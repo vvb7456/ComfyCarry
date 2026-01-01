@@ -83,7 +83,7 @@ export PIP_BREAK_SYSTEM_PACKAGES=1
 apt-get update -qq
 apt-get install -y --no-install-recommends \
     aria2 rclone tmux jq screen git git-lfs ffmpeg \
-    libgl1 libglib2.0-0 libsm6 libxext6 ninja-build build-essential python3-dev
+    cuda-toolkit libgl1 libglib2.0-0 libsm6 libxext6 ninja-build build-essential python3-dev
 
 git lfs install
 echo "✅ 系统环境就绪。"
