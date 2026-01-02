@@ -7,14 +7,14 @@
 必须使用以下 RunPod 官方基础镜像，否则无法保证 CUDA/Python 版本兼容性：
 
 *   **Docker Image**: `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`
-*   **Python**: 3.12 (镜像自带)
-*   **CUDA**: 12.8 (System) / 12.4 (Torch) - *脚本包含自动修补逻辑*
-*   **GPU**: 支持 Ampere (A100/3090), Ada (4090), Blackwell (sm_100/120) 架构
+*   **Python**: 3.12
+*   **CUDA**: 12.8 (System) / 12.4 (Torch)
+*   **GPU**: 支持 Ampere,Ada,Blackwell架构
 
 ## 2. 核心功能
 
 ### 🚀 极速推理
-*   **SageAttention V2**: 自动识别 GPU 算力 (sm_xx) 并从源码编译，显著优化 Wan2.1 等 Transformer 模型性能。
+*   **SageAttention V2**: 自动识别 GPU 算力 (sm_xx) 并从源码编译，显著优化 Wan2.2 等 Transformer 模型性能。
 *   **Torch 2.x + FlashAttn**: 集成 Flash Attention 2 和 xformers，强制修补 PyTorch CUDA 版本检查机制。
 
 ### 📦 智能资源管理 (CivitDL v3)
@@ -34,7 +34,7 @@
 | 变量名 | 必填 | 示例/说明 |
 | :--- | :--- | :--- |
 | `CIVITAI_TOKEN` | 是 | CivitAI API Key，用于下载模型 (Settings -> API Key)。 |
-| `ALL_MODEL_IDS` | 否 | 逗号分隔的模型 ID (Model ID 或 Version ID)。支持混合输入 Checkpoint/LoRA/ControlNet，脚本会自动分类。<br>例: `12345,67890,102030` |
+| `ALL_MODEL_IDS` | 否 | 逗号分隔的模型 ID (Model ID)。支持混合输入 Checkpoint/LoRA/ControlNet，脚本会自动分类。<br>例: `12345,67890,102030` |
 | `RCLONE_CONF_BASE64` | 否 | Base64 编码后的 `rclone.conf` 文件内容 (生成方法见下文)。 |
 | `R2_REMOTE_NAME` | 否 | Rclone 配置中 R2 存储桶的名称，用于拉取私有资源。 |
 | `ONEDRIVE_REMOTE_NAME` | 否 | Rclone 配置中 OneDrive 的名称，用于上传产出物。 |

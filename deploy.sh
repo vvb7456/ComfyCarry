@@ -281,6 +281,8 @@ if [ "$ENABLE_SYNC" = true ]; then
     
     # 如果你也同步 LoRA，请取消下面注释（同样去掉了 &）
     rclone sync "${R2_REMOTE_NAME}:comfyui-assets/loras" /workspace/ComfyUI/models/loras/ -P --transfers 8
+    mkdir -p /workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards
+    rclone sync "${R2_REMOTE_NAME}:comfyui-assets/wildcards" /workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards/ -P --transfers 8
 fi
 
 echo "  -> [Download] 下载 AuraSR..."
@@ -298,14 +300,6 @@ aria2c -x 8 -s 8 --console-log-level=error --summary-interval=1 \
     "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true"
 
 echo "✅ 资源下载阶段完成。"
-
-# AuraSR (HuggingFace直链，不走CivitDL)
-echo "  -> 下载 AuraSR..."
-mkdir -p "/workspace/ComfyUI/models/Aura-SR"
-wget --quiet -O "/workspace/ComfyUI/models/Aura-SR/model.safetensors" "https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true" &
-wget --quiet -O "/workspace/ComfyUI/models/Aura-SR/config.json" "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true" &
-wait
-
 
 # =================================================
 # 8. 启动服务
