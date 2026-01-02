@@ -66,9 +66,6 @@ fi
 
 
 # =================================================
-# 2. 基础系统环境
-# =================================================
-# =================================================
 # 2. 基础系统环境 (升级 Python 3.13 & 动态 Torch)
 # =================================================
 echo "--> [2/8] 安装系统依赖与 Python 3.13..."
@@ -92,7 +89,8 @@ add-apt-repository ppa:deadsnakes/ppa -y
 apt-get update -qq
 
 # 2.2 安装 Python 3.13 开发环境
-apt-get install -y python3.13 python3.13-venv python3.13-dev python3.13-distutils
+# ⚠️ 修正：Python 3.13 已移除 distutils，无需安装 python3.13-distutils
+apt-get install -y python3.13 python3.13-venv python3.13-dev
 
 # 2.3 创建并激活虚拟环境
 echo "  -> 创建 Python 3.13 虚拟环境..."
@@ -104,6 +102,7 @@ echo 'export PATH="/workspace/venv/bin:$PATH"' >> ~/.bashrc
 
 # 2.4 动态安装 PyTorch (适配当前 CUDA 版本)
 echo "  -> 正在检测系统 CUDA 版本..."
+# 确保在 venv 中升级 pip/setuptools (替代 distutils)
 pip install --upgrade pip setuptools wheel
 
 # 获取 CUDA 版本 (例如 12.8 或 13.0)
