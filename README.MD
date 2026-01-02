@@ -68,9 +68,8 @@
 2.  **选择镜像**: 输入 `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`。
 3.  **编辑环境变量**: 填入上述 API Token 和模型 ID。
 4.  **填入启动脚本**:
-    将 `setup.sh` 的内容粘贴至 **Container Start Command** (Docker Command) 中。
-    *或者*
-    直接使用本仓库地址:
+    将 `deploy.sh` 的内容粘贴至 **Container Start Command** (Docker Command) 中。
+    *或*直接使用本仓库地址:
     ```bash
     bash -c "wget -O deploy.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/refs/heads/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh && tail -f /workspace/setup.log"
     ```
