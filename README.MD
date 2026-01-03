@@ -1,141 +1,62 @@
-# 艾萝工坊 RunPod ComfyUI Automation Script (v3.2)
 
-针对 RunPod 环境定制的 ComfyUI 全自动化部署脚本。集成 SageAttention 加速（适配 Wan2.2）、CivitDL 并行下载与自动分类、Rclone 双向同步功能。
 
-## 1. 环境要求
+# 艾萝工坊 RunPod ComfyUI 自动化部署脚本 
 
-必须使用以下 RunPod 官方基础镜像，否则无法保证 CUDA/Python 版本兼容性：
+专为 RunPod 优化的 ComfyUI 一键启动脚本。支持 **Blackwell (RTX 5090/B200)** 及 **Hopper (H100)** 架构，
 
-*   **Docker Image**: `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`
-*   **Python**: 3.12
-*   **CUDA**: 12.8 (System) / 12.4 (Torch)
-*   **GPU**: 支持 Ampere,Ada,Blackwell架构
+## 核心特性 (v4.5)
 
-## 2. 核心功能
+1.  **UI 优先 (UI-First)**: 依赖装完立即启动 ComfyUI，**模型下载在后台并行处理**，无需等待即可进入界面。
+2.  **新架构适配**: 自动识别 GPU，针对 5090/H100 自动配置 **FlashAttention-3** 和 **SageAttention-3**。
+3.  **Wheel 预装**: 优先从 R2 读取预编译加速包，跳过耗时的源码编译过程（需配置 R2）。
+4.  **双向同步**: 启动时从 R2 拉取私有流/模型，运行时自动将产出图上传至 OneDrive 并清理本地空间。
 
-### 🚀 极速推理
-*   **SageAttention V2**: 自动识别 GPU 算力 (sm_xx) 并从源码编译，显著优化 Wan2.2 等 Transformer 模型性能。
-*   **Torch 2.x + FlashAttn**: 集成 Flash Attention 2 和 xformers，强制修补 PyTorch CUDA 版本检查机制。
+## 1. 镜像要求
 
-### 📦 智能资源管理 (CivitDL v3)
-*   **并行下载**: 通过 `civitdl` 批量并发下载模型，跑满机房带宽。
-*   **自动分类**: 内置 Python Sorter，根据元数据自动将 Checkpoint, LoRA, VAE, ControlNet 分流至 ComfyUI 对应目录。
-*   **免交互认证**: 自动生成配置文件注入 API Key，无需手动干预。
+```
+runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404
+```
 
-### 🔄 数据同步
-*   **R2/S3 输入**: 启动时从对象存储拉取私有工作流和 LoRA。
-*   **OneDrive 输出**: 后台监控 `/output` 目录，生成的图片/视频自动上传至 OneDrive。
-*   **Tmux 守护**: 所有服务运行在 Tmux 会话中，SSH 断开不影响运行。
+## 2. 环境变量配置 (Edit Template)
 
-## 3. 配置参数 (Environment Variables)
-
-在 RunPod 模板中设置以下环境变量：
-
-| 变量名 | 必填 | 示例/说明 |
+| 变量名 | 必填 | 说明 |
 | :--- | :--- | :--- |
-| `CIVITAI_TOKEN` | 是 | CivitAI API Key，用于下载模型 (Settings -> API Key)。 |
-| `ALL_MODEL_IDS` | 否 | 逗号分隔的模型 ID (Model ID)。支持混合输入 Checkpoint/LoRA/ControlNet，脚本会自动分类。<br>例: `12345,67890,102030` |
-| `RCLONE_CONF_BASE64` | 否 | Base64 编码后的 `rclone.conf` 文件内容 (生成方法见下文)。 |
-| `R2_REMOTE_NAME` | 否 | Rclone 配置中 R2 存储桶的名称，用于拉取私有资源。 |
-| `ONEDRIVE_REMOTE_NAME` | 否 | Rclone 配置中 OneDrive 的名称，用于上传产出物。 |
-| `PLUGIN_URLS` | 否 | 自定义插件 Git 地址列表，逗号分隔。如不填则使用脚本内置的默认列表。 |
+| `CIVITAI_TOKEN` | 是 | CivitAI API Key，用于下载模型。 |
+| `ALL_MODEL_IDS` | 否 | 逗号分隔的模型 ID（Checkpoint/LoRA/ControlNet 混合填，脚本自动分类）。 |
+| `RCLONE_CONF_BASE64` | 否 | Base64 后的 `rclone.conf` 内容。 |
+| `R2_REMOTE_NAME` | 否 | Rclone 中 R2 的配置名（用于拉取 Wheel/Workflow）。 |
+| `ONEDRIVE_REMOTE_NAME` | 否 | Rclone 中 OneDrive 的配置名（用于上传 Output）。 |
+| `PLUGIN_URLS` | 否 | 自定义插件 Git 地址，逗号分隔。 |
 
-> **兼容性说明**: 旧版变量 `CHECKPOINT_IDS`, `LORA_IDS` 依然有效，脚本会自动将其合并至 `ALL_MODEL_IDS` 处理。
+## 3. 启动命令
 
-## 4. 设置指南
+在 **Container Start Command** 中填入：
 
-### 4.1 获取 Rclone Base64 配置
-脚本需要无交互读取 Rclone 配置，请在你的电脑上安装 Rclone 并执行：
-
-1.  配置 Rclone (如未配置):
-    ```bash
-    rclone config
-    # 按提示配置好 R2 (source) 和 OneDrive (dest)
-    ```
-2.  导出 Base64 字符串:
-    ```bash
-    # Linux/Mac
-    cat ~/.config/rclone/rclone.conf | base64 -w 0
-    
-    # Windows PowerShell
-    [Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.config\rclone\rclone.conf"))
-    ```
-3.  复制输出的长字符串，填入 RunPod 的 `RCLONE_CONF_BASE64` 变量。
-
-### 4.2 部署步骤
-
-1.  **RunPod 后台**: Create Pod -> Select Template。
-2.  **选择镜像**: 输入 `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`。
-3.  **编辑环境变量**: 填入上述 API Token 和模型 ID。
-4.  **填入启动脚本**:
-    将 `deploy.sh` 的内容粘贴至 **Container Start Command** (Docker Command) 中。
-    *或*直接使用本仓库地址:
-    ```bash
-    bash -c "wget -O deploy.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/refs/heads/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh && tail -f /workspace/setup.log"
-    ```
-    > **提示**: 无需配置永久存储，请将Volume disk设置为0，Container disk大小按需设置，如果需要下载大量模型，请确保磁盘空间大于要下载的模型大小。
-5.  **启动**: 等待约 5-20 分钟（视模型下载量而定）。
-
-### 4.3 验证运行
-
-SSH 连接到 Pod 后：
-
-*   **查看部署日志**:
-    ```bash
-    tail -f /workspace/setup.log
-    ```
-*   **查看 ComfyUI 服务**:
-    ```bash
-    tmux attach -t comfy
-    ```
-*   **查看同步服务**:
-    ```bash
-    tmux attach -t sync
-    ```
-
-## 5. 目录结构说明
-
-脚本运行后，`/workspace/ComfyUI/models` 将呈现如下结构：
-
-```text
-/models
-├── checkpoints/
-│   └── [Wan2.1_Model_Name]/       # Checkpoint 文件
-├── loras/
-│   └── [Detail_Tweaker]/          # LoRA 文件 + 预览图
-├── controlnet/
-├── vae/
-└── ...
+```bash
+bash -c "wget -O deploy.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/refs/heads/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh"
 ```
 
-## 6. Cloudflare R2 / OneDrive 目录结构规范
+## 4. 目录与同步说明
 
-为了确保同步功能正常工作，请在你的云存储端预先建立以下目录结构。
+### 模型下载 (CivitDL)
+脚本启动后，ComfyUI 会立刻运行。模型下载在后台 `tmux` 会话中进行，下载完成后刷新 UI 即可看到。
 
-### 6.1 R2 存储桶 (输入源)
-脚本默认从 R2 拉取私有工作流或模型。请确保你的 R2 Bucket 根目录下包含 `comfyui-assets` 文件夹：
-
-```text
-[R2_Bucket_Root]
-└── comfyui-assets/
-    ├── workflow/              # 存放 .json 工作流文件
-    │   ├── My_Wan2.1_Workflow.json
-    │   └── ... (这些文件会被同步到 ComfyUI 侧边栏/加载菜单)
-    │
-    └── loras/                 # 存放私有 LoRA 模型
-        └── Private_Model.safetensors
-```
-
-### 6.2 OneDrive (输出端)
-脚本启动后，会监控 `/workspace/ComfyUI/output` 目录，一旦生成图片或视频（且文件静止超过 30秒），会自动**移动**（Move）到 OneDrive 的以下目录：
+### R2 存储结构 (加速包与私货)
+如配置了 R2，请保持以下结构以启用数据下载：
 
 ```text
-[OneDrive_Root]
-└── ComfyUI_Transfer/          # 脚本自动创建此文件夹
-    ├── ComfyUI_0001.png
-    ├── AnimateDiff_0001.mp4
-    └── ...
+[R2_Bucket]/comfyui-assets/
+├── wheels/                # 存放 flash_attn/sageattention 的 .whl (大幅缩短启动时间)
+├── workflow/              # 私有工作流 -> /user/default/workflows
+├── loras/                 # 私有 LoRA -> /models/loras
+└── wildcards/             # DynamicPrompts 通配符
 ```
 
-> **提示**: 同步脚本使用 `rclone move` ，文件上传成功后会从 RunPod 硬盘中删除，以节省 Pod 磁盘空间。
+### OneDrive 产出 (自动归档)
+启用同步后，脚本监控 `/output`，文件静止 30 秒即上传至 OneDrive 的 `ComfyUI_Transfer` 目录并删除本地文件。
 
+## 5. 常用指令
+
+*   **看部署日志**: `tail -f /workspace/setup.log`
+*   **进 ComfyUI 后台**: `tmux attach -t comfy`
+*   **看同步/下载进度**: `tmux attach -t sync`
