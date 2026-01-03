@@ -86,7 +86,7 @@ apt-get install -y --no-install-recommends \
 
 # 环境路径与基础工具升级
 export PATH="/usr/local/bin:$PATH"
-pip install --upgrade pip setuptools packaging ninja wheel
+pip install --upgrade pip setuptools packaging ninja
 
 # Rclone 配置文件注入 (提前注入，以便后续拉取 Wheel)
 if [ "$ENABLE_SYNC" = true ]; then
