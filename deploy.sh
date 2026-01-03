@@ -82,7 +82,7 @@ echo "set -g mouse on" > ~/.tmux.conf
 # 2.1 安装基础工具 & Python 3.13 源
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-    software-properties-common git curl wget aria2 rclone tmux jq screen \
+    software-properties-common git git-lfs curl wget aria2 rclone tmux jq screen \
     ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 build-essential
 
 add-apt-repository ppa:deadsnakes/ppa -y
