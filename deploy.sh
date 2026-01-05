@@ -86,9 +86,24 @@ apt-get install -y --no-install-recommends \
     software-properties-common git git-lfs aria2 rclone jq \
     ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 build-essential
 
+# Python 3.13 准备（SageAttention3 需要）
+if ! command -v python3.13 >/dev/null 2>&1; then
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get update -qq
+    apt-get install -y python3.13 python3.13-venv python3.13-distutils python3.13-dev
+fi
+
+export PYTHON_BIN="python3.13"
+export PIP_BIN="$PYTHON_BIN -m pip"
+
 # 环境路径与基础工具升级
 export PATH="/usr/local/bin:$PATH"
-pip install --upgrade pip setuptools packaging ninja
+$PYTHON_BIN -m ensurepip --upgrade
+$PIP_BIN install --upgrade pip setuptools packaging ninja
+
+# 统一安装 torch 2.9.1 (CUDA 12.8) 以匹配 Py3.13
+TORCH_INDEX="https://download.pytorch.org/whl/cu128"
+$PIP_BIN install --no-cache-dir torch==2.9.1 --index-url "$TORCH_INDEX"
 
 # Rclone 配置文件注入 (提前注入，以便后续拉取 Wheel)
 if [ "$ENABLE_SYNC" = true ]; then
@@ -97,7 +112,7 @@ if [ "$ENABLE_SYNC" = true ]; then
     chmod 600 ~/.config/rclone/rclone.conf
 fi
 
-echo "✅ 系统环境就绪: $(python --version)"
+echo "✅ 系统环境就绪: $($PYTHON_BIN --version)"
 
 
 # =================================================
@@ -110,11 +125,11 @@ git clone https://github.com/comfyanonymous/ComfyUI.git
 cd /workspace/ComfyUI
 
 echo "  -> 安装基础 requirements.txt..."
-pip install --no-cache-dir -r requirements.txt
+$PIP_BIN install --no-cache-dir -r requirements.txt
 
 # --- 保留原脚本健康检查逻辑 ---
 echo "  -> 执行首次启动环境自检..."
-python main.py --listen 127.0.0.1 --port 8188 > /tmp/comfy_boot.log 2>&1 &
+$PYTHON_BIN main.py --listen 127.0.0.1 --port 8188 > /tmp/comfy_boot.log 2>&1 &
 COMFY_PID=$!
 
 MAX_RETRIES=30
@@ -143,8 +158,8 @@ wait $COMFY_PID 2>/dev/null || true
 # =================================================
 echo "--> [4/8] 注入加速组件 (FA3 & SA3)..."
 
-CUDA_CAP_MAJOR=$(python -c "import torch; print(torch.cuda.get_device_capability()[0])" 2>/dev/null)
-PY_VER=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+CUDA_CAP_MAJOR=$($PYTHON_BIN -c "import torch; print(torch.cuda.get_device_capability()[0])" 2>/dev/null)
+PY_VER=$($PYTHON_BIN -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
 
 mkdir -p /workspace/prebuilt_wheels
 if [ -n "$RCLONE_CONF_BASE64" ]; then
@@ -155,35 +170,35 @@ fi
 # 4.1 FlashAttention 安装
 if [ "$CUDA_CAP_MAJOR" -ge 9 ]; then
     FA_WHEEL="/workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl"
-    if [ -f "$FA_WHEEL" ] && pip install "$FA_WHEEL"; then
+    if [ -f "$FA_WHEEL" ] && $PIP_BIN install "$FA_WHEEL"; then
         FA_INSTALL_TYPE="Pre-built Wheel (abi3)"
     else
         echo "⚠️ Wheel 缺失或不兼容，开始源码编译 FA3..."
         cd /workspace && git clone https://github.com/Dao-AILab/flash-attention.git
-        cd flash-attention/hopper && MAX_JOBS=8 python setup.py install
+        cd flash-attention/hopper && MAX_JOBS=8 $PYTHON_BIN setup.py install
         cd /workspace && rm -rf flash-attention
         FA_INSTALL_TYPE="Source Compiled (Hopper/Blackwell)"
     fi
 else
-    pip install --no-cache-dir flash-attn --no-build-isolation
+    $PIP_BIN install --no-cache-dir flash-attn --no-build-isolation
     FA_INSTALL_TYPE="Standard Install (FA2)"
 fi
 
 # 4.2 SageAttention 安装
 if [ "$CUDA_CAP_MAJOR" -ge 10 ]; then
     SA_WHEEL=$(ls /workspace/prebuilt_wheels/sageattn3-1.0.0-${PY_VER}-*.whl 2>/dev/null | head -n 1)
-    if [ -n "$SA_WHEEL" ] && pip install "$SA_WHEEL"; then
+    if [ -n "$SA_WHEEL" ] && $PIP_BIN install "$SA_WHEEL"; then
         SA_INSTALL_TYPE="Pre-built Wheel ($PY_VER)"
     else
         echo "⚠️ $PY_VER Wheel 缺失，开始源码编译 SA3..."
         cd /workspace && git clone https://github.com/thu-ml/SageAttention.git
-        cd SageAttention/sageattention3_blackwell && python setup.py install
+        cd SageAttention/sageattention3_blackwell && $PYTHON_BIN setup.py install
         cd /workspace && rm -rf SageAttention
         SA_INSTALL_TYPE="Source Compiled (Blackwell Native)"
     fi
 else
     cd /workspace && git clone https://github.com/thu-ml/SageAttention.git
-    cd SageAttention && pip install . --no-build-isolation
+    cd SageAttention && $PIP_BIN install . --no-build-isolation
     cd /workspace && rm -rf SageAttention
     SA_INSTALL_TYPE="Source Compiled (SA2 General)"
 fi
@@ -207,7 +222,7 @@ done
 
 echo "  -> 批量安装插件依赖..."
 find /workspace/ComfyUI/custom_nodes -name "requirements.txt" -type f -print0 | while IFS= read -r -d $'\0' file; do
-    pip install --no-cache-dir -r "$file" || echo "⚠️ 依赖安装警告: $file"
+    $PIP_BIN install --no-cache-dir -r "$file" || echo "⚠️ 依赖安装警告: $file"
 done
 echo "✅ 插件环境构建完成。"
 
@@ -273,7 +288,7 @@ fi
 
 # 启动 ComfyUI
 tmux new-session -d -s comfy
-tmux send-keys -t comfy "cd /workspace/ComfyUI && python main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers" C-m
+tmux send-keys -t comfy "cd /workspace/ComfyUI && $PYTHON_BIN main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers" C-m
 
 echo "✅ ComfyUI 已启动！(Tmux: comfy)"
 
@@ -287,7 +302,7 @@ echo "--> [8/8] 开始后台大文件下载任务..."
 
 if [ "$ENABLE_CIVITDL" = true ]; then
     echo "  -> [CivitDL] 正在安装并配置工具..."
-    pip install civitdl
+    $PIP_BIN install civitdl
     
     # 1. 注入 API Key 配置文件 (完全还原 JSON 字段)
     mkdir -p ~/.config/civitdl
