@@ -84,8 +84,37 @@ https://raw.githubusercontent.com/username/repo/main/models.csv
 
 **R2/S3**：
 ```bash
-rclone copy models.csv r2:comfyui-assets/
+rclone copy models.csv r2:comfyui-assets/csv/
 # 脚本自动检测
+```
+
+### R2 存储桶目录结构
+
+```
+comfyui-assets/
+├── wheels/              # GPU 架构预编译包
+│   ├── flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl
+│   └── sageattn3-1.0.0-cp313-*.whl
+├── workflow/            # ComfyUI 工作流 JSON
+│   └── *.json
+├── loras/               # 私有 LoRA 模型
+│   └── *.safetensors
+├── wildcards/           # DynamicPrompts 通配符
+│   └── *.txt
+└── csv/                 # 配置文件
+    └── models.csv       # CivitAI 模型下载列表
+```
+
+**上传示例**：
+```bash
+# 上传模型列表
+rclone copy models.csv r2:comfyui-assets/csv/
+
+# 上传私有 LoRA
+rclone copy my_loras/ r2:comfyui-assets/loras/ -P
+
+# 上传工作流
+rclone copy workflows/ r2:comfyui-assets/workflow/ -P
 ```
 
 ## 功能特性

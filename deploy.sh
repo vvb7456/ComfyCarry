@@ -375,7 +375,7 @@ if [ "$ENABLE_CIVICOMFY" = true ]; then
             echo "  -> 尝试从 R2 下载模型列表"
             DOWNLOADED_CSV="/workspace/models_from_r2.csv"
             
-            if rclone copyto "${R2_REMOTE_NAME}:comfyui-assets/models.csv" "$DOWNLOADED_CSV" 2>/dev/null; then
+            if rclone copyto "${R2_REMOTE_NAME}:comfyui-assets/csv/models.csv" "$DOWNLOADED_CSV" 2>/dev/null; then
                 MODELS_SOURCE="--csv $DOWNLOADED_CSV"
                 echo "  ✓ 从 R2 获取模型列表成功"
             else
