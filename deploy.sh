@@ -183,9 +183,25 @@ CUDA_CAP_MAJOR=$($PYTHON_BIN -c "import torch; print(torch.cuda.get_device_capab
 PY_VER=$($PYTHON_BIN -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
 
 mkdir -p /workspace/prebuilt_wheels
-if [ "$ENABLE_SYNC" = true ] && [ "$R2_SYNC_WHEELS" = true ]; then
-    echo "  -> 正在从 R2 检索预编译 Wheel..."
-    rclone copy "${R2_REMOTE_NAME}:comfyui-assets/wheels/" /workspace/prebuilt_wheels/ -P || echo "⚠️ 未能拉取预编译包"
+
+# 优先从 GitHub Release 下载预编译包
+GITHUB_RELEASE_URL="https://github.com/vvb7456/ComfyUI_RunPod_Sync/releases/download/v4.5-wheels"
+echo "  -> 正在从 GitHub Release 下载预编译 Wheel..."
+
+# FlashAttention-3 (abi3 通用版本)
+wget -q -O /workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl \
+    "${GITHUB_RELEASE_URL}/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl" \
+    || echo "⚠️ FlashAttention-3 wheel 下载失败"
+
+# SageAttention-3 (根据 Python 版本选择)
+if [ "$PY_VER" = "cp313" ]; then
+    wget -q -O /workspace/prebuilt_wheels/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl \
+        "${GITHUB_RELEASE_URL}/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl" \
+        || echo "⚠️ SageAttention-3 (cp313) wheel 下载失败"
+elif [ "$PY_VER" = "cp312" ]; then
+    wget -q -O /workspace/prebuilt_wheels/sageattn3-1.0.0-cp312-cp312-linux_x86_64.whl \
+        "${GITHUB_RELEASE_URL}/sageattn3-1.0.0-cp312-cp312-linux_x86_64.whl" \
+        || echo "⚠️ SageAttention-3 (cp312) wheel 下载失败"
 fi
 
 # 4.1 FlashAttention 安装
