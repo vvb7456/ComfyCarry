@@ -1,0 +1,22 @@
+# Copilot Instructions for ComfyUI_RunPod_Sync
+
+- **Purpose**: Single Bash entrypoint [deploy.sh](deploy.sh#L1-L402) automates ComfyUI on RunPod/Vast with GPU-tuned wheels, tmux-managed services, and optional cloud sync.
+- **Base image**: Assumes runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404; installs Python 3.13 and pins torch 2.9.1 from CUDA 12.8 index.
+- **Execution model**: Script runs with `set -e -o pipefail`; all output tees to /workspace/setup.log for post-mortem (`tail -f /workspace/setup.log`).
+- **Pathing**: Work dir is /workspace; symlink /root/workspace -> /workspace. ComfyUI lives at /workspace/ComfyUI.
+- **Startup flow**: (1) env detection and switches, (2) apt + Python bootstrap, (3) clone ComfyUI + initial health boot check, (4) attention accelerators, (5) plugin installs, (6) R2 asset sync, (7) service launch, (8) background downloads.
+- **Health check**: After installing requirements, script briefly boots ComfyUI to ensure GUI string appears; failure dumps /tmp/comfy_boot.log and exits.
+- **GPU-specific tuning**: Detects CUDA capability via torch to choose FlashAttention-3/SageAttention-3 path; prefers R2 wheels, falls back to source builds (Hopper/Blackwell paths for ≥sm90/100) [deploy.sh](deploy.sh#L85-L160).
+- **Wheels cache**: If Rclone configured, pulls wheels from `${R2_REMOTE_NAME}:comfyui-assets/wheels/` into /workspace/prebuilt_wheels then deletes after install.
+- **Plugins**: Default plugin list baked in (Manager, ControlNet Aux, Impact Pack, Easy Use, Crystools, UltimateSDUpscale, DynamicPrompts, WeiLin tools, AuraSR, KJNodes, etc.). Override via `PLUGIN_URLS` comma list; installs each requirements.txt found under custom_nodes [deploy.sh](deploy.sh#L59-L120).
+- **Rclone sync (optional)**: Enabled when both RCLONE_CONF_BASE64 and R2_REMOTE_NAME are set. Expects base64 rclone.conf; syncs workflow/loras/wildcards from `comfyui-assets` bucket into ComfyUI paths before final launch [deploy.sh](deploy.sh#L122-L207).
+- **OneDrive output sync (optional)**: When sync enabled and ONEDRIVE_REMOTE_NAME set, background tmux session `sync` runs /workspace/onedrive_sync.sh watching /workspace/ComfyUI/output, moving files older than 30s to `ComfyUI_Transfer` remote [deploy.sh](deploy.sh#L207-L270).
+- **Services & tmux**: Main server runs in tmux session `comfy` with `python3.13 main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers`; attach via `tmux attach -t comfy`. Sync session named `sync` when enabled.
+- **CivitAI downloads**: If CIVITAI_TOKEN or any *_IDS provided, installs civitdl, writes ~/.config/civitdl/config.json, and uses /workspace/runpod_sorter.py to map model types -> subfolders (checkpoints, loras, controlnet, vae, upscale_models, animatediff_models) [deploy.sh](deploy.sh#L272-L360).
+- **Model ID intake**: Aggregates CHECKPOINT_IDS, CONTROLNET_IDS, UPSCALER_IDS, LORA_IDS, ALL_MODEL_IDS; cleans, de-dups, and passes batch file to civitdl targeting /workspace/ComfyUI/models.
+- **Bundled weights**: Always fetches AuraSR V2 (model.safetensors + config.json) into /workspace/ComfyUI/models/Aura-SR [deploy.sh](deploy.sh#L360-L380).
+- **Env vars to know**: CIVITAI_TOKEN (API key), ALL_MODEL_IDS / *_IDS (comma IDs), RCLONE_CONF_BASE64 (base64 rclone.conf), R2_REMOTE_NAME (for wheels/workflows), ONEDRIVE_REMOTE_NAME (output sync), PLUGIN_URLS (override plugins).
+- **Logs & troubleshooting**: Primary log /workspace/setup.log; ComfyUI boot log /tmp/comfy_boot.log for first-run check; tmux sessions hold live output; rclone sync commands run with `-P` for progress.
+- **Idempotency considerations**: Script reclones ComfyUI and plugins fresh each run; cleans prebuilt_wheels after use; kills initial health-check process explicitly.
+- **Extending script**: Keep CUDA capability detection and wheel-first strategy; respect tmux service model; add new assets via R2 bucket structure (wheels/workflow/loras/wildcards) to avoid blocking startup.
+- **Deploy command for RunPod**: Provided in README with wget + chmod + ./deploy.sh fetch; keep this updated if moving branch/URL.

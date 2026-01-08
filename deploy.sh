@@ -25,7 +25,7 @@ echo "================================================="
 # =================================================
 echo "--> [1/8] 初始化配置..."
 
-ln -s /workspace /root/workspace
+ln -snf /workspace /root/workspace
 
 # 1.1 Rclone (同步功能)
 if [ -n "$RCLONE_CONF_BASE64" ] && [ -n "$R2_REMOTE_NAME" ]; then
@@ -96,6 +96,11 @@ fi
 export PYTHON_BIN="python3.13"
 export PIP_BIN="$PYTHON_BIN -m pip"
 
+# 将系统默认 python 指向 3.13，避免后续依赖调用旧版
+PY313_BIN=$(command -v python3.13)
+ln -sf "$PY313_BIN" /usr/local/bin/python
+ln -sf "$PY313_BIN" /usr/bin/python || true
+
 # 环境路径与基础工具升级
 export PATH="/usr/local/bin:$PATH"
 $PYTHON_BIN -m ensurepip --upgrade
@@ -121,6 +126,9 @@ echo "✅ 系统环境就绪: $($PYTHON_BIN --version)"
 echo "--> [3/8] 安装 ComfyUI (Vanilla Mode)..."
 
 cd /workspace
+if [ -d /workspace/ComfyUI ]; then
+    rm -rf /workspace/ComfyUI
+fi
 git clone https://github.com/comfyanonymous/ComfyUI.git
 cd /workspace/ComfyUI
 
@@ -282,11 +290,13 @@ while true; do
 done
 EOF
     chmod +x /workspace/onedrive_sync.sh
+    tmux has-session -t sync 2>/dev/null && tmux kill-session -t sync
     tmux new-session -d -s sync "/workspace/onedrive_sync.sh"
     echo "✅ 后台同步服务已启动 (Tmux: sync)"
 fi
 
 # 启动 ComfyUI
+tmux has-session -t comfy 2>/dev/null && tmux kill-session -t comfy
 tmux new-session -d -s comfy
 tmux send-keys -t comfy "cd /workspace/ComfyUI && $PYTHON_BIN main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers" C-m
 
@@ -366,7 +376,7 @@ EOF
         BATCH_FILE="/workspace/civitai_batch.txt"
         echo "$CLEAN_IDS" > "$BATCH_FILE"
         echo "  -> 启动 CivitDL 批量下载..."
-        civitdl "$BATCH_FILE" "/workspace/ComfyUI/models" \
+        $PYTHON_BIN -m civitdl "$BATCH_FILE" "/workspace/ComfyUI/models" \
             --sorter "/workspace/runpod_sorter.py" \
             || echo "⚠️ CivitDL 下载出现部分错误"
     fi
