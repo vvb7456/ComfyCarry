@@ -16,19 +16,18 @@ runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404
 CIVITAI_TOKEN=your_civitai_api_key
 ```
 
-**模型配置（选一种）**：
+**模型配置（推荐）**：
 
 ```bash
-# 方式1：Gist URL（推荐）
-MODEL_CSV_URL=https://gist.githubusercontent.com/username/xxx/raw/models.csv
-
-# 方式2：环境变量
-CHECKPOINT_IDS=206886,123456
-LORA_IDS=789012,654321
-
-# 方式3：Base64编码
-MODEL_CSV_BASE64=MjA2ODg2LGNoZWNrcG9pbnQsLAo=
+# 方式1：统一变量（支持模型 ID 和 URL 混合）
+ALL_MODEL_IDS=206886,https://civitai.com/models/789012?modelVersionId=123456,1102581
 ```
+
+**工作原理**：
+- 脚本自动调用 CivitAI API 查询每个模型的类型（checkpoint/lora/controlnet/vae/upscaler）
+- 支持纯 ID（如 `206886`）和完整 URL（如 `https://civitai.com/models/789012`）
+- 如 URL 中包含 `modelVersionId` 参数，优先使用该版本；否则使用 API 返回的默认版本
+- 自动生成临时 CSV 文件并调用 Civicomfy 下载，无需手动创建文件
 
 **可选配置**：
 ```bash
@@ -55,38 +54,25 @@ bash -c "wget -O deploy.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_Run
 
 ## 模型配置
 
-### CSV 格式
+### 环境变量自动生成（推荐）
 
-创建 `models.csv` 文件：
+直接在环境变量中填写模型 ID 或 URL：
 
-```csv
-# model_id, type, version_id(可选), custom_name(可选)
-206886,checkpoint,,
-789012,lora,,
-555666,controlnet,98765,MyControlNet
-https://civitai.com/models/123456,lora,,  # 支持URL
-```
-
-**支持的模型类型**：`checkpoint`, `lora`, `controlnet`, `vae`, `upscaler`
-
-### 托管方式
-
-**GitHub Gist**（推荐）：
-1. 访问 https://gist.github.com
-2. 创建 `models.csv`
-3. 点击 Raw 获取 URL
-4. 设置 `MODEL_CSV_URL`
-
-**GitHub 仓库**：
-```
-https://raw.githubusercontent.com/username/repo/main/models.csv
-```
-
-**R2/S3**：
 ```bash
-rclone copy models.csv r2:comfyui-assets/csv/
-# 脚本自动检测
+# 混合使用模型 ID 和完整 URL（脚本自动识别类型）
+ALL_MODEL_IDS=206886,https://civitai.com/models/789012?modelVersionId=123456,1102581
 ```
+
+**工作原理**：
+1. 脚本自动调用 CivitAI API 查询每个模型的类型和默认版本
+2. URL 中的 `modelVersionId` 参数会覆盖 API 默认版本
+3. 自动生成临时 CSV 文件并传递给 Civicomfy
+4. 无需手动创建或托管 CSV 文件
+
+**支持格式**：
+- 纯 ID：`1162518`
+- 完整 URL（无版本）：`https://civitai.com/models/1162518/plant-milk-model-suite`
+- 完整 URL（指定版本）：`https://civitai.com/models/1162518?modelVersionId=1714002`
 
 ### R2 存储桶目录结构
 
@@ -99,17 +85,12 @@ comfyui-assets/
 │   └── *.json
 ├── loras/               # 私有 LoRA 模型
 │   └── *.safetensors
-├── wildcards/           # DynamicPrompts 通配符
-│   └── *.txt
-└── csv/                 # 配置文件
-    └── models.csv       # CivitAI 模型下载列表
+└── wildcards/           # DynamicPrompts 通配符
+    └── *.txt
 ```
 
 **上传示例**：
 ```bash
-# 上传模型列表
-rclone copy models.csv r2:comfyui-assets/csv/
-
 # 上传私有 LoRA
 rclone copy my_loras/ r2:comfyui-assets/loras/ -P
 
@@ -157,12 +138,7 @@ find /workspace/ComfyUI/models -name "*.safetensors"
 | 变量 | 说明 |
 |------|------|
 | `CIVITAI_TOKEN` | CivitAI API Key（必填） |
-| `MODEL_CSV_URL` | 模型列表 CSV 的 URL |
-| `MODEL_CSV_BASE64` | Base64 编码的 CSV 内容 |
-| `CHECKPOINT_IDS` | Checkpoint 模型 ID，逗号分隔 |
-| `LORA_IDS` | LoRA 模型 ID，逗号分隔 |
-| `CONTROLNET_IDS` | ControlNet 模型 ID，逗号分隔 |
-| `ALL_MODEL_IDS` | 统一模型 ID 列表 |
+| `ALL_MODEL_IDS` | 模型 ID 或 URL 列表，逗号分隔（支持混合） |
 | `RCLONE_CONF_BASE64` | Base64 编码的 rclone.conf |
 | `R2_REMOTE_NAME` | R2 远程名称 |
 | `R2_SYNC_WHEELS` | 是否拉取预编译包（默认 true） |
@@ -198,6 +174,7 @@ find /workspace/ComfyUI/models -name "*.safetensors"
 
 - `deploy.sh` - 主部署脚本
 - `civicomfy_batch_downloader.py` - 批量下载工具
+- `auto_generate_csv.py` - CSV 自动生成工具（查询 CivitAI API）
 - `models.csv.template` - CSV 模板
 - `models.csv.example` - CSV 示例
 

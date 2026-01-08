@@ -340,60 +340,34 @@ if [ "$ENABLE_CIVICOMFY" = true ]; then
                 || echo "⚠️ 脚本下载失败，检查是否已存在"
         fi
         
-        # 确定使用哪个源的模型列表
+        # 下载 CSV 自动生成脚本
+        if [ ! -f /workspace/auto_generate_csv.py ]; then
+            echo "  -> 下载 CSV 自动生成脚本..."
+            wget -q -O /workspace/auto_generate_csv.py \
+                "https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/auto_generate_csv.py" \
+                || echo "⚠️ 脚本下载失败"
+        fi
+        
+        # 安装 Python 脚本依赖
+        echo "  -> 安装 requests 库..."
+        $PIP_BIN install --no-cache-dir requests >/dev/null 2>&1
+        
+        # 从环境变量自动生成模型列表
         MODELS_SOURCE=""
-        DOWNLOADED_CSV=""
         
-        # 优先级 1: MODEL_CSV_URL (从远端下载)
-        if [ -n "$MODEL_CSV_URL" ]; then
-            echo "  -> 从远端下载模型列表: $MODEL_CSV_URL"
-            DOWNLOADED_CSV="/workspace/models_downloaded.csv"
+        if [ -n "$ALL_MODEL_IDS" ]; then
+            echo "  -> 从环境变量自动生成模型列表..."
+            DOWNLOADED_CSV="/workspace/models_auto_generated.csv"
             
-            if wget -q -O "$DOWNLOADED_CSV" "$MODEL_CSV_URL"; then
+            if $PYTHON_BIN /workspace/auto_generate_csv.py \
+                --ids "$ALL_MODEL_IDS" \
+                --api-key "$CIVITAI_TOKEN" \
+                -o "$DOWNLOADED_CSV"; then
+                
                 MODELS_SOURCE="--csv $DOWNLOADED_CSV"
-                echo "  ✓ 模型列表下载成功"
+                echo "  ✓ 模型列表自动生成成功"
             else
-                echo "  ✗ 模型列表下载失败，尝试其他方式"
-            fi
-        fi
-        
-        # 优先级 2: MODEL_CSV_BASE64 (Base64 编码的 CSV 内容)
-        if [ -z "$MODELS_SOURCE" ] && [ -n "$MODEL_CSV_BASE64" ]; then
-            echo "  -> 从 Base64 解码模型列表"
-            DOWNLOADED_CSV="/workspace/models_from_base64.csv"
-            
-            if echo "$MODEL_CSV_BASE64" | base64 -d > "$DOWNLOADED_CSV" 2>/dev/null; then
-                MODELS_SOURCE="--csv $DOWNLOADED_CSV"
-                echo "  ✓ 模型列表解码成功"
-            else
-                echo "  ✗ Base64 解码失败"
-            fi
-        fi
-        
-        # 优先级 3: R2 存储 (如果启用了 Rclone 同步)
-        if [ -z "$MODELS_SOURCE" ] && [ "$ENABLE_SYNC" = true ]; then
-            echo "  -> 尝试从 R2 下载模型列表"
-            DOWNLOADED_CSV="/workspace/models_from_r2.csv"
-            
-            if rclone copyto "${R2_REMOTE_NAME}:comfyui-assets/csv/models.csv" "$DOWNLOADED_CSV" 2>/dev/null; then
-                MODELS_SOURCE="--csv $DOWNLOADED_CSV"
-                echo "  ✓ 从 R2 获取模型列表成功"
-            else
-                echo "  ℹ️ R2 中未找到 models.csv"
-            fi
-        fi
-        
-        # 优先级 4: MODEL_CSV_PATH (本地路径，向后兼容)
-        if [ -z "$MODELS_SOURCE" ] && [ -n "$MODEL_CSV_PATH" ] && [ -f "$MODEL_CSV_PATH" ]; then
-            MODELS_SOURCE="--csv $MODEL_CSV_PATH"
-            echo "  -> 使用本地 CSV 文件: $MODEL_CSV_PATH"
-        fi
-        
-        # 优先级 5: 环境变量中的模型 ID
-        if [ -z "$MODELS_SOURCE" ]; then
-            if [ -n "$CHECKPOINT_IDS" ] || [ -n "$LORA_IDS" ] || [ -n "$CONTROLNET_IDS" ] || [ -n "$UPSCALER_IDS" ] || [ -n "$ALL_MODEL_IDS" ]; then
-                MODELS_SOURCE="--env-var ALL_MODEL_IDS"
-                echo "  -> 使用环境变量中的模型 ID"
+                echo "  ✗ 模型列表生成失败"
             fi
         fi
         
