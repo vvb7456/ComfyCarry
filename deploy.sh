@@ -120,6 +120,9 @@ $PIP_BIN install --upgrade pip setuptools packaging ninja
 TORCH_INDEX="https://download.pytorch.org/whl/cu128"
 $PIP_BIN install --no-cache-dir torch==2.9.1 --index-url "$TORCH_INDEX"
 
+# 安装 HuggingFace 加速下载工具
+$PIP_BIN install --no-cache-dir hf_transfer
+
 # Rclone 配置文件注入 (提前注入，以便后续拉取 Wheel)
 if [ "$ENABLE_SYNC" = true ]; then
     mkdir -p ~/.config/rclone
@@ -283,8 +286,8 @@ echo "Watching: \$SOURCE_DIR"
 echo "Target:   \$REMOTE_PATH"
 
 while true; do
-    # 检查是否有超过 30 秒未变动的文件
-    FOUND_FILES=\$(find "\$SOURCE_DIR" -type f -mmin +0.5 ! -path '*/.*' -print -quit)
+    # 检查是否有超过 30 秒未变动的图片/视频文件
+    FOUND_FILES=\$(find "\$SOURCE_DIR" -type f -mmin +0.5 \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" -o -iname "*.gif" -o -iname "*.mp4" -o -iname "*.mov" -o -iname "*.avi" -o -iname "*.webm" -o -iname "*.mkv" \\) ! -path '*/.*' -print -quit)
 
     if [ -n "\$FOUND_FILES" ]; then
         TIME=\$(date '+%H:%M:%S')
@@ -292,7 +295,9 @@ while true; do
 
         rclone move "\$SOURCE_DIR" "\$REMOTE_PATH" \\
             --min-age "30s" \\
+            --include "*.{png,jpg,jpeg,webp,gif,mp4,mov,avi,webm,mkv,PNG,JPG,JPEG,WEBP,GIF,MP4,MOV,AVI,WEBM,MKV}" \\
             --exclude ".*/**" \\
+            --exclude "_*" \\
             --ignore-existing \\
             --transfers 4 \\
             --stats-one-line \\
