@@ -13,3 +13,5 @@ v4.6.1_UPDATE.md
 *.log
 *.tmp
 /workspace/
+models.csv
+lora_scan_result.csv
