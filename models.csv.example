@@ -1,0 +1,99 @@
+# ComfyUI 模型下载列表示例
+# 
+# 说明：
+#   - 这些是真实可用的 CivitAI 模型
+#   - 格式: model_id, model_type, version_id(可选), custom_filename(可选)
+#   - 删除或添加你需要的模型
+#   - 以 # 开头的行为注释
+#
+# 获取模型 ID 方法：
+#   1. 打开 https://civitai.com
+#   2. 找到要下载的模型
+#   3. URL 格式: https://civitai.com/models/{ID} <- 这就是 ID
+#   4. 复制 ID 到下面
+
+# ============================================================
+# Checkpoint 模型 (基础生成模型)
+# ============================================================
+
+# Dreamshaper - 高质量通用生成
+206886,checkpoint,,
+
+# Beautiful Realistic Asians - 亚洲人物写实
+134065,checkpoint,,
+
+# Protogen Infinity - 多功能模型
+274662,checkpoint,,
+
+# DreamShaper XL - SDXL 高质量模型
+541055,checkpoint,,
+
+# ============================================================
+# LoRA 模型 (风格和人物)
+# ============================================================
+
+# Anime Style
+789012,lora,,
+
+# Photorealistic Style
+654321,lora,,
+
+# Ink Drawing Style
+987654,lora,,
+
+# ============================================================
+# ControlNet 模型 (姿态和结构控制)
+# ============================================================
+
+# Canny Edge Detection - 边缘检测
+555666,controlnet,,
+
+# Openpose - 人物姿态检测
+777888,controlnet,,
+
+# Depth - 深度图控制
+999000,controlnet,,
+
+# ============================================================
+# VAE 模型 (图像处理优化)
+# ============================================================
+
+# VAE FP16 - 高精度VAE
+111222,vae,,
+
+# VAE Pruned - 轻量级VAE
+222333,vae,,
+
+# ============================================================
+# 放大器模型 (超分辨率)
+# ============================================================
+
+# RealESRGAN - 4倍放大
+333444,upscaler,,
+
+# BSRGAN - 通用放大器
+444555,upscaler,,
+
+# ============================================================
+# 注意事项
+# ============================================================
+
+# 1. 如果某个模型下载失败，可能原因：
+#    - 模型 ID 错误 (在 CivitAI 验证)
+#    - 模型已被删除或变为私有
+#    - 需要特定权限访问
+#    - API Key 无效或已过期
+
+# 2. 大型模型 (5GB+) 需要较长时间下载
+#    - 网络速度: 通常 10-30 分钟
+#    - 如需加速，可在 Python 脚本中增加 num_connections
+
+# 3. 下载完成后模型会自动出现在:
+#    - Checkpoint: /workspace/ComfyUI/models/checkpoints/
+#    - LoRA: /workspace/ComfyUI/models/loras/
+#    - ControlNet: /workspace/ComfyUI/models/controlnet/
+#    - VAE: /workspace/ComfyUI/models/vae/
+#    - Upscaler: /workspace/ComfyUI/models/upscale_models/
+
+# 4. 首次部署建议先下载少数几个模型测试
+#    然后根据需要添加更多

@@ -36,15 +36,25 @@ else
     echo "ℹ️ 未检测到 Rclone 配置，跳过同步。"
 fi
 
-# 1.2 CivitAI (模型下载)
-if [ -n "$CIVITAI_TOKEN" ] || [ -n "$ALL_MODEL_IDS" ] || [ -n "$CHECKPOINT_IDS" ]; then
-    ENABLE_CIVITDL=true
-    echo "✅ 启用 CivitDL 智能下载。"
-else
-    ENABLE_CIVITDL=false
+# 1.2 R2 同步内容控制 (细粒度开关)
+R2_SYNC_WHEELS=${R2_SYNC_WHEELS:-true}      # 预编译包 (推荐启用)
+R2_SYNC_WORKFLOWS=${R2_SYNC_WORKFLOWS:-true}  # 工作流
+R2_SYNC_LORAS=${R2_SYNC_LORAS:-true}         # LoRA 模型
+R2_SYNC_WILDCARDS=${R2_SYNC_WILDCARDS:-true} # 通配符
+
+if [ "$ENABLE_SYNC" = true ]; then
+    echo "  R2 同步配置: Wheels=$R2_SYNC_WHEELS | Workflows=$R2_SYNC_WORKFLOWS | Loras=$R2_SYNC_LORAS | Wildcards=$R2_SYNC_WILDCARDS"
 fi
 
-# 1.3 插件列表
+# 1.3 Civicomfy (Web UI 模型下载)
+if [ -n "$CIVITAI_TOKEN" ] || [ -n "$ALL_MODEL_IDS" ] || [ -n "$CHECKPOINT_IDS" ] || [ -n "$MODEL_CSV_PATH" ]; then
+    ENABLE_CIVICOMFY=true
+    echo "✅ 启用 Civicomfy 模型下载。"
+else
+    ENABLE_CIVICOMFY=false
+fi
+
+# 1.4 插件列表
 if [ -z "$PLUGIN_URLS" ]; then
     PLUGIN_URLS=(
         "https://github.com/ltdrdata/ComfyUI-Manager"
@@ -170,7 +180,7 @@ CUDA_CAP_MAJOR=$($PYTHON_BIN -c "import torch; print(torch.cuda.get_device_capab
 PY_VER=$($PYTHON_BIN -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
 
 mkdir -p /workspace/prebuilt_wheels
-if [ -n "$RCLONE_CONF_BASE64" ]; then
+if [ "$ENABLE_SYNC" = true ] && [ "$R2_SYNC_WHEELS" = true ]; then
     echo "  -> 正在从 R2 检索预编译 Wheel..."
     rclone copy "${R2_REMOTE_NAME}:comfyui-assets/wheels/" /workspace/prebuilt_wheels/ -P || echo "⚠️ 未能拉取预编译包"
 fi
@@ -232,7 +242,15 @@ echo "  -> 批量安装插件依赖..."
 find /workspace/ComfyUI/custom_nodes -name "requirements.txt" -type f -print0 | while IFS= read -r -d $'\0' file; do
     $PIP_BIN install --no-cache-dir -r "$file" || echo "⚠️ 依赖安装警告: $file"
 done
-echo "✅ 插件环境构建完成。"
+
+# =================================================
+# 5.5 Civicomfy 插件安装 (Web UI 模型管理)
+# =================================================
+if [ "$ENABLE_CIVICOMFY" = true ]; then
+    echo "  -> 克隆 Civicomfy 插件..."
+    git clone https://github.com/MoonGoblinDev/Civicomfy.git || echo "⚠️ Civicomfy 克隆失败"
+    echo "✅ Civicomfy 插件安装完成。"
+fi
 
 
 # =================================================
@@ -241,9 +259,9 @@ echo "✅ 插件环境构建完成。"
 echo "--> [6/8] 同步核心资产 (启动前必备)..."
 
 if [ "$ENABLE_SYNC" = true ]; then
-    rclone sync "${R2_REMOTE_NAME}:comfyui-assets/workflow" /workspace/ComfyUI/user/default/workflows/ -P
-    rclone sync "${R2_REMOTE_NAME}:comfyui-assets/loras" /workspace/ComfyUI/models/loras/ -P
-    rclone sync "${R2_REMOTE_NAME}:comfyui-assets/wildcards" /workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards/ -P
+    [ "$R2_SYNC_WORKFLOWS" = true ] && rclone sync "${R2_REMOTE_NAME}:comfyui-assets/workflow" /workspace/ComfyUI/user/default/workflows/ -P
+    [ "$R2_SYNC_LORAS" = true ] && rclone sync "${R2_REMOTE_NAME}:comfyui-assets/loras" /workspace/ComfyUI/models/loras/ -P
+    [ "$R2_SYNC_WILDCARDS" = true ] && rclone sync "${R2_REMOTE_NAME}:comfyui-assets/wildcards" /workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards/ -P
     echo "✅ 核心资产同步完成。"
 fi
 
@@ -301,6 +319,99 @@ tmux new-session -d -s comfy
 tmux send-keys -t comfy "cd /workspace/ComfyUI && $PYTHON_BIN main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers" C-m
 
 echo "✅ ComfyUI 已启动！(Tmux: comfy)"
+echo "  → 等待 1 分钟让 ComfyUI 完全启动..."
+sleep 60
+
+
+# =================================================
+# 7.5 Civicomfy 自动配置和模型下载 (启动后)
+# =================================================
+if [ "$ENABLE_CIVICOMFY" = true ]; then
+    echo "--> [7.5/8] 配置 Civicomfy 和批量下载模型..."
+    
+    if [ -z "$CIVITAI_TOKEN" ]; then
+        echo "⚠️ 警告: CIVITAI_TOKEN 未设置，跳过 Civicomfy 下载"
+    else
+        # 下载批量下载脚本（如果本地不存在）
+        if [ ! -f /workspace/civicomfy_batch_downloader.py ]; then
+            echo "  -> 下载批量下载脚本..."
+            wget -q -O /workspace/civicomfy_batch_downloader.py \
+                "https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/civicomfy_batch_downloader.py" \
+                || echo "⚠️ 脚本下载失败，检查是否已存在"
+        fi
+        
+        # 确定使用哪个源的模型列表
+        MODELS_SOURCE=""
+        DOWNLOADED_CSV=""
+        
+        # 优先级 1: MODEL_CSV_URL (从远端下载)
+        if [ -n "$MODEL_CSV_URL" ]; then
+            echo "  -> 从远端下载模型列表: $MODEL_CSV_URL"
+            DOWNLOADED_CSV="/workspace/models_downloaded.csv"
+            
+            if wget -q -O "$DOWNLOADED_CSV" "$MODEL_CSV_URL"; then
+                MODELS_SOURCE="--csv $DOWNLOADED_CSV"
+                echo "  ✓ 模型列表下载成功"
+            else
+                echo "  ✗ 模型列表下载失败，尝试其他方式"
+            fi
+        fi
+        
+        # 优先级 2: MODEL_CSV_BASE64 (Base64 编码的 CSV 内容)
+        if [ -z "$MODELS_SOURCE" ] && [ -n "$MODEL_CSV_BASE64" ]; then
+            echo "  -> 从 Base64 解码模型列表"
+            DOWNLOADED_CSV="/workspace/models_from_base64.csv"
+            
+            if echo "$MODEL_CSV_BASE64" | base64 -d > "$DOWNLOADED_CSV" 2>/dev/null; then
+                MODELS_SOURCE="--csv $DOWNLOADED_CSV"
+                echo "  ✓ 模型列表解码成功"
+            else
+                echo "  ✗ Base64 解码失败"
+            fi
+        fi
+        
+        # 优先级 3: R2 存储 (如果启用了 Rclone 同步)
+        if [ -z "$MODELS_SOURCE" ] && [ "$ENABLE_SYNC" = true ]; then
+            echo "  -> 尝试从 R2 下载模型列表"
+            DOWNLOADED_CSV="/workspace/models_from_r2.csv"
+            
+            if rclone copyto "${R2_REMOTE_NAME}:comfyui-assets/models.csv" "$DOWNLOADED_CSV" 2>/dev/null; then
+                MODELS_SOURCE="--csv $DOWNLOADED_CSV"
+                echo "  ✓ 从 R2 获取模型列表成功"
+            else
+                echo "  ℹ️ R2 中未找到 models.csv"
+            fi
+        fi
+        
+        # 优先级 4: MODEL_CSV_PATH (本地路径，向后兼容)
+        if [ -z "$MODELS_SOURCE" ] && [ -n "$MODEL_CSV_PATH" ] && [ -f "$MODEL_CSV_PATH" ]; then
+            MODELS_SOURCE="--csv $MODEL_CSV_PATH"
+            echo "  -> 使用本地 CSV 文件: $MODEL_CSV_PATH"
+        fi
+        
+        # 优先级 5: 环境变量中的模型 ID
+        if [ -z "$MODELS_SOURCE" ]; then
+            if [ -n "$CHECKPOINT_IDS" ] || [ -n "$LORA_IDS" ] || [ -n "$CONTROLNET_IDS" ] || [ -n "$UPSCALER_IDS" ] || [ -n "$ALL_MODEL_IDS" ]; then
+                MODELS_SOURCE="--env-var ALL_MODEL_IDS"
+                echo "  -> 使用环境变量中的模型 ID"
+            fi
+        fi
+        
+        # 执行下载
+        if [ -n "$MODELS_SOURCE" ]; then
+            $PYTHON_BIN /workspace/civicomfy_batch_downloader.py \
+                --url "http://localhost:8188" \
+                --api-key "$CIVITAI_TOKEN" \
+                $MODELS_SOURCE \
+                --check-interval 30 \
+                || echo "⚠️ Civicomfy 模型下载出现错误，但继续执行"
+            
+            echo "✅ Civicomfy 模型配置和下载完成。"
+        else
+            echo "ℹ️ 未指定模型列表，跳过自动下载。可通过 Web UI 手动下载。"
+        fi
+    fi
+fi
 
 
 # =================================================
@@ -308,79 +419,7 @@ echo "✅ ComfyUI 已启动！(Tmux: comfy)"
 # =================================================
 echo "--> [8/8] 开始后台大文件下载任务..."
 
-# 8.1 CivitDL 处理
-
-if [ "$ENABLE_CIVITDL" = true ]; then
-    echo "  -> [CivitDL] 正在安装并配置工具..."
-    $PIP_BIN install civitdl
-    
-    # 1. 注入 API Key 配置文件 (完全还原 JSON 字段)
-    mkdir -p ~/.config/civitdl
-    TOKEN_VAL="${CIVITAI_TOKEN:-}"
-    
-    cat <<EOF > ~/.config/civitdl/config.json
-{
-  "version": "1",
-  "default": {
-    "api_key": "$TOKEN_VAL",
-    "sorter": "basic",
-    "max_images": 2,
-    "nsfw_mode": "2",
-    "with_prompt": true,
-    "without_model": false,
-    "limit_rate": "0",
-    "retry_count": 5,
-    "pause_time": 2.0,
-    "cache_mode": "1",
-    "strict_mode": "0",
-    "model_overwrite": false,
-    "with_color": true
-  },
-  "sorters": [],
-  "aliases": []
-}
-EOF
-    echo "✅ CivitDL 配置文件已注入。"
-
-    cat <<EOF > /workspace/runpod_sorter.py
-from civitdl.api.sorter import SorterData
-import os
-
-def sort_model(model_dict, version_dict, filename, root_path):
-    raw_type = model_dict.get('type', 'unknown')
-    m_type = raw_type.lower()
-    print(f"  -> [Sorter] 处理: {model_dict.get('name')} | 类型: {raw_type}")
-
-    type_map = {
-        "checkpoint": "checkpoints",
-        "lora": "loras",
-        "locon": "loras",
-        "dora": "loras",
-        "controlnet": "controlnet",
-        "vae": "vae",
-        "upscaler": "upscale_models",
-        "motionmodule": "animatediff_models"
-    }
-    
-    target_subfolder = type_map.get(m_type, "extras")
-    final_dir = os.path.join(root_path, target_subfolder, model_dict.get('name', 'Unknown_Model'))
-    
-    return SorterData(final_dir, final_dir, final_dir, final_dir)
-EOF
-
-    # 3. 整合 ID 并启动下载
-    RAW_IDS="${CHECKPOINT_IDS},${CONTROLNET_IDS},${UPSCALER_IDS},${LORA_IDS},${ALL_MODEL_IDS}"
-    CLEAN_IDS=$(echo "$RAW_IDS" | tr ',' '\n' | grep -v '^\s*$' | sort -u | tr '\n' ',' | sed 's/,$//')
-
-    if [ -n "$CLEAN_IDS" ]; then
-        BATCH_FILE="/workspace/civitai_batch.txt"
-        echo "$CLEAN_IDS" > "$BATCH_FILE"
-        echo "  -> 启动 CivitDL 批量下载..."
-        $PYTHON_BIN -m civitdl "$BATCH_FILE" "/workspace/ComfyUI/models" \
-            --sorter "/workspace/runpod_sorter.py" \
-            || echo "⚠️ CivitDL 下载出现部分错误"
-    fi
-fi
+# 注: CivitDL 已由 Civicomfy 的 REST API 方式替代 (更简洁、更无人值守)
 
 # 8.2 AuraSR 下载
 echo "  -> [AuraSR] 正在下载 AuraSR V2 权重..."
