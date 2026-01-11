@@ -67,8 +67,11 @@ if [ -z "$PLUGIN_URLS" ]; then
         "https://github.com/weilin9999/WeiLin-Comfyui-Tools"
         "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
         "https://github.com/ltdrdata/was-node-suite-comfyui"
-        "https://github.com/weilin9999/WeiLin-ComfyUI-prompt-all-in-one"
         "https://github.com/kijai/ComfyUI-KJNodes"
+        "https://github.com/BenjaMITM/Enhanced-Civicomfy"
+        "https://github.com/pythongosssss/ComfyUI-WD14-Tagger"
+        "https://github.com/rgthree/rgthree-comfy"
+        "https://github.com/ltdrdata/ComfyUI-Inspire-Pack"
     )
 else
     IFS=',' read -r -a PLUGIN_URLS <<< "$PLUGIN_URLS"
@@ -262,14 +265,7 @@ find /workspace/ComfyUI/custom_nodes -name "requirements.txt" -type f -print0 | 
     $PIP_BIN install --no-cache-dir -r "$file" || echo "⚠️ 依赖安装警告: $file"
 done
 
-# =================================================
-# 5.5 Civicomfy 插件安装 (Web UI 模型管理)
-# =================================================
-if [ "$ENABLE_CIVICOMFY" = true ]; then
-    echo "  -> 克隆 Civicomfy 插件..."
-    git clone https://github.com/MoonGoblinDev/Civicomfy.git || echo "⚠️ Civicomfy 克隆失败"
-    echo "✅ Civicomfy 插件安装完成。"
-fi
+echo "✅ 自定义节点安装完成。"
 
 
 # =================================================
