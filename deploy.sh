@@ -307,9 +307,10 @@ while true; do
 
         rclone move "\$SOURCE_DIR" "\$REMOTE_PATH" \\
             --min-age "30s" \\
-            --include "*.{png,jpg,jpeg,webp,gif,mp4,mov,avi,webm,mkv,PNG,JPG,JPEG,WEBP,GIF,MP4,MOV,AVI,WEBM,MKV}" \\
-            --exclude ".*/**" \\
-            --exclude "_*" \\
+            --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,avi,webm,mkv,PNG,JPG,JPEG,WEBP,GIF,MP4,MOV,AVI,WEBM,MKV}" \\
+            --filter "- .*/**" \\
+            --filter "- _*" \\
+            --filter "- *" \\
             --ignore-existing \\
             --transfers 4 \\
             --stats-one-line \\
