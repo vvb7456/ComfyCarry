@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # ==============================================================================
-# RunPod ComfyUI 自动化部署脚本 (v4.5 极速启动完全版)
+# RunPod ComfyUI 自动化部署脚本 (v4.6 PM2 版)
 # 核心特性:
 #   1. 架构自适应: 自动识别 Blackwell/Hopper/Ada 并优化加速组件
 #   2. Wheel 预装: 优先使用预编译的 FA3/SA3 Wheel，大幅缩短 GPU 浪费时间
 #   3. UI 优先: 核心环境就绪后立即启动 ComfyUI，模型下载在后台并行
 #   4. 完整校验: 保留首次启动 Health Check，确保环境百分之百可用
+#   5. PM2 管理: 专业进程管理器，提供原生日志体验、自动重启、资源监控
 # ==============================================================================
 
 set -e # 遇到错误退出
@@ -16,7 +17,7 @@ LOG_FILE="/workspace/setup.log"
 exec &> >(tee -a "$LOG_FILE")
 
 echo "================================================="
-echo "  RunPod ComfyUI 部署脚本 (v4.5 完全版)"
+echo "  RunPod ComfyUI 部署脚本 (v4.6 PM2 版)"
 echo "  机器架构: $(uname -m) | 开始时间: $(date)"
 echo "================================================="
 
@@ -89,15 +90,25 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
 fi
 ! pgrep -x "sshd" > /dev/null && /usr/sbin/sshd
 
-# 配置 Tmux
-echo "set -g mouse on" > ~/.tmux.conf
-touch ~/.no_auto_tmux
-
 # 安装必要依赖 (保持原脚本依赖列表)
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-    software-properties-common git git-lfs aria2 rclone jq \
+    software-properties-common git git-lfs aria2 rclone jq curl \
     ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 build-essential
+
+# 安装 Node.js 20.x LTS (PM2 需要)
+if ! command -v node >/dev/null 2>&1; then
+    echo "  -> 安装 Node.js 20.x LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+fi
+
+# 安装 PM2 进程管理器
+if ! command -v pm2 >/dev/null 2>&1; then
+    echo "  -> 安装 PM2 进程管理器..."
+    npm install -g pm2
+    pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
+fi
 
 # Python 3.13 准备（SageAttention3 需要）
 if ! command -v python3.13 >/dev/null 2>&1; then
@@ -286,6 +297,9 @@ fi
 # =================================================
 echo "--> [7/8] 启动 ComfyUI 服务..."
 
+# 清理旧进程
+pm2 delete all 2>/dev/null || true
+
 # 启动 OneDrive 同步后台服务 (如果开启)
 if [ "$ENABLE_SYNC" = true ]; then
 cat <<EOF > /workspace/onedrive_sync.sh
@@ -326,19 +340,26 @@ while true; do
 done
 EOF
     chmod +x /workspace/onedrive_sync.sh
-    tmux has-session -t sync 2>/dev/null && tmux kill-session -t sync
-    tmux new-session -d -s sync "/workspace/onedrive_sync.sh"
-    echo "✅ 后台同步服务已启动 (Tmux: sync)"
+    pm2 start /workspace/onedrive_sync.sh --name sync --log /workspace/sync.log
+    echo "✅ 后台同步服务已启动 (PM2: sync)"
 fi
 
-# 启动 ComfyUI
-tmux has-session -t comfy 2>/dev/null && tmux kill-session -t comfy
-tmux new-session -d -s comfy
-tmux send-keys -t comfy "cd /workspace/ComfyUI && $PYTHON_BIN main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers" C-m
+# 启动 ComfyUI 主服务
+cd /workspace/ComfyUI
+pm2 start $PYTHON_BIN --name comfy \
+    --interpreter none \
+    --log /workspace/comfy.log \
+    --time \
+    --restart-delay 3000 \
+    --max-restarts 10 \
+    -- main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers
 
-echo "✅ ComfyUI 已启动！(Tmux: comfy)"
-echo "  → 等待 1 分钟让 ComfyUI 完全启动..."
-sleep 60
+# 保存 PM2 配置 (重启后自动恢复)
+pm2 save
+
+echo "✅ ComfyUI 已启动！(PM2: comfy)"
+echo "  → 等待 20 秒让 ComfyUI 完全启动..."
+sleep 20
 
 
 # =================================================
@@ -438,6 +459,12 @@ echo "  - FlashAttention: $FA_INSTALL_TYPE"
 echo "  - SageAttention:  $SA_INSTALL_TYPE"
 echo "-------------------------------------------------"
 echo "  资产同步: $(if [ "$ENABLE_SYNC" = true ]; then echo "已完成 (R2 -> Local)"; else echo "未启用"; fi)"
-echo "  后台同步: $(if [ "$ENABLE_SYNC" = true ]; then echo "运行中 (Tmux: sync)"; else echo "未启用"; fi)"
+echo "  后台同步: $(if [ "$ENABLE_SYNC" = true ]; then echo "运行中 (PM2: sync)"; else echo "未启用"; fi)"
 echo "  模型下载: 请查看主日志确认进度。"
+echo "-------------------------------------------------"
+echo "  📊 PM2 管理命令:"
+echo "    pm2 logs comfy --lines 100  # 查看 ComfyUI 日志"
+echo "    pm2 monit                   # 实时监控资源"
+echo "    pm2 restart comfy           # 重启服务"
+echo "    pm2 status                  # 查看进程状态"
 echo "================================================="
