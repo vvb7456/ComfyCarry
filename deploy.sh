@@ -27,6 +27,7 @@ echo "================================================="
 echo "--> [1/8] 初始化配置..."
 
 ln -snf /workspace /root/workspace
+touch ~/.no_auto_tmux      # 让vast连接ssh时不要自动进入tmux
 
 # 1.1 Rclone (同步功能)
 if [ -n "$RCLONE_CONF_BASE64" ] && [ -n "$R2_REMOTE_NAME" ]; then
