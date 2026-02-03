@@ -97,6 +97,16 @@ apt-get install -y --no-install-recommends \
     software-properties-common git git-lfs aria2 rclone jq curl \
     ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 build-essential
 
+# 安装 Cloudflare Tunnel (如果提供了 Token)
+if [ -n "$CLOUDFLARED_TOKEN" ]; then
+    echo "  -> 检测到 CLOUDFLARED_TOKEN，安装 Cloudflared..."
+    mkdir -p --mode=0755 /usr/share/keyrings
+    curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
+    echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list
+    apt-get update -qq
+    apt-get install -y cloudflared
+fi
+
 # 安装 Node.js 20.x LTS (PM2 需要)
 if ! command -v node >/dev/null 2>&1; then
     echo "  -> 安装 Node.js 20.x LTS..."
@@ -354,6 +364,13 @@ pm2 start $PYTHON_BIN --name comfy \
     --restart-delay 3000 \
     --max-restarts 10 \
     -- main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers
+
+# 启动 Cloudflare Tunnel (如果配置)
+if [ -n "$CLOUDFLARED_TOKEN" ]; then
+    echo "  -> 启动 Cloudflare Tunnel..."
+    pm2 start cloudflared --name tunnel -- tunnel run --token "$CLOUDFLARED_TOKEN"
+    echo "✅ Cloudflare Tunnel 已启动 (PM2: tunnel)"
+fi
 
 # 保存 PM2 配置 (重启后自动恢复)
 pm2 save
