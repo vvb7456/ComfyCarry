@@ -29,22 +29,53 @@ echo "--> [1/8] 初始化配置..."
 ln -snf /workspace /root/workspace
 touch ~/.no_auto_tmux      # 让vast连接ssh时不要自动进入tmux
 
-# 1.1 Rclone (同步功能)
-if [ -n "$RCLONE_CONF_BASE64" ] && [ -n "$R2_REMOTE_NAME" ]; then
-    ENABLE_SYNC=true
-    echo "✅ 启用 Rclone 云同步。"
-else
-    ENABLE_SYNC=false
-    echo "ℹ️ 未检测到 Rclone 配置，跳过同步。"
-fi
+# 1.1 从 URL 下载 Rclone 配置文件
+mkdir -p ~/.config/rclone
+ENABLE_R2_SYNC=false
 
+if [ -n "$RCLONE_CONF_URL" ]; then
+    echo "  -> 从 URL 下载 rclone.conf..."
+    curl -fsSL "$RCLONE_CONF_URL" -o ~/.config/rclone/rclone.conf
+    
+    if [ $? -eq 0 ] && [ -s ~/.config/rclone/rclone.conf ]; then
+        chmod 600 ~/.config/rclone/rclone.conf
+        echo "✅ Rclone 配置已下载"
+        
+        # 自动检测 remote 名称
+        R2_REMOTE_NAME=$(grep -E '^\[(r2|.*r2.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        ONEDRIVE_REMOTE_NAME=$(grep -E '^\[(onedrive|.*onedrive.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        GDRIVE_REMOTE_NAME=$(grep -E '^\[(gdrive|.*drive.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        
+        # 功能开关（默认启用，可通过环境变量禁用）
+        ENABLE_R2=${ENABLE_R2:-true}
+        ENABLE_ONEDRIVE=${ENABLE_ONEDRIVE:-true}
+        ENABLE_GDRIVE=${ENABLE_GDRIVE:-true}
+        
+        # 根据开关和配置决定启用哪些功能
+        if [ "$ENABLE_R2" = "true" ] && [ -n "$R2_REMOTE_NAME" ]; then
+            ENABLE_R2_SYNC=true
+        fi
+        
+        if [ "$ENABLE_ONEDRIVE" != "true" ]; then
+            ONEDRIVE_REMOTE_NAME=""
+        fi
+        
+        if [ "$ENABLE_GDRIVE" != "true" ]; then
+            GDRIVE_REMOTE_NAME=""
+        fi
+    else
+        echo "❌ URL 下载失败，跳过云同步功能"
+    fi
+else
+    echo "ℹ️ 未设置 RCLONE_CONF_URL，跳过云同步"
+fi
 # 1.2 R2 同步内容控制 (细粒度开关)
 R2_SYNC_WHEELS=${R2_SYNC_WHEELS:-true}      # 预编译包 (推荐启用)
 R2_SYNC_WORKFLOWS=${R2_SYNC_WORKFLOWS:-true}  # 工作流
 R2_SYNC_LORAS=${R2_SYNC_LORAS:-true}         # LoRA 模型
 R2_SYNC_WILDCARDS=${R2_SYNC_WILDCARDS:-true} # 通配符
 
-if [ "$ENABLE_SYNC" = true ]; then
+if [ "$ENABLE_R2_SYNC" = true ]; then
     echo "  R2 同步配置: Wheels=$R2_SYNC_WHEELS | Workflows=$R2_SYNC_WORKFLOWS | Loras=$R2_SYNC_LORAS | Wildcards=$R2_SYNC_WILDCARDS"
 fi
 
@@ -147,13 +178,6 @@ $PIP_BIN install --no-cache-dir torch==2.9.1 --index-url "$TORCH_INDEX"
 
 # 安装 HuggingFace 加速下载工具
 $PIP_BIN install --no-cache-dir hf_transfer
-
-# Rclone 配置文件注入 (提前注入，以便后续拉取 Wheel)
-if [ "$ENABLE_SYNC" = true ]; then
-    mkdir -p ~/.config/rclone
-    echo "$RCLONE_CONF_BASE64" | base64 -d > ~/.config/rclone/rclone.conf
-    chmod 600 ~/.config/rclone/rclone.conf
-fi
 
 echo "✅ 系统环境就绪: $($PYTHON_BIN --version)"
 
@@ -295,7 +319,7 @@ echo "✅ 自定义节点安装完成。"
 # =================================================
 echo "--> [6/8] 同步核心资产 (启动前必备)..."
 
-if [ "$ENABLE_SYNC" = true ]; then
+if [ "$ENABLE_R2_SYNC" = true ]; then
     [ "$R2_SYNC_WORKFLOWS" = true ] && rclone sync "${R2_REMOTE_NAME}:comfyui-assets/workflow" /workspace/ComfyUI/user/default/workflows/ -P
     [ "$R2_SYNC_LORAS" = true ] && rclone sync "${R2_REMOTE_NAME}:comfyui-assets/loras" /workspace/ComfyUI/models/loras/ -P
     [ "$R2_SYNC_WILDCARDS" = true ] && rclone sync "${R2_REMOTE_NAME}:comfyui-assets/wildcards" /workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards/ -P
@@ -312,7 +336,7 @@ echo "--> [7/8] 启动 ComfyUI 服务..."
 pm2 delete all 2>/dev/null || true
 
 # Output 云端同步服务 (OneDrive / Google Drive)
-if [ "$ENABLE_SYNC" = true ] && [ -n "$ONEDRIVE_REMOTE_NAME$GDRIVE_REMOTE_NAME" ]; then
+if [ -n "$ONEDRIVE_REMOTE_NAME" ] || [ -n "$GDRIVE_REMOTE_NAME" ]; then
 cat <<EOF > /workspace/cloud_sync.sh
 #!/bin/bash
 SOURCE_DIR="/workspace/ComfyUI/output"
@@ -499,8 +523,10 @@ echo "  加速组件安装状态:"
 echo "  - FlashAttention: $FA_INSTALL_TYPE"
 echo "  - SageAttention:  $SA_INSTALL_TYPE"
 echo "-------------------------------------------------"
-echo "  资产同步: $(if [ "$ENABLE_SYNC" = true ]; then echo "已完成 (R2 -> Local)"; else echo "未启用"; fi)"
-echo "  后台同步: $(if [ "$ENABLE_SYNC" = true ]; then echo "运行中 (PM2: sync)"; else echo "未启用"; fi)"
+echo "  资产同步: $(if [ "$ENABLE_R2_SYNC" = true ]; then echo "已完成 (R2 -> Local)"; else echo "未启用"; fi)"
+echo "  Output同步:"
+[ -n "$ONEDRIVE_REMOTE_NAME" ] && echo "    - OneDrive: ✓ 运行中 (PM2: sync)" || echo "    - OneDrive: ✗ 未配置"
+[ -n "$GDRIVE_REMOTE_NAME" ] && echo "    - Google Drive: ✓ 运行中 (PM2: sync)" || echo "    - Google Drive: ✗ 未配置"
 echo "  模型下载: 请查看主日志确认进度。"
 echo "-------------------------------------------------"
 echo "  📊 PM2 管理命令:"

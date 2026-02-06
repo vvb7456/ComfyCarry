@@ -30,18 +30,15 @@ ALL_MODEL_IDS=206886,https://civitai.com/models/789012?modelVersionId=123456,110
 - 自动生成临时 CSV 文件并调用 Civicomfy 下载，无需手动创建文件
 
 **可选配置**：
-```bash
-# R2/OneDrive/Google Drive 同步
-RCLONE_CONF_BASE64=your_rclone_config_base64
-R2_REMOTE_NAME=r2                    # 用于资产下载 (workflow/loras/wildcards)
-ONEDRIVE_REMOTE_NAME=onedrive        # 用于 output 同步
-GDRIVE_REMOTE_NAME=gdrive            # 用于 output 同步 (可与 OneDrive 并用)
 
-# R2 同步细粒度控制（可选，默认全部启用）
-R2_SYNC_WHEELS=true       # 预编译包（推荐启用）
+```bash
+# Rclone 云同步（上传 rclone.conf 到 GitHub Secret Gist）
+RCLONE_CONF_URL=https://gist.githubusercontent.com/your-username/xxx/raw/xxx/rclone.conf
+
+# R2 同步细粒度控制
 R2_SYNC_WORKFLOWS=true    # 工作流
-R2_SYNC_LORAS=false       # 如不需要私有 LoRA，可关闭
-R2_SYNC_WILDCARDS=true    # DynamicPrompts 通配符
+R2_SYNC_LORAS=false       # LoRA 模型
+R2_SYNC_WILDCARDS=true    # 通配符
 
 # 自定义插件
 PLUGIN_URLS=https://github.com/user/plugin1,https://github.com/user/plugin2
@@ -139,15 +136,11 @@ find /workspace/ComfyUI/models -name "*.safetensors"
 | 变量 | 说明 |
 |------|------|
 | `CIVITAI_TOKEN` | CivitAI API Key（必填） |
-| `ALL_MODEL_IDS` | 模型 ID 或 URL 列表，逗号分隔（支持混合） |
-| `RCLONE_CONF_BASE64` | Base64 编码的 rclone.conf |
-| `R2_REMOTE_NAME` | R2 远程名称（资产下载） |
-| `R2_SYNC_WHEELS` | 是否拉取预编译包（默认 true） |
+| `ALL_MODEL_IDS` | 模型 ID 或 URL 列表，逗号分隔 |
+| `RCLONE_CONF_URL` | rclone.conf 文件的 URL（GitHub Secret Gist） |
 | `R2_SYNC_WORKFLOWS` | 是否拉取工作流（默认 true） |
 | `R2_SYNC_LORAS` | 是否拉取 LoRA 模型（默认 true） |
 | `R2_SYNC_WILDCARDS` | 是否拉取通配符（默认 true） |
-| `ONEDRIVE_REMOTE_NAME` | OneDrive 远程名称（output 同步） |
-| `GDRIVE_REMOTE_NAME` | Google Drive 远程名称（output 同步） |
 | `PLUGIN_URLS` | 自定义插件 URL，逗号分隔 |
 
 ## 故障排查
@@ -174,45 +167,35 @@ find /workspace/ComfyUI/models -name "*.safetensors"
 
 ## 配置 Rclone 云存储
 
-### 配置 Google Drive
+### 上传到 GitHub Secret Gist
 
-1. 在本地运行 rclone 配置向导：
-```bash
-rclone config
-```
+**步骤：**
 
-2. 选择 "n) New remote"
-3. 输入名称：`gdrive`
-4. 选择 storage type：`drive` (Google Drive)
-5. 配置 OAuth 授权（会打开浏览器）
-6. 完成后选择要同步的文件夹 ID（可选）
+1. **在本地配置 rclone**（R2/OneDrive/GDrive）
+   ```bash
+   rclone config
+   ```
+   按提示配置 R2、OneDrive、Google Drive 等
 
-### 配置 OneDrive
+2. **上传配置到 GitHub Gist**
+   - 访问 https://gist.github.com/
+   - 点击 "+ New secret gist"（⚠️ 必须选 Secret）
+   - 文件名：`rclone.conf`
+   - 内容：复制 `~/.config/rclone/rclone.conf` (Linux) 或 `%APPDATA%\rclone\rclone.conf` (Windows)
+   - 点击 "Create secret gist"
 
-1. 运行 `rclone config`
-2. 输入名称：`onedrive`
-3. 选择 storage type：`onedrive`
-4. 按提示完成 OAuth 授权
+3. **获取 Raw URL**
+   - 点击文件右上角 "Raw" 按钮
+   - 复制完整 URL：`https://gist.githubusercontent.com/username/.../raw/.../rclone.conf`
 
-### 配置 R2 (Cloudflare)
+4. **设置环境变量**
+   ```bash
+   RCLONE_CONF_URL=https://gist.githubusercontent.com/username/.../raw/.../rclone.conf
+   ```
 
-1. 运行 `rclone config`
-2. 输入名称：`r2`
-3. 选择 storage type：`s3`
-4. Provider 选择：`Cloudflare`
-5. 填入 Access Key ID 和 Secret Key
-6. Endpoint：`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
+完成！脚本会自动识别配置中的所有 remote 并启用对应功能。
 
-### 生成 Base64 配置
-
-配置完成后，将配置文件转换为 Base64：
-```bash
-cat ~/.config/rclone/rclone.conf | base64 -w 0
-```
-
-将输出结果设置为环境变量 `RCLONE_CONF_BASE64`。
-
-完整配置示例请参考 [ENV_EXAMPLE.md](ENV_EXAMPLE.md)。
+---
 
 ## 文件说明
 

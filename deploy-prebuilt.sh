@@ -53,25 +53,54 @@ export PIP_BIN="$PYTHON_BIN -m pip"
 UPDATE_COMFYUI=${UPDATE_COMFYUI:-false}
 UPDATE_PLUGINS=${UPDATE_PLUGINS:-false}
 
-# 1.2 Rclone (同步功能)
-if [ -n "$RCLONE_CONF_BASE64" ] && [ -n "$R2_REMOTE_NAME" ]; then
-    ENABLE_SYNC=true
-    echo "✅ 启用 Rclone 云同步。"
-    mkdir -p ~/.config/rclone
-    echo "$RCLONE_CONF_BASE64" | base64 -d > ~/.config/rclone/rclone.conf
-    chmod 600 ~/.config/rclone/rclone.conf
+# 1.2 从 URL 下载 Rclone 配置文件
+mkdir -p ~/.config/rclone
+ENABLE_R2_SYNC=false
+
+if [ -n "$RCLONE_CONF_URL" ]; then
+    echo "  -> 从 URL 下载 rclone.conf..."
+    curl -fsSL "$RCLONE_CONF_URL" -o ~/.config/rclone/rclone.conf
+    
+    if [ $? -eq 0 ] && [ -s ~/.config/rclone/rclone.conf ]; then
+        chmod 600 ~/.config/rclone/rclone.conf
+        echo "✅ Rclone 配置已下载"
+        
+        # 自动检测 remote 名称
+        R2_REMOTE_NAME=$(grep -E '^\[(r2|.*r2.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        ONEDRIVE_REMOTE_NAME=$(grep -E '^\[(onedrive|.*onedrive.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        GDRIVE_REMOTE_NAME=$(grep -E '^\[(gdrive|.*drive.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        
+        # 功能开关（默认启用，可通过环境变量禁用）
+        ENABLE_R2=${ENABLE_R2:-true}
+        ENABLE_ONEDRIVE=${ENABLE_ONEDRIVE:-true}
+        ENABLE_GDRIVE=${ENABLE_GDRIVE:-true}
+        
+        # 根据开关和配置决定启用哪些功能
+        if [ "$ENABLE_R2" = "true" ] && [ -n "$R2_REMOTE_NAME" ]; then
+            ENABLE_R2_SYNC=true
+        fi
+        
+        if [ "$ENABLE_ONEDRIVE" != "true" ]; then
+            ONEDRIVE_REMOTE_NAME=""
+        fi
+        
+        if [ "$ENABLE_GDRIVE" != "true" ]; then
+            GDRIVE_REMOTE_NAME=""
+        fi
+    else
+        echo "❌ URL 下载失败，跳过云同步功能"
+    fi
 else
-    ENABLE_SYNC=false
-    echo "ℹ️ 未检测到 Rclone 配置，跳过同步。"
+    echo "ℹ️ 未设置 RCLONE_CONF_URL，跳过云同步"
 fi
 
-# 1.3 R2 同步内容控制
+# 1.3 R2 资产同步控制
 R2_SYNC_WORKFLOWS=${R2_SYNC_WORKFLOWS:-true}
 R2_SYNC_LORAS=${R2_SYNC_LORAS:-true}
 R2_SYNC_WILDCARDS=${R2_SYNC_WILDCARDS:-true}
 
-if [ "$ENABLE_SYNC" = true ]; then
-    echo "  R2 同步配置: Workflows=$R2_SYNC_WORKFLOWS | Loras=$R2_SYNC_LORAS | Wildcards=$R2_SYNC_WILDCARDS"
+if [ "$ENABLE_R2_SYNC" = true ]; then
+    echo "  R2 资产同步: Workflows=$R2_SYNC_WORKFLOWS | Loras=$R2_SYNC_LORAS | Wildcards=$R2_SYNC_WILDCARDS"
 fi
 
 # 1.4 Civicomfy (模型下载)
@@ -146,7 +175,7 @@ echo "✅ ComfyUI 就绪。"
 # =================================================
 echo "--> [4/5] 同步云端资产..."
 
-if [ "$ENABLE_SYNC" = true ]; then
+if [ "$ENABLE_R2_SYNC" = true ]; then
     [ "$R2_SYNC_WORKFLOWS" = true ] && {
         echo "  -> 同步工作流..."
         rclone sync "${R2_REMOTE_NAME}:comfyui-assets/workflow" /workspace/ComfyUI/user/default/workflows/ -P
@@ -174,7 +203,7 @@ echo "--> [5/5] 启动 ComfyUI 服务..."
 pm2 delete all 2>/dev/null || true
 
 # Output 云端同步 (OneDrive / Google Drive)
-if [ "$ENABLE_SYNC" = true ] && [ -n "$ONEDRIVE_REMOTE_NAME$GDRIVE_REMOTE_NAME" ]; then
+if [ -n "$ONEDRIVE_REMOTE_NAME" ] || [ -n "$GDRIVE_REMOTE_NAME" ]; then
 cat <<'EOF' > /workspace/cloud_sync.sh
 #!/bin/bash
 SOURCE_DIR="/workspace/ComfyUI/output"
@@ -314,7 +343,7 @@ echo "  预装加速组件:"
 echo "  - FlashAttention-3: 3.0.0b1 ✓"
 echo "  - SageAttention-3:  1.0.0 ✓"
 echo "-------------------------------------------------"
-echo "  R2 资产同步: $([ "$ENABLE_SYNC" = true ] && echo "✓ 已完成" || echo "✗ 未启用")"
+echo "  R2 资产同步: $([ "$ENABLE_R2_SYNC" = true ] && echo "✓ 已完成" || echo "✗ 未启用")"
 echo "  Output 同步:"
 [ -n "$ONEDRIVE_REMOTE_NAME" ] && echo "    - OneDrive: ✓ 运行中" || echo "    - OneDrive: ✗ 未配置"
 [ -n "$GDRIVE_REMOTE_NAME" ] && echo "    - Google Drive: ✓ 运行中" || echo "    - Google Drive: ✗ 未配置"
