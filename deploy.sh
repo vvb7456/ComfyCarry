@@ -311,16 +311,16 @@ echo "--> [7/8] 启动 ComfyUI 服务..."
 # 清理旧进程
 pm2 delete all 2>/dev/null || true
 
-# 启动 OneDrive 同步后台服务 (如果开启)
-if [ "$ENABLE_SYNC" = true ]; then
-cat <<EOF > /workspace/onedrive_sync.sh
+# Output 云端同步服务 (OneDrive / Google Drive)
+if [ "$ENABLE_SYNC" = true ] && [ -n "$ONEDRIVE_REMOTE_NAME$GDRIVE_REMOTE_NAME" ]; then
+cat <<EOF > /workspace/cloud_sync.sh
 #!/bin/bash
 SOURCE_DIR="/workspace/ComfyUI/output"
-REMOTE_PATH="${ONEDRIVE_REMOTE_NAME}:ComfyUI_Transfer"
 
-echo "--- Sync Service Started ---"
+echo "--- Cloud Sync Service Started ---"
+[ -n "$ONEDRIVE_REMOTE_NAME" ] && echo "  OneDrive: \${ONEDRIVE_REMOTE_NAME}:ComfyUI_Transfer"
+[ -n "$GDRIVE_REMOTE_NAME" ] && echo "  Google Drive: \${GDRIVE_REMOTE_NAME}:ComfyUI_Transfer"
 echo "Watching: \$SOURCE_DIR"
-echo "Target:   \$REMOTE_PATH"
 
 while true; do
     # 检查是否有超过 30 秒未变动的图片/视频文件
@@ -328,31 +328,54 @@ while true; do
 
     if [ -n "\$FOUND_FILES" ]; then
         TIME=\$(date '+%H:%M:%S')
-        echo "[\$TIME] New files detected. Uploading..."
+        echo "[\$TIME] New files detected. Syncing..."
 
-        rclone move "\$SOURCE_DIR" "\$REMOTE_PATH" \\
-            --min-age "30s" \\
-            --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,avi,webm,mkv,PNG,JPG,JPEG,WEBP,GIF,MP4,MOV,AVI,WEBM,MKV}" \\
-            --filter "- .*/**" \\
-            --filter "- _*" \\
-            --filter "- *" \\
-            --ignore-existing \\
-            --transfers 4 \\
-            --stats-one-line \\
-            -v
+        # OneDrive 同步
+        if [ -n "$ONEDRIVE_REMOTE_NAME" ]; then
+            rclone move "\$SOURCE_DIR" "\${ONEDRIVE_REMOTE_NAME}:ComfyUI_Transfer" \\
+                --min-age "30s" \\
+                --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,avi,webm,mkv,PNG,JPG,JPEG,WEBP,GIF,MP4,MOV,AVI,WEBM,MKV}" \\
+                --filter "- .*/**" \\
+                --filter "- _*" \\
+                --filter "- *" \\
+                --ignore-existing \\
+                --transfers 4 \\
+                --stats-one-line \\
+                -v
 
-        if [ \$? -eq 0 ]; then
-            echo "[\$TIME] Upload Success."
-        else
-            echo "[\$TIME] Upload Failed or Partial."
+            if [ \$? -eq 0 ]; then
+                echo "[\$TIME] OneDrive sync completed."
+            else
+                echo "[\$TIME] OneDrive sync failed or partial."
+            fi
+        fi
+        
+        # Google Drive 同步
+        if [ -n "$GDRIVE_REMOTE_NAME" ]; then
+            rclone move "\$SOURCE_DIR" "\${GDRIVE_REMOTE_NAME}:ComfyUI_Transfer" \\
+                --min-age "30s" \\
+                --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,avi,webm,mkv,PNG,JPG,JPEG,WEBP,GIF,MP4,MOV,AVI,WEBM,MKV}" \\
+                --filter "- .*/**" \\
+                --filter "- _*" \\
+                --filter "- *" \\
+                --ignore-existing \\
+                --transfers 4 \\
+                --stats-one-line \\
+                -v
+
+            if [ \$? -eq 0 ]; then
+                echo "[\$TIME] Google Drive sync completed."
+            else
+                echo "[\$TIME] Google Drive sync failed or partial."
+            fi
         fi
     fi
     sleep 10
 done
 EOF
-    chmod +x /workspace/onedrive_sync.sh
-    pm2 start /workspace/onedrive_sync.sh --name sync --log /workspace/sync.log
-    echo "✅ 后台同步服务已启动 (PM2: sync)"
+    chmod +x /workspace/cloud_sync.sh
+    pm2 start /workspace/cloud_sync.sh --name sync --log /workspace/sync.log
+    echo "✅ 云端同步服务已启动 (OneDrive: $([ -n "$ONEDRIVE_REMOTE_NAME" ] && echo '✓' || echo '✗') | Google Drive: $([ -n "$GDRIVE_REMOTE_NAME" ] && echo '✓' || echo '✗'))"
 fi
 
 # 启动 ComfyUI 主服务
