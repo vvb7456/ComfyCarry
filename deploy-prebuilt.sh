@@ -142,10 +142,11 @@ echo "--> [3/5] 检查 ComfyUI 状态..."
 
 cd /workspace
 
-# 如果 /workspace/ComfyUI 不存在，从镜像复制
-if [ ! -d /workspace/ComfyUI ]; then
+# 如果 main.py 不存在，从镜像复制 ComfyUI 核心文件
+if [ ! -f /workspace/ComfyUI/main.py ]; then
     echo "  -> 首次启动，从镜像复制 ComfyUI..."
-    cp -r /opt/ComfyUI /workspace/ComfyUI
+    mkdir -p /workspace/ComfyUI
+    cp -r /opt/ComfyUI/* /workspace/ComfyUI/
     echo "  ✓ ComfyUI 已复制到 /workspace"
 fi
 
