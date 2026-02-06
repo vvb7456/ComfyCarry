@@ -15,3 +15,6 @@ v4.6.1_UPDATE.md
 /workspace/
 models.csv
 lora_scan_result.csv
+
+# Docker 构建文件（本地使用）
+docker/
