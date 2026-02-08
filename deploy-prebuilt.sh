@@ -205,40 +205,52 @@ pm2 delete all 2>/dev/null || true
 
 # Output 云端同步 (OneDrive / Google Drive)
 if [ -n "$ONEDRIVE_REMOTE_NAME" ] || [ -n "$GDRIVE_REMOTE_NAME" ]; then
-cat <<'EOF' > /workspace/cloud_sync.sh
+cat <<EOF > /workspace/cloud_sync.sh
 #!/bin/bash
 SOURCE_DIR="/workspace/ComfyUI/output"
 
 echo "--- Cloud Sync Service Started ---"
-[ -n "$ONEDRIVE_REMOTE_NAME" ] && echo "  OneDrive: ${ONEDRIVE_REMOTE_NAME}:ComfyUI_Transfer"
-[ -n "$GDRIVE_REMOTE_NAME" ] && echo "  Google Drive: ${GDRIVE_REMOTE_NAME}:ComfyUI_Transfer"
+echo "  OneDrive: ${ONEDRIVE_REMOTE_NAME:-未配置}"
+echo "  Google Drive: ${GDRIVE_REMOTE_NAME:-未配置}"
 
 while true; do
-    FOUND_FILES=$(find "$SOURCE_DIR" -type f -mmin +0.5 \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.mp4" -o -iname "*.webp" \) ! -path '*/.*' -print -quit)
+    FOUND_FILES=\$(find "\$SOURCE_DIR" -type f -mmin +0.5 \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.mp4" -o -iname "*.webp" \) ! -path '*/.*' -print -quit)
     
-    if [ -n "$FOUND_FILES" ]; then
-        TIME=$(date '+%H:%M:%S')
-        echo "[$TIME] New files detected. Syncing..."
+    if [ -n "\$FOUND_FILES" ]; then
+        TIME=\$(date '+%H:%M:%S')
+        echo "[\$TIME] New files detected. Syncing..."
         
+EOF
+
+    # OneDrive 同步块（仅在配置时写入）
+    if [ -n "$ONEDRIVE_REMOTE_NAME" ]; then
+cat <<EOF >> /workspace/cloud_sync.sh
         # OneDrive 同步
-        if [ -n "$ONEDRIVE_REMOTE_NAME" ]; then
-            rclone move "$SOURCE_DIR" "${ONEDRIVE_REMOTE_NAME}:ComfyUI_Transfer" \
-                --min-age "30s" \
-                --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}" \
-                --filter "- .*/**" \
-                --filter "- *" \
-                --transfers 4 -v && echo "[$TIME] OneDrive sync completed"
-        fi
+        rclone move "\$SOURCE_DIR" "${ONEDRIVE_REMOTE_NAME}:ComfyUI_Transfer" \\
+            --min-age "30s" \\
+            --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}" \\
+            --filter "- .*/**" \\
+            --filter "- *" \\
+            --transfers 4 -v && echo "[\$TIME] OneDrive sync completed"
         
+EOF
+    fi
+
+    # Google Drive 同步块（仅在配置时写入）
+    if [ -n "$GDRIVE_REMOTE_NAME" ]; then
+cat <<EOF >> /workspace/cloud_sync.sh
         # Google Drive 同步
-        if [ -n "$GDRIVE_REMOTE_NAME" ]; then
-            rclone move "$SOURCE_DIR" "${GDRIVE_REMOTE_NAME}:ComfyUI_Transfer" \
-                --min-age "30s" \
-                --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}" \
-                --filter "- .*/**" \
-                --filter "- *" \
-                --transfers 4 -v && echo "[$TIME] Google Drive sync completed"
-        fi
+        rclone move "\$SOURCE_DIR" "${GDRIVE_REMOTE_NAME}:ComfyUI_Transfer" \\
+            --min-age "30s" \\
+            --filter "+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}" \\
+            --filter "- .*/**" \\
+            --filter "- *" \\
+            --transfers 4 -v && echo "[\$TIME] Google Drive sync completed"
+        
+EOF
+    fi
+
+cat <<EOF >> /workspace/cloud_sync.sh
     fi
     sleep 10
 done
@@ -295,13 +307,17 @@ if [ "$ENABLE_CIVICOMFY" = true ]; then
             --api-key "$CIVITAI_TOKEN" \
             -o "$DOWNLOADED_CSV"; then
             
+            echo "--- 开始批量下载模型 ---"
+            
             $PYTHON_BIN /workspace/civicomfy_batch_downloader.py \
                 --url "http://localhost:8188" \
                 --api-key "$CIVITAI_TOKEN" \
                 --csv "$DOWNLOADED_CSV" \
-                --check-interval 30 &
+                --wait \
+                --timeout 7200 \
+                --check-interval 30
             
-            echo "✅ 模型下载已在后台启动"
+            echo "✅ 模型下载完成，请检查 pm2 logs comfy"
         fi
     fi
 fi

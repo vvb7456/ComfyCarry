@@ -477,12 +477,16 @@ if [ "$ENABLE_CIVICOMFY" = true ]; then
         
         # 执行下载
         if [ -n "$MODELS_SOURCE" ]; then
+            echo "--- 开始批量下载模型（前台等待，可能需要几分钟到几小时） ---"
+            
             $PYTHON_BIN /workspace/civicomfy_batch_downloader.py \
                 --url "http://localhost:8188" \
                 --api-key "$CIVITAI_TOKEN" \
                 $MODELS_SOURCE \
+                --wait \
+                --timeout 7200 \
                 --check-interval 30 \
-                || echo "⚠️ Civicomfy 模型下载出现错误，但继续执行"
+                || echo "⚠️ Civicomfy 模型下载出现错误或超时，但继续执行"
             
             echo "✅ Civicomfy 模型配置和下载完成。"
         else
