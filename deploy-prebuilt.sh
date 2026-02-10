@@ -49,6 +49,44 @@ touch ~/.no_auto_tmux
 export PYTHON_BIN="python3.13"
 export PIP_BIN="$PYTHON_BIN -m pip"
 
+# 0. 重启 Jupyter 使用自定义 Token（优先执行）
+if [ -z "$JUPYTER_TOKEN" ]; then
+    # 如果未指定，使用默认固定 Token
+    JUPYTER_TOKEN="comfyui-jupyter-default-token-2024"
+    echo "  -> 使用默认 Jupyter Token（建议设置环境变量 JUPYTER_TOKEN 自定义）"
+else
+    echo "  -> 使用自定义 Jupyter Token: ${JUPYTER_TOKEN:0:16}..."
+fi
+
+# 停止 Vast/RunPod 自带的 Jupyter
+echo "  -> 停止现有 Jupyter 进程..."
+pkill -f jupyter-lab 2>/dev/null || true
+sleep 2
+
+# 启动自定义配置的 Jupyter Lab
+echo "  -> 启动 Jupyter Lab (Token: ${JUPYTER_TOKEN:0:16}...)..."
+nohup jupyter-lab \
+    --ip=0.0.0.0 \
+    --port=8080 \
+    --no-browser \
+    --ServerApp.token="$JUPYTER_TOKEN" \
+    --ServerApp.password='' \
+    --ServerApp.allow_remote_access=True \
+    --ServerApp.allow_origin='*' \
+    --ServerApp.certfile=/etc/instance.crt \
+    --ServerApp.keyfile=/etc/instance.key \
+    --allow-root \
+    > /workspace/jupyter.log 2>&1 &
+
+# 等待 Jupyter 启动
+sleep 5
+if pgrep -f jupyter-lab > /dev/null; then
+    echo "✅ Jupyter Lab 已启动 (端口: 8080, Token: ${JUPYTER_TOKEN:0:16}...)"
+    echo "  🔗 访问地址: https://localhost:8080/?token=$JUPYTER_TOKEN"
+else
+    echo "⚠️ Jupyter Lab 启动失败，检查日志: /workspace/jupyter.log"
+fi
+
 # 1.1 更新开关 (默认关闭以加速启动)
 UPDATE_COMFYUI=${UPDATE_COMFYUI:-false}
 UPDATE_PLUGINS=${UPDATE_PLUGINS:-false}
@@ -193,6 +231,43 @@ if [ "$ENABLE_R2_SYNC" = true ]; then
 else
     echo "ℹ️ 跳过资产同步。"
 fi
+
+# 创建 jtoken 快捷命令脚本
+cat > /usr/local/bin/jtoken << 'JTOKEN_EOF'
+#!/bin/bash
+# 快捷命令：查看 Jupyter 访问地址
+
+echo '🔍 正在查找 Jupyter 信息...'
+JUPYTER_TOKEN=$(ps aux | grep '[j]upyter-lab' | grep -oP 'token=\K[a-zA-Z0-9-]+' | head -1)
+JUPYTER_PORT=$(ps aux | grep '[j]upyter-lab' | grep -oP -- '--port=\K[0-9]+' | head -1)
+
+if [ -z "$JUPYTER_TOKEN" ]; then
+    echo '❌ Jupyter Lab 未运行'
+    exit 1
+fi
+
+echo ''
+echo '📊 Jupyter Lab 信息:'
+echo "  端口: ${JUPYTER_PORT:-未知}"
+echo "  Token: $JUPYTER_TOKEN"
+echo ''
+
+# 尝试获取 Cloudflare Tunnel 域名
+if command -v pm2 >/dev/null 2>&1; then
+    JUPYTER_DOMAIN=$(pm2 logs tunnel --nostream --lines 100 2>/dev/null | grep -oP 'dest=https://jupyter[^/]+' | head -1 | sed 's/dest=https:\/\///')
+    if [ -n "$JUPYTER_DOMAIN" ]; then
+        echo '🌐 公网访问地址:'
+        echo "  https://$JUPYTER_DOMAIN/?token=$JUPYTER_TOKEN"
+        echo ''
+    fi
+fi
+
+echo '🔗 本地访问地址:'
+echo "  http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
+JTOKEN_EOF
+
+chmod +x /usr/local/bin/jtoken
+echo "✅ jtoken 命令已安装"
 
 
 # =================================================
@@ -366,8 +441,31 @@ echo "  Output 同步:"
 [ -n "$GDRIVE_REMOTE_NAME" ] && echo "    - Google Drive: ✓ 运行中" || echo "    - Google Drive: ✗ 未配置"
 echo "  模型下载: $([ "$ENABLE_CIVICOMFY" = true ] && echo "✓ 后台进行中" || echo "✗ 未配置")"
 echo "-------------------------------------------------"
+
+# 自动检测并显示 Jupyter 访问信息
+JUPYTER_TOKEN=$(ps aux | grep '[j]upyter-lab' | grep -oP 'token=\K[a-zA-Z0-9-]+' | head -1)
+JUPYTER_PORT=$(ps aux | grep '[j]upyter-lab' | grep -oP -- '--port=\K[0-9]+' | head -1)
+
+if [ -n "$JUPYTER_TOKEN" ]; then
+    echo "  🔗 Jupyter Lab 访问信息:"
+    echo "    Token: $JUPYTER_TOKEN"
+    
+    # 尝试从 Cloudflare Tunnel 日志中提取 Jupyter 域名
+    if [ -n "$CLOUDFLARED_TOKEN" ]; then
+        JUPYTER_DOMAIN=$(pm2 logs tunnel --nostream --lines 100 2>/dev/null | grep -oP 'dest=https://jupyter[^/]+' | head -1 | sed 's/dest=https:\/\///')
+        if [ -n "$JUPYTER_DOMAIN" ]; then
+            echo "    公网访问: https://$JUPYTER_DOMAIN/?token=$JUPYTER_TOKEN"
+        fi
+    fi
+    echo "    本地访问: http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
+    echo ""
+fi
+
 echo "  📊 PM2 管理命令:"
 echo "    pm2 logs comfy --lines 100  # 查看日志"
 echo "    pm2 monit                   # 实时监控"
 echo "    pm2 restart comfy           # 重启服务"
+echo ""
+echo "  🔍 快捷命令:"
+echo "    jtoken  # 查看 Jupyter 访问地址和 Token"
 echo "================================================="
