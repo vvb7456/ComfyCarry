@@ -60,8 +60,6 @@ bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_S
 | `CIVITAI_TOKEN` | CivitAI API Key | `abc123def456...` |
 
 ### 可选
-插件** |||
-| `PLUGIN_URLS` | 无 | 额外插件，逗号分隔GitHub URL |
 | **
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -70,6 +68,8 @@ bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_S
 | **更新控制** |||
 | `UPDATE_COMFYUI` | `false` | 是否更新ComfyUI到最新版 |
 | `UPDATE_PLUGINS` | `false` | 是否更新所有插件 |
+|**插件** |||
+| `PLUGIN_URLS` | 无 | 额外插件，逗号分隔GitHub URL |
 | **Rclone配置** |||
 | `RCLONE_CONF_URL` | 无 | rclone.conf下载地址（GitHub Gist Raw URL） |
 | `ENABLE_R2` | `true` | 启用R2资产同步 |
