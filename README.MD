@@ -60,7 +60,6 @@ bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_S
 | `CIVITAI_TOKEN` | CivitAI API Key | `abc123def456...` |
 
 ### 可选
-| **
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | **模型下载** |||
