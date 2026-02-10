@@ -15,6 +15,23 @@ ghcr.io/vvb7456/comfyui-runpod:latest
 
 **预装**：Python 3.13 + PyTorch 2.9.1 + CUDA 13.0 + FlashAttention-3 + SageAttention-3 + ComfyUI + 15插件
 
+**预装插件**：
+- ComfyUI-Manager
+- comfyui_controlnet_aux
+- ComfyUI-Impact-Pack
+- ComfyUI-Easy-Use
+- ComfyUI-Crystools
+- ComfyUI_UltimateSDUpscale
+- comfyui-dynamicprompts
+- WeiLin-Comfyui-Tools
+- AuraSR-ComfyUI
+- was-node-suite-comfyui
+- ComfyUI-KJNodes
+- Enhanced-Civicomfy
+- ComfyUI-WD14-Tagger
+- rgthree-comfy
+- ComfyUI-Inspire-Pack
+
 **启动命令**：
 ```bash
 bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/deploy-prebuilt.sh && bash d.sh"
@@ -43,7 +60,9 @@ bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_S
 | `CIVITAI_TOKEN` | CivitAI API Key | `abc123def456...` |
 
 ### 可选
-
+插件** |||
+| `PLUGIN_URLS` | 无 | 额外插件，逗号分隔GitHub URL |
+| **
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | **模型下载** |||
@@ -121,7 +140,17 @@ R2_SYNC_WILDCARDS=true        # 通配符
 - 生成的图片/视频自动移动到 `ComfyUI_Transfer` 文件夹
 - 控制：`ENABLE_ONEDRIVE=false` 或 `ENABLE_GDRIVE=false`
 
-### 3. Cloudflare Tunnel
+### 3. 额外插件
+
+15个默认插件外需要更多插件：
+
+```bash
+PLUGIN_URLS=https://github.com/author/plugin1,https://github.com/author/plugin2
+```
+
+脚本自动克隆并安装requirements.txt依赖。
+
+### 4. Cloudflare Tunnel
 
 **获取Token**：
 1. https://one.dash.cloudflare.com/ → Zero Trust → Access → Tunnels

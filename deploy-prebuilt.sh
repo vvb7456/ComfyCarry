@@ -206,6 +206,30 @@ if [ "$UPDATE_PLUGINS" = true ]; then
     done
 fi
 
+# 额外插件安装 (可选)
+if [ -n "$PLUGIN_URLS" ]; then
+    echo "  -> 安装额外插件..."
+    IFS=',' read -r -a PLUGIN_ARRAY <<< "$PLUGIN_URLS"
+    for plugin_url in "${PLUGIN_ARRAY[@]}"; do
+        plugin_url=$(echo "$plugin_url" | xargs)  # 去除空格
+        [ -z "$plugin_url" ] && continue
+        
+        plugin_name=$(basename "$plugin_url" .git)
+        echo "    ✓ $plugin_name"
+        
+        cd /workspace/ComfyUI/custom_nodes
+        if [ ! -d "$plugin_name" ]; then
+            git clone --depth 1 "$plugin_url" 2>/dev/null || echo "      ✗ 克隆失败"
+        fi
+        
+        # 安装依赖
+        if [ -f "$plugin_name/requirements.txt" ]; then
+            $PIP_BIN install --no-cache-dir -r "$plugin_name/requirements.txt" -q 2>/dev/null || true
+        fi
+    done
+    cd /workspace/ComfyUI
+fi
+
 echo "✅ ComfyUI 就绪。"
 
 
