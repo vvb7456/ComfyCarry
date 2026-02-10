@@ -425,14 +425,14 @@ fi
 # =================================================
 # 6. AuraSR 下载 (后台)
 # =================================================
-echo "--> [后台] 下载 AuraSR 权重..."
+echo "--> [后台] 下载 AuraSR 权重 (日志: /workspace/aurasr_download.log)..."
 mkdir -p "/workspace/ComfyUI/models/Aura-SR"
 (
     aria2c -x 16 -s 16 --console-log-level=error -d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" \
         "https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true"
     aria2c -x 16 -s 16 --console-log-level=error -d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" \
         "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true"
-) &
+) > /workspace/aurasr_download.log 2>&1 &
 
 
 # =================================================

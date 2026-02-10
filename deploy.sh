@@ -579,10 +579,12 @@ echo "--> [8/8] 开始后台大文件下载任务..."
 # 注: CivitDL 已由 Civicomfy 的 REST API 方式替代 (更简洁、更无人值守)
 
 # 8.2 AuraSR 下载
-echo "  -> [AuraSR] 正在下载 AuraSR V2 权重..."
+echo "  -> [AuraSR] 后台下载 AuraSR V2 权重 (日志: /workspace/aurasr_download.log)..."
 mkdir -p "/workspace/ComfyUI/models/Aura-SR"
-aria2c -x 16 -s 16 --console-log-level=error -d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" "https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true"
-aria2c -x 16 -s 16 --console-log-level=error -d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true"
+(
+    aria2c -x 16 -s 16 --console-log-level=error -d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" "https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true"
+    aria2c -x 16 -s 16 --console-log-level=error -d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true"
+) > /workspace/aurasr_download.log 2>&1 &
 
 # --- [修改版 结尾] 最终部署报告 ---
 if [ "$CUDA_CAP_MAJOR" -ge 10 ]; then
