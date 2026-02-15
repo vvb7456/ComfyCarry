@@ -244,11 +244,27 @@ def save_config():
 # ====================================================================
 @app.route("/api/search", methods=["POST"])
 def proxy_search():
+    """代理搜索请求到 CivitAI REST API"""
+    data = request.get_json()
+    params = {
+        "query": data.get("query", ""),
+        "limit": data.get("limit", 20),
+        "nsfw": "true" if data.get("nsfw") else "false",
+        "sort": data.get("sort", "Newest"),
+    }
+    
+    # 处理分页 cursor
+    if data.get("cursor"):
+        params["cursor"] = data.get("cursor")
+        
+    # 处理 types (支持列表)
+    types = data.get("types", [])
+    if types:
+        params["types"] = types
+
     try:
-        resp = requests.post(MEILI_URL, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {MEILI_BEARER}"
-        }, json=request.get_json(), timeout=10)
+        # 使用 REST API 替代不稳定的 MeiliSearch
+        resp = requests.get("https://civitai.com/api/v1/models", params=params, timeout=15)
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception as e:
         return jsonify({"error": str(e)}), 500

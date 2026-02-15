@@ -36,7 +36,7 @@ function fmtBytes(b) {
 }
 function fmtPct(v) { return (v || 0).toFixed(1) + '%'; }
 function showToast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2500); }
-function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => {}); }
+function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => { }); }
 function getAuthHeaders() { return apiKey ? { Authorization: 'Bearer ' + apiKey } : {}; }
 function openImg(url) { if (!url) return; document.getElementById('modal-img').src = url; document.getElementById('img-modal').classList.add('active'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); } });
@@ -150,7 +150,7 @@ async function loadLocalModels() {
     localModelsData = d.models || [];
     status.innerHTML = `<div class="success-msg" style="display:flex;justify-content:space-between;align-items:center">
       <span>找到 ${d.total} 个模型文件</span>
-      <span style="font-size:.78rem;color:var(--t2)">${localModelsData.filter(m=>m.has_info).length} 已有元数据</span></div>`;
+      <span style="font-size:.78rem;color:var(--t2)">${localModelsData.filter(m => m.has_info).length} 已有元数据</span></div>`;
 
     if (localModelsData.length === 0) {
       grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">该类别下未找到模型文件</div>';
@@ -192,7 +192,7 @@ function renderLocalModelCard(m, idx) {
       ${twHtml ? `<div class="model-card-tags">${twHtml}</div>` : ''}
       <div class="model-card-actions">
         <button class="btn btn-sm" onclick="fetchModelInfo(${idx})" ${m.has_info ? 'title="重新获取"' : 'title="从 CivitAI 获取信息"'}>${m.has_info ? '🔄 刷新' : '📥 获取信息'}</button>
-        ${m.trained_words && m.trained_words.length > 0 ? `<button class="btn btn-sm btn-success" onclick="copyText('${(m.trained_words||[]).join(', ').replace(/'/g, "\\'")}')">📋 触发词</button>` : ''}
+        ${m.trained_words && m.trained_words.length > 0 ? `<button class="btn btn-sm btn-success" onclick="copyText('${(m.trained_words || []).join(', ').replace(/'/g, "\\'")}')">📋 触发词</button>` : ''}
         <button class="btn btn-sm btn-danger" onclick="deleteModel(${idx})">🗑️</button>
       </div>
     </div></div>`;
@@ -289,42 +289,37 @@ function switchCivitTab(tab) {
   if (tab === 'cart') renderCart();
 }
 
-async function searchModels(page = 0) {
+let nextCursor = null;
+
+async function searchModels(cursor = null) {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
 
-  searchPage = page;
   const loading = document.getElementById('search-loading');
   const results = document.getElementById('search-results');
   const pag = document.getElementById('search-pagination');
   const errEl = document.getElementById('search-error');
+
+  if (!cursor) {
+    results.innerHTML = '';
+    pag.innerHTML = '';
+    nextCursor = null;
+  }
+
   errEl.innerHTML = '';
   loading.classList.remove('hidden');
-  results.innerHTML = '';
-  pag.innerHTML = '';
 
   const types = getActiveChips('filter-type-chips');
-  const bms = getActiveChips('filter-bm-chips');
-  const sort = document.getElementById('filter-sort').value;
-  const limit = 20;
-  const offset = page * limit;
-
-  // Build Meilisearch query
-  const filter = [];
-  if (types.length > 0) filter.push(types.map(t => `type = ${t}`).join(' OR '));
-  if (bms.length > 0) filter.push(bms.map(b => `version.baseModel = "${b}"`).join(' OR '));
-  filter.push('nsfwLevel <= 4');
-
-  const sortMap = { 'Most Downloaded': ['stats.downloadCount:desc'], 'Highest Rated': ['stats.rating:desc'], 'Newest': ['createdAtUnix:desc'], 'Relevancy': [] };
+  const sort = document.getElementById('filter-sort').value; // REST API: Most Downloaded, Highest Rated, Newest
+  const nsfw = document.getElementById('filter-nsfw').checked;
 
   const body = {
-    queries: [{
-      indexUid: 'models', q: query, limit, offset,
-      filter: filter.length > 0 ? filter : undefined,
-      sort: sortMap[sort] || [],
-      attributesToRetrieve: ['id', 'name', 'type', 'stats', 'images', 'version', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
-      attributesToHighlight: ['name'],
-    }]
+    query: query,
+    limit: 20,
+    cursor: cursor,
+    sort: sort,
+    nsfw: nsfw,
+    types: types
   };
 
   try {
@@ -332,25 +327,24 @@ async function searchModels(page = 0) {
     const d = await r.json();
     loading.classList.add('hidden');
 
-    const res = (d.results || [])[0] || {};
-    const hits = res.hits || [];
-    const total = res.estimatedTotalHits || 0;
+    if (d.error) throw new Error(d.error);
 
-    if (hits.length === 0) {
+    const items = d.items || [];
+    if (items.length === 0 && !cursor) {
       results.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">没有找到匹配的模型</div>';
       return;
     }
 
-    results.innerHTML = hits.map(h => renderCivitCard(h)).join('');
+    if (!cursor) results.innerHTML = '';
+    results.innerHTML += items.map(h => renderCivitCard(h)).join('');
 
     // Pagination
-    const totalPages = Math.ceil(total / limit);
-    const curPage = page;
-    let pagHtml = '';
-    if (curPage > 0) pagHtml += `<button class="btn btn-sm" onclick="searchModels(${curPage - 1})">◀ 上一页</button>`;
-    pagHtml += `<span style="padding:6px;color:var(--t2);font-size:.82rem">${curPage + 1} / ${totalPages} (共 ${total})</span>`;
-    if (curPage < totalPages - 1) pagHtml += `<button class="btn btn-sm" onclick="searchModels(${curPage + 1})">下一页 ▶</button>`;
-    pag.innerHTML = pagHtml;
+    nextCursor = d.metadata?.nextCursor;
+    if (nextCursor) {
+      pag.innerHTML = `<button class="btn btn-sm" onclick="searchModels('${nextCursor}')">加载更多 ▶</button>`;
+    } else {
+      pag.innerHTML = '<span style="padding:6px;color:var(--t2);font-size:.82rem">没有更多了</span>';
+    }
   } catch (e) {
     loading.classList.add('hidden');
     errEl.innerHTML = `<div class="error-msg">搜索失败: ${e.message}</div>`;
@@ -358,24 +352,36 @@ async function searchModels(page = 0) {
 }
 
 function renderCivitCard(h) {
-  const img = (h.images && h.images[0]) ? (h.images[0].url || '') : '';
+  // REST API adaptation
+  const version = h.modelVersions && h.modelVersions.length > 0 ? h.modelVersions[0] : null;
+  const image = version && version.images && version.images.length > 0 ? version.images[0] : null;
+  const imgUrl = image ? image.url : '';
+
   const badgeClass = getBadgeClass((h.type || '').toLowerCase() === 'lora' ? 'loras' : (h.type || '').toLowerCase());
-  const bm = h.version?.baseModel || '';
+  const bm = version ? version.baseModel : '';
   const inCart = selectedModels.has(String(h.id));
 
+  // Construct data object for cart
+  const cartData = {
+    name: h.name,
+    type: h.type,
+    images: version && version.images ? version.images : [],
+    version: version
+  };
+
   return `<div class="model-card">
-    <div class="model-card-img">${img ? `<img src="${img}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
-      <div class="model-card-title" title="${h.name||''}">${h.name||'Unknown'}</div>
+      <div class="model-card-title" title="${h.name || ''}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
-        <span class="badge ${badgeClass}">${h.type||''}</span>
+        <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
-        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${h.stats?.downloadCount?.toLocaleString()||0}</span>
+        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${h.stats?.downloadCount?.toLocaleString() || 0}</span>
       </div>
       <div class="model-card-actions">
         <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
-        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(h).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
-        <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type||'Checkpoint').toLowerCase()}')">📥 下载</button>
+        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(cartData).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+        <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
 }
@@ -459,15 +465,15 @@ async function lookupIds() {
     return `<div class="model-card">
       <div class="model-card-img">${img ? `<img src="${img}" alt="" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
       <div class="model-card-body">
-        <div class="model-card-title">${d.name||''}</div>
+        <div class="model-card-title">${d.name || ''}</div>
         <div class="model-card-meta">
-          <span class="badge ${getBadgeClass((d.type||'').toLowerCase())}">${d.type||''}</span>
+          <span class="badge ${getBadgeClass((d.type || '').toLowerCase())}">${d.type || ''}</span>
           ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
-          <span style="font-size:.75rem;color:var(--t2)">⬇️ ${d.stats?.downloadCount?.toLocaleString()||0}</span>
+          <span style="font-size:.75rem;color:var(--t2)">⬇️ ${d.stats?.downloadCount?.toLocaleString() || 0}</span>
         </div>
         <div class="model-card-actions">
           <a class="btn btn-sm" href="https://civitai.com/models/${d.id}" target="_blank">🔗</a>
-          <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${d.id}', '${(d.type||'Checkpoint').toLowerCase()}')">📥 下载</button>
+          <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${d.id}', '${(d.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
         </div>
       </div></div>`;
   }).join('');
@@ -483,9 +489,9 @@ function renderCart() {
   let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>操作</th></tr></thead><tbody>';
   for (const [id, m] of selectedModels) {
     html += `<tr>
-      <td><img src="${m.imageUrl||''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px" onerror="this.style.display='none'"></td>
+      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px" onerror="this.style.display='none'"></td>
       <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${m.name}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
-      <td><span class="badge ${getBadgeClass((m.type||'').toLowerCase())}">${m.type}</span></td>
+      <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
       <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
   }
   html += '</tbody></table>';
@@ -508,7 +514,7 @@ function updateCartBadge() {
 function saveCartToStorage() {
   const data = {};
   for (const [id, v] of selectedModels) data[id] = v;
-  try { localStorage.setItem('civitai_cart', JSON.stringify(data)); } catch (e) {}
+  try { localStorage.setItem('civitai_cart', JSON.stringify(data)); } catch (e) { }
 }
 function loadCartFromStorage() {
   try {
@@ -516,7 +522,7 @@ function loadCartFromStorage() {
     if (!raw) return;
     const data = JSON.parse(raw);
     for (const [id, v] of Object.entries(data)) selectedModels.set(id, v);
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // ========== Logs ==========
