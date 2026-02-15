@@ -219,7 +219,7 @@ $PIP_BIN install --no-cache-dir hf_transfer
 
 # Workspace Manager (Dashboard) - 提前启动
 echo "  -> 安装 Dashboard 依赖..."
-$PIP_BIN install --no-cache-dir flask psutil flask-cors requests -q 2>/dev/null || true
+$PIP_BIN install --no-cache-dir --ignore-installed flask psutil flask-cors requests -q 2>/dev/null || true
 
 DASHBOARD_DIR="/workspace/ComfyUI_RunPod_Sync"
 if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
