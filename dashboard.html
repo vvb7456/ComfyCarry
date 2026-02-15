@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --bg: #0a0a0f;
+            --bg2: #12121c;
+            --bg3: #1a1a28;
+            --bg4: #222236;
+            --bg-in: #0e0e18;
+            --bd: #2a2a3e;
+            --bd-f: #7c5cfc;
+            --t1: #e8e8f0;
+            --t2: #9898b0;
+            --t3: #5a5a72;
+            --ac: #7c5cfc;
+            --ac2: #9078ff;
+            --acg: rgba(124, 92, 252, 0.2);
+            --green: #4ade80;
+            --blue: #60a5fa;
+            --amber: #fbbf24;
+            --red: #f87171;
+            --pink: #f472b6;
+            --cyan: #22d3ee;
+            --r: 12px;
+            --rs: 8px;
+            --sh: 0 4px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        html {
+            font-size: 14px
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--t1);
+            min-height: 100vh;
+            line-height: 1.5;
+            display: flex
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 220px;
+            background: var(--bg2);
+            border-right: 1px solid var(--bd);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 50
+        }
+
+        .sidebar-logo {
+            padding: 20px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c5cfc, #e879f9);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            border-bottom: 1px solid var(--bd)
+        }
+
+        .sidebar-logo small {
+            display: block;
+            font-size: .7rem;
+            font-weight: 400;
+            -webkit-text-fill-color: var(--t3);
+            margin-top: 2px
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 0
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            cursor: pointer;
+            color: var(--t2);
+            font-size: .9rem;
+            font-weight: 500;
+            transition: all .15s;
+            border-left: 3px solid transparent
+        }
+
+        .nav-item:hover {
+            background: rgba(124, 92, 252, .05);
+            color: var(--t1)
+        }
+
+        .nav-item.active {
+            color: var(--ac);
+            border-left-color: var(--ac);
+            background: rgba(124, 92, 252, .08)
+        }
+
+        .nav-item .icon {
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center
+        }
+
+        .sidebar-footer {
+            padding: 12px 20px;
+            border-top: 1px solid var(--bd);
+            font-size: .75rem;
+            color: var(--t3)
+        }
+
+        /* Content */
+        .content {
+            margin-left: 220px;
+            flex: 1;
+            min-height: 100vh
+        }
+
+        .page-header {
+            padding: 16px 28px;
+            border-bottom: 1px solid var(--bd);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(10, 10, 15, .8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 40
+        }
+
+        .page-header h2 {
+            font-size: 1.15rem;
+            font-weight: 600
+        }
+
+        .page-body {
+            padding: 20px 28px
+        }
+
+        /* Cards */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px
+        }
+
+        .stat-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 18px 20px;
+            position: relative;
+            overflow: hidden
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--ac);
+            opacity: .6;
+            border-radius: var(--r) var(--r) 0 0
+        }
+
+        .stat-card.green::before {
+            background: var(--green)
+        }
+
+        .stat-card.amber::before {
+            background: var(--amber)
+        }
+
+        .stat-card.blue::before {
+            background: var(--blue)
+        }
+
+        .stat-card.red::before {
+            background: var(--red)
+        }
+
+        .stat-card.cyan::before {
+            background: var(--cyan)
+        }
+
+        .stat-label {
+            font-size: .78rem;
+            color: var(--t3);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 8px
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700
+        }
+
+        .stat-sub {
+            font-size: .78rem;
+            color: var(--t2);
+            margin-top: 4px
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg);
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width .5s
+        }
+
+        /* Services table */
+        .svc-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px
+        }
+
+        .svc-table th {
+            text-align: left;
+            padding: 10px 14px;
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--t3);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            border-bottom: 1px solid var(--bd)
+        }
+
+        .svc-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(42, 42, 58, .3);
+            vertical-align: middle
+        }
+
+        .svc-table tr:hover {
+            background: rgba(124, 92, 252, .03)
+        }
+
+        .svc-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: .82rem;
+            font-weight: 500
+        }
+
+        .svc-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block
+        }
+
+        .svc-dot.online {
+            background: var(--green)
+        }
+
+        .svc-dot.stopped {
+            background: var(--red)
+        }
+
+        .svc-dot.errored {
+            background: var(--amber)
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 7px 14px;
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            background: var(--bg3);
+            color: var(--t1);
+            cursor: pointer;
+            font-size: .82rem;
+            font-family: inherit;
+            font-weight: 500;
+            transition: all .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap
+        }
+
+        .btn:hover {
+            border-color: var(--bd-f);
+            background: var(--bg4)
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            cursor: not-allowed
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: .78rem
+        }
+
+        .btn-primary {
+            background: var(--ac);
+            border-color: var(--ac);
+            color: #fff
+        }
+
+        .btn-primary:hover {
+            background: var(--ac2)
+        }
+
+        .btn-danger {
+            border-color: rgba(248, 113, 113, .3);
+            color: var(--red)
+        }
+
+        .btn-danger:hover {
+            background: rgba(248, 113, 113, .1)
+        }
+
+        .btn-success {
+            border-color: rgba(74, 222, 128, .3);
+            color: var(--green)
+        }
+
+        .btn-success:hover {
+            background: rgba(74, 222, 128, .1)
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 4px
+        }
+
+        /* Inputs */
+        textarea,
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 9px 13px;
+            background: var(--bg-in);
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            color: var(--t1);
+            font-family: inherit;
+            font-size: .88rem;
+            outline: none;
+            transition: border-color .15s
+        }
+
+        textarea:focus,
+        input:focus,
+        select:focus {
+            border-color: var(--bd-f);
+            box-shadow: 0 0 0 3px var(--acg)
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239898b0' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+            cursor: pointer
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--bd);
+            margin-bottom: 16px
+        }
+
+        .tab {
+            padding: 10px 18px;
+            cursor: pointer;
+            font-size: .88rem;
+            font-weight: 500;
+            color: var(--t2);
+            border-bottom: 2px solid transparent;
+            transition: all .15s;
+            user-select: none
+        }
+
+        .tab:hover {
+            color: var(--t1)
+        }
+
+        .tab.active {
+            color: var(--ac);
+            border-bottom-color: var(--ac)
+        }
+
+        .tab .badge-count {
+            background: var(--ac);
+            color: #fff;
+            font-size: .68rem;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-left: 5px
+        }
+
+        /* Model cards */
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 14px
+        }
+
+        .model-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            overflow: hidden;
+            transition: all .2s
+        }
+
+        .model-card:hover {
+            border-color: rgba(124, 92, 252, .4);
+            transform: translateY(-1px);
+            box-shadow: var(--sh)
+        }
+
+        .model-card-img {
+            width: 100%;
+            aspect-ratio: 3/2;
+            overflow: hidden;
+            background: var(--bg-in);
+            position: relative
+        }
+
+        .model-card-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform .3s
+        }
+
+        .model-card:hover .model-card-img img {
+            transform: scale(1.04)
+        }
+
+        .model-card-body {
+            padding: 12px 14px
+        }
+
+        .model-card-title {
+            font-size: .92rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .model-card-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+            align-items: center
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: .7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .4px
+        }
+
+        .badge-checkpoint {
+            background: rgba(96, 165, 250, .15);
+            color: var(--blue)
+        }
+
+        .badge-loras,
+        .badge-lora {
+            background: rgba(74, 222, 128, .15);
+            color: var(--green)
+        }
+
+        .badge-controlnet {
+            background: rgba(251, 191, 36, .15);
+            color: var(--amber)
+        }
+
+        .badge-vae {
+            background: rgba(34, 211, 238, .15);
+            color: var(--cyan)
+        }
+
+        .badge-embeddings {
+            background: rgba(244, 114, 182, .15);
+            color: var(--pink)
+        }
+
+        .badge-other {
+            background: rgba(152, 152, 176, .15);
+            color: var(--t2)
+        }
+
+        .model-card-tags {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+            margin-bottom: 8px
+        }
+
+        .tw-tag {
+            font-size: .7rem;
+            padding: 2px 6px;
+            background: rgba(124, 92, 252, .12);
+            border: 1px solid rgba(124, 92, 252, .2);
+            border-radius: 3px;
+            color: var(--ac);
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .tw-tag:hover {
+            background: rgba(124, 92, 252, .25)
+        }
+
+        .model-card-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px
+        }
+
+        .model-card-size {
+            font-size: .78rem;
+            color: var(--amber);
+            font-weight: 500
+        }
+
+        .model-card-no-img {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--t3);
+            font-size: .82rem;
+            height: 100%
+        }
+
+        /* Logs */
+        .log-box {
+            background: var(--bg-in);
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: .8rem;
+            line-height: 1.6;
+            color: var(--t2);
+            max-height: 70vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all
+        }
+
+        /* CivitAI search */
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px
+        }
+
+        .search-bar input {
+            flex: 1
+        }
+
+        .filters {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px
+        }
+
+        .filter-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px
+        }
+
+        .filter-row label {
+            min-width: 80px;
+            padding-top: 8px;
+            font-size: .8rem;
+            font-weight: 500;
+            color: var(--t2);
+            text-align: right
+        }
+
+        .chip-select {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 8px;
+            background: var(--bg-in);
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            min-height: 38px;
+            flex: 1
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 8px;
+            background: rgba(124, 92, 252, .12);
+            border: 1px solid rgba(124, 92, 252, .2);
+            border-radius: 4px;
+            font-size: .75rem;
+            font-weight: 500;
+            color: var(--ac);
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap
+        }
+
+        .chip:hover {
+            background: rgba(124, 92, 252, .22)
+        }
+
+        .chip.active {
+            background: var(--ac);
+            color: #fff;
+            border-color: var(--ac)
+        }
+
+        .chip .chip-count {
+            font-size: .65rem;
+            color: var(--t3);
+            margin-left: 2px
+        }
+
+        .chip.active .chip-count {
+            color: rgba(255, 255, 255, .7)
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px
+        }
+
+        /* Misc */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--t2)
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--bd);
+            border-top-color: var(--ac);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin-bottom: 10px
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .error-msg {
+            background: rgba(248, 113, 113, .1);
+            border: 1px solid rgba(248, 113, 113, .3);
+            border-radius: var(--rs);
+            padding: 10px 14px;
+            color: var(--red);
+            font-size: .82rem;
+            margin-bottom: 14px
+        }
+
+        .success-msg {
+            background: rgba(74, 222, 128, .1);
+            border: 1px solid rgba(74, 222, 128, .3);
+            border-radius: var(--rs);
+            padding: 10px 14px;
+            color: var(--green);
+            font-size: .82rem;
+            margin-bottom: 14px
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--bg3);
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 10px 20px;
+            border-radius: var(--rs);
+            font-size: .82rem;
+            z-index: 300;
+            opacity: 0;
+            transition: all .3s;
+            pointer-events: none
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0)
+        }
+
+        .hidden {
+            display: none !important
+        }
+
+        .section-title {
+            font-size: .95rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .85);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all .25s
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible
+        }
+
+        .modal-box {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 24px;
+            width: 520px;
+            max-width: 92vw;
+            max-height: 85vh;
+            overflow-y: auto
+        }
+
+        .modal-box h3 {
+            font-size: 1.05rem;
+            margin-bottom: 16px
+        }
+
+        .modal-box .form-group {
+            margin-bottom: 14px
+        }
+
+        .modal-box .form-group label {
+            display: block;
+            font-size: .82rem;
+            font-weight: 500;
+            color: var(--t2);
+            margin-bottom: 5px
+        }
+
+        .modal-box .form-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 16px
+        }
+
+        /* Detail panel */
+        .detail-panel {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 20px;
+            margin-bottom: 16px
+        }
+
+        .detail-panel h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px
+        }
+
+        .detail-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 8px;
+            font-size: .85rem
+        }
+
+        .detail-label {
+            color: var(--t3);
+            min-width: 100px
+        }
+
+        .detail-value {
+            color: var(--t1);
+            flex: 1
+        }
+
+        .detail-imgs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px
+        }
+
+        .detail-imgs img {
+            width: 120px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform .15s
+        }
+
+        .detail-imgs img:hover {
+            transform: scale(1.08)
+        }
+
+        @media(max-width:768px) {
+            .sidebar {
+                display: none
+            }
+
+            .content {
+                margin-left: 0
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr
+            }
+
+            .model-grid,
+            .results-grid {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">🖥️ Workspace Manager<small>ComfyUI RunPod/Vast</small></div>
+        <div class="sidebar-nav">
+            <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span
+                    class="icon">📊</span>仪表盘</div>
+            <div class="nav-item" data-page="models" onclick="showPage('models')"><span class="icon">🎨</span>模型管理</div>
+            <div class="nav-item" data-page="civitai" onclick="showPage('civitai')"><span class="icon">🔍</span>CivitAI
+                搜索</div>
+            <div class="nav-item" data-page="logs" onclick="showPage('logs')"><span class="icon">📜</span>运行日志</div>
+        </div>
+        <div class="sidebar-footer">
+            <div id="key-status" style="margin-bottom:4px">🔒 未设置 Key</div>
+            <button class="btn btn-sm" onclick="openConfigModal()" style="width:100%">⚙️ API Key</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="content">
+
+        <!-- ========== Dashboard Page ========== -->
+        <div id="page-dashboard" class="page">
+            <div class="page-header">
+                <h2>📊 仪表盘</h2><button class="btn btn-sm" onclick="refreshDashboard()">🔄 刷新</button>
+            </div>
+            <div class="page-body">
+                <div class="stat-grid" id="sys-stats"></div>
+                <div class="section-title">🔧 服务管理</div>
+                <table class="svc-table" id="svc-table">
+                    <thead>
+                        <tr>
+                            <th>服务</th>
+                            <th>状态</th>
+                            <th>CPU</th>
+                            <th>内存</th>
+                            <th>重启</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="svc-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ========== Models Page ========== -->
+        <div id="page-models" class="page hidden">
+            <div class="page-header">
+                <h2>🎨 本地模型管理</h2>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <select id="model-category" onchange="loadLocalModels()" style="width:auto;min-width:140px">
+                        <option value="all">全部类型</option>
+                        <option value="checkpoints">Checkpoints</option>
+                        <option value="loras">LoRA</option>
+                        <option value="controlnet">ControlNet</option>
+                        <option value="vae">VAE</option>
+                        <option value="upscale_models">Upscale</option>
+                        <option value="embeddings">Embeddings</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="loadLocalModels()">🔄 刷新</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">📥 全部获取信息</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <div id="local-models-status"></div>
+                <div id="local-models-grid" class="model-grid"></div>
+            </div>
+        </div>
+
+        <!-- ========== CivitAI Page ========== -->
+        <div id="page-civitai" class="page hidden">
+            <div class="page-header">
+                <h2>🔍 CivitAI 搜索 & 下载</h2>
+            </div>
+            <div class="page-body">
+                <div class="tabs">
+                    <div class="tab active" data-ctab="search" onclick="switchCivitTab('search')">🔎 搜索</div>
+                    <div class="tab" data-ctab="lookup" onclick="switchCivitTab('lookup')">📋 ID 查询</div>
+                    <div class="tab" data-ctab="cart" onclick="switchCivitTab('cart')">🛒 已选 <span class="badge-count"
+                            id="cart-badge" style="display:none">0</span></div>
+                </div>
+                <!-- Search -->
+                <div id="ctab-search">
+                    <div class="search-bar">
+                        <input type="text" id="search-input" placeholder="搜索模型名称..."
+                            onkeydown="if(event.key==='Enter')searchModels()">
+                        <button class="btn btn-primary" onclick="searchModels()">搜索</button>
+                    </div>
+                    <div class="filters">
+                        <div class="filter-row"><label>类型</label>
+                            <div class="chip-select" id="filter-type-chips"></div>
+                        </div>
+                        <div class="filter-row"><label>Base Model</label>
+                            <div class="chip-select" id="filter-bm-chips" style="max-height:120px;overflow-y:auto">
+                            </div>
+                        </div>
+                        <div class="filter-row"><label>排序</label>
+                            <select id="filter-sort" style="flex:0 0 auto;width:auto;min-width:150px">
+                                <option value="Most Downloaded">最多下载</option>
+                                <option value="Highest Rated">最高评分</option>
+                                <option value="Newest">最新</option>
+                                <option value="Relevancy">相关性</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="search-error"></div>
+                    <div id="search-loading" class="loading hidden">
+                        <div class="spinner"></div>
+                        <div>搜索中...</div>
+                    </div>
+                    <div id="search-results" class="results-grid"></div>
+                    <div id="search-pagination" class="pagination"></div>
+                </div>
+                <!-- ID Lookup -->
+                <div id="ctab-lookup" class="hidden">
+                    <div style="margin-bottom:14px"><label
+                            style="font-size:.85rem;color:var(--t2);display:block;margin-bottom:5px">输入 Model
+                            ID（逗号/换行/空格分隔，支持 URL）</label>
+                        <div style="display:flex;gap:10px"><textarea id="id-input" style="flex:1;min-height:70px"
+                                placeholder="例如: 1102, 4384&#10;https://civitai.com/models/1102"></textarea><button
+                                class="btn btn-primary" onclick="lookupIds()" id="btn-lookup">查询</button></div>
+                    </div>
+                    <div id="lookup-error"></div>
+                    <div id="lookup-loading" class="loading hidden">
+                        <div class="spinner"></div>
+                        <div>查询中...</div>
+                        <div id="lookup-progress" style="margin-top:6px;font-size:.78rem"></div>
+                    </div>
+                    <div id="lookup-results" class="results-grid"></div>
+                </div>
+                <!-- Cart -->
+                <div id="ctab-cart" class="hidden">
+                    <div id="cart-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Logs Page ========== -->
+        <div id="page-logs" class="page hidden">
+            <div class="page-header">
+                <h2>📜 运行日志</h2>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <select id="log-service" onchange="loadLogs()" style="width:auto;min-width:140px">
+                        <option value="comfy">ComfyUI</option>
+                        <option value="dashboard">Dashboard</option>
+                        <option value="tunnel">Tunnel</option>
+                        <option value="sync">Cloud Sync</option>
+                    </select>
+                    <select id="log-lines" onchange="loadLogs()" style="width:auto;min-width:100px">
+                        <option value="50">50 行</option>
+                        <option value="100" selected>100 行</option>
+                        <option value="300">300 行</option>
+                        <option value="500">500 行</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="loadLogs()">🔄 刷新</button>
+                    <label style="font-size:.8rem;color:var(--t2);display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" id="log-auto" onchange="toggleAutoLog()"> 自动刷新
+                    </label>
+                </div>
+            </div>
+            <div class="page-body">
+                <div class="log-box" id="log-content">请选择服务查看日志...</div>
+            </div>
+        </div>
+
+    </div><!-- /content -->
+
+    <!-- Config Modal -->
+    <div class="modal-overlay" id="config-modal" onclick="if(event.target===this)closeConfigModal()">
+        <div class="modal-box">
+            <h3>⚙️ CivitAI API Key</h3>
+            <div class="form-group"><label>API Key 从 <a href="https://civitai.com/user/account" target="_blank"
+                        style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
+                <input type="text" id="config-apikey" placeholder="输入 CivitAI API Key...">
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-sm" onclick="closeConfigModal()">取消</button>
+                <button class="btn btn-sm btn-danger" onclick="clearApiKey()">清除</button>
+                <button class="btn btn-sm btn-primary" onclick="saveApiKey()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="modal-overlay" id="img-modal" onclick="this.classList.remove('active')"><img id="modal-img" src=""
+            style="max-width:90vw;max-height:90vh;border-radius:var(--r);object-fit:contain"></div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="dashboard.js"></script>
+</body>
+
+</html>

@@ -172,6 +172,41 @@ if [ -n "$CLOUDFLARED_TOKEN" ]; then
     fi
 fi
 
+# Workspace Manager (Dashboard) - 提前启动
+echo "  -> 安装 Dashboard 依赖..."
+$PIP_BIN install --no-cache-dir flask psutil flask-cors requests -q 2>/dev/null || true
+
+# 下载 Dashboard 文件（如果不存在）
+DASHBOARD_DIR="/workspace/ComfyUI_RunPod_Sync"
+if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
+    echo "  -> 下载 Dashboard 文件..."
+    mkdir -p "$DASHBOARD_DIR"
+    for f in workspace_manager.py dashboard.html dashboard.js; do
+        wget -q -O "$DASHBOARD_DIR/$f" \
+            "https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/$f" 2>/dev/null || true
+    done
+fi
+
+# 启动 Dashboard & Tunnel (提前，用户可立即查看部署状态)
+pm2 delete all 2>/dev/null || true
+
+if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
+    pm2 start $PYTHON_BIN --name dashboard \
+        --interpreter none \
+        --log /workspace/dashboard.log \
+        --time \
+        -- "$DASHBOARD_DIR/workspace_manager.py" 5000
+    echo "✅ Dashboard 已启动 (端口: 5000)"
+fi
+
+if [ -n "$CLOUDFLARED_TOKEN" ]; then
+    pm2 start cloudflared --name tunnel -- tunnel run --token "$CLOUDFLARED_TOKEN"
+    echo "✅ Cloudflare Tunnel 已启动 (Dashboard + ComfyUI + Jupyter 均可通过 Tunnel 访问)"
+fi
+pm2 save 2>/dev/null || true
+
+echo "📍 Dashboard & Tunnel 已就绪，后续步骤将在 Dashboard 中可见"
+
 
 # =================================================
 # 3. ComfyUI 更新 (可选)
@@ -299,8 +334,8 @@ echo "✅ jtoken 命令已安装"
 # =================================================
 echo "--> [5/5] 启动 ComfyUI 服务..."
 
-# 清理旧进程
-pm2 delete all 2>/dev/null || true
+# 注: pm2 进程已在 Step 2 中初始化 (dashboard + tunnel)
+# 下面只追加 ComfyUI 及同步服务
 
 # Output 云端同步 (OneDrive / Google Drive)
 if [ -n "$ONEDRIVE_REMOTE_NAME" ] || [ -n "$GDRIVE_REMOTE_NAME" ]; then
@@ -369,11 +404,7 @@ pm2 start $PYTHON_BIN --name comfy \
     --max-restarts 10 \
     -- main.py --listen 0.0.0.0 --port 8188 --use-pytorch-cross-attention --fast --disable-xformers
 
-# Cloudflare Tunnel
-if [ -n "$CLOUDFLARED_TOKEN" ]; then
-    pm2 start cloudflared --name tunnel -- tunnel run --token "$CLOUDFLARED_TOKEN"
-    echo "✅ Cloudflare Tunnel 已启动"
-fi
+# Cloudflare Tunnel & Dashboard 已在 Step 2 启动
 
 pm2 save
 echo "✅ ComfyUI 已启动！"

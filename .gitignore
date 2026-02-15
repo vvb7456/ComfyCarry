@@ -18,3 +18,13 @@ lora_scan_result.csv
 
 # Docker 构建文件（本地使用）
 docker/
+
+# Workspace Manager
+.civitai_config.json
+*.weilin-info.json
+*.preview.png
+*.preview.jpg
+*.preview.jpeg
+*.preview.webp
+.venv/
+__pycache__/
