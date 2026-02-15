@@ -535,6 +535,23 @@ def index():
     return Response("<h1>dashboard.html not found</h1>", mimetype="text/html", status=404)
 
 
+@app.route("/dashboard.js")
+def serve_js():
+    js_path = Path(__file__).parent / "dashboard.js"
+    if js_path.exists():
+        return Response(js_path.read_text(encoding="utf-8"), mimetype="application/javascript")
+    return "", 404
+
+
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    """通用静态文件服务"""
+    safe_path = Path(__file__).parent / filename
+    if safe_path.exists() and safe_path.is_file():
+        return send_file(str(safe_path))
+    return "", 404
+
+
 # ====================================================================
 # 启动
 # ====================================================================
