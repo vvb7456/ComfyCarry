@@ -28,3 +28,4 @@ docker/
 *.preview.webp
 .venv/
 __pycache__/
+cloudflared
