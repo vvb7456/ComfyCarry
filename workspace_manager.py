@@ -646,29 +646,58 @@ def api_download_clear_history():
 def api_tunnel_links():
     """获取 Cloudflare Tunnel 代理的服务链接"""
     links = []
-    # 尝试从环境变量获取 tunnel URL
+    # 尝试从环境变量获取
     tunnel_url = os.environ.get("CF_TUNNEL_URL", os.environ.get("TUNNEL_URL", ""))
     if tunnel_url:
-        tunnel_url = tunnel_url.rstrip("/")
-        links.append({"name": "ComfyUI", "url": tunnel_url, "icon": "🎨"})
-
-    # 常见 Jupyter 端口
+        links.append({"name": "ComfyUI", "url": tunnel_url.rstrip("/"), "icon": "🎨"})
     jupyter_url = os.environ.get("JUPYTER_URL", "")
     if jupyter_url:
         links.append({"name": "Jupyter", "url": jupyter_url, "icon": "📓"})
 
-    # 尝试从 PM2/tunnel 进程中提取 URL
+    # 尝试从 PM2 tunnel 日志中解析 Cloudflare Tunnel config
     if not links:
         try:
             r = subprocess.run(
-                "pm2 logs tunnel --nostream --lines 30 2>/dev/null | grep -oP 'https://[a-z0-9-]+\\.trycloudflare\\.com'",
+                "pm2 logs tunnel --nostream --lines 100 2>/dev/null",
                 shell=True, capture_output=True, text=True, timeout=5
             )
-            urls = list(set(r.stdout.strip().split("\n")))
-            urls = [u for u in urls if u.startswith("https://")]
-            for i, u in enumerate(urls):
-                name = "ComfyUI" if i == 0 else f"Service #{i+1}"
-                links.append({"name": name, "url": u, "icon": "🌐"})
+            log = r.stdout + r.stderr
+            # 尝试匹配 Named tunnel 的 ingress config JSON
+            import re as _re
+            cfg_match = _re.search(r'"ingress":\s*\[(.*?)\]', log)
+            if cfg_match:
+                try:
+                    ingress = json.loads("[" + cfg_match.group(1) + "]")
+                    service_icons = {
+                        "8188": ("ComfyUI", "🎨"),
+                        "8080": ("Jupyter", "📓"),
+                        "5000": ("Dashboard", "📊"),
+                        "22": ("SSH", "🖥️"),
+                    }
+                    for entry in ingress:
+                        hostname = entry.get("hostname", "")
+                        service = entry.get("service", "")
+                        if not hostname:
+                            continue
+                        # Skip SSH and catch-all
+                        if "ssh://" in service or service.startswith("http_status:"):
+                            continue
+                        # Guess icon from port
+                        port = ""
+                        port_match = _re.search(r':(\d+)', service)
+                        if port_match:
+                            port = port_match.group(1)
+                        name, icon = service_icons.get(port, (hostname.split(".")[0].title(), "🌐"))
+                        links.append({"name": name, "url": f"https://{hostname}", "icon": icon})
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+            # Fallback: try random trycloudflare URLs
+            if not links:
+                urls = list(set(_re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log)))
+                for i, u in enumerate(urls):
+                    name = "ComfyUI" if i == 0 else f"Service #{i+1}"
+                    links.append({"name": name, "url": u, "icon": "🌐"})
         except Exception:
             pass
 

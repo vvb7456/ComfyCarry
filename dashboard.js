@@ -29,6 +29,7 @@ function showPage(page) {
   if (page === 'dashboard') refreshDashboard();
   else { stopDlStatusPolling(); if (page === 'models') loadLocalModels(); }
   if (page === 'civitai') { loadFacets(); }
+  else if (page === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
   else if (page === 'logs') loadLogs();
 }
 
@@ -50,7 +51,7 @@ function openImg(url) {
   document.getElementById('img-modal').classList.add('active');
   img.src = url;
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); closeMetaModal(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); closeMetaModal(); closeVersionPicker(); } });
 
 // ========== Metadata Modal ==========
 function openMetaModal(data) {
@@ -264,7 +265,6 @@ async function refreshDashboard() {
   const statsEl = document.getElementById('sys-stats');
   const svcEl = document.getElementById('svc-tbody');
   loadTunnelLinks();
-  startDlStatusPolling();
 
   try {
     const [sysR, svcR] = await Promise.all([fetch('/api/system'), fetch('/api/services')]);
@@ -689,9 +689,19 @@ function toggleCartFromSearch(id, btn) {
 }
 
 async function downloadFromSearch(modelId, modelType) {
-  // Try to get the selected version from cache
+  // Check if multiple versions available → show picker
   const cached = searchResultsCache[String(modelId)];
+  const allVersions = cached?.allVersions || [];
+  if (allVersions.length > 1) {
+    showVersionPicker(modelId, modelType, allVersions);
+    return;
+  }
+  // Single version: download directly
   const versionId = cached?.version?.id || null;
+  await doDownload(modelId, modelType, versionId);
+}
+
+async function doDownload(modelId, modelType, versionId) {
   showToast(`正在发送下载请求: ${modelId}${versionId ? ' (v' + versionId + ')' : ''}...`);
   try {
     const payload = { model_id: modelId, model_type: modelType };
@@ -704,6 +714,32 @@ async function downloadFromSearch(modelId, modelType) {
     if (d.error) showToast('❌ ' + d.error);
     else showToast('✅ ' + (d.message || '下载任务已提交'));
   } catch (e) { showToast('请求失败: ' + e.message); }
+}
+
+// ========== Version Picker ==========
+function showVersionPicker(modelId, modelType, versions) {
+  const title = document.getElementById('vp-title');
+  const body = document.getElementById('vp-body');
+  const cached = searchResultsCache[String(modelId)];
+  title.textContent = `选择版本 - ${cached?.name || modelId}`;
+
+  let html = '<div style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto">';
+  versions.forEach(v => {
+    const bm = v.baseModel ? `<span class="badge badge-other" style="font-size:.72rem">${v.baseModel}</span>` : '';
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rs)">
+      <div>
+        <span style="font-weight:500">${v.name || v.id}</span> ${bm}
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="closeVersionPicker(); doDownload('${modelId}', '${modelType}', '${v.id}')">📥 下载</button>
+    </div>`;
+  });
+  html += '</div>';
+  body.innerHTML = html;
+  document.getElementById('version-picker-modal').classList.add('active');
+}
+
+function closeVersionPicker() {
+  document.getElementById('version-picker-modal').classList.remove('active');
 }
 
 // ========== ID Lookup ==========

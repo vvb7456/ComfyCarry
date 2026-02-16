@@ -1075,12 +1075,13 @@
             <div class="nav-item" data-page="models" onclick="showPage('models')"><span class="icon">🎨</span>模型管理</div>
             <div class="nav-item" data-page="civitai" onclick="showPage('civitai')"><span class="icon">🔍</span>CivitAI
                 搜索</div>
+            <div class="nav-item" data-page="downloads" onclick="showPage('downloads')"><span class="icon">📥</span>下载管理</div>
             <div class="nav-item" data-page="logs" onclick="showPage('logs')"><span class="icon">📜</span>运行日志</div>
         </div>
         <div class="sidebar-footer">
             <div id="key-status" style="margin-bottom:4px">🔒 未设置 Key</div>
             <button class="btn btn-sm" onclick="openConfigModal()" style="width:100%">⚙️ API Key</button>
-            <div style="font-size:0.7rem;color:var(--t3);text-align:center;margin-top:8px">v2.1 (Metadata + Scroll)</div>
+            <div style="font-size:0.7rem;color:var(--t3);text-align:center;margin-top:8px">v2.2 (Downloads + Auth)</div>
         </div>
     </nav>
 
@@ -1102,10 +1103,6 @@
                 <div class="tunnel-links" id="tunnel-links"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
 
                 <div class="stat-grid" id="sys-stats"></div>
-
-                <!-- Download Status -->
-                <div class="section-title">📥 下载状态</div>
-                <div id="dl-status-content" style="margin-bottom:20px"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
 
                 <div class="section-title">🔧 服务管理</div>
                 <table class="svc-table" id="svc-table">
@@ -1216,6 +1213,17 @@
             </div>
         </div>
 
+        <!-- ========== Downloads Page ========== -->
+        <div id="page-downloads" class="page hidden">
+            <div class="page-header">
+                <h2>📥 下载管理</h2>
+                <button class="btn btn-sm" onclick="refreshDownloadStatus()">🔄 刷新</button>
+            </div>
+            <div class="page-body">
+                <div id="dl-status-content"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
+            </div>
+        </div>
+
         <!-- ========== Logs Page ========== -->
         <div id="page-logs" class="page hidden">
             <div class="page-header">
@@ -1273,6 +1281,14 @@
         </div>
     </div>
 
+    <!-- Version Picker Modal -->
+    <div class="modal-overlay" id="version-picker-modal" onclick="if(event.target===this)closeVersionPicker()">
+        <div class="modal-box" style="width:480px">
+            <h3 id="vp-title">选择版本</h3>
+            <div id="vp-body"></div>
+        </div>
+    </div>
+
     <!-- Image Modal -->
     <div class="modal-overlay" id="img-modal" onclick="this.classList.remove('active')"><img id="modal-img" src=""
             style="max-width:90vw;max-height:90vh;border-radius:var(--r);object-fit:contain"></div>
@@ -1280,7 +1296,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=14"></script>
+    <script src="dashboard.js?v=15"></script>
 </body>
 
 </html>
