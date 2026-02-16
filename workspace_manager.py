@@ -245,27 +245,33 @@ def save_config():
 @app.route("/api/search", methods=["POST"])
 def proxy_search():
     try:
+        raw_data = request.get_data()
+        print(f"\n[DEBUG] === Search Request ({datetime.now().isoformat()}) ===", flush=True)
+        print(f"[DEBUG] Headers: {dict(request.headers)}", flush=True)
+        print(f"[DEBUG] Raw Body: {raw_data.decode('utf-8', errors='ignore')}", flush=True)
+        
         data = request.get_json(force=True, silent=True)
         if not data:
-            print("[DEBUG] Search: No JSON body", flush=True)
+            print("[DEBUG] Error: No JSON body", flush=True)
             return jsonify({"error": "No JSON body"}), 400
 
-        print(f"[DEBUG] Search payload: {json.dumps(data)}", flush=True)
-        
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {MEILI_BEARER}",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
+        print(f"[DEBUG] Sending to Meili: {MEILI_URL} with headers {headers}", flush=True)
         resp = requests.post(MEILI_URL, headers=headers, json=data, timeout=10)
-        print(f"[DEBUG] Search resp: {resp.status_code}", flush=True)
-        if resp.status_code != 200:
-            print(f"[DEBUG] Search error: {resp.text[:200]}", flush=True)
+        
+        print(f"[DEBUG] Meili Response Status: {resp.status_code}", flush=True)
+        print(f"[DEBUG] Meili Response Text: {resp.text[:1000]}", flush=True) # Limit to 1000 chars
 
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception as e:
-        print(f"[DEBUG] Search exception: {e}", flush=True)
+        print(f"[DEBUG] Search Exception: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
