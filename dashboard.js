@@ -1676,12 +1676,12 @@ function renderInstalledPlugins() {
       description: enriched.description || '',
       repository: enriched.repository || enriched.reference || (inst.aux_id ? `https://github.com/${inst.aux_id}` : ''),
       author: enriched.author || (inst.aux_id ? inst.aux_id.split('/')[0] : ''),
-      stars: enriched.stars || 0,
+      stars: enriched.stars != null ? enriched.stars : 0,
       ver: inst.ver || '',
       activeVersion: enriched.active_version || inst.ver || '',
       cnrLatest: enriched.cnr_latest || '',
       enabled: inst.enabled !== false,
-      updateState: enriched['update-state'] || false,
+      updateState: enriched['update-state'] === 'true' || enriched['update-state'] === true,
     };
   });
 
@@ -1711,14 +1711,14 @@ function renderInstalledPlugins() {
   }
 
   el.innerHTML = filtered.map(p => {
-    const verDisplay = p.activeVersion === 'nightly' ? 'nightly' : (p.cnrLatest || p.activeVersion || _shortHash(p.ver));
     const isNightly = p.activeVersion === 'nightly';
+    const installedVer = isNightly ? _shortHash(p.ver) : (p.activeVersion || _shortHash(p.ver));
+    const latestVer = p.cnrLatest || '';
 
     let badgeHtml = '';
     if (p.updateState) badgeHtml += '<span class="plugin-badge update">有更新</span>';
     if (!p.enabled) badgeHtml += '<span class="plugin-badge disabled">已禁用</span>';
     else badgeHtml += '<span class="plugin-badge installed">已安装</span>';
-    if (isNightly) badgeHtml += '<span class="plugin-badge" style="background:rgba(34,211,238,.15);color:var(--cyan)">nightly</span>';
 
     let actionsHtml = '';
     if (p.updateState) actionsHtml += `<button class="btn btn-sm btn-success" onclick="updatePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">⬆️ 更新</button>`;
@@ -1738,9 +1738,9 @@ function renderInstalledPlugins() {
       ${p.description ? `<div class="plugin-item-desc">${_h(p.description)}</div>` : ''}
       <div class="plugin-item-meta">
         <span>📦 ${_h(p.cnrId || p.dirName)}</span>
-        <span style="color:var(--cyan)">v${_h(verDisplay)}</span>
-        ${p.cnrLatest && p.activeVersion === 'nightly' ? `<span style="color:var(--t3)">(latest: ${_h(p.cnrLatest)})</span>` : ''}
-        ${p.stars ? `<span>⭐ ${p.stars}</span>` : ''}
+        <span style="color:var(--cyan)">${isNightly ? '🔧 ' + _h(installedVer) : 'v' + _h(installedVer)}</span>
+        ${latestVer ? `<span style="color:var(--t3)">(latest: ${_h(latestVer)})</span>` : ''}
+        ${p.stars > 0 ? `<span>⭐ ${p.stars}</span>` : ''}
         ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
         <div class="plugin-item-actions">${actionsHtml}</div>
       </div>
@@ -1823,7 +1823,6 @@ function _renderBrowseItem(p) {
   else badgeHtml = '<span class="plugin-badge not-installed">未安装</span>';
 
   const activeVer = p.active_version || '';
-  if (activeVer === 'nightly') badgeHtml += '<span class="plugin-badge" style="background:rgba(34,211,238,.15);color:var(--cyan)">nightly</span>';
 
   let actionsHtml = '';
   if (!isInstalled) {
@@ -1843,7 +1842,7 @@ function _renderBrowseItem(p) {
       <span>📦 ${_h(p.id)}</span>
       ${ver ? `<span>v${_h(ver)}</span>` : ''}
       ${p.cnr_latest ? `<span style="color:var(--t3)">latest: ${_h(p.cnr_latest)}</span>` : ''}
-      ${p.stars ? `<span>⭐ ${p.stars}</span>` : ''}
+      ${p.stars > 0 ? `<span>⭐ ${p.stars}</span>` : ''}
       ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
       ${p.last_update ? `<span>🕐 ${p.last_update.split('T')[0]}</span>` : ''}
       <div class="plugin-item-actions">${actionsHtml}</div>
