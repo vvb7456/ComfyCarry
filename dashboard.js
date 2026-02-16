@@ -456,19 +456,22 @@ async function _autoFetchMetadataForNewDownloads() {
   try {
     const r = await fetch('/api/local_models');
     if (!r.ok) return;
-    const models = await r.json();
-    const noInfo = models.filter(m => !m.has_info);
+    const data = await r.json();
+    const allModels = data.models || [];
+    const noInfo = allModels.filter(m => !m.has_info);
     if (noInfo.length === 0) return;
     showToast(`🔄 自动获取 ${noInfo.length} 个新模型的元数据...`);
+    let ok = 0;
     for (const m of noInfo) {
       try {
-        await fetch('/api/local_models/fetch_info', {
+        const fr = await fetch('/api/local_models/fetch_info', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ abs_path: m.abs_path })
         });
+        if (fr.ok) ok++;
       } catch (e) { console.error('Auto-fetch metadata failed:', m.filename, e); }
     }
-    showToast(`✅ 元数据自动获取完成`);
+    showToast(`✅ 元数据自动获取完成 (${ok}/${noInfo.length})`);
     // Refresh model list if user is on models page
     if (document.getElementById('local-models-grid')) loadLocalModels();
   } catch (e) { console.error('_autoFetchMetadataForNewDownloads error:', e); }
