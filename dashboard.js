@@ -289,37 +289,42 @@ function switchCivitTab(tab) {
   if (tab === 'cart') renderCart();
 }
 
-let nextCursor = null;
-
-async function searchModels(cursor = null) {
+async function searchModels(page = 0) {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
 
+  searchPage = page;
   const loading = document.getElementById('search-loading');
   const results = document.getElementById('search-results');
   const pag = document.getElementById('search-pagination');
   const errEl = document.getElementById('search-error');
-
-  if (!cursor) {
-    results.innerHTML = '';
-    pag.innerHTML = '';
-    nextCursor = null;
-  }
-
   errEl.innerHTML = '';
   loading.classList.remove('hidden');
+  results.innerHTML = '';
+  pag.innerHTML = '';
 
   const types = getActiveChips('filter-type-chips');
-  const sort = document.getElementById('filter-sort').value; // REST API: Most Downloaded, Highest Rated, Newest
-  const nsfw = document.getElementById('filter-nsfw').checked;
+  const bms = getActiveChips('filter-bm-chips');
+  const sort = document.getElementById('filter-sort').value;
+  const limit = 20;
+  const offset = page * limit;
+
+  // Build Meilisearch query
+  const filter = [];
+  if (types.length > 0) filter.push(types.map(t => `type = ${t}`).join(' OR '));
+  if (bms.length > 0) filter.push(bms.map(b => `version.baseModel = "${b}"`).join(' OR '));
+  filter.push('nsfwLevel <= 4');
+
+  const sortMap = { 'Most Downloaded': ['stats.downloadCount:desc'], 'Highest Rated': ['stats.rating:desc'], 'Newest': ['createdAtUnix:desc'], 'Relevancy': [] };
 
   const body = {
-    query: query,
-    limit: 20,
-    cursor: cursor,
-    sort: sort,
-    nsfw: nsfw,
-    types: types
+    queries: [{
+      indexUid: 'models_v9', q: query, limit, offset,
+      filter: filter.length > 0 ? filter : undefined,
+      sort: sortMap[sort] || [],
+      attributesToRetrieve: ['id', 'name', 'type', 'stats', 'images', 'version', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
+      attributesToHighlight: ['name'],
+    }]
   };
 
   try {
@@ -327,24 +332,25 @@ async function searchModels(cursor = null) {
     const d = await r.json();
     loading.classList.add('hidden');
 
-    if (d.error) throw new Error(d.error);
+    const res = (d.results || [])[0] || {};
+    const hits = res.hits || [];
+    const total = res.estimatedTotalHits || 0;
 
-    const items = d.items || [];
-    if (items.length === 0 && !cursor) {
+    if (hits.length === 0) {
       results.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">没有找到匹配的模型</div>';
       return;
     }
 
-    if (!cursor) results.innerHTML = '';
-    results.innerHTML += items.map(h => renderCivitCard(h)).join('');
+    results.innerHTML = hits.map(h => renderCivitCard(h)).join('');
 
     // Pagination
-    nextCursor = d.metadata?.nextCursor;
-    if (nextCursor) {
-      pag.innerHTML = `<button class="btn btn-sm" onclick="searchModels('${nextCursor}')">加载更多 ▶</button>`;
-    } else {
-      pag.innerHTML = '<span style="padding:6px;color:var(--t2);font-size:.82rem">没有更多了</span>';
-    }
+    const totalPages = Math.ceil(total / limit);
+    const curPage = page;
+    let pagHtml = '';
+    if (curPage > 0) pagHtml += `<button class="btn btn-sm" onclick="searchModels(${curPage - 1})">◀ 上一页</button>`;
+    pagHtml += `<span style="padding:6px;color:var(--t2);font-size:.82rem">${curPage + 1} / ${totalPages} (共 ${total})</span>`;
+    if (curPage < totalPages - 1) pagHtml += `<button class="btn btn-sm" onclick="searchModels(${curPage + 1})">下一页 ▶</button>`;
+    pag.innerHTML = pagHtml;
   } catch (e) {
     loading.classList.add('hidden');
     errEl.innerHTML = `<div class="error-msg">搜索失败: ${e.message}</div>`;
@@ -352,25 +358,13 @@ async function searchModels(cursor = null) {
 }
 
 function renderCivitCard(h) {
-  // REST API adaptation
-  const version = h.modelVersions && h.modelVersions.length > 0 ? h.modelVersions[0] : null;
-  const image = version && version.images && version.images.length > 0 ? version.images[0] : null;
-  const imgUrl = image ? image.url : '';
-
+  const img = (h.images && h.images[0]) ? (h.images[0].url || '') : '';
   const badgeClass = getBadgeClass((h.type || '').toLowerCase() === 'lora' ? 'loras' : (h.type || '').toLowerCase());
-  const bm = version ? version.baseModel : '';
+  const bm = h.version?.baseModel || '';
   const inCart = selectedModels.has(String(h.id));
 
-  // Construct data object for cart
-  const cartData = {
-    name: h.name,
-    type: h.type,
-    images: version && version.images ? version.images : [],
-    version: version
-  };
-
   return `<div class="model-card">
-    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+    <div class="model-card-img">${img ? `<img src="${img}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${h.name || ''}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
@@ -380,7 +374,7 @@ function renderCivitCard(h) {
       </div>
       <div class="model-card-actions">
         <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
-        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(cartData).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(h).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
         <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
