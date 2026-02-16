@@ -1374,28 +1374,25 @@ async function loadComfyParams() {
         if (!depMet) continue;
       }
 
-      const helpHtml = schema.help ? `<div class="comfy-param-help">${escHtml(schema.help)}</div>` : '';
+      const helpIcon = schema.help ? ` <span class="comfy-param-help-icon" data-tip="${escHtml(schema.help)}">?</span>` : '';
 
       html += `<div class="comfy-param-group">`;
       if (schema.type === 'select') {
-        html += `<label>${escHtml(schema.label)}</label>`;
+        html += `<label>${escHtml(schema.label)}${helpIcon}</label>`;
         html += `<select id="cparam-${key}" data-param="${key}">`;
         for (const [val, label] of schema.options) {
           html += `<option value="${val}" ${val === String(schema.value) || val === schema.value ? 'selected' : ''}>${escHtml(label)}</option>`;
         }
         html += '</select>';
-        html += helpHtml;
       } else if (schema.type === 'bool') {
         html += `<label class="comfy-param-toggle">
           <input type="checkbox" id="cparam-${key}" data-param="${key}" ${schema.value ? 'checked' : ''}>
           <span class="comfy-toggle-slider"></span>
-          <span>${escHtml(schema.label)}</span>
+          <span class="toggle-text">${escHtml(schema.label)}${helpIcon}</span>
         </label>`;
-        html += helpHtml;
       } else if (schema.type === 'number') {
-        html += `<label>${escHtml(schema.label)}</label>`;
+        html += `<label>${escHtml(schema.label)}${helpIcon}</label>`;
         html += `<input type="number" id="cparam-${key}" data-param="${key}" value="${schema.value || 0}" min="0" max="100">`;
-        html += helpHtml;
       }
       html += '</div>';
     }
@@ -1460,7 +1457,7 @@ async function saveComfyUIParams() {
       status.textContent = '✅ 已保存，ComfyUI 正在重启...';
       status.style.color = 'var(--green)';
       showToast('ComfyUI 正在使用新参数重启...');
-      setTimeout(loadComfyUIPage, 5000);
+      setTimeout(() => { status.textContent = ''; loadComfyUIPage(); }, 5000);
     } else {
       status.textContent = '❌ ' + (d.error || '保存失败');
       status.style.color = 'var(--red, #e74c3c)';
