@@ -444,6 +444,29 @@ async function fetchAllInfo() {
   loadLocalModels();
 }
 
+async function _autoFetchMetadataForNewDownloads() {
+  // Silently scan local models and fetch metadata for any missing info
+  try {
+    const r = await fetch('/api/local_models');
+    if (!r.ok) return;
+    const models = await r.json();
+    const noInfo = models.filter(m => !m.has_info);
+    if (noInfo.length === 0) return;
+    showToast(`🔄 自动获取 ${noInfo.length} 个新模型的元数据...`);
+    for (const m of noInfo) {
+      try {
+        await fetch('/api/local_models/fetch_info', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ abs_path: m.abs_path })
+        });
+      } catch (e) { console.error('Auto-fetch metadata failed:', m.filename, e); }
+    }
+    showToast(`✅ 元数据自动获取完成`);
+    // Refresh model list if user is on models page
+    if (document.getElementById('local-models-grid')) loadLocalModels();
+  } catch (e) { console.error('_autoFetchMetadataForNewDownloads error:', e); }
+}
+
 async function deleteModel(idx) {
   const m = localModelsData[idx];
   if (!m) return;
@@ -984,6 +1007,7 @@ function toggleAutoLog() {
 
 // ========== Download Status ==========
 let dlStatusInterval = null;
+let _dlCompletedIds = new Set();  // track completed download IDs for auto-metadata
 
 async function refreshDownloadStatus() {
   const container = document.getElementById('dl-status-content');
@@ -1034,6 +1058,15 @@ async function refreshDownloadStatus() {
           <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
         </div>`;
       });
+    }
+
+    // Check for new completions → auto-fetch metadata
+    // Seed known IDs on first load (before checking for new)
+    const prevSize = _dlCompletedIds.size;
+    history.filter(dl => dl.status === 'completed').forEach(dl => _dlCompletedIds.add(dl.id));
+    // Only trigger if set grew AND we had previous data (not first load)
+    if (prevSize > 0 && _dlCompletedIds.size > prevSize) {
+      setTimeout(() => _autoFetchMetadataForNewDownloads(), 3000);
     }
 
     // History
