@@ -1607,7 +1607,8 @@ async function restartDashboard() {
 
 
 // ========== Plugin Management ==========
-let pluginInstalledData = {};   // id -> node pack info
+let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed
+let pluginGetlistCache = {};    // id -> full info from /getlist
 let pluginBrowseData = [];      // flat array of all browsable packs
 let pluginBrowseIndex = 0;      // pagination index for browse
 const PLUGIN_PAGE_SIZE = 40;
@@ -1634,9 +1635,24 @@ async function loadInstalledPlugins() {
   const el = document.getElementById('plugin-installed-list');
   el.innerHTML = '<div class="loading"><div class="spinner"></div><br>加载已安装插件...</div>';
   try {
-    const r = await fetch('/api/plugins/installed');
-    if (!r.ok) { const e = await r.json(); throw new Error(e.error || r.statusText); }
-    pluginInstalledData = await r.json();
+    // Fetch installed list and getlist in parallel to enrich data
+    const [instR, listR] = await Promise.allSettled([
+      fetch('/api/plugins/installed').then(r => r.ok ? r.json() : Promise.reject(r.statusText)),
+      fetch('/api/plugins/available').then(r => r.ok ? r.json() : null)
+    ]);
+    if (instR.status !== 'fulfilled') throw new Error(instR.reason || '获取已安装列表失败');
+    pluginInstalledRaw = instR.value;
+    // Cache getlist data for enrichment
+    if (listR.status === 'fulfilled' && listR.value) {
+      const packs = listR.value.node_packs || listR.value;
+      pluginGetlistCache = packs;
+      // Also populate browse data
+      pluginBrowseData = Object.entries(packs).map(([id, info]) => ({
+        id, ...info,
+        _title: (info.title || id).toLowerCase(),
+        _desc: (info.description || '').toLowerCase(),
+      }));
+    }
     renderInstalledPlugins();
   } catch (e) {
     el.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
@@ -1649,27 +1665,44 @@ function renderInstalledPlugins() {
   const filter = (document.getElementById('plugin-installed-filter')?.value || '').toLowerCase();
   const statusFilter = document.getElementById('plugin-installed-status')?.value || 'all';
 
-  const packs = Object.entries(pluginInstalledData);
-  let filtered = packs.filter(([id, info]) => {
-    const name = (info.title || info.title_aux || id).toLowerCase();
-    const desc = (info.description || '').toLowerCase();
-    if (filter && !name.includes(filter) && !desc.includes(filter) && !id.includes(filter)) return false;
-    if (statusFilter === 'enabled' && info.enabled === false) return false;
-    if (statusFilter === 'disabled' && info.enabled !== false) return false;
-    if (statusFilter === 'update' && !info.update_available) return false;
+  // Merge installed data with getlist enrichment
+  const packs = Object.entries(pluginInstalledRaw).map(([dirName, inst]) => {
+    const cnrId = inst.cnr_id || '';
+    const enriched = pluginGetlistCache[cnrId] || {};
+    return {
+      dirName,
+      cnrId,
+      title: enriched.title || dirName,
+      description: enriched.description || '',
+      repository: enriched.repository || enriched.reference || (inst.aux_id ? `https://github.com/${inst.aux_id}` : ''),
+      author: enriched.author || (inst.aux_id ? inst.aux_id.split('/')[0] : ''),
+      stars: enriched.stars || 0,
+      ver: inst.ver || '',
+      activeVersion: enriched.active_version || inst.ver || '',
+      cnrLatest: enriched.cnr_latest || '',
+      enabled: inst.enabled !== false,
+      updateState: enriched['update-state'] || false,
+    };
+  });
+
+  let filtered = packs.filter(p => {
+    if (filter && !p.title.toLowerCase().includes(filter) && !p.description.toLowerCase().includes(filter) && !p.cnrId.includes(filter) && !p.dirName.toLowerCase().includes(filter)) return false;
+    if (statusFilter === 'enabled' && !p.enabled) return false;
+    if (statusFilter === 'disabled' && p.enabled) return false;
+    if (statusFilter === 'update' && !p.updateState) return false;
     return true;
   });
 
-  // Sort: updates first, then by name
+  // Sort: updates first, then by title
   filtered.sort((a, b) => {
-    if (a[1].update_available && !b[1].update_available) return -1;
-    if (!a[1].update_available && b[1].update_available) return 1;
-    return (a[1].title || a[0]).localeCompare(b[1].title || b[0]);
+    if (a.updateState && !b.updateState) return -1;
+    if (!a.updateState && b.updateState) return 1;
+    return a.title.localeCompare(b.title);
   });
 
   const totalCount = packs.length;
-  const enabledCount = packs.filter(([, i]) => i.enabled !== false).length;
-  const updateCount = packs.filter(([, i]) => i.update_available).length;
+  const enabledCount = packs.filter(p => p.enabled).length;
+  const updateCount = packs.filter(p => p.updateState).length;
   statsEl.textContent = `共 ${totalCount} 个插件, ${enabledCount} 个启用, ${updateCount} 个有更新 | 显示 ${filtered.length} 个`;
 
   if (filtered.length === 0) {
@@ -1677,45 +1710,45 @@ function renderInstalledPlugins() {
     return;
   }
 
-  el.innerHTML = filtered.map(([id, info]) => {
-    const title = info.title || info.title_aux || id;
-    const ver = info.ver || info.version || '';
-    const desc = info.description || '';
-    const repo = info.repository || info.reference || '';
-    const isDisabled = info.enabled === false;
-    const hasUpdate = info.update_available;
+  el.innerHTML = filtered.map(p => {
+    const verDisplay = p.activeVersion === 'nightly' ? 'nightly' : (p.cnrLatest || p.activeVersion || _shortHash(p.ver));
+    const isNightly = p.activeVersion === 'nightly';
 
     let badgeHtml = '';
-    if (hasUpdate) badgeHtml += '<span class="plugin-badge update">有更新</span>';
-    if (isDisabled) badgeHtml += '<span class="plugin-badge disabled">已禁用</span>';
+    if (p.updateState) badgeHtml += '<span class="plugin-badge update">有更新</span>';
+    if (!p.enabled) badgeHtml += '<span class="plugin-badge disabled">已禁用</span>';
     else badgeHtml += '<span class="plugin-badge installed">已安装</span>';
+    if (isNightly) badgeHtml += '<span class="plugin-badge" style="background:rgba(34,211,238,.15);color:var(--cyan)">nightly</span>';
 
     let actionsHtml = '';
-    if (hasUpdate) actionsHtml += `<button class="btn btn-sm btn-success" onclick="updatePlugin('${_esc(id)}','${_esc(ver)}')">⬆️ 更新</button>`;
-    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(id)}','${_esc(title)}')">📋 版本</button>`;
-    if (isDisabled) {
-      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="togglePlugin('${_esc(id)}','${_esc(ver)}')">▶️ 启用</button>`;
+    if (p.updateState) actionsHtml += `<button class="btn btn-sm btn-success" onclick="updatePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">⬆️ 更新</button>`;
+    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.cnrId || p.dirName)}','${_esc(p.title)}')">📋 版本</button>`;
+    if (!p.enabled) {
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">▶️ 启用</button>`;
     } else {
-      actionsHtml += `<button class="btn btn-sm" onclick="togglePlugin('${_esc(id)}','${_esc(ver)}')">⏸️ 禁用</button>`;
+      actionsHtml += `<button class="btn btn-sm" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">⏸️ 禁用</button>`;
     }
-    actionsHtml += `<button class="btn btn-sm btn-danger" onclick="uninstallPlugin('${_esc(id)}','${_esc(ver)}','${_esc(title)}')">🗑️</button>`;
+    actionsHtml += `<button class="btn btn-sm btn-danger" onclick="uninstallPlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}','${_esc(p.title)}')">🗑️</button>`;
 
     return `<div class="plugin-item">
       <div class="plugin-item-header">
-        <div class="plugin-item-title">${repo ? `<a href="${repo}" target="_blank">${_h(title)}</a>` : _h(title)}</div>
+        <div class="plugin-item-title">${p.repository ? `<a href="${p.repository}" target="_blank">${_h(p.title)}</a>` : _h(p.title)}</div>
         ${badgeHtml}
       </div>
-      ${desc ? `<div class="plugin-item-desc">${_h(desc)}</div>` : ''}
+      ${p.description ? `<div class="plugin-item-desc">${_h(p.description)}</div>` : ''}
       <div class="plugin-item-meta">
-        <span>📦 ${_h(id)}</span>
-        ${ver ? `<span>v${_h(ver)}</span>` : ''}
-        ${info.stars ? `<span>⭐ ${info.stars}</span>` : ''}
-        ${info.author ? `<span>👤 ${_h(info.author)}</span>` : ''}
+        <span>📦 ${_h(p.cnrId || p.dirName)}</span>
+        <span style="color:var(--cyan)">v${_h(verDisplay)}</span>
+        ${p.cnrLatest && p.activeVersion === 'nightly' ? `<span style="color:var(--t3)">(latest: ${_h(p.cnrLatest)})</span>` : ''}
+        ${p.stars ? `<span>⭐ ${p.stars}</span>` : ''}
+        ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
         <div class="plugin-item-actions">${actionsHtml}</div>
       </div>
     </div>`;
   }).join('');
 }
+
+function _shortHash(h) { return h && h.length > 8 ? h.substring(0, 8) : (h || 'unknown'); }
 
 function filterInstalledPlugins() {
   renderInstalledPlugins();
@@ -1729,15 +1762,19 @@ async function loadBrowsePlugins() {
   const el = document.getElementById('plugin-browse-list');
   el.innerHTML = '<div class="loading"><div class="spinner"></div><br>加载插件列表中 (首次可能较慢)...</div>';
   try {
+    // Use cached data if available (loaded by installed tab)
+    if (pluginBrowseData.length > 0) {
+      searchPlugins();
+      return;
+    }
     const r = await fetch('/api/plugins/available');
     if (!r.ok) { const e = await r.json(); throw new Error(e.error || r.statusText); }
     const data = await r.json();
-    // node_packs 是 {id: info} 的对象
     const packs = data.node_packs || data;
+    pluginGetlistCache = packs;
     pluginBrowseData = Object.entries(packs).map(([id, info]) => ({
-      id,
-      ...info,
-      _title: (info.title || info.title_aux || id).toLowerCase(),
+      id, ...info,
+      _title: (info.title || id).toLowerCase(),
       _desc: (info.description || '').toLowerCase(),
     }));
     pluginBrowseIndex = 0;
@@ -1758,7 +1795,6 @@ function searchPlugins() {
     );
   }
 
-  // Sort
   if (sort === 'stars') results.sort((a, b) => (b.stars || 0) - (a.stars || 0));
   else if (sort === 'update') results.sort((a, b) => (b.last_update || '').localeCompare(a.last_update || ''));
   else if (sort === 'name') results.sort((a, b) => a._title.localeCompare(b._title));
@@ -1767,9 +1803,52 @@ function searchPlugins() {
   const statsEl = document.getElementById('plugin-browse-stats');
   statsEl.textContent = `共 ${results.length} 个插件${query ? ` (匹配 "${query}")` : ''}`;
 
-  // Store filtered results for pagination
   window._pluginFilteredBrowse = results;
   renderBrowsePage();
+}
+
+function _renderBrowseItem(p) {
+  const title = p.title || p.id;
+  const ver = p.version || '';
+  const desc = p.description || '';
+  const repo = p.repository || p.reference || '';
+  // Use 'state' from getlist API: 'enabled', 'disabled', 'not-installed'
+  const state = p.state || 'not-installed';
+  const isInstalled = state === 'enabled' || state === 'disabled';
+  const isDisabled = state === 'disabled';
+
+  let badgeHtml = '';
+  if (isInstalled && !isDisabled) badgeHtml = '<span class="plugin-badge installed">已安装</span>';
+  else if (isInstalled && isDisabled) badgeHtml = '<span class="plugin-badge disabled">已禁用</span>';
+  else badgeHtml = '<span class="plugin-badge not-installed">未安装</span>';
+
+  const activeVer = p.active_version || '';
+  if (activeVer === 'nightly') badgeHtml += '<span class="plugin-badge" style="background:rgba(34,211,238,.15);color:var(--cyan)">nightly</span>';
+
+  let actionsHtml = '';
+  if (!isInstalled) {
+    actionsHtml += `<button class="btn btn-sm btn-primary" onclick="installPlugin('${_esc(p.id)}','latest')">安装</button>`;
+    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.id)}','${_esc(title)}')">📋 版本</button>`;
+  } else {
+    actionsHtml += '<span style="font-size:.78rem;color:var(--green)">✅ 已安装</span>';
+  }
+
+  return `<div class="plugin-item">
+    <div class="plugin-item-header">
+      <div class="plugin-item-title">${repo ? `<a href="${repo}" target="_blank">${_h(title)}</a>` : _h(title)}</div>
+      ${badgeHtml}
+    </div>
+    ${desc ? `<div class="plugin-item-desc">${_h(desc)}</div>` : ''}
+    <div class="plugin-item-meta">
+      <span>📦 ${_h(p.id)}</span>
+      ${ver ? `<span>v${_h(ver)}</span>` : ''}
+      ${p.cnr_latest ? `<span style="color:var(--t3)">latest: ${_h(p.cnr_latest)}</span>` : ''}
+      ${p.stars ? `<span>⭐ ${p.stars}</span>` : ''}
+      ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
+      ${p.last_update ? `<span>🕐 ${p.last_update.split('T')[0]}</span>` : ''}
+      <div class="plugin-item-actions">${actionsHtml}</div>
+    </div>
+  </div>`;
 }
 
 function renderBrowsePage() {
@@ -1786,44 +1865,7 @@ function renderBrowsePage() {
     return;
   }
 
-  el.innerHTML = slice.map(p => {
-    const title = p.title || p.title_aux || p.id;
-    const ver = p.ver || p.version || '';
-    const desc = p.description || '';
-    const repo = p.repository || p.reference || '';
-    const installed = p.installed || p.cnr_installed || false;
-    const isDisabled = p.enabled === false;
-
-    let badgeHtml = '';
-    if (installed && !isDisabled) badgeHtml = '<span class="plugin-badge installed">已安装</span>';
-    else if (installed && isDisabled) badgeHtml = '<span class="plugin-badge disabled">已禁用</span>';
-    else badgeHtml = '<span class="plugin-badge not-installed">未安装</span>';
-
-    let actionsHtml = '';
-    if (!installed) {
-      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="installPlugin('${_esc(p.id)}','latest')">安装</button>`;
-      actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.id)}','${_esc(title)}')">📋 版本</button>`;
-    } else {
-      actionsHtml += '<span style="font-size:.78rem;color:var(--green)">✅ 已安装</span>';
-    }
-
-    return `<div class="plugin-item">
-      <div class="plugin-item-header">
-        <div class="plugin-item-title">${repo ? `<a href="${repo}" target="_blank">${_h(title)}</a>` : _h(title)}</div>
-        ${badgeHtml}
-      </div>
-      ${desc ? `<div class="plugin-item-desc">${_h(desc)}</div>` : ''}
-      <div class="plugin-item-meta">
-        <span>📦 ${_h(p.id)}</span>
-        ${ver ? `<span>v${_h(ver)}</span>` : ''}
-        ${p.stars ? `<span>⭐ ${p.stars}</span>` : ''}
-        ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
-        ${p.last_update ? `<span>🕐 ${p.last_update.split('T')[0]}</span>` : ''}
-        <div class="plugin-item-actions">${actionsHtml}</div>
-      </div>
-    </div>`;
-  }).join('');
-
+  el.innerHTML = slice.map(p => _renderBrowseItem(p)).join('');
   moreEl.classList.toggle('hidden', end >= results.length);
 }
 
@@ -1836,44 +1878,7 @@ function loadMoreBrowsePlugins() {
   const slice = results.slice(start, end);
   pluginBrowseIndex = end;
 
-  el.innerHTML += slice.map(p => {
-    const title = p.title || p.title_aux || p.id;
-    const ver = p.ver || p.version || '';
-    const desc = p.description || '';
-    const repo = p.repository || p.reference || '';
-    const installed = p.installed || p.cnr_installed || false;
-    const isDisabled = p.enabled === false;
-
-    let badgeHtml = '';
-    if (installed && !isDisabled) badgeHtml = '<span class="plugin-badge installed">已安装</span>';
-    else if (installed && isDisabled) badgeHtml = '<span class="plugin-badge disabled">已禁用</span>';
-    else badgeHtml = '<span class="plugin-badge not-installed">未安装</span>';
-
-    let actionsHtml = '';
-    if (!installed) {
-      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="installPlugin('${_esc(p.id)}','latest')">安装</button>`;
-      actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.id)}','${_esc(title)}')">📋 版本</button>`;
-    } else {
-      actionsHtml += '<span style="font-size:.78rem;color:var(--green)">✅ 已安装</span>';
-    }
-
-    return `<div class="plugin-item">
-      <div class="plugin-item-header">
-        <div class="plugin-item-title">${repo ? `<a href="${repo}" target="_blank">${_h(title)}</a>` : _h(title)}</div>
-        ${badgeHtml}
-      </div>
-      ${desc ? `<div class="plugin-item-desc">${_h(desc)}</div>` : ''}
-      <div class="plugin-item-meta">
-        <span>📦 ${_h(p.id)}</span>
-        ${ver ? `<span>v${_h(ver)}</span>` : ''}
-        ${p.stars ? `<span>⭐ ${p.stars}</span>` : ''}
-        ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
-        ${p.last_update ? `<span>🕐 ${p.last_update.split('T')[0]}</span>` : ''}
-        <div class="plugin-item-actions">${actionsHtml}</div>
-      </div>
-    </div>`;
-  }).join('');
-
+  el.innerHTML += slice.map(p => _renderBrowseItem(p)).join('');
   moreEl.classList.toggle('hidden', end >= results.length);
 }
 
@@ -1981,7 +1986,6 @@ async function installPluginFromGit() {
     statusEl.innerHTML = `<div class="success-msg">${d.message}</div>`;
     showToast('✅ 安装完成');
     document.getElementById('plugin-git-url').value = '';
-    // Reload installed
     if (currentPluginTab === 'installed') loadInstalledPlugins();
   } catch (e) {
     statusEl.innerHTML = `<div class="error-msg">安装失败: ${e.message}</div>`;
@@ -2003,7 +2007,7 @@ async function openPluginVersionModal(id, title) {
     if (!r.ok) throw new Error('获取版本失败');
     const versions = await r.json();
     if (!versions || versions.length === 0) {
-      body.innerHTML = '<div style="text-align:center;padding:16px;color:var(--t3)">无版本信息</div>';
+      body.innerHTML = '<div style="text-align:center;padding:16px;color:var(--t3)">无版本信息 (可能为 nightly 安装)</div>';
       return;
     }
     body.innerHTML = `<div style="max-height:50vh;overflow-y:auto">${versions.map(v => {
@@ -2052,13 +2056,10 @@ async function pollPluginQueue() {
       if (pluginQueuePollTimer) {
         clearInterval(pluginQueuePollTimer);
         pluginQueuePollTimer = null;
-        // Refresh installed list when queue completes
         if (currentPluginTab === 'installed') loadInstalledPlugins();
       }
     }
-  } catch (e) {
-    // silent
-  }
+  } catch (e) { /* silent */ }
 }
 
 // Escape key handler for plugin version modal
