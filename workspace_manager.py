@@ -843,6 +843,351 @@ def api_tunnel_status():
     return jsonify({"status": status, "logs": logs, "links": links})
 
 
+
+# ====================================================================
+# Cloud Sync (Rclone) 管理
+# ====================================================================
+RCLONE_CONF = Path.home() / ".config" / "rclone" / "rclone.conf"
+CLOUD_SYNC_SCRIPT = Path("/workspace/cloud_sync.sh")
+
+def _parse_rclone_conf():
+    """解析 rclone.conf 返回 remote 列表"""
+    remotes = []
+    if not RCLONE_CONF.exists():
+        return remotes
+    current = None
+    for line in RCLONE_CONF.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        m = re.match(r'^\[(.+)\]$', line)
+        if m:
+            if current:
+                remotes.append(current)
+            current = {"name": m.group(1), "type": "", "params": {}}
+        elif current and '=' in line:
+            k, v = line.split('=', 1)
+            k, v = k.strip(), v.strip()
+            if k == "type":
+                current["type"] = v
+            # 不要暴露敏感 token
+            if k not in ("token", "access_key_id", "secret_access_key", "refresh_token"):
+                current["params"][k] = v
+    if current:
+        remotes.append(current)
+    return remotes
+
+
+def _get_sync_script_remotes():
+    """从 cloud_sync.sh 中解析当前启用的 remote 目标"""
+    enabled = {"onedrive": False, "gdrive": False}
+    if not CLOUD_SYNC_SCRIPT.exists():
+        return enabled
+    content = CLOUD_SYNC_SCRIPT.read_text(encoding="utf-8")
+    # 查找 rclone move 行中的 remote 名称
+    for m in re.finditer(r'rclone\s+move\s+"?\$\{?SOURCE_DIR\}?"?\s+"?(\w+):([^"]+)"?', content):
+        remote = m.group(1)
+        if remote.lower() in enabled or "onedrive" in remote.lower():
+            enabled[remote.lower()] = True
+        elif "drive" in remote.lower() or "gdrive" in remote.lower():
+            enabled["gdrive"] = True
+    return enabled
+
+
+def _parse_sync_log_entries(raw_log, max_entries=100):
+    """将 rclone 日志解析为结构化条目，并附中文翻译"""
+    entries = []
+    for line in raw_log.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # rclone log: 2026/02/16 02:15:55 INFO  : file.png: Copied (new)
+        m = re.match(r'(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\w+)\s*:\s*(.*)', line)
+        if m:
+            ts, level, msg = m.group(1), m.group(2), m.group(3)
+            cn_msg = _translate_rclone_msg(msg)
+            entries.append({"time": ts, "level": level, "raw": msg, "msg": cn_msg})
+        else:
+            # 自定义行如 [HH:MM:SS] New files detected
+            m2 = re.match(r'\[(\d{2}:\d{2}:\d{2})\]\s*(.*)', line)
+            if m2:
+                entries.append({"time": m2.group(1), "level": "INFO", "raw": m2.group(2),
+                                "msg": _translate_sync_event(m2.group(2))})
+            elif line.startswith("Transferred:") or line.startswith("Checks:") or \
+                    line.startswith("Deleted:") or line.startswith("Renamed:") or \
+                    line.startswith("Elapsed"):
+                entries.append({"time": "", "level": "STAT", "raw": line,
+                                "msg": _translate_rclone_stat(line)})
+    return entries[-max_entries:]
+
+
+def _translate_rclone_msg(msg):
+    """翻译 rclone 操作消息为中文"""
+    # file.png: Copied (new)
+    m = re.match(r'(.+?):\s*Copied\s*\(new\)', msg)
+    if m:
+        return f"📤 上传新文件: {m.group(1)}"
+    m = re.match(r'(.+?):\s*Copied\s*\(replaced existing\)', msg)
+    if m:
+        return f"🔄 覆盖更新: {m.group(1)}"
+    m = re.match(r'(.+?):\s*Deleted', msg)
+    if m:
+        return f"🗑️ 已删除本地: {m.group(1)}"
+    m = re.match(r'(.+?):\s*Moved', msg)
+    if m:
+        return f"📦 已移动: {m.group(1)}"
+    if "There was nothing to transfer" in msg:
+        return "✅ 无需同步，全部最新"
+    if "Renamed" in msg:
+        return f"📝 重命名: {msg}"
+    return msg
+
+
+def _translate_sync_event(msg):
+    """翻译自定义同步事件"""
+    if "New files detected" in msg:
+        return "🔍 检测到新文件，开始同步..."
+    if "OneDrive sync completed" in msg:
+        return "✅ OneDrive 同步完成"
+    if "Google Drive sync completed" in msg:
+        return "✅ Google Drive 同步完成"
+    if "Sync Service Started" in msg:
+        return "🚀 同步服务已启动"
+    return msg
+
+
+def _translate_rclone_stat(line):
+    """翻译 rclone 统计行"""
+    if line.startswith("Transferred:") and "/" in line:
+        # Transferred: 281.952 KiB / 281.952 KiB, 100%, 94.052 KiB/s
+        parts = line.split(",")
+        size_part = parts[0].replace("Transferred:", "").strip()
+        return f"📊 已传输: {size_part}" + (f" ({parts[1].strip()})" if len(parts) > 1 else "")
+    if line.startswith("Deleted:"):
+        return f"🗑️ {line}"
+    if line.startswith("Elapsed"):
+        return f"⏱️ {line}"
+    if line.startswith("Checks:"):
+        return f"🔍 {line}"
+    return line
+
+
+@app.route("/api/sync/status")
+def api_sync_status():
+    """获取 Cloud Sync 状态、日志和配置"""
+    # PM2 进程状态
+    status = "unknown"
+    try:
+        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True, capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            for p in json.loads(r.stdout):
+                if p.get("name") == "sync":
+                    status = p.get("pm2_env", {}).get("status", "unknown")
+                    break
+    except Exception:
+        pass
+
+    # 同步日志
+    try:
+        r = subprocess.run(
+            "pm2 logs sync --nostream --lines 150 2>/dev/null",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        raw = r.stdout + r.stderr
+        # Strip ANSI and PM2 prefix
+        raw = re.sub(r'\x1b\[[0-9;]*m', '', raw)
+        raw = re.sub(r'^\d+\|[^|]+\|\s*', '', raw, flags=re.MULTILINE)
+        raw = '\n'.join(l for l in raw.split('\n')
+                       if not l.startswith('[TAILING]') and 'last 150 lines' not in l
+                       and '/root/.pm2/logs/' not in l)
+        entries = _parse_sync_log_entries(raw)
+    except Exception:
+        entries = []
+
+    # 当前脚本中启用的 remote
+    script_remotes = _get_sync_script_remotes()
+
+    return jsonify({
+        "status": status,
+        "entries": entries,
+        "enabled_remotes": script_remotes
+    })
+
+
+@app.route("/api/sync/remotes")
+def api_sync_remotes():
+    """列出 rclone 配置的 remote（隐藏敏感信息）"""
+    remotes = _parse_rclone_conf()
+    # 分类
+    for r in remotes:
+        t = r["type"]
+        if t == "s3":
+            r["category"] = "r2"
+            r["display_name"] = "Cloudflare R2"
+            r["icon"] = "☁️"
+        elif "onedrive" in t:
+            r["category"] = "onedrive"
+            r["display_name"] = "OneDrive"
+            r["icon"] = "📁"
+        elif t == "drive":
+            r["category"] = "gdrive"
+            r["display_name"] = "Google Drive"
+            r["icon"] = "📂"
+        else:
+            r["category"] = "other"
+            r["display_name"] = r["name"]
+            r["icon"] = "💾"
+    return jsonify({"remotes": remotes})
+
+
+@app.route("/api/sync/storage")
+def api_sync_storage():
+    """获取各 remote 的容量信息"""
+    remotes = _parse_rclone_conf()
+    results = {}
+    for r in remotes:
+        name = r["name"]
+        try:
+            proc = subprocess.run(
+                f"rclone about {name}: --json 2>/dev/null",
+                shell=True, capture_output=True, text=True, timeout=30
+            )
+            if proc.returncode == 0:
+                about = json.loads(proc.stdout)
+                results[name] = {
+                    "total": about.get("total"),
+                    "used": about.get("used"),
+                    "free": about.get("free"),
+                    "trashed": about.get("trashed"),
+                }
+            else:
+                results[name] = {"error": "不支持容量查询"}
+        except subprocess.TimeoutExpired:
+            results[name] = {"error": "查询超时"}
+        except Exception as e:
+            results[name] = {"error": str(e)}
+    return jsonify({"storage": results})
+
+
+@app.route("/api/sync/toggle", methods=["POST"])
+def api_sync_toggle():
+    """启用/禁用某个 remote 的输出同步，并重新生成 cloud_sync.sh"""
+    data = request.get_json(force=True)
+    remote_name = data.get("remote", "")
+    enabled = data.get("enabled", True)
+
+    if not CLOUD_SYNC_SCRIPT.exists():
+        return jsonify({"error": "cloud_sync.sh 不存在"}), 404
+
+    # 读取 rclone 配置确认 remote 存在
+    remotes = {r["name"]: r for r in _parse_rclone_conf()}
+    if remote_name not in remotes:
+        return jsonify({"error": f"Remote '{remote_name}' 不存在"}), 400
+
+    # 生成新的 cloud_sync.sh
+    _regenerate_sync_script(remotes, remote_name, enabled)
+
+    # 重启 sync 服务
+    subprocess.run("pm2 restart sync 2>/dev/null", shell=True, timeout=10)
+
+    return jsonify({"ok": True, "message": f"{'启用' if enabled else '禁用'} {remote_name} 同步，服务已重启"})
+
+
+def _regenerate_sync_script(remotes, toggle_remote, toggle_enabled):
+    """重新生成 cloud_sync.sh，控制哪些 remote 参与输出同步"""
+    # 解析当前脚本中启用的 remote
+    current = _get_sync_script_remotes()
+
+    # 应用 toggle
+    if toggle_remote.lower() in current:
+        current[toggle_remote.lower()] = toggle_enabled
+    elif "onedrive" in toggle_remote.lower():
+        current["onedrive"] = toggle_enabled
+    elif "drive" in toggle_remote.lower():
+        current["gdrive"] = toggle_enabled
+
+    # 找到实际 remote 名称
+    onedrive_name = ""
+    gdrive_name = ""
+    for name, r in remotes.items():
+        if r["type"] == "onedrive" or "onedrive" in name.lower():
+            onedrive_name = name
+        elif r["type"] == "drive" or "gdrive" in name.lower():
+            gdrive_name = name
+
+    # 构建 sync 块
+    sync_blocks = []
+    if current.get("onedrive") and onedrive_name:
+        sync_blocks.append(f'''        # OneDrive 同步
+        rclone move "$SOURCE_DIR" "{onedrive_name}:ComfyUI_Transfer" \\
+            --min-age "30s" \\
+            --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
+            --filter "- .*/**" \\
+            --filter "- *" \\
+            --transfers 4 -v && echo "[$TIME] OneDrive sync completed"''')
+
+    if current.get("gdrive") and gdrive_name:
+        sync_blocks.append(f'''        # Google Drive 同步
+        rclone move "$SOURCE_DIR" "{gdrive_name}:ComfyUI_Transfer" \\
+            --min-age "30s" \\
+            --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
+            --filter "- .*/**" \\
+            --filter "- *" \\
+            --transfers 4 -v && echo "[$TIME] Google Drive sync completed"''')
+
+    # 生成启用信息
+    info_lines = []
+    if onedrive_name:
+        info_lines.append(f'echo "  OneDrive: {onedrive_name} ({("启用" if current.get("onedrive") else "禁用")})"')
+    if gdrive_name:
+        info_lines.append(f'echo "  Google Drive: {gdrive_name} ({("启用" if current.get("gdrive") else "禁用")})"')
+
+    script = f'''#!/bin/bash
+SOURCE_DIR="/workspace/ComfyUI/output"
+
+echo "--- Cloud Sync Service Started ---"
+{chr(10).join(info_lines)}
+
+while true; do
+    FOUND_FILES=$(find "$SOURCE_DIR" -type f -mmin +0.5 \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.mp4" -o -iname "*.webp" \\) ! -path '*/.*' -print -quit)
+
+    if [ -n "$FOUND_FILES" ]; then
+        TIME=$(date '+%H:%M:%S')
+        echo "[$TIME] New files detected. Syncing..."
+
+{chr(10).join(sync_blocks) if sync_blocks else '        echo "[$TIME] No remotes enabled, skipping"'}
+
+    fi
+    sleep 10
+done
+'''
+    CLOUD_SYNC_SCRIPT.write_text(script, encoding="utf-8")
+    CLOUD_SYNC_SCRIPT.chmod(0o755)
+
+
+@app.route("/api/sync/rclone_config", methods=["GET"])
+def api_get_rclone_config():
+    """获取 rclone.conf 内容（屏蔽 token）"""
+    if not RCLONE_CONF.exists():
+        return jsonify({"config": "", "exists": False})
+    raw = RCLONE_CONF.read_text(encoding="utf-8")
+    # 屏蔽敏感字段
+    sanitized = re.sub(
+        r'(token\s*=\s*)\{.*?\}',
+        r'\1{***HIDDEN***}',
+        raw, flags=re.DOTALL
+    )
+    sanitized = re.sub(
+        r'(access_key_id\s*=\s*).+',
+        r'\1***HIDDEN***',
+        sanitized
+    )
+    sanitized = re.sub(
+        r'(secret_access_key\s*=\s*).+',
+        r'\1***HIDDEN***',
+        sanitized
+    )
+    return jsonify({"config": sanitized, "exists": True})
+
+
 # ====================================================================
 # 前端页面
 # ====================================================================

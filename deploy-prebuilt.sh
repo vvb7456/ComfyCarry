@@ -75,7 +75,7 @@ if [ -n "$RCLONE_CONF_URL" ]; then
         # 自动检测 remote 名称
         R2_REMOTE_NAME=$(grep -E '^\[(r2|.*r2.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
         ONEDRIVE_REMOTE_NAME=$(grep -E '^\[(onedrive|.*onedrive.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
-        GDRIVE_REMOTE_NAME=$(grep -E '^\[(gdrive|.*drive.*)\]' ~/.config/rclone/rclone.conf | head -n1 | tr -d '[]')
+        GDRIVE_REMOTE_NAME=$(grep -E '^\[(gdrive|.*drive.*)\]' ~/.config/rclone/rclone.conf | grep -iv onedrive | head -n1 | tr -d '[]')
         
         # 功能开关（默认启用，可通过环境变量禁用）
         ENABLE_R2=${ENABLE_R2:-true}

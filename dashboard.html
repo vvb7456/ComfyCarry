@@ -1058,6 +1058,116 @@
         #tunnel-log-content .log-warn { color: #f39c12; }
         #tunnel-log-content .log-info { color: var(--accent); }
 
+        /* Cloud Sync Page */
+        .sync-remotes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+            margin-top: 8px;
+        }
+        .sync-remote-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 16px;
+        }
+        .sync-remote-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .sync-remote-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: .95rem;
+        }
+        .sync-remote-type {
+            font-size: .72rem;
+            color: var(--t3);
+            background: var(--bg2);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .sync-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+        }
+        .sync-toggle input { opacity: 0; width: 0; height: 0; }
+        .sync-toggle .slider {
+            position: absolute;
+            inset: 0;
+            background: var(--bg2);
+            border-radius: 12px;
+            transition: .3s;
+            border: 1px solid var(--bd);
+        }
+        .sync-toggle .slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 2px;
+            bottom: 2px;
+            background: var(--t3);
+            border-radius: 50%;
+            transition: .3s;
+        }
+        .sync-toggle input:checked + .slider {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .sync-toggle input:checked + .slider::before {
+            transform: translateX(20px);
+            background: white;
+        }
+        .sync-storage-info {
+            font-size: .8rem;
+            color: var(--t2);
+            margin-top: 8px;
+        }
+        .sync-storage-bar {
+            height: 6px;
+            background: var(--bg2);
+            border-radius: 3px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .sync-storage-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+            transition: width .5s;
+        }
+        .sync-log-box {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px;
+            max-height: 450px;
+            overflow-y: auto;
+            font-family: var(--mono);
+            font-size: .8rem;
+            line-height: 1.7;
+        }
+        .sync-log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--bd) 50%, transparent);
+        }
+        .sync-log-entry:last-child { border-bottom: none; }
+        .sync-log-time {
+            color: var(--t3);
+            font-size: .72rem;
+            margin-right: 6px;
+        }
+        .sync-log-level-INFO { color: var(--accent); }
+        .sync-log-level-STAT { color: var(--t2); font-size: .75rem; }
+        .sync-log-level-ERROR { color: #e74c3c; }
+
         /* Detail panel */
         .detail-panel {
             background: var(--bg3);
@@ -1144,6 +1254,7 @@
                 搜索</div>
             <div class="nav-item" data-page="downloads" onclick="showPage('downloads')"><span class="icon">📥</span>下载管理</div>
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span>Tunnel</div>
+            <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span>Cloud Sync</div>
             <div class="nav-item" data-page="logs" onclick="showPage('logs')"><span class="icon">📜</span>运行日志</div>
         </div>
         <div class="sidebar-footer">
@@ -1307,6 +1418,40 @@
             </div>
         </div>
 
+        <!-- ========== Cloud Sync Page ========== -->
+        <div id="page-sync" class="page hidden">
+            <div class="page-header">
+                <h2>☁️ Cloud Sync</h2>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" onclick="loadSyncPage()">🔄 刷新</button>
+                    <button class="btn btn-sm btn-danger" onclick="restartSync()">♻️ 重启同步</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <!-- 同步状态 -->
+                <div id="sync-status-badge"></div>
+
+                <!-- 存储 Remote 卡片 -->
+                <div class="section-title" style="margin-top:16px">💾 存储服务</div>
+                <div id="sync-remotes-grid" class="sync-remotes-grid">
+                    <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                </div>
+
+                <!-- Rclone 配置 -->
+                <div class="section-title" style="margin-top:24px">
+                    ⚙️ Rclone 配置
+                    <button class="btn btn-sm" style="margin-left:8px;font-size:.72rem" onclick="toggleRcloneConfig()">查看/隐藏</button>
+                </div>
+                <div id="rclone-config-box" class="hidden">
+                    <pre id="rclone-config-content" class="log-box" style="max-height:300px;font-size:.75rem;white-space:pre-wrap">加载中...</pre>
+                </div>
+
+                <!-- 同步日志 -->
+                <div class="section-title" style="margin-top:24px">📜 同步日志</div>
+                <div id="sync-log-content" class="sync-log-box">加载中...</div>
+            </div>
+        </div>
+
         <!-- ========== Logs Page ========== -->
         <div id="page-logs" class="page hidden">
             <div class="page-header">
@@ -1315,8 +1460,6 @@
                     <select id="log-service" onchange="loadLogs()" style="width:auto;min-width:140px">
                         <option value="comfy">ComfyUI</option>
                         <option value="dashboard">Dashboard</option>
-                        <option value="tunnel">Tunnel</option>
-                        <option value="sync">Cloud Sync</option>
                     </select>
                     <select id="log-lines" onchange="loadLogs()" style="width:auto;min-width:100px">
                         <option value="50">50 行</option>
@@ -1379,7 +1522,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=16"></script>
+    <script src="dashboard.js?v=17"></script>
 </body>
 
 </html>

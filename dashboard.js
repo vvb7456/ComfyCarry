@@ -27,10 +27,11 @@ function showPage(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
 
   if (page === 'dashboard') refreshDashboard();
-  else { stopDlStatusPolling(); stopTunnelAutoRefresh(); if (page === 'models') loadLocalModels(); }
+  else { stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); if (page === 'models') loadLocalModels(); }
   if (page === 'civitai') { loadFacets(); }
   else if (page === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
+  else if (page === 'sync') { loadSyncPage(); startSyncAutoRefresh(); }
   else if (page === 'logs') loadLogs();
 }
 
@@ -1152,4 +1153,162 @@ function startTunnelAutoRefresh() {
 }
 function stopTunnelAutoRefresh() {
   if (tunnelAutoRefresh) { clearInterval(tunnelAutoRefresh); tunnelAutoRefresh = null; }
+}
+
+// ========== Cloud Sync Page ==========
+let syncAutoRefresh = null;
+let syncStorageCache = null;
+
+async function loadSyncPage() {
+  const [statusR, remotesR] = await Promise.allSettled([
+    fetch('/api/sync/status').then(r => r.json()),
+    fetch('/api/sync/remotes').then(r => r.json())
+  ]);
+
+  const status = statusR.status === 'fulfilled' ? statusR.value : {};
+  const remotesData = remotesR.status === 'fulfilled' ? remotesR.value : {};
+
+  // Status badge
+  const st = status.status || 'unknown';
+  const stColor = st === 'online' ? 'var(--green)' : st === 'stopped' ? 'var(--red, #e74c3c)' : 'var(--t3)';
+  const stLabel = { online: '运行中', stopped: '已停止', errored: '错误', launching: '启动中' }[st] || st;
+  document.getElementById('sync-status-badge').innerHTML = `
+    <div class="tunnel-header-row">
+      <div class="tunnel-status-badge" style="color:${stColor}">
+        <span class="tunnel-dot" style="background:${stColor}"></span> 同步服务: ${stLabel}
+      </div>
+    </div>`;
+
+  // Remote cards
+  const remotes = remotesData.remotes || [];
+  const enabled = status.enabled_remotes || {};
+  const grid = document.getElementById('sync-remotes-grid');
+  if (remotes.length === 0) {
+    grid.innerHTML = '<div style="color:var(--t3);font-size:.85rem">未检测到 rclone remote 配置</div>';
+  } else {
+    grid.innerHTML = remotes.map(r => {
+      const isSync = r.category === 'onedrive' || r.category === 'gdrive';
+      const isEnabled = enabled[r.category] || false;
+      const toggleHtml = isSync ? `
+        <label class="sync-toggle">
+          <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleSyncRemote('${r.name}', this.checked)">
+          <span class="slider"></span>
+        </label>` : '<span class="sync-remote-type">拉取源</span>';
+
+      return `<div class="sync-remote-card">
+        <div class="sync-remote-header">
+          <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name}</span></div>
+          ${toggleHtml}
+        </div>
+        <div class="sync-storage-info" id="storage-${r.name}">
+          <span style="color:var(--t3);font-size:.75rem">容量信息加载中...</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Load storage info async (can be slow)
+    loadSyncStorage(remotes);
+  }
+
+  // Log entries
+  renderSyncLog(status.entries || []);
+}
+
+async function loadSyncStorage(remotes) {
+  try {
+    const r = await fetch('/api/sync/storage');
+    const d = await r.json();
+    syncStorageCache = d.storage || {};
+    for (const remote of remotes) {
+      const el = document.getElementById(`storage-${remote.name}`);
+      if (!el) continue;
+      const info = syncStorageCache[remote.name];
+      if (!info) { el.innerHTML = '<span style="color:var(--t3);font-size:.75rem">—</span>'; continue; }
+      if (info.error) {
+        // R2 doesn't support "about", show just the type
+        if (remote.category === 'r2') {
+          el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">S3 对象存储 (不支持容量查询)</span>`;
+        } else {
+          el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">${info.error}</span>`;
+        }
+        continue;
+      }
+      const used = info.used || 0;
+      const total = info.total || 0;
+      const free = info.free || 0;
+      const pct = total > 0 ? (used / total * 100) : 0;
+      const barColor = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : 'var(--accent)';
+      el.innerHTML = `
+        <div>已用: ${fmtBytes(used)} / ${fmtBytes(total)}${free ? ` (剩余 ${fmtBytes(free)})` : ''}</div>
+        <div class="sync-storage-bar">
+          <div class="sync-storage-bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div>
+        </div>`;
+    }
+  } catch (e) {
+    // Silently fail, storage info is nice-to-have
+  }
+}
+
+function renderSyncLog(entries) {
+  const el = document.getElementById('sync-log-content');
+  if (!entries || entries.length === 0) {
+    el.innerHTML = '<div style="color:var(--t3)">暂无同步日志</div>';
+    return;
+  }
+  el.innerHTML = entries.map(e => {
+    const timeHtml = e.time ? `<span class="sync-log-time">${escHtml(e.time)}</span>` : '';
+    const levelClass = `sync-log-level-${e.level}`;
+    return `<div class="sync-log-entry ${levelClass}">${timeHtml}${escHtml(e.msg)}</div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function toggleSyncRemote(name, enabled) {
+  try {
+    const r = await fetch('/api/sync/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ remote: name, enabled })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(d.message);
+      setTimeout(loadSyncPage, 2000);
+    } else {
+      showToast('操作失败: ' + (d.error || '未知错误'));
+    }
+  } catch (e) { showToast('切换失败: ' + e.message); }
+}
+
+async function restartSync() {
+  if (!confirm('确定要重启 Cloud Sync 服务吗？')) return;
+  try {
+    await fetch('/api/services/sync/restart', { method: 'POST' });
+    showToast('同步服务正在重启...');
+    setTimeout(loadSyncPage, 3000);
+  } catch (e) { showToast('重启失败: ' + e.message); }
+}
+
+let rcloneConfigLoaded = false;
+async function toggleRcloneConfig() {
+  const box = document.getElementById('rclone-config-box');
+  box.classList.toggle('hidden');
+  if (!box.classList.contains('hidden') && !rcloneConfigLoaded) {
+    try {
+      const r = await fetch('/api/sync/rclone_config');
+      const d = await r.json();
+      document.getElementById('rclone-config-content').textContent = d.config || '(空)';
+      rcloneConfigLoaded = true;
+    } catch (e) {
+      document.getElementById('rclone-config-content').textContent = '加载失败: ' + e.message;
+    }
+  }
+}
+
+function startSyncAutoRefresh() {
+  stopSyncAutoRefresh();
+  syncAutoRefresh = setInterval(loadSyncPage, 15000);
+}
+function stopSyncAutoRefresh() {
+  if (syncAutoRefresh) { clearInterval(syncAutoRefresh); syncAutoRefresh = null; }
 }
