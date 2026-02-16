@@ -39,7 +39,13 @@ function fmtPct(v) { return (v || 0).toFixed(1) + '%'; }
 function showToast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2500); }
 function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => { }); }
 function getAuthHeaders() { return apiKey ? { Authorization: 'Bearer ' + apiKey } : {}; }
-function openImg(url) { if (!url) return; document.getElementById('modal-img').src = url; document.getElementById('img-modal').classList.add('active'); }
+function openImg(url) {
+  if (!url) return;
+  const img = document.getElementById('modal-img');
+  img.src = '';  // clear stale image
+  document.getElementById('img-modal').classList.add('active');
+  img.src = url;
+}
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); } });
 
 // ========== API Key ==========
@@ -360,7 +366,7 @@ async function searchModels(page = 0) {
       indexUid: 'models_v9', q: query, limit, offset,
       filter: filter.length > 0 ? filter : undefined,
       sort: sortMap[sort] || [],
-      attributesToRetrieve: ['id', 'name', 'type', 'stats', 'images', 'version', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
+      attributesToRetrieve: ['id', 'name', 'type', 'metrics', 'images', 'version', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
       attributesToHighlight: ['name'],
     }]
   };
@@ -433,7 +439,7 @@ function renderCivitCard(h) {
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
-        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${(h.stats?.downloadCount || h.metrics?.downloadCount || 0).toLocaleString()}</span>
+        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${(h.metrics?.downloadCount || 0).toLocaleString()}</span>
       </div>
       <div class="model-card-actions">
         <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
