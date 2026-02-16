@@ -436,11 +436,11 @@ function renderCivitCard(h) {
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
-        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${h.stats?.downloadCount?.toLocaleString() || h.metrics?.downloadCount?.toLocaleString() || 0}</span>
+        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${(h.stats?.downloadCount || h.rank?.downloadCount || h.metrics?.downloadCount || 0).toLocaleString()}</span>
       </div>
       <div class="model-card-actions">
         <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
-        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(cartData).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(cartData).replace(/"/g, '&quot;').replace(/'/g, "\\'")})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
         <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
