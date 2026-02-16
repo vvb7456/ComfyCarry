@@ -95,17 +95,36 @@ if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
         --time \
         -- "$DASHBOARD_DIR/workspace_manager.py" 5000
     pm2 save 2>/dev/null || true
-    echo ""
-    echo "================================================="
-    echo "  ✅ Dashboard 已启动！"
-    echo ""
-    echo "  请访问以下地址完成部署向导："
-    echo "  → http://localhost:5000"
-    echo ""
-    echo "  公网端口请在 Vast.ai/RunPod 面板查看"
-    echo "  （通常映射 5000 → 某个公网端口）"
-    echo "================================================="
 else
     echo "❌ Dashboard 文件下载失败，请检查网络连接"
     exit 1
 fi
+
+# ── CF Tunnel (可选 — 让向导页可通过 Tunnel 域名访问) ──
+# 如果设置了 CF_TUNNEL_TOKEN 环境变量，bootstrap 阶段就启动 tunnel
+# 这样即使公网端口不通，也能通过 tunnel 域名访问 Dashboard 向导
+if [ -n "${CF_TUNNEL_TOKEN:-}" ]; then
+    echo "  -> 启动 Cloudflare Tunnel..."
+    pm2 delete tunnel 2>/dev/null || true
+    pm2 start cloudflared --name tunnel \
+        --interpreter none \
+        --log /workspace/tunnel.log \
+        --time \
+        -- tunnel run --token "$CF_TUNNEL_TOKEN"
+    pm2 save 2>/dev/null || true
+    echo "  ✅ Tunnel 已启动，等待连接建立..."
+    sleep 3
+fi
+
+echo ""
+echo "================================================="
+echo "  ✅ Dashboard 已启动！"
+echo ""
+echo "  请访问以下地址完成部署向导："
+echo "  → http://localhost:5000"
+echo ""
+if [ -n "${CF_TUNNEL_TOKEN:-}" ]; then
+    echo "  → 可通过你的 Cloudflare Tunnel 域名访问"
+fi
+echo "  → 公网端口请在 Vast.ai/RunPod 面板查看"
+echo "================================================="
