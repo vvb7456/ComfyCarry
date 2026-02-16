@@ -177,9 +177,10 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-1">
         <div class="step-title">🔐 设置 Dashboard 密码</div>
         <div class="step-desc">保护你的工作空间管理器</div>
+        <div id="password-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
         <div class="form-group">
             <label>访问密码</label>
-            <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码..." value="comfy2025">
+            <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码...">
             <div class="form-hint">部署完成后通过此密码登录 Dashboard</div>
         </div>
         <div class="btn-row">
@@ -192,6 +193,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-2">
         <div class="step-title">🌐 Cloudflare Tunnel</div>
         <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问（推荐，很多实例端口映射不可靠）</div>
+        <div id="cf-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
         <div class="form-group">
             <label>Tunnel Token</label>
             <input type="text" id="input-cf-token" placeholder="eyJhIjoixxxx... (从 Cloudflare Zero Trust 获取)">
@@ -207,7 +209,9 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-3">
         <div class="step-title">☁️ 云存储配置 (Rclone)</div>
         <div class="step-desc">配置 Rclone 以同步工作流、LoRA 和输出文件到云端</div>
+        <div id="rclone-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
         <div class="radio-group">
+            <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="showRcloneInput('base64_env')"> 使用环境变量</label>
             <label><input type="radio" name="rclone-method" value="url" onchange="showRcloneInput('url')"> 从 URL 导入</label>
             <label><input type="radio" name="rclone-method" value="base64" onchange="showRcloneInput('base64')"> Base64 粘贴</label>
             <label><input type="radio" name="rclone-method" value="skip" onchange="showRcloneInput('skip')" checked> 跳过</label>
@@ -223,6 +227,21 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
         <div id="rclone-skip-note" class="form-hint" style="margin-bottom:12px">
             跳过后可以在 Dashboard 的「云同步」页面随时配置
         </div>
+        <!-- 同步选项 (仅当配置了 rclone 时显示) -->
+        <div id="sync-options-panel" style="display:none;margin-top:16px">
+            <label style="font-size:.85rem;font-weight:600;margin-bottom:8px;display:block">部署时同步以下内容:</label>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-workflows" checked style="accent-color:var(--accent)"> 工作流 (workflow)
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-loras" checked style="accent-color:var(--accent)"> LoRA 模型 (loras)
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-wildcards" checked style="accent-color:var(--accent)"> 动态提示词 (wildcards)
+                </label>
+            </div>
+        </div>
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
             <button class="btn btn-primary" onclick="nextStep()">下一步</button>
@@ -233,6 +252,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-4">
         <div class="step-title">🎨 CivitAI API Key</div>
         <div class="step-desc">配置 CivitAI API Key 以在 Dashboard 中搜索和下载模型</div>
+        <div id="civitai-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
         <div class="form-group">
             <label>API Key</label>
             <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)">
@@ -287,20 +307,23 @@ const TOTAL_STEPS = 7;
 let currentStep = 0;
 let wizardConfig = {
     image_type: '',
-    password: 'comfy2025',
+    password: '',
     cloudflared_token: '',
     rclone_config_method: 'skip',
     rclone_config_value: '',
     civitai_token: '',
     plugins: [],
+    sync_options: { workflows: true, loras: true, wildcards: true },
 };
 let pluginData = [];
+let envVars = {};  // 从环境变量检测到的预设值
 
 // ── Init ──
 async function init() {
     try {
         const r = await fetch('/api/setup/state');
         const state = await r.json();
+        envVars = state.env_vars || {};
 
         // GPU info
         if (state.gpu_info && state.gpu_info.name) {
@@ -323,9 +346,45 @@ async function init() {
             selectImageType(state.image_type, true);
         }
         if (state.deploy_started && !state.deploy_completed) {
-            // Deploy is already running, show progress
             showDeployView();
             connectSSE();
+        }
+
+        // ── 环境变量预填充 ──
+        // 密码
+        if (envVars.password) {
+            document.getElementById('input-password').value = envVars.password;
+            wizardConfig.password = envVars.password;
+            const hint = document.getElementById('password-env-hint');
+            hint.style.display = 'block';
+            hint.innerHTML = '✅ 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
+        }
+        // CF Tunnel Token
+        if (envVars.cloudflared_token) {
+            document.getElementById('input-cf-token').value = envVars.cloudflared_token;
+            wizardConfig.cloudflared_token = envVars.cloudflared_token;
+            const hint = document.getElementById('cf-env-hint');
+            hint.style.display = 'block';
+            hint.innerHTML = '✅ 已从环境变量 <code>CF_TUNNEL_TOKEN</code> 检测到 Token（Tunnel 已在运行中）';
+        }
+        // Rclone
+        if (envVars.rclone_has_env) {
+            document.getElementById('rclone-method-env').style.display = '';
+            const hint = document.getElementById('rclone-env-hint');
+            hint.style.display = 'block';
+            hint.innerHTML = '✅ 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
+            // 自动选择环境变量选项
+            document.querySelector('input[name="rclone-method"][value="base64_env"]').checked = true;
+            wizardConfig.rclone_config_method = 'base64_env';
+            showRcloneInput('base64_env');
+        }
+        // CivitAI
+        if (envVars.civitai_token) {
+            document.getElementById('input-civitai-token').value = envVars.civitai_token;
+            wizardConfig.civitai_token = envVars.civitai_token;
+            const hint = document.getElementById('civitai-env-hint');
+            hint.style.display = 'block';
+            hint.innerHTML = '✅ 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
         }
 
         updateProgressBar();
@@ -380,7 +439,14 @@ function saveCurrentStep() {
             wizardConfig.rclone_config_method = method;
             if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
             else if (method === 'base64') wizardConfig.rclone_config_value = document.getElementById('input-rclone-base64').value.trim();
+            else if (method === 'base64_env') wizardConfig.rclone_config_value = '';  // 后端从环境变量读取
             else wizardConfig.rclone_config_value = '';
+            // 同步选项
+            wizardConfig.sync_options = {
+                workflows: document.getElementById('sync-workflows')?.checked ?? true,
+                loras: document.getElementById('sync-loras')?.checked ?? true,
+                wildcards: document.getElementById('sync-wildcards')?.checked ?? true,
+            };
             break;
         case 4:
             wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
@@ -411,6 +477,8 @@ function showRcloneInput(method) {
     document.getElementById('rclone-url-input').style.display = method === 'url' ? 'block' : 'none';
     document.getElementById('rclone-base64-input').style.display = method === 'base64' ? 'block' : 'none';
     document.getElementById('rclone-skip-note').style.display = method === 'skip' ? 'block' : 'none';
+    // 同步选项: 非 skip 时显示
+    document.getElementById('sync-options-panel').style.display = method !== 'skip' ? 'block' : 'none';
 }
 
 // ── Plugins ──

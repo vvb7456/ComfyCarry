@@ -939,6 +939,18 @@ def api_setup_state():
     safe["plugins_available"] = DEFAULT_PLUGINS
     # GPU 信息 (如果 torch 可用)
     safe["gpu_info"] = _detect_gpu_info()
+    # 环境变量预填充 — 让向导自动检测已设置的值
+    env_vars = {}
+    if os.environ.get("DASHBOARD_PASSWORD"):
+        env_vars["password"] = os.environ["DASHBOARD_PASSWORD"]
+    if os.environ.get("CF_TUNNEL_TOKEN"):
+        env_vars["cloudflared_token"] = os.environ["CF_TUNNEL_TOKEN"]
+    if os.environ.get("CIVITAI_TOKEN"):
+        env_vars["civitai_token"] = os.environ["CIVITAI_TOKEN"]
+    if os.environ.get("RCLONE_CONF_BASE64"):
+        env_vars["rclone_config_method"] = "base64"
+        env_vars["rclone_has_env"] = True  # 不暴露完整值
+    safe["env_vars"] = env_vars
     return jsonify(safe)
 
 
@@ -951,7 +963,7 @@ def api_setup_save():
     allowed_keys = {
         "current_step", "image_type", "password",
         "cloudflared_token", "rclone_config_method", "rclone_config_value",
-        "civitai_token", "plugins",
+        "civitai_token", "plugins", "sync_options",
     }
     for k, v in data.items():
         if k in allowed_keys:
@@ -1108,17 +1120,31 @@ def _run_deploy(config):
         # ─────────────────────────────────────────────
         cf_token = config.get("cloudflared_token", "")
         if cf_token:
-            _deploy_step("启动 Cloudflare Tunnel")
-            # cloudflared 已在 bootstrap.sh 中安装
-            _deploy_exec("pm2 delete tunnel 2>/dev/null || true")
-            _deploy_exec(f'pm2 start cloudflared --name tunnel -- tunnel run --token "{cf_token}"')
-            _deploy_log("Cloudflare Tunnel 已启动")
+            # 检查 tunnel 是否已在运行 (bootstrap 可能已启动)
+            tunnel_pid = subprocess.run(
+                "pm2 pid tunnel 2>/dev/null", shell=True, capture_output=True, text=True
+            ).stdout.strip()
+            tunnel_running = tunnel_pid and tunnel_pid != "0" and tunnel_pid.isdigit()
+
+            if tunnel_running:
+                _deploy_step("Cloudflare Tunnel (已在运行)")
+                _deploy_log("Tunnel 已由 bootstrap 启动，跳过重启以保持连接稳定")
+            else:
+                _deploy_step("启动 Cloudflare Tunnel")
+                # cloudflared 已在 bootstrap.sh 中安装
+                _deploy_exec("pm2 delete tunnel 2>/dev/null || true")
+                _deploy_exec(f'pm2 start cloudflared --name tunnel -- tunnel run --token "{cf_token}"')
+                _deploy_log("Cloudflare Tunnel 已启动")
 
         # ─────────────────────────────────────────────
         # STEP 3: Rclone 配置
         # ─────────────────────────────────────────────
         rclone_method = config.get("rclone_config_method", "skip")
         rclone_value = config.get("rclone_config_value", "")
+        # 支持 base64_env: 从环境变量 RCLONE_CONF_BASE64 读取
+        if rclone_method == "base64_env":
+            rclone_method = "base64"
+            rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
         if rclone_method != "skip" and rclone_value:
             _deploy_step("配置 Rclone")
             _deploy_exec("mkdir -p ~/.config/rclone")
@@ -1315,27 +1341,33 @@ def _run_deploy(config):
             ).stdout.strip()
 
             if r2_name:
-                prefs = _load_sync_prefs()
-                r2p = prefs.get("r2", {})
-                if r2p.get("sync_workflows", True):
+                # 使用向导中选择的同步选项
+                sync_opts = config.get("sync_options", {})
+                if sync_opts.get("workflows", True):
                     _deploy_log("同步工作流...")
                     _deploy_exec(
                         f'rclone sync "{r2_name}:comfyui-assets/workflow" /workspace/ComfyUI/user/default/workflows/ -P',
                         timeout=300
                     )
-                if r2p.get("sync_loras", True):
+                else:
+                    _deploy_log("⏭ 跳过工作流同步 (用户选择)")
+                if sync_opts.get("loras", True):
                     _deploy_log("同步 LoRA...")
                     _deploy_exec(
                         f'rclone sync "{r2_name}:comfyui-assets/loras" /workspace/ComfyUI/models/loras/ -P',
                         timeout=300
                     )
-                if r2p.get("sync_wildcards", True):
+                else:
+                    _deploy_log("⏭ 跳过 LoRA 同步 (用户选择)")
+                if sync_opts.get("wildcards", True):
                     _deploy_log("同步 Wildcards...")
                     _deploy_exec(
                         f'rclone sync "{r2_name}:comfyui-assets/wildcards" '
                         f'/workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards/ -P',
                         timeout=300
                     )
+                else:
+                    _deploy_log("⏭ 跳过 Wildcards 同步 (用户选择)")
                 _deploy_log("✅ 资产同步完成")
             else:
                 _deploy_log("未检测到 R2 remote, 跳过资产同步")
@@ -1402,20 +1434,22 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
         Path("/usr/local/bin/jtoken").write_text(jtoken_script)
         _deploy_exec("chmod +x /usr/local/bin/jtoken")
 
-        # AuraSR 下载
+        # AuraSR 下载 (真正后台, 不阻塞部署完成)
         _deploy_log("后台下载 AuraSR V2...")
         _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
         _deploy_exec(
-            'aria2c -x 16 -s 16 --console-log-level=error '
+            'nohup aria2c -x 16 -s 16 --console-log-level=error '
             '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true" &',
-            label="AuraSR model"
+            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true" '
+            '>/dev/null 2>&1 &',
+            label="AuraSR model (后台)"
         )
         _deploy_exec(
-            'aria2c -x 16 -s 16 --console-log-level=error '
+            'nohup aria2c -x 16 -s 16 --console-log-level=error '
             '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true" &',
-            label="AuraSR config"
+            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true" '
+            '>/dev/null 2>&1 &',
+            label="AuraSR config (后台)"
         )
 
         # ─────────────────────────────────────────────
