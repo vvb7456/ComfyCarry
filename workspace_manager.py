@@ -761,19 +761,13 @@ def _tunnel_ingress_to_links(ingress, links):
 def _detect_port_services():
     """检测本机端口对应的服务名称"""
     mapping = {}
-    # 已知端口
-    mapping["8188"] = "ComfyUI"
-    mapping["5000"] = "Dashboard"
-    mapping["8080"] = "Jupyter"
-    mapping["8888"] = "Jupyter"
-    # 尝试用 PM2 获取实际端口
+    # 尝试用 PM2 获取动态端口映射
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True, capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
             procs = json.loads(r.stdout)
             for p in procs:
                 name = p.get("name", "")
-                # 从命令行参数中提取 --port
                 args = p.get("pm2_env", {}).get("args", [])
                 if isinstance(args, list):
                     for i, a in enumerate(args):
@@ -781,12 +775,18 @@ def _detect_port_services():
                             mapping[str(args[i + 1])] = name.title()
     except Exception:
         pass
+    # 已知端口（覆盖 PM2 自动检测，确保名称准确）
+    mapping["8188"] = "ComfyUI"
+    mapping["5000"] = "Dashboard"
+    mapping["8080"] = "Jupyter"
+    mapping["8888"] = "Jupyter"
     return mapping
 
 
 @app.route("/api/tunnel_status")
 def api_tunnel_status():
     """获取 Tunnel 状态和日志"""
+    import re as _re
     # PM2 进程信息
     status = "unknown"
     try:
@@ -800,13 +800,21 @@ def api_tunnel_status():
     except Exception:
         pass
 
-    # 日志
+    # 日志 (strip ANSI codes and PM2 prefixes)
     try:
         r = subprocess.run(
             "pm2 logs tunnel --nostream --lines 100 2>/dev/null",
             shell=True, capture_output=True, text=True, timeout=5
         )
-        logs = r.stdout + r.stderr
+        raw_logs = r.stdout + r.stderr
+        # Strip ANSI escape codes
+        ansi_re = _re.compile(r'\x1b\[[0-9;]*m')
+        logs = ansi_re.sub('', raw_logs)
+        # Strip PM2 prefix like "1|tunnel   | "
+        logs = _re.sub(r'^\d+\|[^|]+\|\s*', '', logs, flags=_re.MULTILINE)
+        # Strip PM2 tailing header lines
+        logs = '\n'.join(l for l in logs.split('\n')
+                        if not l.startswith('[TAILING]') and 'last 100 lines' not in l and '/root/.pm2/logs/' not in l)
     except Exception:
         logs = ""
 
