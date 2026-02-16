@@ -244,29 +244,28 @@ def save_config():
 # ====================================================================
 @app.route("/api/search", methods=["POST"])
 def proxy_search():
-    """代理搜索请求到 CivitAI REST API"""
-    data = request.get_json()
-    params = {
-        "query": data.get("query", ""),
-        "limit": data.get("limit", 20),
-        "nsfw": "true" if data.get("nsfw") else "false",
-        "sort": data.get("sort", "Newest"),
-    }
-    
-    # 处理分页 cursor
-    if data.get("cursor"):
-        params["cursor"] = data.get("cursor")
-        
-    # 处理 types (支持列表)
-    types = data.get("types", [])
-    if types:
-        params["types"] = types
-
     try:
-        # 使用 REST API 替代不稳定的 MeiliSearch
-        resp = requests.get("https://civitai.com/api/v1/models", params=params, timeout=15)
+        data = request.get_json(force=True, silent=True)
+        if not data:
+            print("[DEBUG] Search: No JSON body", flush=True)
+            return jsonify({"error": "No JSON body"}), 400
+
+        print(f"[DEBUG] Search payload: {json.dumps(data)}", flush=True)
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {MEILI_BEARER}",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        resp = requests.post(MEILI_URL, headers=headers, json=data, timeout=10)
+        print(f"[DEBUG] Search resp: {resp.status_code}", flush=True)
+        if resp.status_code != 200:
+            print(f"[DEBUG] Search error: {resp.text[:200]}", flush=True)
+
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception as e:
+        print(f"[DEBUG] Search exception: {e}", flush=True)
         return jsonify({"error": str(e)}), 500
 
 
