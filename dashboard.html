@@ -1299,13 +1299,11 @@
             <div class="nav-item" data-page="downloads" onclick="showPage('downloads')"><span class="icon">📥</span>下载管理</div>
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span>Tunnel</div>
             <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span>Cloud Sync</div>
-            <div class="nav-item" data-page="logs" onclick="showPage('logs')"><span class="icon">📜</span>运行日志</div>
             <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span>设置</div>
         </div>
         <div class="sidebar-footer">
             <div id="key-status" style="margin-bottom:4px">🔒 未设置 Key</div>
-            <button class="btn btn-sm" onclick="openConfigModal()" style="width:100%">⚙️ API Key</button>
-            <div style="font-size:0.7rem;color:var(--t3);text-align:center;margin-top:8px">v2.2 (Downloads + Auth)</div>
+            <div style="font-size:0.7rem;color:var(--t3);text-align:center;margin-top:8px">v2.3</div>
         </div>
     </nav>
 
@@ -1521,43 +1519,16 @@
             </div>
         </div>
 
-        <!-- ========== Logs Page ========== -->
-        <div id="page-logs" class="page hidden">
-            <div class="page-header">
-                <h2>📜 运行日志</h2>
-                <div style="display:flex;gap:8px;align-items:center">
-                    <select id="log-service" onchange="loadLogs()" style="width:auto;min-width:140px">
-                        <option value="comfy">ComfyUI</option>
-                        <option value="dashboard">Dashboard</option>
-                    </select>
-                    <select id="log-lines" onchange="loadLogs()" style="width:auto;min-width:100px">
-                        <option value="50">50 行</option>
-                        <option value="100" selected>100 行</option>
-                        <option value="300">300 行</option>
-                        <option value="500">500 行</option>
-                    </select>
-                    <button class="btn btn-sm" onclick="loadLogs()">🔄 刷新</button>
-                    <label style="font-size:.8rem;color:var(--t2);display:flex;align-items:center;gap:4px">
-                        <input type="checkbox" id="log-auto" onchange="toggleAutoLog()"> 自动刷新
-                    </label>
-                </div>
-            </div>
-            <div class="page-body">
-                <div class="log-box" id="log-content">请选择服务查看日志...</div>
-            </div>
-        </div>
-
         <!-- ========== Settings Page ========== -->
         <div id="page-settings" class="page hidden">
             <div class="page-header">
                 <h2>⚙️ 设置</h2>
             </div>
             <div class="page-body">
-                <div style="display:grid;gap:clamp(16px,1.5vw,24px);max-width:640px">
+                <div style="display:grid;gap:clamp(16px,1.5vw,24px);max-width:720px">
                     <!-- 密码设置 -->
                     <div class="card" style="padding:clamp(16px,1.5vw,24px)">
                         <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 Dashboard 密码</h3>
-                        <div id="settings-pw-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
                         <div class="form-group" style="margin-bottom:10px">
                             <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
                             <input type="password" id="settings-pw-current" placeholder="输入当前密码">
@@ -1587,38 +1558,44 @@
                         </div>
                     </div>
 
-                    <!-- 存储信息 -->
+                    <!-- Debug 模式 & 服务管理 -->
                     <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">💾 配置存储</h3>
-                        <div style="font-size:.8rem;color:var(--t2);line-height:1.8">
-                            <div>📄 密码 & Session → <code style="color:var(--ac)">/workspace/.dashboard_env</code></div>
-                            <div>📄 CivitAI Key → <code style="color:var(--ac)">.civitai_config.json</code></div>
-                            <div>📄 同步偏好 → <code style="color:var(--ac)">/workspace/.sync_prefs.json</code></div>
-                            <div>📄 部署状态 → <code style="color:var(--ac)">/workspace/.setup_state.json</code></div>
-                            <div style="margin-top:8px;color:var(--t3)">所有配置持久化在 /workspace 目录, 重启不丢失</div>
+                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🛠️ 服务管理</h3>
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                            <label style="font-size:.85rem;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" id="settings-debug-toggle" onchange="toggleDebugMode()" style="width:16px;height:16px;accent-color:var(--ac)">
+                                <span>Debug 模式</span>
+                            </label>
+                            <span style="font-size:.75rem;color:var(--t3)">开启后显示 Dashboard 运行日志</span>
                         </div>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 Dashboard</button>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard 日志 (Debug 模式) -->
+                    <div class="card" id="settings-log-card" style="padding:clamp(16px,1.5vw,24px);display:none">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                            <h3 style="font-size:clamp(0.95rem,1.1vw,1.15rem)">📜 Dashboard 日志</h3>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <select id="log-lines" onchange="loadSettingsLogs()" style="width:auto;min-width:80px;font-size:.8rem;padding:4px 8px">
+                                    <option value="50">50 行</option>
+                                    <option value="100" selected>100 行</option>
+                                    <option value="300">300 行</option>
+                                </select>
+                                <button class="btn btn-sm" onclick="loadSettingsLogs()">🔄</button>
+                                <label style="font-size:.75rem;color:var(--t2);display:flex;align-items:center;gap:4px">
+                                    <input type="checkbox" id="log-auto" onchange="toggleAutoLog()"> 自动刷新
+                                </label>
+                            </div>
+                        </div>
+                        <div class="log-box" id="log-content" style="max-height:50vh">加载中...</div>
                     </div>
                 </div>
             </div>
         </div>
 
     </div><!-- /content -->
-
-    <!-- Config Modal -->
-    <div class="modal-overlay" id="config-modal" onclick="if(event.target===this)closeConfigModal()">
-        <div class="modal-box">
-            <h3>⚙️ CivitAI API Key</h3>
-            <div class="form-group"><label>API Key 从 <a href="https://civitai.com/user/account" target="_blank"
-                        style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
-                <input type="text" id="config-apikey" placeholder="输入 CivitAI API Key...">
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-sm" onclick="closeConfigModal()">取消</button>
-                <button class="btn btn-sm btn-danger" onclick="clearApiKey()">清除</button>
-                <button class="btn btn-sm btn-primary" onclick="saveApiKey()">保存</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Metadata Modal -->
     <div class="modal-overlay" id="meta-modal" onclick="if(event.target===this)closeMetaModal()">

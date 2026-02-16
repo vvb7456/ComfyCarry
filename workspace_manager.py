@@ -1008,6 +1008,32 @@ def api_settings_password():
     return jsonify({"ok": True, "message": "密码已更新并持久化保存"})
 
 
+@app.route("/api/settings/restart", methods=["POST"])
+def api_settings_restart():
+    """重启 Dashboard (pm2 restart dashboard，延迟执行)"""
+    import threading
+    def _do_restart():
+        import time; time.sleep(1)
+        subprocess.run("pm2 restart dashboard", shell=True, timeout=15)
+    threading.Thread(target=_do_restart, daemon=True).start()
+    return jsonify({"ok": True, "message": "Dashboard 正在重启..."})
+
+
+@app.route("/api/settings/debug", methods=["GET"])
+def api_settings_debug_get():
+    """获取 debug 模式状态"""
+    return jsonify({"debug": _get_config("debug", False)})
+
+
+@app.route("/api/settings/debug", methods=["POST"])
+def api_settings_debug_set():
+    """切换 debug 模式"""
+    data = request.get_json(force=True) or {}
+    enabled = bool(data.get("enabled", False))
+    _set_config("debug", enabled)
+    return jsonify({"ok": True, "debug": enabled})
+
+
 # ====================================================================
 # Setup Wizard API
 # ====================================================================

@@ -32,7 +32,6 @@ function showPage(page) {
   else if (page === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
   else if (page === 'sync') { loadSyncPage(); startSyncAutoRefresh(); }
-  else if (page === 'logs') loadLogs();
   else if (page === 'settings') loadSettingsPage();
 }
 
@@ -54,7 +53,7 @@ function openImg(url) {
   document.getElementById('img-modal').classList.add('active');
   img.src = url;
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); closeMetaModal(); closeVersionPicker(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeMetaModal(); closeVersionPicker(); } });
 
 // ========== Metadata Modal ==========
 function openMetaModal(data) {
@@ -248,20 +247,9 @@ async function loadApiKey() {
     document.getElementById('key-status').innerHTML = d.has_key ? `🔓 Key: ${d.key_preview}` : '🔒 未设置 Key';
   } catch (e) { console.error(e); }
 }
-function openConfigModal() {
-  document.getElementById('config-apikey').value = apiKey;
-  document.getElementById('config-modal').classList.add('active');
-}
-function closeConfigModal() { document.getElementById('config-modal').classList.remove('active'); }
-async function saveApiKey() {
-  const key = document.getElementById('config-apikey').value.trim();
-  await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: key }) });
-  closeConfigModal(); await loadApiKey(); showToast('API Key 已保存');
-}
-async function clearApiKey() {
-  await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: '' }) });
-  closeConfigModal(); await loadApiKey(); showToast('API Key 已清除');
-}
+// Config modal removed — API key management moved to Settings page
+function openConfigModal() { showPage('settings'); }
+function closeConfigModal() {}
 
 // ========== Dashboard ==========
 async function refreshDashboard() {
@@ -924,13 +912,13 @@ function loadCartFromStorage() {
   } catch (e) { }
 }
 
-// ========== Logs ==========
-async function loadLogs() {
-  const name = document.getElementById('log-service').value;
-  const lines = document.getElementById('log-lines').value;
+// ========== Logs (Settings page) ==========
+async function loadSettingsLogs() {
+  const lines = document.getElementById('log-lines')?.value || 100;
   const box = document.getElementById('log-content');
+  if (!box) return;
   try {
-    const r = await fetch(`/api/logs/${name}?lines=${lines}`);
+    const r = await fetch(`/api/logs/dashboard?lines=${lines}`);
     const d = await r.json();
     box.textContent = d.logs || '(空)';
     box.scrollTop = box.scrollHeight;
@@ -938,8 +926,8 @@ async function loadLogs() {
 }
 
 function toggleAutoLog() {
-  if (document.getElementById('log-auto').checked) {
-    autoLogInterval = setInterval(loadLogs, 3000);
+  if (document.getElementById('log-auto')?.checked) {
+    autoLogInterval = setInterval(loadSettingsLogs, 3000);
   } else {
     clearInterval(autoLogInterval);
     autoLogInterval = null;
@@ -1452,15 +1440,28 @@ function stopSyncAutoRefresh() {
 // ========== Settings Page ==========
 async function loadSettingsPage() {
   try {
-    const r = await fetch('/api/settings');
-    const d = await r.json();
-    const pwStatus = document.getElementById('settings-pw-status');
-    if (pwStatus) {
-      pwStatus.textContent = d.password_set ? `当前密码: ${d.password_masked}` : '未设置密码 (无需登录)';
-    }
+    const [settingsR, debugR] = await Promise.all([
+      fetch('/api/settings'),
+      fetch('/api/settings/debug')
+    ]);
+    const settings = await settingsR.json();
+    const debugData = await debugR.json();
+
+    // CivitAI status
     const civStatus = document.getElementById('settings-civitai-status');
     if (civStatus) {
-      civStatus.textContent = d.civitai_key_set ? `已配置: ${d.civitai_key_masked}` : '未设置 API Key';
+      civStatus.textContent = settings.civitai_key_set ? `已配置: ${settings.civitai_key_masked}` : '未设置 API Key';
+    }
+
+    // Debug toggle
+    const debugToggle = document.getElementById('settings-debug-toggle');
+    if (debugToggle) debugToggle.checked = debugData.debug;
+
+    // Show/hide log card based on debug mode
+    const logCard = document.getElementById('settings-log-card');
+    if (logCard) {
+      logCard.style.display = debugData.debug ? 'block' : 'none';
+      if (debugData.debug) loadSettingsLogs();
     }
   } catch (e) {
     console.error('Failed to load settings:', e);
@@ -1487,7 +1488,6 @@ async function changePassword() {
     document.getElementById('settings-pw-current').value = '';
     document.getElementById('settings-pw-new').value = '';
     document.getElementById('settings-pw-confirm').value = '';
-    loadSettingsPage();
   } catch (e) {
     showToast('修改失败: ' + e.message);
   }
@@ -1506,7 +1506,7 @@ async function saveSettingsCivitaiKey() {
     showToast(d.status === 'ok' ? '✅ API Key 已保存' : (d.error || '保存失败'));
     document.getElementById('settings-civitai-key').value = '';
     loadSettingsPage();
-    loadKeyStatus();
+    loadApiKey();
   } catch (e) {
     showToast('保存失败: ' + e.message);
   }
@@ -1514,15 +1514,43 @@ async function saveSettingsCivitaiKey() {
 
 async function clearSettingsCivitaiKey() {
   try {
-    const r = await fetch('/api/config', {
+    await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: '' })
     });
     showToast('✅ API Key 已清除');
     loadSettingsPage();
-    loadKeyStatus();
+    loadApiKey();
   } catch (e) {
     showToast('清除失败: ' + e.message);
   }
 }
+
+async function toggleDebugMode() {
+  const enabled = document.getElementById('settings-debug-toggle')?.checked || false;
+  try {
+    await fetch('/api/settings/debug', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    });
+    const logCard = document.getElementById('settings-log-card');
+    if (logCard) {
+      logCard.style.display = enabled ? 'block' : 'none';
+      if (enabled) loadSettingsLogs();
+    }
+    showToast(enabled ? '✅ Debug 模式已开启' : 'Debug 模式已关闭');
+  } catch (e) {
+    showToast('操作失败: ' + e.message);
+  }
+}
+
+async function restartDashboard() {
+  if (!confirm('确定要重启 Dashboard 吗? 页面将短暂不可用')) return;
+  try {
+    await fetch('/api/settings/restart', { method: 'POST' });
+    showToast('🔄 Dashboard 正在重启, 3 秒后自动刷新...');
+    setTimeout(() => location.reload(), 3000);
+  } catch (e) {
+    showToast('重启失败: ' + e.message);
