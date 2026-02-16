@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ComfyUI 部署向导</title>
+<style>
+:root {
+    --bg1: #0a0a0f; --bg2: #12121e; --bg3: #1a1a28; --bg4: #22223a;
+    --bd: #2a2a3e; --t1: #e8e8f0; --t2: #a8a8c0; --t3: #68688a;
+    --accent: #7c5cfc; --accent2: #9078ff; --green: #4ade80; --red: #f87171;
+    --r: 10px; --mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); color: var(--t1); min-height: 100vh; }
+
+.wizard-container {
+    max-width: 720px; margin: 0 auto; padding: 40px 20px;
+}
+.wizard-header {
+    text-align: center; margin-bottom: 32px;
+}
+.wizard-header h1 {
+    font-size: 1.8rem; font-weight: 700;
+    background: linear-gradient(135deg, #7c5cfc, #e879f9);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.wizard-header p { color: var(--t3); font-size: .85rem; margin-top: 6px; }
+
+/* Progress bar */
+.progress-bar { display: flex; gap: 4px; margin-bottom: 32px; }
+.progress-segment {
+    flex: 1; height: 4px; border-radius: 2px; background: var(--bg4);
+    transition: background .3s;
+}
+.progress-segment.done { background: var(--accent); }
+.progress-segment.active { background: var(--accent2); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* Steps */
+.step { display: none; }
+.step.active { display: block; }
+.step-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
+.step-desc { color: var(--t2); font-size: .85rem; margin-bottom: 20px; }
+
+/* Cards for selection */
+.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.choice-card {
+    background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
+    padding: 16px; cursor: pointer; transition: all .2s;
+}
+.choice-card:hover { border-color: var(--accent); }
+.choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
+.choice-card h3 { font-size: .95rem; margin-bottom: 4px; }
+.choice-card p { font-size: .78rem; color: var(--t3); }
+.choice-card .badge { display: inline-block; font-size: .65rem; background: var(--accent); color: #fff; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+
+/* Form inputs */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: .82rem; color: var(--t2); margin-bottom: 6px; font-weight: 500; }
+.form-group input, .form-group textarea {
+    width: 100%; padding: 10px 14px; background: var(--bg2); color: var(--t1);
+    border: 1px solid var(--bd); border-radius: 8px; font-size: .88rem;
+    font-family: inherit;
+}
+.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); outline: none; }
+.form-group textarea { min-height: 80px; font-family: var(--mono); font-size: .78rem; resize: vertical; }
+.form-hint { font-size: .72rem; color: var(--t3); margin-top: 4px; }
+
+/* Buttons */
+.btn-row { display: flex; gap: 12px; margin-top: 24px; }
+.btn {
+    padding: 10px 24px; border: none; border-radius: 8px; font-size: .88rem;
+    cursor: pointer; font-weight: 600; transition: all .15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-secondary { background: var(--bg4); color: var(--t2); }
+.btn-secondary:hover { background: var(--bd); }
+.btn-lg { padding: 14px 32px; font-size: 1rem; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Plugin list */
+.plugin-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--bd); border-radius: var(--r); }
+.plugin-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+    border-bottom: 1px solid var(--bd); font-size: .82rem;
+}
+.plugin-item:last-child { border-bottom: none; }
+.plugin-item input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.plugin-item .plugin-name { flex: 1; }
+.plugin-item .plugin-required { font-size: .65rem; color: var(--accent); }
+
+/* Radio group for rclone */
+.radio-group { display: flex; gap: 12px; margin-bottom: 12px; }
+.radio-group label {
+    display: flex; align-items: center; gap: 6px; font-size: .85rem;
+    color: var(--t2); cursor: pointer;
+}
+.radio-group input[type="radio"] { accent-color: var(--accent); }
+
+/* GPU info card */
+.gpu-card {
+    background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
+    padding: 14px; margin-bottom: 16px; font-size: .85rem;
+}
+.gpu-card .gpu-name { font-weight: 600; font-size: 1rem; }
+.gpu-card .gpu-detail { color: var(--t3); font-size: .78rem; margin-top: 4px; }
+
+/* Deploy progress */
+.deploy-view { display: none; }
+.deploy-view.active { display: block; }
+.deploy-steps-list { margin-bottom: 16px; }
+.deploy-step-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    font-size: .85rem; color: var(--t3);
+}
+.deploy-step-item.active { color: var(--t1); font-weight: 500; }
+.deploy-step-item.done { color: var(--green); }
+.deploy-step-item .step-icon { width: 20px; text-align: center; }
+
+.deploy-log {
+    background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--r);
+    padding: 12px; min-height: 300px; max-height: 500px; overflow-y: auto;
+    font-family: var(--mono); font-size: .75rem; line-height: 1.8;
+}
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line.info { color: var(--t2); }
+.log-line.output { color: var(--t3); }
+.log-line.warn { color: #f59e0b; }
+.log-line.error { color: var(--red); }
+.log-line .log-time { color: var(--t3); margin-right: 8px; font-size: .68rem; }
+
+/* Summary section */
+.summary-card {
+    background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
+    padding: 16px; margin-bottom: 12px;
+}
+.summary-card h4 { font-size: .88rem; margin-bottom: 8px; color: var(--accent); }
+.summary-row { display: flex; justify-content: space-between; font-size: .82rem; padding: 3px 0; }
+.summary-row .label { color: var(--t3); }
+.summary-row .value { color: var(--t1); }
+</style>
+</head>
+<body>
+<div class="wizard-container">
+    <div class="wizard-header">
+        <h1>🚀 ComfyUI 部署向导</h1>
+        <p>按步骤配置，一键部署你的 AI 绘画工作站</p>
+    </div>
+
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Step 0: 镜像选择 -->
+    <div class="step active" id="step-0">
+        <div class="step-title">选择部署方式</div>
+        <div class="step-desc">根据你使用的 Docker 镜像选择对应的部署模式</div>
+        <div id="gpu-info-display"></div>
+        <div class="choice-grid">
+            <div class="choice-card" onclick="selectImageType('generic')" id="choice-generic">
+                <h3>🔧 通用镜像部署</h3>
+                <p>使用 runpod/pytorch 等标准镜像，从零安装 PyTorch、加速组件、ComfyUI 和插件</p>
+                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 预计 15-30 分钟</p>
+            </div>
+            <div class="choice-card" onclick="selectImageType('prebuilt')" id="choice-prebuilt">
+                <h3>⚡ 预构建镜像部署 <span class="badge">推荐</span></h3>
+                <p>使用已预装 FA3/SA3/ComfyUI 的自定义镜像，只做配置和同步</p>
+                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 预计 2-5 分钟</p>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="nextStep()" id="btn-next-0" disabled>下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 1: Dashboard 密码 -->
+    <div class="step" id="step-1">
+        <div class="step-title">🔐 设置 Dashboard 密码</div>
+        <div class="step-desc">保护你的工作空间管理器</div>
+        <div class="form-group">
+            <label>访问密码</label>
+            <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码..." value="comfy2025">
+            <div class="form-hint">部署完成后通过此密码登录 Dashboard</div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 2: Cloudflare Tunnel -->
+    <div class="step" id="step-2">
+        <div class="step-title">🌐 Cloudflare Tunnel</div>
+        <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问（推荐，很多实例端口映射不可靠）</div>
+        <div class="form-group">
+            <label>Tunnel Token</label>
+            <input type="text" id="input-cf-token" placeholder="eyJhIjoixxxx... (从 Cloudflare Zero Trust 获取)">
+            <div class="form-hint">留空则跳过 Tunnel，仅使用实例端口映射访问</div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 3: Rclone 配置 -->
+    <div class="step" id="step-3">
+        <div class="step-title">☁️ 云存储配置 (Rclone)</div>
+        <div class="step-desc">配置 Rclone 以同步工作流、LoRA 和输出文件到云端</div>
+        <div class="radio-group">
+            <label><input type="radio" name="rclone-method" value="url" onchange="showRcloneInput('url')"> 从 URL 导入</label>
+            <label><input type="radio" name="rclone-method" value="base64" onchange="showRcloneInput('base64')"> Base64 粘贴</label>
+            <label><input type="radio" name="rclone-method" value="skip" onchange="showRcloneInput('skip')" checked> 跳过</label>
+        </div>
+        <div id="rclone-url-input" style="display:none" class="form-group">
+            <label>Rclone 配置文件 URL</label>
+            <input type="text" id="input-rclone-url" placeholder="https://example.com/rclone.conf">
+        </div>
+        <div id="rclone-base64-input" style="display:none" class="form-group">
+            <label>Base64 编码的 rclone.conf</label>
+            <textarea id="input-rclone-base64" placeholder="粘贴 RCLONE_CONF_BASE64 的值..."></textarea>
+        </div>
+        <div id="rclone-skip-note" class="form-hint" style="margin-bottom:12px">
+            跳过后可以在 Dashboard 的「云同步」页面随时配置
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 4: CivitAI -->
+    <div class="step" id="step-4">
+        <div class="step-title">🎨 CivitAI API Key</div>
+        <div class="step-desc">配置 CivitAI API Key 以在 Dashboard 中搜索和下载模型</div>
+        <div class="form-group">
+            <label>API Key</label>
+            <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)">
+            <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 Dashboard 设置</div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 5: 插件选择 -->
+    <div class="step" id="step-5">
+        <div class="step-title">🧩 自定义节点插件</div>
+        <div class="step-desc">选择要安装的 ComfyUI 插件 (带 * 标记的为必选)</div>
+        <div class="plugin-list" id="plugin-list"></div>
+        <div class="form-group" style="margin-top:12px">
+            <label>额外插件 URL (每行一个)</label>
+            <textarea id="input-extra-plugins" placeholder="https://github.com/user/ComfyUI-CustomNode" style="min-height:60px"></textarea>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 6: 确认部署 -->
+    <div class="step" id="step-6">
+        <div class="step-title">📋 确认部署配置</div>
+        <div class="step-desc">检查以下配置，确认后开始部署</div>
+        <div id="deploy-summary"></div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">返回修改</button>
+            <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy">🚀 开始部署</button>
+        </div>
+    </div>
+
+    <!-- Deploy Progress View -->
+    <div class="deploy-view" id="deploy-view">
+        <div class="step-title">⚙️ 正在部署...</div>
+        <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
+        <div class="deploy-steps-list" id="deploy-steps-list"></div>
+        <div class="deploy-log" id="deploy-log"></div>
+        <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
+            <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 Dashboard</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const TOTAL_STEPS = 7;
+let currentStep = 0;
+let wizardConfig = {
+    image_type: '',
+    password: 'comfy2025',
+    cloudflared_token: '',
+    rclone_config_method: 'skip',
+    rclone_config_value: '',
+    civitai_token: '',
+    plugins: [],
+};
+let pluginData = [];
+
+// ── Init ──
+async function init() {
+    try {
+        const r = await fetch('/api/setup/state');
+        const state = await r.json();
+
+        // GPU info
+        if (state.gpu_info && state.gpu_info.name) {
+            const g = state.gpu_info;
+            document.getElementById('gpu-info-display').innerHTML = `
+                <div class="gpu-card">
+                    <div class="gpu-name">🖥️ ${esc(g.name)}</div>
+                    <div class="gpu-detail">CUDA Capability: ${esc(g.cuda_cap)} | VRAM: ${g.vram_gb} GB</div>
+                </div>`;
+        }
+
+        // Load plugin list
+        pluginData = state.plugins_available || [];
+        const selectedUrls = state.plugins || pluginData.map(p => p.url);
+        renderPluginList(pluginData, selectedUrls);
+
+        // Restore state if partially filled
+        if (state.image_type) {
+            wizardConfig.image_type = state.image_type;
+            selectImageType(state.image_type, true);
+        }
+        if (state.deploy_started && !state.deploy_completed) {
+            // Deploy is already running, show progress
+            showDeployView();
+            connectSSE();
+        }
+
+        updateProgressBar();
+    } catch (e) {
+        console.error('init error:', e);
+    }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── Navigation ──
+function updateProgressBar() {
+    const bar = document.getElementById('progressBar');
+    bar.innerHTML = '';
+    for (let i = 0; i < TOTAL_STEPS; i++) {
+        const seg = document.createElement('div');
+        seg.className = 'progress-segment' + (i < currentStep ? ' done' : i === currentStep ? ' active' : '');
+        bar.appendChild(seg);
+    }
+}
+
+function showStep(n) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(`step-${n}`);
+    if (el) el.classList.add('active');
+    currentStep = n;
+    updateProgressBar();
+}
+
+function nextStep() {
+    saveCurrentStep();
+    if (currentStep < TOTAL_STEPS - 1) {
+        showStep(currentStep + 1);
+        if (currentStep === TOTAL_STEPS - 1) renderSummary();
+    }
+}
+
+function prevStep() {
+    if (currentStep > 0) showStep(currentStep - 1);
+}
+
+function saveCurrentStep() {
+    switch (currentStep) {
+        case 1:
+            wizardConfig.password = document.getElementById('input-password').value || 'comfy2025';
+            break;
+        case 2:
+            wizardConfig.cloudflared_token = document.getElementById('input-cf-token').value.trim();
+            break;
+        case 3:
+            const method = document.querySelector('input[name="rclone-method"]:checked')?.value || 'skip';
+            wizardConfig.rclone_config_method = method;
+            if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
+            else if (method === 'base64') wizardConfig.rclone_config_value = document.getElementById('input-rclone-base64').value.trim();
+            else wizardConfig.rclone_config_value = '';
+            break;
+        case 4:
+            wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
+            break;
+        case 5:
+            wizardConfig.plugins = getSelectedPlugins();
+            break;
+    }
+    // Persist to backend
+    fetch('/api/setup/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...wizardConfig, current_step: currentStep })
+    }).catch(() => {});
+}
+
+// ── Image Type Selection ──
+function selectImageType(type, noEnable) {
+    wizardConfig.image_type = type;
+    document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById(`choice-${type}`).classList.add('selected');
+    if (!noEnable) document.getElementById('btn-next-0').disabled = false;
+    else document.getElementById('btn-next-0').disabled = false;
+}
+
+// ── Rclone Input Toggle ──
+function showRcloneInput(method) {
+    document.getElementById('rclone-url-input').style.display = method === 'url' ? 'block' : 'none';
+    document.getElementById('rclone-base64-input').style.display = method === 'base64' ? 'block' : 'none';
+    document.getElementById('rclone-skip-note').style.display = method === 'skip' ? 'block' : 'none';
+}
+
+// ── Plugins ──
+function renderPluginList(plugins, selectedUrls) {
+    const list = document.getElementById('plugin-list');
+    list.innerHTML = plugins.map((p, i) => {
+        const checked = selectedUrls.includes(p.url) || p.required;
+        const disabled = p.required ? 'disabled' : '';
+        const req = p.required ? '<span class="plugin-required">* 必选</span>' : '';
+        return `<div class="plugin-item">
+            <input type="checkbox" id="plugin-${i}" ${checked ? 'checked' : ''} ${disabled} data-url="${esc(p.url)}">
+            <span class="plugin-name">${esc(p.name)} ${req}</span>
+        </div>`;
+    }).join('');
+}
+
+function getSelectedPlugins() {
+    const urls = [];
+    document.querySelectorAll('#plugin-list input[type="checkbox"]').forEach(cb => {
+        if (cb.checked) urls.push(cb.dataset.url);
+    });
+    // Extra plugins
+    const extra = document.getElementById('input-extra-plugins').value.trim();
+    if (extra) {
+        extra.split('\n').forEach(u => {
+            u = u.trim();
+            if (u && u.startsWith('http')) urls.push(u);
+        });
+    }
+    return urls;
+}
+
+// ── Summary ──
+function renderSummary() {
+    saveCurrentStep();
+    const c = wizardConfig;
+    const pluginCount = (c.plugins || []).length;
+    const html = `
+        <div class="summary-card">
+            <h4>部署方式</h4>
+            <div class="summary-row"><span class="label">镜像类型</span><span class="value">${c.image_type === 'prebuilt' ? '⚡ 预构建镜像' : '🔧 通用镜像'}</span></div>
+        </div>
+        <div class="summary-card">
+            <h4>网络与安全</h4>
+            <div class="summary-row"><span class="label">Dashboard 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
+            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.cloudflared_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
+        </div>
+        <div class="summary-card">
+            <h4>云存储</h4>
+            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${c.rclone_config_method === 'skip' ? '⏭ 跳过' : c.rclone_config_method === 'url' ? '🔗 从 URL 导入' : '📋 Base64 导入'}</span></div>
+        </div>
+        <div class="summary-card">
+            <h4>模型与插件</h4>
+            <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
+            <div class="summary-row"><span class="label">插件数量</span><span class="value">${pluginCount} 个</span></div>
+        </div>`;
+    document.getElementById('deploy-summary').innerHTML = html;
+}
+
+// ── Deploy ──
+async function startDeploy() {
+    saveCurrentStep();
+    document.getElementById('btn-deploy').disabled = true;
+
+    try {
+        const r = await fetch('/api/setup/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(wizardConfig)
+        });
+        const d = await r.json();
+        if (!d.ok) { alert('部署启动失败: ' + (d.error || '')); return; }
+    } catch (e) { alert('请求失败: ' + e.message); return; }
+
+    showDeployView();
+    connectSSE();
+}
+
+function showDeployView() {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.getElementById('deploy-view').classList.add('active');
+    document.getElementById('progressBar').style.display = 'none';
+    startElapsedTimer();
+}
+
+let elapsedTimer = null;
+let deployStartTime = Date.now();
+
+function startElapsedTimer() {
+    deployStartTime = Date.now();
+    elapsedTimer = setInterval(() => {
+        const s = Math.floor((Date.now() - deployStartTime) / 1000);
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        document.getElementById('deploy-elapsed').textContent = `已用时: ${m > 0 ? m + ' 分 ' : ''}${sec} 秒`;
+    }, 1000);
+}
+
+let completedSteps = [];
+
+function connectSSE() {
+    const evtSource = new EventSource('/api/setup/log_stream');
+    const logEl = document.getElementById('deploy-log');
+    const stepsEl = document.getElementById('deploy-steps-list');
+
+    evtSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'step') {
+            // Mark previous step as done
+            if (completedSteps.length > 0) {
+                const prev = stepsEl.querySelector('.deploy-step-item.active');
+                if (prev) { prev.classList.remove('active'); prev.classList.add('done'); prev.querySelector('.step-icon').textContent = '✅'; }
+            }
+            completedSteps.push(data.name);
+            const item = document.createElement('div');
+            item.className = 'deploy-step-item active';
+            item.innerHTML = `<span class="step-icon">⏳</span>${esc(data.name)}`;
+            stepsEl.appendChild(item);
+            return;
+        }
+
+        if (data.type === 'done') {
+            evtSource.close();
+            if (elapsedTimer) clearInterval(elapsedTimer);
+            // Mark last step done
+            const lastActive = stepsEl.querySelector('.deploy-step-item.active');
+            if (lastActive) { lastActive.classList.remove('active'); lastActive.classList.add('done'); lastActive.querySelector('.step-icon').textContent = '✅'; }
+
+            if (data.success) {
+                const doneEl = document.createElement('div');
+                doneEl.className = 'log-line info';
+                doneEl.style.color = 'var(--green)';
+                doneEl.style.fontWeight = '600';
+                doneEl.textContent = '🎉 部署完成！';
+                logEl.appendChild(doneEl);
+            } else {
+                const errEl = document.createElement('div');
+                errEl.className = 'log-line error';
+                errEl.textContent = '❌ ' + (data.msg || '部署失败');
+                logEl.appendChild(errEl);
+            }
+            document.getElementById('deploy-done-row').style.display = 'flex';
+            logEl.scrollTop = logEl.scrollHeight;
+            return;
+        }
+
+        if (data.type === 'log') {
+            const line = document.createElement('div');
+            line.className = `log-line ${data.level || 'info'}`;
+            const timeSpan = data.time ? `<span class="log-time">${esc(data.time)}</span>` : '';
+            line.innerHTML = `${timeSpan}${esc(data.msg)}`;
+            logEl.appendChild(line);
+            // Auto scroll
+            if (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 100) {
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        }
+    };
+
+    evtSource.onerror = () => {
+        // Connection lost — might be done
+        setTimeout(() => { evtSource.close(); }, 3000);
+    };
+}
+
+// ── Start ──
+init();
+</script>
+</body>
+</html>
