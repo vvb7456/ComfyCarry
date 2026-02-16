@@ -1451,52 +1451,49 @@ class ComfyWSBridge:
             msg_data = data.get("data", {})
 
             if msg_type == "status":
-                self._last_status = msg_data
-                self._broadcast({"type": "status", "data": msg_data})
+                q_info = msg_data.get("status", {}).get("exec_info", {})
+                q_remaining = q_info.get("queue_remaining", 0)
+                old_remaining = (self._last_status or {}).get("status", {}).get(
+                    "exec_info", {}).get("queue_remaining", 0)
 
-            elif msg_type == "execution_start":
-                self._exec_info = {
-                    "prompt_id": msg_data.get("prompt_id", ""),
-                    "start_time": time.time(),
-                    "current_node": None,
-                    "progress": None,
-                }
-                self._broadcast({"type": "execution_start", "data": {
-                    **msg_data, "start_time": self._exec_info["start_time"]
-                }})
-
-            elif msg_type == "executing":
-                node = msg_data.get("node")
-                if node is None:
-                    # Execution finished
+                # Detect execution start/end from queue transitions
+                if old_remaining == 0 and q_remaining > 0 and not self._exec_info:
+                    self._exec_info = {"start_time": time.time()}
+                    self._broadcast({"type": "execution_start", "data": {
+                        "start_time": self._exec_info["start_time"]
+                    }})
+                elif q_remaining == 0 and self._exec_info:
                     elapsed = time.time() - self._exec_info.get("start_time", time.time())
                     self._broadcast({"type": "execution_done", "data": {
-                        "prompt_id": msg_data.get("prompt_id", ""),
-                        "elapsed": round(elapsed, 1),
+                        "elapsed": round(elapsed, 1)
                     }})
                     self._exec_info = {}
                     self._last_progress = None
+
+                self._last_status = msg_data
+                self._broadcast({"type": "status", "data": msg_data})
+
+            elif msg_type == "crystools.monitor":
+                # Real-time GPU/CPU/RAM stats from Crystools plugin
+                self._broadcast({"type": "monitor", "data": msg_data})
+
+            elif msg_type in ("execution_start", "executing", "progress",
+                              "executed", "execution_error", "execution_cached",
+                              "execution_success"):
+                # These are normally only sent to the prompt submitter,
+                # but forward them if we somehow receive them
+                if msg_type == "progress":
+                    val = msg_data.get("value", 0)
+                    mx = msg_data.get("max", 1)
+                    self._last_progress = {"value": val, "max": mx,
+                                           "percent": round(val / mx * 100) if mx > 0 else 0}
+                    self._broadcast({"type": "progress", "data": self._last_progress})
+                elif msg_type == "execution_error":
+                    self._broadcast({"type": "execution_error", "data": msg_data})
+                    self._exec_info = {}
+                    self._last_progress = None
                 else:
-                    self._exec_info["current_node"] = node
-                    self._broadcast({"type": "executing", "data": msg_data})
-
-            elif msg_type == "progress":
-                val = msg_data.get("value", 0)
-                mx = msg_data.get("max", 1)
-                self._last_progress = {"value": val, "max": mx,
-                                       "percent": round(val / mx * 100) if mx > 0 else 0}
-                self._broadcast({"type": "progress", "data": self._last_progress})
-
-            elif msg_type == "execution_error":
-                self._broadcast({"type": "execution_error", "data": msg_data})
-                self._exec_info = {}
-                self._last_progress = None
-
-            elif msg_type == "execution_cached":
-                self._broadcast({"type": "execution_cached", "data": msg_data})
-
-            elif msg_type == "executed":
-                self._broadcast({"type": "executed", "data": msg_data})
+                    self._broadcast({"type": msg_type, "data": msg_data})
 
         except Exception:
             pass

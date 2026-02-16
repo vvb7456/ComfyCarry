@@ -1244,6 +1244,7 @@ let _comfyParamsSchema = null;
 let _comfyEventSource = null;
 let _comfyLogSource = null;
 let _comfyExecState = null;  // Current execution state
+let _comfyExecTimer = null;  // Timer for elapsed counter
 
 async function loadComfyUIPage() {
   await Promise.all([loadComfyStatus(), loadComfyQueue(), loadComfyParams()]);
@@ -1280,28 +1281,21 @@ function handleComfyEvent(evt) {
     const qr = qInfo.exec_info || {};
     const qRemain = qr.queue_remaining || 0;
     const el = document.getElementById('comfyui-queue-info');
-    if (el && _comfyExecState) {
-      // Actively executing — show progress
-    } else if (el) {
+    if (el) {
       if (qRemain > 0) {
-        el.innerHTML = `<span style="color:var(--amber)">⏳ 队列中 ${qRemain} 个任务</span>`;
-      } else {
+        el.innerHTML = `<span style="color:var(--green)">▶ 正在执行 (队列: ${qRemain})</span>`;
+      } else if (!_comfyExecState) {
         el.innerHTML = '<span style="color:var(--t3)">空闲 — 无任务</span>';
       }
     }
   }
 
   else if (t === 'execution_start') {
-    _comfyExecState = { prompt_id: d.prompt_id, start_time: d.start_time || (Date.now() / 1000), nodes: {} };
+    _comfyExecState = { start_time: d.start_time || (Date.now() / 1000) };
     _updateExecBar();
-  }
-
-  else if (t === 'executing') {
-    if (_comfyExecState) {
-      _comfyExecState.current_node = d.node;
-      _comfyExecState.nodes[d.node] = 'running';
-    }
-    _updateExecBar();
+    // Start elapsed timer
+    if (_comfyExecTimer) clearInterval(_comfyExecTimer);
+    _comfyExecTimer = setInterval(_updateExecBar, 1000);
   }
 
   else if (t === 'progress') {
@@ -1311,17 +1305,12 @@ function handleComfyEvent(evt) {
     _updateExecBar();
   }
 
-  else if (t === 'executed') {
-    if (_comfyExecState && d.node) {
-      _comfyExecState.nodes[d.node] = 'done';
-    }
-    _updateExecBar();
-  }
-
   else if (t === 'execution_done') {
+    const elapsed = d.elapsed ? `${d.elapsed}s` : '';
     _comfyExecState = null;
+    if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
     _updateExecBar();
-    // Refresh status (GPU usage may have changed)
+    if (elapsed) showToast(`✅ 生成完成 (${elapsed})`);
     loadComfyStatus();
     loadComfyQueue();
   }
@@ -1337,9 +1326,48 @@ function handleComfyEvent(evt) {
     }
   }
 
-  else if (t === 'execution_cached') {
-    // Nodes were cached, skip
+  else if (t === 'monitor') {
+    // Crystools real-time GPU/CPU monitor data
+    _updateMonitorData(d);
   }
+}
+
+function _updateMonitorData(d) {
+  // Update GPU stats in real-time from crystools.monitor
+  const gpuCards = document.querySelectorAll('#comfyui-status-cards .stat-card.cyan');
+  if (!gpuCards.length) return;
+  // Crystools sends gpus array
+  const gpus = d.gpus || [];
+  gpus.forEach((gpu, i) => {
+    if (!gpuCards[i]) return;
+    const vramPct = gpu.gpu_utilization || 0;
+    const vramUsed = gpu.vram_used || 0;
+    const vramTotal = gpu.vram_total || 1;
+    const usedPct = (vramUsed / vramTotal * 100);
+    const bar = gpuCards[i].querySelector('.comfy-vram-bar .fill');
+    const label = gpuCards[i].querySelector('.comfy-vram-bar .label');
+    const valEl = gpuCards[i].querySelector('.stat-value');
+    if (bar) bar.style.width = usedPct.toFixed(0) + '%';
+    if (label) label.textContent = `${fmtBytes(vramUsed)} / ${fmtBytes(vramTotal)}`;
+    if (valEl) valEl.textContent = usedPct.toFixed(0) + '%';
+  });
+}
+
+// Parse log lines for step progress (e.g., "KSampler STEPS: 5/20", "10%|███")
+function _parseLogProgress(line) {
+  // Pattern 1: "XX%|" (tqdm-style progress)
+  let m = line.match(/\b(\d{1,3})%\|/);
+  if (m) return { percent: parseInt(m[1]) };
+  // Pattern 2: "N/M" step counter in sampler logs
+  m = line.match(/\b(\d+)\/(\d+)\b.*(?:step|sample|it)/i);
+  if (m) {
+    const val = parseInt(m[1]), max = parseInt(m[2]);
+    if (max > 1 && val <= max) return { value: val, max, percent: Math.round(val / max * 100) };
+  }
+  // Pattern 3: "Prompt executed in X.XX seconds"
+  m = line.match(/Prompt executed in ([\d.]+) seconds/i);
+  if (m) return { done: true, elapsed: parseFloat(m[1]) };
+  return null;
 }
 
 function _updateExecBar() {
@@ -1361,20 +1389,16 @@ function _updateExecBar() {
   let html = `<div class="comfy-exec-status">`;
   html += `<span class="comfy-exec-pulse"></span>`;
   html += `<span>⚡ 正在生成</span>`;
-
-  if (st.current_node) {
-    html += `<span style="color:var(--t2);margin-left:8px">节点: ${escHtml(st.current_node)}</span>`;
-  }
-
   html += `<span style="color:var(--t3);margin-left:auto">${timeStr}</span>`;
   html += `</div>`;
 
-  // Progress bar
-  if (st.progress) {
-    const pct = st.progress.percent || 0;
+  // Progress bar (from log parsing or WS)
+  if (st.progress && st.progress.percent != null) {
+    const pct = st.progress.percent;
+    const detail = st.progress.value != null ? `${st.progress.value}/${st.progress.max}` : '';
     html += `<div class="comfy-exec-progress">
       <div class="comfy-exec-progress-fill" style="width:${pct}%"></div>
-      <span class="comfy-exec-progress-text">${st.progress.value}/${st.progress.max} (${pct}%)</span>
+      <span class="comfy-exec-progress-text">${detail ? detail + ' ' : ''}(${pct}%)</span>
     </div>`;
   }
 
@@ -1411,6 +1435,14 @@ function startComfyLogStream() {
       div.textContent = d.line;
       if (d.level === 'error') div.className = 'log-error';
       else if (d.level === 'warn') div.className = 'log-warn';
+
+      // Check for progress in log lines
+      const prog = _parseLogProgress(d.line);
+      if (prog && !prog.done && _comfyExecState) {
+        _comfyExecState.progress = prog;
+        _updateExecBar();
+      }
+
       // Auto-scroll if near bottom
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       el.appendChild(div);
@@ -1626,6 +1658,7 @@ function startComfyAutoRefresh() {
 }
 function stopComfyAutoRefresh() {
   if (comfyAutoRefresh) { clearInterval(comfyAutoRefresh); comfyAutoRefresh = null; }
+  if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
   stopComfyEventStream();
   stopComfyLogStream();
 }
