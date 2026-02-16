@@ -315,7 +315,12 @@ async function searchModels(page = 0) {
   if (bms.length > 0) filter.push(bms.map(b => `version.baseModel = "${b}"`).join(' OR '));
   filter.push('nsfwLevel <= 4');
 
-  const sortMap = { 'Most Downloaded': ['stats.downloadCount:desc'], 'Highest Rated': ['stats.rating:desc'], 'Newest': ['createdAtUnix:desc'], 'Relevancy': [] };
+  const sortMap = {
+    'Most Downloaded': ['metrics.downloadCount:desc'],
+    'Highest Rated': ['metrics.thumbsUpCount:desc'],
+    'Newest': ['createdAt:desc'],
+    'Relevancy': []
+  };
 
   const body = {
     queries: [{
