@@ -49,42 +49,11 @@ touch ~/.no_auto_tmux
 export PYTHON_BIN="python3.13"
 export PIP_BIN="$PYTHON_BIN -m pip"
 
-# 0. 重启 Jupyter 使用自定义 Token（优先执行）
-if [ -z "$JUPYTER_TOKEN" ]; then
-    # 如果未指定，使用默认固定 Token
-    JUPYTER_TOKEN="comfyui-jupyter-default-token-2024"
-    echo "  -> 使用默认 Jupyter Token（建议设置环境变量 JUPYTER_TOKEN 自定义）"
-else
-    echo "  -> 使用自定义 Jupyter Token: ${JUPYTER_TOKEN:0:16}..."
-fi
-
-# 停止 Vast/RunPod 自带的 Jupyter
-echo "  -> 停止现有 Jupyter 进程..."
-pkill -f jupyter-lab 2>/dev/null || true
-sleep 2
-
-# 启动自定义配置的 Jupyter Lab
-echo "  -> 启动 Jupyter Lab (Token: ${JUPYTER_TOKEN:0:16}...)..."
-nohup jupyter-lab \
-    --ip=0.0.0.0 \
-    --port=8080 \
-    --no-browser \
-    --ServerApp.token="$JUPYTER_TOKEN" \
-    --ServerApp.password='' \
-    --ServerApp.allow_remote_access=True \
-    --ServerApp.allow_origin='*' \
-    --ServerApp.certfile=/etc/instance.crt \
-    --ServerApp.keyfile=/etc/instance.key \
-    --allow-root \
-    > /workspace/jupyter.log 2>&1 &
-
-# 等待 Jupyter 启动
-sleep 5
+# 使用平台自带的 Jupyter（Dashboard 会自动检测 token 并拼接到链接中）
 if pgrep -f jupyter-lab > /dev/null; then
-    echo "✅ Jupyter Lab 已启动 (端口: 8080, Token: ${JUPYTER_TOKEN:0:16}...)"
-    echo "  🔗 访问地址: https://localhost:8080/?token=$JUPYTER_TOKEN"
+    echo "  -> Jupyter Lab 已在运行"
 else
-    echo "⚠️ Jupyter Lab 启动失败，检查日志: /workspace/jupyter.log"
+    echo "  -> Jupyter Lab 未运行，跳过"
 fi
 
 # 1.1 更新开关 (默认关闭以加速启动)

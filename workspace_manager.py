@@ -731,31 +731,50 @@ def _parse_tunnel_ingress():
 
 def _tunnel_ingress_to_links(ingress, links):
     """将 Cloudflare Tunnel ingress 列表转换为服务链接"""
-    # 检测本机端口 → 服务名称
     port_services = _detect_port_services()
+    jupyter_token = _get_jupyter_token()
     for entry in ingress:
         hostname = entry.get("hostname", "")
         service = entry.get("service", "")
         if not hostname or "http_status:" in service:
             continue
-        # 提取端口
         import re as _re
         port_match = _re.search(r':(\d+)', service)
         port = port_match.group(1) if port_match else ""
-        # 协议
         proto = "ssh" if service.startswith("ssh://") else "http"
         if proto == "ssh":
-            continue  # Skip SSH
-        # 获取服务名（从端口检测或 hostname 推断）
+            continue
         svc_name = port_services.get(port, "")
         if not svc_name:
-            # 从 hostname 第一段推断
             svc_name = hostname.split(".")[0].replace("-", " ").title()
         icon = {"comfyui": "🎨", "jupyter": "📓", "dashboard": "📊"}.get(svc_name.lower(), "🌐")
+        url = f"https://{hostname}"
+        # Append Jupyter token if applicable
+        if svc_name.lower() == "jupyter" and jupyter_token:
+            url += f"/?token={jupyter_token}"
         links.append({
-            "name": svc_name, "url": f"https://{hostname}",
+            "name": svc_name, "url": url,
             "icon": icon, "port": port, "service": service
         })
+
+
+def _get_jupyter_token():
+    """从 jupyter server list 获取运行中的 Jupyter token"""
+    try:
+        r = subprocess.run(
+            "jupyter server list 2>&1",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        output = r.stdout + r.stderr
+        import re as _re
+        # Match: https://host:port/?token=TOKEN :: /path
+        # or:   http://host:port/?token=TOKEN :: /path
+        match = _re.search(r'https?://[^?]+\?token=([a-f0-9]+)', output)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return ""
 
 
 def _detect_port_services():
