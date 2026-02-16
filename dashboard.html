@@ -41,7 +41,7 @@
         }
 
         html {
-            font-size: 14px
+            font-size: clamp(14px, 1.1vw, 21px)
         }
 
         body {
@@ -55,7 +55,7 @@
 
         /* Sidebar */
         .sidebar {
-            width: 220px;
+            width: clamp(220px, 16vw, 300px);
             background: var(--bg2);
             border-right: 1px solid var(--bd);
             display: flex;
@@ -131,13 +131,13 @@
 
         /* Content */
         .content {
-            margin-left: 220px;
+            margin-left: clamp(220px, 16vw, 300px);
             flex: 1;
             min-height: 100vh
         }
 
         .page-header {
-            padding: 16px 28px;
+            padding: clamp(16px, 1.5vw, 24px) clamp(28px, 2.5vw, 42px);
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;
@@ -155,22 +155,22 @@
         }
 
         .page-body {
-            padding: 20px 28px
+            padding: clamp(20px, 2vw, 32px) clamp(28px, 2.5vw, 42px)
         }
 
         /* Cards */
         .stat-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px
+            grid-template-columns: repeat(auto-fit, minmax(clamp(240px, 18vw, 320px), 1fr));
+            gap: clamp(16px, 1.2vw, 24px);
+            margin-bottom: clamp(24px, 2vw, 36px)
         }
 
         .stat-card {
             background: var(--bg3);
             border: 1px solid var(--bd);
             border-radius: var(--r);
-            padding: 18px 20px;
+            padding: clamp(18px, 1.5vw, 28px) clamp(20px, 1.8vw, 32px);
             position: relative;
             overflow: hidden
         }
@@ -249,7 +249,7 @@
 
         .svc-table th {
             text-align: left;
-            padding: 10px 14px;
+            padding: clamp(10px, 0.9vw, 16px) clamp(14px, 1.2vw, 22px);
             font-size: .78rem;
             font-weight: 600;
             color: var(--t3);
@@ -259,7 +259,7 @@
         }
 
         .svc-table td {
-            padding: 10px 14px;
+            padding: clamp(10px, 0.9vw, 16px) clamp(14px, 1.2vw, 22px);
             border-bottom: 1px solid rgba(42, 42, 58, .3);
             vertical-align: middle
         }
@@ -433,8 +433,8 @@
         /* Model cards */
         .model-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 14px
+            grid-template-columns: repeat(auto-fill, minmax(clamp(280px, 22vw, 380px), 1fr));
+            gap: clamp(14px, 1.2vw, 22px)
         }
 
         .model-card {
@@ -675,8 +675,8 @@
 
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 14px
+            grid-template-columns: repeat(auto-fill, minmax(clamp(300px, 24vw, 420px), 1fr));
+            gap: clamp(14px, 1.2vw, 22px)
         }
 
         .pagination {
@@ -788,8 +788,8 @@
             background: var(--bg3);
             border: 1px solid var(--bd);
             border-radius: var(--r);
-            padding: 24px;
-            width: 520px;
+            padding: clamp(24px, 2vw, 36px);
+            width: clamp(520px, 40vw, 720px);
             max-width: 92vw;
             max-height: 85vh;
             overflow-y: auto
@@ -821,7 +821,7 @@
 
         /* Metadata Modal */
         .meta-modal-box {
-            width: 720px;
+            width: clamp(720px, 55vw, 960px);
             max-width: 95vw;
             max-height: 90vh;
             padding: 0;
@@ -1017,8 +1017,8 @@
         }
         .tunnel-services {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(clamp(260px, 20vw, 360px), 1fr));
+            gap: clamp(12px, 1vw, 20px);
             margin-top: 8px;
         }
         .tunnel-svc-card {
@@ -1061,8 +1061,8 @@
         /* Cloud Sync Page */
         .sync-remotes-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 14px;
+            grid-template-columns: repeat(auto-fill, minmax(clamp(300px, 22vw, 420px), 1fr));
+            gap: clamp(14px, 1.2vw, 22px);
             margin-top: 8px;
         }
         .sync-remote-card {

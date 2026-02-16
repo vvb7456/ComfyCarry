@@ -131,14 +131,14 @@ LOGIN_PAGE = """<!DOCTYPE html>
 <title>Login - Workspace Manager</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#0a0a0f;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:#1a1a28;border:1px solid #2a2a3e;border-radius:12px;padding:32px;width:360px;max-width:92vw}
-.card h2{text-align:center;margin-bottom:20px;background:linear-gradient(135deg,#7c5cfc,#e879f9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-input{width:100%;padding:10px 14px;background:#0e0e18;color:#e8e8f0;border:1px solid #2a2a3e;border-radius:8px;font-size:.9rem;margin-bottom:14px}
+body{font-family:'Inter',sans-serif;background:#0a0a0f;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:clamp(15px,1.1vw,21px)}
+.card{background:#1a1a28;border:1px solid #2a2a3e;border-radius:14px;padding:clamp(32px,3vw,48px);width:clamp(360px,28vw,480px);max-width:92vw}
+.card h2{text-align:center;margin-bottom:clamp(20px,2vw,32px);font-size:clamp(1.3rem,1.8vw,1.8rem);background:linear-gradient(135deg,#7c5cfc,#e879f9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+input{width:100%;padding:clamp(10px,1.2vw,16px) clamp(14px,1.5vw,20px);background:#0e0e18;color:#e8e8f0;border:1px solid #2a2a3e;border-radius:10px;font-size:clamp(.9rem,1vw,1.1rem);margin-bottom:clamp(14px,1.2vw,20px)}
 input:focus{border-color:#7c5cfc;outline:none}
-button{width:100%;padding:10px;background:#7c5cfc;color:#fff;border:none;border-radius:8px;font-size:.9rem;cursor:pointer;font-weight:600}
+button{width:100%;padding:clamp(10px,1.2vw,16px);background:#7c5cfc;color:#fff;border:none;border-radius:10px;font-size:clamp(.9rem,1vw,1.1rem);cursor:pointer;font-weight:600}
 button:hover{background:#9078ff}
-.err{color:#f87171;font-size:.82rem;text-align:center;margin-bottom:10px}
+.err{color:#f87171;font-size:clamp(.82rem,.9vw,1rem);text-align:center;margin-bottom:10px}
 </style></head>
 <body><div class="card"><h2>Workspace Manager</h2>
 <form method="POST" action="/login">
