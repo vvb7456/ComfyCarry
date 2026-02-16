@@ -27,8 +27,8 @@ function showPage(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
 
   if (page === 'dashboard') refreshDashboard();
-  else if (page === 'models') loadLocalModels();
-  else if (page === 'civitai') { loadFacets(); }
+  else { stopDlStatusPolling(); if (page === 'models') loadLocalModels(); }
+  if (page === 'civitai') { loadFacets(); }
   else if (page === 'logs') loadLogs();
 }
 
@@ -263,6 +263,8 @@ async function clearApiKey() {
 async function refreshDashboard() {
   const statsEl = document.getElementById('sys-stats');
   const svcEl = document.getElementById('svc-tbody');
+  loadTunnelLinks();
+  startDlStatusPolling();
 
   try {
     const [sysR, svcR] = await Promise.all([fetch('/api/system'), fetch('/api/services')]);
@@ -687,15 +689,20 @@ function toggleCartFromSearch(id, btn) {
 }
 
 async function downloadFromSearch(modelId, modelType) {
-  showToast(`正在发送下载请求: ${modelId}...`);
+  // Try to get the selected version from cache
+  const cached = searchResultsCache[String(modelId)];
+  const versionId = cached?.version?.id || null;
+  showToast(`正在发送下载请求: ${modelId}${versionId ? ' (v' + versionId + ')' : ''}...`);
   try {
+    const payload = { model_id: modelId, model_type: modelType };
+    if (versionId) payload.version_id = versionId;
     const r = await fetch('/api/download', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model_id: modelId, model_type: modelType })
+      body: JSON.stringify(payload)
     });
     const d = await r.json();
     if (d.error) showToast('❌ ' + d.error);
-    else showToast('✅ 下载任务已提交');
+    else showToast('✅ ' + (d.message || '下载任务已提交'));
   } catch (e) { showToast('请求失败: ' + e.message); }
 }
 
@@ -897,5 +904,136 @@ function toggleAutoLog() {
   } else {
     clearInterval(autoLogInterval);
     autoLogInterval = null;
+  }
+}
+
+// ========== Download Status ==========
+let dlStatusInterval = null;
+
+async function refreshDownloadStatus() {
+  const container = document.getElementById('dl-status-content');
+  if (!container) return;
+  try {
+    const r = await fetch('/api/download/status');
+    const d = await r.json();
+    const active = d.active || [];
+    const queue = d.queue || [];
+    const history = d.history || [];
+
+    if (active.length === 0 && queue.length === 0 && history.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">暂无下载任务</div>';
+      return;
+    }
+
+    let html = '';
+
+    // Active downloads
+    if (active.length > 0) {
+      html += '<div class="section-title">🔄 下载中</div>';
+      active.forEach(dl => {
+        const pct = (dl.progress || 0).toFixed(1);
+        const speed = dl.speed ? fmtBytes(dl.speed) + '/s' : '';
+        html += `<div class="dl-item">
+          <div class="dl-item-info">
+            <span class="dl-item-name" title="${dl.filename || ''}">${dl.model_name || dl.filename || dl.id}</span>
+            <span class="dl-item-meta">${dl.version_name || ''} ${speed ? '• ' + speed : ''} ${dl.connection_type || ''}</span>
+          </div>
+          <div class="progress-bar" style="height:8px;margin:6px 0"><div class="progress-fill" style="width:${pct}%;background:var(--ac);transition:width .3s"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--t3)">
+            <span>${pct}%</span>
+            <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
+          </div>
+        </div>`;
+      });
+    }
+
+    // Queued
+    if (queue.length > 0) {
+      html += '<div class="section-title" style="margin-top:12px">⏳ 队列中</div>';
+      queue.forEach(dl => {
+        html += `<div class="dl-item">
+          <div class="dl-item-info">
+            <span class="dl-item-name">${dl.model_name || dl.filename || dl.id}</span>
+            <span class="dl-item-meta">${dl.version_name || ''} • 等待中</span>
+          </div>
+          <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
+        </div>`;
+      });
+    }
+
+    // History
+    if (history.length > 0) {
+      html += '<div class="section-title" style="margin-top:12px">📋 历史</div>';
+      history.slice(0, 20).forEach(dl => {
+        const statusIcon = dl.status === 'completed' ? '✅' : dl.status === 'failed' ? '❌' : '⛔';
+        const canRetry = dl.status === 'failed' || dl.status === 'cancelled';
+        html += `<div class="dl-item">
+          <div class="dl-item-info">
+            <span class="dl-item-name">${statusIcon} ${dl.model_name || dl.filename || dl.id}</span>
+            <span class="dl-item-meta">${dl.version_name || ''} ${dl.error ? '• ' + dl.error : ''}</span>
+          </div>
+          ${canRetry ? `<button class="btn btn-sm" style="padding:2px 8px;font-size:.7rem" onclick="retryDownload('${dl.id}')">🔄 重试</button>` : ''}
+        </div>`;
+      });
+      html += `<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="clearDlHistory()">🗑️ 清除历史</button></div>`;
+    }
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="error-msg">获取下载状态失败: ${e.message}</div>`;
+  }
+}
+
+function startDlStatusPolling() {
+  if (dlStatusInterval) return;
+  refreshDownloadStatus();
+  dlStatusInterval = setInterval(refreshDownloadStatus, 3000);
+}
+function stopDlStatusPolling() {
+  if (dlStatusInterval) { clearInterval(dlStatusInterval); dlStatusInterval = null; }
+}
+
+async function cancelDownload(id) {
+  try {
+    await fetch('/api/download/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
+    showToast('已取消');
+    refreshDownloadStatus();
+  } catch (e) { showToast('取消失败: ' + e.message); }
+}
+
+async function retryDownload(id) {
+  try {
+    const r = await fetch('/api/download/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
+    const d = await r.json();
+    showToast(d.message || '已重试');
+    refreshDownloadStatus();
+  } catch (e) { showToast('重试失败: ' + e.message); }
+}
+
+async function clearDlHistory() {
+  try {
+    await fetch('/api/download/clear_history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    showToast('历史已清除');
+    refreshDownloadStatus();
+  } catch (e) { showToast('清除失败: ' + e.message); }
+}
+
+// ========== Tunnel Links ==========
+async function loadTunnelLinks() {
+  const container = document.getElementById('tunnel-links');
+  if (!container) return;
+  try {
+    const r = await fetch('/api/tunnel_links');
+    const d = await r.json();
+    const links = d.links || [];
+    if (links.length === 0) {
+      container.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">未检测到 Tunnel 链接</span>';
+      return;
+    }
+    container.innerHTML = links.map(l =>
+      `<a href="${l.url}" target="_blank" class="btn btn-sm" style="display:inline-flex;align-items:center;gap:4px">${l.icon || '🔗'} ${l.name}</a>`
+    ).join(' ');
+  } catch (e) {
+    container.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">无法获取链接</span>';
   }
 }

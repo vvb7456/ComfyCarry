@@ -16,15 +16,19 @@ import hashlib
 import threading
 import time
 import re
+import secrets
 from pathlib import Path
 from datetime import datetime
 
 import requests
-from flask import Flask, jsonify, request, Response, send_file
+from flask import Flask, jsonify, request, Response, send_file, redirect, session
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
+# Session secret key
+app.secret_key = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
 
 # --- 配置 ---
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
@@ -33,6 +37,7 @@ CONFIG_FILE = Path(__file__).parent / ".civitai_config.json"
 MEILI_URL = 'https://search.civitai.com/multi-search'
 MEILI_BEARER = '8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61'
 MANAGER_PORT = int(os.environ.get("MANAGER_PORT", 5000))
+DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "comfy2025")
 
 # 模型目录映射
 MODEL_DIRS = {
@@ -48,6 +53,65 @@ MODEL_DIRS = {
 }
 
 MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin"}
+
+
+# --- 鉴权 ---
+
+
+LOGIN_PAGE = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login - Workspace Manager</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#0a0a0f;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#1a1a28;border:1px solid #2a2a3e;border-radius:12px;padding:32px;width:360px;max-width:92vw}
+.card h2{text-align:center;margin-bottom:20px;background:linear-gradient(135deg,#7c5cfc,#e879f9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+input{width:100%;padding:10px 14px;background:#0e0e18;color:#e8e8f0;border:1px solid #2a2a3e;border-radius:8px;font-size:.9rem;margin-bottom:14px}
+input:focus{border-color:#7c5cfc;outline:none}
+button{width:100%;padding:10px;background:#7c5cfc;color:#fff;border:none;border-radius:8px;font-size:.9rem;cursor:pointer;font-weight:600}
+button:hover{background:#9078ff}
+.err{color:#f87171;font-size:.82rem;text-align:center;margin-bottom:10px}
+</style></head>
+<body><div class="card"><h2>Workspace Manager</h2>
+<form method="POST" action="/login">
+<div class="err" id="err">__ERR__</div>
+<input name="password" type="password" placeholder="输入访问密码..." autofocus>
+<button type="submit">登录</button>
+</form></div></body></html>"""
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return Response(LOGIN_PAGE.replace("__ERR__", ""), mimetype="text/html")
+    pw = request.form.get("password", "")
+    if pw == DASHBOARD_PASSWORD:
+        session["authed"] = True
+        return redirect("/")
+    return Response(LOGIN_PAGE.replace("__ERR__", "密码错误"), mimetype="text/html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+@app.before_request
+def check_auth():
+    """全局鉴权: 除 /login 外所有路由需要密码"""
+    if not DASHBOARD_PASSWORD:
+        return
+    if request.path in ("/login", "/favicon.ico"):
+        return
+    if session.get("authed"):
+        return
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Unauthorized"}), 401
+    return redirect("/login")
+
 
 # --- 工具函数 ---
 def _get_api_key():
@@ -538,6 +602,82 @@ def api_download_status():
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception:
         return jsonify({"queue": [], "active": [], "history": []}), 200
+
+
+@app.route("/api/download/cancel", methods=["POST"])
+def api_download_cancel():
+    """取消指定下载任务"""
+    data = request.get_json()
+    download_id = data.get("download_id", "")
+    if not download_id:
+        return jsonify({"error": "download_id required"}), 400
+    try:
+        resp = requests.post(f"{COMFYUI_URL}/civitai/cancel", json={"download_id": download_id}, timeout=10)
+        return Response(resp.content, status=resp.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/download/retry", methods=["POST"])
+def api_download_retry():
+    """重试失败/取消的下载"""
+    data = request.get_json()
+    download_id = data.get("download_id", "")
+    if not download_id:
+        return jsonify({"error": "download_id required"}), 400
+    try:
+        resp = requests.post(f"{COMFYUI_URL}/civitai/retry", json={"download_id": download_id}, timeout=10)
+        return Response(resp.content, status=resp.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/download/clear_history", methods=["POST"])
+def api_download_clear_history():
+    """清除下载历史"""
+    try:
+        resp = requests.post(f"{COMFYUI_URL}/civitai/clear_history", json={}, timeout=10)
+        return Response(resp.content, status=resp.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/tunnel_links")
+def api_tunnel_links():
+    """获取 Cloudflare Tunnel 代理的服务链接"""
+    links = []
+    # 尝试从环境变量获取 tunnel URL
+    tunnel_url = os.environ.get("CF_TUNNEL_URL", os.environ.get("TUNNEL_URL", ""))
+    if tunnel_url:
+        tunnel_url = tunnel_url.rstrip("/")
+        links.append({"name": "ComfyUI", "url": tunnel_url, "icon": "🎨"})
+
+    # 常见 Jupyter 端口
+    jupyter_url = os.environ.get("JUPYTER_URL", "")
+    if jupyter_url:
+        links.append({"name": "Jupyter", "url": jupyter_url, "icon": "📓"})
+
+    # 尝试从 PM2/tunnel 进程中提取 URL
+    if not links:
+        try:
+            r = subprocess.run(
+                "pm2 logs tunnel --nostream --lines 30 2>/dev/null | grep -oP 'https://[a-z0-9-]+\\.trycloudflare\\.com'",
+                shell=True, capture_output=True, text=True, timeout=5
+            )
+            urls = list(set(r.stdout.strip().split("\n")))
+            urls = [u for u in urls if u.startswith("https://")]
+            for i, u in enumerate(urls):
+                name = "ComfyUI" if i == 0 else f"Service #{i+1}"
+                links.append({"name": name, "url": u, "icon": "🌐"})
+        except Exception:
+            pass
+
+    # Vast.ai direct URL
+    vast_proxy = os.environ.get("VAST_PROXY_URL", "")
+    if vast_proxy:
+        links.append({"name": "Vast.ai Proxy", "url": vast_proxy, "icon": "☁️"})
+
+    return jsonify({"links": links})
 
 
 # ====================================================================

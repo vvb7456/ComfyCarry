@@ -956,6 +956,41 @@
         }
         .cart-ids-box:focus { border-color: var(--bd-f); outline: none }
 
+        /* Download Status Items */
+        .dl-item {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            padding: 10px 14px;
+            margin-bottom: 8px;
+        }
+        .dl-item-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .dl-item-name {
+            font-size: .85rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
+        }
+        .dl-item-meta {
+            font-size: .75rem;
+            color: var(--t3);
+        }
+
+        /* Tunnel Links */
+        .tunnel-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
         /* Detail panel */
         .detail-panel {
             background: var(--bg3);
@@ -1055,10 +1090,23 @@
         <!-- ========== Dashboard Page ========== -->
         <div id="page-dashboard" class="page">
             <div class="page-header">
-                <h2>📊 仪表盘</h2><button class="btn btn-sm" onclick="refreshDashboard()">🔄 刷新</button>
+                <h2>📊 仪表盘</h2>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" onclick="refreshDashboard()">🔄 刷新</button>
+                    <a href="/logout" class="btn btn-sm btn-danger">🔑 登出</a>
+                </div>
             </div>
             <div class="page-body">
+                <!-- Tunnel Links -->
+                <div class="section-title">🌐 快捷链接</div>
+                <div class="tunnel-links" id="tunnel-links"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
+
                 <div class="stat-grid" id="sys-stats"></div>
+
+                <!-- Download Status -->
+                <div class="section-title">📥 下载状态</div>
+                <div id="dl-status-content" style="margin-bottom:20px"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
+
                 <div class="section-title">🔧 服务管理</div>
                 <table class="svc-table" id="svc-table">
                     <thead>
@@ -1232,7 +1280,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=13"></script>
+    <script src="dashboard.js?v=14"></script>
 </body>
 
 </html>
