@@ -1554,3 +1554,6 @@ async function restartDashboard() {
     setTimeout(() => location.reload(), 3000);
   } catch (e) {
     showToast('重启失败: ' + e.message);
+  }
+}
+
