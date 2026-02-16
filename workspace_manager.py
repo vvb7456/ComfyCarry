@@ -17,6 +17,8 @@ import threading
 import time
 import re
 import secrets
+import uuid
+import queue
 from pathlib import Path
 from datetime import datetime
 
@@ -1381,6 +1383,221 @@ def api_comfyui_view():
         }
     except Exception:
         return "", 503
+
+
+# ====================================================================
+#   ComfyUI WebSocket → SSE 实时事件推送
+# ====================================================================
+
+import websocket  # websocket-client
+
+class ComfyWSBridge:
+    """Maintains a WebSocket connection to ComfyUI and broadcasts events via SSE."""
+
+    def __init__(self, comfyui_url):
+        self._ws_url = comfyui_url.replace("http://", "ws://").replace("https://", "wss://")
+        self._client_id = str(uuid.uuid4())
+        self._subscribers = {}   # id -> queue.Queue
+        self._lock = threading.Lock()
+        self._ws = None
+        self._running = False
+        self._thread = None
+        # Latest state cache for new subscribers
+        self._last_status = None
+        self._last_progress = None
+        self._exec_info = {}     # Current execution info
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+
+    def _run_loop(self):
+        """Reconnect loop — keeps trying to connect to ComfyUI WS."""
+        while self._running:
+            try:
+                url = f"{self._ws_url}/ws?clientId={self._client_id}"
+                self._ws = websocket.WebSocketApp(
+                    url,
+                    on_message=self._on_message,
+                    on_error=self._on_error,
+                    on_close=self._on_close,
+                    on_open=self._on_open,
+                )
+                self._ws.run_forever(ping_interval=30, ping_timeout=10)
+            except Exception:
+                pass
+            if self._running:
+                time.sleep(3)  # Wait before reconnect
+
+    def _on_open(self, ws):
+        self._broadcast({"type": "ws_connected"})
+
+    def _on_error(self, ws, error):
+        pass  # Will reconnect in _run_loop
+
+    def _on_close(self, ws, close_status_code=None, close_msg=None):
+        self._broadcast({"type": "ws_disconnected"})
+
+    def _on_message(self, ws, message):
+        if isinstance(message, bytes):
+            # Binary = preview image, skip for SSE (too large)
+            return
+        try:
+            data = json.loads(message)
+            msg_type = data.get("type", "")
+            msg_data = data.get("data", {})
+
+            if msg_type == "status":
+                self._last_status = msg_data
+                self._broadcast({"type": "status", "data": msg_data})
+
+            elif msg_type == "execution_start":
+                self._exec_info = {
+                    "prompt_id": msg_data.get("prompt_id", ""),
+                    "start_time": time.time(),
+                    "current_node": None,
+                    "progress": None,
+                }
+                self._broadcast({"type": "execution_start", "data": {
+                    **msg_data, "start_time": self._exec_info["start_time"]
+                }})
+
+            elif msg_type == "executing":
+                node = msg_data.get("node")
+                if node is None:
+                    # Execution finished
+                    elapsed = time.time() - self._exec_info.get("start_time", time.time())
+                    self._broadcast({"type": "execution_done", "data": {
+                        "prompt_id": msg_data.get("prompt_id", ""),
+                        "elapsed": round(elapsed, 1),
+                    }})
+                    self._exec_info = {}
+                    self._last_progress = None
+                else:
+                    self._exec_info["current_node"] = node
+                    self._broadcast({"type": "executing", "data": msg_data})
+
+            elif msg_type == "progress":
+                val = msg_data.get("value", 0)
+                mx = msg_data.get("max", 1)
+                self._last_progress = {"value": val, "max": mx,
+                                       "percent": round(val / mx * 100) if mx > 0 else 0}
+                self._broadcast({"type": "progress", "data": self._last_progress})
+
+            elif msg_type == "execution_error":
+                self._broadcast({"type": "execution_error", "data": msg_data})
+                self._exec_info = {}
+                self._last_progress = None
+
+            elif msg_type == "execution_cached":
+                self._broadcast({"type": "execution_cached", "data": msg_data})
+
+            elif msg_type == "executed":
+                self._broadcast({"type": "executed", "data": msg_data})
+
+        except Exception:
+            pass
+
+    def subscribe(self):
+        """Add a new SSE subscriber and return (sub_id, queue)."""
+        sub_id = str(uuid.uuid4())
+        q = queue.Queue(maxsize=200)
+        with self._lock:
+            self._subscribers[sub_id] = q
+        # Send cached state to new subscriber
+        if self._last_status:
+            q.put({"type": "status", "data": self._last_status})
+        if self._exec_info:
+            q.put({"type": "executing", "data": self._exec_info})
+        if self._last_progress:
+            q.put({"type": "progress", "data": self._last_progress})
+        return sub_id, q
+
+    def unsubscribe(self, sub_id):
+        with self._lock:
+            self._subscribers.pop(sub_id, None)
+
+    def _broadcast(self, event):
+        with self._lock:
+            dead = []
+            for sid, q in self._subscribers.items():
+                try:
+                    q.put_nowait(event)
+                except queue.Full:
+                    dead.append(sid)
+            for sid in dead:
+                self._subscribers.pop(sid, None)
+
+
+# Global WebSocket bridge instance
+_comfy_ws_bridge = ComfyWSBridge(COMFYUI_URL)
+_comfy_ws_bridge.start()
+
+
+@app.route("/api/comfyui/events")
+def api_comfyui_events():
+    """SSE endpoint — streams real-time ComfyUI events to the frontend."""
+    sub_id, q = _comfy_ws_bridge.subscribe()
+
+    def generate():
+        try:
+            while True:
+                try:
+                    event = q.get(timeout=30)
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                except queue.Empty:
+                    # Send keepalive
+                    yield ": keepalive\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            _comfy_ws_bridge.unsubscribe(sub_id)
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/comfyui/logs/stream")
+def api_comfyui_logs_stream():
+    """SSE endpoint — streams pm2 log lines for comfy in real-time."""
+    def generate():
+        proc = None
+        try:
+            # Use pm2 logs --raw --lines 0 to get only new lines
+            proc = subprocess.Popen(
+                ["pm2", "logs", "comfy", "--raw", "--lines", "50"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                if not line:
+                    break
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+                # Classify log level
+                lvl = "info"
+                if re.search(r'error|exception|traceback', line, re.I):
+                    lvl = "error"
+                elif re.search(r'warn', line, re.I):
+                    lvl = "warn"
+                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            if proc:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/plugins/installed")

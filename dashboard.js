@@ -1241,9 +1241,188 @@ function stopTunnelAutoRefresh() {
 // ========== ComfyUI Management Page ==========
 let comfyAutoRefresh = null;
 let _comfyParamsSchema = null;
+let _comfyEventSource = null;
+let _comfyLogSource = null;
+let _comfyExecState = null;  // Current execution state
 
 async function loadComfyUIPage() {
-  await Promise.all([loadComfyStatus(), loadComfyQueue(), loadComfyParams(), loadComfyLogs()]);
+  await Promise.all([loadComfyStatus(), loadComfyQueue(), loadComfyParams()]);
+  startComfyEventStream();
+  startComfyLogStream();
+}
+
+// ── SSE: ComfyUI real-time events ──
+function startComfyEventStream() {
+  stopComfyEventStream();
+  _comfyEventSource = new EventSource('/api/comfyui/events');
+  _comfyEventSource.onmessage = (e) => {
+    try {
+      const evt = JSON.parse(e.data);
+      handleComfyEvent(evt);
+    } catch (_) {}
+  };
+  _comfyEventSource.onerror = () => {
+    // Will auto-reconnect by default
+  };
+}
+
+function stopComfyEventStream() {
+  if (_comfyEventSource) { _comfyEventSource.close(); _comfyEventSource = null; }
+}
+
+function handleComfyEvent(evt) {
+  const t = evt.type;
+  const d = evt.data || {};
+
+  if (t === 'status') {
+    // Update queue display from WS status
+    const qInfo = d.status || {};
+    const qr = qInfo.exec_info || {};
+    const qRemain = qr.queue_remaining || 0;
+    const el = document.getElementById('comfyui-queue-info');
+    if (el && _comfyExecState) {
+      // Actively executing — show progress
+    } else if (el) {
+      if (qRemain > 0) {
+        el.innerHTML = `<span style="color:var(--amber)">⏳ 队列中 ${qRemain} 个任务</span>`;
+      } else {
+        el.innerHTML = '<span style="color:var(--t3)">空闲 — 无任务</span>';
+      }
+    }
+  }
+
+  else if (t === 'execution_start') {
+    _comfyExecState = { prompt_id: d.prompt_id, start_time: d.start_time || (Date.now() / 1000), nodes: {} };
+    _updateExecBar();
+  }
+
+  else if (t === 'executing') {
+    if (_comfyExecState) {
+      _comfyExecState.current_node = d.node;
+      _comfyExecState.nodes[d.node] = 'running';
+    }
+    _updateExecBar();
+  }
+
+  else if (t === 'progress') {
+    if (_comfyExecState) {
+      _comfyExecState.progress = d;
+    }
+    _updateExecBar();
+  }
+
+  else if (t === 'executed') {
+    if (_comfyExecState && d.node) {
+      _comfyExecState.nodes[d.node] = 'done';
+    }
+    _updateExecBar();
+  }
+
+  else if (t === 'execution_done') {
+    _comfyExecState = null;
+    _updateExecBar();
+    // Refresh status (GPU usage may have changed)
+    loadComfyStatus();
+    loadComfyQueue();
+  }
+
+  else if (t === 'execution_error') {
+    _comfyExecState = null;
+    _updateExecBar();
+    const errEl = document.getElementById('comfyui-exec-bar');
+    if (errEl) {
+      errEl.innerHTML = `<div class="comfy-exec-error">❌ 执行出错: ${escHtml(d.exception_message || d.node_type || '未知错误')}</div>`;
+      errEl.classList.remove('hidden');
+      setTimeout(() => errEl.classList.add('hidden'), 8000);
+    }
+  }
+
+  else if (t === 'execution_cached') {
+    // Nodes were cached, skip
+  }
+}
+
+function _updateExecBar() {
+  const bar = document.getElementById('comfyui-exec-bar');
+  if (!bar) return;
+
+  if (!_comfyExecState) {
+    bar.classList.add('hidden');
+    return;
+  }
+
+  bar.classList.remove('hidden');
+  const st = _comfyExecState;
+  const elapsed = Math.round(Date.now() / 1000 - st.start_time);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+  let html = `<div class="comfy-exec-status">`;
+  html += `<span class="comfy-exec-pulse"></span>`;
+  html += `<span>⚡ 正在生成</span>`;
+
+  if (st.current_node) {
+    html += `<span style="color:var(--t2);margin-left:8px">节点: ${escHtml(st.current_node)}</span>`;
+  }
+
+  html += `<span style="color:var(--t3);margin-left:auto">${timeStr}</span>`;
+  html += `</div>`;
+
+  // Progress bar
+  if (st.progress) {
+    const pct = st.progress.percent || 0;
+    html += `<div class="comfy-exec-progress">
+      <div class="comfy-exec-progress-fill" style="width:${pct}%"></div>
+      <span class="comfy-exec-progress-text">${st.progress.value}/${st.progress.max} (${pct}%)</span>
+    </div>`;
+  }
+
+  bar.innerHTML = html;
+}
+
+// ── SSE: Real-time log stream ──
+function startComfyLogStream() {
+  stopComfyLogStream();
+  const el = document.getElementById('comfyui-log-content');
+  if (!el) return;
+
+  // Load initial logs first
+  fetch('/api/logs/comfy?lines=200').then(r => r.json()).then(d => {
+    if (d.logs) {
+      const lines = d.logs.split('\n').filter(l => l.trim());
+      el.innerHTML = lines.map(l => {
+        let cls = '';
+        if (/error|exception|traceback/i.test(l)) cls = 'log-error';
+        else if (/warn/i.test(l)) cls = 'log-warn';
+        else if (/loaded|model|checkpoint|lora/i.test(l)) cls = 'log-info';
+        return `<div class="${cls}">${escHtml(l)}</div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+  }).catch(() => {});
+
+  // Then start SSE for new lines
+  _comfyLogSource = new EventSource('/api/comfyui/logs/stream');
+  _comfyLogSource.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      const div = document.createElement('div');
+      div.textContent = d.line;
+      if (d.level === 'error') div.className = 'log-error';
+      else if (d.level === 'warn') div.className = 'log-warn';
+      // Auto-scroll if near bottom
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      el.appendChild(div);
+      // Limit lines to 500
+      while (el.children.length > 500) el.removeChild(el.firstChild);
+      if (nearBottom) el.scrollTop = el.scrollHeight;
+    } catch (_) {}
+  };
+}
+
+function stopComfyLogStream() {
+  if (_comfyLogSource) { _comfyLogSource.close(); _comfyLogSource = null; }
 }
 
 async function loadComfyStatus() {
@@ -1370,29 +1549,6 @@ async function loadComfyParams() {
   }
 }
 
-async function loadComfyLogs() {
-  const el = document.getElementById('comfyui-log-content');
-  try {
-    const r = await fetch('/api/logs/comfy?lines=200');
-    const d = await r.json();
-    if (d.logs) {
-      const lines = d.logs.split('\n').filter(l => l.trim());
-      el.innerHTML = lines.map(l => {
-        let cls = '';
-        if (/error|exception|traceback/i.test(l)) cls = 'log-error';
-        else if (/warn/i.test(l)) cls = 'log-warn';
-        else if (/loaded|model|checkpoint|lora/i.test(l)) cls = 'log-info';
-        return `<div class="${cls}">${escHtml(l)}</div>`;
-      }).join('');
-      el.scrollTop = el.scrollHeight;
-    } else {
-      el.innerHTML = '<div style="color:var(--t3)">暂无日志</div>';
-    }
-  } catch (e) {
-    el.innerHTML = `<div class="error-msg">日志加载失败: ${e.message}</div>`;
-  }
-}
-
 function _collectComfyParams() {
   const params = {};
   document.querySelectorAll('#comfyui-params-form [data-param]').forEach(el => {
@@ -1466,11 +1622,12 @@ function startComfyAutoRefresh() {
   comfyAutoRefresh = setInterval(() => {
     loadComfyStatus();
     loadComfyQueue();
-    loadComfyLogs();
   }, 10000);
 }
 function stopComfyAutoRefresh() {
   if (comfyAutoRefresh) { clearInterval(comfyAutoRefresh); comfyAutoRefresh = null; }
+  stopComfyEventStream();
+  stopComfyLogStream();
 }
 
 // ========== Cloud Sync Page ==========
