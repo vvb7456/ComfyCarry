@@ -1281,6 +1281,10 @@
             .results-grid {
                 grid-template-columns: 1fr
             }
+
+            .settings-grid {
+                grid-template-columns: 1fr !important
+            }
         }
     </style>
 </head>
@@ -1525,56 +1529,59 @@
                 <h2>⚙️ 设置</h2>
             </div>
             <div class="page-body">
-                <div style="display:grid;gap:clamp(16px,1.5vw,24px);max-width:720px">
-                    <!-- 密码设置 -->
-                    <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 Dashboard 密码</h3>
-                        <div class="form-group" style="margin-bottom:10px">
-                            <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
-                            <input type="password" id="settings-pw-current" placeholder="输入当前密码">
+                <div class="settings-grid" style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:clamp(16px,1.5vw,24px);align-items:start">
+                    <!-- 左列: 配置卡片 -->
+                    <div style="display:grid;gap:clamp(16px,1.5vw,24px)">
+                        <!-- 密码设置 -->
+                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 Dashboard 密码</h3>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
+                                <input type="password" id="settings-pw-current" placeholder="输入当前密码">
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="font-size:.8rem;color:var(--t2)">新密码</label>
+                                <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)">
+                            </div>
+                            <div class="form-group" style="margin-bottom:12px">
+                                <label style="font-size:.8rem;color:var(--t2)">确认新密码</label>
+                                <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码">
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="changePassword()">更新密码</button>
                         </div>
-                        <div class="form-group" style="margin-bottom:10px">
-                            <label style="font-size:.8rem;color:var(--t2)">新密码</label>
-                            <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)">
+
+                        <!-- CivitAI API Key -->
+                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🎨 CivitAI API Key</h3>
+                            <div id="settings-civitai-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
+                            <div class="form-group" style="margin-bottom:12px">
+                                <label style="font-size:.8rem;color:var(--t2)">API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
+                                <input type="text" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
+                            </div>
+                            <div style="display:flex;gap:8px">
+                                <button class="btn btn-sm btn-primary" onclick="saveSettingsCivitaiKey()">保存</button>
+                                <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()">清除</button>
+                            </div>
                         </div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label style="font-size:.8rem;color:var(--t2)">确认新密码</label>
-                            <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码">
+
+                        <!-- Debug 模式 & 服务管理 -->
+                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🛠️ 服务管理</h3>
+                            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                                <label style="font-size:.85rem;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
+                                    <input type="checkbox" id="settings-debug-toggle" onchange="toggleDebugMode()" style="width:16px;height:16px;accent-color:var(--ac)">
+                                    <span>Debug 模式</span>
+                                </label>
+                                <span style="font-size:.75rem;color:var(--t3)">开启后显示日志</span>
+                            </div>
+                            <div style="display:flex;gap:8px">
+                                <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 Dashboard</button>
+                            </div>
                         </div>
-                        <button class="btn btn-sm btn-primary" onclick="changePassword()">更新密码</button>
                     </div>
 
-                    <!-- CivitAI API Key -->
-                    <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🎨 CivitAI API Key</h3>
-                        <div id="settings-civitai-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
-                        <div class="form-group" style="margin-bottom:12px">
-                            <label style="font-size:.8rem;color:var(--t2)">API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
-                            <input type="text" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
-                        </div>
-                        <div style="display:flex;gap:8px">
-                            <button class="btn btn-sm btn-primary" onclick="saveSettingsCivitaiKey()">保存</button>
-                            <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()">清除</button>
-                        </div>
-                    </div>
-
-                    <!-- Debug 模式 & 服务管理 -->
-                    <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🛠️ 服务管理</h3>
-                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-                            <label style="font-size:.85rem;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
-                                <input type="checkbox" id="settings-debug-toggle" onchange="toggleDebugMode()" style="width:16px;height:16px;accent-color:var(--ac)">
-                                <span>Debug 模式</span>
-                            </label>
-                            <span style="font-size:.75rem;color:var(--t3)">开启后显示 Dashboard 运行日志</span>
-                        </div>
-                        <div style="display:flex;gap:8px">
-                            <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 Dashboard</button>
-                        </div>
-                    </div>
-
-                    <!-- Dashboard 日志 (Debug 模式) -->
-                    <div class="card" id="settings-log-card" style="padding:clamp(16px,1.5vw,24px);display:none">
+                    <!-- 右列: Dashboard 日志 (Debug 模式) -->
+                    <div class="card" id="settings-log-card" style="padding:clamp(16px,1.5vw,24px);display:none;height:100%;min-height:400px;max-height:calc(100vh - 160px)">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                             <h3 style="font-size:clamp(0.95rem,1.1vw,1.15rem)">📜 Dashboard 日志</h3>
                             <div style="display:flex;gap:8px;align-items:center">
@@ -1589,7 +1596,7 @@
                                 </label>
                             </div>
                         </div>
-                        <div class="log-box" id="log-content" style="max-height:50vh">加载中...</div>
+                        <div class="log-box" id="log-content" style="max-height:calc(100% - 50px);height:calc(100% - 50px)">加载中...</div>
                     </div>
                 </div>
             </div>
@@ -1623,7 +1630,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=23"></script>
+    <script src="dashboard.js?v=24"></script>
 </body>
 
 </html>
