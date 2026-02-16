@@ -1385,10 +1385,11 @@ async function loadComfyParams() {
         }
         html += '</select>';
       } else if (schema.type === 'bool') {
+        html += `<label>${escHtml(schema.label)}${helpIcon}</label>`;
         html += `<label class="comfy-param-toggle">
           <input type="checkbox" id="cparam-${key}" data-param="${key}" ${schema.value ? 'checked' : ''}>
           <span class="comfy-toggle-slider"></span>
-          <span class="toggle-text">${escHtml(schema.label)}${helpIcon}</span>
+          <span style="font-size:.82rem;color:var(--t2)">${schema.value ? '已启用' : '已禁用'}</span>
         </label>`;
       } else if (schema.type === 'number') {
         html += `<label>${escHtml(schema.label)}${helpIcon}</label>`;
@@ -1498,6 +1499,7 @@ function startComfyAutoRefresh() {
   comfyAutoRefresh = setInterval(() => {
     loadComfyStatus();
     loadComfyQueue();
+    loadComfyLogs();
   }, 10000);
 }
 function stopComfyAutoRefresh() {
