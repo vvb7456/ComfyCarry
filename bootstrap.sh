@@ -60,7 +60,8 @@ fi
 
 # ── Dashboard 依赖 ──
 echo "  -> 安装 Dashboard 依赖..."
-$PYTHON_BIN -m pip install --no-cache-dir flask psutil flask-cors requests -q 2>/dev/null || true
+# --ignore-installed: 避免系统包 (如 blinker) 的 uninstall-no-record-file 错误
+$PYTHON_BIN -m pip install --no-cache-dir --ignore-installed flask psutil flask-cors requests -q 2>/dev/null || true
 
 # ── Cloudflared (Tunnel) ──
 # 很多实例公网端口映射不可靠, Tunnel 是可靠访问 Dashboard 的前提
