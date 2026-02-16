@@ -66,16 +66,13 @@ def _run_cmd(cmd, timeout=10):
     except Exception as e:
         return f"Error: {e}"
 
-def _sha256_file(filepath, partial=True):
-    """计算文件 SHA256 (partial=True 时只读前 10MB 用于快速匹配)"""
+def _sha256_file(filepath):
+    """计算文件完整 SHA256 (CivitAI 需要完整文件哈希)"""
     sha = hashlib.sha256()
     try:
         with open(filepath, "rb") as f:
-            if partial:
-                # CivitAI 使用完整文件哈希
-                pass
             while True:
-                chunk = f.read(8192)
+                chunk = f.read(65536)
                 if not chunk:
                     break
                 sha.update(chunk)
@@ -201,6 +198,8 @@ def api_service_action(name, action):
     """控制服务: restart, stop, start"""
     if action not in ("restart", "stop", "start"):
         return jsonify({"error": "Invalid action"}), 400
+    if not re.match(r'^[\w\-]+$', name):
+        return jsonify({"error": "Invalid service name"}), 400
     out = _run_cmd(f"pm2 {action} {name}", timeout=10)
     return jsonify({"ok": True, "output": out})
 
@@ -211,7 +210,13 @@ def api_service_action(name, action):
 @app.route("/api/logs/<name>")
 def api_logs(name):
     """获取 PM2 日志"""
-    lines = request.args.get("lines", "100")
+    if not re.match(r'^[\w\-]+$', name):
+        return jsonify({"logs": "", "error": "Invalid service name"}), 400
+    try:
+        lines = int(request.args.get("lines", "100"))
+        lines = min(max(lines, 1), 1000)
+    except (ValueError, TypeError):
+        lines = 100
     try:
         out = _run_cmd(f"pm2 logs {name} --nostream --lines {lines}", timeout=5)
         return jsonify({"logs": out})
@@ -245,14 +250,8 @@ def save_config():
 @app.route("/api/search", methods=["POST"])
 def proxy_search():
     try:
-        raw_data = request.get_data()
-        print(f"\n[DEBUG] === Search Request ({datetime.now().isoformat()}) ===", flush=True)
-        print(f"[DEBUG] Headers: {dict(request.headers)}", flush=True)
-        print(f"[DEBUG] Raw Body: {raw_data.decode('utf-8', errors='ignore')}", flush=True)
-        
         data = request.get_json(force=True, silent=True)
         if not data:
-            print("[DEBUG] Error: No JSON body", flush=True)
             return jsonify({"error": "No JSON body"}), 400
 
         headers = {
@@ -261,17 +260,9 @@ def proxy_search():
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
-        print(f"[DEBUG] Sending to Meili: {MEILI_URL} with headers {headers}", flush=True)
         resp = requests.post(MEILI_URL, headers=headers, json=data, timeout=10)
-        
-        print(f"[DEBUG] Meili Response Status: {resp.status_code}", flush=True)
-        print(f"[DEBUG] Meili Response Text: {resp.text[:1000]}", flush=True) # Limit to 1000 chars
-
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception as e:
-        print(f"[DEBUG] Search Exception: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -396,6 +387,10 @@ def api_fetch_model_info():
     """通过 SHA256 从 CivitAI 获取模型元数据并保存"""
     data = request.get_json()
     abs_path = data.get("abs_path", "")
+
+    # 安全检查
+    if not abs_path.startswith(COMFYUI_DIR):
+        return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
 
     if not os.path.isfile(abs_path):
         return jsonify({"error": "文件不存在"}), 404
@@ -567,7 +562,10 @@ def serve_js():
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     """通用静态文件服务"""
-    safe_path = Path(__file__).parent / filename
+    base_dir = Path(__file__).parent.resolve()
+    safe_path = (base_dir / filename).resolve()
+    if not str(safe_path).startswith(str(base_dir)):
+        return "", 403
     if safe_path.exists() and safe_path.is_file():
         return send_file(str(safe_path))
     return "", 404

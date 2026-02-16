@@ -5,6 +5,7 @@
 const CIVITAI_API_BASE = 'https://civitai.com/api/v1';
 let apiKey = '';
 let selectedModels = new Map();
+let searchResultsCache = {};
 let autoLogInterval = null;
 
 // ========== Init ==========
@@ -395,7 +396,9 @@ async function searchModels(page = 0) {
 }
 
 function renderCivitCard(h) {
-  const imageObj = (h.images && h.images[0]) ? h.images[0] : (h.modelVersions && h.modelVersions[0] && h.modelVersions[0].images && h.modelVersions[0].images[0] ? h.modelVersions[0].images[0] : null);
+  // Meilisearch returns 'version' (single object), not 'modelVersions' (array)
+  const ver = h.version || null;
+  const imageObj = (h.images && h.images[0]) ? h.images[0] : (ver?.images?.[0] || null);
 
   let imgUrl = '';
   if (imageObj && imageObj.url) {
@@ -403,8 +406,7 @@ function renderCivitCard(h) {
     else imgUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj.url}/width=450/default.jpg`;
   }
 
-  let fullUrl = imgUrl.replace('/width=450', '');
-  if (!fullUrl.startsWith('http')) fullUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj?.url}/default.jpg`;
+  let fullUrl = imgUrl ? imgUrl.replace('/width=450', '') : '';
 
   const typeLower = (h.type || '').toLowerCase();
   let badgeKey = typeLower;
@@ -413,43 +415,45 @@ function renderCivitCard(h) {
   if (typeLower === 'textualinversion') badgeKey = 'embeddings';
 
   const badgeClass = getBadgeClass(badgeKey);
-  const bm = h.modelVersions && h.modelVersions[0] ? h.modelVersions[0].baseModel : '';
+  const bm = ver?.baseModel || '';
   const inCart = selectedModels.has(String(h.id));
 
-  const cartData = {
-    name: h.name,
-    type: h.type,
-    image: imgUrl, // Use the resolved URL
-    version: h.modelVersions ? h.modelVersions[0] : null
+  // Cache data for cart (avoids unsafe inline JSON)
+  searchResultsCache[String(h.id)] = {
+    name: h.name || 'Unknown', type: h.type || '',
+    image: imgUrl, version: ver
   };
 
   return `<div class="model-card">
-    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt="" onclick="openImg('${fullUrl}')" style="cursor:zoom-in" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt=""
+      onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')"
+      style="cursor:zoom-in" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
-      <div class="model-card-title" title="${h.name || ''}">${h.name || 'Unknown'}</div>
+      <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
-        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${(h.stats?.downloadCount || h.rank?.downloadCount || h.metrics?.downloadCount || 0).toLocaleString()}</span>
+        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${(h.stats?.downloadCount || h.metrics?.downloadCount || 0).toLocaleString()}</span>
       </div>
       <div class="model-card-actions">
         <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
-        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(cartData).replace(/"/g, '&quot;').replace(/'/g, "\\'")})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '✕ 移除' : '🛒 加入'}</button>
         <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
 }
 
-function toggleCartFromSearch(id, btn, data) {
+function toggleCartFromSearch(id, btn) {
   id = String(id);
   if (selectedModels.has(id)) {
     selectedModels.delete(id);
     btn.textContent = '🛒 加入';
     btn.classList.remove('btn-danger'); btn.classList.add('btn-primary');
   } else {
+    const data = searchResultsCache[id] || {};
     selectedModels.set(id, {
       name: data.name || 'Unknown', type: data.type || '',
-      imageUrl: data.image || '', // Use passed valid URL
+      imageUrl: data.image || '',
       versionId: data.version?.id, versionName: data.version?.name,
       baseModel: data.version?.baseModel,
     });
@@ -516,6 +520,12 @@ async function lookupIds() {
   results.innerHTML = found.map(d => {
     const img = d.modelVersions?.[0]?.images?.[0]?.url || '';
     const bm = d.modelVersions?.[0]?.baseModel || '';
+    const inCart = selectedModels.has(String(d.id));
+    // Cache for cart
+    searchResultsCache[String(d.id)] = {
+      name: d.name || 'Unknown', type: d.type || '',
+      image: img, version: d.modelVersions?.[0] || null
+    };
     return `<div class="model-card">
       <div class="model-card-img">${img ? `<img src="${img}" alt="" onclick="openImg('${img}')" style="cursor:zoom-in" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
       <div class="model-card-body">
@@ -527,6 +537,7 @@ async function lookupIds() {
         </div>
         <div class="model-card-actions">
           <a class="btn btn-sm" href="https://civitai.com/models/${d.id}" target="_blank">🔗</a>
+          <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${d.id}', this)">${inCart ? '✕ 移除' : '🛒 加入'}</button>
           <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${d.id}', '${(d.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
         </div>
       </div></div>`;
@@ -542,22 +553,26 @@ function renderCart() {
   }
   let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>操作</th></tr></thead><tbody>';
   for (const [id, m] of selectedModels) {
+    const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     html += `<tr>
-      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${m.imageUrl || ''}')" onerror="this.style.display='none'"></td>
-      <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${m.name}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
+      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${(m.imageUrl || '').replace(/'/g, "\\'")}')"
+        onerror="this.style.display='none'"></td>
+      <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
       <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
       <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
   }
   html += '</tbody></table>';
 
-  const idStr = [...selectedModels.keys()].join(',');
   html += `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-    <button class="btn btn-sm" onclick="copyText('${idStr}')">📋 复制 IDs</button>
-    <button class="btn btn-sm btn-primary" onclick="copyText('ALL_MODEL_IDS=\\'${idStr}\\'')">📋 复制为 ALL_MODEL_IDS</button>
+    <button class="btn btn-sm" onclick="copyCartIds()">📋 复制 IDs</button>
+    <button class="btn btn-sm btn-primary" onclick="copyCartAsEnv()">📋 复制为 ALL_MODEL_IDS</button>
   </div>`;
 
   container.innerHTML = html;
 }
+
+function copyCartIds() { copyText([...selectedModels.keys()].join(',')); }
+function copyCartAsEnv() { copyText("ALL_MODEL_IDS='" + [...selectedModels.keys()].join(',') + "'"); }
 
 function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderCart(); }
 function updateCartBadge() {
