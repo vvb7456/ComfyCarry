@@ -263,7 +263,6 @@ async function loadFacets() {
   const typeChips = document.getElementById('filter-type-chips');
   const bmChips = document.getElementById('filter-bm-chips');
 
-  // Show loading state
   typeChips.innerHTML = '<span class="loading-mini">Loading types...</span>';
   bmChips.innerHTML = '<span class="loading-mini">Loading base models...</span>';
 
@@ -285,7 +284,6 @@ async function loadFacets() {
     if (!d.results || !d.results[0]) throw new Error('Invalid response');
     const facets = d.results[0].facetDistribution || {};
 
-    // Helper to render chips
     const renderChips = (container, counts, labelMap = {}) => {
       const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
       container.innerHTML = sorted.map(k => {
@@ -397,7 +395,6 @@ async function searchModels(page = 0) {
 }
 
 function renderCivitCard(h) {
-  // Use root images if available, else version images
   const imageObj = (h.images && h.images[0]) ? h.images[0] : (h.modelVersions && h.modelVersions[0] && h.modelVersions[0].images && h.modelVersions[0].images[0] ? h.modelVersions[0].images[0] : null);
 
   let imgUrl = '';
@@ -406,11 +403,9 @@ function renderCivitCard(h) {
     else imgUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj.url}/width=450/default.jpg`;
   }
 
-  // Full size URL for lightbox (width=0 or omit width)
   let fullUrl = imgUrl.replace('/width=450', '');
   if (!fullUrl.startsWith('http')) fullUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj?.url}/default.jpg`;
 
-  // Type mapping for badges
   const typeLower = (h.type || '').toLowerCase();
   let badgeKey = typeLower;
   if (typeLower === 'checkpoint') badgeKey = 'checkpoints';
@@ -421,7 +416,6 @@ function renderCivitCard(h) {
   const bm = h.modelVersions && h.modelVersions[0] ? h.modelVersions[0].baseModel : '';
   const inCart = selectedModels.has(String(h.id));
 
-  // Construct data object for cart - Pass full URL
   const cartData = {
     name: h.name,
     type: h.type,
