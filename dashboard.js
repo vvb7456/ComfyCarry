@@ -7,6 +7,10 @@ let apiKey = '';
 let selectedModels = new Map();
 let searchResultsCache = {};
 let autoLogInterval = null;
+let metaSelectedWords = new Set();
+let searchObserver = null;
+let isSearchLoading = false;
+let hasMoreResults = false;
 
 // ========== Init ==========
 document.addEventListener('DOMContentLoaded', async () => {
@@ -46,7 +50,190 @@ function openImg(url) {
   document.getElementById('img-modal').classList.add('active');
   img.src = url;
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeConfigModal(); closeMetaModal(); } });
+
+// ========== Metadata Modal ==========
+function openMetaModal(data) {
+  metaSelectedWords = new Set();
+  document.getElementById('meta-title').textContent = data.name || '模型详情';
+  document.getElementById('meta-body').innerHTML = renderMetaContent(data);
+  document.getElementById('meta-modal').classList.add('active');
+}
+function closeMetaModal() { document.getElementById('meta-modal').classList.remove('active'); }
+
+function renderMetaContent(data) {
+  const ver = data.selectedVersion || data.version || null;
+  const versions = data.versions || (ver ? [ver] : []);
+  const trainedWords = ver?.trainedWords || [];
+  const images = data.images || ver?.images || [];
+  const type = data.type || '';
+  const baseModel = ver?.baseModel || '';
+  const hashes = ver?.hashes || {};
+
+  let html = '';
+
+  // Tags
+  html += '<div class="meta-tags">';
+  if (type) html += `<span class="badge ${getBadgeClass(type.toLowerCase())}">${type}</span>`;
+  if (baseModel) html += `<span class="badge badge-other">${baseModel}</span>`;
+  html += '</div>';
+
+  // Version selector (if multiple)
+  let versionRow = '';
+  if (versions.length > 1) {
+    const opts = versions.map(v => {
+      const sel = (ver && v.id === ver.id) ? 'selected' : '';
+      return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
+    }).join('');
+    versionRow = `<tr><td>版本</td><td><select class="meta-version-select" onchange="switchMetaVersion(this.value, '${data.id}')">${opts}</select></td></tr>`;
+  } else if (ver) {
+    versionRow = `<tr><td>版本</td><td>${ver.name || ver.id || '-'}</td></tr>`;
+  }
+
+  // Info table
+  html += '<table class="meta-info-table"><tbody>';
+  html += `<tr><td>ID</td><td>${data.id || '-'}</td></tr>`;
+  html += versionRow;
+  if (data.user?.username) html += `<tr><td>作者</td><td>${data.user.username}</td></tr>`;
+  html += `<tr><td>链接</td><td><a href="https://civitai.com/models/${data.id}" target="_blank">在 CivitAI 查看 ↗</a></td></tr>`;
+  if (hashes?.SHA256) html += `<tr><td>SHA256</td><td style="word-break:break-all;font-family:monospace;font-size:.75rem">${hashes.SHA256}</td></tr>`;
+  if (data.metrics) {
+    const m = data.metrics;
+    html += `<tr><td>统计</td><td>⬇️ ${(m.downloadCount||0).toLocaleString()} &nbsp; 👍 ${(m.thumbsUpCount||0).toLocaleString()}</td></tr>`;
+  }
+  // For local models with extra fields
+  if (data.file) html += `<tr><td>文件</td><td style="word-break:break-all">${data.file}</td></tr>`;
+  if (data.sha256) html += `<tr><td>SHA256</td><td style="word-break:break-all;font-family:monospace;font-size:.75rem">${data.sha256}</td></tr>`;
+  html += '</tbody></table>';
+
+  // Trained words
+  if (trainedWords.length > 0) {
+    html += '<div class="section-title" style="font-size:.88rem">🏷️ 触发词</div>';
+    html += '<ul class="meta-tw-list">';
+    trainedWords.forEach(w => {
+      const word = typeof w === 'string' ? w : (w.word || '');
+      if (word) html += `<li class="meta-tw-item" onclick="toggleMetaWord(this, '${word.replace(/'/g, "\\'")}')">${word}</li>`;
+    });
+    html += '</ul>';
+    html += '<div class="meta-tw-actions"><span id="meta-tw-count">点击选择触发词</span> <button class="btn btn-sm btn-success" onclick="copyMetaWords()">📋 复制选中</button> <button class="btn btn-sm" onclick="copyAllMetaWords()">全部复制</button></div>';
+  }
+
+  // Images with generation params
+  if (images.length > 0) {
+    html += '<div class="section-title" style="font-size:.88rem;margin-top:16px">🖼️ 示例图片</div>';
+    html += '<div class="meta-images">';
+    images.forEach(img => {
+      let imgUrl = '';
+      if (img.url) {
+        if (img.url.startsWith('http')) imgUrl = img.url;
+        else imgUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${img.url}/width=450/default.jpg`;
+      }
+      const fullUrl = imgUrl ? imgUrl.replace('/width=450', '') : '';
+      if (!imgUrl) return;
+
+      let caption = '';
+      if (img.seed) caption += `<label>Seed</label>${img.seed}`;
+      if (img.steps) caption += `<label>Steps</label>${img.steps}`;
+      if (img.cfg) caption += `<label>CFG</label>${img.cfg}`;
+      if (img.sampler) caption += `<label>Sampler</label>${img.sampler}`;
+      if (img.model) caption += `<label>Model</label>${img.model}`;
+      if (img.positive) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${img.positive}</span>`;
+      if (img.negative) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${img.negative}</span>`;
+
+      // Meilisearch images have meta in different structure
+      if (img.meta) {
+        const mt = img.meta;
+        if (mt.seed) caption += `<label>Seed</label>${mt.seed}`;
+        if (mt.steps) caption += `<label>Steps</label>${mt.steps}`;
+        if (mt.cfgScale) caption += `<label>CFG</label>${mt.cfgScale}`;
+        if (mt.sampler) caption += `<label>Sampler</label>${mt.sampler}`;
+        if (mt.prompt) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${mt.prompt}</span>`;
+        if (mt.negativePrompt) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${mt.negativePrompt}</span>`;
+      }
+
+      html += `<figure><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">`;
+      if (caption) html += `<figcaption>${caption}</figcaption>`;
+      html += '</figure>';
+    });
+    html += '</div>';
+  }
+
+  return html;
+}
+
+function toggleMetaWord(el, word) {
+  el.classList.toggle('selected');
+  if (metaSelectedWords.has(word)) metaSelectedWords.delete(word);
+  else metaSelectedWords.add(word);
+  document.getElementById('meta-tw-count').textContent = metaSelectedWords.size > 0 ? `已选 ${metaSelectedWords.size} 个` : '点击选择触发词';
+}
+function copyMetaWords() {
+  if (metaSelectedWords.size === 0) { showToast('请先点击选择触发词'); return; }
+  copyText([...metaSelectedWords].join(', '));
+}
+function copyAllMetaWords() {
+  const items = document.querySelectorAll('#meta-body .meta-tw-item');
+  if (items.length === 0) return;
+  copyText([...items].map(el => el.textContent.trim()).join(', '));
+}
+
+function switchMetaVersion(versionId, modelId) {
+  const cached = searchResultsCache[String(modelId)];
+  if (!cached || !cached.allVersions) return;
+  const newVer = cached.allVersions.find(v => String(v.id) === String(versionId));
+  if (!newVer) return;
+  // Update cached selected version
+  cached.version = newVer;
+  // Also update cart if in cart
+  if (selectedModels.has(String(modelId))) {
+    const entry = selectedModels.get(String(modelId));
+    entry.versionId = newVer.id;
+    entry.versionName = newVer.name;
+    entry.baseModel = newVer.baseModel;
+    saveCartToStorage();
+  }
+  // Re-render modal with new version
+  openMetaModal({
+    ...cached, id: modelId, selectedVersion: newVer, versions: cached.allVersions
+  });
+}
+
+// Open metadata for a search result / ID lookup item
+function openMetaFromCache(modelId) {
+  const data = searchResultsCache[String(modelId)];
+  if (!data) { showToast('未找到缓存数据'); return; }
+  openMetaModal({
+    id: modelId, name: data.name, type: data.type,
+    version: data.version, versions: data.allVersions || (data.version ? [data.version] : []),
+    selectedVersion: data.version,
+    images: data.images || [],
+    metrics: data.metrics, user: data.user,
+  });
+}
+
+// Open metadata for a local model
+function openLocalMeta(idx) {
+  const m = localModelsData[idx];
+  if (!m) return;
+  const trainedWords = (m.trained_words || []).map(w => typeof w === 'string' ? { word: w } : w);
+  const images = [];
+  if (m.has_preview && m.preview_path) {
+    images.push({ url: `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}` });
+  }
+  if (m.civitai_image) images.push({ url: m.civitai_image });
+  // If weilin info has images, add them
+  if (m.images && Array.isArray(m.images)) {
+    m.images.forEach(img => images.push(img));
+  }
+
+  openMetaModal({
+    id: m.civitai_id || '-', name: m.name || m.filename,
+    type: m.category || '', file: m.filename,
+    sha256: m.sha256 || '',
+    version: { baseModel: m.base_model || '', trainedWords, hashes: {} },
+    images,
+  });
+}
 
 // ========== API Key ==========
 async function loadApiKey() {
@@ -200,7 +387,7 @@ function renderLocalModelCard(m, idx) {
       ${twHtml ? `<div class="model-card-tags">${twHtml}</div>` : ''}
       <div class="model-card-actions">
         <button class="btn btn-sm" onclick="fetchModelInfo(${idx})" ${m.has_info ? 'title="重新获取"' : 'title="从 CivitAI 获取信息"'}>${m.has_info ? '🔄 刷新' : '📥 获取信息'}</button>
-        ${m.trained_words && m.trained_words.length > 0 ? `<button class="btn btn-sm btn-success" onclick="copyText('${(m.trained_words || []).join(', ').replace(/'/g, "\\'")}')">📋 触发词</button>` : ''}
+        <button class="btn btn-sm btn-success" onclick="openLocalMeta(${idx})">📄 详情</button>
         <button class="btn btn-sm btn-danger" onclick="deleteModel(${idx})">🗑️</button>
       </div>
     </div></div>`;
@@ -328,19 +515,20 @@ function switchCivitTab(tab) {
   if (tab === 'cart') renderCart();
 }
 
-async function searchModels(page = 0) {
+async function searchModels(page = 0, append = false) {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
+  if (isSearchLoading) return;
 
   searchPage = page;
+  isSearchLoading = true;
   const loading = document.getElementById('search-loading');
   const results = document.getElementById('search-results');
   const pag = document.getElementById('search-pagination');
   const errEl = document.getElementById('search-error');
   errEl.innerHTML = '';
   loading.classList.remove('hidden');
-  results.innerHTML = '';
-  pag.innerHTML = '';
+  if (!append) { results.innerHTML = ''; pag.innerHTML = ''; }
 
   const types = getActiveChips('filter-type-chips');
   const bms = getActiveChips('filter-bm-chips');
@@ -366,7 +554,7 @@ async function searchModels(page = 0) {
       indexUid: 'models_v9', q: query, limit, offset,
       filter: filter.length > 0 ? filter : undefined,
       sort: sortMap[sort] || [],
-      attributesToRetrieve: ['id', 'name', 'type', 'metrics', 'images', 'version', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
+      attributesToRetrieve: ['id', 'name', 'type', 'metrics', 'images', 'version', 'versions', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
       attributesToHighlight: ['name'],
     }]
   };
@@ -375,35 +563,60 @@ async function searchModels(page = 0) {
     const r = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json();
     loading.classList.add('hidden');
+    isSearchLoading = false;
 
     const res = (d.results || [])[0] || {};
     const hits = res.hits || [];
     const total = res.estimatedTotalHits || 0;
 
-    if (hits.length === 0) {
+    if (hits.length === 0 && !append) {
       results.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">没有找到匹配的模型</div>';
+      hasMoreResults = false;
       return;
     }
 
-    results.innerHTML = hits.map(h => renderCivitCard(h)).join('');
+    const cardsHtml = hits.map(h => renderCivitCard(h)).join('');
+    if (append) {
+      results.insertAdjacentHTML('beforeend', cardsHtml);
+    } else {
+      results.innerHTML = cardsHtml;
+    }
 
-    // Pagination
-    const totalPages = Math.ceil(total / limit);
-    const curPage = page;
-    let pagHtml = '';
-    if (curPage > 0) pagHtml += `<button class="btn btn-sm" onclick="searchModels(${curPage - 1})">◀ 上一页</button>`;
-    pagHtml += `<span style="padding:6px;color:var(--t2);font-size:.82rem">${curPage + 1} / ${totalPages} (共 ${total})</span>`;
-    if (curPage < totalPages - 1) pagHtml += `<button class="btn btn-sm" onclick="searchModels(${curPage + 1})">下一页 ▶</button>`;
-    pag.innerHTML = pagHtml;
+    // Check if more results
+    const loaded = (page + 1) * limit;
+    hasMoreResults = loaded < total;
+
+    // Infinite scroll sentinel
+    pag.innerHTML = '';
+    if (hasMoreResults) {
+      pag.innerHTML = `<div id="scroll-sentinel" style="text-align:center;padding:16px;color:var(--t3);font-size:.82rem">⏳ 向下滚动加载更多 (${Math.min(loaded, total)}/${total})</div>`;
+      setupScrollObserver();
+    } else {
+      pag.innerHTML = `<div style="text-align:center;padding:16px;color:var(--t3);font-size:.82rem">— 共 ${total} 个结果 —</div>`;
+    }
   } catch (e) {
     loading.classList.add('hidden');
+    isSearchLoading = false;
     errEl.innerHTML = `<div class="error-msg">搜索失败: ${e.message}</div>`;
   }
+}
+
+function setupScrollObserver() {
+  if (searchObserver) searchObserver.disconnect();
+  const sentinel = document.getElementById('scroll-sentinel');
+  if (!sentinel) return;
+  searchObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && hasMoreResults && !isSearchLoading) {
+      searchModels(searchPage + 1, true);
+    }
+  }, { rootMargin: '200px' });
+  searchObserver.observe(sentinel);
 }
 
 function renderCivitCard(h) {
   // Meilisearch returns 'version' (single object), not 'modelVersions' (array)
   const ver = h.version || null;
+  const allVersions = h.versions || (ver ? [ver] : []);
   const imageObj = (h.images && h.images[0]) ? h.images[0] : (ver?.images?.[0] || null);
 
   let imgUrl = '';
@@ -423,11 +636,14 @@ function renderCivitCard(h) {
   const badgeClass = getBadgeClass(badgeKey);
   const bm = ver?.baseModel || '';
   const inCart = selectedModels.has(String(h.id));
+  const vCount = allVersions.length;
 
-  // Cache data for cart (avoids unsafe inline JSON)
+  // Cache data for cart and metadata (avoids unsafe inline JSON)
   searchResultsCache[String(h.id)] = {
     name: h.name || 'Unknown', type: h.type || '',
-    image: imgUrl, version: ver
+    image: imgUrl, version: ver, allVersions,
+    images: h.images || [], metrics: h.metrics || {},
+    user: h.user || {},
   };
 
   return `<div class="model-card">
@@ -439,12 +655,13 @@ function renderCivitCard(h) {
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
+        ${vCount > 1 ? `<span class="badge badge-other" title="${vCount} 个版本">v${vCount}</span>` : ''}
         <span style="font-size:.75rem;color:var(--t2)">⬇️ ${(h.metrics?.downloadCount || 0).toLocaleString()}</span>
       </div>
       <div class="model-card-actions">
-        <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
+        <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${h.id}')">📄 详情</button>
         <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '✕ 移除' : '🛒 加入'}</button>
-        <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
+        <button class="btn btn-sm" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
 }
@@ -527,10 +744,14 @@ async function lookupIds() {
     const img = d.modelVersions?.[0]?.images?.[0]?.url || '';
     const bm = d.modelVersions?.[0]?.baseModel || '';
     const inCart = selectedModels.has(String(d.id));
-    // Cache for cart
+    const vCount = (d.modelVersions || []).length;
+    // Cache for cart and metadata
     searchResultsCache[String(d.id)] = {
       name: d.name || 'Unknown', type: d.type || '',
-      image: img, version: d.modelVersions?.[0] || null
+      image: img, version: d.modelVersions?.[0] || null,
+      allVersions: d.modelVersions || [],
+      images: d.modelVersions?.[0]?.images || [],
+      metrics: d.stats || {}, user: d.creator || {},
     };
     return `<div class="model-card">
       <div class="model-card-img">${img ? `<img src="${img}" alt="" onclick="openImg('${img}')" style="cursor:zoom-in" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
@@ -539,12 +760,13 @@ async function lookupIds() {
         <div class="model-card-meta">
           <span class="badge ${getBadgeClass((d.type || '').toLowerCase())}">${d.type || ''}</span>
           ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
+          ${vCount > 1 ? `<span class="badge badge-other" title="${vCount} 个版本">v${vCount}</span>` : ''}
           <span style="font-size:.75rem;color:var(--t2)">⬇️ ${d.stats?.downloadCount?.toLocaleString() || 0}</span>
         </div>
         <div class="model-card-actions">
-          <a class="btn btn-sm" href="https://civitai.com/models/${d.id}" target="_blank">🔗</a>
+          <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${d.id}')">📄 详情</button>
           <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${d.id}', this)">${inCart ? '✕ 移除' : '🛒 加入'}</button>
-          <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${d.id}', '${(d.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
+          <button class="btn btn-sm" onclick="downloadFromSearch('${d.id}', '${(d.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
         </div>
       </div></div>`;
   }).join('');
@@ -557,28 +779,84 @@ function renderCart() {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">🛒 购物车为空</div>';
     return;
   }
-  let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>操作</th></tr></thead><tbody>';
+  let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>版本</th><th>操作</th></tr></thead><tbody>';
   for (const [id, m] of selectedModels) {
     const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cached = searchResultsCache[String(id)];
+    const allVersions = cached?.allVersions || [];
+    let versionCell = m.versionName || '-';
+    if (allVersions.length > 1) {
+      const opts = allVersions.map(v => {
+        const sel = String(v.id) === String(m.versionId) ? 'selected' : '';
+        return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
+      }).join('');
+      versionCell = `<select class="meta-version-select" onchange="changeCartVersion('${id}', this.value)" style="max-width:140px">${opts}</select>`;
+    }
     html += `<tr>
       <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${(m.imageUrl || '').replace(/'/g, "\\'")}')"
         onerror="this.style.display='none'"></td>
       <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
       <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
+      <td>${versionCell}</td>
       <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
   }
   html += '</tbody></table>';
 
-  html += `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-    <button class="btn btn-sm" onclick="copyCartIds()">📋 复制 IDs</button>
-    <button class="btn btn-sm btn-primary" onclick="copyCartAsEnv()">📋 复制为 ALL_MODEL_IDS</button>
+  // Live ID textarea
+  const ids = [...selectedModels.keys()].join(', ');
+  html += `<div style="margin-top:16px">
+    <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:6px">模型 ID 列表 (可直接在文本框中编辑)</label>
+    <textarea class="cart-ids-box" id="cart-ids-textarea" oninput="syncCartFromTextarea(this)">${ids}</textarea>
   </div>`;
 
   container.innerHTML = html;
 }
 
-function copyCartIds() { copyText([...selectedModels.keys()].join(',')); }
-function copyCartAsEnv() { copyText("ALL_MODEL_IDS='" + [...selectedModels.keys()].join(',') + "'"); }
+function changeCartVersion(modelId, versionId) {
+  modelId = String(modelId);
+  const cached = searchResultsCache[modelId];
+  if (!cached || !cached.allVersions) return;
+  const newVer = cached.allVersions.find(v => String(v.id) === String(versionId));
+  if (!newVer) return;
+  const entry = selectedModels.get(modelId);
+  if (entry) {
+    entry.versionId = newVer.id;
+    entry.versionName = newVer.name;
+    entry.baseModel = newVer.baseModel;
+    saveCartToStorage();
+    updateCartIdsTextarea();
+  }
+}
+
+function updateCartIdsTextarea() {
+  const ta = document.getElementById('cart-ids-textarea');
+  if (ta) ta.value = [...selectedModels.keys()].join(', ');
+}
+
+function syncCartFromTextarea(el) {
+  // Parse IDs from textarea and sync cart
+  const text = el.value;
+  const ids = parseIds(text);
+  // Remove IDs not in textarea
+  for (const existingId of [...selectedModels.keys()]) {
+    if (!ids.includes(existingId)) {
+      selectedModels.delete(existingId);
+    }
+  }
+  // Add new IDs (with minimal data)
+  for (const id of ids) {
+    if (!selectedModels.has(id)) {
+      const cached = searchResultsCache[id];
+      selectedModels.set(id, {
+        name: cached?.name || `Model #${id}`, type: cached?.type || '',
+        imageUrl: cached?.image || '',
+        versionId: cached?.version?.id, versionName: cached?.version?.name,
+        baseModel: cached?.version?.baseModel,
+      });
+    }
+  }
+  saveCartToStorage(); updateCartBadge();
+}
 
 function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderCart(); }
 function updateCartBadge() {
