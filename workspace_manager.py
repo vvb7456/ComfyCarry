@@ -1869,82 +1869,28 @@ def _parse_rclone_conf():
     return remotes
 
 
-def _parse_sync_log_entries(raw_log, max_entries=100):
-    """将 rclone 日志解析为结构化条目，并附中文翻译"""
-    entries = []
-    for line in raw_log.split('\n'):
-        line = line.strip()
-        if not line:
-            continue
-        # rclone log: 2026/02/16 02:15:55 INFO  : file.png: Copied (new)
-        m = re.match(r'(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\w+)\s*:\s*(.*)', line)
-        if m:
-            ts, level, msg = m.group(1), m.group(2), m.group(3)
-            cn_msg = _translate_rclone_msg(msg)
-            entries.append({"time": ts, "level": level, "raw": msg, "msg": cn_msg})
-        else:
-            # 自定义行如 [HH:MM:SS] New files detected
-            m2 = re.match(r'\[(\d{2}:\d{2}:\d{2})\]\s*(.*)', line)
-            if m2:
-                entries.append({"time": m2.group(1), "level": "INFO", "raw": m2.group(2),
-                                "msg": _translate_sync_event(m2.group(2))})
-            elif line.startswith("Transferred:") or line.startswith("Checks:") or \
-                    line.startswith("Deleted:") or line.startswith("Renamed:") or \
-                    line.startswith("Elapsed"):
-                entries.append({"time": "", "level": "STAT", "raw": line,
-                                "msg": _translate_rclone_stat(line)})
-    return entries[-max_entries:]
-
-
-def _translate_rclone_msg(msg):
-    """翻译 rclone 操作消息为中文"""
-    # file.png: Copied (new)
-    m = re.match(r'(.+?):\s*Copied\s*\(new\)', msg)
-    if m:
-        return f"📤 上传新文件: {m.group(1)}"
-    m = re.match(r'(.+?):\s*Copied\s*\(replaced existing\)', msg)
-    if m:
-        return f"🔄 覆盖更新: {m.group(1)}"
-    m = re.match(r'(.+?):\s*Deleted', msg)
-    if m:
-        return f"🗑️ 已删除本地: {m.group(1)}"
-    m = re.match(r'(.+?):\s*Moved', msg)
-    if m:
-        return f"📦 已移动: {m.group(1)}"
-    if "There was nothing to transfer" in msg:
-        return "✅ 无需同步，全部最新"
-    if "Renamed" in msg:
-        return f"📝 重命名: {msg}"
-    return msg
-
-
-def _translate_sync_event(msg):
-    """翻译自定义同步事件"""
-    if "New files detected" in msg:
-        return "🔍 检测到新文件，开始同步..."
-    if "OneDrive sync completed" in msg:
-        return "✅ OneDrive 同步完成"
-    if "Google Drive sync completed" in msg:
-        return "✅ Google Drive 同步完成"
-    if "Sync Service Started" in msg:
-        return "🚀 同步服务已启动"
-    return msg
-
-
-def _translate_rclone_stat(line):
-    """翻译 rclone 统计行"""
-    if line.startswith("Transferred:") and "/" in line:
-        # Transferred: 281.952 KiB / 281.952 KiB, 100%, 94.052 KiB/s
-        parts = line.split(",")
-        size_part = parts[0].replace("Transferred:", "").strip()
-        return f"📊 已传输: {size_part}" + (f" ({parts[1].strip()})" if len(parts) > 1 else "")
-    if line.startswith("Deleted:"):
-        return f"🗑️ {line}"
-    if line.startswith("Elapsed"):
-        return f"⏱️ {line}"
-    if line.startswith("Checks:"):
-        return f"🔍 {line}"
-    return line
+def _get_sync_log_lines(max_lines=150):
+    """从 PM2 获取同步日志原始行，仅做前缀清理"""
+    try:
+        r = subprocess.run(
+            f"pm2 logs sync --nostream --lines {max_lines} 2>/dev/null",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        raw = r.stdout + r.stderr
+        # Strip ANSI codes
+        raw = re.sub(r'\x1b\[[0-9;]*m', '', raw)
+        # Strip PM2 prefix: "3|sync     | "
+        raw = re.sub(r'^\d+\|[^|]+\|\s*', '', raw, flags=re.MULTILINE)
+        # Strip PM2 ISO timestamp prefix: "2026-02-16T12:06:06: "
+        raw = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}:\s*', '', raw, flags=re.MULTILINE)
+        lines = [l for l in raw.split('\n')
+                 if l.strip()
+                 and not l.startswith('[TAILING]')
+                 and 'last ' not in l[:30]
+                 and '/root/.pm2/logs/' not in l]
+        return lines[-max_lines:]
+    except Exception:
+        return []
 
 
 @app.route("/api/sync/status")
@@ -1962,31 +1908,15 @@ def api_sync_status():
     except Exception:
         pass
 
-    # 同步日志
-    try:
-        r = subprocess.run(
-            "pm2 logs sync --nostream --lines 150 2>/dev/null",
-            shell=True, capture_output=True, text=True, timeout=5
-        )
-        raw = r.stdout + r.stderr
-        # Strip ANSI and PM2 prefix
-        raw = re.sub(r'\x1b\[[0-9;]*m', '', raw)
-        raw = re.sub(r'^\d+\|[^|]+\|\s*', '', raw, flags=re.MULTILINE)
-        # Strip PM2 ISO timestamp prefix (e.g. "2026-02-16T12:06:06: ")
-        raw = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}:\s*', '', raw, flags=re.MULTILINE)
-        raw = '\n'.join(l for l in raw.split('\n')
-                       if not l.startswith('[TAILING]') and 'last 150 lines' not in l
-                       and '/root/.pm2/logs/' not in l)
-        entries = _parse_sync_log_entries(raw)
-    except Exception:
-        entries = []
+    # 同步日志 (raw lines from PM2)
+    log_lines = _get_sync_log_lines(150)
 
     # 当前同步偏好
     prefs = _load_sync_prefs()
 
     return jsonify({
         "status": status,
-        "entries": entries,
+        "log_lines": log_lines,
         "prefs": prefs
     })
 
@@ -2091,47 +2021,66 @@ def _regenerate_sync_script(remotes, prefs):
     od_dest = prefs.get("onedrive", {}).get("destination", "ComfyUI_Transfer")
     gd_dest = prefs.get("gdrive", {}).get("destination", "ComfyUI_Transfer")
 
-    # 构建 sync 块
+    # 构建 sync 块 (输出中文日志，rclone 静默模式)
     sync_blocks = []
     if onedrive_enabled and onedrive_name:
-        sync_blocks.append(f'''        # OneDrive 同步
-        rclone move "$SOURCE_DIR" "{onedrive_name}:{od_dest}" \\
+        sync_blocks.append(f'''        echo "[$TIME] 📤 正在同步到 OneDrive ({onedrive_name}:{od_dest})..."
+        OUTPUT=$(rclone move "$SOURCE_DIR" "{onedrive_name}:{od_dest}" \\
             --min-age "30s" \\
             --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
             --filter "- .*/**" \\
             --filter "- *" \\
-            --transfers 4 -v && echo "[$TIME] OneDrive sync completed"''')
+            --transfers 4 --stats-one-line -q 2>&1)
+        RC=$?
+        if [ $RC -eq 0 ]; then
+            echo "[$TIME] ✅ OneDrive 同步完成"
+            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
+        else
+            echo "[$TIME] ❌ OneDrive 同步失败 (code=$RC)"
+            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
+        fi''')
 
     if gdrive_enabled and gdrive_name:
-        sync_blocks.append(f'''        # Google Drive 同步
-        rclone move "$SOURCE_DIR" "{gdrive_name}:{gd_dest}" \\
+        sync_blocks.append(f'''        echo "[$TIME] 📤 正在同步到 Google Drive ({gdrive_name}:{gd_dest})..."
+        OUTPUT=$(rclone move "$SOURCE_DIR" "{gdrive_name}:{gd_dest}" \\
             --min-age "30s" \\
             --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
             --filter "- .*/**" \\
             --filter "- *" \\
-            --transfers 4 -v && echo "[$TIME] Google Drive sync completed"''')
+            --transfers 4 --stats-one-line -q 2>&1)
+        RC=$?
+        if [ $RC -eq 0 ]; then
+            echo "[$TIME] ✅ Google Drive 同步完成"
+            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
+        else
+            echo "[$TIME] ❌ Google Drive 同步失败 (code=$RC)"
+            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
+        fi''')
 
     # 生成启用信息
     info_lines = []
     if onedrive_name:
-        info_lines.append(f'echo "  OneDrive: {onedrive_name} ({"启用" if onedrive_enabled else "禁用"})"')
+        info_lines.append(f'echo "  📁 OneDrive: {onedrive_name} → {od_dest} ({"启用" if onedrive_enabled else "禁用"})"')
     if gdrive_name:
-        info_lines.append(f'echo "  Google Drive: {gdrive_name} ({"启用" if gdrive_enabled else "禁用"})"')
+        info_lines.append(f'echo "  📁 Google Drive: {gdrive_name} → {gd_dest} ({"启用" if gdrive_enabled else "禁用"})"')
 
     script = f'''#!/bin/bash
 SOURCE_DIR="/workspace/ComfyUI/output"
 
-echo "--- Cloud Sync Service Started ---"
+echo "☁️  云同步服务已启动"
+echo "  📂 监控目录: $SOURCE_DIR"
 {chr(10).join(info_lines)}
 
 while true; do
-    FOUND_FILES=$(find "$SOURCE_DIR" -type f -mmin +0.5 \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.mp4" -o -iname "*.webp" \\) ! -path '*/.*' -print -quit)
+    FILES=$(find "$SOURCE_DIR" -type f -mmin +0.5 \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.mp4" -o -iname "*.webp" -o -iname "*.jpeg" -o -iname "*.gif" -o -iname "*.mov" -o -iname "*.webm" \\) ! -path '*/.*')
 
-    if [ -n "$FOUND_FILES" ]; then
+    if [ -n "$FILES" ]; then
+        COUNT=$(echo "$FILES" | wc -l)
         TIME=$(date '+%H:%M:%S')
-        echo "[$TIME] New files detected. Syncing..."
+        echo ""
+        echo "[$TIME] 🔍 检测到 $COUNT 个新文件"
 
-{chr(10).join(sync_blocks) if sync_blocks else '        echo "[$TIME] No remotes enabled, skipping"'}
+{chr(10).join(sync_blocks) if sync_blocks else '        echo "[$TIME] ⚠️  没有启用的同步目标，跳过"'}
 
     fi
     sleep 10

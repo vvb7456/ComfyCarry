@@ -1235,8 +1235,8 @@ async function loadSyncPage() {
     }
   }
 
-  // Log entries
-  renderSyncLog(status.entries || []);
+  // Log lines (raw text)
+  renderSyncLog(status.log_lines || []);
 }
 
 function renderSyncRemoteCard(r, prefs) {
@@ -1338,16 +1338,21 @@ async function loadSyncStorage(remotes) {
   for (const r of remotes) refreshRemoteStorage(r.name);
 }
 
-function renderSyncLog(entries) {
+function renderSyncLog(lines) {
   const el = document.getElementById('sync-log-content');
-  if (!entries || entries.length === 0) {
+  if (!lines || lines.length === 0) {
     el.innerHTML = '<div style="color:var(--t3)">暂无同步日志</div>';
     return;
   }
-  el.innerHTML = entries.map(e => {
-    const timeHtml = e.time ? `<span class="sync-log-time">${escHtml(e.time)}</span>` : '';
-    const levelClass = `sync-log-level-${e.level}`;
-    return `<div class="sync-log-entry ${levelClass}">${timeHtml}${escHtml(e.msg)}</div>`;
+  el.innerHTML = lines.map(line => {
+    const esc = escHtml(line);
+    // Color-code based on emoji/content
+    let cls = '';
+    if (line.includes('✅')) cls = 'style="color:var(--green)"';
+    else if (line.includes('❌')) cls = 'style="color:var(--red, #e74c3c)"';
+    else if (line.includes('📤') || line.includes('🔍')) cls = 'style="color:var(--cyan)"';
+    else if (line.includes('☁️') || line.includes('📂') || line.includes('📁')) cls = 'style="color:var(--t2)"';
+    return `<div class="sync-log-entry" ${cls}>${esc}</div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
 }
