@@ -67,10 +67,26 @@ function copyText(text) { navigator.clipboard.writeText(text).then(() => showToa
 function getAuthHeaders() { return apiKey ? { Authorization: 'Bearer ' + apiKey } : {}; }
 function openImg(url) {
   if (!url) return;
+  const modal = document.getElementById('img-modal');
   const img = document.getElementById('modal-img');
-  img.src = '';  // clear stale image
-  document.getElementById('img-modal').classList.add('active');
-  img.src = url;
+  // Remove any previous video element
+  const oldVid = modal.querySelector('video.modal-vid');
+  if (oldVid) oldVid.remove();
+  img.style.display = '';
+
+  const isVideo = /\.(webm|mp4|gif)(\?|$)/i.test(url);
+  if (isVideo) {
+    img.style.display = 'none';
+    const vid = document.createElement('video');
+    vid.className = 'modal-vid';
+    vid.src = url; vid.controls = true; vid.autoplay = true; vid.muted = true; vid.loop = true;
+    vid.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;';
+    img.parentNode.insertBefore(vid, img);
+  } else {
+    img.src = '';  // clear stale image
+    img.src = url;
+  }
+  modal.classList.add('active');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeMetaModal(); closeVersionPicker(); } });
 
@@ -174,7 +190,17 @@ function renderMetaContent(data) {
         if (mt.negativePrompt) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${mt.negativePrompt}</span>`;
       }
 
-      html += `<figure><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">`;
+      const isVideo = img.type === 'video' || (img.name && /\.(webm|mp4|gif)$/i.test(img.name));
+      if (isVideo) {
+        // Construct proper video URL using original filename
+        let videoUrl = fullUrl;
+        if (img.name && !img.url.startsWith('http') && !img.url.startsWith('/')) {
+          videoUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${img.url}/${encodeURIComponent(img.name)}`;
+        }
+        html += `<figure><video src="${videoUrl}" controls muted loop playsinline style="width:100%;border-radius:8px" loading="lazy"></video>`;
+      } else {
+        html += `<figure><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">`;
+      }
       if (caption) html += `<figcaption>${caption}</figcaption>`;
       html += '</figure>';
     });
@@ -663,7 +689,9 @@ function renderCivitCard(h) {
   // Meilisearch returns 'version' (single object), not 'modelVersions' (array)
   const ver = h.version || null;
   const allVersions = h.versions || (ver ? [ver] : []);
-  const imageObj = (h.images && h.images[0]) ? h.images[0] : (ver?.images?.[0] || null);
+  // Prefer first non-video image for card thumbnail
+  const allImgs = h.images && h.images.length > 0 ? h.images : (ver?.images || []);
+  const imageObj = allImgs.find(i => i.type !== 'video') || allImgs[0] || null;
 
   let imgUrl = '';
   if (imageObj && imageObj.url) {
