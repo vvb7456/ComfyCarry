@@ -129,9 +129,10 @@ LOGIN_PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Login - Workspace Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#0a0a0f;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:clamp(15px,1.1vw,21px)}
+body{font-family:'IBM Plex Sans','IBM Plex Sans SC',-apple-system,sans-serif;background:#0a0a0f;color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:clamp(15px,1.1vw,21px)}
 .card{background:#1a1a28;border:1px solid #2a2a3e;border-radius:14px;padding:clamp(32px,3vw,48px);width:clamp(360px,28vw,480px);max-width:92vw}
 .card h2{text-align:center;margin-bottom:clamp(20px,2vw,32px);font-size:clamp(1.3rem,1.8vw,1.8rem);background:linear-gradient(135deg,#7c5cfc,#e879f9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 input{width:100%;padding:clamp(10px,1.2vw,16px) clamp(14px,1.5vw,20px);background:#0e0e18;color:#e8e8f0;border:1px solid #2a2a3e;border-radius:10px;font-size:clamp(.9rem,1vw,1.1rem);margin-bottom:clamp(14px,1.2vw,20px)}
