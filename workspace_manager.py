@@ -1018,6 +1018,7 @@ COMFYUI_PARAM_GROUPS = {
     "vram": {
         "label": "VRAM 管理",
         "type": "select",
+        "help": "控制模型显存分配策略。默认自动检测，High VRAM 适合大显存GPU不卸载模型，Low VRAM 适合小显存拆分推理",
         "options": [
             ("default", "默认 (自动)"),
             ("gpu-only", "GPU Only (全部保留在GPU)"),
@@ -1035,13 +1036,14 @@ COMFYUI_PARAM_GROUPS = {
     "attention": {
         "label": "Attention 方案",
         "type": "select",
+        "help": "PyTorch SDPA 推荐，自动调用最优内核(含FlashAttention)。FlashAttention/SageAttention 需要额外安装对应包",
         "options": [
             ("default", "默认 (自动选择)"),
-            ("pytorch-cross", "PyTorch SDPA"),
+            ("pytorch-cross", "PyTorch SDPA (推荐✓)"),
             ("split-cross", "Split Cross Attention (省VRAM)"),
             ("quad-cross", "Sub-Quadratic"),
-            ("flash", "FlashAttention"),
-            ("sage", "SageAttention"),
+            ("flash", "FlashAttention (需flash-attn包)"),
+            ("sage", "SageAttention (需sageattention包)"),
         ],
         "flag_map": {
             "pytorch-cross": "--use-pytorch-cross-attention",
@@ -1054,11 +1056,13 @@ COMFYUI_PARAM_GROUPS = {
     "disable_xformers": {
         "label": "禁用 xFormers",
         "type": "bool",
+        "help": "xFormers 在新版 PyTorch 下已不推荐，建议禁用并使用 PyTorch SDPA",
         "flag": "--disable-xformers",
     },
     "unet_precision": {
         "label": "UNet 精度",
         "type": "select",
+        "help": "控制 UNet 推理精度。FP8 可大幅减少显存占用，适合大模型；BF16 是 Ampere+ 推荐精度",
         "options": [
             ("default", "默认 (自动)"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
@@ -1072,6 +1076,7 @@ COMFYUI_PARAM_GROUPS = {
     "vae_precision": {
         "label": "VAE 精度",
         "type": "select",
+        "help": "VAE 解码精度。FP32 最稳定，FP16/BF16 更快。黑图时可尝试 FP32",
         "options": [
             ("default", "默认 (自动)"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
@@ -1085,6 +1090,7 @@ COMFYUI_PARAM_GROUPS = {
     "text_enc_precision": {
         "label": "Text Encoder 精度",
         "type": "select",
+        "help": "文本编码器精度。通常默认即可，FP8 可节省显存",
         "options": [
             ("default", "默认 (自动)"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
@@ -1099,11 +1105,13 @@ COMFYUI_PARAM_GROUPS = {
     "fast": {
         "label": "实验性优化 (--fast)",
         "type": "bool",
+        "help": "启用 ComfyUI 实验性加速，可能提升推理速度 10-20%，极少数工作流可能不兼容",
         "flag": "--fast",
     },
     "preview_method": {
         "label": "预览方式",
         "type": "select",
+        "help": "生成过程中的实时预览方式。TAESD 效果最好但稍慢，Latent2RGB 最快但模糊",
         "options": [
             ("auto", "自动"), ("none", "无"),
             ("latent2rgb", "Latent2RGB"), ("taesd", "TAESD"),
@@ -1113,6 +1121,7 @@ COMFYUI_PARAM_GROUPS = {
     "cache": {
         "label": "缓存策略",
         "type": "select",
+        "help": "控制节点输出缓存。LRU 精细控制缓存大小，经典模式激进缓存更快但占更多内存",
         "options": [
             ("default", "默认"), ("classic", "经典 (Aggressive)"),
             ("lru", "LRU"), ("none", "禁用"),
@@ -1124,6 +1133,7 @@ COMFYUI_PARAM_GROUPS = {
     "cache_lru_size": {
         "label": "LRU 缓存大小",
         "type": "number",
+        "help": "LRU 缓存最大条目数，0 = 无限制。建议根据可用内存设置",
         "flag_prefix": "--cache-lru",
         "depends_on": {"cache": "lru"},
     },
@@ -1245,6 +1255,8 @@ def api_comfyui_params_get():
                 schema[gk]["options"] = gv["options"]
             if "depends_on" in gv:
                 schema[gk]["depends_on"] = gv["depends_on"]
+            if "help" in gv:
+                schema[gk]["help"] = gv["help"]
         return jsonify({"schema": schema, "current": current, "raw_args": raw_args})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

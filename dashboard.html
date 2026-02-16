@@ -629,14 +629,51 @@
         .comfy-param-toggle {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             cursor: pointer;
+            user-select: none;
         }
 
         .comfy-param-toggle input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--ac);
+            display: none;
+        }
+
+        .comfy-toggle-slider {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            background: var(--bd);
+            border-radius: 11px;
+            transition: background .25s;
+            flex-shrink: 0;
+        }
+
+        .comfy-toggle-slider::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform .25s;
+            box-shadow: 0 1px 3px rgba(0,0,0,.2);
+        }
+
+        .comfy-param-toggle input:checked + .comfy-toggle-slider {
+            background: var(--ac);
+        }
+
+        .comfy-param-toggle input:checked + .comfy-toggle-slider::after {
+            transform: translateX(18px);
+        }
+
+        .comfy-param-help {
+            font-size: .72rem;
+            color: var(--t3);
+            margin-top: 4px;
+            line-height: 1.3;
         }
 
         .comfy-recent-grid {
@@ -1698,7 +1735,7 @@
             </div>
             <div class="page-body">
                 <!-- 状态信息 -->
-                <div id="comfyui-status-cards" class="stats-grid">
+                <div id="comfyui-status-cards" class="stat-grid">
                     <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
                 </div>
 

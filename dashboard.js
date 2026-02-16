@@ -1339,9 +1339,17 @@ async function loadComfyHistory() {
     let html = '';
     for (const item of items) {
       for (const img of (item.images || [])) {
-        const thumbUrl = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${img.type || 'output'}&preview=webp;80`;
-        const fullUrl = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${img.type || 'output'}`;
-        html += `<img src="${thumbUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy" onerror="this.style.display='none'">`;
+        // Skip temp images (preview buffers, may be already deleted)
+        if (img.type === 'temp') continue;
+        const params = new URLSearchParams({
+          filename: img.filename,
+          subfolder: img.subfolder || '',
+          type: img.type || 'output'
+        });
+        const thumbUrl = `/api/comfyui/view?${params.toString()}&preview=${encodeURIComponent('webp;80')}`;
+        const fullUrl = `/api/comfyui/view?${params.toString()}`;
+        html += `<img src="${thumbUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy"
+          onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='${fullUrl}'}else{this.style.display='none'}">`;
       }
     }
     el.innerHTML = html || '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">暂无图片输出</div>';
@@ -1366,22 +1374,28 @@ async function loadComfyParams() {
         if (!depMet) continue;
       }
 
+      const helpHtml = schema.help ? `<div class="comfy-param-help">${escHtml(schema.help)}</div>` : '';
+
       html += `<div class="comfy-param-group">`;
       if (schema.type === 'select') {
-        html += `<label>${schema.label}</label>`;
+        html += `<label>${escHtml(schema.label)}</label>`;
         html += `<select id="cparam-${key}" data-param="${key}">`;
         for (const [val, label] of schema.options) {
-          html += `<option value="${val}" ${val === String(schema.value) || val === schema.value ? 'selected' : ''}>${label}</option>`;
+          html += `<option value="${val}" ${val === String(schema.value) || val === schema.value ? 'selected' : ''}>${escHtml(label)}</option>`;
         }
         html += '</select>';
+        html += helpHtml;
       } else if (schema.type === 'bool') {
         html += `<label class="comfy-param-toggle">
           <input type="checkbox" id="cparam-${key}" data-param="${key}" ${schema.value ? 'checked' : ''}>
-          <span>${schema.label}</span>
+          <span class="comfy-toggle-slider"></span>
+          <span>${escHtml(schema.label)}</span>
         </label>`;
+        html += helpHtml;
       } else if (schema.type === 'number') {
-        html += `<label>${schema.label}</label>`;
+        html += `<label>${escHtml(schema.label)}</label>`;
         html += `<input type="number" id="cparam-${key}" data-param="${key}" value="${schema.value || 0}" min="0" max="100">`;
+        html += helpHtml;
       }
       html += '</div>';
     }
