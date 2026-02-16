@@ -172,9 +172,10 @@ function renderLocalModelCard(m, idx) {
 
   let imgHtml;
   if (m.has_preview && m.preview_path) {
-    imgHtml = `<img src="/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦 无预览</div>`;
+    const pUrl = `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}`;
+    imgHtml = `<img src="${pUrl}" alt="" onclick="openImg('${pUrl}')" style="cursor:zoom-in" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦 无预览</div>`;
   } else if (m.civitai_image) {
-    imgHtml = `<img src="${m.civitai_image}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦</div>`;
+    imgHtml = `<img src="${m.civitai_image}" alt="" onclick="openImg('${m.civitai_image}')" style="cursor:zoom-in" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦</div>`;
   } else {
     imgHtml = `<div class="model-card-no-img">📦 无预览</div>`;
   }
@@ -405,6 +406,10 @@ function renderCivitCard(h) {
     else imgUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj.url}/width=450/default.jpg`;
   }
 
+  // Full size URL for lightbox (width=0 or omit width)
+  let fullUrl = imgUrl.replace('/width=450', '');
+  if (!fullUrl.startsWith('http')) fullUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj?.url}/default.jpg`;
+
   // Type mapping for badges
   const typeLower = (h.type || '').toLowerCase();
   let badgeKey = typeLower;
@@ -416,16 +421,16 @@ function renderCivitCard(h) {
   const bm = h.modelVersions && h.modelVersions[0] ? h.modelVersions[0].baseModel : '';
   const inCart = selectedModels.has(String(h.id));
 
-  // Construct data object for cart
+  // Construct data object for cart - Pass full URL
   const cartData = {
     name: h.name,
     type: h.type,
-    images: h.images || [],
+    image: imgUrl, // Use the resolved URL
     version: h.modelVersions ? h.modelVersions[0] : null
   };
 
   return `<div class="model-card">
-    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt="" onclick="openImg('${fullUrl}')" style="cursor:zoom-in" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${h.name || ''}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
@@ -450,7 +455,7 @@ function toggleCartFromSearch(id, btn, data) {
   } else {
     selectedModels.set(id, {
       name: data.name || 'Unknown', type: data.type || '',
-      imageUrl: (data.images && data.images[0]) ? data.images[0].url : '',
+      imageUrl: data.image || '', // Use passed valid URL
       versionId: data.version?.id, versionName: data.version?.name,
       baseModel: data.version?.baseModel,
     });
@@ -518,7 +523,7 @@ async function lookupIds() {
     const img = d.modelVersions?.[0]?.images?.[0]?.url || '';
     const bm = d.modelVersions?.[0]?.baseModel || '';
     return `<div class="model-card">
-      <div class="model-card-img">${img ? `<img src="${img}" alt="" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+      <div class="model-card-img">${img ? `<img src="${img}" alt="" onclick="openImg('${img}')" style="cursor:zoom-in" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
       <div class="model-card-body">
         <div class="model-card-title">${d.name || ''}</div>
         <div class="model-card-meta">
@@ -544,7 +549,7 @@ function renderCart() {
   let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>操作</th></tr></thead><tbody>';
   for (const [id, m] of selectedModels) {
     html += `<tr>
-      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px" onerror="this.style.display='none'"></td>
+      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${m.imageUrl || ''}')" onerror="this.style.display='none'"></td>
       <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${m.name}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
       <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
       <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
