@@ -363,23 +363,46 @@ async function searchModels(page = 0) {
 }
 
 function renderCivitCard(h) {
-  const img = (h.images && h.images[0]) ? (h.images[0].url || '') : '';
-  const badgeClass = getBadgeClass((h.type || '').toLowerCase() === 'lora' ? 'loras' : (h.type || '').toLowerCase());
-  const bm = h.version?.baseModel || '';
+  // Use root images if available, else version images
+  const imageObj = (h.images && h.images[0]) ? h.images[0] : (h.modelVersions && h.modelVersions[0] && h.modelVersions[0].images && h.modelVersions[0].images[0] ? h.modelVersions[0].images[0] : null);
+
+  let imgUrl = '';
+  if (imageObj && imageObj.url) {
+    if (imageObj.url.startsWith('http')) imgUrl = imageObj.url;
+    else imgUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imageObj.url}/width=450/default.jpg`;
+  }
+
+  // Type mapping for badges
+  const typeLower = (h.type || '').toLowerCase();
+  let badgeKey = typeLower;
+  if (typeLower === 'checkpoint') badgeKey = 'checkpoints';
+  if (typeLower === 'lora') badgeKey = 'loras';
+  if (typeLower === 'textualinversion') badgeKey = 'embeddings';
+
+  const badgeClass = getBadgeClass(badgeKey);
+  const bm = h.modelVersions && h.modelVersions[0] ? h.modelVersions[0].baseModel : '';
   const inCart = selectedModels.has(String(h.id));
 
+  // Construct data object for cart
+  const cartData = {
+    name: h.name,
+    type: h.type,
+    images: h.images || [],
+    version: h.modelVersions ? h.modelVersions[0] : null
+  };
+
   return `<div class="model-card">
-    <div class="model-card-img">${img ? `<img src="${img}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt="" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${h.name || ''}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
-        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${h.stats?.downloadCount?.toLocaleString() || 0}</span>
+        <span style="font-size:.75rem;color:var(--t2)">⬇️ ${h.stats?.downloadCount?.toLocaleString() || h.metrics?.downloadCount?.toLocaleString() || 0}</span>
       </div>
       <div class="model-card-actions">
         <a class="btn btn-sm" href="https://civitai.com/models/${h.id}" target="_blank">🔗 查看</a>
-        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(h).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this, ${JSON.stringify(cartData).replace(/"/g, '&quot;')})">${inCart ? '✕ 移除' : '🛒 加入'}</button>
         <button class="btn btn-sm btn-success" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
