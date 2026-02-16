@@ -37,7 +37,40 @@ CONFIG_FILE = Path(__file__).parent / ".civitai_config.json"
 MEILI_URL = 'https://search.civitai.com/multi-search'
 MEILI_BEARER = '8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61'
 MANAGER_PORT = int(os.environ.get("MANAGER_PORT", 5000))
-DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "comfy2025")
+
+# Dashboard 密码持久化: 优先 .dashboard_env > 环境变量 > 默认值
+DASHBOARD_ENV_FILE = Path("/workspace/.dashboard_env")
+
+def _load_dashboard_password():
+    """从持久化文件或环境变量加载密码"""
+    # 1. 从持久化文件读取
+    if DASHBOARD_ENV_FILE.exists():
+        try:
+            data = json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
+            pw = data.get("password", "")
+            if pw:
+                return pw
+        except Exception:
+            pass
+    # 2. 从环境变量读取
+    env_pw = os.environ.get("DASHBOARD_PASSWORD", "")
+    if env_pw:
+        return env_pw
+    # 3. 默认值
+    return "comfy2025"
+
+def _save_dashboard_password(pw):
+    """持久化保存密码"""
+    data = {}
+    if DASHBOARD_ENV_FILE.exists():
+        try:
+            data = json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    data["password"] = pw
+    DASHBOARD_ENV_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+DASHBOARD_PASSWORD = _load_dashboard_password()
 
 # 模型目录映射
 MODEL_DIRS = {
@@ -1456,12 +1489,13 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
         # ─────────────────────────────────────────────
         _deploy_step("部署完成")
 
-        # 更新 Dashboard 密码
+        # 更新 Dashboard 密码 (持久化)
         new_pw = config.get("password", "")
         if new_pw:
             global DASHBOARD_PASSWORD
             DASHBOARD_PASSWORD = new_pw
-            _deploy_log(f"Dashboard 密码已更新")
+            _save_dashboard_password(new_pw)
+            _deploy_log(f"Dashboard 密码已更新并保存")
 
         state = _load_setup_state()
         state["deploy_completed"] = True
