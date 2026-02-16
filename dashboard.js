@@ -1187,6 +1187,15 @@ async function loadSyncPage() {
     grid.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">未检测到 rclone remote，请通过下方导入配置</div>';
   } else {
     grid.innerHTML = remotes.map(r => renderSyncRemoteCard(r, prefs)).join('');
+    // Restore cached storage info so auto-refresh doesn't wipe it
+    if (syncStorageCache) {
+      for (const r of remotes) {
+        const el = document.getElementById(`storage-${r.name}`);
+        if (el && syncStorageCache[r.name] !== undefined) {
+          renderStorageResult(el, r.name, syncStorageCache[r.name]);
+        }
+      }
+    }
   }
 
   // Log entries
