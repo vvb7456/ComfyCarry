@@ -1165,27 +1165,45 @@ done
 
 @app.route("/api/sync/rclone_config", methods=["GET"])
 def api_get_rclone_config():
-    """获取 rclone.conf 内容（屏蔽 token）"""
+    """获取 rclone.conf 完整内容（Dashboard 已有密码保护）"""
     if not RCLONE_CONF.exists():
         return jsonify({"config": "", "exists": False})
     raw = RCLONE_CONF.read_text(encoding="utf-8")
-    # 屏蔽敏感字段
-    sanitized = re.sub(
-        r'(token\s*=\s*)\{.*?\}',
-        r'\1{***HIDDEN***}',
-        raw, flags=re.DOTALL
-    )
-    sanitized = re.sub(
-        r'(access_key_id\s*=\s*).+',
-        r'\1***HIDDEN***',
-        sanitized
-    )
-    sanitized = re.sub(
-        r'(secret_access_key\s*=\s*).+',
-        r'\1***HIDDEN***',
-        sanitized
-    )
-    return jsonify({"config": sanitized, "exists": True})
+    return jsonify({"config": raw, "exists": True})
+
+
+@app.route("/api/sync/rclone_config", methods=["POST"])
+def api_save_rclone_config():
+    """保存 rclone.conf"""
+    data = request.get_json(force=True)
+    config_text = data.get("config", "")
+
+    if not config_text.strip():
+        return jsonify({"error": "配置内容不能为空"}), 400
+
+    # 基本语法校验：至少有一个 [remote] 段
+    sections = re.findall(r'^\[.+\]', config_text, re.MULTILINE)
+    if not sections:
+        return jsonify({"error": "配置格式错误：至少需要一个 [remote] 段"}), 400
+
+    # 备份旧配置
+    if RCLONE_CONF.exists():
+        backup = RCLONE_CONF.with_suffix('.conf.bak')
+        backup.write_text(RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
+
+    # 写入新配置
+    RCLONE_CONF.parent.mkdir(parents=True, exist_ok=True)
+    RCLONE_CONF.write_text(config_text, encoding="utf-8")
+    RCLONE_CONF.chmod(0o600)
+
+    # 验证配置是否可用
+    try:
+        r = subprocess.run("rclone listremotes 2>&1", shell=True, capture_output=True, text=True, timeout=5)
+        remotes = [l.strip().rstrip(':') for l in r.stdout.strip().split('\n') if l.strip()]
+    except Exception:
+        remotes = []
+
+    return jsonify({"ok": True, "message": f"配置已保存，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
 
 
 # ====================================================================

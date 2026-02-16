@@ -1294,14 +1294,47 @@ async function toggleRcloneConfig() {
   const box = document.getElementById('rclone-config-box');
   box.classList.toggle('hidden');
   if (!box.classList.contains('hidden') && !rcloneConfigLoaded) {
-    try {
-      const r = await fetch('/api/sync/rclone_config');
-      const d = await r.json();
-      document.getElementById('rclone-config-content').textContent = d.config || '(空)';
-      rcloneConfigLoaded = true;
-    } catch (e) {
-      document.getElementById('rclone-config-content').textContent = '加载失败: ' + e.message;
+    await loadRcloneConfig();
+  }
+}
+
+async function loadRcloneConfig() {
+  try {
+    const r = await fetch('/api/sync/rclone_config');
+    const d = await r.json();
+    document.getElementById('rclone-config-content').value = d.config || '';
+    rcloneConfigLoaded = true;
+    document.getElementById('rclone-save-status').textContent = '';
+  } catch (e) {
+    document.getElementById('rclone-config-content').value = '加载失败: ' + e.message;
+  }
+}
+
+async function saveRcloneConfig() {
+  const content = document.getElementById('rclone-config-content').value;
+  const statusEl = document.getElementById('rclone-save-status');
+  if (!content.trim()) { showToast('配置不能为空'); return; }
+  if (!confirm('确定要保存 rclone 配置？旧配置将自动备份为 rclone.conf.bak')) return;
+  statusEl.textContent = '保存中...';
+  try {
+    const r = await fetch('/api/sync/rclone_config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: content })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      statusEl.textContent = '✅ ' + d.message;
+      showToast(d.message);
+      // Refresh remotes
+      setTimeout(loadSyncPage, 1000);
+    } else {
+      statusEl.textContent = '❌ ' + (d.error || '保存失败');
+      showToast(d.error || '保存失败');
     }
+  } catch (e) {
+    statusEl.textContent = '❌ ' + e.message;
+    showToast('保存失败: ' + e.message);
   }
 }
 

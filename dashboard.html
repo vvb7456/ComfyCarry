@@ -1167,6 +1167,22 @@
         .sync-log-level-INFO { color: var(--accent); }
         .sync-log-level-STAT { color: var(--t2); font-size: .75rem; }
         .sync-log-level-ERROR { color: #e74c3c; }
+        .rclone-config-editor {
+            width: 100%;
+            min-height: 250px;
+            max-height: 400px;
+            font-family: var(--mono);
+            font-size: .78rem;
+            line-height: 1.5;
+            background: var(--bg3);
+            color: var(--t1);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px;
+            resize: vertical;
+            white-space: pre;
+            overflow: auto;
+        }
 
         /* Detail panel */
         .detail-panel {
@@ -1440,10 +1456,15 @@
                 <!-- Rclone 配置 -->
                 <div class="section-title" style="margin-top:24px">
                     ⚙️ Rclone 配置
-                    <button class="btn btn-sm" style="margin-left:8px;font-size:.72rem" onclick="toggleRcloneConfig()">查看/隐藏</button>
+                    <button class="btn btn-sm" style="margin-left:8px;font-size:.72rem" onclick="toggleRcloneConfig()">编辑配置</button>
                 </div>
                 <div id="rclone-config-box" class="hidden">
-                    <pre id="rclone-config-content" class="log-box" style="max-height:300px;font-size:.75rem;white-space:pre-wrap">加载中...</pre>
+                    <textarea id="rclone-config-content" class="rclone-config-editor" spellcheck="false" placeholder="加载中..."></textarea>
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                        <button class="btn btn-sm btn-primary" onclick="saveRcloneConfig()">💾 保存配置</button>
+                        <button class="btn btn-sm" onclick="loadRcloneConfig()">🔄 重新加载</button>
+                        <span id="rclone-save-status" style="font-size:.78rem;color:var(--t3);align-self:center"></span>
+                    </div>
                 </div>
 
                 <!-- 同步日志 -->
@@ -1522,7 +1543,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=17"></script>
+    <script src="dashboard.js?v=18"></script>
 </body>
 
 </html>
