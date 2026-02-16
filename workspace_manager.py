@@ -27,9 +27,6 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Session secret key
-app.secret_key = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
-
 # --- 配置 ---
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://localhost:8188")
@@ -38,39 +35,60 @@ MEILI_URL = 'https://search.civitai.com/multi-search'
 MEILI_BEARER = '8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61'
 MANAGER_PORT = int(os.environ.get("MANAGER_PORT", 5000))
 
-# Dashboard 密码持久化: 优先 .dashboard_env > 环境变量 > 默认值
+# ── 持久化配置 (.dashboard_env) ──────────────────────────────
+# 所有用户可修改的运行时配置统一存储在此文件
 DASHBOARD_ENV_FILE = Path("/workspace/.dashboard_env")
 
-def _load_dashboard_password():
-    """从持久化文件或环境变量加载密码"""
-    # 1. 从持久化文件读取
+def _load_config():
+    """从 .dashboard_env 加载全部配置"""
     if DASHBOARD_ENV_FILE.exists():
         try:
-            data = json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
-            pw = data.get("password", "")
-            if pw:
-                return pw
+            return json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
-    # 2. 从环境变量读取
+    return {}
+
+def _save_config(data):
+    """写入 .dashboard_env"""
+    DASHBOARD_ENV_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def _get_config(key, default=""):
+    """读取单个配置值"""
+    return _load_config().get(key, default)
+
+def _set_config(key, value):
+    """写入单个配置值"""
+    data = _load_config()
+    data[key] = value
+    _save_config(data)
+
+# ── 密码 ──────────────────────────────────────────────────────
+def _load_dashboard_password():
+    """优先 .dashboard_env > 环境变量 > 默认值"""
+    pw = _get_config("password")
+    if pw:
+        return pw
     env_pw = os.environ.get("DASHBOARD_PASSWORD", "")
     if env_pw:
         return env_pw
-    # 3. 默认值
     return "comfy2025"
 
 def _save_dashboard_password(pw):
-    """持久化保存密码"""
-    data = {}
-    if DASHBOARD_ENV_FILE.exists():
-        try:
-            data = json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    data["password"] = pw
-    DASHBOARD_ENV_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    _set_config("password", pw)
 
 DASHBOARD_PASSWORD = _load_dashboard_password()
+
+# ── Session Secret (持久化 → 重启不掉线) ─────────────────────
+def _load_session_secret():
+    """从 .dashboard_env 读 session_secret, 不存在则生成并保存"""
+    existing = _get_config("session_secret")
+    if existing:
+        return existing
+    new_secret = secrets.token_hex(32)
+    _set_config("session_secret", new_secret)
+    return new_secret
+
+app.secret_key = _load_session_secret()
 
 # 模型目录映射
 MODEL_DIRS = {
@@ -952,6 +970,42 @@ def api_tunnel_status():
     links = _parse_tunnel_ingress()
 
     return jsonify({"status": status, "logs": logs, "links": links})
+
+
+# ====================================================================
+# Settings API (密码 / 配置管理)
+# ====================================================================
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings_get():
+    """返回当前设置概览"""
+    api_key = _get_api_key()
+    return jsonify({
+        "password_set": bool(DASHBOARD_PASSWORD),
+        "password_masked": DASHBOARD_PASSWORD[:2] + "***" if DASHBOARD_PASSWORD and len(DASHBOARD_PASSWORD) > 2 else "***",
+        "civitai_key_set": bool(api_key),
+        "civitai_key_masked": api_key[:6] + "..." if api_key and len(api_key) > 6 else ("已设置" if api_key else ""),
+    })
+
+
+@app.route("/api/settings/password", methods=["POST"])
+def api_settings_password():
+    """修改 Dashboard 密码"""
+    global DASHBOARD_PASSWORD
+    data = request.get_json(force=True) or {}
+    current = data.get("current", "")
+    new_pw = data.get("new", "").strip()
+
+    if not new_pw:
+        return jsonify({"error": "新密码不能为空"}), 400
+    if len(new_pw) < 4:
+        return jsonify({"error": "密码至少 4 个字符"}), 400
+    if current != DASHBOARD_PASSWORD:
+        return jsonify({"error": "当前密码错误"}), 403
+
+    DASHBOARD_PASSWORD = new_pw
+    _save_dashboard_password(new_pw)
+    return jsonify({"ok": True, "message": "密码已更新并持久化保存"})
 
 
 # ====================================================================

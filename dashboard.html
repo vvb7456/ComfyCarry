@@ -1300,6 +1300,7 @@
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span>Tunnel</div>
             <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span>Cloud Sync</div>
             <div class="nav-item" data-page="logs" onclick="showPage('logs')"><span class="icon">📜</span>运行日志</div>
+            <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span>设置</div>
         </div>
         <div class="sidebar-footer">
             <div id="key-status" style="margin-bottom:4px">🔒 未设置 Key</div>
@@ -1546,6 +1547,61 @@
             </div>
         </div>
 
+        <!-- ========== Settings Page ========== -->
+        <div id="page-settings" class="page hidden">
+            <div class="page-header">
+                <h2>⚙️ 设置</h2>
+            </div>
+            <div class="page-body">
+                <div style="display:grid;gap:clamp(16px,1.5vw,24px);max-width:640px">
+                    <!-- 密码设置 -->
+                    <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 Dashboard 密码</h3>
+                        <div id="settings-pw-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
+                        <div class="form-group" style="margin-bottom:10px">
+                            <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
+                            <input type="password" id="settings-pw-current" placeholder="输入当前密码">
+                        </div>
+                        <div class="form-group" style="margin-bottom:10px">
+                            <label style="font-size:.8rem;color:var(--t2)">新密码</label>
+                            <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)">
+                        </div>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label style="font-size:.8rem;color:var(--t2)">确认新密码</label>
+                            <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码">
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="changePassword()">更新密码</button>
+                    </div>
+
+                    <!-- CivitAI API Key -->
+                    <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🎨 CivitAI API Key</h3>
+                        <div id="settings-civitai-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
+                        <div class="form-group" style="margin-bottom:12px">
+                            <label style="font-size:.8rem;color:var(--t2)">API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
+                            <input type="text" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
+                        </div>
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-sm btn-primary" onclick="saveSettingsCivitaiKey()">保存</button>
+                            <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()">清除</button>
+                        </div>
+                    </div>
+
+                    <!-- 存储信息 -->
+                    <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                        <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">💾 配置存储</h3>
+                        <div style="font-size:.8rem;color:var(--t2);line-height:1.8">
+                            <div>📄 密码 & Session → <code style="color:var(--ac)">/workspace/.dashboard_env</code></div>
+                            <div>📄 CivitAI Key → <code style="color:var(--ac)">.civitai_config.json</code></div>
+                            <div>📄 同步偏好 → <code style="color:var(--ac)">/workspace/.sync_prefs.json</code></div>
+                            <div>📄 部署状态 → <code style="color:var(--ac)">/workspace/.setup_state.json</code></div>
+                            <div style="margin-top:8px;color:var(--t3)">所有配置持久化在 /workspace 目录, 重启不丢失</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /content -->
 
     <!-- Config Modal -->
@@ -1590,7 +1646,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=21"></script>
+    <script src="dashboard.js?v=22"></script>
 </body>
 
 </html>

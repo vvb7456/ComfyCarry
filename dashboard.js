@@ -33,6 +33,7 @@ function showPage(page) {
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
   else if (page === 'sync') { loadSyncPage(); startSyncAutoRefresh(); }
   else if (page === 'logs') loadLogs();
+  else if (page === 'settings') loadSettingsPage();
 }
 
 // ========== Utils ==========
@@ -1446,4 +1447,82 @@ function startSyncAutoRefresh() {
 }
 function stopSyncAutoRefresh() {
   if (syncAutoRefresh) { clearInterval(syncAutoRefresh); syncAutoRefresh = null; }
+}
+
+// ========== Settings Page ==========
+async function loadSettingsPage() {
+  try {
+    const r = await fetch('/api/settings');
+    const d = await r.json();
+    const pwStatus = document.getElementById('settings-pw-status');
+    if (pwStatus) {
+      pwStatus.textContent = d.password_set ? `当前密码: ${d.password_masked}` : '未设置密码 (无需登录)';
+    }
+    const civStatus = document.getElementById('settings-civitai-status');
+    if (civStatus) {
+      civStatus.textContent = d.civitai_key_set ? `已配置: ${d.civitai_key_masked}` : '未设置 API Key';
+    }
+  } catch (e) {
+    console.error('Failed to load settings:', e);
+  }
+}
+
+async function changePassword() {
+  const current = document.getElementById('settings-pw-current').value;
+  const newPw = document.getElementById('settings-pw-new').value;
+  const confirm = document.getElementById('settings-pw-confirm').value;
+  if (!current) return showToast('请输入当前密码');
+  if (!newPw) return showToast('请输入新密码');
+  if (newPw.length < 4) return showToast('密码至少 4 个字符');
+  if (newPw !== confirm) return showToast('两次输入的密码不一致');
+  try {
+    const r = await fetch('/api/settings/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current, new: newPw })
+    });
+    const d = await r.json();
+    if (!r.ok) return showToast(d.error || '修改失败');
+    showToast('✅ ' + d.message);
+    document.getElementById('settings-pw-current').value = '';
+    document.getElementById('settings-pw-new').value = '';
+    document.getElementById('settings-pw-confirm').value = '';
+    loadSettingsPage();
+  } catch (e) {
+    showToast('修改失败: ' + e.message);
+  }
+}
+
+async function saveSettingsCivitaiKey() {
+  const key = document.getElementById('settings-civitai-key').value.trim();
+  if (!key) return showToast('请输入 API Key');
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key })
+    });
+    const d = await r.json();
+    showToast(d.status === 'ok' ? '✅ API Key 已保存' : (d.error || '保存失败'));
+    document.getElementById('settings-civitai-key').value = '';
+    loadSettingsPage();
+    loadKeyStatus();
+  } catch (e) {
+    showToast('保存失败: ' + e.message);
+  }
+}
+
+async function clearSettingsCivitaiKey() {
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: '' })
+    });
+    showToast('✅ API Key 已清除');
+    loadSettingsPage();
+    loadKeyStatus();
+  } catch (e) {
+    showToast('清除失败: ' + e.message);
+  }
 }
