@@ -2238,11 +2238,15 @@ def index():
     if not _is_setup_complete():
         wizard_path = Path(__file__).parent / "setup_wizard.html"
         if wizard_path.exists():
-            return Response(wizard_path.read_text(encoding="utf-8"), mimetype="text/html")
+            resp = Response(wizard_path.read_text(encoding="utf-8"), mimetype="text/html")
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return resp
         return Response("<h1>setup_wizard.html not found</h1>", mimetype="text/html", status=404)
     html_path = Path(__file__).parent / "dashboard.html"
     if html_path.exists():
-        return Response(html_path.read_text(encoding="utf-8"), mimetype="text/html")
+        resp = Response(html_path.read_text(encoding="utf-8"), mimetype="text/html")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
     return Response("<h1>dashboard.html not found</h1>", mimetype="text/html", status=404)
 
 
@@ -2250,7 +2254,9 @@ def index():
 def serve_js():
     js_path = Path(__file__).parent / "dashboard.js"
     if js_path.exists():
-        return Response(js_path.read_text(encoding="utf-8"), mimetype="application/javascript")
+        resp = Response(js_path.read_text(encoding="utf-8"), mimetype="application/javascript")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
     return "", 404
 
 

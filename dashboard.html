@@ -1034,20 +1034,20 @@
             transition: border-color .2s, box-shadow .2s;
         }
         .tunnel-svc-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+            border-color: var(--ac);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 20%, transparent);
         }
         .tunnel-svc-icon { font-size: 1.3rem; }
         .tunnel-svc-name { font-weight: 600; font-size: .95rem; }
         .tunnel-svc-detail {
             font-size: .78rem;
-            color: var(--accent);
+            color: var(--ac);
             word-break: break-all;
         }
         .tunnel-svc-port {
             font-size: .72rem;
             color: var(--t3);
-            font-family: var(--mono);
+            font-family: 'IBM Plex Mono', monospace;
         }
         #tunnel-log-content {
             font-size: .78rem;
@@ -1056,7 +1056,7 @@
         }
         #tunnel-log-content .log-error { color: #e74c3c; }
         #tunnel-log-content .log-warn { color: #f39c12; }
-        #tunnel-log-content .log-info { color: var(--accent); }
+        #tunnel-log-content .log-info { color: var(--ac); }
 
         /* Cloud Sync Page */
         .sync-remotes-grid {
@@ -1118,8 +1118,8 @@
             transition: .3s;
         }
         .sync-toggle input:checked + .slider {
-            background: var(--accent);
-            border-color: var(--accent);
+            background: var(--ac);
+            border-color: var(--ac);
         }
         .sync-toggle input:checked + .slider::before {
             transform: translateX(20px);
@@ -1139,7 +1139,7 @@
         }
         .sync-storage-bar-fill {
             height: 100%;
-            background: var(--accent);
+            background: var(--ac);
             border-radius: 3px;
             transition: width .5s;
         }
@@ -1158,7 +1158,7 @@
             cursor: pointer;
         }
         .sync-checkbox input[type="checkbox"] {
-            accent-color: var(--accent);
+            accent-color: var(--ac);
             width: 16px;
             height: 16px;
         }
@@ -1178,7 +1178,7 @@
             padding: 12px;
             max-height: 450px;
             overflow-y: auto;
-            font-family: var(--mono);
+            font-family: 'IBM Plex Mono', monospace;
             font-size: .8rem;
             line-height: 1.7;
         }
@@ -1192,14 +1192,14 @@
             font-size: .72rem;
             margin-right: 6px;
         }
-        .sync-log-level-INFO { color: var(--accent); }
+        .sync-log-level-INFO { color: var(--ac); }
         .sync-log-level-STAT { color: var(--t2); font-size: .75rem; }
         .sync-log-level-ERROR { color: #e74c3c; }
         .rclone-config-editor {
             width: 100%;
             min-height: 250px;
             max-height: 400px;
-            font-family: var(--mono);
+            font-family: 'IBM Plex Mono', monospace;
             font-size: .78rem;
             line-height: 1.5;
             background: var(--bg3);
@@ -1698,7 +1698,7 @@
                         <div class="sync-import-option" style="margin-top:12px">
                             <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">粘贴 Base64 编码的 rclone.conf</label>
                             <div style="display:flex;gap:8px">
-                                <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:var(--mono);font-size:.75rem"></textarea>
+                                <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:'IBM Plex Mono', monospace;font-size:.75rem"></textarea>
                                 <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
                             </div>
                         </div>
