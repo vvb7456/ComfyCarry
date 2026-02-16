@@ -1187,7 +1187,6 @@ async function loadSyncPage() {
     grid.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">未检测到 rclone remote，请通过下方导入配置</div>';
   } else {
     grid.innerHTML = remotes.map(r => renderSyncRemoteCard(r, prefs)).join('');
-    loadSyncStorage(remotes);
   }
 
   // Log entries
@@ -1214,7 +1213,7 @@ function renderSyncRemoteCard(r, prefs) {
           onchange="updateSyncPref('r2','sync_wildcards',this.checked)"> 同步 Wildcards</label>
       </div>
       <div class="sync-storage-info" id="storage-${r.name}">
-        <span style="color:var(--t3);font-size:.75rem">容量信息加载中...</span>
+        <button class="btn btn-sm" style="font-size:.7rem;padding:2px 8px" onclick="refreshRemoteStorage('${r.name}')">🔄 查看容量</button>
       </div>
     </div>`;
   }
@@ -1242,44 +1241,55 @@ function renderSyncRemoteCard(r, prefs) {
       </label>
     </div>` : ''}
     <div class="sync-storage-info" id="storage-${r.name}">
-      <span style="color:var(--t3);font-size:.75rem">容量信息加载中...</span>
+      <button class="btn btn-sm" style="font-size:.7rem;padding:2px 8px" onclick="refreshRemoteStorage('${r.name}')">🔄 查看容量</button>
     </div>
   </div>`;
 }
 
-async function loadSyncStorage(remotes) {
+async function refreshRemoteStorage(name) {
+  const el = document.getElementById(`storage-${name}`);
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--t3);font-size:.75rem">查询中...</span>';
   try {
     const r = await fetch('/api/sync/storage');
     const d = await r.json();
     syncStorageCache = d.storage || {};
-    for (const remote of remotes) {
-      const el = document.getElementById(`storage-${remote.name}`);
-      if (!el) continue;
-      const info = syncStorageCache[remote.name];
-      if (!info) { el.innerHTML = '<span style="color:var(--t3);font-size:.75rem">—</span>'; continue; }
-      if (info.error) {
-        // R2 doesn't support "about", show just the type
-        if (remote.category === 'r2') {
-          el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">S3 对象存储 (不支持容量查询)</span>`;
-        } else {
-          el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">${info.error}</span>`;
-        }
-        continue;
-      }
-      const used = info.used || 0;
-      const total = info.total || 0;
-      const free = info.free || 0;
-      const pct = total > 0 ? (used / total * 100) : 0;
-      const barColor = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : 'var(--accent)';
-      el.innerHTML = `
-        <div>已用: ${fmtBytes(used)} / ${fmtBytes(total)}${free ? ` (剩余 ${fmtBytes(free)})` : ''}</div>
-        <div class="sync-storage-bar">
-          <div class="sync-storage-bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div>
-        </div>`;
-    }
+    const info = syncStorageCache[name];
+    if (!info) { renderStorageResult(el, name, null); return; }
+    renderStorageResult(el, name, info);
   } catch (e) {
-    // Silently fail, storage info is nice-to-have
+    el.innerHTML = `<span style="font-size:.75rem;color:#e74c3c">查询失败</span>
+      <button class="btn btn-sm" style="font-size:.7rem;padding:2px 8px;margin-left:8px" onclick="refreshRemoteStorage('${name}')">重试</button>`;
   }
+}
+
+function renderStorageResult(el, name, info) {
+  const refreshBtn = `<button class="btn btn-sm" style="font-size:.65rem;padding:1px 6px;margin-left:8px;vertical-align:middle" onclick="refreshRemoteStorage('${name}')">🔄</button>`;
+  if (!info) {
+    el.innerHTML = `<span style="color:var(--t3);font-size:.75rem">—</span>${refreshBtn}`;
+    return;
+  }
+  if (info.error) {
+    const msg = name.toLowerCase().includes('r2') || info.error.includes('not supported')
+      ? 'S3 对象存储 (不支持容量查询)' : info.error;
+    el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">${msg}</span>${refreshBtn}`;
+    return;
+  }
+  const used = info.used || 0;
+  const total = info.total || 0;
+  const free = info.free || 0;
+  const pct = total > 0 ? (used / total * 100) : 0;
+  const barColor = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : 'var(--accent)';
+  el.innerHTML = `
+    <div>已用: ${fmtBytes(used)} / ${fmtBytes(total)}${free ? ` (剩余 ${fmtBytes(free)})` : ''}${refreshBtn}</div>
+    <div class="sync-storage-bar">
+      <div class="sync-storage-bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div>
+    </div>`;
+}
+
+// Legacy wrapper for batch refresh
+async function loadSyncStorage(remotes) {
+  for (const r of remotes) refreshRemoteStorage(r.name);
 }
 
 function renderSyncLog(entries) {
