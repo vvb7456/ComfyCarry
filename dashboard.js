@@ -1167,6 +1167,7 @@ async function loadSyncPage() {
 
   const status = statusR.status === 'fulfilled' ? statusR.value : {};
   const remotesData = remotesR.status === 'fulfilled' ? remotesR.value : {};
+  const prefs = status.prefs || remotesData.prefs || {};
 
   // Status badge
   const st = status.status || 'unknown';
@@ -1179,39 +1180,71 @@ async function loadSyncPage() {
       </div>
     </div>`;
 
-  // Remote cards
+  // Render structured remote cards
   const remotes = remotesData.remotes || [];
-  const enabled = status.enabled_remotes || {};
   const grid = document.getElementById('sync-remotes-grid');
   if (remotes.length === 0) {
-    grid.innerHTML = '<div style="color:var(--t3);font-size:.85rem">未检测到 rclone remote 配置</div>';
+    grid.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">未检测到 rclone remote，请通过下方导入配置</div>';
   } else {
-    grid.innerHTML = remotes.map(r => {
-      const isSync = r.category === 'onedrive' || r.category === 'gdrive';
-      const isEnabled = enabled[r.category] || false;
-      const toggleHtml = isSync ? `
-        <label class="sync-toggle">
-          <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleSyncRemote('${r.name}', this.checked)">
-          <span class="slider"></span>
-        </label>` : '<span class="sync-remote-type">拉取源</span>';
-
-      return `<div class="sync-remote-card">
-        <div class="sync-remote-header">
-          <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name}</span></div>
-          ${toggleHtml}
-        </div>
-        <div class="sync-storage-info" id="storage-${r.name}">
-          <span style="color:var(--t3);font-size:.75rem">容量信息加载中...</span>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Load storage info async (can be slow)
+    grid.innerHTML = remotes.map(r => renderSyncRemoteCard(r, prefs)).join('');
     loadSyncStorage(remotes);
   }
 
   // Log entries
   renderSyncLog(status.entries || []);
+}
+
+function renderSyncRemoteCard(r, prefs) {
+  const p = prefs[r.category] || {};
+  const authIcon = r.has_auth ? '✅ 已认证' : '⚠️ 未配置';
+
+  if (r.category === 'r2') {
+    return `<div class="sync-remote-card">
+      <div class="sync-remote-header">
+        <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name}</span></div>
+        <span style="font-size:.75rem;color:var(--t3)">${authIcon}</span>
+      </div>
+      <div style="font-size:.78rem;color:var(--t2);margin:8px 0">部署时从 R2 拉取资产到本地</div>
+      <div class="sync-settings">
+        <label class="sync-checkbox"><input type="checkbox" ${p.sync_workflows !== false ? 'checked' : ''}
+          onchange="updateSyncPref('r2','sync_workflows',this.checked)"> 同步工作流 (workflows)</label>
+        <label class="sync-checkbox"><input type="checkbox" ${p.sync_loras !== false ? 'checked' : ''}
+          onchange="updateSyncPref('r2','sync_loras',this.checked)"> 同步 LoRA</label>
+        <label class="sync-checkbox"><input type="checkbox" ${p.sync_wildcards !== false ? 'checked' : ''}
+          onchange="updateSyncPref('r2','sync_wildcards',this.checked)"> 同步 Wildcards</label>
+      </div>
+      <div class="sync-storage-info" id="storage-${r.name}">
+        <span style="color:var(--t3);font-size:.75rem">容量信息加载中...</span>
+      </div>
+    </div>`;
+  }
+
+  const isOutputSync = r.category === 'onedrive' || r.category === 'gdrive';
+  const isEnabled = p.enabled || false;
+  const dest = p.destination || 'ComfyUI_Transfer';
+
+  return `<div class="sync-remote-card">
+    <div class="sync-remote-header">
+      <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name}</span></div>
+      ${isOutputSync ? `<label class="sync-toggle">
+        <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="updateSyncPref('${r.category}','enabled',this.checked)">
+        <span class="slider"></span>
+      </label>` : ''}
+    </div>
+    <div style="font-size:.78rem;color:var(--t2);margin:4px 0">${authIcon}</div>
+    ${isOutputSync ? `
+    <div style="font-size:.78rem;color:var(--t2);margin:8px 0">运行时自动上传 ComfyUI 输出</div>
+    <div class="sync-settings">
+      <label style="font-size:.78rem;color:var(--t2);display:flex;align-items:center;gap:6px">
+        目标文件夹:
+        <input type="text" value="${escHtml(dest)}" style="width:180px;font-size:.78rem"
+          onchange="updateSyncPref('${r.category}','destination',this.value)">
+      </label>
+    </div>` : ''}
+    <div class="sync-storage-info" id="storage-${r.name}">
+      <span style="color:var(--t3);font-size:.75rem">容量信息加载中...</span>
+    </div>
+  </div>`;
 }
 
 async function loadSyncStorage(remotes) {
@@ -1263,21 +1296,22 @@ function renderSyncLog(entries) {
   el.scrollTop = el.scrollHeight;
 }
 
-async function toggleSyncRemote(name, enabled) {
+async function updateSyncPref(category, key, value) {
   try {
     const r = await fetch('/api/sync/toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ remote: name, enabled })
+      body: JSON.stringify({ category, updates: { [key]: value } })
     });
     const d = await r.json();
     if (d.ok) {
-      showToast(d.message);
-      setTimeout(loadSyncPage, 2000);
+      showToast(d.message || '设置已更新');
+      if (key === 'enabled') setTimeout(loadSyncPage, 2000);
     } else {
       showToast('操作失败: ' + (d.error || '未知错误'));
+      loadSyncPage();
     }
-  } catch (e) { showToast('切换失败: ' + e.message); }
+  } catch (e) { showToast('更新失败: ' + e.message); }
 }
 
 async function restartSync() {
@@ -1296,6 +1330,55 @@ async function toggleRcloneConfig() {
   if (!box.classList.contains('hidden') && !rcloneConfigLoaded) {
     await loadRcloneConfig();
   }
+}
+
+function toggleImportConfig() {
+  const box = document.getElementById('import-config-box');
+  box.classList.toggle('hidden');
+}
+
+async function importConfigFromUrl() {
+  const url = document.getElementById('import-url').value.trim();
+  if (!url) { showToast('请输入 URL'); return; }
+  showToast('正在从 URL 导入...');
+  try {
+    const r = await fetch('/api/sync/import_config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'url', value: url })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(d.message || '导入成功');
+      document.getElementById('import-url').value = '';
+      rcloneConfigLoaded = false;
+      setTimeout(loadSyncPage, 1000);
+    } else {
+      showToast('导入失败: ' + (d.error || '未知'));
+    }
+  } catch (e) { showToast('导入失败: ' + e.message); }
+}
+
+async function importConfigFromBase64() {
+  const b64 = document.getElementById('import-base64').value.trim();
+  if (!b64) { showToast('请输入 base64 编码内容'); return; }
+  showToast('正在解码并导入...');
+  try {
+    const r = await fetch('/api/sync/import_config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'base64', value: b64 })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(d.message || '导入成功');
+      document.getElementById('import-base64').value = '';
+      rcloneConfigLoaded = false;
+      setTimeout(loadSyncPage, 1000);
+    } else {
+      showToast('导入失败: ' + (d.error || '未知'));
+    }
+  } catch (e) { showToast('导入失败: ' + e.message); }
 }
 
 async function loadRcloneConfig() {

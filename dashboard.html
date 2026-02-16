@@ -1143,6 +1143,34 @@
             border-radius: 3px;
             transition: width .5s;
         }
+        .sync-settings {
+            margin: 8px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .sync-checkbox {
+            font-size: .8rem;
+            color: var(--t2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .sync-checkbox input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: 16px;
+            height: 16px;
+        }
+        .sync-import-row {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px;
+        }
+        .sync-import-option label {
+            font-weight: 500;
+        }
         .sync-log-box {
             background: var(--bg3);
             border: 1px solid var(--bd);
@@ -1448,22 +1476,41 @@
                 <div id="sync-status-badge"></div>
 
                 <!-- 存储 Remote 卡片 -->
-                <div class="section-title" style="margin-top:16px">💾 存储服务</div>
+                <div class="section-title" style="margin-top:16px">💾 存储服务配置</div>
                 <div id="sync-remotes-grid" class="sync-remotes-grid">
                     <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
                 </div>
 
-                <!-- Rclone 配置 -->
+                <!-- 导入配置 -->
                 <div class="section-title" style="margin-top:24px">
-                    ⚙️ Rclone 配置
-                    <button class="btn btn-sm" style="margin-left:8px;font-size:.72rem" onclick="toggleRcloneConfig()">编辑配置</button>
+                    📥 导入 Rclone 配置
+                    <button class="btn btn-sm" style="margin-left:8px;font-size:.72rem" onclick="toggleImportConfig()">展开</button>
                 </div>
-                <div id="rclone-config-box" class="hidden">
-                    <textarea id="rclone-config-content" class="rclone-config-editor" spellcheck="false" placeholder="加载中..."></textarea>
-                    <div style="display:flex;gap:8px;margin-top:8px">
-                        <button class="btn btn-sm btn-primary" onclick="saveRcloneConfig()">💾 保存配置</button>
-                        <button class="btn btn-sm" onclick="loadRcloneConfig()">🔄 重新加载</button>
-                        <span id="rclone-save-status" style="font-size:.78rem;color:var(--t3);align-self:center"></span>
+                <div id="import-config-box" class="hidden" style="margin-top:8px">
+                    <div class="sync-import-row">
+                        <div class="sync-import-option">
+                            <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">从 URL 导入 rclone.conf</label>
+                            <div style="display:flex;gap:8px">
+                                <input type="text" id="import-url" placeholder="https://example.com/rclone.conf" style="flex:1">
+                                <button class="btn btn-sm btn-primary" onclick="importConfigFromUrl()">导入</button>
+                            </div>
+                        </div>
+                        <div class="sync-import-option" style="margin-top:12px">
+                            <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">粘贴 Base64 编码的 rclone.conf</label>
+                            <div style="display:flex;gap:8px">
+                                <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:var(--mono);font-size:.75rem"></textarea>
+                                <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
+                            </div>
+                        </div>
+                        <div class="sync-import-option" style="margin-top:12px">
+                            <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">直接编辑 rclone.conf</label>
+                            <textarea id="rclone-config-content" class="rclone-config-editor" spellcheck="false" placeholder="点击加载..."></textarea>
+                            <div style="display:flex;gap:8px;margin-top:6px">
+                                <button class="btn btn-sm" onclick="loadRcloneConfig()">加载当前配置</button>
+                                <button class="btn btn-sm btn-primary" onclick="saveRcloneConfig()">💾 保存</button>
+                                <span id="rclone-save-status" style="font-size:.78rem;color:var(--t3);align-self:center"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1543,7 +1590,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=18"></script>
+    <script src="dashboard.js?v=19"></script>
 </body>
 
 </html>

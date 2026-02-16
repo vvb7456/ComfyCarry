@@ -849,6 +849,36 @@ def api_tunnel_status():
 # ====================================================================
 RCLONE_CONF = Path.home() / ".config" / "rclone" / "rclone.conf"
 CLOUD_SYNC_SCRIPT = Path("/workspace/cloud_sync.sh")
+SYNC_PREFS_FILE = Path("/workspace/.sync_prefs.json")
+
+
+def _load_sync_prefs():
+    """加载同步偏好设置"""
+    defaults = {
+        "r2": {"enabled": True, "sync_workflows": True, "sync_loras": True, "sync_wildcards": True},
+        "onedrive": {"enabled": True, "destination": "ComfyUI_Transfer"},
+        "gdrive": {"enabled": False, "destination": "ComfyUI_Transfer"},
+    }
+    if SYNC_PREFS_FILE.exists():
+        try:
+            prefs = json.loads(SYNC_PREFS_FILE.read_text(encoding="utf-8"))
+            # Merge with defaults
+            for k, v in defaults.items():
+                if k not in prefs:
+                    prefs[k] = v
+                else:
+                    for dk, dv in v.items():
+                        if dk not in prefs[k]:
+                            prefs[k][dk] = dv
+            return prefs
+        except Exception:
+            pass
+    return defaults
+
+
+def _save_sync_prefs(prefs):
+    """保存同步偏好设置"""
+    SYNC_PREFS_FILE.write_text(json.dumps(prefs, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _parse_rclone_conf():
     """解析 rclone.conf 返回 remote 列表"""
@@ -862,34 +892,23 @@ def _parse_rclone_conf():
         if m:
             if current:
                 remotes.append(current)
-            current = {"name": m.group(1), "type": "", "params": {}}
+            current = {"name": m.group(1), "type": "", "params": {},
+                        "_has_token": False, "_has_keys": False}
         elif current and '=' in line:
             k, v = line.split('=', 1)
             k, v = k.strip(), v.strip()
             if k == "type":
                 current["type"] = v
+            if k == "token" and v:
+                current["_has_token"] = True
+            if k == "access_key_id" and v:
+                current["_has_keys"] = True
             # 不要暴露敏感 token
             if k not in ("token", "access_key_id", "secret_access_key", "refresh_token"):
                 current["params"][k] = v
     if current:
         remotes.append(current)
     return remotes
-
-
-def _get_sync_script_remotes():
-    """从 cloud_sync.sh 中解析当前启用的 remote 目标"""
-    enabled = {"onedrive": False, "gdrive": False}
-    if not CLOUD_SYNC_SCRIPT.exists():
-        return enabled
-    content = CLOUD_SYNC_SCRIPT.read_text(encoding="utf-8")
-    # 查找 rclone move 行中的 remote 名称
-    for m in re.finditer(r'rclone\s+move\s+"?\$\{?SOURCE_DIR\}?"?\s+"?(\w+):([^"]+)"?', content):
-        remote = m.group(1)
-        if remote.lower() in enabled or "onedrive" in remote.lower():
-            enabled[remote.lower()] = True
-        elif "drive" in remote.lower() or "gdrive" in remote.lower():
-            enabled["gdrive"] = True
-    return enabled
 
 
 def _parse_sync_log_entries(raw_log, max_entries=100):
@@ -1002,40 +1021,46 @@ def api_sync_status():
     except Exception:
         entries = []
 
-    # 当前脚本中启用的 remote
-    script_remotes = _get_sync_script_remotes()
+    # 当前同步偏好
+    prefs = _load_sync_prefs()
 
     return jsonify({
         "status": status,
         "entries": entries,
-        "enabled_remotes": script_remotes
+        "prefs": prefs
     })
 
 
 @app.route("/api/sync/remotes")
 def api_sync_remotes():
-    """列出 rclone 配置的 remote（隐藏敏感信息）"""
+    """列出 rclone 配置的 remote，包含同步偏好"""
     remotes = _parse_rclone_conf()
-    # 分类
+    prefs = _load_sync_prefs()
     for r in remotes:
         t = r["type"]
         if t == "s3":
             r["category"] = "r2"
             r["display_name"] = "Cloudflare R2"
             r["icon"] = "☁️"
+            r["prefs"] = prefs.get("r2", {})
         elif "onedrive" in t:
             r["category"] = "onedrive"
             r["display_name"] = "OneDrive"
             r["icon"] = "📁"
+            r["prefs"] = prefs.get("onedrive", {})
         elif t == "drive":
             r["category"] = "gdrive"
             r["display_name"] = "Google Drive"
             r["icon"] = "📂"
+            r["prefs"] = prefs.get("gdrive", {})
         else:
             r["category"] = "other"
             r["display_name"] = r["name"]
             r["icon"] = "💾"
-    return jsonify({"remotes": remotes})
+            r["prefs"] = {}
+        # Auth status — check if token/keys exist
+        r["has_auth"] = bool(r.get("_has_token") or r.get("_has_keys"))
+    return jsonify({"remotes": remotes, "prefs": prefs})
 
 
 @app.route("/api/sync/storage")
@@ -1069,40 +1094,30 @@ def api_sync_storage():
 
 @app.route("/api/sync/toggle", methods=["POST"])
 def api_sync_toggle():
-    """启用/禁用某个 remote 的输出同步，并重新生成 cloud_sync.sh"""
+    """更新同步偏好设置"""
     data = request.get_json(force=True)
-    remote_name = data.get("remote", "")
-    enabled = data.get("enabled", True)
+    category = data.get("category", "")  # r2, onedrive, gdrive
+    updates = data.get("updates", {})    # e.g. {"enabled": true, "sync_loras": false}
 
-    if not CLOUD_SYNC_SCRIPT.exists():
-        return jsonify({"error": "cloud_sync.sh 不存在"}), 404
+    prefs = _load_sync_prefs()
+    if category not in prefs:
+        prefs[category] = {}
+    prefs[category].update(updates)
+    _save_sync_prefs(prefs)
 
-    # 读取 rclone 配置确认 remote 存在
-    remotes = {r["name"]: r for r in _parse_rclone_conf()}
-    if remote_name not in remotes:
-        return jsonify({"error": f"Remote '{remote_name}' 不存在"}), 400
+    # 如果是 output sync 相关的变更，重新生成 cloud_sync.sh
+    if category in ("onedrive", "gdrive") and "enabled" in updates:
+        remotes = {r["name"]: r for r in _parse_rclone_conf()}
+        _regenerate_sync_script(remotes, prefs)
+        subprocess.run("pm2 restart sync 2>/dev/null", shell=True, timeout=10)
 
-    # 生成新的 cloud_sync.sh
-    _regenerate_sync_script(remotes, remote_name, enabled)
-
-    # 重启 sync 服务
-    subprocess.run("pm2 restart sync 2>/dev/null", shell=True, timeout=10)
-
-    return jsonify({"ok": True, "message": f"{'启用' if enabled else '禁用'} {remote_name} 同步，服务已重启"})
+    return jsonify({"ok": True, "message": "设置已保存", "prefs": prefs})
 
 
-def _regenerate_sync_script(remotes, toggle_remote, toggle_enabled):
-    """重新生成 cloud_sync.sh，控制哪些 remote 参与输出同步"""
-    # 解析当前脚本中启用的 remote
-    current = _get_sync_script_remotes()
-
-    # 应用 toggle
-    if toggle_remote.lower() in current:
-        current[toggle_remote.lower()] = toggle_enabled
-    elif "onedrive" in toggle_remote.lower():
-        current["onedrive"] = toggle_enabled
-    elif "drive" in toggle_remote.lower():
-        current["gdrive"] = toggle_enabled
+def _regenerate_sync_script(remotes, prefs):
+    """重新生成 cloud_sync.sh，根据偏好设置控制哪些 remote 参与输出同步"""
+    onedrive_enabled = prefs.get("onedrive", {}).get("enabled", False)
+    gdrive_enabled = prefs.get("gdrive", {}).get("enabled", False)
 
     # 找到实际 remote 名称
     onedrive_name = ""
@@ -1113,20 +1128,23 @@ def _regenerate_sync_script(remotes, toggle_remote, toggle_enabled):
         elif r["type"] == "drive" or "gdrive" in name.lower():
             gdrive_name = name
 
+    od_dest = prefs.get("onedrive", {}).get("destination", "ComfyUI_Transfer")
+    gd_dest = prefs.get("gdrive", {}).get("destination", "ComfyUI_Transfer")
+
     # 构建 sync 块
     sync_blocks = []
-    if current.get("onedrive") and onedrive_name:
+    if onedrive_enabled and onedrive_name:
         sync_blocks.append(f'''        # OneDrive 同步
-        rclone move "$SOURCE_DIR" "{onedrive_name}:ComfyUI_Transfer" \\
+        rclone move "$SOURCE_DIR" "{onedrive_name}:{od_dest}" \\
             --min-age "30s" \\
             --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
             --filter "- .*/**" \\
             --filter "- *" \\
             --transfers 4 -v && echo "[$TIME] OneDrive sync completed"''')
 
-    if current.get("gdrive") and gdrive_name:
+    if gdrive_enabled and gdrive_name:
         sync_blocks.append(f'''        # Google Drive 同步
-        rclone move "$SOURCE_DIR" "{gdrive_name}:ComfyUI_Transfer" \\
+        rclone move "$SOURCE_DIR" "{gdrive_name}:{gd_dest}" \\
             --min-age "30s" \\
             --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
             --filter "- .*/**" \\
@@ -1136,9 +1154,9 @@ def _regenerate_sync_script(remotes, toggle_remote, toggle_enabled):
     # 生成启用信息
     info_lines = []
     if onedrive_name:
-        info_lines.append(f'echo "  OneDrive: {onedrive_name} ({("启用" if current.get("onedrive") else "禁用")})"')
+        info_lines.append(f'echo "  OneDrive: {onedrive_name} ({"启用" if onedrive_enabled else "禁用"})"')
     if gdrive_name:
-        info_lines.append(f'echo "  Google Drive: {gdrive_name} ({("启用" if current.get("gdrive") else "禁用")})"')
+        info_lines.append(f'echo "  Google Drive: {gdrive_name} ({"启用" if gdrive_enabled else "禁用"})"')
 
     script = f'''#!/bin/bash
 SOURCE_DIR="/workspace/ComfyUI/output"
@@ -1204,6 +1222,53 @@ def api_save_rclone_config():
         remotes = []
 
     return jsonify({"ok": True, "message": f"配置已保存，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
+
+
+@app.route("/api/sync/import_config", methods=["POST"])
+def api_import_config():
+    """从 URL 或 base64 导入 rclone.conf"""
+    import base64
+    data = request.get_json(force=True)
+    import_type = data.get("type", "")
+    value = data.get("value", "")
+
+    config_text = ""
+    if import_type == "url" and value:
+        try:
+            resp = requests.get(value, timeout=15)
+            resp.raise_for_status()
+            config_text = resp.text
+        except Exception as e:
+            return jsonify({"error": f"下载失败: {e}"}), 400
+    elif import_type == "base64" and value:
+        try:
+            config_text = base64.b64decode(value).decode("utf-8")
+        except Exception as e:
+            return jsonify({"error": f"Base64 解码失败: {e}"}), 400
+    else:
+        return jsonify({"error": "请提供 type (url/base64) 和 value"}), 400
+
+    # 验证
+    sections = re.findall(r'^\[.+\]', config_text, re.MULTILINE)
+    if not sections:
+        return jsonify({"error": "导入的内容不是有效的 rclone 配置"}), 400
+
+    # 备份 + 写入
+    if RCLONE_CONF.exists():
+        backup = RCLONE_CONF.with_suffix('.conf.bak')
+        backup.write_text(RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
+    RCLONE_CONF.parent.mkdir(parents=True, exist_ok=True)
+    RCLONE_CONF.write_text(config_text, encoding="utf-8")
+    RCLONE_CONF.chmod(0o600)
+
+    # 列出 remotes
+    try:
+        r = subprocess.run("rclone listremotes 2>&1", shell=True, capture_output=True, text=True, timeout=5)
+        remotes = [l.strip().rstrip(':') for l in r.stdout.strip().split('\n') if l.strip()]
+    except Exception:
+        remotes = []
+
+    return jsonify({"ok": True, "message": f"导入成功，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
 
 
 # ====================================================================
