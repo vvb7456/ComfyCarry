@@ -1243,7 +1243,7 @@ let comfyAutoRefresh = null;
 let _comfyParamsSchema = null;
 
 async function loadComfyUIPage() {
-  await Promise.all([loadComfyStatus(), loadComfyQueue(), loadComfyHistory(), loadComfyParams(), loadComfyLogs()]);
+  await Promise.all([loadComfyStatus(), loadComfyQueue(), loadComfyParams(), loadComfyLogs()]);
 }
 
 async function loadComfyStatus() {
@@ -1326,38 +1326,6 @@ async function loadComfyQueue() {
   }
 }
 
-async function loadComfyHistory() {
-  const el = document.getElementById('comfyui-recent-images');
-  try {
-    const r = await fetch('/api/comfyui/history?max_items=10');
-    const d = await r.json();
-    const items = d.history || [];
-    if (items.length === 0) {
-      el.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">暂无生成记录</div>';
-      return;
-    }
-    let html = '';
-    for (const item of items) {
-      for (const img of (item.images || [])) {
-        // Skip temp images (preview buffers, may be already deleted)
-        if (img.type === 'temp') continue;
-        const params = new URLSearchParams({
-          filename: img.filename,
-          subfolder: img.subfolder || '',
-          type: img.type || 'output'
-        });
-        const thumbUrl = `/api/comfyui/view?${params.toString()}&preview=${encodeURIComponent('webp;80')}`;
-        const fullUrl = `/api/comfyui/view?${params.toString()}`;
-        html += `<img src="${thumbUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy"
-          onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='${fullUrl}'}else{this.style.display='none'}">`;
-      }
-    }
-    el.innerHTML = html || '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">暂无图片输出</div>';
-  } catch (e) {
-    el.innerHTML = `<div style="color:var(--t3);font-size:.85rem">加载失败</div>`;
-  }
-}
-
 async function loadComfyParams() {
   const el = document.getElementById('comfyui-params-form');
   try {
@@ -1389,7 +1357,6 @@ async function loadComfyParams() {
         html += `<label class="comfy-param-toggle">
           <input type="checkbox" id="cparam-${key}" data-param="${key}" ${schema.value ? 'checked' : ''}>
           <span class="comfy-toggle-slider"></span>
-          <span style="font-size:.82rem;color:var(--t2)">${schema.value ? '已启用' : '已禁用'}</span>
         </label>`;
       } else if (schema.type === 'number') {
         html += `<label>${escHtml(schema.label)}${helpIcon}</label>`;
