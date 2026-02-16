@@ -1264,6 +1264,41 @@
             transform: scale(1.08)
         }
 
+        /* Scroll-to-top FAB */
+        .scroll-top-fab {
+            position: fixed;
+            bottom: clamp(20px, 2vw, 32px);
+            right: clamp(20px, 2vw, 32px);
+            width: clamp(40px, 3vw, 52px);
+            height: clamp(40px, 3vw, 52px);
+            border-radius: 50%;
+            background: var(--ac);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: clamp(16px, 1.2vw, 22px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 12px rgba(124, 92, 252, .4);
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+            transition: opacity .25s, transform .25s;
+            z-index: 900
+        }
+
+        .scroll-top-fab.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto
+        }
+
+        .scroll-top-fab:hover {
+            background: var(--ach);
+            transform: translateY(-2px)
+        }
+
         @media(max-width:768px) {
             .sidebar {
                 display: none
@@ -1300,7 +1335,6 @@
             <div class="nav-item" data-page="models" onclick="showPage('models')"><span class="icon">🎨</span>模型管理</div>
             <div class="nav-item" data-page="civitai" onclick="showPage('civitai')"><span class="icon">🔍</span>CivitAI
                 搜索</div>
-            <div class="nav-item" data-page="downloads" onclick="showPage('downloads')"><span class="icon">📥</span>下载管理</div>
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span>Tunnel</div>
             <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span>Cloud Sync</div>
             <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span>设置</div>
@@ -1346,27 +1380,41 @@
             </div>
         </div>
 
-        <!-- ========== Models Page ========== -->
+        <!-- ========== Models Page (unified: local + downloads) ========== -->
         <div id="page-models" class="page hidden">
             <div class="page-header">
-                <h2>🎨 本地模型管理</h2>
-                <div style="display:flex;gap:8px;align-items:center">
-                    <select id="model-category" onchange="loadLocalModels()" style="width:auto;min-width:140px">
-                        <option value="all">全部类型</option>
-                        <option value="checkpoints">Checkpoints</option>
-                        <option value="loras">LoRA</option>
-                        <option value="controlnet">ControlNet</option>
-                        <option value="vae">VAE</option>
-                        <option value="upscale_models">Upscale</option>
-                        <option value="embeddings">Embeddings</option>
-                    </select>
-                    <button class="btn btn-sm" onclick="loadLocalModels()">🔄 刷新</button>
-                    <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">📥 全部获取信息</button>
-                </div>
+                <h2>🎨 模型管理</h2>
             </div>
             <div class="page-body">
-                <div id="local-models-status"></div>
-                <div id="local-models-grid" class="model-grid"></div>
+                <div class="tabs">
+                    <div class="tab active" data-mtab="local" onclick="switchModelTab('local')">📦 本地模型</div>
+                    <div class="tab" data-mtab="downloads" onclick="switchModelTab('downloads')">📥 下载管理</div>
+                </div>
+                <!-- Local Models Tab -->
+                <div id="mtab-local">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                        <select id="model-category" onchange="loadLocalModels()" style="width:auto;min-width:140px">
+                            <option value="all">全部类型</option>
+                            <option value="checkpoints">Checkpoints</option>
+                            <option value="loras">LoRA</option>
+                            <option value="controlnet">ControlNet</option>
+                            <option value="vae">VAE</option>
+                            <option value="upscale_models">Upscale</option>
+                            <option value="embeddings">Embeddings</option>
+                        </select>
+                        <button class="btn btn-sm" onclick="loadLocalModels()">🔄 刷新</button>
+                        <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">📥 全部获取信息</button>
+                    </div>
+                    <div id="local-models-status"></div>
+                    <div id="local-models-grid" class="model-grid"></div>
+                </div>
+                <!-- Downloads Tab -->
+                <div id="mtab-downloads" class="hidden">
+                    <div style="margin-bottom:12px">
+                        <button class="btn btn-sm" onclick="refreshDownloadStatus()">🔄 刷新</button>
+                    </div>
+                    <div id="dl-status-content"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
+                </div>
             </div>
         </div>
 
@@ -1435,17 +1483,6 @@
                 <div id="ctab-cart" class="hidden">
                     <div id="cart-content"></div>
                 </div>
-            </div>
-        </div>
-
-        <!-- ========== Downloads Page ========== -->
-        <div id="page-downloads" class="page hidden">
-            <div class="page-header">
-                <h2>📥 下载管理</h2>
-                <button class="btn btn-sm" onclick="refreshDownloadStatus()">🔄 刷新</button>
-            </div>
-            <div class="page-body">
-                <div id="dl-status-content"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
             </div>
         </div>
 
@@ -1627,10 +1664,13 @@
     <div class="modal-overlay" id="img-modal" onclick="this.classList.remove('active')"><img id="modal-img" src=""
             style="max-width:90vw;max-height:90vh;border-radius:var(--r);object-fit:contain"></div>
 
+    <!-- Scroll-to-top FAB -->
+    <button class="scroll-top-fab" id="scroll-top-fab" onclick="document.querySelector('.content').scrollTo({top:0,behavior:'smooth'})" title="返回顶部">↑</button>
+
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=24"></script>
+    <script src="dashboard.js?v=25"></script>
 </body>
 
 </html>

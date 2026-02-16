@@ -18,6 +18,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadCartFromStorage();
   updateCartBadge();
   showPage('dashboard');
+
+  // Scroll-to-top FAB visibility
+  const content = document.querySelector('.content');
+  const fab = document.getElementById('scroll-top-fab');
+  if (content && fab) {
+    content.addEventListener('scroll', () => {
+      fab.classList.toggle('visible', content.scrollTop > 300);
+    });
+  }
 });
 
 // ========== Navigation ==========
@@ -29,10 +38,19 @@ function showPage(page) {
   if (page === 'dashboard') refreshDashboard();
   else { stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); if (page === 'models') loadLocalModels(); }
   if (page === 'civitai') { loadFacets(); }
-  else if (page === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
   else if (page === 'sync') { loadSyncPage(); startSyncAutoRefresh(); }
   else if (page === 'settings') loadSettingsPage();
+}
+
+let currentModelTab = 'local';
+function switchModelTab(tab) {
+  currentModelTab = tab;
+  document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
+  document.getElementById('mtab-local').classList.toggle('hidden', tab !== 'local');
+  document.getElementById('mtab-downloads').classList.toggle('hidden', tab !== 'downloads');
+  if (tab === 'local') loadLocalModels();
+  else if (tab === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
 }
 
 // ========== Utils ==========
@@ -836,6 +854,12 @@ function renderCart() {
   }
   html += '</tbody></table>';
 
+  // Batch download button
+  html += `<div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+    <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()">📥 一键下载全部 (${selectedModels.size})</button>
+    <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空购物车?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderCart();}">🗑️ 清空购物车</button>
+  </div>`;
+
   // Live ID textarea
   const ids = [...selectedModels.keys()].join(', ');
   html += `<div style="margin-top:16px">
@@ -893,6 +917,29 @@ function syncCartFromTextarea(el) {
 }
 
 function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderCart(); }
+
+async function batchDownloadCart() {
+  if (selectedModels.size === 0) return showToast('购物车为空');
+  const total = selectedModels.size;
+  showToast(`📥 开始批量下载 ${total} 个模型...`);
+  let ok = 0, fail = 0;
+  for (const [id, m] of selectedModels) {
+    const modelType = (m.type || 'Checkpoint').toLowerCase();
+    const versionId = m.versionId || null;
+    try {
+      const payload = { model_id: id, model_type: modelType };
+      if (versionId) payload.version_id = versionId;
+      const r = await fetch('/api/download', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.error) { fail++; } else { ok++; }
+    } catch (e) { fail++; }
+  }
+  showToast(`✅ 批量下载: ${ok} 个已提交${fail > 0 ? `, ${fail} 个失败` : ''}`);
+}
+
 function updateCartBadge() {
   const b = document.getElementById('cart-badge');
   b.textContent = selectedModels.size;
