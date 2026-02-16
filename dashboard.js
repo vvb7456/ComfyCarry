@@ -148,6 +148,7 @@ function renderMetaContent(data) {
       let imgUrl = '';
       if (img.url) {
         if (img.url.startsWith('http')) imgUrl = img.url;
+        else if (img.url.startsWith('/')) imgUrl = img.url;  // local preview path
         else imgUrl = `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${img.url}/width=450/default.jpg`;
       }
       const fullUrl = imgUrl ? imgUrl.replace('/width=450', '') : '';
@@ -694,7 +695,7 @@ function renderCivitCard(h) {
   return `<div class="model-card">
     <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt=""
       onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')"
-      style="cursor:zoom-in" onerror="this.style.display='none'" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+      style="cursor:zoom-in" onerror="if(!this.dataset.retry&&'${fullUrl}'){this.dataset.retry='1';this.src='${fullUrl}'}else{this.style.display='none'}" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
