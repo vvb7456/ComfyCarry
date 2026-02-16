@@ -9,28 +9,28 @@
     --bg1: #0a0a0f; --bg2: #12121e; --bg3: #1a1a28; --bg4: #22223a;
     --bd: #2a2a3e; --t1: #e8e8f0; --t2: #a8a8c0; --t3: #68688a;
     --accent: #7c5cfc; --accent2: #9078ff; --green: #4ade80; --red: #f87171;
-    --r: 10px; --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --r: 12px; --mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); color: var(--t1); min-height: 100vh; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); color: var(--t1); min-height: 100vh; font-size: clamp(15px, 1vw, 18px); }
 
 .wizard-container {
-    max-width: 720px; margin: 0 auto; padding: 40px 20px;
+    max-width: 960px; margin: 0 auto; padding: clamp(24px, 4vw, 60px) clamp(16px, 3vw, 40px);
 }
 .wizard-header {
-    text-align: center; margin-bottom: 32px;
+    text-align: center; margin-bottom: clamp(24px, 3vw, 48px);
 }
 .wizard-header h1 {
-    font-size: 1.8rem; font-weight: 700;
+    font-size: clamp(1.6rem, 2.5vw, 2.4rem); font-weight: 700;
     background: linear-gradient(135deg, #7c5cfc, #e879f9);
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
-.wizard-header p { color: var(--t3); font-size: .85rem; margin-top: 6px; }
+.wizard-header p { color: var(--t3); font-size: clamp(0.85rem, 1vw, 1.05rem); margin-top: 8px; }
 
 /* Progress bar */
-.progress-bar { display: flex; gap: 4px; margin-bottom: 32px; }
+.progress-bar { display: flex; gap: 6px; margin-bottom: clamp(24px, 3vw, 40px); }
 .progress-segment {
-    flex: 1; height: 4px; border-radius: 2px; background: var(--bg4);
+    flex: 1; height: 5px; border-radius: 3px; background: var(--bg4);
     transition: background .3s;
 }
 .progress-segment.done { background: var(--accent); }
@@ -40,106 +40,130 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
 /* Steps */
 .step { display: none; }
 .step.active { display: block; }
-.step-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
-.step-desc { color: var(--t2); font-size: .85rem; margin-bottom: 20px; }
+.step-title { font-size: clamp(1.1rem, 1.5vw, 1.5rem); font-weight: 600; margin-bottom: 8px; }
+.step-desc { color: var(--t2); font-size: clamp(0.88rem, 1vw, 1.05rem); margin-bottom: 24px; line-height: 1.6; }
 
 /* Cards for selection */
-.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
 .choice-card {
     background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
-    padding: 16px; cursor: pointer; transition: all .2s;
+    padding: clamp(16px, 2vw, 28px); cursor: pointer; transition: all .2s;
 }
 .choice-card:hover { border-color: var(--accent); }
 .choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
-.choice-card h3 { font-size: .95rem; margin-bottom: 4px; }
-.choice-card p { font-size: .78rem; color: var(--t3); }
-.choice-card .badge { display: inline-block; font-size: .65rem; background: var(--accent); color: #fff; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+.choice-card h3 { font-size: clamp(0.95rem, 1.1vw, 1.15rem); margin-bottom: 8px; }
+.choice-card p { font-size: clamp(0.82rem, 0.95vw, 1rem); color: var(--t3); line-height: 1.5; }
+.choice-card .badge { display: inline-block; font-size: clamp(0.65rem, 0.7vw, 0.78rem); background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 4px; margin-left: 6px; }
 
 /* Form inputs */
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: .82rem; color: var(--t2); margin-bottom: 6px; font-weight: 500; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: clamp(0.88rem, 1vw, 1.05rem); color: var(--t2); margin-bottom: 8px; font-weight: 500; }
 .form-group input, .form-group textarea {
-    width: 100%; padding: 10px 14px; background: var(--bg2); color: var(--t1);
-    border: 1px solid var(--bd); border-radius: 8px; font-size: .88rem;
+    width: 100%; padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
+    background: var(--bg2); color: var(--t1);
+    border: 1px solid var(--bd); border-radius: 10px;
+    font-size: clamp(0.9rem, 1vw, 1.05rem);
     font-family: inherit;
 }
 .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); outline: none; }
-.form-group textarea { min-height: 80px; font-family: var(--mono); font-size: .78rem; resize: vertical; }
-.form-hint { font-size: .72rem; color: var(--t3); margin-top: 4px; }
+.form-group textarea { min-height: 100px; font-family: var(--mono); font-size: clamp(0.82rem, 0.9vw, 0.95rem); resize: vertical; }
+.form-hint { font-size: clamp(0.78rem, 0.85vw, 0.92rem); color: var(--t3); margin-top: 6px; line-height: 1.5; }
 
 /* Buttons */
-.btn-row { display: flex; gap: 12px; margin-top: 24px; }
+.btn-row { display: flex; gap: 14px; margin-top: 28px; }
 .btn {
-    padding: 10px 24px; border: none; border-radius: 8px; font-size: .88rem;
+    padding: clamp(10px, 1.3vw, 16px) clamp(24px, 2.5vw, 36px);
+    border: none; border-radius: 10px;
+    font-size: clamp(0.92rem, 1vw, 1.1rem);
     cursor: pointer; font-weight: 600; transition: all .15s;
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent2); }
 .btn-secondary { background: var(--bg4); color: var(--t2); }
 .btn-secondary:hover { background: var(--bd); }
-.btn-lg { padding: 14px 32px; font-size: 1rem; }
+.btn-lg { padding: clamp(14px, 1.5vw, 20px) clamp(32px, 3vw, 48px); font-size: clamp(1rem, 1.2vw, 1.2rem); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Plugin list */
-.plugin-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--bd); border-radius: var(--r); }
+.plugin-list { max-height: 400px; overflow-y: auto; border: 1px solid var(--bd); border-radius: var(--r); }
 .plugin-item {
-    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
-    border-bottom: 1px solid var(--bd); font-size: .82rem;
+    display: flex; align-items: center; gap: 12px;
+    padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
+    border-bottom: 1px solid var(--bd); font-size: clamp(0.88rem, 1vw, 1.05rem);
 }
 .plugin-item:last-child { border-bottom: none; }
-.plugin-item input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.plugin-item input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; }
 .plugin-item .plugin-name { flex: 1; }
-.plugin-item .plugin-required { font-size: .65rem; color: var(--accent); }
+.plugin-item .plugin-required { font-size: clamp(0.7rem, 0.8vw, 0.85rem); color: var(--accent); }
 
 /* Radio group for rclone */
-.radio-group { display: flex; gap: 12px; margin-bottom: 12px; }
+.radio-group { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
 .radio-group label {
-    display: flex; align-items: center; gap: 6px; font-size: .85rem;
+    display: flex; align-items: center; gap: 8px;
+    font-size: clamp(0.88rem, 1vw, 1.05rem);
     color: var(--t2); cursor: pointer;
 }
-.radio-group input[type="radio"] { accent-color: var(--accent); }
+.radio-group input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
 /* GPU info card */
 .gpu-card {
     background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
-    padding: 14px; margin-bottom: 16px; font-size: .85rem;
+    padding: clamp(14px, 1.5vw, 24px); margin-bottom: 20px;
 }
-.gpu-card .gpu-name { font-weight: 600; font-size: 1rem; }
-.gpu-card .gpu-detail { color: var(--t3); font-size: .78rem; margin-top: 4px; }
+.gpu-card .gpu-name { font-weight: 600; font-size: clamp(1rem, 1.2vw, 1.3rem); }
+.gpu-card .gpu-detail { color: var(--t3); font-size: clamp(0.82rem, 0.9vw, 1rem); margin-top: 6px; }
 
 /* Deploy progress */
 .deploy-view { display: none; }
 .deploy-view.active { display: block; }
-.deploy-steps-list { margin-bottom: 16px; }
+.deploy-steps-list { margin-bottom: 20px; }
 .deploy-step-item {
-    display: flex; align-items: center; gap: 8px; padding: 6px 0;
-    font-size: .85rem; color: var(--t3);
+    display: flex; align-items: center; gap: 10px;
+    padding: clamp(6px, 0.8vw, 10px) 0;
+    font-size: clamp(0.9rem, 1vw, 1.08rem); color: var(--t3);
 }
 .deploy-step-item.active { color: var(--t1); font-weight: 500; }
 .deploy-step-item.done { color: var(--green); }
-.deploy-step-item .step-icon { width: 20px; text-align: center; }
+.deploy-step-item .step-icon { width: 24px; text-align: center; }
 
 .deploy-log {
     background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--r);
-    padding: 12px; min-height: 300px; max-height: 500px; overflow-y: auto;
-    font-family: var(--mono); font-size: .75rem; line-height: 1.8;
+    padding: clamp(12px, 1.5vw, 20px);
+    min-height: clamp(300px, 40vh, 500px); max-height: clamp(400px, 55vh, 700px);
+    overflow-y: auto;
+    font-family: var(--mono); font-size: clamp(0.78rem, 0.85vw, 0.92rem); line-height: 1.9;
 }
 .log-line { white-space: pre-wrap; word-break: break-all; }
 .log-line.info { color: var(--t2); }
 .log-line.output { color: var(--t3); }
 .log-line.warn { color: #f59e0b; }
 .log-line.error { color: var(--red); }
-.log-line .log-time { color: var(--t3); margin-right: 8px; font-size: .68rem; }
+.log-line .log-time { color: var(--t3); margin-right: 10px; font-size: clamp(0.72rem, 0.78vw, 0.85rem); }
 
 /* Summary section */
 .summary-card {
     background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
-    padding: 16px; margin-bottom: 12px;
+    padding: clamp(16px, 1.8vw, 24px); margin-bottom: 14px;
 }
-.summary-card h4 { font-size: .88rem; margin-bottom: 8px; color: var(--accent); }
-.summary-row { display: flex; justify-content: space-between; font-size: .82rem; padding: 3px 0; }
+.summary-card h4 { font-size: clamp(0.92rem, 1vw, 1.1rem); margin-bottom: 10px; color: var(--accent); }
+.summary-row { display: flex; justify-content: space-between; font-size: clamp(0.88rem, 1vw, 1.05rem); padding: 4px 0; }
 .summary-row .label { color: var(--t3); }
 .summary-row .value { color: var(--t1); }
+
+/* Env hint styling */
+.env-hint {
+    background: color-mix(in srgb, var(--green) 8%, var(--bg3));
+    border: 1px solid color-mix(in srgb, var(--green) 25%, var(--bd));
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;
+    font-size: clamp(0.82rem, 0.9vw, 0.95rem); color: var(--green); line-height: 1.5;
+}
+.env-hint code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 0.9em; }
+
+/* Responsive */
+@media (max-width: 600px) {
+    .choice-grid { grid-template-columns: 1fr; }
+    .radio-group { flex-direction: column; gap: 10px; }
+}
 </style>
 </head>
 <body>
@@ -177,7 +201,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-1">
         <div class="step-title">🔐 设置 Dashboard 密码</div>
         <div class="step-desc">保护你的工作空间管理器</div>
-        <div id="password-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
+        <div id="password-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>访问密码</label>
             <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码...">
@@ -193,7 +217,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-2">
         <div class="step-title">🌐 Cloudflare Tunnel</div>
         <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问（推荐，很多实例端口映射不可靠）</div>
-        <div id="cf-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
+        <div id="cf-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>Tunnel Token</label>
             <input type="text" id="input-cf-token" placeholder="eyJhIjoixxxx... (从 Cloudflare Zero Trust 获取)">
@@ -209,7 +233,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-3">
         <div class="step-title">☁️ 云存储配置 (Rclone)</div>
         <div class="step-desc">配置 Rclone 以同步工作流、LoRA 和输出文件到云端</div>
-        <div id="rclone-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
+        <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
         <div class="radio-group">
             <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="showRcloneInput('base64_env')"> 使用环境变量</label>
             <label><input type="radio" name="rclone-method" value="url" onchange="showRcloneInput('url')"> 从 URL 导入</label>
@@ -252,7 +276,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg1); 
     <div class="step" id="step-4">
         <div class="step-title">🎨 CivitAI API Key</div>
         <div class="step-desc">配置 CivitAI API Key 以在 Dashboard 中搜索和下载模型</div>
-        <div id="civitai-env-hint" style="display:none" class="form-hint" style="margin-bottom:12px;color:var(--green)"></div>
+        <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>API Key</label>
             <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)">

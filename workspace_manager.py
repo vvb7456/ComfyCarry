@@ -1434,22 +1434,20 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
         Path("/usr/local/bin/jtoken").write_text(jtoken_script)
         _deploy_exec("chmod +x /usr/local/bin/jtoken")
 
-        # AuraSR 下载 (真正后台, 不阻塞部署完成)
-        _deploy_log("后台下载 AuraSR V2...")
+        # AuraSR 下载 (前台, 显示进度)
+        _deploy_log("下载 AuraSR V2...")
         _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
         _deploy_exec(
-            'nohup aria2c -x 16 -s 16 --console-log-level=error '
+            'aria2c -x 16 -s 16 '
             '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true" '
-            '>/dev/null 2>&1 &',
-            label="AuraSR model (后台)"
+            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true"',
+            timeout=300, label="AuraSR model.safetensors"
         )
         _deploy_exec(
-            'nohup aria2c -x 16 -s 16 --console-log-level=error '
+            'aria2c -x 16 -s 16 '
             '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true" '
-            '>/dev/null 2>&1 &',
-            label="AuraSR config (后台)"
+            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true"',
+            timeout=60, label="AuraSR config.json"
         )
 
         # ─────────────────────────────────────────────
