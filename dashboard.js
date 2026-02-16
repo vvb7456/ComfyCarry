@@ -1864,7 +1864,17 @@ function renderBrowsePage() {
     return;
   }
 
-  el.innerHTML = slice.map(p => _renderBrowseItem(p)).join('');
+  try {
+    const htmlParts = [];
+    for (let i = 0; i < slice.length; i++) {
+      try { htmlParts.push(_renderBrowseItem(slice[i])); }
+      catch (itemErr) { console.error('_renderBrowseItem error at index', i, slice[i]?.id, itemErr); }
+    }
+    el.innerHTML = htmlParts.join('');
+  } catch (e) {
+    console.error('renderBrowsePage error:', e);
+    el.innerHTML = `<div class="error-msg">渲染失败: ${e.message}</div>`;
+  }
   moreEl.classList.toggle('hidden', end >= results.length);
 }
 
@@ -1877,7 +1887,14 @@ function loadMoreBrowsePlugins() {
   const slice = results.slice(start, end);
   pluginBrowseIndex = end;
 
-  el.innerHTML += slice.map(p => _renderBrowseItem(p)).join('');
+  try {
+    const htmlParts = [];
+    for (let i = 0; i < slice.length; i++) {
+      try { htmlParts.push(_renderBrowseItem(slice[i])); }
+      catch (itemErr) { console.error('_renderBrowseItem error at index', start + i, slice[i]?.id, itemErr); }
+    }
+    el.innerHTML += htmlParts.join('');
+  } catch (e) { console.error('loadMoreBrowsePlugins error:', e); }
   moreEl.classList.toggle('hidden', end >= results.length);
 }
 

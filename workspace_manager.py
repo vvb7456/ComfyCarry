@@ -1972,6 +1972,8 @@ def api_sync_status():
         # Strip ANSI and PM2 prefix
         raw = re.sub(r'\x1b\[[0-9;]*m', '', raw)
         raw = re.sub(r'^\d+\|[^|]+\|\s*', '', raw, flags=re.MULTILINE)
+        # Strip PM2 ISO timestamp prefix (e.g. "2026-02-16T12:06:06: ")
+        raw = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}:\s*', '', raw, flags=re.MULTILINE)
         raw = '\n'.join(l for l in raw.split('\n')
                        if not l.startswith('[TAILING]') and 'last 150 lines' not in l
                        and '/root/.pm2/logs/' not in l)
