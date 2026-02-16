@@ -260,13 +260,25 @@ const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion
 async function loadFacets() {
   if (facetsLoaded) return;
   // Type chips
-  const types = ['Checkpoint', 'LORA', 'TextualInversion', 'Controlnet', 'Upscaler', 'VAE'];
+  const types = ['Checkpoint', 'LORA', 'TextualInversion', 'Controlnet', 'Upscaler', 'VAE', 'Poses', 'MotionModule', 'Workflows', 'Other'];
   document.getElementById('filter-type-chips').innerHTML = types.map(t =>
     `<span class="chip" data-val="${t}" onclick="toggleChip(this)">${TYPE_MAP[t] || t}</span>`
   ).join('');
 
-  // Base Model chips - try from search
-  const bms = ['Illustrious', 'Pony', 'SDXL 1.0', 'SD 1.5', 'Flux.1 D', 'Flux.1 S', 'SD 3.5', 'SD 3.5 Large', 'SD 3.5 Medium', 'Hunyuan 1', 'Other'];
+  // Base Model chips - Sycned with CivitAI
+  const bms = [
+    'SD 1.5', 'SDXL 1.0', 'Pony', 'Flux.1 D', 'Flux.1 S', 'SD 3.5 Large',
+    'Illustrious', 'Animagine', // Popular top
+    'Anima', 'Aura Flow', 'Chroma', 'CogVideoX',
+    'Flux.1 Kontext', 'Flux.1 Krea', 'Flux.2 D', 'Flux.2 Klein 4B', 'Flux.2 Klein 9B',
+    'Hunyuan 1', 'Hunyuan Video', 'Imagen 4', 'Kling', 'Kolors', 'LTXV', 'LTXV2', 'Lumina', 'Mochi',
+    'Nano Banana', 'NoobAI', 'ODOR', 'Open AI',
+    'PixArt Σ', 'PixArt A', 'Playground V2', 'Pony V7', 'Qwen',
+    'SD 1.4', 'SD 1.5 Hyper', 'SD 1.5 LCM', 'SD 2.0', 'SD 2.0 768', 'SD 2.1', 'SD 2.1 768', 'SD 2.1 Unclip',
+    'SDXL 0.9', 'SDXL 1.0 LCM', 'SDXL Distilled', 'SDXL Hyper', 'SDXL Lightning', 'SDXL Turbo',
+    'SVD XT', 'Seedream', 'Sora 2', 'Stable Cascade', 'Veo 3', 'Vidu Q1', 'WAN Video', 'Other'
+  ];
+
   document.getElementById('filter-bm-chips').innerHTML = bms.map(b =>
     `<span class="chip" data-val="${b}" onclick="toggleChip(this)">${b}</span>`
   ).join('');
