@@ -259,31 +259,52 @@ const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion
 
 async function loadFacets() {
   if (facetsLoaded) return;
-  // Type chips
-  const types = ['Checkpoint', 'LORA', 'TextualInversion', 'Controlnet', 'Upscaler', 'VAE', 'Poses', 'MotionModule', 'Workflows', 'Other'];
-  document.getElementById('filter-type-chips').innerHTML = types.map(t =>
-    `<span class="chip" data-val="${t}" onclick="toggleChip(this)">${TYPE_MAP[t] || t}</span>`
-  ).join('');
+  const typeChips = document.getElementById('filter-type-chips');
+  const bmChips = document.getElementById('filter-bm-chips');
 
-  // Base Model chips - Sycned with CivitAI
-  const bms = [
-    'SD 1.5', 'SDXL 1.0', 'Pony', 'Flux.1 D', 'Flux.1 S', 'SD 3.5 Large',
-    'Illustrious', 'Animagine', // Popular top
-    'Anima', 'Aura Flow', 'Chroma', 'CogVideoX',
-    'Flux.1 Kontext', 'Flux.1 Krea', 'Flux.2 D', 'Flux.2 Klein 4B', 'Flux.2 Klein 9B',
-    'Hunyuan 1', 'Hunyuan Video', 'Imagen 4', 'Kling', 'Kolors', 'LTXV', 'LTXV2', 'Lumina', 'Mochi',
-    'Nano Banana', 'NoobAI', 'ODOR', 'Open AI',
-    'PixArt Σ', 'PixArt A', 'Playground V2', 'Pony V7', 'Qwen',
-    'SD 1.4', 'SD 1.5 Hyper', 'SD 1.5 LCM', 'SD 2.0', 'SD 2.0 768', 'SD 2.1', 'SD 2.1 768', 'SD 2.1 Unclip',
-    'SDXL 0.9', 'SDXL 1.0 LCM', 'SDXL Distilled', 'SDXL Hyper', 'SDXL Lightning', 'SDXL Turbo',
-    'SVD XT', 'Seedream', 'Sora 2', 'Stable Cascade', 'Veo 3', 'Vidu Q1', 'WAN Video', 'Other'
-  ];
+  // Show loading state
+  typeChips.innerHTML = '<span class="loading-mini">Loading types...</span>';
+  bmChips.innerHTML = '<span class="loading-mini">Loading base models...</span>';
 
-  document.getElementById('filter-bm-chips').innerHTML = bms.map(b =>
-    `<span class="chip" data-val="${b}" onclick="toggleChip(this)">${b}</span>`
-  ).join('');
+  try {
+    const r = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        queries: [{
+          indexUid: 'models_v9',
+          q: '',
+          limit: 0,
+          facets: ['type', 'version.baseModel']
+        }]
+      })
+    });
 
-  facetsLoaded = true;
+    const d = await r.json();
+    if (!d.results || !d.results[0]) throw new Error('Invalid response');
+    const facets = d.results[0].facetDistribution || {};
+
+    // Helper to render chips
+    const renderChips = (container, counts, labelMap = {}) => {
+      const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+      container.innerHTML = sorted.map(k => {
+        const label = labelMap[k] || k;
+        const count = counts[k];
+        // Format count: 1.2k if > 1000
+        const countStr = count > 1000 ? (count / 1000).toFixed(1) + 'k' : count;
+        return `<span class="chip" data-val="${k}" onclick="toggleChip(this)">${label} <span style="font-size:0.75em;opacity:0.6;margin-left:4px">${countStr}</span></span>`;
+      }).join('');
+    };
+
+    renderChips(typeChips, facets['type'] || {}, TYPE_MAP);
+    renderChips(bmChips, facets['version.baseModel'] || {});
+
+    facetsLoaded = true;
+  } catch (e) {
+    console.error("Failed to load facets", e);
+    typeChips.innerHTML = '<span class="error-msg">Failed to load types</span>';
+    bmChips.innerHTML = '<span class="error-msg">Failed to load base models</span>';
+  }
 }
 
 function toggleChip(el) { el.classList.toggle('active'); }
@@ -323,7 +344,7 @@ async function searchModels(page = 0) {
 
   // Build Meilisearch query
   const filter = [];
-  if (types.length > 0) filter.push(types.map(t => `type = ${t}`).join(' OR '));
+  if (types.length > 0) filter.push(types.map(t => `type = "${t}"`).join(' OR '));
   if (bms.length > 0) filter.push(bms.map(b => `version.baseModel = "${b}"`).join(' OR '));
   filter.push('nsfwLevel <= 4');
 
