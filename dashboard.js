@@ -238,21 +238,28 @@ function openLocalMeta(idx) {
   const m = localModelsData[idx];
   if (!m) return;
   const trainedWords = (m.trained_words || []).map(w => typeof w === 'string' ? { word: w } : w);
+  // Collect images: local preview first, then all CivitAI images from info
   const images = [];
   if (m.has_preview && m.preview_path) {
     images.push({ url: `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}` });
   }
-  if (m.civitai_image) images.push({ url: m.civitai_image });
-  // If weilin info has images, add them
   if (m.images && Array.isArray(m.images)) {
     m.images.forEach(img => images.push(img));
+  } else if (m.civitai_image) {
+    images.push({ url: m.civitai_image });
   }
 
   openMetaModal({
     id: m.civitai_id || '-', name: m.name || m.filename,
     type: m.category || '', file: m.filename,
     sha256: m.sha256 || '',
-    version: { baseModel: m.base_model || '', trainedWords, hashes: {} },
+    version: {
+      id: m.civitai_version_id || '',
+      name: m.version_name || '',
+      baseModel: m.base_model || '',
+      trainedWords,
+      hashes: m.sha256 ? { SHA256: m.sha256 } : {},
+    },
     images,
   });
 }

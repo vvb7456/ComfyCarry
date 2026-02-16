@@ -522,8 +522,15 @@ def api_local_models():
                         w.get("word", "") for w in info_data.get("trainedWords", [])
                     ]
                     entry["links"] = info_data.get("links", [])
-                    # Images from info
+                    # CivitAI IDs from raw data
+                    raw_civitai = info_data.get("raw", {}).get("civitai", {})
+                    entry["civitai_id"] = raw_civitai.get("modelId")
+                    entry["civitai_version_id"] = raw_civitai.get("id")
+                    entry["version_name"] = raw_civitai.get("name", "")
+                    entry["sha256"] = info_data.get("sha256", "")
+                    # Images from info (full array)
                     imgs = info_data.get("images", [])
+                    entry["images"] = imgs
                     if imgs:
                         entry["civitai_image"] = imgs[0].get("url", "")
                 else:
