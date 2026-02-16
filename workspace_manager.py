@@ -654,59 +654,166 @@ def api_tunnel_links():
     if jupyter_url:
         links.append({"name": "Jupyter", "url": jupyter_url, "icon": "📓"})
 
-    # 尝试从 PM2 tunnel 日志中解析 Cloudflare Tunnel config
     if not links:
-        try:
-            r = subprocess.run(
-                "pm2 logs tunnel --nostream --lines 100 2>/dev/null",
-                shell=True, capture_output=True, text=True, timeout=5
-            )
-            log = r.stdout + r.stderr
-            # 尝试匹配 Named tunnel 的 ingress config JSON
-            import re as _re
-            cfg_match = _re.search(r'"ingress":\s*\[(.*?)\]', log)
-            if cfg_match:
-                try:
-                    ingress = json.loads("[" + cfg_match.group(1) + "]")
-                    service_icons = {
-                        "8188": ("ComfyUI", "🎨"),
-                        "8080": ("Jupyter", "📓"),
-                        "5000": ("Dashboard", "📊"),
-                        "22": ("SSH", "🖥️"),
-                    }
-                    for entry in ingress:
-                        hostname = entry.get("hostname", "")
-                        service = entry.get("service", "")
-                        if not hostname:
-                            continue
-                        # Skip SSH and catch-all
-                        if "ssh://" in service or service.startswith("http_status:"):
-                            continue
-                        # Guess icon from port
-                        port = ""
-                        port_match = _re.search(r':(\d+)', service)
-                        if port_match:
-                            port = port_match.group(1)
-                        name, icon = service_icons.get(port, (hostname.split(".")[0].title(), "🌐"))
-                        links.append({"name": name, "url": f"https://{hostname}", "icon": icon})
-                except (json.JSONDecodeError, ValueError):
-                    pass
+        links = _parse_tunnel_ingress()
 
-            # Fallback: try random trycloudflare URLs
-            if not links:
-                urls = list(set(_re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log)))
-                for i, u in enumerate(urls):
-                    name = "ComfyUI" if i == 0 else f"Service #{i+1}"
-                    links.append({"name": name, "url": u, "icon": "🌐"})
-        except Exception:
-            pass
-
-    # Vast.ai direct URL
     vast_proxy = os.environ.get("VAST_PROXY_URL", "")
     if vast_proxy:
         links.append({"name": "Vast.ai Proxy", "url": vast_proxy, "icon": "☁️"})
 
     return jsonify({"links": links})
+
+
+def _parse_tunnel_ingress():
+    """从 PM2 tunnel 日志中解析 Cloudflare Tunnel ingress 配置"""
+    links = []
+    try:
+        r = subprocess.run(
+            "pm2 logs tunnel --nostream --lines 300 2>/dev/null",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        log = r.stdout + r.stderr
+        import re as _re
+
+        # Strategy 1: Parse config="{...}" with escaped JSON (named tunnels)
+        # The JSON value has escaped quotes, so we can't use simple (.*?) — match
+        # everything between config=" and the closing " that is NOT preceded by \
+        cfg_match = _re.search(r'config="((?:[^"\\]|\\.)*)"', log)
+        if cfg_match:
+            raw = cfg_match.group(1).replace('\\"', '"').replace('\\\\', '\\')
+            try:
+                cfg = json.loads(raw)
+                ingress = cfg.get("ingress", [])
+                _tunnel_ingress_to_links(ingress, links)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Strategy 2: Look for "ingress" JSON array directly in logs
+        if not links:
+            # Sometimes the config is logged as plain JSON
+            ing_match = _re.search(r'"ingress"\s*:\s*\[', log)
+            if ing_match:
+                # Find the matching closing bracket
+                start = ing_match.start()
+                brace_start = log.index('[', start)
+                depth = 0
+                end = brace_start
+                for i in range(brace_start, min(brace_start + 5000, len(log))):
+                    if log[i] == '[': depth += 1
+                    elif log[i] == ']': depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+                try:
+                    ingress = json.loads(log[brace_start:end])
+                    _tunnel_ingress_to_links(ingress, links)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        # Strategy 3: Find hostname→URL mappings from "Registered tunnel connection" lines
+        if not links:
+            # Look for registered hostnames like "Updated to ... hostname=xxx.com"
+            hostnames = _re.findall(r'hostname[=:]\s*([a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', log)
+            for h in set(hostnames):
+                if 'cloudflare' not in h:
+                    links.append({"name": h.split(".")[0].replace("-", " ").title(),
+                                  "url": f"https://{h}", "icon": "🌐"})
+
+        # Strategy 4: Fallback — trycloudflare quick tunnel URLs
+        if not links:
+            urls = list(set(_re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log)))
+            for i, u in enumerate(urls):
+                links.append({"name": f"Service #{i+1}", "url": u, "icon": "🌐"})
+    except Exception:
+        pass
+    return links
+
+
+def _tunnel_ingress_to_links(ingress, links):
+    """将 Cloudflare Tunnel ingress 列表转换为服务链接"""
+    # 检测本机端口 → 服务名称
+    port_services = _detect_port_services()
+    for entry in ingress:
+        hostname = entry.get("hostname", "")
+        service = entry.get("service", "")
+        if not hostname or "http_status:" in service:
+            continue
+        # 提取端口
+        import re as _re
+        port_match = _re.search(r':(\d+)', service)
+        port = port_match.group(1) if port_match else ""
+        # 协议
+        proto = "ssh" if service.startswith("ssh://") else "http"
+        if proto == "ssh":
+            continue  # Skip SSH
+        # 获取服务名（从端口检测或 hostname 推断）
+        svc_name = port_services.get(port, "")
+        if not svc_name:
+            # 从 hostname 第一段推断
+            svc_name = hostname.split(".")[0].replace("-", " ").title()
+        icon = {"comfyui": "🎨", "jupyter": "📓", "dashboard": "📊"}.get(svc_name.lower(), "🌐")
+        links.append({
+            "name": svc_name, "url": f"https://{hostname}",
+            "icon": icon, "port": port, "service": service
+        })
+
+
+def _detect_port_services():
+    """检测本机端口对应的服务名称"""
+    mapping = {}
+    # 已知端口
+    mapping["8188"] = "ComfyUI"
+    mapping["5000"] = "Dashboard"
+    mapping["8080"] = "Jupyter"
+    mapping["8888"] = "Jupyter"
+    # 尝试用 PM2 获取实际端口
+    try:
+        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True, capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            procs = json.loads(r.stdout)
+            for p in procs:
+                name = p.get("name", "")
+                # 从命令行参数中提取 --port
+                args = p.get("pm2_env", {}).get("args", [])
+                if isinstance(args, list):
+                    for i, a in enumerate(args):
+                        if a == "--port" and i + 1 < len(args):
+                            mapping[str(args[i + 1])] = name.title()
+    except Exception:
+        pass
+    return mapping
+
+
+@app.route("/api/tunnel_status")
+def api_tunnel_status():
+    """获取 Tunnel 状态和日志"""
+    # PM2 进程信息
+    status = "unknown"
+    try:
+        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True, capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            procs = json.loads(r.stdout)
+            for p in procs:
+                if p.get("name") == "tunnel":
+                    status = p.get("pm2_env", {}).get("status", "unknown")
+                    break
+    except Exception:
+        pass
+
+    # 日志
+    try:
+        r = subprocess.run(
+            "pm2 logs tunnel --nostream --lines 100 2>/dev/null",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        logs = r.stdout + r.stderr
+    except Exception:
+        logs = ""
+
+    # Ingress 链接
+    links = _parse_tunnel_ingress()
+
+    return jsonify({"status": status, "logs": logs, "links": links})
 
 
 # ====================================================================

@@ -27,9 +27,10 @@ function showPage(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
 
   if (page === 'dashboard') refreshDashboard();
-  else { stopDlStatusPolling(); if (page === 'models') loadLocalModels(); }
+  else { stopDlStatusPolling(); stopTunnelAutoRefresh(); if (page === 'models') loadLocalModels(); }
   if (page === 'civitai') { loadFacets(); }
   else if (page === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
+  else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
   else if (page === 'logs') loadLogs();
 }
 
@@ -1054,7 +1055,7 @@ async function clearDlHistory() {
   } catch (e) { showToast('清除失败: ' + e.message); }
 }
 
-// ========== Tunnel Links ==========
+// ========== Tunnel Links (Dashboard quick links) ==========
 async function loadTunnelLinks() {
   const container = document.getElementById('tunnel-links');
   if (!container) return;
@@ -1062,14 +1063,93 @@ async function loadTunnelLinks() {
     const r = await fetch('/api/tunnel_links');
     const d = await r.json();
     const links = d.links || [];
-    if (links.length === 0) {
-      container.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">未检测到 Tunnel 链接</span>';
-      return;
-    }
+    if (links.length === 0) { container.innerHTML = ''; return; }
     container.innerHTML = links.map(l =>
       `<a href="${l.url}" target="_blank" class="btn btn-sm" style="display:inline-flex;align-items:center;gap:4px">${l.icon || '🔗'} ${l.name}</a>`
     ).join(' ');
+  } catch (e) { container.innerHTML = ''; }
+}
+
+// ========== Tunnel Page ==========
+let tunnelAutoRefresh = null;
+
+async function loadTunnelPage() {
+  const statusEl = document.getElementById('tunnel-status-info');
+  const logEl = document.getElementById('tunnel-log-content');
+  try {
+    const r = await fetch('/api/tunnel_status');
+    const d = await r.json();
+
+    // Status badge
+    const st = d.status || 'unknown';
+    const stColor = st === 'online' ? 'var(--green)' : st === 'stopped' ? 'var(--red, #e74c3c)' : 'var(--t3)';
+    const stLabel = { online: '运行中', stopped: '已停止', errored: '错误', launching: '启动中' }[st] || st;
+
+    // Service links
+    const links = d.links || [];
+    let linksHtml = '';
+    if (links.length > 0) {
+      linksHtml = '<div class="tunnel-services">' + links.map(l => {
+        const proto = (l.service || '').split('://')[0] || 'http';
+        const portInfo = l.port ? `:${l.port}` : '';
+        return `<a href="${l.url}" target="_blank" class="tunnel-svc-card">
+          <span class="tunnel-svc-icon">${l.icon || '🔗'}</span>
+          <span class="tunnel-svc-name">${l.name}</span>
+          <span class="tunnel-svc-detail">${l.url}</span>
+          <span class="tunnel-svc-port">${proto}${portInfo}</span>
+        </a>`;
+      }).join('') + '</div>';
+    } else {
+      linksHtml = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">未检测到转发服务</div>';
+    }
+
+    statusEl.innerHTML = `
+      <div class="tunnel-header-row">
+        <div class="tunnel-status-badge" style="color:${stColor}">
+          <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:16px">🔗 转发服务</div>
+      ${linksHtml}`;
+
+    // Logs
+    if (d.logs) {
+      // Strip PM2 log prefix timestamps if present, and color-code
+      const lines = d.logs.split('\n').filter(l => l.trim());
+      logEl.innerHTML = lines.map(l => {
+        let cls = '';
+        if (/error|ERR/i.test(l)) cls = 'log-error';
+        else if (/warn/i.test(l)) cls = 'log-warn';
+        else if (/connection|register|route|ingress/i.test(l)) cls = 'log-info';
+        return `<div class="${cls}">${escHtml(l)}</div>`;
+      }).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+    } else {
+      logEl.innerHTML = '<div style="color:var(--t3)">暂无日志</div>';
+    }
   } catch (e) {
-    container.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">无法获取链接</span>';
+    statusEl.innerHTML = `<div style="color:var(--red,#e74c3c)">加载失败: ${e.message}</div>`;
+    logEl.innerHTML = '';
   }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function restartTunnel() {
+  if (!confirm('确定要重启 Cloudflare Tunnel 吗？')) return;
+  try {
+    await fetch('/api/services/tunnel/restart', { method: 'POST' });
+    showToast('Tunnel 正在重启...');
+    setTimeout(loadTunnelPage, 3000);
+  } catch (e) { showToast('重启失败: ' + e.message); }
+}
+
+function startTunnelAutoRefresh() {
+  stopTunnelAutoRefresh();
+  tunnelAutoRefresh = setInterval(loadTunnelPage, 10000);
+}
+function stopTunnelAutoRefresh() {
+  if (tunnelAutoRefresh) { clearInterval(tunnelAutoRefresh); tunnelAutoRefresh = null; }
 }

@@ -991,6 +991,73 @@
             margin-bottom: 20px;
         }
 
+        /* Tunnel Page */
+        .tunnel-header-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .tunnel-status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .tunnel-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .4; }
+        }
+        .tunnel-services {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .tunnel-svc-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-decoration: none;
+            color: var(--t1);
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .tunnel-svc-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+        }
+        .tunnel-svc-icon { font-size: 1.3rem; }
+        .tunnel-svc-name { font-weight: 600; font-size: .95rem; }
+        .tunnel-svc-detail {
+            font-size: .78rem;
+            color: var(--accent);
+            word-break: break-all;
+        }
+        .tunnel-svc-port {
+            font-size: .72rem;
+            color: var(--t3);
+            font-family: var(--mono);
+        }
+        #tunnel-log-content {
+            font-size: .78rem;
+            line-height: 1.5;
+            overflow-y: auto;
+        }
+        #tunnel-log-content .log-error { color: #e74c3c; }
+        #tunnel-log-content .log-warn { color: #f39c12; }
+        #tunnel-log-content .log-info { color: var(--accent); }
+
         /* Detail panel */
         .detail-panel {
             background: var(--bg3);
@@ -1076,6 +1143,7 @@
             <div class="nav-item" data-page="civitai" onclick="showPage('civitai')"><span class="icon">🔍</span>CivitAI
                 搜索</div>
             <div class="nav-item" data-page="downloads" onclick="showPage('downloads')"><span class="icon">📥</span>下载管理</div>
+            <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span>Tunnel</div>
             <div class="nav-item" data-page="logs" onclick="showPage('logs')"><span class="icon">📜</span>运行日志</div>
         </div>
         <div class="sidebar-footer">
@@ -1099,8 +1167,7 @@
             </div>
             <div class="page-body">
                 <!-- Tunnel Links -->
-                <div class="section-title">🌐 快捷链接</div>
-                <div class="tunnel-links" id="tunnel-links"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
+                <div class="tunnel-links" id="tunnel-links" style="margin-bottom:16px"></div>
 
                 <div class="stat-grid" id="sys-stats"></div>
 
@@ -1224,6 +1291,22 @@
             </div>
         </div>
 
+        <!-- ========== Tunnel Page ========== -->
+        <div id="page-tunnel" class="page hidden">
+            <div class="page-header">
+                <h2>🌐 Cloudflare Tunnel</h2>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" onclick="loadTunnelPage()">🔄 刷新</button>
+                    <button class="btn btn-sm btn-danger" onclick="restartTunnel()">♻️ 重启 Tunnel</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <div id="tunnel-status-info"></div>
+                <div class="section-title" style="margin-top:16px">📜 Tunnel 日志</div>
+                <div class="log-box" id="tunnel-log-content" style="max-height:400px">加载中...</div>
+            </div>
+        </div>
+
         <!-- ========== Logs Page ========== -->
         <div id="page-logs" class="page hidden">
             <div class="page-header">
@@ -1296,7 +1379,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=15"></script>
+    <script src="dashboard.js?v=16"></script>
 </body>
 
 </html>
