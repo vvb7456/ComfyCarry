@@ -1009,6 +1009,368 @@ def _cm_post(path, json_data=None, text_data=None, timeout=30):
         return None
 
 
+# ====================================================================
+# ComfyUI 管理 API
+# ====================================================================
+
+# ---------- 启动参数定义 ----------
+COMFYUI_PARAM_GROUPS = {
+    "vram": {
+        "label": "VRAM 管理",
+        "type": "select",
+        "options": [
+            ("default", "默认 (自动)"),
+            ("gpu-only", "GPU Only (全部保留在GPU)"),
+            ("highvram", "High VRAM (模型不卸载)"),
+            ("normalvram", "Normal VRAM (强制正常模式)"),
+            ("lowvram", "Low VRAM (拆分 UNet)"),
+            ("novram", "No VRAM (极限低显存)"),
+        ],
+        "flag_map": {
+            "gpu-only": "--gpu-only", "highvram": "--highvram",
+            "normalvram": "--normalvram", "lowvram": "--lowvram",
+            "novram": "--novram",
+        },
+    },
+    "attention": {
+        "label": "Attention 方案",
+        "type": "select",
+        "options": [
+            ("default", "默认 (自动选择)"),
+            ("pytorch-cross", "PyTorch SDPA"),
+            ("split-cross", "Split Cross Attention (省VRAM)"),
+            ("quad-cross", "Sub-Quadratic"),
+            ("flash", "FlashAttention"),
+            ("sage", "SageAttention"),
+        ],
+        "flag_map": {
+            "pytorch-cross": "--use-pytorch-cross-attention",
+            "split-cross": "--use-split-cross-attention",
+            "quad-cross": "--use-quad-cross-attention",
+            "flash": "--use-flash-attention",
+            "sage": "--use-sage-attention",
+        },
+    },
+    "disable_xformers": {
+        "label": "禁用 xFormers",
+        "type": "bool",
+        "flag": "--disable-xformers",
+    },
+    "unet_precision": {
+        "label": "UNet 精度",
+        "type": "select",
+        "options": [
+            ("default", "默认 (自动)"),
+            ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
+            ("fp8_e4m3fn", "FP8 (e4m3fn)"), ("fp8_e5m2", "FP8 (e5m2)"),
+        ],
+        "flag_map": {
+            "fp32": "--fp32-unet", "fp16": "--fp16-unet", "bf16": "--bf16-unet",
+            "fp8_e4m3fn": "--fp8_e4m3fn-unet", "fp8_e5m2": "--fp8_e5m2-unet",
+        },
+    },
+    "vae_precision": {
+        "label": "VAE 精度",
+        "type": "select",
+        "options": [
+            ("default", "默认 (自动)"),
+            ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
+            ("cpu", "CPU (在CPU上运行)"),
+        ],
+        "flag_map": {
+            "fp32": "--fp32-vae", "fp16": "--fp16-vae",
+            "bf16": "--bf16-vae", "cpu": "--cpu-vae",
+        },
+    },
+    "text_enc_precision": {
+        "label": "Text Encoder 精度",
+        "type": "select",
+        "options": [
+            ("default", "默认 (自动)"),
+            ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
+            ("fp8_e4m3fn", "FP8 (e4m3fn)"), ("fp8_e5m2", "FP8 (e5m2)"),
+        ],
+        "flag_map": {
+            "fp32": "--fp32-text-enc", "fp16": "--fp16-text-enc",
+            "bf16": "--bf16-text-enc",
+            "fp8_e4m3fn": "--fp8_e4m3fn-text-enc", "fp8_e5m2": "--fp8_e5m2-text-enc",
+        },
+    },
+    "fast": {
+        "label": "实验性优化 (--fast)",
+        "type": "bool",
+        "flag": "--fast",
+    },
+    "preview_method": {
+        "label": "预览方式",
+        "type": "select",
+        "options": [
+            ("auto", "自动"), ("none", "无"),
+            ("latent2rgb", "Latent2RGB"), ("taesd", "TAESD"),
+        ],
+        "flag_prefix": "--preview-method",
+    },
+    "cache": {
+        "label": "缓存策略",
+        "type": "select",
+        "options": [
+            ("default", "默认"), ("classic", "经典 (Aggressive)"),
+            ("lru", "LRU"), ("none", "禁用"),
+        ],
+        "flag_map": {
+            "classic": "--cache-classic", "none": "--cache-none",
+        },
+    },
+    "cache_lru_size": {
+        "label": "LRU 缓存大小",
+        "type": "number",
+        "flag_prefix": "--cache-lru",
+        "depends_on": {"cache": "lru"},
+    },
+}
+
+# Reverse lookup: flag -> (group_key, value)
+_FLAG_TO_PARAM = {}
+for _gk, _gv in COMFYUI_PARAM_GROUPS.items():
+    if _gv["type"] == "bool":
+        _FLAG_TO_PARAM[_gv["flag"]] = (_gk, True)
+    elif "flag_map" in _gv:
+        for _val, _flag in _gv["flag_map"].items():
+            _FLAG_TO_PARAM[_flag] = (_gk, _val)
+
+
+def _parse_comfyui_args(args):
+    """从命令行参数列表解析为结构化参数字典"""
+    params = {k: (False if v["type"] == "bool" else 0 if v["type"] == "number" else "default")
+              for k, v in COMFYUI_PARAM_GROUPS.items()}
+    params["listen"] = "0.0.0.0"
+    params["port"] = 8188
+
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--listen" and i + 1 < len(args):
+            params["listen"] = args[i + 1]; i += 2; continue
+        elif a == "--port" and i + 1 < len(args):
+            params["port"] = int(args[i + 1]); i += 2; continue
+        elif a == "--preview-method" and i + 1 < len(args):
+            params["preview_method"] = args[i + 1]; i += 2; continue
+        elif a == "--cache-lru" and i + 1 < len(args):
+            params["cache"] = "lru"
+            params["cache_lru_size"] = int(args[i + 1]); i += 2; continue
+        elif a in _FLAG_TO_PARAM:
+            gk, val = _FLAG_TO_PARAM[a]
+            params[gk] = val
+        i += 1
+    return params
+
+
+def _build_comfyui_args(params):
+    """从结构化参数字典构建命令行参数字符串"""
+    args = ["--listen", params.get("listen", "0.0.0.0"),
+            "--port", str(params.get("port", 8188))]
+
+    for gk, gv in COMFYUI_PARAM_GROUPS.items():
+        val = params.get(gk)
+        if val is None or val == "default" or val is False or val == 0:
+            continue
+        if gv["type"] == "bool" and val:
+            args.append(gv["flag"])
+        elif gv["type"] == "select" and "flag_map" in gv and val in gv["flag_map"]:
+            args.append(gv["flag_map"][val])
+        elif gv["type"] == "select" and "flag_prefix" in gv and val != "default":
+            args.extend([gv["flag_prefix"], str(val)])
+        elif gv["type"] == "number" and "flag_prefix" in gv and val:
+            args.extend([gv["flag_prefix"], str(val)])
+
+    return " ".join(args)
+
+
+@app.route("/api/comfyui/status")
+def api_comfyui_status():
+    """获取 ComfyUI 系统状态 + 当前启动参数"""
+    result = {"online": False, "system": {}, "devices": [], "params": {}, "args": []}
+    # 系统状态 from ComfyUI
+    try:
+        resp = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
+        data = resp.json()
+        result["online"] = True
+        result["system"] = data.get("system", {})
+        result["devices"] = data.get("devices", [])
+    except Exception:
+        pass
+    # 当前启动参数 from PM2
+    try:
+        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
+                           capture_output=True, text=True, timeout=5)
+        procs = json.loads(r.stdout or "[]")
+        comfy = next((p for p in procs if p.get("name") == "comfy"), None)
+        if comfy:
+            pm2_env = comfy.get("pm2_env", {})
+            raw_args = pm2_env.get("args", [])
+            if isinstance(raw_args, str):
+                raw_args = raw_args.split()
+            result["args"] = raw_args
+            result["params"] = _parse_comfyui_args(raw_args)
+            result["pm2_status"] = pm2_env.get("status", "unknown")
+            result["pm2_restarts"] = pm2_env.get("restart_time", 0)
+            result["pm2_uptime"] = pm2_env.get("pm_uptime", 0)
+    except Exception:
+        pass
+    return jsonify(result)
+
+
+@app.route("/api/comfyui/params", methods=["GET"])
+def api_comfyui_params_get():
+    """获取参数定义 + 当前值"""
+    try:
+        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
+                           capture_output=True, text=True, timeout=5)
+        procs = json.loads(r.stdout or "[]")
+        comfy = next((p for p in procs if p.get("name") == "comfy"), None)
+        raw_args = []
+        if comfy:
+            raw_args = comfy.get("pm2_env", {}).get("args", [])
+            if isinstance(raw_args, str):
+                raw_args = raw_args.split()
+        current = _parse_comfyui_args(raw_args)
+        # Build schema for frontend
+        schema = {}
+        for gk, gv in COMFYUI_PARAM_GROUPS.items():
+            schema[gk] = {
+                "label": gv["label"], "type": gv["type"],
+                "value": current.get(gk),
+            }
+            if "options" in gv:
+                schema[gk]["options"] = gv["options"]
+            if "depends_on" in gv:
+                schema[gk]["depends_on"] = gv["depends_on"]
+        return jsonify({"schema": schema, "current": current, "raw_args": raw_args})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/comfyui/params", methods=["POST"])
+def api_comfyui_params_update():
+    """更新 ComfyUI 启动参数并重启"""
+    data = request.get_json()
+    params = data.get("params", {})
+    args_str = _build_comfyui_args(params)
+
+    # 查找 Python 路径
+    py = "/usr/bin/python3.13"
+    for candidate in ["/usr/bin/python3.13", "/usr/bin/python3.12",
+                      "/usr/bin/python3.11", "/usr/bin/python3"]:
+        if os.path.isfile(candidate):
+            py = candidate
+            break
+
+    try:
+        subprocess.run("pm2 delete comfy 2>/dev/null || true",
+                       shell=True, timeout=10)
+        cmd = (
+            f'cd /workspace/ComfyUI && pm2 start {py} --name comfy '
+            f'--interpreter none --log /workspace/comfy.log --time '
+            f'--restart-delay 3000 --max-restarts 10 '
+            f'-- main.py {args_str}'
+        )
+        subprocess.run(cmd, shell=True, timeout=30, check=True)
+        subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5)
+        return jsonify({"ok": True, "args": args_str})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/comfyui/queue")
+def api_comfyui_queue():
+    """获取 ComfyUI 任务队列"""
+    try:
+        resp = requests.get(f"{COMFYUI_URL}/queue", timeout=5)
+        return jsonify(resp.json())
+    except Exception:
+        return jsonify({"queue_running": [], "queue_pending": [], "error": "ComfyUI 无法连接"})
+
+
+@app.route("/api/comfyui/interrupt", methods=["POST"])
+def api_comfyui_interrupt():
+    """中断当前执行"""
+    try:
+        requests.post(f"{COMFYUI_URL}/interrupt", timeout=5)
+        return jsonify({"ok": True})
+    except Exception:
+        return jsonify({"error": "ComfyUI 无法连接"}), 503
+
+
+@app.route("/api/comfyui/free", methods=["POST"])
+def api_comfyui_free():
+    """释放 VRAM / 卸载模型"""
+    try:
+        requests.post(f"{COMFYUI_URL}/free",
+                      json={"unload_models": True, "free_memory": True}, timeout=10)
+        return jsonify({"ok": True})
+    except Exception:
+        return jsonify({"error": "ComfyUI 无法连接"}), 503
+
+
+@app.route("/api/comfyui/history")
+def api_comfyui_history():
+    """获取最近生成记录"""
+    max_items = request.args.get("max_items", 5, type=int)
+    try:
+        resp = requests.get(f"{COMFYUI_URL}/history",
+                            params={"max_items": max_items}, timeout=10)
+        raw = resp.json()
+        # Convert from dict {prompt_id: {outputs, status}} to sorted list
+        items = []
+        for pid, entry in raw.items():
+            status = entry.get("status", {})
+            outputs = entry.get("outputs", {})
+            # Find output images
+            images = []
+            for node_id, node_out in outputs.items():
+                for img in node_out.get("images", []):
+                    images.append({
+                        "filename": img.get("filename", ""),
+                        "subfolder": img.get("subfolder", ""),
+                        "type": img.get("type", "output"),
+                    })
+            items.append({
+                "prompt_id": pid,
+                "completed": status.get("completed", False),
+                "images": images,
+                "timestamp": status.get("status_str_start_time", ""),
+            })
+        # Sort by timestamp desc
+        items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return jsonify({"history": items[:max_items]})
+    except Exception:
+        return jsonify({"history": [], "error": "ComfyUI 无法连接"})
+
+
+@app.route("/api/comfyui/view")
+def api_comfyui_view():
+    """代理 ComfyUI 图片查看 (用于缩略图)"""
+    filename = request.args.get("filename", "")
+    subfolder = request.args.get("subfolder", "")
+    img_type = request.args.get("type", "output")
+    preview = request.args.get("preview", "")
+    if not filename:
+        return "", 400
+    try:
+        params = {"filename": filename, "type": img_type}
+        if subfolder:
+            params["subfolder"] = subfolder
+        if preview:
+            params["preview"] = preview
+        resp = requests.get(f"{COMFYUI_URL}/view", params=params,
+                            timeout=10, stream=True)
+        return resp.content, resp.status_code, {
+            "Content-Type": resp.headers.get("Content-Type", "image/png")
+        }
+    except Exception:
+        return "", 503
+
+
 @app.route("/api/plugins/installed")
 def api_plugins_installed():
     """获取已安装插件列表"""

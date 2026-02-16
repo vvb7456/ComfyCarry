@@ -36,9 +36,10 @@ function showPage(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
 
   if (page === 'dashboard') refreshDashboard();
-  else { stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); stopPluginQueuePoll(); if (page === 'models') loadLocalModels(); }
+  else { stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); stopPluginQueuePoll(); stopComfyAutoRefresh(); if (page === 'models') loadLocalModels(); }
   if (page === 'civitai') { loadFacets(); }
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
+  else if (page === 'comfyui') { loadComfyUIPage(); startComfyAutoRefresh(); }
   else if (page === 'sync') { loadSyncPage(); startSyncAutoRefresh(); }
   else if (page === 'settings') loadSettingsPage();
   else if (page === 'plugins') loadPluginsPage();
@@ -1235,6 +1236,261 @@ function startTunnelAutoRefresh() {
 }
 function stopTunnelAutoRefresh() {
   if (tunnelAutoRefresh) { clearInterval(tunnelAutoRefresh); tunnelAutoRefresh = null; }
+}
+
+// ========== ComfyUI Management Page ==========
+let comfyAutoRefresh = null;
+let _comfyParamsSchema = null;
+
+async function loadComfyUIPage() {
+  await Promise.all([loadComfyStatus(), loadComfyQueue(), loadComfyHistory(), loadComfyParams(), loadComfyLogs()]);
+}
+
+async function loadComfyStatus() {
+  const el = document.getElementById('comfyui-status-cards');
+  try {
+    const r = await fetch('/api/comfyui/status');
+    const d = await r.json();
+    let html = '';
+
+    // Online status
+    const online = d.online;
+    const sys = d.system || {};
+    const pm2St = d.pm2_status || 'unknown';
+    const stColor = online ? 'var(--green)' : 'var(--red, #e74c3c)';
+    const stLabel = online ? '运行中' : '离线';
+
+    // Status card
+    html += `<div class="stat-card" style="border-left:3px solid ${stColor}">
+      <div class="stat-label">ComfyUI</div>
+      <div class="stat-value" style="font-size:1rem;color:${stColor}">${stLabel}</div>
+      <div class="stat-sub">${online ? `v${sys.comfyui_version || '?'} • Python ${sys.python_version || '?'} • PyTorch ${sys.pytorch_version || '?'}` : `PM2: ${pm2St}`}</div>
+    </div>`;
+
+    // GPU/VRAM cards
+    if (d.devices && d.devices.length > 0) {
+      for (const gpu of d.devices) {
+        const vramUsed = gpu.vram_total - gpu.vram_free;
+        const vramPct = gpu.vram_total > 0 ? (vramUsed / gpu.vram_total * 100) : 0;
+        const torchUsed = gpu.torch_vram_total - gpu.torch_vram_free;
+        html += `<div class="stat-card cyan">
+          <div class="stat-label">${gpu.name || 'GPU'}</div>
+          <div class="stat-value">${vramPct.toFixed(0)}%</div>
+          <div class="stat-sub">VRAM: ${fmtBytes(vramUsed)} / ${fmtBytes(gpu.vram_total)} • Torch: ${fmtBytes(torchUsed)}</div>
+          <div class="comfy-vram-bar"><div class="fill" style="width:${vramPct}%;background:${vramPct > 90 ? 'var(--red,#e74c3c)' : vramPct > 70 ? 'var(--amber)' : 'var(--cyan)'}"></div>
+            <div class="label">${fmtBytes(vramUsed)} / ${fmtBytes(gpu.vram_total)}</div></div>
+        </div>`;
+      }
+    }
+
+    // Uptime / restarts
+    if (d.pm2_uptime) {
+      const up = Date.now() - d.pm2_uptime;
+      const hrs = Math.floor(up / 3600000);
+      const mins = Math.floor((up % 3600000) / 60000);
+      html += `<div class="stat-card green">
+        <div class="stat-label">运行时间</div>
+        <div class="stat-value" style="font-size:1rem">${hrs}h ${mins}m</div>
+        <div class="stat-sub">重启次数: ${d.pm2_restarts || 0}</div>
+      </div>`;
+    }
+
+    // Current args
+    const argsRaw = document.getElementById('comfyui-args-raw');
+    if (argsRaw) argsRaw.textContent = d.args ? d.args.join(' ') : '';
+
+    el.innerHTML = html || '<div style="color:var(--t3);padding:16px">无法获取状态</div>';
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+  }
+}
+
+async function loadComfyQueue() {
+  const el = document.getElementById('comfyui-queue-info');
+  try {
+    const r = await fetch('/api/comfyui/queue');
+    const d = await r.json();
+    const running = d.queue_running || [];
+    const pending = d.queue_pending || [];
+
+    if (running.length === 0 && pending.length === 0) {
+      el.innerHTML = '<span style="color:var(--t3)">空闲 — 无任务</span>';
+    } else {
+      let html = '';
+      if (running.length > 0) html += `<span style="color:var(--green)">▶ 正在执行 ${running.length} 个任务</span>`;
+      if (pending.length > 0) html += `<span style="margin-left:12px;color:var(--amber)">⏳ 等待中 ${pending.length} 个</span>`;
+      el.innerHTML = html;
+    }
+  } catch (e) {
+    el.innerHTML = `<span style="color:var(--red,#e74c3c)">队列获取失败</span>`;
+  }
+}
+
+async function loadComfyHistory() {
+  const el = document.getElementById('comfyui-recent-images');
+  try {
+    const r = await fetch('/api/comfyui/history?max_items=10');
+    const d = await r.json();
+    const items = d.history || [];
+    if (items.length === 0) {
+      el.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">暂无生成记录</div>';
+      return;
+    }
+    let html = '';
+    for (const item of items) {
+      for (const img of (item.images || [])) {
+        const thumbUrl = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${img.type || 'output'}&preview=webp;80`;
+        const fullUrl = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${img.type || 'output'}`;
+        html += `<img src="${thumbUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy" onerror="this.style.display='none'">`;
+      }
+    }
+    el.innerHTML = html || '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">暂无图片输出</div>';
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--t3);font-size:.85rem">加载失败</div>`;
+  }
+}
+
+async function loadComfyParams() {
+  const el = document.getElementById('comfyui-params-form');
+  try {
+    const r = await fetch('/api/comfyui/params');
+    const d = await r.json();
+    _comfyParamsSchema = d.schema;
+    const current = d.current || {};
+
+    let html = '';
+    for (const [key, schema] of Object.entries(d.schema)) {
+      // Skip if depends_on not met
+      if (schema.depends_on) {
+        const depMet = Object.entries(schema.depends_on).every(([dk, dv]) => current[dk] === dv);
+        if (!depMet) continue;
+      }
+
+      html += `<div class="comfy-param-group">`;
+      if (schema.type === 'select') {
+        html += `<label>${schema.label}</label>`;
+        html += `<select id="cparam-${key}" data-param="${key}">`;
+        for (const [val, label] of schema.options) {
+          html += `<option value="${val}" ${val === String(schema.value) || val === schema.value ? 'selected' : ''}>${label}</option>`;
+        }
+        html += '</select>';
+      } else if (schema.type === 'bool') {
+        html += `<label class="comfy-param-toggle">
+          <input type="checkbox" id="cparam-${key}" data-param="${key}" ${schema.value ? 'checked' : ''}>
+          <span>${schema.label}</span>
+        </label>`;
+      } else if (schema.type === 'number') {
+        html += `<label>${schema.label}</label>`;
+        html += `<input type="number" id="cparam-${key}" data-param="${key}" value="${schema.value || 0}" min="0" max="100">`;
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">加载参数失败: ${e.message}</div>`;
+  }
+}
+
+async function loadComfyLogs() {
+  const el = document.getElementById('comfyui-log-content');
+  try {
+    const r = await fetch('/api/logs/comfy?lines=200');
+    const d = await r.json();
+    if (d.logs) {
+      const lines = d.logs.split('\n').filter(l => l.trim());
+      el.innerHTML = lines.map(l => {
+        let cls = '';
+        if (/error|exception|traceback/i.test(l)) cls = 'log-error';
+        else if (/warn/i.test(l)) cls = 'log-warn';
+        else if (/loaded|model|checkpoint|lora/i.test(l)) cls = 'log-info';
+        return `<div class="${cls}">${escHtml(l)}</div>`;
+      }).join('');
+      el.scrollTop = el.scrollHeight;
+    } else {
+      el.innerHTML = '<div style="color:var(--t3)">暂无日志</div>';
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">日志加载失败: ${e.message}</div>`;
+  }
+}
+
+function _collectComfyParams() {
+  const params = {};
+  document.querySelectorAll('#comfyui-params-form [data-param]').forEach(el => {
+    const key = el.dataset.param;
+    if (el.type === 'checkbox') params[key] = el.checked;
+    else if (el.type === 'number') params[key] = parseInt(el.value) || 0;
+    else params[key] = el.value;
+  });
+  // Always ensure listen + port
+  if (!params.listen) params.listen = '0.0.0.0';
+  if (!params.port) params.port = 8188;
+  return params;
+}
+
+async function saveComfyUIParams() {
+  const status = document.getElementById('comfyui-params-status');
+  const params = _collectComfyParams();
+
+  if (!confirm('保存参数将重启 ComfyUI，确定继续？')) return;
+
+  status.textContent = '保存中...';
+  status.style.color = 'var(--amber)';
+  try {
+    const r = await fetch('/api/comfyui/params', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ params })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.textContent = '✅ 已保存，ComfyUI 正在重启...';
+      status.style.color = 'var(--green)';
+      showToast('ComfyUI 正在使用新参数重启...');
+      setTimeout(loadComfyUIPage, 5000);
+    } else {
+      status.textContent = '❌ ' + (d.error || '保存失败');
+      status.style.color = 'var(--red, #e74c3c)';
+    }
+  } catch (e) {
+    status.textContent = '❌ 请求失败: ' + e.message;
+    status.style.color = 'var(--red, #e74c3c)';
+  }
+}
+
+async function restartComfyUI() {
+  if (!confirm('确定要重启 ComfyUI 吗？')) return;
+  try {
+    await fetch('/api/services/comfy/restart', { method: 'POST' });
+    showToast('ComfyUI 正在重启...');
+    setTimeout(loadComfyUIPage, 5000);
+  } catch (e) { showToast('重启失败: ' + e.message); }
+}
+
+async function comfyInterrupt() {
+  try {
+    await fetch('/api/comfyui/interrupt', { method: 'POST' });
+    showToast('已发送中断信号');
+    setTimeout(loadComfyQueue, 1000);
+  } catch (e) { showToast('中断失败: ' + e.message); }
+}
+
+async function comfyFreeVRAM() {
+  try {
+    await fetch('/api/comfyui/free', { method: 'POST' });
+    showToast('🧹 已释放 VRAM');
+    setTimeout(loadComfyStatus, 2000);
+  } catch (e) { showToast('释放失败: ' + e.message); }
+}
+
+function startComfyAutoRefresh() {
+  stopComfyAutoRefresh();
+  comfyAutoRefresh = setInterval(() => {
+    loadComfyStatus();
+    loadComfyQueue();
+  }, 10000);
+}
+function stopComfyAutoRefresh() {
+  if (comfyAutoRefresh) { clearInterval(comfyAutoRefresh); comfyAutoRefresh = null; }
 }
 
 // ========== Cloud Sync Page ==========
