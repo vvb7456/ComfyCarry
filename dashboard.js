@@ -2076,6 +2076,32 @@ async function restartDashboard() {
   }
 }
 
+async function reinitialize() {
+  const keepModels = document.getElementById('reinit-keep-models')?.checked ?? true;
+  const msg = keepModels
+    ? '确定要重新初始化吗?\n\n将删除 ComfyUI 安装 (保留模型文件)，停止 ComfyUI 和同步服务，重新进入部署向导。\n\n系统依赖、PyTorch、Tunnel 不受影响。'
+    : '确定要重新初始化吗?\n\n将删除整个 ComfyUI 目录 (包括所有模型文件)，停止 ComfyUI 和同步服务，重新进入部署向导。\n\n⚠️ 模型文件将被永久删除！';
+  if (!confirm(msg)) return;
+  if (!keepModels && !confirm('再次确认: 所有模型文件将被永久删除，无法恢复。继续？')) return;
+  try {
+    showToast('⏳ 正在重新初始化...');
+    const r = await fetch('/api/settings/reinitialize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keep_models: keepModels })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 已重置, 正在跳转到部署向导...');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast('❌ 部分操作失败: ' + (d.errors || []).join('; '));
+    }
+  } catch (e) {
+    showToast('重新初始化失败: ' + e.message);
+  }
+}
+
 
 // ========== Plugin Management ==========
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed

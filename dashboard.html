@@ -2044,6 +2044,22 @@
                                 <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 Dashboard</button>
                             </div>
                         </div>
+
+                        <!-- 重新初始化 -->
+                        <div class="card" style="padding:clamp(16px,1.5vw,24px);border:1px solid rgba(255,80,80,0.25)">
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem);color:var(--red,#ff5050)">⚠️ 重新初始化</h3>
+                            <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
+                                停止 ComfyUI 和同步服务，删除 ComfyUI 安装目录，重新进入 Setup Wizard。
+                                已安装的系统依赖和 PyTorch 会保留，Tunnel 不受影响。
+                            </p>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                                <label style="font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
+                                    <input type="checkbox" id="reinit-keep-models" checked style="width:15px;height:15px;accent-color:var(--ac)">
+                                    <span>保留已下载的模型文件</span>
+                                </label>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="reinitialize()">🗑️ 重新初始化</button>
+                        </div>
                     </div>
 
                     <!-- 右列: Dashboard 日志 (Debug 模式) -->

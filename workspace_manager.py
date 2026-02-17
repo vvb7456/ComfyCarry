@@ -1849,6 +1849,78 @@ def api_settings_debug_set():
     return jsonify({"ok": True, "debug": enabled})
 
 
+@app.route("/api/settings/reinitialize", methods=["POST"])
+def api_settings_reinitialize():
+    """重新初始化 — 停止服务, 清理 ComfyUI, 重置向导状态, 进入 Setup Wizard
+
+    保留: apt/pip 已安装的包 (system_deps, pytorch), Tunnel (如无变更)
+    删除: ComfyUI 目录 (可选保留 models), 自定义节点, 部署状态
+    """
+    data = request.get_json(force=True) or {}
+    keep_models = bool(data.get("keep_models", False))
+
+    errors = []
+
+    # 1. 停止 ComfyUI 和 sync 服务
+    try:
+        subprocess.run("pm2 delete comfy 2>/dev/null || true", shell=True, timeout=15)
+        subprocess.run("pm2 delete sync 2>/dev/null || true", shell=True, timeout=15)
+    except Exception as e:
+        errors.append(f"停止服务失败: {e}")
+
+    # 2. 清理 ComfyUI 目录
+    comfy_dir = Path(COMFYUI_DIR)
+    if comfy_dir.exists():
+        try:
+            if keep_models:
+                # 保留 models 目录, 删除其他
+                models_tmp = Path("/workspace/.models_backup")
+                models_src = comfy_dir / "models"
+                if models_src.exists():
+                    subprocess.run(f'mv "{models_src}" "{models_tmp}"', shell=True, timeout=60)
+                subprocess.run(f'rm -rf "{comfy_dir}"', shell=True, timeout=120)
+                if models_tmp.exists():
+                    comfy_dir.mkdir(parents=True, exist_ok=True)
+                    subprocess.run(f'mv "{models_tmp}" "{models_src}"', shell=True, timeout=60)
+            else:
+                subprocess.run(f'rm -rf "{comfy_dir}"', shell=True, timeout=120)
+        except Exception as e:
+            errors.append(f"清理 ComfyUI 目录失败: {e}")
+
+    # 3. 清理生成的脚本和同步配置
+    for f in [Path("/workspace/cloud_sync.sh"), Path("/workspace/.sync_prefs.json")]:
+        try:
+            if f.exists():
+                f.unlink()
+        except Exception:
+            pass
+
+    # 4. 重置 Setup Wizard 状态 — 保留 system_deps 和 pytorch 步骤标记
+    try:
+        preserved_steps = []
+        if SETUP_STATE_FILE.exists():
+            old_state = _load_setup_state()
+            for step_key in ("system_deps", "pytorch"):
+                if step_key in old_state.get("deploy_steps_completed", []):
+                    preserved_steps.append(step_key)
+        # 删除旧状态文件, 写入仅含保留步骤的干净状态
+        if SETUP_STATE_FILE.exists():
+            SETUP_STATE_FILE.unlink()
+        if preserved_steps:
+            new_state = _load_setup_state()  # 获取默认值
+            new_state["deploy_steps_completed"] = preserved_steps
+            _save_setup_state(new_state)
+    except Exception as e:
+        errors.append(f"重置状态失败: {e}")
+
+    # 5. 保存 PM2 配置
+    subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=15)
+
+    if errors:
+        return jsonify({"ok": False, "errors": errors}), 500
+    return jsonify({"ok": True, "message": "已重置, 请刷新页面进入 Setup Wizard"})
+
+
 # ====================================================================
 # Setup Wizard API
 # ====================================================================
