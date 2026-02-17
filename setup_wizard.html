@@ -264,44 +264,79 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 3: Rclone 配置 -->
+    <!-- Step 3: 云存储与同步 -->
     <div class="step" id="step-3">
-        <div class="step-title">☁️ 云存储配置 (Rclone)</div>
-        <div class="step-desc">配置 Rclone 以同步工作流、LoRA 和输出文件到云端</div>
-        <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
-        <div class="radio-group">
-            <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="showRcloneInput('base64_env')"> 使用环境变量</label>
-            <label><input type="radio" name="rclone-method" value="url" onchange="showRcloneInput('url')"> 从 URL 导入</label>
-            <label><input type="radio" name="rclone-method" value="base64" onchange="showRcloneInput('base64')"> Base64 粘贴</label>
-            <label><input type="radio" name="rclone-method" value="skip" onchange="showRcloneInput('skip')" checked> 跳过</label>
+        <div class="step-title">☁️ 云存储与同步</div>
+        <div class="step-desc">配置 Rclone 连接云端存储，设置部署拉取和输出同步规则</div>
+
+        <!-- Section 1: Rclone 配置 -->
+        <div style="margin-bottom:20px">
+            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">1️⃣ 导入 Rclone 配置</label>
+            <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
+            <div class="radio-group">
+                <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="showRcloneInput('base64_env')"> 环境变量</label>
+                <label><input type="radio" name="rclone-method" value="file" onchange="showRcloneInput('file')"> 上传文件</label>
+                <label><input type="radio" name="rclone-method" value="url" onchange="showRcloneInput('url')"> URL 导入</label>
+                <label><input type="radio" name="rclone-method" value="base64" onchange="showRcloneInput('base64')"> Base64 粘贴</label>
+                <label><input type="radio" name="rclone-method" value="skip" onchange="showRcloneInput('skip')" checked> 跳过</label>
+            </div>
+            <div id="rclone-file-input" style="display:none" class="form-group">
+                <label style="cursor:pointer;display:inline-block;background:var(--bg4);padding:8px 18px;border-radius:8px;font-size:.88rem">
+                    📂 选择 rclone.conf 文件
+                    <input type="file" accept=".conf,.txt" onchange="handleRcloneFile(event)" style="display:none">
+                </label>
+                <span id="rclone-file-status" style="margin-left:10px;font-size:.82rem;color:var(--t3)"></span>
+            </div>
+            <div id="rclone-url-input" style="display:none" class="form-group">
+                <label>Rclone 配置文件 URL</label>
+                <input type="text" id="input-rclone-url" placeholder="https://example.com/rclone.conf">
+            </div>
+            <div id="rclone-base64-input" style="display:none" class="form-group">
+                <label>Base64 编码的 rclone.conf</label>
+                <textarea id="input-rclone-base64" placeholder="粘贴 RCLONE_CONF_BASE64 的值..."></textarea>
+            </div>
+            <div id="rclone-skip-note" class="form-hint" style="margin-bottom:4px">
+                跳过后可在 Dashboard「云同步」页面随时配置
+            </div>
         </div>
-        <div id="rclone-url-input" style="display:none" class="form-group">
-            <label>Rclone 配置文件 URL</label>
-            <input type="text" id="input-rclone-url" placeholder="https://example.com/rclone.conf">
-        </div>
-        <div id="rclone-base64-input" style="display:none" class="form-group">
-            <label>Base64 编码的 rclone.conf</label>
-            <textarea id="input-rclone-base64" placeholder="粘贴 RCLONE_CONF_BASE64 的值..."></textarea>
-        </div>
-        <div id="rclone-skip-note" class="form-hint" style="margin-bottom:12px">
-            跳过后可以在 Dashboard 的「云同步」页面随时配置
-        </div>
-        <!-- 同步选项 (仅当配置了 rclone 时显示) -->
-        <div id="sync-options-panel" style="display:none;margin-top:16px">
-            <label style="font-size:.85rem;font-weight:600;margin-bottom:4px;display:block">部署时从云端拉取:</label>
-            <div style="font-size:.78rem;color:var(--t3);margin-bottom:8px">将使用第一个可用的 Remote，通过 copy 方式拉取到本地（部署后可在 Dashboard 云同步页面修改规则）</div>
+
+        <!-- Section 2: 部署拉取 (非 skip 时显示) -->
+        <div id="sync-pull-panel" style="display:none;margin-bottom:20px;padding:16px;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r)">
+            <label style="font-size:.92rem;font-weight:600;margin-bottom:4px;display:block">2️⃣ 部署时从云端拉取</label>
+            <div style="font-size:.78rem;color:var(--t3);margin-bottom:10px">首次部署时使用第一个可用 Remote 通过 copy 方式拉取到本地</div>
             <div style="display:flex;flex-direction:column;gap:8px">
-                <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-workflows" checked style="accent-color:var(--accent)"> 工作流 (workflow)
+                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-pull-workflows" checked style="accent-color:var(--accent)"> 工作流 (<code style="font-size:.78rem">user/default/workflows</code>)
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-loras" checked style="accent-color:var(--accent)"> LoRA 模型 (loras)
+                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-pull-loras" checked style="accent-color:var(--accent)"> LoRA 模型 (<code style="font-size:.78rem">models/loras</code>)
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-wildcards" checked style="accent-color:var(--accent)"> 动态提示词 (wildcards)
+                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-pull-wildcards" checked style="accent-color:var(--accent)"> Wildcards (<code style="font-size:.78rem">custom_nodes/.../wildcards</code>)
                 </label>
             </div>
         </div>
+
+        <!-- Section 3: 输出推送 (非 skip 时显示) -->
+        <div id="sync-push-panel" style="display:none;margin-bottom:20px;padding:16px;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r)">
+            <label style="font-size:.92rem;font-weight:600;margin-bottom:4px;display:block">3️⃣ 运行时自动推送</label>
+            <div style="font-size:.78rem;color:var(--t3);margin-bottom:10px">Worker 在后台持续监控，自动将输出文件推送到云端</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
+                    <input type="checkbox" id="sync-push-output" style="accent-color:var(--accent)"> 输出图片 (<code style="font-size:.78rem">output/</code>)
+                </label>
+                <div id="sync-push-method-row" style="display:none;margin-left:26px">
+                    <label style="font-size:.82rem;color:var(--t3);margin-right:8px">推送方式:</label>
+                    <select id="sync-push-method" style="font-size:.85rem;padding:4px 10px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:6px">
+                        <option value="copy">copy — 复制到云端 (保留本地文件)</option>
+                        <option value="move">move — 移动到云端 (释放本地空间)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div style="font-size:.75rem;color:var(--t3);margin-bottom:8px">💡 以上仅为初始规则，部署后可在 Dashboard「云同步」页面自由添加、修改、删除任意同步规则</div>
+
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
             <button class="btn btn-primary" onclick="nextStep()">下一步</button>
@@ -383,7 +418,9 @@ let wizardConfig = {
     rclone_config_value: '',
     civitai_token: '',
     plugins: [],
-    sync_options: { workflows: true, loras: true, wildcards: true },
+    sync_pull: { workflows: true, loras: true, wildcards: true },
+    sync_push: { output: false },
+    sync_push_method: 'copy',
 };
 let pluginData = [];
 let envVars = {};  // 从环境变量检测到的预设值
@@ -579,17 +616,28 @@ function saveCurrentStep() {
             break;
         case 3:
             const method = document.querySelector('input[name="rclone-method"]:checked')?.value || 'skip';
-            wizardConfig.rclone_config_method = method;
-            if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
-            else if (method === 'base64') wizardConfig.rclone_config_value = document.getElementById('input-rclone-base64').value.trim();
-            else if (method === 'base64_env') wizardConfig.rclone_config_value = '';  // 后端从环境变量读取
-            else wizardConfig.rclone_config_value = '';
-            // 同步选项
-            wizardConfig.sync_options = {
-                workflows: document.getElementById('sync-workflows')?.checked ?? true,
-                loras: document.getElementById('sync-loras')?.checked ?? true,
-                wildcards: document.getElementById('sync-wildcards')?.checked ?? true,
+            wizardConfig._rclone_display_method = method;  // 用于 summary 显示
+            if (method === 'file') {
+                // 文件上传: 已在 handleRcloneFile 中设置 rclone_config_value
+                wizardConfig.rclone_config_method = 'base64';  // 后端统一用 base64
+            } else {
+                wizardConfig.rclone_config_method = method;
+                if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
+                else if (method === 'base64') wizardConfig.rclone_config_value = document.getElementById('input-rclone-base64').value.trim();
+                else if (method === 'base64_env') wizardConfig.rclone_config_value = '';
+                else wizardConfig.rclone_config_value = '';
+            }
+            // 拉取选项
+            wizardConfig.sync_pull = {
+                workflows: document.getElementById('sync-pull-workflows')?.checked ?? true,
+                loras: document.getElementById('sync-pull-loras')?.checked ?? true,
+                wildcards: document.getElementById('sync-pull-wildcards')?.checked ?? true,
             };
+            // 推送选项
+            wizardConfig.sync_push = {
+                output: document.getElementById('sync-push-output')?.checked ?? false,
+            };
+            wizardConfig.sync_push_method = document.getElementById('sync-push-method')?.value || 'copy';
             break;
         case 4:
             wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
@@ -630,12 +678,33 @@ function selectMode(mode) {
 
 // ── Rclone Input Toggle ──
 function showRcloneInput(method) {
+    document.getElementById('rclone-file-input').style.display = method === 'file' ? 'block' : 'none';
     document.getElementById('rclone-url-input').style.display = method === 'url' ? 'block' : 'none';
     document.getElementById('rclone-base64-input').style.display = method === 'base64' ? 'block' : 'none';
     document.getElementById('rclone-skip-note').style.display = method === 'skip' ? 'block' : 'none';
-    // 同步选项: 非 skip 时显示
-    document.getElementById('sync-options-panel').style.display = method !== 'skip' ? 'block' : 'none';
+    // 同步选项面板: 非 skip 时显示
+    const show = method !== 'skip';
+    document.getElementById('sync-pull-panel').style.display = show ? 'block' : 'none';
+    document.getElementById('sync-push-panel').style.display = show ? 'block' : 'none';
 }
+
+function handleRcloneFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        wizardConfig.rclone_config_value = btoa(reader.result);
+        document.getElementById('rclone-file-status').textContent = `✅ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    };
+    reader.readAsText(file);
+}
+
+// Push output toggle
+document.addEventListener('change', (e) => {
+    if (e.target.id === 'sync-push-output') {
+        document.getElementById('sync-push-method-row').style.display = e.target.checked ? 'block' : 'none';
+    }
+});
 
 // ── Plugins ──
 function renderPluginList(plugins, selectedUrls) {
@@ -705,8 +774,12 @@ function renderSummary() {
             <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.cloudflared_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
         </div>
         <div class="summary-card">
-            <h4>云存储</h4>
-            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${c.rclone_config_method === 'skip' ? '⏭ 跳过' : c.rclone_config_method === 'url' ? '🔗 从 URL 导入' : '📋 Base64 导入'}</span></div>
+            <h4>云存储与同步</h4>
+            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${(c._rclone_display_method || c.rclone_config_method) === 'skip' ? '⏭ 跳过' : (c._rclone_display_method || c.rclone_config_method) === 'url' ? '🔗 URL 导入' : (c._rclone_display_method || c.rclone_config_method) === 'file' ? '📂 文件上传' : '📋 Base64'}</span></div>
+            ${(c._rclone_display_method || c.rclone_config_method) !== 'skip' ? `
+            <div class="summary-row"><span class="label">部署拉取</span><span class="value">${[c.sync_pull?.workflows && '工作流', c.sync_pull?.loras && 'LoRA', c.sync_pull?.wildcards && 'Wildcards'].filter(Boolean).join(', ') || '无'}</span></div>
+            <div class="summary-row"><span class="label">输出推送</span><span class="value">${c.sync_push?.output ? (c.sync_push_method === 'move' ? '✅ move (释放空间)' : '✅ copy (保留本地)') : '⏭ 不推送'}</span></div>
+            ` : ''}
         </div>
         <div class="summary-card">
             <h4>模型与插件</h4>
@@ -918,10 +991,14 @@ async function handleImportFile(event) {
             plugins.push(...(config.extra_plugins || []));
             wizardConfig.plugins = plugins;
         }
-        // 同步偏好 (嵌套在 r2 下)
-        if (config.sync_prefs) {
+        // 同步规则 (v2) — 如果有则直接使用，不再需要 wizard 创建
+        if (config.sync_rules && config.sync_rules.length > 0) {
+            wizardConfig._imported_sync_rules = true;  // 标记已导入规则
+        }
+        // 同步偏好 (旧版 v1，嵌套在 r2 下)
+        if (config.sync_prefs && !config.sync_rules) {
             const r2 = config.sync_prefs.r2 || {};
-            wizardConfig.sync_options = {
+            wizardConfig.sync_pull = {
                 workflows: r2.sync_workflows ?? true,
                 loras: r2.sync_loras ?? true,
                 wildcards: r2.sync_wildcards ?? true,

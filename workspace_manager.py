@@ -2220,7 +2220,8 @@ def api_setup_save():
     allowed_keys = {
         "current_step", "image_type", "password",
         "cloudflared_token", "rclone_config_method", "rclone_config_value",
-        "civitai_token", "plugins", "sync_options",
+        "civitai_token", "plugins", "sync_pull", "sync_push", "sync_push_method",
+        "_imported_sync_rules",
     }
     for k, v in data.items():
         if k in allowed_keys:
@@ -2642,24 +2643,26 @@ def _run_deploy(config):
             # 迁移旧配置或加载规则
             _migrate_old_sync_prefs()
 
-            # 从向导 sync_options 自动创建 deploy 规则 (首次部署时)
+            # 从向导配置自动创建同步规则 (首次部署时, 且非导入模式)
             rules = _load_sync_rules()
-            if not rules:
-                sync_opts = config.get("sync_options", {})
+            if not rules and not config.get("_imported_sync_rules"):
+                sync_pull = config.get("sync_pull", {})
+                sync_push = config.get("sync_push", {})
+                sync_push_method = config.get("sync_push_method", "copy")
                 remotes = _parse_rclone_conf()
-                if remotes and any(sync_opts.values()):
+                if remotes:
                     first_remote = remotes[0]["name"]
-                    _deploy_log(f"根据向导配置创建同步规则 (使用 {first_remote}:)")
                     new_rules = []
-                    opt_map = [
+                    # 拉取规则
+                    pull_map = [
                         ("workflows", "拉取工作流",       "user/default/workflows"),
                         ("loras",     "拉取 LoRA 模型",   "models/loras"),
                         ("wildcards", "拉取 Wildcards",   "custom_nodes/ComfyUI-Impact-Pack/wildcards"),
                     ]
-                    for key, name, local_path in opt_map:
-                        if sync_opts.get(key):
+                    for key, name, local_path in pull_map:
+                        if sync_pull.get(key):
                             new_rules.append({
-                                "id": f"wizard-{key}-{int(time.time())}",
+                                "id": f"wizard-pull-{key}-{int(time.time())}",
                                 "name": name,
                                 "remote": first_remote,
                                 "remote_path": local_path,
@@ -2670,9 +2673,23 @@ def _run_deploy(config):
                                 "enabled": True,
                                 "filters": [],
                             })
+                    # 推送规则
+                    if sync_push.get("output"):
+                        new_rules.append({
+                            "id": f"wizard-push-output-{int(time.time())}",
+                            "name": "推送输出图片",
+                            "remote": first_remote,
+                            "remote_path": "ComfyUI/output",
+                            "local_path": "output",
+                            "direction": "push",
+                            "method": sync_push_method,
+                            "trigger": "watch",
+                            "enabled": True,
+                            "filters": ["- .thumbs/**"],
+                        })
                     if new_rules:
                         _save_sync_rules(new_rules)
-                        _deploy_log(f"已创建 {len(new_rules)} 条 deploy 规则")
+                        _deploy_log(f"根据向导配置创建了 {len(new_rules)} 条同步规则 (使用 {first_remote}:)")
                         rules = new_rules
 
             deploy_rules = [r for r in rules if r.get("trigger") == "deploy" and r.get("enabled", True)]
