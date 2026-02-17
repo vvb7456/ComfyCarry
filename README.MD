@@ -34,7 +34,7 @@ ghcr.io/vvb7456/comfyui-runpod:latest
 
 **启动命令**：
 ```bash
-bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/deploy-prebuilt.sh && bash d.sh"
+bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/deploy-prebuilt.sh && bash d.sh"
 ```
 
 ### 方式二：从零安装（20分钟）
@@ -46,7 +46,7 @@ runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404
 
 **启动命令**：
 ```bash
-bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/deploy.sh && bash d.sh"
+bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/deploy.sh && bash d.sh"
 ```
 
 ---

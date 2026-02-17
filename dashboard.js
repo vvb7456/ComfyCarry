@@ -53,7 +53,7 @@ async function loadVersionInfo() {
     const branch = d.branch || 'main';
     const ver = d.version || 'v2.4';
     if (short) {
-      el.innerHTML = `<a href="https://github.com/vvb7456/ComfyUI_RunPod_Sync/commit/${d.commit}" target="_blank"
+      el.innerHTML = `<a href="https://github.com/vvb7456/ComfyCarry/commit/${d.commit}" target="_blank"
         style="font-size:.68rem;color:var(--t3);text-decoration:none;font-family:'IBM Plex Mono',monospace" title="${branch}@${short}">
         <span style="background:rgba(124,92,252,.15);padding:1px 5px;border-radius:3px;color:var(--ac)">${branch}</span>
         <span style="margin-left:3px">${short}</span>

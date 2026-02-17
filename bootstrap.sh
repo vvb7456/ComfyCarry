@@ -6,7 +6,7 @@
 # 所有配置和部署逻辑都在 Dashboard 向导中完成
 #
 # 用法:
-#   wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main/bootstrap.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash
 # ==============================================================================
 
 set -e
@@ -75,8 +75,8 @@ if ! command -v cloudflared >/dev/null 2>&1; then
 fi
 
 # ── 下载 Dashboard 文件 ──
-DASHBOARD_DIR="/workspace/ComfyUI_RunPod_Sync"
-REPO_URL="https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main"
+DASHBOARD_DIR="/workspace/ComfyCarry"
+REPO_URL="https://raw.githubusercontent.com/vvb7456/ComfyCarry/main"
 
 mkdir -p "$DASHBOARD_DIR"
 for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html favicon.ico; do
@@ -87,7 +87,7 @@ for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html favi
 done
 
 # Write version info
-COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/vvb7456/ComfyUI_RunPod_Sync/commits/main" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
+COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/vvb7456/ComfyCarry/commits/main" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
 cat > "$DASHBOARD_DIR/.version" <<EOF
 version=v2.4
 branch=main

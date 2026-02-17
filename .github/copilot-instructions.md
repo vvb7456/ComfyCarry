@@ -1,4 +1,4 @@
-# Copilot Instructions for ComfyUI_RunPod_Sync
+# Copilot Instructions for ComfyCarry
 
 ## 项目概述
 

@@ -2529,7 +2529,7 @@ def _run_deploy(config):
                 ).stdout.strip()
 
                 # 下载预编译 wheels
-                GH_WHEELS = "https://github.com/vvb7456/ComfyUI_RunPod_Sync/releases/download/v4.5-wheels"
+                GH_WHEELS = "https://github.com/vvb7456/ComfyCarry/releases/download/v4.5-wheels"
                 _deploy_exec("mkdir -p /workspace/prebuilt_wheels")
                 _deploy_exec(
                     f'wget -q -O /workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl '
