@@ -1279,7 +1279,10 @@ def api_comfyui_params_update():
     """更新 ComfyUI 启动参数并重启"""
     data = request.get_json()
     params = data.get("params", {})
+    extra_args = data.get("extra_args", "").strip()
     args_str = _build_comfyui_args(params)
+    if extra_args:
+        args_str = args_str + " " + extra_args
 
     # 查找 Python 路径
     py = "/usr/bin/python3.13"

@@ -49,15 +49,14 @@ function showPage(page) {
 }
 
 let currentModelTab = 'local';
-const modelTabIds = ['local', 'search', 'lookup', 'cart', 'downloads'];
+const modelTabIds = ['local', 'civitai', 'downloads'];
 function switchModelTab(tab) {
   currentModelTab = tab;
   document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
   modelTabIds.forEach(id => document.getElementById('mtab-' + id).classList.toggle('hidden', id !== tab));
   if (tab === 'local') loadLocalModels();
-  else if (tab === 'search') loadFacets();
-  else if (tab === 'cart') renderCart();
-  else if (tab === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
+  else if (tab === 'civitai') loadFacets();
+  else if (tab === 'downloads') { renderDownloadsTab(); startDlStatusPolling(); }
 }
 
 // ========== Utils ==========
@@ -573,6 +572,23 @@ function switchCivitTab(tab) {
   if (tab === 'cart') renderCart();
 }
 
+function _isIdQuery(text) {
+  // Check if ALL parts are numeric IDs or CivitAI URLs
+  const parts = text.split(/[,\s\n]+/).filter(p => p.trim());
+  if (parts.length === 0) return false;
+  return parts.every(p => /^\d+$/.test(p.trim()) || /civitai\.com\/models\/\d+/.test(p.trim()));
+}
+
+function smartSearch() {
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+  if (_isIdQuery(query)) {
+    lookupIds(query);
+  } else {
+    searchModels(0, false);
+  }
+}
+
 async function searchModels(page = 0, append = false) {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
@@ -813,17 +829,19 @@ function parseIds(text) {
   return [...new Set(ids)];
 }
 
-async function lookupIds() {
-  const text = document.getElementById('id-input').value.trim();
+async function lookupIds(text) {
+  if (!text) text = document.getElementById('search-input')?.value?.trim() || '';
   const ids = parseIds(text);
   if (ids.length === 0) { showToast('请输入有效的模型 ID'); return; }
 
-  const loading = document.getElementById('lookup-loading');
-  const results = document.getElementById('lookup-results');
-  const errEl = document.getElementById('lookup-error');
+  const loading = document.getElementById('search-loading');
+  const results = document.getElementById('search-results');
+  const errEl = document.getElementById('search-error');
   const progress = document.getElementById('lookup-progress');
+  const pag = document.getElementById('search-pagination');
   errEl.innerHTML = '';
   results.innerHTML = '';
+  if (pag) pag.innerHTML = '';
   loading.classList.remove('hidden');
 
   const found = [];
@@ -963,9 +981,12 @@ function syncCartFromTextarea(el) {
     }
   }
   saveCartToStorage(); updateCartBadge();
+  // Debounce pending list re-render
+  clearTimeout(syncCartFromTextarea._timer);
+  syncCartFromTextarea._timer = setTimeout(renderPendingList, 500);
 }
 
-function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderCart(); }
+function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderPendingList(); updateCartIdsTextarea(); }
 
 async function batchDownloadCart() {
   if (selectedModels.size === 0) return showToast('购物车为空');
@@ -1035,32 +1056,31 @@ let dlStatusInterval = null;
 let _dlCompletedIds = new Set();  // track completed download IDs for auto-metadata
 
 async function refreshDownloadStatus() {
-  const container = document.getElementById('dl-status-content');
-  if (!container) return;
+  const activeEl = document.getElementById('dl-active-content');
+  const completedEl = document.getElementById('dl-completed-content');
+  const failedEl = document.getElementById('dl-failed-content');
+  if (!activeEl) return;
   try {
     const r = await fetch('/api/download/status');
     const d = await r.json();
     const active = d.active || [];
     const queue = d.queue || [];
     const history = d.history || [];
+    const completed = history.filter(h => h.status === 'completed');
+    const failed = history.filter(h => h.status === 'failed' || h.status === 'cancelled');
 
-    if (active.length === 0 && queue.length === 0 && history.length === 0) {
-      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">暂无下载任务</div>';
-      return;
-    }
-
-    let html = '';
-
-    // Active downloads
-    if (active.length > 0) {
-      html += '<div class="section-title">🔄 下载中</div>';
+    // Active + Queue
+    if (active.length === 0 && queue.length === 0) {
+      activeEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">无活跃的下载任务</div>';
+    } else {
+      let html = '';
       active.forEach(dl => {
         const pct = (dl.progress || 0).toFixed(1);
         const speed = dl.speed ? fmtBytes(dl.speed) + '/s' : '';
         html += `<div class="dl-item">
           <div class="dl-item-info">
             <span class="dl-item-name" title="${dl.filename || ''}">${dl.model_name || dl.filename || dl.id}</span>
-            <span class="dl-item-meta">${dl.version_name || ''} ${speed ? '• ' + speed : ''} ${dl.connection_type || ''}</span>
+            <span class="dl-item-meta">${dl.version_name || ''} ${speed ? '• ' + speed : ''}</span>
           </div>
           <div class="progress-bar" style="height:8px;margin:6px 0"><div class="progress-fill" style="width:${pct}%;background:var(--ac);transition:width .3s"></div></div>
           <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--t3)">
@@ -1069,11 +1089,6 @@ async function refreshDownloadStatus() {
           </div>
         </div>`;
       });
-    }
-
-    // Queued
-    if (queue.length > 0) {
-      html += '<div class="section-title" style="margin-top:12px">⏳ 队列中</div>';
       queue.forEach(dl => {
         html += `<div class="dl-item">
           <div class="dl-item-info">
@@ -1083,37 +1098,59 @@ async function refreshDownloadStatus() {
           <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
         </div>`;
       });
+      activeEl.innerHTML = html;
     }
 
     // Check for new completions → auto-fetch metadata
-    // Seed known IDs on first load (before checking for new)
     const prevSize = _dlCompletedIds.size;
-    history.filter(dl => dl.status === 'completed').forEach(dl => _dlCompletedIds.add(dl.id));
-    // Only trigger if set grew AND we had previous data (not first load)
+    completed.forEach(dl => _dlCompletedIds.add(dl.id));
     if (prevSize > 0 && _dlCompletedIds.size > prevSize) {
       setTimeout(() => _autoFetchMetadataForNewDownloads(), 3000);
     }
 
-    // History
-    if (history.length > 0) {
-      html += '<div class="section-title" style="margin-top:12px">📋 历史</div>';
-      history.slice(0, 20).forEach(dl => {
-        const statusIcon = dl.status === 'completed' ? '✅' : dl.status === 'failed' ? '❌' : '⛔';
-        const canRetry = dl.status === 'failed' || dl.status === 'cancelled';
-        html += `<div class="dl-item">
-          <div class="dl-item-info">
-            <span class="dl-item-name">${statusIcon} ${dl.model_name || dl.filename || dl.id}</span>
-            <span class="dl-item-meta">${dl.version_name || ''} ${dl.error ? '• ' + dl.error : ''}</span>
-          </div>
-          ${canRetry ? `<button class="btn btn-sm" style="padding:2px 8px;font-size:.7rem" onclick="retryDownload('${dl.id}')">🔄 重试</button>` : ''}
-        </div>`;
+    // Completed
+    if (completed.length === 0) {
+      completedEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无已完成的下载</div>';
+    } else {
+      let html = '';
+      completed.forEach(dl => {
+        html += `<div class="dl-item"><div class="dl-item-info">
+            <span class="dl-item-name">✅ ${dl.model_name || dl.filename || dl.id}</span>
+            <span class="dl-item-meta">${dl.version_name || ''}</span>
+          </div></div>`;
       });
       html += `<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="clearDlHistory()">🗑️ 清除历史</button></div>`;
+      completedEl.innerHTML = html;
     }
 
-    container.innerHTML = html;
+    // Failed
+    if (failed.length === 0) {
+      failedEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无失败的下载</div>';
+    } else {
+      let html = '';
+      failed.forEach(dl => {
+        html += `<div class="dl-item"><div class="dl-item-info">
+            <span class="dl-item-name">❌ ${dl.model_name || dl.filename || dl.id}</span>
+            <span class="dl-item-meta">${dl.version_name || ''} ${dl.error ? '• ' + dl.error : ''}</span>
+          </div>
+          <button class="btn btn-sm" style="padding:2px 8px;font-size:.7rem" onclick="retryDownload('${dl.id}')">🔄 重试</button>
+        </div>`;
+      });
+      failedEl.innerHTML = html;
+    }
+
+    // Update sub-tab counts
+    document.querySelectorAll('[data-dltab="active"]').forEach(t => {
+      t.textContent = `🔄 队列${active.length + queue.length > 0 ? ' (' + (active.length + queue.length) + ')' : ''}`;
+    });
+    document.querySelectorAll('[data-dltab="completed"]').forEach(t => {
+      t.textContent = `✅ 已完成${completed.length > 0 ? ' (' + completed.length + ')' : ''}`;
+    });
+    document.querySelectorAll('[data-dltab="failed"]').forEach(t => {
+      t.textContent = `❌ 失败${failed.length > 0 ? ' (' + failed.length + ')' : ''}`;
+    });
   } catch (e) {
-    container.innerHTML = `<div class="error-msg">获取下载状态失败: ${e.message}</div>`;
+    activeEl.innerHTML = `<div class="error-msg">获取下载状态失败: ${e.message}</div>`;
   }
 }
 
@@ -1149,6 +1186,60 @@ async function clearDlHistory() {
     showToast('历史已清除');
     refreshDownloadStatus();
   } catch (e) { showToast('清除失败: ' + e.message); }
+}
+
+let currentDlTab = 'pending';
+function switchDlTab(tab) {
+  currentDlTab = tab;
+  document.querySelectorAll('[data-dltab]').forEach(t => t.classList.toggle('active', t.dataset.dltab === tab));
+  ['pending', 'active', 'completed', 'failed'].forEach(id => {
+    const el = document.getElementById('dl-' + id + '-content');
+    if (el) el.classList.toggle('hidden', id !== tab);
+  });
+}
+
+async function renderDownloadsTab() {
+  // Update ID textarea
+  const ta = document.getElementById('cart-ids-textarea');
+  if (ta && document.activeElement !== ta) {
+    ta.value = [...selectedModels.keys()].join(', ');
+  }
+  // Render pending (cart)
+  renderPendingList();
+  // Fetch and render download status
+  await refreshDownloadStatus();
+}
+
+function renderPendingList() {
+  const container = document.getElementById('dl-pending-content');
+  if (!container) return;
+  if (selectedModels.size === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无待下载模型，从 CivitAI 页添加或在上方 ID 框输入</div>';
+    return;
+  }
+  let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>版本</th><th>操作</th></tr></thead><tbody>';
+  for (const [id, m] of selectedModels) {
+    const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cached = searchResultsCache[String(id)];
+    const allVersions = cached?.allVersions || [];
+    let versionCell = m.versionName || '-';
+    if (allVersions.length > 1) {
+      const opts = allVersions.map(v => {
+        const sel = String(v.id) === String(m.versionId) ? 'selected' : '';
+        return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
+      }).join('');
+      versionCell = `<select class="meta-version-select" onchange="changeCartVersion('${id}', this.value)" style="max-width:140px">${opts}</select>`;
+    }
+    html += `<tr>
+      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${(m.imageUrl || '').replace(/'/g, "\\'")}')"
+        onerror="this.style.display='none'"></td>
+      <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
+      <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
+      <td>${versionCell}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
 // ========== Tunnel Links (Dashboard quick links) ==========
@@ -1521,7 +1612,7 @@ async function loadComfyStatus() {
 
     // Current args
     const argsRaw = document.getElementById('comfyui-args-raw');
-    if (argsRaw) argsRaw.textContent = d.args ? d.args.join(' ') : '';
+    if (argsRaw) argsRaw.value = d.args ? d.args.join(' ') : '';
 
     el.innerHTML = html || '<div style="color:var(--t3);padding:16px">无法获取状态</div>';
   } catch (e) {
@@ -1612,6 +1703,32 @@ async function saveComfyUIParams() {
   const status = document.getElementById('comfyui-params-status');
   const params = _collectComfyParams();
 
+  // Extract extra args from the raw input that aren't covered by schema
+  const rawInput = document.getElementById('comfyui-args-raw')?.value || '';
+  const knownFlags = new Set();
+  if (_comfyParamsSchema) {
+    for (const [, schema] of Object.entries(_comfyParamsSchema)) {
+      if (schema.flag) knownFlags.add(schema.flag);
+      if (schema.flag_map) Object.values(schema.flag_map).forEach(f => knownFlags.add(f));
+      if (schema.flag_prefix) knownFlags.add(schema.flag_prefix);
+    }
+  }
+  knownFlags.add('--listen'); knownFlags.add('--port');
+  // Parse raw input to find extra flags not in schema
+  const rawParts = rawInput.replace(/^main\.py\s*/, '').split(/\s+/).filter(Boolean);
+  const extraParts = [];
+  let i = 0;
+  while (i < rawParts.length) {
+    if (knownFlags.has(rawParts[i])) {
+      i++; // skip known flag
+      if (i < rawParts.length && !rawParts[i].startsWith('--')) i++; // skip its value
+    } else {
+      extraParts.push(rawParts[i]);
+      i++;
+    }
+  }
+  const extraArgs = extraParts.join(' ');
+
   if (!confirm('保存参数将重启 ComfyUI，确定继续？')) return;
 
   status.textContent = '保存中...';
@@ -1619,7 +1736,7 @@ async function saveComfyUIParams() {
   try {
     const r = await fetch('/api/comfyui/params', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ params })
+      body: JSON.stringify({ params, extra_args: extraArgs })
     });
     const d = await r.json();
     if (d.ok) {

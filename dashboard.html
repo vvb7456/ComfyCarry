@@ -1781,10 +1781,8 @@
             <div class="page-body">
                 <div class="tabs">
                     <div class="tab active" data-mtab="local" onclick="switchModelTab('local')">📦 本地模型</div>
-                    <div class="tab" data-mtab="search" onclick="switchModelTab('search')">🔎 搜索</div>
-                    <div class="tab" data-mtab="lookup" onclick="switchModelTab('lookup')">📋 ID 查询</div>
-                    <div class="tab" data-mtab="cart" onclick="switchModelTab('cart')">🛒 已选 <span class="badge-count" id="cart-badge" style="display:none">0</span></div>
-                    <div class="tab" data-mtab="downloads" onclick="switchModelTab('downloads')">📥 下载管理</div>
+                    <div class="tab" data-mtab="civitai" onclick="switchModelTab('civitai')">🔍 CivitAI</div>
+                    <div class="tab" data-mtab="downloads" onclick="switchModelTab('downloads')">📥 下载管理 <span class="badge-count" id="cart-badge" style="display:none">0</span></div>
                 </div>
                 <!-- Local Models Tab -->
                 <div id="mtab-local">
@@ -1804,11 +1802,17 @@
                     <div id="local-models-status"></div>
                     <div id="local-models-grid" class="model-grid"></div>
                 </div>
-                <!-- CivitAI Search Tab -->
-                <div id="mtab-search" class="hidden">
-                        <div class="search-bar">
-                            <input type="text" id="search-input" placeholder="搜索模型名称..." onkeydown="if(event.key==='Enter')searchModels()">
-                            <button class="btn btn-primary" onclick="searchModels()">搜索</button>
+                <!-- CivitAI Tab (unified search + ID lookup) -->
+                <div id="mtab-civitai" class="hidden">
+                        <div class="search-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <input type="text" id="search-input" placeholder="搜索模型名 / 输入 ID / 粘贴 CivitAI URL..." onkeydown="if(event.key==='Enter')smartSearch()" style="flex:1;min-width:200px">
+                            <select id="filter-sort" style="width:auto;min-width:140px">
+                                <option value="Most Downloaded">最多下载</option>
+                                <option value="Highest Rated">最高评分</option>
+                                <option value="Newest">最新</option>
+                                <option value="Relevancy">相关性</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="smartSearch()">搜索</button>
                         </div>
                         <div class="filters">
                             <div class="filter-row"><label>类型</label>
@@ -1817,37 +1821,33 @@
                             <div class="filter-row"><label>Base Model</label>
                                 <div class="chip-select" id="filter-bm-chips" style="max-height:120px;overflow-y:auto"></div>
                             </div>
-                            <div class="filter-row"><label>排序</label>
-                                <select id="filter-sort" style="flex:0 0 auto;width:auto;min-width:150px">
-                                    <option value="Most Downloaded">最多下载</option>
-                                    <option value="Highest Rated">最高评分</option>
-                                    <option value="Newest">最新</option>
-                                    <option value="Relevancy">相关性</option>
-                                </select>
-                            </div>
                         </div>
                         <div id="search-error"></div>
-                        <div id="search-loading" class="loading hidden"><div class="spinner"></div><div>搜索中...</div></div>
+                        <div id="search-loading" class="loading hidden"><div class="spinner"></div><div>搜索中...</div><div id="lookup-progress" style="margin-top:6px;font-size:.78rem"></div></div>
                         <div id="search-results" class="results-grid"></div>
                         <div id="search-pagination" class="pagination"></div>
                 </div>
-                <!-- ID Lookup Tab -->
-                <div id="mtab-lookup" class="hidden">
-                        <div style="margin-bottom:14px">
-                            <label style="font-size:.85rem;color:var(--t2);display:block;margin-bottom:5px">Model ID（逗号/换行/空格分隔，支持 URL）</label>
-                            <div style="display:flex;gap:10px"><textarea id="id-input" style="flex:1;min-height:70px" placeholder="例如: 1102, 4384&#10;https://civitai.com/models/1102"></textarea><button class="btn btn-primary" onclick="lookupIds()" id="btn-lookup">查询</button></div>
-                        </div>
-                        <div id="lookup-error"></div>
-                        <div id="lookup-loading" class="loading hidden"><div class="spinner"></div><div>查询中...</div><div id="lookup-progress" style="margin-top:6px;font-size:.78rem"></div></div>
-                        <div id="lookup-results" class="results-grid"></div>
-                </div>
-                <!-- Cart Tab -->
-                <div id="mtab-cart" class="hidden">
-                        <div id="cart-content"></div>
-                </div>
-                <!-- Downloads Tab -->
+                <!-- Downloads Tab (unified: cart + active + history) -->
                 <div id="mtab-downloads" class="hidden">
-                    <div id="dl-status-content"><span style="font-size:.82rem;color:var(--t3)">加载中...</span></div>
+                    <!-- ID textarea + action bar -->
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                        <span style="font-size:.85rem;font-weight:600;color:var(--t1)">模型 ID 列表</span>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()">📥 一键下载全部</button>
+                        <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderDownloadsTab();}">🗑️ 清空</button>
+                    </div>
+                    <textarea class="cart-ids-box" id="cart-ids-textarea" oninput="syncCartFromTextarea(this)" style="min-height:50px;margin-bottom:12px" placeholder="输入模型 ID（逗号分隔）或从 CivitAI 页添加"></textarea>
+                    <!-- Sub-tabs -->
+                    <div class="tabs" style="font-size:.85rem">
+                        <div class="tab active" data-dltab="pending" onclick="switchDlTab('pending')">🛒 待下载</div>
+                        <div class="tab" data-dltab="active" onclick="switchDlTab('active')">🔄 队列</div>
+                        <div class="tab" data-dltab="completed" onclick="switchDlTab('completed')">✅ 已完成</div>
+                        <div class="tab" data-dltab="failed" onclick="switchDlTab('failed')">❌ 失败</div>
+                    </div>
+                    <div id="dl-pending-content"></div>
+                    <div id="dl-active-content" class="hidden"></div>
+                    <div id="dl-completed-content" class="hidden"></div>
+                    <div id="dl-failed-content" class="hidden"></div>
                 </div>
             </div>
         </div>
@@ -1892,16 +1892,17 @@
                 <div id="comfyui-queue-info" style="font-size:.85rem;color:var(--t2)">加载中...</div>
 
                 <!-- 启动参数 -->
-                <div class="section-title" style="margin-top:24px">
-                    ⚙️ 启动参数
-                    <span style="font-size:.75rem;color:var(--t3);margin-left:8px" id="comfyui-args-raw"></span>
+                <div class="section-title" style="margin-top:24px;display:flex;align-items:center">
+                    <span>⚙️ 启动参数</span>
+                    <div style="flex:1"></div>
+                    <button class="btn btn-sm" onclick="comfyFreeVRAM()" style="font-size:.75rem;padding:3px 10px">🧹 释放显存</button>
+                    <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()" style="font-size:.75rem;padding:3px 10px;margin-left:4px">💾 保存并重启</button>
+                    <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3);margin-left:8px"></span>
+                </div>
+                <div style="margin-bottom:8px">
+                    <input type="text" id="comfyui-args-raw" placeholder="main.py --listen 0.0.0.0 --port 8188 ..." style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;width:100%">
                 </div>
                 <div id="comfyui-params-form" class="comfy-params-form">加载中...</div>
-                <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-                    <button class="btn btn-primary" onclick="saveComfyUIParams()">💾 保存并重启</button>
-                    <button class="btn btn-sm" onclick="comfyFreeVRAM()">🧹 释放显存</button>
-                    <span id="comfyui-params-status" style="font-size:.82rem;color:var(--t3)"></span>
-                </div>
 
                 <!-- 日志 -->
                 <div class="section-title" style="margin-top:24px">📜 ComfyUI 日志</div>
@@ -1922,10 +1923,7 @@
                     <div class="tab active" data-ptab="installed" onclick="switchPluginTab('installed')">📦 已安装</div>
                     <div class="tab" data-ptab="browse" onclick="switchPluginTab('browse')">🔎 浏览</div>
                     <div class="tab" data-ptab="git" onclick="switchPluginTab('git')">🔗 Git 安装</div>
-                    <div style="flex:1"></div>
-                    <span id="plugin-queue-indicator" class="hidden" style="font-size:.78rem;color:var(--amber);margin-right:8px">⏳ 队列处理中...</span>
-                    <button class="btn btn-sm" onclick="loadPluginsPage()" style="font-size:.75rem;padding:4px 10px">🔄 刷新</button>
-                    <button class="btn btn-sm btn-primary" onclick="updateAllPlugins()" style="font-size:.75rem;padding:4px 10px;margin-left:4px">⬆️ 全部更新</button>
+                    <span id="plugin-queue-indicator" class="hidden" style="font-size:.78rem;color:var(--amber);margin-left:auto">⏳ 队列处理中...</span>
                 </div>
                 <!-- Installed Plugins Tab -->
                 <div id="ptab-installed">
@@ -1937,6 +1935,9 @@
                             <option value="disabled">已禁用</option>
                             <option value="update">有更新</option>
                         </select>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm" onclick="loadPluginsPage()" style="font-size:.75rem;padding:4px 10px">🔄 刷新</button>
+                        <button class="btn btn-sm btn-primary" onclick="updateAllPlugins()" style="font-size:.75rem;padding:4px 10px">⬆️ 全部更新</button>
                     </div>
                     <div id="plugin-installed-stats" style="font-size:.82rem;color:var(--t2);margin-bottom:12px"></div>
                     <div id="plugin-installed-list"></div>
