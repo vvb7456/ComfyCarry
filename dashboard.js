@@ -179,7 +179,8 @@ function renderMetaContent(data) {
       }
 
       const isVideo = img.type === 'video' || (img.name && /\.(webm|mp4)$/i.test(img.name));
-      html += `<figure${isVideo ? ' style="position:relative"' : ''}><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">${isVideo ? '<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;padding:2px 8px;border-radius:4px;font-size:.75rem">🎬 视频</span>' : ''}</figure>`;
+      const figcaptionHtml = caption ? `<figcaption>${caption}</figcaption>` : '';
+      html += `<figure${isVideo ? ' style="position:relative"' : ''}><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">${isVideo ? '<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;padding:2px 8px;border-radius:4px;font-size:.75rem">🎬 视频</span>' : ''}${figcaptionHtml}</figure>`;
     });
     html += '</div>';
   }

@@ -147,6 +147,8 @@ def _load_setup_state():
         "plugins": [p["url"] for p in DEFAULT_PLUGINS],
         "deploy_started": False,
         "deploy_completed": False,
+        "deploy_error": "",
+        "deploy_steps_completed": [],
         "deploy_log": [],
     }
     if SETUP_STATE_FILE.exists():
@@ -1919,6 +1921,8 @@ def api_setup_deploy():
         state = _load_setup_state()
         state["deploy_started"] = True
         state["deploy_completed"] = False
+        state["deploy_error"] = ""
+        # 保留 deploy_steps_completed 以支持智能重试
         _save_setup_state(state)
 
         with _deploy_log_lock:
@@ -1947,7 +1951,8 @@ def api_setup_log_stream():
                 break
             if not _deploy_thread or not _deploy_thread.is_alive():
                 if not state.get("deploy_completed"):
-                    yield f"data: {json.dumps({'type': 'done', 'success': False, 'msg': '部署进程异常终止'}, ensure_ascii=False)}\n\n"
+                    error_msg = state.get("deploy_error") or "部署进程异常终止"
+                    yield f"data: {json.dumps({'type': 'done', 'success': False, 'msg': error_msg}, ensure_ascii=False)}\n\n"
                 break
             time.sleep(0.5)
     return Response(generate(), mimetype="text/event-stream",
@@ -2025,6 +2030,22 @@ def _deploy_exec(cmd, timeout=600, label=""):
         return False
 
 
+def _step_done(step_key):
+    """检查某个部署步骤是否在上次尝试中已完成 (用于智能重试)"""
+    state = _load_setup_state()
+    return step_key in state.get("deploy_steps_completed", [])
+
+
+def _mark_step_done(step_key):
+    """标记步骤完成并持久化"""
+    state = _load_setup_state()
+    completed = state.get("deploy_steps_completed", [])
+    if step_key not in completed:
+        completed.append(step_key)
+    state["deploy_steps_completed"] = completed
+    _save_setup_state(state)
+
+
 def _run_deploy(config):
     """主部署流程 — 在后台线程运行, 完整复刻 deploy.sh / deploy-prebuilt.sh 逻辑"""
     import base64 as _b64
@@ -2037,21 +2058,25 @@ def _run_deploy(config):
         # ─────────────────────────────────────────────
         # STEP 1: 系统依赖
         # ─────────────────────────────────────────────
-        _deploy_step("安装系统依赖")
-        _deploy_log("正在安装系统依赖包...")
-        _deploy_exec(
-            "apt-get update -qq && "
-            "apt-get install -y --no-install-recommends "
-            "git git-lfs aria2 rclone jq curl ffmpeg libgl1 "
-            "libglib2.0-0 libsm6 libxext6 build-essential",
-            timeout=300, label="apt-get install"
-        )
+        if _step_done("system_deps"):
+            _deploy_step("安装系统依赖 ✅ (已完成, 跳过)")
+        else:
+            _deploy_step("安装系统依赖")
+            _deploy_log("正在安装系统依赖包...")
+            _deploy_exec(
+                "apt-get update -qq && "
+                "apt-get install -y --no-install-recommends "
+                "git git-lfs aria2 rclone jq curl ffmpeg libgl1 "
+                "libglib2.0-0 libsm6 libxext6 build-essential",
+                timeout=300, label="apt-get install"
+            )
 
-        # 将系统 python 指向 3.13 (保持原 deploy.sh 逻辑)
-        py313 = subprocess.run("command -v python3.13", shell=True, capture_output=True, text=True).stdout.strip()
-        if py313:
-            _deploy_exec(f'ln -sf "{py313}" /usr/local/bin/python && ln -sf "{py313}" /usr/bin/python || true')
-        _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q', label="pip upgrade")
+            # 将系统 python 指向 3.13 (保持原 deploy.sh 逻辑)
+            py313 = subprocess.run("command -v python3.13", shell=True, capture_output=True, text=True).stdout.strip()
+            if py313:
+                _deploy_exec(f'ln -sf "{py313}" /usr/local/bin/python && ln -sf "{py313}" /usr/bin/python || true')
+            _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q', label="pip upgrade")
+            _mark_step_done("system_deps")
 
         # ─────────────────────────────────────────────
         # STEP 2: Cloudflare Tunnel
@@ -2103,14 +2128,18 @@ def _run_deploy(config):
         # STEP 4: PyTorch
         # ─────────────────────────────────────────────
         if image_type == "generic":
-            _deploy_step("安装 PyTorch")
-            TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
-            _deploy_log("安装 torch 2.9.1 (CUDA 12.8)...")
-            _deploy_exec(
-                f'{PIP} install --no-cache-dir torch==2.9.1 --index-url "{TORCH_INDEX}"',
-                timeout=600, label="pip install torch"
-            )
-            _deploy_exec(f'{PIP} install --no-cache-dir hf_transfer', label="hf_transfer")
+            if _step_done("pytorch"):
+                _deploy_step("安装 PyTorch ✅ (已完成, 跳过)")
+            else:
+                _deploy_step("安装 PyTorch")
+                TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
+                _deploy_log("安装 torch 2.9.1 (CUDA 12.8)...")
+                _deploy_exec(
+                    f'{PIP} install --no-cache-dir torch==2.9.1 --index-url "{TORCH_INDEX}"',
+                    timeout=600, label="pip install torch"
+                )
+                _deploy_exec(f'{PIP} install --no-cache-dir hf_transfer', label="hf_transfer")
+                _mark_step_done("pytorch")
         else:
             _deploy_step("检查预装 PyTorch")
             _deploy_log("预构建镜像 — 跳过 torch 安装")
@@ -2119,121 +2148,131 @@ def _run_deploy(config):
         # ─────────────────────────────────────────────
         # STEP 5: ComfyUI
         # ─────────────────────────────────────────────
-        _deploy_step("安装 ComfyUI")
-        if image_type == "prebuilt":
-            # 预构建镜像: 从 /opt/ComfyUI 复制
-            if not Path("/workspace/ComfyUI/main.py").exists():
-                _deploy_log("从镜像复制 ComfyUI...")
-                _deploy_exec("mkdir -p /workspace/ComfyUI && cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
+        if _step_done("comfyui_install"):
+            _deploy_step("安装 ComfyUI ✅ (已完成, 跳过)")
+            _deploy_step("ComfyUI 健康检查 ✅ (已完成, 跳过)")
+        else:
+            _deploy_step("安装 ComfyUI")
+            if image_type == "prebuilt":
+                # 预构建镜像: 从 /opt/ComfyUI 复制
+                if not Path("/workspace/ComfyUI/main.py").exists():
+                    _deploy_log("从镜像复制 ComfyUI...")
+                    _deploy_exec("mkdir -p /workspace/ComfyUI && cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
+                else:
+                    _deploy_log("ComfyUI 已存在, 跳过复制")
             else:
-                _deploy_log("ComfyUI 已存在, 跳过复制")
-        else:
-            # 通用镜像: git clone
-            if Path("/workspace/ComfyUI").exists():
-                _deploy_exec("rm -rf /workspace/ComfyUI")
-            _deploy_log("克隆 ComfyUI 仓库...")
-            _deploy_exec("cd /workspace && git clone https://github.com/comfyanonymous/ComfyUI.git", timeout=120)
-            _deploy_log("安装 ComfyUI 依赖...")
-            _deploy_exec(f"cd /workspace/ComfyUI && {PIP} install --no-cache-dir -r requirements.txt", timeout=300)
+                # 通用镜像: git clone
+                if Path("/workspace/ComfyUI").exists():
+                    _deploy_exec("rm -rf /workspace/ComfyUI")
+                _deploy_log("克隆 ComfyUI 仓库...")
+                _deploy_exec("cd /workspace && git clone https://github.com/comfyanonymous/ComfyUI.git", timeout=120)
+                _deploy_log("安装 ComfyUI 依赖...")
+                _deploy_exec(f"cd /workspace/ComfyUI && {PIP} install --no-cache-dir -r requirements.txt", timeout=300)
 
-        # 健康检查 (与原 deploy.sh 完全一致)
-        _deploy_step("ComfyUI 健康检查")
-        _deploy_log("启动首次健康检查...")
-        _deploy_exec(f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 --port 8188 > /tmp/comfy_boot.log 2>&1 &')
-        boot_ok = False
-        for i in range(30):
-            time.sleep(2)
-            try:
-                log = Path("/tmp/comfy_boot.log").read_text(errors="ignore")
-                if "To see the GUI go to" in log:
-                    boot_ok = True
-                    break
-            except Exception:
-                pass
-            _deploy_log(f"等待 ComfyUI 启动... ({i+1}/30)")
+            # 健康检查 (与原 deploy.sh 完全一致)
+            _deploy_step("ComfyUI 健康检查")
+            _deploy_log("启动首次健康检查...")
+            _deploy_exec(f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 --port 8188 > /tmp/comfy_boot.log 2>&1 &')
+            boot_ok = False
+            for i in range(30):
+                time.sleep(2)
+                try:
+                    log = Path("/tmp/comfy_boot.log").read_text(errors="ignore")
+                    if "To see the GUI go to" in log:
+                        boot_ok = True
+                        break
+                except Exception:
+                    pass
+                _deploy_log(f"等待 ComfyUI 启动... ({i+1}/30)")
 
-        # 清理健康检查进程
-        _deploy_exec("pkill -f 'main.py --listen 127.0.0.1 --port 8188' 2>/dev/null; sleep 1", label="停止检查进程")
+            # 清理健康检查进程
+            _deploy_exec("pkill -f 'main.py --listen 127.0.0.1 --port 8188' 2>/dev/null; sleep 1", label="停止检查进程")
 
-        if boot_ok:
-            _deploy_log("✅ ComfyUI 健康检查通过")
-        else:
-            _deploy_log("❌ ComfyUI 健康检查失败!", "error")
-            try:
-                err = Path("/tmp/comfy_boot.log").read_text(errors="ignore")[-500:]
-                _deploy_log(f"最后日志: {err}", "error")
-            except Exception:
-                pass
-            # 不中断, 继续后续步骤
+            if boot_ok:
+                _deploy_log("✅ ComfyUI 健康检查通过")
+            else:
+                _deploy_log("❌ ComfyUI 健康检查失败!", "error")
+                try:
+                    err = Path("/tmp/comfy_boot.log").read_text(errors="ignore")[-500:]
+                    _deploy_log(f"最后日志: {err}", "error")
+                except Exception:
+                    pass
+                # 不中断, 继续后续步骤
+
+            _mark_step_done("comfyui_install")
 
         # ─────────────────────────────────────────────
         # STEP 6: 加速组件 (FA3 / SA3)
         # ─────────────────────────────────────────────
         if image_type == "generic":
-            _deploy_step("安装加速组件 (FA3/SA3)")
-            _deploy_log("检测 GPU 架构...")
-            gpu_info = _detect_gpu_info()
-            cuda_cap = gpu_info.get("cuda_cap", "0.0")
-            cuda_major = int(cuda_cap.split(".")[0]) if cuda_cap else 0
-            _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
-
-            # Python 版本 tag
-            py_ver_tag = subprocess.run(
-                f'{PY} -c "import sys; print(f\\"cp{{sys.version_info.major}}{{sys.version_info.minor}}\\")"',
-                shell=True, capture_output=True, text=True, timeout=5
-            ).stdout.strip()
-
-            # 下载预编译 wheels
-            GH_WHEELS = "https://github.com/vvb7456/ComfyUI_RunPod_Sync/releases/download/v4.5-wheels"
-            _deploy_exec("mkdir -p /workspace/prebuilt_wheels")
-            _deploy_exec(
-                f'wget -q -O /workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl '
-                f'"{GH_WHEELS}/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl" || true',
-                label="下载 FA3 wheel"
-            )
-            if py_ver_tag in ("cp313", "cp312"):
-                _deploy_exec(
-                    f'wget -q -O /workspace/prebuilt_wheels/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl '
-                    f'"{GH_WHEELS}/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl" || true',
-                    label=f"下载 SA3 wheel ({py_ver_tag})"
-                )
-
-            # FlashAttention 安装 (保持原 deploy.sh 逻辑)
-            if cuda_major >= 9:
-                fa_wheel = "/workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl"
-                if not _deploy_exec(f'[ -f "{fa_wheel}" ] && {PIP} install "{fa_wheel}"'):
-                    _deploy_log("Wheel 不可用, 源码编译 FA3...", "warn")
-                    _deploy_exec(
-                        f'cd /workspace && git clone https://github.com/Dao-AILab/flash-attention.git && '
-                        f'cd flash-attention/hopper && MAX_JOBS=8 {PY} setup.py install && '
-                        f'cd /workspace && rm -rf flash-attention',
-                        timeout=1200, label="编译 FA3"
-                    )
+            if _step_done("accelerators"):
+                _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
             else:
-                _deploy_exec(f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
-                             timeout=600, label="安装 FA2")
+                _deploy_step("安装加速组件 (FA3/SA3)")
+                _deploy_log("检测 GPU 架构...")
+                gpu_info = _detect_gpu_info()
+                cuda_cap = gpu_info.get("cuda_cap", "0.0")
+                cuda_major = int(cuda_cap.split(".")[0]) if cuda_cap else 0
+                _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
 
-            # SageAttention 安装 (保持原 deploy.sh 逻辑)
-            if cuda_major >= 10:
-                sa_wheel = f"/workspace/prebuilt_wheels/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl"
-                if not _deploy_exec(f'[ -f "{sa_wheel}" ] && {PIP} install "{sa_wheel}"'):
-                    _deploy_log("Wheel 不可用, 源码编译 SA3...", "warn")
+                # Python 版本 tag
+                py_ver_tag = subprocess.run(
+                    f'{PY} -c "import sys; print(f\\"cp{{sys.version_info.major}}{{sys.version_info.minor}}\\")"',
+                    shell=True, capture_output=True, text=True, timeout=5
+                ).stdout.strip()
+
+                # 下载预编译 wheels
+                GH_WHEELS = "https://github.com/vvb7456/ComfyUI_RunPod_Sync/releases/download/v4.5-wheels"
+                _deploy_exec("mkdir -p /workspace/prebuilt_wheels")
+                _deploy_exec(
+                    f'wget -q -O /workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl '
+                    f'"{GH_WHEELS}/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl" || true',
+                    label="下载 FA3 wheel"
+                )
+                if py_ver_tag in ("cp313", "cp312"):
+                    _deploy_exec(
+                        f'wget -q -O /workspace/prebuilt_wheels/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl '
+                        f'"{GH_WHEELS}/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl" || true',
+                        label=f"下载 SA3 wheel ({py_ver_tag})"
+                    )
+
+                # FlashAttention 安装 (保持原 deploy.sh 逻辑)
+                if cuda_major >= 9:
+                    fa_wheel = "/workspace/prebuilt_wheels/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl"
+                    if not _deploy_exec(f'[ -f "{fa_wheel}" ] && {PIP} install "{fa_wheel}"'):
+                        _deploy_log("Wheel 不可用, 源码编译 FA3...", "warn")
+                        _deploy_exec(
+                            f'cd /workspace && git clone https://github.com/Dao-AILab/flash-attention.git && '
+                            f'cd flash-attention/hopper && MAX_JOBS=8 {PY} setup.py install && '
+                            f'cd /workspace && rm -rf flash-attention',
+                            timeout=1200, label="编译 FA3"
+                        )
+                else:
+                    _deploy_exec(f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
+                                 timeout=600, label="安装 FA2")
+
+                # SageAttention 安装 (保持原 deploy.sh 逻辑)
+                if cuda_major >= 10:
+                    sa_wheel = f"/workspace/prebuilt_wheels/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl"
+                    if not _deploy_exec(f'[ -f "{sa_wheel}" ] && {PIP} install "{sa_wheel}"'):
+                        _deploy_log("Wheel 不可用, 源码编译 SA3...", "warn")
+                        _deploy_exec(
+                            f'cd /workspace && git clone https://github.com/thu-ml/SageAttention.git && '
+                            f'cd SageAttention/sageattention3_blackwell && {PY} setup.py install && '
+                            f'cd /workspace && rm -rf SageAttention',
+                            timeout=1200, label="编译 SA3"
+                        )
+                else:
                     _deploy_exec(
                         f'cd /workspace && git clone https://github.com/thu-ml/SageAttention.git && '
-                        f'cd SageAttention/sageattention3_blackwell && {PY} setup.py install && '
+                        f'cd SageAttention && {PIP} install . --no-build-isolation && '
                         f'cd /workspace && rm -rf SageAttention',
-                        timeout=1200, label="编译 SA3"
+                        timeout=600, label="安装 SA2"
                     )
-            else:
-                _deploy_exec(
-                    f'cd /workspace && git clone https://github.com/thu-ml/SageAttention.git && '
-                    f'cd SageAttention && {PIP} install . --no-build-isolation && '
-                    f'cd /workspace && rm -rf SageAttention',
-                    timeout=600, label="安装 SA2"
-                )
 
-            _deploy_exec("rm -rf /workspace/prebuilt_wheels")
-            _deploy_log("✅ 加速组件安装完成")
+                _deploy_exec("rm -rf /workspace/prebuilt_wheels")
+                _deploy_log("✅ 加速组件安装完成")
+                _mark_step_done("accelerators")
         else:
             _deploy_step("检查加速组件")
             _deploy_log("预构建镜像 — FA3/SA3 已预装, 跳过")
@@ -2403,6 +2442,8 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
 
         state = _load_setup_state()
         state["deploy_completed"] = True
+        state["deploy_error"] = ""
+        state["deploy_steps_completed"] = []  # 清理: 成功后无需保留
         _save_setup_state(state)
 
         gpu_info = _detect_gpu_info()
@@ -2413,6 +2454,14 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
         _deploy_log(f"❌ 部署失败: {e}", "error")
         import traceback
         _deploy_log(traceback.format_exc(), "error")
+        # 保存错误状态, 允许重试 (deploy_steps_completed 已逐步保存)
+        try:
+            state = _load_setup_state()
+            state["deploy_error"] = str(e)
+            state["deploy_started"] = False
+            _save_setup_state(state)
+        except Exception:
+            pass
 
 
 # ====================================================================

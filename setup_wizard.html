@@ -317,12 +317,20 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 
     <!-- Deploy Progress View -->
     <div class="deploy-view" id="deploy-view">
-        <div class="step-title">⚙️ 正在部署...</div>
+        <div class="step-title" id="deploy-title">⚙️ 正在部署...</div>
         <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
         <div class="deploy-steps-list" id="deploy-steps-list"></div>
         <div class="deploy-log" id="deploy-log"></div>
+        <!-- 错误详情 (部署失败时显示) -->
+        <div id="deploy-error-banner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:14px;word-break:break-word;"></div>
+        <!-- 成功按钮 -->
         <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
             <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 Dashboard</button>
+        </div>
+        <!-- 失败按钮 -->
+        <div class="btn-row" id="deploy-fail-row" style="display:none;margin-top:16px">
+            <button class="btn btn-secondary" onclick="backToWizard()">⬅ 返回修改配置</button>
+            <button class="btn btn-primary btn-lg" onclick="retryDeploy()">🔄 重试部署</button>
         </div>
     </div>
 </div>
@@ -373,6 +381,16 @@ async function init() {
         if (state.deploy_started && !state.deploy_completed) {
             showDeployView();
             connectSSE();
+        } else if (state.deploy_error) {
+            // 上次部署失败 — 显示错误提示，允许重试或修改配置
+            showStep(TOTAL_STEPS - 1);  // 回到确认页
+            renderSummary();
+            const summaryEl = document.getElementById('deploy-summary');
+            summaryEl.innerHTML = `
+                <div style="padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);margin-bottom:16px;">
+                    <strong>⚠️ 上次部署未完成:</strong> ${esc(state.deploy_error)}<br>
+                    <small>点击「重试部署」将自动跳过已完成的步骤。</small>
+                </div>` + summaryEl.innerHTML;
         }
 
         // ── 环境变量预填充 ──
@@ -629,24 +647,40 @@ function connectSSE() {
         if (data.type === 'done') {
             evtSource.close();
             if (elapsedTimer) clearInterval(elapsedTimer);
-            // Mark last step done
+            // Mark last step done or failed
             const lastActive = stepsEl.querySelector('.deploy-step-item.active');
-            if (lastActive) { lastActive.classList.remove('active'); lastActive.classList.add('done'); lastActive.querySelector('.step-icon').textContent = '✅'; }
+            if (lastActive) {
+                lastActive.classList.remove('active');
+                if (data.success) {
+                    lastActive.classList.add('done');
+                    lastActive.querySelector('.step-icon').textContent = '✅';
+                } else {
+                    lastActive.style.color = 'var(--red)';
+                    lastActive.querySelector('.step-icon').textContent = '❌';
+                }
+            }
 
             if (data.success) {
+                document.getElementById('deploy-title').textContent = '✅ 部署完成';
                 const doneEl = document.createElement('div');
                 doneEl.className = 'log-line info';
                 doneEl.style.color = 'var(--green)';
                 doneEl.style.fontWeight = '600';
                 doneEl.textContent = '🎉 部署完成！';
                 logEl.appendChild(doneEl);
+                document.getElementById('deploy-done-row').style.display = 'flex';
             } else {
+                document.getElementById('deploy-title').textContent = '❌ 部署失败';
                 const errEl = document.createElement('div');
                 errEl.className = 'log-line error';
                 errEl.textContent = '❌ ' + (data.msg || '部署失败');
                 logEl.appendChild(errEl);
+                // 显示错误 banner
+                const banner = document.getElementById('deploy-error-banner');
+                banner.style.display = 'block';
+                banner.innerHTML = `<strong>错误:</strong> ${esc(data.msg || '部署进程异常终止')}<br><small>已完成的步骤会在重试时自动跳过，节省时间。</small>`;
+                document.getElementById('deploy-fail-row').style.display = 'flex';
             }
-            document.getElementById('deploy-done-row').style.display = 'flex';
             logEl.scrollTop = logEl.scrollHeight;
             return;
         }
@@ -668,6 +702,26 @@ function connectSSE() {
         // Connection lost — might be done
         setTimeout(() => { evtSource.close(); }, 3000);
     };
+}
+
+function retryDeploy() {
+    // 重置 deploy view 状态
+    document.getElementById('deploy-steps-list').innerHTML = '';
+    document.getElementById('deploy-log').innerHTML = '';
+    document.getElementById('deploy-error-banner').style.display = 'none';
+    document.getElementById('deploy-fail-row').style.display = 'none';
+    document.getElementById('deploy-done-row').style.display = 'none';
+    document.getElementById('deploy-title').textContent = '⚙️ 正在部署... (智能重试)';
+    completedSteps = [];
+    startDeploy();
+}
+
+function backToWizard() {
+    // 回到配置确认页
+    document.getElementById('deploy-view').classList.remove('active');
+    document.getElementById('progressBar').style.display = '';
+    showStep(TOTAL_STEPS - 1);
+    renderSummary();
 }
 
 // ── Start ──
