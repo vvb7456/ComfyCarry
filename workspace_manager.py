@@ -2977,6 +2977,14 @@ def _sync_worker_loop():
         for rule in watch_rules:
             if _sync_worker_stop.is_set():
                 break
+            # Push 方向: 跳过空目录 (只有占位文件或完全为空)
+            if rule.get("direction") == "push":
+                local_abs = os.path.join(COMFYUI_DIR, rule.get("local_path", ""))
+                if os.path.isdir(local_abs):
+                    real_files = [f for f in os.listdir(local_abs)
+                                  if not f.startswith('.') and not f.startswith('_')]
+                    if not real_files:
+                        continue  # 无实际文件，跳过本轮
             _run_sync_rule(rule)
         # 等待最短 interval，默认 15 秒
         intervals = [r.get("watch_interval", 15) for r in watch_rules]
