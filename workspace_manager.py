@@ -2773,18 +2773,18 @@ SYNC_PREFS_FILE = Path("/workspace/.sync_prefs.json")  # 向后兼容
 
 # 同步规则预设模板 (前端快速添加)
 SYNC_RULE_TEMPLATES = [
-    {"id": "tpl-pull-workflows",  "name": "⬇️ 下拉工作流",        "direction": "pull", "remote_path": "comfyui-assets/workflow",    "local_path": "user/default/workflows", "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-loras",      "name": "⬇️ 下拉 LoRA",         "direction": "pull", "remote_path": "comfyui-assets/loras",       "local_path": "models/loras",           "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-checkpoints","name": "⬇️ 下拉 Checkpoints",  "direction": "pull", "remote_path": "comfyui-assets/checkpoints", "local_path": "models/checkpoints",     "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-controlnet", "name": "⬇️ 下拉 ControlNet",   "direction": "pull", "remote_path": "comfyui-assets/controlnet",  "local_path": "models/controlnet",      "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-embeddings", "name": "⬇️ 下拉 Embeddings",   "direction": "pull", "remote_path": "comfyui-assets/embeddings",  "local_path": "models/embeddings",      "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-vae",        "name": "⬇️ 下拉 VAE",          "direction": "pull", "remote_path": "comfyui-assets/vae",         "local_path": "models/vae",             "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-upscale",    "name": "⬇️ 下拉 Upscale",      "direction": "pull", "remote_path": "comfyui-assets/upscale",     "local_path": "models/upscale_models",  "method": "sync",  "trigger": "deploy"},
-    {"id": "tpl-pull-wildcards",  "name": "⬇️ 下拉 Wildcards",    "direction": "pull", "remote_path": "comfyui-assets/wildcards",   "local_path": "custom_nodes/comfyui-dynamicprompts/wildcards", "method": "sync", "trigger": "deploy"},
-    {"id": "tpl-pull-input",      "name": "⬇️ 下拉 Input 素材",   "direction": "pull", "remote_path": "comfyui-assets/input",       "local_path": "input",                  "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-workflows",  "name": "⬇️ 下拉工作流",        "direction": "pull", "remote_path": "comfyui-assets/workflow",    "local_path": "user/default/workflows", "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-loras",      "name": "⬇️ 下拉 LoRA",         "direction": "pull", "remote_path": "comfyui-assets/loras",       "local_path": "models/loras",           "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-checkpoints","name": "⬇️ 下拉 Checkpoints",  "direction": "pull", "remote_path": "comfyui-assets/checkpoints", "local_path": "models/checkpoints",     "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-controlnet", "name": "⬇️ 下拉 ControlNet",   "direction": "pull", "remote_path": "comfyui-assets/controlnet",  "local_path": "models/controlnet",      "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-embeddings", "name": "⬇️ 下拉 Embeddings",   "direction": "pull", "remote_path": "comfyui-assets/embeddings",  "local_path": "models/embeddings",      "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-vae",        "name": "⬇️ 下拉 VAE",          "direction": "pull", "remote_path": "comfyui-assets/vae",         "local_path": "models/vae",             "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-upscale",    "name": "⬇️ 下拉 Upscale",      "direction": "pull", "remote_path": "comfyui-assets/upscale",     "local_path": "models/upscale_models",  "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-wildcards",  "name": "⬇️ 下拉 Wildcards",    "direction": "pull", "remote_path": "comfyui-assets/wildcards",   "local_path": "custom_nodes/comfyui-dynamicprompts/wildcards", "method": "copy", "trigger": "deploy"},
+    {"id": "tpl-pull-input",      "name": "⬇️ 下拉 Input 素材",   "direction": "pull", "remote_path": "comfyui-assets/input",       "local_path": "input",                  "method": "copy",  "trigger": "deploy"},
     {"id": "tpl-push-output",     "name": "⬆️ 上传输出 (移动)",    "direction": "push", "remote_path": "ComfyUI_Output",             "local_path": "output",                 "method": "move",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"]},
     {"id": "tpl-push-output-copy","name": "⬆️ 上传输出 (保留本地)","direction": "push", "remote_path": "ComfyUI_Output",             "local_path": "output",                 "method": "copy",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"]},
-    {"id": "tpl-push-workflows",  "name": "⬆️ 备份工作流",        "direction": "push", "remote_path": "comfyui-assets/workflow",     "local_path": "user/default/workflows", "method": "sync",  "trigger": "manual"},
+    {"id": "tpl-push-workflows",  "name": "⬆️ 备份工作流",        "direction": "push", "remote_path": "comfyui-assets/workflow",     "local_path": "user/default/workflows", "method": "copy",  "trigger": "manual"},
 ]
 
 # Remote 类型表单定义 (非 OAuth)
@@ -2881,7 +2881,7 @@ def _parse_rclone_conf():
             if current:
                 remotes.append(current)
             current = {"name": m.group(1), "type": "", "params": {},
-                        "_has_token": False, "_has_keys": False}
+                        "_has_token": False, "_has_keys": False, "_has_pass": False}
         elif current and '=' in line:
             k, v = line.split('=', 1)
             k, v = k.strip(), v.strip()
@@ -2891,6 +2891,8 @@ def _parse_rclone_conf():
                 current["_has_token"] = True
             if k == "access_key_id" and v:
                 current["_has_keys"] = True
+            if k in ("pass", "password", "user", "key_file") and v:
+                current["_has_pass"] = True
             if k not in ("token", "access_key_id", "secret_access_key", "refresh_token"):
                 current["params"][k] = v
     if current:
@@ -3042,7 +3044,7 @@ def api_sync_remotes():
         type_def = REMOTE_TYPE_DEFS.get(t, {})
         r["display_name"] = type_def.get("label", t)
         r["icon"] = type_def.get("icon", "💾")
-        r["has_auth"] = bool(r.get("_has_token") or r.get("_has_keys"))
+        r["has_auth"] = bool(r.get("_has_token") or r.get("_has_keys") or r.get("_has_pass"))
     return jsonify({"remotes": remotes})
 
 

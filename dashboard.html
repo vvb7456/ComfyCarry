@@ -549,6 +549,7 @@
         textarea,
         input[type="text"],
         input[type="password"],
+        input[type="number"],
         select {
             width: 100%;
             padding: 9px 13px;
@@ -2257,34 +2258,10 @@
                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
                         <div id="sync-status-badge" style="font-size:.85rem"></div>
                         <div style="flex:1"></div>
-                        <button class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
+                        <button id="sync-worker-btn" class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
                         <button class="btn btn-sm" onclick="loadSyncLogs()">🔄 刷新</button>
                     </div>
                     <div id="sync-log-content" class="sync-log-box">加载中...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Add Remote Modal -->
-        <div id="add-remote-modal" class="modal hidden" onclick="if(event.target===this)this.classList.add('hidden')">
-            <div class="modal-content" style="max-width:520px">
-                <h3 id="add-remote-title">添加存储服务</h3>
-                <div id="add-remote-body"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-                    <button class="btn btn-sm" onclick="document.getElementById('add-remote-modal').classList.add('hidden')">取消</button>
-                    <button class="btn btn-sm btn-primary" onclick="submitAddRemote()">创建</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Add Rule Modal -->
-        <div id="add-rule-modal" class="modal hidden" onclick="if(event.target===this)this.classList.add('hidden')">
-            <div class="modal-content" style="max-width:600px">
-                <h3 id="add-rule-title">添加同步规则</h3>
-                <div id="add-rule-body"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-                    <button class="btn btn-sm" onclick="document.getElementById('add-rule-modal').classList.add('hidden')">取消</button>
-                    <button class="btn btn-sm btn-primary" onclick="submitAddRule()">保存</button>
                 </div>
             </div>
         </div>
@@ -2441,6 +2418,36 @@
                     选择文件导入
                     <input type="file" accept=".json" onchange="importConfig(event)" style="display:none">
                 </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Remote Modal -->
+    <div class="modal-overlay" id="add-remote-modal" onclick="if(event.target===this)closeSyncModal('add-remote-modal')">
+        <div class="modal-box" style="width:520px">
+            <div style="display:flex;align-items:center;margin-bottom:16px">
+                <h3 id="add-remote-title" style="margin-bottom:0">添加存储服务</h3>
+                <button class="btn btn-sm" onclick="closeSyncModal('add-remote-modal')" style="margin-left:auto">✕</button>
+            </div>
+            <div id="add-remote-body"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn btn-sm" onclick="closeSyncModal('add-remote-modal')">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="submitAddRemote()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Rule Modal -->
+    <div class="modal-overlay" id="add-rule-modal" onclick="if(event.target===this)closeSyncModal('add-rule-modal')">
+        <div class="modal-box" style="width:600px">
+            <div style="display:flex;align-items:center;margin-bottom:16px">
+                <h3 id="add-rule-title" style="margin-bottom:0">添加同步规则</h3>
+                <button class="btn btn-sm" onclick="closeSyncModal('add-rule-modal')" style="margin-left:auto">✕</button>
+            </div>
+            <div id="add-rule-body"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn btn-sm" onclick="closeSyncModal('add-rule-modal')">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="submitAddRule()">保存</button>
             </div>
         </div>
     </div>

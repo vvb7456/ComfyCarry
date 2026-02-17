@@ -111,7 +111,7 @@ function openImg(url) {
   document.getElementById('img-modal').classList.add('active');
   img.src = url;
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeMetaModal(); closeVersionPicker(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeMetaModal(); closeVersionPicker(); closeSyncModal('add-remote-modal'); closeSyncModal('add-rule-modal'); } });
 
 // ========== Metadata Modal ==========
 function openMetaModal(data) {
@@ -2015,8 +2015,9 @@ async function showAddRemoteModal() {
       </select>
     </div>
     <div id="new-remote-fields"></div>`;
-  document.getElementById('add-remote-modal').classList.remove('hidden');
+  document.getElementById('add-remote-modal').classList.add('active');
 }
+function closeSyncModal(id) { document.getElementById(id).classList.remove('active'); }
 
 function renderRemoteTypeFields() {
   const type = document.getElementById('new-remote-type').value;
@@ -2070,7 +2071,7 @@ async function submitAddRemote() {
     const d = await r.json();
     if (d.ok) {
       showToast(d.message);
-      document.getElementById('add-remote-modal').classList.add('hidden');
+      closeSyncModal('add-remote-modal');
       loadSyncRemotes();
     } else {
       showToast('创建失败: ' + (d.error || '未知'));
@@ -2111,7 +2112,7 @@ function renderSyncRulesList() {
   el.innerHTML = _syncRules.map((r, i) => {
     const dir = r.direction === 'pull' ? '⬇' : '⬆';
     const triggerMap = {deploy: '📦 部署时', watch: '👁 监控', manual: '🖐 手动'};
-    const methodMap = {sync: '同步', copy: '复制', move: '移动'};
+    const methodMap = {sync: '镜像同步', copy: '复制', move: '移动'};
     return `<div class="sync-rule-card${r.enabled === false ? ' disabled' : ''}">
       <div class="sync-rule-dir">${dir}</div>
       <div class="sync-rule-info">
@@ -2242,9 +2243,9 @@ function showRuleForm(rule) {
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方法</label>
         <select id="rule-method" style="width:100%">
-          <option value="sync"${r.method === 'sync' ? ' selected' : ''}>sync (双向同步)</option>
-          <option value="copy"${r.method === 'copy' ? ' selected' : ''}>copy (复制,保留源)</option>
-          <option value="move"${r.method === 'move' ? ' selected' : ''}>move (移动,删除源)</option>
+          <option value="copy"${r.method === 'copy' ? ' selected' : ''}>copy — 复制文件 (保留源端)</option>
+          <option value="sync"${r.method === 'sync' ? ' selected' : ''}>sync — 镜像同步 (目标多余文件会被删除!)</option>
+          <option value="move"${r.method === 'move' ? ' selected' : ''}>move — 移动文件 (完成后删除源端)</option>
         </select>
       </div>
       <div>
@@ -2265,7 +2266,7 @@ function showRuleForm(rule) {
       <textarea id="rule-filters" style="width:100%;min-height:50px;font-family:monospace;font-size:.78rem" placeholder="+ *.{png,jpg}&#10;- .*/**&#10;- *">${(r.filters || []).join('\n')}</textarea>
     </div>`;
 
-  document.getElementById('add-rule-modal').classList.remove('hidden');
+  document.getElementById('add-rule-modal').classList.add('active');
 }
 
 function applyTemplate(idx) {
@@ -2317,7 +2318,7 @@ function submitAddRule() {
     _syncRules.push(rule);
   }
 
-  document.getElementById('add-rule-modal').classList.add('hidden');
+  closeSyncModal('add-rule-modal');
   renderSyncRulesList();
   saveSyncRules();
 }
@@ -2329,11 +2330,12 @@ async function loadSyncLogs() {
     const r = await fetch('/api/sync/status');
     const d = await r.json();
     // Worker 状态 badge
+    const on = d.worker_running;
     const badge = document.getElementById('sync-status-badge');
-    if (badge) {
-      const on = d.worker_running;
-      badge.innerHTML = `<span style="color:${on ? 'var(--green)' : 'var(--t3)'}">● Sync Worker: ${on ? '运行中' : '已停止'}</span>`;
-    }
+    if (badge) badge.innerHTML = `<span style="color:${on ? 'var(--green)' : 'var(--t3)'}">● Sync Worker: ${on ? '运行中' : '已停止'}</span>`;
+    // Worker 按钮状态
+    const btn = document.getElementById('sync-worker-btn');
+    if (btn) btn.innerHTML = on ? '⏹ 停止 Worker' : '▶ 启动 Worker';
     renderSyncLog(d.log_lines || []);
   } catch (e) {
     document.getElementById('sync-log-content').innerHTML = '<div style="color:var(--red)">加载失败</div>';
@@ -2359,6 +2361,8 @@ function renderSyncLog(lines) {
 }
 
 async function toggleSyncWorker() {
+  const btn = document.getElementById('sync-worker-btn');
+  if (btn) btn.disabled = true;
   try {
     const r = await fetch('/api/sync/status');
     const d = await r.json();
@@ -2366,8 +2370,11 @@ async function toggleSyncWorker() {
     const url = running ? '/api/sync/worker/stop' : '/api/sync/worker/start';
     await fetch(url, {method: 'POST'});
     showToast(running ? 'Worker 已停止' : 'Worker 已启动');
-    setTimeout(loadSyncLogs, 1000);
-  } catch (e) { showToast('操作失败: ' + e.message); }
+    setTimeout(() => { if (btn) btn.disabled = false; loadSyncLogs(); }, 1500);
+  } catch (e) {
+    showToast('操作失败: ' + e.message);
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ── Rclone 配置导入 (保留旧功能) ────────────────────
