@@ -85,7 +85,7 @@
         }
 
         .sidebar-logo .logo-text {
-            font-size: 1.15rem;
+            font-size: 1.35rem;
             font-weight: 700;
             background: linear-gradient(135deg, #7c5cfc, #e879f9);
             -webkit-background-clip: text;
@@ -94,14 +94,28 @@
             color: transparent
         }
 
+        .sidebar-logo .logo-cc {
+            display: none;
+            font-size: 1rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #7c5cfc, #e879f9);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px
+        }
+
         .sidebar.collapsed .sidebar-logo {
             padding: 20px 12px;
             justify-content: center
         }
 
         .sidebar.collapsed .sidebar-logo .logo-text {
-            font-size: .85rem;
-            letter-spacing: -1px
+            display: none
+        }
+
+        .sidebar.collapsed .sidebar-logo .logo-cc {
+            display: block
         }
 
         .sidebar-logo small {
@@ -1894,6 +1908,7 @@
         <button class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开">◀</button>
         <div class="sidebar-logo">
             <span class="logo-text">ComfyCarry</span>
+            <span class="logo-cc">CC</span>
         </div>
         <div class="sidebar-nav">
             <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="icon">📊</span><span class="nav-label">总览</span></div>
