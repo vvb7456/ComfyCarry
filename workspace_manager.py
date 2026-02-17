@@ -26,7 +26,7 @@ import requests
 from flask import Flask, jsonify, request, Response, send_file, redirect, session
 from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 CORS(app)
 
 # --- 配置 ---
