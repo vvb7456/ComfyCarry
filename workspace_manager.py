@@ -1950,6 +1950,13 @@ def api_settings_export_config():
         except Exception:
             pass
 
+    # 7b. 全局同步设置
+    if SYNC_SETTINGS_FILE.exists():
+        try:
+            config["sync_settings"] = json.loads(SYNC_SETTINGS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
     # 8. ComfyUI 启动参数
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
@@ -2019,7 +2026,7 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"Rclone: {e}")
 
-    # 4. 同步规则 (v2) / 旧版同步偏好
+    # 4. 同步规则 (v2)
     if data.get("sync_rules"):
         try:
             SYNC_RULES_FILE.write_text(
@@ -2028,6 +2035,12 @@ def api_settings_import_config():
             applied.append("同步规则")
         except Exception as e:
             errors.append(f"同步规则: {e}")
+    if data.get("sync_settings"):
+        try:
+            _save_sync_settings(data["sync_settings"])
+            applied.append("同步设置")
+        except Exception as e:
+            errors.append(f"同步设置: {e}")
     # 5. Debug 模式
     if "debug" in data:
         _set_config("debug", bool(data["debug"]))
