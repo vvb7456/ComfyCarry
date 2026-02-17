@@ -3,6 +3,12 @@
 RunPod / Vast.ai 上的 ComfyUI 一站式管理。用完即毁实例 + 配置永续。
 
 ![Dashboard](images/dashboard.png)
+![Setup Wizard](images/wizard.png)
+![ComfyUI](images/comfyui.png)
+![Models](images/models.png)
+![Plugins](images/plugins.png)
+![Sync](images/sync.png)
+![Settings](images/setting.png)
 
 ---
 
@@ -138,43 +144,3 @@ pm2 restart comfy         # 重启 ComfyUI
 | 模型下载失败 | 检查 CivitAI Key 有效性 |
 | Tunnel 断连 | Dashboard → Tunnel 页查看状态 |
 | 同步不工作 | Dashboard → Sync 页检查 Rclone 配置 |
-
----
-
-## 截图
-
-<details>
-<summary>Setup Wizard</summary>
-
-![Setup Wizard](images/wizard.png)
-</details>
-
-<details>
-<summary>ComfyUI 控制</summary>
-
-![ComfyUI](images/comfyui.png)
-</details>
-
-<details>
-<summary>模型管理</summary>
-
-![Models](images/models.png)
-</details>
-
-<details>
-<summary>插件管理</summary>
-
-![Plugins](images/plugins.png)
-</details>
-
-<details>
-<summary>云同步</summary>
-
-![Sync](images/sync.png)
-</details>
-
-<details>
-<summary>设置</summary>
-
-![Settings](images/setting.png)
-</details>
