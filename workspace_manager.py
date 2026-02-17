@@ -230,6 +230,9 @@ def check_auth():
     # Setup 相关路由始终允许
     if request.path.startswith("/api/setup/") or request.path == "/setup":
         return
+    # 配置导入在 Setup 阶段也需要可用
+    if request.path == "/api/settings/import-config":
+        return
     if request.path in ("/login", "/favicon.ico", "/dashboard.js"):
         return
     # 如果尚未完成部署向导, 重定向到向导页
