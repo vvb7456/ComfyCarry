@@ -2199,19 +2199,21 @@
             <div class="page-body">
                 <!-- Sub-tabs -->
                 <div class="tabs">
-                    <div class="tab active" data-stab="remotes" onclick="switchSyncTab('remotes')">💾 存储服务</div>
+                    <div class="tab active" data-stab="remotes" onclick="switchSyncTab('remotes')">💾 存储 & 日志</div>
                     <div class="tab" data-stab="rules" onclick="switchSyncTab('rules')">🔄 同步规则</div>
-                    <div class="tab" data-stab="logs" onclick="switchSyncTab('logs')">📜 日志</div>
                 </div>
 
-                <!-- Remotes Tab -->
+                <!-- Storage + Logs Tab -->
                 <div id="stab-remotes">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                        <div id="sync-status-badge" style="font-size:.85rem"></div>
+                        <div style="flex:1"></div>
+                        <button id="sync-worker-btn" class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
+                        <button class="btn btn-sm btn-primary" onclick="showAddRemoteModal()">+ 添加存储</button>
+                        <button class="btn btn-sm" onclick="toggleImportConfig()">📥 导入配置</button>
+                    </div>
                     <div id="sync-remotes-grid" class="sync-remotes-grid">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
-                    </div>
-                    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-                        <button class="btn btn-sm btn-primary" onclick="showAddRemoteModal()">+ 添加存储</button>
-                        <button class="btn btn-sm" onclick="toggleImportConfig()">📥 导入 Rclone 配置</button>
                     </div>
                     <div id="import-config-box" class="hidden" style="margin-top:8px">
                         <div class="sync-import-row">
@@ -2240,6 +2242,14 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Inline Logs -->
+                    <div style="margin-top:16px">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                            <span style="font-size:.85rem;font-weight:600;color:var(--t2)">📜 同步日志</span>
+                            <button class="btn btn-sm" onclick="loadSyncLogs()" style="font-size:.68rem;padding:2px 8px">🔄</button>
+                        </div>
+                        <div id="sync-log-content" class="sync-log-box">加载中...</div>
+                    </div>
                 </div>
 
                 <!-- Rules Tab -->
@@ -2251,17 +2261,6 @@
                         <button class="btn btn-sm btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
                     </div>
                     <div id="sync-rules-list"></div>
-                </div>
-
-                <!-- Logs Tab -->
-                <div id="stab-logs" class="hidden">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                        <div id="sync-status-badge" style="font-size:.85rem"></div>
-                        <div style="flex:1"></div>
-                        <button id="sync-worker-btn" class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
-                        <button class="btn btn-sm" onclick="loadSyncLogs()">🔄 刷新</button>
-                    </div>
-                    <div id="sync-log-content" class="sync-log-box">加载中...</div>
                 </div>
             </div>
         </div>

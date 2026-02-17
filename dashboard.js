@@ -1898,15 +1898,14 @@ let _syncRemoteTypes = null;
 let _editingRuleIdx = -1; // -1=新增, >=0=编辑索引
 
 function switchSyncTab(tab) {
-  ['remotes', 'rules', 'logs'].forEach(t => {
+  ['remotes', 'rules'].forEach(t => {
     const el = document.getElementById('stab-' + t);
     const tabEl = document.querySelector(`.tab[data-stab="${t}"]`);
     if (el) el.classList.toggle('hidden', t !== tab);
     if (tabEl) tabEl.classList.toggle('active', t === tab);
   });
-  if (tab === 'remotes') loadSyncRemotes();
+  if (tab === 'remotes') { loadSyncRemotes(); loadSyncLogs(); }
   else if (tab === 'rules') loadSyncRules();
-  else if (tab === 'logs') loadSyncLogs();
 }
 
 // ── 存储服务 Tab ───────────────────────────────────
@@ -1980,8 +1979,7 @@ function renderStorageResult(el, name, info) {
   const btn = `<button class="btn btn-sm" style="font-size:.65rem;padding:1px 6px;margin-left:8px" onclick="refreshRemoteStorage('${name}')">🔄</button>`;
   if (!info) { el.innerHTML = `<span style="color:var(--t3);font-size:.75rem">—</span>${btn}`; return; }
   if (info.error) {
-    const msg = info.error.includes('not supported') ? 'S3 对象存储 (不支持容量查询)' : info.error;
-    el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">${msg}</span>${btn}`;
+    el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">${escHtml(info.error)}</span>`;
     return;
   }
   const used = info.used || 0, total = info.total || 0, free = info.free || 0;
@@ -2083,24 +2081,24 @@ async function submitAddRemote() {
 
 async function loadSyncRules() {
   try {
-    const r = await fetch('/api/sync/rules');
-    const d = await r.json();
-    _syncRules = d.rules || [];
-    _syncTemplates = d.templates || [];
-    renderSyncRulesList();
+    const [rulesR, statusR] = await Promise.allSettled([
+      fetch('/api/sync/rules').then(r => r.json()),
+      fetch('/api/sync/status').then(r => r.json())
+    ]);
+    if (rulesR.status === 'fulfilled') {
+      _syncRules = rulesR.value.rules || [];
+      _syncTemplates = rulesR.value.templates || [];
+      renderSyncRulesList();
+    }
+    if (statusR.status === 'fulfilled') {
+      const on = statusR.value.worker_running;
+      const statusText = `<span style="color:${on?'var(--green)':'var(--t3)'}">● Worker ${on?'运行中':'已停止'}</span>`;
+      const badge = document.getElementById('sync-worker-badge');
+      if (badge) badge.innerHTML = statusText;
+    }
   } catch (e) {
     document.getElementById('sync-rules-list').innerHTML = '<div style="color:var(--red)">加载失败</div>';
   }
-  // Worker 状态
-  try {
-    const r = await fetch('/api/sync/status');
-    const d = await r.json();
-    const badge = document.getElementById('sync-worker-badge');
-    if (badge) {
-      const on = d.worker_running;
-      badge.innerHTML = `<span style="color:${on?'var(--green)':'var(--t3)'}">● Worker ${on?'运行中':'已停止'}</span>`;
-    }
-  } catch {}
 }
 
 function renderSyncRulesList() {
@@ -2330,11 +2328,14 @@ async function loadSyncLogs() {
   try {
     const r = await fetch('/api/sync/status');
     const d = await r.json();
-    // Worker 状态 badge
     const on = d.worker_running;
+    // 更新所有 Worker 状态显示 (统一文本)
+    const statusText = `<span style="color:${on ? 'var(--green)' : 'var(--t3)'}">● Worker ${on ? '运行中' : '已停止'}</span>`;
     const badge = document.getElementById('sync-status-badge');
-    if (badge) badge.innerHTML = `<span style="color:${on ? 'var(--green)' : 'var(--t3)'}">● Sync Worker: ${on ? '运行中' : '已停止'}</span>`;
-    // Worker 按钮状态
+    if (badge) badge.innerHTML = statusText;
+    const badge2 = document.getElementById('sync-worker-badge');
+    if (badge2) badge2.innerHTML = statusText;
+    // Worker 按钮
     const btn = document.getElementById('sync-worker-btn');
     if (btn) btn.innerHTML = on ? '⏹ 停止 Worker' : '▶ 启动 Worker';
     renderSyncLog(d.log_lines || []);
@@ -2444,13 +2445,14 @@ async function saveRcloneConfig() {
 
 async function loadSyncPage() {
   loadSyncRemotes();
+  loadSyncLogs();
 }
 
 function startSyncAutoRefresh() {
   stopSyncAutoRefresh();
   syncAutoRefresh = setInterval(() => {
-    const logsTab = document.getElementById('stab-logs');
-    if (logsTab && !logsTab.classList.contains('hidden')) loadSyncLogs();
+    const remotesTab = document.getElementById('stab-remotes');
+    if (remotesTab && !remotesTab.classList.contains('hidden')) loadSyncLogs();
   }, 10000);
 }
 function stopSyncAutoRefresh() {

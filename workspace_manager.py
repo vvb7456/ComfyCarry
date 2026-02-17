@@ -2980,13 +2980,22 @@ def _sync_worker_loop():
         for rule in watch_rules:
             if _sync_worker_stop.is_set():
                 break
-            # Push 方向: 跳过空目录 (只有占位文件或完全为空)
+            # Push 方向: 跳过无实际内容的目录
             if rule.get("direction") == "push":
                 local_abs = os.path.join(COMFYUI_DIR, rule.get("local_path", ""))
                 if os.path.isdir(local_abs):
-                    real_files = [f for f in os.listdir(local_abs)
-                                  if not f.startswith('.') and not f.startswith('_')]
-                    if not real_files:
+                    # 递归检查是否有非隐藏、非占位的真实文件
+                    has_real = False
+                    for root, dirs, files in os.walk(local_abs):
+                        # 跳过隐藏目录
+                        dirs[:] = [d for d in dirs if not d.startswith('.')]
+                        for f in files:
+                            if not f.startswith('.') and not f.startswith('_'):
+                                has_real = True
+                                break
+                        if has_real:
+                            break
+                    if not has_real:
                         continue  # 无实际文件，跳过本轮
             _run_sync_rule(rule)
         # 等待最短 interval，默认 15 秒
