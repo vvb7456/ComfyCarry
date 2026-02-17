@@ -58,11 +58,14 @@ def _get_config(key, default=""):
     """读取单个配置值"""
     return _load_config().get(key, default)
 
+_config_lock = threading.Lock()
+
 def _set_config(key, value):
-    """写入单个配置值"""
-    data = _load_config()
-    data[key] = value
-    _save_config(data)
+    """写入单个配置值 (线程安全)"""
+    with _config_lock:
+        data = _load_config()
+        data[key] = value
+        _save_config(data)
 
 # ── 密码 ──────────────────────────────────────────────────────
 def _load_dashboard_password():
@@ -433,7 +436,7 @@ def get_config():
 
 @app.route("/api/config", methods=["POST"])
 def save_config():
-    data = request.get_json()
+    data = request.get_json(force=True) or {}
     api_key = data.get("api_key", "").strip()
     CONFIG_FILE.write_text(json.dumps({"api_key": api_key}))
     return jsonify({"ok": True, "has_key": bool(api_key)})
@@ -551,7 +554,10 @@ def api_local_models():
 def api_model_preview():
     """返回模型预览图"""
     rel = request.args.get("path", "")
-    full = os.path.join(COMFYUI_DIR, rel)
+    full = os.path.realpath(os.path.join(COMFYUI_DIR, rel))
+    # 路径安全检查: 必须在 COMFYUI_DIR 内
+    if not full.startswith(os.path.realpath(COMFYUI_DIR) + os.sep):
+        return jsonify({"error": "路径越界"}), 403
     if os.path.isfile(full):
         return send_file(full)
     return "", 404
@@ -560,11 +566,11 @@ def api_model_preview():
 @app.route("/api/local_models/delete", methods=["POST"])
 def api_delete_model():
     """删除本地模型及其关联文件"""
-    data = request.get_json()
-    abs_path = data.get("abs_path", "")
+    data = request.get_json(force=True) or {}
+    abs_path = os.path.realpath(data.get("abs_path", ""))
 
-    # 安全检查
-    if not abs_path.startswith(COMFYUI_DIR):
+    # 安全检查: realpath + 前缀匹配含 /
+    if not abs_path.startswith(os.path.realpath(COMFYUI_DIR) + os.sep):
         return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
 
     if not os.path.isfile(abs_path):
@@ -587,11 +593,11 @@ def api_delete_model():
 @app.route("/api/local_models/fetch_info", methods=["POST"])
 def api_fetch_model_info():
     """通过 SHA256 从 CivitAI 获取模型元数据并保存"""
-    data = request.get_json()
-    abs_path = data.get("abs_path", "")
+    data = request.get_json(force=True) or {}
+    abs_path = os.path.realpath(data.get("abs_path", ""))
 
-    # 安全检查
-    if not abs_path.startswith(COMFYUI_DIR):
+    # 安全检查: realpath + 前缀匹配含 /
+    if not abs_path.startswith(os.path.realpath(COMFYUI_DIR) + os.sep):
         return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
 
     if not os.path.isfile(abs_path):
@@ -684,19 +690,19 @@ def api_fetch_model_info():
         first_img_url = info_data["images"][0].get("url", "")
         if first_img_url:
             try:
-                img_resp = requests.get(first_img_url, timeout=15, stream=True)
-                img_resp.raise_for_status()
-                ct = img_resp.headers.get("Content-Type", "")
-                ext = ".png"
-                if "jpeg" in ct or "jpg" in ct:
-                    ext = ".jpeg"
-                elif "webp" in ct:
-                    ext = ".webp"
-                preview_path = base_no_ext + ext
-                with open(preview_path, "wb") as pf:
-                    for chunk in img_resp.iter_content(4096):
-                        pf.write(chunk)
-                info_data["_preview_saved"] = preview_path
+                with requests.get(first_img_url, timeout=15, stream=True) as img_resp:
+                    img_resp.raise_for_status()
+                    ct = img_resp.headers.get("Content-Type", "")
+                    ext = ".png"
+                    if "jpeg" in ct or "jpg" in ct:
+                        ext = ".jpeg"
+                    elif "webp" in ct:
+                        ext = ".webp"
+                    preview_path = base_no_ext + ext
+                    with open(preview_path, "wb") as pf:
+                        for chunk in img_resp.iter_content(4096):
+                            pf.write(chunk)
+                    info_data["_preview_saved"] = preview_path
             except Exception:
                 pass
 
@@ -709,7 +715,7 @@ def api_fetch_model_info():
 @app.route("/api/download", methods=["POST"])
 def api_download_model():
     """代理请求到 ComfyUI 的 Enhanced-Civicomfy 下载接口"""
-    data = request.get_json()
+    data = request.get_json(force=True) or {}
     api_key = data.get("api_key") or _get_api_key()
 
     payload = {
@@ -745,7 +751,7 @@ def api_download_status():
 @app.route("/api/download/cancel", methods=["POST"])
 def api_download_cancel():
     """取消指定下载任务"""
-    data = request.get_json()
+    data = request.get_json(force=True) or {}
     download_id = data.get("download_id", "")
     if not download_id:
         return jsonify({"error": "download_id required"}), 400
@@ -759,7 +765,7 @@ def api_download_cancel():
 @app.route("/api/download/retry", methods=["POST"])
 def api_download_retry():
     """重试失败/取消的下载"""
-    data = request.get_json()
+    data = request.get_json(force=True) or {}
     download_id = data.get("download_id", "")
     if not download_id:
         return jsonify({"error": "download_id required"}), 400
@@ -811,12 +817,11 @@ def _parse_tunnel_ingress():
             shell=True, capture_output=True, text=True, timeout=5
         )
         log = r.stdout + r.stderr
-        import re as _re
 
         # Strategy 1: Parse config="{...}" with escaped JSON (named tunnels)
         # The JSON value has escaped quotes, so we can't use simple (.*?) — match
         # everything between config=" and the closing " that is NOT preceded by \
-        cfg_match = _re.search(r'config="((?:[^"\\]|\\.)*)"', log)
+        cfg_match = re.search(r'config="((?:[^"\\]|\\.)*)"', log)
         if cfg_match:
             raw = cfg_match.group(1).replace('\\"', '"').replace('\\\\', '\\')
             try:
@@ -829,7 +834,7 @@ def _parse_tunnel_ingress():
         # Strategy 2: Look for "ingress" JSON array directly in logs
         if not links:
             # Sometimes the config is logged as plain JSON
-            ing_match = _re.search(r'"ingress"\s*:\s*\[', log)
+            ing_match = re.search(r'"ingress"\s*:\s*\[', log)
             if ing_match:
                 # Find the matching closing bracket
                 start = ing_match.start()
@@ -851,7 +856,7 @@ def _parse_tunnel_ingress():
         # Strategy 3: Find hostname→URL mappings from "Registered tunnel connection" lines
         if not links:
             # Look for registered hostnames like "Updated to ... hostname=xxx.com"
-            hostnames = _re.findall(r'hostname[=:]\s*([a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', log)
+            hostnames = re.findall(r'hostname[=:]\s*([a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', log)
             for h in set(hostnames):
                 if 'cloudflare' not in h:
                     links.append({"name": h.split(".")[0].replace("-", " ").title(),
@@ -859,7 +864,7 @@ def _parse_tunnel_ingress():
 
         # Strategy 4: Fallback — trycloudflare quick tunnel URLs
         if not links:
-            urls = list(set(_re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log)))
+            urls = list(set(re.findall(r'https://[a-z0-9-]+\.trycloudflare\.com', log)))
             for i, u in enumerate(urls):
                 links.append({"name": f"Service #{i+1}", "url": u, "icon": "🌐"})
     except Exception:
@@ -876,8 +881,7 @@ def _tunnel_ingress_to_links(ingress, links):
         service = entry.get("service", "")
         if not hostname or "http_status:" in service:
             continue
-        import re as _re
-        port_match = _re.search(r':(\d+)', service)
+        port_match = re.search(r':(\d+)', service)
         port = port_match.group(1) if port_match else ""
         proto = "ssh" if service.startswith("ssh://") else "http"
         if proto == "ssh":
@@ -904,10 +908,9 @@ def _get_jupyter_token():
             shell=True, capture_output=True, text=True, timeout=5
         )
         output = r.stdout + r.stderr
-        import re as _re
         # Match: https://host:port/?token=TOKEN :: /path
         # or:   http://host:port/?token=TOKEN :: /path
-        match = _re.search(r'https?://[^?]+\?token=([a-f0-9]+)', output)
+        match = re.search(r'https?://[^?]+\?token=([a-f0-9]+)', output)
         if match:
             return match.group(1)
     except Exception:
@@ -943,7 +946,6 @@ def _detect_port_services():
 @app.route("/api/tunnel_status")
 def api_tunnel_status():
     """获取 Tunnel 状态和日志"""
-    import re as _re
     # PM2 进程信息
     status = "unknown"
     try:
@@ -965,10 +967,10 @@ def api_tunnel_status():
         )
         raw_logs = r.stdout + r.stderr
         # Strip ANSI escape codes
-        ansi_re = _re.compile(r'\x1b\[[0-9;]*m')
+        ansi_re = re.compile(r'\x1b\[[0-9;]*m')
         logs = ansi_re.sub('', raw_logs)
         # Strip PM2 prefix like "1|tunnel   | "
-        logs = _re.sub(r'^\d+\|[^|]+\|\s*', '', logs, flags=_re.MULTILINE)
+        logs = re.sub(r'^\d+\|[^|]+\|\s*', '', logs, flags=re.MULTILINE)
         # Strip PM2 tailing header lines
         logs = '\n'.join(l for l in logs.split('\n')
                         if not l.startswith('[TAILING]') and 'last 100 lines' not in l and '/root/.pm2/logs/' not in l)
@@ -1184,7 +1186,7 @@ def _build_comfyui_args(params):
 
     for gk, gv in COMFYUI_PARAM_GROUPS.items():
         val = params.get(gk)
-        if val is None or val == "default" or val is False or val == 0:
+        if val is None or val == "default" or val is False:
             continue
         if gv["type"] == "bool" and val:
             args.append(gv["flag"])
@@ -1192,8 +1194,11 @@ def _build_comfyui_args(params):
             args.append(gv["flag_map"][val])
         elif gv["type"] == "select" and "flag_prefix" in gv and val != "default":
             args.extend([gv["flag_prefix"], str(val)])
-        elif gv["type"] == "number" and "flag_prefix" in gv and val:
-            args.extend([gv["flag_prefix"], str(val)])
+        elif gv["type"] == "number" and "flag_prefix" in gv and val is not None:
+            # val=0 对 --cache-lru 仍有意义 (无限制)，只跳过初始默认值 0
+            if gk == "cache_lru_size" and params.get("cache") != "lru":
+                continue  # cache 不是 LRU 模式时不输出
+            args.extend([gv["flag_prefix"], str(int(val))])
 
     return " ".join(args)
 
@@ -1589,6 +1594,8 @@ def api_comfyui_logs_stream():
             if proc:
                 try:
                     proc.kill()
+                    proc.stdout.close()
+                    proc.wait(timeout=5)
                 except Exception:
                     pass
 

@@ -35,8 +35,11 @@ function showPage(page) {
   document.getElementById('page-' + page).classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
 
+  // Stop all page-specific polling/SSE regardless of target page
+  stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); stopPluginQueuePoll(); stopComfyAutoRefresh();
+
   if (page === 'dashboard') refreshDashboard();
-  else { stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); stopPluginQueuePoll(); stopComfyAutoRefresh(); if (page === 'models') loadLocalModels(); }
+  else if (page === 'models') loadLocalModels();
   if (page === 'civitai') { loadFacets(); }
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
   else if (page === 'comfyui') { loadComfyUIPage(); startComfyAutoRefresh(); }
@@ -397,7 +400,7 @@ function renderLocalModelCard(m, idx) {
   return `<div class="model-card" data-idx="${idx}">
     <div class="model-card-img">${imgHtml}</div>
     <div class="model-card-body">
-      <div class="model-card-title" title="${m.name}">${m.name}</div>
+      <div class="model-card-title" title="${(m.name || '').replace(/"/g, '&quot;')}">${m.name}</div>
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${m.category}</span>
         ${m.base_model ? `<span class="badge badge-other">${m.base_model}</span>` : ''}
@@ -697,7 +700,7 @@ function renderCivitCard(h) {
   return `<div class="model-card">
     <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt=""
       onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')"
-      style="cursor:zoom-in" onerror="if(!this.dataset.retry&&'${fullUrl}'){this.dataset.retry='1';this.src='${fullUrl}'}else{this.style.display='none'}" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+      style="cursor:zoom-in" onerror="if(!this.dataset.retry&&'${fullUrl.replace(/'/g, "\\'")}'.length>0){this.dataset.retry='1';this.src='${fullUrl.replace(/'/g, "\\'")}'}else{this.style.display='none'}" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
@@ -843,7 +846,7 @@ async function lookupIds() {
       metrics: d.stats || {}, user: d.creator || {},
     };
     return `<div class="model-card">
-      <div class="model-card-img">${img ? `<img src="${img}" alt="" onclick="openImg('${img}')" style="cursor:zoom-in" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+      <div class="model-card-img">${img ? `<img src="${img}" alt="" onclick="openImg('${img.replace(/'/g, "\\\'")}')" style="cursor:zoom-in" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
       <div class="model-card-body">
         <div class="model-card-title">${d.name || ''}</div>
         <div class="model-card-meta">
@@ -1796,7 +1799,7 @@ function renderStorageResult(el, name, info) {
   const total = info.total || 0;
   const free = info.free || 0;
   const pct = total > 0 ? (used / total * 100) : 0;
-  const barColor = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : 'var(--accent)';
+  const barColor = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : 'var(--ac)';
   el.innerHTML = `
     <div>已用: ${fmtBytes(used)} / ${fmtBytes(total)}${free ? ` (剩余 ${fmtBytes(free)})` : ''}${refreshBtn}</div>
     <div class="sync-storage-bar">

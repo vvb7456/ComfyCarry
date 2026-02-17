@@ -9,6 +9,16 @@ RUNPOD_MODELS_CONFIG.md
 TESTING_AND_DIAGNOSTICS.md
 v4.6.1_UPDATE.md
 
+# 已废弃的旧脚本 — 功能已迁移至 bootstrap.sh + workspace_manager.py
+deploy.sh
+deploy-prebuilt.sh
+# 旧的独立工具脚本 — 功能已集成到 Dashboard
+auto_generate_csv.py
+civicomfy_batch_downloader.py
+civitai_lookup.py
+models.csv.example
+models.csv.template
+
 # 临时文件
 *.log
 *.tmp
