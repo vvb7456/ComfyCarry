@@ -2247,6 +2247,7 @@ function showRuleForm(rule) {
           <option value="sync"${r.method === 'sync' ? ' selected' : ''}>sync — 镜像同步 (目标多余文件会被删除!)</option>
           <option value="move"${r.method === 'move' ? ' selected' : ''}>move — 移动文件 (完成后删除源端)</option>
         </select>
+        <div style="font-size:.72rem;color:var(--t3);margin-top:3px">💡 同目录多规则时 copy 会在 move 之前执行，不会冲突</div>
       </div>
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">触发方式</label>

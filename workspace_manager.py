@@ -2974,6 +2974,9 @@ def _sync_worker_loop():
         if not watch_rules:
             _sync_worker_stop.wait(30)
             continue
+        # 排序: copy/sync 优先于 move，确保 move 不会在 copy 之前删除文件
+        method_order = {"copy": 0, "sync": 1, "move": 2}
+        watch_rules.sort(key=lambda r: method_order.get(r.get("method", "sync"), 1))
         for rule in watch_rules:
             if _sync_worker_stop.is_set():
                 break
@@ -3143,16 +3146,19 @@ def api_sync_storage():
                 f'rclone about "{name}:" --json 2>/dev/null',
                 shell=True, capture_output=True, text=True, timeout=30
             )
-            if proc.returncode == 0:
+            if proc.returncode == 0 and proc.stdout.strip():
                 about = json.loads(proc.stdout)
-                results[name] = {
-                    "total": about.get("total"),
-                    "used": about.get("used"),
-                    "free": about.get("free"),
-                    "trashed": about.get("trashed"),
-                }
+                if about.get("total") or about.get("used") or about.get("free"):
+                    results[name] = {
+                        "total": about.get("total"),
+                        "used": about.get("used"),
+                        "free": about.get("free"),
+                        "trashed": about.get("trashed"),
+                    }
+                else:
+                    results[name] = {"error": "此存储类型不支持容量查询"}
             else:
-                results[name] = {"error": "不支持容量查询"}
+                results[name] = {"error": "此存储类型不支持容量查询"}
         except subprocess.TimeoutExpired:
             results[name] = {"error": "查询超时"}
         except Exception as e:
