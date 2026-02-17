@@ -23,7 +23,14 @@ Web Dashboard 统一管理 ComfyUI 全生命周期：
 
 ### 1. 创建实例
 
-在 Vast.ai / RunPod 创建 GPU 实例，任意 PyTorch 镜像均可。
+在 Vast.ai / RunPod 创建 GPU 实例，选择以下镜像之一：
+
+| 方式 | 镜像 | 耗时 |
+|------|------|------|
+| **预构建（推荐）** | `ghcr.io/vvb7456/comfyui-runpod:latest` | 2-5 分钟 |
+| **完整安装** | `runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404` | 15-30 分钟 |
+
+预构建镜像含 Python 3.13 + PyTorch 2.9 + CUDA 13 + FlashAttention-3 + SageAttention-3 + ComfyUI + 15 个常用插件。
 
 ### 2. 运行 bootstrap
 
