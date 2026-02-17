@@ -2105,6 +2105,14 @@ _deploy_log_lines = []       # 实时日志行缓冲, SSE 消费
 _deploy_log_lock = threading.Lock()
 
 
+def _detect_image_type():
+    """检测当前环境是 prebuilt 还是 generic 镜像"""
+    comfyui_main = Path(COMFYUI_DIR) / "main.py"
+    if comfyui_main.exists():
+        return "prebuilt"
+    return "generic"
+
+
 @app.route("/api/setup/state")
 def api_setup_state():
     """获取向导状态"""
@@ -2116,6 +2124,8 @@ def api_setup_state():
     safe["plugins_available"] = DEFAULT_PLUGINS
     # GPU 信息 (如果 torch 可用)
     safe["gpu_info"] = _detect_gpu_info()
+    # 镜像类型自动检测
+    safe["detected_image_type"] = _detect_image_type()
     # 环境变量预填充 — 让向导自动检测已设置的值
     env_vars = {}
     if os.environ.get("DASHBOARD_PASSWORD"):

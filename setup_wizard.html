@@ -117,7 +117,9 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 /* Deploy progress */
 .deploy-view { display: none; }
 .deploy-view.active { display: block; }
-.deploy-steps-list { margin-bottom: 20px; }
+.deploy-content { display: flex; gap: 20px; align-items: flex-start; }
+.deploy-content .deploy-steps-list { flex: 0 0 260px; min-width: 200px; position: sticky; top: 20px; }
+.deploy-content .deploy-log { flex: 1; min-width: 0; }
 .deploy-step-item {
     display: flex; align-items: center; gap: 10px;
     padding: clamp(6px, 0.8vw, 10px) 0;
@@ -130,7 +132,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 .deploy-log {
     background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--r);
     padding: clamp(12px, 1.5vw, 20px);
-    min-height: clamp(300px, 40vh, 500px); max-height: clamp(400px, 55vh, 700px);
+    min-height: clamp(400px, 55vh, 600px); max-height: clamp(500px, 70vh, 800px);
     overflow-y: auto;
     font-family: var(--mono); font-size: clamp(0.78rem, 0.85vw, 0.92rem); line-height: 1.9;
 }
@@ -160,10 +162,28 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 }
 .env-hint code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 0.9em; }
 
+/* Import upload area */
+.import-upload-box {
+    background: var(--bg3); border: 2px dashed var(--bd); border-radius: var(--r);
+    padding: clamp(20px, 2.5vw, 32px); text-align: center; transition: border-color .2s;
+}
+.import-upload-box:hover { border-color: var(--accent); }
+.import-upload-box p { color: var(--t2); margin-bottom: 12px; font-size: clamp(0.85rem, 0.95vw, 1rem); }
+.import-upload-box code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 0.9em; }
+.import-result {
+    margin-top: 12px; padding: 12px 16px; border-radius: 8px;
+    font-size: clamp(0.82rem, 0.92vw, 0.95rem); line-height: 1.6;
+}
+
 /* Responsive */
-@media (max-width: 600px) {
-    .choice-grid { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
+    .choice-grid { grid-template-columns: 1fr !important; }
     .radio-group { flex-direction: column; gap: 10px; }
+    .deploy-content { flex-direction: column; }
+    .deploy-content .deploy-steps-list { flex: none; position: static; }
+}
+@media (max-width: 600px) {
+    .choice-grid { grid-template-columns: 1fr !important; }
 }
 </style>
 </head>
@@ -176,23 +196,12 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 
     <div class="progress-bar" id="progressBar"></div>
 
-    <!-- Step 0: 镜像选择 -->
+    <!-- Step 0: 部署方式选择 -->
     <div class="step active" id="step-0">
         <div class="step-title">选择部署方式</div>
         <div class="step-desc">根据你使用的 Docker 镜像选择对应的部署模式</div>
-        <!-- 导入配置 -->
-        <div id="import-config-banner" style="margin-bottom:16px;padding:12px 16px;background:rgba(106,153,255,0.1);border:1px solid var(--accent,#6a99ff);border-radius:8px">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <span style="font-size:.88rem;color:var(--t1)">📦 有之前导出的配置文件？</span>
-                <label class="btn btn-sm btn-primary" style="cursor:pointer;margin:0">
-                    导入配置
-                    <input type="file" accept=".json" onchange="importWizardConfig(event)" style="display:none">
-                </label>
-            </div>
-            <div id="wizard-import-result" style="display:none;margin-top:8px;font-size:.82rem;color:var(--green,#50c878)"></div>
-        </div>
         <div id="gpu-info-display"></div>
-        <div class="choice-grid">
+        <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
             <div class="choice-card" onclick="selectImageType('generic')" id="choice-generic">
                 <h3>🔧 通用镜像部署</h3>
                 <p>使用 runpod/pytorch 等标准镜像，从零安装 PyTorch、加速组件、ComfyUI 和插件</p>
@@ -203,6 +212,22 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
                 <p>使用已预装 FA3/SA3/ComfyUI 的自定义镜像，只做配置和同步</p>
                 <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 预计 2-5 分钟</p>
             </div>
+            <div class="choice-card" onclick="selectImageType('import')" id="choice-import">
+                <h3>📦 恢复设置</h3>
+                <p>从之前导出的配置文件恢复所有设置，快速重建工作环境</p>
+                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 自动匹配镜像类型</p>
+            </div>
+        </div>
+        <!-- 导入文件上传区域 (选择恢复设置时显示) -->
+        <div id="import-upload-area" style="display:none;margin-bottom:24px">
+            <div class="import-upload-box">
+                <p>上传之前导出的 <code>comfyui-config.json</code> 文件</p>
+                <label class="btn btn-primary" style="cursor:pointer;display:inline-block">
+                    📂 选择文件
+                    <input type="file" accept=".json" onchange="handleImportFile(event)" style="display:none">
+                </label>
+            </div>
+            <div id="import-result" class="import-result" style="display:none"></div>
         </div>
         <div class="btn-row">
             <button class="btn btn-primary" onclick="nextStep()" id="btn-next-0" disabled>下一步</button>
@@ -330,8 +355,10 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <div class="deploy-view" id="deploy-view">
         <div class="step-title" id="deploy-title">⚙️ 正在部署...</div>
         <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
-        <div class="deploy-steps-list" id="deploy-steps-list"></div>
-        <div class="deploy-log" id="deploy-log"></div>
+        <div class="deploy-content">
+            <div class="deploy-steps-list" id="deploy-steps-list"></div>
+            <div class="deploy-log" id="deploy-log"></div>
+        </div>
         <!-- 错误详情 (部署失败时显示) -->
         <div id="deploy-error-banner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:14px;word-break:break-word;"></div>
         <!-- 成功按钮 -->
@@ -361,6 +388,8 @@ let wizardConfig = {
 };
 let pluginData = [];
 let envVars = {};  // 从环境变量检测到的预设值
+let detectedImageType = '';  // 后端检测的镜像类型
+let importedConfig = null;   // 导入的配置对象 (非 null 表示恢复模式)
 
 // ── Init ──
 async function init() {
@@ -368,6 +397,7 @@ async function init() {
         const r = await fetch('/api/setup/state');
         const state = await r.json();
         envVars = state.env_vars || {};
+        detectedImageType = state.detected_image_type || '';
 
         // GPU info
         if (state.gpu_info && state.gpu_info.name) {
@@ -495,6 +525,12 @@ function showStep(n) {
 
 function nextStep() {
     saveCurrentStep();
+    // 恢复模式: 从 step 0 直接跳到确认部署 (step 6)
+    if (currentStep === 0 && importedConfig) {
+        showStep(TOTAL_STEPS - 1);
+        renderSummary();
+        return;
+    }
     if (currentStep < TOTAL_STEPS - 1) {
         showStep(currentStep + 1);
         if (currentStep === TOTAL_STEPS - 1) renderSummary();
@@ -502,6 +538,11 @@ function nextStep() {
 }
 
 function prevStep() {
+    // 确认页返回: 恢复模式回到 step 0, 正常模式回前一步
+    if (currentStep === TOTAL_STEPS - 1 && importedConfig) {
+        showStep(0);
+        return;
+    }
     if (currentStep > 0) showStep(currentStep - 1);
 }
 
@@ -544,11 +585,26 @@ function saveCurrentStep() {
 
 // ── Image Type Selection ──
 function selectImageType(type, noEnable) {
-    wizardConfig.image_type = type;
     document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+
+    if (type === 'import') {
+        // 恢复设置模式 — 显示文件上传区
+        document.getElementById('choice-import').classList.add('selected');
+        document.getElementById('import-upload-area').style.display = 'block';
+        document.getElementById('btn-next-0').disabled = true;  // 等导入成功后启用
+        importedConfig = null;
+        wizardConfig.image_type = '';
+        return;
+    }
+
+    // 非导入模式 — 隐藏上传区
+    document.getElementById('import-upload-area').style.display = 'none';
+    document.getElementById('import-result').style.display = 'none';
+    importedConfig = null;
+
+    wizardConfig.image_type = type;
     document.getElementById(`choice-${type}`).classList.add('selected');
-    if (!noEnable) document.getElementById('btn-next-0').disabled = false;
-    else document.getElementById('btn-next-0').disabled = false;
+    document.getElementById('btn-next-0').disabled = false;
     // 切换镜像类型时重新渲染插件列表 (prebuilt 模式全部预装)
     if (pluginData.length > 0) {
         const selectedUrls = wizardConfig.plugins?.length ? wizardConfig.plugins : pluginData.map(p => p.url);
@@ -613,7 +669,16 @@ function renderSummary() {
     saveCurrentStep();
     const c = wizardConfig;
     const pluginCount = (c.plugins || []).length;
-    const html = `
+    // 恢复模式额外信息
+    let importNote = '';
+    if (importedConfig) {
+        importNote = `
+        <div class="summary-card" style="border-color:var(--accent)">
+            <h4>📦 从配置文件恢复</h4>
+            <div class="summary-row"><span class="label">导出时间</span><span class="value">${esc(importedConfig._exported_at || '未知')}</span></div>
+        </div>`;
+    }
+    const html = importNote + `
         <div class="summary-card">
             <h4>部署方式</h4>
             <div class="summary-row"><span class="label">镜像类型</span><span class="value">${c.image_type === 'prebuilt' ? '⚡ 预构建镜像' : '🔧 通用镜像'}</span></div>
@@ -658,6 +723,8 @@ function showDeployView() {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     document.getElementById('deploy-view').classList.add('active');
     document.getElementById('progressBar').style.display = 'none';
+    // 部署页宽屏利用更多空间
+    document.querySelector('.wizard-container').style.maxWidth = '1400px';
     startElapsedTimer();
 }
 
@@ -774,24 +841,37 @@ function backToWizard() {
     // 回到配置确认页
     document.getElementById('deploy-view').classList.remove('active');
     document.getElementById('progressBar').style.display = '';
+    document.querySelector('.wizard-container').style.maxWidth = '';
     showStep(TOTAL_STEPS - 1);
     renderSummary();
 }
 
-async function importWizardConfig(event) {
+async function handleImportFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     event.target.value = '';
-    const resultEl = document.getElementById('wizard-import-result');
     try {
         const text = await file.text();
         const config = JSON.parse(text);
+
         if (!config._version) {
-            resultEl.style.display = 'block';
-            resultEl.style.color = 'var(--red)';
-            resultEl.textContent = '❌ 无效的配置文件格式';
+            showImportResult('❌ 无效的配置文件格式', true);
             return;
         }
+
+        // 镜像类型匹配验证
+        const cfgType = config.image_type;
+        if (cfgType && detectedImageType && cfgType !== detectedImageType) {
+            const cfgLabel = cfgType === 'prebuilt' ? '预构建镜像' : '通用镜像';
+            const envLabel = detectedImageType === 'prebuilt' ? '预构建镜像' : '通用镜像';
+            showImportResult(
+                `❌ 镜像类型不匹配！<br>配置文件为「<b>${esc(cfgLabel)}</b>」，当前环境检测为「<b>${esc(envLabel)}</b>」。<br>` +
+                `请上传与当前环境匹配的配置文件，或使用对应镜像启动实例。`,
+                true
+            );
+            return;
+        }
+
         // 调用后端导入 API
         const r = await fetch('/api/settings/import-config', {
             method: 'POST',
@@ -799,16 +879,56 @@ async function importWizardConfig(event) {
             body: text
         });
         const d = await r.json();
-        resultEl.style.display = 'block';
-        resultEl.style.color = 'var(--green,#50c878)';
-        resultEl.innerHTML = `✅ ${esc(d.message || '导入成功')}<br><small>已导入: ${esc((d.applied || []).join(', '))}</small>`;
-        // 重新加载状态以更新表单
-        setTimeout(() => init(), 500);
+        if (!d.ok) {
+            showImportResult('❌ 导入失败: ' + esc(d.error || '未知错误'), true);
+            return;
+        }
+
+        // 导入成功 — 填充 wizardConfig
+        importedConfig = config;
+        wizardConfig.image_type = cfgType || detectedImageType || 'generic';
+        if (config.password) wizardConfig.password = config.password;
+        if (config.cloudflared_token) wizardConfig.cloudflared_token = config.cloudflared_token;
+        if (config.civitai_token) wizardConfig.civitai_token = config.civitai_token;
+        if (config.rclone_config_base64) {
+            wizardConfig.rclone_config_method = 'base64';
+            wizardConfig.rclone_config_value = config.rclone_config_base64;
+        }
+        // 插件
+        if (config.extra_plugins !== undefined || config.disabled_default_plugins !== undefined) {
+            const defaultUrls = pluginData.map(p => p.url);
+            const disabled = new Set(config.disabled_default_plugins || []);
+            const plugins = defaultUrls.filter(u => !disabled.has(u));
+            plugins.push(...(config.extra_plugins || []));
+            wizardConfig.plugins = plugins;
+        }
+        // 同步偏好
+        if (config.sync_prefs) {
+            wizardConfig.sync_options = {
+                workflows: config.sync_prefs.sync_workflows ?? true,
+                loras: config.sync_prefs.sync_loras ?? true,
+                wildcards: config.sync_prefs.sync_wildcards ?? true,
+            };
+        }
+
+        showImportResult(
+            `✅ 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
+            false
+        );
+        document.getElementById('btn-next-0').disabled = false;
+
     } catch (e) {
-        resultEl.style.display = 'block';
-        resultEl.style.color = 'var(--red)';
-        resultEl.textContent = '❌ 导入失败: ' + e.message;
+        showImportResult('❌ 文件解析失败: ' + e.message, true);
     }
+}
+
+function showImportResult(html, isError) {
+    const el = document.getElementById('import-result');
+    el.style.display = 'block';
+    el.innerHTML = html;
+    el.style.background = isError ? 'rgba(255,80,80,0.12)' : 'rgba(74,222,128,0.12)';
+    el.style.border = `1px solid ${isError ? 'var(--red)' : 'var(--green)'}`;
+    el.style.color = isError ? 'var(--red)' : 'var(--green)';
 }
 
 // ── Start ──
