@@ -1310,6 +1310,12 @@ def api_comfyui_params_get():
                 schema[gk]["depends_on"] = gv["depends_on"]
             if "help" in gv:
                 schema[gk]["help"] = gv["help"]
+            if "flag" in gv:
+                schema[gk]["flag"] = gv["flag"]
+            if "flag_map" in gv:
+                schema[gk]["flag_map"] = gv["flag_map"]
+            if "flag_prefix" in gv:
+                schema[gk]["flag_prefix"] = gv["flag_prefix"]
         return jsonify({"schema": schema, "current": current, "raw_args": raw_args})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

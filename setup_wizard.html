@@ -424,7 +424,6 @@ async function init() {
             badge.style.border = '1px solid var(--green)';
             badge.style.color = 'var(--green)';
             badge.innerHTML = '⚡ 检测到<b>预构建镜像</b> — 已预装 PyTorch / ComfyUI / 加速组件';
-            descEl.textContent = '已自动识别镜像类型，选择部署方式开始配置';
             timeEl.textContent = '⏱ 预计 2-5 分钟';
         } else {
             badge.style.display = 'block';
@@ -432,7 +431,6 @@ async function init() {
             badge.style.border = '1px solid var(--accent)';
             badge.style.color = 'var(--accent2)';
             badge.innerHTML = '🔧 检测到<b>通用镜像</b> — 将从零安装 PyTorch、ComfyUI 和加速组件';
-            descEl.textContent = '已自动识别镜像类型，选择部署方式开始配置';
             timeEl.textContent = '⏱ 预计 15-30 分钟';
         }
 
@@ -919,12 +917,13 @@ async function handleImportFile(event) {
             plugins.push(...(config.extra_plugins || []));
             wizardConfig.plugins = plugins;
         }
-        // 同步偏好
+        // 同步偏好 (嵌套在 r2 下)
         if (config.sync_prefs) {
+            const r2 = config.sync_prefs.r2 || {};
             wizardConfig.sync_options = {
-                workflows: config.sync_prefs.sync_workflows ?? true,
-                loras: config.sync_prefs.sync_loras ?? true,
-                wildcards: config.sync_prefs.sync_wildcards ?? true,
+                workflows: r2.sync_workflows ?? true,
+                loras: r2.sync_loras ?? true,
+                wildcards: r2.sync_wildcards ?? true,
             };
         }
 
