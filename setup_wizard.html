@@ -288,7 +288,8 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
         <!-- 同步选项 (仅当配置了 rclone 时显示) -->
         <div id="sync-options-panel" style="display:none;margin-top:16px">
-            <label style="font-size:.85rem;font-weight:600;margin-bottom:8px;display:block">部署时同步以下内容:</label>
+            <label style="font-size:.85rem;font-weight:600;margin-bottom:4px;display:block">部署时从云端拉取:</label>
+            <div style="font-size:.78rem;color:var(--t3);margin-bottom:8px">将使用第一个可用的 Remote，通过 copy 方式拉取到本地（部署后可在 Dashboard 云同步页面修改规则）</div>
             <div style="display:flex;flex-direction:column;gap:8px">
                 <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--t2);cursor:pointer">
                     <input type="checkbox" id="sync-workflows" checked style="accent-color:var(--accent)"> 工作流 (workflow)

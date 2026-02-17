@@ -2270,25 +2270,20 @@ function showRuleForm(rule) {
         <input type="text" id="rule-local-path" value="${escHtml(r.local_path || '')}" placeholder="models/loras" style="width:100%">
       </div>
       <div>
-        <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方法</label>
+        <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方法 <span title="copy: 复制文件，保留源端\nsync: 镜像同步，目标多余文件会被删除\nmove: 移动文件，完成后删除源端\n\n同目录多规则时 copy 会在 move 之前执行，不会冲突" style="cursor:help;opacity:.6">❓</span></label>
         <select id="rule-method" style="width:100%">
           <option value="copy"${r.method === 'copy' ? ' selected' : ''}>copy — 复制文件 (保留源端)</option>
           <option value="sync"${r.method === 'sync' ? ' selected' : ''}>sync — 镜像同步 (目标多余文件会被删除!)</option>
           <option value="move"${r.method === 'move' ? ' selected' : ''}>move — 移动文件 (完成后删除源端)</option>
         </select>
-        <div style="font-size:.72rem;color:var(--t3);margin-top:3px">💡 同目录多规则时 copy 会在 move 之前执行，不会冲突</div>
       </div>
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">触发方式</label>
-        <select id="rule-trigger" style="width:100%" onchange="document.getElementById('rule-interval-row').style.display=this.value==='watch'?'':'none'">
+        <select id="rule-trigger" style="width:100%">
           <option value="deploy"${r.trigger === 'deploy' ? ' selected' : ''}>📦 部署时执行</option>
           <option value="watch"${r.trigger === 'watch' ? ' selected' : ''}>👁 持续监控</option>
           <option value="manual"${r.trigger === 'manual' ? ' selected' : ''}>🖐 仅手动执行</option>
         </select>
-      </div>
-      <div id="rule-interval-row" style="display:${r.trigger === 'watch' ? '' : 'none'}">
-        <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">监控间隔 (秒)</label>
-        <input type="number" id="rule-interval" value="${r.watch_interval || 15}" min="5" style="width:100%">
       </div>
     </div>
     <div style="margin-top:10px">
@@ -2308,8 +2303,6 @@ function applyTemplate(idx) {
   document.getElementById('rule-local-path').value = t.local_path || '';
   document.getElementById('rule-method').value = t.method || 'sync';
   document.getElementById('rule-trigger').value = t.trigger || 'deploy';
-  document.getElementById('rule-interval-row').style.display = t.trigger === 'watch' ? '' : 'none';
-  document.getElementById('rule-interval').value = t.watch_interval || 15;
   document.getElementById('rule-filters').value = (t.filters || []).join('\n');
   // 自动选第一个 remote
   const sel = document.getElementById('rule-remote');
@@ -2333,9 +2326,6 @@ function submitAddRule() {
     trigger: document.getElementById('rule-trigger').value,
     enabled: true,
   };
-  if (rule.trigger === 'watch') {
-    rule.watch_interval = parseInt(document.getElementById('rule-interval').value) || 15;
-  }
   const filtersText = document.getElementById('rule-filters').value.trim();
   if (filtersText) {
     rule.filters = filtersText.split('\n').map(l => l.trim()).filter(Boolean);

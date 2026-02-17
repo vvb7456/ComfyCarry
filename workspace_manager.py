@@ -2641,7 +2641,40 @@ def _run_deploy(config):
             _deploy_step("同步云端资产")
             # 迁移旧配置或加载规则
             _migrate_old_sync_prefs()
+
+            # 从向导 sync_options 自动创建 deploy 规则 (首次部署时)
             rules = _load_sync_rules()
+            if not rules:
+                sync_opts = config.get("sync_options", {})
+                remotes = _parse_rclone_conf()
+                if remotes and any(sync_opts.values()):
+                    first_remote = remotes[0]["name"]
+                    _deploy_log(f"根据向导配置创建同步规则 (使用 {first_remote}:)")
+                    new_rules = []
+                    opt_map = [
+                        ("workflows", "拉取工作流",       "user/default/workflows"),
+                        ("loras",     "拉取 LoRA 模型",   "models/loras"),
+                        ("wildcards", "拉取 Wildcards",   "custom_nodes/ComfyUI-Impact-Pack/wildcards"),
+                    ]
+                    for key, name, local_path in opt_map:
+                        if sync_opts.get(key):
+                            new_rules.append({
+                                "id": f"wizard-{key}-{int(time.time())}",
+                                "name": name,
+                                "remote": first_remote,
+                                "remote_path": local_path,
+                                "local_path": local_path,
+                                "direction": "pull",
+                                "method": "copy",
+                                "trigger": "deploy",
+                                "enabled": True,
+                                "filters": [],
+                            })
+                    if new_rules:
+                        _save_sync_rules(new_rules)
+                        _deploy_log(f"已创建 {len(new_rules)} 条 deploy 规则")
+                        rules = new_rules
+
             deploy_rules = [r for r in rules if r.get("trigger") == "deploy" and r.get("enabled", True)]
             if deploy_rules:
                 for rule in deploy_rules:
