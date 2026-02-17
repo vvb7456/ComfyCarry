@@ -74,7 +74,7 @@
         }
 
         .sidebar-logo {
-            padding: 0 16px;
+            padding: 0 20px;
             min-height: 76px;
             border-bottom: 1px solid var(--bd);
             display: flex;
@@ -84,42 +84,24 @@
             overflow: hidden
         }
 
-        .sidebar-logo .logo-img {
-            max-width: 170px;
-            height: auto;
-            object-fit: contain
-        }
-
         .sidebar-logo .logo-text {
-            display: none
-        }
-
-        .sidebar-logo .logo-collapsed-icon {
-            display: none;
-            font-size: .85rem;
-            font-weight: 800;
+            font-size: 1.15rem;
+            font-weight: 700;
             background: linear-gradient(135deg, #7c5cfc, #e879f9);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: -1px
+            color: transparent
         }
 
         .sidebar.collapsed .sidebar-logo {
-            padding: 20px 16px;
+            padding: 20px 12px;
             justify-content: center
         }
 
-        .sidebar.collapsed .sidebar-logo .logo-img {
-            display: none
-        }
-
-        .sidebar.collapsed .sidebar-logo .logo-collapsed-icon {
-            display: block
-        }
-
         .sidebar.collapsed .sidebar-logo .logo-text {
-            display: none
+            font-size: .85rem;
+            letter-spacing: -1px
         }
 
         .sidebar-logo small {
@@ -1911,8 +1893,7 @@
     <nav class="sidebar" id="sidebar">
         <button class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开">◀</button>
         <div class="sidebar-logo">
-            <img src="/static/banner.png" alt="Erocraft" class="logo-img">
-            <span class="logo-collapsed-icon">CC</span>
+            <span class="logo-text">ComfyCarry</span>
         </div>
         <div class="sidebar-nav">
             <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="icon">📊</span><span class="nav-label">总览</span></div>

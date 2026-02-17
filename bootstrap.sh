@@ -79,7 +79,7 @@ DASHBOARD_DIR="/workspace/ComfyUI_RunPod_Sync"
 REPO_URL="https://raw.githubusercontent.com/vvb7456/ComfyUI_RunPod_Sync/main"
 
 mkdir -p "$DASHBOARD_DIR"
-for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html banner.png favicon.ico; do
+for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html favicon.ico; do
     if [ ! -f "$DASHBOARD_DIR/$f" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
         echo "  -> 下载 $f..."
         wget -q -O "$DASHBOARD_DIR/$f" "$REPO_URL/$f" || true
