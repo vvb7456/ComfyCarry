@@ -180,6 +180,17 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <div class="step active" id="step-0">
         <div class="step-title">选择部署方式</div>
         <div class="step-desc">根据你使用的 Docker 镜像选择对应的部署模式</div>
+        <!-- 导入配置 -->
+        <div id="import-config-banner" style="margin-bottom:16px;padding:12px 16px;background:rgba(106,153,255,0.1);border:1px solid var(--accent,#6a99ff);border-radius:8px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-size:.88rem;color:var(--t1)">📦 有之前导出的配置文件？</span>
+                <label class="btn btn-sm btn-primary" style="cursor:pointer;margin:0">
+                    导入配置
+                    <input type="file" accept=".json" onchange="importWizardConfig(event)" style="display:none">
+                </label>
+            </div>
+            <div id="wizard-import-result" style="display:none;margin-top:8px;font-size:.82rem;color:var(--green,#50c878)"></div>
+        </div>
         <div id="gpu-info-display"></div>
         <div class="choice-grid">
             <div class="choice-card" onclick="selectImageType('generic')" id="choice-generic">
@@ -430,6 +441,31 @@ async function init() {
             hint.innerHTML = '✅ 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
         }
 
+        // ── 从已保存的 state 中恢复字段 (支持导入配置后预填充) ──
+        if (state.password && !document.getElementById('input-password').value) {
+            document.getElementById('input-password').value = state.password;
+            wizardConfig.password = state.password;
+        }
+        if (state.cloudflared_token && !document.getElementById('input-cf-token').value) {
+            document.getElementById('input-cf-token').value = state.cloudflared_token;
+            wizardConfig.cloudflared_token = state.cloudflared_token;
+        }
+        if (state.civitai_token && !document.getElementById('input-civitai-token').value) {
+            document.getElementById('input-civitai-token').value = state.civitai_token;
+            wizardConfig.civitai_token = state.civitai_token;
+        }
+        if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
+            const method = state.rclone_config_method;
+            const radio = document.querySelector(`input[name="rclone-method"][value="${method}"]`);
+            if (radio) { radio.checked = true; showRcloneInput(method); }
+            wizardConfig.rclone_config_method = method;
+            if (state.rclone_config_value) {
+                wizardConfig.rclone_config_value = state.rclone_config_value;
+                if (method === 'base64') document.getElementById('input-rclone-base64').value = state.rclone_config_value;
+            }
+        }
+        if (state.plugins) wizardConfig.plugins = state.plugins;
+
         updateProgressBar();
     } catch (e) {
         console.error('init error:', e);
@@ -513,6 +549,11 @@ function selectImageType(type, noEnable) {
     document.getElementById(`choice-${type}`).classList.add('selected');
     if (!noEnable) document.getElementById('btn-next-0').disabled = false;
     else document.getElementById('btn-next-0').disabled = false;
+    // 切换镜像类型时重新渲染插件列表 (prebuilt 模式全部预装)
+    if (pluginData.length > 0) {
+        const selectedUrls = wizardConfig.plugins?.length ? wizardConfig.plugins : pluginData.map(p => p.url);
+        renderPluginList(pluginData, selectedUrls);
+    }
 }
 
 // ── Rclone Input Toggle ──
@@ -526,16 +567,29 @@ function showRcloneInput(method) {
 
 // ── Plugins ──
 function renderPluginList(plugins, selectedUrls) {
+    const isPrebuilt = wizardConfig.image_type === 'prebuilt';
     const list = document.getElementById('plugin-list');
-    list.innerHTML = plugins.map((p, i) => {
-        const checked = selectedUrls.includes(p.url) || p.required;
-        const disabled = p.required ? 'disabled' : '';
-        const req = p.required ? '<span class="plugin-required">* 必选</span>' : '';
-        return `<div class="plugin-item">
-            <input type="checkbox" id="plugin-${i}" ${checked ? 'checked' : ''} ${disabled} data-url="${esc(p.url)}">
-            <span class="plugin-name">${esc(p.name)} ${req}</span>
-        </div>`;
-    }).join('');
+    if (isPrebuilt) {
+        // 预构建镜像: 对插件列表显示提示
+        list.innerHTML = '<div style="color:var(--t2);font-size:.82rem;margin-bottom:12px">⚡ 预构建镜像已包含以下插件，均已预装且不可取消：</div>' +
+        plugins.map((p, i) => {
+            return `<div class="plugin-item">
+                <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
+                <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
+            </div>`;
+        }).join('') +
+        '<div style="color:var(--t2);font-size:.82rem;margin-top:12px">可在下方添加额外插件，部署时会安装不在镜像中的新插件：</div>';
+    } else {
+        list.innerHTML = plugins.map((p, i) => {
+            const checked = selectedUrls.includes(p.url) || p.required;
+            const disabled = p.required ? 'disabled' : '';
+            const req = p.required ? '<span class="plugin-required">* 必选</span>' : '';
+            return `<div class="plugin-item">
+                <input type="checkbox" id="plugin-${i}" ${checked ? 'checked' : ''} ${disabled} data-url="${esc(p.url)}">
+                <span class="plugin-name">${esc(p.name)} ${req}</span>
+            </div>`;
+        }).join('');
+    }
 }
 
 function getSelectedPlugins() {
@@ -722,6 +776,39 @@ function backToWizard() {
     document.getElementById('progressBar').style.display = '';
     showStep(TOTAL_STEPS - 1);
     renderSummary();
+}
+
+async function importWizardConfig(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+    const resultEl = document.getElementById('wizard-import-result');
+    try {
+        const text = await file.text();
+        const config = JSON.parse(text);
+        if (!config._version) {
+            resultEl.style.display = 'block';
+            resultEl.style.color = 'var(--red)';
+            resultEl.textContent = '❌ 无效的配置文件格式';
+            return;
+        }
+        // 调用后端导入 API
+        const r = await fetch('/api/settings/import-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: text
+        });
+        const d = await r.json();
+        resultEl.style.display = 'block';
+        resultEl.style.color = 'var(--green,#50c878)';
+        resultEl.innerHTML = `✅ ${esc(d.message || '导入成功')}<br><small>已导入: ${esc((d.applied || []).join(', '))}</small>`;
+        // 重新加载状态以更新表单
+        setTimeout(() => init(), 500);
+    } catch (e) {
+        resultEl.style.display = 'block';
+        resultEl.style.color = 'var(--red)';
+        resultEl.textContent = '❌ 导入失败: ' + e.message;
+    }
 }
 
 // ── Start ──

@@ -2102,6 +2102,62 @@ async function reinitialize() {
   }
 }
 
+async function exportConfig() {
+  try {
+    const r = await fetch('/api/settings/export-config');
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comfyui-config-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ 配置已导出');
+  } catch (e) {
+    showToast('导出失败: ' + e.message);
+  }
+}
+
+async function importConfig(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  event.target.value = '';  // 允许重复选择同一文件
+  try {
+    const text = await file.text();
+    const config = JSON.parse(text);
+    if (!config._version) {
+      showToast('❌ 无效的配置文件格式');
+      return;
+    }
+    if (!confirm(`确定要导入配置吗?\n\n导出于: ${config._exported_at || '未知'}\n将覆盖当前的密码、API Key、Tunnel Token 等设置。`)) return;
+    const r = await fetch('/api/settings/import-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: text
+    });
+    const d = await r.json();
+    const resultEl = document.getElementById('import-result');
+    if (resultEl) {
+      resultEl.style.display = 'block';
+      if (d.errors?.length) {
+        resultEl.style.background = 'rgba(255,180,0,0.12)';
+        resultEl.style.color = 'var(--t1)';
+        resultEl.innerHTML = `<strong>⚠️ ${d.message}</strong><br>已导入: ${d.applied?.join(', ') || '无'}<br>失败: ${d.errors.join(', ')}`;
+      } else {
+        resultEl.style.background = 'rgba(80,200,120,0.12)';
+        resultEl.style.color = 'var(--green,#50c878)';
+        resultEl.innerHTML = `<strong>✅ ${d.message}</strong><br>${d.applied?.join(', ') || ''}`;
+      }
+    }
+    showToast(d.ok ? '✅ ' + d.message : '⚠️ ' + d.message);
+    loadSettingsPage();
+  } catch (e) {
+    showToast('导入失败: ' + e.message);
+  }
+}
+
 
 // ========== Plugin Management ==========
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed

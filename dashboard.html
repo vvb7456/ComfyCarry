@@ -2060,6 +2060,23 @@
                             </div>
                             <button class="btn btn-sm btn-danger" onclick="reinitialize()">🗑️ 重新初始化</button>
                         </div>
+
+                        <!-- 导入导出配置 -->
+                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">📦 配置导入 / 导出</h3>
+                            <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
+                                导出所有配置 (密码、API Key、Tunnel Token、Rclone、同步偏好、插件列表、ComfyUI 参数) 为 JSON 文件。
+                                新建实例时可在 Setup Wizard 中导入，快速恢复配置。
+                            </p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                <button class="btn btn-sm btn-primary" onclick="exportConfig()">📥 导出配置</button>
+                                <label class="btn btn-sm" style="cursor:pointer">
+                                    📤 导入配置
+                                    <input type="file" accept=".json" onchange="importConfig(event)" style="display:none">
+                                </label>
+                            </div>
+                            <div id="import-result" style="display:none;margin-top:12px;padding:10px 14px;border-radius:6px;font-size:.82rem;line-height:1.5"></div>
+                        </div>
                     </div>
 
                     <!-- 右列: Dashboard 日志 (Debug 模式) -->

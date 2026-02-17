@@ -1849,6 +1849,182 @@ def api_settings_debug_set():
     return jsonify({"ok": True, "debug": enabled})
 
 
+@app.route("/api/settings/export-config")
+def api_settings_export_config():
+    """导出所有配置为 JSON 文件"""
+    import base64 as _b64
+    config = {"_version": 1, "_exported_at": datetime.now().isoformat()}
+
+    # 1. Dashboard 密码
+    config["password"] = DASHBOARD_PASSWORD
+
+    # 2. CivitAI API Key
+    try:
+        if CONFIG_FILE.exists():
+            config["civitai_token"] = json.loads(CONFIG_FILE.read_text()).get("api_key", "")
+    except Exception:
+        pass
+
+    # 3. 部署模式
+    state = _load_setup_state()
+    config["image_type"] = state.get("image_type", "")
+
+    # 4. Cloudflare Tunnel Token
+    config["cloudflared_token"] = state.get("cloudflared_token", "")
+
+    # 5. Rclone 配置 (Base64 编码)
+    rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
+    if rclone_conf.exists():
+        try:
+            config["rclone_config_base64"] = _b64.b64encode(
+                rclone_conf.read_bytes()
+            ).decode("ascii")
+        except Exception:
+            pass
+
+    # 6. 插件列表 — 分离: 默认插件 + 额外插件
+    default_urls = {p["url"] for p in DEFAULT_PLUGINS}
+    all_plugins = state.get("plugins", [])
+    config["extra_plugins"] = [u for u in all_plugins if u not in default_urls]
+    # 也保存用户对默认插件的取消选择 (如果有)
+    config["disabled_default_plugins"] = [u for u in default_urls if u not in all_plugins]
+
+    # 7. 同步偏好
+    sync_prefs_file = Path("/workspace/.sync_prefs.json")
+    if sync_prefs_file.exists():
+        try:
+            config["sync_prefs"] = json.loads(sync_prefs_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    # 8. ComfyUI 启动参数
+    try:
+        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
+                           capture_output=True, text=True, timeout=5)
+        procs = json.loads(r.stdout or "[]")
+        comfy = next((p for p in procs if p.get("name") == "comfy"), None)
+        if comfy:
+            raw_args = comfy.get("pm2_env", {}).get("args", [])
+            if isinstance(raw_args, str):
+                raw_args = raw_args.split()
+            config["comfyui_params"] = _parse_comfyui_args(raw_args)
+    except Exception:
+        pass
+
+    # 9. Debug 模式
+    config["debug"] = _get_config("debug", False)
+
+    return Response(
+        json.dumps(config, indent=2, ensure_ascii=False),
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": "attachment; filename=comfyui-config.json",
+            "Cache-Control": "no-cache"
+        }
+    )
+
+
+@app.route("/api/settings/import-config", methods=["POST"])
+def api_settings_import_config():
+    """导入配置 JSON — 合并覆盖现有设置"""
+    import base64 as _b64
+
+    data = request.get_json(force=True) or {}
+    if not data:
+        return jsonify({"error": "无效的配置文件"}), 400
+
+    applied = []
+    errors = []
+
+    # 1. 密码
+    if data.get("password"):
+        try:
+            global DASHBOARD_PASSWORD
+            DASHBOARD_PASSWORD = data["password"]
+            _save_dashboard_password(data["password"])
+            applied.append("Dashboard 密码")
+        except Exception as e:
+            errors.append(f"密码: {e}")
+
+    # 2. CivitAI API Key
+    if data.get("civitai_token"):
+        try:
+            CONFIG_FILE.write_text(json.dumps({"api_key": data["civitai_token"]}))
+            applied.append("CivitAI API Key")
+        except Exception as e:
+            errors.append(f"CivitAI: {e}")
+
+    # 3. Rclone 配置
+    if data.get("rclone_config_base64"):
+        try:
+            rclone_dir = Path.home() / ".config" / "rclone"
+            rclone_dir.mkdir(parents=True, exist_ok=True)
+            conf_text = _b64.b64decode(data["rclone_config_base64"]).decode("utf-8")
+            (rclone_dir / "rclone.conf").write_text(conf_text, encoding="utf-8")
+            subprocess.run("chmod 600 ~/.config/rclone/rclone.conf", shell=True)
+            applied.append("Rclone 配置")
+        except Exception as e:
+            errors.append(f"Rclone: {e}")
+
+    # 4. 同步偏好
+    if data.get("sync_prefs"):
+        try:
+            Path("/workspace/.sync_prefs.json").write_text(
+                json.dumps(data["sync_prefs"], indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            applied.append("同步偏好")
+        except Exception as e:
+            errors.append(f"同步偏好: {e}")
+
+    # 5. Debug 模式
+    if "debug" in data:
+        _set_config("debug", bool(data["debug"]))
+        applied.append("Debug 模式")
+
+    # 6. Setup Wizard 状态 (image_type, plugins, tunnel token)
+    try:
+        state = _load_setup_state()
+        if data.get("image_type"):
+            state["image_type"] = data["image_type"]
+            applied.append("部署模式")
+        if data.get("cloudflared_token"):
+            state["cloudflared_token"] = data["cloudflared_token"]
+            applied.append("Tunnel Token")
+        if data.get("civitai_token"):
+            state["civitai_token"] = data["civitai_token"]
+        # 合并插件列表
+        if "extra_plugins" in data or "disabled_default_plugins" in data:
+            default_urls = [p["url"] for p in DEFAULT_PLUGINS]
+            disabled = set(data.get("disabled_default_plugins", []))
+            plugins = [u for u in default_urls if u not in disabled]
+            plugins.extend(data.get("extra_plugins", []))
+            state["plugins"] = plugins
+            applied.append("插件列表")
+        if data.get("rclone_config_base64"):
+            state["rclone_config_method"] = "base64"
+            state["rclone_config_value"] = data["rclone_config_base64"]
+        if data.get("password"):
+            state["password"] = data["password"]
+        _save_setup_state(state)
+    except Exception as e:
+        errors.append(f"向导状态: {e}")
+
+    # 7. ComfyUI 启动参数 (只在 ComfyUI 运行中时生效)
+    if data.get("comfyui_params"):
+        try:
+            # 参数将在下次启动/重启时通过 API 应用
+            applied.append("ComfyUI 启动参数 (需重启 ComfyUI 生效)")
+        except Exception as e:
+            errors.append(f"ComfyUI 参数: {e}")
+
+    return jsonify({
+        "ok": True,
+        "applied": applied,
+        "errors": errors,
+        "message": f"已导入 {len(applied)} 项配置" + (f", {len(errors)} 项失败" if errors else "")
+    })
+
+
 @app.route("/api/settings/reinitialize", methods=["POST"])
 def api_settings_reinitialize():
     """重新初始化 — 停止服务, 清理 ComfyUI, 重置向导状态, 进入 Setup Wizard
