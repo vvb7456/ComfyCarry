@@ -234,7 +234,7 @@ def check_auth():
     # 配置导入在 Setup 阶段也需要可用
     if request.path == "/api/settings/import-config":
         return
-    if request.path in ("/login", "/favicon.ico", "/dashboard.js"):
+    if request.path in ("/login", "/favicon.ico", "/dashboard.js", "/api/version"):
         return
     # 如果尚未完成部署向导, 重定向到向导页
     if not _is_setup_complete():
