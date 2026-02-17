@@ -2907,6 +2907,23 @@ _sync_worker_stop = threading.Event()
 _sync_log_buffer = []         # 最近 300 行日志
 _sync_log_lock = threading.Lock()
 
+SYNC_SETTINGS_FILE = Path("/workspace/.sync_settings.json")
+
+def _load_sync_settings():
+    """加载全局同步设置"""
+    defaults = {"min_age": 30, "watch_interval": 60}
+    try:
+        if SYNC_SETTINGS_FILE.exists():
+            data = json.loads(SYNC_SETTINGS_FILE.read_text())
+            defaults.update(data)
+    except Exception:
+        pass
+    return defaults
+
+def _save_sync_settings(settings):
+    """保存全局同步设置"""
+    SYNC_SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
+
 
 def _sync_log(msg):
     """写日志到内存 buffer"""
@@ -2939,6 +2956,14 @@ def _run_sync_rule(rule):
         src, dst = local_abs, remote_spec
 
     cmd = ["rclone", method, src, dst, "--transfers", "4", "-P"]
+
+    # Push 规则自动应用 --min-age 防止复制正在写入的文件
+    if direction == "push":
+        settings = _load_sync_settings()
+        min_age = settings.get("min_age", 30)
+        if min_age > 0:
+            cmd.extend(["--min-age", f"{min_age}s"])
+
     for f in filters:
         cmd.extend(["--filter", f])
 
@@ -2998,9 +3023,9 @@ def _sync_worker_loop():
                     if not has_real:
                         continue  # 无实际文件，跳过本轮
             _run_sync_rule(rule)
-        # 等待最短 interval，默认 15 秒
-        intervals = [r.get("watch_interval", 15) for r in watch_rules]
-        wait = max(min(intervals), 5) if intervals else 15
+        # 使用全局 watch_interval 设置
+        settings = _load_sync_settings()
+        wait = max(settings.get("watch_interval", 60), 5)
         _sync_worker_stop.wait(wait)
     _sync_log("🛑 Sync Worker 已停止")
 
@@ -3240,6 +3265,25 @@ def api_sync_worker_stop():
     """停止 Sync Worker"""
     _stop_sync_worker()
     return jsonify({"ok": True, "message": "Sync Worker 已停止"})
+
+
+@app.route("/api/sync/settings", methods=["GET"])
+def api_sync_settings_get():
+    """获取全局同步设置"""
+    return jsonify(_load_sync_settings())
+
+
+@app.route("/api/sync/settings", methods=["POST"])
+def api_sync_settings_save():
+    """保存全局同步设置"""
+    data = request.get_json(force=True)
+    settings = _load_sync_settings()
+    if "min_age" in data:
+        settings["min_age"] = max(int(data["min_age"]), 0)
+    if "watch_interval" in data:
+        settings["watch_interval"] = max(int(data["watch_interval"]), 5)
+    _save_sync_settings(settings)
+    return jsonify({"ok": True, "settings": settings})
 
 
 # ── Rclone 配置文件直接编辑 (高级) ───────────────────────────────

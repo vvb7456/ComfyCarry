@@ -2258,6 +2258,7 @@
                         <div id="sync-worker-badge" style="font-size:.85rem"></div>
                         <div style="flex:1"></div>
                         <button class="btn btn-sm" onclick="runDeployRules()">▶ 执行部署规则</button>
+                        <button class="btn btn-sm" onclick="showSyncSettings()">⚙ 同步设置</button>
                         <button class="btn btn-sm btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
                     </div>
                     <div id="sync-rules-list"></div>
@@ -2447,6 +2448,34 @@
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
                 <button class="btn btn-sm" onclick="closeSyncModal('add-rule-modal')">取消</button>
                 <button class="btn btn-sm btn-primary" onclick="submitAddRule()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Settings Modal -->
+    <div class="modal-overlay" id="sync-settings-modal" onclick="if(event.target===this)closeSyncModal('sync-settings-modal')">
+        <div class="modal-box" style="width:460px">
+            <div style="display:flex;align-items:center;margin-bottom:16px">
+                <h3 style="margin-bottom:0">⚙ 同步设置</h3>
+                <button class="btn btn-sm" onclick="closeSyncModal('sync-settings-modal')" style="margin-left:auto">✕</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+                <div>
+                    <label style="font-weight:600;display:block;margin-bottom:4px">文件稳定延迟 (秒)</label>
+                    <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">推送文件时，跳过修改时间不足此秒数的文件，防止复制正在写入的不完整文件。设为 0 表示不延迟。</p>
+                    <input type="number" id="sync-set-min-age" min="0" max="300" value="30" style="width:100px">
+                    <span style="color:var(--t2);font-size:.85rem;margin-left:8px">默认 30 秒</span>
+                </div>
+                <div>
+                    <label style="font-weight:600;display:block;margin-bottom:4px">检查间隔 (秒)</label>
+                    <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">Worker 每隔多少秒检查一次文件变化并执行同步。值越小检查越频繁但开销越大。</p>
+                    <input type="number" id="sync-set-interval" min="5" max="3600" value="60" style="width:100px">
+                    <span style="color:var(--t2);font-size:.85rem;margin-left:8px">默认 60 秒</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+                <button class="btn btn-sm" onclick="closeSyncModal('sync-settings-modal')">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="saveSyncSettings()">保存</button>
             </div>
         </div>
     </div>

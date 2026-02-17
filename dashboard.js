@@ -2017,6 +2017,37 @@ async function showAddRemoteModal() {
 }
 function closeSyncModal(id) { document.getElementById(id).classList.remove('active'); }
 
+async function showSyncSettings() {
+  try {
+    const r = await fetch('/api/sync/settings');
+    const s = await r.json();
+    document.getElementById('sync-set-min-age').value = s.min_age ?? 30;
+    document.getElementById('sync-set-interval').value = s.watch_interval ?? 60;
+  } catch(e) {}
+  document.getElementById('sync-settings-modal').classList.add('active');
+}
+
+async function saveSyncSettings() {
+  const min_age = parseInt(document.getElementById('sync-set-min-age').value) || 30;
+  const watch_interval = parseInt(document.getElementById('sync-set-interval').value) || 60;
+  try {
+    const r = await fetch('/api/sync/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ min_age, watch_interval })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('同步设置已保存');
+      closeSyncModal('sync-settings-modal');
+    } else {
+      showToast('保存失败', 'error');
+    }
+  } catch(e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
+}
+
 function renderRemoteTypeFields() {
   const type = document.getElementById('new-remote-type').value;
   const container = document.getElementById('new-remote-fields');
