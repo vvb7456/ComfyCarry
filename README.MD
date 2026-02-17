@@ -1,217 +1,133 @@
-﻿# ComfyUI RunPod 自动化部署
+# ComfyCarry
 
-RunPod/Vast.ai 快速部署 ComfyUI，RTX 5090/H100 优化。
+RunPod / Vast.ai 上的 ComfyUI 一站式管理。用完即毁实例 + 配置永续。
+
+---
+
+## 它做什么
+
+Web Dashboard 统一管理 ComfyUI 全生命周期：
+
+- **一键部署** — Setup Wizard 引导配置，自动安装 ComfyUI + 插件 + 依赖
+- **系统监控** — CPU / GPU / VRAM / 磁盘实时状态
+- **模型管理** — 本地模型浏览 + CivitAI 搜索 + 下载队列
+- **插件管理** — 代理 ComfyUI-Manager，浏览/安装/更新/卸载
+- **ComfyUI 控制** — 启动参数热改、实时日志、队列/历史、WS→SSE 桥接
+- **Cloudflare Tunnel** — 穿透廉价宿主的不稳定公网
+- **云同步** — Rclone 管理，工作流/LoRA/输出文件双向同步
+- **配置迁移** — 导出/导入全部设置为 JSON，新实例秒级恢复
 
 ---
 
 ## 快速开始
 
-### 方式一：预构建镜像（推荐，65秒启动）
+### 1. 创建实例
 
-**镜像**：
-```
-ghcr.io/vvb7456/comfyui-runpod:latest
-```
+在 Vast.ai / RunPod 创建 GPU 实例，任意 PyTorch 镜像均可。
 
-**预装**：Python 3.13 + PyTorch 2.9.1 + CUDA 13.0 + FlashAttention-3 + SageAttention-3 + ComfyUI + 15插件
+### 2. 运行 bootstrap
 
-**预装插件**：
-- ComfyUI-Manager
-- comfyui_controlnet_aux
-- ComfyUI-Impact-Pack
-- ComfyUI-Easy-Use
-- ComfyUI-Crystools
-- ComfyUI_UltimateSDUpscale
-- comfyui-dynamicprompts
-- WeiLin-Comfyui-Tools
-- AuraSR-ComfyUI
-- was-node-suite-comfyui
-- ComfyUI-KJNodes
-- Enhanced-Civicomfy
-- ComfyUI-WD14-Tagger
-- rgthree-comfy
-- ComfyUI-Inspire-Pack
+SSH 进入实例后执行：
 
-**启动命令**：
 ```bash
-bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/deploy-prebuilt.sh && bash d.sh"
+wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash
 ```
 
-### 方式二：从零安装（20分钟）
+bootstrap 自动安装 Python 3.13 / Node.js / PM2 / Cloudflared，下载 Dashboard 文件，启动管理面板。
 
-**镜像**：
-```
-runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404
-```
+### 3. 访问 Dashboard
 
-**启动命令**：
-```bash
-bash -c "wget -O d.sh https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/deploy.sh && bash d.sh"
-```
+打开 `http://<实例IP>:5000`，首次进入 Setup Wizard：
+
+| 步骤 | 配置项 |
+|------|--------|
+| 部署方式 | 全新部署 / 从 JSON 恢复 |
+| 密码 | Dashboard 登录密码 |
+| Tunnel | Cloudflare Tunnel Token（可选） |
+| 云存储 | Rclone 配置 + 同步偏好（可选） |
+| CivitAI | API Key（可选） |
+| 插件 | 选择要安装的自定义节点 |
+| 确认 | 一键部署，实时日志 |
+
+部署完成自动跳转主界面。
 
 ---
 
 ## 环境变量
 
-### 必填
+均为可选，Setup Wizard 会自动检测并预填充。
 
-| 变量 | 用途 | 示例 |
+| 变量 | 说明 | 默认 |
 |------|------|------|
-| `CIVITAI_TOKEN` | CivitAI API Key | `abc123def456...` |
-
-### 可选
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| **模型下载** |||
-| `ALL_MODEL_IDS` | 无 | 逗号分隔的模型ID或URL，自动识别类型 |
-| **更新控制** |||
-| `UPDATE_COMFYUI` | `false` | 是否更新ComfyUI到最新版 |
-| `UPDATE_PLUGINS` | `false` | 是否更新所有插件 |
-|**插件** |||
-| `PLUGIN_URLS` | 无 | 额外插件，逗号分隔GitHub URL |
-| **Rclone配置** |||
-| `RCLONE_CONF_URL` | 无 | rclone.conf下载地址（GitHub Gist Raw URL） |
-| `ENABLE_R2` | `true` | 启用R2资产同步 |
-| `ENABLE_ONEDRIVE` | `true` | 启用OneDrive输出同步 |
-| `ENABLE_GDRIVE` | `true` | 启用Google Drive输出同步 |
-| **R2同步细粒度** |||
-| `R2_SYNC_WORKFLOWS` | `true` | 同步工作流JSON |
-| `R2_SYNC_LORAS` | `true` | 同步LoRA模型 |
-| `R2_SYNC_WILDCARDS` | `true` | 同步通配符文件 |
-| **其他** |||
-| `CLOUDFLARED_TOKEN` | 无 | Cloudflare Tunnel令牌 |
-| `JUPYTER_TOKEN` | 自动生成 | Jupyter Lab访问令牌 |
+| `DASHBOARD_PASSWORD` | 登录密码 | `comfy2025` |
+| `CF_TUNNEL_TOKEN` | Cloudflare Tunnel Token | — |
+| `CIVITAI_TOKEN` | CivitAI API Key | — |
+| `RCLONE_CONF_BASE64` | Base64 编码的 rclone.conf | — |
+| `COMFYUI_DIR` | ComfyUI 路径 | `/workspace/ComfyUI` |
+| `MANAGER_PORT` | Dashboard 端口 | `5000` |
 
 ---
 
-## 配置指南
+## 架构
 
-### 1. 模型下载
-
-设置 `ALL_MODEL_IDS`，支持：
-- 纯ID：`1162518,206886`
-- URL：`https://civitai.com/models/1162518`
-- 指定版本：`https://civitai.com/models/1162518?modelVersionId=1714002`
-
-脚本自动调用CivitAI API识别模型类型（checkpoint/lora/controlnet/vae/upscaler）。
-
-### 2. Rclone云同步
-
-**准备rclone.conf**：
-```bash
-# 本地配置remote（r2/onedrive/gdrive）
-rclone config
-
-# 找到配置文件
-# Linux: ~/.config/rclone/rclone.conf
-# Windows: %APPDATA%\rclone\rclone.conf
+```
+bootstrap.sh              # 入口：装依赖、下文件、启 PM2
+workspace_manager.py      # Flask 后端，68 个 API 端点
+dashboard.html / .js      # 前端 SPA，原生 HTML/JS/CSS
+setup_wizard.html         # 首次部署向导
 ```
 
-**上传到GitHub Secret Gist**：
-1. https://gist.github.com/ → "+ New secret gist"
-2. 文件名：`rclone.conf`
-3. 粘贴配置内容 → "Create secret gist"
-4. 点击"Raw"按钮获取URL
+### PM2 进程
 
-**设置环境变量**：
-```bash
-RCLONE_CONF_URL=https://gist.githubusercontent.com/user/xxx/raw/xxx/rclone.conf
-```
+| 名称 | 服务 | 端口 |
+|------|------|------|
+| `dashboard` | Flask 后端 | 5000 |
+| `comfy` | ComfyUI | 8188 |
+| `tunnel` | Cloudflared | — |
+| `sync` | Rclone 同步 | — |
 
-**R2资产结构**（bucket名：comfyui-assets）：
-```
-comfyui-assets/
-├── workflow/*.json       # 工作流
-├── loras/*.safetensors   # LoRA模型
-└── wildcards/*.txt       # 通配符
-```
+### 运行时文件
 
-**控制同步内容**：
-```bash
-ENABLE_R2=true                # 总开关
-R2_SYNC_WORKFLOWS=true        # 工作流
-R2_SYNC_LORAS=false           # 不同步LoRA
-R2_SYNC_WILDCARDS=true        # 通配符
-```
-
-**Output自动上传**（OneDrive/Google Drive）：
-- 设置 `RCLONE_CONF_URL` 且配置中有对应remote
-- 生成的图片/视频自动移动到 `ComfyUI_Transfer` 文件夹
-- 控制：`ENABLE_ONEDRIVE=false` 或 `ENABLE_GDRIVE=false`
-
-### 3. 额外插件
-
-15个默认插件外需要更多插件：
-
-```bash
-PLUGIN_URLS=https://github.com/author/plugin1,https://github.com/author/plugin2
-```
-
-脚本自动克隆并安装requirements.txt依赖。
-
-### 4. Cloudflare Tunnel
-
-**获取Token**：
-1. https://one.dash.cloudflare.com/ → Zero Trust → Access → Tunnels
-2. Create a tunnel → 复制token
-
-**设置环境变量**：
-```bash
-CLOUDFLARED_TOKEN=eyJhIjoixxxx...
-```
-
-启动后通过Cloudflare域名访问ComfyUI（端口8188）。
+| 路径 | 用途 |
+|------|------|
+| `/workspace/.dashboard_env` | Dashboard 配置 |
+| `/workspace/.setup_state.json` | 向导状态 |
+| `/workspace/.sync_prefs.json` | 同步偏好 |
+| `/workspace/.civitai_config.json` | CivitAI Key |
 
 ---
 
-## 目录结构
+## Dashboard 页面
 
-```
-/workspace/ComfyUI/
-├── models/
-│   ├── checkpoints/      # Checkpoint
-│   ├── loras/            # LoRA（含R2同步）
-│   ├── controlnet/       # ControlNet
-│   ├── vae/              # VAE
-│   └── upscale_models/   # 放大器
-├── output/               # 输出（自动同步）
-└── user/default/workflows/  # 工作流（R2同步）
-```
+| 页面 | 功能 |
+|------|------|
+| 总览 | 系统监控、服务状态、Tunnel 快速链接 |
+| ComfyUI | 启动参数、实时日志、队列/历史 |
+| 模型管理 | 本地模型 + CivitAI 搜索/下载 |
+| 插件管理 | 浏览/安装/更新/卸载 |
+| Sync | Rclone 配置、远程存储、同步控制 |
+| Tunnel | Cloudflare 状态、Ingress 链接 |
+| 设置 | 密码、CivitAI Key、Debug、配置导入/导出、重初始化 |
 
 ---
 
 ## 常用命令
 
 ```bash
-# 日志
-tail -f /workspace/setup.log
-
-# PM2管理
-pm2 list
-pm2 logs comfy
-pm2 restart comfy
-
-# 模型列表
-find /workspace/ComfyUI/models -name "*.safetensors"
+pm2 ls                    # 查看所有服务
+pm2 logs dashboard        # Dashboard 日志
+pm2 logs comfy            # ComfyUI 日志
+pm2 restart comfy         # 重启 ComfyUI
 ```
 
 ---
 
 ## 故障排查
 
-| 问题 | 解决 |
+| 问题 | 方向 |
 |------|------|
-| 模型未下载 | 检查 `CIVITAI_TOKEN` 有效性，查看 `/workspace/setup.log` |
-| Rclone同步失败 | 验证 `RCLONE_CONF_URL` 可访问，检查remote名称 |
-| 磁盘满 | `df -h /workspace`，删除不需要的模型 |
-
----
-
-## 文件
-
-- `deploy-prebuilt.sh` - 预构建镜像部署
-- `deploy.sh` - 完整安装部署
-- `civicomfy_batch_downloader.py` - 批量下载器
-- `auto_generate_csv.py` - 模型信息查询
-
-**版本**：v5.0
+| Dashboard 打不开 | `pm2 logs dashboard` 看报错 |
+| ComfyUI 无法启动 | Dashboard → ComfyUI 页查看实时日志 |
+| 模型下载失败 | 检查 CivitAI Key 有效性 |
+| Tunnel 断连 | Dashboard → Tunnel 页查看状态 |
+| 同步不工作 | Dashboard → Sync 页检查 Rclone 配置 |
