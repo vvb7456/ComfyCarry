@@ -49,14 +49,14 @@ function showPage(page) {
 }
 
 let currentModelTab = 'local';
+const modelTabIds = ['local', 'search', 'lookup', 'cart', 'downloads'];
 function switchModelTab(tab) {
   currentModelTab = tab;
   document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
-  document.getElementById('mtab-local').classList.toggle('hidden', tab !== 'local');
-  document.getElementById('mtab-civitai').classList.toggle('hidden', tab !== 'civitai');
-  document.getElementById('mtab-downloads').classList.toggle('hidden', tab !== 'downloads');
+  modelTabIds.forEach(id => document.getElementById('mtab-' + id).classList.toggle('hidden', id !== tab));
   if (tab === 'local') loadLocalModels();
-  else if (tab === 'civitai') loadFacets();
+  else if (tab === 'search') loadFacets();
+  else if (tab === 'cart') renderCart();
   else if (tab === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
 }
 
@@ -1204,6 +1204,7 @@ async function loadTunnelPage() {
         <div class="tunnel-status-badge" style="color:${stColor}">
           <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
         </div>
+        <button class="btn btn-sm" onclick="restartTunnel()" style="font-size:.75rem;padding:3px 10px;margin-left:12px">♻️ 重启</button>
       </div>
       <div class="section-title" style="margin-top:16px">🔗 转发服务</div>
       ${linksHtml}`;
@@ -1698,6 +1699,7 @@ async function loadSyncPage() {
       <div class="tunnel-status-badge" style="color:${stColor}">
         <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
       </div>
+      <button class="btn btn-sm" onclick="restartSync()" style="font-size:.75rem;padding:3px 10px;margin-left:12px">♻️ 重启</button>
     </div>`;
 
   // Render structured remote cards
@@ -2112,6 +2114,10 @@ async function reinitialize() {
   }
 }
 
+// ========== Import/Export Modal ==========
+function openIEModal() { document.getElementById('ie-modal').classList.add('active'); }
+function closeIEModal() { document.getElementById('ie-modal').classList.remove('active'); }
+
 async function exportConfig() {
   try {
     const r = await fetch('/api/settings/export-config');
@@ -2149,6 +2155,7 @@ async function importConfig(event) {
     });
     const d = await r.json();
     showToast(d.ok ? '✅ ' + d.message : '⚠️ ' + d.message);
+    closeIEModal();
     if (document.getElementById('page-settings')?.classList.contains('hidden') === false) loadSettingsPage();
   } catch (e) {
     showToast('导入失败: ' + e.message);
