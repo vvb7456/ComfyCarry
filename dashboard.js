@@ -1,5 +1,5 @@
 // ====================================================================
-// Workspace Manager - dashboard.js
+// ComfyCarry - dashboard.js
 // ====================================================================
 
 const CIVITAI_API_BASE = 'https://civitai.com/api/v1';

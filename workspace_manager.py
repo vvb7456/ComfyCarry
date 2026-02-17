@@ -187,7 +187,7 @@ LOGIN_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Login - Workspace Manager</title>
+<title>Login - ComfyCarry</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -200,7 +200,7 @@ button{width:100%;padding:clamp(10px,1.2vw,16px);background:#7c5cfc;color:#fff;b
 button:hover{background:#9078ff}
 .err{color:#f87171;font-size:clamp(.82rem,.9vw,1rem);text-align:center;margin-bottom:10px}
 </style></head>
-<body><div class="card"><h2>Workspace Manager</h2>
+<body><div class="card"><h2>ComfyCarry</h2>
 <form method="POST" action="/login">
 <div class="err" id="err">__ERR__</div>
 <input name="password" type="password" placeholder="输入访问密码..." autofocus>
@@ -235,6 +235,8 @@ def check_auth():
     if request.path == "/api/settings/import-config":
         return
     if request.path in ("/login", "/favicon.ico", "/dashboard.js", "/api/version"):
+        return
+    if request.path.startswith("/static/"):
         return
     # 如果尚未完成部署向导, 重定向到向导页
     if not _is_setup_complete():
@@ -3178,6 +3180,14 @@ def serve_js():
     return "", 404
 
 
+@app.route("/favicon.ico")
+def serve_favicon():
+    """Serve favicon"""
+    ico = os.path.join(SCRIPT_DIR, "favicon.ico")
+    if os.path.exists(ico):
+        return send_file(ico, mimetype="image/x-icon")
+    return "", 204
+
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     """通用静态文件服务"""
@@ -3202,7 +3212,7 @@ if __name__ == "__main__":
         print(f"  📝 已从环境变量 CIVITAI_TOKEN 导入 API Key")
 
     print(f"\n{'='*50}")
-    print(f"  🖥️  Workspace Manager v1.0")
+    print(f"  🖥️  ComfyCarry v2.4")
     print(f"  访问地址: http://localhost:{port}")
     print(f"  ComfyUI:  {COMFYUI_DIR}")
     print(f"{'='*50}\n")

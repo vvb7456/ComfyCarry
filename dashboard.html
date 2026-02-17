@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workspace Manager</title>
+    <title>ComfyCarry</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         *,
@@ -73,15 +74,8 @@
         }
 
         .sidebar-logo {
-            padding: 0 20px;
+            padding: 0 16px;
             min-height: 76px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #7c5cfc, #e879f9);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            color: transparent;
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;
@@ -90,9 +84,38 @@
             overflow: hidden
         }
 
+        .sidebar-logo .logo-img {
+            max-width: 170px;
+            height: auto;
+            object-fit: contain
+        }
+
+        .sidebar-logo .logo-text {
+            display: none
+        }
+
+        .sidebar-logo .logo-collapsed-icon {
+            display: none;
+            font-size: .85rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #7c5cfc, #e879f9);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px
+        }
+
         .sidebar.collapsed .sidebar-logo {
             padding: 20px 16px;
             justify-content: center
+        }
+
+        .sidebar.collapsed .sidebar-logo .logo-img {
+            display: none
+        }
+
+        .sidebar.collapsed .sidebar-logo .logo-collapsed-icon {
+            display: block
         }
 
         .sidebar.collapsed .sidebar-logo .logo-text {
@@ -1887,7 +1910,10 @@
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
         <button class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开">◀</button>
-        <div class="sidebar-logo"><span class="logo-text">🖥️ Workspace Manager<small>ComfyUI RunPod/Vast</small></span></div>
+        <div class="sidebar-logo">
+            <img src="/static/banner.png" alt="Erocraft" class="logo-img">
+            <span class="logo-collapsed-icon">CC</span>
+        </div>
         <div class="sidebar-nav">
             <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="icon">📊</span><span class="nav-label">总览</span></div>
             <div class="nav-item" data-page="comfyui" onclick="showPage('comfyui')"><span class="icon">🖥️</span><span class="nav-label">ComfyUI</span></div>
