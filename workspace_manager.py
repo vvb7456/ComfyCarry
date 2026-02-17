@@ -17,6 +17,7 @@ import threading
 import time
 import re
 import secrets
+import shlex
 import uuid
 import queue
 from pathlib import Path
@@ -1942,7 +1943,12 @@ def api_settings_export_config():
     # 也保存用户对默认插件的取消选择 (如果有)
     config["disabled_default_plugins"] = [u for u in default_urls if u not in all_plugins]
 
-    # 7. 同步偏好
+    # 7. 同步规则 (v2) + 旧版同步偏好 (向后兼容)
+    if SYNC_RULES_FILE.exists():
+        try:
+            config["sync_rules"] = json.loads(SYNC_RULES_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
     sync_prefs_file = Path("/workspace/.sync_prefs.json")
     if sync_prefs_file.exists():
         try:
@@ -2019,13 +2025,21 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"Rclone: {e}")
 
-    # 4. 同步偏好
+    # 4. 同步规则 (v2) / 旧版同步偏好
+    if data.get("sync_rules"):
+        try:
+            SYNC_RULES_FILE.write_text(
+                json.dumps(data["sync_rules"], indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            applied.append("同步规则")
+        except Exception as e:
+            errors.append(f"同步规则: {e}")
     if data.get("sync_prefs"):
         try:
             Path("/workspace/.sync_prefs.json").write_text(
                 json.dumps(data["sync_prefs"], indent=2, ensure_ascii=False), encoding="utf-8"
             )
-            applied.append("同步偏好")
+            applied.append("同步偏好 (旧版)")
         except Exception as e:
             errors.append(f"同步偏好: {e}")
 
@@ -2092,6 +2106,7 @@ def api_settings_reinitialize():
 
     # 1. 停止 ComfyUI 和 sync 服务
     try:
+        _stop_sync_worker()
         subprocess.run("pm2 delete comfy 2>/dev/null || true", shell=True, timeout=15)
         subprocess.run("pm2 delete sync 2>/dev/null || true", shell=True, timeout=15)
     except Exception as e:
@@ -2117,7 +2132,7 @@ def api_settings_reinitialize():
             errors.append(f"清理 ComfyUI 目录失败: {e}")
 
     # 3. 清理生成的脚本和同步配置
-    for f in [Path("/workspace/cloud_sync.sh"), Path("/workspace/.sync_prefs.json")]:
+    for f in [Path("/workspace/cloud_sync.sh"), Path("/workspace/.sync_prefs.json"), Path("/workspace/.sync_rules.json")]:
         try:
             if f.exists():
                 f.unlink()
@@ -2620,47 +2635,24 @@ def _run_deploy(config):
         )
 
         # ─────────────────────────────────────────────
-        # STEP 8: R2 资产同步
+        # STEP 8: 执行 deploy 同步规则
         # ─────────────────────────────────────────────
         if rclone_method != "skip" and rclone_value:
             _deploy_step("同步云端资产")
-            # 检测 R2 remote
-            r2_name = subprocess.run(
-                "grep -E '^\\[(r2|.*r2.*)\\]' ~/.config/rclone/rclone.conf 2>/dev/null | head -n1 | tr -d '[]'",
-                shell=True, capture_output=True, text=True
-            ).stdout.strip()
-
-            if r2_name:
-                # 使用向导中选择的同步选项
-                sync_opts = config.get("sync_options", {})
-                if sync_opts.get("workflows", True):
-                    _deploy_log("同步工作流...")
-                    _deploy_exec(
-                        f'rclone sync "{r2_name}:comfyui-assets/workflow" /workspace/ComfyUI/user/default/workflows/ -P',
-                        timeout=300
-                    )
-                else:
-                    _deploy_log("⏭ 跳过工作流同步 (用户选择)")
-                if sync_opts.get("loras", True):
-                    _deploy_log("同步 LoRA...")
-                    _deploy_exec(
-                        f'rclone sync "{r2_name}:comfyui-assets/loras" /workspace/ComfyUI/models/loras/ -P',
-                        timeout=300
-                    )
-                else:
-                    _deploy_log("⏭ 跳过 LoRA 同步 (用户选择)")
-                if sync_opts.get("wildcards", True):
-                    _deploy_log("同步 Wildcards...")
-                    _deploy_exec(
-                        f'rclone sync "{r2_name}:comfyui-assets/wildcards" '
-                        f'/workspace/ComfyUI/custom_nodes/comfyui-dynamicprompts/wildcards/ -P',
-                        timeout=300
-                    )
-                else:
-                    _deploy_log("⏭ 跳过 Wildcards 同步 (用户选择)")
+            # 迁移旧配置或加载规则
+            _migrate_old_sync_prefs()
+            rules = _load_sync_rules()
+            deploy_rules = [r for r in rules if r.get("trigger") == "deploy" and r.get("enabled", True)]
+            if deploy_rules:
+                for rule in deploy_rules:
+                    name = rule.get("name", rule.get("id", "?"))
+                    _deploy_log(f"执行: {name}...")
+                    ok = _run_sync_rule(rule)
+                    if not ok:
+                        _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warning")
                 _deploy_log("✅ 资产同步完成")
             else:
-                _deploy_log("未检测到 R2 remote, 跳过资产同步")
+                _deploy_log("没有 deploy 同步规则, 跳过")
         else:
             _deploy_log("未配置 Rclone, 跳过资产同步")
 
@@ -2669,18 +2661,13 @@ def _run_deploy(config):
         # ─────────────────────────────────────────────
         _deploy_step("启动服务")
 
-        # Output 云端同步 (OneDrive / Google Drive)
+        # 启动 Sync Worker (如有 watch 规则)
         if rclone_method != "skip" and rclone_value:
-            prefs = _load_sync_prefs()
-            od = prefs.get("onedrive", {}).get("enabled", False)
-            gd = prefs.get("gdrive", {}).get("enabled", False)
-            if od or gd:
-                _deploy_log("生成 cloud_sync.sh...")
-                remotes = {r["name"]: r for r in _parse_rclone_conf()}
-                _regenerate_sync_script(remotes, prefs)
-                _deploy_exec("pm2 delete sync 2>/dev/null || true")
-                _deploy_exec("pm2 start /workspace/cloud_sync.sh --name sync --log /workspace/sync.log")
-                _deploy_log("✅ 云端同步服务已启动")
+            rules = _load_sync_rules()
+            watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
+            if watch_rules:
+                _start_sync_worker()
+                _deploy_log(f"✅ Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
 
         # CivitAI API Key
         civitai_token = config.get("civitai_token", "")
@@ -2778,40 +2765,108 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
 
 
 # ====================================================================
-# Cloud Sync (Rclone) 管理
+# Cloud Sync v2 — 规则驱动的灵活同步引擎
 # ====================================================================
 RCLONE_CONF = Path.home() / ".config" / "rclone" / "rclone.conf"
-CLOUD_SYNC_SCRIPT = Path("/workspace/cloud_sync.sh")
-SYNC_PREFS_FILE = Path("/workspace/.sync_prefs.json")
+SYNC_RULES_FILE = Path("/workspace/.sync_rules.json")
+SYNC_PREFS_FILE = Path("/workspace/.sync_prefs.json")  # 向后兼容
+
+# 同步规则预设模板 (前端快速添加)
+SYNC_RULE_TEMPLATES = [
+    {"id": "tpl-pull-workflows",  "name": "⬇️ 下拉工作流",        "direction": "pull", "remote_path": "comfyui-assets/workflow",    "local_path": "user/default/workflows", "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-loras",      "name": "⬇️ 下拉 LoRA",         "direction": "pull", "remote_path": "comfyui-assets/loras",       "local_path": "models/loras",           "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-checkpoints","name": "⬇️ 下拉 Checkpoints",  "direction": "pull", "remote_path": "comfyui-assets/checkpoints", "local_path": "models/checkpoints",     "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-controlnet", "name": "⬇️ 下拉 ControlNet",   "direction": "pull", "remote_path": "comfyui-assets/controlnet",  "local_path": "models/controlnet",      "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-embeddings", "name": "⬇️ 下拉 Embeddings",   "direction": "pull", "remote_path": "comfyui-assets/embeddings",  "local_path": "models/embeddings",      "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-vae",        "name": "⬇️ 下拉 VAE",          "direction": "pull", "remote_path": "comfyui-assets/vae",         "local_path": "models/vae",             "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-upscale",    "name": "⬇️ 下拉 Upscale",      "direction": "pull", "remote_path": "comfyui-assets/upscale",     "local_path": "models/upscale_models",  "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-pull-wildcards",  "name": "⬇️ 下拉 Wildcards",    "direction": "pull", "remote_path": "comfyui-assets/wildcards",   "local_path": "custom_nodes/comfyui-dynamicprompts/wildcards", "method": "sync", "trigger": "deploy"},
+    {"id": "tpl-pull-input",      "name": "⬇️ 下拉 Input 素材",   "direction": "pull", "remote_path": "comfyui-assets/input",       "local_path": "input",                  "method": "sync",  "trigger": "deploy"},
+    {"id": "tpl-push-output",     "name": "⬆️ 上传输出 (移动)",    "direction": "push", "remote_path": "ComfyUI_Output",             "local_path": "output",                 "method": "move",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"]},
+    {"id": "tpl-push-output-copy","name": "⬆️ 上传输出 (保留本地)","direction": "push", "remote_path": "ComfyUI_Output",             "local_path": "output",                 "method": "copy",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"]},
+    {"id": "tpl-push-workflows",  "name": "⬆️ 备份工作流",        "direction": "push", "remote_path": "comfyui-assets/workflow",     "local_path": "user/default/workflows", "method": "sync",  "trigger": "manual"},
+]
+
+# Remote 类型表单定义 (非 OAuth)
+REMOTE_TYPE_DEFS = {
+    "s3": {
+        "label": "S3 / Cloudflare R2",
+        "icon": "☁️",
+        "fields": [
+            {"key": "provider", "label": "Provider", "type": "select", "options": ["Cloudflare", "AWS", "Minio", "DigitalOcean", "Wasabi", "Other"], "default": "Cloudflare"},
+            {"key": "access_key_id", "label": "Access Key ID", "type": "text", "required": True},
+            {"key": "secret_access_key", "label": "Secret Access Key", "type": "password", "required": True},
+            {"key": "endpoint", "label": "Endpoint URL", "type": "text", "required": True, "placeholder": "https://<account_id>.r2.cloudflarestorage.com"},
+            {"key": "acl", "label": "ACL", "type": "text", "default": "private"},
+        ],
+    },
+    "sftp": {
+        "label": "SFTP",
+        "icon": "🖥️",
+        "fields": [
+            {"key": "host", "label": "Host", "type": "text", "required": True},
+            {"key": "port", "label": "Port", "type": "text", "default": "22"},
+            {"key": "user", "label": "用户名", "type": "text", "required": True},
+            {"key": "pass", "label": "密码", "type": "password"},
+            {"key": "key_file", "label": "SSH Key 路径", "type": "text", "placeholder": "~/.ssh/id_rsa"},
+        ],
+    },
+    "webdav": {
+        "label": "WebDAV",
+        "icon": "🌐",
+        "fields": [
+            {"key": "url", "label": "WebDAV URL", "type": "text", "required": True},
+            {"key": "user", "label": "用户名", "type": "text"},
+            {"key": "pass", "label": "密码", "type": "password"},
+            {"key": "vendor", "label": "Vendor", "type": "select", "options": ["other", "nextcloud", "owncloud", "sharepoint"], "default": "other"},
+        ],
+    },
+    "onedrive": {
+        "label": "OneDrive",
+        "icon": "📁",
+        "oauth": True,
+        "fields": [
+            {"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
+             "help": "在本地执行 <code>rclone authorize \"onedrive\"</code> 获取 token JSON"},
+        ],
+    },
+    "drive": {
+        "label": "Google Drive",
+        "icon": "📂",
+        "oauth": True,
+        "fields": [
+            {"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
+             "help": "在本地执行 <code>rclone authorize \"drive\"</code> 获取 token JSON"},
+        ],
+    },
+    "dropbox": {
+        "label": "Dropbox",
+        "icon": "📦",
+        "oauth": True,
+        "fields": [
+            {"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
+             "help": "在本地执行 <code>rclone authorize \"dropbox\"</code> 获取 token JSON"},
+        ],
+    },
+}
 
 
-def _load_sync_prefs():
-    """加载同步偏好设置"""
-    defaults = {
-        "r2": {"enabled": True, "sync_workflows": True, "sync_loras": True, "sync_wildcards": True},
-        "onedrive": {"enabled": True, "destination": "ComfyUI_Transfer"},
-        "gdrive": {"enabled": False, "destination": "ComfyUI_Transfer"},
-    }
-    if SYNC_PREFS_FILE.exists():
+# ── Sync Rules CRUD ──────────────────────────────────────────────
+
+def _load_sync_rules():
+    """加载同步规则"""
+    if SYNC_RULES_FILE.exists():
         try:
-            prefs = json.loads(SYNC_PREFS_FILE.read_text(encoding="utf-8"))
-            # Merge with defaults
-            for k, v in defaults.items():
-                if k not in prefs:
-                    prefs[k] = v
-                else:
-                    for dk, dv in v.items():
-                        if dk not in prefs[k]:
-                            prefs[k][dk] = dv
-            return prefs
+            return json.loads(SYNC_RULES_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return defaults
+    return []
 
 
-def _save_sync_prefs(prefs):
-    """保存同步偏好设置"""
-    SYNC_PREFS_FILE.write_text(json.dumps(prefs, indent=2, ensure_ascii=False), encoding="utf-8")
+def _save_sync_rules(rules):
+    """保存同步规则"""
+    SYNC_RULES_FILE.write_text(json.dumps(rules, indent=2, ensure_ascii=False), encoding="utf-8")
+
 
 def _parse_rclone_conf():
     """解析 rclone.conf 返回 remote 列表"""
@@ -2836,7 +2891,6 @@ def _parse_rclone_conf():
                 current["_has_token"] = True
             if k == "access_key_id" and v:
                 current["_has_keys"] = True
-            # 不要暴露敏感 token
             if k not in ("token", "access_key_id", "secret_access_key", "refresh_token"):
                 current["params"][k] = v
     if current:
@@ -2844,88 +2898,227 @@ def _parse_rclone_conf():
     return remotes
 
 
-def _get_sync_log_lines(max_lines=150):
-    """从 PM2 获取同步日志原始行，仅做前缀清理"""
-    try:
-        r = subprocess.run(
-            f"pm2 logs sync --nostream --lines {max_lines} 2>/dev/null",
-            shell=True, capture_output=True, text=True, timeout=5
-        )
-        raw = r.stdout + r.stderr
-        # Strip ANSI codes
-        raw = re.sub(r'\x1b\[[0-9;]*m', '', raw)
-        # Strip PM2 prefix: "3|sync     | "
-        raw = re.sub(r'^\d+\|[^|]+\|\s*', '', raw, flags=re.MULTILINE)
-        # Strip PM2 ISO timestamp prefix: "2026-02-16T12:06:06: "
-        raw = re.sub(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}:\s*', '', raw, flags=re.MULTILINE)
-        lines = [l for l in raw.split('\n')
-                 if l.strip()
-                 and not l.startswith('[TAILING]')
-                 and 'last ' not in l[:30]
-                 and '/root/.pm2/logs/' not in l]
-        return lines[-max_lines:]
-    except Exception:
-        return []
+# ── Sync Worker (Python 后台线程) ────────────────────────────────
 
+_sync_worker_thread = None
+_sync_worker_stop = threading.Event()
+_sync_log_buffer = []         # 最近 300 行日志
+_sync_log_lock = threading.Lock()
+
+
+def _sync_log(msg):
+    """写日志到内存 buffer"""
+    ts = time.strftime("%H:%M:%S")
+    line = f"[{ts}] {msg}"
+    with _sync_log_lock:
+        _sync_log_buffer.append(line)
+        if len(_sync_log_buffer) > 300:
+            _sync_log_buffer[:] = _sync_log_buffer[-300:]
+    app.logger.debug(f"[sync] {msg}")
+
+
+def _run_sync_rule(rule):
+    """执行单条同步规则 (rclone subprocess)"""
+    remote = rule.get("remote", "")
+    remote_path = rule.get("remote_path", "")
+    local_rel = rule.get("local_path", "")
+    method = rule.get("method", "sync")    # sync|copy|move
+    direction = rule.get("direction", "pull")
+    filters = rule.get("filters", [])
+    name = rule.get("name", rule.get("id", "?"))
+
+    local_abs = os.path.join(COMFYUI_DIR, local_rel)
+    os.makedirs(local_abs, exist_ok=True)
+
+    remote_spec = f"{remote}:{remote_path}"
+    if direction == "pull":
+        src, dst = remote_spec, local_abs
+    else:
+        src, dst = local_abs, remote_spec
+
+    cmd = ["rclone", method, src, dst, "--transfers", "4", "-P"]
+    for f in filters:
+        cmd.extend(["--filter", f])
+
+    _sync_log(f"{'⬇' if direction == 'pull' else '⬆'} {name}: {src} → {dst} ({method})")
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        # 提取 rclone 输出摘要
+        output = (proc.stdout + proc.stderr).strip()
+        if output:
+            for line in output.split('\n')[-3:]:
+                line = line.strip()
+                if line:
+                    _sync_log(f"  {line}")
+        if proc.returncode == 0:
+            _sync_log(f"✅ {name} 完成")
+        else:
+            _sync_log(f"❌ {name} 失败 (code={proc.returncode})")
+        return proc.returncode == 0
+    except subprocess.TimeoutExpired:
+        _sync_log(f"⏰ {name} 超时 (600s)")
+        return False
+    except Exception as e:
+        _sync_log(f"❌ {name} 异常: {e}")
+        return False
+
+
+def _sync_worker_loop():
+    """后台线程: 持续执行 watch 类型规则"""
+    _sync_log("☁️ Sync Worker 已启动")
+    while not _sync_worker_stop.is_set():
+        rules = _load_sync_rules()
+        watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
+        if not watch_rules:
+            _sync_worker_stop.wait(30)
+            continue
+        for rule in watch_rules:
+            if _sync_worker_stop.is_set():
+                break
+            _run_sync_rule(rule)
+        # 等待最短 interval，默认 15 秒
+        intervals = [r.get("watch_interval", 15) for r in watch_rules]
+        wait = max(min(intervals), 5) if intervals else 15
+        _sync_worker_stop.wait(wait)
+    _sync_log("🛑 Sync Worker 已停止")
+
+
+def _start_sync_worker():
+    """启动 sync worker 后台线程"""
+    global _sync_worker_thread
+    _stop_sync_worker()
+    _sync_worker_stop.clear()
+    _sync_worker_thread = threading.Thread(target=_sync_worker_loop, daemon=True, name="sync-worker")
+    _sync_worker_thread.start()
+    return True
+
+
+def _stop_sync_worker():
+    """停止 sync worker"""
+    global _sync_worker_thread
+    _sync_worker_stop.set()
+    if _sync_worker_thread and _sync_worker_thread.is_alive():
+        _sync_worker_thread.join(timeout=5)
+    _sync_worker_thread = None
+
+
+# ── API 端点 ─────────────────────────────────────────────────────
 
 @app.route("/api/sync/status")
 def api_sync_status():
-    """获取 Cloud Sync 状态、日志和配置"""
-    # PM2 进程状态
-    status = "unknown"
+    """获取 Sync Worker 状态和日志"""
+    worker_running = _sync_worker_thread is not None and _sync_worker_thread.is_alive()
+
+    # 也检查旧的 PM2 sync 进程 (向后兼容)
+    pm2_status = "stopped"
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True, capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
-            for p in json.loads(r.stdout):
+            for p in json.loads(r.stdout or "[]"):
                 if p.get("name") == "sync":
-                    status = p.get("pm2_env", {}).get("status", "unknown")
+                    pm2_status = p.get("pm2_env", {}).get("status", "unknown")
                     break
     except Exception:
         pass
 
-    # 同步日志 (raw lines from PM2)
-    log_lines = _get_sync_log_lines(150)
+    with _sync_log_lock:
+        log_lines = list(_sync_log_buffer)
 
-    # 当前同步偏好
-    prefs = _load_sync_prefs()
-
+    rules = _load_sync_rules()
     return jsonify({
-        "status": status,
+        "worker_running": worker_running,
+        "pm2_status": pm2_status,
         "log_lines": log_lines,
-        "prefs": prefs
+        "rules": rules,
     })
 
 
 @app.route("/api/sync/remotes")
 def api_sync_remotes():
-    """列出 rclone 配置的 remote，包含同步偏好"""
+    """列出 rclone 配置的 remote"""
     remotes = _parse_rclone_conf()
-    prefs = _load_sync_prefs()
     for r in remotes:
         t = r["type"]
-        if t == "s3":
-            r["category"] = "r2"
-            r["display_name"] = "Cloudflare R2"
-            r["icon"] = "☁️"
-            r["prefs"] = prefs.get("r2", {})
-        elif "onedrive" in t:
-            r["category"] = "onedrive"
-            r["display_name"] = "OneDrive"
-            r["icon"] = "📁"
-            r["prefs"] = prefs.get("onedrive", {})
-        elif t == "drive":
-            r["category"] = "gdrive"
-            r["display_name"] = "Google Drive"
-            r["icon"] = "📂"
-            r["prefs"] = prefs.get("gdrive", {})
-        else:
-            r["category"] = "other"
-            r["display_name"] = r["name"]
-            r["icon"] = "💾"
-            r["prefs"] = {}
-        # Auth status — check if token/keys exist
+        type_def = REMOTE_TYPE_DEFS.get(t, {})
+        r["display_name"] = type_def.get("label", t)
+        r["icon"] = type_def.get("icon", "💾")
         r["has_auth"] = bool(r.get("_has_token") or r.get("_has_keys"))
-    return jsonify({"remotes": remotes, "prefs": prefs})
+    return jsonify({"remotes": remotes})
+
+
+@app.route("/api/sync/remote/create", methods=["POST"])
+def api_sync_remote_create():
+    """创建新的 rclone remote"""
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip()
+    rtype = data.get("type", "").strip()
+    params = data.get("params", {})
+
+    if not name or not rtype:
+        return jsonify({"error": "name 和 type 必填"}), 400
+    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+        return jsonify({"error": "Remote 名称只能包含字母、数字、下划线和短横线"}), 400
+
+    # 已存在检查
+    existing = [r["name"] for r in _parse_rclone_conf()]
+    if name in existing:
+        return jsonify({"error": f"Remote '{name}' 已存在"}), 409
+
+    # 构建 rclone config create 命令
+    cmd = f'rclone config create "{name}" "{rtype}"'
+    for k, v in params.items():
+        if v:
+            # 对 token 等含特殊字符的值需要安全传递
+            cmd += f" {k}={shlex.quote(str(v))}"
+
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
+        if r.returncode != 0:
+            return jsonify({"error": f"创建失败: {r.stderr.strip() or r.stdout.strip()}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"ok": True, "message": f"Remote '{name}' 已创建"})
+
+
+@app.route("/api/sync/remote/delete", methods=["POST"])
+def api_sync_remote_delete():
+    """删除 rclone remote"""
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "缺少 remote 名称"}), 400
+    try:
+        r = subprocess.run(f'rclone config delete "{name}"', shell=True, capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            return jsonify({"error": f"删除失败: {r.stderr.strip()}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True, "message": f"Remote '{name}' 已删除"})
+
+
+@app.route("/api/sync/remote/browse", methods=["POST"])
+def api_sync_remote_browse():
+    """浏览 remote 路径下的目录"""
+    data = request.get_json(force=True)
+    remote = data.get("remote", "")
+    path = data.get("path", "")
+    try:
+        cmd = f'rclone lsjson "{remote}:{path}" --dirs-only -R --max-depth 1 2>/dev/null'
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+        if r.returncode == 0:
+            items = json.loads(r.stdout or "[]")
+            dirs = [i["Path"] for i in items if i.get("IsDir")]
+            return jsonify({"ok": True, "dirs": sorted(dirs)})
+        return jsonify({"ok": True, "dirs": []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/sync/remote/types")
+def api_sync_remote_types():
+    """返回支持的 remote 类型定义 (前端表单渲染)"""
+    return jsonify({"types": REMOTE_TYPE_DEFS})
 
 
 @app.route("/api/sync/storage")
@@ -2937,7 +3130,7 @@ def api_sync_storage():
         name = r["name"]
         try:
             proc = subprocess.run(
-                f"rclone about {name}: --json 2>/dev/null",
+                f'rclone about "{name}:" --json 2>/dev/null',
                 shell=True, capture_output=True, text=True, timeout=30
             )
             if proc.returncode == 0:
@@ -2957,117 +3150,78 @@ def api_sync_storage():
     return jsonify({"storage": results})
 
 
-@app.route("/api/sync/toggle", methods=["POST"])
-def api_sync_toggle():
-    """更新同步偏好设置"""
+# ── 同步规则 API ─────────────────────────────────────────────────
+
+@app.route("/api/sync/rules")
+def api_sync_rules():
+    """获取所有同步规则"""
+    return jsonify({"rules": _load_sync_rules(), "templates": SYNC_RULE_TEMPLATES})
+
+
+@app.route("/api/sync/rules/save", methods=["POST"])
+def api_sync_rules_save():
+    """保存同步规则 (整体替换)"""
     data = request.get_json(force=True)
-    category = data.get("category", "")  # r2, onedrive, gdrive
-    updates = data.get("updates", {})    # e.g. {"enabled": true, "sync_loras": false}
+    rules = data.get("rules", [])
+    # 校验
+    for r in rules:
+        if not r.get("id") or not r.get("remote") or not r.get("local_path"):
+            return jsonify({"error": "每条规则必须有 id, remote, local_path"}), 400
+    _save_sync_rules(rules)
 
-    prefs = _load_sync_prefs()
-    if category not in prefs:
-        prefs[category] = {}
-    prefs[category].update(updates)
-    _save_sync_prefs(prefs)
+    # 如果有 watch 规则且 worker 没运行, 自动启动
+    watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
+    if watch_rules and (not _sync_worker_thread or not _sync_worker_thread.is_alive()):
+        _start_sync_worker()
+    elif not watch_rules:
+        _stop_sync_worker()
 
-    # 如果是 output sync 相关的变更，重新生成 cloud_sync.sh
-    if category in ("onedrive", "gdrive") and "enabled" in updates:
-        remotes = {r["name"]: r for r in _parse_rclone_conf()}
-        _regenerate_sync_script(remotes, prefs)
-        subprocess.run("pm2 restart sync 2>/dev/null", shell=True, timeout=10)
-
-    return jsonify({"ok": True, "message": "设置已保存", "prefs": prefs})
+    return jsonify({"ok": True, "message": f"已保存 {len(rules)} 条规则"})
 
 
-def _regenerate_sync_script(remotes, prefs):
-    """重新生成 cloud_sync.sh，根据偏好设置控制哪些 remote 参与输出同步"""
-    onedrive_enabled = prefs.get("onedrive", {}).get("enabled", False)
-    gdrive_enabled = prefs.get("gdrive", {}).get("enabled", False)
+@app.route("/api/sync/rules/run", methods=["POST"])
+def api_sync_rules_run():
+    """手动执行指定规则 (或全部 deploy 规则)"""
+    data = request.get_json(force=True)
+    rule_id = data.get("rule_id")  # 为空则执行全部 deploy 规则
+    rules = _load_sync_rules()
 
-    # 找到实际 remote 名称
-    onedrive_name = ""
-    gdrive_name = ""
-    for name, r in remotes.items():
-        if r["type"] == "onedrive" or "onedrive" in name.lower():
-            onedrive_name = name
-        elif r["type"] == "drive" or "gdrive" in name.lower():
-            gdrive_name = name
+    if rule_id:
+        targets = [r for r in rules if r.get("id") == rule_id]
+    else:
+        targets = [r for r in rules if r.get("trigger") == "deploy" and r.get("enabled", True)]
 
-    od_dest = prefs.get("onedrive", {}).get("destination", "ComfyUI_Transfer")
-    gd_dest = prefs.get("gdrive", {}).get("destination", "ComfyUI_Transfer")
+    if not targets:
+        return jsonify({"error": "没有找到匹配的规则"}), 404
 
-    # 构建 sync 块 (输出中文日志，rclone 静默模式)
-    sync_blocks = []
-    if onedrive_enabled and onedrive_name:
-        sync_blocks.append(f'''        echo "[$TIME] 📤 正在同步到 OneDrive ({onedrive_name}:{od_dest})..."
-        OUTPUT=$(rclone move "$SOURCE_DIR" "{onedrive_name}:{od_dest}" \\
-            --min-age "30s" \\
-            --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
-            --filter "- .*/**" \\
-            --filter "- *" \\
-            --transfers 4 --stats-one-line -q 2>&1)
-        RC=$?
-        if [ $RC -eq 0 ]; then
-            echo "[$TIME] ✅ OneDrive 同步完成"
-            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
-        else
-            echo "[$TIME] ❌ OneDrive 同步失败 (code=$RC)"
-            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
-        fi''')
+    # 后台执行 (非阻塞)
+    def _run_targets():
+        for r in targets:
+            _run_sync_rule(r)
 
-    if gdrive_enabled and gdrive_name:
-        sync_blocks.append(f'''        echo "[$TIME] 📤 正在同步到 Google Drive ({gdrive_name}:{gd_dest})..."
-        OUTPUT=$(rclone move "$SOURCE_DIR" "{gdrive_name}:{gd_dest}" \\
-            --min-age "30s" \\
-            --filter "+ *.{{png,jpg,jpeg,webp,gif,mp4,mov,webm}}" \\
-            --filter "- .*/**" \\
-            --filter "- *" \\
-            --transfers 4 --stats-one-line -q 2>&1)
-        RC=$?
-        if [ $RC -eq 0 ]; then
-            echo "[$TIME] ✅ Google Drive 同步完成"
-            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
-        else
-            echo "[$TIME] ❌ Google Drive 同步失败 (code=$RC)"
-            [ -n "$OUTPUT" ] && echo "  $OUTPUT"
-        fi''')
+    threading.Thread(target=_run_targets, daemon=True).start()
+    return jsonify({"ok": True, "message": f"开始执行 {len(targets)} 条规则"})
 
-    # 生成启用信息
-    info_lines = []
-    if onedrive_name:
-        info_lines.append(f'echo "  📁 OneDrive: {onedrive_name} → {od_dest} ({"启用" if onedrive_enabled else "禁用"})"')
-    if gdrive_name:
-        info_lines.append(f'echo "  📁 Google Drive: {gdrive_name} → {gd_dest} ({"启用" if gdrive_enabled else "禁用"})"')
 
-    script = f'''#!/bin/bash
-SOURCE_DIR="/workspace/ComfyUI/output"
+@app.route("/api/sync/worker/start", methods=["POST"])
+def api_sync_worker_start():
+    """启动 Sync Worker"""
+    _start_sync_worker()
+    return jsonify({"ok": True, "message": "Sync Worker 已启动"})
 
-echo "☁️  云同步服务已启动"
-echo "  📂 监控目录: $SOURCE_DIR"
-{chr(10).join(info_lines)}
 
-while true; do
-    FILES=$(find "$SOURCE_DIR" -type f -mmin +0.5 \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.mp4" -o -iname "*.webp" -o -iname "*.jpeg" -o -iname "*.gif" -o -iname "*.mov" -o -iname "*.webm" \\) ! -path '*/.*')
+@app.route("/api/sync/worker/stop", methods=["POST"])
+def api_sync_worker_stop():
+    """停止 Sync Worker"""
+    _stop_sync_worker()
+    return jsonify({"ok": True, "message": "Sync Worker 已停止"})
 
-    if [ -n "$FILES" ]; then
-        COUNT=$(echo "$FILES" | wc -l)
-        TIME=$(date '+%H:%M:%S')
-        echo ""
-        echo "[$TIME] 🔍 检测到 $COUNT 个新文件"
 
-{chr(10).join(sync_blocks) if sync_blocks else '        echo "[$TIME] ⚠️  没有启用的同步目标，跳过"'}
-
-    fi
-    sleep 10
-done
-'''
-    CLOUD_SYNC_SCRIPT.write_text(script, encoding="utf-8")
-    CLOUD_SYNC_SCRIPT.chmod(0o755)
-
+# ── Rclone 配置文件直接编辑 (高级) ───────────────────────────────
 
 @app.route("/api/sync/rclone_config", methods=["GET"])
 def api_get_rclone_config():
-    """获取 rclone.conf 完整内容（Dashboard 已有密码保护）"""
+    """获取 rclone.conf 完整内容"""
     if not RCLONE_CONF.exists():
         return jsonify({"config": "", "exists": False})
     raw = RCLONE_CONF.read_text(encoding="utf-8")
@@ -3079,32 +3233,22 @@ def api_save_rclone_config():
     """保存 rclone.conf"""
     data = request.get_json(force=True)
     config_text = data.get("config", "")
-
     if not config_text.strip():
         return jsonify({"error": "配置内容不能为空"}), 400
-
-    # 基本语法校验：至少有一个 [remote] 段
     sections = re.findall(r'^\[.+\]', config_text, re.MULTILINE)
     if not sections:
         return jsonify({"error": "配置格式错误：至少需要一个 [remote] 段"}), 400
-
-    # 备份旧配置
     if RCLONE_CONF.exists():
-        backup = RCLONE_CONF.with_suffix('.conf.bak')
-        backup.write_text(RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
-
-    # 写入新配置
+        RCLONE_CONF.with_suffix('.conf.bak').write_text(
+            RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
     RCLONE_CONF.parent.mkdir(parents=True, exist_ok=True)
     RCLONE_CONF.write_text(config_text, encoding="utf-8")
     RCLONE_CONF.chmod(0o600)
-
-    # 验证配置是否可用
     try:
         r = subprocess.run("rclone listremotes 2>&1", shell=True, capture_output=True, text=True, timeout=5)
         remotes = [l.strip().rstrip(':') for l in r.stdout.strip().split('\n') if l.strip()]
     except Exception:
         remotes = []
-
     return jsonify({"ok": True, "message": f"配置已保存，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
 
 
@@ -3115,7 +3259,6 @@ def api_import_config():
     data = request.get_json(force=True)
     import_type = data.get("type", "")
     value = data.get("value", "")
-
     config_text = ""
     if import_type == "url" and value:
         try:
@@ -3131,28 +3274,78 @@ def api_import_config():
             return jsonify({"error": f"Base64 解码失败: {e}"}), 400
     else:
         return jsonify({"error": "请提供 type (url/base64) 和 value"}), 400
-
-    # 验证
     sections = re.findall(r'^\[.+\]', config_text, re.MULTILINE)
     if not sections:
         return jsonify({"error": "导入的内容不是有效的 rclone 配置"}), 400
-
-    # 备份 + 写入
     if RCLONE_CONF.exists():
-        backup = RCLONE_CONF.with_suffix('.conf.bak')
-        backup.write_text(RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
+        RCLONE_CONF.with_suffix('.conf.bak').write_text(
+            RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
     RCLONE_CONF.parent.mkdir(parents=True, exist_ok=True)
     RCLONE_CONF.write_text(config_text, encoding="utf-8")
     RCLONE_CONF.chmod(0o600)
-
-    # 列出 remotes
     try:
         r = subprocess.run("rclone listremotes 2>&1", shell=True, capture_output=True, text=True, timeout=5)
         remotes = [l.strip().rstrip(':') for l in r.stdout.strip().split('\n') if l.strip()]
     except Exception:
         remotes = []
-
     return jsonify({"ok": True, "message": f"导入成功，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
+
+
+# ── 向后兼容: 旧的 sync_prefs → rules 迁移 ──────────────────────
+
+def _migrate_old_sync_prefs():
+    """如果存在旧的 .sync_prefs.json 且没有 rules，自动迁移"""
+    if SYNC_RULES_FILE.exists():
+        return  # 已有新规则
+    if not SYNC_PREFS_FILE.exists():
+        return
+    try:
+        prefs = json.loads(SYNC_PREFS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    rules = []
+    remotes = _parse_rclone_conf()
+    remote_names = {r["type"]: r["name"] for r in remotes}
+
+    # R2 下拉规则
+    r2_name = remote_names.get("s3", "")
+    r2_prefs = prefs.get("r2", {})
+    if r2_name and r2_prefs.get("enabled", True):
+        if r2_prefs.get("sync_workflows", True):
+            rules.append({"id": "migrated-pull-workflows", "name": "下拉工作流", "direction": "pull",
+                          "remote": r2_name, "remote_path": "comfyui-assets/workflow",
+                          "local_path": "user/default/workflows", "method": "sync", "trigger": "deploy", "enabled": True})
+        if r2_prefs.get("sync_loras", True):
+            rules.append({"id": "migrated-pull-loras", "name": "下拉 LoRA", "direction": "pull",
+                          "remote": r2_name, "remote_path": "comfyui-assets/loras",
+                          "local_path": "models/loras", "method": "sync", "trigger": "deploy", "enabled": True})
+        if r2_prefs.get("sync_wildcards", True):
+            rules.append({"id": "migrated-pull-wildcards", "name": "下拉 Wildcards", "direction": "pull",
+                          "remote": r2_name, "remote_path": "comfyui-assets/wildcards",
+                          "local_path": "custom_nodes/comfyui-dynamicprompts/wildcards",
+                          "method": "sync", "trigger": "deploy", "enabled": True})
+
+    # OneDrive / GDrive 输出上传规则
+    od_name = remote_names.get("onedrive", "")
+    od_prefs = prefs.get("onedrive", {})
+    if od_name and od_prefs.get("enabled", False):
+        rules.append({"id": "migrated-push-od", "name": "上传输出到 OneDrive", "direction": "push",
+                      "remote": od_name, "remote_path": od_prefs.get("destination", "ComfyUI_Transfer"),
+                      "local_path": "output", "method": "move", "trigger": "watch", "watch_interval": 15,
+                      "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"], "enabled": True})
+
+    gd_name = remote_names.get("drive", "")
+    gd_prefs = prefs.get("gdrive", {})
+    if gd_name and gd_prefs.get("enabled", False):
+        rules.append({"id": "migrated-push-gd", "name": "上传输出到 Google Drive", "direction": "push",
+                      "remote": gd_name, "remote_path": gd_prefs.get("destination", "ComfyUI_Transfer"),
+                      "local_path": "output", "method": "move", "trigger": "watch", "watch_interval": 15,
+                      "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"], "enabled": True})
+
+    if rules:
+        _save_sync_rules(rules)
+        _sync_log(f"已从旧配置迁移 {len(rules)} 条同步规则")
 
 
 # ====================================================================
@@ -3216,6 +3409,14 @@ if __name__ == "__main__":
     if os.environ.get("CIVITAI_TOKEN") and not _get_api_key():
         CONFIG_FILE.write_text(json.dumps({"api_key": os.environ["CIVITAI_TOKEN"]}))
         print(f"  📝 已从环境变量 CIVITAI_TOKEN 导入 API Key")
+
+    # 迁移旧 sync_prefs → rules 并启动 watch worker
+    _migrate_old_sync_prefs()
+    rules = _load_sync_rules()
+    watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
+    if watch_rules:
+        _start_sync_worker()
+        print(f"  ☁️  Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
 
     print(f"\n{'='*50}")
     print(f"  🖥️  ComfyCarry v2.4")

@@ -1691,6 +1691,29 @@
             white-space: pre;
             overflow: auto;
         }
+        /* Sync Rule cards */
+        .sync-rule-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .sync-rule-card.disabled { opacity: .5; }
+        .sync-rule-dir { font-size: 1.2rem; flex-shrink: 0; }
+        .sync-rule-info { flex: 1; min-width: 0; }
+        .sync-rule-name { font-weight: 600; font-size: .9rem; }
+        .sync-rule-detail { font-size: .78rem; color: var(--t3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sync-rule-badges { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+        .sync-rule-badge {
+            font-size: .68rem; padding: 1px 7px; border-radius: 8px;
+            background: var(--bg2); color: var(--t2); border: 1px solid var(--bd);
+        }
+        .sync-rule-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .sync-rule-actions button { font-size: .75rem; padding: 4px 8px; }
 
         /* Detail panel */
         .detail-panel {
@@ -2173,51 +2196,96 @@
                 </div>
             </div>
             <div class="page-body">
-                <!-- 同步状态 -->
-                <div id="sync-status-badge"></div>
-
-                <!-- 存储 Remote 卡片 -->
-                <div class="section-title" style="margin-top:16px">💾 存储服务配置</div>
-                <div id="sync-remotes-grid" class="sync-remotes-grid">
-                    <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                <!-- Sub-tabs -->
+                <div class="tabs">
+                    <div class="tab active" data-stab="remotes" onclick="switchSyncTab('remotes')">💾 存储服务</div>
+                    <div class="tab" data-stab="rules" onclick="switchSyncTab('rules')">🔄 同步规则</div>
+                    <div class="tab" data-stab="logs" onclick="switchSyncTab('logs')">📜 日志</div>
                 </div>
 
-                <!-- 导入配置 -->
-                <div class="section-title" style="margin-top:24px">
-                    📥 导入 Rclone 配置
-                    <button class="btn btn-sm" style="margin-left:8px;font-size:.72rem" onclick="toggleImportConfig()">展开</button>
-                </div>
-                <div id="import-config-box" class="hidden" style="margin-top:8px">
-                    <div class="sync-import-row">
-                        <div class="sync-import-option">
-                            <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">从 URL 导入 rclone.conf</label>
-                            <div style="display:flex;gap:8px">
-                                <input type="text" id="import-url" placeholder="https://example.com/rclone.conf" style="flex:1">
-                                <button class="btn btn-sm btn-primary" onclick="importConfigFromUrl()">导入</button>
+                <!-- Remotes Tab -->
+                <div id="stab-remotes">
+                    <div id="sync-remotes-grid" class="sync-remotes-grid">
+                        <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                    </div>
+                    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-primary" onclick="showAddRemoteModal()">+ 添加存储</button>
+                        <button class="btn btn-sm" onclick="toggleImportConfig()">📥 导入 Rclone 配置</button>
+                    </div>
+                    <div id="import-config-box" class="hidden" style="margin-top:8px">
+                        <div class="sync-import-row">
+                            <div class="sync-import-option">
+                                <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">从 URL 导入 rclone.conf</label>
+                                <div style="display:flex;gap:8px">
+                                    <input type="text" id="import-url" placeholder="https://example.com/rclone.conf" style="flex:1">
+                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromUrl()">导入</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="sync-import-option" style="margin-top:12px">
-                            <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">粘贴 Base64 编码的 rclone.conf</label>
-                            <div style="display:flex;gap:8px">
-                                <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:'IBM Plex Mono', monospace;font-size:.75rem"></textarea>
-                                <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
+                            <div class="sync-import-option" style="margin-top:12px">
+                                <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">粘贴 Base64 编码的 rclone.conf</label>
+                                <div style="display:flex;gap:8px">
+                                    <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:'IBM Plex Mono', monospace;font-size:.75rem"></textarea>
+                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="sync-import-option" style="margin-top:12px">
-                            <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">直接编辑 rclone.conf</label>
-                            <textarea id="rclone-config-content" class="rclone-config-editor" spellcheck="false" placeholder="点击加载..."></textarea>
-                            <div style="display:flex;gap:8px;margin-top:6px">
-                                <button class="btn btn-sm" onclick="loadRcloneConfig()">加载当前配置</button>
-                                <button class="btn btn-sm btn-primary" onclick="saveRcloneConfig()">💾 保存</button>
-                                <span id="rclone-save-status" style="font-size:.78rem;color:var(--t3);align-self:center"></span>
+                            <div class="sync-import-option" style="margin-top:12px">
+                                <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">直接编辑 rclone.conf</label>
+                                <textarea id="rclone-config-content" class="rclone-config-editor" spellcheck="false" placeholder="点击加载..."></textarea>
+                                <div style="display:flex;gap:8px;margin-top:6px">
+                                    <button class="btn btn-sm" onclick="loadRcloneConfig()">加载当前配置</button>
+                                    <button class="btn btn-sm btn-primary" onclick="saveRcloneConfig()">💾 保存</button>
+                                    <span id="rclone-save-status" style="font-size:.78rem;color:var(--t3);align-self:center"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 同步日志 -->
-                <div class="section-title" style="margin-top:24px">📜 同步日志</div>
-                <div id="sync-log-content" class="sync-log-box">加载中...</div>
+                <!-- Rules Tab -->
+                <div id="stab-rules" class="hidden">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                        <div id="sync-worker-badge" style="font-size:.85rem"></div>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm" onclick="runDeployRules()">▶ 执行部署规则</button>
+                        <button class="btn btn-sm btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
+                    </div>
+                    <div id="sync-rules-list"></div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div id="stab-logs" class="hidden">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                        <div id="sync-status-badge" style="font-size:.85rem"></div>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
+                        <button class="btn btn-sm" onclick="loadSyncLogs()">🔄 刷新</button>
+                    </div>
+                    <div id="sync-log-content" class="sync-log-box">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Remote Modal -->
+        <div id="add-remote-modal" class="modal hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+            <div class="modal-content" style="max-width:520px">
+                <h3 id="add-remote-title">添加存储服务</h3>
+                <div id="add-remote-body"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button class="btn btn-sm" onclick="document.getElementById('add-remote-modal').classList.add('hidden')">取消</button>
+                    <button class="btn btn-sm btn-primary" onclick="submitAddRemote()">创建</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Rule Modal -->
+        <div id="add-rule-modal" class="modal hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+            <div class="modal-content" style="max-width:600px">
+                <h3 id="add-rule-title">添加同步规则</h3>
+                <div id="add-rule-body"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button class="btn btn-sm" onclick="document.getElementById('add-rule-modal').classList.add('hidden')">取消</button>
+                    <button class="btn btn-sm btn-primary" onclick="submitAddRule()">保存</button>
+                </div>
             </div>
         </div>
 
