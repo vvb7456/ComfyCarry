@@ -373,9 +373,8 @@ async function loadLocalModels() {
     const r = await fetch(`/api/local_models?category=${cat}`);
     const d = await r.json();
     localModelsData = d.models || [];
-    status.innerHTML = `<div class="success-msg" style="display:flex;justify-content:space-between;align-items:center">
-      <span>找到 ${d.total} 个模型文件</span>
-      <span style="font-size:.78rem;color:var(--t2)">${localModelsData.filter(m => m.has_info).length} 已有元数据</span></div>`;
+    const infoCount = localModelsData.filter(m => m.has_info).length;
+    status.innerHTML = `共 ${d.total} 个模型 · ${infoCount} 个已有元数据`;
 
     if (localModelsData.length === 0) {
       grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">该类别下未找到模型文件</div>';
@@ -490,9 +489,8 @@ async function _refreshSingleCard(idx) {
     // Update status bar
     const status = document.getElementById('local-models-status');
     if (status) {
-      status.innerHTML = `<div class="success-msg" style="display:flex;justify-content:space-between;align-items:center">
-        <span>找到 ${d.total} 个模型文件</span>
-        <span style="font-size:.78rem;color:var(--t2)">${localModelsData.filter(m => m.has_info).length} 已有元数据</span></div>`;
+      const infoCount = localModelsData.filter(m => m.has_info).length;
+      status.innerHTML = `共 ${d.total} 个模型 · ${infoCount} 个已有元数据`;
     }
     // Replace only the target card
     const oldCard = document.querySelector(`.model-card[data-idx="${idx}"]`);

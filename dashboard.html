@@ -1865,7 +1865,9 @@
                 </div>
                 <!-- Local Models Tab -->
                 <div id="mtab-local">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                        <div id="local-models-status" style="font-size:.85rem;color:var(--t2)"></div>
+                        <div style="flex:1"></div>
                         <select id="model-category" onchange="loadLocalModels()" style="width:auto;min-width:140px">
                             <option value="all">全部类型</option>
                             <option value="checkpoints">Checkpoints</option>
@@ -1876,9 +1878,8 @@
                             <option value="embeddings">Embeddings</option>
                         </select>
                         <button class="btn btn-sm" onclick="loadLocalModels()">🔄 刷新</button>
-                        <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">📥 全部获取信息</button>
+                        <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">📥 全部获取</button>
                     </div>
-                    <div id="local-models-status"></div>
                     <div id="local-models-grid" class="model-grid"></div>
                 </div>
                 <!-- CivitAI Tab (unified search + ID lookup) -->
