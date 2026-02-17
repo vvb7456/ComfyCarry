@@ -545,6 +545,36 @@
             transform: scale(1.04)
         }
 
+        .model-card-img .zoom-icon {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 24px;
+            height: 24px;
+            background: rgba(0,0,0,.55);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .7rem;
+            color: #fff;
+            cursor: zoom-in;
+            opacity: 0;
+            transition: opacity .2s;
+            z-index: 2
+        }
+
+        .model-card:hover .zoom-icon {
+            opacity: 1
+        }
+
+        .model-card-img .img-click-area {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            z-index: 1
+        }
+
         .model-card-body {
             padding: 12px 14px
         }
@@ -556,7 +586,12 @@
             line-height: 1.3;
             white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis
+            text-overflow: ellipsis;
+            cursor: pointer
+        }
+
+        .model-card-title:hover {
+            color: var(--ac)
         }
 
         .model-card-meta {
@@ -1260,12 +1295,29 @@
             border-radius: var(--rs);
             padding: 10px 14px;
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .dl-item-thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: 6px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: var(--bg-in);
+        }
+        .dl-item-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         .dl-item-info {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+            min-width: 0;
         }
         .dl-item-name {
             font-size: .85rem;
@@ -1273,11 +1325,19 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 60%;
         }
         .dl-item-meta {
             font-size: .75rem;
             color: var(--t3);
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .dl-item-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
         }
 
         /* Tunnel Links */
@@ -1829,17 +1889,9 @@
                 </div>
                 <!-- Downloads Tab (unified: cart + active + history) -->
                 <div id="mtab-downloads" class="hidden">
-                    <!-- ID textarea + action bar -->
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                        <span style="font-size:.85rem;font-weight:600;color:var(--t1)">模型 ID 列表</span>
-                        <div style="flex:1"></div>
-                        <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()">📥 一键下载全部</button>
-                        <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderDownloadsTab();}">🗑️ 清空</button>
-                    </div>
-                    <textarea class="cart-ids-box" id="cart-ids-textarea" oninput="syncCartFromTextarea(this)" style="min-height:50px;margin-bottom:12px" placeholder="输入模型 ID（逗号分隔）或从 CivitAI 页添加"></textarea>
                     <!-- Sub-tabs -->
                     <div class="tabs" style="font-size:.85rem">
-                        <div class="tab active" data-dltab="pending" onclick="switchDlTab('pending')">🛒 待下载</div>
+                        <div class="tab active" data-dltab="pending" onclick="switchDlTab('pending')">📌 已选</div>
                         <div class="tab" data-dltab="active" onclick="switchDlTab('active')">🔄 队列</div>
                         <div class="tab" data-dltab="completed" onclick="switchDlTab('completed')">✅ 已完成</div>
                         <div class="tab" data-dltab="failed" onclick="switchDlTab('failed')">❌ 失败</div>

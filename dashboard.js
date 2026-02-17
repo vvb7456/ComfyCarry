@@ -395,20 +395,25 @@ function renderLocalModelCard(m, idx) {
     `<span class="tw-tag" onclick="copyText('${w.replace(/'/g, "\\'")}')" title="点击复制">${w}</span>`
   ).join('');
 
-  let imgHtml;
+  let imgTag = '', zoomUrl = '';
   if (m.has_preview && m.preview_path) {
     const pUrl = `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}`;
-    imgHtml = `<img src="${pUrl}" alt="" onclick="openImg('${pUrl}')" style="cursor:zoom-in" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦 无预览</div>`;
+    zoomUrl = pUrl;
+    imgTag = `<img src="${pUrl}" alt="" onerror="this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦 无预览</div>`;
   } else if (m.civitai_image) {
-    imgHtml = `<img src="${m.civitai_image}" alt="" onclick="openImg('${m.civitai_image}')" style="cursor:zoom-in" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦</div>`;
+    zoomUrl = m.civitai_image;
+    imgTag = `<img src="${m.civitai_image}" alt="" onerror="this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">📦</div>`;
   } else {
-    imgHtml = `<div class="model-card-no-img">📦 无预览</div>`;
+    imgTag = `<div class="model-card-no-img">📦 无预览</div>`;
   }
 
+  const zoomIcon = zoomUrl ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${zoomUrl.replace(/'/g, "\\'")}')" title="查看大图">🔍</span>` : '';
+  const clickArea = `<div class="img-click-area" onclick="openLocalMeta(${idx})"></div>`;
+
   return `<div class="model-card" data-idx="${idx}">
-    <div class="model-card-img">${imgHtml}</div>
+    <div class="model-card-img">${imgTag}${zoomIcon}${clickArea}</div>
     <div class="model-card-body">
-      <div class="model-card-title" title="${(m.name || '').replace(/"/g, '&quot;')}">${m.name}</div>
+      <div class="model-card-title" title="${(m.name || '').replace(/"/g, '&quot;')}" onclick="openLocalMeta(${idx})">${m.name}</div>
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${m.category}</span>
         ${m.base_model ? `<span class="badge badge-other">${m.base_model}</span>` : ''}
@@ -417,8 +422,8 @@ function renderLocalModelCard(m, idx) {
       </div>
       ${twHtml ? `<div class="model-card-tags">${twHtml}</div>` : ''}
       <div class="model-card-actions">
-        <button class="btn btn-sm" onclick="fetchModelInfo(${idx})" ${m.has_info ? 'title="重新获取"' : 'title="从 CivitAI 获取信息"'}>${m.has_info ? '🔄 刷新' : '📥 获取信息'}</button>
         <button class="btn btn-sm btn-success" onclick="openLocalMeta(${idx})">📄 详情</button>
+        <button class="btn btn-sm" onclick="fetchModelInfo(${idx})" ${m.has_info ? 'title="重新获取"' : 'title="从 CivitAI 获取信息"'}>${m.has_info ? '🔄 刷新' : '📥 获取信息'}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteModel(${idx})">🗑️</button>
       </div>
     </div></div>`;
@@ -722,12 +727,14 @@ function renderCivitCard(h) {
     user: h.user || {},
   };
 
+  const zoomIcon = fullUrl ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${fullUrl.replace(/'/g, "\\'")}')" title="查看大图">🔍</span>` : '';
+  const clickArea = `<div class="img-click-area" onclick="openMetaFromCache('${h.id}')"></div>`;
+
   return `<div class="model-card">
     <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt=""
-      onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')"
-      style="cursor:zoom-in" onerror="if(!this.dataset.retry&&'${fullUrl.replace(/'/g, "\\'")}'.length>0){this.dataset.retry='1';this.src='${fullUrl.replace(/'/g, "\\'")}'}else{this.style.display='none'}" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+      onerror="if(!this.dataset.retry&&'${fullUrl.replace(/'/g, "\\'")}'.length>0){this.dataset.retry='1';this.src='${fullUrl.replace(/'/g, "\\'")}'}else{this.style.display='none'}" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}${zoomIcon}${clickArea}</div>
     <div class="model-card-body">
-      <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}">${h.name || 'Unknown'}</div>
+      <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}" onclick="openMetaFromCache('${h.id}')">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
         <span class="badge ${badgeClass}">${h.type || ''}</span>
         ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
@@ -736,7 +743,7 @@ function renderCivitCard(h) {
       </div>
       <div class="model-card-actions">
         <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${h.id}')">📄 详情</button>
-        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+        <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '✕ 移除' : '📌 收藏'}</button>
         <button class="btn btn-sm" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
       </div>
     </div></div>`;
@@ -746,7 +753,7 @@ function toggleCartFromSearch(id, btn) {
   id = String(id);
   if (selectedModels.has(id)) {
     selectedModels.delete(id);
-    btn.textContent = '🛒 加入';
+    btn.textContent = '� 收藏';
     btn.classList.remove('btn-danger'); btn.classList.add('btn-primary');
   } else {
     const data = searchResultsCache[id] || {};
@@ -861,6 +868,7 @@ async function lookupIds(text) {
 
   results.innerHTML = found.map(d => {
     const img = d.modelVersions?.[0]?.images?.[0]?.url || '';
+    const fullImg = img ? img.replace('/width=450', '') : '';
     const bm = d.modelVersions?.[0]?.baseModel || '';
     const inCart = selectedModels.has(String(d.id));
     const vCount = (d.modelVersions || []).length;
@@ -872,10 +880,12 @@ async function lookupIds(text) {
       images: d.modelVersions?.[0]?.images || [],
       metrics: d.stats || {}, user: d.creator || {},
     };
+    const zoomIcon = img ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${fullImg.replace(/'/g, "\\'")}')" title="查看大图">🔍</span>` : '';
+    const clickArea = `<div class="img-click-area" onclick="openMetaFromCache('${d.id}')"></div>`;
     return `<div class="model-card">
-      <div class="model-card-img">${img ? `<img src="${img}" alt="" onclick="openImg('${img.replace(/'/g, "\\\'")}')" style="cursor:zoom-in" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}</div>
+      <div class="model-card-img">${img ? `<img src="${img}" alt="" loading="lazy">` : '<div class="model-card-no-img">📦</div>'}${zoomIcon}${clickArea}</div>
       <div class="model-card-body">
-        <div class="model-card-title">${d.name || ''}</div>
+        <div class="model-card-title" onclick="openMetaFromCache('${d.id}')">${d.name || ''}</div>
         <div class="model-card-meta">
           <span class="badge ${getBadgeClass((d.type || '').toLowerCase())}">${d.type || ''}</span>
           ${bm ? `<span class="badge badge-other">${bm}</span>` : ''}
@@ -884,57 +894,11 @@ async function lookupIds(text) {
         </div>
         <div class="model-card-actions">
           <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${d.id}')">📄 详情</button>
-          <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${d.id}', this)">${inCart ? '✕ 移除' : '🛒 加入'}</button>
+          <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${d.id}', this)">${inCart ? '✕ 移除' : '📌 收藏'}</button>
           <button class="btn btn-sm" onclick="downloadFromSearch('${d.id}', '${(d.type || 'Checkpoint').toLowerCase()}')">📥 下载</button>
         </div>
       </div></div>`;
   }).join('');
-}
-
-// ========== Cart ==========
-function renderCart() {
-  const container = document.getElementById('cart-content');
-  if (selectedModels.size === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">🛒 购物车为空</div>';
-    return;
-  }
-  let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>版本</th><th>操作</th></tr></thead><tbody>';
-  for (const [id, m] of selectedModels) {
-    const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const cached = searchResultsCache[String(id)];
-    const allVersions = cached?.allVersions || [];
-    let versionCell = m.versionName || '-';
-    if (allVersions.length > 1) {
-      const opts = allVersions.map(v => {
-        const sel = String(v.id) === String(m.versionId) ? 'selected' : '';
-        return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
-      }).join('');
-      versionCell = `<select class="meta-version-select" onchange="changeCartVersion('${id}', this.value)" style="max-width:140px">${opts}</select>`;
-    }
-    html += `<tr>
-      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${(m.imageUrl || '').replace(/'/g, "\\'")}')"
-        onerror="this.style.display='none'"></td>
-      <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
-      <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
-      <td>${versionCell}</td>
-      <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
-  }
-  html += '</tbody></table>';
-
-  // Batch download button
-  html += `<div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-    <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()">📥 一键下载全部 (${selectedModels.size})</button>
-    <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空购物车?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderCart();}">🗑️ 清空购物车</button>
-  </div>`;
-
-  // Live ID textarea
-  const ids = [...selectedModels.keys()].join(', ');
-  html += `<div style="margin-top:16px">
-    <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:6px">模型 ID 列表 (可直接在文本框中编辑)</label>
-    <textarea class="cart-ids-box" id="cart-ids-textarea" oninput="syncCartFromTextarea(this)">${ids}</textarea>
-  </div>`;
-
-  container.innerHTML = html;
 }
 
 function changeCartVersion(modelId, versionId) {
@@ -989,7 +953,7 @@ function syncCartFromTextarea(el) {
 function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderPendingList(); updateCartIdsTextarea(); }
 
 async function batchDownloadCart() {
-  if (selectedModels.size === 0) return showToast('购物车为空');
+  if (selectedModels.size === 0) return showToast('已选列表为空');
   const total = selectedModels.size;
   showToast(`📥 开始批量下载 ${total} 个模型...`);
   let ok = 0, fail = 0;
@@ -1077,25 +1041,32 @@ async function refreshDownloadStatus() {
       active.forEach(dl => {
         const pct = (dl.progress || 0).toFixed(1);
         const speed = dl.speed ? fmtBytes(dl.speed) + '/s' : '';
-        html += `<div class="dl-item">
+        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
+        html += `<div class="dl-item" style="flex-wrap:wrap">
+          ${thumbHtml}
           <div class="dl-item-info">
             <span class="dl-item-name" title="${dl.filename || ''}">${dl.model_name || dl.filename || dl.id}</span>
-            <span class="dl-item-meta">${dl.version_name || ''} ${speed ? '• ' + speed : ''}</span>
+            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span>${speed ? `<span>${speed}</span>` : ''}</div>
           </div>
-          <div class="progress-bar" style="height:8px;margin:6px 0"><div class="progress-fill" style="width:${pct}%;background:var(--ac);transition:width .3s"></div></div>
-          <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--t3)">
-            <span>${pct}%</span>
-            <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
+          <div class="dl-item-actions">
+            <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
           </div>
+          <div style="width:100%;margin-top:4px"><div class="progress-bar" style="height:6px"><div class="progress-fill" style="width:${pct}%;background:var(--ac);transition:width .3s"></div></div><span style="font-size:.72rem;color:var(--t3)">${pct}%</span></div>
         </div>`;
       });
       queue.forEach(dl => {
+        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
         html += `<div class="dl-item">
+          ${thumbHtml}
           <div class="dl-item-info">
             <span class="dl-item-name">${dl.model_name || dl.filename || dl.id}</span>
-            <span class="dl-item-meta">${dl.version_name || ''} • 等待中</span>
+            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span><span>等待中</span></div>
           </div>
-          <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
+          <div class="dl-item-actions">
+            <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
+          </div>
         </div>`;
       });
       activeEl.innerHTML = html;
@@ -1114,10 +1085,15 @@ async function refreshDownloadStatus() {
     } else {
       let html = '';
       completed.forEach(dl => {
-        html += `<div class="dl-item"><div class="dl-item-info">
+        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
+        html += `<div class="dl-item">
+          ${thumbHtml}
+          <div class="dl-item-info">
             <span class="dl-item-name">✅ ${dl.model_name || dl.filename || dl.id}</span>
-            <span class="dl-item-meta">${dl.version_name || ''}</span>
-          </div></div>`;
+            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span></div>
+          </div>
+        </div>`;
       });
       html += `<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="clearDlHistory()">🗑️ 清除历史</button></div>`;
       completedEl.innerHTML = html;
@@ -1129,11 +1105,17 @@ async function refreshDownloadStatus() {
     } else {
       let html = '';
       failed.forEach(dl => {
-        html += `<div class="dl-item"><div class="dl-item-info">
+        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
+        html += `<div class="dl-item">
+          ${thumbHtml}
+          <div class="dl-item-info">
             <span class="dl-item-name">❌ ${dl.model_name || dl.filename || dl.id}</span>
-            <span class="dl-item-meta">${dl.version_name || ''} ${dl.error ? '• ' + dl.error : ''}</span>
+            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span>${dl.error ? `<span style="color:var(--red)">${dl.error}</span>` : ''}</div>
           </div>
-          <button class="btn btn-sm" style="padding:2px 8px;font-size:.7rem" onclick="retryDownload('${dl.id}')">🔄 重试</button>
+          <div class="dl-item-actions">
+            <button class="btn btn-sm" style="font-size:.7rem" onclick="retryDownload('${dl.id}')">🔄 重试</button>
+          </div>
         </div>`;
       });
       failedEl.innerHTML = html;
@@ -1199,12 +1181,7 @@ function switchDlTab(tab) {
 }
 
 async function renderDownloadsTab() {
-  // Update ID textarea
-  const ta = document.getElementById('cart-ids-textarea');
-  if (ta && document.activeElement !== ta) {
-    ta.value = [...selectedModels.keys()].join(', ');
-  }
-  // Render pending (cart)
+  // Render pending (selected models + ID input)
   renderPendingList();
   // Fetch and render download status
   await refreshDownloadStatus();
@@ -1213,33 +1190,64 @@ async function renderDownloadsTab() {
 function renderPendingList() {
   const container = document.getElementById('dl-pending-content');
   if (!container) return;
+
+  // ID textarea + action bar (always shown at top of this tab)
+  const taVal = document.activeElement?.id === 'cart-ids-textarea' ? '' : ` value="${[...selectedModels.keys()].join(', ')}"`;
+  let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:8px">
+    <span style="font-size:.85rem;font-weight:600;color:var(--t1)">模型 ID 列表</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()">📥 一键下载全部</button>
+    <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderDownloadsTab();}">🗑️ 清空</button>
+  </div>
+  <textarea class="cart-ids-box" id="cart-ids-textarea" oninput="syncCartFromTextarea(this)" style="min-height:50px;margin-bottom:12px" placeholder="输入模型 ID（逗号分隔）或从 CivitAI 页添加"></textarea>`;
+
   if (selectedModels.size === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无待下载模型，从 CivitAI 页添加或在上方 ID 框输入</div>';
-    return;
-  }
-  let html = '<table class="svc-table"><thead><tr><th></th><th>模型</th><th>类型</th><th>版本</th><th>操作</th></tr></thead><tbody>';
-  for (const [id, m] of selectedModels) {
-    const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const cached = searchResultsCache[String(id)];
-    const allVersions = cached?.allVersions || [];
-    let versionCell = m.versionName || '-';
-    if (allVersions.length > 1) {
-      const opts = allVersions.map(v => {
-        const sel = String(v.id) === String(m.versionId) ? 'selected' : '';
-        return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
-      }).join('');
-      versionCell = `<select class="meta-version-select" onchange="changeCartVersion('${id}', this.value)" style="max-width:140px">${opts}</select>`;
+    html += '<div style="text-align:center;padding:20px;color:var(--t3)">暂无已选模型，从 CivitAI 页添加或在上方输入 ID</div>';
+  } else {
+    for (const [id, m] of selectedModels) {
+      const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const badgeClass = getBadgeClass((m.type || '').toLowerCase());
+      const cached = searchResultsCache[String(id)];
+      const allVersions = cached?.allVersions || [];
+      let versionHtml = m.versionName || '-';
+      if (allVersions.length > 1) {
+        const opts = allVersions.map(v => {
+          const sel = String(v.id) === String(m.versionId) ? 'selected' : '';
+          return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
+        }).join('');
+        versionHtml = `<select class="meta-version-select" onchange="changeCartVersion('${id}', this.value)" style="max-width:140px;font-size:.75rem">${opts}</select>`;
+      }
+      const imgUrl = m.imageUrl || '';
+      const thumbHtml = imgUrl ? `<div class="dl-item-thumb"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+      html += `<div class="dl-item">
+        ${thumbHtml}
+        <div class="dl-item-info">
+          <span class="dl-item-name"><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a></span>
+          <div class="dl-item-meta">
+            <span class="badge ${badgeClass}" style="font-size:.65rem">${m.type || ''}</span>
+            <span>ID: ${id}</span>
+            ${versionHtml !== '-' ? versionHtml : `<span>${versionHtml}</span>`}
+          </div>
+        </div>
+        <div class="dl-item-actions">
+          <button class="btn btn-sm" onclick="downloadFromSearch('${id}', '${(m.type || 'Checkpoint').toLowerCase()}')" title="立即下载">📥</button>
+          <button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')" title="移除">✕</button>
+        </div>
+      </div>`;
     }
-    html += `<tr>
-      <td><img src="${m.imageUrl || ''}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;cursor:zoom-in" onclick="openImg('${(m.imageUrl || '').replace(/'/g, "\\'")}')"
-        onerror="this.style.display='none'"></td>
-      <td><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a><br><span style="font-size:.72rem;color:var(--t3)">ID: ${id}</span></td>
-      <td><span class="badge ${getBadgeClass((m.type || '').toLowerCase())}">${m.type}</span></td>
-      <td>${versionCell}</td>
-      <td><button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')">✕</button></td></tr>`;
   }
-  html += '</tbody></table>';
   container.innerHTML = html;
+
+  // Restore textarea value if not focused
+  const ta = document.getElementById('cart-ids-textarea');
+  if (ta && document.activeElement !== ta) {
+    ta.value = [...selectedModels.keys()].join(', ');
+  }
+
+  // Update tab badge count
+  document.querySelectorAll('[data-dltab="pending"]').forEach(t => {
+    t.textContent = `📌 已选${selectedModels.size > 0 ? ' (' + selectedModels.size + ')' : ''}`;
+  });
 }
 
 // ========== Tunnel Links (Dashboard quick links) ==========
