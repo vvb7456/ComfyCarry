@@ -32,6 +32,7 @@ CORS(app)
 # --- 配置 ---
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://localhost:8188")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = Path(__file__).parent / ".civitai_config.json"
 MEILI_URL = 'https://search.civitai.com/multi-search'
 MEILI_BEARER = '8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61'
