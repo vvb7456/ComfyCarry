@@ -1943,16 +1943,10 @@ def api_settings_export_config():
     # 也保存用户对默认插件的取消选择 (如果有)
     config["disabled_default_plugins"] = [u for u in default_urls if u not in all_plugins]
 
-    # 7. 同步规则 (v2) + 旧版同步偏好 (向后兼容)
+    # 7. 同步规则 (v2)
     if SYNC_RULES_FILE.exists():
         try:
             config["sync_rules"] = json.loads(SYNC_RULES_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    sync_prefs_file = Path("/workspace/.sync_prefs.json")
-    if sync_prefs_file.exists():
-        try:
-            config["sync_prefs"] = json.loads(sync_prefs_file.read_text(encoding="utf-8"))
         except Exception:
             pass
 
@@ -2034,15 +2028,6 @@ def api_settings_import_config():
             applied.append("同步规则")
         except Exception as e:
             errors.append(f"同步规则: {e}")
-    if data.get("sync_prefs"):
-        try:
-            Path("/workspace/.sync_prefs.json").write_text(
-                json.dumps(data["sync_prefs"], indent=2, ensure_ascii=False), encoding="utf-8"
-            )
-            applied.append("同步偏好 (旧版)")
-        except Exception as e:
-            errors.append(f"同步偏好: {e}")
-
     # 5. Debug 模式
     if "debug" in data:
         _set_config("debug", bool(data["debug"]))
@@ -2132,7 +2117,7 @@ def api_settings_reinitialize():
             errors.append(f"清理 ComfyUI 目录失败: {e}")
 
     # 3. 清理生成的脚本和同步配置
-    for f in [Path("/workspace/cloud_sync.sh"), Path("/workspace/.sync_prefs.json"), Path("/workspace/.sync_rules.json")]:
+    for f in [Path("/workspace/cloud_sync.sh"), Path("/workspace/.sync_rules.json"), Path("/workspace/.sync_settings.json")]:
         try:
             if f.exists():
                 f.unlink()
@@ -2640,8 +2625,6 @@ def _run_deploy(config):
         # ─────────────────────────────────────────────
         if rclone_method != "skip" and rclone_value:
             _deploy_step("同步云端资产")
-            # 迁移旧配置或加载规则
-            _migrate_old_sync_prefs()
 
             # 从向导配置自动创建同步规则 (首次部署时, 且非导入模式)
             rules = _load_sync_rules()
@@ -2819,7 +2802,6 @@ echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
 # ====================================================================
 RCLONE_CONF = Path.home() / ".config" / "rclone" / "rclone.conf"
 SYNC_RULES_FILE = Path("/workspace/.sync_rules.json")
-SYNC_PREFS_FILE = Path("/workspace/.sync_prefs.json")  # 向后兼容
 
 # 同步规则预设模板 (前端快速添加)
 SYNC_RULE_TEMPLATES = [
@@ -3410,63 +3392,6 @@ def api_import_config():
     return jsonify({"ok": True, "message": f"导入成功，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
 
 
-# ── 向后兼容: 旧的 sync_prefs → rules 迁移 ──────────────────────
-
-def _migrate_old_sync_prefs():
-    """如果存在旧的 .sync_prefs.json 且没有 rules，自动迁移"""
-    if SYNC_RULES_FILE.exists():
-        return  # 已有新规则
-    if not SYNC_PREFS_FILE.exists():
-        return
-    try:
-        prefs = json.loads(SYNC_PREFS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return
-
-    rules = []
-    remotes = _parse_rclone_conf()
-    remote_names = {r["type"]: r["name"] for r in remotes}
-
-    # R2 下拉规则
-    r2_name = remote_names.get("s3", "")
-    r2_prefs = prefs.get("r2", {})
-    if r2_name and r2_prefs.get("enabled", True):
-        if r2_prefs.get("sync_workflows", True):
-            rules.append({"id": "migrated-pull-workflows", "name": "下拉工作流", "direction": "pull",
-                          "remote": r2_name, "remote_path": "comfyui-assets/workflow",
-                          "local_path": "user/default/workflows", "method": "sync", "trigger": "deploy", "enabled": True})
-        if r2_prefs.get("sync_loras", True):
-            rules.append({"id": "migrated-pull-loras", "name": "下拉 LoRA", "direction": "pull",
-                          "remote": r2_name, "remote_path": "comfyui-assets/loras",
-                          "local_path": "models/loras", "method": "sync", "trigger": "deploy", "enabled": True})
-        if r2_prefs.get("sync_wildcards", True):
-            rules.append({"id": "migrated-pull-wildcards", "name": "下拉 Wildcards", "direction": "pull",
-                          "remote": r2_name, "remote_path": "comfyui-assets/wildcards",
-                          "local_path": "custom_nodes/comfyui-dynamicprompts/wildcards",
-                          "method": "sync", "trigger": "deploy", "enabled": True})
-
-    # OneDrive / GDrive 输出上传规则
-    od_name = remote_names.get("onedrive", "")
-    od_prefs = prefs.get("onedrive", {})
-    if od_name and od_prefs.get("enabled", False):
-        rules.append({"id": "migrated-push-od", "name": "上传输出到 OneDrive", "direction": "push",
-                      "remote": od_name, "remote_path": od_prefs.get("destination", "ComfyUI_Transfer"),
-                      "local_path": "output", "method": "move", "trigger": "watch", "watch_interval": 15,
-                      "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"], "enabled": True})
-
-    gd_name = remote_names.get("drive", "")
-    gd_prefs = prefs.get("gdrive", {})
-    if gd_name and gd_prefs.get("enabled", False):
-        rules.append({"id": "migrated-push-gd", "name": "上传输出到 Google Drive", "direction": "push",
-                      "remote": gd_name, "remote_path": gd_prefs.get("destination", "ComfyUI_Transfer"),
-                      "local_path": "output", "method": "move", "trigger": "watch", "watch_interval": 15,
-                      "filters": ["+ *.{png,jpg,jpeg,webp,gif,mp4,mov,webm}", "- .*/**", "- *"], "enabled": True})
-
-    if rules:
-        _save_sync_rules(rules)
-        _sync_log(f"已从旧配置迁移 {len(rules)} 条同步规则")
-
-
 # ====================================================================
 # 前端页面
 # ====================================================================
@@ -3529,8 +3454,7 @@ if __name__ == "__main__":
         CONFIG_FILE.write_text(json.dumps({"api_key": os.environ["CIVITAI_TOKEN"]}))
         print(f"  📝 已从环境变量 CIVITAI_TOKEN 导入 API Key")
 
-    # 迁移旧 sync_prefs → rules 并启动 watch worker
-    _migrate_old_sync_prefs()
+    # 启动 watch worker
     rules = _load_sync_rules()
     watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
     if watch_rules:

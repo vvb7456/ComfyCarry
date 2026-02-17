@@ -993,16 +993,7 @@ async function handleImportFile(event) {
         }
         // 同步规则 (v2) — 如果有则直接使用，不再需要 wizard 创建
         if (config.sync_rules && config.sync_rules.length > 0) {
-            wizardConfig._imported_sync_rules = true;  // 标记已导入规则
-        }
-        // 同步偏好 (旧版 v1，嵌套在 r2 下)
-        if (config.sync_prefs && !config.sync_rules) {
-            const r2 = config.sync_prefs.r2 || {};
-            wizardConfig.sync_pull = {
-                workflows: r2.sync_workflows ?? true,
-                loras: r2.sync_loras ?? true,
-                wildcards: r2.sync_wildcards ?? true,
-            };
+            wizardConfig._imported_sync_rules = true;
         }
 
         showImportResult(

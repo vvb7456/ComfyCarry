@@ -105,7 +105,8 @@ setup_wizard.html         # 首次部署向导
 |------|------|
 | `/workspace/.dashboard_env` | Dashboard 配置 |
 | `/workspace/.setup_state.json` | 向导状态 |
-| `/workspace/.sync_prefs.json` | 同步偏好 |
+| `/workspace/.sync_rules.json` | 同步规则 (v2) |
+| `/workspace/.sync_settings.json` | 同步全局设置 |
 | `/workspace/.civitai_config.json` | CivitAI Key |
 
 ---

@@ -50,7 +50,8 @@
 |------|------|
 | `/workspace/.dashboard_env` | Dashboard 持久化配置 (密码、session secret、debug 等) |
 | `/workspace/.setup_state.json` | Setup Wizard 状态 |
-| `/workspace/.sync_prefs.json` | 云同步偏好设置 |
+| `/workspace/.sync_rules.json` | Sync v2 同步规则 |
+| `/workspace/.sync_settings.json` | 全局同步设置 (min_age, watch_interval) |
 | `/workspace/.civitai_config.json` | CivitAI API Key |
 | `~/.config/rclone/rclone.conf` | Rclone 配置 |
 
