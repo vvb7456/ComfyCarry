@@ -437,16 +437,67 @@ function getBadgeClass(cat) {
 async function fetchModelInfo(idx) {
   const m = localModelsData[idx];
   if (!m) return;
-  showToast(`正在查询 ${m.filename}...`);
+  // Find the card and disable the fetch button
+  const card = document.querySelector(`.model-card[data-idx="${idx}"]`);
+  const btn = card?.querySelector('.model-card-actions button:nth-child(2)');
+  if (btn) {
+    if (btn.dataset.fetching === '1') return; // already in progress
+    btn.dataset.fetching = '1';
+    btn._origText = btn.textContent;
+    btn.textContent = '⏳ 获取中…';
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+  }
   try {
     const r = await fetch('/api/local_models/fetch_info', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ abs_path: m.abs_path })
     });
     const d = await r.json();
-    if (d.ok) { showToast(`✅ ${m.filename} 信息获取成功`); loadLocalModels(); }
-    else showToast(`❌ ${d.error || '未知错误'}`);
-  } catch (e) { showToast('请求失败: ' + e.message); }
+    if (d.ok) {
+      showToast(`✅ ${m.filename} 信息获取成功`);
+      // Refresh only this card's data
+      await _refreshSingleCard(idx);
+    } else {
+      showToast(`❌ ${d.error || '未知错误'}`);
+      _resetFetchBtn(btn);
+    }
+  } catch (e) {
+    showToast('请求失败: ' + e.message);
+    _resetFetchBtn(btn);
+  }
+}
+
+function _resetFetchBtn(btn) {
+  if (!btn) return;
+  btn.dataset.fetching = '';
+  btn.textContent = btn._origText || '📥 获取信息';
+  btn.disabled = false;
+  btn.style.opacity = '';
+}
+
+async function _refreshSingleCard(idx) {
+  // Re-fetch model list and update single card in-place
+  const cat = document.getElementById('model-category')?.value || 'all';
+  try {
+    const r = await fetch(`/api/local_models?category=${cat}`);
+    const d = await r.json();
+    localModelsData = d.models || [];
+    // Update status bar
+    const status = document.getElementById('local-models-status');
+    if (status) {
+      status.innerHTML = `<div class="success-msg" style="display:flex;justify-content:space-between;align-items:center">
+        <span>找到 ${d.total} 个模型文件</span>
+        <span style="font-size:.78rem;color:var(--t2)">${localModelsData.filter(m => m.has_info).length} 已有元数据</span></div>`;
+    }
+    // Replace only the target card
+    const oldCard = document.querySelector(`.model-card[data-idx="${idx}"]`);
+    if (oldCard && localModelsData[idx]) {
+      const temp = document.createElement('div');
+      temp.innerHTML = renderLocalModelCard(localModelsData[idx], idx);
+      oldCard.replaceWith(temp.firstElementChild);
+    }
+  } catch (e) { console.error('Refresh single card failed:', e); }
 }
 
 async function fetchAllInfo() {
@@ -753,7 +804,7 @@ function toggleCartFromSearch(id, btn) {
   id = String(id);
   if (selectedModels.has(id)) {
     selectedModels.delete(id);
-    btn.textContent = '� 收藏';
+    btn.textContent = '📌 收藏';
     btn.classList.remove('btn-danger'); btn.classList.add('btn-primary');
   } else {
     const data = searchResultsCache[id] || {};
