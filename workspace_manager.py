@@ -2106,9 +2106,11 @@ _deploy_log_lock = threading.Lock()
 
 
 def _detect_image_type():
-    """检测当前环境是 prebuilt 还是 generic 镜像"""
-    comfyui_main = Path(COMFYUI_DIR) / "main.py"
-    if comfyui_main.exists():
+    """检测当前环境是 prebuilt 还是 generic 镜像
+    预构建镜像在 /opt/ComfyUI/ 保存了 ComfyUI 副本,
+    部署时复制到 /workspace/ComfyUI/"""
+    opt_comfyui = Path("/opt/ComfyUI/main.py")
+    if opt_comfyui.exists():
         return "prebuilt"
     return "generic"
 

@@ -199,23 +199,20 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <!-- Step 0: 部署方式选择 -->
     <div class="step active" id="step-0">
         <div class="step-title">选择部署方式</div>
-        <div class="step-desc">根据你使用的 Docker 镜像选择对应的部署模式</div>
+        <div class="step-desc" id="step-0-desc">正在检测环境...</div>
         <div id="gpu-info-display"></div>
-        <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
-            <div class="choice-card" onclick="selectImageType('generic')" id="choice-generic">
-                <h3>🔧 通用镜像部署</h3>
-                <p>使用 runpod/pytorch 等标准镜像，从零安装 PyTorch、加速组件、ComfyUI 和插件</p>
-                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 预计 15-30 分钟</p>
+        <!-- 检测到的镜像类型提示 -->
+        <div id="image-type-badge" style="display:none;margin-bottom:16px;padding:10px 14px;border-radius:8px;font-size:.88rem"></div>
+        <div class="choice-grid">
+            <div class="choice-card" onclick="selectMode('fresh')" id="choice-fresh">
+                <h3>🚀 全新部署</h3>
+                <p>配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境</p>
+                <p style="color:var(--t3);font-size:.72rem;margin-top:6px" id="fresh-time"></p>
             </div>
-            <div class="choice-card" onclick="selectImageType('prebuilt')" id="choice-prebuilt">
-                <h3>⚡ 预构建镜像部署 <span class="badge">推荐</span></h3>
-                <p>使用已预装 FA3/SA3/ComfyUI 的自定义镜像，只做配置和同步</p>
-                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 预计 2-5 分钟</p>
-            </div>
-            <div class="choice-card" onclick="selectImageType('import')" id="choice-import">
+            <div class="choice-card" onclick="selectMode('import')" id="choice-import">
                 <h3>📦 恢复设置</h3>
                 <p>从之前导出的配置文件恢复所有设置，快速重建工作环境</p>
-                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 自动匹配镜像类型</p>
+                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 跳过手动配置</p>
             </div>
         </div>
         <!-- 导入文件上传区域 (选择恢复设置时显示) -->
@@ -412,12 +409,38 @@ async function init() {
         // Load plugin list
         pluginData = state.plugins_available || [];
         const selectedUrls = state.plugins || pluginData.map(p => p.url);
+
+        // 自动设定 image_type (用户不再手动选)
+        wizardConfig.image_type = detectedImageType || 'generic';
+
+        // 显示镜像检测结果
+        const badge = document.getElementById('image-type-badge');
+        const descEl = document.getElementById('step-0-desc');
+        const timeEl = document.getElementById('fresh-time');
+        if (detectedImageType === 'prebuilt') {
+            badge.style.display = 'block';
+            badge.style.background = 'rgba(74,222,128,0.12)';
+            badge.style.border = '1px solid var(--green)';
+            badge.style.color = 'var(--green)';
+            badge.innerHTML = '⚡ 检测到<b>预构建镜像</b> — 已预装 PyTorch / ComfyUI / 加速组件';
+            descEl.textContent = '已自动识别镜像类型，选择部署方式开始配置';
+            timeEl.textContent = '⏱ 预计 2-5 分钟';
+        } else {
+            badge.style.display = 'block';
+            badge.style.background = 'rgba(124,92,252,0.12)';
+            badge.style.border = '1px solid var(--accent)';
+            badge.style.color = 'var(--accent2)';
+            badge.innerHTML = '🔧 检测到<b>通用镜像</b> — 将从零安装 PyTorch、ComfyUI 和加速组件';
+            descEl.textContent = '已自动识别镜像类型，选择部署方式开始配置';
+            timeEl.textContent = '⏱ 预计 15-30 分钟';
+        }
+
+        // 恢复插件列表渲染 (基于检测到的 image_type)
         renderPluginList(pluginData, selectedUrls);
 
         // Restore state if partially filled
         if (state.image_type) {
             wizardConfig.image_type = state.image_type;
-            selectImageType(state.image_type, true);
         }
         if (state.deploy_started && !state.deploy_completed) {
             showDeployView();
@@ -583,33 +606,26 @@ function saveCurrentStep() {
     }).catch(() => {});
 }
 
-// ── Image Type Selection ──
-function selectImageType(type, noEnable) {
+// ── Mode Selection (全新部署 / 恢复设置) ──
+function selectMode(mode) {
     document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
 
-    if (type === 'import') {
+    if (mode === 'import') {
         // 恢复设置模式 — 显示文件上传区
         document.getElementById('choice-import').classList.add('selected');
         document.getElementById('import-upload-area').style.display = 'block';
         document.getElementById('btn-next-0').disabled = true;  // 等导入成功后启用
         importedConfig = null;
-        wizardConfig.image_type = '';
         return;
     }
 
-    // 非导入模式 — 隐藏上传区
+    // 全新部署模式 — 隐藏上传区
     document.getElementById('import-upload-area').style.display = 'none';
     document.getElementById('import-result').style.display = 'none';
     importedConfig = null;
 
-    wizardConfig.image_type = type;
-    document.getElementById(`choice-${type}`).classList.add('selected');
+    document.getElementById('choice-fresh').classList.add('selected');
     document.getElementById('btn-next-0').disabled = false;
-    // 切换镜像类型时重新渲染插件列表 (prebuilt 模式全部预装)
-    if (pluginData.length > 0) {
-        const selectedUrls = wizardConfig.plugins?.length ? wizardConfig.plugins : pluginData.map(p => p.url);
-        renderPluginList(pluginData, selectedUrls);
-    }
 }
 
 // ── Rclone Input Toggle ──
@@ -859,14 +875,14 @@ async function handleImportFile(event) {
             return;
         }
 
-        // 镜像类型匹配验证
+        // 镜像类型匹配验证 — 配置文件的 image_type 必须与当前环境一致
         const cfgType = config.image_type;
         if (cfgType && detectedImageType && cfgType !== detectedImageType) {
             const cfgLabel = cfgType === 'prebuilt' ? '预构建镜像' : '通用镜像';
             const envLabel = detectedImageType === 'prebuilt' ? '预构建镜像' : '通用镜像';
             showImportResult(
-                `❌ 镜像类型不匹配！<br>配置文件为「<b>${esc(cfgLabel)}</b>」，当前环境检测为「<b>${esc(envLabel)}</b>」。<br>` +
-                `请上传与当前环境匹配的配置文件，或使用对应镜像启动实例。`,
+                `❌ 镜像类型不匹配！<br>配置文件为「<b>${esc(cfgLabel)}</b>」，当前环境为「<b>${esc(envLabel)}</b>」。<br>` +
+                `请上传与当前环境匹配的配置文件，或使用对应的 Docker 镜像重新创建实例。`,
                 true
             );
             return;
@@ -884,9 +900,9 @@ async function handleImportFile(event) {
             return;
         }
 
-        // 导入成功 — 填充 wizardConfig
+        // 导入成功 — 填充 wizardConfig (image_type 始终用当前环境检测值)
         importedConfig = config;
-        wizardConfig.image_type = cfgType || detectedImageType || 'generic';
+        wizardConfig.image_type = detectedImageType || cfgType || 'generic';
         if (config.password) wizardConfig.password = config.password;
         if (config.cloudflared_token) wizardConfig.cloudflared_token = config.cloudflared_token;
         if (config.civitai_token) wizardConfig.civitai_token = config.civitai_token;
