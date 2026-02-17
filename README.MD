@@ -32,15 +32,13 @@ Web Dashboard 统一管理 ComfyUI 全生命周期：
 
 预构建镜像含 Python 3.13 + PyTorch 2.9 + CUDA 13 + FlashAttention-3 + SageAttention-3 + ComfyUI + 15 个常用插件。
 
-### 2. 运行 bootstrap
+### 2. 设置启动命令
 
-SSH 进入实例后执行：
+在 RunPod / Vast.ai 的 **On-start Script** 中填写：
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash
 ```
-
-bootstrap 自动安装 Python 3.13 / Node.js / PM2 / Cloudflared，下载 Dashboard 文件，启动管理面板。
 
 ### 3. 访问 Dashboard
 
