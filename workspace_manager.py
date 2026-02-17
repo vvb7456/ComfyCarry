@@ -2482,10 +2482,10 @@ def _run_deploy(config):
                 _deploy_log("安装 ComfyUI 依赖...")
                 _deploy_exec(f"cd /workspace/ComfyUI && {PIP} install --no-cache-dir -r requirements.txt", timeout=300)
 
-            # 健康检查 (与原 deploy.sh 完全一致)
+            # 健康检查 (不加载插件, 仅验证 ComfyUI 核心能启动)
             _deploy_step("ComfyUI 健康检查")
-            _deploy_log("启动首次健康检查...")
-            _deploy_exec(f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 --port 8188 > /tmp/comfy_boot.log 2>&1 &')
+            _deploy_log("启动首次健康检查 (跳过插件加载)...")
+            _deploy_exec(f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 --port 8188 --disable-all-custom-nodes > /tmp/comfy_boot.log 2>&1 &')
             boot_ok = False
             for i in range(30):
                 time.sleep(2)
@@ -2499,7 +2499,7 @@ def _run_deploy(config):
                 _deploy_log(f"等待 ComfyUI 启动... ({i+1}/30)")
 
             # 清理健康检查进程
-            _deploy_exec("pkill -f 'main.py --listen 127.0.0.1 --port 8188' 2>/dev/null; sleep 1", label="停止检查进程")
+            _deploy_exec("pkill -f 'main.py --listen 127.0.0.1 --port 8188 --disable-all-custom-nodes' 2>/dev/null; sleep 1", label="停止检查进程")
 
             if boot_ok:
                 _deploy_log("✅ ComfyUI 健康检查通过")
