@@ -391,7 +391,7 @@ async function loadLocalModels() {
 function renderLocalModelCard(m, idx) {
   const badgeClass = getBadgeClass(m.category);
   const sizeStr = fmtBytes(m.size_bytes);
-  const twHtml = (m.trained_words || []).slice(0, 5).map(w =>
+  const twHtml = (m.trained_words || []).slice(0, 8).map(w =>
     `<span class="tw-tag" onclick="copyText('${w.replace(/'/g, "\\'")}')" title="点击复制">${w}</span>`
   ).join('');
 
@@ -410,6 +410,11 @@ function renderLocalModelCard(m, idx) {
   const zoomIcon = zoomUrl ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${zoomUrl.replace(/'/g, "\\'")}')" title="查看大图">🔍</span>` : '';
   const clickArea = `<div class="img-click-area" onclick="openLocalMeta(${idx})"></div>`;
 
+  // Fetch button: shows status + allows re-fetch
+  const fetchBtnText = m.has_info ? '✓ 已获取' : '📥 获取信息';
+  const fetchBtnClass = m.has_info ? 'btn btn-sm' : 'btn btn-sm btn-primary';
+  const fetchBtnTitle = m.has_info ? '点击重新获取元数据' : '从 CivitAI 获取信息';
+
   return `<div class="model-card" data-idx="${idx}">
     <div class="model-card-img">${imgTag}${zoomIcon}${clickArea}</div>
     <div class="model-card-body">
@@ -418,12 +423,11 @@ function renderLocalModelCard(m, idx) {
         <span class="badge ${badgeClass}">${m.category}</span>
         ${m.base_model ? `<span class="badge badge-other">${m.base_model}</span>` : ''}
         <span class="model-card-size">${sizeStr}</span>
-        ${m.has_info ? '<span style="font-size:.7rem;color:var(--green)">✓ 已获取信息</span>' : ''}
       </div>
       ${twHtml ? `<div class="model-card-tags">${twHtml}</div>` : ''}
       <div class="model-card-actions">
         <button class="btn btn-sm btn-success" onclick="openLocalMeta(${idx})">📄 详情</button>
-        <button class="btn btn-sm" onclick="fetchModelInfo(${idx})" ${m.has_info ? 'title="重新获取"' : 'title="从 CivitAI 获取信息"'}>${m.has_info ? '🔄 刷新' : '📥 获取信息'}</button>
+        <button class="${fetchBtnClass}" onclick="fetchModelInfo(${idx})" title="${fetchBtnTitle}">${fetchBtnText}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteModel(${idx})">🗑️</button>
       </div>
     </div></div>`;
