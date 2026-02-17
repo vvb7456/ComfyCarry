@@ -278,8 +278,6 @@ async function loadApiKey() {
   } catch (e) { console.error(e); }
 }
 // Config modal removed — API key management moved to Settings page
-function openConfigModal() { showPage('settings'); }
-function closeConfigModal() {}
 
 // ========== Dashboard ==========
 async function refreshDashboard() {
@@ -577,7 +575,7 @@ async function searchModels(page = 0, append = false) {
   const errEl = document.getElementById('search-error');
   errEl.innerHTML = '';
   loading.classList.remove('hidden');
-  if (!append) { results.innerHTML = ''; pag.innerHTML = ''; }
+  if (!append) { results.innerHTML = ''; pag.innerHTML = ''; searchResultsCache = {}; }
 
   const types = getActiveChips('filter-type-chips');
   const bms = getActiveChips('filter-bm-chips');
@@ -1859,13 +1857,6 @@ async function restartSync() {
 }
 
 let rcloneConfigLoaded = false;
-async function toggleRcloneConfig() {
-  const box = document.getElementById('rclone-config-box');
-  box.classList.toggle('hidden');
-  if (!box.classList.contains('hidden') && !rcloneConfigLoaded) {
-    await loadRcloneConfig();
-  }
-}
 
 function toggleImportConfig() {
   const box = document.getElementById('import-config-box');
@@ -1998,11 +1989,11 @@ async function loadSettingsPage() {
 async function changePassword() {
   const current = document.getElementById('settings-pw-current').value;
   const newPw = document.getElementById('settings-pw-new').value;
-  const confirm = document.getElementById('settings-pw-confirm').value;
+  const confirmPw = document.getElementById('settings-pw-confirm').value;
   if (!current) return showToast('请输入当前密码');
   if (!newPw) return showToast('请输入新密码');
   if (newPw.length < 4) return showToast('密码至少 4 个字符');
-  if (newPw !== confirm) return showToast('两次输入的密码不一致');
+  if (newPw !== confirmPw) return showToast('两次输入的密码不一致');
   try {
     const r = await fetch('/api/settings/password', {
       method: 'POST',

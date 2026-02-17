@@ -1905,23 +1905,27 @@ def api_setup_plugins():
     return jsonify({"plugins": DEFAULT_PLUGINS})
 
 
+_deploy_lock = threading.Lock()
+
+
 @app.route("/api/setup/deploy", methods=["POST"])
 def api_setup_deploy():
     """开始部署 — 在后台线程执行全部安装逻辑"""
     global _deploy_thread
-    if _deploy_thread and _deploy_thread.is_alive():
-        return jsonify({"error": "部署已在进行中"}), 409
+    with _deploy_lock:
+        if _deploy_thread and _deploy_thread.is_alive():
+            return jsonify({"error": "部署已在进行中"}), 409
 
-    state = _load_setup_state()
-    state["deploy_started"] = True
-    state["deploy_completed"] = False
-    _save_setup_state(state)
+        state = _load_setup_state()
+        state["deploy_started"] = True
+        state["deploy_completed"] = False
+        _save_setup_state(state)
 
-    with _deploy_log_lock:
-        _deploy_log_lines.clear()
+        with _deploy_log_lock:
+            _deploy_log_lines.clear()
 
-    _deploy_thread = threading.Thread(target=_run_deploy, args=(dict(state),), daemon=True)
-    _deploy_thread.start()
+        _deploy_thread = threading.Thread(target=_run_deploy, args=(dict(state),), daemon=True)
+        _deploy_thread.start()
     return jsonify({"ok": True, "message": "部署已启动"})
 
 
@@ -2011,6 +2015,13 @@ def _deploy_exec(cmd, timeout=600, label=""):
         return proc.returncode == 0
     except Exception as e:
         _deploy_log(f"执行失败: {e}", "error")
+        if proc:
+            try:
+                proc.kill()
+                proc.stdout.close()
+                proc.wait(timeout=5)
+            except Exception:
+                pass
         return False
 
 
