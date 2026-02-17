@@ -38,9 +38,9 @@ function showPage(page) {
   // Stop all page-specific polling/SSE regardless of target page
   stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); stopPluginQueuePoll(); stopComfyAutoRefresh();
 
-  if (page === 'dashboard') refreshDashboard();
-  else if (page === 'models') loadLocalModels();
-  if (page === 'civitai') { loadFacets(); }
+  if (page === 'dashboard') { refreshDashboard(); startDashboardSSE(); }
+  else { stopDashboardSSE(); }
+  if (page === 'models') loadLocalModels();
   else if (page === 'tunnel') { loadTunnelPage(); startTunnelAutoRefresh(); }
   else if (page === 'comfyui') { loadComfyUIPage(); startComfyAutoRefresh(); }
   else if (page === 'sync') { loadSyncPage(); startSyncAutoRefresh(); }
@@ -53,8 +53,10 @@ function switchModelTab(tab) {
   currentModelTab = tab;
   document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
   document.getElementById('mtab-local').classList.toggle('hidden', tab !== 'local');
+  document.getElementById('mtab-civitai').classList.toggle('hidden', tab !== 'civitai');
   document.getElementById('mtab-downloads').classList.toggle('hidden', tab !== 'downloads');
   if (tab === 'local') loadLocalModels();
+  else if (tab === 'civitai') loadFacets();
   else if (tab === 'downloads') { refreshDownloadStatus(); startDlStatusPolling(); }
 }
 
@@ -275,12 +277,20 @@ async function loadApiKey() {
     const r = await fetch('/api/config');
     const d = await r.json();
     apiKey = d.api_key || '';
-    document.getElementById('key-status').innerHTML = d.has_key ? `🔓 Key: ${d.key_preview}` : '🔒 未设置 Key';
   } catch (e) { console.error(e); }
 }
 // Config modal removed — API key management moved to Settings page
 
 // ========== Dashboard ==========
+let dashboardRefreshTimer = null;
+function startDashboardSSE() {
+  stopDashboardSSE();
+  dashboardRefreshTimer = setInterval(refreshDashboard, 3000);
+}
+function stopDashboardSSE() {
+  if (dashboardRefreshTimer) { clearInterval(dashboardRefreshTimer); dashboardRefreshTimer = null; }
+}
+
 async function refreshDashboard() {
   const statsEl = document.getElementById('sys-stats');
   const svcEl = document.getElementById('svc-tbody');
@@ -1471,7 +1481,7 @@ async function loadComfyStatus() {
     const sys = d.system || {};
     const pm2St = d.pm2_status || 'unknown';
     const stColor = online ? 'var(--green)' : 'var(--red, #e74c3c)';
-    const stLabel = online ? '运行中' : '离线';
+    const stLabel = online ? '运行中' : '已停止';
 
     // Status card
     html += `<div class="stat-card" style="border-left:3px solid ${stColor}">
@@ -1686,7 +1696,7 @@ async function loadSyncPage() {
   document.getElementById('sync-status-badge').innerHTML = `
     <div class="tunnel-header-row">
       <div class="tunnel-status-badge" style="color:${stColor}">
-        <span class="tunnel-dot" style="background:${stColor}"></span> 同步服务: ${stLabel}
+        <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
       </div>
     </div>`;
 
@@ -2138,21 +2148,8 @@ async function importConfig(event) {
       body: text
     });
     const d = await r.json();
-    const resultEl = document.getElementById('import-result');
-    if (resultEl) {
-      resultEl.style.display = 'block';
-      if (d.errors?.length) {
-        resultEl.style.background = 'rgba(255,180,0,0.12)';
-        resultEl.style.color = 'var(--t1)';
-        resultEl.innerHTML = `<strong>⚠️ ${d.message}</strong><br>已导入: ${d.applied?.join(', ') || '无'}<br>失败: ${d.errors.join(', ')}`;
-      } else {
-        resultEl.style.background = 'rgba(80,200,120,0.12)';
-        resultEl.style.color = 'var(--green,#50c878)';
-        resultEl.innerHTML = `<strong>✅ ${d.message}</strong><br>${d.applied?.join(', ') || ''}`;
-      }
-    }
     showToast(d.ok ? '✅ ' + d.message : '⚠️ ' + d.message);
-    loadSettingsPage();
+    if (document.getElementById('page-settings')?.classList.contains('hidden') === false) loadSettingsPage();
   } catch (e) {
     showToast('导入失败: ' + e.message);
   }
