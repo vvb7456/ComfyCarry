@@ -86,6 +86,14 @@ for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html; do
     fi
 done
 
+# Write version info
+COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/vvb7456/ComfyUI_RunPod_Sync/commits/main" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
+cat > "$DASHBOARD_DIR/.version" <<EOF
+version=v2.4
+branch=main
+commit=${COMMIT_HASH}
+EOF
+
 # ── 启动 Dashboard ──
 pm2 delete dashboard 2>/dev/null || true
 

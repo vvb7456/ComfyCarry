@@ -285,6 +285,44 @@ def _sha256_file(filepath):
 
 
 # ====================================================================
+# 版本信息 API
+# ====================================================================
+@app.route("/api/version")
+def api_version():
+    """返回当前部署版本信息"""
+    version_info = {"version": "v2.4", "branch": "main", "commit": ""}
+    version_file = os.path.join(SCRIPT_DIR, ".version")
+    try:
+        if os.path.exists(version_file):
+            with open(version_file, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        version_info[k.strip().lower()] = v.strip()
+    except Exception:
+        pass
+    # Also try git if available (dev environment)
+    if not version_info.get("commit"):
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+                cwd=SCRIPT_DIR, timeout=3
+            )
+            if result.returncode == 0:
+                version_info["commit"] = result.stdout.strip()
+            result2 = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True,
+                cwd=SCRIPT_DIR, timeout=3
+            )
+            if result2.returncode == 0:
+                version_info["branch"] = result2.stdout.strip()
+        except Exception:
+            pass
+    return jsonify(version_info)
+
+
 # 系统监控 API
 # ====================================================================
 @app.route("/api/system")

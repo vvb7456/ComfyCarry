@@ -64,11 +64,17 @@
             top: 0;
             left: 0;
             bottom: 0;
-            z-index: 50
+            z-index: 50;
+            transition: width .25s ease
+        }
+
+        .sidebar.collapsed {
+            width: 56px
         }
 
         .sidebar-logo {
-            padding: 20px;
+            padding: 0 20px;
+            min-height: 76px;
             font-size: 1.1rem;
             font-weight: 700;
             background: linear-gradient(135deg, #7c5cfc, #e879f9);
@@ -76,7 +82,21 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
             color: transparent;
-            border-bottom: 1px solid var(--bd)
+            border-bottom: 1px solid var(--bd);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+            overflow: hidden
+        }
+
+        .sidebar.collapsed .sidebar-logo {
+            padding: 20px 16px;
+            justify-content: center
+        }
+
+        .sidebar.collapsed .sidebar-logo .logo-text {
+            display: none
         }
 
         .sidebar-logo small {
@@ -94,6 +114,35 @@
             flex-direction: column
         }
 
+        .sidebar-toggle {
+            position: absolute;
+            top: 22px;
+            right: -12px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            color: var(--t2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .7rem;
+            z-index: 51;
+            transition: transform .25s;
+            opacity: 0
+        }
+
+        .sidebar:hover .sidebar-toggle {
+            opacity: 1
+        }
+
+        .sidebar.collapsed .sidebar-toggle {
+            opacity: 1;
+            transform: rotate(180deg)
+        }
+
         .nav-item {
             display: flex;
             align-items: center;
@@ -104,7 +153,19 @@
             font-size: .9rem;
             font-weight: 500;
             transition: all .15s;
-            border-left: 3px solid transparent
+            border-left: 3px solid transparent;
+            white-space: nowrap;
+            overflow: hidden
+        }
+
+        .sidebar.collapsed .nav-item {
+            padding: 10px 0;
+            justify-content: center;
+            border-left-width: 0
+        }
+
+        .sidebar.collapsed .nav-label {
+            display: none
         }
 
         .nav-item:hover {
@@ -118,17 +179,41 @@
             background: rgba(124, 92, 252, .08)
         }
 
+        .sidebar.collapsed .nav-item.active {
+            border-left-color: transparent;
+            background: rgba(124, 92, 252, .12)
+        }
+
         .nav-item .icon {
             font-size: 1.1rem;
             width: 24px;
-            text-align: center
+            text-align: center;
+            flex-shrink: 0
         }
 
         .sidebar-footer {
             padding: 12px 20px;
             border-top: 1px solid var(--bd);
             font-size: .75rem;
-            color: var(--t3)
+            color: var(--t3);
+            overflow: hidden
+        }
+
+        .sidebar.collapsed .sidebar-footer {
+            padding: 12px 8px;
+            text-align: center
+        }
+
+        .sidebar.collapsed .sidebar-footer .footer-expanded {
+            display: none
+        }
+
+        .sidebar-footer .footer-collapsed {
+            display: none
+        }
+
+        .sidebar.collapsed .sidebar-footer .footer-collapsed {
+            display: block
         }
 
         /* Content */
@@ -136,11 +221,17 @@
             margin-left: clamp(220px, 16vw, 300px);
             flex: 1;
             height: 100vh;
-            overflow-y: auto
+            overflow-y: auto;
+            transition: margin-left .25s ease
+        }
+
+        .content.sidebar-collapsed {
+            margin-left: 56px
         }
 
         .page-header {
-            padding: clamp(16px, 1.5vw, 24px) clamp(28px, 2.5vw, 42px);
+            padding: 0 clamp(28px, 2.5vw, 42px);
+            min-height: 76px;
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;
@@ -1675,7 +1766,7 @@
             }
 
             .content {
-                margin-left: 0
+                margin-left: 0 !important
             }
 
             .stat-grid {
@@ -1795,7 +1886,8 @@
 
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
-        <div class="sidebar-logo">🖥️ Workspace Manager<small>ComfyUI RunPod/Vast</small></div>
+        <button class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开">◀</button>
+        <div class="sidebar-logo"><span class="logo-text">🖥️ Workspace Manager<small>ComfyUI RunPod/Vast</small></span></div>
         <div class="sidebar-nav">
             <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="icon">📊</span><span class="nav-label">总览</span></div>
             <div class="nav-item" data-page="comfyui" onclick="showPage('comfyui')"><span class="icon">🖥️</span><span class="nav-label">ComfyUI</span></div>
@@ -1808,9 +1900,14 @@
             <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span><span class="nav-label">设置</span></div>
         </div>
         <div class="sidebar-footer">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-                <a href="/logout" class="btn btn-sm" title="登出" style="font-size:.72rem;padding:4px 10px">🚪 登出</a>
-                <a href="https://github.com/vvb7456/ComfyUI_RunPod_Sync" target="_blank" style="font-size:.7rem;color:var(--t3);text-decoration:none" title="GitHub">v2.4</a>
+            <div class="footer-expanded">
+                <a href="/logout" class="btn btn-sm" style="font-size:.72rem;padding:4px 10px;width:100%;text-align:center;margin-bottom:8px">🚪 登出</a>
+                <div id="version-info" style="text-align:center">
+                    <a href="https://github.com/vvb7456/ComfyUI_RunPod_Sync" target="_blank" style="font-size:.68rem;color:var(--t3);text-decoration:none;font-family:'IBM Plex Mono',monospace" title="GitHub">v2.4</a>
+                </div>
+            </div>
+            <div class="footer-collapsed">
+                <a href="/logout" title="登出" style="color:var(--t3);font-size:.9rem">🚪</a>
             </div>
         </div>
     </nav>

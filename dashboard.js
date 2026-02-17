@@ -18,6 +18,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadCartFromStorage();
   updateCartBadge();
   showPage('dashboard');
+  loadVersionInfo();
+  // Restore sidebar state
+  if (localStorage.getItem('sidebar_collapsed') === '1') {
+    document.getElementById('sidebar')?.classList.add('collapsed');
+    document.querySelector('.content')?.classList.add('sidebar-collapsed');
+  }
 
   // Scroll-to-top FAB visibility
   const content = document.querySelector('.content');
@@ -28,6 +34,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 });
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ct = document.querySelector('.content');
+  sb.classList.toggle('collapsed');
+  ct.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+}
+
+async function loadVersionInfo() {
+  const el = document.getElementById('version-info');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/version');
+    const d = await r.json();
+    const short = (d.commit || '').substring(0, 7);
+    const branch = d.branch || 'main';
+    const ver = d.version || 'v2.4';
+    if (short) {
+      el.innerHTML = `<a href="https://github.com/vvb7456/ComfyUI_RunPod_Sync/commit/${d.commit}" target="_blank"
+        style="font-size:.68rem;color:var(--t3);text-decoration:none;font-family:'IBM Plex Mono',monospace" title="${branch}@${short}">
+        <span style="background:rgba(124,92,252,.15);padding:1px 5px;border-radius:3px;color:var(--ac)">${branch}</span>
+        <span style="margin-left:3px">${short}</span>
+        <span style="margin-left:3px;color:var(--t3)">${ver}</span>
+      </a>`;
+    }
+  } catch (e) { /* keep default fallback */ }
+}
 
 // ========== Navigation ==========
 function showPage(page) {
