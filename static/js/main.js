@@ -15,6 +15,7 @@ import './page-models.js';
 import './page-comfyui.js';
 import './page-plugins.js';
 import './page-tunnel.js';
+import './page-jupyter.js';
 import './page-sync.js';
 import './page-settings.js';
 

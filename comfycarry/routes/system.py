@@ -212,7 +212,7 @@ def api_logs(name):
 @bp.route("/api/overview")
 def api_overview():
     """聚合总览页所需全部数据，避免前端发 5+ 个并发请求"""
-    from . import tunnel as tunnel_mod
+    from . import tunnel as tunnel_mod, jupyter as jupyter_mod
     from ..services import sync_engine, comfyui_bridge
 
     result = {}
@@ -305,6 +305,14 @@ def api_overview():
             tunnel_info["pm2_status"] = svc.get("status")
             break
     result["tunnel"] = tunnel_info
+
+    # ── Jupyter ──
+    try:
+        jup_resp = jupyter_mod.jupyter_status()
+        jup_data = jup_resp.get_json() if hasattr(jup_resp, 'get_json') else json.loads(jup_resp.get_data())
+        result["jupyter"] = jup_data
+    except Exception:
+        result["jupyter"] = {"online": False}
 
     # ── Downloads ──
     downloads = {"active": [], "queue_count": 0}

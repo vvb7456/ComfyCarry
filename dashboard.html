@@ -2199,6 +2199,74 @@
             background: rgba(96, 165, 250, .15);
             color: var(--blue)
         }
+
+        /* ── Jupyter page styles ── */
+        .jupyter-status-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 0; flex-wrap: wrap;
+        }
+        .jupyter-status-badge {
+            font-weight: 600; font-size: .92rem;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .jupyter-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            display: inline-block;
+        }
+        .jupyter-info-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 8px; margin: 8px 0 16px;
+        }
+        .jupyter-info-item {
+            background: var(--c2); border-radius: 8px; padding: 10px 12px;
+            display: flex; flex-direction: column; gap: 2px;
+        }
+        .jupyter-info-label {
+            font-size: .72rem; color: var(--t3); text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .jupyter-info-item > span:last-child {
+            font-size: .95rem; font-weight: 600; font-family: 'IBM Plex Mono', monospace;
+        }
+        .jupyter-kernelspecs {
+            display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+            margin-bottom: 12px;
+        }
+        .jupyter-ks-badge {
+            background: var(--c2); border-radius: 4px; padding: 2px 8px;
+            font-size: .75rem; color: var(--t2);
+        }
+        .jupyter-ks-badge.default { border: 1px solid var(--ac); color: var(--ac); }
+
+        .jupyter-kernel-item, .jupyter-session-item, .jupyter-terminal-item {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--c2); border-radius: 8px; padding: 10px 14px;
+            margin-bottom: 6px; gap: 10px;
+        }
+        .jupyter-kernel-info, .jupyter-session-info {
+            display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+        }
+        .jupyter-kernel-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+        .jupyter-kernel-name { font-weight: 600; font-size: .88rem; }
+        .jupyter-kernel-state { font-size: .78rem; }
+        .jupyter-kernel-actions, .jupyter-session-actions {
+            display: flex; gap: 4px; flex-shrink: 0;
+        }
+        .jupyter-session-icon { font-size: 1.1rem; flex-shrink: 0; }
+        .jupyter-session-name {
+            font-weight: 600; font-size: .85rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .jupyter-session-meta {
+            font-size: .75rem; color: var(--t3);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .jupyter-session-info { flex-direction: column; align-items: flex-start; gap: 2px; }
+        .jupyter-empty {
+            color: var(--t3); font-size: .82rem; padding: 12px 0;
+        }
     </style>
 </head>
 
@@ -2218,6 +2286,7 @@
             <div class="nav-item" data-page="plugins" onclick="showPage('plugins')"><span class="icon">🧩</span><span class="nav-label">插件管理</span></div>
             <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span><span class="nav-label">Sync</span></div>
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span><span class="nav-label">Tunnel</span></div>
+            <div class="nav-item" data-page="jupyter" onclick="showPage('jupyter')"><span class="icon">📓</span><span class="nav-label">Jupyter</span></div>
             <div style="flex:1"></div>
             <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span><span class="nav-label">设置</span></div>
         </div>
@@ -2358,6 +2427,38 @@
                     <div id="dl-completed-content" class="hidden"></div>
                     <div id="dl-failed-content" class="hidden"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ========== JupyterLab Page ========== -->
+        <div id="page-jupyter" class="page hidden">
+            <div class="page-header">
+                <h2>📓 JupyterLab</h2>
+                <div class="top-toolbar">
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <!-- 状态 -->
+                <div id="jupyter-status-content">
+                    <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                </div>
+
+                <!-- 访问令牌 -->
+                <div class="section-title" style="margin-top:20px;display:flex;align-items:center;gap:8px">
+                    🔑 访问令牌
+                    <code id="jupyter-token-value" style="background:var(--c2);padding:4px 10px;border-radius:6px;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em;max-width:420px">••••••••••••••••</code>
+                    <button class="btn btn-sm" onclick="window._toggleJupyterToken()" id="jupyter-token-toggle" style="font-size:.75rem">👁 显示</button>
+                    <button class="btn btn-sm" onclick="window._copyJupyterToken()" title="复制令牌" style="font-size:.75rem">📋 复制</button>
+                </div>
+
+                <!-- 活跃内核 -->
+                <div class="section-title" style="margin-top:20px">🧠 活跃内核</div>
+                <div id="jupyter-kernels-list"></div>
+
+                <!-- 活跃会话 -->
+                <div class="section-title" style="margin-top:20px">📂 活跃会话</div>
+                <div id="jupyter-sessions-list"></div>
             </div>
         </div>
 
