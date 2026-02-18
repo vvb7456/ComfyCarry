@@ -38,4 +38,5 @@ docker/
 *.preview.webp
 .venv/
 __pycache__/
+*.bak
 cloudflared

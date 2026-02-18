@@ -76,21 +76,45 @@ fi
 
 # ── 下载 Dashboard 文件 ──
 DASHBOARD_DIR="/workspace/ComfyCarry"
-REPO_URL="https://raw.githubusercontent.com/vvb7456/ComfyCarry/main"
+REPO_OWNER="vvb7456"
+REPO_NAME="ComfyCarry"
+BRANCH="main"
 
 mkdir -p "$DASHBOARD_DIR"
-for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html favicon.ico; do
-    if [ ! -f "$DASHBOARD_DIR/$f" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
-        echo "  -> 下载 $f..."
-        wget -q -O "$DASHBOARD_DIR/$f" "$REPO_URL/$f" || true
+
+if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
+    echo "  -> 下载 ComfyCarry..."
+    TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${BRANCH}.tar.gz"
+    TMP_TAR="/tmp/comfycarry_download.tar.gz"
+    TMP_EXTRACT="/tmp/comfycarry_extract"
+
+    wget -q -O "$TMP_TAR" "$TARBALL_URL"
+    rm -rf "$TMP_EXTRACT"
+    mkdir -p "$TMP_EXTRACT"
+    tar xzf "$TMP_TAR" -C "$TMP_EXTRACT"
+
+    # 从解压目录复制所需文件
+    EXTRACTED="${TMP_EXTRACT}/${REPO_NAME}-${BRANCH}"
+    for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html favicon.ico; do
+        [ -f "$EXTRACTED/$f" ] && cp "$EXTRACTED/$f" "$DASHBOARD_DIR/$f"
+    done
+    # 复制 comfycarry/ Python 包
+    if [ -d "$EXTRACTED/comfycarry" ]; then
+        rm -rf "$DASHBOARD_DIR/comfycarry"
+        cp -r "$EXTRACTED/comfycarry" "$DASHBOARD_DIR/comfycarry"
     fi
-done
+
+    rm -rf "$TMP_TAR" "$TMP_EXTRACT"
+    echo "  ✅ ComfyCarry 文件已更新"
+else
+    echo "  -> ComfyCarry 文件已存在，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"
+fi
 
 # Write version info
-COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/vvb7456/ComfyCarry/commits/main" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
+COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${BRANCH}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
 cat > "$DASHBOARD_DIR/.version" <<EOF
 version=v2.4
-branch=main
+branch=${BRANCH}
 commit=${COMMIT_HASH}
 EOF
 
