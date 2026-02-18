@@ -40,3 +40,4 @@ docker/
 __pycache__/
 *.bak
 cloudflared
+docs/
