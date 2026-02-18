@@ -135,6 +135,8 @@ DEFAULT_PLUGINS = [
 ]
 
 
+_setup_state_lock = threading.Lock()
+
 def _load_setup_state():
     """加载 Setup Wizard 状态"""
     defaults = {
@@ -153,21 +155,23 @@ def _load_setup_state():
         "deploy_steps_completed": [],
         "deploy_log": [],
     }
-    if SETUP_STATE_FILE.exists():
-        try:
-            state = json.loads(SETUP_STATE_FILE.read_text(encoding="utf-8"))
-            for k, v in defaults.items():
-                if k not in state:
-                    state[k] = v
-            return state
-        except Exception:
-            pass
-    return defaults
+    with _setup_state_lock:
+        if SETUP_STATE_FILE.exists():
+            try:
+                state = json.loads(SETUP_STATE_FILE.read_text(encoding="utf-8"))
+                for k, v in defaults.items():
+                    if k not in state:
+                        state[k] = v
+                return state
+            except Exception:
+                pass
+        return defaults
 
 
 def _save_setup_state(state):
     """保存 Setup Wizard 状态"""
-    SETUP_STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+    with _setup_state_lock:
+        SETUP_STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _is_setup_complete():
@@ -233,7 +237,7 @@ def check_auth():
     if request.path.startswith("/api/setup/") or request.path == "/setup":
         return
     # 配置导入在 Setup 阶段也需要可用
-    if request.path == "/api/settings/import-config":
+    if request.path == "/api/settings/import-config" and not _is_setup_complete():
         return
     if request.path in ("/login", "/favicon.ico", "/dashboard.js", "/api/version"):
         return
@@ -1330,7 +1334,11 @@ def api_comfyui_params_update():
     extra_args = data.get("extra_args", "").strip()
     args_str = _build_comfyui_args(params)
     if extra_args:
-        args_str = args_str + " " + extra_args
+        try:
+            tokens = shlex.split(extra_args)
+        except ValueError:
+            return jsonify({"error": "extra_args 格式无效"}), 400
+        args_str = args_str + " " + " ".join(shlex.quote(t) for t in tokens)
 
     # 查找 Python 路径
     py = "/usr/bin/python3.13"
@@ -2074,10 +2082,10 @@ def api_settings_import_config():
     except Exception as e:
         errors.append(f"向导状态: {e}")
 
-    # 7. ComfyUI 启动参数 (只在 ComfyUI 运行中时生效)
+    # 7. ComfyUI 启动参数 (持久化保存, 下次启动/重启时生效)
     if data.get("comfyui_params"):
         try:
-            # 参数将在下次启动/重启时通过 API 应用
+            _set_config("comfyui_params", data["comfyui_params"])
             applied.append("ComfyUI 启动参数 (需重启 ComfyUI 生效)")
         except Exception as e:
             errors.append(f"ComfyUI 参数: {e}")
@@ -2206,6 +2214,9 @@ def api_setup_state():
         env_vars["rclone_config_method"] = "base64"
         env_vars["rclone_has_env"] = True  # 不暴露完整值
     safe["env_vars"] = env_vars
+    # 同步相关 (向导 Step 4 需要)
+    safe["sync_templates"] = SYNC_RULE_TEMPLATES
+    safe["remote_type_defs"] = REMOTE_TYPE_DEFS
     return jsonify(safe)
 
 
@@ -2218,7 +2229,8 @@ def api_setup_save():
     allowed_keys = {
         "current_step", "image_type", "password",
         "cloudflared_token", "rclone_config_method", "rclone_config_value",
-        "civitai_token", "plugins", "sync_pull", "sync_push", "sync_push_method",
+        "civitai_token", "plugins",
+        "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules",
     }
     for k, v in data.items():
@@ -2226,6 +2238,54 @@ def api_setup_save():
             state[k] = v
     _save_setup_state(state)
     return jsonify({"ok": True})
+
+
+@app.route("/api/setup/preview_remotes", methods=["POST"])
+def api_setup_preview_remotes():
+    """从提供的 rclone 配置中解析 remote 名称 (不写入文件)"""
+    import base64 as _b64
+    data = request.get_json(force=True)
+    method = data.get("method", "skip")
+    value = data.get("value", "")
+    conf_text = ""
+
+    if method == "skip":
+        return jsonify({"remotes": []})
+    if method == "base64_env":
+        value = os.environ.get("RCLONE_CONF_BASE64", "")
+        method = "base64"
+    if method in ("base64", "file") and value:
+        try:
+            conf_text = _b64.b64decode(value).decode("utf-8")
+        except Exception:
+            pass
+    elif method == "url":
+        try:
+            r = subprocess.run(["curl", "-fsSL", value], capture_output=True, text=True, timeout=10)
+            if r.returncode == 0:
+                conf_text = r.stdout
+        except Exception:
+            pass
+
+    # 解析 [section] 头和类型
+    remotes = []
+    if conf_text:
+        current = None
+        for line in conf_text.splitlines():
+            line = line.strip()
+            m = re.match(r'^\[(.+)\]$', line)
+            if m:
+                if current:
+                    remotes.append(current)
+                current = {"name": m.group(1), "type": ""}
+            elif current and line.startswith("type"):
+                parts = line.split("=", 1)
+                if len(parts) == 2:
+                    current["type"] = parts[1].strip()
+        if current:
+            remotes.append(current)
+
+    return jsonify({"remotes": remotes})
 
 
 @app.route("/api/setup/plugins")
@@ -2332,6 +2392,7 @@ def _deploy_exec(cmd, timeout=600, label=""):
     """执行 shell 命令, 实时推送输出"""
     if label:
         _deploy_log(f"$ {label}")
+    proc = None
     try:
         proc = subprocess.Popen(
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -2423,7 +2484,7 @@ def _run_deploy(config):
                 _deploy_step("启动 Cloudflare Tunnel")
                 # cloudflared 已在 bootstrap.sh 中安装
                 _deploy_exec("pm2 delete tunnel 2>/dev/null || true")
-                _deploy_exec(f'pm2 start cloudflared --name tunnel -- tunnel run --token "{cf_token}"')
+                _deploy_exec(f'pm2 start cloudflared --name tunnel -- tunnel run --token {shlex.quote(cf_token)}')
                 _deploy_log("Cloudflare Tunnel 已启动")
 
         # ─────────────────────────────────────────────
@@ -2440,7 +2501,7 @@ def _run_deploy(config):
             _deploy_exec("mkdir -p ~/.config/rclone")
             if rclone_method == "url":
                 _deploy_log(f"从 URL 下载 rclone.conf...")
-                _deploy_exec(f'curl -fsSL "{rclone_value}" -o ~/.config/rclone/rclone.conf')
+                _deploy_exec(f'curl -fsSL {shlex.quote(rclone_value)} -o ~/.config/rclone/rclone.conf')
             elif rclone_method == "base64":
                 _deploy_log("从 Base64 解码 rclone.conf...")
                 try:
@@ -2616,14 +2677,14 @@ def _run_deploy(config):
                 name = url.rstrip("/").split("/")[-1].replace(".git", "")
                 if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
                     _deploy_log(f"安装新插件: {name}")
-                    _deploy_exec(f'cd /workspace/ComfyUI/custom_nodes && git clone "{url}" || true', timeout=60)
+                    _deploy_exec(f'cd /workspace/ComfyUI/custom_nodes && git clone {shlex.quote(url)} || true', timeout=60)
         else:
             _deploy_log(f"安装 {len(plugins)} 个插件...")
             _deploy_exec("mkdir -p /workspace/ComfyUI/custom_nodes")
             for url in plugins:
                 name = url.rstrip("/").split("/")[-1].replace(".git", "")
                 _deploy_log(f"  克隆 {name}...")
-                _deploy_exec(f'cd /workspace/ComfyUI/custom_nodes && git clone "{url}" || true', timeout=60)
+                _deploy_exec(f'cd /workspace/ComfyUI/custom_nodes && git clone {shlex.quote(url)} || true', timeout=60)
 
         # 批量安装插件依赖
         _deploy_log("安装插件依赖...")
@@ -2639,53 +2700,48 @@ def _run_deploy(config):
         if rclone_method != "skip" and rclone_value:
             _deploy_step("同步云端资产")
 
+            # 创建向导 wizard_remotes (用户手动添加的 Remote)
+            wizard_remotes = config.get("wizard_remotes", [])
+            for wr in wizard_remotes:
+                wr_name = wr.get("name", "")
+                wr_type = wr.get("type", "")
+                wr_params = wr.get("params", {})
+                if wr_name and wr_type:
+                    cmd = f'rclone config create "{wr_name}" "{wr_type}"'
+                    for k, v in wr_params.items():
+                        if v:
+                            cmd += f" {k}={shlex.quote(str(v))}"
+                    _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
+
             # 从向导配置自动创建同步规则 (首次部署时, 且非导入模式)
             rules = _load_sync_rules()
             if not rules and not config.get("_imported_sync_rules"):
-                sync_pull = config.get("sync_pull", {})
-                sync_push = config.get("sync_push", {})
-                sync_push_method = config.get("sync_push_method", "copy")
-                remotes = _parse_rclone_conf()
-                if remotes:
-                    first_remote = remotes[0]["name"]
+                wizard_sync_rules = config.get("wizard_sync_rules", [])
+                if wizard_sync_rules:
+                    # 新版向导: wizard_sync_rules 是模板 ID 列表 + remote/path 覆盖
+                    tpl_map = {t["id"]: t for t in SYNC_RULE_TEMPLATES}
                     new_rules = []
-                    # 拉取规则
-                    pull_map = [
-                        ("workflows", "拉取工作流",       "user/default/workflows"),
-                        ("loras",     "拉取 LoRA 模型",   "models/loras"),
-                        ("wildcards", "拉取 Wildcards",   "custom_nodes/ComfyUI-Impact-Pack/wildcards"),
-                    ]
-                    for key, name, local_path in pull_map:
-                        if sync_pull.get(key):
-                            new_rules.append({
-                                "id": f"wizard-pull-{key}-{int(time.time())}",
-                                "name": name,
-                                "remote": first_remote,
-                                "remote_path": local_path,
-                                "local_path": local_path,
-                                "direction": "pull",
-                                "method": "copy",
-                                "trigger": "deploy",
-                                "enabled": True,
-                                "filters": [],
-                            })
-                    # 推送规则
-                    if sync_push.get("output"):
-                        new_rules.append({
-                            "id": f"wizard-push-output-{int(time.time())}",
-                            "name": "推送输出图片",
-                            "remote": first_remote,
-                            "remote_path": "ComfyUI/output",
-                            "local_path": "output",
-                            "direction": "push",
-                            "method": sync_push_method,
-                            "trigger": "watch",
+                    for wr in wizard_sync_rules:
+                        tpl_id = wr.get("template_id", "")
+                        tpl = tpl_map.get(tpl_id)
+                        if not tpl:
+                            continue
+                        rule = {
+                            "id": f"wizard-{tpl_id}-{int(time.time())}",
+                            "name": tpl.get("name", ""),
+                            "remote": wr.get("remote", ""),
+                            "remote_path": wr.get("remote_path", tpl.get("remote_path", "")),
+                            "local_path": tpl.get("local_path", ""),
+                            "direction": tpl.get("direction", "pull"),
+                            "method": tpl.get("method", "copy"),
+                            "trigger": tpl.get("trigger", "deploy"),
                             "enabled": True,
-                            "filters": ["- .thumbs/**"],
-                        })
+                            "filters": tpl.get("filters", []),
+                        }
+                        new_rules.append(rule)
                     if new_rules:
                         _save_sync_rules(new_rules)
-                        _deploy_log(f"根据向导配置创建了 {len(new_rules)} 条同步规则 (使用 {first_remote}:)")
+                        _deploy_log(f"根据向导配置创建了 {len(new_rules)} 条同步规则")
                         rules = new_rules
 
             deploy_rules = [r for r in rules if r.get("trigger") == "deploy" and r.get("enabled", True)]
@@ -2949,6 +3005,7 @@ def _parse_rclone_conf():
 
 _sync_worker_thread = None
 _sync_worker_stop = threading.Event()
+_sync_exec_lock = threading.Lock()   # 防止同一规则并发执行
 _sync_log_buffer = []         # 最近 300 行日志
 _sync_log_lock = threading.Lock()
 
@@ -2982,7 +3039,13 @@ def _sync_log(msg):
 
 
 def _run_sync_rule(rule):
-    """执行单条同步规则 (rclone subprocess)"""
+    """执行单条同步规则 (rclone subprocess), 带并发锁防止同一规则重复执行"""
+    with _sync_exec_lock:
+        return _run_sync_rule_inner(rule)
+
+
+def _run_sync_rule_inner(rule):
+    """_run_sync_rule 的内部实现"""
     remote = rule.get("remote", "")
     remote_path = rule.get("remote_path", "")
     local_rel = rule.get("local_path", "")
@@ -3079,6 +3142,12 @@ def _start_sync_worker():
     """启动 sync worker 后台线程"""
     global _sync_worker_thread
     _stop_sync_worker()
+    # 确认旧线程已真正终止, 避免并发执行
+    if _sync_worker_thread and _sync_worker_thread.is_alive():
+        _sync_log("⚠️ 旧 Worker 仍在运行, 等待终止...")
+        _sync_worker_thread.join(timeout=10)
+        if _sync_worker_thread.is_alive():
+            _sync_log("❌ 旧 Worker 无法停止, 强制继续")
     _sync_worker_stop.clear()
     _sync_worker_thread = threading.Thread(target=_sync_worker_loop, daemon=True, name="sync-worker")
     _sync_worker_thread.start()
@@ -3180,8 +3249,10 @@ def api_sync_remote_delete():
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"error": "缺少 remote 名称"}), 400
+    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+        return jsonify({"error": "Remote 名称只能包含字母、数字、下划线和连字符"}), 400
     try:
-        r = subprocess.run(f'rclone config delete "{name}"', shell=True, capture_output=True, text=True, timeout=10)
+        r = subprocess.run(f'rclone config delete {shlex.quote(name)}', shell=True, capture_output=True, text=True, timeout=10)
         if r.returncode != 0:
             return jsonify({"error": f"删除失败: {r.stderr.strip()}"}), 500
     except Exception as e:
@@ -3323,10 +3394,13 @@ def api_sync_settings_save():
     """保存全局同步设置"""
     data = request.get_json(force=True)
     settings = _load_sync_settings()
-    if "min_age" in data:
-        settings["min_age"] = max(int(data["min_age"]), 0)
-    if "watch_interval" in data:
-        settings["watch_interval"] = max(int(data["watch_interval"]), 5)
+    try:
+        if "min_age" in data:
+            settings["min_age"] = max(int(data["min_age"]), 0)
+        if "watch_interval" in data:
+            settings["watch_interval"] = max(int(data["watch_interval"]), 5)
+    except (ValueError, TypeError):
+        return jsonify({"error": "min_age 和 watch_interval 必须为数字"}), 400
     _save_sync_settings(settings)
     return jsonify({"ok": True, "settings": settings})
 

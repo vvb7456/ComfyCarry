@@ -71,6 +71,7 @@ function showPage(page) {
 
   // Stop all page-specific polling/SSE regardless of target page
   stopDlStatusPolling(); stopTunnelAutoRefresh(); stopSyncAutoRefresh(); stopPluginQueuePoll(); stopComfyAutoRefresh();
+  if(autoLogInterval){clearInterval(autoLogInterval);autoLogInterval=null;}
 
   if (page === 'dashboard') { refreshDashboard(); startDashboardSSE(); }
   else { stopDashboardSSE(); }
@@ -101,7 +102,8 @@ function fmtBytes(b) {
   return (b / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0) + ' ' + u[i];
 }
 function fmtPct(v) { return (v || 0).toFixed(1) + '%'; }
-function showToast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2500); }
+let _toastTimer;
+function showToast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(_toastTimer); _toastTimer = setTimeout(() => el.classList.remove('show'), 2500); }
 function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => { }); }
 function getAuthHeaders() { return apiKey ? { Authorization: 'Bearer ' + apiKey } : {}; }
 function openImg(url) {
@@ -111,7 +113,7 @@ function openImg(url) {
   document.getElementById('img-modal').classList.add('active');
   img.src = url;
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeMetaModal(); closeVersionPicker(); closeSyncModal('add-remote-modal'); closeSyncModal('add-rule-modal'); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('img-modal').classList.remove('active'); closeMetaModal(); closeVersionPicker(); closeSyncModal('add-remote-modal'); closeSyncModal('add-rule-modal'); closeSyncModal('sync-settings-modal'); closeIEModal(); } });
 
 // ========== Metadata Modal ==========
 function openMetaModal(data) {
@@ -425,7 +427,7 @@ function renderLocalModelCard(m, idx) {
   const badgeClass = getBadgeClass(m.category);
   const sizeStr = fmtBytes(m.size_bytes);
   const twHtml = (m.trained_words || []).slice(0, 8).map(w =>
-    `<span class="tw-tag" onclick="copyText('${w.replace(/'/g, "\\'")}')" title="点击复制">${w}</span>`
+    `<span class="tw-tag" onclick="copyText('${_h(w).replace(/'/g, "\\'")}')" title="点击复制">${_h(w)}</span>`
   ).join('');
 
   let imgTag = '', zoomUrl = '';
@@ -661,7 +663,7 @@ function switchCivitTab(tab) {
     const el = document.getElementById('ctab-' + t);
     if (el) el.classList.toggle('hidden', t !== tab);
   });
-  if (tab === 'cart') renderCart();
+  if (tab === 'cart') renderPendingList();
 }
 
 function _isIdQuery(text) {
@@ -694,7 +696,14 @@ async function searchModels(page = 0, append = false) {
   const errEl = document.getElementById('search-error');
   errEl.innerHTML = '';
   loading.classList.remove('hidden');
-  if (!append) { results.innerHTML = ''; pag.innerHTML = ''; searchResultsCache = {}; }
+  if (!append) {
+    results.innerHTML = ''; pag.innerHTML = '';
+    // Preserve cache entries for models already in cart
+    const cartKeys = new Set(selectedModels.keys());
+    searchResultsCache = Object.fromEntries(
+      Object.entries(searchResultsCache).filter(([k]) => cartKeys.has(k))
+    );
+  }
 
   const types = getActiveChips('filter-type-chips');
   const bms = getActiveChips('filter-bm-chips');
@@ -1453,6 +1462,9 @@ async function loadComfyUIPage() {
 
 // ── SSE: ComfyUI real-time events ──
 function startComfyEventStream() {
+  // Guard: only start if ComfyUI page is active
+  const page = document.getElementById('page-comfyui');
+  if (!page || page.classList.contains('hidden')) return;
   stopComfyEventStream();
   _comfyEventSource = new EventSource('/api/comfyui/events');
   _comfyEventSource.onmessage = (e) => {
@@ -1516,6 +1528,7 @@ function handleComfyEvent(evt) {
 
   else if (t === 'execution_error') {
     _comfyExecState = null;
+    if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
     _updateExecBar();
     const errEl = document.getElementById('comfyui-exec-bar');
     if (errEl) {
@@ -1606,6 +1619,9 @@ function _updateExecBar() {
 
 // ── SSE: Real-time log stream ──
 function startComfyLogStream() {
+  // Guard: only start if ComfyUI page is active
+  const page = document.getElementById('page-comfyui');
+  if (!page || page.classList.contains('hidden')) return;
   stopComfyLogStream();
   const el = document.getElementById('comfyui-log-content');
   if (!el) return;

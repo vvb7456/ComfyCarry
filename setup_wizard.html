@@ -60,14 +60,14 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 /* Form inputs */
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; font-size: clamp(0.88rem, 1vw, 1.05rem); color: var(--t2); margin-bottom: 8px; font-weight: 500; }
-.form-group input, .form-group textarea {
+.form-group input, .form-group textarea, .form-group select {
     width: 100%; padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
     background: var(--bg2); color: var(--t1);
     border: 1px solid var(--bd); border-radius: 10px;
     font-size: clamp(0.9rem, 1vw, 1.05rem);
     font-family: inherit;
 }
-.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); outline: none; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); outline: none; }
 .form-group textarea { min-height: 100px; font-family: var(--mono); font-size: clamp(0.82rem, 0.9vw, 0.95rem); resize: vertical; }
 .form-hint { font-size: clamp(0.78rem, 0.85vw, 0.92rem); color: var(--t3); margin-top: 6px; line-height: 1.5; }
 
@@ -176,6 +176,40 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     font-size: clamp(0.82rem, 0.92vw, 0.95rem); line-height: 1.6;
 }
 
+/* Wizard remote chips */
+.wz-remote-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 8px; padding: 6px 14px; font-size: .85rem; margin: 4px; }
+.wz-remote-chip .wz-rtype { color: var(--t3); font-size: .75rem; }
+
+/* Wizard rule panel */
+.wz-rule-panel { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: clamp(14px,1.5vw,20px); margin-bottom: 16px; }
+.wz-rule-panel h4 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; }
+.wz-rule-panel .wz-rule-hint { font-size: .78rem; color: var(--t3); margin-bottom: 12px; }
+.wz-rule-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.wz-rule-item:last-child { border-bottom: none; }
+.wz-rule-item input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.wz-rule-item .wz-rule-detail { flex: 1; min-width: 0; }
+.wz-rule-item .wz-rule-name { font-size: .88rem; font-weight: 500; color: var(--t1); margin-bottom: 6px; }
+.wz-rule-item .wz-rule-local { font-size: .72rem; color: var(--t3); margin-left: 2px; }
+.wz-rule-item .wz-rule-fields { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.wz-rule-item .wz-rule-fields label { font-size: .78rem; color: var(--t3); white-space: nowrap; }
+.wz-rule-item .wz-rule-fields select,
+.wz-rule-item .wz-rule-fields input[type="text"] {
+    padding: 5px 8px; background: var(--bg2); color: var(--t1);
+    border: 1px solid var(--bd); border-radius: 6px; font-size: .82rem;
+}
+.wz-rule-item .wz-rule-fields select { min-width: 100px; }
+.wz-rule-item .wz-rule-fields input[type="text"] { flex: 1; min-width: 140px; }
+
+/* Add remote inline form */
+.wz-add-remote-form { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 16px; margin-top: 10px; }
+.wz-add-remote-form .form-group { margin-bottom: 10px; }
+.wz-add-remote-form label { font-size: .82rem; color: var(--t2); display: block; margin-bottom: 3px; }
+.wz-add-remote-form select, .wz-add-remote-form input[type="text"], .wz-add-remote-form input[type="password"], .wz-add-remote-form textarea {
+    width: 100%; padding: 8px 12px; background: var(--bg2); color: var(--t1);
+    border: 1px solid var(--bd); border-radius: 8px; font-size: .85rem; font-family: inherit;
+}
+.wz-add-remote-form select:focus, .wz-add-remote-form input:focus, .wz-add-remote-form textarea:focus { border-color: var(--accent); outline: none; }
+
 /* Responsive */
 @media (max-width: 768px) {
     .choice-grid { grid-template-columns: 1fr !important; }
@@ -264,21 +298,21 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 3: 云存储与同步 -->
+    <!-- Step 3: 云存储 (Remotes) -->
     <div class="step" id="step-3">
-        <div class="step-title">☁️ 云存储与同步</div>
-        <div class="step-desc">配置 Rclone 连接云端存储，设置部署拉取和输出同步规则</div>
+        <div class="step-title">☁️ 云存储配置</div>
+        <div class="step-desc">导入或创建 Rclone Remote，连接你的云端存储。跳过后可在 Dashboard 随时配置。</div>
 
-        <!-- Section 1: Rclone 配置 -->
+        <!-- Section: Import rclone config -->
         <div style="margin-bottom:20px">
-            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">1️⃣ 导入 Rclone 配置</label>
+            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">📦 导入 Rclone 配置</label>
             <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
             <div class="radio-group">
-                <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="showRcloneInput('base64_env')"> 环境变量</label>
-                <label><input type="radio" name="rclone-method" value="file" onchange="showRcloneInput('file')"> 上传文件</label>
-                <label><input type="radio" name="rclone-method" value="url" onchange="showRcloneInput('url')"> URL 导入</label>
-                <label><input type="radio" name="rclone-method" value="base64" onchange="showRcloneInput('base64')"> Base64 粘贴</label>
-                <label><input type="radio" name="rclone-method" value="skip" onchange="showRcloneInput('skip')" checked> 跳过</label>
+                <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="onRcloneMethodChange('base64_env')"> 环境变量</label>
+                <label><input type="radio" name="rclone-method" value="file" onchange="onRcloneMethodChange('file')"> 上传文件</label>
+                <label><input type="radio" name="rclone-method" value="url" onchange="onRcloneMethodChange('url')"> URL 导入</label>
+                <label><input type="radio" name="rclone-method" value="base64" onchange="onRcloneMethodChange('base64')"> Base64 粘贴</label>
+                <label><input type="radio" name="rclone-method" value="skip" onchange="onRcloneMethodChange('skip')" checked> 跳过</label>
             </div>
             <div id="rclone-file-input" style="display:none" class="form-group">
                 <label style="cursor:pointer;display:inline-block;background:var(--bg4);padding:8px 18px;border-radius:8px;font-size:.88rem">
@@ -300,39 +334,70 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
             </div>
         </div>
 
-        <!-- Section 2: 部署拉取 (非 skip 时显示) -->
-        <div id="sync-pull-panel" style="display:none;margin-bottom:20px;padding:16px;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r)">
-            <label style="font-size:.92rem;font-weight:600;margin-bottom:4px;display:block">2️⃣ 部署时从云端拉取</label>
-            <div style="font-size:.78rem;color:var(--t3);margin-bottom:10px">首次部署时使用第一个可用 Remote 通过 copy 方式拉取到本地</div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-pull-workflows" checked style="accent-color:var(--accent)"> 工作流 (<code style="font-size:.78rem">user/default/workflows</code>)
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-pull-loras" checked style="accent-color:var(--accent)"> LoRA 模型 (<code style="font-size:.78rem">models/loras</code>)
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-pull-wildcards" checked style="accent-color:var(--accent)"> Wildcards (<code style="font-size:.78rem">custom_nodes/.../wildcards</code>)
-                </label>
+        <!-- Detected remotes preview -->
+        <div id="wizard-remotes-section" style="display:none;margin-bottom:20px">
+            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">📡 已检测到的 Remote</label>
+            <div id="wizard-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+        </div>
+
+        <!-- Manually added remotes -->
+        <div id="wizard-manual-remotes" style="display:none;margin-bottom:20px">
+            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">🔧 手动添加的 Remote</label>
+            <div id="wizard-manual-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+        </div>
+
+        <!-- Add remote button + form -->
+        <div style="margin-bottom:16px">
+            <button class="btn btn-secondary" onclick="toggleWizardAddRemote()" id="btn-wz-add-remote" style="font-size:.85rem;padding:8px 16px">+ 手动创建 Remote</button>
+            <div id="wizard-add-remote-form" style="display:none" class="wz-add-remote-form">
+                <div class="form-group">
+                    <label>Remote 名称</label>
+                    <input type="text" id="wz-remote-name" placeholder="例如 myr2" style="width:100%">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="wz-remote-type" onchange="renderWizardRemoteFields()" style="width:100%">
+                        <option value="">选择类型...</option>
+                    </select>
+                </div>
+                <div id="wz-remote-fields"></div>
+                <div style="display:flex;gap:8px;margin-top:10px">
+                    <button class="btn btn-primary" onclick="submitWizardRemote()" style="font-size:.85rem;padding:6px 16px">添加</button>
+                    <button class="btn btn-secondary" onclick="toggleWizardAddRemote()" style="font-size:.85rem;padding:6px 16px">取消</button>
+                </div>
             </div>
         </div>
 
-        <!-- Section 3: 输出推送 (非 skip 时显示) -->
-        <div id="sync-push-panel" style="display:none;margin-bottom:20px;padding:16px;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r)">
-            <label style="font-size:.92rem;font-weight:600;margin-bottom:4px;display:block">3️⃣ 运行时自动推送</label>
-            <div style="font-size:.78rem;color:var(--t3);margin-bottom:10px">Worker 在后台持续监控，自动将输出文件推送到云端</div>
-            <div style="display:flex;flex-direction:column;gap:10px">
-                <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--t2);cursor:pointer">
-                    <input type="checkbox" id="sync-push-output" style="accent-color:var(--accent)"> 输出图片 (<code style="font-size:.78rem">output/</code>)
-                </label>
-                <div id="sync-push-method-row" style="display:none;margin-left:26px">
-                    <label style="font-size:.82rem;color:var(--t3);margin-right:8px">推送方式:</label>
-                    <select id="sync-push-method" style="font-size:.85rem;padding:4px 10px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:6px">
-                        <option value="copy">copy — 复制到云端 (保留本地文件)</option>
-                        <option value="move">move — 移动到云端 (释放本地空间)</option>
-                    </select>
-                </div>
-            </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+        </div>
+    </div>
+
+    <!-- Step 4: 同步规则 -->
+    <div class="step" id="step-4">
+        <div class="step-title">🔄 同步规则配置</div>
+        <div class="step-desc">选择需要同步的内容，部署后可在 Dashboard「云同步」页面自由增删改。</div>
+
+        <!-- Default remote selector -->
+        <div style="margin-bottom:18px">
+            <label style="font-size:.88rem;font-weight:500;color:var(--t2);margin-bottom:6px;display:block">默认 Remote</label>
+            <select id="wz-default-remote" style="min-width:160px;padding:8px 12px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:8px;font-size:.88rem" onchange="updateWizardRuleRemotes()"></select>
+            <div class="form-hint">更改后自动应用到所有规则，也可单独为每条规则选择不同 Remote</div>
+        </div>
+
+        <!-- Pull rules -->
+        <div class="wz-rule-panel">
+            <h4>📥 部署拉取</h4>
+            <div class="wz-rule-hint">首次部署时从云端下载到本地 ComfyUI 目录 (copy 方式，不删除云端文件)</div>
+            <div id="wz-pull-rules"></div>
+        </div>
+
+        <!-- Push rules -->
+        <div class="wz-rule-panel">
+            <h4>📤 自动推送</h4>
+            <div class="wz-rule-hint">运行时持续监控，自动将文件推送到云端</div>
+            <div id="wz-push-rules"></div>
         </div>
 
         <div style="font-size:.75rem;color:var(--t3);margin-bottom:8px">💡 以上仅为初始规则，部署后可在 Dashboard「云同步」页面自由添加、修改、删除任意同步规则</div>
@@ -343,8 +408,8 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 4: CivitAI -->
-    <div class="step" id="step-4">
+    <!-- Step 5: CivitAI -->
+    <div class="step" id="step-5">
         <div class="step-title">🎨 CivitAI API Key</div>
         <div class="step-desc">配置 CivitAI API Key 以在 Dashboard 中搜索和下载模型</div>
         <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
@@ -359,8 +424,8 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 5: 插件选择 -->
-    <div class="step" id="step-5">
+    <!-- Step 6: 插件选择 -->
+    <div class="step" id="step-6">
         <div class="step-title">🧩 自定义节点插件</div>
         <div class="step-desc">选择要安装的 ComfyUI 插件 (带 * 标记的为必选)</div>
         <div class="plugin-list" id="plugin-list"></div>
@@ -374,8 +439,8 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 6: 确认部署 -->
-    <div class="step" id="step-6">
+    <!-- Step 7: 确认部署 -->
+    <div class="step" id="step-7">
         <div class="step-title">📋 确认部署配置</div>
         <div class="step-desc">检查以下配置，确认后开始部署</div>
         <div id="deploy-summary"></div>
@@ -408,7 +473,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 </div>
 
 <script>
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 let currentStep = 0;
 let wizardConfig = {
     image_type: '',
@@ -418,14 +483,16 @@ let wizardConfig = {
     rclone_config_value: '',
     civitai_token: '',
     plugins: [],
-    sync_pull: { workflows: true, loras: true, wildcards: true },
-    sync_push: { output: false },
-    sync_push_method: 'copy',
+    wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
+    wizard_remotes: [],       // [{name, type, params}]
 };
 let pluginData = [];
-let envVars = {};  // 从环境变量检测到的预设值
-let detectedImageType = '';  // 后端检测的镜像类型
-let importedConfig = null;   // 导入的配置对象 (非 null 表示恢复模式)
+let envVars = {};
+let detectedImageType = '';
+let importedConfig = null;
+let _syncTemplates = [];
+let _remoteTypeDefs = {};
+let _detectedRemotes = [];   // 从 rclone config 中解析出的 remotes
 
 // ── Init ──
 async function init() {
@@ -434,6 +501,8 @@ async function init() {
         const state = await r.json();
         envVars = state.env_vars || {};
         detectedImageType = state.detected_image_type || '';
+        _syncTemplates = state.sync_templates || [];
+        _remoteTypeDefs = state.remote_type_defs || {};
 
         // GPU info
         if (state.gpu_info && state.gpu_info.name) {
@@ -449,12 +518,11 @@ async function init() {
         pluginData = state.plugins_available || [];
         const selectedUrls = state.plugins || pluginData.map(p => p.url);
 
-        // 自动设定 image_type (用户不再手动选)
+        // 自动设定 image_type
         wizardConfig.image_type = detectedImageType || 'generic';
 
         // 显示镜像检测结果
         const badge = document.getElementById('image-type-badge');
-        const descEl = document.getElementById('step-0-desc');
         const timeEl = document.getElementById('fresh-time');
         if (detectedImageType === 'prebuilt') {
             badge.style.display = 'block';
@@ -472,19 +540,24 @@ async function init() {
             timeEl.textContent = '⏱ 预计 15-30 分钟';
         }
 
-        // 恢复插件列表渲染 (基于检测到的 image_type)
         renderPluginList(pluginData, selectedUrls);
 
-        // Restore state if partially filled
-        if (state.image_type) {
-            wizardConfig.image_type = state.image_type;
+        // Populate add-remote type selector
+        const sel = document.getElementById('wz-remote-type');
+        for (const [k, v] of Object.entries(_remoteTypeDefs)) {
+            const opt = document.createElement('option');
+            opt.value = k;
+            opt.textContent = `${v.icon} ${v.label}${v.oauth ? ' (需 OAuth)' : ''}`;
+            sel.appendChild(opt);
         }
+
+        // Restore state if partially filled
+        if (state.image_type) wizardConfig.image_type = state.image_type;
         if (state.deploy_started && !state.deploy_completed) {
             showDeployView();
             connectSSE();
         } else if (state.deploy_error) {
-            // 上次部署失败 — 显示错误提示，允许重试或修改配置
-            showStep(TOTAL_STEPS - 1);  // 回到确认页
+            showStep(TOTAL_STEPS - 1);
             renderSummary();
             const summaryEl = document.getElementById('deploy-summary');
             summaryEl.innerHTML = `
@@ -495,7 +568,6 @@ async function init() {
         }
 
         // ── 环境变量预填充 ──
-        // 密码
         if (envVars.password) {
             document.getElementById('input-password').value = envVars.password;
             wizardConfig.password = envVars.password;
@@ -503,7 +575,6 @@ async function init() {
             hint.style.display = 'block';
             hint.innerHTML = '✅ 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
         }
-        // CF Tunnel Token
         if (envVars.cloudflared_token) {
             document.getElementById('input-cf-token').value = envVars.cloudflared_token;
             wizardConfig.cloudflared_token = envVars.cloudflared_token;
@@ -511,18 +582,15 @@ async function init() {
             hint.style.display = 'block';
             hint.innerHTML = '✅ 已从环境变量 <code>CF_TUNNEL_TOKEN</code> 检测到 Token（Tunnel 已在运行中）';
         }
-        // Rclone
         if (envVars.rclone_has_env) {
             document.getElementById('rclone-method-env').style.display = '';
             const hint = document.getElementById('rclone-env-hint');
             hint.style.display = 'block';
             hint.innerHTML = '✅ 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
-            // 自动选择环境变量选项
             document.querySelector('input[name="rclone-method"][value="base64_env"]').checked = true;
             wizardConfig.rclone_config_method = 'base64_env';
-            showRcloneInput('base64_env');
+            onRcloneMethodChange('base64_env');
         }
-        // CivitAI
         if (envVars.civitai_token) {
             document.getElementById('input-civitai-token').value = envVars.civitai_token;
             wizardConfig.civitai_token = envVars.civitai_token;
@@ -531,7 +599,7 @@ async function init() {
             hint.innerHTML = '✅ 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
         }
 
-        // ── 从已保存的 state 中恢复字段 (支持导入配置后预填充) ──
+        // ── 从已保存的 state 中恢复字段 ──
         if (state.password && !document.getElementById('input-password').value) {
             document.getElementById('input-password').value = state.password;
             wizardConfig.password = state.password;
@@ -547,7 +615,7 @@ async function init() {
         if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
             const method = state.rclone_config_method;
             const radio = document.querySelector(`input[name="rclone-method"][value="${method}"]`);
-            if (radio) { radio.checked = true; showRcloneInput(method); }
+            if (radio) { radio.checked = true; onRcloneMethodChange(method); }
             wizardConfig.rclone_config_method = method;
             if (state.rclone_config_value) {
                 wizardConfig.rclone_config_value = state.rclone_config_value;
@@ -555,6 +623,11 @@ async function init() {
             }
         }
         if (state.plugins) wizardConfig.plugins = state.plugins;
+        if (state.wizard_remotes) wizardConfig.wizard_remotes = state.wizard_remotes;
+        if (state.wizard_sync_rules) wizardConfig.wizard_sync_rules = state.wizard_sync_rules;
+
+        // 恢复手动添加的 remotes 显示
+        renderWizardManualRemotes();
 
         updateProgressBar();
     } catch (e) {
@@ -581,14 +654,21 @@ function showStep(n) {
     if (el) el.classList.add('active');
     currentStep = n;
     updateProgressBar();
+    // 进入 Step 4 时初始化同步规则 UI
+    if (n === 4) initSyncRulesStep();
 }
 
 function nextStep() {
     saveCurrentStep();
-    // 恢复模式: 从 step 0 直接跳到确认部署 (step 6)
+    // 恢复模式: 从 step 0 直接跳到确认部署
     if (currentStep === 0 && importedConfig) {
         showStep(TOTAL_STEPS - 1);
         renderSummary();
+        return;
+    }
+    // Step 3 (rclone) skip → 跳过 Step 4 (sync rules)
+    if (currentStep === 3 && wizardConfig.rclone_config_method === 'skip' && wizardConfig.wizard_remotes.length === 0) {
+        showStep(5);
         return;
     }
     if (currentStep < TOTAL_STEPS - 1) {
@@ -598,9 +678,13 @@ function nextStep() {
 }
 
 function prevStep() {
-    // 确认页返回: 恢复模式回到 step 0, 正常模式回前一步
     if (currentStep === TOTAL_STEPS - 1 && importedConfig) {
         showStep(0);
+        return;
+    }
+    // Step 5 → 如果 rclone 是 skip 且无手动 remote，跳回 Step 3
+    if (currentStep === 5 && wizardConfig.rclone_config_method === 'skip' && wizardConfig.wizard_remotes.length === 0) {
+        showStep(3);
         return;
     }
     if (currentStep > 0) showStep(currentStep - 1);
@@ -614,12 +698,11 @@ function saveCurrentStep() {
         case 2:
             wizardConfig.cloudflared_token = document.getElementById('input-cf-token').value.trim();
             break;
-        case 3:
+        case 3: {
             const method = document.querySelector('input[name="rclone-method"]:checked')?.value || 'skip';
-            wizardConfig._rclone_display_method = method;  // 用于 summary 显示
+            wizardConfig._rclone_display_method = method;
             if (method === 'file') {
-                // 文件上传: 已在 handleRcloneFile 中设置 rclone_config_value
-                wizardConfig.rclone_config_method = 'base64';  // 后端统一用 base64
+                wizardConfig.rclone_config_method = 'base64';
             } else {
                 wizardConfig.rclone_config_method = method;
                 if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
@@ -627,22 +710,30 @@ function saveCurrentStep() {
                 else if (method === 'base64_env') wizardConfig.rclone_config_value = '';
                 else wizardConfig.rclone_config_value = '';
             }
-            // 拉取选项
-            wizardConfig.sync_pull = {
-                workflows: document.getElementById('sync-pull-workflows')?.checked ?? true,
-                loras: document.getElementById('sync-pull-loras')?.checked ?? true,
-                wildcards: document.getElementById('sync-pull-wildcards')?.checked ?? true,
-            };
-            // 推送选项
-            wizardConfig.sync_push = {
-                output: document.getElementById('sync-push-output')?.checked ?? false,
-            };
-            wizardConfig.sync_push_method = document.getElementById('sync-push-method')?.value || 'copy';
             break;
-        case 4:
+        }
+        case 4: {
+            // 收集已勾选的同步规则
+            const rules = [];
+            document.querySelectorAll('.wz-rule-item input[type="checkbox"]:checked').forEach(cb => {
+                const tplId = cb.dataset.tplId;
+                if (!tplId) return;
+                const row = cb.closest('.wz-rule-item');
+                const remoteSel = row.querySelector('.wz-rule-remote');
+                const pathInput = row.querySelector('.wz-rule-path');
+                rules.push({
+                    template_id: tplId,
+                    remote: remoteSel?.value || '',
+                    remote_path: pathInput?.value || '',
+                });
+            });
+            wizardConfig.wizard_sync_rules = rules;
+            break;
+        }
+        case 5:
             wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
             break;
-        case 5:
+        case 6:
             wizardConfig.plugins = getSelectedPlugins();
             break;
     }
@@ -654,38 +745,37 @@ function saveCurrentStep() {
     }).catch(() => {});
 }
 
-// ── Mode Selection (全新部署 / 恢复设置) ──
+// ── Mode Selection ──
 function selectMode(mode) {
     document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
-
     if (mode === 'import') {
-        // 恢复设置模式 — 显示文件上传区
         document.getElementById('choice-import').classList.add('selected');
         document.getElementById('import-upload-area').style.display = 'block';
-        document.getElementById('btn-next-0').disabled = true;  // 等导入成功后启用
+        document.getElementById('btn-next-0').disabled = true;
         importedConfig = null;
         return;
     }
-
-    // 全新部署模式 — 隐藏上传区
     document.getElementById('import-upload-area').style.display = 'none';
     document.getElementById('import-result').style.display = 'none';
     importedConfig = null;
-
     document.getElementById('choice-fresh').classList.add('selected');
     document.getElementById('btn-next-0').disabled = false;
 }
 
-// ── Rclone Input Toggle ──
-function showRcloneInput(method) {
+// ── Rclone Config ──
+function onRcloneMethodChange(method) {
     document.getElementById('rclone-file-input').style.display = method === 'file' ? 'block' : 'none';
     document.getElementById('rclone-url-input').style.display = method === 'url' ? 'block' : 'none';
     document.getElementById('rclone-base64-input').style.display = method === 'base64' ? 'block' : 'none';
     document.getElementById('rclone-skip-note').style.display = method === 'skip' ? 'block' : 'none';
-    // 同步选项面板: 非 skip 时显示
-    const show = method !== 'skip';
-    document.getElementById('sync-pull-panel').style.display = show ? 'block' : 'none';
-    document.getElementById('sync-push-panel').style.display = show ? 'block' : 'none';
+    // Auto-detect remotes when selecting non-skip method
+    if (method !== 'skip') {
+        clearTimeout(window._rcloneDetectTimer);
+        window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 300);
+    } else {
+        document.getElementById('wizard-remotes-section').style.display = 'none';
+        _detectedRemotes = [];
+    }
 }
 
 function handleRcloneFile(event) {
@@ -695,23 +785,200 @@ function handleRcloneFile(event) {
     reader.onload = () => {
         wizardConfig.rclone_config_value = btoa(reader.result);
         document.getElementById('rclone-file-status').textContent = `✅ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        detectRemotes();
     };
     reader.readAsText(file);
 }
 
-// Push output toggle
-document.addEventListener('change', (e) => {
-    if (e.target.id === 'sync-push-output') {
-        document.getElementById('sync-push-method-row').style.display = e.target.checked ? 'block' : 'none';
+async function detectRemotes() {
+    const method = document.querySelector('input[name="rclone-method"]:checked')?.value || 'skip';
+    let value = '';
+    if (method === 'file' || method === 'base64') {
+        value = wizardConfig.rclone_config_value || document.getElementById('input-rclone-base64')?.value?.trim() || '';
+    } else if (method === 'url') {
+        value = document.getElementById('input-rclone-url')?.value?.trim() || '';
     }
-});
+    if (method === 'skip') return;
+    try {
+        const r = await fetch('/api/setup/preview_remotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ method, value })
+        });
+        const d = await r.json();
+        _detectedRemotes = d.remotes || [];
+        const section = document.getElementById('wizard-remotes-section');
+        const list = document.getElementById('wizard-remotes-list');
+        if (_detectedRemotes.length > 0) {
+            section.style.display = 'block';
+            list.innerHTML = _detectedRemotes.map(r =>
+                `<span class="wz-remote-chip">${esc(r.name)} <span class="wz-rtype">${esc(r.type)}</span></span>`
+            ).join('');
+        } else if (method === 'url') {
+            section.style.display = 'block';
+            list.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">URL 配置将在部署时下载，Remote 名在下一步可手动输入</span>';
+        } else if (method === 'base64_env') {
+            section.style.display = 'block';
+            list.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">将从环境变量读取，Remote 名在部署时自动检测</span>';
+        } else {
+            section.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('detectRemotes error:', e);
+    }
+}
+
+// ── Add Remote (Wizard) ──
+function toggleWizardAddRemote() {
+    const form = document.getElementById('wizard-add-remote-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderWizardRemoteFields() {
+    const type = document.getElementById('wz-remote-type').value;
+    const container = document.getElementById('wz-remote-fields');
+    if (!type || !_remoteTypeDefs[type]) { container.innerHTML = ''; return; }
+    const def = _remoteTypeDefs[type];
+    let html = '';
+    if (def.oauth) {
+        html += `<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px;font-size:.8rem;color:var(--t2)">
+            <b>OAuth 授权步骤:</b><br>
+            1. 在本地电脑安装 <a href="https://rclone.org/downloads/" target="_blank" style="color:var(--accent)">rclone</a><br>
+            2. 运行: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">rclone authorize "${type}"</code><br>
+            3. 将终端输出的 token JSON 粘贴到下方</div>`;
+    }
+    for (const f of def.fields) {
+        const val = f.default || '';
+        const req = f.required ? ' <span style="color:var(--red)">*</span>' : '';
+        html += `<div class="form-group"><label>${f.label}${req}</label>`;
+        if (f.type === 'select') {
+            html += `<select id="wz-rf-${f.key}" style="width:100%">${(f.options||[]).map(o =>
+                `<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
+        } else if (f.type === 'textarea') {
+            html += `<textarea id="wz-rf-${f.key}" style="width:100%;min-height:80px;font-family:monospace;font-size:.78rem" placeholder="${f.placeholder||''}"></textarea>`;
+            if (f.help) html += `<div style="font-size:.72rem;color:var(--t3);margin-top:2px">${f.help}</div>`;
+        } else {
+            html += `<input type="${f.type === 'password' ? 'password' : 'text'}" id="wz-rf-${f.key}" value="${esc(val)}" placeholder="${f.placeholder||''}" style="width:100%">`;
+        }
+        html += '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function submitWizardRemote() {
+    const name = document.getElementById('wz-remote-name').value.trim();
+    const type = document.getElementById('wz-remote-type').value;
+    if (!name || !type) { alert('请填写名称和类型'); return; }
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) { alert('名称只能包含字母、数字、下划线和短横线'); return; }
+    // 检查重复
+    const allNames = [..._detectedRemotes.map(r => r.name), ...wizardConfig.wizard_remotes.map(r => r.name)];
+    if (allNames.includes(name)) { alert(`Remote "${name}" 已存在`); return; }
+    const def = _remoteTypeDefs[type];
+    if (!def) return;
+    const params = {};
+    for (const f of def.fields) {
+        const el = document.getElementById('wz-rf-' + f.key);
+        if (el) params[f.key] = el.value.trim();
+        if (f.required && !params[f.key]) { alert(`请填写 ${f.label}`); return; }
+    }
+    wizardConfig.wizard_remotes.push({ name, type, params });
+    renderWizardManualRemotes();
+    // Reset form
+    document.getElementById('wz-remote-name').value = '';
+    document.getElementById('wz-remote-type').value = '';
+    document.getElementById('wz-remote-fields').innerHTML = '';
+    toggleWizardAddRemote();
+}
+
+function removeWizardRemote(name) {
+    wizardConfig.wizard_remotes = wizardConfig.wizard_remotes.filter(r => r.name !== name);
+    renderWizardManualRemotes();
+}
+
+function renderWizardManualRemotes() {
+    const section = document.getElementById('wizard-manual-remotes');
+    const list = document.getElementById('wizard-manual-remotes-list');
+    if (wizardConfig.wizard_remotes.length > 0) {
+        section.style.display = 'block';
+        list.innerHTML = wizardConfig.wizard_remotes.map(r => {
+            const def = _remoteTypeDefs[r.type] || {};
+            return `<span class="wz-remote-chip">${def.icon || '💾'} ${esc(r.name)} <span class="wz-rtype">${esc(def.label || r.type)}</span>
+                <button onclick="removeWizardRemote('${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem;margin-left:4px" title="移除">✕</button></span>`;
+        }).join('');
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+// ── Sync Rules Step (Step 4) ──
+function getAllRemoteNames() {
+    const names = new Set();
+    _detectedRemotes.forEach(r => names.add(r.name));
+    wizardConfig.wizard_remotes.forEach(r => names.add(r.name));
+    return [...names];
+}
+
+function initSyncRulesStep() {
+    const remotes = getAllRemoteNames();
+    const defaultRemoteSel = document.getElementById('wz-default-remote');
+    const currentDefault = defaultRemoteSel.value;
+    defaultRemoteSel.innerHTML = remotes.length === 0
+        ? '<option value="">（无可用 Remote）</option>'
+        : remotes.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if (currentDefault && remotes.includes(currentDefault)) {
+        defaultRemoteSel.value = currentDefault;
+    }
+
+    // Pull templates
+    const pullTpls = _syncTemplates.filter(t => t.direction === 'pull');
+    const pushTpls = _syncTemplates.filter(t => t.direction === 'push');
+
+    const savedRules = wizardConfig.wizard_sync_rules || [];
+    const savedMap = {};
+    savedRules.forEach(r => { savedMap[r.template_id] = r; });
+
+    const defaultRemote = defaultRemoteSel.value || remotes[0] || '';
+
+    document.getElementById('wz-pull-rules').innerHTML = pullTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
+    document.getElementById('wz-push-rules').innerHTML = pushTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
+}
+
+function renderRuleItem(tpl, saved, defaultRemote, remotes) {
+    const checked = saved ? 'checked' : '';
+    const remote = saved?.remote || defaultRemote;
+    const remotePath = saved?.remote_path || tpl.remote_path || '';
+    const methodHint = tpl.method === 'move' ? ' (移动)' : tpl.method === 'copy' ? ' (保留本地)' : '';
+    const triggerHint = tpl.trigger === 'deploy' ? '部署时执行' : tpl.trigger === 'watch' ? '持续监控' : '手动';
+    const remoteOpts = remotes.length === 0
+        ? `<input type="text" class="wz-rule-remote" value="${esc(remote)}" placeholder="remote 名" style="width:100px">`
+        : `<select class="wz-rule-remote">${remotes.map(n => `<option value="${esc(n)}"${n===remote?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
+
+    return `<div class="wz-rule-item">
+        <input type="checkbox" data-tpl-id="${esc(tpl.id)}" ${checked}>
+        <div class="wz-rule-detail">
+            <div class="wz-rule-name">${esc(tpl.name)}${methodHint ? `<span style="font-size:.72rem;color:var(--t3);margin-left:6px">${methodHint}</span>` : ''}</div>
+            <div class="wz-rule-fields">
+                <label>Remote:</label>${remoteOpts}
+                <label>云端路径:</label><input type="text" class="wz-rule-path" value="${esc(remotePath)}" placeholder="远端路径">
+            </div>
+            <div class="wz-rule-local">本地: <code style="font-size:.72rem">${esc(tpl.local_path)}</code> · ${triggerHint}</div>
+        </div>
+    </div>`;
+}
+
+function updateWizardRuleRemotes() {
+    const defaultRemote = document.getElementById('wz-default-remote').value;
+    document.querySelectorAll('.wz-rule-remote').forEach(el => {
+        if (el.tagName === 'SELECT') el.value = defaultRemote;
+        else el.value = defaultRemote;
+    });
+}
 
 // ── Plugins ──
 function renderPluginList(plugins, selectedUrls) {
     const isPrebuilt = wizardConfig.image_type === 'prebuilt';
     const list = document.getElementById('plugin-list');
     if (isPrebuilt) {
-        // 预构建镜像: 对插件列表显示提示
         list.innerHTML = '<div style="color:var(--t2);font-size:.82rem;margin-bottom:12px">⚡ 预构建镜像已包含以下插件，均已预装且不可取消：</div>' +
         plugins.map((p, i) => {
             return `<div class="plugin-item">
@@ -738,7 +1005,6 @@ function getSelectedPlugins() {
     document.querySelectorAll('#plugin-list input[type="checkbox"]').forEach(cb => {
         if (cb.checked) urls.push(cb.dataset.url);
     });
-    // Extra plugins
     const extra = document.getElementById('input-extra-plugins').value.trim();
     if (extra) {
         extra.split('\n').forEach(u => {
@@ -754,7 +1020,8 @@ function renderSummary() {
     saveCurrentStep();
     const c = wizardConfig;
     const pluginCount = (c.plugins || []).length;
-    // 恢复模式额外信息
+    const ruleCount = (c.wizard_sync_rules || []).length;
+    const remoteCount = _detectedRemotes.length + (c.wizard_remotes || []).length;
     let importNote = '';
     if (importedConfig) {
         importNote = `
@@ -763,6 +1030,11 @@ function renderSummary() {
             <div class="summary-row"><span class="label">导出时间</span><span class="value">${esc(importedConfig._exported_at || '未知')}</span></div>
         </div>`;
     }
+    // Sync rules summary
+    const tplMap = {};
+    _syncTemplates.forEach(t => { tplMap[t.id] = t; });
+    const ruleNames = (c.wizard_sync_rules || []).map(r => tplMap[r.template_id]?.name || r.template_id).join(', ');
+
     const html = importNote + `
         <div class="summary-card">
             <h4>部署方式</h4>
@@ -776,10 +1048,9 @@ function renderSummary() {
         <div class="summary-card">
             <h4>云存储与同步</h4>
             <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${(c._rclone_display_method || c.rclone_config_method) === 'skip' ? '⏭ 跳过' : (c._rclone_display_method || c.rclone_config_method) === 'url' ? '🔗 URL 导入' : (c._rclone_display_method || c.rclone_config_method) === 'file' ? '📂 文件上传' : '📋 Base64'}</span></div>
-            ${(c._rclone_display_method || c.rclone_config_method) !== 'skip' ? `
-            <div class="summary-row"><span class="label">部署拉取</span><span class="value">${[c.sync_pull?.workflows && '工作流', c.sync_pull?.loras && 'LoRA', c.sync_pull?.wildcards && 'Wildcards'].filter(Boolean).join(', ') || '无'}</span></div>
-            <div class="summary-row"><span class="label">输出推送</span><span class="value">${c.sync_push?.output ? (c.sync_push_method === 'move' ? '✅ move (释放空间)' : '✅ copy (保留本地)') : '⏭ 不推送'}</span></div>
-            ` : ''}
+            <div class="summary-row"><span class="label">Remote 数量</span><span class="value">${remoteCount} 个${c.wizard_remotes.length ? ' (含 ' + c.wizard_remotes.length + ' 个手动创建)' : ''}</span></div>
+            <div class="summary-row"><span class="label">同步规则</span><span class="value">${ruleCount > 0 ? ruleCount + ' 条' : '无'}</span></div>
+            ${ruleNames ? `<div class="summary-row"><span class="label">规则详情</span><span class="value" style="font-size:.82rem">${esc(ruleNames)}</span></div>` : ''}
         </div>
         <div class="summary-card">
             <h4>模型与插件</h4>
@@ -793,7 +1064,6 @@ function renderSummary() {
 async function startDeploy() {
     saveCurrentStep();
     document.getElementById('btn-deploy').disabled = true;
-
     try {
         const r = await fetch('/api/setup/deploy', {
             method: 'POST',
@@ -803,7 +1073,6 @@ async function startDeploy() {
         const d = await r.json();
         if (!d.ok) { alert('部署启动失败: ' + (d.error || '')); return; }
     } catch (e) { alert('请求失败: ' + e.message); return; }
-
     showDeployView();
     connectSSE();
 }
@@ -812,7 +1081,6 @@ function showDeployView() {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     document.getElementById('deploy-view').classList.add('active');
     document.getElementById('progressBar').style.display = 'none';
-    // 部署页宽屏利用更多空间
     document.querySelector('.wizard-container').style.maxWidth = '1400px';
     startElapsedTimer();
 }
@@ -821,6 +1089,7 @@ let elapsedTimer = null;
 let deployStartTime = Date.now();
 
 function startElapsedTimer() {
+    if (elapsedTimer) clearInterval(elapsedTimer);
     deployStartTime = Date.now();
     elapsedTimer = setInterval(() => {
         const s = Math.floor((Date.now() - deployStartTime) / 1000);
@@ -841,7 +1110,6 @@ function connectSSE() {
         const data = JSON.parse(event.data);
 
         if (data.type === 'step') {
-            // Mark previous step as done
             if (completedSteps.length > 0) {
                 const prev = stepsEl.querySelector('.deploy-step-item.active');
                 if (prev) { prev.classList.remove('active'); prev.classList.add('done'); prev.querySelector('.step-icon').textContent = '✅'; }
@@ -857,7 +1125,6 @@ function connectSSE() {
         if (data.type === 'done') {
             evtSource.close();
             if (elapsedTimer) clearInterval(elapsedTimer);
-            // Mark last step done or failed
             const lastActive = stepsEl.querySelector('.deploy-step-item.active');
             if (lastActive) {
                 lastActive.classList.remove('active');
@@ -869,7 +1136,6 @@ function connectSSE() {
                     lastActive.querySelector('.step-icon').textContent = '❌';
                 }
             }
-
             if (data.success) {
                 document.getElementById('deploy-title').textContent = '✅ 部署完成';
                 const doneEl = document.createElement('div');
@@ -885,7 +1151,6 @@ function connectSSE() {
                 errEl.className = 'log-line error';
                 errEl.textContent = '❌ ' + (data.msg || '部署失败');
                 logEl.appendChild(errEl);
-                // 显示错误 banner
                 const banner = document.getElementById('deploy-error-banner');
                 banner.style.display = 'block';
                 banner.innerHTML = `<strong>错误:</strong> ${esc(data.msg || '部署进程异常终止')}<br><small>已完成的步骤会在重试时自动跳过，节省时间。</small>`;
@@ -901,7 +1166,6 @@ function connectSSE() {
             const timeSpan = data.time ? `<span class="log-time">${esc(data.time)}</span>` : '';
             line.innerHTML = `${timeSpan}${esc(data.msg)}`;
             logEl.appendChild(line);
-            // Auto scroll
             if (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 100) {
                 logEl.scrollTop = logEl.scrollHeight;
             }
@@ -909,13 +1173,12 @@ function connectSSE() {
     };
 
     evtSource.onerror = () => {
-        // Connection lost — might be done
-        setTimeout(() => { evtSource.close(); }, 3000);
+        evtSource.close();
+        setTimeout(() => { connectSSE(); }, 3000);
     };
 }
 
 function retryDeploy() {
-    // 重置 deploy view 状态
     document.getElementById('deploy-steps-list').innerHTML = '';
     document.getElementById('deploy-log').innerHTML = '';
     document.getElementById('deploy-error-banner').style.display = 'none';
@@ -927,7 +1190,6 @@ function retryDeploy() {
 }
 
 function backToWizard() {
-    // 回到配置确认页
     document.getElementById('deploy-view').classList.remove('active');
     document.getElementById('progressBar').style.display = '';
     document.querySelector('.wizard-container').style.maxWidth = '';
@@ -948,7 +1210,6 @@ async function handleImportFile(event) {
             return;
         }
 
-        // 镜像类型匹配验证 — 配置文件的 image_type 必须与当前环境一致
         const cfgType = config.image_type;
         if (cfgType && detectedImageType && cfgType !== detectedImageType) {
             const cfgLabel = cfgType === 'prebuilt' ? '预构建镜像' : '通用镜像';
@@ -961,7 +1222,6 @@ async function handleImportFile(event) {
             return;
         }
 
-        // 调用后端导入 API
         const r = await fetch('/api/settings/import-config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -973,7 +1233,6 @@ async function handleImportFile(event) {
             return;
         }
 
-        // 导入成功 — 填充 wizardConfig (image_type 始终用当前环境检测值)
         importedConfig = config;
         wizardConfig.image_type = detectedImageType || cfgType || 'generic';
         if (config.password) wizardConfig.password = config.password;
@@ -983,7 +1242,6 @@ async function handleImportFile(event) {
             wizardConfig.rclone_config_method = 'base64';
             wizardConfig.rclone_config_value = config.rclone_config_base64;
         }
-        // 插件
         if (config.extra_plugins !== undefined || config.disabled_default_plugins !== undefined) {
             const defaultUrls = pluginData.map(p => p.url);
             const disabled = new Set(config.disabled_default_plugins || []);
@@ -991,7 +1249,6 @@ async function handleImportFile(event) {
             plugins.push(...(config.extra_plugins || []));
             wizardConfig.plugins = plugins;
         }
-        // 同步规则 (v2) — 如果有则直接使用，不再需要 wizard 创建
         if (config.sync_rules && config.sync_rules.length > 0) {
             wizardConfig._imported_sync_rules = true;
         }
@@ -1015,6 +1272,14 @@ function showImportResult(html, isError) {
     el.style.border = `1px solid ${isError ? 'var(--red)' : 'var(--green)'}`;
     el.style.color = isError ? 'var(--red)' : 'var(--green)';
 }
+
+// --- Detect remotes on text input change (debounced) ---
+document.addEventListener('input', (e) => {
+    if (e.target.id === 'input-rclone-base64' || e.target.id === 'input-rclone-url') {
+        clearTimeout(window._rcloneDetectTimer);
+        window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 800);
+    }
+});
 
 // ── Start ──
 init();
