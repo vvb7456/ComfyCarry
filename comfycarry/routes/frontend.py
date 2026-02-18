@@ -59,10 +59,18 @@ def serve_favicon():
 
 @bp.route("/static/<path:filename>")
 def serve_static(filename):
-    base_dir = Path(SCRIPT_DIR).resolve()
-    safe_path = (base_dir / filename).resolve()
-    if not str(safe_path).startswith(str(base_dir)):
+    static_dir = (Path(SCRIPT_DIR) / "static").resolve()
+    safe_path = (static_dir / filename).resolve()
+    if not str(safe_path).startswith(str(static_dir)):
         return "", 403
     if safe_path.exists() and safe_path.is_file():
-        return send_file(str(safe_path))
+        # JS modules need correct MIME type
+        mime = None
+        if filename.endswith(".js"):
+            mime = "application/javascript"
+        elif filename.endswith(".css"):
+            mime = "text/css"
+        resp = send_file(str(safe_path), mimetype=mime)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
     return "", 404

@@ -13,10 +13,13 @@ import json
 import os
 import re
 import subprocess
+import time
 
 from flask import Blueprint, jsonify, request
 
-from ..config import SCRIPT_DIR
+import requests as req_lib
+
+from ..config import SCRIPT_DIR, COMFYUI_URL
 from ..utils import _run_cmd
 
 bp = Blueprint("system", __name__)
@@ -201,3 +204,125 @@ def api_logs(name):
         return jsonify({"logs": out})
     except Exception as e:
         return jsonify({"logs": "", "error": str(e)})
+
+
+# ====================================================================
+# 总览聚合 API
+# ====================================================================
+@bp.route("/api/overview")
+def api_overview():
+    """聚合总览页所需全部数据，避免前端发 5+ 个并发请求"""
+    from . import tunnel as tunnel_mod
+    from ..services import sync_engine, comfyui_bridge
+
+    result = {}
+
+    # ── 系统硬件 ──
+    result["system"] = json.loads(api_system().get_data())
+
+    # ── PM2 服务 ──
+    result["services"] = json.loads(api_services().get_data())
+
+    # ── ComfyUI 状态 ──
+    comfyui = {"online": False, "version": "", "pytorch_version": "",
+               "python_version": "", "queue_pending": 0, "queue_running": 0,
+               "current_prompt_id": None, "progress": None}
+    try:
+        r = req_lib.get(f"{COMFYUI_URL}/system_stats", timeout=3)
+        if r.ok:
+            d = r.json()
+            comfyui["online"] = True
+            sys_info = d.get("system", {})
+            comfyui["version"] = sys_info.get("comfyui_version", "")
+            comfyui["pytorch_version"] = sys_info.get("pytorch_version", "")
+            comfyui["python_version"] = sys_info.get("python_version", "")
+            devs = d.get("devices", [])
+            if devs:
+                comfyui["devices"] = devs
+    except Exception:
+        pass
+    try:
+        r = req_lib.get(f"{COMFYUI_URL}/queue", timeout=3)
+        if r.ok:
+            q = r.json()
+            comfyui["queue_running"] = len(q.get("queue_running", []))
+            comfyui["queue_pending"] = len(q.get("queue_pending", []))
+    except Exception:
+        pass
+
+    # Execution state from WS bridge
+    bridge = comfyui_bridge.get_bridge()
+    if bridge and bridge._exec_info:
+        comfyui["executing"] = True
+        comfyui["exec_start_time"] = bridge._exec_info.get("start_time")
+        if bridge._last_progress:
+            comfyui["progress"] = bridge._last_progress
+    else:
+        comfyui["executing"] = False
+
+    # PM2 status for comfy process
+    for svc in result.get("services", {}).get("services", []):
+        if svc.get("name") == "comfy":
+            comfyui["pm2_status"] = svc.get("status")
+            comfyui["pm2_uptime"] = svc.get("uptime")
+            comfyui["pm2_restarts"] = svc.get("restarts", 0)
+            break
+
+    result["comfyui"] = comfyui
+
+    # ── Sync 状态 ──
+    sync_status = {
+        "worker_running": sync_engine.is_worker_running(),
+        "rules_count": 0,
+        "last_log_lines": [],
+    }
+    try:
+        rules = sync_engine._load_sync_rules()
+        sync_status["rules_count"] = len(rules)
+        sync_status["active_rules"] = len([r for r in rules if r.get("enabled", True)])
+        sync_status["watch_rules"] = len([r for r in rules
+                                          if r.get("trigger") == "watch" and r.get("enabled", True)])
+    except Exception:
+        pass
+    log_buf = sync_engine.get_sync_log_buffer()
+    if log_buf:
+        sync_status["last_log_lines"] = list(log_buf)[-5:]
+    result["sync"] = sync_status
+
+    # ── Tunnel ──
+    tunnel_info = {"running": False, "links": []}
+    try:
+        # Call the view function within request context (we're inside a route)
+        resp = tunnel_mod.api_tunnel_links()
+        tunnel_data = resp.get_json() if hasattr(resp, 'get_json') else json.loads(resp.get_data())
+        tunnel_info["links"] = tunnel_data.get("links", [])
+        tunnel_info["running"] = bool(tunnel_info["links"])
+    except Exception:
+        pass
+    # PM2 status for tunnel
+    for svc in result.get("services", {}).get("services", []):
+        if svc.get("name") == "tunnel":
+            tunnel_info["pm2_status"] = svc.get("status")
+            break
+    result["tunnel"] = tunnel_info
+
+    # ── Downloads ──
+    downloads = {"active": [], "queue_count": 0}
+    try:
+        from . import models as models_mod
+        dl_resp = models_mod.download_status()
+        dl_data = dl_resp.get_json() if hasattr(dl_resp, 'get_json') else json.loads(dl_resp.get_data())
+        active = [d for d in dl_data.get("downloads", []) if d.get("status") == "downloading"]
+        queued = [d for d in dl_data.get("downloads", []) if d.get("status") == "queued"]
+        downloads["active"] = active[:3]  # Limit for overview
+        downloads["active_count"] = len(active)
+        downloads["queue_count"] = len(queued)
+    except Exception:
+        pass
+    result["downloads"] = downloads
+
+    # ── Dashboard 版本 ──
+    ver_resp = api_version()
+    result["version"] = ver_resp.get_json() if hasattr(ver_resp, 'get_json') else json.loads(ver_resp.get_data())
+
+    return jsonify(result)

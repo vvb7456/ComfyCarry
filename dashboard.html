@@ -417,6 +417,272 @@
             transition: width .5s
         }
 
+        /* ── Overview: Quick Links ── */
+        .quick-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px
+        }
+
+        .quick-link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            color: var(--t1);
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 500;
+            transition: all .15s
+        }
+
+        .quick-link-btn:hover {
+            border-color: var(--ac);
+            background: var(--acg)
+        }
+
+        .quick-link-icon {
+            font-size: 1rem
+        }
+
+        .quick-links-empty {
+            font-size: .82rem;
+            color: var(--t3);
+            padding: 4px 0
+        }
+
+        /* ── Overview: Status Bar ── */
+        .status-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 14px 18px;
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            margin-bottom: 20px
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: .78rem;
+            font-weight: 500
+        }
+
+        .status-badge.green {
+            background: rgba(74, 222, 128, .12);
+            color: var(--green)
+        }
+
+        .status-badge.amber {
+            background: rgba(251, 191, 36, .12);
+            color: var(--amber)
+        }
+
+        .status-badge.red {
+            background: rgba(248, 113, 113, .12);
+            color: var(--red)
+        }
+
+        .status-badge.muted {
+            background: rgba(90, 90, 114, .15);
+            color: var(--t2)
+        }
+
+        /* ── Overview: Metric Cards ── */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px
+        }
+
+        .metric-card {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 16px 18px;
+            transition: border-color .2s
+        }
+
+        .metric-card:hover {
+            border-color: rgba(124, 92, 252, .3)
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px
+        }
+
+        .metric-icon {
+            font-size: 1rem
+        }
+
+        .metric-label {
+            font-size: .78rem;
+            color: var(--t2);
+            font-weight: 500
+        }
+
+        .metric-main {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 8px
+        }
+
+        .metric-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            font-family: 'IBM Plex Mono', monospace
+        }
+
+        .metric-unit {
+            font-size: .75rem;
+            color: var(--t3)
+        }
+
+        .metric-bar {
+            height: 6px;
+            background: var(--bg);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px
+        }
+
+        .metric-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width .5s
+        }
+
+        .metric-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            font-size: .72rem;
+            color: var(--t3)
+        }
+
+        /* ── Overview: Activity Feed ── */
+        .activity-feed {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            overflow: hidden;
+            margin-bottom: 20px
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 18px;
+            border-bottom: 1px solid rgba(42, 42, 58, .3)
+        }
+
+        .activity-item:last-child {
+            border-bottom: none
+        }
+
+        .activity-item.activity-executing {
+            background: rgba(74, 222, 128, .04)
+        }
+
+        .activity-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+            margin-top: 2px
+        }
+
+        .activity-text {
+            flex: 1;
+            font-size: .85rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .activity-meta {
+            font-size: .75rem;
+            color: var(--t3);
+            margin-left: auto
+        }
+
+        .activity-log-line {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .72rem;
+            color: var(--t2);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%
+        }
+
+        .activity-progress {
+            width: 100%;
+            height: 5px;
+            background: var(--bg);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 6px;
+            position: relative
+        }
+
+        .activity-progress-fill {
+            height: 100%;
+            background: var(--ac);
+            border-radius: 3px;
+            transition: width .3s
+        }
+
+        .activity-progress-text {
+            position: absolute;
+            right: 0;
+            top: -14px;
+            font-size: .65rem;
+            color: var(--t3)
+        }
+
+        .activity-empty {
+            padding: 20px;
+            text-align: center;
+            color: var(--t3);
+            font-size: .85rem
+        }
+
+        /* ── Overview: Environment Info ── */
+        .env-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px 18px;
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--r)
+        }
+
+        .env-tag {
+            font-size: .7rem;
+            color: var(--t3);
+            padding: 2px 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            border: 1px solid var(--bd);
+            font-family: 'IBM Plex Mono', monospace
+        }
+
         /* Services table */
         .svc-table {
             width: 100%;
@@ -1812,8 +2078,19 @@
                 margin-left: 0 !important
             }
 
-            .stat-grid {
+            .stat-grid,
+            .metrics-grid {
                 grid-template-columns: 1fr
+            }
+
+            .quick-links {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .status-bar {
+                flex-wrap: wrap;
+                gap: 4px;
             }
 
             .model-grid,
@@ -1960,7 +2237,7 @@
     <!-- Main Content -->
     <div class="content">
 
-        <!-- ========== Dashboard Page ========== -->
+        <!-- ========== Dashboard Page (Overview) ========== -->
         <div id="page-dashboard" class="page">
             <div class="page-header">
                 <h2>📊 总览</h2>
@@ -1969,25 +2246,43 @@
                 </div>
             </div>
             <div class="page-body">
-                <!-- Tunnel Links -->
-                <div class="tunnel-links" id="tunnel-links" style="margin-bottom:16px"></div>
+                <!-- Quick Links -->
+                <div class="quick-links" id="overview-quick-links"></div>
 
-                <div class="stat-grid" id="sys-stats"></div>
+                <!-- Status Bar -->
+                <div class="status-bar" id="overview-status-bar">
+                    <span class="status-badge muted">⏳ 加载中...</span>
+                </div>
 
-                <div class="section-title">🔧 服务管理</div>
+                <!-- Metrics Grid -->
+                <div class="metrics-grid" id="overview-metrics"></div>
+
+                <!-- Activity Feed -->
+                <div class="section-title">📥 活动</div>
+                <div class="activity-feed" id="overview-activity">
+                    <div class="activity-empty">⏳ 加载中...</div>
+                </div>
+
+                <!-- Services Table -->
+                <div class="section-title">🔧 服务</div>
                 <table class="svc-table" id="svc-table">
                     <thead>
                         <tr>
                             <th>服务</th>
                             <th>状态</th>
+                            <th>运行时间</th>
                             <th>CPU</th>
                             <th>内存</th>
                             <th>重启</th>
                             <th>操作</th>
                         </tr>
                     </thead>
-                    <tbody id="svc-tbody"></tbody>
+                    <tbody id="overview-svc-tbody"></tbody>
                 </table>
+
+                <!-- Environment Info -->
+                <div class="section-title" style="margin-top:20px">ℹ️ 环境</div>
+                <div class="env-info" id="overview-env-info"></div>
             </div>
         </div>
 
@@ -2281,19 +2576,21 @@
                         <!-- 密码设置 -->
                         <div class="card" style="padding:clamp(16px,1.5vw,24px)">
                             <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 Dashboard 密码</h3>
+                            <form onsubmit="event.preventDefault();changePassword()" autocomplete="off">
                             <div class="form-group" style="margin-bottom:10px">
                                 <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
-                                <input type="password" id="settings-pw-current" placeholder="输入当前密码">
+                                <input type="password" id="settings-pw-current" placeholder="输入当前密码" autocomplete="current-password">
                             </div>
                             <div class="form-group" style="margin-bottom:10px">
                                 <label style="font-size:.8rem;color:var(--t2)">新密码</label>
-                                <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)">
+                                <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
                             </div>
                             <div class="form-group" style="margin-bottom:12px">
                                 <label style="font-size:.8rem;color:var(--t2)">确认新密码</label>
-                                <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码">
+                                <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码" autocomplete="new-password">
                             </div>
-                            <button class="btn btn-sm btn-primary" onclick="changePassword()">更新密码</button>
+                            <button type="submit" class="btn btn-sm btn-primary">更新密码</button>
+                            </form>
                         </div>
 
                         <!-- CivitAI API Key -->
@@ -2486,7 +2783,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="dashboard.js?v=27"></script>
+    <script type="module" src="/static/js/main.js"></script>
 </body>
 
 </html>
