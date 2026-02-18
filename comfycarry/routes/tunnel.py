@@ -10,15 +10,23 @@ import json
 import os
 import re
 import subprocess
+import time
 
 from flask import Blueprint, jsonify
 
 bp = Blueprint("tunnel", __name__)
 
+# ── 缓存 tunnel links，避免每次 overview 轮询都 grep 大量日志 ──
+_tunnel_links_cache = None
+_tunnel_links_cache_time = 0
+_TUNNEL_CACHE_TTL = 60  # 秒
+
 
 @bp.route("/api/tunnel_links")
 def api_tunnel_links():
     """获取 Cloudflare Tunnel 代理的服务链接"""
+    global _tunnel_links_cache, _tunnel_links_cache_time
+
     links = []
     # 尝试从环境变量获取
     tunnel_url = os.environ.get("CF_TUNNEL_URL", os.environ.get("TUNNEL_URL", ""))
@@ -29,7 +37,13 @@ def api_tunnel_links():
         links.append({"name": "Jupyter", "url": jupyter_url, "icon": "📓"})
 
     if not links:
-        links = _parse_tunnel_ingress()
+        now = time.time()
+        if _tunnel_links_cache is not None and (now - _tunnel_links_cache_time) < _TUNNEL_CACHE_TTL:
+            links = _tunnel_links_cache
+        else:
+            links = _parse_tunnel_ingress()
+            _tunnel_links_cache = links
+            _tunnel_links_cache_time = now
 
     vast_proxy = os.environ.get("VAST_PROXY_URL", "")
     if vast_proxy:
@@ -42,9 +56,10 @@ def _parse_tunnel_ingress():
     """从 PM2 tunnel 日志中解析 Cloudflare Tunnel ingress 配置"""
     links = []
     try:
+        # 使用较大的日志窗口，因为 ERR 行会很快淹没 config 行
         r = subprocess.run(
-            "pm2 logs tunnel --nostream --lines 300 2>/dev/null",
-            shell=True, capture_output=True, text=True, timeout=5
+            "pm2 logs tunnel --nostream --lines 5000 2>/dev/null | grep -i 'config=\\|ingress\\|hostname' | head -50",
+            shell=True, capture_output=True, text=True, timeout=10
         )
         log = r.stdout + r.stderr
 

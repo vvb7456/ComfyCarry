@@ -442,6 +442,19 @@ def _run_deploy(config):
             timeout=600, label="pip install plugin deps"
         )
 
+        # Install comfycarry_ws_broadcast plugin (WS event broadcast for Dashboard)
+        _deploy_log("安装 ComfyCarry WS 广播插件...")
+        broadcast_src = Path(__file__).resolve().parent.parent.parent / "comfycarry_ws_broadcast"
+        broadcast_dst = Path("/workspace/ComfyUI/custom_nodes/comfycarry_ws_broadcast")
+        if broadcast_src.exists():
+            import shutil
+            if broadcast_dst.exists():
+                shutil.rmtree(broadcast_dst)
+            shutil.copytree(broadcast_src, broadcast_dst)
+            _deploy_log("✅ comfycarry_ws_broadcast 插件已安装")
+        else:
+            _deploy_log("⚠️ comfycarry_ws_broadcast 源目录不存在, 跳过")
+
         # STEP 8: 执行 deploy 同步规则
         if rclone_method != "skip" and rclone_value:
             _deploy_step("同步云端资产")

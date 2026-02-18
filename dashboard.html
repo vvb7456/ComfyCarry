@@ -596,13 +596,22 @@
         }
 
         .activity-item.activity-executing {
-            background: rgba(74, 222, 128, .04)
+            background: rgba(74, 222, 128, .04);
+            align-items: center
+        }
+        .activity-item.activity-executing .activity-icon {
+            margin-top: 0
         }
 
         .activity-icon {
             font-size: 1rem;
             flex-shrink: 0;
             margin-top: 2px
+        }
+
+        .activity-content {
+            flex: 1;
+            min-width: 0
         }
 
         .activity-text {
@@ -880,6 +889,111 @@
             padding: 1px 6px;
             border-radius: 10px;
             margin-left: 5px
+        }
+
+        /* ── Queue Items ── */
+        .queue-item {
+            background: var(--c1);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+        .queue-item.running {
+            border-left: 3px solid var(--green);
+            flex-wrap: wrap
+        }
+        .queue-item.running .comfy-progress-bar {
+            width: 100%;
+            margin-top: 4px
+        }
+        .queue-item.pending {
+            border-left: 3px solid var(--amber)
+        }
+        .queue-item-info {
+            flex: 1;
+            min-width: 0
+        }
+        .queue-item-id {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .75rem;
+            color: var(--t3);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+        .queue-item-meta {
+            font-size: .8rem;
+            color: var(--t2);
+            margin-top: 2px
+        }
+        /* ── History Grid ── */
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px
+        }
+        .history-grid.size-sm {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 6px
+        }
+        .history-grid.size-sm .history-card-images { height: 90px }
+        .history-grid.size-sm .history-card-info { padding: 6px 10px }
+        .history-grid.size-sm .history-card-meta { font-size: .68rem }
+        .history-grid.size-lg {
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px
+        }
+        .history-grid.size-lg .history-card-images { height: 220px }
+        .history-grid.size-lg .history-card-info { padding: 14px 18px }
+        .history-card {
+            background: var(--c1);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,.2)
+        }
+        .history-card-images {
+            display: flex;
+            gap: 2px;
+            background: var(--bg);
+            height: 140px;
+            overflow: hidden
+        }
+        .history-card-images img {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer
+        }
+        .history-card-info {
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+        .history-card-info .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+        .history-card-info .status-dot.success { background: var(--green) }
+        .history-card-info .status-dot.error { background: var(--red) }
+        .history-card-meta {
+            flex: 1;
+            font-size: .78rem;
+            color: var(--t2)
+        }
+        .history-empty {
+            text-align: center;
+            padding: 24px;
+            color: var(--t3);
+            font-size: .85rem
         }
 
         /* Model cards */
@@ -1257,25 +1371,42 @@
             color: var(--t1);
         }
 
-        /* ComfyUI Execution Bar */
-        .comfy-exec-status {
+        /* ComfyUI Unified Progress Bar */
+        .comfy-progress-bar {
+            position: relative;
             display: flex;
             align-items: center;
-            gap: 8px;
             padding: 10px 14px;
             background: var(--bg-in);
-            border: 1px solid var(--ac);
+            border: 2px solid var(--bd);
             border-radius: var(--rs);
-            font-size: .85rem;
-            font-weight: 600;
-            color: var(--ac);
+            font-size: .82rem;
+            overflow: hidden;
+            gap: 10px;
+            min-height: 40px;
         }
-
-        .comfy-exec-pulse {
+        .comfy-progress-bar.active {
+            border-color: rgba(0,188,212,.6);
+        }
+        .comfy-progress-bar-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(74,222,128,.22), rgba(0,188,212,.18));
+            transition: width .3s ease;
+            pointer-events: none;
+        }
+        .comfy-progress-bar > span {
+            position: relative;
+            z-index: 1;
+        }
+        .comfy-progress-pulse {
             width: 8px;
             height: 8px;
             border-radius: 50%;
             background: var(--ac);
+            flex-shrink: 0;
             animation: execPulse 1.2s infinite;
         }
 
@@ -1284,31 +1415,41 @@
             50% { opacity: .3; }
         }
 
-        .comfy-exec-progress {
-            position: relative;
-            height: 20px;
-            background: var(--bg-in);
-            border-radius: 10px;
+        .comfy-progress-label {
+            font-weight: 600;
+            color: var(--ac);
+            white-space: nowrap;
+        }
+        .comfy-progress-node {
+            color: var(--t2);
+            font-size: .78rem;
+            white-space: nowrap;
             overflow: hidden;
-            margin-top: 6px;
+            text-overflow: ellipsis;
+            max-width: 200px;
         }
-
-        .comfy-exec-progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--ac), var(--cyan, #00bcd4));
-            border-radius: 10px;
-            transition: width .3s;
-        }
-
-        .comfy-exec-progress-text {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: .72rem;
+        .comfy-progress-steps {
+            flex: 1;
+            text-align: center;
+            font-size: .78rem;
             font-weight: 600;
             color: var(--t1);
+            white-space: nowrap;
+        }
+        .comfy-progress-speed {
+            font-size: .72rem;
+            color: var(--t3);
+            white-space: nowrap;
+        }
+        .comfy-progress-time {
+            font-size: .78rem;
+            color: var(--t3);
+            white-space: nowrap;
+            margin-left: auto;
+        }
+        .comfy-progress-idle {
+            color: var(--t3);
+            font-size: .82rem;
         }
 
         .comfy-exec-error {
@@ -2486,37 +2627,84 @@
                 </div>
             </div>
             <div class="page-body">
-                <!-- 状态信息 -->
-                <div id="comfyui-status-cards" class="stat-grid">
-                    <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                <!-- Sub-tabs -->
+                <div class="tabs">
+                    <div class="tab active" data-comfy-tab="console" onclick="switchComfyTab('console')">🖥️ 控制台</div>
+                    <div class="tab" data-comfy-tab="queue" onclick="switchComfyTab('queue')">📋 任务队列</div>
+                    <div class="tab" data-comfy-tab="history" onclick="switchComfyTab('history')">📜 生成历史</div>
                 </div>
 
-                <!-- 实时执行状态 -->
-                <div id="comfyui-exec-bar" class="hidden" style="margin-top:12px"></div>
+                <!-- Console sub-page (original content) -->
+                <div id="comfy-tab-console">
+                    <!-- 状态信息 -->
+                    <div id="comfyui-status-cards" class="stat-grid">
+                        <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                    </div>
 
-                <!-- 任务队列 -->
-                <div class="section-title" style="margin-top:16px">
-                    📋 任务队列
-                    <button class="btn btn-sm btn-danger" style="margin-left:8px;font-size:.72rem" onclick="comfyInterrupt()">⏹ 中断当前</button>
-                </div>
-                <div id="comfyui-queue-info" style="font-size:.85rem;color:var(--t2)">加载中...</div>
+                    <!-- 实时执行状态 -->
+                    <div id="comfyui-exec-bar" class="hidden" style="margin-top:12px"></div>
 
-                <!-- 启动参数 -->
-                <div class="section-title" style="margin-top:24px;display:flex;align-items:center">
-                    <span>⚙️ 启动参数</span>
-                    <div style="flex:1"></div>
-                    <button class="btn btn-sm" onclick="comfyFreeVRAM()" style="font-size:.75rem;padding:3px 10px">🧹 释放显存</button>
-                    <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()" style="font-size:.75rem;padding:3px 10px;margin-left:4px">💾 保存并重启</button>
-                    <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3);margin-left:8px"></span>
-                </div>
-                <div style="margin-bottom:8px">
-                    <input type="text" id="comfyui-args-raw" placeholder="main.py --listen 0.0.0.0 --port 8188 ..." style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;width:100%">
-                </div>
-                <div id="comfyui-params-form" class="comfy-params-form">加载中...</div>
+                    <!-- 启动参数 -->
+                    <div class="section-title" style="margin-top:24px;display:flex;align-items:center">
+                        <span>⚙️ 启动参数</span>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm" onclick="comfyFreeVRAM()" style="font-size:.75rem;padding:3px 10px">🧹 释放显存</button>
+                        <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()" style="font-size:.75rem;padding:3px 10px;margin-left:4px">💾 保存并重启</button>
+                        <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3);margin-left:8px"></span>
+                    </div>
+                    <div style="margin-bottom:8px">
+                        <input type="text" id="comfyui-args-raw" placeholder="main.py --listen 0.0.0.0 --port 8188 ..." style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;width:100%">
+                    </div>
+                    <div id="comfyui-params-form" class="comfy-params-form">加载中...</div>
 
-                <!-- 日志 -->
-                <div class="section-title" style="margin-top:24px">📜 ComfyUI 日志</div>
-                <div class="log-box" id="comfyui-log-content" style="max-height:400px">加载中...</div>
+                    <!-- 日志 -->
+                    <div class="section-title" style="margin-top:24px">📜 ComfyUI 日志</div>
+                    <div class="log-box" id="comfyui-log-content" style="max-height:400px">加载中...</div>
+                </div>
+
+                <!-- Queue sub-page -->
+                <div id="comfy-tab-queue" class="hidden">
+                    <!-- 队列摘要 -->
+                    <div style="margin-bottom:16px">
+                        <span id="queue-summary" style="font-size:.82rem;color:var(--t3)"></span>
+                    </div>
+
+                    <!-- 正在执行 -->
+                    <div class="section-title" style="display:flex;align-items:center">
+                        <span>▶ 正在执行</span>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm btn-danger" onclick="comfyInterrupt()" style="font-size:.72rem;padding:2px 10px">⏹ 中断</button>
+                    </div>
+                    <div id="queue-running" style="margin-bottom:20px">
+                        <div style="font-size:.85rem;color:var(--t3);padding:8px 0">无</div>
+                    </div>
+
+                    <!-- 等待队列 -->
+                    <div class="section-title" style="display:flex;align-items:center">
+                        <span>⏳ 等待队列</span>
+                        <div style="flex:1"></div>
+                        <button class="btn btn-sm" onclick="comfyClearQueue()" style="font-size:.72rem;padding:2px 10px">🗑️ 清空</button>
+                    </div>
+                    <div id="queue-pending" style="margin-bottom:20px">
+                        <div style="font-size:.85rem;color:var(--t3);padding:8px 0">无</div>
+                    </div>
+                </div>
+
+                <!-- History sub-page -->
+                <div id="comfy-tab-history" class="hidden">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                        <button class="btn btn-sm" onclick="toggleHistorySort()" id="history-sort-btn" style="font-size:.72rem;padding:2px 10px" title="切换排序">🔽 新→旧</button>
+                        <div style="display:flex;gap:2px;margin-left:auto">
+                            <button class="btn btn-sm" onclick="setHistorySize('sm')" data-hsize="sm" style="font-size:.72rem;padding:2px 8px" title="小卡片">S</button>
+                            <button class="btn btn-sm active" onclick="setHistorySize('md')" data-hsize="md" style="font-size:.72rem;padding:2px 8px" title="中卡片">M</button>
+                            <button class="btn btn-sm" onclick="setHistorySize('lg')" data-hsize="lg" style="font-size:.72rem;padding:2px 8px" title="大卡片">L</button>
+                        </div>
+                        <button class="btn btn-sm" onclick="loadComfyHistory()" style="font-size:.72rem;padding:2px 10px">🔄</button>
+                    </div>
+                    <div id="queue-history">
+                        <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                    </div>
+                </div>
             </div>
         </div>
 

@@ -54,24 +54,83 @@ function _stopSSE() {
 let _execState = null;
 let _execTimer = null;
 
+function _fetchNodeNames(promptId, stateRef) {
+  fetch('/api/comfyui/queue').then(r => r.json()).then(qData => {
+    if (!stateRef || stateRef.prompt_id !== promptId) return;
+    for (const item of (qData.queue_running || [])) {
+      if (item[1] === promptId && item[2]) {
+        for (const [nid, ndata] of Object.entries(item[2])) {
+          if (typeof ndata === 'object' && ndata.class_type) {
+            stateRef.node_names[nid] = ndata.class_type;
+          }
+        }
+        stateRef.total_nodes = Object.keys(stateRef.node_names).length;
+        _updateActivity();
+        break;
+      }
+    }
+  }).catch(() => {});
+}
+
 function _handleSSE(evt) {
   const t = evt.type;
   const d = evt.data || {};
 
   if (t === 'execution_start') {
-    _execState = { start_time: d.start_time || (Date.now() / 1000) };
+    const nodeNames = d.node_names || {};
+    _execState = {
+      start_time: d.start_time || (Date.now() / 1000),
+      node_names: nodeNames,
+      prompt_id: d.prompt_id || '',
+      executed_nodes: new Set(),
+      cached_nodes: new Set(),
+      total_nodes: Object.keys(nodeNames).length,
+      progress: null,
+      current_node: null
+    };
+    // Fallback: if no node names, fetch from queue
+    if (_execState.total_nodes === 0 && d.prompt_id) {
+      _fetchNodeNames(d.prompt_id, _execState);
+    }
     _updateActivity();
     if (_execTimer) clearInterval(_execTimer);
     _execTimer = setInterval(_updateActivity, 1000);
+  }
+  // 页面刷新后 SSE 重连时收到的完整执行快照
+  else if (t === 'execution_snapshot') {
+    const nodeNames = d.node_names || {};
+    _execState = {
+      start_time: d.start_time || (Date.now() / 1000),
+      node_names: nodeNames,
+      prompt_id: d.prompt_id || '',
+      executed_nodes: new Set(d.executed_nodes || []),
+      cached_nodes: new Set(d.cached_nodes || []),
+      total_nodes: Object.keys(nodeNames).length,
+      progress: null,
+      current_node: d.current_node || null
+    };
+    if (_execState.total_nodes === 0 && d.prompt_id) {
+      _fetchNodeNames(d.prompt_id, _execState);
+    }
+    _updateActivity();
+    if (_execTimer) clearInterval(_execTimer);
+    _execTimer = setInterval(_updateActivity, 1000);
+  }
+  else if (t === 'execution_cached') {
+    if (_execState && Array.isArray(d.nodes)) {
+      d.nodes.forEach(n => _execState.cached_nodes.add(n));
+    }
+    _updateActivity();
   }
   else if (t === 'progress') {
     if (_execState) _execState.progress = d;
     _updateActivity();
   }
   else if (t === 'executing') {
-    // Node-level info from ComfyUI
     if (_execState && d.node) {
       _execState.current_node = d.node;
+      _execState.progress = null;
+      _execState.executed_nodes.add(d.node);
     }
     _updateActivity();
   }
@@ -81,6 +140,11 @@ function _handleSSE(evt) {
     _updateActivity();
   }
   else if (t === 'execution_error') {
+    _execState = null;
+    if (_execTimer) { clearInterval(_execTimer); _execTimer = null; }
+    _updateActivity();
+  }
+  else if (t === 'execution_interrupted') {
     _execState = null;
     if (_execTimer) { clearInterval(_execTimer); _execTimer = null; }
     _updateActivity();
@@ -115,8 +179,9 @@ function _renderQuickLinks(tunnel) {
   if (!el) return;
   // 过滤掉 Dashboard 自身的链接（用户已经在 Dashboard 中）
   const links = (tunnel?.links || []).filter(l => !/dashboard/i.test(l.name));
+  const tunnelOnline = tunnel?.pm2_status === 'online';
   if (links.length === 0) {
-    el.innerHTML = '<div class="quick-links-empty">🌐 Tunnel 未连接</div>';
+    el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? '🌐 Tunnel 已连接' : '🌐 Tunnel 未连接'}</div>`;
     return;
   }
   el.innerHTML = links.map(l =>
@@ -297,28 +362,42 @@ function _renderActivity(data) {
 
   // ComfyUI execution from SSE
   if (_execState) {
-    let text = '⚡ 正在生成';
-    const elapsed = Math.round(Date.now() / 1000 - _execState.start_time);
+    const st = _execState;
+    const elapsed = Math.round(Date.now() / 1000 - st.start_time);
     const timeStr = fmtDuration(elapsed);
-    let progressHtml = '';
+    const completedCount = st.executed_nodes.size + st.cached_nodes.size;
+    const totalNodes = st.total_nodes || '?';
+    const nodeName = st.current_node
+      ? (st.node_names?.[st.current_node] || st.current_node)
+      : '';
 
-    if (_execState.progress && _execState.progress.percent != null) {
-      const pct = _execState.progress.percent;
-      const detail = _execState.progress.value != null
-        ? `${_execState.progress.value}/${_execState.progress.max}`
-        : '';
-      progressHtml = `<div class="activity-progress">
-        <div class="activity-progress-fill" style="width:${pct}%"></div>
-        <span class="activity-progress-text">${detail ? detail + ' ' : ''}(${pct}%)</span>
-      </div>`;
+    const hasSteps = st.progress && st.progress.percent != null;
+    const stepPct = hasSteps ? st.progress.percent : 0;
+
+    let fillPct = 0;
+    if (totalNodes !== '?' && totalNodes > 0) {
+      const baseProgress = Math.max(0, completedCount - 1) / totalNodes;
+      const currentFraction = hasSteps ? (stepPct / 100) / totalNodes : 0;
+      fillPct = Math.min(100, Math.round((baseProgress + currentFraction) * 100));
+    } else if (hasSteps) {
+      fillPct = stepPct;
     }
+
+    let barHtml = `<div class="comfy-progress-bar active" style="margin-top:6px;font-size:.72rem">`;
+    barHtml += `<div class="comfy-progress-bar-fill" style="width:${fillPct}%"></div>`;
+    barHtml += `<span class="comfy-progress-pulse"></span>`;
+    barHtml += `<span class="comfy-progress-label">⚡ 正在生成</span>`;
+    if (nodeName) barHtml += `<span class="comfy-progress-node">${completedCount}/${totalNodes} ${escHtml(nodeName)}</span>`;
+    if (hasSteps) {
+      const stepDetail = st.progress.value != null ? `${st.progress.value}/${st.progress.max}` : '';
+      barHtml += `<span class="comfy-progress-steps">${stepDetail} (${stepPct}%)</span>`;
+    }
+    barHtml += `<span class="comfy-progress-time">${timeStr}</span>`;
+    barHtml += `</div>`;
 
     items.push({
       icon: '▶',
-      html: `<div class="activity-text">
-        <span>${text}</span>
-        <span class="activity-meta">${timeStr}</span>
-      </div>${progressHtml}`,
+      html: barHtml,
       class: 'activity-executing'
     });
   }
@@ -384,7 +463,7 @@ function _renderActivity(data) {
   el.innerHTML = items.map(item =>
     `<div class="activity-item ${item.class || ''}">
       <div class="activity-icon">${item.icon}</div>
-      ${item.html}
+      <div class="activity-content">${item.html}</div>
     </div>`
   ).join('');
 }

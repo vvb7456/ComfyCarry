@@ -165,6 +165,32 @@ def api_comfyui_interrupt():
         return jsonify({"error": "ComfyUI 无法连接"}), 503
 
 
+@bp.route("/api/comfyui/queue/delete", methods=["POST"])
+def api_comfyui_queue_delete():
+    """删除指定的待排队 prompt（不影响正在执行的）"""
+    data = request.get_json(force=True)
+    prompt_ids = data.get("delete", [])
+    if not prompt_ids:
+        return jsonify({"error": "缺少 delete 参数"}), 400
+    try:
+        requests.post(f"{COMFYUI_URL}/queue",
+                      json={"delete": prompt_ids}, timeout=5)
+        return jsonify({"ok": True})
+    except Exception:
+        return jsonify({"error": "ComfyUI 无法连接"}), 503
+
+
+@bp.route("/api/comfyui/queue/clear", methods=["POST"])
+def api_comfyui_queue_clear():
+    """清空所有待排队的 prompt"""
+    try:
+        requests.post(f"{COMFYUI_URL}/queue",
+                      json={"clear": True}, timeout=5)
+        return jsonify({"ok": True})
+    except Exception:
+        return jsonify({"error": "ComfyUI 无法连接"}), 503
+
+
 @bp.route("/api/comfyui/free", methods=["POST"])
 def api_comfyui_free():
     try:
@@ -193,6 +219,8 @@ def api_comfyui_history():
             images = []
             for node_id, node_out in outputs.items():
                 for img in node_out.get("images", []):
+                    if img.get("type") == "temp":
+                        continue
                     images.append({
                         "filename": img.get("filename", ""),
                         "subfolder": img.get("subfolder", ""),
