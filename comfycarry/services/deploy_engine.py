@@ -64,8 +64,8 @@ def _detect_image_type():
 
 
 def _detect_python():
-    """动态检测可用的 Python (3.13 > 3.12 > 3)"""
-    for cmd in ["python3.13", "python3.12", "python3", "python"]:
+    """动态检测可用的 Python (优先 3.12, wheel 在 3.12 上编译验证)"""
+    for cmd in ["python3.12", "python3", "python"]:
         if shutil.which(cmd):
             return cmd
     return "python3"
@@ -97,6 +97,52 @@ def _deploy_log(msg, level="info"):
              "time": datetime.now().strftime("%H:%M:%S")}
     with _deploy_log_lock:
         _deploy_log_lines.append(entry)
+
+
+def _install_sa2_prebuilt(py, cuda_cap):
+    """从预装 wheel 安装 SageAttention-2 (仅预构建镜像)"""
+    # 精确匹配
+    wheel_map = {
+        "8.0": "sm80", "8.6": "sm86", "8.9": "sm89",
+        "9.0": "sm90", "10.0": "sm100", "12.0": "sm120"
+    }
+    wheel_suffix = wheel_map.get(cuda_cap)
+
+    # 向下兼容: 同代未知小版本
+    if not wheel_suffix and cuda_cap:
+        try:
+            major = int(cuda_cap.split(".")[0])
+            minor = int(cuda_cap.split(".")[1]) if "." in cuda_cap else 0
+        except (ValueError, IndexError):
+            _deploy_log(f"⚠️ 无法解析 CUDA Cap: {cuda_cap}", "warn")
+            return
+        if major == 8:
+            wheel_suffix = "sm80" if minor <= 0 else "sm86" if minor <= 6 else "sm89"
+        elif major == 9:
+            wheel_suffix = "sm90"
+        elif major == 10:
+            wheel_suffix = "sm100"
+        elif major == 12:
+            wheel_suffix = "sm120"
+
+    if not wheel_suffix:
+        _deploy_log(f"⚠️ 未知 GPU 架构 {cuda_cap}, 跳过 SA2", "warn")
+        return
+
+    whl_src = Path(f"/opt/wheels/sa2/sageattention-2.2.0-cp312-cp312-linux_x86_64_{wheel_suffix}.whl")
+    if not whl_src.exists():
+        _deploy_log(f"⚠️ SA2 wheel 不存在: {whl_src}", "warn")
+        return
+
+    # wheel 文件名必须符合 PEP 427, 复制后改名为标准格式
+    tmp_whl = "/tmp/sageattention-2.2.0-cp312-cp312-linux_x86_64.whl"
+    shutil.copy2(str(whl_src), tmp_whl)
+
+    _deploy_log(f"安装 SA2 ({wheel_suffix})...")
+    _deploy_exec(f'{py} -m pip install "{tmp_whl}" --no-deps --no-cache-dir',
+                 label=f"pip install SA2-{wheel_suffix}")
+    _deploy_exec(f'rm -f "{tmp_whl}"')
+    _deploy_log(f"✅ SageAttention-2 ({wheel_suffix}) 安装完成")
 
 
 def _deploy_step(name):
@@ -337,87 +383,47 @@ def _run_deploy(config):
                     pass
             _mark_step_done("comfyui_install")
 
-        # STEP 6: 加速组件
-        if image_type == "generic":
-            if _step_done("accelerators"):
-                _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
-            else:
-                _deploy_step("安装加速组件 (FA3/SA3)")
-                _deploy_log("检测 GPU 架构...")
-                gpu_info = _detect_gpu_info()
-                cuda_cap = gpu_info.get("cuda_cap", "0.0")
-                cuda_major = int(cuda_cap.split(".")[0]) if cuda_cap else 0
-                _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
-
-                py_ver_tag = subprocess.run(
-                    f'{PY} -c "import sys; print(f\\"cp{{sys.version_info.major}}'
-                    f'{{sys.version_info.minor}}\\")"',
-                    shell=True, capture_output=True, text=True, timeout=5
-                ).stdout.strip()
-
-                GH_WHEELS = "https://github.com/vvb7456/ComfyCarry/releases/download/v4.5-wheels"
-                _deploy_exec("mkdir -p /workspace/prebuilt_wheels")
-                _deploy_exec(
-                    f'wget -q -O /workspace/prebuilt_wheels/'
-                    f'flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl '
-                    f'"{GH_WHEELS}/flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl" || true',
-                    label="下载 FA3 wheel"
-                )
-                if py_ver_tag in ("cp313", "cp312"):
-                    _deploy_exec(
-                        f'wget -q -O /workspace/prebuilt_wheels/'
-                        f'sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl '
-                        f'"{GH_WHEELS}/sageattn3-1.0.0-{py_ver_tag}-{py_ver_tag}'
-                        f'-linux_x86_64.whl" || true',
-                        label=f"下载 SA3 wheel ({py_ver_tag})"
-                    )
-
-                if cuda_major >= 9:
-                    fa_wheel = ("/workspace/prebuilt_wheels/"
-                                "flash_attn_3-3.0.0b1-cp39-abi3-linux_x86_64.whl")
-                    if not _deploy_exec(f'[ -f "{fa_wheel}" ] && {PIP} install "{fa_wheel}"'):
-                        _deploy_log("Wheel 不可用, 源码编译 FA3...", "warn")
-                        _deploy_exec(
-                            f'cd /workspace && git clone '
-                            f'https://github.com/Dao-AILab/flash-attention.git && '
-                            f'cd flash-attention/hopper && MAX_JOBS=8 {PY} setup.py install && '
-                            f'cd /workspace && rm -rf flash-attention',
-                            timeout=1200, label="编译 FA3"
-                        )
-                else:
-                    _deploy_exec(
-                        f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
-                        timeout=600, label="安装 FA2"
-                    )
-
-                if cuda_major >= 10:
-                    sa_wheel = (f"/workspace/prebuilt_wheels/sageattn3-1.0.0-"
-                                f"{py_ver_tag}-{py_ver_tag}-linux_x86_64.whl")
-                    if not _deploy_exec(f'[ -f "{sa_wheel}" ] && {PIP} install "{sa_wheel}"'):
-                        _deploy_log("Wheel 不可用, 源码编译 SA3...", "warn")
-                        _deploy_exec(
-                            f'cd /workspace && git clone '
-                            f'https://github.com/thu-ml/SageAttention.git && '
-                            f'cd SageAttention/sageattention3_blackwell && '
-                            f'{PY} setup.py install && '
-                            f'cd /workspace && rm -rf SageAttention',
-                            timeout=1200, label="编译 SA3"
-                        )
-                else:
-                    _deploy_exec(
-                        f'cd /workspace && git clone '
-                        f'https://github.com/thu-ml/SageAttention.git && '
-                        f'cd SageAttention && {PIP} install . --no-build-isolation && '
-                        f'cd /workspace && rm -rf SageAttention',
-                        timeout=600, label="安装 SA2"
-                    )
-
-                _deploy_exec("rm -rf /workspace/prebuilt_wheels")
-                _deploy_log("✅ 加速组件安装完成")
-                _mark_step_done("accelerators")
+        # STEP 6: 加速组件 (FA2/SA2)
+        if _step_done("accelerators"):
+            _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
         else:
-            _deploy_step("检查加速组件")
-            _deploy_log("预构建镜像 — FA3/SA3 已预装, 跳过")
+            _deploy_step("安装加速组件 (FA2/SA2)")
+            _deploy_log("检测 GPU 架构...")
+            gpu_info = _detect_gpu_info()
+            cuda_cap = gpu_info.get("cuda_cap", "")
+            _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
+
+            if image_type == "prebuilt":
+                # FA2 已在 Dockerfile 预装
+                _deploy_log("验证 FlashAttention-2...")
+                _deploy_exec(
+                    f'{PY} -c "import flash_attn; '
+                    f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
+                    label="检查 FA2"
+                )
+                # SA2 从预装 wheel 安装
+                if cuda_cap:
+                    _install_sa2_prebuilt(PY, cuda_cap)
+                else:
+                    _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
+            else:
+                # Generic: 从 PyPI/源码安装
+                _deploy_log("安装 FlashAttention-2...")
+                _deploy_exec(
+                    f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
+                    timeout=1200, label="pip install flash-attn"
+                )
+                _deploy_log("安装 SageAttention-2...")
+                _deploy_exec(
+                    f'cd /workspace && git clone '
+                    f'https://github.com/thu-ml/SageAttention.git && '
+                    f'cd SageAttention && {PIP} install . --no-build-isolation && '
+                    f'cd /workspace && rm -rf SageAttention',
+                    timeout=600, label="安装 SA2"
+                )
+
+            _deploy_log("✅ 加速组件安装完成")
+            _mark_step_done("accelerators")
 
         # STEP 7: 插件安装
         _deploy_step("安装插件")

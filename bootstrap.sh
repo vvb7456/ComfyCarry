@@ -25,57 +25,79 @@ echo "================================================="
 ln -snf /workspace /root/workspace 2>/dev/null || true
 touch ~/.no_auto_tmux 2>/dev/null || true
 
+# ── 预构建镜像检测 ──
+PREBUILT=false
+if [ -f /opt/.comfycarry-prebuilt ]; then
+    PREBUILT=true
+    echo "  -> ✅ 预构建镜像, 跳过依赖安装"
+fi
+
 # SSH 修复 (Vast.ai 需要)
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     mkdir -p /run/sshd && ssh-keygen -A 2>/dev/null || true
 fi
 pgrep -x sshd >/dev/null || /usr/sbin/sshd 2>/dev/null || true
 
-# ── Python (优先 3.13，回退到 3.12/系统自带) ──
-if command -v python3.13 >/dev/null 2>&1; then
-    PYTHON_BIN="python3.13"
-elif command -v python3.12 >/dev/null 2>&1; then
-    PYTHON_BIN="python3.12"
+# ── Python ──
+if [ "$PREBUILT" = true ]; then
+    PYTHON_BIN=python3
 else
-    echo "  -> 安装 Python 3.13..."
-    apt-get update -qq
-    apt-get install -y --no-install-recommends software-properties-common
-    add-apt-repository -y ppa:deadsnakes/ppa
-    apt-get update -qq
-    apt-get install -y python3.13 python3.13-venv python3.13-dev
-    PYTHON_BIN="python3.13"
+    # 优先 3.12 (wheel 在 3.12 上编译验证)
+    if command -v python3.12 >/dev/null 2>&1; then
+        PYTHON_BIN="python3.12"
+    else
+        echo "  -> 安装 Python 3.12..."
+        apt-get update -qq
+        apt-get install -y --no-install-recommends software-properties-common
+        add-apt-repository -y ppa:deadsnakes/ppa
+        apt-get update -qq
+        apt-get install -y python3.12 python3.12-venv python3.12-dev
+        PYTHON_BIN="python3.12"
+    fi
+    echo "  -> 使用 Python: $PYTHON_BIN"
+    $PYTHON_BIN -m ensurepip --upgrade 2>/dev/null || true
+    $PYTHON_BIN -m pip install --upgrade pip -q
 fi
-echo "  -> 使用 Python: $PYTHON_BIN"
-$PYTHON_BIN -m ensurepip --upgrade 2>/dev/null || true
-$PYTHON_BIN -m pip install --upgrade pip -q
 
 # ── Node.js + PM2 ──
-if ! command -v node >/dev/null 2>&1; then
-    echo "  -> 安装 Node.js 20.x..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-fi
+if [ "$PREBUILT" = true ]; then
+    echo "  -> Node.js/PM2 已预装, 跳过"
+else
+    if ! command -v node >/dev/null 2>&1; then
+        echo "  -> 安装 Node.js 20.x..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+    fi
 
-if ! command -v pm2 >/dev/null 2>&1; then
-    echo "  -> 安装 PM2..."
-    npm install -g pm2
-    pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
+    if ! command -v pm2 >/dev/null 2>&1; then
+        echo "  -> 安装 PM2..."
+        npm install -g pm2
+        pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
+    fi
 fi
 
 # ── Dashboard 依赖 ──
-echo "  -> 安装 Dashboard 依赖..."
-# --ignore-installed: 避免系统包 (如 blinker) 的 uninstall-no-record-file 错误
-$PYTHON_BIN -m pip install --no-cache-dir --ignore-installed flask psutil flask-cors requests -q 2>/dev/null || true
+if [ "$PREBUILT" = true ]; then
+    echo "  -> Dashboard 依赖已预装, 跳过"
+else
+    echo "  -> 安装 Dashboard 依赖..."
+    # --ignore-installed: 避免系统包 (如 blinker) 的 uninstall-no-record-file 错误
+    $PYTHON_BIN -m pip install --no-cache-dir --ignore-installed flask psutil flask-cors requests websocket-client -q 2>/dev/null || true
+fi
 
 # ── Cloudflared (Tunnel) ──
-# 很多实例公网端口映射不可靠, Tunnel 是可靠访问 Dashboard 的前提
-if ! command -v cloudflared >/dev/null 2>&1; then
-    echo "  -> 安装 Cloudflared..."
-    mkdir -p --mode=0755 /usr/share/keyrings
-    curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
-    echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list
-    apt-get update -qq
-    apt-get install -y cloudflared
+if [ "$PREBUILT" = true ]; then
+    echo "  -> Cloudflared 已预装, 跳过"
+else
+    # 很多实例公网端口映射不可靠, Tunnel 是可靠访问 Dashboard 的前提
+    if ! command -v cloudflared >/dev/null 2>&1; then
+        echo "  -> 安装 Cloudflared..."
+        mkdir -p --mode=0755 /usr/share/keyrings
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
+        echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list
+        apt-get update -qq
+        apt-get install -y cloudflared
+    fi
 fi
 
 # ── 下载 Dashboard 文件 ──
