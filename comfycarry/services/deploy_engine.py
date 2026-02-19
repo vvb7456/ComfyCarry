@@ -461,7 +461,6 @@ def _run_deploy(config):
         broadcast_src = Path(__file__).resolve().parent.parent.parent / "comfycarry_ws_broadcast"
         broadcast_dst = Path("/workspace/ComfyUI/custom_nodes/comfycarry_ws_broadcast")
         if broadcast_src.exists():
-            import shutil
             if broadcast_dst.exists():
                 shutil.rmtree(broadcast_dst)
             shutil.copytree(broadcast_src, broadcast_dst)
