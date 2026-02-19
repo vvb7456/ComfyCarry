@@ -31,17 +31,21 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
 fi
 pgrep -x sshd >/dev/null || /usr/sbin/sshd 2>/dev/null || true
 
-# ── Python 3.13 ──
-if ! command -v python3.13 >/dev/null 2>&1; then
+# ── Python (优先 3.13，回退到 3.12/系统自带) ──
+if command -v python3.13 >/dev/null 2>&1; then
+    PYTHON_BIN="python3.13"
+elif command -v python3.12 >/dev/null 2>&1; then
+    PYTHON_BIN="python3.12"
+else
     echo "  -> 安装 Python 3.13..."
     apt-get update -qq
     apt-get install -y --no-install-recommends software-properties-common
     add-apt-repository -y ppa:deadsnakes/ppa
     apt-get update -qq
     apt-get install -y python3.13 python3.13-venv python3.13-dev
+    PYTHON_BIN="python3.13"
 fi
-
-PYTHON_BIN="python3.13"
+echo "  -> 使用 Python: $PYTHON_BIN"
 $PYTHON_BIN -m ensurepip --upgrade 2>/dev/null || true
 $PYTHON_BIN -m pip install --upgrade pip -q
 

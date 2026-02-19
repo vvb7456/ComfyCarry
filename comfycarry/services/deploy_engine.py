@@ -8,6 +8,7 @@ _run_deploy() 及其所有辅助函数。
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import threading
 import time
@@ -62,12 +63,21 @@ def _detect_image_type():
     return "generic"
 
 
+def _detect_python():
+    """动态检测可用的 Python (3.13 > 3.12 > 3)"""
+    for cmd in ["python3.13", "python3.12", "python3", "python"]:
+        if shutil.which(cmd):
+            return cmd
+    return "python3"
+
+
 def _detect_gpu_info():
     """检测 GPU 信息"""
     info = {"name": "", "cuda_cap": "", "vram_gb": 0}
+    py = _detect_python()
     try:
         r = subprocess.run(
-            'python3.13 -c "import torch; d=torch.cuda.get_device_properties(0); '
+            f'{py} -c "import torch; d=torch.cuda.get_device_properties(0); '
             'print(f\\"{d.name}|{d.major}.{d.minor}|{d.total_mem / 1073741824:.1f}\\")"',
             shell=True, capture_output=True, text=True, timeout=15
         )
@@ -170,9 +180,10 @@ def _run_deploy(config):
     # 导入需要修改的全局变量
     from .. import config as cfg
 
-    PY = "python3.13"
+    PY = _detect_python()
     PIP = f"{PY} -m pip"
     image_type = config.get("image_type", "generic")
+    _deploy_log(f"使用 Python: {PY}")
 
     try:
         # STEP 1: 系统依赖
@@ -188,13 +199,10 @@ def _run_deploy(config):
                 "libglib2.0-0 libsm6 libxext6 build-essential",
                 timeout=300, label="apt-get install"
             )
-            py313 = subprocess.run(
-                "command -v python3.13", shell=True,
-                capture_output=True, text=True
-            ).stdout.strip()
-            if py313:
-                _deploy_exec(f'ln -sf "{py313}" /usr/local/bin/python && '
-                             f'ln -sf "{py313}" /usr/bin/python || true')
+            py_bin = shutil.which(PY) or ""
+            if py_bin:
+                _deploy_exec(f'ln -sf "{py_bin}" /usr/local/bin/python && '
+                             f'ln -sf "{py_bin}" /usr/bin/python || true')
             _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q',
                          label="pip upgrade")
             _mark_step_done("system_deps")
