@@ -76,9 +76,11 @@ def _detect_gpu_info():
     info = {"name": "", "cuda_cap": "", "vram_gb": 0}
     py = _detect_python()
     try:
+        # total_memory (torch >=2.9), 旧版本用 total_mem
         r = subprocess.run(
             f'{py} -c "import torch; d=torch.cuda.get_device_properties(0); '
-            'print(f\\"{d.name}|{d.major}.{d.minor}|{d.total_mem / 1073741824:.1f}\\")"',
+            'mem=d.total_memory if hasattr(d,\'total_memory\') else d.total_mem; '
+            'print(f\\"{d.name}|{d.major}.{d.minor}|{mem / 1073741824:.1f}\\")"',
             shell=True, capture_output=True, text=True, timeout=15
         )
         if r.returncode == 0 and "|" in r.stdout:
