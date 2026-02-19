@@ -663,7 +663,19 @@ function nextStep() {
     // 恢复模式: 从 step 0 直接跳到确认部署
     if (currentStep === 0 && importedConfig) {
         showStep(TOTAL_STEPS - 1);
-        renderSummary();
+        // 恢复模式下异步检测 rclone remotes (DOM radio 未选中，手动调 API)
+        if (wizardConfig.rclone_config_value) {
+            fetch('/api/setup/preview_remotes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ method: wizardConfig.rclone_config_method || 'base64', value: wizardConfig.rclone_config_value })
+            }).then(r => r.json()).then(d => {
+                _detectedRemotes = d.remotes || [];
+                renderSummary();
+            }).catch(() => renderSummary());
+        } else {
+            renderSummary();
+        }
         return;
     }
     // Step 3 (rclone) skip → 跳过 Step 4 (sync rules)
