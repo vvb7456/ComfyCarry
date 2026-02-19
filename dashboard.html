@@ -39,6 +39,8 @@
             --r: 12px;
             --rs: 8px;
             --sh: 0 4px 24px rgba(0, 0, 0, 0.5);
+            --c1: #16162a;
+            --c2: #1c1c32;
         }
 
         html {
@@ -2692,14 +2694,17 @@
 
                 <!-- History sub-page -->
                 <div id="comfy-tab-history" class="hidden">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-                        <button class="btn btn-sm" onclick="toggleHistorySort()" id="history-sort-btn" style="font-size:.72rem;padding:2px 10px" title="切换排序">🔽 新→旧</button>
-                        <div style="display:flex;gap:2px;margin-left:auto">
-                            <button class="btn btn-sm" onclick="setHistorySize('sm')" data-hsize="sm" style="font-size:.72rem;padding:2px 8px" title="小卡片">S</button>
-                            <button class="btn btn-sm active" onclick="setHistorySize('md')" data-hsize="md" style="font-size:.72rem;padding:2px 8px" title="中卡片">M</button>
-                            <button class="btn btn-sm" onclick="setHistorySize('lg')" data-hsize="lg" style="font-size:.72rem;padding:2px 8px" title="大卡片">L</button>
-                        </div>
-                        <button class="btn btn-sm" onclick="loadComfyHistory()" style="font-size:.72rem;padding:2px 10px">🔄</button>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                        <select id="history-sort-select" onchange="setHistorySort(this.value)" style="width:auto;min-width:100px;font-size:.78rem;padding:4px 28px 4px 8px">
+                            <option value="desc" selected>🔽 新→旧</option>
+                            <option value="asc">🔼 旧→新</option>
+                        </select>
+                        <select id="history-size-select" onchange="setHistorySize(this.value)" style="width:auto;min-width:100px;font-size:.78rem;padding:4px 28px 4px 8px">
+                            <option value="sm">紧凑</option>
+                            <option value="md" selected>标准</option>
+                            <option value="lg">大图</option>
+                        </select>
+                        <button class="btn btn-sm" onclick="loadComfyHistory()" style="font-size:.72rem;padding:3px 10px" title="刷新">🔄</button>
                     </div>
                     <div id="queue-history">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>

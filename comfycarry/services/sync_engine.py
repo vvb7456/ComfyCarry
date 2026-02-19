@@ -233,7 +233,8 @@ def start_sync_worker():
         _sync_log("⚠️ 旧 Worker 仍在运行, 等待终止...")
         _sync_worker_thread.join(timeout=10)
         if _sync_worker_thread.is_alive():
-            _sync_log("❌ 旧 Worker 无法停止, 强制继续")
+            _sync_log("❌ 旧 Worker 无法停止, 跳过启动")
+            return False
     _sync_worker_stop.clear()
     _sync_worker_thread = threading.Thread(target=_sync_worker_loop, daemon=True, name="sync-worker")
     _sync_worker_thread.start()

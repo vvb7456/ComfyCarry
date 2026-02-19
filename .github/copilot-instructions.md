@@ -2,28 +2,53 @@
 
 ## 项目概述
 
-全栈 ComfyUI 云端部署管理平台，面向 RunPod / Vast.ai GPU 实例。提供 Web Dashboard 统一管理 ComfyUI 服务、模型、插件、Tunnel、云同步等。
+全栈 ComfyUI 云端部署管理平台，面向 RunPod / Vast.ai GPU 实例。提供 Web Dashboard 统一管理 ComfyUI 服务、模型、插件、Tunnel、云同步、JupyterLab 等。
 
-## 架构 (v2.0 — Dashboard-first)
+## 架构 (v3.0 — 模块化)
+
+### 后端 (Flask — `comfycarry/` 包)
 
 | 文件 | 角色 |
 |------|------|
 | **bootstrap.sh** | 最小化入口脚本 — 安装 Python 3.13 / Node.js / PM2 / Cloudflared，下载 Dashboard 文件，启动 PM2 进程 |
-| **workspace_manager.py** | Flask 后端 (≈2800 行) — 系统监控、服务管理、模型管理、CivitAI 代理、插件管理、ComfyUI 参数控制、Setup Wizard 部署引擎、Cloud Sync、Tunnel 管理、SSE 实时推送 |
-| **dashboard.html** | 前端 HTML + CSS (≈2100 行) — SPA 单页应用，深色主题，支持 4K |
-| **dashboard.js** | 前端 JS (≈2560 行) — 页面路由、API 调用、轮询/SSE 事件流、ComfyUI WebSocket 桥接 |
-| **setup_wizard.html** | 首次部署向导页 (≈680 行) — 引导用户配置密码、Tunnel、Rclone、CivitAI、插件选择，然后触发部署 |
+| **workspace_manager.py** | 入口文件 — 调用 `comfycarry.app.main()` |
+| **comfycarry/app.py** | Flask App 工厂 + `main()` 启动逻辑 |
+| **comfycarry/config.py** | 全局配置 (路径常量、持久化配置读写) |
+| **comfycarry/auth.py** | 认证中间件 (Flask session + 密码、before_request 拦截) |
+| **comfycarry/utils.py** | 工具函数 (_run_cmd 等) |
+| **comfycarry/routes/** | 路由蓝图 — system, comfyui, models, plugins, tunnel, sync, jupyter, settings, setup, frontend |
+| **comfycarry/services/** | 业务服务 — comfyui_bridge (WS→SSE), comfyui_params (启动参数), deploy_engine (部署引擎), sync_engine (同步引擎) |
+| **comfycarry_ws_broadcast/** | ComfyUI 自定义节点 — 实时进度广播 (安装到 ComfyUI custom_nodes 中) |
+
+### 前端 (ES Module SPA)
+
+| 文件 | 角色 |
+|------|------|
+| **dashboard.html** | HTML + CSS (≈3080 行) — SPA 布局、深色主题、支持 4K |
+| **static/js/main.js** | 前端入口 — 导入所有页面模块，初始化路由 |
+| **static/js/core.js** | 核心模块 — 页面路由 (`showPage`/`registerPage`)、Toast、剪贴板、图片预览、API Key、全局快捷键 |
+| **static/js/page-dashboard.js** | Dashboard 概览页 (系统监控 + 服务状态 + ComfyUI 实时进度) |
+| **static/js/page-models.js** | 模型管理页 (本地模型 + CivitAI 搜索 + 下载) |
+| **static/js/page-comfyui.js** | ComfyUI 页 (启动参数 + 实时日志/SSE + 队列/历史 + 进度) |
+| **static/js/page-plugins.js** | 插件页 (浏览/安装/卸载/更新，代理 ComfyUI-Manager) |
+| **static/js/page-tunnel.js** | Tunnel 页 (Cloudflare Tunnel 状态 + 服务链接) |
+| **static/js/page-jupyter.js** | JupyterLab 页 (启动/停止/状态/URL + 内核管理) |
+| **static/js/page-sync.js** | Cloud Sync 页 (Rclone 配置 + Sync v2 规则引擎 + 实时日志) |
+| **static/js/page-settings.js** | 设置页 (密码、CivitAI Key、Debug、配置导入/导出、重新初始化) |
+| **setup_wizard.html** | 首次部署向导页 (≈680 行) — 密码、Tunnel、Rclone、CivitAI、插件选择 |
+| **dashboard.js** | **已废弃** — 旧版单文件前端 JS，保留但不再被 HTML 引用 |
 
 ### 已废弃文件 (在 .gitignore 中)
-- `deploy.sh` / `deploy-prebuilt.sh` — 旧版 Bash 部署脚本，功能已迁移至 `workspace_manager.py` 的 `_run_deploy()` 引擎
-- `auto_generate_csv.py` / `civicomfy_batch_downloader.py` / `civitai_lookup.py` — 旧版独立工具，功能已集成到 Dashboard
+- `deploy.sh` / `deploy-prebuilt.sh` — 旧版 Bash 部署脚本，功能已迁移至 `deploy_engine.py`
+- `auto_generate_csv.py` / `civicomfy_batch_downloader.py` / `civitai_lookup.py` — 旧版独立工具
+- `dashboard.js` — 旧版单文件前端 JS (3170 行)，功能已迁移至 `static/js/` 模块
 
 ## 部署流程
 
 1. 用户在 Vast.ai / RunPod 创建实例，运行 `bootstrap.sh`
-2. bootstrap 安装最小依赖，启动 Dashboard (PM2 `dashboard` 进程，端口 5000)
+2. bootstrap 安装最小依赖，下载 Dashboard 文件（含 `comfycarry/`、`static/`、`comfycarry_ws_broadcast/`），启动 PM2 `dashboard` 进程 (端口 5000)
 3. 用户访问 Dashboard，首次进入 Setup Wizard (`setup_wizard.html`)
-4. 用户配置 → 点击部署 → `workspace_manager.py` 的 `_run_deploy()` 在后台线程执行全部安装逻辑 (日志通过 SSE 实时推送)
+4. 用户配置 → 点击部署 → `deploy_engine.py` 的 `_run_deploy()` 在后台线程执行安装逻辑 (日志通过 SSE 实时推送)
 5. 部署完成后自动跳转到 Dashboard 主界面
 
 ## 服务管理
@@ -36,11 +61,12 @@
 
 | 页面 | 功能 |
 |------|------|
-| Dashboard | 系统监控 (CPU/GPU/内存/磁盘)、PM2 服务状态 |
+| Dashboard | 系统监控 (CPU/GPU/内存/磁盘)、PM2 服务状态、ComfyUI 实时进度 |
 | Models | 本地模型管理 + CivitAI 搜索 + Enhanced-Civicomfy 下载 |
 | Plugins | 插件浏览/安装/卸载/更新 (代理 ComfyUI-Manager) |
 | ComfyUI | 启动参数管理 + 实时日志/事件 (WS→SSE) + 队列/历史 |
 | Tunnel | Cloudflare Tunnel 状态、Ingress 解析、服务链接 |
+| JupyterLab | JupyterLab 启动/停止、Token/URL、内核/Session/Terminal 管理 |
 | Cloud Sync | Rclone 配置编辑、OneDrive/Google Drive/R2 同步偏好、实时日志 |
 | Settings | 密码管理、CivitAI Key、Debug 模式、Dashboard 重启 |
 
@@ -78,10 +104,10 @@
 ## 开发注意事项
 
 - 前端无构建步骤，全部为原生 HTML/JS/CSS
-- CSS 变量: `--bg` (背景)、`--c1`/`--c2` (卡片)、`--ac` (主题色)、`--tx`/`--t2` (文字)
+- CSS 变量: `--bg`~`--bg4` (背景层级)、`--bd`/`--bd-f` (边框)、`--ac`/`--ac2` (主题色)、`--t1`/`--t2`/`--t3` (文字层级)、`--green`/`--red`/`--amber` 等颜色
 - 前端 HTML/JS 通过 Flask 直接 serve，带 `no-cache` 响应头
 - WebSocket 依赖: `websocket-client` (pip 包)
-- 认证: Flask session + 密码，`/dashboard.js` 和 `/api/setup/*` 路由跳过鉴权
+- 认证: Flask session + 密码，`/static/*`、`/api/version`、`/api/setup/*` 路由跳过鉴权
 
 ---
 

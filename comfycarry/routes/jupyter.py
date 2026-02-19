@@ -14,7 +14,6 @@ import json
 import os
 import re
 import subprocess
-import warnings
 
 import requests
 import urllib3

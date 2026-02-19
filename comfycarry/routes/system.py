@@ -318,10 +318,10 @@ def api_overview():
     downloads = {"active": [], "queue_count": 0}
     try:
         from . import models as models_mod
-        dl_resp = models_mod.download_status()
+        dl_resp = models_mod.api_download_status()
         dl_data = dl_resp.get_json() if hasattr(dl_resp, 'get_json') else json.loads(dl_resp.get_data())
-        active = [d for d in dl_data.get("downloads", []) if d.get("status") == "downloading"]
-        queued = [d for d in dl_data.get("downloads", []) if d.get("status") == "queued"]
+        active = dl_data.get("active", [])
+        queued = dl_data.get("queue", [])
         downloads["active"] = active[:3]  # Limit for overview
         downloads["active_count"] = len(active)
         downloads["queue_count"] = len(queued)

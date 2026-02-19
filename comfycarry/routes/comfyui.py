@@ -22,7 +22,7 @@ import subprocess
 import requests
 from flask import Blueprint, Response, jsonify, request
 
-from ..config import COMFYUI_URL
+from ..config import COMFYUI_URL, COMFYUI_DIR
 from ..services.comfyui_params import (
     COMFYUI_PARAM_GROUPS,
     parse_comfyui_args,
@@ -131,7 +131,7 @@ def api_comfyui_params_update():
         subprocess.run("pm2 delete comfy 2>/dev/null || true",
                        shell=True, timeout=10)
         cmd = (
-            f'cd /workspace/ComfyUI && pm2 start {py} --name comfy '
+            f'cd {COMFYUI_DIR} && pm2 start {py} --name comfy '
             f'--interpreter none --log /workspace/comfy.log --time '
             f'--restart-delay 3000 --max-restarts 10 '
             f'-- main.py {args_str}'

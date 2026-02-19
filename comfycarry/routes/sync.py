@@ -92,6 +92,8 @@ def api_sync_remote_create():
         return jsonify({"error": "name 和 type 必填"}), 400
     if not re.match(r'^[a-zA-Z0-9_-]+$', name):
         return jsonify({"error": "Remote 名称只能包含字母、数字、下划线和短横线"}), 400
+    if not re.match(r'^[a-zA-Z0-9_-]+$', rtype):
+        return jsonify({"error": "Remote 类型无效"}), 400
 
     existing = [r["name"] for r in _parse_rclone_conf()]
     if name in existing:

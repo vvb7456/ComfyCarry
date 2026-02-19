@@ -61,7 +61,7 @@ def serve_favicon():
 def serve_static(filename):
     static_dir = (Path(SCRIPT_DIR) / "static").resolve()
     safe_path = (static_dir / filename).resolve()
-    if not str(safe_path).startswith(str(static_dir)):
+    if not str(safe_path).startswith(str(static_dir) + os.sep):
         return "", 403
     if safe_path.exists() and safe_path.is_file():
         # JS modules need correct MIME type

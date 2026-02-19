@@ -210,7 +210,7 @@ class ComfyWSBridge:
                         "prompt_id": msg_data.get("prompt_id"),
                         "elapsed": round(elapsed, 1),
                     }})
-                    self._exec_info = None
+                    self._exec_info = None  # 置 None 防止 executing(node=None) 再次触发
                     self._last_progress = None
 
             # ── 执行错误 ──

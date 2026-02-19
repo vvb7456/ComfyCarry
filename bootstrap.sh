@@ -95,13 +95,23 @@ if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" 
 
     # 从解压目录复制所需文件
     EXTRACTED="${TMP_EXTRACT}/${REPO_NAME}-${BRANCH}"
-    for f in workspace_manager.py dashboard.html dashboard.js setup_wizard.html favicon.ico; do
+    for f in workspace_manager.py dashboard.html setup_wizard.html favicon.ico; do
         [ -f "$EXTRACTED/$f" ] && cp "$EXTRACTED/$f" "$DASHBOARD_DIR/$f"
     done
     # 复制 comfycarry/ Python 包
     if [ -d "$EXTRACTED/comfycarry" ]; then
         rm -rf "$DASHBOARD_DIR/comfycarry"
         cp -r "$EXTRACTED/comfycarry" "$DASHBOARD_DIR/comfycarry"
+    fi
+    # 复制 static/ 前端模块 (ES Module SPA)
+    if [ -d "$EXTRACTED/static" ]; then
+        rm -rf "$DASHBOARD_DIR/static"
+        cp -r "$EXTRACTED/static" "$DASHBOARD_DIR/static"
+    fi
+    # 复制 comfycarry_ws_broadcast/ 自定义节点
+    if [ -d "$EXTRACTED/comfycarry_ws_broadcast" ]; then
+        rm -rf "$DASHBOARD_DIR/comfycarry_ws_broadcast"
+        cp -r "$EXTRACTED/comfycarry_ws_broadcast" "$DASHBOARD_DIR/comfycarry_ws_broadcast"
     fi
 
     rm -rf "$TMP_TAR" "$TMP_EXTRACT"

@@ -628,18 +628,13 @@ async function comfyClearQueue() {
 let _historySortAsc = false;   // false = newest first
 let _historySize = 'md';      // 'sm' | 'md' | 'lg'
 
-function toggleHistorySort() {
-  _historySortAsc = !_historySortAsc;
-  const btn = document.getElementById('history-sort-btn');
-  if (btn) btn.textContent = _historySortAsc ? '🔼 旧→新' : '🔽 新→旧';
+function setHistorySort(value) {
+  _historySortAsc = (value === 'asc');
   loadComfyHistory();
 }
 
 function setHistorySize(size) {
   _historySize = size;
-  document.querySelectorAll('[data-hsize]').forEach(b =>
-    b.classList.toggle('active', b.dataset.hsize === size)
-  );
   const grid = document.querySelector('#queue-history .history-grid');
   if (grid) {
     grid.classList.remove('size-sm', 'size-md', 'size-lg');
@@ -733,5 +728,5 @@ window.comfyDeleteQueueItem = comfyDeleteQueueItem;
 window.comfyClearQueue = comfyClearQueue;
 window.loadComfyHistory = loadComfyHistory;
 window.loadQueuePanel = loadQueuePanel;
-window.toggleHistorySort = toggleHistorySort;
+window.setHistorySort = setHistorySort;
 window.setHistorySize = setHistorySize;

@@ -501,4 +501,5 @@ Object.assign(window, {
   openPluginVersionModal,
   closePluginVersionModal,
   installPluginVersion,
+  loadPluginsPage,
 });

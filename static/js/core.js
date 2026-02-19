@@ -104,7 +104,7 @@ export function copyText(text) {
 
 export function openImg(url) {
   const modal = document.getElementById('img-modal');
-  const img = document.getElementById('img-full');
+  const img = document.getElementById('modal-img');
   if (modal && img) {
     img.src = url;
     modal.classList.add('active');
@@ -198,8 +198,9 @@ export function setupScrollFab() {
 // ── Badge / Model 分类颜色 ──────────────────────────────────
 
 export function getBadgeClass(cat) {
-  const m = { checkpoint: 'badge-purple', lora: 'badge-blue', textualinversion: 'badge-green',
-    hypernetwork: 'badge-amber', aestheticgradient: 'badge-pink', controlnet: 'badge-cyan',
-    upscaler: 'badge-orange', vae: 'badge-red', poses: 'badge-teal' };
-  return m[cat] || 'badge-gray';
+  const key = (cat || '').toLowerCase().replace(/s$/, '');
+  const m = { checkpoint: 'badge-checkpoint', lora: 'badge-lora', textualinversion: 'badge-embeddings',
+    embedding: 'badge-embeddings', hypernetwork: 'badge-other', aestheticgradient: 'badge-other',
+    controlnet: 'badge-controlnet', upscaler: 'badge-other', vae: 'badge-vae', pose: 'badge-other' };
+  return m[key] || 'badge-other';
 }

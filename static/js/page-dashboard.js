@@ -327,7 +327,7 @@ function _renderMetrics(sys) {
   // Disk
   const disk = sys.disk || {};
   const diskPct = disk.percent || 0;
-  const diskColor = diskPct > 85 ? 'var(--red)' : diskPct > 60 ? 'var(--amber)' : 'var(--amber)';
+  const diskColor = diskPct > 85 ? 'var(--red)' : diskPct > 60 ? 'var(--amber)' : 'var(--green)';
   html += `<div class="metric-card">
     <div class="metric-header">
       <span class="metric-icon">💿</span>

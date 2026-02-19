@@ -19,7 +19,6 @@ let searchObserver = null;
 let isSearchLoading = false;
 let hasMoreResults = false;
 let currentModelTab = 'local';
-let _dlStatusTimer = null;
 let currentDlTab = 'pending';
 
 let searchPage = 0;
@@ -135,8 +134,8 @@ function renderMetaContent(data) {
       if (img.cfg) caption += `<label>CFG</label>${img.cfg}`;
       if (img.sampler) caption += `<label>Sampler</label>${img.sampler}`;
       if (img.model) caption += `<label>Model</label>${img.model}`;
-      if (img.positive) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${img.positive}</span>`;
-      if (img.negative) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${img.negative}</span>`;
+      if (img.positive) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(img.positive)}</span>`;
+      if (img.negative) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(img.negative)}</span>`;
 
       // Meilisearch images have meta in different structure
       if (img.meta) {
@@ -145,8 +144,8 @@ function renderMetaContent(data) {
         if (mt.steps) caption += `<label>Steps</label>${mt.steps}`;
         if (mt.cfgScale) caption += `<label>CFG</label>${mt.cfgScale}`;
         if (mt.sampler) caption += `<label>Sampler</label>${mt.sampler}`;
-        if (mt.prompt) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${mt.prompt}</span>`;
-        if (mt.negativePrompt) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${mt.negativePrompt}</span>`;
+        if (mt.prompt) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(mt.prompt)}</span>`;
+        if (mt.negativePrompt) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(mt.negativePrompt)}</span>`;
       }
 
       const isVideo = img.type === 'video' || (img.name && /\.(webm|mp4)$/i.test(img.name));
@@ -1171,7 +1170,7 @@ function renderPendingList() {
 
 registerPage('models', {
   enter() { loadLocalModels(); loadCartFromStorage(); updateCartBadge(); },
-  leave() { stopDlStatusPolling(); }
+  leave() { stopDlStatusPolling(); if (searchObserver) { searchObserver.disconnect(); searchObserver = null; } }
 });
 
 registerEscapeHandler(() => { closeMetaModal(); closeVersionPicker(); });
