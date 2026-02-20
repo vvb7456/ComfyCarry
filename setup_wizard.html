@@ -134,6 +134,25 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 .pw-toggle:hover { color: var(--t1); }
 .pw-mismatch { color: var(--red); font-size: .82rem; margin-top: 4px; display: none; }
 
+/* Help tooltip */
+.help-tip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--bd);
+    font-size: .75rem; color: var(--t3); cursor: help; vertical-align: middle;
+    position: relative;
+}
+.help-tip:hover { color: var(--accent); border-color: var(--accent); }
+.help-tip:hover::after {
+    content: attr(title); position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+    background: var(--bg2); color: var(--t1); border: 1px solid var(--bd); border-radius: 8px;
+    padding: 10px 14px; font-size: .82rem; line-height: 1.5; white-space: normal; width: 280px;
+    z-index: 100; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+.help-tip:hover::before {
+    content: ''; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: var(--bd); z-index: 101;
+}
+
 /* Deploy progress */
 .deploy-view { display: none; }
 .deploy-view.active { display: block; }
@@ -313,7 +332,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <!-- Step 2: Cloudflare Tunnel -->
     <div class="step" id="step-2">
         <div class="step-title">🌐 Cloudflare Tunnel</div>
-        <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问（推荐，很多实例端口映射不可靠）</div>
+        <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问 <span class="help-tip" title="在 Cloudflare Zero Trust → Networks → Tunnels 中创建 Tunnel，复制 Token 粘贴到下方。Tunnel 可将 Dashboard / ComfyUI / JupyterLab 等服务通过你的自定义域名安全暴露到公网。">?</span></div>
         <div id="cf-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>Tunnel Token</label>
