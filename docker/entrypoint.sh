@@ -9,6 +9,8 @@
 # ── SSH (容器基础功能, 即使 bootstrap 失败也要可 SSH 访问) ──
 mkdir -p /run/sshd
 [ ! -f /etc/ssh/ssh_host_rsa_key ] && ssh-keygen -A 2>/dev/null || true
+# 清除云平台注入的 SSH Banner (vast.ai / RunPod)
+: > /etc/banner 2>/dev/null || true
 /usr/sbin/sshd 2>/dev/null || true
 
 # ── Bootstrap (可通过 docker run -v bootstrap.sh:/tmp/bootstrap.sh 挂载覆盖) ──
