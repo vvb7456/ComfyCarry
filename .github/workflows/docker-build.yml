@@ -1,0 +1,108 @@
+# ==============================================================================
+# ComfyUI Docker 镜像构建 & 推送 (GitHub Actions)
+#
+# 触发: 手动 / push docker/ 或 .github/workflows/docker-build.yml
+# 产物: ghcr.io/vvb7456/comfyui-runpod:latest + :v3.0
+# ==============================================================================
+
+name: Build & Push Docker Image
+
+on:
+  workflow_dispatch:  # 手动触发
+  push:
+    paths:
+      - "docker/Dockerfile"
+      - "docker/entrypoint.sh"
+      - ".github/workflows/docker-build.yml"
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: vvb7456/comfyui-runpod
+  # wheels 版本 — 修改时同步更新 Release tag
+  FA2_WHEEL: flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
+  SA2_WHEELS: >-
+    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm80.whl
+    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm86.whl
+    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm89.whl
+    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm90.whl
+    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm100.whl
+    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm120.whl
+  RELEASE_TAG: wheels-v1  # GitHub Release tag (存放预编译 wheels)
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # ── 释放磁盘空间 (~30GB) ──
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: false  # 保留 Docker — 后面要用
+          swap-storage: false
+
+      - name: Check disk space
+        run: df -h /
+
+      # ── 检出代码 ──
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 下载预编译 wheels (从 GitHub Release) ──
+      - name: Download wheels from Release
+        run: |
+          mkdir -p docker/wheels
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
+
+          echo ">>> Downloading FA2 wheel..."
+          wget -q -P docker/wheels "${RELEASE_URL}/${{ env.FA2_WHEEL }}"
+
+          echo ">>> Downloading SA2 wheels..."
+          for whl in ${{ env.SA2_WHEELS }}; do
+            wget -q -P docker/wheels "${RELEASE_URL}/${whl}"
+          done
+
+          echo ">>> Downloaded wheels:"
+          ls -lh docker/wheels/
+
+      # ── Docker 登录 GHCR ──
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 设置 Buildx ──
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 构建 & 推送 ──
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: docker
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v3.0
+          # 不生成 attestation/provenance (避免 manifest list 问题)
+          provenance: false
+          sbom: false
+          # 单平台 amd64
+          platforms: linux/amd64
+
+      # ── 验证 ──
+      - name: Verify pushed image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

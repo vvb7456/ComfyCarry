@@ -26,8 +26,14 @@ models.csv.template
 models.csv
 lora_scan_result.csv
 
-# Docker 构建文件（本地使用）
-docker/
+# Docker 构建 — wheels 通过 GitHub Release 分发，本地配置不入仓库
+docker/wheels/
+docker/daemon.json
+docker/docker-proxy.conf
+docker/Dockerfile.ada
+docker/Dockerfile.blackwell
+docker/build-ada.sh
+docker/build-blackwell.sh
 
 # Workspace Manager
 .civitai_config.json
