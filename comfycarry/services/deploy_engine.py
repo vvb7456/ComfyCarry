@@ -15,7 +15,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-DEPLOY_LOG_FILE = \"/workspace/deploy.log\"
+DEPLOY_LOG_FILE = "/workspace/deploy.log"
 
 from ..config import (
     COMFYUI_DIR, CONFIG_FILE, DEFAULT_PLUGINS,
@@ -96,11 +96,18 @@ def _detect_gpu_info():
 
 
 def _deploy_log(msg, level="info"):
-    """向 SSE 推送一行日志"""
+    """向 SSE 推送一行日志并写入文件"""
+    now_str = datetime.now().strftime("%H:%M:%S")
     entry = {"type": "log", "level": level, "msg": msg,
-             "time": datetime.now().strftime("%H:%M:%S")}
+             "time": now_str}
     with _deploy_log_lock:
         _deploy_log_lines.append(entry)
+        
+    try:
+        with open(DEPLOY_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{now_str}] [{level.upper()}] {msg}\n")
+    except Exception:
+        pass
 
 
 def _install_sa2_prebuilt(py, cuda_cap):
@@ -238,8 +245,8 @@ def _run_deploy(config):
     try:
         # 清空/初始化部署日志文件
         try:
-            with open(DEPLOY_LOG_FILE, \"w\", encoding=\"utf-8\") as f:
-                f.write(f\"=== ComfyUI Deploy Process Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\\n\")
+            with open(DEPLOY_LOG_FILE, "w", encoding="utf-8") as f:
+                f.write(f"=== ComfyUI Deploy Process Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\\n")
         except Exception:
             pass
             
