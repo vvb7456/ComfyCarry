@@ -236,8 +236,6 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div class="step-title">选择部署方式</div>
         <div class="step-desc" id="step-0-desc">正在检测环境...</div>
         <div id="gpu-info-display"></div>
-        <!-- 检测到的镜像类型提示 -->
-        <div id="image-type-badge" style="display:none;margin-bottom:16px;padding:10px 14px;border-radius:8px;font-size:.88rem"></div>
         <div class="choice-grid">
             <div class="choice-card" onclick="selectMode('fresh')" id="choice-fresh">
                 <h3>🚀 全新部署</h3>
@@ -521,22 +519,16 @@ async function init() {
         // 自动设定 image_type
         wizardConfig.image_type = detectedImageType || 'generic';
 
-        // 显示镜像检测结果
-        const badge = document.getElementById('image-type-badge');
+        // 显示镜像检测结果 — 直接更新 step-0-desc
+        const descEl = document.getElementById('step-0-desc');
         const timeEl = document.getElementById('fresh-time');
         if (detectedImageType === 'prebuilt') {
-            badge.style.display = 'block';
-            badge.style.background = 'rgba(74,222,128,0.12)';
-            badge.style.border = '1px solid var(--green)';
-            badge.style.color = 'var(--green)';
-            badge.innerHTML = '⚡ 检测到<b>预构建镜像</b> — 已预装 PyTorch / ComfyUI / 加速组件';
+            descEl.innerHTML = '⚡ 检测到<b>预构建镜像</b> — 已预装 PyTorch / ComfyUI / 加速组件';
+            descEl.style.color = 'var(--green)';
             timeEl.textContent = '⏱ 预计 2-5 分钟';
         } else {
-            badge.style.display = 'block';
-            badge.style.background = 'rgba(124,92,252,0.12)';
-            badge.style.border = '1px solid var(--accent)';
-            badge.style.color = 'var(--accent2)';
-            badge.innerHTML = '🔧 检测到<b>通用镜像</b> — 将从零安装 PyTorch、ComfyUI 和加速组件';
+            descEl.innerHTML = '🔧 检测到<b>通用镜像</b> — 将从零安装 PyTorch、ComfyUI 和加速组件';
+            descEl.style.color = 'var(--accent2)';
             timeEl.textContent = '⏱ 预计 15-30 分钟';
         }
 
