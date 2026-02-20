@@ -15,6 +15,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+DEPLOY_LOG_FILE = \"/workspace/deploy.log\"
+
 from ..config import (
     COMFYUI_DIR, CONFIG_FILE, DEFAULT_PLUGINS,
     SYNC_RULE_TEMPLATES,
@@ -234,6 +236,13 @@ def _run_deploy(config):
     _deploy_log(f"使用 Python: {PY}")
 
     try:
+        # 清空/初始化部署日志文件
+        try:
+            with open(DEPLOY_LOG_FILE, \"w\", encoding=\"utf-8\") as f:
+                f.write(f\"=== ComfyUI Deploy Process Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\\n\")
+        except Exception:
+            pass
+            
         # STEP 1: 系统依赖
         if _step_done("system_deps"):
             _deploy_step("安装系统依赖 ✅ (已完成, 跳过)")
