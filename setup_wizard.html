@@ -124,6 +124,16 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 }
 .env-card .env-tag.green { color: var(--green); border-color: var(--green); }
 
+/* Password input wrapper */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 42px; }
+.pw-toggle {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--t3); cursor: pointer; font-size: 1.1rem; padding: 4px;
+}
+.pw-toggle:hover { color: var(--t1); }
+.pw-mismatch { color: var(--red); font-size: .82rem; margin-top: 4px; display: none; }
+
 /* Deploy progress */
 .deploy-view { display: none; }
 .deploy-view.active { display: block; }
@@ -280,7 +290,18 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div id="password-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>访问密码</label>
-            <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码...">
+            <div class="pw-wrap">
+                <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码...">
+                <button type="button" class="pw-toggle" onclick="togglePw('input-password', this)" title="显示/隐藏密码">👁</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>确认密码</label>
+            <div class="pw-wrap">
+                <input type="password" id="input-password-confirm" placeholder="再次输入密码...">
+                <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)" title="显示/隐藏密码">👁</button>
+            </div>
+            <div class="pw-mismatch" id="pw-mismatch-hint">⚠️ 两次输入的密码不一致</div>
             <div class="form-hint">部署完成后通过此密码登录 Dashboard</div>
         </div>
         <div class="btn-row">
@@ -673,6 +694,7 @@ async function init() {
         // ── 环境变量预填充 ──
         if (envVars.password) {
             document.getElementById('input-password').value = envVars.password;
+            document.getElementById('input-password-confirm').value = envVars.password;
             wizardConfig.password = envVars.password;
             const hint = document.getElementById('password-env-hint');
             hint.style.display = 'block';
@@ -705,6 +727,7 @@ async function init() {
         // ── 从已保存的 state 中恢复字段 ──
         if (state.password && !document.getElementById('input-password').value) {
             document.getElementById('input-password').value = state.password;
+            document.getElementById('input-password-confirm').value = state.password;
             wizardConfig.password = state.password;
         }
         if (state.cloudflared_token && !document.getElementById('input-cf-token').value) {
@@ -740,6 +763,12 @@ async function init() {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+function togglePw(inputId, btn) {
+    const inp = document.getElementById(inputId);
+    if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+    else { inp.type = 'password'; btn.textContent = '👁'; }
+}
+
 // ── Navigation ──
 function updateProgressBar() {
     const bar = document.getElementById('progressBar');
@@ -763,6 +792,20 @@ function showStep(n) {
 
 function nextStep() {
     saveCurrentStep();
+
+    // Step 1: 密码二次确认检查
+    if (currentStep === 1) {
+        const pw = document.getElementById('input-password').value;
+        const pw2 = document.getElementById('input-password-confirm').value;
+        const hint = document.getElementById('pw-mismatch-hint');
+        if (pw && pw2 && pw !== pw2) {
+            hint.style.display = 'block';
+            document.getElementById('input-password-confirm').focus();
+            return;
+        }
+        hint.style.display = 'none';
+    }
+
     // 恢复模式: 从 step 0 直接跳到确认部署
     if (currentStep === 0 && importedConfig) {
         showStep(TOTAL_STEPS - 1);
