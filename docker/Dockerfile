@@ -176,6 +176,11 @@ RUN chmod +x /opt/entrypoint.sh
 # =============================================================================
 # 14. 清理
 # =============================================================================
+# 移除插件 requirements.txt 中的 git+ URL (这些包已在步骤 11 安装,
+# 保留会导致 deploy 阶段 pip 重复 clone+build, 浪费 ~90s)
+RUN find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f \
+        -exec sed -i '/^git+/d' {} \;
+
 RUN rm -rf /tmp/* /var/tmp/* && \
     python3.12 -m pip cache purge 2>/dev/null || true
 
