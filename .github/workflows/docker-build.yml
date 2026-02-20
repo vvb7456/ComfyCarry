@@ -38,21 +38,6 @@ jobs:
       packages: write
 
     steps:
-      # ── 释放磁盘空间 (~30GB) ──
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false  # 保留 Docker — 后面要用
-          swap-storage: false
-
-      - name: Check disk space
-        run: df -h /
-
       # ── 检出代码 ──
       - name: Checkout
         uses: actions/checkout@v4
