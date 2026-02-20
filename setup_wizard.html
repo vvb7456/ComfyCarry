@@ -47,6 +47,10 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 
 /* Cards for selection */
 .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.choice-grid.rclone-cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.choice-grid.rclone-cards .choice-card { padding: clamp(12px, 1.5vw, 20px); }
+.choice-grid.rclone-cards .choice-card h3 { font-size: clamp(.88rem, 1vw, 1.05rem); margin-bottom: 4px; }
+.choice-grid.rclone-cards .choice-card p { font-size: clamp(.75rem, .85vw, .88rem); }
 .choice-card {
     background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
     padding: clamp(16px, 2vw, 28px); cursor: pointer; transition: all .2s;
@@ -274,7 +278,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div class="step-title">选择部署方式</div>
         <div class="step-desc" id="step-0-desc">正在检测环境...</div>
         <div id="gpu-info-display"></div>
-        <div class="choice-grid">
+        <div class="choice-grid" id="step0-cards" style="opacity:.4;pointer-events:none">
             <div class="choice-card" onclick="selectMode('fresh')" id="choice-fresh">
                 <h3>🚀 全新部署</h3>
                 <p>配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境</p>
@@ -348,19 +352,33 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <!-- Step 3: 云存储 (Remotes) -->
     <div class="step" id="step-3">
         <div class="step-title">☁️ 云存储配置</div>
-        <div class="step-desc">导入或创建 Rclone Remote，连接你的云端存储。跳过后可在 Dashboard 随时配置。</div>
+        <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="help-tip" title="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span></div>
 
-        <!-- Section: Import rclone config -->
-        <div style="margin-bottom:20px">
-            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">📦 导入 Rclone 配置</label>
-            <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
-            <div class="radio-group">
-                <label id="rclone-method-env" style="display:none"><input type="radio" name="rclone-method" value="base64_env" onchange="onRcloneMethodChange('base64_env')"> 环境变量</label>
-                <label><input type="radio" name="rclone-method" value="file" onchange="onRcloneMethodChange('file')"> 上传文件</label>
-                <label><input type="radio" name="rclone-method" value="url" onchange="onRcloneMethodChange('url')"> URL 导入</label>
-                <label><input type="radio" name="rclone-method" value="base64" onchange="onRcloneMethodChange('base64')"> Base64 粘贴</label>
-                <label><input type="radio" name="rclone-method" value="skip" onchange="onRcloneMethodChange('skip')" checked> 跳过</label>
+        <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
+
+        <!-- Rclone method cards -->
+        <div class="choice-grid rclone-cards" id="rclone-method-cards">
+            <div class="choice-card" data-rclone="base64_env" id="rclone-card-env" style="display:none" onclick="selectRcloneMethod('base64_env')">
+                <h3>🔑 环境变量</h3>
+                <p>使用已设置的 RCLONE_CONF_BASE64</p>
             </div>
+            <div class="choice-card" data-rclone="file" onclick="selectRcloneMethod('file')">
+                <h3>📂 上传文件</h3>
+                <p>上传本地 rclone.conf 文件</p>
+            </div>
+
+            <div class="choice-card" data-rclone="manual" onclick="selectRcloneMethod('manual')">
+                <h3>🔧 手动创建</h3>
+                <p>交互式创建新的 Remote</p>
+            </div>
+            <div class="choice-card" data-rclone="skip" onclick="selectRcloneMethod('skip')">
+                <h3>⏭️ 跳过</h3>
+                <p>稍后在 Dashboard 中配置</p>
+            </div>
+        </div>
+
+        <!-- Rclone input areas (shown based on selection) -->
+        <div id="rclone-input-area" style="display:none;margin-bottom:20px">
             <div id="rclone-file-input" style="display:none" class="form-group">
                 <label style="cursor:pointer;display:inline-block;background:var(--bg4);padding:8px 18px;border-radius:8px;font-size:.88rem">
                     📂 选择 rclone.conf 文件
@@ -368,16 +386,22 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
                 </label>
                 <span id="rclone-file-status" style="margin-left:10px;font-size:.82rem;color:var(--t3)"></span>
             </div>
-            <div id="rclone-url-input" style="display:none" class="form-group">
-                <label>Rclone 配置文件 URL</label>
-                <input type="text" id="input-rclone-url" placeholder="https://example.com/rclone.conf">
-            </div>
-            <div id="rclone-base64-input" style="display:none" class="form-group">
-                <label>Base64 编码的 rclone.conf</label>
-                <textarea id="input-rclone-base64" placeholder="粘贴 RCLONE_CONF_BASE64 的值..."></textarea>
-            </div>
-            <div id="rclone-skip-note" class="form-hint" style="margin-bottom:4px">
-                跳过后可在 Dashboard「云同步」页面随时配置
+
+            <div id="rclone-manual-input" style="display:none" class="wz-add-remote-form">
+                <div class="form-group">
+                    <label>Remote 名称</label>
+                    <input type="text" id="wz-remote-name" placeholder="例如 myr2" style="width:100%">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="wz-remote-type" onchange="renderWizardRemoteFields()" style="width:100%">
+                        <option value="">选择类型...</option>
+                    </select>
+                </div>
+                <div id="wz-remote-fields"></div>
+                <div style="display:flex;gap:8px;margin-top:10px">
+                    <button class="btn btn-primary" onclick="submitWizardRemote()" style="font-size:.85rem;padding:6px 16px">添加 Remote</button>
+                </div>
             </div>
         </div>
 
@@ -391,28 +415,6 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div id="wizard-manual-remotes" style="display:none;margin-bottom:20px">
             <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">🔧 手动添加的 Remote</label>
             <div id="wizard-manual-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-        </div>
-
-        <!-- Add remote button + form -->
-        <div style="margin-bottom:16px">
-            <button class="btn btn-secondary" onclick="toggleWizardAddRemote()" id="btn-wz-add-remote" style="font-size:.85rem;padding:8px 16px">+ 手动创建 Remote</button>
-            <div id="wizard-add-remote-form" style="display:none" class="wz-add-remote-form">
-                <div class="form-group">
-                    <label>Remote 名称</label>
-                    <input type="text" id="wz-remote-name" placeholder="例如 myr2" style="width:100%">
-                </div>
-                <div class="form-group">
-                    <label>类型</label>
-                    <select id="wz-remote-type" onchange="renderWizardRemoteFields()" style="width:100%">
-                        <option value="">选择类型...</option>
-                    </select>
-                </div>
-                <div id="wz-remote-fields"></div>
-                <div style="display:flex;gap:8px;margin-top:10px">
-                    <button class="btn btn-primary" onclick="submitWizardRemote()" style="font-size:.85rem;padding:6px 16px">添加</button>
-                    <button class="btn btn-secondary" onclick="toggleWizardAddRemote()" style="font-size:.85rem;padding:6px 16px">取消</button>
-                </div>
-            </div>
         </div>
 
         <div class="btn-row">
@@ -683,6 +685,12 @@ async function init() {
             });
         }
 
+        // 解锁 Step 0 卡片 (检测完成)
+        if (!isUnsupported) {
+            const cards0 = document.getElementById('step0-cards');
+            cards0.style.opacity = ''; cards0.style.pointerEvents = '';
+        }
+
         renderPluginList(pluginData, selectedUrls);
 
         // Populate add-remote type selector
@@ -727,13 +735,12 @@ async function init() {
             hint.innerHTML = '✅ 已从环境变量 <code>CF_TUNNEL_TOKEN</code> 检测到 Token（Tunnel 已在运行中）';
         }
         if (envVars.rclone_has_env) {
-            document.getElementById('rclone-method-env').style.display = '';
+            document.getElementById('rclone-card-env').style.display = '';
             const hint = document.getElementById('rclone-env-hint');
             hint.style.display = 'block';
             hint.innerHTML = '✅ 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
-            document.querySelector('input[name="rclone-method"][value="base64_env"]').checked = true;
             wizardConfig.rclone_config_method = 'base64_env';
-            onRcloneMethodChange('base64_env');
+            selectRcloneMethod('base64_env');
         }
         if (envVars.civitai_token) {
             document.getElementById('input-civitai-token').value = envVars.civitai_token;
@@ -759,8 +766,7 @@ async function init() {
         }
         if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
             const method = state.rclone_config_method;
-            const radio = document.querySelector(`input[name="rclone-method"][value="${method}"]`);
-            if (radio) { radio.checked = true; onRcloneMethodChange(method); }
+            selectRcloneMethod(method);
             wizardConfig.rclone_config_method = method;
             if (state.rclone_config_value) {
                 wizardConfig.rclone_config_value = state.rclone_config_value;
@@ -825,6 +831,19 @@ function nextStep() {
         hint.style.display = 'none';
     }
 
+    // Step 3: Rclone 配置完整性检查
+    if (currentStep === 3) {
+        const m = _selectedRcloneMethod;
+        if (m === 'file' && !wizardConfig.rclone_config_value) {
+            alert('请先上传 rclone.conf 文件');
+            return;
+        }
+        if (m === 'manual' && wizardConfig.wizard_remotes.length === 0) {
+            alert('请先添加至少一个 Remote');
+            return;
+        }
+    }
+
     // 恢复模式: 从 step 0 直接跳到确认部署
     if (currentStep === 0 && importedConfig) {
         showStep(TOTAL_STEPS - 1);
@@ -876,10 +895,12 @@ function saveCurrentStep() {
             wizardConfig.cloudflared_token = document.getElementById('input-cf-token').value.trim();
             break;
         case 3: {
-            const method = document.querySelector('input[name="rclone-method"]:checked')?.value || 'skip';
+            const method = _selectedRcloneMethod || 'skip';
             wizardConfig._rclone_display_method = method;
             if (method === 'file') {
                 wizardConfig.rclone_config_method = 'base64';
+            } else if (method === 'manual') {
+                wizardConfig.rclone_config_method = 'skip';
             } else {
                 wizardConfig.rclone_config_method = method;
                 if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
@@ -940,19 +961,32 @@ function selectMode(mode) {
 }
 
 // ── Rclone Config ──
-function onRcloneMethodChange(method) {
+let _selectedRcloneMethod = 'skip';
+
+function selectRcloneMethod(method) {
+    _selectedRcloneMethod = method;
+    // 更新卡片选中状态
+    document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => {
+        c.classList.toggle('selected', c.dataset.rclone === method);
+    });
+    // 切换 input 区域
+    const area = document.getElementById('rclone-input-area');
+    const needsInput = ['file', 'manual'].includes(method);
+    area.style.display = needsInput ? 'block' : 'none';
     document.getElementById('rclone-file-input').style.display = method === 'file' ? 'block' : 'none';
-    document.getElementById('rclone-url-input').style.display = method === 'url' ? 'block' : 'none';
-    document.getElementById('rclone-base64-input').style.display = method === 'base64' ? 'block' : 'none';
-    document.getElementById('rclone-skip-note').style.display = method === 'skip' ? 'block' : 'none';
-    // Auto-detect remotes when selecting non-skip method
-    if (method !== 'skip') {
+    document.getElementById('rclone-manual-input').style.display = method === 'manual' ? 'block' : 'none';
+    // 触发 remote 检测
+    if (method !== 'skip' && method !== 'manual') {
         clearTimeout(window._rcloneDetectTimer);
         window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 300);
-    } else {
+    } else if (method === 'skip') {
         document.getElementById('wizard-remotes-section').style.display = 'none';
         _detectedRemotes = [];
     }
+}
+
+function onRcloneMethodChange(method) {
+    selectRcloneMethod(method);
 }
 
 function handleRcloneFile(event) {
@@ -968,7 +1002,7 @@ function handleRcloneFile(event) {
 }
 
 async function detectRemotes() {
-    const method = document.querySelector('input[name="rclone-method"]:checked')?.value || 'skip';
+    const method = _selectedRcloneMethod || 'skip';
     let value = '';
     if (method === 'file' || method === 'base64') {
         value = wizardConfig.rclone_config_value || document.getElementById('input-rclone-base64')?.value?.trim() || '';
@@ -1007,8 +1041,9 @@ async function detectRemotes() {
 
 // ── Add Remote (Wizard) ──
 function toggleWizardAddRemote() {
-    const form = document.getElementById('wizard-add-remote-form');
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    // Legacy: 手动创建已整合到 rclone-manual-input 卡片中，此函数保留兼容
+    const form = document.getElementById('wizard-add-remote-form') || document.getElementById('rclone-manual-input');
+    if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
 }
 
 function renderWizardRemoteFields() {
@@ -1065,6 +1100,13 @@ function submitWizardRemote() {
     document.getElementById('wz-remote-type').value = '';
     document.getElementById('wz-remote-fields').innerHTML = '';
     toggleWizardAddRemote();
+    // 添加后显示提示
+    const status = document.createElement('div');
+    status.className = 'form-hint';
+    status.style.color = 'var(--green)';
+    status.textContent = `✅ Remote "${name}" 已添加`;
+    document.getElementById('rclone-manual-input').appendChild(status);
+    setTimeout(() => status.remove(), 3000);
 }
 
 function removeWizardRemote(name) {
