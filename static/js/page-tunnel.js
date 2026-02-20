@@ -27,14 +27,24 @@ async function loadTunnelPage() {
     let linksHtml = '';
     if (links.length > 0) {
       linksHtml = '<div class="tunnel-services">' + links.map(l => {
-        const proto = (l.service || '').split('://')[0] || 'http';
         const portInfo = l.port ? `:${l.port}` : '';
-        return `<a href="${l.url}" target="_blank" class="tunnel-svc-card">
-          <span class="tunnel-svc-icon">${l.icon || '🔗'}</span>
-          <span class="tunnel-svc-name">${l.name}</span>
-          <span class="tunnel-svc-detail">${l.url}</span>
-          <span class="tunnel-svc-port">${proto}${portInfo}</span>
-        </a>`;
+        const statusColor = l.status === 'online' ? 'var(--green)' : l.status === 'stopped' ? 'var(--red,#e74c3c)' : 'var(--t3)';
+        if (l.url) {
+          return `<a href="${escHtml(l.url)}" target="_blank" class="tunnel-svc-card">
+            <span class="tunnel-svc-icon">${l.icon || '🔗'}</span>
+            <span class="tunnel-svc-name">${escHtml(l.name)}</span>
+            <span class="tunnel-svc-detail">${escHtml(l.url)}</span>
+            <span class="tunnel-svc-port" style="color:${statusColor}">http${portInfo}</span>
+          </a>`;
+        } else {
+          // 服务运行中但无 Tunnel 域名
+          const hint = l.status === 'online' ? '未配置 Tunnel' : l.status === 'stopped' ? '未运行' : '未检测';
+          return `<div class="tunnel-svc-card" style="opacity:0.5;cursor:default">
+            <span class="tunnel-svc-icon">${l.icon || '🔗'}</span>
+            <span class="tunnel-svc-name">${escHtml(l.name)}</span>
+            <span class="tunnel-svc-detail" style="color:var(--t3)">${hint}${portInfo ? ' · 端口 ' + l.port : ''}</span>
+          </div>`;
+        }
       }).join('') + '</div>';
     } else {
       linksHtml = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">未检测到转发服务</div>';

@@ -392,6 +392,15 @@ def _run_deploy(config):
 
             # 健康检查
             _deploy_step("ComfyUI 健康检查")
+
+            # 确保端口 8188 未被占用 (可能有旧进程残留)
+            _deploy_exec(
+                "pm2 delete comfy 2>/dev/null || true; "
+                "pkill -9 -f 'main.py.*--port 8188' 2>/dev/null || true; "
+                "sleep 1",
+                label="清理端口 8188"
+            )
+
             _deploy_log("启动健康检查...")
             _deploy_exec(
                 f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 '
@@ -648,7 +657,7 @@ def _run_deploy(config):
         if new_pw:
             cfg.DASHBOARD_PASSWORD = new_pw
             _save_dashboard_password(new_pw)
-            _deploy_log("Dashboard 密码已更新并保存")
+            _deploy_log("ComfyCarry 密码已更新并保存")
 
         state = _load_setup_state()
         state["deploy_completed"] = True
@@ -661,7 +670,7 @@ def _run_deploy(config):
             f"🚀 部署完成! GPU: {gpu_info.get('name', '?')} | "
             f"CUDA: {gpu_info.get('cuda_cap', '?')}"
         )
-        _deploy_log("请刷新页面进入 Dashboard")
+        _deploy_log("请刷新页面进入 ComfyCarry")
 
     except Exception as e:
         _deploy_log(f"❌ 部署失败: {e}", "error")

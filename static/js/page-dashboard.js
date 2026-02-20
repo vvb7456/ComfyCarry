@@ -177,8 +177,8 @@ async function refreshOverview() {
 function _renderQuickLinks(tunnel) {
   const el = document.getElementById('overview-quick-links');
   if (!el) return;
-  // 过滤掉 Dashboard 自身的链接（用户已经在 Dashboard 中）
-  const links = (tunnel?.links || []).filter(l => !/dashboard/i.test(l.name));
+  // 只显示有公网 URL 的服务链接, 过滤掉 ComfyCarry 自身
+  const links = (tunnel?.links || []).filter(l => l.url && !/comfycarry/i.test(l.name));
   const tunnelOnline = tunnel?.pm2_status === 'online';
   if (links.length === 0) {
     el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? '🌐 Tunnel 已连接' : '🌐 Tunnel 未连接'}</div>`;
@@ -555,7 +555,7 @@ function _renderEnvInfo(data) {
   if (gpu) tags.push(`${gpu.name} ${gpu.mem_total}MB`);
   if (sys.cpu?.cores) tags.push(`${sys.cpu.cores} CPU cores`);
   if (sys.memory?.total) tags.push(`${fmtBytes(sys.memory.total)} RAM`);
-  if (ver.version) tags.push(`Dashboard ${ver.version}`);
+  if (ver.version) tags.push(`ComfyCarry ${ver.version}`);
 
   el.innerHTML = tags.map(t => `<span class="env-tag">${escHtml(t)}</span>`).join('');
 }

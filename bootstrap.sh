@@ -1,9 +1,9 @@
 #!/bin/bash
 # ==============================================================================
-# ComfyUI Dashboard Bootstrap (v1.0)
+# ComfyCarry Bootstrap (v1.0)
 #
-# 最小化启动脚本 — 只做一件事：让 Dashboard 跑起来
-# 所有配置和部署逻辑都在 Dashboard 向导中完成
+# 最小化启动脚本 — 只做一件事：让 ComfyCarry 跑起来
+# 所有配置和部署逻辑都在 ComfyCarry 向导中完成
 #
 # 用法:
 #   wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash
@@ -17,7 +17,7 @@ mkdir -p /workspace
 exec &> >(tee -a "$LOG_FILE")
 
 echo "================================================="
-echo "  ComfyUI Dashboard Bootstrap v1.0"
+echo "  ComfyCarry Bootstrap v1.0"
 echo "  $(date)"
 echo "================================================="
 
@@ -76,11 +76,11 @@ else
     fi
 fi
 
-# ── Dashboard 依赖 ──
+# ── ComfyCarry 依赖 ──
 if [ "$PREBUILT" = true ]; then
-    echo "  -> Dashboard 依赖已预装, 跳过"
+    echo "  -> ComfyCarry 依赖已预装, 跳过"
 else
-    echo "  -> 安装 Dashboard 依赖..."
+    echo "  -> 安装 ComfyCarry 依赖..."
     # --ignore-installed: 避免系统包 (如 blinker) 的 uninstall-no-record-file 错误
     $PYTHON_BIN -m pip install --no-cache-dir --ignore-installed flask psutil flask-cors requests websocket-client -q 2>/dev/null || true
 fi
@@ -89,7 +89,7 @@ fi
 if [ "$PREBUILT" = true ]; then
     echo "  -> Cloudflared 已预装, 跳过"
 else
-    # 很多实例公网端口映射不可靠, Tunnel 是可靠访问 Dashboard 的前提
+    # 很多实例公网端口映射不可靠, Tunnel 是可靠访问 ComfyCarry 的前提
     if ! command -v cloudflared >/dev/null 2>&1; then
         echo "  -> 安装 Cloudflared..."
         mkdir -p --mode=0755 /usr/share/keyrings
@@ -100,7 +100,7 @@ else
     fi
 fi
 
-# ── 下载 Dashboard 文件 ──
+# ── 下载 ComfyCarry 文件 ──
 DASHBOARD_DIR="/workspace/ComfyCarry"
 REPO_OWNER="vvb7456"
 REPO_NAME="ComfyCarry"
@@ -154,7 +154,7 @@ branch=${BRANCH}
 commit=${COMMIT_HASH}
 EOF
 
-# ── 启动 Dashboard ──
+# ── 启动 ComfyCarry ──
 pm2 delete dashboard 2>/dev/null || true
 
 if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
@@ -165,13 +165,13 @@ if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
         -- "$DASHBOARD_DIR/workspace_manager.py" 5000
     pm2 save 2>/dev/null || true
 else
-    echo "❌ Dashboard 文件下载失败，请检查网络连接"
+    echo "❌ ComfyCarry 文件下载失败，请检查网络连接"
     exit 1
 fi
 
 # ── CF Tunnel (可选 — 让向导页可通过 Tunnel 域名访问) ──
 # 如果设置了 CF_TUNNEL_TOKEN 环境变量，bootstrap 阶段就启动 tunnel
-# 这样即使公网端口不通，也能通过 tunnel 域名访问 Dashboard 向导
+# 这样即使公网端口不通，也能通过 tunnel 域名访问 ComfyCarry 向导
 if [ -n "${CF_TUNNEL_TOKEN:-}" ]; then
     echo "  -> 启动 Cloudflare Tunnel..."
     pm2 delete tunnel 2>/dev/null || true
@@ -187,7 +187,7 @@ fi
 
 echo ""
 echo "================================================="
-echo "  ✅ Dashboard 已启动！"
+echo "  ✅ ComfyCarry 已启动！"
 echo ""
 echo "  请访问以下地址完成部署向导："
 echo "  → http://localhost:5000"

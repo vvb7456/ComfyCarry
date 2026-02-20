@@ -74,7 +74,7 @@ def api_settings_restart():
         time.sleep(1)
         subprocess.run("pm2 restart dashboard", shell=True, timeout=15)
     threading.Thread(target=_do_restart, daemon=True).start()
-    return jsonify({"ok": True, "message": "Dashboard 正在重启..."})
+    return jsonify({"ok": True, "message": "ComfyCarry 正在重启..."})
 
 
 @bp.route("/api/settings/debug", methods=["GET"])
@@ -175,7 +175,7 @@ def api_settings_import_config():
         try:
             cfg.DASHBOARD_PASSWORD = data["password"]
             cfg._save_dashboard_password(data["password"])
-            applied.append("Dashboard 密码")
+            applied.append("ComfyCarry 密码")
         except Exception as e:
             errors.append(f"密码: {e}")
 
@@ -266,12 +266,24 @@ def api_settings_reinitialize():
 
     errors = []
 
+    # 1) 停止 PM2 托管的服务
     try:
         stop_sync_worker()
         subprocess.run("pm2 delete comfy 2>/dev/null || true", shell=True, timeout=15)
         subprocess.run("pm2 delete sync 2>/dev/null || true", shell=True, timeout=15)
     except Exception as e:
         errors.append(f"停止服务失败: {e}")
+
+    # 2) 强制结束所有可能残留的 ComfyUI 进程
+    try:
+        subprocess.run(
+            "pkill -9 -f 'main.py.*--port 8188' 2>/dev/null || true; "
+            "pkill -9 -f 'main.py.*--listen.*8188' 2>/dev/null || true; "
+            "sleep 1",
+            shell=True, timeout=10
+        )
+    except Exception:
+        pass
 
     comfy_dir = Path(COMFYUI_DIR)
     if comfy_dir.exists():

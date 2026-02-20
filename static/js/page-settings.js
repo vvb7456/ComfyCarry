@@ -134,10 +134,10 @@ async function toggleDebugMode() {
 }
 
 async function restartDashboard() {
-  if (!confirm('确定要重启 Dashboard 吗? 页面将短暂不可用')) return;
+  if (!confirm('确定要重启 ComfyCarry 吗? 页面将短暂不可用')) return;
   try {
     await fetch('/api/settings/restart', { method: 'POST' });
-    showToast('🔄 Dashboard 正在重启, 3 秒后自动刷新...');
+    showToast('🔄 ComfyCarry 正在重启, 3 秒后自动刷新...');
     setTimeout(() => location.reload(), 3000);
   } catch (e) { showToast('重启失败: ' + e.message); }
 }

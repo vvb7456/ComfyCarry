@@ -327,15 +327,15 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 1: Dashboard 密码 -->
+    <!-- Step 1: ComfyCarry 密码 -->
     <div class="step" id="step-1">
-        <div class="step-title">🔐 设置 Dashboard 密码</div>
-        <div class="step-desc">保护你的工作空间管理器</div>
+        <div class="step-title">🔐 设置 ComfyCarry 密码</div>
+        <div class="step-desc">保护你的 ComfyCarry 控制台</div>
         <div id="password-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>访问密码</label>
             <div class="pw-wrap">
-                <input type="password" id="input-password" placeholder="输入 Dashboard 访问密码...">
+                <input type="password" id="input-password" placeholder="输入 ComfyCarry 访问密码...">
                 <button type="button" class="pw-toggle" onclick="togglePw('input-password', this)" title="显示/隐藏密码">👁</button>
             </div>
         </div>
@@ -346,7 +346,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
                 <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)" title="显示/隐藏密码">👁</button>
             </div>
             <div class="pw-mismatch" id="pw-mismatch-hint">⚠️ 两次输入的密码不一致</div>
-            <div class="form-hint">部署完成后通过此密码登录 Dashboard</div>
+            <div class="form-hint">部署完成后通过此密码登录 ComfyCarry</div>
         </div>
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
@@ -357,7 +357,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <!-- Step 2: Cloudflare Tunnel -->
     <div class="step" id="step-2">
         <div class="step-title">🌐 Cloudflare Tunnel</div>
-        <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问 <span class="help-tip" title="在 Cloudflare Zero Trust → Networks → Tunnels 中创建 Tunnel，复制 Token 粘贴到下方。Tunnel 可将 Dashboard / ComfyUI / JupyterLab 等服务通过你的自定义域名安全暴露到公网。">?</span></div>
+        <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问 <span class="help-tip" title="在 Cloudflare Zero Trust → Networks → Tunnels 中创建 Tunnel，复制 Token 粘贴到下方。Tunnel 可将 ComfyCarry / ComfyUI / JupyterLab 等服务通过你的自定义域名安全暴露到公网。">?</span></div>
         <div id="cf-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>Tunnel Token</label>
@@ -443,7 +443,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <!-- Step 4: 同步规则 -->
     <div class="step" id="step-4">
         <div class="step-title">🔄 同步规则配置</div>
-        <div class="step-desc">选择需要同步的内容，部署后可在 Dashboard「云同步」页面自由增删改。</div>
+        <div class="step-desc">选择需要同步的内容，部署后可在 ComfyCarry「云同步」页面自由增删改。</div>
 
         <!-- Default remote selector -->
         <div style="margin-bottom:18px">
@@ -464,7 +464,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
             <div class="wz-rule-row" id="wz-push-rules"></div>
         </div>
 
-        <div id="wz-rule-count" style="font-size:.78rem;color:var(--t3);margin-bottom:8px">已选规则：0 · 部署后可在 Dashboard 云同步页修改</div>
+        <div id="wz-rule-count" style="font-size:.78rem;color:var(--t3);margin-bottom:8px">已选规则：0 · 部署后可在 ComfyCarry 云同步页修改</div>
 
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
@@ -475,12 +475,12 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
     <!-- Step 5: CivitAI -->
     <div class="step" id="step-5">
         <div class="step-title">🎨 CivitAI API Key</div>
-        <div class="step-desc">配置 CivitAI API Key 以在 Dashboard 中搜索和下载模型</div>
+        <div class="step-desc">配置 CivitAI API Key 以在 ComfyCarry 中搜索和下载模型</div>
         <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>API Key</label>
             <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)" oninput="updateNextBtnText()">
-            <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 Dashboard 设置</div>
+            <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 ComfyCarry 设置</div>
         </div>
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
@@ -551,7 +551,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div id="deploy-error-banner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:14px;word-break:break-word;"></div>
         <!-- 成功按钮 -->
         <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
-            <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 Dashboard</button>
+            <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 ComfyCarry</button>
         </div>
         <!-- 失败按钮 -->
         <div class="btn-row" id="deploy-fail-row" style="display:none;margin-top:16px">
@@ -1277,7 +1277,7 @@ function toggleRuleCard(card) {
 function updateRuleCount() {
     const n = document.querySelectorAll('.wz-rule-card.selected').length;
     const el = document.getElementById('wz-rule-count');
-    if (el) el.textContent = `已选规则：${n} · 部署后可在 Dashboard 云同步页修改`;
+    if (el) el.textContent = `已选规则：${n} · 部署后可在 ComfyCarry 云同步页修改`;
 }
 
 function initDragScroll(el) {
@@ -1422,7 +1422,7 @@ function renderSummary() {
         </div>
         <div class="summary-card">
             <h4>网络与安全</h4>
-            <div class="summary-row"><span class="label">Dashboard 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
+            <div class="summary-row"><span class="label">ComfyCarry 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
             <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.cloudflared_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
         </div>
         <div class="summary-card">

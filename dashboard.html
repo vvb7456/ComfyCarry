@@ -2869,7 +2869,7 @@
                     <div style="display:grid;gap:clamp(16px,1.5vw,24px)">
                         <!-- 密码设置 -->
                         <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 Dashboard 密码</h3>
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 ComfyCarry 密码</h3>
                             <form onsubmit="event.preventDefault();changePassword()" autocomplete="off">
                             <div class="form-group" style="margin-bottom:10px">
                                 <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
@@ -2912,7 +2912,7 @@
                                 <span style="font-size:.75rem;color:var(--t3)">开启后显示日志</span>
                             </div>
                             <div style="display:flex;gap:8px">
-                                <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 Dashboard</button>
+                                <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 ComfyCarry</button>
                             </div>
                         </div>
 
@@ -2932,10 +2932,10 @@
                         </div>
                     </div>
 
-                    <!-- 右列: Dashboard 日志 (Debug 模式) -->
+                    <!-- 右列: ComfyCarry 日志 (Debug 模式) -->
                     <div class="card" id="settings-log-card" style="padding:clamp(16px,1.5vw,24px);display:none;height:100%;min-height:400px;max-height:calc(100vh - 160px)">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                            <h3 style="font-size:clamp(0.95rem,1.1vw,1.15rem)">📜 Dashboard 日志</h3>
+                            <h3 style="font-size:clamp(0.95rem,1.1vw,1.15rem)">📜 ComfyCarry 日志</h3>
                             <div style="display:flex;gap:8px;align-items:center">
                                 <select id="log-lines" onchange="loadSettingsLogs()" style="width:auto;min-width:80px;font-size:.8rem;padding:4px 8px">
                                     <option value="50">50 行</option>
@@ -2999,7 +2999,7 @@
             </div>
             <div class="ie-section">
                 <h4>📤 导出配置</h4>
-                <p>导出当前 Dashboard 的密码、CivitAI 密钥、同步偏好等配置为 JSON 文件</p>
+                <p>导出当前 ComfyCarry 的密码、CivitAI 密钥、同步偏好等配置为 JSON 文件</p>
                 <button class="btn btn-sm btn-primary" onclick="exportConfig()">导出配置文件</button>
             </div>
             <div class="ie-section">
