@@ -79,6 +79,18 @@ def _detect_image_type():
     return "unsupported"
 
 
+def _read_prebuilt_info():
+    """读取预构建镜像的元信息 (JSON)"""
+    marker = Path("/opt/.comfycarry-prebuilt")
+    if marker.exists():
+        try:
+            import json as _json
+            return _json.loads(marker.read_text(encoding="utf-8"))
+        except Exception:
+            return {"version": "unknown"}
+    return None
+
+
 def _detect_python():
     """动态检测可用的 Python (优先 3.12, wheel 在 3.12 上编译验证)"""
     for cmd in ["python3.12", "python3", "python"]:

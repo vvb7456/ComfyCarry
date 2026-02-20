@@ -153,7 +153,19 @@ RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_model
              /root/.config/rclone && \
     ln -snf /workspace /root/workspace && \
     touch ~/.no_auto_tmux && \
-    touch /opt/.comfycarry-prebuilt
+    python3.12 -c "\
+import json, datetime, torch; \
+info = { \
+    'version': '3.0', \
+    'build_date': datetime.datetime.now().strftime('%Y-%m-%d'), \
+    'python': '3.12', \
+    'torch': torch.__version__, \
+    'cuda_toolkit': torch.version.cuda or '', \
+    'fa2': True, \
+    'sa2_archs': ['sm80','sm86','sm89','sm90','sm100','sm120'], \
+    'base_image': 'runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404', \
+}; \
+open('/opt/.comfycarry-prebuilt','w').write(json.dumps(info, indent=2))"
 
 # =============================================================================
 # 13. 入口脚本

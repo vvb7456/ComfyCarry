@@ -107,13 +107,22 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 }
 .radio-group input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
-/* GPU info card */
-.gpu-card {
+/* Environment info card */
+.env-card {
     background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
     padding: clamp(14px, 1.5vw, 24px); margin-bottom: 20px;
 }
-.gpu-card .gpu-name { font-weight: 600; font-size: clamp(1rem, 1.2vw, 1.3rem); }
-.gpu-card .gpu-detail { color: var(--t3); font-size: clamp(0.82rem, 0.9vw, 1rem); margin-top: 6px; }
+.env-card .env-row { display: flex; align-items: baseline; gap: 8px; }
+.env-card .env-row + .env-row { margin-top: 8px; }
+.env-card .env-label { color: var(--t3); font-size: .82rem; min-width: 60px; white-space: nowrap; }
+.env-card .env-value { font-weight: 600; font-size: clamp(.92rem, 1vw, 1.1rem); }
+.env-card .env-divider { border: none; border-top: 1px solid var(--bd); margin: 10px 0; }
+.env-card .env-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.env-card .env-tag {
+    font-size: .75rem; padding: 2px 8px; border-radius: 10px;
+    background: var(--bg4); color: var(--t2); border: 1px solid var(--bd);
+}
+.env-card .env-tag.green { color: var(--green); border-color: var(--green); }
 
 /* Deploy progress */
 .deploy-view { display: none; }
@@ -487,6 +496,7 @@ let wizardConfig = {
 let pluginData = [];
 let envVars = {};
 let detectedImageType = '';
+let prebuiltInfo = null;
 let importedConfig = null;
 let _syncTemplates = [];
 let _remoteTypeDefs = {};
@@ -499,17 +509,89 @@ async function init() {
         const state = await r.json();
         envVars = state.env_vars || {};
         detectedImageType = state.detected_image_type || '';
+        prebuiltInfo = state.prebuilt_info || null;
         _syncTemplates = state.sync_templates || [];
         _remoteTypeDefs = state.remote_type_defs || {};
 
-        // GPU info
-        if (state.gpu_info && state.gpu_info.name) {
-            const g = state.gpu_info;
-            document.getElementById('gpu-info-display').innerHTML = `
-                <div class="gpu-card">
-                    <div class="gpu-name">🖥️ ${esc(g.name)}</div>
-                    <div class="gpu-detail">CUDA Capability: ${esc(g.cuda_cap)} | VRAM: ${g.vram_gb} GB</div>
-                </div>`;
+        // ── Mock 模式 (URL ?mock=xxx 覆盖检测结果，仅用于调试) ──
+        const mockParam = new URLSearchParams(location.search).get('mock');
+        let mockGpu = state.gpu_info;
+        if (mockParam) {
+            console.log('[Wizard] Mock mode:', mockParam);
+            if (mockParam === 'prebuilt') { detectedImageType = 'prebuilt'; prebuiltInfo = {version:'3.0',torch:'2.9.1+cu130',cuda_toolkit:'13.0',fa2:true,build_date:'2026-02-20T00:00:00Z'}; }
+            else if (mockParam === 'runpod-base') { detectedImageType = 'runpod-base'; prebuiltInfo = null; }
+            else if (mockParam === 'unsupported') { detectedImageType = 'unsupported'; prebuiltInfo = null; mockGpu = null; }
+            else if (mockParam === 'unsupported-gpu') { detectedImageType = 'prebuilt'; mockGpu = {name:'Tesla V100-SXM2-16GB', cuda_cap:'7.0', vram_gb:16}; }
+            else if (mockParam === 'no-gpu') { detectedImageType = 'prebuilt'; mockGpu = null; }
+        }
+        const gpuInfo = mockGpu;
+
+        // ── 环境信息卡片 (GPU + 镜像) ──
+        const envEl = document.getElementById('gpu-info-display');
+        let cardHtml = '';
+        let noGpu = false;
+        let gpuTooOld = false;
+
+        // GPU 行
+        if (gpuInfo && gpuInfo.name) {
+            const g = gpuInfo;
+            const smArch = g.cuda_cap ? `sm_${g.cuda_cap.replace('.', '')}` : '';
+            const capMajor = g.cuda_cap ? parseInt(g.cuda_cap.split('.')[0], 10) : 0;
+            gpuTooOld = capMajor > 0 && capMajor < 8;
+            const archColor = gpuTooOld ? 'color:var(--red)' : '';
+            cardHtml += `<div class="env-row">
+                <span class="env-label">GPU</span>
+                <span class="env-value">🖥️ ${esc(g.name)}</span>
+                <span class="env-label" style="margin-left:auto;${archColor}">${smArch} · ${g.vram_gb} GB VRAM</span>
+            </div>`;
+        } else {
+            noGpu = true;
+            cardHtml += `<div class="env-row">
+                <span class="env-label">GPU</span>
+                <span class="env-value" style="color:var(--red)">未检测到 CUDA GPU</span>
+            </div>`;
+        }
+
+        // GPU 不可用 → 强制不支持
+        if (gpuTooOld) detectedImageType = 'unsupported-gpu';
+        else if (noGpu) detectedImageType = 'no-gpu';
+
+        // 镜像行
+        if (detectedImageType === 'prebuilt') {
+            const ver = (prebuiltInfo && prebuiltInfo.version && prebuiltInfo.version !== 'unknown') ? ` v${prebuiltInfo.version}` : '';
+            cardHtml += `<hr class="env-divider">`;
+            cardHtml += `<div class="env-row">
+                <span class="env-label">镜像</span>
+                <span class="env-value" style="color:var(--green)">⚡ 预构建镜像${ver}</span>
+            </div>`;
+            if (prebuiltInfo) {
+                const tags = [];
+                if (prebuiltInfo.torch) tags.push(`PyTorch ${prebuiltInfo.torch}`);
+                if (prebuiltInfo.cuda_toolkit) tags.push(`CUDA ${prebuiltInfo.cuda_toolkit}`);
+                if (prebuiltInfo.fa2) tags.push({text: 'FA2 ✓', green: true});
+                if (prebuiltInfo.build_date) tags.push(prebuiltInfo.build_date.slice(0, 10));
+                if (tags.length) {
+                    cardHtml += `<div class="env-tags" style="margin-left:68px">`;
+                    for (const t of tags) {
+                        if (typeof t === 'object') cardHtml += `<span class="env-tag green">${t.text}</span>`;
+                        else cardHtml += `<span class="env-tag">${esc(t)}</span>`;
+                    }
+                    cardHtml += `</div>`;
+                }
+            }
+        } else if (detectedImageType === 'runpod-base') {
+            cardHtml += `<hr class="env-divider">`;
+            cardHtml += `<div class="env-row">
+                <span class="env-label">镜像</span>
+                <span class="env-value" style="color:var(--accent2)">🔧 RunPod 基础镜像</span>
+            </div>`;
+        }
+
+        // 渲染卡片 (正常路径)
+        const isUnsupported = detectedImageType === 'unsupported-gpu' || detectedImageType === 'no-gpu' || detectedImageType === 'unsupported';
+
+        if (!isUnsupported && cardHtml) {
+            envEl.innerHTML = `<div class="env-card">${cardHtml}</div>`;
         }
 
         // Load plugin list
@@ -517,23 +599,44 @@ async function init() {
         const selectedUrls = state.plugins || pluginData.map(p => p.url);
 
         // 自动设定 image_type
-        wizardConfig.image_type = detectedImageType || 'unsupported';
+        wizardConfig.image_type = isUnsupported ? 'unsupported' : (detectedImageType || 'unsupported');
 
-        // 显示镜像检测结果 — 直接更新 step-0-desc
+        // step-0-desc: 检测结果
         const descEl = document.getElementById('step-0-desc');
         const timeEl = document.getElementById('fresh-time');
-        if (detectedImageType === 'prebuilt') {
-            descEl.innerHTML = '⚡ 检测到<b>预构建镜像</b> — 已预装 PyTorch / ComfyUI / 加速组件';
+        if (!isUnsupported) {
+            descEl.textContent = '✅ 环境检测通过';
             descEl.style.color = 'var(--green)';
-            timeEl.textContent = '⏱ 预计 2-5 分钟';
-        } else if (detectedImageType === 'runpod-base') {
-            descEl.innerHTML = '🔧 检测到<b>RunPod 基础镜像</b> — 将从零安装 ComfyUI 和加速组件';
-            descEl.style.color = 'var(--accent2)';
-            timeEl.textContent = '⏱ 预计 15-30 分钟';
+            timeEl.textContent = detectedImageType === 'prebuilt' ? '⏱ 预计 2-5 分钟' : '⏱ 预计 15-30 分钟';
         } else {
-            descEl.innerHTML = '⚠️ <b>不支持的镜像</b> — 请使用 <code>ghcr.io/vvb7456/comfyui-runpod:v3.0</code> 或 <code>runpod/pytorch</code> 基础镜像';
+            descEl.innerHTML = '❌ 环境检测失败';
             descEl.style.color = 'var(--red)';
-            // 禁用所有选择
+            timeEl.textContent = '';
+            if (detectedImageType === 'unsupported-gpu') {
+                // GPU 算力过低 — 保留 GPU 行 + 追加警告
+                cardHtml += `<hr class="env-divider">`;
+                cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
+                    ⚠️ <b>GPU 算力不足</b> — FlashAttention 2 需要 Ampere (sm_80) 及以上架构。<br>
+                    请选择配备 RTX 30xx / A100 / RTX 40xx 及以上 GPU 的实例。
+                </div>`;
+                envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
+            } else if (detectedImageType === 'no-gpu') {
+                cardHtml += `<hr class="env-divider">`;
+                cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
+                    ⚠️ <b>未检测到 CUDA GPU</b> — ComfyUI 需要 NVIDIA GPU 运行。<br>
+                    请在 GPU 实例上部署，或检查 CUDA 驱动是否正确安装。
+                </div>`;
+                envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
+            } else {
+                envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">
+                    <div style="color:var(--red);font-weight:600;margin-bottom:8px">⚠️ 不支持的运行环境</div>
+                    <div style="color:var(--t3);font-size:.88rem;line-height:1.6">
+                        当前环境缺少必要的 CUDA / PyTorch 运行时。请使用以下镜像之一创建实例：<br>
+                        <code style="color:var(--accent)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （推荐，预装 ComfyUI + 加速组件）<br>
+                        <code style="color:var(--accent)">runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404</code> （RunPod 官方 PyTorch 镜像）
+                    </div>
+                </div>`;
+            }
             document.querySelectorAll('#step-0 .choice-card').forEach(c => {
                 c.style.opacity = '0.4';
                 c.style.pointerEvents = 'none';
