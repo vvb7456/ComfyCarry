@@ -427,44 +427,52 @@ def _run_deploy(config):
                     pass
             _mark_step_done("comfyui_install")
 
-        # STEP 6: 加速组件 (FA2/SA2)
-        if _step_done("accelerators"):
+        # STEP 6: 加速组件 (FA2/SA2) — 根据用户选择安装
+        want_fa2 = config.get("install_fa2", False)
+        want_sa2 = config.get("install_sa2", False)
+        if not want_fa2 and not want_sa2:
+            _deploy_step("安装加速组件 ⏭ (用户跳过)")
+        elif _step_done("accelerators"):
             _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
         else:
-            _deploy_step("安装加速组件 (FA2/SA2)")
+            parts = []
+            if want_fa2: parts.append("FA2")
+            if want_sa2: parts.append("SA2")
+            _deploy_step(f"安装加速组件 ({'/'.join(parts)})")
             _deploy_log("检测 GPU 架构...")
             gpu_info = _detect_gpu_info()
             cuda_cap = gpu_info.get("cuda_cap", "")
             _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
 
             if image_type == "prebuilt":
-                # FA2 已在 Dockerfile 预装
-                _deploy_log("验证 FlashAttention-2...")
-                _deploy_exec(
-                    f'{PY} -c "import flash_attn; '
-                    f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
-                    label="检查 FA2"
-                )
-                # SA2 从预装 wheel 安装
-                if cuda_cap:
-                    _install_sa2_prebuilt(PY, cuda_cap)
-                else:
-                    _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
+                if want_fa2:
+                    _deploy_log("验证 FlashAttention-2...")
+                    _deploy_exec(
+                        f'{PY} -c "import flash_attn; '
+                        f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
+                        label="检查 FA2"
+                    )
+                if want_sa2:
+                    if cuda_cap:
+                        _install_sa2_prebuilt(PY, cuda_cap)
+                    else:
+                        _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
             else:
-                # RunPod-base: 从 PyPI/源码安装
-                _deploy_log("安装 FlashAttention-2...")
-                _deploy_exec(
-                    f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
-                    timeout=1200, label="pip install flash-attn"
-                )
-                _deploy_log("安装 SageAttention-2...")
-                _deploy_exec(
-                    f'cd /workspace && git clone '
-                    f'https://github.com/thu-ml/SageAttention.git && '
-                    f'cd SageAttention && {PIP} install . --no-build-isolation && '
-                    f'cd /workspace && rm -rf SageAttention',
-                    timeout=600, label="安装 SA2"
-                )
+                if want_fa2:
+                    _deploy_log("安装 FlashAttention-2...")
+                    _deploy_exec(
+                        f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
+                        timeout=1200, label="pip install flash-attn"
+                    )
+                if want_sa2:
+                    _deploy_log("安装 SageAttention-2...")
+                    _deploy_exec(
+                        f'cd /workspace && git clone '
+                        f'https://github.com/thu-ml/SageAttention.git && '
+                        f'cd SageAttention && {PIP} install . --no-build-isolation && '
+                        f'cd /workspace && rm -rf SageAttention',
+                        timeout=600, label="安装 SA2"
+                    )
 
             _deploy_log("✅ 加速组件安装完成")
             _mark_step_done("accelerators")
@@ -589,15 +597,26 @@ def _run_deploy(config):
             _deploy_log("CivitAI API Key 已保存")
 
         _deploy_log("启动 ComfyUI 主服务...")
+        # 根据用户 attn 选择设置启动参数 (FA2 优先于 SA2)
+        attn_flag = "--use-pytorch-cross-attention"
+        if want_fa2:
+            attn_flag = "--use-flash-attention"
+        elif want_sa2:
+            attn_flag = "--use-sage-attention"
         _deploy_exec("pm2 delete comfy 2>/dev/null || true")
         _deploy_exec(
             f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '
             f'--interpreter none --log /workspace/comfy.log --time '
             f'--restart-delay 3000 --max-restarts 10 '
             f'-- main.py --listen 0.0.0.0 --port 8188 '
-            f'--use-pytorch-cross-attention --fast --disable-xformers'
+            f'{attn_flag} --fast --disable-xformers'
         )
         _deploy_exec("pm2 save 2>/dev/null || true")
+
+        # 持久化 attention 安装状态到 .dashboard_env
+        from comfycarry.config import set_config
+        set_config("installed_fa2", want_fa2)
+        set_config("installed_sa2", want_sa2)
 
         # STEP 10: 后台任务
         _deploy_step("后台任务")

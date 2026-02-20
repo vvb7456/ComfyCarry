@@ -106,6 +106,8 @@ def api_settings_export_config():
     state = _load_setup_state()
     config["image_type"] = state.get("image_type", "")
     config["cloudflared_token"] = state.get("cloudflared_token", "")
+    config["install_fa2"] = state.get("install_fa2", False)
+    config["install_sa2"] = state.get("install_sa2", False)
 
     rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
     if rclone_conf.exists():

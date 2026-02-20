@@ -141,6 +141,8 @@ def _load_setup_state():
         "rclone_config_value": "",
         "civitai_token": "",
         "plugins": [p["url"] for p in DEFAULT_PLUGINS],
+        "install_fa2": False,
+        "install_sa2": False,
         "deploy_started": False,
         "deploy_completed": False,
         "deploy_error": "",

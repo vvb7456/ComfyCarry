@@ -53,7 +53,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 .choice-grid.rclone-cards .choice-card p { font-size: clamp(.75rem, .85vw, .88rem); }
 .choice-card {
     background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
-    padding: clamp(16px, 2vw, 28px); cursor: pointer; transition: all .2s;
+    padding: clamp(16px, 2vw, 28px); cursor: pointer; transition: all .2s; position: relative;
 }
 .choice-card:hover { border-color: var(--accent); }
 .choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
@@ -503,8 +503,33 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
     </div>
 
-    <!-- Step 7: 确认部署 -->
+    <!-- Step 7: 加速组件 (FA2/SA2) -->
     <div class="step" id="step-7">
+        <div class="step-title">⚡ Attention 加速</div>
+        <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="help-tip" title="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span></div>
+
+        <div class="choice-grid" id="attn-cards" style="grid-template-columns: repeat(2, 1fr);">
+            <div class="choice-card" id="attn-card-fa2" data-attn="fa2" onclick="toggleAttnCard('fa2')">
+                <h3>🔥 FlashAttention-2</h3>
+                <p>高性能 Attention 实现，广泛支持</p>
+                <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-flash-attention</div>
+            </div>
+            <div class="choice-card" id="attn-card-sa2" data-attn="sa2" onclick="toggleAttnCard('sa2')">
+                <h3>🌿 SageAttention-2</h3>
+                <p>新一代 Attention 方案，部分场景更快</p>
+                <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-sage-attention</div>
+            </div>
+        </div>
+        <div id="attn-hint" style="font-size:.78rem;color:var(--t3);margin-top:8px"></div>
+
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+            <button class="btn btn-primary" id="btn-next-7" onclick="nextStep()">跳过</button>
+        </div>
+    </div>
+
+    <!-- Step 8: 确认部署 -->
+    <div class="step" id="step-8">
         <div class="step-title">📋 确认部署配置</div>
         <div class="step-desc">检查以下配置，确认后开始部署</div>
         <div id="deploy-summary"></div>
@@ -537,7 +562,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 </div>
 
 <script>
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
 let currentStep = 0;
 let wizardConfig = {
     image_type: '',
@@ -547,6 +572,8 @@ let wizardConfig = {
     rclone_config_value: '',
     civitai_token: '',
     plugins: [],
+    install_fa2: false,
+    install_sa2: false,
     wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
     wizard_remotes: [],       // [{name, type, params}]
 };
@@ -791,6 +818,8 @@ async function init() {
         if (state.plugins) wizardConfig.plugins = state.plugins;
         if (state.wizard_remotes) wizardConfig.wizard_remotes = state.wizard_remotes;
         if (state.wizard_sync_rules) wizardConfig.wizard_sync_rules = state.wizard_sync_rules;
+        if (state.install_fa2 !== undefined) wizardConfig.install_fa2 = state.install_fa2;
+        if (state.install_sa2 !== undefined) wizardConfig.install_sa2 = state.install_sa2;
 
         // 恢复手动添加的 remotes 显示
         renderWizardManualRemotes();
@@ -828,6 +857,7 @@ function showStep(n) {
     updateProgressBar();
     // 进入 Step 4 时初始化同步规则 UI
     if (n === 4) initSyncRulesStep();
+    if (n === 7) initAttnStep();
     updateNextBtnText();
 }
 
@@ -838,6 +868,7 @@ function updateNextBtnText() {
         3: () => !!_selectedRcloneMethod,
         4: () => document.querySelectorAll('.wz-rule-card.selected').length > 0,
         5: () => !!document.getElementById('input-civitai-token').value.trim(),
+        7: () => document.querySelectorAll('#attn-cards .choice-card.selected').length > 0,
     };
     for (const [step, hasContent] of Object.entries(map)) {
         const btn = document.getElementById(`btn-next-${step}`);
@@ -963,6 +994,11 @@ function saveCurrentStep() {
         case 6:
             wizardConfig.plugins = getSelectedPlugins();
             break;
+        case 7: {
+            wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
+            wizardConfig.install_sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
+            break;
+        }
     }
     // Persist to backend
     fetch('/api/setup/save', {
@@ -1311,6 +1347,53 @@ function getSelectedPlugins() {
     return urls;
 }
 
+// ── Attention Acceleration ──
+function initAttnStep() {
+    const isPrebuilt = wizardConfig.image_type === 'prebuilt';
+    const fa2Card = document.getElementById('attn-card-fa2');
+    const sa2Card = document.getElementById('attn-card-sa2');
+
+    if (isPrebuilt) {
+        // 预构建镜像: FA2 已预装 → 默认选中 + 不可取消
+        fa2Card.classList.add('selected');
+        fa2Card.style.opacity = '0.7';
+        fa2Card.style.pointerEvents = 'none';
+        fa2Card.querySelector('p').textContent = '已预装在镜像中';
+        document.getElementById('attn-step-desc').textContent = '⚡ FA2 已预装，可选择额外安装 SA2';
+    }
+
+    // 恢复已保存的选择
+    if (wizardConfig.install_fa2 && !isPrebuilt) fa2Card.classList.add('selected');
+    if (wizardConfig.install_sa2) sa2Card.classList.add('selected');
+
+    updateAttnHint();
+    updateNextBtnText();
+}
+
+function toggleAttnCard(type) {
+    const card = document.getElementById(`attn-card-${type}`);
+    // 预构建下 FA2 不可取消
+    if (type === 'fa2' && wizardConfig.image_type === 'prebuilt') return;
+    card.classList.toggle('selected');
+    updateAttnHint();
+    updateNextBtnText();
+}
+
+function updateAttnHint() {
+    const fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
+    const sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
+    const el = document.getElementById('attn-hint');
+    if (fa2 && sa2) {
+        el.textContent = '💡 两者同时安装时，ComfyUI 将优先使用 FlashAttention-2';
+    } else if (fa2) {
+        el.textContent = '🔥 ComfyUI 将使用 --use-flash-attention 启动';
+    } else if (sa2) {
+        el.textContent = '🌿 ComfyUI 将使用 --use-sage-attention 启动';
+    } else {
+        el.textContent = '跳过后 ComfyUI 将使用默认 PyTorch SDPA';
+    }
+}
+
 // ── Summary ──
 function renderSummary() {
     saveCurrentStep();
@@ -1353,6 +1436,11 @@ function renderSummary() {
             <h4>模型与插件</h4>
             <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
             <div class="summary-row"><span class="label">插件数量</span><span class="value">${pluginCount} 个</span></div>
+        </div>
+        <div class="summary-card">
+            <h4>Attention 加速</h4>
+            <div class="summary-row"><span class="label">FlashAttention-2</span><span class="value">${c.install_fa2 ? '✅ 安装' : '⏭ 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SageAttention-2</span><span class="value">${c.install_sa2 ? '✅ 安装' : '⏭ 跳过'}</span></div>
         </div>`;
     document.getElementById('deploy-summary').innerHTML = html;
 }
@@ -1549,6 +1637,8 @@ async function handleImportFile(event) {
         if (config.sync_rules && config.sync_rules.length > 0) {
             wizardConfig._imported_sync_rules = true;
         }
+        if (config.install_fa2 !== undefined) wizardConfig.install_fa2 = config.install_fa2;
+        if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
 
         showImportResult(
             `✅ 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
