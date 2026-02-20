@@ -59,10 +59,24 @@ def get_deploy_log_slice(start):
 # ── 辅助函数 ─────────────────────────────────────────────────
 
 def _detect_image_type():
-    """检测当前环境是 prebuilt 还是 generic 镜像"""
-    if Path("/opt/ComfyUI/main.py").exists():
+    """检测镜像类型: prebuilt / runpod-base / unsupported
+
+    检测优先级:
+      1. /opt/.comfycarry-prebuilt 标记文件 → prebuilt (我们的预构建镜像)
+      2. /etc/runpod.txt 存在 (RunPod 独有) + torch 可用 + CUDA 可用
+         → runpod-base (runpod/pytorch 系列镜像)
+      3. 其他环境 → unsupported
+    """
+    if Path("/opt/.comfycarry-prebuilt").exists():
         return "prebuilt"
-    return "generic"
+    if Path("/etc/runpod.txt").exists():
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "runpod-base"
+        except ImportError:
+            pass
+    return "unsupported"
 
 
 def _detect_python():
@@ -239,7 +253,7 @@ def _run_deploy(config):
 
     PY = _detect_python()
     PIP = f"{PY} -m pip"
-    image_type = config.get("image_type", "generic")
+    image_type = config.get("image_type", "runpod-base")
     _deploy_log(f"使用 Python: {PY}")
 
     try:
@@ -316,7 +330,7 @@ def _run_deploy(config):
             _deploy_exec("rclone listremotes", label="检测 remotes")
 
         # STEP 4: PyTorch
-        if image_type == "generic":
+        if image_type != "prebuilt":
             if _step_done("pytorch"):
                 _deploy_step("安装 PyTorch ✅ (已完成, 跳过)")
             else:
@@ -425,7 +439,7 @@ def _run_deploy(config):
                 else:
                     _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
             else:
-                # Generic: 从 PyPI/源码安装
+                # RunPod-base: 从 PyPI/源码安装
                 _deploy_log("安装 FlashAttention-2...")
                 _deploy_exec(
                     f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',

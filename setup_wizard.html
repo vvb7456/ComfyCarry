@@ -517,7 +517,7 @@ async function init() {
         const selectedUrls = state.plugins || pluginData.map(p => p.url);
 
         // 自动设定 image_type
-        wizardConfig.image_type = detectedImageType || 'generic';
+        wizardConfig.image_type = detectedImageType || 'unsupported';
 
         // 显示镜像检测结果 — 直接更新 step-0-desc
         const descEl = document.getElementById('step-0-desc');
@@ -526,10 +526,18 @@ async function init() {
             descEl.innerHTML = '⚡ 检测到<b>预构建镜像</b> — 已预装 PyTorch / ComfyUI / 加速组件';
             descEl.style.color = 'var(--green)';
             timeEl.textContent = '⏱ 预计 2-5 分钟';
-        } else {
-            descEl.innerHTML = '🔧 检测到<b>通用镜像</b> — 将从零安装 PyTorch、ComfyUI 和加速组件';
+        } else if (detectedImageType === 'runpod-base') {
+            descEl.innerHTML = '🔧 检测到<b>RunPod 基础镜像</b> — 将从零安装 ComfyUI 和加速组件';
             descEl.style.color = 'var(--accent2)';
             timeEl.textContent = '⏱ 预计 15-30 分钟';
+        } else {
+            descEl.innerHTML = '⚠️ <b>不支持的镜像</b> — 请使用 <code>ghcr.io/vvb7456/comfyui-runpod:v3.0</code> 或 <code>runpod/pytorch</code> 基础镜像';
+            descEl.style.color = 'var(--red)';
+            // 禁用所有选择
+            document.querySelectorAll('#step-0 .choice-card').forEach(c => {
+                c.style.opacity = '0.4';
+                c.style.pointerEvents = 'none';
+            });
         }
 
         renderPluginList(pluginData, selectedUrls);
@@ -1042,7 +1050,7 @@ function renderSummary() {
     const html = importNote + `
         <div class="summary-card">
             <h4>部署方式</h4>
-            <div class="summary-row"><span class="label">镜像类型</span><span class="value">${c.image_type === 'prebuilt' ? '⚡ 预构建镜像' : '🔧 通用镜像'}</span></div>
+            <div class="summary-row"><span class="label">镜像类型</span><span class="value">${c.image_type === 'prebuilt' ? '⚡ 预构建镜像' : '🔧 RunPod 基础镜像'}</span></div>
         </div>
         <div class="summary-card">
             <h4>网络与安全</h4>
@@ -1216,8 +1224,8 @@ async function handleImportFile(event) {
 
         const cfgType = config.image_type;
         if (cfgType && detectedImageType && cfgType !== detectedImageType) {
-            const cfgLabel = cfgType === 'prebuilt' ? '预构建镜像' : '通用镜像';
-            const envLabel = detectedImageType === 'prebuilt' ? '预构建镜像' : '通用镜像';
+            const cfgLabel = cfgType === 'prebuilt' ? '预构建镜像' : 'RunPod 基础镜像';
+            const envLabel = detectedImageType === 'prebuilt' ? '预构建镜像' : 'RunPod 基础镜像';
             showImportResult(
                 `❌ 镜像类型不匹配！<br>配置文件为「<b>${esc(cfgLabel)}</b>」，当前环境为「<b>${esc(envLabel)}</b>」。<br>` +
                 `请上传与当前环境匹配的配置文件，或使用对应的 Docker 镜像重新创建实例。`,
@@ -1238,7 +1246,7 @@ async function handleImportFile(event) {
         }
 
         importedConfig = config;
-        wizardConfig.image_type = detectedImageType || cfgType || 'generic';
+        wizardConfig.image_type = detectedImageType || cfgType || 'runpod-base';
         if (config.password) wizardConfig.password = config.password;
         if (config.cloudflared_token) wizardConfig.cloudflared_token = config.cloudflared_token;
         if (config.civitai_token) wizardConfig.civitai_token = config.civitai_token;
