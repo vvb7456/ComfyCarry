@@ -109,6 +109,7 @@ SETUP_STATE_FILE = Path("/workspace/.setup_state.json")
 
 DEFAULT_PLUGINS = [
     {"url": "https://github.com/ltdrdata/ComfyUI-Manager", "name": "ComfyUI-Manager", "required": True},
+    {"url": "comfycarry_ws_broadcast", "name": "ComfyCarry WS Broadcast", "required": True},
     {"url": "https://github.com/Fannovel16/comfyui_controlnet_aux", "name": "ControlNet Aux"},
     {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack", "name": "Impact Pack"},
     {"url": "https://github.com/yolain/ComfyUI-Easy-Use", "name": "Easy Use"},
