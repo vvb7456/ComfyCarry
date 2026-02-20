@@ -58,6 +58,10 @@ def _set_config(key, value):
         _save_config(data)
 
 
+# 公开别名 (供 deploy_engine 等外部模块使用)
+set_config = _set_config
+
+
 # ── 密码 ──────────────────────────────────────────────────────
 def _load_dashboard_password():
     """优先 .dashboard_env > 环境变量 > 默认值"""
