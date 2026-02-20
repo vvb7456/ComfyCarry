@@ -222,25 +222,46 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 .wz-remote-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 8px; padding: 6px 14px; font-size: .85rem; margin: 4px; }
 .wz-remote-chip .wz-rtype { color: var(--t3); font-size: .75rem; }
 
-/* Wizard rule panel */
-.wz-rule-panel { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: clamp(14px,1.5vw,20px); margin-bottom: 16px; }
+/* Wizard sync rule panel — scrollable cards */
+.wz-rule-panel { margin-bottom: 16px; }
 .wz-rule-panel h4 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; }
-.wz-rule-panel .wz-rule-hint { font-size: .78rem; color: var(--t3); margin-bottom: 12px; }
-.wz-rule-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
-.wz-rule-item:last-child { border-bottom: none; }
-.wz-rule-item input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
-.wz-rule-item .wz-rule-detail { flex: 1; min-width: 0; }
-.wz-rule-item .wz-rule-name { font-size: .88rem; font-weight: 500; color: var(--t1); margin-bottom: 6px; }
-.wz-rule-item .wz-rule-local { font-size: .72rem; color: var(--t3); margin-left: 2px; }
-.wz-rule-item .wz-rule-fields { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.wz-rule-item .wz-rule-fields label { font-size: .78rem; color: var(--t3); white-space: nowrap; }
-.wz-rule-item .wz-rule-fields select,
-.wz-rule-item .wz-rule-fields input[type="text"] {
-    padding: 5px 8px; background: var(--bg2); color: var(--t1);
-    border: 1px solid var(--bd); border-radius: 6px; font-size: .82rem;
+.wz-rule-panel .wz-rule-hint { font-size: .78rem; color: var(--t3); margin-bottom: 10px; }
+.wz-rule-row {
+    display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px;
+    scrollbar-width: thin; scrollbar-color: var(--bd-f) transparent;
+    cursor: grab;
 }
-.wz-rule-item .wz-rule-fields select { min-width: 100px; }
-.wz-rule-item .wz-rule-fields input[type="text"] { flex: 1; min-width: 140px; }
+.wz-rule-row:active { cursor: grabbing; }
+.wz-rule-row::-webkit-scrollbar { height: 6px; }
+.wz-rule-row::-webkit-scrollbar-track { background: transparent; border-radius: 3px; }
+.wz-rule-row::-webkit-scrollbar-thumb { background: var(--bd-f); border-radius: 3px; }
+.wz-rule-row::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.wz-rule-card {
+    min-width: 200px; max-width: 240px; flex-shrink: 0; position: relative;
+    background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
+    padding: 14px; transition: all .2s; user-select: none;
+}
+.wz-rule-card:hover { border-color: var(--accent); }
+.wz-rule-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
+.wz-rule-check {
+    position: absolute; top: 8px; right: 8px; width: 20px; height: 20px;
+    border: 2px solid var(--t3); border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s; font-size: 12px; color: transparent; background: var(--bg2);
+}
+.wz-rule-check:hover { border-color: var(--accent); }
+.wz-rule-card.selected .wz-rule-check {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.wz-rule-card .rule-name { font-weight: 600; font-size: .88rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 24px; }
+.wz-rule-card .rule-method { font-size: .72rem; color: var(--t3); margin-bottom: 8px; }
+.wz-rule-card .rule-field { margin-bottom: 6px; }
+.wz-rule-card .rule-field label { font-size: .72rem; color: var(--t3); display: block; margin-bottom: 2px; }
+.wz-rule-card .rule-field input, .wz-rule-card .rule-field select {
+    width: 100%; padding: 4px 8px; background: var(--bg2); color: var(--t1);
+    border: 1px solid var(--bd); border-radius: 6px; font-size: .80rem;
+}
+.wz-rule-card .rule-local { font-size: .70rem; color: var(--t3); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Add remote inline form */
 .wz-add-remote-form { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 16px; margin-top: 10px; }
@@ -340,12 +361,12 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div id="cf-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>Tunnel Token</label>
-            <input type="text" id="input-cf-token" placeholder="eyJhIjoixxxx... (从 Cloudflare Zero Trust 获取)">
+            <input type="text" id="input-cf-token" placeholder="eyJhIjoixxxx... (从 Cloudflare Zero Trust 获取)" oninput="updateNextBtnText()">
             <div class="form-hint">留空则跳过 Tunnel，仅使用实例端口映射访问</div>
         </div>
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+            <button class="btn btn-primary" id="btn-next-2" onclick="nextStep()">跳过</button>
         </div>
     </div>
 
@@ -370,10 +391,6 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
             <div class="choice-card" data-rclone="manual" onclick="selectRcloneMethod('manual')">
                 <h3>🔧 手动创建</h3>
                 <p>交互式创建新的 Remote</p>
-            </div>
-            <div class="choice-card" data-rclone="skip" onclick="selectRcloneMethod('skip')">
-                <h3>⏭️ 跳过</h3>
-                <p>稍后在 Dashboard 中配置</p>
             </div>
         </div>
 
@@ -419,7 +436,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+            <button class="btn btn-primary" id="btn-next-3" onclick="nextStep()">跳过</button>
         </div>
     </div>
 
@@ -437,23 +454,21 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 
         <!-- Pull rules -->
         <div class="wz-rule-panel">
-            <h4>📥 部署拉取</h4>
-            <div class="wz-rule-hint">首次部署时从云端下载到本地 ComfyUI 目录 (copy 方式，不删除云端文件)</div>
-            <div id="wz-pull-rules"></div>
+            <h4>📥 部署拉取 <span class="help-tip" title="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
+            <div class="wz-rule-row" id="wz-pull-rules"></div>
         </div>
 
         <!-- Push rules -->
         <div class="wz-rule-panel">
-            <h4>📤 自动推送</h4>
-            <div class="wz-rule-hint">运行时持续监控，自动将文件推送到云端</div>
-            <div id="wz-push-rules"></div>
+            <h4>📤 自动推送 <span class="help-tip" title="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span></h4>
+            <div class="wz-rule-row" id="wz-push-rules"></div>
         </div>
 
-        <div style="font-size:.75rem;color:var(--t3);margin-bottom:8px">💡 以上仅为初始规则，部署后可在 Dashboard「云同步」页面自由添加、修改、删除任意同步规则</div>
+        <div id="wz-rule-count" style="font-size:.78rem;color:var(--t3);margin-bottom:8px">已选规则：0 · 部署后可在 Dashboard 云同步页修改</div>
 
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+            <button class="btn btn-primary" id="btn-next-4" onclick="nextStep()">跳过</button>
         </div>
     </div>
 
@@ -464,12 +479,12 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
         <div class="form-group">
             <label>API Key</label>
-            <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)">
+            <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)" oninput="updateNextBtnText()">
             <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 Dashboard 设置</div>
         </div>
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+            <button class="btn btn-primary" id="btn-next-5" onclick="nextStep()">跳过</button>
         </div>
     </div>
 
@@ -813,6 +828,21 @@ function showStep(n) {
     updateProgressBar();
     // 进入 Step 4 时初始化同步规则 UI
     if (n === 4) initSyncRulesStep();
+    updateNextBtnText();
+}
+
+/* 动态按钮文本：可选步骤无内容时显示 "跳过"，有内容时显示 "下一步" */
+function updateNextBtnText() {
+    const map = {
+        2: () => !!document.getElementById('input-cf-token').value.trim(),
+        3: () => !!_selectedRcloneMethod,
+        4: () => document.querySelectorAll('.wz-rule-card.selected').length > 0,
+        5: () => !!document.getElementById('input-civitai-token').value.trim(),
+    };
+    for (const [step, hasContent] of Object.entries(map)) {
+        const btn = document.getElementById(`btn-next-${step}`);
+        if (btn) btn.textContent = hasContent() ? '下一步' : '跳过';
+    }
 }
 
 function nextStep() {
@@ -831,7 +861,7 @@ function nextStep() {
         hint.style.display = 'none';
     }
 
-    // Step 3: Rclone 配置完整性检查
+    // Step 3: Rclone 配置完整性检查 (无选择 = 跳过)
     if (currentStep === 3) {
         const m = _selectedRcloneMethod;
         if (m === 'file' && !wizardConfig.rclone_config_value) {
@@ -862,8 +892,8 @@ function nextStep() {
         }
         return;
     }
-    // Step 3 (rclone) skip → 跳过 Step 4 (sync rules)
-    if (currentStep === 3 && wizardConfig.rclone_config_method === 'skip' && wizardConfig.wizard_remotes.length === 0) {
+    // Step 3 (rclone) 无配置 → 跳过 Step 4 (sync rules)
+    if (currentStep === 3 && !_selectedRcloneMethod && wizardConfig.wizard_remotes.length === 0) {
         showStep(5);
         return;
     }
@@ -878,8 +908,8 @@ function prevStep() {
         showStep(0);
         return;
     }
-    // Step 5 → 如果 rclone 是 skip 且无手动 remote，跳回 Step 3
-    if (currentStep === 5 && wizardConfig.rclone_config_method === 'skip' && wizardConfig.wizard_remotes.length === 0) {
+    // Step 5 → 如果 rclone 无配置且无手动 remote，跳回 Step 3
+    if (currentStep === 5 && !_selectedRcloneMethod && wizardConfig.wizard_remotes.length === 0) {
         showStep(3);
         return;
     }
@@ -911,14 +941,13 @@ function saveCurrentStep() {
             break;
         }
         case 4: {
-            // 收集已勾选的同步规则
+            // 收集已选中的同步规则 (卡片 .selected)
             const rules = [];
-            document.querySelectorAll('.wz-rule-item input[type="checkbox"]:checked').forEach(cb => {
-                const tplId = cb.dataset.tplId;
+            document.querySelectorAll('.wz-rule-card.selected').forEach(card => {
+                const tplId = card.dataset.tplId;
                 if (!tplId) return;
-                const row = cb.closest('.wz-rule-item');
-                const remoteSel = row.querySelector('.wz-rule-remote');
-                const pathInput = row.querySelector('.wz-rule-path');
+                const remoteSel = card.querySelector('.wz-rule-remote');
+                const pathInput = card.querySelector('.wz-rule-path');
                 rules.push({
                     template_id: tplId,
                     remote: remoteSel?.value || '',
@@ -961,9 +990,17 @@ function selectMode(mode) {
 }
 
 // ── Rclone Config ──
-let _selectedRcloneMethod = 'skip';
+let _selectedRcloneMethod = '';
 
 function selectRcloneMethod(method) {
+    // 再次点击已选中的卡片 → 反选（回到未选状态）
+    if (_selectedRcloneMethod === method) {
+        _selectedRcloneMethod = '';
+        document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('rclone-input-area').style.display = 'none';
+        updateNextBtnText();
+        return;
+    }
     _selectedRcloneMethod = method;
     // 更新卡片选中状态
     document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => {
@@ -983,6 +1020,7 @@ function selectRcloneMethod(method) {
         document.getElementById('wizard-remotes-section').style.display = 'none';
         _detectedRemotes = [];
     }
+    updateNextBtnText();
 }
 
 function onRcloneMethodChange(method) {
@@ -1160,34 +1198,71 @@ function initSyncRulesStep() {
 
     document.getElementById('wz-pull-rules').innerHTML = pullTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
     document.getElementById('wz-push-rules').innerHTML = pushTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
+
+    // Enable drag-to-scroll on rule rows
+    document.querySelectorAll('.wz-rule-row').forEach(initDragScroll);
+    updateRuleCount();
 }
 
 function renderRuleItem(tpl, saved, defaultRemote, remotes) {
-    const checked = saved ? 'checked' : '';
+    const isSelected = saved ? true : false;
     const remote = saved?.remote || defaultRemote;
     const remotePath = saved?.remote_path || tpl.remote_path || '';
-    const methodHint = tpl.method === 'move' ? ' (移动)' : tpl.method === 'copy' ? ' (保留本地)' : '';
-    const triggerHint = tpl.trigger === 'deploy' ? '部署时执行' : tpl.trigger === 'watch' ? '持续监控' : '手动';
+    const methodTag = tpl.method === 'move' ? '移动' : '保留本地';
+    const triggerTag = tpl.trigger === 'deploy' ? '部署执行' : tpl.trigger === 'watch' ? '持续监控' : '手动';
     const remoteOpts = remotes.length === 0
-        ? `<input type="text" class="wz-rule-remote" value="${esc(remote)}" placeholder="remote 名" style="width:100px">`
-        : `<select class="wz-rule-remote">${remotes.map(n => `<option value="${esc(n)}"${n===remote?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
+        ? `<input type="text" class="wz-rule-remote" value="${esc(remote)}" placeholder="remote" onclick="event.stopPropagation()">`
+        : `<select class="wz-rule-remote" onclick="event.stopPropagation()">${remotes.map(n => `<option value="${esc(n)}"${n===remote?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
+    // 简短名称 (去掉 emoji 前缀)
+    const shortName = tpl.name.replace(/^[⬇️⬆️📥📤]\s*/, '');
 
-    return `<div class="wz-rule-item">
-        <input type="checkbox" data-tpl-id="${esc(tpl.id)}" ${checked}>
-        <div class="wz-rule-detail">
-            <div class="wz-rule-name">${esc(tpl.name)}${methodHint ? `<span style="font-size:.72rem;color:var(--t3);margin-left:6px">${methodHint}</span>` : ''}</div>
-            <div class="wz-rule-fields">
-                <label>Remote:</label>${remoteOpts}
-                <label>云端路径:</label><input type="text" class="wz-rule-path" value="${esc(remotePath)}" placeholder="远端路径">
-            </div>
-            <div class="wz-rule-local">本地: <code style="font-size:.72rem">${esc(tpl.local_path)}</code> · ${triggerHint}</div>
+    return `<div class="wz-rule-card${isSelected ? ' selected' : ''}" data-tpl-id="${esc(tpl.id)}">
+        <div class="wz-rule-check" onclick="toggleRuleCard(this.parentElement)">✓</div>
+        <div class="rule-name">${esc(shortName)}</div>
+        <div class="rule-method">${triggerTag} · ${methodTag}</div>
+        <div class="rule-field">
+            <label>Remote</label>
+            ${remoteOpts}
         </div>
+        <div class="rule-field">
+            <label>云端路径</label>
+            <input type="text" class="wz-rule-path" value="${esc(remotePath)}" placeholder="远端路径" onclick="event.stopPropagation()">
+        </div>
+        <div class="rule-local" title="${esc(tpl.local_path)}">📂 ${esc(tpl.local_path)}</div>
     </div>`;
+}
+
+function toggleRuleCard(card) {
+    card.classList.toggle('selected');
+    updateNextBtnText();
+    updateRuleCount();
+}
+
+function updateRuleCount() {
+    const n = document.querySelectorAll('.wz-rule-card.selected').length;
+    const el = document.getElementById('wz-rule-count');
+    if (el) el.textContent = `已选规则：${n} · 部署后可在 Dashboard 云同步页修改`;
+}
+
+function initDragScroll(el) {
+    let isDown = false, startX, scrollLeft;
+    el.addEventListener('mousedown', e => {
+        if (e.target.closest('input,select,button')) return;
+        isDown = true; startX = e.pageX - el.offsetLeft; scrollLeft = el.scrollLeft;
+        el.style.cursor = 'grabbing'; e.preventDefault();
+    });
+    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
+    el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
+    el.addEventListener('mousemove', e => {
+        if (!isDown) return;
+        const x = e.pageX - el.offsetLeft;
+        el.scrollLeft = scrollLeft - (x - startX);
+    });
 }
 
 function updateWizardRuleRemotes() {
     const defaultRemote = document.getElementById('wz-default-remote').value;
-    document.querySelectorAll('.wz-rule-remote').forEach(el => {
+    document.querySelectorAll('.wz-rule-card .wz-rule-remote').forEach(el => {
         if (el.tagName === 'SELECT') el.value = defaultRemote;
         else el.value = defaultRemote;
     });
@@ -1253,6 +1328,7 @@ function renderSummary() {
     const tplMap = {};
     _syncTemplates.forEach(t => { tplMap[t.id] = t; });
     const ruleNames = (c.wizard_sync_rules || []).map(r => tplMap[r.template_id]?.name || r.template_id).join(', ');
+    const dm = c._rclone_display_method || c.rclone_config_method;
 
     const html = importNote + `
         <div class="summary-card">
@@ -1266,7 +1342,7 @@ function renderSummary() {
         </div>
         <div class="summary-card">
             <h4>云存储与同步</h4>
-            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${(c._rclone_display_method || c.rclone_config_method) === 'skip' ? '⏭ 跳过' : (c._rclone_display_method || c.rclone_config_method) === 'url' ? '🔗 URL 导入' : (c._rclone_display_method || c.rclone_config_method) === 'file' ? '📂 文件上传' : '📋 Base64'}</span></div>
+            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${!dm || dm === 'skip' ? '⏭ 跳过' : dm === 'file' ? '📂 文件上传' : dm === 'manual' ? '🔧 手动创建' : dm === 'base64_env' ? '🔑 环境变量' : '📋 Base64'}</span></div>
             <div class="summary-row"><span class="label">Remote 数量</span><span class="value">${remoteCount} 个${c.wizard_remotes.length ? ' (含 ' + c.wizard_remotes.length + ' 个手动创建)' : ''}</span></div>
             <div class="summary-row"><span class="label">同步规则</span><span class="value">${ruleCount > 0 ? ruleCount + ' 条' : '无'}</span></div>
             ${ruleNames ? `<div class="summary-row"><span class="label">规则详情</span><span class="value" style="font-size:.82rem">${esc(ruleNames)}</span></div>` : ''}

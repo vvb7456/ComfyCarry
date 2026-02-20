@@ -2261,7 +2261,7 @@ function showRuleForm(rule) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">规则名称</label>
-        <input type="text" id="rule-name" value="${escHtml(r.name || '')}" placeholder="例如：下拉工作流" style="width:100%">
+        <input type="text" id="rule-name" value="${escHtml(r.name || '')}" placeholder="例如：下载工作流" style="width:100%">
       </div>
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方向</label>
