@@ -67,6 +67,7 @@ def api_setup_save():
         "current_step", "image_type", "password",
         "cloudflared_token", "rclone_config_method", "rclone_config_value",
         "civitai_token", "plugins",
+        "install_fa2", "install_sa2",
         "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules",
     }

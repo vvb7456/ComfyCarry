@@ -90,7 +90,17 @@ def api_comfyui_params_get():
                 "value": current.get(gk),
             }
             if "options" in gv:
-                schema[gk]["options"] = gv["options"]
+                opts = list(gv["options"])
+                # 根据安装状态过滤 Attention 选项
+                if gk == "attention":
+                    from ..config import _get_config
+                    has_fa2 = _get_config("installed_fa2", False)
+                    has_sa2 = _get_config("installed_sa2", False)
+                    if not has_fa2:
+                        opts = [o for o in opts if o[0] != "flash"]
+                    if not has_sa2:
+                        opts = [o for o in opts if o[0] != "sage"]
+                schema[gk]["options"] = opts
             if "depends_on" in gv:
                 schema[gk]["depends_on"] = gv["depends_on"]
             if "help" in gv:
