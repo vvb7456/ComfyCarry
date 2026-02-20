@@ -307,7 +307,6 @@ def _run_deploy(config):
             tunnel_running = tunnel_pid and tunnel_pid != "0" and tunnel_pid.isdigit()
             if tunnel_running:
                 _deploy_step("Cloudflare Tunnel (已在运行)")
-                _deploy_log("Tunnel 已由 bootstrap 启动，跳过重启以保持连接稳定")
             else:
                 _deploy_step("启动 Cloudflare Tunnel")
                 _deploy_exec("pm2 delete tunnel 2>/dev/null || true")
@@ -393,7 +392,7 @@ def _run_deploy(config):
 
             # 健康检查
             _deploy_step("ComfyUI 健康检查")
-            _deploy_log("启动首次健康检查 (跳过插件加载)...")
+            _deploy_log("启动健康检查...")
             _deploy_exec(
                 f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 '
                 f'--port 8188 --disable-all-custom-nodes > /tmp/comfy_boot.log 2>&1 &'
@@ -483,6 +482,8 @@ def _run_deploy(config):
         if image_type == "prebuilt":
             _deploy_log("预构建镜像已含插件, 检查额外插件...")
             for url in plugins:
+                if url == "comfycarry_ws_broadcast":
+                    continue
                 name = url.rstrip("/").split("/")[-1].replace(".git", "")
                 if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
                     _deploy_log(f"安装新插件: {name}")
@@ -494,6 +495,8 @@ def _run_deploy(config):
             _deploy_log(f"安装 {len(plugins)} 个插件...")
             _deploy_exec("mkdir -p /workspace/ComfyUI/custom_nodes")
             for url in plugins:
+                if url == "comfycarry_ws_broadcast":
+                    continue
                 name = url.rstrip("/").split("/")[-1].replace(".git", "")
                 _deploy_log(f"  克隆 {name}...")
                 _deploy_exec(
@@ -620,22 +623,6 @@ def _run_deploy(config):
 
         # STEP 10: 后台任务
         _deploy_step("后台任务")
-
-        _deploy_log("安装 jtoken 命令...")
-        jtoken_script = '''#!/bin/bash
-echo '🔍 正在查找 Jupyter 信息...'
-JUPYTER_TOKEN=$(ps aux | grep '[j]upyter-lab' | grep -oP 'token=\\K[a-zA-Z0-9-]+' | head -1)
-JUPYTER_PORT=$(ps aux | grep '[j]upyter-lab' | grep -oP -- '--port=\\K[0-9]+' | head -1)
-if [ -z "$JUPYTER_TOKEN" ]; then echo '❌ Jupyter Lab 未运行'; exit 1; fi
-echo "📊 Jupyter Lab: 端口=${JUPYTER_PORT:-未知} Token=$JUPYTER_TOKEN"
-if command -v pm2 >/dev/null 2>&1; then
-    JUPYTER_DOMAIN=$(pm2 logs tunnel --nostream --lines 100 2>/dev/null | grep -oP 'dest=https://jupyter[^/]+' | head -1 | sed 's/dest=https:\\/\\///')
-    [ -n "$JUPYTER_DOMAIN" ] && echo "🌐 https://$JUPYTER_DOMAIN/?token=$JUPYTER_TOKEN"
-fi
-echo "🔗 http://localhost:${JUPYTER_PORT}/?token=$JUPYTER_TOKEN"
-'''
-        Path("/usr/local/bin/jtoken").write_text(jtoken_script)
-        _deploy_exec("chmod +x /usr/local/bin/jtoken")
 
         _deploy_log("下载 AuraSR V2...")
         _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
