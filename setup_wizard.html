@@ -1529,6 +1529,15 @@ function connectSSE() {
                 doneEl.style.fontWeight = '600';
                 doneEl.textContent = '🎉 部署完成！';
                 logEl.appendChild(doneEl);
+                // 显示 attention 安装警告 (如有)
+                if (data.attn_warnings && data.attn_warnings.length > 0) {
+                    const names = data.attn_warnings.join(' / ');
+                    const warnEl = document.createElement('div');
+                    warnEl.className = 'log-line warn';
+                    warnEl.style.color = 'var(--amber)';
+                    warnEl.innerHTML = `⚠️ ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可在 ComfyUI 页面的启动参数中重新选择。`;
+                    logEl.appendChild(warnEl);
+                }
                 document.getElementById('deploy-done-row').style.display = 'flex';
             } else {
                 document.getElementById('deploy-title').textContent = '❌ 部署失败';

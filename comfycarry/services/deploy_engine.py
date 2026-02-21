@@ -609,11 +609,33 @@ def _run_deploy(config):
             _deploy_log("CivitAI API Key 已保存")
 
         _deploy_log("启动 ComfyUI 主服务...")
-        # 根据用户 attn 选择设置启动参数 (FA2 优先于 SA2)
-        attn_flag = "--use-pytorch-cross-attention"
+        # 验证 FA2/SA2 实际安装结果，据此设置 attention 参数
+        from comfycarry.config import set_config
+        fa2_ok = False
+        sa2_ok = False
         if want_fa2:
+            r = subprocess.run(
+                f'{PY} -c "import flash_attn; print(flash_attn.__version__)"',
+                shell=True, capture_output=True, text=True, timeout=10
+            )
+            fa2_ok = r.returncode == 0
+            if not fa2_ok:
+                _deploy_log("⚠️ FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
+        if want_sa2:
+            r = subprocess.run(
+                f'{PY} -c "import sageattention; print(sageattention.__version__)"',
+                shell=True, capture_output=True, text=True, timeout=10
+            )
+            sa2_ok = r.returncode == 0
+            if not sa2_ok:
+                _deploy_log("⚠️ SageAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
+        set_config("installed_fa2", fa2_ok)
+        set_config("installed_sa2", sa2_ok)
+
+        attn_flag = "--use-pytorch-cross-attention"
+        if fa2_ok:
             attn_flag = "--use-flash-attention"
-        elif want_sa2:
+        elif sa2_ok:
             attn_flag = "--use-sage-attention"
         _deploy_exec("pm2 delete comfy 2>/dev/null || true")
         _deploy_exec(
@@ -624,11 +646,6 @@ def _run_deploy(config):
             f'{attn_flag} --fast --disable-xformers'
         )
         _deploy_exec("pm2 save 2>/dev/null || true")
-
-        # 持久化 attention 安装状态到 .dashboard_env
-        from comfycarry.config import set_config
-        set_config("installed_fa2", want_fa2)
-        set_config("installed_sa2", want_sa2)
 
         # STEP 10: 后台任务
         _deploy_step("后台任务")
@@ -662,6 +679,13 @@ def _run_deploy(config):
         state = _load_setup_state()
         state["deploy_completed"] = True
         state["deploy_error"] = ""
+        # 记录 attention 安装结果 (前端据此显示警告)
+        attn_warnings = []
+        if want_fa2 and not fa2_ok:
+            attn_warnings.append("FlashAttention-2")
+        if want_sa2 and not sa2_ok:
+            attn_warnings.append("SageAttention-2")
+        state["attn_install_warnings"] = attn_warnings
         # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
         _save_setup_state(state)
 

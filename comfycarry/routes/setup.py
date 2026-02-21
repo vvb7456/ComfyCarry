@@ -155,7 +155,12 @@ def api_setup_log_stream():
                 yield f"data: {json.dumps(line, ensure_ascii=False)}\n\n"
             state = _load_setup_state()
             if state.get("deploy_completed") and not new_lines:
-                yield f"data: {json.dumps({'type': 'done', 'success': True}, ensure_ascii=False)}\n\n"
+                done_evt = {'type': 'done', 'success': True}
+                # 附带 attention 安装警告 (如有)
+                attn_warnings = state.get("attn_install_warnings", [])
+                if attn_warnings:
+                    done_evt["attn_warnings"] = attn_warnings
+                yield f"data: {json.dumps(done_evt, ensure_ascii=False)}\n\n"
                 break
             deploy_thread = get_deploy_thread()
             if not deploy_thread or not deploy_thread.is_alive():
