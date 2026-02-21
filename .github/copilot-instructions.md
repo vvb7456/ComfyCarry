@@ -10,7 +10,7 @@
 
 | 文件 | 角色 |
 |------|------|
-| **bootstrap.sh** | 最小化入口脚本 — 安装 Python 3.13 / Node.js / PM2 / Cloudflared，下载 Dashboard 文件，启动 PM2 进程 |
+| **bootstrap.sh** | 最小化入口脚本 — 安装 Python 3.12 / Node.js / PM2 / Cloudflared，下载 Dashboard 文件，启动 PM2 进程 |
 | **workspace_manager.py** | 入口文件 — 调用 `comfycarry.app.main()` |
 | **comfycarry/app.py** | Flask App 工厂 + `main()` 启动逻辑 |
 | **comfycarry/config.py** | 全局配置 (路径常量、持久化配置读写) |
@@ -35,8 +35,19 @@
 | **static/js/page-jupyter.js** | JupyterLab 页 (启动/停止/状态/URL + 内核管理) |
 | **static/js/page-sync.js** | Cloud Sync 页 (Rclone 配置 + Sync v2 规则引擎 + 实时日志) |
 | **static/js/page-settings.js** | 设置页 (密码、CivitAI Key、Debug、配置导入/导出、重新初始化) |
-| **setup_wizard.html** | 首次部署向导页 (≈680 行) — 密码、Tunnel、Rclone、CivitAI、插件选择 |
+| **setup_wizard.html** | 首次部署向导页 (≈1675 行) — 密码、Tunnel、Rclone、CivitAI、Attention加速、插件选择 |
 | **dashboard.js** | **已废弃** — 旧版单文件前端 JS，保留但不再被 HTML 引用 |
+
+### Docker 镜像 (`docker/`)
+
+| 文件 | 角色 |
+|------|------|
+| **Dockerfile** | 通用 ComfyUI 镜像 (Ampere/Ada/Hopper/Blackwell) — 基于 runpod/pytorch Python 3.12 + CUDA 13.0 |
+| **Dockerfile.ada** | Ada 架构专用镜像 (40xx) |
+| **Dockerfile.blackwell** | Blackwell 架构专用镜像 (50xx/B200) |
+| **entrypoint.sh** | 最小入口 — SSH + 下载 bootstrap.sh + 保活 |
+| **build.sh / build-ada.sh / build-blackwell.sh** | 本地构建脚本 |
+| **wheels/** | 预编译 Flash Attention 2 / SageAttention 2 wheel (按 SM 架构分) |
 
 ### 已废弃文件 (在 .gitignore 中)
 - `deploy.sh` / `deploy-prebuilt.sh` — 旧版 Bash 部署脚本，功能已迁移至 `deploy_engine.py`
@@ -53,7 +64,8 @@
 
 ## 服务管理
 
-- **PM2 进程**: `dashboard` (Flask 5000), `comfy` (ComfyUI 8188), `tunnel` (Cloudflare), `sync` (云同步)
+- **PM2 进程**: `dashboard` (Flask 5000), `comfy` (ComfyUI 8188), `tunnel` (Cloudflare)
+- **Sync Worker**: 在 Dashboard 进程内的后台线程运行 (非独立 PM2 进程)，通过 `sync_engine.py` 管理
 - **ComfyUI WebSocket 桥接**: `ComfyWSBridge` 类维持到 ComfyUI 的 WS 连接，通过 SSE `/api/comfyui/events` 向前端广播实时状态
 - **插件管理**: 代理 ComfyUI-Manager 的 REST API 端点
 
@@ -98,8 +110,8 @@
 - Dashboard 日志: `pm2 logs dashboard`
 - ComfyUI 日志: `pm2 logs comfy` 或 Dashboard ComfyUI 页实时流
 - Tunnel 日志: `pm2 logs tunnel`
-- 部署日志: SSE `/api/setup/log_stream` (向导页实时展示)
-- 主日志: `/workspace/setup.log`
+- 部署日志: SSE `/api/setup/log_stream` (向导页实时展示) + `/workspace/deploy.log` (文件)
+- Bootstrap 日志: `/workspace/setup.log`
 
 ## 开发注意事项
 

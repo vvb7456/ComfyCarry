@@ -662,7 +662,7 @@ def _run_deploy(config):
         state = _load_setup_state()
         state["deploy_completed"] = True
         state["deploy_error"] = ""
-        state["deploy_steps_completed"] = []
+        # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
         _save_setup_state(state)
 
         gpu_info = _detect_gpu_info()
