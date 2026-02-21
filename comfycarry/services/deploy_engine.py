@@ -23,7 +23,6 @@ from ..config import (
     _load_setup_state, _save_setup_state,
     _save_dashboard_password,
 )
-from ..utils import _get_api_key
 from .sync_engine import (
     _load_sync_rules, _save_sync_rules, _run_sync_rule,
     start_sync_worker,
@@ -39,16 +38,6 @@ _deploy_lock = threading.Lock()
 
 def get_deploy_thread():
     return _deploy_thread
-
-
-def get_deploy_log_lines():
-    with _deploy_log_lock:
-        return list(_deploy_log_lines)
-
-
-def get_deploy_log_count():
-    with _deploy_log_lock:
-        return len(_deploy_log_lines)
 
 
 def get_deploy_log_slice(start):

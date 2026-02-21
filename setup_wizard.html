@@ -1059,10 +1059,6 @@ function selectRcloneMethod(method) {
     updateNextBtnText();
 }
 
-function onRcloneMethodChange(method) {
-    selectRcloneMethod(method);
-}
-
 function handleRcloneFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;

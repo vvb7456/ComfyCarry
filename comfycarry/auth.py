@@ -62,7 +62,7 @@ def register_auth_middleware(app):
         # 配置导入在 Setup 阶段也需要可用
         if request.path == "/api/settings/import-config" and not config._is_setup_complete():
             return
-        if request.path in ("/login", "/favicon.ico", "/dashboard.js", "/api/version"):
+        if request.path in ("/login", "/favicon.ico", "/api/version"):
             return
         if request.path.startswith("/static/"):
             return

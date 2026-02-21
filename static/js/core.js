@@ -7,7 +7,6 @@
 
 export const CIVITAI_API_BASE = 'https://civitai.com/api/v1';
 export let apiKey = '';
-export function setApiKey(k) { apiKey = k; }
 
 // ── 页面注册表 ───────────────────────────────────────────────
 
@@ -42,8 +41,6 @@ export function showPage(page) {
     try { _pages[page].enter(); } catch (_) {}
   }
 }
-
-export function getCurrentPage() { return _currentPage; }
 
 // ── 格式化工具 ───────────────────────────────────────────────
 

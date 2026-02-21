@@ -1,4 +1,5 @@
 # 开发文档（不提交到仓库）
+.github/copilot-instructions.md
 CIVICOMFY_INTEGRATION.md
 DELIVERY_SUMMARY.md
 GIST_TUTORIAL.md
@@ -9,13 +10,10 @@ RUNPOD_MODELS_CONFIG.md
 TESTING_AND_DIAGNOSTICS.md
 v4.6.1_UPDATE.md
 
-# 已废弃的旧脚本 — 功能已迁移至 bootstrap.sh + workspace_manager.py
-deploy.sh
-deploy-prebuilt.sh
-# 旧的独立工具脚本 — 功能已集成到 Dashboard
-auto_generate_csv.py
-civicomfy_batch_downloader.py
-civitai_lookup.py
+# 旧代码归档 (已移至 _archive/ 目录，目录内含 .gitignore)
+_archive/
+
+# 旧的数据模板
 models.csv.example
 models.csv.template
 

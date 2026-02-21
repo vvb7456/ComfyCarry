@@ -2,7 +2,6 @@
 ComfyCarry — 前端页面服务路由
 
 - /              — Dashboard 或 Setup Wizard
-- /dashboard.js  — 前端 JS
 - /favicon.ico   — 图标
 - /static/<path> — 静态文件
 """
@@ -36,17 +35,6 @@ def index():
         return resp
     return Response("<h1>dashboard.html not found</h1>",
                     mimetype="text/html", status=404)
-
-
-@bp.route("/dashboard.js")
-def serve_js():
-    js_path = Path(SCRIPT_DIR) / "dashboard.js"
-    if js_path.exists():
-        resp = Response(js_path.read_text(encoding="utf-8"),
-                        mimetype="application/javascript")
-        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        return resp
-    return "", 404
 
 
 @bp.route("/favicon.ico")
