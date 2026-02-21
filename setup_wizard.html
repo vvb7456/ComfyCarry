@@ -350,7 +350,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         </div>
         <div class="btn-row">
             <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+            <button class="btn btn-primary" id="btn-next-1" onclick="nextStep()" disabled>下一步</button>
         </div>
     </div>
 
@@ -770,6 +770,18 @@ async function init() {
             hint.style.display = 'block';
             hint.innerHTML = '✅ 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
         }
+        // 密码输入监听 — 两个框都有内容且一致时才允许下一步
+        const _pwInputs = ['input-password', 'input-password-confirm'];
+        _pwInputs.forEach(id => document.getElementById(id).addEventListener('input', () => {
+            const pw = document.getElementById('input-password').value;
+            const pw2 = document.getElementById('input-password-confirm').value;
+            const btn = document.getElementById('btn-next-1');
+            btn.disabled = !(pw && pw2 && pw === pw2);
+            document.getElementById('pw-mismatch-hint').style.display =
+                (pw && pw2 && pw !== pw2) ? 'block' : 'none';
+        }));
+        // 环境变量预填时直接启用
+        if (envVars.password) document.getElementById('btn-next-1').disabled = false;
         if (envVars.cloudflared_token) {
             document.getElementById('input-cf-token').value = envVars.cloudflared_token;
             wizardConfig.cloudflared_token = envVars.cloudflared_token;
@@ -798,6 +810,7 @@ async function init() {
             document.getElementById('input-password').value = state.password;
             document.getElementById('input-password-confirm').value = state.password;
             wizardConfig.password = state.password;
+            document.getElementById('btn-next-1').disabled = false;
         }
         if (state.cloudflared_token && !document.getElementById('input-cf-token').value) {
             document.getElementById('input-cf-token').value = state.cloudflared_token;
@@ -880,12 +893,13 @@ function updateNextBtnText() {
 function nextStep() {
     saveCurrentStep();
 
-    // Step 1: 密码二次确认检查
+    // Step 1: 密码检查 (空密码 / 不一致)
     if (currentStep === 1) {
         const pw = document.getElementById('input-password').value;
         const pw2 = document.getElementById('input-password-confirm').value;
         const hint = document.getElementById('pw-mismatch-hint');
-        if (pw && pw2 && pw !== pw2) {
+        if (!pw || !pw2) return;
+        if (pw !== pw2) {
             hint.style.display = 'block';
             document.getElementById('input-password-confirm').focus();
             return;
@@ -951,7 +965,7 @@ function prevStep() {
 function saveCurrentStep() {
     switch (currentStep) {
         case 1:
-            wizardConfig.password = document.getElementById('input-password').value || 'comfy2025';
+            wizardConfig.password = document.getElementById('input-password').value;
             break;
         case 2:
             wizardConfig.cloudflared_token = document.getElementById('input-cf-token').value.trim();
