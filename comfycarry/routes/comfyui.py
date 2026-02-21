@@ -13,7 +13,6 @@ ComfyCarry — ComfyUI 管理路由
 """
 
 import json
-import os
 import queue
 import re
 import shlex
@@ -29,6 +28,7 @@ from ..services.comfyui_params import (
     build_comfyui_args,
 )
 from ..services.comfyui_bridge import get_bridge
+from ..services.deploy_engine import _detect_python
 
 bp = Blueprint("comfyui", __name__)
 
@@ -130,12 +130,7 @@ def api_comfyui_params_update():
             return jsonify({"error": "extra_args 格式无效"}), 400
         args_str = args_str + " " + " ".join(shlex.quote(t) for t in tokens)
 
-    py = "/usr/bin/python3.13"
-    for candidate in ["/usr/bin/python3.13", "/usr/bin/python3.12",
-                      "/usr/bin/python3.11", "/usr/bin/python3"]:
-        if os.path.isfile(candidate):
-            py = candidate
-            break
+    py = _detect_python()
 
     try:
         subprocess.run("pm2 delete comfy 2>/dev/null || true",
