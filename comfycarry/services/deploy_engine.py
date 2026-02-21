@@ -604,7 +604,7 @@ def _run_deploy(config):
         sa2_ok = False
         if want_fa2:
             r = subprocess.run(
-                f'{PY} -c "import flash_attn; print(flash_attn.__version__)"',
+                f'{PY} -c "import flash_attn"',
                 shell=True, capture_output=True, text=True, timeout=10
             )
             fa2_ok = r.returncode == 0
@@ -612,7 +612,7 @@ def _run_deploy(config):
                 _deploy_log("⚠️ FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
         if want_sa2:
             r = subprocess.run(
-                f'{PY} -c "import sageattention; print(sageattention.__version__)"',
+                f'{PY} -c "import sageattention"',
                 shell=True, capture_output=True, text=True, timeout=10
             )
             sa2_ok = r.returncode == 0
@@ -651,7 +651,7 @@ def _run_deploy(config):
                 _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
                 if not aura_model.exists():
                     _deploy_exec(
-                        'aria2c -x 16 -s 16 --console-log-level=notice --summary-interval=5 '
+                        'aria2c -x 16 -s 16 --console-log-level=warn '
                         '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
                         '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
                         '?download=true"',
@@ -659,7 +659,7 @@ def _run_deploy(config):
                     )
                 if not aura_config.exists():
                     _deploy_exec(
-                        'aria2c -x 16 -s 16 --console-log-level=notice --summary-interval=5 '
+                        'aria2c -x 16 -s 16 --console-log-level=warn '
                         '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
                         '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
                         '?download=true"',
@@ -680,12 +680,13 @@ def _run_deploy(config):
         state = _load_setup_state()
         state["deploy_completed"] = True
         state["deploy_error"] = ""
-        # 记录 attention 安装结果 (前端据此显示警告)
+        # 仅当最终回退到 SDPA 时才记录警告 (FA2 可用时 SA2 失败不算回退)
         attn_warnings = []
-        if want_fa2 and not fa2_ok:
-            attn_warnings.append("FlashAttention-2")
-        if want_sa2 and not sa2_ok:
-            attn_warnings.append("SageAttention-2")
+        if (want_fa2 or want_sa2) and not fa2_ok and not sa2_ok:
+            if want_fa2:
+                attn_warnings.append("FlashAttention-2")
+            if want_sa2:
+                attn_warnings.append("SageAttention-2")
         state["attn_install_warnings"] = attn_warnings
         # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
         _save_setup_state(state)

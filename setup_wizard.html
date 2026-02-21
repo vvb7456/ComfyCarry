@@ -551,6 +551,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div id="deploy-error-banner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:14px;word-break:break-word;"></div>
         <!-- 成功按钮 -->
         <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
+            <button class="btn btn-secondary" id="deploy-done-retry" style="display:none" onclick="retryDeploy()">🔄 重试部署</button>
             <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 ComfyCarry</button>
         </div>
         <!-- 失败按钮 -->
@@ -1531,8 +1532,9 @@ function connectSSE() {
                     const warnEl = document.createElement('div');
                     warnEl.className = 'log-line warn';
                     warnEl.style.color = 'var(--amber)';
-                    warnEl.innerHTML = `⚠️ ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可在 ComfyUI 页面的启动参数中重新选择。`;
+                    warnEl.innerHTML = `⚠️ ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。`;
                     logEl.appendChild(warnEl);
+                    document.getElementById('deploy-done-retry').style.display = '';
                 }
                 document.getElementById('deploy-done-row').style.display = 'flex';
             } else {
@@ -1574,6 +1576,7 @@ function retryDeploy() {
     document.getElementById('deploy-error-banner').style.display = 'none';
     document.getElementById('deploy-fail-row').style.display = 'none';
     document.getElementById('deploy-done-row').style.display = 'none';
+    document.getElementById('deploy-done-retry').style.display = 'none';
     document.getElementById('deploy-title').textContent = '⚙️ 正在部署... (智能重试)';
     completedSteps = [];
     startDeploy();
