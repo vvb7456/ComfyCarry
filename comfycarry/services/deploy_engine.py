@@ -650,22 +650,34 @@ def _run_deploy(config):
         # STEP 10: 后台任务
         _deploy_step("后台任务")
 
-        _deploy_log("下载 AuraSR V2...")
-        _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
-        _deploy_exec(
-            'aria2c -x 16 -s 16 '
-            '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
-            '?download=true"',
-            timeout=300, label="AuraSR model.safetensors"
-        )
-        _deploy_exec(
-            'aria2c -x 16 -s 16 '
-            '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
-            '?download=true"',
-            timeout=60, label="AuraSR config.json"
-        )
+        # 仅在用户选择了 AuraSR 插件时下载模型
+        aura_plugin_url = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
+        if aura_plugin_url in plugins:
+            aura_model = Path("/workspace/ComfyUI/models/Aura-SR/model.safetensors")
+            aura_config = Path("/workspace/ComfyUI/models/Aura-SR/config.json")
+            if aura_model.exists() and aura_config.exists():
+                _deploy_log("AuraSR V2 模型已存在, 跳过下载")
+            else:
+                _deploy_log("下载 AuraSR V2...")
+                _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
+                if not aura_model.exists():
+                    _deploy_exec(
+                        'aria2c -x 16 -s 16 --console-log-level=notice --summary-interval=5 '
+                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
+                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
+                        '?download=true"',
+                        timeout=300, label="AuraSR model.safetensors"
+                    )
+                if not aura_config.exists():
+                    _deploy_exec(
+                        'aria2c -x 16 -s 16 --console-log-level=notice --summary-interval=5 '
+                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
+                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
+                        '?download=true"',
+                        timeout=60, label="AuraSR config.json"
+                    )
+        else:
+            _deploy_log("未选择 AuraSR 插件, 跳过模型下载")
 
         # 完成
         _deploy_step("部署完成")
