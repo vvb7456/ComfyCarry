@@ -231,13 +231,20 @@ def api_comfyui_history():
                         "subfolder": img.get("subfolder", ""),
                         "type": img.get("type", "output"),
                     })
+            # 从 status.messages 中提取时间戳
+            timestamp = 0
+            for msg in status.get("messages", []):
+                if isinstance(msg, list) and len(msg) >= 2:
+                    if msg[0] == "execution_start" and isinstance(msg[1], dict):
+                        timestamp = msg[1].get("timestamp", 0)
+                        break
             items.append({
                 "prompt_id": pid,
                 "completed": status.get("completed", False),
                 "images": images,
-                "timestamp": status.get("status_str_start_time", ""),
+                "timestamp": timestamp,
             })
-        items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
         return jsonify({"history": items[:max_items]})
     except Exception:
         return jsonify({"history": [], "error": "ComfyUI 无法连接"})
