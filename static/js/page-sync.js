@@ -259,9 +259,10 @@ function renderSyncRulesList() {
     const dir = r.direction === 'pull' ? '⬇' : '⬆';
     const triggerMap = {deploy: '📦 部署时', watch: '👁 监控', manual: '🖐 手动'};
     const methodMap = {sync: '镜像同步', copy: '复制', move: '移动'};
+    const arrows = '<span class="sync-flow-arrows"><span>▸</span><span>▸</span><span>▸</span></span>';
     const pathDetail = r.direction === 'push'
-      ? `<span style="opacity:.6">📁</span> ${escHtml(r.local_path)} <span style="display:inline-block;background:var(--ac);color:var(--bg);border-radius:4px;padding:0 6px;font-size:.75rem;vertical-align:middle;margin:0 4px">▸▸</span> <span style="opacity:.6">☁️</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)}`
-      : `<span style="opacity:.6">☁️</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)} <span style="display:inline-block;background:var(--ac);color:var(--bg);border-radius:4px;padding:0 6px;font-size:.75rem;vertical-align:middle;margin:0 4px">▸▸</span> <span style="opacity:.6">📁</span> ${escHtml(r.local_path)}`;
+      ? `<span style="opacity:.6">📁</span> ${escHtml(r.local_path)} ${arrows} <span style="opacity:.6">☁️</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)}`
+      : `<span style="opacity:.6">☁️</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)} ${arrows} <span style="opacity:.6">📁</span> ${escHtml(r.local_path)}`;
     return `<div class="sync-rule-card${r.enabled === false ? ' disabled' : ''}">
       <div class="sync-rule-dir">${dir}</div>
       <div class="sync-rule-info">

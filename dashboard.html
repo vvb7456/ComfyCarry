@@ -2113,7 +2113,18 @@
             gap: 14px;
         }
         .sync-rule-card.disabled { opacity: .5; }
+        .sync-rule-card.disabled .sync-flow-arrows span { animation: none !important; opacity: .3; }
         .sync-rule-dir { font-size: 1.2rem; flex-shrink: 0; }
+        .sync-flow-arrows { display: inline-flex; gap: 1px; margin: 0 5px; vertical-align: middle; }
+        .sync-flow-arrows span { color: var(--green); font-size: .85rem; font-weight: 700; animation: arrowFlow 1.4s infinite; opacity: .25; }
+        .sync-flow-arrows span:nth-child(2) { animation-delay: .2s; }
+        .sync-flow-arrows span:nth-child(3) { animation-delay: .4s; }
+        @keyframes arrowFlow {
+            0%, 100% { opacity: .2; }
+            40% { opacity: 1; }
+            60% { opacity: 1; }
+            80% { opacity: .2; }
+        }
         .sync-rule-info { flex: 1; min-width: 0; }
         .sync-rule-name { font-weight: 600; font-size: .9rem; }
         .sync-rule-detail { font-size: .78rem; color: var(--t3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
