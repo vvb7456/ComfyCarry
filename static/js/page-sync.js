@@ -259,11 +259,14 @@ function renderSyncRulesList() {
     const dir = r.direction === 'pull' ? '⬇' : '⬆';
     const triggerMap = {deploy: '📦 部署时', watch: '👁 监控', manual: '🖐 手动'};
     const methodMap = {sync: '镜像同步', copy: '复制', move: '移动'};
+    const pathDetail = r.direction === 'push'
+      ? `${escHtml(r.local_path)} → ${escHtml(r.remote)}:${escHtml(r.remote_path)}`
+      : `${escHtml(r.remote)}:${escHtml(r.remote_path)} → ${escHtml(r.local_path)}`;
     return `<div class="sync-rule-card${r.enabled === false ? ' disabled' : ''}">
       <div class="sync-rule-dir">${dir}</div>
       <div class="sync-rule-info">
         <div class="sync-rule-name">${escHtml(r.name || r.id)}</div>
-        <div class="sync-rule-detail">${escHtml(r.remote)}:${escHtml(r.remote_path)} ↔ ${escHtml(r.local_path)}</div>
+        <div class="sync-rule-detail">${pathDetail}</div>
         <div class="sync-rule-badges">
           <span class="sync-rule-badge">${triggerMap[r.trigger] || r.trigger}</span>
           <span class="sync-rule-badge">${methodMap[r.method] || r.method}</span>
