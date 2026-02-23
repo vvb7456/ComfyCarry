@@ -1496,11 +1496,16 @@ function startElapsedTimer() {
 }
 
 let completedSteps = [];
+let sseCompleted = false;
 
 function connectSSE() {
+    sseCompleted = false;
     const evtSource = new EventSource('/api/setup/log_stream');
     const logEl = document.getElementById('deploy-log');
     const stepsEl = document.getElementById('deploy-steps-list');
+    // 重连时清空已有步骤列表，避免重复显示
+    stepsEl.innerHTML = '';
+    completedSteps = [];
 
     evtSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -1519,6 +1524,7 @@ function connectSSE() {
         }
 
         if (data.type === 'done') {
+            sseCompleted = true;
             evtSource.close();
             if (elapsedTimer) clearInterval(elapsedTimer);
             const lastActive = stepsEl.querySelector('.deploy-step-item.active');
@@ -1580,7 +1586,9 @@ function connectSSE() {
 
     evtSource.onerror = () => {
         evtSource.close();
-        setTimeout(() => { connectSSE(); }, 3000);
+        if (!sseCompleted) {
+            setTimeout(() => { connectSSE(); }, 3000);
+        }
     };
 }
 
@@ -1593,6 +1601,7 @@ function retryDeploy() {
     document.getElementById('deploy-done-retry').style.display = 'none';
     document.getElementById('deploy-title').textContent = '⚙️ 正在部署... (智能重试)';
     completedSteps = [];
+    sseCompleted = false;
     startDeploy();
 }
 

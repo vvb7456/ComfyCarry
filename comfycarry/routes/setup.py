@@ -154,7 +154,12 @@ def api_setup_log_stream():
             for line in new_lines:
                 yield f"data: {json.dumps(line, ensure_ascii=False)}\n\n"
             state = _load_setup_state()
-            if state.get("deploy_completed") and not new_lines:
+            if state.get("deploy_completed"):
+                # 确保剩余日志全部发完
+                remaining, total2 = get_deploy_log_slice(idx)
+                idx = total2
+                for line in remaining:
+                    yield f"data: {json.dumps(line, ensure_ascii=False)}\n\n"
                 done_evt = {'type': 'done', 'success': True}
                 # 附带 attention 安装警告 (如有)
                 attn_warnings = state.get("attn_install_warnings", [])
