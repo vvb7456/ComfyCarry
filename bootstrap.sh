@@ -36,6 +36,11 @@ fi
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     mkdir -p /run/sshd && ssh-keygen -A 2>/dev/null || true
 fi
+# vast.ai 在同物理机重建实例时可能复用旧 authorized_keys (属主错误 → sshd 拒绝认证)
+if [ -f /root/.ssh/authorized_keys ]; then
+    chown root:root /root/.ssh/authorized_keys 2>/dev/null || true
+    chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
+fi
 pgrep -x sshd >/dev/null || /usr/sbin/sshd 2>/dev/null || true
 
 # ── Python ──
