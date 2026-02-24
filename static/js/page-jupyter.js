@@ -221,14 +221,14 @@ function renderTerminalsList(terminals) {
       const base = _jupyterUrl.split('?')[0];
       const tokenPart = _jupyterUrl.includes('?') ? _jupyterUrl.substring(_jupyterUrl.indexOf('?')) : '';
       const termUrl = `${base}/terminals/${encodeURIComponent(t.name)}${tokenPart}`;
-      openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-sm btn-primary" style="font-size:.68rem;padding:2px 6px" title="在 JupyterLab 中打开">🔗</a>`;
+      openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-xs btn-primary" title="在 JupyterLab 中打开">🔗</a>`;
     }
 
     return `<div class="jupyter-terminal-item" style="display:inline-flex">
       <span style="font-size:1rem">💻</span>
       <span style="font-weight:600;font-size:.85rem">终端 ${escHtml(t.name)}</span>
       ${openBtn}
-      <button class="btn btn-sm btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端" style="font-size:.68rem;padding:2px 6px">✕</button>
+      <button class="btn btn-xs btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">✕</button>
     </div>`;
   }).join('')}</div>`;
 }

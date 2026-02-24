@@ -139,8 +139,8 @@ function _renderServices(d, el) {
       </div>`;
     } else {
       const displayUrl = url || `https://${suffix ? suffix+'-' : ''}${d.subdomain}.${d.domain}`;
-      const deleteBtn = isCustom ? `<button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}')" style="font-size:.62rem;padding:1px 5px;margin-left:auto">✕</button>` : '';
-      const editBtn = suffix ? `<button class="btn btn-sm" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" style="font-size:.62rem;padding:1px 5px" title="编辑子域名">✏️</button>` : '';
+      const deleteBtn = isCustom ? `<button class="btn btn-xs btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}')" style="margin-left:auto">✕</button>` : '';
+      const editBtn = suffix ? `<button class="btn btn-xs" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" title="编辑子域名">✏️</button>` : '';
       html += `<a href="${escHtml(displayUrl)}" target="_blank" class="tunnel-svc-card">
         <div style="display:flex;align-items:center;gap:8px">
           <span class="tunnel-svc-icon">${icon}</span>
@@ -176,7 +176,7 @@ function _renderServices(d, el) {
 // 验证 Token (初始配置)
 // ════════════════════════════════════════════════════════════════
 
-window._tunnelValidate = async function() {
+async function _tunnelValidate() {
   const token = document.getElementById('tunnel-api-token').value.trim();
   const domain = document.getElementById('tunnel-domain').value.trim();
   const resultEl = document.getElementById('tunnel-validate-result');
@@ -210,13 +210,13 @@ window._tunnelValidate = async function() {
     resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 验证请求失败';
   }
-};
+}
 
 // ════════════════════════════════════════════════════════════════
 // 创建 Tunnel (初始配置)
 // ════════════════════════════════════════════════════════════════
 
-window._tunnelProvision = async function() {
+async function _tunnelProvision() {
   const token = document.getElementById('tunnel-api-token').value.trim();
   const domain = document.getElementById('tunnel-domain').value.trim();
   const subdomain = document.getElementById('tunnel-subdomain').value.trim();
@@ -246,13 +246,13 @@ window._tunnelProvision = async function() {
   } catch (e) {
     showToast('❌ 请求失败: ' + e.message);
   }
-};
+}
 
 // ════════════════════════════════════════════════════════════════
 // 移除 / 重启
 // ════════════════════════════════════════════════════════════════
 
-window._tunnelTeardown = async function() {
+async function _tunnelTeardown() {
   if (!confirm('确定移除 Cloudflare Tunnel？将删除 Tunnel、DNS 记录，并停止 cloudflared。')) return;
   try {
     const r = await fetch('/api/tunnel/teardown', { method: 'POST' });
@@ -264,22 +264,22 @@ window._tunnelTeardown = async function() {
       showToast('❌ 移除失败: ' + (d.error || ''));
     }
   } catch (e) { showToast('❌ 请求失败: ' + e.message); }
-};
+}
 
-window._tunnelRestart = async function() {
+async function _tunnelRestart() {
   if (!confirm('确定重启 cloudflared？')) return;
   try {
     await fetch('/api/tunnel/restart', { method: 'POST' });
     showToast('Tunnel 正在重启...');
     setTimeout(loadTunnelPage, 3000);
   } catch (e) { showToast('重启失败: ' + e.message); }
-};
+}
 
 // ════════════════════════════════════════════════════════════════
 // 修改配置弹窗
 // ════════════════════════════════════════════════════════════════
 
-window._tunnelOpenConfig = async function() {
+async function _tunnelOpenConfig() {
   const modal = document.getElementById('tunnel-config-modal');
   const resultEl = document.getElementById('tunnel-cfg-result');
   resultEl.style.display = 'none';
@@ -293,9 +293,9 @@ window._tunnelOpenConfig = async function() {
   } catch (_) {}
 
   modal.classList.add('active');
-};
+}
 
-window._tunnelCfgValidate = async function() {
+async function _tunnelCfgValidate() {
   const token = document.getElementById('tunnel-cfg-token').value.trim();
   const domain = document.getElementById('tunnel-cfg-domain').value.trim();
   const resultEl = document.getElementById('tunnel-cfg-result');
@@ -329,9 +329,9 @@ window._tunnelCfgValidate = async function() {
     resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 验证失败';
   }
-};
+}
 
-window._tunnelCfgSave = async function() {
+async function _tunnelCfgSave() {
   const token = document.getElementById('tunnel-cfg-token').value.trim();
   const domain = document.getElementById('tunnel-cfg-domain').value.trim();
   const subdomain = document.getElementById('tunnel-cfg-subdomain').value.trim();
@@ -367,13 +367,13 @@ window._tunnelCfgSave = async function() {
     resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 请求失败';
   }
-};
+}
 
 // ════════════════════════════════════════════════════════════════
 // 添加/移除自定义服务
 // ════════════════════════════════════════════════════════════════
 
-window._tunnelAddService = function() {
+function _tunnelAddService() {
   const modal = document.getElementById('tunnel-addsvc-modal');
   document.getElementById('tunnel-addsvc-name').value = '';
   document.getElementById('tunnel-addsvc-port').value = '';
@@ -383,7 +383,7 @@ window._tunnelAddService = function() {
   modal.classList.add('active');
 
   document.getElementById('tunnel-addsvc-suffix').oninput = _updateAddSvcPreview;
-};
+}
 
 function _updateAddSvcPreview() {
   const suffix = document.getElementById('tunnel-addsvc-suffix').value.trim();
@@ -395,7 +395,7 @@ function _updateAddSvcPreview() {
   }
 }
 
-window._tunnelAddServiceSubmit = async function() {
+async function _tunnelAddServiceSubmit() {
   const name = document.getElementById('tunnel-addsvc-name').value.trim();
   const port = parseInt(document.getElementById('tunnel-addsvc-port').value);
   const suffix = document.getElementById('tunnel-addsvc-suffix').value.trim();
@@ -425,9 +425,9 @@ window._tunnelAddServiceSubmit = async function() {
   } catch (e) {
     showToast('❌ 请求失败: ' + e.message);
   }
-};
+}
 
-window._tunnelRemoveService = async function(suffix) {
+async function _tunnelRemoveService(suffix) {
   if (!confirm(`确定移除自定义服务 (${suffix})？`)) return;
   showToast('正在移除...');
   try {
@@ -440,9 +440,9 @@ window._tunnelRemoveService = async function(suffix) {
       showToast('❌ ' + (d.error || '移除失败'));
     }
   } catch (e) { showToast('❌ ' + e.message); }
-};
+}
 
-window._tunnelEditSuffix = async function(currentSuffix) {
+async function _tunnelEditSuffix(currentSuffix) {
   const newSuffix = prompt(`修改子域名后缀 (当前: ${currentSuffix})`, currentSuffix);
   if (!newSuffix || newSuffix === currentSuffix) return;
   showToast('正在更新...');
@@ -460,10 +460,16 @@ window._tunnelEditSuffix = async function(currentSuffix) {
       showToast('❌ ' + (d.error || '更新失败'));
     }
   } catch (e) { showToast('❌ ' + e.message); }
-};
+}
 
 // expose for inline onclick
-window.showToast = showToast;
+Object.assign(window, {
+  _tunnelValidate, _tunnelProvision, _tunnelTeardown, _tunnelRestart,
+  _tunnelOpenConfig, _tunnelCfgValidate, _tunnelCfgSave,
+  _tunnelAddService, _tunnelAddServiceSubmit,
+  _tunnelRemoveService, _tunnelEditSuffix,
+  showToast,
+});
 
 function _startAutoRefresh() {
   _stopAutoRefresh();

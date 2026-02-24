@@ -1,5 +1,5 @@
 // ========== Plugin Management (ES Module) ==========
-import { registerPage, showToast, escHtml, renderLoading, renderError } from './core.js';
+import { registerPage, registerEscapeHandler, showToast, escHtml, renderLoading, renderError } from './core.js';
 
 // --- State ---
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed
@@ -12,7 +12,7 @@ let currentPluginTab = 'installed';
 
 // --- Local helpers ---
 function _esc(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
-function _h(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// _h removed — use escHtml from core.js
 function _shortHash(h) { return h && h.length > 8 ? h.substring(0, 8) : (h || 'unknown'); }
 
 // --- Tab switching ---
@@ -134,16 +134,16 @@ function renderInstalledPlugins() {
 
     return `<div class="plugin-item">
       <div class="plugin-item-header">
-        <div class="plugin-item-title">${p.repository ? `<a href="${p.repository}" target="_blank">${_h(p.title)}</a>` : _h(p.title)}</div>
+        <div class="plugin-item-title">${p.repository ? `<a href="${p.repository}" target="_blank">${escHtml(p.title)}</a>` : escHtml(p.title)}</div>
         ${badgeHtml}
       </div>
-      ${p.description ? `<div class="plugin-item-desc">${_h(p.description)}</div>` : ''}
+      ${p.description ? `<div class="plugin-item-desc">${escHtml(p.description)}</div>` : ''}
       <div class="plugin-item-meta">
-        <span>📦 ${_h(p.cnrId || p.dirName)}</span>
-        <span style="color:var(--cyan)">${isNightly ? '🔧 ' + _h(installedVer) : 'v' + _h(installedVer)}</span>
-        ${latestVer ? `<span style="color:var(--t3)">(latest: ${_h(latestVer)})</span>` : ''}
+        <span>📦 ${escHtml(p.cnrId || p.dirName)}</span>
+        <span style="color:var(--cyan)">${isNightly ? '🔧 ' + escHtml(installedVer) : 'v' + escHtml(installedVer)}</span>
+        ${latestVer ? `<span style="color:var(--t3)">(latest: ${escHtml(latestVer)})</span>` : ''}
         ${p.stars > 0 ? `<span>⭐ ${p.stars}</span>` : ''}
-        ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
+        ${p.author ? `<span>👤 ${escHtml(p.author)}</span>` : ''}
         <div class="plugin-item-actions">${actionsHtml}</div>
       </div>
     </div>`;
@@ -231,16 +231,16 @@ function _renderBrowseItem(p) {
 
   return `<div class="plugin-item">
     <div class="plugin-item-header">
-      <div class="plugin-item-title">${repo ? `<a href="${repo}" target="_blank">${_h(title)}</a>` : _h(title)}</div>
+      <div class="plugin-item-title">${repo ? `<a href="${repo}" target="_blank">${escHtml(title)}</a>` : escHtml(title)}</div>
       ${badgeHtml}
     </div>
-    ${desc ? `<div class="plugin-item-desc">${_h(desc)}</div>` : ''}
+    ${desc ? `<div class="plugin-item-desc">${escHtml(desc)}</div>` : ''}
     <div class="plugin-item-meta">
-      <span>📦 ${_h(p.id)}</span>
-      ${ver ? `<span>v${_h(ver)}</span>` : ''}
-      ${p.cnr_latest ? `<span style="color:var(--t3)">latest: ${_h(p.cnr_latest)}</span>` : ''}
+      <span>📦 ${escHtml(p.id)}</span>
+      ${ver ? `<span>v${escHtml(ver)}</span>` : ''}
+      ${p.cnr_latest ? `<span style="color:var(--t3)">latest: ${escHtml(p.cnr_latest)}</span>` : ''}
       ${p.stars > 0 ? `<span>⭐ ${p.stars}</span>` : ''}
-      ${p.author ? `<span>👤 ${_h(p.author)}</span>` : ''}
+      ${p.author ? `<span>👤 ${escHtml(p.author)}</span>` : ''}
       ${p.last_update ? `<span>🕐 ${p.last_update.split('T')[0]}</span>` : ''}
       <div class="plugin-item-actions">${actionsHtml}</div>
     </div>
@@ -426,7 +426,7 @@ async function openPluginVersionModal(id, title) {
     body.innerHTML = `<div style="max-height:50vh;overflow-y:auto">${versions.map(v => {
       const ver = v.version || v;
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--bd)">
-        <span style="font-size:.88rem;font-weight:500">${_h(typeof ver === 'string' ? ver : JSON.stringify(ver))}</span>
+        <span style="font-size:.88rem;font-weight:500">${escHtml(typeof ver === 'string' ? ver : JSON.stringify(ver))}</span>
         <button class="btn btn-sm btn-primary" onclick="installPluginVersion('${_esc(id)}','${_esc(typeof ver === 'string' ? ver : '')}')">安装此版本</button>
       </div>`;
     }).join('')}</div>`;
@@ -476,9 +476,7 @@ async function pollPluginQueue() {
 }
 
 // ---------- Escape key handler for plugin version modal ----------
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closePluginVersionModal();
-});
+registerEscapeHandler(() => closePluginVersionModal());
 
 // ---------- Page registration ----------
 registerPage('plugins', {

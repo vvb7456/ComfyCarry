@@ -5,6 +5,7 @@
 
 import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty } from './core.js';
 import { createLogStream } from './sse-log.js';
+import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
 // ── 模块状态 ──────────────────────────────────────────────────
 
@@ -12,8 +13,13 @@ let comfyAutoRefresh = null;
 let _comfyParamsSchema = null;
 let _comfyEventSource = null;
 let _comfyLogStream = null;
-let _comfyExecState = null;   // Current execution state
-let _comfyExecTimer = null;   // Timer for elapsed counter
+
+// Shared execution tracker
+const _comfyTracker = createExecTracker({
+  onUpdate() {
+    _updateAllBars();
+  }
+});
 
 // ── 页面入口 ──────────────────────────────────────────────────
 
@@ -51,103 +57,36 @@ function handleComfyEvent(evt) {
   const t = evt.type;
   const d = evt.data || {};
 
+  // ComfyUI-specific: status & monitor
   if (t === 'status') {
     if (_currentComfyTab === 'queue') loadQueuePanel();
+    return;
   }
-
-  else if (t === 'execution_start') {
-    const nodeNames = d.node_names || {};
-    _comfyExecState = {
-      start_time: d.start_time || (Date.now() / 1000),
-      prompt_id: d.prompt_id,
-      current_node: null,
-      node_names: nodeNames,
-      total_nodes: Object.keys(nodeNames).length,
-      executed_nodes: new Set(),
-      cached_nodes: new Set(),
-      progress: null,
-    };
-    // If backend couldn't fetch node names (timing issue), fetch from frontend
-    if (_comfyExecState.total_nodes === 0 && d.prompt_id) {
-      _fetchAndFillNodeNames(d.prompt_id, _comfyExecState);
-    }
-    _updateAllBars();
-    _startExecTimer();
-  }
-
-  // 页面刷新后 SSE 重连时收到的完整执行快照
-  else if (t === 'execution_snapshot') {
-    const nodeNames = d.node_names || {};
-    _comfyExecState = {
-      start_time: d.start_time || (Date.now() / 1000),
-      prompt_id: d.prompt_id,
-      current_node: d.current_node || null,
-      node_names: nodeNames,
-      total_nodes: Object.keys(nodeNames).length,
-      executed_nodes: new Set(d.executed_nodes || []),
-      cached_nodes: new Set(d.cached_nodes || []),
-      progress: null,
-    };
-    if (_comfyExecState.total_nodes === 0 && d.prompt_id) {
-      _fetchAndFillNodeNames(d.prompt_id, _comfyExecState);
-    }
-    _updateAllBars();
-    _startExecTimer();
-  }
-
-  else if (t === 'progress') {
-    if (_comfyExecState) _comfyExecState.progress = d;
-    _updateAllBars();
-  }
-
-  else if (t === 'executing') {
-    if (_comfyExecState && d.node) {
-      _comfyExecState.current_node = d.node;
-      _comfyExecState.executed_nodes.add(d.node);
-      if (d.class_type) _comfyExecState.node_names[d.node] = d.class_type;
-      _comfyExecState.progress = null;
-      _updateAllBars();
-    }
-  }
-
-  else if (t === 'execution_cached') {
-    if (_comfyExecState && d.nodes) {
-      for (const nid of d.nodes) _comfyExecState.cached_nodes.add(nid);
-    }
-  }
-
-  else if (t === 'execution_done') {
-    const elapsed = d.elapsed ? `${d.elapsed}s` : '';
-    _comfyExecState = null;
-    if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
-    _updateAllBars();
-    if (elapsed) showToast(`\u2705 生成完成 (${elapsed})`);
-    loadComfyStatus();
-    if (_currentComfyTab === 'queue') { loadQueuePanel(); loadComfyHistory(); }
-  }
-
-  else if (t === 'execution_error') {
-    _comfyExecState = null;
-    if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
-    _updateAllBars();
-    const errEl = document.getElementById('comfyui-exec-bar');
-    if (errEl) {
-      errEl.innerHTML = `<div class="comfy-exec-error">\u274c 执行出错: ${escHtml(d.exception_message || d.node_type || '未知错误')}</div>`;
-      errEl.classList.remove('hidden');
-      setTimeout(() => errEl.classList.add('hidden'), 8000);
-    }
-  }
-
-  else if (t === 'execution_interrupted') {
-    _comfyExecState = null;
-    if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
-    _updateAllBars();
-    showToast('\u23f9 执行已中断');
-    if (_currentComfyTab === 'queue') loadQueuePanel();
-  }
-
-  else if (t === 'monitor') {
+  if (t === 'monitor') {
     _updateMonitorData(d);
+    return;
+  }
+
+  // Delegate execution events to shared tracker
+  const result = _comfyTracker.handleEvent(evt);
+  if (result && result.finished) {
+    // Handle completion side-effects
+    if (result.type === 'execution_done') {
+      const elapsed = result.data.elapsed ? `${result.data.elapsed}s` : '';
+      if (elapsed) showToast(`\u2705 生成完成 (${elapsed})`);
+      loadComfyStatus();
+      if (_currentComfyTab === 'queue') { loadQueuePanel(); loadComfyHistory(); }
+    } else if (result.type === 'execution_error') {
+      const errEl = document.getElementById('comfyui-exec-bar');
+      if (errEl) {
+        errEl.innerHTML = `<div class="comfy-exec-error">\u274c 执行出错: ${escHtml(result.data.exception_message || result.data.node_type || '未知错误')}</div>`;
+        errEl.classList.remove('hidden');
+        setTimeout(() => errEl.classList.add('hidden'), 8000);
+      }
+    } else if (result.type === 'execution_interrupted') {
+      showToast('\u23f9 执行已中断');
+      if (_currentComfyTab === 'queue') loadQueuePanel();
+    }
   }
 }
 
@@ -169,76 +108,7 @@ function _updateMonitorData(d) {
   });
 }
 
-// ── 统一进度条渲染 ────────────────────────────────────────────
-
-function _fetchAndFillNodeNames(promptId, stateRef) {
-  fetch('/api/comfyui/queue').then(r => r.json()).then(qData => {
-    if (!stateRef || stateRef.prompt_id !== promptId) return;
-    for (const item of (qData.queue_running || [])) {
-      if (item[1] === promptId && item[2]) {
-        for (const [nid, ndata] of Object.entries(item[2])) {
-          if (typeof ndata === 'object' && ndata.class_type) {
-            stateRef.node_names[nid] = ndata.class_type;
-          }
-        }
-        stateRef.total_nodes = Object.keys(stateRef.node_names).length;
-        _updateAllBars();
-        break;
-      }
-    }
-  }).catch(() => {});
-}
-
-function _startExecTimer() {
-  if (_comfyExecTimer) clearInterval(_comfyExecTimer);
-  _comfyExecTimer = setInterval(() => { _updateAllBars(); if (_currentComfyTab === 'queue') loadQueuePanel(); }, 1000);
-}
-
-function _renderProgressBar(st) {
-  const elapsed = Math.round(Date.now() / 1000 - st.start_time);
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-
-  const completedCount = st.executed_nodes.size + st.cached_nodes.size;
-  const totalNodes = st.total_nodes || '?';
-
-  const nodeName = st.current_node
-    ? (st.node_names?.[st.current_node] || st.current_node)
-    : '';
-
-  const hasSteps = st.progress && st.progress.percent != null;
-  const stepPct = hasSteps ? st.progress.percent : 0;
-
-  let fillPct = 0;
-  if (totalNodes !== '?' && totalNodes > 0) {
-    const baseProgress = Math.max(0, completedCount - 1) / totalNodes;
-    const currentFraction = hasSteps ? (stepPct / 100) / totalNodes : 0;
-    fillPct = Math.min(100, Math.round((baseProgress + currentFraction) * 100));
-  } else if (hasSteps) {
-    fillPct = stepPct;
-  }
-
-  let html = `<div class="comfy-progress-bar active">`;
-  html += `<div class="comfy-progress-bar-fill" style="width:${fillPct}%"></div>`;
-  html += `<span class="comfy-progress-pulse"></span>`;
-  html += `<span class="comfy-progress-label">\u26a1 正在生成</span>`;
-
-  if (nodeName) {
-    html += `<span class="comfy-progress-node">${completedCount}/${totalNodes} ${escHtml(nodeName)}</span>`;
-  }
-
-  if (hasSteps) {
-    const stepDetail = st.progress.value != null ? `${st.progress.value}/${st.progress.max}` : '';
-    html += `<span class="comfy-progress-steps">${stepDetail} (${stepPct}%)</span>`;
-  } else {
-    html += `<span class="comfy-progress-steps"></span>`;
-  }
-
-  html += `<span class="comfy-progress-time">${timeStr}</span>`;
-  html += `</div>`;
-  return html;
-}
+// ── 进度条渲染 (使用共享模块) ──────────────────────────────────
 
 function _updateAllBars() {
   _updateExecBar();
@@ -248,9 +118,10 @@ function _updateAllBars() {
 function _updateExecBar() {
   const bar = document.getElementById('comfyui-exec-bar');
   if (!bar) return;
-  if (!_comfyExecState) { bar.classList.add('hidden'); return; }
+  const st = _comfyTracker.getState();
+  if (!st) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
-  bar.innerHTML = _renderProgressBar(_comfyExecState);
+  bar.innerHTML = renderProgressBar(st);
 }
 
 // ── SSE: Real-time log stream ─────────────────────────────────
@@ -507,8 +378,6 @@ function switchComfyTab(tab) {
 
 // ── 任务队列面板 ─────────────────────────────────────────────
 
-let _queueRefreshTimer = null;
-
 async function loadQueuePanel() {
   try {
     const r = await fetch('/api/comfyui/queue');
@@ -538,8 +407,9 @@ async function loadQueuePanel() {
           const shortId = promptId.substring(0, 8);
 
           let progressHtml = '';
-          if (_comfyExecState && _comfyExecState.prompt_id === promptId) {
-            progressHtml = _renderProgressBar(_comfyExecState);
+          const _st = _comfyTracker.getState();
+          if (_st && _st.prompt_id === promptId) {
+            progressHtml = renderProgressBar(_st);
           }
 
           return `<div class="queue-item running">
@@ -567,14 +437,14 @@ async function loadQueuePanel() {
             <div class="queue-item-info">
               <div class="queue-item-id">#${idx + 1} · ${shortId}… · ${nodeCount} 个节点</div>
             </div>
-            <button class="btn btn-sm btn-danger" style="font-size:.7rem;padding:2px 8px" onclick="comfyDeleteQueueItem('${promptId}')">✕</button>
+            <button class="btn btn-xs btn-danger" onclick="comfyDeleteQueueItem('${promptId}')">✕</button>
           </div>`;
         }).join('');
       }
     }
 
     // Also refresh running items with progress
-    if (_comfyExecState && _currentComfyTab === 'queue') {
+    if (_comfyTracker.getState() && _currentComfyTab === 'queue') {
       // Progress is rendered inline in running items
     }
   } catch (e) {
@@ -683,7 +553,7 @@ function startComfyAutoRefresh() {
 
 function stopComfyAutoRefresh() {
   if (comfyAutoRefresh) { clearInterval(comfyAutoRefresh); comfyAutoRefresh = null; }
-  if (_comfyExecTimer) { clearInterval(_comfyExecTimer); _comfyExecTimer = null; }
+  _comfyTracker.destroy();
   stopComfyEventStream();
   stopComfyLogStream();
 }

@@ -56,7 +56,7 @@ function renderSyncRemoteCard(r) {
       <span style="font-size:.75rem;color:var(--t3)">${authIcon}</span>
     </div>
     <div class="sync-storage-info" id="storage-${r.name}">
-      <button class="btn btn-sm" style="font-size:.7rem;padding:2px 8px" onclick="refreshRemoteStorage('${r.name}')">🔄 查看容量</button>
+      <button class="btn btn-xs" onclick="refreshRemoteStorage('${r.name}')">🔄 查看容量</button>
     </div>
     <div style="margin-top:8px;display:flex;gap:4px">
       <button class="btn btn-sm" style="font-size:.7rem;color:var(--red)" onclick="deleteRemote('${r.name}')">🗑️ 删除</button>

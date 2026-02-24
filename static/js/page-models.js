@@ -31,9 +31,6 @@ const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion
 
 // ── 本地 helpers ─────────────────────────────────────────────
 
-function _esc(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
-function _h(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
 // ── Model Tab 切换 ───────────────────────────────────────────
 
 const modelTabIds = ['local', 'civitai', 'downloads'];
@@ -135,8 +132,8 @@ function renderMetaContent(data) {
       if (img.cfg) caption += `<label>CFG</label>${img.cfg}`;
       if (img.sampler) caption += `<label>Sampler</label>${img.sampler}`;
       if (img.model) caption += `<label>Model</label>${img.model}`;
-      if (img.positive) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(img.positive)}</span>`;
-      if (img.negative) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(img.negative)}</span>`;
+      if (img.positive) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${escHtml(img.positive)}</span>`;
+      if (img.negative) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${escHtml(img.negative)}</span>`;
 
       // Meilisearch images have meta in different structure
       if (img.meta) {
@@ -145,8 +142,8 @@ function renderMetaContent(data) {
         if (mt.steps) caption += `<label>Steps</label>${mt.steps}`;
         if (mt.cfgScale) caption += `<label>CFG</label>${mt.cfgScale}`;
         if (mt.sampler) caption += `<label>Sampler</label>${mt.sampler}`;
-        if (mt.prompt) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(mt.prompt)}</span>`;
-        if (mt.negativePrompt) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${_h(mt.negativePrompt)}</span>`;
+        if (mt.prompt) caption += `<label>Positive</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${escHtml(mt.prompt)}</span>`;
+        if (mt.negativePrompt) caption += `<label>Negative</label><span class="prompt-text" onclick="copyText(this.textContent)" title="点击复制">${escHtml(mt.negativePrompt)}</span>`;
       }
 
       const isVideo = img.type === 'video' || (img.name && /\.(webm|mp4)$/i.test(img.name));
@@ -273,7 +270,7 @@ function renderLocalModelCard(m, idx) {
   const badgeClass = getBadgeClass(m.category);
   const sizeStr = fmtBytes(m.size_bytes);
   const twHtml = (m.trained_words || []).slice(0, 8).map(w =>
-    `<span class="tw-tag" onclick="copyText('${_h(w).replace(/'/g, "\\'")}')" title="点击复制">${_h(w)}</span>`
+    `<span class="tw-tag" onclick="copyText('${escHtml(w).replace(/'/g, "\\'")}')" title="点击复制">${escHtml(w)}</span>`
   ).join('');
 
   let imgTag = '', zoomUrl = '';
