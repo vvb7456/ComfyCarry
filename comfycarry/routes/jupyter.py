@@ -311,14 +311,19 @@ def jupyter_restart():
 @bp.route("/api/jupyter/url")
 def jupyter_url():
     """获取 Jupyter 外部访问 URL"""
-    # 尝试从 tunnel links 获取
+    # 尝试从 tunnel v2 API 获取
     try:
         from . import tunnel as tunnel_mod
-        resp = tunnel_mod.api_tunnel_links()
+        resp = tunnel_mod.api_tunnel_status_v2()
         data = resp.get_json() if hasattr(resp, 'get_json') else {}
-        for link in data.get("links", []):
-            if "jupyter" in link.get("name", "").lower():
-                return jsonify({"url": link["url"], "source": "tunnel"})
+        urls = data.get("urls", {})
+        for name, url in urls.items():
+            if "jupyter" in name.lower():
+                # 拼接 token 参数
+                token = JUPYTER_TOKEN or _detect_token()
+                if token:
+                    url = f"{url}?token={token}"
+                return jsonify({"url": url, "source": "tunnel"})
     except Exception:
         pass
     # 回退到环境变量

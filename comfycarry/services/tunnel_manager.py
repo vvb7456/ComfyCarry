@@ -331,15 +331,13 @@ class TunnelManager:
         ingress = []
         for svc in services:
             protocol = svc.get("protocol", "http")
-            service_url = f"{protocol}://localhost:{svc['port']}"
+            # 使用 127.0.0.1 而非 localhost，避免 cloudflared 解析到 IPv6
+            service_url = f"{protocol}://127.0.0.1:{svc['port']}"
             entry = {
                 "hostname": self._hostname_for(svc),
                 "service": service_url,
                 "originRequest": {},
             }
-            # SSH 需要 proxyType 配置
-            if protocol == "ssh":
-                entry["originRequest"] = {"proxyType": "socks"}
             ingress.append(entry)
         ingress.append({"service": "http_status:404"})
         return ingress

@@ -1,16 +1,22 @@
 /**
- * ComfyCarry — page-tunnel.js (v2)
+ * ComfyCarry — page-tunnel.js (v3)
  * Tunnel 页面: CF API 驱动的配置/状态管理
+ * 支持: 自定义服务、子域名编辑、服务状态、配置弹窗
  */
 
 import { registerPage, showToast, escHtml } from './core.js';
 
 let _autoRefresh = null;
+let _lastData = null;
 
 registerPage('tunnel', {
   enter() { loadTunnelPage(); _startAutoRefresh(); },
   leave() { _stopAutoRefresh(); }
 });
+
+// ════════════════════════════════════════════════════════════════
+// 主加载
+// ════════════════════════════════════════════════════════════════
 
 async function loadTunnelPage() {
   const statusSection = document.getElementById('tunnel-status-section');
@@ -22,14 +28,11 @@ async function loadTunnelPage() {
   try {
     const r = await fetch('/api/tunnel/status');
     const d = await r.json();
+    _lastData = d;
 
     if (d.configured) {
-      // ── 已配置视图 ──
       statusSection.style.display = '';
-      // 只有当 setup section 不是用户手动展开时才隐藏
-      if (!setupSection.dataset.manualOpen) {
-        setupSection.style.display = 'none';
-      }
+      setupSection.style.display = 'none';
 
       const tunnel = d.tunnel || {};
       const st = tunnel.status || d.cloudflared || 'unknown';
@@ -61,34 +64,9 @@ async function loadTunnelPage() {
           连接节点: ${escHtml(connInfo)}
         </div>`;
 
-      // 服务列表
-      const urls = d.urls || {};
-      if (Object.keys(urls).length > 0) {
-        servicesEl.innerHTML = '<div class="tunnel-services">' + Object.entries(urls).map(([name, url]) => {
-          const icon = {ComfyCarry: '📊', ComfyUI: '🎨', JupyterLab: '📓', SSH: '🔒'}[name] || '🌐';
-          if (name === 'SSH') {
-            // SSH 显示连接命令而非可点击链接
-            const hostname = url.replace('https://', '');
-            const sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
-            return `<div class="tunnel-svc-card" style="cursor:default">
-              <span class="tunnel-svc-icon">${icon}</span>
-              <span class="tunnel-svc-name">${escHtml(name)}</span>
-              <code class="tunnel-svc-detail" style="font-size:.72rem;user-select:all;cursor:text">${escHtml(sshCmd)}</code>
-              <button class="btn btn-sm" onclick="navigator.clipboard.writeText('${sshCmd.replace(/'/g,"\\'")}');window.showToast?.('已复制')" style="font-size:.68rem;padding:2px 8px;flex-shrink:0">📋</button>
-            </div>`;
-          }
-          return `<a href="${escHtml(url)}" target="_blank" class="tunnel-svc-card">
-            <span class="tunnel-svc-icon">${icon}</span>
-            <span class="tunnel-svc-name">${escHtml(name)}</span>
-            <span class="tunnel-svc-detail">${escHtml(url)}</span>
-          </a>`;
-        }).join('') + '</div>';
-      } else {
-        servicesEl.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">正在获取服务链接...</div>';
-      }
+      _renderServices(d, servicesEl);
 
     } else {
-      // ── 未配置视图 ──
       statusSection.style.display = 'none';
       setupSection.style.display = '';
     }
@@ -110,11 +88,89 @@ async function loadTunnelPage() {
 
   } catch (e) {
     if (statusEl) statusEl.innerHTML = `<div style="color:var(--red,#e74c3c)">加载失败: ${escHtml(e.message)}</div>`;
-    logEl.innerHTML = '';
+    if (logEl) logEl.innerHTML = '';
   }
 }
 
-// ── 验证 Token ──
+// ════════════════════════════════════════════════════════════════
+// 服务列表渲染
+// ════════════════════════════════════════════════════════════════
+
+function _renderServices(d, el) {
+  const urls = d.urls || {};
+  const services = d.services || [];
+
+  if (Object.keys(urls).length === 0 && services.length === 0) {
+    el.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">正在获取服务链接...</div>';
+    return;
+  }
+
+  let html = '<div class="tunnel-services">';
+  for (const svc of services) {
+    const name = svc.name;
+    const url = urls[name] || '';
+    const icon = {ComfyCarry: '📊', ComfyUI: '🎨', JupyterLab: '📓', SSH: '🔒'}[name] || '🌐';
+    const isCustom = svc.custom;
+    const protocol = svc.protocol || 'http';
+    const port = svc.port;
+    const suffix = svc.suffix || '';
+
+    const tunnelHealthy = (d.tunnel?.status === 'healthy' || d.cloudflared === 'online');
+    const statusDot = tunnelHealthy
+      ? '<span class="tunnel-svc-status-dot" style="background:var(--green)"></span> 路由就绪'
+      : '<span class="tunnel-svc-status-dot" style="background:var(--red,#e74c3c)"></span> 离线';
+
+    if (name === 'SSH') {
+      const hostname = url ? url.replace('https://', '') : `${d.subdomain}-${suffix}.${d.domain}`;
+      const sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
+      const encodedCmd = encodeURIComponent(sshCmd);
+      html += `<div class="tunnel-svc-card" style="cursor:pointer" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedCmd}'));window.showToast?.('SSH 命令已复制')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tunnel-svc-icon">${icon}</span>
+          <span class="tunnel-svc-name">${escHtml(name)}</span>
+          <span class="tunnel-svc-status">${statusDot}</span>
+          <span style="font-size:.68rem;color:var(--t3);margin-left:auto">点击复制</span>
+        </div>
+        <code class="tunnel-svc-detail" style="font-size:.72rem;user-select:all;cursor:pointer">${escHtml(sshCmd)}</code>
+        <span class="tunnel-svc-port">:${port} · ${escHtml(suffix ? suffix + '.' : '')}${escHtml(d.domain)}</span>
+      </div>`;
+    } else {
+      const displayUrl = url || `https://${d.subdomain}${suffix ? '-'+suffix : ''}.${d.domain}`;
+      const deleteBtn = isCustom ? `<button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}')" style="font-size:.62rem;padding:1px 5px;margin-left:auto">✕</button>` : '';
+      html += `<a href="${escHtml(displayUrl)}" target="_blank" class="tunnel-svc-card">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tunnel-svc-icon">${icon}</span>
+          <span class="tunnel-svc-name">${escHtml(name)}</span>
+          ${isCustom ? '<span style="font-size:.6rem;background:var(--ac);color:#000;padding:1px 5px;border-radius:3px">自定义</span>' : ''}
+          <span class="tunnel-svc-status">${statusDot}</span>
+          ${deleteBtn}
+        </div>
+        <span class="tunnel-svc-detail">${escHtml(displayUrl)}</span>
+        <span class="tunnel-svc-port">:${port} · ${protocol}</span>
+      </a>`;
+    }
+  }
+
+  // fallback: 只有 urls 没有 services
+  if (services.length === 0) {
+    for (const [name, url] of Object.entries(urls)) {
+      const icon = {ComfyCarry: '📊', ComfyUI: '🎨', JupyterLab: '📓', SSH: '🔒'}[name] || '🌐';
+      html += `<a href="${escHtml(url)}" target="_blank" class="tunnel-svc-card">
+        <span class="tunnel-svc-icon">${icon}</span>
+        <span class="tunnel-svc-name">${escHtml(name)}</span>
+        <span class="tunnel-svc-detail">${escHtml(url)}</span>
+      </a>`;
+    }
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════════
+// 验证 Token (初始配置)
+// ════════════════════════════════════════════════════════════════
+
 window._tunnelValidate = async function() {
   const token = document.getElementById('tunnel-api-token').value.trim();
   const domain = document.getElementById('tunnel-domain').value.trim();
@@ -151,7 +207,10 @@ window._tunnelValidate = async function() {
   }
 };
 
-// ── 创建 Tunnel ──
+// ════════════════════════════════════════════════════════════════
+// 创建 Tunnel (初始配置)
+// ════════════════════════════════════════════════════════════════
+
 window._tunnelProvision = async function() {
   const token = document.getElementById('tunnel-api-token').value.trim();
   const domain = document.getElementById('tunnel-domain').value.trim();
@@ -175,7 +234,6 @@ window._tunnelProvision = async function() {
     const d = await r.json();
     if (d.ok) {
       showToast('✅ Tunnel 创建成功！');
-      document.getElementById('tunnel-setup-section').dataset.manualOpen = '';
       setTimeout(loadTunnelPage, 2000);
     } else {
       showToast('❌ 创建失败: ' + (d.error || '未知错误'));
@@ -185,7 +243,10 @@ window._tunnelProvision = async function() {
   }
 };
 
-// ── 移除 Tunnel ──
+// ════════════════════════════════════════════════════════════════
+// 移除 / 重启
+// ════════════════════════════════════════════════════════════════
+
 window._tunnelTeardown = async function() {
   if (!confirm('确定移除 Cloudflare Tunnel？将删除 Tunnel、DNS 记录，并停止 cloudflared。')) return;
   try {
@@ -200,7 +261,6 @@ window._tunnelTeardown = async function() {
   } catch (e) { showToast('❌ 请求失败: ' + e.message); }
 };
 
-// ── 重启 cloudflared ──
 window._tunnelRestart = async function() {
   if (!confirm('确定重启 cloudflared？')) return;
   try {
@@ -210,19 +270,174 @@ window._tunnelRestart = async function() {
   } catch (e) { showToast('重启失败: ' + e.message); }
 };
 
-// ── 切换配置区显示 ──
-window._tunnelToggleSetup = function() {
-  const el = document.getElementById('tunnel-setup-section');
-  if (el.style.display === 'none') {
-    el.style.display = '';
-    el.dataset.manualOpen = 'true';
-  } else {
-    el.style.display = 'none';
-    el.dataset.manualOpen = '';
+// ════════════════════════════════════════════════════════════════
+// 修改配置弹窗
+// ════════════════════════════════════════════════════════════════
+
+window._tunnelOpenConfig = async function() {
+  const modal = document.getElementById('tunnel-config-modal');
+  const resultEl = document.getElementById('tunnel-cfg-result');
+  resultEl.style.display = 'none';
+
+  try {
+    const r = await fetch('/api/tunnel/config');
+    const d = await r.json();
+    document.getElementById('tunnel-cfg-token').value = d.api_token || '';
+    document.getElementById('tunnel-cfg-domain').value = d.domain || '';
+    document.getElementById('tunnel-cfg-subdomain').value = d.subdomain || '';
+  } catch (_) {}
+
+  modal.classList.add('active');
+};
+
+window._tunnelCfgValidate = async function() {
+  const token = document.getElementById('tunnel-cfg-token').value.trim();
+  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
+  const resultEl = document.getElementById('tunnel-cfg-result');
+
+  if (!token || !domain) {
+    resultEl.style.display = 'block';
+    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.innerHTML = '❌ 请填写 API Token 和域名';
+    return;
+  }
+
+  resultEl.style.display = 'block';
+  resultEl.style.color = 'var(--t2)';
+  resultEl.innerHTML = '⏳ 验证中...';
+
+  try {
+    const r = await fetch('/api/tunnel/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ api_token: token, domain: domain })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      resultEl.style.color = 'var(--green)';
+      resultEl.innerHTML = `✅ ${escHtml(d.message)}`;
+    } else {
+      resultEl.style.color = 'var(--red, #e74c3c)';
+      resultEl.innerHTML = `❌ ${escHtml(d.message)}`;
+    }
+  } catch (e) {
+    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.innerHTML = '❌ 验证失败';
   }
 };
 
-// expose showToast for inline onclick
+window._tunnelCfgSave = async function() {
+  const token = document.getElementById('tunnel-cfg-token').value.trim();
+  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
+  const subdomain = document.getElementById('tunnel-cfg-subdomain').value.trim();
+  const resultEl = document.getElementById('tunnel-cfg-result');
+
+  if (!token || !domain) {
+    showToast('请填写 API Token 和域名');
+    return;
+  }
+
+  if (!confirm('将更新现有 Tunnel 配置并重启 cloudflared，确定继续？')) return;
+
+  resultEl.style.display = 'block';
+  resultEl.style.color = 'var(--t2)';
+  resultEl.innerHTML = '⏳ 正在应用配置...';
+
+  try {
+    const r = await fetch('/api/tunnel/provision', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ api_token: token, domain: domain, subdomain: subdomain })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 配置已更新！');
+      document.getElementById('tunnel-config-modal').classList.remove('active');
+      setTimeout(loadTunnelPage, 2000);
+    } else {
+      resultEl.style.color = 'var(--red, #e74c3c)';
+      resultEl.innerHTML = `❌ ${escHtml(d.error || '保存失败')}`;
+    }
+  } catch (e) {
+    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.innerHTML = '❌ 请求失败';
+  }
+};
+
+// ════════════════════════════════════════════════════════════════
+// 添加/移除自定义服务
+// ════════════════════════════════════════════════════════════════
+
+window._tunnelAddService = function() {
+  const modal = document.getElementById('tunnel-addsvc-modal');
+  document.getElementById('tunnel-addsvc-name').value = '';
+  document.getElementById('tunnel-addsvc-port').value = '';
+  document.getElementById('tunnel-addsvc-suffix').value = '';
+  document.getElementById('tunnel-addsvc-proto').value = 'http';
+  _updateAddSvcPreview();
+  modal.classList.add('active');
+
+  document.getElementById('tunnel-addsvc-suffix').oninput = _updateAddSvcPreview;
+};
+
+function _updateAddSvcPreview() {
+  const suffix = document.getElementById('tunnel-addsvc-suffix').value.trim();
+  const preview = document.getElementById('tunnel-addsvc-preview');
+  if (_lastData && suffix) {
+    preview.textContent = `${_lastData.subdomain}-${suffix}.${_lastData.domain}`;
+  } else {
+    preview.textContent = '请输入后缀';
+  }
+}
+
+window._tunnelAddServiceSubmit = async function() {
+  const name = document.getElementById('tunnel-addsvc-name').value.trim();
+  const port = parseInt(document.getElementById('tunnel-addsvc-port').value);
+  const suffix = document.getElementById('tunnel-addsvc-suffix').value.trim();
+  const protocol = document.getElementById('tunnel-addsvc-proto').value;
+
+  if (!name || !port || !suffix) {
+    showToast('请填写所有字段');
+    return;
+  }
+
+  showToast('正在添加服务...');
+
+  try {
+    const r = await fetch('/api/tunnel/services', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, port, suffix, protocol })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 服务已添加！');
+      document.getElementById('tunnel-addsvc-modal').classList.remove('active');
+      setTimeout(loadTunnelPage, 2000);
+    } else {
+      showToast('❌ 添加失败: ' + (d.error || ''));
+    }
+  } catch (e) {
+    showToast('❌ 请求失败: ' + e.message);
+  }
+};
+
+window._tunnelRemoveService = async function(suffix) {
+  if (!confirm(`确定移除自定义服务 (${suffix})？`)) return;
+  showToast('正在移除...');
+  try {
+    const r = await fetch(`/api/tunnel/services/${encodeURIComponent(suffix)}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 服务已移除');
+      setTimeout(loadTunnelPage, 2000);
+    } else {
+      showToast('❌ ' + (d.error || '移除失败'));
+    }
+  } catch (e) { showToast('❌ ' + e.message); }
+};
+
+// expose for inline onclick
 window.showToast = showToast;
 
 function _startAutoRefresh() {

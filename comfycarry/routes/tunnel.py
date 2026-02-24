@@ -40,19 +40,41 @@ def api_tunnel_status_v2():
         "subdomain": "my-workspace",
         "tunnel": { "exists": bool, "tunnel_id": "...", "status": "...", "connections": [...] },
         "urls": { "ComfyCarry": "https://...", ... },
+        "services": [ { "name": ..., "port": ..., "suffix": ..., "protocol": ..., "custom": bool } ],
         "cloudflared": "online" | "stopped" | "unknown",
         "logs": "..."
     }
     """
+    from ..services.tunnel_manager import DEFAULT_SERVICES
     result = {
         "configured": False,
         "domain": get_config("cf_domain", ""),
         "subdomain": get_config("cf_subdomain", ""),
         "tunnel": {"exists": False, "status": "inactive"},
         "urls": {},
+        "services": [],
         "cloudflared": _get_cloudflared_pm2_status(),
         "logs": _get_cloudflared_logs(),
     }
+
+    # 构建服务列表 (默认 + 自定义)
+    overrides = _get_suffix_overrides()
+    all_services = []
+    for svc in DEFAULT_SERVICES:
+        s = dict(svc)
+        s["custom"] = False
+        orig_suffix = s.get("suffix", "")
+        if orig_suffix in overrides:
+            s["suffix"] = overrides[orig_suffix]
+        all_services.append(s)
+
+    custom = _get_custom_services()
+    for svc in custom:
+        s = dict(svc)
+        s["custom"] = True
+        all_services.append(s)
+
+    result["services"] = all_services
 
     mgr = _get_manager()
     if not mgr:
@@ -100,12 +122,24 @@ def api_tunnel_provision():
     if not api_token or not domain:
         return jsonify({"ok": False, "error": "缺少 api_token 或 domain"}), 400
 
-    from ..services.tunnel_manager import TunnelManager, CFAPIError
+    from ..services.tunnel_manager import TunnelManager, CFAPIError, DEFAULT_SERVICES
 
     mgr = TunnelManager(api_token, domain, subdomain)
 
+    # 包含自定义服务
+    overrides = _get_suffix_overrides()
+    services = []
+    for svc in DEFAULT_SERVICES:
+        s = dict(svc)
+        orig_suffix = s.get("suffix", "")
+        if orig_suffix in overrides:
+            s["suffix"] = overrides[orig_suffix]
+        services.append(s)
+    custom = _get_custom_services()
+    services.extend(custom)
+
     try:
-        result = mgr.ensure()
+        result = mgr.ensure(services)
     except CFAPIError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -138,6 +172,7 @@ def api_tunnel_teardown():
         set_config("cf_api_token", "")
         set_config("cf_domain", "")
         set_config("cf_subdomain", "")
+        set_config("cf_custom_services", "")
 
     return jsonify({"ok": ok})
 
@@ -163,43 +198,144 @@ def api_tunnel_restart():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-# ═══════════════════════════════════════════════════════════════
-# 旧端点兼容 (重定向到新 API)
-# ═══════════════════════════════════════════════════════════════
+@bp.route("/api/tunnel/services", methods=["GET"])
+def api_tunnel_services():
+    """获取当前服务列表 (默认 + 自定义)"""
+    from ..services.tunnel_manager import DEFAULT_SERVICES
+    custom = _get_custom_services()
+    all_services = list(DEFAULT_SERVICES) + custom
+    return jsonify({"services": all_services})
 
-@bp.route("/api/tunnel_status")
-def api_tunnel_status_compat():
-    """兼容旧端点 — 转换新 API 格式"""
-    r = api_tunnel_status_v2()
-    data = r.get_json()
-    # 转换为旧格式
-    links = []
-    for name, url in data.get("urls", {}).items():
-        from ..services.tunnel_manager import DEFAULT_SERVICES
-        svc = next((s for s in DEFAULT_SERVICES if s["name"] == name), {})
-        links.append({
-            "name": name,
-            "icon": {"ComfyCarry": "📊", "ComfyUI": "🎨",
-                     "JupyterLab": "📓", "SSH": "🔒"}.get(name, "🌐"),
-            "port": str(svc.get("port", "")),
-            "status": data.get("cloudflared", "unknown"),
-            "url": url if svc.get("protocol", "http") != "ssh" else None,
-            "service": f"{svc.get('protocol', 'http')}://localhost:{svc.get('port', '')}",
-        })
+
+@bp.route("/api/tunnel/services", methods=["POST"])
+def api_tunnel_add_service():
+    """
+    添加自定义服务并更新 Tunnel Ingress + DNS。
+    Request: { "name": "MyApp", "port": 3000, "suffix": "app", "protocol": "http" }
+    """
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip()
+    port = data.get("port", 0)
+    suffix = data.get("suffix", "").strip()
+    protocol = data.get("protocol", "http")
+
+    if not name or not port or not suffix:
+        return jsonify({"ok": False, "error": "请填写服务名称、端口和子域名后缀"}), 400
+
+    # 保存到自定义服务列表
+    custom = _get_custom_services()
+    # 检查是否已存在
+    for s in custom:
+        if s["suffix"] == suffix:
+            return jsonify({"ok": False, "error": f"后缀 '{suffix}' 已被服务 '{s['name']}' 使用"}), 400
+
+    custom.append({"name": name, "port": int(port), "suffix": suffix, "protocol": protocol})
+    set_config("cf_custom_services", json.dumps(custom))
+
+    # 重新 provision (更新 Ingress + DNS)
+    return _reprovision_services()
+
+
+@bp.route("/api/tunnel/services/<suffix>", methods=["DELETE"])
+def api_tunnel_remove_service(suffix):
+    """移除自定义服务"""
+    custom = _get_custom_services()
+    custom = [s for s in custom if s["suffix"] != suffix]
+    set_config("cf_custom_services", json.dumps(custom))
+    return _reprovision_services()
+
+
+@bp.route("/api/tunnel/services/<suffix>/subdomain", methods=["PUT"])
+def api_tunnel_update_subdomain(suffix):
+    """
+    修改某个服务的子域名后缀。
+    Request: { "new_suffix": "newname" }
+    """
+    data = request.get_json(force=True)
+    new_suffix = data.get("new_suffix", "").strip()
+    if not new_suffix:
+        return jsonify({"ok": False, "error": "新后缀不能为空"}), 400
+
+    custom = _get_custom_services()
+    found = False
+    for s in custom:
+        if s["suffix"] == suffix:
+            s["suffix"] = new_suffix
+            found = True
+            break
+
+    if not found:
+        # 检查是否是默认服务 — 默认服务的后缀通过 override 存储
+        overrides = _get_suffix_overrides()
+        overrides[suffix] = new_suffix
+        set_config("cf_suffix_overrides", json.dumps(overrides))
+    else:
+        set_config("cf_custom_services", json.dumps(custom))
+
+    return _reprovision_services()
+
+
+@bp.route("/api/tunnel/config", methods=["GET"])
+def api_tunnel_get_config():
+    """获取当前 Tunnel 配置 (用于修改配置弹窗)"""
     return jsonify({
-        "status": data.get("cloudflared", "unknown"),
-        "logs": data.get("logs", ""),
-        "links": links,
+        "api_token": get_config("cf_api_token", ""),
+        "domain": get_config("cf_domain", ""),
+        "subdomain": get_config("cf_subdomain", ""),
     })
 
 
-@bp.route("/api/tunnel_links")
-def api_tunnel_links_compat():
-    """兼容旧端点"""
-    r = api_tunnel_status_compat()
-    data = r.get_json()
-    return jsonify({"links": data.get("links", [])})
+def _get_custom_services():
+    """获取用户自定义服务列表"""
+    raw = get_config("cf_custom_services", "")
+    if not raw:
+        return []
+    try:
+        return json.loads(raw)
+    except Exception:
+        return []
 
+
+def _get_suffix_overrides():
+    """获取默认服务的后缀覆盖"""
+    raw = get_config("cf_suffix_overrides", "")
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {}
+
+
+def _reprovision_services():
+    """重新 provision 所有服务 (默认 + 自定义)"""
+    mgr = _get_manager()
+    if not mgr:
+        return jsonify({"ok": False, "error": "Tunnel 未配置"}), 400
+
+    from ..services.tunnel_manager import DEFAULT_SERVICES, CFAPIError
+
+    # 应用后缀覆盖到默认服务
+    overrides = _get_suffix_overrides()
+    services = []
+    for svc in DEFAULT_SERVICES:
+        s = dict(svc)
+        orig_suffix = s.get("suffix", "")
+        if orig_suffix in overrides:
+            s["suffix"] = overrides[orig_suffix]
+        services.append(s)
+
+    # 添加自定义服务
+    custom = _get_custom_services()
+    services.extend(custom)
+
+    try:
+        result = mgr.ensure(services)
+        # 重启 cloudflared
+        mgr.start_cloudflared(result["tunnel_token"])
+        return jsonify({"ok": True, "urls": result["urls"]})
+    except CFAPIError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
 
 # ═══════════════════════════════════════════════════════════════
 # 辅助函数

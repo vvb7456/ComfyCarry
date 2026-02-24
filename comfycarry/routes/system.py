@@ -289,19 +289,24 @@ def api_overview():
         sync_status["last_log_lines"] = list(log_buf)[-5:]
     result["sync"] = sync_status
 
-    # ── Tunnel ──
-    tunnel_info = {"running": False, "links": []}
+    # ── Tunnel (v2 — 使用新 API) ──
+    tunnel_info = {"running": False, "urls": {}}
     try:
-        # Call the view function within request context (we're inside a route)
-        resp = tunnel_mod.api_tunnel_links()
+        resp = tunnel_mod.api_tunnel_status_v2()
         tunnel_data = resp.get_json() if hasattr(resp, 'get_json') else json.loads(resp.get_data())
-        tunnel_info["links"] = tunnel_data.get("links", [])
-        tunnel_info["running"] = bool(tunnel_info["links"])
+        tunnel_info["configured"] = tunnel_data.get("configured", False)
+        tunnel_info["urls"] = tunnel_data.get("urls", {})
+        tunnel_info["cloudflared"] = tunnel_data.get("cloudflared", "unknown")
+        tunnel_info["domain"] = tunnel_data.get("domain", "")
+        tunnel_info["subdomain"] = tunnel_data.get("subdomain", "")
+        tunnel_status = tunnel_data.get("tunnel", {})
+        tunnel_info["status"] = tunnel_status.get("status", "inactive")
+        tunnel_info["running"] = tunnel_status.get("status") in ("healthy", "active")
     except Exception:
         pass
-    # PM2 status for tunnel
+    # PM2 status for cf-tunnel (新名称)
     for svc in result.get("services", {}).get("services", []):
-        if svc.get("name") == "tunnel":
+        if svc.get("name") == "cf-tunnel":
             tunnel_info["pm2_status"] = svc.get("status")
             break
     result["tunnel"] = tunnel_info

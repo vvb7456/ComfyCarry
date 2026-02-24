@@ -1945,6 +1945,42 @@
             color: var(--t3);
             font-family: 'IBM Plex Mono', monospace;
         }
+        .tunnel-svc-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: .72rem;
+            margin-top: 2px;
+        }
+        .tunnel-svc-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .tunnel-svc-subdomain {
+            font-size: .72rem;
+            color: var(--t3);
+            font-family: 'IBM Plex Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .tunnel-svc-subdomain input {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: 4px;
+            color: var(--t1);
+            font-size: .72rem;
+            padding: 2px 6px;
+            width: 100px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .tunnel-svc-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+        }
         #tunnel-log-content {
             font-size: .78rem;
             line-height: 1.5;
@@ -2629,17 +2665,20 @@
                 <div id="tunnel-status-section" style="display:none">
                     <div id="tunnel-status-info"></div>
                     <div style="margin-top:16px">
-                        <div class="section-title">🔗 服务</div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                            <div class="section-title" style="margin:0">🔗 服务</div>
+                            <div style="margin-left:auto;display:flex;gap:6px">
+                                <button class="btn btn-sm" onclick="window._tunnelAddService()" title="添加自定义服务">➕ 添加服务</button>
+                                <button class="btn btn-sm" onclick="window._tunnelRestart()">♻️ 重启</button>
+                                <button class="btn btn-sm btn-danger" onclick="window._tunnelTeardown()">🗑️ 移除</button>
+                                <button class="btn btn-sm" onclick="window._tunnelOpenConfig()">⚙ 修改配置</button>
+                            </div>
+                        </div>
                         <div id="tunnel-services"></div>
-                    </div>
-                    <div style="margin-top:12px;display:flex;gap:8px">
-                        <button class="btn btn-sm" onclick="window._tunnelRestart()">♻️ 重启</button>
-                        <button class="btn btn-sm btn-danger" onclick="window._tunnelTeardown()">🗑️ 移除 Tunnel</button>
-                        <button class="btn btn-sm" onclick="window._tunnelToggleSetup()" style="margin-left:auto">⚙ 修改配置</button>
                     </div>
                 </div>
 
-                <!-- 配置区 (未配置时, 或手动展开) -->
+                <!-- 未配置时的初始配置区 -->
                 <div id="tunnel-setup-section" style="display:none">
                     <div class="card" style="padding:clamp(16px,1.5vw,24px);max-width:600px">
                         <div class="section-title">⚙️ 配置 Cloudflare Tunnel</div>
@@ -2670,6 +2709,66 @@
                 <div style="margin-top:16px">
                     <div class="section-title">📜 Tunnel 日志</div>
                     <div class="log-box" id="tunnel-log-content" style="max-height:400px">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tunnel 配置修改弹窗 -->
+        <div id="tunnel-config-modal" class="modal-overlay" onclick="if(event.target===this){this.classList.remove('active')}">
+            <div class="modal-box">
+                <h3>⚙️ 修改 Tunnel 配置</h3>
+                <div style="font-size:.78rem;color:var(--t3);margin-bottom:12px;padding:8px 12px;background:var(--bg2);border-radius:var(--r)">
+                    修改配置将<strong>更新现有 Tunnel</strong> 的设置（域名、子域名前缀）。如需更换 Tunnel，请先移除再重新创建。
+                </div>
+                <div class="form-group">
+                    <label>CF API Token</label>
+                    <input type="password" id="tunnel-cfg-token" placeholder="CF Token">
+                </div>
+                <div class="form-group">
+                    <label>域名</label>
+                    <input type="text" id="tunnel-cfg-domain" placeholder="mydomain.com">
+                </div>
+                <div class="form-group">
+                    <label>子域名前缀</label>
+                    <input type="text" id="tunnel-cfg-subdomain" placeholder="留空则随机生成">
+                </div>
+                <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
+                <div class="form-actions">
+                    <button class="btn btn-sm" onclick="window._tunnelCfgValidate()">🔍 验证</button>
+                    <button class="btn btn-sm btn-primary" onclick="window._tunnelCfgSave()">💾 保存并应用</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加自定义服务弹窗 -->
+        <div id="tunnel-addsvc-modal" class="modal-overlay" onclick="if(event.target===this){this.classList.remove('active')}">
+            <div class="modal-box" style="width:clamp(400px,30vw,520px)">
+                <h3>➕ 添加自定义服务</h3>
+                <div class="form-group">
+                    <label>服务名称</label>
+                    <input type="text" id="tunnel-addsvc-name" placeholder="如 MyApp">
+                </div>
+                <div class="form-group">
+                    <label>本地端口</label>
+                    <input type="number" id="tunnel-addsvc-port" placeholder="如 3000">
+                </div>
+                <div class="form-group">
+                    <label>子域名后缀</label>
+                    <input type="text" id="tunnel-addsvc-suffix" placeholder="如 app → subdomain-app.domain.com">
+                    <div style="font-size:.72rem;color:var(--t3);margin-top:4px">生成域名: <code id="tunnel-addsvc-preview">...</code></div>
+                </div>
+                <div class="form-group">
+                    <label>协议</label>
+                    <select id="tunnel-addsvc-proto" style="width:100%;padding:8px;border-radius:var(--r);border:1px solid var(--bd);background:var(--bg2);color:var(--t1)">
+                        <option value="http">HTTP</option>
+                        <option value="https">HTTPS</option>
+                        <option value="tcp">TCP</option>
+                        <option value="ssh">SSH</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-sm" onclick="document.getElementById('tunnel-addsvc-modal').classList.remove('active')">取消</button>
+                    <button class="btn btn-sm btn-primary" onclick="window._tunnelAddServiceSubmit()">✅ 添加</button>
                 </div>
             </div>
         </div>

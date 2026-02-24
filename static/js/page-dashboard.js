@@ -177,17 +177,23 @@ async function refreshOverview() {
 function _renderQuickLinks(tunnel) {
   const el = document.getElementById('overview-quick-links');
   if (!el) return;
-  // 只显示有公网 URL 的服务链接, 过滤掉 ComfyCarry 自身
-  const links = (tunnel?.links || []).filter(l => l.url && !/comfycarry/i.test(l.name));
-  const tunnelOnline = tunnel?.pm2_status === 'online';
-  if (links.length === 0) {
-    el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? '🌐 Tunnel 已连接' : '🌐 Tunnel 未连接'}</div>`;
+
+  const urls = tunnel?.urls || {};
+  const tunnelOnline = tunnel?.pm2_status === 'online' || tunnel?.cloudflared === 'online' || tunnel?.status === 'healthy';
+
+  // 过滤掉 ComfyCarry 自身和 SSH，只显示可点击链接
+  const entries = Object.entries(urls).filter(([name]) => !/comfycarry/i.test(name) && !/ssh/i.test(name));
+
+  if (entries.length === 0) {
+    el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? '🌐 Tunnel 已连接' : tunnel?.configured ? '🌐 Tunnel 离线' : '🌐 Tunnel 未配置'}</div>`;
     return;
   }
-  el.innerHTML = links.map(l =>
-    `<a href="${escHtml(l.url)}" target="_blank" class="quick-link-btn" title="${escHtml(l.service || '')}">
-      <span class="quick-link-icon">${l.icon || '🔗'}</span>
-      <span class="quick-link-name">${escHtml(l.name)}</span>
+
+  const icons = {ComfyUI: '🎨', JupyterLab: '📓'};
+  el.innerHTML = entries.map(([name, url]) =>
+    `<a href="${escHtml(url)}" target="_blank" class="quick-link-btn">
+      <span class="quick-link-icon">${icons[name] || '🔗'}</span>
+      <span class="quick-link-name">${escHtml(name)}</span>
     </a>`
   ).join('');
 }
@@ -238,10 +244,12 @@ function _renderStatusBar(data) {
   }
 
   // Tunnel
-  if (tunnel.pm2_status === 'online') {
+  if (tunnel.pm2_status === 'online' || tunnel.cloudflared === 'online' || tunnel.status === 'healthy') {
     html += `<span class="status-badge green">🌐 Tunnel 在线</span>`;
-  } else {
+  } else if (tunnel.configured) {
     html += `<span class="status-badge red">🌐 Tunnel 离线</span>`;
+  } else {
+    html += `<span class="status-badge muted">🌐 Tunnel 未配置</span>`;
   }
 
   el.innerHTML = html;
