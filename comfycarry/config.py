@@ -138,7 +138,7 @@ def _load_setup_state():
     defaults = {
         "completed": False,
         "current_step": 0,
-        "image_type": "",
+        "image_type": "prebuilt",
         "password": "",
         "cloudflared_token": "",
         "rclone_config_method": "",

@@ -570,7 +570,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
 const TOTAL_STEPS = 9;
 let currentStep = 0;
 let wizardConfig = {
-    image_type: '',
+    image_type: 'prebuilt',
     password: '',
     cloudflared_token: '',
     rclone_config_method: 'skip',
@@ -608,7 +608,6 @@ async function init() {
         if (mockParam) {
             console.log('[Wizard] Mock mode:', mockParam);
             if (mockParam === 'prebuilt') { detectedImageType = 'prebuilt'; prebuiltInfo = {version:'3.0',torch:'2.9.1+cu130',cuda_toolkit:'13.0',fa2:true,build_date:'2026-02-20T00:00:00Z'}; }
-            else if (mockParam === 'runpod-base') { detectedImageType = 'runpod-base'; prebuiltInfo = null; }
             else if (mockParam === 'unsupported') { detectedImageType = 'unsupported'; prebuiltInfo = null; mockGpu = null; }
             else if (mockParam === 'unsupported-gpu') { detectedImageType = 'prebuilt'; mockGpu = {name:'Tesla V100-SXM2-16GB', cuda_cap:'7.0', vram_gb:16}; }
             else if (mockParam === 'no-gpu') { detectedImageType = 'prebuilt'; mockGpu = null; }
@@ -668,12 +667,6 @@ async function init() {
                     cardHtml += `</div>`;
                 }
             }
-        } else if (detectedImageType === 'runpod-base') {
-            cardHtml += `<hr class="env-divider">`;
-            cardHtml += `<div class="env-row">
-                <span class="env-label">镜像</span>
-                <span class="env-value" style="color:var(--accent2)">🔧 RunPod 基础镜像</span>
-            </div>`;
         }
 
         // 渲染卡片 (正常路径)
@@ -688,7 +681,7 @@ async function init() {
         const selectedUrls = state.plugins || pluginData.map(p => p.url);
 
         // 自动设定 image_type
-        wizardConfig.image_type = isUnsupported ? 'unsupported' : (detectedImageType || 'unsupported');
+        wizardConfig.image_type = isUnsupported ? 'unsupported' : 'prebuilt';
 
         // step-0-desc: 检测结果
         const descEl = document.getElementById('step-0-desc');
@@ -696,7 +689,7 @@ async function init() {
         if (!isUnsupported) {
             descEl.textContent = '✅ 环境检测通过';
             descEl.style.color = 'var(--green)';
-            timeEl.textContent = detectedImageType === 'prebuilt' ? '⏱ 预计 2-5 分钟' : '⏱ 预计 15-30 分钟';
+            timeEl.textContent = '⏱ 预计 2-5 分钟';
         } else {
             descEl.innerHTML = '❌ 环境检测失败';
             descEl.style.color = 'var(--red)';
@@ -720,9 +713,8 @@ async function init() {
                 envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">
                     <div style="color:var(--red);font-weight:600;margin-bottom:8px">⚠️ 不支持的运行环境</div>
                     <div style="color:var(--t3);font-size:.88rem;line-height:1.6">
-                        当前环境缺少必要的 CUDA / PyTorch 运行时。请使用以下镜像之一创建实例：<br>
-                        <code style="color:var(--accent)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （推荐，预装 ComfyUI + 加速组件）<br>
-                        <code style="color:var(--accent)">runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404</code> （RunPod 官方 PyTorch 镜像）
+                        当前环境缺少必要的运行时组件。请使用 ComfyCarry 预构建镜像创建实例：<br>
+                        <code style="color:var(--accent)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （预装 ComfyUI + 加速组件）
                     </div>
                 </div>`;
             }
@@ -1321,30 +1313,16 @@ function updateWizardRuleRemotes() {
 
 // ── Plugins ──
 function renderPluginList(plugins, selectedUrls) {
-    const isPrebuilt = wizardConfig.image_type === 'prebuilt';
     const list = document.getElementById('plugin-list');
     const desc = document.getElementById('plugin-step-desc');
-    // 必选插件始终排在前面
     const sorted = [...plugins].sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
-    if (isPrebuilt) {
-        desc.textContent = '⚡ 预构建镜像已包含以下插件';
-        list.innerHTML = sorted.map((p, i) => {
-            return `<div class="plugin-item">
-                <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
-                <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
-            </div>`;
-        }).join('');
-    } else {
-        list.innerHTML = sorted.map((p, i) => {
-            const checked = selectedUrls.includes(p.url) || p.required;
-            const disabled = p.required ? 'disabled' : '';
-            const req = p.required ? '<span class="plugin-required">* 必选</span>' : '';
-            return `<div class="plugin-item">
-                <input type="checkbox" id="plugin-${i}" ${checked ? 'checked' : ''} ${disabled} data-url="${esc(p.url)}">
-                <span class="plugin-name">${esc(p.name)} ${req}</span>
-            </div>`;
-        }).join('');
-    }
+    desc.textContent = '⚡ 预构建镜像已包含以下插件';
+    list.innerHTML = sorted.map((p, i) => {
+        return `<div class="plugin-item">
+            <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
+            <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
+        </div>`;
+    }).join('');
 }
 
 function getSelectedPlugins() {
@@ -1364,21 +1342,16 @@ function getSelectedPlugins() {
 
 // ── Attention Acceleration ──
 function initAttnStep() {
-    const isPrebuilt = wizardConfig.image_type === 'prebuilt';
     const fa2Card = document.getElementById('attn-card-fa2');
     const sa2Card = document.getElementById('attn-card-sa2');
 
-    if (isPrebuilt) {
-        // 预构建镜像: FA2 已预装 → 默认选中 + 不可取消
-        fa2Card.classList.add('selected');
-        fa2Card.style.opacity = '0.7';
-        fa2Card.style.pointerEvents = 'none';
-        fa2Card.querySelector('p').textContent = '已预装在镜像中';
-        document.getElementById('attn-step-desc').textContent = '⚡ FA2 已预装，可选择额外安装 SA2';
-    }
+    // 预构建镜像: FA2 已预装 → 默认选中 + 不可取消
+    fa2Card.classList.add('selected');
+    fa2Card.style.opacity = '0.7';
+    fa2Card.style.pointerEvents = 'none';
+    fa2Card.querySelector('p').textContent = '已预装在镜像中';
+    document.getElementById('attn-step-desc').textContent = '⚡ FA2 已预装，可选择额外安装 SA2';
 
-    // 恢复已保存的选择
-    if (wizardConfig.install_fa2 && !isPrebuilt) fa2Card.classList.add('selected');
     if (wizardConfig.install_sa2) sa2Card.classList.add('selected');
 
     updateAttnHint();
@@ -1388,7 +1361,7 @@ function initAttnStep() {
 function toggleAttnCard(type) {
     const card = document.getElementById(`attn-card-${type}`);
     // 预构建下 FA2 不可取消
-    if (type === 'fa2' && wizardConfig.image_type === 'prebuilt') return;
+    if (type === 'fa2') return;  // FA2 已预装，不可取消
     card.classList.toggle('selected');
     updateAttnHint();
     updateNextBtnText();
@@ -1433,7 +1406,7 @@ function renderSummary() {
     const html = importNote + `
         <div class="summary-card">
             <h4>部署方式</h4>
-            <div class="summary-row"><span class="label">镜像类型</span><span class="value">${c.image_type === 'prebuilt' ? '⚡ 预构建镜像' : '🔧 RunPod 基础镜像'}</span></div>
+            <div class="summary-row"><span class="label">镜像类型</span><span class="value">⚡ 预构建镜像</span></div>
         </div>
         <div class="summary-card">
             <h4>网络与安全</h4>
@@ -1630,17 +1603,7 @@ async function handleImportFile(event) {
             return;
         }
 
-        const cfgType = config.image_type;
-        if (cfgType && detectedImageType && cfgType !== detectedImageType) {
-            const cfgLabel = cfgType === 'prebuilt' ? '预构建镜像' : 'RunPod 基础镜像';
-            const envLabel = detectedImageType === 'prebuilt' ? '预构建镜像' : 'RunPod 基础镜像';
-            showImportResult(
-                `❌ 镜像类型不匹配！<br>配置文件为「<b>${esc(cfgLabel)}</b>」，当前环境为「<b>${esc(envLabel)}</b>」。<br>` +
-                `请上传与当前环境匹配的配置文件，或使用对应的 Docker 镜像重新创建实例。`,
-                true
-            );
-            return;
-        }
+        // 镜像类型检查 (仅兼容预构建镜像)
 
         const r = await fetch('/api/settings/import-config', {
             method: 'POST',
@@ -1654,7 +1617,7 @@ async function handleImportFile(event) {
         }
 
         importedConfig = config;
-        wizardConfig.image_type = detectedImageType || cfgType || 'runpod-base';
+        wizardConfig.image_type = 'prebuilt';
         if (config.password) wizardConfig.password = config.password;
         if (config.cloudflared_token) wizardConfig.cloudflared_token = config.cloudflared_token;
         if (config.civitai_token) wizardConfig.civitai_token = config.civitai_token;

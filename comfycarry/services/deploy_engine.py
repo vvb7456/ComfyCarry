@@ -48,23 +48,9 @@ def get_deploy_log_slice(start):
 # ── 辅助函数 ─────────────────────────────────────────────────
 
 def _detect_image_type():
-    """检测镜像类型: prebuilt / runpod-base / unsupported
-
-    检测优先级:
-      1. /opt/.comfycarry-prebuilt 标记文件 → prebuilt (我们的预构建镜像)
-      2. /etc/runpod.txt 存在 (RunPod 独有) + torch 可用 + CUDA 可用
-         → runpod-base (runpod/pytorch 系列镜像)
-      3. 其他环境 → unsupported
-    """
+    """检测镜像类型: prebuilt / unsupported"""
     if Path("/opt/.comfycarry-prebuilt").exists():
         return "prebuilt"
-    if Path("/etc/runpod.txt").exists():
-        try:
-            import torch
-            if torch.cuda.is_available():
-                return "runpod-base"
-        except ImportError:
-            pass
     return "unsupported"
 
 
@@ -125,8 +111,8 @@ def _deploy_log(msg, level="info"):
         pass
 
 
-def _install_sa2_prebuilt(py, cuda_cap):
-    """从预装 wheel 安装 SageAttention-2 (仅预构建镜像)"""
+def _install_sa2(py, cuda_cap):
+    """从预装 wheel 安装 SageAttention-2"""
     # 精确匹配
     wheel_map = {
         "8.0": "sm80", "8.6": "sm86", "8.9": "sm89",
@@ -254,7 +240,6 @@ def _run_deploy(config):
 
     PY = _detect_python()
     PIP = f"{PY} -m pip"
-    image_type = config.get("image_type", "runpod-base")
     _deploy_log(f"使用 Python: {PY}")
 
     try:
@@ -329,28 +314,12 @@ def _run_deploy(config):
             _deploy_exec("chmod 600 ~/.config/rclone/rclone.conf")
             _deploy_exec("rclone listremotes", label="检测 remotes")
 
-        # STEP 4: PyTorch
-        if image_type != "prebuilt":
-            if _step_done("pytorch"):
-                _deploy_step("安装 PyTorch ✅ (已完成, 跳过)")
-            else:
-                _deploy_step("安装 PyTorch")
-                TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
-                _deploy_log("安装 torch 2.9.1 (CUDA 12.8)...")
-                _deploy_exec(
-                    f'{PIP} install --no-cache-dir torch==2.9.1 --index-url "{TORCH_INDEX}"',
-                    timeout=600, label="pip install torch"
-                )
-                _deploy_exec(f'{PIP} install --no-cache-dir hf_transfer',
-                             label="hf_transfer")
-                _mark_step_done("pytorch")
-        else:
-            _deploy_step("检查预装 PyTorch")
-            _deploy_log("预构建镜像 — 跳过 torch 安装")
-            _deploy_exec(
-                f'{PY} -c "import torch; print(f\\"PyTorch {{torch.__version__}} '
-                f'CUDA {{torch.version.cuda}}\\")"'
-            )
+        # STEP 4: 检查预装 PyTorch
+        _deploy_step("检查预装 PyTorch")
+        _deploy_exec(
+            f'{PY} -c "import torch; print(f\\"PyTorch {{torch.__version__}} '
+            f'CUDA {{torch.version.cuda}}\\")"'
+        )
 
         # STEP 5: ComfyUI
         if _step_done("comfyui_install"):
@@ -358,26 +327,12 @@ def _run_deploy(config):
             _deploy_step("ComfyUI 健康检查 ✅ (已完成, 跳过)")
         else:
             _deploy_step("安装 ComfyUI")
-            if image_type == "prebuilt":
-                if not Path("/workspace/ComfyUI/main.py").exists():
-                    _deploy_log("从镜像复制 ComfyUI...")
-                    _deploy_exec("mkdir -p /workspace/ComfyUI && "
-                                 "cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
-                else:
-                    _deploy_log("ComfyUI 已存在, 跳过复制")
+            if not Path("/workspace/ComfyUI/main.py").exists():
+                _deploy_log("从镜像复制 ComfyUI...")
+                _deploy_exec("mkdir -p /workspace/ComfyUI && "
+                             "cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
             else:
-                if Path("/workspace/ComfyUI").exists():
-                    _deploy_exec("rm -rf /workspace/ComfyUI")
-                _deploy_log("克隆 ComfyUI 仓库...")
-                _deploy_exec(
-                    "cd /workspace && git clone https://github.com/comfyanonymous/ComfyUI.git",
-                    timeout=120
-                )
-                _deploy_log("安装 ComfyUI 依赖...")
-                _deploy_exec(
-                    f"cd /workspace/ComfyUI && {PIP} install --no-cache-dir "
-                    f"-r requirements.txt", timeout=300
-                )
+                _deploy_log("ComfyUI 已存在, 跳过复制")
 
             # 健康检查
             _deploy_step("ComfyUI 健康检查")
@@ -441,35 +396,18 @@ def _run_deploy(config):
             cuda_cap = gpu_info.get("cuda_cap", "")
             _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
 
-            if image_type == "prebuilt":
-                if want_fa2:
-                    _deploy_log("验证 FlashAttention-2...")
-                    _deploy_exec(
-                        f'{PY} -c "import flash_attn; '
-                        f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
-                        label="检查 FA2"
-                    )
-                if want_sa2:
-                    if cuda_cap:
-                        _install_sa2_prebuilt(PY, cuda_cap)
-                    else:
-                        _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
-            else:
-                if want_fa2:
-                    _deploy_log("安装 FlashAttention-2...")
-                    _deploy_exec(
-                        f'{PIP} install --no-cache-dir flash-attn --no-build-isolation',
-                        timeout=1200, label="pip install flash-attn"
-                    )
-                if want_sa2:
-                    _deploy_log("安装 SageAttention-2...")
-                    _deploy_exec(
-                        f'cd /workspace && git clone '
-                        f'https://github.com/thu-ml/SageAttention.git && '
-                        f'cd SageAttention && {PIP} install . --no-build-isolation && '
-                        f'cd /workspace && rm -rf SageAttention',
-                        timeout=600, label="安装 SA2"
-                    )
+            if want_fa2:
+                _deploy_log("验证 FlashAttention-2...")
+                _deploy_exec(
+                    f'{PY} -c "import flash_attn; '
+                    f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
+                    label="检查 FA2"
+                )
+            if want_sa2:
+                if cuda_cap:
+                    _install_sa2(PY, cuda_cap)
+                else:
+                    _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
 
             _deploy_log("✅ 加速组件安装完成")
             _mark_step_done("accelerators")
@@ -477,26 +415,13 @@ def _run_deploy(config):
         # STEP 7: 插件安装
         _deploy_step("安装插件")
         plugins = config.get("plugins", [])
-        if image_type == "prebuilt":
-            _deploy_log("预构建镜像已含插件, 检查额外插件...")
-            for url in plugins:
-                if url == "comfycarry_ws_broadcast":
-                    continue
-                name = url.rstrip("/").split("/")[-1].replace(".git", "")
-                if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
-                    _deploy_log(f"安装新插件: {name}")
-                    _deploy_exec(
-                        f'cd /workspace/ComfyUI/custom_nodes && '
-                        f'git clone {shlex.quote(url)} || true', timeout=60
-                    )
-        else:
-            _deploy_log(f"安装 {len(plugins)} 个插件...")
-            _deploy_exec("mkdir -p /workspace/ComfyUI/custom_nodes")
-            for url in plugins:
-                if url == "comfycarry_ws_broadcast":
-                    continue
-                name = url.rstrip("/").split("/")[-1].replace(".git", "")
-                _deploy_log(f"  克隆 {name}...")
+        _deploy_log("检查额外插件...")
+        for url in plugins:
+            if url == "comfycarry_ws_broadcast":
+                continue
+            name = url.rstrip("/").split("/")[-1].replace(".git", "")
+            if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
+                _deploy_log(f"安装新插件: {name}")
                 _deploy_exec(
                     f'cd /workspace/ComfyUI/custom_nodes && '
                     f'git clone {shlex.quote(url)} || true', timeout=60

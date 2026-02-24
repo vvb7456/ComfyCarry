@@ -27,7 +27,7 @@ from ..config import (
 )
 from ..services.deploy_engine import (
     start_deploy, get_deploy_thread, get_deploy_log_slice,
-    _detect_gpu_info, _detect_image_type, _read_prebuilt_info,
+    _detect_gpu_info, _read_prebuilt_info,
 )
 
 bp = Blueprint("setup", __name__)
@@ -41,7 +41,7 @@ def api_setup_state():
     safe["rclone_config_value"] = ""
     safe["plugins_available"] = DEFAULT_PLUGINS
     safe["gpu_info"] = _detect_gpu_info()
-    safe["detected_image_type"] = _detect_image_type()
+    safe["detected_image_type"] = "prebuilt" if _read_prebuilt_info() else "unsupported"
     safe["prebuilt_info"] = _read_prebuilt_info()
 
     env_vars = {}

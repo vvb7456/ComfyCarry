@@ -104,7 +104,6 @@ def api_settings_export_config():
         pass
 
     state = _load_setup_state()
-    config["image_type"] = state.get("image_type", "")
     config["cloudflared_token"] = state.get("cloudflared_token", "")
     config["install_fa2"] = state.get("install_fa2", False)
     config["install_sa2"] = state.get("install_sa2", False)
@@ -219,9 +218,6 @@ def api_settings_import_config():
 
     try:
         state = _load_setup_state()
-        if data.get("image_type"):
-            state["image_type"] = data["image_type"]
-            applied.append("部署模式")
         if data.get("cloudflared_token"):
             state["cloudflared_token"] = data["cloudflared_token"]
             applied.append("Tunnel Token")
