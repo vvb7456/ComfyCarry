@@ -186,6 +186,10 @@ def api_settings_export_config():
     # API Key
     config["api_key"] = cfg.API_KEY
 
+    # Attention 安装标记
+    config["installed_fa2"] = _get_config("installed_fa2", False)
+    config["installed_sa2"] = _get_config("installed_sa2", False)
+
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -270,6 +274,12 @@ def api_settings_import_config():
         cfg._save_api_key(data["api_key"])
         cfg.API_KEY = data["api_key"]
         applied.append("API Key")
+
+    # Attention 安装标记
+    if "installed_fa2" in data:
+        _set_config("installed_fa2", bool(data["installed_fa2"]))
+    if "installed_sa2" in data:
+        _set_config("installed_sa2", bool(data["installed_sa2"]))
 
     try:
         state = _load_setup_state()
