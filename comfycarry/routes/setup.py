@@ -4,10 +4,8 @@ ComfyCarry — Setup Wizard 路由
 - /api/setup/state           — 向导状态
 - /api/setup/save            — 保存步骤配置
 - /api/setup/preview_remotes — 预览 rclone remote
-- /api/setup/plugins         — 默认插件列表
 - /api/setup/deploy          — 启动部署
 - /api/setup/log_stream      — SSE 部署日志
-- /api/setup/reset           — 重置向导
 """
 
 import json
@@ -132,11 +130,6 @@ def api_setup_preview_remotes():
     return jsonify({"remotes": remotes})
 
 
-@bp.route("/api/setup/plugins")
-def api_setup_plugins():
-    return jsonify({"plugins": DEFAULT_PLUGINS})
-
-
 @bp.route("/api/setup/deploy", methods=["POST"])
 def api_setup_deploy():
     state = _load_setup_state()
@@ -185,13 +178,6 @@ def api_setup_log_stream():
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",
                              "X-Accel-Buffering": "no"})
-
-
-@bp.route("/api/setup/reset", methods=["POST"])
-def api_setup_reset():
-    if SETUP_STATE_FILE.exists():
-        SETUP_STATE_FILE.unlink()
-    return jsonify({"ok": True})
 
 
 # ── Rclone Helper Bundle ────────────────────────────────────────────────

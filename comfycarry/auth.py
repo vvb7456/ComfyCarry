@@ -78,6 +78,14 @@ def register_auth_middleware(app):
             return
         if session.get("authed"):
             return
+        # API Key 认证 (X-API-Key header 或 Authorization: Bearer)
+        api_key = request.headers.get("X-API-Key") or ""
+        if not api_key:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                api_key = auth_header[7:]
+        if api_key and api_key == config.API_KEY:
+            return
         if request.path.startswith("/api/"):
             return jsonify({"error": "Unauthorized"}), 401
         return redirect("/login")

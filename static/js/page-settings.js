@@ -18,25 +18,21 @@ registerEscapeHandler(() => { closeIEModal(); });
 
 async function loadSettingsPage() {
   try {
-    const [settingsR, debugR] = await Promise.all([
-      fetch('/api/settings'),
-      fetch('/api/settings/debug')
-    ]);
+    const settingsR = await fetch('/api/settings');
     const settings = await settingsR.json();
-    const debugData = await debugR.json();
 
     const civStatus = document.getElementById('settings-civitai-status');
     if (civStatus) {
-      civStatus.textContent = settings.civitai_key_set ? `已配置: ${settings.civitai_key_masked}` : '未设置 API Key';
+      civStatus.textContent = settings.civitai_key_set ? `已配置: ${settings.civitai_key}` : '未设置 API Key';
     }
 
     const debugToggle = document.getElementById('settings-debug-toggle');
-    if (debugToggle) debugToggle.checked = debugData.debug;
+    if (debugToggle) debugToggle.checked = settings.debug;
 
     const logCard = document.getElementById('settings-log-card');
     if (logCard) {
-      logCard.style.display = debugData.debug ? 'block' : 'none';
-      if (debugData.debug) loadSettingsLogs();
+      logCard.style.display = settings.debug ? 'block' : 'none';
+      if (settings.debug) loadSettingsLogs();
     }
   } catch (e) {
     console.error('Failed to load settings:', e);
@@ -90,13 +86,13 @@ async function saveSettingsCivitaiKey() {
   const key = document.getElementById('settings-civitai-key').value.trim();
   if (!key) return showToast('请输入 API Key');
   try {
-    const r = await fetch('/api/config', {
+    const r = await fetch('/api/settings/civitai-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: key })
     });
     const d = await r.json();
-    showToast(d.status === 'ok' ? '✅ API Key 已保存' : (d.error || '保存失败'));
+    showToast(d.ok ? '✅ API Key 已保存' : (d.error || '保存失败'));
     document.getElementById('settings-civitai-key').value = '';
     loadSettingsPage();
     loadApiKey();
@@ -105,7 +101,7 @@ async function saveSettingsCivitaiKey() {
 
 async function clearSettingsCivitaiKey() {
   try {
-    await fetch('/api/config', {
+    await fetch('/api/settings/civitai-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: '' })

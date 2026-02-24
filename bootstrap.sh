@@ -118,14 +118,12 @@ fi
 
 # ── JupyterLab (基础镜像已预装, 通过 PM2 管理) ──
 pm2 delete jupyter 2>/dev/null || true
-JUPYTER_TOKEN=${JUPYTER_TOKEN:-$($PYTHON_BIN -c 'import secrets; print(secrets.token_hex(32))')}
-export JUPYTER_TOKEN
 pm2 start jupyter-lab --name jupyter \
     --interpreter none \
     --log /workspace/jupyter.log --time \
     -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
-    --IdentityProvider.token="$JUPYTER_TOKEN" \
-    --ServerApp.root_dir=/workspace
+    --ServerApp.root_dir=/workspace \
+    --ServerApp.language=zh_CN
 pm2 save 2>/dev/null || true
 echo "  ✅ JupyterLab 已启动 (port 8888)"
 

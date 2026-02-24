@@ -4,7 +4,8 @@ ComfyCarry — 设置路由
 - /api/settings           — 设置概览
 - /api/settings/password  — 修改密码
 - /api/settings/restart   — 重启 Dashboard
-- /api/settings/debug     — Debug 模式
+- /api/settings/debug     — Debug 模式 (POST 切换, GET 已合入 /api/settings)
+- /api/settings/api-key   — 重新生成 API Key
 - /api/settings/export-config  — 配置导出
 - /api/settings/import-config  — 配置导入
 - /api/settings/reinitialize   — 重新初始化
@@ -37,16 +38,18 @@ bp = Blueprint("settings", __name__)
 
 @bp.route("/api/settings", methods=["GET"])
 def api_settings_get():
-    api_key = _get_api_key()
+    civitai_key = _get_api_key()
     return jsonify({
         "password_set": bool(cfg.DASHBOARD_PASSWORD),
         "password_masked": (cfg.DASHBOARD_PASSWORD[:2] + "***"
                             if cfg.DASHBOARD_PASSWORD and len(cfg.DASHBOARD_PASSWORD) > 2
                             else "***"),
-        "civitai_key_set": bool(api_key),
-        "civitai_key_masked": (api_key[:6] + "..."
-                               if api_key and len(api_key) > 6
-                               else ("已设置" if api_key else "")),
+        "civitai_key": civitai_key,
+        "civitai_key_set": bool(civitai_key),
+        "debug": _get_config("debug", False),
+        "api_key": cfg.API_KEY,
+        "comfyui_dir": cfg.COMFYUI_DIR,
+        "comfyui_url": cfg.COMFYUI_URL,
     })
 
 
@@ -77,17 +80,31 @@ def api_settings_restart():
     return jsonify({"ok": True, "message": "ComfyCarry 正在重启..."})
 
 
-@bp.route("/api/settings/debug", methods=["GET"])
-def api_settings_debug_get():
-    return jsonify({"debug": _get_config("debug", False)})
-
-
 @bp.route("/api/settings/debug", methods=["POST"])
 def api_settings_debug_set():
     data = request.get_json(force=True) or {}
     enabled = bool(data.get("enabled", False))
     _set_config("debug", enabled)
     return jsonify({"ok": True, "debug": enabled})
+
+
+@bp.route("/api/settings/api-key", methods=["POST"])
+def api_settings_api_key():
+    """重新生成 API Key"""
+    import secrets as _sec
+    new_key = f"cc-{_sec.token_hex(24)}"
+    cfg._save_api_key(new_key)
+    cfg.API_KEY = new_key
+    return jsonify({"ok": True, "api_key": new_key})
+
+
+@bp.route("/api/settings/civitai-key", methods=["POST"])
+def api_settings_civitai_key():
+    """保存或清除 CivitAI API Key"""
+    data = request.get_json(force=True) or {}
+    key = data.get("api_key", "").strip()
+    CONFIG_FILE.write_text(json.dumps({"api_key": key}))
+    return jsonify({"ok": True, "civitai_key_set": bool(key)})
 
 
 @bp.route("/api/settings/export-config")

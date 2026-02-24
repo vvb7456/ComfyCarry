@@ -1,12 +1,11 @@
 """
 ComfyCarry — Cloud Sync v2 路由
 
-- /api/sync/status           — Worker 状态 & 日志
+- /api/sync/status           — Worker 状态 & 规则 & 模板 & 日志
 - /api/sync/remotes          — rclone remote 列表
 - /api/sync/remote/create|delete|browse — Remote 管理
 - /api/sync/remote/types     — Remote 类型定义
 - /api/sync/storage          — 容量查询
-- /api/sync/rules            — 同步规则 CRUD
 - /api/sync/rules/save|run   — 规则保存/执行
 - /api/sync/worker/start|stop — Worker 控制
 - /api/sync/settings         — 全局设置
@@ -57,11 +56,14 @@ def api_sync_status():
 
     log_lines = get_sync_log_buffer()
     rules = _load_sync_rules()
+    settings = _load_sync_settings()
     return jsonify({
         "worker_running": worker_running,
         "pm2_status": pm2_status,
         "log_lines": log_lines,
         "rules": rules,
+        "templates": SYNC_RULE_TEMPLATES,
+        "settings": settings,
     })
 
 
@@ -201,12 +203,6 @@ def api_sync_storage():
 # ====================================================================
 # 同步规则
 # ====================================================================
-@bp.route("/api/sync/rules")
-def api_sync_rules():
-    return jsonify({"rules": _load_sync_rules(),
-                    "templates": SYNC_RULE_TEMPLATES})
-
-
 @bp.route("/api/sync/rules/save", methods=["POST"])
 def api_sync_rules_save():
     data = request.get_json(force=True)

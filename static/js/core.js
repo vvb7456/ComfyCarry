@@ -116,10 +116,10 @@ export function getAuthHeaders() {
 
 export async function loadApiKey() {
   try {
-    const r = await fetch('/api/config');
+    const r = await fetch('/api/settings');
     const d = await r.json();
-    if (d.api_key) {
-      apiKey = d.api_key;
+    if (d.civitai_key) {
+      apiKey = d.civitai_key;
     }
   } catch (_) {}
 }

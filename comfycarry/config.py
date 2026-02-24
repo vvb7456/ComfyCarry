@@ -83,6 +83,24 @@ def _save_dashboard_password(pw):
 DASHBOARD_PASSWORD = _load_dashboard_password()
 
 
+# ── API Key (用于自动化/脚本调用) ────────────────────────────
+def _load_api_key():
+    """从 .dashboard_env 读 api_key, 不存在则生成并保存"""
+    existing = _get_config("api_key")
+    if existing:
+        return existing
+    new_key = f"cc-{secrets.token_hex(24)}"
+    _set_config("api_key", new_key)
+    return new_key
+
+
+def _save_api_key(key):
+    _set_config("api_key", key)
+
+
+API_KEY = _load_api_key()
+
+
 # ── Session Secret (持久化 → 重启不掉线) ─────────────────────
 def _load_session_secret():
     """从 .dashboard_env 读 session_secret, 不存在则生成并保存"""

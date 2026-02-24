@@ -229,21 +229,15 @@ async function submitAddRemote() {
 
 async function loadSyncRules() {
   try {
-    const [rulesR, statusR] = await Promise.allSettled([
-      fetch('/api/sync/rules').then(r => r.json()),
-      fetch('/api/sync/status').then(r => r.json())
-    ]);
-    if (rulesR.status === 'fulfilled') {
-      _syncRules = rulesR.value.rules || [];
-      _syncTemplates = rulesR.value.templates || [];
-      renderSyncRulesList();
-    }
-    if (statusR.status === 'fulfilled') {
-      const on = statusR.value.worker_running;
-      const statusText = `<span style="color:${on?'var(--green)':'var(--t3)'}">● Worker ${on?'运行中':'已停止'}</span>`;
-      const badge = document.getElementById('sync-worker-badge');
-      if (badge) badge.innerHTML = statusText;
-    }
+    const r = await fetch('/api/sync/status');
+    const d = await r.json();
+    _syncRules = d.rules || [];
+    _syncTemplates = d.templates || [];
+    renderSyncRulesList();
+    const on = d.worker_running;
+    const statusText = `<span style="color:${on?'var(--green)':'var(--t3)'}">● Worker ${on?'运行中':'已停止'}</span>`;
+    const badge = document.getElementById('sync-worker-badge');
+    if (badge) badge.innerHTML = statusText;
   } catch (e) {
     document.getElementById('sync-rules-list').innerHTML = '<div style="color:var(--red)">加载失败</div>';
   }

@@ -3,8 +3,7 @@ ComfyCarry — 系统监控 & 服务管理路由
 
 包含:
 - /api/version    — 版本信息
-- /api/system     — CPU/GPU/内存/磁盘/网络监控
-- /api/services   — PM2 服务列表
+- (internal)      — system() / services() → 由 /api/overview 聚合
 - /api/services/<name>/<action> — 服务控制 (start/stop/restart)
 - /api/logs/<name> — PM2 日志查看
 """
@@ -64,11 +63,10 @@ def api_version():
 
 
 # ====================================================================
-# 系统监控 API
+# 系统监控 (内部函数, 由 api_overview 聚合调用)
 # ====================================================================
-@bp.route("/api/system")
 def api_system():
-    """获取系统信息"""
+    """获取系统信息 (仅供 api_overview 内部调用)"""
     info = {"cpu": {}, "memory": {}, "disk": {}, "gpu": [], "network": {}, "uptime": ""}
 
     # CPU
@@ -148,11 +146,10 @@ def api_system():
 
 
 # ====================================================================
-# 服务管理 API (PM2)
+# 服务管理 (内部函数, 由 api_overview 聚合调用)
 # ====================================================================
-@bp.route("/api/services")
 def api_services():
-    """获取 PM2 服务列表"""
+    """获取 PM2 服务列表 (仅供 api_overview 内部调用)"""
     try:
         out = _run_cmd("pm2 jlist", timeout=5)
         if out and not out.startswith("Error"):

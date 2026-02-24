@@ -55,7 +55,8 @@ RUN python3.12 -m pip install --upgrade pip setuptools wheel && \
     python3.12 -m pip install \
         packaging ninja einops numpy psutil && \
     python3.12 -m pip install --ignore-installed \
-        flask flask-cors requests websocket-client
+        flask flask-cors requests websocket-client && \
+    python3.12 -m pip install jupyterlab-language-pack-zh-CN
 
 # =============================================================================
 # 5. torchvision (CUDA 版)

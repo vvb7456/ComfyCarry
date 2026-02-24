@@ -7,11 +7,10 @@ ComfyCarry — Jupyter 管理路由
 - /api/jupyter/start    — 启动 JupyterLab
 - /api/jupyter/stop     — 停止 JupyterLab
 - /api/jupyter/restart  — 重启 JupyterLab
-- /api/jupyter/kernels  — 内核列表
-- /api/jupyter/sessions — 活跃会话
-- /api/jupyter/terminals — 终端列表
-- /api/jupyter/kernelspecs — 可用内核规格
+- /api/jupyter/kernelspecs — 可用内核规格 (kernels/sessions/terminals 已合入 status)
 - /api/jupyter/logs     — Jupyter 日志
+- /api/jupyter/logs/stream — SSE 实时日志流
+- /api/jupyter/token    — 访问令牌
 """
 
 import json
@@ -22,7 +21,7 @@ import subprocess
 import requests
 import urllib3
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -53,16 +52,32 @@ _cached_token = None
 
 
 def _detect_token() -> str:
-    """从 Jupyter 进程命令行自动检测 token"""
+    """从 jupyter server list 获取 token"""
     global _cached_token
     if _cached_token:
         return _cached_token
+    try:
+        r = subprocess.run(
+            "jupyter server list --json 2>/dev/null",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        for line in r.stdout.strip().splitlines():
+            try:
+                info = json.loads(line)
+                token = info.get("token", "")
+                if token:
+                    _cached_token = token
+                    return _cached_token
+            except json.JSONDecodeError:
+                continue
+    except Exception:
+        pass
+    # 回退: 从进程命令行检测
     try:
         out = subprocess.run(
             "ps aux | grep jupyter",
             shell=True, capture_output=True, text=True, timeout=3
         ).stdout
-        # --IdentityProvider.token=xxx 或 --ServerApp.token=xxx 或旧格式
         m = re.search(
             r'(?:IdentityProvider|Lab|Server|Notebook)(?:App)?\.token[=\s]+([a-f0-9]{30,})',
             out
@@ -243,42 +258,6 @@ def jupyter_status():
     return jsonify(result)
 
 
-@bp.route("/api/jupyter/kernels")
-def jupyter_kernels():
-    """获取活跃内核列表"""
-    try:
-        r = _jupyter_get("/api/kernels")
-        if r and r.ok:
-            return jsonify(r.json())
-        return jsonify([])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/api/jupyter/sessions")
-def jupyter_sessions():
-    """获取活跃会话列表"""
-    try:
-        r = _jupyter_get("/api/sessions")
-        if r and r.ok:
-            return jsonify(r.json())
-        return jsonify([])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/api/jupyter/terminals")
-def jupyter_terminals():
-    """获取终端列表"""
-    try:
-        r = _jupyter_get("/api/terminals")
-        if r and r.ok:
-            return jsonify(r.json())
-        return jsonify([])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @bp.route("/api/jupyter/terminals/new", methods=["POST"])
 def jupyter_new_terminal():
     """创建新终端"""
@@ -347,6 +326,45 @@ def jupyter_logs():
         return jsonify({"logs": "", "error": str(e)})
 
 
+@bp.route("/api/jupyter/logs/stream")
+def jupyter_logs_stream():
+    """SSE — PM2 Jupyter 日志实时流"""
+    def generate():
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                ["pm2", "logs", PM2_NAME, "--raw", "--lines", "50"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                if not line:
+                    break
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+                lvl = "info"
+                if re.search(r'error|exception|traceback', line, re.I):
+                    lvl = "error"
+                elif re.search(r'warn', line, re.I):
+                    lvl = "warn"
+                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            if proc:
+                try:
+                    proc.kill()
+                    proc.stdout.close()
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
+
+
 @bp.route("/api/jupyter/start", methods=["POST"])
 def jupyter_start():
     """启动 JupyterLab (PM2)"""
@@ -354,10 +372,7 @@ def jupyter_start():
     if pm2 == "online":
         return jsonify({"ok": True, "message": "JupyterLab 已在运行"})
 
-    import secrets
-    token = secrets.token_hex(32)
-
-    # 清除 token 缓存
+    # 清除 token 缓存 (Jupyter 自动生成新 token)
     global _cached_token
     _cached_token = None
 
@@ -368,8 +383,8 @@ def jupyter_start():
             f'--interpreter none '
             f'--log /workspace/jupyter.log --time '
             f'-- --ip=0.0.0.0 --port=8888 --no-browser --allow-root '
-            f'--IdentityProvider.token={token} '
-            f'--ServerApp.root_dir=/workspace'
+            f'--ServerApp.root_dir=/workspace '
+            f'--ServerApp.language=zh_CN'
         )
     else:
         # 已存在但 stopped/errored — 重启
@@ -411,34 +426,6 @@ def jupyter_restart():
         return jsonify({"ok": False, "error": "重启失败 (进程可能不存在)"}), 500
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@bp.route("/api/jupyter/url")
-def jupyter_url_endpoint():
-    """获取 Jupyter 外部访问 URL"""
-    token = _detect_token()
-    # 尝试从 tunnel v2 API 获取
-    try:
-        from . import tunnel as tunnel_mod
-        resp = tunnel_mod.api_tunnel_status_v2()
-        data = resp.get_json() if hasattr(resp, 'get_json') else {}
-        urls = data.get("urls", {})
-        for name, url in urls.items():
-            if "jupyter" in name.lower():
-                if token:
-                    url = f"{url}?token={token}"
-                return jsonify({"url": url, "source": "tunnel"})
-    except Exception:
-        pass
-    # 回退到本地 URL
-    port = _detect_port()
-    if port:
-        local = f"http://localhost:{port}"
-        if token:
-            local = f"{local}?token={token}"
-        return jsonify({"url": local, "source": "localhost",
-                        "note": "仅限本地访问"})
-    return jsonify({"url": "", "error": "JupyterLab 未运行"})
 
 
 @bp.route("/api/jupyter/token")

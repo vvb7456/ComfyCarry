@@ -2,7 +2,6 @@
 ComfyCarry — 模型管理路由
 
 包含:
-- CivitAI Key 配置 API
 - CivitAI 搜索代理 (Meilisearch CORS bypass)
 - 本地模型管理 (扫描/预览/删除/获取信息)
 - Enhanced-Civicomfy 下载代理
@@ -17,7 +16,6 @@ from flask import Blueprint, Response, jsonify, request, send_file
 from ..config import (
     COMFYUI_DIR,
     COMFYUI_URL,
-    CONFIG_FILE,
     MEILI_BEARER,
     MEILI_URL,
     MODEL_DIRS,
@@ -26,26 +24,6 @@ from ..config import (
 from ..utils import _get_api_key, _sha256_file
 
 bp = Blueprint("models", __name__)
-
-
-# ====================================================================
-# 配置 API (CivitAI Key)
-# ====================================================================
-@bp.route("/api/config", methods=["GET"])
-def get_config():
-    key = _get_api_key()
-    return jsonify({
-        "api_key": key, "has_key": bool(key),
-        "key_preview": f"{key[:8]}...{key[-4:]}" if len(key) > 12 else ("****" if key else ""),
-        "comfyui_dir": COMFYUI_DIR, "comfyui_url": COMFYUI_URL,
-    })
-
-@bp.route("/api/config", methods=["POST"])
-def save_config():
-    data = request.get_json(force=True) or {}
-    api_key = data.get("api_key", "").strip()
-    CONFIG_FILE.write_text(json.dumps({"api_key": api_key}))
-    return jsonify({"ok": True, "has_key": bool(api_key)})
 
 
 # ====================================================================

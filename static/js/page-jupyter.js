@@ -9,12 +9,13 @@ let _autoRefresh = null;
 let _jupyterUrl = '';
 let _tokenVisible = false;
 let _cachedToken = '';
+let _jupyterLogSource = null;
 
 // ── 页面生命周期 ─────────────────────────────────────────────
 
 registerPage('jupyter', {
-  enter() { loadJupyterPage(); _startAutoRefresh(); },
-  leave() { _stopAutoRefresh(); }
+  enter() { loadJupyterPage(); _startAutoRefresh(); _startJupyterLogStream(); },
+  leave() { _stopAutoRefresh(); _stopJupyterLogStream(); }
 });
 
 function _startAutoRefresh() {
@@ -31,14 +32,21 @@ async function loadJupyterPage() {
   await Promise.all([loadJupyterStatus(), loadJupyterUrl()]);
 }
 
-// ── 获取外部 URL ────────────────────────────────────────────
+// ── 获取外部 URL (从 Tunnel 状态) ────────────────────────────
 
 async function loadJupyterUrl() {
   try {
-    const r = await fetch('/api/jupyter/url');
+    const r = await fetch('/api/tunnel/status');
     const d = await r.json();
-    _jupyterUrl = d.url || '';
+    const urls = d.urls || {};
+    for (const [name, url] of Object.entries(urls)) {
+      if (name.toLowerCase().includes('jupyter')) {
+        _jupyterUrl = url;
+        return;
+      }
+    }
   } catch (_) {}
+  _jupyterUrl = '';
 }
 
 // ── 状态 ────────────────────────────────────────────────────
@@ -192,14 +200,17 @@ function renderSessionsList(sessions) {
   }).join('');
 }
 
-// ── 日志 ────────────────────────────────────────────────────
+// ── SSE: 实时日志流 ──────────────────────────────────────────
 
-async function loadJupyterLogs() {
+function _startJupyterLogStream() {
+  const page = document.getElementById('page-jupyter');
+  if (!page || page.classList.contains('hidden')) return;
+  _stopJupyterLogStream();
   const el = document.getElementById('jupyter-log-content');
   if (!el) return;
-  try {
-    const r = await fetch('/api/jupyter/logs?lines=200');
-    const d = await r.json();
+
+  // 先加载历史日志
+  fetch('/api/jupyter/logs?lines=200').then(r => r.json()).then(d => {
     if (d.logs && d.logs.trim()) {
       const lines = d.logs.split('\n').filter(l => l.trim());
       el.innerHTML = lines.map(l => {
@@ -211,11 +222,30 @@ async function loadJupyterLogs() {
       }).join('');
       el.scrollTop = el.scrollHeight;
     } else {
-      el.innerHTML = '<div style="color:var(--t3)">日志为空 — Jupyter 的 stderr 输出未被重定向到日志文件</div>';
+      el.innerHTML = '<div style="color:var(--t3)">暂无日志</div>';
     }
-  } catch (e) {
-    el.innerHTML = `<div style="color:var(--red,#e74c3c)">加载失败: ${escHtml(e.message)}</div>`;
-  }
+  }).catch(() => {});
+
+  // SSE 实时推送新行
+  _jupyterLogSource = new EventSource('/api/jupyter/logs/stream');
+  _jupyterLogSource.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      const div = document.createElement('div');
+      div.textContent = d.line;
+      if (d.level === 'error') div.className = 'log-error';
+      else if (d.level === 'warn') div.className = 'log-warn';
+
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      el.appendChild(div);
+      while (el.children.length > 500) el.removeChild(el.firstChild);
+      if (nearBottom) el.scrollTop = el.scrollHeight;
+    } catch (_) {}
+  };
+}
+
+function _stopJupyterLogStream() {
+  if (_jupyterLogSource) { _jupyterLogSource.close(); _jupyterLogSource = null; }
 }
 
 // ── Token 显示/隐藏 ─────────────────────────────────────────
@@ -334,5 +364,4 @@ window._closeSession = async function(sessionId) {
   } catch (e) { showToast('操作失败: ' + e.message); }
 };
 
-window.loadJupyterLogs = loadJupyterLogs;
 window.loadJupyterStatus = loadJupyterStatus;
