@@ -47,6 +47,23 @@ def get_deploy_log_slice(start):
 
 # ── 辅助函数 ─────────────────────────────────────────────────
 
+def _is_cf_tunnel_online() -> bool:
+    """检查 cf-tunnel PM2 进程是否在线"""
+    try:
+        r = subprocess.run(
+            "pm2 jlist 2>/dev/null", shell=True,
+            capture_output=True, text=True, timeout=5
+        )
+        if r.returncode == 0:
+            import json as _json
+            for p in _json.loads(r.stdout):
+                if p.get("name") == "cf-tunnel":
+                    return p.get("pm2_env", {}).get("status") == "online"
+    except Exception:
+        pass
+    return False
+
+
 def _detect_image_type():
     """检测镜像类型: prebuilt / unsupported"""
     if Path("/opt/.comfycarry-prebuilt").exists():
@@ -298,9 +315,12 @@ def _run_deploy(config):
                     _sc("cf_domain", cf_domain)
                     _sc("cf_subdomain", mgr.subdomain)
 
-                    # 启动 cloudflared
-                    mgr.start_cloudflared(result["tunnel_token"])
-                    _deploy_log("✅ cloudflared 已启动")
+                    # 启动 cloudflared (如已在运行则跳过, 避免断开 SSE)
+                    if _is_cf_tunnel_online():
+                        _deploy_log("✅ cloudflared 已在运行，跳过重启 (ingress 已通过 API 更新)")
+                    else:
+                        mgr.start_cloudflared(result["tunnel_token"])
+                        _deploy_log("✅ cloudflared 已启动")
 
             except CFAPIError as e:
                 _deploy_log(f"⚠️ Tunnel 配置失败: {e}", "warn")

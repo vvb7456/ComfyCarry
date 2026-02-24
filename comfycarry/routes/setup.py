@@ -214,9 +214,10 @@ def api_setup_rclone_bundle():
         return jsonify({"error": "bat 脚本不存在"}), 500
 
     buf = io.BytesIO()
+    folder = "ComfyCarry-RcloneHelper"
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.write(bat_path, "rclone-setup.bat")
-        zf.write(RCLONE_WIN_EXE, "rclone.exe")
+        zf.write(bat_path, f"{folder}/rclone-setup.bat")
+        zf.write(RCLONE_WIN_EXE, f"{folder}/rclone.exe")
     buf.seek(0)
 
     return send_file(
