@@ -164,7 +164,7 @@ async function refreshOverview() {
     _renderStatusBar(data);
     _renderMetrics(data.system);
     _renderActivity(data);
-    _renderServices(data.services, data.jupyter);
+    _renderServices(data.services);
     _renderEnvInfo(data);
   } catch (e) {
     const el = document.getElementById('overview-status-bar');
@@ -478,15 +478,17 @@ function _renderActivity(data) {
 
 // ── 5. 服务管理 ─────────────────────────────────────────────
 
-function _renderServices(svcData, jupyterData) {
+function _renderServices(svcData) {
   const el = document.getElementById('overview-svc-tbody');
   if (!el) return;
 
   const services = svcData?.services || [];
-  let rows = '';
+  if (!services.length) {
+    el.innerHTML = '<tr><td colspan="7" class="svc-empty">未发现服务</td></tr>';
+    return;
+  }
 
-  // PM2 services
-  rows += services.map(s => {
+  el.innerHTML = services.map(s => {
     const st = s.status || 'unknown';
     const dotClass = st === 'online' ? 'online' : st === 'stopped' ? 'stopped' : 'errored';
     return `<tr>
@@ -503,34 +505,6 @@ function _renderServices(svcData, jupyterData) {
       </div></td>
     </tr>`;
   }).join('');
-
-  // Jupyter (non-PM2 service)
-  if (jupyterData) {
-    const jOnline = jupyterData.online;
-    const jDot = jOnline ? 'online' : 'stopped';
-    const jStatus = jOnline ? 'online' : 'stopped';
-    const jCpu = jupyterData.cpu != null ? jupyterData.cpu.toFixed(1) + '%' : '-';
-    const jMem = jupyterData.memory ? fmtBytes(jupyterData.memory) : '-';
-    const jVer = jupyterData.version ? ` <span style="font-size:.72rem;color:var(--t3)">v${escHtml(jupyterData.version)}</span>` : '';
-    rows += `<tr>
-      <td><strong>jupyter</strong>${jVer}</td>
-      <td><span class="svc-status"><span class="svc-dot ${jDot}"></span>${jStatus}</span></td>
-      <td>-</td>
-      <td>${jCpu}</td>
-      <td>${jMem}</td>
-      <td>-</td>
-      <td><div class="btn-group">
-        <button class="btn btn-sm" onclick="window._restartJupyter && window._restartJupyter()" title="重启">🔄</button>
-        <button class="btn btn-sm" onclick="showPage('jupyter')" title="详情">📓</button>
-      </div></td>
-    </tr>`;
-  }
-
-  if (!rows) {
-    el.innerHTML = '<tr><td colspan="7" class="svc-empty">未发现服务</td></tr>';
-    return;
-  }
-  el.innerHTML = rows;
 }
 
 // 暴露到 window，供 onclick 调用
