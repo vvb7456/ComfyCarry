@@ -94,7 +94,7 @@ if errorlevel 1 (
 
 echo  [..] 正在获取 OneDrive Drive ID...
 set "DRIVE_ID="
-for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $di=''; try{$j=ConvertFrom-Json $tk; $h=@{Authorization=""Bearer $($j.access_token)""}; $r=Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/me/drive' -Headers $h -EA Stop; $di=$r.id}catch{}; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+""[$env:REMOTE_NAME]""+$nl+""type = onedrive""+$nl+""drive_type = $env:OD_DT""+$nl+""token = $tk""+$nl); if($di){[IO.File]::AppendAllText($cf, ""drive_id = $di""+$nl)}; Write-Output $di"`) do set "DRIVE_ID=%%R"
+for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $di=''; try{$j=ConvertFrom-Json $tk; $h=@{Authorization='Bearer '+$j.access_token}; $r=Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/me/drive' -Headers $h -EA Stop; $di=$r.id}catch{}; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+'['+$env:REMOTE_NAME+']'+$nl+'type = onedrive'+$nl+'drive_type = '+$env:OD_DT+$nl+'token = '+$tk+$nl); if($di){[IO.File]::AppendAllText($cf, 'drive_id = '+$di+$nl)}; Write-Output $di"`) do set "DRIVE_ID=%%R"
 
 del "%TOKEN_FILE%" >nul 2>&1
 
@@ -148,7 +148,7 @@ if errorlevel 1 (
 )
 
 set "PS_RESULT="
-for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+""[$env:REMOTE_NAME]""+$nl+""type = dropbox""+$nl+""token = $tk""+$nl); Write-Output 'OK'"`) do set "PS_RESULT=%%R"
+for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+'['+$env:REMOTE_NAME+']'+$nl+'type = dropbox'+$nl+'token = '+$tk+$nl); Write-Output 'OK'"`) do set "PS_RESULT=%%R"
 
 del "%TOKEN_FILE%" >nul 2>&1
 
