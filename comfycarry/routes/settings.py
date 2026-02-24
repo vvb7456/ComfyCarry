@@ -166,6 +166,26 @@ def api_settings_export_config():
 
     config["debug"] = _get_config("debug", False)
 
+    # Tunnel v2 配置
+    config["cf_api_token"] = _get_config("cf_api_token", "")
+    config["cf_domain"] = _get_config("cf_domain", "")
+    config["cf_subdomain"] = _get_config("cf_subdomain", "")
+    raw_custom = _get_config("cf_custom_services", "")
+    if raw_custom:
+        try:
+            config["cf_custom_services"] = json.loads(raw_custom)
+        except Exception:
+            pass
+    raw_overrides = _get_config("cf_suffix_overrides", "")
+    if raw_overrides:
+        try:
+            config["cf_suffix_overrides"] = json.loads(raw_overrides)
+        except Exception:
+            pass
+
+    # API Key
+    config["api_key"] = cfg.API_KEY
+
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -233,11 +253,33 @@ def api_settings_import_config():
         _set_config("debug", bool(data["debug"]))
         applied.append("Debug 模式")
 
+    # Tunnel v2 配置
+    if data.get("cf_api_token"):
+        _set_config("cf_api_token", data["cf_api_token"])
+        _set_config("cf_domain", data.get("cf_domain", ""))
+        _set_config("cf_subdomain", data.get("cf_subdomain", ""))
+        applied.append("Tunnel 配置")
+    if data.get("cf_custom_services"):
+        _set_config("cf_custom_services", json.dumps(data["cf_custom_services"]))
+        applied.append("Tunnel 自定义服务")
+    if data.get("cf_suffix_overrides"):
+        _set_config("cf_suffix_overrides", json.dumps(data["cf_suffix_overrides"]))
+
+    # API Key
+    if data.get("api_key"):
+        cfg._save_api_key(data["api_key"])
+        cfg.API_KEY = data["api_key"]
+        applied.append("API Key")
+
     try:
         state = _load_setup_state()
         if data.get("cloudflared_token"):
             state["cloudflared_token"] = data["cloudflared_token"]
             applied.append("Tunnel Token")
+        if data.get("cf_api_token"):
+            state["cf_api_token"] = data["cf_api_token"]
+            state["cf_domain"] = data.get("cf_domain", "")
+            state["cf_subdomain"] = data.get("cf_subdomain", "")
         if data.get("civitai_token"):
             state["civitai_token"] = data["civitai_token"]
         if "extra_plugins" in data or "disabled_default_plugins" in data:

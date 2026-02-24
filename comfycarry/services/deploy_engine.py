@@ -293,8 +293,8 @@ def _run_deploy(config):
         cf_domain = config.get("cf_domain", "")
         if cf_api_token and cf_domain:
             _deploy_step("配置 Cloudflare Tunnel")
-            from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError
-            from comfycarry.config import set_config as _sc
+            from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
+            from comfycarry.config import set_config as _sc, get_config as _gc
 
             cf_subdomain = config.get("cf_subdomain", "")
             mgr = TunnelManager(cf_api_token, cf_domain, cf_subdomain)
@@ -305,7 +305,29 @@ def _run_deploy(config):
                     _deploy_log(f"⚠️ CF Token 问题: {info['message']}", "warn")
                 else:
                     _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
-                    result = mgr.ensure()
+
+                    # 构建服务列表: 默认 + 后缀覆盖 + 自定义
+                    raw_overrides = _gc("cf_suffix_overrides", "")
+                    raw_custom = _gc("cf_custom_services", "")
+                    suffix_overrides = {}
+                    custom_services = []
+                    try:
+                        if raw_overrides:
+                            suffix_overrides = json.loads(raw_overrides)
+                        if raw_custom:
+                            custom_services = json.loads(raw_custom)
+                    except Exception:
+                        pass
+                    services = []
+                    for svc in get_default_services():
+                        s = dict(svc)
+                        orig = s.get("suffix", "")
+                        if orig in suffix_overrides:
+                            s["suffix"] = suffix_overrides[orig]
+                        services.append(s)
+                    services.extend(custom_services)
+
+                    result = mgr.ensure(services)
                     _deploy_log(f"✅ Tunnel 已就绪: {mgr.subdomain}.{cf_domain}")
                     for name, url in result["urls"].items():
                         _deploy_log(f"  {name}: {url}")

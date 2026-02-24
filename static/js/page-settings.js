@@ -202,7 +202,7 @@ async function importConfig(event) {
       showToast('❌ 无效的配置文件格式');
       return;
     }
-    if (!confirm(`确定要导入配置吗?\n\n导出于: ${config._exported_at || '未知'}\n将覆盖当前的密码、API Key、Tunnel Token 等设置。`)) return;
+    if (!confirm(`确定要导入配置吗?\n\n导出于: ${config._exported_at || '未知'}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。`)) return;
     const r = await fetch('/api/settings/import-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
