@@ -25,7 +25,7 @@ TUNNEL_NAME_PREFIX = "comfycarry"
 DEFAULT_SERVICES = [
     {"name": "ComfyCarry", "port": 5000, "suffix": "",      "protocol": "http"},
     {"name": "ComfyUI",    "port": 8188, "suffix": "comfy", "protocol": "http"},
-    {"name": "JupyterLab", "port": 8888, "suffix": "jp",    "protocol": "http"},
+    {"name": "JupyterLab", "port": 8080, "suffix": "jp",    "protocol": "https"},
     {"name": "SSH",        "port": 22,   "suffix": "ssh",   "protocol": "ssh"},
 ]
 
@@ -333,10 +333,14 @@ class TunnelManager:
             protocol = svc.get("protocol", "http")
             # 使用 127.0.0.1 而非 localhost，避免 cloudflared 解析到 IPv6
             service_url = f"{protocol}://127.0.0.1:{svc['port']}"
+            origin_req = {}
+            # HTTPS 源站需要跳过 TLS 验证 (自签证书)
+            if protocol == "https":
+                origin_req["noTLSVerify"] = True
             entry = {
                 "hostname": self._hostname_for(svc),
                 "service": service_url,
-                "originRequest": {},
+                "originRequest": origin_req,
             }
             ingress.append(entry)
         ingress.append({"service": "http_status:404"})

@@ -56,12 +56,15 @@ async function loadTunnelPage() {
             <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
           </div>
           <span style="font-size:.78rem;color:var(--t3);margin-left:12px">
-            域名: <strong>${escHtml(d.subdomain)}.${escHtml(d.domain)}</strong>
-            ${tunnel.tunnel_id ? ` · ID: <code style="font-size:.7rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code>` : ''}
+            ${escHtml(d.subdomain)}.${escHtml(d.domain)}
+            ${tunnel.tunnel_id ? ` · <code style="font-size:.7rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code>` : ''}
+            · 节点: ${escHtml(connInfo)}
           </span>
-        </div>
-        <div style="font-size:.78rem;color:var(--t3);margin-top:6px">
-          连接节点: ${escHtml(connInfo)}
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="window._tunnelRestart()">♻️ 重启</button>
+            <button class="btn btn-sm" onclick="window._tunnelOpenConfig()">⚙ 配置</button>
+            <button class="btn btn-sm btn-danger" onclick="window._tunnelTeardown()">🗑️ 移除</button>
+          </div>
         </div>`;
 
       _renderServices(d, servicesEl);
