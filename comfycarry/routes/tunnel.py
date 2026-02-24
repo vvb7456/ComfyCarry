@@ -45,7 +45,7 @@ def api_tunnel_status_v2():
         "logs": "..."
     }
     """
-    from ..services.tunnel_manager import DEFAULT_SERVICES
+    from ..services.tunnel_manager import get_default_services
     result = {
         "configured": False,
         "domain": get_config("cf_domain", ""),
@@ -60,7 +60,7 @@ def api_tunnel_status_v2():
     # 构建服务列表 (默认 + 自定义)
     overrides = _get_suffix_overrides()
     all_services = []
-    for svc in DEFAULT_SERVICES:
+    for svc in get_default_services():
         s = dict(svc)
         s["custom"] = False
         orig_suffix = s.get("suffix", "")
@@ -82,7 +82,21 @@ def api_tunnel_status_v2():
 
     result["configured"] = True
     result["tunnel"] = mgr.get_tunnel_status()
-    result["urls"] = mgr.get_service_urls()
+    urls = mgr.get_service_urls()
+
+    # 为 JupyterLab URL 自动拼接 token
+    for name in list(urls.keys()):
+        if "jupyter" in name.lower():
+            try:
+                from . import jupyter as jup_mod
+                token = jup_mod.JUPYTER_TOKEN or jup_mod._detect_token()
+                if token:
+                    urls[name] = f"{urls[name]}?token={token}"
+            except Exception:
+                pass
+            break
+
+    result["urls"] = urls
     return jsonify(result)
 
 
@@ -122,14 +136,14 @@ def api_tunnel_provision():
     if not api_token or not domain:
         return jsonify({"ok": False, "error": "缺少 api_token 或 domain"}), 400
 
-    from ..services.tunnel_manager import TunnelManager, CFAPIError, DEFAULT_SERVICES
+    from ..services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
 
     mgr = TunnelManager(api_token, domain, subdomain)
 
     # 包含自定义服务
     overrides = _get_suffix_overrides()
     services = []
-    for svc in DEFAULT_SERVICES:
+    for svc in get_default_services():
         s = dict(svc)
         orig_suffix = s.get("suffix", "")
         if orig_suffix in overrides:
@@ -201,9 +215,9 @@ def api_tunnel_restart():
 @bp.route("/api/tunnel/services", methods=["GET"])
 def api_tunnel_services():
     """获取当前服务列表 (默认 + 自定义)"""
-    from ..services.tunnel_manager import DEFAULT_SERVICES
+    from ..services.tunnel_manager import get_default_services
     custom = _get_custom_services()
-    all_services = list(DEFAULT_SERVICES) + custom
+    all_services = list(get_default_services()) + custom
     return jsonify({"services": all_services})
 
 
@@ -313,12 +327,12 @@ def _reprovision_services():
     if not mgr:
         return jsonify({"ok": False, "error": "Tunnel 未配置"}), 400
 
-    from ..services.tunnel_manager import DEFAULT_SERVICES, CFAPIError
+    from ..services.tunnel_manager import get_default_services, CFAPIError
 
     # 应用后缀覆盖到默认服务
     overrides = _get_suffix_overrides()
     services = []
-    for svc in DEFAULT_SERVICES:
+    for svc in get_default_services():
         s = dict(svc)
         orig_suffix = s.get("suffix", "")
         if orig_suffix in overrides:

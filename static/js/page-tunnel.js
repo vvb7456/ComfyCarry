@@ -124,7 +124,7 @@ function _renderServices(d, el) {
       : '<span class="tunnel-svc-status-dot" style="background:var(--red,#e74c3c)"></span> 离线';
 
     if (name === 'SSH') {
-      const hostname = url ? url.replace('https://', '') : `${d.subdomain}-${suffix}.${d.domain}`;
+      const hostname = url ? url.replace('https://', '') : `${suffix}-${d.subdomain}.${d.domain}`;
       const sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
       const encodedCmd = encodeURIComponent(sshCmd);
       html += `<div class="tunnel-svc-card" style="cursor:pointer" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedCmd}'));window.showToast?.('SSH 命令已复制')">
@@ -138,7 +138,7 @@ function _renderServices(d, el) {
         <span class="tunnel-svc-port">:${port} · ${escHtml(suffix ? suffix + '.' : '')}${escHtml(d.domain)}</span>
       </div>`;
     } else {
-      const displayUrl = url || `https://${d.subdomain}${suffix ? '-'+suffix : ''}.${d.domain}`;
+      const displayUrl = url || `https://${suffix ? suffix+'-' : ''}${d.subdomain}.${d.domain}`;
       const deleteBtn = isCustom ? `<button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}')" style="font-size:.62rem;padding:1px 5px;margin-left:auto">✕</button>` : '';
       html += `<a href="${escHtml(displayUrl)}" target="_blank" class="tunnel-svc-card">
         <div style="display:flex;align-items:center;gap:8px">
@@ -236,8 +236,8 @@ window._tunnelProvision = async function() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ Tunnel 创建成功！');
-      setTimeout(loadTunnelPage, 2000);
+      showToast('✅ Tunnel 创建成功！连接可能短暂中断，5 秒后自动刷新...');
+      setTimeout(() => location.reload(), 5000);
     } else {
       showToast('❌ 创建失败: ' + (d.error || '未知错误'));
     }
@@ -340,7 +340,7 @@ window._tunnelCfgSave = async function() {
     return;
   }
 
-  if (!confirm('将更新现有 Tunnel 配置并重启 cloudflared，确定继续？')) return;
+  if (!confirm('将更新现有 Tunnel 配置并重启 cloudflared。\n\n⚠️ 通过 Tunnel 的连接（包括当前页面）可能会短暂中断，确定继续？')) return;
 
   resultEl.style.display = 'block';
   resultEl.style.color = 'var(--t2)';
@@ -354,9 +354,9 @@ window._tunnelCfgSave = async function() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 配置已更新！');
+      showToast('✅ 配置已更新！连接可能短暂中断，5 秒后自动刷新...');
       document.getElementById('tunnel-config-modal').classList.remove('active');
-      setTimeout(loadTunnelPage, 2000);
+      setTimeout(() => location.reload(), 5000);
     } else {
       resultEl.style.color = 'var(--red, #e74c3c)';
       resultEl.innerHTML = `❌ ${escHtml(d.error || '保存失败')}`;
@@ -387,7 +387,7 @@ function _updateAddSvcPreview() {
   const suffix = document.getElementById('tunnel-addsvc-suffix').value.trim();
   const preview = document.getElementById('tunnel-addsvc-preview');
   if (_lastData && suffix) {
-    preview.textContent = `${_lastData.subdomain}-${suffix}.${_lastData.domain}`;
+    preview.textContent = `${suffix}-${_lastData.subdomain}.${_lastData.domain}`;
   } else {
     preview.textContent = '请输入后缀';
   }

@@ -7,6 +7,7 @@
 import base64
 import json
 import logging
+import os
 import re
 import secrets
 import shlex
@@ -20,14 +21,61 @@ log = logging.getLogger(__name__)
 CF_API_BASE = "https://api.cloudflare.com/client/v4"
 TUNNEL_NAME_PREFIX = "comfycarry"
 
-# 默认服务映射
-# protocol 默认 "http", SSH 使用 "ssh"
-DEFAULT_SERVICES = [
-    {"name": "ComfyCarry", "port": 5000, "suffix": "",      "protocol": "http"},
-    {"name": "ComfyUI",    "port": 8188, "suffix": "comfy", "protocol": "http"},
-    {"name": "JupyterLab", "port": 8080, "suffix": "jp",    "protocol": "https"},
-    {"name": "SSH",        "port": 22,   "suffix": "ssh",   "protocol": "ssh"},
-]
+# ── 服务端口检测 ─────────────────────────────────────────────
+# 不硬编码端口号 — 从环境变量/运行进程推导
+
+def _detect_jupyter() -> dict:
+    """检测 Jupyter 端口和协议"""
+    port = int(os.environ.get("JUPYTER_PORT", "0"))
+    protocol = "http"
+    if port:
+        # 检查是否 HTTPS (通过 JUPYTER_URL_INTERNAL 或默认规则)
+        internal = os.environ.get("JUPYTER_URL_INTERNAL", "")
+        if internal.startswith("https") or port in (8080,):
+            protocol = "https"
+        return {"port": port, "protocol": protocol}
+    # 从进程探测
+    try:
+        out = subprocess.run(
+            "ps aux | grep '[j]upyter-lab\\|[j]upyter-notebook' | head -1",
+            shell=True, capture_output=True, text=True, timeout=3
+        ).stdout
+        if out:
+            m = re.search(r'--port[= ](\d+)', out)
+            if m:
+                port = int(m.group(1))
+                protocol = "https" if "--certfile" in out or "--LabApp.certfile" in out else "http"
+                return {"port": port, "protocol": protocol}
+    except Exception:
+        pass
+    return {"port": 8080, "protocol": "https"}  # vast.ai 默认
+
+
+def _detect_comfyui_port() -> int:
+    """从 COMFYUI_URL 环境变量解析 ComfyUI 端口"""
+    url = os.environ.get("COMFYUI_URL", "http://localhost:8188")
+    m = re.search(r':(\d+)', url)
+    return int(m.group(1)) if m else 8188
+
+
+def get_default_services() -> List[dict]:
+    """构建默认服务列表 (端口从环境/进程检测)"""
+    jupyter = _detect_jupyter()
+    return [
+        {"name": "ComfyCarry", "port": int(os.environ.get("MANAGER_PORT", 5000)),
+         "suffix": "",          "protocol": "http"},
+        {"name": "ComfyUI",    "port": _detect_comfyui_port(),
+         "suffix": "comfyui",   "protocol": "http"},
+        {"name": "JupyterLab", "port": jupyter["port"],
+         "suffix": "jupyter",   "protocol": jupyter["protocol"]},
+        {"name": "SSH",        "port": 22,
+         "suffix": "ssh",       "protocol": "ssh"},
+    ]
+
+
+# 向后兼容: 其他模块 import DEFAULT_SERVICES 时获取检测结果
+# 注意: 模块级别调用, 仅在 import 时执行一次
+DEFAULT_SERVICES = get_default_services()
 
 
 class CFAPIError(Exception):
@@ -91,7 +139,7 @@ class TunnelManager:
         }
         """
         if services is None:
-            services = DEFAULT_SERVICES
+            services = get_default_services()
 
         account_id, _ = self._get_account()
         zone_id, _ = self._get_zone()
@@ -257,15 +305,15 @@ class TunnelManager:
         return f"cc-{secrets.token_hex(4)}"
 
     def _hostname_for(self, svc: dict) -> str:
-        """生成服务的完整域名"""
+        """生成服务的完整域名: suffix-subdomain.domain"""
         suffix = svc.get("suffix", "")
         if suffix:
-            return f"{self.subdomain}-{suffix}.{self.domain}"
+            return f"{suffix}-{self.subdomain}.{self.domain}"
         return f"{self.subdomain}.{self.domain}"
 
     def _port_to_service_name(self, port: int) -> str:
         """端口 → 服务名映射"""
-        for svc in DEFAULT_SERVICES:
+        for svc in get_default_services():
             if svc["port"] == port:
                 return svc["name"]
         return f"Service:{port}"
