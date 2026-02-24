@@ -13,7 +13,6 @@ title ComfyCarry - Rclone 配置助手
 set "RCLONE_EXE=%~dp0rclone.exe"
 set "RCLONE_CONF=%~dp0rclone.conf"
 set "TOKEN_FILE=%temp%\cc_tkn_tmp.txt"
-set "CLEAN_TOKEN_FILE=%temp%\cc_tkn_clean.txt"
 
 echo.
 echo  +==================================================+
@@ -100,7 +99,6 @@ echo  [..] 正在打开浏览器授权...
 taskkill /f /im rclone.exe >nul 2>&1
 timeout /t 1 >nul 2>&1
 if exist "%TOKEN_FILE%" del /q "%TOKEN_FILE%"
-if exist "%CLEAN_TOKEN_FILE%" del /q "%CLEAN_TOKEN_FILE%"
 
 "%RCLONE_EXE%" authorize "onedrive" > "%TOKEN_FILE%"
 if errorlevel 1 (
@@ -108,44 +106,28 @@ if errorlevel 1 (
     goto :main_menu
 )
 
-:: 使用 PowerShell Regex 精确提取 JSON
-:: 匹配模式: { ... "access_token" ... }，(?s) 开启单行模式忽略换行
-powershell -Command "$content = Get-Content -Raw '%TOKEN_FILE%'; $match = [regex]::Match($content, '(?s)\{.*""access_token"".*\}'); if ($match.Success) { [System.IO.File]::WriteAllText('%CLEAN_TOKEN_FILE%', $match.Value) }"
+:: ================================================================
+:: 关键修复: PowerShell 直接读取 token 文件并写入配置
+:: 避免 batch enabledelayedexpansion 将 token 中的 ! 字符当作变量解析
+:: (Microsoft refresh_token 常含 ! 字符, 经 batch 处理后会被截断/损坏)
+:: ================================================================
+echo  [..] 正在获取 OneDrive Drive ID...
+set "DRIVE_ID="
+for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $di=''; try{$j=ConvertFrom-Json $tk; $h=@{Authorization=""Bearer $($j.access_token)""}; $r=Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/me/drive' -Headers $h -EA Stop; $di=$r.id}catch{}; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+""[$env:REMOTE_NAME]""+$nl+""type = onedrive""+$nl+""drive_type = $env:OD_DT""+$nl+""token = $tk""+$nl); if($di){[IO.File]::AppendAllText($cf, ""drive_id = $di""+$nl)}; Write-Output $di"`) do set "DRIVE_ID=%%R"
 
-set "CLEAN_TOKEN="
-if exist "%CLEAN_TOKEN_FILE%" (
-    for /f "usebackq delims=" %%L in ("%CLEAN_TOKEN_FILE%") do set "CLEAN_TOKEN=!CLEAN_TOKEN!%%L"
-)
-
-:: 清理临时文件
 del "%TOKEN_FILE%" >nul 2>&1
-del "%CLEAN_TOKEN_FILE%" >nul 2>&1
 
-if "!CLEAN_TOKEN!"=="" (
+if "!DRIVE_ID!"=="FAIL" (
     echo  [!!] 无法捕获 Token，请检查浏览器是否授权成功。
+    set "DRIVE_ID="
     goto :main_menu
 )
 
-:: 通过 Graph API 获取 drive_id
-echo  [..] 正在获取 OneDrive Drive ID...
-set "DRIVE_ID="
-for /f "usebackq delims=" %%D in (`powershell -Command "try { $t = (ConvertFrom-Json '%CLEAN_TOKEN:"=\"%').access_token; $r = Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/me/drive' -Headers @{Authorization=\"Bearer $t\"} -ErrorAction Stop; Write-Output $r.id } catch { Write-Output '' }"`) do set "DRIVE_ID=%%D"
-
 if "!DRIVE_ID!"=="" (
-    echo  [!!] 无法获取 Drive ID，请检查 Token 是否有效。
-    echo  [!!] 配置将不含 drive_id，使用前需手动补充。
-)
-
-echo. >> "%RCLONE_CONF%"
-echo [!REMOTE_NAME!] >> "%RCLONE_CONF%"
-echo type = onedrive >> "%RCLONE_CONF%"
-echo drive_type = !OD_DT! >> "%RCLONE_CONF%"
-echo token = !CLEAN_TOKEN! >> "%RCLONE_CONF%"
-if not "!DRIVE_ID!"=="" (
-    echo drive_id = !DRIVE_ID! >> "%RCLONE_CONF%"
-    echo  [OK] OneDrive 配置已完成 ^(drive_id: !DRIVE_ID!^)
-) else (
+    echo  [!!] 获取 Drive ID 失败，配置将不含 drive_id，使用前需手动补充。
     echo  [OK] OneDrive 配置已写入 ^(缺少 drive_id^)
+) else (
+    echo  [OK] OneDrive 配置已完成 ^(drive_id: !DRIVE_ID!^)
 )
 
 echo.
@@ -183,7 +165,6 @@ echo  [..] 正在打开浏览器授权...
 taskkill /f /im rclone.exe >nul 2>&1
 timeout /t 1 >nul 2>&1
 if exist "%TOKEN_FILE%" del /q "%TOKEN_FILE%"
-if exist "%CLEAN_TOKEN_FILE%" del /q "%CLEAN_TOKEN_FILE%"
 
 "%RCLONE_EXE%" authorize "dropbox" > "%TOKEN_FILE%"
 if errorlevel 1 (
@@ -191,29 +172,23 @@ if errorlevel 1 (
     goto :main_menu
 )
 
-:: 使用 PowerShell Regex 精确提取 JSON
-powershell -Command "$content = Get-Content -Raw '%TOKEN_FILE%'; $match = [regex]::Match($content, '(?s)\{.*""access_token"".*\}'); if ($match.Success) { [System.IO.File]::WriteAllText('%CLEAN_TOKEN_FILE%', $match.Value) }"
-
-set "CLEAN_TOKEN="
-if exist "%CLEAN_TOKEN_FILE%" (
-    for /f "usebackq delims=" %%L in ("%CLEAN_TOKEN_FILE%") do set "CLEAN_TOKEN=!CLEAN_TOKEN!%%L"
-)
+:: PowerShell 直接读取 token 文件并写入配置 (同 OneDrive 修复)
+set "PS_RESULT="
+for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+""[$env:REMOTE_NAME]""+$nl+""type = dropbox""+$nl+""token = $tk""+$nl); Write-Output 'OK'"`) do set "PS_RESULT=%%R"
 
 del "%TOKEN_FILE%" >nul 2>&1
-del "%CLEAN_TOKEN_FILE%" >nul 2>&1
 
-if "!CLEAN_TOKEN!"=="" (
+if "!PS_RESULT!"=="FAIL" (
     echo  [!!] 无法捕获 Token。
     goto :main_menu
 )
 
-echo. >> "%RCLONE_CONF%"
-echo [!REMOTE_NAME!] >> "%RCLONE_CONF%"
-echo type = dropbox >> "%RCLONE_CONF%"
-echo token = !CLEAN_TOKEN! >> "%RCLONE_CONF%"
-
-echo.
-echo  [OK] Dropbox 配置已累加。
+if "!PS_RESULT!"=="OK" (
+    echo  [OK] Dropbox 配置已完成。
+) else (
+    echo  [!!] Token 处理异常。
+    goto :main_menu
+)
 goto :create_folders
 
 :: ==============================================================
