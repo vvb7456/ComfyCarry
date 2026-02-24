@@ -121,7 +121,6 @@ def api_settings_export_config():
         pass
 
     state = _load_setup_state()
-    config["cloudflared_token"] = state.get("cloudflared_token", "")
     config["install_fa2"] = state.get("install_fa2", False)
     config["install_sa2"] = state.get("install_sa2", False)
 
@@ -185,10 +184,6 @@ def api_settings_export_config():
 
     # API Key
     config["api_key"] = cfg.API_KEY
-
-    # Attention 安装标记
-    config["installed_fa2"] = _get_config("installed_fa2", False)
-    config["installed_sa2"] = _get_config("installed_sa2", False)
 
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
@@ -275,17 +270,8 @@ def api_settings_import_config():
         cfg.API_KEY = data["api_key"]
         applied.append("API Key")
 
-    # Attention 安装标记
-    if "installed_fa2" in data:
-        _set_config("installed_fa2", bool(data["installed_fa2"]))
-    if "installed_sa2" in data:
-        _set_config("installed_sa2", bool(data["installed_sa2"]))
-
     try:
         state = _load_setup_state()
-        if data.get("cloudflared_token"):
-            state["cloudflared_token"] = data["cloudflared_token"]
-            applied.append("Tunnel Token")
         if data.get("cf_api_token"):
             state["cf_api_token"] = data["cf_api_token"]
             state["cf_domain"] = data.get("cf_domain", "")
