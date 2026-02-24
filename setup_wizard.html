@@ -375,6 +375,10 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-ser
         <div class="step-title">☁️ 云存储配置</div>
         <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="help-tip" title="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span></div>
 
+        <div style="margin:12px 0;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:.85rem;color:var(--t2)">
+            💡 还没有 rclone 配置？<a href="/api/setup/rclone-bundle" style="color:var(--ac);text-decoration:underline;font-weight:600">下载配置助手 (Windows)</a> — 解压后双击 bat 脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 文件即可。
+        </div>
+
         <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
 
         <!-- Rclone method cards -->

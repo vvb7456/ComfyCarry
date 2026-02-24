@@ -80,6 +80,14 @@ RUN python3.12 -m pip install /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_x86
 COPY wheels/sageattention-2.2.0-cp312-cp312-linux_x86_64_sm*.whl /opt/wheels/sa2/
 
 # =============================================================================
+# 8. Rclone Windows 版 (供用户从 Dashboard 下载配置助手)
+# =============================================================================
+RUN mkdir -p /opt/rclone-win && \
+    curl -fsSL https://downloads.rclone.org/rclone-current-windows-amd64.zip -o /tmp/rclone-win.zip && \
+    unzip -j /tmp/rclone-win.zip '*/rclone.exe' -d /opt/rclone-win/ && \
+    rm -f /tmp/rclone-win.zip
+
+# =============================================================================
 # 8. 生成 torch 约束文件 (后续步骤复用, 防止依赖覆盖预装版本)
 # =============================================================================
 RUN python3.12 -c "\

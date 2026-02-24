@@ -15,8 +15,10 @@ import os
 import re
 import subprocess
 import time
+import zipfile
+import io
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, send_file
 
 from ..config import (
     DEFAULT_PLUGINS, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
@@ -185,3 +187,37 @@ def api_setup_reset():
     if SETUP_STATE_FILE.exists():
         SETUP_STATE_FILE.unlink()
     return jsonify({"ok": True})
+
+
+# ── Rclone Helper Bundle ────────────────────────────────────────────────
+# 镜像内预装了 Windows 版 rclone.exe (/opt/rclone-win/rclone.exe)
+# 此端点将 bat + rclone.exe 打包成 zip 供用户下载
+
+RCLONE_WIN_EXE = "/opt/rclone-win/rclone.exe"
+
+
+@bp.route("/api/setup/rclone-bundle")
+def api_setup_rclone_bundle():
+    """下载 rclone 配置助手压缩包 (rclone-setup.bat + rclone.exe)"""
+    if not os.path.exists(RCLONE_WIN_EXE):
+        return jsonify({"error": "镜像中未找到 rclone.exe，请更新镜像"}), 500
+
+    bat_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "static", "rclone-setup.bat")
+    )
+    if not os.path.exists(bat_path):
+        return jsonify({"error": "bat 脚本不存在"}), 500
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.write(bat_path, "rclone-setup.bat")
+        zf.write(RCLONE_WIN_EXE, "rclone.exe")
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="ComfyCarry-RcloneHelper.zip"
+    )
+
