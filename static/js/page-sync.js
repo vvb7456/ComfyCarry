@@ -1,5 +1,5 @@
 // ── page-sync.js  ·  Sync 页面模块 ──────────────────────────────
-import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml } from './core.js';
+import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError } from './core.js';
 
 // ── State ───────────────────────────────────────────────────────
 let _syncRemotes = [];
@@ -33,7 +33,7 @@ async function loadSyncRemotes() {
     _syncRemotes = d.remotes || [];
     const grid = document.getElementById('sync-remotes-grid');
     if (_syncRemotes.length === 0) {
-      grid.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">未检测到 rclone remote，请添加存储或导入配置</div>';
+      grid.innerHTML = renderEmpty('未检测到 rclone remote，请添加存储或导入配置');
     } else {
       grid.innerHTML = _syncRemotes.map(renderSyncRemoteCard).join('');
       if (syncStorageCache) {
@@ -44,7 +44,7 @@ async function loadSyncRemotes() {
       }
     }
   } catch (e) {
-    document.getElementById('sync-remotes-grid').innerHTML = '<div style="color:var(--red)">加载失败</div>';
+    document.getElementById('sync-remotes-grid').innerHTML = renderError('加载失败');
   }
 }
 
@@ -240,14 +240,14 @@ async function loadSyncRules() {
     const badge = document.getElementById('sync-worker-badge');
     if (badge) badge.innerHTML = statusText;
   } catch (e) {
-    document.getElementById('sync-rules-list').innerHTML = '<div style="color:var(--red)">加载失败</div>';
+    document.getElementById('sync-rules-list').innerHTML = renderError('加载失败');
   }
 }
 
 function renderSyncRulesList() {
   const el = document.getElementById('sync-rules-list');
   if (_syncRules.length === 0) {
-    el.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:16px 0">暂无同步规则，点击右上角「+ 添加规则」开始配置</div>';
+    el.innerHTML = renderEmpty('暂无同步规则，点击右上角「+ 添加规则」开始配置');
     return;
   }
   el.innerHTML = _syncRules.map((r, i) => {
@@ -483,21 +483,21 @@ async function loadSyncLogs() {
     if (btn) btn.innerHTML = on ? '⏹ 停止 Worker' : '▶ 启动 Worker';
     renderSyncLog(d.log_lines || []);
   } catch (e) {
-    document.getElementById('sync-log-content').innerHTML = '<div style="color:var(--red)">加载失败</div>';
+    document.getElementById('sync-log-content').innerHTML = renderError('加载失败');
   }
 }
 
 function renderSyncLog(lines) {
   const el = document.getElementById('sync-log-content');
   if (!lines || lines.length === 0) {
-    el.innerHTML = '<div style="color:var(--t3)">暂无同步日志</div>';
+    el.innerHTML = renderEmpty('暂无同步日志');
     return;
   }
   el.innerHTML = lines.map(line => {
     const esc = escHtml(line);
     let cls = '';
     if (line.includes('✅')) cls = 'style="color:var(--green)"';
-    else if (line.includes('❌') || line.includes('失败')) cls = 'style="color:var(--red, #e74c3c)"';
+    else if (line.includes('❌') || line.includes('失败')) cls = 'style="color:var(--red)"';
     else if (line.includes('⬆') || line.includes('⬇') || line.includes('🔍')) cls = 'style="color:var(--cyan)"';
     else if (line.includes('☁️') || line.includes('🛑')) cls = 'style="color:var(--t2)"';
     return `<div class="sync-log-entry" ${cls}>${esc}</div>`;

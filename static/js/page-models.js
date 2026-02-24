@@ -6,7 +6,8 @@
 import {
   registerPage, registerEscapeHandler,
   fmtBytes, fmtPct, showToast, copyText, openImg, escHtml,
-  apiKey, getAuthHeaders, getBadgeClass, CIVITAI_API_BASE
+  apiKey, getAuthHeaders, getBadgeClass, CIVITAI_API_BASE,
+  renderLoading, renderError, renderEmpty
 } from './core.js';
 
 // ── 页面内部状态 ─────────────────────────────────────────────
@@ -247,7 +248,7 @@ async function loadLocalModels() {
   const grid = document.getElementById('local-models-grid');
   const status = document.getElementById('local-models-status');
   const cat = document.getElementById('model-category').value;
-  grid.innerHTML = '<div class="loading"><div class="spinner"></div><div>扫描模型文件...</div></div>';
+  grid.innerHTML = renderLoading('扫描模型文件...');
   status.innerHTML = '';
 
   try {
@@ -258,13 +259,13 @@ async function loadLocalModels() {
     status.innerHTML = `共 ${d.total} 个模型 · ${infoCount} 个已有元数据`;
 
     if (localModelsData.length === 0) {
-      grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">该类别下未找到模型文件</div>';
+      grid.innerHTML = renderEmpty('该类别下未找到模型文件');
       return;
     }
 
     grid.innerHTML = localModelsData.map((m, i) => renderLocalModelCard(m, i)).join('');
   } catch (e) {
-    grid.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    grid.innerHTML = renderError('加载失败: ' + e.message);
   }
 }
 
@@ -609,7 +610,7 @@ async function searchModels(page = 0, append = false) {
   } catch (e) {
     loading.classList.add('hidden');
     isSearchLoading = false;
-    errEl.innerHTML = `<div class="error-msg">搜索失败: ${e.message}</div>`;
+    errEl.innerHTML = renderError('搜索失败: ' + e.message);
   }
 }
 
@@ -799,7 +800,7 @@ async function lookupIds(text) {
   }
 
   loading.classList.add('hidden');
-  if (found.length === 0) { errEl.innerHTML = '<div class="error-msg">未找到任何模型</div>'; return; }
+  if (found.length === 0) { errEl.innerHTML = renderEmpty('未找到任何模型'); return; }
 
   results.innerHTML = found.map(d => {
     const img = d.modelVersions?.[0]?.images?.[0]?.url || '';
@@ -1046,7 +1047,7 @@ async function refreshDownloadStatus() {
       t.textContent = `❌ 失败${failed.length > 0 ? ' (' + failed.length + ')' : ''}`;
     });
   } catch (e) {
-    activeEl.innerHTML = `<div class="error-msg">获取下载状态失败: ${e.message}</div>`;
+    activeEl.innerHTML = renderError('获取下载状态失败: ' + e.message);
   }
 }
 

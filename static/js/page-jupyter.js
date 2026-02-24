@@ -3,13 +3,14 @@
  * JupyterLab 页面: 状态监控、会话管理、内核管理、日志、Token
  */
 
-import { registerPage, fmtBytes, showToast, escHtml, copyText } from './core.js';
+import { registerPage, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError } from './core.js';
+import { createLogStream } from './sse-log.js';
 
 let _autoRefresh = null;
 let _jupyterUrl = '';
 let _tokenVisible = false;
 let _cachedToken = '';
-let _jupyterLogSource = null;
+let _jupyterLogStream = null;
 
 // ── 页面生命周期 ─────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ async function loadJupyterStatus() {
     renderSessionsList(d.sessions || []);
     renderTerminalsList(d.terminals || []);
   } catch (e) {
-    el.innerHTML = `<div style="color:var(--red,#e74c3c)">加载失败: ${escHtml(e.message)}</div>`;
+    el.innerHTML = renderError('加载失败: ' + e.message);
   }
 }
 
@@ -223,7 +224,7 @@ function renderTerminalsList(terminals) {
       openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-sm btn-primary" style="font-size:.68rem;padding:2px 6px" title="在 JupyterLab 中打开">🔗</a>`;
     }
 
-    return `<div style="background:var(--c2);border-radius:8px;padding:8px 12px;display:inline-flex;align-items:center;gap:8px">
+    return `<div class="jupyter-terminal-item" style="display:inline-flex">
       <span style="font-size:1rem">💻</span>
       <span style="font-weight:600;font-size:.85rem">终端 ${escHtml(t.name)}</span>
       ${openBtn}
@@ -232,7 +233,7 @@ function renderTerminalsList(terminals) {
   }).join('')}</div>`;
 }
 
-window._newJupyterTerminal = async function() {
+async function _newJupyterTerminal() {
   try {
     const r = await fetch('/api/jupyter/terminals/new', { method: 'POST' });
     const d = await r.json();
@@ -243,9 +244,9 @@ window._newJupyterTerminal = async function() {
       showToast(d.error || '创建失败');
     }
   } catch (e) { showToast('创建失败: ' + e.message); }
-};
+}
 
-window._deleteJupyterTerminal = async function(name) {
+async function _deleteJupyterTerminal(name) {
   if (!confirm(`确定销毁终端 ${name}？`)) return;
   try {
     const r = await fetch(`/api/jupyter/terminals/${encodeURIComponent(name)}`, { method: 'DELETE' });
@@ -257,7 +258,7 @@ window._deleteJupyterTerminal = async function(name) {
       showToast(d.error || '销毁失败');
     }
   } catch (e) { showToast('销毁失败: ' + e.message); }
-};
+}
 
 // ── SSE: 实时日志流 ──────────────────────────────────────────
 
@@ -268,48 +269,27 @@ function _startJupyterLogStream() {
   const el = document.getElementById('jupyter-log-content');
   if (!el) return;
 
-  // 先加载历史日志
-  fetch('/api/jupyter/logs?lines=200').then(r => r.json()).then(d => {
-    if (d.logs && d.logs.trim()) {
-      const lines = d.logs.split('\n').filter(l => l.trim());
-      el.innerHTML = lines.map(l => {
-        let cls = '';
-        if (/error|exception|traceback/i.test(l)) cls = 'log-error';
-        else if (/warn/i.test(l)) cls = 'log-warn';
-        else if (/kernel|session/i.test(l)) cls = 'log-info';
-        return `<div class="${cls}">${escHtml(l)}</div>`;
-      }).join('');
-      el.scrollTop = el.scrollHeight;
-    } else {
-      el.innerHTML = '<div style="color:var(--t3)">暂无日志</div>';
-    }
-  }).catch(() => {});
-
-  // SSE 实时推送新行
-  _jupyterLogSource = new EventSource('/api/jupyter/logs/stream');
-  _jupyterLogSource.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      const div = document.createElement('div');
-      div.textContent = d.line;
-      if (d.level === 'error') div.className = 'log-error';
-      else if (d.level === 'warn') div.className = 'log-warn';
-
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      el.appendChild(div);
-      while (el.children.length > 500) el.removeChild(el.firstChild);
-      if (nearBottom) el.scrollTop = el.scrollHeight;
-    } catch (_) {}
-  };
+  _jupyterLogStream = createLogStream({
+    el,
+    historyUrl: '/api/jupyter/logs?lines=200',
+    streamUrl: '/api/jupyter/logs/stream',
+    classify: line => {
+      if (/error|exception|traceback/i.test(line)) return 'log-error';
+      if (/warn/i.test(line)) return 'log-warn';
+      if (/kernel|session/i.test(line)) return 'log-info';
+      return '';
+    },
+  });
+  _jupyterLogStream.start();
 }
 
 function _stopJupyterLogStream() {
-  if (_jupyterLogSource) { _jupyterLogSource.close(); _jupyterLogSource = null; }
+  if (_jupyterLogStream) { _jupyterLogStream.stop(); _jupyterLogStream = null; }
 }
 
 // ── Token 显示/隐藏 ─────────────────────────────────────────
 
-window._toggleJupyterToken = async function() {
+async function _toggleJupyterToken() {
   const valEl = document.getElementById('jupyter-token-value');
   const btnEl = document.getElementById('jupyter-token-toggle');
   if (!valEl) return;
@@ -332,9 +312,9 @@ window._toggleJupyterToken = async function() {
     btnEl.textContent = '🙈 隐藏';
     _tokenVisible = true;
   }
-};
+}
 
-window._copyJupyterToken = async function() {
+async function _copyJupyterToken() {
   if (!_cachedToken) {
     try {
       const r = await fetch('/api/jupyter/token');
@@ -348,11 +328,11 @@ window._copyJupyterToken = async function() {
   } else {
     showToast('未找到 Token');
   }
-};
+}
 
-// ── Window exports ──────────────────────────────────────────
+// ── 操作函数 ────────────────────────────────────────────────
 
-window._startJupyter = async function() {
+async function _startJupyter() {
   try {
     const r = await fetch('/api/jupyter/start', { method: 'POST' });
     const d = await r.json();
@@ -364,9 +344,9 @@ window._startJupyter = async function() {
       showToast('启动失败: ' + (d.error || ''));
     }
   } catch (e) { showToast('启动失败: ' + e.message); }
-};
+}
 
-window._stopJupyter = async function() {
+async function _stopJupyter() {
   if (!confirm('确定停止 JupyterLab？活跃的内核/会话将丢失。')) return;
   try {
     const r = await fetch('/api/jupyter/stop', { method: 'POST' });
@@ -379,9 +359,9 @@ window._stopJupyter = async function() {
       showToast('停止失败: ' + (d.error || ''));
     }
   } catch (e) { showToast('停止失败: ' + e.message); }
-};
+}
 
-window._restartJupyter = async function() {
+async function _restartJupyter() {
   if (!confirm('确定要重启 Jupyter 吗？活跃的内核/会话将丢失。')) return;
   try {
     const r = await fetch('/api/jupyter/restart', { method: 'POST' });
@@ -394,9 +374,9 @@ window._restartJupyter = async function() {
       showToast('重启失败: ' + (d.error || ''));
     }
   } catch (e) { showToast('重启失败: ' + e.message); }
-};
+}
 
-window._kernelAction = async function(kernelId, action) {
+async function _kernelAction(kernelId, action) {
   try {
     const r = await fetch(`/api/jupyter/kernels/${kernelId}/${action}`, { method: 'POST' });
     const d = await r.json();
@@ -407,9 +387,9 @@ window._kernelAction = async function(kernelId, action) {
       showToast('操作失败: ' + (d.error || ''));
     }
   } catch (e) { showToast('操作失败: ' + e.message); }
-};
+}
 
-window._closeSession = async function(sessionId) {
+async function _closeSession(sessionId) {
   if (!confirm('关闭此会话？关联的内核也将被停止。')) return;
   try {
     const r = await fetch(`/api/jupyter/sessions/${sessionId}`, { method: 'DELETE' });
@@ -421,6 +401,14 @@ window._closeSession = async function(sessionId) {
       showToast('操作失败: ' + (d.error || ''));
     }
   } catch (e) { showToast('操作失败: ' + e.message); }
-};
+}
 
-window.loadJupyterStatus = loadJupyterStatus;
+// ── Window exports (供 HTML onclick 调用) ─────────────────────
+
+Object.assign(window, {
+  loadJupyterStatus,
+  _newJupyterTerminal, _deleteJupyterTerminal,
+  _toggleJupyterToken, _copyJupyterToken,
+  _startJupyter, _stopJupyter, _restartJupyter,
+  _kernelAction, _closeSession,
+});

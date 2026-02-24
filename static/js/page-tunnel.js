@@ -4,7 +4,7 @@
  * 支持: 自定义服务、子域名编辑、服务状态、配置弹窗
  */
 
-import { registerPage, showToast, escHtml } from './core.js';
+import { registerPage, showToast, escHtml, renderEmpty, renderError } from './core.js';
 
 let _autoRefresh = null;
 let _lastData = null;
@@ -38,7 +38,7 @@ async function loadTunnelPage() {
       const st = tunnel.status || d.cloudflared || 'unknown';
       const stColor = st === 'healthy' || st === 'online' ? 'var(--green)'
                      : st === 'degraded' ? 'var(--amber)'
-                     : st === 'down' || st === 'stopped' ? 'var(--red, #e74c3c)'
+                     : st === 'down' || st === 'stopped' ? 'var(--red)'
                      : 'var(--t3)';
       const stLabel = {
         healthy: '运行中', online: '运行中', degraded: '部分连接',
@@ -86,11 +86,11 @@ async function loadTunnelPage() {
       }).join('');
       logEl.scrollTop = logEl.scrollHeight;
     } else {
-      logEl.innerHTML = '<div style="color:var(--t3)">暂无日志</div>';
+      logEl.innerHTML = renderEmpty('暂无日志');
     }
 
   } catch (e) {
-    if (statusEl) statusEl.innerHTML = `<div style="color:var(--red,#e74c3c)">加载失败: ${escHtml(e.message)}</div>`;
+    if (statusEl) statusEl.innerHTML = renderError('加载失败: ' + e.message);
     if (logEl) logEl.innerHTML = '';
   }
 }
@@ -121,7 +121,7 @@ function _renderServices(d, el) {
     const tunnelHealthy = (d.tunnel?.status === 'healthy' || d.cloudflared === 'online');
     const statusDot = tunnelHealthy
       ? '<span class="tunnel-svc-status-dot" style="background:var(--green)"></span> 路由就绪'
-      : '<span class="tunnel-svc-status-dot" style="background:var(--red,#e74c3c)"></span> 离线';
+      : '<span class="tunnel-svc-status-dot" style="background:var(--red)"></span> 离线';
 
     if (name === 'SSH') {
       const hostname = url ? url.replace('https://', '') : `${suffix}-${d.subdomain}.${d.domain}`;
@@ -183,7 +183,7 @@ window._tunnelValidate = async function() {
 
   if (!token || !domain) {
     resultEl.style.display = 'block';
-    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 请填写 API Token 和域名';
     return;
   }
@@ -203,11 +203,11 @@ window._tunnelValidate = async function() {
       resultEl.style.color = 'var(--green)';
       resultEl.innerHTML = `✅ ${escHtml(d.message)} · 账户: ${escHtml(d.account_name)} · Zone: ${escHtml(d.zone_status)}`;
     } else {
-      resultEl.style.color = 'var(--red, #e74c3c)';
+      resultEl.style.color = 'var(--red)';
       resultEl.innerHTML = `❌ ${escHtml(d.message)}`;
     }
   } catch (e) {
-    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 验证请求失败';
   }
 };
@@ -302,7 +302,7 @@ window._tunnelCfgValidate = async function() {
 
   if (!token || !domain) {
     resultEl.style.display = 'block';
-    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 请填写 API Token 和域名';
     return;
   }
@@ -322,11 +322,11 @@ window._tunnelCfgValidate = async function() {
       resultEl.style.color = 'var(--green)';
       resultEl.innerHTML = `✅ ${escHtml(d.message)}`;
     } else {
-      resultEl.style.color = 'var(--red, #e74c3c)';
+      resultEl.style.color = 'var(--red)';
       resultEl.innerHTML = `❌ ${escHtml(d.message)}`;
     }
   } catch (e) {
-    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 验证失败';
   }
 };
@@ -360,11 +360,11 @@ window._tunnelCfgSave = async function() {
       document.getElementById('tunnel-config-modal').classList.remove('active');
       setTimeout(() => location.reload(), 5000);
     } else {
-      resultEl.style.color = 'var(--red, #e74c3c)';
+      resultEl.style.color = 'var(--red)';
       resultEl.innerHTML = `❌ ${escHtml(d.error || '保存失败')}`;
     }
   } catch (e) {
-    resultEl.style.color = 'var(--red, #e74c3c)';
+    resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = '❌ 请求失败';
   }
 };

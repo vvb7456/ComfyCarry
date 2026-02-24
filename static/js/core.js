@@ -57,6 +57,11 @@ export function escHtml(s) {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** 转义 HTML 属性值 (用于 data-xxx="..." 或 onclick="fn('...')") */
+export function escAttr(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /** 格式化 uptime: ms timestamp → "2h30m" */
 export function fmtUptime(pmUptime) {
   if (!pmUptime) return '-';
@@ -80,10 +85,19 @@ export function fmtDuration(seconds) {
 // ── Toast ────────────────────────────────────────────────────
 
 let _toastTimer = null;
-export function showToast(msg) {
+/**
+ * 显示 Toast 通知
+ * @param {string} msg - 消息内容
+ * @param {'success'|'error'|'warning'} [type='success'] - 类型
+ */
+export function showToast(msg, type) {
   const el = document.getElementById('toast');
   if (!el) return;
   el.textContent = msg;
+  // 移除旧类型, 添加新类型
+  el.classList.remove('toast-error', 'toast-warning');
+  if (type === 'error') el.classList.add('toast-error');
+  else if (type === 'warning') el.classList.add('toast-warning');
   el.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
@@ -200,4 +214,45 @@ export function getBadgeClass(cat) {
     embedding: 'badge-embeddings', hypernetwork: 'badge-other', aestheticgradient: 'badge-other',
     controlnet: 'badge-controlnet', upscaler: 'badge-other', vae: 'badge-vae', pose: 'badge-other' };
   return m[key] || 'badge-other';
+}
+
+// ── API Fetch 封装 ──────────────────────────────────────────
+
+/**
+ * 发起 API 请求并返回 JSON，失败时自动 toast 错误
+ * @param {string} url - API 地址
+ * @param {RequestInit} [opts] - fetch 选项
+ * @returns {Promise<any|null>} 成功返回 JSON，失败返回 null
+ */
+export async function apiFetch(url, opts) {
+  try {
+    const r = await fetch(url, opts);
+    if (!r.ok) {
+      let msg = `HTTP ${r.status}`;
+      try { const d = await r.json(); msg = d.error || d.message || msg; } catch (_) {}
+      showToast(msg, 'error');
+      return null;
+    }
+    return await r.json();
+  } catch (e) {
+    showToast('网络错误', 'error');
+    return null;
+  }
+}
+
+// ── 状态渲染 Helper ─────────────────────────────────────────
+
+/** 返回 loading spinner HTML */
+export function renderLoading(msg = '加载中...') {
+  return `<div class="loading"><div class="spinner"></div><div>${escHtml(msg)}</div></div>`;
+}
+
+/** 返回 error-msg HTML */
+export function renderError(msg) {
+  return `<div class="error-msg">${escHtml(msg)}</div>`;
+}
+
+/** 返回 empty-state HTML */
+export function renderEmpty(msg = '暂无数据') {
+  return `<div class="empty-state">${escHtml(msg)}</div>`;
 }

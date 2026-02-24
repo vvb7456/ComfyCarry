@@ -3,14 +3,15 @@
  * ComfyUI 页面模块: 状态监控、参数管理、日志流、实时事件
  */
 
-import { registerPage, fmtBytes, fmtPct, showToast, escHtml } from './core.js';
+import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty } from './core.js';
+import { createLogStream } from './sse-log.js';
 
 // ── 模块状态 ──────────────────────────────────────────────────
 
 let comfyAutoRefresh = null;
 let _comfyParamsSchema = null;
 let _comfyEventSource = null;
-let _comfyLogSource = null;
+let _comfyLogStream = null;
 let _comfyExecState = null;   // Current execution state
 let _comfyExecTimer = null;   // Timer for elapsed counter
 
@@ -262,43 +263,22 @@ function startComfyLogStream() {
   const el = document.getElementById('comfyui-log-content');
   if (!el) return;
 
-  // Load initial logs first
-  fetch('/api/logs/comfy?lines=200').then(r => r.json()).then(d => {
-    if (d.logs) {
-      const lines = d.logs.split('\n').filter(l => l.trim());
-      el.innerHTML = lines.map(l => {
-        let cls = '';
-        if (/error|exception|traceback/i.test(l)) cls = 'log-error';
-        else if (/warn/i.test(l)) cls = 'log-warn';
-        else if (/loaded|model|checkpoint|lora/i.test(l)) cls = 'log-info';
-        return `<div class="${cls}">${escHtml(l)}</div>`;
-      }).join('');
-      el.scrollTop = el.scrollHeight;
-    }
-  }).catch(() => {});
-
-  // Then start SSE for new lines
-  _comfyLogSource = new EventSource('/api/comfyui/logs/stream');
-  _comfyLogSource.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      const div = document.createElement('div');
-      div.textContent = d.line;
-      if (d.level === 'error') div.className = 'log-error';
-      else if (d.level === 'warn') div.className = 'log-warn';
-
-      // Auto-scroll if near bottom
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      el.appendChild(div);
-      // Limit lines to 500
-      while (el.children.length > 500) el.removeChild(el.firstChild);
-      if (nearBottom) el.scrollTop = el.scrollHeight;
-    } catch (_) {}
-  };
+  _comfyLogStream = createLogStream({
+    el,
+    historyUrl: '/api/logs/comfy?lines=200',
+    streamUrl: '/api/comfyui/logs/stream',
+    classify: line => {
+      if (/error|exception|traceback/i.test(line)) return 'log-error';
+      if (/warn/i.test(line)) return 'log-warn';
+      if (/loaded|model|checkpoint|lora/i.test(line)) return 'log-info';
+      return '';
+    },
+  });
+  _comfyLogStream.start();
 }
 
 function stopComfyLogStream() {
-  if (_comfyLogSource) { _comfyLogSource.close(); _comfyLogSource = null; }
+  if (_comfyLogStream) { _comfyLogStream.stop(); _comfyLogStream = null; }
 }
 
 // ── 状态 & 队列 ──────────────────────────────────────────────
@@ -314,7 +294,7 @@ async function loadComfyStatus() {
     const online = d.online;
     const sys = d.system || {};
     const pm2St = d.pm2_status || 'unknown';
-    const stColor = online ? 'var(--green)' : 'var(--red, #e74c3c)';
+    const stColor = online ? 'var(--green)' : 'var(--red)';
     const stLabel = online ? '运行中' : '已停止';
 
     // Status card
@@ -334,7 +314,7 @@ async function loadComfyStatus() {
           <div class="stat-label">${gpu.name || 'GPU'}</div>
           <div class="stat-value">${vramPct.toFixed(0)}%</div>
           <div class="stat-sub">VRAM: ${fmtBytes(vramUsed)} / ${fmtBytes(gpu.vram_total)} • Torch: ${fmtBytes(torchUsed)}</div>
-          <div class="comfy-vram-bar"><div class="fill" style="width:${vramPct}%;background:${vramPct > 90 ? 'var(--red,#e74c3c)' : vramPct > 70 ? 'var(--amber)' : 'var(--cyan)'}"></div>
+          <div class="comfy-vram-bar"><div class="fill" style="width:${vramPct}%;background:${vramPct > 90 ? 'var(--red)' : vramPct > 70 ? 'var(--amber)' : 'var(--cyan)'}"></div>
             <div class="label">${fmtBytes(vramUsed)} / ${fmtBytes(gpu.vram_total)}</div></div>
         </div>`;
       }
@@ -356,9 +336,9 @@ async function loadComfyStatus() {
     const argsRaw = document.getElementById('comfyui-args-raw');
     if (argsRaw) argsRaw.value = d.args ? d.args.join(' ') : '';
 
-    el.innerHTML = html || '<div style="color:var(--t3);padding:16px">无法获取状态</div>';
+    el.innerHTML = html || renderEmpty('无法获取状态');
   } catch (e) {
-    el.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    el.innerHTML = renderError('加载失败: ' + e.message);
   }
 }
 
@@ -404,7 +384,7 @@ async function loadComfyParams() {
     }
     el.innerHTML = html;
   } catch (e) {
-    el.innerHTML = `<div class="error-msg">加载参数失败: ${e.message}</div>`;
+    el.innerHTML = renderError('加载参数失败: ' + e.message);
   }
 }
 
@@ -469,11 +449,11 @@ async function saveComfyUIParams() {
       setTimeout(() => { status.textContent = ''; loadComfyUIPage(); }, 5000);
     } else {
       status.textContent = '❌ ' + (d.error || '保存失败');
-      status.style.color = 'var(--red, #e74c3c)';
+      status.style.color = 'var(--red)';
     }
   } catch (e) {
     status.textContent = '❌ 请求失败: ' + e.message;
-    status.style.color = 'var(--red, #e74c3c)';
+    status.style.color = 'var(--red)';
   }
 }
 
@@ -599,7 +579,7 @@ async function loadQueuePanel() {
     }
   } catch (e) {
     const runEl = document.getElementById('queue-running');
-    if (runEl) runEl.innerHTML = `<div style="color:var(--red);font-size:.85rem">获取队列失败</div>`;
+    if (runEl) runEl.innerHTML = renderError('获取队列失败');
   }
 }
 
@@ -688,7 +668,7 @@ async function loadComfyHistory() {
       </div>`;
     }).join('')}</div>`;
   } catch (e) {
-    el.innerHTML = `<div class="history-empty" style="color:var(--red)">获取历史失败</div>`;
+    el.innerHTML = renderError('获取历史失败');
   }
 }
 
@@ -717,16 +697,9 @@ registerPage('comfyui', {
 
 // ── Window exports (供 HTML onclick 调用) ─────────────────────
 
-window.loadComfyStatus = loadComfyStatus;
-window.loadComfyParams = loadComfyParams;
-window.saveComfyUIParams = saveComfyUIParams;
-window.comfyInterrupt = comfyInterrupt;
-window.comfyFreeVRAM = comfyFreeVRAM;
-window.restartComfyUI = restartComfyUI;
-window.switchComfyTab = switchComfyTab;
-window.comfyDeleteQueueItem = comfyDeleteQueueItem;
-window.comfyClearQueue = comfyClearQueue;
-window.loadComfyHistory = loadComfyHistory;
-window.loadQueuePanel = loadQueuePanel;
-window.setHistorySort = setHistorySort;
-window.setHistorySize = setHistorySize;
+Object.assign(window, {
+  loadComfyStatus, loadComfyParams, saveComfyUIParams,
+  comfyInterrupt, comfyFreeVRAM, restartComfyUI,
+  switchComfyTab, comfyDeleteQueueItem, comfyClearQueue,
+  loadComfyHistory, loadQueuePanel, setHistorySort, setHistorySize,
+});

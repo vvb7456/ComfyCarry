@@ -1,5 +1,5 @@
 // ========== Plugin Management (ES Module) ==========
-import { registerPage, showToast, escHtml } from './core.js';
+import { registerPage, showToast, escHtml, renderLoading, renderError } from './core.js';
 
 // --- State ---
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed
@@ -35,7 +35,7 @@ async function loadPluginsPage() {
 // ---------- Installed Plugins ----------
 async function loadInstalledPlugins() {
   const el = document.getElementById('plugin-installed-list');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div><br>加载已安装插件...</div>';
+  el.innerHTML = renderLoading('加载已安装插件...');
   try {
     // Fetch installed list and getlist in parallel to enrich data
     const [instR, listR] = await Promise.allSettled([
@@ -57,7 +57,7 @@ async function loadInstalledPlugins() {
     }
     renderInstalledPlugins();
   } catch (e) {
-    el.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    el.innerHTML = renderError('加载失败: ' + e.message);
   }
 }
 
@@ -157,7 +157,7 @@ function filterInstalledPlugins() {
 // ---------- Browse Plugins ----------
 async function loadBrowsePlugins() {
   const el = document.getElementById('plugin-browse-list');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div><br>加载插件列表中 (首次可能较慢)...</div>';
+  el.innerHTML = renderLoading('加载插件列表中 (首次可能较慢)...');
   try {
     // Use cached data if available (loaded by installed tab)
     if (pluginBrowseData.length > 0) {
@@ -177,7 +177,7 @@ async function loadBrowsePlugins() {
     pluginBrowseIndex = 0;
     searchPlugins();
   } catch (e) {
-    el.innerHTML = `<div class="error-msg">加载失败: ${e.message}</div>`;
+    el.innerHTML = renderError('加载失败: ' + e.message);
   }
 }
 
@@ -270,7 +270,7 @@ function renderBrowsePage() {
     el.innerHTML = htmlParts.join('');
   } catch (e) {
     console.error('renderBrowsePage error:', e);
-    el.innerHTML = `<div class="error-msg">渲染失败: ${e.message}</div>`;
+    el.innerHTML = renderError('渲染失败: ' + e.message);
   }
   moreEl.classList.toggle('hidden', end >= results.length);
 }
@@ -401,7 +401,7 @@ async function installPluginFromGit() {
     document.getElementById('plugin-git-url').value = '';
     if (currentPluginTab === 'installed') loadInstalledPlugins();
   } catch (e) {
-    statusEl.innerHTML = `<div class="error-msg">安装失败: ${e.message}</div>`;
+    statusEl.innerHTML = renderError('安装失败: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '安装';
@@ -431,7 +431,7 @@ async function openPluginVersionModal(id, title) {
       </div>`;
     }).join('')}</div>`;
   } catch (e) {
-    body.innerHTML = `<div class="error-msg">${e.message}</div>`;
+    body.innerHTML = renderError(e.message);
   }
 }
 
