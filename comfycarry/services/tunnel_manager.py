@@ -24,17 +24,8 @@ TUNNEL_NAME_PREFIX = "comfycarry"
 # ── 服务端口检测 ─────────────────────────────────────────────
 # 不硬编码端口号 — 从环境变量/运行进程推导
 
-def _detect_jupyter() -> dict:
-    """检测 Jupyter 端口和协议"""
-    port = int(os.environ.get("JUPYTER_PORT", "0"))
-    protocol = "http"
-    if port:
-        # 检查是否 HTTPS (通过 JUPYTER_URL_INTERNAL 或默认规则)
-        internal = os.environ.get("JUPYTER_URL_INTERNAL", "")
-        if internal.startswith("https") or port in (8080,):
-            protocol = "https"
-        return {"port": port, "protocol": protocol}
-    # 从进程探测
+def _detect_jupyter() -> dict | None:
+    """检测 Jupyter 端口和协议 (从运行中的进程, 无默认值)"""
     try:
         out = subprocess.run(
             "ps aux | grep '[j]upyter-lab\\|[j]upyter-notebook' | head -1",
@@ -48,7 +39,7 @@ def _detect_jupyter() -> dict:
                 return {"port": port, "protocol": protocol}
     except Exception:
         pass
-    return {"port": 8080, "protocol": "https"}  # vast.ai 默认
+    return None  # 未运行则不包含在服务列表中
 
 
 def _detect_comfyui_port() -> int:
@@ -60,17 +51,23 @@ def _detect_comfyui_port() -> int:
 
 def get_default_services() -> List[dict]:
     """构建默认服务列表 (端口从环境/进程检测)"""
-    jupyter = _detect_jupyter()
-    return [
+    services = [
         {"name": "ComfyCarry", "port": int(os.environ.get("MANAGER_PORT", 5000)),
          "suffix": "",          "protocol": "http"},
         {"name": "ComfyUI",    "port": _detect_comfyui_port(),
          "suffix": "comfyui",   "protocol": "http"},
-        {"name": "JupyterLab", "port": jupyter["port"],
-         "suffix": "jupyter",   "protocol": jupyter["protocol"]},
-        {"name": "SSH",        "port": 22,
-         "suffix": "ssh",       "protocol": "ssh"},
     ]
+    jupyter = _detect_jupyter()
+    if jupyter:
+        services.append(
+            {"name": "JupyterLab", "port": jupyter["port"],
+             "suffix": "jupyter",   "protocol": jupyter["protocol"]}
+        )
+    services.append(
+        {"name": "SSH",        "port": 22,
+         "suffix": "ssh",       "protocol": "ssh"}
+    )
+    return services
 
 
 # 向后兼容: 其他模块 import DEFAULT_SERVICES 时获取检测结果

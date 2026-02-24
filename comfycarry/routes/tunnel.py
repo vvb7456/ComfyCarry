@@ -89,7 +89,7 @@ def api_tunnel_status_v2():
         if "jupyter" in name.lower():
             try:
                 from . import jupyter as jup_mod
-                token = jup_mod.JUPYTER_TOKEN or jup_mod._detect_token()
+                token = jup_mod._detect_token()
                 if token:
                     urls[name] = f"{urls[name]}?token={token}"
             except Exception:

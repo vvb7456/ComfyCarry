@@ -32,16 +32,7 @@ if [ ! -f /opt/.comfycarry-prebuilt ]; then
 fi
 PYTHON_BIN=python3
 
-# SSH 修复 (Vast.ai 需要)
-if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
-    mkdir -p /run/sshd && ssh-keygen -A 2>/dev/null || true
-fi
-# vast.ai 在同物理机重建实例时可能复用旧 authorized_keys (属主错误 → sshd 拒绝认证)
-if [ -f /root/.ssh/authorized_keys ]; then
-    chown root:root /root/.ssh/authorized_keys 2>/dev/null || true
-    chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
-fi
-pgrep -x sshd >/dev/null || /usr/sbin/sshd 2>/dev/null || true
+# SSH 已由 entrypoint.sh 处理 (SSH Key + sshd)
 
 # ── Python ──
 # 预构建镜像已含 Python 3.12
@@ -124,6 +115,19 @@ else
     echo "❌ ComfyCarry 文件下载失败，请检查网络连接"
     exit 1
 fi
+
+# ── JupyterLab (基础镜像已预装, 通过 PM2 管理) ──
+pm2 delete jupyter 2>/dev/null || true
+JUPYTER_TOKEN=${JUPYTER_TOKEN:-$($PYTHON_BIN -c 'import secrets; print(secrets.token_hex(32))')}
+export JUPYTER_TOKEN
+pm2 start jupyter-lab --name jupyter \
+    --interpreter none \
+    --log /workspace/jupyter.log --time \
+    -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
+    --IdentityProvider.token="$JUPYTER_TOKEN" \
+    --ServerApp.root_dir=/workspace
+pm2 save 2>/dev/null || true
+echo "  ✅ JupyterLab 已启动 (port 8888)"
 
 # ── CF Tunnel (可选 — 让向导页可通过 Tunnel 域名访问) ──
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then

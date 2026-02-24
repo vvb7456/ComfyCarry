@@ -51,9 +51,19 @@ async function loadJupyterStatus() {
 
     let html = '';
 
+    // PM2 status label
+    const pm2St = d.pm2_status || 'unknown';
+    const pm2Color = pm2St === 'online' ? 'var(--green)' :
+                     pm2St === 'stopped' ? 'var(--amber)' :
+                     pm2St === 'errored' ? 'var(--red)' : 'var(--t3)';
+    const pm2Label = pm2St === 'online' ? '运行中' :
+                     pm2St === 'stopped' ? '已停止' :
+                     pm2St === 'errored' ? '出错' :
+                     pm2St === 'not_found' ? '未创建' : pm2St;
+
     // Status header
-    const stColor = d.online ? 'var(--green)' : 'var(--red, #e74c3c)';
-    const stLabel = d.online ? '运行中' : '未运行';
+    const stColor = d.online ? 'var(--green)' : pm2Color;
+    const stLabel = d.online ? '运行中' : pm2Label;
     html += `<div class="jupyter-status-header">
       <div class="jupyter-status-badge" style="color:${stColor}">
         <span class="jupyter-dot" style="background:${stColor}"></span> ${stLabel}
@@ -62,12 +72,19 @@ async function loadJupyterStatus() {
       <div style="margin-left:auto;display:flex;gap:6px">
         ${_jupyterUrl ? `<a href="${_jupyterUrl}" target="_blank" class="btn btn-sm btn-primary">🔗 打开 JupyterLab</a>` : ''}
         <button class="btn btn-sm" onclick="loadJupyterStatus()" title="刷新">🔄 刷新</button>
-        <button class="btn btn-sm" onclick="window._restartJupyter()">♻️ 重启</button>
+        ${d.online || pm2St === 'online' ?
+          `<button class="btn btn-sm btn-danger" onclick="window._stopJupyter()">⏹ 停止</button>
+           <button class="btn btn-sm" onclick="window._restartJupyter()">♻️ 重启</button>` :
+          `<button class="btn btn-sm btn-primary" onclick="window._startJupyter()">▶ 启动</button>`}
       </div>
     </div>`;
 
     if (!d.online) {
-      html += '<div style="color:var(--t3);padding:16px 0">Jupyter 服务未运行或无法连接</div>';
+      const hint = pm2St === 'not_found' ? '点击「启动」创建 JupyterLab 进程' :
+                   pm2St === 'stopped' ? '进程已停止，点击「启动」恢复' :
+                   pm2St === 'errored' ? '进程出错，请查看日志' :
+                   'Jupyter 服务未运行或无法连接';
+      html += `<div style="color:var(--t3);padding:16px 0">${hint}</div>`;
       el.innerHTML = html;
       renderKernelsList([]);
       renderSessionsList([]);
@@ -246,6 +263,35 @@ window._copyJupyterToken = async function() {
 
 // ── Window exports ──────────────────────────────────────────
 
+window._startJupyter = async function() {
+  try {
+    const r = await fetch('/api/jupyter/start', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('▶ ' + (d.message || 'JupyterLab 启动中...'));
+      _cachedToken = '';
+      setTimeout(loadJupyterPage, 3000);
+    } else {
+      showToast('启动失败: ' + (d.error || ''));
+    }
+  } catch (e) { showToast('启动失败: ' + e.message); }
+};
+
+window._stopJupyter = async function() {
+  if (!confirm('确定停止 JupyterLab？活跃的内核/会话将丢失。')) return;
+  try {
+    const r = await fetch('/api/jupyter/stop', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('⏹ JupyterLab 已停止');
+      _cachedToken = '';
+      setTimeout(loadJupyterStatus, 1000);
+    } else {
+      showToast('停止失败: ' + (d.error || ''));
+    }
+  } catch (e) { showToast('停止失败: ' + e.message); }
+};
+
 window._restartJupyter = async function() {
   if (!confirm('确定要重启 Jupyter 吗？活跃的内核/会话将丢失。')) return;
   try {
@@ -253,7 +299,8 @@ window._restartJupyter = async function() {
     const d = await r.json();
     if (d.ok) {
       showToast('♻️ Jupyter 正在重启...');
-      setTimeout(loadJupyterStatus, 5000);
+      _cachedToken = '';
+      setTimeout(loadJupyterPage, 5000);
     } else {
       showToast('重启失败: ' + (d.error || ''));
     }
