@@ -133,6 +133,7 @@ async function showAddRemoteModal() {
 }
 
 function closeSyncModal(id) { document.getElementById(id).classList.remove('active'); }
+window.closeSyncModal = closeSyncModal;
 
 async function showSyncSettings() {
   try {
@@ -378,14 +379,20 @@ function showRuleForm(rule) {
       </div>
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">远程路径</label>
-        <input type="text" id="rule-remote-path" value="${escHtml(r.remote_path || '')}" placeholder="bucket/folder" style="width:100%">
+        <div style="display:flex;gap:4px">
+          <input type="text" id="rule-remote-path" value="${escHtml(r.remote_path || '')}" placeholder="bucket/folder" style="flex:1">
+          <button class="btn btn-sm" onclick="window._browseRemotePath()" title="浏览远程目录" style="padding:4px 8px;flex-shrink:0">📂</button>
+        </div>
       </div>
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">本地路径 (相对 ComfyUI)</label>
-        <input type="text" id="rule-local-path" value="${escHtml(r.local_path || '')}" placeholder="models/loras" style="width:100%">
+        <div style="display:flex;gap:4px">
+          <input type="text" id="rule-local-path" value="${escHtml(r.local_path || '')}" placeholder="models/loras" style="flex:1">
+          <button class="btn btn-sm" onclick="window._browseLocalPath()" title="浏览本地目录" style="padding:4px 8px;flex-shrink:0">📂</button>
+        </div>
       </div>
       <div>
-        <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方法 <span title="copy: 复制文件，保留源端\nsync: 镜像同步，目标多余文件会被删除\nmove: 移动文件，完成后删除源端\n\n同目录多规则时 copy 会在 move 之前执行，不会冲突" style="cursor:help;opacity:.6">❓</span></label>
+        <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方法 <span class="comfy-param-help-icon" data-tip="copy: 复制文件，保留源端&#10;sync: 镜像同步，目标多余文件会被删除&#10;move: 移动文件，完成后删除源端&#10;&#10;同目录多规则时 copy 会在 move 之前执行，不会冲突">?</span></label>
         <select id="rule-method" style="width:100%">
           <option value="copy"${r.method === 'copy' ? ' selected' : ''}>copy — 复制文件 (保留源端)</option>
           <option value="sync"${r.method === 'sync' ? ' selected' : ''}>sync — 镜像同步 (目标多余文件会被删除!)</option>
@@ -604,8 +611,109 @@ registerPage('sync', {
 registerEscapeHandler(() => {
   closeSyncModal('add-remote-modal');
   closeSyncModal('add-rule-modal');
+  closeSyncModal('remote-browse-modal');
   closeSyncModal('sync-settings-modal');
 });
+
+// ── 目录浏览 (树状图，支持远程和本地) ──────────────────────────
+
+let _browsePath = '';
+let _browseRemote = '';
+let _browseMode = 'remote'; // 'remote' | 'local'
+
+window._browseRemotePath = function() {
+  const remote = document.getElementById('rule-remote')?.value;
+  if (!remote) { showToast('请先选择 Remote'); return; }
+  _browseMode = 'remote';
+  _browseRemote = remote;
+  _browsePath = document.getElementById('rule-remote-path')?.value || '';
+  document.getElementById('browse-modal-title').textContent = '📂 浏览远程目录';
+  document.getElementById('remote-browse-modal')?.classList.add('active');
+  _browseLoadDir(_browsePath);
+};
+
+window._browseLocalPath = function() {
+  _browseMode = 'local';
+  _browsePath = document.getElementById('rule-local-path')?.value || '';
+  document.getElementById('browse-modal-title').textContent = '📂 浏览本地目录';
+  document.getElementById('remote-browse-modal')?.classList.add('active');
+  _browseLoadDir(_browsePath);
+};
+
+async function _browseLoadDir(path) {
+  _browsePath = path;
+  const treeEl = document.getElementById('browse-tree');
+  const breadEl = document.getElementById('browse-breadcrumb');
+
+  // 面包屑导航
+  const parts = path ? path.split('/').filter(Boolean) : [];
+  const rootLabel = _browseMode === 'remote' ? `☁️ ${escHtml(_browseRemote)}:/` : '📁 ComfyUI/';
+  let crumb = `<span style="cursor:pointer;color:var(--ac)" onclick="window._browseNav('')">${rootLabel}</span>`;
+  let acc = '';
+  for (const p of parts) {
+    acc += (acc ? '/' : '') + p;
+    const escaped = acc.replace(/'/g, "\\'");
+    crumb += ` / <span style="cursor:pointer;color:var(--ac)" onclick="window._browseNav('${escaped}')">${escHtml(p)}</span>`;
+  }
+  breadEl.innerHTML = crumb;
+
+  treeEl.innerHTML = '<div style="padding:16px;color:var(--t3);text-align:center">加载中...</div>';
+
+  try {
+    const apiUrl = _browseMode === 'remote' ? '/api/sync/remote/browse' : '/api/sync/local/browse';
+    const body = _browseMode === 'remote'
+      ? { remote: _browseRemote, path }
+      : { path };
+    const r = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!d.ok && d.error) { treeEl.innerHTML = `<div style="padding:16px;color:var(--red)">${escHtml(d.error)}</div>`; return; }
+
+    const dirs = d.dirs || [];
+    let html = '';
+
+    if (path) {
+      const parentPath = parts.slice(0, -1).join('/');
+      html += `<div class="browse-item" onclick="window._browseNav('${parentPath.replace(/'/g, "\\'")}')" style="cursor:pointer;padding:6px 10px;display:flex;align-items:center;gap:6px;border-radius:6px" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">
+        <span style="font-size:1.1em">⬆️</span>
+        <span style="color:var(--t2)">..</span>
+      </div>`;
+    }
+
+    if (dirs.length === 0 && !path) {
+      html += '<div style="padding:16px;color:var(--t3);text-align:center">根目录下无子目录</div>';
+    } else if (dirs.length === 0) {
+      html += '<div style="padding:16px;color:var(--t3);text-align:center">无子目录</div>';
+    }
+
+    for (const dir of dirs) {
+      const fullPath = path ? `${path}/${dir}` : dir;
+      const escaped = fullPath.replace(/'/g, "\\'");
+      html += `<div class="browse-item" onclick="window._browseNav('${escaped}')" style="cursor:pointer;padding:6px 10px;display:flex;align-items:center;gap:6px;border-radius:6px" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">
+        <span style="font-size:1.1em">📁</span>
+        <span>${escHtml(dir)}</span>
+      </div>`;
+    }
+
+    treeEl.innerHTML = html;
+  } catch (e) {
+    treeEl.innerHTML = `<div style="padding:16px;color:var(--red)">加载失败: ${escHtml(e.message)}</div>`;
+  }
+}
+
+window._browseNav = function(path) {
+  _browseLoadDir(path);
+};
+
+window._browseSelect = function() {
+  const targetId = _browseMode === 'remote' ? 'rule-remote-path' : 'rule-local-path';
+  document.getElementById(targetId).value = _browsePath;
+  closeSyncModal('remote-browse-modal');
+  showToast(`✅ 已选择: ${_browsePath || '/'}`);
+};
 
 // ── Window Exports (for onclick attributes in HTML) ─────────────
 

@@ -1321,7 +1321,7 @@
             border-radius: 6px;
             font-size: .72rem;
             line-height: 1.4;
-            white-space: normal;
+            white-space: pre-line;
             width: max-content;
             max-width: 280px;
             z-index: 100;
@@ -2650,6 +2650,13 @@
                 <div class="section-title" style="margin-top:20px">📂 活跃会话</div>
                 <div id="jupyter-sessions-list"></div>
 
+                <!-- 终端 -->
+                <div style="margin-top:20px;display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <div class="section-title" style="margin:0">💻 终端</div>
+                    <button class="btn btn-sm" onclick="window._newJupyterTerminal()">➕ 新建</button>
+                </div>
+                <div id="jupyter-terminals-list"></div>
+
                 <!-- 日志 -->
                 <div style="margin-top:20px">
                     <div class="section-title">📜 日志</div>
@@ -2896,6 +2903,7 @@
                         </select>
                         <div style="flex:1"></div>
                         <button class="btn btn-sm" onclick="loadPluginsPage()" style="font-size:.75rem;padding:4px 10px">🔄 刷新</button>
+                        <button class="btn btn-sm" onclick="window._checkPluginUpdates()" style="font-size:.75rem;padding:4px 10px" title="强制 ComfyUI-Manager 重新检查所有插件更新 (耗时较长)">🔍 检查更新</button>
                         <button class="btn btn-sm btn-primary" onclick="updateAllPlugins()" style="font-size:.75rem;padding:4px 10px">⬆️ 全部更新</button>
                     </div>
                     <div id="plugin-installed-stats" style="font-size:.82rem;color:var(--t2);margin-bottom:12px"></div>
@@ -3057,6 +3065,20 @@
                             </div>
                         </div>
 
+                        <!-- ComfyCarry API Key -->
+                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
+                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔑 ComfyCarry API Key</h3>
+                            <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
+                                用于外部脚本或应用通过 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">X-API-Key</code> 或 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">Bearer</code> 方式访问 API
+                            </p>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                                <input type="password" id="settings-api-key" readonly style="flex:1;font-family:monospace;font-size:.82rem;letter-spacing:.5px">
+                                <button class="btn btn-sm" onclick="toggleApiKeyVisibility()" title="显示/隐藏" id="settings-api-key-toggle">👁️</button>
+                                <button class="btn btn-sm" onclick="copyApiKey()" title="复制">📋</button>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">🔄 重新生成</button>
+                        </div>
+
                         <!-- Debug 模式 & 服务管理 -->
                         <div class="card" style="padding:clamp(16px,1.5vw,24px)">
                             <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🛠️ 服务管理</h3>
@@ -3195,6 +3217,22 @@
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
                 <button class="btn btn-sm" onclick="closeSyncModal('add-rule-modal')">取消</button>
                 <button class="btn btn-sm btn-primary" onclick="submitAddRule()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remote Browse Modal (tree-style directory picker) -->
+    <div class="modal-overlay" id="remote-browse-modal" onclick="if(event.target===this)closeSyncModal('remote-browse-modal')" style="z-index:1002">
+        <div class="modal-box" style="width:480px;max-height:70vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;margin-bottom:12px">
+                <h3 style="margin-bottom:0" id="browse-modal-title">📂 浏览目录</h3>
+                <button class="btn btn-sm" onclick="closeSyncModal('remote-browse-modal')" style="margin-left:auto">✕</button>
+            </div>
+            <div id="browse-breadcrumb" style="font-size:.78rem;color:var(--t2);margin-bottom:8px;word-break:break-all"></div>
+            <div id="browse-tree" style="flex:1;overflow-y:auto;min-height:200px;max-height:45vh;border:1px solid var(--bd);border-radius:8px;padding:4px"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+                <button class="btn btn-sm" onclick="closeSyncModal('remote-browse-modal')">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="window._browseSelect()">选择当前目录</button>
             </div>
         </div>
     </div>

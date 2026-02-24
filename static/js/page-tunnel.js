@@ -140,12 +140,14 @@ function _renderServices(d, el) {
     } else {
       const displayUrl = url || `https://${suffix ? suffix+'-' : ''}${d.subdomain}.${d.domain}`;
       const deleteBtn = isCustom ? `<button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}')" style="font-size:.62rem;padding:1px 5px;margin-left:auto">✕</button>` : '';
+      const editBtn = suffix ? `<button class="btn btn-sm" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" style="font-size:.62rem;padding:1px 5px" title="编辑子域名">✏️</button>` : '';
       html += `<a href="${escHtml(displayUrl)}" target="_blank" class="tunnel-svc-card">
         <div style="display:flex;align-items:center;gap:8px">
           <span class="tunnel-svc-icon">${icon}</span>
           <span class="tunnel-svc-name">${escHtml(name)}</span>
           ${isCustom ? '<span style="font-size:.6rem;background:var(--ac);color:#000;padding:1px 5px;border-radius:3px">自定义</span>' : ''}
           <span class="tunnel-svc-status">${statusDot}</span>
+          ${editBtn}
           ${deleteBtn}
         </div>
         <span class="tunnel-svc-detail">${escHtml(displayUrl)}</span>
@@ -436,6 +438,26 @@ window._tunnelRemoveService = async function(suffix) {
       setTimeout(loadTunnelPage, 2000);
     } else {
       showToast('❌ ' + (d.error || '移除失败'));
+    }
+  } catch (e) { showToast('❌ ' + e.message); }
+};
+
+window._tunnelEditSuffix = async function(currentSuffix) {
+  const newSuffix = prompt(`修改子域名后缀 (当前: ${currentSuffix})`, currentSuffix);
+  if (!newSuffix || newSuffix === currentSuffix) return;
+  showToast('正在更新...');
+  try {
+    const r = await fetch(`/api/tunnel/services/${encodeURIComponent(currentSuffix)}/subdomain`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_suffix: newSuffix })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 子域名已更新');
+      setTimeout(loadTunnelPage, 2000);
+    } else {
+      showToast('❌ ' + (d.error || '更新失败'));
     }
   } catch (e) { showToast('❌ ' + e.message); }
 };

@@ -274,6 +274,22 @@ def jupyter_new_terminal():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/api/jupyter/terminals/<name>", methods=["DELETE"])
+def jupyter_delete_terminal(name):
+    """销毁终端"""
+    try:
+        base = _jupyter_url()
+        if not base:
+            return jsonify({"error": "JupyterLab 未运行"}), 503
+        r = requests.delete(f"{base}/api/terminals/{name}",
+                            headers=_jupyter_headers(), verify=False, timeout=5)
+        if r.ok or r.status_code == 204:
+            return jsonify({"ok": True})
+        return jsonify({"error": "Delete terminal failed"}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/api/jupyter/kernels/<kernel_id>/<action>", methods=["POST"])
 def jupyter_kernel_action(kernel_id, action):
     """内核操作: restart, interrupt"""

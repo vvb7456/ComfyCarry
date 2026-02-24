@@ -486,6 +486,25 @@ registerPage('plugins', {
   leave() { stopPluginQueuePoll(); }
 });
 
+// ---------- Check updates (fetch_updates) ----------
+async function checkPluginUpdates() {
+  showToast('🔍 正在检查更新...');
+  try {
+    const r = await fetch('/api/plugins/fetch_updates');
+    const d = await r.json();
+    if (d.error) {
+      showToast(d.error);
+      return;
+    }
+    if (d.has_updates) {
+      showToast('✅ 发现新更新，正在刷新列表...');
+      loadPluginsPage();
+    } else {
+      showToast('所有插件已是最新版本');
+    }
+  } catch (e) { showToast('检查失败: ' + e.message); }
+}
+
 // ---------- Window exports (for onclick in HTML) ----------
 Object.assign(window, {
   switchPluginTab,
@@ -502,4 +521,5 @@ Object.assign(window, {
   closePluginVersionModal,
   installPluginVersion,
   loadPluginsPage,
+  _checkPluginUpdates: checkPluginUpdates,
 });

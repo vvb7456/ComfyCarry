@@ -26,6 +26,14 @@ async function loadSettingsPage() {
       civStatus.textContent = settings.civitai_key_set ? `已配置: ${settings.civitai_key}` : '未设置 API Key';
     }
 
+    // API Key
+    const apiKeyInput = document.getElementById('settings-api-key');
+    if (apiKeyInput && settings.api_key) {
+      apiKeyInput.dataset.key = settings.api_key;
+      apiKeyInput.value = '••••••••••••••••••••••••';
+      apiKeyInput.type = 'password';
+    }
+
     const debugToggle = document.getElementById('settings-debug-toggle');
     if (debugToggle) debugToggle.checked = settings.debug;
 
@@ -207,11 +215,50 @@ async function importConfig(event) {
   } catch (e) { showToast('导入失败: ' + e.message); }
 }
 
+// ── API Key 管理 ────────────────────────────────────────────
+
+function toggleApiKeyVisibility() {
+  const el = document.getElementById('settings-api-key');
+  if (!el) return;
+  if (el.type === 'password') {
+    el.type = 'text';
+    el.value = el.dataset.key || '';
+  } else {
+    el.type = 'password';
+    el.value = '••••••••••••••••••••••••';
+  }
+}
+
+async function copyApiKey() {
+  const el = document.getElementById('settings-api-key');
+  if (!el?.dataset.key) return;
+  try {
+    await navigator.clipboard.writeText(el.dataset.key);
+    showToast('✅ API Key 已复制');
+  } catch { showToast('复制失败'); }
+}
+
+async function regenerateApiKey() {
+  if (!confirm('确定要重新生成 API Key 吗？\n\n旧的 Key 将立即失效，所有使用旧 Key 的外部应用需要更新。')) return;
+  try {
+    const r = await fetch('/api/settings/api-key', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      const el = document.getElementById('settings-api-key');
+      if (el) { el.dataset.key = d.api_key; el.type = 'text'; el.value = d.api_key; }
+      showToast('✅ API Key 已重新生成');
+    } else {
+      showToast('⚠️ ' + (d.error || '重新生成失败'));
+    }
+  } catch (e) { showToast('请求失败: ' + e.message); }
+}
+
 // ── Window exports ──────────────────────────────────────────
 
 Object.assign(window, {
   changePassword, saveSettingsCivitaiKey, clearSettingsCivitaiKey,
   toggleDebugMode, restartDashboard, reinitialize,
   loadSettingsLogs, toggleAutoLog,
-  openIEModal, closeIEModal, exportConfig, importConfig
+  openIEModal, closeIEModal, exportConfig, importConfig,
+  toggleApiKeyVisibility, copyApiKey, regenerateApiKey
 });

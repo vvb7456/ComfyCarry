@@ -24,7 +24,7 @@ from flask import Blueprint, jsonify, request
 from pathlib import Path
 
 from ..config import (
-    RCLONE_CONF, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
+    COMFYUI_DIR, RCLONE_CONF, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
 )
 from ..services.sync_engine import (
     _load_sync_rules, _save_sync_rules, _parse_rclone_conf,
@@ -148,6 +148,28 @@ def api_sync_remote_browse():
             dirs = [i["Path"] for i in items if i.get("IsDir")]
             return jsonify({"ok": True, "dirs": sorted(dirs)})
         return jsonify({"ok": True, "dirs": []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/sync/local/browse", methods=["POST"])
+def api_sync_local_browse():
+    """Browse local directories (relative to COMFYUI_DIR)."""
+    data = request.get_json(force=True)
+    path = data.get("path", "")
+    base = Path(COMFYUI_DIR)
+    target = (base / path).resolve()
+    # Security: must stay within COMFYUI_DIR
+    if not str(target).startswith(str(base.resolve())):
+        return jsonify({"error": "路径超出 ComfyUI 目录范围"}), 400
+    if not target.is_dir():
+        return jsonify({"ok": True, "dirs": []})
+    try:
+        dirs = sorted(
+            d.name for d in target.iterdir()
+            if d.is_dir() and not d.name.startswith('.')
+        )
+        return jsonify({"ok": True, "dirs": dirs})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

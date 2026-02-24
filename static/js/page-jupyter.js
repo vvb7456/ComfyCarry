@@ -96,6 +96,7 @@ async function loadJupyterStatus() {
       el.innerHTML = html;
       renderKernelsList([]);
       renderSessionsList([]);
+      renderTerminalsList([]);
       return;
     }
 
@@ -131,6 +132,7 @@ async function loadJupyterStatus() {
     // Render sub-sections
     renderKernelsList(d.kernels || []);
     renderSessionsList(d.sessions || []);
+    renderTerminalsList(d.terminals || []);
   } catch (e) {
     el.innerHTML = `<div style="color:var(--red,#e74c3c)">加载失败: ${escHtml(e.message)}</div>`;
   }
@@ -199,6 +201,63 @@ function renderSessionsList(sessions) {
     </div>`;
   }).join('');
 }
+
+// ── Terminals ───────────────────────────────────────────────
+
+function renderTerminalsList(terminals) {
+  const el = document.getElementById('jupyter-terminals-list');
+  if (!el) return;
+
+  if (terminals.length === 0) {
+    el.innerHTML = '<div class="jupyter-empty">无活跃终端</div>';
+    return;
+  }
+
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${terminals.map(t => {
+    // 构建跳转 URL
+    let openBtn = '';
+    if (_jupyterUrl) {
+      const base = _jupyterUrl.split('?')[0];
+      const tokenPart = _jupyterUrl.includes('?') ? _jupyterUrl.substring(_jupyterUrl.indexOf('?')) : '';
+      const termUrl = `${base}/terminals/${encodeURIComponent(t.name)}${tokenPart}`;
+      openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-sm btn-primary" style="font-size:.68rem;padding:2px 6px" title="在 JupyterLab 中打开">🔗</a>`;
+    }
+
+    return `<div style="background:var(--c2);border-radius:8px;padding:8px 12px;display:inline-flex;align-items:center;gap:8px">
+      <span style="font-size:1rem">💻</span>
+      <span style="font-weight:600;font-size:.85rem">终端 ${escHtml(t.name)}</span>
+      ${openBtn}
+      <button class="btn btn-sm btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端" style="font-size:.68rem;padding:2px 6px">✕</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+window._newJupyterTerminal = async function() {
+  try {
+    const r = await fetch('/api/jupyter/terminals/new', { method: 'POST' });
+    const d = await r.json();
+    if (r.ok) {
+      showToast(`✅ 终端 ${d.name || ''} 已创建`);
+      loadJupyterStatus();
+    } else {
+      showToast(d.error || '创建失败');
+    }
+  } catch (e) { showToast('创建失败: ' + e.message); }
+};
+
+window._deleteJupyterTerminal = async function(name) {
+  if (!confirm(`确定销毁终端 ${name}？`)) return;
+  try {
+    const r = await fetch(`/api/jupyter/terminals/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (r.ok) {
+      showToast(`✅ 终端 ${name} 已销毁`);
+      loadJupyterStatus();
+    } else {
+      showToast(d.error || '销毁失败');
+    }
+  } catch (e) { showToast('销毁失败: ' + e.message); }
+};
 
 // ── SSE: 实时日志流 ──────────────────────────────────────────
 
