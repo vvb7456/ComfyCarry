@@ -1,12 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: 尝试设置 UTF-8 编码
 chcp 65001 >nul 2>&1
 
-:: ============================================================================
-:: ComfyCarry Rclone 配置助手 (Regex 修复版)
-:: ============================================================================
 
 title ComfyCarry - Rclone 配置助手
 
@@ -27,9 +23,6 @@ if not exist "%RCLONE_EXE%" (
     goto :exit_pause
 )
 
-:: ==============================================================
-:: 代理设置引导
-:: ==============================================================
 echo.
 echo  [步骤 1/2] 网络代理设置
 echo  --------------------------------------------------
@@ -47,9 +40,6 @@ if not "!USER_PROXY!"=="" (
 )
 echo.
 
-:: ==============================================================
-:: 主菜单
-:: ==============================================================
 :main_menu
 echo.
 echo  [步骤 2/2] 云存储配置
@@ -79,9 +69,6 @@ if "!CHOICE!"=="0" goto :export_config
 echo  [!!] 无效选择
 goto :main_menu
 
-:: ==============================================================
-:: OneDrive
-:: ==============================================================
 :setup_onedrive
 echo.
 echo  -- OneDrive 设置 ------------------------------------
@@ -95,7 +82,6 @@ if "!OD_TYPE!"=="2" (set "OD_DT=business") else (set "OD_DT=personal")
 
 echo.
 echo  [..] 正在打开浏览器授权...
-:: 清理残留 rclone 进程，避免端口冲突
 taskkill /f /im rclone.exe >nul 2>&1
 timeout /t 1 >nul 2>&1
 if exist "%TOKEN_FILE%" del /q "%TOKEN_FILE%"
@@ -106,11 +92,6 @@ if errorlevel 1 (
     goto :main_menu
 )
 
-:: ================================================================
-:: 关键修复: PowerShell 直接读取 token 文件并写入配置
-:: 避免 batch enabledelayedexpansion 将 token 中的 ! 字符当作变量解析
-:: (Microsoft refresh_token 常含 ! 字符, 经 batch 处理后会被截断/损坏)
-:: ================================================================
 echo  [..] 正在获取 OneDrive Drive ID...
 set "DRIVE_ID="
 for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $di=''; try{$j=ConvertFrom-Json $tk; $h=@{Authorization=""Bearer $($j.access_token)""}; $r=Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/me/drive' -Headers $h -EA Stop; $di=$r.id}catch{}; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+""[$env:REMOTE_NAME]""+$nl+""type = onedrive""+$nl+""drive_type = $env:OD_DT""+$nl+""token = $tk""+$nl); if($di){[IO.File]::AppendAllText($cf, ""drive_id = $di""+$nl)}; Write-Output $di"`) do set "DRIVE_ID=%%R"
@@ -133,9 +114,6 @@ if "!DRIVE_ID!"=="" (
 echo.
 goto :create_folders
 
-:: ==============================================================
-:: Google Drive
-:: ==============================================================
 :setup_gdrive
 echo.
 echo  -- Google Drive 设置 --------------------------------
@@ -150,9 +128,6 @@ echo.
 echo  [OK] Google Drive 配置完成。
 goto :create_folders
 
-:: ==============================================================
-:: Dropbox
-:: ==============================================================
 :setup_dropbox
 echo.
 echo  -- Dropbox 设置 -------------------------------------
@@ -172,7 +147,6 @@ if errorlevel 1 (
     goto :main_menu
 )
 
-:: PowerShell 直接读取 token 文件并写入配置 (同 OneDrive 修复)
 set "PS_RESULT="
 for /f "usebackq delims=" %%R in (`powershell -NoProfile -Command "$c=Get-Content -Raw $env:TOKEN_FILE; $m=[regex]::Match($c,'(?s)\{.*""access_token"".*\}'); if(-not $m.Success){Write-Output 'FAIL'; exit}; $tk=$m.Value; $nl=[Environment]::NewLine; $cf=$env:RCLONE_CONF; [IO.File]::AppendAllText($cf, $nl+""[$env:REMOTE_NAME]""+$nl+""type = dropbox""+$nl+""token = $tk""+$nl); Write-Output 'OK'"`) do set "PS_RESULT=%%R"
 
@@ -191,9 +165,6 @@ if "!PS_RESULT!"=="OK" (
 )
 goto :create_folders
 
-:: ==============================================================
-:: WebDAV
-:: ==============================================================
 :setup_webdav
 echo.
 echo  -- WebDAV 设置 --------------------------------------
@@ -213,9 +184,6 @@ echo.
 echo  [OK] WebDAV 配置完成。
 goto :create_folders
 
-:: ==============================================================
-:: S3 / R2
-:: ==============================================================
 :setup_r2
 echo.
 echo  -- Cloudflare R2 设置 -------------------------------
@@ -242,9 +210,6 @@ set /p "S3_REGION=  Region: "
 "%RCLONE_EXE%" config create "!REMOTE_NAME!" s3 provider=AWS access_key_id="!S3_KEY!" secret_access_key="!S3_SECRET!" region="!S3_REGION!" --config "%RCLONE_CONF%"
 goto :create_folders
 
-:: ==============================================================
-:: 目录初始化 (与 ComfyCarry Sync 模板一致)
-:: ==============================================================
 :create_folders
 echo.
 set /p "CONFIRM=  是否在该存储上初始化 ComfyUI 同步目录结构? (y/n): "
@@ -256,12 +221,10 @@ if "!ROOT!"=="" set "ROOT=comfyui-assets"
 
 echo  [..] 正在创建完整目录结构 (请稍候)...
 
-:: 基础目录 (与 SYNC_RULE_TEMPLATES 对应)
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/workflow" --config "%RCLONE_CONF%"
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/input" --config "%RCLONE_CONF%"
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/wildcards" --config "%RCLONE_CONF%"
 
-:: Models 子目录 (遵照 ComfyUI 标准目录名称)
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/checkpoints" --config "%RCLONE_CONF%"
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/loras" --config "%RCLONE_CONF%"
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/vae" --config "%RCLONE_CONF%"
@@ -272,7 +235,6 @@ echo  [..] 正在创建完整目录结构 (请稍候)...
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/clip_vision" --config "%RCLONE_CONF%"
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:!ROOT!/unet" --config "%RCLONE_CONF%"
 
-:: 输出目录 (独立于 comfyui-assets)
 "%RCLONE_EXE%" mkdir "!REMOTE_NAME!:ComfyUI_Output" --config "%RCLONE_CONF%"
 
 echo.
@@ -283,9 +245,6 @@ echo                        embeddings, upscale, clip, clip_vision, unet
 echo       ComfyUI_Output/
 goto :main_menu
 
-:: ==============================================================
-:: 导出
-:: ==============================================================
 :export_config
 echo.
 if not exist "%RCLONE_CONF%" (
