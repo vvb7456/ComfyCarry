@@ -34,11 +34,10 @@ if not exist "%RCLONE_EXE%" (
 echo.
 echo  [步骤 1/2] 网络代理设置
 echo  --------------------------------------------------
-echo  . 如果配置 Google Drive 或 Dropbox，建议设置代理。
-echo  . 示例: http://127.0.0.1:7890
+echo  如果配置 Google Drive 或 Dropbox，建议设置代理。
 echo.
 set "USER_PROXY="
-set /p "USER_PROXY=  请输入代理地址 (直接回车跳过): "
+set /p "USER_PROXY=  请输入代理地址 (示例: http://127.0.0.1:7890 直接回车跳过): "
 
 if not "!USER_PROXY!"=="" (
     set "HTTP_PROXY=!USER_PROXY!"
@@ -97,10 +96,17 @@ if "!OD_TYPE!"=="2" (set "OD_DT=business") else (set "OD_DT=personal")
 
 echo.
 echo  [..] 正在打开浏览器授权...
+:: 清理残留 rclone 进程，避免端口冲突
+taskkill /f /im rclone.exe >nul 2>&1
+timeout /t 1 >nul 2>&1
 if exist "%TOKEN_FILE%" del /q "%TOKEN_FILE%"
 if exist "%CLEAN_TOKEN_FILE%" del /q "%CLEAN_TOKEN_FILE%"
 
 "%RCLONE_EXE%" authorize "onedrive" > "%TOKEN_FILE%"
+if errorlevel 1 (
+    echo  [!!] rclone authorize 失败，请检查网络或重试。
+    goto :main_menu
+)
 
 :: 使用 PowerShell Regex 精确提取 JSON
 :: 匹配模式: { ... "access_token" ... }，(?s) 开启单行模式忽略换行
@@ -174,10 +180,16 @@ if "!REMOTE_NAME!"=="" set "REMOTE_NAME=dropbox"
 
 echo.
 echo  [..] 正在打开浏览器授权...
+taskkill /f /im rclone.exe >nul 2>&1
+timeout /t 1 >nul 2>&1
 if exist "%TOKEN_FILE%" del /q "%TOKEN_FILE%"
 if exist "%CLEAN_TOKEN_FILE%" del /q "%CLEAN_TOKEN_FILE%"
 
 "%RCLONE_EXE%" authorize "dropbox" > "%TOKEN_FILE%"
+if errorlevel 1 (
+    echo  [!!] rclone authorize 失败，请检查网络或重试。
+    goto :main_menu
+)
 
 :: 使用 PowerShell Regex 精确提取 JSON
 powershell -Command "$content = Get-Content -Raw '%TOKEN_FILE%'; $match = [regex]::Match($content, '(?s)\{.*""access_token"".*\}'); if ($match.Success) { [System.IO.File]::WriteAllText('%CLEAN_TOKEN_FILE%', $match.Value) }"
