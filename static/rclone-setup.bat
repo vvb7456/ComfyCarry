@@ -120,14 +120,29 @@ if "!CLEAN_TOKEN!"=="" (
     goto :main_menu
 )
 
+:: 通过 Graph API 获取 drive_id
+echo  [..] 正在获取 OneDrive Drive ID...
+set "DRIVE_ID="
+for /f "usebackq delims=" %%D in (`powershell -Command "try { $t = (ConvertFrom-Json '%CLEAN_TOKEN:"=\"%').access_token; $r = Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/me/drive' -Headers @{Authorization=\"Bearer $t\"} -ErrorAction Stop; Write-Output $r.id } catch { Write-Output '' }"`) do set "DRIVE_ID=%%D"
+
+if "!DRIVE_ID!"=="" (
+    echo  [!!] 无法获取 Drive ID，请检查 Token 是否有效。
+    echo  [!!] 配置将不含 drive_id，使用前需手动补充。
+)
+
 echo. >> "%RCLONE_CONF%"
 echo [!REMOTE_NAME!] >> "%RCLONE_CONF%"
 echo type = onedrive >> "%RCLONE_CONF%"
 echo drive_type = !OD_DT! >> "%RCLONE_CONF%"
 echo token = !CLEAN_TOKEN! >> "%RCLONE_CONF%"
+if not "!DRIVE_ID!"=="" (
+    echo drive_id = !DRIVE_ID! >> "%RCLONE_CONF%"
+    echo  [OK] OneDrive 配置已完成 ^(drive_id: !DRIVE_ID!^)
+) else (
+    echo  [OK] OneDrive 配置已写入 ^(缺少 drive_id^)
+)
 
 echo.
-echo  [OK] OneDrive 配置已累加。
 goto :create_folders
 
 :: ==============================================================
