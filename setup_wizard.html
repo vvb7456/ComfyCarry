@@ -1,1265 +1,1971 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ComfyCarry - 部署向导</title>
-<link rel="icon" href="/favicon.ico" type="image/x-icon">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root {
-    --bg1: #0a0a0f; --bg2: #12121e; --bg3: #1a1a28; --bg4: #22223a;
-    --bd: #2a2a3e; --t1: #e8e8f0; --t2: #a8a8c0; --t3: #68688a;
-    --accent: #7c5cfc; --accent2: #9078ff; --green: #4ade80; --red: #f87171;
-    --r: 12px; --mono: 'IBM Plex Mono', 'Fira Code', monospace;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-serif; background: var(--bg1); color: var(--t1); min-height: 100vh; font-size: clamp(15px, 1vw, 18px); }
-
-.wizard-container {
-    max-width: 960px; margin: 0 auto; padding: clamp(24px, 4vw, 60px) clamp(16px, 3vw, 40px);
-}
-.wizard-header {
-    text-align: center; margin-bottom: clamp(24px, 3vw, 48px);
-}
-.wizard-header h1 {
-    font-size: clamp(1.6rem, 2.5vw, 2.4rem); font-weight: 700;
-    background: linear-gradient(135deg, #7c5cfc, #e879f9);
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.wizard-header p { color: var(--t3); font-size: clamp(0.85rem, 1vw, 1.05rem); margin-top: 8px; }
-
-/* Progress bar */
-.progress-bar { display: flex; gap: 6px; margin-bottom: clamp(24px, 3vw, 40px); }
-.progress-segment {
-    flex: 1; height: 5px; border-radius: 3px; background: var(--bg4);
-    transition: background .3s;
-}
-.progress-segment.done { background: var(--accent); }
-.progress-segment.active { background: var(--accent2); animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-
-/* Steps */
-.step { display: none; }
-.step.active { display: block; }
-.step-title { font-size: clamp(1.1rem, 1.5vw, 1.5rem); font-weight: 600; margin-bottom: 8px; }
-.step-desc { color: var(--t2); font-size: clamp(0.88rem, 1vw, 1.05rem); margin-bottom: 24px; line-height: 1.6; }
-
-/* Cards for selection */
-.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-.choice-grid.rclone-cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-.choice-grid.rclone-cards .choice-card { padding: clamp(12px, 1.5vw, 20px); }
-.choice-grid.rclone-cards .choice-card h3 { font-size: clamp(.88rem, 1vw, 1.05rem); margin-bottom: 4px; }
-.choice-grid.rclone-cards .choice-card p { font-size: clamp(.75rem, .85vw, .88rem); }
-.choice-card {
-    background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
-    padding: clamp(16px, 2vw, 28px); cursor: pointer; transition: all .2s; position: relative;
-}
-.choice-card:hover { border-color: var(--accent); }
-.choice-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
-.choice-card h3 { font-size: clamp(0.95rem, 1.1vw, 1.15rem); margin-bottom: 8px; }
-.choice-card p { font-size: clamp(0.82rem, 0.95vw, 1rem); color: var(--t3); line-height: 1.5; }
-.choice-card .badge { display: inline-block; font-size: clamp(0.65rem, 0.7vw, 0.78rem); background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 4px; margin-left: 6px; }
-
-/* Form inputs */
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; font-size: clamp(0.88rem, 1vw, 1.05rem); color: var(--t2); margin-bottom: 8px; font-weight: 500; }
-.form-group input, .form-group textarea, .form-group select {
-    width: 100%; padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
-    background: var(--bg2); color: var(--t1);
-    border: 1px solid var(--bd); border-radius: 10px;
-    font-size: clamp(0.9rem, 1vw, 1.05rem);
-    font-family: inherit;
-}
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); outline: none; }
-.form-group textarea { min-height: 100px; font-family: var(--mono); font-size: clamp(0.82rem, 0.9vw, 0.95rem); resize: vertical; }
-.form-hint { font-size: clamp(0.78rem, 0.85vw, 0.92rem); color: var(--t3); margin-top: 6px; line-height: 1.5; }
-
-/* Buttons */
-.btn-row { display: flex; gap: 14px; margin-top: 28px; }
-.btn {
-    padding: clamp(10px, 1.3vw, 16px) clamp(24px, 2.5vw, 36px);
-    border: none; border-radius: 10px;
-    font-size: clamp(0.92rem, 1vw, 1.1rem);
-    cursor: pointer; font-weight: 600; transition: all .15s;
-}
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent2); }
-.btn-secondary { background: var(--bg4); color: var(--t2); }
-.btn-secondary:hover { background: var(--bd); }
-.btn-lg { padding: clamp(14px, 1.5vw, 20px) clamp(32px, 3vw, 48px); font-size: clamp(1rem, 1.2vw, 1.2rem); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-
-/* Plugin list */
-.plugin-list { max-height: 400px; overflow-y: auto; border: 1px solid var(--bd); border-radius: var(--r); }
-.plugin-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
-    border-bottom: 1px solid var(--bd); font-size: clamp(0.88rem, 1vw, 1.05rem);
-}
-.plugin-item:last-child { border-bottom: none; }
-.plugin-item input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; }
-.plugin-item .plugin-name { flex: 1; }
-.plugin-item .plugin-required { font-size: clamp(0.7rem, 0.8vw, 0.85rem); color: var(--accent); }
-
-/* Radio group for rclone */
-.radio-group { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
-.radio-group label {
-    display: flex; align-items: center; gap: 8px;
-    font-size: clamp(0.88rem, 1vw, 1.05rem);
-    color: var(--t2); cursor: pointer;
-}
-.radio-group input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; }
-
-/* Environment info card */
-.env-card {
-    background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
-    padding: clamp(14px, 1.5vw, 24px); margin-bottom: 20px;
-}
-.env-card .env-row { display: flex; align-items: baseline; gap: 8px; }
-.env-card .env-row + .env-row { margin-top: 8px; }
-.env-card .env-label { color: var(--t3); font-size: .82rem; min-width: 60px; white-space: nowrap; }
-.env-card .env-value { font-weight: 600; font-size: clamp(.92rem, 1vw, 1.1rem); }
-.env-card .env-divider { border: none; border-top: 1px solid var(--bd); margin: 10px 0; }
-.env-card .env-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.env-card .env-tag {
-    font-size: .75rem; padding: 2px 8px; border-radius: 10px;
-    background: var(--bg4); color: var(--t2); border: 1px solid var(--bd);
-}
-.env-card .env-tag.green { color: var(--green); border-color: var(--green); }
-
-/* Password input wrapper */
-.pw-wrap { position: relative; }
-.pw-wrap input { padding-right: 42px; }
-.pw-toggle {
-    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; color: var(--t3); cursor: pointer; font-size: 1.1rem; padding: 4px;
-}
-.pw-toggle:hover { color: var(--t1); }
-.pw-mismatch { color: var(--red); font-size: .82rem; margin-top: 4px; display: none; }
-
-/* Help tooltip */
-.help-tip {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--bd);
-    font-size: .75rem; color: var(--t3); cursor: help; vertical-align: middle;
-    position: relative;
-}
-.help-tip:hover { color: var(--accent); border-color: var(--accent); }
-.help-tip:hover::after {
-    content: attr(title); position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
-    background: var(--bg2); color: var(--t1); border: 1px solid var(--bd); border-radius: 8px;
-    padding: 10px 14px; font-size: .82rem; line-height: 1.5; white-space: normal; width: 280px;
-    z-index: 100; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,.3);
-}
-.help-tip:hover::before {
-    content: ''; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
-    border: 6px solid transparent; border-top-color: var(--bd); z-index: 101;
-}
-
-/* Deploy progress */
-.deploy-view { display: none; }
-.deploy-view.active { display: block; }
-.deploy-content { display: flex; gap: 20px; align-items: flex-start; }
-.deploy-content .deploy-steps-list { flex: 0 0 260px; min-width: 200px; position: sticky; top: 20px; }
-.deploy-content .deploy-log { flex: 1; min-width: 0; }
-.deploy-step-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: clamp(6px, 0.8vw, 10px) 0;
-    font-size: clamp(0.9rem, 1vw, 1.08rem); color: var(--t3);
-}
-.deploy-step-item.active { color: var(--t1); font-weight: 500; }
-.deploy-step-item.done { color: var(--green); }
-.deploy-step-item .step-icon { width: 24px; text-align: center; }
-
-.deploy-log {
-    background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--r);
-    padding: clamp(12px, 1.5vw, 20px);
-    min-height: clamp(400px, 55vh, 600px); max-height: clamp(500px, 70vh, 800px);
-    overflow-y: auto;
-    font-family: var(--mono); font-size: clamp(0.78rem, 0.85vw, 0.92rem); line-height: 1.9;
-}
-.log-line { white-space: pre-wrap; word-break: break-all; }
-.log-line.info { color: var(--t2); }
-.log-line.output { color: var(--t3); }
-.log-line.warn { color: #f59e0b; }
-.log-line.error { color: var(--red); }
-.log-line .log-time { color: var(--t3); margin-right: 10px; font-size: clamp(0.72rem, 0.78vw, 0.85rem); }
-
-/* Summary section */
-.summary-card {
-    background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r);
-    padding: clamp(16px, 1.8vw, 24px); margin-bottom: 14px;
-}
-.summary-card h4 { font-size: clamp(0.92rem, 1vw, 1.1rem); margin-bottom: 10px; color: var(--accent); }
-.summary-row { display: flex; justify-content: space-between; font-size: clamp(0.88rem, 1vw, 1.05rem); padding: 4px 0; }
-.summary-row .label { color: var(--t3); }
-.summary-row .value { color: var(--t1); }
-
-/* Env hint styling */
-.env-hint {
-    background: color-mix(in srgb, var(--green) 8%, var(--bg3));
-    border: 1px solid color-mix(in srgb, var(--green) 25%, var(--bd));
-    border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;
-    font-size: clamp(0.82rem, 0.9vw, 0.95rem); color: var(--green); line-height: 1.5;
-}
-.env-hint code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 0.9em; }
-
-/* Import upload area */
-.import-upload-box {
-    background: var(--bg3); border: 2px dashed var(--bd); border-radius: var(--r);
-    padding: clamp(20px, 2.5vw, 32px); text-align: center; transition: border-color .2s;
-}
-.import-upload-box:hover { border-color: var(--accent); }
-.import-upload-box p { color: var(--t2); margin-bottom: 12px; font-size: clamp(0.85rem, 0.95vw, 1rem); }
-.import-upload-box code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; font-family: var(--mono); font-size: 0.9em; }
-.import-result {
-    margin-top: 12px; padding: 12px 16px; border-radius: 8px;
-    font-size: clamp(0.82rem, 0.92vw, 0.95rem); line-height: 1.6;
-}
-
-/* Wizard remote chips */
-.wz-remote-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 8px; padding: 6px 14px; font-size: .85rem; margin: 4px; }
-.wz-remote-chip .wz-rtype { color: var(--t3); font-size: .75rem; }
-
-/* Wizard sync rule panel — scrollable cards */
-.wz-rule-panel { margin-bottom: 16px; }
-.wz-rule-panel h4 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; }
-.wz-rule-panel .wz-rule-hint { font-size: .78rem; color: var(--t3); margin-bottom: 10px; }
-.wz-rule-row {
-    display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px;
-    scrollbar-width: thin; scrollbar-color: var(--bd-f) transparent;
-    cursor: grab;
-}
-.wz-rule-row:active { cursor: grabbing; }
-.wz-rule-row::-webkit-scrollbar { height: 6px; }
-.wz-rule-row::-webkit-scrollbar-track { background: transparent; border-radius: 3px; }
-.wz-rule-row::-webkit-scrollbar-thumb { background: var(--bd-f); border-radius: 3px; }
-.wz-rule-row::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-.wz-rule-card {
-    min-width: 200px; max-width: 240px; flex-shrink: 0; position: relative;
-    background: var(--bg3); border: 2px solid var(--bd); border-radius: var(--r);
-    padding: 14px; transition: all .2s; user-select: none;
-}
-.wz-rule-card:hover { border-color: var(--accent); }
-.wz-rule-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
-.wz-rule-check {
-    position: absolute; top: 8px; right: 8px; width: 20px; height: 20px;
-    border: 2px solid var(--t3); border-radius: 50%; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all .2s; font-size: 12px; color: transparent; background: var(--bg2);
-}
-.wz-rule-check:hover { border-color: var(--accent); }
-.wz-rule-card.selected .wz-rule-check {
-    background: var(--accent); border-color: var(--accent); color: #fff;
-}
-.wz-rule-card .rule-name { font-weight: 600; font-size: .88rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 24px; }
-.wz-rule-card .rule-method { font-size: .72rem; color: var(--t3); margin-bottom: 8px; }
-.wz-rule-card .rule-field { margin-bottom: 6px; }
-.wz-rule-card .rule-field label { font-size: .72rem; color: var(--t3); display: block; margin-bottom: 2px; }
-.wz-rule-card .rule-field input, .wz-rule-card .rule-field select {
-    width: 100%; padding: 4px 8px; background: var(--bg2); color: var(--t1);
-    border: 1px solid var(--bd); border-radius: 6px; font-size: .80rem;
-}
-.wz-rule-card .rule-local { font-size: .70rem; color: var(--t3); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Add remote inline form */
-.wz-add-remote-form { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 16px; margin-top: 10px; }
-.wz-add-remote-form .form-group { margin-bottom: 10px; }
-.wz-add-remote-form label { font-size: .82rem; color: var(--t2); display: block; margin-bottom: 3px; }
-.wz-add-remote-form select, .wz-add-remote-form input[type="text"], .wz-add-remote-form input[type="password"], .wz-add-remote-form textarea {
-    width: 100%; padding: 8px 12px; background: var(--bg2); color: var(--t1);
-    border: 1px solid var(--bd); border-radius: 8px; font-size: .85rem; font-family: inherit;
-}
-.wz-add-remote-form select:focus, .wz-add-remote-form input:focus, .wz-add-remote-form textarea:focus { border-color: var(--accent); outline: none; }
-
-/* Responsive */
-@media (max-width: 768px) {
-    .choice-grid { grid-template-columns: 1fr !important; }
-    .radio-group { flex-direction: column; gap: 10px; }
-    .deploy-content { flex-direction: column; }
-    .deploy-content .deploy-steps-list { flex: none; position: static; }
-}
-@media (max-width: 600px) {
-    .choice-grid { grid-template-columns: 1fr !important; }
-}
-</style>
-</head>
-<body>
-<div class="wizard-container">
-    <div class="wizard-header">
-        <h1>🚀 ComfyCarry 部署向导</h1>
-        <p><a href="https://github.com/vvb7456/ComfyCarry" target="_blank" style="color:var(--accent);text-decoration:none">GitHub</a> · RunPod / Vast.ai 上的 ComfyUI 一站式管理</p>
-    </div>
-
-    <div class="progress-bar" id="progressBar"></div>
-
-    <!-- Step 0: 部署方式选择 -->
-    <div class="step active" id="step-0">
-        <div class="step-title">选择部署方式</div>
-        <div class="step-desc" id="step-0-desc">正在检测环境...</div>
-        <div id="gpu-info-display"></div>
-        <div class="choice-grid" id="step0-cards" style="opacity:.4;pointer-events:none">
-            <div class="choice-card" onclick="selectMode('fresh')" id="choice-fresh">
-                <h3>🚀 全新部署</h3>
-                <p>配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境</p>
-                <p style="color:var(--t3);font-size:.72rem;margin-top:6px" id="fresh-time"></p>
-            </div>
-            <div class="choice-card" onclick="selectMode('import')" id="choice-import">
-                <h3>📦 恢复设置</h3>
-                <p>从之前导出的配置文件恢复所有设置，快速重建工作环境</p>
-                <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 跳过手动配置</p>
-            </div>
-        </div>
-        <!-- 导入文件上传区域 (选择恢复设置时显示) -->
-        <div id="import-upload-area" style="display:none;margin-bottom:24px">
-            <div class="import-upload-box">
-                <p>上传之前导出的 <code>comfyui-config.json</code> 文件</p>
-                <label class="btn btn-primary" style="cursor:pointer;display:inline-block">
-                    📂 选择文件
-                    <input type="file" accept=".json" onchange="handleImportFile(event)" style="display:none">
-                </label>
-            </div>
-            <div id="import-result" class="import-result" style="display:none"></div>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-primary" onclick="nextStep()" id="btn-next-0" disabled>下一步</button>
-        </div>
-    </div>
-
-    <!-- Step 1: ComfyCarry 密码 -->
-    <div class="step" id="step-1">
-        <div class="step-title">🔐 设置 ComfyCarry 密码</div>
-        <div class="step-desc">保护你的 ComfyCarry 控制台</div>
-        <div id="password-env-hint" style="display:none" class="env-hint"></div>
-        <div class="form-group">
-            <label>访问密码</label>
-            <div class="pw-wrap">
-                <input type="password" id="input-password" placeholder="输入 ComfyCarry 访问密码...">
-                <button type="button" class="pw-toggle" onclick="togglePw('input-password', this)" title="显示/隐藏密码">👁</button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>确认密码</label>
-            <div class="pw-wrap">
-                <input type="password" id="input-password-confirm" placeholder="再次输入密码...">
-                <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)" title="显示/隐藏密码">👁</button>
-            </div>
-            <div class="pw-mismatch" id="pw-mismatch-hint">⚠️ 两次输入的密码不一致</div>
-            <div class="form-hint">部署完成后通过此密码登录 ComfyCarry</div>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" id="btn-next-1" onclick="nextStep()" disabled>下一步</button>
-        </div>
-    </div>
-
-    <!-- Step 2: Cloudflare Tunnel -->
-    <div class="step" id="step-2">
-        <div class="step-title">🌐 Cloudflare Tunnel</div>
-        <div class="step-desc">配置 Cloudflare Tunnel 以获得稳定的公网访问 <span class="help-tip" title="在 Cloudflare Zero Trust → Networks → Tunnels 中创建 Tunnel，复制 Token 粘贴到下方。Tunnel 可将 ComfyCarry / ComfyUI / JupyterLab 等服务通过你的自定义域名安全暴露到公网。">?</span></div>
-        <div id="cf-env-hint" style="display:none" class="env-hint"></div>
-        <div class="form-group">
-            <label>Tunnel Token</label>
-            <input type="text" id="input-cf-token" placeholder="eyJhIjoixxxx... (从 Cloudflare Zero Trust 获取)" oninput="updateNextBtnText()">
-            <div class="form-hint">留空则跳过 Tunnel，仅使用实例端口映射访问</div>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" id="btn-next-2" onclick="nextStep()">跳过</button>
-        </div>
-    </div>
-
-    <!-- Step 3: 云存储 (Remotes) -->
-    <div class="step" id="step-3">
-        <div class="step-title">☁️ 云存储配置</div>
-        <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="help-tip" title="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span></div>
-
-        <div style="margin:12px 0;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:.85rem;color:var(--t2)">
-            💡 还没有 rclone 配置？<a href="/api/setup/rclone-bundle" style="color:var(--ac);text-decoration:underline;font-weight:600">下载配置助手 (Windows)</a> — 解压后双击 bat 脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 文件即可。
-        </div>
-
-        <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
-
-        <!-- Rclone method cards -->
-        <div class="choice-grid rclone-cards" id="rclone-method-cards">
-            <div class="choice-card" data-rclone="base64_env" id="rclone-card-env" style="display:none" onclick="selectRcloneMethod('base64_env')">
-                <h3>🔑 环境变量</h3>
-                <p>使用已设置的 RCLONE_CONF_BASE64</p>
-            </div>
-            <div class="choice-card" data-rclone="file" onclick="selectRcloneMethod('file')">
-                <h3>📂 上传文件</h3>
-                <p>上传本地 rclone.conf 文件</p>
-            </div>
-
-            <div class="choice-card" data-rclone="manual" onclick="selectRcloneMethod('manual')">
-                <h3>🔧 手动创建</h3>
-                <p>交互式创建新的 Remote</p>
-            </div>
-        </div>
-
-        <!-- Rclone input areas (shown based on selection) -->
-        <div id="rclone-input-area" style="display:none;margin-bottom:20px">
-            <div id="rclone-file-input" style="display:none" class="form-group">
-                <label style="cursor:pointer;display:inline-block;background:var(--bg4);padding:8px 18px;border-radius:8px;font-size:.88rem">
-                    📂 选择 rclone.conf 文件
-                    <input type="file" accept=".conf,.txt" onchange="handleRcloneFile(event)" style="display:none">
-                </label>
-                <span id="rclone-file-status" style="margin-left:10px;font-size:.82rem;color:var(--t3)"></span>
-            </div>
-
-            <div id="rclone-manual-input" style="display:none" class="wz-add-remote-form">
-                <div class="form-group">
-                    <label>Remote 名称</label>
-                    <input type="text" id="wz-remote-name" placeholder="例如 myr2" style="width:100%">
-                </div>
-                <div class="form-group">
-                    <label>类型</label>
-                    <select id="wz-remote-type" onchange="renderWizardRemoteFields()" style="width:100%">
-                        <option value="">选择类型...</option>
-                    </select>
-                </div>
-                <div id="wz-remote-fields"></div>
-                <div style="display:flex;gap:8px;margin-top:10px">
-                    <button class="btn btn-primary" onclick="submitWizardRemote()" style="font-size:.85rem;padding:6px 16px">添加 Remote</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Detected remotes preview -->
-        <div id="wizard-remotes-section" style="display:none;margin-bottom:20px">
-            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">📡 已检测到的 Remote</label>
-            <div id="wizard-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-        </div>
-
-        <!-- Manually added remotes -->
-        <div id="wizard-manual-remotes" style="display:none;margin-bottom:20px">
-            <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">🔧 手动添加的 Remote</label>
-            <div id="wizard-manual-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-        </div>
-
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" id="btn-next-3" onclick="nextStep()">跳过</button>
-        </div>
-    </div>
-
-    <!-- Step 4: 同步规则 -->
-    <div class="step" id="step-4">
-        <div class="step-title">🔄 同步规则配置</div>
-        <div class="step-desc">选择需要同步的内容，部署后可在 ComfyCarry「云同步」页面自由增删改。</div>
-
-        <!-- Default remote selector -->
-        <div style="margin-bottom:18px">
-            <label style="font-size:.88rem;font-weight:500;color:var(--t2);margin-bottom:6px;display:block">默认 Remote</label>
-            <select id="wz-default-remote" style="min-width:160px;padding:8px 12px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:8px;font-size:.88rem" onchange="updateWizardRuleRemotes()"></select>
-            <div class="form-hint">更改后自动应用到所有规则，也可单独为每条规则选择不同 Remote</div>
-        </div>
-
-        <!-- Pull rules -->
-        <div class="wz-rule-panel">
-            <h4>📥 部署拉取 <span class="help-tip" title="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
-            <div class="wz-rule-row" id="wz-pull-rules"></div>
-        </div>
-
-        <!-- Push rules -->
-        <div class="wz-rule-panel">
-            <h4>📤 自动推送 <span class="help-tip" title="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span></h4>
-            <div class="wz-rule-row" id="wz-push-rules"></div>
-        </div>
-
-        <div id="wz-rule-count" style="font-size:.78rem;color:var(--t3);margin-bottom:8px">已选规则：0 · 部署后可在 ComfyCarry 云同步页修改</div>
-
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" id="btn-next-4" onclick="nextStep()">跳过</button>
-        </div>
-    </div>
-
-    <!-- Step 5: CivitAI -->
-    <div class="step" id="step-5">
-        <div class="step-title">🎨 CivitAI API Key</div>
-        <div class="step-desc">配置 CivitAI API Key 以在 ComfyCarry 中搜索和下载模型</div>
-        <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
-        <div class="form-group">
-            <label>API Key</label>
-            <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)" oninput="updateNextBtnText()">
-            <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 ComfyCarry 设置</div>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" id="btn-next-5" onclick="nextStep()">跳过</button>
-        </div>
-    </div>
-
-    <!-- Step 6: 插件选择 -->
-    <div class="step" id="step-6">
-        <div class="step-title">🧩 自定义节点插件</div>
-        <div class="step-desc" id="plugin-step-desc">选择要安装的 ComfyUI 插件 (带 * 标记的为必选)</div>
-        <div class="plugin-list" id="plugin-list"></div>
-        <div class="form-group" style="margin-top:12px">
-            <label>额外插件 URL (每行一个)</label>
-            <textarea id="input-extra-plugins" placeholder="https://github.com/user/ComfyUI-CustomNode" style="min-height:60px"></textarea>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" onclick="nextStep()">下一步</button>
-        </div>
-    </div>
-
-    <!-- Step 7: 加速组件 (FA2/SA2) -->
-    <div class="step" id="step-7">
-        <div class="step-title">⚡ Attention 加速</div>
-        <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="help-tip" title="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span></div>
-
-        <div class="choice-grid" id="attn-cards" style="grid-template-columns: repeat(2, 1fr);">
-            <div class="choice-card" id="attn-card-fa2" data-attn="fa2" onclick="toggleAttnCard('fa2')">
-                <h3>🔥 FlashAttention-2</h3>
-                <p>高性能 Attention 实现，广泛支持</p>
-                <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-flash-attention</div>
-            </div>
-            <div class="choice-card" id="attn-card-sa2" data-attn="sa2" onclick="toggleAttnCard('sa2')">
-                <h3>🌿 SageAttention-2</h3>
-                <p>新一代 Attention 方案，部分场景更快</p>
-                <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-sage-attention</div>
-            </div>
-        </div>
-        <div id="attn-hint" style="font-size:.78rem;color:var(--t3);margin-top:8px"></div>
-
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-            <button class="btn btn-primary" id="btn-next-7" onclick="nextStep()">跳过</button>
-        </div>
-    </div>
-
-    <!-- Step 8: 确认部署 -->
-    <div class="step" id="step-8">
-        <div class="step-title">📋 确认部署配置</div>
-        <div class="step-desc">检查以下配置，确认后开始部署</div>
-        <div id="deploy-summary"></div>
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="prevStep()">返回修改</button>
-            <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy">🚀 开始部署</button>
-        </div>
-    </div>
-
-    <!-- Deploy Progress View -->
-    <div class="deploy-view" id="deploy-view">
-        <div class="step-title" id="deploy-title">⚙️ 正在部署...</div>
-        <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
-        <div class="deploy-content">
-            <div class="deploy-steps-list" id="deploy-steps-list"></div>
-            <div class="deploy-log" id="deploy-log"></div>
-        </div>
-        <!-- 错误详情 (部署失败时显示) -->
-        <div id="deploy-error-banner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:14px;word-break:break-word;"></div>
-        <!-- 成功按钮 -->
-        <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
-            <button class="btn btn-secondary" id="deploy-done-retry" style="display:none" onclick="retryDeploy()">🔄 重试部署</button>
-            <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 ComfyCarry</button>
-        </div>
-        <!-- 失败按钮 -->
-        <div class="btn-row" id="deploy-fail-row" style="display:none;margin-top:16px">
-            <button class="btn btn-secondary" onclick="backToWizard()">⬅ 返回修改配置</button>
-            <button class="btn btn-primary btn-lg" onclick="retryDeploy()">🔄 重试部署</button>
-        </div>
-    </div>
-</div>
-
-<script>
-const TOTAL_STEPS = 9;
-let currentStep = 0;
-let wizardConfig = {
-    image_type: 'prebuilt',
-    password: '',
-    cloudflared_token: '',
-    rclone_config_method: 'skip',
-    rclone_config_value: '',
-    civitai_token: '',
-    plugins: [],
-    install_fa2: false,
-    install_sa2: false,
-    wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
-    wizard_remotes: [],       // [{name, type, params}]
-};
-let pluginData = [];
-let envVars = {};
-let detectedImageType = '';
-let prebuiltInfo = null;
-let importedConfig = null;
-let _syncTemplates = [];
-let _remoteTypeDefs = {};
-let _detectedRemotes = [];   // 从 rclone config 中解析出的 remotes
-
-// ── Init ──
-async function init() {
-    try {
-        const r = await fetch('/api/setup/state');
-        const state = await r.json();
-        envVars = state.env_vars || {};
-        detectedImageType = state.detected_image_type || '';
-        prebuiltInfo = state.prebuilt_info || null;
-        _syncTemplates = state.sync_templates || [];
-        _remoteTypeDefs = state.remote_type_defs || {};
-
-        // ── Mock 模式 (URL ?mock=xxx 覆盖检测结果，仅用于调试) ──
-        const mockParam = new URLSearchParams(location.search).get('mock');
-        let mockGpu = state.gpu_info;
-        if (mockParam) {
-            console.log('[Wizard] Mock mode:', mockParam);
-            if (mockParam === 'prebuilt') { detectedImageType = 'prebuilt'; prebuiltInfo = {version:'3.0',torch:'2.9.1+cu130',cuda_toolkit:'13.0',fa2:true,build_date:'2026-02-20T00:00:00Z'}; }
-            else if (mockParam === 'unsupported') { detectedImageType = 'unsupported'; prebuiltInfo = null; mockGpu = null; }
-            else if (mockParam === 'unsupported-gpu') { detectedImageType = 'prebuilt'; mockGpu = {name:'Tesla V100-SXM2-16GB', cuda_cap:'7.0', vram_gb:16}; }
-            else if (mockParam === 'no-gpu') { detectedImageType = 'prebuilt'; mockGpu = null; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ComfyCarry - 部署向导</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg1: #0a0a0f;
+            --bg2: #12121e;
+            --bg3: #1a1a28;
+            --bg4: #22223a;
+            --bd: #2a2a3e;
+            --t1: #e8e8f0;
+            --t2: #a8a8c0;
+            --t3: #68688a;
+            --accent: #7c5cfc;
+            --accent2: #9078ff;
+            --green: #4ade80;
+            --red: #f87171;
+            --r: 12px;
+            --mono: 'IBM Plex Mono', 'Fira Code', monospace;
         }
-        const gpuInfo = mockGpu;
 
-        // ── 环境信息卡片 (GPU + 镜像) ──
-        const envEl = document.getElementById('gpu-info-display');
-        let cardHtml = '';
-        let noGpu = false;
-        let gpuTooOld = false;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-        // GPU 行
-        if (gpuInfo && gpuInfo.name) {
-            const g = gpuInfo;
-            const smArch = g.cuda_cap ? `sm_${g.cuda_cap.replace('.', '')}` : '';
-            const capMajor = g.cuda_cap ? parseInt(g.cuda_cap.split('.')[0], 10) : 0;
-            gpuTooOld = capMajor > 0 && capMajor < 8;
-            const archColor = gpuTooOld ? 'color:var(--red)' : '';
-            cardHtml += `<div class="env-row">
+        body {
+            font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-serif;
+            background: var(--bg1);
+            color: var(--t1);
+            min-height: 100vh;
+            font-size: clamp(15px, 1vw, 18px);
+        }
+
+        .wizard-container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: clamp(24px, 4vw, 60px) clamp(16px, 3vw, 40px);
+        }
+
+        .wizard-header {
+            text-align: center;
+            margin-bottom: clamp(24px, 3vw, 48px);
+        }
+
+        .wizard-header h1 {
+            font-size: clamp(1.6rem, 2.5vw, 2.4rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c5cfc, #e879f9);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .wizard-header p {
+            color: var(--t3);
+            font-size: clamp(0.85rem, 1vw, 1.05rem);
+            margin-top: 8px;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: clamp(24px, 3vw, 40px);
+        }
+
+        .progress-segment {
+            flex: 1;
+            height: 5px;
+            border-radius: 3px;
+            background: var(--bg4);
+            transition: background .3s;
+        }
+
+        .progress-segment.done {
+            background: var(--accent);
+        }
+
+        .progress-segment.active {
+            background: var(--accent2);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .5
+            }
+        }
+
+        /* Steps */
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        .step-title {
+            font-size: clamp(1.1rem, 1.5vw, 1.5rem);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .step-desc {
+            color: var(--t2);
+            font-size: clamp(0.88rem, 1vw, 1.05rem);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        /* Cards for selection */
+        .choice-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .choice-grid.rclone-cards {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+
+        .choice-grid.rclone-cards .choice-card {
+            padding: clamp(12px, 1.5vw, 20px);
+        }
+
+        .choice-grid.rclone-cards .choice-card h3 {
+            font-size: clamp(.88rem, 1vw, 1.05rem);
+            margin-bottom: 4px;
+        }
+
+        .choice-grid.rclone-cards .choice-card p {
+            font-size: clamp(.75rem, .85vw, .88rem);
+        }
+
+        .choice-card {
+            background: var(--bg3);
+            border: 2px solid var(--bd);
+            border-radius: var(--r);
+            padding: clamp(16px, 2vw, 28px);
+            cursor: pointer;
+            transition: all .2s;
+            position: relative;
+        }
+
+        .choice-card:hover {
+            border-color: var(--accent);
+        }
+
+        .choice-card.selected {
+            border-color: var(--accent);
+            background: color-mix(in srgb, var(--accent) 10%, var(--bg3));
+        }
+
+        .choice-card h3 {
+            font-size: clamp(0.95rem, 1.1vw, 1.15rem);
+            margin-bottom: 8px;
+        }
+
+        .choice-card p {
+            font-size: clamp(0.82rem, 0.95vw, 1rem);
+            color: var(--t3);
+            line-height: 1.5;
+        }
+
+        .choice-card .badge {
+            display: inline-block;
+            font-size: clamp(0.65rem, 0.7vw, 0.78rem);
+            background: var(--accent);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 6px;
+        }
+
+        /* Form inputs */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: clamp(0.88rem, 1vw, 1.05rem);
+            color: var(--t2);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
+            background: var(--bg2);
+            color: var(--t1);
+            border: 1px solid var(--bd);
+            border-radius: 10px;
+            font-size: clamp(0.9rem, 1vw, 1.05rem);
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            font-family: var(--mono);
+            font-size: clamp(0.82rem, 0.9vw, 0.95rem);
+            resize: vertical;
+        }
+
+        .form-hint {
+            font-size: clamp(0.78rem, 0.85vw, 0.92rem);
+            color: var(--t3);
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        /* Buttons */
+        .btn-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 28px;
+        }
+
+        .btn {
+            padding: clamp(10px, 1.3vw, 16px) clamp(24px, 2.5vw, 36px);
+            border: none;
+            border-radius: 10px;
+            font-size: clamp(0.92rem, 1vw, 1.1rem);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all .15s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent2);
+        }
+
+        .btn-secondary {
+            background: var(--bg4);
+            color: var(--t2);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bd);
+        }
+
+        .btn-lg {
+            padding: clamp(14px, 1.5vw, 20px) clamp(32px, 3vw, 48px);
+            font-size: clamp(1rem, 1.2vw, 1.2rem);
+        }
+
+        .btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        /* Plugin list */
+        .plugin-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+        }
+
+        .plugin-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.5vw, 20px);
+            border-bottom: 1px solid var(--bd);
+            font-size: clamp(0.88rem, 1vw, 1.05rem);
+        }
+
+        .plugin-item:last-child {
+            border-bottom: none;
+        }
+
+        .plugin-item input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: 18px;
+            height: 18px;
+        }
+
+        .plugin-item .plugin-name {
+            flex: 1;
+        }
+
+        .plugin-item .plugin-required {
+            font-size: clamp(0.7rem, 0.8vw, 0.85rem);
+            color: var(--accent);
+        }
+
+        /* Radio group for rclone */
+        .radio-group {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: clamp(0.88rem, 1vw, 1.05rem);
+            color: var(--t2);
+            cursor: pointer;
+        }
+
+        .radio-group input[type="radio"] {
+            accent-color: var(--accent);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Environment info card */
+        .env-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: clamp(14px, 1.5vw, 24px);
+            margin-bottom: 20px;
+        }
+
+        .env-card .env-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .env-card .env-row+.env-row {
+            margin-top: 8px;
+        }
+
+        .env-card .env-label {
+            color: var(--t3);
+            font-size: .82rem;
+            min-width: 60px;
+            white-space: nowrap;
+        }
+
+        .env-card .env-value {
+            font-weight: 600;
+            font-size: clamp(.92rem, 1vw, 1.1rem);
+        }
+
+        .env-card .env-divider {
+            border: none;
+            border-top: 1px solid var(--bd);
+            margin: 10px 0;
+        }
+
+        .env-card .env-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .env-card .env-tag {
+            font-size: .75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--bg4);
+            color: var(--t2);
+            border: 1px solid var(--bd);
+        }
+
+        .env-card .env-tag.green {
+            color: var(--green);
+            border-color: var(--green);
+        }
+
+        /* Password input wrapper */
+        .pw-wrap {
+            position: relative;
+        }
+
+        .pw-wrap input {
+            padding-right: 42px;
+        }
+
+        .pw-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--t3);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 4px;
+        }
+
+        .pw-toggle:hover {
+            color: var(--t1);
+        }
+
+        .pw-mismatch {
+            color: var(--red);
+            font-size: .82rem;
+            margin-top: 4px;
+            display: none;
+        }
+
+        /* Help tooltip */
+        .help-tip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 1px solid var(--bd);
+            font-size: .75rem;
+            color: var(--t3);
+            cursor: help;
+            vertical-align: middle;
+            position: relative;
+        }
+
+        .help-tip:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .help-tip:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg2);
+            color: var(--t1);
+            border: 1px solid var(--bd);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: .82rem;
+            line-height: 1.5;
+            white-space: normal;
+            width: 280px;
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+        }
+
+        .help-tip:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--bd);
+            z-index: 101;
+        }
+
+        /* Deploy progress */
+        .deploy-view {
+            display: none;
+        }
+
+        .deploy-view.active {
+            display: block;
+        }
+
+        .deploy-content {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .deploy-content .deploy-steps-list {
+            flex: 0 0 260px;
+            min-width: 200px;
+            position: sticky;
+            top: 20px;
+        }
+
+        .deploy-content .deploy-log {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .deploy-step-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: clamp(6px, 0.8vw, 10px) 0;
+            font-size: clamp(0.9rem, 1vw, 1.08rem);
+            color: var(--t3);
+        }
+
+        .deploy-step-item.active {
+            color: var(--t1);
+            font-weight: 500;
+        }
+
+        .deploy-step-item.done {
+            color: var(--green);
+        }
+
+        .deploy-step-item .step-icon {
+            width: 24px;
+            text-align: center;
+        }
+
+        .deploy-log {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: clamp(12px, 1.5vw, 20px);
+            min-height: clamp(400px, 55vh, 600px);
+            max-height: clamp(500px, 70vh, 800px);
+            overflow-y: auto;
+            font-family: var(--mono);
+            font-size: clamp(0.78rem, 0.85vw, 0.92rem);
+            line-height: 1.9;
+        }
+
+        .log-line {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-line.info {
+            color: var(--t2);
+        }
+
+        .log-line.output {
+            color: var(--t3);
+        }
+
+        .log-line.warn {
+            color: #f59e0b;
+        }
+
+        .log-line.error {
+            color: var(--red);
+        }
+
+        .log-line .log-time {
+            color: var(--t3);
+            margin-right: 10px;
+            font-size: clamp(0.72rem, 0.78vw, 0.85rem);
+        }
+
+        /* Summary section */
+        .summary-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: clamp(16px, 1.8vw, 24px);
+            margin-bottom: 14px;
+        }
+
+        .summary-card h4 {
+            font-size: clamp(0.92rem, 1vw, 1.1rem);
+            margin-bottom: 10px;
+            color: var(--accent);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(0.88rem, 1vw, 1.05rem);
+            padding: 4px 0;
+        }
+
+        .summary-row .label {
+            color: var(--t3);
+        }
+
+        .summary-row .value {
+            color: var(--t1);
+        }
+
+        /* Env hint styling */
+        .env-hint {
+            background: color-mix(in srgb, var(--green) 8%, var(--bg3));
+            border: 1px solid color-mix(in srgb, var(--green) 25%, var(--bd));
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: clamp(0.82rem, 0.9vw, 0.95rem);
+            color: var(--green);
+            line-height: 1.5;
+        }
+
+        .env-hint code {
+            background: rgba(255, 255, 255, .08);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 0.9em;
+        }
+
+        /* Import upload area */
+        .import-upload-box {
+            background: var(--bg3);
+            border: 2px dashed var(--bd);
+            border-radius: var(--r);
+            padding: clamp(20px, 2.5vw, 32px);
+            text-align: center;
+            transition: border-color .2s;
+        }
+
+        .import-upload-box:hover {
+            border-color: var(--accent);
+        }
+
+        .import-upload-box p {
+            color: var(--t2);
+            margin-bottom: 12px;
+            font-size: clamp(0.85rem, 0.95vw, 1rem);
+        }
+
+        .import-upload-box code {
+            background: rgba(255, 255, 255, .08);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 0.9em;
+        }
+
+        .import-result {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: clamp(0.82rem, 0.92vw, 0.95rem);
+            line-height: 1.6;
+        }
+
+        /* Wizard remote chips */
+        .wz-remote-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: .85rem;
+            margin: 4px;
+        }
+
+        .wz-remote-chip .wz-rtype {
+            color: var(--t3);
+            font-size: .75rem;
+        }
+
+        /* Wizard sync rule panel — scrollable cards */
+        .wz-rule-panel {
+            margin-bottom: 16px;
+        }
+
+        .wz-rule-panel h4 {
+            font-size: .95rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .wz-rule-panel .wz-rule-hint {
+            font-size: .78rem;
+            color: var(--t3);
+            margin-bottom: 10px;
+        }
+
+        .wz-rule-row {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--bd-f) transparent;
+            cursor: grab;
+        }
+
+        .wz-rule-row:active {
+            cursor: grabbing;
+        }
+
+        .wz-rule-row::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .wz-rule-row::-webkit-scrollbar-track {
+            background: transparent;
+            border-radius: 3px;
+        }
+
+        .wz-rule-row::-webkit-scrollbar-thumb {
+            background: var(--bd-f);
+            border-radius: 3px;
+        }
+
+        .wz-rule-row::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        .wz-rule-card {
+            min-width: 200px;
+            max-width: 240px;
+            flex-shrink: 0;
+            position: relative;
+            background: var(--bg3);
+            border: 2px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px;
+            transition: all .2s;
+            user-select: none;
+        }
+
+        .wz-rule-card:hover {
+            border-color: var(--accent);
+        }
+
+        .wz-rule-card.selected {
+            border-color: var(--accent);
+            background: color-mix(in srgb, var(--accent) 10%, var(--bg3));
+        }
+
+        .wz-rule-check {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--t3);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+            font-size: 12px;
+            color: transparent;
+            background: var(--bg2);
+        }
+
+        .wz-rule-check:hover {
+            border-color: var(--accent);
+        }
+
+        .wz-rule-card.selected .wz-rule-check {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .wz-rule-card .rule-name {
+            font-weight: 600;
+            font-size: .88rem;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 24px;
+        }
+
+        .wz-rule-card .rule-method {
+            font-size: .72rem;
+            color: var(--t3);
+            margin-bottom: 8px;
+        }
+
+        .wz-rule-card .rule-field {
+            margin-bottom: 6px;
+        }
+
+        .wz-rule-card .rule-field label {
+            font-size: .72rem;
+            color: var(--t3);
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .wz-rule-card .rule-field input,
+        .wz-rule-card .rule-field select {
+            width: 100%;
+            padding: 4px 8px;
+            background: var(--bg2);
+            color: var(--t1);
+            border: 1px solid var(--bd);
+            border-radius: 6px;
+            font-size: .80rem;
+        }
+
+        .wz-rule-card .rule-local {
+            font-size: .70rem;
+            color: var(--t3);
+            margin-top: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Add remote inline form */
+        .wz-add-remote-form {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 16px;
+            margin-top: 10px;
+        }
+
+        .wz-add-remote-form .form-group {
+            margin-bottom: 10px;
+        }
+
+        .wz-add-remote-form label {
+            font-size: .82rem;
+            color: var(--t2);
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .wz-add-remote-form select,
+        .wz-add-remote-form input[type="text"],
+        .wz-add-remote-form input[type="password"],
+        .wz-add-remote-form textarea {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg2);
+            color: var(--t1);
+            border: 1px solid var(--bd);
+            border-radius: 8px;
+            font-size: .85rem;
+            font-family: inherit;
+        }
+
+        .wz-add-remote-form select:focus,
+        .wz-add-remote-form input:focus,
+        .wz-add-remote-form textarea:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .choice-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            .radio-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .deploy-content {
+                flex-direction: column;
+            }
+
+            .deploy-content .deploy-steps-list {
+                flex: none;
+                position: static;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .choice-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wizard-container">
+        <div class="wizard-header">
+            <h1>🚀 ComfyCarry 部署向导</h1>
+            <p><a href="https://github.com/vvb7456/ComfyCarry" target="_blank"
+                    style="color:var(--accent);text-decoration:none">GitHub</a> · RunPod / Vast.ai 上的 ComfyUI 一站式管理</p>
+        </div>
+
+        <div class="progress-bar" id="progressBar"></div>
+
+        <!-- Step 0: 部署方式选择 -->
+        <div class="step active" id="step-0">
+            <div class="step-title">选择部署方式</div>
+            <div class="step-desc" id="step-0-desc">正在检测环境...</div>
+            <div id="gpu-info-display"></div>
+            <div class="choice-grid" id="step0-cards" style="opacity:.4;pointer-events:none">
+                <div class="choice-card" onclick="selectMode('fresh')" id="choice-fresh">
+                    <h3>🚀 全新部署</h3>
+                    <p>配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境</p>
+                    <p style="color:var(--t3);font-size:.72rem;margin-top:6px" id="fresh-time"></p>
+                </div>
+                <div class="choice-card" onclick="selectMode('import')" id="choice-import">
+                    <h3>📦 恢复设置</h3>
+                    <p>从之前导出的配置文件恢复所有设置，快速重建工作环境</p>
+                    <p style="color:var(--t3);font-size:.72rem;margin-top:6px">⏱ 跳过手动配置</p>
+                </div>
+            </div>
+            <!-- 导入文件上传区域 (选择恢复设置时显示) -->
+            <div id="import-upload-area" style="display:none;margin-bottom:24px">
+                <div class="import-upload-box">
+                    <p>上传之前导出的 <code>comfyui-config.json</code> 文件</p>
+                    <label class="btn btn-primary" style="cursor:pointer;display:inline-block">
+                        📂 选择文件
+                        <input type="file" accept=".json" onchange="handleImportFile(event)" style="display:none">
+                    </label>
+                </div>
+                <div id="import-result" class="import-result" style="display:none"></div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="nextStep()" id="btn-next-0" disabled>下一步</button>
+            </div>
+        </div>
+
+        <!-- Step 1: ComfyCarry 密码 -->
+        <div class="step" id="step-1">
+            <div class="step-title">🔐 设置 ComfyCarry 密码</div>
+            <div class="step-desc">保护你的 ComfyCarry 控制台</div>
+            <div id="password-env-hint" style="display:none" class="env-hint"></div>
+            <div class="form-group">
+                <label>访问密码</label>
+                <div class="pw-wrap">
+                    <input type="password" id="input-password" placeholder="输入 ComfyCarry 访问密码...">
+                    <button type="button" class="pw-toggle" onclick="togglePw('input-password', this)"
+                        title="显示/隐藏密码">👁</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>确认密码</label>
+                <div class="pw-wrap">
+                    <input type="password" id="input-password-confirm" placeholder="再次输入密码...">
+                    <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)"
+                        title="显示/隐藏密码">👁</button>
+                </div>
+                <div class="pw-mismatch" id="pw-mismatch-hint">⚠️ 两次输入的密码不一致</div>
+                <div class="form-hint">部署完成后通过此密码登录 ComfyCarry</div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-1" onclick="nextStep()" disabled>下一步</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Cloudflare Tunnel -->
+        <div class="step" id="step-2">
+            <div class="step-title">🌐 Cloudflare Tunnel</div>
+            <div class="step-desc">配置 Cloudflare Tunnel 获得稳定的公网访问（ComfyUI / SSH / JupyterLab）<span class="help-tip"
+                    title="通过 Cloudflare API 自动创建 Tunnel、配置 DNS 和 Ingress。需要一个拥有 Tunnel Edit + DNS Edit 权限的 API Token。">?</span>
+            </div>
+            <div id="cf-env-hint" style="display:none" class="env-hint"></div>
+            <div class="form-group">
+                <label>CF API Token</label>
+                <input type="password" id="input-cf-token"
+                    placeholder="Cloudflare API Token (需 Tunnel Edit + DNS Edit 权限)" oninput="updateNextBtnText()">
+                <div class="form-hint">在 <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank"
+                        style="color:var(--accent)">Cloudflare API Tokens</a> 创建，留空则跳过</div>
+            </div>
+            <div class="form-group">
+                <label>域名</label>
+                <input type="text" id="input-cf-domain" placeholder="mydomain.com (已托管在 Cloudflare 的域名)"
+                    oninput="updateNextBtnText()">
+            </div>
+            <div class="form-group">
+                <label>子域名前缀 <span style="color:var(--t3);font-size:.82rem">(可选)</span></label>
+                <input type="text" id="input-cf-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
+            </div>
+            <div id="cf-validate-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+                <button class="btn btn-secondary" onclick="validateCfToken()"
+                    style="padding:8px 16px;font-size:.88rem">🔍 验证 Token</button>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-2" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 3: 云存储 (Remotes) -->
+        <div class="step" id="step-3">
+            <div class="step-title">☁️ 云存储配置</div>
+            <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="help-tip"
+                    title="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span>
+            </div>
+
+            <div
+                style="margin:12px 0;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:.85rem;color:var(--t2)">
+                💡 还没有 rclone 配置？<a href="/api/setup/rclone-bundle"
+                    style="color:var(--ac);text-decoration:underline;font-weight:600">下载配置助手 (Windows)</a> — 解压后双击 bat
+                脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 文件即可。
+            </div>
+
+            <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
+
+            <!-- Rclone method cards -->
+            <div class="choice-grid rclone-cards" id="rclone-method-cards">
+                <div class="choice-card" data-rclone="base64_env" id="rclone-card-env" style="display:none"
+                    onclick="selectRcloneMethod('base64_env')">
+                    <h3>🔑 环境变量</h3>
+                    <p>使用已设置的 RCLONE_CONF_BASE64</p>
+                </div>
+                <div class="choice-card" data-rclone="file" onclick="selectRcloneMethod('file')">
+                    <h3>📂 上传文件</h3>
+                    <p>上传本地 rclone.conf 文件</p>
+                </div>
+
+                <div class="choice-card" data-rclone="manual" onclick="selectRcloneMethod('manual')">
+                    <h3>🔧 手动创建</h3>
+                    <p>交互式创建新的 Remote</p>
+                </div>
+            </div>
+
+            <!-- Rclone input areas (shown based on selection) -->
+            <div id="rclone-input-area" style="display:none;margin-bottom:20px">
+                <div id="rclone-file-input" style="display:none" class="form-group">
+                    <label
+                        style="cursor:pointer;display:inline-block;background:var(--bg4);padding:8px 18px;border-radius:8px;font-size:.88rem">
+                        📂 选择 rclone.conf 文件
+                        <input type="file" accept=".conf,.txt" onchange="handleRcloneFile(event)" style="display:none">
+                    </label>
+                    <span id="rclone-file-status" style="margin-left:10px;font-size:.82rem;color:var(--t3)"></span>
+                </div>
+
+                <div id="rclone-manual-input" style="display:none" class="wz-add-remote-form">
+                    <div class="form-group">
+                        <label>Remote 名称</label>
+                        <input type="text" id="wz-remote-name" placeholder="例如 myr2" style="width:100%">
+                    </div>
+                    <div class="form-group">
+                        <label>类型</label>
+                        <select id="wz-remote-type" onchange="renderWizardRemoteFields()" style="width:100%">
+                            <option value="">选择类型...</option>
+                        </select>
+                    </div>
+                    <div id="wz-remote-fields"></div>
+                    <div style="display:flex;gap:8px;margin-top:10px">
+                        <button class="btn btn-primary" onclick="submitWizardRemote()"
+                            style="font-size:.85rem;padding:6px 16px">添加 Remote</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detected remotes preview -->
+            <div id="wizard-remotes-section" style="display:none;margin-bottom:20px">
+                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">📡 已检测到的 Remote</label>
+                <div id="wizard-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+            </div>
+
+            <!-- Manually added remotes -->
+            <div id="wizard-manual-remotes" style="display:none;margin-bottom:20px">
+                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block">🔧 手动添加的 Remote</label>
+                <div id="wizard-manual-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-3" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 4: 同步规则 -->
+        <div class="step" id="step-4">
+            <div class="step-title">🔄 同步规则配置</div>
+            <div class="step-desc">选择需要同步的内容，部署后可在 ComfyCarry「云同步」页面自由增删改。</div>
+
+            <!-- Default remote selector -->
+            <div style="margin-bottom:18px">
+                <label style="font-size:.88rem;font-weight:500;color:var(--t2);margin-bottom:6px;display:block">默认
+                    Remote</label>
+                <select id="wz-default-remote"
+                    style="min-width:160px;padding:8px 12px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:8px;font-size:.88rem"
+                    onchange="updateWizardRuleRemotes()"></select>
+                <div class="form-hint">更改后自动应用到所有规则，也可单独为每条规则选择不同 Remote</div>
+            </div>
+
+            <!-- Pull rules -->
+            <div class="wz-rule-panel">
+                <h4>📥 部署拉取 <span class="help-tip"
+                        title="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
+                <div class="wz-rule-row" id="wz-pull-rules"></div>
+            </div>
+
+            <!-- Push rules -->
+            <div class="wz-rule-panel">
+                <h4>📤 自动推送 <span class="help-tip" title="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
+                </h4>
+                <div class="wz-rule-row" id="wz-push-rules"></div>
+            </div>
+
+            <div id="wz-rule-count" style="font-size:.78rem;color:var(--t3);margin-bottom:8px">已选规则：0 · 部署后可在 ComfyCarry
+                云同步页修改</div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-4" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 5: CivitAI -->
+        <div class="step" id="step-5">
+            <div class="step-title">🎨 CivitAI API Key</div>
+            <div class="step-desc">配置 CivitAI API Key 以在 ComfyCarry 中搜索和下载模型</div>
+            <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)"
+                    oninput="updateNextBtnText()">
+                <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank"
+                        style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 ComfyCarry 设置</div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-5" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 6: 插件选择 -->
+        <div class="step" id="step-6">
+            <div class="step-title">🧩 自定义节点插件</div>
+            <div class="step-desc" id="plugin-step-desc">选择要安装的 ComfyUI 插件 (带 * 标记的为必选)</div>
+            <div class="plugin-list" id="plugin-list"></div>
+            <div class="form-group" style="margin-top:12px">
+                <label>额外插件 URL (每行一个)</label>
+                <textarea id="input-extra-plugins" placeholder="https://github.com/user/ComfyUI-CustomNode"
+                    style="min-height:60px"></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+            </div>
+        </div>
+
+        <!-- Step 7: 加速组件 (FA2/SA2) -->
+        <div class="step" id="step-7">
+            <div class="step-title">⚡ Attention 加速</div>
+            <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="help-tip"
+                    title="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span>
+            </div>
+
+            <div class="choice-grid" id="attn-cards" style="grid-template-columns: repeat(2, 1fr);">
+                <div class="choice-card" id="attn-card-fa2" data-attn="fa2" onclick="toggleAttnCard('fa2')">
+                    <h3>🔥 FlashAttention-2</h3>
+                    <p>高性能 Attention 实现，广泛支持</p>
+                    <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-flash-attention</div>
+                </div>
+                <div class="choice-card" id="attn-card-sa2" data-attn="sa2" onclick="toggleAttnCard('sa2')">
+                    <h3>🌿 SageAttention-2</h3>
+                    <p>新一代 Attention 方案，部分场景更快</p>
+                    <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-sage-attention</div>
+                </div>
+            </div>
+            <div id="attn-hint" style="font-size:.78rem;color:var(--t3);margin-top:8px"></div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-7" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 8: 确认部署 -->
+        <div class="step" id="step-8">
+            <div class="step-title">📋 确认部署配置</div>
+            <div class="step-desc">检查以下配置，确认后开始部署</div>
+            <div id="deploy-summary"></div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">返回修改</button>
+                <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy">🚀 开始部署</button>
+            </div>
+        </div>
+
+        <!-- Deploy Progress View -->
+        <div class="deploy-view" id="deploy-view">
+            <div class="step-title" id="deploy-title">⚙️ 正在部署...</div>
+            <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
+            <div class="deploy-content">
+                <div class="deploy-steps-list" id="deploy-steps-list"></div>
+                <div class="deploy-log" id="deploy-log"></div>
+            </div>
+            <!-- 错误详情 (部署失败时显示) -->
+            <div id="deploy-error-banner"
+                style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:14px;word-break:break-word;">
+            </div>
+            <!-- 成功按钮 -->
+            <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
+                <button class="btn btn-secondary" id="deploy-done-retry" style="display:none" onclick="retryDeploy()">🔄
+                    重试部署</button>
+                <button class="btn btn-primary btn-lg" onclick="location.reload()">🎉 进入 ComfyCarry</button>
+            </div>
+            <!-- 失败按钮 -->
+            <div class="btn-row" id="deploy-fail-row" style="display:none;margin-top:16px">
+                <button class="btn btn-secondary" onclick="backToWizard()">⬅ 返回修改配置</button>
+                <button class="btn btn-primary btn-lg" onclick="retryDeploy()">🔄 重试部署</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TOTAL_STEPS = 9;
+        let currentStep = 0;
+        let wizardConfig = {
+            image_type: 'prebuilt',
+            password: '',
+            cf_api_token: '',
+            cf_domain: '',
+            cf_subdomain: '',
+            rclone_config_method: 'skip',
+            rclone_config_value: '',
+            civitai_token: '',
+            plugins: [],
+            install_fa2: false,
+            install_sa2: false,
+            wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
+            wizard_remotes: [],       // [{name, type, params}]
+        };
+        let pluginData = [];
+        let envVars = {};
+        let detectedImageType = '';
+        let prebuiltInfo = null;
+        let importedConfig = null;
+        let _syncTemplates = [];
+        let _remoteTypeDefs = {};
+        let _detectedRemotes = [];   // 从 rclone config 中解析出的 remotes
+
+        // ── Init ──
+        async function init() {
+            try {
+                const r = await fetch('/api/setup/state');
+                const state = await r.json();
+                envVars = state.env_vars || {};
+                detectedImageType = state.detected_image_type || '';
+                prebuiltInfo = state.prebuilt_info || null;
+                _syncTemplates = state.sync_templates || [];
+                _remoteTypeDefs = state.remote_type_defs || {};
+
+                // ── Mock 模式 (URL ?mock=xxx 覆盖检测结果，仅用于调试) ──
+                const mockParam = new URLSearchParams(location.search).get('mock');
+                let mockGpu = state.gpu_info;
+                if (mockParam) {
+                    console.log('[Wizard] Mock mode:', mockParam);
+                    if (mockParam === 'prebuilt') { detectedImageType = 'prebuilt'; prebuiltInfo = { version: '3.0', torch: '2.9.1+cu130', cuda_toolkit: '13.0', fa2: true, build_date: '2026-02-20T00:00:00Z' }; }
+                    else if (mockParam === 'unsupported') { detectedImageType = 'unsupported'; prebuiltInfo = null; mockGpu = null; }
+                    else if (mockParam === 'unsupported-gpu') { detectedImageType = 'prebuilt'; mockGpu = { name: 'Tesla V100-SXM2-16GB', cuda_cap: '7.0', vram_gb: 16 }; }
+                    else if (mockParam === 'no-gpu') { detectedImageType = 'prebuilt'; mockGpu = null; }
+                }
+                const gpuInfo = mockGpu;
+
+                // ── 环境信息卡片 (GPU + 镜像) ──
+                const envEl = document.getElementById('gpu-info-display');
+                let cardHtml = '';
+                let noGpu = false;
+                let gpuTooOld = false;
+
+                // GPU 行
+                if (gpuInfo && gpuInfo.name) {
+                    const g = gpuInfo;
+                    const smArch = g.cuda_cap ? `sm_${g.cuda_cap.replace('.', '')}` : '';
+                    const capMajor = g.cuda_cap ? parseInt(g.cuda_cap.split('.')[0], 10) : 0;
+                    gpuTooOld = capMajor > 0 && capMajor < 8;
+                    const archColor = gpuTooOld ? 'color:var(--red)' : '';
+                    cardHtml += `<div class="env-row">
                 <span class="env-label">GPU</span>
                 <span class="env-value">🖥️ ${esc(g.name)}</span>
                 <span class="env-label" style="margin-left:auto;${archColor}">${smArch} · ${g.vram_gb} GB VRAM</span>
             </div>`;
-        } else {
-            noGpu = true;
-            cardHtml += `<div class="env-row">
+                } else {
+                    noGpu = true;
+                    cardHtml += `<div class="env-row">
                 <span class="env-label">GPU</span>
                 <span class="env-value" style="color:var(--red)">未检测到 CUDA GPU</span>
             </div>`;
-        }
+                }
 
-        // GPU 不可用 → 强制不支持
-        if (gpuTooOld) detectedImageType = 'unsupported-gpu';
-        else if (noGpu) detectedImageType = 'no-gpu';
+                // GPU 不可用 → 强制不支持
+                if (gpuTooOld) detectedImageType = 'unsupported-gpu';
+                else if (noGpu) detectedImageType = 'no-gpu';
 
-        // 镜像行
-        if (detectedImageType === 'prebuilt') {
-            const ver = (prebuiltInfo && prebuiltInfo.version && prebuiltInfo.version !== 'unknown') ? ` v${prebuiltInfo.version}` : '';
-            cardHtml += `<hr class="env-divider">`;
-            cardHtml += `<div class="env-row">
+                // 镜像行
+                if (detectedImageType === 'prebuilt') {
+                    const ver = (prebuiltInfo && prebuiltInfo.version && prebuiltInfo.version !== 'unknown') ? ` v${prebuiltInfo.version}` : '';
+                    cardHtml += `<hr class="env-divider">`;
+                    cardHtml += `<div class="env-row">
                 <span class="env-label">镜像</span>
                 <span class="env-value" style="color:var(--green)">⚡ 预构建镜像${ver}</span>
             </div>`;
-            if (prebuiltInfo) {
-                const tags = [];
-                if (prebuiltInfo.torch) tags.push(`PyTorch ${prebuiltInfo.torch}`);
-                if (prebuiltInfo.cuda_toolkit) tags.push(`CUDA ${prebuiltInfo.cuda_toolkit}`);
-                if (prebuiltInfo.fa2) tags.push({text: 'FA2 ✓', green: true});
-                if (prebuiltInfo.build_date) tags.push(prebuiltInfo.build_date.slice(0, 10));
-                if (tags.length) {
-                    cardHtml += `<div class="env-tags" style="margin-left:68px">`;
-                    for (const t of tags) {
-                        if (typeof t === 'object') cardHtml += `<span class="env-tag green">${t.text}</span>`;
-                        else cardHtml += `<span class="env-tag">${esc(t)}</span>`;
+                    if (prebuiltInfo) {
+                        const tags = [];
+                        if (prebuiltInfo.torch) tags.push(`PyTorch ${prebuiltInfo.torch}`);
+                        if (prebuiltInfo.cuda_toolkit) tags.push(`CUDA ${prebuiltInfo.cuda_toolkit}`);
+                        if (prebuiltInfo.fa2) tags.push({ text: 'FA2 ✓', green: true });
+                        if (prebuiltInfo.build_date) tags.push(prebuiltInfo.build_date.slice(0, 10));
+                        if (tags.length) {
+                            cardHtml += `<div class="env-tags" style="margin-left:68px">`;
+                            for (const t of tags) {
+                                if (typeof t === 'object') cardHtml += `<span class="env-tag green">${t.text}</span>`;
+                                else cardHtml += `<span class="env-tag">${esc(t)}</span>`;
+                            }
+                            cardHtml += `</div>`;
+                        }
                     }
-                    cardHtml += `</div>`;
                 }
-            }
-        }
 
-        // 渲染卡片 (正常路径)
-        const isUnsupported = detectedImageType === 'unsupported-gpu' || detectedImageType === 'no-gpu' || detectedImageType === 'unsupported';
+                // 渲染卡片 (正常路径)
+                const isUnsupported = detectedImageType === 'unsupported-gpu' || detectedImageType === 'no-gpu' || detectedImageType === 'unsupported';
 
-        if (!isUnsupported && cardHtml) {
-            envEl.innerHTML = `<div class="env-card">${cardHtml}</div>`;
-        }
+                if (!isUnsupported && cardHtml) {
+                    envEl.innerHTML = `<div class="env-card">${cardHtml}</div>`;
+                }
 
-        // Load plugin list
-        pluginData = state.plugins_available || [];
-        const selectedUrls = state.plugins || pluginData.map(p => p.url);
+                // Load plugin list
+                pluginData = state.plugins_available || [];
+                const selectedUrls = state.plugins || pluginData.map(p => p.url);
 
-        // 自动设定 image_type
-        wizardConfig.image_type = isUnsupported ? 'unsupported' : 'prebuilt';
+                // 自动设定 image_type
+                wizardConfig.image_type = isUnsupported ? 'unsupported' : 'prebuilt';
 
-        // step-0-desc: 检测结果
-        const descEl = document.getElementById('step-0-desc');
-        const timeEl = document.getElementById('fresh-time');
-        if (!isUnsupported) {
-            descEl.textContent = '✅ 环境检测通过';
-            descEl.style.color = 'var(--green)';
-            timeEl.textContent = '⏱ 预计 2-5 分钟';
-        } else {
-            descEl.innerHTML = '❌ 环境检测失败';
-            descEl.style.color = 'var(--red)';
-            timeEl.textContent = '';
-            if (detectedImageType === 'unsupported-gpu') {
-                // GPU 算力过低 — 保留 GPU 行 + 追加警告
-                cardHtml += `<hr class="env-divider">`;
-                cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
+                // step-0-desc: 检测结果
+                const descEl = document.getElementById('step-0-desc');
+                const timeEl = document.getElementById('fresh-time');
+                if (!isUnsupported) {
+                    descEl.textContent = '✅ 环境检测通过';
+                    descEl.style.color = 'var(--green)';
+                    timeEl.textContent = '⏱ 预计 2-5 分钟';
+                } else {
+                    descEl.innerHTML = '❌ 环境检测失败';
+                    descEl.style.color = 'var(--red)';
+                    timeEl.textContent = '';
+                    if (detectedImageType === 'unsupported-gpu') {
+                        // GPU 算力过低 — 保留 GPU 行 + 追加警告
+                        cardHtml += `<hr class="env-divider">`;
+                        cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
                     ⚠️ <b>GPU 算力不足</b> — FlashAttention 2 需要 Ampere (sm_80) 及以上架构。<br>
                     请选择配备 RTX 30xx / A100 / RTX 40xx 及以上 GPU 的实例。
                 </div>`;
-                envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
-            } else if (detectedImageType === 'no-gpu') {
-                cardHtml += `<hr class="env-divider">`;
-                cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
+                        envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
+                    } else if (detectedImageType === 'no-gpu') {
+                        cardHtml += `<hr class="env-divider">`;
+                        cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
                     ⚠️ <b>未检测到 CUDA GPU</b> — ComfyUI 需要 NVIDIA GPU 运行。<br>
                     请在 GPU 实例上部署，或检查 CUDA 驱动是否正确安装。
                 </div>`;
-                envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
-            } else {
-                envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">
+                        envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
+                    } else {
+                        envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">
                     <div style="color:var(--red);font-weight:600;margin-bottom:8px">⚠️ 不支持的运行环境</div>
                     <div style="color:var(--t3);font-size:.88rem;line-height:1.6">
                         当前环境缺少必要的运行时组件。请使用 ComfyCarry 预构建镜像创建实例：<br>
                         <code style="color:var(--accent)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （预装 ComfyUI + 加速组件）
                     </div>
                 </div>`;
-            }
-            document.querySelectorAll('#step-0 .choice-card').forEach(c => {
-                c.style.opacity = '0.4';
-                c.style.pointerEvents = 'none';
-            });
-        }
+                    }
+                    document.querySelectorAll('#step-0 .choice-card').forEach(c => {
+                        c.style.opacity = '0.4';
+                        c.style.pointerEvents = 'none';
+                    });
+                }
 
-        // 解锁 Step 0 卡片 (检测完成)
-        if (!isUnsupported) {
-            const cards0 = document.getElementById('step0-cards');
-            cards0.style.opacity = ''; cards0.style.pointerEvents = '';
-        }
+                // 解锁 Step 0 卡片 (检测完成)
+                if (!isUnsupported) {
+                    const cards0 = document.getElementById('step0-cards');
+                    cards0.style.opacity = ''; cards0.style.pointerEvents = '';
+                }
 
-        renderPluginList(pluginData, selectedUrls);
+                renderPluginList(pluginData, selectedUrls);
 
-        // Populate add-remote type selector
-        const sel = document.getElementById('wz-remote-type');
-        for (const [k, v] of Object.entries(_remoteTypeDefs)) {
-            const opt = document.createElement('option');
-            opt.value = k;
-            opt.textContent = `${v.icon} ${v.label}${v.oauth ? ' (需 OAuth)' : ''}`;
-            sel.appendChild(opt);
-        }
+                // Populate add-remote type selector
+                const sel = document.getElementById('wz-remote-type');
+                for (const [k, v] of Object.entries(_remoteTypeDefs)) {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.textContent = `${v.icon} ${v.label}${v.oauth ? ' (需 OAuth)' : ''}`;
+                    sel.appendChild(opt);
+                }
 
-        // Restore state if partially filled
-        if (state.image_type) wizardConfig.image_type = state.image_type;
-        if (state.deploy_started && !state.deploy_completed) {
-            showDeployView();
-            connectSSE();
-        } else if (state.deploy_error) {
-            showStep(TOTAL_STEPS - 1);
-            renderSummary();
-            const summaryEl = document.getElementById('deploy-summary');
-            summaryEl.innerHTML = `
+                // Restore state if partially filled
+                if (state.image_type) wizardConfig.image_type = state.image_type;
+                if (state.deploy_started && !state.deploy_completed) {
+                    showDeployView();
+                    connectSSE();
+                } else if (state.deploy_error) {
+                    showStep(TOTAL_STEPS - 1);
+                    renderSummary();
+                    const summaryEl = document.getElementById('deploy-summary');
+                    summaryEl.innerHTML = `
                 <div style="padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);margin-bottom:16px;">
                     <strong>⚠️ 上次部署未完成:</strong> ${esc(state.deploy_error)}<br>
                     <small>点击「重试部署」将自动跳过已完成的步骤。</small>
                 </div>` + summaryEl.innerHTML;
-        }
+                }
 
-        // ── 环境变量预填充 ──
-        if (envVars.password) {
-            document.getElementById('input-password').value = envVars.password;
-            document.getElementById('input-password-confirm').value = envVars.password;
-            wizardConfig.password = envVars.password;
-            const hint = document.getElementById('password-env-hint');
-            hint.style.display = 'block';
-            hint.innerHTML = '✅ 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
-        }
-        // 密码输入监听 — 两个框都有内容且一致时才允许下一步
-        const _pwInputs = ['input-password', 'input-password-confirm'];
-        _pwInputs.forEach(id => document.getElementById(id).addEventListener('input', () => {
-            const pw = document.getElementById('input-password').value;
-            const pw2 = document.getElementById('input-password-confirm').value;
-            const btn = document.getElementById('btn-next-1');
-            btn.disabled = !(pw && pw2 && pw === pw2);
-            document.getElementById('pw-mismatch-hint').style.display =
-                (pw && pw2 && pw !== pw2) ? 'block' : 'none';
-        }));
-        // 环境变量预填时直接启用
-        if (envVars.password) document.getElementById('btn-next-1').disabled = false;
-        if (envVars.cloudflared_token) {
-            document.getElementById('input-cf-token').value = envVars.cloudflared_token;
-            wizardConfig.cloudflared_token = envVars.cloudflared_token;
-            const hint = document.getElementById('cf-env-hint');
-            hint.style.display = 'block';
-            hint.innerHTML = '✅ 已从环境变量 <code>CF_TUNNEL_TOKEN</code> 检测到 Token（Tunnel 已在运行中）';
-        }
-        if (envVars.rclone_has_env) {
-            document.getElementById('rclone-card-env').style.display = '';
-            const hint = document.getElementById('rclone-env-hint');
-            hint.style.display = 'block';
-            hint.innerHTML = '✅ 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
-            wizardConfig.rclone_config_method = 'base64_env';
-            selectRcloneMethod('base64_env');
-        }
-        if (envVars.civitai_token) {
-            document.getElementById('input-civitai-token').value = envVars.civitai_token;
-            wizardConfig.civitai_token = envVars.civitai_token;
-            const hint = document.getElementById('civitai-env-hint');
-            hint.style.display = 'block';
-            hint.innerHTML = '✅ 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
-        }
+                // ── 环境变量预填充 ──
+                if (envVars.password) {
+                    document.getElementById('input-password').value = envVars.password;
+                    document.getElementById('input-password-confirm').value = envVars.password;
+                    wizardConfig.password = envVars.password;
+                    const hint = document.getElementById('password-env-hint');
+                    hint.style.display = 'block';
+                    hint.innerHTML = '✅ 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
+                }
+                // 密码输入监听 — 两个框都有内容且一致时才允许下一步
+                const _pwInputs = ['input-password', 'input-password-confirm'];
+                _pwInputs.forEach(id => document.getElementById(id).addEventListener('input', () => {
+                    const pw = document.getElementById('input-password').value;
+                    const pw2 = document.getElementById('input-password-confirm').value;
+                    const btn = document.getElementById('btn-next-1');
+                    btn.disabled = !(pw && pw2 && pw === pw2);
+                    document.getElementById('pw-mismatch-hint').style.display =
+                        (pw && pw2 && pw !== pw2) ? 'block' : 'none';
+                }));
+                // 环境变量预填时直接启用
+                if (envVars.password) document.getElementById('btn-next-1').disabled = false;
+                if (envVars.cf_api_token) {
+                    document.getElementById('input-cf-token').value = envVars.cf_api_token;
+                    wizardConfig.cf_api_token = envVars.cf_api_token;
+                    if (envVars.cf_domain) {
+                        document.getElementById('input-cf-domain').value = envVars.cf_domain;
+                        wizardConfig.cf_domain = envVars.cf_domain;
+                    }
+                    if (envVars.cf_subdomain) {
+                        document.getElementById('input-cf-subdomain').value = envVars.cf_subdomain;
+                        wizardConfig.cf_subdomain = envVars.cf_subdomain;
+                    }
+                    const hint = document.getElementById('cf-env-hint');
+                    hint.style.display = 'block';
+                    hint.innerHTML = '✅ 已从环境变量检测到 CF 配置';
+                }
+                if (envVars.rclone_has_env) {
+                    document.getElementById('rclone-card-env').style.display = '';
+                    const hint = document.getElementById('rclone-env-hint');
+                    hint.style.display = 'block';
+                    hint.innerHTML = '✅ 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
+                    wizardConfig.rclone_config_method = 'base64_env';
+                    selectRcloneMethod('base64_env');
+                }
+                if (envVars.civitai_token) {
+                    document.getElementById('input-civitai-token').value = envVars.civitai_token;
+                    wizardConfig.civitai_token = envVars.civitai_token;
+                    const hint = document.getElementById('civitai-env-hint');
+                    hint.style.display = 'block';
+                    hint.innerHTML = '✅ 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
+                }
 
-        // ── 从已保存的 state 中恢复字段 ──
-        if (state.password && !document.getElementById('input-password').value) {
-            document.getElementById('input-password').value = state.password;
-            document.getElementById('input-password-confirm').value = state.password;
-            wizardConfig.password = state.password;
-            document.getElementById('btn-next-1').disabled = false;
-        }
-        if (state.cloudflared_token && !document.getElementById('input-cf-token').value) {
-            document.getElementById('input-cf-token').value = state.cloudflared_token;
-            wizardConfig.cloudflared_token = state.cloudflared_token;
-        }
-        if (state.civitai_token && !document.getElementById('input-civitai-token').value) {
-            document.getElementById('input-civitai-token').value = state.civitai_token;
-            wizardConfig.civitai_token = state.civitai_token;
-        }
-        if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
-            const method = state.rclone_config_method;
-            selectRcloneMethod(method);
-            wizardConfig.rclone_config_method = method;
-            if (state.rclone_config_value) {
-                wizardConfig.rclone_config_value = state.rclone_config_value;
-                if (method === 'base64') document.getElementById('input-rclone-base64').value = state.rclone_config_value;
+                // ── 从已保存的 state 中恢复字段 ──
+                if (state.password && !document.getElementById('input-password').value) {
+                    document.getElementById('input-password').value = state.password;
+                    document.getElementById('input-password-confirm').value = state.password;
+                    wizardConfig.password = state.password;
+                    document.getElementById('btn-next-1').disabled = false;
+                }
+                if (state.cf_api_token && !document.getElementById('input-cf-token').value) {
+                    document.getElementById('input-cf-token').value = state.cf_api_token;
+                    wizardConfig.cf_api_token = state.cf_api_token;
+                }
+                if (state.cf_domain && !document.getElementById('input-cf-domain').value) {
+                    document.getElementById('input-cf-domain').value = state.cf_domain;
+                    wizardConfig.cf_domain = state.cf_domain;
+                }
+                if (state.cf_subdomain && !document.getElementById('input-cf-subdomain').value) {
+                    document.getElementById('input-cf-subdomain').value = state.cf_subdomain;
+                    wizardConfig.cf_subdomain = state.cf_subdomain;
+                }
+                if (state.civitai_token && !document.getElementById('input-civitai-token').value) {
+                    document.getElementById('input-civitai-token').value = state.civitai_token;
+                    wizardConfig.civitai_token = state.civitai_token;
+                }
+                if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
+                    const method = state.rclone_config_method;
+                    selectRcloneMethod(method);
+                    wizardConfig.rclone_config_method = method;
+                    if (state.rclone_config_value) {
+                        wizardConfig.rclone_config_value = state.rclone_config_value;
+                        if (method === 'base64') document.getElementById('input-rclone-base64').value = state.rclone_config_value;
+                    }
+                }
+                if (state.plugins) wizardConfig.plugins = state.plugins;
+                if (state.wizard_remotes) wizardConfig.wizard_remotes = state.wizard_remotes;
+                if (state.wizard_sync_rules) wizardConfig.wizard_sync_rules = state.wizard_sync_rules;
+                if (state.install_fa2 !== undefined) wizardConfig.install_fa2 = state.install_fa2;
+                if (state.install_sa2 !== undefined) wizardConfig.install_sa2 = state.install_sa2;
+
+                // 恢复手动添加的 remotes 显示
+                renderWizardManualRemotes();
+
+                updateProgressBar();
+            } catch (e) {
+                console.error('init error:', e);
             }
         }
-        if (state.plugins) wizardConfig.plugins = state.plugins;
-        if (state.wizard_remotes) wizardConfig.wizard_remotes = state.wizard_remotes;
-        if (state.wizard_sync_rules) wizardConfig.wizard_sync_rules = state.wizard_sync_rules;
-        if (state.install_fa2 !== undefined) wizardConfig.install_fa2 = state.install_fa2;
-        if (state.install_sa2 !== undefined) wizardConfig.install_sa2 = state.install_sa2;
 
-        // 恢复手动添加的 remotes 显示
-        renderWizardManualRemotes();
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-        updateProgressBar();
-    } catch (e) {
-        console.error('init error:', e);
-    }
-}
-
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-function togglePw(inputId, btn) {
-    const inp = document.getElementById(inputId);
-    if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
-    else { inp.type = 'password'; btn.textContent = '👁'; }
-}
-
-// ── Navigation ──
-function updateProgressBar() {
-    const bar = document.getElementById('progressBar');
-    bar.innerHTML = '';
-    for (let i = 0; i < TOTAL_STEPS; i++) {
-        const seg = document.createElement('div');
-        seg.className = 'progress-segment' + (i < currentStep ? ' done' : i === currentStep ? ' active' : '');
-        bar.appendChild(seg);
-    }
-}
-
-function showStep(n) {
-    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-    const el = document.getElementById(`step-${n}`);
-    if (el) el.classList.add('active');
-    currentStep = n;
-    updateProgressBar();
-    // 进入 Step 4 时初始化同步规则 UI
-    if (n === 4) initSyncRulesStep();
-    if (n === 7) initAttnStep();
-    updateNextBtnText();
-}
-
-/* 动态按钮文本：可选步骤无内容时显示 "跳过"，有内容时显示 "下一步" */
-function updateNextBtnText() {
-    const map = {
-        2: () => !!document.getElementById('input-cf-token').value.trim(),
-        3: () => !!_selectedRcloneMethod,
-        4: () => document.querySelectorAll('.wz-rule-card.selected').length > 0,
-        5: () => !!document.getElementById('input-civitai-token').value.trim(),
-        7: () => document.querySelectorAll('#attn-cards .choice-card.selected').length > 0,
-    };
-    for (const [step, hasContent] of Object.entries(map)) {
-        const btn = document.getElementById(`btn-next-${step}`);
-        if (btn) btn.textContent = hasContent() ? '下一步' : '跳过';
-    }
-}
-
-function nextStep() {
-    saveCurrentStep();
-
-    // Step 1: 密码检查 (空密码 / 不一致)
-    if (currentStep === 1) {
-        const pw = document.getElementById('input-password').value;
-        const pw2 = document.getElementById('input-password-confirm').value;
-        const hint = document.getElementById('pw-mismatch-hint');
-        if (!pw || !pw2) return;
-        if (pw !== pw2) {
-            hint.style.display = 'block';
-            document.getElementById('input-password-confirm').focus();
-            return;
+        function togglePw(inputId, btn) {
+            const inp = document.getElementById(inputId);
+            if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+            else { inp.type = 'password'; btn.textContent = '👁'; }
         }
-        hint.style.display = 'none';
-    }
 
-    // Step 3: Rclone 配置完整性检查 (无选择 = 跳过)
-    if (currentStep === 3) {
-        const m = _selectedRcloneMethod;
-        if (m === 'file' && !wizardConfig.rclone_config_value) {
-            alert('请先上传 rclone.conf 文件');
-            return;
+        // ── Navigation ──
+        function updateProgressBar() {
+            const bar = document.getElementById('progressBar');
+            bar.innerHTML = '';
+            for (let i = 0; i < TOTAL_STEPS; i++) {
+                const seg = document.createElement('div');
+                seg.className = 'progress-segment' + (i < currentStep ? ' done' : i === currentStep ? ' active' : '');
+                bar.appendChild(seg);
+            }
         }
-        if (m === 'manual' && wizardConfig.wizard_remotes.length === 0) {
-            alert('请先添加至少一个 Remote');
-            return;
-        }
-    }
 
-    // 恢复模式: 从 step 0 直接跳到确认部署
-    if (currentStep === 0 && importedConfig) {
-        showStep(TOTAL_STEPS - 1);
-        // 恢复模式下异步检测 rclone remotes (DOM radio 未选中，手动调 API)
-        if (wizardConfig.rclone_config_value) {
-            fetch('/api/setup/preview_remotes', {
+        function showStep(n) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            const el = document.getElementById(`step-${n}`);
+            if (el) el.classList.add('active');
+            currentStep = n;
+            updateProgressBar();
+            // 进入 Step 4 时初始化同步规则 UI
+            if (n === 4) initSyncRulesStep();
+            if (n === 7) initAttnStep();
+            updateNextBtnText();
+        }
+
+        /* 动态按钮文本：可选步骤无内容时显示 "跳过"，有内容时显示 "下一步" */
+        function updateNextBtnText() {
+            const map = {
+                2: () => !!(document.getElementById('input-cf-token').value.trim() && document.getElementById('input-cf-domain').value.trim()),
+                3: () => !!_selectedRcloneMethod,
+                4: () => document.querySelectorAll('.wz-rule-card.selected').length > 0,
+                5: () => !!document.getElementById('input-civitai-token').value.trim(),
+                7: () => document.querySelectorAll('#attn-cards .choice-card.selected').length > 0,
+            };
+            for (const [step, hasContent] of Object.entries(map)) {
+                const btn = document.getElementById(`btn-next-${step}`);
+                if (btn) btn.textContent = hasContent() ? '下一步' : '跳过';
+            }
+        }
+
+        async function validateCfToken() {
+            const token = document.getElementById('input-cf-token').value.trim();
+            const domain = document.getElementById('input-cf-domain').value.trim();
+            const el = document.getElementById('cf-validate-result');
+            if (!token || !domain) {
+                el.style.display = 'block';
+                el.style.color = 'var(--red)';
+                el.innerHTML = '❌ 请填写 API Token 和域名';
+                return;
+            }
+            el.style.display = 'block';
+            el.style.color = 'var(--t2)';
+            el.innerHTML = '⏳ 验证中...';
+            try {
+                const r = await fetch('/api/tunnel/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_token: token, domain: domain })
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    el.style.color = 'var(--green)';
+                    el.innerHTML = `✅ ${esc(d.message)} · 账户: ${esc(d.account_name)}`;
+                } else {
+                    el.style.color = 'var(--red)';
+                    el.innerHTML = `❌ ${esc(d.message)}`;
+                }
+            } catch (e) {
+                el.style.color = 'var(--red)';
+                el.innerHTML = '❌ 验证请求失败';
+            }
+        }
+
+        function nextStep() {
+            saveCurrentStep();
+
+            // Step 1: 密码检查 (空密码 / 不一致)
+            if (currentStep === 1) {
+                const pw = document.getElementById('input-password').value;
+                const pw2 = document.getElementById('input-password-confirm').value;
+                const hint = document.getElementById('pw-mismatch-hint');
+                if (!pw || !pw2) return;
+                if (pw !== pw2) {
+                    hint.style.display = 'block';
+                    document.getElementById('input-password-confirm').focus();
+                    return;
+                }
+                hint.style.display = 'none';
+            }
+
+            // Step 3: Rclone 配置完整性检查 (无选择 = 跳过)
+            if (currentStep === 3) {
+                const m = _selectedRcloneMethod;
+                if (m === 'file' && !wizardConfig.rclone_config_value) {
+                    alert('请先上传 rclone.conf 文件');
+                    return;
+                }
+                if (m === 'manual' && wizardConfig.wizard_remotes.length === 0) {
+                    alert('请先添加至少一个 Remote');
+                    return;
+                }
+            }
+
+            // 恢复模式: 从 step 0 直接跳到确认部署
+            if (currentStep === 0 && importedConfig) {
+                showStep(TOTAL_STEPS - 1);
+                // 恢复模式下异步检测 rclone remotes (DOM radio 未选中，手动调 API)
+                if (wizardConfig.rclone_config_value) {
+                    fetch('/api/setup/preview_remotes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ method: wizardConfig.rclone_config_method || 'base64', value: wizardConfig.rclone_config_value })
+                    }).then(r => r.json()).then(d => {
+                        _detectedRemotes = d.remotes || [];
+                        renderSummary();
+                    }).catch(() => renderSummary());
+                } else {
+                    renderSummary();
+                }
+                return;
+            }
+            // Step 3 (rclone) 无配置 → 跳过 Step 4 (sync rules)
+            if (currentStep === 3 && !_selectedRcloneMethod && wizardConfig.wizard_remotes.length === 0) {
+                showStep(5);
+                return;
+            }
+            if (currentStep < TOTAL_STEPS - 1) {
+                showStep(currentStep + 1);
+                if (currentStep === TOTAL_STEPS - 1) renderSummary();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep === TOTAL_STEPS - 1 && importedConfig) {
+                showStep(0);
+                return;
+            }
+            // Step 5 → 如果 rclone 无配置且无手动 remote，跳回 Step 3
+            if (currentStep === 5 && !_selectedRcloneMethod && wizardConfig.wizard_remotes.length === 0) {
+                showStep(3);
+                return;
+            }
+            if (currentStep > 0) showStep(currentStep - 1);
+        }
+
+        function saveCurrentStep() {
+            switch (currentStep) {
+                case 1:
+                    wizardConfig.password = document.getElementById('input-password').value;
+                    break;
+                case 2:
+                    wizardConfig.cf_api_token = document.getElementById('input-cf-token').value.trim();
+                    wizardConfig.cf_domain = document.getElementById('input-cf-domain').value.trim();
+                    wizardConfig.cf_subdomain = document.getElementById('input-cf-subdomain').value.trim();
+                    break;
+                case 3: {
+                    const method = _selectedRcloneMethod || 'skip';
+                    wizardConfig._rclone_display_method = method;
+                    if (method === 'file') {
+                        wizardConfig.rclone_config_method = 'base64';
+                    } else if (method === 'manual') {
+                        wizardConfig.rclone_config_method = 'skip';
+                    } else {
+                        wizardConfig.rclone_config_method = method;
+                        if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
+                        else if (method === 'base64') wizardConfig.rclone_config_value = document.getElementById('input-rclone-base64').value.trim();
+                        else if (method === 'base64_env') wizardConfig.rclone_config_value = '';
+                        else wizardConfig.rclone_config_value = '';
+                    }
+                    break;
+                }
+                case 4: {
+                    // 收集已选中的同步规则 (卡片 .selected)
+                    const rules = [];
+                    document.querySelectorAll('.wz-rule-card.selected').forEach(card => {
+                        const tplId = card.dataset.tplId;
+                        if (!tplId) return;
+                        const remoteSel = card.querySelector('.wz-rule-remote');
+                        const pathInput = card.querySelector('.wz-rule-path');
+                        rules.push({
+                            template_id: tplId,
+                            remote: remoteSel?.value || '',
+                            remote_path: pathInput?.value || '',
+                        });
+                    });
+                    wizardConfig.wizard_sync_rules = rules;
+                    break;
+                }
+                case 5:
+                    wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
+                    break;
+                case 6:
+                    wizardConfig.plugins = getSelectedPlugins();
+                    break;
+                case 7: {
+                    wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
+                    wizardConfig.install_sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
+                    break;
+                }
+            }
+            // Persist to backend
+            fetch('/api/setup/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ method: wizardConfig.rclone_config_method || 'base64', value: wizardConfig.rclone_config_value })
-            }).then(r => r.json()).then(d => {
-                _detectedRemotes = d.remotes || [];
-                renderSummary();
-            }).catch(() => renderSummary());
-        } else {
-            renderSummary();
+                body: JSON.stringify({ ...wizardConfig, current_step: currentStep })
+            }).catch(() => { });
         }
-        return;
-    }
-    // Step 3 (rclone) 无配置 → 跳过 Step 4 (sync rules)
-    if (currentStep === 3 && !_selectedRcloneMethod && wizardConfig.wizard_remotes.length === 0) {
-        showStep(5);
-        return;
-    }
-    if (currentStep < TOTAL_STEPS - 1) {
-        showStep(currentStep + 1);
-        if (currentStep === TOTAL_STEPS - 1) renderSummary();
-    }
-}
 
-function prevStep() {
-    if (currentStep === TOTAL_STEPS - 1 && importedConfig) {
-        showStep(0);
-        return;
-    }
-    // Step 5 → 如果 rclone 无配置且无手动 remote，跳回 Step 3
-    if (currentStep === 5 && !_selectedRcloneMethod && wizardConfig.wizard_remotes.length === 0) {
-        showStep(3);
-        return;
-    }
-    if (currentStep > 0) showStep(currentStep - 1);
-}
-
-function saveCurrentStep() {
-    switch (currentStep) {
-        case 1:
-            wizardConfig.password = document.getElementById('input-password').value;
-            break;
-        case 2:
-            wizardConfig.cloudflared_token = document.getElementById('input-cf-token').value.trim();
-            break;
-        case 3: {
-            const method = _selectedRcloneMethod || 'skip';
-            wizardConfig._rclone_display_method = method;
-            if (method === 'file') {
-                wizardConfig.rclone_config_method = 'base64';
-            } else if (method === 'manual') {
-                wizardConfig.rclone_config_method = 'skip';
-            } else {
-                wizardConfig.rclone_config_method = method;
-                if (method === 'url') wizardConfig.rclone_config_value = document.getElementById('input-rclone-url').value.trim();
-                else if (method === 'base64') wizardConfig.rclone_config_value = document.getElementById('input-rclone-base64').value.trim();
-                else if (method === 'base64_env') wizardConfig.rclone_config_value = '';
-                else wizardConfig.rclone_config_value = '';
+        // ── Mode Selection ──
+        function selectMode(mode) {
+            document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+            if (mode === 'import') {
+                document.getElementById('choice-import').classList.add('selected');
+                document.getElementById('import-upload-area').style.display = 'block';
+                document.getElementById('btn-next-0').disabled = true;
+                importedConfig = null;
+                return;
             }
-            break;
+            document.getElementById('import-upload-area').style.display = 'none';
+            document.getElementById('import-result').style.display = 'none';
+            importedConfig = null;
+            document.getElementById('choice-fresh').classList.add('selected');
+            document.getElementById('btn-next-0').disabled = false;
         }
-        case 4: {
-            // 收集已选中的同步规则 (卡片 .selected)
-            const rules = [];
-            document.querySelectorAll('.wz-rule-card.selected').forEach(card => {
-                const tplId = card.dataset.tplId;
-                if (!tplId) return;
-                const remoteSel = card.querySelector('.wz-rule-remote');
-                const pathInput = card.querySelector('.wz-rule-path');
-                rules.push({
-                    template_id: tplId,
-                    remote: remoteSel?.value || '',
-                    remote_path: pathInput?.value || '',
-                });
+
+        // ── Rclone Config ──
+        let _selectedRcloneMethod = '';
+
+        function selectRcloneMethod(method) {
+            // 再次点击已选中的卡片 → 反选（回到未选状态）
+            if (_selectedRcloneMethod === method) {
+                _selectedRcloneMethod = '';
+                document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => c.classList.remove('selected'));
+                document.getElementById('rclone-input-area').style.display = 'none';
+                updateNextBtnText();
+                return;
+            }
+            _selectedRcloneMethod = method;
+            // 更新卡片选中状态
+            document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => {
+                c.classList.toggle('selected', c.dataset.rclone === method);
             });
-            wizardConfig.wizard_sync_rules = rules;
-            break;
+            // 切换 input 区域
+            const area = document.getElementById('rclone-input-area');
+            const needsInput = ['file', 'manual'].includes(method);
+            area.style.display = needsInput ? 'block' : 'none';
+            document.getElementById('rclone-file-input').style.display = method === 'file' ? 'block' : 'none';
+            document.getElementById('rclone-manual-input').style.display = method === 'manual' ? 'block' : 'none';
+            // 触发 remote 检测
+            if (method !== 'skip' && method !== 'manual') {
+                clearTimeout(window._rcloneDetectTimer);
+                window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 300);
+            } else if (method === 'skip') {
+                document.getElementById('wizard-remotes-section').style.display = 'none';
+                _detectedRemotes = [];
+            }
+            updateNextBtnText();
         }
-        case 5:
-            wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
-            break;
-        case 6:
-            wizardConfig.plugins = getSelectedPlugins();
-            break;
-        case 7: {
-            wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
-            wizardConfig.install_sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
-            break;
+
+        function handleRcloneFile(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                wizardConfig.rclone_config_value = btoa(reader.result);
+                document.getElementById('rclone-file-status').textContent = `✅ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                detectRemotes();
+            };
+            reader.readAsText(file);
         }
-    }
-    // Persist to backend
-    fetch('/api/setup/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...wizardConfig, current_step: currentStep })
-    }).catch(() => {});
-}
 
-// ── Mode Selection ──
-function selectMode(mode) {
-    document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
-    if (mode === 'import') {
-        document.getElementById('choice-import').classList.add('selected');
-        document.getElementById('import-upload-area').style.display = 'block';
-        document.getElementById('btn-next-0').disabled = true;
-        importedConfig = null;
-        return;
-    }
-    document.getElementById('import-upload-area').style.display = 'none';
-    document.getElementById('import-result').style.display = 'none';
-    importedConfig = null;
-    document.getElementById('choice-fresh').classList.add('selected');
-    document.getElementById('btn-next-0').disabled = false;
-}
-
-// ── Rclone Config ──
-let _selectedRcloneMethod = '';
-
-function selectRcloneMethod(method) {
-    // 再次点击已选中的卡片 → 反选（回到未选状态）
-    if (_selectedRcloneMethod === method) {
-        _selectedRcloneMethod = '';
-        document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => c.classList.remove('selected'));
-        document.getElementById('rclone-input-area').style.display = 'none';
-        updateNextBtnText();
-        return;
-    }
-    _selectedRcloneMethod = method;
-    // 更新卡片选中状态
-    document.querySelectorAll('#rclone-method-cards .choice-card').forEach(c => {
-        c.classList.toggle('selected', c.dataset.rclone === method);
-    });
-    // 切换 input 区域
-    const area = document.getElementById('rclone-input-area');
-    const needsInput = ['file', 'manual'].includes(method);
-    area.style.display = needsInput ? 'block' : 'none';
-    document.getElementById('rclone-file-input').style.display = method === 'file' ? 'block' : 'none';
-    document.getElementById('rclone-manual-input').style.display = method === 'manual' ? 'block' : 'none';
-    // 触发 remote 检测
-    if (method !== 'skip' && method !== 'manual') {
-        clearTimeout(window._rcloneDetectTimer);
-        window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 300);
-    } else if (method === 'skip') {
-        document.getElementById('wizard-remotes-section').style.display = 'none';
-        _detectedRemotes = [];
-    }
-    updateNextBtnText();
-}
-
-function handleRcloneFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-        wizardConfig.rclone_config_value = btoa(reader.result);
-        document.getElementById('rclone-file-status').textContent = `✅ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-        detectRemotes();
-    };
-    reader.readAsText(file);
-}
-
-async function detectRemotes() {
-    const method = _selectedRcloneMethod || 'skip';
-    let value = '';
-    if (method === 'file' || method === 'base64') {
-        value = wizardConfig.rclone_config_value || document.getElementById('input-rclone-base64')?.value?.trim() || '';
-    } else if (method === 'url') {
-        value = document.getElementById('input-rclone-url')?.value?.trim() || '';
-    }
-    if (method === 'skip') return;
-    try {
-        const r = await fetch('/api/setup/preview_remotes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ method, value })
-        });
-        const d = await r.json();
-        _detectedRemotes = d.remotes || [];
-        const section = document.getElementById('wizard-remotes-section');
-        const list = document.getElementById('wizard-remotes-list');
-        if (_detectedRemotes.length > 0) {
-            section.style.display = 'block';
-            list.innerHTML = _detectedRemotes.map(r =>
-                `<span class="wz-remote-chip">${esc(r.name)} <span class="wz-rtype">${esc(r.type)}</span></span>`
-            ).join('');
-        } else if (method === 'url') {
-            section.style.display = 'block';
-            list.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">URL 配置将在部署时下载，Remote 名在下一步可手动输入</span>';
-        } else if (method === 'base64_env') {
-            section.style.display = 'block';
-            list.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">将从环境变量读取，Remote 名在部署时自动检测</span>';
-        } else {
-            section.style.display = 'none';
+        async function detectRemotes() {
+            const method = _selectedRcloneMethod || 'skip';
+            let value = '';
+            if (method === 'file' || method === 'base64') {
+                value = wizardConfig.rclone_config_value || document.getElementById('input-rclone-base64')?.value?.trim() || '';
+            } else if (method === 'url') {
+                value = document.getElementById('input-rclone-url')?.value?.trim() || '';
+            }
+            if (method === 'skip') return;
+            try {
+                const r = await fetch('/api/setup/preview_remotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ method, value })
+                });
+                const d = await r.json();
+                _detectedRemotes = d.remotes || [];
+                const section = document.getElementById('wizard-remotes-section');
+                const list = document.getElementById('wizard-remotes-list');
+                if (_detectedRemotes.length > 0) {
+                    section.style.display = 'block';
+                    list.innerHTML = _detectedRemotes.map(r =>
+                        `<span class="wz-remote-chip">${esc(r.name)} <span class="wz-rtype">${esc(r.type)}</span></span>`
+                    ).join('');
+                } else if (method === 'url') {
+                    section.style.display = 'block';
+                    list.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">URL 配置将在部署时下载，Remote 名在下一步可手动输入</span>';
+                } else if (method === 'base64_env') {
+                    section.style.display = 'block';
+                    list.innerHTML = '<span style="font-size:.82rem;color:var(--t3)">将从环境变量读取，Remote 名在部署时自动检测</span>';
+                } else {
+                    section.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('detectRemotes error:', e);
+            }
         }
-    } catch (e) {
-        console.error('detectRemotes error:', e);
-    }
-}
 
-// ── Add Remote (Wizard) ──
-function toggleWizardAddRemote() {
-    // Legacy: 手动创建已整合到 rclone-manual-input 卡片中，此函数保留兼容
-    const form = document.getElementById('wizard-add-remote-form') || document.getElementById('rclone-manual-input');
-    if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
-}
+        // ── Add Remote (Wizard) ──
+        function toggleWizardAddRemote() {
+            // Legacy: 手动创建已整合到 rclone-manual-input 卡片中，此函数保留兼容
+            const form = document.getElementById('wizard-add-remote-form') || document.getElementById('rclone-manual-input');
+            if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
 
-function renderWizardRemoteFields() {
-    const type = document.getElementById('wz-remote-type').value;
-    const container = document.getElementById('wz-remote-fields');
-    if (!type || !_remoteTypeDefs[type]) { container.innerHTML = ''; return; }
-    const def = _remoteTypeDefs[type];
-    let html = '';
-    if (def.oauth) {
-        html += `<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px;font-size:.8rem;color:var(--t2)">
+        function renderWizardRemoteFields() {
+            const type = document.getElementById('wz-remote-type').value;
+            const container = document.getElementById('wz-remote-fields');
+            if (!type || !_remoteTypeDefs[type]) { container.innerHTML = ''; return; }
+            const def = _remoteTypeDefs[type];
+            let html = '';
+            if (def.oauth) {
+                html += `<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px;font-size:.8rem;color:var(--t2)">
             <b>OAuth 授权步骤:</b><br>
             1. 在本地电脑安装 <a href="https://rclone.org/downloads/" target="_blank" style="color:var(--accent)">rclone</a><br>
             2. 运行: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">rclone authorize "${type}"</code><br>
             3. 将终端输出的 token JSON 粘贴到下方</div>`;
-    }
-    for (const f of def.fields) {
-        const val = f.default || '';
-        const req = f.required ? ' <span style="color:var(--red)">*</span>' : '';
-        html += `<div class="form-group"><label>${f.label}${req}</label>`;
-        if (f.type === 'select') {
-            html += `<select id="wz-rf-${f.key}" style="width:100%">${(f.options||[]).map(o =>
-                `<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
-        } else if (f.type === 'textarea') {
-            html += `<textarea id="wz-rf-${f.key}" style="width:100%;min-height:80px;font-family:monospace;font-size:.78rem" placeholder="${f.placeholder||''}"></textarea>`;
-            if (f.help) html += `<div style="font-size:.72rem;color:var(--t3);margin-top:2px">${f.help}</div>`;
-        } else {
-            html += `<input type="${f.type === 'password' ? 'password' : 'text'}" id="wz-rf-${f.key}" value="${esc(val)}" placeholder="${f.placeholder||''}" style="width:100%">`;
+            }
+            for (const f of def.fields) {
+                const val = f.default || '';
+                const req = f.required ? ' <span style="color:var(--red)">*</span>' : '';
+                html += `<div class="form-group"><label>${f.label}${req}</label>`;
+                if (f.type === 'select') {
+                    html += `<select id="wz-rf-${f.key}" style="width:100%">${(f.options || []).map(o =>
+                        `<option value="${o}"${o === val ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+                } else if (f.type === 'textarea') {
+                    html += `<textarea id="wz-rf-${f.key}" style="width:100%;min-height:80px;font-family:monospace;font-size:.78rem" placeholder="${f.placeholder || ''}"></textarea>`;
+                    if (f.help) html += `<div style="font-size:.72rem;color:var(--t3);margin-top:2px">${f.help}</div>`;
+                } else {
+                    html += `<input type="${f.type === 'password' ? 'password' : 'text'}" id="wz-rf-${f.key}" value="${esc(val)}" placeholder="${f.placeholder || ''}" style="width:100%">`;
+                }
+                html += '</div>';
+            }
+            container.innerHTML = html;
         }
-        html += '</div>';
-    }
-    container.innerHTML = html;
-}
 
-function submitWizardRemote() {
-    const name = document.getElementById('wz-remote-name').value.trim();
-    const type = document.getElementById('wz-remote-type').value;
-    if (!name || !type) { alert('请填写名称和类型'); return; }
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) { alert('名称只能包含字母、数字、下划线和短横线'); return; }
-    // 检查重复
-    const allNames = [..._detectedRemotes.map(r => r.name), ...wizardConfig.wizard_remotes.map(r => r.name)];
-    if (allNames.includes(name)) { alert(`Remote "${name}" 已存在`); return; }
-    const def = _remoteTypeDefs[type];
-    if (!def) return;
-    const params = {};
-    for (const f of def.fields) {
-        const el = document.getElementById('wz-rf-' + f.key);
-        if (el) params[f.key] = el.value.trim();
-        if (f.required && !params[f.key]) { alert(`请填写 ${f.label}`); return; }
-    }
-    wizardConfig.wizard_remotes.push({ name, type, params });
-    renderWizardManualRemotes();
-    // Reset form
-    document.getElementById('wz-remote-name').value = '';
-    document.getElementById('wz-remote-type').value = '';
-    document.getElementById('wz-remote-fields').innerHTML = '';
-    toggleWizardAddRemote();
-    // 添加后显示提示
-    const status = document.createElement('div');
-    status.className = 'form-hint';
-    status.style.color = 'var(--green)';
-    status.textContent = `✅ Remote "${name}" 已添加`;
-    document.getElementById('rclone-manual-input').appendChild(status);
-    setTimeout(() => status.remove(), 3000);
-}
+        function submitWizardRemote() {
+            const name = document.getElementById('wz-remote-name').value.trim();
+            const type = document.getElementById('wz-remote-type').value;
+            if (!name || !type) { alert('请填写名称和类型'); return; }
+            if (!/^[a-zA-Z0-9_-]+$/.test(name)) { alert('名称只能包含字母、数字、下划线和短横线'); return; }
+            // 检查重复
+            const allNames = [..._detectedRemotes.map(r => r.name), ...wizardConfig.wizard_remotes.map(r => r.name)];
+            if (allNames.includes(name)) { alert(`Remote "${name}" 已存在`); return; }
+            const def = _remoteTypeDefs[type];
+            if (!def) return;
+            const params = {};
+            for (const f of def.fields) {
+                const el = document.getElementById('wz-rf-' + f.key);
+                if (el) params[f.key] = el.value.trim();
+                if (f.required && !params[f.key]) { alert(`请填写 ${f.label}`); return; }
+            }
+            wizardConfig.wizard_remotes.push({ name, type, params });
+            renderWizardManualRemotes();
+            // Reset form
+            document.getElementById('wz-remote-name').value = '';
+            document.getElementById('wz-remote-type').value = '';
+            document.getElementById('wz-remote-fields').innerHTML = '';
+            toggleWizardAddRemote();
+            // 添加后显示提示
+            const status = document.createElement('div');
+            status.className = 'form-hint';
+            status.style.color = 'var(--green)';
+            status.textContent = `✅ Remote "${name}" 已添加`;
+            document.getElementById('rclone-manual-input').appendChild(status);
+            setTimeout(() => status.remove(), 3000);
+        }
 
-function removeWizardRemote(name) {
-    wizardConfig.wizard_remotes = wizardConfig.wizard_remotes.filter(r => r.name !== name);
-    renderWizardManualRemotes();
-}
+        function removeWizardRemote(name) {
+            wizardConfig.wizard_remotes = wizardConfig.wizard_remotes.filter(r => r.name !== name);
+            renderWizardManualRemotes();
+        }
 
-function renderWizardManualRemotes() {
-    const section = document.getElementById('wizard-manual-remotes');
-    const list = document.getElementById('wizard-manual-remotes-list');
-    if (wizardConfig.wizard_remotes.length > 0) {
-        section.style.display = 'block';
-        list.innerHTML = wizardConfig.wizard_remotes.map(r => {
-            const def = _remoteTypeDefs[r.type] || {};
-            return `<span class="wz-remote-chip">${def.icon || '💾'} ${esc(r.name)} <span class="wz-rtype">${esc(def.label || r.type)}</span>
+        function renderWizardManualRemotes() {
+            const section = document.getElementById('wizard-manual-remotes');
+            const list = document.getElementById('wizard-manual-remotes-list');
+            if (wizardConfig.wizard_remotes.length > 0) {
+                section.style.display = 'block';
+                list.innerHTML = wizardConfig.wizard_remotes.map(r => {
+                    const def = _remoteTypeDefs[r.type] || {};
+                    return `<span class="wz-remote-chip">${def.icon || '💾'} ${esc(r.name)} <span class="wz-rtype">${esc(def.label || r.type)}</span>
                 <button onclick="removeWizardRemote('${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem;margin-left:4px" title="移除">✕</button></span>`;
-        }).join('');
-    } else {
-        section.style.display = 'none';
-    }
-}
+                }).join('');
+            } else {
+                section.style.display = 'none';
+            }
+        }
 
-// ── Sync Rules Step (Step 4) ──
-function getAllRemoteNames() {
-    const names = new Set();
-    _detectedRemotes.forEach(r => names.add(r.name));
-    wizardConfig.wizard_remotes.forEach(r => names.add(r.name));
-    return [...names];
-}
+        // ── Sync Rules Step (Step 4) ──
+        function getAllRemoteNames() {
+            const names = new Set();
+            _detectedRemotes.forEach(r => names.add(r.name));
+            wizardConfig.wizard_remotes.forEach(r => names.add(r.name));
+            return [...names];
+        }
 
-function initSyncRulesStep() {
-    const remotes = getAllRemoteNames();
-    const defaultRemoteSel = document.getElementById('wz-default-remote');
-    const currentDefault = defaultRemoteSel.value;
-    defaultRemoteSel.innerHTML = remotes.length === 0
-        ? '<option value="">（无可用 Remote）</option>'
-        : remotes.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-    if (currentDefault && remotes.includes(currentDefault)) {
-        defaultRemoteSel.value = currentDefault;
-    }
+        function initSyncRulesStep() {
+            const remotes = getAllRemoteNames();
+            const defaultRemoteSel = document.getElementById('wz-default-remote');
+            const currentDefault = defaultRemoteSel.value;
+            defaultRemoteSel.innerHTML = remotes.length === 0
+                ? '<option value="">（无可用 Remote）</option>'
+                : remotes.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            if (currentDefault && remotes.includes(currentDefault)) {
+                defaultRemoteSel.value = currentDefault;
+            }
 
-    // Pull templates
-    const pullTpls = _syncTemplates.filter(t => t.direction === 'pull');
-    const pushTpls = _syncTemplates.filter(t => t.direction === 'push');
+            // Pull templates
+            const pullTpls = _syncTemplates.filter(t => t.direction === 'pull');
+            const pushTpls = _syncTemplates.filter(t => t.direction === 'push');
 
-    const savedRules = wizardConfig.wizard_sync_rules || [];
-    const savedMap = {};
-    savedRules.forEach(r => { savedMap[r.template_id] = r; });
+            const savedRules = wizardConfig.wizard_sync_rules || [];
+            const savedMap = {};
+            savedRules.forEach(r => { savedMap[r.template_id] = r; });
 
-    const defaultRemote = defaultRemoteSel.value || remotes[0] || '';
+            const defaultRemote = defaultRemoteSel.value || remotes[0] || '';
 
-    document.getElementById('wz-pull-rules').innerHTML = pullTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
-    document.getElementById('wz-push-rules').innerHTML = pushTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
+            document.getElementById('wz-pull-rules').innerHTML = pullTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
+            document.getElementById('wz-push-rules').innerHTML = pushTpls.map(t => renderRuleItem(t, savedMap[t.id], defaultRemote, remotes)).join('');
 
-    // Enable drag-to-scroll on rule rows
-    document.querySelectorAll('.wz-rule-row').forEach(initDragScroll);
-    updateRuleCount();
-}
+            // Enable drag-to-scroll on rule rows
+            document.querySelectorAll('.wz-rule-row').forEach(initDragScroll);
+            updateRuleCount();
+        }
 
-function renderRuleItem(tpl, saved, defaultRemote, remotes) {
-    const isSelected = saved ? true : false;
-    const remote = saved?.remote || defaultRemote;
-    const remotePath = saved?.remote_path || tpl.remote_path || '';
-    const methodTag = tpl.method === 'move' ? '移动' : '保留本地';
-    const triggerTag = tpl.trigger === 'deploy' ? '部署执行' : tpl.trigger === 'watch' ? '持续监控' : '手动';
-    const remoteOpts = remotes.length === 0
-        ? `<input type="text" class="wz-rule-remote" value="${esc(remote)}" placeholder="remote" onclick="event.stopPropagation()">`
-        : `<select class="wz-rule-remote" onclick="event.stopPropagation()">${remotes.map(n => `<option value="${esc(n)}"${n===remote?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
-    // 简短名称 (去掉 emoji 前缀)
-    const shortName = tpl.name.replace(/^[⬇️⬆️📥📤]\s*/, '');
+        function renderRuleItem(tpl, saved, defaultRemote, remotes) {
+            const isSelected = saved ? true : false;
+            const remote = saved?.remote || defaultRemote;
+            const remotePath = saved?.remote_path || tpl.remote_path || '';
+            const methodTag = tpl.method === 'move' ? '移动' : '保留本地';
+            const triggerTag = tpl.trigger === 'deploy' ? '部署执行' : tpl.trigger === 'watch' ? '持续监控' : '手动';
+            const remoteOpts = remotes.length === 0
+                ? `<input type="text" class="wz-rule-remote" value="${esc(remote)}" placeholder="remote" onclick="event.stopPropagation()">`
+                : `<select class="wz-rule-remote" onclick="event.stopPropagation()">${remotes.map(n => `<option value="${esc(n)}"${n === remote ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+            // 简短名称 (去掉 emoji 前缀)
+            const shortName = tpl.name.replace(/^[⬇️⬆️📥📤]\s*/, '');
 
-    return `<div class="wz-rule-card${isSelected ? ' selected' : ''}" data-tpl-id="${esc(tpl.id)}">
+            return `<div class="wz-rule-card${isSelected ? ' selected' : ''}" data-tpl-id="${esc(tpl.id)}">
         <div class="wz-rule-check" onclick="toggleRuleCard(this.parentElement)">✓</div>
         <div class="rule-name">${esc(shortName)}</div>
         <div class="rule-method">${triggerTag} · ${methodTag}</div>
@@ -1273,137 +1979,137 @@ function renderRuleItem(tpl, saved, defaultRemote, remotes) {
         </div>
         <div class="rule-local" title="${esc(tpl.local_path)}">📂 ${esc(tpl.local_path)}</div>
     </div>`;
-}
+        }
 
-function toggleRuleCard(card) {
-    card.classList.toggle('selected');
-    updateNextBtnText();
-    updateRuleCount();
-}
+        function toggleRuleCard(card) {
+            card.classList.toggle('selected');
+            updateNextBtnText();
+            updateRuleCount();
+        }
 
-function updateRuleCount() {
-    const n = document.querySelectorAll('.wz-rule-card.selected').length;
-    const el = document.getElementById('wz-rule-count');
-    if (el) el.textContent = `已选规则：${n} · 部署后可在 ComfyCarry 云同步页修改`;
-}
+        function updateRuleCount() {
+            const n = document.querySelectorAll('.wz-rule-card.selected').length;
+            const el = document.getElementById('wz-rule-count');
+            if (el) el.textContent = `已选规则：${n} · 部署后可在 ComfyCarry 云同步页修改`;
+        }
 
-function initDragScroll(el) {
-    let isDown = false, startX, scrollLeft;
-    el.addEventListener('mousedown', e => {
-        if (e.target.closest('input,select,button')) return;
-        isDown = true; startX = e.pageX - el.offsetLeft; scrollLeft = el.scrollLeft;
-        el.style.cursor = 'grabbing'; e.preventDefault();
-    });
-    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
-    el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
-    el.addEventListener('mousemove', e => {
-        if (!isDown) return;
-        const x = e.pageX - el.offsetLeft;
-        el.scrollLeft = scrollLeft - (x - startX);
-    });
-}
+        function initDragScroll(el) {
+            let isDown = false, startX, scrollLeft;
+            el.addEventListener('mousedown', e => {
+                if (e.target.closest('input,select,button')) return;
+                isDown = true; startX = e.pageX - el.offsetLeft; scrollLeft = el.scrollLeft;
+                el.style.cursor = 'grabbing'; e.preventDefault();
+            });
+            el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
+            el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
+            el.addEventListener('mousemove', e => {
+                if (!isDown) return;
+                const x = e.pageX - el.offsetLeft;
+                el.scrollLeft = scrollLeft - (x - startX);
+            });
+        }
 
-function updateWizardRuleRemotes() {
-    const defaultRemote = document.getElementById('wz-default-remote').value;
-    document.querySelectorAll('.wz-rule-card .wz-rule-remote').forEach(el => {
-        if (el.tagName === 'SELECT') el.value = defaultRemote;
-        else el.value = defaultRemote;
-    });
-}
+        function updateWizardRuleRemotes() {
+            const defaultRemote = document.getElementById('wz-default-remote').value;
+            document.querySelectorAll('.wz-rule-card .wz-rule-remote').forEach(el => {
+                if (el.tagName === 'SELECT') el.value = defaultRemote;
+                else el.value = defaultRemote;
+            });
+        }
 
-// ── Plugins ──
-function renderPluginList(plugins, selectedUrls) {
-    const list = document.getElementById('plugin-list');
-    const desc = document.getElementById('plugin-step-desc');
-    const sorted = [...plugins].sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
-    desc.textContent = '⚡ 预构建镜像已包含以下插件';
-    list.innerHTML = sorted.map((p, i) => {
-        return `<div class="plugin-item">
+        // ── Plugins ──
+        function renderPluginList(plugins, selectedUrls) {
+            const list = document.getElementById('plugin-list');
+            const desc = document.getElementById('plugin-step-desc');
+            const sorted = [...plugins].sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
+            desc.textContent = '⚡ 预构建镜像已包含以下插件';
+            list.innerHTML = sorted.map((p, i) => {
+                return `<div class="plugin-item">
             <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
             <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
         </div>`;
-    }).join('');
-}
+            }).join('');
+        }
 
-function getSelectedPlugins() {
-    const urls = [];
-    document.querySelectorAll('#plugin-list input[type="checkbox"]').forEach(cb => {
-        if (cb.checked) urls.push(cb.dataset.url);
-    });
-    const extra = document.getElementById('input-extra-plugins').value.trim();
-    if (extra) {
-        extra.split('\n').forEach(u => {
-            u = u.trim();
-            if (u && u.startsWith('http')) urls.push(u);
-        });
-    }
-    return urls;
-}
+        function getSelectedPlugins() {
+            const urls = [];
+            document.querySelectorAll('#plugin-list input[type="checkbox"]').forEach(cb => {
+                if (cb.checked) urls.push(cb.dataset.url);
+            });
+            const extra = document.getElementById('input-extra-plugins').value.trim();
+            if (extra) {
+                extra.split('\n').forEach(u => {
+                    u = u.trim();
+                    if (u && u.startsWith('http')) urls.push(u);
+                });
+            }
+            return urls;
+        }
 
-// ── Attention Acceleration ──
-function initAttnStep() {
-    const fa2Card = document.getElementById('attn-card-fa2');
-    const sa2Card = document.getElementById('attn-card-sa2');
+        // ── Attention Acceleration ──
+        function initAttnStep() {
+            const fa2Card = document.getElementById('attn-card-fa2');
+            const sa2Card = document.getElementById('attn-card-sa2');
 
-    // 预构建镜像: FA2 已预装 → 默认选中 + 不可取消
-    fa2Card.classList.add('selected');
-    fa2Card.style.opacity = '0.7';
-    fa2Card.style.pointerEvents = 'none';
-    fa2Card.querySelector('p').textContent = '已预装在镜像中';
-    document.getElementById('attn-step-desc').textContent = '⚡ FA2 已预装，可选择额外安装 SA2';
+            // 预构建镜像: FA2 已预装 → 默认选中 + 不可取消
+            fa2Card.classList.add('selected');
+            fa2Card.style.opacity = '0.7';
+            fa2Card.style.pointerEvents = 'none';
+            fa2Card.querySelector('p').textContent = '已预装在镜像中';
+            document.getElementById('attn-step-desc').textContent = '⚡ FA2 已预装，可选择额外安装 SA2';
 
-    if (wizardConfig.install_sa2) sa2Card.classList.add('selected');
+            if (wizardConfig.install_sa2) sa2Card.classList.add('selected');
 
-    updateAttnHint();
-    updateNextBtnText();
-}
+            updateAttnHint();
+            updateNextBtnText();
+        }
 
-function toggleAttnCard(type) {
-    const card = document.getElementById(`attn-card-${type}`);
-    // 预构建下 FA2 不可取消
-    if (type === 'fa2') return;  // FA2 已预装，不可取消
-    card.classList.toggle('selected');
-    updateAttnHint();
-    updateNextBtnText();
-}
+        function toggleAttnCard(type) {
+            const card = document.getElementById(`attn-card-${type}`);
+            // 预构建下 FA2 不可取消
+            if (type === 'fa2') return;  // FA2 已预装，不可取消
+            card.classList.toggle('selected');
+            updateAttnHint();
+            updateNextBtnText();
+        }
 
-function updateAttnHint() {
-    const fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
-    const sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
-    const el = document.getElementById('attn-hint');
-    if (fa2 && sa2) {
-        el.textContent = '💡 两者同时安装时，ComfyUI 将优先使用 FlashAttention-2';
-    } else if (fa2) {
-        el.textContent = '🔥 ComfyUI 将使用 --use-flash-attention 启动';
-    } else if (sa2) {
-        el.textContent = '🌿 ComfyUI 将使用 --use-sage-attention 启动';
-    } else {
-        el.textContent = '跳过后 ComfyUI 将使用默认 PyTorch SDPA';
-    }
-}
+        function updateAttnHint() {
+            const fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
+            const sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
+            const el = document.getElementById('attn-hint');
+            if (fa2 && sa2) {
+                el.textContent = '💡 两者同时安装时，ComfyUI 将优先使用 FlashAttention-2';
+            } else if (fa2) {
+                el.textContent = '🔥 ComfyUI 将使用 --use-flash-attention 启动';
+            } else if (sa2) {
+                el.textContent = '🌿 ComfyUI 将使用 --use-sage-attention 启动';
+            } else {
+                el.textContent = '跳过后 ComfyUI 将使用默认 PyTorch SDPA';
+            }
+        }
 
-// ── Summary ──
-function renderSummary() {
-    saveCurrentStep();
-    const c = wizardConfig;
-    const pluginCount = (c.plugins || []).length;
-    const ruleCount = (c.wizard_sync_rules || []).length;
-    const remoteCount = _detectedRemotes.length + (c.wizard_remotes || []).length;
-    let importNote = '';
-    if (importedConfig) {
-        importNote = `
+        // ── Summary ──
+        function renderSummary() {
+            saveCurrentStep();
+            const c = wizardConfig;
+            const pluginCount = (c.plugins || []).length;
+            const ruleCount = (c.wizard_sync_rules || []).length;
+            const remoteCount = _detectedRemotes.length + (c.wizard_remotes || []).length;
+            let importNote = '';
+            if (importedConfig) {
+                importNote = `
         <div class="summary-card" style="border-color:var(--accent)">
             <h4>📦 从配置文件恢复</h4>
             <div class="summary-row"><span class="label">导出时间</span><span class="value">${esc(importedConfig._exported_at || '未知')}</span></div>
         </div>`;
-    }
-    // Sync rules summary
-    const tplMap = {};
-    _syncTemplates.forEach(t => { tplMap[t.id] = t; });
-    const ruleNames = (c.wizard_sync_rules || []).map(r => tplMap[r.template_id]?.name || r.template_id).join(', ');
-    const dm = c._rclone_display_method || c.rclone_config_method;
+            }
+            // Sync rules summary
+            const tplMap = {};
+            _syncTemplates.forEach(t => { tplMap[t.id] = t; });
+            const ruleNames = (c.wizard_sync_rules || []).map(r => tplMap[r.template_id]?.name || r.template_id).join(', ');
+            const dm = c._rclone_display_method || c.rclone_config_method;
 
-    const html = importNote + `
+            const html = importNote + `
         <div class="summary-card">
             <h4>部署方式</h4>
             <div class="summary-row"><span class="label">镜像类型</span><span class="value">⚡ 预构建镜像</span></div>
@@ -1411,7 +2117,7 @@ function renderSummary() {
         <div class="summary-card">
             <h4>网络与安全</h4>
             <div class="summary-row"><span class="label">ComfyCarry 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
-            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.cloudflared_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
+            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.cf_api_token ? '✅ ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : '⏭ 跳过'}</span></div>
         </div>
         <div class="summary-card">
             <h4>云存储与同步</h4>
@@ -1430,244 +2136,247 @@ function renderSummary() {
             <div class="summary-row"><span class="label">FlashAttention-2</span><span class="value">${c.install_fa2 ? '✅ 安装' : '⏭ 跳过'}</span></div>
             <div class="summary-row"><span class="label">SageAttention-2</span><span class="value">${c.install_sa2 ? '✅ 安装' : '⏭ 跳过'}</span></div>
         </div>`;
-    document.getElementById('deploy-summary').innerHTML = html;
-}
-
-// ── Deploy ──
-async function startDeploy() {
-    saveCurrentStep();
-    document.getElementById('btn-deploy').disabled = true;
-    try {
-        const r = await fetch('/api/setup/deploy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(wizardConfig)
-        });
-        const d = await r.json();
-        if (!d.ok) { alert('部署启动失败: ' + (d.error || '')); return; }
-    } catch (e) { alert('请求失败: ' + e.message); return; }
-    showDeployView();
-    connectSSE();
-}
-
-function showDeployView() {
-    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-    document.getElementById('deploy-view').classList.add('active');
-    document.getElementById('progressBar').style.display = 'none';
-    document.querySelector('.wizard-container').style.maxWidth = '1400px';
-    startElapsedTimer();
-}
-
-let elapsedTimer = null;
-let deployStartTime = Date.now();
-
-function startElapsedTimer() {
-    if (elapsedTimer) clearInterval(elapsedTimer);
-    deployStartTime = Date.now();
-    elapsedTimer = setInterval(() => {
-        const s = Math.floor((Date.now() - deployStartTime) / 1000);
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        document.getElementById('deploy-elapsed').textContent = `已用时: ${m > 0 ? m + ' 分 ' : ''}${sec} 秒`;
-    }, 1000);
-}
-
-let completedSteps = [];
-let sseCompleted = false;
-
-function connectSSE() {
-    sseCompleted = false;
-    const evtSource = new EventSource('/api/setup/log_stream');
-    const logEl = document.getElementById('deploy-log');
-    const stepsEl = document.getElementById('deploy-steps-list');
-    // 重连时清空已有步骤列表，避免重复显示
-    stepsEl.innerHTML = '';
-    completedSteps = [];
-
-    evtSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-
-        if (data.type === 'step') {
-            if (completedSteps.length > 0) {
-                const prev = stepsEl.querySelector('.deploy-step-item.active');
-                if (prev) { prev.classList.remove('active'); prev.classList.add('done'); prev.querySelector('.step-icon').textContent = '✅'; }
-            }
-            completedSteps.push(data.name);
-            const item = document.createElement('div');
-            item.className = 'deploy-step-item active';
-            item.innerHTML = `<span class="step-icon">⏳</span>${esc(data.name)}`;
-            stepsEl.appendChild(item);
-            return;
+            document.getElementById('deploy-summary').innerHTML = html;
         }
 
-        if (data.type === 'done') {
-            sseCompleted = true;
-            evtSource.close();
+        // ── Deploy ──
+        async function startDeploy() {
+            saveCurrentStep();
+            document.getElementById('btn-deploy').disabled = true;
+            try {
+                const r = await fetch('/api/setup/deploy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(wizardConfig)
+                });
+                const d = await r.json();
+                if (!d.ok) { alert('部署启动失败: ' + (d.error || '')); return; }
+            } catch (e) { alert('请求失败: ' + e.message); return; }
+            showDeployView();
+            connectSSE();
+        }
+
+        function showDeployView() {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('deploy-view').classList.add('active');
+            document.getElementById('progressBar').style.display = 'none';
+            document.querySelector('.wizard-container').style.maxWidth = '1400px';
+            startElapsedTimer();
+        }
+
+        let elapsedTimer = null;
+        let deployStartTime = Date.now();
+
+        function startElapsedTimer() {
             if (elapsedTimer) clearInterval(elapsedTimer);
-            const lastActive = stepsEl.querySelector('.deploy-step-item.active');
-            if (lastActive) {
-                lastActive.classList.remove('active');
-                if (data.success) {
-                    lastActive.classList.add('done');
-                    lastActive.querySelector('.step-icon').textContent = '✅';
-                } else {
-                    lastActive.style.color = 'var(--red)';
-                    lastActive.querySelector('.step-icon').textContent = '❌';
+            deployStartTime = Date.now();
+            elapsedTimer = setInterval(() => {
+                const s = Math.floor((Date.now() - deployStartTime) / 1000);
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                document.getElementById('deploy-elapsed').textContent = `已用时: ${m > 0 ? m + ' 分 ' : ''}${sec} 秒`;
+            }, 1000);
+        }
+
+        let completedSteps = [];
+        let sseCompleted = false;
+
+        function connectSSE() {
+            sseCompleted = false;
+            const evtSource = new EventSource('/api/setup/log_stream');
+            const logEl = document.getElementById('deploy-log');
+            const stepsEl = document.getElementById('deploy-steps-list');
+            // 重连时清空已有步骤列表，避免重复显示
+            stepsEl.innerHTML = '';
+            completedSteps = [];
+
+            evtSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'step') {
+                    if (completedSteps.length > 0) {
+                        const prev = stepsEl.querySelector('.deploy-step-item.active');
+                        if (prev) { prev.classList.remove('active'); prev.classList.add('done'); prev.querySelector('.step-icon').textContent = '✅'; }
+                    }
+                    completedSteps.push(data.name);
+                    const item = document.createElement('div');
+                    item.className = 'deploy-step-item active';
+                    item.innerHTML = `<span class="step-icon">⏳</span>${esc(data.name)}`;
+                    stepsEl.appendChild(item);
+                    return;
                 }
-            }
-            if (data.success) {
-                document.getElementById('deploy-title').textContent = '✅ 部署完成';
-                const doneEl = document.createElement('div');
-                doneEl.className = 'log-line info';
-                doneEl.style.color = 'var(--green)';
-                doneEl.style.fontWeight = '600';
-                doneEl.textContent = '🎉 部署完成！';
-                logEl.appendChild(doneEl);
-                // 显示 attention 安装警告 (如有)
-                if (data.attn_warnings && data.attn_warnings.length > 0) {
-                    const names = data.attn_warnings.join(' / ');
-                    const warnEl = document.createElement('div');
-                    warnEl.className = 'log-line warn';
-                    warnEl.style.color = 'var(--amber)';
-                    warnEl.innerHTML = `⚠️ ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。`;
-                    logEl.appendChild(warnEl);
-                    document.getElementById('deploy-done-retry').style.display = '';
+
+                if (data.type === 'done') {
+                    sseCompleted = true;
+                    evtSource.close();
+                    if (elapsedTimer) clearInterval(elapsedTimer);
+                    const lastActive = stepsEl.querySelector('.deploy-step-item.active');
+                    if (lastActive) {
+                        lastActive.classList.remove('active');
+                        if (data.success) {
+                            lastActive.classList.add('done');
+                            lastActive.querySelector('.step-icon').textContent = '✅';
+                        } else {
+                            lastActive.style.color = 'var(--red)';
+                            lastActive.querySelector('.step-icon').textContent = '❌';
+                        }
+                    }
+                    if (data.success) {
+                        document.getElementById('deploy-title').textContent = '✅ 部署完成';
+                        const doneEl = document.createElement('div');
+                        doneEl.className = 'log-line info';
+                        doneEl.style.color = 'var(--green)';
+                        doneEl.style.fontWeight = '600';
+                        doneEl.textContent = '🎉 部署完成！';
+                        logEl.appendChild(doneEl);
+                        // 显示 attention 安装警告 (如有)
+                        if (data.attn_warnings && data.attn_warnings.length > 0) {
+                            const names = data.attn_warnings.join(' / ');
+                            const warnEl = document.createElement('div');
+                            warnEl.className = 'log-line warn';
+                            warnEl.style.color = 'var(--amber)';
+                            warnEl.innerHTML = `⚠️ ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。`;
+                            logEl.appendChild(warnEl);
+                            document.getElementById('deploy-done-retry').style.display = '';
+                        }
+                        document.getElementById('deploy-done-row').style.display = 'flex';
+                    } else {
+                        document.getElementById('deploy-title').textContent = '❌ 部署失败';
+                        const errEl = document.createElement('div');
+                        errEl.className = 'log-line error';
+                        errEl.textContent = '❌ ' + (data.msg || '部署失败');
+                        logEl.appendChild(errEl);
+                        const banner = document.getElementById('deploy-error-banner');
+                        banner.style.display = 'block';
+                        banner.innerHTML = `<strong>错误:</strong> ${esc(data.msg || '部署进程异常终止')}<br><small>已完成的步骤会在重试时自动跳过，节省时间。</small>`;
+                        document.getElementById('deploy-fail-row').style.display = 'flex';
+                    }
+                    logEl.scrollTop = logEl.scrollHeight;
+                    return;
                 }
-                document.getElementById('deploy-done-row').style.display = 'flex';
-            } else {
-                document.getElementById('deploy-title').textContent = '❌ 部署失败';
-                const errEl = document.createElement('div');
-                errEl.className = 'log-line error';
-                errEl.textContent = '❌ ' + (data.msg || '部署失败');
-                logEl.appendChild(errEl);
-                const banner = document.getElementById('deploy-error-banner');
-                banner.style.display = 'block';
-                banner.innerHTML = `<strong>错误:</strong> ${esc(data.msg || '部署进程异常终止')}<br><small>已完成的步骤会在重试时自动跳过，节省时间。</small>`;
-                document.getElementById('deploy-fail-row').style.display = 'flex';
+
+                if (data.type === 'log') {
+                    const line = document.createElement('div');
+                    line.className = `log-line ${data.level || 'info'}`;
+                    const timeSpan = data.time ? `<span class="log-time">${esc(data.time)}</span>` : '';
+                    line.innerHTML = `${timeSpan}${esc(data.msg)}`;
+                    logEl.appendChild(line);
+                    if (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 100) {
+                        logEl.scrollTop = logEl.scrollHeight;
+                    }
+                }
+            };
+
+            evtSource.onerror = () => {
+                evtSource.close();
+                if (!sseCompleted) {
+                    setTimeout(() => { connectSSE(); }, 3000);
+                }
+            };
+        }
+
+        function retryDeploy() {
+            document.getElementById('deploy-steps-list').innerHTML = '';
+            document.getElementById('deploy-log').innerHTML = '';
+            document.getElementById('deploy-error-banner').style.display = 'none';
+            document.getElementById('deploy-fail-row').style.display = 'none';
+            document.getElementById('deploy-done-row').style.display = 'none';
+            document.getElementById('deploy-done-retry').style.display = 'none';
+            document.getElementById('deploy-title').textContent = '⚙️ 正在部署... (智能重试)';
+            completedSteps = [];
+            sseCompleted = false;
+            startDeploy();
+        }
+
+        function backToWizard() {
+            document.getElementById('deploy-view').classList.remove('active');
+            document.getElementById('progressBar').style.display = '';
+            document.querySelector('.wizard-container').style.maxWidth = '';
+            showStep(TOTAL_STEPS - 1);
+            renderSummary();
+        }
+
+        async function handleImportFile(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            event.target.value = '';
+            try {
+                const text = await file.text();
+                const config = JSON.parse(text);
+
+                if (!config._version) {
+                    showImportResult('❌ 无效的配置文件格式', true);
+                    return;
+                }
+
+                // 镜像类型检查 (仅兼容预构建镜像)
+
+                const r = await fetch('/api/settings/import-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: text
+                });
+                const d = await r.json();
+                if (!d.ok) {
+                    showImportResult('❌ 导入失败: ' + esc(d.error || '未知错误'), true);
+                    return;
+                }
+
+                importedConfig = config;
+                wizardConfig.image_type = 'prebuilt';
+                if (config.password) wizardConfig.password = config.password;
+                if (config.cf_api_token) wizardConfig.cf_api_token = config.cf_api_token;
+                if (config.cf_domain) wizardConfig.cf_domain = config.cf_domain;
+                if (config.cf_subdomain) wizardConfig.cf_subdomain = config.cf_subdomain;
+                if (config.civitai_token) wizardConfig.civitai_token = config.civitai_token;
+                if (config.rclone_config_base64) {
+                    wizardConfig.rclone_config_method = 'base64';
+                    wizardConfig.rclone_config_value = config.rclone_config_base64;
+                }
+                if (config.extra_plugins !== undefined || config.disabled_default_plugins !== undefined) {
+                    const defaultUrls = pluginData.map(p => p.url);
+                    const disabled = new Set(config.disabled_default_plugins || []);
+                    const plugins = defaultUrls.filter(u => !disabled.has(u));
+                    plugins.push(...(config.extra_plugins || []));
+                    wizardConfig.plugins = plugins;
+                }
+                if (config.sync_rules && config.sync_rules.length > 0) {
+                    wizardConfig._imported_sync_rules = true;
+                }
+                if (config.install_fa2 !== undefined) wizardConfig.install_fa2 = config.install_fa2;
+                if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
+
+                showImportResult(
+                    `✅ 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
+                    false
+                );
+                document.getElementById('btn-next-0').disabled = false;
+
+            } catch (e) {
+                showImportResult('❌ 文件解析失败: ' + e.message, true);
             }
-            logEl.scrollTop = logEl.scrollHeight;
-            return;
         }
 
-        if (data.type === 'log') {
-            const line = document.createElement('div');
-            line.className = `log-line ${data.level || 'info'}`;
-            const timeSpan = data.time ? `<span class="log-time">${esc(data.time)}</span>` : '';
-            line.innerHTML = `${timeSpan}${esc(data.msg)}`;
-            logEl.appendChild(line);
-            if (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 100) {
-                logEl.scrollTop = logEl.scrollHeight;
+        function showImportResult(html, isError) {
+            const el = document.getElementById('import-result');
+            el.style.display = 'block';
+            el.innerHTML = html;
+            el.style.background = isError ? 'rgba(255,80,80,0.12)' : 'rgba(74,222,128,0.12)';
+            el.style.border = `1px solid ${isError ? 'var(--red)' : 'var(--green)'}`;
+            el.style.color = isError ? 'var(--red)' : 'var(--green)';
+        }
+
+        // --- Detect remotes on text input change (debounced) ---
+        document.addEventListener('input', (e) => {
+            if (e.target.id === 'input-rclone-base64' || e.target.id === 'input-rclone-url') {
+                clearTimeout(window._rcloneDetectTimer);
+                window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 800);
             }
-        }
-    };
-
-    evtSource.onerror = () => {
-        evtSource.close();
-        if (!sseCompleted) {
-            setTimeout(() => { connectSSE(); }, 3000);
-        }
-    };
-}
-
-function retryDeploy() {
-    document.getElementById('deploy-steps-list').innerHTML = '';
-    document.getElementById('deploy-log').innerHTML = '';
-    document.getElementById('deploy-error-banner').style.display = 'none';
-    document.getElementById('deploy-fail-row').style.display = 'none';
-    document.getElementById('deploy-done-row').style.display = 'none';
-    document.getElementById('deploy-done-retry').style.display = 'none';
-    document.getElementById('deploy-title').textContent = '⚙️ 正在部署... (智能重试)';
-    completedSteps = [];
-    sseCompleted = false;
-    startDeploy();
-}
-
-function backToWizard() {
-    document.getElementById('deploy-view').classList.remove('active');
-    document.getElementById('progressBar').style.display = '';
-    document.querySelector('.wizard-container').style.maxWidth = '';
-    showStep(TOTAL_STEPS - 1);
-    renderSummary();
-}
-
-async function handleImportFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    event.target.value = '';
-    try {
-        const text = await file.text();
-        const config = JSON.parse(text);
-
-        if (!config._version) {
-            showImportResult('❌ 无效的配置文件格式', true);
-            return;
-        }
-
-        // 镜像类型检查 (仅兼容预构建镜像)
-
-        const r = await fetch('/api/settings/import-config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: text
         });
-        const d = await r.json();
-        if (!d.ok) {
-            showImportResult('❌ 导入失败: ' + esc(d.error || '未知错误'), true);
-            return;
-        }
 
-        importedConfig = config;
-        wizardConfig.image_type = 'prebuilt';
-        if (config.password) wizardConfig.password = config.password;
-        if (config.cloudflared_token) wizardConfig.cloudflared_token = config.cloudflared_token;
-        if (config.civitai_token) wizardConfig.civitai_token = config.civitai_token;
-        if (config.rclone_config_base64) {
-            wizardConfig.rclone_config_method = 'base64';
-            wizardConfig.rclone_config_value = config.rclone_config_base64;
-        }
-        if (config.extra_plugins !== undefined || config.disabled_default_plugins !== undefined) {
-            const defaultUrls = pluginData.map(p => p.url);
-            const disabled = new Set(config.disabled_default_plugins || []);
-            const plugins = defaultUrls.filter(u => !disabled.has(u));
-            plugins.push(...(config.extra_plugins || []));
-            wizardConfig.plugins = plugins;
-        }
-        if (config.sync_rules && config.sync_rules.length > 0) {
-            wizardConfig._imported_sync_rules = true;
-        }
-        if (config.install_fa2 !== undefined) wizardConfig.install_fa2 = config.install_fa2;
-        if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
-
-        showImportResult(
-            `✅ 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
-            false
-        );
-        document.getElementById('btn-next-0').disabled = false;
-
-    } catch (e) {
-        showImportResult('❌ 文件解析失败: ' + e.message, true);
-    }
-}
-
-function showImportResult(html, isError) {
-    const el = document.getElementById('import-result');
-    el.style.display = 'block';
-    el.innerHTML = html;
-    el.style.background = isError ? 'rgba(255,80,80,0.12)' : 'rgba(74,222,128,0.12)';
-    el.style.border = `1px solid ${isError ? 'var(--red)' : 'var(--green)'}`;
-    el.style.color = isError ? 'var(--red)' : 'var(--green)';
-}
-
-// --- Detect remotes on text input change (debounced) ---
-document.addEventListener('input', (e) => {
-    if (e.target.id === 'input-rclone-base64' || e.target.id === 'input-rclone-url') {
-        clearTimeout(window._rcloneDetectTimer);
-        window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 800);
-    }
-});
-
-// ── Start ──
-init();
-</script>
+        // ── Start ──
+        init();
+    </script>
 </body>
+
 </html>

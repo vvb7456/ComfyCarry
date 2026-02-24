@@ -2625,9 +2625,52 @@
                 </div>
             </div>
             <div class="page-body">
-                <div id="tunnel-status-info"></div>
-                <div class="section-title" style="margin-top:16px">📜 Tunnel 日志</div>
-                <div class="log-box" id="tunnel-log-content" style="max-height:400px">加载中...</div>
+                <!-- 状态区 (已配置时) -->
+                <div id="tunnel-status-section" style="display:none">
+                    <div id="tunnel-status-info"></div>
+                    <div style="margin-top:16px">
+                        <div class="section-title">🔗 服务</div>
+                        <div id="tunnel-services"></div>
+                    </div>
+                    <div style="margin-top:12px;display:flex;gap:8px">
+                        <button class="btn btn-sm" onclick="window._tunnelRestart()">♻️ 重启</button>
+                        <button class="btn btn-sm btn-danger" onclick="window._tunnelTeardown()">🗑️ 移除 Tunnel</button>
+                        <button class="btn btn-sm" onclick="window._tunnelToggleSetup()" style="margin-left:auto">⚙ 修改配置</button>
+                    </div>
+                </div>
+
+                <!-- 配置区 (未配置时, 或手动展开) -->
+                <div id="tunnel-setup-section" style="display:none">
+                    <div class="card" style="padding:clamp(16px,1.5vw,24px);max-width:600px">
+                        <div class="section-title">⚙️ 配置 Cloudflare Tunnel</div>
+                        <div class="form-group" style="margin-bottom:10px">
+                            <label style="font-size:.8rem;color:var(--t2)">CF API Token</label>
+                            <input type="password" id="tunnel-api-token" placeholder="CF Token (My Profile → API Tokens)">
+                            <div style="font-size:.72rem;color:var(--t3);margin-top:4px">
+                                需要权限: <code>Account > Tunnel Edit</code> + <code>Zone > DNS Edit</code>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:10px">
+                            <label style="font-size:.8rem;color:var(--t2)">域名</label>
+                            <input type="text" id="tunnel-domain" placeholder="mydomain.com (必须已托管在 Cloudflare)">
+                        </div>
+                        <div class="form-group" style="margin-bottom:10px">
+                            <label style="font-size:.8rem;color:var(--t2)">子域名前缀 <span style="color:var(--t3)">(可选)</span></label>
+                            <input type="text" id="tunnel-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
+                        </div>
+                        <div id="tunnel-validate-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
+                        <div style="display:flex;gap:8px;margin-top:12px">
+                            <button class="btn btn-sm" onclick="window._tunnelValidate()">🔍 验证 Token</button>
+                            <button class="btn btn-sm btn-primary" onclick="window._tunnelProvision()">🚀 创建 Tunnel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日志 -->
+                <div style="margin-top:16px">
+                    <div class="section-title">📜 Tunnel 日志</div>
+                    <div class="log-box" id="tunnel-log-content" style="max-height:400px">加载中...</div>
+                </div>
             </div>
         </div>
 

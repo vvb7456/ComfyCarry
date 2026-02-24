@@ -272,23 +272,42 @@ def _run_deploy(config):
             _mark_step_done("system_deps")
 
         # STEP 2: Cloudflare Tunnel
-        cf_token = config.get("cloudflared_token", "")
-        if cf_token:
-            tunnel_pid = subprocess.run(
-                "pm2 pid tunnel 2>/dev/null", shell=True,
-                capture_output=True, text=True
-            ).stdout.strip()
-            tunnel_running = tunnel_pid and tunnel_pid != "0" and tunnel_pid.isdigit()
-            if tunnel_running:
-                _deploy_step("Cloudflare Tunnel (已在运行)")
-            else:
-                _deploy_step("启动 Cloudflare Tunnel")
-                _deploy_exec("pm2 delete tunnel 2>/dev/null || true")
-                _deploy_exec(
-                    f'pm2 start cloudflared --name tunnel -- tunnel run '
-                    f'--token {shlex.quote(cf_token)}'
-                )
-                _deploy_log("Cloudflare Tunnel 已启动")
+        cf_api_token = config.get("cf_api_token", "")
+        cf_domain = config.get("cf_domain", "")
+        if cf_api_token and cf_domain:
+            _deploy_step("配置 Cloudflare Tunnel")
+            from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError
+            from comfycarry.config import set_config as _sc
+
+            cf_subdomain = config.get("cf_subdomain", "")
+            mgr = TunnelManager(cf_api_token, cf_domain, cf_subdomain)
+
+            try:
+                ok, info = mgr.validate_token()
+                if not ok:
+                    _deploy_log(f"⚠️ CF Token 问题: {info['message']}", "warn")
+                else:
+                    _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
+                    result = mgr.ensure()
+                    _deploy_log(f"✅ Tunnel 已就绪: {mgr.subdomain}.{cf_domain}")
+                    for name, url in result["urls"].items():
+                        _deploy_log(f"  {name}: {url}")
+
+                    # 保存实际使用的 subdomain
+                    _sc("cf_api_token", cf_api_token)
+                    _sc("cf_domain", cf_domain)
+                    _sc("cf_subdomain", mgr.subdomain)
+
+                    # 启动 cloudflared
+                    mgr.start_cloudflared(result["tunnel_token"])
+                    _deploy_log("✅ cloudflared 已启动")
+
+            except CFAPIError as e:
+                _deploy_log(f"⚠️ Tunnel 配置失败: {e}", "warn")
+            except Exception as e:
+                _deploy_log(f"⚠️ Tunnel 异常: {e}", "warn")
+        else:
+            _deploy_step("Cloudflare Tunnel (跳过)")
 
         # STEP 3: Rclone 配置
         rclone_method = config.get("rclone_config_method", "skip")

@@ -60,6 +60,7 @@ def _set_config(key, value):
 
 # 公开别名 (供 deploy_engine 等外部模块使用)
 set_config = _set_config
+get_config = _get_config
 
 
 # ── 密码 ──────────────────────────────────────────────────────
@@ -141,6 +142,9 @@ def _load_setup_state():
         "image_type": "prebuilt",
         "password": "",
         "cloudflared_token": "",
+        "cf_api_token": "",
+        "cf_domain": "",
+        "cf_subdomain": "",
         "rclone_config_method": "",
         "rclone_config_value": "",
         "civitai_token": "",

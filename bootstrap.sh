@@ -126,19 +126,26 @@ else
 fi
 
 # ── CF Tunnel (可选 — 让向导页可通过 Tunnel 域名访问) ──
-# 如果设置了 CF_TUNNEL_TOKEN 环境变量，bootstrap 阶段就启动 tunnel
-# 这样即使公网端口不通，也能通过 tunnel 域名访问 ComfyCarry 向导
-if [ -n "${CF_TUNNEL_TOKEN:-}" ]; then
-    echo "  -> 启动 Cloudflare Tunnel..."
-    pm2 delete tunnel 2>/dev/null || true
-    pm2 start cloudflared --name tunnel \
-        --interpreter none \
-        --log /workspace/tunnel.log \
-        --time \
-        -- tunnel run --token "$CF_TUNNEL_TOKEN"
-    pm2 save 2>/dev/null || true
-    echo "  ✅ Tunnel 已启动，等待连接建立..."
-    sleep 3
+if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
+    echo "  -> 检测到 CF 配置, 启动 Tunnel..."
+    $PYTHON_BIN -c "
+import sys, os
+sys.path.insert(0, '$DASHBOARD_DIR')
+from comfycarry.services.tunnel_manager import TunnelManager
+
+mgr = TunnelManager(
+    api_token=os.environ['CF_API_TOKEN'],
+    domain=os.environ['CF_DOMAIN'],
+    subdomain=os.environ.get('CF_SUBDOMAIN', '')
+)
+
+try:
+    result = mgr.ensure()
+    mgr.start_cloudflared(result['tunnel_token'])
+    print(f'  ✅ Tunnel 已启动: {mgr.subdomain}.{mgr.domain}')
+except Exception as e:
+    print(f'  ⚠️ Tunnel 启动失败: {e}')
+" 2>&1 | tee -a /workspace/setup.log
 fi
 
 echo ""
@@ -148,7 +155,7 @@ echo ""
 echo "  请访问以下地址完成部署向导："
 echo "  → http://localhost:5000"
 echo ""
-if [ -n "${CF_TUNNEL_TOKEN:-}" ]; then
+if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     echo "  → 可通过你的 Cloudflare Tunnel 域名访问"
 fi
 echo "  → 公网端口请在 Vast.ai/RunPod 面板查看"

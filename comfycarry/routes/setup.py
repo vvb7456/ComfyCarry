@@ -47,8 +47,12 @@ def api_setup_state():
     env_vars = {}
     if os.environ.get("DASHBOARD_PASSWORD"):
         env_vars["password"] = os.environ["DASHBOARD_PASSWORD"]
-    if os.environ.get("CF_TUNNEL_TOKEN"):
-        env_vars["cloudflared_token"] = os.environ["CF_TUNNEL_TOKEN"]
+    if os.environ.get("CF_API_TOKEN"):
+        env_vars["cf_api_token"] = os.environ["CF_API_TOKEN"]
+    if os.environ.get("CF_DOMAIN"):
+        env_vars["cf_domain"] = os.environ["CF_DOMAIN"]
+    if os.environ.get("CF_SUBDOMAIN"):
+        env_vars["cf_subdomain"] = os.environ["CF_SUBDOMAIN"]
     if os.environ.get("CIVITAI_TOKEN"):
         env_vars["civitai_token"] = os.environ["CIVITAI_TOKEN"]
     if os.environ.get("RCLONE_CONF_BASE64"):
@@ -67,7 +71,8 @@ def api_setup_save():
     state = _load_setup_state()
     allowed_keys = {
         "current_step", "image_type", "password",
-        "cloudflared_token", "rclone_config_method", "rclone_config_value",
+        "cf_api_token", "cf_domain", "cf_subdomain",
+        "rclone_config_method", "rclone_config_value",
         "civitai_token", "plugins",
         "install_fa2", "install_sa2",
         "wizard_sync_rules", "wizard_remotes",
