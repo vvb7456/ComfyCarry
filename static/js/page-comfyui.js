@@ -75,7 +75,8 @@ function handleComfyEvent(evt) {
       const elapsed = result.data.elapsed ? `${result.data.elapsed}s` : '';
       if (elapsed) showToast(`\u2705 生成完成 (${elapsed})`);
       loadComfyStatus();
-      if (_currentComfyTab === 'queue') { loadQueuePanel(); loadComfyHistory(); }
+      if (_currentComfyTab === 'queue') loadQueuePanel();
+      if (_currentComfyTab === 'queue' || _currentComfyTab === 'history') loadComfyHistory();
     } else if (result.type === 'execution_error') {
       const errEl = document.getElementById('comfyui-exec-bar');
       if (errEl) {
@@ -112,7 +113,27 @@ function _updateMonitorData(d) {
 
 function _updateAllBars() {
   _updateExecBar();
+  _updateStatusCard();
   if (_currentComfyTab === 'queue') loadQueuePanel();
+}
+
+// ── 即时状态卡片更新 ──────────────────────────────────────────
+
+function _updateStatusCard() {
+  const cards = document.getElementById('comfyui-status-cards');
+  if (!cards) return;
+  const firstCard = cards.querySelector('.stat-card');
+  if (!firstCard) return;
+  const valEl = firstCard.querySelector('.stat-value');
+  if (!valEl) return;
+
+  const trackerState = _comfyTracker.getState();
+  const isGenerating = trackerState && !trackerState.finished;
+  const label = isGenerating ? '正在生成' : '空闲中';
+  const color = isGenerating ? 'var(--amber)' : 'var(--green)';
+  valEl.textContent = label;
+  valEl.style.color = color;
+  firstCard.style.borderLeftColor = color;
 }
 
 function _updateExecBar() {
@@ -565,6 +586,10 @@ async function loadComfyHistory() {
     const d = await r.json();
     const items = d.history || [];
 
+    // Update total count
+    const totalEl = document.getElementById('history-total');
+    if (totalEl) totalEl.textContent = items.length > 0 ? `共 ${items.length} 条记录` : '';
+
     if (items.length === 0) {
       el.innerHTML = '<div class="history-empty">暂无生成记录</div>';
       return;
@@ -574,18 +599,15 @@ async function loadComfyHistory() {
     if (_historySortAsc) items.reverse();
 
     el.innerHTML = `<div class="history-grid size-${_historySize}">${items.map(item => {
-      const images = item.images || [];
+      const img = (item.images || [])[0] || null;
       const status = item.completed ? 'success' : 'error';
       const shortId = (item.prompt_id || '').substring(0, 8);
       const ts = item.timestamp ? new Date(item.timestamp).toLocaleString('zh-CN') : '';
 
       let imagesHtml = '';
-      if (images.length > 0) {
-        const showImages = images.slice(0, 3);
-        imagesHtml = `<div class="history-card-images">${showImages.map(img =>
-          `<img src="/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}"
-                loading="lazy" alt="" onclick="window.open(this.src,'_blank')">`
-        ).join('')}</div>`;
+      if (img) {
+        const src = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+        imagesHtml = `<div class="history-card-images"><img src="${src}" loading="lazy" alt="" onclick="window.open(this.src,'_blank')"></div>`;
       } else {
         imagesHtml = `<div class="history-card-images" style="align-items:center;justify-content:center;color:var(--t3);font-size:.8rem">无预览图</div>`;
       }
@@ -595,15 +617,28 @@ async function loadComfyHistory() {
         <div class="history-card-info">
           <span class="status-dot ${status}"></span>
           <div class="history-card-meta">
-            <div>${shortId}…${images.length > 0 ? ` · ${images.length} 张图` : ''}</div>
+            <div>${shortId}…</div>
             <div style="font-size:.7rem;color:var(--t3)">${ts}</div>
           </div>
+          ${img ? `<div class="history-card-actions"><button class="btn btn-sm" title="下载" onclick="downloadHistoryImage('${img.filename.replace(/'/g,"\\'")}','${img.subfolder.replace(/'/g,"\\'")}','${img.type}')">💾</button></div>` : ''}
         </div>
       </div>`;
     }).join('')}</div>`;
   } catch (e) {
     el.innerHTML = renderError('获取历史失败');
   }
+}
+
+// ── 下载历史图片 ──────────────────────────────────────────────
+
+function downloadHistoryImage(filename, subfolder, type) {
+  const url = `/api/comfyui/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${type}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ── 自动刷新 ──────────────────────────────────────────────────
@@ -637,4 +672,5 @@ Object.assign(window, {
   _comfyStop, _comfyStart,
   switchComfyTab, comfyDeleteQueueItem, comfyClearQueue,
   loadComfyHistory, loadQueuePanel, setHistorySort, setHistorySize,
+  downloadHistoryImage,
 });

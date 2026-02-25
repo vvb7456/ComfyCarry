@@ -224,13 +224,18 @@ def api_comfyui_history():
             images = []
             for node_id, node_out in outputs.items():
                 for img in node_out.get("images", []):
-                    if img.get("type") == "temp":
-                        continue
                     images.append({
                         "filename": img.get("filename", ""),
                         "subfolder": img.get("subfolder", ""),
                         "type": img.get("type", "output"),
                     })
+            # 优先 output 类型, 仅在无 output 时回退到 temp
+            output_imgs = [i for i in images if i["type"] == "output"]
+            temp_imgs = [i for i in images if i["type"] == "temp"]
+            images = output_imgs if output_imgs else temp_imgs
+            # 只保留最后一张作为代表图
+            if images:
+                images = [images[-1]]
             # 从 status.messages 中提取时间戳
             timestamp = 0
             for msg in status.get("messages", []):

@@ -1060,6 +1060,17 @@
             font-size: .78rem;
             color: var(--t2)
         }
+        .history-card-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+            flex-shrink: 0
+        }
+        .history-card-actions .btn {
+            padding: 2px 6px;
+            font-size: .72rem;
+            min-width: unset
+        }
         .history-empty {
             text-align: center;
             padding: 24px;
@@ -3074,17 +3085,18 @@
 
                 <!-- History sub-page -->
                 <div id="comfy-tab-history" class="hidden">
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-                        <select id="history-sort-select" onchange="setHistorySort(this.value)" style="width:auto;min-width:100px;font-size:.78rem;padding:4px 28px 4px 8px">
+                    <div class="top-toolbar" style="margin-bottom:14px">
+                        <span id="history-total" style="font-size:.82rem;color:var(--t3)"></span>
+                        <div style="flex:1"></div>
+                        <select id="history-sort-select" onchange="setHistorySort(this.value)" style="width:auto;min-width:100px">
                             <option value="desc" selected>🔽 新→旧</option>
                             <option value="asc">🔼 旧→新</option>
                         </select>
-                        <select id="history-size-select" onchange="setHistorySize(this.value)" style="width:auto;min-width:100px;font-size:.78rem;padding:4px 28px 4px 8px">
+                        <select id="history-size-select" onchange="setHistorySize(this.value)" style="width:auto;min-width:100px">
                             <option value="sm">紧凑</option>
                             <option value="md" selected>标准</option>
                             <option value="lg">大图</option>
                         </select>
-                        <button class="btn btn-sm" onclick="loadComfyHistory()" style="font-size:.72rem;padding:3px 10px" title="刷新">🔄</button>
                     </div>
                     <div id="queue-history">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
