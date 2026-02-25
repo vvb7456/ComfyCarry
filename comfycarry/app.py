@@ -20,7 +20,8 @@ from .utils import _get_api_key
 from .auth import auth_bp, register_auth_middleware
 
 # Route Blueprints
-from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter
+from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
+from .routes.ssh import restore_ssh_config
 
 # Services
 from .services.comfyui_bridge import get_bridge
@@ -49,6 +50,7 @@ def create_app():
     app.register_blueprint(sync.bp)
     app.register_blueprint(setup.bp)
     app.register_blueprint(jupyter.bp)
+    app.register_blueprint(ssh.bp)
     app.register_blueprint(frontend.bp)
 
     # ── 全局认证中间件 ───────────────────────────────────
@@ -73,6 +75,9 @@ def main():
 
     # 启动 ComfyUI WS Bridge
     get_bridge()
+
+    # 恢复 SSH 配置
+    restore_ssh_config()
 
     # 启动 watch worker
     rules = _load_sync_rules()

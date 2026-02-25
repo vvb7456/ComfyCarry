@@ -2599,6 +2599,59 @@
             padding: 20px; text-align: center;
         }
 
+        /* ── SSH Page ── */
+        .ssh-auth-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(16px, 1.5vw, 28px);
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .ssh-auth-grid { grid-template-columns: 1fr; }
+        }
+        .ssh-key-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .ssh-key-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .ssh-key-type {
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--t1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .ssh-key-fp {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .75rem;
+            color: var(--t2);
+            word-break: break-all;
+        }
+        .ssh-key-comment {
+            font-size: .72rem;
+            color: var(--t3);
+        }
+        .ssh-add-key-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px;
+            margin-bottom: 8px;
+        }
+
         /* ── Global: Empty State ── */
         .empty-state {
             text-align: center;
@@ -2655,6 +2708,7 @@
             <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span><span class="nav-label">Sync</span></div>
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span><span class="nav-label">Tunnel</span></div>
             <div class="nav-item" data-page="jupyter" onclick="showPage('jupyter')"><span class="icon">📓</span><span class="nav-label">Jupyter</span></div>
+            <div class="nav-item" data-page="ssh" onclick="showPage('ssh')"><span class="icon">🔑</span><span class="nav-label">SSH</span></div>
             <div style="flex:1"></div>
             <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span><span class="nav-label">设置</span></div>
         </div>
@@ -3256,6 +3310,85 @@
                             <input type="file" accept=".conf,.txt" onchange="uploadRcloneFile(event)" style="display:none">
                         </label>
                         <button class="btn btn-primary" onclick="saveSyncConfigAll()">💾 保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SSH Page ========== -->
+        <div id="page-ssh" class="page hidden">
+            <div class="page-header">
+                <div class="page-title-group">
+                    <h2>🔑 SSH</h2>
+                    <span id="ssh-header-badge" class="page-status-badge"></span>
+                </div>
+                <div class="top-toolbar">
+                    <span id="ssh-header-controls"></span>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                </div>
+            </div>
+            <div class="page-body">
+                <!-- Sub-tabs -->
+                <div class="tabs">
+                    <div class="tab active" data-sshtab="status" onclick="window.switchSSHTab('status')">🔗 服务 & 日志</div>
+                    <div class="tab" data-sshtab="config" onclick="window.switchSSHTab('config')">⚙️ 密钥 & 密码</div>
+                </div>
+
+                <!-- Status Tab -->
+                <div id="sshtab-status">
+                    <!-- 状态卡片 -->
+                    <div id="ssh-status-cards" class="stat-grid">
+                        <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                    </div>
+
+                    <!-- SSH 连接命令 -->
+                    <div class="section-header" style="margin-top:0">
+                        <div class="section-title">📋 连接命令</div>
+                    </div>
+                    <div class="card" style="padding:12px 14px">
+                        <div id="ssh-connect-cmd">
+                            <div style="color:var(--t3);font-size:.85rem">加载中...</div>
+                        </div>
+                    </div>
+
+                    <!-- 日志 -->
+                    <div class="section-header">
+                        <div class="section-title">📜 SSH 日志</div>
+                    </div>
+                    <div>
+                        <div class="log-box" id="ssh-log-content">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- Config Tab -->
+                <div id="sshtab-config" class="hidden">
+                    <div class="ssh-auth-grid">
+                        <!-- 公钥管理 -->
+                        <div>
+                            <div class="section-header" style="margin-top:0">
+                                <div class="section-title">🔐 授权公钥</div>
+                            </div>
+                            <div id="ssh-keys-list">
+                                <div style="color:var(--t3);font-size:.85rem;padding:12px 0">加载中...</div>
+                            </div>
+                        </div>
+
+                        <!-- Root 密码 -->
+                        <div>
+                            <div class="section-header" style="margin-top:0">
+                                <div class="section-title">🔒 Root 密码</div>
+                            </div>
+                            <div class="card" style="padding:14px">
+                                <div style="display:flex;flex-direction:column;gap:10px">
+                                    <input type="password" id="ssh-pw-new" placeholder="新密码"
+                                           style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
+                                    <input type="password" id="ssh-pw-confirm" placeholder="确认密码"
+                                           style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
+                                    <button class="btn btn-primary" onclick="window.setSSHPassword()" style="align-self:flex-start">设置密码</button>
+                                    <div style="font-size:.72rem;color:var(--t3);line-height:1.4">设置后将自动启用密码认证、PermitRootLogin 并重启 sshd</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

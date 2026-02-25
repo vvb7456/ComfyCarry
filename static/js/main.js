@@ -17,6 +17,7 @@ import './page-plugins.js';
 import './page-tunnel.js';
 import './page-jupyter.js';
 import './page-sync.js';
+import './page-ssh.js';
 import './page-settings.js';
 
 // ── 初始化 ──────────────────────────────────────────────────

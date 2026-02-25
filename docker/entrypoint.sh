@@ -22,7 +22,7 @@ mkdir -p /run/sshd
 [ ! -f /etc/ssh/ssh_host_rsa_key ] && ssh-keygen -A 2>/dev/null || true
 # 清除云平台注入的 SSH Banner (vast.ai / RunPod)
 : > /etc/banner 2>/dev/null || true
-/usr/sbin/sshd 2>/dev/null || true
+/usr/sbin/sshd -E /var/log/sshd.log 2>/dev/null || true
 
 # ── 环境变量持久化 (SSH session 可见) ──
 env >> /etc/environment 2>/dev/null || true
