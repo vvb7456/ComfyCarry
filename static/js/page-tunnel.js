@@ -53,7 +53,7 @@ async function loadTunnelPage() {
       const headerControls = document.getElementById('tunnel-header-controls');
       if (headerControls) {
         headerControls.innerHTML = st === 'online' || st === 'connecting' || st === 'degraded'
-          ? `<button class="btn" onclick="window._tunnelRestart()">♻️ 重启</button><button class="btn" onclick="window._tunnelTeardown()">⏹ 停止</button>`
+          ? `<button class="btn" onclick="window._tunnelTeardown()">⏹ 停止</button><button class="btn" onclick="window._tunnelRestart()">♻️ 重启</button>`
           : `<button class="btn" onclick="window._tunnelRestart()">▶ 启动</button>`;
       }
 
@@ -63,13 +63,10 @@ async function loadTunnelPage() {
         : '无连接';
 
       statusEl.innerHTML = `
-        <div class="tunnel-header-row">
-          <span style="font-size:.82rem;color:var(--t3)">
-            ${escHtml(d.subdomain)}.${escHtml(d.domain)}
-            ${tunnel.tunnel_id ? ` · <code style="font-size:.7rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code>` : ''}
-            · 节点: ${escHtml(connInfo)}
-          </span>
-        </div>`;
+        <div class="info-item"><span class="info-label">🌐 域名</span><span class="info-value">${escHtml(d.subdomain)}.${escHtml(d.domain)}</span></div>
+        ${tunnel.tunnel_id ? `<div class="info-item"><span class="info-label">🔑 Tunnel ID</span><span class="info-value"><code style="font-size:.78rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code></span></div>` : ''}
+        <div class="info-item"><span class="info-label">📡 节点</span><span class="info-value">${escHtml(connInfo)}</span></div>
+      `;
 
       _renderServices(d, servicesEl);
 
