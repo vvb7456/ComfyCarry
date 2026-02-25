@@ -2232,6 +2232,68 @@
         .sync-import-option label {
             font-weight: 500;
         }
+
+        /* Rclone Config Form */
+        .rclone-section-card {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .rclone-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--bd);
+        }
+        .rclone-section-name {
+            font-weight: 600;
+            font-size: .92rem;
+            color: var(--t1);
+        }
+        .rclone-section-type {
+            font-size: .75rem;
+            color: var(--t3);
+            margin-left: 8px;
+        }
+        .rclone-fields-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 700px) {
+            .rclone-fields-grid { grid-template-columns: 1fr; }
+        }
+        .rclone-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .rclone-field.wide {
+            grid-column: 1 / -1;
+        }
+        .rclone-field label {
+            font-size: .78rem;
+            color: var(--t2);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .rclone-field .field-input-wrap {
+            display: flex;
+            gap: 4px;
+        }
+        .rclone-field input,
+        .rclone-field textarea {
+            flex: 1;
+        }
+        .rclone-field textarea {
+            min-height: 60px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .78rem;
+        }
+
         .sync-log-box {
             background: var(--bg3);
             border: 1px solid var(--bd);
@@ -2875,77 +2937,74 @@
                 </div>
             </div>
             <div class="page-body">
-                <!-- 状态区 (已配置时) -->
-                <div id="tunnel-status-section" style="display:none">
-                    <div class="section-header" style="margin-top:0">
-                        <div class="section-title">🔗 服务</div>
-                        <span id="tunnel-status-info" style="font-size:.78rem;color:var(--t3)"></span>
-                    </div>
-                    <div id="tunnel-services"></div>
+                <!-- Sub-tabs -->
+                <div class="tabs">
+                    <div class="tab active" data-ttab="status" onclick="switchTunnelTab('status')">🔗 服务 & 日志</div>
+                    <div class="tab" data-ttab="config" onclick="switchTunnelTab('config')">⚙️ 配置</div>
                 </div>
 
-                <!-- 未配置时的初始配置区 -->
-                <div id="tunnel-setup-section" style="display:none">
-                    <div class="card card-padded">
-                        <div style="max-width:600px">
-                        <div class="section-title">⚙️ 配置 Cloudflare Tunnel</div>
-                        <div class="form-group" style="margin-bottom:10px">
-                            <label style="font-size:.8rem;color:var(--t2)">CF API Token</label>
-                            <input type="password" id="tunnel-api-token" placeholder="CF Token (My Profile → API Tokens)">
-                            <div style="font-size:.72rem;color:var(--t3);margin-top:4px">
-                                需要权限: <code>Account > Tunnel Edit</code> + <code>Zone > DNS Edit</code>
+                <!-- Status Tab -->
+                <div id="ttab-status">
+                    <!-- 状态区 (已配置时) -->
+                    <div id="tunnel-status-section" style="display:none">
+                        <div class="section-header" style="margin-top:0">
+                            <div class="section-title">🔗 服务</div>
+                            <span id="tunnel-status-info" style="font-size:.78rem;color:var(--t3)"></span>
+                        </div>
+                        <div id="tunnel-services"></div>
+                    </div>
+
+                    <!-- 未配置时的提示 -->
+                    <div id="tunnel-setup-hint" style="display:none">
+                        <div class="card card-padded" style="text-align:center;padding:32px">
+                            <div style="font-size:1.2rem;margin-bottom:8px">🌐</div>
+                            <div style="color:var(--t2);margin-bottom:12px">尚未配置 Cloudflare Tunnel，请前往「配置」tab 设置</div>
+                            <button class="btn btn-sm btn-primary" onclick="switchTunnelTab('config')">前往配置</button>
+                        </div>
+                    </div>
+
+                    <!-- 日志 -->
+                    <div class="section-header">
+                        <div class="section-title">📜 Tunnel 日志</div>
+                    </div>
+                    <div>
+                        <div class="log-box" id="tunnel-log-content">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- Config Tab -->
+                <div id="ttab-config" class="hidden">
+                    <div id="tunnel-config-section">
+                        <div class="card card-padded" style="max-width:600px">
+                            <div class="section-title" style="margin-bottom:12px">⚙️ Tunnel 配置</div>
+                            <div style="font-size:.78rem;color:var(--t3);margin-bottom:16px;padding:8px 12px;background:var(--bg3);border-radius:var(--r)">
+                                修改配置将<strong>更新现有 Tunnel</strong> 的设置。如未创建 Tunnel，点击「创建」将自动配置 DNS 和 Ingress。
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="font-size:.8rem;color:var(--t2)">CF API Token</label>
+                                <div style="display:flex;gap:4px">
+                                    <input type="password" id="tunnel-cfg-token" placeholder="CF Token (My Profile → API Tokens)" style="flex:1">
+                                    <button class="btn btn-sm" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'" style="flex-shrink:0">👁️</button>
+                                </div>
+                                <div style="font-size:.72rem;color:var(--t3);margin-top:4px">
+                                    需要权限: <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Account > Tunnel Edit</code> + <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Zone > DNS Edit</code>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="font-size:.8rem;color:var(--t2)">域名</label>
+                                <input type="text" id="tunnel-cfg-domain" placeholder="mydomain.com (必须已托管在 Cloudflare)">
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="font-size:.8rem;color:var(--t2)">子域名前缀 <span style="color:var(--t3)">(可选)</span></label>
+                                <input type="text" id="tunnel-cfg-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
+                            </div>
+                            <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
+                            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                                <button class="btn btn-sm" onclick="window._tunnelCfgValidate()">🔍 验证 Token</button>
+                                <button class="btn btn-sm btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelCfgSave()">💾 保存并应用</button>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-bottom:10px">
-                            <label style="font-size:.8rem;color:var(--t2)">域名</label>
-                            <input type="text" id="tunnel-domain" placeholder="mydomain.com (必须已托管在 Cloudflare)">
-                        </div>
-                        <div class="form-group" style="margin-bottom:10px">
-                            <label style="font-size:.8rem;color:var(--t2)">子域名前缀 <span style="color:var(--t3)">(可选)</span></label>
-                            <input type="text" id="tunnel-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
-                        </div>
-                        <div id="tunnel-validate-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
-                        <div style="display:flex;gap:8px;margin-top:12px">
-                            <button class="btn btn-sm" onclick="window._tunnelValidate()">🔍 验证 Token</button>
-                            <button class="btn btn-sm btn-primary" onclick="window._tunnelProvision()">🚀 创建 Tunnel</button>
-                        </div>
-                        </div>
                     </div>
-                </div>
-
-                <!-- 日志 -->
-                <div class="section-header">
-                    <div class="section-title">📜 Tunnel 日志</div>
-                </div>
-                <div>
-                    <div class="log-box" id="tunnel-log-content">加载中...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tunnel 配置修改弹窗 -->
-        <div id="tunnel-config-modal" class="modal-overlay" onclick="if(event.target===this){this.classList.remove('active')}">
-            <div class="modal-box">
-                <h3>⚙️ 修改 Tunnel 配置</h3>
-                <div style="font-size:.78rem;color:var(--t3);margin-bottom:12px;padding:8px 12px;background:var(--bg2);border-radius:var(--r)">
-                    修改配置将<strong>更新现有 Tunnel</strong> 的设置（域名、子域名前缀）。如需更换 Tunnel，请先移除再重新创建。
-                </div>
-                <div class="form-group">
-                    <label>CF API Token</label>
-                    <input type="password" id="tunnel-cfg-token" placeholder="CF Token">
-                </div>
-                <div class="form-group">
-                    <label>域名</label>
-                    <input type="text" id="tunnel-cfg-domain" placeholder="mydomain.com">
-                </div>
-                <div class="form-group">
-                    <label>子域名前缀</label>
-                    <input type="text" id="tunnel-cfg-subdomain" placeholder="留空则随机生成">
-                </div>
-                <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
-                <div class="form-actions">
-                    <button class="btn btn-sm" onclick="window._tunnelCfgValidate()">🔍 验证</button>
-                    <button class="btn btn-sm btn-primary" onclick="window._tunnelCfgSave()">💾 保存并应用</button>
                 </div>
             </div>
         </div>
@@ -3165,6 +3224,7 @@
                 <div class="tabs">
                     <div class="tab active" data-stab="remotes" onclick="switchSyncTab('remotes')">💾 存储 & 日志</div>
                     <div class="tab" data-stab="rules" onclick="switchSyncTab('rules')">🔄 同步规则</div>
+                    <div class="tab" data-stab="config" onclick="switchSyncTab('config')">⚙️ 配置</div>
                 </div>
 
                 <!-- Storage + Logs Tab -->
@@ -3172,33 +3232,7 @@
                     <div id="sync-remotes-grid" class="sync-remotes-grid">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
                     </div>
-                    <div id="import-config-box" class="hidden" style="margin-top:8px">
-                        <div class="sync-import-row">
-                            <div class="sync-import-option">
-                                <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">从 URL 导入 rclone.conf</label>
-                                <div style="display:flex;gap:8px">
-                                    <input type="text" id="import-url" placeholder="https://example.com/rclone.conf" style="flex:1">
-                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromUrl()">导入</button>
-                                </div>
-                            </div>
-                            <div class="sync-import-option" style="margin-top:12px">
-                                <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">粘贴 Base64 编码的 rclone.conf</label>
-                                <div style="display:flex;gap:8px">
-                                    <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:'IBM Plex Mono', monospace;font-size:.75rem"></textarea>
-                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
-                                </div>
-                            </div>
-                            <div class="sync-import-option" style="margin-top:12px">
-                                <label style="font-size:.82rem;color:var(--t2);margin-bottom:4px;display:block">直接编辑 rclone.conf</label>
-                                <textarea id="rclone-config-content" class="rclone-config-editor" spellcheck="false" placeholder="点击加载..."></textarea>
-                                <div style="display:flex;gap:8px;margin-top:6px">
-                                    <button class="btn btn-sm" onclick="loadRcloneConfig()">加载当前配置</button>
-                                    <button class="btn btn-sm btn-primary" onclick="saveRcloneConfig()">💾 保存</button>
-                                    <span id="rclone-save-status" style="font-size:.78rem;color:var(--t3);align-self:center"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
                     <!-- Inline Logs -->
                     <div class="section-header">
                         <div class="section-title">📜 同步日志</div>
@@ -3211,6 +3245,68 @@
                 <!-- Rules Tab -->
                 <div id="stab-rules" class="hidden">
                     <div id="sync-rules-list"></div>
+                </div>
+
+                <!-- Config Tab -->
+                <div id="stab-config" class="hidden">
+                    <!-- 同步设置 -->
+                    <div class="section-header" style="margin-top:0">
+                        <div class="section-title">⏱ 同步设置</div>
+                    </div>
+                    <div class="card card-padded" style="margin-bottom:16px">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+                            <div>
+                                <label style="font-weight:600;display:block;margin-bottom:4px">文件稳定延迟 (秒)</label>
+                                <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">推送文件时，跳过修改时间不足此秒数的文件</p>
+                                <input type="number" id="cfg-min-age" min="0" max="300" value="30" style="width:100px">
+                                <span style="color:var(--t3);font-size:.82rem;margin-left:6px">默认 30</span>
+                            </div>
+                            <div>
+                                <label style="font-weight:600;display:block;margin-bottom:4px">检查间隔 (秒)</label>
+                                <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">Worker 每隔多少秒检查一次文件变化</p>
+                                <input type="number" id="cfg-watch-interval" min="5" max="3600" value="60" style="width:100px">
+                                <span style="color:var(--t3);font-size:.82rem;margin-left:6px">默认 60</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rclone 配置 GUI -->
+                    <div class="section-header">
+                        <div class="section-title">📋 Rclone 配置</div>
+                    </div>
+                    <div id="rclone-config-form">
+                        <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
+                    </div>
+
+                    <!-- 导入选项 (折叠) -->
+                    <details style="margin-top:16px">
+                        <summary style="font-size:.82rem;color:var(--t2);cursor:pointer;user-select:none">📥 更多导入方式...</summary>
+                        <div class="card card-padded" style="margin-top:8px">
+                            <div style="margin-bottom:12px">
+                                <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:4px">从 URL 导入 rclone.conf</label>
+                                <div style="display:flex;gap:8px">
+                                    <input type="text" id="import-url" placeholder="https://example.com/rclone.conf" style="flex:1">
+                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromUrl()">导入</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:4px">粘贴 Base64 编码的 rclone.conf</label>
+                                <div style="display:flex;gap:8px">
+                                    <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:'IBM Plex Mono',monospace;font-size:.75rem"></textarea>
+                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- 底部操作栏 -->
+                    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:12px 0">
+                        <label class="btn" style="cursor:pointer">
+                            📤 上传本地文件
+                            <input type="file" accept=".conf,.txt" onchange="uploadRcloneFile(event)" style="display:none">
+                        </label>
+                        <button class="btn btn-primary" onclick="saveSyncConfigAll()">💾 保存</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3402,34 +3498,6 @@
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
                 <button class="btn btn-sm" onclick="closeSyncModal('remote-browse-modal')">取消</button>
                 <button class="btn btn-sm btn-primary" onclick="window._browseSelect()">选择当前目录</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sync Settings Modal -->
-    <div class="modal-overlay" id="sync-settings-modal" onclick="if(event.target===this)closeSyncModal('sync-settings-modal')">
-        <div class="modal-box" style="width:460px">
-            <div style="display:flex;align-items:center;margin-bottom:16px">
-                <h3 style="margin-bottom:0">⚙ 同步设置</h3>
-                <button class="btn btn-sm" onclick="closeSyncModal('sync-settings-modal')" style="margin-left:auto">✕</button>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:16px">
-                <div>
-                    <label style="font-weight:600;display:block;margin-bottom:4px">文件稳定延迟 (秒)</label>
-                    <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">推送文件时，跳过修改时间不足此秒数的文件，防止复制正在写入的不完整文件。设为 0 表示不延迟。</p>
-                    <input type="number" id="sync-set-min-age" min="0" max="300" value="30" style="width:100px">
-                    <span style="color:var(--t2);font-size:.85rem;margin-left:8px">默认 30 秒</span>
-                </div>
-                <div>
-                    <label style="font-weight:600;display:block;margin-bottom:4px">检查间隔 (秒)</label>
-                    <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">Worker 每隔多少秒检查一次文件变化并执行同步。值越小检查越频繁但开销越大。</p>
-                    <input type="number" id="sync-set-interval" min="5" max="3600" value="60" style="width:100px">
-                    <span style="color:var(--t2);font-size:.85rem;margin-left:8px">默认 60 秒</span>
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
-                <button class="btn btn-sm" onclick="closeSyncModal('sync-settings-modal')">取消</button>
-                <button class="btn btn-sm btn-primary" onclick="saveSyncSettings()">保存</button>
             </div>
         </div>
     </div>

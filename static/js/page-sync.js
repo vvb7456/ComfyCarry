@@ -11,12 +11,11 @@ let _editingRuleIdx = -1;
 let syncAutoRefresh = null;
 let _syncLogStream = null;
 let syncStorageCache = null;
-let rcloneConfigLoaded = false;
 
 // ── Sync Tab 切换 ───────────────────────────────────────────────
 
 function switchSyncTab(tab) {
-  ['remotes', 'rules'].forEach(t => {
+  ['remotes', 'rules', 'config'].forEach(t => {
     const el = document.getElementById('stab-' + t);
     const tabEl = document.querySelector(`.tab[data-stab="${t}"]`);
     if (el) el.classList.toggle('hidden', t !== tab);
@@ -24,6 +23,7 @@ function switchSyncTab(tab) {
   });
   if (tab === 'remotes') { loadSyncRemotes(); loadSyncLogs(); }
   else if (tab === 'rules') loadSyncRules();
+  else if (tab === 'config') loadSyncConfigTab();
 }
 
 // ── 存储服务 Tab ────────────────────────────────────────────────
@@ -133,37 +133,6 @@ async function showAddRemoteModal() {
 
 function closeSyncModal(id) { document.getElementById(id).classList.remove('active'); }
 window.closeSyncModal = closeSyncModal;
-
-async function showSyncSettings() {
-  try {
-    const r = await fetch('/api/sync/settings');
-    const s = await r.json();
-    document.getElementById('sync-set-min-age').value = s.min_age ?? 30;
-    document.getElementById('sync-set-interval').value = s.watch_interval ?? 60;
-  } catch(e) {}
-  document.getElementById('sync-settings-modal').classList.add('active');
-}
-
-async function saveSyncSettings() {
-  const min_age = parseInt(document.getElementById('sync-set-min-age').value) || 30;
-  const watch_interval = parseInt(document.getElementById('sync-set-interval').value) || 60;
-  try {
-    const r = await fetch('/api/sync/settings', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ min_age, watch_interval })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('同步设置已保存');
-      closeSyncModal('sync-settings-modal');
-    } else {
-      showToast('保存失败', 'error');
-    }
-  } catch(e) {
-    showToast('保存失败: ' + e.message, 'error');
-  }
-}
 
 function renderRemoteTypeFields() {
   const type = document.getElementById('new-remote-type').value;
@@ -535,10 +504,6 @@ async function toggleSyncWorker() {
 
 // ── Rclone 配置导入 (保留旧功能) ────────────────────────────────
 
-function toggleImportConfig() {
-  document.getElementById('import-config-box').classList.toggle('hidden');
-}
-
 async function importConfigFromUrl() {
   const url = document.getElementById('import-url').value.trim();
   if (!url) { showToast('请输入 URL'); return; }
@@ -548,7 +513,7 @@ async function importConfigFromUrl() {
       body: JSON.stringify({type: 'url', value: url})
     });
     const d = await r.json();
-    if (d.ok) { showToast(d.message); document.getElementById('import-url').value = ''; loadSyncRemotes(); }
+    if (d.ok) { showToast(d.message); document.getElementById('import-url').value = ''; loadSyncConfigTab(); }
     else showToast('导入失败: ' + (d.error || ''));
   } catch (e) { showToast('导入失败: ' + e.message); }
 }
@@ -562,35 +527,238 @@ async function importConfigFromBase64() {
       body: JSON.stringify({type: 'base64', value: b64})
     });
     const d = await r.json();
-    if (d.ok) { showToast(d.message); document.getElementById('import-base64').value = ''; loadSyncRemotes(); }
+    if (d.ok) { showToast(d.message); document.getElementById('import-base64').value = ''; loadSyncConfigTab(); }
     else showToast('导入失败: ' + (d.error || ''));
   } catch (e) { showToast('导入失败: ' + e.message); }
 }
 
-async function loadRcloneConfig() {
+// ── Config Tab (rclone GUI + sync settings) ─────────────────────
+
+function _parseRcloneConf(text) {
+  const sections = [];
+  let current = null;
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const secMatch = trimmed.match(/^\[(.+)\]$/);
+    if (secMatch) {
+      current = { name: secMatch[1], fields: [] };
+      sections.push(current);
+    } else if (current) {
+      const kvMatch = trimmed.match(/^(\S+)\s*=\s*(.*)$/);
+      if (kvMatch) {
+        current.fields.push({ key: kvMatch[1], value: kvMatch[2].trim() });
+      }
+    }
+  }
+  return sections;
+}
+
+function _serializeRcloneConf(sections) {
+  return sections.map(s => {
+    let text = `[${s.name}]\n`;
+    for (const f of s.fields) {
+      text += `${f.key} = ${f.value}\n`;
+    }
+    return text;
+  }).join('\n');
+}
+
+function _fieldType(key, value) {
+  const k = key.toLowerCase();
+  if (value.length > 100 || value.startsWith('{')) return 'textarea';
+  if (value === 'true' || value === 'false') return 'toggle';
+  if (/secret|password|^pass$/.test(k)) return 'password';
+  return 'text';
+}
+
+async function loadSyncConfigTab() {
+  // Load sync settings
+  try {
+    const r = await fetch('/api/sync/settings');
+    const s = await r.json();
+    document.getElementById('cfg-min-age').value = s.min_age ?? 30;
+    document.getElementById('cfg-watch-interval').value = s.watch_interval ?? 60;
+  } catch(e) {}
+
+  // Load rclone config
+  const formEl = document.getElementById('rclone-config-form');
   try {
     const r = await fetch('/api/sync/rclone_config');
     const d = await r.json();
-    document.getElementById('rclone-config-content').value = d.config || '';
-    rcloneConfigLoaded = true;
-  } catch (e) { document.getElementById('rclone-config-content').value = '加载失败'; }
+    if (!d.exists || !d.config.trim()) {
+      formEl.innerHTML = renderEmpty('暂无 rclone 配置，可上传本地文件或使用「存储」tab 添加 Remote');
+      return;
+    }
+    const sections = _parseRcloneConf(d.config);
+    if (sections.length === 0) {
+      formEl.innerHTML = renderEmpty('配置文件为空或格式无法识别');
+      return;
+    }
+    _renderRcloneForm(formEl, sections);
+  } catch (e) {
+    formEl.innerHTML = renderError('加载配置失败: ' + e.message);
+  }
 }
 
-async function saveRcloneConfig() {
-  const content = document.getElementById('rclone-config-content').value;
-  if (!content.trim()) { showToast('配置不能为空'); return; }
-  if (!confirm('确定保存？旧配置将备份为 rclone.conf.bak')) return;
-  const statusEl = document.getElementById('rclone-save-status');
-  statusEl.textContent = '保存中...';
+function _renderRcloneForm(container, sections) {
+  let html = '';
+  for (let si = 0; si < sections.length; si++) {
+    const sec = sections[si];
+    const typeField = sec.fields.find(f => f.key === 'type');
+    const typeLabel = typeField ? typeField.value : '';
+    html += `<div class="rclone-section-card" data-section="${si}">
+      <div class="rclone-section-header">
+        <div>
+          <span class="rclone-section-name">${escHtml(sec.name)}</span>
+          ${typeLabel ? `<span class="rclone-section-type">${escHtml(typeLabel)}</span>` : ''}
+        </div>
+        <button class="btn btn-sm" style="color:var(--red);font-size:.72rem" onclick="removeRcloneSection(${si})" title="删除此 Remote">🗑️ 删除</button>
+      </div>
+      <div class="rclone-fields-grid">`;
+
+    for (let fi = 0; fi < sec.fields.length; fi++) {
+      const f = sec.fields[fi];
+      const ft = _fieldType(f.key, f.value);
+      const inputId = `rcf-${si}-${fi}`;
+      const isWide = ft === 'textarea';
+
+      html += `<div class="rclone-field${isWide ? ' wide' : ''}">
+        <label for="${inputId}">${escHtml(f.key)}</label>`;
+
+      if (ft === 'toggle') {
+        html += `<label class="comfy-param-toggle" style="margin:0">
+          <input type="checkbox" id="${inputId}" data-sec="${si}" data-fi="${fi}" ${f.value === 'true' ? 'checked' : ''}>
+          <span class="comfy-toggle-slider"></span>
+          <span style="font-size:.78rem;color:var(--t2)">${f.value === 'true' ? 'true' : 'false'}</span>
+        </label>`;
+      } else if (ft === 'textarea') {
+        html += `<textarea id="${inputId}" data-sec="${si}" data-fi="${fi}" spellcheck="false">${escHtml(f.value)}</textarea>`;
+      } else if (ft === 'password') {
+        html += `<div class="field-input-wrap">
+          <input type="password" id="${inputId}" data-sec="${si}" data-fi="${fi}" value="${escHtml(f.value)}">
+          <button class="btn btn-sm" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'" title="显示/隐藏" style="flex-shrink:0">👁️</button>
+        </div>`;
+      } else {
+        html += `<input type="text" id="${inputId}" data-sec="${si}" data-fi="${fi}" value="${escHtml(f.value)}">`;
+      }
+
+      html += '</div>';
+    }
+
+    html += '</div></div>';
+  }
+  container.innerHTML = html;
+
+  // Bind toggle label updates
+  container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const label = cb.parentElement.querySelector('span:last-child');
+      if (label) label.textContent = cb.checked ? 'true' : 'false';
+    });
+  });
+}
+
+function _collectRcloneFromForm() {
+  const container = document.getElementById('rclone-config-form');
+  const cards = container.querySelectorAll('.rclone-section-card');
+  const sections = [];
+  for (const card of cards) {
+    const si = parseInt(card.dataset.section);
+    const nameEl = card.querySelector('.rclone-section-name');
+    const name = nameEl ? nameEl.textContent : `remote${si}`;
+    const fields = [];
+    card.querySelectorAll('[data-fi]').forEach(el => {
+      const key = el.closest('.rclone-field')?.querySelector('label')?.textContent || '';
+      let value;
+      if (el.type === 'checkbox') {
+        value = el.checked ? 'true' : 'false';
+      } else {
+        value = el.value;
+      }
+      fields.push({ key, value });
+    });
+    sections.push({ name, fields });
+  }
+  return sections;
+}
+
+function removeRcloneSection(si) {
+  const card = document.querySelector(`.rclone-section-card[data-section="${si}"]`);
+  if (!card) return;
+  const name = card.querySelector('.rclone-section-name')?.textContent || '';
+  if (!confirm(`确定删除 Remote "${name}"？\n保存后生效。`)) return;
+  card.remove();
+  showToast(`已标记删除 "${name}"，点击保存生效`);
+}
+
+async function saveSyncConfigAll() {
+  // 1. Save sync settings
+  const min_age = parseInt(document.getElementById('cfg-min-age').value) || 30;
+  const watch_interval = parseInt(document.getElementById('cfg-watch-interval').value) || 60;
   try {
+    await fetch('/api/sync/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ min_age, watch_interval })
+    });
+  } catch(e) {
+    showToast('同步设置保存失败: ' + e.message, 'error');
+    return;
+  }
+
+  // 2. Save rclone config (if form has sections)
+  const cards = document.querySelectorAll('.rclone-section-card');
+  if (cards.length > 0) {
+    const sections = _collectRcloneFromForm();
+    const configText = _serializeRcloneConf(sections);
+    try {
+      const r = await fetch('/api/sync/rclone_config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ config: configText })
+      });
+      const d = await r.json();
+      if (d.ok) {
+        showToast('✅ ' + d.message);
+      } else {
+        showToast('❌ ' + (d.error || '保存失败'), 'error');
+        return;
+      }
+    } catch(e) {
+      showToast('rclone 配置保存失败: ' + e.message, 'error');
+      return;
+    }
+  } else {
+    showToast('✅ 同步设置已保存');
+  }
+}
+
+async function uploadRcloneFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    if (!text.trim()) { showToast('文件为空'); return; }
+    if (!confirm('确定上传并覆盖当前 rclone 配置？旧配置将备份为 rclone.conf.bak')) return;
     const r = await fetch('/api/sync/rclone_config', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({config: content})
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ config: text })
     });
     const d = await r.json();
-    statusEl.textContent = d.ok ? '✅ ' + d.message : '❌ ' + (d.error || '失败');
-    if (d.ok) loadSyncRemotes();
-  } catch (e) { statusEl.textContent = '❌ ' + e.message; }
+    if (d.ok) {
+      showToast('✅ ' + d.message);
+      loadSyncConfigTab();
+      loadSyncRemotes();
+    } else {
+      showToast('❌ ' + (d.error || '上传失败'), 'error');
+    }
+  } catch(e) {
+    showToast('上传失败: ' + e.message, 'error');
+  }
+  // Reset file input
+  event.target.value = '';
 }
 
 // ── Sync Page Lifecycle ─────────────────────────────────────────
@@ -623,7 +791,6 @@ registerEscapeHandler(() => {
   closeSyncModal('add-remote-modal');
   closeSyncModal('add-rule-modal');
   closeSyncModal('remote-browse-modal');
-  closeSyncModal('sync-settings-modal');
 });
 
 // ── 目录浏览 (树状图，支持远程和本地) ──────────────────────────
@@ -736,8 +903,6 @@ Object.assign(window, {
   refreshRemoteStorage,
   showAddRemoteModal,
   closeSyncModal,
-  showSyncSettings,
-  saveSyncSettings,
   renderRemoteTypeFields,
   submitAddRemote,
   loadSyncRules,
@@ -753,11 +918,12 @@ Object.assign(window, {
   loadSyncLogs,
   toggleSyncWorker,
   _restartSyncWorker,
-  toggleImportConfig,
   importConfigFromUrl,
   importConfigFromBase64,
-  loadRcloneConfig,
-  saveRcloneConfig,
+  loadSyncConfigTab,
+  saveSyncConfigAll,
+  uploadRcloneFile,
+  removeRcloneSection,
   loadSyncPage,
   startSyncAutoRefresh,
   stopSyncAutoRefresh,

@@ -8,6 +8,7 @@ import { registerPage, showToast, escHtml, renderEmpty, renderError } from './co
 
 let _autoRefresh = null;
 let _lastData = null;
+let _currentTunnelTab = 'status';
 
 registerPage('tunnel', {
   enter() { loadTunnelPage(); _startAutoRefresh(); },
@@ -15,12 +16,28 @@ registerPage('tunnel', {
 });
 
 // ════════════════════════════════════════════════════════════════
+// Tab 切换
+// ════════════════════════════════════════════════════════════════
+
+function switchTunnelTab(tab) {
+  ['status', 'config'].forEach(t => {
+    const el = document.getElementById('ttab-' + t);
+    const tabEl = document.querySelector(`.tab[data-ttab="${t}"]`);
+    if (el) el.classList.toggle('hidden', t !== tab);
+    if (tabEl) tabEl.classList.toggle('active', t === tab);
+  });
+  _currentTunnelTab = tab;
+  if (tab === 'status') loadTunnelPage();
+  else if (tab === 'config') _loadTunnelConfigTab();
+}
+
+// ════════════════════════════════════════════════════════════════
 // 主加载
 // ════════════════════════════════════════════════════════════════
 
 async function loadTunnelPage() {
   const statusSection = document.getElementById('tunnel-status-section');
-  const setupSection = document.getElementById('tunnel-setup-section');
+  const setupHint = document.getElementById('tunnel-setup-hint');
   const statusEl = document.getElementById('tunnel-status-info');
   const servicesEl = document.getElementById('tunnel-services');
   const logEl = document.getElementById('tunnel-log-content');
@@ -32,7 +49,7 @@ async function loadTunnelPage() {
 
     if (d.configured) {
       statusSection.style.display = '';
-      setupSection.style.display = 'none';
+      setupHint.style.display = 'none';
 
       const tunnel = d.tunnel || {};
       const st = d.effective_status || 'unknown';
@@ -68,7 +85,7 @@ async function loadTunnelPage() {
 
     } else {
       statusSection.style.display = 'none';
-      setupSection.style.display = '';
+      setupHint.style.display = '';
 
       // Unconfigured state
       const badge = document.getElementById('tunnel-header-badge');
@@ -187,13 +204,32 @@ function _renderServices(d, el) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 验证 Token (初始配置)
+// Config Tab — 加载/验证/保存
 // ════════════════════════════════════════════════════════════════
 
-async function _tunnelValidate() {
-  const token = document.getElementById('tunnel-api-token').value.trim();
-  const domain = document.getElementById('tunnel-domain').value.trim();
-  const resultEl = document.getElementById('tunnel-validate-result');
+async function _loadTunnelConfigTab() {
+  const resultEl = document.getElementById('tunnel-cfg-result');
+  if (resultEl) resultEl.style.display = 'none';
+
+  try {
+    const r = await fetch('/api/tunnel/config');
+    const d = await r.json();
+    document.getElementById('tunnel-cfg-token').value = d.api_token || '';
+    document.getElementById('tunnel-cfg-domain').value = d.domain || '';
+    document.getElementById('tunnel-cfg-subdomain').value = d.subdomain || '';
+  } catch (_) {}
+
+  // Update submit button label based on configured state
+  const btn = document.getElementById('tunnel-cfg-submit');
+  if (btn) {
+    btn.textContent = _lastData?.configured ? '💾 保存并应用' : '🚀 创建 Tunnel';
+  }
+}
+
+async function _tunnelCfgValidate() {
+  const token = document.getElementById('tunnel-cfg-token').value.trim();
+  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
+  const resultEl = document.getElementById('tunnel-cfg-result');
 
   if (!token || !domain) {
     resultEl.style.display = 'block';
@@ -226,23 +262,26 @@ async function _tunnelValidate() {
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// 创建 Tunnel (初始配置)
-// ════════════════════════════════════════════════════════════════
-
-async function _tunnelProvision() {
-  const token = document.getElementById('tunnel-api-token').value.trim();
-  const domain = document.getElementById('tunnel-domain').value.trim();
-  const subdomain = document.getElementById('tunnel-subdomain').value.trim();
+async function _tunnelCfgSave() {
+  const token = document.getElementById('tunnel-cfg-token').value.trim();
+  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
+  const subdomain = document.getElementById('tunnel-cfg-subdomain').value.trim();
+  const resultEl = document.getElementById('tunnel-cfg-result');
 
   if (!token || !domain) {
     showToast('请填写 API Token 和域名');
     return;
   }
 
-  if (!confirm('确定创建 Cloudflare Tunnel？将自动配置 DNS 和 Ingress。')) return;
+  const isCreate = !_lastData?.configured;
+  const msg = isCreate
+    ? '确定创建 Cloudflare Tunnel？将自动配置 DNS 和 Ingress。'
+    : '将更新现有 Tunnel 配置并重启 cloudflared。\n\n⚠️ 通过 Tunnel 的连接可能会短暂中断，确定继续？';
+  if (!confirm(msg)) return;
 
-  showToast('正在创建 Tunnel...');
+  resultEl.style.display = 'block';
+  resultEl.style.color = 'var(--t2)';
+  resultEl.innerHTML = '⏳ 正在应用配置...';
 
   try {
     const r = await fetch('/api/tunnel/provision', {
@@ -252,13 +291,15 @@ async function _tunnelProvision() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ Tunnel 创建成功！连接可能短暂中断，5 秒后自动刷新...');
+      showToast('✅ Tunnel 配置已应用！连接可能短暂中断，5 秒后自动刷新...');
       setTimeout(() => location.reload(), 5000);
     } else {
-      showToast('❌ 创建失败: ' + (d.error || '未知错误'));
+      resultEl.style.color = 'var(--red)';
+      resultEl.innerHTML = `❌ ${escHtml(d.error || '保存失败')}`;
     }
   } catch (e) {
-    showToast('❌ 请求失败: ' + e.message);
+    resultEl.style.color = 'var(--red)';
+    resultEl.innerHTML = '❌ 请求失败';
   }
 }
 
@@ -287,100 +328,6 @@ async function _tunnelRestart() {
     showToast('Tunnel 正在重启...');
     setTimeout(loadTunnelPage, 3000);
   } catch (e) { showToast('重启失败: ' + e.message); }
-}
-
-// ════════════════════════════════════════════════════════════════
-// 修改配置弹窗
-// ════════════════════════════════════════════════════════════════
-
-async function _tunnelOpenConfig() {
-  const modal = document.getElementById('tunnel-config-modal');
-  const resultEl = document.getElementById('tunnel-cfg-result');
-  resultEl.style.display = 'none';
-
-  try {
-    const r = await fetch('/api/tunnel/config');
-    const d = await r.json();
-    document.getElementById('tunnel-cfg-token').value = d.api_token || '';
-    document.getElementById('tunnel-cfg-domain').value = d.domain || '';
-    document.getElementById('tunnel-cfg-subdomain').value = d.subdomain || '';
-  } catch (_) {}
-
-  modal.classList.add('active');
-}
-
-async function _tunnelCfgValidate() {
-  const token = document.getElementById('tunnel-cfg-token').value.trim();
-  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
-  const resultEl = document.getElementById('tunnel-cfg-result');
-
-  if (!token || !domain) {
-    resultEl.style.display = 'block';
-    resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 请填写 API Token 和域名';
-    return;
-  }
-
-  resultEl.style.display = 'block';
-  resultEl.style.color = 'var(--t2)';
-  resultEl.innerHTML = '⏳ 验证中...';
-
-  try {
-    const r = await fetch('/api/tunnel/validate', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ api_token: token, domain: domain })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      resultEl.style.color = 'var(--green)';
-      resultEl.innerHTML = `✅ ${escHtml(d.message)}`;
-    } else {
-      resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = `❌ ${escHtml(d.message)}`;
-    }
-  } catch (e) {
-    resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 验证失败';
-  }
-}
-
-async function _tunnelCfgSave() {
-  const token = document.getElementById('tunnel-cfg-token').value.trim();
-  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
-  const subdomain = document.getElementById('tunnel-cfg-subdomain').value.trim();
-  const resultEl = document.getElementById('tunnel-cfg-result');
-
-  if (!token || !domain) {
-    showToast('请填写 API Token 和域名');
-    return;
-  }
-
-  if (!confirm('将更新现有 Tunnel 配置并重启 cloudflared。\n\n⚠️ 通过 Tunnel 的连接（包括当前页面）可能会短暂中断，确定继续？')) return;
-
-  resultEl.style.display = 'block';
-  resultEl.style.color = 'var(--t2)';
-  resultEl.innerHTML = '⏳ 正在应用配置...';
-
-  try {
-    const r = await fetch('/api/tunnel/provision', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ api_token: token, domain: domain, subdomain: subdomain })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('✅ 配置已更新！连接可能短暂中断，5 秒后自动刷新...');
-      document.getElementById('tunnel-config-modal').classList.remove('active');
-      setTimeout(() => location.reload(), 5000);
-    } else {
-      resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = `❌ ${escHtml(d.error || '保存失败')}`;
-    }
-  } catch (e) {
-    resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 请求失败';
-  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -482,8 +429,9 @@ async function _tunnelEditSuffix(currentSuffix) {
 
 // expose for inline onclick
 Object.assign(window, {
-  _tunnelValidate, _tunnelProvision, _tunnelTeardown, _tunnelRestart,
-  _tunnelOpenConfig, _tunnelCfgValidate, _tunnelCfgSave,
+  switchTunnelTab,
+  _tunnelCfgValidate, _tunnelCfgSave,
+  _tunnelTeardown, _tunnelRestart,
   _tunnelAddService, _tunnelAddServiceSubmit,
   _tunnelRemoveService, _tunnelEditSuffix,
   showToast,
