@@ -70,26 +70,23 @@ async function loadJupyterStatus() {
                      pm2St === 'errored' ? '出错' :
                      pm2St === 'not_found' ? '未创建' : pm2St;
 
-    // Status header → page header badge + controls
+    // Status header
     const stColor = d.online ? 'var(--green)' : pm2Color;
     const stLabel = d.online ? '运行中' : pm2Label;
-
-    const badge = document.getElementById('jupyter-header-badge');
-    if (badge) {
-      badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
-    }
-    const controls = document.getElementById('jupyter-header-controls');
-    if (controls) {
-      controls.innerHTML = d.online || pm2St === 'online'
-        ? `<button class="btn" onclick="window._stopJupyter()">⏹ 停止</button><button class="btn" onclick="window._restartJupyter()">♻️ 重启</button>`
-        : `<button class="btn" onclick="window._startJupyter()">▶ 启动</button>`;
-    }
-
-    // Info section in page body
-    let html = '';
-    if (d.version) {
-      html += `<div style="font-size:.82rem;color:var(--t3);padding:4px 0">JupyterLab v${escHtml(d.version)}</div>`;
-    }
+    html += `<div class="jupyter-status-header">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">
+        <div class="jupyter-status-badge" style="color:${stColor}">
+          <span class="jupyter-dot" style="background:${stColor}"></span> ${stLabel}
+        </div>
+        ${d.version ? `<span style="font-size:.82rem;color:var(--t3)">JupyterLab v${escHtml(d.version)}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${d.online || pm2St === 'online' ?
+          `<button class="btn btn-sm btn-danger" onclick="window._stopJupyter()">⏹ 停止</button>
+           <button class="btn btn-sm" onclick="window._restartJupyter()">♻️ 重启</button>` :
+          `<button class="btn btn-sm btn-primary" onclick="window._startJupyter()">▶ 启动</button>`}
+      </div>
+    </div>`;
 
     if (!d.online) {
       const hint = pm2St === 'not_found' ? '点击「启动」创建 JupyterLab 进程' :

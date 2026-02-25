@@ -275,24 +275,6 @@
             font-size: 1.15rem;
             font-weight: 600
         }
-        .page-title-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .page-status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: .82rem;
-            font-weight: 500;
-        }
-        .page-status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
 
         /* Top-right toolbar */
         .top-toolbar {
@@ -2761,12 +2743,8 @@
         <!-- ========== JupyterLab Page ========== -->
         <div id="page-jupyter" class="page hidden">
             <div class="page-header">
-                <div class="page-title-group">
-                    <h2>📓 JupyterLab</h2>
-                    <span id="jupyter-header-badge" class="page-status-badge"></span>
-                </div>
+                <h2>📓 JupyterLab</h2>
                 <div class="top-toolbar">
-                    <span id="jupyter-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -2834,12 +2812,8 @@
         <!-- ========== Tunnel Page ========== -->
         <div id="page-tunnel" class="page hidden">
             <div class="page-header">
-                <div class="page-title-group">
-                    <h2>🌐 Tunnel</h2>
-                    <span id="tunnel-header-badge" class="page-status-badge"></span>
-                </div>
+                <h2>🌐 Tunnel</h2>
                 <div class="top-toolbar">
-                    <span id="tunnel-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -2960,12 +2934,8 @@
         <!-- ========== ComfyUI Management Page ========== -->
         <div id="page-comfyui" class="page hidden">
             <div class="page-header">
-                <div class="page-title-group">
-                    <h2>🖥️ ComfyUI</h2>
-                    <span id="comfyui-header-badge" class="page-status-badge"></span>
-                </div>
+                <h2>🖥️ ComfyUI</h2>
                 <div class="top-toolbar">
-                    <span id="comfyui-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
