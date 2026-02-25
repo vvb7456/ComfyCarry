@@ -1993,6 +1993,19 @@
             text-decoration: none;
             color: var(--t1);
             transition: border-color .2s, box-shadow .2s;
+            position: relative;
+        }
+        .tunnel-svc-card .tunnel-svc-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity .2s;
+        }
+        .tunnel-svc-card:hover .tunnel-svc-actions {
+            opacity: 1;
         }
         .tunnel-svc-card:hover {
             border-color: var(--ac);
@@ -2948,7 +2961,6 @@
                     <div class="section-header">
                         <div class="section-title">⚙️ 启动参数</div>
                         <div class="section-actions">
-                            <button class="btn btn-sm" onclick="comfyFreeVRAM()">🧹 释放显存</button>
                             <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()">💾 保存并重启</button>
                             <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3)"></span>
                         </div>
@@ -3069,15 +3081,13 @@
                 <!-- Git Install Tab -->
                 <div id="ptab-git" class="hidden">
                     <div class="card card-padded">
-                        <div style="max-width:600px">
                         <h3 style="margin-bottom:12px;font-size:clamp(0.95rem,1.1vw,1.15rem)">🔗 通过 Git URL 安装插件</h3>
                         <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px">输入插件的 GitHub 仓库地址，直接克隆并安装</p>
                         <div style="display:flex;gap:8px;margin-bottom:12px">
                             <input type="text" id="plugin-git-url" placeholder="https://github.com/author/ComfyUI-Plugin" style="flex:1">
-                            <button class="btn btn-primary" onclick="installPluginFromGit()" id="plugin-git-btn">安装</button>
+                            <button class="btn btn-primary" onclick="installPluginFromGit()" id="plugin-git-btn" style="padding:8px 20px">安装</button>
                         </div>
                         <div id="plugin-git-status"></div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -3105,7 +3115,6 @@
                         <div class="toolbar-spacer"></div>
                         <button id="sync-worker-btn" class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
                         <button class="btn btn-sm btn-primary" onclick="showAddRemoteModal()">+ 添加存储</button>
-                        <button class="btn btn-sm" onclick="toggleImportConfig()">📥 导入配置</button>
                     </div>
                     <div id="sync-remotes-grid" class="sync-remotes-grid">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>

@@ -124,11 +124,18 @@ function _renderServices(d, el) {
       ? `<span class="tunnel-svc-status-dot" style="background:${eff === 'online' ? 'var(--green)' : 'var(--amber)'}"></span> ${eff === 'online' ? '路由就绪' : '连接中'}`
       : '<span class="tunnel-svc-status-dot" style="background:var(--red)"></span> 离线';
 
+    // Top-right action buttons (hover to reveal)
+    const actionBtns = suffix ? `<div class="tunnel-svc-actions">
+      <button class="btn btn-xs" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" title="编辑">✏️</button>
+      <button class="btn btn-xs btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}'${isCustom ? '' : ",true"})" title="删除">✕</button>
+    </div>` : '';
+
     if (name === 'SSH') {
       const hostname = url ? url.replace('https://', '') : `${suffix}-${d.subdomain}.${d.domain}`;
       const sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
       const encodedCmd = encodeURIComponent(sshCmd);
       html += `<div class="tunnel-svc-card" style="cursor:pointer" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedCmd}'));window.showToast?.('SSH 命令已复制')">
+        ${actionBtns}
         <div style="display:flex;align-items:center;gap:8px">
           <span class="tunnel-svc-icon">${icon}</span>
           <span class="tunnel-svc-name">${escHtml(name)}</span>
@@ -140,16 +147,13 @@ function _renderServices(d, el) {
       </div>`;
     } else {
       const displayUrl = url || `https://${suffix ? suffix+'-' : ''}${d.subdomain}.${d.domain}`;
-      const deleteBtn = isCustom ? `<button class="btn btn-xs btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}')" style="margin-left:auto">✕</button>` : '';
-      const editBtn = suffix ? `<button class="btn btn-xs" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" title="编辑子域名">✏️</button>` : '';
       html += `<a href="${escHtml(displayUrl)}" target="_blank" class="tunnel-svc-card">
+        ${actionBtns}
         <div style="display:flex;align-items:center;gap:8px">
           <span class="tunnel-svc-icon">${icon}</span>
           <span class="tunnel-svc-name">${escHtml(name)}</span>
           ${isCustom ? '<span style="font-size:.6rem;background:var(--ac);color:#000;padding:1px 5px;border-radius:3px">自定义</span>' : ''}
           <span class="tunnel-svc-status">${statusDot}</span>
-          ${editBtn}
-          ${deleteBtn}
         </div>
         <span class="tunnel-svc-detail">${escHtml(displayUrl)}</span>
         <span class="tunnel-svc-port">:${port} · ${protocol}</span>
@@ -428,8 +432,12 @@ async function _tunnelAddServiceSubmit() {
   }
 }
 
-async function _tunnelRemoveService(suffix) {
-  if (!confirm(`确定移除自定义服务 (${suffix})？`)) return;
+async function _tunnelRemoveService(suffix, isDefault) {
+  if (isDefault) {
+    if (!confirm(`⚠️ "${suffix}" 是默认服务。删除后相关功能将无法通过 Tunnel 访问。\n\n确定继续？`)) return;
+  } else {
+    if (!confirm(`确定移除自定义服务 (${suffix})？`)) return;
+  }
   showToast('正在移除...');
   try {
     const r = await fetch(`/api/tunnel/services/${encodeURIComponent(suffix)}`, { method: 'DELETE' });

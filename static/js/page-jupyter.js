@@ -81,8 +81,6 @@ async function loadJupyterStatus() {
         ${d.version ? `<span style="font-size:.82rem;color:var(--t3)">JupyterLab v${escHtml(d.version)}</span>` : ''}
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${_jupyterUrl ? `<a href="${_jupyterUrl}" target="_blank" class="btn btn-sm btn-primary">🔗 打开 JupyterLab</a>` : ''}
-        <button class="btn btn-sm" onclick="loadJupyterStatus()" title="刷新">🔄 刷新</button>
         ${d.online || pm2St === 'online' ?
           `<button class="btn btn-sm btn-danger" onclick="window._stopJupyter()">⏹ 停止</button>
            <button class="btn btn-sm" onclick="window._restartJupyter()">♻️ 重启</button>` :
