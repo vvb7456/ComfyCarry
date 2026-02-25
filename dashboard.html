@@ -877,6 +877,7 @@
         /* Tabs */
         .tabs {
             display: flex;
+            align-items: center;
             gap: 0;
             border-bottom: 1px solid var(--bd);
             margin-bottom: 16px
@@ -1658,6 +1659,49 @@
             gap: 8px
         }
 
+        /* ── 布局组件: section-header / toolbar ── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+        .section-header .section-title { margin: 0; }
+        .section-header .section-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .toolbar-spacer { flex: 1; }
+        .card-padded { padding: clamp(16px, 1.5vw, 24px); }
+        .card-padded h3 {
+            font-size: clamp(0.95rem, 1.1vw, 1.15rem);
+            margin-bottom: clamp(10px, 1vw, 16px);
+        }
+        .card-padded label {
+            font-size: .8rem;
+            color: var(--t2);
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: minmax(280px, 420px) 1fr;
+            gap: clamp(16px, 1.5vw, 24px);
+            align-items: start;
+        }
+        .settings-col {
+            display: grid;
+            gap: clamp(16px, 1.5vw, 24px);
+        }
+
         /* Modal */
         .modal-overlay {
             position: fixed;
@@ -2426,7 +2470,7 @@
             display: inline-block;
         }
         .jupyter-info-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: 8px; margin: 8px 0 16px;
         }
         .jupyter-info-item {
@@ -2477,7 +2521,8 @@
         }
         .jupyter-session-info { flex-direction: column; align-items: flex-start; gap: 2px; }
         .jupyter-empty {
-            color: var(--t3); font-size: .82rem; padding: 12px 0;
+            color: var(--t3); font-size: .82rem;
+            padding: 20px; text-align: center;
         }
 
         /* ── Global: Empty State ── */
@@ -2599,7 +2644,9 @@
                 </table>
 
                 <!-- Environment Info -->
-                <div class="section-title" style="margin-top:20px">ℹ️ 环境</div>
+                <div class="section-header">
+                    <div class="section-title">ℹ️ 环境</div>
+                </div>
                 <div class="env-info" id="overview-env-info"></div>
             </div>
         </div>
@@ -2620,9 +2667,9 @@
                 </div>
                 <!-- Local Models Tab -->
                 <div id="mtab-local">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                    <div class="toolbar">
                         <div id="local-models-status" style="font-size:.85rem;color:var(--t2)"></div>
-                        <div style="flex:1"></div>
+                        <div class="toolbar-spacer"></div>
                         <select id="model-category" onchange="loadLocalModels()" style="width:auto;min-width:140px">
                             <option value="all">全部类型</option>
                             <option value="checkpoints">Checkpoints</option>
@@ -2639,7 +2686,7 @@
                 </div>
                 <!-- CivitAI Tab (unified search + ID lookup) -->
                 <div id="mtab-civitai" class="hidden">
-                        <div class="search-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                        <div class="search-bar" style="gap:8px;align-items:center;flex-wrap:wrap">
                             <input type="text" id="search-input" placeholder="搜索模型名 / 输入 ID / 粘贴 CivitAI URL..." onkeydown="if(event.key==='Enter')smartSearch()" style="flex:1;min-width:200px">
                             <select id="filter-sort" style="width:auto;min-width:140px">
                                 <option value="Most Downloaded">最多下载</option>
@@ -2694,31 +2741,49 @@
                 </div>
 
                 <!-- 访问令牌 -->
-                <div class="section-title" style="margin-top:20px;display:flex;align-items:center;gap:8px">
-                    🔑 访问令牌
-                    <code id="jupyter-token-value" style="background:var(--bg3);padding:4px 10px;border-radius:6px;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em;max-width:420px">••••••••••••••••</code>
-                    <button class="btn btn-sm" onclick="window._toggleJupyterToken()" id="jupyter-token-toggle" style="font-size:.75rem">👁 显示</button>
-                    <button class="btn btn-sm" onclick="window._copyJupyterToken()" title="复制令牌" style="font-size:.75rem">📋 复制</button>
+                <div class="section-header">
+                    <div class="section-title">🔑 访问令牌</div>
+                    <div class="section-actions">
+                        <button class="btn btn-sm" onclick="window._toggleJupyterToken()" id="jupyter-token-toggle" style="font-size:.75rem">👁 显示</button>
+                        <button class="btn btn-sm" onclick="window._copyJupyterToken()" title="复制令牌" style="font-size:.75rem">📋 复制</button>
+                    </div>
+                </div>
+                <div class="card" style="padding:12px 14px">
+                    <code id="jupyter-token-value" style="background:var(--bg3);padding:4px 10px;border-radius:6px;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em;max-width:100%;display:block">••••••••••••••••</code>
                 </div>
 
                 <!-- 活跃内核 -->
-                <div class="section-title" style="margin-top:20px">🧠 活跃内核</div>
-                <div id="jupyter-kernels-list"></div>
+                <div class="section-header">
+                    <div class="section-title">🧠 活跃内核</div>
+                </div>
+                <div class="card" style="padding:10px 14px">
+                    <div id="jupyter-kernels-list"></div>
+                </div>
 
                 <!-- 活跃会话 -->
-                <div class="section-title" style="margin-top:20px">📂 活跃会话</div>
-                <div id="jupyter-sessions-list"></div>
+                <div class="section-header">
+                    <div class="section-title">📂 活跃会话</div>
+                </div>
+                <div class="card" style="padding:10px 14px">
+                    <div id="jupyter-sessions-list"></div>
+                </div>
 
                 <!-- 终端 -->
-                <div style="margin-top:20px;display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                    <div class="section-title" style="margin:0">💻 终端</div>
-                    <button class="btn btn-sm" onclick="window._newJupyterTerminal()">➕ 新建</button>
+                <div class="section-header">
+                    <div class="section-title">💻 终端</div>
+                    <div class="section-actions">
+                        <button class="btn btn-sm" onclick="window._newJupyterTerminal()">➕ 新建</button>
+                    </div>
                 </div>
-                <div id="jupyter-terminals-list"></div>
+                <div class="card" style="padding:10px 14px">
+                    <div id="jupyter-terminals-list"></div>
+                </div>
 
                 <!-- 日志 -->
-                <div style="margin-top:20px">
+                <div class="section-header">
                     <div class="section-title">📜 日志</div>
+                </div>
+                <div class="card" style="padding:10px 14px">
                     <div class="log-box" id="jupyter-log-content">加载中...</div>
                 </div>
             </div>
@@ -2737,9 +2802,9 @@
                 <div id="tunnel-status-section" style="display:none">
                     <div id="tunnel-status-info"></div>
                     <div style="margin-top:16px">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                            <div class="section-title" style="margin:0">🔗 服务</div>
-                            <div style="margin-left:auto;display:flex;gap:6px">
+                        <div class="section-header" style="margin-top:0">
+                            <div class="section-title">🔗 服务</div>
+                            <div class="section-actions">
                                 <button class="btn btn-sm" onclick="window._tunnelAddService()" title="添加自定义服务">➕ 添加服务</button>
                             </div>
                         </div>
@@ -2775,8 +2840,10 @@
                 </div>
 
                 <!-- 日志 -->
-                <div style="margin-top:16px">
+                <div class="section-header">
                     <div class="section-title">📜 Tunnel 日志</div>
+                </div>
+                <div>
                     <div class="log-box" id="tunnel-log-content">加载中...</div>
                 </div>
             </div>
@@ -2869,12 +2936,13 @@
                     <div id="comfyui-exec-bar" class="hidden" style="margin-top:12px"></div>
 
                     <!-- 启动参数 -->
-                    <div class="section-title" style="margin-top:24px;display:flex;align-items:center">
-                        <span>⚙️ 启动参数</span>
-                        <div style="flex:1"></div>
-                        <button class="btn btn-sm" onclick="comfyFreeVRAM()" style="font-size:.75rem;padding:3px 10px">🧹 释放显存</button>
-                        <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()" style="font-size:.75rem;padding:3px 10px;margin-left:4px">💾 保存并重启</button>
-                        <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3);margin-left:8px"></span>
+                    <div class="section-header">
+                        <div class="section-title">⚙️ 启动参数</div>
+                        <div class="section-actions">
+                            <button class="btn btn-sm" onclick="comfyFreeVRAM()">🧹 释放显存</button>
+                            <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()">💾 保存并重启</button>
+                            <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3)"></span>
+                        </div>
                     </div>
                     <div style="margin-bottom:8px">
                         <input type="text" id="comfyui-args-raw" placeholder="main.py --listen 0.0.0.0 --port 8188 ..." style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;width:100%">
@@ -2882,7 +2950,9 @@
                     <div id="comfyui-params-form" class="comfy-params-form">加载中...</div>
 
                     <!-- 日志 -->
-                    <div class="section-title" style="margin-top:24px">📜 ComfyUI 日志</div>
+                    <div class="section-header">
+                        <div class="section-title">📜 ComfyUI 日志</div>
+                    </div>
                     <div class="log-box" id="comfyui-log-content">加载中...</div>
                 </div>
 
@@ -2894,20 +2964,22 @@
                     </div>
 
                     <!-- 正在执行 -->
-                    <div class="section-title" style="display:flex;align-items:center">
-                        <span>▶ 正在执行</span>
-                        <div style="flex:1"></div>
-                        <button class="btn btn-sm btn-danger" onclick="comfyInterrupt()" style="font-size:.72rem;padding:2px 10px">⏹ 中断</button>
+                    <div class="section-header" style="margin-top:0">
+                        <div class="section-title">▶ 正在执行</div>
+                        <div class="section-actions">
+                            <button class="btn btn-sm btn-danger" onclick="comfyInterrupt()">⏹ 中断</button>
+                        </div>
                     </div>
                     <div id="queue-running" style="margin-bottom:20px">
                         <div style="font-size:.85rem;color:var(--t3);padding:8px 0">无</div>
                     </div>
 
                     <!-- 等待队列 -->
-                    <div class="section-title" style="display:flex;align-items:center">
-                        <span>⏳ 等待队列</span>
-                        <div style="flex:1"></div>
-                        <button class="btn btn-sm" onclick="comfyClearQueue()" style="font-size:.72rem;padding:2px 10px">🗑️ 清空</button>
+                    <div class="section-header" style="margin-top:0">
+                        <div class="section-title">⏳ 等待队列</div>
+                        <div class="section-actions">
+                            <button class="btn btn-sm" onclick="comfyClearQueue()">🗑️ 清空</button>
+                        </div>
                     </div>
                     <div id="queue-pending" style="margin-bottom:20px">
                         <div style="font-size:.85rem;color:var(--t3);padding:8px 0">无</div>
@@ -2944,7 +3016,7 @@
                 </div>
             </div>
             <div class="page-body">
-                <div class="tabs" style="display:flex;align-items:center">
+                <div class="tabs">
                     <div class="tab active" data-ptab="installed" onclick="switchPluginTab('installed')">📦 已安装</div>
                     <div class="tab" data-ptab="browse" onclick="switchPluginTab('browse')">🔎 浏览</div>
                     <div class="tab" data-ptab="git" onclick="switchPluginTab('git')">🔗 Git 安装</div>
@@ -2952,7 +3024,7 @@
                 </div>
                 <!-- Installed Plugins Tab -->
                 <div id="ptab-installed">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                    <div class="toolbar">
                         <input type="text" id="plugin-installed-filter" placeholder="筛选已安装插件..." oninput="filterInstalledPlugins()" style="flex:1;max-width:400px">
                         <select id="plugin-installed-status" onchange="filterInstalledPlugins()" style="width:auto;min-width:120px">
                             <option value="all">全部状态</option>
@@ -2960,7 +3032,7 @@
                             <option value="disabled">已禁用</option>
                             <option value="update">有更新</option>
                         </select>
-                        <div style="flex:1"></div>
+                        <div class="toolbar-spacer"></div>
                         <button class="btn btn-sm" onclick="loadPluginsPage()" style="font-size:.75rem;padding:4px 10px">🔄 刷新</button>
                         <button class="btn btn-sm" onclick="window._checkPluginUpdates()" style="font-size:.75rem;padding:4px 10px" title="强制 ComfyUI-Manager 重新检查所有插件更新 (耗时较长)">🔍 检查更新</button>
                         <button class="btn btn-sm btn-primary" onclick="updateAllPlugins()" style="font-size:.75rem;padding:4px 10px">⬆️ 全部更新</button>
@@ -2970,7 +3042,7 @@
                 </div>
                 <!-- Browse/Search Plugins Tab -->
                 <div id="ptab-browse" class="hidden">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                    <div class="toolbar">
                         <input type="text" id="plugin-search-input" placeholder="搜索插件名称或描述..." onkeydown="if(event.key==='Enter')searchPlugins()" style="flex:1;max-width:500px">
                         <button class="btn btn-sm btn-primary" onclick="searchPlugins()">🔎 搜索</button>
                         <select id="plugin-browse-sort" onchange="searchPlugins()" style="width:auto;min-width:120px">
@@ -3017,9 +3089,9 @@
 
                 <!-- Storage + Logs Tab -->
                 <div id="stab-remotes">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                    <div class="toolbar">
                         <div id="sync-status-badge" style="font-size:.85rem"></div>
-                        <div style="flex:1"></div>
+                        <div class="toolbar-spacer"></div>
                         <button id="sync-worker-btn" class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
                         <button class="btn btn-sm btn-primary" onclick="showAddRemoteModal()">+ 添加存储</button>
                         <button class="btn btn-sm" onclick="toggleImportConfig()">📥 导入配置</button>
@@ -3055,20 +3127,22 @@
                         </div>
                     </div>
                     <!-- Inline Logs -->
-                    <div style="margin-top:16px">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                            <span style="font-size:.85rem;font-weight:600;color:var(--t2)">📜 同步日志</span>
-                            <button class="btn btn-sm" onclick="loadSyncLogs()" style="font-size:.68rem;padding:2px 8px">🔄</button>
+                    <div class="section-header">
+                        <div class="section-title">📜 同步日志</div>
+                        <div class="section-actions">
+                            <button class="btn btn-sm" onclick="loadSyncLogs()">🔄</button>
                         </div>
+                    </div>
+                    <div>
                         <div id="sync-log-content" class="sync-log-box">加载中...</div>
                     </div>
                 </div>
 
                 <!-- Rules Tab -->
                 <div id="stab-rules" class="hidden">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                    <div class="toolbar">
                         <div id="sync-worker-badge" style="font-size:.85rem"></div>
-                        <div style="flex:1"></div>
+                        <div class="toolbar-spacer"></div>
                         <button class="btn btn-sm" onclick="runDeployRules()">▶ 执行部署规则</button>
                         <button class="btn btn-sm" onclick="showSyncSettings()">⚙ 同步设置</button>
                         <button class="btn btn-sm btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
@@ -3087,23 +3161,23 @@
                 </div>
             </div>
             <div class="page-body">
-                <div class="settings-grid" style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:clamp(16px,1.5vw,24px);align-items:start">
+                <div class="settings-grid">
                     <!-- 左列: 配置卡片 -->
-                    <div style="display:grid;gap:clamp(16px,1.5vw,24px)">
+                    <div class="settings-col">
                         <!-- 密码设置 -->
-                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔒 ComfyCarry 密码</h3>
+                        <div class="card card-padded">
+                            <h3>🔒 ComfyCarry 密码</h3>
                             <form onsubmit="event.preventDefault();changePassword()" autocomplete="off">
                             <div class="form-group" style="margin-bottom:10px">
-                                <label style="font-size:.8rem;color:var(--t2)">当前密码</label>
+                                <label>当前密码</label>
                                 <input type="password" id="settings-pw-current" placeholder="输入当前密码" autocomplete="current-password">
                             </div>
                             <div class="form-group" style="margin-bottom:10px">
-                                <label style="font-size:.8rem;color:var(--t2)">新密码</label>
+                                <label>新密码</label>
                                 <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
                             </div>
                             <div class="form-group" style="margin-bottom:12px">
-                                <label style="font-size:.8rem;color:var(--t2)">确认新密码</label>
+                                <label>确认新密码</label>
                                 <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码" autocomplete="new-password">
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary">更新密码</button>
@@ -3111,11 +3185,11 @@
                         </div>
 
                         <!-- CivitAI API Key -->
-                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🎨 CivitAI API Key</h3>
+                        <div class="card card-padded">
+                            <h3>🎨 CivitAI API Key</h3>
                             <div id="settings-civitai-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
                             <div class="form-group" style="margin-bottom:12px">
-                                <label style="font-size:.8rem;color:var(--t2)">API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
+                                <label>API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
                                 <input type="text" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
                             </div>
                             <div style="display:flex;gap:8px">
@@ -3125,8 +3199,8 @@
                         </div>
 
                         <!-- ComfyCarry API Key -->
-                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🔑 ComfyCarry API Key</h3>
+                        <div class="card card-padded">
+                            <h3>🔑 ComfyCarry API Key</h3>
                             <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
                                 用于外部脚本或应用通过 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">X-API-Key</code> 或 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">Bearer</code> 方式访问 API
                             </p>
@@ -3139,8 +3213,8 @@
                         </div>
 
                         <!-- Debug 模式 & 服务管理 -->
-                        <div class="card" style="padding:clamp(16px,1.5vw,24px)">
-                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem)">🛠️ 服务管理</h3>
+                        <div class="card card-padded">
+                            <h3>🛠️ 服务管理</h3>
                             <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
                                 <label style="font-size:.85rem;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
                                     <input type="checkbox" id="settings-debug-toggle" onchange="toggleDebugMode()" style="width:16px;height:16px;accent-color:var(--ac)">
@@ -3154,8 +3228,8 @@
                         </div>
 
                         <!-- 重新初始化 -->
-                        <div class="card" style="padding:clamp(16px,1.5vw,24px);border:1px solid rgba(255,80,80,0.25)">
-                            <h3 style="margin-bottom:clamp(10px,1vw,16px);font-size:clamp(0.95rem,1.1vw,1.15rem);color:var(--red)">⚠️ 重新初始化</h3>
+                        <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
+                            <h3 style="color:var(--red)">⚠️ 重新初始化</h3>
                             <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
                                 删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留。
                             </p>
@@ -3170,9 +3244,9 @@
                     </div>
 
                     <!-- 右列: ComfyCarry 日志 (Debug 模式) -->
-                    <div class="card" id="settings-log-card" style="padding:clamp(16px,1.5vw,24px);display:none;height:100%;min-height:400px;max-height:calc(100vh - 160px)">
+                    <div class="card card-padded" id="settings-log-card" style="display:none;height:100%;min-height:400px;max-height:calc(100vh - 160px)">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                            <h3 style="font-size:clamp(0.95rem,1.1vw,1.15rem)">📜 ComfyCarry 日志</h3>
+                            <h3 style="margin-bottom:0">📜 ComfyCarry 日志</h3>
                             <div style="display:flex;gap:8px;align-items:center">
                                 <select id="log-lines" onchange="loadSettingsLogs()" style="width:auto;min-width:80px;font-size:.8rem;padding:4px 8px">
                                     <option value="50">50 行</option>

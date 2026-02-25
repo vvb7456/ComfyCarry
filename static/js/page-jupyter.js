@@ -74,11 +74,13 @@ async function loadJupyterStatus() {
     const stColor = d.online ? 'var(--green)' : pm2Color;
     const stLabel = d.online ? '运行中' : pm2Label;
     html += `<div class="jupyter-status-header">
-      <div class="jupyter-status-badge" style="color:${stColor}">
-        <span class="jupyter-dot" style="background:${stColor}"></span> ${stLabel}
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">
+        <div class="jupyter-status-badge" style="color:${stColor}">
+          <span class="jupyter-dot" style="background:${stColor}"></span> ${stLabel}
+        </div>
+        ${d.version ? `<span style="font-size:.82rem;color:var(--t3)">JupyterLab v${escHtml(d.version)}</span>` : ''}
       </div>
-      ${d.version ? `<span style="font-size:.82rem;color:var(--t3)">JupyterLab v${escHtml(d.version)}</span>` : ''}
-      <div style="margin-left:auto;display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-shrink:0">
         ${_jupyterUrl ? `<a href="${_jupyterUrl}" target="_blank" class="btn btn-sm btn-primary">🔗 打开 JupyterLab</a>` : ''}
         <button class="btn btn-sm" onclick="loadJupyterStatus()" title="刷新">🔄 刷新</button>
         ${d.online || pm2St === 'online' ?
