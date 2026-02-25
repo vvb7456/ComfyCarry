@@ -168,6 +168,20 @@ async function loadComfyStatus() {
     const stColor = online ? 'var(--green)' : 'var(--red)';
     const stLabel = online ? '运行中' : '已停止';
 
+    // Update header badge
+    const badge = document.getElementById('comfyui-header-badge');
+    if (badge) {
+      badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
+    }
+
+    // Update header controls
+    const controls = document.getElementById('comfyui-header-controls');
+    if (controls) {
+      controls.innerHTML = online || pm2St === 'online'
+        ? `<button class="btn" onclick="restartComfyUI()">♻️ 重启</button>`
+        : `<button class="btn" onclick="restartComfyUI()">▶ 启动</button>`;
+    }
+
     // Status card
     html += `<div class="stat-card" style="border-left:3px solid ${stColor}">
       <div class="stat-label">ComfyUI</div>

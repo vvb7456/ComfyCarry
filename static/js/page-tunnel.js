@@ -45,6 +45,21 @@ async function loadTunnelPage() {
         offline: '离线', unconfigured: '未配置'
       }[st] || st;
 
+      // Update page header badge
+      const badge = document.getElementById('tunnel-header-badge');
+      if (badge) {
+        badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
+      }
+
+      // Update page header controls
+      const headerControls = document.getElementById('tunnel-header-controls');
+      if (headerControls) {
+        headerControls.innerHTML = `
+          <button class="btn" onclick="window._tunnelRestart()">♻️ 重启</button>
+          <button class="btn" onclick="window._tunnelOpenConfig()">⚙ 配置</button>
+          <button class="btn" onclick="window._tunnelTeardown()">🗑️ 移除</button>`;
+      }
+
       const conns = tunnel.connections || [];
       const connInfo = conns.length > 0
         ? conns.map(c => c.colo_name || '?').join(', ')
@@ -52,19 +67,11 @@ async function loadTunnelPage() {
 
       statusEl.innerHTML = `
         <div class="tunnel-header-row">
-          <div class="tunnel-status-badge" style="color:${stColor}">
-            <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
-          </div>
-          <span style="font-size:.78rem;color:var(--t3);margin-left:12px">
+          <span style="font-size:.82rem;color:var(--t3)">
             ${escHtml(d.subdomain)}.${escHtml(d.domain)}
             ${tunnel.tunnel_id ? ` · <code style="font-size:.7rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code>` : ''}
             · 节点: ${escHtml(connInfo)}
           </span>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="btn btn-sm" onclick="window._tunnelRestart()">♻️ 重启</button>
-            <button class="btn btn-sm" onclick="window._tunnelOpenConfig()">⚙ 配置</button>
-            <button class="btn btn-sm btn-danger" onclick="window._tunnelTeardown()">🗑️ 移除</button>
-          </div>
         </div>`;
 
       _renderServices(d, servicesEl);
@@ -72,6 +79,12 @@ async function loadTunnelPage() {
     } else {
       statusSection.style.display = 'none';
       setupSection.style.display = '';
+
+      // Unconfigured state
+      const badge = document.getElementById('tunnel-header-badge');
+      if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:var(--t3)"></span> <span style="color:var(--t3)">未配置</span>`;
+      const headerControls = document.getElementById('tunnel-header-controls');
+      if (headerControls) headerControls.innerHTML = '';
     }
 
     // 日志
