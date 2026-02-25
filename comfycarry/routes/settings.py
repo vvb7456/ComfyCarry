@@ -123,6 +123,7 @@ def api_settings_export_config():
     state = _load_setup_state()
     config["install_fa2"] = state.get("install_fa2", False)
     config["install_sa2"] = state.get("install_sa2", False)
+    config["download_aura_model"] = state.get("download_aura_model", True)
 
     rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
     if rclone_conf.exists():

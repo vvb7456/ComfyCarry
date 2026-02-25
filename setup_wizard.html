@@ -989,10 +989,10 @@
                 <label>子域名前缀 <span style="color:var(--t3);font-size:.82rem">(可选)</span></label>
                 <input type="text" id="input-cf-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
             </div>
-            <div id="cf-validate-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
+            <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
                 <button class="btn btn-secondary" onclick="validateCfToken()"
-                    style="padding:8px 16px;font-size:.88rem">🔍 验证 Token</button>
+                    style="padding:8px 16px;font-size:.88rem;flex-shrink:0">🔍 验证 Token</button>
+                <span id="cf-validate-inline" style="font-size:.85rem;display:none"></span>
             </div>
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
@@ -1234,6 +1234,7 @@
             plugins: [],
             install_fa2: false,
             install_sa2: false,
+            download_aura_model: true,
             wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
             wizard_remotes: [],       // [{name, type, params}]
         };
@@ -1501,6 +1502,7 @@
                 if (state.wizard_sync_rules) wizardConfig.wizard_sync_rules = state.wizard_sync_rules;
                 if (state.install_fa2 !== undefined) wizardConfig.install_fa2 = state.install_fa2;
                 if (state.install_sa2 !== undefined) wizardConfig.install_sa2 = state.install_sa2;
+                if (state.download_aura_model !== undefined) wizardConfig.download_aura_model = state.download_aura_model;
 
                 // 恢复手动添加的 remotes 显示
                 renderWizardManualRemotes();
@@ -1560,14 +1562,14 @@
         async function validateCfToken() {
             const token = document.getElementById('input-cf-token').value.trim();
             const domain = document.getElementById('input-cf-domain').value.trim();
-            const el = document.getElementById('cf-validate-result');
+            const el = document.getElementById('cf-validate-inline');
             if (!token || !domain) {
-                el.style.display = 'block';
+                el.style.display = 'inline';
                 el.style.color = 'var(--red)';
                 el.innerHTML = '❌ 请填写 API Token 和域名';
                 return;
             }
-            el.style.display = 'block';
+            el.style.display = 'inline';
             el.style.color = 'var(--t2)';
             el.innerHTML = '⏳ 验证中...';
             try {
@@ -1582,11 +1584,11 @@
                     el.innerHTML = `✅ ${esc(d.message)} · 账户: ${esc(d.account_name)}`;
                 } else {
                     el.style.color = 'var(--red)';
-                    el.innerHTML = `❌ ${esc(d.message)}`;
+                    el.innerHTML = `❌ ${esc(d.message || d.error || '验证失败')}`;
                 }
             } catch (e) {
                 el.style.color = 'var(--red)';
-                el.innerHTML = '❌ 验证请求失败';
+                el.innerHTML = '❌ 验证请求失败: ' + esc(e.message);
             }
         }
 
@@ -1710,6 +1712,8 @@
                     break;
                 case 6:
                     wizardConfig.plugins = getSelectedPlugins();
+                    const auraCb = document.getElementById('aura-model-dl');
+                    if (auraCb) wizardConfig.download_aura_model = auraCb.checked;
                     break;
                 case 7: {
                     wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
@@ -2023,10 +2027,16 @@
             const desc = document.getElementById('plugin-step-desc');
             const sorted = [...plugins].sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
             desc.textContent = '⚡ 预构建镜像已包含以下插件';
+            const auraUrl = 'https://github.com/GreenLandisaLie/AuraSR-ComfyUI';
             list.innerHTML = sorted.map((p, i) => {
+                const isAura = p.url === auraUrl;
                 return `<div class="plugin-item">
             <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
             <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
+            ${isAura ? `<label style="margin-left:auto;font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="aura-model-dl" ${wizardConfig.download_aura_model ? 'checked' : ''} style="width:14px;height:14px">
+                下载模型 (~234MB)
+            </label>` : ''}
         </div>`;
             }).join('');
         }
@@ -2093,7 +2103,10 @@
             saveCurrentStep();
             const c = wizardConfig;
             const pluginCount = (c.plugins || []).length;
-            const ruleCount = (c.wizard_sync_rules || []).length;
+            // 导入的规则直接写入文件, 不在 wizard_sync_rules 中
+            const wizardRuleCount = (c.wizard_sync_rules || []).length;
+            const importedRuleCount = (c._imported_sync_rules && importedConfig?.sync_rules?.length) || 0;
+            const ruleCount = wizardRuleCount || importedRuleCount;
             const remoteCount = _detectedRemotes.length + (c.wizard_remotes || []).length;
             let importNote = '';
             if (importedConfig) {
@@ -2106,7 +2119,10 @@
             // Sync rules summary
             const tplMap = {};
             _syncTemplates.forEach(t => { tplMap[t.id] = t; });
-            const ruleNames = (c.wizard_sync_rules || []).map(r => tplMap[r.template_id]?.name || r.template_id).join(', ');
+            let ruleNames = (c.wizard_sync_rules || []).map(r => tplMap[r.template_id]?.name || r.template_id).join(', ');
+            if (!ruleNames && importedRuleCount > 0) {
+                ruleNames = (importedConfig.sync_rules || []).map(r => r.name || r.id || '').filter(Boolean).join(', ');
+            }
             const dm = c._rclone_display_method || c.rclone_config_method;
 
             const html = importNote + `
@@ -2130,6 +2146,7 @@
             <h4>模型与插件</h4>
             <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? '✅ 已配置' : '⏭ 跳过'}</span></div>
             <div class="summary-row"><span class="label">插件数量</span><span class="value">${pluginCount} 个</span></div>
+            <div class="summary-row"><span class="label">AuraSR 模型</span><span class="value">${c.download_aura_model ? '✅ 下载' : '⏭ 跳过'}</span></div>
         </div>
         <div class="summary-card">
             <h4>Attention 加速</h4>
@@ -2346,6 +2363,7 @@
                 }
                 if (config.install_fa2 !== undefined) wizardConfig.install_fa2 = config.install_fa2;
                 if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
+                if (config.download_aura_model !== undefined) wizardConfig.download_aura_model = config.download_aura_model;
 
                 showImportResult(
                     `✅ 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,

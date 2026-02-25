@@ -7,6 +7,7 @@ _run_deploy() 及其所有辅助函数。
 
 import json
 import os
+import selectors
 import shlex
 import shutil
 import subprocess
@@ -183,7 +184,7 @@ def _deploy_step(name):
 
 
 def _deploy_exec(cmd, timeout=600, label=""):
-    """执行 shell 命令, 实时推送输出"""
+    """执行 shell 命令, 实时推送输出 (带真正的超时保护)"""
     if label:
         _deploy_log(f"$ {label}")
     proc = None
@@ -192,11 +193,39 @@ def _deploy_exec(cmd, timeout=600, label=""):
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1
         )
-        for line in proc.stdout:
-            line = line.rstrip()
-            if line:
-                _deploy_log(line, "output")
-        proc.wait(timeout=timeout)
+        deadline = time.time() + timeout
+        sel = selectors.DefaultSelector()
+        sel.register(proc.stdout, selectors.EVENT_READ)
+        timed_out = False
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                timed_out = True
+                break
+            events = sel.select(timeout=min(remaining, 2.0))
+            if events:
+                line = proc.stdout.readline()
+                if not line:
+                    break  # EOF
+                line = line.rstrip()
+                if line:
+                    _deploy_log(line, "output")
+            # 即使没有 events (sel 超时), 也检查进程是否已退出
+            if proc.poll() is not None:
+                # 读取残留输出
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    if line:
+                        _deploy_log(line, "output")
+                break
+        sel.close()
+        if timed_out:
+            _deploy_log(f"命令超时 ({timeout}s), 强制终止", "warn")
+            proc.kill()
+            proc.stdout.close()
+            proc.wait(timeout=5)
+            return False
+        proc.wait(timeout=10)
         if proc.returncode != 0:
             _deploy_log(f"命令退出码: {proc.returncode}", "warn")
         return proc.returncode == 0
@@ -560,14 +589,43 @@ def _run_deploy(config):
                     _deploy_log(f"执行: {name}...")
                     ok = _run_sync_rule(rule)
                     if not ok:
-                        _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warning")
+                        _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warn")
                 _deploy_log("✅ 资产同步完成")
             else:
                 _deploy_log("没有 deploy 同步规则, 跳过")
         else:
             _deploy_log("未配置 Rclone, 跳过资产同步")
 
-        # STEP 9: 启动服务
+        # STEP 9: 下载 AuraSR 模型
+        aura_plugin_url = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
+        download_aura = config.get("download_aura_model", True)
+        if aura_plugin_url in plugins and download_aura:
+            _deploy_step("下载 AuraSR 模型")
+            aura_model = Path("/workspace/ComfyUI/models/Aura-SR/model.safetensors")
+            aura_config = Path("/workspace/ComfyUI/models/Aura-SR/config.json")
+            if aura_model.exists() and aura_config.exists():
+                _deploy_log("AuraSR V2 模型已存在, 跳过下载")
+            else:
+                _deploy_log("下载 AuraSR V2...")
+                _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
+                if not aura_model.exists():
+                    _deploy_exec(
+                        'aria2c -x 16 -s 16 --console-log-level=warn '
+                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
+                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
+                        '?download=true"',
+                        timeout=300, label="AuraSR model.safetensors"
+                    )
+                if not aura_config.exists():
+                    _deploy_exec(
+                        'aria2c -x 16 -s 16 --console-log-level=warn '
+                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
+                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
+                        '?download=true"',
+                        timeout=60, label="AuraSR config.json"
+                    )
+
+        # STEP 10: 启动服务
         _deploy_step("启动服务")
 
         if rclone_method != "skip" and rclone_value:
@@ -621,38 +679,6 @@ def _run_deploy(config):
             f'{attn_flag} --fast --disable-xformers'
         )
         _deploy_exec("pm2 save 2>/dev/null || true")
-
-        # STEP 10: 后台任务
-        _deploy_step("后台任务")
-
-        # 仅在用户选择了 AuraSR 插件时下载模型
-        aura_plugin_url = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
-        if aura_plugin_url in plugins:
-            aura_model = Path("/workspace/ComfyUI/models/Aura-SR/model.safetensors")
-            aura_config = Path("/workspace/ComfyUI/models/Aura-SR/config.json")
-            if aura_model.exists() and aura_config.exists():
-                _deploy_log("AuraSR V2 模型已存在, 跳过下载")
-            else:
-                _deploy_log("下载 AuraSR V2...")
-                _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
-                if not aura_model.exists():
-                    _deploy_exec(
-                        'aria2c -x 16 -s 16 --console-log-level=warn '
-                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
-                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
-                        '?download=true"',
-                        timeout=300, label="AuraSR model.safetensors"
-                    )
-                if not aura_config.exists():
-                    _deploy_exec(
-                        'aria2c -x 16 -s 16 --console-log-level=warn '
-                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
-                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
-                        '?download=true"',
-                        timeout=60, label="AuraSR config.json"
-                    )
-        else:
-            _deploy_log("未选择 AuraSR 插件, 跳过模型下载")
 
         # 完成
         _deploy_step("部署完成")
