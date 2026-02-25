@@ -14,7 +14,7 @@ import re
 import subprocess
 import time
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 
 import requests as req_lib
 
@@ -201,6 +201,48 @@ def api_logs(name):
         return jsonify({"logs": out})
     except Exception as e:
         return jsonify({"logs": "", "error": str(e)})
+
+
+@bp.route("/api/logs/<name>/stream")
+def api_logs_stream(name):
+    """SSE — PM2 实时日志流"""
+    if not re.match(r'^[\w\-]+$', name):
+        return jsonify({"error": "Invalid service name"}), 400
+
+    def generate():
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                ["pm2", "logs", name, "--raw", "--lines", "0"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                if not line:
+                    break
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+                lvl = "info"
+                if re.search(r'error|exception|traceback', line, re.I):
+                    lvl = "error"
+                elif re.search(r'warn', line, re.I):
+                    lvl = "warn"
+                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            if proc:
+                try:
+                    proc.kill()
+                    proc.stdout.close()
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
 
 
 # ====================================================================

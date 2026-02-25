@@ -4,14 +4,13 @@
  */
 
 import { registerPage, registerEscapeHandler, showToast, loadApiKey } from './core.js';
+import { createLogStream } from './sse-log.js';
 
-let _autoLogInterval = null;
+let _debugLogStream = null;
 
 registerPage('settings', {
   enter() { loadSettingsPage(); },
-  leave() {
-    if (_autoLogInterval) { clearInterval(_autoLogInterval); _autoLogInterval = null; }
-  }
+  leave() { _stopDebugLogStream(); }
 });
 
 registerEscapeHandler(() => { closeIEModal(); });
@@ -40,31 +39,28 @@ async function loadSettingsPage() {
     const logCard = document.getElementById('settings-log-card');
     if (logCard) {
       logCard.style.display = settings.debug ? 'block' : 'none';
-      if (settings.debug) loadSettingsLogs();
+      if (settings.debug) _startDebugLogStream();
+      else _stopDebugLogStream();
     }
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
 }
 
-async function loadSettingsLogs() {
-  const lines = document.getElementById('log-lines')?.value || 100;
-  const box = document.getElementById('log-content');
-  if (!box) return;
-  try {
-    const r = await fetch(`/api/logs/dashboard?lines=${lines}`);
-    const d = await r.json();
-    box.textContent = d.logs || '(空)';
-    box.scrollTop = box.scrollHeight;
-  } catch (e) { box.textContent = '加载失败: ' + e.message; }
+function _startDebugLogStream() {
+  _stopDebugLogStream();
+  const el = document.getElementById('log-content');
+  if (!el) return;
+  _debugLogStream = createLogStream({
+    el,
+    historyUrl: '/api/logs/dashboard?lines=100',
+    streamUrl: '/api/logs/dashboard/stream',
+  });
+  _debugLogStream.start();
 }
 
-function toggleAutoLog() {
-  if (document.getElementById('log-auto')?.checked) {
-    _autoLogInterval = setInterval(loadSettingsLogs, 3000);
-  } else {
-    if (_autoLogInterval) { clearInterval(_autoLogInterval); _autoLogInterval = null; }
-  }
+function _stopDebugLogStream() {
+  if (_debugLogStream) { _debugLogStream.stop(); _debugLogStream = null; }
 }
 
 async function changePassword() {
@@ -258,7 +254,6 @@ async function regenerateApiKey() {
 Object.assign(window, {
   changePassword, saveSettingsCivitaiKey, clearSettingsCivitaiKey,
   toggleDebugMode, restartDashboard, reinitialize,
-  loadSettingsLogs, toggleAutoLog,
   openIEModal, closeIEModal, exportConfig, importConfig,
   toggleApiKeyVisibility, copyApiKey, regenerateApiKey
 });

@@ -3308,20 +3308,7 @@
 
                     <!-- 右列: ComfyCarry 日志 (Debug 模式) -->
                     <div class="card card-padded" id="settings-log-card" style="display:none;height:100%;min-height:400px;max-height:calc(100vh - 160px)">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                            <h3 style="margin-bottom:0">📜 ComfyCarry 日志</h3>
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <select id="log-lines" onchange="loadSettingsLogs()" style="width:auto;min-width:80px;font-size:.8rem;padding:4px 8px">
-                                    <option value="50">50 行</option>
-                                    <option value="100" selected>100 行</option>
-                                    <option value="300">300 行</option>
-                                </select>
-                                <button class="btn btn-sm" onclick="loadSettingsLogs()">🔄</button>
-                                <label style="font-size:.75rem;color:var(--t2);display:flex;align-items:center;gap:4px">
-                                    <input type="checkbox" id="log-auto" onchange="toggleAutoLog()"> 自动刷新
-                                </label>
-                            </div>
-                        </div>
+                        <h3 style="margin-bottom:12px">📜 ComfyCarry 日志</h3>
                         <div class="log-box" id="log-content" style="max-height:calc(100% - 50px);height:calc(100% - 50px)">加载中...</div>
                     </div>
                 </div>
