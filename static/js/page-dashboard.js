@@ -146,10 +146,13 @@ function _renderStatusBar(data) {
     html += `<span class="status-badge muted">☁️ Sync 未启动</span>`;
   }
 
-  // Tunnel
-  if (tunnel.pm2_status === 'online' || tunnel.cloudflared === 'online' || tunnel.status === 'healthy') {
+  // Tunnel (使用后端统一的 effective_status)
+  const tst = tunnel.effective_status || 'unconfigured';
+  if (tst === 'online') {
     html += `<span class="status-badge green">🌐 Tunnel 在线</span>`;
-  } else if (tunnel.configured) {
+  } else if (tst === 'connecting' || tst === 'degraded') {
+    html += `<span class="status-badge amber">🌐 Tunnel 连接中</span>`;
+  } else if (tst === 'offline') {
     html += `<span class="status-badge red">🌐 Tunnel 离线</span>`;
   } else {
     html += `<span class="status-badge muted">🌐 Tunnel 未配置</span>`;

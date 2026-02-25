@@ -678,6 +678,7 @@ def _run_deploy(config):
             f'-- main.py --listen 0.0.0.0 --port 8188 '
             f'{attn_flag} --fast --disable-xformers'
         )
+
         _deploy_exec("pm2 save 2>/dev/null || true")
 
         # 完成

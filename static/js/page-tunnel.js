@@ -35,14 +35,14 @@ async function loadTunnelPage() {
       setupSection.style.display = 'none';
 
       const tunnel = d.tunnel || {};
-      const st = tunnel.status || d.cloudflared || 'unknown';
-      const stColor = st === 'healthy' || st === 'online' ? 'var(--green)'
-                     : st === 'degraded' ? 'var(--amber)'
-                     : st === 'down' || st === 'stopped' ? 'var(--red)'
+      const st = d.effective_status || 'unknown';
+      const stColor = st === 'online' ? 'var(--green)'
+                     : st === 'degraded' || st === 'connecting' ? 'var(--amber)'
+                     : st === 'offline' ? 'var(--red)'
                      : 'var(--t3)';
       const stLabel = {
-        healthy: '运行中', online: '运行中', degraded: '部分连接',
-        down: '离线', stopped: '已停止', inactive: '未活跃'
+        online: '运行中', degraded: '部分连接', connecting: '连接中',
+        offline: '离线', unconfigured: '未配置'
       }[st] || st;
 
       const conns = tunnel.connections || [];
@@ -118,9 +118,10 @@ function _renderServices(d, el) {
     const port = svc.port;
     const suffix = svc.suffix || '';
 
-    const tunnelHealthy = (d.tunnel?.status === 'healthy' || d.cloudflared === 'online');
-    const statusDot = tunnelHealthy
-      ? '<span class="tunnel-svc-status-dot" style="background:var(--green)"></span> 路由就绪'
+    const eff = d.effective_status || 'unknown';
+    const svcOnline = eff === 'online' || eff === 'connecting';
+    const statusDot = svcOnline
+      ? `<span class="tunnel-svc-status-dot" style="background:${eff === 'online' ? 'var(--green)' : 'var(--amber)'}"></span> ${eff === 'online' ? '路由就绪' : '连接中'}`
       : '<span class="tunnel-svc-status-dot" style="background:var(--red)"></span> 离线';
 
     if (name === 'SSH') {

@@ -296,9 +296,10 @@ def api_overview():
         tunnel_info["cloudflared"] = tunnel_data.get("cloudflared", "unknown")
         tunnel_info["domain"] = tunnel_data.get("domain", "")
         tunnel_info["subdomain"] = tunnel_data.get("subdomain", "")
+        tunnel_info["effective_status"] = tunnel_data.get("effective_status", "unconfigured")
         tunnel_status = tunnel_data.get("tunnel", {})
         tunnel_info["status"] = tunnel_status.get("status", "inactive")
-        tunnel_info["running"] = tunnel_status.get("status") in ("healthy", "active")
+        tunnel_info["running"] = tunnel_info["effective_status"] == "online"
     except Exception:
         pass
     # PM2 status for cf-tunnel (新名称)

@@ -97,6 +97,23 @@ def api_tunnel_status_v2():
             break
 
     result["urls"] = urls
+
+    # ── 统一状态: effective_status ──
+    # 综合 CF API 状态 + PM2 进程状态, 给前端一个唯一判定值
+    cf_st = result["tunnel"].get("status", "inactive")
+    pm2_on = result["cloudflared"] == "online"
+    if cf_st == "healthy" and pm2_on:
+        result["effective_status"] = "online"
+    elif cf_st == "degraded" and pm2_on:
+        result["effective_status"] = "degraded"
+    elif pm2_on:
+        # cloudflared 在运行但 CF API 未报告 healthy (连接建立中/API 延迟)
+        result["effective_status"] = "connecting"
+    elif result["configured"]:
+        result["effective_status"] = "offline"
+    else:
+        result["effective_status"] = "unconfigured"
+
     return jsonify(result)
 
 
