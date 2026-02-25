@@ -83,6 +83,10 @@ export function createLogStream(opts) {
     _source.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data);
+        // 收到第一条数据时清除空状态
+        const emptyEl = el.querySelector('.empty-state');
+        if (emptyEl) el.innerHTML = '';
+
         const div = document.createElement('div');
         div.textContent = d.line;
         if (d.level === 'error') div.className = 'log-error';
