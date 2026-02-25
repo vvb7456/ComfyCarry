@@ -502,36 +502,6 @@ async function toggleSyncWorker() {
   }
 }
 
-// ── Rclone 配置导入 (保留旧功能) ────────────────────────────────
-
-async function importConfigFromUrl() {
-  const url = document.getElementById('import-url').value.trim();
-  if (!url) { showToast('请输入 URL'); return; }
-  try {
-    const r = await fetch('/api/sync/import_config', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({type: 'url', value: url})
-    });
-    const d = await r.json();
-    if (d.ok) { showToast(d.message); document.getElementById('import-url').value = ''; loadSyncConfigTab(); }
-    else showToast('导入失败: ' + (d.error || ''));
-  } catch (e) { showToast('导入失败: ' + e.message); }
-}
-
-async function importConfigFromBase64() {
-  const b64 = document.getElementById('import-base64').value.trim();
-  if (!b64) { showToast('请输入 base64 内容'); return; }
-  try {
-    const r = await fetch('/api/sync/import_config', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({type: 'base64', value: b64})
-    });
-    const d = await r.json();
-    if (d.ok) { showToast(d.message); document.getElementById('import-base64').value = ''; loadSyncConfigTab(); }
-    else showToast('导入失败: ' + (d.error || ''));
-  } catch (e) { showToast('导入失败: ' + e.message); }
-}
-
 // ── Config Tab (rclone GUI + sync settings) ─────────────────────
 
 function _parseRcloneConf(text) {
@@ -918,8 +888,6 @@ Object.assign(window, {
   loadSyncLogs,
   toggleSyncWorker,
   _restartSyncWorker,
-  importConfigFromUrl,
-  importConfigFromBase64,
   loadSyncConfigTab,
   saveSyncConfigAll,
   uploadRcloneFile,

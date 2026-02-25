@@ -2259,12 +2259,18 @@
             color: var(--t3);
             margin-left: 8px;
         }
+        .rclone-config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 12px;
+        }
         .rclone-fields-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
         }
         @media (max-width: 700px) {
+            .rclone-config-grid { grid-template-columns: 1fr; }
             .rclone-fields-grid { grid-template-columns: 1fr; }
         }
         .rclone-field {
@@ -2418,7 +2424,7 @@
         /* Scroll-to-top FAB */
         .scroll-top-fab {
             position: fixed;
-            bottom: clamp(20px, 2vw, 32px);
+            bottom: clamp(60px, 5vw, 80px);
             right: clamp(20px, 2vw, 32px);
             width: clamp(40px, 3vw, 52px);
             height: clamp(40px, 3vw, 52px);
@@ -3249,23 +3255,33 @@
 
                 <!-- Config Tab -->
                 <div id="stab-config" class="hidden">
-                    <!-- 同步设置 -->
+                    <!-- 同步设置: 两张卡片并排 -->
                     <div class="section-header" style="margin-top:0">
                         <div class="section-title">⏱ 同步设置</div>
                     </div>
-                    <div class="card card-padded" style="margin-bottom:16px">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                            <div>
-                                <label style="font-weight:600;display:block;margin-bottom:4px">文件稳定延迟 (秒)</label>
-                                <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">推送文件时，跳过修改时间不足此秒数的文件</p>
-                                <input type="number" id="cfg-min-age" min="0" max="300" value="30" style="width:100px">
-                                <span style="color:var(--t3);font-size:.82rem;margin-left:6px">默认 30</span>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+                        <div class="card card-padded">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                                <div style="flex:1">
+                                    <label style="font-weight:600;display:block;margin-bottom:4px">文件稳定延迟</label>
+                                    <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">推送文件时跳过修改时间不足此秒数的文件，防止复制不完整文件</p>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                                    <input type="number" id="cfg-min-age" min="0" max="300" value="30" style="width:72px;text-align:center">
+                                    <span style="color:var(--t3);font-size:.78rem">秒</span>
+                                </div>
                             </div>
-                            <div>
-                                <label style="font-weight:600;display:block;margin-bottom:4px">检查间隔 (秒)</label>
-                                <p style="color:var(--t2);font-size:.82rem;margin:0 0 6px">Worker 每隔多少秒检查一次文件变化</p>
-                                <input type="number" id="cfg-watch-interval" min="5" max="3600" value="60" style="width:100px">
-                                <span style="color:var(--t3);font-size:.82rem;margin-left:6px">默认 60</span>
+                        </div>
+                        <div class="card card-padded">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                                <div style="flex:1">
+                                    <label style="font-weight:600;display:block;margin-bottom:4px">检查间隔</label>
+                                    <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">Worker 每隔多少秒检查一次文件变化并执行同步</p>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                                    <input type="number" id="cfg-watch-interval" min="5" max="3600" value="60" style="width:72px;text-align:center">
+                                    <span style="color:var(--t3);font-size:.78rem">秒</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3274,30 +3290,9 @@
                     <div class="section-header">
                         <div class="section-title">📋 Rclone 配置</div>
                     </div>
-                    <div id="rclone-config-form">
+                    <div id="rclone-config-form" class="rclone-config-grid">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
                     </div>
-
-                    <!-- 导入选项 (折叠) -->
-                    <details style="margin-top:16px">
-                        <summary style="font-size:.82rem;color:var(--t2);cursor:pointer;user-select:none">📥 更多导入方式...</summary>
-                        <div class="card card-padded" style="margin-top:8px">
-                            <div style="margin-bottom:12px">
-                                <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:4px">从 URL 导入 rclone.conf</label>
-                                <div style="display:flex;gap:8px">
-                                    <input type="text" id="import-url" placeholder="https://example.com/rclone.conf" style="flex:1">
-                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromUrl()">导入</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:4px">粘贴 Base64 编码的 rclone.conf</label>
-                                <div style="display:flex;gap:8px">
-                                    <textarea id="import-base64" placeholder="RCLONE_CONF_BASE64 的值..." style="flex:1;min-height:60px;font-family:'IBM Plex Mono',monospace;font-size:.75rem"></textarea>
-                                    <button class="btn btn-sm btn-primary" onclick="importConfigFromBase64()" style="align-self:flex-start">导入</button>
-                                </div>
-                            </div>
-                        </div>
-                    </details>
 
                     <!-- 底部操作栏 -->
                     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:12px 0">

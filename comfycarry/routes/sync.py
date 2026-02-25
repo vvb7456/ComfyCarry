@@ -10,7 +10,6 @@ ComfyCarry — Cloud Sync v2 路由
 - /api/sync/worker/start|stop — Worker 控制
 - /api/sync/settings         — 全局设置
 - /api/sync/rclone_config    — 直接编辑 rclone.conf
-- /api/sync/import_config    — 导入 rclone 配置
 """
 
 import json
@@ -374,44 +373,3 @@ def api_save_rclone_config():
         remotes = []
     return jsonify({"ok": True,
                     "message": f"配置已保存，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
-
-
-@bp.route("/api/sync/import_config", methods=["POST"])
-def api_import_config():
-    import base64
-    data = request.get_json(force=True)
-    import_type = data.get("type", "")
-    value = data.get("value", "")
-    config_text = ""
-    if import_type == "url" and value:
-        try:
-            resp = requests.get(value, timeout=15)
-            resp.raise_for_status()
-            config_text = resp.text
-        except Exception as e:
-            return jsonify({"error": f"下载失败: {e}"}), 400
-    elif import_type == "base64" and value:
-        try:
-            config_text = base64.b64decode(value).decode("utf-8")
-        except Exception as e:
-            return jsonify({"error": f"Base64 解码失败: {e}"}), 400
-    else:
-        return jsonify({"error": "请提供 type (url/base64) 和 value"}), 400
-    sections = re.findall(r'^\[.+\]', config_text, re.MULTILINE)
-    if not sections:
-        return jsonify({"error": "导入的内容不是有效的 rclone 配置"}), 400
-    if RCLONE_CONF.exists():
-        RCLONE_CONF.with_suffix('.conf.bak').write_text(
-            RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
-    RCLONE_CONF.parent.mkdir(parents=True, exist_ok=True)
-    RCLONE_CONF.write_text(config_text, encoding="utf-8")
-    RCLONE_CONF.chmod(0o600)
-    try:
-        r = subprocess.run("rclone listremotes 2>&1", shell=True,
-                           capture_output=True, text=True, timeout=5)
-        remotes = [l.strip().rstrip(':') for l in r.stdout.strip().split('\n')
-                   if l.strip()]
-    except Exception:
-        remotes = []
-    return jsonify({"ok": True,
-                    "message": f"导入成功，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
