@@ -2232,74 +2232,6 @@
         .sync-import-option label {
             font-weight: 500;
         }
-
-        /* Rclone Config Form */
-        .rclone-section-card {
-            background: var(--bg2);
-            border: 1px solid var(--bd);
-            border-radius: var(--r);
-            padding: 16px;
-            margin-bottom: 12px;
-        }
-        .rclone-section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--bd);
-        }
-        .rclone-section-name {
-            font-weight: 600;
-            font-size: .92rem;
-            color: var(--t1);
-        }
-        .rclone-section-type {
-            font-size: .75rem;
-            color: var(--t3);
-            margin-left: 8px;
-        }
-        .rclone-config-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-            gap: 12px;
-        }
-        .rclone-fields-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        @media (max-width: 700px) {
-            .rclone-config-grid { grid-template-columns: 1fr; }
-            .rclone-fields-grid { grid-template-columns: 1fr; }
-        }
-        .rclone-field {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .rclone-field.wide {
-            grid-column: 1 / -1;
-        }
-        .rclone-field label {
-            font-size: .78rem;
-            color: var(--t2);
-            font-family: 'IBM Plex Mono', monospace;
-        }
-        .rclone-field .field-input-wrap {
-            display: flex;
-            gap: 4px;
-        }
-        .rclone-field input,
-        .rclone-field textarea {
-            flex: 1;
-        }
-        .rclone-field textarea {
-            min-height: 60px;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: .78rem;
-        }
-
         .sync-log-box {
             background: var(--bg3);
             border: 1px solid var(--bd);
@@ -3286,13 +3218,11 @@
                         </div>
                     </div>
 
-                    <!-- Rclone 配置 GUI -->
+                    <!-- Rclone 配置编辑 -->
                     <div class="section-header">
                         <div class="section-title">📋 Rclone 配置</div>
                     </div>
-                    <div id="rclone-config-form" class="rclone-config-grid">
-                        <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
-                    </div>
+                    <textarea id="rclone-config-editor" class="rclone-config-editor" spellcheck="false" placeholder="加载中..."></textarea>
 
                     <!-- 底部操作栏 -->
                     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:12px 0">
