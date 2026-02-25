@@ -33,15 +33,7 @@ async function loadSettingsPage() {
       apiKeyInput.type = 'password';
     }
 
-    const debugToggle = document.getElementById('settings-debug-toggle');
-    if (debugToggle) debugToggle.checked = settings.debug;
-
-    const logCard = document.getElementById('settings-log-card');
-    if (logCard) {
-      logCard.style.display = settings.debug ? 'block' : 'none';
-      if (settings.debug) _startDebugLogStream();
-      else _stopDebugLogStream();
-    }
+    _startDebugLogStream();
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
@@ -114,23 +106,6 @@ async function clearSettingsCivitaiKey() {
     loadSettingsPage();
     loadApiKey();
   } catch (e) { showToast('清除失败: ' + e.message); }
-}
-
-async function toggleDebugMode() {
-  const enabled = document.getElementById('settings-debug-toggle')?.checked || false;
-  try {
-    await fetch('/api/settings/debug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled })
-    });
-    const logCard = document.getElementById('settings-log-card');
-    if (logCard) {
-      logCard.style.display = enabled ? 'block' : 'none';
-      if (enabled) loadSettingsLogs();
-    }
-    showToast(enabled ? '✅ Debug 模式已开启' : 'Debug 模式已关闭');
-  } catch (e) { showToast('操作失败: ' + e.message); }
 }
 
 async function restartDashboard() {
@@ -253,7 +228,7 @@ async function regenerateApiKey() {
 
 Object.assign(window, {
   changePassword, saveSettingsCivitaiKey, clearSettingsCivitaiKey,
-  toggleDebugMode, restartDashboard, reinitialize,
+  restartDashboard, reinitialize,
   openIEModal, closeIEModal, exportConfig, importConfig,
   toggleApiKeyVisibility, copyApiKey, regenerateApiKey
 });

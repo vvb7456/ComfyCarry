@@ -3220,6 +3220,7 @@
             <div class="page-header">
                 <h2>⚙️ 设置</h2>
                 <div class="top-toolbar">
+                    <button class="btn" onclick="restartDashboard()">♻️ 重启</button>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -3275,21 +3276,6 @@
                             <button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">🔄 重新生成</button>
                         </div>
 
-                        <!-- Debug 模式 & 服务管理 -->
-                        <div class="card card-padded">
-                            <h3>🛠️ 服务管理</h3>
-                            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-                                <label style="font-size:.85rem;color:var(--t2);display:flex;align-items:center;gap:8px;cursor:pointer">
-                                    <input type="checkbox" id="settings-debug-toggle" onchange="toggleDebugMode()" style="width:16px;height:16px;accent-color:var(--ac)">
-                                    <span>Debug 模式</span>
-                                </label>
-                                <span style="font-size:.75rem;color:var(--t3)">开启后显示日志</span>
-                            </div>
-                            <div style="display:flex;gap:8px">
-                                <button class="btn btn-sm btn-danger" onclick="restartDashboard()">🔄 重启 ComfyCarry</button>
-                            </div>
-                        </div>
-
                         <!-- 重新初始化 -->
                         <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
                             <h3 style="color:var(--red)">⚠️ 重新初始化</h3>
@@ -3307,7 +3293,7 @@
                     </div>
 
                     <!-- 右列: ComfyCarry 日志 (Debug 模式) -->
-                    <div class="card card-padded" id="settings-log-card" style="display:none;height:100%;min-height:400px;max-height:calc(100vh - 160px)">
+                    <div class="card card-padded" id="settings-log-card" style="height:100%;min-height:400px;max-height:calc(100vh - 160px)">
                         <h3 style="margin-bottom:12px">📜 ComfyCarry 日志</h3>
                         <div class="log-box" id="log-content" style="max-height:calc(100% - 50px);height:calc(100% - 50px)">加载中...</div>
                     </div>
