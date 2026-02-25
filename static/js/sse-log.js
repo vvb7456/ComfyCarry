@@ -34,6 +34,7 @@ function defaultClassify(line) {
  * @param {string}      opts.historyUrl  - 历史日志 API (返回 { logs: string })
  * @param {string}      opts.streamUrl   - SSE 流地址 (每条 JSON { line, level })
  * @param {function}    [opts.classify]  - 行分类器, 返回 CSS class
+ * @param {function}    [opts.historyExtract] - 自定义历史提取器，接收 JSON 数据，返回行数组 string[]
  * @param {number}      [opts.maxLines=500] - 最大保留行数
  * @param {string}      [opts.emptyMsg='暂无日志'] - 空日志提示
  * @returns {{ start(): void, stop(): void }}
@@ -44,6 +45,7 @@ export function createLogStream(opts) {
     historyUrl,
     streamUrl,
     classify = defaultClassify,
+    historyExtract = null,
     maxLines = 500,
     emptyMsg = '暂无日志',
   } = opts;
@@ -56,8 +58,16 @@ export function createLogStream(opts) {
 
     // 加载历史日志
     fetch(historyUrl).then(r => r.json()).then(d => {
-      if (d.logs && d.logs.trim()) {
-        const lines = d.logs.split('\n').filter(l => l.trim());
+      let lines;
+      if (historyExtract) {
+        // 自定义提取: 返回 string[]
+        lines = historyExtract(d);
+      } else if (d.logs && d.logs.trim()) {
+        lines = d.logs.split('\n').filter(l => l.trim());
+      } else {
+        lines = [];
+      }
+      if (lines.length > 0) {
         el.innerHTML = lines.map(l => {
           const cls = classify(l);
           return `<div${cls ? ` class="${cls}"` : ''}>${escHtml(l)}</div>`;

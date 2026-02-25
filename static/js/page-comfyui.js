@@ -180,10 +180,14 @@ async function loadComfyStatus() {
         : `<button class="btn" onclick="window._comfyStart()">▶ 启动</button>`;
     }
 
-    // Status card
-    html += `<div class="stat-card" style="border-left:3px solid ${stColor}">
+    // Status card — show generating/idle when online
+    const trackerState = _comfyTracker.getState();
+    const isGenerating = online && trackerState && !trackerState.finished;
+    const cardLabel = !online ? '已停止' : isGenerating ? '正在生成' : '空闲中';
+    const cardColor = !online ? 'var(--red)' : isGenerating ? 'var(--amber)' : 'var(--green)';
+    html += `<div class="stat-card" style="border-left:3px solid ${cardColor}">
       <div class="stat-label">ComfyUI</div>
-      <div class="stat-value" style="font-size:1rem;color:${stColor}">${stLabel}</div>
+      <div class="stat-value" style="font-size:1rem;color:${cardColor}">${cardLabel}</div>
       <div class="stat-sub">${online ? `v${sys.comfyui_version || '?'} • Python ${sys.python_version || '?'} • PyTorch ${sys.pytorch_version || '?'}` : `PM2: ${pm2St}`}</div>
     </div>`;
 

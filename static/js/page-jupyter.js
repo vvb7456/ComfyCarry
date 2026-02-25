@@ -86,9 +86,7 @@ async function loadJupyterStatus() {
     }
 
     // Version info in body (no status header)
-    if (d.version) {
-      html += `<div style="font-size:.82rem;color:var(--t3);padding:4px 0">JupyterLab v${escHtml(d.version)}</div>`;
-    }
+    // (version merged into info-grid below)
 
     if (!d.online) {
       const hint = pm2St === 'not_found' ? '点击「启动」创建 JupyterLab 进程' :
@@ -105,6 +103,9 @@ async function loadJupyterStatus() {
 
     // Process info
     html += '<div class="jupyter-info-grid">';
+    if (d.version) {
+      html += `<div class="jupyter-info-item"><span class="jupyter-info-label">版本</span><span>v${escHtml(d.version)}</span></div>`;
+    }
     if (d.pid) {
       html += `<div class="jupyter-info-item"><span class="jupyter-info-label">PID</span><span>${d.pid}</span></div>`;
     }
@@ -220,13 +221,15 @@ function renderTerminalsList(terminals) {
   if (!el) return;
   const wrapper = document.getElementById('jupyter-section-terminals');
 
+  // Always show the section (has add-card)
+  if (wrapper) wrapper.style.display = '';
+
+  const addCard = `<div class="add-card" onclick="window._newJupyterTerminal()" style="display:inline-flex;min-width:120px;min-height:48px;padding:8px 16px"><span class="add-icon">+</span><span>新建终端</span></div>`;
+
   if (terminals.length === 0) {
-    el.innerHTML = '';
-    if (wrapper) wrapper.style.display = 'none';
+    el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${addCard}</div>`;
     return;
   }
-
-  if (wrapper) wrapper.style.display = '';
 
   el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${terminals.map(t => {
     // 构建跳转 URL
@@ -244,7 +247,7 @@ function renderTerminalsList(terminals) {
       ${openBtn}
       <button class="btn btn-xs btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">✕</button>
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}${addCard}</div>`;
 }
 
 async function _newJupyterTerminal() {
@@ -309,8 +312,9 @@ async function _toggleJupyterToken() {
   if (!valEl) return;
 
   if (_tokenVisible) {
-    valEl.textContent = '••••••••••••••••';
-    btnEl.textContent = '👁 显示';
+    valEl.type = 'password';
+    valEl.value = _cachedToken || '';
+    btnEl.textContent = '👁';
     _tokenVisible = false;
   } else {
     if (!_cachedToken) {
@@ -322,8 +326,9 @@ async function _toggleJupyterToken() {
         _cachedToken = '(获取失败)';
       }
     }
-    valEl.textContent = _cachedToken;
-    btnEl.textContent = '🙈 隐藏';
+    valEl.type = 'text';
+    valEl.value = _cachedToken;
+    btnEl.textContent = '🙈';
     _tokenVisible = true;
   }
 }

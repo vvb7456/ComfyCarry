@@ -284,14 +284,43 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: .82rem;
+            font-size: .78rem;
             font-weight: 500;
+            padding: 3px 10px;
+            border-radius: var(--rs);
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            line-height: 1;
         }
         .page-status-dot {
-            width: 8px;
-            height: 8px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
             display: inline-block;
+        }
+        /* Empty add-card style */
+        .add-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 80px;
+            border: 2px dashed var(--bd);
+            border-radius: var(--r);
+            color: var(--t3);
+            font-size: .85rem;
+            cursor: pointer;
+            transition: all .2s;
+            background: transparent;
+        }
+        .add-card:hover {
+            border-color: var(--ac);
+            color: var(--ac);
+            background: rgba(99,102,241,.05);
+        }
+        .add-card .add-icon {
+            font-size: 1.4rem;
+            line-height: 1;
         }
 
         /* Top-right toolbar */
@@ -2779,13 +2808,14 @@
                 <!-- 访问令牌 -->
                 <div class="section-header">
                     <div class="section-title">🔑 访问令牌</div>
-                    <div class="section-actions">
-                        <button class="btn btn-sm" onclick="window._toggleJupyterToken()" id="jupyter-token-toggle" style="font-size:.75rem">👁 显示</button>
-                        <button class="btn btn-sm" onclick="window._copyJupyterToken()" title="复制令牌" style="font-size:.75rem">📋 复制</button>
-                    </div>
                 </div>
                 <div class="card" style="padding:12px 14px">
-                    <code id="jupyter-token-value" style="background:var(--bg3);padding:4px 10px;border-radius:6px;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.02em;max-width:100%;display:block">••••••••••••••••</code>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <input type="password" id="jupyter-token-value" value="" readonly
+                               style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:.78rem;letter-spacing:.02em;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--t1)">
+                        <button class="btn btn-sm" onclick="window._toggleJupyterToken()" id="jupyter-token-toggle" style="font-size:.75rem;flex-shrink:0">👁</button>
+                        <button class="btn btn-sm" onclick="window._copyJupyterToken()" title="复制令牌" style="font-size:.75rem;flex-shrink:0">📋</button>
+                    </div>
                 </div>
 
                 <!-- 活跃内核 -->
@@ -2812,9 +2842,6 @@
                 <div id="jupyter-section-terminals" style="display:none">
                     <div class="section-header">
                         <div class="section-title">💻 终端</div>
-                        <div class="section-actions">
-                            <button class="btn btn-sm" onclick="window._newJupyterTerminal()">➕ 新建</button>
-                        </div>
                     </div>
                     <div class="card" style="padding:10px 14px">
                         <div id="jupyter-terminals-list"></div>
@@ -2850,9 +2877,6 @@
                     <div style="margin-top:16px">
                         <div class="section-header" style="margin-top:0">
                             <div class="section-title">🔗 服务</div>
-                            <div class="section-actions">
-                                <button class="btn btn-sm" onclick="window._tunnelAddService()" title="添加自定义服务">➕ 添加服务</button>
-                            </div>
                         </div>
                         <div id="tunnel-services"></div>
                     </div>
@@ -3143,12 +3167,6 @@
 
                 <!-- Storage + Logs Tab -->
                 <div id="stab-remotes">
-                    <div class="toolbar">
-                        <div id="sync-status-badge" style="font-size:.85rem"></div>
-                        <div class="toolbar-spacer"></div>
-                        <button id="sync-worker-btn" class="btn btn-sm" onclick="toggleSyncWorker()">⏯ Worker</button>
-                        <button class="btn btn-sm btn-primary" onclick="showAddRemoteModal()">+ 添加存储</button>
-                    </div>
                     <div id="sync-remotes-grid" class="sync-remotes-grid">
                         <div class="loading"><div class="spinner"></div><div>加载中...</div></div>
                     </div>
@@ -3182,9 +3200,6 @@
                     <!-- Inline Logs -->
                     <div class="section-header">
                         <div class="section-title">📜 同步日志</div>
-                        <div class="section-actions">
-                            <button class="btn btn-sm" onclick="loadSyncLogs()">🔄</button>
-                        </div>
                     </div>
                     <div>
                         <div id="sync-log-content" class="sync-log-box">加载中...</div>
@@ -3193,11 +3208,6 @@
 
                 <!-- Rules Tab -->
                 <div id="stab-rules" class="hidden">
-                    <div class="toolbar">
-                        <div id="sync-worker-badge" style="font-size:.85rem"></div>
-                        <div class="toolbar-spacer"></div>
-                        <button class="btn btn-sm btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
-                    </div>
                     <div id="sync-rules-list"></div>
                 </div>
             </div>

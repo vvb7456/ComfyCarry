@@ -1,5 +1,6 @@
 // ── page-sync.js  ·  Sync 页面模块 ──────────────────────────────
 import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError } from './core.js';
+import { createLogStream } from './sse-log.js';
 
 // ── State ───────────────────────────────────────────────────────
 let _syncRemotes = [];
@@ -8,6 +9,7 @@ let _syncTemplates = [];
 let _syncRemoteTypes = null;
 let _editingRuleIdx = -1;
 let syncAutoRefresh = null;
+let _syncLogStream = null;
 let syncStorageCache = null;
 let rcloneConfigLoaded = false;
 
@@ -27,20 +29,17 @@ function switchSyncTab(tab) {
 // ── 存储服务 Tab ────────────────────────────────────────────────
 
 async function loadSyncRemotes() {
+  const addCard = `<div class="sync-remote-card add-card" onclick="showAddRemoteModal()"><span class="add-icon">+</span><span>添加存储</span></div>`;
   try {
     const r = await fetch('/api/sync/remotes');
     const d = await r.json();
     _syncRemotes = d.remotes || [];
     const grid = document.getElementById('sync-remotes-grid');
-    if (_syncRemotes.length === 0) {
-      grid.innerHTML = renderEmpty('未检测到 rclone remote，请添加存储或导入配置');
-    } else {
-      grid.innerHTML = _syncRemotes.map(renderSyncRemoteCard).join('');
-      if (syncStorageCache) {
-        for (const r of _syncRemotes) {
-          const el = document.getElementById('storage-' + r.name);
-          if (el && syncStorageCache[r.name]) renderStorageResult(el, r.name, syncStorageCache[r.name]);
-        }
+    grid.innerHTML = _syncRemotes.map(renderSyncRemoteCard).join('') + addCard;
+    if (syncStorageCache) {
+      for (const r of _syncRemotes) {
+        const el = document.getElementById('storage-' + r.name);
+        if (el && syncStorageCache[r.name]) renderStorageResult(el, r.name, syncStorageCache[r.name]);
       }
     }
   } catch (e) {
@@ -235,10 +234,6 @@ async function loadSyncRules() {
     _syncRules = d.rules || [];
     _syncTemplates = d.templates || [];
     renderSyncRulesList();
-    const on = d.worker_running;
-    const statusText = `<span style="color:${on?'var(--green)':'var(--t3)'}">● Worker ${on?'运行中':'已停止'}</span>`;
-    const badge = document.getElementById('sync-worker-badge');
-    if (badge) badge.innerHTML = statusText;
   } catch (e) {
     document.getElementById('sync-rules-list').innerHTML = renderError('加载失败');
   }
@@ -246,8 +241,9 @@ async function loadSyncRules() {
 
 function renderSyncRulesList() {
   const el = document.getElementById('sync-rules-list');
+  const addCard = `<div class="sync-rule-card add-card" onclick="showAddRuleModal()" style="min-height:60px"><span class="add-icon">+</span><span>添加规则</span></div>`;
   if (_syncRules.length === 0) {
-    el.innerHTML = renderEmpty('暂无同步规则，点击右上角「+ 添加规则」开始配置');
+    el.innerHTML = addCard;
     return;
   }
   el.innerHTML = _syncRules.map((r, i) => {
@@ -276,7 +272,7 @@ function renderSyncRulesList() {
         <button class="btn btn-sm" onclick="deleteRule(${i})" title="删除" style="color:var(--red)">🗑️</button>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + addCard;
 }
 
 async function saveSyncRules() {
@@ -472,15 +468,6 @@ async function loadSyncLogs() {
     const r = await fetch('/api/sync/status');
     const d = await r.json();
     const on = d.worker_running;
-    // 更新所有 Worker 状态显示 (统一文本)
-    const statusText = `<span style="color:${on ? 'var(--green)' : 'var(--t3)'}">● Worker ${on ? '运行中' : '已停止'}</span>`;
-    const badge = document.getElementById('sync-status-badge');
-    if (badge) badge.innerHTML = statusText;
-    const badge2 = document.getElementById('sync-worker-badge');
-    if (badge2) badge2.innerHTML = statusText;
-    // Worker 按钮
-    const btn = document.getElementById('sync-worker-btn');
-    if (btn) btn.innerHTML = on ? '⏹ 停止 Worker' : '▶ 启动 Worker';
     // ── Header badge + controls ──
     const hBadge = document.getElementById('sync-header-badge');
     if (hBadge) {
@@ -491,36 +478,48 @@ async function loadSyncLogs() {
     const hCtrl = document.getElementById('sync-header-controls');
     if (hCtrl) {
       hCtrl.innerHTML = on
-        ? `<button class="btn" onclick="toggleSyncWorker()">⏹ 停止</button>`
+        ? `<button class="btn" onclick="toggleSyncWorker()">⏹ 停止</button><button class="btn" onclick="_restartSyncWorker()">♻️ 重启</button>`
         : `<button class="btn" onclick="toggleSyncWorker()">▶ 启动</button>`;
     }
-    renderSyncLog(d.log_lines || []);
   } catch (e) {
-    document.getElementById('sync-log-content').innerHTML = renderError('加载失败');
+    // header badge loading failed silently
   }
 }
 
-function renderSyncLog(lines) {
+function _startSyncLogStream() {
+  _stopSyncLogStream();
   const el = document.getElementById('sync-log-content');
-  if (!lines || lines.length === 0) {
-    el.innerHTML = renderEmpty('暂无同步日志');
-    return;
-  }
-  el.innerHTML = lines.map(line => {
-    const esc = escHtml(line);
-    let cls = '';
-    if (line.includes('✅')) cls = 'style="color:var(--green)"';
-    else if (line.includes('❌') || line.includes('失败')) cls = 'style="color:var(--red)"';
-    else if (line.includes('⬆') || line.includes('⬇') || line.includes('🔍')) cls = 'style="color:var(--cyan)"';
-    else if (line.includes('☁️') || line.includes('🛑')) cls = 'style="color:var(--t2)"';
-    return `<div class="sync-log-entry" ${cls}>${esc}</div>`;
-  }).join('');
-  el.scrollTop = el.scrollHeight;
+  if (!el) return;
+  _syncLogStream = createLogStream({
+    el,
+    historyUrl: '/api/sync/status',
+    historyExtract: (data) => data.log_lines || [],
+    streamUrl: '/api/sync/logs/stream',
+    classify: line => {
+      if (/❌|失败/i.test(line)) return 'log-error';
+      if (/⬆|⬇|🔍/i.test(line)) return 'log-info';
+      if (/✅/i.test(line)) return 'log-info';
+      return '';
+    },
+  });
+  _syncLogStream.start();
+}
+
+function _stopSyncLogStream() {
+  if (_syncLogStream) { _syncLogStream.stop(); _syncLogStream = null; }
+}
+
+async function _restartSyncWorker() {
+  try {
+    await fetch('/api/sync/worker/stop', { method: 'POST' });
+    await new Promise(r => setTimeout(r, 1000));
+    await fetch('/api/sync/worker/start', { method: 'POST' });
+    showToast('♻️ Sync Worker 已重启');
+    setTimeout(loadSyncLogs, 2000);
+  } catch (e) { showToast('重启失败: ' + e.message); }
 }
 
 async function toggleSyncWorker() {
-  const btn = document.getElementById('sync-worker-btn');
-  if (btn) btn.disabled = true;
   try {
     const r = await fetch('/api/sync/status');
     const d = await r.json();
@@ -528,10 +527,9 @@ async function toggleSyncWorker() {
     const url = running ? '/api/sync/worker/stop' : '/api/sync/worker/start';
     await fetch(url, {method: 'POST'});
     showToast(running ? 'Worker 已停止' : 'Worker 已启动');
-    setTimeout(() => { if (btn) btn.disabled = false; loadSyncLogs(); }, 1500);
+    setTimeout(loadSyncLogs, 1500);
   } catch (e) {
     showToast('操作失败: ' + e.message);
-    if (btn) btn.disabled = false;
   }
 }
 
@@ -617,8 +615,8 @@ function stopSyncAutoRefresh() {
 // ── Page Registration ───────────────────────────────────────────
 
 registerPage('sync', {
-  enter() { loadSyncPage(); startSyncAutoRefresh(); },
-  leave() { stopSyncAutoRefresh(); }
+  enter() { loadSyncPage(); startSyncAutoRefresh(); _startSyncLogStream(); },
+  leave() { stopSyncAutoRefresh(); _stopSyncLogStream(); }
 });
 
 registerEscapeHandler(() => {
@@ -754,6 +752,7 @@ Object.assign(window, {
   submitAddRule,
   loadSyncLogs,
   toggleSyncWorker,
+  _restartSyncWorker,
   toggleImportConfig,
   importConfigFromUrl,
   importConfigFromBase64,

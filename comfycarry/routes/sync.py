@@ -18,9 +18,10 @@ import re
 import shlex
 import subprocess
 import threading
+import time
 
 import requests
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from pathlib import Path
 
 from ..config import (
@@ -65,6 +66,39 @@ def api_sync_status():
         "templates": SYNC_RULE_TEMPLATES,
         "settings": settings,
     })
+
+
+# ====================================================================
+# Sync SSE 日志流
+# ====================================================================
+@bp.route("/api/sync/logs/stream")
+def api_sync_logs_stream():
+    """SSE: 轮询 sync log buffer 推送新日志行"""
+    def generate():
+        last_count = 0
+        try:
+            while True:
+                lines = get_sync_log_buffer()
+                current_count = len(lines)
+                if current_count > last_count:
+                    new_lines = lines[last_count:]
+                    for line in new_lines:
+                        lvl = "info"
+                        if "❌" in line or "失败" in line:
+                            lvl = "error"
+                        elif "⬆" in line or "⬇" in line or "🔍" in line:
+                            lvl = "info"
+                        yield f"data: {json.dumps({'line': line, 'level': lvl})}\n\n"
+                    last_count = current_count
+                elif current_count < last_count:
+                    # buffer was trimmed, reset
+                    last_count = current_count
+                time.sleep(2)
+        except GeneratorExit:
+            pass
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ====================================================================

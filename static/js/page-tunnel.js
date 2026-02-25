@@ -64,10 +64,7 @@ async function loadTunnelPage() {
 
       statusEl.innerHTML = `
         <div class="tunnel-header-row">
-          <div class="tunnel-status-badge" style="color:${stColor}">
-            <span class="tunnel-dot" style="background:${stColor}"></span> ${stLabel}
-          </div>
-          <span style="font-size:.78rem;color:var(--t3);margin-left:12px">
+          <span style="font-size:.82rem;color:var(--t3)">
             ${escHtml(d.subdomain)}.${escHtml(d.domain)}
             ${tunnel.tunnel_id ? ` · <code style="font-size:.7rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code>` : ''}
             · 节点: ${escHtml(connInfo)}
@@ -185,6 +182,12 @@ function _renderServices(d, el) {
       </a>`;
     }
   }
+
+  // Add service card (empty card)
+  html += `<div class="tunnel-svc-card add-card" onclick="window._tunnelAddService()" style="cursor:pointer">
+    <span class="add-icon">+</span>
+    <span>添加服务</span>
+  </div>`;
 
   html += '</div>';
   el.innerHTML = html;
