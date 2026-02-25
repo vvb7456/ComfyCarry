@@ -2252,8 +2252,8 @@
         .sync-log-entry:last-child { border-bottom: none; }
         .rclone-config-editor {
             width: 100%;
-            min-height: 250px;
-            max-height: 500px;
+            min-height: 400px;
+            max-height: 600px;
             font-family: 'IBM Plex Mono', monospace;
             font-size: .78rem;
             line-height: 1.5;
@@ -2913,34 +2913,53 @@
                 <!-- Config Tab -->
                 <div id="ttab-config" class="hidden">
                     <div id="tunnel-config-section">
-                        <div class="card card-padded" style="max-width:600px">
-                            <div class="section-title" style="margin-bottom:12px">⚙️ Tunnel 配置</div>
-                            <div style="font-size:.78rem;color:var(--t3);margin-bottom:16px;padding:8px 12px;background:var(--bg3);border-radius:var(--r)">
-                                修改配置将<strong>更新现有 Tunnel</strong> 的设置。如未创建 Tunnel，点击「创建」将自动配置 DNS 和 Ingress。
-                            </div>
-                            <div class="form-group" style="margin-bottom:10px">
-                                <label style="font-size:.8rem;color:var(--t2)">CF API Token</label>
-                                <div style="display:flex;gap:4px">
-                                    <input type="password" id="tunnel-cfg-token" placeholder="CF Token (My Profile → API Tokens)" style="flex:1">
-                                    <button class="btn btn-sm" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'" style="flex-shrink:0">👁️</button>
+                        <div style="font-size:.78rem;color:var(--t3);margin-bottom:16px;padding:8px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r)">
+                            修改配置将<strong>更新现有 Tunnel</strong> 的设置。如未创建 Tunnel，点击底部的「创建」按钮将自动配置 DNS 和 Ingress。
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                            <div class="card card-padded">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                                    <div style="flex:1">
+                                        <label style="font-weight:600;display:block;margin-bottom:4px">CF API Token</label>
+                                        <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">
+                                            需要权限: <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Tunnel Edit</code> + <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">DNS Edit</code>
+                                        </p>
+                                    </div>
+                                    <div style="display:flex;gap:4px;flex-shrink:0;min-width:200px">
+                                        <input type="password" id="tunnel-cfg-token" placeholder="CF Token" style="flex:1">
+                                        <button class="btn btn-sm" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'" style="flex-shrink:0">👁️</button>
+                                    </div>
                                 </div>
-                                <div style="font-size:.72rem;color:var(--t3);margin-top:4px">
-                                    需要权限: <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Account > Tunnel Edit</code> + <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Zone > DNS Edit</code>
+                            </div>
+                            <div class="card card-padded">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                                    <div style="flex:1">
+                                        <label style="font-weight:600;display:block;margin-bottom:4px">域名</label>
+                                        <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">必须已托管在 Cloudflare</p>
+                                    </div>
+                                    <div style="flex-shrink:0;min-width:200px">
+                                        <input type="text" id="tunnel-cfg-domain" placeholder="mydomain.com" style="width:100%">
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-group" style="margin-bottom:10px">
-                                <label style="font-size:.8rem;color:var(--t2)">域名</label>
-                                <input type="text" id="tunnel-cfg-domain" placeholder="mydomain.com (必须已托管在 Cloudflare)">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                            <div class="card card-padded">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                                    <div style="flex:1">
+                                        <label style="font-weight:600;display:block;margin-bottom:4px">子域名前缀</label>
+                                        <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">留空则随机生成</p>
+                                    </div>
+                                    <div style="flex-shrink:0;min-width:200px">
+                                        <input type="text" id="tunnel-cfg-subdomain" placeholder="cc-a1b2c3d4" style="width:100%">
+                                    </div>
+                                </div>
                             </div>
-                            <div class="form-group" style="margin-bottom:10px">
-                                <label style="font-size:.8rem;color:var(--t2)">子域名前缀 <span style="color:var(--t3)">(可选)</span></label>
-                                <input type="text" id="tunnel-cfg-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
-                            </div>
-                            <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
-                            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-                                <button class="btn btn-sm" onclick="window._tunnelCfgValidate()">🔍 验证 Token</button>
-                                <button class="btn btn-sm btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelCfgSave()">💾 保存并应用</button>
-                            </div>
+                        </div>
+                        <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
+                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding:12px 0">
+                            <button class="btn" onclick="window._tunnelCfgValidate()">🔍 验证 Token</button>
+                            <button class="btn btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelCfgSave()">💾 保存并应用</button>
                         </div>
                     </div>
                 </div>
