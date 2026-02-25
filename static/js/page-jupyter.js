@@ -146,11 +146,15 @@ async function loadJupyterStatus() {
 function renderKernelsList(kernels) {
   const el = document.getElementById('jupyter-kernels-list');
   if (!el) return;
+  const wrapper = document.getElementById('jupyter-section-kernels');
 
   if (kernels.length === 0) {
-    el.innerHTML = '<div class="jupyter-empty">无活跃内核</div>';
+    el.innerHTML = '';
+    if (wrapper) wrapper.style.display = 'none';
     return;
   }
+
+  if (wrapper) wrapper.style.display = '';
 
   el.innerHTML = kernels.map(k => {
     const stateColor = k.state === 'idle' ? 'var(--green)' :
@@ -177,11 +181,15 @@ function renderKernelsList(kernels) {
 function renderSessionsList(sessions) {
   const el = document.getElementById('jupyter-sessions-list');
   if (!el) return;
+  const wrapper = document.getElementById('jupyter-section-sessions');
 
   if (sessions.length === 0) {
-    el.innerHTML = '<div class="jupyter-empty">无活跃会话</div>';
+    el.innerHTML = '';
+    if (wrapper) wrapper.style.display = 'none';
     return;
   }
+
+  if (wrapper) wrapper.style.display = '';
 
   el.innerHTML = sessions.map(s => {
     const icon = s.type === 'notebook' ? '📓' : s.type === 'console' ? '💻' : '📄';
@@ -210,11 +218,15 @@ function renderSessionsList(sessions) {
 function renderTerminalsList(terminals) {
   const el = document.getElementById('jupyter-terminals-list');
   if (!el) return;
+  const wrapper = document.getElementById('jupyter-section-terminals');
 
   if (terminals.length === 0) {
-    el.innerHTML = '<div class="jupyter-empty">无活跃终端</div>';
+    el.innerHTML = '';
+    if (wrapper) wrapper.style.display = 'none';
     return;
   }
+
+  if (wrapper) wrapper.style.display = '';
 
   el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${terminals.map(t => {
     // 构建跳转 URL

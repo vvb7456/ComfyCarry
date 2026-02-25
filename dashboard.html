@@ -705,7 +705,6 @@
         .svc-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 16px
         }
 
         .svc-table th {
@@ -2628,6 +2627,7 @@
 
                 <!-- Services Table -->
                 <div class="section-title">🔧 服务</div>
+                <div class="card" style="padding:0;overflow-x:auto">
                 <table class="svc-table" id="svc-table">
                     <thead>
                         <tr>
@@ -2642,6 +2642,7 @@
                     </thead>
                     <tbody id="overview-svc-tbody"></tbody>
                 </table>
+                </div>
 
                 <!-- Environment Info -->
                 <div class="section-header">
@@ -2753,30 +2754,36 @@
                 </div>
 
                 <!-- 活跃内核 -->
-                <div class="section-header">
-                    <div class="section-title">🧠 活跃内核</div>
-                </div>
-                <div class="card" style="padding:10px 14px">
-                    <div id="jupyter-kernels-list"></div>
+                <div id="jupyter-section-kernels" style="display:none">
+                    <div class="section-header">
+                        <div class="section-title">🧠 活跃内核</div>
+                    </div>
+                    <div class="card" style="padding:10px 14px">
+                        <div id="jupyter-kernels-list"></div>
+                    </div>
                 </div>
 
                 <!-- 活跃会话 -->
-                <div class="section-header">
-                    <div class="section-title">📂 活跃会话</div>
-                </div>
-                <div class="card" style="padding:10px 14px">
-                    <div id="jupyter-sessions-list"></div>
+                <div id="jupyter-section-sessions" style="display:none">
+                    <div class="section-header">
+                        <div class="section-title">📂 活跃会话</div>
+                    </div>
+                    <div class="card" style="padding:10px 14px">
+                        <div id="jupyter-sessions-list"></div>
+                    </div>
                 </div>
 
                 <!-- 终端 -->
-                <div class="section-header">
-                    <div class="section-title">💻 终端</div>
-                    <div class="section-actions">
-                        <button class="btn btn-sm" onclick="window._newJupyterTerminal()">➕ 新建</button>
+                <div id="jupyter-section-terminals" style="display:none">
+                    <div class="section-header">
+                        <div class="section-title">💻 终端</div>
+                        <div class="section-actions">
+                            <button class="btn btn-sm" onclick="window._newJupyterTerminal()">➕ 新建</button>
+                        </div>
                     </div>
-                </div>
-                <div class="card" style="padding:10px 14px">
-                    <div id="jupyter-terminals-list"></div>
+                    <div class="card" style="padding:10px 14px">
+                        <div id="jupyter-terminals-list"></div>
+                    </div>
                 </div>
 
                 <!-- 日志 -->
@@ -2814,7 +2821,8 @@
 
                 <!-- 未配置时的初始配置区 -->
                 <div id="tunnel-setup-section" style="display:none">
-                    <div class="card" style="padding:clamp(16px,1.5vw,24px);max-width:600px">
+                    <div class="card card-padded">
+                        <div style="max-width:600px">
                         <div class="section-title">⚙️ 配置 Cloudflare Tunnel</div>
                         <div class="form-group" style="margin-bottom:10px">
                             <label style="font-size:.8rem;color:var(--t2)">CF API Token</label>
@@ -2835,6 +2843,7 @@
                         <div style="display:flex;gap:8px;margin-top:12px">
                             <button class="btn btn-sm" onclick="window._tunnelValidate()">🔍 验证 Token</button>
                             <button class="btn btn-sm btn-primary" onclick="window._tunnelProvision()">🚀 创建 Tunnel</button>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -3059,7 +3068,8 @@
                 </div>
                 <!-- Git Install Tab -->
                 <div id="ptab-git" class="hidden">
-                    <div class="card" style="padding:clamp(16px,1.5vw,24px);max-width:600px">
+                    <div class="card card-padded">
+                        <div style="max-width:600px">
                         <h3 style="margin-bottom:12px;font-size:clamp(0.95rem,1.1vw,1.15rem)">🔗 通过 Git URL 安装插件</h3>
                         <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px">输入插件的 GitHub 仓库地址，直接克隆并安装</p>
                         <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -3067,6 +3077,7 @@
                             <button class="btn btn-primary" onclick="installPluginFromGit()" id="plugin-git-btn">安装</button>
                         </div>
                         <div id="plugin-git-status"></div>
+                        </div>
                     </div>
                 </div>
             </div>
