@@ -224,7 +224,7 @@ function renderTerminalsList(terminals) {
   // Always show the section (has add-card)
   if (wrapper) wrapper.style.display = '';
 
-  const addCard = `<div class="add-card" onclick="window._newJupyterTerminal()" style="display:inline-flex;min-width:120px;min-height:48px;padding:8px 16px"><span class="add-icon">+</span><span>新建终端</span></div>`;
+  const addCard = `<div class="jupyter-terminal-item" onclick="window._newJupyterTerminal()" style="display:inline-flex;cursor:pointer;color:var(--t3);justify-content:center;transition:all .2s" onmouseenter="this.style.borderColor='var(--ac)';this.style.color='var(--ac)'" onmouseleave="this.style.borderColor='';this.style.color='var(--t3)'"><span style="font-size:1.2rem;line-height:1">+</span><span style="font-size:.85rem">新建终端</span></div>`;
 
   if (terminals.length === 0) {
     el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${addCard}</div>`;

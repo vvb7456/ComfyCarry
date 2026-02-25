@@ -62,11 +62,7 @@ async function loadTunnelPage() {
         ? conns.map(c => c.colo_name || '?').join(', ')
         : '无连接';
 
-      statusEl.innerHTML = `
-        <div class="info-item"><span class="info-label">🌐 域名</span><span class="info-value">${escHtml(d.subdomain)}.${escHtml(d.domain)}</span></div>
-        ${tunnel.tunnel_id ? `<div class="info-item"><span class="info-label">🔑 Tunnel ID</span><span class="info-value"><code style="font-size:.78rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code></span></div>` : ''}
-        <div class="info-item"><span class="info-label">📡 节点</span><span class="info-value">${escHtml(connInfo)}</span></div>
-      `;
+      statusEl.textContent = `${d.subdomain}.${d.domain}${tunnel.tunnel_id ? ` · ${tunnel.tunnel_id.slice(0,8)}...` : ''} · 节点: ${connInfo}`;
 
       _renderServices(d, servicesEl);
 
