@@ -481,6 +481,19 @@ async function loadSyncLogs() {
     // Worker 按钮
     const btn = document.getElementById('sync-worker-btn');
     if (btn) btn.innerHTML = on ? '⏹ 停止 Worker' : '▶ 启动 Worker';
+    // ── Header badge + controls ──
+    const hBadge = document.getElementById('sync-header-badge');
+    if (hBadge) {
+      const color = on ? 'var(--green)' : 'var(--t3)';
+      const label = on ? '运行中' : '已停止';
+      hBadge.innerHTML = `<span class="page-status-dot" style="background:${color}"></span> <span style="color:${color}">${label}</span>`;
+    }
+    const hCtrl = document.getElementById('sync-header-controls');
+    if (hCtrl) {
+      hCtrl.innerHTML = on
+        ? `<button class="btn" onclick="toggleSyncWorker()">⏹ 停止</button>`
+        : `<button class="btn" onclick="toggleSyncWorker()">▶ 启动</button>`;
+    }
     renderSyncLog(d.log_lines || []);
   } catch (e) {
     document.getElementById('sync-log-content').innerHTML = renderError('加载失败');

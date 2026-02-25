@@ -45,6 +45,18 @@ async function loadTunnelPage() {
         offline: '离线', unconfigured: '未配置'
       }[st] || st;
 
+      // ── Header badge + controls ──
+      const badge = document.getElementById('tunnel-header-badge');
+      if (badge) {
+        badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
+      }
+      const headerControls = document.getElementById('tunnel-header-controls');
+      if (headerControls) {
+        headerControls.innerHTML = st === 'online' || st === 'connecting' || st === 'degraded'
+          ? `<button class="btn" onclick="window._tunnelRestart()">♻️ 重启</button><button class="btn" onclick="window._tunnelTeardown()">⏹ 停止</button>`
+          : `<button class="btn" onclick="window._tunnelRestart()">▶ 启动</button>`;
+      }
+
       const conns = tunnel.connections || [];
       const connInfo = conns.length > 0
         ? conns.map(c => c.colo_name || '?').join(', ')
@@ -60,11 +72,6 @@ async function loadTunnelPage() {
             ${tunnel.tunnel_id ? ` · <code style="font-size:.7rem">${escHtml(tunnel.tunnel_id.slice(0,8))}...</code>` : ''}
             · 节点: ${escHtml(connInfo)}
           </span>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="btn btn-sm" onclick="window._tunnelRestart()">♻️ 重启</button>
-            <button class="btn btn-sm" onclick="window._tunnelOpenConfig()">⚙ 配置</button>
-            <button class="btn btn-sm btn-danger" onclick="window._tunnelTeardown()">🗑️ 移除</button>
-          </div>
         </div>`;
 
       _renderServices(d, servicesEl);
@@ -72,6 +79,12 @@ async function loadTunnelPage() {
     } else {
       statusSection.style.display = 'none';
       setupSection.style.display = '';
+
+      // Unconfigured state
+      const badge = document.getElementById('tunnel-header-badge');
+      if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:var(--t3)"></span> <span style="color:var(--t3)">未配置</span>`;
+      const headerControls = document.getElementById('tunnel-header-controls');
+      if (headerControls) headerControls.innerHTML = '';
     }
 
     // 日志

@@ -168,6 +168,18 @@ async function loadComfyStatus() {
     const stColor = online ? 'var(--green)' : 'var(--red)';
     const stLabel = online ? '运行中' : '已停止';
 
+    // ── Header badge + controls ──
+    const badge = document.getElementById('comfyui-header-badge');
+    if (badge) {
+      badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
+    }
+    const controls = document.getElementById('comfyui-header-controls');
+    if (controls) {
+      controls.innerHTML = online
+        ? `<button class="btn" onclick="window._comfyStop()">⏹ 停止</button><button class="btn" onclick="restartComfyUI()">♻️ 重启</button>`
+        : `<button class="btn" onclick="window._comfyStart()">▶ 启动</button>`;
+    }
+
     // Status card
     html += `<div class="stat-card" style="border-left:3px solid ${stColor}">
       <div class="stat-label">ComfyUI</div>
@@ -332,11 +344,59 @@ async function saveComfyUIParams() {
 
 async function restartComfyUI() {
   if (!confirm('确定要重启 ComfyUI 吗？')) return;
+  // Auto-save params before restart
+  const params = _collectComfyParams();
+  const rawInput = document.getElementById('comfyui-args-raw')?.value || '';
+  const knownFlags = new Set();
+  if (_comfyParamsSchema) {
+    for (const [, schema] of Object.entries(_comfyParamsSchema)) {
+      if (schema.flag) knownFlags.add(schema.flag);
+      if (schema.flag_map) Object.values(schema.flag_map).forEach(f => knownFlags.add(f));
+      if (schema.flag_prefix) knownFlags.add(schema.flag_prefix);
+    }
+  }
+  knownFlags.add('--listen'); knownFlags.add('--port');
+  const rawParts = rawInput.replace(/^main\.py\s*/, '').split(/\s+/).filter(Boolean);
+  const extraParts = [];
+  let i = 0;
+  while (i < rawParts.length) {
+    if (knownFlags.has(rawParts[i])) {
+      i++;
+      if (i < rawParts.length && !rawParts[i].startsWith('--')) i++;
+    } else {
+      extraParts.push(rawParts[i]);
+      i++;
+    }
+  }
+  const extraArgs = extraParts.join(' ');
+  try {
+    await fetch('/api/comfyui/params', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ params, extra_args: extraArgs })
+    });
+  } catch (_) {}
   try {
     await fetch('/api/services/comfy/restart', { method: 'POST' });
     showToast('ComfyUI 正在重启...');
     setTimeout(loadComfyUIPage, 5000);
   } catch (e) { showToast('重启失败: ' + e.message); }
+}
+
+async function _comfyStop() {
+  if (!confirm('确定要停止 ComfyUI 吗？')) return;
+  try {
+    await fetch('/api/services/comfy/stop', { method: 'POST' });
+    showToast('⏹ ComfyUI 已停止');
+    setTimeout(loadComfyStatus, 1000);
+  } catch (e) { showToast('停止失败: ' + e.message); }
+}
+
+async function _comfyStart() {
+  try {
+    await fetch('/api/services/comfy/start', { method: 'POST' });
+    showToast('▶ ComfyUI 启动中...');
+    setTimeout(loadComfyUIPage, 3000);
+  } catch (e) { showToast('启动失败: ' + e.message); }
 }
 
 async function comfyInterrupt() {
@@ -570,6 +630,7 @@ registerPage('comfyui', {
 Object.assign(window, {
   loadComfyStatus, loadComfyParams, saveComfyUIParams,
   comfyInterrupt, comfyFreeVRAM, restartComfyUI,
+  _comfyStop, _comfyStart,
   switchComfyTab, comfyDeleteQueueItem, comfyClearQueue,
   loadComfyHistory, loadQueuePanel, setHistorySort, setHistorySize,
 });

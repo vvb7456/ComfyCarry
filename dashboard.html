@@ -275,6 +275,24 @@
             font-size: 1.15rem;
             font-weight: 600
         }
+        .page-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: .82rem;
+            font-weight: 500;
+        }
+        .page-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
 
         /* Top-right toolbar */
         .top-toolbar {
@@ -2743,8 +2761,12 @@
         <!-- ========== JupyterLab Page ========== -->
         <div id="page-jupyter" class="page hidden">
             <div class="page-header">
-                <h2>📓 JupyterLab</h2>
+                <div class="page-title-group">
+                    <h2>📓 JupyterLab</h2>
+                    <span id="jupyter-header-badge" class="page-status-badge"></span>
+                </div>
                 <div class="top-toolbar">
+                    <span id="jupyter-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -2812,8 +2834,12 @@
         <!-- ========== Tunnel Page ========== -->
         <div id="page-tunnel" class="page hidden">
             <div class="page-header">
-                <h2>🌐 Tunnel</h2>
+                <div class="page-title-group">
+                    <h2>🌐 Tunnel</h2>
+                    <span id="tunnel-header-badge" class="page-status-badge"></span>
+                </div>
                 <div class="top-toolbar">
+                    <span id="tunnel-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -2934,8 +2960,12 @@
         <!-- ========== ComfyUI Management Page ========== -->
         <div id="page-comfyui" class="page hidden">
             <div class="page-header">
-                <h2>🖥️ ComfyUI</h2>
+                <div class="page-title-group">
+                    <h2>🖥️ ComfyUI</h2>
+                    <span id="comfyui-header-badge" class="page-status-badge"></span>
+                </div>
                 <div class="top-toolbar">
+                    <span id="comfyui-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -2961,7 +2991,6 @@
                     <div class="section-header">
                         <div class="section-title">⚙️ 启动参数</div>
                         <div class="section-actions">
-                            <button class="btn btn-sm btn-primary" onclick="saveComfyUIParams()">💾 保存并重启</button>
                             <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3)"></span>
                         </div>
                     </div>
@@ -3096,8 +3125,12 @@
         <!-- ========== Cloud Sync Page ========== -->
         <div id="page-sync" class="page hidden">
             <div class="page-header">
-                <h2>☁️ Sync</h2>
+                <div class="page-title-group">
+                    <h2>☁️ Sync</h2>
+                    <span id="sync-header-badge" class="page-status-badge"></span>
+                </div>
                 <div class="top-toolbar">
+                    <span id="sync-header-controls"></span>
                     <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
                 </div>
             </div>
@@ -3163,8 +3196,6 @@
                     <div class="toolbar">
                         <div id="sync-worker-badge" style="font-size:.85rem"></div>
                         <div class="toolbar-spacer"></div>
-                        <button class="btn btn-sm" onclick="runDeployRules()">▶ 执行部署规则</button>
-                        <button class="btn btn-sm" onclick="showSyncSettings()">⚙ 同步设置</button>
                         <button class="btn btn-sm btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
                     </div>
                     <div id="sync-rules-list"></div>
