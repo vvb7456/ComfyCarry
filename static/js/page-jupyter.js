@@ -28,7 +28,9 @@ function _stopAutoRefresh() {
 // ── 主加载 ──────────────────────────────────────────────────
 
 async function loadJupyterPage() {
-  await Promise.all([loadJupyterStatus(), loadJupyterUrl(), loadJupyterToken()]);
+  // URL 必须先获取，终端列表渲染依赖 _jupyterUrl
+  await loadJupyterUrl();
+  await Promise.all([loadJupyterStatus(), loadJupyterToken()]);
 }
 
 // ── 获取外部 URL (从 Tunnel 状态) ────────────────────────────
@@ -37,8 +39,11 @@ async function loadJupyterUrl() {
   try {
     const r = await fetch('/api/tunnel/status');
     const d = await r.json();
+    // 自定义 tunnel: urls 在顶层; 公共 tunnel: urls 在 public.urls
     const urls = d.urls || {};
-    for (const [name, url] of Object.entries(urls)) {
+    const pubUrls = d.public?.urls || {};
+    const all = { ...urls, ...pubUrls };
+    for (const [name, url] of Object.entries(all)) {
       if (name.toLowerCase().includes('jupyter')) {
         _jupyterUrl = url;
         return;
@@ -245,19 +250,18 @@ function renderTerminalsList(terminals) {
   }
 
   el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${terminals.map(t => {
-    // 构建跳转 URL
-    let openBtn = '';
+    // 构建跳转 URL — 点击终端名称直接打开
+    let nameHtml = `<span style="font-weight:600;font-size:.85rem">终端 ${escHtml(t.name)}</span>`;
     if (_jupyterUrl) {
       const base = _jupyterUrl.split('?')[0];
       const tokenPart = _jupyterUrl.includes('?') ? _jupyterUrl.substring(_jupyterUrl.indexOf('?')) : '';
       const termUrl = `${base}/terminals/${encodeURIComponent(t.name)}${tokenPart}`;
-      openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-xs btn-primary" title="在 JupyterLab 中打开">打开</a>`;
+      nameHtml = `<a href="${termUrl}" target="_blank" style="font-weight:600;font-size:.85rem;color:var(--t1);text-decoration:none" title="点击打开终端" onmouseenter="this.style.color='var(--ac)'" onmouseleave="this.style.color='var(--t1)'">终端 ${escHtml(t.name)}</a>`;
     }
 
     return `<div class="jupyter-terminal-item" style="display:inline-flex">
       <span style="font-size:1rem">${msIcon('terminal')}</span>
-      <span style="font-weight:600;font-size:.85rem">终端 ${escHtml(t.name)}</span>
-      ${openBtn}
+      ${nameHtml}
       <button class="btn btn-sm btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">${msIcon('close')}</button>
     </div>`;
   }).join('')}${addCard}</div>`;

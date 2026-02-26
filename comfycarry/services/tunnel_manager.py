@@ -287,7 +287,7 @@ class TunnelManager:
         r = subprocess.run(
             f'pm2 start cloudflared --name cf-tunnel '
             f'--interpreter none --log /workspace/tunnel.log --time '
-            f'-- tunnel run --token {shlex.quote(tunnel_token)}',
+            f'-- tunnel run --metrics localhost:20241 --token {shlex.quote(tunnel_token)}',
             shell=True, capture_output=True, text=True
         )
         subprocess.run("pm2 save 2>/dev/null", shell=True)

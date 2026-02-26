@@ -390,7 +390,9 @@ class PublicTunnelClient:
 
         try:
             subprocess.run(
-                f'pm2 start cloudflared --name cf-tunnel -- tunnel run --token "{token}"',
+                f'pm2 start cloudflared --name cf-tunnel '
+                f'--interpreter none --log /workspace/tunnel.log --time '
+                f'-- tunnel run --metrics localhost:20241 --token {shlex.quote(token)}',
                 shell=True, capture_output=True, text=True, timeout=15,
             )
             log.info("cloudflared (cf-tunnel) 已通过 PM2 启动")

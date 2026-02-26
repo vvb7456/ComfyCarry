@@ -7,11 +7,27 @@ import json
 import re
 import subprocess
 
+import requests as http_requests
 from flask import Blueprint, Response, jsonify, request
 
 from ..config import get_config, set_config
 
 bp = Blueprint("tunnel", __name__)
+
+# cloudflared --metrics 端点 (两种模式统一使用)
+_CF_METRICS_URL = "http://localhost:20241"
+
+
+def _check_cloudflared_ready() -> str:
+    """通过 cloudflared metrics /ready 端点检测实际连通性。
+
+    Returns: "connected" | "disconnected" | "unknown"
+    """
+    try:
+        r = http_requests.get(f"{_CF_METRICS_URL}/ready", timeout=2)
+        return "connected" if r.status_code == 200 else "disconnected"
+    except Exception:
+        return "unknown"
 
 
 def _get_manager():
@@ -87,9 +103,13 @@ def api_tunnel_status_v2():
             "urls": pub_status.get("urls"),
             "degraded": pub_status.get("degraded", False),
         }
-        # 公共模式下, effective_status 基于 cloudflared PM2 状态
-        if pub_status.get("cloudflared_running"):
-            result["effective_status"] = "degraded" if pub_status.get("degraded") else "online"
+        # 统一使用 cloudflared /ready 端点检测实际连通性
+        ready = _check_cloudflared_ready()
+        result["cloudflared_ready"] = ready
+        if ready == "connected":
+            result["effective_status"] = "online"
+        elif pub_status.get("cloudflared_running"):
+            result["effective_status"] = "connecting"
         else:
             result["effective_status"] = "offline"
         return jsonify(result)
@@ -120,14 +140,17 @@ def api_tunnel_status_v2():
 
     result["urls"] = urls
 
-    # ── 统一状态: effective_status ──
-    cf_st = result["tunnel"].get("status", "inactive")
+    # ── 统一状态: 优先使用 cloudflared /ready 本地检测 ──
+    ready = _check_cloudflared_ready()
+    result["cloudflared_ready"] = ready
     pm2_on = result["cloudflared"] == "online"
-    if cf_st == "healthy" and pm2_on:
+
+    if ready == "connected":
         result["effective_status"] = "online"
-    elif cf_st == "degraded" and pm2_on:
-        result["effective_status"] = "degraded"
+    elif ready == "disconnected" and pm2_on:
+        result["effective_status"] = "connecting"
     elif pm2_on:
+        # /ready 未知但进程在跑 — 可能 metrics 端口未就绪
         result["effective_status"] = "connecting"
     elif result["configured"]:
         result["effective_status"] = "offline"
