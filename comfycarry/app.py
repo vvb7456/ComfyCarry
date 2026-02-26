@@ -79,6 +79,19 @@ def main():
     # 恢复 SSH 配置
     restore_ssh_config()
 
+    # 恢复公共 Tunnel (如果之前是公共模式, 恢复状态而非重新注册)
+    if cfg.get_config("tunnel_mode") == "public":
+        try:
+            from .services.public_tunnel import PublicTunnelClient
+            client = PublicTunnelClient()
+            result = client.restore()
+            if result.get("ok"):
+                print(f"  🌐 公共 Tunnel 已恢复: {result.get('random_id', '?')}")
+            else:
+                print(f"  ⚠️  公共 Tunnel 恢复失败: {result.get('error', '未知')}")
+        except Exception as e:
+            print(f"  ⚠️  公共 Tunnel 恢复失败: {e}")
+
     # 启动 watch worker
     rules = _load_sync_rules()
     watch_rules = [r for r in rules

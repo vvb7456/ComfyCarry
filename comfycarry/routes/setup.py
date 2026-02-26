@@ -69,12 +69,14 @@ def api_setup_save():
     state = _load_setup_state()
     allowed_keys = {
         "current_step", "image_type", "password",
+        "tunnel_mode",
         "cf_api_token", "cf_domain", "cf_subdomain",
         "rclone_config_method", "rclone_config_value",
         "civitai_token", "plugins",
         "install_fa2", "install_sa2", "download_aura_model",
         "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules",
+        "ssh_password", "ssh_keys",
     }
     for k, v in data.items():
         if k in allowed_keys:

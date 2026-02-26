@@ -76,11 +76,35 @@ def api_tunnel_status_v2():
 
     result["services"] = all_services
 
+    # ── 公共 Tunnel 模式 ──
+    tunnel_mode = get_config("tunnel_mode", "")
+
+    if tunnel_mode == "public":
+        from ..services.public_tunnel import PublicTunnelClient
+        client = PublicTunnelClient()
+        pub_status = client.get_status()
+        result["tunnel_mode"] = "public"
+        result["public"] = {
+            "random_id": pub_status.get("random_id"),
+            "urls": pub_status.get("urls"),
+            "degraded": pub_status.get("degraded", False),
+        }
+        # 公共模式下, effective_status 基于 cloudflared PM2 状态
+        if pub_status.get("cloudflared_running"):
+            result["effective_status"] = "degraded" if pub_status.get("degraded") else "online"
+        else:
+            result["effective_status"] = "offline"
+        return jsonify(result)
+
+    # ── 自定义 Tunnel 模式 ──
     mgr = _get_manager()
     if not mgr:
+        result["tunnel_mode"] = None
+        result["effective_status"] = "unconfigured"
         return jsonify(result)
 
     result["configured"] = True
+    result["tunnel_mode"] = "custom"
     result["tunnel"] = mgr.get_tunnel_status()
     urls = mgr.get_service_urls()
 
@@ -99,7 +123,6 @@ def api_tunnel_status_v2():
     result["urls"] = urls
 
     # ── 统一状态: effective_status ──
-    # 综合 CF API 状态 + PM2 进程状态, 给前端一个唯一判定值
     cf_st = result["tunnel"].get("status", "inactive")
     pm2_on = result["cloudflared"] == "online"
     if cf_st == "healthy" and pm2_on:
@@ -107,7 +130,6 @@ def api_tunnel_status_v2():
     elif cf_st == "degraded" and pm2_on:
         result["effective_status"] = "degraded"
     elif pm2_on:
-        # cloudflared 在运行但 CF API 未报告 healthy (连接建立中/API 延迟)
         result["effective_status"] = "connecting"
     elif result["configured"]:
         result["effective_status"] = "offline"
@@ -314,6 +336,81 @@ def api_tunnel_get_config():
         "domain": get_config("cf_domain", ""),
         "subdomain": get_config("cf_subdomain", ""),
     })
+
+
+# ═══════════════════════════════════════════════════════════════
+# 公共 Tunnel 端点
+# ═══════════════════════════════════════════════════════════════
+
+@bp.route("/api/tunnel/public/enable", methods=["POST"])
+def api_tunnel_public_enable():
+    """
+    启用公共 Tunnel。
+    - 如果当前有自定义 Tunnel 运行, 先停止
+    - 调用 Worker 注册获取 tunnel
+
+    Response: { "ok": true, "urls": {...}, "random_id": "..." }
+    """
+    from ..services.public_tunnel import PublicTunnelClient, PublicTunnelError
+
+    # 检查是否有自定义 Tunnel 在运行, 如果有则停止
+    custom_token = get_config("cf_api_token", "")
+    if custom_token:
+        try:
+            mgr = _get_manager()
+            if mgr:
+                mgr.teardown()
+                set_config("cf_api_token", "")
+                set_config("cf_domain", "")
+                set_config("cf_subdomain", "")
+                set_config("cf_custom_services", "")
+        except Exception as e:
+            # 自定义 Tunnel 停止失败不阻塞公共 Tunnel 启用
+            pass
+
+    client = PublicTunnelClient()
+    try:
+        result = client.register()
+        return jsonify(result)
+    except PublicTunnelError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@bp.route("/api/tunnel/public/disable", methods=["POST"])
+def api_tunnel_public_disable():
+    """
+    禁用公共 Tunnel。
+
+    Response: { "ok": true }
+    """
+    from ..services.public_tunnel import PublicTunnelClient
+
+    client = PublicTunnelClient()
+    result = client.release()
+    return jsonify(result)
+
+
+@bp.route("/api/tunnel/public/status", methods=["GET"])
+def api_tunnel_public_status():
+    """
+    获取公共 Tunnel 状态 + Worker 容量。
+
+    Response: {
+        "mode": "public" | "custom" | null,
+        "random_id": "...",
+        "urls": {...},
+        "cloudflared_running": bool,
+        "degraded": bool,
+        "capacity": { "active_tunnels": N, "max_tunnels": 200, "available": bool }
+    }
+    """
+    from ..services.public_tunnel import PublicTunnelClient
+
+    client = PublicTunnelClient()
+    status = client.get_status()
+    capacity = client.get_capacity()
+    status["capacity"] = capacity
+    return jsonify(status)
 
 
 def _get_custom_services():

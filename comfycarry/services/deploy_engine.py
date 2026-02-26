@@ -318,9 +318,26 @@ def _run_deploy(config):
             _mark_step_done("system_deps")
 
         # STEP 2: Cloudflare Tunnel
+        tunnel_mode = config.get("tunnel_mode", "")
         cf_api_token = config.get("cf_api_token", "")
         cf_domain = config.get("cf_domain", "")
-        if cf_api_token and cf_domain:
+
+        if tunnel_mode == "public":
+            _deploy_step("配置公共 Tunnel")
+            try:
+                from comfycarry.services.public_tunnel import PublicTunnelClient, PublicTunnelError
+                from comfycarry.config import set_config as _sc
+                client = PublicTunnelClient()
+                result = client.register()
+                _deploy_log(f"✅ 公共 Tunnel 已启用: {result.get('random_id', '?')}")
+                urls = result.get("urls", {})
+                for name, url in urls.items():
+                    _deploy_log(f"  {name}: {url}")
+            except PublicTunnelError as e:
+                _deploy_log(f"⚠️ 公共 Tunnel 启用失败: {e}", "warn")
+            except Exception as e:
+                _deploy_log(f"⚠️ 公共 Tunnel 异常: {e}", "warn")
+        elif cf_api_token and cf_domain:
             _deploy_step("配置 Cloudflare Tunnel")
             from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
             from comfycarry.config import set_config as _sc, get_config as _gc
@@ -403,6 +420,62 @@ def _run_deploy(config):
                     _deploy_log(f"Base64 解码失败: {e}", "error")
             _deploy_exec("chmod 600 ~/.config/rclone/rclone.conf")
             _deploy_exec("rclone listremotes", label="检测 remotes")
+
+        # STEP 3.5: SSH 配置 (密码 + 公钥)
+        ssh_password = config.get("ssh_password", "")
+        ssh_keys = config.get("ssh_keys", [])
+        if ssh_password or ssh_keys:
+            _deploy_step("配置 SSH 访问")
+            from comfycarry.config import set_config as _sc2
+            if ssh_password:
+                code = subprocess.run(
+                    f"echo 'root:{ssh_password}' | chpasswd",
+                    shell=True, capture_output=True, timeout=5
+                ).returncode
+                if code == 0:
+                    _sc2("ssh_password", ssh_password)
+                    # 启用密码认证
+                    subprocess.run(
+                        "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' "
+                        "/etc/ssh/sshd_config 2>/dev/null || true",
+                        shell=True, timeout=5
+                    )
+                    subprocess.run(
+                        "sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' "
+                        "/etc/ssh/sshd_config 2>/dev/null || true",
+                        shell=True, timeout=5
+                    )
+                    _deploy_log("✅ SSH Root 密码已设置")
+                else:
+                    _deploy_log("⚠️ SSH 密码设置失败", "warn")
+            if ssh_keys and isinstance(ssh_keys, list):
+                import os
+                ak_file = os.path.expanduser("~/.ssh/authorized_keys")
+                os.makedirs(os.path.dirname(ak_file), exist_ok=True)
+                existing = set()
+                try:
+                    with open(ak_file, "r") as f:
+                        existing = {l.strip() for l in f if l.strip()}
+                except FileNotFoundError:
+                    pass
+                added = 0
+                with open(ak_file, "a") as f:
+                    for key in ssh_keys:
+                        key = key.strip()
+                        if key and key not in existing:
+                            f.write(key + "\n")
+                            existing.add(key)
+                            added += 1
+                os.chmod(ak_file, 0o600)
+                _sc2("ssh_keys", ssh_keys)
+                _deploy_log(f"✅ SSH 公钥已添加 ({added} 个新增, 共 {len(ssh_keys)} 个)")
+            # 重启 sshd 使配置生效
+            subprocess.run(
+                "pkill sshd 2>/dev/null; sleep 0.5; "
+                "/usr/sbin/sshd -E /var/log/sshd.log 2>/dev/null || true",
+                shell=True, timeout=10
+            )
+            _deploy_log("✅ sshd 已重启")
 
         # STEP 4: 检查预装 PyTorch
         _deploy_step("检查预装 PyTorch")

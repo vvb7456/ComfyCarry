@@ -186,6 +186,23 @@ def api_settings_export_config():
     # API Key
     config["api_key"] = cfg.API_KEY
 
+    # Tunnel 模式
+    tunnel_mode = _get_config("tunnel_mode", "")
+    if tunnel_mode:
+        config["tunnel_mode"] = tunnel_mode
+
+    # SSH 配置
+    ssh_keys = _get_config("ssh_keys", [])
+    if ssh_keys:
+        config["ssh_keys"] = ssh_keys
+    ssh_password = _get_config("ssh_password", "")
+    if ssh_password:
+        config["ssh_password"] = ssh_password
+
+    # 加速组件安装状态 (信息参考)
+    config["installed_fa2"] = _get_config("installed_fa2", False)
+    config["installed_sa2"] = _get_config("installed_sa2", False)
+
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -270,6 +287,19 @@ def api_settings_import_config():
         cfg._save_api_key(data["api_key"])
         cfg.API_KEY = data["api_key"]
         applied.append("API Key")
+
+    # Tunnel 模式
+    if data.get("tunnel_mode"):
+        _set_config("tunnel_mode", data["tunnel_mode"])
+        applied.append("Tunnel 模式")
+
+    # SSH 配置
+    if data.get("ssh_keys"):
+        _set_config("ssh_keys", data["ssh_keys"])
+        applied.append("SSH 公钥")
+    if data.get("ssh_password"):
+        _set_config("ssh_password", data["ssh_password"])
+        applied.append("SSH 密码")
 
     try:
         state = _load_setup_state()

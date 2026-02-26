@@ -1,7 +1,6 @@
 /**
- * ComfyCarry — page-tunnel.js (v3)
- * Tunnel 页面: CF API 驱动的配置/状态管理
- * 支持: 自定义服务、子域名编辑、服务状态、配置弹窗
+ * ComfyCarry — page-tunnel.js (v4)
+ * Tunnel 页面: 公共节点 + 自定义 Tunnel 双模式
  */
 
 import { registerPage, showToast, escHtml, renderEmpty, renderError } from './core.js';
@@ -9,6 +8,7 @@ import { registerPage, showToast, escHtml, renderEmpty, renderError } from './co
 let _autoRefresh = null;
 let _lastData = null;
 let _currentTunnelTab = 'status';
+let _selectedMode = null;  // 'public' | 'custom'
 
 registerPage('tunnel', {
   enter() { loadTunnelPage(); _startAutoRefresh(); },
@@ -47,7 +47,32 @@ async function loadTunnelPage() {
     const d = await r.json();
     _lastData = d;
 
-    if (d.configured) {
+    const tunnelMode = d.tunnel_mode; // "public" | "custom" | null
+
+    // ── Header badge ──
+    const badge = document.getElementById('tunnel-header-badge');
+    const headerControls = document.getElementById('tunnel-header-controls');
+
+    if (tunnelMode === 'public' && d.public) {
+      // 公共模式
+      const st = d.effective_status || 'unknown';
+      const stColor = st === 'online' ? 'var(--green)' : st === 'degraded' ? 'var(--amber)' : 'var(--red)';
+      const stLabel = { online: '公共 · 运行中', degraded: '公共 · 部分异常', offline: '公共 · 离线' }[st] || st;
+
+      if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
+      if (headerControls) headerControls.innerHTML = `<button class="btn" onclick="window._tunnelPublicDisable()">⏹ 停用</button>`;
+
+      // Show status section with public tunnel services
+      statusSection.style.display = '';
+      setupHint.style.display = 'none';
+
+      const pubId = d.public.random_id || '?';
+      statusEl.textContent = `公共节点 · ${pubId}`;
+
+      _renderPublicServices(d, servicesEl);
+
+    } else if (d.configured) {
+      // 自定义模式
       statusSection.style.display = '';
       setupHint.style.display = 'none';
 
@@ -58,16 +83,11 @@ async function loadTunnelPage() {
                      : st === 'offline' ? 'var(--red)'
                      : 'var(--t3)';
       const stLabel = {
-        online: '运行中', degraded: '部分连接', connecting: '连接中',
-        offline: '离线', unconfigured: '未配置'
+        online: '自定义 · 运行中', degraded: '自定义 · 部分连接', connecting: '自定义 · 连接中',
+        offline: '自定义 · 离线', unconfigured: '未配置'
       }[st] || st;
 
-      // ── Header badge + controls ──
-      const badge = document.getElementById('tunnel-header-badge');
-      if (badge) {
-        badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
-      }
-      const headerControls = document.getElementById('tunnel-header-controls');
+      if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
       if (headerControls) {
         headerControls.innerHTML = st === 'online' || st === 'connecting' || st === 'degraded'
           ? `<button class="btn" onclick="window._tunnelTeardown()">⏹ 停止</button><button class="btn" onclick="window._tunnelRestart()">♻️ 重启</button>`
@@ -81,16 +101,13 @@ async function loadTunnelPage() {
 
       statusEl.textContent = `${d.subdomain}.${d.domain}${tunnel.tunnel_id ? ` · ${tunnel.tunnel_id.slice(0,8)}...` : ''} · 节点: ${connInfo}`;
 
-      _renderServices(d, servicesEl);
+      _renderCustomServices(d, servicesEl);
 
     } else {
+      // 未配置
       statusSection.style.display = 'none';
       setupHint.style.display = '';
-
-      // Unconfigured state
-      const badge = document.getElementById('tunnel-header-badge');
       if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:var(--t3)"></span> <span style="color:var(--t3)">未配置</span>`;
-      const headerControls = document.getElementById('tunnel-header-controls');
       if (headerControls) headerControls.innerHTML = '';
     }
 
@@ -116,10 +133,65 @@ async function loadTunnelPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 服务列表渲染
+// 公共节点服务列表渲染
 // ════════════════════════════════════════════════════════════════
 
-function _renderServices(d, el) {
+function _renderPublicServices(d, el) {
+  const urls = d.public?.urls || {};
+
+  if (Object.keys(urls).length === 0) {
+    el.innerHTML = '<div style="color:var(--t3);font-size:.85rem;padding:8px 0">正在获取服务链接...</div>';
+    return;
+  }
+
+  const eff = d.effective_status || 'unknown';
+  const svcOnline = eff === 'online';
+  const statusDot = svcOnline
+    ? '<span class="tunnel-svc-status-dot" style="background:var(--green)"></span> 在线'
+    : '<span class="tunnel-svc-status-dot" style="background:var(--amber)"></span> 连接中';
+
+  const iconMap = { dashboard: '📊', comfyui: '🎨', jupyter: '📓', ssh: '🔒' };
+  const nameMap = { dashboard: 'Dashboard', comfyui: 'ComfyUI', jupyter: 'JupyterLab', ssh: 'SSH' };
+
+  let html = '<div class="tunnel-services">';
+  for (const [key, url] of Object.entries(urls)) {
+    const icon = iconMap[key] || '🌐';
+    const name = nameMap[key] || key;
+
+    if (key === 'ssh') {
+      const hostname = url.replace(/^https?:\/\//, '');
+      const sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
+      const encodedCmd = encodeURIComponent(sshCmd);
+      html += `<div class="tunnel-svc-card" style="cursor:pointer" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodedCmd}'));window.showToast?.('SSH 命令已复制')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tunnel-svc-icon">${icon}</span>
+          <span class="tunnel-svc-name">${escHtml(name)}</span>
+          <span class="tunnel-svc-status">${statusDot}</span>
+          <span style="font-size:.68rem;color:var(--t3);margin-left:auto">点击复制</span>
+        </div>
+        <code class="tunnel-svc-detail" style="font-size:.72rem;user-select:all;cursor:pointer">${escHtml(sshCmd)}</code>
+        <span class="tunnel-svc-port">:22 · TCP</span>
+      </div>`;
+    } else {
+      html += `<a href="${escHtml(url)}" target="_blank" class="tunnel-svc-card">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tunnel-svc-icon">${icon}</span>
+          <span class="tunnel-svc-name">${escHtml(name)}</span>
+          <span class="tunnel-svc-status">${statusDot}</span>
+        </div>
+        <span class="tunnel-svc-detail">${escHtml(url)}</span>
+      </a>`;
+    }
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════════
+// 自定义 Tunnel 服务列表渲染
+// ════════════════════════════════════════════════════════════════
+
+function _renderCustomServices(d, el) {
   const urls = d.urls || {};
   const services = d.services || [];
 
@@ -204,13 +276,30 @@ function _renderServices(d, el) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Config Tab — 加载/验证/保存
+// Config Tab — 模式选择 + 配置加载
 // ════════════════════════════════════════════════════════════════
 
 async function _loadTunnelConfigTab() {
   const resultEl = document.getElementById('tunnel-cfg-result');
   if (resultEl) resultEl.style.display = 'none';
 
+  // 获取公共 Tunnel 容量
+  _loadPublicCapacity();
+
+  // 获取当前模式
+  const tunnelMode = _lastData?.tunnel_mode;
+
+  if (tunnelMode === 'public') {
+    _selectedMode = 'public';
+  } else if (_lastData?.configured) {
+    _selectedMode = 'custom';
+  } else {
+    _selectedMode = _selectedMode || null;
+  }
+
+  _updateModeUI();
+
+  // 加载自定义配置
   try {
     const r = await fetch('/api/tunnel/config');
     const d = await r.json();
@@ -219,12 +308,177 @@ async function _loadTunnelConfigTab() {
     document.getElementById('tunnel-cfg-subdomain').value = d.subdomain || '';
   } catch (_) {}
 
-  // Update submit button label based on configured state
+  // Update submit button label
   const btn = document.getElementById('tunnel-cfg-submit');
   if (btn) {
     btn.textContent = _lastData?.configured ? '💾 保存并应用' : '🚀 创建 Tunnel';
   }
+
+  // 加载公共 Tunnel 状态
+  _loadPublicStatus();
 }
+
+async function _loadPublicCapacity() {
+  const capEl = document.getElementById('tunnel-public-capacity');
+  try {
+    const r = await fetch('/api/tunnel/public/status');
+    const d = await r.json();
+    const cap = d.capacity || {};
+    if (cap.active_tunnels >= 0) {
+      const pct = Math.round((cap.active_tunnels / cap.max_tunnels) * 100);
+      capEl.innerHTML = `容量: <strong>${cap.active_tunnels}</strong> / ${cap.max_tunnels} (${pct}%)${cap.available ? '' : ' · <span style="color:var(--red)">已满</span>'}`;
+    } else {
+      capEl.textContent = '容量: 无法获取';
+    }
+  } catch (_) {
+    capEl.textContent = '容量: 无法获取';
+  }
+}
+
+async function _loadPublicStatus() {
+  const activeEl = document.getElementById('tunnel-public-active');
+  const inactiveEl = document.getElementById('tunnel-public-inactive');
+
+  if (_selectedMode !== 'public') return;
+
+  try {
+    const r = await fetch('/api/tunnel/public/status');
+    const d = await r.json();
+    if (d.mode === 'public' && d.random_id) {
+      // 已启用 — 显示 URLs
+      activeEl.style.display = '';
+      inactiveEl.style.display = 'none';
+
+      const badge = document.getElementById('tunnel-public-status-badge');
+      if (d.degraded) {
+        badge.textContent = '部分异常';
+        badge.style.color = 'var(--amber)';
+      } else {
+        badge.textContent = '已启用';
+        badge.style.color = 'var(--green)';
+      }
+
+      const urlsEl = document.getElementById('tunnel-public-urls');
+      _renderPublicUrlCards(d.urls || {}, urlsEl);
+    } else {
+      // 未启用
+      activeEl.style.display = 'none';
+      inactiveEl.style.display = '';
+    }
+  } catch (_) {
+    activeEl.style.display = 'none';
+    inactiveEl.style.display = '';
+  }
+}
+
+function _renderPublicUrlCards(urls, el) {
+  const iconMap = { dashboard: '📊', comfyui: '🎨', jupyter: '📓', ssh: '🔒' };
+  const nameMap = { dashboard: 'Dashboard', comfyui: 'ComfyUI', jupyter: 'JupyterLab', ssh: 'SSH' };
+
+  let html = '';
+  for (const [key, url] of Object.entries(urls)) {
+    const icon = iconMap[key] || '🌐';
+    const name = nameMap[key] || key;
+    if (key === 'ssh') {
+      const hostname = url.replace(/^https?:\/\//, '');
+      html += `<div class="tunnel-svc-card" style="cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(url)}');window.showToast?.('已复制')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tunnel-svc-icon">${icon}</span>
+          <span class="tunnel-svc-name">${escHtml(name)}</span>
+          <span style="font-size:.68rem;color:var(--t3);margin-left:auto">点击复制</span>
+        </div>
+        <span class="tunnel-svc-detail" style="font-size:.75rem">${escHtml(hostname)}</span>
+      </div>`;
+    } else {
+      html += `<a href="${escHtml(url)}" target="_blank" class="tunnel-svc-card">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="tunnel-svc-icon">${icon}</span>
+          <span class="tunnel-svc-name">${escHtml(name)}</span>
+        </div>
+        <span class="tunnel-svc-detail" style="font-size:.75rem">${escHtml(url)}</span>
+      </a>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+function _selectTunnelMode(mode) {
+  _selectedMode = mode;
+  _updateModeUI();
+}
+
+function _updateModeUI() {
+  const publicCard = document.getElementById('tunnel-mode-public');
+  const customCard = document.getElementById('tunnel-mode-custom');
+  const publicDetails = document.getElementById('tunnel-public-details');
+  const customDetails = document.getElementById('tunnel-custom-details');
+
+  // Reset borders
+  publicCard.style.borderColor = 'transparent';
+  customCard.style.borderColor = 'transparent';
+
+  // Hide both
+  publicDetails.style.display = 'none';
+  customDetails.style.display = 'none';
+
+  if (_selectedMode === 'public') {
+    publicCard.style.borderColor = 'var(--ac)';
+    publicDetails.style.display = '';
+    _loadPublicStatus();
+  } else if (_selectedMode === 'custom') {
+    customCard.style.borderColor = 'var(--ac)';
+    customDetails.style.display = '';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 公共 Tunnel 操作
+// ════════════════════════════════════════════════════════════════
+
+async function _tunnelPublicEnable() {
+  const btn = document.getElementById('tunnel-public-enable-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在启用...'; }
+
+  try {
+    const r = await fetch('/api/tunnel/public/enable', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 公共节点已启用！');
+      setTimeout(() => {
+        loadTunnelPage();
+        _loadPublicStatus();
+      }, 2000);
+    } else {
+      showToast('❌ 启用失败: ' + (d.error || ''));
+    }
+  } catch (e) {
+    showToast('❌ 请求失败: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 启用公共节点'; }
+  }
+}
+
+async function _tunnelPublicDisable() {
+  if (!confirm('确定停用公共节点？Tunnel 将被删除，所有公网链接将失效。')) return;
+
+  try {
+    const r = await fetch('/api/tunnel/public/disable', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ 公共节点已停用');
+      setTimeout(() => {
+        loadTunnelPage();
+        _loadTunnelConfigTab();
+      }, 1000);
+    } else {
+      showToast('❌ 停用失败: ' + (d.error || ''));
+    }
+  } catch (e) { showToast('❌ 请求失败: ' + e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 自定义 Tunnel — Config 验证/保存
+// ════════════════════════════════════════════════════════════════
 
 async function _tunnelCfgValidate() {
   const token = document.getElementById('tunnel-cfg-token').value.trim();
@@ -304,7 +558,7 @@ async function _tunnelCfgSave() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 移除 / 重启
+// 移除 / 重启 (自定义 Tunnel)
 // ════════════════════════════════════════════════════════════════
 
 async function _tunnelTeardown() {
@@ -430,8 +684,10 @@ async function _tunnelEditSuffix(currentSuffix) {
 // expose for inline onclick
 Object.assign(window, {
   switchTunnelTab,
+  _selectTunnelMode,
   _tunnelCfgValidate, _tunnelCfgSave,
   _tunnelTeardown, _tunnelRestart,
+  _tunnelPublicEnable, _tunnelPublicDisable,
   _tunnelAddService, _tunnelAddServiceSubmit,
   _tunnelRemoveService, _tunnelEditSuffix,
   showToast,

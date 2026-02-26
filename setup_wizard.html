@@ -969,31 +969,55 @@
         <!-- Step 2: Cloudflare Tunnel -->
         <div class="step" id="step-2">
             <div class="step-title">🌐 Cloudflare Tunnel</div>
-            <div class="step-desc">配置 Cloudflare Tunnel 获得稳定的公网访问（ComfyUI / SSH / JupyterLab）<span class="help-tip"
-                    title="通过 Cloudflare API 自动创建 Tunnel、配置 DNS 和 Ingress。需要一个拥有 Tunnel Edit + DNS Edit 权限的 API Token。">?</span>
-            </div>
+            <div class="step-desc">配置 Cloudflare Tunnel 获得稳定的公网访问（ComfyUI / SSH / JupyterLab）</div>
             <div id="cf-env-hint" style="display:none" class="env-hint"></div>
-            <div class="form-group">
-                <label>CF API Token</label>
-                <input type="password" id="input-cf-token"
-                    placeholder="Cloudflare API Token (需 Tunnel Edit + DNS Edit 权限)" oninput="updateNextBtnText()">
-                <div class="form-hint">在 <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank"
-                        style="color:var(--accent)">Cloudflare API Tokens</a> 创建，留空则跳过</div>
+
+            <!-- Tunnel 模式选择 -->
+            <div class="choice-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+                <div class="choice-card" id="wizard-tunnel-public" onclick="selectWizardTunnelMode('public')" style="cursor:pointer;text-align:left">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <span style="font-size:1.2rem">🌍</span>
+                        <strong>公共节点</strong>
+                        <span style="font-size:.65rem;background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
+                    </div>
+                    <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">一键启用，无需域名或 CF 账号。通过 ComfyCarry 共享节点获得公网访问。</p>
+                    <div id="wizard-tunnel-capacity" style="font-size:.72rem;color:var(--t3);margin-top:6px">容量加载中...</div>
+                </div>
+                <div class="choice-card" id="wizard-tunnel-custom" onclick="selectWizardTunnelMode('custom')" style="cursor:pointer;text-align:left">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <span style="font-size:1.2rem">🔧</span>
+                        <strong>自定义 Tunnel</strong>
+                    </div>
+                    <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">使用自己的 Cloudflare 账号和域名，完全自主控制。</p>
+                    <div style="font-size:.72rem;color:var(--t3);margin-top:6px">需要 CF API Token + 域名</div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>域名</label>
-                <input type="text" id="input-cf-domain" placeholder="mydomain.com (已托管在 Cloudflare 的域名)"
-                    oninput="updateNextBtnText()">
+
+            <!-- 自定义 Tunnel 配置 (仅自定义模式显示) -->
+            <div id="wizard-tunnel-custom-fields" style="display:none">
+                <div class="form-group">
+                    <label>CF API Token</label>
+                    <input type="password" id="input-cf-token"
+                        placeholder="Cloudflare API Token (需 Tunnel Edit + DNS Edit 权限)" oninput="updateNextBtnText()">
+                    <div class="form-hint">在 <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank"
+                            style="color:var(--accent)">Cloudflare API Tokens</a> 创建</div>
+                </div>
+                <div class="form-group">
+                    <label>域名</label>
+                    <input type="text" id="input-cf-domain" placeholder="mydomain.com (已托管在 Cloudflare 的域名)"
+                        oninput="updateNextBtnText()">
+                </div>
+                <div class="form-group">
+                    <label>子域名前缀 <span style="color:var(--t3);font-size:.82rem">(可选)</span></label>
+                    <input type="text" id="input-cf-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
+                </div>
+                <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
+                    <button class="btn btn-secondary" onclick="validateCfToken()"
+                        style="padding:8px 16px;font-size:.88rem;flex-shrink:0">🔍 验证 Token</button>
+                    <span id="cf-validate-inline" style="font-size:.85rem;display:none"></span>
+                </div>
             </div>
-            <div class="form-group">
-                <label>子域名前缀 <span style="color:var(--t3);font-size:.82rem">(可选)</span></label>
-                <input type="text" id="input-cf-subdomain" placeholder="留空则随机生成 (如 cc-a1b2c3d4)">
-            </div>
-            <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
-                <button class="btn btn-secondary" onclick="validateCfToken()"
-                    style="padding:8px 16px;font-size:.88rem;flex-shrink:0">🔍 验证 Token</button>
-                <span id="cf-validate-inline" style="font-size:.85rem;display:none"></span>
-            </div>
+
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
                 <button class="btn btn-primary" id="btn-next-2" onclick="nextStep()">跳过</button>
@@ -1182,8 +1206,31 @@
             </div>
         </div>
 
-        <!-- Step 8: 确认部署 -->
+        <!-- Step 8: SSH 配置 -->
         <div class="step" id="step-8">
+            <div class="step-title">🔑 SSH 访问配置</div>
+            <div class="step-desc">设置 SSH 密码和公钥，用于远程终端访问容器 <span class="help-tip" title="SSH 密码用于终端登录 root 账户。公钥 (Ed25519/RSA) 提供更安全的免密登录。两者可同时配置。">?</span></div>
+            <div class="form-group">
+                <label>Root 密码 <span style="color:var(--t3);font-size:.82rem">(可选)</span></label>
+                <div class="pw-wrap">
+                    <input type="password" id="input-ssh-password" placeholder="设置容器 root 密码..." oninput="updateNextBtnText()">
+                    <button type="button" class="pw-toggle" onclick="togglePw('input-ssh-password', this)" title="显示/隐藏密码">👁</button>
+                </div>
+                <div class="form-hint">用于 <code>ssh root@host</code> 登录</div>
+            </div>
+            <div class="form-group">
+                <label>SSH 公钥 <span style="color:var(--t3);font-size:.82rem">(可选, 每行一个)</span></label>
+                <textarea id="input-ssh-keys" rows="4" placeholder="ssh-ed25519 AAAA... your-key&#10;ssh-rsa AAAA... another-key" oninput="updateNextBtnText()" style="font-family:monospace;font-size:.82rem;resize:vertical"></textarea>
+                <div class="form-hint">支持 ed25519、rsa、ecdsa 格式。粘贴 <code>~/.ssh/id_ed25519.pub</code> 的内容</div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-8" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 9: 确认部署 -->
+        <div class="step" id="step-9">
             <div class="step-title">📋 确认部署配置</div>
             <div class="step-desc">检查以下配置，确认后开始部署</div>
             <div id="deploy-summary"></div>
@@ -1220,11 +1267,12 @@
     </div>
 
     <script>
-        const TOTAL_STEPS = 9;
+        const TOTAL_STEPS = 10;
         let currentStep = 0;
         let wizardConfig = {
             image_type: 'prebuilt',
             password: '',
+            tunnel_mode: '',  // 'public' | 'custom' | ''
             cf_api_token: '',
             cf_domain: '',
             cf_subdomain: '',
@@ -1235,6 +1283,8 @@
             install_fa2: false,
             install_sa2: false,
             download_aura_model: true,
+            ssh_password: '',
+            ssh_keys: [],
             wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
             wizard_remotes: [],       // [{name, type, params}]
         };
@@ -1541,17 +1591,52 @@
             // 进入 Step 4 时初始化同步规则 UI
             if (n === 4) initSyncRulesStep();
             if (n === 7) initAttnStep();
+            // 进入 Step 2 时加载公共节点容量
+            if (n === 2) loadWizardTunnelCapacity();
             updateNextBtnText();
+        }
+
+        /* ─── Wizard Tunnel 模式选择 ─── */
+        let _wizardTunnelMode = null; // 'public' | 'custom' | null
+
+        function selectWizardTunnelMode(mode) {
+            _wizardTunnelMode = mode;
+            const pubCard = document.getElementById('wizard-tunnel-public');
+            const cusCard = document.getElementById('wizard-tunnel-custom');
+            const cusFields = document.getElementById('wizard-tunnel-custom-fields');
+
+            pubCard.classList.toggle('selected', mode === 'public');
+            cusCard.classList.toggle('selected', mode === 'custom');
+            cusFields.style.display = mode === 'custom' ? '' : 'none';
+
+            updateNextBtnText();
+        }
+
+        async function loadWizardTunnelCapacity() {
+            const el = document.getElementById('wizard-tunnel-capacity');
+            try {
+                const r = await fetch('/api/tunnel/public/status');
+                const d = await r.json();
+                const cap = d.capacity || {};
+                if (cap.active_tunnels >= 0) {
+                    el.textContent = `容量: ${cap.active_tunnels} / ${cap.max_tunnels}${cap.available ? '' : ' (已满)'}`;
+                } else {
+                    el.textContent = '容量: 无法获取';
+                }
+            } catch (_) {
+                el.textContent = '容量: 无法获取';
+            }
         }
 
         /* 动态按钮文本：可选步骤无内容时显示 "跳过"，有内容时显示 "下一步" */
         function updateNextBtnText() {
             const map = {
-                2: () => !!(document.getElementById('input-cf-token').value.trim() && document.getElementById('input-cf-domain').value.trim()),
+                2: () => _wizardTunnelMode === 'public' || !!(document.getElementById('input-cf-token').value.trim() && document.getElementById('input-cf-domain').value.trim()),
                 3: () => !!_selectedRcloneMethod,
                 4: () => document.querySelectorAll('.wz-rule-card.selected').length > 0,
                 5: () => !!document.getElementById('input-civitai-token').value.trim(),
                 7: () => document.querySelectorAll('#attn-cards .choice-card.selected').length > 0,
+                8: () => !!(document.getElementById('input-ssh-password').value || document.getElementById('input-ssh-keys').value.trim()),
             };
             for (const [step, hasContent] of Object.entries(map)) {
                 const btn = document.getElementById(`btn-next-${step}`);
@@ -1670,9 +1755,16 @@
                     wizardConfig.password = document.getElementById('input-password').value;
                     break;
                 case 2:
-                    wizardConfig.cf_api_token = document.getElementById('input-cf-token').value.trim();
-                    wizardConfig.cf_domain = document.getElementById('input-cf-domain').value.trim();
-                    wizardConfig.cf_subdomain = document.getElementById('input-cf-subdomain').value.trim();
+                    wizardConfig.tunnel_mode = _wizardTunnelMode || '';
+                    if (_wizardTunnelMode === 'custom') {
+                        wizardConfig.cf_api_token = document.getElementById('input-cf-token').value.trim();
+                        wizardConfig.cf_domain = document.getElementById('input-cf-domain').value.trim();
+                        wizardConfig.cf_subdomain = document.getElementById('input-cf-subdomain').value.trim();
+                    } else {
+                        wizardConfig.cf_api_token = '';
+                        wizardConfig.cf_domain = '';
+                        wizardConfig.cf_subdomain = '';
+                    }
                     break;
                 case 3: {
                     const method = _selectedRcloneMethod || 'skip';
@@ -1718,6 +1810,12 @@
                 case 7: {
                     wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
                     wizardConfig.install_sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
+                    break;
+                }
+                case 8: {
+                    wizardConfig.ssh_password = document.getElementById('input-ssh-password').value;
+                    const rawKeys = document.getElementById('input-ssh-keys').value.trim();
+                    wizardConfig.ssh_keys = rawKeys ? rawKeys.split('\n').map(k => k.trim()).filter(k => k && k.startsWith('ssh-')) : [];
                     break;
                 }
             }
@@ -2133,7 +2231,9 @@
         <div class="summary-card">
             <h4>网络与安全</h4>
             <div class="summary-row"><span class="label">ComfyCarry 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
-            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.cf_api_token ? '✅ ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : '⏭ 跳过'}</span></div>
+            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.tunnel_mode === 'public' ? '🌍 公共节点' : c.cf_api_token ? '🔧 自定义 · ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : '⏭ 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SSH 密码</span><span class="value">${c.ssh_password ? '✅ 已设置' : '⏭ 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SSH 公钥</span><span class="value">${(c.ssh_keys || []).length > 0 ? c.ssh_keys.length + ' 个' : '⏭ 跳过'}</span></div>
         </div>
         <div class="summary-card">
             <h4>云存储与同步</h4>
