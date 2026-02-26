@@ -155,32 +155,6 @@
         .input-secret-toggle:hover,
         .input-secret-copy:hover { color: var(--t1); }
 
-        /* ── Help Tip (Tooltip) ── */
-        .help-tip {
-            cursor: help;
-            color: var(--t3);
-            position: relative;
-            vertical-align: middle;
-            margin-left: 4px;
-        }
-        .help-tip .ms { font-size: 16px; }
-        .help-tip[data-tip]:hover::after {
-            content: attr(data-tip);
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            bottom: calc(100% + 6px);
-            background: var(--bg4);
-            color: var(--t1);
-            padding: 6px 10px;
-            border-radius: var(--r-sm);
-            font-size: .75rem;
-            white-space: nowrap;
-            z-index: 100;
-            border: 1px solid var(--bd);
-            pointer-events: none;
-        }
-
         /* ── Status Dot ── */
         .status-dot {
             display: inline-block;
@@ -411,25 +385,19 @@
 
         /* ── Theme Toggle Button ── */
         .theme-toggle {
-            position: fixed;
-            top: 18px;
-            right: 18px;
-            z-index: 200;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: 1px solid var(--bd);
-            background: var(--bg3);
+            background: none;
+            border: none;
             color: var(--t2);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background .2s, border-color .2s, color .2s;
-            box-shadow: var(--sh);
+            padding: 4px;
+            border-radius: 50%;
+            transition: color .2s;
         }
-        .theme-toggle:hover { border-color: var(--ac); color: var(--ac) }
-        .theme-toggle .ms { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18; }
+        .theme-toggle:hover { color: var(--ac) }
+        .theme-toggle .ms { font-size: 20px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
 
         .page-header h2 {
             font-size: 1.15rem;
@@ -2902,13 +2870,10 @@
     <script>
         // 主题初始化 — 在 <head> 中内联执行以防止闪烁
         (function() {
-            var iconMap = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
             function getTheme() { return localStorage.getItem('theme') || 'system'; }
             function applyTheme(pref) {
                 var isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
                 document.documentElement.dataset.theme = isDark ? '' : 'light';
-                var ico = document.getElementById('theme-toggle-icon');
-                if (ico) ico.textContent = iconMap[pref] || 'contrast';
             }
             applyTheme(getTheme());
             matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
@@ -2919,9 +2884,6 @@
 </head>
 
 <body>
-
-    <!-- Theme Toggle -->
-    <button class="theme-toggle" id="theme-toggle" onclick="window.cycleTheme()" title="切换主题"><span class="ms" id="theme-toggle-icon">contrast</span></button>
 
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
@@ -3260,9 +3222,10 @@
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
                                 <span style="font-size:1.05rem;font-weight:600;color:var(--t1)">公共节点</span>
                                 <span id="tunnel-public-status-badge" style="font-size:.78rem;font-weight:500;padding:2px 8px;border-radius:var(--r-pill);background:var(--bg2)">已启用</span>
+                                <span style="flex:1"></span>
+                                <button class="btn btn-sm btn-danger" onclick="window._tunnelPublicDisable()">停用</button>
                             </div>
-                            <div id="tunnel-public-urls" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:20px"></div>
-                            <div style="text-align:right"><button class="btn btn-sm btn-danger" onclick="window._tunnelPublicDisable()">停用公共节点</button></div>
+                            <div id="tunnel-public-urls" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"></div>
                         </div>
                         <div id="tunnel-public-inactive" style="display:none;text-align:center;padding:24px">
                             <div style="font-size:1rem;margin-bottom:12px;color:var(--t2)">点击下方按钮一键启用公共 Tunnel</div>
@@ -3692,7 +3655,7 @@
                                         </label>
                                         <button class="btn btn-sm btn-primary" id="ssh-pw-submit-btn" onclick="window.setSSHPassword()">设置密码</button>
                                     </div>
-                                    <span class="help-tip" data-tip="设置后将自动启用密码认证、PermitRootLogin 并重启 sshd"><span class="ms" style="color:#60a5fa">info</span></span>
+                                    <span class="comfy-param-help-icon" data-tip="设置后将自动启用密码认证、PermitRootLogin 并重启 sshd">?</span>
                                 </div>
                             </div>
                         </div>
@@ -3761,7 +3724,7 @@
 
                         <!-- ComfyCarry API Key -->
                         <div class="card card-padded">
-                            <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key <span class="help-tip" data-tip="用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API"><span class="ms" style="color:#60a5fa">info</span></span></h3>
+                            <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key <span class="comfy-param-help-icon" data-tip="用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API">?</span></h3>
                             <div class="input-secret" style="margin-bottom:12px">
                                 <input type="password" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
                                 <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
@@ -3774,7 +3737,7 @@
 
                         <!-- 重新初始化 -->
                         <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
-                            <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化 <span class="help-tip" data-tip="删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留"><span class="ms" style="color:#60a5fa">info</span></span></h3>
+                            <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化 <span class="comfy-param-help-icon" data-tip="删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留">?</span></h3>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
                                 <label style="font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
                                     <input type="checkbox" id="reinit-keep-models" checked style="width:15px;height:15px;accent-color:var(--ac)">
@@ -3910,13 +3873,25 @@
         function toggleSecret(btn) {
             const input = btn.closest('.input-secret').querySelector('input');
             const hidden = input.type === 'password';
-            input.type = hidden ? 'text' : 'password';
+            if (input.dataset.key) {
+                // pre-filled readonly field — swap value between key and dots
+                if (hidden) {
+                    input.type = 'text';
+                    input.value = input.dataset.key;
+                } else {
+                    input.type = 'password';
+                    input.value = '\u2022'.repeat(24);
+                }
+            } else {
+                input.type = hidden ? 'text' : 'password';
+            }
             btn.querySelector('.ms').textContent = hidden ? 'visibility_off' : 'visibility';
             btn.title = hidden ? '隐藏' : '显示';
         }
         function copySecret(btn) {
             const input = btn.closest('.input-secret').querySelector('input');
-            navigator.clipboard.writeText(input.value);
+            const text = input.dataset.key || input.value;
+            navigator.clipboard.writeText(text);
             if (window.showToast) showToast('已复制');
         }
     </script>

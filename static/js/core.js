@@ -13,14 +13,20 @@ export let apiKey = '';
 /** 获取当前主题偏好 ('dark' | 'light' | 'system') */
 export function getTheme() { return localStorage.getItem('theme') || 'system'; }
 
+const _themeIcons = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
+
+function _updateThemeIcons(pref) {
+  document.querySelectorAll('.theme-toggle-icon').forEach(ico => {
+    ico.textContent = _themeIcons[pref] || 'contrast';
+  });
+}
+
 /** 设置并应用主题偏好 */
 export function applyTheme(pref) {
   localStorage.setItem('theme', pref);
   const isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = isDark ? '' : 'light';
-  const iconMap = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
-  const ico = document.getElementById('theme-toggle-icon');
-  if (ico) ico.textContent = iconMap[pref] || 'contrast';
+  _updateThemeIcons(pref);
 }
 
 /** 循环切换主题: dark → light → system → dark */
@@ -31,6 +37,18 @@ export function cycleTheme() {
   applyTheme(next);
 }
 window.cycleTheme = cycleTheme;
+
+// 注入主题切换按钮到所有页面的 toolbar
+queueMicrotask(() => {
+  document.querySelectorAll('.top-toolbar').forEach(tb => {
+    const btn = document.createElement('button');
+    btn.className = 'theme-toggle';
+    btn.title = '切换主题';
+    btn.onclick = cycleTheme;
+    btn.innerHTML = `<span class="ms theme-toggle-icon">${_themeIcons[getTheme()] || 'contrast'}</span>`;
+    tb.appendChild(btn);
+  });
+});
 
 // ── 页面注册表 ───────────────────────────────────────────────
 

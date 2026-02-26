@@ -47,15 +47,22 @@ async function loadSyncRemotes() {
   }
 }
 
+// 不支持 rclone about 的存储类型
+const _NO_ABOUT_TYPES = new Set(['s3', 'webdav', 'ftp', 'swift', 'http', 'azureblob']);
+
 function renderSyncRemoteCard(r) {
   const authIcon = r.has_auth ? '<span class="status-dot online"></span> 已认证' : '<span class="status-dot pending"></span> 未配置';
+  const noAbout = _NO_ABOUT_TYPES.has(r.type);
+  const storageInfo = noAbout
+    ? '<span style="font-size:.75rem;color:var(--t3)">此存储类型不支持容量查询</span>'
+    : `<button class="btn btn-xs" onclick="refreshRemoteStorage('${r.name}')">查看容量</button>`;
   return `<div class="sync-remote-card">
     <div class="sync-remote-header">
       <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name} · ${r.type}</span></div>
       <span style="font-size:.75rem;color:var(--t3)">${authIcon}</span>
     </div>
     <div class="sync-storage-info" id="storage-${r.name}">
-      <button class="btn btn-xs" onclick="refreshRemoteStorage('${r.name}')">查看容量</button>
+      ${storageInfo}
     </div>
     <div style="margin-top:8px;display:flex;gap:4px;justify-content:flex-end">
       <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="deleteRemote('${r.name}')">删除</button>

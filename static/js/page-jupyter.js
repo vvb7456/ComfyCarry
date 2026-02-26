@@ -28,7 +28,7 @@ function _stopAutoRefresh() {
 // ── 主加载 ──────────────────────────────────────────────────
 
 async function loadJupyterPage() {
-  await Promise.all([loadJupyterStatus(), loadJupyterUrl()]);
+  await Promise.all([loadJupyterStatus(), loadJupyterUrl(), loadJupyterToken()]);
 }
 
 // ── 获取外部 URL (从 Tunnel 状态) ────────────────────────────
@@ -46,6 +46,21 @@ async function loadJupyterUrl() {
     }
   } catch (_) {}
   _jupyterUrl = '';
+}
+
+// ── Token ───────────────────────────────────────────────────
+
+async function loadJupyterToken() {
+  try {
+    const r = await fetch('/api/jupyter/token');
+    const d = await r.json();
+    const el = document.getElementById('jupyter-token-value');
+    if (el && d.token) {
+      el.dataset.key = d.token;
+      el.value = '\u2022'.repeat(24);
+      el.type = 'password';
+    }
+  } catch (_) {}
 }
 
 // ── 状态 ────────────────────────────────────────────────────

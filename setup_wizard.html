@@ -434,55 +434,40 @@
         }
 
         /* Help tooltip */
-        .help-tip {
+        .comfy-param-help-icon {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            border: 1px solid var(--bd);
-            font-size: .75rem;
+            background: var(--bd);
             color: var(--t3);
+            font-size: .65rem;
             cursor: help;
-            vertical-align: middle;
+            flex-shrink: 0;
             position: relative;
         }
 
-        .help-tip:hover {
-            color: var(--accent);
-            border-color: var(--accent);
-        }
-
-        .help-tip:hover::after {
-            content: attr(title);
+        .comfy-param-help-icon:hover::after {
+            content: attr(data-tip);
             position: absolute;
-            bottom: 130%;
+            bottom: calc(100% + 6px);
             left: 50%;
             transform: translateX(-50%);
             background: var(--bg2);
             color: var(--t1);
             border: 1px solid var(--bd);
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: .82rem;
-            line-height: 1.5;
-            white-space: normal;
-            width: 280px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: .72rem;
+            line-height: 1.4;
+            white-space: pre-line;
+            width: max-content;
+            max-width: 280px;
             z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,.15);
             pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
-        }
-
-        .help-tip:hover::before {
-            content: '';
-            position: absolute;
-            bottom: 120%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent;
-            border-top-color: var(--bd);
-            z-index: 101;
         }
 
         /* Deploy progress */
@@ -1153,8 +1138,8 @@
         <!-- Step 3: 云存储 (Remotes) -->
         <div class="step" id="step-3">
             <div class="step-title"><span class="ms ms-sm" style="color:#34d399">cloud_sync</span> 云存储配置</div>
-            <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="help-tip"
-                    title="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span>
+            <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="comfy-param-help-icon"
+                    data-tip="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span>
             </div>
 
             <div
@@ -1250,14 +1235,14 @@
 
             <!-- Pull rules -->
             <div class="wz-rule-panel">
-                <h4><span class="ms ms-sm" style="color:#60a5fa">cloud_download</span> 部署拉取 <span class="help-tip"
-                        title="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
+                <h4><span class="ms ms-sm" style="color:#60a5fa">cloud_download</span> 部署拉取 <span class="comfy-param-help-icon"
+                        data-tip="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
                 <div class="wz-rule-row" id="wz-pull-rules"></div>
             </div>
 
             <!-- Push rules -->
             <div class="wz-rule-panel">
-                <h4><span class="ms ms-sm" style="color:#34d399">cloud_upload</span> 自动推送 <span class="help-tip" title="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
+                <h4><span class="ms ms-sm" style="color:#34d399">cloud_upload</span> 自动推送 <span class="comfy-param-help-icon" data-tip="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
                 </h4>
                 <div class="wz-rule-row" id="wz-push-rules"></div>
             </div>
@@ -1308,8 +1293,8 @@
         <!-- Step 7: 加速组件 (FA2/SA2) -->
         <div class="step" id="step-7">
             <div class="step-title"><span class="ms ms-sm" style="color:#fbbf24">bolt</span> Attention 加速</div>
-            <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="help-tip"
-                    title="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span>
+            <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="comfy-param-help-icon"
+                    data-tip="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span>
             </div>
 
             <div class="choice-grid" id="attn-cards" style="grid-template-columns: repeat(2, 1fr);">

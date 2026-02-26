@@ -6,7 +6,7 @@
 import {
   showPage, loadApiKey, loadVersionInfo,
   restoreSidebar, setupGlobalKeys, setupScrollFab,
-  toggleSidebar
+  toggleSidebar, showToast, copyText
 } from './core.js';
 
 // ── 导入所有页面模块 (副作用: 自动注册 registerPage) ──
@@ -35,3 +35,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 window.showPage = showPage;
 window.toggleSidebar = toggleSidebar;
+window.showToast = showToast;
+window.copyText = copyText;
