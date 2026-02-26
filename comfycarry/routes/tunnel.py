@@ -326,15 +326,6 @@ def api_tunnel_start():
     return jsonify({"ok": True})
 
 
-@bp.route("/api/tunnel/services", methods=["GET"])
-def api_tunnel_services():
-    """获取当前服务列表 (默认 + 自定义)"""
-    from ..services.tunnel_manager import get_default_services
-    custom = _get_custom_services()
-    all_services = list(get_default_services()) + custom
-    return jsonify({"services": all_services})
-
-
 @bp.route("/api/tunnel/services", methods=["POST"])
 def api_tunnel_add_service():
     """
@@ -647,22 +638,4 @@ def _get_cloudflared_pm2_status() -> str:
     return "unknown"
 
 
-def _get_cloudflared_logs() -> str:
-    """获取 cloudflared 最近日志"""
-    try:
-        r = subprocess.run(
-            "pm2 logs cf-tunnel --nostream --lines 50 2>/dev/null",
-            shell=True, capture_output=True, text=True, timeout=5
-        )
-        raw = r.stdout + r.stderr
-        ansi_re = re.compile(r'\x1b\[[0-9;]*m')
-        cleaned = ansi_re.sub('', raw)
-        cleaned = re.sub(r'^\d+\|[^|]+\|\s*', '', cleaned, flags=re.MULTILINE)
-        return '\n'.join(
-            l for l in cleaned.split('\n')
-            if not l.startswith('[TAILING]')
-            and 'last 50 lines' not in l
-            and '/root/.pm2/logs/' not in l
-        )
-    except Exception:
-        return ""
+

@@ -67,7 +67,7 @@ async function loadTunnelPage() {
       // 公共模式
       const cfOnline = d.cloudflared === 'online';
       const stColor = cfOnline ? 'var(--green)' : 'var(--red)';
-      const stLabel = cfOnline ? '运行中 · 公共' : '已停止 · 公共';
+      const stLabel = cfOnline ? '运行中' : '已停止';
 
       if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
       if (headerControls) {
@@ -97,8 +97,8 @@ async function loadTunnelPage() {
                      : st === 'offline' ? 'var(--red)'
                      : 'var(--t3)';
       const stLabel = {
-        online: '自定义 · 运行中', degraded: '自定义 · 部分连接', connecting: '自定义 · 连接中',
-        offline: '自定义 · 离线', unconfigured: '未配置'
+        online: '运行中', degraded: '部分连接', connecting: '连接中',
+        offline: '离线', unconfigured: '未配置'
       }[st] || st;
 
       if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
@@ -297,7 +297,11 @@ async function _loadTunnelConfigTab() {
     _selectedMode = _selectedMode || null;
   }
 
-  _updateModeUI();
+  // 加载协议设置
+  const protocolSel = document.getElementById('tunnel-cfg-protocol');
+  if (protocolSel && _lastData?.cf_protocol) {
+    protocolSel.value = _lastData.cf_protocol;
+  }
 
   // 加载自定义配置
   try {
@@ -308,14 +312,7 @@ async function _loadTunnelConfigTab() {
     document.getElementById('tunnel-cfg-subdomain').value = d.subdomain || '';
   } catch (_) {}
 
-  // Update submit button label
-  const btn = document.getElementById('tunnel-cfg-submit');
-  if (btn) {
-    btn.textContent = _lastData?.configured ? '保存并应用' : '创建 Tunnel';
-  }
-
-  // 加载公共 Tunnel 状态
-  _loadPublicStatus();
+  _updateModeUI();
 }
 
 async function _loadPublicCapacity() {
@@ -335,73 +332,6 @@ async function _loadPublicCapacity() {
   }
 }
 
-async function _loadPublicStatus() {
-  const activeEl = document.getElementById('tunnel-public-active');
-  const inactiveEl = document.getElementById('tunnel-public-inactive');
-
-  if (_selectedMode !== 'public') return;
-
-  try {
-    const r = await fetch('/api/tunnel/public/status');
-    const d = await r.json();
-    if (d.mode === 'public' && d.random_id) {
-      // 已启用 — 显示 URLs
-      activeEl.style.display = '';
-      inactiveEl.style.display = 'none';
-
-      const badge = document.getElementById('tunnel-public-status-badge');
-      if (d.degraded) {
-        badge.textContent = '部分异常';
-        badge.style.color = 'var(--amber)';
-      } else {
-        badge.textContent = '已启用';
-        badge.style.color = 'var(--green)';
-      }
-
-      const urlsEl = document.getElementById('tunnel-public-urls');
-      _renderPublicUrlCards(d.urls || {}, urlsEl);
-    } else {
-      // 未启用
-      activeEl.style.display = 'none';
-      inactiveEl.style.display = '';
-    }
-  } catch (_) {
-    activeEl.style.display = 'none';
-    inactiveEl.style.display = '';
-  }
-}
-
-function _renderPublicUrlCards(urls, el) {
-  const iconMap = { dashboard: msIcon('monitoring'), comfyui: msIcon('palette'), jupyter: msIcon('book_2'), ssh: msIcon('lock') };
-  const nameMap = { dashboard: 'Dashboard', comfyui: 'ComfyUI', jupyter: 'JupyterLab', ssh: 'SSH' };
-
-  let html = '';
-  for (const [key, url] of Object.entries(urls)) {
-    const icon = iconMap[key] || msIcon('language');
-    const name = nameMap[key] || key;
-    if (key === 'ssh') {
-      const hostname = url.replace(/^https?:\/\//, '');
-      html += `<div class="tunnel-svc-card" style="cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(url)}');window.showToast?.('已复制')">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="tunnel-svc-icon">${icon}</span>
-          <span class="tunnel-svc-name">${escHtml(name)}</span>
-          <span style="font-size:.68rem;color:var(--t3);margin-left:auto">点击复制</span>
-        </div>
-        <span class="tunnel-svc-detail" style="font-size:.75rem">${escHtml(hostname)}</span>
-      </div>`;
-    } else {
-      html += `<a href="${escHtml(url)}" target="_blank" class="tunnel-svc-card">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="tunnel-svc-icon">${icon}</span>
-          <span class="tunnel-svc-name">${escHtml(name)}</span>
-        </div>
-        <span class="tunnel-svc-detail" style="font-size:.75rem">${escHtml(url)}</span>
-      </a>`;
-    }
-  }
-  el.innerHTML = html;
-}
-
 function _selectTunnelMode(mode) {
   _selectedMode = mode;
   _updateModeUI();
@@ -410,24 +340,137 @@ function _selectTunnelMode(mode) {
 function _updateModeUI() {
   const publicCard = document.getElementById('tunnel-mode-public');
   const customCard = document.getElementById('tunnel-mode-custom');
-  const publicDetails = document.getElementById('tunnel-public-details');
-  const customDetails = document.getElementById('tunnel-custom-details');
+  const configDetails = document.getElementById('tunnel-config-details');
+  const banner = document.getElementById('tunnel-config-banner');
+  const customCards = document.querySelectorAll('.tunnel-cfg-custom-card');
+  const submitBtn = document.getElementById('tunnel-cfg-submit');
+  const disableBtn = document.getElementById('tunnel-disable-btn');
+  const resultEl = document.getElementById('tunnel-cfg-result');
 
   // Reset borders
   publicCard.style.borderColor = 'transparent';
   customCard.style.borderColor = 'transparent';
 
-  // Hide both
-  publicDetails.style.display = 'none';
-  customDetails.style.display = 'none';
+  const isPublicActive = _lastData?.tunnel_mode === 'public';
+  const isCustomConfigured = !!_lastData?.configured;
 
-  if (_selectedMode === 'public') {
+  // Active mode indicator — inset box-shadow (won't conflict with selection border)
+  publicCard.style.boxShadow = isPublicActive ? 'inset 0 3px 0 0 var(--green)' : 'none';
+  customCard.style.boxShadow = isCustomConfigured ? 'inset 0 3px 0 0 var(--green)' : 'none';
+
+  if (!_selectedMode) {
+    configDetails.style.display = 'none';
+    return;
+  }
+
+  configDetails.style.display = '';
+  if (resultEl) resultEl.style.display = 'none';
+
+  const isPublic = _selectedMode === 'public';
+  const hasActiveTunnel = isPublicActive || isCustomConfigured;
+
+  // Highlight selected mode card
+  if (isPublic) {
     publicCard.style.borderColor = 'var(--ac)';
-    publicDetails.style.display = '';
-    _loadPublicStatus();
-  } else if (_selectedMode === 'custom') {
+  } else {
     customCard.style.borderColor = 'var(--ac)';
-    customDetails.style.display = '';
+  }
+
+  // Banner text
+  if (isPublic) {
+    banner.innerHTML = isPublicActive
+      ? `<span class="ms ms-sm" style="color:var(--green);vertical-align:middle">check_circle</span> 公共节点已启用 · 服务链接请查看「服务 & 日志」Tab。`
+      : `公共模式无需域名或 CF 账号，点击「保存」一键启用。`;
+  } else {
+    banner.innerHTML = isCustomConfigured
+      ? `自定义 Tunnel 运行中 · 修改配置后点击「保存」将更新并重启。`
+      : `填写 CF API Token 和域名后，点击「保存」自动创建 Tunnel、配置 DNS 和 Ingress。`;
+  }
+
+  // Custom cards disabled state (grayed out in public mode)
+  customCards.forEach(card => {
+    card.style.opacity = isPublic ? '0.4' : '1';
+    card.style.pointerEvents = isPublic ? 'none' : '';
+  });
+  document.querySelectorAll('.tunnel-cfg-custom-card input').forEach(inp => {
+    inp.disabled = isPublic;
+  });
+
+  // Submit button — always visible
+  submitBtn.textContent = '保存';
+
+  // Destroy button — only shown when a tunnel is active
+  disableBtn.style.display = hasActiveTunnel ? '' : 'none';
+  disableBtn.textContent = '销毁 Tunnel';
+}
+
+// ════════════════════════════════════════════════════════════════
+// 统一保存 (协议 + 模式切换 + 配置)
+// ════════════════════════════════════════════════════════════════
+
+async function _tunnelSave() {
+  const protocol = document.getElementById('tunnel-cfg-protocol')?.value || 'auto';
+  const isPublic = _selectedMode === 'public';
+  const isPublicActive = _lastData?.tunnel_mode === 'public';
+  const isCustomConfigured = !!_lastData?.configured;
+
+  // 保存协议
+  await apiFetch('/api/tunnel/protocol', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ protocol })
+  });
+
+  if (isPublic) {
+    // 如果当前已经是公共模式且在运行，仅保存协议并提示重启
+    if (isPublicActive) {
+      if (confirm('协议已保存。需要重启 cloudflared 才能生效，立即重启？')) {
+        _tunnelRestart();
+      } else {
+        showToast('协议已保存，下次启动生效');
+      }
+      return;
+    }
+    // 切换到公共模式 — 销毁自定义 + 启用公共
+    if (isCustomConfigured) {
+      if (!confirm('将销毁当前自定义 Tunnel 并切换到公共模式，确定？')) return;
+      await apiFetch('/api/tunnel/teardown', { method: 'POST' });
+    }
+    _tunnelPublicEnable();
+  } else {
+    // 自定义模式
+    const token = document.getElementById('tunnel-cfg-token').value.trim();
+    const domain = document.getElementById('tunnel-cfg-domain').value.trim();
+    const subdomain = document.getElementById('tunnel-cfg-subdomain').value.trim();
+
+    if (!token || !domain) {
+      showToast('请填写 API Token 和域名');
+      return;
+    }
+
+    // 切换到自定义模式 — 先销毁公共
+    if (isPublicActive) {
+      if (!confirm('将停用公共节点并切换到自定义 Tunnel，确定？')) return;
+      await apiFetch('/api/tunnel/public/disable', { method: 'POST' });
+    } else if (isCustomConfigured) {
+      if (!confirm('将更新现有 Tunnel 配置并重启 cloudflared。\n\n通过 Tunnel 的连接可能会短暂中断，确定继续？')) return;
+    } else {
+      if (!confirm('确定创建 Cloudflare Tunnel？将自动配置 DNS 和 Ingress。')) return;
+    }
+
+    showToast('正在应用配置...');
+    const d = await apiFetch('/api/tunnel/provision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_token: token, domain: domain, subdomain: subdomain })
+    });
+    if (!d) return;
+    if (d.ok) {
+      showToast('Tunnel 配置已应用！5 秒后自动刷新...');
+      setTimeout(() => location.reload(), 5000);
+    } else {
+      showToast(d.error || '保存失败');
+    }
   }
 }
 
@@ -436,17 +479,14 @@ function _updateModeUI() {
 // ════════════════════════════════════════════════════════════════
 
 async function _tunnelPublicEnable() {
-  const btn = document.getElementById('tunnel-public-enable-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '正在启用...'; }
-
+  showToast('正在启用公共节点...');
   const d = await apiFetch('/api/tunnel/public/enable', { method: 'POST' });
-  if (btn) { btn.disabled = false; btn.textContent = '启用公共节点'; }
   if (!d) return;
   if (d.ok) {
     showToast('公共节点已启用！');
     setTimeout(() => {
       loadTunnelPage();
-      _loadPublicStatus();
+      _loadTunnelConfigTab();
     }, 2000);
   } else {
     showToast('启用失败: ' + (d.error || ''));
@@ -470,6 +510,18 @@ async function _tunnelPublicDisable() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// 统一停用按钮
+// ════════════════════════════════════════════════════════════════
+
+function _tunnelDisable() {
+  if (_selectedMode === 'public') {
+    _tunnelPublicDisable();
+  } else {
+    _tunnelTeardown();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // 自定义 Tunnel — Config 验证/保存
 // ════════════════════════════════════════════════════════════════
 
@@ -481,7 +533,7 @@ async function _tunnelCfgValidate() {
   if (!token || !domain) {
     resultEl.style.display = 'block';
     resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = `${msIcon('cancel')} 请填写 API Token 和域名`;
+    resultEl.innerHTML = `${msIcon('cancel')} 请填写 Token 和域名`;
     return;
   }
 
@@ -498,7 +550,7 @@ async function _tunnelCfgValidate() {
     const d = await r.json();
     if (d.ok) {
       resultEl.style.color = 'var(--green)';
-      resultEl.innerHTML = `${msIcon('check_circle')} ${escHtml(d.message)} · 账户: ${escHtml(d.account_name)} · Zone: ${escHtml(d.zone_status)}`;
+      resultEl.innerHTML = `${msIcon('check_circle')} ${escHtml(d.account_name)} · ${escHtml(d.zone_status)}`;
     } else {
       resultEl.style.color = 'var(--red)';
       resultEl.innerHTML = `${msIcon('cancel')} ${escHtml(d.message)}`;
@@ -506,46 +558,6 @@ async function _tunnelCfgValidate() {
   } catch (e) {
     resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = `${msIcon('cancel')} 验证请求失败`;
-  }
-}
-
-async function _tunnelCfgSave() {
-  const token = document.getElementById('tunnel-cfg-token').value.trim();
-  const domain = document.getElementById('tunnel-cfg-domain').value.trim();
-  const subdomain = document.getElementById('tunnel-cfg-subdomain').value.trim();
-  const resultEl = document.getElementById('tunnel-cfg-result');
-
-  if (!token || !domain) {
-    showToast('请填写 API Token 和域名');
-    return;
-  }
-
-  const isCreate = !_lastData?.configured;
-  const msg = isCreate
-    ? '确定创建 Cloudflare Tunnel？将自动配置 DNS 和 Ingress。'
-    : '将更新现有 Tunnel 配置并重启 cloudflared。\n\n通过 Tunnel 的连接可能会短暂中断，确定继续？';
-  if (!confirm(msg)) return;
-
-  resultEl.style.display = 'block';
-  resultEl.style.color = 'var(--t2)';
-  resultEl.innerHTML = `${msIcon('hourglass_top')} 正在应用配置...`;
-
-  const d = await apiFetch('/api/tunnel/provision', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ api_token: token, domain: domain, subdomain: subdomain })
-  });
-  if (!d) {
-    resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = `${msIcon('cancel')} 请求失败`;
-    return;
-  }
-  if (d.ok) {
-    showToast('Tunnel 配置已应用！连接可能短暂中断，5 秒后自动刷新...');
-    setTimeout(() => location.reload(), 5000);
-  } else {
-    resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = `${msIcon('cancel')} ${escHtml(d.error || '保存失败')}`;
   }
 }
 
@@ -687,9 +699,9 @@ async function _tunnelEditSuffix(currentSuffix) {
 Object.assign(window, {
   switchTunnelTab,
   _selectTunnelMode,
-  _tunnelCfgValidate, _tunnelCfgSave,
+  _tunnelCfgValidate, _tunnelSave,
   _tunnelTeardown, _tunnelRestart, _tunnelStop, _tunnelStart,
-  _tunnelPublicEnable, _tunnelPublicDisable,
+  _tunnelPublicEnable, _tunnelPublicDisable, _tunnelDisable,
   _tunnelAddService, _tunnelAddServiceSubmit,
   _tunnelRemoveService, _tunnelEditSuffix,
   showToast,

@@ -3216,68 +3216,69 @@
                         </div>
                     </div>
 
-                    <!-- 公共节点详情 (仅公共模式时显示) -->
-                    <div id="tunnel-public-details" style="display:none">
-                        <div id="tunnel-public-active" style="display:none">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-                                <span style="font-size:1.05rem;font-weight:600;color:var(--t1)">公共节点</span>
-                                <span id="tunnel-public-status-badge" style="font-size:.78rem;font-weight:500;padding:2px 8px;border-radius:var(--r-pill);background:var(--bg2)">已启用</span>
-                                <span style="flex:1"></span>
-                                <button class="btn btn-sm btn-danger" onclick="window._tunnelPublicDisable()">停用</button>
-                            </div>
-                            <div id="tunnel-public-urls" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"></div>
-                        </div>
-                        <div id="tunnel-public-inactive" style="display:none;text-align:center;padding:24px">
-                            <div style="font-size:1rem;margin-bottom:12px;color:var(--t2)">点击下方按钮一键启用公共 Tunnel</div>
-                            <button class="btn btn-primary" onclick="window._tunnelPublicEnable()" id="tunnel-public-enable-btn">启用公共节点</button>
-                        </div>
-                    </div>
-
-                    <!-- 自定义 Tunnel 配置 (仅自定义模式时显示) -->
-                    <div id="tunnel-custom-details" style="display:none">
-                        <div style="font-size:.78rem;color:var(--t3);margin-bottom:16px;padding:8px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r)">
-                            修改配置将<strong>更新现有 Tunnel</strong> 的设置。如未创建 Tunnel，点击底部的「创建」按钮将自动配置 DNS 和 Ingress。
-                        </div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+                    <!-- 统一配置区域 (根据模式启用/禁用字段) -->
+                    <div id="tunnel-config-details" style="display:none">
+                        <div id="tunnel-config-banner" style="font-size:.78rem;color:var(--t3);margin-bottom:16px;padding:8px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r)"></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                            <!-- 传输协议 -->
                             <div class="card card-padded">
                                 <div style="display:flex;flex-direction:column;gap:8px">
-                                    <div>
-                                        <label style="font-weight:600;display:block;margin-bottom:4px">CF API Token</label>
-                                        <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">
-                                            权限: <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Tunnel Edit</code> + <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">DNS Edit</code>
-                                        </p>
+                                    <div style="display:flex;align-items:center;gap:6px">
+                                        <label style="font-weight:600">传输协议</label>
+                                        <span class="comfy-param-help-icon" data-tip="cloudflared 传输层协议。QUIC 可能不稳定，推荐 HTTP/2">?</span>
+                                    </div>
+                                    <select id="tunnel-cfg-protocol" style="width:100%;padding:8px;border-radius:var(--r);border:1px solid var(--bd);background:var(--bg2);color:var(--t1)">
+                                        <option value="auto">Auto (默认)</option>
+                                        <option value="http2">HTTP/2</option>
+                                        <option value="quic">QUIC</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- CF API Token -->
+                            <div class="card card-padded tunnel-cfg-custom-card">
+                                <div style="display:flex;flex-direction:column;gap:8px">
+                                    <div style="display:flex;align-items:center;gap:6px">
+                                        <label style="font-weight:600">CF API Token</label>
+                                        <span class="comfy-param-help-icon" data-tip="需要 Tunnel Edit + DNS Edit 权限">?</span>
+                                        <span style="flex:1"></span>
+                                        <button class="btn btn-xs" onclick="window._tunnelCfgValidate()" style="font-size:.7rem;padding:2px 8px">验证</button>
                                     </div>
                                     <div class="input-secret">
                                         <input type="password" id="tunnel-cfg-token" placeholder="CF Token">
                                         <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                                     </div>
+                                    <div id="tunnel-cfg-result" style="display:none;font-size:.78rem;margin:0"></div>
                                 </div>
                             </div>
-                            <div class="card card-padded">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                            <!-- 域名 -->
+                            <div class="card card-padded tunnel-cfg-custom-card">
                                 <div style="display:flex;flex-direction:column;gap:8px">
-                                    <div>
-                                        <label style="font-weight:600;display:block;margin-bottom:4px">域名</label>
-                                        <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">必须已托管在 Cloudflare</p>
+                                    <div style="display:flex;align-items:center;gap:6px">
+                                        <label style="font-weight:600">域名</label>
+                                        <span class="comfy-param-help-icon" data-tip="必须已托管在 Cloudflare">?</span>
                                     </div>
                                     <input type="text" id="tunnel-cfg-domain" placeholder="mydomain.com">
                                 </div>
                             </div>
-                            <div class="card card-padded">
+                            <!-- 子域名前缀 -->
+                            <div class="card card-padded tunnel-cfg-custom-card">
                                 <div style="display:flex;flex-direction:column;gap:8px">
-                                    <div>
-                                        <label style="font-weight:600;display:block;margin-bottom:4px">子域名前缀</label>
-                                        <p style="color:var(--t2);font-size:.78rem;margin:0;line-height:1.4">留空则随机生成</p>
+                                    <div style="display:flex;align-items:center;gap:6px">
+                                        <label style="font-weight:600">子域名前缀</label>
+                                        <span class="comfy-param-help-icon" data-tip="留空则随机生成">?</span>
                                     </div>
                                     <input type="text" id="tunnel-cfg-subdomain" placeholder="cc-a1b2c3d4">
                                 </div>
                             </div>
                         </div>
-                        <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
-                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding:12px 0">
-                            <button class="btn" onclick="window._tunnelCfgValidate()">验证 Token</button>
-                            <button class="btn btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelCfgSave()">保存并应用</button>
+                        <!-- 底部操作栏 -->
+                        <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:16px;padding:12px 0;border-top:1px solid var(--bd)">
+                            <button class="btn btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelSave()">保存</button>
+                            <button class="btn btn-sm btn-danger" id="tunnel-disable-btn" onclick="window._tunnelDisable()" style="display:none">销毁 Tunnel</button>
                         </div>
-                    </div><!-- /tunnel-custom-details -->
+                    </div><!-- /tunnel-config-details -->
                 </div>
             </div>
         </div>
