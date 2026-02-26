@@ -339,6 +339,9 @@ def api_overview():
         tunnel_info["domain"] = tunnel_data.get("domain", "")
         tunnel_info["subdomain"] = tunnel_data.get("subdomain", "")
         tunnel_info["effective_status"] = tunnel_data.get("effective_status", "unconfigured")
+        tunnel_info["tunnel_mode"] = tunnel_data.get("tunnel_mode", "")
+        if tunnel_data.get("public"):
+            tunnel_info["public"] = tunnel_data["public"]
         tunnel_status = tunnel_data.get("tunnel", {})
         tunnel_info["status"] = tunnel_status.get("status", "inactive")
         tunnel_info["running"] = tunnel_info["effective_status"] == "online"

@@ -1,5 +1,5 @@
 // ========== Plugin Management (ES Module) ==========
-import { registerPage, registerEscapeHandler, showToast, escHtml, renderLoading, renderError } from './core.js';
+import { registerPage, registerEscapeHandler, showToast, escHtml, renderLoading, renderError, msIcon } from './core.js';
 
 // --- State ---
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed
@@ -123,14 +123,14 @@ function renderInstalledPlugins() {
     else badgeHtml += '<span class="plugin-badge installed">已安装</span>';
 
     let actionsHtml = '';
-    if (p.updateState) actionsHtml += `<button class="btn btn-sm btn-success" onclick="updatePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">⬆️ 更新</button>`;
-    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.cnrId || p.dirName)}','${_esc(p.title)}')">📋 版本</button>`;
+    if (p.updateState) actionsHtml += `<button class="btn btn-sm btn-success" onclick="updatePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">更新</button>`;
+    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.cnrId || p.dirName)}','${_esc(p.title)}')">版本</button>`;
     if (!p.enabled) {
-      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">▶️ 启用</button>`;
+      actionsHtml += `<button class="btn btn-sm btn-primary" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">启用</button>`;
     } else {
-      actionsHtml += `<button class="btn btn-sm" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">⏸️ 禁用</button>`;
+      actionsHtml += `<button class="btn btn-sm" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">禁用</button>`;
     }
-    actionsHtml += `<button class="btn btn-sm btn-danger" onclick="uninstallPlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}','${_esc(p.title)}')">🗑️</button>`;
+    actionsHtml += `<button class="btn btn-sm btn-danger" onclick="uninstallPlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}','${_esc(p.title)}')">\u2715</button>`;
 
     return `<div class="plugin-item">
       <div class="plugin-item-header">
@@ -139,11 +139,11 @@ function renderInstalledPlugins() {
       </div>
       ${p.description ? `<div class="plugin-item-desc">${escHtml(p.description)}</div>` : ''}
       <div class="plugin-item-meta">
-        <span>📦 ${escHtml(p.cnrId || p.dirName)}</span>
-        <span style="color:var(--cyan)">${isNightly ? '🔧 ' + escHtml(installedVer) : 'v' + escHtml(installedVer)}</span>
+        <span>${msIcon('extension')} ${escHtml(p.cnrId || p.dirName)}</span>
+        <span style="color:var(--cyan)">${isNightly ? msIcon('build') + ' ' + escHtml(installedVer) : 'v' + escHtml(installedVer)}</span>
         ${latestVer ? `<span style="color:var(--t3)">(latest: ${escHtml(latestVer)})</span>` : ''}
-        ${p.stars > 0 ? `<span>⭐ ${p.stars}</span>` : ''}
-        ${p.author ? `<span>👤 ${escHtml(p.author)}</span>` : ''}
+        ${p.stars > 0 ? `<span>${msIcon('star')} ${p.stars}</span>` : ''}
+        ${p.author ? `<span>${msIcon('person')} ${escHtml(p.author)}</span>` : ''}
         <div class="plugin-item-actions">${actionsHtml}</div>
       </div>
     </div>`;
@@ -224,9 +224,9 @@ function _renderBrowseItem(p) {
   let actionsHtml = '';
   if (!isInstalled) {
     actionsHtml += `<button class="btn btn-sm btn-primary" onclick="installPlugin('${_esc(p.id)}','latest')">安装</button>`;
-    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.id)}','${_esc(title)}')">📋 版本</button>`;
+    actionsHtml += `<button class="btn btn-sm" onclick="openPluginVersionModal('${_esc(p.id)}','${_esc(title)}')">版本</button>`;
   } else {
-    actionsHtml += '<span style="font-size:.78rem;color:var(--green)">✅ 已安装</span>';
+    actionsHtml += '<span style="font-size:.78rem;color:var(--green)">' + msIcon('check_circle') + ' 已安装</span>';
   }
 
   return `<div class="plugin-item">
@@ -236,12 +236,12 @@ function _renderBrowseItem(p) {
     </div>
     ${desc ? `<div class="plugin-item-desc">${escHtml(desc)}</div>` : ''}
     <div class="plugin-item-meta">
-      <span>📦 ${escHtml(p.id)}</span>
+      <span>${msIcon('extension')} ${escHtml(p.id)}</span>
       ${ver ? `<span>v${escHtml(ver)}</span>` : ''}
       ${p.cnr_latest ? `<span style="color:var(--t3)">latest: ${escHtml(p.cnr_latest)}</span>` : ''}
-      ${p.stars > 0 ? `<span>⭐ ${p.stars}</span>` : ''}
-      ${p.author ? `<span>👤 ${escHtml(p.author)}</span>` : ''}
-      ${p.last_update ? `<span>🕐 ${p.last_update.split('T')[0]}</span>` : ''}
+      ${p.stars > 0 ? `<span>${msIcon('star')} ${p.stars}</span>` : ''}
+      ${p.author ? `<span>${msIcon('person')} ${escHtml(p.author)}</span>` : ''}
+      ${p.last_update ? `<span>${msIcon('schedule')} ${p.last_update.split('T')[0]}</span>` : ''}
       <div class="plugin-item-actions">${actionsHtml}</div>
     </div>
   </div>`;
@@ -297,7 +297,7 @@ function loadMoreBrowsePlugins() {
 
 // ---------- Plugin Actions ----------
 async function installPlugin(id, selectedVersion) {
-  showToast(`📥 正在安装 ${id}...`);
+  showToast(`正在安装 ${id}...`);
   try {
     const r = await fetch('/api/plugins/install', {
       method: 'POST',
@@ -306,16 +306,16 @@ async function installPlugin(id, selectedVersion) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    showToast(`✅ ${d.message}`);
+    showToast(d.message);
     startPluginQueuePoll();
   } catch (e) {
-    showToast('❌ 安装失败: ' + e.message);
+    showToast('安装失败: ' + e.message);
   }
 }
 
 async function uninstallPlugin(id, version, title) {
   if (!confirm(`确定要卸载插件 "${title || id}" 吗？`)) return;
-  showToast(`🗑️ 正在卸载 ${title || id}...`);
+  showToast(`正在卸载 ${title || id}...`);
   try {
     const r = await fetch('/api/plugins/uninstall', {
       method: 'POST',
@@ -324,15 +324,15 @@ async function uninstallPlugin(id, version, title) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    showToast(`✅ ${d.message}`);
+    showToast(d.message);
     startPluginQueuePoll();
   } catch (e) {
-    showToast('❌ 卸载失败: ' + e.message);
+    showToast('卸载失败: ' + e.message);
   }
 }
 
 async function updatePlugin(id, version) {
-  showToast(`⬆️ 正在更新 ${id}...`);
+  showToast(`正在更新 ${id}...`);
   try {
     const r = await fetch('/api/plugins/update', {
       method: 'POST',
@@ -341,29 +341,29 @@ async function updatePlugin(id, version) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    showToast(`✅ ${d.message}`);
+    showToast(d.message);
     startPluginQueuePoll();
   } catch (e) {
-    showToast('❌ 更新失败: ' + e.message);
+    showToast('更新失败: ' + e.message);
   }
 }
 
 async function updateAllPlugins() {
   if (!confirm('确定要更新所有已安装插件吗？这可能需要一些时间。')) return;
-  showToast('⬆️ 正在提交全部更新...');
+  showToast('正在提交全部更新...');
   try {
     const r = await fetch('/api/plugins/update_all', { method: 'POST' });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    showToast(`✅ ${d.message}`);
+    showToast(d.message);
     startPluginQueuePoll();
   } catch (e) {
-    showToast('❌ 更新失败: ' + e.message);
+    showToast('更新失败: ' + e.message);
   }
 }
 
 async function togglePlugin(id, version) {
-  showToast(`⏳ 操作中...`);
+  showToast(`操作中...`);
   try {
     const r = await fetch('/api/plugins/disable', {
       method: 'POST',
@@ -372,10 +372,10 @@ async function togglePlugin(id, version) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
-    showToast(`✅ ${d.message}`);
+    showToast(d.message);
     startPluginQueuePoll();
   } catch (e) {
-    showToast('❌ 操作失败: ' + e.message);
+    showToast('操作失败: ' + e.message);
   }
 }
 
@@ -387,7 +387,7 @@ async function installPluginFromGit() {
   const statusEl = document.getElementById('plugin-git-status');
   btn.disabled = true;
   btn.textContent = '安装中...';
-  statusEl.innerHTML = '<div style="color:var(--amber);font-size:.82rem">⏳ 正在克隆并安装, 请稍候...</div>';
+  statusEl.innerHTML = '<div style="color:var(--amber);font-size:.82rem">' + msIcon('hourglass_top') + ' 正在克隆, 请稍候...</div>';
   try {
     const r = await fetch('/api/plugins/install_git', {
       method: 'POST',
@@ -397,7 +397,7 @@ async function installPluginFromGit() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
     statusEl.innerHTML = `<div class="success-msg">${d.message}</div>`;
-    showToast('✅ 安装完成');
+    showToast('安装完成');
     document.getElementById('plugin-git-url').value = '';
     if (currentPluginTab === 'installed') loadInstalledPlugins();
   } catch (e) {
@@ -463,7 +463,7 @@ async function pollPluginQueue() {
     const indicator = document.getElementById('plugin-queue-indicator');
     if (d.is_processing && d.total_count > 0) {
       indicator.classList.remove('hidden');
-      indicator.textContent = `⏳ 队列: ${d.done_count}/${d.total_count} 完成`;
+      indicator.innerHTML = `${msIcon('hourglass_top')} 队列: ${d.done_count}/${d.total_count} 完成`;
     } else {
       indicator.classList.add('hidden');
       if (pluginQueuePollTimer) {
@@ -486,7 +486,7 @@ registerPage('plugins', {
 
 // ---------- Check updates (fetch_updates) ----------
 async function checkPluginUpdates() {
-  showToast('🔍 正在检查更新...');
+  showToast('正在检查更新...');
   try {
     const r = await fetch('/api/plugins/fetch_updates');
     const d = await r.json();
@@ -495,7 +495,7 @@ async function checkPluginUpdates() {
       return;
     }
     if (d.has_updates) {
-      showToast('✅ 发现新更新，正在刷新列表...');
+      showToast('发现新更新，正在刷新列表...');
       loadPluginsPage();
     } else {
       showToast('所有插件已是最新版本');

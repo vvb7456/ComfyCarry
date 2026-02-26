@@ -3,7 +3,7 @@
  * 设置页: 密码管理、CivitAI Key、Debug 模式、Import/Export、重新初始化
  */
 
-import { registerPage, registerEscapeHandler, showToast, loadApiKey } from './core.js';
+import { registerPage, registerEscapeHandler, showToast, loadApiKey, msIcon } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _debugLogStream = null;
@@ -71,7 +71,7 @@ async function changePassword() {
     });
     const d = await r.json();
     if (!r.ok) return showToast(d.error || '修改失败');
-    showToast('✅ ' + d.message);
+    showToast(d.message);
     document.getElementById('settings-pw-current').value = '';
     document.getElementById('settings-pw-new').value = '';
     document.getElementById('settings-pw-confirm').value = '';
@@ -88,7 +88,7 @@ async function saveSettingsCivitaiKey() {
       body: JSON.stringify({ api_key: key })
     });
     const d = await r.json();
-    showToast(d.ok ? '✅ API Key 已保存' : (d.error || '保存失败'));
+    showToast(d.ok ? 'API Key 已保存' : (d.error || '保存失败'));
     document.getElementById('settings-civitai-key').value = '';
     loadSettingsPage();
     loadApiKey();
@@ -96,13 +96,14 @@ async function saveSettingsCivitaiKey() {
 }
 
 async function clearSettingsCivitaiKey() {
+  if (!confirm('确定要清除 CivitAI API Key?')) return;
   try {
     await fetch('/api/settings/civitai-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: '' })
     });
-    showToast('✅ API Key 已清除');
+    showToast('API Key 已清除');
     loadSettingsPage();
     loadApiKey();
   } catch (e) { showToast('清除失败: ' + e.message); }
@@ -112,7 +113,7 @@ async function restartDashboard() {
   if (!confirm('确定要重启 ComfyCarry 吗? 页面将短暂不可用')) return;
   try {
     await fetch('/api/settings/restart', { method: 'POST' });
-    showToast('🔄 ComfyCarry 正在重启, 3 秒后自动刷新...');
+    showToast('ComfyCarry 正在重启, 3 秒后自动刷新...');
     setTimeout(() => location.reload(), 3000);
   } catch (e) { showToast('重启失败: ' + e.message); }
 }
@@ -121,11 +122,11 @@ async function reinitialize() {
   const keepModels = document.getElementById('reinit-keep-models')?.checked ?? true;
   const msg = keepModels
     ? '确定要重新初始化吗?\n\n将删除 ComfyUI 安装 (保留模型文件)，停止 ComfyUI 和同步服务，重新进入部署向导。\n\n系统依赖、PyTorch、Tunnel 不受影响。'
-    : '确定要重新初始化吗?\n\n将删除整个 ComfyUI 目录 (包括所有模型文件)，停止 ComfyUI 和同步服务，重新进入部署向导。\n\n⚠️ 模型文件将被永久删除！';
+    : '确定要重新初始化吗?\n\n将删除整个 ComfyUI 目录 (包括所有模型文件)，停止 ComfyUI 和同步服务，重新进入部署向导。\n\n模型文件将被永久删除！';
   if (!confirm(msg)) return;
   if (!keepModels && !confirm('再次确认: 所有模型文件将被永久删除，无法恢复。继续？')) return;
   try {
-    showToast('⏳ 正在重新初始化...');
+    showToast('正在重新初始化...');
     const r = await fetch('/api/settings/reinitialize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,10 +134,10 @@ async function reinitialize() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 已重置, 正在跳转到部署向导...');
+      showToast('已重置, 正在跳转到部署向导...');
       setTimeout(() => location.reload(), 1500);
     } else {
-      showToast('❌ 部分操作失败: ' + (d.errors || []).join('; '));
+      showToast('部分操作失败: ' + (d.errors || []).join('; '));
     }
   } catch (e) { showToast('重新初始化失败: ' + e.message); }
 }
@@ -158,7 +159,7 @@ async function exportConfig() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('✅ 配置已导出');
+    showToast('配置已导出');
   } catch (e) { showToast('导出失败: ' + e.message); }
 }
 
@@ -170,7 +171,7 @@ async function importConfig(event) {
     const text = await file.text();
     const config = JSON.parse(text);
     if (!config._version) {
-      showToast('❌ 无效的配置文件格式');
+      showToast('无效的配置文件格式');
       return;
     }
     if (!confirm(`确定要导入配置吗?\n\n导出于: ${config._exported_at || '未知'}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。`)) return;
@@ -180,34 +181,13 @@ async function importConfig(event) {
       body: text
     });
     const d = await r.json();
-    showToast(d.ok ? '✅ ' + d.message : '⚠️ ' + d.message);
+    showToast(d.message);
     closeIEModal();
     if (document.getElementById('page-settings')?.classList.contains('hidden') === false) loadSettingsPage();
   } catch (e) { showToast('导入失败: ' + e.message); }
 }
 
 // ── API Key 管理 ────────────────────────────────────────────
-
-function toggleApiKeyVisibility() {
-  const el = document.getElementById('settings-api-key');
-  if (!el) return;
-  if (el.type === 'password') {
-    el.type = 'text';
-    el.value = el.dataset.key || '';
-  } else {
-    el.type = 'password';
-    el.value = '••••••••••••••••••••••••';
-  }
-}
-
-async function copyApiKey() {
-  const el = document.getElementById('settings-api-key');
-  if (!el?.dataset.key) return;
-  try {
-    await navigator.clipboard.writeText(el.dataset.key);
-    showToast('✅ API Key 已复制');
-  } catch { showToast('复制失败'); }
-}
 
 async function regenerateApiKey() {
   if (!confirm('确定要重新生成 API Key 吗？\n\n旧的 Key 将立即失效，所有使用旧 Key 的外部应用需要更新。')) return;
@@ -217,9 +197,9 @@ async function regenerateApiKey() {
     if (d.ok) {
       const el = document.getElementById('settings-api-key');
       if (el) { el.dataset.key = d.api_key; el.type = 'text'; el.value = d.api_key; }
-      showToast('✅ API Key 已重新生成');
+      showToast('API Key 已重新生成');
     } else {
-      showToast('⚠️ ' + (d.error || '重新生成失败'));
+      showToast(d.error || '重新生成失败');
     }
   } catch (e) { showToast('请求失败: ' + e.message); }
 }
@@ -230,5 +210,5 @@ Object.assign(window, {
   changePassword, saveSettingsCivitaiKey, clearSettingsCivitaiKey,
   restartDashboard, reinitialize,
   openIEModal, closeIEModal, exportConfig, importConfig,
-  toggleApiKeyVisibility, copyApiKey, regenerateApiKey
+  regenerateApiKey
 });

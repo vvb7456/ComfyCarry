@@ -11,7 +11,7 @@
  * 6. 环境信息栏 (Environment Info)
  */
 
-import { registerPage, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml } from './core.js';
+import { registerPage, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml, msIcon } from './core.js';
 import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
 let _refreshTimer = null;
@@ -71,7 +71,7 @@ async function refreshOverview() {
     _renderEnvInfo(data);
   } catch (e) {
     const el = document.getElementById('overview-status-bar');
-    if (el) el.innerHTML = `<span class="status-badge red">⚠ 后端连接失败: ${escHtml(e.message)}</span>`;
+    if (el) el.innerHTML = `<span class="status-badge red">${msIcon('warning','ms-sm')} 后端连接失败: ${escHtml(e.message)}</span>`;
   }
 }
 
@@ -81,22 +81,32 @@ function _renderQuickLinks(tunnel) {
   const el = document.getElementById('overview-quick-links');
   if (!el) return;
 
-  const urls = tunnel?.urls || {};
+  // 合并自定义和公共两种模式的 URL
+  let urls = tunnel?.urls || {};
+  const publicUrls = tunnel?.public?.urls || {};
+  if (Object.keys(urls).length === 0 && Object.keys(publicUrls).length > 0) {
+    urls = publicUrls;
+  }
+
   const tunnelOnline = tunnel?.pm2_status === 'online' || tunnel?.cloudflared === 'online' || tunnel?.status === 'healthy';
 
-  // 过滤掉 ComfyCarry 自身和 SSH，只显示可点击链接
-  const entries = Object.entries(urls).filter(([name]) => !/comfycarry/i.test(name) && !/ssh/i.test(name));
+  // 过滤掉 ComfyCarry 自身(dashboard)和 SSH，只显示可点击链接
+  const entries = Object.entries(urls).filter(([name]) =>
+    !/comfycarry/i.test(name) && !/ssh/i.test(name) && !/dashboard/i.test(name)
+  );
 
   if (entries.length === 0) {
-    el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? '🌐 Tunnel 已连接' : tunnel?.configured ? '🌐 Tunnel 离线' : '🌐 Tunnel 未配置'}</div>`;
+    el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? `${msIcon('language','ms-sm')} Tunnel 已连接` : tunnel?.configured ? `${msIcon('language','ms-sm')} Tunnel 离线` : `${msIcon('language','ms-sm')} Tunnel 未配置`}</div>`;
     return;
   }
 
-  const icons = {ComfyUI: '🎨', JupyterLab: '📓'};
+  // 映射公共模式 key → 显示名
+  const nameMap = { comfyui: 'ComfyUI', jupyter: 'JupyterLab', ComfyUI: 'ComfyUI', JupyterLab: 'JupyterLab' };
+  const icons = { comfyui: msIcon('palette','ms-sm'), jupyter: msIcon('book_2','ms-sm'), ComfyUI: msIcon('palette','ms-sm'), JupyterLab: msIcon('book_2','ms-sm') };
   el.innerHTML = entries.map(([name, url]) =>
     `<a href="${escHtml(url)}" target="_blank" class="quick-link-btn">
-      <span class="quick-link-icon">${icons[name] || '🔗'}</span>
-      <span class="quick-link-name">${escHtml(name)}</span>
+      <span class="quick-link-icon">${icons[name] || msIcon('link','ms-sm')}</span>
+      <span class="quick-link-name">${escHtml(nameMap[name] || name)}</span>
     </a>`
   ).join('');
 }
@@ -116,16 +126,16 @@ function _renderStatusBar(data) {
   // ComfyUI status
   if (comfy.online) {
     const ver = comfy.version ? ` v${comfy.version}` : '';
-    html += `<span class="status-badge green">🟢 ComfyUI${ver} 在线</span>`;
+    html += `<span class="status-badge green"><span class="status-dot online"></span> ComfyUI${ver} 在线</span>`;
   } else if (comfy.pm2_status === 'online') {
-    html += `<span class="status-badge amber">🟡 ComfyUI 启动中</span>`;
+    html += `<span class="status-badge amber"><span class="status-dot pending"></span> ComfyUI 启动中</span>`;
   } else {
-    html += `<span class="status-badge red">🔴 ComfyUI 离线</span>`;
+    html += `<span class="status-badge red"><span class="status-dot offline"></span> ComfyUI 离线</span>`;
   }
 
   // Uptime
   if (comfy.pm2_uptime) {
-    html += `<span class="status-badge muted">⏱ ${fmtUptime(comfy.pm2_uptime)}</span>`;
+    html += `<span class="status-badge muted">${msIcon('timer')} ${fmtUptime(comfy.pm2_uptime)}</span>`;
   }
 
   // Queue
@@ -134,28 +144,28 @@ function _renderStatusBar(data) {
   if (qr > 0 || qp > 0) {
     const total = qr + qp;
     const color = total > 5 ? 'red' : 'amber';
-    html += `<span class="status-badge ${color}">🎯 队列: ${qr} 运行 / ${qp} 等待</span>`;
+    html += `<span class="status-badge ${color}">${msIcon('assignment')} 队列: ${qr} 运行 / ${qp} 等待</span>`;
   } else if (comfy.online) {
-    html += `<span class="status-badge muted">🎯 队列空闲</span>`;
+    html += `<span class="status-badge muted">${msIcon('assignment')} 队列空闲</span>`;
   }
 
   // Sync
   if (sync.worker_running) {
-    html += `<span class="status-badge green">☁️ Sync 运行中</span>`;
+    html += `<span class="status-badge green">${msIcon('cloud_sync','ms-sm')} Sync 运行中</span>`;
   } else if (sync.rules_count > 0) {
-    html += `<span class="status-badge muted">☁️ Sync 未启动</span>`;
+    html += `<span class="status-badge muted">${msIcon('cloud_sync','ms-sm')} Sync 未启动</span>`;
   }
 
   // Tunnel (使用后端统一的 effective_status)
   const tst = tunnel.effective_status || 'unconfigured';
   if (tst === 'online') {
-    html += `<span class="status-badge green">🌐 Tunnel 在线</span>`;
+    html += `<span class="status-badge green">${msIcon('language','ms-sm')} Tunnel 在线</span>`;
   } else if (tst === 'connecting' || tst === 'degraded') {
-    html += `<span class="status-badge amber">🌐 Tunnel 连接中</span>`;
+    html += `<span class="status-badge amber">${msIcon('language','ms-sm')} Tunnel 连接中</span>`;
   } else if (tst === 'offline') {
-    html += `<span class="status-badge red">🌐 Tunnel 离线</span>`;
+    html += `<span class="status-badge red">${msIcon('language','ms-sm')} Tunnel 离线</span>`;
   } else {
-    html += `<span class="status-badge muted">🌐 Tunnel 未配置</span>`;
+    html += `<span class="status-badge muted">${msIcon('language','ms-sm')} Tunnel 未配置</span>`;
   }
 
   el.innerHTML = html;
@@ -177,7 +187,7 @@ function _renderMetrics(sys) {
       const tempColor = g.temp > 85 ? 'var(--red)' : g.temp > 70 ? 'var(--amber)' : 'var(--t3)';
       html += `<div class="metric-card">
         <div class="metric-header">
-          <span class="metric-icon">🎮</span>
+          <span class="metric-icon">${msIcon('memory','ms-sm')}</span>
           <span class="metric-label">${escHtml(g.name)}</span>
         </div>
         <div class="metric-main">
@@ -202,7 +212,7 @@ function _renderMetrics(sys) {
   const cpuColor = cpuPct > 85 ? 'var(--red)' : cpuPct > 60 ? 'var(--amber)' : 'var(--ac)';
   html += `<div class="metric-card">
     <div class="metric-header">
-      <span class="metric-icon">🖥️</span>
+      <span class="metric-icon">${msIcon('developer_board','ms-sm')}</span>
       <span class="metric-label">CPU</span>
     </div>
     <div class="metric-main">
@@ -223,7 +233,7 @@ function _renderMetrics(sys) {
   const memColor = memPct > 85 ? 'var(--red)' : memPct > 60 ? 'var(--amber)' : 'var(--green)';
   html += `<div class="metric-card">
     <div class="metric-header">
-      <span class="metric-icon">💾</span>
+      <span class="metric-icon">${msIcon('memory','ms-sm')}</span>
       <span class="metric-label">内存</span>
     </div>
     <div class="metric-main">
@@ -244,7 +254,7 @@ function _renderMetrics(sys) {
   const diskColor = diskPct > 85 ? 'var(--red)' : diskPct > 60 ? 'var(--amber)' : 'var(--green)';
   html += `<div class="metric-card">
     <div class="metric-header">
-      <span class="metric-icon">💿</span>
+      <span class="metric-icon">${msIcon('hard_drive_2','ms-sm')}</span>
       <span class="metric-label">磁盘 ${escHtml(disk.path || '')}</span>
     </div>
     <div class="metric-main">
@@ -278,7 +288,7 @@ function _renderActivity(data) {
   const _execState = _execTracker.getState();
   if (_execState) {
     items.push({
-      icon: '▶',
+      icon: 'play_arrow',
       html: renderProgressBar(_execState, 'margin-top:6px;font-size:.72rem'),
       class: 'activity-executing'
     });
@@ -292,7 +302,7 @@ function _renderActivity(data) {
         const pct = (d.progress || 0).toFixed(1);
         const name = d.filename || d.model_name || '下载中...';
         items.push({
-          icon: '⬇',
+          icon: msIcon('download','ms-sm'),
           html: `<div class="activity-text">
             <span>${escHtml(name)}</span>
             <span class="activity-meta">${pct}%${d.speed ? ' • ' + d.speed : ''}</span>
@@ -305,7 +315,7 @@ function _renderActivity(data) {
       }
       if (dl.queue_count > 0) {
         items.push({
-          icon: '📋',
+          icon: msIcon('queue','ms-sm'),
           html: `<div class="activity-text"><span>${dl.queue_count} 个下载等待中</span></div>`,
           class: ''
         });
@@ -318,7 +328,7 @@ function _renderActivity(data) {
     const sync = data.sync;
     if (sync.worker_running && sync.watch_rules > 0) {
       items.push({
-        icon: '☁',
+        icon: msIcon('cloud','ms-sm'),
         html: `<div class="activity-text">
           <span>Sync Worker 监控中 (${sync.watch_rules} 条规则)</span>
         </div>`,
@@ -329,7 +339,7 @@ function _renderActivity(data) {
     if (sync.last_log_lines?.length > 0) {
       const last = sync.last_log_lines[sync.last_log_lines.length - 1];
       items.push({
-        icon: '📝',
+        icon: msIcon('brush','ms-sm'),
         html: `<div class="activity-text"><span class="activity-log-line">${escHtml(last)}</span></div>`,
         class: 'activity-log'
       });
@@ -338,7 +348,7 @@ function _renderActivity(data) {
 
   // Empty state
   if (items.length === 0) {
-    el.innerHTML = `<div class="activity-empty">✨ 一切就绪，等待任务</div>`;
+    el.innerHTML = `<div class="activity-empty">${msIcon('check_circle','ms-sm')} 一切就绪，等待任务</div>`;
     return;
   }
 
@@ -373,9 +383,9 @@ function _renderServices(svcData) {
       <td>${fmtBytes(s.memory || 0)}</td>
       <td>${s.restarts || 0}</td>
       <td><div class="btn-group">
-        <button class="btn btn-sm btn-success" onclick="window._svcAction('${escHtml(s.name)}','start')">▶</button>
-        <button class="btn btn-sm btn-danger" onclick="window._svcAction('${escHtml(s.name)}','stop')">⏹</button>
-        <button class="btn btn-sm" onclick="window._svcAction('${escHtml(s.name)}','restart')">🔄</button>
+        <button class="btn btn-sm btn-success" onclick="window._svcAction('${escHtml(s.name)}','start')">${msIcon('play_arrow')}</button>
+        <button class="btn btn-sm btn-danger" onclick="window._svcAction('${escHtml(s.name)}','stop')">${msIcon('stop')}</button>
+        <button class="btn btn-sm" onclick="window._svcAction('${escHtml(s.name)}','restart')">${msIcon('refresh')}</button>
       </div></td>
     </tr>`;
   }).join('');

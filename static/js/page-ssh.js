@@ -3,7 +3,7 @@
  * SSH 管理页面: 服务状态/日志 + 密钥/密码配置 (双 Tab)
  */
 
-import { registerPage, showToast, escHtml, copyText, renderError } from './core.js';
+import { registerPage, showToast, escHtml, copyText, renderError, msIcon } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _autoRefresh = null;
@@ -93,15 +93,15 @@ async function loadSSHStatus() {
     const controls = document.getElementById('ssh-header-controls');
     if (controls) {
       controls.innerHTML = running
-        ? `<button class="btn" onclick="window.sshStop()">⏹ 停止</button><button class="btn" onclick="window.sshRestart()">♻️ 重启</button>`
-        : `<button class="btn" onclick="window.sshStart()">▶ 启动</button>`;
+        ? `<button class="btn" onclick="window.sshStop()">${msIcon('stop')} 停止</button><button class="btn" onclick="window.sshRestart()">${msIcon('restart_alt')} 重启</button>`
+        : `<button class="btn" onclick="window.sshStart()">${msIcon('play_arrow')} 启动</button>`;
     }
 
     // Status cards
     if (cardsEl) {
       const pwAuthLabel = d.password_auth ? '已启用' : '已禁用';
       const pwAuthColor = d.password_auth ? 'var(--green)' : 'var(--t3)';
-      const pwSetLabel = d.password_set ? '已设置 ✅' : '未设置 ⚠️';
+      const pwSetLabel = d.password_set ? `${msIcon('check_circle')} 已设置` : `${msIcon('warning')} 未设置`;
       const pwSetColor = d.password_set ? 'var(--green)' : 'var(--amber)';
 
       cardsEl.innerHTML = `
@@ -131,6 +131,13 @@ async function loadSSHStatus() {
     // SSH command
     _updateSSHCommand(running);
 
+    // 同步复选框状态
+    const syncCb = document.getElementById('ssh-pw-sync');
+    if (syncCb && d.pw_sync !== undefined) {
+      syncCb.checked = !!d.pw_sync;
+      _toggleSSHPwSync();
+    }
+
   } catch (e) {
     if (cardsEl) cardsEl.innerHTML = renderError('获取 SSH 状态失败');
   }
@@ -153,14 +160,24 @@ async function _updateSSHCommand(running) {
   try {
     const r = await fetch('/api/tunnel/status');
     const d = await r.json();
+    // 检查自定义 Tunnel 的 urls
     const urls = d.urls || {};
     for (const [name, url] of Object.entries(urls)) {
       if (name.toLowerCase() === 'ssh') {
-        // 提取 hostname
         const hostname = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
         sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
         sshHint = 'via Cloudflare Tunnel';
         break;
+      }
+    }
+    // 检查公共 Tunnel 的 urls
+    if (!sshCmd && d.tunnel_mode === 'public' && d.public?.urls) {
+      const pubUrls = d.public.urls;
+      const sshUrl = pubUrls.ssh || pubUrls.SSH;
+      if (sshUrl) {
+        const hostname = sshUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        sshCmd = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`;
+        sshHint = 'via ComfyCarry 公共 Tunnel';
       }
     }
   } catch (_) {}
@@ -169,7 +186,7 @@ async function _updateSSHCommand(running) {
     sshHint = '请查看实例平台获取公网 IP / 端口';
     // 尝试从环境变量获取容器的公开端口信息
     el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">
-      <div style="color:var(--t3);font-size:.82rem">ℹ️ Tunnel 未配置 SSH 映射。${escHtml(sshHint)}</div>
+      <div style="color:var(--t3);font-size:.82rem">${msIcon('info')} Tunnel 未配置 SSH 映射。${escHtml(sshHint)}</div>
       <code style="font-size:.8rem;color:var(--t2);background:var(--bg);padding:6px 12px;border-radius:var(--rs);font-family:'IBM Plex Mono',monospace">ssh root@&lt;实例公网地址&gt; -p &lt;映射端口&gt;</code>
     </div>`;
     return;
@@ -177,7 +194,7 @@ async function _updateSSHCommand(running) {
 
   el.innerHTML = `<div style="display:flex;align-items:center;gap:8px">
     <code style="flex:1;font-size:.8rem;color:var(--t1);background:var(--bg);padding:8px 12px;border-radius:var(--rs);font-family:'IBM Plex Mono',monospace;overflow-x:auto;white-space:nowrap">${escHtml(sshCmd)}</code>
-    <button class="btn btn-sm" onclick="copyText('${sshCmd.replace(/'/g, "\\'")}');showToast('已复制')" title="复制">📋</button>
+    <button class="btn btn-sm" onclick="copyText('${sshCmd.replace(/'/g, "\\'")}');showToast('已复制')" title="复制">${msIcon('content_copy')}</button>
   </div>
   <div style="font-size:.72rem;color:var(--t3);margin-top:4px">${escHtml(sshHint)}
     · 需要本地安装 <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" style="color:var(--ac)">cloudflared</a></div>`;
@@ -207,11 +224,11 @@ async function loadSSHKeys() {
 
       return `<div class="ssh-key-card">
         <div class="ssh-key-info">
-          <div class="ssh-key-type">🔑 ${typeLabel}${sourceTag}</div>
+          <div class="ssh-key-type">${msIcon('key')} ${typeLabel}${sourceTag}</div>
           <div class="ssh-key-fp">${fp}</div>
           ${comment ? `<div class="ssh-key-comment">${comment}</div>` : ''}
         </div>
-        <button class="btn btn-sm btn-danger" onclick="window.deleteSSHKey('${fp.replace(/'/g, "\\'")}')" title="删除">🗑</button>
+        <button class="btn btn-sm btn-danger" onclick="window.deleteSSHKey('${fp.replace(/'/g, "\\'")}')" title="删除">${msIcon('close')}</button>
       </div>`;
     }).join('');
 
@@ -301,34 +318,67 @@ async function deleteSSHKey(fingerprint) {
 
 // ── 密码管理 ────────────────────────────────────────────────
 
-async function setSSHPassword() {
-  const pw1 = document.getElementById('ssh-pw-new')?.value || '';
-  const pw2 = document.getElementById('ssh-pw-confirm')?.value || '';
+/** 切换"使用 ComfyCarry 密码"复选框 */
+function _toggleSSHPwSync() {
+  const cb = document.getElementById('ssh-pw-sync');
+  const pw1 = document.getElementById('ssh-pw-new');
+  const pw2 = document.getElementById('ssh-pw-confirm');
+  const btn = document.getElementById('ssh-pw-submit-btn');
+  if (!cb || !pw1 || !pw2) return;
+  const synced = cb.checked;
+  pw1.disabled = synced;
+  pw2.disabled = synced;
+  pw1.style.opacity = synced ? '0.5' : '1';
+  pw2.style.opacity = synced ? '0.5' : '1';
+  if (synced) {
+    pw1.value = '';
+    pw2.value = '';
+    pw1.placeholder = '使用 ComfyCarry 密码';
+    pw2.placeholder = '使用 ComfyCarry 密码';
+    if (btn) btn.textContent = '同步密码';
+  } else {
+    pw1.placeholder = '新密码';
+    pw2.placeholder = '确认密码';
+    if (btn) btn.textContent = '设置密码';
+  }
+}
 
-  if (!pw1) { showToast('请输入新密码'); return; }
-  if (pw1 !== pw2) { showToast('两次密码不一致'); return; }
-  if (pw1.length < 4) { showToast('密码长度至少 4 位'); return; }
+async function setSSHPassword() {
+  const syncMode = document.getElementById('ssh-pw-sync')?.checked;
+  let pw;
+
+  if (syncMode) {
+    // 从后端获取 ComfyCarry 密码并同步
+    pw = '_sync_dashboard_password_';
+  } else {
+    const pw1 = document.getElementById('ssh-pw-new')?.value || '';
+    const pw2 = document.getElementById('ssh-pw-confirm')?.value || '';
+    if (!pw1) { showToast('请输入新密码'); return; }
+    if (pw1 !== pw2) { showToast('两次密码不一致'); return; }
+    if (pw1.length < 4) { showToast('密码长度至少 4 位'); return; }
+    pw = pw1;
+  }
 
   try {
     const r = await fetch('/api/ssh/password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw1 }),
+      body: JSON.stringify({ password: pw }),
     });
     const d = await r.json();
     if (d.error) { showToast(d.error); return; }
 
-    let msg = '密码已设置';
+    let msg = syncMode ? 'SSH 密码已同步为 ComfyCarry 密码' : '密码已设置';
     if (d.sshd_restarted) msg += '，已自动启用密码认证并重启 sshd';
     showToast(msg);
 
-    // 清空输入
-    const el1 = document.getElementById('ssh-pw-new');
-    const el2 = document.getElementById('ssh-pw-confirm');
-    if (el1) el1.value = '';
-    if (el2) el2.value = '';
+    if (!syncMode) {
+      const el1 = document.getElementById('ssh-pw-new');
+      const el2 = document.getElementById('ssh-pw-confirm');
+      if (el1) el1.value = '';
+      if (el2) el2.value = '';
+    }
 
-    // 刷新状态
     loadSSHStatus();
   } catch (e) {
     showToast('设置失败: ' + e.message);
@@ -370,7 +420,7 @@ async function sshRestart() {
 Object.assign(window, {
   loadSSHStatus, loadSSHKeys,
   showAddKeyDialog, addSSHKeys, deleteSSHKey,
-  setSSHPassword,
+  setSSHPassword, _toggleSSHPwSync,
   sshStart, sshStop, sshRestart,
   switchSSHTab,
 });

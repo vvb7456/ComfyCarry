@@ -76,7 +76,7 @@ def api_setup_save():
         "install_fa2", "install_sa2", "download_aura_model",
         "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules",
-        "ssh_password", "ssh_keys",
+        "ssh_password", "ssh_keys", "ssh_pw_sync",
     }
     for k, v in data.items():
         if k in allowed_keys:

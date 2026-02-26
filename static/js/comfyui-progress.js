@@ -4,7 +4,7 @@
  * Used by both page-dashboard.js (activity feed) and page-comfyui.js (exec bar).
  */
 
-import { escHtml, fmtDuration } from './core.js';
+import { escHtml, fmtDuration, msIcon } from './core.js';
 
 /**
  * Create an execution state tracker.
@@ -154,7 +154,7 @@ export function renderProgressBar(st, extraStyle) {
   let html = `<div class="comfy-progress-bar active"${styleAttr}>`;
   html += `<div class="comfy-progress-bar-fill" style="width:${fillPct}%"></div>`;
   html += `<span class="comfy-progress-pulse"></span>`;
-  html += `<span class="comfy-progress-label">⚡ 正在生成</span>`;
+  html += `<span class="comfy-progress-label">${msIcon('bolt')} 正在生成</span>`;
 
   if (nodeName) {
     html += `<span class="comfy-progress-node">${completedCount}/${totalNodes} ${escHtml(nodeName)}</span>`;

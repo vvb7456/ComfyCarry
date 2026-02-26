@@ -326,6 +326,7 @@ def ssh_status():
         "password_auth": sshd_cfg["password_auth"],
         "root_login": sshd_cfg["root_login"],
         "password_set": _password_set(),
+        "pw_sync": bool(_get_config("ssh_pw_sync", False)),
     })
 
 
@@ -423,11 +424,19 @@ def ssh_keys_delete():
 
 @bp.route("/api/ssh/password", methods=["POST"])
 def ssh_set_password():
-    """设置 Root 密码"""
+    """设置 Root 密码 (支持同步 ComfyCarry 密码)"""
     data = request.get_json(silent=True) or {}
     password = data.get("password", "")
     if not password:
         return jsonify({"error": "密码不能为空"}), 400
+
+    # 同步模式: 使用 ComfyCarry Dashboard 密码
+    is_sync = password == "_sync_dashboard_password_"
+    if is_sync:
+        password = _get_config("password", "")
+        if not password:
+            return jsonify({"error": "ComfyCarry 密码未设置，无法同步"}), 400
+
     if len(password) < 4:
         return jsonify({"error": "密码长度至少 4 位"}), 400
 
@@ -438,8 +447,9 @@ def ssh_set_password():
     if code != 0:
         return jsonify({"error": f"设置密码失败: {err}"}), 500
 
-    # 持久化密码到 .dashboard_env
+    # 持久化密码与同步标志到 .dashboard_env
     _set_config("ssh_password", password)
+    _set_config("ssh_pw_sync", is_sync)
 
     # 确保 PasswordAuthentication + PermitRootLogin 为 yes，并重启 sshd
     _set_sshd_password_auth(True)

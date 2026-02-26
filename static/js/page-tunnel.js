@@ -3,7 +3,7 @@
  * Tunnel 页面: 公共节点 + 自定义 Tunnel 双模式
  */
 
-import { registerPage, showToast, escHtml, renderEmpty, renderError } from './core.js';
+import { registerPage, showToast, escHtml, renderEmpty, renderError, msIcon } from './core.js';
 
 let _autoRefresh = null;
 let _lastData = null;
@@ -55,12 +55,16 @@ async function loadTunnelPage() {
 
     if (tunnelMode === 'public' && d.public) {
       // 公共模式
-      const st = d.effective_status || 'unknown';
-      const stColor = st === 'online' ? 'var(--green)' : st === 'degraded' ? 'var(--amber)' : 'var(--red)';
-      const stLabel = { online: '公共 · 运行中', degraded: '公共 · 部分异常', offline: '公共 · 离线' }[st] || st;
+      const cfOnline = d.cloudflared === 'online';
+      const stColor = cfOnline ? 'var(--green)' : 'var(--red)';
+      const stLabel = cfOnline ? '运行中 · 公共' : '已停止 · 公共';
 
       if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
-      if (headerControls) headerControls.innerHTML = `<button class="btn" onclick="window._tunnelPublicDisable()">⏹ 停用</button>`;
+      if (headerControls) {
+        headerControls.innerHTML = cfOnline
+          ? `<button class="btn" onclick="window._tunnelStop()">${msIcon('stop')} 停止</button><button class="btn" onclick="window._tunnelRestart()">${msIcon('restart_alt')} 重启</button>`
+          : `<button class="btn" onclick="window._tunnelStart()">${msIcon('play_arrow')} 启动</button>`;
+      }
 
       // Show status section with public tunnel services
       statusSection.style.display = '';
@@ -90,8 +94,8 @@ async function loadTunnelPage() {
       if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
       if (headerControls) {
         headerControls.innerHTML = st === 'online' || st === 'connecting' || st === 'degraded'
-          ? `<button class="btn" onclick="window._tunnelTeardown()">⏹ 停止</button><button class="btn" onclick="window._tunnelRestart()">♻️ 重启</button>`
-          : `<button class="btn" onclick="window._tunnelRestart()">▶ 启动</button>`;
+          ? `<button class="btn" onclick="window._tunnelTeardown()">${msIcon('stop')} 停止</button><button class="btn" onclick="window._tunnelRestart()">${msIcon('restart_alt')} 重启</button>`
+          : `<button class="btn" onclick="window._tunnelRestart()">${msIcon('play_arrow')} 启动</button>`;
       }
 
       const conns = tunnel.connections || [];
@@ -150,12 +154,12 @@ function _renderPublicServices(d, el) {
     ? '<span class="tunnel-svc-status-dot" style="background:var(--green)"></span> 在线'
     : '<span class="tunnel-svc-status-dot" style="background:var(--amber)"></span> 连接中';
 
-  const iconMap = { dashboard: '📊', comfyui: '🎨', jupyter: '📓', ssh: '🔒' };
+  const iconMap = { dashboard: msIcon('monitoring'), comfyui: msIcon('palette'), jupyter: msIcon('book_2'), ssh: msIcon('lock') };
   const nameMap = { dashboard: 'Dashboard', comfyui: 'ComfyUI', jupyter: 'JupyterLab', ssh: 'SSH' };
 
   let html = '<div class="tunnel-services">';
   for (const [key, url] of Object.entries(urls)) {
-    const icon = iconMap[key] || '🌐';
+    const icon = iconMap[key] || msIcon('language');
     const name = nameMap[key] || key;
 
     if (key === 'ssh') {
@@ -204,7 +208,7 @@ function _renderCustomServices(d, el) {
   for (const svc of services) {
     const name = svc.name;
     const url = urls[name] || '';
-    const icon = {ComfyCarry: '📊', ComfyUI: '🎨', JupyterLab: '📓', SSH: '🔒'}[name] || '🌐';
+    const icon = {ComfyCarry: msIcon('monitoring'), ComfyUI: msIcon('palette'), JupyterLab: msIcon('book_2'), SSH: msIcon('lock')}[name] || msIcon('language');
     const isCustom = svc.custom;
     const protocol = svc.protocol || 'http';
     const port = svc.port;
@@ -218,8 +222,8 @@ function _renderCustomServices(d, el) {
 
     // Top-right action buttons (hover to reveal)
     const actionBtns = suffix ? `<div class="tunnel-svc-actions">
-      <button class="btn btn-xs" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" title="编辑">✏️</button>
-      <button class="btn btn-xs btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}'${isCustom ? '' : ",true"})" title="删除">✕</button>
+      <button class="btn btn-xs" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" title="编辑">编辑</button>
+      <button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}'${isCustom ? '' : ",true"})" title="删除">${msIcon('close')}</button>
     </div>` : '';
 
     if (name === 'SSH') {
@@ -256,7 +260,7 @@ function _renderCustomServices(d, el) {
   // fallback: 只有 urls 没有 services
   if (services.length === 0) {
     for (const [name, url] of Object.entries(urls)) {
-      const icon = {ComfyCarry: '📊', ComfyUI: '🎨', JupyterLab: '📓', SSH: '🔒'}[name] || '🌐';
+      const icon = {ComfyCarry: msIcon('monitoring'), ComfyUI: msIcon('palette'), JupyterLab: msIcon('book_2'), SSH: msIcon('lock')}[name] || msIcon('language');
       html += `<a href="${escHtml(url)}" target="_blank" class="tunnel-svc-card">
         <span class="tunnel-svc-icon">${icon}</span>
         <span class="tunnel-svc-name">${escHtml(name)}</span>
@@ -311,7 +315,7 @@ async function _loadTunnelConfigTab() {
   // Update submit button label
   const btn = document.getElementById('tunnel-cfg-submit');
   if (btn) {
-    btn.textContent = _lastData?.configured ? '💾 保存并应用' : '🚀 创建 Tunnel';
+    btn.textContent = _lastData?.configured ? '保存并应用' : '创建 Tunnel';
   }
 
   // 加载公共 Tunnel 状态
@@ -372,12 +376,12 @@ async function _loadPublicStatus() {
 }
 
 function _renderPublicUrlCards(urls, el) {
-  const iconMap = { dashboard: '📊', comfyui: '🎨', jupyter: '📓', ssh: '🔒' };
+  const iconMap = { dashboard: msIcon('monitoring'), comfyui: msIcon('palette'), jupyter: msIcon('book_2'), ssh: msIcon('lock') };
   const nameMap = { dashboard: 'Dashboard', comfyui: 'ComfyUI', jupyter: 'JupyterLab', ssh: 'SSH' };
 
   let html = '';
   for (const [key, url] of Object.entries(urls)) {
-    const icon = iconMap[key] || '🌐';
+    const icon = iconMap[key] || msIcon('language');
     const name = nameMap[key] || key;
     if (key === 'ssh') {
       const hostname = url.replace(/^https?:\/\//, '');
@@ -437,24 +441,24 @@ function _updateModeUI() {
 
 async function _tunnelPublicEnable() {
   const btn = document.getElementById('tunnel-public-enable-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在启用...'; }
+  if (btn) { btn.disabled = true; btn.textContent = '正在启用...'; }
 
   try {
     const r = await fetch('/api/tunnel/public/enable', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 公共节点已启用！');
+      showToast('公共节点已启用！');
       setTimeout(() => {
         loadTunnelPage();
         _loadPublicStatus();
       }, 2000);
     } else {
-      showToast('❌ 启用失败: ' + (d.error || ''));
+      showToast('启用失败: ' + (d.error || ''));
     }
   } catch (e) {
-    showToast('❌ 请求失败: ' + e.message);
+    showToast('请求失败: ' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🚀 启用公共节点'; }
+    if (btn) { btn.disabled = false; btn.textContent = '启用公共节点'; }
   }
 }
 
@@ -465,15 +469,15 @@ async function _tunnelPublicDisable() {
     const r = await fetch('/api/tunnel/public/disable', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 公共节点已停用');
+      showToast('公共节点已停用');
       setTimeout(() => {
         loadTunnelPage();
         _loadTunnelConfigTab();
       }, 1000);
     } else {
-      showToast('❌ 停用失败: ' + (d.error || ''));
+      showToast('停用失败: ' + (d.error || ''));
     }
-  } catch (e) { showToast('❌ 请求失败: ' + e.message); }
+  } catch (e) { showToast('请求失败: ' + e.message); }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -488,13 +492,13 @@ async function _tunnelCfgValidate() {
   if (!token || !domain) {
     resultEl.style.display = 'block';
     resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 请填写 API Token 和域名';
+    resultEl.innerHTML = `${msIcon('cancel')} 请填写 API Token 和域名`;
     return;
   }
 
   resultEl.style.display = 'block';
   resultEl.style.color = 'var(--t2)';
-  resultEl.innerHTML = '⏳ 验证中...';
+  resultEl.innerHTML = `${msIcon('hourglass_top')} 验证中...`;
 
   try {
     const r = await fetch('/api/tunnel/validate', {
@@ -505,14 +509,14 @@ async function _tunnelCfgValidate() {
     const d = await r.json();
     if (d.ok) {
       resultEl.style.color = 'var(--green)';
-      resultEl.innerHTML = `✅ ${escHtml(d.message)} · 账户: ${escHtml(d.account_name)} · Zone: ${escHtml(d.zone_status)}`;
+      resultEl.innerHTML = `${msIcon('check_circle')} ${escHtml(d.message)} · 账户: ${escHtml(d.account_name)} · Zone: ${escHtml(d.zone_status)}`;
     } else {
       resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = `❌ ${escHtml(d.message)}`;
+      resultEl.innerHTML = `${msIcon('cancel')} ${escHtml(d.message)}`;
     }
   } catch (e) {
     resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 验证请求失败';
+    resultEl.innerHTML = `${msIcon('cancel')} 验证请求失败`;
   }
 }
 
@@ -530,12 +534,12 @@ async function _tunnelCfgSave() {
   const isCreate = !_lastData?.configured;
   const msg = isCreate
     ? '确定创建 Cloudflare Tunnel？将自动配置 DNS 和 Ingress。'
-    : '将更新现有 Tunnel 配置并重启 cloudflared。\n\n⚠️ 通过 Tunnel 的连接可能会短暂中断，确定继续？';
+    : '将更新现有 Tunnel 配置并重启 cloudflared。\n\n通过 Tunnel 的连接可能会短暂中断，确定继续？';
   if (!confirm(msg)) return;
 
   resultEl.style.display = 'block';
   resultEl.style.color = 'var(--t2)';
-  resultEl.innerHTML = '⏳ 正在应用配置...';
+  resultEl.innerHTML = `${msIcon('hourglass_top')} 正在应用配置...`;
 
   try {
     const r = await fetch('/api/tunnel/provision', {
@@ -545,15 +549,15 @@ async function _tunnelCfgSave() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ Tunnel 配置已应用！连接可能短暂中断，5 秒后自动刷新...');
+      showToast('Tunnel 配置已应用！连接可能短暂中断，5 秒后自动刷新...');
       setTimeout(() => location.reload(), 5000);
     } else {
       resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = `❌ ${escHtml(d.error || '保存失败')}`;
+      resultEl.innerHTML = `${msIcon('cancel')} ${escHtml(d.error || '保存失败')}`;
     }
   } catch (e) {
     resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 请求失败';
+    resultEl.innerHTML = `${msIcon('cancel')} 请求失败`;
   }
 }
 
@@ -567,19 +571,44 @@ async function _tunnelTeardown() {
     const r = await fetch('/api/tunnel/teardown', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ Tunnel 已移除');
+      showToast('Tunnel 已移除');
       setTimeout(loadTunnelPage, 1000);
     } else {
-      showToast('❌ 移除失败: ' + (d.error || ''));
+      showToast('移除失败: ' + (d.error || ''));
     }
-  } catch (e) { showToast('❌ 请求失败: ' + e.message); }
+  } catch (e) { showToast('请求失败: ' + e.message); }
+}
+
+async function _tunnelStop() {
+  try {
+    const r = await fetch('/api/tunnel/stop', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('cloudflared 已停止');
+    } else {
+      showToast(d.error || '停止失败');
+    }
+    setTimeout(loadTunnelPage, 1500);
+  } catch (e) { showToast(e.message); }
+}
+
+async function _tunnelStart() {
+  try {
+    const r = await fetch('/api/tunnel/start', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('cloudflared 正在启动...');
+    } else {
+      showToast(d.error || '启动失败');
+    }
+    setTimeout(loadTunnelPage, 2000);
+  } catch (e) { showToast(e.message); }
 }
 
 async function _tunnelRestart() {
-  if (!confirm('确定重启 cloudflared？')) return;
   try {
     await fetch('/api/tunnel/restart', { method: 'POST' });
-    showToast('Tunnel 正在重启...');
+    showToast('cloudflared 正在重启...');
     setTimeout(loadTunnelPage, 3000);
   } catch (e) { showToast('重启失败: ' + e.message); }
 }
@@ -631,20 +660,20 @@ async function _tunnelAddServiceSubmit() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 服务已添加！');
+      showToast('服务已添加！');
       document.getElementById('tunnel-addsvc-modal').classList.remove('active');
       setTimeout(loadTunnelPage, 2000);
     } else {
-      showToast('❌ 添加失败: ' + (d.error || ''));
+      showToast('添加失败: ' + (d.error || ''));
     }
   } catch (e) {
-    showToast('❌ 请求失败: ' + e.message);
+    showToast('请求失败: ' + e.message);
   }
 }
 
 async function _tunnelRemoveService(suffix, isDefault) {
   if (isDefault) {
-    if (!confirm(`⚠️ "${suffix}" 是默认服务。删除后相关功能将无法通过 Tunnel 访问。\n\n确定继续？`)) return;
+    if (!confirm(`"${suffix}" 是默认服务。删除后相关功能将无法通过 Tunnel 访问。\n\n确定继续？`)) return;
   } else {
     if (!confirm(`确定移除自定义服务 (${suffix})？`)) return;
   }
@@ -653,12 +682,12 @@ async function _tunnelRemoveService(suffix, isDefault) {
     const r = await fetch(`/api/tunnel/services/${encodeURIComponent(suffix)}`, { method: 'DELETE' });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 服务已移除');
+      showToast('服务已移除');
       setTimeout(loadTunnelPage, 2000);
     } else {
-      showToast('❌ ' + (d.error || '移除失败'));
+      showToast(d.error || '移除失败');
     }
-  } catch (e) { showToast('❌ ' + e.message); }
+  } catch (e) { showToast(e.message); }
 }
 
 async function _tunnelEditSuffix(currentSuffix) {
@@ -673,12 +702,12 @@ async function _tunnelEditSuffix(currentSuffix) {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 子域名已更新');
+      showToast('子域名已更新');
       setTimeout(loadTunnelPage, 2000);
     } else {
-      showToast('❌ ' + (d.error || '更新失败'));
+      showToast(d.error || '更新失败');
     }
-  } catch (e) { showToast('❌ ' + e.message); }
+  } catch (e) { showToast(e.message); }
 }
 
 // expose for inline onclick
@@ -686,7 +715,7 @@ Object.assign(window, {
   switchTunnelTab,
   _selectTunnelMode,
   _tunnelCfgValidate, _tunnelCfgSave,
-  _tunnelTeardown, _tunnelRestart,
+  _tunnelTeardown, _tunnelRestart, _tunnelStop, _tunnelStart,
   _tunnelPublicEnable, _tunnelPublicDisable,
   _tunnelAddService, _tunnelAddServiceSubmit,
   _tunnelRemoveService, _tunnelEditSuffix,

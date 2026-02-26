@@ -1,5 +1,5 @@
 // ── page-sync.js  ·  Sync 页面模块 ──────────────────────────────
-import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError } from './core.js';
+import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError, msIcon } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 // ── State ───────────────────────────────────────────────────────
@@ -48,17 +48,17 @@ async function loadSyncRemotes() {
 }
 
 function renderSyncRemoteCard(r) {
-  const authIcon = r.has_auth ? '✅ 已认证' : '⚠️ 未配置';
+  const authIcon = r.has_auth ? '<span class="status-dot online"></span> 已认证' : '<span class="status-dot pending"></span> 未配置';
   return `<div class="sync-remote-card">
     <div class="sync-remote-header">
       <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name} · ${r.type}</span></div>
       <span style="font-size:.75rem;color:var(--t3)">${authIcon}</span>
     </div>
     <div class="sync-storage-info" id="storage-${r.name}">
-      <button class="btn btn-xs" onclick="refreshRemoteStorage('${r.name}')">🔄 查看容量</button>
+      <button class="btn btn-xs" onclick="refreshRemoteStorage('${r.name}')">查看容量</button>
     </div>
-    <div style="margin-top:8px;display:flex;gap:4px">
-      <button class="btn btn-sm" style="font-size:.7rem;color:var(--red)" onclick="deleteRemote('${r.name}')">🗑️ 删除</button>
+    <div style="margin-top:8px;display:flex;gap:4px;justify-content:flex-end">
+      <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="deleteRemote('${r.name}')">删除</button>
     </div>
   </div>`;
 }
@@ -91,10 +91,10 @@ async function refreshRemoteStorage(name) {
 }
 
 function renderStorageResult(el, name, info) {
-  const btn = `<button class="btn btn-sm" style="font-size:.65rem;padding:1px 6px;margin-left:8px" onclick="refreshRemoteStorage('${name}')">🔄</button>`;
+  const btn = `<button class="btn btn-sm" style="font-size:.65rem;padding:1px 6px;margin-left:8px" onclick="refreshRemoteStorage('${name}')">\u21bb</button>`;
   if (!info) { el.innerHTML = `<span style="color:var(--t3);font-size:.75rem">—</span>${btn}`; return; }
   if (info.error) {
-    el.innerHTML = `<span style="font-size:.75rem;color:var(--t3)">${escHtml(info.error)}</span>`;
+    el.innerHTML = `<span style="font-size:.75rem;color:var(--red)">${escHtml(info.error)}</span>${btn}`;
     return;
   }
   const used = info.used || 0, total = info.total || 0, free = info.free || 0;
@@ -216,13 +216,13 @@ function renderSyncRulesList() {
     return;
   }
   el.innerHTML = _syncRules.map((r, i) => {
-    const dir = r.direction === 'pull' ? '⬇' : '⬆';
-    const triggerMap = {deploy: '📦 部署时', watch: '👁 监控', manual: '🖐 手动'};
+    const dir = r.direction === 'pull' ? msIcon('arrow_downward') : msIcon('arrow_upward');
+    const triggerMap = {deploy: msIcon('inventory_2') + ' 部署时', watch: msIcon('visibility') + ' 监控', manual: msIcon('pan_tool') + ' 手动'};
     const methodMap = {sync: '镜像同步', copy: '复制', move: '移动'};
     const arrows = '<span class="sync-flow-arrows"><span>▸</span><span>▸</span><span>▸</span></span>';
     const pathDetail = r.direction === 'push'
-      ? `<span style="opacity:.6">📁</span> ${escHtml(r.local_path)} ${arrows} <span style="opacity:.6">☁️</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)}`
-      : `<span style="opacity:.6">☁️</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)} ${arrows} <span style="opacity:.6">📁</span> ${escHtml(r.local_path)}`;
+      ? `<span style="opacity:.6">${msIcon('folder')}</span> ${escHtml(r.local_path)} ${arrows} <span style="opacity:.6">${msIcon('cloud')}</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)}`
+      : `<span style="opacity:.6">${msIcon('cloud')}</span> ${escHtml(r.remote)}:${escHtml(r.remote_path)} ${arrows} <span style="opacity:.6">${msIcon('folder')}</span> ${escHtml(r.local_path)}`;
     return `<div class="sync-rule-card${r.enabled === false ? ' disabled' : ''}">
       <div class="sync-rule-dir">${dir}</div>
       <div class="sync-rule-info">
@@ -235,10 +235,10 @@ function renderSyncRulesList() {
         </div>
       </div>
       <div class="sync-rule-actions">
-        <button class="btn btn-sm" onclick="runSingleRule('${r.id}')" title="立即执行">▶</button>
-        <button class="btn btn-sm" onclick="editRule(${i})" title="编辑">✏️</button>
-        <button class="btn btn-sm" onclick="toggleRule(${i})" title="${r.enabled !== false ? '禁用' : '启用'}">${r.enabled !== false ? '⏸' : '▶'}</button>
-        <button class="btn btn-sm" onclick="deleteRule(${i})" title="删除" style="color:var(--red)">🗑️</button>
+        <button class="btn btn-sm" onclick="runSingleRule('${r.id}')" title="立即执行">${msIcon('play_arrow')}</button>
+        <button class="btn btn-sm" onclick="editRule(${i})" title="编辑">${msIcon('edit')}</button>
+        <button class="btn btn-sm" onclick="toggleRule(${i})" title="${r.enabled !== false ? '禁用' : '启用'}">${r.enabled !== false ? msIcon('pause') : msIcon('play_arrow')}</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteRule(${i})" title="删除">${msIcon('close')}</button>
       </div>
     </div>`;
   }).join('') + addCard;
@@ -331,8 +331,8 @@ function showRuleForm(rule) {
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">方向</label>
         <select id="rule-direction" style="width:100%">
-          <option value="pull"${r.direction === 'pull' ? ' selected' : ''}>⬇ Pull (远程→本地)</option>
-          <option value="push"${r.direction === 'push' ? ' selected' : ''}>⬆ Push (本地→远程)</option>
+          <option value="pull"${r.direction === 'pull' ? ' selected' : ''}>Pull (远程→本地)</option>
+          <option value="push"${r.direction === 'push' ? ' selected' : ''}>Push (本地→远程)</option>
         </select>
       </div>
       <div>
@@ -346,14 +346,14 @@ function showRuleForm(rule) {
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">远程路径</label>
         <div style="display:flex;gap:4px">
           <input type="text" id="rule-remote-path" value="${escHtml(r.remote_path || '')}" placeholder="bucket/folder" style="flex:1">
-          <button class="btn btn-sm" onclick="window._browseRemotePath()" title="浏览远程目录" style="padding:4px 8px;flex-shrink:0">📂</button>
+          <button class="btn btn-sm" onclick="window._browseRemotePath()" title="浏览远程目录" style="padding:4px 8px;flex-shrink:0">${msIcon('folder_open')}</button>
         </div>
       </div>
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">本地路径 (相对 ComfyUI)</label>
         <div style="display:flex;gap:4px">
           <input type="text" id="rule-local-path" value="${escHtml(r.local_path || '')}" placeholder="models/loras" style="flex:1">
-          <button class="btn btn-sm" onclick="window._browseLocalPath()" title="浏览本地目录" style="padding:4px 8px;flex-shrink:0">📂</button>
+          <button class="btn btn-sm" onclick="window._browseLocalPath()" title="浏览本地目录" style="padding:4px 8px;flex-shrink:0">${msIcon('folder_open')}</button>
         </div>
       </div>
       <div>
@@ -367,9 +367,9 @@ function showRuleForm(rule) {
       <div>
         <label style="font-size:.82rem;color:var(--t2);display:block;margin-bottom:3px">触发方式</label>
         <select id="rule-trigger" style="width:100%">
-          <option value="deploy"${r.trigger === 'deploy' ? ' selected' : ''}>📦 部署时执行</option>
-          <option value="watch"${r.trigger === 'watch' ? ' selected' : ''}>👁 持续监控</option>
-          <option value="manual"${r.trigger === 'manual' ? ' selected' : ''}>🖐 仅手动执行</option>
+          <option value="deploy"${r.trigger === 'deploy' ? ' selected' : ''}>部署时执行</option>
+          <option value="watch"${r.trigger === 'watch' ? ' selected' : ''}>持续监控</option>
+          <option value="manual"${r.trigger === 'manual' ? ' selected' : ''}>仅手动执行</option>
         </select>
       </div>
     </div>
@@ -447,8 +447,8 @@ async function loadSyncLogs() {
     const hCtrl = document.getElementById('sync-header-controls');
     if (hCtrl) {
       hCtrl.innerHTML = on
-        ? `<button class="btn" onclick="toggleSyncWorker()">⏹ 停止</button><button class="btn" onclick="_restartSyncWorker()">♻️ 重启</button>`
-        : `<button class="btn" onclick="toggleSyncWorker()">▶ 启动</button>`;
+        ? `<button class="btn" onclick="toggleSyncWorker()">${msIcon('stop')} 停止</button><button class="btn" onclick="_restartSyncWorker()">${msIcon('restart_alt')} 重启</button>`
+        : `<button class="btn" onclick="toggleSyncWorker()">${msIcon('play_arrow')} 启动</button>`;
     }
   } catch (e) {
     // header badge loading failed silently
@@ -465,9 +465,9 @@ function _startSyncLogStream() {
     historyExtract: (data) => data.log_lines || [],
     streamUrl: '/api/sync/logs/stream',
     classify: line => {
-      if (/❌|失败/i.test(line)) return 'log-error';
-      if (/⬆|⬇|🔍/i.test(line)) return 'log-info';
-      if (/✅/i.test(line)) return 'log-info';
+      if (/\u274c|失败/i.test(line)) return 'log-error';
+      if (/\u2b06|\u2b07|\ud83d\udd0d/i.test(line)) return 'log-info';
+      if (/\u2705/i.test(line)) return 'log-info';
       return '';
     },
   });
@@ -483,7 +483,7 @@ async function _restartSyncWorker() {
     await fetch('/api/sync/worker/stop', { method: 'POST' });
     await new Promise(r => setTimeout(r, 1000));
     await fetch('/api/sync/worker/start', { method: 'POST' });
-    showToast('♻️ Sync Worker 已重启');
+    showToast('Sync Worker 已重启');
     setTimeout(loadSyncLogs, 2000);
   } catch (e) { showToast('重启失败: ' + e.message); }
 }
@@ -552,10 +552,10 @@ async function saveSyncConfigAll() {
       });
       const d = await r.json();
       if (d.ok) {
-        showToast('✅ ' + d.message);
+        showToast(d.message);
         loadSyncRemotes();
       } else {
-        showToast('❌ ' + (d.error || '保存失败'), 'error');
+        showToast(d.error || '保存失败', 'error');
         return;
       }
     } catch(e) {
@@ -563,7 +563,7 @@ async function saveSyncConfigAll() {
       return;
     }
   } else {
-    showToast('✅ 同步设置已保存');
+    showToast('同步设置已保存');
   }
 }
 
@@ -581,11 +581,11 @@ async function uploadRcloneFile(event) {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ ' + d.message);
+      showToast(d.message);
       loadSyncConfigTab();
       loadSyncRemotes();
     } else {
-      showToast('❌ ' + (d.error || '上传失败'), 'error');
+      showToast(d.error || '上传失败', 'error');
     }
   } catch(e) {
     showToast('上传失败: ' + e.message, 'error');
@@ -637,7 +637,7 @@ window._browseRemotePath = function() {
   _browseMode = 'remote';
   _browseRemote = remote;
   _browsePath = document.getElementById('rule-remote-path')?.value || '';
-  document.getElementById('browse-modal-title').textContent = '📂 浏览远程目录';
+  document.getElementById('browse-modal-title').innerHTML = msIcon('folder_open') + ' 浏览远程目录';
   document.getElementById('remote-browse-modal')?.classList.add('active');
   _browseLoadDir(_browsePath);
 };
@@ -645,7 +645,7 @@ window._browseRemotePath = function() {
 window._browseLocalPath = function() {
   _browseMode = 'local';
   _browsePath = document.getElementById('rule-local-path')?.value || '';
-  document.getElementById('browse-modal-title').textContent = '📂 浏览本地目录';
+  document.getElementById('browse-modal-title').innerHTML = msIcon('folder_open') + ' 浏览本地目录';
   document.getElementById('remote-browse-modal')?.classList.add('active');
   _browseLoadDir(_browsePath);
 };
@@ -657,7 +657,7 @@ async function _browseLoadDir(path) {
 
   // 面包屑导航
   const parts = path ? path.split('/').filter(Boolean) : [];
-  const rootLabel = _browseMode === 'remote' ? `☁️ ${escHtml(_browseRemote)}:/` : '📁 ComfyUI/';
+  const rootLabel = _browseMode === 'remote' ? `${msIcon('cloud')} ${escHtml(_browseRemote)}:/` : `${msIcon('folder')} ComfyUI/`;
   let crumb = `<span style="cursor:pointer;color:var(--ac)" onclick="window._browseNav('')">${rootLabel}</span>`;
   let acc = '';
   for (const p of parts) {
@@ -688,7 +688,7 @@ async function _browseLoadDir(path) {
     if (path) {
       const parentPath = parts.slice(0, -1).join('/');
       html += `<div class="browse-item" onclick="window._browseNav('${parentPath.replace(/'/g, "\\'")}')" style="cursor:pointer;padding:6px 10px;display:flex;align-items:center;gap:6px;border-radius:6px" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">
-        <span style="font-size:1.1em">⬆️</span>
+        <span>${msIcon('arrow_upward')}</span>
         <span style="color:var(--t2)">..</span>
       </div>`;
     }
@@ -703,7 +703,7 @@ async function _browseLoadDir(path) {
       const fullPath = path ? `${path}/${dir}` : dir;
       const escaped = fullPath.replace(/'/g, "\\'");
       html += `<div class="browse-item" onclick="window._browseNav('${escaped}')" style="cursor:pointer;padding:6px 10px;display:flex;align-items:center;gap:6px;border-radius:6px" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">
-        <span style="font-size:1.1em">📁</span>
+        <span>${msIcon('folder')}</span>
         <span>${escHtml(dir)}</span>
       </div>`;
     }
@@ -722,7 +722,7 @@ window._browseSelect = function() {
   const targetId = _browseMode === 'remote' ? 'rule-remote-path' : 'rule-local-path';
   document.getElementById(targetId).value = _browsePath;
   closeSyncModal('remote-browse-modal');
-  showToast(`✅ 已选择: ${_browsePath || '/'}`);
+  showToast(`已选择: ${_browsePath || '/'}`);
 };
 
 // ── Window Exports (for onclick attributes in HTML) ─────────────

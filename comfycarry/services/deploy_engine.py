@@ -424,9 +424,12 @@ def _run_deploy(config):
         # STEP 3.5: SSH 配置 (密码 + 公钥)
         ssh_password = config.get("ssh_password", "")
         ssh_keys = config.get("ssh_keys", [])
+        ssh_pw_sync = config.get("ssh_pw_sync", False)
         if ssh_password or ssh_keys:
             _deploy_step("配置 SSH 访问")
             from comfycarry.config import set_config as _sc2
+            if ssh_pw_sync:
+                _sc2("ssh_pw_sync", True)
             if ssh_password:
                 code = subprocess.run(
                     f"echo 'root:{ssh_password}' | chpasswd",

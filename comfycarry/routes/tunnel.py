@@ -232,7 +232,18 @@ def api_tunnel_teardown():
 
 @bp.route("/api/tunnel/restart", methods=["POST"])
 def api_tunnel_restart():
-    """重启 cloudflared (不重新 provision)"""
+    """重启 cloudflared (PM2)"""
+    tunnel_mode = get_config("tunnel_mode", "")
+
+    if tunnel_mode == "public":
+        # 公共模式: 直接 PM2 重启
+        r = subprocess.run("pm2 restart cf-tunnel 2>/dev/null", shell=True,
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            return jsonify({"ok": False, "error": "PM2 重启失败"}), 500
+        return jsonify({"ok": True})
+
+    # 自定义模式
     mgr = _get_manager()
     if not mgr:
         return jsonify({"ok": False, "error": "Tunnel 未配置"}), 400
@@ -249,6 +260,26 @@ def api_tunnel_restart():
         return jsonify({"ok": True})
     except CFAPIError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@bp.route("/api/tunnel/stop", methods=["POST"])
+def api_tunnel_stop():
+    """停止 cloudflared (PM2)"""
+    r = subprocess.run("pm2 stop cf-tunnel 2>/dev/null", shell=True,
+                       capture_output=True, text=True, timeout=10)
+    if r.returncode != 0:
+        return jsonify({"ok": False, "error": "停止失败"}), 500
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/tunnel/start", methods=["POST"])
+def api_tunnel_start():
+    """启动 cloudflared (PM2)"""
+    r = subprocess.run("pm2 start cf-tunnel 2>/dev/null", shell=True,
+                       capture_output=True, text=True, timeout=10)
+    if r.returncode != 0:
+        return jsonify({"ok": False, "error": "启动失败"}), 500
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/tunnel/services", methods=["GET"])

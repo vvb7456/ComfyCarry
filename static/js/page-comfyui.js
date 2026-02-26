@@ -3,7 +3,7 @@
  * ComfyUI 页面模块: 状态监控、参数管理、日志流、实时事件
  */
 
-import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty } from './core.js';
+import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty, msIcon } from './core.js';
 import { createLogStream } from './sse-log.js';
 import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
@@ -197,8 +197,8 @@ async function loadComfyStatus() {
     const controls = document.getElementById('comfyui-header-controls');
     if (controls) {
       controls.innerHTML = online
-        ? `<button class="btn" onclick="window._comfyStop()">⏹ 停止</button><button class="btn" onclick="restartComfyUI()">♻️ 重启</button>`
-        : `<button class="btn" onclick="window._comfyStart()">▶ 启动</button>`;
+        ? `<button class="btn" onclick="window._comfyStop()">${msIcon('stop')} 停止</button><button class="btn" onclick="restartComfyUI()">${msIcon('restart_alt')} 重启</button>`
+        : `<button class="btn" onclick="window._comfyStart()">${msIcon('play_arrow')} 启动</button>`;
     }
 
     // Status card — show generating/idle when online
@@ -351,16 +351,16 @@ async function saveComfyUIParams() {
     });
     const d = await r.json();
     if (d.ok) {
-      status.textContent = '✅ 已保存，ComfyUI 正在重启...';
+      status.textContent = '已保存，ComfyUI 正在重启...';
       status.style.color = 'var(--green)';
       showToast('ComfyUI 正在使用新参数重启...');
       setTimeout(() => { status.textContent = ''; loadComfyUIPage(); }, 5000);
     } else {
-      status.textContent = '❌ ' + (d.error || '保存失败');
+      status.textContent = (d.error || '保存失败');
       status.style.color = 'var(--red)';
     }
   } catch (e) {
-    status.textContent = '❌ 请求失败: ' + e.message;
+    status.textContent = '请求失败: ' + e.message;
     status.style.color = 'var(--red)';
   }
 }
@@ -411,7 +411,7 @@ async function _comfyStop() {
   if (!confirm('确定要停止 ComfyUI 吗？')) return;
   try {
     await fetch('/api/services/comfy/stop', { method: 'POST' });
-    showToast('⏹ ComfyUI 已停止');
+    showToast('ComfyUI 已停止');
     setTimeout(loadComfyStatus, 1000);
   } catch (e) { showToast('停止失败: ' + e.message); }
 }
@@ -419,7 +419,7 @@ async function _comfyStop() {
 async function _comfyStart() {
   try {
     await fetch('/api/services/comfy/start', { method: 'POST' });
-    showToast('▶ ComfyUI 启动中...');
+    showToast('ComfyUI 启动中...');
     setTimeout(loadComfyUIPage, 3000);
   } catch (e) { showToast('启动失败: ' + e.message); }
 }
@@ -435,7 +435,7 @@ async function comfyInterrupt() {
 async function comfyFreeVRAM() {
   try {
     await fetch('/api/comfyui/free', { method: 'POST' });
-    showToast('🧹 已释放 VRAM');
+    showToast('已释放 VRAM');
     setTimeout(loadComfyStatus, 2000);
   } catch (e) { showToast('释放失败: ' + e.message); }
 }
@@ -522,7 +522,7 @@ async function loadQueuePanel() {
             <div class="queue-item-info">
               <div class="queue-item-id">#${idx + 1} · ${shortId}… · ${nodeCount} 个节点</div>
             </div>
-            <button class="btn btn-xs btn-danger" onclick="comfyDeleteQueueItem('${promptId}')">✕</button>
+            <button class="btn btn-sm btn-danger" onclick="comfyDeleteQueueItem('${promptId}')">${msIcon('close')}</button>
           </div>`;
         }).join('');
       }
@@ -539,6 +539,7 @@ async function loadQueuePanel() {
 }
 
 async function comfyDeleteQueueItem(promptId) {
+  if (!confirm('确定要删除此队列项?')) return;
   try {
     await fetch('/api/comfyui/queue/delete', {
       method: 'POST',
@@ -620,7 +621,7 @@ async function loadComfyHistory() {
             <div>${shortId}…</div>
             <div style="font-size:.7rem;color:var(--t3)">${ts}</div>
           </div>
-          ${img ? `<div class="history-card-actions"><button class="btn btn-sm" title="下载" onclick="downloadHistoryImage('${img.filename.replace(/'/g,"\\'")}','${img.subfolder.replace(/'/g,"\\'")}','${img.type}')">💾</button></div>` : ''}
+          ${img ? `<div class="history-card-actions"><button class="btn btn-sm" title="下载" onclick="downloadHistoryImage('${img.filename.replace(/'/g,"\\'")}','${img.subfolder.replace(/'/g,"\\'")}','${img.type}')">${msIcon('download')}</button></div>` : ''}
         </div>
       </div>`;
     }).join('')}</div>`;

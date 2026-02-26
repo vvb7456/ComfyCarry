@@ -63,6 +63,104 @@
             display: flex
         }
 
+        /* ── Material Symbols ── */
+        @font-face {
+            font-family: 'Material Symbols Outlined';
+            font-style: normal;
+            font-weight: 100 700;
+            src: url('/static/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
+            font-display: block;
+        }
+        .ms {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 20px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            vertical-align: -3px;
+            -webkit-font-smoothing: antialiased;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+        }
+        .ms-xs { font-size: 16px; vertical-align: -3px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 16; }
+        .ms-sm { font-size: 18px; vertical-align: -3px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 18; }
+        .ms-lg { font-size: 32px; vertical-align: -6px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 32; }
+        .ms-xl { font-size: 48px; vertical-align: -10px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48; }
+        /* Contextual icon size overrides */
+        .section-title .ms { font-size: 22px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 22; }
+        .tab .ms { font-size: 20px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20; }
+        .activity-icon .ms { font-size: 22px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 22; }
+        .activity-empty .ms { font-size: 22px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 22; }
+
+        /* ── Input Secret (密码/Token 输入框) ── */
+        .input-secret {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-secret input {
+            flex: 1;
+            padding-right: 60px;
+        }
+        .input-secret-toggle,
+        .input-secret-copy {
+            position: absolute;
+            background: none;
+            border: none;
+            color: var(--t3);
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+        .input-secret-toggle { right: 28px; }
+        .input-secret-copy { right: 4px; }
+        .input-secret-toggle:hover,
+        .input-secret-copy:hover { color: var(--t1); }
+
+        /* ── Help Tip (Tooltip) ── */
+        .help-tip {
+            cursor: help;
+            color: var(--t3);
+            position: relative;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+        .help-tip .ms { font-size: 16px; }
+        .help-tip[data-tip]:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: calc(100% + 6px);
+            background: var(--bg4);
+            color: var(--t1);
+            padding: 6px 10px;
+            border-radius: var(--r-sm);
+            font-size: .75rem;
+            white-space: nowrap;
+            z-index: 100;
+            border: 1px solid var(--bd);
+            pointer-events: none;
+        }
+
+        /* ── Status Dot ── */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .status-dot.online  { background: var(--green); }
+        .status-dot.pending { background: var(--amber); }
+        .status-dot.offline { background: var(--red); }
+
         /* Sidebar */
         .sidebar {
             width: clamp(220px, 16vw, 300px);
@@ -174,8 +272,8 @@
         .nav-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
+            gap: 12px;
+            padding: 11px 20px;
             cursor: pointer;
             color: var(--t2);
             font-size: .9rem;
@@ -214,10 +312,17 @@
 
         .nav-item .icon {
             font-size: 1.1rem;
-            width: 24px;
-            text-align: center;
+            width: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             flex-shrink: 0
         }
+        .nav-item .icon .ms {
+            font-size: 28px;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 28;
+        }
+        .nav-item.active .icon .ms { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 28; }
 
         .sidebar-footer {
             padding: 12px 20px;
@@ -274,6 +379,12 @@
         .page-header h2 {
             font-size: 1.15rem;
             font-weight: 600
+        }
+        .page-header h2 .ms {
+            font-size: 28px;
+            vertical-align: -5px;
+            margin-right: 6px;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 28;
         }
         .page-title-group {
             display: flex;
@@ -645,7 +756,7 @@
 
         .activity-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 12px;
             padding: 12px 18px;
             border-bottom: 1px solid rgba(42, 42, 58, .3)
@@ -665,8 +776,7 @@
 
         .activity-icon {
             font-size: 1rem;
-            flex-shrink: 0;
-            margin-top: 2px
+            flex-shrink: 0
         }
 
         .activity-content {
@@ -941,7 +1051,10 @@
             color: var(--t2);
             border-bottom: 2px solid transparent;
             transition: all .15s;
-            user-select: none
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px
         }
 
         .tab:hover {
@@ -1260,7 +1373,8 @@
         .model-card-actions {
             display: flex;
             gap: 6px;
-            margin-top: 8px
+            margin-top: 8px;
+            justify-content: flex-end
         }
 
         .model-card-size {
@@ -2303,11 +2417,12 @@
         }
         .sync-rule-info { flex: 1; min-width: 0; }
         .sync-rule-name { font-weight: 600; font-size: .9rem; }
-        .sync-rule-detail { font-size: .78rem; color: var(--t3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sync-rule-detail { font-size: .78rem; color: var(--t3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
         .sync-rule-badges { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
         .sync-rule-badge {
             font-size: .68rem; padding: 1px 7px; border-radius: 8px;
             background: var(--bg2); color: var(--t2); border: 1px solid var(--bd);
+            display: inline-flex; align-items: center; gap: 3px;
         }
         .sync-rule-actions { display: flex; gap: 4px; flex-shrink: 0; }
         .sync-rule-actions button { font-size: .75rem; padding: 4px 8px; }
@@ -2491,6 +2606,11 @@
             flex-wrap: wrap;
             font-size: .75rem;
             color: var(--t3)
+        }
+        .plugin-item-meta > span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .plugin-item-actions {
@@ -2701,26 +2821,26 @@
             <span class="logo-cc">CC</span>
         </div>
         <div class="sidebar-nav">
-            <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="icon">📊</span><span class="nav-label">总览</span></div>
-            <div class="nav-item" data-page="comfyui" onclick="showPage('comfyui')"><span class="icon">🖥️</span><span class="nav-label">ComfyUI</span></div>
-            <div class="nav-item" data-page="models" onclick="showPage('models')"><span class="icon">🎨</span><span class="nav-label">模型管理</span></div>
-            <div class="nav-item" data-page="plugins" onclick="showPage('plugins')"><span class="icon">🧩</span><span class="nav-label">插件管理</span></div>
-            <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon">☁️</span><span class="nav-label">Sync</span></div>
-            <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon">🌐</span><span class="nav-label">Tunnel</span></div>
-            <div class="nav-item" data-page="jupyter" onclick="showPage('jupyter')"><span class="icon">📓</span><span class="nav-label">Jupyter</span></div>
-            <div class="nav-item" data-page="ssh" onclick="showPage('ssh')"><span class="icon">🔑</span><span class="nav-label">SSH</span></div>
+            <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="icon"><span class="ms" style="color:#8b5cf6">dashboard</span></span><span class="nav-label">总览</span></div>
+            <div class="nav-item" data-page="comfyui" onclick="showPage('comfyui')"><span class="icon"><span class="ms" style="color:#22d3ee">terminal</span></span><span class="nav-label">ComfyUI</span></div>
+            <div class="nav-item" data-page="models" onclick="showPage('models')"><span class="icon"><span class="ms" style="color:#f472b6">palette</span></span><span class="nav-label">模型管理</span></div>
+            <div class="nav-item" data-page="plugins" onclick="showPage('plugins')"><span class="icon"><span class="ms" style="color:#a78bfa">extension</span></span><span class="nav-label">插件管理</span></div>
+            <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon"><span class="ms" style="color:#34d399">cloud_sync</span></span><span class="nav-label">Sync</span></div>
+            <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon"><span class="ms" style="color:#60a5fa">language</span></span><span class="nav-label">Tunnel</span></div>
+            <div class="nav-item" data-page="jupyter" onclick="showPage('jupyter')"><span class="icon"><span class="ms" style="color:#fb923c">book_2</span></span><span class="nav-label">Jupyter</span></div>
+            <div class="nav-item" data-page="ssh" onclick="showPage('ssh')"><span class="icon"><span class="ms" style="color:#fbbf24">key</span></span><span class="nav-label">SSH</span></div>
             <div style="flex:1"></div>
-            <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon">⚙️</span><span class="nav-label">设置</span></div>
+            <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon"><span class="ms" style="color:#94a3b8">settings</span></span><span class="nav-label">设置</span></div>
         </div>
         <div class="sidebar-footer">
             <div class="footer-expanded">
-                <a href="/logout" class="btn btn-sm" style="font-size:.72rem;padding:4px 10px;width:100%;text-align:center;justify-content:center;margin-bottom:8px;text-decoration:none">🚪 登出</a>
+                <a href="/logout" class="btn btn-sm" style="font-size:.72rem;padding:4px 10px;width:100%;text-align:center;justify-content:center;margin-bottom:8px;text-decoration:none"><span class="ms ms-sm" style="color:#94a3b8">logout</span> 登出</a>
                 <div id="version-info" style="text-align:center">
                     <a href="https://github.com/vvb7456/ComfyCarry" target="_blank" style="font-size:.68rem;color:var(--t3);text-decoration:none;font-family:'IBM Plex Mono',monospace" title="GitHub">v2.4</a>
                 </div>
             </div>
             <div class="footer-collapsed">
-                <a href="/logout" title="登出" style="color:var(--t3);font-size:.9rem">🚪</a>
+                <a href="/logout" title="登出" style="color:var(--t3);font-size:.9rem"><span class="ms ms-sm" style="color:#94a3b8">logout</span></a>
             </div>
         </div>
     </nav>
@@ -2731,9 +2851,9 @@
         <!-- ========== Dashboard Page (Overview) ========== -->
         <div id="page-dashboard" class="page">
             <div class="page-header">
-                <h2>📊 总览</h2>
+                <h2><span class="ms" style="color:#8b5cf6">dashboard</span> 总览</h2>
                 <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -2742,20 +2862,20 @@
 
                 <!-- Status Bar -->
                 <div class="status-bar" id="overview-status-bar">
-                    <span class="status-badge muted">⏳ 加载中...</span>
+                    <span class="status-badge muted"><span class="ms ms-sm" style="color:var(--amber)">hourglass_top</span> 加载中...</span>
                 </div>
 
                 <!-- Metrics Grid -->
                 <div class="metrics-grid" id="overview-metrics"></div>
 
                 <!-- Activity Feed -->
-                <div class="section-title">📥 活动</div>
+                <div class="section-title"><span class="ms ms-sm" style="color:#34d399">trending_up</span> 活动</div>
                 <div class="activity-feed" id="overview-activity">
-                    <div class="activity-empty">⏳ 加载中...</div>
+                    <div class="activity-empty"><span class="ms ms-sm" style="color:var(--amber)">hourglass_top</span> 加载中...</div>
                 </div>
 
                 <!-- Services Table -->
-                <div class="section-title">🔧 服务</div>
+                <div class="section-title"><span class="ms ms-sm" style="color:#60a5fa">dns</span> 服务</div>
                 <div class="card" style="padding:0;overflow-x:auto">
                 <table class="svc-table" id="svc-table">
                     <thead>
@@ -2775,7 +2895,7 @@
 
                 <!-- Environment Info -->
                 <div class="section-header">
-                    <div class="section-title">ℹ️ 环境</div>
+                    <div class="section-title"><span class="ms ms-sm" style="color:#60a5fa">info</span> 环境</div>
                 </div>
                 <div class="env-info" id="overview-env-info"></div>
             </div>
@@ -2784,16 +2904,16 @@
         <!-- ========== Models Page (unified: local + civitai + downloads) ========== -->
         <div id="page-models" class="page hidden">
             <div class="page-header">
-                <h2>🎨 模型管理</h2>
+                <h2><span class="ms" style="color:#f472b6">palette</span> 模型管理</h2>
                 <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
                 <div class="tabs">
-                    <div class="tab active" data-mtab="local" onclick="switchModelTab('local')">📦 本地模型</div>
-                    <div class="tab" data-mtab="civitai" onclick="switchModelTab('civitai')">🔍 CivitAI</div>
-                    <div class="tab" data-mtab="downloads" onclick="switchModelTab('downloads')">📥 下载管理 <span class="badge-count" id="cart-badge" style="display:none">0</span></div>
+                    <div class="tab active" data-mtab="local" onclick="switchModelTab('local')"><span class="ms ms-sm" style="color:#a78bfa">inventory_2</span> 本地模型</div>
+                    <div class="tab" data-mtab="civitai" onclick="switchModelTab('civitai')"><span class="ms ms-sm" style="color:#60a5fa">search</span> CivitAI</div>
+                    <div class="tab" data-mtab="downloads" onclick="switchModelTab('downloads')"><span class="ms ms-sm" style="color:#60a5fa">download</span> 下载管理 <span class="badge-count" id="cart-badge" style="display:none">0</span></div>
                 </div>
                 <!-- Local Models Tab -->
                 <div id="mtab-local">
@@ -2809,8 +2929,8 @@
                             <option value="upscale_models">Upscale</option>
                             <option value="embeddings">Embeddings</option>
                         </select>
-                        <button class="btn btn-sm" onclick="loadLocalModels()">🔄 刷新</button>
-                        <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">📥 全部获取</button>
+                        <button class="btn btn-sm" onclick="loadLocalModels()">刷新</button>
+                        <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">全部获取</button>
                     </div>
                     <div id="local-models-grid" class="model-grid"></div>
                 </div>
@@ -2843,10 +2963,10 @@
                 <div id="mtab-downloads" class="hidden">
                     <!-- Sub-tabs -->
                     <div class="tabs" style="font-size:.85rem">
-                        <div class="tab active" data-dltab="pending" onclick="switchDlTab('pending')">📌 已选</div>
-                        <div class="tab" data-dltab="active" onclick="switchDlTab('active')">🔄 队列</div>
-                        <div class="tab" data-dltab="completed" onclick="switchDlTab('completed')">✅ 已完成</div>
-                        <div class="tab" data-dltab="failed" onclick="switchDlTab('failed')">❌ 失败</div>
+                        <div class="tab active" data-dltab="pending" onclick="switchDlTab('pending')"><span class="ms ms-sm" style="color:#f472b6">push_pin</span> 已选</div>
+                        <div class="tab" data-dltab="active" onclick="switchDlTab('active')"><span class="ms ms-sm" style="color:#34d399">sync</span> 队列</div>
+                        <div class="tab" data-dltab="completed" onclick="switchDlTab('completed')"><span class="ms ms-sm" style="color:var(--green)">check_circle</span> 已完成</div>
+                        <div class="tab" data-dltab="failed" onclick="switchDlTab('failed')"><span class="ms ms-sm" style="color:var(--red)">error</span> 失败</div>
                     </div>
                     <div id="dl-pending-content"></div>
                     <div id="dl-active-content" class="hidden"></div>
@@ -2860,12 +2980,12 @@
         <div id="page-jupyter" class="page hidden">
             <div class="page-header">
                 <div class="page-title-group">
-                    <h2>📓 JupyterLab</h2>
+                    <h2><span class="ms" style="color:#fb923c">book_2</span> JupyterLab</h2>
                     <span id="jupyter-header-badge" class="page-status-badge"></span>
                 </div>
                 <div class="top-toolbar">
                     <span id="jupyter-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -2876,21 +2996,21 @@
 
                 <!-- 访问令牌 -->
                 <div class="section-header">
-                    <div class="section-title">🔑 访问令牌</div>
+                    <div class="section-title"><span class="ms ms-sm" style="color:#fbbf24">key</span> 访问令牌</div>
                 </div>
                 <div class="card" style="padding:12px 14px">
-                    <div style="display:flex;align-items:center;gap:8px">
+                    <div class="input-secret">
                         <input type="password" id="jupyter-token-value" value="" readonly
-                               style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:.78rem;letter-spacing:.02em;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--t1)">
-                        <button class="btn btn-sm" onclick="window._toggleJupyterToken()" id="jupyter-token-toggle" style="font-size:.75rem;flex-shrink:0">👁</button>
-                        <button class="btn btn-sm" onclick="window._copyJupyterToken()" title="复制令牌" style="font-size:.75rem;flex-shrink:0">📋</button>
+                               style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;letter-spacing:.02em;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--t1)">
+                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                        <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm" style="color:#60a5fa">content_copy</span></button>
                     </div>
                 </div>
 
                 <!-- 活跃内核 -->
                 <div id="jupyter-section-kernels" style="display:none">
                     <div class="section-header">
-                        <div class="section-title">🧠 活跃内核</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#22d3ee">memory</span> 活跃内核</div>
                     </div>
                     <div class="card" style="padding:10px 14px">
                         <div id="jupyter-kernels-list"></div>
@@ -2900,7 +3020,7 @@
                 <!-- 活跃会话 -->
                 <div id="jupyter-section-sessions" style="display:none">
                     <div class="section-header">
-                        <div class="section-title">📂 活跃会话</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#fbbf24">folder_open</span> 活跃会话</div>
                     </div>
                     <div class="card" style="padding:10px 14px">
                         <div id="jupyter-sessions-list"></div>
@@ -2910,7 +3030,7 @@
                 <!-- 终端 -->
                 <div id="jupyter-section-terminals" style="display:none">
                     <div class="section-header">
-                        <div class="section-title">💻 终端</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#22d3ee">terminal</span> 终端</div>
                     </div>
                     <div class="card" style="padding:10px 14px">
                         <div id="jupyter-terminals-list"></div>
@@ -2919,7 +3039,7 @@
 
                 <!-- 日志 -->
                 <div class="section-header">
-                    <div class="section-title">📜 日志</div>
+                    <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> 日志</div>
                 </div>
                 <div class="card" style="padding:10px 14px">
                     <div class="log-box" id="jupyter-log-content">加载中...</div>
@@ -2931,19 +3051,19 @@
         <div id="page-tunnel" class="page hidden">
             <div class="page-header">
                 <div class="page-title-group">
-                    <h2>🌐 Tunnel</h2>
+                    <h2><span class="ms" style="color:#60a5fa">language</span> Tunnel</h2>
                     <span id="tunnel-header-badge" class="page-status-badge"></span>
                 </div>
                 <div class="top-toolbar">
                     <span id="tunnel-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
                 <!-- Sub-tabs -->
                 <div class="tabs">
-                    <div class="tab active" data-ttab="status" onclick="switchTunnelTab('status')">🔗 服务 & 日志</div>
-                    <div class="tab" data-ttab="config" onclick="switchTunnelTab('config')">⚙️ 配置</div>
+                    <div class="tab active" data-ttab="status" onclick="switchTunnelTab('status')"><span class="ms ms-sm" style="color:#60a5fa">link</span> 服务 & 日志</div>
+                    <div class="tab" data-ttab="config" onclick="switchTunnelTab('config')"><span class="ms ms-sm" style="color:#94a3b8">settings</span> 配置</div>
                 </div>
 
                 <!-- Status Tab -->
@@ -2951,7 +3071,7 @@
                     <!-- 状态区 (已配置时) -->
                     <div id="tunnel-status-section" style="display:none">
                         <div class="section-header" style="margin-top:0">
-                            <div class="section-title">🔗 服务</div>
+                            <div class="section-title"><span class="ms ms-sm" style="color:#60a5fa">link</span> 服务</div>
                             <span id="tunnel-status-info" style="font-size:.78rem;color:var(--t3)"></span>
                         </div>
                         <div id="tunnel-services"></div>
@@ -2960,18 +3080,18 @@
                     <!-- 未配置时的提示 -->
                     <div id="tunnel-setup-hint" style="display:none">
                         <div class="card card-padded" style="text-align:center;padding:32px">
-                            <div style="font-size:1.2rem;margin-bottom:8px">🌐</div>
+                            <div style="font-size:1.2rem;margin-bottom:8px"><span class="ms ms-xl" style="color:#60a5fa">language</span></div>
                             <div style="color:var(--t2);margin-bottom:12px">尚未配置 Tunnel，请前往「配置」tab 设置</div>
                             <div style="display:flex;gap:8px;justify-content:center">
-                                <button class="btn btn-sm btn-primary" onclick="window._selectTunnelMode('public');switchTunnelTab('config')">🌍 一键启用公共节点</button>
-                                <button class="btn btn-sm" onclick="switchTunnelTab('config')">🔧 自定义配置</button>
+                                <button class="btn btn-sm btn-primary" onclick="window._selectTunnelMode('public');switchTunnelTab('config')"><span class="ms ms-sm" style="color:#34d399">public</span> 一键启用公共节点</button>
+                                <button class="btn btn-sm" onclick="switchTunnelTab('config')"><span class="ms ms-sm" style="color:#fb923c">build</span> 自定义配置</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- 日志 -->
                     <div class="section-header">
-                        <div class="section-title">📜 Tunnel 日志</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> Tunnel 日志</div>
                     </div>
                     <div>
                         <div class="log-box" id="tunnel-log-content">加载中...</div>
@@ -2984,7 +3104,7 @@
                     <div id="tunnel-mode-selector" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                         <div class="card card-padded tunnel-mode-card" id="tunnel-mode-public" onclick="window._selectTunnelMode('public')" style="cursor:pointer;border:2px solid transparent;transition:border-color .2s">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                                <span style="font-size:1.3rem">🌍</span>
+                                <span style="font-size:1.3rem"><span class="ms" style="color:#34d399">public</span></span>
                                 <span style="font-weight:700;font-size:1rem">公共节点</span>
                                 <span style="font-size:.65rem;background:var(--green);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
                             </div>
@@ -2995,7 +3115,7 @@
                         </div>
                         <div class="card card-padded tunnel-mode-card" id="tunnel-mode-custom" onclick="window._selectTunnelMode('custom')" style="cursor:pointer;border:2px solid transparent;transition:border-color .2s">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                                <span style="font-size:1.3rem">🔧</span>
+                                <span style="font-size:1.3rem"><span class="ms" style="color:#fb923c">build</span></span>
                                 <span style="font-weight:700;font-size:1rem">自定义 Tunnel</span>
                             </div>
                             <p style="color:var(--t2);font-size:.82rem;margin:0 0 10px 0;line-height:1.5">
@@ -3007,17 +3127,14 @@
 
                     <!-- 公共节点详情 (仅公共模式时显示) -->
                     <div id="tunnel-public-details" style="display:none">
-                        <div id="tunnel-public-active" style="display:none">
-                            <div class="section-header" style="margin-top:0">
-                                <div class="section-title">🌍 公共节点</div>
-                                <span style="font-size:.78rem;color:var(--green);font-weight:600" id="tunnel-public-status-badge">已启用</span>
-                            </div>
-                            <div id="tunnel-public-urls" class="tunnel-services" style="margin-bottom:16px"></div>
-                            <button class="btn btn-danger" onclick="window._tunnelPublicDisable()" style="margin-top:8px">❌ 停用公共节点</button>
+                        <div id="tunnel-public-active" style="display:none;text-align:center;padding:48px 20px">
+                            <div style="font-size:1.1rem;color:var(--t1);margin-bottom:8px;font-weight:600">公共节点已启用</div>
+                            <div style="font-size:.85rem;color:var(--t3);margin-bottom:32px">请至「服务」页查看详情与链接</div>
+                            <button class="btn btn-lg btn-danger" onclick="window._tunnelPublicDisable()">停用公共节点</button>
                         </div>
                         <div id="tunnel-public-inactive" style="display:none;text-align:center;padding:24px">
                             <div style="font-size:1rem;margin-bottom:12px;color:var(--t2)">点击下方按钮一键启用公共 Tunnel</div>
-                            <button class="btn btn-primary" onclick="window._tunnelPublicEnable()" id="tunnel-public-enable-btn">🚀 启用公共节点</button>
+                            <button class="btn btn-primary" onclick="window._tunnelPublicEnable()" id="tunnel-public-enable-btn">启用公共节点</button>
                         </div>
                     </div>
 
@@ -3035,9 +3152,9 @@
                                             权限: <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">Tunnel Edit</code> + <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.7rem">DNS Edit</code>
                                         </p>
                                     </div>
-                                    <div style="display:flex;gap:4px">
-                                        <input type="password" id="tunnel-cfg-token" placeholder="CF Token" style="flex:1">
-                                        <button class="btn btn-sm" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password'" style="flex-shrink:0">👁️</button>
+                                    <div class="input-secret">
+                                        <input type="password" id="tunnel-cfg-token" placeholder="CF Token">
+                                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                                     </div>
                                 </div>
                             </div>
@@ -3062,8 +3179,8 @@
                         </div>
                         <div id="tunnel-cfg-result" style="display:none;margin:12px 0;font-size:.85rem"></div>
                         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding:12px 0">
-                            <button class="btn" onclick="window._tunnelCfgValidate()">🔍 验证 Token</button>
-                            <button class="btn btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelCfgSave()">💾 保存并应用</button>
+                            <button class="btn" onclick="window._tunnelCfgValidate()">验证 Token</button>
+                            <button class="btn btn-primary" id="tunnel-cfg-submit" onclick="window._tunnelCfgSave()">保存并应用</button>
                         </div>
                     </div><!-- /tunnel-custom-details -->
                 </div>
@@ -3073,7 +3190,7 @@
         <!-- 添加自定义服务弹窗 -->
         <div id="tunnel-addsvc-modal" class="modal-overlay" onclick="if(event.target===this){this.classList.remove('active')}">
             <div class="modal-box" style="width:clamp(400px,30vw,520px)">
-                <h3>➕ 添加自定义服务</h3>
+                <h3><span class="ms ms-sm" style="color:#34d399">add</span> 添加自定义服务</h3>
                 <div class="form-group">
                     <label>服务名称</label>
                     <input type="text" id="tunnel-addsvc-name" placeholder="如 MyApp">
@@ -3098,7 +3215,7 @@
                 </div>
                 <div class="form-actions">
                     <button class="btn btn-sm" onclick="document.getElementById('tunnel-addsvc-modal').classList.remove('active')">取消</button>
-                    <button class="btn btn-sm btn-primary" onclick="window._tunnelAddServiceSubmit()">✅ 添加</button>
+                    <button class="btn btn-sm btn-primary" onclick="window._tunnelAddServiceSubmit()">添加</button>
                 </div>
             </div>
         </div>
@@ -3107,20 +3224,20 @@
         <div id="page-comfyui" class="page hidden">
             <div class="page-header">
                 <div class="page-title-group">
-                    <h2>🖥️ ComfyUI</h2>
+                    <h2><span class="ms" style="color:#22d3ee">terminal</span> ComfyUI</h2>
                     <span id="comfyui-header-badge" class="page-status-badge"></span>
                 </div>
                 <div class="top-toolbar">
                     <span id="comfyui-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
                 <!-- Sub-tabs -->
                 <div class="tabs">
-                    <div class="tab active" data-comfy-tab="console" onclick="switchComfyTab('console')">🖥️ 控制台</div>
-                    <div class="tab" data-comfy-tab="queue" onclick="switchComfyTab('queue')">📋 任务队列</div>
-                    <div class="tab" data-comfy-tab="history" onclick="switchComfyTab('history')">📜 生成历史</div>
+                    <div class="tab active" data-comfy-tab="console" onclick="switchComfyTab('console')"><span class="ms ms-sm" style="color:#22d3ee">terminal</span> 控制台</div>
+                    <div class="tab" data-comfy-tab="queue" onclick="switchComfyTab('queue')"><span class="ms ms-sm" style="color:#fb923c">queue</span> 任务队列</div>
+                    <div class="tab" data-comfy-tab="history" onclick="switchComfyTab('history')"><span class="ms ms-sm" style="color:#94a3b8">history</span> 生成历史</div>
                 </div>
 
                 <!-- Console sub-page (original content) -->
@@ -3135,7 +3252,7 @@
 
                     <!-- 启动参数 -->
                     <div class="section-header">
-                        <div class="section-title">⚙️ 启动参数</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">settings</span> 启动参数</div>
                         <div class="section-actions">
                             <span id="comfyui-params-status" style="font-size:.78rem;color:var(--t3)"></span>
                         </div>
@@ -3147,7 +3264,7 @@
 
                     <!-- 日志 -->
                     <div class="section-header">
-                        <div class="section-title">📜 ComfyUI 日志</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> ComfyUI 日志</div>
                     </div>
                     <div class="log-box" id="comfyui-log-content">加载中...</div>
                 </div>
@@ -3161,9 +3278,9 @@
 
                     <!-- 正在执行 -->
                     <div class="section-header" style="margin-top:0">
-                        <div class="section-title">▶ 正在执行</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#34d399">play_arrow</span> 正在执行</div>
                         <div class="section-actions">
-                            <button class="btn btn-sm btn-danger" onclick="comfyInterrupt()">⏹ 中断</button>
+                            <button class="btn btn-sm btn-danger" onclick="comfyInterrupt()">中断</button>
                         </div>
                     </div>
                     <div id="queue-running" style="margin-bottom:20px">
@@ -3172,9 +3289,9 @@
 
                     <!-- 等待队列 -->
                     <div class="section-header" style="margin-top:0">
-                        <div class="section-title">⏳ 等待队列</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:var(--amber)">hourglass_top</span> 等待队列</div>
                         <div class="section-actions">
-                            <button class="btn btn-sm" onclick="comfyClearQueue()">🗑️ 清空</button>
+                            <button class="btn btn-sm" onclick="comfyClearQueue()">清空</button>
                         </div>
                     </div>
                     <div id="queue-pending" style="margin-bottom:20px">
@@ -3184,12 +3301,12 @@
 
                 <!-- History sub-page -->
                 <div id="comfy-tab-history" class="hidden">
-                    <div class="top-toolbar" style="margin-bottom:14px">
+                    <div class="toolbar" style="margin-bottom:14px">
                         <span id="history-total" style="font-size:.82rem;color:var(--t3)"></span>
-                        <div style="flex:1"></div>
+                        <div class="toolbar-spacer"></div>
                         <select id="history-sort-select" onchange="setHistorySort(this.value)" style="width:auto;min-width:100px">
-                            <option value="desc" selected>🔽 新→旧</option>
-                            <option value="asc">🔼 旧→新</option>
+                            <option value="desc" selected>新→旧</option>
+                            <option value="asc">旧→新</option>
                         </select>
                         <select id="history-size-select" onchange="setHistorySize(this.value)" style="width:auto;min-width:100px">
                             <option value="sm">紧凑</option>
@@ -3207,17 +3324,17 @@
         <!-- ========== Plugins Page ========== -->
         <div id="page-plugins" class="page hidden">
             <div class="page-header">
-                <h2>🧩 插件管理</h2>
+                <h2><span class="ms" style="color:#a78bfa">extension</span> 插件管理</h2>
                 <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
                 <div class="tabs">
-                    <div class="tab active" data-ptab="installed" onclick="switchPluginTab('installed')">📦 已安装</div>
-                    <div class="tab" data-ptab="browse" onclick="switchPluginTab('browse')">🔎 浏览</div>
-                    <div class="tab" data-ptab="git" onclick="switchPluginTab('git')">🔗 Git 安装</div>
-                    <span id="plugin-queue-indicator" class="hidden" style="font-size:.78rem;color:var(--amber);margin-left:auto">⏳ 队列处理中...</span>
+                    <div class="tab active" data-ptab="installed" onclick="switchPluginTab('installed')"><span class="ms ms-sm" style="color:#a78bfa">inventory_2</span> 已安装</div>
+                    <div class="tab" data-ptab="browse" onclick="switchPluginTab('browse')"><span class="ms ms-sm" style="color:#60a5fa">search</span> 浏览</div>
+                    <div class="tab" data-ptab="git" onclick="switchPluginTab('git')"><span class="ms ms-sm" style="color:#60a5fa">link</span> Git 安装</div>
+                    <span id="plugin-queue-indicator" class="hidden" style="font-size:.78rem;color:var(--amber);margin-left:auto"><span class="ms ms-sm" style="color:var(--amber)">hourglass_top</span> 队列处理中...</span>
                 </div>
                 <!-- Installed Plugins Tab -->
                 <div id="ptab-installed">
@@ -3230,9 +3347,9 @@
                             <option value="update">有更新</option>
                         </select>
                         <div class="toolbar-spacer"></div>
-                        <button class="btn btn-sm" onclick="loadPluginsPage()" style="font-size:.75rem;padding:4px 10px">🔄 刷新</button>
-                        <button class="btn btn-sm" onclick="window._checkPluginUpdates()" style="font-size:.75rem;padding:4px 10px" title="强制 ComfyUI-Manager 重新检查所有插件更新 (耗时较长)">🔍 检查更新</button>
-                        <button class="btn btn-sm btn-primary" onclick="updateAllPlugins()" style="font-size:.75rem;padding:4px 10px">⬆️ 全部更新</button>
+                        <button class="btn btn-sm" onclick="loadPluginsPage()">刷新</button>
+                        <button class="btn btn-sm" onclick="window._checkPluginUpdates()" title="强制 ComfyUI-Manager 重新检查所有插件更新 (耗时较长)">检查更新</button>
+                        <button class="btn btn-sm btn-primary" onclick="updateAllPlugins()">全部更新</button>
                     </div>
                     <div id="plugin-installed-stats" style="font-size:.82rem;color:var(--t2);margin-bottom:12px"></div>
                     <div id="plugin-installed-list"></div>
@@ -3241,7 +3358,8 @@
                 <div id="ptab-browse" class="hidden">
                     <div class="toolbar">
                         <input type="text" id="plugin-search-input" placeholder="搜索插件名称或描述..." onkeydown="if(event.key==='Enter')searchPlugins()" style="flex:1;max-width:500px">
-                        <button class="btn btn-sm btn-primary" onclick="searchPlugins()">🔎 搜索</button>
+                        <button class="btn btn-sm btn-primary" onclick="searchPlugins()">搜索</button>
+                        <div class="toolbar-spacer"></div>
                         <select id="plugin-browse-sort" onchange="searchPlugins()" style="width:auto;min-width:120px">
                             <option value="stars">按热度</option>
                             <option value="update">最近更新</option>
@@ -3257,7 +3375,7 @@
                 <!-- Git Install Tab -->
                 <div id="ptab-git" class="hidden">
                     <div class="card card-padded">
-                        <h3 style="margin-bottom:12px;font-size:clamp(0.95rem,1.1vw,1.15rem)">🔗 通过 Git URL 安装插件</h3>
+                        <h3 style="margin-bottom:12px;font-size:clamp(0.95rem,1.1vw,1.15rem)"><span class="ms ms-sm" style="color:#60a5fa">link</span> 通过 Git URL 安装插件</h3>
                         <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px">输入插件的 GitHub 仓库地址，直接克隆并安装</p>
                         <div style="display:flex;gap:8px;margin-bottom:12px">
                             <input type="text" id="plugin-git-url" placeholder="https://github.com/author/ComfyUI-Plugin" style="flex:1">
@@ -3273,20 +3391,20 @@
         <div id="page-sync" class="page hidden">
             <div class="page-header">
                 <div class="page-title-group">
-                    <h2>☁️ Sync</h2>
+                    <h2><span class="ms" style="color:#34d399">cloud_sync</span> Sync</h2>
                     <span id="sync-header-badge" class="page-status-badge"></span>
                 </div>
                 <div class="top-toolbar">
                     <span id="sync-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
                 <!-- Sub-tabs -->
                 <div class="tabs">
-                    <div class="tab active" data-stab="remotes" onclick="switchSyncTab('remotes')">💾 存储 & 日志</div>
-                    <div class="tab" data-stab="rules" onclick="switchSyncTab('rules')">🔄 同步规则</div>
-                    <div class="tab" data-stab="config" onclick="switchSyncTab('config')">⚙️ 配置</div>
+                    <div class="tab active" data-stab="remotes" onclick="switchSyncTab('remotes')"><span class="ms ms-sm" style="color:#60a5fa">storage</span> 存储 & 日志</div>
+                    <div class="tab" data-stab="rules" onclick="switchSyncTab('rules')"><span class="ms ms-sm" style="color:#34d399">sync</span> 同步规则</div>
+                    <div class="tab" data-stab="config" onclick="switchSyncTab('config')"><span class="ms ms-sm" style="color:#94a3b8">settings</span> 配置</div>
                 </div>
 
                 <!-- Storage + Logs Tab -->
@@ -3297,7 +3415,7 @@
 
                     <!-- Inline Logs -->
                     <div class="section-header">
-                        <div class="section-title">📜 同步日志</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> 同步日志</div>
                     </div>
                     <div>
                         <div id="sync-log-content" class="sync-log-box">加载中...</div>
@@ -3313,7 +3431,7 @@
                 <div id="stab-config" class="hidden">
                     <!-- 同步设置: 两张卡片并排 -->
                     <div class="section-header" style="margin-top:0">
-                        <div class="section-title">⏱ 同步设置</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#fb923c">timer</span> 同步设置</div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                         <div class="card card-padded">
@@ -3344,17 +3462,17 @@
 
                     <!-- Rclone 配置编辑 -->
                     <div class="section-header">
-                        <div class="section-title">📋 Rclone 配置</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">description</span> Rclone 配置</div>
                     </div>
                     <textarea id="rclone-config-editor" class="rclone-config-editor" spellcheck="false" placeholder="加载中..."></textarea>
 
                     <!-- 底部操作栏 -->
                     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:12px 0">
                         <label class="btn" style="cursor:pointer">
-                            📤 上传本地文件
+                            <span class="ms ms-sm" style="color:#60a5fa">upload</span> 上传本地文件
                             <input type="file" accept=".conf,.txt" onchange="uploadRcloneFile(event)" style="display:none">
                         </label>
-                        <button class="btn btn-primary" onclick="saveSyncConfigAll()">💾 保存</button>
+                        <button class="btn btn-primary" onclick="saveSyncConfigAll()">保存</button>
                     </div>
                 </div>
             </div>
@@ -3364,19 +3482,19 @@
         <div id="page-ssh" class="page hidden">
             <div class="page-header">
                 <div class="page-title-group">
-                    <h2>🔑 SSH</h2>
+                    <h2><span class="ms" style="color:#fbbf24">key</span> SSH</h2>
                     <span id="ssh-header-badge" class="page-status-badge"></span>
                 </div>
                 <div class="top-toolbar">
                     <span id="ssh-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
                 <!-- Sub-tabs -->
                 <div class="tabs">
-                    <div class="tab active" data-sshtab="status" onclick="window.switchSSHTab('status')">🔗 服务 & 日志</div>
-                    <div class="tab" data-sshtab="config" onclick="window.switchSSHTab('config')">⚙️ 密钥 & 密码</div>
+                    <div class="tab active" data-sshtab="status" onclick="window.switchSSHTab('status')"><span class="ms ms-sm" style="color:#60a5fa">link</span> 服务 & 日志</div>
+                    <div class="tab" data-sshtab="config" onclick="window.switchSSHTab('config')"><span class="ms ms-sm" style="color:#94a3b8">settings</span> 密钥 & 密码</div>
                 </div>
 
                 <!-- Status Tab -->
@@ -3388,7 +3506,7 @@
 
                     <!-- SSH 连接命令 -->
                     <div class="section-header" style="margin-top:0">
-                        <div class="section-title">📋 连接命令</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#60a5fa">content_paste</span> 连接命令</div>
                     </div>
                     <div class="card" style="padding:12px 14px">
                         <div id="ssh-connect-cmd">
@@ -3398,7 +3516,7 @@
 
                     <!-- 日志 -->
                     <div class="section-header">
-                        <div class="section-title">📜 SSH 日志</div>
+                        <div class="section-title"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> SSH 日志</div>
                     </div>
                     <div>
                         <div class="log-box" id="ssh-log-content">加载中...</div>
@@ -3411,7 +3529,7 @@
                         <!-- 公钥管理 -->
                         <div>
                             <div class="section-header" style="margin-top:0">
-                                <div class="section-title">🔐 授权公钥</div>
+                                <div class="section-title"><span class="ms ms-sm" style="color:#fbbf24">lock</span> 授权公钥</div>
                             </div>
                             <div id="ssh-keys-list">
                                 <div style="color:var(--t3);font-size:.85rem;padding:12px 0">加载中...</div>
@@ -3421,16 +3539,28 @@
                         <!-- Root 密码 -->
                         <div>
                             <div class="section-header" style="margin-top:0">
-                                <div class="section-title">🔒 Root 密码</div>
+                                <div class="section-title"><span class="ms ms-sm" style="color:#fbbf24">lock</span> Root 密码</div>
                             </div>
                             <div class="card" style="padding:14px">
                                 <div style="display:flex;flex-direction:column;gap:10px">
-                                    <input type="password" id="ssh-pw-new" placeholder="新密码"
-                                           style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
-                                    <input type="password" id="ssh-pw-confirm" placeholder="确认密码"
-                                           style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
-                                    <button class="btn btn-primary" onclick="window.setSSHPassword()" style="align-self:flex-start">设置密码</button>
-                                    <div style="font-size:.72rem;color:var(--t3);line-height:1.4">设置后将自动启用密码认证、PermitRootLogin 并重启 sshd</div>
+                                    <div class="input-secret">
+                                        <input type="password" id="ssh-pw-new" placeholder="新密码"
+                                               style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
+                                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                    </div>
+                                    <div class="input-secret">
+                                        <input type="password" id="ssh-pw-confirm" placeholder="确认密码"
+                                               style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
+                                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                    </div>
+                                    <div style="display:flex;align-items:center;justify-content:space-between">
+                                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+                                            <input type="checkbox" id="ssh-pw-sync" onchange="window._toggleSSHPwSync()" style="width:15px;height:15px">
+                                            <span style="font-size:.82rem">使用 ComfyCarry 密码</span>
+                                        </label>
+                                        <button class="btn btn-sm btn-primary" id="ssh-pw-submit-btn" onclick="window.setSSHPassword()">设置密码</button>
+                                    </div>
+                                    <span class="help-tip" data-tip="设置后将自动启用密码认证、PermitRootLogin 并重启 sshd"><span class="ms" style="color:#60a5fa">info</span></span>
                                 </div>
                             </div>
                         </div>
@@ -3442,10 +3572,10 @@
         <!-- ========== Settings Page ========== -->
         <div id="page-settings" class="page hidden">
             <div class="page-header">
-                <h2>⚙️ 设置</h2>
+                <h2><span class="ms" style="color:#94a3b8">settings</span> 设置</h2>
                 <div class="top-toolbar">
-                    <button class="btn" onclick="restartDashboard()">♻️ 重启</button>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">📦 配置</button>
+                    <button class="btn" onclick="restartDashboard()"><span class="ms ms-sm" style="color:#34d399">refresh</span> 重启</button>
+                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -3454,19 +3584,28 @@
                     <div class="settings-col">
                         <!-- 密码设置 -->
                         <div class="card card-padded">
-                            <h3>🔒 ComfyCarry 密码</h3>
+                            <h3><span class="ms ms-sm" style="color:#fbbf24">lock</span> ComfyCarry 密码</h3>
                             <form onsubmit="event.preventDefault();changePassword()" autocomplete="off">
                             <div class="form-group" style="margin-bottom:10px">
                                 <label>当前密码</label>
-                                <input type="password" id="settings-pw-current" placeholder="输入当前密码" autocomplete="current-password">
+                                <div class="input-secret">
+                                    <input type="password" id="settings-pw-current" placeholder="输入当前密码" autocomplete="current-password">
+                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                </div>
                             </div>
                             <div class="form-group" style="margin-bottom:10px">
                                 <label>新密码</label>
-                                <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
+                                <div class="input-secret">
+                                    <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
+                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                </div>
                             </div>
                             <div class="form-group" style="margin-bottom:12px">
                                 <label>确认新密码</label>
-                                <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码" autocomplete="new-password">
+                                <div class="input-secret">
+                                    <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码" autocomplete="new-password">
+                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                </div>
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary">更新密码</button>
                             </form>
@@ -3474,35 +3613,38 @@
 
                         <!-- CivitAI API Key -->
                         <div class="card card-padded">
-                            <h3>🎨 CivitAI API Key</h3>
+                            <h3><span class="ms ms-sm" style="color:#f472b6">palette</span> CivitAI API Key</h3>
                             <div id="settings-civitai-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
                             <div class="form-group" style="margin-bottom:12px">
                                 <label>API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
-                                <input type="text" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
+                                <div class="input-secret">
+                                    <input type="password" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
+                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                </div>
                             </div>
                             <div style="display:flex;gap:8px">
                                 <button class="btn btn-sm btn-primary" onclick="saveSettingsCivitaiKey()">保存</button>
-                                <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()">清除</button>
+                                <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()" title="清除"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
                             </div>
                         </div>
 
                         <!-- ComfyCarry API Key -->
                         <div class="card card-padded">
-                            <h3>🔑 ComfyCarry API Key</h3>
+                            <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key</h3>
                             <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
                                 用于外部脚本或应用通过 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">X-API-Key</code> 或 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">Bearer</code> 方式访问 API
                             </p>
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-                                <input type="password" id="settings-api-key" readonly style="flex:1;font-family:monospace;font-size:.82rem;letter-spacing:.5px">
-                                <button class="btn btn-sm" onclick="toggleApiKeyVisibility()" title="显示/隐藏" id="settings-api-key-toggle">👁️</button>
-                                <button class="btn btn-sm" onclick="copyApiKey()" title="复制">📋</button>
+                            <div class="input-secret" style="margin-bottom:12px">
+                                <input type="password" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
+                                <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                                <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm" style="color:#60a5fa">content_copy</span></button>
                             </div>
-                            <button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">🔄 重新生成</button>
+                            <button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">重新生成</button>
                         </div>
 
                         <!-- 重新初始化 -->
                         <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
-                            <h3 style="color:var(--red)">⚠️ 重新初始化</h3>
+                            <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化</h3>
                             <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
                                 删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留。
                             </p>
@@ -3512,13 +3654,13 @@
                                     <span>保留模型文件</span>
                                 </label>
                             </div>
-                            <button class="btn btn-sm btn-danger" onclick="reinitialize()">🗑️ 重新初始化</button>
+                            <button class="btn btn-sm btn-danger" onclick="reinitialize()">重新初始化</button>
                         </div>
                     </div>
 
                     <!-- 右列: ComfyCarry 日志 (Debug 模式) -->
                     <div class="card card-padded" id="settings-log-card" style="height:100%;min-height:400px;max-height:calc(100vh - 160px)">
-                        <h3 style="margin-bottom:12px">📜 ComfyCarry 日志</h3>
+                        <h3 style="margin-bottom:12px"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> ComfyCarry 日志</h3>
                         <div class="log-box" id="log-content" style="max-height:calc(100% - 50px);height:calc(100% - 50px)">加载中...</div>
                     </div>
                 </div>
@@ -3532,7 +3674,7 @@
         <div class="modal-box meta-modal-box">
             <div class="meta-header">
                 <h3 id="meta-title">模型详情</h3>
-                <button class="btn btn-sm" onclick="closeMetaModal()" style="margin-left:auto">✕</button>
+                <button class="btn btn-sm" onclick="closeMetaModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="meta-body"></div>
         </div>
@@ -3555,7 +3697,7 @@
         <div class="modal-box" style="width:500px">
             <div style="display:flex;align-items:center;margin-bottom:16px">
                 <h3 id="pv-title" style="margin-bottom:0">选择插件版本</h3>
-                <button class="btn btn-sm" onclick="closePluginVersionModal()" style="margin-left:auto">✕</button>
+                <button class="btn btn-sm" onclick="closePluginVersionModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="pv-body"></div>
         </div>
@@ -3565,16 +3707,16 @@
     <div class="modal-overlay" id="ie-modal" onclick="if(event.target===this)closeIEModal()">
         <div class="ie-modal-box">
             <div style="display:flex;align-items:center;margin-bottom:16px">
-                <h3 style="margin-bottom:0">📦 导入/导出配置</h3>
-                <button class="btn btn-sm" onclick="closeIEModal()" style="margin-left:auto">✕</button>
+                <h3 style="margin-bottom:0"><span class="ms ms-sm" style="color:#a78bfa">package_2</span> 导入/导出配置</h3>
+                <button class="btn btn-sm" onclick="closeIEModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div class="ie-section">
-                <h4>📤 导出配置</h4>
+                <h4><span class="ms ms-sm" style="color:#60a5fa">upload</span> 导出配置</h4>
                 <p>导出当前 ComfyCarry 的密码、CivitAI 密钥、同步偏好等配置为 JSON 文件</p>
                 <button class="btn btn-sm btn-primary" onclick="exportConfig()">导出配置文件</button>
             </div>
             <div class="ie-section">
-                <h4>📥 导入配置</h4>
+                <h4><span class="ms ms-sm" style="color:#60a5fa">download</span> 导入配置</h4>
                 <p>从之前导出的 JSON 文件恢复配置</p>
                 <label class="btn btn-sm btn-primary" style="cursor:pointer;display:inline-block">
                     选择文件导入
@@ -3589,7 +3731,7 @@
         <div class="modal-box" style="width:520px">
             <div style="display:flex;align-items:center;margin-bottom:16px">
                 <h3 id="add-remote-title" style="margin-bottom:0">添加存储服务</h3>
-                <button class="btn btn-sm" onclick="closeSyncModal('add-remote-modal')" style="margin-left:auto">✕</button>
+                <button class="btn btn-sm" onclick="closeSyncModal('add-remote-modal')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="add-remote-body"></div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
@@ -3604,7 +3746,7 @@
         <div class="modal-box" style="width:600px">
             <div style="display:flex;align-items:center;margin-bottom:16px">
                 <h3 id="add-rule-title" style="margin-bottom:0">添加同步规则</h3>
-                <button class="btn btn-sm" onclick="closeSyncModal('add-rule-modal')" style="margin-left:auto">✕</button>
+                <button class="btn btn-sm" onclick="closeSyncModal('add-rule-modal')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="add-rule-body"></div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
@@ -3618,8 +3760,8 @@
     <div class="modal-overlay" id="remote-browse-modal" onclick="if(event.target===this)closeSyncModal('remote-browse-modal')" style="z-index:1002">
         <div class="modal-box" style="width:480px;max-height:70vh;display:flex;flex-direction:column">
             <div style="display:flex;align-items:center;margin-bottom:12px">
-                <h3 style="margin-bottom:0" id="browse-modal-title">📂 浏览目录</h3>
-                <button class="btn btn-sm" onclick="closeSyncModal('remote-browse-modal')" style="margin-left:auto">✕</button>
+                <h3 style="margin-bottom:0" id="browse-modal-title"><span class="ms ms-sm" style="color:#fbbf24">folder_open</span> 浏览目录</h3>
+                <button class="btn btn-sm" onclick="closeSyncModal('remote-browse-modal')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="browse-breadcrumb" style="font-size:.78rem;color:var(--t2);margin-bottom:8px;word-break:break-all"></div>
             <div id="browse-tree" style="flex:1;overflow-y:auto;min-height:200px;max-height:45vh;border:1px solid var(--bd);border-radius:8px;padding:4px"></div>
@@ -3636,6 +3778,21 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <!-- Global utility functions -->
+    <script>
+        function toggleSecret(btn) {
+            const input = btn.closest('.input-secret').querySelector('input');
+            const hidden = input.type === 'password';
+            input.type = hidden ? 'text' : 'password';
+            btn.querySelector('.ms').textContent = hidden ? 'visibility_off' : 'visibility';
+            btn.title = hidden ? '隐藏' : '显示';
+        }
+        function copySecret(btn) {
+            const input = btn.closest('.input-secret').querySelector('input');
+            navigator.clipboard.writeText(input.value);
+            if (window.showToast) showToast('已复制');
+        }
+    </script>
     <script type="module" src="/static/js/main.js"></script>
 </body>
 

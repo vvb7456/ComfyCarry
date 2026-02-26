@@ -3,13 +3,11 @@
  * JupyterLab 页面: 状态监控、会话管理、内核管理、日志、Token
  */
 
-import { registerPage, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError } from './core.js';
+import { registerPage, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError, msIcon } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _autoRefresh = null;
 let _jupyterUrl = '';
-let _tokenVisible = false;
-let _cachedToken = '';
 let _jupyterLogStream = null;
 
 // ── 页面生命周期 ─────────────────────────────────────────────
@@ -81,8 +79,8 @@ async function loadJupyterStatus() {
     const controls = document.getElementById('jupyter-header-controls');
     if (controls) {
       controls.innerHTML = d.online || pm2St === 'online'
-        ? `<button class="btn" onclick="window._stopJupyter()">⏹ 停止</button><button class="btn" onclick="window._restartJupyter()">♻️ 重启</button>`
-        : `<button class="btn" onclick="window._startJupyter()">▶ 启动</button>`;
+        ? `<button class="btn" onclick="window._stopJupyter()">${msIcon('stop')} 停止</button><button class="btn" onclick="window._restartJupyter()">${msIcon('restart_alt')} 重启</button>`
+        : `<button class="btn" onclick="window._startJupyter()">${msIcon('play_arrow')} 启动</button>`;
     }
 
     // Version info in body (no status header)
@@ -126,7 +124,7 @@ async function loadJupyterStatus() {
       html += '<span style="font-size:.78rem;color:var(--t3);margin-right:8px">可用内核:</span>';
       d.kernelspecs.forEach(ks => {
         const isDefault = ks.name === d.default_kernel;
-        html += `<span class="jupyter-ks-badge${isDefault ? ' default' : ''}">${escHtml(ks.display_name)}${isDefault ? ' ✓' : ''}</span>`;
+        html += `<span class="jupyter-ks-badge${isDefault ? ' default' : ''}">${escHtml(ks.display_name)}${isDefault ? ` ${msIcon('check')}` : ''}</span>`;
       });
       html += '</div>';
     }
@@ -170,8 +168,8 @@ function renderKernelsList(kernels) {
         ${k.connections > 0 ? `<span style="font-size:.75rem;color:var(--t3)">${k.connections} 连接</span>` : ''}
       </div>
       <div class="jupyter-kernel-actions">
-        <button class="btn btn-sm" onclick="window._kernelAction('${k.id}','interrupt')" title="中断">⏸</button>
-        <button class="btn btn-sm" onclick="window._kernelAction('${k.id}','restart')" title="重启">♻️</button>
+        <button class="btn btn-sm" onclick="window._kernelAction('${k.id}','interrupt')" title="中断">${msIcon('pause')}</button>
+        <button class="btn btn-sm" onclick="window._kernelAction('${k.id}','restart')" title="重启">\u21bb</button>
       </div>
     </div>`;
   }).join('');
@@ -193,7 +191,7 @@ function renderSessionsList(sessions) {
   if (wrapper) wrapper.style.display = '';
 
   el.innerHTML = sessions.map(s => {
-    const icon = s.type === 'notebook' ? '📓' : s.type === 'console' ? '💻' : '📄';
+    const icon = s.type === 'notebook' ? msIcon('book_2') : s.type === 'console' ? msIcon('terminal') : msIcon('description');
     const kernelState = s.kernel_state === 'idle' ? '空闲' :
                         s.kernel_state === 'busy' ? '忙碌' : (s.kernel_state || '-');
     const stateColor = s.kernel_state === 'idle' ? 'var(--green)' :
@@ -208,7 +206,7 @@ function renderSessionsList(sessions) {
         </span>
       </div>
       <div class="jupyter-session-actions">
-        <button class="btn btn-sm btn-danger" onclick="window._closeSession('${s.id}')" title="关闭会话">✕</button>
+        <button class="btn btn-sm btn-danger" onclick="window._closeSession('${s.id}')" title="关闭会话">${msIcon('close')}</button>
       </div>
     </div>`;
   }).join('');
@@ -238,14 +236,14 @@ function renderTerminalsList(terminals) {
       const base = _jupyterUrl.split('?')[0];
       const tokenPart = _jupyterUrl.includes('?') ? _jupyterUrl.substring(_jupyterUrl.indexOf('?')) : '';
       const termUrl = `${base}/terminals/${encodeURIComponent(t.name)}${tokenPart}`;
-      openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-xs btn-primary" title="在 JupyterLab 中打开">🔗</a>`;
+      openBtn = `<a href="${termUrl}" target="_blank" class="btn btn-xs btn-primary" title="在 JupyterLab 中打开">打开</a>`;
     }
 
     return `<div class="jupyter-terminal-item" style="display:inline-flex">
-      <span style="font-size:1rem">💻</span>
+      <span style="font-size:1rem">${msIcon('terminal')}</span>
       <span style="font-weight:600;font-size:.85rem">终端 ${escHtml(t.name)}</span>
       ${openBtn}
-      <button class="btn btn-xs btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">✕</button>
+      <button class="btn btn-sm btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">${msIcon('close')}</button>
     </div>`;
   }).join('')}${addCard}</div>`;
 }
@@ -255,7 +253,7 @@ async function _newJupyterTerminal() {
     const r = await fetch('/api/jupyter/terminals/new', { method: 'POST' });
     const d = await r.json();
     if (r.ok) {
-      showToast(`✅ 终端 ${d.name || ''} 已创建`);
+      showToast(`终端 ${d.name || ''} 已创建`);
       loadJupyterStatus();
     } else {
       showToast(d.error || '创建失败');
@@ -269,7 +267,7 @@ async function _deleteJupyterTerminal(name) {
     const r = await fetch(`/api/jupyter/terminals/${encodeURIComponent(name)}`, { method: 'DELETE' });
     const d = await r.json();
     if (r.ok) {
-      showToast(`✅ 终端 ${name} 已销毁`);
+      showToast(`终端 ${name} 已销毁`);
       loadJupyterStatus();
     } else {
       showToast(d.error || '销毁失败');
@@ -304,51 +302,6 @@ function _stopJupyterLogStream() {
   if (_jupyterLogStream) { _jupyterLogStream.stop(); _jupyterLogStream = null; }
 }
 
-// ── Token 显示/隐藏 ─────────────────────────────────────────
-
-async function _toggleJupyterToken() {
-  const valEl = document.getElementById('jupyter-token-value');
-  const btnEl = document.getElementById('jupyter-token-toggle');
-  if (!valEl) return;
-
-  if (_tokenVisible) {
-    valEl.type = 'password';
-    valEl.value = _cachedToken || '';
-    btnEl.textContent = '👁';
-    _tokenVisible = false;
-  } else {
-    if (!_cachedToken) {
-      try {
-        const r = await fetch('/api/jupyter/token');
-        const d = await r.json();
-        _cachedToken = d.token || '(未找到)';
-      } catch (_) {
-        _cachedToken = '(获取失败)';
-      }
-    }
-    valEl.type = 'text';
-    valEl.value = _cachedToken;
-    btnEl.textContent = '🙈';
-    _tokenVisible = true;
-  }
-}
-
-async function _copyJupyterToken() {
-  if (!_cachedToken) {
-    try {
-      const r = await fetch('/api/jupyter/token');
-      const d = await r.json();
-      _cachedToken = d.token || '';
-    } catch (_) {}
-  }
-  if (_cachedToken) {
-    copyText(_cachedToken);
-    showToast('📋 Token 已复制');
-  } else {
-    showToast('未找到 Token');
-  }
-}
-
 // ── 操作函数 ────────────────────────────────────────────────
 
 async function _startJupyter() {
@@ -356,8 +309,7 @@ async function _startJupyter() {
     const r = await fetch('/api/jupyter/start', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('▶ ' + (d.message || 'JupyterLab 启动中...'));
-      _cachedToken = '';
+      showToast(d.message || 'JupyterLab 启动中...');
       setTimeout(loadJupyterPage, 3000);
     } else {
       showToast('启动失败: ' + (d.error || ''));
@@ -371,8 +323,7 @@ async function _stopJupyter() {
     const r = await fetch('/api/jupyter/stop', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('⏹ JupyterLab 已停止');
-      _cachedToken = '';
+      showToast('JupyterLab 已停止');
       setTimeout(loadJupyterStatus, 1000);
     } else {
       showToast('停止失败: ' + (d.error || ''));
@@ -386,8 +337,7 @@ async function _restartJupyter() {
     const r = await fetch('/api/jupyter/restart', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('♻️ Jupyter 正在重启...');
-      _cachedToken = '';
+      showToast('Jupyter 正在重启...');
       setTimeout(loadJupyterPage, 5000);
     } else {
       showToast('重启失败: ' + (d.error || ''));
@@ -400,7 +350,7 @@ async function _kernelAction(kernelId, action) {
     const r = await fetch(`/api/jupyter/kernels/${kernelId}/${action}`, { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast(`✅ 内核已${action === 'restart' ? '重启' : '中断'}`);
+      showToast(`内核已${action === 'restart' ? '重启' : '中断'}`);
       setTimeout(loadJupyterStatus, 1000);
     } else {
       showToast('操作失败: ' + (d.error || ''));
@@ -414,7 +364,7 @@ async function _closeSession(sessionId) {
     const r = await fetch(`/api/jupyter/sessions/${sessionId}`, { method: 'DELETE' });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ 会话已关闭');
+      showToast('会话已关闭');
       setTimeout(loadJupyterStatus, 1000);
     } else {
       showToast('操作失败: ' + (d.error || ''));
@@ -427,7 +377,6 @@ async function _closeSession(sessionId) {
 Object.assign(window, {
   loadJupyterStatus,
   _newJupyterTerminal, _deleteJupyterTerminal,
-  _toggleJupyterToken, _copyJupyterToken,
   _startJupyter, _stopJupyter, _restartJupyter,
   _kernelAction, _closeSession,
 });
