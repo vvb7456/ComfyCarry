@@ -580,7 +580,7 @@ def _run_deploy(config):
 
         # STEP 7: 插件安装
         _deploy_step("安装插件")
-        plugins = config.get("plugins", [])
+        plugins = [p for p in config.get("plugins", []) if p]
         _deploy_log("检查额外插件...")
         for url in plugins:
             if url == "comfycarry_ws_broadcast":

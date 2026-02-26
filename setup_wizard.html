@@ -2197,7 +2197,7 @@
 
         function getSelectedPlugins() {
             const urls = [];
-            document.querySelectorAll('#plugin-list input[type="checkbox"]').forEach(cb => {
+            document.querySelectorAll('#plugin-list input[type="checkbox"][data-url]').forEach(cb => {
                 if (cb.checked) urls.push(cb.dataset.url);
             });
             const extra = document.getElementById('input-extra-plugins').value.trim();
