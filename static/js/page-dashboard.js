@@ -11,7 +11,7 @@
  * 6. 环境信息栏 (Environment Info)
  */
 
-import { registerPage, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml, msIcon } from './core.js';
+import { registerPage, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml, msIcon, apiFetch, renderSkeleton } from './core.js';
 import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
 let _refreshTimer = null;
@@ -57,6 +57,16 @@ const _execTracker = createExecTracker({ onUpdate: _updateActivity });
 // ── 主刷新函数 ──────────────────────────────────────────────
 
 async function refreshOverview() {
+  // Inject skeleton placeholders while content is loading
+  const metricsEl = document.getElementById('overview-metrics');
+  if (metricsEl && (!metricsEl.innerHTML.trim() || metricsEl.querySelector('.skeleton'))) {
+    metricsEl.innerHTML = renderSkeleton('stat-cards', 4);
+  }
+  const svcEl = document.getElementById('overview-svc-tbody');
+  if (svcEl && (!svcEl.innerHTML.trim() || svcEl.querySelector('.skeleton'))) {
+    svcEl.innerHTML = renderSkeleton('service-list', 5);
+  }
+
   try {
     const r = await fetch('/api/overview');
     if (!r.ok) return;
@@ -393,11 +403,10 @@ function _renderServices(svcData) {
 
 // 暴露到 window，供 onclick 调用
 window._svcAction = async function(name, action) {
-  try {
-    await fetch(`/api/services/${name}/${action}`, { method: 'POST' });
-    showToast(`${action} ${name} 完成`);
-    setTimeout(refreshOverview, 1000);
-  } catch (e) { showToast('操作失败: ' + e.message); }
+  const d = await apiFetch(`/api/services/${name}/${action}`, { method: 'POST' });
+  if (!d) return;
+  showToast(`${action} ${name} 完成`);
+  setTimeout(refreshOverview, 1000);
 };
 
 // ── 6. 环境信息 ─────────────────────────────────────────────

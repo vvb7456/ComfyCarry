@@ -7,7 +7,8 @@ import {
   registerPage, registerEscapeHandler,
   fmtBytes, fmtPct, showToast, copyText, openImg, escHtml,
   apiKey, getAuthHeaders, getBadgeClass, CIVITAI_API_BASE,
-  renderLoading, renderError, renderEmpty, msIcon
+  renderLoading, renderError, renderEmpty, msIcon, apiFetch,
+  renderSkeleton
 } from './core.js';
 
 // ── 页面内部状态 ─────────────────────────────────────────────
@@ -33,7 +34,7 @@ const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion
 
 // ── Model Tab 切换 ───────────────────────────────────────────
 
-const modelTabIds = ['local', 'civitai', 'downloads'];
+const modelTabIds = ['local', 'civitai', 'downloads', 'workflow'];
 
 function switchModelTab(tab) {
   currentModelTab = tab;
@@ -42,6 +43,7 @@ function switchModelTab(tab) {
   if (tab === 'local') loadLocalModels();
   else if (tab === 'civitai') loadFacets();
   else if (tab === 'downloads') { renderDownloadsTab(); startDlStatusPolling(); }
+  else if (tab === 'workflow') _initWorkflowDropZone();
 }
 
 // ========== Metadata Modal ==========
@@ -245,7 +247,9 @@ async function loadLocalModels() {
   const grid = document.getElementById('local-models-grid');
   const status = document.getElementById('local-models-status');
   const cat = document.getElementById('model-category').value;
-  grid.innerHTML = renderLoading('扫描模型文件...');
+  if (!grid.children.length || grid.querySelector('.skeleton-wrap')) {
+    grid.innerHTML = renderSkeleton('model-grid', 6);
+  }
   status.innerHTML = '';
 
   try {
@@ -425,15 +429,13 @@ async function deleteModel(idx) {
   const m = localModelsData[idx];
   if (!m) return;
   if (!confirm(`确定删除 ${m.filename}？\n此操作不可恢复！`)) return;
-  try {
-    const r = await fetch('/api/local_models/delete', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ abs_path: m.abs_path })
-    });
-    const d = await r.json();
-    if (d.ok) { showToast(`已删除 ${m.filename}`); loadLocalModels(); }
-    else showToast('删除失败: ' + (d.error || ''));
-  } catch (e) { showToast('请求失败: ' + e.message); }
+  const d = await apiFetch('/api/local_models/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ abs_path: m.abs_path })
+  });
+  if (!d) return;
+  if (d.ok) { showToast(`已删除 ${m.filename}`); loadLocalModels(); }
+  else showToast('删除失败: ' + (d.error || ''));
 }
 
 // ========== CivitAI Search ==========
@@ -532,7 +534,7 @@ async function searchModels(page = 0, append = false) {
   errEl.innerHTML = '';
   loading.classList.remove('hidden');
   if (!append) {
-    results.innerHTML = ''; pag.innerHTML = '';
+    results.innerHTML = renderSkeleton('model-grid', 6); pag.innerHTML = '';
     // Preserve cache entries for models already in cart
     const cartKeys = new Set(selectedModels.keys());
     searchResultsCache = Object.fromEntries(
@@ -715,17 +717,15 @@ async function downloadFromSearch(modelId, modelType) {
 
 async function doDownload(modelId, modelType, versionId) {
   showToast(`正在发送下载请求: ${modelId}${versionId ? ' (v' + versionId + ')' : ''}...`);
-  try {
-    const payload = { model_id: modelId, model_type: modelType };
-    if (versionId) payload.version_id = versionId;
-    const r = await fetch('/api/download', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const d = await r.json();
-    if (d.error) showToast(d.error);
-    else showToast(d.message || '下载任务已提交');
-  } catch (e) { showToast('请求失败: ' + e.message); }
+  const payload = { model_id: modelId, model_type: modelType };
+  if (versionId) payload.version_id = versionId;
+  const d = await apiFetch('/api/download', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!d) return;
+  if (d.error) showToast(d.error);
+  else showToast(d.message || '下载任务已提交');
 }
 
 // ========== Version Picker ==========
@@ -893,16 +893,14 @@ async function batchDownloadCart() {
   for (const [id, m] of selectedModels) {
     const modelType = (m.type || 'Checkpoint').toLowerCase();
     const versionId = m.versionId || null;
-    try {
-      const payload = { model_id: id, model_type: modelType };
-      if (versionId) payload.version_id = versionId;
-      const r = await fetch('/api/download', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const d = await r.json();
-      if (d.error) { fail++; } else { ok++; }
-    } catch (e) { fail++; }
+    const payload = { model_id: id, model_type: modelType };
+    if (versionId) payload.version_id = versionId;
+    const d = await apiFetch('/api/download', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!d) { fail++; continue; }
+    if (d.error) { fail++; } else { ok++; }
   }
   showToast(`批量下载: ${ok} 个已提交${fail > 0 ? `, ${fail} 个失败` : ''}`);
 }
@@ -1059,28 +1057,24 @@ function stopDlStatusPolling() {
 }
 
 async function cancelDownload(id) {
-  try {
-    await fetch('/api/download/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
-    showToast('已取消');
-    refreshDownloadStatus();
-  } catch (e) { showToast('取消失败: ' + e.message); }
+  const d = await apiFetch('/api/download/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
+  if (!d) return;
+  showToast('已取消');
+  refreshDownloadStatus();
 }
 
 async function retryDownload(id) {
-  try {
-    const r = await fetch('/api/download/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
-    const d = await r.json();
-    showToast(d.message || '已重试');
-    refreshDownloadStatus();
-  } catch (e) { showToast('重试失败: ' + e.message); }
+  const d = await apiFetch('/api/download/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
+  if (!d) return;
+  showToast(d.message || '已重试');
+  refreshDownloadStatus();
 }
 
 async function clearDlHistory() {
-  try {
-    await fetch('/api/download/clear_history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    showToast('历史已清除');
-    refreshDownloadStatus();
-  } catch (e) { showToast('清除失败: ' + e.message); }
+  const d = await apiFetch('/api/download/clear_history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!d) return;
+  showToast('历史已清除');
+  refreshDownloadStatus();
 }
 
 // ========== Download Tabs ==========
@@ -1228,3 +1222,165 @@ window.copyText = copyText;
 window.selectedModels = selectedModels;
 window.saveCartToStorage = saveCartToStorage;
 window.updateCartBadge = updateCartBadge;
+
+// ── 工作流解析 ──────────────────────────────────────────────
+
+let _wfDropInited = false;
+
+function _initWorkflowDropZone() {
+  if (_wfDropInited) return;
+  _wfDropInited = true;
+  const zone = document.getElementById('wf-drop-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleWorkflowFile(file);
+  });
+}
+
+/**
+ * 从 PNG 文件的 tEXt chunk 中提取 ComfyUI 元数据
+ */
+async function _extractPNGMetadata(file) {
+  const buf = await file.arrayBuffer();
+  const view = new DataView(buf);
+
+  // 验证 PNG signature
+  if (view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) {
+    throw new Error('不是有效的 PNG 文件');
+  }
+
+  let offset = 8; // 跳过 signature
+  const decoder = new TextDecoder('latin1');
+  const result = {};
+
+  while (offset < view.byteLength) {
+    const length = view.getUint32(offset);
+    offset += 4;
+    const typeBytes = new Uint8Array(buf, offset, 4);
+    const type = String.fromCharCode(...typeBytes);
+    offset += 4;
+
+    if (type === 'tEXt') {
+      const data = new Uint8Array(buf, offset, length);
+      // tEXt: keyword\0value
+      const nullIdx = data.indexOf(0);
+      if (nullIdx > 0) {
+        const key = decoder.decode(data.slice(0, nullIdx));
+        const val = new TextDecoder('utf-8').decode(data.slice(nullIdx + 1));
+        if (key === 'prompt' || key === 'workflow') {
+          try { result[key] = JSON.parse(val); } catch (_) {}
+        }
+      }
+    } else if (type === 'IEND') {
+      break;
+    }
+
+    offset += length + 4; // 跳过 data + CRC
+  }
+
+  return result;
+}
+
+async function handleWorkflowFile(file) {
+  if (!file) return;
+
+  const statusEl = document.getElementById('wf-parse-status');
+  const resultsEl = document.getElementById('wf-results');
+  const listEl = document.getElementById('wf-results-list');
+  const summaryEl = document.getElementById('wf-results-summary');
+
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = `<span style="color:var(--t2)"><span class="ms ms-sm" style="color:var(--ac)">hourglass_empty</span> 正在解析 ${escHtml(file.name)}...</span>`;
+  resultsEl.style.display = 'none';
+
+  try {
+    let payload;
+
+    if (file.name.endsWith('.json')) {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      // 判断是 prompt 还是 workflow 格式
+      if (json.nodes && Array.isArray(json.nodes)) {
+        payload = { workflow: json };
+      } else {
+        payload = { prompt: json };
+      }
+    } else if (file.name.endsWith('.png')) {
+      const meta = await _extractPNGMetadata(file);
+      if (meta.prompt) {
+        payload = { prompt: meta.prompt };
+      } else if (meta.workflow) {
+        payload = { workflow: meta.workflow };
+      } else {
+        statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> PNG 文件中未找到 ComfyUI 工作流数据</span>`;
+        return;
+      }
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 不支持的文件格式，请上传 PNG 或 JSON 文件</span>`;
+      return;
+    }
+
+    const data = await apiFetch('/api/models/parse-workflow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!data) {
+      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 解析请求失败</span>`;
+      return;
+    }
+
+    if (!data.models || data.models.length === 0) {
+      statusEl.innerHTML = `<span style="color:var(--amber)"><span class="ms ms-sm">info</span> 未找到模型引用</span>`;
+      return;
+    }
+
+    statusEl.style.display = 'none';
+    resultsEl.style.display = 'block';
+    summaryEl.textContent = `共 ${data.total} 个模型，${data.missing} 个缺失`;
+
+    listEl.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
+      data.models.map(m => {
+        const icon = m.exists
+          ? '<span class="ms ms-sm" style="color:var(--green)">check_circle</span>'
+          : '<span class="ms ms-sm" style="color:var(--red)">cancel</span>';
+        const statusText = m.exists
+          ? '<span style="color:var(--green);font-size:.8rem">已有</span>'
+          : '<span style="color:var(--red);font-size:.8rem">缺失</span>';
+        const searchBtn = m.exists
+          ? ''
+          : ` <button class="btn btn-sm btn-primary" onclick="searchModelFromWorkflow('${escHtml(m.name)}')" style="font-size:.75rem;padding:2px 8px">搜索</button>`;
+        return `<div class="wf-model-row">
+          <div class="wf-model-status">${icon}</div>
+          <div class="wf-model-name">${escHtml(m.name)}</div>
+          <div class="wf-model-type">${escHtml(m.type)}</div>
+          <div>${statusText}${searchBtn}</div>
+        </div>`;
+      }).join('') + '</div>';
+
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 解析失败: ${escHtml(e.message)}</span>`;
+  }
+
+  // 清空文件输入，允许再次选择同一文件
+  document.getElementById('wf-file-input').value = '';
+}
+
+function searchModelFromWorkflow(name) {
+  // 切换到 CivitAI 搜索 tab 并填入模型名
+  const searchInput = document.getElementById('search-input');
+  // 去掉扩展名作为搜索关键词
+  const keyword = name.replace(/\.(safetensors|ckpt|pt|pth|bin)$/i, '').replace(/[_-]/g, ' ');
+  if (searchInput) searchInput.value = keyword;
+  switchModelTab('civitai');
+  setTimeout(() => smartSearch(), 100);
+}
+
+window.handleWorkflowFile = handleWorkflowFile;
+window.searchModelFromWorkflow = searchModelFromWorkflow;

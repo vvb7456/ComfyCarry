@@ -9,6 +9,7 @@ ComfyCarry — 模型管理路由
 
 import json
 import os
+from pathlib import Path
 
 import requests
 from flask import Blueprint, Response, jsonify, request, send_file
@@ -138,11 +139,11 @@ def api_local_models():
 def api_model_preview():
     """返回模型预览图"""
     rel = request.args.get("path", "")
-    full = os.path.realpath(os.path.join(COMFYUI_DIR, rel))
+    full = Path(COMFYUI_DIR, rel).resolve()
     # 路径安全检查: 必须在 COMFYUI_DIR 内
-    if not full.startswith(os.path.realpath(COMFYUI_DIR) + os.sep):
+    if not full.is_relative_to(Path(COMFYUI_DIR).resolve()):
         return jsonify({"error": "路径越界"}), 403
-    if os.path.isfile(full):
+    if full.is_file():
         return send_file(full)
     return "", 404
 
@@ -151,25 +152,26 @@ def api_model_preview():
 def api_delete_model():
     """删除本地模型及其关联文件"""
     data = request.get_json(force=True) or {}
-    abs_path = os.path.realpath(data.get("abs_path", ""))
+    abs_path = Path(data.get("abs_path", "")).resolve()
+    comfy_root = Path(COMFYUI_DIR).resolve()
 
-    # 安全检查: realpath + 前缀匹配含 /
-    if not abs_path.startswith(os.path.realpath(COMFYUI_DIR) + os.sep):
+    # 安全检查: resolve() + is_relative_to()
+    if not abs_path.is_relative_to(comfy_root):
         return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
 
-    if not os.path.isfile(abs_path):
+    if not abs_path.is_file():
         return jsonify({"error": "文件不存在"}), 404
 
-    deleted = [abs_path]
-    os.remove(abs_path)
+    deleted = [str(abs_path)]
+    abs_path.unlink()
 
     # 删除关联文件
-    base_no_ext = os.path.splitext(abs_path)[0]
+    base_no_ext = abs_path.with_suffix("")
     for suffix in [".weilin-info.json", ".jpg", ".png", ".jpeg", ".webp", ".civitai.info"]:
-        companion = (abs_path + suffix) if suffix.startswith(".weilin") else (base_no_ext + suffix)
-        if os.path.exists(companion):
-            os.remove(companion)
-            deleted.append(companion)
+        companion = Path(str(abs_path) + suffix) if suffix.startswith(".weilin") else base_no_ext.with_suffix(suffix)
+        if companion.exists():
+            companion.unlink()
+            deleted.append(str(companion))
 
     return jsonify({"ok": True, "deleted": deleted})
 
@@ -178,13 +180,14 @@ def api_delete_model():
 def api_fetch_model_info():
     """通过 SHA256 从 CivitAI 获取模型元数据并保存"""
     data = request.get_json(force=True) or {}
-    abs_path = os.path.realpath(data.get("abs_path", ""))
+    abs_path = Path(data.get("abs_path", "")).resolve()
+    comfy_root = Path(COMFYUI_DIR).resolve()
 
-    # 安全检查: realpath + 前缀匹配含 /
-    if not abs_path.startswith(os.path.realpath(COMFYUI_DIR) + os.sep):
+    # 安全检查: resolve() + is_relative_to()
+    if not abs_path.is_relative_to(comfy_root):
         return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
 
-    if not os.path.isfile(abs_path):
+    if not abs_path.is_file():
         return jsonify({"error": "文件不存在"}), 404
 
     # 计算 SHA256
@@ -210,8 +213,8 @@ def api_fetch_model_info():
 
     # 构建 weilin-info.json
     info_data = {
-        "file": os.path.basename(abs_path),
-        "path": abs_path,
+        "file": abs_path.name,
+        "path": str(abs_path),
         "sha256": file_hash,
         "name": civitai_data.get("model", {}).get("name", ""),
         "type": civitai_data.get("model", {}).get("type", ""),
@@ -264,12 +267,12 @@ def api_fetch_model_info():
             info_data["images"].append(img_entry)
 
     # 保存 info json
-    info_path = f"{abs_path}.weilin-info.json"
+    info_path = str(abs_path) + ".weilin-info.json"
     with open(info_path, "w", encoding="utf-8") as f:
         json.dump(info_data, f, sort_keys=False, indent=2, ensure_ascii=False)
 
     # 下载预览图
-    base_no_ext = os.path.splitext(abs_path)[0]
+    base_no_ext = abs_path.with_suffix("")
     if info_data["images"]:
         first_img_url = info_data["images"][0].get("url", "")
         if first_img_url:
@@ -282,7 +285,7 @@ def api_fetch_model_info():
                         ext = ".jpeg"
                     elif "webp" in ct:
                         ext = ".webp"
-                    preview_path = base_no_ext + ext
+                    preview_path = str(base_no_ext) + ext
                     with open(preview_path, "wb") as pf:
                         for chunk in img_resp.iter_content(4096):
                             pf.write(chunk)
@@ -368,3 +371,156 @@ def api_download_clear_history():
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ====================================================================
+# 工作流模型依赖解析
+# ====================================================================
+
+# 节点 class_type → (输入字段, 模型类别)
+_MODEL_FIELD_MAP = {
+    "CheckpointLoaderSimple":  ("ckpt_name",          "checkpoints"),
+    "CheckpointLoader":        ("ckpt_name",          "checkpoints"),
+    "unCLIPCheckpointLoader":  ("ckpt_name",          "checkpoints"),
+    "LoraLoader":              ("lora_name",          "loras"),
+    "LoraLoaderModelOnly":     ("lora_name",          "loras"),
+    "ControlNetLoader":        ("control_net_name",   "controlnet"),
+    "VAELoader":               ("vae_name",           "vae"),
+    "UNETLoader":              ("unet_name",          "unet"),
+    "CLIPLoader":              ("clip_name",          "clip"),
+    "DualCLIPLoader":          ("clip_name1",         "clip"),
+    "UpscaleModelLoader":      ("model_name",         "upscale_models"),
+    "StyleModelLoader":        ("style_model_name",   "style_models"),
+    "IPAdapterModelLoader":    ("ipadapter_file",     "ipadapter"),
+    "InstantIDModelLoader":    ("instantid_file",     "instantid"),
+}
+
+# DualCLIPLoader has two clip fields
+_EXTRA_FIELDS = {
+    "DualCLIPLoader": [("clip_name2", "clip")],
+}
+
+
+def _extract_models_from_prompt(prompt: dict) -> list[dict]:
+    """从 ComfyUI prompt JSON 中提取模型引用列表"""
+    seen = set()
+    models = []
+
+    for _node_id, node in prompt.items():
+        if not isinstance(node, dict):
+            continue
+        class_type = node.get("class_type", "")
+        inputs = node.get("inputs", {})
+        if not isinstance(inputs, dict):
+            continue
+
+        # 主字段
+        if class_type in _MODEL_FIELD_MAP:
+            field, category = _MODEL_FIELD_MAP[class_type]
+            name = inputs.get(field)
+            if name and isinstance(name, str) and name not in seen:
+                seen.add(name)
+                models.append({"name": name, "type": category, "field": field, "node": class_type})
+
+        # 额外字段 (如 DualCLIPLoader 的 clip_name2)
+        if class_type in _EXTRA_FIELDS:
+            for field, category in _EXTRA_FIELDS[class_type]:
+                name = inputs.get(field)
+                if name and isinstance(name, str) and name not in seen:
+                    seen.add(name)
+                    models.append({"name": name, "type": category, "field": field, "node": class_type})
+
+    return models
+
+
+def _check_model_exists(name: str, category: str) -> bool:
+    """检查模型文件是否存在于本地"""
+    rel_dir = MODEL_DIRS.get(category, "")
+    if not rel_dir:
+        # 未知类别 — 搜索所有目录
+        for _cat, rd in MODEL_DIRS.items():
+            full = os.path.join(COMFYUI_DIR, rd, name)
+            if os.path.isfile(full):
+                return True
+        return False
+    full = os.path.join(COMFYUI_DIR, rel_dir, name)
+    return os.path.isfile(full)
+
+
+@bp.route("/api/models/parse-workflow", methods=["POST"])
+def api_parse_workflow():
+    """
+    解析工作流 JSON，提取模型引用并检查本地是否存在
+
+    Body: { "prompt": {...} }   — ComfyUI prompt 格式
+      或  { "workflow": {...} } — ComfyUI workflow 编辑器格式 (自动从中提取 prompt)
+
+    Response: {
+        "models": [
+            {"name": "xx.safetensors", "type": "checkpoints", "exists": true, "node": "CheckpointLoaderSimple"},
+            ...
+        ],
+        "total": 4,
+        "missing": 2
+    }
+    """
+    data = request.get_json(force=True, silent=True)
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    prompt = data.get("prompt")
+    workflow = data.get("workflow")
+
+    if prompt and isinstance(prompt, dict):
+        models = _extract_models_from_prompt(prompt)
+    elif workflow and isinstance(workflow, dict):
+        # workflow 编辑器格式: nodes 数组中有 widgets_values
+        # 尝试从 workflow.nodes 重建简化 prompt
+        nodes = workflow.get("nodes", [])
+        pseudo_prompt = {}
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            ct = node.get("type", "")
+            node_id = str(node.get("id", ""))
+            inputs_raw = node.get("widgets_values", [])
+            input_defs = node.get("inputs", [])
+            # 尝试将 widgets_values 映射到字段名
+            # 简化做法: 如果 class_type 在映射表中, 只需找到对应值
+            if ct in _MODEL_FIELD_MAP:
+                field, category = _MODEL_FIELD_MAP[ct]
+                # widgets_values 中的第一个字符串通常是模型名
+                for val in (inputs_raw if isinstance(inputs_raw, list) else []):
+                    if isinstance(val, str) and (
+                        val.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))
+                        or '/' in val  # 子目录的模型名
+                        or val.count('.') >= 1  # 有扩展名
+                    ):
+                        pseudo_prompt[node_id] = {
+                            "class_type": ct,
+                            "inputs": {field: val}
+                        }
+                        break
+            # DualCLIPLoader extra fields
+            if ct in _EXTRA_FIELDS:
+                for field, category in _EXTRA_FIELDS[ct]:
+                    for val in (inputs_raw if isinstance(inputs_raw, list) else []):
+                        if isinstance(val, str) and (
+                            val.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))
+                            or '/' in val
+                        ):
+                            if node_id not in pseudo_prompt:
+                                pseudo_prompt[node_id] = {"class_type": ct, "inputs": {}}
+                            pseudo_prompt[node_id]["inputs"][field] = val
+                            break
+
+        models = _extract_models_from_prompt(pseudo_prompt)
+    else:
+        return jsonify({"error": "需要 prompt 或 workflow 字段"}), 400
+
+    # 检查本地存在性
+    for m in models:
+        m["exists"] = _check_model_exists(m["name"], m["type"])
+
+    missing = sum(1 for m in models if not m["exists"])
+    return jsonify({"models": models, "total": len(models), "missing": missing})

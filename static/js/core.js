@@ -8,6 +8,18 @@
 export const CIVITAI_API_BASE = 'https://civitai.com/api/v1';
 export let apiKey = '';
 
+// ── 主题管理 ──────────────────────────────────────────────────
+
+/** 获取当前主题偏好 ('dark' | 'light' | 'system') */
+export function getTheme() { return localStorage.getItem('theme') || 'system'; }
+
+/** 设置并应用主题偏好 */
+export function applyTheme(pref) {
+  localStorage.setItem('theme', pref);
+  const isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = isDark ? '' : 'light';
+}
+
 // ── 页面注册表 ───────────────────────────────────────────────
 
 const _pages = {};          // name → { enter, leave }
@@ -301,4 +313,34 @@ export function renderError(msg) {
 /** 返回 empty-state HTML */
 export function renderEmpty(msg = '暂无数据') {
   return `<div class="empty-state">${escHtml(msg)}</div>`;
+}
+
+/**
+ * 返回骨架屏 HTML
+ * @param {'stat-cards'|'model-grid'|'plugin-list'|'service-list'|'table-rows'} type
+ * @param {number} [count] 骨架项数量
+ */
+export function renderSkeleton(type, count) {
+  switch (type) {
+    case 'stat-cards':
+      return `<div class="skeleton-row">${'<div class="skeleton skeleton-card" style="height:88px"></div>'.repeat(count || 4)}</div>`;
+    case 'model-grid':
+      return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">${
+        '<div class="skeleton skeleton-card" style="height:200px"></div>'.repeat(count || 6)
+      }</div>`;
+    case 'plugin-list':
+      return Array.from({length: count || 8}, () =>
+        '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div class="skeleton skeleton-text w80"></div><div class="skeleton skeleton-text w40"></div></div>'
+      ).join('');
+    case 'service-list':
+      return Array.from({length: count || 3}, () =>
+        '<div class="skeleton skeleton-card" style="height:64px;margin-bottom:8px"></div>'
+      ).join('');
+    case 'table-rows':
+      return Array.from({length: count || 5}, () =>
+        '<div class="skeleton-row"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text w60"></div><div class="skeleton skeleton-text w40"></div></div>'
+      ).join('');
+    default:
+      return '<div class="skeleton skeleton-card"></div>'.repeat(count || 1);
+  }
 }

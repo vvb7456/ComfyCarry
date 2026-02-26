@@ -3,7 +3,7 @@
  * ComfyUI 页面模块: 状态监控、参数管理、日志流、实时事件
  */
 
-import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty, msIcon } from './core.js';
+import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
@@ -400,44 +400,39 @@ async function restartComfyUI() {
       body: JSON.stringify({ params, extra_args: extraArgs })
     });
   } catch (_) {}
-  try {
-    await fetch('/api/services/comfy/restart', { method: 'POST' });
-    showToast('ComfyUI 正在重启...');
-    setTimeout(loadComfyUIPage, 5000);
-  } catch (e) { showToast('重启失败: ' + e.message); }
+  const d = await apiFetch('/api/services/comfy/restart', { method: 'POST' });
+  if (!d) return;
+  showToast('ComfyUI 正在重启...');
+  setTimeout(loadComfyUIPage, 5000);
 }
 
 async function _comfyStop() {
   if (!confirm('确定要停止 ComfyUI 吗？')) return;
-  try {
-    await fetch('/api/services/comfy/stop', { method: 'POST' });
-    showToast('ComfyUI 已停止');
-    setTimeout(loadComfyStatus, 1000);
-  } catch (e) { showToast('停止失败: ' + e.message); }
+  const d = await apiFetch('/api/services/comfy/stop', { method: 'POST' });
+  if (!d) return;
+  showToast('ComfyUI 已停止');
+  setTimeout(loadComfyStatus, 1000);
 }
 
 async function _comfyStart() {
-  try {
-    await fetch('/api/services/comfy/start', { method: 'POST' });
-    showToast('ComfyUI 启动中...');
-    setTimeout(loadComfyUIPage, 3000);
-  } catch (e) { showToast('启动失败: ' + e.message); }
+  const d = await apiFetch('/api/services/comfy/start', { method: 'POST' });
+  if (!d) return;
+  showToast('ComfyUI 启动中...');
+  setTimeout(loadComfyUIPage, 3000);
 }
 
 async function comfyInterrupt() {
-  try {
-    await fetch('/api/comfyui/interrupt', { method: 'POST' });
-    showToast('已发送中断信号');
-    setTimeout(loadQueuePanel, 1000);
-  } catch (e) { showToast('中断失败: ' + e.message); }
+  const d = await apiFetch('/api/comfyui/interrupt', { method: 'POST' });
+  if (!d) return;
+  showToast('已发送中断信号');
+  setTimeout(loadQueuePanel, 1000);
 }
 
 async function comfyFreeVRAM() {
-  try {
-    await fetch('/api/comfyui/free', { method: 'POST' });
-    showToast('已释放 VRAM');
-    setTimeout(loadComfyStatus, 2000);
-  } catch (e) { showToast('释放失败: ' + e.message); }
+  const d = await apiFetch('/api/comfyui/free', { method: 'POST' });
+  if (!d) return;
+  showToast('已释放 VRAM');
+  setTimeout(loadComfyStatus, 2000);
 }
 
 // ── ComfyUI Sub-tab 切换 ─────────────────────────────────────
@@ -540,23 +535,21 @@ async function loadQueuePanel() {
 
 async function comfyDeleteQueueItem(promptId) {
   if (!confirm('确定要删除此队列项?')) return;
-  try {
-    await fetch('/api/comfyui/queue/delete', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({delete: [promptId]}),
-    });
-    showToast('已删除');
-    loadQueuePanel();
-  } catch (e) { showToast('删除失败: ' + e.message); }
+  const d = await apiFetch('/api/comfyui/queue/delete', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({delete: [promptId]}),
+  });
+  if (!d) return;
+  showToast('已删除');
+  loadQueuePanel();
 }
 
 async function comfyClearQueue() {
-  try {
-    await fetch('/api/comfyui/queue/clear', { method: 'POST' });
-    showToast('队列已清空');
-    loadQueuePanel();
-  } catch (e) { showToast('清空失败: ' + e.message); }
+  const d = await apiFetch('/api/comfyui/queue/clear', { method: 'POST' });
+  if (!d) return;
+  showToast('队列已清空');
+  loadQueuePanel();
 }
 
 // ── 生成历史 ──────────────────────────────────────────────────

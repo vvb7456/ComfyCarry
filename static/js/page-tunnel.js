@@ -3,16 +3,27 @@
  * Tunnel 页面: 公共节点 + 自定义 Tunnel 双模式
  */
 
-import { registerPage, showToast, escHtml, renderEmpty, renderError, msIcon } from './core.js';
+import { registerPage, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
+import { createLogStream } from './sse-log.js';
 
 let _autoRefresh = null;
 let _lastData = null;
 let _currentTunnelTab = 'status';
 let _selectedMode = null;  // 'public' | 'custom'
 
+// SSE 日志流
+let _tunnelLogStream = null;
+
 registerPage('tunnel', {
-  enter() { loadTunnelPage(); _startAutoRefresh(); },
-  leave() { _stopAutoRefresh(); }
+  enter() {
+    loadTunnelPage();
+    _startAutoRefresh();
+    _startLogStream();
+  },
+  leave() {
+    _stopAutoRefresh();
+    _stopLogStream();
+  }
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -40,7 +51,6 @@ async function loadTunnelPage() {
   const setupHint = document.getElementById('tunnel-setup-hint');
   const statusEl = document.getElementById('tunnel-status-info');
   const servicesEl = document.getElementById('tunnel-services');
-  const logEl = document.getElementById('tunnel-log-content');
 
   try {
     const r = await fetch('/api/tunnel/status');
@@ -115,24 +125,10 @@ async function loadTunnelPage() {
       if (headerControls) headerControls.innerHTML = '';
     }
 
-    // 日志
-    if (d.logs) {
-      const lines = d.logs.split('\n').filter(l => l.trim());
-      logEl.innerHTML = lines.map(l => {
-        let cls = '';
-        if (/error|ERR/i.test(l)) cls = 'log-error';
-        else if (/warn/i.test(l)) cls = 'log-warn';
-        else if (/connection|register|route|ingress/i.test(l)) cls = 'log-info';
-        return `<div class="${cls}">${escHtml(l)}</div>`;
-      }).join('');
-      logEl.scrollTop = logEl.scrollHeight;
-    } else {
-      logEl.innerHTML = renderEmpty('暂无日志');
-    }
+    // 日志由 SSE 流管理，不再在此处渲染
 
   } catch (e) {
     if (statusEl) statusEl.innerHTML = renderError('加载失败: ' + e.message);
-    if (logEl) logEl.innerHTML = '';
   }
 }
 
@@ -443,41 +439,34 @@ async function _tunnelPublicEnable() {
   const btn = document.getElementById('tunnel-public-enable-btn');
   if (btn) { btn.disabled = true; btn.textContent = '正在启用...'; }
 
-  try {
-    const r = await fetch('/api/tunnel/public/enable', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('公共节点已启用！');
-      setTimeout(() => {
-        loadTunnelPage();
-        _loadPublicStatus();
-      }, 2000);
-    } else {
-      showToast('启用失败: ' + (d.error || ''));
-    }
-  } catch (e) {
-    showToast('请求失败: ' + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '启用公共节点'; }
+  const d = await apiFetch('/api/tunnel/public/enable', { method: 'POST' });
+  if (btn) { btn.disabled = false; btn.textContent = '启用公共节点'; }
+  if (!d) return;
+  if (d.ok) {
+    showToast('公共节点已启用！');
+    setTimeout(() => {
+      loadTunnelPage();
+      _loadPublicStatus();
+    }, 2000);
+  } else {
+    showToast('启用失败: ' + (d.error || ''));
   }
 }
 
 async function _tunnelPublicDisable() {
   if (!confirm('确定停用公共节点？Tunnel 将被删除，所有公网链接将失效。')) return;
 
-  try {
-    const r = await fetch('/api/tunnel/public/disable', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('公共节点已停用');
-      setTimeout(() => {
-        loadTunnelPage();
-        _loadTunnelConfigTab();
-      }, 1000);
-    } else {
-      showToast('停用失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('请求失败: ' + e.message); }
+  const d = await apiFetch('/api/tunnel/public/disable', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('公共节点已停用');
+    setTimeout(() => {
+      loadTunnelPage();
+      _loadTunnelConfigTab();
+    }, 1000);
+  } else {
+    showToast('停用失败: ' + (d.error || ''));
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -541,23 +530,22 @@ async function _tunnelCfgSave() {
   resultEl.style.color = 'var(--t2)';
   resultEl.innerHTML = `${msIcon('hourglass_top')} 正在应用配置...`;
 
-  try {
-    const r = await fetch('/api/tunnel/provision', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ api_token: token, domain: domain, subdomain: subdomain })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('Tunnel 配置已应用！连接可能短暂中断，5 秒后自动刷新...');
-      setTimeout(() => location.reload(), 5000);
-    } else {
-      resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = `${msIcon('cancel')} ${escHtml(d.error || '保存失败')}`;
-    }
-  } catch (e) {
+  const d = await apiFetch('/api/tunnel/provision', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ api_token: token, domain: domain, subdomain: subdomain })
+  });
+  if (!d) {
     resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = `${msIcon('cancel')} 请求失败`;
+    return;
+  }
+  if (d.ok) {
+    showToast('Tunnel 配置已应用！连接可能短暂中断，5 秒后自动刷新...');
+    setTimeout(() => location.reload(), 5000);
+  } else {
+    resultEl.style.color = 'var(--red)';
+    resultEl.innerHTML = `${msIcon('cancel')} ${escHtml(d.error || '保存失败')}`;
   }
 }
 
@@ -567,50 +555,43 @@ async function _tunnelCfgSave() {
 
 async function _tunnelTeardown() {
   if (!confirm('确定移除 Cloudflare Tunnel？将删除 Tunnel、DNS 记录，并停止 cloudflared。')) return;
-  try {
-    const r = await fetch('/api/tunnel/teardown', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('Tunnel 已移除');
-      setTimeout(loadTunnelPage, 1000);
-    } else {
-      showToast('移除失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('请求失败: ' + e.message); }
+  const d = await apiFetch('/api/tunnel/teardown', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('Tunnel 已移除');
+    setTimeout(loadTunnelPage, 1000);
+  } else {
+    showToast('移除失败: ' + (d.error || ''));
+  }
 }
 
 async function _tunnelStop() {
-  try {
-    const r = await fetch('/api/tunnel/stop', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('cloudflared 已停止');
-    } else {
-      showToast(d.error || '停止失败');
-    }
-    setTimeout(loadTunnelPage, 1500);
-  } catch (e) { showToast(e.message); }
+  const d = await apiFetch('/api/tunnel/stop', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('cloudflared 已停止');
+  } else {
+    showToast(d.error || '停止失败');
+  }
+  setTimeout(loadTunnelPage, 1500);
 }
 
 async function _tunnelStart() {
-  try {
-    const r = await fetch('/api/tunnel/start', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('cloudflared 正在启动...');
-    } else {
-      showToast(d.error || '启动失败');
-    }
-    setTimeout(loadTunnelPage, 2000);
-  } catch (e) { showToast(e.message); }
+  const d = await apiFetch('/api/tunnel/start', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('cloudflared 正在启动...');
+  } else {
+    showToast(d.error || '启动失败');
+  }
+  setTimeout(loadTunnelPage, 2000);
 }
 
 async function _tunnelRestart() {
-  try {
-    await fetch('/api/tunnel/restart', { method: 'POST' });
-    showToast('cloudflared 正在重启...');
-    setTimeout(loadTunnelPage, 3000);
-  } catch (e) { showToast('重启失败: ' + e.message); }
+  const d = await apiFetch('/api/tunnel/restart', { method: 'POST' });
+  if (!d) return;
+  showToast('cloudflared 正在重启...');
+  setTimeout(loadTunnelPage, 3000);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -652,22 +633,18 @@ async function _tunnelAddServiceSubmit() {
 
   showToast('正在添加服务...');
 
-  try {
-    const r = await fetch('/api/tunnel/services', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ name, port, suffix, protocol })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('服务已添加！');
-      document.getElementById('tunnel-addsvc-modal').classList.remove('active');
-      setTimeout(loadTunnelPage, 2000);
-    } else {
-      showToast('添加失败: ' + (d.error || ''));
-    }
-  } catch (e) {
-    showToast('请求失败: ' + e.message);
+  const d = await apiFetch('/api/tunnel/services', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ name, port, suffix, protocol })
+  });
+  if (!d) return;
+  if (d.ok) {
+    showToast('服务已添加！');
+    document.getElementById('tunnel-addsvc-modal').classList.remove('active');
+    setTimeout(loadTunnelPage, 2000);
+  } else {
+    showToast('添加失败: ' + (d.error || ''));
   }
 }
 
@@ -678,36 +655,32 @@ async function _tunnelRemoveService(suffix, isDefault) {
     if (!confirm(`确定移除自定义服务 (${suffix})？`)) return;
   }
   showToast('正在移除...');
-  try {
-    const r = await fetch(`/api/tunnel/services/${encodeURIComponent(suffix)}`, { method: 'DELETE' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('服务已移除');
-      setTimeout(loadTunnelPage, 2000);
-    } else {
-      showToast(d.error || '移除失败');
-    }
-  } catch (e) { showToast(e.message); }
+  const d = await apiFetch(`/api/tunnel/services/${encodeURIComponent(suffix)}`, { method: 'DELETE' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('服务已移除');
+    setTimeout(loadTunnelPage, 2000);
+  } else {
+    showToast(d.error || '移除失败');
+  }
 }
 
 async function _tunnelEditSuffix(currentSuffix) {
   const newSuffix = prompt(`修改子域名后缀 (当前: ${currentSuffix})`, currentSuffix);
   if (!newSuffix || newSuffix === currentSuffix) return;
   showToast('正在更新...');
-  try {
-    const r = await fetch(`/api/tunnel/services/${encodeURIComponent(currentSuffix)}/subdomain`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ new_suffix: newSuffix })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('子域名已更新');
-      setTimeout(loadTunnelPage, 2000);
-    } else {
-      showToast(d.error || '更新失败');
-    }
-  } catch (e) { showToast(e.message); }
+  const d = await apiFetch(`/api/tunnel/services/${encodeURIComponent(currentSuffix)}/subdomain`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_suffix: newSuffix })
+  });
+  if (!d) return;
+  if (d.ok) {
+    showToast('子域名已更新');
+    setTimeout(loadTunnelPage, 2000);
+  } else {
+    showToast(d.error || '更新失败');
+  }
 }
 
 // expose for inline onclick
@@ -728,4 +701,25 @@ function _startAutoRefresh() {
 }
 function _stopAutoRefresh() {
   if (_autoRefresh) { clearInterval(_autoRefresh); _autoRefresh = null; }
+}
+
+function _startLogStream() {
+  _stopLogStream();
+  const el = document.getElementById('tunnel-log-content');
+  if (!el) return;
+  _tunnelLogStream = createLogStream({
+    el,
+    historyUrl: '/api/tunnel/logs?lines=200',
+    streamUrl: '/api/tunnel/logs/stream',
+    classify(line) {
+      if (/error|ERR|exception/i.test(line)) return 'log-error';
+      if (/warn/i.test(line)) return 'log-warn';
+      if (/connection|register|route|ingress/i.test(line)) return 'log-info';
+      return '';
+    },
+  });
+  _tunnelLogStream.start();
+}
+function _stopLogStream() {
+  if (_tunnelLogStream) { _tunnelLogStream.stop(); _tunnelLogStream = null; }
 }

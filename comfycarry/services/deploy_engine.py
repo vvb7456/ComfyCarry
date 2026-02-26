@@ -280,512 +280,30 @@ def start_deploy(state_dict):
 
 def _run_deploy(config):
     """主部署流程 — 在后台线程运行"""
-    import base64 as _b64
-    # 导入需要修改的全局变量
     from .. import config as cfg
 
     PY = _detect_python()
-    PIP = f"{PY} -m pip"
     _deploy_log(f"使用 Python: {PY}")
 
     try:
         # 清空/初始化部署日志文件
         try:
             with open(DEPLOY_LOG_FILE, "w", encoding="utf-8") as f:
-                f.write(f"=== ComfyUI Deploy Process Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\\n")
+                f.write(f"=== ComfyUI Deploy Process Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
         except Exception:
             pass
-            
-        # STEP 1: 系统依赖
-        if _step_done("system_deps"):
-            _deploy_step("安装系统依赖 ✅ (已完成, 跳过)")
-        else:
-            _deploy_step("安装系统依赖")
-            _deploy_log("正在安装系统依赖包...")
-            _deploy_exec(
-                "apt-get update -qq && "
-                "apt-get install -y --no-install-recommends "
-                "git git-lfs aria2 rclone jq curl ffmpeg libgl1 "
-                "libglib2.0-0 libsm6 libxext6 build-essential",
-                timeout=300, label="apt-get install"
-            )
-            py_bin = shutil.which(PY) or ""
-            if py_bin:
-                _deploy_exec(f'ln -sf "{py_bin}" /usr/local/bin/python && '
-                             f'ln -sf "{py_bin}" /usr/bin/python || true')
-            _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q',
-                         label="pip upgrade")
-            _mark_step_done("system_deps")
 
-        # STEP 2: Cloudflare Tunnel
-        tunnel_mode = config.get("tunnel_mode", "")
-        cf_api_token = config.get("cf_api_token", "")
-        cf_domain = config.get("cf_domain", "")
-
-        if tunnel_mode == "public":
-            _deploy_step("配置公共 Tunnel")
-            try:
-                from comfycarry.services.public_tunnel import PublicTunnelClient, PublicTunnelError
-                from comfycarry.config import set_config as _sc
-                client = PublicTunnelClient()
-                result = client.register()
-                _deploy_log(f"✅ 公共 Tunnel 已启用: {result.get('random_id', '?')}")
-                urls = result.get("urls", {})
-                for name, url in urls.items():
-                    _deploy_log(f"  {name}: {url}")
-            except PublicTunnelError as e:
-                _deploy_log(f"⚠️ 公共 Tunnel 启用失败: {e}", "warn")
-            except Exception as e:
-                _deploy_log(f"⚠️ 公共 Tunnel 异常: {e}", "warn")
-        elif cf_api_token and cf_domain:
-            _deploy_step("配置 Cloudflare Tunnel")
-            from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
-            from comfycarry.config import set_config as _sc, get_config as _gc
-
-            cf_subdomain = config.get("cf_subdomain", "")
-            mgr = TunnelManager(cf_api_token, cf_domain, cf_subdomain)
-
-            try:
-                ok, info = mgr.validate_token()
-                if not ok:
-                    _deploy_log(f"⚠️ CF Token 问题: {info['message']}", "warn")
-                else:
-                    _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
-
-                    # 构建服务列表: 默认 + 后缀覆盖 + 自定义
-                    raw_overrides = _gc("cf_suffix_overrides", "")
-                    raw_custom = _gc("cf_custom_services", "")
-                    suffix_overrides = {}
-                    custom_services = []
-                    try:
-                        if raw_overrides:
-                            suffix_overrides = json.loads(raw_overrides)
-                        if raw_custom:
-                            custom_services = json.loads(raw_custom)
-                    except Exception:
-                        pass
-                    services = []
-                    for svc in get_default_services():
-                        s = dict(svc)
-                        orig = s.get("suffix", "")
-                        if orig in suffix_overrides:
-                            s["suffix"] = suffix_overrides[orig]
-                        services.append(s)
-                    services.extend(custom_services)
-
-                    result = mgr.ensure(services)
-                    _deploy_log(f"✅ Tunnel 已就绪: {mgr.subdomain}.{cf_domain}")
-                    for name, url in result["urls"].items():
-                        _deploy_log(f"  {name}: {url}")
-
-                    # 保存实际使用的 subdomain
-                    _sc("cf_api_token", cf_api_token)
-                    _sc("cf_domain", cf_domain)
-                    _sc("cf_subdomain", mgr.subdomain)
-
-                    # 启动 cloudflared (如已在运行则跳过, 避免断开 SSE)
-                    if _is_cf_tunnel_online():
-                        _deploy_log("✅ cloudflared 已在运行，跳过重启 (ingress 已通过 API 更新)")
-                    else:
-                        mgr.start_cloudflared(result["tunnel_token"])
-                        _deploy_log("✅ cloudflared 已启动")
-
-            except CFAPIError as e:
-                _deploy_log(f"⚠️ Tunnel 配置失败: {e}", "warn")
-            except Exception as e:
-                _deploy_log(f"⚠️ Tunnel 异常: {e}", "warn")
-        else:
-            _deploy_step("Cloudflare Tunnel (跳过)")
-
-        # STEP 3: Rclone 配置
-        rclone_method = config.get("rclone_config_method", "skip")
-        rclone_value = config.get("rclone_config_value", "")
-        if rclone_method == "base64_env":
-            rclone_method = "base64"
-            rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
-        if rclone_method != "skip" and rclone_value:
-            _deploy_step("配置 Rclone")
-            _deploy_exec("mkdir -p ~/.config/rclone")
-            if rclone_method == "url":
-                _deploy_log(f"从 URL 下载 rclone.conf...")
-                _deploy_exec(f'curl -fsSL {shlex.quote(rclone_value)} -o ~/.config/rclone/rclone.conf')
-            elif rclone_method == "base64":
-                _deploy_log("从 Base64 解码 rclone.conf...")
-                try:
-                    conf_text = _b64.b64decode(rclone_value).decode("utf-8")
-                    Path.home().joinpath(".config/rclone/rclone.conf").write_text(
-                        conf_text, encoding="utf-8"
-                    )
-                except Exception as e:
-                    _deploy_log(f"Base64 解码失败: {e}", "error")
-            _deploy_exec("chmod 600 ~/.config/rclone/rclone.conf")
-            _deploy_exec("rclone listremotes", label="检测 remotes")
-
-        # STEP 3.5: SSH 配置 (密码 + 公钥)
-        ssh_password = config.get("ssh_password", "")
-        ssh_keys = config.get("ssh_keys", [])
-        ssh_pw_sync = config.get("ssh_pw_sync", False)
-        if ssh_password or ssh_keys:
-            _deploy_step("配置 SSH 访问")
-            from comfycarry.config import set_config as _sc2
-            if ssh_pw_sync:
-                _sc2("ssh_pw_sync", True)
-            if ssh_password:
-                code = subprocess.run(
-                    f"echo 'root:{ssh_password}' | chpasswd",
-                    shell=True, capture_output=True, timeout=5
-                ).returncode
-                if code == 0:
-                    _sc2("ssh_password", ssh_password)
-                    # 启用密码认证
-                    subprocess.run(
-                        "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' "
-                        "/etc/ssh/sshd_config 2>/dev/null || true",
-                        shell=True, timeout=5
-                    )
-                    subprocess.run(
-                        "sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' "
-                        "/etc/ssh/sshd_config 2>/dev/null || true",
-                        shell=True, timeout=5
-                    )
-                    _deploy_log("✅ SSH Root 密码已设置")
-                else:
-                    _deploy_log("⚠️ SSH 密码设置失败", "warn")
-            if ssh_keys and isinstance(ssh_keys, list):
-                import os
-                ak_file = os.path.expanduser("~/.ssh/authorized_keys")
-                os.makedirs(os.path.dirname(ak_file), exist_ok=True)
-                existing = set()
-                try:
-                    with open(ak_file, "r") as f:
-                        existing = {l.strip() for l in f if l.strip()}
-                except FileNotFoundError:
-                    pass
-                added = 0
-                with open(ak_file, "a") as f:
-                    for key in ssh_keys:
-                        key = key.strip()
-                        if key and key not in existing:
-                            f.write(key + "\n")
-                            existing.add(key)
-                            added += 1
-                os.chmod(ak_file, 0o600)
-                _sc2("ssh_keys", ssh_keys)
-                _deploy_log(f"✅ SSH 公钥已添加 ({added} 个新增, 共 {len(ssh_keys)} 个)")
-            # 重启 sshd 使配置生效
-            subprocess.run(
-                "pkill sshd 2>/dev/null; sleep 0.5; "
-                "/usr/sbin/sshd -E /var/log/sshd.log 2>/dev/null || true",
-                shell=True, timeout=10
-            )
-            _deploy_log("✅ sshd 已重启")
-
-        # STEP 4: 检查预装 PyTorch
-        _deploy_step("检查预装 PyTorch")
-        _deploy_exec(
-            f'{PY} -c "import torch; print(f\\"PyTorch {{torch.__version__}} '
-            f'CUDA {{torch.version.cuda}}\\")"'
-        )
-
-        # STEP 5: ComfyUI
-        if _step_done("comfyui_install"):
-            _deploy_step("安装 ComfyUI ✅ (已完成, 跳过)")
-            _deploy_step("ComfyUI 健康检查 ✅ (已完成, 跳过)")
-        else:
-            _deploy_step("安装 ComfyUI")
-            if not Path("/workspace/ComfyUI/main.py").exists():
-                _deploy_log("从镜像复制 ComfyUI...")
-                _deploy_exec("mkdir -p /workspace/ComfyUI && "
-                             "cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
-            else:
-                _deploy_log("ComfyUI 已存在, 跳过复制")
-
-            # 健康检查
-            _deploy_step("ComfyUI 健康检查")
-
-            # 确保端口 8188 未被占用 (可能有旧进程残留)
-            _deploy_exec(
-                "pm2 delete comfy 2>/dev/null || true; "
-                "pkill -9 -f 'main.py.*--port 8188' 2>/dev/null || true; "
-                "sleep 1",
-                label="清理端口 8188"
-            )
-
-            _deploy_log("启动健康检查...")
-            _deploy_exec(
-                f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 '
-                f'--port 8188 --disable-all-custom-nodes > /tmp/comfy_boot.log 2>&1 &'
-            )
-            boot_ok = False
-            for i in range(30):
-                time.sleep(2)
-                try:
-                    log = Path("/tmp/comfy_boot.log").read_text(errors="ignore")
-                    if "To see the GUI go to" in log:
-                        boot_ok = True
-                        break
-                except Exception:
-                    pass
-                _deploy_log(f"等待 ComfyUI 启动... ({i+1}/30)")
-
-            _deploy_exec(
-                "pkill -f 'main.py --listen 127.0.0.1 --port 8188 "
-                "--disable-all-custom-nodes' 2>/dev/null; sleep 1",
-                label="停止检查进程"
-            )
-
-            if boot_ok:
-                _deploy_log("✅ ComfyUI 健康检查通过")
-            else:
-                _deploy_log("❌ ComfyUI 健康检查失败!", "error")
-                try:
-                    err = Path("/tmp/comfy_boot.log").read_text(errors="ignore")[-500:]
-                    _deploy_log(f"最后日志: {err}", "error")
-                except Exception:
-                    pass
-            _mark_step_done("comfyui_install")
-
-        # STEP 6: 加速组件 (FA2/SA2) — 根据用户选择安装
-        want_fa2 = config.get("install_fa2", False)
-        want_sa2 = config.get("install_sa2", False)
-        if not want_fa2 and not want_sa2:
-            _deploy_step("安装加速组件 ⏭ (用户跳过)")
-        elif _step_done("accelerators"):
-            _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
-        else:
-            parts = []
-            if want_fa2: parts.append("FA2")
-            if want_sa2: parts.append("SA2")
-            _deploy_step(f"安装加速组件 ({'/'.join(parts)})")
-            _deploy_log("检测 GPU 架构...")
-            gpu_info = _detect_gpu_info()
-            cuda_cap = gpu_info.get("cuda_cap", "")
-            _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
-
-            if want_fa2:
-                _deploy_log("验证 FlashAttention-2...")
-                _deploy_exec(
-                    f'{PY} -c "import flash_attn; '
-                    f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
-                    label="检查 FA2"
-                )
-            if want_sa2:
-                if cuda_cap:
-                    _install_sa2(PY, cuda_cap)
-                else:
-                    _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
-
-            _deploy_log("✅ 加速组件安装完成")
-            _mark_step_done("accelerators")
-
-        # STEP 7: 插件安装
-        _deploy_step("安装插件")
-        plugins = [p for p in config.get("plugins", []) if p]
-        _deploy_log("检查额外插件...")
-        for url in plugins:
-            if url == "comfycarry_ws_broadcast":
-                continue
-            name = url.rstrip("/").split("/")[-1].replace(".git", "")
-            if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
-                _deploy_log(f"安装新插件: {name}")
-                _deploy_exec(
-                    f'cd /workspace/ComfyUI/custom_nodes && '
-                    f'git clone {shlex.quote(url)} || true', timeout=60
-                )
-
-        _deploy_log("安装插件依赖...")
-        _deploy_exec(
-            f'find /workspace/ComfyUI/custom_nodes -name "requirements.txt" -type f '
-            f'-exec {PIP} install --no-cache-dir -r {{}} \\; 2>&1 || true',
-            timeout=600, label="pip install plugin deps"
-        )
-
-        # Install comfycarry_ws_broadcast plugin (WS event broadcast for Dashboard)
-        _deploy_log("安装 ComfyCarry WS 广播插件...")
-        broadcast_src = Path(__file__).resolve().parent.parent.parent / "comfycarry_ws_broadcast"
-        broadcast_dst = Path("/workspace/ComfyUI/custom_nodes/comfycarry_ws_broadcast")
-        if broadcast_src.exists():
-            if broadcast_dst.exists():
-                shutil.rmtree(broadcast_dst)
-            shutil.copytree(broadcast_src, broadcast_dst)
-            _deploy_log("✅ comfycarry_ws_broadcast 插件已安装")
-        else:
-            _deploy_log("⚠️ comfycarry_ws_broadcast 源目录不存在, 跳过")
-
-        # STEP 8: 执行 deploy 同步规则
-        if rclone_method != "skip" and rclone_value:
-            _deploy_step("同步云端资产")
-
-            wizard_remotes = config.get("wizard_remotes", [])
-            for wr in wizard_remotes:
-                wr_name = wr.get("name", "")
-                wr_type = wr.get("type", "")
-                wr_params = wr.get("params", {})
-                if wr_name and wr_type:
-                    cmd = f'rclone config create "{wr_name}" "{wr_type}"'
-                    for k, v in wr_params.items():
-                        if v:
-                            cmd += f" {k}={shlex.quote(str(v))}"
-                    _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
-
-            rules = _load_sync_rules()
-            if not rules and not config.get("_imported_sync_rules"):
-                wizard_sync_rules = config.get("wizard_sync_rules", [])
-                if wizard_sync_rules:
-                    tpl_map = {t["id"]: t for t in SYNC_RULE_TEMPLATES}
-                    new_rules = []
-                    for wr in wizard_sync_rules:
-                        tpl_id = wr.get("template_id", "")
-                        tpl = tpl_map.get(tpl_id)
-                        if not tpl:
-                            continue
-                        rule = {
-                            "id": f"wizard-{tpl_id}-{int(time.time())}",
-                            "name": tpl.get("name", ""),
-                            "remote": wr.get("remote", ""),
-                            "remote_path": wr.get("remote_path", tpl.get("remote_path", "")),
-                            "local_path": tpl.get("local_path", ""),
-                            "direction": tpl.get("direction", "pull"),
-                            "method": tpl.get("method", "copy"),
-                            "trigger": tpl.get("trigger", "deploy"),
-                            "enabled": True,
-                            "filters": tpl.get("filters", []),
-                        }
-                        new_rules.append(rule)
-                    if new_rules:
-                        _save_sync_rules(new_rules)
-                        _deploy_log(f"根据向导配置创建了 {len(new_rules)} 条同步规则")
-                        rules = new_rules
-
-            deploy_rules = [r for r in rules
-                            if r.get("trigger") == "deploy" and r.get("enabled", True)]
-            if deploy_rules:
-                for rule in deploy_rules:
-                    name = rule.get("name", rule.get("id", "?"))
-                    _deploy_log(f"执行: {name}...")
-                    ok = _run_sync_rule(rule)
-                    if not ok:
-                        _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warn")
-                _deploy_log("✅ 资产同步完成")
-            else:
-                _deploy_log("没有 deploy 同步规则, 跳过")
-        else:
-            _deploy_log("未配置 Rclone, 跳过资产同步")
-
-        # STEP 9: 下载 AuraSR 模型
-        aura_plugin_url = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
-        download_aura = config.get("download_aura_model", True)
-        if aura_plugin_url in plugins and download_aura:
-            _deploy_step("下载 AuraSR 模型")
-            aura_model = Path("/workspace/ComfyUI/models/Aura-SR/model.safetensors")
-            aura_config = Path("/workspace/ComfyUI/models/Aura-SR/config.json")
-            if aura_model.exists() and aura_config.exists():
-                _deploy_log("AuraSR V2 模型已存在, 跳过下载")
-            else:
-                _deploy_log("下载 AuraSR V2...")
-                _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
-                if not aura_model.exists():
-                    _deploy_exec(
-                        'aria2c -x 16 -s 16 --console-log-level=warn '
-                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
-                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
-                        '?download=true"',
-                        timeout=300, label="AuraSR model.safetensors"
-                    )
-                if not aura_config.exists():
-                    _deploy_exec(
-                        'aria2c -x 16 -s 16 --console-log-level=warn '
-                        '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
-                        '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
-                        '?download=true"',
-                        timeout=60, label="AuraSR config.json"
-                    )
-
-        # STEP 10: 启动服务
-        _deploy_step("启动服务")
-
-        if rclone_method != "skip" and rclone_value:
-            rules = _load_sync_rules()
-            watch_rules = [r for r in rules
-                           if r.get("trigger") == "watch" and r.get("enabled", True)]
-            if watch_rules:
-                start_sync_worker()
-                _deploy_log(f"✅ Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
-
-        civitai_token = config.get("civitai_token", "")
-        if civitai_token:
-            CONFIG_FILE.write_text(json.dumps({"api_key": civitai_token}))
-            _deploy_log("CivitAI API Key 已保存")
-
-        _deploy_log("启动 ComfyUI 主服务...")
-        # 验证 FA2/SA2 实际安装结果，据此设置 attention 参数
-        from comfycarry.config import set_config
-        fa2_ok = False
-        sa2_ok = False
-        if want_fa2:
-            r = subprocess.run(
-                f'{PY} -c "import flash_attn"',
-                shell=True, capture_output=True, text=True, timeout=10
-            )
-            fa2_ok = r.returncode == 0
-            if not fa2_ok:
-                _deploy_log("⚠️ FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
-        if want_sa2:
-            r = subprocess.run(
-                f'{PY} -c "import sageattention"',
-                shell=True, capture_output=True, text=True, timeout=10
-            )
-            sa2_ok = r.returncode == 0
-            if not sa2_ok:
-                _deploy_log("⚠️ SageAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
-        set_config("installed_fa2", fa2_ok)
-        set_config("installed_sa2", sa2_ok)
-
-        attn_flag = "--use-pytorch-cross-attention"
-        if fa2_ok:
-            attn_flag = "--use-flash-attention"
-        elif sa2_ok:
-            attn_flag = "--use-sage-attention"
-        _deploy_exec("pm2 delete comfy 2>/dev/null || true")
-        _deploy_exec(
-            f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '
-            f'--interpreter none --log /workspace/comfy.log --time '
-            f'--restart-delay 3000 --max-restarts 10 '
-            f'-- main.py --listen 0.0.0.0 --port 8188 '
-            f'{attn_flag} --fast --disable-xformers'
-        )
-
-        _deploy_exec("pm2 save 2>/dev/null || true")
-
-        # 完成
-        _deploy_step("部署完成")
-
-        new_pw = config.get("password", "")
-        if new_pw:
-            cfg.DASHBOARD_PASSWORD = new_pw
-            _save_dashboard_password(new_pw)
-            _deploy_log("ComfyCarry 密码已更新并保存")
-
-        state = _load_setup_state()
-        state["deploy_completed"] = True
-        state["deploy_error"] = ""
-        # 仅当最终回退到 SDPA 时才记录警告 (FA2 可用时 SA2 失败不算回退)
-        attn_warnings = []
-        if (want_fa2 or want_sa2) and not fa2_ok and not sa2_ok:
-            if want_fa2:
-                attn_warnings.append("FlashAttention-2")
-            if want_sa2:
-                attn_warnings.append("SageAttention-2")
-        state["attn_install_warnings"] = attn_warnings
-        # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
-        _save_setup_state(state)
-
-        gpu_info = _detect_gpu_info()
-        _deploy_log(
-            f"🚀 部署完成! GPU: {gpu_info.get('name', '?')} | "
-            f"CUDA: {gpu_info.get('cuda_cap', '?')}"
-        )
-        _deploy_log("请刷新页面进入 ComfyCarry")
+        _step_system_deps(config, PY)
+        _step_tunnel(config)
+        _step_rclone(config)
+        _step_ssh(config)
+        _step_check_pytorch(PY)
+        _step_install_comfyui(PY)
+        _step_accelerators(config, PY)
+        _step_plugins(config, PY)
+        _step_sync_assets(config)
+        _step_download_aura(config)
+        _step_start_services(config, cfg, PY)
 
     except Exception as e:
         _deploy_log(f"❌ 部署失败: {e}", "error")
@@ -798,3 +316,545 @@ def _run_deploy(config):
             _save_setup_state(state)
         except Exception:
             pass
+
+
+# ── 部署步骤 ─────────────────────────────────────────────────
+
+def _step_system_deps(config, PY):
+    """STEP 1: 系统依赖"""
+    PIP = f"{PY} -m pip"
+    if _step_done("system_deps"):
+        _deploy_step("安装系统依赖 ✅ (已完成, 跳过)")
+    else:
+        _deploy_step("安装系统依赖")
+        _deploy_log("正在安装系统依赖包...")
+        _deploy_exec(
+            "apt-get update -qq && "
+            "apt-get install -y --no-install-recommends "
+            "git git-lfs aria2 rclone jq curl ffmpeg libgl1 "
+            "libglib2.0-0 libsm6 libxext6 build-essential",
+            timeout=300, label="apt-get install"
+        )
+        py_bin = shutil.which(PY) or ""
+        if py_bin:
+            _deploy_exec(f'ln -sf "{py_bin}" /usr/local/bin/python && '
+                         f'ln -sf "{py_bin}" /usr/bin/python || true')
+        _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q',
+                     label="pip upgrade")
+        _mark_step_done("system_deps")
+
+
+def _step_tunnel(config):
+    """STEP 2: Cloudflare Tunnel"""
+    import base64 as _b64
+    tunnel_mode = config.get("tunnel_mode", "")
+    cf_api_token = config.get("cf_api_token", "")
+    cf_domain = config.get("cf_domain", "")
+
+    if tunnel_mode == "public":
+        _deploy_step("配置公共 Tunnel")
+        try:
+            from comfycarry.services.public_tunnel import PublicTunnelClient, PublicTunnelError
+            from comfycarry.config import set_config as _sc
+            client = PublicTunnelClient()
+            result = client.register()
+            _deploy_log(f"✅ 公共 Tunnel 已启用: {result.get('random_id', '?')}")
+            urls = result.get("urls", {})
+            for name, url in urls.items():
+                _deploy_log(f"  {name}: {url}")
+        except PublicTunnelError as e:
+            _deploy_log(f"⚠️ 公共 Tunnel 启用失败: {e}", "warn")
+        except Exception as e:
+            _deploy_log(f"⚠️ 公共 Tunnel 异常: {e}", "warn")
+    elif cf_api_token and cf_domain:
+        _deploy_step("配置 Cloudflare Tunnel")
+        from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
+        from comfycarry.config import set_config as _sc, get_config as _gc
+
+        cf_subdomain = config.get("cf_subdomain", "")
+        mgr = TunnelManager(cf_api_token, cf_domain, cf_subdomain)
+
+        try:
+            ok, info = mgr.validate_token()
+            if not ok:
+                _deploy_log(f"⚠️ CF Token 问题: {info['message']}", "warn")
+            else:
+                _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
+
+                # 构建服务列表: 默认 + 后缀覆盖 + 自定义
+                raw_overrides = _gc("cf_suffix_overrides", "")
+                raw_custom = _gc("cf_custom_services", "")
+                suffix_overrides = {}
+                custom_services = []
+                try:
+                    if raw_overrides:
+                        suffix_overrides = json.loads(raw_overrides)
+                    if raw_custom:
+                        custom_services = json.loads(raw_custom)
+                except Exception:
+                    pass
+                services = []
+                for svc in get_default_services():
+                    s = dict(svc)
+                    orig = s.get("suffix", "")
+                    if orig in suffix_overrides:
+                        s["suffix"] = suffix_overrides[orig]
+                    services.append(s)
+                services.extend(custom_services)
+
+                result = mgr.ensure(services)
+                _deploy_log(f"✅ Tunnel 已就绪: {mgr.subdomain}.{cf_domain}")
+                for name, url in result["urls"].items():
+                    _deploy_log(f"  {name}: {url}")
+
+                # 保存实际使用的 subdomain
+                _sc("cf_api_token", cf_api_token)
+                _sc("cf_domain", cf_domain)
+                _sc("cf_subdomain", mgr.subdomain)
+
+                # 启动 cloudflared (如已在运行则跳过, 避免断开 SSE)
+                if _is_cf_tunnel_online():
+                    _deploy_log("✅ cloudflared 已在运行，跳过重启 (ingress 已通过 API 更新)")
+                else:
+                    mgr.start_cloudflared(result["tunnel_token"])
+                    _deploy_log("✅ cloudflared 已启动")
+
+        except CFAPIError as e:
+            _deploy_log(f"⚠️ Tunnel 配置失败: {e}", "warn")
+        except Exception as e:
+            _deploy_log(f"⚠️ Tunnel 异常: {e}", "warn")
+    else:
+        _deploy_step("Cloudflare Tunnel (跳过)")
+
+
+def _step_rclone(config):
+    """STEP 3: Rclone 配置"""
+    import base64 as _b64
+    rclone_method = config.get("rclone_config_method", "skip")
+    rclone_value = config.get("rclone_config_value", "")
+    if rclone_method == "base64_env":
+        rclone_method = "base64"
+        rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
+    if rclone_method != "skip" and rclone_value:
+        _deploy_step("配置 Rclone")
+        _deploy_exec("mkdir -p ~/.config/rclone")
+        if rclone_method == "url":
+            _deploy_log(f"从 URL 下载 rclone.conf...")
+            _deploy_exec(f'curl -fsSL {shlex.quote(rclone_value)} -o ~/.config/rclone/rclone.conf')
+        elif rclone_method == "base64":
+            _deploy_log("从 Base64 解码 rclone.conf...")
+            try:
+                conf_text = _b64.b64decode(rclone_value).decode("utf-8")
+                Path.home().joinpath(".config/rclone/rclone.conf").write_text(
+                    conf_text, encoding="utf-8"
+                )
+            except Exception as e:
+                _deploy_log(f"Base64 解码失败: {e}", "error")
+        _deploy_exec("chmod 600 ~/.config/rclone/rclone.conf")
+        _deploy_exec("rclone listremotes", label="检测 remotes")
+
+
+def _step_ssh(config):
+    """STEP 3.5: SSH 配置 (密码 + 公钥)"""
+    ssh_password = config.get("ssh_password", "")
+    ssh_keys = config.get("ssh_keys", [])
+    ssh_pw_sync = config.get("ssh_pw_sync", False)
+    if not ssh_password and not ssh_keys:
+        return
+    _deploy_step("配置 SSH 访问")
+    from comfycarry.config import set_config as _sc2
+    if ssh_pw_sync:
+        _sc2("ssh_pw_sync", True)
+    if ssh_password:
+        code = subprocess.run(
+            f"echo 'root:{shlex.quote(ssh_password)}' | chpasswd",
+            shell=True, capture_output=True, timeout=5
+        ).returncode
+        if code == 0:
+            _sc2("ssh_password", ssh_password)
+            # 启用密码认证
+            subprocess.run(
+                "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' "
+                "/etc/ssh/sshd_config 2>/dev/null || true",
+                shell=True, timeout=5
+            )
+            subprocess.run(
+                "sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' "
+                "/etc/ssh/sshd_config 2>/dev/null || true",
+                shell=True, timeout=5
+            )
+            _deploy_log("✅ SSH Root 密码已设置")
+        else:
+            _deploy_log("⚠️ SSH 密码设置失败", "warn")
+    if ssh_keys and isinstance(ssh_keys, list):
+        import os
+        ak_file = os.path.expanduser("~/.ssh/authorized_keys")
+        os.makedirs(os.path.dirname(ak_file), exist_ok=True)
+        existing = set()
+        try:
+            with open(ak_file, "r") as f:
+                existing = {l.strip() for l in f if l.strip()}
+        except FileNotFoundError:
+            pass
+        added = 0
+        with open(ak_file, "a") as f:
+            for key in ssh_keys:
+                key = key.strip()
+                if key and key not in existing:
+                    f.write(key + "\n")
+                    existing.add(key)
+                    added += 1
+        os.chmod(ak_file, 0o600)
+        _sc2("ssh_keys", ssh_keys)
+        _deploy_log(f"✅ SSH 公钥已添加 ({added} 个新增, 共 {len(ssh_keys)} 个)")
+    # 重启 sshd 使配置生效
+    subprocess.run(
+        "pkill sshd 2>/dev/null; sleep 0.5; "
+        "/usr/sbin/sshd -E /var/log/sshd.log 2>/dev/null || true",
+        shell=True, timeout=10
+    )
+    _deploy_log("✅ sshd 已重启")
+
+
+def _step_check_pytorch(PY):
+    """STEP 4: 检查预装 PyTorch"""
+    _deploy_step("检查预装 PyTorch")
+    _deploy_exec(
+        f'{PY} -c "import torch; print(f\\"PyTorch {{torch.__version__}} '
+        f'CUDA {{torch.version.cuda}}\\")"'
+    )
+
+
+def _step_install_comfyui(PY):
+    """STEP 5: ComfyUI 安装 + 健康检查"""
+    if _step_done("comfyui_install"):
+        _deploy_step("安装 ComfyUI ✅ (已完成, 跳过)")
+        _deploy_step("ComfyUI 健康检查 ✅ (已完成, 跳过)")
+        return
+
+    _deploy_step("安装 ComfyUI")
+    if not Path("/workspace/ComfyUI/main.py").exists():
+        _deploy_log("从镜像复制 ComfyUI...")
+        _deploy_exec("mkdir -p /workspace/ComfyUI && "
+                     "cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
+    else:
+        _deploy_log("ComfyUI 已存在, 跳过复制")
+
+    # 健康检查
+    _deploy_step("ComfyUI 健康检查")
+
+    # 确保端口 8188 未被占用 (可能有旧进程残留)
+    _deploy_exec(
+        "pm2 delete comfy 2>/dev/null || true; "
+        "pkill -9 -f 'main.py.*--port 8188' 2>/dev/null || true; "
+        "sleep 1",
+        label="清理端口 8188"
+    )
+
+    _deploy_log("启动健康检查...")
+    _deploy_exec(
+        f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 '
+        f'--port 8188 --disable-all-custom-nodes > /tmp/comfy_boot.log 2>&1 &'
+    )
+    boot_ok = False
+    for i in range(30):
+        time.sleep(2)
+        try:
+            log = Path("/tmp/comfy_boot.log").read_text(errors="ignore")
+            if "To see the GUI go to" in log:
+                boot_ok = True
+                break
+        except Exception:
+            pass
+        _deploy_log(f"等待 ComfyUI 启动... ({i+1}/30)")
+
+    _deploy_exec(
+        "pkill -f 'main.py --listen 127.0.0.1 --port 8188 "
+        "--disable-all-custom-nodes' 2>/dev/null; sleep 1",
+        label="停止检查进程"
+    )
+
+    if boot_ok:
+        _deploy_log("✅ ComfyUI 健康检查通过")
+    else:
+        _deploy_log("❌ ComfyUI 健康检查失败!", "error")
+        try:
+            err = Path("/tmp/comfy_boot.log").read_text(errors="ignore")[-500:]
+            _deploy_log(f"最后日志: {err}", "error")
+        except Exception:
+            pass
+    _mark_step_done("comfyui_install")
+
+
+def _step_accelerators(config, PY):
+    """STEP 6: 加速组件 (FA2/SA2)"""
+    want_fa2 = config.get("install_fa2", False)
+    want_sa2 = config.get("install_sa2", False)
+    if not want_fa2 and not want_sa2:
+        _deploy_step("安装加速组件 ⏭ (用户跳过)")
+        return
+    if _step_done("accelerators"):
+        _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
+        return
+
+    parts = []
+    if want_fa2: parts.append("FA2")
+    if want_sa2: parts.append("SA2")
+    _deploy_step(f"安装加速组件 ({'/'.join(parts)})")
+    _deploy_log("检测 GPU 架构...")
+    gpu_info = _detect_gpu_info()
+    cuda_cap = gpu_info.get("cuda_cap", "")
+    _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
+
+    if want_fa2:
+        _deploy_log("验证 FlashAttention-2...")
+        _deploy_exec(
+            f'{PY} -c "import flash_attn; '
+            f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
+            label="检查 FA2"
+        )
+    if want_sa2:
+        if cuda_cap:
+            _install_sa2(PY, cuda_cap)
+        else:
+            _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
+
+    _deploy_log("✅ 加速组件安装完成")
+    _mark_step_done("accelerators")
+
+
+def _step_plugins(config, PY):
+    """STEP 7: 插件安装"""
+    PIP = f"{PY} -m pip"
+    _deploy_step("安装插件")
+    plugins = [p for p in config.get("plugins", []) if p]
+    _deploy_log("检查额外插件...")
+    for url in plugins:
+        if url == "comfycarry_ws_broadcast":
+            continue
+        name = url.rstrip("/").split("/")[-1].replace(".git", "")
+        if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
+            _deploy_log(f"安装新插件: {name}")
+            _deploy_exec(
+                f'cd /workspace/ComfyUI/custom_nodes && '
+                f'git clone {shlex.quote(url)} || true', timeout=60
+            )
+
+    _deploy_log("安装插件依赖...")
+    _deploy_exec(
+        f'find /workspace/ComfyUI/custom_nodes -name "requirements.txt" -type f '
+        f'-exec {PIP} install --no-cache-dir -r {{}} \\; 2>&1 || true',
+        timeout=600, label="pip install plugin deps"
+    )
+
+    # Install comfycarry_ws_broadcast plugin (WS event broadcast for Dashboard)
+    _deploy_log("安装 ComfyCarry WS 广播插件...")
+    broadcast_src = Path(__file__).resolve().parent.parent.parent / "comfycarry_ws_broadcast"
+    broadcast_dst = Path("/workspace/ComfyUI/custom_nodes/comfycarry_ws_broadcast")
+    if broadcast_src.exists():
+        if broadcast_dst.exists():
+            shutil.rmtree(broadcast_dst)
+        shutil.copytree(broadcast_src, broadcast_dst)
+        _deploy_log("✅ comfycarry_ws_broadcast 插件已安装")
+    else:
+        _deploy_log("⚠️ comfycarry_ws_broadcast 源目录不存在, 跳过")
+
+
+def _step_sync_assets(config):
+    """STEP 8: 执行 deploy 同步规则"""
+    rclone_method = config.get("rclone_config_method", "skip")
+    rclone_value = config.get("rclone_config_value", "")
+    if rclone_method == "base64_env":
+        rclone_method = "base64"
+        rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
+
+    if rclone_method == "skip" or not rclone_value:
+        _deploy_log("未配置 Rclone, 跳过资产同步")
+        return
+
+    _deploy_step("同步云端资产")
+
+    wizard_remotes = config.get("wizard_remotes", [])
+    for wr in wizard_remotes:
+        wr_name = wr.get("name", "")
+        wr_type = wr.get("type", "")
+        wr_params = wr.get("params", {})
+        if wr_name and wr_type:
+            cmd = f'rclone config create "{wr_name}" "{wr_type}"'
+            for k, v in wr_params.items():
+                if v:
+                    cmd += f" {k}={shlex.quote(str(v))}"
+            _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
+
+    rules = _load_sync_rules()
+    if not rules and not config.get("_imported_sync_rules"):
+        wizard_sync_rules = config.get("wizard_sync_rules", [])
+        if wizard_sync_rules:
+            tpl_map = {t["id"]: t for t in SYNC_RULE_TEMPLATES}
+            new_rules = []
+            for wr in wizard_sync_rules:
+                tpl_id = wr.get("template_id", "")
+                tpl = tpl_map.get(tpl_id)
+                if not tpl:
+                    continue
+                rule = {
+                    "id": f"wizard-{tpl_id}-{int(time.time())}",
+                    "name": tpl.get("name", ""),
+                    "remote": wr.get("remote", ""),
+                    "remote_path": wr.get("remote_path", tpl.get("remote_path", "")),
+                    "local_path": tpl.get("local_path", ""),
+                    "direction": tpl.get("direction", "pull"),
+                    "method": tpl.get("method", "copy"),
+                    "trigger": tpl.get("trigger", "deploy"),
+                    "enabled": True,
+                    "filters": tpl.get("filters", []),
+                }
+                new_rules.append(rule)
+            if new_rules:
+                _save_sync_rules(new_rules)
+                _deploy_log(f"根据向导配置创建了 {len(new_rules)} 条同步规则")
+                rules = new_rules
+
+    deploy_rules = [r for r in rules
+                    if r.get("trigger") == "deploy" and r.get("enabled", True)]
+    if deploy_rules:
+        for rule in deploy_rules:
+            name = rule.get("name", rule.get("id", "?"))
+            _deploy_log(f"执行: {name}...")
+            ok = _run_sync_rule(rule)
+            if not ok:
+                _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warn")
+        _deploy_log("✅ 资产同步完成")
+    else:
+        _deploy_log("没有 deploy 同步规则, 跳过")
+
+
+def _step_download_aura(config):
+    """STEP 9: 下载 AuraSR 模型"""
+    plugins = [p for p in config.get("plugins", []) if p]
+    aura_plugin_url = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
+    download_aura = config.get("download_aura_model", True)
+    if aura_plugin_url not in plugins or not download_aura:
+        return
+
+    _deploy_step("下载 AuraSR 模型")
+    aura_model = Path("/workspace/ComfyUI/models/Aura-SR/model.safetensors")
+    aura_config = Path("/workspace/ComfyUI/models/Aura-SR/config.json")
+    if aura_model.exists() and aura_config.exists():
+        _deploy_log("AuraSR V2 模型已存在, 跳过下载")
+        return
+
+    _deploy_log("下载 AuraSR V2...")
+    _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
+    if not aura_model.exists():
+        _deploy_exec(
+            'aria2c -x 16 -s 16 --console-log-level=warn '
+            '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
+            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
+            '?download=true"',
+            timeout=300, label="AuraSR model.safetensors"
+        )
+    if not aura_config.exists():
+        _deploy_exec(
+            'aria2c -x 16 -s 16 --console-log-level=warn '
+            '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
+            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
+            '?download=true"',
+            timeout=60, label="AuraSR config.json"
+        )
+
+
+def _step_start_services(config, cfg, PY):
+    """STEP 10: 启动服务 + 完成"""
+    _deploy_step("启动服务")
+
+    rclone_method = config.get("rclone_config_method", "skip")
+    rclone_value = config.get("rclone_config_value", "")
+    if rclone_method == "base64_env":
+        rclone_method = "base64"
+        rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
+
+    if rclone_method != "skip" and rclone_value:
+        rules = _load_sync_rules()
+        watch_rules = [r for r in rules
+                       if r.get("trigger") == "watch" and r.get("enabled", True)]
+        if watch_rules:
+            start_sync_worker()
+            _deploy_log(f"✅ Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
+
+    civitai_token = config.get("civitai_token", "")
+    if civitai_token:
+        CONFIG_FILE.write_text(json.dumps({"api_key": civitai_token}))
+        _deploy_log("CivitAI API Key 已保存")
+
+    _deploy_log("启动 ComfyUI 主服务...")
+    # 验证 FA2/SA2 实际安装结果，据此设置 attention 参数
+    from comfycarry.config import set_config
+    want_fa2 = config.get("install_fa2", False)
+    want_sa2 = config.get("install_sa2", False)
+    fa2_ok = False
+    sa2_ok = False
+    if want_fa2:
+        r = subprocess.run(
+            f'{PY} -c "import flash_attn"',
+            shell=True, capture_output=True, text=True, timeout=10
+        )
+        fa2_ok = r.returncode == 0
+        if not fa2_ok:
+            _deploy_log("⚠️ FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
+    if want_sa2:
+        r = subprocess.run(
+            f'{PY} -c "import sageattention"',
+            shell=True, capture_output=True, text=True, timeout=10
+        )
+        sa2_ok = r.returncode == 0
+        if not sa2_ok:
+            _deploy_log("⚠️ SageAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
+    set_config("installed_fa2", fa2_ok)
+    set_config("installed_sa2", sa2_ok)
+
+    attn_flag = "--use-pytorch-cross-attention"
+    if fa2_ok:
+        attn_flag = "--use-flash-attention"
+    elif sa2_ok:
+        attn_flag = "--use-sage-attention"
+    _deploy_exec("pm2 delete comfy 2>/dev/null || true")
+    _deploy_exec(
+        f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '
+        f'--interpreter none --log /workspace/comfy.log --time '
+        f'--restart-delay 3000 --max-restarts 10 '
+        f'-- main.py --listen 0.0.0.0 --port 8188 '
+        f'{attn_flag} --fast --disable-xformers'
+    )
+
+    _deploy_exec("pm2 save 2>/dev/null || true")
+
+    # 完成
+    _deploy_step("部署完成")
+
+    new_pw = config.get("password", "")
+    if new_pw:
+        cfg.DASHBOARD_PASSWORD = new_pw
+        _save_dashboard_password(new_pw)
+        _deploy_log("ComfyCarry 密码已更新并保存")
+
+    state = _load_setup_state()
+    state["deploy_completed"] = True
+    state["deploy_error"] = ""
+    # 仅当最终回退到 SDPA 时才记录警告 (FA2 可用时 SA2 失败不算回退)
+    attn_warnings = []
+    if (want_fa2 or want_sa2) and not fa2_ok and not sa2_ok:
+        if want_fa2:
+            attn_warnings.append("FlashAttention-2")
+        if want_sa2:
+            attn_warnings.append("SageAttention-2")
+    state["attn_install_warnings"] = attn_warnings
+    # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
+    _save_setup_state(state)
+
+    gpu_info = _detect_gpu_info()
+    _deploy_log(
+        f"🚀 部署完成! GPU: {gpu_info.get('name', '?')} | "
+        f"CUDA: {gpu_info.get('cuda_cap', '?')}"
+    )
+    _deploy_log("请刷新页面进入 ComfyCarry")

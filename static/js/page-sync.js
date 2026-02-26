@@ -1,5 +1,5 @@
 // ── page-sync.js  ·  Sync 页面模块 ──────────────────────────────
-import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError, msIcon } from './core.js';
+import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 // ── State ───────────────────────────────────────────────────────
@@ -65,15 +65,13 @@ function renderSyncRemoteCard(r) {
 
 async function deleteRemote(name) {
   if (!confirm(`确定删除 Remote "${name}"？`)) return;
-  try {
-    const r = await fetch('/api/sync/remote/delete', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name})
-    });
-    const d = await r.json();
-    showToast(d.message || d.error);
-    loadSyncRemotes();
-  } catch (e) { showToast('删除失败: ' + e.message); }
+  const d = await apiFetch('/api/sync/remote/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name})
+  });
+  if (!d) return;
+  showToast(d.message || d.error);
+  loadSyncRemotes();
 }
 
 async function refreshRemoteStorage(name) {
@@ -108,10 +106,9 @@ function renderStorageResult(el, name, info) {
 
 async function showAddRemoteModal() {
   if (!_syncRemoteTypes) {
-    try {
-      const r = await fetch('/api/sync/remote/types');
-      _syncRemoteTypes = (await r.json()).types || {};
-    } catch (e) { showToast('加载类型失败'); return; }
+    const _td = await apiFetch('/api/sync/remote/types');
+    if (!_td) return;
+    _syncRemoteTypes = _td.types || {};
   }
   const types = _syncRemoteTypes;
   const body = document.getElementById('add-remote-body');
@@ -178,20 +175,18 @@ async function submitAddRemote() {
     if (el) params[f.key] = el.value.trim();
     if (f.required && !params[f.key]) { showToast(`请填写 ${f.label}`); return; }
   }
-  try {
-    const r = await fetch('/api/sync/remote/create', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name, type, params})
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast(d.message);
-      closeSyncModal('add-remote-modal');
-      loadSyncRemotes();
-    } else {
-      showToast('创建失败: ' + (d.error || '未知'));
-    }
-  } catch (e) { showToast('创建失败: ' + e.message); }
+  const d = await apiFetch('/api/sync/remote/create', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, type, params})
+  });
+  if (!d) return;
+  if (d.ok) {
+    showToast(d.message);
+    closeSyncModal('add-remote-modal');
+    loadSyncRemotes();
+  } else {
+    showToast('创建失败: ' + (d.error || '未知'));
+  }
 }
 
 // ── 同步规则 Tab ────────────────────────────────────────────────
@@ -245,37 +240,33 @@ function renderSyncRulesList() {
 }
 
 async function saveSyncRules() {
-  try {
-    const r = await fetch('/api/sync/rules/save', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({rules: _syncRules})
-    });
-    const d = await r.json();
-    if (d.ok) showToast(d.message);
-    else showToast('保存失败: ' + (d.error || ''));
-  } catch (e) { showToast('保存失败: ' + e.message); }
+  const d = await apiFetch('/api/sync/rules/save', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rules: _syncRules})
+  });
+  if (!d) return;
+  if (d.ok) showToast(d.message);
+  else showToast('保存失败: ' + (d.error || ''));
 }
 
 async function runSingleRule(ruleId) {
   showToast('执行中...');
-  try {
-    await fetch('/api/sync/rules/run', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({rule_id: ruleId})
-    });
-    showToast('规则已开始执行，查看日志了解进度');
-  } catch (e) { showToast('执行失败: ' + e.message); }
+  const d = await apiFetch('/api/sync/rules/run', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rule_id: ruleId})
+  });
+  if (!d) return;
+  showToast('规则已开始执行，查看日志了解进度');
 }
 
 async function runDeployRules() {
   if (!confirm('执行全部「部署时」规则？')) return;
-  try {
-    await fetch('/api/sync/rules/run', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({})
-    });
-    showToast('开始执行部署规则...');
-  } catch (e) { showToast('执行失败: ' + e.message); }
+  const d = await apiFetch('/api/sync/rules/run', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({})
+  });
+  if (!d) return;
+  showToast('开始执行部署规则...');
 }
 
 function toggleRule(idx) {
@@ -530,36 +521,27 @@ async function saveSyncConfigAll() {
   // 1. Save sync settings
   const min_age = parseInt(document.getElementById('cfg-min-age').value) || 30;
   const watch_interval = parseInt(document.getElementById('cfg-watch-interval').value) || 60;
-  try {
-    await fetch('/api/sync/settings', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ min_age, watch_interval })
-    });
-  } catch(e) {
-    showToast('同步设置保存失败: ' + e.message, 'error');
-    return;
-  }
+  const sd = await apiFetch('/api/sync/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ min_age, watch_interval })
+  });
+  if (!sd) return;
 
   // 2. Save rclone config
   const content = document.getElementById('rclone-config-editor').value.trim();
   if (content) {
-    try {
-      const r = await fetch('/api/sync/rclone_config', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ config: content })
-      });
-      const d = await r.json();
-      if (d.ok) {
-        showToast(d.message);
-        loadSyncRemotes();
-      } else {
-        showToast(d.error || '保存失败', 'error');
-        return;
-      }
-    } catch(e) {
-      showToast('rclone 配置保存失败: ' + e.message, 'error');
+    const d = await apiFetch('/api/sync/rclone_config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ config: content })
+    });
+    if (!d) return;
+    if (d.ok) {
+      showToast(d.message);
+      loadSyncRemotes();
+    } else {
+      showToast(d.error || '保存失败', 'error');
       return;
     }
   } else {
@@ -570,25 +552,21 @@ async function saveSyncConfigAll() {
 async function uploadRcloneFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  try {
-    const text = await file.text();
-    if (!text.trim()) { showToast('文件为空'); return; }
-    if (!confirm('确定上传并覆盖当前 rclone 配置？旧配置将备份为 rclone.conf.bak')) return;
-    const r = await fetch('/api/sync/rclone_config', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ config: text })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showToast(d.message);
-      loadSyncConfigTab();
-      loadSyncRemotes();
-    } else {
-      showToast(d.error || '上传失败', 'error');
-    }
-  } catch(e) {
-    showToast('上传失败: ' + e.message, 'error');
+  const text = await file.text();
+  if (!text.trim()) { showToast('文件为空'); return; }
+  if (!confirm('确定上传并覆盖当前 rclone 配置？旧配置将备份为 rclone.conf.bak')) return;
+  const d = await apiFetch('/api/sync/rclone_config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ config: text })
+  });
+  if (!d) { event.target.value = ''; return; }
+  if (d.ok) {
+    showToast(d.message);
+    loadSyncConfigTab();
+    loadSyncRemotes();
+  } else {
+    showToast(d.error || '上传失败', 'error');
   }
   event.target.value = '';
 }

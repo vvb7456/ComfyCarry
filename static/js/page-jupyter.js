@@ -3,7 +3,7 @@
  * JupyterLab 页面: 状态监控、会话管理、内核管理、日志、Token
  */
 
-import { registerPage, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError, msIcon } from './core.js';
+import { registerPage, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _autoRefresh = null;
@@ -249,30 +249,18 @@ function renderTerminalsList(terminals) {
 }
 
 async function _newJupyterTerminal() {
-  try {
-    const r = await fetch('/api/jupyter/terminals/new', { method: 'POST' });
-    const d = await r.json();
-    if (r.ok) {
-      showToast(`终端 ${d.name || ''} 已创建`);
-      loadJupyterStatus();
-    } else {
-      showToast(d.error || '创建失败');
-    }
-  } catch (e) { showToast('创建失败: ' + e.message); }
+  const d = await apiFetch('/api/jupyter/terminals/new', { method: 'POST' });
+  if (!d) return;
+  showToast(`终端 ${d.name || ''} 已创建`);
+  loadJupyterStatus();
 }
 
 async function _deleteJupyterTerminal(name) {
   if (!confirm(`确定销毁终端 ${name}？`)) return;
-  try {
-    const r = await fetch(`/api/jupyter/terminals/${encodeURIComponent(name)}`, { method: 'DELETE' });
-    const d = await r.json();
-    if (r.ok) {
-      showToast(`终端 ${name} 已销毁`);
-      loadJupyterStatus();
-    } else {
-      showToast(d.error || '销毁失败');
-    }
-  } catch (e) { showToast('销毁失败: ' + e.message); }
+  const d = await apiFetch(`/api/jupyter/terminals/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  if (!d) return;
+  showToast(`终端 ${name} 已销毁`);
+  loadJupyterStatus();
 }
 
 // ── SSE: 实时日志流 ──────────────────────────────────────────
@@ -305,71 +293,61 @@ function _stopJupyterLogStream() {
 // ── 操作函数 ────────────────────────────────────────────────
 
 async function _startJupyter() {
-  try {
-    const r = await fetch('/api/jupyter/start', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast(d.message || 'JupyterLab 启动中...');
-      setTimeout(loadJupyterPage, 3000);
-    } else {
-      showToast('启动失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('启动失败: ' + e.message); }
+  const d = await apiFetch('/api/jupyter/start', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast(d.message || 'JupyterLab 启动中...');
+    setTimeout(loadJupyterPage, 3000);
+  } else {
+    showToast('启动失败: ' + (d.error || ''));
+  }
 }
 
 async function _stopJupyter() {
   if (!confirm('确定停止 JupyterLab？活跃的内核/会话将丢失。')) return;
-  try {
-    const r = await fetch('/api/jupyter/stop', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('JupyterLab 已停止');
-      setTimeout(loadJupyterStatus, 1000);
-    } else {
-      showToast('停止失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('停止失败: ' + e.message); }
+  const d = await apiFetch('/api/jupyter/stop', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('JupyterLab 已停止');
+    setTimeout(loadJupyterStatus, 1000);
+  } else {
+    showToast('停止失败: ' + (d.error || ''));
+  }
 }
 
 async function _restartJupyter() {
   if (!confirm('确定要重启 Jupyter 吗？活跃的内核/会话将丢失。')) return;
-  try {
-    const r = await fetch('/api/jupyter/restart', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('Jupyter 正在重启...');
-      setTimeout(loadJupyterPage, 5000);
-    } else {
-      showToast('重启失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('重启失败: ' + e.message); }
+  const d = await apiFetch('/api/jupyter/restart', { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('Jupyter 正在重启...');
+    setTimeout(loadJupyterPage, 5000);
+  } else {
+    showToast('重启失败: ' + (d.error || ''));
+  }
 }
 
 async function _kernelAction(kernelId, action) {
-  try {
-    const r = await fetch(`/api/jupyter/kernels/${kernelId}/${action}`, { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast(`内核已${action === 'restart' ? '重启' : '中断'}`);
-      setTimeout(loadJupyterStatus, 1000);
-    } else {
-      showToast('操作失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('操作失败: ' + e.message); }
+  const d = await apiFetch(`/api/jupyter/kernels/${kernelId}/${action}`, { method: 'POST' });
+  if (!d) return;
+  if (d.ok) {
+    showToast(`内核已${action === 'restart' ? '重启' : '中断'}`);
+    setTimeout(loadJupyterStatus, 1000);
+  } else {
+    showToast('操作失败: ' + (d.error || ''));
+  }
 }
 
 async function _closeSession(sessionId) {
   if (!confirm('关闭此会话？关联的内核也将被停止。')) return;
-  try {
-    const r = await fetch(`/api/jupyter/sessions/${sessionId}`, { method: 'DELETE' });
-    const d = await r.json();
-    if (d.ok) {
-      showToast('会话已关闭');
-      setTimeout(loadJupyterStatus, 1000);
-    } else {
-      showToast('操作失败: ' + (d.error || ''));
-    }
-  } catch (e) { showToast('操作失败: ' + e.message); }
+  const d = await apiFetch(`/api/jupyter/sessions/${sessionId}`, { method: 'DELETE' });
+  if (!d) return;
+  if (d.ok) {
+    showToast('会话已关闭');
+    setTimeout(loadJupyterStatus, 1000);
+  } else {
+    showToast('操作失败: ' + (d.error || ''));
+  }
 }
 
 // ── Window exports (供 HTML onclick 调用) ─────────────────────

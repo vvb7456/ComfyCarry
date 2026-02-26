@@ -1,5 +1,5 @@
 // ========== Plugin Management (ES Module) ==========
-import { registerPage, registerEscapeHandler, showToast, escHtml, renderLoading, renderError, msIcon } from './core.js';
+import { registerPage, registerEscapeHandler, showToast, escHtml, renderLoading, renderError, renderSkeleton, msIcon, apiFetch } from './core.js';
 
 // --- State ---
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed
@@ -35,7 +35,7 @@ async function loadPluginsPage() {
 // ---------- Installed Plugins ----------
 async function loadInstalledPlugins() {
   const el = document.getElementById('plugin-installed-list');
-  el.innerHTML = renderLoading('加载已安装插件...');
+  if (!el.children.length) el.innerHTML = renderSkeleton('plugin-list', 8);
   try {
     // Fetch installed list and getlist in parallel to enrich data
     const [instR, listR] = await Promise.allSettled([
@@ -157,7 +157,7 @@ function filterInstalledPlugins() {
 // ---------- Browse Plugins ----------
 async function loadBrowsePlugins() {
   const el = document.getElementById('plugin-browse-list');
-  el.innerHTML = renderLoading('加载插件列表中 (首次可能较慢)...');
+  if (!el.children.length) el.innerHTML = renderSkeleton('plugin-list', 8);
   try {
     // Use cached data if available (loaded by installed tab)
     if (pluginBrowseData.length > 0) {
@@ -298,85 +298,60 @@ function loadMoreBrowsePlugins() {
 // ---------- Plugin Actions ----------
 async function installPlugin(id, selectedVersion) {
   showToast(`正在安装 ${id}...`);
-  try {
-    const r = await fetch('/api/plugins/install', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, selected_version: selectedVersion || 'latest' })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    showToast(d.message);
-    startPluginQueuePoll();
-  } catch (e) {
-    showToast('安装失败: ' + e.message);
-  }
+  const d = await apiFetch('/api/plugins/install', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, selected_version: selectedVersion || 'latest' })
+  });
+  if (!d) return;
+  showToast(d.message);
+  startPluginQueuePoll();
 }
 
 async function uninstallPlugin(id, version, title) {
   if (!confirm(`确定要卸载插件 "${title || id}" 吗？`)) return;
   showToast(`正在卸载 ${title || id}...`);
-  try {
-    const r = await fetch('/api/plugins/uninstall', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, version })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    showToast(d.message);
-    startPluginQueuePoll();
-  } catch (e) {
-    showToast('卸载失败: ' + e.message);
-  }
+  const d = await apiFetch('/api/plugins/uninstall', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, version })
+  });
+  if (!d) return;
+  showToast(d.message);
+  startPluginQueuePoll();
 }
 
 async function updatePlugin(id, version) {
   showToast(`正在更新 ${id}...`);
-  try {
-    const r = await fetch('/api/plugins/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, version })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    showToast(d.message);
-    startPluginQueuePoll();
-  } catch (e) {
-    showToast('更新失败: ' + e.message);
-  }
+  const d = await apiFetch('/api/plugins/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, version })
+  });
+  if (!d) return;
+  showToast(d.message);
+  startPluginQueuePoll();
 }
 
 async function updateAllPlugins() {
   if (!confirm('确定要更新所有已安装插件吗？这可能需要一些时间。')) return;
   showToast('正在提交全部更新...');
-  try {
-    const r = await fetch('/api/plugins/update_all', { method: 'POST' });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    showToast(d.message);
-    startPluginQueuePoll();
-  } catch (e) {
-    showToast('更新失败: ' + e.message);
-  }
+  const d = await apiFetch('/api/plugins/update_all', { method: 'POST' });
+  if (!d) return;
+  showToast(d.message);
+  startPluginQueuePoll();
 }
 
 async function togglePlugin(id, version) {
   showToast(`操作中...`);
-  try {
-    const r = await fetch('/api/plugins/disable', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, version })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error);
-    showToast(d.message);
-    startPluginQueuePoll();
-  } catch (e) {
-    showToast('操作失败: ' + e.message);
-  }
+  const d = await apiFetch('/api/plugins/disable', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, version })
+  });
+  if (!d) return;
+  showToast(d.message);
+  startPluginQueuePoll();
 }
 
 async function installPluginFromGit() {
@@ -487,20 +462,18 @@ registerPage('plugins', {
 // ---------- Check updates (fetch_updates) ----------
 async function checkPluginUpdates() {
   showToast('正在检查更新...');
-  try {
-    const r = await fetch('/api/plugins/fetch_updates');
-    const d = await r.json();
-    if (d.error) {
-      showToast(d.error);
-      return;
-    }
-    if (d.has_updates) {
-      showToast('发现新更新，正在刷新列表...');
-      loadPluginsPage();
-    } else {
-      showToast('所有插件已是最新版本');
-    }
-  } catch (e) { showToast('检查失败: ' + e.message); }
+  const d = await apiFetch('/api/plugins/fetch_updates');
+  if (!d) return;
+  if (d.error) {
+    showToast(d.error);
+    return;
+  }
+  if (d.has_updates) {
+    showToast('发现新更新，正在刷新列表...');
+    loadPluginsPage();
+  } else {
+    showToast('所有插件已是最新版本');
+  }
 }
 
 // ---------- Window exports (for onclick in HTML) ----------

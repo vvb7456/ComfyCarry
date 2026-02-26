@@ -50,6 +50,37 @@
             --text-base: .85rem; --text-md: .92rem; --text-lg: 1.05rem; --text-xl: 1.15rem;
         }
 
+        /* ── Light Theme ── */
+        [data-theme="light"] {
+            --bg:  #f0f0f4;
+            --bg2: #e6e6ec;
+            --bg3: #ffffff;
+            --bg4: #d8d8e0;
+            --bg-in: #f5f5f8;
+            --bd:  #c8c8d4;
+            --bd-f: #6b4fe0;
+            --t1:  #1a1a2e;
+            --t2:  #55556a;
+            --t3:  #8888a0;
+            --ac:  #6b4fe0;
+            --ac2: #7c5cfc;
+            --acg: rgba(107, 79, 224, 0.12);
+            --green: #16a34a;
+            --blue: #2563eb;
+            --amber: #d97706;
+            --red: #dc2626;
+            --pink: #db2777;
+            --cyan: #0891b2;
+            --sh: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --c1: #eaeaf0;
+            --c2: #e0e0e8;
+        }
+        [data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg) }
+        [data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--bd) }
+        [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: var(--t3) }
+        [data-theme="light"] .modal-overlay { background: rgba(0,0,0,.25) }
+        [data-theme="light"] .log-panel { background: var(--bg-in); border-color: var(--bd) }
+
         html {
             font-size: clamp(14px, 1.1vw, 21px)
         }
@@ -1779,6 +1810,33 @@
             }
         }
 
+        /* Skeleton screens */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+            border-radius: var(--rs)
+        }
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0 }
+            100% { background-position: -200% 0 }
+        }
+        .skeleton-text { height: 14px; margin: 6px 0 }
+        .skeleton-text.w60 { width: 60% }
+        .skeleton-text.w40 { width: 40% }
+        .skeleton-text.w80 { width: 80% }
+        .skeleton-card {
+            height: 120px;
+            border-radius: var(--rs);
+            margin-bottom: 10px
+        }
+        .skeleton-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px
+        }
+        .skeleton-row > * { flex: 1 }
+
         .error-msg {
             background: rgba(248, 113, 113, .1);
             border: 1px solid rgba(248, 113, 113, .3);
@@ -2808,7 +2866,29 @@
         /* ── Global: Toast types ── */
         .toast.toast-error { border-color: var(--red); color: var(--red) }
         .toast.toast-warning { border-color: var(--amber); color: var(--amber) }
+
+        /* ── Workflow drop zone ── */
+        #wf-drop-zone.drag-over { border-color: var(--ac); background: rgba(124,92,252,.08) }
+        .wf-model-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--bd); font-size:.85rem }
+        .wf-model-row:last-child { border-bottom:none }
+        .wf-model-name { flex:1; font-family:var(--mono,'IBM Plex Mono',monospace); word-break:break-all }
+        .wf-model-type { color:var(--t3); font-size:.78rem; min-width:90px }
+        .wf-model-status { min-width:60px; text-align:center }
     </style>
+    <script>
+        // 主题初始化 — 在 <head> 中内联执行以防止闪烁
+        (function() {
+            function getTheme() { return localStorage.getItem('theme') || 'system'; }
+            function applyTheme(pref) {
+                var isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.dataset.theme = isDark ? '' : 'light';
+            }
+            applyTheme(getTheme());
+            matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+                if (getTheme() === 'system') applyTheme(getTheme());
+            });
+        })();
+    </script>
 </head>
 
 <body>
@@ -2914,6 +2994,7 @@
                     <div class="tab active" data-mtab="local" onclick="switchModelTab('local')"><span class="ms ms-sm" style="color:#a78bfa">inventory_2</span> 本地模型</div>
                     <div class="tab" data-mtab="civitai" onclick="switchModelTab('civitai')"><span class="ms ms-sm" style="color:#60a5fa">search</span> CivitAI</div>
                     <div class="tab" data-mtab="downloads" onclick="switchModelTab('downloads')"><span class="ms ms-sm" style="color:#60a5fa">download</span> 下载管理 <span class="badge-count" id="cart-badge" style="display:none">0</span></div>
+                    <div class="tab" data-mtab="workflow" onclick="switchModelTab('workflow')"><span class="ms ms-sm" style="color:#34d399">account_tree</span> 工作流解析</div>
                 </div>
                 <!-- Local Models Tab -->
                 <div id="mtab-local">
@@ -2972,6 +3053,24 @@
                     <div id="dl-active-content" class="hidden"></div>
                     <div id="dl-completed-content" class="hidden"></div>
                     <div id="dl-failed-content" class="hidden"></div>
+                </div>
+                <!-- Workflow Parse Tab -->
+                <div id="mtab-workflow" class="hidden">
+                    <div id="wf-drop-zone" style="border:2px dashed var(--bd);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px"
+                         onclick="document.getElementById('wf-file-input').click()">
+                        <span class="ms" style="font-size:48px;color:var(--t3);display:block;margin-bottom:12px">image</span>
+                        <p style="color:var(--t2);font-size:.9rem;margin-bottom:4px">拖拽 ComfyUI 生成的 PNG 到此处</p>
+                        <p style="color:var(--t3);font-size:.8rem">或点击选择文件 (支持 PNG / JSON)</p>
+                        <input type="file" id="wf-file-input" accept=".png,.json" style="display:none" onchange="handleWorkflowFile(this.files[0])">
+                    </div>
+                    <div id="wf-parse-status" style="display:none;margin-bottom:12px"></div>
+                    <div id="wf-results" style="display:none">
+                        <div class="section-header" style="margin-bottom:8px">
+                            <div class="section-title"><span class="ms ms-sm" style="color:#a78bfa">checklist</span> 解析结果</div>
+                            <span id="wf-results-summary" style="font-size:.82rem;color:var(--t2)"></span>
+                        </div>
+                        <div id="wf-results-list"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3640,6 +3739,16 @@
                                 <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm" style="color:#60a5fa">content_copy</span></button>
                             </div>
                             <button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">重新生成</button>
+                        </div>
+
+                        <!-- 主题切换 -->
+                        <div class="card card-padded">
+                            <h3><span class="ms ms-sm" style="color:#a78bfa">dark_mode</span> 界面主题</h3>
+                            <div id="theme-selector" style="display:flex;gap:8px;margin-top:8px">
+                                <button class="btn btn-sm theme-opt" data-theme-val="dark" onclick="setTheme('dark')"><span class="ms ms-sm">dark_mode</span> 深色</button>
+                                <button class="btn btn-sm theme-opt" data-theme-val="light" onclick="setTheme('light')"><span class="ms ms-sm">light_mode</span> 浅色</button>
+                                <button class="btn btn-sm theme-opt" data-theme-val="system" onclick="setTheme('system')"><span class="ms ms-sm">contrast</span> 跟随系统</button>
+                            </div>
                         </div>
 
                         <!-- 重新初始化 -->

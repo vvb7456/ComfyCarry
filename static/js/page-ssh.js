@@ -3,7 +3,7 @@
  * SSH 管理页面: 服务状态/日志 + 密钥/密码配置 (双 Tab)
  */
 
-import { registerPage, showToast, escHtml, copyText, renderError, msIcon } from './core.js';
+import { registerPage, showToast, escHtml, copyText, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _autoRefresh = null;
@@ -274,46 +274,38 @@ async function addSSHKeys() {
   const val = textarea.value.trim();
   if (!val) { showToast('请输入公钥'); return; }
 
-  try {
-    const r = await fetch('/api/ssh/keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keys: val }),
-    });
-    const d = await r.json();
-    if (d.error) { showToast(d.error); return; }
+  const d = await apiFetch('/api/ssh/keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys: val }),
+  });
+  if (!d) return;
+  if (d.error) { showToast(d.error); return; }
 
-    const msg = `已添加 ${d.added} 个公钥`;
-    if (d.errors && d.errors.length) {
-      showToast(`${msg}，${d.errors.length} 个失败`);
-    } else {
-      showToast(msg);
-    }
-
-    textarea.value = '';
-    document.getElementById('ssh-add-key-area')?.classList.add('hidden');
-    loadSSHKeys();
-  } catch (e) {
-    showToast('添加失败: ' + e.message);
+  const msg = `已添加 ${d.added} 个公钥`;
+  if (d.errors && d.errors.length) {
+    showToast(`${msg}，${d.errors.length} 个失败`);
+  } else {
+    showToast(msg);
   }
+
+  textarea.value = '';
+  document.getElementById('ssh-add-key-area')?.classList.add('hidden');
+  loadSSHKeys();
 }
 
 async function deleteSSHKey(fingerprint) {
   if (!confirm(`确认删除此公钥？\n${fingerprint}`)) return;
 
-  try {
-    const r = await fetch('/api/ssh/keys', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fingerprint }),
-    });
-    const d = await r.json();
-    if (d.error) { showToast(d.error); return; }
-    showToast('已删除');
-    loadSSHKeys();
-  } catch (e) {
-    showToast('删除失败: ' + e.message);
-  }
+  const d = await apiFetch('/api/ssh/keys', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fingerprint }),
+  });
+  if (!d) return;
+  if (d.error) { showToast(d.error); return; }
+  showToast('已删除');
+  loadSSHKeys();
 }
 
 // ── 密码管理 ────────────────────────────────────────────────
@@ -359,60 +351,50 @@ async function setSSHPassword() {
     pw = pw1;
   }
 
-  try {
-    const r = await fetch('/api/ssh/password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
-    });
-    const d = await r.json();
-    if (d.error) { showToast(d.error); return; }
+  const d = await apiFetch('/api/ssh/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw }),
+  });
+  if (!d) return;
+  if (d.error) { showToast(d.error); return; }
 
-    let msg = syncMode ? 'SSH 密码已同步为 ComfyCarry 密码' : '密码已设置';
-    if (d.sshd_restarted) msg += '，已自动启用密码认证并重启 sshd';
-    showToast(msg);
+  let msg = syncMode ? 'SSH 密码已同步为 ComfyCarry 密码' : '密码已设置';
+  if (d.sshd_restarted) msg += '，已自动启用密码认证并重启 sshd';
+  showToast(msg);
 
-    if (!syncMode) {
-      const el1 = document.getElementById('ssh-pw-new');
-      const el2 = document.getElementById('ssh-pw-confirm');
-      if (el1) el1.value = '';
-      if (el2) el2.value = '';
-    }
-
-    loadSSHStatus();
-  } catch (e) {
-    showToast('设置失败: ' + e.message);
+  if (!syncMode) {
+    const el1 = document.getElementById('ssh-pw-new');
+    const el2 = document.getElementById('ssh-pw-confirm');
+    if (el1) el1.value = '';
+    if (el2) el2.value = '';
   }
+
+  loadSSHStatus();
 }
 
 // ── 服务控制 ────────────────────────────────────────────────
 
 async function sshStart() {
-  try {
-    const r = await fetch('/api/ssh/start', { method: 'POST' });
-    const d = await r.json();
-    showToast(d.error || d.message || '已启动');
-    loadSSHStatus();
-  } catch (e) { showToast('启动失败: ' + e.message); }
+  const d = await apiFetch('/api/ssh/start', { method: 'POST' });
+  if (!d) return;
+  showToast(d.error || d.message || '已启动');
+  loadSSHStatus();
 }
 
 async function sshStop() {
   if (!confirm('停止 SSH 服务后，所有 SSH 连接将断开。确认？')) return;
-  try {
-    const r = await fetch('/api/ssh/stop', { method: 'POST' });
-    const d = await r.json();
-    showToast(d.error || '已停止');
-    loadSSHStatus();
-  } catch (e) { showToast('停止失败: ' + e.message); }
+  const d = await apiFetch('/api/ssh/stop', { method: 'POST' });
+  if (!d) return;
+  showToast(d.error || '已停止');
+  loadSSHStatus();
 }
 
 async function sshRestart() {
-  try {
-    const r = await fetch('/api/ssh/restart', { method: 'POST' });
-    const d = await r.json();
-    showToast(d.error || '已重启');
-    loadSSHStatus();
-  } catch (e) { showToast('重启失败: ' + e.message); }
+  const d = await apiFetch('/api/ssh/restart', { method: 'POST' });
+  if (!d) return;
+  showToast(d.error || '已重启');
+  loadSSHStatus();
 }
 
 // ── Window exports ──────────────────────────────────────────

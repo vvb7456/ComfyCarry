@@ -934,7 +934,37 @@
         .status-dot.online { background: var(--green) }
         .status-dot.pending { background: var(--amber) }
         .status-dot.offline { background: var(--red) }
+
+        /* ── Light Theme ── */
+        [data-theme="light"] {
+            --bg1: #f0f0f4;
+            --bg2: #e6e6ec;
+            --bg3: #ffffff;
+            --bg4: #d8d8e0;
+            --bd:  #c8c8d4;
+            --t1:  #1a1a2e;
+            --t2:  #55556a;
+            --t3:  #8888a0;
+            --accent: #6b4fe0;
+            --accent2: #8568ff;
+            --green: #16a34a;
+            --red:   #dc2626;
+            --amber: #d97706;
+        }
     </style>
+    <script>
+        (function() {
+            function getTheme() { return localStorage.getItem('theme') || 'system'; }
+            function applyTheme(pref) {
+                var isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.dataset.theme = isDark ? '' : 'light';
+            }
+            applyTheme(getTheme());
+            matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+                if (getTheme() === 'system') applyTheme(getTheme());
+            });
+        })();
+    </script>
 </head>
 
 <body>

@@ -7,7 +7,7 @@ import json
 import re
 import subprocess
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 from ..config import get_config, set_config
 
@@ -41,8 +41,7 @@ def api_tunnel_status_v2():
         "tunnel": { "exists": bool, "tunnel_id": "...", "status": "...", "connections": [...] },
         "urls": { "ComfyCarry": "https://...", ... },
         "services": [ { "name": ..., "port": ..., "suffix": ..., "protocol": ..., "custom": bool } ],
-        "cloudflared": "online" | "stopped" | "unknown",
-        "logs": "..."
+        "cloudflared": "online" | "stopped" | "unknown"
     }
     """
     from ..services.tunnel_manager import get_default_services
@@ -54,7 +53,6 @@ def api_tunnel_status_v2():
         "urls": {},
         "services": [],
         "cloudflared": _get_cloudflared_pm2_status(),
-        "logs": _get_cloudflared_logs(),
     }
 
     # 构建服务列表 (默认 + 自定义)
@@ -495,6 +493,78 @@ def _reprovision_services():
         return jsonify({"ok": True, "urls": result["urls"]})
     except CFAPIError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+# ═══════════════════════════════════════════════════════════════
+# Tunnel 日志
+# ═══════════════════════════════════════════════════════════════
+
+@bp.route("/api/tunnel/logs")
+def api_tunnel_logs():
+    """获取 cloudflared 历史日志"""
+    lines = int(request.args.get("lines", 100))
+    lines = max(10, min(lines, 500))
+    try:
+        r = subprocess.run(
+            f"pm2 logs cf-tunnel --nostream --lines {lines} 2>/dev/null",
+            shell=True, capture_output=True, text=True, timeout=5
+        )
+        raw = r.stdout + r.stderr
+        ansi_re = re.compile(r'\x1b\[[0-9;]*m')
+        cleaned = ansi_re.sub('', raw)
+        cleaned = re.sub(r'^\d+\|[^|]+\|\s*', '', cleaned, flags=re.MULTILINE)
+        logs = '\n'.join(
+            l for l in cleaned.split('\n')
+            if not l.startswith('[TAILING]')
+            and 'last ' not in l
+            and '/root/.pm2/logs/' not in l
+        )
+        return jsonify({"logs": logs})
+    except Exception as e:
+        return jsonify({"logs": "", "error": str(e)})
+
+
+@bp.route("/api/tunnel/logs/stream")
+def api_tunnel_logs_stream():
+    """SSE — cloudflared 实时日志流"""
+    ansi_re = re.compile(r'\x1b\[[0-9;]*m')
+    pm2_prefix_re = re.compile(r'^\d+\|[^|]+\|\s*')
+
+    def generate():
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                ["pm2", "logs", "cf-tunnel", "--raw", "--lines", "0"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1
+            )
+            for line in iter(proc.stdout.readline, ''):
+                if not line:
+                    break
+                line = ansi_re.sub('', line.rstrip('\n'))
+                line = pm2_prefix_re.sub('', line)
+                if not line:
+                    continue
+                lvl = "info"
+                if re.search(r'error|ERR|exception', line, re.I):
+                    lvl = "error"
+                elif re.search(r'warn', line, re.I):
+                    lvl = "warn"
+                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            if proc:
+                try:
+                    proc.kill()
+                    proc.stdout.close()
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
+
 
 # ═══════════════════════════════════════════════════════════════
 # 辅助函数
