@@ -69,6 +69,7 @@ def api_tunnel_status_v2():
         "urls": {},
         "services": [],
         "cloudflared": _get_cloudflared_pm2_status(),
+        "cf_protocol": get_config("cf_protocol", "auto"),
     }
 
     # 构建服务列表 (默认 + 自定义)
@@ -98,9 +99,23 @@ def api_tunnel_status_v2():
         client = PublicTunnelClient()
         pub_status = client.get_status()
         result["tunnel_mode"] = "public"
+
+        # 为公共 Tunnel 的 Jupyter URL 拼接 token
+        pub_urls = dict(pub_status.get("urls") or {})
+        for name in list(pub_urls.keys()):
+            if "jupyter" in name.lower():
+                try:
+                    from . import jupyter as jup_mod
+                    token = jup_mod._detect_token()
+                    if token:
+                        pub_urls[name] = f"{pub_urls[name]}?token={token}"
+                except Exception:
+                    pass
+                break
+
         result["public"] = {
             "random_id": pub_status.get("random_id"),
-            "urls": pub_status.get("urls"),
+            "urls": pub_urls,
             "degraded": pub_status.get("degraded", False),
         }
         # 统一使用 cloudflared /ready 端点检测实际连通性
@@ -195,6 +210,14 @@ def api_tunnel_provision():
 
     if not api_token or not domain:
         return jsonify({"ok": False, "error": "缺少 api_token 或 domain"}), 400
+
+    # 如果当前在公共 Tunnel 模式, 先释放
+    if get_config("tunnel_mode", "") == "public":
+        try:
+            from ..services.public_tunnel import PublicTunnelClient
+            PublicTunnelClient().release()
+        except Exception:
+            pass
 
     from ..services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
 
@@ -440,6 +463,23 @@ def api_tunnel_public_disable():
     client = PublicTunnelClient()
     result = client.release()
     return jsonify(result)
+
+
+@bp.route("/api/tunnel/protocol", methods=["POST"])
+def api_tunnel_set_protocol():
+    """
+    设置 cloudflared 传输协议。需要重启 cloudflared 生效。
+
+    Request: { "protocol": "auto" | "http2" | "quic" }
+    Response: { "ok": true, "protocol": "http2", "restart_required": true }
+    """
+    data = request.get_json(force=True)
+    protocol = data.get("protocol", "auto")
+    if protocol not in ("auto", "http2", "quic"):
+        return jsonify({"ok": False, "error": "无效协议，可选: auto, http2, quic"}), 400
+
+    set_config("cf_protocol", protocol)
+    return jsonify({"ok": True, "protocol": protocol, "restart_required": True})
 
 
 @bp.route("/api/tunnel/public/status", methods=["GET"])

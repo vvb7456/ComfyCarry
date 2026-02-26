@@ -283,11 +283,14 @@ class TunnelManager:
 
     def start_cloudflared(self, tunnel_token: str) -> bool:
         """通过 PM2 启动 cloudflared (使用 cf-tunnel 避免与旧进程冲突)"""
+        from ..config import get_config
+        protocol = get_config("cf_protocol", "auto")
         subprocess.run("pm2 delete cf-tunnel 2>/dev/null", shell=True)
         r = subprocess.run(
             f'pm2 start cloudflared --name cf-tunnel '
             f'--interpreter none --log /workspace/tunnel.log --time '
-            f'-- tunnel run --metrics localhost:20241 --token {shlex.quote(tunnel_token)}',
+            f'-- tunnel --protocol {shlex.quote(protocol)} '
+            f'--metrics localhost:20241 run --token {shlex.quote(tunnel_token)}',
             shell=True, capture_output=True, text=True
         )
         subprocess.run("pm2 save 2>/dev/null", shell=True)

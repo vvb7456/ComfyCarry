@@ -388,14 +388,16 @@ class PublicTunnelClient:
         # 先确保没有旧进程
         self._stop_cloudflared()
 
+        protocol = get_config("cf_protocol", "auto")
         try:
             subprocess.run(
                 f'pm2 start cloudflared --name cf-tunnel '
                 f'--interpreter none --log /workspace/tunnel.log --time '
-                f'-- tunnel run --metrics localhost:20241 --token {shlex.quote(token)}',
+                f'-- tunnel --protocol {shlex.quote(protocol)} '
+                f'--metrics localhost:20241 run --token {shlex.quote(token)}',
                 shell=True, capture_output=True, text=True, timeout=15,
             )
-            log.info("cloudflared (cf-tunnel) 已通过 PM2 启动")
+            log.info(f"cloudflared (cf-tunnel) 已通过 PM2 启动 (protocol={protocol})")
         except Exception as e:
             log.error(f"启动 cloudflared 失败: {e}")
 
