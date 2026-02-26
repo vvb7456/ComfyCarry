@@ -18,7 +18,19 @@ export function applyTheme(pref) {
   localStorage.setItem('theme', pref);
   const isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = isDark ? '' : 'light';
+  const iconMap = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
+  const ico = document.getElementById('theme-toggle-icon');
+  if (ico) ico.textContent = iconMap[pref] || 'contrast';
 }
+
+/** 循环切换主题: dark → light → system → dark */
+export function cycleTheme() {
+  const order = ['dark', 'light', 'system'];
+  const cur = getTheme();
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  applyTheme(next);
+}
+window.cycleTheme = cycleTheme;
 
 // ── 页面注册表 ───────────────────────────────────────────────
 

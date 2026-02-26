@@ -952,23 +952,55 @@
             --red:   #dc2626;
             --amber: #d97706;
         }
+        /* ── Theme Toggle Button ── */
+        .theme-toggle {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 200;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--bd);
+            background: var(--bg3);
+            color: var(--t2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .2s, border-color .2s, color .2s;
+            box-shadow: var(--sh);
+        }
+        .theme-toggle:hover { border-color: var(--accent); color: var(--accent) }
+        .theme-toggle .ms { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18; }
     </style>
     <script>
         (function() {
+            var iconMap = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
             function getTheme() { return localStorage.getItem('theme') || 'system'; }
             function applyTheme(pref) {
                 var isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
                 document.documentElement.dataset.theme = isDark ? '' : 'light';
+                var ico = document.getElementById('theme-toggle-icon');
+                if (ico) ico.textContent = iconMap[pref] || 'contrast';
             }
             applyTheme(getTheme());
             matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
                 if (getTheme() === 'system') applyTheme(getTheme());
             });
+            window.cycleTheme = function() {
+                var order = ['dark', 'light', 'system'];
+                var cur = getTheme();
+                var next = order[(order.indexOf(cur) + 1) % order.length];
+                localStorage.setItem('theme', next);
+                applyTheme(next);
+            };
         })();
     </script>
 </head>
 
 <body>
+    <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()" title="切换主题"><span class="ms" id="theme-toggle-icon">contrast</span></button>
     <div class="wizard-container">
         <div class="wizard-header">
             <h1>ComfyCarry 部署向导</h1>

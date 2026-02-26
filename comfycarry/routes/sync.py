@@ -241,6 +241,8 @@ def api_sync_storage():
                     results[name] = {"error": "认证已过期，请运行 rclone config reconnect 重新授权"}
                 elif "not found" in stderr.lower() or "doesn't exist" in stderr.lower():
                     results[name] = {"error": "远程存储不存在或路径错误"}
+                elif "doesn't support about" in stderr.lower() or "not supported" in stderr.lower():
+                    results[name] = {"error": "此存储类型不支持容量查询"}
                 elif stderr:
                     # 提取最后一行有意义的错误
                     lines = [l for l in stderr.split('\n') if l.strip() and 'DEBUG' not in l]

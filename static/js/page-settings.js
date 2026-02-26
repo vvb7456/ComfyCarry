@@ -3,7 +3,7 @@
  * 设置页: 密码管理、CivitAI Key、Debug 模式、Import/Export、重新初始化
  */
 
-import { registerPage, registerEscapeHandler, showToast, loadApiKey, msIcon, apiFetch, getTheme, applyTheme } from './core.js';
+import { registerPage, registerEscapeHandler, showToast, loadApiKey, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _debugLogStream = null;
@@ -20,9 +20,9 @@ async function loadSettingsPage() {
     const settingsR = await fetch('/api/settings');
     const settings = await settingsR.json();
 
-    const civStatus = document.getElementById('settings-civitai-status');
-    if (civStatus) {
-      civStatus.textContent = settings.civitai_key_set ? `已配置: ${settings.civitai_key}` : '未设置 API Key';
+    const civKeyInput = document.getElementById('settings-civitai-key');
+    if (civKeyInput && settings.civitai_key_set && settings.civitai_key) {
+      civKeyInput.value = settings.civitai_key;
     }
 
     // API Key
@@ -33,26 +33,10 @@ async function loadSettingsPage() {
       apiKeyInput.type = 'password';
     }
 
-    // 主题高亮
-    _highlightThemeBtn();
-
     _startDebugLogStream();
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
-}
-
-function _highlightThemeBtn() {
-  const cur = getTheme();
-  document.querySelectorAll('#theme-selector .theme-opt').forEach(btn => {
-    btn.classList.toggle('btn-primary', btn.dataset.themeVal === cur);
-  });
-}
-
-function setTheme(pref) {
-  applyTheme(pref);
-  _highlightThemeBtn();
-  showToast('主题已切换');
 }
 
 function _startDebugLogStream() {
@@ -215,5 +199,5 @@ Object.assign(window, {
   changePassword, saveSettingsCivitaiKey, clearSettingsCivitaiKey,
   restartDashboard, reinitialize,
   openIEModal, closeIEModal, exportConfig, importConfig,
-  regenerateApiKey, setTheme
+  regenerateApiKey
 });

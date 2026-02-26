@@ -80,6 +80,8 @@
         [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: var(--t3) }
         [data-theme="light"] .modal-overlay { background: rgba(0,0,0,.25) }
         [data-theme="light"] .log-panel { background: var(--bg-in); border-color: var(--bd) }
+        [data-theme="light"] .page-header { background: rgba(240, 240, 244, .85) }
+        [data-theme="light"] .sidebar { background: #e2e2ea }
 
         html {
             font-size: clamp(14px, 1.1vw, 21px)
@@ -406,6 +408,28 @@
             top: 0;
             z-index: 40
         }
+
+        /* ── Theme Toggle Button ── */
+        .theme-toggle {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 200;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--bd);
+            background: var(--bg3);
+            color: var(--t2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .2s, border-color .2s, color .2s;
+            box-shadow: var(--sh);
+        }
+        .theme-toggle:hover { border-color: var(--ac); color: var(--ac) }
+        .theme-toggle .ms { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18; }
 
         .page-header h2 {
             font-size: 1.15rem;
@@ -2878,10 +2902,13 @@
     <script>
         // 主题初始化 — 在 <head> 中内联执行以防止闪烁
         (function() {
+            var iconMap = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
             function getTheme() { return localStorage.getItem('theme') || 'system'; }
             function applyTheme(pref) {
                 var isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
                 document.documentElement.dataset.theme = isDark ? '' : 'light';
+                var ico = document.getElementById('theme-toggle-icon');
+                if (ico) ico.textContent = iconMap[pref] || 'contrast';
             }
             applyTheme(getTheme());
             matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
@@ -2892,6 +2919,9 @@
 </head>
 
 <body>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="theme-toggle" onclick="window.cycleTheme()" title="切换主题"><span class="ms" id="theme-toggle-icon">contrast</span></button>
 
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
@@ -3226,10 +3256,13 @@
 
                     <!-- 公共节点详情 (仅公共模式时显示) -->
                     <div id="tunnel-public-details" style="display:none">
-                        <div id="tunnel-public-active" style="display:none;text-align:center;padding:48px 20px">
-                            <div style="font-size:1.1rem;color:var(--t1);margin-bottom:8px;font-weight:600">公共节点已启用</div>
-                            <div style="font-size:.85rem;color:var(--t3);margin-bottom:32px">请至「服务」页查看详情与链接</div>
-                            <button class="btn btn-lg btn-danger" onclick="window._tunnelPublicDisable()">停用公共节点</button>
+                        <div id="tunnel-public-active" style="display:none">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+                                <span style="font-size:1.05rem;font-weight:600;color:var(--t1)">公共节点</span>
+                                <span id="tunnel-public-status-badge" style="font-size:.78rem;font-weight:500;padding:2px 8px;border-radius:var(--r-pill);background:var(--bg2)">已启用</span>
+                            </div>
+                            <div id="tunnel-public-urls" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:20px"></div>
+                            <div style="text-align:right"><button class="btn btn-sm btn-danger" onclick="window._tunnelPublicDisable()">停用公共节点</button></div>
                         </div>
                         <div id="tunnel-public-inactive" style="display:none;text-align:center;padding:24px">
                             <div style="font-size:1rem;margin-bottom:12px;color:var(--t2)">点击下方按钮一键启用公共 Tunnel</div>
@@ -3706,14 +3739,13 @@
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-sm btn-primary">更新密码</button>
+                            <div style="display:flex;justify-content:flex-end"><button type="submit" class="btn btn-sm btn-primary">更新密码</button></div>
                             </form>
                         </div>
 
                         <!-- CivitAI API Key -->
                         <div class="card card-padded">
                             <h3><span class="ms ms-sm" style="color:#f472b6">palette</span> CivitAI API Key</h3>
-                            <div id="settings-civitai-status" style="font-size:.85rem;color:var(--t2);margin-bottom:12px"></div>
                             <div class="form-group" style="margin-bottom:12px">
                                 <label>API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
                                 <div class="input-secret">
@@ -3721,7 +3753,7 @@
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                                 </div>
                             </div>
-                            <div style="display:flex;gap:8px">
+                            <div style="display:flex;gap:8px;justify-content:flex-end">
                                 <button class="btn btn-sm btn-primary" onclick="saveSettingsCivitaiKey()">保存</button>
                                 <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()" title="清除"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
                             </div>
@@ -3729,41 +3761,27 @@
 
                         <!-- ComfyCarry API Key -->
                         <div class="card card-padded">
-                            <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key</h3>
-                            <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
-                                用于外部脚本或应用通过 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">X-API-Key</code> 或 <code style="background:var(--bg2);padding:1px 4px;border-radius:3px;font-size:.8rem">Bearer</code> 方式访问 API
-                            </p>
+                            <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key <span class="help-tip" data-tip="用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API"><span class="ms" style="color:#60a5fa">info</span></span></h3>
                             <div class="input-secret" style="margin-bottom:12px">
                                 <input type="password" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
                                 <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                                 <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm" style="color:#60a5fa">content_copy</span></button>
                             </div>
-                            <button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">重新生成</button>
+                            <div style="display:flex;justify-content:flex-end"><button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">重新生成</button></div>
                         </div>
 
-                        <!-- 主题切换 -->
-                        <div class="card card-padded">
-                            <h3><span class="ms ms-sm" style="color:#a78bfa">dark_mode</span> 界面主题</h3>
-                            <div id="theme-selector" style="display:flex;gap:8px;margin-top:8px">
-                                <button class="btn btn-sm theme-opt" data-theme-val="dark" onclick="setTheme('dark')"><span class="ms ms-sm">dark_mode</span> 深色</button>
-                                <button class="btn btn-sm theme-opt" data-theme-val="light" onclick="setTheme('light')"><span class="ms ms-sm">light_mode</span> 浅色</button>
-                                <button class="btn btn-sm theme-opt" data-theme-val="system" onclick="setTheme('system')"><span class="ms ms-sm">contrast</span> 跟随系统</button>
-                            </div>
-                        </div>
+
 
                         <!-- 重新初始化 -->
                         <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
-                            <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化</h3>
-                            <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.5">
-                                删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留。
-                            </p>
+                            <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化 <span class="help-tip" data-tip="删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留"><span class="ms" style="color:#60a5fa">info</span></span></h3>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
                                 <label style="font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
                                     <input type="checkbox" id="reinit-keep-models" checked style="width:15px;height:15px;accent-color:var(--ac)">
                                     <span>保留模型文件</span>
                                 </label>
                             </div>
-                            <button class="btn btn-sm btn-danger" onclick="reinitialize()">重新初始化</button>
+                            <div style="display:flex;justify-content:flex-end"><button class="btn btn-sm btn-danger" onclick="reinitialize()">重新初始化</button></div>
                         </div>
                     </div>
 
