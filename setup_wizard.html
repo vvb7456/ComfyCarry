@@ -913,14 +913,15 @@
             white-space: nowrap;
             word-wrap: normal;
             direction: ltr;
+            vertical-align: -3px;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             font-feature-settings: 'liga';
-            vertical-align: middle;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
         }
 
-        .ms-xs { font-size: 14px }
-        .ms-sm { font-size: 18px }
+        .ms-xs { font-size: 14px; vertical-align: -2px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 14; }
+        .ms-sm { font-size: 18px; vertical-align: -3px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 18; }
 
         .status-dot {
             display: inline-block;
@@ -984,14 +985,14 @@
             <div id="gpu-info-display"></div>
             <div class="choice-grid" id="step0-cards" style="opacity:.4;pointer-events:none">
                 <div class="choice-card" onclick="selectMode('fresh')" id="choice-fresh">
-                    <h3><span class="ms ms-sm">rocket_launch</span> 全新部署</h3>
+                    <h3><span class="ms ms-sm" style="color:#f472b6">rocket_launch</span> 全新部署</h3>
                     <p>配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境</p>
                     <p style="color:var(--t3);font-size:.72rem;margin-top:6px" id="fresh-time"></p>
                 </div>
                 <div class="choice-card" onclick="selectMode('import')" id="choice-import">
-                    <h3><span class="ms ms-sm">inventory_2</span> 恢复设置</h3>
+                    <h3><span class="ms ms-sm" style="color:#a78bfa">inventory_2</span> 恢复设置</h3>
                     <p>从之前导出的配置文件恢复所有设置，快速重建工作环境</p>
-                    <p style="color:var(--t3);font-size:.72rem;margin-top:6px"><span class="ms ms-xs">timer</span> 跳过手动配置</p>
+                    <p style="color:var(--t3);font-size:.72rem;margin-top:6px"><span class="ms ms-xs" style="color:#fb923c">timer</span> 跳过手动配置</p>
                 </div>
             </div>
             <!-- 导入文件上传区域 (选择恢复设置时显示) -->
@@ -999,7 +1000,7 @@
                 <div class="import-upload-box">
                     <p>上传之前导出的 <code>comfyui-config.json</code> 文件</p>
                     <label class="btn btn-primary" style="cursor:pointer;display:inline-block">
-                        <span class="ms ms-sm">folder_open</span> 选择文件
+                        <span class="ms ms-sm" style="color:#fbbf24">folder_open</span> 选择文件
                         <input type="file" accept=".json" onchange="handleImportFile(event)" style="display:none">
                     </label>
                 </div>
@@ -1012,7 +1013,7 @@
 
         <!-- Step 1: ComfyCarry 密码 + SSH -->
         <div class="step" id="step-1">
-            <div class="step-title"><span class="ms ms-sm">lock</span> 密码与 SSH 访问</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#fbbf24">lock</span> 密码与 SSH 访问</div>
             <div class="step-desc">设置 ComfyCarry 控制台密码及 SSH 远程访问</div>
             <div id="password-env-hint" style="display:none" class="env-hint"></div>
             <div class="form-group">
@@ -1020,7 +1021,7 @@
                 <div class="pw-wrap">
                     <input type="password" id="input-password" placeholder="输入 ComfyCarry 访问密码...">
                     <button type="button" class="pw-toggle" onclick="togglePw('input-password', this)"
-                        title="显示/隐藏密码"><span class="ms ms-sm">visibility</span></button>
+                        title="显示/隐藏密码"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                 </div>
             </div>
             <div class="form-group">
@@ -1028,9 +1029,9 @@
                 <div class="pw-wrap">
                     <input type="password" id="input-password-confirm" placeholder="再次输入密码...">
                     <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)"
-                        title="显示/隐藏密码"><span class="ms ms-sm">visibility</span></button>
+                        title="显示/隐藏密码"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                 </div>
-                <div class="pw-mismatch" id="pw-mismatch-hint"><span class="ms ms-xs">warning</span> 两次输入的密码不一致</div>
+                <div class="pw-mismatch" id="pw-mismatch-hint"><span class="ms ms-xs" style="color:var(--amber)">warning</span> 两次输入的密码不一致</div>
             </div>
 
             <!-- SSH 选项 -->
@@ -1042,7 +1043,7 @@
                 </label>
                 <div style="margin-top:12px">
                     <div onclick="toggleSSHKeysArea()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--t2);user-select:none">
-                        <span id="ssh-keys-toggle-icon" class="ms" style="font-size:14px;transition:transform .2s">chevron_right</span>
+                        <span id="ssh-keys-toggle-icon" class="ms" style="font-size:14px;transition:transform .2s;color:#94a3b8">chevron_right</span>
                         <span>SSH 公钥</span>
                         <span style="font-size:.72rem;color:var(--t3)">(可选)</span>
                     </div>
@@ -1061,7 +1062,7 @@
 
         <!-- Step 2: Cloudflare Tunnel -->
         <div class="step" id="step-2">
-            <div class="step-title"><span class="ms ms-sm">language</span> Cloudflare Tunnel</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#60a5fa">language</span> Cloudflare Tunnel</div>
             <div class="step-desc">配置 Cloudflare Tunnel 获得稳定的公网访问（ComfyUI / SSH / JupyterLab）</div>
             <div id="cf-env-hint" style="display:none" class="env-hint"></div>
 
@@ -1069,7 +1070,7 @@
             <div class="choice-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                 <div class="choice-card" id="wizard-tunnel-public" onclick="selectWizardTunnelMode('public')" style="cursor:pointer;text-align:left">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                        <span class="ms" style="font-size:1.2rem">public</span>
+                        <span class="ms" style="font-size:1.2rem;color:#34d399">public</span>
                         <strong>公共节点</strong>
                         <span style="font-size:.65rem;background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
                     </div>
@@ -1078,7 +1079,7 @@
                 </div>
                 <div class="choice-card" id="wizard-tunnel-custom" onclick="selectWizardTunnelMode('custom')" style="cursor:pointer;text-align:left">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                        <span class="ms" style="font-size:1.2rem">build</span>
+                        <span class="ms" style="font-size:1.2rem;color:#fb923c">build</span>
                         <strong>自定义 Tunnel</strong>
                     </div>
                     <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">使用自己的 Cloudflare 账号和域名，完全自主控制。</p>
@@ -1106,7 +1107,7 @@
                 </div>
                 <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
                     <button class="btn btn-secondary" onclick="validateCfToken()"
-                        style="padding:8px 16px;font-size:.88rem;flex-shrink:0"><span class="ms ms-sm">search</span> 验证 Token</button>
+                        style="padding:8px 16px;font-size:.88rem;flex-shrink:0"><span class="ms ms-sm" style="color:#60a5fa">search</span> 验证 Token</button>
                     <span id="cf-validate-inline" style="font-size:.85rem;display:none"></span>
                 </div>
             </div>
@@ -1119,14 +1120,14 @@
 
         <!-- Step 3: 云存储 (Remotes) -->
         <div class="step" id="step-3">
-            <div class="step-title"><span class="ms ms-sm">cloud_sync</span> 云存储配置</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#34d399">cloud_sync</span> 云存储配置</div>
             <div class="step-desc">连接云端存储，实现工作区自动同步 <span class="help-tip"
                     title="Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。">?</span>
             </div>
 
             <div
                 style="margin:12px 0;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:.85rem;color:var(--t2)">
-                <span class="ms ms-xs">lightbulb</span> 还没有 rclone 配置？<a href="/api/setup/rclone-bundle"
+                <span class="ms ms-xs" style="color:#fbbf24">lightbulb</span> 还没有 rclone 配置？<a href="/api/setup/rclone-bundle"
                     style="color:var(--ac);text-decoration:underline;font-weight:600">下载配置助手 (Windows)</a> — 解压后双击 bat
                 脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 文件即可。
             </div>
@@ -1137,16 +1138,16 @@
             <div class="choice-grid rclone-cards" id="rclone-method-cards">
                 <div class="choice-card" data-rclone="base64_env" id="rclone-card-env" style="display:none"
                     onclick="selectRcloneMethod('base64_env')">
-                    <h3><span class="ms ms-sm">key</span> 环境变量</h3>
+                    <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> 环境变量</h3>
                     <p>使用已设置的 RCLONE_CONF_BASE64</p>
                 </div>
                 <div class="choice-card" data-rclone="file" onclick="selectRcloneMethod('file')">
-                    <h3><span class="ms ms-sm">folder_open</span> 上传文件</h3>
+                    <h3><span class="ms ms-sm" style="color:#fbbf24">folder_open</span> 上传文件</h3>
                     <p>上传本地 rclone.conf 文件</p>
                 </div>
 
                 <div class="choice-card" data-rclone="manual" onclick="selectRcloneMethod('manual')">
-                    <h3><span class="ms ms-sm">build</span> 手动创建</h3>
+                    <h3><span class="ms ms-sm" style="color:#fb923c">build</span> 手动创建</h3>
                     <p>交互式创建新的 Remote</p>
                 </div>
             </div>
@@ -1156,7 +1157,7 @@
                 <div id="rclone-file-input" style="display:none" class="form-group">
                     <label
                         style="cursor:pointer;display:inline-block;background:var(--bg4);padding:8px 18px;border-radius:8px;font-size:.88rem">
-                        <span class="ms ms-sm">folder_open</span> 选择 rclone.conf 文件
+                        <span class="ms ms-sm" style="color:#fbbf24">folder_open</span> 选择 rclone.conf 文件
                         <input type="file" accept=".conf,.txt" onchange="handleRcloneFile(event)" style="display:none">
                     </label>
                     <span id="rclone-file-status" style="margin-left:10px;font-size:.82rem;color:var(--t3)"></span>
@@ -1183,13 +1184,13 @@
 
             <!-- Detected remotes preview -->
             <div id="wizard-remotes-section" style="display:none;margin-bottom:20px">
-                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm">settings_input_antenna</span> 已检测到的 Remote</label>
+                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm" style="color:#34d399">settings_input_antenna</span> 已检测到的 Remote</label>
                 <div id="wizard-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
             </div>
 
             <!-- Manually added remotes -->
             <div id="wizard-manual-remotes" style="display:none;margin-bottom:20px">
-                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm">build</span> 手动添加的 Remote</label>
+                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm" style="color:#fb923c">build</span> 手动添加的 Remote</label>
                 <div id="wizard-manual-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
                 </div>
             </div>
@@ -1202,7 +1203,7 @@
 
         <!-- Step 4: 同步规则 -->
         <div class="step" id="step-4">
-            <div class="step-title"><span class="ms ms-sm">sync</span> 同步规则配置</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#34d399">sync</span> 同步规则配置</div>
             <div class="step-desc">选择需要同步的内容，部署后可在 ComfyCarry「云同步」页面自由增删改。</div>
 
             <!-- Default remote selector -->
@@ -1217,14 +1218,14 @@
 
             <!-- Pull rules -->
             <div class="wz-rule-panel">
-                <h4><span class="ms ms-sm">cloud_download</span> 部署拉取 <span class="help-tip"
+                <h4><span class="ms ms-sm" style="color:#60a5fa">cloud_download</span> 部署拉取 <span class="help-tip"
                         title="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
                 <div class="wz-rule-row" id="wz-pull-rules"></div>
             </div>
 
             <!-- Push rules -->
             <div class="wz-rule-panel">
-                <h4><span class="ms ms-sm">cloud_upload</span> 自动推送 <span class="help-tip" title="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
+                <h4><span class="ms ms-sm" style="color:#34d399">cloud_upload</span> 自动推送 <span class="help-tip" title="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
                 </h4>
                 <div class="wz-rule-row" id="wz-push-rules"></div>
             </div>
@@ -1240,7 +1241,7 @@
 
         <!-- Step 5: CivitAI -->
         <div class="step" id="step-5">
-            <div class="step-title"><span class="ms ms-sm">palette</span> CivitAI API Key</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#f472b6">palette</span> CivitAI API Key</div>
             <div class="step-desc">配置 CivitAI API Key 以在 ComfyCarry 中搜索和下载模型</div>
             <div id="civitai-env-hint" style="display:none" class="env-hint"></div>
             <div class="form-group">
@@ -1258,7 +1259,7 @@
 
         <!-- Step 6: 插件选择 -->
         <div class="step" id="step-6">
-            <div class="step-title"><span class="ms ms-sm">extension</span> 自定义节点插件</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#a78bfa">extension</span> 自定义节点插件</div>
             <div class="step-desc" id="plugin-step-desc">选择要安装的 ComfyUI 插件 (带 * 标记的为必选)</div>
             <div class="plugin-list" id="plugin-list"></div>
             <div class="form-group" style="margin-top:12px">
@@ -1274,19 +1275,19 @@
 
         <!-- Step 7: 加速组件 (FA2/SA2) -->
         <div class="step" id="step-7">
-            <div class="step-title"><span class="ms ms-sm">bolt</span> Attention 加速</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#fbbf24">bolt</span> Attention 加速</div>
             <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="help-tip"
                     title="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span>
             </div>
 
             <div class="choice-grid" id="attn-cards" style="grid-template-columns: repeat(2, 1fr);">
                 <div class="choice-card" id="attn-card-fa2" data-attn="fa2" onclick="toggleAttnCard('fa2')">
-                    <h3><span class="ms ms-sm">local_fire_department</span> FlashAttention-2</h3>
+                    <h3><span class="ms ms-sm" style="color:#fb923c">local_fire_department</span> FlashAttention-2</h3>
                     <p>高性能 Attention 实现，广泛支持</p>
                     <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-flash-attention</div>
                 </div>
                 <div class="choice-card" id="attn-card-sa2" data-attn="sa2" onclick="toggleAttnCard('sa2')">
-                    <h3><span class="ms ms-sm">eco</span> SageAttention-2</h3>
+                    <h3><span class="ms ms-sm" style="color:#34d399">eco</span> SageAttention-2</h3>
                     <p>新一代 Attention 方案，部分场景更快</p>
                     <div style="font-size:.72rem;color:var(--t3);margin-top:6px">启动参数: --use-sage-attention</div>
                 </div>
@@ -1301,18 +1302,18 @@
 
         <!-- Step 8: 确认部署 -->
         <div class="step" id="step-8">
-            <div class="step-title"><span class="ms ms-sm">checklist</span> 确认部署配置</div>
+            <div class="step-title"><span class="ms ms-sm" style="color:#a78bfa">checklist</span> 确认部署配置</div>
             <div class="step-desc">检查以下配置，确认后开始部署</div>
             <div id="deploy-summary"></div>
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="prevStep()">返回修改</button>
-                <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy"><span class="ms ms-sm">rocket_launch</span> 开始部署</button>
+                <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy"><span class="ms ms-sm" style="color:#f472b6">rocket_launch</span> 开始部署</button>
             </div>
         </div>
 
         <!-- Deploy Progress View -->
         <div class="deploy-view" id="deploy-view">
-            <div class="step-title" id="deploy-title"><span class="ms ms-sm">settings</span> 正在部署...</div>
+            <div class="step-title" id="deploy-title"><span class="ms ms-sm" style="color:#94a3b8">settings</span> 正在部署...</div>
             <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
             <div class="deploy-content">
                 <div class="deploy-steps-list" id="deploy-steps-list"></div>
@@ -1324,14 +1325,14 @@
             </div>
             <!-- 成功按钮 -->
             <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
-                <button class="btn btn-secondary" id="deploy-done-retry" style="display:none" onclick="retryDeploy()"><span class="ms ms-sm">refresh</span>
+                <button class="btn btn-secondary" id="deploy-done-retry" style="display:none" onclick="retryDeploy()"><span class="ms ms-sm" style="color:#34d399">refresh</span>
                     重试部署</button>
-                <button class="btn btn-primary btn-lg" onclick="location.reload()"><span class="ms ms-sm">celebration</span> 进入 ComfyCarry</button>
+                <button class="btn btn-primary btn-lg" onclick="location.reload()"><span class="ms ms-sm" style="color:#fbbf24">celebration</span> 进入 ComfyCarry</button>
             </div>
             <!-- 失败按钮 -->
             <div class="btn-row" id="deploy-fail-row" style="display:none;margin-top:16px">
-                <button class="btn btn-secondary" onclick="backToWizard()"><span class="ms ms-sm">arrow_back</span> 返回修改配置</button>
-                <button class="btn btn-primary btn-lg" onclick="retryDeploy()"><span class="ms ms-sm">refresh</span> 重试部署</button>
+                <button class="btn btn-secondary" onclick="backToWizard()"><span class="ms ms-sm" style="color:#94a3b8">arrow_back</span> 返回修改配置</button>
+                <button class="btn btn-primary btn-lg" onclick="retryDeploy()"><span class="ms ms-sm" style="color:#34d399">refresh</span> 重试部署</button>
             </div>
         </div>
     </div>
