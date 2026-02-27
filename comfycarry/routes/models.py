@@ -379,25 +379,44 @@ def api_download_clear_history():
 
 # 节点 class_type → (输入字段, 模型类别)
 _MODEL_FIELD_MAP = {
+    # Checkpoints
     "CheckpointLoaderSimple":  ("ckpt_name",          "checkpoints"),
     "CheckpointLoader":        ("ckpt_name",          "checkpoints"),
     "unCLIPCheckpointLoader":  ("ckpt_name",          "checkpoints"),
+    # LoRA
     "LoraLoader":              ("lora_name",          "loras"),
     "LoraLoaderModelOnly":     ("lora_name",          "loras"),
+    # ControlNet
     "ControlNetLoader":        ("control_net_name",   "controlnet"),
+    # VAE
     "VAELoader":               ("vae_name",           "vae"),
+    # UNET
     "UNETLoader":              ("unet_name",          "unet"),
+    # CLIP
     "CLIPLoader":              ("clip_name",          "clip"),
     "DualCLIPLoader":          ("clip_name1",         "clip"),
+    "TripleCLIPLoader":        ("clip_name1",         "clip"),
+    # CLIP Vision
+    "CLIPVisionLoader":        ("clip_name",          "clip_vision"),
+    # Upscale
     "UpscaleModelLoader":      ("model_name",         "upscale_models"),
+    # Style / IP-Adapter / InstantID
     "StyleModelLoader":        ("style_model_name",   "style_models"),
     "IPAdapterModelLoader":    ("ipadapter_file",     "ipadapter"),
     "InstantIDModelLoader":    ("instantid_file",     "instantid"),
+    # Hypernetwork / GLIGEN / PhotoMaker / PuLID
+    "HypernetworkLoader":      ("hypernetwork_name",  "hypernetworks"),
+    "GLIGENLoader":            ("gligen_name",        "gligen"),
+    "PhotoMakerLoader":        ("photomaker_model_name", "photomaker"),
+    "PuLIDModelLoader":        ("pulid_file",         "pulid"),
+    # Diffusers
+    "DiffusersLoader":         ("model_path",         "diffusers"),
 }
 
-# DualCLIPLoader has two clip fields
+# 额外字段 (同一节点有多个模型字段)
 _EXTRA_FIELDS = {
-    "DualCLIPLoader": [("clip_name2", "clip")],
+    "DualCLIPLoader":   [("clip_name2", "clip")],
+    "TripleCLIPLoader": [("clip_name2", "clip"), ("clip_name3", "clip")],
 }
 
 
@@ -429,6 +448,15 @@ def _extract_models_from_prompt(prompt: dict) -> list[dict]:
                 if name and isinstance(name, str) and name not in seen:
                     seen.add(name)
                     models.append({"name": name, "type": category, "field": field, "node": class_type})
+
+        # Fallback: 对于未知节点，扫描 inputs 中以模型扩展名结尾的值
+        if class_type not in _MODEL_FIELD_MAP:
+            for field, val in inputs.items():
+                if not isinstance(val, str) or val in seen:
+                    continue
+                if any(val.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
+                    seen.add(val)
+                    models.append({"name": val, "type": "unknown", "field": field, "node": class_type})
 
     return models
 
@@ -478,41 +506,57 @@ def api_parse_workflow():
         # 尝试从 workflow.nodes 重建简化 prompt
         nodes = workflow.get("nodes", [])
         pseudo_prompt = {}
-        for node in nodes:
+
+        # 已知节点的 widget 字段索引映射 (key=字段名, value=widgets_values 中的位置)
+        _WIDGET_INDEX_MAP = {
+            "CheckpointLoaderSimple": {"ckpt_name": 0},
+            "CheckpointLoader":       {"ckpt_name": 0},
+            "unCLIPCheckpointLoader": {"ckpt_name": 0},
+            "LoraLoader":             {"lora_name": 0},
+            "LoraLoaderModelOnly":    {"lora_name": 0},
+            "ControlNetLoader":       {"control_net_name": 0},
+            "VAELoader":              {"vae_name": 0},
+            "UNETLoader":             {"unet_name": 0},
+            "CLIPLoader":             {"clip_name": 0},
+            "DualCLIPLoader":         {"clip_name1": 0, "clip_name2": 1},
+            "TripleCLIPLoader":       {"clip_name1": 0, "clip_name2": 1, "clip_name3": 2},
+            "CLIPVisionLoader":       {"clip_name": 0},
+            "UpscaleModelLoader":     {"model_name": 0},
+            "StyleModelLoader":       {"style_model_name": 0},
+            "IPAdapterModelLoader":   {"ipadapter_file": 0},
+            "InstantIDModelLoader":   {"instantid_file": 0},
+            "HypernetworkLoader":     {"hypernetwork_name": 0},
+            "GLIGENLoader":           {"gligen_name": 0},
+            "PhotoMakerLoader":       {"photomaker_model_name": 0},
+            "PuLIDModelLoader":       {"pulid_file": 0},
+            "DiffusersLoader":        {"model_path": 0},
+        }
+
+        for i, node in enumerate(nodes):
             if not isinstance(node, dict):
                 continue
             ct = node.get("type", "")
-            node_id = str(node.get("id", ""))
-            inputs_raw = node.get("widgets_values", [])
-            input_defs = node.get("inputs", [])
-            # 尝试将 widgets_values 映射到字段名
-            # 简化做法: 如果 class_type 在映射表中, 只需找到对应值
-            if ct in _MODEL_FIELD_MAP:
-                field, category = _MODEL_FIELD_MAP[ct]
-                # widgets_values 中的第一个字符串通常是模型名
-                for val in (inputs_raw if isinstance(inputs_raw, list) else []):
-                    if isinstance(val, str) and (
-                        val.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))
-                        or '/' in val  # 子目录的模型名
-                        or val.count('.') >= 1  # 有扩展名
-                    ):
-                        pseudo_prompt[node_id] = {
-                            "class_type": ct,
-                            "inputs": {field: val}
-                        }
-                        break
-            # DualCLIPLoader extra fields
-            if ct in _EXTRA_FIELDS:
-                for field, category in _EXTRA_FIELDS[ct]:
-                    for val in (inputs_raw if isinstance(inputs_raw, list) else []):
-                        if isinstance(val, str) and (
-                            val.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))
-                            or '/' in val
-                        ):
-                            if node_id not in pseudo_prompt:
-                                pseudo_prompt[node_id] = {"class_type": ct, "inputs": {}}
-                            pseudo_prompt[node_id]["inputs"][field] = val
-                            break
+            node_id = str(node.get("id", f"_auto_{i}"))
+            widgets = node.get("widgets_values", [])
+            if not isinstance(widgets, list):
+                continue
+
+            inputs_dict = {}
+
+            if ct in _WIDGET_INDEX_MAP:
+                # 已知节点: 按索引精确取值
+                idx_map = _WIDGET_INDEX_MAP[ct]
+                for field, idx in idx_map.items():
+                    if idx < len(widgets) and isinstance(widgets[idx], str):
+                        inputs_dict[field] = widgets[idx]
+            else:
+                # 未知节点 fallback: 扫描所有字符串值, 检查是否以模型扩展名结尾
+                for i, val in enumerate(widgets):
+                    if isinstance(val, str) and any(val.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
+                        inputs_dict[f"_unknown_field_{i}"] = val
+
+            if inputs_dict:
+                pseudo_prompt[node_id] = {"class_type": ct, "inputs": inputs_dict}
 
         models = _extract_models_from_prompt(pseudo_prompt)
     else:

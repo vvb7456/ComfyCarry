@@ -123,9 +123,17 @@ MODEL_DIRS = {
     "clip": "models/clip",
     "unet": "models/unet",
     "clip_vision": "models/clip_vision",
+    "style_models": "models/style_models",
+    "ipadapter": "models/ipadapter",
+    "instantid": "models/instantid",
+    "hypernetworks": "models/hypernetworks",
+    "gligen": "models/gligen",
+    "photomaker": "models/photomaker",
+    "pulid": "models/pulid",
+    "diffusers": "models/diffusers",
 }
 
-MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin"}
+MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
 # ── Setup Wizard ─────────────────────────────────────────────
 SETUP_STATE_FILE = Path("/workspace/.setup_state.json")
