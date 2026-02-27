@@ -7,16 +7,13 @@ ComfyCarry — 模型管理路由
 - Enhanced-Civicomfy 下载代理
 """
 
-import io
 import json
 import os
-import struct
-import zlib
+import re
 from pathlib import Path
 
 import requests
 from flask import Blueprint, Response, jsonify, request, send_file
-from PIL import Image
 
 from ..config import (
     COMFYUI_DIR,
@@ -380,287 +377,510 @@ def api_download_clear_history():
 # ====================================================================
 # 工作流模型依赖解析
 # ====================================================================
+#
+# 两层检测 + 两个特殊节点精确匹配:
+#
+# 层 1: /object_info 动态检测 + 白名单
+#   — 主检测: combo 列表中含模型扩展名 → 自动识别为模型字段
+#   — 白名单: combo 为空/仅含哨兵值时, 查 _MODEL_FIELD_WHITELIST 精确匹配
+#   — 零误报: 不做任何启发式回退, 未知插件仅在有模型文件时可检测
+#
+# 层 2: 内联语法正则
+#   — <lora:name:weight>  (rgthree Power Prompt / Impact Pack / Easy-Use)
+#   — <wlr:name:w1:w2>    (WeiLin Prompt Editor)
+#
+# 特殊节点精确匹配:
+#   — WeiLinPromptUI / WeiLinPromptUIOnlyLoraStack
+#     LoRA 信息存储在 STRING 输入 lora_str 中, JSON 编码
+#   — Power Lora Loader (rgthree)
+#     LoRA 信息存储在 lora_N kwargs 中, dict 格式 {"lora": "name", ...}
+#
+# 不涉及:
+#   — 预设映射类节点 (IPAdapter Unified 等) — 用户选预设不选文件
+#   — STRING 绝对路径输入 (InstantID 等) — 非标准模型引用
+#   — API 模型名 (Kling 等) — 非本地文件
+#   — 自动下载类节点 (Florence2/layerdiffuse 等) — 运行时自动获取
 
-# 节点 class_type → (输入字段, 模型类别)
-_MODEL_FIELD_MAP = {
-    # Checkpoints
-    "CheckpointLoaderSimple":  ("ckpt_name",          "checkpoints"),
-    "CheckpointLoader":        ("ckpt_name",          "checkpoints"),
-    "unCLIPCheckpointLoader":  ("ckpt_name",          "checkpoints"),
-    # LoRA
-    "LoraLoader":              ("lora_name",          "loras"),
-    "LoraLoaderModelOnly":     ("lora_name",          "loras"),
-    # ControlNet
-    "ControlNetLoader":        ("control_net_name",   "controlnet"),
-    # VAE
-    "VAELoader":               ("vae_name",           "vae"),
-    # UNET
-    "UNETLoader":              ("unet_name",          "unet"),
-    # CLIP
-    "CLIPLoader":              ("clip_name",          "clip"),
-    "DualCLIPLoader":          ("clip_name1",         "clip"),
-    "TripleCLIPLoader":        ("clip_name1",         "clip"),
-    # CLIP Vision
-    "CLIPVisionLoader":        ("clip_name",          "clip_vision"),
-    # Upscale
-    "UpscaleModelLoader":      ("model_name",         "upscale_models"),
-    # Style / IP-Adapter / InstantID
-    "StyleModelLoader":        ("style_model_name",   "style_models"),
-    "IPAdapterModelLoader":    ("ipadapter_file",     "ipadapter"),
-    "InstantIDModelLoader":    ("instantid_file",     "instantid"),
-    # Hypernetwork / GLIGEN / PhotoMaker / PuLID
-    "HypernetworkLoader":      ("hypernetwork_name",  "hypernetworks"),
-    "GLIGENLoader":            ("gligen_name",        "gligen"),
-    "PhotoMakerLoader":        ("photomaker_model_name", "photomaker"),
-    "PuLIDModelLoader":        ("pulid_file",         "pulid"),
-    # Diffusers
-    "DiffusersLoader":         ("model_path",         "diffusers"),
+# ── 哨兵值: 非模型文件的 combo 占位项, 提取时跳过 ──
+_SENTINEL_VALUES = frozenset({
+    "None", "none", "Baked VAE", "pixel_space",
+})
+
+# ── 模型字段白名单 ──────────────────────────────────────────
+# {class_type: {field_name: folder_paths_category}}
+# 仅在 /object_info combo 主检测 (模型扩展名) 无法覆盖时生效
+# (例如本地未安装对应模型导致 combo 为空/仅含哨兵值)
+#
+# 维护规则:
+#   — 只列出使用 folder_paths.get_filename_list() 的真实模型选择字段
+#   — 排除 API 模型名 (Kling)、insightface 包名、自动下载类显示名
+#   — 新插件/冷门插件: 等用户反馈后再添加, 也用白名单方式, 不做回退
+_MODEL_FIELD_WHITELIST: dict[str, dict[str, str]] = {
+    # ── ComfyUI 内置 ──
+    "CLIPLoader":                {"clip_name": "clip"},
+    "CLIPVisionLoader":          {"clip_name": "clip_vision"},
+    "ControlNetLoader":          {"control_net_name": "controlnet"},
+    "DiffControlNetLoader":      {"control_net_name": "controlnet"},
+    "DiffusersLoader":           {"model_path": "diffusers"},
+    "GLIGENLoader":              {"gligen_name": "gligen"},
+    "LoraLoader":                {"lora_name": "loras"},
+    "LoraLoaderModelOnly":       {"lora_name": "loras"},
+    "StyleModelLoader":          {"style_model_name": "style_models"},
+    "UNETLoader":                {"unet_name": "unet"},
+    "VAELoader":                 {"vae_name": "vae"},
+    # ── ComfyUI extras ──
+    "CreateHookLora":            {"lora_name": "loras"},
+    "CreateHookLoraModelOnly":   {"lora_name": "loras"},
+    "HypernetworkLoader":        {"hypernetwork_name": "hypernetworks"},
+    "LatentUpscaleModelLoader":  {"model_name": "upscale_models"},
+    "LoraLoaderBypass":          {"lora_name": "loras"},
+    "LoraLoaderBypassModelOnly": {"lora_name": "loras"},
+    "PhotoMakerLoader":          {"photomaker_model_name": "photomaker"},
+    "UpscaleModelLoader":        {"model_name": "upscale_models"},
+    # ── ComfyUI-Advanced-ControlNet ──
+    "ACN_SparseCtrlMergedLoaderAdvanced": {"control_net_name": "controlnet"},
+    "ControlNetLoaderAdvanced":           {"control_net_name": "controlnet"},
+    "DiffControlNetLoaderAdvanced":       {"control_net_name": "controlnet"},
+    # ── ComfyUI-AnimateDiff-Evolved ──
+    "ADE_AnimateDiffLoaderGen1":              {"model_name": "animatediff_models"},
+    "ADE_AnimateDiffLoaderV1Advanced":        {"model_name": "animatediff_models"},
+    "ADE_AnimateDiffLoaderWithContext":        {"model_name": "animatediff_models"},
+    "ADE_InjectI2VIntoAnimateDiffModel":      {"model_name": "animatediff_models"},
+    "ADE_InjectPIAIntoAnimateDiffModel":      {"model_name": "animatediff_models"},
+    "ADE_LoadAnimateDiffModel":               {"model_name": "animatediff_models"},
+    "ADE_LoadAnimateDiffModelWithCameraCtrl": {"model_name": "animatediff_models"},
+    "ADE_LoadAnimateLCMI2VModel":             {"model_name": "animatediff_models"},
+    "ADE_RegisterLoraHook":                   {"lora_name": "loras"},
+    "ADE_RegisterLoraHookModelOnly":          {"lora_name": "loras"},
+    "AnimateDiffLoaderV1":                    {"model_name": "animatediff_models"},
+    # ── ComfyUI-IC-Light ──
+    "LoadAndApplyICLightUnet": {"model_path": "unet"},
+    # ── ComfyUI-Impact-Pack ──
+    "ONNXDetectorProvider": {"model_name": "onnx"},
+    "SAMLoader":            {"model_name": "sams"},
+    # ── ComfyUI-Inspire-Pack ──
+    "LoadDiffusionModelShared //Inspire":      {"model_name": "diffusion_models"},
+    "LoraBlockInfo //Inspire":                 {"lora_name": "loras"},
+    "LoraLoaderBlockWeight //Inspire":         {"lora_name": "loras"},
+    "MakeLBW //Inspire":                       {"lora_name": "loras"},
+    "XY Input: Lora Block Weight //Inspire":   {"lora_name": "loras"},
+    # ── ComfyUI-KJNodes ──
+    "DiTBlockLoraLoader":    {"lora_name": "loras"},
+    "DiffusionModelLoaderKJ": {"model_name": "diffusion_models"},
+    "DiffusionModelSelector": {"model_name": "diffusion_models"},
+    "GGUFLoaderKJ":          {"model_name": "unet_gguf", "extra_model_name": "unet_gguf"},
+    "LTX2LoraLoaderAdvanced": {"lora_name": "loras"},
+    "LoraReduceRankKJ":      {"lora_name": "loras"},
+    "VAELoaderKJ":           {"vae_name": "vae"},
+    # ── ComfyUI_IPAdapter_plus ──
+    "IPAdapterModelLoader":  {"ipadapter_file": "ipadapter"},
+    # ── AuraSR-ComfyUI ──
+    "AuraSR.AuraSRUpscaler": {"model_name": "upscale_models"},
+    # ── efficiency-nodes-comfyui ──
+    "Eff. Loader SDXL":      {"vae_name": "vae"},
+    "Efficient Loader":      {"lora_name": "loras", "vae_name": "vae"},
+    "HighRes-Fix Script":    {"control_net_name": "controlnet"},
+    "XY Input: LoRA Plot":   {"lora_name": "loras"},
+    # ── was-node-suite-comfyui ──
+    "Diffusers Model Loader": {"model_path": "diffusers"},
+    "Load Lora":             {"lora_name": "loras"},
+    "Lora Loader":           {"lora_name": "loras"},
+    "Upscale Model Loader":  {"model_name": "upscale_models"},
+    # ── ComfyUI-Easy-Use (基础加载器) ──
+    "easy a1111Loader":        {"lora_name": "loras", "vae_name": "vae"},
+    "easy cascadeLoader":      {"clip_name": "clip", "lora_name": "loras"},
+    "easy comfyLoader":        {"lora_name": "loras", "vae_name": "vae"},
+    "easy controlnetLoader":   {"control_net_name": "controlnet"},
+    "easy controlnetLoader++": {"control_net_name": "controlnet"},
+    "easy controlnetLoaderADV": {"control_net_name": "controlnet"},
+    "easy controlnetNames":    {"controlnet_name": "controlnet"},
+    "easy fluxLoader":         {"lora_name": "loras", "vae_name": "vae"},
+    "easy fullCascadeKSampler": {"decode_vae_name": "vae", "encode_vae_name": "vae"},
+    "easy fullLoader":         {"lora_name": "loras", "vae_name": "vae"},
+    "easy hiresFix":           {"model_name": "upscale_models"},
+    "easy hunyuanDiTLoader":   {"lora_name": "loras", "vae_name": "vae"},
+    "easy instantIDApply":     {"control_net_name": "controlnet"},
+    "easy instantIDApplyADV":  {"control_net_name": "controlnet"},
+    "easy kolorsLoader":       {"lora_name": "loras", "unet_name": "unet", "vae_name": "vae"},
+    "easy LLLiteLoader":       {"model_name": "controlnet"},
+    "easy loraNames":          {"lora_name": "loras"},
+    "easy mochiLoader":        {"vae_name": "vae"},
+    "easy pixArtLoader":       {"clip_name": "clip", "lora_name": "loras", "vae_name": "vae"},
+    "easy preSamplingCascade": {"decode_vae_name": "vae", "encode_vae_name": "vae"},
+    "easy samLoaderPipe":      {"model_name": "sams"},
+    "easy sv3dLoader":         {"ckpt_name": "checkpoints", "vae_name": "vae"},
+    "easy svdLoader":          {"ckpt_name": "checkpoints", "clip_name": "clip", "vae_name": "vae"},
+    "easy ultralyticsDetectorPipe": {"model_name": "ultralytics"},
+    "easy XYInputs: ControlNet":    {"control_net_name": "controlnet"},
+    "easy zero123Loader":      {"ckpt_name": "checkpoints", "vae_name": "vae"},
 }
-
-# 额外字段 (同一节点有多个模型字段)
-_EXTRA_FIELDS = {
-    "DualCLIPLoader":   [("clip_name2", "clip")],
-    "TripleCLIPLoader": [("clip_name2", "clip"), ("clip_name3", "clip")],
-}
-
-# 已知节点的 widget 字段索引映射 (用于 workflow 编辑器格式解析)
-# key=字段名, value=widgets_values 数组中的索引位置
-_WIDGET_INDEX_MAP = {
-    "CheckpointLoaderSimple": {"ckpt_name": 0},
-    "CheckpointLoader":       {"ckpt_name": 0},
-    "unCLIPCheckpointLoader": {"ckpt_name": 0},
-    "LoraLoader":             {"lora_name": 0},
-    "LoraLoaderModelOnly":    {"lora_name": 0},
-    "ControlNetLoader":       {"control_net_name": 0},
-    "VAELoader":              {"vae_name": 0},
-    "UNETLoader":             {"unet_name": 0},
-    "CLIPLoader":             {"clip_name": 0},
-    "DualCLIPLoader":         {"clip_name1": 0, "clip_name2": 1},
-    "TripleCLIPLoader":       {"clip_name1": 0, "clip_name2": 1, "clip_name3": 2},
-    "CLIPVisionLoader":       {"clip_name": 0},
-    "UpscaleModelLoader":     {"model_name": 0},
-    "StyleModelLoader":       {"style_model_name": 0},
-    "IPAdapterModelLoader":   {"ipadapter_file": 0},
-    "InstantIDModelLoader":   {"instantid_file": 0},
-    "HypernetworkLoader":     {"hypernetwork_name": 0},
-    "GLIGENLoader":           {"gligen_name": 0},
-    "PhotoMakerLoader":       {"photomaker_model_name": 0},
-    "PuLIDModelLoader":       {"pulid_file": 0},
-    "DiffusersLoader":        {"model_path": 0},
-}
+# ComfyUI-Easy-Use: loraStack (1-10) / loraSwitcher (1-50)
+_MODEL_FIELD_WHITELIST["easy loraStack"] = {f"lora_{i}_name": "loras" for i in range(1, 11)}
+_MODEL_FIELD_WHITELIST["easy loraSwitcher"] = {f"lora_{i}_name": "loras" for i in range(1, 51)}
 
 
-def _extract_metadata_from_image(file_bytes: bytes, filename: str) -> dict:
-    """从 ComfyUI 生成的图片文件中提取 prompt/workflow 元数据
+# ── 内联引用正则 ──
+_LORA_TAG_RE = re.compile(
+    r"<lora:([^:>]+?)(?::[^>]*)?>", re.IGNORECASE
+)
+_WLR_TAG_RE = re.compile(
+    r"<wlr:([^:]+):[^>]+>", re.IGNORECASE
+)
 
-    支持格式:
-      - PNG (静态): tEXt chunk — keys 'prompt' / 'workflow'
-      - PNG (APNG): 自定义 'comf' chunk — key\\x00value 格式
-      - WebP: EXIF 0x0110 (Model) / 0x010F (Make) — "key:json"
-      - SVG: <metadata> CDATA 中的 JSON
+# ── /object_info 内存缓存 ──
+_object_info_cache: dict | None = None
+# {class_type: {field_name: set(combo_values)}} — 仅包含模型文件 combo 字段
+_model_field_cache: dict | None = None
 
-    Returns: {"prompt": dict|None, "workflow": dict|None, "format": str}
-    """
-    ext = os.path.splitext(filename)[1].lower()
-    result = {"prompt": None, "workflow": None, "format": ext.lstrip(".")}
 
+def _refresh_object_info() -> dict | None:
+    """从 ComfyUI 获取 /object_info 并构建模型字段映射缓存"""
+    global _object_info_cache, _model_field_cache
     try:
-        if ext == ".svg":
-            return _extract_metadata_from_svg(file_bytes, result)
-        elif ext in (".png", ".webp", ".jpg", ".jpeg"):
-            img = Image.open(io.BytesIO(file_bytes))
-
-            if ext == ".png":
-                # 静态 PNG: tEXt chunks
-                if hasattr(img, "text") and img.text:
-                    for key in ("prompt", "workflow"):
-                        if key in img.text:
-                            try:
-                                result[key] = json.loads(img.text[key])
-                            except (json.JSONDecodeError, TypeError):
-                                pass
-
-                # APNG: 自定义 'comf' chunk (tEXt 可能为空)
-                if not result["prompt"] and not result["workflow"]:
-                    result = _parse_apng_comf_chunks(file_bytes, result)
-
-            elif ext == ".webp":
-                # WebP: EXIF tags (Model=0x0110, Make=0x010F, ...)
-                exif = img.getexif()
-                for tag_id in (0x0110, 0x010F, 0x010E, 0x010D):
-                    if tag_id in exif:
-                        raw = exif[tag_id]
-                        if isinstance(raw, str) and ":" in raw:
-                            key, val = raw.split(":", 1)
-                            key = key.strip().lower()
-                            if key in ("prompt", "workflow"):
-                                try:
-                                    result[key] = json.loads(val)
-                                except (json.JSONDecodeError, TypeError):
-                                    pass
-
-            elif ext in (".jpg", ".jpeg"):
-                # JPEG: ComfyUI 核心不支持, 但某些第三方节点
-                # 可能在 EXIF UserComment 中存储
-                exif = img.getexif()
-                # 尝试与 WebP 相同的 tag
-                for tag_id in (0x0110, 0x010F):
-                    if tag_id in exif:
-                        raw = exif[tag_id]
-                        if isinstance(raw, str) and ":" in raw:
-                            key, val = raw.split(":", 1)
-                            key = key.strip().lower()
-                            if key in ("prompt", "workflow"):
-                                try:
-                                    result[key] = json.loads(val)
-                                except (json.JSONDecodeError, TypeError):
-                                    pass
-            img.close()
+        resp = requests.get(f"{COMFYUI_URL}/object_info", timeout=15)
+        resp.raise_for_status()
+        _object_info_cache = resp.json()
     except Exception:
-        pass
+        return _object_info_cache
 
-    return result
+    field_map: dict[str, dict[str, set]] = {}
+    for ct, info in _object_info_cache.items():
+        node_inputs = info.get("input", {})
+        fields: dict[str, set] = {}
+        for section in ("required", "optional"):
+            for fname, fspec in node_inputs.get(section, {}).items():
+                if not isinstance(fspec, (list, tuple)) or not fspec:
+                    continue
+                # 兼容新旧两种 /object_info combo 格式:
+                #   旧: [["opt1","opt2",...], {...}]  →  fspec[0] 是 list
+                #   新: ["COMBO", {"options":["opt1",...],...}]  →  fspec[0]=="COMBO"
+                options = fspec[0]
+                if isinstance(options, str) and options == "COMBO":
+                    if (len(fspec) > 1 and isinstance(fspec[1], dict)):
+                        options = fspec[1].get("options", [])
+                    else:
+                        continue
+                if not isinstance(options, list):
+                    continue
+                # combo 选项中有模型扩展名 → 这是模型文件字段
+                if any(
+                    isinstance(o, str)
+                    and any(o.lower().endswith(e) for e in MODEL_EXTENSIONS)
+                    for o in options[:20]
+                ):
+                    fields[fname] = set(options)
+                # 白名单: combo 为空或仅含哨兵值时, 查静态白名单
+                elif (ct in _MODEL_FIELD_WHITELIST
+                      and fname in _MODEL_FIELD_WHITELIST[ct]):
+                    fields[fname] = set(options)
+        if fields:
+            field_map[ct] = fields
+
+    _model_field_cache = field_map
+    return _object_info_cache
 
 
-def _parse_apng_comf_chunks(data: bytes, result: dict) -> dict:
-    """解析 APNG 中的自定义 'comf' chunk"""
-    if len(data) < 8 or data[:8] != b'\x89PNG\r\n\x1a\n':
-        return result
-    pos = 8
-    while pos + 8 <= len(data):
-        try:
-            length = struct.unpack(">I", data[pos:pos + 4])[0]
-            chunk_type = data[pos + 4:pos + 8]
-            chunk_data = data[pos + 8:pos + 8 + length]
-            # CRC 4 bytes after chunk data
-            pos += 12 + length
+# ── 类别推断 (仅用于 UI 显示标签) ──
+_CATEGORY_HINTS = (
+    ("checkpoint", "checkpoints"), ("ckpt", "checkpoints"),
+    ("lora", "loras"),
+    ("vae", "vae"),
+    ("unet", "diffusion_models"), ("diffusion_model", "diffusion_models"),
+    ("clip_vision", "clip_vision"),
+    ("clip", "text_encoders"), ("text_encoder", "text_encoders"),
+    ("controlnet", "controlnet"), ("control_net", "controlnet"),
+    ("upscale", "upscale_models"),
+    ("hypernetwork", "hypernetworks"),
+    ("embedding", "embeddings"),
+    ("gligen", "gligen"),
+    ("style_model", "style_models"),
+    ("ipadapter", "ipadapter"),
+    ("photomaker", "photomaker"),
+    ("animatediff", "animatediff_models"),
+    ("sam", "sams"), ("onnx", "onnx"),
+    ("gguf", "diffusion_models"),
+    # 通用: 放在最后, _infer_category 优先使用更具体的关键词
+    ("model", "unknown"),
+)
 
-            if chunk_type == b'comf' and b'\x00' in chunk_data:
-                sep = chunk_data.index(b'\x00')
-                key = chunk_data[:sep].decode("latin-1", errors="replace")
-                val = chunk_data[sep + 1:].decode("latin-1", errors="replace")
-                if key in ("prompt", "workflow"):
-                    try:
-                        result[key] = json.loads(val)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-            elif chunk_type == b'IEND':
-                # 不要在 IEND 后退出, comf chunks 可能在 IEND 之后
+
+def _infer_category(class_type: str, field_name: str) -> str:
+    """从字段名 / 节点类型名推断模型类别"""
+    fl, cl = field_name.lower(), class_type.lower()
+    # 字段名匹配 (跳过过于泛化的 model, 优先用 class_type 上下文)
+    for kw, cat in _CATEGORY_HINTS:
+        if kw != "model" and kw in fl:
+            return cat
+    # 节点类型名匹配
+    for kw, cat in _CATEGORY_HINTS:
+        if kw in cl:
+            return cat
+    return "unknown"
+
+
+# ── 扫描辅助函数 ──
+
+def _scan_inline_loras(inputs: dict, ct: str, seen: set, out: list):
+    """层 2: 扫描所有 STRING 输入中的 <lora:> 和 <wlr:> 标签"""
+    for fname, val in inputs.items():
+        if not isinstance(val, str) or len(val) < 7:
+            continue
+        for m in _LORA_TAG_RE.finditer(val):
+            name = m.group(1).strip()
+            if not name or name in seen:
                 continue
-        except (struct.error, IndexError):
-            break
-    return result
+            if not any(name.lower().endswith(e) for e in MODEL_EXTENSIONS):
+                name += ".safetensors"
+            if name in seen:
+                continue
+            seen.add(name)
+            out.append({"name": name, "type": "loras",
+                        "node": ct, "field": fname})
+        for m in _WLR_TAG_RE.finditer(val):
+            name = m.group(1).strip()
+            if not name or name in seen:
+                continue
+            if not any(name.lower().endswith(e) for e in MODEL_EXTENSIONS):
+                name += ".safetensors"
+            if name in seen:
+                continue
+            seen.add(name)
+            out.append({"name": name, "type": "loras",
+                        "node": ct, "field": fname})
 
 
-def _extract_metadata_from_svg(data: bytes, result: dict) -> dict:
-    """从 SVG 的 <metadata> 标签中提取 ComfyUI 工作流元数据"""
-    try:
-        text = data.decode("utf-8", errors="replace")
-        import re
-        # ComfyUI SVG 格式: <metadata><![CDATA[{json}]]></metadata>
-        match = re.search(
-            r'<metadata>\s*<!\[CDATA\[(.*?)\]\]>\s*</metadata>',
-            text, re.DOTALL
-        )
-        if match:
-            meta_json = json.loads(match.group(1))
-            if isinstance(meta_json, dict):
-                result["prompt"] = meta_json.get("prompt")
-                result["workflow"] = meta_json.get("workflow")
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        pass
-    return result
+def _handle_weilin(inputs: dict, ct: str, seen: set, out: list):
+    """特殊处理: WeiLin Lora Stack / Prompt Editor 的 JSON 编码 LoRA"""
+    for key in ("lora_str", "temp_lora_str", "positive"):
+        val = inputs.get(key, "")
+        if not isinstance(val, str) or not val.strip():
+            continue
+        lora_list = None
+        try:
+            parsed = json.loads(val)
+            if isinstance(parsed, list):
+                lora_list = parsed
+            elif isinstance(parsed, dict) and "lora" in parsed:
+                lora_list = parsed["lora"]
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(lora_list, list):
+            continue
+        for item in lora_list:
+            if isinstance(item, dict) and "lora" in item:
+                name = item["lora"]
+                if isinstance(name, str) and name and name not in seen:
+                    seen.add(name)
+                    out.append({"name": name, "type": "loras",
+                                "node": ct, "field": key})
 
 
-def _extract_models_from_prompt(prompt: dict) -> list[dict]:
-    """从 ComfyUI prompt JSON 中提取模型引用列表"""
-    seen = set()
-    models = []
+def _handle_power_lora(inputs: dict, ct: str, seen: set, out: list):
+    """特殊处理: rgthree Power Lora Loader 的 dict 嵌套 LoRA"""
+    for key, val in inputs.items():
+        if not key.upper().startswith("LORA_") or not isinstance(val, dict):
+            continue
+        name = val.get("lora", "")
+        if isinstance(name, str) and name and name != "None" and name not in seen:
+            seen.add(name)
+            out.append({"name": name, "type": "loras",
+                        "node": ct, "field": f"{key}.lora"})
 
-    for _node_id, node in prompt.items():
+
+# ── 主提取函数 ──
+
+def _extract_models_from_prompt(prompt: dict) -> tuple[list[dict], list[dict]]:
+    """从 ComfyUI prompt JSON 提取模型依赖
+
+    返回: (models, missing_nodes)
+    - models:        模型引用列表, 每项含 name/type/exists/node/field
+    - missing_nodes: 未安装的节点列表, 每项含 class_type/node_id
+    """
+    if _model_field_cache is None:
+        _refresh_object_info()
+    field_map = _model_field_cache or {}
+
+    models: list[dict] = []
+    missing_nodes: list[dict] = []
+    seen: set[str] = set()
+    seen_missing: set[str] = set()
+
+    for nid, node in prompt.items():
         if not isinstance(node, dict):
             continue
-        class_type = node.get("class_type", "")
+        ct = node.get("class_type", "")
         inputs = node.get("inputs", {})
         if not isinstance(inputs, dict):
             continue
 
-        # 主字段
-        if class_type in _MODEL_FIELD_MAP:
-            field, category = _MODEL_FIELD_MAP[class_type]
-            name = inputs.get(field)
-            if name and isinstance(name, str) and name not in seen:
-                seen.add(name)
-                models.append({"name": name, "type": category, "field": field, "node": class_type})
-
-        # 额外字段 (如 DualCLIPLoader 的 clip_name2)
-        if class_type in _EXTRA_FIELDS:
-            for field, category in _EXTRA_FIELDS[class_type]:
-                name = inputs.get(field)
-                if name and isinstance(name, str) and name not in seen:
-                    seen.add(name)
-                    models.append({"name": name, "type": category, "field": field, "node": class_type})
-
-        # Fallback: 对于未知节点，扫描 inputs 中以模型扩展名结尾的值
-        if class_type not in _MODEL_FIELD_MAP:
-            for field, val in inputs.items():
-                if not isinstance(val, str) or val in seen:
-                    continue
-                if any(val.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
+        # ── 层 1: /object_info 精确检测 ──
+        if ct in field_map:
+            for fname, combo_set in field_map[ct].items():
+                val = inputs.get(fname)
+                if (isinstance(val, str) and val
+                        and val not in seen
+                        and val not in _SENTINEL_VALUES):
                     seen.add(val)
-                    models.append({"name": val, "type": "unknown", "field": field, "node": class_type})
+                    models.append({
+                        "name": val,
+                        "type": _infer_category(ct, fname),
+                        "exists": val in combo_set,
+                        "node": ct,
+                        "field": fname,
+                    })
+        elif (ct and _object_info_cache is not None
+              and ct not in _object_info_cache
+              and ct not in seen_missing):
+            seen_missing.add(ct)
+            missing_nodes.append({"class_type": ct, "node_id": nid})
 
-    return models
+        # ── 层 2: <lora:> / <wlr:> 内联语法 ──
+        _scan_inline_loras(inputs, ct, seen, models)
+
+        # ── 特殊节点 ──
+        if ct in ("WeiLinPromptUI", "WeiLinPromptUIOnlyLoraStack"):
+            _handle_weilin(inputs, ct, seen, models)
+        elif ct == "Power Lora Loader (rgthree)":
+            _handle_power_lora(inputs, ct, seen, models)
+
+    return models, missing_nodes
 
 
-def _extract_models_from_workflow(workflow: dict) -> list[dict]:
-    """从 ComfyUI workflow 编辑器格式中提取模型引用列表
+def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict]]:
+    """从 ComfyUI workflow 编辑器格式提取模型依赖
 
-    将 workflow.nodes 中的 widgets_values 通过 _WIDGET_INDEX_MAP
-    映射为 pseudo_prompt，然后委托给 _extract_models_from_prompt()
+    widgets_values 是无字段名的值数组。策略:
+    - 对于 /object_info 已知的节点: 将每个 string widget 与 combo 集对比
+    - 对于内联语法 / 特殊节点: 扫描所有 widget 值
     """
-    nodes = workflow.get("nodes", [])
-    pseudo_prompt = {}
+    if _model_field_cache is None:
+        _refresh_object_info()
+    field_map = _model_field_cache or {}
 
-    for i, node in enumerate(nodes):
+    models: list[dict] = []
+    missing_nodes: list[dict] = []
+    seen: set[str] = set()
+    seen_missing: set[str] = set()
+
+    for node in workflow.get("nodes", []):
         if not isinstance(node, dict):
             continue
         ct = node.get("type", "")
-        node_id = str(node.get("id", f"_auto_{i}"))
-        widgets = node.get("widgets_values", [])
+        widgets = node.get("widgets_values")
         if not isinstance(widgets, list):
             continue
 
-        inputs_dict = {}
+        # ── 层 1: /object_info — 将 widget 值与 combo 集合对比 ──
+        if ct in field_map:
+            all_combos = field_map[ct]
+            for val in widgets:
+                if (not isinstance(val, str) or not val
+                        or val in seen or val in _SENTINEL_VALUES):
+                    continue
+                # 检查是否在某个 combo 集中 (说明文件存在)
+                matched_field = None
+                for fname, combo_set in all_combos.items():
+                    if val in combo_set:
+                        matched_field = fname
+                        break
+                if matched_field:
+                    seen.add(val)
+                    models.append({
+                        "name": val,
+                        "type": _infer_category(ct, matched_field),
+                        "exists": True,
+                        "node": ct, "field": matched_field,
+                    })
+                elif any(val.lower().endswith(e) for e in MODEL_EXTENSIONS):
+                    # 有模型扩展名但不在 combo 中 → 可能是缺失的模型
+                    fname = next(iter(all_combos))
+                    seen.add(val)
+                    models.append({
+                        "name": val,
+                        "type": _infer_category(ct, fname),
+                        "exists": False,
+                        "node": ct, "field": fname,
+                    })
+        elif (ct and _object_info_cache is not None
+              and ct not in _object_info_cache
+              and ct not in seen_missing):
+            seen_missing.add(ct)
+            missing_nodes.append({"class_type": ct})
 
-        if ct in _WIDGET_INDEX_MAP:
-            idx_map = _WIDGET_INDEX_MAP[ct]
-            for field, idx in idx_map.items():
-                if idx < len(widgets) and isinstance(widgets[idx], str):
-                    inputs_dict[field] = widgets[idx]
-        else:
-            for j, val in enumerate(widgets):
-                if isinstance(val, str) and any(val.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
-                    inputs_dict[f"_unknown_field_{j}"] = val
+        # ── 层 2: <lora:> / <wlr:> 在 widget 字符串值中 ──
+        for val in widgets:
+            if not isinstance(val, str) or len(val) < 7:
+                continue
+            for m in _LORA_TAG_RE.finditer(val):
+                name = m.group(1).strip()
+                if not name:
+                    continue
+                if not any(name.lower().endswith(e) for e in MODEL_EXTENSIONS):
+                    name += ".safetensors"
+                if name in seen:
+                    continue
+                seen.add(name)
+                models.append({"name": name, "type": "loras",
+                                "node": ct, "field": ""})
+            for m in _WLR_TAG_RE.finditer(val):
+                name = m.group(1).strip()
+                if not name:
+                    continue
+                if not any(name.lower().endswith(e) for e in MODEL_EXTENSIONS):
+                    name += ".safetensors"
+                if name in seen:
+                    continue
+                seen.add(name)
+                models.append({"name": name, "type": "loras",
+                                "node": ct, "field": ""})
 
-        if inputs_dict:
-            pseudo_prompt[node_id] = {"class_type": ct, "inputs": inputs_dict}
+        # ── WeiLin 特殊: 扫描 widget 值中的 JSON 字符串 ──
+        if ct in ("WeiLinPromptUI", "WeiLinPromptUIOnlyLoraStack"):
+            for val in widgets:
+                if not isinstance(val, str) or not val.strip():
+                    continue
+                try:
+                    parsed = json.loads(val)
+                    items = (parsed if isinstance(parsed, list)
+                             else parsed.get("lora", [])
+                             if isinstance(parsed, dict) else [])
+                    for item in items:
+                        if isinstance(item, dict) and "lora" in item:
+                            name = item["lora"]
+                            if (isinstance(name, str) and name
+                                    and name not in seen):
+                                seen.add(name)
+                                models.append({
+                                    "name": name, "type": "loras",
+                                    "node": ct, "field": "lora_str",
+                                })
+                except (json.JSONDecodeError, ValueError, TypeError):
+                    pass
 
-    return _extract_models_from_prompt(pseudo_prompt)
+        # ── rgthree Power Lora Loader 特殊: widget 值中的 dict ──
+        if ct == "Power Lora Loader (rgthree)":
+            for val in widgets:
+                if isinstance(val, dict) and "lora" in val:
+                    name = val.get("lora", "")
+                    if isinstance(name, str) and name and name not in seen:
+                        seen.add(name)
+                        models.append({
+                            "name": name, "type": "loras",
+                            "node": ct, "field": "lora_N",
+                        })
+
+    return models, missing_nodes
 
 
 def _check_model_exists(name: str, category: str) -> bool:
-    """检查模型文件是否存在于本地"""
+    """检查模型文件是否存在于本地 (用于非 combo 检测的模型)"""
     rel_dir = MODEL_DIRS.get(category, "")
     if not rel_dir:
-        # 未知类别 — 搜索所有目录
         for _cat, rd in MODEL_DIRS.items():
-            full = os.path.join(COMFYUI_DIR, rd, name)
-            if os.path.isfile(full):
+            if os.path.isfile(os.path.join(COMFYUI_DIR, rd, name)):
                 return True
         return False
-    full = os.path.join(COMFYUI_DIR, rel_dir, name)
-    return os.path.isfile(full)
+    return os.path.isfile(os.path.join(COMFYUI_DIR, rel_dir, name))
 
 
 @bp.route("/api/models/parse-workflow", methods=["POST"])
@@ -668,13 +888,19 @@ def api_parse_workflow():
     """
     解析工作流 JSON，提取模型引用并检查本地是否存在
 
+    需要 ComfyUI 运行中 (依赖 /object_info 端点)。
+
     Body: { "prompt": {...} }   — ComfyUI prompt 格式
-      或  { "workflow": {...} } — ComfyUI workflow 编辑器格式 (自动从中提取 prompt)
+      或  { "workflow": {...} } — ComfyUI workflow 编辑器格式
 
     Response: {
         "models": [
-            {"name": "xx.safetensors", "type": "checkpoints", "exists": true, "node": "CheckpointLoaderSimple"},
+            {"name": "xx.safetensors", "type": "checkpoints",
+             "exists": true, "node": "CheckpointLoaderSimple", "field": "ckpt_name"},
             ...
+        ],
+        "missing_nodes": [
+            {"class_type": "SomeCustomNode", "node_id": "5"}
         ],
         "total": 4,
         "missing": 2
@@ -688,95 +914,44 @@ def api_parse_workflow():
     workflow = data.get("workflow")
 
     if prompt and isinstance(prompt, dict):
-        models = _extract_models_from_prompt(prompt)
+        models, missing_nodes = _extract_models_from_prompt(prompt)
     elif workflow and isinstance(workflow, dict):
-        models = _extract_models_from_workflow(workflow)
+        models, missing_nodes = _extract_models_from_workflow(workflow)
     else:
         return jsonify({"error": "需要 prompt 或 workflow 字段"}), 400
 
-    # 检查本地存在性
-    for m in models:
-        m["exists"] = _check_model_exists(m["name"], m["type"])
-
-    missing = sum(1 for m in models if not m["exists"])
-    return jsonify({"models": models, "total": len(models), "missing": missing})
-
-
-# ====================================================================
-#  文件上传解析 — 从图片/SVG 中提取工作流元数据并解析模型依赖
-# ====================================================================
-
-_ALLOWED_IMAGE_EXTS = {".png", ".webp", ".jpg", ".jpeg", ".svg"}
-_MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100 MB
-
-
-@bp.route("/api/models/parse-image", methods=["POST"])
-def api_parse_image():
-    """
-    从上传的图片文件中提取 ComfyUI 工作流元数据并解析模型依赖
-
-    支持: PNG (含 APNG)、WebP、SVG、JPEG (有限)
-
-    Body: multipart/form-data
-      - file: 图片文件
-
-    Response: {
-        "format": "png",
-        "has_prompt": true,
-        "has_workflow": true,
-        "models": [...],
-        "total": 4,
-        "missing": 2
-    }
-    """
-    if "file" not in request.files:
-        return jsonify({"error": "需要上传文件 (field name: file)"}), 400
-
-    f = request.files["file"]
-    if not f.filename:
-        return jsonify({"error": "文件名为空"}), 400
-
-    ext = os.path.splitext(f.filename)[1].lower()
-    if ext not in _ALLOWED_IMAGE_EXTS:
+    # 如果 /object_info 不可用, 提示 ComfyUI 未运行
+    if _object_info_cache is None:
         return jsonify({
-            "error": f"不支持的文件格式: {ext}",
-            "supported": list(_ALLOWED_IMAGE_EXTS),
-        }), 400
+            "error": "ComfyUI 未运行或无法连接, 无法解析工作流模型依赖",
+        }), 503
 
-    file_bytes = f.read()
-    if len(file_bytes) > _MAX_UPLOAD_SIZE:
-        return jsonify({"error": f"文件过大 (最大 {_MAX_UPLOAD_SIZE // 1024 // 1024} MB)"}), 400
-
-    # 提取元数据
-    meta = _extract_metadata_from_image(file_bytes, f.filename)
-
-    prompt = meta.get("prompt")
-    workflow = meta.get("workflow")
-
-    if not prompt and not workflow:
-        return jsonify({
-            "error": "未在文件中找到 ComfyUI 工作流元数据",
-            "format": meta.get("format", ext.lstrip(".")),
-            "hint": "文件可能不是由 ComfyUI 生成，或元数据已被清除",
-        }), 404
-
-    # 复用共享解析逻辑
-    models = []
-    if prompt and isinstance(prompt, dict):
-        models = _extract_models_from_prompt(prompt)
-    elif workflow and isinstance(workflow, dict):
-        models = _extract_models_from_workflow(workflow)
-
-    # 检查本地存在性
+    # 对非 combo 检测的模型 (内联/特殊节点), 补充文件系统存在性检查
     for m in models:
-        m["exists"] = _check_model_exists(m["name"], m["type"])
+        if "exists" not in m:
+            m["exists"] = _check_model_exists(m["name"], m["type"])
 
     missing = sum(1 for m in models if not m["exists"])
     return jsonify({
-        "format": meta.get("format", ext.lstrip(".")),
-        "has_prompt": prompt is not None,
-        "has_workflow": workflow is not None,
         "models": models,
+        "missing_nodes": missing_nodes,
         "total": len(models),
         "missing": missing,
+    })
+
+
+@bp.route("/api/models/refresh-object-info", methods=["POST"])
+def api_refresh_object_info():
+    """手动刷新 /object_info 缓存 (安装/卸载插件后调用)"""
+    info = _refresh_object_info()
+    if info is None:
+        return jsonify({"error": "无法连接 ComfyUI"}), 503
+    node_count = len(info)
+    model_field_count = sum(
+        len(fields) for fields in (_model_field_cache or {}).values()
+    )
+    return jsonify({
+        "ok": True,
+        "nodes": node_count,
+        "model_fields": model_field_count,
     })

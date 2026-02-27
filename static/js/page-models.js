@@ -1225,6 +1225,8 @@ window.updateCartBadge = updateCartBadge;
 
 // ── 工作流解析 ──────────────────────────────────────────────
 
+import { extractComfyUIMetadata, SUPPORTED_EXTS } from './workflow-metadata.js';
+
 let _wfDropInited = false;
 
 function _initWorkflowDropZone() {
@@ -1242,49 +1244,14 @@ function _initWorkflowDropZone() {
   });
 }
 
-/**
- * 从 PNG 文件的 tEXt chunk 中提取 ComfyUI 元数据
- */
-async function _extractPNGMetadata(file) {
-  const buf = await file.arrayBuffer();
-  const view = new DataView(buf);
-
-  // 验证 PNG signature
-  if (view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) {
-    throw new Error('不是有效的 PNG 文件');
-  }
-
-  let offset = 8; // 跳过 signature
-  const decoder = new TextDecoder('latin1');
-  const result = {};
-
-  while (offset < view.byteLength) {
-    const length = view.getUint32(offset);
-    offset += 4;
-    const typeBytes = new Uint8Array(buf, offset, 4);
-    const type = String.fromCharCode(...typeBytes);
-    offset += 4;
-
-    if (type === 'tEXt') {
-      const data = new Uint8Array(buf, offset, length);
-      // tEXt: keyword\0value
-      const nullIdx = data.indexOf(0);
-      if (nullIdx > 0) {
-        const key = decoder.decode(data.slice(0, nullIdx));
-        const val = new TextDecoder('utf-8').decode(data.slice(nullIdx + 1));
-        if (key === 'prompt' || key === 'workflow') {
-          try { result[key] = JSON.parse(val); } catch (_) {}
-        }
-      }
-    } else if (type === 'IEND') {
-      break;
-    }
-
-    offset += length + 4; // 跳过 data + CRC
-  }
-
-  return result;
-}
+/** 格式显示名 */
+const _FORMAT_LABELS = {
+  png: 'PNG 图片', webp: 'WebP 图片', svg: 'SVG 图片',
+  webm: 'WebM 视频', mp4: 'MP4 视频',
+  flac: 'FLAC 音频', mp3: 'MP3 音频', opus: 'Opus 音频', ogg: 'OGG 音频',
+  glb: 'GLB 3D 模型', safetensors: 'Safetensors', latent: 'Latent',
+  json: 'JSON 工作流',
+};
 
 async function handleWorkflowFile(file) {
   if (!file) return;
@@ -1299,31 +1266,30 @@ async function handleWorkflowFile(file) {
   resultsEl.style.display = 'none';
 
   try {
-    let payload;
-
-    if (file.name.endsWith('.json')) {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      // 判断是 prompt 还是 workflow 格式
-      if (json.nodes && Array.isArray(json.nodes)) {
-        payload = { workflow: json };
-      } else {
-        payload = { prompt: json };
-      }
-    } else if (file.name.endsWith('.png')) {
-      const meta = await _extractPNGMetadata(file);
-      if (meta.prompt) {
-        payload = { prompt: meta.prompt };
-      } else if (meta.workflow) {
-        payload = { workflow: meta.workflow };
-      } else {
-        statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> PNG 文件中未找到 ComfyUI 工作流数据</span>`;
-        return;
-      }
-    } else {
-      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 不支持的文件格式，请上传 PNG 或 JSON 文件</span>`;
+    // 检查文件扩展名
+    const dotIdx = file.name.lastIndexOf('.');
+    const ext = dotIdx >= 0 ? file.name.slice(dotIdx).toLowerCase() : '';
+    if (!SUPPORTED_EXTS.has(ext)) {
+      const supported = [...SUPPORTED_EXTS].map(e => e.replace('.', '').toUpperCase()).join(' / ');
+      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 不支持的文件格式 (${escHtml(ext)})</span>`
+        + `<br><span style="color:var(--t3);font-size:.8rem">支持: ${supported}</span>`;
       return;
     }
+
+    // 客户端提取元数据
+    const meta = await extractComfyUIMetadata(file);
+    const formatLabel = _FORMAT_LABELS[meta.format] || meta.format;
+
+    if (!meta.prompt && !meta.workflow) {
+      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 未检测到 ComfyUI 元数据</span>`
+        + `<br><span style="color:var(--t3);font-size:.8rem">文件格式: ${escHtml(formatLabel)}。该文件可能不是由 ComfyUI 生成的，或元数据已被清除。</span>`;
+      return;
+    }
+
+    // 发送提取到的元数据到后端分析模型引用
+    const payload = {};
+    if (meta.prompt) payload.prompt = meta.prompt;
+    if (meta.workflow) payload.workflow = meta.workflow;
 
     const data = await apiFetch('/api/models/parse-workflow', {
       method: 'POST',
@@ -1332,18 +1298,25 @@ async function handleWorkflowFile(file) {
     });
 
     if (!data) {
-      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 解析请求失败</span>`;
+      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 服务端解析请求失败</span>`;
+      return;
+    }
+
+    if (data.error) {
+      statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> ${escHtml(data.error)}</span>`;
+      if (data.hint) statusEl.innerHTML += `<br><span style="color:var(--t3);font-size:.8rem">${escHtml(data.hint)}</span>`;
       return;
     }
 
     if (!data.models || data.models.length === 0) {
-      statusEl.innerHTML = `<span style="color:var(--amber)"><span class="ms ms-sm">info</span> 未找到模型引用</span>`;
+      statusEl.innerHTML = `<span style="color:var(--amber)"><span class="ms ms-sm">info</span> 未找到模型引用 (${escHtml(formatLabel)})</span>`;
       return;
     }
 
     statusEl.style.display = 'none';
     resultsEl.style.display = 'block';
-    summaryEl.textContent = `共 ${data.total} 个模型，${data.missing} 个缺失`;
+
+    summaryEl.textContent = `共 ${data.total} 个模型，${data.missing} 个缺失 (${formatLabel})`;
 
     listEl.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
       data.models.map(m => {
@@ -1376,7 +1349,7 @@ function searchModelFromWorkflow(name) {
   // 切换到 CivitAI 搜索 tab 并填入模型名
   const searchInput = document.getElementById('search-input');
   // 去掉扩展名作为搜索关键词
-  const keyword = name.replace(/\.(safetensors|ckpt|pt|pth|bin)$/i, '').replace(/[_-]/g, ' ');
+  const keyword = name.replace(/\.(safetensors|ckpt|pt|pth|bin|onnx|gguf)$/i, '').replace(/[_-]/g, ' ');
   if (searchInput) searchInput.value = keyword;
   switchModelTab('civitai');
   setTimeout(() => smartSearch(), 100);

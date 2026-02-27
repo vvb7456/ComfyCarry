@@ -3050,10 +3050,10 @@
                 <div id="mtab-workflow" class="hidden">
                     <div id="wf-drop-zone" style="border:2px dashed var(--bd);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px"
                          onclick="document.getElementById('wf-file-input').click()">
-                        <span class="ms" style="font-size:48px;color:var(--t3);display:block;margin-bottom:12px">image</span>
-                        <p style="color:var(--t2);font-size:.9rem;margin-bottom:4px">拖拽 ComfyUI 生成的 PNG 到此处</p>
-                        <p style="color:var(--t3);font-size:.8rem">或点击选择文件 (支持 PNG / JSON)</p>
-                        <input type="file" id="wf-file-input" accept=".png,.json" style="display:none" onchange="handleWorkflowFile(this.files[0])">
+                        <span class="ms" style="font-size:48px;color:var(--t3);display:block;margin-bottom:12px">upload_file</span>
+                        <p style="color:var(--t2);font-size:.9rem;margin-bottom:4px">拖拽 ComfyUI 生成的文件到此处</p>
+                        <p style="color:var(--t3);font-size:.8rem">或点击选择文件 (支持图片 / 视频 / 音频 / 3D / 权重 / JSON)</p>
+                        <input type="file" id="wf-file-input" accept=".png,.webp,.svg,.webm,.mp4,.flac,.mp3,.opus,.ogg,.glb,.safetensors,.latent,.json" style="display:none" onchange="handleWorkflowFile(this.files[0])">
                     </div>
                     <div id="wf-parse-status" style="display:none;margin-bottom:12px"></div>
                     <div id="wf-results" style="display:none">

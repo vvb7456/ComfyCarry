@@ -131,6 +131,16 @@ MODEL_DIRS = {
     "photomaker": "models/photomaker",
     "pulid": "models/pulid",
     "diffusers": "models/diffusers",
+    # 第三方节点常用目录
+    "ultralytics": "models/ultralytics",
+    "sams": "models/sams",
+    "animatediff_models": "models/animatediff_models",
+    "animatediff_motion_lora": "models/animatediff_motion_lora",
+    "mmdets_bbox": "models/mmdets/bbox",
+    "mmdets_segm": "models/mmdets/segm",
+    "reactor": "models/reactor",
+    "insightface": "models/insightface",
+    "facerestore_models": "models/facerestore_models",
 }
 
 MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
