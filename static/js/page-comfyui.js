@@ -517,7 +517,7 @@ async function loadQueuePanel() {
             <div class="queue-item-info">
               <div class="queue-item-id">#${idx + 1} · ${shortId}… · ${nodeCount} 个节点</div>
             </div>
-            <button class="btn btn-sm btn-danger" onclick="comfyDeleteQueueItem('${promptId}')">${msIcon('close')}</button>
+            <button class="btn btn-sm btn-danger" onclick="comfyDeleteQueueItem('${promptId}')">${msIcon('delete')}</button>
           </div>`;
         }).join('');
       }

@@ -310,7 +310,7 @@ function renderLocalModelCard(m, idx) {
       <div class="model-card-actions">
         <button class="btn btn-sm btn-success" onclick="openLocalMeta(${idx})">详情</button>
         <button class="${fetchBtnClass}" onclick="fetchModelInfo(${idx})" title="${fetchBtnTitle}">${fetchBtnText}</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteModel(${idx})">\u2715</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteModel(${idx})">${msIcon('delete')}</button>
       </div>
     </div></div>`;
 }
@@ -1139,7 +1139,7 @@ function renderPendingList() {
         </div>
         <div class="dl-item-actions">
           <button class="btn btn-sm" onclick="downloadFromSearch('${id}', '${(m.type || 'Checkpoint').toLowerCase()}')" title="立即下载">${msIcon('download')}</button>
-          <button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')" title="移除">${msIcon('close')}</button>
+          <button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')" title="移除">${msIcon('delete')}</button>
         </div>
       </div>`;
     }

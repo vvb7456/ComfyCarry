@@ -262,7 +262,7 @@ function renderTerminalsList(terminals) {
     return `<div class="jupyter-terminal-item" style="display:inline-flex">
       <span style="font-size:1rem">${msIcon('terminal')}</span>
       ${nameHtml}
-      <button class="btn btn-sm btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">${msIcon('close')}</button>
+      <button class="btn btn-sm btn-danger" onclick="window._deleteJupyterTerminal('${escHtml(t.name)}')" title="销毁终端">${msIcon('delete')}</button>
     </div>`;
   }).join('')}${addCard}</div>`;
 }

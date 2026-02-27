@@ -38,6 +38,7 @@ async function loadSyncRemotes() {
     grid.innerHTML = _syncRemotes.map(renderSyncRemoteCard).join('') + addCard;
     if (syncStorageCache) {
       for (const r of _syncRemotes) {
+        if (_NO_ABOUT_TYPES.has(r.type)) continue;  // 跳过不支持容量的类型
         const el = document.getElementById('storage-' + r.name);
         if (el && syncStorageCache[r.name]) renderStorageResult(el, r.name, syncStorageCache[r.name]);
       }
@@ -55,17 +56,18 @@ function renderSyncRemoteCard(r) {
   const noAbout = _NO_ABOUT_TYPES.has(r.type);
   const storageInfo = noAbout
     ? '<span style="font-size:.75rem;color:var(--t3)">此存储类型不支持容量查询</span>'
-    : `<button class="btn btn-xs" onclick="refreshRemoteStorage('${r.name}')">查看容量</button>`;
+    : '<span style="font-size:.75rem;color:var(--t3)">点击刷新查看容量</span>';
   return `<div class="sync-remote-card">
     <div class="sync-remote-header">
       <div class="sync-remote-name">${r.icon} ${r.display_name} <span class="sync-remote-type">${r.name} · ${r.type}</span></div>
       <span style="font-size:.75rem;color:var(--t3)">${authIcon}</span>
     </div>
-    <div class="sync-storage-info" id="storage-${r.name}">
+    <div class="sync-storage-info" id="storage-${r.name}" style="min-height:24px">
       ${storageInfo}
     </div>
     <div style="margin-top:8px;display:flex;gap:4px;justify-content:flex-end">
-      <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="deleteRemote('${r.name}')">删除</button>
+      ${noAbout ? '' : `<button class="btn btn-sm" onclick="refreshRemoteStorage('${r.name}')" title="刷新容量">${msIcon('refresh')}</button>`}
+      <button class="btn btn-sm btn-danger" onclick="deleteRemote('${r.name}')" title="删除">${msIcon('delete')}</button>
     </div>
   </div>`;
 }
@@ -96,16 +98,15 @@ async function refreshRemoteStorage(name) {
 }
 
 function renderStorageResult(el, name, info) {
-  const btn = `<button class="btn btn-sm" style="font-size:.65rem;padding:1px 6px;margin-left:8px" onclick="refreshRemoteStorage('${name}')">\u21bb</button>`;
-  if (!info) { el.innerHTML = `<span style="color:var(--t3);font-size:.75rem">—</span>${btn}`; return; }
+  if (!info) { el.innerHTML = `<span style="color:var(--t3);font-size:.75rem">—</span>`; return; }
   if (info.error) {
-    el.innerHTML = `<span style="font-size:.75rem;color:var(--red)">${escHtml(info.error)}</span>${btn}`;
+    el.innerHTML = `<span style="font-size:.75rem;color:var(--red)">${escHtml(info.error)}</span>`;
     return;
   }
   const used = info.used || 0, total = info.total || 0, free = info.free || 0;
   const pct = total > 0 ? (used / total * 100) : 0;
-  const barColor = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : 'var(--ac)';
-  el.innerHTML = `<div>已用: ${fmtBytes(used)} / ${fmtBytes(total)}${free ? ` (剩余 ${fmtBytes(free)})` : ''}${btn}</div>
+  const barColor = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--amber)' : 'var(--ac)';
+  el.innerHTML = `<div style="font-size:.75rem;white-space:nowrap">已用: ${fmtBytes(used)} / ${fmtBytes(total)}${free ? ` (剩余 ${fmtBytes(free)})` : ''}</div>
     <div class="sync-storage-bar"><div class="sync-storage-bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div></div>`;
 }
 
@@ -240,7 +241,7 @@ function renderSyncRulesList() {
         <button class="btn btn-sm" onclick="runSingleRule('${r.id}')" title="立即执行">${msIcon('play_arrow')}</button>
         <button class="btn btn-sm" onclick="editRule(${i})" title="编辑">${msIcon('edit')}</button>
         <button class="btn btn-sm" onclick="toggleRule(${i})" title="${r.enabled !== false ? '禁用' : '启用'}">${r.enabled !== false ? msIcon('pause') : msIcon('play_arrow')}</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteRule(${i})" title="删除">${msIcon('close')}</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteRule(${i})" title="删除">${msIcon('delete')}</button>
       </div>
     </div>`;
   }).join('') + addCard;

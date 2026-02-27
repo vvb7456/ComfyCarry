@@ -228,7 +228,7 @@ async function loadSSHKeys() {
           <div class="ssh-key-fp">${fp}</div>
           ${comment ? `<div class="ssh-key-comment">${comment}</div>` : ''}
         </div>
-        <button class="btn btn-sm btn-danger" onclick="window.deleteSSHKey('${fp.replace(/'/g, "\\'")}')" title="删除">${msIcon('close')}</button>
+        <button class="btn btn-sm btn-danger" onclick="window.deleteSSHKey('${fp.replace(/'/g, "\\'")}')" title="删除">${msIcon('delete')}</button>
       </div>`;
     }).join('');
 

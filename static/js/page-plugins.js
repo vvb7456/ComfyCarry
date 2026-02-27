@@ -130,7 +130,7 @@ function renderInstalledPlugins() {
     } else {
       actionsHtml += `<button class="btn btn-sm" onclick="togglePlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}')">禁用</button>`;
     }
-    actionsHtml += `<button class="btn btn-sm btn-danger" onclick="uninstallPlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}','${_esc(p.title)}')">\u2715</button>`;
+    actionsHtml += `<button class="btn btn-sm btn-danger" onclick="uninstallPlugin('${_esc(p.cnrId || p.dirName)}','${_esc(p.ver)}','${_esc(p.title)}')">${msIcon('delete')}</button>`;
 
     return `<div class="plugin-item">
       <div class="plugin-item-header">

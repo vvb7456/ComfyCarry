@@ -33,6 +33,7 @@ docker/Dockerfile.ada
 docker/Dockerfile.blackwell
 docker/build-ada.sh
 docker/build-blackwell.sh
+docker/docker-compose.yml
 
 # Workspace Manager
 .civitai_config.json

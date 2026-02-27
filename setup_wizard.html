@@ -1146,7 +1146,7 @@
                 style="margin:12px 0;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:.85rem;color:var(--t2)">
                 <span class="ms ms-xs" style="color:#fbbf24">lightbulb</span> 还没有 rclone 配置？<a href="/api/setup/rclone-bundle"
                     style="color:var(--ac);text-decoration:underline;font-weight:600">下载配置助手 (Windows)</a> — 解压后双击 bat
-                脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 文件即可。
+                脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 。
             </div>
 
             <div id="rclone-env-hint" style="display:none" class="env-hint"></div>
@@ -2115,7 +2115,7 @@
                 list.innerHTML = wizardConfig.wizard_remotes.map(r => {
                     const def = _remoteTypeDefs[r.type] || {};
                     return `<span class="wz-remote-chip">${def.icon || msIcon('save','ms-xs')} ${esc(r.name)} <span class="wz-rtype">${esc(def.label || r.type)}</span>
-                <button onclick="removeWizardRemote('${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem;margin-left:4px" title="移除">${msIcon('close','ms-xs')}</button></span>`;
+                <button onclick="removeWizardRemote('${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem;margin-left:4px" title="移除">${msIcon('delete','ms-xs')}</button></span>`;
                 }).join('');
             } else {
                 section.style.display = 'none';

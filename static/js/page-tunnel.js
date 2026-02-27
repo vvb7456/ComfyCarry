@@ -219,7 +219,7 @@ function _renderCustomServices(d, el) {
     // Top-right action buttons (hover to reveal)
     const actionBtns = suffix ? `<div class="tunnel-svc-actions">
       <button class="btn btn-xs" onclick="event.preventDefault();event.stopPropagation();window._tunnelEditSuffix('${escHtml(suffix)}')" title="编辑">编辑</button>
-      <button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}'${isCustom ? '' : ",true"})" title="删除">${msIcon('close')}</button>
+      <button class="btn btn-sm btn-danger" onclick="event.preventDefault();event.stopPropagation();window._tunnelRemoveService('${escHtml(suffix)}'${isCustom ? '' : ",true"})" title="删除">${msIcon('delete')}</button>
     </div>` : '';
 
     if (name === 'SSH') {
