@@ -7,12 +7,16 @@ ComfyCarry — 模型管理路由
 - Enhanced-Civicomfy 下载代理
 """
 
+import io
 import json
 import os
+import struct
+import zlib
 from pathlib import Path
 
 import requests
 from flask import Blueprint, Response, jsonify, request, send_file
+from PIL import Image
 
 from ..config import (
     COMFYUI_DIR,
@@ -419,6 +423,154 @@ _EXTRA_FIELDS = {
     "TripleCLIPLoader": [("clip_name2", "clip"), ("clip_name3", "clip")],
 }
 
+# 已知节点的 widget 字段索引映射 (用于 workflow 编辑器格式解析)
+# key=字段名, value=widgets_values 数组中的索引位置
+_WIDGET_INDEX_MAP = {
+    "CheckpointLoaderSimple": {"ckpt_name": 0},
+    "CheckpointLoader":       {"ckpt_name": 0},
+    "unCLIPCheckpointLoader": {"ckpt_name": 0},
+    "LoraLoader":             {"lora_name": 0},
+    "LoraLoaderModelOnly":    {"lora_name": 0},
+    "ControlNetLoader":       {"control_net_name": 0},
+    "VAELoader":              {"vae_name": 0},
+    "UNETLoader":             {"unet_name": 0},
+    "CLIPLoader":             {"clip_name": 0},
+    "DualCLIPLoader":         {"clip_name1": 0, "clip_name2": 1},
+    "TripleCLIPLoader":       {"clip_name1": 0, "clip_name2": 1, "clip_name3": 2},
+    "CLIPVisionLoader":       {"clip_name": 0},
+    "UpscaleModelLoader":     {"model_name": 0},
+    "StyleModelLoader":       {"style_model_name": 0},
+    "IPAdapterModelLoader":   {"ipadapter_file": 0},
+    "InstantIDModelLoader":   {"instantid_file": 0},
+    "HypernetworkLoader":     {"hypernetwork_name": 0},
+    "GLIGENLoader":           {"gligen_name": 0},
+    "PhotoMakerLoader":       {"photomaker_model_name": 0},
+    "PuLIDModelLoader":       {"pulid_file": 0},
+    "DiffusersLoader":        {"model_path": 0},
+}
+
+
+def _extract_metadata_from_image(file_bytes: bytes, filename: str) -> dict:
+    """从 ComfyUI 生成的图片文件中提取 prompt/workflow 元数据
+
+    支持格式:
+      - PNG (静态): tEXt chunk — keys 'prompt' / 'workflow'
+      - PNG (APNG): 自定义 'comf' chunk — key\\x00value 格式
+      - WebP: EXIF 0x0110 (Model) / 0x010F (Make) — "key:json"
+      - SVG: <metadata> CDATA 中的 JSON
+
+    Returns: {"prompt": dict|None, "workflow": dict|None, "format": str}
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    result = {"prompt": None, "workflow": None, "format": ext.lstrip(".")}
+
+    try:
+        if ext == ".svg":
+            return _extract_metadata_from_svg(file_bytes, result)
+        elif ext in (".png", ".webp", ".jpg", ".jpeg"):
+            img = Image.open(io.BytesIO(file_bytes))
+
+            if ext == ".png":
+                # 静态 PNG: tEXt chunks
+                if hasattr(img, "text") and img.text:
+                    for key in ("prompt", "workflow"):
+                        if key in img.text:
+                            try:
+                                result[key] = json.loads(img.text[key])
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+
+                # APNG: 自定义 'comf' chunk (tEXt 可能为空)
+                if not result["prompt"] and not result["workflow"]:
+                    result = _parse_apng_comf_chunks(file_bytes, result)
+
+            elif ext == ".webp":
+                # WebP: EXIF tags (Model=0x0110, Make=0x010F, ...)
+                exif = img.getexif()
+                for tag_id in (0x0110, 0x010F, 0x010E, 0x010D):
+                    if tag_id in exif:
+                        raw = exif[tag_id]
+                        if isinstance(raw, str) and ":" in raw:
+                            key, val = raw.split(":", 1)
+                            key = key.strip().lower()
+                            if key in ("prompt", "workflow"):
+                                try:
+                                    result[key] = json.loads(val)
+                                except (json.JSONDecodeError, TypeError):
+                                    pass
+
+            elif ext in (".jpg", ".jpeg"):
+                # JPEG: ComfyUI 核心不支持, 但某些第三方节点
+                # 可能在 EXIF UserComment 中存储
+                exif = img.getexif()
+                # 尝试与 WebP 相同的 tag
+                for tag_id in (0x0110, 0x010F):
+                    if tag_id in exif:
+                        raw = exif[tag_id]
+                        if isinstance(raw, str) and ":" in raw:
+                            key, val = raw.split(":", 1)
+                            key = key.strip().lower()
+                            if key in ("prompt", "workflow"):
+                                try:
+                                    result[key] = json.loads(val)
+                                except (json.JSONDecodeError, TypeError):
+                                    pass
+            img.close()
+    except Exception:
+        pass
+
+    return result
+
+
+def _parse_apng_comf_chunks(data: bytes, result: dict) -> dict:
+    """解析 APNG 中的自定义 'comf' chunk"""
+    if len(data) < 8 or data[:8] != b'\x89PNG\r\n\x1a\n':
+        return result
+    pos = 8
+    while pos + 8 <= len(data):
+        try:
+            length = struct.unpack(">I", data[pos:pos + 4])[0]
+            chunk_type = data[pos + 4:pos + 8]
+            chunk_data = data[pos + 8:pos + 8 + length]
+            # CRC 4 bytes after chunk data
+            pos += 12 + length
+
+            if chunk_type == b'comf' and b'\x00' in chunk_data:
+                sep = chunk_data.index(b'\x00')
+                key = chunk_data[:sep].decode("latin-1", errors="replace")
+                val = chunk_data[sep + 1:].decode("latin-1", errors="replace")
+                if key in ("prompt", "workflow"):
+                    try:
+                        result[key] = json.loads(val)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+            elif chunk_type == b'IEND':
+                # 不要在 IEND 后退出, comf chunks 可能在 IEND 之后
+                continue
+        except (struct.error, IndexError):
+            break
+    return result
+
+
+def _extract_metadata_from_svg(data: bytes, result: dict) -> dict:
+    """从 SVG 的 <metadata> 标签中提取 ComfyUI 工作流元数据"""
+    try:
+        text = data.decode("utf-8", errors="replace")
+        import re
+        # ComfyUI SVG 格式: <metadata><![CDATA[{json}]]></metadata>
+        match = re.search(
+            r'<metadata>\s*<!\[CDATA\[(.*?)\]\]>\s*</metadata>',
+            text, re.DOTALL
+        )
+        if match:
+            meta_json = json.loads(match.group(1))
+            if isinstance(meta_json, dict):
+                result["prompt"] = meta_json.get("prompt")
+                result["workflow"] = meta_json.get("workflow")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        pass
+    return result
+
 
 def _extract_models_from_prompt(prompt: dict) -> list[dict]:
     """从 ComfyUI prompt JSON 中提取模型引用列表"""
@@ -459,6 +611,42 @@ def _extract_models_from_prompt(prompt: dict) -> list[dict]:
                     models.append({"name": val, "type": "unknown", "field": field, "node": class_type})
 
     return models
+
+
+def _extract_models_from_workflow(workflow: dict) -> list[dict]:
+    """从 ComfyUI workflow 编辑器格式中提取模型引用列表
+
+    将 workflow.nodes 中的 widgets_values 通过 _WIDGET_INDEX_MAP
+    映射为 pseudo_prompt，然后委托给 _extract_models_from_prompt()
+    """
+    nodes = workflow.get("nodes", [])
+    pseudo_prompt = {}
+
+    for i, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            continue
+        ct = node.get("type", "")
+        node_id = str(node.get("id", f"_auto_{i}"))
+        widgets = node.get("widgets_values", [])
+        if not isinstance(widgets, list):
+            continue
+
+        inputs_dict = {}
+
+        if ct in _WIDGET_INDEX_MAP:
+            idx_map = _WIDGET_INDEX_MAP[ct]
+            for field, idx in idx_map.items():
+                if idx < len(widgets) and isinstance(widgets[idx], str):
+                    inputs_dict[field] = widgets[idx]
+        else:
+            for j, val in enumerate(widgets):
+                if isinstance(val, str) and any(val.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
+                    inputs_dict[f"_unknown_field_{j}"] = val
+
+        if inputs_dict:
+            pseudo_prompt[node_id] = {"class_type": ct, "inputs": inputs_dict}
+
+    return _extract_models_from_prompt(pseudo_prompt)
 
 
 def _check_model_exists(name: str, category: str) -> bool:
@@ -502,63 +690,7 @@ def api_parse_workflow():
     if prompt and isinstance(prompt, dict):
         models = _extract_models_from_prompt(prompt)
     elif workflow and isinstance(workflow, dict):
-        # workflow 编辑器格式: nodes 数组中有 widgets_values
-        # 尝试从 workflow.nodes 重建简化 prompt
-        nodes = workflow.get("nodes", [])
-        pseudo_prompt = {}
-
-        # 已知节点的 widget 字段索引映射 (key=字段名, value=widgets_values 中的位置)
-        _WIDGET_INDEX_MAP = {
-            "CheckpointLoaderSimple": {"ckpt_name": 0},
-            "CheckpointLoader":       {"ckpt_name": 0},
-            "unCLIPCheckpointLoader": {"ckpt_name": 0},
-            "LoraLoader":             {"lora_name": 0},
-            "LoraLoaderModelOnly":    {"lora_name": 0},
-            "ControlNetLoader":       {"control_net_name": 0},
-            "VAELoader":              {"vae_name": 0},
-            "UNETLoader":             {"unet_name": 0},
-            "CLIPLoader":             {"clip_name": 0},
-            "DualCLIPLoader":         {"clip_name1": 0, "clip_name2": 1},
-            "TripleCLIPLoader":       {"clip_name1": 0, "clip_name2": 1, "clip_name3": 2},
-            "CLIPVisionLoader":       {"clip_name": 0},
-            "UpscaleModelLoader":     {"model_name": 0},
-            "StyleModelLoader":       {"style_model_name": 0},
-            "IPAdapterModelLoader":   {"ipadapter_file": 0},
-            "InstantIDModelLoader":   {"instantid_file": 0},
-            "HypernetworkLoader":     {"hypernetwork_name": 0},
-            "GLIGENLoader":           {"gligen_name": 0},
-            "PhotoMakerLoader":       {"photomaker_model_name": 0},
-            "PuLIDModelLoader":       {"pulid_file": 0},
-            "DiffusersLoader":        {"model_path": 0},
-        }
-
-        for i, node in enumerate(nodes):
-            if not isinstance(node, dict):
-                continue
-            ct = node.get("type", "")
-            node_id = str(node.get("id", f"_auto_{i}"))
-            widgets = node.get("widgets_values", [])
-            if not isinstance(widgets, list):
-                continue
-
-            inputs_dict = {}
-
-            if ct in _WIDGET_INDEX_MAP:
-                # 已知节点: 按索引精确取值
-                idx_map = _WIDGET_INDEX_MAP[ct]
-                for field, idx in idx_map.items():
-                    if idx < len(widgets) and isinstance(widgets[idx], str):
-                        inputs_dict[field] = widgets[idx]
-            else:
-                # 未知节点 fallback: 扫描所有字符串值, 检查是否以模型扩展名结尾
-                for i, val in enumerate(widgets):
-                    if isinstance(val, str) and any(val.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
-                        inputs_dict[f"_unknown_field_{i}"] = val
-
-            if inputs_dict:
-                pseudo_prompt[node_id] = {"class_type": ct, "inputs": inputs_dict}
-
-        models = _extract_models_from_prompt(pseudo_prompt)
+        models = _extract_models_from_workflow(workflow)
     else:
         return jsonify({"error": "需要 prompt 或 workflow 字段"}), 400
 
@@ -568,3 +700,83 @@ def api_parse_workflow():
 
     missing = sum(1 for m in models if not m["exists"])
     return jsonify({"models": models, "total": len(models), "missing": missing})
+
+
+# ====================================================================
+#  文件上传解析 — 从图片/SVG 中提取工作流元数据并解析模型依赖
+# ====================================================================
+
+_ALLOWED_IMAGE_EXTS = {".png", ".webp", ".jpg", ".jpeg", ".svg"}
+_MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100 MB
+
+
+@bp.route("/api/models/parse-image", methods=["POST"])
+def api_parse_image():
+    """
+    从上传的图片文件中提取 ComfyUI 工作流元数据并解析模型依赖
+
+    支持: PNG (含 APNG)、WebP、SVG、JPEG (有限)
+
+    Body: multipart/form-data
+      - file: 图片文件
+
+    Response: {
+        "format": "png",
+        "has_prompt": true,
+        "has_workflow": true,
+        "models": [...],
+        "total": 4,
+        "missing": 2
+    }
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "需要上传文件 (field name: file)"}), 400
+
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"error": "文件名为空"}), 400
+
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in _ALLOWED_IMAGE_EXTS:
+        return jsonify({
+            "error": f"不支持的文件格式: {ext}",
+            "supported": list(_ALLOWED_IMAGE_EXTS),
+        }), 400
+
+    file_bytes = f.read()
+    if len(file_bytes) > _MAX_UPLOAD_SIZE:
+        return jsonify({"error": f"文件过大 (最大 {_MAX_UPLOAD_SIZE // 1024 // 1024} MB)"}), 400
+
+    # 提取元数据
+    meta = _extract_metadata_from_image(file_bytes, f.filename)
+
+    prompt = meta.get("prompt")
+    workflow = meta.get("workflow")
+
+    if not prompt and not workflow:
+        return jsonify({
+            "error": "未在文件中找到 ComfyUI 工作流元数据",
+            "format": meta.get("format", ext.lstrip(".")),
+            "hint": "文件可能不是由 ComfyUI 生成，或元数据已被清除",
+        }), 404
+
+    # 复用共享解析逻辑
+    models = []
+    if prompt and isinstance(prompt, dict):
+        models = _extract_models_from_prompt(prompt)
+    elif workflow and isinstance(workflow, dict):
+        models = _extract_models_from_workflow(workflow)
+
+    # 检查本地存在性
+    for m in models:
+        m["exists"] = _check_model_exists(m["name"], m["type"])
+
+    missing = sum(1 for m in models if not m["exists"])
+    return jsonify({
+        "format": meta.get("format", ext.lstrip(".")),
+        "has_prompt": prompt is not None,
+        "has_workflow": workflow is not None,
+        "models": models,
+        "total": len(models),
+        "missing": missing,
+    })
