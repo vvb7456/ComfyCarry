@@ -477,9 +477,9 @@ _MODEL_FIELD_WHITELIST: dict[str, dict[str, str]] = {
     # ── AuraSR-ComfyUI ──
     "AuraSR.AuraSRUpscaler": {"model_name": "upscale_models"},
     # ── efficiency-nodes-comfyui ──
-    "Eff. Loader SDXL":      {"vae_name": "vae"},
-    "Efficient Loader":      {"lora_name": "loras", "vae_name": "vae"},
-    "HighRes-Fix Script":    {"control_net_name": "controlnet"},
+    "Eff. Loader SDXL":      {"base_ckpt_name": "checkpoints", "refiner_ckpt_name": "checkpoints", "vae_name": "vae"},
+    "Efficient Loader":      {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},
+    "HighRes-Fix Script":    {"control_net_name": "controlnet", "hires_ckpt_name": "checkpoints"},
     "XY Input: LoRA Plot":   {"lora_name": "loras"},
     # ── was-node-suite-comfyui ──
     "Diffusers Model Loader": {"model_path": "diffusers"},
@@ -487,25 +487,25 @@ _MODEL_FIELD_WHITELIST: dict[str, dict[str, str]] = {
     "Lora Loader":           {"lora_name": "loras"},
     "Upscale Model Loader":  {"model_name": "upscale_models"},
     # ── ComfyUI-Easy-Use (基础加载器) ──
-    "easy a1111Loader":        {"lora_name": "loras", "vae_name": "vae"},
-    "easy cascadeLoader":      {"clip_name": "clip", "lora_name": "loras"},
-    "easy comfyLoader":        {"lora_name": "loras", "vae_name": "vae"},
+    "easy a1111Loader":        {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},
+    "easy cascadeLoader":      {"clip_name": "clip", "lora_name": "loras", "stage_b": "checkpoints", "stage_c": "checkpoints"},
+    "easy comfyLoader":        {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},
     "easy controlnetLoader":   {"control_net_name": "controlnet"},
     "easy controlnetLoader++": {"control_net_name": "controlnet"},
     "easy controlnetLoaderADV": {"control_net_name": "controlnet"},
     "easy controlnetNames":    {"controlnet_name": "controlnet"},
-    "easy fluxLoader":         {"lora_name": "loras", "vae_name": "vae"},
+    "easy fluxLoader":         {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},
     "easy fullCascadeKSampler": {"decode_vae_name": "vae", "encode_vae_name": "vae"},
-    "easy fullLoader":         {"lora_name": "loras", "vae_name": "vae"},
+    "easy fullLoader":         {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},
     "easy hiresFix":           {"model_name": "upscale_models"},
-    "easy hunyuanDiTLoader":   {"lora_name": "loras", "vae_name": "vae"},
+    "easy hunyuanDiTLoader":   {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},
     "easy instantIDApply":     {"control_net_name": "controlnet"},
     "easy instantIDApplyADV":  {"control_net_name": "controlnet"},
     "easy kolorsLoader":       {"lora_name": "loras", "unet_name": "unet", "vae_name": "vae"},
     "easy LLLiteLoader":       {"model_name": "controlnet"},
     "easy loraNames":          {"lora_name": "loras"},
-    "easy mochiLoader":        {"vae_name": "vae"},
-    "easy pixArtLoader":       {"clip_name": "clip", "lora_name": "loras", "vae_name": "vae"},
+    "easy mochiLoader":        {"ckpt_name": "checkpoints", "vae_name": "vae"},
+    "easy pixArtLoader":       {"ckpt_name": "checkpoints", "clip_name": "clip", "lora_name": "loras", "vae_name": "vae"},
     "easy preSamplingCascade": {"decode_vae_name": "vae", "encode_vae_name": "vae"},
     "easy samLoaderPipe":      {"model_name": "sams"},
     "easy sv3dLoader":         {"ckpt_name": "checkpoints", "vae_name": "vae"},
@@ -517,6 +517,48 @@ _MODEL_FIELD_WHITELIST: dict[str, dict[str, str]] = {
 # ComfyUI-Easy-Use: loraStack (1-10) / loraSwitcher (1-50)
 _MODEL_FIELD_WHITELIST["easy loraStack"] = {f"lora_{i}_name": "loras" for i in range(1, 11)}
 _MODEL_FIELD_WHITELIST["easy loraSwitcher"] = {f"lora_{i}_name": "loras" for i in range(1, 51)}
+
+# ── 补充: 主检测覆盖的 checkpoint 字段 (防止空模型目录时漏检) ──
+_MODEL_FIELD_WHITELIST.update({
+    # ComfyUI 内置
+    "CheckpointLoader":                         {"ckpt_name": "checkpoints"},
+    "CheckpointLoaderSimple":                    {"ckpt_name": "checkpoints"},
+    "unCLIPCheckpointLoader":                    {"ckpt_name": "checkpoints"},
+    # ComfyUI extras
+    "CreateHookModelAsLora":                     {"ckpt_name": "checkpoints"},
+    "CreateHookModelAsLoraModelOnly":             {"ckpt_name": "checkpoints"},
+    "ImageOnlyCheckpointLoader":                 {"ckpt_name": "checkpoints"},
+    "LTXAVTextEncoderLoader":                    {"ckpt_name": "checkpoints"},
+    "LTXVAudioVAELoader":                        {"ckpt_name": "checkpoints"},
+    # ComfyUI-AnimateDiff-Evolved
+    "ADE_RegisterModelAsLoraHook":               {"ckpt_name": "checkpoints"},
+    "ADE_RegisterModelAsLoraHookModelOnly":       {"ckpt_name": "checkpoints"},
+    "CheckpointLoaderSimpleWithNoiseSelect":      {"ckpt_name": "checkpoints"},
+    # ComfyUI-Inspire-Pack
+    "CheckpointLoaderSimpleShared //Inspire":     {"ckpt_name": "checkpoints"},
+    "MakeBasicPipe //Inspire":                    {"ckpt_name": "checkpoints"},
+    "StableCascade_CheckpointLoader //Inspire":   {"stage_b": "checkpoints", "stage_c": "checkpoints"},
+    # ComfyUI-KJNodes
+    "CheckpointLoaderKJ":                        {"ckpt_name": "checkpoints"},
+    "LoadResAdapterNormalization":                {"resadapter_path": "checkpoints"},
+    # rgthree-comfy
+    "Context Big (rgthree)":                     {"ckpt_name": "checkpoints"},
+    # was-node-suite-comfyui
+    "Checkpoint Loader":                         {"ckpt_name": "checkpoints"},
+    "Checkpoint Loader (Simple)":                {"ckpt_name": "checkpoints"},
+    "unCLIP Checkpoint Loader":                  {"ckpt_name": "checkpoints"},
+    # ComfyUI-Easy-Use
+    "easy ckptNames":                            {"ckpt_name": "checkpoints"},
+    "easy XYInputs: ModelMergeBlocks":            {"ckpt_name_1": "checkpoints", "ckpt_name_2": "checkpoints"},
+})
+# ComfyUI-Easy-Use: XYInputs Checkpoint (ckpt_name_1 ~ ckpt_name_10)
+_MODEL_FIELD_WHITELIST["easy XYInputs: Checkpoint"] = {
+    f"ckpt_name_{i}": "checkpoints" for i in range(1, 11)
+}
+# efficiency-nodes: XY Input Checkpoint (ckpt_name_1 ~ ckpt_name_50)
+_MODEL_FIELD_WHITELIST["XY Input: Checkpoint"] = {
+    f"ckpt_name_{i}": "checkpoints" for i in range(1, 51)
+}
 
 
 # ── 内联引用正则 ──
