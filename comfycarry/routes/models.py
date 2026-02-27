@@ -647,7 +647,7 @@ _CATEGORY_HINTS = (
 
 
 def _infer_category(class_type: str, field_name: str) -> str:
-    """从字段名 / 节点类型名推断模型类别"""
+    """从字段名 / 节点类型名推断模型类别 (关键词启发式, 仅作回退)"""
     fl, cl = field_name.lower(), class_type.lower()
     # 字段名匹配 (跳过过于泛化的 model, 优先用 class_type 上下文)
     for kw, cat in _CATEGORY_HINTS:
@@ -658,6 +658,14 @@ def _infer_category(class_type: str, field_name: str) -> str:
         if kw in cl:
             return cat
     return "unknown"
+
+
+def _get_category(class_type: str, field_name: str) -> str:
+    """获取模型类别 — 白名单精确值优先, 找不到时回退到关键词推断"""
+    wl = _MODEL_FIELD_WHITELIST.get(class_type)
+    if wl and field_name in wl:
+        return wl[field_name]
+    return _infer_category(class_type, field_name)
 
 
 # ── 扫描辅助函数 ──
@@ -765,7 +773,7 @@ def _extract_models_from_prompt(prompt: dict) -> tuple[list[dict], list[dict]]:
                     seen.add(val)
                     models.append({
                         "name": val,
-                        "type": _infer_category(ct, fname),
+                        "type": _get_category(ct, fname),
                         "exists": val in combo_set,
                         "node": ct,
                         "field": fname,
@@ -829,7 +837,7 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                     seen.add(val)
                     models.append({
                         "name": val,
-                        "type": _infer_category(ct, matched_field),
+                        "type": _get_category(ct, matched_field),
                         "exists": True,
                         "node": ct, "field": matched_field,
                     })
@@ -839,7 +847,7 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                     seen.add(val)
                     models.append({
                         "name": val,
-                        "type": _infer_category(ct, fname),
+                        "type": _get_category(ct, fname),
                         "exists": False,
                         "node": ct, "field": fname,
                     })
