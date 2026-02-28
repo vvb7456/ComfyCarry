@@ -1700,6 +1700,8 @@ window.downloadHfModel = downloadHfModel;
 window._cancelHfDownload = _cancelHfDownload;
 
 // ── 缺失插件一键安装 ──
+let _pluginInstallPollTimer = null;
+
 async function _installMissingPlugin(btn) {
   const pluginId = btn.dataset.pluginId || '';
   const pluginUrl = btn.dataset.pluginUrl || '';
@@ -1722,13 +1724,34 @@ async function _installMissingPlugin(btn) {
   });
 
   if (data && data.ok) {
-    btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 已加入队列';
-    btn.style.color = 'var(--green)';
-    showToast('插件已加入安装队列，安装完成后需重启 ComfyUI', 'success');
+    btn.innerHTML = '<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> 队列安装中...';
+    showToast('插件已加入安装队列', 'info');
+    _startInstallQueuePoll(btn);
   } else {
     // apiFetch 已经通过 showToast 显示了错误信息
     btn.disabled = false;
     btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装';
   }
+}
+
+function _startInstallQueuePoll(btn) {
+  if (_pluginInstallPollTimer) clearInterval(_pluginInstallPollTimer);
+  _pluginInstallPollTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/api/plugins/queue_status');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.is_processing && d.total_count > 0) {
+        btn.innerHTML = `<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> ${d.done_count}/${d.total_count}`;
+      } else {
+        // 队列完成
+        clearInterval(_pluginInstallPollTimer);
+        _pluginInstallPollTimer = null;
+        btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 安装完成';
+        btn.style.color = 'var(--green)';
+        showToast('插件安装完成，需重启 ComfyUI 生效', 'success');
+      }
+    } catch (_) {}
+  }, 2000);
 }
 window._installMissingPlugin = _installMissingPlugin;
