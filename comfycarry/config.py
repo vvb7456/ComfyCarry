@@ -178,6 +178,12 @@ DEFAULT_PLUGINS = [
     {"url": "https://github.com/pythongosssss/ComfyUI-WD14-Tagger", "name": "WD14 Tagger"},
     {"url": "https://github.com/rgthree/rgthree-comfy", "name": "rgthree"},
     {"url": "https://github.com/ltdrdata/ComfyUI-Inspire-Pack", "name": "Inspire Pack"},
+    {"url": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts", "name": "Custom Scripts"},
+    {"url": "https://github.com/city96/ComfyUI-GGUF", "name": "GGUF"},
+    {"url": "https://github.com/cubiq/ComfyUI_IPAdapter_plus", "name": "IPAdapter Plus"},
+    {"url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite", "name": "Video Helper Suite"},
+    {"url": "https://github.com/cubiq/ComfyUI_essentials", "name": "Essentials"},
+    {"url": "https://github.com/1038lab/ComfyUI-RMBG", "name": "RMBG"},
 ]
 
 _setup_state_lock = threading.Lock()

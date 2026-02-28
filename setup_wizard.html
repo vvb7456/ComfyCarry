@@ -1375,6 +1375,7 @@
             install_fa2: false,
             install_sa2: false,
             download_aura_model: true,
+            download_sam_model: true,
             ssh_password: '',
             ssh_keys: [],
             wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
@@ -1645,6 +1646,7 @@
                 if (state.install_fa2 !== undefined) wizardConfig.install_fa2 = state.install_fa2;
                 if (state.install_sa2 !== undefined) wizardConfig.install_sa2 = state.install_sa2;
                 if (state.download_aura_model !== undefined) wizardConfig.download_aura_model = state.download_aura_model;
+                if (state.download_sam_model !== undefined) wizardConfig.download_sam_model = state.download_sam_model;
 
                 // 恢复手动添加的 remotes 显示
                 renderWizardManualRemotes();
@@ -1916,6 +1918,8 @@
                     wizardConfig.plugins = getSelectedPlugins();
                     const auraCb = document.getElementById('aura-model-dl');
                     if (auraCb) wizardConfig.download_aura_model = auraCb.checked;
+                    const samCb = document.getElementById('sam-model-dl');
+                    if (samCb) wizardConfig.download_sam_model = samCb.checked;
                     break;
                 case 7: {
                     wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
@@ -2230,15 +2234,23 @@
             const sorted = [...plugins].sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
             desc.innerHTML = msIcon('bolt','ms-xs') + ' 预构建镜像已包含以下插件';
             const auraUrl = 'https://github.com/GreenLandisaLie/AuraSR-ComfyUI';
+            const impactUrl = 'https://github.com/ltdrdata/ComfyUI-Impact-Pack';
             list.innerHTML = sorted.map((p, i) => {
                 const isAura = p.url === auraUrl;
+                const isImpact = p.url === impactUrl;
+                let extra = '';
+                if (isAura) extra = `<label style="margin-left:auto;font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="aura-model-dl" ${wizardConfig.download_aura_model ? 'checked' : ''} style="width:14px;height:14px">
+                下载模型 (~234MB)
+            </label>`;
+                if (isImpact) extra = `<label style="margin-left:auto;font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="sam-model-dl" ${wizardConfig.download_sam_model ? 'checked' : ''} style="width:14px;height:14px">
+                下载 SAM 模型 (~375MB)
+            </label>`;
                 return `<div class="plugin-item">
             <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
             <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
-            ${isAura ? `<label style="margin-left:auto;font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:4px;cursor:pointer">
-                <input type="checkbox" id="aura-model-dl" ${wizardConfig.download_aura_model ? 'checked' : ''} style="width:14px;height:14px">
-                下载模型 (~234MB)
-            </label>` : ''}
+            ${extra}
         </div>`;
             }).join('');
         }
@@ -2351,6 +2363,7 @@
             <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? msIcon('check_circle','ms-xs') + ' 已配置' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
             <div class="summary-row"><span class="label">插件数量</span><span class="value">${pluginCount} 个</span></div>
             <div class="summary-row"><span class="label">AuraSR 模型</span><span class="value">${c.download_aura_model ? msIcon('check_circle','ms-xs') + ' 下载' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SAM 模型</span><span class="value">${c.download_sam_model ? msIcon('check_circle','ms-xs') + ' 下载' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
         </div>
         <div class="summary-card">
             <h4>Attention 加速</h4>
@@ -2568,6 +2581,7 @@
                 if (config.install_fa2 !== undefined) wizardConfig.install_fa2 = config.install_fa2;
                 if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
                 if (config.download_aura_model !== undefined) wizardConfig.download_aura_model = config.download_aura_model;
+                if (config.download_sam_model !== undefined) wizardConfig.download_sam_model = config.download_sam_model;
 
                 showImportResult(
                     `${msIcon('check_circle','ms-xs')} 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,

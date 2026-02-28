@@ -125,7 +125,13 @@ RUN git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Manager && \
     git clone --depth 1 https://github.com/BenjaMITM/Enhanced-Civicomfy && \
     git clone --depth 1 https://github.com/pythongosssss/ComfyUI-WD14-Tagger && \
     git clone --depth 1 https://github.com/rgthree/rgthree-comfy && \
-    git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Inspire-Pack
+    git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Inspire-Pack && \
+    git clone --depth 1 https://github.com/pythongosssss/ComfyUI-Custom-Scripts && \
+    git clone --depth 1 https://github.com/city96/ComfyUI-GGUF && \
+    git clone --depth 1 https://github.com/cubiq/ComfyUI_IPAdapter_plus && \
+    git clone --depth 1 https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite && \
+    git clone --depth 1 https://github.com/cubiq/ComfyUI_essentials && \
+    git clone --depth 1 https://github.com/1038lab/ComfyUI-RMBG
 
 # 逐个安装插件依赖 (失败打印警告但继续, 后续显式安装补救)
 RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f); do \
@@ -152,11 +158,14 @@ RUN python3.12 -m pip install \
     hf_transfer aiohttp opencv-python-headless scikit-image \
     accelerate transformers safetensors onnxruntime-gpu
 
+RUN python3.12 -m pip install \
+    gguf insightface imageio imageio-ffmpeg
+
 # =============================================================================
 # 12. 目录结构 & 标记
 # =============================================================================
 WORKDIR /workspace
-RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_models,Aura-SR} \
+RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_models,Aura-SR,sams} \
              /opt/ComfyUI/{output,input} \
              /opt/ComfyUI/user/default/workflows \
              /root/.config/rclone && \

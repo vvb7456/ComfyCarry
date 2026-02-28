@@ -303,6 +303,7 @@ def _run_deploy(config):
         _step_plugins(config, PY)
         _step_sync_assets(config)
         _step_download_aura(config)
+        _step_download_sam(config)
         _step_start_services(config, cfg, PY)
 
     except Exception as e:
@@ -762,6 +763,30 @@ def _step_download_aura(config):
             '?download=true"',
             timeout=60, label="AuraSR config.json"
         )
+
+
+def _step_download_sam(config):
+    """STEP 9b: 下载 Impact Pack SAM 模型"""
+    plugins = [p for p in config.get("plugins", []) if p]
+    impact_plugin_url = "https://github.com/ltdrdata/ComfyUI-Impact-Pack"
+    download_sam = config.get("download_sam_model", True)
+    if impact_plugin_url not in plugins or not download_sam:
+        return
+
+    _deploy_step("下载 SAM 模型")
+    sam_model = Path("/workspace/ComfyUI/models/sams/sam_vit_b_01ec64.pth")
+    if sam_model.exists():
+        _deploy_log("SAM ViT-B 模型已存在, 跳过下载")
+        return
+
+    _deploy_log("下载 SAM ViT-B (~375MB)...")
+    _deploy_exec("mkdir -p /workspace/ComfyUI/models/sams")
+    _deploy_exec(
+        'aria2c -x 16 -s 16 --console-log-level=warn '
+        '-d "/workspace/ComfyUI/models/sams" -o "sam_vit_b_01ec64.pth" '
+        '"https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"',
+        timeout=300, label="SAM ViT-B"
+    )
 
 
 def _step_start_services(config, cfg, PY):
