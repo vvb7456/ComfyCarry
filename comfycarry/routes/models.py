@@ -63,6 +63,7 @@ def api_local_models():
 
     dirs_to_scan = MODEL_DIRS if category == "all" else {category: MODEL_DIRS.get(category, "")}
 
+    seen_paths = set()  # 防止多个分类指向同一目录时出现重复
     for cat, rel_dir in dirs_to_scan.items():
         full_dir = os.path.join(COMFYUI_DIR, rel_dir)
         if not os.path.isdir(full_dir):
@@ -73,6 +74,9 @@ def api_local_models():
                 if ext not in MODEL_EXTENSIONS:
                     continue
                 fpath = os.path.join(root, fname)
+                if fpath in seen_paths:
+                    continue
+                seen_paths.add(fpath)
                 rel_path = os.path.relpath(fpath, os.path.join(COMFYUI_DIR, rel_dir))
                 stat = os.stat(fpath)
 
