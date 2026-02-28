@@ -559,7 +559,6 @@ async function searchModels(page = 0, append = false) {
   const filter = [];
   if (types.length > 0) filter.push(types.map(t => `type = "${t}"`).join(' OR '));
   if (bms.length > 0) filter.push(bms.map(b => `version.baseModel = "${b}"`).join(' OR '));
-  filter.push('nsfwLevel <= 4');
 
   const sortMap = {
     'Most Downloaded': ['metrics.downloadCount:desc'],
