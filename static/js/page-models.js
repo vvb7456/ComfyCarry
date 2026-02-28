@@ -1415,6 +1415,7 @@ async function handleWorkflowFile(file) {
             pluginGroups[n.plugin_id] = {
               title: n.plugin_title || n.plugin_id,
               url: n.plugin_url || '',
+              files: n.plugin_files || [],
               nodes: [],
             };
           }
@@ -1448,6 +1449,7 @@ async function handleWorkflowFile(file) {
         html += `</div>`;
         html += `<div><button class="btn btn-xs btn-outline" data-plugin-id="${escAttr(pid)}" `
           + `data-plugin-url="${escAttr(pg.url)}" `
+          + `data-plugin-files="${escAttr(JSON.stringify(pg.files))}" `
           + `onclick="window._installMissingPlugin(this)" `
           + `style="font-size:.75rem;padding:2px 8px">`
           + `<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装</button></div>`;
@@ -1701,28 +1703,24 @@ window._cancelHfDownload = _cancelHfDownload;
 async function _installMissingPlugin(btn) {
   const pluginId = btn.dataset.pluginId || '';
   const pluginUrl = btn.dataset.pluginUrl || '';
+  let pluginFiles = [];
+  try { pluginFiles = JSON.parse(btn.dataset.pluginFiles || '[]'); } catch (_) {}
   if (!pluginId) return;
 
   btn.disabled = true;
   btn.innerHTML = '<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> 安装中...';
 
   try {
-    let data;
-    if (pluginUrl) {
-      // URL 类插件 → 用 install_git 端点
-      data = await apiFetch('/api/plugins/install_git', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: pluginUrl }),
-      });
-    } else {
-      // 昵称 ID 插件 → 用 CM install 队列
-      data = await apiFetch('/api/plugins/install', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: pluginId }),
-      });
-    }
+    // 统一使用 CM install 队列 (需要 files 字段)
+    const payload = { id: pluginId };
+    if (pluginFiles.length) payload.files = pluginFiles;
+    if (pluginUrl) payload.repository = pluginUrl;
+
+    const data = await apiFetch('/api/plugins/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     if (data && data.ok) {
       btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 已加入队列';
       btn.style.color = 'var(--green)';

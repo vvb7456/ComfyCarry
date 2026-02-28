@@ -749,19 +749,26 @@ _WLR_TAG_RE = re.compile(
 _object_info_cache: dict | None = None
 # {class_type: {field_name: set(combo_values)}} — 仅包含模型文件 combo 字段
 _model_field_cache: dict | None = None
+_object_info_ts: float = 0  # 上次刷新时间
 
 # ── CM node→plugin 反向映射缓存 ──
-# {class_type: {"id": plugin_key, "title": display_name, "url": repo_url_or_empty}}
+# {class_type: {"id": str, "title": str, "url": str, "files": list}}
 _node_to_plugin_cache: dict | None = None
 _node_to_plugin_ts: float = 0  # 上次刷新时间
 
 
 def _get_node_to_plugin_map() -> dict:
     """
-    从 ComfyUI-Manager 的 /customnode/getmappings 构建
-    class_type → plugin 反向映射。缓存 10 分钟。
+    从 ComfyUI-Manager 构建 class_type → plugin 反向映射。缓存 10 分钟。
 
-    返回: {class_type: {"id": str, "title": str, "url": str}}
+    数据源:
+    - /customnode/getmappings?mode=nickname — 节点→插件键 映射 (3,953 entries)
+    - /customnode/getlist?mode=remote       — 插件目录 (5,137 entries, 含 files/reference)
+
+    对 URL 类 key，通过 reference 字段匹配 getlist 获取 nickname id。
+    所有插件均附带 files 字段以确保 CM install 正常工作。
+
+    返回: {class_type: {"id": str, "title": str, "url": str, "files": list}}
     """
     import time as _time
     global _node_to_plugin_cache, _node_to_plugin_ts
@@ -770,30 +777,76 @@ def _get_node_to_plugin_map() -> dict:
     if _node_to_plugin_cache is not None and (now - _node_to_plugin_ts) < 600:
         return _node_to_plugin_cache
 
+    # 1. 获取节点→插件映射
     try:
         resp = requests.get(
             f"{COMFYUI_URL}/customnode/getmappings",
             params={"mode": "nickname"}, timeout=15,
         )
         resp.raise_for_status()
-        raw = resp.json()
+        raw_mappings = resp.json()
     except Exception:
         return _node_to_plugin_cache or {}
 
+    # 2. 获取插件目录 (含 files/reference 信息)
+    node_packs: dict = {}
+    ref_to_pack: dict[str, dict] = {}  # reference_url → pack_entry
+    try:
+        resp2 = requests.get(
+            f"{COMFYUI_URL}/customnode/getlist",
+            params={"mode": "remote"}, timeout=60,
+        )
+        resp2.raise_for_status()
+        node_packs = resp2.json().get("node_packs", {})
+        for pid, pack in node_packs.items():
+            ref = pack.get("reference", "")
+            if ref:
+                ref_to_pack[ref] = pack
+    except Exception:
+        pass  # getlist 失败时仍可用 getmappings 数据
+
+    # 3. 构建反向映射
     reverse: dict[str, dict] = {}
-    for plugin_key, entry in raw.items():
+    for plugin_key, entry in raw_mappings.items():
         if not isinstance(entry, (list, tuple)) or len(entry) < 2:
             continue
-        node_classes = entry[0]   # list of class_type strings
-        meta = entry[1]           # {"title_aux": "Display Name"}
+        node_classes = entry[0]
+        meta = entry[1]
         if not isinstance(node_classes, list) or not isinstance(meta, dict):
             continue
 
         title = meta.get("title_aux", plugin_key)
-        # plugin_key 通常是 git URL 或纯标识符
-        url = plugin_key if plugin_key.startswith("http") else ""
 
-        plugin_info = {"id": plugin_key, "title": title, "url": url}
+        if plugin_key.startswith("http"):
+            # URL 类 key — 尝试通过 reference 匹配 getlist 获取 nickname
+            pack = ref_to_pack.get(plugin_key)
+            if pack:
+                plugin_id = pack.get("id", plugin_key)
+                title = pack.get("title", title)
+                files = pack.get("files", [plugin_key])
+                url = pack.get("reference", plugin_key)
+            else:
+                plugin_id = plugin_key
+                files = [plugin_key]
+                url = plugin_key
+        else:
+            # Nickname key — 从 getlist 获取 files
+            pack = node_packs.get(plugin_key)
+            plugin_id = plugin_key
+            if pack:
+                files = pack.get("files", [])
+                url = pack.get("reference", "")
+                title = pack.get("title", title)
+            else:
+                files = []
+                url = ""
+
+        plugin_info = {
+            "id": plugin_id,
+            "title": title,
+            "url": url,
+            "files": files,
+        }
         for ct in node_classes:
             if isinstance(ct, str) and ct:
                 reverse[ct] = plugin_info
@@ -805,11 +858,13 @@ def _get_node_to_plugin_map() -> dict:
 
 def _refresh_object_info() -> dict | None:
     """从 ComfyUI 获取 /object_info 并构建模型字段映射缓存"""
-    global _object_info_cache, _model_field_cache
+    import time as _time
+    global _object_info_cache, _model_field_cache, _object_info_ts
     try:
         resp = requests.get(f"{COMFYUI_URL}/object_info", timeout=15)
         resp.raise_for_status()
         _object_info_cache = resp.json()
+        _object_info_ts = _time.time()
     except Exception:
         return _object_info_cache
 
@@ -1262,6 +1317,11 @@ def api_parse_workflow():
     prompt = data.get("prompt")
     workflow = data.get("workflow")
 
+    # 每次解析前检查 /object_info 缓存是否需要刷新 (>2 分钟)
+    import time as _time
+    if _object_info_cache is None or (_time.time() - _object_info_ts) > 120:
+        _refresh_object_info()
+
     if prompt and isinstance(prompt, dict):
         models, missing_nodes = _extract_models_from_prompt(prompt)
     elif workflow and isinstance(workflow, dict):
@@ -1290,6 +1350,8 @@ def api_parse_workflow():
                 mn["plugin_id"] = info["id"]
                 mn["plugin_title"] = info["title"]
                 mn["plugin_url"] = info["url"]
+                if info.get("files"):
+                    mn["plugin_files"] = info["files"]
 
     missing = sum(1 for m in models if not m["exists"])
     return jsonify({
