@@ -3,27 +3,20 @@
  * JupyterLab 页面: 状态监控、会话管理、内核管理、日志、Token
  */
 
-import { registerPage, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
+import { registerPage, createAutoRefresh, fmtBytes, showToast, escHtml, copyText, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
-let _autoRefresh = null;
 let _jupyterUrl = '';
 let _jupyterLogStream = null;
 
 // ── 页面生命周期 ─────────────────────────────────────────────
 
-registerPage('jupyter', {
-  enter() { loadJupyterPage(); _startAutoRefresh(); _startJupyterLogStream(); },
-  leave() { _stopAutoRefresh(); _stopJupyterLogStream(); }
-});
+const _refresh = createAutoRefresh(() => loadJupyterStatus(), 8000);
 
-function _startAutoRefresh() {
-  _stopAutoRefresh();
-  _autoRefresh = setInterval(loadJupyterStatus, 8000);
-}
-function _stopAutoRefresh() {
-  if (_autoRefresh) { clearInterval(_autoRefresh); _autoRefresh = null; }
-}
+registerPage('jupyter', {
+  enter() { loadJupyterPage(); _refresh.start(); _startJupyterLogStream(); },
+  leave() { _refresh.stop(); _stopJupyterLogStream(); }
+});
 
 // ── 主加载 ──────────────────────────────────────────────────
 

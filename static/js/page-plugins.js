@@ -1,5 +1,5 @@
 // ========== Plugin Management (ES Module) ==========
-import { registerPage, registerEscapeHandler, showToast, escHtml, renderLoading, renderError, renderSkeleton, msIcon, apiFetch } from './core.js';
+import { registerPage, registerEscapeHandler, createTabSwitcher, showToast, escHtml, renderLoading, renderError, renderSkeleton, msIcon, apiFetch } from './core.js';
 
 // --- State ---
 let pluginInstalledRaw = {};    // key -> {ver, cnr_id, aux_id, enabled} from /installed
@@ -16,15 +16,11 @@ function _esc(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')
 function _shortHash(h) { return h && h.length > 8 ? h.substring(0, 8) : (h || 'unknown'); }
 
 // --- Tab switching ---
-function switchPluginTab(tab) {
+const switchPluginTab = createTabSwitcher('ptab', ['installed', 'browse', 'git'], tab => {
   currentPluginTab = tab;
-  document.querySelectorAll('[data-ptab]').forEach(t => t.classList.toggle('active', t.dataset.ptab === tab));
-  document.getElementById('ptab-installed').classList.toggle('hidden', tab !== 'installed');
-  document.getElementById('ptab-browse').classList.toggle('hidden', tab !== 'browse');
-  document.getElementById('ptab-git').classList.toggle('hidden', tab !== 'git');
   if (tab === 'installed') loadInstalledPlugins();
   else if (tab === 'browse' && pluginBrowseData.length === 0) loadBrowsePlugins();
-}
+});
 
 // --- Page lifecycle ---
 async function loadPluginsPage() {

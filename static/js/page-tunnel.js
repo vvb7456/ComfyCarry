@@ -3,10 +3,9 @@
  * Tunnel 页面: 公共节点 + 自定义 Tunnel 双模式
  */
 
-import { registerPage, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
+import { registerPage, createTabSwitcher, createAutoRefresh, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
-let _autoRefresh = null;
 let _lastData = null;
 let _currentTunnelTab = 'status';
 let _selectedMode = null;  // 'public' | 'custom'
@@ -14,14 +13,17 @@ let _selectedMode = null;  // 'public' | 'custom'
 // SSE 日志流
 let _tunnelLogStream = null;
 
+// 自动刷新
+const _refresh = createAutoRefresh(() => loadTunnelPage(), 10000);
+
 registerPage('tunnel', {
   enter() {
     loadTunnelPage();
-    _startAutoRefresh();
+    _refresh.start();
     _startLogStream();
   },
   leave() {
-    _stopAutoRefresh();
+    _refresh.stop();
     _stopLogStream();
   }
 });
@@ -30,17 +32,11 @@ registerPage('tunnel', {
 // Tab 切换
 // ════════════════════════════════════════════════════════════════
 
-function switchTunnelTab(tab) {
-  ['status', 'config'].forEach(t => {
-    const el = document.getElementById('ttab-' + t);
-    const tabEl = document.querySelector(`.tab[data-ttab="${t}"]`);
-    if (el) el.classList.toggle('hidden', t !== tab);
-    if (tabEl) tabEl.classList.toggle('active', t === tab);
-  });
+const switchTunnelTab = createTabSwitcher('ttab', ['status', 'config'], tab => {
   _currentTunnelTab = tab;
   if (tab === 'status') loadTunnelPage();
   else if (tab === 'config') _loadTunnelConfigTab();
-}
+});
 
 // ════════════════════════════════════════════════════════════════
 // 主加载
@@ -706,14 +702,6 @@ Object.assign(window, {
   _tunnelRemoveService, _tunnelEditSuffix,
   showToast,
 });
-
-function _startAutoRefresh() {
-  _stopAutoRefresh();
-  _autoRefresh = setInterval(loadTunnelPage, 10000);
-}
-function _stopAutoRefresh() {
-  if (_autoRefresh) { clearInterval(_autoRefresh); _autoRefresh = null; }
-}
 
 function _startLogStream() {
   _stopLogStream();

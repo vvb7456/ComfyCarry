@@ -3,13 +3,13 @@
  * ComfyUI 页面模块: 状态监控、参数管理、日志流、实时事件
  */
 
-import { registerPage, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty, msIcon, apiFetch } from './core.js';
+import { registerPage, createTabSwitcher, createAutoRefresh, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
 // ── 模块状态 ──────────────────────────────────────────────────
 
-let comfyAutoRefresh = null;
+
 let _comfyParamsSchema = null;
 let _comfyEventSource = null;
 let _comfyLogStream = null;
@@ -421,22 +421,11 @@ async function comfyFreeVRAM() {
 
 let _currentComfyTab = 'console';
 
-function switchComfyTab(tab) {
+const switchComfyTab = createTabSwitcher('comfy-tab', ['console', 'queue', 'history'], tab => {
   _currentComfyTab = tab;
-  document.querySelectorAll('[data-comfy-tab]').forEach(el => {
-    el.classList.toggle('active', el.dataset.comfyTab === tab);
-  });
-  ['console', 'queue', 'history'].forEach(t => {
-    const el = document.getElementById('comfy-tab-' + t);
-    if (el) el.classList.toggle('hidden', tab !== t);
-  });
-
-  if (tab === 'queue') {
-    loadQueuePanel();
-  } else if (tab === 'history') {
-    loadComfyHistory();
-  }
-}
+  if (tab === 'queue') loadQueuePanel();
+  else if (tab === 'history') loadComfyHistory();
+});
 
 // ── 任务队列面板 ─────────────────────────────────────────────
 
@@ -619,15 +608,9 @@ function downloadHistoryImage(filename, subfolder, type) {
 
 // ── 自动刷新 ──────────────────────────────────────────────────
 
-function startComfyAutoRefresh() {
-  stopComfyAutoRefresh();
-  comfyAutoRefresh = setInterval(() => {
-    loadComfyStatus();
-  }, 10000);
-}
+const _refresh = createAutoRefresh(() => loadComfyStatus(), 10000);
 
-function stopComfyAutoRefresh() {
-  if (comfyAutoRefresh) { clearInterval(comfyAutoRefresh); comfyAutoRefresh = null; }
+function _stopAllStreams() {
   _comfyTracker.destroy();
   stopComfyEventStream();
   stopComfyLogStream();
@@ -636,8 +619,8 @@ function stopComfyAutoRefresh() {
 // ── 页面生命周期注册 ──────────────────────────────────────────
 
 registerPage('comfyui', {
-  enter() { loadComfyUIPage(); startComfyAutoRefresh(); },
-  leave() { stopComfyAutoRefresh(); stopComfyEventStream(); stopComfyLogStream(); }
+  enter() { loadComfyUIPage(); _refresh.start(); },
+  leave() { _refresh.stop(); _stopAllStreams(); }
 });
 
 // ── Window exports (供 HTML onclick 调用) ─────────────────────

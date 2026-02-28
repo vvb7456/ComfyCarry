@@ -1,5 +1,5 @@
 // ── page-sync.js  ·  Sync 页面模块 ──────────────────────────────
-import { registerPage, registerEscapeHandler, fmtBytes, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
+import { registerPage, registerEscapeHandler, createTabSwitcher, createAutoRefresh, fmtBytes, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 // ── State ───────────────────────────────────────────────────────
@@ -586,23 +586,16 @@ async function loadSyncPage() {
   loadSyncLogs();
 }
 
-function startSyncAutoRefresh() {
-  stopSyncAutoRefresh();
-  syncAutoRefresh = setInterval(() => {
-    const remotesTab = document.getElementById('stab-remotes');
-    if (remotesTab && !remotesTab.classList.contains('hidden')) loadSyncLogs();
-  }, 10000);
-}
-
-function stopSyncAutoRefresh() {
-  if (syncAutoRefresh) { clearInterval(syncAutoRefresh); syncAutoRefresh = null; }
-}
+const _refresh = createAutoRefresh(() => {
+  const remotesTab = document.getElementById('stab-remotes');
+  if (remotesTab && !remotesTab.classList.contains('hidden')) loadSyncLogs();
+}, 10000);
 
 // ── Page Registration ───────────────────────────────────────────
 
 registerPage('sync', {
-  enter() { loadSyncPage(); startSyncAutoRefresh(); _startSyncLogStream(); },
-  leave() { stopSyncAutoRefresh(); _stopSyncLogStream(); }
+  enter() { loadSyncPage(); _refresh.start(); _startSyncLogStream(); },
+  leave() { _refresh.stop(); _stopSyncLogStream(); }
 });
 
 registerEscapeHandler(() => {
@@ -740,6 +733,4 @@ Object.assign(window, {
   saveSyncConfigAll,
   uploadRcloneFile,
   loadSyncPage,
-  startSyncAutoRefresh,
-  stopSyncAutoRefresh,
 });

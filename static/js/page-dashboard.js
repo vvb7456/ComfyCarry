@@ -11,23 +11,24 @@
  * 6. 环境信息栏 (Environment Info)
  */
 
-import { registerPage, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml, msIcon, apiFetch, renderSkeleton } from './core.js';
+import { registerPage, createAutoRefresh, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml, msIcon, apiFetch, renderSkeleton } from './core.js';
 import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
 
-let _refreshTimer = null;
 let _sseSource = null;
 let _cachedData = null;
 
 // ── 页面生命周期 ─────────────────────────────────────────────
 
+const _refresh = createAutoRefresh(() => refreshOverview(), 5000);
+
 registerPage('dashboard', {
   enter() {
     refreshOverview();
-    _refreshTimer = setInterval(refreshOverview, 5000);
+    _refresh.start();
     _startSSE();
   },
   leave() {
-    if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
+    _refresh.stop();
     _stopSSE();
   }
 });

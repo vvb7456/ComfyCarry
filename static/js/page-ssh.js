@@ -3,41 +3,28 @@
  * SSH 管理页面: 服务状态/日志 + 密钥/密码配置 (双 Tab)
  */
 
-import { registerPage, showToast, escHtml, copyText, renderError, msIcon, apiFetch } from './core.js';
+import { registerPage, createTabSwitcher, createAutoRefresh, showToast, escHtml, copyText, renderError, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
 
-let _autoRefresh = null;
 let _sshLogStream = null;
 let _currentTab = 'status';
 
 // ── 页面生命周期 ─────────────────────────────────────────────
 
-registerPage('ssh', {
-  enter() { loadSSHPage(); _startAutoRefresh(); _startSSHLogStream(); },
-  leave() { _stopAutoRefresh(); _stopSSHLogStream(); }
-});
+const _refresh = createAutoRefresh(() => loadSSHStatus(), 10000);
 
-function _startAutoRefresh() {
-  _stopAutoRefresh();
-  _autoRefresh = setInterval(loadSSHStatus, 10000);
-}
-function _stopAutoRefresh() {
-  if (_autoRefresh) { clearInterval(_autoRefresh); _autoRefresh = null; }
-}
+registerPage('ssh', {
+  enter() { loadSSHPage(); _refresh.start(); _startSSHLogStream(); },
+  leave() { _refresh.stop(); _stopSSHLogStream(); }
+});
 
 // ── Tab 切换 ────────────────────────────────────────────────
 
-function switchSSHTab(tab) {
-  ['status', 'config'].forEach(t => {
-    const el = document.getElementById('sshtab-' + t);
-    const tabEl = document.querySelector(`.tab[data-sshtab="${t}"]`);
-    if (el) el.classList.toggle('hidden', t !== tab);
-    if (tabEl) tabEl.classList.toggle('active', t === tab);
-  });
+const switchSSHTab = createTabSwitcher('sshtab', ['status', 'config'], tab => {
   _currentTab = tab;
   if (tab === 'status') { loadSSHStatus(); _startSSHLogStream(); }
   else if (tab === 'config') { loadSSHKeys(); _stopSSHLogStream(); }
-}
+});
 
 // ── SSE 日志流 ──────────────────────────────────────────────
 

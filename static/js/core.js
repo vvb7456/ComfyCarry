@@ -374,3 +374,40 @@ export function renderSkeleton(type, count) {
       return '<div class="skeleton skeleton-card"></div>'.repeat(count || 1);
   }
 }
+
+// ── Tab 切换 & 自动刷新 工具 ────────────────────────────────────
+
+/**
+ * 创建 Tab 切换器
+ * @param {string} dataAttr  按钮上的 data 属性名 (如 'mtab' → data-mtab)，同时作为面板 ID 前缀 (mtab-xxx)
+ * @param {string[]} tabs    Tab ID 列表
+ * @param {(tab:string)=>void} [onSwitch] 切换回调
+ * @returns {(tab:string)=>void}
+ */
+export function createTabSwitcher(dataAttr, tabs, onSwitch) {
+  const dsKey = dataAttr.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  return function switchTab(tab) {
+    document.querySelectorAll(`[data-${dataAttr}]`).forEach(el => {
+      el.classList.toggle('active', el.dataset[dsKey] === tab);
+    });
+    tabs.forEach(t => {
+      const panel = document.getElementById(dataAttr + '-' + t);
+      if (panel) panel.classList.toggle('hidden', t !== tab);
+    });
+    if (onSwitch) onSwitch(tab);
+  };
+}
+
+/**
+ * 创建自动刷新控制器
+ * @param {()=>void} fn        每次刷新调用的函数
+ * @param {number}   interval  刷新间隔 (ms)
+ * @returns {{start:()=>void, stop:()=>void}}
+ */
+export function createAutoRefresh(fn, interval) {
+  let timer = null;
+  return {
+    start() { this.stop(); timer = setInterval(fn, interval); },
+    stop()  { if (timer) { clearInterval(timer); timer = null; } }
+  };
+}

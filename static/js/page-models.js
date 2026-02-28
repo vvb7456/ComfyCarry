@@ -4,7 +4,7 @@
  */
 
 import {
-  registerPage, registerEscapeHandler,
+  registerPage, registerEscapeHandler, createTabSwitcher,
   fmtBytes, fmtPct, showToast, copyText, openImg, escHtml, escAttr,
   apiKey, getAuthHeaders, getBadgeClass, CIVITAI_API_BASE,
   renderLoading, renderError, renderEmpty, msIcon, apiFetch,
@@ -35,17 +35,13 @@ const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion
 
 // ── Model Tab 切换 ───────────────────────────────────────────
 
-const modelTabIds = ['local', 'civitai', 'downloads', 'workflow'];
-
-function switchModelTab(tab) {
+const switchModelTab = createTabSwitcher('mtab', ['local', 'civitai', 'downloads', 'workflow'], tab => {
   currentModelTab = tab;
-  document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
-  modelTabIds.forEach(id => document.getElementById('mtab-' + id).classList.toggle('hidden', id !== tab));
   if (tab === 'local') loadLocalModels();
   else if (tab === 'civitai') loadFacets();
   else if (tab === 'downloads') { renderDownloadsTab(); startDlStatusPolling(); }
   else if (tab === 'workflow') _initWorkflowDropZone();
-}
+});
 
 // ========== Metadata Modal ==========
 
@@ -501,14 +497,9 @@ function getActiveChips(containerId) {
   return [...document.querySelectorAll(`#${containerId} .chip.active`)].map(c => c.dataset.val);
 }
 
-function switchCivitTab(tab) {
-  document.querySelectorAll('[data-ctab]').forEach(t => t.classList.toggle('active', t.dataset.ctab === tab));
-  ['search', 'lookup', 'cart'].forEach(t => {
-    const el = document.getElementById('ctab-' + t);
-    if (el) el.classList.toggle('hidden', t !== tab);
-  });
+const switchCivitTab = createTabSwitcher('ctab', ['search', 'lookup', 'cart'], tab => {
   if (tab === 'cart') renderPendingList();
-}
+});
 
 function _isIdQuery(text) {
   // Check if ALL parts are numeric IDs or CivitAI URLs
