@@ -1710,28 +1710,25 @@ async function _installMissingPlugin(btn) {
   btn.disabled = true;
   btn.innerHTML = '<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> 安装中...';
 
-  try {
-    // 统一使用 CM install 队列 (需要 files 字段)
-    const payload = { id: pluginId };
-    if (pluginFiles.length) payload.files = pluginFiles;
-    if (pluginUrl) payload.repository = pluginUrl;
+  // 统一使用 CM install 队列 (需要 files 字段)
+  const payload = { id: pluginId };
+  if (pluginFiles.length) payload.files = pluginFiles;
+  if (pluginUrl) payload.repository = pluginUrl;
 
-    const data = await apiFetch('/api/plugins/install', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (data && data.ok) {
-      btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 已加入队列';
-      btn.style.color = 'var(--green)';
-      showToast('插件已加入安装队列，安装完成后需重启 ComfyUI', 'success');
-    } else {
-      throw new Error((data && data.error) || '安装失败');
-    }
-  } catch (e) {
+  const data = await apiFetch('/api/plugins/install', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (data && data.ok) {
+    btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 已加入队列';
+    btn.style.color = 'var(--green)';
+    showToast('插件已加入安装队列，安装完成后需重启 ComfyUI', 'success');
+  } else {
+    // apiFetch 已经通过 showToast 显示了错误信息
     btn.disabled = false;
     btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装';
-    showToast(`安装失败: ${e.message}`, 'error');
   }
 }
 window._installMissingPlugin = _installMissingPlugin;

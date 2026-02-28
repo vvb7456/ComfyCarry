@@ -1317,10 +1317,8 @@ def api_parse_workflow():
     prompt = data.get("prompt")
     workflow = data.get("workflow")
 
-    # 每次解析前检查 /object_info 缓存是否需要刷新 (>2 分钟)
-    import time as _time
-    if _object_info_cache is None or (_time.time() - _object_info_ts) > 120:
-        _refresh_object_info()
+    # 每次解析前始终刷新 /object_info (用户主动操作，需要最新数据)
+    _refresh_object_info()
 
     if prompt and isinstance(prompt, dict):
         models, missing_nodes = _extract_models_from_prompt(prompt)
