@@ -298,10 +298,21 @@ function loadMoreBrowsePlugins() {
 // ---------- Plugin Actions ----------
 async function installPlugin(id, selectedVersion) {
   showToast(`正在安装 ${id}...`);
+  // 从 getlist 缓存获取 version (决定 CM 走 CNR 还是 Git Clone 路径)
+  const packInfo = pluginGetlistCache[id] || {};
+  const version = packInfo.version || 'unknown';
+  const payload = { id, version, selected_version: selectedVersion || 'latest' };
+  // Git Clone 路径需要 files
+  if (version === 'unknown' && packInfo.files) {
+    payload.files = packInfo.files;
+  }
+  if (packInfo.repository || packInfo.reference) {
+    payload.repository = packInfo.repository || packInfo.reference;
+  }
   const d = await apiFetch('/api/plugins/install', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, selected_version: selectedVersion || 'latest' })
+    body: JSON.stringify(payload)
   });
   if (!d) return;
   showToast(d.message);
@@ -362,7 +373,7 @@ async function installPluginFromGit() {
   const statusEl = document.getElementById('plugin-git-status');
   btn.disabled = true;
   btn.textContent = '安装中...';
-  statusEl.innerHTML = '<div style="color:var(--amber);font-size:.82rem">' + msIcon('hourglass_top') + ' 正在克隆, 请稍候...</div>';
+  statusEl.innerHTML = '<div style="color:var(--amber);font-size:.82rem">' + msIcon('hourglass_top') + ' 已加入安装队列...</div>';
   try {
     const r = await fetch('/api/plugins/install_git', {
       method: 'POST',
@@ -372,9 +383,9 @@ async function installPluginFromGit() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
     statusEl.innerHTML = `<div class="success-msg">${d.message}</div>`;
-    showToast('安装完成');
+    showToast('已加入安装队列');
     document.getElementById('plugin-git-url').value = '';
-    if (currentPluginTab === 'installed') loadInstalledPlugins();
+    startPluginQueuePoll();
   } catch (e) {
     statusEl.innerHTML = renderError('安装失败: ' + e.message);
   } finally {

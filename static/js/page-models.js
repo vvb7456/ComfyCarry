@@ -1416,6 +1416,7 @@ async function handleWorkflowFile(file) {
               title: n.plugin_title || n.plugin_id,
               url: n.plugin_url || '',
               files: n.plugin_files || [],
+              version: n.plugin_version || 'unknown',
               nodes: [],
             };
           }
@@ -1450,6 +1451,7 @@ async function handleWorkflowFile(file) {
         html += `<div><button class="btn btn-xs btn-outline" data-plugin-id="${escAttr(pid)}" `
           + `data-plugin-url="${escAttr(pg.url)}" `
           + `data-plugin-files="${escAttr(JSON.stringify(pg.files))}" `
+          + `data-plugin-version="${escAttr(pg.version)}" `
           + `onclick="window._installMissingPlugin(this)" `
           + `style="font-size:.75rem;padding:2px 8px">`
           + `<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装</button></div>`;
@@ -1705,6 +1707,7 @@ let _pluginInstallPollTimer = null;
 async function _installMissingPlugin(btn) {
   const pluginId = btn.dataset.pluginId || '';
   const pluginUrl = btn.dataset.pluginUrl || '';
+  const pluginVersion = btn.dataset.pluginVersion || 'unknown';
   let pluginFiles = [];
   try { pluginFiles = JSON.parse(btn.dataset.pluginFiles || '[]'); } catch (_) {}
   if (!pluginId) return;
@@ -1712,8 +1715,13 @@ async function _installMissingPlugin(btn) {
   btn.disabled = true;
   btn.innerHTML = '<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> 安装中...';
 
-  // 统一使用 CM install 队列 (需要 files 字段)
-  const payload = { id: pluginId };
+  // version 决定 CM 安装路径:
+  //   != "unknown" → CNR 路径 (zip 下载, 推荐)
+  //   == "unknown" → Git Clone 路径 (需要 files)
+  const payload = { id: pluginId, version: pluginVersion };
+  if (pluginVersion !== 'unknown') {
+    payload.selected_version = 'latest';
+  }
   if (pluginFiles.length) payload.files = pluginFiles;
   if (pluginUrl) payload.repository = pluginUrl;
 
@@ -1726,32 +1734,61 @@ async function _installMissingPlugin(btn) {
   if (data && data.ok) {
     btn.innerHTML = '<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> 队列安装中...';
     showToast('插件已加入安装队列', 'info');
-    _startInstallQueuePoll(btn);
+    _startInstallQueuePoll(btn, pluginId);
   } else {
-    // apiFetch 已经通过 showToast 显示了错误信息
     btn.disabled = false;
     btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装';
   }
 }
 
-function _startInstallQueuePoll(btn) {
+function _startInstallQueuePoll(btn, pluginId) {
   if (_pluginInstallPollTimer) clearInterval(_pluginInstallPollTimer);
+  let checks = 0;
+  const maxChecks = 150; // 最多 5 分钟 (150 × 2s)
   _pluginInstallPollTimer = setInterval(async () => {
+    checks++;
     try {
       const r = await fetch('/api/plugins/queue_status');
       if (!r.ok) return;
       const d = await r.json();
       if (d.is_processing && d.total_count > 0) {
         btn.innerHTML = `<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> ${d.done_count}/${d.total_count}`;
-      } else {
-        // 队列完成
+      } else if (!d.is_processing) {
+        // 队列完成 — 查询 installed 列表确认是否安装成功
         clearInterval(_pluginInstallPollTimer);
         _pluginInstallPollTimer = null;
-        btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 安装完成';
-        btn.style.color = 'var(--green)';
-        showToast('插件安装完成，需重启 ComfyUI 生效', 'success');
+        try {
+          const ir = await fetch('/api/plugins/installed');
+          const installed = ir.ok ? await ir.json() : {};
+          // 检查 installed 中是否有 cnr_id 匹配 pluginId 的条目
+          const found = Object.values(installed).some(v => v.cnr_id === pluginId)
+            || pluginId in installed;
+          if (found) {
+            btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 已安装';
+            btn.style.color = 'var(--green)';
+            showToast('插件安装成功，需重启 ComfyUI 生效', 'success');
+          } else {
+            btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--red)">error</span> 失败';
+            btn.style.color = 'var(--red)';
+            btn.disabled = false;
+            showToast('插件安装失败，请查看 ComfyUI 日志', 'error');
+          }
+        } catch (_e) {
+          // installed 查询失败，无法确认
+          btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--amber)">help</span> 未知';
+          btn.style.color = 'var(--amber)';
+          btn.disabled = false;
+          showToast('安装队列已完成，但无法确认结果', 'warning');
+        }
       }
     } catch (_) {}
+    if (checks >= maxChecks) {
+      clearInterval(_pluginInstallPollTimer);
+      _pluginInstallPollTimer = null;
+      btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--amber)">help</span> 超时';
+      btn.style.color = 'var(--amber)';
+      btn.disabled = false;
+    }
   }, 2000);
 }
 window._installMissingPlugin = _installMissingPlugin;

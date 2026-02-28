@@ -768,7 +768,7 @@ def _get_node_to_plugin_map() -> dict:
     对 URL 类 key，通过 reference 字段匹配 getlist 获取 nickname id。
     所有插件均附带 files 字段以确保 CM install 正常工作。
 
-    返回: {class_type: {"id": str, "title": str, "url": str, "files": list}}
+    返回: {class_type: {"id": str, "title": str, "url": str, "files": list, "version": str}}
     """
     import time as _time
     global _node_to_plugin_cache, _node_to_plugin_ts
@@ -825,10 +825,12 @@ def _get_node_to_plugin_map() -> dict:
                 title = pack.get("title", title)
                 files = pack.get("files", [plugin_key])
                 url = pack.get("reference", plugin_key)
+                version = pack.get("version", "unknown")
             else:
                 plugin_id = plugin_key
                 files = [plugin_key]
                 url = plugin_key
+                version = "unknown"
         else:
             # Nickname key — 从 getlist 获取 files
             pack = node_packs.get(plugin_key)
@@ -837,15 +839,18 @@ def _get_node_to_plugin_map() -> dict:
                 files = pack.get("files", [])
                 url = pack.get("reference", "")
                 title = pack.get("title", title)
+                version = pack.get("version", "unknown")
             else:
                 files = []
                 url = ""
+                version = "unknown"
 
         plugin_info = {
             "id": plugin_id,
             "title": title,
             "url": url,
             "files": files,
+            "version": version,
         }
         for ct in node_classes:
             if isinstance(ct, str) and ct:
@@ -1122,6 +1127,14 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
         if not isinstance(node, dict):
             continue
         ct = node.get("type", "")
+
+        # ── 缺失节点检测 (不依赖 widgets_values) ──
+        if (ct and _object_info_cache is not None
+                and ct not in _object_info_cache
+                and ct not in seen_missing):
+            seen_missing.add(ct)
+            missing_nodes.append({"class_type": ct})
+
         widgets = node.get("widgets_values")
         if not isinstance(widgets, list):
             continue
@@ -1183,14 +1196,6 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                         "exists": False,
                         "node": ct, "field": "",
                     })
-            if ct not in seen_missing:
-                seen_missing.add(ct)
-                missing_nodes.append({"class_type": ct})
-        elif (ct and _object_info_cache is not None
-              and ct not in _object_info_cache
-              and ct not in seen_missing):
-            seen_missing.add(ct)
-            missing_nodes.append({"class_type": ct})
 
         # ── 层 2: <lora:> / <wlr:> 在 widget 字符串值中 ──
         for val in widgets:
@@ -1348,6 +1353,7 @@ def api_parse_workflow():
                 mn["plugin_id"] = info["id"]
                 mn["plugin_title"] = info["title"]
                 mn["plugin_url"] = info["url"]
+                mn["plugin_version"] = info.get("version", "unknown")
                 if info.get("files"):
                     mn["plugin_files"] = info["files"]
 

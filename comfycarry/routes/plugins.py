@@ -106,10 +106,20 @@ def api_plugins_fetch_updates():
 
 @bp.route("/api/plugins/install", methods=["POST"])
 def api_plugins_install():
+    """安装插件。
+
+    前端需传入 version 字段 (来自 CM getlist):
+    - version != "unknown" → CM 走 CNR 路径 (zip 下载, 安全)
+    - version == "unknown" → CM 走 Git Clone 路径 (需要 files 字段)
+    """
     data = request.get_json(force=True) or {}
+    plugin_id = data.get("id", "").strip()
+    if not plugin_id:
+        return jsonify({"error": "缺少 id 字段"}), 400
+    version = data.get("version", "unknown")
     payload = {
-        "id": data.get("id", ""),
-        "version": data.get("version", "unknown"),
+        "id": plugin_id,
+        "version": version,
         "selected_version": data.get("selected_version", "latest"),
         "channel": "default",
         "mode": "remote",
@@ -118,8 +128,11 @@ def api_plugins_install():
     }
     if data.get("repository"):
         payload["repository"] = data["repository"]
+    # Git Clone 路径必须有 files; CNR 路径不需要但带上无害
     if data.get("files"):
         payload["files"] = data["files"]
+    elif version == "unknown":
+        return jsonify({"error": "unknown 版本需要提供 files 字段"}), 400
     r = _cm_post("/manager/queue/install", json_data=payload)
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
@@ -132,8 +145,11 @@ def api_plugins_install():
 @bp.route("/api/plugins/uninstall", methods=["POST"])
 def api_plugins_uninstall():
     data = request.get_json(force=True) or {}
+    plugin_id = data.get("id", "").strip()
+    if not plugin_id:
+        return jsonify({"error": "缺少 id 字段"}), 400
     payload = {
-        "id": data.get("id", ""),
+        "id": plugin_id,
         "version": data.get("version", "unknown"),
         "ui_id": f"dash-{int(time.time())}",
     }
@@ -151,8 +167,11 @@ def api_plugins_uninstall():
 @bp.route("/api/plugins/update", methods=["POST"])
 def api_plugins_update():
     data = request.get_json(force=True) or {}
+    plugin_id = data.get("id", "").strip()
+    if not plugin_id:
+        return jsonify({"error": "缺少 id 字段"}), 400
     payload = {
-        "id": data.get("id", ""),
+        "id": plugin_id,
         "version": data.get("version", "unknown"),
         "ui_id": f"dash-{int(time.time())}",
     }
@@ -178,8 +197,11 @@ def api_plugins_update_all():
 @bp.route("/api/plugins/disable", methods=["POST"])
 def api_plugins_disable():
     data = request.get_json(force=True) or {}
+    plugin_id = data.get("id", "").strip()
+    if not plugin_id:
+        return jsonify({"error": "缺少 id 字段"}), 400
     payload = {
-        "id": data.get("id", ""),
+        "id": plugin_id,
         "version": data.get("version", "unknown"),
         "ui_id": f"dash-{int(time.time())}",
     }
@@ -194,16 +216,32 @@ def api_plugins_disable():
 
 @bp.route("/api/plugins/install_git", methods=["POST"])
 def api_plugins_install_git():
+    """通过 Git URL 安装插件。
+
+    使用 queue/install 的 unknown 路径 (而非 /customnode/install/git_url,
+    后者在默认安全级别 normal 下会 403)。
+    """
     data = request.get_json(force=True) or {}
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "URL 不能为空"}), 400
-    r = _cm_post("/customnode/install/git_url", text_data=url, timeout=120)
+    payload = {
+        "id": "",
+        "version": "unknown",
+        "selected_version": "unknown",
+        "channel": "default",
+        "mode": "remote",
+        "files": [url],
+        "ui_id": f"dash-{int(time.time())}",
+        "skip_post_install": False,
+    }
+    r = _cm_post("/manager/queue/install", json_data=payload, timeout=30)
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"安装失败: {r.status_code}"}), r.status_code
-    return jsonify({"ok": True, "message": "Git URL 安装完成"})
+        return jsonify({"error": f"安装请求失败: {r.status_code}"}), r.status_code
+    _cm_get("/manager/queue/start")
+    return jsonify({"ok": True, "message": "已加入安装队列"})
 
 
 @bp.route("/api/plugins/queue_status")
