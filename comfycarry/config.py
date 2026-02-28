@@ -158,6 +158,79 @@ MODEL_DIRS = {
 
 MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
+
+# ── Extra Model Paths (extra_model_paths.yaml 解析) ──────────
+_extra_model_paths_cache = None
+_extra_model_paths_mtime = 0.0
+
+
+def get_extra_model_paths() -> dict[str, list[str]]:
+    """解析 ComfyUI 的 extra_model_paths.yaml，返回 {category: [abs_path, ...]}
+
+    格式示例:
+        a111:
+            base_path: /mnt/models/
+            checkpoints: models/Stable-diffusion
+            loras: |
+                models/Lora
+                models/LyCORIS
+
+    返回: {"checkpoints": ["/mnt/models/models/Stable-diffusion"], "loras": ["/mnt/models/models/Lora", ...]}
+    """
+    global _extra_model_paths_cache, _extra_model_paths_mtime
+
+    yaml_path = os.path.join(COMFYUI_DIR, "extra_model_paths.yaml")
+    if not os.path.isfile(yaml_path):
+        return {}
+
+    try:
+        mtime = os.path.getmtime(yaml_path)
+    except OSError:
+        return {}
+
+    if _extra_model_paths_cache is not None and mtime == _extra_model_paths_mtime:
+        return _extra_model_paths_cache
+
+    try:
+        import yaml
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except Exception:
+        return {}
+
+    if not isinstance(data, dict):
+        return {}
+
+    result: dict[str, list[str]] = {}
+    for _section_name, section in data.items():
+        if not isinstance(section, dict):
+            continue
+        base_path = section.get("base_path", "")
+        for key, value in section.items():
+            if key in ("base_path", "is_default"):
+                continue
+            if not isinstance(value, str):
+                continue
+            # value 可以是单行路径或多行（用 | 分隔）
+            paths = [p.strip() for p in value.strip().splitlines() if p.strip()]
+            for p in paths:
+                # 如果 p 以 # 开头是注释
+                if p.startswith("#"):
+                    continue
+                # 去掉行内注释
+                p = p.split("#")[0].strip()
+                if not p:
+                    continue
+                abs_p = os.path.join(base_path, p) if base_path and not os.path.isabs(p) else p
+                abs_p = os.path.expanduser(abs_p)
+                if key not in result:
+                    result[key] = []
+                result[key].append(abs_p)
+
+    _extra_model_paths_cache = result
+    _extra_model_paths_mtime = mtime
+    return result
+
 # ── Setup Wizard ─────────────────────────────────────────────
 SETUP_STATE_FILE = Path("/workspace/.setup_state.json")
 

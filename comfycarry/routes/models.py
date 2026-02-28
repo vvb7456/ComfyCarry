@@ -24,6 +24,7 @@ from ..config import (
     MEILI_URL,
     MODEL_DIRS,
     MODEL_EXTENSIONS,
+    get_extra_model_paths,
 )
 from ..utils import _get_api_key, _run_cmd, _sha256_file
 
@@ -137,6 +138,44 @@ def api_local_models():
                     entry["trained_words"] = []
 
                 results.append(entry)
+
+    # ── 扫描 extra_model_paths.yaml 额外路径 ──
+    extra = get_extra_model_paths()
+    extra_to_scan = extra if category == "all" else {category: extra.get(category, [])}
+    for cat, dir_list in extra_to_scan.items():
+        if not isinstance(dir_list, list):
+            continue
+        for extra_dir in dir_list:
+            if not os.path.isdir(extra_dir):
+                continue
+            for root, _, files in os.walk(extra_dir):
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext not in MODEL_EXTENSIONS:
+                        continue
+                    fpath = os.path.join(root, fname)
+                    abs_path = os.path.abspath(fpath)
+                    if abs_path in seen_paths:
+                        continue
+                    seen_paths.add(abs_path)
+                    rel_path = os.path.relpath(fpath, extra_dir)
+                    stat = os.stat(fpath)
+                    results.append({
+                        "filename": fname,
+                        "rel_path": rel_path,
+                        "category": cat,
+                        "size_bytes": stat.st_size,
+                        "modified": stat.st_mtime,
+                        "abs_path": abs_path,
+                        "has_info": False,
+                        "has_preview": False,
+                        "preview_path": None,
+                        "name": fname,
+                        "base_model": "",
+                        "type": cat,
+                        "trained_words": [],
+                        "source": "extra_model_paths",
+                    })
 
     results.sort(key=lambda x: x["modified"], reverse=True)
     return jsonify({"models": results, "total": len(results)})
@@ -1286,14 +1325,31 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
 
 
 def _check_model_exists(name: str, category: str) -> bool:
-    """检查模型文件是否存在于本地 (用于非 combo 检测的模型)"""
+    """检查模型文件是否存在于本地 (含 extra_model_paths.yaml 额外路径)"""
+    # 1. 检查标准 MODEL_DIRS
     rel_dir = MODEL_DIRS.get(category, "")
-    if not rel_dir:
+    if rel_dir:
+        if os.path.isfile(os.path.join(COMFYUI_DIR, rel_dir, name)):
+            return True
+    else:
         for _cat, rd in MODEL_DIRS.items():
             if os.path.isfile(os.path.join(COMFYUI_DIR, rd, name)):
                 return True
-        return False
-    return os.path.isfile(os.path.join(COMFYUI_DIR, rel_dir, name))
+
+    # 2. 检查 extra_model_paths.yaml 额外路径
+    extra = get_extra_model_paths()
+    if category and category in extra:
+        for ep in extra[category]:
+            if os.path.isfile(os.path.join(ep, name)):
+                return True
+    elif not rel_dir:
+        # 未知分类: 遍历所有 extra 路径
+        for paths in extra.values():
+            for ep in paths:
+                if os.path.isfile(os.path.join(ep, name)):
+                    return True
+
+    return False
 
 
 @bp.route("/api/models/parse-workflow", methods=["POST"])
@@ -1343,8 +1399,9 @@ def api_parse_workflow():
         }), 503
 
     # 对非 combo 检测的模型 (内联/特殊节点), 补充文件系统存在性检查
+    # 对 combo 检测为 False 的模型, 兜底检查 extra_model_paths + 磁盘
     for m in models:
-        if "exists" not in m:
+        if "exists" not in m or not m["exists"]:
             m["exists"] = _check_model_exists(m["name"], m["type"])
 
     # ── 缺失节点 → 反查 CM 插件映射 ──
