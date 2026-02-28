@@ -1318,6 +1318,7 @@ async function handleWorkflowFile(file) {
 
     summaryEl.textContent = `共 ${data.total} 个模型，${data.missing} 个缺失 (${formatLabel})`;
 
+    // ── 渲染模型列表 (按类型区分搜索/下载按钮) ──
     listEl.innerHTML = '<div class="card" style="padding:0;overflow:hidden">' +
       data.models.map(m => {
         const icon = m.exists
@@ -1326,14 +1327,26 @@ async function handleWorkflowFile(file) {
         const statusText = m.exists
           ? '<span style="color:var(--green);font-size:.8rem">已有</span>'
           : '<span style="color:var(--red);font-size:.8rem">缺失</span>';
-        const searchBtn = m.exists
-          ? ''
-          : ` <button class="btn btn-sm btn-primary" onclick="searchModelFromWorkflow('${escHtml(m.name)}')" style="font-size:.75rem;padding:2px 8px">搜索</button>`;
+        let actionBtn = '';
+        if (!m.exists) {
+          const hf = getHfModelInfo(m.name);
+          if (hf) {
+            // HF 映射表命中 → 直接下载按钮
+            actionBtn = ` <button class="btn btn-sm" onclick="downloadHfModel('${escHtml(m.name)}','${escHtml(hf.url)}','${escHtml(m.type)}')" style="font-size:.75rem;padding:2px 8px;background:var(--ac2);color:#fff" title="${escHtml(hf.desc)}"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">download</span> 下载</button>`;
+          } else if (_CIVITAI_TYPES.has(m.type)) {
+            // CivitAI 可搜类型 → 搜索按钮
+            actionBtn = ` <button class="btn btn-sm btn-primary" onclick="searchModelFromWorkflow('${escHtml(m.name)}')" style="font-size:.75rem;padding:2px 8px"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">search</span> 搜索</button>`;
+          } else {
+            // 非 CivitAI 类型且不在 HF 映射 → HuggingFace 搜索
+            const hfQuery = encodeURIComponent(cleanModelKeyword(m.name));
+            actionBtn = ` <a href="https://huggingface.co/models?search=${hfQuery}" target="_blank" class="btn btn-sm" style="font-size:.75rem;padding:2px 8px;background:var(--bg3);color:var(--t2);text-decoration:none"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">open_in_new</span> HF</a>`;
+          }
+        }
         return `<div class="wf-model-row">
           <div class="wf-model-status">${icon}</div>
           <div class="wf-model-name">${escHtml(m.name)}</div>
           <div class="wf-model-type">${escHtml(m.type)}</div>
-          <div>${statusText}${searchBtn}</div>
+          <div>${statusText}${actionBtn}</div>
         </div>`;
       }).join('') + '</div>';
 
@@ -1345,15 +1358,91 @@ async function handleWorkflowFile(file) {
   document.getElementById('wf-file-input').value = '';
 }
 
+// ── CivitAI 可搜模型类型 (这些类型在 CivitAI 上有对应 modelType 过滤)
+const _CIVITAI_TYPES = new Set([
+  'checkpoints', 'loras', 'vae', 'controlnet', 'upscale_models',
+  'embeddings', 'hypernetworks', 'style_models',
+]);
+
+// ── 常见 HuggingFace 模型映射: filename → {url, desc} ──
+// 仅包含社区广泛使用的基座模型，用于"直接下载"按钮
+const _HF_MODEL_MAP = {
+  // -- CLIP text encoders --
+  'clip_l.safetensors':      { url: 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors', desc: 'CLIP-L (FLUX/SD3)' },
+  'clip_g.safetensors':      { url: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder_2/model.safetensors', desc: 'CLIP-G (SDXL)' },
+  't5xxl_fp16.safetensors':  { url: 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors', desc: 'T5-XXL FP16 (~9.5GB)' },
+  't5xxl_fp8_e4m3fn.safetensors': { url: 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors', desc: 'T5-XXL FP8 (~4.9GB)' },
+  't5xxl_fp8_e4m3fn_scaled.safetensors': { url: 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn_scaled.safetensors', desc: 'T5-XXL FP8 Scaled' },
+  // -- VAE --
+  'ae.safetensors':          { url: 'https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors', desc: 'FLUX VAE' },
+  'sdxl_vae.safetensors':    { url: 'https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors', desc: 'SDXL VAE' },
+  'vae-ft-mse-840000-ema-pruned.safetensors': { url: 'https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors', desc: 'SD1.5 VAE' },
+  // -- FLUX UNET/Diffusion models --
+  'flux1-dev.safetensors':   { url: 'https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors', desc: 'FLUX.1-dev (~23GB)' },
+  'flux1-schnell.safetensors': { url: 'https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors', desc: 'FLUX.1-schnell (~23GB)' },
+  'flux1-dev-fp8.safetensors': { url: 'https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors', desc: 'FLUX.1-dev FP8 (~11.9GB)' },
+  // -- Upscale models --
+  '4x-UltraSharp.pth':      { url: 'https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x-UltraSharp.pth', desc: '4x UltraSharp' },
+  'RealESRGAN_x4plus.pth':  { url: 'https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/RealESRGAN_x4plus.pth', desc: 'Real-ESRGAN 4x+' },
+  'RealESRGAN_x4plus_anime_6B.pth': { url: 'https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/RealESRGAN_x4plus_anime_6B.pth', desc: 'Real-ESRGAN 4x+ Anime' },
+  '4x_NMKD-Siax_200k.pth':  { url: 'https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x_NMKD-Siax_200k.pth', desc: '4x NMKD-Siax' },
+  // -- CLIP Vision --
+  'clip_vision_g.safetensors': { url: 'https://huggingface.co/stabilityai/control-lora/resolve/main/revision/clip_vision_g.safetensors', desc: 'CLIP Vision G (IP-Adapter)' },
+  // -- SAM --
+  'sam_vit_b_01ec64.pth':   { url: 'https://huggingface.co/segments-arnaud/sam_vit_b/resolve/main/sam_vit_b_01ec64.pth', desc: 'SAM ViT-B (375MB)' },
+  'sam_vit_l_0b3195.pth':   { url: 'https://huggingface.co/segments-arnaud/sam_vit_l/resolve/main/sam_vit_l_0b3195.pth', desc: 'SAM ViT-L (1.25GB)' },
+  'sam_vit_h_4b8939.pth':   { url: 'https://huggingface.co/ybelkada/segment-anything/resolve/main/checkpoints/sam_vit_h_4b8939.pth', desc: 'SAM ViT-H (2.56GB)' },
+};
+
+/**
+ * 从模型文件名中提取搜索关键词
+ * 去路径前缀、扩展名、版本号后缀、常见修饰词
+ */
+function cleanModelKeyword(name) {
+  // 去路径前缀 (只保留文件名)
+  let kw = name.replace(/^.*[\\\/]/, '');
+  // 去扩展名
+  kw = kw.replace(/\.(safetensors|ckpt|pt|pth|bin|onnx|gguf)$/i, '');
+  // 去常见版本号/精度后缀
+  kw = kw.replace(/[_\-](?:fp(?:8|16|32)|bf16|v\d+(?:\.\d+)*|q\d+|e4m3fn(?:_scaled)?|pruned|ema|no[_\-]?ema|inpainting)$/gi, '');
+  // 多轮清理 (可能有多个后缀叠加)
+  kw = kw.replace(/[_\-](?:fp(?:8|16|32)|bf16|v\d+(?:\.\d+)*|pruned|ema)$/gi, '');
+  // 下划线/连字符替换为空格
+  kw = kw.replace(/[_\-]+/g, ' ').trim();
+  return kw;
+}
+
+/**
+ * 获取 HF 模型映射 (只用文件名部分查找, 不含路径前缀)
+ */
+function getHfModelInfo(name) {
+  const basename = name.replace(/^.*[\\\/]/, '');
+  return _HF_MODEL_MAP[basename] || null;
+}
+
 function searchModelFromWorkflow(name) {
-  // 切换到 CivitAI 搜索 tab 并填入模型名
   const searchInput = document.getElementById('search-input');
-  // 去掉扩展名作为搜索关键词
-  const keyword = name.replace(/\.(safetensors|ckpt|pt|pth|bin|onnx|gguf)$/i, '').replace(/[_-]/g, ' ');
+  const keyword = cleanModelKeyword(name);
   if (searchInput) searchInput.value = keyword;
   switchModelTab('civitai');
   setTimeout(() => smartSearch(), 100);
 }
 
+function downloadHfModel(name, url, type) {
+  // 调用后端 aria2c 下载 HF 模型到对应目录
+  apiFetch('/api/models/download-hf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, filename: name.replace(/^.*[\\\/]/, ''), type })
+  }).then(data => {
+    if (data && data.ok) {
+      showToast('下载已开始: ' + name.replace(/^.*[\\\/]/, ''), 'success');
+    } else {
+      showToast('下载失败: ' + (data?.error || '未知错误'), 'error');
+    }
+  }).catch(e => showToast('请求失败: ' + e.message, 'error'));
+}
+
 window.handleWorkflowFile = handleWorkflowFile;
 window.searchModelFromWorkflow = searchModelFromWorkflow;
+window.downloadHfModel = downloadHfModel;

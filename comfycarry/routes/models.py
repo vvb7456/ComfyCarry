@@ -10,6 +10,8 @@ ComfyCarry — 模型管理路由
 import json
 import os
 import re
+import subprocess
+import threading
 from pathlib import Path
 
 import requests
@@ -23,7 +25,7 @@ from ..config import (
     MODEL_DIRS,
     MODEL_EXTENSIONS,
 )
-from ..utils import _get_api_key, _sha256_file
+from ..utils import _get_api_key, _run_cmd, _sha256_file
 
 bp = Blueprint("models", __name__)
 
@@ -372,6 +374,53 @@ def api_download_clear_history():
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ====================================================================
+# HuggingFace 模型直接下载
+# ====================================================================
+@bp.route("/api/models/download-hf", methods=["POST"])
+def api_download_hf():
+    """通过 aria2c 下载 HuggingFace 模型到对应 MODEL_DIRS 目录"""
+    data = request.get_json(force=True) or {}
+    url = data.get("url", "").strip()
+    filename = data.get("filename", "").strip()
+    model_type = data.get("type", "").strip()
+
+    if not url or not filename:
+        return jsonify({"error": "url 和 filename 必填"}), 400
+
+    # 确定保存目录
+    rel_dir = MODEL_DIRS.get(model_type)
+    if not rel_dir:
+        # fallback: 放到 models/<type>
+        rel_dir = f"models/{model_type}" if model_type else "models/other"
+
+    save_dir = Path(COMFYUI_DIR) / rel_dir
+    save_dir.mkdir(parents=True, exist_ok=True)
+    dest = save_dir / filename
+
+    if dest.exists():
+        return jsonify({"ok": True, "msg": f"{filename} 已存在，跳过下载"}), 200
+
+    # aria2c 后台下载
+    def _do_download():
+        try:
+            cmd = [
+                "aria2c", "-x", "8", "-s", "8",
+                "--file-allocation=falloc",
+                "-d", str(save_dir),
+                "-o", filename,
+                url,
+            ]
+            subprocess.run(cmd, timeout=3600, capture_output=True)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_do_download, daemon=True)
+    t.start()
+
+    return jsonify({"ok": True, "msg": f"已开始下载 {filename} → {rel_dir}/"}), 200
 
 
 # ====================================================================

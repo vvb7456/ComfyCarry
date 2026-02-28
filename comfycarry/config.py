@@ -131,8 +131,18 @@ MODEL_DIRS = {
     "photomaker": "models/photomaker",
     "pulid": "models/pulid",
     "diffusers": "models/diffusers",
+    "diffusion_models": "models/diffusion_models",
+    "text_encoders": "models/text_encoders",
+    "unet_gguf": "models/unet_gguf",
+    "clip_gguf": "models/clip_gguf",
+    "onnx": "models/onnx",
+    "latent_upscale_models": "models/upscale_models",
+    "vae_approx": "models/vae_approx",
+    "configs": "models/configs",
     # 第三方节点常用目录
     "ultralytics": "models/ultralytics",
+    "ultralytics_bbox": "models/ultralytics/bbox",
+    "ultralytics_segm": "models/ultralytics/segm",
     "sams": "models/sams",
     "animatediff_models": "models/animatediff_models",
     "animatediff_motion_lora": "models/animatediff_motion_lora",
@@ -141,6 +151,9 @@ MODEL_DIRS = {
     "reactor": "models/reactor",
     "insightface": "models/insightface",
     "facerestore_models": "models/facerestore_models",
+    "aura-sr": "models/Aura-SR",
+    "lbw_models": "models/lbw_models",
+    "intrinsic_loras": "models/intrinsic_loras",
 }
 
 MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
