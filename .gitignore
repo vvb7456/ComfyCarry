@@ -24,6 +24,7 @@ models.csv.template
 models.csv
 lora_scan_result.csv
 test/
+.pytest_cache/
 
 # Docker 构建 — wheels 通过 GitHub Release 分发，本地配置不入仓库
 docker/wheels/
