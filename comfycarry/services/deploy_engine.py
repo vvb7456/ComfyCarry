@@ -753,7 +753,7 @@ def _step_download_aura(config):
             '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
             '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
             '?download=true"',
-            timeout=300, label="AuraSR model.safetensors"
+            timeout=900, label="AuraSR model.safetensors"
         )
     if not aura_config.exists():
         _deploy_exec(
@@ -784,8 +784,9 @@ def _step_download_sam(config):
     _deploy_exec(
         'aria2c -x 16 -s 16 --console-log-level=warn '
         '-d "/workspace/ComfyUI/models/sams" -o "sam_vit_b_01ec64.pth" '
-        '"https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"',
-        timeout=300, label="SAM ViT-B"
+        '"https://huggingface.co/ybelkada/segment-anything/resolve/main/checkpoints/sam_vit_b_01ec64.pth'
+        '?download=true"',
+        timeout=600, label="SAM ViT-B"
     )
 
 
