@@ -501,6 +501,7 @@ def api_download_hf_cancel():
 # ── 哨兵值: 非模型文件的 combo 占位项, 提取时跳过 ──
 _SENTINEL_VALUES = frozenset({
     "None", "none", "Baked VAE", "pixel_space",
+    "(use same)",
 })
 
 # ── 模型字段白名单 ──────────────────────────────────────────
@@ -647,6 +648,31 @@ _MODEL_FIELD_WHITELIST.update({
     # ComfyUI-Easy-Use
     "easy ckptNames":                            {"ckpt_name": "checkpoints"},
     "easy XYInputs: ModelMergeBlocks":            {"ckpt_name_1": "checkpoints", "ckpt_name_2": "checkpoints"},
+    # ── 批量测试新增 (v3.0.1) ──
+    # ComfyUI 内置 — CLIP 多模型加载
+    "DualCLIPLoader":                {"clip_name1": "text_encoders", "clip_name2": "text_encoders"},
+    "TripleCLIPLoader":              {"clip_name1": "text_encoders", "clip_name2": "text_encoders", "clip_name3": "text_encoders"},
+    # ComfyUI-Impact-Pack — Ultralytics
+    "UltralyticsDetectorProvider":   {"model_name": "ultralytics"},
+    # ComfyUI-Impact-Subpack
+    "UltralyticsDetectorSEGSProvider": {"model_name": "ultralytics"},
+    # comfyui-art-venture
+    "Checkpoint Loader with Name (Image Saver)": {"ckpt_name": "checkpoints"},
+    # SeedVR2
+    "SeedVR2LoadVAEModel":           {"model": "vae"},
+    "SeedVR2LoadDiTModel":           {"model": "diffusion_models"},
+    # pysssss — LoraLoader 变体 (字段名与标准 LoraLoader 相同)
+    "LoraLoader|pysssss":            {"lora_name": "loras"},
+    # SD-WEBUI-style LoRA 加载器
+    "SDLoraLoader":                  {"lora_name": "loras"},
+    # LyCORIS 加载器
+    "LycorisLoaderNode":             {"model_name": "loras"},
+    # KJNodes GGUF
+    "UnetLoaderGGUF":                {"unet_name": "diffusion_models"},
+    # ECHO — checkpoint 加载器别名
+    "ECHOCheckpointLoaderSimple":    {"ckpt_name": "checkpoints"},
+    # ComfyRoll
+    "CR Upscale Image":              {"upscale_model": "upscale_models"},
 })
 # ComfyUI-Easy-Use: XYInputs Checkpoint (ckpt_name_1 ~ ckpt_name_10)
 _MODEL_FIELD_WHITELIST["easy XYInputs: Checkpoint"] = {
@@ -656,6 +682,57 @@ _MODEL_FIELD_WHITELIST["easy XYInputs: Checkpoint"] = {
 _MODEL_FIELD_WHITELIST["XY Input: Checkpoint"] = {
     f"ckpt_name_{i}": "checkpoints" for i in range(1, 51)
 }
+# ComfyRoll LoRA Stack (lora_name_1 ~ lora_name_3)
+_MODEL_FIELD_WHITELIST["CR LoRA Stack"] = {
+    f"lora_name_{i}": "loras" for i in range(1, 4)
+}
+# ComfyRoll Random LoRA Stack (lora_name_1 ~ lora_name_5)
+_MODEL_FIELD_WHITELIST["CR Random LoRA Stack"] = {
+    f"lora_name_{i}": "loras" for i in range(1, 6)
+}
+# Impact-Pack LoRA Stacker (lora_name_1 ~ lora_name_49)
+_MODEL_FIELD_WHITELIST["LoRA Stacker"] = {
+    f"lora_name_{i}": "loras" for i in range(1, 50)
+}
+# rgthree Lora Loader Stack (lora_01 ~ lora_20)
+_MODEL_FIELD_WHITELIST["Lora Loader Stack (rgthree)"] = {
+    f"lora_{i:02d}": "loras" for i in range(1, 21)
+}
+# LorasForFluxParams+ (lora_1 ~ lora_10)
+_MODEL_FIELD_WHITELIST["LorasForFluxParams+"] = {
+    f"lora_{i}": "loras" for i in range(1, 11)
+}
+
+# ── 准确性测试新增 (v3.0.2) ──
+_MODEL_FIELD_WHITELIST.update({
+    # GGUF 系列
+    "ClipLoaderGGUF":               {"clip_name": "text_encoders"},
+    # LongCLIP
+    "LongCLIPTextEncodeFlux":       {"clip_name": "text_encoders"},
+    # 信息/选择器/保存器 (引用了真实模型路径)
+    "LoraInfo":                     {"lora_name": "loras"},
+    "PWLoraSelector":               {"lora_name": "loras"},
+    "SDLoraSelector":               {"lora_name": "loras"},
+    "Checkpoint Selector":          {"ckpt_name": "checkpoints"},
+    "CheckpointLoader|pysssss":     {"ckpt_name": "checkpoints"},
+    "SDPromptSaver":                {"model_name": "checkpoints"},
+    "Save Image w/Metadata":        {"modelname": "checkpoints"},
+    "LF_CivitAIMetadataSetup":      {"hires_upscaler": "upscale_models"},
+    # Impact-Pack 检测器
+    "MMDetDetectorProvider":        {"model_name": "mmdets_bbox"},
+    # 人脸修复
+    "FaceRestoreModelLoader":       {"model_name": "facerestore_models"},
+    # PuLID
+    "PulidFluxModelLoader":         {"model_name": "pulid"},
+    # Upscaler
+    "MaraScottMcBoatyUpscalerRefiner_v5": {"upscale_model": "upscale_models"},
+    # 视频插帧
+    "RIFE VFI":                     {"ckpt_name": "custom_nodes"},
+    # ReActor
+    "ReActorFaceSwap":              {"face_model": "facerestore_models"},
+    # UUID 自定义节点 (CogVideoX-Fun 等)
+    "65c22b29-59aa-496b-89c6-55a603658670": {"unet_name": "diffusion_models"},
+})
 
 
 # ── 内联引用正则 ──
@@ -879,6 +956,25 @@ def _extract_models_from_prompt(prompt: dict) -> tuple[list[dict], list[dict]]:
                         "node": ct,
                         "field": fname,
                     })
+        elif ct in _MODEL_FIELD_WHITELIST:
+            # ── 白名单回退: 节点未安装但白名单有映射 ──
+            wl = _MODEL_FIELD_WHITELIST[ct]
+            for fname, category in wl.items():
+                val = inputs.get(fname)
+                if (isinstance(val, str) and val
+                        and val not in seen
+                        and val not in _SENTINEL_VALUES):
+                    seen.add(val)
+                    models.append({
+                        "name": val,
+                        "type": category,
+                        "exists": False,
+                        "node": ct,
+                        "field": fname,
+                    })
+            if ct not in seen_missing:
+                seen_missing.add(ct)
+                missing_nodes.append({"class_type": ct, "node_id": nid})
         elif (ct and _object_info_cache is not None
               and ct not in _object_info_cache
               and ct not in seen_missing):
@@ -952,6 +1048,35 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                         "exists": False,
                         "node": ct, "field": fname,
                     })
+        elif ct in _MODEL_FIELD_WHITELIST:
+            # ── 白名单回退: 节点未安装, 扫描 widget 值中的模型文件名 ──
+            wl = _MODEL_FIELD_WHITELIST[ct]
+            # 取白名单中第一个类别作为默认 (多数节点只有一种模型类型)
+            default_cat = next(iter(wl.values()))
+            for val in widgets:
+                if (not isinstance(val, str) or not val
+                        or val in seen or val in _SENTINEL_VALUES):
+                    continue
+                if any(val.lower().endswith(e) for e in MODEL_EXTENSIONS):
+                    seen.add(val)
+                    # 尝试精确匹配字段名对应的类别 (按白名单键搜索)
+                    cat = default_cat
+                    for fname, fcat in wl.items():
+                        # 启发式: val 的路径/文件名暗示类别
+                        if fcat != default_cat:
+                            vl = val.lower()
+                            if fcat in vl or fname.split("_")[0] in vl:
+                                cat = fcat
+                                break
+                    models.append({
+                        "name": val,
+                        "type": cat,
+                        "exists": False,
+                        "node": ct, "field": "",
+                    })
+            if ct not in seen_missing:
+                seen_missing.add(ct)
+                missing_nodes.append({"class_type": ct})
         elif (ct and _object_info_cache is not None
               and ct not in _object_info_cache
               and ct not in seen_missing):
@@ -1022,6 +1147,22 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                             "name": name, "type": "loras",
                             "node": ct, "field": "lora_N",
                         })
+
+        # ── pysssss COMBO widget: dict {'content': 'name.safetensors', ...} ──
+        for val in widgets:
+            if (isinstance(val, dict) and "content" in val
+                    and isinstance(val["content"], str)):
+                name = val["content"]
+                if (name and name not in seen
+                        and name not in _SENTINEL_VALUES
+                        and any(name.lower().endswith(e)
+                                for e in MODEL_EXTENSIONS)):
+                    seen.add(name)
+                    cat = _get_category(ct, "")
+                    models.append({
+                        "name": name, "type": cat,
+                        "node": ct, "field": "",
+                    })
 
     return models, missing_nodes
 
