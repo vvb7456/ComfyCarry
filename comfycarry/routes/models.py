@@ -413,8 +413,13 @@ def api_download_hf():
                 "--file-allocation=falloc",
                 "-d", str(save_dir),
                 "-o", filename,
-                url,
             ]
+            # 传递代理设置 (aria2c 不自动读取 HTTP_PROXY 环境变量)
+            proxy = (os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+                     or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or "")
+            if proxy:
+                cmd.extend(["--all-proxy", proxy])
+            cmd.append(url)
             proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             _hf_download_procs[filename] = proc
             proc.wait(timeout=3600)
