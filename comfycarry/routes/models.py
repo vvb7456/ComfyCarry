@@ -379,6 +379,8 @@ def api_download_clear_history():
 # ====================================================================
 # HuggingFace 模型直接下载
 # ====================================================================
+_hf_download_procs: dict[str, subprocess.Popen] = {}  # filename → Popen
+
 @bp.route("/api/models/download-hf", methods=["POST"])
 def api_download_hf():
     """通过 aria2c 下载 HuggingFace 模型到对应 MODEL_DIRS 目录"""
@@ -413,14 +415,60 @@ def api_download_hf():
                 "-o", filename,
                 url,
             ]
-            subprocess.run(cmd, timeout=3600, capture_output=True)
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _hf_download_procs[filename] = proc
+            proc.wait(timeout=3600)
         except Exception:
             pass
+        finally:
+            _hf_download_procs.pop(filename, None)
 
     t = threading.Thread(target=_do_download, daemon=True)
     t.start()
 
     return jsonify({"ok": True, "msg": f"已开始下载 {filename} → {rel_dir}/"}), 200
+
+
+@bp.route("/api/models/download-hf/status")
+def api_download_hf_status():
+    """查询 HF 模型文件是否已下载完成"""
+    filename = request.args.get("filename", "").strip()
+    model_type = request.args.get("type", "").strip()
+
+    if not filename:
+        return jsonify({"error": "filename required"}), 400
+
+    rel_dir = MODEL_DIRS.get(model_type, f"models/{model_type}" if model_type else "models/other")
+    dest = Path(COMFYUI_DIR) / rel_dir / filename
+
+    downloading = filename in _hf_download_procs
+    exists = dest.exists() and not downloading  # 下载完成后才算存在
+
+    return jsonify({"exists": exists, "downloading": downloading})
+
+
+@bp.route("/api/models/download-hf/cancel", methods=["POST"])
+def api_download_hf_cancel():
+    """取消 HF 模型下载"""
+    data = request.get_json(force=True) or {}
+    filename = data.get("filename", "").strip()
+
+    if not filename:
+        return jsonify({"error": "filename required"}), 400
+
+    proc = _hf_download_procs.pop(filename, None)
+    if proc:
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return jsonify({"ok": True, "msg": f"已取消 {filename}"})
+
+    return jsonify({"ok": True, "msg": "未找到活跃下载"})
 
 
 # ====================================================================
@@ -768,7 +816,9 @@ def _handle_weilin(inputs: dict, ct: str, seen: set, out: list):
         for item in lora_list:
             if isinstance(item, dict) and "lora" in item:
                 name = item["lora"]
-                if isinstance(name, str) and name and name not in seen:
+                if (isinstance(name, str) and name
+                        and name not in seen
+                        and name not in _SENTINEL_VALUES):
                     seen.add(name)
                     out.append({"name": name, "type": "loras",
                                 "node": ct, "field": key})
@@ -780,7 +830,9 @@ def _handle_power_lora(inputs: dict, ct: str, seen: set, out: list):
         if not key.upper().startswith("LORA_") or not isinstance(val, dict):
             continue
         name = val.get("lora", "")
-        if isinstance(name, str) and name and name != "None" and name not in seen:
+        if (isinstance(name, str) and name
+                and name not in seen
+                and name not in _SENTINEL_VALUES):
             seen.add(name)
             out.append({"name": name, "type": "loras",
                         "node": ct, "field": f"{key}.lora"})
@@ -947,7 +999,8 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                         if isinstance(item, dict) and "lora" in item:
                             name = item["lora"]
                             if (isinstance(name, str) and name
-                                    and name not in seen):
+                                    and name not in seen
+                                    and name not in _SENTINEL_VALUES):
                                 seen.add(name)
                                 models.append({
                                     "name": name, "type": "loras",
@@ -961,7 +1014,9 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
             for val in widgets:
                 if isinstance(val, dict) and "lora" in val:
                     name = val.get("lora", "")
-                    if isinstance(name, str) and name and name not in seen:
+                    if (isinstance(name, str) and name
+                            and name not in seen
+                            and name not in _SENTINEL_VALUES):
                         seen.add(name)
                         models.append({
                             "name": name, "type": "loras",

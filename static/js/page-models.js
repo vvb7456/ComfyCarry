@@ -5,7 +5,7 @@
 
 import {
   registerPage, registerEscapeHandler,
-  fmtBytes, fmtPct, showToast, copyText, openImg, escHtml,
+  fmtBytes, fmtPct, showToast, copyText, openImg, escHtml, escAttr,
   apiKey, getAuthHeaders, getBadgeClass, CIVITAI_API_BASE,
   renderLoading, renderError, renderEmpty, msIcon, apiFetch,
   renderSkeleton
@@ -1332,19 +1332,22 @@ async function handleWorkflowFile(file) {
           const hf = getHfModelInfo(m.name);
           if (hf) {
             // HF 映射表命中 → 直接下载按钮
-            actionBtn = ` <button class="btn btn-sm" onclick="downloadHfModel('${escHtml(m.name)}','${escHtml(hf.url)}','${escHtml(m.type)}')" style="font-size:.75rem;padding:2px 8px;background:var(--ac2);color:#fff" title="${escHtml(hf.desc)}"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">download</span> 下载</button>`;
+            actionBtn = ` <button class="btn btn-sm" onclick="downloadHfModel('${escAttr(m.name)}','${escAttr(hf.url)}','${escAttr(m.type)}')" style="font-size:.75rem;padding:2px 8px;background:var(--ac2);color:#fff" title="${escAttr(hf.desc)}"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">download</span> 下载</button>`;
           } else if (_CIVITAI_TYPES.has(m.type)) {
-            // CivitAI 可搜类型 → 搜索按钮
-            actionBtn = ` <button class="btn btn-sm btn-primary" onclick="searchModelFromWorkflow('${escHtml(m.name)}')" style="font-size:.75rem;padding:2px 8px"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">search</span> 搜索</button>`;
+            // CivitAI 可搜类型 → 搜索按钮 (带类型预选)
+            actionBtn = ` <button class="btn btn-sm btn-primary" onclick="searchModelFromWorkflow('${escAttr(m.name)}','${escAttr(m.type)}')" style="font-size:.75rem;padding:2px 8px"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">search</span> 搜索</button>`;
           } else {
             // 非 CivitAI 类型且不在 HF 映射 → HuggingFace 搜索
             const hfQuery = encodeURIComponent(cleanModelKeyword(m.name));
             actionBtn = ` <a href="https://huggingface.co/models?search=${hfQuery}" target="_blank" class="btn btn-sm" style="font-size:.75rem;padding:2px 8px;background:var(--bg3);color:var(--t2);text-decoration:none"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">open_in_new</span> HF</a>`;
           }
         }
+        // 显示名: 只显示文件名部分 (去路径前缀), 但 tooltip 显示完整路径
+        const displayName = m.name.replace(/^.*[\\\/]/, '');
+        const hasPath = displayName !== m.name;
         return `<div class="wf-model-row">
           <div class="wf-model-status">${icon}</div>
-          <div class="wf-model-name">${escHtml(m.name)}</div>
+          <div class="wf-model-name" ${hasPath ? `title="${escAttr(m.name)}"` : ''}>${escHtml(displayName)}</div>
           <div class="wf-model-type">${escHtml(m.type)}</div>
           <div>${statusText}${actionBtn}</div>
         </div>`;
@@ -1363,6 +1366,18 @@ const _CIVITAI_TYPES = new Set([
   'checkpoints', 'loras', 'vae', 'controlnet', 'upscale_models',
   'embeddings', 'hypernetworks', 'style_models',
 ]);
+
+// ── 内部类型 → CivitAI filter type 映射 (用于搜索时预选类型 chip)
+const _TYPE_TO_CIVITAI = {
+  'checkpoints': 'Checkpoint',
+  'loras': 'LORA',
+  'vae': 'VAE',
+  'controlnet': 'Controlnet',
+  'upscale_models': 'Upscaler',
+  'embeddings': 'TextualInversion',
+  'hypernetworks': 'Hypernetwork',
+  'style_models': 'Checkpoint',
+};
 
 // ── 常见 HuggingFace 模型映射: filename → {url, desc} ──
 // 仅包含社区广泛使用的基座模型，用于"直接下载"按钮
@@ -1420,29 +1435,115 @@ function getHfModelInfo(name) {
   return _HF_MODEL_MAP[basename] || null;
 }
 
-function searchModelFromWorkflow(name) {
+/**
+ * 从工作流结果跳转到 CivitAI 搜索
+ * @param {string} name - 模型文件名 (可含路径前缀)
+ * @param {string} type - 模型类型 (checkpoints/loras/vae 等)
+ */
+function searchModelFromWorkflow(name, type) {
   const searchInput = document.getElementById('search-input');
   const keyword = cleanModelKeyword(name);
   if (searchInput) searchInput.value = keyword;
+
+  // 切换到 CivitAI Tab
   switchModelTab('civitai');
-  setTimeout(() => smartSearch(), 100);
+
+  // 等待 facets 加载后预选类型 chip
+  const preSelectType = () => {
+    const civitType = _TYPE_TO_CIVITAI[type];
+    if (!civitType) return;
+    // 先清除所有已选 type chips
+    document.querySelectorAll('#filter-type-chips .chip.active').forEach(c => c.classList.remove('active'));
+    // 选中对应类型
+    const target = document.querySelector(`#filter-type-chips .chip[data-val="${civitType}"]`);
+    if (target) target.classList.add('active');
+  };
+
+  setTimeout(() => {
+    preSelectType();
+    smartSearch();
+  }, 150);
 }
 
+// ── HF 下载状态跟踪 ──
+const _hfDownloads = new Map(); // name → {interval, el}
+
 function downloadHfModel(name, url, type) {
+  const basename = name.replace(/^.*[\\\/]/, '');
   // 调用后端 aria2c 下载 HF 模型到对应目录
   apiFetch('/api/models/download-hf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, filename: name.replace(/^.*[\\\/]/, ''), type })
+    body: JSON.stringify({ url, filename: basename, type })
   }).then(data => {
     if (data && data.ok) {
-      showToast('下载已开始: ' + name.replace(/^.*[\\\/]/, ''), 'success');
+      showToast(data.msg || '下载已开始', 'success');
+      // 启动进度轮询
+      _startHfProgressPoll(basename, type);
     } else {
       showToast('下载失败: ' + (data?.error || '未知错误'), 'error');
     }
   }).catch(e => showToast('请求失败: ' + e.message, 'error'));
 }
 
+function _startHfProgressPoll(filename, type) {
+  // 找到该模型在列表中的按钮区域并替换为进度条
+  const rows = document.querySelectorAll('.wf-model-row');
+  let targetRow = null;
+  for (const row of rows) {
+    const nameEl = row.querySelector('.wf-model-name');
+    if (nameEl && nameEl.textContent.replace(/^.*[\\\/]/, '') === filename) {
+      targetRow = row;
+      break;
+    }
+  }
+
+  if (targetRow) {
+    const actionCell = targetRow.lastElementChild;
+    const origHtml = actionCell.innerHTML;
+    actionCell.innerHTML = `<span style="color:var(--amber);font-size:.8rem">
+      <span class="ms ms-sm" style="font-size:14px;vertical-align:middle;animation:spin 1s linear infinite">progress_activity</span>
+      下载中...
+    </span>
+    <button class="btn btn-sm" onclick="_cancelHfDownload('${escAttr(filename)}')" style="font-size:.7rem;padding:1px 6px;background:var(--red);color:#fff;margin-left:4px">取消</button>`;
+
+    // 轮询检查文件是否出现 (每 3 秒)
+    const interval = setInterval(async () => {
+      try {
+        const resp = await apiFetch(`/api/models/download-hf/status?filename=${encodeURIComponent(filename)}&type=${encodeURIComponent(type)}`);
+        if (resp && resp.exists) {
+          clearInterval(interval);
+          _hfDownloads.delete(filename);
+          // 更新为已完成状态
+          const statusEl = targetRow.querySelector('.wf-model-status');
+          if (statusEl) statusEl.innerHTML = '<span class="ms ms-sm" style="color:var(--green)">check_circle</span>';
+          actionCell.innerHTML = '<span style="color:var(--green);font-size:.8rem">已下载</span>';
+          showToast(`${filename} 下载完成`, 'success');
+        }
+      } catch (e) { /* 忽略轮询错误 */ }
+    }, 3000);
+
+    _hfDownloads.set(filename, { interval, el: actionCell, origHtml });
+  }
+}
+
+function _cancelHfDownload(filename) {
+  const entry = _hfDownloads.get(filename);
+  if (entry) {
+    clearInterval(entry.interval);
+    entry.el.innerHTML = entry.origHtml;
+    _hfDownloads.delete(filename);
+  }
+  // 通知后端取消 (best effort)
+  apiFetch('/api/models/download-hf/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename })
+  }).catch(() => {});
+  showToast('已取消下载', 'info');
+}
+
 window.handleWorkflowFile = handleWorkflowFile;
 window.searchModelFromWorkflow = searchModelFromWorkflow;
 window.downloadHfModel = downloadHfModel;
+window._cancelHfDownload = _cancelHfDownload;
