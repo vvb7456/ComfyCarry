@@ -51,6 +51,8 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
 # =============================================================================
 # 4. Python 基础包 + Dashboard 依赖
 # =============================================================================
+# 移除 PEP 668 EXTERNALLY-MANAGED 标记 (允许 CM 的 uv/pip 安装插件依赖)
+RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED
 RUN python3.12 -m pip install --upgrade pip setuptools wheel && \
     python3.12 -m pip install \
         packaging ninja einops numpy psutil && \
