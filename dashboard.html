@@ -2861,11 +2861,21 @@
 
         /* ── Workflow drop zone ── */
         #wf-drop-zone.drag-over { border-color: var(--ac); background: rgba(124,92,252,.08) }
-        .wf-model-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--bd); font-size:.85rem }
+        .wf-model-row { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--bd); font-size:.85rem }
         .wf-model-row:last-child { border-bottom:none }
         .wf-model-name { flex:1; font-family:var(--mono,'IBM Plex Mono',monospace); word-break:break-all }
         .wf-model-type { color:var(--t3); font-size:.78rem; min-width:90px }
-        .wf-model-status { min-width:60px; text-align:center }
+        .wf-model-status { min-width:24px; text-align:center }
+        .wf-model-node { color:var(--t3); font-size:.72rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+        .wf-group { margin-bottom:12px }
+        .wf-group-header { display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--bg2); border-radius:var(--r) var(--r) 0 0; cursor:pointer; user-select:none; font-size:.85rem; font-weight:500; border:1px solid var(--bd) }
+        .wf-group-header:hover { background:var(--bg3) }
+        .wf-group-header .ms { font-size:16px; transition:transform .2s }
+        .wf-group-header.collapsed .ms.expand-icon { transform:rotate(-90deg) }
+        .wf-group-body { border:1px solid var(--bd); border-top:none; border-radius:0 0 var(--r) var(--r); overflow:hidden }
+        .wf-group-body.hidden { display:none }
+        .wf-group-count { font-size:.78rem; color:var(--t3); margin-left:auto }
+        .wf-group-missing { color:var(--red); font-size:.78rem }
     </style>
     <script>
         // 主题初始化 — 在 <head> 中内联执行以防止闪烁
