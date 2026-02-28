@@ -1406,20 +1406,63 @@ async function handleWorkflowFile(file) {
 
     // ── 缺失节点 (未安装插件) ──
     if (data.missing_nodes && data.missing_nodes.length > 0) {
+      // 按插件分组: {plugin_id → {title, url, nodes: [class_type, ...]}}
+      const pluginGroups = {};    // 有插件映射的
+      const unknownNodes = [];    // 无插件映射的
+      for (const n of data.missing_nodes) {
+        if (n.plugin_id) {
+          if (!pluginGroups[n.plugin_id]) {
+            pluginGroups[n.plugin_id] = {
+              title: n.plugin_title || n.plugin_id,
+              url: n.plugin_url || '',
+              nodes: [],
+            };
+          }
+          pluginGroups[n.plugin_id].nodes.push(n.class_type);
+        } else {
+          unknownNodes.push(n);
+        }
+      }
+
       html += `<div class="wf-group" style="margin-top:16px">`;
       html += `<div class="wf-group-header" style="border-color:var(--amber)" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('hidden')">`;
       html += `<span class="ms expand-icon" style="color:var(--amber)">expand_more</span>`;
       html += `<span style="color:var(--amber)"><span class="ms ms-sm" style="vertical-align:middle">warning</span> 缺失节点 (未安装插件)</span>`;
-      html += `<span class="wf-group-count">${data.missing_nodes.length} 个</span>`;
+      html += `<span class="wf-group-count">${data.missing_nodes.length} 个节点</span>`;
       html += `</div>`;
       html += `<div class="wf-group-body">`;
-      for (const n of data.missing_nodes) {
+
+      // 有插件映射的 — 按插件分组显示 + 安装按钮
+      for (const [pid, pg] of Object.entries(pluginGroups)) {
+        const nodeList = pg.nodes.map(c => escHtml(c)).join(', ');
+        const titleDisp = escHtml(pg.title);
+        const urlLink = pg.url
+          ? `<a href="${escAttr(pg.url)}" target="_blank" rel="noopener" style="color:var(--ac);text-decoration:none;font-size:.8rem" title="GitHub">`
+              + `<span class="ms ms-sm" style="vertical-align:middle">open_in_new</span></a> `
+          : '';
+        html += `<div class="wf-model-row" style="flex-wrap:wrap;gap:4px">`;
+        html += `<div class="wf-model-status"><span class="ms ms-sm" style="color:var(--amber)">extension</span></div>`;
+        html += `<div class="wf-model-name" style="flex:1;min-width:0">`;
+        html += `<span style="font-weight:500">${titleDisp}</span> ${urlLink}`;
+        html += `<div style="font-size:.75rem;color:var(--t3);margin-top:2px">${nodeList}</div>`;
+        html += `</div>`;
+        html += `<div><button class="btn btn-xs btn-outline" data-plugin-id="${escAttr(pid)}" `
+          + `data-plugin-url="${escAttr(pg.url)}" `
+          + `onclick="window._installMissingPlugin(this)" `
+          + `style="font-size:.75rem;padding:2px 8px">`
+          + `<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装</button></div>`;
+        html += `</div>`;
+      }
+
+      // 无插件映射的 — 仅显示 class_type
+      for (const n of unknownNodes) {
         html += `<div class="wf-model-row">`;
         html += `<div class="wf-model-status"><span class="ms ms-sm" style="color:var(--amber)">extension_off</span></div>`;
         html += `<div class="wf-model-name">${escHtml(n.class_type)}</div>`;
-        html += `<div></div>`;
+        html += `<div><span style="color:var(--t3);font-size:.75rem">未知插件</span></div>`;
         html += `</div>`;
       }
+
       html += `</div></div>`;
     }
 
@@ -1653,3 +1696,44 @@ window.handleWorkflowFile = handleWorkflowFile;
 window.searchModelFromWorkflow = searchModelFromWorkflow;
 window.downloadHfModel = downloadHfModel;
 window._cancelHfDownload = _cancelHfDownload;
+
+// ── 缺失插件一键安装 ──
+async function _installMissingPlugin(btn) {
+  const pluginId = btn.dataset.pluginId || '';
+  const pluginUrl = btn.dataset.pluginUrl || '';
+  if (!pluginId) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ms ms-sm spin" style="vertical-align:middle">progress_activity</span> 安装中...';
+
+  try {
+    let data;
+    if (pluginUrl) {
+      // URL 类插件 → 用 install_git 端点
+      data = await apiFetch('/api/plugins/install_git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: pluginUrl }),
+      });
+    } else {
+      // 昵称 ID 插件 → 用 CM install 队列
+      data = await apiFetch('/api/plugins/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pluginId }),
+      });
+    }
+    if (data && data.ok) {
+      btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle;color:var(--green)">check_circle</span> 已加入队列';
+      btn.style.color = 'var(--green)';
+      showToast('插件已加入安装队列，安装完成后需重启 ComfyUI', 'success');
+    } else {
+      throw new Error((data && data.error) || '安装失败');
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装';
+    showToast(`安装失败: ${e.message}`, 'error');
+  }
+}
+window._installMissingPlugin = _installMissingPlugin;

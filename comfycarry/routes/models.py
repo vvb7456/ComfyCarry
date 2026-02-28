@@ -750,6 +750,58 @@ _object_info_cache: dict | None = None
 # {class_type: {field_name: set(combo_values)}} — 仅包含模型文件 combo 字段
 _model_field_cache: dict | None = None
 
+# ── CM node→plugin 反向映射缓存 ──
+# {class_type: {"id": plugin_key, "title": display_name, "url": repo_url_or_empty}}
+_node_to_plugin_cache: dict | None = None
+_node_to_plugin_ts: float = 0  # 上次刷新时间
+
+
+def _get_node_to_plugin_map() -> dict:
+    """
+    从 ComfyUI-Manager 的 /customnode/getmappings 构建
+    class_type → plugin 反向映射。缓存 10 分钟。
+
+    返回: {class_type: {"id": str, "title": str, "url": str}}
+    """
+    import time as _time
+    global _node_to_plugin_cache, _node_to_plugin_ts
+
+    now = _time.time()
+    if _node_to_plugin_cache is not None and (now - _node_to_plugin_ts) < 600:
+        return _node_to_plugin_cache
+
+    try:
+        resp = requests.get(
+            f"{COMFYUI_URL}/customnode/getmappings",
+            params={"mode": "nickname"}, timeout=15,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+    except Exception:
+        return _node_to_plugin_cache or {}
+
+    reverse: dict[str, dict] = {}
+    for plugin_key, entry in raw.items():
+        if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+            continue
+        node_classes = entry[0]   # list of class_type strings
+        meta = entry[1]           # {"title_aux": "Display Name"}
+        if not isinstance(node_classes, list) or not isinstance(meta, dict):
+            continue
+
+        title = meta.get("title_aux", plugin_key)
+        # plugin_key 通常是 git URL 或纯标识符
+        url = plugin_key if plugin_key.startswith("http") else ""
+
+        plugin_info = {"id": plugin_key, "title": title, "url": url}
+        for ct in node_classes:
+            if isinstance(ct, str) and ct:
+                reverse[ct] = plugin_info
+
+    _node_to_plugin_cache = reverse
+    _node_to_plugin_ts = now
+    return reverse
+
 
 def _refresh_object_info() -> dict | None:
     """从 ComfyUI 获取 /object_info 并构建模型字段映射缓存"""
@@ -1227,6 +1279,17 @@ def api_parse_workflow():
     for m in models:
         if "exists" not in m:
             m["exists"] = _check_model_exists(m["name"], m["type"])
+
+    # ── 缺失节点 → 反查 CM 插件映射 ──
+    if missing_nodes:
+        plugin_map = _get_node_to_plugin_map()
+        for mn in missing_nodes:
+            ct = mn.get("class_type", "")
+            info = plugin_map.get(ct)
+            if info:
+                mn["plugin_id"] = info["id"]
+                mn["plugin_title"] = info["title"]
+                mn["plugin_url"] = info["url"]
 
     missing = sum(1 for m in models if not m["exists"])
     return jsonify({
