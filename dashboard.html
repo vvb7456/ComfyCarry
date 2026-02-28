@@ -2859,23 +2859,57 @@
         .toast.toast-error { border-color: var(--red); color: var(--red) }
         .toast.toast-warning { border-color: var(--amber); color: var(--amber) }
 
-        /* ── Workflow drop zone ── */
+        /* ── Workflow parse results ── */
         #wf-drop-zone.drag-over { border-color: var(--ac); background: rgba(124,92,252,.08) }
-        .wf-model-row { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--bd); font-size:.85rem }
+
+        /* Summary stat bar */
+        .wf-stat-bar { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-4) }
+        .wf-stat-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 12px; border-radius:var(--r-pill); font-size:var(--text-sm); background:var(--bg3); border:1px solid var(--bd) }
+        .wf-stat-chip .ms { font-size:14px }
+        .wf-stat-chip--ok { color:var(--green) }
+        .wf-stat-chip--warn { color:var(--red) }
+        .wf-stat-chip--plugin { color:var(--amber) }
+        .wf-stat-chip--info { color:var(--t3) }
+
+        /* Two-panel grid */
+        .wf-panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap:var(--sp-4); align-items:start }
+        .wf-panel { background:var(--bg3); border:1px solid var(--bd); border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column }
+        .wf-panel-header { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); background:var(--bg2); font-size:var(--text-md); font-weight:500; border-bottom:1px solid var(--bd); position:sticky; top:0; z-index:1 }
+        .wf-panel-header .ms { font-size:18px }
+        .wf-panel-count { font-size:var(--text-sm); color:var(--t3); margin-left:auto }
+        .wf-panel-body { max-height:60vh; overflow-y:auto; padding:var(--sp-2) }
+        .wf-panel-empty { text-align:center; padding:var(--sp-6); color:var(--t3); font-size:var(--text-base) }
+        .wf-panel-empty .ms { font-size:32px; display:block; margin-bottom:var(--sp-2); opacity:.5 }
+
+        /* Model rows (inside wf-group) */
+        .wf-model-row { display:flex; align-items:center; gap:10px; padding:6px var(--sp-3); border-bottom:1px solid var(--bd); font-size:var(--text-base) }
         .wf-model-row:last-child { border-bottom:none }
         .wf-model-name { flex:1; font-family:var(--mono,'IBM Plex Mono',monospace); word-break:break-all }
-        .wf-model-type { color:var(--t3); font-size:.78rem; min-width:90px }
+        .wf-model-type { color:var(--t3); font-size:var(--text-sm); min-width:90px }
         .wf-model-status { min-width:24px; text-align:center }
-        .wf-model-node { color:var(--t3); font-size:.72rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-        .wf-group { margin-bottom:12px }
-        .wf-group-header { display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--bg2); border-radius:var(--r) var(--r) 0 0; cursor:pointer; user-select:none; font-size:.85rem; font-weight:500; border:1px solid var(--bd) }
+        .wf-model-node { color:var(--t3); font-size:var(--text-xs); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+        /* Collapsible groups */
+        .wf-group { margin-bottom:var(--sp-2) }
+        .wf-group-header { display:flex; align-items:center; gap:var(--sp-2); padding:6px var(--sp-3); background:var(--bg2); border-radius:var(--r-sm) var(--r-sm) 0 0; cursor:pointer; user-select:none; font-size:var(--text-base); font-weight:500; border:1px solid var(--bd) }
         .wf-group-header:hover { background:var(--bg3) }
         .wf-group-header .ms { font-size:16px; transition:transform .2s }
+        .wf-group-header.collapsed { border-radius:var(--r-sm) }
         .wf-group-header.collapsed .ms.expand-icon { transform:rotate(-90deg) }
-        .wf-group-body { border:1px solid var(--bd); border-top:none; border-radius:0 0 var(--r) var(--r); overflow:hidden }
+        .wf-group-body { border:1px solid var(--bd); border-top:none; border-radius:0 0 var(--r-sm) var(--r-sm); overflow:hidden }
         .wf-group-body.hidden { display:none }
-        .wf-group-count { font-size:.78rem; color:var(--t3); margin-left:auto }
-        .wf-group-missing { color:var(--red); font-size:.78rem }
+        .wf-group-count { font-size:var(--text-sm); color:var(--t3); margin-left:auto }
+        .wf-group-missing { color:var(--red); font-size:var(--text-sm) }
+
+        /* Plugin cards (inside plugins panel) */
+        .wf-plugin-card { background:var(--bg2); border:1px solid var(--bd); border-radius:var(--r-md); padding:var(--sp-3); margin-bottom:var(--sp-2) }
+        .wf-plugin-card:last-child { margin-bottom:0 }
+        .wf-plugin-header { display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-1) }
+        .wf-plugin-header .ms { font-size:16px; color:var(--amber) }
+        .wf-plugin-title { font-weight:500; font-size:var(--text-base); flex:1; min-width:0 }
+        .wf-plugin-repo { font-size:var(--text-xs); color:var(--t3); font-family:var(--mono,'IBM Plex Mono',monospace); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+        .wf-plugin-nodes { font-size:var(--text-sm); color:var(--t3); margin:var(--sp-1) 0 }
+        .wf-plugin-actions { display:flex; justify-content:flex-end; gap:var(--sp-2); margin-top:var(--sp-2) }
     </style>
     <script>
         // 主题初始化 — 在 <head> 中内联执行以防止闪烁
@@ -3067,11 +3101,25 @@
                     </div>
                     <div id="wf-parse-status" style="display:none;margin-bottom:12px"></div>
                     <div id="wf-results" style="display:none">
-                        <div class="section-header" style="margin-bottom:8px">
-                            <div class="section-title"><span class="ms ms-sm" style="color:#a78bfa">checklist</span> 解析结果</div>
-                            <span id="wf-results-summary" style="font-size:.82rem;color:var(--t2)"></span>
+                        <div id="wf-stat-bar" class="wf-stat-bar"></div>
+                        <div class="wf-panels">
+                            <div class="wf-panel">
+                                <div class="wf-panel-header">
+                                    <span class="ms" style="color:#a78bfa">inventory_2</span>
+                                    <span>模型依赖</span>
+                                    <span id="wf-models-count" class="wf-panel-count"></span>
+                                </div>
+                                <div id="wf-models-panel" class="wf-panel-body"></div>
+                            </div>
+                            <div class="wf-panel">
+                                <div class="wf-panel-header">
+                                    <span class="ms" style="color:var(--amber)">extension</span>
+                                    <span>缺失插件</span>
+                                    <span id="wf-plugins-count" class="wf-panel-count"></span>
+                                </div>
+                                <div id="wf-plugins-panel" class="wf-panel-body"></div>
+                            </div>
                         </div>
-                        <div id="wf-results-list"></div>
                     </div>
                 </div>
             </div>

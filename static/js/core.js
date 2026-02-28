@@ -87,9 +87,9 @@ export function showPage(page) {
 // ── 格式化工具 ───────────────────────────────────────────────
 
 export function fmtBytes(b) {
-  if (!b || b === 0) return '0 B';
+  if (!b || b <= 0) return '0 B';
   const u = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(b) / Math.log(1024));
+  const i = Math.min(Math.floor(Math.log(b) / Math.log(1024)), u.length - 1);
   return (b / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + u[i];
 }
 

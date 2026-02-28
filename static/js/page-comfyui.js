@@ -310,11 +310,10 @@ function _collectComfyParams() {
   return params;
 }
 
-async function saveComfyUIParams() {
-  const status = document.getElementById('comfyui-params-status');
-  const params = _collectComfyParams();
-
-  // Extract extra args from the raw input that aren't covered by schema
+/**
+ * 从 raw input 中提取不在 schema 中的额外参数
+ */
+function _extractExtraArgs() {
   const rawInput = document.getElementById('comfyui-args-raw')?.value || '';
   const knownFlags = new Set();
   if (_comfyParamsSchema) {
@@ -325,20 +324,25 @@ async function saveComfyUIParams() {
     }
   }
   knownFlags.add('--listen'); knownFlags.add('--port');
-  // Parse raw input to find extra flags not in schema
   const rawParts = rawInput.replace(/^main\.py\s*/, '').split(/\s+/).filter(Boolean);
   const extraParts = [];
   let i = 0;
   while (i < rawParts.length) {
     if (knownFlags.has(rawParts[i])) {
-      i++; // skip known flag
-      if (i < rawParts.length && !rawParts[i].startsWith('--')) i++; // skip its value
+      i++;
+      if (i < rawParts.length && !rawParts[i].startsWith('--')) i++;
     } else {
       extraParts.push(rawParts[i]);
       i++;
     }
   }
-  const extraArgs = extraParts.join(' ');
+  return extraParts.join(' ');
+}
+
+async function saveComfyUIParams() {
+  const status = document.getElementById('comfyui-params-status');
+  const params = _collectComfyParams();
+  const extraArgs = _extractExtraArgs();
 
   if (!confirm('保存参数将重启 ComfyUI，确定继续？')) return;
 
@@ -371,29 +375,7 @@ async function restartComfyUI() {
   if (!confirm('确定要重启 ComfyUI 吗？')) return;
   // Auto-save params before restart
   const params = _collectComfyParams();
-  const rawInput = document.getElementById('comfyui-args-raw')?.value || '';
-  const knownFlags = new Set();
-  if (_comfyParamsSchema) {
-    for (const [, schema] of Object.entries(_comfyParamsSchema)) {
-      if (schema.flag) knownFlags.add(schema.flag);
-      if (schema.flag_map) Object.values(schema.flag_map).forEach(f => knownFlags.add(f));
-      if (schema.flag_prefix) knownFlags.add(schema.flag_prefix);
-    }
-  }
-  knownFlags.add('--listen'); knownFlags.add('--port');
-  const rawParts = rawInput.replace(/^main\.py\s*/, '').split(/\s+/).filter(Boolean);
-  const extraParts = [];
-  let i = 0;
-  while (i < rawParts.length) {
-    if (knownFlags.has(rawParts[i])) {
-      i++;
-      if (i < rawParts.length && !rawParts[i].startsWith('--')) i++;
-    } else {
-      extraParts.push(rawParts[i]);
-      i++;
-    }
-  }
-  const extraArgs = extraParts.join(' ');
+  const extraArgs = _extractExtraArgs();
   try {
     await fetch('/api/comfyui/params', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -671,7 +671,7 @@ function renderCivitCard(h) {
 
   return `<div class="model-card">
     <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt=""
-      onerror="if(!this.dataset.retry&&'${fullUrl.replace(/'/g, "\\'")}'.length>0){this.dataset.retry='1';this.src='${fullUrl.replace(/'/g, "\\'")}'}else{this.style.display='none'}" loading="lazy">` : `<div class="model-card-no-img">${msIcon('image_not_supported')}</div>`}${zoomIcon}${clickArea}</div>
+      data-fallback="${escAttr(fullUrl)}" onerror="window._civitImgError(this)" loading="lazy">` : `<div class="model-card-no-img">${msIcon('image_not_supported')}</div>`}${zoomIcon}${clickArea}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}" onclick="openMetaFromCache('${h.id}')">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">
@@ -1259,13 +1259,235 @@ const _FORMAT_LABELS = {
   json: 'JSON 工作流',
 };
 
+// ── 类型标签 & 排序 ──
+const _TYPE_LABELS = {
+  checkpoints: 'Checkpoints', loras: 'LoRA', vae: 'VAE', controlnet: 'ControlNet',
+  upscale_models: 'Upscale', clip: 'CLIP', clip_vision: 'CLIP Vision',
+  text_encoders: 'Text Encoders', diffusion_models: 'Diffusion Models',
+  unet: 'UNet', embeddings: 'Embeddings', hypernetworks: 'Hypernetworks',
+  style_models: 'Style Models', ipadapter: 'IP-Adapter', sams: 'SAM',
+  ultralytics: 'Ultralytics', mmdets_bbox: 'MMDet', facerestore_models: 'Face Restore',
+  pulid: 'PuLID', animatediff_models: 'AnimateDiff', photomaker: 'PhotoMaker',
+  gligen: 'GLIGEN', onnx: 'ONNX',
+};
+const _TYPE_ORDER = [
+  'checkpoints', 'loras', 'vae', 'controlnet', 'upscale_models',
+  'clip', 'clip_vision', 'text_encoders', 'diffusion_models', 'unet',
+  'embeddings', 'hypernetworks', 'style_models', 'ipadapter', 'sams',
+  'ultralytics', 'mmdets_bbox', 'facerestore_models', 'pulid',
+  'animatediff_models', 'photomaker', 'gligen', 'onnx',
+];
+
+// ── CivitAI 可搜模型类型 ──
+const _CIVITAI_TYPES = new Set([
+  'checkpoints', 'loras', 'vae', 'controlnet', 'upscale_models',
+  'embeddings', 'hypernetworks', 'style_models',
+]);
+
+/**
+ * 渲染 Summary 统计条
+ */
+function _renderWfSummary(data, formatLabel) {
+  const bar = document.getElementById('wf-stat-bar');
+  const total = data.total || 0;
+  const missing = data.missing || 0;
+  const existing = total - missing;
+  const missingNodes = data.missing_nodes || [];
+  // 区分有映射/无映射的缺失节点
+  const knownPlugins = new Set();
+  let unknownCount = 0;
+  for (const n of missingNodes) {
+    if (n.plugin_id) knownPlugins.add(n.plugin_id);
+    else unknownCount++;
+  }
+
+  let chips = '';
+  chips += `<span class="wf-stat-chip"><span class="ms" style="color:var(--ac)">description</span> ${escHtml(formatLabel)}</span>`;
+  chips += `<span class="wf-stat-chip wf-stat-chip--ok"><span class="ms">check_circle</span> ${existing} 已有</span>`;
+  if (missing > 0) {
+    chips += `<span class="wf-stat-chip wf-stat-chip--warn"><span class="ms">cancel</span> ${missing} 模型缺失</span>`;
+  }
+  if (knownPlugins.size > 0) {
+    chips += `<span class="wf-stat-chip wf-stat-chip--plugin"><span class="ms">extension</span> ${knownPlugins.size} 插件需安装</span>`;
+  }
+  if (unknownCount > 0) {
+    chips += `<span class="wf-stat-chip wf-stat-chip--info"><span class="ms">extension_off</span> ${unknownCount} 未知节点</span>`;
+  }
+  bar.innerHTML = chips;
+}
+
+/**
+ * 渲染模型依赖面板 (左侧)
+ */
+function _renderWfModels(models) {
+  const panelEl = document.getElementById('wf-models-panel');
+  const countEl = document.getElementById('wf-models-count');
+
+  const total = models.length;
+  const missing = models.filter(m => !m.exists).length;
+  countEl.textContent = missing > 0 ? `${total} 个 · ${missing} 缺失` : `${total} 个 · 全部就绪`;
+
+  if (total === 0) {
+    panelEl.innerHTML = `<div class="wf-panel-empty"><span class="ms">inventory_2</span>该工作流未引用任何模型</div>`;
+    return;
+  }
+
+  // 按类型分组
+  const groups = {};
+  for (const m of models) {
+    const t = m.type || 'unknown';
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(m);
+  }
+
+  const sortedTypes = Object.keys(groups).sort((a, b) => {
+    const ia = _TYPE_ORDER.indexOf(a), ib = _TYPE_ORDER.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  let html = '';
+  for (const type of sortedTypes) {
+    const items = groups[type];
+    const label = _TYPE_LABELS[type] || type;
+    const missingCount = items.filter(m => !m.exists).length;
+    const missingBadge = missingCount > 0
+      ? ` <span class="wf-group-missing">${missingCount} 缺失</span>` : '';
+    // 无缺失的组默认折叠
+    const collapsed = missingCount === 0;
+
+    html += `<div class="wf-group">`;
+    html += `<div class="wf-group-header${collapsed ? ' collapsed' : ''}" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('hidden')">`;
+    html += `<span class="ms expand-icon">expand_more</span>`;
+    html += `<span>${escHtml(label)}</span>`;
+    html += `<span class="wf-group-count">${items.length} 个${missingBadge}</span>`;
+    html += `</div>`;
+    html += `<div class="wf-group-body${collapsed ? ' hidden' : ''}">`;
+
+    for (const m of items) {
+      const icon = m.exists
+        ? '<span class="ms ms-sm" style="color:var(--green)">check_circle</span>'
+        : '<span class="ms ms-sm" style="color:var(--red)">cancel</span>';
+      let actionBtn = '';
+      if (!m.exists) {
+        const hf = getHfModelInfo(m.name);
+        if (hf) {
+          actionBtn = ` <button class="btn btn-xs" onclick="downloadHfModel('${escAttr(m.name)}','${escAttr(hf.url)}','${escAttr(m.type)}')" style="background:var(--ac2);color:#fff" title="${escAttr(hf.desc)}"><span class="ms ms-sm" style="vertical-align:middle">download</span> 下载</button>`;
+        } else if (_CIVITAI_TYPES.has(m.type)) {
+          actionBtn = ` <button class="btn btn-xs btn-primary" onclick="searchModelFromWorkflow('${escAttr(m.name)}','${escAttr(m.type)}')"><span class="ms ms-sm" style="vertical-align:middle">search</span> 搜索</button>`;
+        } else {
+          const hfQuery = encodeURIComponent(cleanModelKeyword(m.name));
+          actionBtn = ` <a href="https://huggingface.co/models?search=${hfQuery}" target="_blank" class="btn btn-xs" style="background:var(--bg3);color:var(--t2);text-decoration:none"><span class="ms ms-sm" style="vertical-align:middle">open_in_new</span> HF</a>`;
+        }
+      }
+      const displayName = m.name.replace(/^.*[\\\/]/, '');
+      const hasPath = displayName !== m.name;
+      const nodeLabel = m.node ? escHtml(m.node) : '';
+
+      html += `<div class="wf-model-row">`;
+      html += `<div class="wf-model-status">${icon}</div>`;
+      html += `<div class="wf-model-name" ${hasPath ? `title="${escAttr(m.name)}"` : ''}>${escHtml(displayName)}</div>`;
+      html += `<div class="wf-model-node" title="${escAttr(m.node || '')}">${nodeLabel}</div>`;
+      html += `<div>${m.exists ? '<span style="color:var(--green);font-size:var(--text-xs)">已有</span>' : '<span style="color:var(--red);font-size:var(--text-xs)">缺失</span>'}${actionBtn}</div>`;
+      html += `</div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  panelEl.innerHTML = html;
+}
+
+/**
+ * 渲染缺失插件面板 (右侧)
+ */
+function _renderWfPlugins(missingNodes) {
+  const panelEl = document.getElementById('wf-plugins-panel');
+  const countEl = document.getElementById('wf-plugins-count');
+
+  if (!missingNodes || missingNodes.length === 0) {
+    countEl.textContent = '无缺失';
+    panelEl.innerHTML = `<div class="wf-panel-empty"><span class="ms">check_circle</span>所有节点插件已安装</div>`;
+    return;
+  }
+
+  // 按插件分组
+  const pluginGroups = {};
+  const unknownNodes = [];
+  for (const n of missingNodes) {
+    if (n.plugin_id) {
+      if (!pluginGroups[n.plugin_id]) {
+        pluginGroups[n.plugin_id] = {
+          title: n.plugin_title || n.plugin_id,
+          url: n.plugin_url || '',
+          files: n.plugin_files || [],
+          version: n.plugin_version || 'unknown',
+          nodes: [],
+        };
+      }
+      pluginGroups[n.plugin_id].nodes.push(n.class_type);
+    } else {
+      unknownNodes.push(n);
+    }
+  }
+
+  const knownCount = Object.keys(pluginGroups).length;
+  countEl.textContent = `${knownCount} 插件 · ${unknownNodes.length} 未知`;
+
+  let html = '';
+
+  // 有插件映射的 — 每个插件一个卡片
+  for (const [pid, pg] of Object.entries(pluginGroups)) {
+    const nodeList = pg.nodes.map(c => `<span style="display:inline-block;background:var(--bg3);padding:1px 6px;border-radius:var(--r-xs);margin:1px">${escHtml(c)}</span>`).join(' ');
+    const titleDisp = escHtml(pg.title);
+    // 从 URL 提取 owner/repo 作为简短仓库名
+    const repoShort = pg.url ? pg.url.replace(/^https?:\/\/github\.com\//, '') : '';
+
+    html += `<div class="wf-plugin-card">`;
+    html += `<div class="wf-plugin-header">`;
+    html += `<span class="ms">extension</span>`;
+    html += `<span class="wf-plugin-title">${titleDisp}</span>`;
+    if (pg.url) {
+      html += `<a href="${escAttr(pg.url)}" target="_blank" rel="noopener" title="GitHub" style="color:var(--ac);flex-shrink:0"><span class="ms ms-sm">open_in_new</span></a>`;
+    }
+    html += `</div>`;
+    if (repoShort) {
+      html += `<div class="wf-plugin-repo">${escHtml(repoShort)}</div>`;
+    }
+    html += `<div class="wf-plugin-nodes">${nodeList}</div>`;
+    html += `<div class="wf-plugin-actions">`;
+    html += `<button class="btn btn-xs btn-outline" data-plugin-id="${escAttr(pid)}" `
+      + `data-plugin-url="${escAttr(pg.url)}" `
+      + `data-plugin-files="${escAttr(JSON.stringify(pg.files))}" `
+      + `data-plugin-version="${escAttr(pg.version)}" `
+      + `onclick="window._installMissingPlugin(this)">`
+      + `<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装</button>`;
+    html += `</div>`;
+    html += `</div>`;
+  }
+
+  // 无插件映射的 — 统一放在一个分组
+  if (unknownNodes.length > 0) {
+    html += `<div class="wf-plugin-card" style="border-color:var(--bd)">`;
+    html += `<div class="wf-plugin-header">`;
+    html += `<span class="ms" style="color:var(--t3)">extension_off</span>`;
+    html += `<span class="wf-plugin-title" style="color:var(--t3)">未知插件</span>`;
+    html += `<span style="font-size:var(--text-xs);color:var(--t3)">${unknownNodes.length} 个节点</span>`;
+    html += `</div>`;
+    const unknownList = unknownNodes.map(n =>
+      `<span style="display:inline-block;background:var(--bg3);padding:1px 6px;border-radius:var(--r-xs);margin:1px;color:var(--t3)">${escHtml(n.class_type)}</span>`
+    ).join(' ');
+    html += `<div class="wf-plugin-nodes">${unknownList}</div>`;
+    html += `</div>`;
+  }
+
+  panelEl.innerHTML = html;
+}
+
 async function handleWorkflowFile(file) {
   if (!file) return;
 
   const statusEl = document.getElementById('wf-parse-status');
   const resultsEl = document.getElementById('wf-results');
-  const listEl = document.getElementById('wf-results-list');
-  const summaryEl = document.getElementById('wf-results-summary');
 
   statusEl.style.display = 'block';
   statusEl.innerHTML = `<span style="color:var(--t2)"><span class="ms ms-sm" style="color:var(--ac)">hourglass_empty</span> 正在解析 ${escHtml(file.name)}...</span>`;
@@ -1322,155 +1544,14 @@ async function handleWorkflowFile(file) {
     statusEl.style.display = 'none';
     resultsEl.style.display = 'block';
 
-    summaryEl.textContent = `共 ${data.total} 个模型，${data.missing} 个缺失 (${formatLabel})`;
+    // ── 渲染 Summary 统计条 ──
+    _renderWfSummary(data, formatLabel);
 
-    // ── 按类型分组 ──
-    const _TYPE_LABELS = {
-      checkpoints: 'Checkpoints', loras: 'LoRA', vae: 'VAE', controlnet: 'ControlNet',
-      upscale_models: 'Upscale', clip: 'CLIP', clip_vision: 'CLIP Vision',
-      text_encoders: 'Text Encoders', diffusion_models: 'Diffusion Models',
-      unet: 'UNet', embeddings: 'Embeddings', hypernetworks: 'Hypernetworks',
-      style_models: 'Style Models', ipadapter: 'IP-Adapter', sams: 'SAM',
-      ultralytics: 'Ultralytics', mmdets_bbox: 'MMDet', facerestore_models: 'Face Restore',
-      pulid: 'PuLID', animatediff_models: 'AnimateDiff', photomaker: 'PhotoMaker',
-      gligen: 'GLIGEN', onnx: 'ONNX',
-    };
-    const _TYPE_ORDER = [
-      'checkpoints', 'loras', 'vae', 'controlnet', 'upscale_models',
-      'clip', 'clip_vision', 'text_encoders', 'diffusion_models', 'unet',
-      'embeddings', 'hypernetworks', 'style_models', 'ipadapter', 'sams',
-      'ultralytics', 'mmdets_bbox', 'facerestore_models', 'pulid',
-      'animatediff_models', 'photomaker', 'gligen', 'onnx',
-    ];
+    // ── 渲染模型面板 (左) ──
+    _renderWfModels(data.models);
 
-    const groups = {};
-    for (const m of data.models) {
-      const t = m.type || 'unknown';
-      if (!groups[t]) groups[t] = [];
-      groups[t].push(m);
-    }
-
-    // 排序: 按预定义顺序, 未知类型排最后
-    const sortedTypes = Object.keys(groups).sort((a, b) => {
-      const ia = _TYPE_ORDER.indexOf(a), ib = _TYPE_ORDER.indexOf(b);
-      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-    });
-
-    let html = '';
-    for (const type of sortedTypes) {
-      const items = groups[type];
-      const label = _TYPE_LABELS[type] || type;
-      const missingCount = items.filter(m => !m.exists).length;
-      const missingBadge = missingCount > 0
-        ? ` <span class="wf-group-missing">${missingCount} 缺失</span>`
-        : '';
-
-      html += `<div class="wf-group">`;
-      html += `<div class="wf-group-header" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('hidden')">`;
-      html += `<span class="ms expand-icon">expand_more</span>`;
-      html += `<span>${escHtml(label)}</span>`;
-      html += `<span class="wf-group-count">${items.length} 个${missingBadge}</span>`;
-      html += `</div>`;
-      html += `<div class="wf-group-body">`;
-
-      for (const m of items) {
-        const icon = m.exists
-          ? '<span class="ms ms-sm" style="color:var(--green)">check_circle</span>'
-          : '<span class="ms ms-sm" style="color:var(--red)">cancel</span>';
-        let actionBtn = '';
-        if (!m.exists) {
-          const hf = getHfModelInfo(m.name);
-          if (hf) {
-            actionBtn = ` <button class="btn btn-sm" onclick="downloadHfModel('${escAttr(m.name)}','${escAttr(hf.url)}','${escAttr(m.type)}')" style="font-size:.75rem;padding:2px 8px;background:var(--ac2);color:#fff" title="${escAttr(hf.desc)}"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">download</span> 下载</button>`;
-          } else if (_CIVITAI_TYPES.has(m.type)) {
-            actionBtn = ` <button class="btn btn-sm btn-primary" onclick="searchModelFromWorkflow('${escAttr(m.name)}','${escAttr(m.type)}')" style="font-size:.75rem;padding:2px 8px"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">search</span> 搜索</button>`;
-          } else {
-            const hfQuery = encodeURIComponent(cleanModelKeyword(m.name));
-            actionBtn = ` <a href="https://huggingface.co/models?search=${hfQuery}" target="_blank" class="btn btn-sm" style="font-size:.75rem;padding:2px 8px;background:var(--bg3);color:var(--t2);text-decoration:none"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">open_in_new</span> HF</a>`;
-          }
-        }
-        const displayName = m.name.replace(/^.*[\\\/]/, '');
-        const hasPath = displayName !== m.name;
-        const nodeLabel = m.node ? escHtml(m.node) : '';
-
-        html += `<div class="wf-model-row">`;
-        html += `<div class="wf-model-status">${icon}</div>`;
-        html += `<div class="wf-model-name" ${hasPath ? `title="${escAttr(m.name)}"` : ''}>${escHtml(displayName)}</div>`;
-        html += `<div class="wf-model-node" title="${escAttr(m.node || '')}">${nodeLabel}</div>`;
-        html += `<div>${m.exists ? '<span style="color:var(--green);font-size:.8rem">已有</span>' : '<span style="color:var(--red);font-size:.8rem">缺失</span>'}${actionBtn}</div>`;
-        html += `</div>`;
-      }
-
-      html += `</div></div>`;
-    }
-
-    // ── 缺失节点 (未安装插件) ──
-    if (data.missing_nodes && data.missing_nodes.length > 0) {
-      // 按插件分组: {plugin_id → {title, url, nodes: [class_type, ...]}}
-      const pluginGroups = {};    // 有插件映射的
-      const unknownNodes = [];    // 无插件映射的
-      for (const n of data.missing_nodes) {
-        if (n.plugin_id) {
-          if (!pluginGroups[n.plugin_id]) {
-            pluginGroups[n.plugin_id] = {
-              title: n.plugin_title || n.plugin_id,
-              url: n.plugin_url || '',
-              files: n.plugin_files || [],
-              version: n.plugin_version || 'unknown',
-              nodes: [],
-            };
-          }
-          pluginGroups[n.plugin_id].nodes.push(n.class_type);
-        } else {
-          unknownNodes.push(n);
-        }
-      }
-
-      html += `<div class="wf-group" style="margin-top:16px">`;
-      html += `<div class="wf-group-header" style="border-color:var(--amber)" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('hidden')">`;
-      html += `<span class="ms expand-icon" style="color:var(--amber)">expand_more</span>`;
-      html += `<span style="color:var(--amber)"><span class="ms ms-sm" style="vertical-align:middle">warning</span> 缺失节点 (未安装插件)</span>`;
-      html += `<span class="wf-group-count">${data.missing_nodes.length} 个节点</span>`;
-      html += `</div>`;
-      html += `<div class="wf-group-body">`;
-
-      // 有插件映射的 — 按插件分组显示 + 安装按钮
-      for (const [pid, pg] of Object.entries(pluginGroups)) {
-        const nodeList = pg.nodes.map(c => escHtml(c)).join(', ');
-        const titleDisp = escHtml(pg.title);
-        const urlLink = pg.url
-          ? `<a href="${escAttr(pg.url)}" target="_blank" rel="noopener" style="color:var(--ac);text-decoration:none;font-size:.8rem" title="GitHub">`
-              + `<span class="ms ms-sm" style="vertical-align:middle">open_in_new</span></a> `
-          : '';
-        html += `<div class="wf-model-row" style="flex-wrap:wrap;gap:4px">`;
-        html += `<div class="wf-model-status"><span class="ms ms-sm" style="color:var(--amber)">extension</span></div>`;
-        html += `<div class="wf-model-name" style="flex:1;min-width:0">`;
-        html += `<span style="font-weight:500">${titleDisp}</span> ${urlLink}`;
-        html += `<div style="font-size:.75rem;color:var(--t3);margin-top:2px">${nodeList}</div>`;
-        html += `</div>`;
-        html += `<div><button class="btn btn-xs btn-outline" data-plugin-id="${escAttr(pid)}" `
-          + `data-plugin-url="${escAttr(pg.url)}" `
-          + `data-plugin-files="${escAttr(JSON.stringify(pg.files))}" `
-          + `data-plugin-version="${escAttr(pg.version)}" `
-          + `onclick="window._installMissingPlugin(this)" `
-          + `style="font-size:.75rem;padding:2px 8px">`
-          + `<span class="ms ms-sm" style="vertical-align:middle">download</span> 安装</button></div>`;
-        html += `</div>`;
-      }
-
-      // 无插件映射的 — 仅显示 class_type
-      for (const n of unknownNodes) {
-        html += `<div class="wf-model-row">`;
-        html += `<div class="wf-model-status"><span class="ms ms-sm" style="color:var(--amber)">extension_off</span></div>`;
-        html += `<div class="wf-model-name">${escHtml(n.class_type)}</div>`;
-        html += `<div><span style="color:var(--t3);font-size:.75rem">未知插件</span></div>`;
-        html += `</div>`;
-      }
-
-      html += `</div></div>`;
-    }
-
-    listEl.innerHTML = html;
+    // ── 渲染插件面板 (右) ──
+    _renderWfPlugins(data.missing_nodes || []);
 
   } catch (e) {
     statusEl.innerHTML = `<span style="color:var(--red)"><span class="ms ms-sm">error</span> 解析失败: ${escHtml(e.message)}</span>`;
@@ -1479,12 +1560,6 @@ async function handleWorkflowFile(file) {
   // 清空文件输入，允许再次选择同一文件
   document.getElementById('wf-file-input').value = '';
 }
-
-// ── CivitAI 可搜模型类型 (这些类型在 CivitAI 上有对应 modelType 过滤)
-const _CIVITAI_TYPES = new Set([
-  'checkpoints', 'loras', 'vae', 'controlnet', 'upscale_models',
-  'embeddings', 'hypernetworks', 'style_models',
-]);
 
 // ── 内部类型 → CivitAI filter type 映射 (用于搜索时预选类型 chip)
 const _TYPE_TO_CIVITAI = {
@@ -1792,3 +1867,13 @@ function _startInstallQueuePoll(btn, pluginId) {
   }, 2000);
 }
 window._installMissingPlugin = _installMissingPlugin;
+/** CivitAI 图片加载失败: 重试 fallback URL 或隐藏 */
+window._civitImgError = function(img) {
+  const fallback = img.dataset.fallback;
+  if (!img.dataset.retry && fallback) {
+    img.dataset.retry = '1';
+    img.src = fallback;
+  } else {
+    img.style.display = 'none';
+  }
+};
