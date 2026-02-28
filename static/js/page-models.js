@@ -25,6 +25,7 @@ let currentDlTab = 'pending';
 
 let searchPage = 0;
 let facetsLoaded = false;
+let _facetsPromise = null;   // 防止并发重复加载
 let dlStatusInterval = null;
 let _dlCompletedIds = new Set();
 
@@ -442,6 +443,12 @@ async function deleteModel(idx) {
 
 async function loadFacets() {
   if (facetsLoaded) return;
+  if (_facetsPromise) return _facetsPromise;  // 已在加载中, 等同一个 promise
+  _facetsPromise = _doLoadFacets();
+  return _facetsPromise;
+}
+
+async function _doLoadFacets() {
   const typeChips = document.getElementById('filter-type-chips');
   const bmChips = document.getElementById('filter-bm-chips');
 
@@ -1379,6 +1386,29 @@ const _TYPE_TO_CIVITAI = {
   'style_models': 'Checkpoint',
 };
 
+// ── Base Model 大类前缀映射 (用于从文件名推断并选中所有子类 chips) ──
+// key: 文件名中可能出现的关键词 (小写)
+// value: baseModel chip data-val 的匹配前缀 (用于 startsWith)
+// 这样当 CivitAI 新增 "Flux.2 Klein 9B" 等子类时会自动被选中
+const _BASE_MODEL_HINTS = [
+  // 顺序很重要: 更特定的先匹配
+  { keywords: ['pony'],              prefix: 'Pony' },
+  { keywords: ['illustrious', 'ill', 'noobai'], prefix: 'Illustrious' },
+  { keywords: ['sdxl', 'xl'],        prefix: 'SDXL' },
+  { keywords: ['sd3'],               prefix: 'SD 3' },
+  { keywords: ['flux'],              prefix: 'Flux' },
+  { keywords: ['sd1', 'sd15', '1.5'], prefix: 'SD 1' },
+  { keywords: ['hunyuan'],           prefix: 'Hunyuan' },
+  { keywords: ['kolors'],            prefix: 'Kolors' },
+  { keywords: ['pixart'],            prefix: 'PixArt' },
+  { keywords: ['cascade'],           prefix: 'Stable Cascade' },
+  { keywords: ['auraflow'],          prefix: 'AuraFlow' },
+  { keywords: ['cogvideo'],          prefix: 'CogVideo' },
+  { keywords: ['ltx'],               prefix: 'LTX' },
+  { keywords: ['mochi'],             prefix: 'Mochi' },
+  { keywords: ['wan'],               prefix: 'Wan' },
+];
+
 // ── 常见 HuggingFace 模型映射: filename → {url, desc} ──
 // 仅包含社区广泛使用的基座模型，用于"直接下载"按钮
 const _HF_MODEL_MAP = {
@@ -1411,19 +1441,14 @@ const _HF_MODEL_MAP = {
 
 /**
  * 从模型文件名中提取搜索关键词
- * 去路径前缀、扩展名、版本号后缀、常见修饰词
+ * 只去路径前缀和扩展名，保留完整文件名作为搜索词
+ * (lora 命名五花八门，过度清理反而降低搜索准确性)
  */
 function cleanModelKeyword(name) {
   // 去路径前缀 (只保留文件名)
   let kw = name.replace(/^.*[\\\/]/, '');
   // 去扩展名
   kw = kw.replace(/\.(safetensors|ckpt|pt|pth|bin|onnx|gguf)$/i, '');
-  // 去常见版本号/精度后缀
-  kw = kw.replace(/[_\-](?:fp(?:8|16|32)|bf16|v\d+(?:\.\d+)*|q\d+|e4m3fn(?:_scaled)?|pruned|ema|no[_\-]?ema|inpainting)$/gi, '');
-  // 多轮清理 (可能有多个后缀叠加)
-  kw = kw.replace(/[_\-](?:fp(?:8|16|32)|bf16|v\d+(?:\.\d+)*|pruned|ema)$/gi, '');
-  // 下划线/连字符替换为空格
-  kw = kw.replace(/[_\-]+/g, ' ').trim();
   return kw;
 }
 
@@ -1440,29 +1465,45 @@ function getHfModelInfo(name) {
  * @param {string} name - 模型文件名 (可含路径前缀)
  * @param {string} type - 模型类型 (checkpoints/loras/vae 等)
  */
-function searchModelFromWorkflow(name, type) {
+async function searchModelFromWorkflow(name, type) {
   const searchInput = document.getElementById('search-input');
   const keyword = cleanModelKeyword(name);
   if (searchInput) searchInput.value = keyword;
 
-  // 切换到 CivitAI Tab
+  // 切换到 CivitAI Tab (触发 loadFacets)
   switchModelTab('civitai');
 
-  // 等待 facets 加载后预选类型 chip
-  const preSelectType = () => {
-    const civitType = _TYPE_TO_CIVITAI[type];
-    if (!civitType) return;
-    // 先清除所有已选 type chips
+  // 等待 facets 完全加载完毕 (chips DOM 可用)
+  await loadFacets();
+
+  // ── 预选类型 chip ──
+  const civitType = _TYPE_TO_CIVITAI[type];
+  if (civitType) {
     document.querySelectorAll('#filter-type-chips .chip.active').forEach(c => c.classList.remove('active'));
-    // 选中对应类型
     const target = document.querySelector(`#filter-type-chips .chip[data-val="${civitType}"]`);
     if (target) target.classList.add('active');
-  };
+  }
 
-  setTimeout(() => {
-    preSelectType();
-    smartSearch();
-  }, 150);
+  // ── 预选 Base Model chips (动态模糊匹配) ──
+  const filenameLower = name.replace(/^.*[\\\/]/, '').toLowerCase();
+  let matchedPrefix = null;
+  for (const hint of _BASE_MODEL_HINTS) {
+    if (hint.keywords.some(kw => filenameLower.includes(kw))) {
+      matchedPrefix = hint.prefix;
+      break;
+    }
+  }
+  if (matchedPrefix) {
+    // 清除已选 baseModel chips
+    document.querySelectorAll('#filter-bm-chips .chip.active').forEach(c => c.classList.remove('active'));
+    // 选中所有匹配前缀的 chips (如 prefix="Flux" → 选中 "Flux.1 Dev", "Flux.1 Kontext", "Flux.2 Klein 9B" 等)
+    document.querySelectorAll('#filter-bm-chips .chip').forEach(c => {
+      if (c.dataset.val.startsWith(matchedPrefix)) c.classList.add('active');
+    });
+  }
+
+  // 执行搜索
+  smartSearch();
 }
 
 // ── HF 下载状态跟踪 ──

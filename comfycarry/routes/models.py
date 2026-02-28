@@ -709,15 +709,12 @@ _MODEL_FIELD_WHITELIST.update({
     "ClipLoaderGGUF":               {"clip_name": "text_encoders"},
     # LongCLIP
     "LongCLIPTextEncodeFlux":       {"clip_name": "text_encoders"},
-    # 信息/选择器/保存器 (引用了真实模型路径)
+    # 信息/选择器 (引用了真实模型路径)
     "LoraInfo":                     {"lora_name": "loras"},
     "PWLoraSelector":               {"lora_name": "loras"},
     "SDLoraSelector":               {"lora_name": "loras"},
     "Checkpoint Selector":          {"ckpt_name": "checkpoints"},
     "CheckpointLoader|pysssss":     {"ckpt_name": "checkpoints"},
-    "SDPromptSaver":                {"model_name": "checkpoints"},
-    "Save Image w/Metadata":        {"modelname": "checkpoints"},
-    "LF_CivitAIMetadataSetup":      {"hires_upscaler": "upscale_models"},
     # Impact-Pack 检测器
     "MMDetDetectorProvider":        {"model_name": "mmdets_bbox"},
     # 人脸修复
