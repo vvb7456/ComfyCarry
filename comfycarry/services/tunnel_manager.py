@@ -212,29 +212,6 @@ class TunnelManager:
             log.error(f"Teardown 失败: {e}")
             return False
 
-    def get_service_urls(self) -> Dict[str, str]:
-        """
-        从 CF API 查询当前 Tunnel 的 Ingress 配置, 返回服务 URL 映射。
-
-        Returns: {"ComfyCarry": "https://...", "ComfyUI": "https://...", ...}
-        """
-        overview = self.get_tunnel_overview()
-        return overview["urls"]
-
-    def get_tunnel_status(self) -> dict:
-        """
-        查询 Tunnel 连接状态。
-
-        Returns: {
-            "exists": bool,
-            "tunnel_id": str,
-            "status": "healthy" | "degraded" | "down" | "inactive",
-            "connections": [...]
-        }
-        """
-        overview = self.get_tunnel_overview()
-        return overview["status"]
-
     def get_tunnel_overview(self) -> dict:
         """合并获取 Tunnel 状态 + 服务 URL (3 次 CF API 调用代替 5 次)。
 
