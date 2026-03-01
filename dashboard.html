@@ -38,9 +38,9 @@
             <div class="nav-item" data-page="comfyui" onclick="showPage('comfyui')"><span class="icon"><span class="ms" style="color:#22d3ee">terminal</span></span><span class="nav-label">ComfyUI</span></div>
             <div class="nav-item" data-page="models" onclick="showPage('models')"><span class="icon"><span class="ms" style="color:#f472b6">palette</span></span><span class="nav-label">模型管理</span></div>
             <div class="nav-item" data-page="plugins" onclick="showPage('plugins')"><span class="icon"><span class="ms" style="color:#a78bfa">extension</span></span><span class="nav-label">插件管理</span></div>
-            <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon"><span class="ms" style="color:#34d399">cloud_sync</span></span><span class="nav-label">Sync</span></div>
             <div class="nav-item" data-page="tunnel" onclick="showPage('tunnel')"><span class="icon"><span class="ms" style="color:#60a5fa">language</span></span><span class="nav-label">Tunnel</span></div>
             <div class="nav-item" data-page="jupyter" onclick="showPage('jupyter')"><span class="icon"><span class="ms" style="color:#fb923c">book_2</span></span><span class="nav-label">Jupyter</span></div>
+            <div class="nav-item" data-page="sync" onclick="showPage('sync')"><span class="icon"><span class="ms" style="color:#34d399">cloud_sync</span></span><span class="nav-label">Sync</span></div>
             <div class="nav-item" data-page="ssh" onclick="showPage('ssh')"><span class="icon"><span class="ms" style="color:#fbbf24">key</span></span><span class="nav-label">SSH</span></div>
             <div style="flex:1"></div>
             <div class="nav-item" data-page="settings" onclick="showPage('settings')"><span class="icon"><span class="ms" style="color:#94a3b8">settings</span></span><span class="nav-label">设置</span></div>
@@ -70,15 +70,13 @@
                 </div>
             </div>
             <div class="page-body">
-                <!-- Quick Links -->
-                <div class="quick-links" id="overview-quick-links"></div>
-
                 <!-- Status Bar -->
                 <div class="status-bar" id="overview-status-bar">
                     <span class="status-badge muted"><span class="ms ms-sm" style="color:var(--amber)">hourglass_top</span> 加载中...</span>
                 </div>
 
                 <!-- Metrics Grid -->
+                <div class="section-title"><span class="ms ms-sm" style="color:#f472b6">monitoring</span> 性能指标</div>
                 <div class="metrics-grid" id="overview-metrics"></div>
 
                 <!-- Activity Feed -->

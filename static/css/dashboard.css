@@ -681,6 +681,17 @@
             color: var(--t2)
         }
 
+        a.status-badge {
+            text-decoration: none;
+            cursor: pointer;
+            transition: filter .15s, box-shadow .15s
+        }
+
+        a.status-badge:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 0 0 1px currentColor
+        }
+
         /* ── Overview: Metric Cards ── */
         .metrics-grid {
             display: grid;
@@ -849,7 +860,7 @@
 
         .activity-empty {
             padding: 20px;
-            text-align: center;
+            text-align: left;
             color: var(--t3);
             font-size: .85rem
         }

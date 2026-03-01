@@ -74,7 +74,6 @@ async function refreshOverview() {
     const data = await r.json();
     _cachedData = data;
 
-    _renderQuickLinks(data.tunnel);
     _renderStatusBar(data);
     _renderMetrics(data.system);
     _renderActivity(data);
@@ -86,58 +85,30 @@ async function refreshOverview() {
   }
 }
 
-// ── 1. 快速访问栏 ───────────────────────────────────────────
-
-function _renderQuickLinks(tunnel) {
-  const el = document.getElementById('overview-quick-links');
-  if (!el) return;
-
-  // 合并自定义和公共两种模式的 URL
-  let urls = tunnel?.urls || {};
-  const publicUrls = tunnel?.public?.urls || {};
-  if (Object.keys(urls).length === 0 && Object.keys(publicUrls).length > 0) {
-    urls = publicUrls;
-  }
-
-  const tunnelOnline = tunnel?.pm2_status === 'online' || tunnel?.cloudflared === 'online' || tunnel?.status === 'healthy';
-
-  // 过滤掉 ComfyCarry 自身(dashboard)和 SSH，只显示可点击链接
-  const entries = Object.entries(urls).filter(([name]) =>
-    !/comfycarry/i.test(name) && !/ssh/i.test(name) && !/dashboard/i.test(name)
-  );
-
-  if (entries.length === 0) {
-    el.innerHTML = `<div class="quick-links-empty">${tunnelOnline ? `${msIcon('language','ms-sm')} Tunnel 已连接` : tunnel?.configured ? `${msIcon('language','ms-sm')} Tunnel 离线` : `${msIcon('language','ms-sm')} Tunnel 未配置`}</div>`;
-    return;
-  }
-
-  // 映射公共模式 key → 显示名
-  const nameMap = { comfyui: 'ComfyUI', jupyter: 'JupyterLab', ComfyUI: 'ComfyUI', JupyterLab: 'JupyterLab' };
-  const icons = { comfyui: msIcon('palette','ms-sm'), jupyter: msIcon('book_2','ms-sm'), ComfyUI: msIcon('palette','ms-sm'), JupyterLab: msIcon('book_2','ms-sm') };
-  el.innerHTML = entries.map(([name, url]) =>
-    `<a href="${escHtml(url)}" target="_blank" class="quick-link-btn">
-      <span class="quick-link-icon">${icons[name] || msIcon('link','ms-sm')}</span>
-      <span class="quick-link-name">${escHtml(nameMap[name] || name)}</span>
-    </a>`
-  ).join('');
-}
-
-// ── 2. 实例状态栏 ───────────────────────────────────────────
+// ── 1. 实例状态栏 ───────────────────────────────────────────
 
 function _renderStatusBar(data) {
   const el = document.getElementById('overview-status-bar');
   if (!el) return;
 
   const comfy = data.comfyui || {};
+  const jupyter = data.jupyter || {};
   const sync = data.sync || {};
   const tunnel = data.tunnel || {};
 
+  // 提取 Tunnel URLs 用于让 badges 可点击
+  const urlMap = _getTunnelUrlMap(tunnel);
+
   let html = '';
 
-  // ComfyUI status
+  // ComfyUI status (可点击: 有 Tunnel URL 时跳转)
+  const comfyUrl = urlMap.comfyui || urlMap.ComfyUI || '';
   if (comfy.online) {
     const ver = comfy.version ? ` v${comfy.version}` : '';
-    html += `<span class="status-badge green"><span class="status-dot online"></span> ComfyUI${ver} 在线</span>`;
+    const inner = `<span class="status-dot online"></span> ComfyUI${ver} 在线${comfyUrl ? ' ' + msIcon('open_in_new','ms-xs') : ''}`;
+    html += comfyUrl
+      ? `<a href="${escHtml(comfyUrl)}" target="_blank" class="status-badge green" title="在新窗口打开 ComfyUI">${inner}</a>`
+      : `<span class="status-badge green">${inner}</span>`;
   } else if (comfy.pm2_status === 'online') {
     html += `<span class="status-badge amber"><span class="status-dot pending"></span> ComfyUI 启动中</span>`;
   } else {
@@ -160,14 +131,7 @@ function _renderStatusBar(data) {
     html += `<span class="status-badge muted">${msIcon('assignment')} 队列空闲</span>`;
   }
 
-  // Sync
-  if (sync.worker_running) {
-    html += `<span class="status-badge green">${msIcon('cloud_sync','ms-sm')} Sync 运行中</span>`;
-  } else if (sync.rules_count > 0) {
-    html += `<span class="status-badge muted">${msIcon('cloud_sync','ms-sm')} Sync 未启动</span>`;
-  }
-
-  // Tunnel (使用后端统一的 effective_status)
+  // Tunnel (使用后端统一的 effective_status) — 紧跟 ComfyUI
   const tst = tunnel.effective_status || 'unconfigured';
   if (tst === 'online') {
     html += `<span class="status-badge green">${msIcon('language','ms-sm')} Tunnel 在线</span>`;
@@ -179,10 +143,42 @@ function _renderStatusBar(data) {
     html += `<span class="status-badge muted">${msIcon('language','ms-sm')} Tunnel 未配置</span>`;
   }
 
+  // JupyterLab (可点击: 有 Tunnel URL 时跳转)
+  const jupyterUrl = urlMap.jupyter || urlMap.JupyterLab || '';
+  if (jupyter.online || jupyter.pm2_status === 'online') {
+    const inner = `${msIcon('book_2','ms-sm')} Jupyter 运行中${jupyterUrl ? ' ' + msIcon('open_in_new','ms-xs') : ''}`;
+    html += jupyterUrl
+      ? `<a href="${escHtml(jupyterUrl)}" target="_blank" class="status-badge green" title="在新窗口打开 JupyterLab">${inner}</a>`
+      : `<span class="status-badge green">${inner}</span>`;
+  } else if (jupyter.pm2_status === 'stopped' || jupyter.pm2_status === 'errored') {
+    html += `<span class="status-badge red">${msIcon('book_2','ms-sm')} Jupyter 离线</span>`;
+  }
+
+  // Sync
+  if (sync.worker_running) {
+    html += `<span class="status-badge green">${msIcon('cloud_sync','ms-sm')} Sync 运行中</span>`;
+  } else if (sync.rules_count > 0) {
+    html += `<span class="status-badge muted">${msIcon('cloud_sync','ms-sm')} Sync 未启动</span>`;
+  }
+
   el.innerHTML = html;
 }
 
-// ── 3. 硬件指标卡片 ─────────────────────────────────────────
+/** 提取 Tunnel URL 映射 (name → url), 过滤掉 Dashboard/SSH */
+function _getTunnelUrlMap(tunnel) {
+  let urls = tunnel?.urls || {};
+  const publicUrls = tunnel?.public?.urls || {};
+  if (Object.keys(urls).length === 0 && Object.keys(publicUrls).length > 0) urls = publicUrls;
+  const map = {};
+  for (const [name, url] of Object.entries(urls)) {
+    if (!/comfycarry/i.test(name) && !/ssh/i.test(name) && !/dashboard/i.test(name)) {
+      map[name] = url;
+    }
+  }
+  return map;
+}
+
+// ── 2. 硬件指标卡片 ─────────────────────────────────────────
 
 function _renderMetrics(sys) {
   const el = document.getElementById('overview-metrics');
@@ -283,7 +279,7 @@ function _renderMetrics(sys) {
   el.innerHTML = html;
 }
 
-// ── 4. 活动面板 ─────────────────────────────────────────────
+// ── 3. 活动面板 ─────────────────────────────────────────────
 
 function _updateActivity() {
   _renderActivity(_cachedData);
@@ -371,33 +367,77 @@ function _renderActivity(data) {
   ).join('');
 }
 
-// ── 5. 服务管理 ─────────────────────────────────────────────
+// ── 4. 服务管理 ─────────────────────────────────────────────
+
+/** 服务排序权重 (核心 → 辅助) */
+const _SVC_ORDER = { comfy: 0, 'cf-tunnel': 1, jupyter: 2, 'sync-worker': 3, dashboard: 4 };
 
 function _renderServices(svcData) {
   const el = document.getElementById('overview-svc-tbody');
   if (!el) return;
 
-  const services = svcData?.services || [];
-  if (!services.length) {
+  // PM2 服务
+  const pm2Services = (svcData?.services || []).map(s => ({
+    name: s.name,
+    status: s.status || 'unknown',
+    uptime: fmtUptime(s.uptime),
+    cpu: (s.cpu || 0).toFixed(1) + '%',
+    memory: fmtBytes(s.memory || 0),
+    restarts: s.restarts || 0,
+    isPm2: true
+  }));
+
+  // Sync Worker 虚拟行
+  const sync = _cachedData?.sync || {};
+  pm2Services.push({
+    name: 'sync-worker',
+    status: sync.worker_running ? 'online' : 'stopped',
+    uptime: '-',
+    cpu: '-',
+    memory: '-',
+    restarts: '-',
+    isPm2: false
+  });
+
+  // 按预定义顺序排序 (未知的排到最后)
+  pm2Services.sort((a, b) => {
+    const oa = _SVC_ORDER[a.name] ?? 99;
+    const ob = _SVC_ORDER[b.name] ?? 99;
+    return oa - ob;
+  });
+
+  if (!pm2Services.length) {
     el.innerHTML = '<tr><td colspan="7" class="svc-empty">未发现服务</td></tr>';
     return;
   }
 
-  el.innerHTML = services.map(s => {
-    const st = s.status || 'unknown';
+  el.innerHTML = pm2Services.map(s => {
+    const st = s.status;
     const dotClass = st === 'online' ? 'online' : st === 'stopped' ? 'stopped' : 'errored';
+    const isOnline = st === 'online';
+
+    // 操作按钮: online → stop+restart, 其他 → start
+    let actions;
+    if (s.isPm2) {
+      actions = isOnline
+        ? `<button class="btn btn-sm btn-danger" onclick="window._svcAction('${escHtml(s.name)}','stop')">${msIcon('stop')}</button>
+           <button class="btn btn-sm" onclick="window._svcAction('${escHtml(s.name)}','restart')">${msIcon('refresh')}</button>`
+        : `<button class="btn btn-sm btn-success" onclick="window._svcAction('${escHtml(s.name)}','start')">${msIcon('play_arrow')}</button>`;
+    } else {
+      actions = isOnline
+        ? `<button class="btn btn-sm btn-danger" onclick="window._syncWorkerAction('stop')">${msIcon('stop')}</button>
+           <button class="btn btn-sm" onclick="window._syncWorkerAction('restart')">${msIcon('refresh')}</button>`
+        : `<button class="btn btn-sm btn-success" onclick="window._syncWorkerAction('start')">${msIcon('play_arrow')}</button>`;
+    }
+
     return `<tr>
       <td><strong>${escHtml(s.name)}</strong></td>
       <td><span class="svc-status"><span class="svc-dot ${dotClass}"></span>${st}</span></td>
-      <td>${fmtUptime(s.uptime)}</td>
-      <td>${(s.cpu || 0).toFixed(1)}%</td>
-      <td>${fmtBytes(s.memory || 0)}</td>
-      <td>${s.restarts || 0}</td>
-      <td><div class="btn-group">
-        <button class="btn btn-sm btn-success" onclick="window._svcAction('${escHtml(s.name)}','start')">${msIcon('play_arrow')}</button>
-        <button class="btn btn-sm btn-danger" onclick="window._svcAction('${escHtml(s.name)}','stop')">${msIcon('stop')}</button>
-        <button class="btn btn-sm" onclick="window._svcAction('${escHtml(s.name)}','restart')">${msIcon('refresh')}</button>
-      </div></td>
+      <td>${s.uptime}</td>
+      <td>${s.cpu}</td>
+      <td>${s.memory}</td>
+      <td>${s.restarts}</td>
+      <td><div class="btn-group">${actions}</div></td>
     </tr>`;
   }).join('');
 }
@@ -410,7 +450,19 @@ window._svcAction = async function(name, action) {
   setTimeout(refreshOverview, 1000);
 };
 
-// ── 6. 环境信息 ─────────────────────────────────────────────
+window._syncWorkerAction = async function(action) {
+  if (action === 'restart') {
+    await apiFetch('/api/sync/stop', { method: 'POST' });
+    await new Promise(r => setTimeout(r, 500));
+    action = 'start';
+  }
+  const d = await apiFetch(`/api/sync/${action}`, { method: 'POST' });
+  if (!d) return;
+  showToast(`sync-worker ${action} 完成`);
+  setTimeout(refreshOverview, 1000);
+};
+
+// ── 5. 环境信息 ─────────────────────────────────────────────
 
 function _renderEnvInfo(data) {
   const el = document.getElementById('overview-env-info');
