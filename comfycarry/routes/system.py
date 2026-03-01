@@ -23,6 +23,13 @@ from ..utils import _run_cmd
 
 bp = Blueprint("system", __name__)
 
+# 初始化 psutil CPU 计数器 (首次调用返回 0%, 后续返回自上次调用以来的真实使用率)
+try:
+    import psutil as _psutil_init
+    _psutil_init.cpu_percent()
+except Exception:
+    pass
+
 
 # ====================================================================
 # 版本信息 API
@@ -72,7 +79,7 @@ def api_system():
     # CPU
     try:
         import psutil
-        info["cpu"]["percent"] = psutil.cpu_percent(interval=0.5)
+        info["cpu"]["percent"] = psutil.cpu_percent(interval=None)
         info["cpu"]["cores"] = psutil.cpu_count()
         info["cpu"]["freq"] = psutil.cpu_freq()._asdict() if psutil.cpu_freq() else {}
         load = os.getloadavg()
@@ -266,28 +273,40 @@ def api_overview():
     comfyui = {"online": False, "version": "", "pytorch_version": "",
                "python_version": "", "queue_pending": 0, "queue_running": 0,
                "current_prompt_id": None, "progress": None}
-    try:
-        r = req_lib.get(f"{COMFYUI_URL}/system_stats", timeout=3)
-        if r.ok:
-            d = r.json()
-            comfyui["online"] = True
-            sys_info = d.get("system", {})
-            comfyui["version"] = sys_info.get("comfyui_version", "")
-            comfyui["pytorch_version"] = sys_info.get("pytorch_version", "")
-            comfyui["python_version"] = sys_info.get("python_version", "")
-            devs = d.get("devices", [])
-            if devs:
-                comfyui["devices"] = devs
-    except Exception:
-        pass
-    try:
-        r = req_lib.get(f"{COMFYUI_URL}/queue", timeout=3)
-        if r.ok:
-            q = r.json()
-            comfyui["queue_running"] = len(q.get("queue_running", []))
-            comfyui["queue_pending"] = len(q.get("queue_pending", []))
-    except Exception:
-        pass
+
+    # 先检查 PM2 状态, 避免 ComfyUI 离线时浪费 6s 在 HTTP 超时上
+    comfy_pm2_online = False
+    for svc in result.get("services", {}).get("services", []):
+        if svc.get("name") == "comfy":
+            comfyui["pm2_status"] = svc.get("status")
+            comfyui["pm2_uptime"] = svc.get("uptime")
+            comfyui["pm2_restarts"] = svc.get("restarts", 0)
+            comfy_pm2_online = svc.get("status") == "online"
+            break
+
+    if comfy_pm2_online:
+        try:
+            r = req_lib.get(f"{COMFYUI_URL}/system_stats", timeout=2)
+            if r.ok:
+                d = r.json()
+                comfyui["online"] = True
+                sys_info = d.get("system", {})
+                comfyui["version"] = sys_info.get("comfyui_version", "")
+                comfyui["pytorch_version"] = sys_info.get("pytorch_version", "")
+                comfyui["python_version"] = sys_info.get("python_version", "")
+                devs = d.get("devices", [])
+                if devs:
+                    comfyui["devices"] = devs
+        except Exception:
+            pass
+        try:
+            r = req_lib.get(f"{COMFYUI_URL}/queue", timeout=2)
+            if r.ok:
+                q = r.json()
+                comfyui["queue_running"] = len(q.get("queue_running", []))
+                comfyui["queue_pending"] = len(q.get("queue_pending", []))
+        except Exception:
+            pass
 
     # Execution state from WS bridge
     bridge = comfyui_bridge.get_bridge()
@@ -298,14 +317,6 @@ def api_overview():
             comfyui["progress"] = bridge._last_progress
     else:
         comfyui["executing"] = False
-
-    # PM2 status for comfy process
-    for svc in result.get("services", {}).get("services", []):
-        if svc.get("name") == "comfy":
-            comfyui["pm2_status"] = svc.get("status")
-            comfyui["pm2_uptime"] = svc.get("uptime")
-            comfyui["pm2_restarts"] = svc.get("restarts", 0)
-            break
 
     result["comfyui"] = comfyui
 
@@ -328,11 +339,10 @@ def api_overview():
         sync_status["last_log_lines"] = list(log_buf)[-5:]
     result["sync"] = sync_status
 
-    # ── Tunnel (v2 — 使用新 API) ──
+    # ── Tunnel (使用缓存, 避免每次调用 CF API) ──
     tunnel_info = {"running": False, "urls": {}}
     try:
-        resp = tunnel_mod.api_tunnel_status_v2()
-        tunnel_data = resp.get_json() if hasattr(resp, 'get_json') else json.loads(resp.get_data())
+        tunnel_data = tunnel_mod._build_tunnel_status()
         tunnel_info["configured"] = tunnel_data.get("configured", False)
         tunnel_info["urls"] = tunnel_data.get("urls", {})
         tunnel_info["cloudflared"] = tunnel_data.get("cloudflared", "unknown")

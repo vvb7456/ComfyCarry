@@ -406,8 +406,16 @@ export function createTabSwitcher(dataAttr, tabs, onSwitch) {
  */
 export function createAutoRefresh(fn, interval) {
   let timer = null;
+  let running = false;
   return {
-    start() { this.stop(); timer = setInterval(fn, interval); },
+    start() {
+      this.stop();
+      timer = setInterval(async () => {
+        if (running) return;           // 防止请求堆叠
+        running = true;
+        try { await fn(); } finally { running = false; }
+      }, interval);
+    },
     stop()  { if (timer) { clearInterval(timer); timer = null; } }
   };
 }

@@ -69,7 +69,7 @@ async function loadTunnelPage() {
   }
 
   try {
-    const r = await fetch('/api/tunnel/status');
+    const r = await fetch('/api/tunnel/status?refresh=1');
     const d = await r.json();
     _lastData = d;
 

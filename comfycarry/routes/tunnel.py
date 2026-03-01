@@ -6,6 +6,7 @@ Cloudflare Tunnel 管理路由。通过 CF API 自动配置, 不再解析日志�
 import json
 import re
 import subprocess
+import time as _time
 
 import requests as http_requests
 from flask import Blueprint, Response, jsonify, request
@@ -16,6 +17,17 @@ bp = Blueprint("tunnel", __name__)
 
 # cloudflared --metrics 端点 (两种模式统一使用)
 _CF_METRICS_URL = "http://localhost:20241"
+
+# ── Tunnel 状态 TTL 缓存 ──
+# CF API 调用延迟高 (每次 2-4s, 共 3 次 ≈ 6-12s), 缓存 30 秒
+_tunnel_cache: dict = {"data": None, "ts": 0.0}
+_TUNNEL_CACHE_TTL = 30  # seconds
+
+
+def _invalidate_tunnel_cache():
+    """清除 Tunnel 状态缓存 (在配置/DNS 变更后调用)"""
+    _tunnel_cache["data"] = None
+    _tunnel_cache["ts"] = 0.0
 
 
 def _check_cloudflared_ready() -> str:
@@ -50,16 +62,24 @@ def api_tunnel_status_v2():
     """
     Tunnel 综合状态 — 替代旧的 /api/tunnel_status + /api/tunnel_links
 
-    Response: {
-        "configured": bool,
-        "domain": "mydomain.com",
-        "subdomain": "my-workspace",
-        "tunnel": { "exists": bool, "tunnel_id": "...", "status": "...", "connections": [...] },
-        "urls": { "ComfyCarry": "https://...", ... },
-        "services": [ { "name": ..., "port": ..., "suffix": ..., "protocol": ..., "custom": bool } ],
-        "cloudflared": "online" | "stopped" | "unknown"
-    }
+    支持 ?refresh=1 强制刷新缓存 (Tunnel 页使用)。
+    /api/overview 调用 _build_tunnel_status() 使用缓存。
     """
+    force = request.args.get("refresh") == "1"
+    return jsonify(_build_tunnel_status(force))
+
+
+def _build_tunnel_status(force: bool = False) -> dict:
+    """构建 Tunnel 综合状态 (带 TTL 缓存)。
+
+    CF API 调用延迟高, 缓存 30 秒减少 /api/overview 延迟。
+    """
+    now = _time.time()
+    if (not force
+            and _tunnel_cache["data"]
+            and (now - _tunnel_cache["ts"]) < _TUNNEL_CACHE_TTL):
+        return _tunnel_cache["data"]
+
     from ..services.tunnel_manager import get_default_services
     result = {
         "configured": False,
@@ -127,19 +147,27 @@ def api_tunnel_status_v2():
             result["effective_status"] = "connecting"
         else:
             result["effective_status"] = "offline"
-        return jsonify(result)
+
+        _tunnel_cache["data"] = result
+        _tunnel_cache["ts"] = _time.time()
+        return result
 
     # ── 自定义 Tunnel 模式 ──
     mgr = _get_manager()
     if not mgr:
         result["tunnel_mode"] = None
         result["effective_status"] = "unconfigured"
-        return jsonify(result)
+        _tunnel_cache["data"] = result
+        _tunnel_cache["ts"] = _time.time()
+        return result
 
     result["configured"] = True
     result["tunnel_mode"] = "custom"
-    result["tunnel"] = mgr.get_tunnel_status()
-    urls = mgr.get_service_urls()
+
+    # 合并获取 status + urls (3 次 CF API 调用代替 5 次)
+    overview = mgr.get_tunnel_overview()
+    result["tunnel"] = overview["status"]
+    urls = overview["urls"]
 
     # 为 JupyterLab URL 自动拼接 token
     for name in list(urls.keys()):
@@ -172,7 +200,9 @@ def api_tunnel_status_v2():
     else:
         result["effective_status"] = "unconfigured"
 
-    return jsonify(result)
+    _tunnel_cache["data"] = result
+    _tunnel_cache["ts"] = _time.time()
+    return result
 
 
 @bp.route("/api/tunnel/validate", methods=["POST"])
@@ -248,6 +278,7 @@ def api_tunnel_provision():
     # 启动 cloudflared
     mgr.start_cloudflared(result["tunnel_token"])
 
+    _invalidate_tunnel_cache()
     return jsonify({
         "ok": True,
         "tunnel_id": result["tunnel_id"],
@@ -271,6 +302,7 @@ def api_tunnel_teardown():
         set_config("cf_subdomain", "")
         set_config("cf_custom_services", "")
 
+    _invalidate_tunnel_cache()
     return jsonify({"ok": ok})
 
 
@@ -437,6 +469,7 @@ def api_tunnel_public_enable():
     client = PublicTunnelClient()
     try:
         result = client.register()
+        _invalidate_tunnel_cache()
         return jsonify(result)
     except PublicTunnelError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -453,6 +486,7 @@ def api_tunnel_public_disable():
 
     client = PublicTunnelClient()
     result = client.release()
+    _invalidate_tunnel_cache()
     return jsonify(result)
 
 
@@ -544,6 +578,7 @@ def _reprovision_services():
         result = mgr.ensure(services)
         # 重启 cloudflared
         mgr.start_cloudflared(result["tunnel_token"])
+        _invalidate_tunnel_cache()
         return jsonify({"ok": True, "urls": result["urls"]})
     except CFAPIError as e:
         return jsonify({"ok": False, "error": str(e)}), 400

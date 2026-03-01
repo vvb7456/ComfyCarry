@@ -218,35 +218,8 @@ class TunnelManager:
 
         Returns: {"ComfyCarry": "https://...", "ComfyUI": "https://...", ...}
         """
-        try:
-            account_id, _ = self._get_account()
-            tunnel = self._find_tunnel(account_id, self.tunnel_name)
-            if not tunnel:
-                return {}
-
-            tunnel_id = tunnel["id"]
-            config = self._cf_get(
-                f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations"
-            )
-            ingress = config.get("config", {}).get("ingress", [])
-
-            urls = {}
-            for entry in ingress:
-                hostname = entry.get("hostname", "")
-                service = entry.get("service", "")
-                if not hostname or "http_status:" in service:
-                    continue
-
-                # 反查服务名
-                port_match = re.search(r':(\d+)', service)
-                port = int(port_match.group(1)) if port_match else 0
-                svc_name = self._port_to_service_name(port)
-                urls[svc_name] = f"https://{hostname}"
-
-            return urls
-
-        except Exception:
-            return {}
+        overview = self.get_tunnel_overview()
+        return overview["urls"]
 
     def get_tunnel_status(self) -> dict:
         """
@@ -259,27 +232,59 @@ class TunnelManager:
             "connections": [...]
         }
         """
+        overview = self.get_tunnel_overview()
+        return overview["status"]
+
+    def get_tunnel_overview(self) -> dict:
+        """合并获取 Tunnel 状态 + 服务 URL (3 次 CF API 调用代替 5 次)。
+
+        Returns: {"status": {...}, "urls": {...}}
+        """
         try:
             account_id, _ = self._get_account()
             tunnel = self._find_tunnel(account_id, self.tunnel_name)
             if not tunnel:
-                return {"exists": False, "status": "inactive"}
+                return {
+                    "status": {"exists": False, "status": "inactive"},
+                    "urls": {},
+                }
 
             tunnel_id = tunnel["id"]
-            status = tunnel.get("status", "inactive")
 
-            # 查询连接详情
-            connections = tunnel.get("connections", [])
-
-            return {
+            # 状态 (来自 _find_tunnel 响应)
+            status = {
                 "exists": True,
                 "tunnel_id": tunnel_id,
-                "status": status,
-                "connections": connections or [],
+                "status": tunnel.get("status", "inactive"),
+                "connections": tunnel.get("connections", []) or [],
             }
 
+            # URL (来自 Ingress 配置)
+            urls = {}
+            try:
+                cfg = self._cf_get(
+                    f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations"
+                )
+                ingress = cfg.get("config", {}).get("ingress", [])
+                for entry in ingress:
+                    hostname = entry.get("hostname", "")
+                    service = entry.get("service", "")
+                    if not hostname or "http_status:" in service:
+                        continue
+                    port_match = re.search(r':(\d+)', service)
+                    port = int(port_match.group(1)) if port_match else 0
+                    svc_name = self._port_to_service_name(port)
+                    urls[svc_name] = f"https://{hostname}"
+            except Exception:
+                pass
+
+            return {"status": status, "urls": urls}
+
         except Exception:
-            return {"exists": False, "status": "unknown"}
+            return {
+                "status": {"exists": False, "status": "unknown"},
+                "urls": {},
+            }
 
     def start_cloudflared(self, tunnel_token: str) -> bool:
         """通过 PM2 启动 cloudflared (使用 cf-tunnel 避免与旧进程冲突)"""
