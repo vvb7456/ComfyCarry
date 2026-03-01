@@ -844,16 +844,19 @@ def _step_start_services(config, cfg, PY):
         attn_flag = "--use-flash-attention"
     elif sa2_ok:
         attn_flag = "--use-sage-attention"
+    comfy_args = f"--listen 0.0.0.0 --port 8188 {attn_flag} --fast --disable-xformers"
     _deploy_exec("pm2 delete comfy 2>/dev/null || true")
     _deploy_exec(
         f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '
         f'--interpreter none --log /workspace/comfy.log --time '
         f'--restart-delay 3000 --max-restarts 10 '
-        f'-- main.py --listen 0.0.0.0 --port 8188 '
-        f'{attn_flag} --fast --disable-xformers'
+        f'-- main.py {comfy_args}'
     )
 
     _deploy_exec("pm2 save 2>/dev/null || true")
+
+    # 持久化 ComfyUI 启动参数 (容器重启后可恢复)
+    set_config("comfyui_args", comfy_args)
 
     # 完成
     _deploy_step("部署完成")

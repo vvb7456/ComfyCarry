@@ -6,6 +6,7 @@ ComfyCarry — Flask Application Factory
 
 import json
 import os
+import subprocess
 import sys
 
 from flask import Flask
@@ -14,7 +15,7 @@ from flask_cors import CORS
 from . import config as cfg
 from .config import (
     CONFIG_FILE, MANAGER_PORT,
-    _load_session_secret,
+    _load_session_secret, _get_config,
 )
 from .utils import _get_api_key
 from .auth import auth_bp, register_auth_middleware
@@ -25,6 +26,7 @@ from .routes.ssh import restore_ssh_config
 
 # Services
 from .services.comfyui_bridge import get_bridge
+from .services.deploy_engine import _detect_python
 from .services.sync_engine import (
     _load_sync_rules, start_sync_worker, set_app_logger,
 )
@@ -62,6 +64,60 @@ def create_app():
     return app
 
 
+def _restore_comfyui(log):
+    """容器重启后自动恢复 ComfyUI 进程.
+
+    条件: setup 已完成 + ComfyUI 目录存在 + comfy 进程未运行
+    """
+    # 检查 setup 是否已完成
+    setup_state_file = os.path.join("/workspace", ".setup_state.json")
+    try:
+        with open(setup_state_file) as f:
+            state = json.load(f)
+        if not state.get("deploy_completed"):
+            return
+    except (FileNotFoundError, json.JSONDecodeError):
+        return
+
+    # 检查 ComfyUI 目录是否存在
+    comfy_dir = cfg.COMFYUI_DIR
+    if not os.path.isdir(comfy_dir):
+        return
+
+    # 检查 comfy 进程是否已在运行
+    try:
+        r = subprocess.run(
+            "pm2 jlist",
+            shell=True, capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode == 0:
+            procs = json.loads(r.stdout)
+            for p in procs:
+                if p.get("name") == "comfy":
+                    return  # 已存在 (running 或 stopped 都不干预)
+    except Exception:
+        pass
+
+    # 获取保存的启动参数
+    saved_args = _get_config("comfyui_args", "")
+    if not saved_args:
+        saved_args = "--listen 0.0.0.0 --port 8188"
+
+    py = _detect_python()
+    try:
+        cmd = (
+            f'cd {comfy_dir} && pm2 start {py} --name comfy '
+            f'--interpreter none --log /workspace/comfy.log --time '
+            f'--restart-delay 3000 --max-restarts 10 '
+            f'-- main.py {saved_args}'
+        )
+        subprocess.run(cmd, shell=True, timeout=30)
+        subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5)
+        log.info(f"ComfyUI 已自动恢复 (args: {saved_args})")
+    except Exception as e:
+        log.warning(f"ComfyUI 自动恢复失败: {e}")
+
+
 def main():
     """入口函数 — 启动 Flask 应用"""
     app = create_app()
@@ -78,6 +134,9 @@ def main():
 
     # 恢复 SSH 配置
     restore_ssh_config()
+
+    # 恢复 ComfyUI (如果 setup 已完成、ComfyUI 已安装、但进程未运行)
+    _restore_comfyui(app.logger)
 
     # 恢复公共 Tunnel (如果之前是公共模式, 恢复状态而非重新注册)
     if cfg.get_config("tunnel_mode") == "public":

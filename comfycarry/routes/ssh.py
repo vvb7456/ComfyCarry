@@ -43,25 +43,41 @@ def restore_ssh_config():
     saved_keys = _get_config("ssh_keys", [])
     if saved_keys and isinstance(saved_keys, list):
         os.makedirs(os.path.dirname(AUTHORIZED_KEYS_FILE), exist_ok=True)
-        # 合并: 保留已有 key + 添加新 key
-        existing = set()
+        # 加载已有 key (用 raw 字符串去重)
+        existing_raw = set()
         try:
             with open(AUTHORIZED_KEYS_FILE, "r") as f:
-                existing = {l.strip() for l in f if l.strip() and not l.startswith("#")}
+                existing_raw = {l.strip() for l in f if l.strip() and not l.startswith("#")}
         except FileNotFoundError:
             pass
 
+        # 只恢复有效且不重复的 key
         added = 0
-        with open(AUTHORIZED_KEYS_FILE, "a") as f:
-            for key in saved_keys:
-                key = key.strip()
-                if key and key not in existing:
-                    f.write(key + "\n")
-                    existing.add(key)
-                    added += 1
-        if added:
+        new_lines = []
+        for key in saved_keys:
+            key = key.strip()
+            if not key or key in existing_raw:
+                continue
+            parsed = _parse_key_line(key, strict=True)
+            if not parsed:
+                log.warning(f"SSH: 跳过无效配置 key: {key[:50]}")
+                continue
+            new_lines.append(key)
+            existing_raw.add(key)
+            added += 1
+
+        if new_lines:
+            with open(AUTHORIZED_KEYS_FILE, "a") as f:
+                for line in new_lines:
+                    f.write(line + "\n")
             os.chmod(AUTHORIZED_KEYS_FILE, 0o600)
             log.info(f"SSH: 从配置恢复 {added} 个公钥")
+
+        # 清理 .dashboard_env 中的无效 key
+        valid_saved = [k for k in saved_keys if _parse_key_line(k.strip(), strict=True)]
+        if len(valid_saved) < len(saved_keys):
+            _set_config("ssh_keys", valid_saved)
+            log.info(f"SSH: 清理了 {len(saved_keys) - len(valid_saved)} 个无效配置 key")
 
     # ── 恢复密码 ──
     saved_pw = _get_config("ssh_password", "")
@@ -185,8 +201,13 @@ def _get_key_fingerprint(key_line):
     return ""
 
 
-def _parse_key_line(line):
-    """解析一行 authorized_keys, 返回 key 信息 dict 或 None"""
+def _parse_key_line(line, *, strict=False):
+    """解析一行 authorized_keys, 返回 key 信息 dict 或 None.
+
+    Args:
+        strict: True 时要求 ssh-keygen 能计算出有效 fingerprint,
+                否则返回 None (拒绝 base64 无效的 key).
+    """
     line = line.strip()
     if not line or line.startswith("#"):
         return None
@@ -201,6 +222,8 @@ def _parse_key_line(line):
         return None
     comment = parts[2] if len(parts) > 2 else ""
     fingerprint = _get_key_fingerprint(line)
+    if strict and not fingerprint:
+        return None
     return {
         "type": key_type,
         "fingerprint": fingerprint,
@@ -343,6 +366,7 @@ def ssh_keys_list():
             "fingerprint": k["fingerprint"],
             "comment": k["comment"],
             "source": k["source"],
+            "valid": bool(k["fingerprint"]),
         })
     return jsonify({"keys": safe_keys})
 
@@ -364,9 +388,9 @@ def ssh_keys_add():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        parsed = _parse_key_line(line)
+        parsed = _parse_key_line(line, strict=True)
         if not parsed:
-            errors.append(f"无效的公钥格式: {line[:40]}...")
+            errors.append(f"无效的公钥: {line[:50]}...")
             continue
         if parsed["fingerprint"] in existing_fps:
             errors.append(f"已存在: {parsed['fingerprint']}")

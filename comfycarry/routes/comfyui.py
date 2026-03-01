@@ -21,7 +21,7 @@ import subprocess
 import requests
 from flask import Blueprint, Response, jsonify, request
 
-from ..config import COMFYUI_URL, COMFYUI_DIR
+from ..config import COMFYUI_URL, COMFYUI_DIR, _set_config
 from ..services.comfyui_params import (
     COMFYUI_PARAM_GROUPS,
     parse_comfyui_args,
@@ -143,6 +143,10 @@ def api_comfyui_params_update():
         )
         subprocess.run(cmd, shell=True, timeout=30, check=True)
         subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5)
+
+        # 持久化到 .dashboard_env (容器重启后可恢复)
+        _set_config("comfyui_args", args_str)
+
         return jsonify({"ok": True, "args": args_str})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
