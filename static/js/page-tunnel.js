@@ -3,7 +3,7 @@
  * Tunnel 页面: 公共节点 + 自定义 Tunnel 双模式
  */
 
-import { registerPage, createTabSwitcher, createAutoRefresh, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch } from './core.js';
+import { registerPage, createTabSwitcher, createAutoRefresh, showToast, escHtml, renderEmpty, renderError, msIcon, apiFetch, renderSkeleton } from './core.js';
 import { createLogStream } from './sse-log.js';
 
 let _lastData = null;
@@ -15,6 +15,19 @@ let _tunnelLogStream = null;
 
 // 自动刷新
 const _refresh = createAutoRefresh(() => loadTunnelPage(), 10000);
+
+// ── 按钮 loading 状态工具 ──
+function _btnLoading(btn, text) {
+  if (!btn) return () => {};
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = text || '处理中...';
+  return () => { btn.disabled = false; btn.textContent = orig; };
+}
+function _headerBtnsDisable(disable) {
+  const el = document.getElementById('tunnel-header-controls');
+  if (el) el.querySelectorAll('button').forEach(b => b.disabled = disable);
+}
 
 registerPage('tunnel', {
   enter() {
@@ -47,6 +60,13 @@ async function loadTunnelPage() {
   const setupHint = document.getElementById('tunnel-setup-hint');
   const statusEl = document.getElementById('tunnel-status-info');
   const servicesEl = document.getElementById('tunnel-services');
+
+  // 首次加载显示骨架屏
+  if (servicesEl && !_lastData && !servicesEl.querySelector('.skeleton')) {
+    statusSection.style.display = '';
+    setupHint.style.display = 'none';
+    servicesEl.innerHTML = `<div class="tunnel-services">${'<div class="skeleton skeleton-card" style="height:80px"></div>'.repeat(4)}</div>`;
+  }
 
   try {
     const r = await fetch('/api/tunnel/status');
@@ -407,6 +427,11 @@ function _updateModeUI() {
 async function _tunnelSave() {
   const protocol = document.getElementById('tunnel-cfg-protocol')?.value || 'auto';
   const isPublic = _selectedMode === 'public';
+
+  const submitBtn = document.getElementById('tunnel-cfg-submit');
+  const restore = _btnLoading(submitBtn, '保存中...');
+
+  try {
   const isPublicActive = _lastData?.tunnel_mode === 'public';
   const isCustomConfigured = !!_lastData?.configured;
 
@@ -432,7 +457,7 @@ async function _tunnelSave() {
       if (!confirm('将销毁当前自定义 Tunnel 并切换到公共模式，确定？')) return;
       await apiFetch('/api/tunnel/teardown', { method: 'POST' });
     }
-    _tunnelPublicEnable();
+    await _tunnelPublicEnable();
   } else {
     // 自定义模式
     const token = document.getElementById('tunnel-cfg-token').value.trim();
@@ -468,6 +493,7 @@ async function _tunnelSave() {
       showToast(d.error || '保存失败');
     }
   }
+  } finally { restore(); }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -476,7 +502,9 @@ async function _tunnelSave() {
 
 async function _tunnelPublicEnable() {
   showToast('正在启用公共节点...');
+  _headerBtnsDisable(true);
   const d = await apiFetch('/api/tunnel/public/enable', { method: 'POST' });
+  _headerBtnsDisable(false);
   if (!d) return;
   if (d.ok) {
     showToast('公共节点已启用！');
@@ -492,7 +520,9 @@ async function _tunnelPublicEnable() {
 async function _tunnelPublicDisable() {
   if (!confirm('确定停用公共节点？Tunnel 将被删除，所有公网链接将失效。')) return;
 
+  _headerBtnsDisable(true);
   const d = await apiFetch('/api/tunnel/public/disable', { method: 'POST' });
+  _headerBtnsDisable(false);
   if (!d) return;
   if (d.ok) {
     showToast('公共节点已停用');
@@ -537,6 +567,11 @@ async function _tunnelCfgValidate() {
   resultEl.style.color = 'var(--t2)';
   resultEl.innerHTML = `${msIcon('hourglass_top')} 验证中...`;
 
+  // 找到验证按钮并禁用
+  const vBtn = resultEl.closest('.form-group')?.querySelector('button') ||
+               document.querySelector('[onclick*="tunnelCfgValidate"]');
+  if (vBtn) vBtn.disabled = true;
+
   try {
     const r = await fetch('/api/tunnel/validate', {
       method: 'POST',
@@ -554,6 +589,8 @@ async function _tunnelCfgValidate() {
   } catch (e) {
     resultEl.style.color = 'var(--red)';
     resultEl.innerHTML = `${msIcon('cancel')} 验证请求失败`;
+  } finally {
+    if (vBtn) vBtn.disabled = false;
   }
 }
 
@@ -563,7 +600,9 @@ async function _tunnelCfgValidate() {
 
 async function _tunnelTeardown() {
   if (!confirm('确定移除 Cloudflare Tunnel？将删除 Tunnel、DNS 记录，并停止 cloudflared。')) return;
+  _headerBtnsDisable(true);
   const d = await apiFetch('/api/tunnel/teardown', { method: 'POST' });
+  _headerBtnsDisable(false);
   if (!d) return;
   if (d.ok) {
     showToast('Tunnel 已移除');
@@ -574,7 +613,9 @@ async function _tunnelTeardown() {
 }
 
 async function _tunnelStop() {
+  _headerBtnsDisable(true);
   const d = await apiFetch('/api/tunnel/stop', { method: 'POST' });
+  _headerBtnsDisable(false);
   if (!d) return;
   if (d.ok) {
     showToast('cloudflared 已停止');
@@ -585,7 +626,9 @@ async function _tunnelStop() {
 }
 
 async function _tunnelStart() {
+  _headerBtnsDisable(true);
   const d = await apiFetch('/api/tunnel/start', { method: 'POST' });
+  _headerBtnsDisable(false);
   if (!d) return;
   if (d.ok) {
     showToast('cloudflared 正在启动...');
@@ -596,7 +639,9 @@ async function _tunnelStart() {
 }
 
 async function _tunnelRestart() {
+  _headerBtnsDisable(true);
   const d = await apiFetch('/api/tunnel/restart', { method: 'POST' });
+  _headerBtnsDisable(false);
   if (!d) return;
   showToast('cloudflared 正在重启...');
   setTimeout(loadTunnelPage, 3000);

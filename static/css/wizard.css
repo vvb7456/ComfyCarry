@@ -33,6 +33,13 @@
             background: transparent
         }
 
+        /* Hide native browser password reveal button */
+        input::-ms-reveal,
+        input::-ms-clear,
+        input::-webkit-credentials-auto-fill-button {
+            display: none
+        }
+
         ::-webkit-scrollbar-thumb {
             background: var(--bd);
             border-radius: 3px
@@ -440,10 +447,12 @@
             cursor: pointer;
             font-size: 1.1rem;
             padding: 4px;
+            opacity: .5
         }
 
         .pw-toggle:hover {
             color: var(--t1);
+            opacity: 1
         }
 
         .pw-mismatch {

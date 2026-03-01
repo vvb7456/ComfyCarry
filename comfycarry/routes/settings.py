@@ -46,7 +46,6 @@ def api_settings_get():
                             else "***"),
         "civitai_key": civitai_key,
         "civitai_key_set": bool(civitai_key),
-        "debug": _get_config("debug", False),
         "api_key": cfg.API_KEY,
         "comfyui_dir": cfg.COMFYUI_DIR,
         "comfyui_url": cfg.COMFYUI_URL,
@@ -78,14 +77,6 @@ def api_settings_restart():
         subprocess.run("pm2 restart dashboard", shell=True, timeout=15)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True, "message": "ComfyCarry 正在重启..."})
-
-
-@bp.route("/api/settings/debug", methods=["POST"])
-def api_settings_debug_set():
-    data = request.get_json(force=True) or {}
-    enabled = bool(data.get("enabled", False))
-    _set_config("debug", enabled)
-    return jsonify({"ok": True, "debug": enabled})
 
 
 @bp.route("/api/settings/api-key", methods=["POST"])
@@ -124,6 +115,7 @@ def api_settings_export_config():
     config["install_fa2"] = state.get("install_fa2", False)
     config["install_sa2"] = state.get("install_sa2", False)
     config["download_aura_model"] = state.get("download_aura_model", True)
+    config["download_sam_model"] = state.get("download_sam_model", True)
 
     rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
     if rclone_conf.exists():
@@ -164,8 +156,6 @@ def api_settings_export_config():
     except Exception:
         pass
 
-    config["debug"] = _get_config("debug", False)
-
     # Tunnel v2 配置
     config["cf_api_token"] = _get_config("cf_api_token", "")
     config["cf_domain"] = _get_config("cf_domain", "")
@@ -198,10 +188,14 @@ def api_settings_export_config():
     ssh_password = _get_config("ssh_password", "")
     if ssh_password:
         config["ssh_password"] = ssh_password
+    ssh_pw_sync = _get_config("ssh_pw_sync", False)
+    if ssh_pw_sync:
+        config["ssh_pw_sync"] = ssh_pw_sync
 
-    # 加速组件安装状态 (信息参考)
-    config["installed_fa2"] = _get_config("installed_fa2", False)
-    config["installed_sa2"] = _get_config("installed_sa2", False)
+    # Tunnel 协议
+    cf_protocol = _get_config("cf_protocol", "")
+    if cf_protocol:
+        config["cf_protocol"] = cf_protocol
 
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
@@ -266,10 +260,6 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"同步设置: {e}")
 
-    if "debug" in data:
-        _set_config("debug", bool(data["debug"]))
-        applied.append("Debug 模式")
-
     # Tunnel v2 配置
     if data.get("cf_api_token"):
         _set_config("cf_api_token", data["cf_api_token"])
@@ -281,6 +271,8 @@ def api_settings_import_config():
         applied.append("Tunnel 自定义服务")
     if data.get("cf_suffix_overrides"):
         _set_config("cf_suffix_overrides", json.dumps(data["cf_suffix_overrides"]))
+    if data.get("cf_protocol"):
+        _set_config("cf_protocol", data["cf_protocol"])
 
     # API Key
     if data.get("api_key"):
@@ -300,6 +292,8 @@ def api_settings_import_config():
     if data.get("ssh_password"):
         _set_config("ssh_password", data["ssh_password"])
         applied.append("SSH 密码")
+    if "ssh_pw_sync" in data:
+        _set_config("ssh_pw_sync", data["ssh_pw_sync"])
 
     try:
         state = _load_setup_state()

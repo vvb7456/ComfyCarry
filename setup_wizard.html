@@ -92,7 +92,7 @@
                 <div class="pw-wrap">
                     <input type="password" id="input-password" placeholder="输入 ComfyCarry 访问密码...">
                     <button type="button" class="pw-toggle" onclick="togglePw('input-password', this)"
-                        title="显示/隐藏密码"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                        title="显示/隐藏密码"><span class="ms ms-sm">visibility</span></button>
                 </div>
             </div>
             <div class="form-group">
@@ -100,7 +100,7 @@
                 <div class="pw-wrap">
                     <input type="password" id="input-password-confirm" placeholder="再次输入密码...">
                     <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)"
-                        title="显示/隐藏密码"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
+                        title="显示/隐藏密码"><span class="ms ms-sm">visibility</span></button>
                 </div>
                 <div class="pw-mismatch" id="pw-mismatch-hint"><span class="ms ms-xs"
                         style="color:var(--amber)">warning</span> 两次输入的密码不一致</div>
@@ -1662,6 +1662,11 @@
                 if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
                 if (config.download_aura_model !== undefined) wizardConfig.download_aura_model = config.download_aura_model;
                 if (config.download_sam_model !== undefined) wizardConfig.download_sam_model = config.download_sam_model;
+                if (config.tunnel_mode) wizardConfig.tunnel_mode = config.tunnel_mode;
+                if (config.ssh_password) wizardConfig.ssh_password = config.ssh_password;
+                if (config.ssh_keys) wizardConfig.ssh_keys = config.ssh_keys;
+                if (config.ssh_pw_sync !== undefined) wizardConfig.ssh_pw_sync = config.ssh_pw_sync;
+                if (config.cf_protocol) wizardConfig.cf_protocol = config.cf_protocol;
 
                 showImportResult(
                     `${msIcon('check_circle', 'ms-xs')} 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,

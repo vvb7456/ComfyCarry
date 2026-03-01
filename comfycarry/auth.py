@@ -54,6 +54,7 @@ body{font-family:'IBM Plex Sans','IBM Plex Sans SC',-apple-system,sans-serif;bac
 .err{color:#f87171;font-size:clamp(.8rem,.85vw,.92rem);text-align:center;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:4px}
 .err:empty{display:none}
 .err .ms{font-size:16px;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 16}
+input::-ms-reveal,input::-ms-clear,input::-webkit-credentials-auto-fill-button{display:none}
 </style></head>
 <body>
 <div class="bg"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
