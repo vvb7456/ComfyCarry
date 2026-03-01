@@ -207,7 +207,7 @@ def api_settings_export_config():
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
         headers={
-            "Content-Disposition": "attachment; filename=comfyui-config.json",
+            "Content-Disposition": "attachment; filename=comfycarry-config.json",
             "Cache-Control": "no-cache"
         }
     )

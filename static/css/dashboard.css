@@ -130,6 +130,10 @@
             flex: 1;
             padding-right: 60px;
         }
+        /* 只有 toggle 无 copy 时减少右 padding */
+        .input-secret:not(:has(.input-secret-copy)) input {
+            padding-right: 32px;
+        }
         .input-secret-toggle,
         .input-secret-copy {
             position: absolute;
@@ -139,11 +143,14 @@
             cursor: pointer;
             padding: 4px;
             line-height: 1;
+            opacity: .5;
         }
         .input-secret-toggle { right: 28px; }
         .input-secret-copy { right: 4px; }
+        /* 只有 toggle 无 copy 时靠右 */
+        .input-secret:not(:has(.input-secret-copy)) .input-secret-toggle { right: 4px; }
         .input-secret-toggle:hover,
-        .input-secret-copy:hover { color: var(--t1); }
+        .input-secret-copy:hover { color: var(--t1); opacity: 1; }
 
         /* ── Status Dot ── */
         .status-dot {
@@ -160,7 +167,7 @@
 
         /* Sidebar */
         .sidebar {
-            width: clamp(220px, 16vw, 300px);
+            width: clamp(200px, 14vw, 260px);
             background: var(--bg2);
             border-right: 1px solid var(--bd);
             display: flex;
@@ -178,14 +185,23 @@
         }
 
         .sidebar-logo {
-            padding: 0 20px;
-            min-height: 76px;
+            padding: 0 16px;
+            min-height: 64px;
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;
             gap: 10px;
             white-space: nowrap;
             overflow: hidden
+        }
+
+        .sidebar-logo .logo-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            flex-shrink: 0;
+            transition: width .25s, height .25s;
+            display: none
         }
 
         .sidebar-logo .logo-text {
@@ -198,28 +214,19 @@
             color: transparent
         }
 
-        .sidebar-logo .logo-cc {
-            display: none;
-            font-size: 1rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #7c5cfc, #e879f9);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -1px
-        }
-
         .sidebar.collapsed .sidebar-logo {
             padding: 20px 12px;
             justify-content: center
         }
 
-        .sidebar.collapsed .sidebar-logo .logo-text {
-            display: none
+        .sidebar.collapsed .sidebar-logo .logo-icon {
+            display: block;
+            width: 30px;
+            height: 30px
         }
 
-        .sidebar.collapsed .sidebar-logo .logo-cc {
-            display: block
+        .sidebar.collapsed .sidebar-logo .logo-text {
+            display: none
         }
 
         .sidebar-logo small {
@@ -348,7 +355,7 @@
 
         /* Content */
         .content {
-            margin-left: clamp(220px, 16vw, 300px);
+            margin-left: clamp(200px, 14vw, 260px);
             flex: 1;
             height: 100vh;
             overflow-y: auto;
@@ -361,7 +368,7 @@
 
         .page-header {
             padding: 0 clamp(28px, 2.5vw, 42px);
-            min-height: 76px;
+            min-height: 64px;
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;

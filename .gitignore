@@ -50,4 +50,4 @@ __pycache__/
 *.bak
 cloudflared
 docs/
-comfyui-config-test.json
+comfycarry-config-test.json

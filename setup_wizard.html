@@ -6,12 +6,13 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ComfyCarry - 部署向导</title>
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
     <link
         href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/css/wizard.css">
     <script>
-        (function() {
+        (function () {
             var iconMap = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
             function getTheme() { return localStorage.getItem('theme') || 'system'; }
             function applyTheme(pref) {
@@ -21,10 +22,10 @@
                 if (ico) ico.textContent = iconMap[pref] || 'contrast';
             }
             applyTheme(getTheme());
-            matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
                 if (getTheme() === 'system') applyTheme(getTheme());
             });
-            window.cycleTheme = function() {
+            window.cycleTheme = function () {
                 var order = ['dark', 'light', 'system'];
                 var cur = getTheme();
                 var next = order[(order.indexOf(cur) + 1) % order.length];
@@ -36,7 +37,8 @@
 </head>
 
 <body>
-    <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()" title="切换主题"><span class="ms" id="theme-toggle-icon">contrast</span></button>
+    <button class="theme-toggle" id="theme-toggle" onclick="cycleTheme()" title="切换主题"><span class="ms"
+            id="theme-toggle-icon">contrast</span></button>
     <div class="wizard-container">
         <div class="wizard-header">
             <h1>ComfyCarry 部署向导</h1>
@@ -60,13 +62,14 @@
                 <div class="choice-card" onclick="selectMode('import')" id="choice-import">
                     <h3><span class="ms ms-sm" style="color:#a78bfa">inventory_2</span> 恢复设置</h3>
                     <p>从之前导出的配置文件恢复所有设置，快速重建工作环境</p>
-                    <p style="color:var(--t3);font-size:.72rem;margin-top:6px"><span class="ms ms-xs" style="color:#fb923c">timer</span> 跳过手动配置</p>
+                    <p style="color:var(--t3);font-size:.72rem;margin-top:6px"><span class="ms ms-xs"
+                            style="color:#fb923c">timer</span> 跳过手动配置</p>
                 </div>
             </div>
             <!-- 导入文件上传区域 (选择恢复设置时显示) -->
             <div id="import-upload-area" style="display:none;margin-bottom:24px">
                 <div class="import-upload-box">
-                    <p>上传之前导出的 <code>comfyui-config.json</code> 文件</p>
+                    <p>上传之前导出的 <code>comfycarry-config.json</code> 配置文件</p>
                     <label class="btn btn-primary" style="cursor:pointer;display:inline-block">
                         <span class="ms ms-sm" style="color:#fbbf24">folder_open</span> 选择文件
                         <input type="file" accept=".json" onchange="handleImportFile(event)" style="display:none">
@@ -99,7 +102,8 @@
                     <button type="button" class="pw-toggle" onclick="togglePw('input-password-confirm', this)"
                         title="显示/隐藏密码"><span class="ms ms-sm" style="color:#60a5fa">visibility</span></button>
                 </div>
-                <div class="pw-mismatch" id="pw-mismatch-hint"><span class="ms ms-xs" style="color:var(--amber)">warning</span> 两次输入的密码不一致</div>
+                <div class="pw-mismatch" id="pw-mismatch-hint"><span class="ms ms-xs"
+                        style="color:var(--amber)">warning</span> 两次输入的密码不一致</div>
             </div>
 
             <!-- SSH 选项 -->
@@ -110,14 +114,19 @@
                     <span style="font-size:.72rem;color:var(--t3)">(用于 <code>ssh root@host</code> 登录)</span>
                 </label>
                 <div style="margin-top:12px">
-                    <div onclick="toggleSSHKeysArea()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--t2);user-select:none">
-                        <span id="ssh-keys-toggle-icon" class="ms" style="font-size:14px;transition:transform .2s;color:#94a3b8">chevron_right</span>
+                    <div onclick="toggleSSHKeysArea()"
+                        style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:.88rem;color:var(--t2);user-select:none">
+                        <span id="ssh-keys-toggle-icon" class="ms"
+                            style="font-size:14px;transition:transform .2s;color:#94a3b8">chevron_right</span>
                         <span>SSH 公钥</span>
                         <span style="font-size:.72rem;color:var(--t3)">(可选)</span>
                     </div>
                     <div id="wizard-ssh-keys-area" style="display:none;margin-top:8px">
-                        <textarea id="input-ssh-keys" rows="3" placeholder="ssh-ed25519 AAAA... your-key&#10;ssh-rsa AAAA... another-key" style="font-family:monospace;font-size:.82rem;resize:vertical;width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:10px;padding:10px 14px"></textarea>
-                        <div class="form-hint">每行一个，支持 ed25519 / rsa / ecdsa。粘贴 <code>~/.ssh/id_ed25519.pub</code> 的内容</div>
+                        <textarea id="input-ssh-keys" rows="3"
+                            placeholder="ssh-ed25519 AAAA... your-key&#10;ssh-rsa AAAA... another-key"
+                            style="font-family:monospace;font-size:.82rem;resize:vertical;width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);border-radius:10px;padding:10px 14px"></textarea>
+                        <div class="form-hint">每行一个，支持 ed25519 / rsa / ecdsa。粘贴 <code>~/.ssh/id_ed25519.pub</code> 的内容
+                        </div>
                     </div>
                 </div>
             </div>
@@ -136,21 +145,27 @@
 
             <!-- Tunnel 模式选择 -->
             <div class="choice-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-                <div class="choice-card" id="wizard-tunnel-public" onclick="selectWizardTunnelMode('public')" style="cursor:pointer;text-align:left">
+                <div class="choice-card" id="wizard-tunnel-public" onclick="selectWizardTunnelMode('public')"
+                    style="cursor:pointer;text-align:left">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                         <span class="ms" style="font-size:1.2rem;color:#34d399">public</span>
                         <strong>公共节点</strong>
-                        <span style="font-size:.65rem;background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
+                        <span
+                            style="font-size:.65rem;background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
                     </div>
-                    <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">一键启用，无需域名或 CF 账号。通过 ComfyCarry 共享节点获得公网访问。</p>
-                    <div id="wizard-tunnel-capacity" style="font-size:.72rem;color:var(--t3);margin-top:6px">容量加载中...</div>
+                    <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">一键启用，无需域名或 CF 账号。通过 ComfyCarry
+                        共享节点获得公网访问。</p>
+                    <div id="wizard-tunnel-capacity" style="font-size:.72rem;color:var(--t3);margin-top:6px">容量加载中...
+                    </div>
                 </div>
-                <div class="choice-card" id="wizard-tunnel-custom" onclick="selectWizardTunnelMode('custom')" style="cursor:pointer;text-align:left">
+                <div class="choice-card" id="wizard-tunnel-custom" onclick="selectWizardTunnelMode('custom')"
+                    style="cursor:pointer;text-align:left">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                         <span class="ms" style="font-size:1.2rem;color:#fb923c">build</span>
                         <strong>自定义 Tunnel</strong>
                     </div>
-                    <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">使用自己的 Cloudflare 账号和域名，完全自主控制。</p>
+                    <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">使用自己的 Cloudflare 账号和域名，完全自主控制。
+                    </p>
                     <div style="font-size:.72rem;color:var(--t3);margin-top:6px">需要 CF API Token + 域名</div>
                 </div>
             </div>
@@ -175,7 +190,8 @@
                 </div>
                 <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
                     <button class="btn btn-secondary" onclick="validateCfToken()"
-                        style="padding:8px 16px;font-size:.88rem;flex-shrink:0"><span class="ms ms-sm" style="color:#60a5fa">search</span> 验证 Token</button>
+                        style="padding:8px 16px;font-size:.88rem;flex-shrink:0"><span class="ms ms-sm"
+                            style="color:#60a5fa">search</span> 验证 Token</button>
                     <span id="cf-validate-inline" style="font-size:.85rem;display:none"></span>
                 </div>
             </div>
@@ -195,7 +211,8 @@
 
             <div
                 style="margin:12px 0;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;font-size:.85rem;color:var(--t2)">
-                <span class="ms ms-xs" style="color:#fbbf24">lightbulb</span> 还没有 rclone 配置？<a href="/api/setup/rclone-bundle"
+                <span class="ms ms-xs" style="color:#fbbf24">lightbulb</span> 还没有 rclone 配置？<a
+                    href="/api/setup/rclone-bundle"
                     style="color:var(--ac);text-decoration:underline;font-weight:600">下载配置助手 (Windows)</a> — 解压后双击 bat
                 脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 。
             </div>
@@ -252,13 +269,15 @@
 
             <!-- Detected remotes preview -->
             <div id="wizard-remotes-section" style="display:none;margin-bottom:20px">
-                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm" style="color:#34d399">settings_input_antenna</span> 已检测到的 Remote</label>
+                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm"
+                        style="color:#34d399">settings_input_antenna</span> 已检测到的 Remote</label>
                 <div id="wizard-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
             </div>
 
             <!-- Manually added remotes -->
             <div id="wizard-manual-remotes" style="display:none;margin-bottom:20px">
-                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm" style="color:#fb923c">build</span> 手动添加的 Remote</label>
+                <label style="font-size:.92rem;font-weight:600;margin-bottom:8px;display:block"><span class="ms ms-sm"
+                        style="color:#fb923c">build</span> 手动添加的 Remote</label>
                 <div id="wizard-manual-remotes-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
                 </div>
             </div>
@@ -286,14 +305,17 @@
 
             <!-- Pull rules -->
             <div class="wz-rule-panel">
-                <h4><span class="ms ms-sm" style="color:#60a5fa">cloud_download</span> 部署拉取 <span class="comfy-param-help-icon"
+                <h4><span class="ms ms-sm" style="color:#60a5fa">cloud_download</span> 部署拉取 <span
+                        class="comfy-param-help-icon"
                         data-tip="部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。">?</span></h4>
                 <div class="wz-rule-row" id="wz-pull-rules"></div>
             </div>
 
             <!-- Push rules -->
             <div class="wz-rule-panel">
-                <h4><span class="ms ms-sm" style="color:#34d399">cloud_upload</span> 自动推送 <span class="comfy-param-help-icon" data-tip="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
+                <h4><span class="ms ms-sm" style="color:#34d399">cloud_upload</span> 自动推送 <span
+                        class="comfy-param-help-icon"
+                        data-tip="运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。">?</span>
                 </h4>
                 <div class="wz-rule-row" id="wz-push-rules"></div>
             </div>
@@ -375,13 +397,15 @@
             <div id="deploy-summary"></div>
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="prevStep()">返回修改</button>
-                <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy"><span class="ms ms-sm" style="color:#f472b6">rocket_launch</span> 开始部署</button>
+                <button class="btn btn-primary btn-lg" onclick="startDeploy()" id="btn-deploy"><span class="ms ms-sm"
+                        style="color:#f472b6">rocket_launch</span> 开始部署</button>
             </div>
         </div>
 
         <!-- Deploy Progress View -->
         <div class="deploy-view" id="deploy-view">
-            <div class="step-title" id="deploy-title"><span class="ms ms-sm" style="color:#94a3b8">settings</span> 正在部署...</div>
+            <div class="step-title" id="deploy-title"><span class="ms ms-sm" style="color:#94a3b8">settings</span>
+                正在部署...</div>
             <div class="step-desc" id="deploy-elapsed">已用时: 0 秒</div>
             <div class="deploy-content">
                 <div class="deploy-steps-list" id="deploy-steps-list"></div>
@@ -393,14 +417,18 @@
             </div>
             <!-- 成功按钮 -->
             <div class="btn-row" id="deploy-done-row" style="display:none;margin-top:16px">
-                <button class="btn btn-secondary" id="deploy-done-retry" style="display:none" onclick="retryDeploy()"><span class="ms ms-sm" style="color:#34d399">refresh</span>
+                <button class="btn btn-secondary" id="deploy-done-retry" style="display:none"
+                    onclick="retryDeploy()"><span class="ms ms-sm" style="color:#34d399">refresh</span>
                     重试部署</button>
-                <button class="btn btn-primary btn-lg" onclick="location.reload()"><span class="ms ms-sm" style="color:#fbbf24">celebration</span> 进入 ComfyCarry</button>
+                <button class="btn btn-primary btn-lg" onclick="location.reload()"><span class="ms ms-sm"
+                        style="color:#fbbf24">celebration</span> 进入 ComfyCarry</button>
             </div>
             <!-- 失败按钮 -->
             <div class="btn-row" id="deploy-fail-row" style="display:none;margin-top:16px">
-                <button class="btn btn-secondary" onclick="backToWizard()"><span class="ms ms-sm" style="color:#94a3b8">arrow_back</span> 返回修改配置</button>
-                <button class="btn btn-primary btn-lg" onclick="retryDeploy()"><span class="ms ms-sm" style="color:#34d399">refresh</span> 重试部署</button>
+                <button class="btn btn-secondary" onclick="backToWizard()"><span class="ms ms-sm"
+                        style="color:#94a3b8">arrow_back</span> 返回修改配置</button>
+                <button class="btn btn-primary btn-lg" onclick="retryDeploy()"><span class="ms ms-sm"
+                        style="color:#34d399">refresh</span> 重试部署</button>
             </div>
         </div>
     </div>
@@ -479,7 +507,7 @@
                     const archColor = gpuTooOld ? 'color:var(--red)' : '';
                     cardHtml += `<div class="env-row">
                 <span class="env-label">GPU</span>
-                <span class="env-value">${msIcon('monitor','ms-xs')} ${esc(g.name)}</span>
+                <span class="env-value">${msIcon('monitor', 'ms-xs')} ${esc(g.name)}</span>
                 <span class="env-label" style="margin-left:auto;${archColor}">${smArch} · ${g.vram_gb} GB VRAM</span>
             </div>`;
                 } else {
@@ -500,13 +528,13 @@
                     cardHtml += `<hr class="env-divider">`;
                     cardHtml += `<div class="env-row">
                 <span class="env-label">镜像</span>
-                <span class="env-value" style="color:var(--green)">${msIcon('bolt','ms-xs')} 预构建镜像${ver}</span>
+                <span class="env-value" style="color:var(--green)">${msIcon('bolt', 'ms-xs')} 预构建镜像${ver}</span>
             </div>`;
                     if (prebuiltInfo) {
                         const tags = [];
                         if (prebuiltInfo.torch) tags.push(`PyTorch ${prebuiltInfo.torch}`);
                         if (prebuiltInfo.cuda_toolkit) tags.push(`CUDA ${prebuiltInfo.cuda_toolkit}`);
-                        if (prebuiltInfo.fa2) tags.push({ text: 'FA2 ' + msIcon('check','ms-xs'), green: true });
+                        if (prebuiltInfo.fa2) tags.push({ text: 'FA2 ' + msIcon('check', 'ms-xs'), green: true });
                         if (prebuiltInfo.build_date) tags.push(prebuiltInfo.build_date.slice(0, 10));
                         if (tags.length) {
                             cardHtml += `<div class="env-tags" style="margin-left:68px">`;
@@ -537,31 +565,31 @@
                 const descEl = document.getElementById('step-0-desc');
                 const timeEl = document.getElementById('fresh-time');
                 if (!isUnsupported) {
-                    descEl.innerHTML = msIcon('check_circle','ms-xs') + ' 环境检测通过';
+                    descEl.innerHTML = msIcon('check_circle', 'ms-xs') + ' 环境检测通过';
                     descEl.style.color = 'var(--green)';
-                    timeEl.innerHTML = msIcon('timer','ms-xs') + ' 预计 2-5 分钟';
+                    timeEl.innerHTML = msIcon('timer', 'ms-xs') + ' 预计 2-5 分钟';
                 } else {
-                    descEl.innerHTML = msIcon('cancel','ms-xs') + ' 环境检测失败';
+                    descEl.innerHTML = msIcon('cancel', 'ms-xs') + ' 环境检测失败';
                     descEl.style.color = 'var(--red)';
                     timeEl.textContent = '';
                     if (detectedImageType === 'unsupported-gpu') {
                         // GPU 算力过低 — 保留 GPU 行 + 追加警告
                         cardHtml += `<hr class="env-divider">`;
                         cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
-                    ${msIcon('warning','ms-xs')} <b>GPU 算力不足</b> — FlashAttention 2 需要 Ampere (sm_80) 及以上架构。<br>
+                    ${msIcon('warning', 'ms-xs')} <b>GPU 算力不足</b> — FlashAttention 2 需要 Ampere (sm_80) 及以上架构。<br>
                     请选择配备 RTX 30xx / A100 / RTX 40xx 及以上 GPU 的实例。
                 </div>`;
                         envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
                     } else if (detectedImageType === 'no-gpu') {
                         cardHtml += `<hr class="env-divider">`;
                         cardHtml += `<div style="color:var(--red);font-size:.88rem;line-height:1.6">
-                    ${msIcon('warning','ms-xs')} <b>未检测到 CUDA GPU</b> — ComfyUI 需要 NVIDIA GPU 运行。<br>
+                    ${msIcon('warning', 'ms-xs')} <b>未检测到 CUDA GPU</b> — ComfyUI 需要 NVIDIA GPU 运行。<br>
                     请在 GPU 实例上部署，或检查 CUDA 驱动是否正确安装。
                 </div>`;
                         envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">${cardHtml}</div>`;
                     } else {
                         envEl.innerHTML = `<div class="env-card" style="border-color:var(--red)">
-                    <div style="color:var(--red);font-weight:600;margin-bottom:8px">${msIcon('warning','ms-xs')} 不支持的运行环境</div>
+                    <div style="color:var(--red);font-weight:600;margin-bottom:8px">${msIcon('warning', 'ms-xs')} 不支持的运行环境</div>
                     <div style="color:var(--t3);font-size:.88rem;line-height:1.6">
                         当前环境缺少必要的运行时组件。请使用 ComfyCarry 预构建镜像创建实例：<br>
                         <code style="color:var(--accent)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （预装 ComfyUI + 加速组件）
@@ -602,7 +630,7 @@
                     const summaryEl = document.getElementById('deploy-summary');
                     summaryEl.innerHTML = `
                 <div style="padding:12px 16px;background:rgba(255,80,80,0.12);border:1px solid var(--red);border-radius:8px;color:var(--red);margin-bottom:16px;">
-                    <strong>${msIcon('warning','ms-xs')} 上次部署未完成:</strong> ${esc(state.deploy_error)}<br>
+                    <strong>${msIcon('warning', 'ms-xs')} 上次部署未完成:</strong> ${esc(state.deploy_error)}<br>
                     <small>点击「重试部署」将自动跳过已完成的步骤。</small>
                 </div>` + summaryEl.innerHTML;
                 }
@@ -614,7 +642,7 @@
                     wizardConfig.password = envVars.password;
                     const hint = document.getElementById('password-env-hint');
                     hint.style.display = 'block';
-                    hint.innerHTML = msIcon('check_circle','ms-xs') + ' 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
+                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量 <code>DASHBOARD_PASSWORD</code> 检测到密码，可直接使用或修改';
                 }
                 // 密码输入监听 — 两个框都有内容且一致时才允许下一步
                 const _pwInputs = ['input-password', 'input-password-confirm'];
@@ -641,13 +669,13 @@
                     }
                     const hint = document.getElementById('cf-env-hint');
                     hint.style.display = 'block';
-                    hint.innerHTML = msIcon('check_circle','ms-xs') + ' 已从环境变量检测到 CF 配置';
+                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量检测到 CF 配置';
                 }
                 if (envVars.rclone_has_env) {
                     document.getElementById('rclone-card-env').style.display = '';
                     const hint = document.getElementById('rclone-env-hint');
                     hint.style.display = 'block';
-                    hint.innerHTML = msIcon('check_circle','ms-xs') + ' 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
+                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量 <code>RCLONE_CONF_BASE64</code> 检测到配置';
                     wizardConfig.rclone_config_method = 'base64_env';
                     selectRcloneMethod('base64_env');
                 }
@@ -656,7 +684,7 @@
                     wizardConfig.civitai_token = envVars.civitai_token;
                     const hint = document.getElementById('civitai-env-hint');
                     hint.style.display = 'block';
-                    hint.innerHTML = msIcon('check_circle','ms-xs') + ' 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
+                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量 <code>CIVITAI_TOKEN</code> 检测到 API Key';
                 }
 
                 // ── 从已保存的 state 中恢复字段 ──
@@ -712,8 +740,8 @@
 
         function togglePw(inputId, btn) {
             const inp = document.getElementById(inputId);
-            if (inp.type === 'password') { inp.type = 'text'; btn.innerHTML = msIcon('visibility_off','ms-sm'); }
-            else { inp.type = 'password'; btn.innerHTML = msIcon('visibility','ms-sm'); }
+            if (inp.type === 'password') { inp.type = 'text'; btn.innerHTML = msIcon('visibility_off', 'ms-sm'); }
+            else { inp.type = 'password'; btn.innerHTML = msIcon('visibility', 'ms-sm'); }
         }
 
         // ── Navigation ──
@@ -804,12 +832,12 @@
             if (!token || !domain) {
                 el.style.display = 'inline';
                 el.style.color = 'var(--red)';
-                el.innerHTML = msIcon('cancel','ms-xs') + ' 请填写 API Token 和域名';
+                el.innerHTML = msIcon('cancel', 'ms-xs') + ' 请填写 API Token 和域名';
                 return;
             }
             el.style.display = 'inline';
             el.style.color = 'var(--t2)';
-            el.innerHTML = msIcon('hourglass_top','ms-xs') + ' 验证中...';
+            el.innerHTML = msIcon('hourglass_top', 'ms-xs') + ' 验证中...';
             try {
                 const r = await fetch('/api/tunnel/validate', {
                     method: 'POST',
@@ -819,14 +847,14 @@
                 const d = await r.json();
                 if (d.ok) {
                     el.style.color = 'var(--green)';
-                    el.innerHTML = `${msIcon('check_circle','ms-xs')} ${esc(d.message)} · 账户: ${esc(d.account_name)}`;
+                    el.innerHTML = `${msIcon('check_circle', 'ms-xs')} ${esc(d.message)} · 账户: ${esc(d.account_name)}`;
                 } else {
                     el.style.color = 'var(--red)';
-                    el.innerHTML = `${msIcon('cancel','ms-xs')} ${esc(d.message || d.error || '验证失败')}`;
+                    el.innerHTML = `${msIcon('cancel', 'ms-xs')} ${esc(d.message || d.error || '验证失败')}`;
                 }
             } catch (e) {
                 el.style.color = 'var(--red)';
-                el.innerHTML = msIcon('cancel','ms-xs') + ' 验证请求失败: ' + esc(e.message);
+                el.innerHTML = msIcon('cancel', 'ms-xs') + ' 验证请求失败: ' + esc(e.message);
             }
         }
 
@@ -1043,7 +1071,7 @@
             const reader = new FileReader();
             reader.onload = () => {
                 wizardConfig.rclone_config_value = btoa(reader.result);
-                document.getElementById('rclone-file-status').innerHTML = `${msIcon('check_circle','ms-xs')} ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                document.getElementById('rclone-file-status').innerHTML = `${msIcon('check_circle', 'ms-xs')} ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
                 detectRemotes();
             };
             reader.readAsText(file);
@@ -1152,7 +1180,7 @@
             const status = document.createElement('div');
             status.className = 'form-hint';
             status.style.color = 'var(--green)';
-            status.innerHTML = msIcon('check_circle','ms-xs') + ` Remote "${name}" 已添加`;
+            status.innerHTML = msIcon('check_circle', 'ms-xs') + ` Remote "${name}" 已添加`;
             document.getElementById('rclone-manual-input').appendChild(status);
             setTimeout(() => status.remove(), 3000);
         }
@@ -1169,8 +1197,8 @@
                 section.style.display = 'block';
                 list.innerHTML = wizardConfig.wizard_remotes.map(r => {
                     const def = _remoteTypeDefs[r.type] || {};
-                    return `<span class="wz-remote-chip">${def.icon || msIcon('save','ms-xs')} ${esc(r.name)} <span class="wz-rtype">${esc(def.label || r.type)}</span>
-                <button onclick="removeWizardRemote('${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem;margin-left:4px" title="移除">${msIcon('delete','ms-xs')}</button></span>`;
+                    return `<span class="wz-remote-chip">${def.icon || msIcon('save', 'ms-xs')} ${esc(r.name)} <span class="wz-rtype">${esc(def.label || r.type)}</span>
+                <button onclick="removeWizardRemote('${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem;margin-left:4px" title="移除">${msIcon('delete', 'ms-xs')}</button></span>`;
                 }).join('');
             } else {
                 section.style.display = 'none';
@@ -1227,7 +1255,7 @@
             const shortName = tpl.name.replace(/^[\u2B07\uFE0F\u2B06\u{1F4E5}\u{1F4E4}]+\s*/u, '');
 
             return `<div class="wz-rule-card${isSelected ? ' selected' : ''}" data-tpl-id="${esc(tpl.id)}">
-        <div class="wz-rule-check" onclick="toggleRuleCard(this.parentElement)">${msIcon('check','ms-xs')}</div>
+        <div class="wz-rule-check" onclick="toggleRuleCard(this.parentElement)">${msIcon('check', 'ms-xs')}</div>
         <div class="rule-name">${esc(shortName)}</div>
         <div class="rule-method">${triggerTag} · ${methodTag}</div>
         <div class="rule-field">
@@ -1238,7 +1266,7 @@
             <label>云端路径</label>
             <input type="text" class="wz-rule-path" value="${esc(remotePath)}" placeholder="远端路径" onclick="event.stopPropagation()">
         </div>
-        <div class="rule-local" title="${esc(tpl.local_path)}">${msIcon('folder_open','ms-xs')} ${esc(tpl.local_path)}</div>
+        <div class="rule-local" title="${esc(tpl.local_path)}">${msIcon('folder_open', 'ms-xs')} ${esc(tpl.local_path)}</div>
     </div>`;
         }
 
@@ -1283,7 +1311,7 @@
             const list = document.getElementById('plugin-list');
             const desc = document.getElementById('plugin-step-desc');
             const sorted = [...plugins].sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
-            desc.innerHTML = msIcon('bolt','ms-xs') + ' 预构建镜像已包含以下插件';
+            desc.innerHTML = msIcon('bolt', 'ms-xs') + ' 预构建镜像已包含以下插件';
             const auraUrl = 'https://github.com/GreenLandisaLie/AuraSR-ComfyUI';
             const impactUrl = 'https://github.com/ltdrdata/ComfyUI-Impact-Pack';
             list.innerHTML = sorted.map((p, i) => {
@@ -1299,7 +1327,8 @@
                 下载 SAM 模型 (~375MB)
             </label>`;
                 return `<div class="plugin-item">
-            <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}">
+            <input type="checkbox" id="plugin-${i}" checked disabled data-url="${esc(p.url)}" style="display:none">
+            <span class="ms ms-xs plugin-preinstalled-icon">check_circle</span>
             <span class="plugin-name">${esc(p.name)} <span class="plugin-required">预装</span></span>
             ${extra}
         </div>`;
@@ -1331,7 +1360,7 @@
             fa2Card.style.opacity = '0.7';
             fa2Card.style.pointerEvents = 'none';
             fa2Card.querySelector('p').textContent = '已预装在镜像中';
-            document.getElementById('attn-step-desc').innerHTML = msIcon('bolt','ms-xs') + ' FA2 已预装，可选择额外安装 SA2';
+            document.getElementById('attn-step-desc').innerHTML = msIcon('bolt', 'ms-xs') + ' FA2 已预装，可选择额外安装 SA2';
 
             if (wizardConfig.install_sa2) sa2Card.classList.add('selected');
 
@@ -1353,11 +1382,11 @@
             const sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
             const el = document.getElementById('attn-hint');
             if (fa2 && sa2) {
-                el.innerHTML = msIcon('lightbulb','ms-xs') + ' 两者同时安装时，ComfyUI 将优先使用 FlashAttention-2';
+                el.innerHTML = msIcon('lightbulb', 'ms-xs') + ' 两者同时安装时，ComfyUI 将优先使用 FlashAttention-2';
             } else if (fa2) {
-                el.innerHTML = msIcon('local_fire_department','ms-xs') + ' ComfyUI 将使用 --use-flash-attention 启动';
+                el.innerHTML = msIcon('local_fire_department', 'ms-xs') + ' ComfyUI 将使用 --use-flash-attention 启动';
             } else if (sa2) {
-                el.innerHTML = msIcon('eco','ms-xs') + ' ComfyUI 将使用 --use-sage-attention 启动';
+                el.innerHTML = msIcon('eco', 'ms-xs') + ' ComfyUI 将使用 --use-sage-attention 启动';
             } else {
                 el.textContent = '跳过后 ComfyUI 将使用默认 PyTorch SDPA';
             }
@@ -1377,7 +1406,7 @@
             if (importedConfig) {
                 importNote = `
         <div class="summary-card" style="border-color:var(--accent)">
-            <h4>${msIcon('inventory_2','ms-xs')} 从配置文件恢复</h4>
+            <h4>${msIcon('inventory_2', 'ms-xs')} 从配置文件恢复</h4>
             <div class="summary-row"><span class="label">导出时间</span><span class="value">${esc(importedConfig._exported_at || '未知')}</span></div>
         </div>`;
             }
@@ -1393,33 +1422,33 @@
             const html = importNote + `
         <div class="summary-card">
             <h4>部署方式</h4>
-            <div class="summary-row"><span class="label">镜像类型</span><span class="value">${msIcon('bolt','ms-xs')} 预构建镜像</span></div>
+            <div class="summary-row"><span class="label">镜像类型</span><span class="value">${msIcon('bolt', 'ms-xs')} 预构建镜像</span></div>
         </div>
         <div class="summary-card">
             <h4>网络与安全</h4>
             <div class="summary-row"><span class="label">ComfyCarry 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
-            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.tunnel_mode === 'public' ? msIcon('public','ms-xs') + ' 公共节点' : c.cf_api_token ? msIcon('build','ms-xs') + ' 自定义 · ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
-            <div class="summary-row"><span class="label">SSH 密码</span><span class="value">${c.ssh_password ? msIcon('check_circle','ms-xs') + ' 已设置' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
-            <div class="summary-row"><span class="label">SSH 公钥</span><span class="value">${(c.ssh_keys || []).length > 0 ? c.ssh_keys.length + ' 个' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.tunnel_mode === 'public' ? msIcon('public', 'ms-xs') + ' 公共节点' : c.cf_api_token ? msIcon('build', 'ms-xs') + ' 自定义 · ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SSH 密码</span><span class="value">${c.ssh_password ? msIcon('check_circle', 'ms-xs') + ' 已设置' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SSH 公钥</span><span class="value">${(c.ssh_keys || []).length > 0 ? c.ssh_keys.length + ' 个' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
         </div>
         <div class="summary-card">
             <h4>云存储与同步</h4>
-            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${!dm || dm === 'skip' ? msIcon('skip_next','ms-xs') + ' 跳过' : dm === 'file' ? msIcon('folder_open','ms-xs') + ' 文件上传' : dm === 'manual' ? msIcon('build','ms-xs') + ' 手动创建' : dm === 'base64_env' ? msIcon('key','ms-xs') + ' 环境变量' : msIcon('assignment','ms-xs') + ' Base64'}</span></div>
+            <div class="summary-row"><span class="label">Rclone 配置</span><span class="value">${!dm || dm === 'skip' ? msIcon('skip_next', 'ms-xs') + ' 跳过' : dm === 'file' ? msIcon('folder_open', 'ms-xs') + ' 文件上传' : dm === 'manual' ? msIcon('build', 'ms-xs') + ' 手动创建' : dm === 'base64_env' ? msIcon('key', 'ms-xs') + ' 环境变量' : msIcon('assignment', 'ms-xs') + ' Base64'}</span></div>
             <div class="summary-row"><span class="label">Remote 数量</span><span class="value">${remoteCount} 个${c.wizard_remotes.length ? ' (含 ' + c.wizard_remotes.length + ' 个手动创建)' : ''}</span></div>
             <div class="summary-row"><span class="label">同步规则</span><span class="value">${ruleCount > 0 ? ruleCount + ' 条' : '无'}</span></div>
             ${ruleNames ? `<div class="summary-row"><span class="label">规则详情</span><span class="value" style="font-size:.82rem">${esc(ruleNames)}</span></div>` : ''}
         </div>
         <div class="summary-card">
             <h4>模型与插件</h4>
-            <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? msIcon('check_circle','ms-xs') + ' 已配置' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? msIcon('check_circle', 'ms-xs') + ' 已配置' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
             <div class="summary-row"><span class="label">插件数量</span><span class="value">${pluginCount} 个</span></div>
-            <div class="summary-row"><span class="label">AuraSR 模型</span><span class="value">${c.download_aura_model ? msIcon('check_circle','ms-xs') + ' 下载' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
-            <div class="summary-row"><span class="label">SAM 模型</span><span class="value">${c.download_sam_model ? msIcon('check_circle','ms-xs') + ' 下载' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">AuraSR 模型</span><span class="value">${c.download_aura_model ? msIcon('check_circle', 'ms-xs') + ' 下载' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SAM 模型</span><span class="value">${c.download_sam_model ? msIcon('check_circle', 'ms-xs') + ' 下载' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
         </div>
         <div class="summary-card">
             <h4>Attention 加速</h4>
-            <div class="summary-row"><span class="label">FlashAttention-2</span><span class="value">${c.install_fa2 ? msIcon('check_circle','ms-xs') + ' 安装' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
-            <div class="summary-row"><span class="label">SageAttention-2</span><span class="value">${c.install_sa2 ? msIcon('check_circle','ms-xs') + ' 安装' : msIcon('skip_next','ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">FlashAttention-2</span><span class="value">${c.install_fa2 ? msIcon('check_circle', 'ms-xs') + ' 安装' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">SageAttention-2</span><span class="value">${c.install_sa2 ? msIcon('check_circle', 'ms-xs') + ' 安装' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
         </div>`;
             document.getElementById('deploy-summary').innerHTML = html;
         }
@@ -1482,12 +1511,12 @@
                 if (data.type === 'step') {
                     if (completedSteps.length > 0) {
                         const prev = stepsEl.querySelector('.deploy-step-item.active');
-                        if (prev) { prev.classList.remove('active'); prev.classList.add('done'); prev.querySelector('.step-icon').innerHTML = msIcon('check_circle','ms-xs'); }
+                        if (prev) { prev.classList.remove('active'); prev.classList.add('done'); prev.querySelector('.step-icon').innerHTML = msIcon('check_circle', 'ms-xs'); }
                     }
                     completedSteps.push(data.name);
                     const item = document.createElement('div');
                     item.className = 'deploy-step-item active';
-                    item.innerHTML = `<span class="step-icon">${msIcon('hourglass_top','ms-xs')}</span>${esc(data.name)}`;
+                    item.innerHTML = `<span class="step-icon">${msIcon('hourglass_top', 'ms-xs')}</span>${esc(data.name)}`;
                     stepsEl.appendChild(item);
                     return;
                 }
@@ -1501,19 +1530,19 @@
                         lastActive.classList.remove('active');
                         if (data.success) {
                             lastActive.classList.add('done');
-                            lastActive.querySelector('.step-icon').innerHTML = msIcon('check_circle','ms-xs');
+                            lastActive.querySelector('.step-icon').innerHTML = msIcon('check_circle', 'ms-xs');
                         } else {
                             lastActive.style.color = 'var(--red)';
-                            lastActive.querySelector('.step-icon').innerHTML = msIcon('cancel','ms-xs');
+                            lastActive.querySelector('.step-icon').innerHTML = msIcon('cancel', 'ms-xs');
                         }
                     }
                     if (data.success) {
-                        document.getElementById('deploy-title').innerHTML = msIcon('check_circle','ms-xs') + ' 部署完成';
+                        document.getElementById('deploy-title').innerHTML = msIcon('check_circle', 'ms-xs') + ' 部署完成';
                         const doneEl = document.createElement('div');
                         doneEl.className = 'log-line info';
                         doneEl.style.color = 'var(--green)';
                         doneEl.style.fontWeight = '600';
-                        doneEl.innerHTML = msIcon('celebration','ms-xs') + ' 部署完成！';
+                        doneEl.innerHTML = msIcon('celebration', 'ms-xs') + ' 部署完成！';
                         logEl.appendChild(doneEl);
                         // 显示 attention 安装警告 (如有)
                         if (data.attn_warnings && data.attn_warnings.length > 0) {
@@ -1521,16 +1550,16 @@
                             const warnEl = document.createElement('div');
                             warnEl.className = 'log-line warn';
                             warnEl.style.color = 'var(--amber)';
-                            warnEl.innerHTML = `${msIcon('warning','ms-xs')} ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。`;
+                            warnEl.innerHTML = `${msIcon('warning', 'ms-xs')} ${esc(names)} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。`;
                             logEl.appendChild(warnEl);
                             document.getElementById('deploy-done-retry').style.display = '';
                         }
                         document.getElementById('deploy-done-row').style.display = 'flex';
                     } else {
-                        document.getElementById('deploy-title').innerHTML = msIcon('cancel','ms-xs') + ' 部署失败';
+                        document.getElementById('deploy-title').innerHTML = msIcon('cancel', 'ms-xs') + ' 部署失败';
                         const errEl = document.createElement('div');
                         errEl.className = 'log-line error';
-                        errEl.innerHTML = msIcon('cancel','ms-xs') + ' ' + (data.msg || '部署失败');
+                        errEl.innerHTML = msIcon('cancel', 'ms-xs') + ' ' + (data.msg || '部署失败');
                         logEl.appendChild(errEl);
                         const banner = document.getElementById('deploy-error-banner');
                         banner.style.display = 'block';
@@ -1568,7 +1597,7 @@
             document.getElementById('deploy-fail-row').style.display = 'none';
             document.getElementById('deploy-done-row').style.display = 'none';
             document.getElementById('deploy-done-retry').style.display = 'none';
-            document.getElementById('deploy-title').innerHTML = msIcon('settings','ms-xs') + ' 正在部署... (智能重试)';
+            document.getElementById('deploy-title').innerHTML = msIcon('settings', 'ms-xs') + ' 正在部署... (智能重试)';
             completedSteps = [];
             sseCompleted = false;
             startDeploy();
@@ -1591,7 +1620,7 @@
                 const config = JSON.parse(text);
 
                 if (!config._version) {
-                    showImportResult(msIcon('cancel','ms-xs') + ' 无效的配置文件格式', true);
+                    showImportResult(msIcon('cancel', 'ms-xs') + ' 无效的配置文件格式', true);
                     return;
                 }
 
@@ -1604,7 +1633,7 @@
                 });
                 const d = await r.json();
                 if (!d.ok) {
-                    showImportResult(msIcon('cancel','ms-xs') + ' 导入失败: ' + esc(d.error || '未知错误'), true);
+                    showImportResult(msIcon('cancel', 'ms-xs') + ' 导入失败: ' + esc(d.error || '未知错误'), true);
                     return;
                 }
 
@@ -1635,13 +1664,13 @@
                 if (config.download_sam_model !== undefined) wizardConfig.download_sam_model = config.download_sam_model;
 
                 showImportResult(
-                    `${msIcon('check_circle','ms-xs')} 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
+                    `${msIcon('check_circle', 'ms-xs')} 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
                     false
                 );
                 document.getElementById('btn-next-0').disabled = false;
 
             } catch (e) {
-                showImportResult(msIcon('cancel','ms-xs') + ' 文件解析失败: ' + e.message, true);
+                showImportResult(msIcon('cancel', 'ms-xs') + ' 文件解析失败: ' + e.message, true);
             }
         }
 

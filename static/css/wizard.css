@@ -20,6 +20,26 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--bd) transparent;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bd);
+            border-radius: 3px
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--t3)
         }
 
         body {
@@ -273,7 +293,7 @@
 
         /* Plugin list */
         .plugin-list {
-            max-height: 400px;
+            max-height: 520px;
             overflow-y: auto;
             border: 1px solid var(--bd);
             border-radius: var(--r);
@@ -298,6 +318,12 @@
             height: 18px;
         }
 
+        .plugin-item input[type="checkbox"]:disabled {
+            opacity: 0.35;
+            cursor: default;
+            pointer-events: none;
+        }
+
         .plugin-item .plugin-name {
             flex: 1;
         }
@@ -305,6 +331,12 @@
         .plugin-item .plugin-required {
             font-size: clamp(0.7rem, 0.8vw, 0.85rem);
             color: var(--accent);
+        }
+
+        .plugin-preinstalled-icon {
+            color: var(--green, #22c55e);
+            font-size: 18px;
+            flex-shrink: 0;
         }
 
         /* Radio group for rclone */
@@ -454,7 +486,7 @@
             width: max-content;
             max-width: 280px;
             z-index: 100;
-            box-shadow: 0 4px 12px rgba(0,0,0,.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
             pointer-events: none;
         }
 
@@ -893,8 +925,17 @@
             font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
         }
 
-        .ms-xs { font-size: 14px; vertical-align: -2px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 14; }
-        .ms-sm { font-size: 18px; vertical-align: -3px; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 18; }
+        .ms-xs {
+            font-size: 14px;
+            vertical-align: -2px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 14;
+        }
+
+        .ms-sm {
+            font-size: 18px;
+            vertical-align: -3px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 18;
+        }
 
         .status-dot {
             display: inline-block;
@@ -905,9 +946,17 @@
             margin-right: 4px;
         }
 
-        .status-dot.online { background: var(--green) }
-        .status-dot.pending { background: var(--amber) }
-        .status-dot.offline { background: var(--red) }
+        .status-dot.online {
+            background: var(--green)
+        }
+
+        .status-dot.pending {
+            background: var(--amber)
+        }
+
+        .status-dot.offline {
+            background: var(--red)
+        }
 
         /* ── Light Theme ── */
         [data-theme="light"] {
@@ -915,16 +964,17 @@
             --bg2: #e6e6ec;
             --bg3: #ffffff;
             --bg4: #d8d8e0;
-            --bd:  #c8c8d4;
-            --t1:  #1a1a2e;
-            --t2:  #55556a;
-            --t3:  #8888a0;
+            --bd: #c8c8d4;
+            --t1: #1a1a2e;
+            --t2: #55556a;
+            --t3: #8888a0;
             --accent: #6b4fe0;
             --accent2: #8568ff;
             --green: #16a34a;
-            --red:   #dc2626;
+            --red: #dc2626;
             --amber: #d97706;
         }
+
         /* ── Theme Toggle Button ── */
         .theme-toggle {
             position: fixed;
@@ -944,5 +994,13 @@
             transition: background .2s, border-color .2s, color .2s;
             box-shadow: var(--sh);
         }
-        .theme-toggle:hover { border-color: var(--accent); color: var(--accent) }
-        .theme-toggle .ms { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18; }
+
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        .theme-toggle .ms {
+            font-size: 18px;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18;
+        }

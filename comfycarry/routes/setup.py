@@ -73,7 +73,7 @@ def api_setup_save():
         "cf_api_token", "cf_domain", "cf_subdomain",
         "rclone_config_method", "rclone_config_value",
         "civitai_token", "plugins",
-        "install_fa2", "install_sa2", "download_aura_model",
+        "install_fa2", "install_sa2", "download_aura_model", "download_sam_model",
         "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules",
         "ssh_password", "ssh_keys", "ssh_pw_sync",
