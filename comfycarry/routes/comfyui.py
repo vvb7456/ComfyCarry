@@ -217,10 +217,16 @@ def api_comfyui_free():
 @bp.route("/api/comfyui/history")
 def api_comfyui_history():
     max_items = request.args.get("max_items", 5, type=int)
+    filter_prompt_id = request.args.get("prompt_id", "").strip()
     try:
-        resp = requests.get(f"{COMFYUI_URL}/history",
-                            params={"max_items": max_items}, timeout=10)
-        raw = resp.json()
+        if filter_prompt_id:
+            # 直接获取特定 prompt 的历史 (ComfyUI 支持 /history/{prompt_id})
+            resp = requests.get(f"{COMFYUI_URL}/history/{filter_prompt_id}", timeout=10)
+            raw = resp.json()
+        else:
+            resp = requests.get(f"{COMFYUI_URL}/history",
+                                params={"max_items": max_items}, timeout=10)
+            raw = resp.json()
         items = []
         for pid, entry in raw.items():
             status = entry.get("status", {})
@@ -237,9 +243,6 @@ def api_comfyui_history():
             output_imgs = [i for i in images if i["type"] == "output"]
             temp_imgs = [i for i in images if i["type"] == "temp"]
             images = output_imgs if output_imgs else temp_imgs
-            # 只保留最后一张作为代表图
-            if images:
-                images = [images[-1]]
             # 从 status.messages 中提取时间戳
             timestamp = 0
             for msg in status.get("messages", []):

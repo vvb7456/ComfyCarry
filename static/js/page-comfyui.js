@@ -564,15 +564,18 @@ async function loadComfyHistory() {
     if (_historySortAsc) items.reverse();
 
     el.innerHTML = `<div class="history-grid size-${_historySize}">${items.map(item => {
-      const img = (item.images || [])[0] || null;
+      const images = item.images || [];
       const status = item.completed ? 'success' : 'error';
       const shortId = (item.prompt_id || '').substring(0, 8);
       const ts = item.timestamp ? new Date(item.timestamp).toLocaleString('zh-CN') : '';
 
       let imagesHtml = '';
-      if (img) {
-        const src = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
-        imagesHtml = `<div class="history-card-images"><img src="${src}" loading="lazy" alt="" onclick="window.open(this.src,'_blank')"></div>`;
+      if (images.length > 0) {
+        const imgTags = images.map(img => {
+          const src = `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+          return `<img src="${src}" loading="lazy" alt="" onclick="window.open(this.src,'_blank')">`;
+        }).join('');
+        imagesHtml = `<div class="history-card-images">${imgTags}</div>`;
       } else {
         imagesHtml = `<div class="history-card-images" style="align-items:center;justify-content:center;color:var(--t3);font-size:.8rem">无预览图</div>`;
       }
@@ -585,7 +588,7 @@ async function loadComfyHistory() {
             <div>${shortId}…</div>
             <div style="font-size:.7rem;color:var(--t3)">${ts}</div>
           </div>
-          ${img ? `<div class="history-card-actions"><button class="btn btn-sm" title="下载" onclick="downloadHistoryImage('${img.filename.replace(/'/g,"\\'")}','${img.subfolder.replace(/'/g,"\\'")}','${img.type}')">${msIcon('download')}</button></div>` : ''}
+          ${images.length > 0 ? `<div class="history-card-actions">${images.length > 1 ? `<span style="font-size:.68rem;color:var(--t3)">${images.length}张</span>` : ''}<button class="btn btn-sm" title="下载全部" onclick="downloadHistoryImages(${JSON.stringify(images).replace(/"/g,'&quot;')})">${msIcon('download')}</button></div>` : ''}
         </div>
       </div>`;
     }).join('')}</div>`;
@@ -604,6 +607,13 @@ function downloadHistoryImage(filename, subfolder, type) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+function downloadHistoryImages(images) {
+  if (!Array.isArray(images)) return;
+  images.forEach((img, i) => {
+    setTimeout(() => downloadHistoryImage(img.filename, img.subfolder || '', img.type || 'output'), i * 200);
+  });
 }
 
 // ── 自动刷新 ──────────────────────────────────────────────────

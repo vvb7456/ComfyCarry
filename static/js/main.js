@@ -12,6 +12,7 @@ import {
 // ── 导入所有页面模块 (副作用: 自动注册 registerPage) ──
 import './page-dashboard.js';
 import './page-comfyui.js';
+import './page-generate.js';
 import './page-models.js';
 import './page-plugins.js';
 import './page-tunnel.js';

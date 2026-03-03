@@ -101,14 +101,13 @@ function renderMetaContent(data) {
 
   // Trained words
   if (trainedWords.length > 0) {
-    html += `<div class="section-title" style="font-size:.88rem">${msIcon('label','ms-sm')} 触发词</div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center"><div class="section-title" style="font-size:.88rem;margin-bottom:0">${msIcon('label','ms-sm')} 触发词</div><div style="display:flex;align-items:center;gap:6px"><span id="meta-tw-count" style="font-size:.78rem;color:var(--t3)">点击选择</span><button class="btn btn-sm btn-success" onclick="copyMetaWords()">复制选中</button><button class="btn btn-sm" onclick="copyAllMetaWords()">全部复制</button></div></div>`;
     html += '<ul class="meta-tw-list">';
     trainedWords.forEach(w => {
       const word = typeof w === 'string' ? w : (w.word || '');
       if (word) html += `<li class="meta-tw-item" onclick="toggleMetaWord(this, '${word.replace(/'/g, "\\'")}')">${word}</li>`;
     });
     html += '</ul>';
-    html += '<div class="meta-tw-actions"><span id="meta-tw-count">点击选择触发词</span> <button class="btn btn-sm btn-success" onclick="copyMetaWords()">复制选中</button> <button class="btn btn-sm" onclick="copyAllMetaWords()">全部复制</button></div>';
   }
 
   // Images with generation params
@@ -159,7 +158,7 @@ function toggleMetaWord(el, word) {
   el.classList.toggle('selected');
   if (metaSelectedWords.has(word)) metaSelectedWords.delete(word);
   else metaSelectedWords.add(word);
-  document.getElementById('meta-tw-count').textContent = metaSelectedWords.size > 0 ? `已选 ${metaSelectedWords.size} 个` : '点击选择触发词';
+  document.getElementById('meta-tw-count').textContent = metaSelectedWords.size > 0 ? `已选 ${metaSelectedWords.size} 个` : '点击选择';
 }
 
 function copyMetaWords() {

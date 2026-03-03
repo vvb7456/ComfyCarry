@@ -257,9 +257,23 @@ def api_fetch_model_info():
     except Exception as e:
         return jsonify({"error": f"API 请求失败: {e}", "hash": file_hash}), 500
 
-    # 构建 weilin-info.json
+    # 计算 weilin 兼容的相对路径 file 字段
+    # weilin 插件使用 folder_paths 返回的相对路径 (如 "subfolder/model.safetensors")
+    rel_from_comfy = abs_path.relative_to(comfy_root)
+    rel_parts = rel_from_comfy.parts
+    # 路径格式: models/<type>/[subdir/]filename — 去掉前两级得到相对于模型类型目录的路径
+    if len(rel_parts) > 2 and rel_parts[0] == "models":
+        file_rel = str(Path(*rel_parts[2:]))
+    else:
+        file_rel = abs_path.name
+
+    # 向 raw civitai 数据注入 weilin 兼容字段
+    civitai_data["_sha256"] = file_hash
+    civitai_data["_civitai_api"] = api_url
+
+    # 构建 weilin-info.json (与 WeiLin-Comfyui-Tools 格式严格兼容)
     info_data = {
-        "file": abs_path.name,
+        "file": file_rel,
         "path": str(abs_path),
         "sha256": file_hash,
         "name": civitai_data.get("model", {}).get("name", ""),
@@ -281,7 +295,7 @@ def api_fetch_model_info():
     for w in trigger_words:
         info_data["trainedWords"].append({"word": w, "civitai": True})
 
-    # Links
+    # Links (weilin 格式: 模型页 URL + API URL)
     model_id = civitai_data.get("modelId")
     version_id = civitai_data.get("id")
     if model_id:
@@ -289,13 +303,16 @@ def api_fetch_model_info():
         if version_id:
             link += f"?modelVersionId={version_id}"
         info_data["links"].append(link)
+        info_data["links"].append(api_url)
 
-    # 图片
+    # 图片 (weilin 兼容格式: 增加 civitaiUrl / resources)
     for img in civitai_data.get("images", []):
         img_url = img.get("url", "")
         if img_url:
+            img_id = os.path.splitext(os.path.basename(img_url))[0] if img_url else None
             img_entry = {
                 "url": img_url,
+                "civitaiUrl": f"https://civitai.com/images/{img_id}" if img_id else None,
                 "type": img.get("type", "image"),
                 "width": img.get("width"),
                 "height": img.get("height"),
@@ -303,13 +320,14 @@ def api_fetch_model_info():
             }
             meta = img.get("meta") or {}
             if meta:
+                img_entry["seed"] = meta.get("seed")
                 img_entry["positive"] = meta.get("prompt", "")
                 img_entry["negative"] = meta.get("negativePrompt", "")
-                img_entry["seed"] = meta.get("seed")
+                img_entry["steps"] = meta.get("steps")
                 img_entry["sampler"] = meta.get("sampler")
                 img_entry["cfg"] = meta.get("cfgScale")
-                img_entry["steps"] = meta.get("steps")
                 img_entry["model"] = meta.get("Model")
+                img_entry["resources"] = meta.get("resources")
             info_data["images"].append(img_entry)
 
     # 保存 info json

@@ -13,6 +13,8 @@ Bridge 使用 ComfyUI 原生事件信号追踪执行状态:
 
 import json
 import queue
+import struct
+import base64
 import threading
 import time
 import uuid
@@ -39,6 +41,10 @@ class ComfyWSBridge:
         self._last_status = None
         self._last_progress = None
         self._exec_info = None       # Current execution tracking
+
+    @property
+    def client_id(self):
+        return self._client_id
 
     def start(self):
         if self._running:
@@ -96,8 +102,27 @@ class ComfyWSBridge:
     def _on_message(self, ws, message):
         """处理 ComfyUI WebSocket 消息 — 使用原生事件信号追踪执行状态"""
         if isinstance(message, bytes):
-            # Binary: preview images — broadcast as base64
-            # 暂时跳过 binary 预览图 (可选未来增强)
+            # Binary frame: ComfyUI preview images
+            # 格式: [4字节 event_type][4字节 format][...image bytes...]
+            # event_type=1 = PREVIEW_IMAGE, event_type=3 = PREVIEW_IMAGE_WITH_METADATA
+            try:
+                if len(message) > 8:
+                    event_type = struct.unpack('>I', message[0:4])[0]
+                    # event_type 1 or 3 are preview images
+                    if event_type in (1, 3):
+                        # format bytes: 1=JPEG, 2=PNG (skip, we don't need to distinguish)
+                        img_bytes = message[8:]
+                        b64 = base64.b64encode(img_bytes).decode('ascii')
+                        # Detect mime type from header
+                        mime = 'image/jpeg'
+                        if img_bytes[:4] == b'\x89PNG':
+                            mime = 'image/png'
+                        self._broadcast({
+                            "type": "preview_image",
+                            "data": {"b64": b64, "mime": mime}
+                        })
+            except Exception:
+                pass
             return
         try:
             data = json.loads(message)
