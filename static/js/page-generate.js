@@ -49,6 +49,7 @@ let _cnImagePreview = { pose: '', canny: '', depth: '' }; // 本地预览 data U
 let _cnModelOptions = { pose: [], canny: [], depth: [] }; // 从 options API 获取
 let _cnDepHandles = {};  // model-dependency 句柄
 let _upscaleDepHandle = null;  // AuraSR model-dependency 句柄
+let _upscaleModelReady = false; // AuraSR 模型是否已安装
 
 // ── 注册页面 ─────────────────────────────────────────────────────────────────
 registerPage('generate', {
@@ -195,6 +196,57 @@ function _bindUIEvents() {
     chk.addEventListener('change', () => {
       const mod = chk.dataset.module;
       const tab = chk.closest('.gen-mod-tab');
+
+      if (chk.checked) {
+        // ── 前置校验: 开启时检查条件 ──
+        if (mod === 'lora') {
+          if (_loraSelected.size === 0) {
+            chk.checked = false;
+            if (tab) tab.classList.remove('gen-mod-tab-on');
+            showToast('请先至少添加一个 LoRA', 'warning');
+            return;
+          }
+        }
+        if (_CN_TYPES.includes(mod)) {
+          // 检查 CN 模型是否已安装
+          if (_cnModelOptions[mod].length === 0) {
+            chk.checked = false;
+            if (tab) tab.classList.remove('gen-mod-tab-on');
+            showToast('请先安装 ControlNet 模型', 'warning');
+            // 展开该 tab 的下载面板
+            if (tab && !tab.classList.contains('active')) tab.click();
+            return;
+          }
+          // 检查是否已上传参考图
+          if (!_cnImage[mod]) {
+            chk.checked = false;
+            if (tab) tab.classList.remove('gen-mod-tab-on');
+            showToast('请先选择参考图', 'warning');
+            // 展开该 tab
+            if (tab && !tab.classList.contains('active')) tab.click();
+            return;
+          }
+        }
+        if (mod === 'upscale') {
+          // 如果还没执行过模型检测，先触发检测再展开 tab
+          if (_upscaleDepHandle?._lazy) {
+            chk.checked = false;
+            if (tab) tab.classList.remove('gen-mod-tab-on');
+            showToast('请先确认放大模型已安装', 'warning');
+            if (tab && !tab.classList.contains('active')) tab.click();
+            return;
+          }
+          // 模型检测已完成，检查结果
+          if (!_upscaleModelReady) {
+            chk.checked = false;
+            if (tab) tab.classList.remove('gen-mod-tab-on');
+            showToast('请先安装放大模型', 'warning');
+            if (tab && !tab.classList.contains('active')) tab.click();
+            return;
+          }
+        }
+      }
+
       if (tab) tab.classList.toggle('gen-mod-tab-on', chk.checked);
       if (mod === 'upscale') {
         _upscaleEnabled = chk.checked;
@@ -528,6 +580,9 @@ function _initCNModelDeps() {
           description: cfg.description,
           models: cfg.models,
           onReady: () => {
+            _loadOptions(true).then(() => _refreshCNPanel(type));
+          },
+          onAllInstalled: () => {
             _loadOptions(true).then(() => _refreshCNPanel(type));
           },
         });
@@ -1173,7 +1228,9 @@ function _initUpscaleModelDep() {
             { filename: 'model.safetensors', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true', subdir: 'models/Aura-SR' },
           ],
         }],
-        onReady: () => {},
+        onReady: () => { _upscaleModelReady = true; },
+        onAllInstalled: () => { _upscaleModelReady = true; },
+        onMissing: () => { _upscaleModelReady = false; },
       });
       _upscaleDepHandle = handle;
     },
@@ -1203,6 +1260,31 @@ export async function handleSubmit() {
 
   if (!ckpt) { _showError('请选择基础模型'); return; }
   if (!positive) { _showError('请填写画面描述'); return; }
+
+  // 检测 "已配置但未开启" 的模块 (仅 ControlNet — LoRA 开关自动同步)
+  if (!localStorage.getItem('gen_skip_inactive_warn')) {
+    const inactive = [];
+    for (const type of _CN_TYPES) {
+      if (!_cnEnabled[type] && _cnImage[type] && _cnModelOptions[type].length > 0) {
+        const labels = { pose: '姿势控制', canny: '轮廓控制', depth: '景深控制' };
+        inactive.push({ mod: type, label: labels[type] });
+      }
+    }
+    if (inactive.length > 0) {
+      const action = await _showInactiveConfirm(inactive);
+      if (action === 'cancel') return;
+      if (action === 'enable') {
+        for (const { mod } of inactive) {
+          const chk = document.querySelector(`.gen-mod-tab-chk[data-module="${mod}"]`);
+          if (chk) {
+            chk.checked = true;
+            chk.closest('.gen-mod-tab')?.classList.toggle('gen-mod-tab-on', true);
+            _cnEnabled[mod] = true;
+          }
+        }
+      }
+    }
+  }
 
   // ControlNet 校验: 已启用的 CN 必须有参考图
   for (const type of _CN_TYPES) {
@@ -1256,6 +1338,46 @@ export async function handleSubmit() {
   _currentPromptId = result.prompt_id || '';
   _setState('generating');
   showToast('⚡ 已加入队列 (' + _currentPromptId.slice(0, 8) + ')');
+}
+
+/** 显示"已配置但未启用"确认弹窗, 返回 'enable' | 'submit' | 'cancel' */
+function _showInactiveConfirm(inactiveList) {
+  return new Promise(resolve => {
+    const names = inactiveList.map(i => i.label).join('、');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay active';
+    overlay.innerHTML = `
+      <div class="modal-box" style="width:420px;padding:24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span class="ms" style="color:var(--amber)">warning</span>
+          <h3 style="margin:0;font-size:1rem">部分功能已配置但未启用</h3>
+          <button class="btn btn-sm" data-action="cancel" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+        </div>
+        <p style="color:var(--t2);margin:0 0 20px;line-height:1.6;font-size:.88rem">
+          <b>${escHtml(names)}</b> 已配置参数但开关未打开，提交后将不会生效。
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--t3);cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="gen-inactive-skip">
+            不再提示
+          </label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" data-action="submit">不启用，直接提交</button>
+            <button class="btn btn-sm btn-primary" data-action="enable">启用并提交</button>
+          </div>
+        </div>
+      </div>`;
+    overlay.addEventListener('click', (e) => {
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      if (!action && e.target !== overlay) return;
+      if (document.getElementById('gen-inactive-skip')?.checked) {
+        localStorage.setItem('gen_skip_inactive_warn', '1');
+      }
+      overlay.remove();
+      resolve(action || 'cancel');
+    });
+    document.body.appendChild(overlay);
+  });
 }
 
 // ── SSE ──────────────────────────────────────────────────────────────────────

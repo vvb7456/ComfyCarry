@@ -86,9 +86,11 @@ async function _check(st) {
       // 首次检查 → 全部已就绪，直接显示参数面板
       container.classList.add('hidden');
       params.classList.remove('hidden');
+      cfg.onAllInstalled?.();
     } else if (allInstalled && st.rendered) {
       // 下载完成后 recheck → 保持卡片页面，更新状态显示进入按钮
       _renderCards(st, true);
+      cfg.onAllInstalled?.();
     } else {
       params.classList.add('hidden');
       container.classList.remove('hidden');
