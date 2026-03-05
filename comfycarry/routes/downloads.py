@@ -112,7 +112,12 @@ def api_downloads_submit():
         headers=headers,
     )
 
-    return jsonify(task.to_dict()), 201 if task.status == DownloadStatus.ACTIVE else 200
+    resp = task.to_dict()
+    if task.meta.get("existed"):
+        resp["existed"] = True
+        resp["message"] = f"文件已存在: {filename}"
+
+    return jsonify(resp), 201 if task.status == DownloadStatus.ACTIVE else 200
 
 
 @bp.route("/api/downloads", methods=["GET"])
@@ -189,6 +194,7 @@ def api_downloads_events(download_id: str):
 
     def _sse_generator():
         last_progress = -1
+        heartbeat_counter = 0
         terminal_states = (
             DownloadStatus.COMPLETE,
             DownloadStatus.FAILED,
@@ -201,7 +207,7 @@ def api_downloads_events(download_id: str):
                 yield f"data: {json.dumps({'error': '任务已删除'})}\n\n"
                 break
 
-            # 只在进度变化时推送, 减少流量
+            # 进度变化或终态 → 推送数据
             if t.progress != last_progress or t.status in terminal_states:
                 event = {
                     "status": t.status.value,
@@ -215,6 +221,13 @@ def api_downloads_events(download_id: str):
                     event["error"] = t.error
                 yield f"data: {json.dumps(event)}\n\n"
                 last_progress = t.progress
+                heartbeat_counter = 0
+            else:
+                # 进度无变化时定期发心跳, 防止连接被中间件/浏览器超时断开
+                heartbeat_counter += 1
+                if heartbeat_counter >= 15:  # 约每 12 秒
+                    yield ": heartbeat\n\n"
+                    heartbeat_counter = 0
 
             if t.status in terminal_states:
                 break
@@ -242,11 +255,29 @@ def api_downloads_retry(download_id: str):
     if old_task.status != DownloadStatus.FAILED:
         return jsonify({"error": f"任务状态为 {old_task.status.value}, 无需重试"}), 409
 
+    url = old_task.url
+
+    # CivitAI 下载重试时重新注入当前 API Key
+    if old_task.meta.get("source") == "civitai":
+        from ..utils import _get_api_key
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        api_key = _get_api_key()
+        # 先移除旧的 token 参数
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query, keep_blank_values=True)
+        params.pop("token", None)
+        new_query = urlencode(params, doseq=True)
+        url = urlunparse(parsed._replace(query=new_query))
+        # 注入新的 token
+        if api_key and api_key.strip():
+            sep = "&" if "?" in url and url.split("?")[1] else "?"
+            url += f"{sep}token={api_key}"
+
     # 移除旧的失败记录
     engine.clear_task(download_id)
 
     new_task = engine.submit(
-        url=old_task.url,
+        url=url,
         save_dir=old_task.save_dir,
         filename=old_task.filename,
         meta=old_task.meta,
@@ -342,9 +373,16 @@ def api_downloads_civitai():
         },
     )
 
+    existed = task.meta.get("existed", False)
+    if existed:
+        msg = f"该模型已存在: {resolved['display_name']}"
+    else:
+        msg = f"已提交: {resolved['display_name']}"
+
     return jsonify({
         **task.to_dict(),
-        "message": f"已提交: {resolved['display_name']}",
+        "message": msg,
+        "existed": existed,
     }), 201 if task.status == DownloadStatus.ACTIVE else 200
 
 

@@ -230,9 +230,30 @@ class DownloadEngine:
         # 创建目录
         os.makedirs(save_dir, exist_ok=True)
 
-        # 检查文件是否已存在 (非空文件视为已完成)
+        # 去重：检查是否已有相同 filename+save_dir 的活跃/排队任务
+        with self._lock:
+            for existing in self._tasks.values():
+                if (existing.filename == filename
+                        and existing.save_dir == save_dir
+                        and existing.status in (
+                            DownloadStatus.ACTIVE,
+                            DownloadStatus.QUEUED,
+                        )):
+                    logger.info(
+                        f"[download_engine] 跳过重复下载: {filename} "
+                        f"(已有任务 {existing.download_id})"
+                    )
+                    return existing
+
+        # 检查文件是否已存在且完整 (非空 + 无 .aria2 控制文件)
+        # 返回 task 供调用方使用，但不加入 _tasks 列表（不显示在下载管理中）
         dest = os.path.join(save_dir, filename)
-        if os.path.isfile(dest) and os.path.getsize(dest) > 0:
+        aria2_ctrl = dest + ".aria2"
+        if (os.path.isfile(dest)
+                and os.path.getsize(dest) > 0
+                and not os.path.isfile(aria2_ctrl)):
+            task_meta = dict(meta or {})
+            task_meta["existed"] = True
             task = DownloadTask(
                 download_id=download_id,
                 url=url,
@@ -241,13 +262,14 @@ class DownloadEngine:
                 status=DownloadStatus.COMPLETE,
                 progress=100.0,
                 completed_at=time.time(),
-                meta=meta or {},
+                meta=task_meta,
                 on_complete=on_complete,
             )
             task.total_bytes = os.path.getsize(dest)
             task.completed_bytes = task.total_bytes
-            with self._lock:
-                self._tasks[download_id] = task
+            logger.info(
+                f"[download_engine] 文件已存在, 跳过下载: {filename}"
+            )
             self._fire_on_complete(task)
             return task
 
@@ -404,7 +426,8 @@ class DownloadEngine:
         Returns: {installed: bool, downloading: bool, download_id: str|None}
         """
         dest = os.path.join(save_dir, filename)
-        file_exists = os.path.isfile(dest)
+        file_exists = os.path.isfile(dest) and os.path.getsize(dest) > 0
+        aria2_partial = os.path.isfile(dest + ".aria2")
 
         downloading = False
         active_id = None
@@ -416,8 +439,8 @@ class DownloadEngine:
                     active_id = task.download_id
                     break
 
-        # 文件正在下载时 (部分文件已存在于磁盘), 不算 installed
-        installed = file_exists and not downloading
+        # 文件存在 + 无活跃下载 + 无 .aria2 控制文件 = 已安装
+        installed = file_exists and not downloading and not aria2_partial
 
         return {
             "installed": installed,
@@ -551,6 +574,9 @@ class DownloadEngine:
                 error_code = status.get("errorCode", "")
                 error_msg = status.get("errorMessage", "")
                 task.error = f"[{error_code}] {error_msg}" if error_code else error_msg
+                # 授权失败 — 追加友好提示
+                if error_code == "24" and task.meta.get("source") == "civitai":
+                    task.error += " — 请在设置页配置 CivitAI API Key 后重试"
                 task.completed_at = time.time()
                 self._cleanup_partial(task)
             elif aria2_status == "removed":

@@ -35,6 +35,7 @@ bp = Blueprint("generate", __name__)
 # ── 懒加载缓存: Generate 页面所需的全部选项 ─────────────────────────────────
 _options_cache: dict | None = None
 _options_cache_time: float = 0.0
+_combo_cache: dict = {}  # _get_combo_list 的 object_info 缓存
 
 
 def _scan_model_previews(names: list[str], rel_dir: str) -> dict[str, str | None]:
@@ -102,6 +103,38 @@ def _scan_lora_metadata(names: list[str], rel_dir: str) -> tuple[dict[str, str],
         except Exception:
             pass
     return triggers, info_result
+
+
+def _classify_controlnet_models(names: list[str]) -> dict:
+    """
+    将 ControlNet 模型名按类型分组。
+    根据文件名关键词自动分类: pose/openpose → pose, canny/edge → canny, depth → depth。
+    Union 模型出现在所有类型中。无法识别的归入 "other"。
+    返回: {"pose": [...], "canny": [...], "depth": [...], "other": [...]}
+    """
+    import re
+    result = {"pose": [], "canny": [], "depth": [], "other": []}
+    for name in names:
+        lower = name.lower()
+        # Union ProMax 出现在所有类型
+        if "union" in lower:
+            result["pose"].append(name)
+            result["canny"].append(name)
+            result["depth"].append(name)
+            continue
+        matched = False
+        if re.search(r"pose|openpose|dwpose", lower):
+            result["pose"].append(name)
+            matched = True
+        if re.search(r"canny|edge|lineart|line.?art", lower):
+            result["canny"].append(name)
+            matched = True
+        if re.search(r"depth", lower):
+            result["depth"].append(name)
+            matched = True
+        if not matched:
+            result["other"].append(name)
+    return result
 
 
 def _detect_arch(filepath: str) -> str:
@@ -196,17 +229,17 @@ def _fetch_generate_options() -> dict:
                "lora_info": {}, "checkpoint_info": {},
                "checkpoint_archs": {}, "lora_archs": {}}
 
-    def _get_combo_list(node_name: str, field: str, cache: dict = {}) -> list:
+    def _get_combo_list(node_name: str, field: str) -> list:
         """获取节点的下拉选项（同节点缓存，避免重复 HTTP 请求）"""
-        if node_name not in cache:
+        if node_name not in _combo_cache:
             try:
                 r = requests.get(f"{COMFYUI_URL}/object_info/{node_name}", timeout=10)
                 r.raise_for_status()
-                cache[node_name] = r.json()
+                _combo_cache[node_name] = r.json()
             except Exception as e:
                 logger.warning(f"[generate] 获取 {node_name} 失败: {e}")
-                cache[node_name] = {}
-        d = cache.get(node_name, {})
+                _combo_cache[node_name] = {}
+        d = _combo_cache.get(node_name, {})
         return d.get(node_name, {}).get("input", {}).get("required", {}).get(field, [[]])[0] or []
 
     samplers   = _get_combo_list("KSampler", "sampler_name")
@@ -242,6 +275,10 @@ def _fetch_generate_options() -> dict:
     result["lora_archs"] = _scan_model_archs(lora_list, "models/loras")
     result["comfyui_dir"] = COMFYUI_DIR
 
+    # ── ControlNet 模型 (按类型分组) ───────────────────────────────────
+    cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
+    result["controlnet_models"] = _classify_controlnet_models(cn_list)
+
     _options_cache = result
     _options_cache_time = time.time()
     return result
@@ -259,11 +296,103 @@ def api_generate_options():
 
     ?refresh=1  强制清除缓存并重新获取。
     """
-    global _options_cache, _options_cache_time
+    global _options_cache, _options_cache_time, _combo_cache
     if request.args.get("refresh") == "1":
         _options_cache = None
         _options_cache_time = 0.0
+        _combo_cache.clear()
     return jsonify(_fetch_generate_options())
+
+
+# ── /api/generate/upload_image ───────────────────────────────────────────────
+
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/bmp"}
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MB
+
+@bp.route("/api/generate/upload_image", methods=["POST"])
+def api_generate_upload_image():
+    """
+    上传图片到 ComfyUI input/ 目录 (供 ControlNet / Img2Img 使用)。
+
+    Form data:
+        file  — 图片文件 (png/jpeg/webp/bmp, 最大 20MB)
+        type  — 用途标识 (可选: "pose" / "canny" / "depth" / "i2i")
+
+    返回: {"filename": "pose_abc123.png"}  (ComfyUI input/ 目录中的文件名)
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "请上传图片文件"}), 400
+
+    file = request.files["file"]
+    if not file or not file.filename:
+        return jsonify({"error": "无效的文件"}), 400
+
+    # 文件类型校验
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        return jsonify({"error": f"不支持的图片格式: {content_type}"}), 400
+
+    # 文件大小校验
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > MAX_IMAGE_SIZE:
+        return jsonify({"error": f"文件过大 ({size // 1024 // 1024}MB)，最大 20MB"}), 400
+
+    # 生成安全文件名
+    import uuid
+    usage = request.form.get("type", "ref")
+    ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
+    ext = ext_map.get(content_type, ".png")
+    safe_name = f"comfycarry_{usage}_{uuid.uuid4().hex[:8]}{ext}"
+
+    input_dir = os.path.join(COMFYUI_DIR, "input")
+    os.makedirs(input_dir, exist_ok=True)
+    dest = os.path.join(input_dir, safe_name)
+
+    file.save(dest)
+    logger.info(f"[generate] 图片已上传: {safe_name} ({size} bytes)")
+    return jsonify({"filename": safe_name})
+
+
+# ── /api/generate/input_images ───────────────────────────────────────────────
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+
+@bp.route("/api/generate/input_images")
+def api_generate_input_images():
+    """列出 ComfyUI input/ 目录中的所有图片文件 (供参考图选择器使用)。"""
+    input_dir = os.path.join(COMFYUI_DIR, "input")
+    if not os.path.isdir(input_dir):
+        return jsonify({"images": []})
+    images = []
+    for f in sorted(os.listdir(input_dir)):
+        ext = os.path.splitext(f)[1].lower()
+        if ext not in IMAGE_EXTENSIONS:
+            continue
+        fpath = os.path.join(input_dir, f)
+        if not os.path.isfile(fpath):
+            continue
+        images.append({"name": f, "size": os.path.getsize(fpath)})
+    return jsonify({"images": images})
+
+
+@bp.route("/api/generate/input_image_preview")
+def api_generate_input_image_preview():
+    """返回 ComfyUI input/ 中指定图片的原始文件 (用于缩略图预览)。"""
+    from flask import send_from_directory, abort
+    name = request.args.get("name", "")
+    if not name or "/" in name or "\\" in name or ".." in name:
+        abort(400)
+    input_dir = os.path.join(COMFYUI_DIR, "input")
+    fpath = os.path.join(input_dir, name)
+    real_input = os.path.realpath(input_dir)
+    real_fpath = os.path.realpath(fpath)
+    if not real_fpath.startswith(real_input + os.sep):
+        abort(403)
+    if not os.path.isfile(fpath):
+        abort(404)
+    return send_from_directory(input_dir, name)
 
 
 # ── /api/generate/submit ─────────────────────────────────────────────────────
@@ -355,6 +484,33 @@ def api_generate_submit():
 
     # 确保归一化后的 loras 写回 data（兼容 workflow_builder 读取）
     data["loras"] = loras
+
+    # ── ControlNet 参数校验 ─────────────────────────────────────────────────
+    controlnets = data.get("controlnets") or []
+    validated_cns = []
+    input_dir = os.path.join(COMFYUI_DIR, "input")
+    for cn in controlnets:
+        cn_model = str(cn.get("model", "")).strip()
+        cn_image = str(cn.get("image", "")).strip()
+        if not cn_model or not cn_image:
+            continue
+        # 校验图片文件存在
+        img_path = os.path.join(input_dir, cn_image)
+        real_img = os.path.realpath(img_path)
+        real_input = os.path.realpath(input_dir)
+        if not real_img.startswith(real_input + os.sep):
+            return jsonify({"error": f"ControlNet 图片路径无效: {cn_image}"}), 400
+        if not os.path.isfile(img_path):
+            return jsonify({"error": f"ControlNet 参考图不存在: {cn_image}，请重新上传"}), 400
+        validated_cns.append({
+            "type": str(cn.get("type", "")),
+            "model": cn_model,
+            "image": cn_image,
+            "strength": float(cn.get("strength", 1.0)),
+            "start_percent": float(cn.get("start_percent", 0.0)),
+            "end_percent": float(cn.get("end_percent", 1.0)),
+        })
+    data["controlnets"] = validated_cns
 
     # ── 保存路径模板解析 ─────────────────────────────────────────────────────
     # 支持 WAS Image Save 标准格式: [time(%Y-%m-%d)], [time(%H%M%S)] 等

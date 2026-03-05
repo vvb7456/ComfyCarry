@@ -725,6 +725,7 @@ async function doDownload(modelId, modelType, versionId) {
   });
   if (!d) return;
   if (d.error) showToast(d.error);
+  else if (d.existed) showToast(d.message || '该模型已存在', 'warning');
   else showToast(d.message || '下载任务已提交');
 }
 

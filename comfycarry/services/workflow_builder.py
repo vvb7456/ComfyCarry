@@ -78,8 +78,8 @@ class WorkflowBuilder:
     def add_ksampler(
         self,
         model_node_id: str,
-        positive_node_id: str,
-        negative_node_id: str,
+        positive_ref,
+        negative_ref,
         latent_node_id: str,
         seed: int = -1,
         steps: int = 20,
@@ -90,11 +90,14 @@ class WorkflowBuilder:
     ) -> str:
         """
         KSampler 采样器。
+        positive_ref / negative_ref: node_id (str) 或 (node_id, output_index) 元组。
         seed=-1 → 运行时随机生成。
         输出: [node_id, 0]=LATENT
         """
         nid = self._next_id()
         actual_seed = seed if seed >= 0 else random.randint(0, 2**32 - 1)
+        pos = list(positive_ref) if isinstance(positive_ref, tuple) else [positive_ref, 0]
+        neg = list(negative_ref) if isinstance(negative_ref, tuple) else [negative_ref, 0]
         self._nodes[nid] = {
             "class_type": "KSampler",
             "inputs": {
@@ -105,8 +108,8 @@ class WorkflowBuilder:
                 "scheduler": scheduler,
                 "denoise": denoise,
                 "model": [model_node_id, 0],
-                "positive": [positive_node_id, 0],
-                "negative": [negative_node_id, 0],
+                "positive": pos,
+                "negative": neg,
                 "latent_image": [latent_node_id, 0],
             },
         }
@@ -205,10 +208,71 @@ class WorkflowBuilder:
         }
         return nid
 
-    # Phase 2+ 扩展占位符:
-    # def add_load_image(self, image_path): ...          ← Img2Img / ControlNet
-    # def add_vae_encode(self, image_node_id, vae_node_id): ...
-    # def add_controlnet_apply(self, ...): ...
+    # ── ControlNet 模块 ─────────────────────────────────────────────────────
+
+    def add_load_image(self, image_name: str) -> str:
+        """
+        加载已上传到 ComfyUI input/ 目录的图片。
+        image_name: 文件名 (不含路径)，如 "pose_abc123.png"
+        输出: [node_id, 0]=IMAGE, [node_id, 1]=MASK
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "LoadImage",
+            "inputs": {
+                "image": image_name,
+            },
+        }
+        return nid
+
+    def add_controlnet_loader(self, control_net_name: str) -> str:
+        """
+        加载 ControlNet 模型。
+        control_net_name: 模型文件名 (可含子目录前缀)
+        输出: [node_id, 0]=CONTROL_NET
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "ControlNetLoader",
+            "inputs": {
+                "control_net_name": control_net_name,
+            },
+        }
+        return nid
+
+    def add_controlnet_apply_advanced(
+        self,
+        positive_ref: tuple,
+        negative_ref: tuple,
+        control_net_node_id: str,
+        image_node_id: str,
+        strength: float = 1.0,
+        start_percent: float = 0.0,
+        end_percent: float = 1.0,
+    ) -> str:
+        """
+        应用 ControlNet (ControlNetApplyAdvanced)。
+        链式拼接: 多个 ControlNet 顺序应用时，后一个的 pos/neg 接前一个的输出。
+        positive_ref / negative_ref: (node_id, output_index) 元组
+        输出: [node_id, 0]=positive CONDITIONING, [node_id, 1]=negative CONDITIONING
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "ControlNetApplyAdvanced",
+            "inputs": {
+                "positive": list(positive_ref),
+                "negative": list(negative_ref),
+                "control_net": [control_net_node_id, 0],
+                "image": [image_node_id, 0],
+                "strength": max(0.0, min(float(strength), 2.0)),
+                "start_percent": max(0.0, min(float(start_percent), 1.0)),
+                "end_percent": max(0.0, min(float(end_percent), 1.0)),
+            },
+        }
+        return nid
+
+    # Phase 3+ 占位符:
+    # def add_vae_encode(self, image_node_id, vae_node_id): ...  ← Img2Img / HiRes Fix
     # def add_inpaint_model_conditioning(self, ...): ...
 
     # ── AI 放大模块 ──────────────────────────────────────────────────────────
@@ -301,6 +365,13 @@ def build_sdxl_workflow(params: dict) -> dict:
         upscale_mode    (str)       — 放大模式: 4x / 4x_overlapped_checkboard / 4x_overlapped_constant
         upscale_tile_batch_size (int) — 分块大小 1-32，默认 8
         upscale_downscale_method (str) — 缩放算法: lanczos / bicubic / bilinear / area / nearest-exact
+        controlnets     (list)      — ControlNet 列表: [{type, model, image, strength, start_percent, end_percent}, ...]
+                                      type: "pose" | "canny" | "depth"
+                                      model: ControlNet 模型文件名
+                                      image: 已上传到 ComfyUI input/ 的图片文件名
+                                      strength: 0.0-2.0 (默认 1.0)
+                                      start_percent: 0.0-1.0 (默认 0.0)
+                                      end_percent: 0.0-1.0 (默认 1.0)
 
     返回值: ComfyUI /prompt API 所需的 prompt dict
     """
@@ -329,6 +400,26 @@ def build_sdxl_workflow(params: dict) -> dict:
     positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
     negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
 
+    # 3.5 ControlNet 链式应用 (在 pos/neg 与 KSampler 之间)
+    pos_ref = (positive, 0)
+    neg_ref = (negative, 0)
+    controlnets = params.get("controlnets") or []
+    for cn in controlnets:
+        cn_model = str(cn.get("model", "")).strip()
+        cn_image = str(cn.get("image", "")).strip()
+        if not cn_model or not cn_image:
+            continue
+        cn_loader = b.add_controlnet_loader(cn_model)
+        cn_img = b.add_load_image(cn_image)
+        cn_apply = b.add_controlnet_apply_advanced(
+            pos_ref, neg_ref, cn_loader, cn_img,
+            strength=float(cn.get("strength", 1.0)),
+            start_percent=float(cn.get("start_percent", 0.0)),
+            end_percent=float(cn.get("end_percent", 1.0)),
+        )
+        pos_ref = (cn_apply, 0)
+        neg_ref = (cn_apply, 1)
+
     # 4. 空 Latent (支持批量)
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
     latent = b.add_empty_latent(
@@ -340,8 +431,8 @@ def build_sdxl_workflow(params: dict) -> dict:
     # 5. 采样
     sampled = b.add_ksampler(
         model_ref,
-        positive,
-        negative,
+        pos_ref,
+        neg_ref,
         latent,
         seed=int(params.get("seed", -1)),
         steps=int(params.get("steps", 20)),

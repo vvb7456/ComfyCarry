@@ -1,14 +1,6 @@
 # 开发文档（不提交到仓库）
 .github/copilot-instructions.md
-CIVICOMFY_INTEGRATION.md
-DELIVERY_SUMMARY.md
-GIST_TUTORIAL.md
-IMPLEMENTATION_SUMMARY.md
-QUICKSTART.md
-QUICK_REFERENCE.md
-RUNPOD_MODELS_CONFIG.md
-TESTING_AND_DIAGNOSTICS.md
-v4.6.1_UPDATE.md
+docs/
 
 # 旧代码归档 (已移至 _archive/ 目录，目录内含 .gitignore)
 _archive/
@@ -23,7 +15,6 @@ models.csv.template
 /workspace/
 models.csv
 lora_scan_result.csv
-test/
 tests/
 .pytest_cache/
 pytest.ini
@@ -47,7 +38,6 @@ docker/docker-compose.yml
 *.preview.webp
 .venv/
 __pycache__/
+.vscode/
 *.bak
-cloudflared
-docs/
 comfycarry-config-test.json
