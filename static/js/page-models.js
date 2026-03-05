@@ -28,6 +28,7 @@ let facetsLoaded = false;
 let _facetsPromise = null;   // 防止并发重复加载
 let dlStatusInterval = null;
 let _dlCompletedIds = new Set();
+let _localCivitaiIds = new Set();  // CivitAI modelId → 本地已存在
 
 const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion': 'Embedding', 'Controlnet': 'ControlNet', 'Upscaler': 'Upscaler', 'VAE': 'VAE', 'Poses': 'Poses' };
 
@@ -252,6 +253,11 @@ async function loadLocalModels() {
     const r = await fetch(`/api/local_models?category=${cat}`);
     const d = await r.json();
     localModelsData = d.models || [];
+    // 更新本地 CivitAI ID 索引
+    _localCivitaiIds.clear();
+    for (const m of localModelsData) {
+      if (m.civitai_id) _localCivitaiIds.add(String(m.civitai_id));
+    }
     const infoCount = localModelsData.filter(m => m.has_info).length;
     status.innerHTML = `共 ${d.total} 个模型 · ${infoCount} 个已有元数据`;
 
@@ -269,10 +275,6 @@ async function loadLocalModels() {
 function renderLocalModelCard(m, idx) {
   const badgeClass = getBadgeClass(m.category);
   const sizeStr = fmtBytes(m.size_bytes);
-  const twHtml = (m.trained_words || []).slice(0, 8).map(w =>
-    `<span class="tw-tag" onclick="copyText('${escHtml(w).replace(/'/g, "\\'")}')" title="点击复制">${escHtml(w)}</span>`
-  ).join('');
-
   let imgTag = '', zoomUrl = '';
   if (m.has_preview && m.preview_path) {
     const pUrl = `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}`;
@@ -302,7 +304,6 @@ function renderLocalModelCard(m, idx) {
         ${m.base_model ? `<span class="badge badge-other">${m.base_model}</span>` : ''}
         <span class="model-card-size">${sizeStr}</span>
       </div>
-      ${twHtml ? `<div class="model-card-tags">${twHtml}</div>` : ''}
       <div class="model-card-actions">
         <button class="btn btn-sm btn-success" onclick="openLocalMeta(${idx})">详情</button>
         <button class="${fetchBtnClass}" onclick="fetchModelInfo(${idx})" title="${fetchBtnTitle}">${fetchBtnText}</button>
@@ -647,6 +648,7 @@ function renderCivitCard(h) {
   const bm = ver?.baseModel || '';
   const inCart = selectedModels.has(String(h.id));
   const vCount = allVersions.length;
+  const isLocal = _localCivitaiIds.has(String(h.id));
 
   // Cache data for cart and metadata (avoids unsafe inline JSON)
   searchResultsCache[String(h.id)] = {
@@ -673,7 +675,9 @@ function renderCivitCard(h) {
       <div class="model-card-actions">
         <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${h.id}')">详情</button>
         <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '移除' : '收藏'}</button>
-        <button class="btn btn-sm" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">下载</button>
+        ${isLocal
+          ? `<button class="btn btn-sm" disabled style="opacity:.5;cursor:default">已有</button>`
+          : `<button class="btn btn-sm" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">下载</button>`}
       </div>
     </div></div>`;
 }
@@ -715,7 +719,7 @@ async function doDownload(modelId, modelType, versionId) {
   showToast(`正在发送下载请求: ${modelId}${versionId ? ' (v' + versionId + ')' : ''}...`);
   const payload = { model_id: modelId, model_type: modelType };
   if (versionId) payload.version_id = versionId;
-  const d = await apiFetch('/api/download', {
+  const d = await apiFetch('/api/downloads/civitai', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
@@ -891,7 +895,7 @@ async function batchDownloadCart() {
     const versionId = m.versionId || null;
     const payload = { model_id: id, model_type: modelType };
     if (versionId) payload.version_id = versionId;
-    const d = await apiFetch('/api/download', {
+    const d = await apiFetch('/api/downloads/civitai', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
@@ -923,7 +927,7 @@ function loadCartFromStorage() {
   } catch (e) { }
 }
 
-// ========== Download Status ==========
+// ========== Download Status (using /api/downloads engine) ==========
 
 async function refreshDownloadStatus() {
   const activeEl = document.getElementById('dl-active-content');
@@ -931,73 +935,88 @@ async function refreshDownloadStatus() {
   const failedEl = document.getElementById('dl-failed-content');
   if (!activeEl) return;
   try {
-    const r = await fetch('/api/download/status');
-    const d = await r.json();
-    const active = d.active || [];
-    const queue = d.queue || [];
-    const history = d.history || [];
-    const completed = history.filter(h => h.status === 'completed');
-    const failed = history.filter(h => h.status === 'failed' || h.status === 'cancelled');
+    const r = await apiFetch('/api/downloads');
+    if (!r) return;
+    const allTasks = r.tasks || [];
 
-    // Active + Queue
-    if (active.length === 0 && queue.length === 0) {
+    // Classify tasks by status
+    const active = allTasks.filter(t => t.status === 'active');
+    const paused = allTasks.filter(t => t.status === 'paused');
+    const queued = allTasks.filter(t => t.status === 'queued');
+    const completed = allTasks.filter(t => t.status === 'complete');
+    const failed = allTasks.filter(t => t.status === 'failed');
+
+    // Helper: extract meta fields
+    const _meta = (t, k) => (t.meta || {})[k] || '';
+
+    // ── Active + Paused + Queued ────────────────────────────
+    const runningTasks = [...active, ...paused, ...queued];
+    if (runningTasks.length === 0) {
       activeEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">无活跃的下载任务</div>';
     } else {
       let html = '';
-      active.forEach(dl => {
+      runningTasks.forEach(dl => {
+        const dlId = dl.download_id;
         const pct = (dl.progress || 0).toFixed(1);
         const speed = dl.speed ? fmtBytes(dl.speed) + '/s' : '';
-        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
-        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
+        const imgUrl = _meta(dl, 'image_url');
+        const thumbHtml = imgUrl ? `<div class="dl-item-thumb"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const mType = _meta(dl, 'model_type');
+        const typeHtml = mType ? `<span class="badge ${getBadgeClass(mType)}" style="font-size:.65rem">${mType}</span>` : '';
+        const displayName = _meta(dl, 'model_name') || dl.filename || dlId;
+        const versionName = _meta(dl, 'version_name');
+        const isPaused = dl.status === 'paused';
+        const isQueued = dl.status === 'queued';
+
+        // Action buttons: pause/resume + delete
+        let actionsHtml = '';
+        if (isQueued) {
+          actionsHtml = `<span style="font-size:.72rem;color:var(--t3)">等待中</span>
+            <button class="btn btn-sm btn-danger" onclick="cancelDownload('${dlId}')" title="取消">${msIcon('delete')}</button>`;
+        } else if (isPaused) {
+          actionsHtml = `<button class="btn btn-sm" onclick="resumeDownload('${dlId}')" title="恢复下载">${msIcon('play_arrow','ms-sm')}</button>
+            <button class="btn btn-sm btn-danger" onclick="cancelDownload('${dlId}')" title="取消">${msIcon('delete')}</button>`;
+        } else {
+          actionsHtml = `<button class="btn btn-sm" onclick="pauseDownload('${dlId}')" title="暂停">${msIcon('pause','ms-sm')}</button>
+            <button class="btn btn-sm btn-danger" onclick="cancelDownload('${dlId}')" title="取消">${msIcon('delete')}</button>`;
+        }
+
+        const statusLabel = isPaused ? '<span style="color:var(--amber);font-size:.72rem">已暂停</span>' : '';
+
         html += `<div class="dl-item" style="flex-wrap:wrap">
           ${thumbHtml}
           <div class="dl-item-info">
-            <span class="dl-item-name" title="${dl.filename || ''}">${dl.model_name || dl.filename || dl.id}</span>
-            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span>${speed ? `<span>${speed}</span>` : ''}</div>
+            <span class="dl-item-name" title="${dl.filename || ''}">${displayName}</span>
+            <div class="dl-item-meta">${typeHtml}<span>${versionName}</span>${statusLabel}</div>
           </div>
-          <div class="dl-item-actions">
-            <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
-          </div>
-          <div style="width:100%;margin-top:4px"><div class="progress-bar" style="height:6px"><div class="progress-fill" style="width:${pct}%;background:var(--ac);transition:width .3s"></div></div><span style="font-size:.72rem;color:var(--t3)">${pct}%</span></div>
-        </div>`;
-      });
-      queue.forEach(dl => {
-        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
-        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
-        html += `<div class="dl-item">
-          ${thumbHtml}
-          <div class="dl-item-info">
-            <span class="dl-item-name">${dl.model_name || dl.filename || dl.id}</span>
-            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span><span>等待中</span></div>
-          </div>
-          <div class="dl-item-actions">
-            <button class="btn btn-sm btn-danger" style="font-size:.7rem" onclick="cancelDownload('${dl.id}')">取消</button>
-          </div>
+          <div class="dl-item-actions">${actionsHtml}</div>
+          ${!isQueued ? `<div style="width:100%;margin-top:4px"><div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:2px"><span style="font-size:.72rem;color:var(--t3)">${speed && !isPaused ? speed : ''}</span><span style="font-size:.72rem;color:var(--t3)">${pct}%</span></div><div class="progress-bar" style="height:6px"><div class="progress-fill" style="width:${pct}%;background:${isPaused ? 'var(--amber)' : 'var(--ac)'};transition:width .3s"></div></div></div>` : ''}
         </div>`;
       });
       activeEl.innerHTML = html;
     }
 
-    // Check for new completions → auto-fetch metadata
+    // ── Completed ───────────────────────────────────────────
     const prevSize = _dlCompletedIds.size;
-    completed.forEach(dl => _dlCompletedIds.add(dl.id));
+    completed.forEach(dl => _dlCompletedIds.add(dl.download_id));
     if (prevSize > 0 && _dlCompletedIds.size > prevSize) {
       setTimeout(() => _autoFetchMetadataForNewDownloads(), 3000);
     }
 
-    // Completed
     if (completed.length === 0) {
       completedEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无已完成的下载</div>';
     } else {
       let html = '';
       completed.forEach(dl => {
-        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
-        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
+        const imgUrl = _meta(dl, 'image_url');
+        const thumbHtml = imgUrl ? `<div class="dl-item-thumb"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const mType = _meta(dl, 'model_type');
+        const typeHtml = mType ? `<span class="badge ${getBadgeClass(mType)}" style="font-size:.65rem">${mType}</span>` : '';
         html += `<div class="dl-item">
           ${thumbHtml}
           <div class="dl-item-info">
-            <span class="dl-item-name">${dl.model_name || dl.filename || dl.id}</span>
-            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span></div>
+            <span class="dl-item-name">${_meta(dl, 'model_name') || dl.filename || dl.download_id}</span>
+            <div class="dl-item-meta">${typeHtml}<span>${_meta(dl, 'version_name')}</span></div>
           </div>
         </div>`;
       });
@@ -1005,31 +1024,33 @@ async function refreshDownloadStatus() {
       completedEl.innerHTML = html;
     }
 
-    // Failed
+    // ── Failed ──────────────────────────────────────────────
     if (failed.length === 0) {
       failedEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无失败的下载</div>';
     } else {
       let html = '';
       failed.forEach(dl => {
-        const thumbHtml = dl.image_url ? `<div class="dl-item-thumb"><img src="${dl.image_url}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
-        const typeHtml = dl.model_type ? `<span class="badge ${getBadgeClass(dl.model_type)}" style="font-size:.65rem">${dl.model_type}</span>` : '';
+        const imgUrl = _meta(dl, 'image_url');
+        const thumbHtml = imgUrl ? `<div class="dl-item-thumb"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+        const mType = _meta(dl, 'model_type');
+        const typeHtml = mType ? `<span class="badge ${getBadgeClass(mType)}" style="font-size:.65rem">${mType}</span>` : '';
         html += `<div class="dl-item">
           ${thumbHtml}
           <div class="dl-item-info">
-            <span class="dl-item-name">${dl.model_name || dl.filename || dl.id}</span>
-            <div class="dl-item-meta">${typeHtml}<span>${dl.version_name || ''}</span>${dl.error ? `<span style="color:var(--red)">${dl.error}</span>` : ''}</div>
+            <span class="dl-item-name">${_meta(dl, 'model_name') || dl.filename || dl.download_id}</span>
+            <div class="dl-item-meta">${typeHtml}<span>${_meta(dl, 'version_name')}</span>${dl.error ? `<span style="color:var(--red)">${dl.error}</span>` : ''}</div>
           </div>
           <div class="dl-item-actions">
-            <button class="btn btn-sm" style="font-size:.7rem" onclick="retryDownload('${dl.id}')">重试</button>
+            <button class="btn btn-sm" style="font-size:.7rem" onclick="retryDownload('${dl.download_id}')">重试</button>
           </div>
         </div>`;
       });
       failedEl.innerHTML = html;
     }
 
-    // Update sub-tab counts
+    // ── Sub-tab counts ──────────────────────────────────────
     document.querySelectorAll('[data-dltab="active"]').forEach(t => {
-      t.textContent = `队列${active.length + queue.length > 0 ? ' (' + (active.length + queue.length) + ')' : ''}`;
+      t.innerHTML = `<span class="ms ms-sm" style="color:#34d399">sync</span> 队列${runningTasks.length > 0 ? ' (' + runningTasks.length + ')' : ''}`;
     });
     document.querySelectorAll('[data-dltab="completed"]').forEach(t => {
       t.innerHTML = `${msIcon('check_circle','ms-sm')} 已完成${completed.length > 0 ? ' (' + completed.length + ')' : ''}`;
@@ -1053,22 +1074,34 @@ function stopDlStatusPolling() {
 }
 
 async function cancelDownload(id) {
-  const d = await apiFetch('/api/download/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
-  if (!d) return;
+  await apiFetch(`/api/downloads/${id}/cancel`, { method: 'POST' });
   showToast('已取消');
   refreshDownloadStatus();
 }
 
+async function pauseDownload(id) {
+  const d = await apiFetch(`/api/downloads/${id}/pause`, { method: 'POST' });
+  if (d && d.error) showToast(d.error);
+  else showToast('已暂停');
+  refreshDownloadStatus();
+}
+
+async function resumeDownload(id) {
+  const d = await apiFetch(`/api/downloads/${id}/resume`, { method: 'POST' });
+  if (d && d.error) showToast(d.error);
+  else showToast('已恢复');
+  refreshDownloadStatus();
+}
+
 async function retryDownload(id) {
-  const d = await apiFetch('/api/download/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ download_id: id }) });
+  const d = await apiFetch(`/api/downloads/${id}/retry`, { method: 'POST' });
   if (!d) return;
   showToast(d.message || '已重试');
   refreshDownloadStatus();
 }
 
 async function clearDlHistory() {
-  const d = await apiFetch('/api/download/clear_history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-  if (!d) return;
+  await apiFetch('/api/downloads/clear', { method: 'POST' });
   showToast('历史已清除');
   refreshDownloadStatus();
 }
@@ -1150,7 +1183,7 @@ function renderPendingList() {
 
   // Update tab badge count
   document.querySelectorAll('[data-dltab="pending"]').forEach(t => {
-    t.textContent = `已选${selectedModels.size > 0 ? ' (' + selectedModels.size + ')' : ''}`;
+    t.innerHTML = `<span class="ms ms-sm" style="color:#f472b6">push_pin</span> 已选${selectedModels.size > 0 ? ' (' + selectedModels.size + ')' : ''}`;
   });
 }
 
@@ -1205,6 +1238,8 @@ window.batchDownloadCart = batchDownloadCart;
 // Download status
 window.switchDlTab = switchDlTab;
 window.cancelDownload = cancelDownload;
+window.pauseDownload = pauseDownload;
+window.resumeDownload = resumeDownload;
 window.retryDownload = retryDownload;
 window.clearDlHistory = clearDlHistory;
 window.renderDownloadsTab = renderDownloadsTab;
@@ -1684,27 +1719,35 @@ async function searchModelFromWorkflow(name, type) {
 }
 
 // ── HF 下载状态跟踪 ──
-const _hfDownloads = new Map(); // name → {interval, el}
+const _hfDownloads = new Map(); // name → {evtSource, el}
 
 function downloadHfModel(name, url, type) {
   const basename = name.replace(/^.*[\\\/]/, '');
-  // 调用后端 aria2c 下载 HF 模型到对应目录
-  apiFetch('/api/models/download-hf', {
+  // 通过通用下载引擎提交下载
+  apiFetch('/api/downloads', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, filename: basename, type })
+    body: JSON.stringify({
+      url,
+      filename: basename,
+      model_type: type,
+      meta: { source: 'huggingface', model_type: type },
+    })
   }).then(data => {
-    if (data && data.ok) {
-      showToast(data.msg || '下载已开始', 'success');
-      // 启动进度轮询
-      _startHfProgressPoll(basename, type);
+    if (data && (data.status === 'active' || data.status === 'complete')) {
+      if (data.status === 'complete') {
+        showToast(`${basename} 已存在`, 'info');
+        return;
+      }
+      showToast('下载已开始', 'success');
+      _startHfProgressSSE(basename, data.download_id);
     } else {
       showToast('下载失败: ' + (data?.error || '未知错误'), 'error');
     }
   }).catch(e => showToast('请求失败: ' + e.message, 'error'));
 }
 
-function _startHfProgressPoll(filename, type) {
+function _startHfProgressSSE(filename, downloadId) {
   // 找到该模型在列表中的按钮区域并替换为进度条
   const rows = document.querySelectorAll('.wf-model-row');
   let targetRow = null;
@@ -1721,42 +1764,54 @@ function _startHfProgressPoll(filename, type) {
     const origHtml = actionCell.innerHTML;
     actionCell.innerHTML = `<span style="color:var(--amber);font-size:.8rem">
       <span class="ms ms-sm" style="font-size:14px;vertical-align:middle;animation:spin 1s linear infinite">progress_activity</span>
-      下载中...
+      下载中…
     </span>
-    <button class="btn btn-sm" onclick="_cancelHfDownload('${escAttr(filename)}')" style="font-size:.7rem;padding:1px 6px;background:var(--red);color:#fff;margin-left:4px">取消</button>`;
+    <button class="btn btn-sm" onclick="_cancelHfDownload('${escAttr(filename)}','${escAttr(downloadId)}')" style="font-size:.7rem;padding:1px 6px;background:var(--red);color:#fff;margin-left:4px">取消</button>`;
 
-    // 轮询检查文件是否出现 (每 3 秒)
-    const interval = setInterval(async () => {
+    // 监听 SSE 进度事件
+    const evtSource = new EventSource(`/api/downloads/${downloadId}/events`);
+    evtSource.onmessage = (e) => {
       try {
-        const resp = await apiFetch(`/api/models/download-hf/status?filename=${encodeURIComponent(filename)}&type=${encodeURIComponent(type)}`);
-        if (resp && resp.exists) {
-          clearInterval(interval);
+        const d = JSON.parse(e.data);
+        if (d.status === 'complete') {
+          evtSource.close();
           _hfDownloads.delete(filename);
-          // 更新为已完成状态
           const statusEl = targetRow.querySelector('.wf-model-status');
           if (statusEl) statusEl.innerHTML = '<span class="ms ms-sm" style="color:var(--green)">check_circle</span>';
           actionCell.innerHTML = '<span style="color:var(--green);font-size:.8rem">已下载</span>';
           showToast(`${filename} 下载完成`, 'success');
+        } else if (d.status === 'failed' || d.status === 'cancelled') {
+          evtSource.close();
+          _hfDownloads.delete(filename);
+          actionCell.innerHTML = origHtml;
+          if (d.status === 'failed') showToast(`${filename} 下载失败`, 'error');
+        } else if (d.progress > 0) {
+          // 更新进度文本
+          actionCell.querySelector('span')
+            && (actionCell.firstElementChild.innerHTML = `<span class="ms ms-sm" style="font-size:14px;vertical-align:middle;animation:spin 1s linear infinite">progress_activity</span> ${Math.round(d.progress)}%`);
         }
-      } catch (e) { /* 忽略轮询错误 */ }
-    }, 3000);
+      } catch (_) { /* ignore */ }
+    };
+    evtSource.onerror = () => {
+      evtSource.close();
+      _hfDownloads.delete(filename);
+      actionCell.innerHTML = origHtml;
+    };
 
-    _hfDownloads.set(filename, { interval, el: actionCell, origHtml });
+    _hfDownloads.set(filename, { evtSource, el: actionCell, origHtml, downloadId });
   }
 }
 
-function _cancelHfDownload(filename) {
+function _cancelHfDownload(filename, downloadId) {
   const entry = _hfDownloads.get(filename);
   if (entry) {
-    clearInterval(entry.interval);
+    if (entry.evtSource) entry.evtSource.close();
     entry.el.innerHTML = entry.origHtml;
     _hfDownloads.delete(filename);
   }
   // 通知后端取消 (best effort)
-  apiFetch('/api/models/download-hf/cancel', {
+  apiFetch(`/api/downloads/${downloadId}/cancel`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename })
   }).catch(() => {});
   showToast('已取消下载', 'info');
 }

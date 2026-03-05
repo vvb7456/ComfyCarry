@@ -240,6 +240,7 @@ def _fetch_generate_options() -> dict:
     result["checkpoint_info"] = ckpt_info
     result["checkpoint_archs"] = _scan_model_archs(ckpt_list, "models/checkpoints")
     result["lora_archs"] = _scan_model_archs(lora_list, "models/loras")
+    result["comfyui_dir"] = COMFYUI_DIR
 
     _options_cache = result
     _options_cache_time = time.time()
@@ -421,3 +422,4 @@ def api_generate_submit():
     logger.info(f"[generate] 提交成功 prompt_id={prompt_id} model={model_type} batch={batch_size}")
 
     return jsonify({"prompt_id": prompt_id, "status": "queued"})
+

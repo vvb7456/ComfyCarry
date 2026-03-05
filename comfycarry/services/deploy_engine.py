@@ -302,8 +302,6 @@ def _run_deploy(config):
         _step_accelerators(config, PY)
         _step_plugins(config, PY)
         _step_sync_assets(config)
-        _step_download_aura(config)
-        _step_download_sam(config)
         _step_start_services(config, cfg, PY)
 
     except Exception as e:
@@ -728,66 +726,6 @@ def _step_sync_assets(config):
         _deploy_log("✅ 资产同步完成")
     else:
         _deploy_log("没有 deploy 同步规则, 跳过")
-
-
-def _step_download_aura(config):
-    """STEP 9: 下载 AuraSR 模型"""
-    plugins = [p for p in config.get("plugins", []) if p]
-    aura_plugin_url = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
-    download_aura = config.get("download_aura_model", True)
-    if aura_plugin_url not in plugins or not download_aura:
-        return
-
-    _deploy_step("下载 AuraSR 模型")
-    aura_model = Path("/workspace/ComfyUI/models/Aura-SR/model.safetensors")
-    aura_config = Path("/workspace/ComfyUI/models/Aura-SR/config.json")
-    if aura_model.exists() and aura_config.exists():
-        _deploy_log("AuraSR V2 模型已存在, 跳过下载")
-        return
-
-    _deploy_log("下载 AuraSR V2...")
-    _deploy_exec("mkdir -p /workspace/ComfyUI/models/Aura-SR")
-    if not aura_model.exists():
-        _deploy_exec(
-            'aria2c -x 16 -s 16 --console-log-level=warn '
-            '-d "/workspace/ComfyUI/models/Aura-SR" -o "model.safetensors" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors'
-            '?download=true"',
-            timeout=900, label="AuraSR model.safetensors"
-        )
-    if not aura_config.exists():
-        _deploy_exec(
-            'aria2c -x 16 -s 16 --console-log-level=warn '
-            '-d "/workspace/ComfyUI/models/Aura-SR" -o "config.json" '
-            '"https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json'
-            '?download=true"',
-            timeout=60, label="AuraSR config.json"
-        )
-
-
-def _step_download_sam(config):
-    """STEP 9b: 下载 Impact Pack SAM 模型"""
-    plugins = [p for p in config.get("plugins", []) if p]
-    impact_plugin_url = "https://github.com/ltdrdata/ComfyUI-Impact-Pack"
-    download_sam = config.get("download_sam_model", True)
-    if impact_plugin_url not in plugins or not download_sam:
-        return
-
-    _deploy_step("下载 SAM 模型")
-    sam_model = Path("/workspace/ComfyUI/models/sams/sam_vit_b_01ec64.pth")
-    if sam_model.exists():
-        _deploy_log("SAM ViT-B 模型已存在, 跳过下载")
-        return
-
-    _deploy_log("下载 SAM ViT-B (~375MB)...")
-    _deploy_exec("mkdir -p /workspace/ComfyUI/models/sams")
-    _deploy_exec(
-        'aria2c -x 16 -s 16 --console-log-level=warn '
-        '-d "/workspace/ComfyUI/models/sams" -o "sam_vit_b_01ec64.pth" '
-        '"https://huggingface.co/ybelkada/segment-anything/resolve/main/checkpoints/sam_vit_b_01ec64.pth'
-        '?download=true"',
-        timeout=600, label="SAM ViT-B"
-    )
 
 
 def _step_start_services(config, cfg, PY):

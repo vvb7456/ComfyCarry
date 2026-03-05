@@ -8,10 +8,9 @@ ComfyCarry — 模型管理路由
 """
 
 import json
+import logging
 import os
 import re
-import subprocess
-import threading
 from pathlib import Path
 
 import requests
@@ -27,6 +26,8 @@ from ..config import (
     get_extra_model_paths,
 )
 from ..utils import _get_api_key, _run_cmd, _sha256_file
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("models", __name__)
 
@@ -358,183 +359,6 @@ def api_fetch_model_info():
                 pass
 
     return jsonify({"ok": True, "info": info_data, "hash": file_hash})
-
-
-# ====================================================================
-# Enhanced-Civicomfy 下载代理
-# ====================================================================
-@bp.route("/api/download", methods=["POST"])
-def api_download_model():
-    """代理请求到 ComfyUI 的 Enhanced-Civicomfy 下载接口"""
-    data = request.get_json(force=True) or {}
-    api_key = data.get("api_key") or _get_api_key()
-
-    payload = {
-        "model_url_or_id": data.get("model_id", ""),
-        "model_type": data.get("model_type", "checkpoint"),
-        "api_key": api_key,
-        "num_connections": data.get("num_connections", 4),
-    }
-    if data.get("version_id"):
-        payload["model_version_id"] = int(data["version_id"])
-    if data.get("custom_filename"):
-        payload["custom_filename"] = data["custom_filename"]
-
-    try:
-        resp = requests.post(f"{COMFYUI_URL}/civitai/download", json=payload, timeout=30)
-        return Response(resp.content, status=resp.status_code, mimetype="application/json")
-    except requests.exceptions.ConnectionError:
-        return jsonify({"error": "ComfyUI 未运行，无法下载。请先启动 ComfyUI 服务。"}), 503
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/api/download/status")
-def api_download_status():
-    """获取 Civicomfy 下载状态"""
-    try:
-        resp = requests.get(f"{COMFYUI_URL}/civitai/status", timeout=5)
-        return Response(resp.content, status=resp.status_code, mimetype="application/json")
-    except Exception:
-        return jsonify({"queue": [], "active": [], "history": []}), 200
-
-
-@bp.route("/api/download/cancel", methods=["POST"])
-def api_download_cancel():
-    """取消指定下载任务"""
-    data = request.get_json(force=True) or {}
-    download_id = data.get("download_id", "")
-    if not download_id:
-        return jsonify({"error": "download_id required"}), 400
-    try:
-        resp = requests.post(f"{COMFYUI_URL}/civitai/cancel", json={"download_id": download_id}, timeout=10)
-        return Response(resp.content, status=resp.status_code, mimetype="application/json")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/api/download/retry", methods=["POST"])
-def api_download_retry():
-    """重试失败/取消的下载"""
-    data = request.get_json(force=True) or {}
-    download_id = data.get("download_id", "")
-    if not download_id:
-        return jsonify({"error": "download_id required"}), 400
-    try:
-        resp = requests.post(f"{COMFYUI_URL}/civitai/retry", json={"download_id": download_id}, timeout=10)
-        return Response(resp.content, status=resp.status_code, mimetype="application/json")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/api/download/clear_history", methods=["POST"])
-def api_download_clear_history():
-    """清除下载历史"""
-    try:
-        resp = requests.post(f"{COMFYUI_URL}/civitai/clear_history", json={}, timeout=10)
-        return Response(resp.content, status=resp.status_code, mimetype="application/json")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# ====================================================================
-# HuggingFace 模型直接下载
-# ====================================================================
-_hf_download_procs: dict[str, subprocess.Popen] = {}  # filename → Popen
-
-@bp.route("/api/models/download-hf", methods=["POST"])
-def api_download_hf():
-    """通过 aria2c 下载 HuggingFace 模型到对应 MODEL_DIRS 目录"""
-    data = request.get_json(force=True) or {}
-    url = data.get("url", "").strip()
-    filename = data.get("filename", "").strip()
-    model_type = data.get("type", "").strip()
-
-    if not url or not filename:
-        return jsonify({"error": "url 和 filename 必填"}), 400
-
-    # 确定保存目录
-    rel_dir = MODEL_DIRS.get(model_type)
-    if not rel_dir:
-        # fallback: 放到 models/<type>
-        rel_dir = f"models/{model_type}" if model_type else "models/other"
-
-    save_dir = Path(COMFYUI_DIR) / rel_dir
-    save_dir.mkdir(parents=True, exist_ok=True)
-    dest = save_dir / filename
-
-    if dest.exists():
-        return jsonify({"ok": True, "msg": f"{filename} 已存在，跳过下载"}), 200
-
-    # aria2c 后台下载
-    def _do_download():
-        try:
-            cmd = [
-                "aria2c", "-x", "8", "-s", "8",
-                "--file-allocation=falloc",
-                "-d", str(save_dir),
-                "-o", filename,
-            ]
-            # 传递代理设置 (aria2c 不自动读取 HTTP_PROXY 环境变量)
-            proxy = (os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
-                     or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or "")
-            if proxy:
-                cmd.extend(["--all-proxy", proxy])
-            cmd.append(url)
-            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            _hf_download_procs[filename] = proc
-            proc.wait(timeout=3600)
-        except Exception:
-            pass
-        finally:
-            _hf_download_procs.pop(filename, None)
-
-    t = threading.Thread(target=_do_download, daemon=True)
-    t.start()
-
-    return jsonify({"ok": True, "msg": f"已开始下载 {filename} → {rel_dir}/"}), 200
-
-
-@bp.route("/api/models/download-hf/status")
-def api_download_hf_status():
-    """查询 HF 模型文件是否已下载完成"""
-    filename = request.args.get("filename", "").strip()
-    model_type = request.args.get("type", "").strip()
-
-    if not filename:
-        return jsonify({"error": "filename required"}), 400
-
-    rel_dir = MODEL_DIRS.get(model_type, f"models/{model_type}" if model_type else "models/other")
-    dest = Path(COMFYUI_DIR) / rel_dir / filename
-
-    downloading = filename in _hf_download_procs
-    exists = dest.exists() and not downloading  # 下载完成后才算存在
-
-    return jsonify({"exists": exists, "downloading": downloading})
-
-
-@bp.route("/api/models/download-hf/cancel", methods=["POST"])
-def api_download_hf_cancel():
-    """取消 HF 模型下载"""
-    data = request.get_json(force=True) or {}
-    filename = data.get("filename", "").strip()
-
-    if not filename:
-        return jsonify({"error": "filename required"}), 400
-
-    proc = _hf_download_procs.pop(filename, None)
-    if proc:
-        try:
-            proc.terminate()
-            proc.wait(timeout=5)
-        except Exception:
-            try:
-                proc.kill()
-            except Exception:
-                pass
-        return jsonify({"ok": True, "msg": f"已取消 {filename}"})
-
-    return jsonify({"ok": True, "msg": "未找到活跃下载"})
 
 
 # ====================================================================

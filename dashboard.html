@@ -1158,46 +1158,139 @@
                 <!-- ═══ 下半：功能模块 Tab ══════════════════════════════ -->
                 <div style="margin-top:var(--sp-4)">
                     <div class="gen-module-tabs" id="gen-module-tabs" role="tablist">
-                        <button class="gen-mod-tab" data-module="lora" role="tab" aria-selected="false">
-                            <span class="ms ms-sm">extension</span> LoRA 风格
+                        <button class="gen-mod-tab active" data-module="lora" role="tab" aria-selected="true">
+                            <span class="ms ms-sm">extension</span> LoRA
+                            <input type="checkbox" class="gen-mod-tab-chk" data-module="lora" title="启用 LoRA">
                         </button>
-                        <button class="gen-mod-tab gen-mod-tab-future" data-module="controlnet" disabled title="Phase 2 — 即将推出">
-                            <span class="ms ms-sm">account_tree</span> ControlNet
+                        <button class="gen-mod-tab gen-mod-tab-future" data-module="pose" disabled title="Phase 2 — 即将推出">
+                            <span class="ms ms-sm">accessibility_new</span> 姿势控制
                         </button>
-                        <button class="gen-mod-tab gen-mod-tab-future" data-module="hires" disabled title="Phase 3 — 即将推出">
+                        <button class="gen-mod-tab gen-mod-tab-future" data-module="canny" disabled title="Phase 2 — 即将推出">
+                            <span class="ms ms-sm">border_style</span> 轮廓控制
+                        </button>
+                        <button class="gen-mod-tab gen-mod-tab-future" data-module="depth" disabled title="Phase 2 — 即将推出">
+                            <span class="ms ms-sm">layers</span> 景深控制
+                        </button>
+                        <button class="gen-mod-tab" data-module="upscale" role="tab" aria-selected="false">
                             <span class="ms ms-sm">hd</span> 高清放大
+                            <input type="checkbox" class="gen-mod-tab-chk" data-module="upscale" title="启用高清放大">
                         </button>
-                        <button class="gen-mod-tab gen-mod-tab-future" data-module="i2i" disabled title="Phase 4 — 即将推出">
+                        <button class="gen-mod-tab gen-mod-tab-future" data-module="i2i" disabled title="Phase 3 — 即将推出">
                             <span class="ms ms-sm">image</span> 图生图
                         </button>
                     </div>
 
                     <!-- LoRA 模块内容 -->
-                    <div id="gen-mod-lora" class="gen-mod-content card card-padded hidden">
+                    <div id="gen-mod-lora" class="gen-mod-content card card-padded">
                         <div id="gen-lora-grid" class="gen-lora-grid">
                             <!-- JS 动态填充：已选 LoRA 卡片 + 末尾 add-card -->
                         </div>
                     </div>
 
                     <!-- 占位模块 (未来实现) -->
-                    <div id="gen-mod-controlnet" class="gen-mod-content card card-padded hidden">
+                    <div id="gen-mod-pose" class="gen-mod-content card card-padded hidden">
                         <div class="gen-mod-future-hint">
-                            <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">account_tree</span>
-                            <div style="margin-top:8px;color:var(--t2);font-weight:500">ControlNet — Phase 2</div>
-                            <div style="font-size:.82rem;color:var(--t3);margin-top:4px">上传参考图，控制构图、深度、姿势等</div>
+                            <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">accessibility_new</span>
+                            <div style="margin-top:8px;color:var(--t2);font-weight:500">姿势控制 — Phase 2</div>
+                            <div style="font-size:.82rem;color:var(--t3);margin-top:4px">上传骨骼图，控制生成人物的姿态</div>
                         </div>
                     </div>
-                    <div id="gen-mod-hires" class="gen-mod-content card card-padded hidden">
+                    <div id="gen-mod-canny" class="gen-mod-content card card-padded hidden">
                         <div class="gen-mod-future-hint">
-                            <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">hd</span>
-                            <div style="margin-top:8px;color:var(--t2);font-weight:500">高清放大 — Phase 3</div>
-                            <div style="font-size:.82rem;color:var(--t3);margin-top:4px">自动放大并精修输出图像</div>
+                            <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">border_style</span>
+                            <div style="margin-top:8px;color:var(--t2);font-weight:500">轮廓控制 — Phase 2</div>
+                            <div style="font-size:.82rem;color:var(--t3);margin-top:4px">上传边缘图，按轮廓约束生成</div>
                         </div>
                     </div>
+                    <div id="gen-mod-depth" class="gen-mod-content card card-padded hidden">
+                        <div class="gen-mod-future-hint">
+                            <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">layers</span>
+                            <div style="margin-top:8px;color:var(--t2);font-weight:500">景深控制 — Phase 2</div>
+                            <div style="font-size:.82rem;color:var(--t3);margin-top:4px">上传深度图，控制画面的空间层次</div>
+                        </div>
+                    </div>
+
+                    <!-- 高清放大模块 -->
+                    <div id="gen-mod-upscale" class="gen-mod-content card card-padded hidden">
+                        <!-- 模型未安装：下载提示 -->
+                        <div id="gen-upscale-download" class="gen-upscale-download hidden">
+                            <span class="ms" style="font-size:2.2rem;color:var(--ac);opacity:.7">download</span>
+                            <div style="margin-top:8px;color:var(--t2);font-weight:500">AuraSR v2 模型未安装</div>
+                            <div style="font-size:.78rem;color:var(--t3);margin-top:4px">高清放大功能需要下载约 2.3 GB 模型文件</div>
+                            <button id="gen-upscale-dl-btn" class="btn btn-sm" style="margin-top:12px;gap:4px">
+                                <span class="ms ms-sm">download</span> 下载模型
+                            </button>
+                            <div id="gen-upscale-dl-progress" class="hidden" style="width:100%;margin-top:12px">
+                                <div class="gen-upscale-dl-bar-wrap">
+                                    <div id="gen-upscale-dl-bar" class="gen-upscale-dl-bar" style="width:0%"></div>
+                                    <span id="gen-upscale-dl-pct" class="gen-upscale-dl-pct">0%</span>
+                                </div>
+                                <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px">
+                                    <span id="gen-upscale-dl-text" style="font-size:.78rem;color:var(--t2)">准备下载…</span>
+                                    <button id="gen-upscale-dl-cancel" class="btn btn-xs" style="background:var(--red);color:#fff;font-size:.72rem;padding:1px 8px">取消</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 参数面板 -->
+                        <div id="gen-upscale-params">
+                        <div class="gen-2col">
+                            <!-- 放大倍率 -->
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl" style="display:flex;justify-content:space-between">
+                                    <span>放大倍率 <span id="gen-upscale-size" class="gen-upscale-size"></span></span>
+                                    <span id="gen-upscale-factor-val" class="gen-editable-val" title="点击编辑">2.0x</span>
+                                </label>
+                                <input type="range" id="gen-upscale-factor" class="gen-range" min="1" max="4" step="0.5" value="2">
+                                <div class="gen-range-tips"><span>1x</span><span>2x</span><span>4x</span></div>
+                            </div>
+                            <!-- 放大模式 -->
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl">
+                                    放大模式
+                                    <span class="comfy-param-help-icon" data-tip="重叠棋盘格可消除分块拼接痕迹，适合大多数场景；标准模式速度最快但可能有接缝">?</span>
+                                </label>
+                                <select id="gen-upscale-mode">
+                                    <option value="4x_overlapped_checkboard" selected>重叠棋盘格（推荐）</option>
+                                    <option value="4x_overlapped_constant">重叠平滑</option>
+                                    <option value="4x">标准</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="gen-2col" style="margin-top:var(--sp-2)">
+                            <!-- 分块大小 -->
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl" style="display:flex;justify-content:space-between">
+                                    <span>
+                                        分块大小
+                                        <span class="comfy-param-help-icon" data-tip="每次处理的图块数量。值越大速度越快但占用显存越多，显存不足时请降低此值">?</span>
+                                    </span>
+                                    <span id="gen-upscale-tile-val" class="gen-editable-val" title="点击编辑">8</span>
+                                </label>
+                                <input type="range" id="gen-upscale-tile" class="gen-range" min="1" max="32" step="1" value="8">
+                                <div class="gen-range-tips"><span>1</span><span>16</span><span>32</span></div>
+                            </div>
+                            <!-- 缩放算法 -->
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl">
+                                    缩放算法
+                                    <span class="comfy-param-help-icon" data-tip="2x/3x 倍率时，先 4x 超采再缩放到目标尺寸所用的插值算法。4x 时不生效">?</span>
+                                </label>
+                                <select id="gen-upscale-downscale">
+                                    <option value="lanczos" selected>Lanczos（推荐）</option>
+                                    <option value="bicubic">Bicubic</option>
+                                    <option value="bilinear">Bilinear</option>
+                                    <option value="area">Area</option>
+                                    <option value="nearest-exact">Nearest</option>
+                                </select>
+                            </div>
+                        </div>
+                        </div><!-- /gen-upscale-params -->
+                    </div>
+
                     <div id="gen-mod-i2i" class="gen-mod-content card card-padded hidden">
                         <div class="gen-mod-future-hint">
                             <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">image</span>
-                            <div style="margin-top:8px;color:var(--t2);font-weight:500">图生图 — Phase 4</div>
+                            <div style="margin-top:8px;color:var(--t2);font-weight:500">图生图 — Phase 3</div>
                             <div style="font-size:.82rem;color:var(--t3);margin-top:4px">以参考图为基础，融合提示词进行创作</div>
                         </div>
                     </div>

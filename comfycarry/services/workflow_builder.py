@@ -211,6 +211,63 @@ class WorkflowBuilder:
     # def add_controlnet_apply(self, ...): ...
     # def add_inpaint_model_conditioning(self, ...): ...
 
+    # ── AI 放大模块 ──────────────────────────────────────────────────────────
+
+    def add_aurasr_upscale(
+        self,
+        image_node_id: str,
+        model_name: str = "model.safetensors",
+        mode: str = "4x_overlapped_checkboard",
+        tile_batch_size: int = 8,
+    ) -> str:
+        """
+        AuraSR v2 超分辨率放大 (固定 4x)。
+        model_name: Aura-SR 模型目录下的文件名 (含后缀, 如 model.safetensors)
+        mode: 4x | 4x_overlapped_checkboard (推荐，消除拼接) | 4x_overlapped_constant
+        tile_batch_size: 1-32，每次处理的图块数，越大越快但占用显存越多
+        输出: [node_id, 0]=IMAGE (4x 分辨率)
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "AuraSR.AuraSRUpscaler",
+            "inputs": {
+                "image": [image_node_id, 0],
+                "model_name": model_name,
+                "mode": mode,
+                "reapply_transparency": True,
+                "tile_batch_size": max(1, min(int(tile_batch_size), 32)),
+                "device": "default",
+                "offload_to_cpu": False,
+            },
+        }
+        return nid
+
+    def add_image_scale(
+        self,
+        image_node_id: str,
+        width: int,
+        height: int,
+        method: str = "lanczos",
+        crop: str = "disabled",
+    ) -> str:
+        """
+        缩放图片到指定尺寸 (内置节点)。
+        用于将 AuraSR 4x 输出缩回目标倍率 (2x/3x)。
+        输出: [node_id, 0]=IMAGE
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "ImageScale",
+            "inputs": {
+                "image": [image_node_id, 0],
+                "upscale_method": method,
+                "width": width,
+                "height": height,
+                "crop": crop,
+            },
+        }
+        return nid
+
     # ── 构建 ─────────────────────────────────────────────────────────────────
 
     def build(self) -> dict:
@@ -239,6 +296,11 @@ def build_sdxl_workflow(params: dict) -> dict:
         save_prefix     (str)       — 文件名前缀，默认 "ComfyCarry"
         loras           (list)      — LoRA 列表: [{name, strength}, ...]
                                       （也兼容旧格式: lora_name + lora_strength）
+        upscale_enabled (bool)      — 是否启用 AI 放大 (Phase 2)
+        upscale_factor  (int)       — 放大倍率: 2 / 3 / 4，默认 2
+        upscale_mode    (str)       — 放大模式: 4x / 4x_overlapped_checkboard / 4x_overlapped_constant
+        upscale_tile_batch_size (int) — 分块大小 1-32，默认 8
+        upscale_downscale_method (str) — 缩放算法: lanczos / bicubic / bilinear / area / nearest-exact
 
     返回值: ComfyUI /prompt API 所需的 prompt dict
     """
@@ -291,6 +353,36 @@ def build_sdxl_workflow(params: dict) -> dict:
     # 6. VAE 解码 (VAE 始终来自原始 Checkpoint，index=2)
     decoded = b.add_vae_decode(sampled, ckpt)
 
+    # ── 放大链路 (Phase 2) ───────────────────────────────────────────────
+    # AuraSR 4x → [ImageScale 缩到目标倍率] → 输出
+    final_image = decoded
+    upscale_enabled = bool(params.get("upscale_enabled", False))
+    if upscale_enabled:
+        upscale_factor = max(1.0, min(float(params.get("upscale_factor", 2)), 4.0))
+        upscale_mode = str(params.get("upscale_mode", "4x_overlapped_checkboard"))
+        if upscale_mode not in ("4x", "4x_overlapped_checkboard", "4x_overlapped_constant"):
+            upscale_mode = "4x_overlapped_checkboard"
+        upscale_tile = int(params.get("upscale_tile_batch_size", 8))
+        downscale_method = str(params.get("upscale_downscale_method", "lanczos"))
+        if downscale_method not in ("lanczos", "bicubic", "bilinear", "area", "nearest-exact"):
+            downscale_method = "lanczos"
+        # AuraSR 固定 4x
+        aurasr = b.add_aurasr_upscale(
+            decoded,
+            model_name="model.safetensors",
+            mode=upscale_mode,
+            tile_batch_size=upscale_tile,
+        )
+        if upscale_factor < 4.0:
+            # 非 4x: 先 4x 超采再缩回目标尺寸
+            base_w = int(params.get("width", 1024))
+            base_h = int(params.get("height", 1024))
+            target_w = round(base_w * upscale_factor)
+            target_h = round(base_h * upscale_factor)
+            final_image = b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
+        else:
+            final_image = aurasr
+
     # 7. 保存图片 (WAS Image Save)
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()
@@ -303,12 +395,12 @@ def build_sdxl_workflow(params: dict) -> dict:
     else:
         save_output_path, save_filename = '', save_prefix_raw
 
-    b.add_save_image(decoded, prefix=save_filename, output_path=save_output_path,
+    b.add_save_image(final_image, prefix=save_filename, output_path=save_output_path,
                      extension=output_format, batch_size=batch_size)
 
     # 8. PreviewImage — 加入工作流以触发 ComfyUI WS 预览帧广播
     #    (每执行步通过 WS 二进制帧推送 JPEG 预览给所有连接的客户端)
-    b.add_preview_image(decoded)
+    b.add_preview_image(final_image)
 
     return b.build()
 

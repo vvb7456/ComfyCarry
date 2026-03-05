@@ -3358,6 +3358,64 @@
             text-align: center;
         }
 
+        /* ── 高清放大 ────────────────────────────────────────────────────── */
+        #gen-mod-upscale {
+            max-width: 50%;
+        }
+        .gen-upscale-size {
+            font-size: .72rem;
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--t3);
+            white-space: nowrap;
+            margin-left: 6px;
+        }
+
+        /* 下载提示区域 */
+        .gen-upscale-download {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--sp-6) var(--sp-4);
+            text-align: center;
+        }
+        .gen-upscale-dl-bar-wrap {
+            position: relative;
+            width: 100%;
+            height: 22px;
+            background: var(--bg2);
+            border-radius: var(--r-sm);
+            overflow: hidden;
+        }
+        .gen-upscale-dl-bar {
+            height: 100%;
+            background: var(--ac);
+            border-radius: var(--r-sm);
+            transition: width .3s ease;
+        }
+        .gen-upscale-dl-pct {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-xs);
+            font-weight: 600;
+            color: var(--t1);
+            mix-blend-mode: difference;
+            pointer-events: none;
+        }
+
+        /* ── Tab 启用标记 (checkbox) ──────────────────────────────────── */
+        .gen-mod-tab-chk {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--ac);
+            cursor: pointer;
+            margin: 0 0 0 4px;
+            flex-shrink: 0;
+        }
+
         /* ── LoRA 列表 ───────────────────────────────────────────────────── */
         .gen-lora-empty-hint {
             display: flex;
@@ -3497,7 +3555,7 @@
             cursor: pointer;
         }
         /* 已选面板中的卡片更紧凑 */
-        #gen-lora-grid .gen-lora-card-img { aspect-ratio: 3/3.5; }
+        #gen-lora-grid .gen-lora-card-img { aspect-ratio: 3/3.38; }
         .gen-lora-card-img img {
             width: 100%;
             height: 100%;
@@ -3583,7 +3641,7 @@
             z-index: 2;
             padding: 0;
         }
-        .gen-lora-card:hover .gen-lora-card-del { opacity: 1; }
+        .gen-lora-card .gen-lora-card-del { opacity: 1; }
         .gen-lora-card-del:hover { background: var(--red); }
         /* 强度滑块行 */
         .gen-lora-card-strength {
@@ -3608,10 +3666,25 @@
         /* 添加 LoRA 卡片 (add-card 在 grid 中的特化) */
         .gen-lora-card.add-card {
             flex-direction: column;
-            min-height: unset;
             aspect-ratio: auto;
             border-style: dashed;
             background: transparent;
+            position: relative;
+        }
+        /* 通过伪元素擑齐真实 LoRA 卡片高度 (image + body) */
+        .gen-lora-card.add-card::before {
+            content: '';
+            display: block;
+            padding-bottom: 130%;
+        }
+        .gen-lora-add-inner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
         }
 
         /* ── 错误提示 ────────────────────────────────────────────────────── */

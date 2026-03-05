@@ -22,12 +22,13 @@ from .auth import auth_bp, register_auth_middleware
 
 # Route Blueprints
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
-from .routes import generate
+from .routes import generate, downloads
 from .routes.ssh import restore_ssh_config
 
 # Services
 from .services.comfyui_bridge import get_bridge
 from .services.deploy_engine import _detect_python
+from .services.download_engine import shutdown_engine
 from .services.sync_engine import (
     _load_sync_rules, start_sync_worker, set_app_logger,
 )
@@ -55,6 +56,7 @@ def create_app():
     app.register_blueprint(jupyter.bp)
     app.register_blueprint(ssh.bp)
     app.register_blueprint(generate.bp)
+    app.register_blueprint(downloads.bp)
     app.register_blueprint(frontend.bp)
 
     # ── 全局认证中间件 ───────────────────────────────────
@@ -122,7 +124,11 @@ def _restore_comfyui(log):
 
 def main():
     """入口函数 — 启动 Flask 应用"""
+    import atexit
     app = create_app()
+
+    # 注册引擎清理
+    atexit.register(shutdown_engine)
 
     port = int(sys.argv[1]) if len(sys.argv) > 1 else MANAGER_PORT
 

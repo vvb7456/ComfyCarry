@@ -27,6 +27,13 @@ let _seedValue = null;
 let _loraSelected = new Map(); // name -> strength (0-2)
 let _runMode = 'normal'; // 'normal' | 'onChange' | 'live'
 let _saveTimer = null;
+let _upscaleEnabled = false;
+let _upscaleFactor = 2;
+let _upscaleMode = '4x_overlapped_checkboard';
+let _upscaleTile = 8;
+let _upscaleDownscale = 'lanczos';
+let _comfyuiDir = '';  // 从 options API 获取, 用于构建模型路径
+let _deferSave = () => {};  // assigned in _bindUIEvents
 const STORAGE_KEY = 'comfycarry_generate_params';
 
 // ── 注册页面 ─────────────────────────────────────────────────────────────────
@@ -62,6 +69,7 @@ function _bindUIEvents() {
       const custom = document.getElementById('gen-custom-size');
       const isCustom = resSelect.value === 'custom';
       if (custom) custom.style.display = isCustom ? 'flex' : 'none';
+      _updateUpscaleSizeHint();
     });
   }
 
@@ -95,6 +103,7 @@ function _bindUIEvents() {
   const page = document.getElementById('page-generate');
   if (page) {
     const debounceSave = () => { clearTimeout(_saveTimer); _saveTimer = setTimeout(_saveState, 500); };
+    _deferSave = debounceSave; // expose for programmatic calls
     page.addEventListener('input', debounceSave);
     page.addEventListener('change', debounceSave);
   }
@@ -135,17 +144,80 @@ function _bindUIEvents() {
   // 点击其他区域关闭下拉
   document.addEventListener('click', _handleDocClick);
 
-  // 功能模块 Tab 切换
+  // 功能模块 Tab 切换 (互斥：同一时间只显示一个面板)
   document.querySelectorAll('.gen-mod-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
+    tab.addEventListener('click', (e) => {
+      // 如果点击的是 checkbox 本身，不触发 tab 切换
+      if (e.target.classList.contains('gen-mod-tab-chk')) return;
       if (tab.disabled) return;
       const mod = tab.dataset.module;
       const panel = document.getElementById('gen-mod-' + mod);
+      // 互斥切换
+      document.querySelectorAll('.gen-mod-tab').forEach(t => {
+        if (t !== tab) t.classList.remove('active');
+      });
+      document.querySelectorAll('.gen-mod-content').forEach(p => {
+        if (p !== panel) p.classList.add('hidden');
+      });
       const isNowActive = !tab.classList.contains('active');
       tab.classList.toggle('active', isNowActive);
       if (panel) panel.classList.toggle('hidden', !isNowActive);
+      // 切换到高清放大时检查模型状态
+      if (mod === 'upscale' && isNowActive) _checkUpscaleModel();
     });
   });
+
+  // Tab checkbox: 独立控制功能开关
+  document.querySelectorAll('.gen-mod-tab-chk').forEach(chk => {
+    chk.addEventListener('click', (e) => {
+      e.stopPropagation(); // 不触发 tab 切换
+    });
+    chk.addEventListener('change', () => {
+      const mod = chk.dataset.module;
+      if (mod === 'upscale') {
+        _upscaleEnabled = chk.checked;
+        _updateUpscaleSizeHint();
+        _deferSave();
+      }
+    });
+  });
+
+  // ── 高清放大 Tab ───────────────────────────────────────────────────────
+  _bindSlider('gen-upscale-factor', 'gen-upscale-factor-val', v => parseFloat(v).toFixed(1) + 'x');
+  const factorSlider = document.getElementById('gen-upscale-factor');
+  if (factorSlider) {
+    factorSlider.addEventListener('input', () => {
+      _upscaleFactor = parseFloat(factorSlider.value) || 2;
+      _updateUpscaleSizeHint();
+      _deferSave();
+    });
+  }
+  _bindSlider('gen-upscale-tile', 'gen-upscale-tile-val', v => v);
+  const tileSlider = document.getElementById('gen-upscale-tile');
+  if (tileSlider) {
+    tileSlider.addEventListener('input', () => {
+      _upscaleTile = parseInt(tileSlider.value) || 8;
+      _deferSave();
+    });
+  }
+  const modeSelect = document.getElementById('gen-upscale-mode');
+  if (modeSelect) {
+    modeSelect.addEventListener('change', () => {
+      _upscaleMode = modeSelect.value;
+      _deferSave();
+    });
+  }
+  const dsSelect = document.getElementById('gen-upscale-downscale');
+  if (dsSelect) {
+    dsSelect.addEventListener('change', () => {
+      _upscaleDownscale = dsSelect.value;
+      _deferSave();
+    });
+  }
+
+  // 高清放大 — 下载按钮
+  const dlBtn = document.getElementById('gen-upscale-dl-btn');
+  if (dlBtn) dlBtn.addEventListener('click', _downloadUpscaleModel);
 }
 
 function _bindSlider(sliderId, valId, fmt) {
@@ -159,6 +231,8 @@ async function _loadOptions(refresh = false) {
   const url = '/api/generate/options' + (refresh ? '?refresh=1' : '');
   const data = await apiFetch(url);
   if (!data) { _showOfflineBanner(true); return; }
+
+  if (data.comfyui_dir) _comfyuiDir = data.comfyui_dir;
 
   const missing = document.getElementById('gen-ckpt-missing');
 
@@ -395,6 +469,9 @@ function _renderLoraPanel() {
   const grid = document.getElementById('gen-lora-grid');
   if (!grid) return;
   grid.innerHTML = '';
+  // 同步 LoRA Tab checkbox
+  const loraChk = document.querySelector('.gen-mod-tab-chk[data-module="lora"]');
+  if (loraChk) loraChk.checked = _loraSelected.size > 0;
 
   // 已选 LoRA 卡片
   _loraSelected.forEach((strength, name) => {
@@ -448,7 +525,7 @@ function _renderLoraPanel() {
   // 末尾“添加 LoRA” add-card
   const addCard = document.createElement('div');
   addCard.className = 'gen-lora-card add-card';
-  addCard.innerHTML = '<span class="add-icon">+</span><span>添加 LoRA</span>';
+  addCard.innerHTML = '<div class="gen-lora-add-inner"><span class="add-icon">+</span><span>添加 LoRA</span></div>';
   addCard.addEventListener('click', () => _openLoraModal());
   grid.appendChild(addCard);
 }
@@ -522,6 +599,11 @@ function _saveState() {
       format: document.getElementById('gen-format')?.value || 'png',
       loras: Object.fromEntries(_loraSelected),
       runMode: _runMode,
+      upscaleEnabled: _upscaleEnabled,
+      upscaleFactor: _upscaleFactor,
+      upscaleMode: _upscaleMode,
+      upscaleTile: _upscaleTile,
+      upscaleDownscale: _upscaleDownscale,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) { /* quota exceeded etc */ }
@@ -596,7 +678,332 @@ function _restoreState() {
 
     // 运行模式
     if (s.runMode) _setRunMode(s.runMode);
+
+    // 高清放大
+    if (s.upscaleEnabled != null) _upscaleEnabled = !!s.upscaleEnabled;
+    if (s.upscaleFactor) _upscaleFactor = parseFloat(s.upscaleFactor) || 2;
+    if (s.upscaleMode) _upscaleMode = s.upscaleMode;
+    if (s.upscaleTile) _upscaleTile = parseInt(s.upscaleTile) || 8;
+    if (s.upscaleDownscale) _upscaleDownscale = s.upscaleDownscale;
+    _syncUpscaleUI();
   } catch (e) { /* corrupted data etc */ }
+}
+
+// ── 高清放大 ─────────────────────────────────────────────────────────────────
+function _syncUpscaleUI() {
+  // checkbox 状态
+  const chk = document.querySelector('.gen-mod-tab-chk[data-module="upscale"]');
+  if (chk) chk.checked = _upscaleEnabled;
+  // factor 滑块
+  const factorSl = document.getElementById('gen-upscale-factor');
+  const factorVal = document.getElementById('gen-upscale-factor-val');
+  if (factorSl) factorSl.value = _upscaleFactor;
+  if (factorVal) factorVal.textContent = parseFloat(_upscaleFactor).toFixed(1) + 'x';
+  // mode select
+  const modeSel = document.getElementById('gen-upscale-mode');
+  if (modeSel) modeSel.value = _upscaleMode;
+  // tile slider
+  const tileSl = document.getElementById('gen-upscale-tile');
+  const tileVal = document.getElementById('gen-upscale-tile-val');
+  if (tileSl) tileSl.value = _upscaleTile;
+  if (tileVal) tileVal.textContent = _upscaleTile;
+  // downscale method
+  const dsSel = document.getElementById('gen-upscale-downscale');
+  if (dsSel) dsSel.value = _upscaleDownscale;
+  _updateUpscaleSizeHint();
+}
+
+function _updateUpscaleSizeHint() {
+  const hint = document.getElementById('gen-upscale-size');
+  if (hint) {
+    const { width, height } = _getResolution();
+    const w = Math.round(width * _upscaleFactor);
+    const h = Math.round(height * _upscaleFactor);
+    hint.textContent = `→ ${w} × ${h}`;
+  }
+  // 4x 时禁用缩放算法（不经过 ImageScale）
+  const dsSel = document.getElementById('gen-upscale-downscale');
+  if (dsSel) {
+    const is4x = _upscaleFactor >= 4;
+    dsSel.disabled = is4x;
+    dsSel.style.opacity = is4x ? '.4' : '';
+  }
+}
+
+// ── 高清放大：模型检测 & 下载 ───────────────────────────────────────────────
+let _upscaleModelInstalled = null; // null=未检测, true/false
+let _upscaleDownloadId = null;     // 活跃下载任务 ID
+
+// AuraSR 模型信息
+const _AURA_SR = {
+  files: [
+    { filename: 'model.safetensors', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true' },
+    { filename: 'config.json', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true' },
+  ],
+  subdir: 'models/Aura-SR',
+};
+
+async function _checkUpscaleModel() {
+  const dlArea = document.getElementById('gen-upscale-download');
+  const params = document.getElementById('gen-upscale-params');
+  if (!dlArea || !params) return;
+  if (!_comfyuiDir) return;
+
+  const saveDir = _comfyuiDir + '/' + _AURA_SR.subdir;
+  try {
+    // 批量检查两个文件
+    const r = await apiFetch('/api/downloads/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        files: _AURA_SR.files.map(f => ({ save_dir: saveDir, filename: f.filename })),
+      }),
+    });
+    const results = r?.results || [];
+    const allInstalled = results.length === _AURA_SR.files.length && results.every(x => x.installed);
+    const anyDownloading = results.some(x => x.downloading);
+
+    _upscaleModelInstalled = allInstalled;
+    if (allInstalled) {
+      dlArea.classList.add('hidden');
+      params.classList.remove('hidden');
+    } else {
+      params.classList.add('hidden');
+      dlArea.classList.remove('hidden');
+      if (anyDownloading) {
+        const activeTask = results.find(x => x.downloading);
+        if (activeTask?.download_id) {
+          _upscaleDownloadId = activeTask.download_id;
+          document.getElementById('gen-upscale-dl-btn')?.classList.add('hidden');
+          const prog = document.getElementById('gen-upscale-dl-progress');
+          if (prog) prog.classList.remove('hidden');
+          const txt = document.getElementById('gen-upscale-dl-text');
+          if (txt) txt.textContent = '下载进行中…';
+          _listenDownloadEvents(_upscaleDownloadId);
+        }
+      }
+    }
+  } catch (e) {
+    // 接口不通时默认显示参数
+    dlArea.classList.add('hidden');
+    params.classList.remove('hidden');
+  }
+}
+
+async function _downloadUpscaleModel() {
+  const btn = document.getElementById('gen-upscale-dl-btn');
+  const prog = document.getElementById('gen-upscale-dl-progress');
+  const bar = document.getElementById('gen-upscale-dl-bar');
+  const pctEl = document.getElementById('gen-upscale-dl-pct');
+  const txt = document.getElementById('gen-upscale-dl-text');
+  const cancelBtn = document.getElementById('gen-upscale-dl-cancel');
+  if (!btn || !prog || !bar || !txt) return;
+  if (!_comfyuiDir) { showToast('ComfyUI 路径未知，请刷新页面', 'error'); return; }
+
+  btn.classList.add('hidden');
+  prog.classList.remove('hidden');
+  txt.textContent = '正在提交下载…';
+  bar.style.width = '0%';
+  if (pctEl) pctEl.textContent = '0%';
+
+  // 取消按钮事件
+  let cancelled = false;
+  const onCancel = async () => {
+    if (_upscaleDownloadId) {
+      await apiFetch(`/api/downloads/${_upscaleDownloadId}/cancel`, { method: 'POST' });
+    }
+    cancelled = true;
+    // 恢复初始状态: 显示下载按钮, 隐藏进度条
+    prog.classList.add('hidden');
+    btn.classList.remove('hidden');
+    bar.style.width = '0%';
+    if (pctEl) pctEl.textContent = '0%';
+    txt.textContent = '准备下载…';
+  };
+  if (cancelBtn) {
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.onclick = onCancel;
+  }
+
+  const saveDir = _comfyuiDir + '/' + _AURA_SR.subdir;
+
+  try {
+    // 按顺序下载: config.json (小) 然后 model.safetensors (大)
+    for (let i = 0; i < _AURA_SR.files.length; i++) {
+      if (cancelled) return;
+      const f = _AURA_SR.files[i];
+      const isLast = i === _AURA_SR.files.length - 1;
+
+      // 先检查是否已存在
+      const chk = await apiFetch('/api/downloads/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ save_dir: saveDir, filename: f.filename }),
+      });
+      if (chk?.installed) {
+        const basePct = isLast ? 100 : 5;
+        bar.style.width = basePct + '%';
+        if (pctEl) pctEl.textContent = basePct + '%';
+        txt.textContent = f.filename + ' 已存在';
+        continue;
+      }
+
+      // 提交下载
+      txt.textContent = `正在下载 ${f.filename}…`;
+      const resp = await apiFetch('/api/downloads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: f.url,
+          save_dir: saveDir,
+          filename: f.filename,
+          meta: { source: 'huggingface', model: 'AuraSR-v2' },
+        }),
+      });
+
+      if (!resp || resp.error) {
+        txt.textContent = '下载失败: ' + (resp?.error || '未知错误');
+        btn.classList.remove('hidden');
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+        return;
+      }
+
+      if (resp.status === 'complete') {
+        const basePct = isLast ? 100 : 5;
+        bar.style.width = basePct + '%';
+        if (pctEl) pctEl.textContent = basePct + '%';
+        continue;
+      }
+
+      _upscaleDownloadId = resp.download_id;
+
+      // 监听 SSE 进度
+      const success = await _waitForDownload(resp.download_id, (pct) => {
+        // config.json 占 5%, model.safetensors 占 95%
+        const totalPct = isLast ? (5 + Math.round(pct * 0.95)) : Math.round(pct * 0.05);
+        bar.style.width = totalPct + '%';
+        if (pctEl) pctEl.textContent = totalPct + '%';
+        txt.textContent = pct >= 100
+          ? `${f.filename} 完成`
+          : `正在下载 ${f.filename}…`;
+      });
+
+      if (!success) {
+        txt.textContent = cancelled ? '已取消' : `${f.filename} 下载失败`;
+        btn.classList.remove('hidden');
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+        return;
+      }
+    }
+
+    // 全部完成
+    bar.style.width = '100%';
+    if (pctEl) pctEl.textContent = '100%';
+    txt.textContent = '下载完成！';
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    setTimeout(() => {
+      _upscaleModelInstalled = true;
+      const dlArea = document.getElementById('gen-upscale-download');
+      const paramsEl = document.getElementById('gen-upscale-params');
+      if (dlArea) dlArea.classList.add('hidden');
+      if (paramsEl) paramsEl.classList.remove('hidden');
+      showToast('AuraSR v2 模型安装完成', 'success');
+    }, 800);
+
+  } catch (e) {
+    txt.textContent = '下载失败: ' + e.message;
+    btn.classList.remove('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+  }
+}
+
+/**
+ * 监听下载 SSE 事件流, 返回 Promise<boolean> (成功/失败)
+ */
+function _waitForDownload(downloadId, onProgress) {
+  return new Promise((resolve) => {
+    const evtSource = new EventSource(`/api/downloads/${downloadId}/events`);
+    evtSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.error) {
+          evtSource.close();
+          resolve(false);
+          return;
+        }
+        if (onProgress) onProgress(data.progress || 0);
+        if (data.status === 'complete') {
+          evtSource.close();
+          resolve(true);
+        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          evtSource.close();
+          resolve(false);
+        }
+      } catch (_) { /* ignore */ }
+    };
+    evtSource.onerror = () => {
+      evtSource.close();
+      resolve(false);
+    };
+  });
+}
+
+/**
+ * 恢复已有下载的 SSE 监听 (页面重新进入时)
+ */
+function _listenDownloadEvents(downloadId) {
+  const bar = document.getElementById('gen-upscale-dl-bar');
+  const pctEl = document.getElementById('gen-upscale-dl-pct');
+  const txt = document.getElementById('gen-upscale-dl-text');
+  const cancelBtn = document.getElementById('gen-upscale-dl-cancel');
+  if (!bar || !txt) return;
+
+  // 取消按钮
+  if (cancelBtn) {
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.onclick = async () => {
+      await apiFetch(`/api/downloads/${downloadId}/cancel`, { method: 'POST' });
+      // 恢复初始状态
+      const prog = document.getElementById('gen-upscale-dl-progress');
+      const btn = document.getElementById('gen-upscale-dl-btn');
+      if (prog) prog.classList.add('hidden');
+      if (btn) btn.classList.remove('hidden');
+      bar.style.width = '0%';
+      if (pctEl) pctEl.textContent = '0%';
+      txt.textContent = '准备下载…';
+    };
+  }
+
+  _waitForDownload(downloadId, (pct) => {
+    const totalPct = 5 + Math.round(pct * 0.95);
+    bar.style.width = totalPct + '%';
+    if (pctEl) pctEl.textContent = totalPct + '%';
+    txt.textContent = pct >= 100 ? '下载完成' : '正在下载模型…';
+  }).then((ok) => {
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (ok) {
+      bar.style.width = '100%';
+      if (pctEl) pctEl.textContent = '100%';
+      txt.textContent = '下载完成！';
+      setTimeout(() => {
+        _upscaleModelInstalled = true;
+        const dlArea = document.getElementById('gen-upscale-download');
+        const params = document.getElementById('gen-upscale-params');
+        if (dlArea) dlArea.classList.add('hidden');
+        if (params) params.classList.remove('hidden');
+        showToast('AuraSR v2 模型安装完成', 'success');
+      }, 800);
+    } else {
+      // 失败/取消时恢复初始状态
+      const prog = document.getElementById('gen-upscale-dl-progress');
+      const btn = document.getElementById('gen-upscale-dl-btn');
+      if (prog) prog.classList.add('hidden');
+      if (btn) btn.classList.remove('hidden');
+      bar.style.width = '0%';
+      if (pctEl) pctEl.textContent = '0%';
+      txt.textContent = '准备下载…';
+    }
+  });
 }
 
 // ── 分辨率 ───────────────────────────────────────────────────────────────────
@@ -625,6 +1032,9 @@ export async function handleSubmit() {
 
   const { width, height } = _getResolution();
   const params = {
+    upscale_mode: _upscaleMode,
+    upscale_tile_batch_size: _upscaleTile,
+    upscale_downscale_method: _upscaleDownscale,
     model_type: 'sdxl',
     checkpoint: ckpt,
     positive_prompt: positive,
@@ -639,6 +1049,8 @@ export async function handleSubmit() {
     save_prefix: document.getElementById('gen-prefix')?.value?.trim() || '[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]',
     output_format: document.getElementById('gen-format')?.value || 'png',
     loras: _collectLoras(),
+    upscale_enabled: _upscaleEnabled,
+    upscale_factor: _upscaleFactor,
   };
 
   _setState('submitting');
