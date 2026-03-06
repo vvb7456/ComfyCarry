@@ -1,79 +1,87 @@
 /**
- * model-dependency.js — 模型依赖检测 + 下载共享模块
+ * model-dependency.js — 模型依赖欢迎页共享模块
  *
- * 卡片布局: 每个模型一张卡片并排显示，各有独立下载按钮 + 进度条。
- * 任意一个模型下载完成后显示"进入控制页面"按钮，不自动切换。
+ * 欢迎页 (Welcome Page):
+ *   每个容器生命周期内，每个 tab 首次进入时显示欢迎页。
+ *   - 检测文件是否存在 → 已存在的模型自动打勾
+ *   - 卡片可选中/反选（必选模型锁定勾选）
+ *   - 统一下载按钮 + 进度条，顺序下载选中模型
+ *   - 进度文案嵌入进度条内: "1/3 · ModelName · 45% · 12 MB/s"
+ *   - 点击"进入"后写入 welcome state，同一容器不再显示
+ *   - 全部已安装时自动 dismiss，不显示欢迎页
  *
  * 用法:
  *   import { initModelDependency } from './model-dependency.js';
- *   initModelDependency({ containerId, paramsId, comfyuiDir, title, description, models, onReady });
+ *   const handle = initModelDependency({ ... });
+ *   // handle.destroy() — 页面离开时清理 SSE 连接
  */
 
 import { apiFetch } from './core.js';
 
 /**
- * 初始化模型依赖组件
  * @param {Object} cfg
- * @param {string} cfg.containerId  - 下载区 DOM 容器 ID
- * @param {string} cfg.paramsId     - 参数面板 DOM ID (模型就绪后显示)
- * @param {string} cfg.comfyuiDir   - ComfyUI 根目录 (构建 save_dir)
- * @param {string} cfg.title        - 缺失状态标题
- * @param {string} cfg.description  - 缺失状态描述
- * @param {Array} cfg.models        - 模型列表 [{id, name, description?, size, files:[{filename,url,subdir}]}]
- * @param {Function} cfg.onReady    - 进入控制页面回调
- * @param {Function} [cfg.onMissing]- 模型缺失回调
- * @returns {{ recheck: Function }}  - 返回控制句柄
+ * @param {string} cfg.containerId  - 欢迎页 DOM 容器 ID
+ * @param {string} cfg.paramsId     - 参数面板 DOM ID (欢迎页关闭后显示)
+ * @param {string} cfg.comfyuiDir   - ComfyUI 根目录
+ * @param {string} cfg.tab          - Tab 标识 ("pose"/"canny"/"depth"/"upscale")
+ * @param {string} cfg.title        - 欢迎页标题
+ * @param {Array}  cfg.models       - [{id, name, size, required?, files:[{filename,url,subdir}]}]
+ * @param {Function} cfg.onEnter    - 点击"进入" / 自动 dismiss 后的回调
+ * @returns {{ destroy: Function }}
  */
 export function initModelDependency(cfg) {
   const container = document.getElementById(cfg.containerId);
   const params = document.getElementById(cfg.paramsId);
-  if (!container || !params) return { recheck() {}, destroy() {} };
+  if (!container || !params) return { destroy() {} };
 
-  const state = {
+  const st = {
     cfg,
     container,
     params,
     modelStatus: new Map(),   // id → { installed, downloading, download_id }
-    rendered: false,          // 是否已渲染过卡片
-    activeHandles: [],        // 活跃的 SSE waitHandle 列表 (防止泄漏)
+    selected: new Set(),      // 用户选中的 model id
+    activeHandle: null,       // 当前 SSE { promise, abort }
+    downloading: false,
   };
 
-  // 首次检测前显示 loading 占位
-  _showLoading(state);
+  _showLoading(st);
+  _init(st);
 
-  const recheck = () => _check(state);
-  const destroy = () => _destroyHandles(state);
-  recheck();
-  return { recheck, destroy };
+  return {
+    destroy() {
+      if (st.activeHandle) { st.activeHandle.abort(); st.activeHandle = null; }
+    },
+  };
 }
 
-// ── 清理活跃 SSE 连接 ────────────────────────────────────────────────────────
-function _destroyHandles(st) {
-  for (const h of st.activeHandles) {
-    h.abort();
-  }
-  st.activeHandles = [];
-}
-
-// ── Loading 占位 ─────────────────────────────────────────────────────────────
+// ── Loading ──────────────────────────────────────────────────────────────────
 function _showLoading(st) {
-  const { container, params } = st;
-  params.classList.add('hidden');
-  container.classList.remove('hidden');
-  container.innerHTML = `
-    <div class="mdep-missing" style="padding:2rem;text-align:center">
+  st.params.classList.add('hidden');
+  st.container.classList.remove('hidden');
+  st.container.innerHTML = `
+    <div class="mdep-welcome" style="padding:2rem;text-align:center">
       <div class="mdep-spinner" style="margin:0 auto 12px"></div>
       <div style="color:var(--t2);font-size:.85rem">正在检测模型…</div>
     </div>`;
 }
 
-// ── 检测逻辑 ────────────────────────────────────────────────────────────────
-async function _check(st) {
+// ── 初始化 ───────────────────────────────────────────────────────────────────
+async function _init(st) {
   const { cfg, container, params } = st;
-  if (!cfg.comfyuiDir) return;
 
-  // 先关闭上一轮残留的 SSE 连接，防止重复 recheck 时累积
-  _destroyHandles(st);
+  // 1. 检查 welcome state — 已 dismiss 过则直接跳过
+  try {
+    const state = await apiFetch('/api/generate/welcome_state');
+    if (state?.[cfg.tab]) {
+      container.classList.add('hidden');
+      params.classList.remove('hidden');
+      cfg.onEnter?.();
+      return;
+    }
+  } catch { /* 继续 */ }
+
+  // 2. 检查文件
+  if (!cfg.comfyuiDir) { _renderWelcome(st); return; }
 
   const checkFiles = [];
   for (const m of cfg.models) {
@@ -106,285 +114,331 @@ async function _check(st) {
       if (!res.installed) ms.installed = false;
       if (res.downloading) { ms.downloading = true; ms.download_id = res.download_id; }
     }
-
-    const anyInstalled = [...st.modelStatus.values()].some(s => s.installed);
-    const allInstalled = [...st.modelStatus.values()].every(s => s.installed);
-
-    if (allInstalled && !st.rendered) {
-      // 首次检查 → 全部已就绪，直接显示参数面板
-      container.classList.add('hidden');
-      params.classList.remove('hidden');
-      cfg.onAllInstalled?.();
-    } else if (allInstalled && st.rendered) {
-      // 下载完成后 recheck → 保持卡片页面，更新状态显示进入按钮
-      _renderCards(st, true);
-      cfg.onAllInstalled?.();
-    } else {
-      params.classList.add('hidden');
-      container.classList.remove('hidden');
-      _renderCards(st, anyInstalled);
-      cfg.onMissing?.();
-    }
   } catch {
-    // 检测失败 → 显示重试提示，而不是静默隐藏
-    params.classList.add('hidden');
-    container.classList.remove('hidden');
-    container.innerHTML = `
-      <div class="mdep-missing" style="padding:2rem;text-align:center">
-        <span class="ms" style="font-size:2rem;color:var(--amber);opacity:.7">warning</span>
-        <div class="mdep-title" style="margin-top:8px">模型检测失败</div>
-        <div class="mdep-desc">无法连接到后端服务，请检查网络后重试</div>
-        <button class="btn btn-sm" style="margin-top:12px;gap:4px">
-          <span class="ms ms-sm">refresh</span> 重试
-        </button>
-      </div>`;
-    container.querySelector('button')?.addEventListener('click', () => {
-      _showLoading(st);
-      _check(st);
-    });
+    for (const m of cfg.models) {
+      st.modelStatus.set(m.id, { installed: false, downloading: false, download_id: null });
+    }
+  }
+
+  // 3. 全部已安装 → 自动 dismiss
+  const allInstalled = cfg.models.every(m => st.modelStatus.get(m.id)?.installed);
+  if (allInstalled) {
+    _dismissWelcome(st);
+    return;
+  }
+
+  // 4. 初始选中: installed 或 required
+  for (const m of cfg.models) {
+    const ms = st.modelStatus.get(m.id);
+    if (ms?.installed || m.required) st.selected.add(m.id);
+  }
+
+  _renderWelcome(st);
+
+  // 5. 恢复正在下载
+  const dlModel = cfg.models.find(m => {
+    const ms = st.modelStatus.get(m.id);
+    return ms?.downloading && ms.download_id;
+  });
+  if (dlModel) {
+    const ms = st.modelStatus.get(dlModel.id);
+    st.selected.add(dlModel.id);
+    _resumeDownload(st, dlModel, ms.download_id);
   }
 }
 
-// ── 渲染卡片列表 ─────────────────────────────────────────────────────────────
-function _renderCards(st, anyInstalled) {
+// ── 渲染欢迎页 ──────────────────────────────────────────────────────────────
+function _renderWelcome(st) {
   const { cfg, container } = st;
-  st.rendered = true;
+
+  const hasSelected = st.selected.size > 0;
+  const needsDownload = cfg.models.some(m => st.selected.has(m.id) && !st.modelStatus.get(m.id)?.installed);
 
   let cardsHtml = '';
   for (const m of cfg.models) {
     const ms = st.modelStatus.get(m.id);
     const installed = ms?.installed;
+    const isSelected = st.selected.has(m.id);
+    const locked = installed || m.required;
 
     cardsHtml += `
-      <div class="mdep-card${installed ? ' mdep-card-done' : ''}" data-model-id="${_esc(m.id)}">
-        <div class="mdep-card-header">
-          <span class="ms mdep-card-icon">${installed ? 'check_circle' : 'deployed_code'}</span>
-          <div class="mdep-card-info">
-            <div class="mdep-card-name">${_esc(m.name)}</div>
-            ${m.description ? `<div class="mdep-card-desc">${_esc(m.description)}</div>` : ''}
-          </div>
-          <div class="mdep-card-size">${_esc(m.size || '')}</div>
+      <div class="mdep-card${isSelected ? ' mdep-card-selected' : ''}${installed ? ' mdep-card-done' : ''}${locked ? ' mdep-card-locked' : ''}"
+           data-model-id="${_esc(m.id)}">
+        <div class="mdep-card-check">
+          <span class="ms">${isSelected ? 'check_circle' : 'radio_button_unchecked'}</span>
         </div>
-        <div class="mdep-card-actions">
-          ${installed
-            ? '<div class="mdep-card-status"><span class="ms" style="font-size:.9rem;color:var(--green)">check_circle</span> 已安装</div>'
-            : `<button class="btn btn-sm mdep-card-dl" data-model-id="${_esc(m.id)}">
-                <span class="ms ms-sm">download</span> 下载
-              </button>
-              <div class="mdep-card-progress hidden" data-model-id="${_esc(m.id)}">
-                <div class="mdep-progress-row">
-                  <div class="mdep-progress-wrap">
-                    <div class="mdep-progress-bar" style="width:0%"></div>
-                    <span class="mdep-progress-pct">0%</span>
-                  </div>
-                  <button class="btn btn-xs mdep-cancel-btn" data-model-id="${_esc(m.id)}">取消</button>
-                </div>
-              </div>`
-          }
+        <div class="mdep-card-body">
+          <div class="mdep-card-name">${_esc(m.name)}</div>
+          ${m.description ? `<div class="mdep-card-desc">${_esc(m.description)}</div>` : ''}
+        </div>
+        <div class="mdep-card-meta">
+          <span class="mdep-card-size">${_esc(m.size || '')}</span>
+          ${installed ? '<span class="mdep-card-badge">已安装</span>' : ''}
+          ${m.required && !installed ? '<span class="mdep-card-badge mdep-badge-required">必需</span>' : ''}
         </div>
       </div>`;
   }
 
+  // 按钮逻辑:
+  // - needsDownload → "下载选中模型"
+  // - hasSelected && !needsDownload → "进入" (所有选中的都已安装)
+  // - !hasSelected → 不显示任何按钮
+  let btnHtml = '';
+  if (needsDownload) {
+    btnHtml = `<button class="btn btn-sm mdep-download-btn">
+      <span class="ms ms-sm">download</span> 下载选中模型
+    </button>`;
+  } else if (hasSelected) {
+    btnHtml = `<button class="btn btn-sm mdep-enter-btn">
+      <span class="ms ms-sm">arrow_forward</span> 进入
+    </button>`;
+  }
+
   container.innerHTML = `
-    <div class="mdep-missing">
-      <span class="ms" style="font-size:2.2rem;color:var(--ac);opacity:.7">download</span>
-      <div class="mdep-title">${_esc(cfg.title)}</div>
-      <div class="mdep-desc">${_esc(cfg.description)}</div>
+    <div class="mdep-welcome">
+      <div class="mdep-welcome-header">
+        <span class="ms" style="font-size:2rem;color:var(--ac);opacity:.7">widgets</span>
+        <div class="mdep-title">${_esc(cfg.title)}</div>
+        <div class="mdep-desc">请选择需要下载的模型</div>
+      </div>
       <div class="mdep-card-grid">${cardsHtml}</div>
-      <button class="btn btn-sm mdep-enter-btn${anyInstalled ? '' : ' hidden'}" style="margin-top:16px;gap:4px">
-        <span class="ms ms-sm">arrow_forward</span> 进入控制页面
-      </button>
+      <div class="mdep-actions">
+        <div class="mdep-progress-area hidden">
+          <div class="mdep-progress-wrap">
+            <div class="mdep-progress-bar" style="width:0%"></div>
+            <div class="mdep-progress-pct"></div>
+          </div>
+          <button class="btn btn-xs mdep-cancel-btn" style="margin-top:6px">
+            <span class="ms ms-sm">close</span> 取消
+          </button>
+        </div>
+        <div class="mdep-btn-row">${btnHtml}</div>
+      </div>
     </div>`;
 
-  // 绑定下载按钮
-  container.querySelectorAll('.mdep-card-dl').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const mid = btn.dataset.modelId;
+  // 卡片点击
+  container.querySelectorAll('.mdep-card').forEach(card => {
+    card.addEventListener('click', () => {
+      if (st.downloading) return;
+      const mid = card.dataset.modelId;
       const model = cfg.models.find(m => m.id === mid);
-      if (model) _startCardDownload(st, model);
+      if (!model) return;
+      const ms = st.modelStatus.get(mid);
+      if (ms?.installed || model.required) return;
+
+      if (st.selected.has(mid)) st.selected.delete(mid);
+      else st.selected.add(mid);
+      _renderWelcome(st);
     });
   });
 
-  // 绑定进入按钮
-  container.querySelector('.mdep-enter-btn')?.addEventListener('click', () => {
-    container.classList.add('hidden');
-    st.params.classList.remove('hidden');
-    cfg.onReady?.();
+  container.querySelector('.mdep-download-btn')?.addEventListener('click', () => {
+    _startBatchDownload(st);
   });
 
-  // 恢复正在下载的任务
-  for (const m of cfg.models) {
-    const ms = st.modelStatus.get(m.id);
-    if (ms?.downloading && ms.download_id) {
-      _resumeCardDownload(st, m, ms.download_id);
-    }
-  }
+  container.querySelector('.mdep-enter-btn')?.addEventListener('click', () => {
+    _dismissWelcome(st);
+  });
 }
 
-// ── 单卡片下载 ───────────────────────────────────────────────────────────────
-async function _startCardDownload(st, model) {
+// ── 批量下载 ─────────────────────────────────────────────────────────────────
+async function _startBatchDownload(st) {
   const { cfg, container } = st;
-  const card = container.querySelector(`.mdep-card[data-model-id="${model.id}"]`);
-  if (!card) return;
-  const btn = card.querySelector('.mdep-card-dl');
-  const prog = card.querySelector('.mdep-card-progress');
-  const bar = card.querySelector('.mdep-progress-bar');
-  const pct = card.querySelector('.mdep-progress-pct');
-  const cancelBtn = card.querySelector('.mdep-cancel-btn');
 
-  if (btn) btn.classList.add('hidden');
-  if (prog) prog.classList.remove('hidden');
-  if (bar) bar.style.width = '0%';
-  if (pct) pct.textContent = '0%';
+  const toDownload = cfg.models.filter(m =>
+    st.selected.has(m.id) && !st.modelStatus.get(m.id)?.installed
+  );
+  if (!toDownload.length) return;
+
+  st.downloading = true;
+  const progressArea = container.querySelector('.mdep-progress-area');
+  const progressPct = container.querySelector('.mdep-progress-pct');
+  const progressBar = container.querySelector('.mdep-progress-bar');
+  const cancelBtn = container.querySelector('.mdep-cancel-btn');
+  const btnRow = container.querySelector('.mdep-btn-row');
+
+  if (progressArea) progressArea.classList.remove('hidden');
+  if (btnRow) btnRow.classList.add('hidden');
+  container.querySelectorAll('.mdep-card').forEach(c => c.style.pointerEvents = 'none');
 
   let cancelled = false;
   let currentDownloadId = null;
-  let currentWaitHandle = null;  // { promise, abort }
 
   if (cancelBtn) {
     cancelBtn.onclick = async () => {
       cancelled = true;
-      // 先关闭 SSE 连接，再发取消请求
-      if (currentWaitHandle) currentWaitHandle.abort();
+      if (st.activeHandle) st.activeHandle.abort();
       if (currentDownloadId) {
         await apiFetch(`/api/downloads/${currentDownloadId}/cancel`, { method: 'POST' });
       }
-      _resetCard(card);
+      st.downloading = false;
+      _renderWelcome(st);
     };
   }
 
-  const files = model.files;
-  try {
-    for (let i = 0; i < files.length; i++) {
-      if (cancelled) return;
-      const f = files[i];
-      const saveDir = cfg.comfyuiDir + '/' + f.subdir;
-      const baseProgress = (i / files.length) * 100;
-      const fileWeight = 100 / files.length;
+  const total = toDownload.length;
 
+  for (let mi = 0; mi < total; mi++) {
+    if (cancelled) return;
+    const model = toDownload[mi];
+    const files = model.files;
+    const label = `${mi + 1}/${total} · ${model.name}`;
+
+    if (progressPct) progressPct.textContent = label;
+    if (progressBar) progressBar.style.width = '0%';
+
+    for (let fi = 0; fi < files.length; fi++) {
+      if (cancelled) return;
+      const f = files[fi];
+      const saveDir = cfg.comfyuiDir + '/' + f.subdir;
+
+      // 已存在则跳过
       const chk = await apiFetch('/api/downloads/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ save_dir: saveDir, filename: f.filename }),
       });
-      if (chk?.installed) {
-        const p = baseProgress + fileWeight;
-        if (bar) bar.style.width = p + '%';
-        if (pct) pct.textContent = p.toFixed(1) + '%';
-        continue;
+      if (chk?.installed) continue;
+
+      // 检查是否正在下载
+      let downloadId = chk?.downloading ? chk.download_id : null;
+
+      if (!downloadId) {
+        const resp = await apiFetch('/api/downloads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: f.url,
+            save_dir: saveDir,
+            filename: f.filename,
+            meta: { source: 'model-dependency', model: model.name },
+          }),
+        });
+
+        if (!resp || resp.error) {
+          if (progressPct) progressPct.textContent = `下载失败: ${model.name}`;
+          st.downloading = false;
+          setTimeout(() => _renderWelcome(st), 2000);
+          return;
+        }
+
+        if (resp.status === 'complete') continue;
+        downloadId = resp.download_id;
       }
 
-      const resp = await apiFetch('/api/downloads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: f.url,
-          save_dir: saveDir,
-          filename: f.filename,
-          meta: { source: 'model-dependency', model: model.name },
-        }),
-      });
+      currentDownloadId = downloadId;
 
-      if (!resp || resp.error) {
-        _resetCard(card);
-        return;
-      }
-
-      if (resp.status === 'complete') {
-        const p = baseProgress + fileWeight;
-        if (bar) bar.style.width = p + '%';
-        if (pct) pct.textContent = p.toFixed(1) + '%';
-        continue;
-      }
-
-      currentDownloadId = resp.download_id;
-      currentWaitHandle = _waitForDownload(resp.download_id, (data) => {
-        const dlPct = data.progress || 0;
-        const total = baseProgress + (dlPct / 100) * fileWeight;
-        if (bar) bar.style.width = total + '%';
+      st.activeHandle = _waitForDownload(downloadId, (data) => {
+        const pct = data.progress || 0;
+        if (progressBar) progressBar.style.width = pct + '%';
         const speed = _fmtSpeed(data.speed || 0);
-        if (pct) pct.textContent = speed ? `${total.toFixed(1)}% · ${speed}` : `${total.toFixed(1)}%`;
+        const pctText = Math.round(pct) + '%';
+        if (progressPct) {
+          progressPct.textContent = speed
+            ? `${label} · ${pctText} · ${speed}`
+            : `${label} · ${pctText}`;
+        }
       });
-      st.activeHandles.push(currentWaitHandle);
 
-      const success = await currentWaitHandle.promise;
-
+      const success = await st.activeHandle.promise;
+      st.activeHandle = null;
       currentDownloadId = null;
-      currentWaitHandle = null;
+
       if (!success) {
         if (cancelled) return;
-        _resetCard(card);
+        if (progressPct) progressPct.textContent = `下载失败: ${model.name}`;
+        st.downloading = false;
+        setTimeout(() => _renderWelcome(st), 2000);
         return;
       }
     }
 
-    _markCardDone(card);
-    const enterBtn = container.querySelector('.mdep-enter-btn');
-    if (enterBtn) enterBtn.classList.remove('hidden');
-
-  } catch {
-    _resetCard(card);
+    // model 所有文件完成
+    const ms = st.modelStatus.get(model.id);
+    if (ms) ms.installed = true;
+    const card = container.querySelector(`.mdep-card[data-model-id="${model.id}"]`);
+    if (card) {
+      card.classList.add('mdep-card-done', 'mdep-card-selected');
+      const check = card.querySelector('.mdep-card-check .ms');
+      if (check) check.textContent = 'check_circle';
+      const meta = card.querySelector('.mdep-card-meta');
+      if (meta && !meta.querySelector('.mdep-card-badge')) {
+        meta.insertAdjacentHTML('beforeend', '<span class="mdep-card-badge">已安装</span>');
+      }
+    }
   }
+
+  // 全部完成
+  st.downloading = false;
+  if (progressBar) progressBar.style.width = '100%';
+  if (progressPct) progressPct.textContent = '全部下载完成';
+  setTimeout(() => _renderWelcome(st), 1000);
 }
 
-function _markCardDone(card) {
-  card.classList.add('mdep-card-done');
-  const icon = card.querySelector('.mdep-card-icon');
-  if (icon) icon.textContent = 'check_circle';
-  const actions = card.querySelector('.mdep-card-actions');
-  if (actions) actions.innerHTML = '<div class="mdep-card-status"><span class="ms" style="font-size:.9rem;color:var(--green)">check_circle</span> 已安装</div>';
-}
-
-function _resetCard(card) {
-  const btn = card.querySelector('.mdep-card-dl');
-  const prog = card.querySelector('.mdep-card-progress');
-  if (btn) btn.classList.remove('hidden');
-  if (prog) prog.classList.add('hidden');
-}
-
-// ── 恢复已有下载 ─────────────────────────────────────────────────────────────
-function _resumeCardDownload(st, model, downloadId) {
+// ── 恢复下载 ─────────────────────────────────────────────────────────────────
+function _resumeDownload(st, model, downloadId) {
   const { container } = st;
-  const card = container.querySelector(`.mdep-card[data-model-id="${model.id}"]`);
-  if (!card) return;
-  const btn = card.querySelector('.mdep-card-dl');
-  const prog = card.querySelector('.mdep-card-progress');
-  const bar = card.querySelector('.mdep-progress-bar');
-  const pct = card.querySelector('.mdep-progress-pct');
-  const cancelBtn = card.querySelector('.mdep-cancel-btn');
+  st.downloading = true;
 
-  if (btn) btn.classList.add('hidden');
-  if (prog) prog.classList.remove('hidden');
+  const progressArea = container.querySelector('.mdep-progress-area');
+  const progressPct = container.querySelector('.mdep-progress-pct');
+  const progressBar = container.querySelector('.mdep-progress-bar');
+  const cancelBtn = container.querySelector('.mdep-cancel-btn');
+  const btnRow = container.querySelector('.mdep-btn-row');
 
-  const waitHandle = _waitForDownload(downloadId, (data) => {
-    const dlPct = data.progress || 0;
-    if (bar) bar.style.width = dlPct + '%';
-    const speed = _fmtSpeed(data.speed || 0);
-    if (pct) pct.textContent = speed ? `${dlPct.toFixed(1)}% · ${speed}` : `${dlPct.toFixed(1)}%`;
-  });
-  st.activeHandles.push(waitHandle);
+  if (progressArea) progressArea.classList.remove('hidden');
+  if (btnRow) btnRow.classList.add('hidden');
+  if (progressPct) progressPct.textContent = `${model.name}`;
+  container.querySelectorAll('.mdep-card').forEach(c => c.style.pointerEvents = 'none');
 
   if (cancelBtn) {
     cancelBtn.onclick = async () => {
-      waitHandle.abort();
+      if (st.activeHandle) st.activeHandle.abort();
       await apiFetch(`/api/downloads/${downloadId}/cancel`, { method: 'POST' });
-      _resetCard(card);
+      st.downloading = false;
+      _renderWelcome(st);
     };
   }
 
-  waitHandle.promise.then(ok => {
-    if (ok) {
-      _markCardDone(card);
-      const enterBtn = container.querySelector('.mdep-enter-btn');
-      if (enterBtn) enterBtn.classList.remove('hidden');
-    } else {
-      _resetCard(card);
+  st.activeHandle = _waitForDownload(downloadId, (data) => {
+    const pct = data.progress || 0;
+    if (progressBar) progressBar.style.width = pct + '%';
+    const speed = _fmtSpeed(data.speed || 0);
+    const pctText = Math.round(pct) + '%';
+    if (progressPct) {
+      progressPct.textContent = speed
+        ? `${model.name} · ${pctText} · ${speed}`
+        : `${model.name} · ${pctText}`;
     }
+  });
+
+  st.activeHandle.promise.then(ok => {
+    st.activeHandle = null;
+    st.downloading = false;
+    if (ok) {
+      const ms = st.modelStatus.get(model.id);
+      if (ms) ms.installed = true;
+    }
+    _renderWelcome(st);
   });
 }
 
+// ── Dismiss ──────────────────────────────────────────────────────────────────
+async function _dismissWelcome(st) {
+  const { cfg, container, params } = st;
+
+  await apiFetch('/api/generate/welcome_state', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tab: cfg.tab }),
+  });
+
+  container.classList.add('hidden');
+  params.classList.remove('hidden');
+  cfg.onEnter?.();
+}
+
 // ── SSE 下载监听 ─────────────────────────────────────────────────────────────
-// 返回 { promise: Promise<boolean>, abort: Function }
 function _waitForDownload(downloadId, onProgress) {
   let evtSource = null;
   let settled = false;

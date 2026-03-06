@@ -710,3 +710,46 @@ def api_generate_submit():
 
     return jsonify({"prompt_id": prompt_id, "status": "queued"})
 
+
+# ── /api/generate/welcome_state ──────────────────────────────────────────────
+
+_WELCOME_STATE_FILE = "/workspace/.generate_welcome.json"
+
+
+@bp.route("/api/generate/welcome_state", methods=["GET"])
+def api_generate_welcome_state_get():
+    """
+    读取欢迎页 dismiss 状态。
+    返回: {"pose": true, "canny": true, ...}
+    容器重建后文件不存在 → 返回全 false。
+    """
+    try:
+        with open(_WELCOME_STATE_FILE, "r") as f:
+            return jsonify(json.load(f))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify({})
+
+
+@bp.route("/api/generate/welcome_state", methods=["POST"])
+def api_generate_welcome_state_post():
+    """
+    标记某个 tab 的欢迎页已 dismiss。
+    Body: {"tab": "pose"}  或 {"tab": "upscale"}
+    """
+    data = request.get_json(force=True) or {}
+    tab = data.get("tab", "").strip()
+    if not tab:
+        return jsonify({"error": "tab 必填"}), 400
+
+    state = {}
+    try:
+        with open(_WELCOME_STATE_FILE, "r") as f:
+            state = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    state[tab] = True
+    with open(_WELCOME_STATE_FILE, "w") as f:
+        json.dump(state, f)
+    return jsonify({"ok": True})
+

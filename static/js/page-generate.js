@@ -48,6 +48,7 @@ let _cnImage = { pose: '', canny: '', depth: '' };       // 上传后的文件�
 let _cnImagePreview = { pose: '', canny: '', depth: '' }; // 本地预览 data URL
 let _cnModelOptions = { pose: [], canny: [], depth: [] }; // 从 options API 获取
 let _cnDepHandles = {};  // model-dependency 句柄
+let _cnReady = { pose: false, canny: false, depth: false }; // welcome 页已通过
 let _upscaleDepHandle = null;  // AuraSR model-dependency 句柄
 let _upscaleModelReady = false; // AuraSR 模型是否已安装
 
@@ -92,6 +93,8 @@ function _destroyModelDepHandles() {
     if (_cnDepHandles[type]?.destroy) _cnDepHandles[type].destroy();
   }
   _cnDepHandles = {};
+  _cnReady = { pose: false, canny: false, depth: false };
+  _upscaleModelReady = false;
 }
 
 // ── UI 事件绑定 ───────────────────────────────────────────────────────────────
@@ -199,12 +202,6 @@ function _bindUIEvents() {
       const isNowActive = !tab.classList.contains('active');
       tab.classList.toggle('active', isNowActive);
       if (panel) panel.classList.toggle('hidden', !isNowActive);
-      // 切换到高清放大时检查模型状态
-      if (mod === 'upscale' && isNowActive && _upscaleDepHandle) _upscaleDepHandle.recheck();
-      // 切换到 ControlNet tab 时检查模型
-      if (_CN_TYPES.includes(mod) && isNowActive && _cnDepHandles[mod]) {
-        _cnDepHandles[mod].recheck();
-      }
     });
   });
 
@@ -228,6 +225,15 @@ function _bindUIEvents() {
           }
         }
         if (_CN_TYPES.includes(mod)) {
+          // welcome 页尚未完成 → 禁止开启
+          if (!_cnReady[mod]) {
+            chk.checked = false;
+            if (tab) tab.classList.remove('gen-mod-tab-on');
+            const cnLabels = { pose: '姿势控制', canny: '轮廓控制', depth: '景深控制' };
+            showToast(`请先安装${cnLabels[mod]}模型`, 'warning');
+            if (tab && !tab.classList.contains('active')) tab.click();
+            return;
+          }
           // 检查 CN 模型是否已安装
           if (_cnModelOptions[mod].length === 0) {
             chk.checked = false;
@@ -577,6 +583,9 @@ function _renderRefPreview(type) {
   const uploadDiv = document.getElementById(`gen-${type}-upload`);
   if (!uploadDiv) return;
 
+  // 清理框外的分辨率标签
+  uploadDiv.parentElement?.querySelector('.gen-ref-res')?.remove();
+
   // 预处理进行中 → 显示加载状态
   if (_ppRunning[type]) {
     uploadDiv.innerHTML = `
@@ -592,6 +601,16 @@ function _renderRefPreview(type) {
       <img src="${_cnImagePreview[type]}" alt="参考图">
       <div class="gen-ref-fname">${escHtml(_cnImage[type] || '')}</div>
       <div class="gen-ref-clear" title="移除参考图"><span class="ms">close</span></div>`;
+    // 显示分辨率 (框外)
+    let resEl = uploadDiv.parentElement?.querySelector('.gen-ref-res');
+    if (!resEl) {
+      resEl = document.createElement('div');
+      resEl.className = 'gen-ref-res';
+      uploadDiv.after(resEl);
+    }
+    const img = new Image();
+    img.onload = () => { resEl.textContent = `${img.naturalWidth} × ${img.naturalHeight}`; };
+    img.src = _cnImagePreview[type];
     uploadDiv.querySelector('.gen-ref-clear')?.addEventListener('click', (e) => {
       e.stopPropagation();
       _cnImage[type] = '';
@@ -867,6 +886,8 @@ async function _ppPickInput() {
     const images = resp?.images || [];
     if (!images.length) { showToast('ComfyUI input/ 中没有图片', 'warning'); return; }
     _refModalType = '__pp__';
+    const titleEl = document.getElementById('gen-ref-modal-title');
+    if (titleEl) titleEl.textContent = '选择图片';
     _renderRefModalGrid(images);
     const rm = document.getElementById('gen-ref-modal');
     if (rm) { rm.style.zIndex = '210'; rm.classList.add('active'); }
@@ -878,7 +899,7 @@ const _CN_MODELS = {
   union: {
     id: 'xinsir-union-promax',
     name: 'Xinsir Union ProMax',
-    description: 'SDXL/写实/Pony 通用 · 单模型覆盖所有控制类型',
+    description: 'SDXL/Pony 通用',
     size: '~2.5 GB',
     files: [{
       filename: 'diffusion_pytorch_model_promax.safetensors',
@@ -890,7 +911,7 @@ const _CN_MODELS = {
   pose_dedicated: {
     id: 'windsingai-openpose',
     name: 'windsingai OpenPose',
-    description: 'Illustrious/NoobAI 专用 · 姿态控制优化',
+    description: 'Illustrious/NoobAI 专用',
     size: '~2.5 GB',
     files: [{
       filename: 'openpose_s6000.safetensors',
@@ -902,7 +923,7 @@ const _CN_MODELS = {
   canny_dedicated: {
     id: 'illustrious-canny',
     name: 'Illustrious XL Canny',
-    description: 'Illustrious/NoobAI 专用 · 轮廓控制优化',
+    description: 'Illustrious/NoobAI 专用',
     size: '~1.2 GB',
     files: [{
       filename: 'illustriousXLv1.1_canny_fp16.safetensors',
@@ -914,7 +935,7 @@ const _CN_MODELS = {
   depth_dedicated: {
     id: 'illustrious-depth',
     name: 'Illustrious XL Depth',
-    description: 'Illustrious/NoobAI 专用 · 景深控制优化',
+    description: 'Illustrious/NoobAI 专用',
     size: '~1.2 GB',
     files: [{
       filename: 'illustriousXLv1.1_depth_midas_fp16.safetensors',
@@ -922,77 +943,77 @@ const _CN_MODELS = {
       subdir: 'models/controlnet',
     }],
   },
+  // ── 预处理器模型 (必选) ──────────────────────────────────────────────────
+  dwpose: {
+    id: 'dwpose',
+    name: 'DWPose 姿态检测器',
+    description: 'YOLO + 关键点估计',
+    size: '~200 MB',
+    required: true,
+    files: [
+      {
+        filename: 'yolox_l.onnx',
+        url: 'https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx?download=true',
+        subdir: 'custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose',
+      },
+      {
+        filename: 'dw-ll_ucoco_384_bs5.torchscript.pt',
+        url: 'https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt?download=true',
+        subdir: 'custom_nodes/comfyui_controlnet_aux/ckpts/hr16/DWPose-TorchScript-BatchSize5',
+      },
+    ],
+  },
+  depth_anything_v2: {
+    id: 'depth-anything-v2',
+    name: 'Depth Anything V2',
+    description: '深度图估计',
+    size: '~398 MB',
+    required: true,
+    files: [{
+      filename: 'depth_anything_v2_vitl.pth',
+      url: 'https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true',
+      subdir: 'custom_nodes/comfyui_controlnet_aux/ckpts/depth-anything/Depth-Anything-V2-Large',
+    }],
+  },
 };
 
 const _CN_MODEL_CFG = {
   pose: {
-    title: '姿势控制模型未安装',
-    description: '请选择要下载的姿势控制模型（至少一个）',
-    models: [_CN_MODELS.union, _CN_MODELS.pose_dedicated],
+    tab: 'pose',
+    title: '姿势控制',
+    models: [_CN_MODELS.union, _CN_MODELS.pose_dedicated, _CN_MODELS.dwpose],
   },
   canny: {
-    title: '轮廓控制模型未安装',
-    description: '请选择要下载的轮廓控制模型（至少一个）',
+    tab: 'canny',
+    title: '轮廓控制',
     models: [_CN_MODELS.union, _CN_MODELS.canny_dedicated],
   },
   depth: {
-    title: '景深控制模型未安装',
-    description: '请选择要下载的景深控制模型（至少一个）',
-    models: [_CN_MODELS.union, _CN_MODELS.depth_dedicated],
+    tab: 'depth',
+    title: '景深控制',
+    models: [_CN_MODELS.union, _CN_MODELS.depth_dedicated, _CN_MODELS.depth_anything_v2],
   },
 };
 
-// ── ControlNet model-dependency 初始化 (eager: 页面加载时立即检测) ────────────
+// ── ControlNet model-dependency 初始化 ──────────────────────────────────────
 function _initCNModelDeps() {
   if (!_comfyuiDir) return;
 
   for (const type of _CN_TYPES) {
-    // 如果后端已检测到该类型有可用模型, 直接显示参数面板
-    if (_cnModelOptions[type].length > 0) {
-      const dlArea = document.getElementById(`gen-${type}-download`);
-      const params = document.getElementById(`gen-${type}-params`);
-      if (dlArea) dlArea.classList.add('hidden');
-      if (params) params.classList.remove('hidden');
-      _cnDepHandles[type] = {
-        recheck: async () => {
-          await _loadOptions(true);
-          _refreshCNPanel(type);
-        },
-      };
-      continue;
-    }
-
-    // 无模型 → 直接创建 model-dependency (initModelDependency 内部会显示 loading)
     const cfg = _CN_MODEL_CFG[type];
     _cnDepHandles[type] = initModelDependency({
       containerId: `gen-${type}-download`,
       paramsId: `gen-${type}-params`,
       comfyuiDir: _comfyuiDir,
+      tab: cfg.tab,
       title: cfg.title,
-      description: cfg.description,
       models: cfg.models,
-      onReady: () => {
-        _loadOptions(true).then(() => _refreshCNPanel(type));
-      },
-      onAllInstalled: () => {
-        _loadOptions(true).then(() => _refreshCNPanel(type));
+      onEnter: () => {
+        _cnReady[type] = true;
+        _loadOptions(true);
+        _syncCNUI();
       },
     });
-  }
-}
-
-/** 刷新单个 CN type 的面板可见性 (模型列表变化后调用) */
-function _refreshCNPanel(type) {
-  const dlArea = document.getElementById(`gen-${type}-download`);
-  const params = document.getElementById(`gen-${type}-params`);
-  if (!dlArea || !params) return;
-
-  if (_cnModelOptions[type].length > 0) {
-    dlArea.classList.add('hidden');
-    params.classList.remove('hidden');
-  } else {
-    params.classList.add('hidden');
-    dlArea.classList.remove('hidden');
   }
 }
 
@@ -1547,11 +1568,12 @@ function _syncUpscaleUI() {
 
 function _syncCNUI() {
   for (const type of _CN_TYPES) {
-    // checkbox
+    // checkbox — welcome 页未完成时强制关闭
+    const enabled = _cnEnabled[type] && _cnReady[type];
     const chk = document.querySelector(`.gen-mod-tab-chk[data-module="${type}"]`);
     if (chk) {
-      chk.checked = _cnEnabled[type];
-      chk.closest('.gen-mod-tab')?.classList.toggle('gen-mod-tab-on', _cnEnabled[type]);
+      chk.checked = enabled;
+      chk.closest('.gen-mod-tab')?.classList.toggle('gen-mod-tab-on', enabled);
     }
     // model select
     const modelSel = document.getElementById(`gen-${type}-model`);
@@ -1606,29 +1628,27 @@ function _updateUpscaleSizeHint() {
   }
 }
 
-// ── 高清放大：模型检测 (通过 model-dependency.js 模块管理) ──────────────────
+// ── 高清放大：模型检测 (通过 model-dependency.js 欢迎页管理) ────────────────
 function _initUpscaleModelDep() {
   if (!_comfyuiDir) return;
-  // 直接创建 initModelDependency (内部会显示 loading 并异步检测)
   _upscaleDepHandle = initModelDependency({
     containerId: 'gen-upscale-download',
     paramsId: 'gen-upscale-params',
     comfyuiDir: _comfyuiDir,
-    title: 'AuraSR v2 模型未安装',
-    description: '高清放大功能需要下载约 2.3 GB 模型文件',
+    tab: 'upscale',
+    title: '高清放大',
     models: [{
       id: 'aurasr-v2',
       name: 'AuraSR v2',
-      description: '4× 超分辨率模型',
+      description: '4× 超分辨率放大',
       size: '~2.3 GB',
+      required: true,
       files: [
         { filename: 'config.json', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true', subdir: 'models/Aura-SR' },
         { filename: 'model.safetensors', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true', subdir: 'models/Aura-SR' },
       ],
     }],
-    onReady: () => { _upscaleModelReady = true; },
-    onAllInstalled: () => { _upscaleModelReady = true; },
-    onMissing: () => { _upscaleModelReady = false; },
+    onEnter: () => { _upscaleModelReady = true; },
   });
 }
 
@@ -1666,7 +1686,7 @@ export async function handleSubmit() {
   if (!localStorage.getItem('gen_skip_inactive_warn')) {
     const inactive = [];
     for (const type of _CN_TYPES) {
-      if (!_cnEnabled[type] && _cnImage[type] && _cnModelOptions[type].length > 0) {
+      if (!_cnEnabled[type] && _cnImage[type] && _cnReady[type]) {
         const labels = { pose: '姿势控制', canny: '轮廓控制', depth: '景深控制' };
         inactive.push({ mod: type, label: labels[type] });
       }
@@ -1697,6 +1717,11 @@ export async function handleSubmit() {
     }
     if (!_cnModel[type] && _cnModelOptions[type].length > 0) {
       _cnModel[type] = _cnModelOptions[type][0]; // 自动选第一个
+    }
+    if (!_cnModel[type] && !_cnModelOptions[type]?.length) {
+      const labels = { pose: '姿势控制', canny: '轮廓控制', depth: '景深控制' };
+      _showError(`${labels[type]}未检测到可用模型，请确认 ComfyUI 已启动`);
+      return;
     }
   }
 
