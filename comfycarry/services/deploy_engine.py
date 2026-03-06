@@ -783,6 +783,10 @@ def _step_start_services(config, cfg, PY):
     elif sa2_ok:
         attn_flag = "--use-sage-attention"
     comfy_args = f"--listen 0.0.0.0 --port 8188 {attn_flag} --fast --disable-xformers"
+
+    # 创建 ControlNet 预处理输出子目录
+    _deploy_exec("mkdir -p /workspace/ComfyUI/input/openpose /workspace/ComfyUI/input/canny /workspace/ComfyUI/input/depth")
+
     _deploy_exec("pm2 delete comfy 2>/dev/null || true")
     _deploy_exec(
         f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '

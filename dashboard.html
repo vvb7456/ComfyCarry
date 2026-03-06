@@ -1234,6 +1234,7 @@
                                     </div>
                                 </div>
                                 <input type="file" id="gen-pose-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
+                                <input type="file" id="gen-pose-preprocess-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
                             </div>
                         </div>
                     </div>
@@ -1281,6 +1282,7 @@
                                     </div>
                                 </div>
                                 <input type="file" id="gen-canny-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
+                                <input type="file" id="gen-canny-preprocess-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
                             </div>
                         </div>
                     </div>
@@ -1328,6 +1330,7 @@
                                     </div>
                                 </div>
                                 <input type="file" id="gen-depth-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
+                                <input type="file" id="gen-depth-preprocess-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
                             </div>
                         </div>
                     </div>
@@ -1514,6 +1517,30 @@
                 <button class="btn btn-sm" onclick="window._closeRefModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="gen-ref-modal-grid" class="gen-ref-grid" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
+        </div>
+    </div>
+
+    <!-- CN 预处理弹窗 -->
+    <div class="modal-overlay" id="gen-pp-modal" onclick="if(event.target===this)window._closePPModal()">
+        <div class="modal-box" style="width:720px;max-height:80vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+                <span class="ms ms-sm">auto_fix_high</span>
+                <h3 style="margin:0" id="gen-pp-modal-title">生成参考图</h3>
+                <button class="btn btn-sm" onclick="window._closePPModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <div class="gen-mod-split" style="flex:1;min-height:0;overflow:hidden">
+                <!-- 左：图片预览 (与 CN tab 布局一致) -->
+                <div class="gen-mod-media-area">
+                    <div id="gen-pp-image-preview" class="gen-ref-upload">
+                        <!-- JS 动态渲染 split 布局或预览图 -->
+                    </div>
+                </div>
+                <!-- 右：参数设置 + 提交 -->
+                <div class="gen-mod-params-area" style="display:flex;flex-direction:column;gap:12px">
+                    <div id="gen-pp-params" style="flex:1;min-height:0;overflow-y:auto"></div>
+                    <button class="btn btn-sm btn-primary" id="gen-pp-submit" disabled style="width:100%"><span class="ms ms-sm">play_arrow</span> 开始生成</button>
+                </div>
+            </div>
         </div>
     </div>
 

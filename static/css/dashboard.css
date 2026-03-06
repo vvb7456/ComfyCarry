@@ -3507,8 +3507,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            flex: 1;
-            min-height: 180px;
+            height: 280px;
             border: 2px dashed var(--bd);
             border-radius: var(--r-md);
             cursor: pointer;
@@ -3522,8 +3521,8 @@
             background: color-mix(in srgb, var(--ac) 5%, transparent);
         }
         .gen-ref-upload img {
-            max-width: 100%;
-            max-height: 320px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             border-radius: var(--r-sm);
         }
@@ -3560,6 +3559,85 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        /* ── 参考图预览: 分区占位符 (选择已有 / 从新图片生成) ─── */
+        .gen-ref-split {
+            width: 100%;
+            height: 100%;
+            gap: 0;
+        }
+        .gen-ref-split-top,
+        .gen-ref-split-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            flex: 1;
+            width: 100%;
+            padding: 8px 0;
+            cursor: pointer;
+            border-radius: var(--r-sm);
+            transition: background .15s;
+        }
+        .gen-ref-split-top:hover,
+        .gen-ref-split-bottom:hover {
+            background: color-mix(in srgb, var(--ac) 8%, transparent);
+        }
+        .gen-ref-split-divider {
+            width: 80%;
+            text-align: center;
+            position: relative;
+            color: var(--t3);
+            font-size: .7rem;
+        }
+        .gen-ref-split-divider::before,
+        .gen-ref-split-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: calc(50% - 16px);
+            height: 1px;
+            background: var(--bd);
+        }
+        .gen-ref-split-divider::before { left: 0; }
+        .gen-ref-split-divider::after { right: 0; }
+
+        /* ── 参考图预处理中 (旋转动画) ─── */
+        .gen-ref-processing {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: var(--t3);
+            font-size: var(--text-xs);
+        }
+        .gen-ref-spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--bd);
+            border-top-color: var(--ac);
+            border-radius: 50%;
+            animation: gen-ref-spin 0.8s linear infinite;
+        }
+        @keyframes gen-ref-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── 预处理弹窗参数行 ────────────────────────────────────────────── */
+        .gen-pp-param-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: var(--r);
+            font-size: var(--text-sm);
+            color: var(--t1);
+        }
+        .gen-pp-param-row + .gen-pp-param-row {
+            border-top: 1px solid var(--bd);
         }
 
         /* ── 参考图选择弹窗卡片网格 ───────────────────────────────────────── */

@@ -240,9 +240,15 @@ def api_comfyui_history():
                         "type": img.get("type", "output"),
                     })
             # 优先 output 类型, 仅在无 output 时回退到 temp
-            output_imgs = [i for i in images if i["type"] == "output"]
+            # 排除 subfolder 以 "input" 开头的图片 (CN 预处理输出)
+            output_imgs = [i for i in images
+                           if i["type"] == "output"
+                           and not i["subfolder"].startswith("input")]
             temp_imgs = [i for i in images if i["type"] == "temp"]
             images = output_imgs if output_imgs else temp_imgs
+            # 无有效 output 图片的条目跳过 (如纯预处理工作流)
+            if not output_imgs and not filter_prompt_id:
+                continue
             # 从 status.messages 中提取时间戳
             timestamp = 0
             for msg in status.get("messages", []):

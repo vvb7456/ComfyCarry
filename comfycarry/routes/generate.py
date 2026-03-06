@@ -26,7 +26,7 @@ from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
 from ..services.comfyui_bridge import get_bridge
-from ..services.workflow_builder import build_sdxl_workflow
+from ..services.workflow_builder import build_sdxl_workflow, build_preprocess_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -355,34 +355,161 @@ def api_generate_upload_image():
     return jsonify({"filename": safe_name})
 
 
+# ── /api/generate/preprocess ─────────────────────────────────────────────────
+
+@bp.route("/api/generate/preprocess", methods=["POST"])
+def api_generate_preprocess():
+    """
+    上传源图片（或指定 input/ 已有文件）并提交 ControlNet 预处理工作流。
+
+    Form data:
+        file       — 源图片文件 (png/jpeg/webp/bmp, 最大 20MB)。与 input_name 二选一
+        input_name — input/ 中已有文件的文件名。与 file 二选一
+        type       — 预处理类型: "pose" | "canny" | "depth"
+        params     — JSON 字符串，预处理器参数 (可选)
+
+    返回: {"prompt_id": "...", "output_filename": "preprocess_pose_xxx.png"}
+    """
+    import uuid as _uuid
+    import json as _json
+
+    pp_type = request.form.get("type", "").strip()
+    if pp_type not in ("pose", "canny", "depth"):
+        return jsonify({"error": f"不支持的预处理类型: {pp_type}"}), 400
+
+    input_dir = os.path.join(COMFYUI_DIR, "input")
+    os.makedirs(input_dir, exist_ok=True)
+    uid = _uuid.uuid4().hex[:8]
+
+    # 确定源图片
+    input_name = request.form.get("input_name", "").strip()
+    if input_name:
+        # 使用 input/ 中已有文件
+        safe_name = os.path.basename(input_name)
+        src_path = os.path.join(input_dir, safe_name)
+        if not os.path.isfile(src_path):
+            return jsonify({"error": f"文件不存在: {safe_name}"}), 404
+        src_name = safe_name
+    elif "file" in request.files:
+        file = request.files["file"]
+        if not file or not file.filename:
+            return jsonify({"error": "无效的文件"}), 400
+
+        # 文件类型校验
+        content_type = file.content_type or ""
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            return jsonify({"error": f"不支持的图片格式: {content_type}"}), 400
+
+        # 文件大小校验
+        file.seek(0, 2)
+        size = file.tell()
+        file.seek(0)
+        if size > MAX_IMAGE_SIZE:
+            return jsonify({"error": f"文件过大 ({size // 1024 // 1024}MB)，最大 20MB"}), 400
+
+        ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
+        ext = ext_map.get(content_type, ".png")
+        src_name = f"comfycarry_src_{pp_type}_{uid}{ext}"
+        dest = os.path.join(input_dir, src_name)
+        file.save(dest)
+    else:
+        return jsonify({"error": "请上传图片或指定 input 文件名"}), 400
+
+    # 解析预处理器参数
+    extra_params = {}
+    params_str = request.form.get("params", "")
+    if params_str:
+        try:
+            extra_params = _json.loads(params_str)
+        except _json.JSONDecodeError:
+            pass
+
+    # 预处理输出文件名 → 保存到子目录 (input/openpose, input/canny, input/depth)
+    _SUBFOLDER_MAP = {"pose": "openpose", "canny": "canny", "depth": "depth"}
+    subfolder = _SUBFOLDER_MAP.get(pp_type, pp_type)
+    output_dir = os.path.join(input_dir, subfolder)
+    os.makedirs(output_dir, exist_ok=True)
+    output_name = f"preprocess_{pp_type}_{uid}"
+
+    # 构建预处理工作流
+    try:
+        prompt = build_preprocess_workflow({
+            "image": src_name,
+            "type": pp_type,
+            "save_prefix": output_name,
+            "input_dir": output_dir,
+            **extra_params,
+        })
+    except Exception as e:
+        logger.exception("[generate] 构建预处理工作流失败")
+        return jsonify({"error": f"工作流构建失败: {e}"}), 500
+
+    # 提交到 ComfyUI
+    try:
+        bridge = get_bridge()
+        payload = {"prompt": prompt, "client_id": bridge.client_id}
+        resp = requests.post(f"{COMFYUI_URL}/prompt", json=payload, timeout=30)
+        resp.raise_for_status()
+        result = resp.json()
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "ComfyUI 未运行"}), 503
+    except Exception as e:
+        logger.exception("[generate] 提交预处理工作流失败")
+        return jsonify({"error": f"提交失败: {e}"}), 500
+
+    prompt_id = result.get("prompt_id", "")
+    output_filename = f"{output_name}.png"
+    # 返回带子目录的相对路径（如 "openpose/preprocess_pose_xxx.png"）
+    output_relpath = f"{subfolder}/{output_filename}"
+    logger.info(f"[generate] 预处理提交 prompt_id={prompt_id} type={pp_type} output={output_relpath}")
+
+    return jsonify({
+        "prompt_id": prompt_id,
+        "output_filename": output_relpath,
+    })
+
+
 # ── /api/generate/input_images ───────────────────────────────────────────────
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 
 @bp.route("/api/generate/input_images")
 def api_generate_input_images():
-    """列出 ComfyUI input/ 目录中的所有图片文件 (供参考图选择器使用)。"""
+    """
+    列出 ComfyUI input/ 目录中的图片文件 (供参考图选择器使用)。
+    Query params:
+        subfolder — 可选子目录名 (如 "openpose"), 仅列出该子目录中的图片
+    """
+    subfolder = request.args.get("subfolder", "").strip()
     input_dir = os.path.join(COMFYUI_DIR, "input")
-    if not os.path.isdir(input_dir):
+    if subfolder:
+        # 安全校验：不允许路径遍历
+        safe_sub = os.path.basename(subfolder)
+        scan_dir = os.path.join(input_dir, safe_sub)
+    else:
+        scan_dir = input_dir
+    if not os.path.isdir(scan_dir):
         return jsonify({"images": []})
     images = []
-    for f in sorted(os.listdir(input_dir)):
+    for f in sorted(os.listdir(scan_dir)):
         ext = os.path.splitext(f)[1].lower()
         if ext not in IMAGE_EXTENSIONS:
             continue
-        fpath = os.path.join(input_dir, f)
+        fpath = os.path.join(scan_dir, f)
         if not os.path.isfile(fpath):
             continue
-        images.append({"name": f, "size": os.path.getsize(fpath)})
+        # 返回相对于 input/ 的路径
+        rel_name = f"{safe_sub}/{f}" if subfolder else f
+        images.append({"name": rel_name, "size": os.path.getsize(fpath)})
     return jsonify({"images": images})
 
 
 @bp.route("/api/generate/input_image_preview")
 def api_generate_input_image_preview():
-    """返回 ComfyUI input/ 中指定图片的原始文件 (用于缩略图预览)。"""
+    """返回 ComfyUI input/ 中指定图片的原始文件 (用于缩略图预览)。支持子目录 (如 "openpose/file.png")。"""
     from flask import send_from_directory, abort
     name = request.args.get("name", "")
-    if not name or "/" in name or "\\" in name or ".." in name:
+    if not name or ".." in name:
         abort(400)
     input_dir = os.path.join(COMFYUI_DIR, "input")
     fpath = os.path.join(input_dir, name)
@@ -392,7 +519,11 @@ def api_generate_input_image_preview():
         abort(403)
     if not os.path.isfile(fpath):
         abort(404)
-    return send_from_directory(input_dir, name)
+    # 分离目录和文件名
+    sub_dir = os.path.dirname(name)
+    base_name = os.path.basename(name)
+    serve_dir = os.path.join(input_dir, sub_dir) if sub_dir else input_dir
+    return send_from_directory(serve_dir, base_name)
 
 
 # ── /api/generate/submit ─────────────────────────────────────────────────────

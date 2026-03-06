@@ -51,6 +51,11 @@ let _cnDepHandles = {};  // model-dependency 句柄
 let _upscaleDepHandle = null;  // AuraSR model-dependency 句柄
 let _upscaleModelReady = false; // AuraSR 模型是否已安装
 
+// ControlNet 预处理状态
+let _ppRunning = { pose: false, canny: false, depth: false };  // 预处理进行中
+let _ppPromptId = { pose: '', canny: '', depth: '' };          // 预处理 prompt_id
+let _ppOutputFile = { pose: '', canny: '', depth: '' };        // 预期输出文件名
+
 // ── 注册页面 ─────────────────────────────────────────────────────────────────
 registerPage('generate', {
   enter() { _enterPage(); },
@@ -63,6 +68,8 @@ async function _enterPage() {
   _restoreState();     // 恢复持久化参数
   _initUpscaleModelDep();  // AuraSR 模型依赖检测 (仅注册, 不立即检查)
   _initCNModelDeps();  // ControlNet 模型依赖检测 (仅注册, 不立即检查)
+  _restoreActiveModule(); // 恢复展开的功能模块 Tab
+  for (const t of _CN_TYPES) _renderRefPreview(t);  // 渲染分区占位符
   _startSSE();
   _renderProgress();   // 初始渲染空闲状态
   _renderSeedUI();     // 初始种子值显示
@@ -70,7 +77,8 @@ async function _enterPage() {
 
 function _leavePage() {
   _saveState();
-  _stopSSE();
+  // 预处理进行中不关闭 SSE，避免丢失 execution_done
+  if (!_CN_TYPES.some(t => _ppRunning[t])) _stopSSE();
   document.removeEventListener('click', _handleDocClick);
 }
 
@@ -324,10 +332,22 @@ function _bindRefUpload(type) {
   const fileInput = document.getElementById(`gen-${type}-file`);
   if (!uploadDiv || !fileInput) return;
 
-  // 点击上传区 → 打开图片选择弹窗
+  // 点击上传区 — 根据 data-action 区分
   uploadDiv.addEventListener('click', (e) => {
     if (e.target.closest('.gen-ref-clear')) return;
-    _openRefModal(type);
+    if (_ppRunning[type]) return;  // 预处理中不响应点击
+    const action = e.target.closest('[data-action]')?.dataset?.action;
+    if (action === 'preprocess') {
+      // 点击"从新图片生成" → 打开预处理弹窗
+      if (_state === 'generating') {
+        showToast('请等待当前工作流完成或取消', 'warning');
+        return;
+      }
+      _openPPModal(type);
+    } else {
+      // 默认: 打开图片选择弹窗（仅显示对应子目录中的图片）
+      _openRefModal(type, _CN_SUBFOLDER[type]);
+    }
   });
 
   // 拖放仍然直接上传
@@ -346,9 +366,13 @@ function _bindRefUpload(type) {
     if (file) _handleRefFile(type, file);
     fileInput.value = '';
   });
+
+  // 预处理文件选择
 }
 
-async function _openRefModal(type) {
+const _CN_SUBFOLDER = { pose: 'openpose', canny: 'canny', depth: 'depth' };
+
+async function _openRefModal(type, subfolder) {
   _refModalType = type;
   const labels = { pose: '骨骼图', canny: '边缘图', depth: '深度图' };
   const titleEl = document.getElementById('gen-ref-modal-title');
@@ -359,9 +383,10 @@ async function _openRefModal(type) {
 
   document.getElementById('gen-ref-modal')?.classList.add('active');
 
-  // 加载 input 文件夹图片列表
+  // 加载 input 文件夹图片列表（可选子目录）
   try {
-    const resp = await apiFetch('/api/generate/input_images');
+    const qs = subfolder ? `?subfolder=${encodeURIComponent(subfolder)}` : '';
+    const resp = await apiFetch(`/api/generate/input_images${qs}`);
     _renderRefModalGrid(resp?.images || []);
   } catch {
     _renderRefModalGrid([]);
@@ -369,7 +394,8 @@ async function _openRefModal(type) {
 }
 
 window._closeRefModal = function() {
-  document.getElementById('gen-ref-modal')?.classList.remove('active');
+  const rm = document.getElementById('gen-ref-modal');
+  if (rm) { rm.classList.remove('active'); rm.style.zIndex = ''; }
 };
 
 function _renderRefModalGrid(images) {
@@ -395,7 +421,16 @@ function _renderRefModalGrid(images) {
         <div class="gen-ref-card-size">${sizeStr}</div>
       </div>`;
     card.addEventListener('click', () => {
-      // 选择已有图片
+      if (_refModalType === '__pp__') {
+        // 来自预处理弹窗 → 回填到弹窗
+        _ppModalFile = img.name;
+        _ppModalFileName = img.name;
+        window._closeRefModal();
+        _renderPPImagePreview();
+        _updatePPSubmitBtn();
+        return;
+      }
+      // 正常模式: 选择已有图片
       _cnImage[_refModalType] = img.name;
       _cnImagePreview[_refModalType] = `/api/generate/input_image_preview?name=${encodeURIComponent(img.name)}`;
       _renderRefPreview(_refModalType);
@@ -412,6 +447,12 @@ function _renderRefModalGrid(images) {
     <span class="ms" style="font-size:2rem">upload_file</span>
     <span>上传本地图片</span>`;
   uploadCard.addEventListener('click', () => {
+    if (_refModalType === '__pp__') {
+      // PP 模式: 本地上传 → 关闭 ref modal → 触发 pp file input
+      window._closeRefModal();
+      document.getElementById('gen-pp-file-input')?.click();
+      return;
+    }
     const fileInput = document.getElementById(`gen-${_refModalType}-file`);
     if (fileInput) fileInput.click();
     window._closeRefModal();
@@ -450,9 +491,97 @@ async function _handleRefFile(type, file) {
   }
 }
 
+// ── ControlNet 预处理: 从新图片生成参考图 ─────────────────────────────────────
+async function _startPreprocess(type, file, params = {}) {
+  if (_state === 'generating') {
+    showToast('请等待当前工作流完成或取消', 'warning');
+    return;
+  }
+  if (_ppRunning[type]) return;
+
+  // 设置预处理状态
+  _ppRunning[type] = true;
+  _renderRefPreview(type);
+  _startPPTimer();
+
+  const form = new FormData();
+  // file 可以是 File 对象或字符串（input/ 中的文件名）
+  if (file instanceof File) {
+    form.append('file', file);
+  } else {
+    form.append('input_name', file);  // 使用 input/ 中已有文件
+  }
+  form.append('type', type);
+  // 附加预处理器参数
+  if (Object.keys(params).length) {
+    form.append('params', JSON.stringify(params));
+  }
+
+  try {
+    const resp = await apiFetch('/api/generate/preprocess', { method: 'POST', body: form });
+    if (!resp || resp?.error) {
+      _ppRunning[type] = false;
+      _stopPPTimer();
+      _renderRefPreview(type);
+      _renderProgress();
+      if (resp?.error) showToast('预处理失败: ' + resp.error, 'error');
+      return;
+    }
+    _ppPromptId[type] = resp.prompt_id || '';
+    _ppOutputFile[type] = resp.output_filename || '';
+    const labels = { pose: '骨骼图', canny: '边缘图', depth: '深度图' };
+    showToast(`正在生成${labels[type]}…`);
+  } catch (e) {
+    _ppRunning[type] = false;
+    _stopPPTimer();
+    _renderRefPreview(type);
+    _renderProgress();
+    showToast('预处理请求失败: ' + e.message, 'error');
+  }
+}
+
+/** 预处理完成回调 — 由 SSE handler 调用 */
+function _onPreprocessDone(type, success) {
+  _ppRunning[type] = false;
+  _stopPPTimer();
+  _renderProgress();  // 恢复主状态栏
+  if (success && _ppOutputFile[type]) {
+    // 自动选择生成的参考图
+    _cnImage[type] = _ppOutputFile[type];
+    _cnImagePreview[type] = `/api/generate/input_image_preview?name=${encodeURIComponent(_ppOutputFile[type])}`;
+    _deferSave();
+    const labels = { pose: '骨骼图', canny: '边缘图', depth: '深度图' };
+    showToast(`${labels[type]}生成完成`, 'success');
+  } else if (!success) {
+    showToast('参考图生成失败', 'error');
+  }
+  _ppPromptId[type] = '';
+  _ppOutputFile[type] = '';
+  _renderRefPreview(type);
+}
+
+/** 检查 prompt_id 是否属于预处理工作流, 返回对应类型或 null */
+function _findPreprocessType(promptId) {
+  if (!promptId) return null;
+  for (const t of _CN_TYPES) {
+    if (_ppPromptId[t] && _ppPromptId[t] === promptId) return t;
+  }
+  return null;
+}
+
 function _renderRefPreview(type) {
   const uploadDiv = document.getElementById(`gen-${type}-upload`);
   if (!uploadDiv) return;
+
+  // 预处理进行中 → 显示加载状态
+  if (_ppRunning[type]) {
+    uploadDiv.innerHTML = `
+      <div class="gen-ref-processing">
+        <div class="gen-ref-spinner"></div>
+        <span>正在生成参考图…</span>
+      </div>`;
+    return;
+  }
 
   if (_cnImagePreview[type]) {
     uploadDiv.innerHTML = `
@@ -469,14 +598,271 @@ function _renderRefPreview(type) {
   } else {
     const labels = { pose: '骨骼图', canny: '边缘图', depth: '深度图' };
     uploadDiv.innerHTML = `
-      <div class="gen-ref-placeholder">
-        <span class="ms" style="font-size:2rem;opacity:.4">image</span>
-        <span>点击选择${labels[type] || '参考图'}</span>
+      <div class="gen-ref-placeholder gen-ref-split">
+        <div class="gen-ref-split-top" data-action="pick">
+          <span class="ms" style="font-size:1.5rem;opacity:.4">image</span>
+          <span>点击选择${labels[type] || '参考图'}</span>
+        </div>
+        <div class="gen-ref-split-divider"><span>或</span></div>
+        <div class="gen-ref-split-bottom" data-action="preprocess">
+          <span class="ms" style="font-size:1.5rem;opacity:.4">auto_fix_high</span>
+          <span>从新图片生成</span>
+        </div>
       </div>`;
   }
 }
 
 // ── ControlNet 可下载模型定义 ─────────────────────────────────────────────────
+// ── 预处理弹窗 ─────────────────────────────────────────────────────────────
+let _ppModalType = '';      // 当前弹窗对应的 CN 类型
+let _ppModalFile = null;    // 选中的文件 (File 或 input 文件名字符串)
+let _ppModalFileName = '';  // 显示用的文件名
+
+const _PP_PARAMS_DEF = {
+  pose: {
+    title: '骨骼图',
+    icon: 'accessibility_new',
+    params: [
+      { key: 'detect_body', label: '检测身体', type: 'toggle', default: true },
+      { key: 'detect_hand', label: '检测手指', type: 'toggle', default: true },
+      { key: 'detect_face', label: '检测面部', type: 'toggle', default: true },
+      { key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
+        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }] },
+    ],
+  },
+  canny: {
+    title: '边缘图',
+    icon: 'border_style',
+    params: [
+      { key: 'low_threshold', label: '低阈值', type: 'slider', min: 0, max: 255, step: 1, default: 100 },
+      { key: 'high_threshold', label: '高阈值', type: 'slider', min: 0, max: 255, step: 1, default: 200 },
+      { key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
+        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }] },
+    ],
+  },
+  depth: {
+    title: '深度图',
+    icon: 'layers',
+    params: [
+      { key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
+        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }] },
+    ],
+  },
+};
+
+let _ppParamValues = {};  // { key: value } 当前弹窗参数
+
+function _openPPModal(type) {
+  _ppModalType = type;
+  _ppModalFile = null;
+  _ppModalFileName = '';
+  const def = _PP_PARAMS_DEF[type];
+  if (!def) return;
+
+  // 初始化参数默认值
+  _ppParamValues = {};
+  for (const p of def.params) _ppParamValues[p.key] = p.default;
+
+  // 标题
+  const titleEl = document.getElementById('gen-pp-modal-title');
+  if (titleEl) titleEl.textContent = `生成${def.title}`;
+
+  // 渲染参数区
+  _renderPPParams(type);
+  // 重置图片预览
+  _renderPPImagePreview();
+  // 禁用提交
+  _updatePPSubmitBtn();
+
+  // 绑定事件（一次性）
+  _bindPPModalEvents(type);
+
+  document.getElementById('gen-pp-modal')?.classList.add('active');
+}
+
+window._closePPModal = function() {
+  document.getElementById('gen-pp-modal')?.classList.remove('active');
+  _ppModalFile = null;
+};
+
+function _renderPPParams(type) {
+  const container = document.getElementById('gen-pp-params');
+  if (!container) return;
+  const def = _PP_PARAMS_DEF[type];
+  let html = `<div style="font-weight:500;margin-bottom:12px;font-size:.85rem;color:var(--t2)">参数设置</div>`;
+
+  for (const p of def.params) {
+    if (p.type === 'toggle') {
+      const checked = _ppParamValues[p.key] ? 'checked' : '';
+      html += `<div class="gen-pp-param-row">
+        <span>${escHtml(p.label)}</span>
+        <label class="comfy-param-toggle" style="margin-left:auto;gap:0">
+          <input type="checkbox" data-pp-key="${p.key}" ${checked}>
+          <span class="comfy-toggle-slider"></span>
+        </label>
+      </div>`;
+    } else if (p.type === 'slider') {
+      html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div style="display:flex;justify-content:space-between">
+          <span>${escHtml(p.label)}</span>
+          <span class="gen-pp-slider-val" data-pp-key="${p.key}" style="color:var(--ac);font-weight:600">${_ppParamValues[p.key]}</span>
+        </div>
+        <input type="range" data-pp-key="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${_ppParamValues[p.key]}" style="width:100%">
+      </div>`;
+    } else if (p.type === 'select') {
+      const opts = p.options.map(o =>
+        `<option value="${o.v}"${_ppParamValues[p.key] == o.v ? ' selected' : ''}>${escHtml(o.l)}</option>`
+      ).join('');
+      html += `<div class="gen-pp-param-row">
+        <span>${escHtml(p.label)}</span>
+        <select data-pp-key="${p.key}" class="input-field" style="width:auto;margin-left:auto">${opts}</select>
+      </div>`;
+    }
+  }
+  container.innerHTML = html;
+
+  // 绑定参数事件
+  container.querySelectorAll('[data-pp-key]').forEach(el => {
+    const key = el.dataset.ppKey;
+    if (el.type === 'checkbox') {
+      el.addEventListener('change', () => { _ppParamValues[key] = el.checked; });
+    } else if (el.type === 'range') {
+      el.addEventListener('input', () => {
+        _ppParamValues[key] = Number(el.value);
+        const valEl = container.querySelector(`span.gen-pp-slider-val[data-pp-key="${key}"]`);
+        if (valEl) valEl.textContent = el.value;
+      });
+    } else if (el.tagName === 'SELECT') {
+      el.addEventListener('change', () => { _ppParamValues[key] = Number(el.value); });
+    }
+  });
+}
+
+function _renderPPImagePreview() {
+  const container = document.getElementById('gen-pp-image-preview');
+  if (!container) return;
+
+  if (_ppModalFile) {
+    // 有文件 → 显示预览
+    let imgSrc;
+    if (_ppModalFile instanceof File) {
+      imgSrc = URL.createObjectURL(_ppModalFile);
+    } else {
+      imgSrc = `/api/generate/input_image_preview?name=${encodeURIComponent(_ppModalFile)}`;
+    }
+    container.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain">
+      <div style="position:absolute;bottom:4px;left:4px;right:4px;text-align:center;font-size:.75rem;color:var(--t3);background:var(--bg2);border-radius:4px;padding:2px 4px;word-break:break-all">${escHtml(_ppModalFileName)}</div>
+      <div class="gen-ref-clear" title="移除"><span class="ms">close</span></div>`;
+    container.querySelector('.gen-ref-clear')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _ppModalFile = null;
+      _ppModalFileName = '';
+      _renderPPImagePreview();
+      _updatePPSubmitBtn();
+    });
+  } else {
+    // 无文件 → split 布局（上方选已有、下方拖放上传）
+    container.innerHTML = `
+      <div class="gen-ref-placeholder gen-ref-split" style="width:100%;height:100%">
+        <div class="gen-ref-split-top" data-action="pick-input">
+          <span class="ms" style="font-size:1.5rem;opacity:.4">folder_open</span>
+          <span>从 input 选择</span>
+        </div>
+        <div class="gen-ref-split-divider"><span>或</span></div>
+        <div class="gen-ref-split-bottom" data-action="upload-local">
+          <span class="ms" style="font-size:1.5rem;opacity:.4">upload</span>
+          <span>拖放或点击上传</span>
+        </div>
+      </div>`;
+  }
+}
+
+function _updatePPSubmitBtn() {
+  const btn = document.getElementById('gen-pp-submit');
+  if (btn) btn.disabled = !_ppModalFile;
+}
+
+let _ppModalBound = false;
+
+function _bindPPModalEvents(type) {
+  if (_ppModalBound) return;
+  _ppModalBound = true;
+
+  const previewArea = document.getElementById('gen-pp-image-preview');
+  const submitBtn = document.getElementById('gen-pp-submit');
+
+  // 创建一个专用 input
+  let ppInput = document.getElementById('gen-pp-file-input');
+  if (!ppInput) {
+    ppInput = document.createElement('input');
+    ppInput.type = 'file';
+    ppInput.accept = 'image/*';
+    ppInput.id = 'gen-pp-file-input';
+    ppInput.style.display = 'none';
+    document.body.appendChild(ppInput);
+  }
+
+  // 事件委托：点击 split 区域
+  previewArea?.addEventListener('click', (e) => {
+    const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    if (action === 'pick-input') {
+      // 从 input 选择
+      _ppPickInput();
+    } else if (action === 'upload-local') {
+      ppInput.click();
+    }
+  });
+
+  // 拖放（仅在 split-bottom 区域生效，但为简单起见整个 previewArea 都支持）
+  previewArea?.addEventListener('dragover', (e) => { e.preventDefault(); });
+  previewArea?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      _ppModalFile = file;
+      _ppModalFileName = file.name;
+      _renderPPImagePreview();
+      _updatePPSubmitBtn();
+    }
+  });
+
+  // 本地文件选择
+  ppInput.addEventListener('change', () => {
+    const file = ppInput.files?.[0];
+    if (file) {
+      _ppModalFile = file;
+      _ppModalFileName = file.name;
+      _renderPPImagePreview();
+      _updatePPSubmitBtn();
+    }
+    ppInput.value = '';
+  });
+
+  // 提交
+  submitBtn?.addEventListener('click', () => {
+    if (!_ppModalFile || !_ppModalType) return;
+    const file = _ppModalFile;
+    const type = _ppModalType;
+    const params = { ..._ppParamValues };
+    _closePPModal();
+    _startPreprocess(type, file, params);
+  });
+}
+
+async function _ppPickInput() {
+  try {
+    const resp = await apiFetch('/api/generate/input_images');
+    const images = resp?.images || [];
+    if (!images.length) { showToast('ComfyUI input/ 中没有图片', 'warning'); return; }
+    _refModalType = '__pp__';
+    _renderRefModalGrid(images);
+    const rm = document.getElementById('gen-ref-modal');
+    if (rm) { rm.style.zIndex = '210'; rm.classList.add('active'); }
+  } catch { showToast('加载图片列表失败', 'error'); }
+}
+
 const _CN_MODELS = {
   // 共享: Xinsir Union ProMax (所有类型通用)
   union: {
@@ -1035,6 +1421,7 @@ function _saveState() {
       cnStart: { ..._cnStart },
       cnEnd: { ..._cnEnd },
       cnImage: { ..._cnImage },
+      activeModule: document.querySelector('.gen-mod-tab.active')?.dataset?.module || '',
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) { /* quota exceeded etc */ }
@@ -1188,6 +1575,18 @@ function _syncCNUI() {
   }
 }
 
+/** 从 localStorage 恢复上次展开的功能模块 Tab (在所有 init 完成后调用) */
+function _restoreActiveModule() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (!s.activeModule) return;
+    const tab = document.querySelector(`.gen-mod-tab[data-module="${s.activeModule}"]`);
+    if (tab && !tab.classList.contains('active') && !tab.disabled) tab.click();
+  } catch { /* ignore */ }
+}
+
 function _updateUpscaleSizeHint() {
   const hint = document.getElementById('gen-upscale-size');
   if (hint) {
@@ -1254,6 +1653,12 @@ function _getResolution() {
 // ── 提交生成 ─────────────────────────────────────────────────────────────────
 export async function handleSubmit() {
   if (_state !== 'idle' && _state !== 'done' && _state !== 'error') return;
+
+  // 预处理进行中不允许提交主工作流
+  if (_CN_TYPES.some(t => _ppRunning[t])) {
+    showToast('正在生成参考图，请稍候', 'warning');
+    return;
+  }
 
   const ckpt = _selectedCheckpoint || '';
   const positive = document.getElementById('gen-positive')?.value?.trim();
@@ -1404,6 +1809,23 @@ function _stopSSE() {
 }
 
 function _handleSSEEvent(evt) {
+  // ── 预处理工作流事件拦截 ──
+  const evtPid = evt.data?.prompt_id || '';
+  const ppType = evtPid ? _findPreprocessType(evtPid) : null;
+
+  if (ppType) {
+    // 带 prompt_id 且匹配预处理 → 拦截
+    if (evt.type === 'execution_done') {
+      _onPreprocessDone(ppType, true);
+    } else if (evt.type === 'execution_error' || evt.type === 'execution_interrupted') {
+      _onPreprocessDone(ppType, false);
+    } else if (evt.type === 'progress' || evt.type === 'executing') {
+      // 更新预处理进度到状态栏
+      _renderPreprocessProgress(ppType, evt);
+    }
+    return;  // 不让 tracker 处理
+  }
+
   // 实时预览帧
   if (evt.type === 'preview_image') {
     const img = document.getElementById('gen-preview-img');
@@ -1450,7 +1872,12 @@ function _handleSSEEvent(evt) {
 function _renderProgress() {
   const statusEl = document.getElementById('gen-bar-status');
   const stepEl = document.getElementById('gen-preview-step');
+  const runBtn = document.getElementById('gen-run-btn');
   if (!statusEl) return;
+
+  // 预处理运行中 → 禁用运行按钮
+  const ppBusy = _CN_TYPES.some(t => _ppRunning[t]);
+  if (runBtn && _state !== 'generating') runBtn.disabled = ppBusy;
 
   const st = _tracker?.getState();
   if (!st) {
@@ -1478,6 +1905,62 @@ function _renderProgress() {
 }
 
 // ── 运行模式 ─────────────────────────────────────────────────────────────────
+let _ppTimer = null;   // 预处理计时器
+let _ppStartTime = 0;  // 预处理开始时间
+
+/** 预处理进度渲染到主状态栏 */
+function _renderPreprocessProgress(type, evt) {
+  const statusEl = document.getElementById('gen-bar-status');
+  if (!statusEl) return;
+
+  const labels = { pose: '骨骼图', canny: '边缘图', depth: '深度图' };
+  const label = labels[type] || '参考图';
+
+  let nodeName = '';
+  let stepInfo = '';
+
+  if (evt.type === 'executing') {
+    nodeName = evt.data?.class_type || evt.data?.node || '';
+  } else if (evt.type === 'progress') {
+    const v = evt.data?.value, m = evt.data?.max;
+    if (v != null && m != null) stepInfo = `${v}/${m}`;
+    nodeName = evt.data?.node || '';
+  }
+
+  const elapsed = _ppStartTime ? Math.round((Date.now() - _ppStartTime) / 1000) : 0;
+  const mm = Math.floor(elapsed / 60), ss = String(elapsed % 60).padStart(2, '0');
+  const timeStr = mm > 0 ? `${mm}m ${ss}s` : `${ss}s`;
+  const detail = [stepInfo, nodeName].filter(Boolean).join(' ');
+
+  statusEl.innerHTML = `<div class="comfy-progress-bar active">
+    <span class="comfy-progress-label" style="color:var(--ac)"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">auto_fix_high</span> 生成${label}</span>
+    <span class="comfy-progress-steps" style="color:var(--t2)">${escHtml(detail)}</span>
+    <span class="comfy-progress-time">${timeStr}</span>
+  </div>`;
+}
+
+/** 开始预处理计时 */
+function _startPPTimer() {
+  _ppStartTime = Date.now();
+  _stopPPTimer();
+  _ppTimer = setInterval(() => {
+    // 只在预处理还在跑时更新计时
+    if (!_CN_TYPES.some(t => _ppRunning[t])) { _stopPPTimer(); _renderProgress(); return; }
+    // 只更新时间部分
+    const statusEl = document.getElementById('gen-bar-status');
+    const timeEl = statusEl?.querySelector('.comfy-progress-time');
+    if (!timeEl) return;
+    const elapsed = Math.round((Date.now() - _ppStartTime) / 1000);
+    const mm = Math.floor(elapsed / 60), ss = String(elapsed % 60).padStart(2, '0');
+    timeEl.textContent = mm > 0 ? `${mm}m ${ss}s` : `${ss}s`;
+  }, 1000);
+}
+
+function _stopPPTimer() {
+  if (_ppTimer) { clearInterval(_ppTimer); _ppTimer = null; }
+  _ppStartTime = 0;
+}
+
 const _RUN_MODE_LABELS = { normal: '运行', onChange: '运行（修改时）', live: '运行（实时）' };
 const _RUN_MODE_ICONS = { normal: 'play_arrow', onChange: 'edit_note', live: 'loop' };
 

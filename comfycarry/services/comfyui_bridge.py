@@ -162,7 +162,10 @@ class ComfyWSBridge:
                 if self._exec_info:
                     for nid in cached_nodes:
                         self._exec_info["nodes"][nid] = "cached"
-                self._broadcast({"type": "execution_cached", "data": msg_data})
+                enriched = dict(msg_data)
+                if self._exec_info:
+                    enriched["prompt_id"] = self._exec_info.get("prompt_id", "")
+                self._broadcast({"type": "execution_cached", "data": enriched})
 
             # ── 当前执行节点 / 执行完成 ──
             elif msg_type == "executing":
@@ -182,10 +185,12 @@ class ComfyWSBridge:
                     if self._exec_info:
                         self._exec_info["current_node"] = node_id
                         self._exec_info["nodes"][node_id] = "running"
-                    # Enrich with node class name
+                    # Enrich with node class name + prompt_id
                     enriched = dict(msg_data)
-                    if self._exec_info and node_id in self._exec_info.get("node_names", {}):
-                        enriched["class_type"] = self._exec_info["node_names"][node_id]
+                    if self._exec_info:
+                        if node_id in self._exec_info.get("node_names", {}):
+                            enriched["class_type"] = self._exec_info["node_names"][node_id]
+                        enriched["prompt_id"] = self._exec_info.get("prompt_id", "")
                     self._broadcast({"type": "executing", "data": enriched})
 
             # ── 节点完成 ──
@@ -209,6 +214,8 @@ class ComfyWSBridge:
                     "percent": round(val / mx * 100) if mx > 0 else 0,
                     "node": msg_data.get("node"),
                 }
+                if self._exec_info:
+                    self._last_progress["prompt_id"] = self._exec_info.get("prompt_id", "")
                 self._broadcast({"type": "progress", "data": self._last_progress})
 
             # ── 全节点进度状态快照 ──

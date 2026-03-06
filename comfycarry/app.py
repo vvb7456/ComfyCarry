@@ -146,6 +146,10 @@ def main():
     # 恢复 ComfyUI (如果 setup 已完成、ComfyUI 已安装、但进程未运行)
     _restore_comfyui(app.logger)
 
+    # 确保 ControlNet 预处理输出子目录存在
+    for sub in ("openpose", "canny", "depth"):
+        os.makedirs(os.path.join(cfg.COMFYUI_DIR, "input", sub), exist_ok=True)
+
     # 恢复公共 Tunnel (如果之前是公共模式, 恢复状态而非重新注册)
     if cfg.get_config("tunnel_mode") == "public":
         try:

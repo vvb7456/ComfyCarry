@@ -275,6 +275,55 @@ class WorkflowBuilder:
     # def add_vae_encode(self, image_node_id, vae_node_id): ...  ← Img2Img / HiRes Fix
     # def add_inpaint_model_conditioning(self, ...): ...
 
+    # ── ControlNet 预处理器节点 ──────────────────────────────────────────────
+
+    def add_dw_preprocessor(self, image_node_id: str, resolution: int = 1024,
+                           detect_body: bool = True, detect_hand: bool = True,
+                           detect_face: bool = True) -> str:
+        """DWPreprocessor — DWPose 骨骼/关键点检测。输出: IMAGE"""
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "DWPreprocessor",
+            "inputs": {
+                "image": [image_node_id, 0],
+                "detect_hand": "enable" if detect_hand else "disable",
+                "detect_body": "enable" if detect_body else "disable",
+                "detect_face": "enable" if detect_face else "disable",
+                "resolution": resolution,
+                "bbox_detector": "yolox_l.onnx",
+                "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
+            },
+        }
+        return nid
+
+    def add_canny_preprocessor(self, image_node_id: str, resolution: int = 1024,
+                               low_threshold: int = 100, high_threshold: int = 200) -> str:
+        """CannyEdgePreprocessor — Canny 边缘检测。输出: IMAGE"""
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "CannyEdgePreprocessor",
+            "inputs": {
+                "image": [image_node_id, 0],
+                "low_threshold": low_threshold,
+                "high_threshold": high_threshold,
+                "resolution": resolution,
+            },
+        }
+        return nid
+
+    def add_depth_preprocessor(self, image_node_id: str, resolution: int = 1024) -> str:
+        """DepthAnythingV2Preprocessor — 深度图估计。输出: IMAGE"""
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "DepthAnythingV2Preprocessor",
+            "inputs": {
+                "image": [image_node_id, 0],
+                "ckpt_name": "depth_anything_v2_vitl.pth",
+                "resolution": resolution,
+            },
+        }
+        return nid
+
     # ── AI 放大模块 ──────────────────────────────────────────────────────────
 
     def add_aurasr_upscale(
@@ -492,6 +541,66 @@ def build_sdxl_workflow(params: dict) -> dict:
     # 8. PreviewImage — 加入工作流以触发 ComfyUI WS 预览帧广播
     #    (每执行步通过 WS 二进制帧推送 JPEG 预览给所有连接的客户端)
     b.add_preview_image(final_image)
+
+    return b.build()
+
+
+def build_preprocess_workflow(params: dict) -> dict:
+    """
+    构建 ControlNet 预处理工作流。
+    LoadImage → Preprocessor → WAS Image Save (→ input/)
+
+    参数:
+        image       (str) — ComfyUI input/ 中的源图片文件名
+        type        (str) — 预处理类型: "pose" | "canny" | "depth"
+        save_prefix (str) — 输出文件名前缀 (不含路径)
+        input_dir   (str) — ComfyUI input/ 的绝对路径
+        resolution  (int) — 预处理分辨率 (默认 1024)
+        --- Pose 专用 ---
+        detect_body (bool) — 检测身体 (默认 True)
+        detect_hand (bool) — 检测手指 (默认 True)
+        detect_face (bool) — 检测面部 (默认 True)
+        --- Canny 专用 ---
+        low_threshold  (int) — 低阈值 (默认 100)
+        high_threshold (int) — 高阈值 (默认 200)
+    """
+    image = params.get("image", "")
+    pp_type = params.get("type", "")
+    save_prefix = params.get("save_prefix", "preprocess")
+    input_dir = params.get("input_dir", "")
+    resolution = int(params.get("resolution", 1024))
+
+    b = WorkflowBuilder()
+
+    # 1. 加载源图片
+    load_img = b.add_load_image(image)
+
+    # 2. 预处理器 (按类型分配)
+    if pp_type == "pose":
+        detect_body = params.get("detect_body", True)
+        detect_hand = params.get("detect_hand", True)
+        detect_face = params.get("detect_face", True)
+        processed = b.add_dw_preprocessor(
+            load_img, resolution=resolution,
+            detect_body=detect_body, detect_hand=detect_hand, detect_face=detect_face,
+        )
+    elif pp_type == "canny":
+        low = int(params.get("low_threshold", 100))
+        high = int(params.get("high_threshold", 200))
+        processed = b.add_canny_preprocessor(
+            load_img, resolution=resolution, low_threshold=low, high_threshold=high,
+        )
+    elif pp_type == "depth":
+        processed = b.add_depth_preprocessor(load_img, resolution=resolution)
+    else:
+        raise ValueError(f"不支持的预处理类型: {pp_type}")
+
+    # 3. 保存到 input/ 目录 (使用绝对路径)
+    b.add_save_image(processed, prefix=save_prefix,
+                     output_path=input_dir, extension='png')
+
+    # 4. PreviewImage — 广播预览帧
+    b.add_preview_image(processed)
 
     return b.build()
 
