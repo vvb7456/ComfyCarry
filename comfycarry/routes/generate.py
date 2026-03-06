@@ -116,8 +116,8 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     result = {"pose": [], "canny": [], "depth": [], "other": []}
     for name in names:
         lower = name.lower()
-        # Union ProMax 出现在所有类型
-        if "union" in lower:
+        # Union / ProMax 出现在所有类型
+        if "union" in lower or "promax" in lower:
             result["pose"].append(name)
             result["canny"].append(name)
             result["depth"].append(name)
