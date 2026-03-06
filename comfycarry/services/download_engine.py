@@ -359,9 +359,8 @@ class DownloadEngine:
         # 清理临时文件
         self._cleanup_partial(task)
 
-        # 取消的任务直接从列表中移除 (用户主动行为, 无需保留历史)
-        with self._lock:
-            self._tasks.pop(download_id, None)
+        # 不立即从 _tasks 中移除 — 保留 CANCELLED 状态让 SSE 端读到终态
+        # 后续由 clear_completed() 统一清理
 
         logger.info(f"[download_engine] 已取消 {download_id}")
         return True
