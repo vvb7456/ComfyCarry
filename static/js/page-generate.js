@@ -34,7 +34,7 @@ let _upscaleMode = '4x_overlapped_checkboard';
 let _upscaleTile = 8;
 let _upscaleDownscale = 'lanczos';
 let _comfyuiDir = '';  // 从 options API 获取, 用于构建模型路径
-let _deferSave = () => {};  // assigned in _bindUIEvents
+let _deferSave = () => { };  // assigned in _bindUIEvents
 const STORAGE_KEY = 'comfycarry_generate_params';
 
 // ControlNet 状态 (pose / canny / depth 共用结构)
@@ -79,7 +79,19 @@ function _leavePage() {
   _saveState();
   // 预处理进行中不关闭 SSE，避免丢失 execution_done
   if (!_CN_TYPES.some(t => _ppRunning[t])) _stopSSE();
+  // 关闭 model-dependency 的下载 SSE 连接，防止浏览器连接数耗尽
+  _destroyModelDepHandles();
   document.removeEventListener('click', _handleDocClick);
+}
+
+/** 销毁所有 model-dependency 的 SSE 连接 */
+function _destroyModelDepHandles() {
+  if (_upscaleDepHandle?.destroy) _upscaleDepHandle.destroy();
+  _upscaleDepHandle = null;
+  for (const type of _CN_TYPES) {
+    if (_cnDepHandles[type]?.destroy) _cnDepHandles[type].destroy();
+  }
+  _cnDepHandles = {};
 }
 
 // ── UI 事件绑定 ───────────────────────────────────────────────────────────────
@@ -236,14 +248,6 @@ function _bindUIEvents() {
           }
         }
         if (mod === 'upscale') {
-          // 如果还没执行过模型检测，先触发检测再展开 tab
-          if (_upscaleDepHandle?._lazy) {
-            chk.checked = false;
-            if (tab) tab.classList.remove('gen-mod-tab-on');
-            showToast('请先确认放大模型已安装', 'warning');
-            if (tab && !tab.classList.contains('active')) tab.click();
-            return;
-          }
           // 模型检测已完成，检查结果
           if (!_upscaleModelReady) {
             chk.checked = false;
@@ -393,7 +397,7 @@ async function _openRefModal(type, subfolder) {
   }
 }
 
-window._closeRefModal = function() {
+window._closeRefModal = function () {
   const rm = document.getElementById('gen-ref-modal');
   if (rm) { rm.classList.remove('active'); rm.style.zIndex = ''; }
 };
@@ -626,8 +630,10 @@ const _PP_PARAMS_DEF = {
       { key: 'detect_body', label: '检测身体', type: 'toggle', default: true },
       { key: 'detect_hand', label: '检测手指', type: 'toggle', default: true },
       { key: 'detect_face', label: '检测面部', type: 'toggle', default: true },
-      { key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
-        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }] },
+      {
+        key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
+        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }]
+      },
     ],
   },
   canny: {
@@ -636,16 +642,20 @@ const _PP_PARAMS_DEF = {
     params: [
       { key: 'low_threshold', label: '低阈值', type: 'slider', min: 0, max: 255, step: 1, default: 100 },
       { key: 'high_threshold', label: '高阈值', type: 'slider', min: 0, max: 255, step: 1, default: 200 },
-      { key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
-        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }] },
+      {
+        key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
+        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }]
+      },
     ],
   },
   depth: {
     title: '深度图',
     icon: 'layers',
     params: [
-      { key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
-        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }] },
+      {
+        key: 'resolution', label: '检测分辨率', type: 'select', default: 1024,
+        options: [{ v: 512, l: '512' }, { v: 768, l: '768' }, { v: 1024, l: '1024' }, { v: 1536, l: '1536' }]
+      },
     ],
   },
 };
@@ -680,7 +690,7 @@ function _openPPModal(type) {
   document.getElementById('gen-pp-modal')?.classList.add('active');
 }
 
-window._closePPModal = function() {
+window._closePPModal = function () {
   document.getElementById('gen-pp-modal')?.classList.remove('active');
   _ppModalFile = null;
 };
@@ -932,7 +942,7 @@ const _CN_MODEL_CFG = {
   },
 };
 
-// ── ControlNet model-dependency 初始化 (惰性: tab 点击时才检测) ─────────────
+// ── ControlNet model-dependency 初始化 (eager: 页面加载时立即检测) ────────────
 function _initCNModelDeps() {
   if (!_comfyuiDir) return;
 
@@ -952,30 +962,22 @@ function _initCNModelDeps() {
       continue;
     }
 
-    // 无模型 → 注册惰性初始化 (tab 首次点击时才创建 model-dependency)
+    // 无模型 → 直接创建 model-dependency (initModelDependency 内部会显示 loading)
     const cfg = _CN_MODEL_CFG[type];
-    _cnDepHandles[type] = {
-      _lazy: true,
-      recheck() {
-        // 首次 recheck 时初始化 model-dependency
-        const handle = initModelDependency({
-          containerId: `gen-${type}-download`,
-          paramsId: `gen-${type}-params`,
-          comfyuiDir: _comfyuiDir,
-          title: cfg.title,
-          description: cfg.description,
-          models: cfg.models,
-          onReady: () => {
-            _loadOptions(true).then(() => _refreshCNPanel(type));
-          },
-          onAllInstalled: () => {
-            _loadOptions(true).then(() => _refreshCNPanel(type));
-          },
-        });
-        // 替换自身为真实句柄
-        _cnDepHandles[type] = handle;
+    _cnDepHandles[type] = initModelDependency({
+      containerId: `gen-${type}-download`,
+      paramsId: `gen-${type}-params`,
+      comfyuiDir: _comfyuiDir,
+      title: cfg.title,
+      description: cfg.description,
+      models: cfg.models,
+      onReady: () => {
+        _loadOptions(true).then(() => _refreshCNPanel(type));
       },
-    };
+      onAllInstalled: () => {
+        _loadOptions(true).then(() => _refreshCNPanel(type));
+      },
+    });
   }
 }
 
@@ -1062,7 +1064,7 @@ async function _loadOptions(refresh = false) {
   if (samplerSel && data.samplers?.length) {
     const prev = samplerSel.value;
     samplerSel.innerHTML = data.samplers
-      .map(s => `<option value="${escAttr(s)}"${s==='euler'?' selected':''}>${escHtml(s)}</option>`).join('');
+      .map(s => `<option value="${escAttr(s)}"${s === 'euler' ? ' selected' : ''}>${escHtml(s)}</option>`).join('');
     if (prev && data.samplers.includes(prev)) samplerSel.value = prev;
   }
 
@@ -1070,7 +1072,7 @@ async function _loadOptions(refresh = false) {
   if (schedulerSel && data.schedulers?.length) {
     const prev = schedulerSel.value;
     schedulerSel.innerHTML = data.schedulers
-      .map(s => `<option value="${escAttr(s)}"${s==='normal'?' selected':''}>${escHtml(s)}</option>`).join('');
+      .map(s => `<option value="${escAttr(s)}"${s === 'normal' ? ' selected' : ''}>${escHtml(s)}</option>`).join('');
     if (prev && data.schedulers.includes(prev)) schedulerSel.value = prev;
   }
 }
@@ -1125,7 +1127,7 @@ function _openCkptModal() {
   document.getElementById('gen-ckpt-modal')?.classList.add('active');
 }
 
-window._closeCkptModal = function() {
+window._closeCkptModal = function () {
   document.getElementById('gen-ckpt-modal')?.classList.remove('active');
 };
 
@@ -1189,11 +1191,11 @@ function _openLoraModal() {
   _loadOptions(true).then(() => _renderLoraModalGrid());
 }
 
-window._closeLoraModal = function() {
+window._closeLoraModal = function () {
   document.getElementById('gen-lora-modal')?.classList.remove('active');
 };
 
-window._confirmLoraModal = function() {
+window._confirmLoraModal = function () {
   _loraSelected = new Map(_loraModalPending);
   _renderLoraPanel();
   _saveState(); // 持久化 LoRA 选择
@@ -1607,33 +1609,27 @@ function _updateUpscaleSizeHint() {
 // ── 高清放大：模型检测 (通过 model-dependency.js 模块管理) ──────────────────
 function _initUpscaleModelDep() {
   if (!_comfyuiDir) return;
-  // 惰性初始化: tab 首次点击时才检测
-  _upscaleDepHandle = {
-    _lazy: true,
-    recheck() {
-      const handle = initModelDependency({
-        containerId: 'gen-upscale-download',
-        paramsId: 'gen-upscale-params',
-        comfyuiDir: _comfyuiDir,
-        title: 'AuraSR v2 模型未安装',
-        description: '高清放大功能需要下载约 2.3 GB 模型文件',
-        models: [{
-          id: 'aurasr-v2',
-          name: 'AuraSR v2',
-          description: '4× 超分辨率模型',
-          size: '~2.3 GB',
-          files: [
-            { filename: 'config.json', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true', subdir: 'models/Aura-SR' },
-            { filename: 'model.safetensors', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true', subdir: 'models/Aura-SR' },
-          ],
-        }],
-        onReady: () => { _upscaleModelReady = true; },
-        onAllInstalled: () => { _upscaleModelReady = true; },
-        onMissing: () => { _upscaleModelReady = false; },
-      });
-      _upscaleDepHandle = handle;
-    },
-  };
+  // 直接创建 initModelDependency (内部会显示 loading 并异步检测)
+  _upscaleDepHandle = initModelDependency({
+    containerId: 'gen-upscale-download',
+    paramsId: 'gen-upscale-params',
+    comfyuiDir: _comfyuiDir,
+    title: 'AuraSR v2 模型未安装',
+    description: '高清放大功能需要下载约 2.3 GB 模型文件',
+    models: [{
+      id: 'aurasr-v2',
+      name: 'AuraSR v2',
+      description: '4× 超分辨率模型',
+      size: '~2.3 GB',
+      files: [
+        { filename: 'config.json', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true', subdir: 'models/Aura-SR' },
+        { filename: 'model.safetensors', url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true', subdir: 'models/Aura-SR' },
+      ],
+    }],
+    onReady: () => { _upscaleModelReady = true; },
+    onAllInstalled: () => { _upscaleModelReady = true; },
+    onMissing: () => { _upscaleModelReady = false; },
+  });
 }
 
 // ── 分辨率 ───────────────────────────────────────────────────────────────────
@@ -1790,7 +1786,7 @@ function _startSSE() {
   if (_sse) return;
   _tracker = createExecTracker({ onUpdate: _renderProgress });
   _sse = new EventSource('/api/comfyui/events');
-  _sse.onmessage = e => { try { _handleSSEEvent(JSON.parse(e.data)); } catch(_){} };
+  _sse.onmessage = e => { try { _handleSSEEvent(JSON.parse(e.data)); } catch (_) { } };
   _sse.onerror = () => {
     // 连接断开 → 延迟重连
     _stopSSE();
@@ -2025,8 +2021,8 @@ async function _fetchAndRenderImages(promptId) {
 
 function _imageUrl(img) {
   return '/api/comfyui/view?filename=' + encodeURIComponent(img.filename) +
-    '&subfolder=' + encodeURIComponent(img.subfolder||'') +
-    '&type=' + encodeURIComponent(img.type||'output');
+    '&subfolder=' + encodeURIComponent(img.subfolder || '') +
+    '&type=' + encodeURIComponent(img.type || 'output');
 }
 
 // ── 状态机 ───────────────────────────────────────────────────────────────────

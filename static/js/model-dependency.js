@@ -27,7 +27,7 @@ import { apiFetch } from './core.js';
 export function initModelDependency(cfg) {
   const container = document.getElementById(cfg.containerId);
   const params = document.getElementById(cfg.paramsId);
-  if (!container || !params) return { recheck() {} };
+  if (!container || !params) return { recheck() {}, destroy() {} };
 
   const state = {
     cfg,
@@ -35,17 +35,45 @@ export function initModelDependency(cfg) {
     params,
     modelStatus: new Map(),   // id → { installed, downloading, download_id }
     rendered: false,          // 是否已渲染过卡片
+    activeHandles: [],        // 活跃的 SSE waitHandle 列表 (防止泄漏)
   };
 
+  // 首次检测前显示 loading 占位
+  _showLoading(state);
+
   const recheck = () => _check(state);
+  const destroy = () => _destroyHandles(state);
   recheck();
-  return { recheck };
+  return { recheck, destroy };
+}
+
+// ── 清理活跃 SSE 连接 ────────────────────────────────────────────────────────
+function _destroyHandles(st) {
+  for (const h of st.activeHandles) {
+    h.abort();
+  }
+  st.activeHandles = [];
+}
+
+// ── Loading 占位 ─────────────────────────────────────────────────────────────
+function _showLoading(st) {
+  const { container, params } = st;
+  params.classList.add('hidden');
+  container.classList.remove('hidden');
+  container.innerHTML = `
+    <div class="mdep-missing" style="padding:2rem;text-align:center">
+      <div class="mdep-spinner" style="margin:0 auto 12px"></div>
+      <div style="color:var(--t2);font-size:.85rem">正在检测模型…</div>
+    </div>`;
 }
 
 // ── 检测逻辑 ────────────────────────────────────────────────────────────────
 async function _check(st) {
   const { cfg, container, params } = st;
   if (!cfg.comfyuiDir) return;
+
+  // 先关闭上一轮残留的 SSE 连接，防止重复 recheck 时累积
+  _destroyHandles(st);
 
   const checkFiles = [];
   for (const m of cfg.models) {
@@ -98,8 +126,22 @@ async function _check(st) {
       cfg.onMissing?.();
     }
   } catch {
-    container.classList.add('hidden');
-    params.classList.remove('hidden');
+    // 检测失败 → 显示重试提示，而不是静默隐藏
+    params.classList.add('hidden');
+    container.classList.remove('hidden');
+    container.innerHTML = `
+      <div class="mdep-missing" style="padding:2rem;text-align:center">
+        <span class="ms" style="font-size:2rem;color:var(--amber);opacity:.7">warning</span>
+        <div class="mdep-title" style="margin-top:8px">模型检测失败</div>
+        <div class="mdep-desc">无法连接到后端服务，请检查网络后重试</div>
+        <button class="btn btn-sm" style="margin-top:12px;gap:4px">
+          <span class="ms ms-sm">refresh</span> 重试
+        </button>
+      </div>`;
+    container.querySelector('button')?.addEventListener('click', () => {
+      _showLoading(st);
+      _check(st);
+    });
   }
 }
 
@@ -197,10 +239,13 @@ async function _startCardDownload(st, model) {
 
   let cancelled = false;
   let currentDownloadId = null;
+  let currentWaitHandle = null;  // { promise, abort }
 
   if (cancelBtn) {
     cancelBtn.onclick = async () => {
       cancelled = true;
+      // 先关闭 SSE 连接，再发取消请求
+      if (currentWaitHandle) currentWaitHandle.abort();
       if (currentDownloadId) {
         await apiFetch(`/api/downloads/${currentDownloadId}/cancel`, { method: 'POST' });
       }
@@ -253,16 +298,19 @@ async function _startCardDownload(st, model) {
       }
 
       currentDownloadId = resp.download_id;
-
-      const success = await _waitForDownload(resp.download_id, (data) => {
+      currentWaitHandle = _waitForDownload(resp.download_id, (data) => {
         const dlPct = data.progress || 0;
         const total = baseProgress + (dlPct / 100) * fileWeight;
         if (bar) bar.style.width = total + '%';
         const speed = _fmtSpeed(data.speed || 0);
         if (pct) pct.textContent = speed ? `${total.toFixed(1)}% · ${speed}` : `${total.toFixed(1)}%`;
       });
+      st.activeHandles.push(currentWaitHandle);
+
+      const success = await currentWaitHandle.promise;
 
       currentDownloadId = null;
+      currentWaitHandle = null;
       if (!success) {
         if (cancelled) return;
         _resetCard(card);
@@ -308,19 +356,23 @@ function _resumeCardDownload(st, model, downloadId) {
   if (btn) btn.classList.add('hidden');
   if (prog) prog.classList.remove('hidden');
 
+  const waitHandle = _waitForDownload(downloadId, (data) => {
+    const dlPct = data.progress || 0;
+    if (bar) bar.style.width = dlPct + '%';
+    const speed = _fmtSpeed(data.speed || 0);
+    if (pct) pct.textContent = speed ? `${dlPct.toFixed(1)}% · ${speed}` : `${dlPct.toFixed(1)}%`;
+  });
+  st.activeHandles.push(waitHandle);
+
   if (cancelBtn) {
     cancelBtn.onclick = async () => {
+      waitHandle.abort();
       await apiFetch(`/api/downloads/${downloadId}/cancel`, { method: 'POST' });
       _resetCard(card);
     };
   }
 
-  _waitForDownload(downloadId, (data) => {
-    const dlPct = data.progress || 0;
-    if (bar) bar.style.width = dlPct + '%';
-    const speed = _fmtSpeed(data.speed || 0);
-    if (pct) pct.textContent = speed ? `${dlPct.toFixed(1)}% · ${speed}` : `${dlPct.toFixed(1)}%`;
-  }).then(ok => {
+  waitHandle.promise.then(ok => {
     if (ok) {
       _markCardDone(card);
       const enterBtn = container.querySelector('.mdep-enter-btn');
@@ -332,35 +384,64 @@ function _resumeCardDownload(st, model, downloadId) {
 }
 
 // ── SSE 下载监听 ─────────────────────────────────────────────────────────────
+// 返回 { promise: Promise<boolean>, abort: Function }
 function _waitForDownload(downloadId, onProgress) {
-  return new Promise(resolve => {
+  let evtSource = null;
+  let settled = false;
+  let retryTimer = null;
+  let resolveRef = null;
+
+  const promise = new Promise(resolve => {
+    resolveRef = resolve;
     let retries = 0;
     const MAX_RETRIES = 5;
 
     function connect() {
-      const evtSource = new EventSource(`/api/downloads/${downloadId}/events`);
+      if (settled) return;
+      evtSource = new EventSource(`/api/downloads/${downloadId}/events`);
       evtSource.onmessage = (e) => {
         retries = 0;
         try {
           const data = JSON.parse(e.data);
-          if (data.error) { evtSource.close(); resolve(false); return; }
+          if (data.error) { _finish(false); return; }
           onProgress?.(data);
-          if (data.status === 'complete') { evtSource.close(); resolve(true); }
-          else if (data.status === 'failed' || data.status === 'cancelled') { evtSource.close(); resolve(false); }
+          if (data.status === 'complete') _finish(true);
+          else if (data.status === 'failed' || data.status === 'cancelled') _finish(false);
         } catch { /* ignore */ }
       };
       evtSource.onerror = () => {
+        if (settled) { evtSource.close(); return; }
         evtSource.close();
+        evtSource = null;
         if (retries < MAX_RETRIES) {
           retries++;
-          setTimeout(connect, 2000 * retries);
+          retryTimer = setTimeout(connect, 2000 * retries);
         } else {
-          resolve(false);
+          _finish(false);
         }
       };
     }
+
+    function _finish(ok) {
+      if (settled) return;
+      settled = true;
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+      resolve(ok);
+    }
+
     connect();
   });
+
+  function abort() {
+    if (settled) return;
+    settled = true;
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    resolveRef?.(false);
+  }
+
+  return { promise, abort };
 }
 
 // ── 工具 ─────────────────────────────────────────────────────────────────────
