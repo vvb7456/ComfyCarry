@@ -136,8 +136,8 @@ sys.path.insert(0, '$DASHBOARD_DIR')
 from comfycarry.services.tunnel_manager import TunnelManager
 
 mgr = TunnelManager(
-    api_token=os.environ['CF_API_TOKEN'],
-    domain=os.environ['CF_DOMAIN'],
+    api_token=os.environ.get('CF_API_TOKEN', ''),
+    domain=os.environ.get('CF_DOMAIN', ''),
     subdomain=os.environ.get('CF_SUBDOMAIN', '')
 )
 

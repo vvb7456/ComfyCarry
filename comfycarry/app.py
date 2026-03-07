@@ -133,8 +133,9 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else MANAGER_PORT
 
     # 从环境变量导入 API Key
-    if os.environ.get("CIVITAI_TOKEN") and not _get_api_key():
-        CONFIG_FILE.write_text(json.dumps({"api_key": os.environ["CIVITAI_TOKEN"]}))
+    civitai_token = os.environ.get("CIVITAI_TOKEN", "")
+    if civitai_token and not _get_api_key():
+        CONFIG_FILE.write_text(json.dumps({"api_key": civitai_token}))
         print(f"  📝 已从环境变量 CIVITAI_TOKEN 导入 API Key")
 
     # 启动 ComfyUI WS Bridge

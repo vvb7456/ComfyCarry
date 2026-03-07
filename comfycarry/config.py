@@ -15,7 +15,10 @@ COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://localhost:8188")
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根目录
 CONFIG_FILE = Path(SCRIPT_DIR) / ".civitai_config.json"
-MANAGER_PORT = int(os.environ.get("MANAGER_PORT", 5000))
+try:
+    MANAGER_PORT = int(os.environ.get("MANAGER_PORT") or 5000)
+except (ValueError, TypeError):
+    MANAGER_PORT = 5000
 
 # CivitAI 搜索代理
 MEILI_URL = "https://search.civitai.com/multi-search"
