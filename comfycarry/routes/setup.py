@@ -56,6 +56,8 @@ def api_setup_state():
     if os.environ.get("RCLONE_CONF_BASE64"):
         env_vars["rclone_config_method"] = "base64"
         env_vars["rclone_has_env"] = True
+    if os.environ.get("PUBLIC_TUNNEL", "").lower() in ("1", "true"):
+        env_vars["public_tunnel"] = True
     safe["env_vars"] = env_vars
 
     safe["sync_templates"] = SYNC_RULE_TEMPLATES

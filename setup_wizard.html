@@ -668,6 +668,13 @@
                     const hint = document.getElementById('cf-env-hint');
                     hint.style.display = 'block';
                     hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量检测到 CF 配置';
+                    selectWizardTunnelMode('custom');
+                } else if (envVars.public_tunnel) {
+                    selectWizardTunnelMode('public');
+                    wizardConfig.tunnel_mode = 'public';
+                    const hint = document.getElementById('cf-env-hint');
+                    hint.style.display = 'block';
+                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量 <code>PUBLIC_TUNNEL</code> 检测到配置，公共 Tunnel 已自动启用';
                 }
                 if (envVars.rclone_has_env) {
                     document.getElementById('rclone-card-env').style.display = '';
