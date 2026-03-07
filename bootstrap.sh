@@ -148,6 +148,8 @@ try:
 except Exception as e:
     print(f'  ⚠️ Tunnel 启动失败: {e}')
 " 2>&1 | tee -a /workspace/setup.log
+elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
+    echo "  -> 检测到 PUBLIC_TUNNEL, 将在 Dashboard 启动后自动启用公共 Tunnel"
 fi
 
 echo ""
@@ -159,6 +161,8 @@ echo "  → http://localhost:5000"
 echo ""
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     echo "  → 可通过你的 Cloudflare Tunnel 域名访问"
+elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
+    echo "  → 公共 Tunnel 将在 Dashboard 启动后自动启用"
 fi
 echo "  → 公网端口请在 Vast.ai/RunPod 面板查看"
 echo "================================================="

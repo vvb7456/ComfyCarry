@@ -93,6 +93,7 @@ ComfyUI-Manager, comfyui_controlnet_aux, ComfyUI-Impact-Pack, ComfyUI-Easy-Use, 
 | `COMFYUI_URL` | ComfyUI 内部 URL | `http://localhost:8188` |
 | `MANAGER_PORT` | Dashboard 端口 | `5000` |
 | `FORCE_UPDATE` | 强制重新下载 Dashboard 文件 | `false` |
+| `PUBLIC_TUNNEL` | 自动启用公共 Tunnel | — |
 | `SSH_PUBLIC_KEY` | SSH 公钥 | — |
 
 ---

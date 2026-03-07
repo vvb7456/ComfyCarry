@@ -152,7 +152,8 @@ def main():
         os.makedirs(os.path.join(cfg.COMFYUI_DIR, "input", sub), exist_ok=True)
 
     # 恢复公共 Tunnel (如果之前是公共模式, 恢复状态而非重新注册)
-    if cfg.get_config("tunnel_mode") == "public":
+    tunnel_mode = cfg.get_config("tunnel_mode")
+    if tunnel_mode == "public":
         try:
             from .services.public_tunnel import PublicTunnelClient
             client = PublicTunnelClient()
@@ -163,6 +164,21 @@ def main():
                 print(f"  ⚠️  公共 Tunnel 恢复失败: {result.get('error', '未知')}")
         except Exception as e:
             print(f"  ⚠️  公共 Tunnel 恢复失败: {e}")
+    elif not tunnel_mode and os.environ.get("PUBLIC_TUNNEL", "").lower() in ("1", "true"):
+        # 环境变量触发公共 Tunnel 首次注册
+        try:
+            from .services.public_tunnel import PublicTunnelClient
+            client = PublicTunnelClient()
+            result = client.register()
+            if result.get("ok"):
+                print(f"  🌐 公共 Tunnel 已启用: {result.get('random_id', '?')}")
+                urls = result.get("urls", {})
+                for svc, url in urls.items():
+                    print(f"     {svc}: {url}")
+            else:
+                print(f"  ⚠️  公共 Tunnel 启用失败: {result.get('error', '未知')}")
+        except Exception as e:
+            print(f"  ⚠️  公共 Tunnel 启用失败: {e}")
 
     # 启动 watch worker
     rules = _load_sync_rules()
