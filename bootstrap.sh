@@ -149,7 +149,24 @@ except Exception as e:
     print(f'  ⚠️ Tunnel 启动失败: {e}')
 " 2>&1 | tee -a /workspace/setup.log
 elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
-    echo "  -> 检测到 PUBLIC_TUNNEL, 将在 Dashboard 启动后自动启用公共 Tunnel"
+    echo "  -> 检测到 PUBLIC_TUNNEL, 正在注册公共 Tunnel..."
+    $PYTHON_BIN -c "
+import sys, os
+sys.path.insert(0, '$DASHBOARD_DIR')
+from comfycarry.services.public_tunnel import PublicTunnelClient
+
+client = PublicTunnelClient()
+try:
+    result = client.register()
+    if result.get('ok'):
+        print(f'  ✅ 公共 Tunnel 已启用')
+        for svc, url in result.get('urls', {}).items():
+            print(f'     {svc}: {url}')
+    else:
+        print(f'  ⚠️ 公共 Tunnel 启用失败: {result.get(\"error\", \"未知\")}')
+except Exception as e:
+    print(f'  ⚠️ 公共 Tunnel 启用失败: {e}')
+" 2>&1 | tee -a /workspace/setup.log
 fi
 
 echo ""
@@ -162,7 +179,7 @@ echo ""
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     echo "  → 可通过你的 Cloudflare Tunnel 域名访问"
 elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
-    echo "  → 公共 Tunnel 将在 Dashboard 启动后自动启用"
+    echo "  → 公共 Tunnel 地址见上方日志"
 fi
 echo "  → 公网端口请在 Vast.ai/RunPod 面板查看"
 echo "================================================="
