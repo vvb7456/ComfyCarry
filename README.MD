@@ -14,7 +14,7 @@ RunPod / Vast.ai 上的 ComfyUI 云端管理平台。用完即毁的实例，永
 
 ## 功能
 
-Web Dashboard 管理 ComfyUI 全生命周期，127 个 API 端点，10 个功能页面：
+Web Dashboard 管理 ComfyUI 全生命周期，10 个功能页面：
 
 - **一键部署** — Setup Wizard 引导完成全部配置，自动安装 ComfyUI、插件、依赖
 - **系统监控** — CPU / GPU / VRAM / 磁盘实时状态，PM2 服务管理
@@ -24,7 +24,7 @@ Web Dashboard 管理 ComfyUI 全生命周期，127 个 API 端点，10 个功能
 - **ComfyUI 控制** — 启动参数热改、实时日志流、队列/历史管理
 - **Tunnel** — Cloudflare 公共节点 + 自定义 Tunnel 双模式，多服务 DNS 管理
 - **云同步** — Rclone 双向同步，规则引擎控制同步策略
-- **JupyterLab** — 完整的 JupyterLab 管理，内核/Session/Terminal 控制
+- **JupyterLab** — 启动/停止、内核/Session/Terminal 控制
 - **SSH** — SSH 服务管理、公钥管理、Root 密码配置
 - **配置迁移** — 导出/导入全部设置为 JSON，新实例秒级恢复
 
@@ -34,14 +34,13 @@ Web Dashboard 管理 ComfyUI 全生命周期，127 个 API 端点，10 个功能
 
 ### 1. 创建实例
 
-在 Vast.ai / RunPod 创建 GPU 实例，选择镜像：
+在 Vast.ai / RunPod 创建 GPU 实例，选择预构建镜像：
 
-| 方式 | 镜像 | 耗时 |
-|------|------|------|
-| **预构建** | `ghcr.io/vvb7456/comfyui-runpod:latest` | 2-5 分钟 |
-| **完整安装** | `runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404` | 15-30 分钟 |
+```
+ghcr.io/vvb7456/comfyui-runpod:latest
+```
 
-预构建镜像基于 Python 3.12 + PyTorch 2.9.1 + CUDA 13.0，内含 FlashAttention-2、SageAttention-2、ComfyUI 及 21 个常用插件。
+基于 Python 3.12 + PyTorch 2.9.1 + CUDA 13.0，内含 FlashAttention-2、SageAttention-2、ComfyUI 及 21 个常用插件。启动耗时 2-5 分钟。
 
 ### 2. 设置启动命令
 
@@ -101,7 +100,7 @@ ComfyUI-Manager, comfyui_controlnet_aux, ComfyUI-Impact-Pack, ComfyUI-Easy-Use, 
 ## 架构
 
 ```
-comfycarry/                       # Flask 后端 (模块化)
+comfycarry/                       # Flask 后端
 ├── app.py                        # App 工厂 + 启动逻辑
 ├── config.py                     # 全局配置
 ├── auth.py                       # 认证中间件
@@ -121,16 +120,7 @@ comfycarry/                       # Flask 后端 (模块化)
 dashboard.html                    # 前端 SPA
 static/js/                        # 前端模块
 ├── core.js                       # 路由 / Toast / 全局快捷键
-├── page-dashboard.js             # 总览页
-├── page-generate.js              # 生成页
-├── page-models.js                # 模型管理
-├── page-comfyui.js               # ComfyUI 管理
-├── page-plugins.js               # 插件管理
-├── page-tunnel.js                # Tunnel 管理
-├── page-sync.js                  # 云同步
-├── page-jupyter.js               # JupyterLab
-├── page-settings.js              # 设置
-├── page-ssh.js                   # SSH
+├── page-*.js                     # 各页面模块
 ├── comfyui-progress.js           # 执行状态机 + 进度条
 └── sse-log.js                    # SSE 日志流
 
@@ -159,24 +149,6 @@ Sync Worker 在 Dashboard 进程内的后台线程运行。
 | `/workspace/.sync_rules.json` | 同步规则 |
 | `/workspace/.sync_settings.json` | 同步全局设置 |
 | `/workspace/.civitai_config.json` | CivitAI Key |
-| `/workspace/.generate_welcome.json` | 生成页欢迎状态 |
-
----
-
-## Dashboard 页面
-
-| 页面 | 功能 |
-|------|------|
-| 总览 | 系统监控、PM2 服务状态、ComfyUI 实时进度、Tunnel 快速链接 |
-| 生成 | SDXL 文生图、LoRA、ControlNet、超分、二次采样、预设管理 |
-| 模型管理 | 本地模型浏览、CivitAI 搜索/下载、下载状态实时刷新 |
-| ComfyUI | 启动参数管理、实时日志/事件流、队列/历史 |
-| 插件管理 | 浏览/安装/更新/卸载 |
-| Tunnel | 公共节点 + 自定义 CF Tunnel 双模式、CF API 自动配置 |
-| JupyterLab | 启动/停止、Token/URL、内核/Session 管理 |
-| Cloud Sync | Rclone 配置、远程存储管理、规则引擎、实时日志 |
-| 设置 | 密码、CivitAI Key、Debug 模式、配置导入/导出、重初始化 |
-| SSH | SSH 服务管理、公钥管理、Root 密码、实时日志 |
 
 ---
 
@@ -188,16 +160,3 @@ pm2 logs dashboard        # Dashboard 日志
 pm2 logs comfy            # ComfyUI 日志
 pm2 restart comfy         # 重启 ComfyUI
 ```
-
----
-
-## 故障排查
-
-| 问题 | 方向 |
-|------|------|
-| Dashboard 打不开 | `pm2 logs dashboard` 看报错 |
-| ComfyUI 无法启动 | Dashboard → ComfyUI 页查看实时日志 |
-| 模型下载失败 | 检查 CivitAI Key 有效性 |
-| Tunnel 断连 | Dashboard → Tunnel 页查看状态 |
-| 同步不工作 | Dashboard → Sync 页检查 Rclone 配置 |
-| 生成报错 | Dashboard → 生成页查看错误提示，确认模型已加载 |
