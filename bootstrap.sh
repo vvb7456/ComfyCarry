@@ -128,9 +128,10 @@ pm2 save 2>/dev/null || true
 echo "  ✅ JupyterLab 已启动 (port 8888)"
 
 # ── CF Tunnel (可选 — 让向导页可通过 Tunnel 域名访问) ──
+_TUNNEL_DASHBOARD_URL=""
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     echo "  -> 检测到 CF 配置, 启动 Tunnel..."
-    $PYTHON_BIN -c "
+    _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "
 import sys, os
 sys.path.insert(0, '$DASHBOARD_DIR')
 from comfycarry.services.tunnel_manager import TunnelManager
@@ -144,13 +145,19 @@ mgr = TunnelManager(
 try:
     result = mgr.ensure()
     mgr.start_cloudflared(result['tunnel_token'])
-    print(f'  ✅ Tunnel 已启动: {mgr.subdomain}.{mgr.domain}')
+    print(f'https://{mgr.subdomain}.{mgr.domain}')
 except Exception as e:
-    print(f'  ⚠️ Tunnel 启动失败: {e}')
-" 2>&1 | tee -a /workspace/setup.log
+    print('', file=sys.stderr)
+    print(f'⚠️ Tunnel 启动失败: {e}', file=sys.stderr)
+" 2>/dev/null) || true
+    if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
+        echo "  ✅ Tunnel 已启动"
+    else
+        echo "  ⚠️ Tunnel 启动失败"
+    fi
 elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
     echo "  -> 检测到 PUBLIC_TUNNEL, 正在注册公共 Tunnel..."
-    $PYTHON_BIN -c "
+    _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "
 import sys, os
 sys.path.insert(0, '$DASHBOARD_DIR')
 from comfycarry.services.public_tunnel import PublicTunnelClient
@@ -159,27 +166,28 @@ client = PublicTunnelClient()
 try:
     result = client.register()
     if result.get('ok'):
-        print(f'  ✅ 公共 Tunnel 已启用')
-        for svc, url in result.get('urls', {}).items():
-            print(f'     {svc}: {url}')
+        urls = result.get('urls', {})
+        # 输出 dashboard URL
+        print(urls.get('dashboard', ''))
     else:
-        print(f'  ⚠️ 公共 Tunnel 启用失败: {result.get(\"error\", \"未知\")}')
+        print(f'⚠️ {result.get(\"error\", \"未知\")}', file=sys.stderr)
 except Exception as e:
-    print(f'  ⚠️ 公共 Tunnel 启用失败: {e}')
-" 2>&1 | tee -a /workspace/setup.log
+    print(f'⚠️ {e}', file=sys.stderr)
+" 2>/dev/null) || true
+    if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
+        echo "  ✅ 公共 Tunnel 已启用"
+    else
+        echo "  ⚠️ 公共 Tunnel 启用失败"
+    fi
 fi
 
 echo ""
 echo "================================================="
 echo "  ✅ ComfyCarry 已启动！"
 echo ""
-echo "  请访问以下地址完成部署向导："
-echo "  → http://localhost:5000"
-echo ""
-if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
-    echo "  → 可通过你的 Cloudflare Tunnel 域名访问"
-elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
-    echo "  → 公共 Tunnel 地址见上方日志"
+if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
+    echo "  → $_TUNNEL_DASHBOARD_URL"
+else
+    echo "  → http://localhost:5000"
 fi
-echo "  → 公网端口请在 Vast.ai/RunPod 面板查看"
 echo "================================================="
