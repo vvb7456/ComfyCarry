@@ -272,8 +272,24 @@ class WorkflowBuilder:
         return nid
 
     # Phase 3+ 占位符:
-    # def add_vae_encode(self, image_node_id, vae_node_id): ...  ← Img2Img / HiRes Fix
     # def add_inpaint_model_conditioning(self, ...): ...
+
+    def add_vae_encode(self, image_node_id: str, vae_node_id: str) -> str:
+        """
+        VAE 编码 Image → Latent。
+        用于二次采样: 将放大后的图像编码回 latent 空间以供第二次 KSampler 使用。
+        vae_node_id: 提供 VAE 的节点 ID (通常是 CheckpointLoader, index 2)
+        输出: [node_id, 0]=LATENT
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "VAEEncode",
+            "inputs": {
+                "pixels": [image_node_id, 0],
+                "vae": [vae_node_id, 2],
+            },
+        }
+        return nid
 
     # ── ControlNet 预处理器节点 ──────────────────────────────────────────────
 
@@ -418,6 +434,13 @@ def build_sdxl_workflow(params: dict) -> dict:
                                       type: "pose" | "canny" | "depth"
                                       model: ControlNet 模型文件名
                                       image: 已上传到 ComfyUI input/ 的图片文件名
+        hires_enabled   (bool)      — 是否启用二次采样
+        hires_denoise   (float)     — 二次采样去噪强度 (0.1-0.8)，默认 0.4
+        hires_steps     (int)       — 二次采样步数 (5-50)，默认 20
+        hires_cfg       (float)     — 二次采样 CFG scale，默认 7.0
+        hires_sampler   (str)       — 二次采样采样器，默认 "euler"
+        hires_scheduler (str)       — 二次采样调度器，默认 "normal"
+        hires_seed      (int)       — 二次采样种子，-1 = 随机
                                       strength: 0.0-2.0 (默认 1.0)
                                       start_percent: 0.0-1.0 (默认 0.0)
                                       end_percent: 0.0-1.0 (默认 1.0)
@@ -522,6 +545,33 @@ def build_sdxl_workflow(params: dict) -> dict:
             final_image = b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
         else:
             final_image = aurasr
+
+    # ── 二次采样 (HiRes Refine) ─────────────────────────────────────
+    # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码
+    hires_enabled = bool(params.get("hires_enabled", False))
+    if hires_enabled:
+        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
+        hires_steps = max(5, min(int(params.get("hires_steps", 20)), 50))
+        hires_cfg = max(1.0, min(float(params.get("hires_cfg", 7.0)), 20.0))
+        hires_sampler = str(params.get("hires_sampler", "euler"))
+        hires_scheduler = str(params.get("hires_scheduler", "normal"))
+        hires_seed = int(params.get("hires_seed", -1))
+        # VAE 编码: IMAGE → LATENT
+        hires_latent = b.add_vae_encode(final_image, ckpt)
+        # 第二次 KSampler (使用基础正/负提示词，不带 ControlNet)
+        hires_sampled = b.add_ksampler(
+            model_ref,
+            positive,  # 基础正向提示词 (非 ControlNet 修改后的)
+            negative,  # 基础负向提示词
+            hires_latent,
+            seed=hires_seed,
+            steps=hires_steps,
+            cfg=hires_cfg,
+            sampler=hires_sampler,
+            scheduler=hires_scheduler,
+            denoise=hires_denoise,
+        )
+        final_image = b.add_vae_decode(hires_sampled, ckpt)
 
     # 7. 保存图片 (WAS Image Save)
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"

@@ -33,6 +33,14 @@ let _upscaleFactor = 2;
 let _upscaleMode = '4x_overlapped_checkboard';
 let _upscaleTile = 8;
 let _upscaleDownscale = 'lanczos';
+let _hiresEnabled = false;
+let _hiresDenoise = 0.40;
+let _hiresSteps = 20;
+let _hiresCfg = 7.0;
+let _hiresSampler = 'euler';
+let _hiresScheduler = 'normal';
+let _hiresSeedMode = 'random';
+let _hiresSeedValue = null;
 let _comfyuiDir = '';  // 从 options API 获取, 用于构建模型路径
 let _deferSave = () => { };  // assigned in _bindUIEvents
 const STORAGE_KEY = 'comfycarry_generate_params';
@@ -62,6 +70,13 @@ registerPage('generate', {
   enter() { _enterPage(); },
   leave() { _leavePage(); },
 });
+
+// ── 模型类型 Tab 切换 (当前仅 SDXL 可用) ─────────────────────────────────────
+window.switchGenTab = function (tab) {
+  document.querySelectorAll('#gen-type-tabs .tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.gentab === tab);
+  });
+};
 
 async function _enterPage() {
   _bindUIEvents();
@@ -271,6 +286,10 @@ function _bindUIEvents() {
         _updateUpscaleSizeHint();
         _deferSave();
       }
+      if (mod === 'hires') {
+        _hiresEnabled = chk.checked;
+        _deferSave();
+      }
       if (_CN_TYPES.includes(mod)) {
         _cnEnabled[mod] = chk.checked;
         _deferSave();
@@ -310,6 +329,49 @@ function _bindUIEvents() {
       _deferSave();
     });
   }
+
+  // ── 二次采样 Tab ────────────────────────────────────────────────────────
+  _bindSlider('gen-hires-denoise', 'gen-hires-denoise-val', v => parseFloat(v).toFixed(2));
+  const hiresDenoiseSlider = document.getElementById('gen-hires-denoise');
+  if (hiresDenoiseSlider) {
+    hiresDenoiseSlider.addEventListener('input', () => {
+      _hiresDenoise = parseFloat(hiresDenoiseSlider.value) || 0.4;
+      _deferSave();
+    });
+  }
+  _bindSlider('gen-hires-steps', 'gen-hires-steps-val', v => v);
+  const hiresStepsSlider = document.getElementById('gen-hires-steps');
+  if (hiresStepsSlider) {
+    hiresStepsSlider.addEventListener('input', () => {
+      _hiresSteps = parseInt(hiresStepsSlider.value) || 20;
+      _deferSave();
+    });
+  }
+  _bindSlider('gen-hires-cfg', 'gen-hires-cfg-val', v => parseFloat(v).toFixed(1));
+  const hiresCfgSlider = document.getElementById('gen-hires-cfg');
+  if (hiresCfgSlider) {
+    hiresCfgSlider.addEventListener('input', () => {
+      _hiresCfg = parseFloat(hiresCfgSlider.value) || 7.0;
+      _deferSave();
+    });
+  }
+  const hiresSamplerSel = document.getElementById('gen-hires-sampler');
+  if (hiresSamplerSel) {
+    hiresSamplerSel.addEventListener('change', () => {
+      _hiresSampler = hiresSamplerSel.value;
+      _deferSave();
+    });
+  }
+  const hiresSchedulerSel = document.getElementById('gen-hires-scheduler');
+  if (hiresSchedulerSel) {
+    hiresSchedulerSel.addEventListener('change', () => {
+      _hiresScheduler = hiresSchedulerSel.value;
+      _deferSave();
+    });
+  }
+  document.getElementById('gen-hires-seed-toggle')?.addEventListener('click', () => {
+    _setHiresSeedMode(_hiresSeedMode === 'random' ? 'fixed' : 'random');
+  });
 
   // ── ControlNet Tabs 绑定 ────────────────────────────────────────────────
   for (const type of _CN_TYPES) {
@@ -1096,6 +1158,25 @@ async function _loadOptions(refresh = false) {
       .map(s => `<option value="${escAttr(s)}"${s === 'normal' ? ' selected' : ''}>${escHtml(s)}</option>`).join('');
     if (prev && data.schedulers.includes(prev)) schedulerSel.value = prev;
   }
+
+  // 二次采样 采样器/调度器 (与主采样器相同选项列表)
+  const hiresSamSel = document.getElementById('gen-hires-sampler');
+  if (hiresSamSel && data.samplers?.length) {
+    const prev = hiresSamSel.value;
+    hiresSamSel.innerHTML = data.samplers
+      .map(s => `<option value="${escAttr(s)}"${s === 'euler' ? ' selected' : ''}>${escHtml(s)}</option>`).join('');
+    if (prev && data.samplers.includes(prev)) hiresSamSel.value = prev;
+    else if (_hiresSampler && data.samplers.includes(_hiresSampler)) hiresSamSel.value = _hiresSampler;
+  }
+
+  const hiresSchSel = document.getElementById('gen-hires-scheduler');
+  if (hiresSchSel && data.schedulers?.length) {
+    const prev = hiresSchSel.value;
+    hiresSchSel.innerHTML = data.schedulers
+      .map(s => `<option value="${escAttr(s)}"${s === 'normal' ? ' selected' : ''}>${escHtml(s)}</option>`).join('');
+    if (prev && data.schedulers.includes(prev)) hiresSchSel.value = prev;
+    else if (_hiresScheduler && data.schedulers.includes(_hiresScheduler)) hiresSchSel.value = _hiresScheduler;
+  }
 }
 
 // ── Checkpoint 卡片选择器 ────────────────────────────────────────────────────
@@ -1412,6 +1493,45 @@ function _getCurrentSeed() {
   return parseInt(document.getElementById('gen-seed-input')?.value ?? _seedValue ?? -1);
 }
 
+// ── 二次采样 种子 UI ─────────────────────────────────────────────────────────
+function _setHiresSeedMode(mode, value) {
+  _hiresSeedMode = mode;
+  if (mode === 'fixed') {
+    if (value != null) _hiresSeedValue = value;
+    else if (_hiresSeedValue == null) _hiresSeedValue = Math.floor(Math.random() * 4294967295);
+  }
+  _renderHiresSeedUI();
+  _deferSave();
+}
+
+function _renderHiresSeedUI() {
+  const input = document.getElementById('gen-hires-seed-input');
+  const icon = document.getElementById('gen-hires-seed-icon');
+  const lockBtn = document.getElementById('gen-hires-seed-toggle');
+
+  if (_hiresSeedMode === 'random') {
+    if (_hiresSeedValue == null) _hiresSeedValue = Math.floor(Math.random() * 4294967295);
+    if (input) { input.value = _hiresSeedValue; input.readOnly = true; input.style.color = 'var(--t3)'; }
+    if (icon) icon.textContent = 'casino';
+    if (lockBtn) lockBtn.classList.remove('locked');
+  } else {
+    const val = _hiresSeedValue ?? 0;
+    if (input) { input.value = val; input.readOnly = false; input.style.color = ''; }
+    if (icon) icon.textContent = 'lock_open';
+    if (lockBtn) lockBtn.classList.add('locked');
+  }
+}
+
+function _getHiresSeed() {
+  if (_hiresSeedMode === 'random') {
+    _hiresSeedValue = Math.floor(Math.random() * 4294967295);
+    const input = document.getElementById('gen-hires-seed-input');
+    if (input) { input.value = _hiresSeedValue; input.style.color = 'var(--t3)'; }
+    return _hiresSeedValue;
+  }
+  return parseInt(document.getElementById('gen-hires-seed-input')?.value ?? _hiresSeedValue ?? -1);
+}
+
 // ── 参数持久化 ──────────────────────────────────────────────────────────────
 function _saveState() {
   try {
@@ -1438,6 +1558,14 @@ function _saveState() {
       upscaleMode: _upscaleMode,
       upscaleTile: _upscaleTile,
       upscaleDownscale: _upscaleDownscale,
+      hiresEnabled: _hiresEnabled,
+      hiresDenoise: _hiresDenoise,
+      hiresSteps: _hiresSteps,
+      hiresCfg: _hiresCfg,
+      hiresSampler: _hiresSampler,
+      hiresScheduler: _hiresScheduler,
+      hiresSeedMode: _hiresSeedMode,
+      hiresSeedValue: _hiresSeedValue,
       cnEnabled: { ..._cnEnabled },
       cnModel: { ..._cnModel },
       cnStrength: { ..._cnStrength },
@@ -1528,6 +1656,17 @@ function _restoreState() {
     if (s.upscaleDownscale) _upscaleDownscale = s.upscaleDownscale;
     _syncUpscaleUI();
 
+    // 二次采样
+    if (s.hiresEnabled != null) _hiresEnabled = !!s.hiresEnabled;
+    if (s.hiresDenoise != null) _hiresDenoise = parseFloat(s.hiresDenoise) || 0.4;
+    if (s.hiresSteps) _hiresSteps = parseInt(s.hiresSteps) || 20;
+    if (s.hiresCfg != null) _hiresCfg = parseFloat(s.hiresCfg) || 7.0;
+    if (s.hiresSampler) _hiresSampler = s.hiresSampler;
+    if (s.hiresScheduler) _hiresScheduler = s.hiresScheduler;
+    if (s.hiresSeedMode) _hiresSeedMode = s.hiresSeedMode;
+    if (s.hiresSeedValue != null) _hiresSeedValue = s.hiresSeedValue;
+    _syncHiresUI();
+
     // ControlNet
     if (s.cnEnabled) for (const t of _CN_TYPES) if (s.cnEnabled[t] != null) _cnEnabled[t] = !!s.cnEnabled[t];
     if (s.cnModel) for (const t of _CN_TYPES) if (s.cnModel[t]) _cnModel[t] = s.cnModel[t];
@@ -1564,6 +1703,37 @@ function _syncUpscaleUI() {
   const dsSel = document.getElementById('gen-upscale-downscale');
   if (dsSel) dsSel.value = _upscaleDownscale;
   _updateUpscaleSizeHint();
+}
+
+// ── 二次采样 ─────────────────────────────────────────────────────────────────
+function _syncHiresUI() {
+  const chk = document.querySelector('.gen-mod-tab-chk[data-module="hires"]');
+  if (chk) {
+    chk.checked = _hiresEnabled;
+    chk.closest('.gen-mod-tab')?.classList.toggle('gen-mod-tab-on', _hiresEnabled);
+  }
+  // denoise slider
+  const denoiseSl = document.getElementById('gen-hires-denoise');
+  const denoiseVal = document.getElementById('gen-hires-denoise-val');
+  if (denoiseSl) denoiseSl.value = _hiresDenoise;
+  if (denoiseVal) denoiseVal.textContent = parseFloat(_hiresDenoise).toFixed(2);
+  // steps slider
+  const stepsSl = document.getElementById('gen-hires-steps');
+  const stepsVal = document.getElementById('gen-hires-steps-val');
+  if (stepsSl) stepsSl.value = _hiresSteps;
+  if (stepsVal) stepsVal.textContent = _hiresSteps;
+  // cfg slider
+  const cfgSl = document.getElementById('gen-hires-cfg');
+  const cfgVal = document.getElementById('gen-hires-cfg-val');
+  if (cfgSl) cfgSl.value = _hiresCfg;
+  if (cfgVal) cfgVal.textContent = parseFloat(_hiresCfg).toFixed(1);
+  // sampler / scheduler selects
+  const samSel = document.getElementById('gen-hires-sampler');
+  const schSel = document.getElementById('gen-hires-scheduler');
+  if (samSel && _hiresSampler) samSel.value = _hiresSampler;
+  if (schSel && _hiresScheduler) schSel.value = _hiresScheduler;
+  // seed
+  _renderHiresSeedUI();
 }
 
 function _syncCNUI() {
@@ -1746,6 +1916,13 @@ export async function handleSubmit() {
     loras: _collectLoras(),
     upscale_enabled: _upscaleEnabled,
     upscale_factor: _upscaleFactor,
+    hires_enabled: _hiresEnabled,
+    hires_denoise: _hiresDenoise,
+    hires_steps: _hiresSteps,
+    hires_cfg: _hiresCfg,
+    hires_sampler: _hiresSampler,
+    hires_scheduler: _hiresScheduler,
+    hires_seed: _hiresEnabled ? _getHiresSeed() : -1,
     controlnets: _collectControlnets(),
   };
 
@@ -1822,6 +1999,30 @@ function _startSSE() {
       }
     }, 3000);
   };
+  // SSE (重)连后验证：若前端认为正在生成，检查 ComfyUI 队列是否仍有该任务
+  if (_state === 'generating' && _currentPromptId) {
+    _validateGeneratingState();
+  }
+}
+
+/** 检查 ComfyUI 队列中是否仍有当前 prompt，若无则重置为 idle */
+async function _validateGeneratingState() {
+  try {
+    const data = await apiFetch('/api/comfyui/queue');
+    if (!data) return;
+    const running = (data.queue_running || []).map(item => item[1]);
+    const pending = (data.queue_pending || []).map(item => item[1]);
+    if (!running.includes(_currentPromptId) && !pending.includes(_currentPromptId)) {
+      // 任务已不在队列中，可能在断连期间已完成/被取消
+      // 尝试获取历史记录中的输出图片
+      _fetchAndRenderImages(_currentPromptId)
+        .then(() => _setState('done'))
+        .catch(() => _setState('idle'));
+    }
+  } catch (e) {
+    // 查询失败（ComfyUI 可能已重启），直接重置
+    _setState('idle');
+  }
 }
 
 function _stopSSE() {
@@ -1987,10 +2188,13 @@ const _RUN_MODE_ICONS = { normal: 'play_arrow', onChange: 'edit_note', live: 'lo
 
 function _setRunMode(mode) {
   _runMode = mode;
-  const label = document.getElementById('gen-run-label');
-  const icon = document.querySelector('#gen-run-btn .ms');
-  if (label) label.textContent = _RUN_MODE_LABELS[mode] || '运行';
-  if (icon) icon.textContent = _RUN_MODE_ICONS[mode] || 'play_arrow';
+  // 生成中不更新按钮文字/图标，防止 .stop 样式与 "运行" 文字冲突
+  if (_state !== 'generating') {
+    const label = document.getElementById('gen-run-label');
+    const icon = document.querySelector('#gen-run-btn .ms');
+    if (label) label.textContent = _RUN_MODE_LABELS[mode] || '运行';
+    if (icon) icon.textContent = _RUN_MODE_ICONS[mode] || 'play_arrow';
+  }
   // 高亮当前选项
   document.querySelectorAll('.gen-run-opt').forEach(opt => {
     opt.classList.toggle('active', opt.dataset.mode === mode);

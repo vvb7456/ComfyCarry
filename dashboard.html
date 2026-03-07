@@ -927,6 +927,12 @@
             </div>
             <div class="page-body">
 
+                <!-- ═══ 模型类型 Tabs ═══════════════════════════════ -->
+                <div class="tabs" id="gen-type-tabs">
+                    <div class="tab active" data-gentab="sdxl" onclick="switchGenTab('sdxl')"><span class="ms ms-sm" style="color:#f472b6">image</span> SDXL</div>
+                    <div class="tab disabled" data-gentab="flux" title="Coming Soon" style="opacity:.45;cursor:default;pointer-events:none"><span class="ms ms-sm">bolt</span> Flux</div>
+                </div>
+
                 <!-- ═══ 上半：左右 50/50 ═══════════════════════════════ -->
                 <div class="gen-top-row">
 
@@ -1178,6 +1184,10 @@
                             <span class="ms ms-sm">hd</span> 高清放大
                             <input type="checkbox" class="gen-mod-tab-chk" data-module="upscale" title="启用高清放大">
                         </button>
+                        <button class="gen-mod-tab" data-module="hires" role="tab" aria-selected="false">
+                            <span class="ms ms-sm">auto_fix_high</span> 二次采样
+                            <input type="checkbox" class="gen-mod-tab-chk" data-module="hires" title="启用二次采样">
+                        </button>
                         <button class="gen-mod-tab gen-mod-tab-future" data-module="i2i" disabled title="Phase 3 — 即将推出">
                             <span class="ms ms-sm">image</span> 图生图
                         </button>
@@ -1393,6 +1403,71 @@
                             </div>
                         </div>
                         </div><!-- /gen-upscale-params -->
+                    </div>
+
+                    <div id="gen-mod-hires" class="gen-mod-content card card-padded hidden">
+                        <div id="gen-hires-params" class="gen-mod-params-compact">
+                        <!-- Row 1: 去噪强度 + 采样步数 -->
+                        <div class="gen-2col">
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl" style="display:flex;justify-content:space-between">
+                                    <span>去噪强度
+                                        <span class="comfy-param-help-icon"
+                                              data-tip="控制二次采样对画面的修改程度。值越低越接近原图，值越高细节越丰富但可能偏离原始构图。建议 0.3-0.5">?</span>
+                                    </span>
+                                    <span id="gen-hires-denoise-val" class="gen-editable-val" title="点击编辑">0.40</span>
+                                </label>
+                                <input type="range" id="gen-hires-denoise" class="gen-range"
+                                       min="0.10" max="0.80" step="0.05" value="0.40">
+                                <div class="gen-range-tips"><span>0.10</span><span>0.45</span><span>0.80</span></div>
+                            </div>
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl" style="display:flex;justify-content:space-between">
+                                    <span>采样步数
+                                        <span class="comfy-param-help-icon"
+                                              data-tip="二次采样的迭代步数。步数越多细节越精细但耗时更长。通常 15-25 即可">?</span>
+                                    </span>
+                                    <span id="gen-hires-steps-val" class="gen-editable-val" title="点击编辑">20</span>
+                                </label>
+                                <input type="range" id="gen-hires-steps" class="gen-range"
+                                       min="5" max="50" step="1" value="20">
+                                <div class="gen-range-tips"><span>5</span><span>27</span><span>50</span></div>
+                            </div>
+                        </div>
+                        <!-- Row 2: CFG + 采样器 -->
+                        <div class="gen-2col" style="margin-top:var(--sp-2)">
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl" style="display:flex;justify-content:space-between">
+                                    <span>CFG</span>
+                                    <span id="gen-hires-cfg-val" class="gen-editable-val" title="点击编辑">7.0</span>
+                                </label>
+                                <input type="range" id="gen-hires-cfg" class="gen-range"
+                                       min="1" max="20" step="0.5" value="7">
+                                <div class="gen-range-tips"><span>1</span><span>10</span><span>20</span></div>
+                            </div>
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl">采样器</label>
+                                <select id="gen-hires-sampler"><option value="euler">euler</option></select>
+                            </div>
+                        </div>
+                        <!-- Row 3: 调度器 + 种子 -->
+                        <div class="gen-2col" style="margin-top:var(--sp-2)">
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl">调度器</label>
+                                <select id="gen-hires-scheduler"><option value="normal">normal</option></select>
+                            </div>
+                            <div class="gen-field" style="margin-bottom:0">
+                                <label class="gen-lbl">种子</label>
+                                <div class="gen-seed-wrap">
+                                    <input type="number" id="gen-hires-seed-input"
+                                           min="0" max="4294967295">
+                                    <button class="gen-seed-lock" id="gen-hires-seed-toggle" title="切换随机/固定" type="button">
+                                        <span class="ms ms-sm" id="gen-hires-seed-icon">casino</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        </div><!-- /gen-hires-params -->
                     </div>
 
                     <div id="gen-mod-i2i" class="gen-mod-content card card-padded hidden">

@@ -29,6 +29,7 @@ let _facetsPromise = null;   // 防止并发重复加载
 let dlStatusInterval = null;
 let _dlCompletedIds = new Set();
 let _localCivitaiIds = new Set();  // CivitAI modelId → 本地已存在
+let _downloadingCivitaiIds = new Set();  // CivitAI modelId → 正在下载(active/paused/queued)
 
 const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion': 'Embedding', 'Controlnet': 'ControlNet', 'Upscaler': 'Upscaler', 'VAE': 'VAE', 'Poses': 'Poses' };
 
@@ -40,7 +41,7 @@ const switchModelTab = createTabSwitcher('mtab', ['local', 'civitai', 'downloads
   currentModelTab = tab;
   if (tab === 'local') loadLocalModels();
   else if (tab === 'civitai') loadFacets();
-  else if (tab === 'downloads') { renderDownloadsTab(); startDlStatusPolling(); }
+  else if (tab === 'downloads') { renderDownloadsTab(); }
   else if (tab === 'workflow') _initWorkflowDropZone();
 });
 
@@ -403,6 +404,11 @@ async function _autoFetchMetadataForNewDownloads() {
     if (!r.ok) return;
     const data = await r.json();
     const allModels = data.models || [];
+    // 始终更新本地 CivitAI ID 索引
+    for (const m of allModels) {
+      if (m.civitai_id) _localCivitaiIds.add(String(m.civitai_id));
+    }
+    _refreshSearchButtons();
     const noInfo = allModels.filter(m => !m.has_info);
     if (noInfo.length === 0) return;
     showToast(`自动获取 ${noInfo.length} 个新模型的元数据...`);
@@ -676,8 +682,10 @@ function renderCivitCard(h) {
         <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${h.id}')">详情</button>
         <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '移除' : '收藏'}</button>
         ${isLocal
-          ? `<button class="btn btn-sm" disabled style="opacity:.5;cursor:default">已有</button>`
-          : `<button class="btn btn-sm" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">下载</button>`}
+          ? `<button class="btn btn-sm" data-dl-btn="${h.id}" disabled style="opacity:.5;cursor:default">已有</button>`
+          : _downloadingCivitaiIds.has(String(h.id))
+            ? `<button class="btn btn-sm" data-dl-btn="${h.id}" disabled style="opacity:.5;cursor:default">下载中</button>`
+            : `<button class="btn btn-sm" data-dl-btn="${h.id}" onclick="downloadFromSearch('${h.id}', '${(h.type || 'Checkpoint').toLowerCase()}')">下载</button>`}
       </div>
     </div></div>`;
 }
@@ -724,9 +732,52 @@ async function doDownload(modelId, modelType, versionId) {
     body: JSON.stringify(payload)
   });
   if (!d) return;
-  if (d.error) showToast(d.error);
-  else if (d.existed) showToast(d.message || '该模型已存在', 'warning');
-  else showToast(d.message || '下载任务已提交');
+  if (d.error) { showToast(d.error); return; }
+  if (d.existed) { showToast(d.message || '该模型已存在', 'warning'); return; }
+  showToast(d.message || '下载任务已提交');
+  // 立即标记为下载中并刷新按钮
+  _downloadingCivitaiIds.add(String(modelId));
+  _updateDlBtn(String(modelId), 'downloading');
+}
+
+/** 刷新搜索结果中所有可见的下载按钮状态 */
+function _refreshSearchButtons() {
+  document.querySelectorAll('[data-dl-btn]').forEach(btn => {
+    const mid = btn.getAttribute('data-dl-btn');
+    if (_localCivitaiIds.has(mid)) {
+      _updateDlBtn(mid, 'local');
+    } else if (_downloadingCivitaiIds.has(mid)) {
+      _updateDlBtn(mid, 'downloading');
+    } else {
+      // 还原为可下载状态
+      const cached = searchResultsCache[mid];
+      const mtype = (cached?.type || 'Checkpoint').toLowerCase();
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+      btn.textContent = '下载';
+      btn.setAttribute('onclick', `downloadFromSearch('${mid}', '${mtype}')`);
+    }
+  });
+}
+
+/** 更新单个模型的下载按钮 */
+function _updateDlBtn(modelId, state) {
+  const btn = document.querySelector(`[data-dl-btn="${modelId}"]`);
+  if (!btn) return;
+  if (state === 'local') {
+    btn.disabled = true;
+    btn.style.opacity = '.5';
+    btn.style.cursor = 'default';
+    btn.textContent = '已有';
+    btn.removeAttribute('onclick');
+  } else if (state === 'downloading') {
+    btn.disabled = true;
+    btn.style.opacity = '.5';
+    btn.style.cursor = 'default';
+    btn.textContent = '下载中';
+    btn.removeAttribute('onclick');
+  }
 }
 
 // ========== Version Picker ==========
@@ -931,10 +982,6 @@ function loadCartFromStorage() {
 // ========== Download Status (using /api/downloads engine) ==========
 
 async function refreshDownloadStatus() {
-  const activeEl = document.getElementById('dl-active-content');
-  const completedEl = document.getElementById('dl-completed-content');
-  const failedEl = document.getElementById('dl-failed-content');
-  if (!activeEl) return;
   try {
     const r = await apiFetch('/api/downloads');
     if (!r) return;
@@ -950,8 +997,38 @@ async function refreshDownloadStatus() {
     // Helper: extract meta fields
     const _meta = (t, k) => (t.meta || {})[k] || '';
 
-    // ── Active + Paused + Queued ────────────────────────────
+    // ── 更新下载中/已完成 CivitAI ID 索引 ──────────────────
     const runningTasks = [...active, ...paused, ...queued];
+    const newDownloading = new Set();
+    runningTasks.forEach(t => {
+      const mid = _meta(t, 'model_id');
+      if (mid) newDownloading.add(String(mid));
+    });
+    const prevCompleted = _dlCompletedIds.size;
+    completed.forEach(dl => {
+      _dlCompletedIds.add(dl.download_id);
+      const mid = _meta(dl, 'model_id');
+      if (mid) _localCivitaiIds.add(String(mid));
+    });
+    const setsChanged = newDownloading.size !== _downloadingCivitaiIds.size ||
+      [...newDownloading].some(id => !_downloadingCivitaiIds.has(id)) ||
+      _dlCompletedIds.size > prevCompleted;
+    _downloadingCivitaiIds = newDownloading;
+
+    if (prevCompleted > 0 && _dlCompletedIds.size > prevCompleted) {
+      setTimeout(() => _autoFetchMetadataForNewDownloads(), 3000);
+    }
+
+    // 刷新搜索结果中的按钮状态
+    if (setsChanged) _refreshSearchButtons();
+
+    // ── 下载管理 Tab DOM 渲染 (仅在 downloads tab 可见时) ───
+    const activeEl = document.getElementById('dl-active-content');
+    if (!activeEl) return;
+    const completedEl = document.getElementById('dl-completed-content');
+    const failedEl = document.getElementById('dl-failed-content');
+
+    // ── Active + Paused + Queued ────────────────────────────
     if (runningTasks.length === 0) {
       activeEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">无活跃的下载任务</div>';
     } else {
@@ -998,12 +1075,6 @@ async function refreshDownloadStatus() {
     }
 
     // ── Completed ───────────────────────────────────────────
-    const prevSize = _dlCompletedIds.size;
-    completed.forEach(dl => _dlCompletedIds.add(dl.download_id));
-    if (prevSize > 0 && _dlCompletedIds.size > prevSize) {
-      setTimeout(() => _autoFetchMetadataForNewDownloads(), 3000);
-    }
-
     if (completed.length === 0) {
       completedEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">暂无已完成的下载</div>';
     } else {
@@ -1060,7 +1131,8 @@ async function refreshDownloadStatus() {
       t.innerHTML = `${msIcon('error','ms-sm')} 失败${failed.length > 0 ? ' (' + failed.length + ')' : ''}`;
     });
   } catch (e) {
-    activeEl.innerHTML = renderError('获取下载状态失败: ' + e.message);
+    const activeEl = document.getElementById('dl-active-content');
+    if (activeEl) activeEl.innerHTML = renderError('获取下载状态失败: ' + e.message);
   }
 }
 
@@ -1191,7 +1263,7 @@ function renderPendingList() {
 // ── 页面生命周期注册 ─────────────────────────────────────────
 
 registerPage('models', {
-  enter() { loadLocalModels(); loadCartFromStorage(); updateCartBadge(); },
+  enter() { loadLocalModels(); loadCartFromStorage(); updateCartBadge(); startDlStatusPolling(); },
   leave() { stopDlStatusPolling(); if (searchObserver) { searchObserver.disconnect(); searchObserver = null; } }
 });
 
