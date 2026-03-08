@@ -353,7 +353,18 @@ def api_generate_upload_image():
 
     file.save(dest)
     logger.info(f"[generate] 图片已上传: {safe_name} ({size} bytes)")
-    return jsonify({"filename": safe_name})
+
+    result = {"filename": safe_name}
+
+    # 返回图片尺寸 (用于图生图自动填充 width/height)
+    try:
+        from PIL import Image as PILImage
+        with PILImage.open(dest) as img:
+            result["width"], result["height"] = img.size
+    except Exception:
+        pass
+
+    return jsonify(result)
 
 
 # ── /api/generate/preprocess ─────────────────────────────────────────────────
@@ -643,6 +654,18 @@ def api_generate_submit():
             "end_percent": float(cn.get("end_percent", 1.0)),
         })
     data["controlnets"] = validated_cns
+
+    # ── Img2Img 参数校验 ────────────────────────────────────────────────────
+    i2i_image = str(data.get("i2i_image", "")).strip()
+    if i2i_image:
+        img_path = os.path.join(input_dir, i2i_image)
+        real_img = os.path.realpath(img_path)
+        real_input = os.path.realpath(input_dir)
+        if not real_img.startswith(real_input + os.sep):
+            return jsonify({"error": f"图生图参考图路径无效: {i2i_image}"}), 400
+        if not os.path.isfile(img_path):
+            return jsonify({"error": f"图生图参考图不存在: {i2i_image}，请重新上传"}), 400
+        data["i2i_image"] = i2i_image
 
     # ── 保存路径模板解析 ─────────────────────────────────────────────────────
     # 支持 WAS Image Save 标准格式: [time(%Y-%m-%d)], [time(%H%M%S)] 等

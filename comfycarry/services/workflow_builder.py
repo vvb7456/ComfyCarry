@@ -441,6 +441,8 @@ def build_sdxl_workflow(params: dict) -> dict:
         hires_sampler   (str)       — 二次采样采样器，默认 "euler"
         hires_scheduler (str)       — 二次采样调度器，默认 "normal"
         hires_seed      (int)       — 二次采样种子，-1 = 随机
+        i2i_image       (str)       — 图生图: 已上传到 ComfyUI input/ 的图片文件名 (启用时替换 EmptyLatentImage)
+        i2i_denoise     (float)     — 图生图去噪强度 (0.10-0.90)，默认 0.7，值越低越贴近原图
                                       strength: 0.0-2.0 (默认 1.0)
                                       start_percent: 0.0-1.0 (默认 0.0)
                                       end_percent: 0.0-1.0 (默认 1.0)
@@ -492,13 +494,22 @@ def build_sdxl_workflow(params: dict) -> dict:
         pos_ref = (cn_apply, 0)
         neg_ref = (cn_apply, 1)
 
-    # 4. 空 Latent (支持批量)
+    # 4. Latent 来源 (T2I: EmptyLatentImage / I2I: LoadImage + VAEEncode)
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
-    latent = b.add_empty_latent(
-        int(params.get("width", 1024)),
-        int(params.get("height", 1024)),
-        batch_size=batch_size,
-    )
+    i2i_image = str(params.get("i2i_image", "")).strip()
+    i2i_denoise = 1.0  # T2I 默认全去噪
+
+    if i2i_image:
+        # 图生图: 加载参考图 → VAE 编码为 latent
+        i2i_load = b.add_load_image(i2i_image)
+        latent = b.add_vae_encode(i2i_load, ckpt)
+        i2i_denoise = max(0.10, min(float(params.get("i2i_denoise", 0.7)), 0.90))
+    else:
+        latent = b.add_empty_latent(
+            int(params.get("width", 1024)),
+            int(params.get("height", 1024)),
+            batch_size=batch_size,
+        )
 
     # 5. 采样
     sampled = b.add_ksampler(
@@ -511,6 +522,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         cfg=float(params.get("cfg", 7.0)),
         sampler=str(params.get("sampler", "euler")),
         scheduler=str(params.get("scheduler", "normal")),
+        denoise=i2i_denoise,
     )
 
     # 6. VAE 解码 (VAE 始终来自原始 Checkpoint，index=2)

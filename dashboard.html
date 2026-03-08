@@ -1193,6 +1193,10 @@
                             <span class="ms ms-sm">extension</span> LoRA
                             <input type="checkbox" class="gen-mod-tab-chk" data-module="lora" title="启用 LoRA">
                         </button>
+                        <button class="gen-mod-tab" data-module="i2i" role="tab" aria-selected="false">
+                            <span class="ms ms-sm">image</span> 图生图
+                            <input type="checkbox" class="gen-mod-tab-chk" data-module="i2i" title="启用图生图">
+                        </button>
                         <button class="gen-mod-tab" data-module="pose" role="tab" aria-selected="false">
                             <span class="ms ms-sm">accessibility_new</span> 姿势控制
                             <input type="checkbox" class="gen-mod-tab-chk" data-module="pose" title="启用姿势控制">
@@ -1213,15 +1217,38 @@
                             <span class="ms ms-sm">auto_fix_high</span> 二次采样
                             <input type="checkbox" class="gen-mod-tab-chk" data-module="hires" title="启用二次采样">
                         </button>
-                        <button class="gen-mod-tab gen-mod-tab-future" data-module="i2i" disabled title="Phase 3 — 即将推出">
-                            <span class="ms ms-sm">image</span> 图生图
-                        </button>
                     </div>
 
                     <!-- LoRA 模块内容 -->
                     <div id="gen-mod-lora" class="gen-mod-content card card-padded">
                         <div id="gen-lora-grid" class="gen-lora-grid">
                             <!-- JS 动态填充：已选 LoRA 卡片 + 末尾 add-card -->
+                        </div>
+                    </div>
+
+                    <!-- 图生图 -->
+                    <div id="gen-mod-i2i" class="gen-mod-content card card-padded hidden">
+                        <div class="gen-mod-split">
+                            <div class="gen-mod-params-area" style="display:flex;flex-direction:column;justify-content:center">
+                                <div class="gen-field">
+                                    <label class="gen-lbl" style="display:flex;justify-content:space-between">
+                                        <span>重绘强度 <span class="comfy-param-help-icon" data-tip="控制生成结果与原图的相似度。值越低越接近原图，值越高变化越大。0.3=微调, 0.5=适度, 0.7=大幅重绘">?</span></span>
+                                        <span id="gen-i2i-denoise-val" class="gen-editable-val">0.70</span>
+                                    </label>
+                                    <input type="range" id="gen-i2i-denoise" class="gen-range" min="0.10" max="0.90" step="0.01" value="0.70">
+                                    <div class="gen-range-tips"><span>0.10</span><span>0.50</span><span>0.90</span></div>
+                                </div>
+                            </div>
+                            <div class="gen-mod-media-area">
+                                <label class="gen-lbl">参考图</label>
+                                <div id="gen-i2i-upload" class="gen-ref-upload">
+                                    <div class="gen-ref-placeholder">
+                                        <span class="ms" style="font-size:2rem;opacity:.4">add_photo_alternate</span>
+                                        <span>点击选择参考图</span>
+                                    </div>
+                                </div>
+                                <input type="file" id="gen-i2i-file" accept="image/png,image/jpeg,image/webp,image/bmp" style="display:none">
+                            </div>
                         </div>
                     </div>
 
@@ -1495,13 +1522,6 @@
                         </div><!-- /gen-hires-params -->
                     </div>
 
-                    <div id="gen-mod-i2i" class="gen-mod-content card card-padded hidden">
-                        <div class="gen-mod-future-hint">
-                            <span class="ms" style="font-size:2rem;color:var(--t3);opacity:.4">image</span>
-                            <div style="margin-top:8px;color:var(--t2);font-weight:500">图生图 — Phase 3</div>
-                            <div style="font-size:.82rem;color:var(--t3);margin-top:4px">以参考图为基础，融合提示词进行创作</div>
-                        </div>
-                    </div>
                 </div>
 
                 </div><!-- /gen-main-content -->
