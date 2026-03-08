@@ -1,18 +1,20 @@
         :root {
-            --bg1: #0a0a0f;
+            --bg: #0a0a0f;
             --bg2: #12121e;
             --bg3: #1a1a28;
             --bg4: #22223a;
             --bd: #2a2a3e;
+            --bd-f: #7c5cfc;
             --t1: #e8e8f0;
             --t2: #a8a8c0;
             --t3: #68688a;
-            --accent: #7c5cfc;
-            --accent2: #9078ff;
+            --ac: #7c5cfc;
+            --ac2: #9078ff;
             --green: #4ade80;
             --red: #f87171;
             --amber: #f59e0b;
             --r: 12px;
+            --sh: 0 4px 24px rgba(0, 0, 0, 0.5);
             --mono: 'IBM Plex Mono', 'Fira Code', monospace;
         }
 
@@ -51,7 +53,7 @@
 
         body {
             font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-serif;
-            background: var(--bg1);
+            background: var(--bg);
             color: var(--t1);
             min-height: 100vh;
             font-size: clamp(15px, 1vw, 18px);
@@ -99,11 +101,11 @@
         }
 
         .progress-segment.done {
-            background: var(--accent);
+            background: var(--ac);
         }
 
         .progress-segment.active {
-            background: var(--accent2);
+            background: var(--ac2);
             animation: pulse 1.5s infinite;
         }
 
@@ -177,12 +179,12 @@
         }
 
         .choice-card:hover {
-            border-color: var(--accent);
+            border-color: var(--ac);
         }
 
         .choice-card.selected {
-            border-color: var(--accent);
-            background: color-mix(in srgb, var(--accent) 10%, var(--bg3));
+            border-color: var(--ac);
+            background: color-mix(in srgb, var(--ac) 10%, var(--bg3));
         }
 
         .choice-card h3 {
@@ -199,7 +201,7 @@
         .choice-card .badge {
             display: inline-block;
             font-size: clamp(0.65rem, 0.7vw, 0.78rem);
-            background: var(--accent);
+            background: var(--ac);
             color: #fff;
             padding: 2px 8px;
             border-radius: 4px;
@@ -235,7 +237,7 @@
         .form-group input:focus,
         .form-group textarea:focus,
         .form-group select:focus {
-            border-color: var(--accent);
+            border-color: var(--ac);
             outline: none;
         }
 
@@ -271,12 +273,12 @@
         }
 
         .btn-primary {
-            background: var(--accent);
+            background: var(--ac);
             color: #fff;
         }
 
         .btn-primary:hover {
-            background: var(--accent2);
+            background: var(--ac2);
         }
 
         .btn-secondary {
@@ -320,7 +322,7 @@
         }
 
         .plugin-item input[type="checkbox"] {
-            accent-color: var(--accent);
+            accent-color: var(--ac);
             width: 18px;
             height: 18px;
         }
@@ -337,36 +339,13 @@
 
         .plugin-item .plugin-required {
             font-size: clamp(0.7rem, 0.8vw, 0.85rem);
-            color: var(--accent);
+            color: var(--ac);
         }
 
         .plugin-preinstalled-icon {
             color: var(--green, #22c55e);
             font-size: 18px;
             flex-shrink: 0;
-        }
-
-        /* Radio group for rclone */
-        .radio-group {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-
-        .radio-group label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: clamp(0.88rem, 1vw, 1.05rem);
-            color: var(--t2);
-            cursor: pointer;
-        }
-
-        .radio-group input[type="radio"] {
-            accent-color: var(--accent);
-            width: 16px;
-            height: 16px;
         }
 
         /* Environment info card */
@@ -601,7 +580,7 @@
         .summary-card h4 {
             font-size: clamp(0.92rem, 1vw, 1.1rem);
             margin-bottom: 10px;
-            color: var(--accent);
+            color: var(--ac);
         }
 
         .summary-row {
@@ -650,7 +629,7 @@
         }
 
         .import-upload-box:hover {
-            border-color: var(--accent);
+            border-color: var(--ac);
         }
 
         .import-upload-box p {
@@ -739,7 +718,7 @@
         }
 
         .wz-rule-row::-webkit-scrollbar-thumb:hover {
-            background: var(--accent);
+            background: var(--ac);
         }
 
         .wz-rule-card {
@@ -756,12 +735,12 @@
         }
 
         .wz-rule-card:hover {
-            border-color: var(--accent);
+            border-color: var(--ac);
         }
 
         .wz-rule-card.selected {
-            border-color: var(--accent);
-            background: color-mix(in srgb, var(--accent) 10%, var(--bg3));
+            border-color: var(--ac);
+            background: color-mix(in srgb, var(--ac) 10%, var(--bg3));
         }
 
         .wz-rule-check {
@@ -783,12 +762,12 @@
         }
 
         .wz-rule-check:hover {
-            border-color: var(--accent);
+            border-color: var(--ac);
         }
 
         .wz-rule-card.selected .wz-rule-check {
-            background: var(--accent);
-            border-color: var(--accent);
+            background: var(--ac);
+            border-color: var(--ac);
             color: #fff;
         }
 
@@ -876,7 +855,7 @@
         .wz-add-remote-form select:focus,
         .wz-add-remote-form input:focus,
         .wz-add-remote-form textarea:focus {
-            border-color: var(--accent);
+            border-color: var(--ac);
             outline: none;
         }
 
@@ -884,11 +863,6 @@
         @media (max-width: 768px) {
             .choice-grid {
                 grid-template-columns: 1fr !important;
-            }
-
-            .radio-group {
-                flex-direction: column;
-                gap: 10px;
             }
 
             .deploy-content {
@@ -969,16 +943,17 @@
 
         /* ── Light Theme ── */
         [data-theme="light"] {
-            --bg1: #f0f0f4;
+            --bg: #f0f0f4;
             --bg2: #e6e6ec;
             --bg3: #ffffff;
             --bg4: #d8d8e0;
             --bd: #c8c8d4;
+            --bd-f: #6b4fe0;
             --t1: #1a1a2e;
             --t2: #55556a;
             --t3: #8888a0;
-            --accent: #6b4fe0;
-            --accent2: #8568ff;
+            --ac: #6b4fe0;
+            --ac2: #8568ff;
             --green: #16a34a;
             --red: #dc2626;
             --amber: #d97706;
@@ -1005,8 +980,8 @@
         }
 
         .theme-toggle:hover {
-            border-color: var(--accent);
-            color: var(--accent)
+            border-color: var(--ac);
+            color: var(--ac)
         }
 
         .theme-toggle .ms {

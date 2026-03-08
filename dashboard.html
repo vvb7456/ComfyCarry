@@ -8,7 +8,18 @@
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/pages/dashboard.css">
+    <link rel="stylesheet" href="/static/css/pages/comfyui.css">
+    <link rel="stylesheet" href="/static/css/pages/models.css">
+    <link rel="stylesheet" href="/static/css/pages/plugins.css">
+    <link rel="stylesheet" href="/static/css/pages/tunnel.css">
+    <link rel="stylesheet" href="/static/css/pages/sync.css">
+    <link rel="stylesheet" href="/static/css/pages/jupyter.css">
+    <link rel="stylesheet" href="/static/css/pages/ssh.css">
+    <link rel="stylesheet" href="/static/css/pages/generate.css">
     <script>
         // 主题初始化 — 在 <head> 中内联执行以防止闪烁
         (function() {
@@ -151,7 +162,7 @@
                 <!-- CivitAI Tab (unified search + ID lookup) -->
                 <div id="mtab-civitai" class="hidden">
                         <div class="search-bar" style="gap:8px;align-items:center;flex-wrap:wrap">
-                            <input type="text" id="search-input" placeholder="搜索模型名 / 输入 ID / 粘贴 CivitAI URL..." onkeydown="if(event.key==='Enter')smartSearch()" style="flex:1;min-width:200px">
+                            <input type="text" id="search-input" name="civitai-search" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="搜索模型名 / 输入 ID / 粘贴 CivitAI URL..." onkeydown="if(event.key==='Enter')smartSearch()" style="flex:1;min-width:200px">
                             <select id="filter-sort" style="width:auto;min-width:140px">
                                 <option value="Relevancy">相关性</option>
                                 <option value="Most Downloaded">最多下载</option>
@@ -246,7 +257,7 @@
                 </div>
                 <div class="card" style="padding:12px 14px">
                     <div class="input-secret">
-                        <input type="password" id="jupyter-token-value" value="" readonly
+                        <input type="text" class="secret-masked" id="jupyter-token-value" value="" readonly
                                style="font-family:'IBM Plex Mono',monospace;font-size:.78rem;letter-spacing:.02em;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--t1)">
                         <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                         <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm">content_copy</span></button>
@@ -399,7 +410,7 @@
                                         <button class="btn btn-xs" onclick="window._tunnelCfgValidate()" style="font-size:.7rem;padding:2px 8px">验证</button>
                                     </div>
                                     <div class="input-secret">
-                                        <input type="password" id="tunnel-cfg-token" placeholder="CF Token">
+                                        <input type="text" class="secret-masked" id="tunnel-cfg-token" autocomplete="off" placeholder="CF Token">
                                         <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                     </div>
                                     <div id="tunnel-cfg-result" style="display:none;font-size:.78rem;margin:0"></div>
@@ -793,14 +804,15 @@
                                 <div class="section-title"><span class="ms ms-sm" style="color:#fbbf24">lock</span> Root 密码</div>
                             </div>
                             <div class="card" style="padding:14px">
+                                <form onsubmit="event.preventDefault();window.setSSHPassword()" autocomplete="off">
                                 <div style="display:flex;flex-direction:column;gap:10px">
                                     <div class="input-secret">
-                                        <input type="password" id="ssh-pw-new" placeholder="新密码"
+                                        <input type="password" id="ssh-pw-new" data-pw="1" autocomplete="new-password" placeholder="新密码"
                                                style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
                                         <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                     </div>
                                     <div class="input-secret">
-                                        <input type="password" id="ssh-pw-confirm" placeholder="确认密码"
+                                        <input type="password" id="ssh-pw-confirm" data-pw="1" autocomplete="new-password" placeholder="确认密码"
                                                style="font-size:.85rem;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;color:var(--t1)">
                                         <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                     </div>
@@ -813,6 +825,7 @@
                                     </div>
                                     <span class="comfy-param-help-icon" data-tip="设置后将自动启用密码认证、PermitRootLogin 并重启 sshd">?</span>
                                 </div>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -840,21 +853,21 @@
                             <div class="form-group" style="margin-bottom:10px">
                                 <label>当前密码</label>
                                 <div class="input-secret">
-                                    <input type="password" id="settings-pw-current" placeholder="输入当前密码" autocomplete="current-password">
+                                    <input type="password" id="settings-pw-current" data-pw="1" placeholder="输入当前密码" autocomplete="current-password">
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                 </div>
                             </div>
                             <div class="form-group" style="margin-bottom:10px">
                                 <label>新密码</label>
                                 <div class="input-secret">
-                                    <input type="password" id="settings-pw-new" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
+                                    <input type="password" id="settings-pw-new" data-pw="1" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                 </div>
                             </div>
                             <div class="form-group" style="margin-bottom:12px">
                                 <label>确认新密码</label>
                                 <div class="input-secret">
-                                    <input type="password" id="settings-pw-confirm" placeholder="再次输入新密码" autocomplete="new-password">
+                                    <input type="password" id="settings-pw-confirm" data-pw="1" placeholder="再次输入新密码" autocomplete="new-password">
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                 </div>
                             </div>
@@ -868,7 +881,7 @@
                             <div class="form-group" style="margin-bottom:12px">
                                 <label>API Key 从 <a href="https://civitai.com/user/account" target="_blank" style="color:var(--ac)">CivitAI 账户设置</a> 中生成</label>
                                 <div class="input-secret">
-                                    <input type="password" id="settings-civitai-key" placeholder="输入 CivitAI API Key...">
+                                    <input type="text" class="secret-masked" id="settings-civitai-key" autocomplete="off" placeholder="输入 CivitAI API Key...">
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                 </div>
                             </div>
@@ -882,7 +895,7 @@
                         <div class="card card-padded">
                             <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key <span class="comfy-param-help-icon" data-tip="用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API">?</span></h3>
                             <div class="input-secret" style="margin-bottom:12px">
-                                <input type="password" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
+                                <input type="text" class="secret-masked" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
                                 <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
                                 <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm">content_copy</span></button>
                             </div>
@@ -926,6 +939,18 @@
                 </div>
             </div>
             <div class="page-body">
+
+                <!-- ComfyUI 未就绪遮罩 (JS 动态控制) -->
+                <div id="gen-gate" class="hidden" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 1rem;text-align:center">
+                    <span id="gen-gate-icon" class="ms" style="font-size:3rem;opacity:.5;color:var(--amber)">power_off</span>
+                    <div id="gen-gate-msg" style="margin-top:12px;font-size:.95rem;color:var(--t2)"></div>
+                    <button id="gen-gate-btn" class="btn btn-sm btn-primary hidden" style="margin-top:16px" onclick="showPage('comfyui')">
+                        前往 ComfyUI 页启动
+                    </button>
+                </div>
+
+                <!-- ═══ 主内容区 (ComfyUI 就绪后显示) ═══════════════ -->
+                <div id="gen-main-content">
 
                 <!-- ═══ 模型类型 Tabs ═══════════════════════════════ -->
                 <div class="tabs" id="gen-type-tabs">
@@ -1479,6 +1504,8 @@
                     </div>
                 </div>
 
+                </div><!-- /gen-main-content -->
+
             </div>
         </div>
 
@@ -1675,21 +1702,36 @@
     <script>
         function toggleSecret(btn) {
             const input = btn.closest('.input-secret').querySelector('input');
-            const hidden = input.type === 'password';
-            if (input.dataset.key) {
-                // pre-filled readonly field — swap value between key and dots
-                if (hidden) {
+            if (input.type === 'password') {
+                // 真正的 password 字段 (SSH密码、Dashboard密码)
+                if (input.dataset.key) {
                     input.type = 'text';
                     input.value = input.dataset.key;
                 } else {
-                    input.type = 'password';
-                    input.value = '\u2022'.repeat(24);
+                    input.type = 'text';
                 }
+                btn.querySelector('.ms').textContent = 'visibility_off';
+                btn.title = '隐藏';
+            } else if (input.classList.contains('secret-masked')) {
+                // CSS 遮罩模式 (API Key/Token)
+                input.classList.remove('secret-masked');
+                if (input.dataset.key) input.value = input.dataset.key;
+                btn.querySelector('.ms').textContent = 'visibility_off';
+                btn.title = '隐藏';
             } else {
-                input.type = hidden ? 'text' : 'password';
+                // 当前可见 → 隐藏
+                if (input.dataset.pw) {
+                    // 真正的密码字段恢复 type=password
+                    input.type = 'password';
+                    if (input.dataset.key) input.value = '\u2022'.repeat(24);
+                } else {
+                    // API Key/Token 用 CSS 遮罩
+                    input.classList.add('secret-masked');
+                    if (input.dataset.key) input.value = '\u2022'.repeat(24);
+                }
+                btn.querySelector('.ms').textContent = 'visibility';
+                btn.title = '显示';
             }
-            btn.querySelector('.ms').textContent = hidden ? 'visibility_off' : 'visibility';
-            btn.title = hidden ? '隐藏' : '显示';
         }
         function copySecret(btn) {
             const input = btn.closest('.input-secret').querySelector('input');

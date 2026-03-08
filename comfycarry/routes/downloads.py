@@ -344,8 +344,17 @@ def api_downloads_civitai():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
 
-    # 下载完成后的回调: 保存元数据 + 预览图
+    # Early Access 付费模型检测
     info = resolved["info"]
+    if info.get("availability") == "EarlyAccess":
+        ea = info.get("early_access_config") or {}
+        if ea.get("chargeForDownload"):
+            price = ea.get("downloadPrice", "?")
+            return jsonify({
+                "error": f"该模型为 Early Access 付费模型，需要 {price} Buzz 才能下载。请在 CivitAI 网站购买后再试。",
+                "early_access": True,
+            }), 403
+        # EarlyAccess 但不收费: 可能仅需登录, 继续尝试下载
 
     def _on_civitai_complete(task):
         model_path = os.path.join(task.save_dir, task.filename)

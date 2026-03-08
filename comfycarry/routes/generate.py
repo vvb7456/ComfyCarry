@@ -227,7 +227,8 @@ def _fetch_generate_options() -> dict:
                "checkpoints": [], "loras": [],
                "checkpoint_previews": {}, "lora_previews": {}, "lora_triggers": {},
                "lora_info": {}, "checkpoint_info": {},
-               "checkpoint_archs": {}, "lora_archs": {}}
+               "checkpoint_archs": {}, "lora_archs": {},
+               "comfyui_dir": COMFYUI_DIR, "controlnet_models": {}}
 
     def _get_combo_list(node_name: str, field: str) -> list:
         """获取节点的下拉选项（同节点缓存，避免重复 HTTP 请求）"""

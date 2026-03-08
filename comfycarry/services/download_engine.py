@@ -573,9 +573,12 @@ class DownloadEngine:
                 error_code = status.get("errorCode", "")
                 error_msg = status.get("errorMessage", "")
                 task.error = f"[{error_code}] {error_msg}" if error_code else error_msg
-                # 授权失败 — 追加友好提示
-                if error_code == "24" and task.meta.get("source") == "civitai":
-                    task.error += " — 请在设置页配置 CivitAI API Key 后重试"
+                # CivitAI 下载失败 — 追加友好提示
+                if task.meta.get("source") == "civitai":
+                    if "status=403" in error_msg or error_code == "24":
+                        task.error += " — 该模型可能为 Early Access 付费模型，或需要在设置页配置 CivitAI API Key"
+                    elif "status=401" in error_msg:
+                        task.error += " — 请在设置页配置 CivitAI API Key 后重试"
                 task.completed_at = time.time()
                 self._cleanup_partial(task)
             elif aria2_status == "removed":

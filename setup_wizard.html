@@ -43,7 +43,7 @@
         <div class="wizard-header">
             <h1>ComfyCarry 部署向导</h1>
             <p><a href="https://github.com/vvb7456/ComfyCarry" target="_blank"
-                    style="color:var(--accent);text-decoration:none">GitHub</a> · RunPod / Vast.ai 上的 ComfyUI 一站式管理</p>
+                    style="color:var(--ac);text-decoration:none">GitHub</a> · RunPod / Vast.ai 上的 ComfyUI 一站式管理</p>
         </div>
 
         <div class="progress-bar" id="progressBar"></div>
@@ -151,7 +151,7 @@
                         <span class="ms" style="font-size:1.2rem;color:#34d399">public</span>
                         <strong>公共节点</strong>
                         <span
-                            style="font-size:.65rem;background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
+                            style="font-size:.65rem;background:var(--ac);color:#000;padding:1px 6px;border-radius:8px;font-weight:600">推荐</span>
                     </div>
                     <p style="font-size:.82rem;color:var(--t2);margin:0;line-height:1.5">一键启用，无需域名或 CF 账号。通过 ComfyCarry
                         共享节点获得公网访问。</p>
@@ -177,7 +177,7 @@
                     <input type="password" id="input-cf-token"
                         placeholder="Cloudflare API Token (需 Tunnel Edit + DNS Edit 权限)" oninput="updateNextBtnText()">
                     <div class="form-hint">在 <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank"
-                            style="color:var(--accent)">Cloudflare API Tokens</a> 创建</div>
+                            style="color:var(--ac)">Cloudflare API Tokens</a> 创建</div>
                 </div>
                 <div class="form-group">
                     <label>域名</label>
@@ -339,7 +339,7 @@
                 <input type="text" id="input-civitai-token" placeholder="你的 CivitAI API Key (可选)"
                     oninput="updateNextBtnText()">
                 <div class="form-hint">可在 <a href="https://civitai.com/user/account" target="_blank"
-                        style="color:var(--accent)">CivitAI 账户设置</a> 获取，也可跳过后在 ComfyCarry 设置</div>
+                        style="color:var(--ac)">CivitAI 账户设置</a> 获取，也可跳过后在 ComfyCarry 设置</div>
             </div>
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
@@ -590,7 +590,7 @@
                     <div style="color:var(--red);font-weight:600;margin-bottom:8px">${msIcon('warning', 'ms-xs')} 不支持的运行环境</div>
                     <div style="color:var(--t3);font-size:.88rem;line-height:1.6">
                         当前环境缺少必要的运行时组件。请使用 ComfyCarry 预构建镜像创建实例：<br>
-                        <code style="color:var(--accent)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （预装 ComfyUI + 加速组件）
+                        <code style="color:var(--ac)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （预装 ComfyUI + 加速组件）
                     </div>
                 </div>`;
                     }
@@ -1149,7 +1149,7 @@
             if (def.oauth) {
                 html += `<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px;font-size:.8rem;color:var(--t2)">
             <b>OAuth 授权步骤:</b><br>
-            1. 在本地电脑安装 <a href="https://rclone.org/downloads/" target="_blank" style="color:var(--accent)">rclone</a><br>
+            1. 在本地电脑安装 <a href="https://rclone.org/downloads/" target="_blank" style="color:var(--ac)">rclone</a><br>
             2. 运行: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">rclone authorize "${type}"</code><br>
             3. 将终端输出的 token JSON 粘贴到下方</div>`;
             }
@@ -1409,7 +1409,7 @@
             let importNote = '';
             if (importedConfig) {
                 importNote = `
-        <div class="summary-card" style="border-color:var(--accent)">
+        <div class="summary-card" style="border-color:var(--ac)">
             <h4>${msIcon('inventory_2', 'ms-xs')} 从配置文件恢复</h4>
             <div class="summary-row"><span class="label">导出时间</span><span class="value">${esc(importedConfig._exported_at || '未知')}</span></div>
         </div>`;

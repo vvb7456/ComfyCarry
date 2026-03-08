@@ -1,0 +1,383 @@
+        /* ══════════════════════════════════════════════════════════════
+           pages/comfyui.css — ComfyUI management page: Params · Queue ·
+                               History · Progress Bar · VRAM
+           ══════════════════════════════════════════════════════════════ */
+
+        /* ── Queue Items ── */
+        .queue-item {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .queue-item.running {
+            border-left: 3px solid var(--green);
+            flex-wrap: wrap
+        }
+
+        .queue-item.running .comfy-progress-bar {
+            width: 100%;
+            margin-top: 4px
+        }
+
+        .queue-item.pending {
+            border-left: 3px solid var(--amber)
+        }
+
+        .queue-item-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .queue-item-id {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .75rem;
+            color: var(--t3);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .queue-item-meta {
+            font-size: .8rem;
+            color: var(--t2);
+            margin-top: 2px
+        }
+
+        /* ── History Grid ── */
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px
+        }
+
+        .history-grid.size-sm {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 6px
+        }
+
+        .history-grid.size-sm .history-card-images {
+            height: 90px
+        }
+
+        .history-grid.size-sm .history-card-info {
+            padding: 6px 10px
+        }
+
+        .history-grid.size-sm .history-card-meta {
+            font-size: .68rem
+        }
+
+        .history-grid.size-lg {
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px
+        }
+
+        .history-grid.size-lg .history-card-images {
+            height: 220px
+        }
+
+        .history-grid.size-lg .history-card-info {
+            padding: 14px 18px
+        }
+
+        .history-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .2)
+        }
+
+        .history-card-images {
+            display: flex;
+            gap: 2px;
+            background: var(--bg);
+            height: 140px;
+            overflow: hidden
+        }
+
+        .history-card-images img {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer
+        }
+
+        .history-card-info {
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .history-card-info .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        .history-card-info .status-dot.success {
+            background: var(--green)
+        }
+
+        .history-card-info .status-dot.error {
+            background: var(--red)
+        }
+
+        .history-card-meta {
+            flex: 1;
+            font-size: .78rem;
+            color: var(--t2)
+        }
+
+        .history-card-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+            flex-shrink: 0
+        }
+
+        .history-card-actions .btn {
+            padding: 2px 6px;
+            font-size: .72rem;
+            min-width: unset
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 24px;
+            color: var(--t3);
+            font-size: .85rem
+        }
+
+        /* ── ComfyUI Management — Params Form ── */
+        .comfy-params-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .comfy-param-group {
+            background: var(--bg-in);
+            border: 1px solid var(--bd);
+            border-radius: var(--rs);
+            padding: 12px;
+        }
+
+        .comfy-param-group label {
+            display: block;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--t1);
+            margin-bottom: 6px;
+        }
+
+        .comfy-param-group select,
+        .comfy-param-group input[type="number"] {
+            width: 100%;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--bd);
+            background: var(--bg);
+            color: var(--t1);
+            font-size: .82rem;
+        }
+
+        .comfy-param-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 0;
+        }
+
+        .comfy-param-toggle input[type="checkbox"] {
+            display: none;
+        }
+
+        .comfy-toggle-slider {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            min-width: 40px;
+            height: 22px;
+            background: var(--bd);
+            border-radius: 11px;
+            transition: background .25s;
+            flex-shrink: 0;
+        }
+
+        .comfy-toggle-slider::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform .25s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+        }
+
+        .comfy-param-toggle input:checked+.comfy-toggle-slider {
+            background: var(--ac);
+        }
+
+        .comfy-param-toggle input:checked+.comfy-toggle-slider::after {
+            transform: translateX(18px);
+        }
+
+        .comfy-recent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        .comfy-recent-grid img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: var(--rs);
+            cursor: zoom-in;
+            transition: transform .2s;
+        }
+
+        .comfy-recent-grid img:hover {
+            transform: scale(1.03);
+        }
+
+        .comfy-vram-bar {
+            height: 24px;
+            background: var(--bg-in);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .comfy-vram-bar .fill {
+            height: 100%;
+            border-radius: 12px;
+            transition: width .5s;
+        }
+
+        .comfy-vram-bar .label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .75rem;
+            font-weight: 600;
+            color: var(--t1);
+        }
+
+        /* ── ComfyUI Unified Progress Bar ── */
+        .comfy-progress-bar {
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            background: var(--bg-in);
+            border: 2px solid var(--bd);
+            border-radius: var(--rs);
+            font-size: .82rem;
+            overflow: hidden;
+            gap: 10px;
+            min-height: 40px;
+        }
+
+        .comfy-progress-bar.active {
+            border-color: rgba(0, 188, 212, .6);
+        }
+
+        .comfy-progress-bar-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(74, 222, 128, .22), rgba(0, 188, 212, .18));
+            transition: width .3s ease;
+            pointer-events: none;
+        }
+
+        .comfy-progress-bar>span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .comfy-progress-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--ac);
+            flex-shrink: 0;
+            animation: execPulse 1.2s infinite;
+        }
+
+        @keyframes execPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .3;
+            }
+        }
+
+        .comfy-progress-label {
+            font-weight: 600;
+            color: var(--ac);
+            white-space: nowrap;
+        }
+
+        .comfy-progress-node {
+            color: var(--t2);
+            font-size: .78rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .comfy-progress-steps {
+            flex: 1;
+            text-align: center;
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--t1);
+            white-space: nowrap;
+        }
+
+        .comfy-progress-speed {
+            font-size: .72rem;
+            color: var(--t3);
+            white-space: nowrap;
+        }
+
+        .comfy-progress-time {
+            font-size: .78rem;
+            color: var(--t3);
+            white-space: nowrap;
+            margin-left: auto;
+        }
+
+        .comfy-exec-error {
+            padding: 10px 14px;
+            background: rgba(231, 76, 60, .1);
+            border: 1px solid var(--red);
+            border-radius: var(--rs);
+            font-size: .85rem;
+            color: var(--red);
+        }

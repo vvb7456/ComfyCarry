@@ -56,7 +56,7 @@ async function loadJupyterToken() {
     if (el && d.token) {
       el.dataset.key = d.token;
       el.value = '\u2022'.repeat(24);
-      el.type = 'password';
+      el.classList.add('secret-masked');
     }
   } catch (_) {}
 }

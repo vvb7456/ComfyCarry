@@ -244,6 +244,10 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
     type_lower = model_type.lower()
     save_dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
 
+    # Early Access / 付费检测
+    availability = version_data.get("availability", "Public")
+    ea_config = version_data.get("earlyAccessConfig") or {}
+
     return {
         "model_id": model_info.get("id") or version_data.get("modelId"),
         "model_name": model_info.get("name", "Unknown"),
@@ -257,6 +261,8 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
         "download_url": download_url,
         "selected_file": selected,
         "save_dir_key": save_dir_key,
+        "availability": availability,
+        "early_access_config": ea_config,
         "raw": version_data,
     }
 

@@ -1,0 +1,164 @@
+        /* ══════════════════════════════════════════════════════════════
+           pages/tunnel.css — Tunnel page styles
+           ══════════════════════════════════════════════════════════════ */
+
+        .tunnel-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .tunnel-header-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .tunnel-status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .tunnel-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .4;
+            }
+        }
+
+        .tunnel-services {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(clamp(260px, 20vw, 360px), 1fr));
+            gap: clamp(12px, 1vw, 20px);
+            margin-top: 8px;
+        }
+
+        .tunnel-svc-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-decoration: none;
+            color: var(--t1);
+            transition: border-color .2s, box-shadow .2s;
+            position: relative;
+        }
+
+        .tunnel-svc-card .tunnel-svc-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity .2s;
+        }
+
+        .tunnel-svc-card:hover .tunnel-svc-actions {
+            opacity: 1;
+        }
+
+        .tunnel-svc-card:hover {
+            border-color: var(--ac);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 20%, transparent);
+        }
+
+        .tunnel-svc-icon {
+            font-size: 1.3rem;
+        }
+
+        .tunnel-svc-name {
+            font-weight: 600;
+            font-size: .95rem;
+        }
+
+        .tunnel-svc-detail {
+            font-size: .78rem;
+            color: var(--ac);
+            word-break: break-all;
+        }
+
+        .tunnel-svc-port {
+            font-size: .72rem;
+            color: var(--t3);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .tunnel-svc-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: .72rem;
+            margin-top: 2px;
+        }
+
+        .tunnel-svc-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .tunnel-svc-subdomain {
+            font-size: .72rem;
+            color: var(--t3);
+            font-family: 'IBM Plex Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tunnel-svc-subdomain input {
+            background: var(--bg2);
+            border: 1px solid var(--bd);
+            border-radius: 4px;
+            color: var(--t1);
+            font-size: .72rem;
+            padding: 2px 6px;
+            width: 100px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .tunnel-svc-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        #tunnel-log-content {
+            font-size: .78rem;
+            line-height: 1.5;
+            overflow-y: auto;
+        }
+
+        #tunnel-log-content .log-error {
+            color: var(--red);
+        }
+
+        #tunnel-log-content .log-warn {
+            color: var(--amber);
+        }
+
+        #tunnel-log-content .log-info {
+            color: var(--ac);
+        }

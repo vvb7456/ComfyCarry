@@ -25,6 +25,7 @@ let currentDlTab = 'pending';
 
 let searchPage = 0;
 let facetsLoaded = false;
+let _initialSearchDone = false;  // 首次自动空搜索
 let _facetsPromise = null;   // 防止并发重复加载
 let dlStatusInterval = null;
 let _dlCompletedIds = new Set();
@@ -40,7 +41,11 @@ const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion
 const switchModelTab = createTabSwitcher('mtab', ['local', 'civitai', 'downloads', 'workflow'], tab => {
   currentModelTab = tab;
   if (tab === 'local') loadLocalModels();
-  else if (tab === 'civitai') loadFacets();
+  else if (tab === 'civitai') {
+    loadFacets().then(() => {
+      if (!_initialSearchDone) { _initialSearchDone = true; searchModels(0, false); }
+    });
+  }
   else if (tab === 'downloads') { renderDownloadsTab(); }
   else if (tab === 'workflow') _initWorkflowDropZone();
 });
@@ -516,8 +521,7 @@ function _isIdQuery(text) {
 
 function smartSearch() {
   const query = document.getElementById('search-input').value.trim();
-  if (!query) return;
-  if (_isIdQuery(query)) {
+  if (query && _isIdQuery(query)) {
     lookupIds(query);
   } else {
     searchModels(0, false);
@@ -526,7 +530,6 @@ function smartSearch() {
 
 async function searchModels(page = 0, append = false) {
   const query = document.getElementById('search-input').value.trim();
-  if (!query) return;
   if (isSearchLoading) return;
 
   searchPage = page;
@@ -564,12 +567,16 @@ async function searchModels(page = 0, append = false) {
     'Relevancy': []
   };
 
+  // 空搜索时 Relevancy 无意义，改用 Most Downloaded
+  let sortVal = sortMap[sort] || [];
+  if (!query && sortVal.length === 0) sortVal = sortMap['Most Downloaded'];
+
   const body = {
     queries: [{
       indexUid: 'models_v9', q: query, limit, offset,
       filter: filter.length > 0 ? filter : undefined,
-      sort: sortMap[sort] || [],
-      attributesToRetrieve: ['id', 'name', 'type', 'metrics', 'images', 'version', 'versions', 'lastVersionAtUnix', 'user', 'nsfwLevel'],
+      sort: sortVal,
+      attributesToRetrieve: ['id', 'name', 'type', 'metrics', 'images', 'version', 'versions', 'lastVersionAtUnix', 'user', 'nsfwLevel', 'availability'],
       attributesToHighlight: ['name'],
     }]
   };

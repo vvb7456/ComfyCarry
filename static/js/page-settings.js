@@ -30,7 +30,7 @@ async function loadSettingsPage() {
     if (apiKeyInput && settings.api_key) {
       apiKeyInput.dataset.key = settings.api_key;
       apiKeyInput.value = '••••••••••••••••••••••••';
-      apiKeyInput.type = 'password';
+      apiKeyInput.classList.add('secret-masked');
     }
 
     _startDebugLogStream();
@@ -186,7 +186,7 @@ async function regenerateApiKey() {
   if (!d) return;
   if (d.ok) {
     const el = document.getElementById('settings-api-key');
-    if (el) { el.dataset.key = d.api_key; el.type = 'text'; el.value = d.api_key; }
+    if (el) { el.dataset.key = d.api_key; el.classList.remove('secret-masked'); el.value = d.api_key; }
     showToast('API Key 已重新生成');
   } else {
     showToast(d.error || '重新生成失败');

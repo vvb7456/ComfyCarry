@@ -78,7 +78,13 @@ window.switchGenTab = function (tab) {
   });
 };
 
+let _gatePollTimer = null; // ComfyUI 就绪轮询定时器
+
 async function _enterPage() {
+  // ── ComfyUI 就绪检查 — 未就绪时不初始化任何 UI ──────────────────────
+  const ready = await _checkComfyGate();
+  if (!ready) return; // 页面被门控，等待轮询自动刷新
+
   _bindUIEvents();
   await _loadOptions();
   _restoreState();     // 恢复持久化参数
@@ -93,6 +99,7 @@ async function _enterPage() {
 
 function _leavePage() {
   _saveState();
+  _stopGatePoll();
   // 预处理进行中不关闭 SSE，避免丢失 execution_done
   if (!_CN_TYPES.some(t => _ppRunning[t])) _stopSSE();
   // 关闭 model-dependency 的下载 SSE 连接，防止浏览器连接数耗尽
@@ -2296,6 +2303,89 @@ function _setState(newState) {
 }
 
 // ── 辅助 ─────────────────────────────────────────────────────────────────────
+
+// ── ComfyUI 就绪门控 ────────────────────────────────────────────────────────
+async function _checkComfyGate() {
+  const gate = document.getElementById('gen-gate');
+  const main = document.getElementById('gen-main-content');
+  const icon = document.getElementById('gen-gate-icon');
+  const msg = document.getElementById('gen-gate-msg');
+  const btn = document.getElementById('gen-gate-btn');
+  if (!gate || !main) return true;
+
+  try {
+    const d = await apiFetch('/api/comfyui/status');
+    if (d?.online) {
+      // ComfyUI 在线 — 显示主内容
+      gate.classList.add('hidden');
+      main.classList.remove('hidden');
+      return true;
+    }
+
+    // ComfyUI 未在线
+    main.classList.add('hidden');
+    gate.classList.remove('hidden');
+
+    const pm2 = d?.pm2_status;
+    if (pm2 === 'online') {
+      // PM2 进程存在但 HTTP 未通 → 启动中
+      icon.textContent = 'hourglass_top';
+      icon.style.color = 'var(--amber)';
+      msg.textContent = 'ComfyUI 正在启动，请稍候…';
+      btn.classList.add('hidden');
+      _startGatePoll();
+    } else {
+      // PM2 进程不在 → 未运行
+      icon.textContent = 'power_off';
+      icon.style.color = 'var(--amber)';
+      msg.textContent = 'ComfyUI 未运行，生成功能需要 ComfyUI 服务';
+      btn.classList.remove('hidden');
+      _startGatePoll();
+    }
+    return false;
+  } catch {
+    // API 异常 — 也当作未就绪
+    main.classList.add('hidden');
+    gate.classList.remove('hidden');
+    if (icon) { icon.textContent = 'error'; icon.style.color = 'var(--red)'; }
+    if (msg) msg.textContent = '无法连接 Dashboard 服务';
+    if (btn) btn.classList.add('hidden');
+    return false;
+  }
+}
+
+function _startGatePoll() {
+  _stopGatePoll();
+  _gatePollTimer = setInterval(async () => {
+    try {
+      const d = await apiFetch('/api/comfyui/status');
+      if (d?.online) {
+        _stopGatePoll();
+        // ComfyUI 就绪 — 重新触发 enterPage 来初始化完整 UI
+        _enterPage();
+      } else {
+        // 更新启动中状态
+        const icon = document.getElementById('gen-gate-icon');
+        const msg = document.getElementById('gen-gate-msg');
+        const btn = document.getElementById('gen-gate-btn');
+        if (d?.pm2_status === 'online') {
+          if (icon) { icon.textContent = 'hourglass_top'; icon.style.color = 'var(--amber)'; }
+          if (msg) msg.textContent = 'ComfyUI 正在启动，请稍候…';
+          if (btn) btn.classList.add('hidden');
+        } else {
+          if (icon) { icon.textContent = 'power_off'; icon.style.color = 'var(--amber)'; }
+          if (msg) msg.textContent = 'ComfyUI 未运行，生成功能需要 ComfyUI 服务';
+          if (btn) btn.classList.remove('hidden');
+        }
+      }
+    } catch { /* 静默重试 */ }
+  }, 5000);
+}
+
+function _stopGatePoll() {
+  if (_gatePollTimer) { clearInterval(_gatePollTimer); _gatePollTimer = null; }
+}
+
 function _showOfflineBanner(show) {
   document.getElementById('gen-offline-banner')?.classList.toggle('hidden', !show);
 }

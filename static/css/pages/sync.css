@@ -1,0 +1,298 @@
+        /* ══════════════════════════════════════════════════════════════
+           pages/sync.css — Cloud Sync page: Remotes · Rules · Logs
+           ══════════════════════════════════════════════════════════════ */
+
+        .sync-remotes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(clamp(300px, 22vw, 420px), 1fr));
+            gap: clamp(14px, 1.2vw, 22px);
+            margin-top: 8px;
+        }
+
+        .sync-remote-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 16px;
+        }
+
+        .sync-remote-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .sync-remote-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: .95rem;
+        }
+
+        .sync-remote-type {
+            font-size: .72rem;
+            color: var(--t3);
+            background: var(--bg2);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .sync-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .sync-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .sync-toggle .slider {
+            position: absolute;
+            inset: 0;
+            background: var(--bg2);
+            border-radius: 12px;
+            transition: .3s;
+            border: 1px solid var(--bd);
+        }
+
+        .sync-toggle .slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 2px;
+            bottom: 2px;
+            background: var(--t3);
+            border-radius: 50%;
+            transition: .3s;
+        }
+
+        .sync-toggle input:checked+.slider {
+            background: var(--ac);
+            border-color: var(--ac);
+        }
+
+        .sync-toggle input:checked+.slider::before {
+            transform: translateX(20px);
+            background: white;
+        }
+
+        .sync-storage-info {
+            font-size: .8rem;
+            color: var(--t2);
+            margin-top: 8px;
+        }
+
+        .sync-storage-bar {
+            height: 6px;
+            background: var(--bg2);
+            border-radius: 3px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+
+        .sync-storage-bar-fill {
+            height: 100%;
+            background: var(--ac);
+            border-radius: 3px;
+            transition: width .5s;
+        }
+
+        .sync-settings {
+            margin: 8px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .sync-checkbox {
+            font-size: .8rem;
+            color: var(--t2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .sync-checkbox input[type="checkbox"] {
+            accent-color: var(--ac);
+            width: 16px;
+            height: 16px;
+        }
+
+        .sync-import-row {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px;
+        }
+
+        .sync-import-option label {
+            font-weight: 500;
+        }
+
+        .sync-log-box {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .8rem;
+            line-height: 1.7;
+        }
+
+        .sync-log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--bd) 50%, transparent);
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .sync-log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .rclone-config-editor {
+            width: 100%;
+            min-height: 400px;
+            max-height: 600px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: .78rem;
+            line-height: 1.5;
+            background: var(--bg3);
+            color: var(--t1);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 12px;
+            resize: vertical;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        /* ── Sync Rule Cards ── */
+        .sync-rule-card {
+            background: var(--bg3);
+            border: 1px solid var(--bd);
+            border-radius: var(--r);
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .sync-rule-card.disabled {
+            opacity: .5;
+        }
+
+        .sync-rule-card.disabled .sync-flow-arrows span {
+            animation: none !important;
+            opacity: .3;
+        }
+
+        .sync-rule-dir {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .sync-flow-arrows {
+            display: inline-flex;
+            gap: 1px;
+            margin: 0 5px;
+            vertical-align: middle;
+        }
+
+        .sync-flow-arrows span {
+            color: var(--green);
+            font-size: .85rem;
+            font-weight: 700;
+            animation: arrowFlow 1.4s infinite;
+            opacity: .25;
+        }
+
+        .sync-flow-arrows span:nth-child(2) {
+            animation-delay: .2s;
+        }
+
+        .sync-flow-arrows span:nth-child(3) {
+            animation-delay: .4s;
+        }
+
+        @keyframes arrowFlow {
+
+            0%,
+            100% {
+                opacity: .2;
+            }
+
+            40% {
+                opacity: 1;
+            }
+
+            60% {
+                opacity: 1;
+            }
+
+            80% {
+                opacity: .2;
+            }
+        }
+
+        .sync-rule-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sync-rule-name {
+            font-weight: 600;
+            font-size: .9rem;
+        }
+
+        .sync-rule-detail {
+            font-size: .78rem;
+            color: var(--t3);
+            margin-top: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+
+        .sync-rule-badges {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+
+        .sync-rule-badge {
+            font-size: .68rem;
+            padding: 1px 7px;
+            border-radius: 8px;
+            background: var(--bg2);
+            color: var(--t2);
+            border: 1px solid var(--bd);
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .sync-rule-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .sync-rule-actions button {
+            font-size: .75rem;
+            padding: 4px 8px;
+        }
