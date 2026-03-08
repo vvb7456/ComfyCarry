@@ -234,18 +234,17 @@ class PublicTunnelClient:
         # 启动心跳
         self._start_heartbeat()
 
-        # 发送一次心跳验证注册是否仍有效
+        # 尝试验证，但不因单次失败就重新注册
+        # (启动后网络/代理可能尚未就绪，transient failure 很常见)
         if self.heartbeat():
             log.info(f"公共 Tunnel 恢复成功: {self.random_id}")
-            return {"ok": True, "random_id": self.random_id}
         else:
-            # 注册已过期，需要重新注册
-            log.warning("公共 Tunnel 心跳失败，尝试重新注册")
-            self._stop_heartbeat()
-            try:
-                return self.register()
-            except PublicTunnelError as e:
-                return {"ok": False, "error": str(e)}
+            log.warning(
+                f"公共 Tunnel 心跳验证失败 (可能是暂时性网络问题)，"
+                f"保留现有 Tunnel {self.random_id}，后台心跳线程将持续重试"
+            )
+
+        return {"ok": True, "random_id": self.random_id}
 
     def heartbeat(self) -> bool:
         """

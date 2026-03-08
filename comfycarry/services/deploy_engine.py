@@ -352,6 +352,11 @@ def _step_tunnel(config):
 
     if tunnel_mode == "public":
         _deploy_step("配置公共 Tunnel")
+        # 已由 bootstrap 或之前部署启用时跳过
+        from comfycarry.config import get_config as _gc_rt
+        if _gc_rt("tunnel_mode", "") == "public":
+            _deploy_log("✅ 公共 Tunnel 已通过环境变量启用，跳过重复配置")
+            return
         try:
             from comfycarry.services.public_tunnel import PublicTunnelClient, PublicTunnelError
             from comfycarry.config import set_config as _sc

@@ -175,9 +175,9 @@ def api_settings_export_config():
     # API Key
     config["api_key"] = cfg.API_KEY
 
-    # Tunnel 模式
+    # Tunnel 模式 (公共 Tunnel 由环境变量控制, 不导出)
     tunnel_mode = _get_config("tunnel_mode", "")
-    if tunnel_mode:
+    if tunnel_mode and tunnel_mode != "public":
         config["tunnel_mode"] = tunnel_mode
 
     # SSH 配置
@@ -279,8 +279,8 @@ def api_settings_import_config():
         cfg.API_KEY = data["api_key"]
         applied.append("API Key")
 
-    # Tunnel 模式
-    if data.get("tunnel_mode"):
+    # Tunnel 模式 (公共 Tunnel 由环境变量控制, 不允许导入)
+    if data.get("tunnel_mode") and data["tunnel_mode"] != "public":
         _set_config("tunnel_mode", data["tunnel_mode"])
         applied.append("Tunnel 模式")
 

@@ -22,6 +22,7 @@ from ..config import (
     DEFAULT_PLUGINS, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
     SETUP_STATE_FILE,
     _load_setup_state, _save_setup_state,
+    get_config,
 )
 from ..services.deploy_engine import (
     start_deploy, get_deploy_thread, get_deploy_log_slice,
@@ -59,6 +60,18 @@ def api_setup_state():
     if os.environ.get("PUBLIC_TUNNEL", "").lower() in ("1", "true"):
         env_vars["public_tunnel"] = True
     safe["env_vars"] = env_vars
+
+    # 运行时 tunnel 状态 (bootstrap 或之前的部署已配置)
+    active_tunnel = get_config("tunnel_mode", "")
+    if active_tunnel:
+        safe["active_tunnel_mode"] = active_tunnel
+        if active_tunnel == "public":
+            try:
+                from ..services.public_tunnel import PublicTunnelClient
+                client = PublicTunnelClient()
+                safe["active_tunnel_urls"] = client.urls or {}
+            except Exception:
+                safe["active_tunnel_urls"] = {}
 
     safe["sync_templates"] = SYNC_RULE_TEMPLATES
     safe["remote_type_defs"] = REMOTE_TYPE_DEFS

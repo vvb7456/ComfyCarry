@@ -101,33 +101,7 @@ branch=${BRANCH}
 commit=${COMMIT_HASH}
 EOF
 
-# ── 启动 ComfyCarry ──
-pm2 delete dashboard 2>/dev/null || true
-
-if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
-    pm2 start "$PYTHON_BIN" --name dashboard \
-        --interpreter none \
-        --log /workspace/dashboard.log \
-        --time \
-        -- "$DASHBOARD_DIR/workspace_manager.py" 5000
-    pm2 save 2>/dev/null || true
-else
-    echo "❌ ComfyCarry 文件下载失败，请检查网络连接"
-    exit 1
-fi
-
-# ── JupyterLab (基础镜像已预装, 通过 PM2 管理) ──
-pm2 delete jupyter 2>/dev/null || true
-pm2 start jupyter-lab --name jupyter \
-    --interpreter none \
-    --log /workspace/jupyter.log --time \
-    -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
-    --ServerApp.root_dir=/workspace \
-    --ServerApp.language=zh_CN
-pm2 save 2>/dev/null || true
-echo "  ✅ JupyterLab 已启动 (port 8888)"
-
-# ── CF Tunnel (可选 — 让向导页可通过 Tunnel 域名访问) ──
+# ── CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册) ──
 _TUNNEL_DASHBOARD_URL=""
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     echo "  -> 检测到 CF 配置, 启动 Tunnel..."
@@ -180,6 +154,32 @@ except Exception as e:
         echo "  ⚠️ 公共 Tunnel 启用失败"
     fi
 fi
+
+# ── 启动 ComfyCarry ──
+pm2 delete dashboard 2>/dev/null || true
+
+if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
+    pm2 start "$PYTHON_BIN" --name dashboard \
+        --interpreter none \
+        --log /workspace/dashboard.log \
+        --time \
+        -- "$DASHBOARD_DIR/workspace_manager.py" 5000
+    pm2 save 2>/dev/null || true
+else
+    echo "❌ ComfyCarry 文件下载失败，请检查网络连接"
+    exit 1
+fi
+
+# ── JupyterLab (基础镜像已预装, 通过 PM2 管理) ──
+pm2 delete jupyter 2>/dev/null || true
+pm2 start jupyter-lab --name jupyter \
+    --interpreter none \
+    --log /workspace/jupyter.log --time \
+    -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
+    --ServerApp.root_dir=/workspace \
+    --ServerApp.language=zh_CN
+pm2 save 2>/dev/null || true
+echo "  ✅ JupyterLab 已启动 (port 8888)"
 
 echo ""
 echo "================================================="

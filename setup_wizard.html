@@ -654,7 +654,26 @@
                 }));
                 // 环境变量预填时直接启用
                 if (envVars.password) document.getElementById('btn-next-1').disabled = false;
-                if (envVars.cf_api_token) {
+                // Tunnel 已通过环境变量/bootstrap 启用时, 禁用卡片
+                const _activeTunnel = state.active_tunnel_mode || '';
+                if (_activeTunnel) {
+                    const _pubCard = document.getElementById('wizard-tunnel-public');
+                    const _cusCard = document.getElementById('wizard-tunnel-custom');
+                    _pubCard.style.pointerEvents = 'none';
+                    _pubCard.style.opacity = '0.6';
+                    _cusCard.style.pointerEvents = 'none';
+                    _cusCard.style.opacity = '0.6';
+                    wizardConfig.tunnel_mode = _activeTunnel;
+                    if (_activeTunnel === 'public') _pubCard.classList.add('selected');
+                    else _cusCard.classList.add('selected');
+                    _wizardTunnelMode = _activeTunnel;
+                    const hint = document.getElementById('cf-env-hint');
+                    hint.style.display = 'block';
+                    const _urls = state.active_tunnel_urls || {};
+                    hint.innerHTML = _activeTunnel === 'public'
+                        ? msIcon('check_circle', 'ms-xs') + ' Tunnel 已启用（公共节点' + (_urls.dashboard ? '：' + _urls.dashboard : '') + '），如需修改请在 Dashboard Tunnel 页操作'
+                        : msIcon('check_circle', 'ms-xs') + ' Tunnel 已启用（自定义模式），如需修改请在 Dashboard Tunnel 页操作';
+                } else if (envVars.cf_api_token) {
                     document.getElementById('input-cf-token').value = envVars.cf_api_token;
                     wizardConfig.cf_api_token = envVars.cf_api_token;
                     if (envVars.cf_domain) {
@@ -674,7 +693,7 @@
                     wizardConfig.tunnel_mode = 'public';
                     const hint = document.getElementById('cf-env-hint');
                     hint.style.display = 'block';
-                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量 <code>PUBLIC_TUNNEL</code> 检测到配置，公共 Tunnel 已自动启用';
+                    hint.innerHTML = msIcon('check_circle', 'ms-xs') + ' 已从环境变量 <code>PUBLIC_TUNNEL</code> 检测到配置，公共 Tunnel 已自动选择';
                 }
                 if (envVars.rclone_has_env) {
                     document.getElementById('rclone-card-env').style.display = '';
@@ -1643,7 +1662,7 @@
                 }
                 if (config.install_fa2 !== undefined) wizardConfig.install_fa2 = config.install_fa2;
                 if (config.install_sa2 !== undefined) wizardConfig.install_sa2 = config.install_sa2;
-                if (config.tunnel_mode) wizardConfig.tunnel_mode = config.tunnel_mode;
+                if (config.tunnel_mode && config.tunnel_mode !== 'public') wizardConfig.tunnel_mode = config.tunnel_mode;
                 if (config.ssh_password) wizardConfig.ssh_password = config.ssh_password;
                 if (config.ssh_keys) wizardConfig.ssh_keys = config.ssh_keys;
                 if (config.ssh_pw_sync !== undefined) wizardConfig.ssh_pw_sync = config.ssh_pw_sync;
