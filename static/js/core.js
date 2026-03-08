@@ -355,9 +355,7 @@ export function renderSkeleton(type, count) {
     case 'stat-cards':
       return `<div class="skeleton-row">${'<div class="skeleton skeleton-card" style="height:88px"></div>'.repeat(count || 4)}</div>`;
     case 'model-grid':
-      return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">${
-        '<div class="skeleton skeleton-card" style="height:200px"></div>'.repeat(count || 6)
-      }</div>`;
+      return '<div class="skeleton skeleton-card" style="height:200px"></div>'.repeat(count || 6);
     case 'plugin-list':
       return Array.from({length: count || 8}, () =>
         '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div class="skeleton skeleton-text w80"></div><div class="skeleton skeleton-text w40"></div></div>'

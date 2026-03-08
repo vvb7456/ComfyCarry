@@ -516,8 +516,6 @@ def download_preview_image(model_path: str, images: list[dict]) -> str | None:
         if img.get("type", "image") != "video" and img.get("url"):
             img_url = img["url"]
             break
-    if not img_url and images[0].get("url"):
-        img_url = images[0]["url"]
     if not img_url:
         return None
 
@@ -526,6 +524,9 @@ def download_preview_image(model_path: str, images: list[dict]) -> str | None:
         with http_requests.get(img_url, timeout=15, stream=True) as r:
             r.raise_for_status()
             ct = r.headers.get("Content-Type", "")
+            if "video" in ct:
+                logger.warning(f"[civitai_resolver] 预览图 URL 返回视频类型: {ct}")
+                return None
             ext = ".png"
             if "jpeg" in ct or "jpg" in ct:
                 ext = ".jpeg"

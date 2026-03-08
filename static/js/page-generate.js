@@ -1201,9 +1201,25 @@ function _renderCkptPanel() {
     const imgSrc = ckpt?.has_preview && ckpt?.preview_path
       ? `/api/local_models/preview?path=${encodeURIComponent(ckpt.preview_path)}`
       : null;
-    const imgHtml = imgSrc
-      ? `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-ckpt-no-img" style="display:none"><span class="ms" style="font-size:2rem;opacity:.3">deployed_code</span></div>`
-      : `<div class="gen-ckpt-no-img"><span class="ms" style="font-size:2rem;opacity:.25">deployed_code</span></div>`;
+    const civitImg = ckpt?.info?.images?.[0];
+    const civitUrl = civitImg?.url?.startsWith?.('http') ? civitImg.url : null;
+    const civitIsVid = civitImg?.type === 'video';
+    let imgHtml;
+    if (imgSrc) {
+      if (civitUrl && civitIsVid) {
+        imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';var v=document.createElement('video');v.src='${escHtml(civitUrl)}';v.muted=v.autoplay=v.loop=v.playsInline=true;v.preload='metadata';this.parentElement.insertBefore(v,this)" loading="lazy">`;
+      } else if (civitUrl) {
+        imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='${escHtml(civitUrl)}'}else{this.style.display='none';this.nextElementSibling.style.display='flex'}" loading="lazy"><div class="gen-ckpt-no-img" style="display:none"><span class="ms" style="font-size:2rem;opacity:.3">deployed_code</span></div>`;
+      } else {
+        imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-ckpt-no-img" style="display:none"><span class="ms" style="font-size:2rem;opacity:.3">deployed_code</span></div>`;
+      }
+    } else if (civitUrl) {
+      imgHtml = civitIsVid
+        ? `<video src="${escHtml(civitUrl)}" muted autoplay loop playsinline preload="metadata"></video>`
+        : `<img src="${escHtml(civitUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-ckpt-no-img" style="display:none"><span class="ms" style="font-size:2rem;opacity:.3">deployed_code</span></div>`;
+    } else {
+      imgHtml = `<div class="gen-ckpt-no-img"><span class="ms" style="font-size:2rem;opacity:.25">deployed_code</span></div>`;
+    }
     card.innerHTML = `
       <div class="gen-ckpt-img">${imgHtml}${ckpt ? _modelTagHtml(ckpt) : ''}</div>
       <div class="gen-ckpt-info">
@@ -1257,9 +1273,26 @@ function _renderCkptModalGrid() {
       const imgSrc = ckpt.has_preview && ckpt.preview_path
         ? `/api/local_models/preview?path=${encodeURIComponent(ckpt.preview_path)}`
         : null;
-      const imgHtml = imgSrc
-        ? `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`
-        : `<div class="gen-lora-card-no-img"><span class="ms" style="font-size:1.8rem;opacity:.25">image_not_supported</span></div>`;
+      // Fallback to CivitAI cover image from metadata
+      const civitImg = ckpt.info?.images?.[0];
+      const civitUrl = civitImg?.url?.startsWith?.('http') ? civitImg.url : null;
+      const civitIsVid = civitImg?.type === 'video';
+      let imgHtml;
+      if (imgSrc) {
+        if (civitUrl && civitIsVid) {
+          imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';var v=document.createElement('video');v.src='${escHtml(civitUrl)}';v.muted=v.autoplay=v.loop=v.playsInline=true;v.preload='metadata';this.parentElement.insertBefore(v,this)" loading="lazy">`;
+        } else if (civitUrl) {
+          imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='${escHtml(civitUrl)}'}else{this.style.display='none';this.nextElementSibling.style.display='flex'}" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`;
+        } else {
+          imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`;
+        }
+      } else if (civitUrl) {
+        imgHtml = civitIsVid
+          ? `<video src="${escHtml(civitUrl)}" muted autoplay loop playsinline preload="metadata"></video>`
+          : `<img src="${escHtml(civitUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`;
+      } else {
+        imgHtml = `<div class="gen-lora-card-no-img"><span class="ms" style="font-size:1.8rem;opacity:.25">image_not_supported</span></div>`;
+      }
       card.innerHTML = `
         <div class="gen-lora-card-img">
           ${imgHtml}
@@ -1337,9 +1370,25 @@ function _renderLoraModalGrid() {
       const imgSrc = lora.has_preview && lora.preview_path
         ? `/api/local_models/preview?path=${encodeURIComponent(lora.preview_path)}`
         : null;
-      const imgHtml = imgSrc
-        ? `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`
-        : `<div class="gen-lora-card-no-img"><span class="ms" style="font-size:1.8rem;opacity:.25">image_not_supported</span></div>`;
+      const civitImg = lora.info?.images?.[0];
+      const civitUrl = civitImg?.url?.startsWith?.('http') ? civitImg.url : null;
+      const civitIsVid = civitImg?.type === 'video';
+      let imgHtml;
+      if (imgSrc) {
+        if (civitUrl && civitIsVid) {
+          imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';var v=document.createElement('video');v.src='${escHtml(civitUrl)}';v.muted=v.autoplay=v.loop=v.playsInline=true;v.preload='metadata';this.parentElement.insertBefore(v,this)" loading="lazy">`;
+        } else if (civitUrl) {
+          imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='${escHtml(civitUrl)}'}else{this.style.display='none';this.nextElementSibling.style.display='flex'}" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`;
+        } else {
+          imgHtml = `<img src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`;
+        }
+      } else if (civitUrl) {
+        imgHtml = civitIsVid
+          ? `<video src="${escHtml(civitUrl)}" muted autoplay loop playsinline preload="metadata"></video>`
+          : `<img src="${escHtml(civitUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"><div class="gen-lora-card-no-img" style="display:none"><span class="ms" style="font-size:1.8rem;opacity:.3">image_not_supported</span></div>`;
+      } else {
+        imgHtml = `<div class="gen-lora-card-no-img"><span class="ms" style="font-size:1.8rem;opacity:.25">image_not_supported</span></div>`;
+      }
       card.innerHTML = `
         <div class="gen-lora-card-img">
           ${imgHtml}

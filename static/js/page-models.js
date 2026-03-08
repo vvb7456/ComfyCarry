@@ -153,7 +153,11 @@ function renderMetaContent(data) {
 
       const isVideo = img.type === 'video' || (img.name && /\.(webm|mp4)$/i.test(img.name));
       const figcaptionHtml = caption ? `<figcaption>${caption}</figcaption>` : '';
-      html += `<figure${isVideo ? ' style="position:relative"' : ''}><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">${isVideo ? `<span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;padding:2px 8px;border-radius:4px;font-size:.75rem">${msIcon('videocam')} 视频</span>` : ''}${figcaptionHtml}</figure>`;
+      if (isVideo) {
+        html += `<figure style="position:relative"><video src="${fullUrl || imgUrl}" muted loop playsinline preload="metadata" onclick="this.paused?this.play():this.pause()" style="width:100%;border-radius:var(--r);cursor:pointer"></video><span style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;padding:2px 8px;border-radius:4px;font-size:.75rem">${msIcon('videocam')} 视频</span>${figcaptionHtml}</figure>`;
+      } else {
+        html += `<figure><img src="${imgUrl}" alt="" onclick="openImg('${fullUrl.replace(/'/g, "\\'")}')" loading="lazy">${figcaptionHtml}</figure>`;
+      }
     });
     html += '</div>';
   }
@@ -282,13 +286,26 @@ function renderLocalModelCard(m, idx) {
   const badgeClass = getBadgeClass(m.category);
   const sizeStr = fmtBytes(m.size_bytes);
   let imgTag = '', zoomUrl = '';
+  const civitIsVideo = m.civitai_image_type === 'video';
   if (m.has_preview && m.preview_path) {
     const pUrl = `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}`;
     zoomUrl = pUrl;
-    imgTag = `<img src="${pUrl}" alt="" onerror="this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">${msIcon('image_not_supported')} 无预览</div>`;
+    if (m.civitai_image) {
+      const fb = m.civitai_image.replace(/'/g, "\\'");
+      if (civitIsVideo) {
+        // Local preview failed → fallback to video cover
+        imgTag = `<img src="${pUrl}" alt="" onerror="this.style.display='none';var v=document.createElement('video');v.src='${fb}';v.muted=v.autoplay=v.loop=v.playsInline=true;v.preload='metadata';this.parentElement.insertBefore(v,this)" loading="lazy">`;
+      } else {
+        imgTag = `<img src="${pUrl}" alt="" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='${fb}'}else{this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'}" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">${msIcon('image_not_supported')} 无预览</div>`;
+      }
+    } else {
+      imgTag = `<img src="${pUrl}" alt="" onerror="this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">${msIcon('image_not_supported')} 无预览</div>`;
+    }
   } else if (m.civitai_image) {
-    zoomUrl = m.civitai_image;
-    imgTag = `<img src="${m.civitai_image}" alt="" onerror="this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">${msIcon('image_not_supported')}</div>`;
+    zoomUrl = civitIsVideo ? '' : m.civitai_image;
+    imgTag = civitIsVideo
+      ? `<video src="${m.civitai_image}" muted autoplay loop playsinline preload="metadata"></video>`
+      : `<img src="${m.civitai_image}" alt="" onerror="this.style.display='none';this.parentElement.querySelector('.model-card-no-img').style.display='flex'" loading="lazy"><div class="model-card-no-img" style="display:none;position:absolute;inset:0">${msIcon('image_not_supported')}</div>`;
   } else {
     imgTag = `<div class="model-card-no-img">${msIcon('image_not_supported')} 无预览</div>`;
   }
@@ -639,9 +656,10 @@ function renderCivitCard(h) {
   // Meilisearch returns 'version' (single object), not 'modelVersions' (array)
   const ver = h.version || null;
   const allVersions = h.versions || (ver ? [ver] : []);
-  // Prefer first non-video image for card thumbnail
+  // Use first image (including video) for card thumbnail
   const allImgs = h.images && h.images.length > 0 ? h.images : (ver?.images || []);
-  const imageObj = allImgs.find(i => i.type !== 'video') || allImgs[0] || null;
+  const imageObj = allImgs[0] || null;
+  const isVideo = imageObj?.type === 'video';
 
   let imgUrl = '';
   if (imageObj && imageObj.url) {
@@ -671,12 +689,22 @@ function renderCivitCard(h) {
     user: h.user || {},
   };
 
-  const zoomIcon = fullUrl ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${fullUrl.replace(/'/g, "\\'")}')" title="查看大图">${msIcon('zoom_in','ms-sm')}</span>` : '';
+  const zoomIcon = (fullUrl && !isVideo) ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${fullUrl.replace(/'/g, "\\'")}')" title="查看大图">${msIcon('zoom_in','ms-sm')}</span>` : '';
   const clickArea = `<div class="img-click-area" onclick="openMetaFromCache('${h.id}')"></div>`;
 
+  let mediaHtml = '';
+  if (imgUrl) {
+    if (isVideo) {
+      mediaHtml = `<video src="${fullUrl || imgUrl}" muted autoplay loop playsinline preload="metadata"></video>`;
+    } else {
+      mediaHtml = `<img src="${imgUrl}" alt="" data-fallback="${escAttr(fullUrl)}" onerror="window._civitImgError(this)" loading="lazy">`;
+    }
+  } else {
+    mediaHtml = `<div class="model-card-no-img">${msIcon('image_not_supported')}</div>`;
+  }
+
   return `<div class="model-card">
-    <div class="model-card-img">${imgUrl ? `<img src="${imgUrl}" alt=""
-      data-fallback="${escAttr(fullUrl)}" onerror="window._civitImgError(this)" loading="lazy">` : `<div class="model-card-no-img">${msIcon('image_not_supported')}</div>`}${zoomIcon}${clickArea}</div>
+    <div class="model-card-img">${mediaHtml}${zoomIcon}${clickArea}</div>
     <div class="model-card-body">
       <div class="model-card-title" title="${(h.name || '').replace(/"/g, '&quot;')}" onclick="openMetaFromCache('${h.id}')">${h.name || 'Unknown'}</div>
       <div class="model-card-meta">

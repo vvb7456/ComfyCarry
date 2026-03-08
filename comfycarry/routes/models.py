@@ -132,6 +132,7 @@ def api_local_models():
                     entry["images"] = imgs
                     if imgs:
                         entry["civitai_image"] = imgs[0].get("url", "")
+                        entry["civitai_image_type"] = imgs[0].get("type", "image")
                 else:
                     entry["name"] = fname
                     entry["base_model"] = ""

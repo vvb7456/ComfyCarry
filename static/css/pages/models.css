@@ -32,14 +32,16 @@
             position: relative
         }
 
-        .model-card-img img {
+        .model-card-img img,
+        .model-card-img video {
             width: 100%;
             height: 100%;
             object-fit: cover;
             transition: transform .3s
         }
 
-        .model-card:hover .model-card-img img {
+        .model-card:hover .model-card-img img,
+        .model-card:hover .model-card-img video {
             transform: scale(1.04)
         }
 
@@ -321,12 +323,20 @@
             border: 1px solid var(--bd);
         }
 
-        .meta-images img {
+        .meta-images img,
+        .meta-images video {
             width: 100%;
             aspect-ratio: 3/4;
             object-fit: cover;
-            cursor: zoom-in;
             display: block;
+        }
+
+        .meta-images img {
+            cursor: zoom-in;
+        }
+
+        .meta-images video {
+            cursor: pointer;
         }
 
         .meta-images figcaption {
