@@ -6,7 +6,7 @@
 
 set -e
 
-IMAGE_NAME="comfyui-runpod"
+IMAGE_NAME="comfycarry"
 IMAGE_TAG="v3.0-cu130-universal"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 DOCKERFILE="Dockerfile"
@@ -68,6 +68,6 @@ echo "  镜像大小:"
 docker images "${FULL_IMAGE_NAME}" --format "  {{.Size}}"
 echo ""
 echo "  推送到 GHCR:"
-echo "  docker tag ${FULL_IMAGE_NAME} ghcr.io/vvb7456/comfyui-runpod:latest"
-echo "  docker push ghcr.io/vvb7456/comfyui-runpod:latest"
+echo "  docker tag ${FULL_IMAGE_NAME} ghcr.io/vvb7456/comfycarry:latest"
+echo "  docker push ghcr.io/vvb7456/comfycarry:latest"
 echo "================================================="

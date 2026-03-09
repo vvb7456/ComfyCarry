@@ -368,9 +368,17 @@
             <div class="form-group" id="wizard-llm-model-group" style="display:none">
                 <label>模型</label>
                 <div style="display:flex;gap:8px;align-items:center">
-                    <select id="input-llm-model" style="flex:1" onchange="updateNextBtnText()">
-                        <option value="" disabled selected>— 获取模型列表后选择 —</option>
-                    </select>
+                    <div class="searchable-select" id="wizard-llm-model-wrap" style="flex:1">
+                        <div class="ss-display" onclick="toggleWizardLlmModelDropdown()">
+                            <span class="ss-text placeholder" id="wizard-llm-model-text">获取模型列表后选择</span>
+                            <span class="ms" style="font-size:18px;color:var(--t3)">expand_more</span>
+                        </div>
+                        <div class="ss-dropdown" id="wizard-llm-model-dropdown">
+                            <input type="text" class="ss-search" id="wizard-llm-model-search" placeholder="搜索模型..." oninput="filterWizardLlmModels()">
+                            <div class="ss-options" id="wizard-llm-model-options"></div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="input-llm-model" value="">
                     <button class="btn btn-secondary" type="button" style="white-space:nowrap;padding:8px 14px" onclick="fetchWizardLlmModels()">获取模型</button>
                 </div>
                 <div id="wizard-llm-model-status" style="font-size:.82rem;color:var(--t3);margin-top:4px"></div>
@@ -629,7 +637,7 @@
                     <div style="color:var(--red);font-weight:600;margin-bottom:8px">${msIcon('warning', 'ms-xs')} 不支持的运行环境</div>
                     <div style="color:var(--t3);font-size:.88rem;line-height:1.6">
                         当前环境缺少必要的运行时组件。请使用 ComfyCarry 预构建镜像创建实例：<br>
-                        <code style="color:var(--ac)">ghcr.io/vvb7456/comfyui-runpod:v3.0</code> （预装 ComfyUI + 加速组件）
+                        <code style="color:var(--ac)">ghcr.io/vvb7456/comfycarry:v3.0</code> （预装 ComfyUI + 加速组件）
                     </div>
                 </div>`;
                     }
@@ -1447,11 +1455,16 @@
             // show model group when a provider is selected
             document.getElementById('wizard-llm-model-group').style.display = provider ? '' : 'none';
             // clear model list on provider change
-            const modelSel = document.getElementById('input-llm-model');
-            modelSel.innerHTML = '<option value="" disabled selected>— 获取模型列表后选择 —</option>';
+            document.getElementById('input-llm-model').value = '';
+            document.getElementById('wizard-llm-model-options').innerHTML = '';
+            document.getElementById('wizard-llm-model-text').textContent = '获取模型列表后选择';
+            document.getElementById('wizard-llm-model-text').classList.add('placeholder');
             document.getElementById('wizard-llm-model-status').textContent = '';
+            _wizardLlmModels = [];
             updateNextBtnText();
         }
+
+        let _wizardLlmModels = [];
 
         async function fetchWizardLlmModels(preselect) {
             const provider = document.getElementById('input-llm-provider').value;
@@ -1460,7 +1473,6 @@
             if (!provider || !apiKey) return;
 
             const statusEl = document.getElementById('wizard-llm-model-status');
-            const modelSel = document.getElementById('input-llm-model');
             statusEl.textContent = '加载中...';
 
             try {
@@ -1471,17 +1483,10 @@
                 });
                 const d = await r.json();
                 if (d.ok && d.models) {
-                    const sorted = d.models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
-                    modelSel.innerHTML = '<option value="" disabled>— 选择模型 —</option>';
-                    for (const m of sorted) {
-                        const opt = document.createElement('option');
-                        opt.value = m.id;
-                        opt.textContent = m.name || m.id;
-                        modelSel.appendChild(opt);
-                    }
-                    if (preselect) modelSel.value = preselect;
-                    if (!modelSel.value) modelSel.selectedIndex = 0;
-                    statusEl.textContent = `${sorted.length} 个可用模型`;
+                    _wizardLlmModels = d.models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+                    _renderWizardLlmModelOptions(_wizardLlmModels);
+                    if (preselect) selectWizardLlmModel(preselect);
+                    statusEl.textContent = `${_wizardLlmModels.length} 个可用模型`;
                 } else {
                     statusEl.textContent = d.error || '获取失败';
                 }
@@ -1489,6 +1494,56 @@
                 statusEl.textContent = '请求失败: ' + e.message;
             }
             updateNextBtnText();
+        }
+
+        function _renderWizardLlmModelOptions(models) {
+            const container = document.getElementById('wizard-llm-model-options');
+            if (!models.length) {
+                container.innerHTML = '<div class="ss-empty">无可用模型</div>';
+                return;
+            }
+            container.innerHTML = models.map(m =>
+                `<div class="ss-option" data-value="${m.id}" onclick="selectWizardLlmModel('${m.id.replace(/'/g, "\\'")}')">${m.name || m.id}</div>`
+            ).join('');
+        }
+
+        function selectWizardLlmModel(modelId) {
+            document.getElementById('input-llm-model').value = modelId;
+            const textEl = document.getElementById('wizard-llm-model-text');
+            const model = _wizardLlmModels.find(m => m.id === modelId);
+            textEl.textContent = model ? (model.name || model.id) : modelId;
+            textEl.classList.remove('placeholder');
+            // highlight selected option
+            document.querySelectorAll('#wizard-llm-model-options .ss-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.value === modelId);
+            });
+            // close dropdown
+            document.getElementById('wizard-llm-model-dropdown').classList.remove('open');
+            updateNextBtnText();
+        }
+
+        function toggleWizardLlmModelDropdown() {
+            const dd = document.getElementById('wizard-llm-model-dropdown');
+            dd.classList.toggle('open');
+            if (dd.classList.contains('open')) {
+                const search = document.getElementById('wizard-llm-model-search');
+                search.value = '';
+                search.focus();
+                _renderWizardLlmModelOptions(_wizardLlmModels);
+            }
+        }
+
+        function filterWizardLlmModels() {
+            const q = document.getElementById('wizard-llm-model-search').value.toLowerCase();
+            const filtered = _wizardLlmModels.filter(m => (m.name || m.id).toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
+            _renderWizardLlmModelOptions(filtered);
+            // re-highlight current selection
+            const cur = document.getElementById('input-llm-model').value;
+            if (cur) {
+                document.querySelectorAll('#wizard-llm-model-options .ss-option').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.value === cur);
+                });
+            }
         }
 
         function _getWizardLlmProviderName(id) {
@@ -1845,6 +1900,14 @@
             if (e.target.id === 'input-rclone-base64' || e.target.id === 'input-rclone-url') {
                 clearTimeout(window._rcloneDetectTimer);
                 window._rcloneDetectTimer = setTimeout(() => detectRemotes(), 800);
+            }
+        });
+
+        // --- Close wizard model dropdown on outside click ---
+        document.addEventListener('click', (e) => {
+            const wrap = document.getElementById('wizard-llm-model-wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                document.getElementById('wizard-llm-model-dropdown').classList.remove('open');
             }
         });
 

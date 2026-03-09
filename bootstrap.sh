@@ -28,7 +28,7 @@ touch ~/.no_auto_tmux 2>/dev/null || true
 # ── 预构建镜像校验 ──
 if [ ! -f /opt/.comfycarry-prebuilt ]; then
     echo "  ⚠️  未检测到 ComfyCarry 预构建镜像"
-    echo "  请使用官方预构建镜像: ghcr.io/vvb7456/comfyui-runpod"
+    echo "  请使用官方预构建镜像: ghcr.io/vvb7456/comfycarry"
 fi
 PYTHON_BIN=python3
 
