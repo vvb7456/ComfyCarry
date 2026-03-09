@@ -506,7 +506,7 @@ async function testLlmConnection() {
       body: JSON.stringify({ provider, api_key: apiKey, model, base_url: baseUrl })
     });
     if (d?.ok) {
-      resultEl.innerHTML = `<span style="color:var(--green)">✓ 连接成功</span><span style="color:var(--t3);margin-left:8px;font-size:.78rem">${d.reply || ''}</span>`;
+      resultEl.innerHTML = `<span style="color:var(--green)">✓ 连接成功</span><span style="color:var(--t3);margin-left:8px;font-size:.78rem">${d.latency_ms ? d.latency_ms + 'ms' : ''}${d.response ? ' — ' + d.response : ''}</span>`;
     } else {
       resultEl.innerHTML = `<span style="color:var(--red)">✗ 连接失败: ${d?.error || '未知错误'}</span>`;
     }

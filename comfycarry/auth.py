@@ -109,6 +109,9 @@ def register_auth_middleware(app):
         # Tunnel 验证在 Setup 阶段需要可用 (Setup Wizard Step 2)
         if request.path == "/api/tunnel/validate" and not config._is_setup_complete():
             return
+        # LLM 模型列表在 Setup 阶段需要可用 (Setup Wizard Step 6)
+        if request.path == "/api/llm/models" and not config._is_setup_complete():
+            return
         if request.path in ("/login", "/favicon.ico", "/api/version"):
             return
         if request.path.startswith("/static/"):

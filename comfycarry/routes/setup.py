@@ -92,10 +92,34 @@ def api_setup_save():
         "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules",
         "ssh_password", "ssh_keys", "ssh_pw_sync",
+        "llm_provider", "llm_api_key", "llm_base_url", "llm_model",
     }
     for k, v in data.items():
         if k in allowed_keys:
             state[k] = v
+    # Persist LLM config to dashboard env (not just wizard state)
+    if data.get("llm_provider") or data.get("llm_api_key"):
+        from ..config import set_config
+        if data.get("llm_provider"):
+            set_config("llm_provider", data["llm_provider"])
+        if data.get("llm_api_key"):
+            set_config("llm_api_key", data["llm_api_key"])
+        if data.get("llm_base_url"):
+            set_config("llm_base_url", data["llm_base_url"])
+        if data.get("llm_model"):
+            set_config("llm_model", data["llm_model"])
+        # Per-provider key persistence
+        provider = data.get("llm_provider", "")
+        api_key = data.get("llm_api_key", "")
+        if provider and api_key:
+            from ..config import get_config
+            keys = get_config("llm_provider_keys", {})
+            keys[provider] = {
+                "api_key": api_key,
+                "model": data.get("llm_model", ""),
+                "base_url": data.get("llm_base_url", ""),
+            }
+            set_config("llm_provider_keys", keys)
     _save_setup_state(state)
     return jsonify({"ok": True})
 

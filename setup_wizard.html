@@ -347,8 +347,43 @@
             </div>
         </div>
 
-        <!-- Step 6: 插件选择 -->
+        <!-- Step 6: LLM 配置 -->
         <div class="step" id="step-6">
+            <div class="step-title"><span class="ms ms-sm" style="color:#818cf8">psychology</span> LLM 服务</div>
+            <div class="step-desc">配置大语言模型服务，用于 AI 提示词生成等功能</div>
+            <div class="form-group">
+                <label>服务提供商</label>
+                <select id="input-llm-provider" onchange="onWizardLlmProviderChange()">
+                    <option value="" disabled selected>— 选择服务提供商 —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="text" id="input-llm-api-key" placeholder="你的 API Key" oninput="updateNextBtnText()">
+            </div>
+            <div id="wizard-llm-base-url-group" class="form-group" style="display:none">
+                <label>Base URL</label>
+                <input type="text" id="input-llm-base-url" placeholder="https://api.example.com/v1">
+            </div>
+            <div class="form-group" id="wizard-llm-model-group" style="display:none">
+                <label>模型</label>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <select id="input-llm-model" style="flex:1" onchange="updateNextBtnText()">
+                        <option value="" disabled selected>— 获取模型列表后选择 —</option>
+                    </select>
+                    <button class="btn btn-secondary" type="button" style="white-space:nowrap;padding:8px 14px" onclick="fetchWizardLlmModels()">获取模型</button>
+                </div>
+                <div id="wizard-llm-model-status" style="font-size:.82rem;color:var(--t3);margin-top:4px"></div>
+            </div>
+            <div class="form-hint">也可跳过后在 ComfyCarry 设置中配置</div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
+                <button class="btn btn-primary" id="btn-next-6" onclick="nextStep()">跳过</button>
+            </div>
+        </div>
+
+        <!-- Step 7: 插件选择 -->
+        <div class="step" id="step-7">
             <div class="step-title"><span class="ms ms-sm" style="color:#a78bfa">extension</span> 自定义节点插件</div>
             <div class="step-desc" id="plugin-step-desc">选择要安装的 ComfyUI 插件 (带 * 标记的为必选)</div>
             <div class="plugin-list" id="plugin-list"></div>
@@ -363,8 +398,8 @@
             </div>
         </div>
 
-        <!-- Step 7: 加速组件 (FA2/SA2) -->
-        <div class="step" id="step-7">
+        <!-- Step 8: 加速组件 (FA2/SA2) -->
+        <div class="step" id="step-8">
             <div class="step-title"><span class="ms ms-sm" style="color:#fbbf24">bolt</span> Attention 加速</div>
             <div class="step-desc" id="attn-step-desc">选择要安装的 Attention 加速组件 <span class="comfy-param-help-icon"
                     data-tip="FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。">?</span>
@@ -386,12 +421,12 @@
 
             <div class="btn-row">
                 <button class="btn btn-secondary" onclick="prevStep()">上一步</button>
-                <button class="btn btn-primary" id="btn-next-7" onclick="nextStep()">跳过</button>
+                <button class="btn btn-primary" id="btn-next-8" onclick="nextStep()">跳过</button>
             </div>
         </div>
 
-        <!-- Step 8: 确认部署 -->
-        <div class="step" id="step-8">
+        <!-- Step 9: 确认部署 -->
+        <div class="step" id="step-9">
             <div class="step-title"><span class="ms ms-sm" style="color:#a78bfa">checklist</span> 确认部署配置</div>
             <div class="step-desc">检查以下配置，确认后开始部署</div>
             <div id="deploy-summary"></div>
@@ -438,7 +473,7 @@
             return `<span class="ms ${cls}">${name}</span>`;
         }
 
-        const TOTAL_STEPS = 9;
+        const TOTAL_STEPS = 10;
         let currentStep = 0;
         let wizardConfig = {
             image_type: 'prebuilt',
@@ -457,6 +492,10 @@
             ssh_keys: [],
             wizard_sync_rules: [],   // [{template_id, remote, remote_path}]
             wizard_remotes: [],       // [{name, type, params}]
+            llm_provider: '',
+            llm_api_key: '',
+            llm_base_url: '',
+            llm_model: '',
         };
         let pluginData = [];
         let envVars = {};
@@ -785,7 +824,8 @@
             updateProgressBar();
             // 进入 Step 4 时初始化同步规则 UI
             if (n === 4) initSyncRulesStep();
-            if (n === 7) initAttnStep();
+            if (n === 6) initWizardLlmStep();
+            if (n === 8) initAttnStep();
             // 进入 Step 2 时加载公共节点容量
             if (n === 2) loadWizardTunnelCapacity();
             updateNextBtnText();
@@ -839,7 +879,8 @@
                 3: () => !!_selectedRcloneMethod,
                 4: () => document.querySelectorAll('.wz-rule-card.selected').length > 0,
                 5: () => !!document.getElementById('input-civitai-token').value.trim(),
-                7: () => document.querySelectorAll('#attn-cards .choice-card.selected').length > 0,
+                6: () => !!(document.getElementById('input-llm-api-key').value.trim() && document.getElementById('input-llm-model').value),
+                8: () => document.querySelectorAll('#attn-cards .choice-card.selected').length > 0,
             };
             for (const [step, hasContent] of Object.entries(map)) {
                 const btn = document.getElementById(`btn-next-${step}`);
@@ -1016,9 +1057,15 @@
                     wizardConfig.civitai_token = document.getElementById('input-civitai-token').value.trim();
                     break;
                 case 6:
+                    wizardConfig.llm_provider = document.getElementById('input-llm-provider').value;
+                    wizardConfig.llm_api_key = document.getElementById('input-llm-api-key').value.trim();
+                    wizardConfig.llm_base_url = document.getElementById('input-llm-base-url').value.trim();
+                    wizardConfig.llm_model = document.getElementById('input-llm-model').value || '';
+                    break;
+                case 7:
                     wizardConfig.plugins = getSelectedPlugins();
                     break;
-                case 7: {
+                case 8: {
                     wizardConfig.install_fa2 = document.getElementById('attn-card-fa2').classList.contains('selected');
                     wizardConfig.install_sa2 = document.getElementById('attn-card-sa2').classList.contains('selected');
                     break;
@@ -1355,6 +1402,101 @@
         }
 
         // ── Attention Acceleration ──
+        // ── LLM Step ──
+        const _WIZARD_LLM_PROVIDERS = [
+            { id: 'openai', name: 'OpenAI' },
+            { id: 'deepseek', name: 'DeepSeek' },
+            { id: 'openrouter', name: 'OpenRouter' },
+            { id: 'anthropic', name: 'Anthropic (Claude)' },
+            { id: 'gemini', name: 'Google Gemini' },
+            { id: 'custom', name: '自定义 (OpenAI 兼容)' }
+        ];
+        let _wizardLlmInited = false;
+
+        function initWizardLlmStep() {
+            if (_wizardLlmInited) return;
+            _wizardLlmInited = true;
+            const sel = document.getElementById('input-llm-provider');
+            for (const p of _WIZARD_LLM_PROVIDERS) {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                sel.appendChild(opt);
+            }
+            // restore from wizardConfig (e.g. after import)
+            if (wizardConfig.llm_provider) {
+                sel.value = wizardConfig.llm_provider;
+                onWizardLlmProviderChange();
+            }
+            if (wizardConfig.llm_api_key) {
+                document.getElementById('input-llm-api-key').value = wizardConfig.llm_api_key;
+            }
+            if (wizardConfig.llm_base_url) {
+                document.getElementById('input-llm-base-url').value = wizardConfig.llm_base_url;
+            }
+            // auto-fetch models if provider + key already set
+            if (wizardConfig.llm_provider && wizardConfig.llm_api_key) {
+                fetchWizardLlmModels(wizardConfig.llm_model);
+            }
+            updateNextBtnText();
+        }
+
+        function onWizardLlmProviderChange() {
+            const provider = document.getElementById('input-llm-provider').value;
+            document.getElementById('wizard-llm-base-url-group').style.display = provider === 'custom' ? '' : 'none';
+            // show model group when a provider is selected
+            document.getElementById('wizard-llm-model-group').style.display = provider ? '' : 'none';
+            // clear model list on provider change
+            const modelSel = document.getElementById('input-llm-model');
+            modelSel.innerHTML = '<option value="" disabled selected>— 获取模型列表后选择 —</option>';
+            document.getElementById('wizard-llm-model-status').textContent = '';
+            updateNextBtnText();
+        }
+
+        async function fetchWizardLlmModels(preselect) {
+            const provider = document.getElementById('input-llm-provider').value;
+            const apiKey = document.getElementById('input-llm-api-key').value.trim();
+            const baseUrl = document.getElementById('input-llm-base-url').value.trim();
+            if (!provider || !apiKey) return;
+
+            const statusEl = document.getElementById('wizard-llm-model-status');
+            const modelSel = document.getElementById('input-llm-model');
+            statusEl.textContent = '加载中...';
+
+            try {
+                const r = await fetch('/api/llm/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, api_key: apiKey, base_url: baseUrl })
+                });
+                const d = await r.json();
+                if (d.ok && d.models) {
+                    const sorted = d.models.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+                    modelSel.innerHTML = '<option value="" disabled>— 选择模型 —</option>';
+                    for (const m of sorted) {
+                        const opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.textContent = m.name || m.id;
+                        modelSel.appendChild(opt);
+                    }
+                    if (preselect) modelSel.value = preselect;
+                    if (!modelSel.value) modelSel.selectedIndex = 0;
+                    statusEl.textContent = `${sorted.length} 个可用模型`;
+                } else {
+                    statusEl.textContent = d.error || '获取失败';
+                }
+            } catch (e) {
+                statusEl.textContent = '请求失败: ' + e.message;
+            }
+            updateNextBtnText();
+        }
+
+        function _getWizardLlmProviderName(id) {
+            const p = _WIZARD_LLM_PROVIDERS.find(p => p.id === id);
+            return p ? p.name : id;
+        }
+
+        // ── Attention Step ──
         function initAttnStep() {
             const fa2Card = document.getElementById('attn-card-fa2');
             const sa2Card = document.getElementById('attn-card-sa2');
@@ -1446,6 +1588,12 @@
             <h4>模型与插件</h4>
             <div class="summary-row"><span class="label">CivitAI API Key</span><span class="value">${c.civitai_token ? msIcon('check_circle', 'ms-xs') + ' 已配置' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
             <div class="summary-row"><span class="label">插件数量</span><span class="value">${pluginCount} 个</span></div>
+        </div>
+        <div class="summary-card">
+            <h4>LLM 服务</h4>
+            <div class="summary-row"><span class="label">服务提供商</span><span class="value">${c.llm_provider ? esc(_getWizardLlmProviderName(c.llm_provider)) : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">API Key</span><span class="value">${c.llm_api_key ? msIcon('check_circle', 'ms-xs') + ' 已配置' : msIcon('skip_next', 'ms-xs') + ' 未配置'}</span></div>
+            ${c.llm_model ? `<div class="summary-row"><span class="label">模型</span><span class="value">${esc(c.llm_model)}</span></div>` : ''}
         </div>
         <div class="summary-card">
             <h4>Attention 加速</h4>
@@ -1667,6 +1815,10 @@
                 if (config.ssh_keys) wizardConfig.ssh_keys = config.ssh_keys;
                 if (config.ssh_pw_sync !== undefined) wizardConfig.ssh_pw_sync = config.ssh_pw_sync;
                 if (config.cf_protocol) wizardConfig.cf_protocol = config.cf_protocol;
+                if (config.llm_provider) wizardConfig.llm_provider = config.llm_provider;
+                if (config.llm_api_key) wizardConfig.llm_api_key = config.llm_api_key;
+                if (config.llm_base_url) wizardConfig.llm_base_url = config.llm_base_url;
+                if (config.llm_model) wizardConfig.llm_model = config.llm_model;
 
                 showImportResult(
                     `${msIcon('check_circle', 'ms-xs')} 导入成功！已恢复 ${d.applied?.length || 0} 项配置。<br><small>点击「下一步」查看配置摘要并开始部署。</small>`,
