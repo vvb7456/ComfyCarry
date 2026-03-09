@@ -22,7 +22,7 @@ from .auth import auth_bp, register_auth_middleware
 
 # Route Blueprints
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
-from .routes import generate, downloads
+from .routes import generate, downloads, llm
 from .routes.ssh import restore_ssh_config
 
 # Services
@@ -57,6 +57,7 @@ def create_app():
     app.register_blueprint(ssh.bp)
     app.register_blueprint(generate.bp)
     app.register_blueprint(downloads.bp)
+    app.register_blueprint(llm.bp)
     app.register_blueprint(frontend.bp)
 
     # ── 全局认证中间件 ───────────────────────────────────
