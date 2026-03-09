@@ -26,7 +26,7 @@ from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
 from ..services.comfyui_bridge import get_bridge
-from ..services.workflow_builder import build_sdxl_workflow, build_preprocess_workflow
+from ..services.workflow_builder import build_sdxl_workflow, build_preprocess_workflow, build_tag_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -776,4 +776,131 @@ def api_generate_welcome_state_post():
     with open(_WELCOME_STATE_FILE, "w") as f:
         json.dump(state, f)
     return jsonify({"ok": True})
+
+
+# ── /api/generate/interrogate ────────────────────────────────────────────────
+
+@bp.route("/api/generate/interrogate", methods=["POST"])
+def api_generate_interrogate():
+    """
+    上传图片（或指定 input/ 已有文件）并提交 WD14 反推工作流。
+
+    Form data:
+        file       — 图片文件 (png/jpeg/webp/bmp, 最大 20MB)。与 input_name 二选一
+        input_name — input/ 中已有文件的文件名。与 file 二选一
+        params     — JSON 字符串: {model, threshold, character_threshold, exclude_tags, replace_underscore}
+
+    返回: {"prompt_id": "..."}
+    """
+    import uuid as _uuid
+
+    input_dir = os.path.join(COMFYUI_DIR, "input")
+    os.makedirs(input_dir, exist_ok=True)
+    uid = _uuid.uuid4().hex[:8]
+
+    # 确定源图片
+    input_name = request.form.get("input_name", "").strip()
+    if input_name:
+        safe_name = os.path.basename(input_name)
+        src_path = os.path.join(input_dir, safe_name)
+        if not os.path.isfile(src_path):
+            return jsonify({"error": f"文件不存在: {safe_name}"}), 404
+        src_name = safe_name
+    elif "file" in request.files:
+        file = request.files["file"]
+        if not file or not file.filename:
+            return jsonify({"error": "无效的文件"}), 400
+
+        content_type = file.content_type or ""
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            return jsonify({"error": f"不支持的图片格式: {content_type}"}), 400
+
+        file.seek(0, 2)
+        size = file.tell()
+        file.seek(0)
+        if size > MAX_IMAGE_SIZE:
+            return jsonify({"error": f"文件过大 ({size // 1024 // 1024}MB)，最大 20MB"}), 400
+
+        ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
+        ext = ext_map.get(content_type, ".png")
+        src_name = f"comfycarry_tag_src_{uid}{ext}"
+        dest = os.path.join(input_dir, src_name)
+        file.save(dest)
+    else:
+        return jsonify({"error": "请上传图片或指定 input 文件名"}), 400
+
+    # 解析参数
+    extra_params = {}
+    params_str = request.form.get("params", "")
+    if params_str:
+        try:
+            extra_params = json.loads(params_str)
+        except json.JSONDecodeError:
+            pass
+
+    # 构建反推工作流
+    try:
+        prompt = build_tag_workflow({
+            "image": src_name,
+            **extra_params,
+        })
+    except Exception as e:
+        logger.exception("[generate] 构建反推工作流失败")
+        return jsonify({"error": f"工作流构建失败: {e}"}), 500
+
+    # 提交到 ComfyUI
+    try:
+        bridge = get_bridge()
+        payload = {"prompt": prompt, "client_id": bridge.client_id}
+        resp = requests.post(f"{COMFYUI_URL}/prompt", json=payload, timeout=30)
+        resp.raise_for_status()
+        result = resp.json()
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "ComfyUI 未运行"}), 503
+    except Exception as e:
+        logger.exception("[generate] 提交反推工作流失败")
+        return jsonify({"error": f"提交失败: {e}"}), 500
+
+    prompt_id = result.get("prompt_id", "")
+    logger.info(f"[generate] 反推提交 prompt_id={prompt_id}")
+
+    return jsonify({"prompt_id": prompt_id})
+
+
+@bp.route("/api/generate/interrogate_result")
+def api_generate_interrogate_result():
+    """
+    从 ComfyUI history 获取 WD14 反推结果。
+
+    Query params:
+        prompt_id — ComfyUI prompt_id
+
+    返回: {"tags": "1girl, solo, ...", "prompt_id": "..."}
+    """
+    prompt_id = request.args.get("prompt_id", "").strip()
+    if not prompt_id:
+        return jsonify({"error": "prompt_id 必填"}), 400
+
+    try:
+        resp = requests.get(f"{COMFYUI_URL}/history/{prompt_id}", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.exception("[generate] 查询反推结果失败")
+        return jsonify({"error": f"查询失败: {e}"}), 500
+
+    if prompt_id not in data:
+        return jsonify({"error": "结果未找到，可能尚未完成"}), 404
+
+    entry = data[prompt_id]
+    outputs = entry.get("outputs", {})
+
+    tags = ""
+    for node_id, output in outputs.items():
+        if "tags" in output:
+            tag_list = output["tags"]
+            tags = tag_list[0] if tag_list else ""
+            break
+
+    return jsonify({"tags": tags, "prompt_id": prompt_id})
 

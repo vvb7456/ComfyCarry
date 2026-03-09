@@ -1446,3 +1446,90 @@
 .gen-advanced-body {
     padding-top: 0;
 }
+
+/* ── 提示词工具图标 (textarea 右下角) ────────────────────────── */
+.gen-prompt-tools {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    display: flex;
+    gap: 2px;
+    z-index: 1;
+}
+
+.gen-prompt-tool-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: var(--bg2);
+    color: var(--t3);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity .15s, color .15s, background .15s;
+}
+
+.gen-prompt-tool-btn:hover:not(:disabled) {
+    opacity: 1;
+    color: var(--ac);
+    background: var(--bg3);
+}
+
+.gen-prompt-tool-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.25;
+}
+
+/* ── 反推弹窗三列布局 ───────────────────────────────────────── */
+.gen-tag-split {
+    display: flex;
+    gap: var(--sp-3);
+}
+
+.gen-tag-result-area {
+    flex: 1;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--bd);
+    border-radius: var(--rad);
+    padding: var(--sp-3);
+    overflow-y: auto;
+}
+
+.gen-tag-result-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.gen-tag-result-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    flex: 1;
+}
+
+.gen-tag-result-tags {
+    flex: 1;
+    overflow-y: auto;
+    font-size: .85rem;
+    line-height: 1.6;
+    color: var(--t1);
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.gen-tag-result-actions {
+    display: flex;
+    gap: var(--sp-2);
+    padding-top: var(--sp-2);
+    border-top: 1px solid var(--bd);
+    flex-shrink: 0;
+}

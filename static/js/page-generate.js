@@ -71,6 +71,17 @@ let _i2iImage = '';          // 上传后的文件名 (服务端)
 let _i2iImagePreview = '';   // 本地预览 data URL
 let _i2iDenoise = 0.7;
 
+// ── 反推 (Tag Interrogation) 状态 ─────────────────────────────────────────
+let _tagRunning = false;
+let _tagPromptId = '';
+let _tagModalFile = null;
+let _tagModalFileName = '';
+let _tagModalBound = false;
+let _tagResultText = '';
+let _tagParamValues = {};
+let _tagMdep = null;
+let _tagModelReady = false;
+
 // ── 注册页面 ─────────────────────────────────────────────────────────────────
 registerPage('generate', {
   enter() { _enterPage(); },
@@ -107,8 +118,8 @@ async function _enterPage() {
 function _leavePage() {
   _saveState();
   _stopGatePoll();
-  // 预处理进行中不关闭 SSE，避免丢失 execution_done
-  if (!_CN_TYPES.some(t => _ppRunning[t])) _stopSSE();
+  // 预处理/反推进行中不关闭 SSE，避免丢失 execution_done
+  if (!_CN_TYPES.some(t => _ppRunning[t]) && !_tagRunning) _stopSSE();
   // 关闭 model-dependency 的下载 SSE 连接，防止浏览器连接数耗尽
   _destroyModelDepHandles();
   document.removeEventListener('click', _handleDocClick);
@@ -124,6 +135,9 @@ function _destroyModelDepHandles() {
   _cnDepHandles = {};
   _cnReady = { pose: false, canny: false, depth: false };
   _upscaleModelReady = false;
+  if (_tagMdep?.destroy) _tagMdep.destroy();
+  _tagMdep = null;
+  _tagModelReady = false;
 }
 
 // ── UI 事件绑定 ───────────────────────────────────────────────────────────────
@@ -212,6 +226,9 @@ function _bindUIEvents() {
 
   // 点击其他区域关闭下拉
   document.addEventListener('click', _handleDocClick);
+
+  // 提示词工具图标
+  document.querySelector('[data-action="tag-interrogate"]')?.addEventListener('click', () => _openTagModal());
 
   // 功能模块 Tab 切换 (互斥：同一时间只显示一个面板)
   document.querySelectorAll('.gen-mod-tab').forEach(tab => {
@@ -641,6 +658,14 @@ function _renderRefModalGrid(images) {
         _updatePPSubmitBtn();
         return;
       }
+      if (_refModalType === '__tag__') {
+        _tagModalFile = img.name;
+        _tagModalFileName = img.name;
+        window._closeRefModal();
+        _renderTagImagePreview();
+        _updateTagSubmitBtn();
+        return;
+      }
       if (_refModalType === 'i2i') {
         // 图生图: 选择已有图片
         _i2iImage = img.name;
@@ -672,6 +697,11 @@ function _renderRefModalGrid(images) {
       // PP 模式: 本地上传 → 关闭 ref modal → 触发 pp file input
       window._closeRefModal();
       document.getElementById('gen-pp-file-input')?.click();
+      return;
+    }
+    if (_refModalType === '__tag__') {
+      window._closeRefModal();
+      document.getElementById('gen-tag-file-input')?.click();
       return;
     }
     const fileInput = document.getElementById(`gen-${_refModalType}-file`);
@@ -1129,6 +1159,416 @@ async function _ppPickInput() {
   } catch { showToast('加载图片列表失败', 'error'); }
 }
 
+// ── 提示词反推 (Tag Interrogation) ──────────────────────────────────────────
+
+const _TAG_PARAMS_DEF = [
+  { key: 'model', label: '模型', type: 'select', default: 'wd-eva02-large-tagger-v3',
+    options: [
+      { v: 'wd-eva02-large-tagger-v3', l: 'EVA02 Large v3 (精度最高)' },
+      { v: 'wd-vit-tagger-v3',         l: 'ViT v3 (轻量)' },
+    ] },
+  { key: 'threshold', label: '通用阈值', type: 'slider', min: 0.1, max: 0.9, step: 0.05, default: 0.35 },
+  { key: 'character_threshold', label: '角色阈值', type: 'slider', min: 0.1, max: 0.9, step: 0.05, default: 0.85 },
+  { key: 'replace_underscore', label: '替换下划线', type: 'toggle', default: true },
+  { key: 'exclude_tags', label: '排除标签', type: 'text', default: '', placeholder: '逗号分隔, 如: simple background' },
+];
+
+const _TAG_MODELS = [
+  {
+    id: 'wd-eva02-large-tagger-v3',
+    name: 'WD EVA02 Large v3',
+    size: '1.2 GB',
+    description: '最高精度',
+    files: [
+      { filename: 'wd-eva02-large-tagger-v3.onnx', subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        url: 'https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/model.onnx' },
+      { filename: 'wd-eva02-large-tagger-v3.csv', subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        url: 'https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/selected_tags.csv' },
+    ],
+  },
+  {
+    id: 'wd-vit-tagger-v3',
+    name: 'WD ViT v3',
+    size: '361 MB',
+    description: '轻量快速',
+    files: [
+      { filename: 'wd-vit-tagger-v3.onnx', subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        url: 'https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/model.onnx' },
+      { filename: 'wd-vit-tagger-v3.csv', subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        url: 'https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/selected_tags.csv' },
+    ],
+  },
+];
+
+async function _openTagModal() {
+  const modal = document.getElementById('gen-tag-modal');
+  if (!modal) return;
+
+  // 检测任意模型是否已安装
+  if (!_tagModelReady) {
+    const dir = _comfyuiDir + '/custom_nodes/ComfyUI-WD14-Tagger/models';
+    for (const m of _TAG_MODELS) {
+      try {
+        const resp = await apiFetch('/api/downloads/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ save_dir: dir, filename: m.files[0].filename }),
+        });
+        if (resp?.installed) { _tagModelReady = true; break; }
+      } catch { /* ignore */ }
+    }
+  }
+
+  if (!_tagModelReady) {
+    // 显示欢迎页 (model-dependency)
+    document.getElementById('gen-tag-welcome').style.display = '';
+    document.getElementById('gen-tag-body').style.display = 'none';
+    modal.classList.add('active');
+    _initTagModelDep();
+    return;
+  }
+
+  _showTagBody();
+  modal.classList.add('active');
+}
+
+function _showTagBody() {
+  document.getElementById('gen-tag-welcome').style.display = 'none';
+  const body = document.getElementById('gen-tag-body');
+  body.classList.remove('hidden');
+  body.style.display = '';
+  // 初始化参数
+  _tagParamValues = {};
+  for (const p of _TAG_PARAMS_DEF) _tagParamValues[p.key] = p.default;
+  _tagModalFile = null;
+  _tagModalFileName = '';
+  _renderTagParams();
+  _renderTagImagePreview();
+  _renderTagResult();
+  _updateTagSubmitBtn();
+  _bindTagModalEvents();
+}
+
+window._closeTagModal = function () {
+  document.getElementById('gen-tag-modal')?.classList.remove('active');
+};
+
+function _renderTagParams() {
+  const container = document.getElementById('gen-tag-params');
+  if (!container) return;
+  let html = `<div style="font-weight:500;margin-bottom:12px;font-size:.85rem;color:var(--t2)">反推参数</div>`;
+
+  for (const p of _TAG_PARAMS_DEF) {
+    if (p.type === 'toggle') {
+      const checked = _tagParamValues[p.key] ? 'checked' : '';
+      html += `<div class="gen-pp-param-row">
+        <span>${escHtml(p.label)}</span>
+        <label class="comfy-param-toggle" style="margin-left:auto;gap:0">
+          <input type="checkbox" data-tag-key="${p.key}" ${checked}>
+          <span class="comfy-toggle-slider"></span>
+        </label>
+      </div>`;
+    } else if (p.type === 'slider') {
+      html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div style="display:flex;justify-content:space-between">
+          <span>${escHtml(p.label)}</span>
+          <span class="gen-tag-slider-val" data-tag-key="${p.key}" style="color:var(--ac);font-weight:600">${_tagParamValues[p.key]}</span>
+        </div>
+        <input type="range" data-tag-key="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${_tagParamValues[p.key]}" style="width:100%">
+      </div>`;
+    } else if (p.type === 'select') {
+      const opts = p.options.map(o =>
+        `<option value="${o.v}"${_tagParamValues[p.key] === o.v ? ' selected' : ''}>${escHtml(o.l)}</option>`
+      ).join('');
+      html += `<div class="gen-pp-param-row">
+        <span>${escHtml(p.label)}</span>
+        <select data-tag-key="${p.key}" class="input-field" style="width:auto;margin-left:auto;max-width:180px">${opts}</select>
+      </div>`;
+    } else if (p.type === 'text') {
+      html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <span>${escHtml(p.label)}</span>
+        <input type="text" data-tag-key="${p.key}" class="input-field" value="${escHtml(_tagParamValues[p.key])}"
+               placeholder="${escHtml(p.placeholder || '')}" style="width:100%;font-size:.8rem">
+      </div>`;
+    }
+  }
+  container.innerHTML = html;
+
+  container.querySelectorAll('[data-tag-key]').forEach(el => {
+    const key = el.dataset.tagKey;
+    if (el.type === 'checkbox') {
+      el.addEventListener('change', () => { _tagParamValues[key] = el.checked; });
+    } else if (el.type === 'range') {
+      el.addEventListener('input', () => {
+        _tagParamValues[key] = Number(el.value);
+        const valEl = container.querySelector(`span.gen-tag-slider-val[data-tag-key="${key}"]`);
+        if (valEl) valEl.textContent = el.value;
+      });
+    } else if (el.tagName === 'SELECT') {
+      el.addEventListener('change', () => { _tagParamValues[key] = el.value; });
+    } else if (el.type === 'text') {
+      el.addEventListener('input', () => { _tagParamValues[key] = el.value; });
+    }
+  });
+}
+
+function _renderTagImagePreview() {
+  const container = document.getElementById('gen-tag-image-preview');
+  if (!container) return;
+
+  if (_tagModalFile) {
+    let imgSrc;
+    if (_tagModalFile instanceof File) {
+      imgSrc = URL.createObjectURL(_tagModalFile);
+    } else {
+      imgSrc = `/api/generate/input_image_preview?name=${encodeURIComponent(_tagModalFile)}`;
+    }
+    container.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain">
+      <div style="position:absolute;bottom:4px;left:4px;right:4px;text-align:center;font-size:.75rem;color:var(--t3);background:var(--bg2);border-radius:4px;padding:2px 4px;word-break:break-all">${escHtml(_tagModalFileName)}</div>
+      <div class="gen-ref-clear" title="移除"><span class="ms">close</span></div>`;
+    container.querySelector('.gen-ref-clear')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _tagModalFile = null;
+      _tagModalFileName = '';
+      _renderTagImagePreview();
+      _updateTagSubmitBtn();
+    });
+  } else {
+    container.innerHTML = `
+      <div class="gen-ref-placeholder gen-ref-split" style="width:100%;height:100%">
+        <div class="gen-ref-split-top" data-action="pick-input">
+          <span class="ms" style="font-size:1.5rem;opacity:.4">folder_open</span>
+          <span>从 input 选择</span>
+        </div>
+        <div class="gen-ref-split-divider"><span>或</span></div>
+        <div class="gen-ref-split-bottom" data-action="upload-local">
+          <span class="ms" style="font-size:1.5rem;opacity:.4">upload</span>
+          <span>拖放或点击上传</span>
+        </div>
+      </div>`;
+  }
+}
+
+function _renderTagResult() {
+  const area = document.getElementById('gen-tag-result-area');
+  if (!area) return;
+
+  if (_tagRunning) {
+    area.innerHTML = `<div class="gen-tag-result-empty">
+      <div class="spinner" style="width:32px;height:32px"></div>
+      <p style="color:var(--t3);margin:0">正在反推中…</p>
+    </div>`;
+  } else if (_tagResultText) {
+    area.innerHTML = `<div class="gen-tag-result-content">
+      <div class="gen-tag-result-tags">${escHtml(_tagResultText)}</div>
+      <div class="gen-tag-result-actions">
+        <button class="btn btn-primary btn-sm" data-action="fill-positive"><span class="ms ms-sm">input</span> 填入正面提示词</button>
+        <button class="btn btn-sm" data-action="copy-tags"><span class="ms ms-sm">content_copy</span> 复制</button>
+      </div>
+    </div>`;
+    area.querySelector('[data-action="fill-positive"]')?.addEventListener('click', () => {
+      _fillPositivePrompt(_tagResultText);
+    });
+    area.querySelector('[data-action="copy-tags"]')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(_tagResultText).then(
+        () => showToast('已复制到剪贴板', 'success'),
+        () => showToast('复制失败', 'error')
+      );
+    });
+  } else {
+    area.innerHTML = `<div class="gen-tag-result-empty">
+      <span class="ms" style="font-size:48px;color:var(--t3)">sell</span>
+      <p style="color:var(--t3);margin:0">反推结果将显示在这里</p>
+    </div>`;
+  }
+}
+
+function _updateTagSubmitBtn() {
+  const btn = document.getElementById('gen-tag-submit');
+  if (btn) btn.disabled = !_tagModalFile || _tagRunning;
+}
+
+function _bindTagModalEvents() {
+  if (_tagModalBound) return;
+  _tagModalBound = true;
+
+  const previewArea = document.getElementById('gen-tag-image-preview');
+  const submitBtn = document.getElementById('gen-tag-submit');
+
+  let tagInput = document.getElementById('gen-tag-file-input');
+  if (!tagInput) {
+    tagInput = document.createElement('input');
+    tagInput.type = 'file';
+    tagInput.accept = 'image/*';
+    tagInput.id = 'gen-tag-file-input';
+    tagInput.style.display = 'none';
+    document.body.appendChild(tagInput);
+  }
+
+  previewArea?.addEventListener('click', (e) => {
+    const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    if (action === 'pick-input') _tagPickInput();
+    else if (action === 'upload-local') tagInput.click();
+  });
+
+  previewArea?.addEventListener('dragover', (e) => { e.preventDefault(); });
+  previewArea?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      _tagModalFile = file;
+      _tagModalFileName = file.name;
+      _renderTagImagePreview();
+      _updateTagSubmitBtn();
+    }
+  });
+
+  tagInput.addEventListener('change', () => {
+    const file = tagInput.files?.[0];
+    if (file) {
+      _tagModalFile = file;
+      _tagModalFileName = file.name;
+      _renderTagImagePreview();
+      _updateTagSubmitBtn();
+    }
+    tagInput.value = '';
+  });
+
+  submitBtn?.addEventListener('click', () => {
+    if (!_tagModalFile || _tagRunning) return;
+    const file = _tagModalFile;
+    const params = { ..._tagParamValues };
+    _startTagInterrogate(file, params);
+  });
+}
+
+async function _tagPickInput() {
+  try {
+    const resp = await apiFetch('/api/generate/input_images');
+    const images = resp?.images || [];
+    if (!images.length) { showToast('ComfyUI input/ 中没有图片', 'warning'); return; }
+    _refModalType = '__tag__';
+    const titleEl = document.getElementById('gen-ref-modal-title');
+    if (titleEl) titleEl.textContent = '选择图片';
+    _renderRefModalGrid(images);
+    const rm = document.getElementById('gen-ref-modal');
+    if (rm) { rm.style.zIndex = '210'; rm.classList.add('active'); }
+  } catch { showToast('加载图片列表失败', 'error'); }
+}
+
+async function _startTagInterrogate(file, params) {
+  _tagRunning = true;
+  _tagResultText = '';
+  _renderTagResult();
+  _updateTagSubmitBtn();
+  _startPPTimer();  // 复用预处理计时器
+
+  const form = new FormData();
+  if (file instanceof File) form.append('file', file);
+  else form.append('input_name', file);
+  form.append('params', JSON.stringify(params));
+
+  try {
+    const resp = await apiFetch('/api/generate/interrogate', { method: 'POST', body: form });
+    _tagPromptId = resp?.prompt_id || '';
+    if (!_tagPromptId) throw new Error('未获取到 prompt_id');
+  } catch (e) {
+    _tagRunning = false;
+    _stopPPTimer();
+    _renderTagResult();
+    _updateTagSubmitBtn();
+    showToast(`反推提交失败: ${e.message || e}`, 'error');
+  }
+}
+
+async function _onTagDone(success) {
+  _tagRunning = false;
+  _stopPPTimer();
+  _renderProgress();
+
+  if (success && _tagPromptId) {
+    try {
+      const resp = await apiFetch(`/api/generate/interrogate_result?prompt_id=${encodeURIComponent(_tagPromptId)}`);
+      _tagResultText = resp?.tags || '';
+      if (_tagResultText) {
+        showToast('反推完成', 'success');
+      } else {
+        showToast('反推完成但未获取到标签', 'warning');
+      }
+    } catch (e) {
+      showToast(`获取反推结果失败: ${e.message || e}`, 'error');
+    }
+  } else if (!success) {
+    showToast('反推失败', 'error');
+  }
+
+  _tagPromptId = '';
+  _renderTagResult();
+  _updateTagSubmitBtn();
+
+  // 自动重新打开弹窗显示结果 (如果用户关闭了弹窗)
+  const modal = document.getElementById('gen-tag-modal');
+  if (modal && !modal.classList.contains('active') && _tagResultText) {
+    modal.classList.add('active');
+    document.getElementById('gen-tag-welcome').style.display = 'none';
+    document.getElementById('gen-tag-body').style.display = '';
+  }
+}
+
+function _fillPositivePrompt(tags) {
+  const el = document.getElementById('gen-positive');
+  if (!el) return;
+  const existing = el.value.trim();
+  el.value = existing ? existing + ', ' + tags : tags;
+  _deferSave();
+  showToast('已填入正面提示词', 'success');
+}
+
+function _renderTagProgress(evt) {
+  const statusEl = document.getElementById('gen-bar-status');
+  if (!statusEl) return;
+
+  let nodeName = '';
+  let stepInfo = '';
+  if (evt.type === 'executing') {
+    nodeName = evt.data?.class_type || evt.data?.node || '';
+  } else if (evt.type === 'progress') {
+    const v = evt.data?.value, m = evt.data?.max;
+    if (v != null && m != null) stepInfo = `${v}/${m}`;
+    nodeName = evt.data?.node || '';
+  }
+
+  const elapsed = _ppStartTime ? Math.round((Date.now() - _ppStartTime) / 1000) : 0;
+  const mm = Math.floor(elapsed / 60), ss = String(elapsed % 60).padStart(2, '0');
+  const timeStr = mm > 0 ? `${mm}m ${ss}s` : `${ss}s`;
+  const detail = [stepInfo, nodeName].filter(Boolean).join(' ');
+
+  statusEl.innerHTML = `<div class="comfy-progress-bar active">
+    <span class="comfy-progress-label" style="color:var(--ac)"><span class="ms ms-sm" style="font-size:14px;vertical-align:middle">image_search</span> 反推中</span>
+    <span class="comfy-progress-steps" style="color:var(--t2)">${escHtml(detail)}</span>
+    <span class="comfy-progress-time">${timeStr}</span>
+  </div>`;
+}
+
+function _initTagModelDep() {
+  if (_tagMdep) return;  // 已初始化
+  _tagMdep = initModelDependency({
+    containerId: 'gen-tag-welcome',
+    paramsId: 'gen-tag-body',
+    comfyuiDir: _comfyuiDir,
+    tab: 'tagger',
+    title: '提示词反推 — 需要下载额外模型才能工作',
+    models: _TAG_MODELS,
+    minOptional: 1,
+    onEnter: () => {
+      _tagModelReady = true;
+      _showTagBody();
+    },
+  });
+}
+
 const _CN_MODELS = {
   // 共享: Xinsir Union ProMax (所有类型通用)
   union: {
@@ -1215,18 +1655,21 @@ const _CN_MODELS = {
 const _CN_MODEL_CFG = {
   pose: {
     tab: 'pose',
-    title: '姿势控制',
+    title: '姿势控制 — 需要下载额外模型才能工作',
     models: [_CN_MODELS.union, _CN_MODELS.pose_dedicated, _CN_MODELS.dwpose],
+    minOptional: 1,
   },
   canny: {
     tab: 'canny',
-    title: '轮廓控制',
+    title: '轮廓控制 — 需要下载额外模型才能工作',
     models: [_CN_MODELS.union, _CN_MODELS.canny_dedicated],
+    minOptional: 1,
   },
   depth: {
     tab: 'depth',
-    title: '景深控制',
+    title: '景深控制 — 需要下载额外模型才能工作',
     models: [_CN_MODELS.union, _CN_MODELS.depth_dedicated, _CN_MODELS.depth_anything_v2],
+    minOptional: 1,
   },
 };
 
@@ -1243,6 +1686,7 @@ function _initCNModelDeps() {
       tab: cfg.tab,
       title: cfg.title,
       models: cfg.models,
+      minOptional: cfg.minOptional,
       onEnter: () => {
         _cnReady[type] = true;
         _loadOptions(true);
@@ -2055,7 +2499,7 @@ function _initUpscaleModelDep() {
     paramsId: 'gen-upscale-params',
     comfyuiDir: _comfyuiDir,
     tab: 'upscale',
-    title: '高清放大',
+    title: '高清放大 — 需要下载额外模型才能工作',
     models: [{
       id: 'aurasr-v2',
       name: 'AuraSR v2',
@@ -2309,6 +2753,14 @@ function _handleSSEEvent(evt) {
     return;  // 不让 tracker 处理
   }
 
+  // ── 反推工作流事件拦截 ──
+  if (evtPid && evtPid === _tagPromptId) {
+    if (evt.type === 'execution_done') _onTagDone(true);
+    else if (evt.type === 'execution_error' || evt.type === 'execution_interrupted') _onTagDone(false);
+    else if (evt.type === 'progress' || evt.type === 'executing') _renderTagProgress(evt);
+    return;
+  }
+
   // 实时预览帧
   if (evt.type === 'preview_image') {
     const img = document.getElementById('gen-preview-img');
@@ -2427,8 +2879,8 @@ function _startPPTimer() {
   _ppStartTime = Date.now();
   _stopPPTimer();
   _ppTimer = setInterval(() => {
-    // 只在预处理还在跑时更新计时
-    if (!_CN_TYPES.some(t => _ppRunning[t])) { _stopPPTimer(); _renderProgress(); return; }
+    // 只在预处理/反推还在跑时更新计时
+    if (!_CN_TYPES.some(t => _ppRunning[t]) && !_tagRunning) { _stopPPTimer(); _renderProgress(); return; }
     // 只更新时间部分
     const statusEl = document.getElementById('gen-bar-status');
     const timeEl = statusEl?.querySelector('.comfy-progress-time');

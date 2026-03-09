@@ -667,6 +667,45 @@ def build_preprocess_workflow(params: dict) -> dict:
     return b.build()
 
 
+def build_tag_workflow(params: dict) -> dict:
+    """
+    构建 WD14 反推工作流: LoadImage → WD14Tagger。
+
+    参数:
+        image               (str)  — ComfyUI input/ 中的图片文件名
+        model               (str)  — WD14 模型名 (默认 wd-eva02-large-tagger-v3)
+        threshold           (float) — 通用阈值 (默认 0.35)
+        character_threshold (float) — 角色阈值 (默认 0.85)
+        exclude_tags        (str)  — 排除标签 (逗号分隔)
+        replace_underscore  (bool) — 替换下划线 (默认 True)
+    """
+    image = params.get("image", "")
+    model = params.get("model", "wd-eva02-large-tagger-v3")
+    threshold = float(params.get("threshold", 0.35))
+    char_threshold = float(params.get("character_threshold", 0.85))
+    exclude_tags = params.get("exclude_tags", "")
+    replace_underscore = bool(params.get("replace_underscore", True))
+
+    return {
+        "1": {
+            "class_type": "LoadImage",
+            "inputs": {"image": image},
+        },
+        "2": {
+            "class_type": "WD14Tagger|pysssss",
+            "inputs": {
+                "image": ["1", 0],
+                "model": model,
+                "threshold": threshold,
+                "character_threshold": char_threshold,
+                "exclude_tags": exclude_tags,
+                "replace_underscore": replace_underscore,
+                "trailing_comma": False,
+            },
+        },
+    }
+
+
 # Phase 2+ 扩展占位符:
 # def build_flux_workflow(params): ...
 # def build_zimage_workflow(params): ...

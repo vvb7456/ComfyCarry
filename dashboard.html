@@ -970,9 +970,17 @@
                             提示词
                         </div>
 
-                        <div class="gen-field">
+                        <div class="gen-field" style="position:relative">
                             <textarea id="gen-positive" class="gen-textarea" rows="3"
                                 placeholder="输入提示词（A1111格式），例如：1girl, solo, long hair, looking at viewer, smile, white dress, outdoors, blue sky, masterpiece, best quality"></textarea>
+                            <div class="gen-prompt-tools">
+                                <button class="gen-prompt-tool-btn" data-action="tag-interrogate" title="提示词反推 (WD14 Tagger)">
+                                    <span class="ms ms-sm">image_search</span>
+                                </button>
+                                <button class="gen-prompt-tool-btn" data-action="llm-assist" title="AI 辅助 (即将推出)" disabled>
+                                    <span class="ms ms-sm">auto_awesome</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="gen-field" style="margin-bottom:var(--sp-3)">
                             <textarea id="gen-negative" class="gen-textarea" rows="3"
@@ -1661,6 +1669,38 @@
                 <div class="gen-mod-params-area" style="display:flex;flex-direction:column;gap:12px">
                     <div id="gen-pp-params" style="flex:1;min-height:0;overflow-y:auto"></div>
                     <button class="btn btn-sm btn-primary" id="gen-pp-submit" disabled style="width:100%"><span class="ms ms-sm">play_arrow</span> 开始生成</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WD14 反推弹窗 -->
+    <div class="modal-overlay" id="gen-tag-modal" onclick="if(event.target===this)window._closeTagModal()">
+        <div class="modal-box" style="width:860px;max-height:85vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+                <span class="ms ms-sm" style="color:var(--ac)">image_search</span>
+                <h3 style="margin:0">提示词反推</h3>
+                <button class="btn btn-sm" onclick="window._closeTagModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <!-- 欢迎页容器 (模型未下载时显示) -->
+            <div id="gen-tag-welcome" style="display:none"></div>
+            <!-- 正常界面 (模型就绪时显示) -->
+            <div id="gen-tag-body" class="gen-tag-split" style="flex:1;min-height:0;overflow:hidden;display:none">
+                <!-- 左：图片选择 -->
+                <div class="gen-mod-media-area">
+                    <div id="gen-tag-image-preview" class="gen-ref-upload"></div>
+                </div>
+                <!-- 中：参数 + 运行按钮 -->
+                <div class="gen-mod-params-area" style="display:flex;flex-direction:column;gap:12px">
+                    <div id="gen-tag-params" style="flex:1;min-height:0;overflow-y:auto"></div>
+                    <button class="btn btn-sm btn-primary" id="gen-tag-submit" disabled style="width:100%"><span class="ms ms-sm">play_arrow</span> 开始反推</button>
+                </div>
+                <!-- 右：结果展示 -->
+                <div class="gen-tag-result-area" id="gen-tag-result-area">
+                    <div class="gen-tag-result-empty">
+                        <span class="ms" style="font-size:48px;color:var(--t3)">sell</span>
+                        <p style="color:var(--t3);margin:0">反推结果将显示在这里</p>
+                    </div>
                 </div>
             </div>
         </div>

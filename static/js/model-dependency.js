@@ -183,12 +183,20 @@ function _renderWelcome(st) {
   // - needsDownload → "下载选中模型"
   // - hasSelected && !needsDownload → "进入" (所有选中的都已安装)
   // - !hasSelected → 不显示任何按钮
+  // - minOptional: 至少选择 N 个非 required 模型才允许进入
+  const optionalSelected = cfg.models.filter(m => !m.required && st.selected.has(m.id)).length;
+  const minOpt = cfg.minOptional || 0;
+  const optionalSatisfied = optionalSelected >= minOpt;
+
   let btnHtml = '';
-  if (needsDownload) {
+  let hintHtml = '';
+  if (!optionalSatisfied && hasSelected && !needsDownload) {
+    hintHtml = `<div class="mdep-hint" style="color:var(--t3);font-size:.82rem;margin-bottom:6px">请至少选择一个模型</div>`;
+  } else if (needsDownload) {
     btnHtml = `<button class="btn btn-sm mdep-download-btn">
       <span class="ms ms-sm">download</span> 下载选中模型
     </button>`;
-  } else if (hasSelected) {
+  } else if (hasSelected && optionalSatisfied) {
     btnHtml = `<button class="btn btn-sm mdep-enter-btn">
       <span class="ms ms-sm">arrow_forward</span> 进入
     </button>`;
@@ -199,7 +207,6 @@ function _renderWelcome(st) {
       <div class="mdep-welcome-header">
         <span class="ms" style="font-size:2rem;color:var(--ac);opacity:.7">widgets</span>
         <div class="mdep-title">${_esc(cfg.title)}</div>
-        <div class="mdep-desc">请选择需要下载的模型</div>
       </div>
       <div class="mdep-card-grid">${cardsHtml}</div>
       <div class="mdep-actions">
@@ -212,7 +219,7 @@ function _renderWelcome(st) {
             <span class="ms ms-sm">close</span> 取消
           </button>
         </div>
-        <div class="mdep-btn-row">${btnHtml}</div>
+        <div class="mdep-btn-row">${hintHtml}${btnHtml}</div>
       </div>
     </div>`;
 
@@ -278,6 +285,7 @@ async function _startBatchDownload(st) {
 
   const total = toDownload.length;
 
+  try {
   for (let mi = 0; mi < total; mi++) {
     if (cancelled) return;
     const model = toDownload[mi];
@@ -373,6 +381,11 @@ async function _startBatchDownload(st) {
   if (progressBar) progressBar.style.width = '100%';
   if (progressPct) progressPct.textContent = '全部下载完成';
   setTimeout(() => _renderWelcome(st), 1000);
+  } catch (err) {
+    console.error('[mdep] batch download error:', err);
+    st.downloading = false;
+    setTimeout(() => _renderWelcome(st), 2000);
+  }
 }
 
 // ── 恢复下载 ─────────────────────────────────────────────────────────────────
@@ -440,59 +453,31 @@ async function _dismissWelcome(st) {
 
 // ── SSE 下载监听 ─────────────────────────────────────────────────────────────
 function _waitForDownload(downloadId, onProgress) {
-  let evtSource = null;
-  let settled = false;
-  let retryTimer = null;
-  let resolveRef = null;
+  let aborted = false;
+  let timer = null;
 
   const promise = new Promise(resolve => {
-    resolveRef = resolve;
-    let retries = 0;
-    const MAX_RETRIES = 5;
-
-    function connect() {
-      if (settled) return;
-      evtSource = new EventSource(`/api/downloads/${downloadId}/events`);
-      evtSource.onmessage = (e) => {
-        retries = 0;
-        try {
-          const data = JSON.parse(e.data);
-          if (data.error) { _finish(false); return; }
-          onProgress?.(data);
-          if (data.status === 'complete') _finish(true);
-          else if (data.status === 'failed' || data.status === 'cancelled') _finish(false);
-        } catch { /* ignore */ }
-      };
-      evtSource.onerror = () => {
-        if (settled) { evtSource.close(); return; }
-        evtSource.close();
-        evtSource = null;
-        if (retries < MAX_RETRIES) {
-          retries++;
-          retryTimer = setTimeout(connect, 2000 * retries);
-        } else {
-          _finish(false);
-        }
-      };
+    async function poll() {
+      if (aborted) return;
+      try {
+        const resp = await fetch(`/api/downloads/${downloadId}`);
+        if (!resp.ok) { resolve(false); return; }
+        const data = await resp.json();
+        if (aborted) return;
+        onProgress?.(data);
+        if (data.status === 'complete') { resolve(true); return; }
+        if (data.status === 'failed' || data.status === 'cancelled') { resolve(false); return; }
+      } catch {
+        if (aborted) return;
+      }
+      timer = setTimeout(poll, 800);
     }
-
-    function _finish(ok) {
-      if (settled) return;
-      settled = true;
-      if (evtSource) { evtSource.close(); evtSource = null; }
-      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
-      resolve(ok);
-    }
-
-    connect();
+    poll();
   });
 
   function abort() {
-    if (settled) return;
-    settled = true;
-    if (evtSource) { evtSource.close(); evtSource = null; }
-    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
-    resolveRef?.(false);
+    aborted = true;
+    if (timer) { clearTimeout(timer); timer = null; }
   }
 
   return { promise, abort };
