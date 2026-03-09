@@ -196,6 +196,20 @@ def api_settings_export_config():
     if cf_protocol:
         config["cf_protocol"] = cf_protocol
 
+    # LLM 配置
+    llm_provider = _get_config("llm_provider", "")
+    if llm_provider:
+        config["llm_provider"] = llm_provider
+        config["llm_model"] = _get_config("llm_model", "")
+        config["llm_api_key"] = _get_config("llm_api_key", "")
+        config["llm_base_url"] = _get_config("llm_base_url", "")
+        config["llm_temperature"] = _get_config("llm_temperature", 0.7)
+        config["llm_max_tokens"] = _get_config("llm_max_tokens", 2000)
+        config["llm_stream"] = _get_config("llm_stream", False)
+    llm_provider_keys = _get_config("llm_provider_keys", {})
+    if llm_provider_keys:
+        config["llm_provider_keys"] = llm_provider_keys
+
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -293,6 +307,26 @@ def api_settings_import_config():
         applied.append("SSH 密码")
     if "ssh_pw_sync" in data:
         _set_config("ssh_pw_sync", data["ssh_pw_sync"])
+
+    # LLM 配置
+    if data.get("llm_provider"):
+        try:
+            _set_config("llm_provider", data["llm_provider"])
+            _set_config("llm_model", data.get("llm_model", ""))
+            _set_config("llm_api_key", data.get("llm_api_key", ""))
+            _set_config("llm_base_url", data.get("llm_base_url", ""))
+            _set_config("llm_temperature", data.get("llm_temperature", 0.7))
+            _set_config("llm_max_tokens", data.get("llm_max_tokens", 2000))
+            _set_config("llm_stream", data.get("llm_stream", False))
+            applied.append("LLM 配置")
+        except Exception as e:
+            errors.append(f"LLM 配置: {e}")
+    if data.get("llm_provider_keys"):
+        try:
+            _set_config("llm_provider_keys", data["llm_provider_keys"])
+            applied.append("LLM Provider Keys")
+        except Exception as e:
+            errors.append(f"LLM Provider Keys: {e}")
 
     try:
         state = _load_setup_state()

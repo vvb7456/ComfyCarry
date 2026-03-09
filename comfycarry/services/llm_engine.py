@@ -480,14 +480,27 @@ def get_llm_config() -> dict:
         "base_url": get_config("llm_base_url", ""),
         "temperature": get_config("llm_temperature", 0.7),
         "max_tokens": get_config("llm_max_tokens", 2000),
+        "stream": get_config("llm_stream", False),
+        "provider_keys": get_config("llm_provider_keys", {}),
     }
 
 
 def save_llm_config(data: dict):
     """保存 LLM 配置"""
-    for key in ("provider", "model", "api_key", "base_url", "temperature", "max_tokens"):
+    for key in ("provider", "model", "api_key", "base_url", "temperature", "max_tokens", "stream"):
         if key in data:
             set_config(f"llm_{key}", data[key])
+
+    # Per-provider key/model/base_url persistence
+    provider = data.get("provider") or get_config("llm_provider", "")
+    if provider and "api_key" in data:
+        keys = get_config("llm_provider_keys", {})
+        keys[provider] = {
+            "api_key": data.get("api_key", ""),
+            "model": data.get("model", ""),
+            "base_url": data.get("base_url", ""),
+        }
+        set_config("llm_provider_keys", keys)
 
 
 def mask_api_key(key: str) -> str:

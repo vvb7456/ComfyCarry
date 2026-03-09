@@ -3,32 +3,6 @@
                                  Activity Feed · Environment · Services
            ══════════════════════════════════════════════════════════════ */
 
-        /* ── Environment Info ── */
-        .ie-section {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--bd)
-        }
-
-        .ie-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0
-        }
-
-        .ie-section h4 {
-            font-size: .9rem;
-            margin-bottom: 10px;
-            color: var(--t1)
-        }
-
-        .ie-section p {
-            font-size: .82rem;
-            color: var(--t2);
-            margin-bottom: 10px;
-            line-height: 1.5
-        }
-
         /* ── Stat Cards Grid ── */
         .stat-grid {
             display: grid;

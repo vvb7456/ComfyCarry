@@ -78,9 +78,6 @@
         <div id="page-dashboard" class="page">
             <div class="page-header">
                 <h2><span class="ms" style="color:#8b5cf6">dashboard</span> 总览</h2>
-                <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
-                </div>
             </div>
             <div class="page-body">
                 <!-- Status Bar -->
@@ -129,9 +126,6 @@
         <div id="page-models" class="page hidden">
             <div class="page-header">
                 <h2><span class="ms" style="color:#f472b6">palette</span> 模型管理</h2>
-                <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
-                </div>
             </div>
             <div class="page-body">
                 <div class="tabs">
@@ -242,7 +236,6 @@
                 </div>
                 <div class="top-toolbar">
                     <span id="jupyter-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -313,7 +306,6 @@
                 </div>
                 <div class="top-toolbar">
                     <span id="tunnel-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -491,7 +483,6 @@
                 </div>
                 <div class="top-toolbar">
                     <span id="comfyui-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -587,9 +578,6 @@
         <div id="page-plugins" class="page hidden">
             <div class="page-header">
                 <h2><span class="ms" style="color:#a78bfa">extension</span> 插件管理</h2>
-                <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
-                </div>
             </div>
             <div class="page-body">
                 <div class="tabs">
@@ -658,7 +646,6 @@
                 </div>
                 <div class="top-toolbar">
                     <span id="sync-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -749,7 +736,6 @@
                 </div>
                 <div class="top-toolbar">
                     <span id="ssh-header-controls"></span>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
@@ -839,43 +825,103 @@
                 <h2><span class="ms" style="color:#94a3b8">settings</span> 设置</h2>
                 <div class="top-toolbar">
                     <button class="btn" onclick="restartDashboard()"><span class="ms ms-sm" style="color:#34d399">refresh</span> 重启</button>
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置"><span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置</button>
                 </div>
             </div>
             <div class="page-body">
-                <div class="settings-grid">
-                    <!-- 左列: 配置卡片 -->
-                    <div class="settings-col">
-                        <!-- 密码设置 -->
-                        <div class="card card-padded">
-                            <h3><span class="ms ms-sm" style="color:#fbbf24">lock</span> ComfyCarry 密码</h3>
-                            <form onsubmit="event.preventDefault();changePassword()" autocomplete="off">
-                            <div class="form-group" style="margin-bottom:10px">
-                                <label>当前密码</label>
-                                <div class="input-secret">
-                                    <input type="password" id="settings-pw-current" data-pw="1" placeholder="输入当前密码" autocomplete="current-password">
+                <!-- Settings 子 Tab 栏 -->
+                <div class="tabs" id="settings-tabs">
+                    <div class="tab active" data-stab="comfycarry" onclick="switchSettingsTab('comfycarry')"><span class="ms ms-sm" style="color:#8b5cf6">home</span> ComfyCarry</div>
+                    <div class="tab" data-stab="civitai" onclick="switchSettingsTab('civitai')"><span class="ms ms-sm" style="color:#f472b6">palette</span> CivitAI</div>
+                    <div class="tab" data-stab="llm" onclick="switchSettingsTab('llm')"><span class="ms ms-sm" style="color:#60a5fa">smart_toy</span> LLM</div>
+                </div>
+
+                <!-- ═══ Tab 1: ComfyCarry ═══════════════════════════════ -->
+                <div id="settings-tab-comfycarry" class="settings-tab-content">
+                    <div class="settings-grid">
+                        <!-- 左列: 配置卡片 -->
+                        <div class="settings-col">
+                            <!-- 密码设置 -->
+                            <div class="card card-padded">
+                                <h3><span class="ms ms-sm" style="color:#fbbf24">lock</span> ComfyCarry 密码</h3>
+                                <form onsubmit="event.preventDefault();changePassword()" autocomplete="off">
+                                <div class="form-group" style="margin-bottom:10px">
+                                    <label>当前密码</label>
+                                    <div class="input-secret">
+                                        <input type="password" id="settings-pw-current" data-pw="1" placeholder="输入当前密码" autocomplete="current-password">
+                                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom:10px">
+                                    <label>新密码</label>
+                                    <div class="input-secret">
+                                        <input type="password" id="settings-pw-new" data-pw="1" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
+                                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom:12px">
+                                    <label>确认新密码</label>
+                                    <div class="input-secret">
+                                        <input type="password" id="settings-pw-confirm" data-pw="1" placeholder="再次输入新密码" autocomplete="new-password">
+                                        <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
+                                    </div>
+                                </div>
+                                <div style="display:flex;justify-content:flex-end"><button type="submit" class="btn btn-sm btn-primary">更新密码</button></div>
+                                </form>
+                            </div>
+
+                            <!-- ComfyCarry API Key -->
+                            <div class="card card-padded">
+                                <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key <span class="comfy-param-help-icon" data-tip="用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API">?</span></h3>
+                                <div class="input-secret" style="margin-bottom:12px">
+                                    <input type="text" class="secret-masked" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
                                     <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
+                                    <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm">content_copy</span></button>
+                                </div>
+                                <div style="display:flex;justify-content:flex-end"><button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">重新生成</button></div>
+                            </div>
+
+                            <!-- 导入/导出配置 -->
+                            <div class="card card-padded">
+                                <h3><span class="ms ms-sm" style="color:#a78bfa">package_2</span> 导入/导出配置</h3>
+                                <div style="display:flex;flex-direction:column;gap:12px">
+                                    <div>
+                                        <p style="font-size:.82rem;color:var(--t2);margin:0 0 8px">导出 ComfyCarry 的所有配置为 JSON 文件</p>
+                                        <button class="btn btn-sm btn-primary" onclick="exportConfig()"><span class="ms ms-sm">upload</span> 导出配置</button>
+                                    </div>
+                                    <div>
+                                        <p style="font-size:.82rem;color:var(--t2);margin:0 0 8px">从 JSON 文件恢复配置</p>
+                                        <label class="btn btn-sm btn-primary" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;color:#fff">
+                                            <span class="ms ms-sm">download</span> 导入配置
+                                            <input type="file" accept=".json" onchange="importConfig(event)" style="display:none">
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-group" style="margin-bottom:10px">
-                                <label>新密码</label>
-                                <div class="input-secret">
-                                    <input type="password" id="settings-pw-new" data-pw="1" placeholder="输入新密码 (至少 4 个字符)" autocomplete="new-password">
-                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
+
+                            <!-- 重新初始化 -->
+                            <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
+                                <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化 <span class="comfy-param-help-icon" data-tip="删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留">?</span></h3>
+                                <div style="display:flex;align-items:center;justify-content:space-between">
+                                    <label style="font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
+                                        <input type="checkbox" id="reinit-keep-models" checked style="width:15px;height:15px;accent-color:var(--ac)">
+                                        <span>保留模型文件</span>
+                                    </label>
+                                    <button class="btn btn-sm btn-danger" onclick="reinitialize()">重新初始化</button>
                                 </div>
                             </div>
-                            <div class="form-group" style="margin-bottom:12px">
-                                <label>确认新密码</label>
-                                <div class="input-secret">
-                                    <input type="password" id="settings-pw-confirm" data-pw="1" placeholder="再次输入新密码" autocomplete="new-password">
-                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
-                                </div>
-                            </div>
-                            <div style="display:flex;justify-content:flex-end"><button type="submit" class="btn btn-sm btn-primary">更新密码</button></div>
-                            </form>
                         </div>
 
-                        <!-- CivitAI API Key -->
+                        <!-- 右列: ComfyCarry 日志 -->
+                        <div class="card card-padded" id="settings-log-card" style="height:100%;min-height:400px;max-height:calc(100vh - 200px)">
+                            <h3 style="margin-bottom:12px"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> ComfyCarry 日志</h3>
+                            <div class="log-box" id="log-content" style="max-height:calc(100% - 50px);height:calc(100% - 50px)">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Tab 2: CivitAI ═══════════════════════════════ -->
+                <div id="settings-tab-civitai" class="settings-tab-content" style="display:none">
+                    <div class="settings-centered">
                         <div class="card card-padded">
                             <h3><span class="ms ms-sm" style="color:#f472b6">palette</span> CivitAI API Key</h3>
                             <div class="form-group" style="margin-bottom:12px">
@@ -890,37 +936,95 @@
                                 <button class="btn btn-sm btn-danger" onclick="clearSettingsCivitaiKey()" title="清除"><span class="ms ms-sm">delete</span></button>
                             </div>
                         </div>
-
-                        <!-- ComfyCarry API Key -->
-                        <div class="card card-padded">
-                            <h3><span class="ms ms-sm" style="color:#fbbf24">key</span> ComfyCarry API Key <span class="comfy-param-help-icon" data-tip="用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API">?</span></h3>
-                            <div class="input-secret" style="margin-bottom:12px">
-                                <input type="text" class="secret-masked" id="settings-api-key" readonly style="font-family:monospace;font-size:.82rem;letter-spacing:.5px">
-                                <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
-                                <button type="button" class="input-secret-copy" onclick="copySecret(this)" title="复制"><span class="ms ms-sm">content_copy</span></button>
-                            </div>
-                            <div style="display:flex;justify-content:flex-end"><button class="btn btn-sm btn-danger" onclick="regenerateApiKey()">重新生成</button></div>
-                        </div>
-
-
-
-                        <!-- 重新初始化 -->
-                        <div class="card card-padded" style="border:1px solid rgba(255,80,80,0.25)">
-                            <h3 style="color:var(--red)"><span class="ms ms-sm" style="color:var(--amber)">warning</span> 重新初始化 <span class="comfy-param-help-icon" data-tip="删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留">?</span></h3>
-                            <div style="display:flex;align-items:center;justify-content:space-between">
-                                <label style="font-size:.82rem;color:var(--t2);display:flex;align-items:center;gap:6px;cursor:pointer">
-                                    <input type="checkbox" id="reinit-keep-models" checked style="width:15px;height:15px;accent-color:var(--ac)">
-                                    <span>保留模型文件</span>
-                                </label>
-                                <button class="btn btn-sm btn-danger" onclick="reinitialize()">重新初始化</button>
-                            </div>
-                        </div>
                     </div>
+                </div>
 
-                    <!-- 右列: ComfyCarry 日志 (Debug 模式) -->
-                    <div class="card card-padded" id="settings-log-card" style="height:100%;min-height:400px;max-height:calc(100vh - 160px)">
-                        <h3 style="margin-bottom:12px"><span class="ms ms-sm" style="color:#94a3b8">receipt_long</span> ComfyCarry 日志</h3>
-                        <div class="log-box" id="log-content" style="max-height:calc(100% - 50px);height:calc(100% - 50px)">加载中...</div>
+                <!-- ═══ Tab 3: LLM ═══════════════════════════════ -->
+                <div id="settings-tab-llm" class="settings-tab-content" style="display:none">
+                    <div class="settings-centered">
+                        <!-- Provider & API Key -->
+                        <div class="card card-padded">
+                            <h3><span class="ms ms-sm" style="color:#60a5fa">smart_toy</span> 服务提供商</h3>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label>服务商</label>
+                                <select id="llm-provider" onchange="onLlmProviderChange()">
+                                    <option value="" disabled selected>— 选择服务提供商 —</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label>API Key</label>
+                                <div class="input-secret">
+                                    <input type="text" class="secret-masked" id="llm-api-key" autocomplete="off" placeholder="输入 API Key...">
+                                    <button type="button" class="input-secret-toggle" onclick="toggleSecret(this)" title="显示"><span class="ms ms-sm">visibility</span></button>
+                                </div>
+                            </div>
+                            <div id="llm-base-url-group" class="form-group" style="margin-bottom:10px;display:none">
+                                <label>Base URL</label>
+                                <input type="text" id="llm-base-url" placeholder="https://api.example.com/v1">
+                            </div>
+                        </div>
+
+                        <!-- Model -->
+                        <div class="card card-padded">
+                            <h3><span class="ms ms-sm" style="color:#34d399">deployed_code</span> 模型</h3>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label>模型</label>
+                                <div style="display:flex;gap:8px;align-items:center">
+                                    <div class="searchable-select" id="llm-model-wrap" style="flex:1">
+                                        <div class="ss-display" onclick="toggleLlmModelDropdown()">
+                                            <span class="ss-text" id="llm-model-text">刷新获取模型列表</span>
+                                            <span class="ms" style="font-size:18px;color:var(--t3)">expand_more</span>
+                                        </div>
+                                        <div class="ss-dropdown" id="llm-model-dropdown">
+                                            <input type="text" class="ss-search" id="llm-model-search" placeholder="搜索模型..." oninput="filterLlmModels()">
+                                            <div class="ss-options" id="llm-model-options"></div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="llm-model" value="">
+                                    <button class="btn btn-sm" onclick="fetchLlmModels()" title="获取模型列表"><span class="ms ms-sm" style="color:var(--ac)">refresh</span></button>
+                                </div>
+                            </div>
+                            <div id="llm-model-info" style="font-size:.78rem;color:var(--t3);display:none"></div>
+                        </div>
+
+                        <!-- Advanced -->
+                        <div class="card card-padded">
+                            <h3><span class="ms ms-sm" style="color:#fbbf24">tune</span> 参数</h3>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="display:flex;justify-content:space-between;align-items:center">
+                                    <span>温度 <span class="comfy-param-help-icon" data-tip="0.0 - 2.0，越高越有创意，越低越稳定。推荐值: 创作类 0.8-1.2，翻译/描述类 0.3-0.5">?</span></span>
+                                    <span id="llm-temperature-val" class="gen-editable-val" title="点击编辑">0.7</span>
+                                </label>
+                                <input type="range" id="llm-temperature" class="gen-range" min="0" max="2" step="0.1" value="0.7">
+                                <div class="gen-range-tips"><span>0</span><span>1</span><span>2</span></div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px">
+                                <label style="display:flex;justify-content:space-between;align-items:center">
+                                    <span>最大回复长度 <span class="comfy-param-help-icon" data-tip="以词符数 (token) 计的最大输出长度。提示词生成通常 500-1000 即可，长对话可设更高">?</span></span>
+                                    <span id="llm-max-tokens-val" class="gen-editable-val" title="点击编辑">2000</span>
+                                </label>
+                                <input type="range" id="llm-max-tokens" class="gen-range" min="100" max="16000" step="100" value="2000">
+                                <div class="gen-range-tips"><span>100</span><span>4000</span><span>8000</span><span>16000</span></div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:12px">
+                                <div style="display:flex;align-items:center;justify-content:space-between">
+                                    <span>流式传输 <span class="comfy-param-help-icon" data-tip="开启后 LLM 将逐字输出响应。关闭可避免部分平台在流式模式下的内容过滤问题">?</span></span>
+                                    <label class="toggle-switch" for="llm-stream">
+                                        <input type="checkbox" id="llm-stream">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save & Test -->
+                        <div class="card card-padded">
+                            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                                <button class="btn btn-sm" onclick="testLlmConnection()"><span class="ms ms-sm" style="color:#34d399">wifi_tethering</span> 测试连接</button>
+                                <button class="btn btn-sm btn-primary" onclick="saveLlmConfig()"><span class="ms ms-sm">save</span> 保存配置</button>
+                            </div>
+                            <div id="llm-test-result" style="margin-top:12px;display:none"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -931,11 +1035,6 @@
             <div class="page-header">
                 <div class="page-title-group">
                     <h2><span class="ms" style="color:#ffb4b4">auto_awesome</span> 内容生成</h2>
-                </div>
-                <div class="top-toolbar">
-                    <button class="btn" onclick="openIEModal()" title="导入/导出配置">
-                        <span class="ms ms-sm" style="color:#94a3b8">tune</span> 配置
-                    </button>
                 </div>
             </div>
             <div class="page-body">
@@ -1570,29 +1669,6 @@
                 <button class="btn btn-sm" onclick="closePluginVersionModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="pv-body"></div>
-        </div>
-    </div>
-
-    <!-- Import/Export Modal -->
-    <div class="modal-overlay" id="ie-modal" onclick="if(event.target===this)closeIEModal()">
-        <div class="ie-modal-box">
-            <div style="display:flex;align-items:center;margin-bottom:16px">
-                <h3 style="margin-bottom:0"><span class="ms ms-sm" style="color:#a78bfa">package_2</span> 导入/导出配置</h3>
-                <button class="btn btn-sm" onclick="closeIEModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
-            </div>
-            <div class="ie-section">
-                <h4><span class="ms ms-sm" style="color:#60a5fa">upload</span> 导出配置</h4>
-                <p>导出当前 ComfyCarry 的密码、CivitAI 密钥、同步偏好等配置为 JSON 文件</p>
-                <button class="btn btn-sm btn-primary" onclick="exportConfig()">导出配置文件</button>
-            </div>
-            <div class="ie-section">
-                <h4><span class="ms ms-sm" style="color:#60a5fa">download</span> 导入配置</h4>
-                <p>从之前导出的 JSON 文件恢复配置</p>
-                <label class="btn btn-sm btn-primary" style="cursor:pointer;display:inline-block">
-                    选择文件导入
-                    <input type="file" accept=".json" onchange="importConfig(event)" style="display:none">
-                </label>
-            </div>
         </div>
     </div>
 

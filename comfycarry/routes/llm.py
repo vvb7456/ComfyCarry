@@ -173,6 +173,11 @@ def api_llm_config_put():
         except (ValueError, TypeError):
             return jsonify(ok=False, error="max_tokens 必须在 1-100000 之间"), 400
 
+    # 验证 stream
+    stream = data.get("stream")
+    if stream is not None:
+        data["stream"] = bool(stream)
+
     save_llm_config(data)
     return jsonify(ok=True)
 
