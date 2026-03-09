@@ -3,6 +3,7 @@
 #
 # 触发: 手动 / push docker/ 或 .github/workflows/docker-build.yml
 # 产物: ghcr.io/vvb7456/comfycarry:latest + :v3.0
+#        vvb7456/comfycarry:latest + :v3.0 (Docker Hub)
 # ==============================================================================
 
 name: Build & Push Docker Image
@@ -67,6 +68,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # ── Docker 登录 Docker Hub ──
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       # ── 设置 Buildx ──
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -81,6 +89,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v3.0
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:v3.0
           # 不生成 attestation/provenance (避免 manifest list 问题)
           provenance: false
           sbom: false
@@ -91,3 +101,4 @@ jobs:
       - name: Verify pushed image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
