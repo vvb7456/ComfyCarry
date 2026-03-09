@@ -1,5 +1,5 @@
 # ==============================================================================
-# ComfyUI 通用 Docker 镜像 (v3.0) — GitHub Actions CI 构建
+# ComfyUI 通用 Docker 镜像 (cu130-torch291) — GitHub Actions CI 构建
 # 支持: Ampere (A100/30xx) | Ada (40xx) | Hopper (H100) | Blackwell (50xx/B200)
 #
 # 基于 runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
@@ -10,7 +10,7 @@ FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
 
 LABEL maintainer="ComfyCarry"
 LABEL description="Universal ComfyUI image — Ampere/Ada/Hopper/Blackwell"
-LABEL version="3.0"
+LABEL version="cu130-torch291"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \

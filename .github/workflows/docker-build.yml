@@ -2,8 +2,8 @@
 # ComfyUI Docker 镜像构建 & 推送 (GitHub Actions)
 #
 # 触发: 手动 / push docker/ 或 .github/workflows/docker-build.yml
-# 产物: ghcr.io/vvb7456/comfycarry:latest + :v3.0
-#        vvb7456/comfycarry:latest + :v3.0 (Docker Hub)
+# 产物: ghcr.io/vvb7456/comfycarry:latest + :cu130-torch291
+#        <dockerhub_user>/comfycarry:latest + :cu130-torch291 (Docker Hub)
 # ==============================================================================
 
 name: Build & Push Docker Image
@@ -88,9 +88,9 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v3.0
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:v3.0
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291
           # 不生成 attestation/provenance (避免 manifest list 问题)
           provenance: false
           sbom: false
