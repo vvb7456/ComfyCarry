@@ -1453,40 +1453,64 @@
     right: 6px;
     bottom: 6px;
     display: flex;
-    gap: 2px;
+    gap: 4px;
     z-index: 1;
 }
 
 .gen-prompt-tool-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
-    border-radius: 6px;
-    background: var(--bg2);
-    color: var(--t3);
+    border-radius: 8px;
+    background: var(--bg3);
+    color: var(--ac);
     cursor: pointer;
-    opacity: 0.5;
     transition: opacity .15s, color .15s, background .15s;
 }
 
 .gen-prompt-tool-btn:hover:not(:disabled) {
-    opacity: 1;
-    color: var(--ac);
-    background: var(--bg3);
+    color: #fff;
+    background: var(--ac);
 }
 
 .gen-prompt-tool-btn:disabled {
     cursor: not-allowed;
-    opacity: 0.25;
+    opacity: 0.3;
+    color: var(--t3);
 }
 
 /* ── 反推弹窗三列布局 ───────────────────────────────────────── */
 .gen-tag-split {
     display: flex;
+    gap: var(--sp-4);
+}
+
+.gen-tag-left {
+    flex: 0 0 320px;
+    display: flex;
+    flex-direction: column;
     gap: var(--sp-3);
+}
+
+.gen-tag-left .comfy-param-help-icon:hover::after {
+    left: 0;
+    transform: none;
+}
+
+.gen-tag-fname {
+    font-size: .75rem;
+    color: var(--t3);
+    text-align: center;
+    word-break: break-all;
+    margin-top: -8px;
+}
+
+.gen-tag-split>.gen-tag-result-area {
+    flex: 1 1 0;
+    min-width: 200px;
 }
 
 .gen-tag-result-area {

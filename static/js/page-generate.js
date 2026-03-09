@@ -979,57 +979,84 @@ window._closePPModal = function () {
   _ppModalFile = null;
 };
 
-function _renderPPParams(type) {
-  const container = document.getElementById('gen-pp-params');
-  if (!container) return;
-  const def = _PP_PARAMS_DEF[type];
-  let html = `<div style="font-weight:500;margin-bottom:12px;font-size:.85rem;color:var(--t2)">参数设置</div>`;
+/**
+ * 通用参数行渲染器 —— PP Modal 和 Tag Modal 共用
+ * @param {HTMLElement} container   目标容器
+ * @param {Array}       paramsDef  参数定义数组 [{key,label,type,tip?,…}]
+ * @param {Object}      values     参数值对象 (会被 change 事件就地修改)
+ * @param {string}      dataAttr   data 属性名 (如 'pp' → data-pp-key)
+ * @param {Object}      [opts]     可选 { title, selectAsNumber }
+ */
+function _renderParamRows(container, paramsDef, values, dataAttr, opts = {}) {
+  const dk = `data-${dataAttr}-key`;
+  const sliderCls = `gen-${dataAttr}-slider-val`;
+  const _tip = t => t ? ` <span class="comfy-param-help-icon" data-tip="${escHtml(t)}">?</span>` : '';
 
-  for (const p of def.params) {
+  let html = '';
+  if (opts.title) html += `<div style="font-weight:500;margin-bottom:12px;font-size:.85rem;color:var(--t2)">${escHtml(opts.title)}</div>`;
+
+  for (const p of paramsDef) {
+    const tipHtml = _tip(p.tip);
     if (p.type === 'toggle') {
-      const checked = _ppParamValues[p.key] ? 'checked' : '';
+      const checked = values[p.key] ? 'checked' : '';
       html += `<div class="gen-pp-param-row">
-        <span>${escHtml(p.label)}</span>
+        <span>${escHtml(p.label)}${tipHtml}</span>
         <label class="comfy-param-toggle" style="margin-left:auto;gap:0">
-          <input type="checkbox" data-pp-key="${p.key}" ${checked}>
+          <input type="checkbox" ${dk}="${p.key}" ${checked}>
           <span class="comfy-toggle-slider"></span>
         </label>
       </div>`;
     } else if (p.type === 'slider') {
       html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
         <div style="display:flex;justify-content:space-between">
-          <span>${escHtml(p.label)}</span>
-          <span class="gen-pp-slider-val" data-pp-key="${p.key}" style="color:var(--ac);font-weight:600">${_ppParamValues[p.key]}</span>
+          <span>${escHtml(p.label)}${tipHtml}</span>
+          <span class="${sliderCls}" ${dk}="${p.key}" style="color:var(--ac);font-weight:600">${values[p.key]}</span>
         </div>
-        <input type="range" data-pp-key="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${_ppParamValues[p.key]}" style="width:100%">
+        <input type="range" ${dk}="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${values[p.key]}" style="width:100%">
       </div>`;
     } else if (p.type === 'select') {
-      const opts = p.options.map(o =>
-        `<option value="${o.v}"${_ppParamValues[p.key] == o.v ? ' selected' : ''}>${escHtml(o.l)}</option>`
+      const optHtml = p.options.map(o =>
+        `<option value="${o.v}"${values[p.key] == o.v ? ' selected' : ''}>${escHtml(o.l)}</option>`
       ).join('');
       html += `<div class="gen-pp-param-row">
-        <span>${escHtml(p.label)}</span>
-        <select data-pp-key="${p.key}" class="input-field" style="width:auto;margin-left:auto">${opts}</select>
+        <span style="white-space:nowrap">${escHtml(p.label)}${tipHtml}</span>
+        <select ${dk}="${p.key}" class="input-field" style="flex:1;min-width:0;margin-left:8px">${optHtml}</select>
+      </div>`;
+    } else if (p.type === 'text') {
+      html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <span>${escHtml(p.label)}${tipHtml}</span>
+        <input type="text" ${dk}="${p.key}" class="input-field" value="${escHtml(values[p.key])}"
+               placeholder="${escHtml(p.placeholder || '')}" style="width:100%;font-size:.8rem">
       </div>`;
     }
   }
   container.innerHTML = html;
 
-  // 绑定参数事件
-  container.querySelectorAll('[data-pp-key]').forEach(el => {
-    const key = el.dataset.ppKey;
+  // 绑定事件
+  const selectAsNum = opts.selectAsNumber !== false;  // PP 默认 Number, Tag 传 false
+  container.querySelectorAll(`[${dk}]`).forEach(el => {
+    const key = el.getAttribute(dk);
     if (el.type === 'checkbox') {
-      el.addEventListener('change', () => { _ppParamValues[key] = el.checked; });
+      el.addEventListener('change', () => { values[key] = el.checked; });
     } else if (el.type === 'range') {
       el.addEventListener('input', () => {
-        _ppParamValues[key] = Number(el.value);
-        const valEl = container.querySelector(`span.gen-pp-slider-val[data-pp-key="${key}"]`);
+        values[key] = Number(el.value);
+        const valEl = container.querySelector(`span.${sliderCls}[${dk}="${key}"]`);
         if (valEl) valEl.textContent = el.value;
       });
     } else if (el.tagName === 'SELECT') {
-      el.addEventListener('change', () => { _ppParamValues[key] = Number(el.value); });
+      el.addEventListener('change', () => { values[key] = selectAsNum ? Number(el.value) : el.value; });
+    } else if (el.type === 'text') {
+      el.addEventListener('input', () => { values[key] = el.value; });
     }
   });
+}
+
+function _renderPPParams(type) {
+  const container = document.getElementById('gen-pp-params');
+  if (!container) return;
+  const def = _PP_PARAMS_DEF[type];
+  _renderParamRows(container, def.params, _ppParamValues, 'pp', { title: '参数设置' });
 }
 
 function _renderPPImagePreview() {
@@ -1163,14 +1190,15 @@ async function _ppPickInput() {
 
 const _TAG_PARAMS_DEF = [
   { key: 'model', label: '模型', type: 'select', default: 'wd-eva02-large-tagger-v3',
-    options: [
-      { v: 'wd-eva02-large-tagger-v3', l: 'EVA02 Large v3 (精度最高)' },
-      { v: 'wd-vit-tagger-v3',         l: 'ViT v3 (轻量)' },
-    ] },
-  { key: 'threshold', label: '通用阈值', type: 'slider', min: 0.1, max: 0.9, step: 0.05, default: 0.35 },
-  { key: 'character_threshold', label: '角色阈值', type: 'slider', min: 0.1, max: 0.9, step: 0.05, default: 0.85 },
-  { key: 'replace_underscore', label: '替换下划线', type: 'toggle', default: true },
-  { key: 'exclude_tags', label: '排除标签', type: 'text', default: '', placeholder: '逗号分隔, 如: simple background' },
+    options: [] },
+  { key: 'threshold', label: '通用阈值', type: 'slider', min: 0.1, max: 0.9, step: 0.05, default: 0.35,
+    tip: '通用标签的置信度阈值。值越低识别越多标签但可能不准确，值越高越精确但可能遗漏' },
+  { key: 'character_threshold', label: '角色阈值', type: 'slider', min: 0.1, max: 0.9, step: 0.05, default: 0.85,
+    tip: '角色标签的置信度阈值。角色识别建议较高阈值以减少误判' },
+  { key: 'replace_underscore', label: '替换下划线', type: 'toggle', default: true,
+    tip: '将标签中的下划线替换为空格，使输出更适合提示词使用' },
+  { key: 'exclude_tags', label: '排除标签', type: 'text', default: '', placeholder: '逗号分隔, 如: simple background',
+    tip: '指定需要排除的标签。常用于过滤背景、评级等无关标签' },
 ];
 
 const _TAG_MODELS = [
@@ -1204,19 +1232,12 @@ async function _openTagModal() {
   const modal = document.getElementById('gen-tag-modal');
   if (!modal) return;
 
-  // 检测任意模型是否已安装
+  // 检查 welcome state：用户是否已点击过「进入」
   if (!_tagModelReady) {
-    const dir = _comfyuiDir + '/custom_nodes/ComfyUI-WD14-Tagger/models';
-    for (const m of _TAG_MODELS) {
-      try {
-        const resp = await apiFetch('/api/downloads/check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ save_dir: dir, filename: m.files[0].filename }),
-        });
-        if (resp?.installed) { _tagModelReady = true; break; }
-      } catch { /* ignore */ }
-    }
+    try {
+      const state = await apiFetch('/api/generate/welcome_state');
+      if (state?.tagger) _tagModelReady = true;
+    } catch { /* ignore */ }
   }
 
   if (!_tagModelReady) {
@@ -1232,11 +1253,24 @@ async function _openTagModal() {
   modal.classList.add('active');
 }
 
-function _showTagBody() {
+async function _showTagBody() {
   document.getElementById('gen-tag-welcome').style.display = 'none';
   const body = document.getElementById('gen-tag-body');
   body.classList.remove('hidden');
   body.style.display = '';
+
+  // 动态加载已安装模型列表
+  try {
+    const resp = await apiFetch('/api/generate/tagger_models');
+    const modelParam = _TAG_PARAMS_DEF.find(p => p.key === 'model');
+    if (resp?.models?.length && modelParam) {
+      modelParam.options = resp.models.map(m => ({ v: m, l: m }));
+      if (!resp.models.includes(modelParam.default)) {
+        modelParam.default = resp.models[0];
+      }
+    }
+  } catch { /* fallback to empty options */ }
+
   // 初始化参数
   _tagParamValues = {};
   for (const p of _TAG_PARAMS_DEF) _tagParamValues[p.key] = p.default;
@@ -1256,65 +1290,15 @@ window._closeTagModal = function () {
 function _renderTagParams() {
   const container = document.getElementById('gen-tag-params');
   if (!container) return;
-  let html = `<div style="font-weight:500;margin-bottom:12px;font-size:.85rem;color:var(--t2)">反推参数</div>`;
-
-  for (const p of _TAG_PARAMS_DEF) {
-    if (p.type === 'toggle') {
-      const checked = _tagParamValues[p.key] ? 'checked' : '';
-      html += `<div class="gen-pp-param-row">
-        <span>${escHtml(p.label)}</span>
-        <label class="comfy-param-toggle" style="margin-left:auto;gap:0">
-          <input type="checkbox" data-tag-key="${p.key}" ${checked}>
-          <span class="comfy-toggle-slider"></span>
-        </label>
-      </div>`;
-    } else if (p.type === 'slider') {
-      html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
-        <div style="display:flex;justify-content:space-between">
-          <span>${escHtml(p.label)}</span>
-          <span class="gen-tag-slider-val" data-tag-key="${p.key}" style="color:var(--ac);font-weight:600">${_tagParamValues[p.key]}</span>
-        </div>
-        <input type="range" data-tag-key="${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${_tagParamValues[p.key]}" style="width:100%">
-      </div>`;
-    } else if (p.type === 'select') {
-      const opts = p.options.map(o =>
-        `<option value="${o.v}"${_tagParamValues[p.key] === o.v ? ' selected' : ''}>${escHtml(o.l)}</option>`
-      ).join('');
-      html += `<div class="gen-pp-param-row">
-        <span>${escHtml(p.label)}</span>
-        <select data-tag-key="${p.key}" class="input-field" style="width:auto;margin-left:auto;max-width:180px">${opts}</select>
-      </div>`;
-    } else if (p.type === 'text') {
-      html += `<div class="gen-pp-param-row" style="flex-direction:column;align-items:stretch;gap:4px">
-        <span>${escHtml(p.label)}</span>
-        <input type="text" data-tag-key="${p.key}" class="input-field" value="${escHtml(_tagParamValues[p.key])}"
-               placeholder="${escHtml(p.placeholder || '')}" style="width:100%;font-size:.8rem">
-      </div>`;
-    }
-  }
-  container.innerHTML = html;
-
-  container.querySelectorAll('[data-tag-key]').forEach(el => {
-    const key = el.dataset.tagKey;
-    if (el.type === 'checkbox') {
-      el.addEventListener('change', () => { _tagParamValues[key] = el.checked; });
-    } else if (el.type === 'range') {
-      el.addEventListener('input', () => {
-        _tagParamValues[key] = Number(el.value);
-        const valEl = container.querySelector(`span.gen-tag-slider-val[data-tag-key="${key}"]`);
-        if (valEl) valEl.textContent = el.value;
-      });
-    } else if (el.tagName === 'SELECT') {
-      el.addEventListener('change', () => { _tagParamValues[key] = el.value; });
-    } else if (el.type === 'text') {
-      el.addEventListener('input', () => { _tagParamValues[key] = el.value; });
-    }
-  });
+  _renderParamRows(container, _TAG_PARAMS_DEF, _tagParamValues, 'tag', { title: '反推参数', selectAsNumber: false });
 }
 
 function _renderTagImagePreview() {
   const container = document.getElementById('gen-tag-image-preview');
   if (!container) return;
+
+  // 移除旧的文件名标签
+  container.parentElement?.querySelector('.gen-tag-fname')?.remove();
 
   if (_tagModalFile) {
     let imgSrc;
@@ -1324,8 +1308,14 @@ function _renderTagImagePreview() {
       imgSrc = `/api/generate/input_image_preview?name=${encodeURIComponent(_tagModalFile)}`;
     }
     container.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain">
-      <div style="position:absolute;bottom:4px;left:4px;right:4px;text-align:center;font-size:.75rem;color:var(--t3);background:var(--bg2);border-radius:4px;padding:2px 4px;word-break:break-all">${escHtml(_tagModalFileName)}</div>
       <div class="gen-ref-clear" title="移除"><span class="ms">close</span></div>`;
+    // 文件名放到容器外面
+    if (_tagModalFileName) {
+      const fnameEl = document.createElement('div');
+      fnameEl.className = 'gen-tag-fname';
+      fnameEl.textContent = _tagModalFileName;
+      container.after(fnameEl);
+    }
     container.querySelector('.gen-ref-clear')?.addEventListener('click', (e) => {
       e.stopPropagation();
       _tagModalFile = null;
@@ -1559,7 +1549,7 @@ function _initTagModelDep() {
     paramsId: 'gen-tag-body',
     comfyuiDir: _comfyuiDir,
     tab: 'tagger',
-    title: '提示词反推 — 需要下载额外模型才能工作',
+    title: '该功能需下载反推模型',
     models: _TAG_MODELS,
     minOptional: 1,
     onEnter: () => {
@@ -1655,19 +1645,19 @@ const _CN_MODELS = {
 const _CN_MODEL_CFG = {
   pose: {
     tab: 'pose',
-    title: '姿势控制 — 需要下载额外模型才能工作',
+    title: '该功能需下载姿势控制模型',
     models: [_CN_MODELS.union, _CN_MODELS.pose_dedicated, _CN_MODELS.dwpose],
     minOptional: 1,
   },
   canny: {
     tab: 'canny',
-    title: '轮廓控制 — 需要下载额外模型才能工作',
+    title: '该功能需下载轮廓控制模型',
     models: [_CN_MODELS.union, _CN_MODELS.canny_dedicated],
     minOptional: 1,
   },
   depth: {
     tab: 'depth',
-    title: '景深控制 — 需要下载额外模型才能工作',
+    title: '该功能需下载景深控制模型',
     models: [_CN_MODELS.union, _CN_MODELS.depth_dedicated, _CN_MODELS.depth_anything_v2],
     minOptional: 1,
   },
@@ -2499,7 +2489,7 @@ function _initUpscaleModelDep() {
     paramsId: 'gen-upscale-params',
     comfyuiDir: _comfyuiDir,
     tab: 'upscale',
-    title: '高清放大 — 需要下载额外模型才能工作',
+    title: '该功能需下载高清放大模型',
     models: [{
       id: 'aurasr-v2',
       name: 'AuraSR v2',

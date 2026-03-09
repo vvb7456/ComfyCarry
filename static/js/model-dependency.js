@@ -8,7 +8,6 @@
  *   - 统一下载按钮 + 进度条，顺序下载选中模型
  *   - 进度文案嵌入进度条内: "1/3 · ModelName · 45% · 12 MB/s"
  *   - 点击"进入"后写入 welcome state，同一容器不再显示
- *   - 全部已安装时自动 dismiss，不显示欢迎页
  *
  * 用法:
  *   import { initModelDependency } from './model-dependency.js';
@@ -120,14 +119,7 @@ async function _init(st) {
     }
   }
 
-  // 3. 全部已安装 → 自动 dismiss
-  const allInstalled = cfg.models.every(m => st.modelStatus.get(m.id)?.installed);
-  if (allInstalled) {
-    _dismissWelcome(st);
-    return;
-  }
-
-  // 4. 初始选中: installed 或 required
+  // 3. 初始选中: installed 或 required
   for (const m of cfg.models) {
     const ms = st.modelStatus.get(m.id);
     if (ms?.installed || m.required) st.selected.add(m.id);
@@ -135,7 +127,7 @@ async function _init(st) {
 
   _renderWelcome(st);
 
-  // 5. 恢复正在下载
+  // 4. 恢复正在下载
   const dlModel = cfg.models.find(m => {
     const ms = st.modelStatus.get(m.id);
     return ms?.downloading && ms.download_id;

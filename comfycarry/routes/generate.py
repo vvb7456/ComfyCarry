@@ -778,6 +778,34 @@ def api_generate_welcome_state_post():
     return jsonify({"ok": True})
 
 
+# ── /api/generate/tagger_models ──────────────────────────────────────────────
+
+@bp.route("/api/generate/tagger_models", methods=["GET"])
+def api_generate_tagger_models():
+    """
+    扫描 WD14 Tagger 模型目录，返回已安装的模型列表。
+    逻辑与 WD14 Tagger 插件的 get_installed_models() 保持一致:
+      - 扫描 .onnx 文件
+      - 过滤出同时有对应 .csv 文件的
+    返回: {"models": ["wd-vit-tagger-v3", "wd-eva02-large-tagger-v3", ...]}
+    """
+    models_dir = os.path.join(COMFYUI_DIR, "custom_nodes", "ComfyUI-WD14-Tagger", "models")
+    if not os.path.isdir(models_dir):
+        return jsonify({"models": []})
+
+    installed = []
+    for f in os.listdir(models_dir):
+        if not f.endswith(".onnx"):
+            continue
+        base = os.path.splitext(f)[0]
+        csv_path = os.path.join(models_dir, base + ".csv")
+        if os.path.exists(csv_path):
+            installed.append(base)
+
+    installed.sort()
+    return jsonify({"models": installed})
+
+
 # ── /api/generate/interrogate ────────────────────────────────────────────────
 
 @bp.route("/api/generate/interrogate", methods=["POST"])
