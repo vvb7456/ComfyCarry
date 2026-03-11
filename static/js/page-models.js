@@ -28,6 +28,17 @@ let facetsLoaded = false;
 let _initialSearchDone = false;  // 首次自动空搜索
 let _facetsPromise = null;   // 防止并发重复加载
 let dlStatusInterval = null;
+
+// Cart key helpers: composite key = "modelId:versionId" when version specified, else "modelId"
+function _cartKey(modelId, versionId) { return versionId ? `${modelId}:${versionId}` : String(modelId); }
+function _getModelId(cartKey, entry) { return entry?.modelId || (cartKey.includes(':') ? cartKey.split(':')[0] : cartKey); }
+function _isInCart(modelId) {
+  modelId = String(modelId);
+  for (const [key, entry] of selectedModels) {
+    if (_getModelId(key, entry) === modelId) return true;
+  }
+  return false;
+}
 let _dlCompletedIds = new Set();
 let _localCivitaiIds = new Set();  // CivitAI modelId → 本地已存在
 let _downloadingCivitaiIds = new Set();  // CivitAI modelId → 正在下载(active/paused/queued)
@@ -191,13 +202,15 @@ function switchMetaVersion(versionId, modelId) {
   // Update cached selected version
   cached.version = newVer;
   // Also update cart if in cart
-  if (selectedModels.has(String(modelId))) {
-    const entry = selectedModels.get(String(modelId));
-    entry.versionId = newVer.id;
-    entry.versionName = newVer.name;
-    entry.baseModel = newVer.baseModel;
-    saveCartToStorage();
+  // Update cart entries for this model (may have composite keys)
+  for (const [key, entry] of selectedModels) {
+    if (_getModelId(key, entry) === String(modelId)) {
+      entry.versionId = newVer.id;
+      entry.versionName = newVer.name;
+      entry.baseModel = newVer.baseModel;
+    }
   }
+  saveCartToStorage();
   // Re-render modal with new version
   openMetaModal({
     ...cached, id: modelId, selectedVersion: newVer, versions: cached.allVersions
@@ -560,9 +573,9 @@ async function searchModels(page = 0, append = false) {
   if (!append) {
     results.innerHTML = renderSkeleton('model-grid', 6); pag.innerHTML = '';
     // Preserve cache entries for models already in cart
-    const cartKeys = new Set(selectedModels.keys());
+    const cartModelIds = new Set([...selectedModels].map(([k, e]) => _getModelId(k, e)));
     searchResultsCache = Object.fromEntries(
-      Object.entries(searchResultsCache).filter(([k]) => cartKeys.has(k))
+      Object.entries(searchResultsCache).filter(([k]) => cartModelIds.has(k))
     );
   }
 
@@ -677,7 +690,7 @@ function renderCivitCard(h) {
 
   const badgeClass = getBadgeClass(badgeKey);
   const bm = ver?.baseModel || '';
-  const inCart = selectedModels.has(String(h.id));
+  const inCart = _isInCart(h.id);
   const vCount = allVersions.length;
   const isLocal = _localCivitaiIds.has(String(h.id));
 
@@ -727,13 +740,17 @@ function renderCivitCard(h) {
 
 function toggleCartFromSearch(id, btn) {
   id = String(id);
-  if (selectedModels.has(id)) {
-    selectedModels.delete(id);
+  if (_isInCart(id)) {
+    // Remove all entries for this model (simple or composite keys)
+    for (const [key, entry] of [...selectedModels]) {
+      if (_getModelId(key, entry) === id) selectedModels.delete(key);
+    }
     btn.textContent = '收藏';
     btn.classList.remove('btn-danger'); btn.classList.add('btn-primary');
   } else {
     const data = searchResultsCache[id] || {};
     selectedModels.set(id, {
+      modelId: id,
       name: data.name || 'Unknown', type: data.type || '',
       imageUrl: data.image || '',
       versionId: data.version?.id, versionName: data.version?.name,
@@ -845,20 +862,37 @@ function closeVersionPicker() {
 // ========== ID Lookup + Cart ==========
 
 function parseIds(text) {
-  const ids = [];
+  const seen = new Set();
+  const results = [];
   for (const part of text.split(/[,\s\n]+/)) {
     const t = part.trim();
     if (!t) continue;
+    let modelId = null, versionId = null;
     const m = t.match(/models\/(\d+)/);
-    if (m) ids.push(m[1]);
-    else if (/^\d+$/.test(t)) ids.push(t);
+    if (m) {
+      modelId = m[1];
+      // Extract versionId from ?modelVersionId= query param
+      const vm = t.match(/[?&]modelVersionId=(\d+)/);
+      if (vm) versionId = vm[1];
+    } else if (/^\d+$/.test(t)) {
+      modelId = t;
+    }
+    if (modelId) {
+      const key = _cartKey(modelId, versionId);
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({ id: modelId, versionId });
+      }
+    }
   }
-  return [...new Set(ids)];
+  return results;
 }
 
 async function lookupIds(text) {
   if (!text) text = document.getElementById('search-input')?.value?.trim() || '';
-  const ids = parseIds(text);
+  const parsed = parseIds(text);
+  const ids = parsed.map(p => p.id);
+  const versionMap = Object.fromEntries(parsed.filter(p => p.versionId).map(p => [p.id, p.versionId]));
   if (ids.length === 0) { showToast('请输入有效的模型 ID'); return; }
 
   const loading = document.getElementById('search-loading');
@@ -887,17 +921,24 @@ async function lookupIds(text) {
   if (found.length === 0) { errEl.innerHTML = renderEmpty('未找到任何模型'); return; }
 
   results.innerHTML = found.map(d => {
-    const img = d.modelVersions?.[0]?.images?.[0]?.url || '';
+    const urlVersionId = versionMap[String(d.id)];
+    // If URL specified a versionId, find that version; otherwise default to first
+    let selectedVer = d.modelVersions?.[0] || null;
+    if (urlVersionId && d.modelVersions) {
+      const match = d.modelVersions.find(v => String(v.id) === String(urlVersionId));
+      if (match) selectedVer = match;
+    }
+    const img = selectedVer?.images?.[0]?.url || '';
     const fullImg = img ? img.replace('/width=450', '') : '';
-    const bm = d.modelVersions?.[0]?.baseModel || '';
-    const inCart = selectedModels.has(String(d.id));
+    const bm = selectedVer?.baseModel || '';
+    const inCart = _isInCart(d.id);
     const vCount = (d.modelVersions || []).length;
     // Cache for cart and metadata
     searchResultsCache[String(d.id)] = {
       name: d.name || 'Unknown', type: d.type || '',
-      image: img, version: d.modelVersions?.[0] || null,
+      image: img, version: selectedVer,
       allVersions: d.modelVersions || [],
-      images: d.modelVersions?.[0]?.images || [],
+      images: selectedVer?.images || [],
       metrics: d.stats || {}, user: d.creator || {},
     };
     const zoomIcon = img ? `<span class="zoom-icon" onclick="event.stopPropagation();openImg('${fullImg.replace(/'/g, "\\'")}')" title="查看大图">${msIcon('zoom_in','ms-sm')}</span>` : '';
@@ -921,66 +962,121 @@ async function lookupIds(text) {
   }).join('');
 }
 
-function changeCartVersion(modelId, versionId) {
-  modelId = String(modelId);
+function changeCartVersion(cartKey, versionId) {
+  const entry = selectedModels.get(cartKey);
+  if (!entry) return;
+  const modelId = _getModelId(cartKey, entry);
   const cached = searchResultsCache[modelId];
   if (!cached || !cached.allVersions) return;
   const newVer = cached.allVersions.find(v => String(v.id) === String(versionId));
   if (!newVer) return;
-  const entry = selectedModels.get(modelId);
-  if (entry) {
-    entry.versionId = newVer.id;
-    entry.versionName = newVer.name;
-    entry.baseModel = newVer.baseModel;
-    saveCartToStorage();
-    updateCartIdsTextarea();
-  }
+  entry.versionId = newVer.id;
+  entry.versionName = newVer.name;
+  entry.baseModel = newVer.baseModel;
+  saveCartToStorage();
 }
 
-function updateCartIdsTextarea() {
-  const ta = document.getElementById('cart-ids-textarea');
-  if (ta) ta.value = [...selectedModels.keys()].join(', ');
-}
+function addFromCartInput() {
+  const el = document.getElementById('cart-ids-input');
+  if (!el) return;
+  const text = el.value.trim();
+  if (!text) return;
+  const parsed = parseIds(text);
+  if (parsed.length === 0) { showToast('请输入有效的模型 ID 或 CivitAI 链接'); return; }
 
-function syncCartFromTextarea(el) {
-  // Parse IDs from textarea and sync cart
-  const text = el.value;
-  const ids = parseIds(text);
-  // Remove IDs not in textarea
-  for (const existingId of [...selectedModels.keys()]) {
-    if (!ids.includes(existingId)) {
-      selectedModels.delete(existingId);
+  const needsFetch = new Set();
+  let added = 0, dupes = 0;
+  for (const { id, versionId: urlVersionId } of parsed) {
+    const key = _cartKey(id, urlVersionId);
+    if (selectedModels.has(key)) { dupes++; continue; }
+    // Check if same modelId+versionId exists under a different key format
+    if (urlVersionId) {
+      let dup = false;
+      for (const [k, e] of selectedModels) {
+        if (_getModelId(k, e) === id && String(e.versionId) === String(urlVersionId)) { dup = true; break; }
+      }
+      if (dup) { dupes++; continue; }
     }
+    const cached = searchResultsCache[id];
+    let ver = cached?.version;
+    if (urlVersionId && cached?.allVersions) {
+      const match = cached.allVersions.find(v => String(v.id) === String(urlVersionId));
+      if (match) ver = match;
+    }
+    selectedModels.set(key, {
+      modelId: id,
+      name: cached?.name || `Model #${id}`, type: cached?.type || '',
+      imageUrl: cached?.image || '',
+      versionId: urlVersionId ? parseInt(urlVersionId) : ver?.id,
+      versionName: ver?.name,
+      baseModel: ver?.baseModel,
+    });
+    if (!cached) needsFetch.add(id);
+    added++;
   }
-  // Add new IDs (with minimal data)
+  el.value = '';
+  if (added === 0) { showToast(dupes > 0 ? '模型已在列表中' : '请输入有效的模型 ID 或 CivitAI 链接'); return; }
+  saveCartToStorage(); updateCartBadge(); renderPendingList();
+  if (needsFetch.size > 0) {
+    _fetchCartModelInfo([...needsFetch]);
+  }
+}
+
+function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderPendingList(); }
+
+async function _fetchCartModelInfo(ids) {
+  let updated = false;
   for (const id of ids) {
-    if (!selectedModels.has(id)) {
-      const cached = searchResultsCache[id];
-      selectedModels.set(id, {
-        name: cached?.name || `Model #${id}`, type: cached?.type || '',
-        imageUrl: cached?.image || '',
-        versionId: cached?.version?.id, versionName: cached?.version?.name,
-        baseModel: cached?.version?.baseModel,
-      });
-    }
+    if (searchResultsCache[id]) continue; // already cached
+    try {
+      const r = await fetch(`${CIVITAI_API_BASE}/models/${id}`, { headers: getAuthHeaders() });
+      if (!r.ok) continue;
+      const d = await r.json();
+      const firstVer = d.modelVersions?.[0] || null;
+      const defaultImg = firstVer?.images?.[0]?.url || '';
+      searchResultsCache[id] = {
+        name: d.name || 'Unknown', type: d.type || '',
+        image: defaultImg, version: firstVer,
+        allVersions: d.modelVersions || [],
+        images: firstVer?.images || [],
+        metrics: d.stats || {}, user: d.creator || {},
+      };
+      // Update all cart entries for this model ID
+      for (const [key, entry] of selectedModels) {
+        if (_getModelId(key, entry) !== id) continue;
+        const urlVersionId = entry.versionId;
+        let selectedVer = firstVer;
+        if (urlVersionId && d.modelVersions) {
+          const match = d.modelVersions.find(v => String(v.id) === String(urlVersionId));
+          if (match) selectedVer = match;
+        }
+        const img = selectedVer?.images?.[0]?.url || '';
+        entry.name = d.name || entry.name;
+        entry.type = d.type || entry.type;
+        entry.imageUrl = img || entry.imageUrl;
+        if (!entry.versionId && selectedVer) entry.versionId = selectedVer.id;
+        if (!entry.versionName && selectedVer) entry.versionName = selectedVer.name;
+        if (!entry.baseModel && selectedVer) entry.baseModel = selectedVer.baseModel;
+        updated = true;
+      }
+    } catch (e) { console.error(`Fetch model ${id}:`, e); }
   }
-  saveCartToStorage(); updateCartBadge();
-  // Debounce pending list re-render
-  clearTimeout(syncCartFromTextarea._timer);
-  syncCartFromTextarea._timer = setTimeout(renderPendingList, 500);
+  if (updated) {
+    saveCartToStorage();
+    renderPendingList();
+  }
 }
-
-function removeFromCart(id) { selectedModels.delete(String(id)); saveCartToStorage(); updateCartBadge(); renderPendingList(); updateCartIdsTextarea(); }
 
 async function batchDownloadCart() {
-  if (selectedModels.size === 0) return showToast('已选列表为空');
+  if (selectedModels.size === 0) return showToast('收藏列表为空');
   const total = selectedModels.size;
   showToast(`开始批量下载 ${total} 个模型...`);
   let ok = 0, fail = 0;
-  for (const [id, m] of selectedModels) {
+  for (const [key, m] of selectedModels) {
+    const modelId = _getModelId(key, m);
     const modelType = (m.type || 'Checkpoint').toLowerCase();
-    const versionId = m.versionId || null;
-    const payload = { model_id: id, model_type: modelType };
+    const versionId = m.versionId || (key.includes(':') ? key.split(':')[1] : null);
+    const payload = { model_id: modelId, model_type: modelType };
     if (versionId) payload.version_id = versionId;
     const d = await apiFetch('/api/downloads/civitai', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1010,7 +1106,10 @@ function loadCartFromStorage() {
     const raw = localStorage.getItem('civitai_cart');
     if (!raw) return;
     const data = JSON.parse(raw);
-    for (const [id, v] of Object.entries(data)) selectedModels.set(id, v);
+    for (const [id, v] of Object.entries(data)) {
+      if (!v.modelId) v.modelId = id.includes(':') ? id.split(':')[0] : id;
+      selectedModels.set(id, v);
+    }
   } catch (e) { }
 }
 
@@ -1236,62 +1335,57 @@ function renderPendingList() {
   const container = document.getElementById('dl-pending-content');
   if (!container) return;
 
-  // ID textarea + action bar (always shown at top of this tab)
-  const taVal = document.activeElement?.id === 'cart-ids-textarea' ? '' : ` value="${[...selectedModels.keys()].join(', ')}"`;
+  // Input bar + actions
   let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:8px">
-    <span style="font-size:.85rem;font-weight:600;color:var(--t1)">模型 ID 列表</span>
-    <div style="flex:1"></div>
-    <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()">一键下载全部</button>
-    <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderDownloadsTab();}">清空</button>
-  </div>
-  <textarea class="cart-ids-box" id="cart-ids-textarea" oninput="syncCartFromTextarea(this)" style="min-height:50px;margin-bottom:12px" placeholder="输入模型 ID（逗号分隔）或从 CivitAI 页添加"></textarea>`;
+    <input type="text" class="cart-ids-box" id="cart-ids-input" onkeydown="if(event.key==='Enter'){event.preventDefault();addFromCartInput()}" style="flex:1;min-width:0;height:32px;box-sizing:border-box" placeholder="输入 CivitAI 链接或模型 ID，按回车添加">
+    <button class="btn btn-sm btn-primary" onclick="addFromCartInput()" title="添加到列表" style="height:32px;box-sizing:border-box">${msIcon('add')}</button>
+    <button class="btn btn-sm btn-primary" onclick="batchDownloadCart()" style="height:32px;box-sizing:border-box">下载全部</button>
+    <button class="btn btn-sm btn-danger" onclick="if(confirm('确定清空?')){selectedModels.clear();saveCartToStorage();updateCartBadge();renderDownloadsTab();}" style="height:32px;box-sizing:border-box">清空</button>
+  </div>`;
 
   if (selectedModels.size === 0) {
-    html += '<div style="text-align:center;padding:20px;color:var(--t3)">暂无已选模型，从 CivitAI 页添加或在上方输入 ID</div>';
+    html += '<div style="text-align:center;padding:20px;color:var(--t3)">暂无收藏模型，从 CivitAI 页添加或在上方输入链接/ID</div>';
   } else {
-    for (const [id, m] of selectedModels) {
+    for (const [key, m] of selectedModels) {
+      const modelId = _getModelId(key, m);
       const safeName = (m.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const badgeClass = getBadgeClass((m.type || '').toLowerCase());
-      const cached = searchResultsCache[String(id)];
+      const cached = searchResultsCache[modelId];
       const allVersions = cached?.allVersions || [];
-      let versionHtml = m.versionName || '-';
+      let versionHtml = m.versionName || (m.versionId ? `v${m.versionId}` : '-');
       if (allVersions.length > 1) {
+        const safeKey = escAttr(key);
         const opts = allVersions.map(v => {
           const sel = String(v.id) === String(m.versionId) ? 'selected' : '';
           return `<option value="${v.id}" ${sel}>${v.name || v.id}${v.baseModel ? ' (' + v.baseModel + ')' : ''}</option>`;
         }).join('');
-        versionHtml = `<select class="meta-version-select" onchange="changeCartVersion('${id}', this.value)" style="max-width:140px;font-size:.75rem">${opts}</select>`;
+        versionHtml = `<select class="meta-version-select" onchange="changeCartVersion('${safeKey}', this.value)" style="max-width:140px;font-size:.75rem">${opts}</select>`;
       }
       const imgUrl = m.imageUrl || '';
       const thumbHtml = imgUrl ? `<div class="dl-item-thumb"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" alt=""></div>` : '';
+      const safeKey = escAttr(key);
       html += `<div class="dl-item">
         ${thumbHtml}
         <div class="dl-item-info">
-          <span class="dl-item-name"><a href="https://civitai.com/models/${id}" target="_blank" style="color:var(--ac)">${safeName}</a></span>
+          <span class="dl-item-name"><a href="https://civitai.com/models/${modelId}" target="_blank" style="color:var(--ac)">${safeName}</a></span>
           <div class="dl-item-meta">
             <span class="badge ${badgeClass}" style="font-size:.65rem">${m.type || ''}</span>
-            <span>ID: ${id}</span>
+            <span>ID: ${modelId}</span>
             ${versionHtml !== '-' ? versionHtml : `<span>${versionHtml}</span>`}
           </div>
         </div>
         <div class="dl-item-actions">
-          <button class="btn btn-sm" onclick="downloadFromSearch('${id}', '${(m.type || 'Checkpoint').toLowerCase()}')" title="立即下载">${msIcon('download')}</button>
-          <button class="btn btn-sm btn-danger" onclick="removeFromCart('${id}')" title="移除">${msIcon('delete')}</button>
+          <button class="btn btn-sm" onclick="${m.versionId ? `doDownload('${modelId}', '${(m.type || 'Checkpoint').toLowerCase()}', '${m.versionId}')` : `downloadFromSearch('${modelId}', '${(m.type || 'Checkpoint').toLowerCase()}')`}" title="立即下载">${msIcon('download')}</button>
+          <button class="btn btn-sm btn-danger" onclick="removeFromCart('${safeKey}')" title="移除">${msIcon('delete')}</button>
         </div>
       </div>`;
     }
   }
   container.innerHTML = html;
 
-  // Restore textarea value if not focused
-  const ta = document.getElementById('cart-ids-textarea');
-  if (ta && document.activeElement !== ta) {
-    ta.value = [...selectedModels.keys()].join(', ');
-  }
-
   // Update tab badge count
   document.querySelectorAll('[data-dltab="pending"]').forEach(t => {
-    t.innerHTML = `<span class="ms ms-sm" style="color:#f472b6">push_pin</span> 已选${selectedModels.size > 0 ? ' (' + selectedModels.size + ')' : ''}`;
+    t.innerHTML = `<span class="ms ms-sm" style="color:#f472b6">push_pin</span> 收藏${selectedModels.size > 0 ? ' (' + selectedModels.size + ')' : ''}`;
   });
 }
 
@@ -1339,7 +1433,7 @@ window.closeVersionPicker = closeVersionPicker;
 // ID lookup + cart
 window.lookupIds = lookupIds;
 window.changeCartVersion = changeCartVersion;
-window.syncCartFromTextarea = syncCartFromTextarea;
+window.addFromCartInput = addFromCartInput;
 window.removeFromCart = removeFromCart;
 window.batchDownloadCart = batchDownloadCart;
 
