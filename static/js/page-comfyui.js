@@ -5,13 +5,12 @@
 
 import { registerPage, createTabSwitcher, createAutoRefresh, fmtBytes, fmtPct, showToast, escHtml, renderError, renderEmpty, msIcon, apiFetch } from './core.js';
 import { createLogStream } from './sse-log.js';
-import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
+import { createExecTracker, renderProgressBar, createComfySSE } from './comfyui-progress.js';
 
 // ── 模块状态 ──────────────────────────────────────────────────
 
 
 let _comfyParamsSchema = null;
-let _comfyEventSource = null;
 let _comfyLogStream = null;
 
 // Shared execution tracker
@@ -21,37 +20,25 @@ const _comfyTracker = createExecTracker({
   }
 });
 
+// SSE connection managed by shared module
+const _comfySSE = createComfySSE(_comfyTracker, {
+  onEvent: handleComfyEvent,
+  guard: () => {
+    const page = document.getElementById('page-comfyui');
+    return page && !page.classList.contains('hidden');
+  },
+});
+
 // ── 页面入口 ──────────────────────────────────────────────────
 
 async function loadComfyUIPage() {
   await Promise.all([loadComfyStatus(), loadComfyParams()]);
-  startComfyEventStream();
+  _comfySSE.start();
   startComfyLogStream();
   _currentComfyTab = 'console';
 }
 
 // ── SSE: ComfyUI real-time events ─────────────────────────────
-
-function startComfyEventStream() {
-  // Guard: only start if ComfyUI page is active
-  const page = document.getElementById('page-comfyui');
-  if (!page || page.classList.contains('hidden')) return;
-  stopComfyEventStream();
-  _comfyEventSource = new EventSource('/api/comfyui/events');
-  _comfyEventSource.onmessage = (e) => {
-    try {
-      const evt = JSON.parse(e.data);
-      handleComfyEvent(evt);
-    } catch (_) {}
-  };
-  _comfyEventSource.onerror = () => {
-    // Will auto-reconnect by default
-  };
-}
-
-function stopComfyEventStream() {
-  if (_comfyEventSource) { _comfyEventSource.close(); _comfyEventSource = null; }
-}
 
 function handleComfyEvent(evt) {
   const t = evt.type;
@@ -621,8 +608,7 @@ function downloadHistoryImages(images) {
 const _refresh = createAutoRefresh(() => loadComfyStatus(), 10000);
 
 function _stopAllStreams() {
-  _comfyTracker.destroy();
-  stopComfyEventStream();
+  _comfySSE.stop();
   stopComfyLogStream();
 }
 

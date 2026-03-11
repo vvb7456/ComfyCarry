@@ -146,6 +146,7 @@ def parse_comfyui_args(args):
               for k, v in COMFYUI_PARAM_GROUPS.items()}
     params["listen"] = "0.0.0.0"
     params["port"] = 8188
+    params["preview_method"] = "auto"
 
     i = 0
     while i < len(args):

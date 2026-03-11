@@ -79,6 +79,13 @@ class ComfyWSBridge:
 
     def _on_close(self, ws, close_status_code=None, close_msg=None):
         self._broadcast({"type": "ws_disconnected"})
+        # WS 断连时如有执行中状态，清除并通知前端
+        if self._exec_info:
+            self._broadcast({"type": "execution_interrupted", "data": {
+                "prompt_id": self._exec_info.get("prompt_id"),
+            }})
+            self._exec_info = None
+            self._last_progress = None
 
     def _fetch_node_names(self, prompt_id):
         """从 ComfyUI /queue 获取节点 ID → class_type 映射"""
@@ -132,6 +139,13 @@ class ComfyWSBridge:
             # ── 队列状态 (广播事件，所有客户端都会收到) ──
             if msg_type == "status":
                 self._last_status = msg_data
+                # WS 重连后 ComfyUI 发送 status — 如果队列空但有残留执行状态，清除
+                if self._exec_info:
+                    queue_info = msg_data.get("status", {})
+                    queue_remaining = queue_info.get("exec_info", {}).get("queue_remaining", -1)
+                    if queue_remaining == 0:
+                        self._exec_info = None
+                        self._last_progress = None
                 self._broadcast({"type": "status", "data": msg_data})
 
             # ── GPU/CPU 监控 (Crystools 广播) ──
@@ -274,6 +288,21 @@ class ComfyWSBridge:
         # 发送当前缓存状态给新订阅者 — 完整快照以支持页面刷新后恢复
         if self._last_status:
             q.put({"type": "status", "data": self._last_status})
+        if self._exec_info:
+            # 验证执行是否真的还在跑（防止陈旧快照）
+            try:
+                r = requests.get(f"{self._http_url}/queue", timeout=3)
+                if r.ok:
+                    data = r.json()
+                    running_ids = {
+                        item[1] for item in data.get("queue_running", [])
+                        if len(item) >= 2
+                    }
+                    if self._exec_info["prompt_id"] not in running_ids:
+                        self._exec_info = None
+                        self._last_progress = None
+            except Exception:
+                pass
         if self._exec_info:
             # 发送完整执行快照，包含所有已执行/已缓存节点
             nodes_state = self._exec_info.get("nodes", {})

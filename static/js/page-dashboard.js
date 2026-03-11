@@ -12,48 +12,27 @@
  */
 
 import { registerPage, createAutoRefresh, fmtBytes, fmtPct, fmtUptime, fmtDuration, showToast, escHtml, msIcon, apiFetch, renderSkeleton } from './core.js';
-import { createExecTracker, renderProgressBar } from './comfyui-progress.js';
+import { createExecTracker, renderProgressBar, createComfySSE } from './comfyui-progress.js';
 
-let _sseSource = null;
 let _cachedData = null;
 
 // ── 页面生命周期 ─────────────────────────────────────────────
 
 const _refresh = createAutoRefresh(() => refreshOverview(), 5000);
+const _execTracker = createExecTracker({ onUpdate: _updateActivity });
+const _sse = createComfySSE(_execTracker);
 
 registerPage('dashboard', {
   enter() {
     refreshOverview();
     _refresh.start();
-    _startSSE();
+    _sse.start();
   },
   leave() {
     _refresh.stop();
-    _stopSSE();
+    _sse.stop();
   }
 });
-
-// ── SSE: ComfyUI 实时事件（用于活动面板进度更新）─────────────
-
-function _startSSE() {
-  _stopSSE();
-  try {
-    _sseSource = new EventSource('/api/comfyui/events');
-    _sseSource.onmessage = (e) => {
-      try {
-        const evt = JSON.parse(e.data);
-        _execTracker.handleEvent(evt);
-      } catch (_) {}
-    };
-  } catch (_) {}
-}
-
-function _stopSSE() {
-  if (_sseSource) { _sseSource.close(); _sseSource = null; }
-}
-
-// Shared execution tracker — drives activity feed progress bar
-const _execTracker = createExecTracker({ onUpdate: _updateActivity });
 
 // ── 主刷新函数 ──────────────────────────────────────────────
 

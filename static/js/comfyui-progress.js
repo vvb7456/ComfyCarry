@@ -1,7 +1,7 @@
 /**
  * ComfyCarry — comfyui-progress.js
- * Shared ComfyUI execution state machine + progress bar rendering.
- * Used by both page-dashboard.js (activity feed) and page-comfyui.js (exec bar).
+ * Shared ComfyUI execution state machine + progress bar rendering + SSE lifecycle.
+ * Used by page-dashboard.js, page-comfyui.js, and page-generate.js.
  */
 
 import { escHtml, fmtDuration, msIcon } from './core.js';
@@ -107,6 +107,12 @@ export function createExecTracker({ onUpdate }) {
       return { finished: true, type: t, data: d };
     }
 
+    if (t === 'ws_disconnected') {
+      _clearState();
+      onUpdate();
+      return true;
+    }
+
     return false;
   }
 
@@ -170,4 +176,49 @@ export function renderProgressBar(st, extraStyle) {
   html += `<span class="comfy-progress-time">${timeStr}</span>`;
   html += `</div>`;
   return html;
+}
+
+/**
+ * Create a managed SSE connection to /api/comfyui/events with auto-reconnect.
+ *
+ * @param {Object} tracker  — createExecTracker instance
+ * @param {Object} opts
+ * @param {Function} [opts.onEvent]   — custom event handler (receives parsed event object)
+ * @param {Function} [opts.guard]     — return false to prevent SSE creation (e.g., page visibility check)
+ * @param {number}   [opts.reconnectDelay=3000]
+ * @returns {{ start, stop, isActive }}
+ */
+export function createComfySSE(tracker, { onEvent, guard, reconnectDelay = 3000 } = {}) {
+  let _sse = null;
+  let _reconnectTimer = null;
+
+  function start() {
+    if (_sse) return;
+    if (guard && !guard()) return;
+    _sse = new EventSource('/api/comfyui/events');
+    _sse.onmessage = (e) => {
+      try {
+        const evt = JSON.parse(e.data);
+        if (onEvent) onEvent(evt);
+        else tracker.handleEvent(evt);
+      } catch (_) {}
+    };
+    _sse.onerror = () => {
+      stop();
+      _reconnectTimer = setTimeout(() => {
+        _reconnectTimer = null;
+        start();
+      }, reconnectDelay);
+    };
+  }
+
+  function stop() {
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+    if (_sse) { _sse.close(); _sse = null; }
+    tracker.destroy();
+  }
+
+  function isActive() { return _sse !== null; }
+
+  return { start, stop, isActive };
 }
