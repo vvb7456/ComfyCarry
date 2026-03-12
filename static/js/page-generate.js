@@ -3573,8 +3573,9 @@ function _renderLlmImagePreview() {
   const container = document.getElementById('gen-llm-image-preview');
   if (!container) return;
 
-  // 移除旧文件名
-  container.parentElement?.querySelector('.gen-tag-fname')?.remove();
+  // 清空文件名槽
+  const fnameSlot = document.getElementById('gen-llm-fname-slot');
+  if (fnameSlot) fnameSlot.textContent = '';
 
   if (_llmImageFile) {
     let imgSrc;
@@ -3585,11 +3586,8 @@ function _renderLlmImagePreview() {
     }
     container.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain">
       <div class="gen-ref-clear" title="移除"><span class="ms">close</span></div>`;
-    if (_llmImageFileName) {
-      const fnameEl = document.createElement('div');
-      fnameEl.className = 'gen-tag-fname';
-      fnameEl.textContent = _llmImageFileName;
-      container.after(fnameEl);
+    if (_llmImageFileName && fnameSlot) {
+      fnameSlot.textContent = _llmImageFileName;
     }
     container.querySelector('.gen-ref-clear')?.addEventListener('click', (e) => {
       e.stopPropagation();
