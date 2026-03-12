@@ -3274,25 +3274,24 @@ async function _openLlmModal() {
   const modal = document.getElementById('gen-llm-modal');
   if (!modal) return;
 
-  // 检查配置
-  if (_llmConfigured === null) {
-    try {
-      const r = await apiFetch('/api/llm/config');
-      const cfg = r?.data || r;
-      _llmConfigured = !!(cfg?.provider && cfg?.api_key && cfg.api_key !== '****');
-      _llmStream = !!cfg?.stream;
+  // 每次打开都重新检查配置和 vision 能力
+  try {
+    const r = await apiFetch('/api/llm/config');
+    const cfg = r?.data || r;
+    _llmConfigured = !!(cfg?.provider && cfg?.api_key && cfg.api_key !== '****');
+    _llmStream = !!cfg?.stream;
 
-      // vision 能力判断
-      if (_llmConfigured && cfg.provider) {
-        try {
-          const prov = await apiFetch('/api/llm/providers');
-          const p = prov?.providers?.find(x => x.id === cfg.provider);
-          _llmVisionSupport = !!p?.supports_vision;
-        } catch { _llmVisionSupport = false; }
-      }
-    } catch {
-      _llmConfigured = false;
+    // vision 能力判断
+    _llmVisionSupport = false;
+    if (_llmConfigured && cfg.provider) {
+      try {
+        const prov = await apiFetch('/api/llm/providers');
+        const p = prov?.providers?.find(x => x.id === cfg.provider);
+        _llmVisionSupport = !!p?.supports_vision;
+      } catch { _llmVisionSupport = false; }
     }
+  } catch {
+    _llmConfigured = false;
   }
 
   const notCfg = document.getElementById('gen-llm-not-configured');
@@ -3320,6 +3319,14 @@ async function _openLlmModal() {
     notCfg.style.display = 'none';
     body.style.display = '';
     _updateLlmTarget();
+    // 更新 vision tab 状态
+    const imgTab = document.querySelector('.gen-llm-mode-tab[data-mode="image"]');
+    if (imgTab) {
+      imgTab.disabled = !_llmVisionSupport;
+      imgTab.title = _llmVisionSupport ? '' : '当前 LLM 不支持 Vision';
+    }
+    // 如果当前是图片模式但 vision 不可用，切回文字模式
+    if (_llmMode === 'image' && !_llmVisionSupport) _llmMode = 'text';
     _setLlmMode(_llmMode);
     _renderLlmResult();
     _renderLlmImagePreview();
@@ -3378,13 +3385,6 @@ function _bindLlmModalEvents() {
       _setLlmMode(tab.dataset.mode);
     });
   });
-
-  // 图片模式 tab: vision 不支持则 disable
-  const imgTab = document.querySelector('.gen-llm-mode-tab[data-mode="image"]');
-  if (imgTab && !_llmVisionSupport) {
-    imgTab.disabled = true;
-    imgTab.title = '当前 LLM 不支持 Vision';
-  }
 
   // 提交按钮
   document.getElementById('gen-llm-submit')?.addEventListener('click', _submitLlmPrompt);
