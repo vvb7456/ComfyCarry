@@ -25,7 +25,6 @@ class PromptOutput(BaseModel):
     """提示词生成的结构化输出"""
     positive: str = Field(description="正面提示词")
     negative: str = Field(description="反面提示词（Flux 模型为空字符串）")
-    notes: str = Field(description="LLM 的简要说明，使用用户输入的语言")
 
 
 # ── JSON 解析容错 ─────────────────────────────────────────────────────────────
@@ -56,7 +55,7 @@ def parse_llm_json(text: str) -> dict:
             pass
 
     # 4. 降级: 原始文本作为 positive
-    return {"positive": text, "negative": "", "notes": "输出格式异常，已原样返回"}
+    return {"positive": text, "negative": ""}
 
 
 def validate_prompt_output(data: dict) -> dict:
@@ -64,7 +63,6 @@ def validate_prompt_output(data: dict) -> dict:
     return {
         "positive": str(data.get("positive", "")).strip(),
         "negative": str(data.get("negative", "")).strip(),
-        "notes": str(data.get("notes", "")).strip(),
     }
 
 
@@ -449,7 +447,7 @@ PROVIDER_CAPABILITIES = {
     "openai":     {"json_schema": True,  "vision": True,  "image_gen": True},
     "anthropic":  {"json_schema": False, "vision": True,  "image_gen": False},
     "gemini":     {"json_schema": True,  "vision": True,  "image_gen": True},
-    "deepseek":   {"json_schema": False, "vision": True,  "image_gen": False},
+    "deepseek":   {"json_schema": False, "vision": False, "image_gen": False},
     "openrouter": {"json_schema": True,  "vision": True,  "image_gen": False},
     "custom":     {"json_schema": False, "vision": True,  "image_gen": False},
 }
@@ -523,18 +521,39 @@ def get_provider_from_config() -> BaseLLMProvider:
     )
 
 
-def generate_prompt(user_input: str, target: str = "sdxl", **kwargs) -> dict:
-    """同步生成提示词 — 返回 {"positive": ..., "negative": ..., "notes": ...}"""
+def _build_prompt_messages(user_input: str = "", target: str = "sdxl", image: str = "") -> list[dict]:
+    """构建 prompt messages — 统一文字/图片模式"""
     from .llm_prompts import PROMPT_REGISTRY
 
-    if target not in PROMPT_REGISTRY:
-        raise ValueError(f"Unknown target: {target}. Available: {list(PROMPT_REGISTRY.keys())}")
+    if image:
+        key = f"{target}_vision"
+        if key not in PROMPT_REGISTRY:
+            key = target
+        prompt_cfg = PROMPT_REGISTRY[key]
+        return [
+            {"role": "system", "content": prompt_cfg["system"]},
+            {"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": image}},
+                {"type": "text", "text": user_input or "请根据这张图片生成对应的提示词。"},
+            ]},
+        ]
+    else:
+        prompt_cfg = PROMPT_REGISTRY[target]
+        return [
+            {"role": "system", "content": prompt_cfg["system"]},
+            {"role": "user", "content": user_input},
+        ]
 
-    prompt_cfg = PROMPT_REGISTRY[target]
-    messages = [
-        {"role": "system", "content": prompt_cfg["system"]},
-        {"role": "user", "content": user_input},
-    ]
+
+def generate_prompt(user_input: str = "", target: str = "sdxl", image: str = "", **kwargs) -> dict:
+    """同步生成提示词 — 返回 {"positive": ..., "negative": ...}"""
+    from .llm_prompts import PROMPT_REGISTRY
+
+    valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
+    if target not in valid_targets:
+        raise ValueError(f"Unknown target: {target}. Available: {valid_targets}")
+
+    messages = _build_prompt_messages(user_input, target, image)
 
     provider = get_provider_from_config()
     cfg = get_llm_config()
@@ -548,19 +567,16 @@ def generate_prompt(user_input: str, target: str = "sdxl", **kwargs) -> dict:
     return validate_prompt_output(result)
 
 
-def generate_prompt_stream(user_input: str, target: str = "sdxl", **kwargs):
+def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: str = "", **kwargs):
     """流式生成提示词 — yield SSE data lines"""
     from .llm_prompts import PROMPT_REGISTRY
 
-    if target not in PROMPT_REGISTRY:
+    valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
+    if target not in valid_targets:
         yield f'data: {json.dumps({"type": "error", "message": f"Unknown target: {target}"})}\n\n'
         return
 
-    prompt_cfg = PROMPT_REGISTRY[target]
-    messages = [
-        {"role": "system", "content": prompt_cfg["system"]},
-        {"role": "user", "content": user_input},
-    ]
+    messages = _build_prompt_messages(user_input, target, image)
 
     provider = get_provider_from_config()
     cfg = get_llm_config()

@@ -1557,3 +1557,24 @@
     border-top: 1px solid var(--bd);
     flex-shrink: 0;
 }
+
+/* ── AI 提示词弹窗 ─────────────────────────────── */
+.gen-llm-mode-tab {
+    background: var(--bg3);
+    color: var(--t3);
+}
+
+.gen-llm-mode-tab.active {
+    background: var(--ac);
+    color: #fff;
+}
+
+.gen-llm-mode-tab:hover:not(.active):not(:disabled) {
+    background: var(--bg4);
+    color: var(--t1);
+}
+
+.gen-llm-mode-tab:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}

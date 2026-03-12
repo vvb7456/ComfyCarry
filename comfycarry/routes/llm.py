@@ -42,25 +42,28 @@ _MAX_INPUT_LEN = 2000
 def api_llm_prompt():
     data = request.get_json(silent=True) or {}
     user_input = str(data.get("input", "")).strip()
+    image = str(data.get("image", "")).strip()
     target = str(data.get("target", "sdxl")).strip()
     stream = data.get("stream", True)
 
-    if not user_input:
-        return jsonify(ok=False, error="input 不能为空"), 400
-    if len(user_input) > _MAX_INPUT_LEN:
+    if not user_input and not image:
+        return jsonify(ok=False, error="input 或 image 不能同时为空"), 400
+    if user_input and len(user_input) > _MAX_INPUT_LEN:
         return jsonify(ok=False, error=f"输入过长 (最大 {_MAX_INPUT_LEN} 字符)"), 400
-    if target not in PROMPT_REGISTRY:
+
+    valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
+    if target not in valid_targets:
         return jsonify(ok=False, error=f"不支持的 target: {target}"), 400
 
     if stream:
         return Response(
-            generate_prompt_stream(user_input, target),
+            generate_prompt_stream(user_input, target, image=image),
             mimetype="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
     else:
         try:
-            result = generate_prompt(user_input, target)
+            result = generate_prompt(user_input, target, image=image)
             return jsonify(ok=True, data=result)
         except ValueError as e:
             return jsonify(ok=False, error=str(e)), 400
