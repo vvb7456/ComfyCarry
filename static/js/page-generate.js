@@ -93,6 +93,7 @@ let _llmImageFileName = '';
 let _llmVisionSupport = false;
 let _llmStream = false;
 let _llmBound = false;
+let _llmModelName = '';      // 当前 LLM 模型名
 
 // ── 注册页面 ─────────────────────────────────────────────────────────────────
 registerPage('generate', {
@@ -1365,7 +1366,7 @@ function _renderTagResult() {
     area.innerHTML = `<div class="gen-tag-result-content">
       <div class="gen-tag-result-tags">${escHtml(_tagResultText)}</div>
       <div class="gen-tag-result-actions">
-        <button class="btn btn-primary btn-sm" data-action="fill-positive"><span class="ms ms-sm">input</span> 填入正面提示词</button>
+        <button class="btn btn-primary btn-sm" data-action="fill-positive"><span class="ms ms-sm">input</span> 使用提示词</button>
         <button class="btn btn-sm" data-action="copy-tags"><span class="ms ms-sm">content_copy</span> 复制</button>
       </div>
     </div>`;
@@ -1523,10 +1524,9 @@ async function _onTagDone(success) {
 function _fillPositivePrompt(tags) {
   const el = document.getElementById('gen-positive');
   if (!el) return;
-  const existing = el.value.trim();
-  el.value = existing ? existing + ', ' + tags : tags;
+  el.value = tags;
   _deferSave();
-  showToast('已填入正面提示词', 'success');
+  showToast('已使用提示词', 'success');
 }
 
 function _renderTagProgress(evt) {
@@ -3280,6 +3280,7 @@ async function _openLlmModal() {
     const cfg = r?.data || r;
     _llmConfigured = !!(cfg?.provider && cfg?.api_key && cfg.api_key !== '****');
     _llmStream = !!cfg?.stream;
+    _llmModelName = cfg?.model || '';
 
     // vision 能力判断
     _llmVisionSupport = false;
@@ -3318,7 +3319,7 @@ async function _openLlmModal() {
   } else {
     notCfg.style.display = 'none';
     body.style.display = '';
-    _updateLlmTarget();
+    _updateLlmModelLabel();
     // 更新 vision tab 状态
     const imgTab = document.querySelector('.gen-llm-mode-tab[data-mode="image"]');
     if (imgTab) {
@@ -3363,15 +3364,10 @@ function _getCurrentTarget() {
   return active?.dataset?.gentab || 'sdxl';
 }
 
-function _updateLlmTarget() {
-  const t = _getCurrentTarget();
-  const el = document.getElementById('gen-llm-target-label');
+function _updateLlmModelLabel() {
+  const el = document.getElementById('gen-llm-model-label');
   if (!el) return;
-  if (t === 'flux') {
-    el.textContent = '目标: Flux (自然语言)';
-  } else {
-    el.textContent = '目标: SDXL (Danbooru 标签)';
-  }
+  el.textContent = _llmModelName ? `模型: ${_llmModelName}` : '';
 }
 
 function _bindLlmModalEvents() {
@@ -3521,8 +3517,8 @@ function _renderLlmResult() {
         </div>` : ''}
       </div>
       <div class="gen-tag-result-actions">
-        <button class="btn btn-primary btn-sm" data-action="llm-fill"><span class="ms ms-sm">input</span> 填入提示词</button>
-        <button class="btn btn-sm" data-action="llm-fill-pos"><span class="ms ms-sm">add</span> 仅填入正面</button>
+        <button class="btn btn-primary btn-sm" data-action="llm-fill-pos"><span class="ms ms-sm">input</span> 使用提示词</button>
+        <button class="btn btn-sm" data-action="llm-fill"><span class="ms ms-sm">done_all</span> 使用全部提示词</button>
         <button class="btn btn-sm" data-action="llm-copy"><span class="ms ms-sm">content_copy</span> 复制</button>
       </div>
     </div>`;
@@ -3533,7 +3529,7 @@ function _renderLlmResult() {
   } else {
     area.innerHTML = `<div class="gen-tag-result-empty">
       <span class="ms" style="font-size:48px;color:var(--t3)">auto_awesome</span>
-      <p style="color:var(--t3);margin:0">描述你想要的画面，AI 将生成对应的提示词</p>
+      <p style="color:var(--t3);margin:0">AI 生成的提示词将会出现在这里</p>
     </div>`;
   }
 }
@@ -3541,22 +3537,16 @@ function _renderLlmResult() {
 function _fillLlmResult(mode) {
   if (!_llmResult) return;
 
-  // 追加正面提示词
   const posEl = document.getElementById('gen-positive');
-  if (posEl) {
-    const existing = posEl.value.trim();
-    posEl.value = existing ? existing + ', ' + _llmResult.positive : _llmResult.positive;
-  }
+  if (posEl) posEl.value = _llmResult.positive;
 
-  // 填入全部: 替换负面提示词
   if (mode === 'all' && _llmResult.negative) {
     const negEl = document.getElementById('gen-negative');
     if (negEl) negEl.value = _llmResult.negative;
   }
 
   _deferSave();
-  showToast('已填入提示词', 'success');
-  if (mode === 'all') _closeLlmModal();
+  showToast(mode === 'all' ? '已使用全部提示词' : '已使用提示词', 'success');
 }
 
 function _copyLlmResult() {
@@ -3573,10 +3563,6 @@ function _renderLlmImagePreview() {
   const container = document.getElementById('gen-llm-image-preview');
   if (!container) return;
 
-  // 清空文件名槽
-  const fnameSlot = document.getElementById('gen-llm-fname-slot');
-  if (fnameSlot) fnameSlot.textContent = '';
-
   if (_llmImageFile) {
     let imgSrc;
     if (_llmImageFile instanceof File) {
@@ -3586,9 +3572,6 @@ function _renderLlmImagePreview() {
     }
     container.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain">
       <div class="gen-ref-clear" title="移除"><span class="ms">close</span></div>`;
-    if (_llmImageFileName && fnameSlot) {
-      fnameSlot.textContent = _llmImageFileName;
-    }
     container.querySelector('.gen-ref-clear')?.addEventListener('click', (e) => {
       e.stopPropagation();
       _llmImageFile = null;
@@ -3685,12 +3668,14 @@ async function _llmPickInput() {
         _llmImageFileName = name;
         _renderLlmImagePreview();
         modal.classList.remove('active');
+        modal.style.zIndex = '';
       });
     });
 
-    // 打开弹窗 (临时覆盖 onclick)
+    // 打开弹窗 (临时覆盖 onclick, 提升 z-index 以覆盖 llm-modal)
     const origOnClick = modal.onclick;
-    modal.onclick = (e) => { if (e.target === modal) { modal.classList.remove('active'); modal.onclick = origOnClick; } };
+    modal.style.zIndex = '210';
+    modal.onclick = (e) => { if (e.target === modal) { modal.classList.remove('active'); modal.style.zIndex = ''; modal.onclick = origOnClick; } };
     modal.classList.add('active');
   } catch {
     showToast('获取图片列表失败', 'error');

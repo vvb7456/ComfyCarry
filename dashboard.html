@@ -77,7 +77,10 @@
         <!-- ========== Dashboard Page (Overview) ========== -->
         <div id="page-dashboard" class="page">
             <div class="page-header">
-                <h2><span class="ms" style="color:#8b5cf6">dashboard</span> 总览</h2>
+                <div class="page-title-group">
+                    <h2><span class="ms" style="color:#8b5cf6">dashboard</span> 总览</h2>
+                </div>
+                <div class="top-toolbar"></div>
             </div>
             <div class="page-body">
                 <!-- Status Bar -->
@@ -125,7 +128,10 @@
         <!-- ========== Models Page (unified: local + civitai + downloads) ========== -->
         <div id="page-models" class="page hidden">
             <div class="page-header">
-                <h2><span class="ms" style="color:#f472b6">palette</span> 模型管理</h2>
+                <div class="page-title-group">
+                    <h2><span class="ms" style="color:#f472b6">palette</span> 模型管理</h2>
+                </div>
+                <div class="top-toolbar"></div>
             </div>
             <div class="page-body">
                 <div class="tabs">
@@ -577,7 +583,10 @@
         <!-- ========== Plugins Page ========== -->
         <div id="page-plugins" class="page hidden">
             <div class="page-header">
-                <h2><span class="ms" style="color:#a78bfa">extension</span> 插件管理</h2>
+                <div class="page-title-group">
+                    <h2><span class="ms" style="color:#a78bfa">extension</span> 插件管理</h2>
+                </div>
+                <div class="top-toolbar"></div>
             </div>
             <div class="page-body">
                 <div class="tabs">
@@ -1038,6 +1047,7 @@
                 <div class="page-title-group">
                     <h2><span class="ms" style="color:#ffb4b4">auto_awesome</span> 内容生成</h2>
                 </div>
+                <div class="top-toolbar"></div>
             </div>
             <div class="page-body">
 
@@ -1835,7 +1845,6 @@
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
                 <span class="ms ms-sm" style="color:var(--ac)">auto_awesome</span>
                 <h3 style="margin:0">AI 提示词</h3>
-                <span id="gen-llm-target-label" style="font-size:.72rem;color:var(--t3);margin-left:4px"></span>
                 <button class="btn btn-sm" onclick="window._closeLlmModal()" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
             <div id="gen-llm-not-configured" style="display:none"></div>
@@ -1857,7 +1866,7 @@
                             <div id="gen-llm-image-preview" class="gen-ref-upload"></div>
                         </div>
                     </div>
-                    <div id="gen-llm-fname-slot" style="height:1.2em;flex-shrink:0;font-size:.65rem;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+                    <div style="font-size:.72rem;color:var(--t3);flex-shrink:0" id="gen-llm-model-label"></div>
                     <button class="btn btn-sm btn-primary" id="gen-llm-submit" style="width:100%;flex-shrink:0">
                         <span class="ms ms-sm">auto_awesome</span> <span id="gen-llm-submit-label">生成</span>
                     </button>

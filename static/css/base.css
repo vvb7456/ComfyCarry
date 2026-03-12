@@ -108,7 +108,7 @@
         }
 
         html {
-            font-size: clamp(14px, 1.1vw, 21px)
+            font-size: clamp(13px, 0.9vw, 18px)
         }
 
         body {
