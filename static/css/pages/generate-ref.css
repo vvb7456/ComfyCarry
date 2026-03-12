@@ -1,0 +1,352 @@
+/* ══════════════════════════════════════════════════════════════════
+   参考图 / 上传 / 预处理 / 反推 / AI 弹窗
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 参考图上传区 ─────────────────────────────────────────────────── */
+.gen-ref-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 280px;
+    border: 2px dashed var(--bd);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    position: relative;
+    overflow: hidden;
+}
+
+.gen-ref-upload:hover,
+.gen-ref-upload.dragover {
+    border-color: var(--ac);
+    background: color-mix(in srgb, var(--ac) 5%, transparent);
+}
+
+.gen-ref-upload img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: var(--r-sm);
+}
+
+.gen-ref-upload .gen-ref-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--t3);
+    font-size: var(--text-xs);
+}
+
+.gen-ref-upload .gen-ref-clear {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .55);
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.gen-ref-upload:hover .gen-ref-clear {
+    opacity: 1;
+}
+
+.gen-ref-upload .gen-ref-clear .ms {
+    font-size: 16px;
+    color: #fff;
+}
+
+.gen-ref-upload .gen-ref-fname {
+    font-size: .65rem;
+    color: var(--t3);
+    margin-top: 4px;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gen-ref-res {
+    font-size: .6rem;
+    color: var(--t3);
+    opacity: .7;
+    margin-top: 4px;
+    text-align: center;
+}
+
+/* ── 参考图预览: 分区占位符 (选择已有 / 从新图片生成) ─── */
+.gen-ref-split {
+    width: 100%;
+    height: 100%;
+    gap: 0;
+}
+
+.gen-ref-split-top,
+.gen-ref-split-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 1;
+    width: 100%;
+    padding: 8px 0;
+    cursor: pointer;
+    border-radius: var(--r-sm);
+    transition: background .15s;
+}
+
+.gen-ref-split-top:hover,
+.gen-ref-split-bottom:hover {
+    background: color-mix(in srgb, var(--ac) 8%, transparent);
+}
+
+.gen-ref-split-divider {
+    width: 80%;
+    text-align: center;
+    position: relative;
+    color: var(--t3);
+    font-size: .7rem;
+}
+
+.gen-ref-split-divider::before,
+.gen-ref-split-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: calc(50% - 16px);
+    height: 1px;
+    background: var(--bd);
+}
+
+.gen-ref-split-divider::before {
+    left: 0;
+}
+
+.gen-ref-split-divider::after {
+    right: 0;
+}
+
+/* ── 参考图预处理中 (旋转动画) ─── */
+.gen-ref-processing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--t3);
+    font-size: var(--text-xs);
+}
+
+/* ── 通用 spinner (预处理 / mdep) ─── */
+.gen-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--bd);
+    border-top-color: var(--ac);
+    border-radius: 50%;
+    animation: gen-ref-spin 0.8s linear infinite;
+}
+
+/* 保留旧名作兼容别名 */
+.gen-ref-spinner { width: 28px; height: 28px; border: 3px solid var(--bd); border-top-color: var(--ac); border-radius: 50%; animation: gen-ref-spin 0.8s linear infinite; }
+.mdep-spinner   { width: 28px; height: 28px; border: 3px solid var(--bd); border-top-color: var(--ac); border-radius: 50%; animation: gen-ref-spin 0.8s linear infinite; }
+
+@keyframes gen-ref-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── 预处理弹窗参数行 ────────────────────────────────────────────── */
+.gen-pp-param-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: var(--r);
+    font-size: var(--text-sm);
+    color: var(--t1);
+}
+
+.gen-pp-param-row+.gen-pp-param-row {
+    border-top: 1px solid var(--bd);
+}
+
+/* ── 参考图选择弹窗卡片网格 ───────────────────────────────────────── */
+.gen-ref-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
+}
+
+.gen-ref-card {
+    background: var(--bg3);
+    border: 2px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+
+.gen-ref-card:hover {
+    border-color: var(--ac);
+    transform: translateY(-1px);
+    box-shadow: var(--sh);
+}
+
+.gen-ref-card-img {
+    width: 100%;
+    aspect-ratio: 1;
+    background: var(--bg-in);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gen-ref-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gen-ref-card-body {
+    padding: 6px 8px;
+}
+
+.gen-ref-card-name {
+    font-size: .72rem;
+    color: var(--t2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gen-ref-card-size {
+    font-size: .65rem;
+    color: var(--t3);
+}
+
+.gen-ref-card.upload-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 130px;
+    color: var(--t3);
+    gap: 8px;
+    font-size: .82rem;
+    border-style: dashed;
+}
+
+.gen-ref-card.upload-card:hover {
+    color: var(--ac);
+    border-color: var(--ac);
+}
+
+/* ── 反推弹窗三列布局 ───────────────────────────────────────── */
+.gen-tag-split {
+    display: flex;
+    gap: var(--sp-4);
+}
+
+.gen-tag-left {
+    flex: 0 0 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+
+.gen-tag-left .comfy-param-help-icon:hover::after {
+    left: 0;
+    transform: none;
+}
+
+.gen-tag-fname {
+    font-size: .75rem;
+    color: var(--t3);
+    text-align: center;
+    word-break: break-all;
+    margin-top: -8px;
+}
+
+.gen-tag-split>.gen-tag-result-area {
+    flex: 1 1 0;
+    min-width: 200px;
+}
+
+.gen-tag-result-area {
+    flex: 1;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--bd);
+    border-radius: var(--rad);
+    padding: var(--sp-3);
+    overflow-y: auto;
+}
+
+.gen-tag-result-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.gen-tag-result-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    flex: 1;
+}
+
+.gen-tag-result-tags {
+    flex: 1;
+    overflow-y: auto;
+    font-size: .85rem;
+    line-height: 1.6;
+    color: var(--t1);
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.gen-tag-result-actions {
+    display: flex;
+    gap: var(--sp-2);
+    padding-top: var(--sp-2);
+    border-top: 1px solid var(--bd);
+    flex-shrink: 0;
+}
+
+/* ── AI 提示词弹窗 ─────────────────────────────── */
+.gen-llm-mode-tab {
+    background: var(--bg3);
+    color: var(--t3);
+}
+
+.gen-llm-mode-tab.active {
+    background: var(--ac);
+    color: #fff;
+}
+
+.gen-llm-mode-tab:hover:not(.active):not(:disabled) {
+    background: var(--bg4);
+    color: var(--t1);
+}
+
+.gen-llm-mode-tab:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}

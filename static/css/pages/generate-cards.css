@@ -1,0 +1,357 @@
+/* ══════════════════════════════════════════════════════════════════
+   Checkpoint + LoRA 卡片选择器
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Checkpoint 卡片选择器 ──────────────────────────────────────────── */
+.gen-basic-row>.gen-field:first-child {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.gen-ckpt-grid {
+    margin-top: var(--sp-1);
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
+.gen-ckpt-card {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    border: 2px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+    background: var(--bg3);
+    position: relative;
+    padding-left: 30%;
+}
+
+.gen-ckpt-card:hover {
+    border-color: var(--ac);
+    box-shadow: var(--sh);
+}
+
+.gen-ckpt-card.add-card {
+    justify-content: center;
+    align-items: center;
+    padding-left: 0;
+    min-height: 60px;
+    border-style: dashed;
+    background: transparent;
+    gap: 8px;
+    color: var(--t3);
+    font-size: .85rem;
+}
+
+.gen-ckpt-card.add-card:hover {
+    border-color: var(--ac);
+    color: var(--ac);
+}
+
+.gen-ckpt-img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 30%;
+    background: var(--bg-in);
+    overflow: hidden;
+}
+
+.gen-ckpt-img img,
+.gen-ckpt-img video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.gen-ckpt-no-img {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--t3);
+}
+
+.gen-ckpt-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6px 10px;
+    gap: 2px;
+}
+
+.gen-ckpt-name {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--t1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* ── Tab 启用标记 (checkbox) ──────────────────────────────────── */
+.gen-mod-tab-chk {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 28px;
+    height: 14px;
+    background: var(--bg3);
+    border: 1px solid var(--bd);
+    border-radius: 7px;
+    cursor: pointer;
+    margin: 0 0 0 4px;
+    flex-shrink: 0;
+    position: relative;
+    transition: background .2s, border-color .2s;
+}
+
+.gen-mod-tab-chk::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 10px;
+    height: 10px;
+    background: var(--t3);
+    border-radius: 50%;
+    transition: transform .2s, background .2s;
+}
+
+.gen-mod-tab-chk:checked {
+    background: var(--ac);
+    border-color: var(--ac);
+}
+
+.gen-mod-tab-chk:checked::after {
+    transform: translateX(14px);
+    background: #fff;
+}
+
+/* ── LoRA 列表 ───────────────────────────────────────────────────── */
+.gen-lora-empty-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: var(--sp-3) var(--sp-4);
+    font-size: .82rem;
+    color: var(--t3);
+    background: var(--bg3);
+    border-radius: var(--r-sm);
+    border: 1px dashed var(--bd);
+}
+
+/* ── LoRA 卡片网格 ──────────────────────────────────────────────────── */
+.gen-lora-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
+}
+
+/* 弹窗内网格：窄容器适配 */
+#gen-lora-modal-grid,
+#gen-ckpt-modal-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.gen-lora-card {
+    background: var(--bg3);
+    border: 2px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s, box-shadow .15s;
+    position: relative;
+}
+
+.gen-lora-card:hover {
+    border-color: var(--ac);
+    transform: translateY(-1px);
+    box-shadow: var(--sh);
+}
+
+.gen-lora-card.selected {
+    border-color: var(--ac);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 30%, transparent);
+}
+
+.gen-lora-card-img {
+    width: 100%;
+    aspect-ratio: 4/5;
+    background: var(--bg-in);
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+}
+
+/* 已选面板中的卡片更紧凑 */
+#gen-lora-grid .gen-lora-card-img {
+    aspect-ratio: 3/3.38;
+}
+
+.gen-lora-card-img img,
+.gen-lora-card-img video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gen-lora-card-no-img {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--t3);
+    font-size: .7rem;
+}
+
+.gen-lora-card-check {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--ac);
+    color: #fff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+.gen-lora-card.selected .gen-lora-card-check {
+    display: flex;
+}
+
+.gen-lora-card-body {
+    padding: 6px 7px;
+}
+
+.gen-lora-card-name {
+    font-size: .73rem;
+    font-weight: 600;
+    color: var(--t1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* baseModel / 架构标签 (覆盖在图片左上角) */
+.gen-model-tag {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    z-index: 2;
+    font-size: .58rem;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--ac);
+    color: #fff;
+    white-space: nowrap;
+    max-width: calc(100% - 32px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    line-height: 1.4;
+}
+
+.gen-model-tag.dim {
+    background: rgba(0, 0, 0, .5);
+    color: rgba(255, 255, 255, .8);
+}
+
+/* 删除按钮 (覆盖在卡片图片右上角) */
+.gen-lora-card-del {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .55);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0;
+    transition: opacity .15s, background .15s;
+    z-index: 2;
+    padding: 0;
+}
+
+.gen-lora-card .gen-lora-card-del {
+    opacity: 1;
+}
+
+.gen-lora-card-del:hover {
+    background: var(--red);
+}
+
+/* 强度滑块行 */
+.gen-lora-card-strength {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 4px;
+}
+
+.gen-lora-card-strength input[type=range] {
+    flex: 1;
+    min-width: 0;
+    height: 3px;
+}
+
+.gen-lora-card-str-val {
+    flex: 0 0 auto;
+    width: 28px;
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .65rem;
+    color: var(--ac);
+}
+
+/* 添加 LoRA 卡片 (add-card 在 grid 中的特化) */
+.gen-lora-card.add-card {
+    flex-direction: column;
+    aspect-ratio: auto;
+    border-style: dashed;
+    background: transparent;
+    position: relative;
+}
+
+/* 通过伪元素擑齐真实 LoRA 卡片高度 (image + body) */
+.gen-lora-card.add-card::before {
+    content: '';
+    display: block;
+    padding-bottom: 130%;
+}
+
+.gen-lora-add-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
