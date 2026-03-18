@@ -145,6 +145,7 @@ class DownloadEngine:
             "--console-log-level=warn",
             "--file-allocation=falloc",
             "--continue=true",
+            "--enable-http-keep-alive=false",  # 防止跨域重定向复用 TLS 连接导致 403
             "--daemon=false",  # 前台运行, 由我们管理
         ]
 
