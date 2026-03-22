@@ -26,6 +26,7 @@ from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
 from ..services.comfyui_bridge import get_bridge
+from ..services.prompt_expander import get_expander
 from ..services.workflow_builder import build_sdxl_workflow, build_preprocess_workflow, build_tag_workflow
 
 logger = logging.getLogger(__name__)
@@ -820,6 +821,18 @@ def api_generate_submit():
         output_format = "png"
     data["output_format"] = output_format
 
+    # ── 提示词模板展开 (dynamicprompts) ─────────────────────────────────────
+    try:
+        expander = get_expander()
+        seed_val = int(data.get("seed", -1))
+        data["positive_prompt"] = expander.expand(positive_prompt, seed=seed_val)
+        data["negative_prompt"] = expander.expand(
+            data.get("negative_prompt", ""),
+            seed=(seed_val + 1) if seed_val >= 0 else -1,
+        )
+    except Exception as e:
+        logger.warning(f"[generate] 提示词展开失败 (使用原文): {e}")
+
     # ── 构建工作流 ──────────────────────────────────────────────────────────
     try:
         prompt = _BUILDERS[model_type](data)
@@ -1056,4 +1069,77 @@ def api_generate_interrogate_result():
             break
 
     return jsonify({"tags": tags, "prompt_id": prompt_id})
+
+
+# ── /api/generate/embeddings ─────────────────────────────────────────────────
+
+
+@bp.route("/api/generate/embeddings")
+def api_generate_embeddings():
+    """列出所有可用的 Embedding 文件"""
+    emb_dir = os.path.join(COMFYUI_DIR, "models", "embeddings")
+    embeddings = []
+    if os.path.isdir(emb_dir):
+        for root, _dirs, files in os.walk(emb_dir):
+            for f in sorted(files):
+                if f.endswith((".safetensors", ".pt", ".bin", ".ckpt")):
+                    name = os.path.splitext(f)[0]
+                    fpath = os.path.join(root, f)
+                    rel = os.path.relpath(fpath, emb_dir)
+                    embeddings.append({
+                        "name": name,
+                        "filename": f,
+                        "path": rel.replace("\\", "/"),
+                        "size": os.path.getsize(fpath),
+                    })
+    return jsonify({"embeddings": embeddings})
+
+
+# ── /api/generate/wildcards ──────────────────────────────────────────────────
+
+
+@bp.route("/api/generate/wildcards")
+def api_generate_wildcards_list():
+    """列出所有可用 wildcard 文件"""
+    expander = get_expander()
+    return jsonify({"wildcards": expander.list_wildcards()})
+
+
+@bp.route("/api/generate/wildcard/<path:name>")
+def api_generate_wildcard_get(name):
+    """获取指定 wildcard 文件内容"""
+    try:
+        expander = get_expander()
+        content = expander.get_wildcard_content(name)
+        return jsonify({"name": name, "content": content})
+    except FileNotFoundError:
+        return jsonify({"error": f"Wildcard 不存在: {name}"}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@bp.route("/api/generate/wildcard/<path:name>", methods=["PUT"])
+def api_generate_wildcard_save(name):
+    """保存/创建 wildcard 文件"""
+    data = request.get_json(silent=True) or {}
+    content = data.get("content", "")
+    try:
+        expander = get_expander()
+        expander.save_wildcard(name, content)
+        return jsonify({"ok": True})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@bp.route("/api/generate/wildcard/<path:name>", methods=["DELETE"])
+def api_generate_wildcard_delete(name):
+    """删除 wildcard 文件"""
+    try:
+        expander = get_expander()
+        expander.delete_wildcard(name)
+        return jsonify({"ok": True})
+    except FileNotFoundError:
+        return jsonify({"error": f"Wildcard 不存在: {name}"}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 

@@ -12,6 +12,7 @@ Bridge 使用 ComfyUI 原生事件信号追踪执行状态:
 """
 
 import json
+import logging
 import queue
 import struct
 import base64
@@ -23,6 +24,8 @@ import requests
 import websocket  # websocket-client
 
 from ..config import COMFYUI_URL
+
+logger = logging.getLogger(__name__)
 
 
 class ComfyWSBridge:
@@ -58,6 +61,7 @@ class ComfyWSBridge:
         while self._running:
             try:
                 url = f"{self._ws_url}/ws?clientId={self._client_id}"
+                logger.info(f"[bridge] WS connecting → {url}")
                 self._ws = websocket.WebSocketApp(
                     url,
                     on_message=self._on_message,
@@ -66,18 +70,21 @@ class ComfyWSBridge:
                     on_open=self._on_open,
                 )
                 self._ws.run_forever(ping_interval=30, ping_timeout=10)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[bridge] WS run_forever exception: {e}")
             if self._running:
+                logger.info("[bridge] WS disconnected, retrying in 3s...")
                 time.sleep(3)
 
     def _on_open(self, ws):
+        logger.info("[bridge] WS connected ✓")
         self._broadcast({"type": "ws_connected"})
 
     def _on_error(self, ws, error):
-        pass
+        logger.warning(f"[bridge] WS error: {error}")
 
     def _on_close(self, ws, close_status_code=None, close_msg=None):
+        logger.info(f"[bridge] WS closed (code={close_status_code})")
         self._broadcast({"type": "ws_disconnected"})
         # WS 断连时如有执行中状态，清除并通知前端
         if self._exec_info:

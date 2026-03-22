@@ -1098,6 +1098,15 @@
                                 <button class="gen-prompt-tool-btn" data-action="llm-assist" title="AI 提示词">
                                     <span class="ms" style="font-size:18px">auto_awesome</span>
                                 </button>
+                                <button class="gen-prompt-tool-btn" data-action="embedding-picker" title="插入 Embedding">
+                                    <span class="ms" style="font-size:18px">link</span>
+                                </button>
+                                <button class="gen-prompt-tool-btn" data-action="wildcard-manager" title="Wildcard 管理">
+                                    <span class="ms" style="font-size:18px">shuffle</span>
+                                </button>
+                                <button class="gen-prompt-tool-btn" data-action="syntax-help" title="随机提示词语法">
+                                    <span class="ms" style="font-size:18px">help_outline</span>
+                                </button>
                             </div>
                         </div>
                         <div class="gen-field" style="margin-bottom:var(--sp-3)">
@@ -1731,6 +1740,86 @@
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-shrink:0;padding-top:10px;border-top:1px solid var(--bd)">
                 <button class="btn btn-sm" onclick="window._closeLoraModal()">取消</button>
                 <button class="btn btn-sm btn-primary" onclick="window._confirmLoraModal()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 语法帮助弹窗 -->
+    <div class="modal-overlay" id="gen-syntax-modal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div class="modal-box" style="width:600px;max-height:80vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+                <span class="ms ms-sm">help_outline</span>
+                <h3 style="margin:0">随机提示词语法</h3>
+                <button class="btn btn-sm" onclick="document.getElementById('gen-syntax-modal').classList.remove('active')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <div style="overflow-y:auto;flex:1;min-height:0;padding-right:4px;font-size:.88rem;line-height:1.7">
+                <table style="width:100%;border-collapse:collapse">
+                    <tr><td style="padding:8px 6px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">随机选择</td><td style="padding:8px 6px;border-bottom:1px solid var(--bd)"><code>{red|green|blue}</code> hair<br><span style="color:var(--t3)">→ red hair / green hair / blue hair</span></td></tr>
+                    <tr><td style="padding:8px 6px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">带权重</td><td style="padding:8px 6px;border-bottom:1px solid var(--bd)"><code>{0.8::masterpiece|0.2::best quality}</code><br><span style="color:var(--t3)">→ masterpiece (80%) / best quality (20%)</span></td></tr>
+                    <tr><td style="padding:8px 6px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">多选</td><td style="padding:8px 6px;border-bottom:1px solid var(--bd)"><code>{2$$cat|dog|bird}</code><br><span style="color:var(--t3)">→ cat, dog / cat, bird / dog, bird</span></td></tr>
+                    <tr><td style="padding:8px 6px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">通配符</td><td style="padding:8px 6px;border-bottom:1px solid var(--bd)"><code>__hair_color__</code> hair<br><span style="color:var(--t3)">→ 从 wildcards/hair_color.txt 随机选取</span></td></tr>
+                    <tr><td style="padding:8px 6px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">子目录通配符</td><td style="padding:8px 6px;border-bottom:1px solid var(--bd)"><code>__sdxl/quality__</code><br><span style="color:var(--t3)">→ 从 wildcards/sdxl/quality.txt 随机选取</span></td></tr>
+                    <tr><td style="padding:8px 6px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">变量锁定</td><td style="padding:8px 6px;border-bottom:1px solid var(--bd)"><code>${c=!{red|blue}}</code> <code>${c}</code> dress, <code>${c}</code> shoes<br><span style="color:var(--t3)">→ red dress, red shoes (两处一致)</span></td></tr>
+                    <tr><td style="padding:8px 6px;font-weight:600;white-space:nowrap;vertical-align:top;color:var(--ac)">嵌套</td><td style="padding:8px 6px"><code>{a {big|small} cat|a {red|blue} ball}</code><br><span style="color:var(--t3)">→ a big cat / a small cat / a red ball / a blue ball</span></td></tr>
+                </table>
+                <div style="margin-top:12px;padding:10px;background:var(--bg2);border-radius:8px;color:var(--t3);font-size:.82rem">
+                    💡 语法基于 <b>dynamicprompts</b> 库，与 ComfyUI 权重语法 <code>(word:1.4)</code> 和 Embedding 语法 <code>embedding:name</code> 完全兼容。多图 batch 中仅展开一次，所有图使用相同结果。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embedding 选择弹窗 -->
+    <div class="modal-overlay" id="gen-emb-modal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div class="modal-box" style="width:640px;max-height:80vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+                <span class="ms ms-sm">link</span>
+                <h3 style="margin:0">插入 Embedding</h3>
+                <button class="btn btn-sm" onclick="document.getElementById('gen-emb-modal').classList.remove('active')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <div style="position:relative;flex-shrink:0;margin-bottom:10px">
+                <span class="ms ms-sm" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3)">search</span>
+                <input type="text" id="gen-emb-search" placeholder="搜索 Embedding..."
+                       style="width:100%;padding-left:34px;box-sizing:border-box" oninput="window._filterEmbeddings()">
+            </div>
+            <div id="gen-emb-list" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-shrink:0;padding-top:10px;border-top:1px solid var(--bd)">
+                <span style="font-size:.82rem;color:var(--t3)">权重:</span>
+                <input type="range" id="gen-emb-weight" min="0.1" max="2.0" step="0.1" value="1.0" style="flex:1"
+                       oninput="document.getElementById('gen-emb-weight-val').textContent=this.value">
+                <span id="gen-emb-weight-val" style="font-size:.82rem;min-width:28px;text-align:center">1.0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wildcard 管理弹窗 -->
+    <div class="modal-overlay" id="gen-wc-modal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div class="modal-box" style="width:700px;max-height:80vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+                <span class="ms ms-sm">shuffle</span>
+                <h3 style="margin:0">Wildcard 管理</h3>
+                <button class="btn btn-sm btn-primary" onclick="window._newWildcard()" style="margin-left:auto">
+                    <span class="ms ms-sm">add</span> 新建
+                </button>
+                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-modal').classList.remove('active')"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <div id="gen-wc-list" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
+        </div>
+    </div>
+
+    <!-- Wildcard 编辑子弹窗 -->
+    <div class="modal-overlay" id="gen-wc-edit-modal" onclick="if(event.target===this)this.classList.remove('active')" style="z-index:1001">
+        <div class="modal-box" style="width:560px;max-height:70vh;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+                <span class="ms ms-sm">edit_note</span>
+                <h3 style="margin:0" id="gen-wc-edit-title">编辑 Wildcard</h3>
+                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-edit-modal').classList.remove('active')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <input type="text" id="gen-wc-edit-name" placeholder="名称 (如 sdxl/quality)" style="margin-bottom:8px;flex-shrink:0">
+            <textarea id="gen-wc-edit-content" style="flex:1;min-height:200px;font-family:monospace;font-size:.85rem;resize:vertical" placeholder="每行一个条目..."></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-shrink:0;padding-top:10px;border-top:1px solid var(--bd)">
+                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-edit-modal').classList.remove('active')">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="window._saveWildcard()">保存</button>
             </div>
         </div>
     </div>

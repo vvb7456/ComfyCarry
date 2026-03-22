@@ -235,6 +235,11 @@ function _bindUIEvents() {
   // 提示词工具图标
   document.querySelector('[data-action="tag-interrogate"]')?.addEventListener('click', () => _openTagModal());
   document.querySelector('[data-action="llm-assist"]')?.addEventListener('click', () => openLlmModal());
+  document.querySelector('[data-action="embedding-picker"]')?.addEventListener('click', () => _openEmbeddingModal());
+  document.querySelector('[data-action="wildcard-manager"]')?.addEventListener('click', () => _openWildcardModal());
+  document.querySelector('[data-action="syntax-help"]')?.addEventListener('click', () => {
+    document.getElementById('gen-syntax-modal')?.classList.add('active');
+  });
 
   // 功能模块 Tab 切换 (互斥：同一时间只显示一个面板)
   document.querySelectorAll('.gen-mod-tab').forEach(tab => {
@@ -3326,3 +3331,177 @@ function _addValidation(inputId, rules) {
     input.value = v;
   });
 }
+
+// ── Embedding 选择器 ────────────────────────────────────────────────────────
+let _embeddingsCache = null;
+
+async function _openEmbeddingModal() {
+  const modal = document.getElementById('gen-emb-modal');
+  if (!modal) return;
+  modal.classList.add('active');
+  const list = document.getElementById('gen-emb-list');
+  if (!_embeddingsCache) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">加载中...</div>';
+    const resp = await apiFetch('/api/generate/embeddings');
+    if (resp?.embeddings) {
+      _embeddingsCache = resp.embeddings;
+    } else {
+      list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">加载失败或无 Embedding 文件</div>';
+      return;
+    }
+  }
+  _renderEmbeddings(_embeddingsCache);
+}
+
+function _renderEmbeddings(items) {
+  const list = document.getElementById('gen-emb-list');
+  const q = (document.getElementById('gen-emb-search')?.value || '').toLowerCase();
+  const filtered = q ? items.filter(e => e.name.toLowerCase().includes(q)) : items;
+  if (!filtered.length) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">无匹配 Embedding</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(e => {
+    const sz = e.size > 1048576 ? (e.size / 1048576).toFixed(1) + ' MB' : (e.size / 1024).toFixed(0) + ' KB';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--bd);font-size:.88rem">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(e.path)}">${escHtml(e.name)}</span>
+      <span style="color:var(--t3);font-size:.78rem;white-space:nowrap">${sz}</span>
+      <button class="btn btn-sm" onclick="window._insertEmbedding('${escAttr(e.name)}','gen-positive')" title="插入到正向提示词">→ 正向</button>
+      <button class="btn btn-sm" onclick="window._insertEmbedding('${escAttr(e.name)}','gen-negative')" title="插入到负向提示词">→ 负向</button>
+    </div>`;
+  }).join('');
+}
+window._filterEmbeddings = () => { if (_embeddingsCache) _renderEmbeddings(_embeddingsCache); };
+
+window._insertEmbedding = (name, targetId) => {
+  const ta = document.getElementById(targetId);
+  if (!ta) return;
+  const w = parseFloat(document.getElementById('gen-emb-weight')?.value || '1.0');
+  const token = w === 1.0 ? `embedding:${name}` : `(embedding:${name}:${w})`;
+  const pos = ta.selectionStart ?? ta.value.length;
+  const before = ta.value.slice(0, pos);
+  const after = ta.value.slice(pos);
+  const sep = before && !before.endsWith(' ') && !before.endsWith(',') ? ', ' : '';
+  ta.value = before + sep + token + after;
+  ta.focus();
+  const newPos = pos + sep.length + token.length;
+  ta.setSelectionRange(newPos, newPos);
+  showToast(`已插入 ${name}`, 'success');
+};
+
+// ── Wildcard 管理 ────────────────────────────────────────────────────────────
+let _wildcardsCache = null;
+
+async function _openWildcardModal() {
+  const modal = document.getElementById('gen-wc-modal');
+  if (!modal) return;
+  modal.classList.add('active');
+  await _loadWildcards();
+}
+
+async function _loadWildcards() {
+  const list = document.getElementById('gen-wc-list');
+  list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">加载中...</div>';
+  const resp = await apiFetch('/api/generate/wildcards');
+  if (!resp?.wildcards) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">加载失败</div>';
+    return;
+  }
+  _wildcardsCache = resp.wildcards;
+  _renderWildcards(resp.wildcards);
+}
+
+function _renderWildcards(items) {
+  const list = document.getElementById('gen-wc-list');
+  if (!items.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">暂无 Wildcard 文件<br><br><span style="font-size:.82rem">Wildcard 是提示词词库文件，可用 <code>__name__</code> 语法随机引用</span></div>';
+    return;
+  }
+  // Group by directory
+  const groups = {};
+  for (const w of items) {
+    const parts = w.name.split('/');
+    const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '(根目录)';
+    if (!groups[dir]) groups[dir] = [];
+    groups[dir].push(w);
+  }
+  let html = '';
+  for (const [dir, wcs] of Object.entries(groups)) {
+    html += `<div style="font-size:.8rem;font-weight:600;color:var(--t3);padding:8px 4px 4px;margin-top:4px">📁 ${escHtml(dir)}</div>`;
+    for (const w of wcs) {
+      const baseName = w.name.split('/').pop();
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:.86rem">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="__${escAttr(w.name)}__">${escHtml(baseName)}</span>
+        <span style="color:var(--t3);font-size:.76rem;white-space:nowrap">${w.entries} 项</span>
+        <button class="btn btn-sm" onclick="window._editWildcard('${escAttr(w.name)}')" title="编辑"><span class="ms" style="font-size:16px">edit</span></button>
+        <button class="btn btn-sm" onclick="window._insertWildcard('${escAttr(w.name)}')" title="插入到正向提示词"><span class="ms" style="font-size:16px">add_circle</span></button>
+        <button class="btn btn-sm" onclick="window._deleteWildcard('${escAttr(w.name)}')" title="删除"><span class="ms" style="font-size:16px;color:var(--red)">delete</span></button>
+      </div>`;
+    }
+  }
+  list.innerHTML = html;
+}
+
+window._insertWildcard = (name) => {
+  const ta = document.getElementById('gen-positive');
+  if (!ta) return;
+  const token = `__${name}__`;
+  const pos = ta.selectionStart ?? ta.value.length;
+  const before = ta.value.slice(0, pos);
+  const after = ta.value.slice(pos);
+  const sep = before && !before.endsWith(' ') && !before.endsWith(',') ? ', ' : '';
+  ta.value = before + sep + token + after;
+  ta.focus();
+  const newPos = pos + sep.length + token.length;
+  ta.setSelectionRange(newPos, newPos);
+  showToast(`已插入 __${name}__`, 'success');
+};
+
+window._newWildcard = () => {
+  document.getElementById('gen-wc-edit-title').textContent = '新建 Wildcard';
+  document.getElementById('gen-wc-edit-name').value = '';
+  document.getElementById('gen-wc-edit-name').disabled = false;
+  document.getElementById('gen-wc-edit-content').value = '';
+  document.getElementById('gen-wc-edit-modal').classList.add('active');
+};
+
+window._editWildcard = async (name) => {
+  document.getElementById('gen-wc-edit-title').textContent = '编辑 Wildcard';
+  document.getElementById('gen-wc-edit-name').value = name;
+  document.getElementById('gen-wc-edit-name').disabled = true;
+  document.getElementById('gen-wc-edit-content').value = '加载中...';
+  document.getElementById('gen-wc-edit-modal').classList.add('active');
+  const resp = await apiFetch(`/api/generate/wildcard/${encodeURIComponent(name)}`);
+  document.getElementById('gen-wc-edit-content').value = resp?.content ?? '加载失败';
+};
+
+window._saveWildcard = async () => {
+  const name = document.getElementById('gen-wc-edit-name').value.trim();
+  const content = document.getElementById('gen-wc-edit-content').value;
+  if (!name) { showToast('请输入名称', 'warning'); return; }
+  const resp = await apiFetch(`/api/generate/wildcard/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (resp?.ok) {
+    showToast('Wildcard 已保存', 'success');
+    document.getElementById('gen-wc-edit-modal').classList.remove('active');
+    await _loadWildcards();
+  } else {
+    showToast('保存失败: ' + (resp?.error || '未知错误'), 'error');
+  }
+};
+
+window._deleteWildcard = async (name) => {
+  if (!confirm(`确认删除 Wildcard "${name}" ?`)) return;
+  const resp = await apiFetch(`/api/generate/wildcard/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  if (resp?.ok) {
+    showToast('已删除', 'success');
+    await _loadWildcards();
+  } else {
+    showToast('删除失败: ' + (resp?.error || '未知错误'), 'error');
+  }
+};
+
+
