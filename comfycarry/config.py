@@ -157,6 +157,10 @@ MODEL_DIRS = {
     "aura-sr": "models/Aura-SR",
     "lbw_models": "models/lbw_models",
     "intrinsic_loras": "models/intrinsic_loras",
+    # CivitAI 模型类型对应目录
+    "wildcards": "wildcards",
+    "poses": "models/poses",
+    "workflows": "user",
 }
 
 MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}

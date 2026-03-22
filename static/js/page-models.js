@@ -42,6 +42,7 @@ function _isInCart(modelId) {
 let _dlCompletedIds = new Set();
 let _localCivitaiIds = new Set();  // CivitAI modelId → 本地已存在
 let _downloadingCivitaiIds = new Set();  // CivitAI modelId → 正在下载(active/paused/queued)
+let _selectedLocalFolder = '';  // 本地模型文件夹过滤 (空=全部)
 
 const TYPE_MAP = { 'Checkpoint': 'Checkpoint', 'LORA': 'LORA', 'TextualInversion': 'Embedding', 'Controlnet': 'ControlNet', 'Upscaler': 'Upscaler', 'VAE': 'VAE', 'Poses': 'Poses' };
 
@@ -271,6 +272,7 @@ async function loadLocalModels() {
     grid.innerHTML = renderSkeleton('model-grid', 6);
   }
   status.innerHTML = '';
+  _selectedLocalFolder = '';
 
   try {
     const r = await fetch(`/api/local_models?category=${cat}`);
@@ -284,15 +286,58 @@ async function loadLocalModels() {
     const infoCount = localModelsData.filter(m => m.has_info).length;
     status.innerHTML = `共 ${d.total} 个模型 · ${infoCount} 个已有元数据`;
 
-    if (localModelsData.length === 0) {
-      grid.innerHTML = renderEmpty('该类别下未找到模型文件');
-      return;
-    }
-
-    grid.innerHTML = localModelsData.map((m, i) => renderLocalModelCard(m, i)).join('');
+    _updateFolderDropdown();
+    _renderLocalGrid();
   } catch (e) {
     grid.innerHTML = renderError('加载失败: ' + e.message);
   }
+}
+
+/** 更新文件夹下拉列表 (从当前 localModelsData 提取子文件夹) */
+function _updateFolderDropdown() {
+  const sel = document.getElementById('model-folder');
+  if (!sel) return;
+  const cat = document.getElementById('model-category').value;
+  sel.innerHTML = '<option value="">全部文件夹</option>';
+  // "全部类型" 时只保留默认选项
+  if (cat === 'all') return;
+  const folders = new Set();
+  for (const m of localModelsData) {
+    const idx = m.rel_path.indexOf('/');
+    if (idx > 0) folders.add(m.rel_path.substring(0, idx));
+  }
+  const sorted = [...folders].sort();
+  for (const f of sorted) {
+    const opt = document.createElement('option');
+    opt.value = f;
+    opt.textContent = f;
+    sel.appendChild(opt);
+  }
+  sel.value = _selectedLocalFolder;
+}
+
+/** 文件夹下拉变化时调用 */
+window.filterLocalByFolder = function () {
+  const sel = document.getElementById('model-folder');
+  _selectedLocalFolder = sel?.value || '';
+  _renderLocalGrid();
+};
+
+function _renderLocalGrid() {
+  const grid = document.getElementById('local-models-grid');
+  if (!grid) return;
+  let display = localModelsData;
+  if (_selectedLocalFolder) {
+    display = localModelsData.filter(m => m.rel_path.startsWith(_selectedLocalFolder + '/'));
+  }
+  if (display.length === 0) {
+    grid.innerHTML = renderEmpty('该类别下未找到模型文件');
+    return;
+  }
+  grid.innerHTML = display.map((m) => {
+    const idx = localModelsData.indexOf(m);
+    return renderLocalModelCard(m, idx);
+  }).join('');
 }
 
 function renderLocalModelCard(m, idx) {

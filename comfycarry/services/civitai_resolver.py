@@ -33,19 +33,22 @@ _TYPE_TO_DIR_KEY = {
     "checkpoint": "checkpoints",
     "lora": "loras",
     "lycoris": "loras",
+    "locon": "loras",
+    "dora": "loras",
     "controlnet": "controlnet",
     "vae": "vae",
     "upscaler": "upscale_models",
     "embedding": "embeddings",
     "textualinversion": "embeddings",
-    "poses": "animatediff_models",
+    "poses": "poses",
     "motionmodule": "animatediff_models",
-    "wildcards": "embeddings",
+    "wildcards": "wildcards",
+    "workflows": "workflows",
+    "detection": "ultralytics",
     "aestheticgradient": "embeddings",
     "other": "checkpoints",
     "clothing": "checkpoints",
     "sdxl": "checkpoints",
-    "locon": "loras",
     "hypernetwork": "hypernetworks",
 }
 
@@ -380,20 +383,35 @@ def sanitize_filename(name: str, max_length: int = 200) -> str:
     return name
 
 
-def resolve_save_dir(model_type: str) -> str:
+def resolve_save_dir(model_type: str, base_model: str = "") -> str:
     """
-    CivitAI 模型类型 → 本地绝对路径.
+    CivitAI 模型类型 + base_model → 本地绝对路径.
 
     Args:
         model_type: CivitAI 类型字符串 (如 "Checkpoint", "LORA")
+        base_model: CivitAI baseModel 字符串 (如 "SDXL 1.0", "Pony")
 
     Returns:
-        绝对路径 (如 "/workspace/ComfyUI/models/checkpoints")
+        绝对路径 (如 "/workspace/ComfyUI/models/checkpoints/SDXL 1.0")
     """
     type_lower = model_type.lower()
     dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
     rel_dir = MODEL_DIRS.get(dir_key, f"models/{dir_key}")
+
+    # 追加 baseModel 子文件夹
+    if base_model and base_model.strip():
+        sub = _sanitize_folder_name(base_model.strip())
+        if sub:
+            rel_dir = os.path.join(rel_dir, sub)
+
     return os.path.join(COMFYUI_DIR, rel_dir)
+
+
+def _sanitize_folder_name(name: str) -> str:
+    """清理文件夹名称，保留原始 baseModel 字符串但移除文件系统不安全字符"""
+    clean = re.sub(r'[/\\:*?"<>|\x00-\x1f]', '_', name)
+    clean = clean.strip('. ')
+    return clean or ""
 
 
 # ── 元数据保存 ───────────────────────────────────────────────────────────────
@@ -595,8 +613,8 @@ def resolve_civitai_download(
     filename = custom_filename or selected.get("name", "model.safetensors")
     filename = sanitize_filename(filename)
 
-    # 4. 保存目录
-    save_dir = resolve_save_dir(info["model_type"])
+    # 4. 保存目录 (按 baseModel 子文件夹分类)
+    save_dir = resolve_save_dir(info["model_type"], info.get("base_model", ""))
 
     # 5. 显示名称
     display_name = info["model_name"]

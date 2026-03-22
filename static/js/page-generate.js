@@ -28,6 +28,8 @@ let _seedMode = 'random';
 let _seedValue = null;
 let _loraSelected = new Map(); // name -> strength (0-2)
 let _runMode = 'normal'; // 'normal' | 'onChange' | 'live'
+let _selectedCkptFolder = ''; // 当前 Checkpoint 弹窗文件夹过滤 (空=全部)
+let _selectedLoraFolder = ''; // 当前 LoRA 弹窗文件夹过滤 (空=全部)
 let _saveTimer = null;
 let _upscaleEnabled = false;
 let _upscaleFactor = 2;
@@ -1841,7 +1843,43 @@ function _renderCkptPanel() {
   }
 }
 
+/** 从模型列表中提取文件夹名称 (模型名中 "/" 之前的部分) */
+function _extractFolders(models) {
+  const folders = new Set();
+  for (const m of models) {
+    const idx = m.name.indexOf('/');
+    if (idx > 0) folders.add(m.name.substring(0, idx));
+  }
+  return [...folders].sort();
+}
+
+/** 渲染文件夹过滤 chips */
+function _renderFolderChips(containerId, folders, selectedFolder, onChange) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (folders.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+  container.innerHTML = '';
+  // "全部" chip
+  const allChip = document.createElement('span');
+  allChip.className = 'chip' + (!selectedFolder ? ' active' : '');
+  allChip.textContent = '全部';
+  allChip.addEventListener('click', () => onChange(''));
+  container.appendChild(allChip);
+  for (const f of folders) {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (selectedFolder === f ? ' active' : '');
+    chip.textContent = f;
+    chip.addEventListener('click', () => onChange(f));
+    container.appendChild(chip);
+  }
+}
+
 function _openCkptModal() {
+  _selectedCkptFolder = '';
   const search = document.getElementById('gen-ckpt-modal-search');
   if (search) {
     search.value = '';
@@ -1850,9 +1888,22 @@ function _openCkptModal() {
     newSearch.addEventListener('input', () => _renderCkptModalGrid());
   }
   // 刷新选项 (实时获取最新模型)
-  _loadOptions(true).then(() => _renderCkptModalGrid());
+  _loadOptions(true).then(() => {
+    _renderCkptFolderChips();
+    _renderCkptModalGrid();
+  });
+  _renderCkptFolderChips();
   _renderCkptModalGrid();
   document.getElementById('gen-ckpt-modal')?.classList.add('active');
+}
+
+function _renderCkptFolderChips() {
+  const folders = _extractFolders(_checkpointOptions);
+  _renderFolderChips('gen-ckpt-folder-chips', folders, _selectedCkptFolder, (f) => {
+    _selectedCkptFolder = f;
+    _renderCkptFolderChips();
+    _renderCkptModalGrid();
+  });
 }
 
 window._closeCkptModal = function () {
@@ -1865,7 +1916,12 @@ function _renderCkptModalGrid() {
   if (!grid) return;
   const q = (search?.value || '').toLowerCase();
   grid.innerHTML = '';
-  const filtered = q ? _checkpointOptions.filter(c => c.basename.toLowerCase().includes(q) || _displayName(c).toLowerCase().includes(q)) : _checkpointOptions;
+  let list = _checkpointOptions;
+  // 文件夹过滤
+  if (_selectedCkptFolder) {
+    list = list.filter(c => c.name.startsWith(_selectedCkptFolder + '/'));
+  }
+  const filtered = q ? list.filter(c => c.basename.toLowerCase().includes(q) || _displayName(c).toLowerCase().includes(q)) : list;
   if (!filtered.length) {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--t3)"><span class="ms ms-sm">deployed_code_alert</span> 未找到 Checkpoint</div>';
   } else {
@@ -1922,6 +1978,7 @@ let _loraModalPending = new Map(); // 弹窗内临时选中状态
 
 function _openLoraModal() {
   _loraModalPending = new Map(_loraSelected);
+  _selectedLoraFolder = '';
   const search = document.getElementById('gen-lora-modal-search');
   if (search) {
     search.value = '';
@@ -1930,10 +1987,23 @@ function _openLoraModal() {
     search.parentNode.replaceChild(newSearch, search);
     newSearch.addEventListener('input', () => _renderLoraModalGrid());
   }
+  _renderLoraFolderChips();
   _renderLoraModalGrid();
   document.getElementById('gen-lora-modal')?.classList.add('active');
   // 实时刷新 LoRA 列表 (后台获取最新，完成后重新渲染)
-  _loadOptions(true).then(() => _renderLoraModalGrid());
+  _loadOptions(true).then(() => {
+    _renderLoraFolderChips();
+    _renderLoraModalGrid();
+  });
+}
+
+function _renderLoraFolderChips() {
+  const folders = _extractFolders(_loraOptions);
+  _renderFolderChips('gen-lora-folder-chips', folders, _selectedLoraFolder, (f) => {
+    _selectedLoraFolder = f;
+    _renderLoraFolderChips();
+    _renderLoraModalGrid();
+  });
 }
 
 window._closeLoraModal = function () {
@@ -1955,14 +2025,13 @@ function _renderLoraModalGrid() {
   const q = (search?.value || '').toLowerCase();
   grid.innerHTML = '';
 
-  // L1 架构过滤: 只显示与当前 checkpoint 兼容的 LoRA
-  const ckptArch = _checkpointOptions.find(c => c.name === _selectedCheckpoint)?.arch || 'unknown';
-  let archFiltered = _loraOptions;
-  if (ckptArch && ckptArch !== 'unknown') {
-    archFiltered = _loraOptions.filter(l => l.arch === ckptArch || l.arch === 'unknown');
+  // 文件夹过滤
+  let list = _loraOptions;
+  if (_selectedLoraFolder) {
+    list = list.filter(l => l.name.startsWith(_selectedLoraFolder + '/'));
   }
 
-  const filtered = q ? archFiltered.filter(l => l.basename.toLowerCase().includes(q) || _displayName(l).toLowerCase().includes(q) || l.trigger_words.toLowerCase().includes(q)) : archFiltered;
+  const filtered = q ? list.filter(l => l.basename.toLowerCase().includes(q) || _displayName(l).toLowerCase().includes(q) || l.trigger_words.toLowerCase().includes(q)) : list;
   if (!filtered.length) {
     grid.innerHTML = '<div class="gen-lora-empty-hint" style="grid-column:1/-1"><span class="ms ms-sm" style="color:var(--t3)">extension_off</span> 未找到 LoRA</div>';
   } else {

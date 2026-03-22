@@ -158,6 +158,9 @@
                             <option value="upscale_models">Upscale</option>
                             <option value="embeddings">Embeddings</option>
                         </select>
+                        <select id="model-folder" onchange="filterLocalByFolder()" style="width:auto;min-width:120px">
+                            <option value="">全部文件夹</option>
+                        </select>
                         <button class="btn btn-sm" onclick="loadLocalModels()">刷新</button>
                         <button class="btn btn-sm btn-primary" onclick="fetchAllInfo()">全部获取</button>
                     </div>
@@ -1701,6 +1704,7 @@
                 <input type="text" id="gen-ckpt-modal-search" placeholder="搜索 Checkpoint..."
                        style="width:100%;padding-left:34px;box-sizing:border-box">
             </div>
+            <div id="gen-ckpt-folder-chips" class="chip-select" style="flex-shrink:0;margin-bottom:10px;display:none"></div>
             <div id="gen-ckpt-modal-grid" class="gen-lora-grid" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
         </div>
     </div>
@@ -1720,6 +1724,7 @@
                 <input type="text" id="gen-lora-modal-search" placeholder="搜索 LoRA..."
                        style="width:100%;padding-left:34px;box-sizing:border-box">
             </div>
+            <div id="gen-lora-folder-chips" class="chip-select" style="flex-shrink:0;margin-bottom:10px;display:none"></div>
             <!-- 卡片网格 -->
             <div id="gen-lora-modal-grid" class="gen-lora-grid" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
             <!-- 底部按钮 -->

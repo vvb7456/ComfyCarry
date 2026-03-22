@@ -137,14 +137,51 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     return result
 
 
-def _detect_arch(filepath: str) -> str:
+def _detect_arch_from_path(name: str) -> str:
     """
-    读取 safetensors 文件 header 检测模型架构。
+    从模型路径中的 baseModel 子文件夹名推断架构。
+    CivitAI 下载时会按 baseModel 创建子文件夹 (如 "SDXL 1.0/model.safetensors")。
     返回: "sd15" | "sdxl" | "flux" | "sd3" | "unknown"
-    对 .ckpt / .pt 等非 safetensors 格式返回 "unknown"。
     """
-    if not filepath.endswith(".safetensors"):
+    parts = name.replace("\\", "/").split("/")
+    if len(parts) < 2:
         return "unknown"
+    folder = parts[0].lower()
+    # SD 1.x
+    if folder in ("sd 1.4", "sd 1.5", "sd 1.5 lcm", "sd 1.5 hyper"):
+        return "sd15"
+    # SDXL ecosystem (includes Pony, Illustrious, NoobAI)
+    if any(k in folder for k in ("sdxl", "pony", "illustrious", "noobai")):
+        return "sdxl"
+    # Flux
+    if "flux" in folder:
+        return "flux"
+    # SD 3.x
+    if folder.startswith("sd 3") or folder == "sd3":
+        return "sd3"
+    return "unknown"
+
+
+def _detect_arch(filepath: str, name: str = "") -> str:
+    """
+    读取模型文件 header 检测架构。
+    支持 safetensors 和 GGUF 格式。
+    返回: "sd15" | "sdxl" | "flux" | "sd3" | "unknown"
+    对 .ckpt / .pt 等不支持的格式返回 "unknown"。
+    当 header 检测为 unknown 时，尝试从路径子文件夹推断。
+    """
+    result = "unknown"
+    if filepath.endswith(".safetensors"):
+        result = _detect_arch_safetensors(filepath)
+    elif filepath.endswith(".gguf"):
+        result = _detect_arch_gguf(filepath)
+    if result == "unknown" and name:
+        result = _detect_arch_from_path(name)
+    return result
+
+
+def _detect_arch_safetensors(filepath: str) -> str:
+    """从 safetensors 文件 header 的 tensor key 名称检测架构。"""
     try:
         with open(filepath, "rb") as f:
             header_len = struct.unpack("<Q", f.read(8))[0]
@@ -153,31 +190,119 @@ def _detect_arch(filepath: str) -> str:
             raw = f.read(header_len)
         header = json.loads(raw)
         keys = set(k for k in header if k != "__metadata__")
-
-        # 提取所有顶级前缀用于快速特征匹配
-        has = lambda prefix: any(k.startswith(prefix) for k in keys)
-
-        # Flux: double_blocks / single_blocks
-        if has("double_blocks."):
-            return "flux"
-        # SD3: joint_blocks
-        if has("joint_blocks."):
-            return "sd3"
-        # SDXL checkpoint: 双 text encoder (conditioner.embedders.1) 或 label_emb
-        if has("conditioner.embedders.1.") or \
-           "model.diffusion_model.label_emb.0.0.weight" in keys:
-            return "sdxl"
-        # SD1.5 checkpoint: cond_stage_model / diffusion_model 但无 SDXL 标记
-        if has("cond_stage_model.") or has("model.diffusion_model."):
-            return "sd15"
-        # LoRA 检测: lora_te2 = SDXL, 无 te2 + 有 te1/unet = SD1.5
-        if has("lora_te2_"):
-            return "sdxl"
-        if has("lora_te1_") or has("lora_unet_"):
-            return "sd15"
-        return "unknown"
+        return _match_arch_from_keys(keys)
     except Exception:
         return "unknown"
+
+
+_GGUF_MAGIC = 0x46554747  # "GGUF" little-endian
+_GGUF_ARCH_MAP = {
+    "flux": "flux", "sd1": "sd15", "sdxl": "sdxl", "sd3": "sd3",
+}
+
+
+def _detect_arch_gguf(filepath: str) -> str:
+    """
+    从 GGUF 文件检测架构。
+    优先读取 general.architecture 元数据，fallback 到 tensor 名称匹配。
+    """
+    try:
+        with open(filepath, "rb") as f:
+            magic = struct.unpack("<I", f.read(4))[0]
+            if magic != _GGUF_MAGIC:
+                return "unknown"
+            _version = struct.unpack("<I", f.read(4))[0]
+            tensor_count = struct.unpack("<Q", f.read(8))[0]
+            kv_count = struct.unpack("<Q", f.read(8))[0]
+
+            # 读取 metadata key-value 对，寻找 general.architecture
+            arch_from_meta = _gguf_scan_metadata(f, kv_count)
+            if arch_from_meta and arch_from_meta in _GGUF_ARCH_MAP:
+                return _GGUF_ARCH_MAP[arch_from_meta]
+
+            # Fallback: 解析 tensor 名称做特征匹配
+            tensor_names = set()
+            for _ in range(min(tensor_count, 500)):
+                name = _gguf_read_string(f)
+                n_dims = struct.unpack("<I", f.read(4))[0]
+                f.read(n_dims * 8 + 4 + 8)  # dims + type + offset
+                # 去除 model.diffusion_model. 前缀
+                if name.startswith("model.diffusion_model."):
+                    name = name[len("model.diffusion_model."):]
+                tensor_names.add(name)
+            return _match_arch_from_keys(tensor_names)
+    except Exception:
+        return "unknown"
+
+
+def _gguf_read_string(f) -> str:
+    """读取 GGUF 格式的 length-prefixed UTF-8 字符串。"""
+    length = struct.unpack("<Q", f.read(8))[0]
+    if length > 1_000_000:
+        raise ValueError("GGUF string too long")
+    return f.read(length).decode("utf-8", errors="replace")
+
+
+def _gguf_skip_value(f, vtype: int):
+    """跳过一个 GGUF metadata value (不解析内容)。"""
+    _FIXED_SIZES = {
+        0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1,
+        10: 8, 11: 8, 12: 8,
+    }
+    if vtype in _FIXED_SIZES:
+        f.read(_FIXED_SIZES[vtype])
+    elif vtype == 8:  # STRING
+        _gguf_read_string(f)
+    elif vtype == 9:  # ARRAY
+        arr_type = struct.unpack("<I", f.read(4))[0]
+        arr_len = struct.unpack("<Q", f.read(8))[0]
+        for _ in range(arr_len):
+            _gguf_skip_value(f, arr_type)
+    else:
+        raise ValueError(f"Unknown GGUF value type: {vtype}")
+
+
+def _gguf_scan_metadata(f, kv_count: int) -> str | None:
+    """扫描 GGUF metadata，返回 general.architecture 的值（如果存在）。"""
+    for _ in range(kv_count):
+        key = _gguf_read_string(f)
+        vtype = struct.unpack("<I", f.read(4))[0]
+        if key == "general.architecture" and vtype == 8:
+            return _gguf_read_string(f)
+        _gguf_skip_value(f, vtype)
+    return None
+
+
+def _match_arch_from_keys(keys: set[str]) -> str:
+    """从 tensor key 名称集合匹配模型架构。"""
+    has = lambda prefix: any(k.startswith(prefix) for k in keys)
+
+    # Flux: double_blocks / single_blocks
+    if has("double_blocks."):
+        return "flux"
+    # SD3: joint_blocks
+    if has("joint_blocks."):
+        return "sd3"
+    # SDXL checkpoint: 双 text encoder (conditioner.embedders.1) 或 label_emb
+    if has("conditioner.embedders.1.") or \
+       any(k in keys for k in (
+           "model.diffusion_model.label_emb.0.0.weight",
+           "label_emb.0.0.weight",
+       )):
+        return "sdxl"
+    # SDXL alt: UNet 风格 + add_embedding
+    if has("add_embedding."):
+        return "sdxl"
+    # SD1.5 checkpoint: cond_stage_model / diffusion_model 但无 SDXL 标记
+    if has("cond_stage_model.") or has("model.diffusion_model.") or \
+       has("input_blocks.") or has("down_blocks."):
+        return "sd15"
+    # LoRA 检测: lora_te2 = SDXL, 无 te2 + 有 te1/unet = SD1.5
+    if has("lora_te2_"):
+        return "sdxl"
+    if has("lora_te1_") or has("lora_unet_"):
+        return "sd15"
+    return "unknown"
 
 
 def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
@@ -192,7 +317,7 @@ def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
         real_path = os.path.realpath(filepath)
         if not real_path.startswith(real_base + os.sep):
             continue  # 跳过路径遍历
-        result[name] = _detect_arch(filepath)
+        result[name] = _detect_arch(filepath, name)
     return result
 
 
