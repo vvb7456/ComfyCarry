@@ -267,7 +267,6 @@ function openLocalMeta(idx) {
 async function loadLocalModels() {
   const grid = document.getElementById('local-models-grid');
   const status = document.getElementById('local-models-status');
-  const cat = document.getElementById('model-category').value;
   if (!grid.children.length || grid.querySelector('.skeleton-wrap')) {
     grid.innerHTML = renderSkeleton('model-grid', 6);
   }
@@ -275,7 +274,7 @@ async function loadLocalModels() {
   _selectedLocalFolder = '';
 
   try {
-    const r = await fetch(`/api/local_models?category=${cat}`);
+    const r = await fetch('/api/local_models?category=all');
     const d = await r.json();
     localModelsData = d.models || [];
     // 更新本地 CivitAI ID 索引
@@ -283,26 +282,59 @@ async function loadLocalModels() {
     for (const m of localModelsData) {
       if (m.civitai_id) _localCivitaiIds.add(String(m.civitai_id));
     }
-    const infoCount = localModelsData.filter(m => m.has_info).length;
-    status.innerHTML = `共 ${d.total} 个模型 · ${infoCount} 个已有元数据`;
 
-    _updateFolderDropdown();
-    _renderLocalGrid();
+    _filterAndRender();
   } catch (e) {
     grid.innerHTML = renderError('加载失败: ' + e.message);
   }
 }
 
-/** 更新文件夹下拉列表 (从当前 localModelsData 提取子文件夹) */
-function _updateFolderDropdown() {
+/** 纯前端过滤 + 渲染 (类型 + 文件夹) */
+function _filterAndRender() {
+  const cat = document.getElementById('model-category')?.value || 'all';
+  const status = document.getElementById('local-models-status');
+  // 按类型过滤
+  let filtered = localModelsData;
+  if (cat !== 'all') {
+    filtered = localModelsData.filter(m => m.category === cat);
+  }
+  // 更新状态栏
+  const infoCount = filtered.filter(m => m.has_info).length;
+  if (status) status.innerHTML = `共 ${filtered.length} 个模型 · ${infoCount} 个已有元数据`;
+  // 更新文件夹下拉 (基于当前类型过滤后的模型)
+  _updateFolderDropdown(filtered, cat);
+  // 按文件夹过滤
+  let display = filtered;
+  if (_selectedLocalFolder) {
+    display = filtered.filter(m => m.rel_path.startsWith(_selectedLocalFolder + '/'));
+  }
+  // 渲染网格
+  const grid = document.getElementById('local-models-grid');
+  if (!grid) return;
+  if (display.length === 0) {
+    grid.innerHTML = renderEmpty('该类别下未找到模型文件');
+    return;
+  }
+  grid.innerHTML = display.map((m) => {
+    const idx = localModelsData.indexOf(m);
+    return renderLocalModelCard(m, idx);
+  }).join('');
+}
+
+/** 类型下拉变化时调用 */
+window.filterLocalByCategory = function () {
+  _selectedLocalFolder = '';  // 切换类型时重置文件夹
+  _filterAndRender();
+};
+
+/** 更新文件夹下拉列表 */
+function _updateFolderDropdown(models, cat) {
   const sel = document.getElementById('model-folder');
   if (!sel) return;
-  const cat = document.getElementById('model-category').value;
   sel.innerHTML = '<option value="">全部文件夹</option>';
-  // "全部类型" 时只保留默认选项
   if (cat === 'all') return;
   const folders = new Set();
-  for (const m of localModelsData) {
+  for (const m of models) {
     const idx = m.rel_path.indexOf('/');
     if (idx > 0) folders.add(m.rel_path.substring(0, idx));
   }
@@ -320,25 +352,8 @@ function _updateFolderDropdown() {
 window.filterLocalByFolder = function () {
   const sel = document.getElementById('model-folder');
   _selectedLocalFolder = sel?.value || '';
-  _renderLocalGrid();
+  _filterAndRender();
 };
-
-function _renderLocalGrid() {
-  const grid = document.getElementById('local-models-grid');
-  if (!grid) return;
-  let display = localModelsData;
-  if (_selectedLocalFolder) {
-    display = localModelsData.filter(m => m.rel_path.startsWith(_selectedLocalFolder + '/'));
-  }
-  if (display.length === 0) {
-    grid.innerHTML = renderEmpty('该类别下未找到模型文件');
-    return;
-  }
-  grid.innerHTML = display.map((m) => {
-    const idx = localModelsData.indexOf(m);
-    return renderLocalModelCard(m, idx);
-  }).join('');
-}
 
 function renderLocalModelCard(m, idx) {
   const badgeClass = getBadgeClass(m.category);
