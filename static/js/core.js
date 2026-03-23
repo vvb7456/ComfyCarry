@@ -48,6 +48,14 @@ queueMicrotask(() => {
     btn.innerHTML = `<span class="ms theme-toggle-icon">${_themeIcons[getTheme()] || 'contrast'}</span>`;
     tb.appendChild(btn);
   });
+  // 注入 mobile hamburger 到每个 page-header
+  document.querySelectorAll('.page-header').forEach(hdr => {
+    const btn = document.createElement('button');
+    btn.className = 'mobile-menu-btn';
+    btn.onclick = () => window.toggleMobileSidebar?.();
+    btn.innerHTML = '<span class="ms">menu</span>';
+    hdr.prepend(btn);
+  });
 });
 
 // ── 页面注册表 ───────────────────────────────────────────────
@@ -66,6 +74,8 @@ export function registerPage(name, hooks) {
 
 /** 切换页面 */
 export function showPage(page) {
+  // 移动端切换页面时关闭 sidebar
+  closeMobileSidebar();
   // 调用当前页的 leave
   if (_currentPage && _pages[_currentPage]?.leave) {
     try { _pages[_currentPage].leave(); } catch (_) {}
@@ -263,6 +273,23 @@ export function restoreSidebar() {
     document.getElementById('sidebar')?.classList.add('collapsed');
     document.querySelector('.content')?.classList.add('sidebar-collapsed');
   }
+}
+
+export function toggleMobileSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('mobile-overlay');
+  const open = sb.classList.toggle('mobile-open');
+  ov.classList.toggle('active', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+
+function closeMobileSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('mobile-overlay');
+  if (!sb || !sb.classList.contains('mobile-open')) return;
+  sb.classList.remove('mobile-open');
+  ov?.classList.remove('active');
+  document.body.style.overflow = '';
 }
 
 // ── 全局 Escape 键 ──────────────────────────────────────────

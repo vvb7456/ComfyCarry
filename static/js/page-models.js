@@ -40,7 +40,7 @@ function _isInCart(modelId) {
   return false;
 }
 let _dlCompletedIds = new Set();
-let _localCivitaiIds = new Set();  // CivitAI modelId → 本地已存在
+let _localCivitaiIds = new Map();  // CivitAI modelId → Set<versionId>
 let _downloadingCivitaiIds = new Set();  // CivitAI modelId → 正在下载(active/paused/queued)
 let _selectedLocalFolder = '';  // 本地模型文件夹过滤 (空=全部)
 
@@ -280,7 +280,11 @@ async function loadLocalModels() {
     // 更新本地 CivitAI ID 索引
     _localCivitaiIds.clear();
     for (const m of localModelsData) {
-      if (m.civitai_id) _localCivitaiIds.add(String(m.civitai_id));
+      if (m.civitai_id) {
+        const mid = String(m.civitai_id);
+        if (!_localCivitaiIds.has(mid)) _localCivitaiIds.set(mid, new Set());
+        if (m.civitai_version_id) _localCivitaiIds.get(mid).add(String(m.civitai_version_id));
+      }
     }
 
     _filterAndRender();
@@ -752,7 +756,8 @@ function renderCivitCard(h) {
   const bm = ver?.baseModel || '';
   const inCart = _isInCart(h.id);
   const vCount = allVersions.length;
-  const isLocal = _localCivitaiIds.has(String(h.id));
+  const localVersions = _localCivitaiIds.get(String(h.id));
+  const isAllLocal = localVersions && allVersions.length > 0 && allVersions.every(v => localVersions.has(String(v.id)));
 
   // Cache data for cart and metadata (avoids unsafe inline JSON)
   searchResultsCache[String(h.id)] = {
@@ -789,7 +794,7 @@ function renderCivitCard(h) {
       <div class="model-card-actions">
         <button class="btn btn-sm btn-success" onclick="openMetaFromCache('${h.id}')">详情</button>
         <button class="btn btn-sm ${inCart ? 'btn-danger' : 'btn-primary'}" onclick="toggleCartFromSearch('${h.id}', this)">${inCart ? '移除' : '收藏'}</button>
-        ${isLocal
+        ${isAllLocal
           ? `<button class="btn btn-sm" data-dl-btn="${h.id}" disabled style="opacity:.5;cursor:default">已有</button>`
           : _downloadingCivitaiIds.has(String(h.id))
             ? `<button class="btn btn-sm" data-dl-btn="${h.id}" disabled style="opacity:.5;cursor:default">下载中</button>`
@@ -900,14 +905,18 @@ function showVersionPicker(modelId, modelType, versions) {
   const cached = searchResultsCache[String(modelId)];
   title.textContent = `选择版本 - ${cached?.name || modelId}`;
 
+  const localVersions = _localCivitaiIds.get(String(modelId));
   let html = '<div style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto">';
   versions.forEach(v => {
     const bm = v.baseModel ? `<span class="badge badge-other" style="font-size:.72rem">${v.baseModel}</span>` : '';
+    const vLocal = localVersions && localVersions.has(String(v.id));
     html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rs)">
       <div>
         <span style="font-weight:500">${v.name || v.id}</span> ${bm}
       </div>
-      <button class="btn btn-sm btn-primary" onclick="closeVersionPicker(); doDownload('${modelId}', '${modelType}', '${v.id}')">下载</button>
+      ${vLocal
+        ? `<button class="btn btn-sm" disabled style="opacity:.5;cursor:default">已有</button>`
+        : `<button class="btn btn-sm btn-primary" onclick="closeVersionPicker(); doDownload('${modelId}', '${modelType}', '${v.id}')">下载</button>`}
     </div>`;
   });
   html += '</div>';

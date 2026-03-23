@@ -587,6 +587,14 @@ def _reprovision_services():
 # Tunnel 日志
 # ═══════════════════════════════════════════════════════════════
 
+# ── cloudflared 日志噪音过滤 (SSE 断连产生的正常错误) ──
+_CF_NOISE_RE = re.compile(
+    r'canceled by remote with error code 0'
+    r'|request ended abruptly: context canceled',
+    re.IGNORECASE,
+)
+
+
 @bp.route("/api/tunnel/logs")
 def api_tunnel_logs():
     """获取 cloudflared 历史日志"""
@@ -606,6 +614,7 @@ def api_tunnel_logs():
             if not l.startswith('[TAILING]')
             and 'last ' not in l
             and '/root/.pm2/logs/' not in l
+            and not _CF_NOISE_RE.search(l)
         )
         return jsonify({"logs": logs})
     except Exception as e:
@@ -631,7 +640,7 @@ def api_tunnel_logs_stream():
                     break
                 line = ansi_re.sub('', line.rstrip('\n'))
                 line = pm2_prefix_re.sub('', line)
-                if not line:
+                if not line or _CF_NOISE_RE.search(line):
                     continue
                 lvl = "info"
                 if re.search(r'error|ERR|exception', line, re.I):

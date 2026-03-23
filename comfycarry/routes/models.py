@@ -949,10 +949,15 @@ def _extract_models_from_prompt(prompt: dict) -> tuple[list[dict], list[dict]]:
                         and val not in seen
                         and val not in _SENTINEL_VALUES):
                     seen.add(val)
+                    # combo 精确匹配 → basename 模糊匹配 (覆盖子目录差异)
+                    exists = val in combo_set
+                    if not exists:
+                        bn = os.path.basename(val)
+                        exists = any(os.path.basename(c) == bn for c in combo_set)
                     models.append({
                         "name": val,
                         "type": _get_category(ct, fname),
-                        "exists": val in combo_set,
+                        "exists": exists,
                         "node": ct,
                         "field": fname,
                     })
@@ -1032,12 +1037,18 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
                 if (not isinstance(val, str) or not val
                         or val in seen or val in _SENTINEL_VALUES):
                     continue
-                # 检查是否在某个 combo 集中 (说明文件存在)
+                # combo 精确匹配 → basename 模糊匹配 (覆盖子目录差异)
                 matched_field = None
                 for fname, combo_set in all_combos.items():
                     if val in combo_set:
                         matched_field = fname
                         break
+                if not matched_field:
+                    bn = os.path.basename(val)
+                    for fname, combo_set in all_combos.items():
+                        if any(os.path.basename(c) == bn for c in combo_set):
+                            matched_field = fname
+                            break
                 if matched_field:
                     seen.add(val)
                     models.append({
@@ -1168,16 +1179,35 @@ def _extract_models_from_workflow(workflow: dict) -> tuple[list[dict], list[dict
 
 
 def _check_model_exists(name: str, category: str) -> bool:
-    """检查模型文件是否存在于本地 (含 extra_model_paths.yaml 额外路径)"""
-    # 1. 检查标准 MODEL_DIRS
+    """检查模型文件是否存在于本地 (含 extra_model_paths.yaml 额外路径)
+
+    策略: 先精确路径匹配, 失败后按文件名递归搜索 (覆盖子目录差异).
+    """
+    basename = os.path.basename(name)
+
+    # 1. 检查标准 MODEL_DIRS — 精确路径
     rel_dir = MODEL_DIRS.get(category, "")
     if rel_dir:
-        if os.path.isfile(os.path.join(COMFYUI_DIR, rel_dir, name)):
+        base_path = os.path.join(COMFYUI_DIR, rel_dir)
+        if os.path.isfile(os.path.join(base_path, name)):
             return True
+        # 回退: 按文件名递归搜索该目录
+        if os.path.isdir(base_path):
+            for root, _dirs, files in os.walk(base_path):
+                if basename in files:
+                    return True
     else:
         for _cat, rd in MODEL_DIRS.items():
-            if os.path.isfile(os.path.join(COMFYUI_DIR, rd, name)):
+            base_path = os.path.join(COMFYUI_DIR, rd)
+            if os.path.isfile(os.path.join(base_path, name)):
                 return True
+        # 回退: 按文件名遍历所有目录
+        for _cat, rd in MODEL_DIRS.items():
+            base_path = os.path.join(COMFYUI_DIR, rd)
+            if os.path.isdir(base_path):
+                for root, _dirs, files in os.walk(base_path):
+                    if basename in files:
+                        return True
 
     # 2. 检查 extra_model_paths.yaml 额外路径
     extra = get_extra_model_paths()
@@ -1185,8 +1215,11 @@ def _check_model_exists(name: str, category: str) -> bool:
         for ep in extra[category]:
             if os.path.isfile(os.path.join(ep, name)):
                 return True
+            if os.path.isdir(ep):
+                for root, _dirs, files in os.walk(ep):
+                    if basename in files:
+                        return True
     elif not rel_dir:
-        # 未知分类: 遍历所有 extra 路径
         for paths in extra.values():
             for ep in paths:
                 if os.path.isfile(os.path.join(ep, name)):
@@ -1241,25 +1274,44 @@ def api_parse_workflow():
             "error": "ComfyUI 未运行或无法连接, 无法解析工作流模型依赖",
         }), 503
 
-    # 对非 combo 检测的模型 (内联/特殊节点), 补充文件系统存在性检查
-    # 对 combo 检测为 False 的模型, 兜底检查 extra_model_paths + 磁盘
-    for m in models:
-        if "exists" not in m or not m["exists"]:
-            m["exists"] = _check_model_exists(m["name"], m["type"])
+    # 补全缺失的 exists 字段 (内联 lora / 特殊节点路径)
+    # 从 field_map 构建 category → combo 集合, 用 combo basename 匹配
+    if _model_field_cache:
+        cat_combos: dict[str, set] = {}
+        for ct_node, ct_fields in _model_field_cache.items():
+            for fname, combo_set in ct_fields.items():
+                cat = _get_category(ct_node, fname)
+                if cat not in cat_combos:
+                    cat_combos[cat] = set()
+                cat_combos[cat].update(combo_set)
 
-    # ── 缺失节点 → 反查 CM 插件映射 ──
+        for m in models:
+            if "exists" not in m:
+                combo = cat_combos.get(m["type"], set())
+                name = m["name"]
+                bn = os.path.basename(name)
+                m["exists"] = (name in combo
+                               or any(os.path.basename(c) == bn
+                                      for c in combo))
+
+    # ── 缺失节点 → 反查 CM 插件映射, 过滤前端专属节点 ──
     if missing_nodes:
         plugin_map = _get_node_to_plugin_map()
+        enriched = []
         for mn in missing_nodes:
             ct = mn.get("class_type", "")
             info = plugin_map.get(ct)
             if info:
+                # CM 映射中存在 → 真正缺失的插件节点
                 mn["plugin_id"] = info["id"]
                 mn["plugin_title"] = info["title"]
                 mn["plugin_url"] = info["url"]
                 mn["plugin_version"] = info.get("version", "unknown")
                 if info.get("files"):
                     mn["plugin_files"] = info["files"]
+                enriched.append(mn)
+            # else: CM 映射中不存在 → 前端专属节点 (Note/Group/Reroute 等), 跳过
+        missing_nodes = enriched
 
     missing = sum(1 for m in models if not m["exists"])
     return jsonify({

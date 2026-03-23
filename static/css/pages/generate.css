@@ -22,6 +22,7 @@
     padding: var(--sp-4);
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 /* ── 右：预览列 ────────────────────────────────────────────────── */
@@ -156,6 +157,20 @@
     display: flex;
     align-items: stretch;
     gap: var(--sp-2);
+}
+
+@media(max-width:768px) {
+    .gen-action-bar {
+        flex-direction: column;
+        gap: var(--sp-2)
+    }
+    .gen-run-main {
+        min-width: 0 !important;
+        flex: 1
+    }
+    .gen-run-split {
+        width: 100%
+    }
 }
 
 .gen-bar-status {
@@ -370,6 +385,12 @@
     gap: var(--sp-2) var(--sp-3);
 }
 
+@media(max-width:768px) {
+    .gen-basic-row {
+        grid-template-columns: 1fr
+    }
+}
+
 .gen-col-full {
     grid-column: 1 / -1
 }
@@ -514,37 +535,118 @@
     padding-top: 0;
 }
 
-/* ── 提示词工具图标 (textarea 右下角) ────────────────────────── */
-.gen-prompt-tools {
-    position: absolute;
-    right: 6px;
-    bottom: 6px;
+/* ── 提示词集成工具栏 (textarea 底边栏) ─────────────────────── */
+
+/* 包裹 textarea + toolbar 的容器, 视觉融为一体 */
+.gen-prompt-wrap {
     display: flex;
-    gap: 4px;
-    z-index: 1;
+    flex-direction: column;
+    border: 1px solid var(--bd);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin-bottom: var(--sp-3);
+    transition: border-color .15s;
+    min-width: 0;
 }
 
-.gen-prompt-tool-btn {
-    width: 32px;
-    height: 32px;
+.gen-prompt-wrap:focus-within {
+    border-color: var(--ac);
+}
+
+/* textarea 去掉自身边框, 由外层容器统一管理 */
+.gen-textarea-tooled {
+    border: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* 工具栏: textarea 底部的一条细条 */
+.gen-prompt-toolbar {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 3px 6px;
+    background: var(--bg2);
+    border-top: 1px solid var(--bd);
+    flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none
+}
+
+.gen-prompt-toolbar::-webkit-scrollbar {
+    display: none
+}
+
+@media(max-width:768px) {
+    .gen-prompt-toolbar {
+        justify-content: flex-start
+    }
+    .gen-prompt-tool-btn .gen-tool-label {
+        display: none
+    }
+}
+
+/* 工具按钮: icon + 标签 */
+.gen-prompt-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
     border: none;
-    border-radius: 8px;
-    background: var(--bg3);
-    color: var(--ac);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--t2);
+    font-size: .72rem;
     cursor: pointer;
-    transition: opacity .15s, color .15s, background .15s;
+    transition: color .15s, background .15s;
+    white-space: nowrap;
+}
+
+.gen-prompt-tool-btn .ms {
+    color: var(--ac);
+    transition: color .15s;
 }
 
 .gen-prompt-tool-btn:hover:not(:disabled) {
-    color: #fff;
-    background: var(--ac);
+    color: var(--t1);
+    background: var(--bg3);
+}
+
+.gen-prompt-tool-btn:hover:not(:disabled) .ms {
+    color: var(--ac2, var(--ac));
 }
 
 .gen-prompt-tool-btn:disabled {
     cursor: not-allowed;
     opacity: 0.3;
+}
+
+.gen-tool-label {
+    font-size: .74rem;
+    font-weight: 500;
+}
+
+/* header 旁的语法帮助按钮 (小圆形) */
+.gen-prompt-help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
     color: var(--t3);
+    cursor: pointer;
+    padding: 0;
+    margin-left: 2px;
+    transition: color .15s, background .15s;
+}
+
+.gen-prompt-help-btn:hover {
+    color: var(--ac);
+    background: var(--bg3);
 }

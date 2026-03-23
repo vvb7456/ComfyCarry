@@ -10,6 +10,22 @@
     margin-bottom: var(--sp-2);
 }
 
+@media(max-width:768px) {
+    .gen-module-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px
+    }
+    .gen-module-tabs::-webkit-scrollbar {
+        display: none
+    }
+    .gen-mod-tab {
+        flex-shrink: 0
+    }
+}
+
 .gen-mod-tab {
     display: flex;
     align-items: center;
