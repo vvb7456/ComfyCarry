@@ -1100,9 +1100,9 @@ def api_generate_embeddings():
 
 @bp.route("/api/generate/wildcards")
 def api_generate_wildcards_list():
-    """列出所有可用 wildcard 文件"""
+    """列出所有可用 wildcard 文件及文件夹"""
     expander = get_expander()
-    return jsonify({"wildcards": expander.list_wildcards()})
+    return jsonify({"wildcards": expander.list_wildcards(), "folders": expander.list_folders()})
 
 
 @bp.route("/api/generate/wildcard/<path:name>")
@@ -1137,6 +1137,34 @@ def api_generate_wildcard_delete(name):
     try:
         expander = get_expander()
         expander.delete_wildcard(name)
+        return jsonify({"ok": True})
+    except FileNotFoundError:
+        return jsonify({"error": f"Wildcard 不存在: {name}"}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@bp.route("/api/generate/wildcard-folder/<path:name>", methods=["POST"])
+def api_generate_wildcard_folder_create(name):
+    """创建 wildcard 子文件夹"""
+    try:
+        expander = get_expander()
+        expander.create_folder(name)
+        return jsonify({"ok": True})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@bp.route("/api/generate/wildcard/<path:name>/rename", methods=["POST"])
+def api_generate_wildcard_rename(name):
+    """重命名 wildcard 文件"""
+    data = request.get_json(silent=True) or {}
+    new_name = data.get("new_name", "").strip()
+    if not new_name:
+        return jsonify({"error": "缺少 new_name 参数"}), 400
+    try:
+        expander = get_expander()
+        expander.rename_wildcard(name, new_name)
         return jsonify({"ok": True})
     except FileNotFoundError:
         return jsonify({"error": f"Wildcard 不存在: {name}"}), 404

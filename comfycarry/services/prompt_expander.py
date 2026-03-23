@@ -121,6 +121,52 @@ class PromptExpander:
         fpath.write_text(content, encoding="utf-8")
         self.reload()
 
+    def list_folders(self) -> list[str]:
+        """列出 wildcards 目录下所有子文件夹 (含空目录，排除隐藏目录)"""
+        folders = []
+        if not self._wildcards_dir.exists():
+            return folders
+        for d in sorted(self._wildcards_dir.rglob("*")):
+            if d.is_dir():
+                rel = str(d.relative_to(self._wildcards_dir)).replace("\\", "/")
+                # 跳过隐藏目录 (任一层级以 . 开头)
+                if any(part.startswith(".") for part in rel.split("/")):
+                    continue
+                folders.append(rel)
+        return folders
+
+    def create_folder(self, name: str) -> None:
+        """在 wildcards 目录下创建子文件夹"""
+        safe = Path(name).as_posix()
+        if ".." in safe:
+            raise ValueError("Invalid folder name")
+        dpath = self._wildcards_dir / safe
+        if not dpath.resolve().is_relative_to(self._wildcards_dir.resolve()):
+            raise ValueError("Invalid folder path")
+        dpath.mkdir(parents=True, exist_ok=True)
+
+    def rename_wildcard(self, old_name: str, new_name: str) -> None:
+        """重命名一个 wildcard 文件 (保留扩展名)"""
+        old_safe = Path(old_name).as_posix()
+        new_safe = Path(new_name).as_posix()
+        if ".." in old_safe or ".." in new_safe:
+            raise ValueError("Invalid wildcard name")
+        # 找到源文件
+        src = None
+        for ext in (".txt", ".yaml", ".yml", ".json"):
+            fpath = self._wildcards_dir / (old_safe + ext)
+            if fpath.is_file() and fpath.resolve().is_relative_to(self._wildcards_dir.resolve()):
+                src = fpath
+                break
+        if not src:
+            raise FileNotFoundError(f"Wildcard not found: {old_name}")
+        dst = self._wildcards_dir / (new_safe + src.suffix)
+        if not dst.resolve().is_relative_to(self._wildcards_dir.resolve()):
+            raise ValueError("Invalid target path")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dst)
+        self.reload()
+
     def delete_wildcard(self, name: str) -> None:
         """删除一个 wildcard 文件"""
         safe = Path(name).as_posix()

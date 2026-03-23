@@ -258,12 +258,15 @@
 }
 
 /* ── 主题化数字 spinner (上下箭头) ────────────────────────────── */
-#page-generate input[type="number"] {
+#page-generate input[type="number"],
+#gen-emb-modal input[type="number"] {
     -moz-appearance: textfield;
 }
 
 #page-generate input[type="number"]::-webkit-inner-spin-button,
-#page-generate input[type="number"]::-webkit-outer-spin-button {
+#page-generate input[type="number"]::-webkit-outer-spin-button,
+#gen-emb-modal input[type="number"]::-webkit-inner-spin-button,
+#gen-emb-modal input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     display: none;
 }

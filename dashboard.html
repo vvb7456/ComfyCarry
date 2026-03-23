@@ -1783,25 +1783,19 @@
                        style="width:100%;padding-left:34px;box-sizing:border-box" oninput="window._filterEmbeddings()">
             </div>
             <div id="gen-emb-list" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
-            <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-shrink:0;padding-top:10px;border-top:1px solid var(--bd)">
-                <span style="font-size:.82rem;color:var(--t3)">权重:</span>
-                <input type="range" id="gen-emb-weight" min="0.1" max="2.0" step="0.1" value="1.0" style="flex:1"
-                       oninput="document.getElementById('gen-emb-weight-val').textContent=this.value">
-                <span id="gen-emb-weight-val" style="font-size:.82rem;min-width:28px;text-align:center">1.0</span>
-            </div>
         </div>
     </div>
 
     <!-- Wildcard 管理弹窗 -->
     <div class="modal-overlay" id="gen-wc-modal" onclick="if(event.target===this)this.classList.remove('active')">
         <div class="modal-box" style="width:700px;max-height:80vh;display:flex;flex-direction:column">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0">
                 <span class="ms ms-sm">shuffle</span>
                 <h3 style="margin:0">Wildcard 管理</h3>
-                <button class="btn btn-sm btn-primary" onclick="window._newWildcard()" style="margin-left:auto">
-                    <span class="ms ms-sm">add</span> 新建
-                </button>
-                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-modal').classList.remove('active')"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-modal').classList.remove('active')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:10px;flex-shrink:0">
+                <select id="gen-wc-folder" style="width:50%" onchange="window._onWcFolderChange()"></select>
             </div>
             <div id="gen-wc-list" style="overflow-y:auto;flex:1;min-height:0;padding-right:4px"></div>
         </div>
@@ -1815,11 +1809,26 @@
                 <h3 style="margin:0" id="gen-wc-edit-title">编辑 Wildcard</h3>
                 <button class="btn btn-sm" onclick="document.getElementById('gen-wc-edit-modal').classList.remove('active')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
             </div>
-            <input type="text" id="gen-wc-edit-name" placeholder="名称 (如 sdxl/quality)" style="margin-bottom:8px;flex-shrink:0">
             <textarea id="gen-wc-edit-content" style="flex:1;min-height:200px;font-family:monospace;font-size:.85rem;resize:vertical" placeholder="每行一个条目..."></textarea>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-shrink:0;padding-top:10px;border-top:1px solid var(--bd)">
                 <button class="btn btn-sm" onclick="document.getElementById('gen-wc-edit-modal').classList.remove('active')">取消</button>
                 <button class="btn btn-sm btn-primary" onclick="window._saveWildcard()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wildcard 新建文件夹 Modal -->
+    <div class="modal-overlay" id="gen-wc-newfolder-modal" onclick="if(event.target===this)this.classList.remove('active')" style="z-index:1001">
+        <div class="modal-box" style="width:400px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                <span class="ms ms-sm">create_new_folder</span>
+                <h3 style="margin:0">新建文件夹</h3>
+                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-newfolder-modal').classList.remove('active')" style="margin-left:auto"><span class="ms ms-sm" style="color:var(--red)">close</span></button>
+            </div>
+            <input type="text" id="gen-wc-newfolder-name" placeholder="文件夹名称 (如 sdxl, flux, common)" style="width:100%;box-sizing:border-box;margin-bottom:12px">
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button class="btn btn-sm" onclick="document.getElementById('gen-wc-newfolder-modal').classList.remove('active')">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="window._confirmNewFolder()">创建</button>
             </div>
         </div>
     </div>
