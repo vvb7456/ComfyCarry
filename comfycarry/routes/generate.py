@@ -825,11 +825,13 @@ def api_generate_submit():
     try:
         expander = get_expander()
         seed_val = int(data.get("seed", -1))
-        data["positive_prompt"] = expander.expand(positive_prompt, seed=seed_val)
-        data["negative_prompt"] = expander.expand(
+        pos_result = expander.expand(positive_prompt, seed=seed_val)
+        neg_result = expander.expand(
             data.get("negative_prompt", ""),
             seed=(seed_val + 1) if seed_val >= 0 else -1,
         )
+        data["positive_prompt"] = pos_result["text"]
+        data["negative_prompt"] = neg_result["text"]
     except Exception as e:
         logger.warning(f"[generate] 提示词展开失败 (使用原文): {e}")
 

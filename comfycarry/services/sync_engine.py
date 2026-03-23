@@ -203,14 +203,17 @@ def _sync_worker_loop():
                 local_abs = os.path.join(COMFYUI_DIR, rule.get("local_path", ""))
                 if os.path.isdir(local_abs):
                     has_real = False
-                    for root, dirs, files in os.walk(local_abs):
-                        dirs[:] = [d for d in dirs if not d.startswith('.')]
-                        for f in files:
-                            if not f.startswith('.') and not f.startswith('_'):
-                                has_real = True
+                    try:
+                        for root, dirs, files in os.walk(local_abs):
+                            dirs[:] = [d for d in dirs if not d.startswith('.')]
+                            for f in files:
+                                if not f.startswith('.') and not f.startswith('_'):
+                                    has_real = True
+                                    break
+                            if has_real:
                                 break
-                        if has_real:
-                            break
+                    except FileNotFoundError:
+                        continue
                     if not has_real:
                         continue
             _run_sync_rule(rule)

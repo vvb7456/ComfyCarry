@@ -5,10 +5,13 @@ ComfyCarry — 共享配置、常量、配置文件读写工具
 """
 
 import json
+import logging
 import os
 import secrets
 import threading
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 # ── 核心路径常量 ─────────────────────────────────────────────
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
@@ -33,8 +36,10 @@ def _load_config():
     if DASHBOARD_ENV_FILE.exists():
         try:
             return json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except json.JSONDecodeError as e:
+            log.warning(f"[config] .dashboard_env JSON 损坏, 将使用默认值: {e}")
+        except Exception as e:
+            log.warning(f"[config] 读取 .dashboard_env 失败: {e}")
     return {}
 
 
@@ -45,12 +50,13 @@ def _save_config(data):
     )
 
 
-def _get_config(key, default=""):
-    """读取单个配置值"""
-    return _load_config().get(key, default)
-
-
 _config_lock = threading.Lock()
+
+
+def _get_config(key, default=""):
+    """读取单个配置值 (线程安全)"""
+    with _config_lock:
+        return _load_config().get(key, default)
 
 
 def _set_config(key, value):
@@ -169,6 +175,7 @@ MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 # ── Extra Model Paths (extra_model_paths.yaml 解析) ──────────
 _extra_model_paths_cache = None
 _extra_model_paths_mtime = 0.0
+_extra_model_paths_lock = threading.Lock()
 
 
 def get_extra_model_paths() -> dict[str, list[str]]:
@@ -195,8 +202,9 @@ def get_extra_model_paths() -> dict[str, list[str]]:
     except OSError:
         return {}
 
-    if _extra_model_paths_cache is not None and mtime == _extra_model_paths_mtime:
-        return _extra_model_paths_cache
+    with _extra_model_paths_lock:
+        if _extra_model_paths_cache is not None and mtime == _extra_model_paths_mtime:
+            return _extra_model_paths_cache
 
     try:
         import yaml
@@ -234,8 +242,9 @@ def get_extra_model_paths() -> dict[str, list[str]]:
                     result[key] = []
                 result[key].append(abs_p)
 
-    _extra_model_paths_cache = result
-    _extra_model_paths_mtime = mtime
+    with _extra_model_paths_lock:
+        _extra_model_paths_cache = result
+        _extra_model_paths_mtime = mtime
     return result
 
 # ── Setup Wizard ─────────────────────────────────────────────

@@ -337,25 +337,30 @@ class DownloadEngine:
                 DownloadStatus.PAUSED,
             ):
                 return False
+            was_paused = task.status == DownloadStatus.PAUSED
+            gid = task.gid
 
-        if task.gid:
+        if gid:
             try:
-                # 先尝试 unpause (aria2c 要求先 unpause 才能 remove paused 任务)
-                if task.status == DownloadStatus.PAUSED:
+                if was_paused:
                     try:
-                        self._rpc_call("aria2.unpause", [task.gid])
+                        self._rpc_call("aria2.unpause", [gid])
                     except Exception:
                         pass
-                self._rpc_call("aria2.forceRemove", [task.gid])
+                self._rpc_call("aria2.forceRemove", [gid])
             except Exception:
                 try:
-                    self._rpc_call("aria2.remove", [task.gid])
+                    self._rpc_call("aria2.remove", [gid])
                 except Exception as e:
                     logger.warning(f"[download_engine] 取消 RPC 调用失败: {e}")
 
         with self._lock:
-            task.status = DownloadStatus.CANCELLED
-            task.completed_at = time.time()
+            # 仅在任务仍处于可取消状态时标记 — 防止覆盖 poll 线程已设置的终态
+            if task.status in (DownloadStatus.QUEUED, DownloadStatus.ACTIVE, DownloadStatus.PAUSED):
+                task.status = DownloadStatus.CANCELLED
+                task.completed_at = time.time()
+            else:
+                return False
 
         # 清理临时文件
         self._cleanup_partial(task)

@@ -505,10 +505,20 @@ def save_model_metadata(
             img_entry["resources"] = meta.get("resources")
         info_data["images"].append(img_entry)
 
-    # 写入文件
+    # 写入文件 (原子替换: 先写临时文件再 rename, 防止中途崩溃留下损坏 JSON)
     info_path = str(abs_path) + ".weilin-info.json"
-    with open(info_path, "w", encoding="utf-8") as f:
-        json.dump(info_data, f, sort_keys=False, indent=2, ensure_ascii=False)
+    tmp_path = info_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(info_data, f, sort_keys=False, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, info_path)
+    except Exception as e:
+        logger.warning(f"[civitai_resolver] 保存元数据失败: {e}")
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        return None
 
     logger.info(f"[civitai_resolver] 已保存元数据: {info_path}")
     return info_path

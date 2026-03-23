@@ -292,10 +292,14 @@ class ComfyWSBridge:
         q = queue.Queue(maxsize=200)
         with self._lock:
             self._subscribers[sub_id] = q
+            # 在锁内复制快照 — 防止 WS 线程 (_on_close) 并发清空 _exec_info
+            snap_status = dict(self._last_status) if self._last_status else None
+            snap_exec = dict(self._exec_info) if self._exec_info else None
+            snap_progress = dict(self._last_progress) if self._last_progress else None
         # 发送当前缓存状态给新订阅者 — 完整快照以支持页面刷新后恢复
-        if self._last_status:
-            q.put({"type": "status", "data": self._last_status})
-        if self._exec_info:
+        if snap_status:
+            q.put({"type": "status", "data": snap_status})
+        if snap_exec:
             # 验证执行是否真的还在跑（防止陈旧快照）
             try:
                 r = requests.get(f"{self._http_url}/queue", timeout=3)
@@ -305,26 +309,29 @@ class ComfyWSBridge:
                         item[1] for item in data.get("queue_running", [])
                         if len(item) >= 2
                     }
-                    if self._exec_info["prompt_id"] not in running_ids:
-                        self._exec_info = None
-                        self._last_progress = None
+                    if snap_exec["prompt_id"] not in running_ids:
+                        with self._lock:
+                            self._exec_info = None
+                            self._last_progress = None
+                        snap_exec = None
+                        snap_progress = None
             except Exception:
                 pass
-        if self._exec_info:
+        if snap_exec:
             # 发送完整执行快照，包含所有已执行/已缓存节点
-            nodes_state = self._exec_info.get("nodes", {})
+            nodes_state = snap_exec.get("nodes", {})
             executed = [nid for nid, st in nodes_state.items() if st in ("running", "done")]
             cached = [nid for nid, st in nodes_state.items() if st == "cached"]
             q.put({"type": "execution_snapshot", "data": {
-                "prompt_id": self._exec_info.get("prompt_id"),
-                "start_time": self._exec_info.get("start_time"),
-                "node_names": self._exec_info.get("node_names", {}),
+                "prompt_id": snap_exec.get("prompt_id"),
+                "start_time": snap_exec.get("start_time"),
+                "node_names": snap_exec.get("node_names", {}),
                 "executed_nodes": executed,
                 "cached_nodes": cached,
-                "current_node": self._exec_info.get("current_node"),
+                "current_node": snap_exec.get("current_node"),
             }})
-        if self._last_progress:
-            q.put({"type": "progress", "data": self._last_progress})
+        if snap_progress:
+            q.put({"type": "progress", "data": snap_progress})
         return sub_id, q
 
     def unsubscribe(self, sub_id):

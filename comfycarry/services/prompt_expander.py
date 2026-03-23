@@ -61,9 +61,11 @@ class PromptExpander:
             return template
 
         text = results[0] if results else template
-        if len(text) > MAX_EXPANDED_LENGTH:
+        truncated = len(text) > MAX_EXPANDED_LENGTH
+        if truncated:
+            logger.info(f"[PromptExpander] 扩展结果被截断: {len(text)} → {MAX_EXPANDED_LENGTH}")
             text = text[:MAX_EXPANDED_LENGTH]
-        return text
+        return {"text": text, "truncated": truncated}
 
     def reload(self):
         """刷新 WildcardManager 缓存 (文件变更后调用)"""

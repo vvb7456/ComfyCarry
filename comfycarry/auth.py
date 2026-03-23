@@ -97,20 +97,21 @@ def logout():
 def register_auth_middleware(app):
     """注册全局认证中间件到 Flask app"""
 
+    # Setup 阶段额外放行的精确路由 (集中维护)
+    _SETUP_OPEN_ROUTES = {
+        "/api/settings/import-config",  # 配置导入
+        "/api/tunnel/validate",         # Tunnel 验证 (Wizard Step 2)
+        "/api/llm/models",              # LLM 模型列表 (Wizard Step 6)
+    }
+
     @app.before_request
     def check_auth():
         """全局鉴权与 Setup Wizard 路由"""
         # Setup 相关路由始终允许
         if request.path.startswith("/api/setup/") or request.path == "/setup":
             return
-        # 配置导入在 Setup 阶段也需要可用
-        if request.path == "/api/settings/import-config" and not config._is_setup_complete():
-            return
-        # Tunnel 验证在 Setup 阶段需要可用 (Setup Wizard Step 2)
-        if request.path == "/api/tunnel/validate" and not config._is_setup_complete():
-            return
-        # LLM 模型列表在 Setup 阶段需要可用 (Setup Wizard Step 6)
-        if request.path == "/api/llm/models" and not config._is_setup_complete():
+        # Setup 阶段额外放行的路由
+        if not config._is_setup_complete() and request.path in _SETUP_OPEN_ROUTES:
             return
         if request.path in ("/login", "/favicon.ico", "/api/version"):
             return

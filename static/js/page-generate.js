@@ -1703,9 +1703,12 @@ function _bindSlider(sliderId, valId, fmt) {
 }
 
 // ── 加载选项 ─────────────────────────────────────────────────────────────────
+let _optionsSeq = 0;
 async function _loadOptions(refresh = false) {
+  const seq = ++_optionsSeq;
   const url = '/api/generate/options' + (refresh ? '?refresh=1' : '');
   const data = await apiFetch(url);
+  if (seq !== _optionsSeq) return;  // 有更新的请求已发起，丢弃过期响应
   if (!data) { _showOfflineBanner(true); return; }
 
   if (data.comfyui_dir) _comfyuiDir = data.comfyui_dir;
