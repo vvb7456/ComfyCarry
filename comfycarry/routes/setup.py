@@ -84,7 +84,7 @@ def api_setup_save():
     state = _load_setup_state()
     allowed_keys = {
         "current_step", "image_type", "password",
-        "tunnel_mode",
+        "tunnel_mode", "public_tunnel_subdomain",
         "cf_api_token", "cf_domain", "cf_subdomain",
         "rclone_config_method", "rclone_config_value",
         "civitai_token", "plugins",
