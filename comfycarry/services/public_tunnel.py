@@ -1,6 +1,6 @@
 """ComfyCarry — Public Tunnel Client
 
-与 ComfyCarry Tunnel Worker (CF Workers) 通信，管理公共 Tunnel 生命周期。
+与 ComfyCarry API (自建后端) 通信，管理公共 Tunnel 生命周期。
 运行时数据 (random_id, tunnel_token, urls) 持久化到 .dashboard_env 的
 public_tunnel_state 字段，重启后可通过 restore() 恢复。
 """
@@ -23,13 +23,9 @@ from ..config import get_config, set_config
 
 log = logging.getLogger(__name__)
 
-WORKER_URL = "https://comfycarry-tunnel-worker.razorback-chorus9.workers.dev"
+API_URL = "https://api.erocraft.org"
 WORKER_AUTH_KEY = "ca8d5865f3ccfc1b305145fd4f4a3c17398e8f5dd7ac493428a3a8f44769ae5f"
-
-# 心跳间隔 (秒)
-HEARTBEAT_INTERVAL = 600  # 10 分钟
-# 心跳连续失败次数阈值
-HEARTBEAT_FAIL_THRESHOLD = 3
+API_HEADERS_BASE = {"User-Agent": "ComfyCarry-Client/1.0"}
 
 
 class PublicTunnelClient:
@@ -58,12 +54,6 @@ class PublicTunnelClient:
 
         # 从持久化配置恢复运行时状态
         self._load_persisted_state()
-
-        # 心跳线程
-        self._heartbeat_thread: Optional[threading.Thread] = None
-        self._heartbeat_stop = threading.Event()
-        self._heartbeat_failures = 0
-        self._degraded = False
 
     # ═══════════════════════════════════════════════════
     # 持久化
@@ -101,11 +91,10 @@ class PublicTunnelClient:
     def register(self) -> dict:
         """
         注册公共 Tunnel。
-        1. 调用 Worker POST /api/v1/register
+        1. 调用 API POST /api/v1/tunnel/register
         2. 获取 tunnel_token + urls
         3. 启动 cloudflared (PM2)
-        4. 启动心跳线程
-        5. 持久化 tunnel_mode=public + 运行时状态
+        4. 持久化 tunnel_mode=public + 运行时状态
 
         Returns: { "ok": True, "urls": {...}, "random_id": "..." }
         Raises: PublicTunnelError
@@ -121,14 +110,22 @@ class PublicTunnelClient:
 
         services = self._get_services()
 
+        # 读取自定义子域名配置
+        subdomain = get_config("public_tunnel_subdomain", "")
+
+        body = {
+            "instance_id": self.instance_id,
+            "services": services,
+        }
+        if subdomain:
+            body["subdomain"] = subdomain
+
         try:
             resp = requests.post(
-                f"{WORKER_URL}/api/v1/register",
-                json={
-                    "instance_id": self.instance_id,
-                    "services": services,
-                },
+                f"{API_URL}/api/v1/tunnel/register",
+                json=body,
                 headers={
+                    **API_HEADERS_BASE,
                     "Content-Type": "application/json",
                     "X-ComfyCarry-Auth": sig,
                     "X-Timestamp": ts,
@@ -137,7 +134,7 @@ class PublicTunnelClient:
             )
             data = resp.json()
         except requests.RequestException as e:
-            raise PublicTunnelError(f"无法连接 Worker: {e}")
+            raise PublicTunnelError(f"无法连接 API: {e}")
 
         if not data.get("ok"):
             raise PublicTunnelError(data.get("error", "注册失败"))
@@ -150,9 +147,6 @@ class PublicTunnelClient:
 
         # 启动 cloudflared
         self._start_cloudflared(self.tunnel_token)
-
-        # 启动心跳
-        self._start_heartbeat()
 
         # 持久化
         set_config("tunnel_mode", "public")
@@ -167,30 +161,27 @@ class PublicTunnelClient:
     def release(self) -> dict:
         """
         释放公共 Tunnel。
-        1. 停止心跳线程
-        2. 停止 cloudflared (PM2)
-        3. 调用 Worker POST /api/v1/release
-        4. 清除状态
+        1. 停止 cloudflared (PM2)
+        2. 调用 API POST /api/v1/tunnel/release
+        3. 清除状态
 
         Returns: { "ok": True }
         """
-        # 停止心跳
-        self._stop_heartbeat()
-
         # 停止 cloudflared
         self._stop_cloudflared()
 
-        # 调用 Worker 释放
+        # 调用 API 释放
         if self.random_id:
             try:
                 sig, ts = self._compute_hmac(self.instance_id)
                 resp = requests.post(
-                    f"{WORKER_URL}/api/v1/release",
+                    f"{API_URL}/api/v1/tunnel/release",
                     json={
                         "instance_id": self.instance_id,
                         "random_id": self.random_id,
                     },
                     headers={
+                        **API_HEADERS_BASE,
                         "Content-Type": "application/json",
                         "X-ComfyCarry-Auth": sig,
                         "X-Timestamp": ts,
@@ -199,16 +190,14 @@ class PublicTunnelClient:
                 )
                 data = resp.json()
                 if not data.get("ok"):
-                    log.warning(f"Worker release 返回错误: {data}")
+                    log.warning(f"API release 返回错误: {data}")
             except Exception as e:
-                log.warning(f"Worker release 请求失败: {e}")
+                log.warning(f"API release 请求失败: {e}")
 
         # 清除运行时状态
         self.random_id = None
         self.tunnel_token = None
         self.urls = None
-        self._heartbeat_failures = 0
-        self._degraded = False
 
         # 清除持久化
         set_config("tunnel_mode", "")
@@ -220,7 +209,7 @@ class PublicTunnelClient:
     def restore(self) -> dict:
         """
         从持久化状态恢复 (重启后调用)。
-        不重新注册，只恢复内存状态 + 确保 cloudflared 运行 + 启动心跳。
+        不重新注册，只恢复内存状态 + 确保 cloudflared 运行。
 
         Returns: { "ok": True, "random_id": "..." } 或 {"ok": False, "error": "..."}
         """
@@ -231,50 +220,8 @@ class PublicTunnelClient:
         if not self._is_cloudflared_running():
             self._start_cloudflared(self.tunnel_token)
 
-        # 启动心跳
-        self._start_heartbeat()
-
-        # 尝试验证，但不因单次失败就重新注册
-        # (启动后网络/代理可能尚未就绪，transient failure 很常见)
-        if self.heartbeat():
-            log.info(f"公共 Tunnel 恢复成功: {self.random_id}")
-        else:
-            log.warning(
-                f"公共 Tunnel 心跳验证失败 (可能是暂时性网络问题)，"
-                f"保留现有 Tunnel {self.random_id}，后台心跳线程将持续重试"
-            )
-
+        log.info(f"公共 Tunnel 恢复成功: {self.random_id}")
         return {"ok": True, "random_id": self.random_id}
-
-    def heartbeat(self) -> bool:
-        """
-        发送心跳检查。
-
-        Returns: True 如果注册仍有效
-        """
-        if not self.random_id:
-            return False
-
-        try:
-            sig, ts = self._compute_hmac(self.instance_id)
-            resp = requests.post(
-                f"{WORKER_URL}/api/v1/heartbeat",
-                json={
-                    "instance_id": self.instance_id,
-                    "random_id": self.random_id,
-                },
-                headers={
-                    "Content-Type": "application/json",
-                    "X-ComfyCarry-Auth": sig,
-                    "X-Timestamp": ts,
-                },
-                timeout=10,
-            )
-            data = resp.json()
-            return data.get("ok", False) and data.get("status") == "active"
-        except Exception as e:
-            log.warning(f"心跳请求失败: {e}")
-            return False
 
     def get_status(self) -> dict:
         """
@@ -284,9 +231,7 @@ class PublicTunnelClient:
             "mode": "public" | "custom" | null,
             "random_id": "...",
             "urls": {...},
-            "cloudflared_running": bool,
-            "degraded": bool,
-            "heartbeat_failures": int
+            "cloudflared_running": bool
         }
         """
         mode = get_config("tunnel_mode", "")
@@ -304,19 +249,17 @@ class PublicTunnelClient:
             "random_id": self.random_id,
             "urls": self.urls,
             "cloudflared_running": self._is_cloudflared_running(),
-            "degraded": self._degraded,
-            "heartbeat_failures": self._heartbeat_failures,
         }
 
     @staticmethod
     def get_capacity() -> dict:
         """
-        获取 Worker 容量 (无需认证)。
+        获取 API 容量 (无需认证)。
 
         Returns: { "active_tunnels": N, "max_tunnels": 200, "available": bool }
         """
         try:
-            resp = requests.get(f"{WORKER_URL}/api/v1/status", timeout=10)
+            resp = requests.get(f"{API_URL}/api/v1/tunnel/status", headers=API_HEADERS_BASE, timeout=10)
             data = resp.json()
             return {
                 "active_tunnels": data.get("active_tunnels", 0),
@@ -324,7 +267,7 @@ class PublicTunnelClient:
                 "available": data.get("available", False),
             }
         except Exception as e:
-            log.warning(f"获取 Worker 容量失败: {e}")
+            log.warning(f"获取 API 容量失败: {e}")
             return {"active_tunnels": -1, "max_tunnels": 200, "available": False}
 
     # ═══════════════════════════════════════════════════
@@ -426,42 +369,6 @@ class PublicTunnelClient:
             pass
         return False
 
-    def _start_heartbeat(self):
-        """启动后台心跳线程"""
-        self._stop_heartbeat()
-        self._heartbeat_stop.clear()
-        self._heartbeat_failures = 0
-        self._degraded = False
-
-        def _worker():
-            while not self._heartbeat_stop.is_set():
-                self._heartbeat_stop.wait(HEARTBEAT_INTERVAL)
-                if self._heartbeat_stop.is_set():
-                    break
-                ok = self.heartbeat()
-                if ok:
-                    self._heartbeat_failures = 0
-                    self._degraded = False
-                else:
-                    self._heartbeat_failures += 1
-                    if self._heartbeat_failures >= HEARTBEAT_FAIL_THRESHOLD:
-                        self._degraded = True
-                        log.warning(
-                            f"心跳连续失败 {self._heartbeat_failures} 次, "
-                            "标记为 degraded"
-                        )
-
-        t = threading.Thread(target=_worker, daemon=True, name="public-tunnel-heartbeat")
-        t.start()
-        self._heartbeat_thread = t
-        log.info("心跳线程已启动")
-
-    def _stop_heartbeat(self):
-        """停止心跳线程"""
-        self._heartbeat_stop.set()
-        if self._heartbeat_thread and self._heartbeat_thread.is_alive():
-            self._heartbeat_thread.join(timeout=5)
-        self._heartbeat_thread = None
 
 
 class PublicTunnelError(Exception):

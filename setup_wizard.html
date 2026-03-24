@@ -170,6 +170,18 @@
                 </div>
             </div>
 
+            <!-- 公共节点配置 (仅公共模式显示) -->
+            <div id="wizard-tunnel-public-fields" style="display:none">
+                <div class="form-group">
+                    <label>自定义子域名 <span style="color:var(--t3);font-size:.82rem">(可选)</span></label>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <input type="text" id="input-public-subdomain" placeholder="留空自动生成 (如 cc-a1b2c3d4)" maxlength="32" style="flex:1">
+                        <span style="font-size:.82rem;color:var(--t3);flex-shrink:0">.erocraft.org</span>
+                    </div>
+                    <div class="form-hint">设置后换实例时可保持相同地址。3-32位小写字母、数字或连字符。</div>
+                </div>
+            </div>
+
             <!-- 自定义 Tunnel 配置 (仅自定义模式显示) -->
             <div id="wizard-tunnel-custom-fields" style="display:none">
                 <div class="form-group">
@@ -856,10 +868,12 @@
             const pubCard = document.getElementById('wizard-tunnel-public');
             const cusCard = document.getElementById('wizard-tunnel-custom');
             const cusFields = document.getElementById('wizard-tunnel-custom-fields');
+            const pubFields = document.getElementById('wizard-tunnel-public-fields');
 
             pubCard.classList.toggle('selected', mode === 'public');
             cusCard.classList.toggle('selected', mode === 'custom');
             cusFields.style.display = mode === 'custom' ? '' : 'none';
+            if (pubFields) pubFields.style.display = mode === 'public' ? '' : 'none';
 
             updateNextBtnText();
         }
@@ -1018,11 +1032,18 @@
                     break;
                 case 2:
                     wizardConfig.tunnel_mode = _wizardTunnelMode || '';
-                    if (_wizardTunnelMode === 'custom') {
+                    if (_wizardTunnelMode === 'public') {
+                        wizardConfig.public_tunnel_subdomain = (document.getElementById('input-public-subdomain')?.value || '').trim().toLowerCase();
+                        wizardConfig.cf_api_token = '';
+                        wizardConfig.cf_domain = '';
+                        wizardConfig.cf_subdomain = '';
+                    } else if (_wizardTunnelMode === 'custom') {
+                        wizardConfig.public_tunnel_subdomain = '';
                         wizardConfig.cf_api_token = document.getElementById('input-cf-token').value.trim();
                         wizardConfig.cf_domain = document.getElementById('input-cf-domain').value.trim();
                         wizardConfig.cf_subdomain = document.getElementById('input-cf-subdomain').value.trim();
                     } else {
+                        wizardConfig.public_tunnel_subdomain = '';
                         wizardConfig.cf_api_token = '';
                         wizardConfig.cf_domain = '';
                         wizardConfig.cf_subdomain = '';
@@ -1628,7 +1649,7 @@
         <div class="summary-card">
             <h4>网络与安全</h4>
             <div class="summary-row"><span class="label">ComfyCarry 密码</span><span class="value">${c.password ? '已设置' : '未设置'}</span></div>
-            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.tunnel_mode === 'public' ? msIcon('public', 'ms-xs') + ' 公共节点' : c.cf_api_token ? msIcon('build', 'ms-xs') + ' 自定义 · ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
+            <div class="summary-row"><span class="label">Cloudflare Tunnel</span><span class="value">${c.tunnel_mode === 'public' ? msIcon('public', 'ms-xs') + ' 公共节点' + (c.public_tunnel_subdomain ? ' · ' + c.public_tunnel_subdomain + '.erocraft.org' : '') : c.cf_api_token ? msIcon('build', 'ms-xs') + ' 自定义 · ' + (c.cf_subdomain || 'auto') + '.' + c.cf_domain : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
             <div class="summary-row"><span class="label">SSH 密码</span><span class="value">${c.ssh_password ? msIcon('check_circle', 'ms-xs') + ' 已设置' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
             <div class="summary-row"><span class="label">SSH 公钥</span><span class="value">${(c.ssh_keys || []).length > 0 ? c.ssh_keys.length + ' 个' : msIcon('skip_next', 'ms-xs') + ' 跳过'}</span></div>
         </div>

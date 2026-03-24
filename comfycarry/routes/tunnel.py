@@ -136,7 +136,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
         result["public"] = {
             "random_id": pub_status.get("random_id"),
             "urls": pub_urls,
-            "degraded": pub_status.get("degraded", False),
         }
         # 统一使用 cloudflared /ready 端点检测实际连通性
         ready = _check_cloudflared_ready()
@@ -510,14 +509,13 @@ def api_tunnel_set_protocol():
 @bp.route("/api/tunnel/public/status", methods=["GET"])
 def api_tunnel_public_status():
     """
-    获取公共 Tunnel 状态 + Worker 容量。
+    获取公共 Tunnel 状态 + API 容量。
 
     Response: {
         "mode": "public" | "custom" | null,
         "random_id": "...",
         "urls": {...},
         "cloudflared_running": bool,
-        "degraded": bool,
         "capacity": { "active_tunnels": N, "max_tunnels": 200, "available": bool }
     }
     """
@@ -528,6 +526,31 @@ def api_tunnel_public_status():
     capacity = client.get_capacity()
     status["capacity"] = capacity
     return jsonify(status)
+
+
+@bp.route("/api/tunnel/public/subdomain", methods=["GET", "POST"])
+def api_tunnel_subdomain():
+    """
+    GET: 获取当前自定义子域名配置。
+    POST: 设置自定义子域名 (下次 register 时生效)。
+
+    POST Body: { "subdomain": "myname" }  (空字符串清除)
+    Response: { "ok": true, "subdomain": "myname" }
+    """
+    if request.method == "GET":
+        subdomain = get_config("public_tunnel_subdomain", "")
+        return jsonify({"ok": True, "subdomain": subdomain})
+
+    data = request.get_json(silent=True) or {}
+    subdomain = data.get("subdomain", "").strip().lower()
+
+    if subdomain:
+        import re
+        if not re.match(r"^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$", subdomain):
+            return jsonify({"ok": False, "error": "子域名必须为 3-32 位小写字母、数字或连字符"}), 400
+
+    set_config("public_tunnel_subdomain", subdomain)
+    return jsonify({"ok": True, "subdomain": subdomain})
 
 
 def _get_custom_services():

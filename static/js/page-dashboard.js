@@ -114,7 +114,7 @@ function _renderStatusBar(data) {
   const tst = tunnel.effective_status || 'unconfigured';
   if (tst === 'online') {
     html += `<span class="status-badge green">${msIcon('language','ms-sm')} Tunnel 在线</span>`;
-  } else if (tst === 'connecting' || tst === 'degraded') {
+  } else if (tst === 'connecting') {
     html += `<span class="status-badge amber">${msIcon('language','ms-sm')} Tunnel 连接中</span>`;
   } else if (tst === 'offline') {
     html += `<span class="status-badge red">${msIcon('language','ms-sm')} Tunnel 离线</span>`;

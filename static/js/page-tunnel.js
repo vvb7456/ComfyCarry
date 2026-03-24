@@ -109,17 +109,17 @@ async function loadTunnelPage() {
       const tunnel = d.tunnel || {};
       const st = d.effective_status || 'unknown';
       const stColor = st === 'online' ? 'var(--green)'
-                     : st === 'degraded' || st === 'connecting' ? 'var(--amber)'
+                     : st === 'connecting' ? 'var(--amber)'
                      : st === 'offline' ? 'var(--red)'
                      : 'var(--t3)';
       const stLabel = {
-        online: '运行中', degraded: '部分连接', connecting: '连接中',
+        online: '运行中', connecting: '连接中',
         offline: '离线', unconfigured: '未配置'
       }[st] || st;
 
       if (badge) badge.innerHTML = `<span class="page-status-dot" style="background:${stColor}"></span> <span style="color:${stColor}">${stLabel}</span>`;
       if (headerControls) {
-        headerControls.innerHTML = st === 'online' || st === 'connecting' || st === 'degraded'
+        headerControls.innerHTML = st === 'online' || st === 'connecting'
           ? `<button class="btn" onclick="window._tunnelTeardown()">${msIcon('stop')} 停止</button><button class="btn" onclick="window._tunnelRestart()">${msIcon('restart_alt')} 重启</button>`
           : `<button class="btn" onclick="window._tunnelRestart()">${msIcon('play_arrow')} 启动</button>`;
       }
@@ -319,14 +319,26 @@ async function _loadTunnelConfigTab() {
     protocolSel.value = _lastData.cf_protocol;
   }
 
-  // 加载自定义配置
+  // 加载自定义配置 + 公共子域名
   try {
     const r = await fetch('/api/tunnel/config');
     const d = await r.json();
     document.getElementById('tunnel-cfg-token').value = d.api_token || '';
+    // 域名: 公共模式下 _updateModeUI 会覆盖为 erocraft.org
     document.getElementById('tunnel-cfg-domain').value = d.domain || '';
     document.getElementById('tunnel-cfg-subdomain').value = d.subdomain || '';
   } catch (_) {}
+
+  // 加载公共模式的子域名配置 (如果当前是公共模式，用它覆盖子域名输入框)
+  if (_selectedMode === 'public') {
+    try {
+      const r2 = await fetch('/api/tunnel/public/subdomain');
+      const d2 = await r2.json();
+      if (d2.ok && d2.subdomain) {
+        document.getElementById('tunnel-cfg-subdomain').value = d2.subdomain;
+      }
+    } catch (_) {}
+  }
 
   _updateModeUI();
 }
@@ -362,6 +374,9 @@ function _updateModeUI() {
   const submitBtn = document.getElementById('tunnel-cfg-submit');
   const disableBtn = document.getElementById('tunnel-disable-btn');
   const resultEl = document.getElementById('tunnel-cfg-result');
+  const domainCard = document.getElementById('tunnel-cfg-domain-card');
+  const domainInput = document.getElementById('tunnel-cfg-domain');
+  const subdomainInput = document.getElementById('tunnel-cfg-subdomain');
 
   // Reset borders
   publicCard.style.borderColor = 'transparent';
@@ -396,14 +411,14 @@ function _updateModeUI() {
   if (isPublic) {
     banner.innerHTML = isPublicActive
       ? `<span class="ms ms-sm" style="color:var(--green);vertical-align:middle">check_circle</span> 公共节点已启用 · 服务链接请查看「服务 & 日志」Tab。`
-      : `公共模式无需域名或 CF 账号，点击「保存」一键启用。`;
+      : `公共模式无需域名或 CF 账号，点击「保存」一键启用。可自定义子域名前缀。`;
   } else {
     banner.innerHTML = isCustomConfigured
       ? `自定义 Tunnel 运行中 · 修改配置后点击「保存」将更新并重启。`
       : `填写 CF API Token 和域名后，点击「保存」自动创建 Tunnel、配置 DNS 和 Ingress。`;
   }
 
-  // Custom cards disabled state (grayed out in public mode)
+  // CF API Token card — disabled in public mode (grayed out)
   customCards.forEach(card => {
     card.style.opacity = isPublic ? '0.4' : '1';
     card.style.pointerEvents = isPublic ? 'none' : '';
@@ -411,6 +426,28 @@ function _updateModeUI() {
   document.querySelectorAll('.tunnel-cfg-custom-card input').forEach(inp => {
     inp.disabled = isPublic;
   });
+
+  // Domain card — merged subdomain + domain inputs
+  if (domainCard && domainInput && subdomainInput) {
+    if (isPublic) {
+      // Public mode: domain fixed "erocraft.org" disabled; subdomain editable
+      domainInput.value = 'erocraft.org';
+      domainInput.disabled = true;
+      domainInput.style.opacity = '0.6';
+      subdomainInput.disabled = false;
+      subdomainInput.placeholder = '留空自动生成';
+    } else {
+      // Custom mode: both editable
+      domainInput.disabled = false;
+      domainInput.style.opacity = '1';
+      subdomainInput.disabled = false;
+      subdomainInput.placeholder = '留空随机生成';
+      // Restore custom domain if switching back from public
+      if (domainInput.value === 'erocraft.org') {
+        domainInput.value = _lastData?.cf_domain || '';
+      }
+    }
+  }
 
   // Submit button — always visible
   submitBtn.textContent = '保存';
@@ -443,12 +480,24 @@ async function _tunnelSave() {
   });
 
   if (isPublic) {
-    // 如果当前已经是公共模式且在运行，仅保存协议并提示重启
+    // 保存子域名到公共 Tunnel 配置
+    const subdomain = document.getElementById('tunnel-cfg-subdomain')?.value.trim().toLowerCase() || '';
+    if (subdomain && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(subdomain)) {
+      showToast('子域名格式错误: 3-32位小写字母、数字或连字符');
+      return;
+    }
+    await apiFetch('/api/tunnel/public/subdomain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subdomain })
+    });
+
+    // 如果当前已经是公共模式且在运行，仅保存协议+子域名，提示重启
     if (isPublicActive) {
-      if (confirm('协议已保存。需要重启 cloudflared 才能生效，立即重启？')) {
+      if (confirm('配置已保存。需要重启 cloudflared 才能生效，立即重启？')) {
         _tunnelRestart();
       } else {
-        showToast('协议已保存，下次启动生效');
+        showToast('配置已保存，下次启动生效');
       }
       return;
     }

@@ -360,6 +360,10 @@ def _step_tunnel(config):
         try:
             from comfycarry.services.public_tunnel import PublicTunnelClient, PublicTunnelError
             from comfycarry.config import set_config as _sc
+            # 保存自定义子域名 (register() 会读取)
+            pub_subdomain = config.get("public_tunnel_subdomain", "")
+            if pub_subdomain:
+                _sc("public_tunnel_subdomain", pub_subdomain)
             client = PublicTunnelClient()
             result = client.register()
             _deploy_log(f"✅ 公共 Tunnel 已启用: {result.get('random_id', '?')}")
