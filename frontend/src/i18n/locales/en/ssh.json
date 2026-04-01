@@ -1,0 +1,101 @@
+{
+  "title": "SSH",
+  "actions": {
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "copy": "Copy",
+    "delete": "Delete",
+    "cancel": "Cancel"
+  },
+  "tabs": {
+    "status": "Service & Logs",
+    "config": "Keys & Passwords"
+  },
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "service": "SSH Service",
+    "listen_port": "Listen Port",
+    "port": "Listen Port",
+    "active_connections": "Active Connections",
+    "connections": "Active Connections",
+    "password_auth": "Password Auth",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "set": "Set",
+    "pw_set": "Set",
+    "not_set": "Not Set",
+    "service_not_running": "Service not running",
+    "root_password": "Root Password"
+  },
+  "connect": {
+    "title": "Connect",
+    "hint": "ssh root{'@'}<instance-public-ip> -p <mapped-port>",
+    "tunnel_not_configured": "Tunnel has no SSH mapping configured",
+    "check_platform": "Check your instance platform for public IP / port",
+    "not_running": "SSH not running, cannot connect",
+    "unavailable": "SSH connection command is currently unavailable",
+    "via_public_tunnel": "via ComfyCarry Public Tunnel",
+    "need_cloudflared": "Requires local installation of",
+    "loading": "Loading..."
+  },
+  "keys": {
+    "title": "Authorized Keys",
+    "loading": "Loading...",
+    "authenticated": "Authenticated",
+    "env_var": "Env Variable",
+    "saved": "Saved",
+    "add": "Add Key",
+    "add_btn": "Add Key",
+    "add_placeholder": "Paste one or more SSH public keys (one per line)",
+    "confirm_add": "Confirm Add",
+    "add_submit": "Add",
+    "added_count": "Added {count} key(s)",
+    "failed_count": "{count} failed",
+    "empty_input": "Please enter a public key",
+    "add_hint": "Paste one or more SSH public keys, one per line",
+    "confirm_delete": "Confirm delete this key?",
+    "deleted": "Deleted",
+    "load_failed": "Failed to load public keys",
+    "empty": "No SSH keys",
+    "delete_btn": "Delete key"
+  },
+  "password": {
+    "title": "Root Password",
+    "new": "New Password",
+    "confirm": "Confirm Password",
+    "set_btn": "Set Password",
+    "use_comfycarry": "Use ComfyCarry Password",
+    "help": "Setting a password will enable password auth, PermitRootLogin, and restart sshd",
+    "synced": "SSH password synced to ComfyCarry password",
+    "set_success": "Password set",
+    "not_set": "SSH password not set",
+    "empty_password": "Please enter a new password",
+    "mismatch": "Passwords do not match",
+    "too_short": "Password must be at least 4 characters",
+    "sync_btn": "Sync Password",
+    "sshd_restarted_suffix": ", password auth enabled and sshd restarted"
+  },
+  "log": {
+    "title": "SSH Logs",
+    "loading": "Loading..."
+  },
+  "confirm": {
+    "stop": "Stop SSH service?\n\nAll active SSH sessions will be disconnected.",
+    "delete_key": "Delete this public key?"
+  },
+  "toast": {
+    "copied": "Copied",
+    "started": "Started",
+    "stopped": "Stopped",
+    "restarted": "Restarted",
+    "status_failed": "Failed to get SSH status",
+    "action_ok": "Action submitted",
+    "key_added": "Added {n} key(s)",
+    "key_deleted": "Key deleted",
+    "pw_empty": "Please enter a new password",
+    "pw_mismatch": "Passwords do not match",
+    "pw_set": "SSH password set"
+  }
+}

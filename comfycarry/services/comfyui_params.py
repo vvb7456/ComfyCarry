@@ -44,10 +44,16 @@ COMFYUI_PARAM_GROUPS = {
         },
     },
     "disable_xformers": {
-        "label": "禁用 xFormers",
-        "type": "bool",
+        "label": "xFormers",
+        "type": "select",
         "help": "xFormers 在新版 PyTorch 下已不推荐，建议禁用并使用 PyTorch SDPA",
-        "flag": "--disable-xformers",
+        "options": [
+            ("default", "默认"),
+            ("disabled", "禁用"),
+        ],
+        "flag_map": {
+            "disabled": "--disable-xformers",
+        },
     },
     "unet_precision": {
         "label": "UNet 精度",
@@ -93,10 +99,16 @@ COMFYUI_PARAM_GROUPS = {
         },
     },
     "fast": {
-        "label": "实验性优化 (--fast)",
-        "type": "bool",
+        "label": "实验性优化",
+        "type": "select",
         "help": "启用 ComfyUI 实验性加速，可能提升推理速度 10-20%，极少数工作流可能不兼容",
-        "flag": "--fast",
+        "options": [
+            ("default", "关闭"),
+            ("enabled", "启用"),
+        ],
+        "flag_map": {
+            "enabled": "--fast",
+        },
     },
     "preview_method": {
         "label": "预览方式",
@@ -111,7 +123,7 @@ COMFYUI_PARAM_GROUPS = {
     "cache": {
         "label": "缓存策略",
         "type": "select",
-        "help": "控制节点输出缓存。LRU 精细控制缓存大小，经典模式激进缓存更快但占更多内存",
+        "help": "控制节点输出缓存。仅当选择 LRU 时，LRU 缓存大小才会生效；经典模式缓存更激进、更快，但占用更多内存",
         "options": [
             ("default", "默认"), ("classic", "经典 (Aggressive)"),
             ("lru", "LRU"), ("none", "禁用"),
@@ -123,7 +135,7 @@ COMFYUI_PARAM_GROUPS = {
     "cache_lru_size": {
         "label": "LRU 缓存大小",
         "type": "number",
-        "help": "LRU 缓存最大条目数，0 = 无限制。建议根据可用内存设置",
+        "help": "LRU 最多保留多少个节点结果用于复用。值越大越容易命中缓存，但会占用更多内存。仅在缓存策略为 LRU 时生效",
         "flag_prefix": "--cache-lru",
         "depends_on": {"cache": "lru"},
     },
@@ -133,16 +145,14 @@ COMFYUI_PARAM_GROUPS = {
 # ── 反向查找表: flag -> (group_key, value) ───────────────────
 _FLAG_TO_PARAM = {}
 for _gk, _gv in COMFYUI_PARAM_GROUPS.items():
-    if _gv["type"] == "bool":
-        _FLAG_TO_PARAM[_gv["flag"]] = (_gk, True)
-    elif "flag_map" in _gv:
+    if "flag_map" in _gv:
         for _val, _flag in _gv["flag_map"].items():
             _FLAG_TO_PARAM[_flag] = (_gk, _val)
 
 
 def parse_comfyui_args(args):
     """从命令行参数列表解析为结构化参数字典"""
-    params = {k: (False if v["type"] == "bool" else 0 if v["type"] == "number" else "default")
+    params = {k: (0 if v["type"] == "number" else "default")
               for k, v in COMFYUI_PARAM_GROUPS.items()}
     params["listen"] = "0.0.0.0"
     params["port"] = 8188
@@ -176,9 +186,7 @@ def build_comfyui_args(params):
         val = params.get(gk)
         if val is None or val == "default" or val is False:
             continue
-        if gv["type"] == "bool" and val:
-            args.append(gv["flag"])
-        elif gv["type"] == "select" and "flag_map" in gv and val in gv["flag_map"]:
+        if gv["type"] == "select" and "flag_map" in gv and val in gv["flag_map"]:
             args.append(gv["flag_map"][val])
         elif gv["type"] == "select" and "flag_prefix" in gv and val != "default":
             args.extend([gv["flag_prefix"], str(val)])

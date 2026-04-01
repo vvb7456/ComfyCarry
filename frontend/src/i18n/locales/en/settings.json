@@ -1,0 +1,123 @@
+{
+  "title": "Settings",
+  "tabs": {
+    "comfycarry": "ComfyCarry",
+    "civitai": "CivitAI",
+    "llm": "LLM"
+  },
+  "restart_btn": "Restart",
+  "password": {
+    "title": "ComfyCarry Password",
+    "current": "Current Password",
+    "current_placeholder": "Enter current password",
+    "new": "New Password",
+    "new_placeholder": "Enter new password (at least 4 characters)",
+    "confirm": "Confirm New Password",
+    "confirm_placeholder": "Enter new password again",
+    "update_btn": "Update Password",
+    "err_current": "Please enter current password",
+    "err_new": "Please enter new password",
+    "err_min_length": "Password must be at least 4 characters",
+    "err_mismatch": "Passwords do not match"
+  },
+  "api_key": {
+    "title": "ComfyCarry API Key",
+    "help": "For external scripts or apps to access the API via X-API-Key / Bearer",
+    "regenerate": "Regenerate",
+    "regenerate_confirm": "Regenerate API Key?\n\nThe old key will be immediately invalidated. All external apps using the old key will need to be updated.",
+    "regenerated": "API Key regenerated",
+    "regenerate_failed": "Regeneration failed"
+  },
+  "config": {
+    "title": "Import/Export Config",
+    "export_desc": "Export all ComfyCarry configuration as a JSON file",
+    "export_btn": "Export Config",
+    "import_desc": "Restore configuration from a JSON file",
+    "import_btn": "Import Config",
+    "exported": "Configuration exported",
+    "export_failed": "Export failed",
+    "invalid_format": "Invalid configuration file format",
+    "import_confirm": "Import configuration?\n\nExported on: {date}\nThis will overwrite current password, API Key, Tunnel config, sync rules, etc.",
+    "import_failed": "Import failed",
+    "unknown_date": "Unknown"
+  },
+  "reinit": {
+    "title": "Re-initialize",
+    "help": "Delete ComfyUI and return to setup wizard. System dependencies and PyTorch are preserved",
+    "keep_models": "Keep model files",
+    "btn": "Re-initialize",
+    "confirm_keep": "Re-initialize?\n\nThis will delete ComfyUI installation (keeping model files), stop ComfyUI and sync services, and return to the setup wizard.\n\nSystem dependencies, PyTorch, and Tunnel are not affected.",
+    "confirm_delete": "Re-initialize?\n\nThis will delete the entire ComfyUI directory (including all model files), stop ComfyUI and sync services, and return to the setup wizard.\n\nModel files will be permanently deleted!",
+    "confirm_delete_final": "All model files will be permanently deleted and cannot be recovered.\n\nContinue?",
+    "in_progress": "Re-initializing...",
+    "success": "Reset complete, redirecting to setup wizard...",
+    "partial_fail": "Some operations failed"
+  },
+  "log": {
+    "title": "ComfyCarry Logs",
+    "loading": "Loading..."
+  },
+  "restart_confirm": "Restart ComfyCarry?\n\nThe page will be briefly unavailable.",
+  "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds...",
+  "civitai": {
+    "title": "CivitAI API Key",
+    "desc": "Generate API Key from CivitAI Account Settings",
+    "key_prefix": "Generate API Key from",
+    "key_link": "CivitAI Account Settings",
+    "key_suffix": "",
+    "placeholder": "Enter CivitAI API Key...",
+    "saved": "API Key saved",
+    "save_failed": "Save failed",
+    "clear_confirm": "Clear CivitAI API Key?",
+    "cleared": "API Key cleared",
+    "err_empty": "Please enter API Key"
+  },
+  "llm": {
+    "provider": {
+      "title": "Service Provider",
+      "label": "Provider",
+      "select_placeholder": "— Select Provider —",
+      "api_key": "API Key",
+      "api_key_placeholder": "Enter API Key...",
+      "base_url": "Base URL",
+      "base_url_placeholder": "https://api.example.com/v1"
+    },
+    "model": {
+      "title": "Model",
+      "label": "Model",
+      "refresh_hint": "Refresh to fetch model list",
+      "search_placeholder": "Search models...",
+      "fetch_title": "Fetch model list",
+      "fetching": "Fetching...",
+      "fetch_failed": "Fetch failed",
+      "fetched_count": "Fetched {count} models",
+      "no_match": "No matching models",
+      "select": "Click to select model",
+      "none_available": "No models available",
+      "context_fmt": "Context: {n} tokens",
+      "input_fmt": "Input: ${n}/M",
+      "output_fmt": "Output: ${n}/M"
+    },
+    "params": {
+      "title": "Parameters",
+      "temperature": "Temperature",
+      "temperature_help": "0.0 - 2.0. Higher = more creative, lower = more stable. Recommended: creative 0.8-1.2, translation/description 0.3-0.5",
+      "max_tokens": "Max Response Length",
+      "max_tokens_help": "Maximum output length in tokens. Prompt generation usually needs 500-1000, longer conversations may need more",
+      "stream": "Streaming",
+      "stream_help": "When enabled, LLM will output response token by token. Disable to avoid content filtering issues on some platforms"
+    },
+    "test_btn": "Test Connection",
+    "save_btn": "Save Config",
+    "testing": "Testing...",
+    "test_success": "Connection successful",
+    "test_failed": "Connection failed",
+    "test_error": "Request failed",
+    "err_no_provider": "Please select a provider first",
+    "err_no_key": "Please enter API Key first",
+    "err_no_model": "Please select a model first",
+    "config_saved": "LLM config saved",
+    "save_failed": "Save failed",
+    "unknown_error": "Unknown error"
+  }
+}

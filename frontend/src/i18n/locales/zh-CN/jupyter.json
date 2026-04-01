@@ -1,0 +1,81 @@
+{
+  "title": "JupyterLab",
+  "status": {
+    "running": "运行中",
+    "stopped": "已停止",
+    "error": "出错",
+    "not_created": "未创建"
+  },
+  "hint": {
+    "not_created": "点击「启动」创建 JupyterLab 进程",
+    "stopped": "进程已停止，点击「启动」恢复",
+    "error": "进程出错，请查看日志",
+    "not_running": "Jupyter 服务未运行或无法连接"
+  },
+  "info": {
+    "version": "版本",
+    "pid": "PID",
+    "port": "端口",
+    "cpu": "CPU",
+    "memory": "内存",
+    "kernels_count": "内核",
+    "sessions_count": "会话"
+  },
+  "actions": {
+    "stop": "停止",
+    "start": "启动",
+    "restart": "重启"
+  },
+  "error": {
+    "load_failed": "加载失败"
+  },
+  "token": {
+    "title": "访问令牌"
+  },
+  "kernels": {
+    "title": "活跃内核",
+    "available": "可用内核",
+    "idle": "空闲",
+    "busy": "忙碌",
+    "connections": "连接",
+    "interrupt": "中断",
+    "restart": "重启",
+    "kernel_restarted": "内核已重启",
+    "kernel_interrupted": "内核已中断",
+    "action_failed": "操作失败"
+  },
+  "sessions": {
+    "title": "活跃会话",
+    "close": "关闭此会话",
+    "close_warning": "关联的内核也将被停止",
+    "closed": "会话已关闭"
+  },
+  "terminals": {
+    "title": "终端",
+    "new": "新建终端",
+    "label": "终端 {name}",
+    "created": "终端 {name} 已创建",
+    "open": "点击打开终端",
+    "destroy": "销毁终端",
+    "destroy_confirm": "确定要销毁终端 {name} 吗？",
+    "destroyed": "终端 {name} 已销毁"
+  },
+  "log": {
+    "title": "日志",
+    "loading": "加载中..."
+  },
+  "confirm": {
+    "stop": "确定要停止 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",
+    "stop_warning": "活跃的内核和会话将丢失",
+    "restart": "确定要重启 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",
+    "close_session": "确定要关闭此会话吗？\n\n关联的内核也将被停止。"
+  },
+  "toast": {
+    "starting": "JupyterLab 启动中...",
+    "start_failed": "启动失败",
+    "stopped": "JupyterLab 已停止",
+    "stop_failed": "停止失败",
+    "restarting": "Jupyter 正在重启",
+    "restart_failed": "重启失败"
+  }
+}

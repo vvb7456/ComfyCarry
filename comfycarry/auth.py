@@ -12,19 +12,152 @@ LOGIN_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Login - ComfyCarry</title>
+<title>ComfyCarry 登录</title>
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
-<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<script>
+(() => {
+const THEME_ICONS = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
+const I18N = {
+  'zh-CN': {
+    title: 'ComfyCarry 登录',
+    password_placeholder: '输入访问密码',
+    login: '登录',
+    invalid_password: '密码错误',
+    toggle_theme: '切换主题',
+    toggle_lang: 'Switch to English',
+    show: '显示',
+    hide: '隐藏',
+  },
+  en: {
+    title: 'ComfyCarry Login',
+    password_placeholder: 'Enter access password',
+    login: 'Login',
+    invalid_password: 'Incorrect password',
+    toggle_theme: 'Toggle theme',
+    toggle_lang: '切换到中文',
+    show: 'Show',
+    hide: 'Hide',
+  },
+};
+
+function detectLanguage() {
+  const stored = localStorage.getItem('lang');
+  if (stored === 'zh-CN' || stored === 'en') return stored;
+  const nav = navigator.language || '';
+  return nav.startsWith('zh') ? 'zh-CN' : 'en';
+}
+
+function getTheme() {
+  return localStorage.getItem('theme') || 'system';
+}
+
+function resolveDark(pref) {
+  return pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function applyTheme(pref) {
+  const isDark = resolveDark(pref);
+  if (isDark) document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', 'light');
+  const ico = document.getElementById('theme-toggle-icon');
+  if (ico) ico.textContent = THEME_ICONS[pref] || 'contrast';
+}
+
+function currentText() {
+  return I18N[window.__loginLang] || I18N['zh-CN'];
+}
+
+function renderError() {
+  const err = document.getElementById('err');
+  if (!err) return;
+  const key = document.body?.dataset.errKey || '';
+  if (!key) {
+    err.textContent = '';
+    return;
+  }
+  const text = currentText()[key] || '';
+  err.innerHTML = text
+    ? `<span class="ms material-symbols-outlined">error</span> ${text}`
+    : '';
+}
+
+function applyLanguage(lang) {
+  window.__loginLang = lang;
+  const text = currentText();
+  document.documentElement.lang = lang;
+  document.title = text.title;
+  const pw = document.getElementById('pw');
+  const btnLogin = document.getElementById('btn-login');
+  const themeBtn = document.getElementById('theme-toggle');
+  const langBtn = document.getElementById('lang-toggle');
+  const pwToggle = document.getElementById('pw-toggle');
+  if (pw) pw.placeholder = text.password_placeholder;
+  if (btnLogin) btnLogin.textContent = text.login;
+  if (themeBtn) {
+    themeBtn.title = text.toggle_theme;
+    themeBtn.setAttribute('aria-label', text.toggle_theme);
+  }
+  if (langBtn) {
+    langBtn.title = text.toggle_lang;
+    langBtn.textContent = lang === 'zh-CN' ? 'EN' : '中';
+  }
+  if (pwToggle && pw) {
+    const hidden = pw.type === 'password';
+    const title = hidden ? text.show : text.hide;
+    pwToggle.title = title;
+    pwToggle.setAttribute('aria-label', title);
+  }
+  renderError();
+}
+
+window.cycleTheme = function () {
+  const order = ['dark', 'light', 'system'];
+  const cur = getTheme();
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+};
+
+window.toggleLoginLang = function () {
+  const next = (window.__loginLang === 'zh-CN') ? 'en' : 'zh-CN';
+  localStorage.setItem('lang', next);
+  applyLanguage(next);
+};
+
+window.toggleLoginPw = function () {
+  const input = document.getElementById('pw');
+  const btn = document.getElementById('pw-toggle');
+  if (!input || !btn) return;
+  const hidden = input.type === 'password';
+  input.type = hidden ? 'text' : 'password';
+  const icon = btn.querySelector('.ms');
+  if (icon) icon.textContent = hidden ? 'visibility_off' : 'visibility';
+  const text = currentText();
+  const title = hidden ? text.hide : text.show;
+  btn.title = title;
+  btn.setAttribute('aria-label', title);
+};
+
+applyTheme(getTheme());
+
+document.addEventListener('DOMContentLoaded', function () {
+  applyLanguage(detectLanguage());
+  applyTheme(getTheme());
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+    if (getTheme() === 'system') applyTheme('system');
+  });
+});
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* ── 深色主题 (默认) ── */
 :root{--l-bg:#06060c;--l-card:rgba(18,18,30,.75);--l-card-bd:rgba(124,92,252,.15);--l-input-bg:rgba(10,10,18,.7);--l-input-bd:#2a2a3e;--l-t1:#e8e8f0;--l-t3:#68688a;--l-orb-op:.15;--l-shadow:rgba(0,0,0,.4)}
 /* ── 浅色主题 ── */
-@media(prefers-color-scheme:light){
-:root{--l-bg:#f0f0f5;--l-card:rgba(255,255,255,.82);--l-card-bd:rgba(124,92,252,.18);--l-input-bg:rgba(245,245,250,.9);--l-input-bd:#d0d0e0;--l-t1:#1a1a2e;--l-t3:#888;--l-orb-op:.1;--l-shadow:rgba(0,0,0,.08)}
-}
+html[data-theme="light"]{--l-bg:#f0f0f5;--l-card:rgba(255,255,255,.82);--l-card-bd:rgba(124,92,252,.18);--l-input-bg:rgba(245,245,250,.9);--l-input-bd:#d0d0e0;--l-t1:#1a1a2e;--l-t3:#888;--l-orb-op:.1;--l-shadow:rgba(0,0,0,.08)}
 body{font-family:'IBM Plex Sans','IBM Plex Sans SC',-apple-system,sans-serif;background:var(--l-bg);color:var(--l-t1);min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:clamp(15px,1.1vw,21px);overflow:hidden}
 /* 背景动画 */
 .bg{position:fixed;inset:0;z-index:0;overflow:hidden}
@@ -33,6 +166,15 @@ body{font-family:'IBM Plex Sans','IBM Plex Sans SC',-apple-system,sans-serif;bac
 .bg .orb:nth-child(2){width:350px;height:350px;background:#e879f9;bottom:-10%;right:-5%;animation-delay:-7s}
 .bg .orb:nth-child(3){width:300px;height:300px;background:#38bdf8;top:50%;left:60%;animation-delay:-14s}
 @keyframes drift{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(30px,-40px) scale(1.05)}50%{transform:translate(-20px,30px) scale(.95)}75%{transform:translate(40px,20px) scale(1.02)}}
+/* 顶部控制区 */
+.top-controls{position:fixed;top:16px;right:16px;z-index:2;display:flex;align-items:center;gap:6px}
+.theme-toggle{background:none;border:none;color:var(--l-t1);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;transition:color .2s;appearance:none;-webkit-appearance:none}
+.theme-toggle:hover{color:#7c5cfc}
+.theme-toggle .ms{font-size:20px;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20}
+.lang-toggle{background:rgba(255,255,255,.06);border:1px solid var(--l-card-bd);color:var(--l-t1);border-radius:4px;font-size:.68rem;font-weight:600;padding:4px 8px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;letter-spacing:.03em;white-space:nowrap;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+html[data-theme="light"] .lang-toggle{background:rgba(255,255,255,.72)}
+.lang-toggle:hover{background:rgba(255,255,255,.12)}
+html[data-theme="light"] .lang-toggle:hover{background:rgba(255,255,255,.92)}
 /* 卡片 */
 .card{position:relative;z-index:1;background:var(--l-card);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--l-card-bd);border-radius:20px;padding:clamp(36px,3.5vw,56px);width:clamp(360px,28vw,440px);max-width:92vw;box-shadow:0 8px 32px var(--l-shadow)}
 /* Logo */
@@ -55,23 +197,32 @@ body{font-family:'IBM Plex Sans','IBM Plex Sans SC',-apple-system,sans-serif;bac
 .err:empty{display:none}
 .err .ms{font-size:16px;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 16}
 input::-ms-reveal,input::-ms-clear,input::-webkit-credentials-auto-fill-button{display:none}
+@media (max-width:768px){
+.top-controls{top:12px;right:12px}
+}
 </style></head>
-<body>
+<body data-err-key="__ERR_KEY__">
 <div class="bg"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
+<div class="top-controls">
+    <button type="button" class="lang-toggle" id="lang-toggle" onclick="toggleLoginLang()" title="Switch to English">EN</button>
+    <button type="button" class="theme-toggle" id="theme-toggle" onclick="cycleTheme()" title="切换主题" aria-label="切换主题">
+        <span class="ms material-symbols-outlined" id="theme-toggle-icon">contrast</span>
+    </button>
+</div>
 <div class="card">
     <div class="logo">
         <h1>ComfyCarry</h1>
     </div>
     <form method="POST" action="/login">
-        <div class="err" id="err">__ERR__</div>
+        <div class="err" id="err"></div>
         <div class="input-wrap">
             <span class="ms material-symbols-outlined input-icon">lock</span>
             <input name="password" id="pw" type="password" placeholder="输入访问密码" autofocus>
-            <button type="button" class="toggle-pw" onclick="const i=document.getElementById('pw');const h=i.type==='password';i.type=h?'text':'password';this.querySelector('.ms').textContent=h?'visibility_off':'visibility'" tabindex="-1">
+            <button type="button" class="toggle-pw" id="pw-toggle" onclick="toggleLoginPw()" tabindex="-1" title="显示" aria-label="显示">
                 <span class="ms material-symbols-outlined">visibility</span>
             </button>
         </div>
-        <button type="submit" class="btn-login">登录</button>
+        <button type="submit" class="btn-login" id="btn-login">登录</button>
     </form>
 </div>
 </body></html>"""
@@ -80,12 +231,13 @@ input::-ms-reveal,input::-ms-clear,input::-webkit-credentials-auto-fill-button{d
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        return Response(LOGIN_PAGE.replace("__ERR__", ""), mimetype="text/html")
+        return Response(LOGIN_PAGE.replace("__ERR_KEY__", ""), mimetype="text/html")
     pw = request.form.get("password", "")
     if pw == config.DASHBOARD_PASSWORD:
+        session.permanent = True
         session["authed"] = True
         return redirect("/")
-    return Response(LOGIN_PAGE.replace("__ERR__", '<span class="ms material-symbols-outlined">error</span> 密码错误'), mimetype="text/html")
+    return Response(LOGIN_PAGE.replace("__ERR_KEY__", "invalid_password"), mimetype="text/html")
 
 
 @auth_bp.route("/logout")
@@ -115,7 +267,12 @@ def register_auth_middleware(app):
             return
         if request.path in ("/login", "/favicon.ico", "/api/version"):
             return
-        if request.path.startswith("/static/"):
+        if (
+            request.path.startswith("/static/")
+            or request.path.startswith("/assets/")
+            or request.path.startswith("/fonts/")
+            or request.path in ("/apple-touch-icon.png", "/logo.png", "/logo-small.png")
+        ):
             return
         # 如果尚未完成部署向导, 重定向到向导页
         if not config._is_setup_complete():

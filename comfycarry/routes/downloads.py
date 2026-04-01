@@ -18,6 +18,7 @@ ComfyCarry — Downloads 路由
 import json
 import logging
 import os
+import threading
 import time
 
 from flask import Blueprint, Response, jsonify, request
@@ -313,6 +314,7 @@ def api_downloads_civitai():
     """
     from ..services.civitai_resolver import (
         resolve_civitai_download, save_model_metadata, download_preview_image,
+        enrich_model_by_hash,
     )
     from ..utils import _get_api_key
 
@@ -363,6 +365,15 @@ def api_downloads_civitai():
             download_preview_image(model_path, info.get("images", []))
         except Exception as e:
             logger.warning(f"CivitAI 元数据保存失败: {e}")
+
+        # 异步二次丰富: SHA256 → by-hash API → 覆写完整元数据 (含 modelId + images.meta)
+        def _enrich():
+            try:
+                enrich_model_by_hash(model_path, api_key=api_key)
+            except Exception as e:
+                logger.warning(f"CivitAI 异步 enrich 失败: {e}")
+
+        threading.Thread(target=_enrich, daemon=True).start()
 
     engine = get_engine()
     task = engine.submit(

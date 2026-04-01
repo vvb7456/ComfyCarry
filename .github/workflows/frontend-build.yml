@@ -1,0 +1,56 @@
+# ==============================================================================
+# Frontend 构建 & 提交 (GitHub Actions)
+#
+# 触发: push 到 main 分支且 frontend/ 目录有变化
+# 流程: npm ci → npm run build → 将 static/dist/ 构建产物提交回仓库
+# 目的: bootstrap.sh 下载的 tarball 始终包含最新前端构建
+# ==============================================================================
+
+name: Build Frontend
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-build.yml"
+    branches: [main]
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Commit dist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add static/dist/ -f
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: build frontend dist [skip ci]"
+            git push
+          fi

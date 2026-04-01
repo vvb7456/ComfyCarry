@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyCarry - 部署向导</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // 主题初始化 — 在 <head> 中内联执行以防止闪烁
+        (function() {
+            function getTheme() { return localStorage.getItem('theme') || 'system'; }
+            function applyTheme(pref) {
+                var isDark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.dataset.theme = isDark ? '' : 'light';
+            }
+            applyTheme(getTheme());
+            matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+                if (getTheme() === 'system') applyTheme('system');
+            });
+        })();
+    </script>
+  <script type="module" crossorigin src="/assets/wizard-BEdOtr9t.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/forms-De1e46bt.js">
+  <link rel="modulepreload" crossorigin href="/assets/ThemeToggle-BrWNszgR.js">
+  <link rel="modulepreload" crossorigin href="/assets/BaseCard-D2S5F33g.js">
+  <link rel="modulepreload" crossorigin href="/assets/ModeCard-BScUC_VR.js">
+  <link rel="modulepreload" crossorigin href="/assets/AlertBanner-Cnptc1rB.js">
+  <link rel="modulepreload" crossorigin href="/assets/FormField-DmLLdzzJ.js">
+  <link rel="modulepreload" crossorigin href="/assets/SecretInput-BeBouILw.js">
+  <link rel="modulepreload" crossorigin href="/assets/ToggleSwitch-BVTryMGf.js">
+  <link rel="modulepreload" crossorigin href="/assets/CollapsibleGroup-CFCAbB1O.js">
+  <link rel="modulepreload" crossorigin href="/assets/FieldControlRow-DbcySCRg.js">
+  <link rel="modulepreload" crossorigin href="/assets/BaseSelect-s7L-kpAV.js">
+  <link rel="modulepreload" crossorigin href="/assets/HelpTip-B2iweqrO.js">
+  <link rel="modulepreload" crossorigin href="/assets/StatusDot-VtSpPkv_.js">
+  <link rel="modulepreload" crossorigin href="/assets/LogPanel-D0NhuqGt.js">
+  <link rel="stylesheet" crossorigin href="/assets/forms-B-BjY0nN.css">
+  <link rel="stylesheet" crossorigin href="/assets/ThemeToggle-DL4jaNWB.css">
+  <link rel="stylesheet" crossorigin href="/assets/BaseCard-DMB62jnD.css">
+  <link rel="stylesheet" crossorigin href="/assets/ModeCard-BSGV46PG.css">
+  <link rel="stylesheet" crossorigin href="/assets/AlertBanner-Zb41FXPX.css">
+  <link rel="stylesheet" crossorigin href="/assets/FormField-C7EI1UjC.css">
+  <link rel="stylesheet" crossorigin href="/assets/SecretInput-DEkLa6Sw.css">
+  <link rel="stylesheet" crossorigin href="/assets/ToggleSwitch-BYbxRPZb.css">
+  <link rel="stylesheet" crossorigin href="/assets/CollapsibleGroup-CtVYEyzp.css">
+  <link rel="stylesheet" crossorigin href="/assets/FieldControlRow-BL3qYEwX.css">
+  <link rel="stylesheet" crossorigin href="/assets/BaseSelect-mKHaXMjc.css">
+  <link rel="stylesheet" crossorigin href="/assets/HelpTip-CeuogCxR.css">
+  <link rel="stylesheet" crossorigin href="/assets/StatusDot-DOWKTCW0.css">
+  <link rel="stylesheet" crossorigin href="/assets/LogPanel-Bcsj3J48.css">
+  <link rel="stylesheet" crossorigin href="/assets/wizard-BzoKvv7i.css">
+</head>
+
+<body>
+    <div id="app"></div>
+</body>
+
+</html>

@@ -1,0 +1,20 @@
+import { inject } from 'vue'
+import type { InjectionKey } from 'vue'
+
+export interface ConfirmOptions {
+  title?: string
+  message: string
+  variant?: 'default' | 'danger'
+  confirmText?: string
+  cancelText?: string
+}
+
+export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
+
+export const confirmKey: InjectionKey<ConfirmFn> = Symbol('confirm')
+
+export function useConfirm() {
+  const confirm = inject(confirmKey)
+  if (!confirm) throw new Error('useConfirm() requires <ConfirmProvider> in ancestor')
+  return { confirm }
+}

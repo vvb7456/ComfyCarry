@@ -28,7 +28,7 @@ touch ~/.no_auto_tmux 2>/dev/null || true
 # ── 预构建镜像校验 ──
 if [ ! -f /opt/.comfycarry-prebuilt ]; then
     echo "  ⚠️  未检测到 ComfyCarry 预构建镜像"
-    echo "  请使用官方预构建镜像: ghcr.io/vvb7456/comfycarry"
+    echo "  请使用官方预构建镜像: erocraft/comfycarry"
 fi
 PYTHON_BIN=python3
 
@@ -68,7 +68,7 @@ if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" 
 
     # 从解压目录复制所需文件
     EXTRACTED="${TMP_EXTRACT}/${REPO_NAME}-${BRANCH}"
-    for f in workspace_manager.py dashboard.html setup_wizard.html favicon.ico; do
+    for f in workspace_manager.py favicon.ico; do
         [ -f "$EXTRACTED/$f" ] && cp "$EXTRACTED/$f" "$DASHBOARD_DIR/$f"
     done
     # 复制 comfycarry/ Python 包

@@ -72,25 +72,18 @@ def api_sync_status():
 # ====================================================================
 @bp.route("/api/sync/logs/stream")
 def api_sync_logs_stream():
-    """SSE: 轮询 sync log buffer 推送新日志行"""
+    """SSE: 轮询 sync log buffer 推送结构化日志"""
     def generate():
         last_count = 0
         try:
             while True:
-                lines = get_sync_log_buffer()
-                current_count = len(lines)
+                entries = get_sync_log_buffer()
+                current_count = len(entries)
                 if current_count > last_count:
-                    new_lines = lines[last_count:]
-                    for line in new_lines:
-                        lvl = "info"
-                        if "❌" in line or "失败" in line:
-                            lvl = "error"
-                        elif "⬆" in line or "⬇" in line or "🔍" in line:
-                            lvl = "info"
-                        yield f"data: {json.dumps({'line': line, 'level': lvl})}\n\n"
+                    for entry in entries[last_count:]:
+                        yield f"data: {json.dumps(entry)}\n\n"
                     last_count = current_count
                 elif current_count < last_count:
-                    # buffer was trimmed, reset
                     last_count = current_count
                 time.sleep(2)
         except GeneratorExit:
@@ -134,7 +127,8 @@ def api_sync_remote_create():
     if name in existing:
         return jsonify({"error": f"Remote '{name}' 已存在"}), 409
 
-    cmd = f'rclone config create "{name}" "{rtype}"'
+    # Step 1: Create the remote config (non-interactive to skip OAuth web server)
+    cmd = f'rclone config create "{name}" "{rtype}" --non-interactive'
     for k, v in params.items():
         if v:
             cmd += f" {k}={shlex.quote(str(v))}"
@@ -145,6 +139,34 @@ def api_sync_remote_create():
             return jsonify({"error": f"创建失败: {r.stderr.strip() or r.stdout.strip()}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+    # Step 2: Test connectivity — list root to verify credentials/endpoint
+    try:
+        test = subprocess.run(
+            f'rclone lsf {shlex.quote(name + ":")} --max-depth 1 --dirs-only',
+            shell=True, capture_output=True, text=True, timeout=20
+        )
+        if test.returncode != 0:
+            # Rollback: delete the broken remote
+            subprocess.run(
+                f'rclone config delete {shlex.quote(name)}',
+                shell=True, capture_output=True, text=True, timeout=10
+            )
+            err_msg = test.stderr.strip() or test.stdout.strip() or "连接失败"
+            return jsonify({"error": f"连接测试失败: {err_msg}"}), 400
+    except subprocess.TimeoutExpired:
+        subprocess.run(
+            f'rclone config delete {shlex.quote(name)}',
+            shell=True, capture_output=True, text=True, timeout=10
+        )
+        return jsonify({"error": "连接测试超时，请检查配置"}), 400
+    except Exception as e:
+        subprocess.run(
+            f'rclone config delete {shlex.quote(name)}',
+            shell=True, capture_output=True, text=True, timeout=10
+        )
+        return jsonify({"error": f"连接测试失败: {str(e)}"}), 400
+
     return jsonify({"ok": True, "message": f"Remote '{name}' 已创建"})
 
 

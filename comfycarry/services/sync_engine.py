@@ -109,16 +109,16 @@ def set_app_logger(logger):
     _app_logger = logger
 
 
-def _sync_log(msg):
-    """写日志到内存 buffer"""
+def _sync_log(key, params=None, level="info"):
+    """写结构化日志到内存 buffer"""
     ts = time.strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
+    entry = {"ts": ts, "key": key, "params": params or {}, "level": level}
     with _sync_log_lock:
-        _sync_log_buffer.append(line)
+        _sync_log_buffer.append(entry)
         if len(_sync_log_buffer) > 300:
             _sync_log_buffer[:] = _sync_log_buffer[-300:]
     if _app_logger:
-        _app_logger.debug(f"[sync] {msg}")
+        _app_logger.debug(f"[sync] {key} {params or {}}")
 
 
 def get_sync_log_buffer():
@@ -163,7 +163,8 @@ def _run_sync_rule_inner(rule):
     for f in filters:
         cmd.extend(["--filter", f])
 
-    _sync_log(f"{'⬇' if direction == 'pull' else '⬆'} {name}: {src} → {dst} ({method})")
+    start_key = "rule_start_pull" if direction == "pull" else "rule_start_push"
+    _sync_log(start_key, {"name": name, "src": src, "dst": dst, "method": method})
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         output = (proc.stdout + proc.stderr).strip()
@@ -171,23 +172,23 @@ def _run_sync_rule_inner(rule):
             for line in output.split('\n')[-3:]:
                 line = line.strip()
                 if line:
-                    _sync_log(f"  {line}")
+                    _sync_log("rclone_output", {"text": line})
         if proc.returncode == 0:
-            _sync_log(f"✅ {name} 完成")
+            _sync_log("rule_done", {"name": name}, "success")
         else:
-            _sync_log(f"❌ {name} 失败 (code={proc.returncode})")
+            _sync_log("rule_failed", {"name": name, "code": proc.returncode}, "error")
         return proc.returncode == 0
     except subprocess.TimeoutExpired:
-        _sync_log(f"⏰ {name} 超时 (600s)")
+        _sync_log("rule_timeout", {"name": name, "seconds": 600}, "error")
         return False
     except Exception as e:
-        _sync_log(f"❌ {name} 异常: {e}")
+        _sync_log("rule_error", {"name": name, "error": str(e)}, "error")
         return False
 
 
 def _sync_worker_loop():
     """后台线程: 持续执行 watch 类型规则"""
-    _sync_log("☁️ Sync Worker 已启动")
+    _sync_log("worker_started")
     while not _sync_worker_stop.is_set():
         rules = _load_sync_rules()
         watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
@@ -220,7 +221,7 @@ def _sync_worker_loop():
         settings = _load_sync_settings()
         wait = max(settings.get("watch_interval", 60), 5)
         _sync_worker_stop.wait(wait)
-    _sync_log("🛑 Sync Worker 已停止")
+    _sync_log("worker_stopped")
 
 
 def is_worker_running():
@@ -233,10 +234,10 @@ def start_sync_worker():
     global _sync_worker_thread
     stop_sync_worker()
     if _sync_worker_thread and _sync_worker_thread.is_alive():
-        _sync_log("⚠️ 旧 Worker 仍在运行, 等待终止...")
+        _sync_log("worker_stale", level="warn")
         _sync_worker_thread.join(timeout=10)
         if _sync_worker_thread.is_alive():
-            _sync_log("❌ 旧 Worker 无法停止, 跳过启动")
+            _sync_log("worker_stale_failed", level="error")
             return False
     _sync_worker_stop.clear()
     _sync_worker_thread = threading.Thread(target=_sync_worker_loop, daemon=True, name="sync-worker")

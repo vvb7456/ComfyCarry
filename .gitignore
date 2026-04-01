@@ -5,29 +5,19 @@ docs/
 # 旧代码归档 (已移至 _archive/ 目录，目录内含 .gitignore)
 _archive/
 
-# 旧的数据模板
-models.csv.example
-models.csv.template
 
 # 临时文件
 *.log
 *.tmp
 /workspace/
-models.csv
-lora_scan_result.csv
 tests/
 .pytest_cache/
 pytest.ini
 
 # Docker 构建 — wheels 通过 GitHub Release 分发，本地配置不入仓库
 docker/wheels/
-docker/daemon.json
-docker/docker-proxy.conf
-docker/Dockerfile.ada
-docker/Dockerfile.blackwell
-docker/build-ada.sh
-docker/build-blackwell.sh
 docker/docker-compose.yml
+docker/dev-bootstrap.sh
 
 # Workspace Manager
 .civitai_config.json
@@ -41,3 +31,7 @@ __pycache__/
 .vscode/
 *.bak
 comfycarry-config-test.json
+.codex
+
+# Frontend 依赖 (CI/CD 构建)
+frontend/node_modules/

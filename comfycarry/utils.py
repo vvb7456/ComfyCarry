@@ -4,6 +4,7 @@ ComfyCarry — 通用工具函数
 
 import hashlib
 import json
+import struct
 import subprocess
 
 from .config import CONFIG_FILE
@@ -41,3 +42,22 @@ def _sha256_file(filepath):
         return sha.hexdigest().upper()
     except Exception:
         return None
+
+
+def read_safetensors_metadata(filepath: str) -> dict:
+    """读取 safetensors 文件的 __metadata__ 字典。
+
+    仅读取 header 部分 (前 8 字节 + header JSON)，不加载权重数据。
+    返回空 dict 表示文件不含 metadata 或解析失败。
+    """
+    try:
+        with open(filepath, "rb") as f:
+            header_len = struct.unpack("<Q", f.read(8))[0]
+            if header_len <= 0 or header_len > 100_000_000:
+                return {}
+            raw = f.read(header_len)
+        header = json.loads(raw)
+        meta = header.get("__metadata__")
+        return meta if isinstance(meta, dict) else {}
+    except Exception:
+        return {}

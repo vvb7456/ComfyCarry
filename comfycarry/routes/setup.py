@@ -90,7 +90,7 @@ def api_setup_save():
         "civitai_token", "plugins",
         "install_fa2", "install_sa2",
         "wizard_sync_rules", "wizard_remotes",
-        "_imported_sync_rules",
+        "_imported_sync_rules", "_imported_sync_rules_count",
         "ssh_password", "ssh_keys", "ssh_pw_sync",
         "llm_provider", "llm_api_key", "llm_base_url", "llm_model",
     }

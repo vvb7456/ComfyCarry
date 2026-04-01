@@ -1,0 +1,94 @@
+{
+  "title": "插件管理",
+  "tabs": {
+    "installed": "已安装",
+    "browse": "浏览",
+    "git": "Git 安装"
+  },
+  "installed": {
+    "filter_placeholder": "筛选已安装插件...",
+    "all_status": "全部状态",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "has_update": "有更新",
+    "refresh": "刷新",
+    "check_updates": "检查更新",
+    "check_updates_title": "强制 ComfyUI-Manager 重新检查所有插件更新 (耗时较长)",
+    "update_all": "全部更新",
+    "stats": "插件统计",
+    "update": "更新",
+    "enable": "启用",
+    "disable": "禁用",
+    "version": "版本",
+    "load_failed": "获取已安装列表失败",
+    "checking_updates": "正在检查更新...",
+    "found_updates": "发现新更新，正在刷新列表...",
+    "all_up_to_date": "所有插件已是最新版本",
+    "load_error": "加载失败: {message}",
+    "stats_text": "共 {total} 个插件, {enabled} 个启用, {update} 个有更新 | 显示 {shown} 个",
+    "no_match": "没有匹配的插件",
+    "installed_badge": "已安装"
+  },
+  "browse": {
+    "search_placeholder": "搜索插件名称或描述...",
+    "sort_stars": "按热度",
+    "sort_update": "最近更新",
+    "sort_name": "按名称",
+    "load_more": "加载更多...",
+    "load_failed": "加载失败",
+    "load_error": "加载失败: {message}",
+    "stats_text": "共 {count} 个插件",
+    "stats_match": " (匹配 \"{query}\")",
+    "no_match": "没有匹配的插件",
+    "installed_badge": "已安装",
+    "disabled_badge": "已禁用",
+    "not_installed": "未安装",
+    "install": "安装",
+    "already_installed": "已安装",
+    "render_error": "渲染失败: {message}"
+  },
+  "git": {
+    "title": "通过 Git URL 安装插件",
+    "desc": "输入插件的 GitHub 仓库地址，直接克隆并安装",
+    "placeholder": "https://github.com/author/ComfyUI-Plugin",
+    "install": "安装",
+    "invalid_url": "请输入有效的 URL",
+    "empty_url": "请输入 Git URL",
+    "installing_btn": "安装中...",
+    "queued_status": "已加入安装队列...",
+    "install_error": "安装失败: {message}",
+    "request_failed": "请求失败"
+  },
+  "queue_processing": "队列处理中...",
+  "toast": {
+    "installing": "安装中",
+    "queued": "已加入安装队列",
+    "install_failed": "安装失败",
+    "version_failed": "获取版本失败",
+    "no_version": "无版本信息",
+    "install_version": "安装此版本",
+    "installing_name": "正在安装 {id}..."
+  },
+  "confirm": {
+    "uninstall": "确定要卸载插件吗",
+    "uninstalling": "正在卸载",
+    "updating": "正在更新",
+    "update_all_confirm": "确定要更新所有已安装插件吗？这可能需要一些时间。",
+    "submitting_updates": "正在提交全部更新...",
+    "uninstall_name": "确定要卸载插件 \"{title}\" 吗？",
+    "uninstalling_name": "正在卸载 {title}...",
+    "updating_name": "正在更新 {id}..."
+  },
+  "version_picker": {
+    "title": "选择插件版本",
+    "title_name": "{name} - 版本选择",
+    "loading": "加载版本列表...",
+    "no_version_nightly": "无版本信息 (可能为 nightly 安装)"
+  },
+  "toggle": {
+    "processing": "操作中..."
+  },
+  "queue": {
+    "status": "队列: {done}/{total} 完成"
+  }
+}

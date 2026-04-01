@@ -1,0 +1,15 @@
+{
+  "dashboard": "Overview",
+  "comfyui": "ComfyUI",
+  "generate": "Generate",
+  "models": "Models",
+  "plugins": "Plugins",
+  "tunnel": "Tunnel",
+  "jupyter": "Jupyter",
+  "sync": "Sync",
+  "ssh": "SSH",
+  "settings": "Settings",
+  "logout": "Logout",
+  "collapse": "Collapse/Expand",
+  "scroll_top": "Back to Top"
+}

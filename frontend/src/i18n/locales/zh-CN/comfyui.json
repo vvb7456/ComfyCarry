@@ -1,0 +1,198 @@
+{
+  "title": "ComfyUI",
+  "tabs": {
+    "console": "控制台",
+    "queue": "任务队列",
+    "history": "生成历史"
+  },
+  "console": {
+    "status_cards_loading": "加载中...",
+    "exec_status": "实时执行状态",
+    "params": "启动参数",
+    "params_placeholder": "main.py --listen 0.0.0.0 --port 8188 ...",
+    "params_loading": "加载中...",
+    "log_title": "ComfyUI 日志",
+    "log_loading": "加载中...",
+    "saved": "已保存",
+    "saved_restarting": "已保存，ComfyUI 正在重启",
+    "log_history_failed": "获取日志历史失败",
+    "uptime": "运行时间",
+    "restart_count": "重启次数: {count}",
+    "status_unavailable": "无法获取状态",
+    "load_failed": "加载失败: {error}",
+    "params_load_failed": "加载参数失败: {error}",
+    "params_save_confirm": "保存参数将重启 ComfyUI，确定继续？",
+    "params_restart_hint": "修改启动参数后，需要重启 ComfyUI 才会生效。",
+    "params_saving": "保存中...",
+    "params_restart_toast": "ComfyUI 正在使用新参数重启...",
+    "params_save_failed": "保存失败"
+  },
+  "params": {
+    "fields": {
+      "vram": {
+        "label": "VRAM 管理",
+        "help": "控制模型显存分配策略。默认自动检测，High VRAM 适合大显存 GPU 不卸载模型，Low VRAM 适合小显存拆分推理。",
+        "options": {
+          "default": "默认 (自动)",
+          "gpu-only": "GPU Only (全部保留在 GPU)",
+          "highvram": "High VRAM (模型不卸载)",
+          "normalvram": "Normal VRAM (强制正常模式)",
+          "lowvram": "Low VRAM (拆分 UNet)",
+          "novram": "No VRAM (极限低显存)"
+        }
+      },
+      "attention": {
+        "label": "Attention 方案",
+        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。FlashAttention 和 SageAttention 可在 Setup Wizard 中安装。",
+        "options": {
+          "default": "默认 (自动选择)",
+          "pytorch-cross": "PyTorch SDPA (推荐)",
+          "split-cross": "Split Cross Attention (省显存)",
+          "quad-cross": "Sub-Quadratic",
+          "flash": "FlashAttention",
+          "sage": "SageAttention"
+        }
+      },
+      "disable_xformers": {
+        "label": "xFormers",
+        "help": "新版 PyTorch 下通常更建议使用 PyTorch SDPA，如无特殊需求可保持禁用 xFormers。",
+        "options": {
+          "default": "默认",
+          "disabled": "禁用"
+        }
+      },
+      "unet_precision": {
+        "label": "UNet 精度",
+        "help": "控制 UNet 推理精度。FP8 可明显降低显存占用，BF16 适合 Ampere 及更新架构。",
+        "options": {
+          "default": "默认 (自动)",
+          "fp32": "FP32",
+          "fp16": "FP16",
+          "bf16": "BF16",
+          "fp8_e4m3fn": "FP8 (e4m3fn)",
+          "fp8_e5m2": "FP8 (e5m2)"
+        }
+      },
+      "vae_precision": {
+        "label": "VAE 精度",
+        "help": "控制 VAE 解码精度。FP32 最稳，FP16/BF16 更快；如果出现黑图，可尝试改回 FP32。",
+        "options": {
+          "default": "默认 (自动)",
+          "fp32": "FP32",
+          "fp16": "FP16",
+          "bf16": "BF16",
+          "cpu": "CPU (在 CPU 上运行)"
+        }
+      },
+      "text_enc_precision": {
+        "label": "Text Encoder 精度",
+        "help": "控制文本编码器精度。一般保持默认即可，FP8 可进一步节省显存。",
+        "options": {
+          "default": "默认 (自动)",
+          "fp32": "FP32",
+          "fp16": "FP16",
+          "bf16": "BF16",
+          "fp8_e4m3fn": "FP8 (e4m3fn)",
+          "fp8_e5m2": "FP8 (e5m2)"
+        }
+      },
+      "fast": {
+        "label": "实验性优化",
+        "help": "启用 ComfyUI 的实验性加速，可能提升速度，但极少数工作流存在兼容性风险。",
+        "options": {
+          "default": "关闭",
+          "enabled": "启用"
+        }
+      },
+      "preview_method": {
+        "label": "预览方式",
+        "help": "控制生成过程中的实时预览。TAESD 观感更好但略慢，Latent2RGB 速度更快但会更模糊。",
+        "options": {
+          "auto": "自动",
+          "none": "无",
+          "latent2rgb": "Latent2RGB",
+          "taesd": "TAESD"
+        }
+      },
+      "cache": {
+        "label": "缓存策略",
+        "help": "控制节点输出缓存方式。只有选择 LRU 时，下方的 LRU 缓存大小才会生效；经典模式更激进、更快，但占用更多内存。",
+        "options": {
+          "default": "默认",
+          "classic": "经典 (Aggressive)",
+          "lru": "LRU",
+          "none": "禁用"
+        }
+      },
+      "cache_lru_size": {
+        "label": "LRU 缓存大小",
+        "help": "设置最多保留多少个节点结果用于复用。值越大，重复执行时越容易命中缓存，但会占用更多内存。仅在缓存策略为 LRU 时生效。",
+        "options": {
+          "16": "16",
+          "32": "32",
+          "64": "64",
+          "128": "128",
+          "256": "256"
+        }
+      }
+    }
+  },
+  "queue": {
+    "summary": "队列摘要",
+    "running": "正在执行",
+    "pending": "等待队列",
+    "interrupt": "中断",
+    "clear": "清空",
+    "none": "无",
+    "cleared": "队列已清空",
+    "executing_count": "{count} 执行中",
+    "pending_count": "{count} 等待中",
+    "idle": "空闲",
+    "no_running": "无正在执行的任务",
+    "no_pending": "无等待中的任务",
+    "node_count": "{count} 个节点",
+    "load_failed": "获取队列失败",
+    "delete_confirm": "确定要删除此队列项吗？"
+  },
+  "history": {
+    "total": "生成历史",
+    "sort_desc": "新→旧",
+    "sort_asc": "旧→新",
+    "size_sm": "紧凑",
+    "size_md": "标准",
+    "size_lg": "大图",
+    "loading": "加载中...",
+    "no_records": "暂无生成记录",
+    "record_count": "共 {count} 条记录",
+    "no_preview": "无预览图",
+    "image_count": "{count}张",
+    "load_failed": "获取历史失败"
+  },
+  "status": {
+    "running": "运行中",
+    "stopped": "已停止",
+    "generating": "正在生成",
+    "idle": "空闲中",
+    "waiting": "等待中"
+  },
+  "confirm": {
+    "restart": "确定要重启 ComfyUI 吗？",
+    "stop": "确定要停止 ComfyUI 吗？"
+  },
+  "toast": {
+    "gen_complete": "生成完成",
+    "exec_error": "执行出错",
+    "exec_interrupted": "执行已中断",
+    "restarting": "ComfyUI 正在重启...",
+    "stopped": "ComfyUI 已停止",
+    "starting": "ComfyUI 启动中...",
+    "interrupt_sent": "已发送中断信号",
+    "vram_freed": "已释放 VRAM",
+    "deleted": "已删除"
+  },
+  "error": {
+    "unknown": "未知错误",
+    "exec_error_detail": "执行出错: {error}",
+    "request_failed": "请求失败: {error}"
+  }
+}

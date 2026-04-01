@@ -23,6 +23,7 @@ from urllib.parse import urlparse, parse_qs
 import requests as http_requests
 
 from ..config import COMFYUI_DIR, MODEL_DIRS
+from ..utils import _sha256_file, read_safetensors_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -411,7 +412,67 @@ def _sanitize_folder_name(name: str) -> str:
     """清理文件夹名称，保留原始 baseModel 字符串但移除文件系统不安全字符"""
     clean = re.sub(r'[/\\:*?"<>|\x00-\x1f]', '_', name)
     clean = clean.strip('. ')
+    # 防止残留的目录穿越序列
+    if '..' in clean:
+        clean = clean.replace('..', '_')
     return clean or ""
+
+
+# ── 文件元数据提取 ────────────────────────────────────────────────────────────
+
+def extract_file_trigger_words(model_path: str) -> list[str]:
+    """
+    从 safetensors 文件 __metadata__ 中提取触发词.
+
+    优先级:
+      1. modelspec.trigger_phrase — 明确的触发短语 (逗号分隔)
+      2. ss_tag_frequency — kohya 训练标签频率 (按总频次降序)
+    返回去重有序的触发词列表。
+    """
+    if not model_path.endswith(".safetensors"):
+        return []
+
+    meta = read_safetensors_metadata(model_path)
+    if not meta:
+        logger.debug(f"[civitai_resolver] 无文件元数据: {Path(model_path).name}")
+        return []
+
+    words: list[str] = []
+    seen: set[str] = set()
+
+    def _add(w: str):
+        w = w.strip()
+        if w and w not in seen:
+            seen.add(w)
+            words.append(w)
+
+    # 1. modelspec.trigger_phrase
+    trigger = meta.get("modelspec.trigger_phrase", "")
+    if trigger:
+        for part in trigger.split(","):
+            _add(part)
+
+    # 2. ss_tag_frequency (kohya 训练标签)
+    tag_freq_raw = meta.get("ss_tag_frequency", "")
+    if tag_freq_raw:
+        try:
+            tag_freq = json.loads(tag_freq_raw) if isinstance(tag_freq_raw, str) else tag_freq_raw
+            # 结构: { "dataset_name": { "tag": count, ... }, ... }
+            merged: dict[str, int] = {}
+            if isinstance(tag_freq, dict):
+                for _ds, tags in tag_freq.items():
+                    if isinstance(tags, dict):
+                        for tag, cnt in tags.items():
+                            tag = tag.strip()
+                            if tag:
+                                merged[tag] = merged.get(tag, 0) + (cnt if isinstance(cnt, (int, float)) else 0)
+            # 按频次降序
+            for tag, _ in sorted(merged.items(), key=lambda x: x[1], reverse=True):
+                _add(tag)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"[civitai_resolver] ss_tag_frequency 解析失败: {e}")
+
+    return words
 
 
 # ── 元数据保存 ───────────────────────────────────────────────────────────────
@@ -420,6 +481,7 @@ def save_model_metadata(
     model_path: str,
     info: dict,
     sha256: str = "",
+    file_trigger_words: list[str] | None = None,
 ) -> str:
     """
     保存模型元数据为 .weilin-info.json (兼容 WeiLin-Comfyui-Tools 格式).
@@ -428,6 +490,7 @@ def save_model_metadata(
         model_path: 模型文件绝对路径
         info: fetch_model_info() 返回的信息
         sha256: SHA256 哈希 (可选, 下载后计算)
+        file_trigger_words: 从 safetensors 文件提取的触发词 (可选)
 
     Returns:
         info 文件路径
@@ -465,9 +528,20 @@ def save_model_metadata(
         "raw": {"civitai": raw},
     }
 
-    # 触发词
+    # 触发词 (normalize: 按逗号拆分不规范条目, 去重保序)
+    seen_words: set[str] = set()
     for w in info.get("trained_words", []):
-        info_data["trainedWords"].append({"word": w, "civitai": True})
+        parts = [p.strip() for p in w.split(",") if p.strip()]
+        for part in parts:
+            if part not in seen_words:
+                seen_words.add(part)
+                info_data["trainedWords"].append({"word": part, "civitai": True})
+
+    # 文件元数据触发词 (去重: 跳过已有的 CivitAI 词)
+    for w in (file_trigger_words or []):
+        if w not in seen_words:
+            seen_words.add(w)
+            info_data["trainedWords"].append({"word": w, "civitai": False})
 
     # Links
     model_id = info.get("model_id")
@@ -521,6 +595,79 @@ def save_model_metadata(
         return None
 
     logger.info(f"[civitai_resolver] 已保存元数据: {info_path}")
+    return info_path
+
+
+def normalize_version_data(version_data: dict) -> dict:
+    """
+    将 CivitAI 版本 API 原始响应转换为 save_model_metadata() 期望的 info 格式.
+
+    适用于 by-hash / model-versions / models 等任何返回版本级数据的 API 响应。
+    不做文件选择或下载 URL 构建, 仅提取元数据字段。
+    """
+    model_info = version_data.get("model", {})
+    return {
+        "model_id": model_info.get("id") or version_data.get("modelId"),
+        "model_name": model_info.get("name", "Unknown"),
+        "version_id": version_data.get("id"),
+        "version_name": version_data.get("name", ""),
+        "model_type": model_info.get("type", ""),
+        "base_model": version_data.get("baseModel", ""),
+        "images": version_data.get("images", []),
+        "trained_words": version_data.get("trainedWords", []),
+        "raw": version_data,
+    }
+
+
+def enrich_model_by_hash(model_path: str, api_key: str = "") -> str | None:
+    """
+    通过 SHA256 by-hash API 获取完整元数据并保存 (含 modelId + images.meta).
+
+    用于下载完成后的异步二次丰富, 以及 fetch_info 手动触发。
+
+    Returns:
+        info 文件路径, 或 None (失败时)
+    """
+    abs_path = Path(model_path).resolve()
+    if not abs_path.is_file():
+        logger.warning(f"[civitai_resolver] enrich: 文件不存在 {abs_path}")
+        return None
+
+    # SHA256
+    sha256 = _sha256_file(str(abs_path))
+    if not sha256:
+        logger.warning(f"[civitai_resolver] enrich: SHA256 计算失败 {abs_path}")
+        return None
+
+    # by-hash API
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        url = f"{_CIVITAI_API_BASE}/model-versions/by-hash/{sha256}"
+        resp = http_requests.get(url, headers=headers, timeout=30)
+        if resp.status_code == 404:
+            logger.info(f"[civitai_resolver] enrich: CivitAI 未找到 {sha256[:16]}...")
+            return None
+        resp.raise_for_status()
+        version_data = resp.json()
+    except Exception as e:
+        logger.warning(f"[civitai_resolver] enrich: API 失败 {e}")
+        return None
+
+    info = normalize_version_data(version_data)
+
+    # 从 safetensors 文件头提取训练触发词
+    file_words = extract_file_trigger_words(str(abs_path))
+
+    # 保存元数据 (覆写已有的 weilin-info.json)
+    info_path = save_model_metadata(str(abs_path), info, sha256=sha256, file_trigger_words=file_words)
+
+    # 更新预览图 (by-hash 返回的 images 可能更丰富)
+    download_preview_image(str(abs_path), info.get("images", []))
+
+    logger.info(f"[civitai_resolver] enrich 完成: {abs_path.name}")
     return info_path
 
 

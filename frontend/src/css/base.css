@@ -1,0 +1,301 @@
+        /* ══════════════════════════════════════════════════════════════
+           base.css — Reset · CSS Variables · Typography · Utilities
+           ══════════════════════════════════════════════════════════════ */
+
+        /* ── Local Fonts: IBM Plex Sans (Latin) ── */
+        @font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-400-normal.woff2') format('woff2'); }
+        @font-face { font-family: 'IBM Plex Sans'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-500-normal.woff2') format('woff2'); }
+        @font-face { font-family: 'IBM Plex Sans'; font-weight: 600; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-600-normal.woff2') format('woff2'); }
+        @font-face { font-family: 'IBM Plex Sans'; font-weight: 700; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-700-normal.woff2') format('woff2'); }
+
+        /* ── Local Fonts: IBM Plex Mono (Latin) ── */
+        @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-mono/latin-400-normal.woff2') format('woff2'); }
+        @font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-mono/latin-500-normal.woff2') format('woff2'); }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --bg: #0a0a0f;
+            --bg2: #12121c;
+            --bg3: #1a1a28;
+            --bg4: #222236;
+            --bg-in: #0e0e18;
+            --bd: #2a2a3e;
+            --bd-f: #7c5cfc;
+            --t1: #e8e8f0;
+            --t2: #9898b0;
+            --t3: #5a5a72;
+            --ac: #7c5cfc;
+            --ac2: #9078ff;
+            --acg: rgba(124, 92, 252, 0.2);
+            --green: #4ade80;
+            --blue: #60a5fa;
+            --amber: #fbbf24;
+            --red: #f87171;
+            --pink: #f472b6;
+            --cyan: #22d3ee;
+            /* ── Semantic Colors ── */
+            --c-positive: var(--green);
+            --c-info: var(--blue);
+            --c-caution: var(--amber);
+            --c-negative: var(--red);
+            --c-neutral: var(--t3);
+            --r: 12px;
+            --rs: 8px;
+            --sh: 0 4px 24px rgba(0, 0, 0, 0.5);
+            /* ── Design Tokens ── */
+            --sp-1: 4px;
+            --sp-2: 8px;
+            --sp-3: 12px;
+            --sp-4: 16px;
+            --sp-5: 20px;
+            --sp-6: 24px;
+            --sp-8: 32px;
+            --r-xs: 4px;
+            --r-sm: 6px;
+            --r-md: 8px;
+            --r-lg: 12px;
+            --r-pill: 9999px;
+            --text-xs: .72rem;
+            --text-sm: .78rem;
+            --text-base: .85rem;
+            --text-md: .92rem;
+            --text-lg: 1.05rem;
+            --text-xl: 1.15rem;
+        }
+
+        /* ── Light Theme ── */
+        [data-theme="light"] {
+            --bg: #f0f0f4;
+            --bg2: #e6e6ec;
+            --bg3: #ffffff;
+            --bg4: #d8d8e0;
+            --bg-in: #f5f5f8;
+            --bd: #c8c8d4;
+            --bd-f: #6b4fe0;
+            --t1: #1a1a2e;
+            --t2: #55556a;
+            --t3: #8888a0;
+            --ac: #6b4fe0;
+            --ac2: #7c5cfc;
+            --acg: rgba(107, 79, 224, 0.12);
+            --green: #16a34a;
+            --blue: #2563eb;
+            --amber: #d97706;
+            --red: #dc2626;
+            --pink: #db2777;
+            --cyan: #0891b2;
+            --sh: 0 2px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] ::-webkit-scrollbar-track {
+            background: var(--bg)
+        }
+
+        [data-theme="light"] ::-webkit-scrollbar-thumb {
+            background: var(--bd)
+        }
+
+        [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+            background: var(--t3)
+        }
+
+        [data-theme="light"] .modal-overlay {
+            background: rgba(0, 0, 0, .25)
+        }
+
+        [data-theme="light"] .log-panel {
+            background: var(--bg-in);
+            border-color: var(--bd)
+        }
+
+        [data-theme="light"] .page-header {
+            background: rgba(240, 240, 244, .85)
+        }
+
+        [data-theme="light"] .sidebar {
+            background: #e2e2ea
+        }
+
+        html {
+            font-size: 100%
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--t1);
+            min-height: 100vh;
+            line-height: 1.5;
+            display: flex
+        }
+
+        #app {
+            display: flex;
+            width: 100%;
+            min-height: 100vh
+        }
+
+        /* ── Material Symbols ── */
+        @font-face {
+            font-family: 'Material Symbols Outlined';
+            font-style: normal;
+            font-weight: 100 700;
+            src: url('/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
+            font-display: block;
+        }
+
+        .ms {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 20px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            vertical-align: -3px;
+            -webkit-font-smoothing: antialiased;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+        }
+
+        .ms-xs {
+            font-size: 16px;
+            vertical-align: -3px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 16;
+        }
+
+        .ms-sm {
+            font-size: 18px;
+            vertical-align: -3px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 18;
+        }
+
+        .ms-lg {
+            font-size: 32px;
+            vertical-align: -6px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 32;
+        }
+
+        .ms-xl {
+            font-size: 48px;
+            vertical-align: -10px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48;
+        }
+
+        /* ── Global: Custom Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bd);
+            border-radius: 3px
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--t3)
+        }
+
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--bd) transparent
+        }
+
+        /* Hide native browser password reveal button */
+        input::-ms-reveal,
+        input::-ms-clear,
+        input::-webkit-credentials-auto-fill-button {
+            display: none
+        }
+
+        /* ── Global: Focus Visible ── */
+        .tab:focus-visible,
+        .nav-item:focus-visible {
+            outline: 2px solid var(--ac);
+            outline-offset: 2px
+        }
+
+        /* ── Global: Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: var(--sp-6);
+            color: var(--t3);
+            font-size: var(--text-base)
+        }
+
+        /* ── Global: Utility Classes ── */
+        .hidden {
+            display: none !important
+        }
+
+        .text-muted {
+            color: var(--t3)
+        }
+
+        .text-error {
+            color: var(--red)
+        }
+
+        .text-success {
+            color: var(--green)
+        }
+
+        .text-warning {
+            color: var(--amber)
+        }
+
+        .text-sm {
+            font-size: var(--text-sm)
+        }
+
+        .text-xs {
+            font-size: var(--text-xs)
+        }
+
+        .mt-4 {
+            margin-top: var(--sp-4)
+        }
+
+        .mt-6 {
+            margin-top: var(--sp-6)
+        }
+
+        .gap-2 {
+            gap: var(--sp-2)
+        }
+
+        .gap-4 {
+            gap: var(--sp-4)
+        }
+
+        /* ── Animations ── */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        @keyframes skeleton-shimmer {
+            0% {
+                background-position: 200% 0
+            }
+
+            100% {
+                background-position: -200% 0
+            }
+        }

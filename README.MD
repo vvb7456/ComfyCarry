@@ -37,7 +37,7 @@ Web Dashboard 管理 ComfyUI 全生命周期，10 个功能页面：
 在 Vast.ai / RunPod 创建 GPU 实例，选择预构建镜像：
 
 ```
-ghcr.io/vvb7456/comfycarry:latest
+erocraft/comfycarry:latest
 ```
 
 基于 Python 3.12 + PyTorch 2.9.1 + CUDA 13.0，内含 FlashAttention-2、SageAttention-2、ComfyUI 及 21 个常用插件。启动耗时 2-5 分钟。

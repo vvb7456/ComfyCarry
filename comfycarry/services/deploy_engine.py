@@ -323,9 +323,9 @@ def _step_system_deps(config, PY):
     """STEP 1: 系统依赖"""
     PIP = f"{PY} -m pip"
     if _step_done("system_deps"):
-        _deploy_step("安装系统依赖 ✅ (已完成, 跳过)")
+        _deploy_step("install_deps_skip")
     else:
-        _deploy_step("安装系统依赖")
+        _deploy_step("install_deps")
         _deploy_log("正在安装系统依赖包...")
         _deploy_exec(
             "apt-get update -qq && "
@@ -351,7 +351,7 @@ def _step_tunnel(config):
     cf_domain = config.get("cf_domain", "")
 
     if tunnel_mode == "public":
-        _deploy_step("配置公共 Tunnel")
+        _deploy_step("setup_public_tunnel")
         # 已由 bootstrap 或之前部署启用时跳过
         from comfycarry.config import get_config as _gc_rt
         if _gc_rt("tunnel_mode", "") == "public":
@@ -375,7 +375,7 @@ def _step_tunnel(config):
         except Exception as e:
             _deploy_log(f"⚠️ 公共 Tunnel 异常: {e}", "warn")
     elif cf_api_token and cf_domain:
-        _deploy_step("配置 Cloudflare Tunnel")
+        _deploy_step("setup_cf_tunnel")
         from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
         from comfycarry.config import set_config as _sc, get_config as _gc
 
@@ -432,7 +432,7 @@ def _step_tunnel(config):
         except Exception as e:
             _deploy_log(f"⚠️ Tunnel 异常: {e}", "warn")
     else:
-        _deploy_step("Cloudflare Tunnel (跳过)")
+        _deploy_step("setup_tunnel_skip")
 
 
 def _step_rclone(config):
@@ -443,8 +443,10 @@ def _step_rclone(config):
     if rclone_method == "base64_env":
         rclone_method = "base64"
         rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
+    elif rclone_method == "file":
+        rclone_method = "base64"
     if rclone_method != "skip" and rclone_value:
-        _deploy_step("配置 Rclone")
+        _deploy_step("setup_rclone")
         _deploy_exec("mkdir -p ~/.config/rclone")
         if rclone_method == "url":
             _deploy_log(f"从 URL 下载 rclone.conf...")
@@ -469,7 +471,7 @@ def _step_ssh(config):
     ssh_pw_sync = config.get("ssh_pw_sync", False)
     if not ssh_password and not ssh_keys:
         return
-    _deploy_step("配置 SSH 访问")
+    _deploy_step("setup_ssh")
     from comfycarry.config import set_config as _sc2
     if ssh_pw_sync:
         _sc2("ssh_pw_sync", True)
@@ -526,7 +528,7 @@ def _step_ssh(config):
 
 def _step_check_pytorch(PY):
     """STEP 4: 检查预装 PyTorch"""
-    _deploy_step("检查预装 PyTorch")
+    _deploy_step("check_pytorch")
     _deploy_exec(
         f'{PY} -c "import torch; print(f\\"PyTorch {{torch.__version__}} '
         f'CUDA {{torch.version.cuda}}\\")"'
@@ -536,11 +538,11 @@ def _step_check_pytorch(PY):
 def _step_install_comfyui(PY):
     """STEP 5: ComfyUI 安装 + 健康检查"""
     if _step_done("comfyui_install"):
-        _deploy_step("安装 ComfyUI ✅ (已完成, 跳过)")
-        _deploy_step("ComfyUI 健康检查 ✅ (已完成, 跳过)")
+        _deploy_step("install_comfyui_skip")
+        _deploy_step("health_check_skip")
         return
 
-    _deploy_step("安装 ComfyUI")
+    _deploy_step("install_comfyui")
     if not Path("/workspace/ComfyUI/main.py").exists():
         _deploy_log("从镜像复制 ComfyUI...")
         _deploy_exec("mkdir -p /workspace/ComfyUI && "
@@ -549,7 +551,7 @@ def _step_install_comfyui(PY):
         _deploy_log("ComfyUI 已存在, 跳过复制")
 
     # 健康检查
-    _deploy_step("ComfyUI 健康检查")
+    _deploy_step("health_check")
 
     # 确保端口 8188 未被占用 (可能有旧进程残留)
     _deploy_exec(
@@ -599,16 +601,16 @@ def _step_accelerators(config, PY):
     want_fa2 = config.get("install_fa2", False)
     want_sa2 = config.get("install_sa2", False)
     if not want_fa2 and not want_sa2:
-        _deploy_step("安装加速组件 ⏭ (用户跳过)")
+        _deploy_step("install_attn_user_skip")
         return
     if _step_done("accelerators"):
-        _deploy_step("安装加速组件 ✅ (已完成, 跳过)")
+        _deploy_step("install_attn_skip")
         return
 
     parts = []
     if want_fa2: parts.append("FA2")
     if want_sa2: parts.append("SA2")
-    _deploy_step(f"安装加速组件 ({'/'.join(parts)})")
+    _deploy_step(f"install_attn:{'/'.join(parts)}")
     _deploy_log("检测 GPU 架构...")
     gpu_info = _detect_gpu_info()
     cuda_cap = gpu_info.get("cuda_cap", "")
@@ -634,7 +636,7 @@ def _step_accelerators(config, PY):
 def _step_plugins(config, PY):
     """STEP 7: 插件安装"""
     PIP = f"{PY} -m pip"
-    _deploy_step("安装插件")
+    _deploy_step("install_plugins")
     plugins = [p for p in config.get("plugins", []) if p]
     _deploy_log("检查额外插件...")
     for url in plugins:
@@ -675,12 +677,14 @@ def _step_sync_assets(config):
     if rclone_method == "base64_env":
         rclone_method = "base64"
         rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
+    elif rclone_method == "file":
+        rclone_method = "base64"
 
     if rclone_method == "skip" or not rclone_value:
         _deploy_log("未配置 Rclone, 跳过资产同步")
         return
 
-    _deploy_step("同步云端资产")
+    _deploy_step("sync_assets")
 
     wizard_remotes = config.get("wizard_remotes", [])
     for wr in wizard_remotes:
@@ -739,7 +743,7 @@ def _step_sync_assets(config):
 
 def _step_start_services(config, cfg, PY):
     """STEP 10: 启动服务 + 完成"""
-    _deploy_step("启动服务")
+    _deploy_step("start_services")
 
     rclone_method = config.get("rclone_config_method", "skip")
     rclone_value = config.get("rclone_config_value", "")
@@ -810,7 +814,7 @@ def _step_start_services(config, cfg, PY):
     set_config("comfyui_args", comfy_args)
 
     # 完成
-    _deploy_step("部署完成")
+    _deploy_step("deploy_done")
 
     new_pw = config.get("password", "")
     if new_pw:

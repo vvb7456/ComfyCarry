@@ -9,6 +9,8 @@ import os
 import subprocess
 import sys
 
+from datetime import timedelta
+
 from flask import Flask
 from flask_cors import CORS
 
@@ -22,7 +24,7 @@ from .auth import auth_bp, register_auth_middleware
 
 # Route Blueprints
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
-from .routes import generate, downloads, llm
+from .routes import generate, downloads, llm, files
 from .routes.ssh import restore_ssh_config
 
 # Services
@@ -39,9 +41,12 @@ def create_app():
     app = Flask(__name__, static_folder=None)
     CORS(app)
 
-    app.secret_key = _load_session_secret()
+    secret = _load_session_secret()
+    app.secret_key = secret
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_NAME"] = f"cc_{secret[:8]}"
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
     # ── 注册 Blueprints ──────────────────────────────────
     app.register_blueprint(auth_bp)
@@ -58,6 +63,7 @@ def create_app():
     app.register_blueprint(generate.bp)
     app.register_blueprint(downloads.bp)
     app.register_blueprint(llm.bp)
+    app.register_blueprint(files.bp)
     app.register_blueprint(frontend.bp)
 
     # ── 全局认证中间件 ───────────────────────────────────

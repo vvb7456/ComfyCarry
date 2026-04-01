@@ -25,6 +25,7 @@ from ..config import (
     MODEL_EXTENSIONS,
     get_extra_model_paths,
 )
+from ..services.civitai_resolver import enrich_model_by_hash
 from ..utils import _get_api_key, _run_cmd, _sha256_file
 
 logger = logging.getLogger(__name__)
@@ -117,13 +118,20 @@ def api_local_models():
                     entry["name"] = info_data.get("name", fname)
                     entry["base_model"] = info_data.get("baseModel", "")
                     entry["type"] = info_data.get("type", cat)
-                    entry["trained_words"] = [
-                        w.get("word", "") for w in info_data.get("trainedWords", [])
-                    ]
+                    # 触发词 (兼容旧数据: 按逗号拆分不规范条目)
+                    raw_words = [w.get("word", "") for w in info_data.get("trainedWords", [])]
+                    normalized = []
+                    seen = set()
+                    for w in raw_words:
+                        for part in (p.strip() for p in w.split(",") if p.strip()):
+                            if part not in seen:
+                                seen.add(part)
+                                normalized.append(part)
+                    entry["trained_words"] = normalized
                     entry["links"] = info_data.get("links", [])
                     # CivitAI IDs from raw data
                     raw_civitai = info_data.get("raw", {}).get("civitai", {})
-                    entry["civitai_id"] = raw_civitai.get("modelId")
+                    entry["civitai_id"] = raw_civitai.get("modelId") or (raw_civitai.get("model") or {}).get("id")
                     entry["civitai_version_id"] = raw_civitai.get("id")
                     entry["version_name"] = raw_civitai.get("name", "")
                     entry["sha256"] = info_data.get("sha256", "")
@@ -133,11 +141,22 @@ def api_local_models():
                     if imgs:
                         entry["civitai_image"] = imgs[0].get("url", "")
                         entry["civitai_image_type"] = imgs[0].get("type", "image")
+                    else:
+                        entry["civitai_image"] = ""
+                        entry["civitai_image_type"] = ""
                 else:
                     entry["name"] = fname
                     entry["base_model"] = ""
                     entry["type"] = cat
                     entry["trained_words"] = []
+                    entry["links"] = []
+                    entry["civitai_id"] = None
+                    entry["civitai_version_id"] = None
+                    entry["version_name"] = ""
+                    entry["sha256"] = ""
+                    entry["images"] = []
+                    entry["civitai_image"] = ""
+                    entry["civitai_image_type"] = ""
 
                 results.append(entry)
 
@@ -238,128 +257,20 @@ def api_fetch_model_info():
     if not abs_path.is_file():
         return jsonify({"error": "文件不存在"}), 404
 
-    # 计算 SHA256
-    file_hash = _sha256_file(abs_path)
-    if not file_hash:
-        return jsonify({"error": "无法计算哈希"}), 500
-
-    # 调用 CivitAI API
     api_key = _get_api_key()
-    headers = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    info_path = enrich_model_by_hash(str(abs_path), api_key=api_key)
 
+    if not info_path:
+        return jsonify({"error": "CivitAI 未找到该模型或请求失败"}), 404
+
+    # 返回保存的 info 数据
     try:
-        api_url = f"https://civitai.com/api/v1/model-versions/by-hash/{file_hash}"
-        resp = requests.get(api_url, headers=headers, timeout=30)
-        if resp.status_code == 404:
-            return jsonify({"error": "CivitAI 未找到该模型", "hash": file_hash}), 404
-        resp.raise_for_status()
-        civitai_data = resp.json()
-    except Exception as e:
-        return jsonify({"error": f"API 请求失败: {e}", "hash": file_hash}), 500
+        with open(info_path, "r", encoding="utf-8") as f:
+            info_data = json.load(f)
+    except Exception:
+        info_data = {}
 
-    # 计算 weilin 兼容的相对路径 file 字段
-    # weilin 插件使用 folder_paths 返回的相对路径 (如 "subfolder/model.safetensors")
-    rel_from_comfy = abs_path.relative_to(comfy_root)
-    rel_parts = rel_from_comfy.parts
-    # 路径格式: models/<type>/[subdir/]filename — 去掉前两级得到相对于模型类型目录的路径
-    if len(rel_parts) > 2 and rel_parts[0] == "models":
-        file_rel = str(Path(*rel_parts[2:]))
-    else:
-        file_rel = abs_path.name
-
-    # 向 raw civitai 数据注入 weilin 兼容字段
-    civitai_data["_sha256"] = file_hash
-    civitai_data["_civitai_api"] = api_url
-
-    # 构建 weilin-info.json (与 WeiLin-Comfyui-Tools 格式严格兼容)
-    info_data = {
-        "file": file_rel,
-        "path": str(abs_path),
-        "sha256": file_hash,
-        "name": civitai_data.get("model", {}).get("name", ""),
-        "type": civitai_data.get("model", {}).get("type", ""),
-        "baseModel": civitai_data.get("baseModel", ""),
-        "images": [],
-        "trainedWords": [],
-        "links": [],
-        "raw": {"civitai": civitai_data},
-    }
-
-    # 版本名
-    ver_name = civitai_data.get("name", "")
-    if ver_name:
-        info_data["name"] += f" - {ver_name}"
-
-    # 触发词
-    trigger_words = civitai_data.get("trainedWords", [])
-    for w in trigger_words:
-        info_data["trainedWords"].append({"word": w, "civitai": True})
-
-    # Links (weilin 格式: 模型页 URL + API URL)
-    model_id = civitai_data.get("modelId")
-    version_id = civitai_data.get("id")
-    if model_id:
-        link = f"https://civitai.com/models/{model_id}"
-        if version_id:
-            link += f"?modelVersionId={version_id}"
-        info_data["links"].append(link)
-        info_data["links"].append(api_url)
-
-    # 图片 (weilin 兼容格式: 增加 civitaiUrl / resources)
-    for img in civitai_data.get("images", []):
-        img_url = img.get("url", "")
-        if img_url:
-            img_id = os.path.splitext(os.path.basename(img_url))[0] if img_url else None
-            img_entry = {
-                "url": img_url,
-                "civitaiUrl": f"https://civitai.com/images/{img_id}" if img_id else None,
-                "type": img.get("type", "image"),
-                "width": img.get("width"),
-                "height": img.get("height"),
-                "nsfwLevel": img.get("nsfwLevel"),
-            }
-            meta = img.get("meta") or {}
-            if meta:
-                img_entry["seed"] = meta.get("seed")
-                img_entry["positive"] = meta.get("prompt", "")
-                img_entry["negative"] = meta.get("negativePrompt", "")
-                img_entry["steps"] = meta.get("steps")
-                img_entry["sampler"] = meta.get("sampler")
-                img_entry["cfg"] = meta.get("cfgScale")
-                img_entry["model"] = meta.get("Model")
-                img_entry["resources"] = meta.get("resources")
-            info_data["images"].append(img_entry)
-
-    # 保存 info json
-    info_path = str(abs_path) + ".weilin-info.json"
-    with open(info_path, "w", encoding="utf-8") as f:
-        json.dump(info_data, f, sort_keys=False, indent=2, ensure_ascii=False)
-
-    # 下载预览图
-    base_no_ext = abs_path.with_suffix("")
-    if info_data["images"]:
-        first_img_url = info_data["images"][0].get("url", "")
-        if first_img_url:
-            try:
-                with requests.get(first_img_url, timeout=15, stream=True) as img_resp:
-                    img_resp.raise_for_status()
-                    ct = img_resp.headers.get("Content-Type", "")
-                    ext = ".png"
-                    if "jpeg" in ct or "jpg" in ct:
-                        ext = ".jpeg"
-                    elif "webp" in ct:
-                        ext = ".webp"
-                    preview_path = str(base_no_ext) + ext
-                    with open(preview_path, "wb") as pf:
-                        for chunk in img_resp.iter_content(4096):
-                            pf.write(chunk)
-                    info_data["_preview_saved"] = preview_path
-            except Exception:
-                pass
-
-    return jsonify({"ok": True, "info": info_data, "hash": file_hash})
+    return jsonify({"ok": True, "info": info_data})
 
 
 # ====================================================================

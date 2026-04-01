@@ -5,7 +5,6 @@ ComfyCarry — ComfyUI 管理路由
 - /api/comfyui/params   — 参数定义/更新
 - /api/comfyui/queue     — 任务队列
 - /api/comfyui/interrupt — 中断执行
-- /api/comfyui/free      — 释放 VRAM
 - /api/comfyui/history   — 生成历史
 - /api/comfyui/view      — 图片代理
 - /api/comfyui/events    — SSE 实时事件
@@ -195,17 +194,6 @@ def api_comfyui_queue_clear():
     try:
         requests.post(f"{COMFYUI_URL}/queue",
                       json={"clear": True}, timeout=5)
-        return jsonify({"ok": True})
-    except Exception:
-        return jsonify({"error": "ComfyUI 无法连接"}), 503
-
-
-@bp.route("/api/comfyui/free", methods=["POST"])
-def api_comfyui_free():
-    try:
-        requests.post(f"{COMFYUI_URL}/free",
-                      json={"unload_models": True, "free_memory": True},
-                      timeout=10)
         return jsonify({"ok": True})
     except Exception:
         return jsonify({"error": "ComfyUI 无法连接"}), 503

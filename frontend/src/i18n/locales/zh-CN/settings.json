@@ -1,0 +1,123 @@
+{
+  "title": "设置",
+  "tabs": {
+    "comfycarry": "ComfyCarry",
+    "civitai": "CivitAI",
+    "llm": "LLM"
+  },
+  "restart_btn": "重启",
+  "password": {
+    "title": "ComfyCarry 密码",
+    "current": "当前密码",
+    "current_placeholder": "输入当前密码",
+    "new": "新密码",
+    "new_placeholder": "输入新密码 (至少 4 个字符)",
+    "confirm": "确认新密码",
+    "confirm_placeholder": "再次输入新密码",
+    "update_btn": "更新密码",
+    "err_current": "请输入当前密码",
+    "err_new": "请输入新密码",
+    "err_min_length": "密码至少 4 个字符",
+    "err_mismatch": "两次输入的密码不一致"
+  },
+  "api_key": {
+    "title": "ComfyCarry API Key",
+    "help": "用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API",
+    "regenerate": "重新生成",
+    "regenerate_confirm": "确定要重新生成 API Key 吗？\n\n旧的 Key 将立即失效，所有使用旧 Key 的外部应用需要更新。",
+    "regenerated": "API Key 已重新生成",
+    "regenerate_failed": "重新生成失败"
+  },
+  "config": {
+    "title": "导入/导出配置",
+    "export_desc": "导出 ComfyCarry 的所有配置为 JSON 文件",
+    "export_btn": "导出配置",
+    "import_desc": "从 JSON 文件恢复配置",
+    "import_btn": "导入配置",
+    "exported": "配置已导出",
+    "export_failed": "导出失败",
+    "invalid_format": "无效的配置文件格式",
+    "import_confirm": "确定要导入配置吗？\n\n导出于: {date}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。",
+    "import_failed": "导入失败",
+    "unknown_date": "未知"
+  },
+  "reinit": {
+    "title": "重新初始化",
+    "help": "删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留",
+    "keep_models": "保留模型文件",
+    "btn": "重新初始化",
+    "confirm_keep": "确定要重新初始化吗？\n\n将删除 ComfyUI 安装（保留模型文件），停止 ComfyUI 和同步服务，重新进入部署向导。\n\n系统依赖、PyTorch、Tunnel 不受影响。",
+    "confirm_delete": "确定要重新初始化吗？\n\n将删除整个 ComfyUI 目录（包括所有模型文件），停止 ComfyUI 和同步服务，重新进入部署向导。\n\n模型文件将被永久删除！",
+    "confirm_delete_final": "所有模型文件将被永久删除，无法恢复。\n\n确定继续？",
+    "in_progress": "正在重新初始化...",
+    "success": "已重置, 正在跳转到部署向导...",
+    "partial_fail": "部分操作失败"
+  },
+  "log": {
+    "title": "ComfyCarry 日志",
+    "loading": "加载中..."
+  },
+  "restart_confirm": "确定要重启 ComfyCarry 吗？\n\n页面将短暂不可用。",
+  "restarting": "ComfyCarry 正在重启, 3 秒后自动刷新...",
+  "civitai": {
+    "title": "CivitAI API Key",
+    "desc": "API Key 从 CivitAI 账户设置中生成",
+    "key_prefix": "API Key 从",
+    "key_link": "CivitAI 账户设置",
+    "key_suffix": "中生成",
+    "placeholder": "输入 CivitAI API Key...",
+    "saved": "API Key 已保存",
+    "save_failed": "保存失败",
+    "clear_confirm": "确定要清除 CivitAI API Key 吗？",
+    "cleared": "API Key 已清除",
+    "err_empty": "请输入 API Key"
+  },
+  "llm": {
+    "provider": {
+      "title": "服务提供商",
+      "label": "服务商",
+      "select_placeholder": "— 选择服务提供商 —",
+      "api_key": "API Key",
+      "api_key_placeholder": "输入 API Key...",
+      "base_url": "Base URL",
+      "base_url_placeholder": "https://api.example.com/v1"
+    },
+    "model": {
+      "title": "模型",
+      "label": "模型",
+      "refresh_hint": "刷新获取模型列表",
+      "search_placeholder": "搜索模型...",
+      "fetch_title": "获取模型列表",
+      "fetching": "获取中...",
+      "fetch_failed": "获取失败",
+      "fetched_count": "获取到 {count} 个模型",
+      "no_match": "无匹配模型",
+      "select": "点击选择模型",
+      "none_available": "无可用模型",
+      "context_fmt": "上下文: {n} tokens",
+      "input_fmt": "输入: ${n}/M",
+      "output_fmt": "输出: ${n}/M"
+    },
+    "params": {
+      "title": "参数",
+      "temperature": "温度",
+      "temperature_help": "0.0 - 2.0，越高越有创意，越低越稳定。推荐值: 创作类 0.8-1.2，翻译/描述类 0.3-0.5",
+      "max_tokens": "最大回复长度",
+      "max_tokens_help": "以词符数 (token) 计的最大输出长度。提示词生成通常 500-1000 即可，长对话可设更高",
+      "stream": "流式传输",
+      "stream_help": "开启后 LLM 将逐字输出响应。关闭可避免部分平台在流式模式下的内容过滤问题"
+    },
+    "test_btn": "测试连接",
+    "save_btn": "保存配置",
+    "testing": "测试中...",
+    "test_success": "连接成功",
+    "test_failed": "连接失败",
+    "test_error": "请求失败",
+    "err_no_provider": "请先选择服务提供商",
+    "err_no_key": "请先输入 API Key",
+    "err_no_model": "请先选择模型",
+    "config_saved": "LLM 配置已保存",
+    "save_failed": "保存失败",
+    "unknown_error": "未知错误"
+  }
+}

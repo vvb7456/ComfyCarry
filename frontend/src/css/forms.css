@@ -1,0 +1,79 @@
+/* ══════════════════════════════════════════════════════════════
+   forms.css — Unified form control visual baseline
+   Imported globally in main.ts
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Base input ── */
+.form-input,
+.form-textarea,
+.form-number {
+    width: 100%;
+    font-size: var(--input-font, .85rem);
+    font-family: inherit;
+    padding: var(--input-py, 8px) var(--input-px, 12px);
+    border-radius: var(--input-radius, 6px);
+    border: 1px solid var(--bd);
+    background: var(--bg);
+    color: var(--t1);
+    outline: none;
+    transition: border-color .15s;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-number:focus {
+    border-color: var(--ac);
+    box-shadow: 0 0 0 3px var(--acg);
+}
+
+.form-input:disabled,
+.form-textarea:disabled,
+.form-number:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+    color: var(--t3);
+}
+
+/* ── Textarea ── */
+.form-textarea {
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.5;
+}
+
+/* ── Number ── */
+.form-number {
+    -moz-appearance: textfield;
+}
+.form-number::-webkit-inner-spin-button,
+.form-number::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* ── Monospace variant ── */
+.form-input--mono,
+.form-textarea--mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: .8rem;
+}
+
+/* ── Range ── */
+.form-range {
+    width: 100%;
+    accent-color: var(--ac);
+    cursor: pointer;
+}
+
+/* ── Checkbox ── */
+.form-checkbox {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--ac);
+    cursor: pointer;
+    flex-shrink: 0;
+}

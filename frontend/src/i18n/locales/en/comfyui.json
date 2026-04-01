@@ -1,0 +1,198 @@
+{
+  "title": "ComfyUI",
+  "tabs": {
+    "console": "Console",
+    "queue": "Task Queue",
+    "history": "History"
+  },
+  "console": {
+    "status_cards_loading": "Loading...",
+    "exec_status": "Execution Status",
+    "params": "Launch Parameters",
+    "params_placeholder": "main.py --listen 0.0.0.0 --port 8188 ...",
+    "params_loading": "Loading...",
+    "log_title": "ComfyUI Logs",
+    "log_loading": "Loading...",
+    "saved": "Saved",
+    "saved_restarting": "Saved, ComfyUI is restarting",
+    "log_history_failed": "Failed to load log history",
+    "uptime": "Uptime",
+    "restart_count": "Restarts: {count}",
+    "status_unavailable": "Unable to get status",
+    "load_failed": "Load failed: {error}",
+    "params_load_failed": "Failed to load params: {error}",
+    "params_save_confirm": "Saving params will restart ComfyUI, continue?",
+    "params_restart_hint": "Changes to launch parameters take effect only after ComfyUI restarts.",
+    "params_saving": "Saving...",
+    "params_restart_toast": "ComfyUI is restarting with new params...",
+    "params_save_failed": "Save failed"
+  },
+  "params": {
+    "fields": {
+      "vram": {
+        "label": "VRAM Management",
+        "help": "Controls model VRAM allocation strategy. Default auto-detects the best mode. High VRAM suits large-memory GPUs, while Low VRAM helps on smaller GPUs.",
+        "options": {
+          "default": "Default (Auto)",
+          "gpu-only": "GPU Only (Keep everything on GPU)",
+          "highvram": "High VRAM (Do not unload models)",
+          "normalvram": "Normal VRAM (Force normal mode)",
+          "lowvram": "Low VRAM (Split UNet)",
+          "novram": "No VRAM (Extreme low-memory)"
+        }
+      },
+      "attention": {
+        "label": "Attention Mode",
+        "help": "PyTorch SDPA is the recommended default and automatically picks an efficient kernel. FlashAttention and SageAttention can be installed in Setup Wizard.",
+        "options": {
+          "default": "Default (Auto)",
+          "pytorch-cross": "PyTorch SDPA (Recommended)",
+          "split-cross": "Split Cross Attention (Lower VRAM)",
+          "quad-cross": "Sub-Quadratic",
+          "flash": "FlashAttention",
+          "sage": "SageAttention"
+        }
+      },
+      "disable_xformers": {
+        "label": "xFormers",
+        "help": "With newer PyTorch versions, PyTorch SDPA is usually preferred. Keep xFormers disabled unless you specifically need it.",
+        "options": {
+          "default": "Default",
+          "disabled": "Disabled"
+        }
+      },
+      "unet_precision": {
+        "label": "UNet Precision",
+        "help": "Controls UNet inference precision. FP8 can significantly reduce VRAM usage, while BF16 is recommended on Ampere and newer GPUs.",
+        "options": {
+          "default": "Default (Auto)",
+          "fp32": "FP32",
+          "fp16": "FP16",
+          "bf16": "BF16",
+          "fp8_e4m3fn": "FP8 (e4m3fn)",
+          "fp8_e5m2": "FP8 (e5m2)"
+        }
+      },
+      "vae_precision": {
+        "label": "VAE Precision",
+        "help": "Controls VAE decoding precision. FP32 is the safest, while FP16/BF16 are faster. If you get black images, try switching back to FP32.",
+        "options": {
+          "default": "Default (Auto)",
+          "fp32": "FP32",
+          "fp16": "FP16",
+          "bf16": "BF16",
+          "cpu": "CPU (Run on CPU)"
+        }
+      },
+      "text_enc_precision": {
+        "label": "Text Encoder Precision",
+        "help": "Controls text encoder precision. Default is usually fine, while FP8 can save additional VRAM.",
+        "options": {
+          "default": "Default (Auto)",
+          "fp32": "FP32",
+          "fp16": "FP16",
+          "bf16": "BF16",
+          "fp8_e4m3fn": "FP8 (e4m3fn)",
+          "fp8_e5m2": "FP8 (e5m2)"
+        }
+      },
+      "fast": {
+        "label": "Experimental Optimization",
+        "help": "Enables ComfyUI experimental acceleration. It may improve speed, but a small number of workflows could be incompatible.",
+        "options": {
+          "default": "Off",
+          "enabled": "On"
+        }
+      },
+      "preview_method": {
+        "label": "Preview Method",
+        "help": "Controls real-time previews during generation. TAESD looks better but is slightly slower; Latent2RGB is faster but blurrier.",
+        "options": {
+          "auto": "Auto",
+          "none": "None",
+          "latent2rgb": "Latent2RGB",
+          "taesd": "TAESD"
+        }
+      },
+      "cache": {
+        "label": "Cache Strategy",
+        "help": "Controls node output caching. The LRU Cache Size setting below only takes effect when this is set to LRU. Classic mode is more aggressive and faster, but uses more memory.",
+        "options": {
+          "default": "Default",
+          "classic": "Classic (Aggressive)",
+          "lru": "LRU",
+          "none": "Disabled"
+        }
+      },
+      "cache_lru_size": {
+        "label": "LRU Cache Size",
+        "help": "Sets how many node results can be retained for reuse. Higher values can improve reuse across repeated runs, but consume more memory. Only applies when Cache Strategy is set to LRU.",
+        "options": {
+          "16": "16",
+          "32": "32",
+          "64": "64",
+          "128": "128",
+          "256": "256"
+        }
+      }
+    }
+  },
+  "queue": {
+    "summary": "Queue Summary",
+    "running": "Running",
+    "pending": "Pending",
+    "interrupt": "Interrupt",
+    "clear": "Clear",
+    "none": "None",
+    "cleared": "Queue cleared",
+    "executing_count": "{count} running",
+    "pending_count": "{count} pending",
+    "idle": "Idle",
+    "no_running": "No running tasks",
+    "no_pending": "No pending tasks",
+    "node_count": "{count} nodes",
+    "load_failed": "Failed to load queue",
+    "delete_confirm": "Delete this queue item?"
+  },
+  "history": {
+    "total": "History",
+    "sort_desc": "Newest first",
+    "sort_asc": "Oldest first",
+    "size_sm": "Compact",
+    "size_md": "Standard",
+    "size_lg": "Large",
+    "loading": "Loading...",
+    "no_records": "No generation records",
+    "record_count": "{count} records",
+    "no_preview": "No preview",
+    "image_count": "{count} images",
+    "load_failed": "Failed to load history"
+  },
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "generating": "Generating",
+    "idle": "Idle",
+    "waiting": "Waiting"
+  },
+  "confirm": {
+    "restart": "Restart ComfyUI?",
+    "stop": "Stop ComfyUI?"
+  },
+  "toast": {
+    "gen_complete": "Generation complete",
+    "exec_error": "Execution error",
+    "exec_interrupted": "Execution interrupted",
+    "restarting": "ComfyUI is restarting...",
+    "stopped": "ComfyUI stopped",
+    "starting": "ComfyUI starting...",
+    "interrupt_sent": "Interrupt signal sent",
+    "vram_freed": "VRAM freed",
+    "deleted": "Deleted"
+  },
+  "error": {
+    "unknown": "Unknown error",
+    "exec_error_detail": "Execution error: {error}",
+    "request_failed": "Request failed: {error}"
+  }
+}

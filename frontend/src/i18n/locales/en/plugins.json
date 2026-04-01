@@ -1,0 +1,94 @@
+{
+  "title": "Plugins",
+  "tabs": {
+    "installed": "Installed",
+    "browse": "Browse",
+    "git": "Git Install"
+  },
+  "installed": {
+    "filter_placeholder": "Filter installed plugins...",
+    "all_status": "All Status",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "has_update": "Has Update",
+    "refresh": "Refresh",
+    "check_updates": "Check Updates",
+    "check_updates_title": "Force ComfyUI-Manager to re-check all plugin updates (may take a while)",
+    "update_all": "Update All",
+    "stats": "Plugin Stats",
+    "update": "Update",
+    "enable": "Enable",
+    "disable": "Disable",
+    "version": "Version",
+    "load_failed": "Failed to load installed list",
+    "checking_updates": "Checking for updates...",
+    "found_updates": "Updates found, refreshing list...",
+    "all_up_to_date": "All plugins are up to date",
+    "load_error": "Load failed: {message}",
+    "stats_text": "{total} plugins, {enabled} enabled, {update} updates | Showing {shown}",
+    "no_match": "No matching plugins",
+    "installed_badge": "Installed"
+  },
+  "browse": {
+    "search_placeholder": "Search plugin name or description...",
+    "sort_stars": "By Popularity",
+    "sort_update": "Recently Updated",
+    "sort_name": "By Name",
+    "load_more": "Load more...",
+    "load_failed": "Load failed",
+    "load_error": "Load failed: {message}",
+    "stats_text": "{count} plugins",
+    "stats_match": " (matching \"{query}\")",
+    "no_match": "No matching plugins",
+    "installed_badge": "Installed",
+    "disabled_badge": "Disabled",
+    "not_installed": "Not Installed",
+    "install": "Install",
+    "already_installed": "Installed",
+    "render_error": "Render failed: {message}"
+  },
+  "git": {
+    "title": "Install from Git URL",
+    "desc": "Enter the GitHub repository URL to clone and install",
+    "placeholder": "https://github.com/author/ComfyUI-Plugin",
+    "install": "Install",
+    "invalid_url": "Please enter a valid URL",
+    "empty_url": "Please enter a Git URL",
+    "installing_btn": "Installing...",
+    "queued_status": "Added to install queue...",
+    "install_error": "Install failed: {message}",
+    "request_failed": "Request failed"
+  },
+  "queue_processing": "Queue processing...",
+  "toast": {
+    "installing": "Installing",
+    "queued": "Added to install queue",
+    "install_failed": "Install failed",
+    "version_failed": "Failed to get version",
+    "no_version": "No version info",
+    "install_version": "Install this version",
+    "installing_name": "Installing {id}..."
+  },
+  "confirm": {
+    "uninstall": "Uninstall this plugin?",
+    "uninstalling": "Uninstalling",
+    "updating": "Updating",
+    "update_all_confirm": "Update all installed plugins? This may take a while.",
+    "submitting_updates": "Submitting all updates...",
+    "uninstall_name": "Uninstall plugin \"{title}\"?",
+    "uninstalling_name": "Uninstalling {title}...",
+    "updating_name": "Updating {id}..."
+  },
+  "version_picker": {
+    "title": "Select Plugin Version",
+    "title_name": "{name} - Version Selection",
+    "loading": "Loading versions...",
+    "no_version_nightly": "No version info (possibly nightly install)"
+  },
+  "toggle": {
+    "processing": "Processing..."
+  },
+  "queue": {
+    "status": "Queue: {done}/{total} done"
+  }
+}

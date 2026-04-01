@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 
 from flask import Blueprint, Response, jsonify, request
 
@@ -111,14 +112,71 @@ def _run(cmd, timeout=5):
 
 
 def _sshd_running():
-    """检查 sshd 是否运行, 返回 (running, pid)"""
-    code, out, _ = _run("pgrep -x sshd | head -1")
-    if code == 0 and out:
-        try:
-            return True, int(out.splitlines()[0])
-        except ValueError:
-            return True, None
+    """检查 sshd listener 是否运行, 返回 (running, pid)"""
+    for proc in _list_sshd_processes():
+        if "Z" in proc["stat"]:
+            continue
+        if "[listener]" in proc["args"]:
+            return True, proc["pid"]
+
+    # 兜底: 只要存在非僵尸 sshd 进程, 也视为运行中
+    for proc in _list_sshd_processes():
+        if "Z" not in proc["stat"]:
+            return True, proc["pid"]
+
     return False, None
+
+
+def _list_sshd_processes():
+    """列出 sshd 进程, 返回 [{pid, stat, args}, ...]"""
+    code, out, _ = _run("ps -o pid=,stat=,args= -C sshd", timeout=3)
+    if code != 0 or not out:
+        return []
+
+    procs = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        procs.append({
+            "pid": pid,
+            "stat": parts[1],
+            "args": parts[2],
+        })
+    return procs
+
+
+def _active_sshd_pids():
+    """返回所有非僵尸 sshd 进程 PID"""
+    return [proc["pid"] for proc in _list_sshd_processes() if "Z" not in proc["stat"]]
+
+
+def _stop_sshd():
+    """停止所有非僵尸 sshd 进程, 返回是否已停止"""
+    pids = _active_sshd_pids()
+    if not pids:
+        return True
+
+    _run("kill " + " ".join(str(pid) for pid in pids), timeout=3)
+    time.sleep(0.5)
+
+    # 若 listener 仍在, 再强制一次
+    still_running, _ = _sshd_running()
+    if still_running:
+        pids = _active_sshd_pids()
+        if pids:
+            _run("kill -9 " + " ".join(str(pid) for pid in pids), timeout=3)
+            time.sleep(0.3)
+
+    still_running, _ = _sshd_running()
+    return not still_running
 
 
 def _active_connections():
@@ -327,7 +385,7 @@ def _set_sshd_password_auth(enable):
 
 def _do_restart_sshd():
     """重启 sshd 服务 (带日志文件输出)"""
-    _run("kill $(pgrep -x sshd) 2>/dev/null", timeout=3)
+    _stop_sshd()
     _run("mkdir -p /run/sshd", timeout=2)
     code, _, err = _run(f"/usr/sbin/sshd -E {SSHD_LOG_FILE}", timeout=5)
     return code == 0
@@ -509,7 +567,10 @@ def ssh_stop():
     if not running:
         return jsonify({"ok": True, "message": "sshd 未在运行"})
 
-    code, _, err = _run("kill $(pgrep -x sshd) 2>/dev/null", timeout=5)
+    stopped = _stop_sshd()
+    if not stopped:
+        return jsonify({"error": "停止 sshd 失败"}), 500
+
     return jsonify({"ok": True, "running": False})
 
 

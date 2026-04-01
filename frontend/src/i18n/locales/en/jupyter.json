@@ -1,0 +1,81 @@
+{
+  "title": "JupyterLab",
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "error": "Error",
+    "not_created": "Not created"
+  },
+  "hint": {
+    "not_created": "Click \"Start\" to create JupyterLab process",
+    "stopped": "Process stopped. Click \"Start\" to resume",
+    "error": "Process error. Check logs for details",
+    "not_running": "Jupyter service not running or unreachable"
+  },
+  "info": {
+    "version": "Version",
+    "pid": "PID",
+    "port": "Port",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "kernels_count": "Kernels",
+    "sessions_count": "Sessions"
+  },
+  "actions": {
+    "stop": "Stop",
+    "start": "Start",
+    "restart": "Restart"
+  },
+  "error": {
+    "load_failed": "Load failed"
+  },
+  "token": {
+    "title": "Access Token"
+  },
+  "kernels": {
+    "title": "Active Kernels",
+    "available": "Available Kernels",
+    "idle": "Idle",
+    "busy": "Busy",
+    "connections": "Connections",
+    "interrupt": "Interrupt",
+    "restart": "Restart",
+    "kernel_restarted": "Kernel restarted",
+    "kernel_interrupted": "Kernel interrupted",
+    "action_failed": "Action failed"
+  },
+  "sessions": {
+    "title": "Active Sessions",
+    "close": "Close this session",
+    "close_warning": "Associated kernel will also be stopped",
+    "closed": "Session closed"
+  },
+  "terminals": {
+    "title": "Terminals",
+    "new": "New Terminal",
+    "label": "Terminal {name}",
+    "created": "Terminal {name} created",
+    "open": "Click to open terminal",
+    "destroy": "Destroy Terminal",
+    "destroy_confirm": "Destroy terminal {name}?",
+    "destroyed": "Terminal {name} destroyed"
+  },
+  "log": {
+    "title": "Logs",
+    "loading": "Loading..."
+  },
+  "confirm": {
+    "stop": "Stop JupyterLab?\n\nActive kernels and sessions will be lost.",
+    "stop_warning": "Active kernels and sessions will be lost",
+    "restart": "Restart JupyterLab?\n\nActive kernels and sessions will be lost.",
+    "close_session": "Close this session?\n\nThe associated kernel will also be stopped."
+  },
+  "toast": {
+    "starting": "JupyterLab starting...",
+    "start_failed": "Start failed",
+    "stopped": "JupyterLab stopped",
+    "stop_failed": "Stop failed",
+    "restarting": "Jupyter restarting",
+    "restart_failed": "Restart failed"
+  }
+}
