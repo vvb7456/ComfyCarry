@@ -9,7 +9,7 @@
   "tabs": {
     "sdxl": "SDXL",
     "flux": "Flux",
-    "history": "History"
+    "history": "Queue & History"
   },
   "prompt": {
     "title": "Prompt",
@@ -25,7 +25,36 @@
       "embedding_title": "Browse and insert Embedding vectors",
       "wildcard_title": "Manage random prompts (Wildcards)"
     },
-    "syntax_help_title": "Random prompt syntax"
+    "syntax_help_title": "Random prompt syntax",
+    "help_modal_title": "Prompt Help",
+    "help": {
+      "basic_title": "Basic Syntax",
+      "comma": "Comma-separated",
+      "comma_desc": "Describe each element with a phrase, separated by commas",
+      "weight_up": "Increase weight",
+      "weight_up_desc": "Increase influence on generation, value > 1.0 means stronger",
+      "weight_down": "Decrease weight",
+      "weight_down_desc": "Value < 1.0 weakens influence, can also fine-tune negative prompts",
+      "embedding": "Embedding",
+      "embedding_desc": "Use installed Embedding vectors (browse via toolbar 'Insert Embedding')",
+      "quality": "Quality prompts",
+      "quality_desc": "Positive: include masterpiece, best quality. Negative: include worst quality, low quality",
+      "random_title": "Random Prompts",
+      "random_pick": "Random pick",
+      "random_pick_desc": "→ red hair / green hair / blue hair",
+      "random_weight": "Weighted",
+      "random_weight_desc": "→ masterpiece (80%) / best quality (20%)",
+      "random_multi": "Multi-select",
+      "random_multi_desc": "→ cat, dog / cat, bird / dog, bird",
+      "wildcard": "Wildcard",
+      "wildcard_desc": "→ Random pick from wildcards/hair_color.txt",
+      "wildcard_sub": "Subdirectory wildcard",
+      "wildcard_sub_desc": "→ Random pick from wildcards/sdxl/quality.txt",
+      "variable_lock": "Variable lock",
+      "variable_lock_desc": "→ red dress, red shoes (consistent)",
+      "nesting": "Nesting",
+      "nesting_desc": "→ a big cat / a small cat / a red ball / a blue ball"
+    }
   },
   "action": {
     "run": "Run",

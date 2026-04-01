@@ -342,7 +342,7 @@ async function deleteRule(rule: SyncRule) {
 
 async function runRule(rule: SyncRule) {
   ruleIsRunning.value = true
-  toast(t('sync.rule.running') + ': ' + rule.name)
+  toast(t('sync.rule.running') + ': ' + rule.name, 'info')
   try {
     const d = await post<ApiOkResponse>('/api/sync/rules/run', { rule_id: rule.id })
     if (d?.ok) toast(t('sync.rule.run_ok'), 'success')
@@ -528,7 +528,7 @@ async function uploadRcloneFile(e: Event) {
             </div>
           </div>
           <div class="sync-rule-actions">
-            <BaseButton size="sm" square :disabled="ruleIsRunning" :title="t('sync.rule.run')" @click="runRule(rule)"><MsIcon name="play_arrow" /></BaseButton>
+            <BaseButton size="sm" square :disabled="ruleIsRunning || !rule.enabled" :title="t('sync.rule.run')" @click="runRule(rule)"><MsIcon name="play_arrow" /></BaseButton>
             <BaseButton size="sm" square :title="t('sync.rule.edit')" @click="openEditRule(rule)"><MsIcon name="edit" /></BaseButton>
             <BaseButton size="sm" square :title="rule.enabled ? t('sync.rule.disable') : t('sync.rule.enable')" @click="toggleRule(rule)">
               <MsIcon :name="rule.enabled ? 'pause' : 'play_arrow'" />

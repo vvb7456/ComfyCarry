@@ -2,8 +2,7 @@
   "title": "ComfyUI",
   "tabs": {
     "console": "控制台",
-    "queue": "任务队列",
-    "history": "生成历史"
+    "plugins": "插件管理"
   },
   "console": {
     "status_cards_loading": "加载中...",

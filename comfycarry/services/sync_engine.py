@@ -96,6 +96,8 @@ def _save_sync_settings(settings):
 _sync_worker_thread = None
 _sync_worker_stop = threading.Event()
 _sync_exec_lock = threading.Lock()
+_sync_current_proc = None          # 当前正在执行的 rclone 子进程
+_sync_current_proc_lock = threading.Lock()
 _sync_log_buffer = []
 _sync_log_lock = threading.Lock()
 
@@ -166,8 +168,21 @@ def _run_sync_rule_inner(rule):
     start_key = "rule_start_pull" if direction == "pull" else "rule_start_push"
     _sync_log(start_key, {"name": name, "src": src, "dst": dst, "method": method})
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        output = (proc.stdout + proc.stderr).strip()
+        global _sync_current_proc
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        with _sync_current_proc_lock:
+            _sync_current_proc = proc
+        try:
+            stdout, stderr = proc.communicate(timeout=600)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+            _sync_log("rule_timeout", {"name": name, "seconds": 600}, "error")
+            return False
+        finally:
+            with _sync_current_proc_lock:
+                _sync_current_proc = None
+        output = (stdout + stderr).strip()
         if output:
             for line in output.split('\n')[-3:]:
                 line = line.strip()
@@ -178,9 +193,6 @@ def _run_sync_rule_inner(rule):
         else:
             _sync_log("rule_failed", {"name": name, "code": proc.returncode}, "error")
         return proc.returncode == 0
-    except subprocess.TimeoutExpired:
-        _sync_log("rule_timeout", {"name": name, "seconds": 600}, "error")
-        return False
     except Exception as e:
         _sync_log("rule_error", {"name": name, "error": str(e)}, "error")
         return False
@@ -246,9 +258,21 @@ def start_sync_worker():
 
 
 def stop_sync_worker():
-    """停止 sync worker"""
+    """停止 sync worker 并终止正在执行的 rclone 进程"""
     global _sync_worker_thread
     _sync_worker_stop.set()
+    # 终止正在执行的 rclone 子进程
+    with _sync_current_proc_lock:
+        if _sync_current_proc and _sync_current_proc.poll() is None:
+            try:
+                _sync_current_proc.terminate()
+                _sync_current_proc.wait(timeout=3)
+            except (subprocess.TimeoutExpired, OSError):
+                try:
+                    _sync_current_proc.kill()
+                except OSError:
+                    pass
+            _sync_log("rclone_killed", level="warn")
     if _sync_worker_thread and _sync_worker_thread.is_alive():
-        _sync_worker_thread.join(timeout=5)
+        _sync_worker_thread.join(timeout=10)
     _sync_worker_thread = None

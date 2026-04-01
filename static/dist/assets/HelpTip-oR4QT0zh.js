@@ -1,0 +1,1 @@
+import{d as e,g as p,o as a,C as s}from"./forms-Bdl4SMqU.js";const o=["data-tip"],c=e({__name:"HelpTip",props:{text:{}},setup(t){return(n,_)=>(a(),p("span",{class:"cc-help-tip","data-tip":t.text},"?",8,o))}}),i=s(c,[["__scopeId","data-v-56717f4d"]]);export{i as H};

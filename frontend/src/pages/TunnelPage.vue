@@ -178,30 +178,30 @@ async function saveTunnelConfig() {
     if (selectedMode.value === 'public') {
       const sub = cfgSubdomain.value.trim().toLowerCase()
       if (sub && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(sub)) {
-        toast(t('tunnel.config.subdomain_error')); return
+        toast(t('tunnel.config.subdomain_error'), 'warning'); return
       }
       if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return
       if (isPublicActive) {
         if (await confirm({ message: t('tunnel.confirm.config_saved_restart') })) tunnelRestart(true)
-        else toast(t('tunnel.confirm.config_saved_next'))
+        else toast(t('tunnel.confirm.config_saved_next'), 'info')
         return
       }
       if (isCustomConfigured && !await confirm({ message: t('tunnel.confirm.destroy_to_public'), variant: 'danger' })) return
       if (isCustomConfigured && !await post('/api/tunnel/teardown')) return
       await enablePublic()
     } else {
-      if (!cfgToken.value || !cfgDomain.value) { toast(t('tunnel.confirm.fill_token_domain')); return }
+      if (!cfgToken.value || !cfgDomain.value) { toast(t('tunnel.confirm.fill_token_domain'), 'warning'); return }
       if (isPublicActive && !await confirm({ message: t('tunnel.confirm.switch_to_custom') })) return
       if (isPublicActive && !await post('/api/tunnel/public/disable')) return
       if (isCustomConfigured && !await confirm({ message: t('tunnel.confirm.update_restart') })) return
       if (!isCustomConfigured && !isPublicActive && !await confirm({ message: t('tunnel.confirm.create_tunnel') })) return
-      toast(t('tunnel.config.applying'))
+      toast(t('tunnel.config.applying'), 'info')
       const d = await post<TunnelActionResponse>('/api/tunnel/provision', { api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value })
       if (d?.ok) {
-        toast(t('tunnel.toast.config_applied') + ' ' + t('tunnel.toast.auto_refresh') + '...')
+        toast(t('tunnel.toast.config_applied') + ' ' + t('tunnel.toast.auto_refresh') + '...', 'success')
         setTimeout(() => location.reload(), 5000)
       } else {
-        toast(d?.error || t('tunnel.toast.save_failed'))
+        toast(d?.error || t('tunnel.toast.save_failed'), 'error')
       }
     }
   } finally {
@@ -210,13 +210,13 @@ async function saveTunnelConfig() {
 }
 
 async function enablePublic() {
-  toast(t('tunnel.toast.enabling_public') + '...')
+  toast(t('tunnel.toast.enabling_public'), 'info')
   const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
   if (d?.ok) {
-    toast(t('tunnel.toast.public_enabled') + '!')
+    toast(t('tunnel.toast.public_enabled'), 'success')
     setTimeout(() => { loadTunnelStatus(); loadConfigTab() }, 2000)
   } else {
-    toast(t('tunnel.toast.enable_failed') + ': ' + (d?.error || ''))
+    toast(t('tunnel.toast.enable_failed') + ': ' + (d?.error || ''), 'error')
   }
 }
 
@@ -224,32 +224,32 @@ async function destroyTunnel() {
   if (selectedMode.value === 'public') {
     if (!await confirm({ message: t('tunnel.confirm.disable_public'), variant: 'danger' })) return
     const d = await post<TunnelActionResponse>('/api/tunnel/public/disable')
-    if (d?.ok) { toast(t('tunnel.toast.public_disabled')); setTimeout(() => { loadTunnelStatus(); loadConfigTab() }, 1000) }
+    if (d?.ok) { toast(t('tunnel.toast.public_disabled'), 'success'); setTimeout(() => { loadTunnelStatus(); loadConfigTab() }, 1000) }
   } else {
     if (!await confirm({ message: t('tunnel.confirm.remove_tunnel'), variant: 'danger' })) return
     const d = await post<TunnelActionResponse>('/api/tunnel/teardown')
-    if (d?.ok) { toast(t('tunnel.toast.removed')); setTimeout(loadTunnelStatus, 1000) }
-    else toast(t('tunnel.toast.remove_failed') + ': ' + (d?.error || ''))
+    if (d?.ok) { toast(t('tunnel.toast.removed'), 'success'); setTimeout(loadTunnelStatus, 1000) }
+    else toast(t('tunnel.toast.remove_failed') + ': ' + (d?.error || ''), 'error')
   }
 }
 
 async function tunnelStop() {
   if (!await confirm({ message: t('tunnel.confirm.stop_cloudflared') })) return
   const d = await post<TunnelActionResponse>('/api/tunnel/stop')
-  toast(d?.ok ? t('tunnel.toast.cf_stopped') : (d?.error || t('tunnel.toast.stop_failed')))
+  toast(d?.ok ? t('tunnel.toast.cf_stopped') : (d?.error || t('tunnel.toast.stop_failed')), d?.ok ? 'success' : 'error')
   setTimeout(loadTunnelStatus, 1500)
 }
 
 async function tunnelStart() {
   if (!await post('/api/tunnel/start')) return
-  toast(t('tunnel.toast.cf_starting') + '...')
+  toast(t('tunnel.toast.cf_starting'), 'info')
   setTimeout(loadTunnelStatus, 2000)
 }
 
 async function tunnelRestart(skipConfirm = false) {
   if (!skipConfirm && !await confirm({ message: t('tunnel.confirm.restart_cloudflared') })) return
   if (!await post('/api/tunnel/restart')) return
-  toast(t('tunnel.toast.cf_restarting') + '...')
+  toast(t('tunnel.toast.cf_restarting'), 'info')
   setTimeout(loadTunnelStatus, 3000)
 }
 
@@ -327,17 +327,17 @@ function openAddSvc() {
 }
 
 async function submitAddSvc() {
-  if (!addSvcName.value || !addSvcPort.value || !addSvcSuffix.value) { toast(t('tunnel.config.fill_all')); return }
+  if (!addSvcName.value || !addSvcPort.value || !addSvcSuffix.value) { toast(t('tunnel.config.fill_all'), 'warning'); return }
   const d = await post<TunnelActionResponse>('/api/tunnel/services', { name: addSvcName.value, port: parseInt(addSvcPort.value), suffix: addSvcSuffix.value, protocol: addSvcProto.value })
-  if (d?.ok) { toast(t('tunnel.toast.service_added') + '!'); addSvcModal.value = false; setTimeout(loadTunnelStatus, 2000) }
-  else toast(t('tunnel.toast.add_failed') + ': ' + (d?.error || ''))
+  if (d?.ok) { toast(t('tunnel.toast.service_added'), 'success'); addSvcModal.value = false; setTimeout(loadTunnelStatus, 2000) }
+  else toast(t('tunnel.toast.add_failed') + ': ' + (d?.error || ''), 'error')
 }
 
 async function removeService(suffix: string) {
   if (!await confirm({ message: t('tunnel.confirm.remove_custom_service', { suffix }), variant: 'danger' })) return
   const d = await del<TunnelActionResponse>(`/api/tunnel/services/${encodeURIComponent(suffix)}`)
-  if (d?.ok) { toast(t('tunnel.toast.service_removed')); setTimeout(loadTunnelStatus, 2000) }
-  else toast(d?.error || t('tunnel.toast.remove_failed'))
+  if (d?.ok) { toast(t('tunnel.toast.service_removed'), 'success'); setTimeout(loadTunnelStatus, 2000) }
+  else toast(d?.error || t('tunnel.toast.remove_failed'), 'error')
 }
 
 const connInfo = computed(() => {

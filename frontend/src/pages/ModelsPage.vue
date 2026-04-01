@@ -47,7 +47,7 @@ function openPreviewSingle(url: string) {
 </script>
 
 <template>
-  <PageHeader icon="palette" :title="t('models.title')" />
+  <PageHeader icon="extension" :title="t('models.title')" />
   <div class="page-body">
     <TabSwitcher v-model="activeTab" :tabs="tabs" />
 

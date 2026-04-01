@@ -308,7 +308,7 @@ def api_sync_rules_run():
     rules = _load_sync_rules()
 
     if rule_id:
-        targets = [r for r in rules if r.get("id") == rule_id]
+        targets = [r for r in rules if r.get("id") == rule_id and r.get("enabled", True)]
     else:
         targets = [r for r in rules
                    if r.get("trigger") == "deploy" and r.get("enabled", True)]

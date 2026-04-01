@@ -25,11 +25,6 @@ const router = createRouter({
       component: () => import('@/pages/ModelsPage.vue'),
     },
     {
-      path: '/plugins',
-      name: 'plugins',
-      component: () => import('@/pages/PluginsPage.vue'),
-    },
-    {
       path: '/tunnel',
       name: 'tunnel',
       component: () => import('@/pages/TunnelPage.vue'),

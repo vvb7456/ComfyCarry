@@ -3,7 +3,6 @@
   "comfyui": "ComfyUI",
   "generate": "Generate",
   "models": "Models",
-  "plugins": "Plugins",
   "tunnel": "Tunnel",
   "jupyter": "Jupyter",
   "sync": "Sync",

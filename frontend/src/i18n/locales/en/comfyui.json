@@ -2,8 +2,7 @@
   "title": "ComfyUI",
   "tabs": {
     "console": "Console",
-    "queue": "Task Queue",
-    "history": "History"
+    "plugins": "Plugins"
   },
   "console": {
     "status_cards_loading": "Loading...",

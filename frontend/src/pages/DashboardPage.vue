@@ -153,7 +153,7 @@ async function svcAction(name: string, action: string) {
     d = await post(`/api/services/${name}/${action}`)
   }
   if (!d) return
-  toast(t('dashboard.services.action_sent', { action }))
+  toast(t('dashboard.services.action_sent', { action }), 'info')
   setTimeout(loadOverview, 2000)
 }
 
