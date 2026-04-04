@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'SeedInput' })
 
@@ -49,7 +50,7 @@ function onChange(e: Event) {
       :title="isRandom ? 'Random' : 'Fixed'"
       @click="toggleMode"
     >
-      <span class="ms" style="font-size: 16px">{{ isRandom ? 'casino' : 'lock_open' }}</span>
+      <MsIcon :name="isRandom ? 'casino' : 'lock_open'" size="xs" color="none" />
     </button>
   </div>
 </template>

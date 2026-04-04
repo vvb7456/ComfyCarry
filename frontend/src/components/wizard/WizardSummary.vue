@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import { useWizardRclone } from '@/composables/useWizardRclone'
 import { useWizardState } from '@/composables/useWizardState'
 import type { WizardConfig } from '@/types/wizard'
@@ -182,11 +183,12 @@ const sections = computed<SummarySection[]>(() => {
           >
             <span class="wizard-summary__label">{{ row.label }}</span>
             <span class="wizard-summary__value">
-              <span
+              <MsIcon
                 v-if="row.icon"
-                class="ms ms-xs"
-                :style="row.green ? { color: 'var(--green)' } : undefined"
-              >{{ row.icon }}</span>
+                :name="row.icon"
+                size="xs"
+                :color="row.green ? 'var(--green)' : 'none'"
+              />
               {{ row.value }}
             </span>
           </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import type { DeployStep } from '@/types/wizard'
 
 defineOptions({ name: 'DeployStepList' })
@@ -37,7 +38,7 @@ function translateStep(name: string): string {
       class="deploy-steps__item"
       :class="`deploy-steps__item--${step.status}`"
     >
-      <span class="ms ms-xs deploy-steps__icon">{{ icons[step.status] }}</span>
+      <MsIcon :name="icons[step.status]" size="xs" color="none" class="deploy-steps__icon" />
       <span>{{ translateStep(step.name) }}</span>
     </div>
   </div>

@@ -1,0 +1,14 @@
+# Material Symbols Outlined — 手动补充清单
+# build-fonts.sh 会自动从源码提取 MsIcon 的 name="..." 和 :name="'...'"
+# 此文件仅用于记录无法自动提取的间接引用 (通过变量/对象传递的图标)
+#
+# 格式: 一行一个图标名
+
+# ThemeToggle.vue — iconMap 对象
+dark_mode
+light_mode
+contrast
+
+# LogPanel.vue — computed followTailIcon
+gps_fixed
+gps_not_fixed

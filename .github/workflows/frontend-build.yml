@@ -40,6 +40,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Build icon font subset
+        working-directory: frontend
+        run: |
+          pip install fonttools brotli
+          bash build-fonts.sh
+
       - name: Build
         working-directory: frontend
         run: npm run build

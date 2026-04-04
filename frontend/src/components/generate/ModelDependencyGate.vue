@@ -12,6 +12,7 @@ import type { UseModelDependencyReturn } from '@/composables/generate/useModelDe
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'ModelDependencyGate' })
 
@@ -95,7 +96,7 @@ function onEnter() {
   <!-- Welcome gate -->
   <div v-else class="mdep-welcome" :class="{ 'mdep-welcome--compact': compact }">
     <div v-if="!compact" class="mdep-welcome-header">
-      <span class="ms mdep-header-icon">widgets</span>
+      <MsIcon name="widgets" color="none" class="mdep-header-icon" />
       <div class="mdep-title">{{ t(title) }}</div>
     </div>
 
@@ -113,7 +114,7 @@ function onEnter() {
         @click="onCardClick(m.id)"
       >
         <div class="mdep-card-check">
-          <span class="ms">{{ dep.selected.value.has(m.id) ? 'check_circle' : 'radio_button_unchecked' }}</span>
+          <MsIcon :name="dep.selected.value.has(m.id) ? 'check_circle' : 'radio_button_unchecked'" color="none" />
         </div>
         <div class="mdep-card-body">
           <div class="mdep-card-name">{{ m.name }}</div>
@@ -136,7 +137,7 @@ function onEnter() {
           <div class="mdep-progress-pct">{{ progressText }}</div>
         </div>
         <BaseButton variant="danger" size="xs" class="mdep-cancel-btn" @click="dep.cancelDownload()">
-          <span class="ms ms-sm">close</span> {{ t('common.btn.cancel') }}
+          <MsIcon name="close" size="sm" color="none" /> {{ t('common.btn.cancel') }}
         </BaseButton>
       </div>
 
@@ -149,10 +150,10 @@ function onEnter() {
       <div v-else class="mdep-btn-row">
         <div v-if="showHint" class="mdep-hint">{{ t('generate.model_dep.select_at_least_one') }}</div>
         <BaseButton v-if="showDownload" variant="primary" size="sm" @click="$emit('download')">
-          <span class="ms ms-sm">download</span> {{ t('generate.model_dep.download_selected') }}
+          <MsIcon name="download" size="sm" color="none" /> {{ t('generate.model_dep.download_selected') }}
         </BaseButton>
         <BaseButton v-if="showEnter" variant="primary" size="sm" @click="onEnter">
-          <span class="ms ms-sm">arrow_forward</span> {{ t('generate.model_dep.enter') }}
+          <MsIcon name="arrow_forward" size="sm" color="none" /> {{ t('generate.model_dep.enter') }}
         </BaseButton>
       </div>
     </div>

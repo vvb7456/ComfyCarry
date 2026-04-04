@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'AlertBanner' })
 
@@ -32,12 +33,12 @@ function close() {
 
 <template>
   <div v-if="visible" class="alert-banner" :class="[`alert-banner--${tone}`, { 'alert-banner--dense': dense }]">
-    <span class="alert-banner__icon"><span class="ms ms-xs">{{ iconName() }}</span></span>
+    <span class="alert-banner__icon"><MsIcon :name="iconName()" size="xs" color="none" /></span>
     <div class="alert-banner__content">
       <slot />
     </div>
     <button v-if="closable" class="alert-banner__close" @click="close">
-      <span class="ms ms-xs">close</span>
+      <MsIcon name="close" size="xs" color="none" />
     </button>
   </div>
 </template>

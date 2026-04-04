@@ -46,7 +46,7 @@ function onClick() {
       class="option-card__check"
       :class="{ 'option-card__check--locked': locked }"
     >
-      <span class="ms" style="font-size: 14px;">check</span>
+      <MsIcon name="check" size="xs" color="none" />
     </span>
 
     <div v-if="icon || title || $slots.title" class="option-card__header">

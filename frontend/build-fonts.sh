@@ -1,0 +1,105 @@
+#!/bin/bash
+# ==============================================================================
+# Font Build Script
+#
+# 在 CI 环境中运行，生成前端所需的字体文件:
+# - Material Symbols Outlined 子集化 (仅保留使用到的图标)
+#
+# 图标名来源 (自动合并去重):
+# 1. 源码中 MsIcon 的 name="xxx" 静态绑定
+# 2. 源码中 :name="... 'xxx' ..." 动态绑定内的字符串字面量
+# 3. MsIcon.vue 中 ICON_COLORS 映射表的 key
+# 4. icons.txt 补充清单 (用于无法自动提取的间接引用)
+#
+# 输出: frontend/public/fonts/MaterialSymbolsOutlined.woff2
+# ==============================================================================
+
+set -e
+set -o pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+FONTS_DIR="$SCRIPT_DIR/public/fonts"
+SRC_DIR="$SCRIPT_DIR/src"
+ICONS_FILE="$SCRIPT_DIR/icons.txt"
+
+echo "=== Font Build ==="
+
+# ── 1. 从源码自动提取图标名 ──
+echo ">>> [1/2] Extracting icon names from source..."
+
+# 1a. MsIcon 静态绑定: <MsIcon ... name="icon_name" ...
+STATIC_ICONS=$(grep -rh --include='*.vue' 'MsIcon' "$SRC_DIR" 2>/dev/null | grep -oP '\bname="[a-z_]+"' | grep -oP '(?<=name=")[a-z_]+' || true)
+
+# 1b. MsIcon 动态绑定: :name="... 'icon_name' ..." 中的单引号字符串
+DYNAMIC_ICONS=$(grep -rh --include='*.vue' 'MsIcon' "$SRC_DIR" 2>/dev/null | grep -oP ":name=\"[^\"]*'" | grep -oP "'[a-z_]+'" | tr -d "'" || true)
+
+# 1c. ICON_COLORS 映射表中的 key
+COLORS_ICONS=$(grep -oP "^\s+'([a-z_]+)'" "$SRC_DIR/components/ui/MsIcon.vue" 2>/dev/null | tr -d "' " || true)
+
+# 1d. icons.txt 补充清单 (间接引用无法自动提取的图标)
+MANUAL_ICONS=""
+if [ -f "$ICONS_FILE" ]; then
+    MANUAL_ICONS=$(grep -v '^#' "$ICONS_FILE" | grep -v '^\s*$' | tr -d '\r')
+fi
+
+# 合并去重
+ALL_ICONS=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${COLORS_ICONS}\n${MANUAL_ICONS}" | grep -v '^\s*$' | sort -u)
+
+AUTO_COUNT=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${COLORS_ICONS}" | grep -v '^\s*$' | sort -u | wc -l)
+TOTAL_COUNT=$(echo "$ALL_ICONS" | wc -l)
+echo "  Auto-extracted: ${AUTO_COUNT}, Manual (icons.txt): +$(echo "$MANUAL_ICONS" | grep -v '^\s*$' | wc -l), Total unique: ${TOTAL_COUNT}"
+
+# ── 2. Material Symbols Outlined 子集化 ──
+echo ">>> [2/2] Material Symbols subset..."
+
+MS_FULL="/tmp/MaterialSymbolsOutlined-full.woff2"
+MS_TTF="/tmp/MaterialSymbolsOutlined-full.ttf"
+MS_OUTPUT="$FONTS_DIR/MaterialSymbolsOutlined.woff2"
+
+CODEPOINTS_URL="https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints"
+FONT_URL="https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.woff2"
+
+# 下载完整字体和 codepoints 映射 (如果已在提取步骤下载则复用)
+wget -q -O "$MS_FULL" "$FONT_URL"
+CP_FILE="/tmp/ms-codepoints.txt"
+[ -f "$CP_FILE" ] || wget -q -O "$CP_FILE" "$CODEPOINTS_URL"
+echo "  Downloaded full font: $(du -h "$MS_FULL" | cut -f1)"
+
+# 查找每个图标对应的 Unicode codepoint
+UNICODES=""
+MISSING=""
+while IFS= read -r icon; do
+    cp=$(grep "^${icon} " "$CP_FILE" | awk '{print $2}' || true)
+    if [ -n "$cp" ]; then
+        UNICODES="${UNICODES},U+${cp}"
+    else
+        MISSING="${MISSING} ${icon}"
+    fi
+done <<< "$ALL_ICONS"
+
+UNICODES="${UNICODES#,}"
+
+if [ -n "$MISSING" ]; then
+    echo "  ⚠️ Missing codepoints for:${MISSING}"
+fi
+
+ICON_COUNT=$(echo "$ALL_ICONS" | wc -l)
+echo "  Icons: ${ICON_COUNT}, Unicodes: $(echo "$UNICODES" | tr ',' '\n' | wc -l)"
+
+# woff2 → ttf → subset → woff2
+python3 -c "
+from fontTools.ttLib import TTFont
+font = TTFont('$MS_FULL')
+font.flavor = None
+font.save('$MS_TTF')
+"
+
+mkdir -p "$FONTS_DIR"
+pyftsubset "$MS_TTF" \
+    --unicodes="$UNICODES" \
+    --layout-features='*' \
+    --flavor=woff2 \
+    --output-file="$MS_OUTPUT"
+
+echo "  Subset: $(du -h "$MS_OUTPUT" | cut -f1) (from $(du -h "$MS_FULL" | cut -f1))"
+echo "=== Done ==="

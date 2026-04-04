@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'FileUploadZone' })
 
@@ -123,17 +124,17 @@ defineExpose({ clearFile })
 
     <!-- Drop mode: file loaded -->
     <div v-if="mode === 'drop' && isLoaded" class="upload-zone__loaded">
-      <span class="ms upload-zone__loaded-icon">check_circle</span>
+      <MsIcon name="check_circle" color="none" class="upload-zone__loaded-icon" />
       <span class="upload-zone__loaded-name text-truncate">{{ loadedName }}</span>
       <button type="button" class="upload-zone__loaded-clear" @click.stop="clearFile">
-        <span class="ms">close</span>
+        <MsIcon name="close" color="none" />
       </button>
     </div>
 
     <!-- Drop mode: empty -->
     <div v-else-if="mode === 'drop'" class="upload-zone__body" @click="triggerPick">
       <slot>
-        <span class="ms upload-zone__icon">upload_file</span>
+        <MsIcon name="upload_file" color="none" class="upload-zone__icon" />
         <p class="upload-zone__text">{{ t('common.upload.drop_hint') }}</p>
         <p class="upload-zone__hint">{{ t('common.upload.click_hint') }}</p>
       </slot>
@@ -143,7 +144,7 @@ defineExpose({ clearFile })
     <template v-else-if="isPreview">
       <img :src="preview" class="upload-zone__img" alt="">
       <span class="upload-zone__clear" @click.stop="$emit('clear')">
-        <span class="ms">close</span>
+        <MsIcon name="close" color="none" />
       </span>
       <span v-if="fileName" class="upload-zone__fname">{{ fileName }}</span>
     </template>
@@ -151,18 +152,18 @@ defineExpose({ clearFile })
     <!-- Pick mode: no preview -->
     <template v-else>
       <div class="upload-zone__pick" @click="$emit('pick')">
-        <span class="ms">{{ pickIcon }}</span>
+        <MsIcon :name="pickIcon" color="none" />
         <span>{{ pickLabel || t('common.upload.pick_label') }}</span>
       </div>
       <div class="upload-zone__divider">{{ t('common.upload.or_divider') }}</div>
       <!-- Action variant: custom bottom action (e.g. open preprocess modal) -->
       <div v-if="actionLabel" class="upload-zone__drop" @click.stop="$emit('action')">
-        <span class="ms">{{ actionIcon }}</span>
+        <MsIcon :name="actionIcon" color="none" />
         <span>{{ actionLabel }}</span>
       </div>
       <!-- Default: upload local file -->
       <div v-else class="upload-zone__drop" @click="triggerPick">
-        <span class="ms">add_photo_alternate</span>
+        <MsIcon name="add_photo_alternate" color="none" />
         <span>{{ uploadLabel || t('common.upload.upload_label') }}</span>
       </div>
     </template>

@@ -7,6 +7,7 @@ import WizardStepLayout from './WizardStepLayout.vue'
 import WizardSummary from './WizardSummary.vue'
 import WizardDeployView from './WizardDeployView.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'StepConfirm' })
 
@@ -49,7 +50,7 @@ if (deployState.value === 'deploying') {
     @next="onDeploy"
   >
     <template #icon>
-      <span class="ms ms-sm" style="color: #a78bfa">checklist</span>
+      <MsIcon name="checklist" size="sm" color="#a78bfa" />
     </template>
 
     <template #footer>
@@ -57,7 +58,7 @@ if (deployState.value === 'deploying') {
         {{ t('wizard.btn.prev') }}
       </BaseButton>
       <BaseButton variant="primary" size="lg" @click="onDeploy">
-        <span class="ms ms-xs">rocket_launch</span>
+        <MsIcon name="rocket_launch" size="xs" color="none" />
         {{ t('wizard.btn.deploy') }}
       </BaseButton>
     </template>

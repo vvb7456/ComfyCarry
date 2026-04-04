@@ -6,8 +6,8 @@ defineOptions({ name: 'MsIcon' })
 const props = defineProps<{
   /** Material Symbols icon name */
   name: string
-  /** Size variant: xs(16) | sm(18, default) | md(20) | lg(32) | xl(48) */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+  /** Size variant: xxs(12) | xs(16) | sm(18, default) | md(20) | lg(32) | xl(48) */
+  size?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   /** Override color. Pass explicit color value, or 'none' to inherit from parent */
   color?: string
 }>()

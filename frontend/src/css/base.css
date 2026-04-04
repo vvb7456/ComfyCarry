@@ -159,7 +159,7 @@
             font-style: normal;
             font-weight: 100 700;
             src: url('/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
-            font-display: block;
+            font-display: swap;
         }
 
         .ms {
@@ -177,6 +177,12 @@
             vertical-align: -3px;
             -webkit-font-smoothing: antialiased;
             font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+        }
+
+        .ms-xxs {
+            font-size: 12px;
+            vertical-align: -2px;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 12;
         }
 
         .ms-xs {

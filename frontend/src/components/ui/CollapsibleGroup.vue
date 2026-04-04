@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'CollapsibleGroup' })
 
@@ -23,9 +24,9 @@ function toggle() {
 <template>
   <div class="collapsible-group">
     <div class="collapsible-group__header" @click="toggle">
-      <span class="ms collapsible-group__arrow" :class="{ 'collapsible-group__arrow--collapsed': !expanded }">expand_more</span>
+      <MsIcon name="expand_more" size="sm" color="none" class="collapsible-group__arrow" :class="{ 'collapsible-group__arrow--collapsed': !expanded }" />
       <slot name="header" :expanded="expanded">
-        <span v-if="icon" class="ms ms-xs collapsible-group__icon">{{ icon }}</span>
+        <MsIcon v-if="icon" :name="icon" size="xs" color="none" class="collapsible-group__icon" />
         <span class="collapsible-group__title">{{ title }}</span>
         <span v-if="count != null" class="collapsible-group__count">{{ count }}</span>
         <span v-if="suffix" class="collapsible-group__suffix">{{ suffix }}</span>

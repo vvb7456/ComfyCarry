@@ -2,6 +2,7 @@
 import { useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'WizardStepLayout' })
 
@@ -37,7 +38,7 @@ const slots = useSlots()
   <div class="wizard-step">
     <h2 class="wizard-step__title">
       <slot name="icon">
-        <span v-if="icon" class="ms ms-sm" :style="iconColor ? { color: iconColor } : undefined">{{ icon }}</span>
+        <MsIcon v-if="icon" :name="icon" size="sm" :color="iconColor || 'none'" />
       </slot>
       {{ title }}
     </h2>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'FilterInput' })
 
@@ -17,7 +18,7 @@ withDefaults(defineProps<{
 
 <template>
   <div class="filter-input">
-    <span class="ms filter-input__icon">search</span>
+    <MsIcon name="search" size="sm" color="none" class="filter-input__icon" />
     <input
       v-model="model"
       type="text"
@@ -29,7 +30,7 @@ withDefaults(defineProps<{
       class="filter-input__clear"
       @click="model = ''"
     >
-      <span class="ms">close</span>
+      <MsIcon name="close" size="sm" color="none" />
     </button>
   </div>
 </template>

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import type { GpuInfo, PrebuiltInfo } from '@/types/wizard'
 
 defineOptions({ name: 'EnvInfoCard' })
@@ -36,7 +37,7 @@ const tags = computed(() => {
       <span class="env-label">{{ t('wizard.env.gpu_label') }}</span>
       <template v-if="gpuInfo">
         <span class="env-value">
-          <span class="ms ms-xs">monitor</span> {{ gpuInfo.name }}
+          <MsIcon name="monitor" size="xs" color="none" /> {{ gpuInfo.name }}
         </span>
         <span class="env-meta">{{ smArch }} · {{ gpuInfo.vram_gb }} GB VRAM</span>
       </template>
@@ -49,7 +50,7 @@ const tags = computed(() => {
       <div class="env-row">
         <span class="env-label">{{ t('wizard.env.image_label') }}</span>
         <span class="env-value env-value--green">
-          <span class="ms ms-xs">bolt</span>
+          <MsIcon name="bolt" size="xs" color="none" />
           {{ t('wizard.env.prebuilt_image') }}{{ prebuiltInfo.version !== 'unknown' ? ` v${prebuiltInfo.version}` : '' }}
         </span>
       </div>

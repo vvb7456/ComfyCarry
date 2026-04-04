@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'NumberInput' })
 
@@ -85,10 +86,10 @@ function decrement() {
     />
     <div v-if="spinners && !disabled" class="number-input__spinners">
       <button type="button" class="number-input__btn" @click="increment">
-        <span class="ms" style="font-size: 12px">expand_less</span>
+        <MsIcon name="expand_less" size="xxs" color="none" />
       </button>
       <button type="button" class="number-input__btn" @click="decrement">
-        <span class="ms" style="font-size: 12px">expand_more</span>
+        <MsIcon name="expand_more" size="xxs" color="none" />
       </button>
     </div>
   </div>

@@ -39,3 +39,6 @@ frontend/node_modules/
 
 # Frontend 构建产物 (通过 GitHub Release 分发)
 static/dist/
+
+# Material Symbols 子集字体 (CI 构建时由 build-fonts.sh 生成)
+frontend/public/fonts/MaterialSymbolsOutlined.woff2

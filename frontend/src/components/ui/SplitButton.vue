@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'SplitButton' })
 
@@ -55,8 +56,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       :disabled="disabled || loading"
       @click="emit('click')"
     >
-      <span v-if="loading" class="ms ms-sm split-button__spin">progress_activity</span>
-      <span v-else-if="icon" class="ms ms-sm">{{ icon }}</span>
+      <MsIcon v-if="loading" name="progress_activity" size="sm" color="none" class="split-button__spin" />
+      <MsIcon v-else-if="icon" :name="icon" size="sm" color="none" />
       <span>{{ label }}</span>
     </button>
 
@@ -65,7 +66,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       :disabled="disabled || loading"
       @click="toggle"
     >
-      <span class="ms" style="font-size: 16px">expand_more</span>
+      <MsIcon name="expand_more" size="xs" color="none" />
     </button>
 
     <div v-if="open" class="split-button__dropdown">
@@ -76,9 +77,9 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
         :class="{ 'split-button__option--active': opt.active, 'split-button__option--disabled': opt.disabled }"
         @click="!opt.disabled && select(opt.key)"
       >
-        <span v-if="opt.icon" class="ms ms-sm">{{ opt.icon }}</span>
+        <MsIcon v-if="opt.icon" :name="opt.icon" size="sm" color="none" />
         <span class="split-button__option-label">{{ opt.label }}</span>
-        <span v-if="opt.active" class="ms split-button__check">check</span>
+        <MsIcon v-if="opt.active" name="check" color="none" class="split-button__check" />
       </div>
     </div>
   </div>
