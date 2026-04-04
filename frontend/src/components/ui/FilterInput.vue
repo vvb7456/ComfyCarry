@@ -20,7 +20,7 @@ withDefaults(defineProps<{
       v-model="model"
       type="text"
       class="form-input filter-input__field"
-      :placeholder="placeholder || t('common.filter')"
+      :placeholder="placeholder || t('common.filter_hint')"
     >
     <button
       v-if="clearable && model"

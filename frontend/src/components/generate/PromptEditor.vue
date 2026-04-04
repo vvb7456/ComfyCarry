@@ -43,6 +43,31 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 
 const helpOpen = ref(false)
+const posRef = ref<HTMLTextAreaElement | null>(null)
+const negRef = ref<HTMLTextAreaElement | null>(null)
+
+/** Insert text at current cursor position in the specified textarea */
+function insertAtCursor(target: 'positive' | 'negative', text: string) {
+  const ta = target === 'positive' ? posRef.value : negRef.value
+  if (!ta) return
+
+  const pos = ta.selectionStart ?? ta.value.length
+  const before = ta.value.slice(0, pos)
+  const after = ta.value.slice(pos)
+  const sep = before && !before.endsWith(' ') && !before.endsWith(',') ? ', ' : ''
+  const newValue = before + sep + text + after
+  const newPos = pos + sep.length + text.length
+
+  emit(target === 'positive' ? 'update:positive' : 'update:negative', newValue)
+
+  // Restore focus and cursor position after Vue re-render
+  requestAnimationFrame(() => {
+    ta.focus()
+    ta.setSelectionRange(newPos, newPos)
+  })
+}
+
+defineExpose({ insertAtCursor })
 </script>
 
 <template>
@@ -59,6 +84,7 @@ const helpOpen = ref(false)
     <!-- Positive prompt -->
     <div class="prompt-wrap">
       <textarea
+        ref="posRef"
         class="prompt-textarea"
         :class="{ 'prompt-textarea--tooled': tools.length > 0 }"
         rows="4"
@@ -75,7 +101,7 @@ const helpOpen = ref(false)
           :disabled="tool.disabled"
           @click="emit('tool', tool.key)"
         >
-          <MsIcon :name="tool.icon" class="tool-icon" />
+          <MsIcon :name="tool.icon" color="var(--ac)" class="tool-icon" />
           <span class="tool-label">{{ tool.label }}</span>
         </button>
       </div>
@@ -84,6 +110,7 @@ const helpOpen = ref(false)
     <!-- Negative prompt -->
     <div v-if="showNegative" class="prompt-wrap prompt-wrap--negative">
       <textarea
+        ref="negRef"
         class="prompt-textarea"
         rows="4"
         :value="negative"

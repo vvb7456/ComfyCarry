@@ -157,7 +157,7 @@ defineExpose({ loadHistory })
               {{ t('comfyui.history.image_count', { count: item.images.length }) }}
             </span>
             <BaseButton size="sm" square :title="t('common.btn.download')" @click="downloadAll(item.images)">
-              <MsIcon name="download" />
+              <MsIcon name="download" color="none" />
             </BaseButton>
           </div>
         </div>

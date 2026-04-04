@@ -134,14 +134,30 @@
     "search_placeholder": "搜索 LoRA...",
     "not_found": "未找到 LoRA",
     "count_selected": "{count} 个已选",
-    "remove": "移除"
+    "remove": "移除",
+    "empty_warn": "请先添加 LoRA 再启用",
+    "disable": "禁用此 LoRA",
+    "enable": "启用此 LoRA"
   },
   "i2i": {
     "denoise": "重绘强度",
     "denoise_help": "控制生成结果与原图的相似度。值越低越接近原图，值越高变化越大。0.3=微调, 0.5=适度, 0.7=大幅重绘",
     "ref_image": "参考图",
-    "select_ref": "请先选择参考图",
-    "upload_placeholder": "点击选择参考图"
+    "select_ref": "请先选择参考图再启用",
+    "upload_placeholder": "点击选择参考图",
+    "pick_from_input": "点击选择参考图",
+    "or": "或",
+    "upload_local": "上传本地图片",
+    "clear": "移除参考图",
+    "uploaded": "参考图已上传"
+  },
+  "ref_modal": {
+    "search": "搜索图片...",
+    "upload_btn": "上传",
+    "upload_hint": "拖放图片至此处上传",
+    "uploading": "正在上传...",
+    "empty": "input/ 目录中没有图片",
+    "no_results": "未找到匹配的图片"
   },
   "controlnet": {
     "model": "模型",
@@ -169,7 +185,10 @@
     "detect_face": "检测面部",
     "detect_resolution": "检测分辨率",
     "low_threshold": "低阈值",
+    "low_threshold_help": "边缘检测的低阈值，低于此值的像素不被视为边缘。降低可检测更多细节，升高可减少噪点",
     "high_threshold": "高阈值",
+    "high_threshold_help": "边缘检测的高阈值，高于此值的像素确定为边缘。两个阈值之差越大，检测到的边缘越少",
+    "detect_resolution_help": "预处理器的输入分辨率，越高细节越多但速度越慢",
     "bone_map": "骨骼图",
     "edge_map": "边缘图",
     "depth_map": "深度图",
@@ -182,7 +201,15 @@
     "need_download_pose": "该功能需下载姿势控制模型",
     "need_download_canny": "该功能需下载轮廓控制模型",
     "need_download_depth": "该功能需下载景深控制模型",
-    "select_title": "选择{label}"
+    "select_title": "选择{label}",
+    "preprocess": "生成",
+    "preprocessing": "正在生成…",
+    "preprocess_done": "生成完成",
+    "no_model_selected": "请先选择模型",
+    "no_image_for_preprocess": "请先选择参考图",
+    "pick_ref": "点击选择{label}",
+    "param_settings": "参数设置",
+    "preprocess_blocked": "请等待当前任务完成"
   },
   "upscale": {
     "scale": "放大系数",
@@ -210,6 +237,7 @@
   },
   "interrogate": {
     "title": "反推参数",
+    "model_select": "反推模型",
     "general_threshold": "通用阈值",
     "general_threshold_help": "通用标签的置信度阈值。值越低识别越多标签但可能不准确，值越高越精确但可能遗漏",
     "character_threshold": "角色阈值",
@@ -225,7 +253,7 @@
     "failed": "反推失败",
     "result_hint": "反推结果将显示在这里",
     "use_prompt": "使用提示词",
-    "need_model": "请先安装反推模型",
+    "need_model": "该功能需下载反推模型",
     "modal_title": "提示词反推",
     "start_btn": "开始反推",
     "copy": "复制",
@@ -273,7 +301,7 @@
     "to_positive": "→ 正向",
     "to_negative": "→ 负向",
     "loading": "加载中...",
-    "load_failed": "加载失败或无 Embedding 文件",
+    "load_failed": "暂无 Embedding 文件",
     "no_match": "无匹配 Embedding",
     "weight_title": "权重",
     "to_positive_title": "插入到正向提示词",

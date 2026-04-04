@@ -11,7 +11,7 @@
  *  - 点击 tab → 切换 active (互斥, 再次点击同一 tab 可收起)
  *  - 点击 switch → 切换 enabled (独立于 active, 不冒泡)
  */
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 export interface SwitchTabItem {
@@ -45,8 +45,15 @@ function onTabClick(tab: SwitchTabItem) {
 function onSwitchClick(e: Event, tab: SwitchTabItem) {
   e.stopPropagation()
   if (tab.disabled) return
-  const checked = (e.target as HTMLInputElement).checked
-  emit('toggle', tab.key, checked)
+  const checkbox = e.target as HTMLInputElement
+  const currentlyEnabled = props.enabledTabs.has(tab.key)
+  emit('toggle', tab.key, !currentlyEnabled)
+  // Force-sync checkbox DOM after parent handles (or rejects) the toggle.
+  // If parent accepts: enabledTabs changes → checkbox matches.
+  // If parent rejects: enabledTabs unchanged → checkbox reverts.
+  nextTick(() => {
+    checkbox.checked = props.enabledTabs.has(tab.key)
+  })
 }
 
 function tabClass(tab: SwitchTabItem) {
@@ -70,7 +77,7 @@ function tabClass(tab: SwitchTabItem) {
       :disabled="tab.disabled"
       @click="onTabClick(tab)"
     >
-      <MsIcon v-if="tab.icon" :name="tab.icon" class="tab-icon" />
+        <MsIcon v-if="tab.icon" :name="tab.icon" color="none" class="tab-icon" />
       <span class="tab-label">{{ tab.label }}</span>
       <input
         type="checkbox"

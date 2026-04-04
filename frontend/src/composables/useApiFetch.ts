@@ -1,6 +1,13 @@
 import { ref } from 'vue'
 import { useToast } from './useToast'
 
+let _redirecting = false
+function redirectToLogin() {
+  if (_redirecting) return
+  _redirecting = true
+  window.location.href = '/login'
+}
+
 /**
  * Unified HTTP client composable.
  * Wraps fetch with loading/error state, JSON parsing, and toast on error.
@@ -22,6 +29,11 @@ export function useApiFetch() {
         ...opts,
       })
       if (!res.ok) {
+        // 401: session expired — redirect to login
+        if (res.status === 401) {
+          redirectToLogin()
+          return null
+        }
         let msg = `HTTP ${res.status}`
         try {
           const body = await res.json()
@@ -76,6 +88,10 @@ export function useApiFetch() {
     try {
       const res = await fetch(url, opts)
       if (!res.ok) {
+        if (res.status === 401) {
+          redirectToLogin()
+          return null
+        }
         let msg = `HTTP ${res.status}`
         try {
           const body = await res.json()

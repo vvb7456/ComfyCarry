@@ -74,7 +74,8 @@ onUnmounted(() => {
             v-if="isVideo"
             :key="`video:${src}`"
             :src="src"
-            controls autoplay loop muted playsinline
+            controls autoplay loop muted playsinline disablepictureinpicture
+            controlslist="nodownload noplaybackrate nofullscreen"
             class="ip-media"
             :class="{ 'ip-media--loaded': loaded }"
             @loadeddata="loaded = true"

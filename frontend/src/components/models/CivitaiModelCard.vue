@@ -113,7 +113,7 @@ const dlState = computed(() => props.downloadState || 'idle')
       </BaseButton>
       <BaseButton
         size="sm"
-        :variant="inCart ? 'danger' : 'primary'"
+        :variant="inCart ? 'danger' : 'default'"
         @click="emit('toggleCart', hit)"
       >
         {{ inCart ? t('models.civitai.unfavorite') : t('models.civitai.favorite') }}
@@ -129,7 +129,7 @@ const dlState = computed(() => props.downloadState || 'idle')
       <BaseButton
         v-else-if="dlState === 'partial'"
         size="sm"
-        class="cc-dl-partial"
+        variant="primary"
         @click="emit('download', hit)"
       >
         {{ t('models.downloads.download') }}
@@ -145,6 +145,7 @@ const dlState = computed(() => props.downloadState || 'idle')
       <BaseButton
         v-else
         size="sm"
+        variant="primary"
         @click="emit('download', hit)"
       >
         {{ t('models.downloads.download') }}
@@ -166,10 +167,5 @@ const dlState = computed(() => props.downloadState || 'idle')
 .cc-dl-busy {
   opacity: .5;
   cursor: default;
-}
-
-.cc-dl-partial {
-  color: var(--green);
-  border-color: color-mix(in srgb, var(--green) 40%, transparent);
 }
 </style>

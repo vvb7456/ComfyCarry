@@ -17,6 +17,7 @@ import TabSwitcher, { type TabItem } from '@/components/ui/TabSwitcher.vue'
 import SdxlTab from '@/components/generate/SdxlTab.vue'
 import QueuePanel from '@/components/generate/QueuePanel.vue'
 import HistoryPanel from '@/components/generate/HistoryPanel.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'GeneratePage' })
@@ -36,9 +37,14 @@ provide(GenerateOptionsKey, options)
 
 const optionsReady = ref(false)
 
-async function initOptions() {
-  await options.load()
+async function initOptions(forceRefresh = false) {
+  if (forceRefresh) {
+    await options.refresh()
+  } else {
+    await options.load()
+  }
   if (!options.loaded.value) return // ComfyUI may be offline, options failed
+  if (optionsReady.value) return // Already restored — skip duplicate restore
   store.restore({
     checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
     loraExists: (name) => options.loras.value.some(l => l.name === name),
@@ -49,17 +55,16 @@ async function initOptions() {
   optionsReady.value = true
 }
 
-initOptions()
-
-// Watch gate: when it transitions to 'ready', re-init options if not loaded
-watch(() => gate.state.value, (newState) => {
-  if (newState === 'ready' && !optionsReady.value) {
-    initOptions()
+// Only load options when gate is ready (not eagerly on mount)
+watch(() => gate.state.value, (newState, oldState) => {
+  if (newState === 'ready') {
+    // Force refresh if we previously loaded stale data while offline
+    initOptions(options.loaded.value && !optionsReady.value)
   }
-})
+}, { immediate: true })
 
 onActivated(() => {
-  if (options.loaded.value) options.refresh()
+  if (optionsReady.value) options.refresh()
   // Re-check gate on page re-activation
   gate.checkNow()
 })
@@ -99,8 +104,45 @@ async function handleStop() {
   toast(t('generate.toast.interrupt_sent'), 'info')
 }
 
+// ── Auxiliary task registration (from SdxlTab) ─────────────────────────────
+const sdxlTabRef = ref<InstanceType<typeof SdxlTab> | null>(null)
+
+function handleRegisterTask(promptId: string, type: 'preprocess' | 'tag', subtype: string) {
+  taskRegistry.registerTask(promptId, type, subtype)
+}
+
+function onPreprocessComplete(cnType: string, success: boolean) {
+  sdxlTabRef.value?.handlePreprocessDone(cnType, success)
+}
+
 // ── SSE event routing ──────────────────────────────────────────────────────
 const sse = useComfySSE(tracker, {
+  // Intercept auxiliary workflow events (preprocess, tag) BEFORE tracker
+  // — prevents them from hijacking the main progress bar (legacy behavior)
+  onBeforeTracker(evt) {
+    const promptId = (evt.data?.prompt_id as string) || ''
+    if (!promptId) return false
+
+    const routed = taskRegistry.routeEvent(evt)
+    if (!routed) return false
+
+    // Only suppress non-main tasks from the tracker
+    if (routed.target.type === 'main') return false
+
+    // Handle auxiliary task completion
+    if (evt.type === 'execution_done' || evt.type === 'execution_error' || evt.type === 'execution_interrupted') {
+      const success = evt.type === 'execution_done'
+      if (routed.target.type === 'preprocess' && routed.target.subtype) {
+        onPreprocessComplete(routed.target.subtype as 'pose' | 'canny' | 'depth', success)
+      } else if (routed.target.type === 'tag') {
+        sdxlTabRef.value?.handleTagDone(success)
+      }
+      taskRegistry.cleanup()
+    }
+
+    return true // suppress from tracker
+  },
+
   onEvent(evt, result) {
     if (evt.type === 'status') {
       queuePanelRef.value?.loadQueue()
@@ -115,31 +157,24 @@ const sse = useComfySSE(tracker, {
       }
     }
 
-    // Route through task registry
-    const routed = taskRegistry.routeEvent(evt)
-
     if (result?.finished) {
-      const promptId = (evt.data?.prompt_id as string) || ''
-
       if (result.type === 'execution_done') {
         const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
-
-        // Only show toast + fetch images for main tasks
-        if (!routed || routed.target.type === 'main') {
-          toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
-          if (promptId) preview.fetchOutputImages(promptId)
-        }
-
+        const promptId = (evt.data?.prompt_id as string) || ''
+        toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
+        if (promptId) preview.fetchOutputImages(promptId)
         queuePanelRef.value?.loadQueue()
         historyPanelRef.value?.loadHistory()
         taskRegistry.cleanup()
       } else if (result.type === 'execution_interrupted') {
         toast(t('generate.toast.exec_interrupted'), 'warning')
+        preview.clearPreview()
         queuePanelRef.value?.loadQueue()
         historyPanelRef.value?.loadHistory()
         taskRegistry.cleanup()
       } else if (result.type === 'execution_error') {
         toast(t('generate.error.exec_error_prefix'), 'error')
+        preview.clearPreview()
         queuePanelRef.value?.loadQueue()
         taskRegistry.cleanup()
       }
@@ -155,24 +190,23 @@ sse.start()
   <div class="page-body">
     <!-- Gate overlay when ComfyUI is not ready -->
     <div v-if="gate.state.value !== 'ready'" class="gen-gate-overlay">
-      <div class="gen-gate-card">
-        <MsIcon :name="gate.state.value === 'error' ? 'error' : 'cloud_off'" class="gen-gate-icon" />
-        <h3 class="gen-gate-title">
-          {{ gate.state.value === 'starting'
-            ? t('generate.gate.starting')
-            : gate.state.value === 'error'
-              ? t('generate.gate.backend_error')
-              : t('generate.preview.offline_title') }}
-        </h3>
-        <p class="gen-gate-desc">{{ t('generate.preview.offline_desc') }}</p>
+      <EmptyState
+        :icon="gate.state.value === 'error' ? 'error' : 'cloud_off'"
+        :title="gate.state.value === 'starting'
+          ? t('generate.gate.starting')
+          : gate.state.value === 'error'
+            ? t('generate.gate.backend_error')
+            : t('generate.preview.offline_title')"
+        :message="t('generate.preview.offline_desc')"
+      >
         <router-link v-if="gate.state.value === 'offline'" to="/comfyui" class="gen-gate-link">
-          <MsIcon name="open_in_new" />
+          <MsIcon name="open_in_new" color="none" />
           {{ t('generate.gate.go_comfyui') }}
         </router-link>
         <div v-if="gate.state.value === 'starting' || gate.state.value === 'checking'" class="gen-gate-spinner">
           <div class="gate-spinner" />
         </div>
-      </div>
+      </EmptyState>
     </div>
 
     <template v-else>
@@ -181,6 +215,7 @@ sse.start()
       <!-- SDXL Tab -->
       <div v-show="activeTab === 'sdxl'">
         <SdxlTab
+          ref="sdxlTabRef"
           :exec-state="execState"
           :elapsed="tracker.elapsed.value"
           :submitting="submitting"
@@ -189,6 +224,7 @@ sse.start()
           :preview-current="preview.currentPreview.value"
           @run="handleRun"
           @stop="handleStop"
+          @register-task="handleRegisterTask"
         />
       </div>
 
@@ -211,32 +247,6 @@ sse.start()
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  padding: var(--sp-6);
-}
-.gen-gate-card {
-  text-align: center;
-  max-width: 420px;
-  padding: var(--sp-6);
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  border-radius: var(--r-lg);
-}
-.gen-gate-icon {
-  font-size: 3rem;
-  color: var(--t3);
-  opacity: .4;
-  margin-bottom: var(--sp-3);
-}
-.gen-gate-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--t1);
-  margin: 0 0 var(--sp-2);
-}
-.gen-gate-desc {
-  font-size: .85rem;
-  color: var(--t2);
-  margin: 0 0 var(--sp-4);
 }
 .gen-gate-link {
   display: inline-flex;
@@ -248,7 +258,6 @@ sse.start()
 }
 .gen-gate-link:hover { text-decoration: underline; }
 .gen-gate-spinner {
-  margin-top: var(--sp-3);
   display: flex;
   justify-content: center;
 }

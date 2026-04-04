@@ -265,7 +265,6 @@ function tunnelStartByMode() {
 const isPublicMode = computed(() => data.value?.tunnel_mode === 'public')
 const tunnelStatus = computed(() => {
   if (!data.value) return 'unknown'
-  if (isPublicMode.value) return data.value.cloudflared === 'online' ? 'online' : 'stopped'
   return data.value.effective_status || 'unknown'
 })
 
@@ -274,7 +273,7 @@ function svcIcon(name: string) { return iconMap[name.toLowerCase()] || 'language
 const nameMap: Record<string, string> = { dashboard: 'Dashboard', comfyui: 'ComfyUI', jupyter: 'JupyterLab', ssh: 'SSH' }
 function svcName(name: string) { return nameMap[name.toLowerCase()] || name }
 
-const customSvcStatus = computed<{ status: 'running' | 'loading' | 'stopped'; label: string }>(() => {
+const svcStatus = computed<{ status: 'running' | 'loading' | 'stopped'; label: string }>(() => {
   const st = tunnelStatus.value
   if (st === 'online') return { status: 'running', label: t('tunnel.services.route_ready') }
   if (st === 'connecting' || st === 'starting') return { status: 'loading', label: t('tunnel.status.connecting') }
@@ -396,8 +395,8 @@ const connInfo = computed(() => {
                 <MsIcon :name="svcIcon(key)" />
                 <span class="tunnel-svc-name">{{ svcName(key) }}</span>
                 <span class="tunnel-svc-status">
-                  <StatusDot :status="tunnelStatus === 'online' ? 'running' : 'loading'" size="sm" />
-                  {{ tunnelStatus === 'online' ? t('tunnel.status.online') : t('tunnel.status.connecting') }}
+                  <StatusDot :status="svcStatus.status" size="sm" />
+                  {{ svcStatus.label }}
                 </span>
               </div>
               <code class="tunnel-svc-detail tunnel-svc-detail--cmd">{{ buildSshCmd(url) }}</code>
@@ -412,8 +411,8 @@ const connInfo = computed(() => {
                 <MsIcon :name="svcIcon(key)" />
                 <span class="tunnel-svc-name">{{ svcName(key) }}</span>
                 <span class="tunnel-svc-status">
-                  <StatusDot :status="tunnelStatus === 'online' ? 'running' : 'loading'" size="sm" />
-                  {{ tunnelStatus === 'online' ? t('tunnel.status.online') : t('tunnel.status.connecting') }}
+                  <StatusDot :status="svcStatus.status" size="sm" />
+                  {{ svcStatus.label }}
                 </span>
               </div>
               <span class="tunnel-svc-detail">{{ url }}</span>
@@ -432,8 +431,8 @@ const connInfo = computed(() => {
                 <MsIcon name="lock" />
                 <span class="tunnel-svc-name">SSH</span>
                 <span class="tunnel-svc-status">
-                  <StatusDot :status="customSvcStatus.status" size="sm" />
-                  {{ customSvcStatus.label }}
+                  <StatusDot :status="svcStatus.status" size="sm" />
+                  {{ svcStatus.label }}
                 </span>
               </div>
               <code class="tunnel-svc-detail tunnel-svc-detail--cmd">{{ buildSshCmd(svc.url) }}</code>
@@ -451,8 +450,8 @@ const connInfo = computed(() => {
                 <span class="tunnel-svc-name">{{ svc.name }}</span>
                 <span v-if="svc.custom" class="custom-badge">{{ t('tunnel.services.custom_badge') }}</span>
                 <span class="tunnel-svc-status">
-                  <StatusDot :status="customSvcStatus.status" size="sm" />
-                  {{ customSvcStatus.label }}
+                  <StatusDot :status="svcStatus.status" size="sm" />
+                  {{ svcStatus.label }}
                 </span>
               </div>
               <span class="tunnel-svc-detail">{{ svc.url }}</span>

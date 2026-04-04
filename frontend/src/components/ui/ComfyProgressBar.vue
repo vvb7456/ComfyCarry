@@ -91,12 +91,10 @@ const timeText = computed(() => {
     <span class="comfy-progress-time">{{ timeText }}</span>
   </div>
   <!-- Idle: placeholder -->
-  <div v-else class="comfy-progress-bar" :class="{ 'comfy-progress-bar--compact': compact }">
+  <div v-else class="comfy-progress-bar comfy-progress-bar--idle" :class="{ 'comfy-progress-bar--compact': compact }">
     <span class="comfy-progress-label comfy-progress-label--idle">
       <MsIcon name="hourglass_empty" size="xs" /> {{ t('comfyui.status.idle') }}
     </span>
-    <span class="comfy-progress-steps"></span>
-    <span class="comfy-progress-time"></span>
   </div>
 </template>
 
@@ -161,6 +159,10 @@ const timeText = computed(() => {
 .comfy-progress-label--idle {
   color: var(--t3);
   font-weight: 500;
+}
+
+.comfy-progress-bar--idle {
+  justify-content: center;
 }
 
 .comfy-progress-node {

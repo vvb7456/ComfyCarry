@@ -21,6 +21,12 @@ import type {
   PluginActionResponse, QueueStatusResponse,
 } from '@/types/plugins'
 
+defineOptions({ name: 'PluginsTab' })
+
+const props = defineProps<{
+  online?: boolean
+}>()
+
 const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
 const { toast } = useToast()
@@ -220,8 +226,18 @@ async function loadData() {
 }
 
 onMounted(() => {
-  loadData()
-  pollQueue()
+  if (props.online !== false) {
+    loadData()
+    pollQueue()
+  }
+})
+
+// Auto-load when coming online
+watch(() => props.online, (val) => {
+  if (val && installedPlugins.value.length === 0) {
+    loadData()
+    pollQueue()
+  }
 })
 
 onUnmounted(() => {

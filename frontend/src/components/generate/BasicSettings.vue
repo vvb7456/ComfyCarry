@@ -14,6 +14,10 @@ defineProps<{
   disabled?: boolean
 }>()
 
+const emit = defineEmits<{
+  'open-checkpoint': []
+}>()
+
 const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
 const state = computed(() => store.currentState)
@@ -23,18 +27,35 @@ const options = inject(GenerateOptionsKey)!
 const selectedCheckpoint = computed<CheckpointInfo | null>(() => {
   const name = state.value.checkpoint
   if (!name) return null
-  // Build displayName: strip folder prefix + extension
   const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
-  const displayName = base.replace(/\.[^.]+$/, '')
+  const fallbackName = base.replace(/\.[^.]+$/, '')
   const item = options.checkpoints.value.find(c => c.name === name)
   if (item) {
-    return { name: item.name, displayName, previewUrl: item.preview, arch: item.arch }
+    const info = item.info as Record<string, unknown> | null
+    // displayName: prefer CivitAI info.name, fallback to filename
+    const displayName = (info?.name as string) || fallbackName
+    const baseModel = info?.baseModel as string | undefined
+    // previewUrl: local preview → API endpoint; fallback to CivitAI image
+    let previewUrl: string | null = null
+    let previewIsVideo = false
+    if (item.preview) {
+      previewUrl = `/api/local_models/preview?path=${encodeURIComponent(item.preview)}`
+    }
+    // CivitAI image fallback
+    const civitImages = info?.images as Array<{ url?: string; type?: string }> | undefined
+    const civitImg = civitImages?.[0]
+    const civitUrl = civitImg?.url?.startsWith?.('http') ? civitImg.url : null
+    if (!previewUrl && civitUrl) {
+      previewUrl = civitUrl
+      previewIsVideo = civitImg?.type === 'video'
+    }
+    return { name: item.name, displayName, previewUrl, fallbackUrl: previewUrl ? civitUrl : null, previewIsVideo, arch: item.arch, baseModel }
   }
-  return { name, displayName }
+  return { name, displayName: fallbackName }
 })
 
 function openCheckpointModal() {
-  // TODO: open checkpoint selection modal
+  emit('open-checkpoint')
 }
 
 /* ── Resolution ── */
@@ -195,7 +216,8 @@ watch(() => state.value.resolution, (v) => {
   flex: 1;
 }
 
-.basic-grid__ckpt :deep(.ckpt-empty) {
+.basic-grid__ckpt :deep(.ckpt-empty),
+.basic-grid__ckpt :deep(.ckpt-card) {
   height: 100%;
   min-height: 0;
 }

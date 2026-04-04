@@ -59,11 +59,11 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     const inactiveModules: string[] = []
     for (const [type, cn] of Object.entries(state.controlNets)) {
       if (!cn.enabled && cn.image) {
-        inactiveModules.push(`ControlNet (${type})`)
+        inactiveModules.push(t(`generate.modules.${type}`))
       }
     }
     if (!state.i2i.enabled && state.i2i.image) {
-      inactiveModules.push('Img2Img')
+      inactiveModules.push(t('generate.modules.i2i'))
     }
 
     if (inactiveModules.length > 0) {
@@ -71,6 +71,7 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
         title: t('generate.error.modules_not_enabled'),
         message: `${t('generate.error.modules_not_enabled_desc')}\n\n${inactiveModules.join(', ')}`,
         confirmText: t('generate.error.skip_submit'),
+        dontAskKey: 'gen_skip_inactive_warn',
       })
       if (!proceed) return null
     }

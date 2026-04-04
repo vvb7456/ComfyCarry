@@ -6,6 +6,7 @@ export interface SplitButtonOption {
   label: string
   icon?: string
   active?: boolean
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<{
@@ -70,8 +71,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
         v-for="opt in options"
         :key="opt.key"
         class="split-button__option"
-        :class="{ 'split-button__option--active': opt.active }"
-        @click="select(opt.key)"
+        :class="{ 'split-button__option--active': opt.active, 'split-button__option--disabled': opt.disabled }"
+        @click="!opt.disabled && select(opt.key)"
       >
         <span v-if="opt.icon" class="ms ms-sm">{{ opt.icon }}</span>
         <span class="split-button__option-label">{{ opt.label }}</span>
@@ -190,6 +191,14 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 .split-button__option--active {
   color: var(--ac);
+}
+
+.split-button__option--disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.split-button__option--disabled:hover {
+  background: transparent;
 }
 
 .split-button__option-label {

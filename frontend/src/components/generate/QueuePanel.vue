@@ -125,7 +125,7 @@ defineExpose({ loadQueue })
           #{{ idx + 1 }} · {{ fmtId(item[1]) }} · {{ t('comfyui.queue.node_count', { count: nodeCount(item) }) }}
         </span>
         <BaseButton variant="danger" size="sm" square @click="deleteItem(item[1])">
-          <MsIcon name="delete" />
+          <MsIcon name="delete" color="none" />
         </BaseButton>
       </div>
     </CollapsibleGroup>

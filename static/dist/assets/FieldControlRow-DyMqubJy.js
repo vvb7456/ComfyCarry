@@ -1,1 +1,0 @@
-import{C as o,o as s,g as t,G as r}from"./forms-Bdl4SMqU.js";const n={},c={class:"field-row"};function a(e,d){return s(),t("div",c,[r(e.$slots,"default",{},void 0,!0)])}const l=o(n,[["render",a],["__scopeId","data-v-b08a54b9"]]);export{l as F};

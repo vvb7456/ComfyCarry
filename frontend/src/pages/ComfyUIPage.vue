@@ -128,7 +128,7 @@ async function comfyRestart() {
     </div>
 
     <div v-show="activeTab === 'plugins'">
-      <PluginsTab />
+      <PluginsTab :online="!!status?.online" />
     </div>
   </div>
 </template>

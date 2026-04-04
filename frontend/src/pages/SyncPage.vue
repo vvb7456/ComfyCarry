@@ -129,6 +129,7 @@ onMounted(() => {
   refresh.start({ immediate: false })
   logStream.start()
 })
+
 onUnmounted(() => {
   refresh.stop()
   // logStream auto-stops via onUnmounted in useLogStream

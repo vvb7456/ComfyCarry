@@ -1,7 +1,14 @@
 import { ref, onUnmounted } from 'vue'
-import { useExecTracker, type ComfyEvent, type EventResult } from './useExecTracker'
+import type { useExecTracker, ComfyEvent, EventResult } from './useExecTracker'
 
 export interface ComfySSEOptions {
+  /**
+   * Called for every SSE event BEFORE tracker.handleEvent().
+   * Return `true` to suppress the event from reaching the tracker
+   * (used for auxiliary-workflow interception: preprocess, tag, etc.).
+   * Return `false` / `undefined` to let the tracker process it normally.
+   */
+  onBeforeTracker?: (event: ComfyEvent) => boolean | void
   /** Called after tracker.handleEvent(). `result` is the return value (contains `finished` on execution end). */
   onEvent?: (event: ComfyEvent, result?: EventResult) => void
   reconnectDelay?: number
@@ -28,8 +35,16 @@ export function useComfySSE(
     source.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data)
-        const result = tracker.handleEvent(event)
-        opts.onEvent?.(event, result || undefined)
+
+        // Let caller intercept auxiliary events before tracker
+        const suppressed = opts.onBeforeTracker?.(event)
+        let result: EventResult | undefined
+        if (!suppressed) {
+          const r = tracker.handleEvent(event)
+          result = r || undefined
+        }
+
+        opts.onEvent?.(event, result)
       } catch { /* ignore malformed events */ }
     }
     source.onerror = () => {

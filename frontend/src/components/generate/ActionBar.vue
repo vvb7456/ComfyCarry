@@ -32,13 +32,14 @@ interface RunModeConfig {
   key: string
   icon: string
   label: string
+  disabled?: boolean
 }
 
 const isRunning = computed(() => props.execState != null)
 
 const runModes = computed<RunModeConfig[]>(() => [
   { key: 'normal', icon: 'play_arrow', label: t('generate.action.run') },
-  { key: 'live', icon: 'loop', label: t('generate.action.run_live') },
+  { key: 'live', icon: 'loop', label: t('generate.action.run_live'), disabled: true },
 ])
 
 const currentRunMode = computed(() =>
@@ -64,6 +65,7 @@ const splitOptions = computed<SplitButtonOption[]>(() =>
     icon: m.icon,
     label: m.label,
     active: m.key === state.value.runMode,
+    disabled: m.disabled,
   }))
 )
 

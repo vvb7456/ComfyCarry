@@ -134,14 +134,30 @@
     "search_placeholder": "Search LoRA...",
     "not_found": "No LoRA found",
     "count_selected": "{count} selected",
-    "remove": "Remove"
+    "remove": "Remove",
+    "empty_warn": "Please add LoRA first before enabling",
+    "disable": "Disable this LoRA",
+    "enable": "Enable this LoRA"
   },
   "i2i": {
     "denoise": "Denoise Strength",
     "denoise_help": "Controls similarity to the original image. Lower values stay closer to the original, higher values produce more changes. 0.3=minor, 0.5=moderate, 0.7=major repaint",
     "ref_image": "Reference Image",
     "select_ref": "Please select a reference image first",
-    "upload_placeholder": "Click to select reference image"
+    "upload_placeholder": "Click to select reference image",
+    "pick_from_input": "Select reference image",
+    "or": "or",
+    "upload_local": "Upload local image",
+    "clear": "Remove reference image",
+    "uploaded": "Reference image uploaded"
+  },
+  "ref_modal": {
+    "search": "Search images...",
+    "upload_btn": "Upload",
+    "upload_hint": "Drop image here to upload",
+    "uploading": "Uploading...",
+    "empty": "No images in input/ directory",
+    "no_results": "No matching images found"
   },
   "controlnet": {
     "model": "Model",
@@ -169,7 +185,10 @@
     "detect_face": "Detect Face",
     "detect_resolution": "Detection Resolution",
     "low_threshold": "Low Threshold",
+    "low_threshold_help": "Lower edge detection threshold. Pixels below this value won't be considered edges. Lower values detect more detail, higher values reduce noise",
     "high_threshold": "High Threshold",
+    "high_threshold_help": "Upper edge detection threshold. Pixels above this value are confirmed as edges. A larger gap between thresholds yields fewer edges",
+    "detect_resolution_help": "Preprocessor input resolution. Higher values capture more detail but run slower",
     "bone_map": "Skeleton Map",
     "edge_map": "Edge Map",
     "depth_map": "Depth Map",
@@ -182,7 +201,15 @@
     "need_download_pose": "Pose control models required",
     "need_download_canny": "Edge control models required",
     "need_download_depth": "Depth control models required",
-    "select_title": "Select {label}"
+    "select_title": "Select {label}",
+    "preprocess": "Generate",
+    "preprocessing": "Generating…",
+    "preprocess_done": "Done",
+    "no_model_selected": "Please select a model first",
+    "no_image_for_preprocess": "Please select a reference image first",
+    "pick_ref": "Click to select {label}",
+    "param_settings": "Parameter Settings",
+    "preprocess_blocked": "Please wait for the current task to finish"
   },
   "upscale": {
     "scale": "Scale Factor",
@@ -210,6 +237,7 @@
   },
   "interrogate": {
     "title": "Interrogate Settings",
+    "model_select": "Tagger Model",
     "general_threshold": "General Threshold",
     "general_threshold_help": "Confidence threshold for general tags. Lower values detect more tags but may be inaccurate, higher values are more precise but may miss some",
     "character_threshold": "Character Threshold",
@@ -225,7 +253,7 @@
     "failed": "Interrogation failed",
     "result_hint": "Results will appear here",
     "use_prompt": "Use as prompt",
-    "need_model": "Please install interrogation model first",
+    "need_model": "This feature requires downloading a tagger model",
     "modal_title": "Interrogate",
     "start_btn": "Start Interrogation",
     "copy": "Copy",
@@ -272,7 +300,7 @@
     "to_positive": "→ Positive",
     "to_negative": "→ Negative",
     "loading": "Loading...",
-    "load_failed": "Load failed or no Embedding files",
+    "load_failed": "No Embedding files found",
     "no_match": "No matching Embedding",
     "weight_title": "Weight",
     "to_positive_title": "Insert to positive prompt",

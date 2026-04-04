@@ -48,7 +48,7 @@ const { t } = useI18n({ useScope: 'global' })
 
     <!-- Empty state -->
     <div v-else class="gen-preview-empty">
-      <MsIcon name="image" class="preview-icon" />
+      <MsIcon name="image" color="none" class="preview-icon" />
       <span class="preview-hint">{{ t('generate.preview.empty') }}</span>
     </div>
   </div>
@@ -57,7 +57,7 @@ const { t } = useI18n({ useScope: 'global' })
 <style scoped>
 .gen-preview-card {
   position: relative;
-  flex: 1;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   background: var(--bg3);
@@ -93,8 +93,8 @@ const { t } = useI18n({ useScope: 'global' })
   padding: var(--sp-2);
 }
 .gen-preview-single img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   cursor: pointer;
   border-radius: var(--r-md);
@@ -122,7 +122,8 @@ const { t } = useI18n({ useScope: 'global' })
 .gen-preview-grid img:hover { opacity: .9; }
 
 /* Live preview */
-.preview-live { opacity: 0.85; }
+.preview-live { opacity: 0.85; cursor: default; }
+.preview-live:hover { opacity: 0.85; }
 
 /* Empty state */
 .gen-preview-empty {

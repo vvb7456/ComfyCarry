@@ -92,12 +92,30 @@ def _scan_lora_metadata(names: list[str], rel_dir: str) -> tuple[dict[str, str],
             if info.get("name"):
                 entry["name"] = info["name"]
             if info.get("trainedWords"):
-                entry["trainedWords"] = info["trainedWords"]
+                # Normalize: [{word: "a"}, {word: "b, c"}] → ["a", "b", "c"]
+                raw_tw = [w.get("word", "") for w in info["trainedWords"] if w.get("word")]
+                normalized = []
+                seen = set()
+                for w in raw_tw:
+                    for part in (p.strip() for p in w.split(",") if p.strip()):
+                        if part not in seen:
+                            seen.add(part)
+                            normalized.append(part)
+                entry["trainedWords"] = normalized
             if info.get("baseModel"):
                 entry["baseModel"] = info["baseModel"]
-            civitai_model_id = info.get("raw", {}).get("civitai", {}).get("modelId")
+            civitai_raw = info.get("raw", {}).get("civitai", {})
+            civitai_model_id = civitai_raw.get("modelId")
             if civitai_model_id:
                 entry["civitai_id"] = civitai_model_id
+            civitai_version_id = civitai_raw.get("id")
+            if civitai_version_id:
+                entry["versionId"] = civitai_version_id
+            civitai_version_name = civitai_raw.get("name")
+            if civitai_version_name:
+                entry["versionName"] = civitai_version_name
+            if info.get("sha256"):
+                entry["sha256"] = info["sha256"]
             if info.get("images"):
                 entry["images"] = info["images"][:6]
             info_result[name] = entry
@@ -442,10 +460,11 @@ def api_generate_upload_image():
     上传图片到 ComfyUI input/ 目录 (供 ControlNet / Img2Img 使用)。
 
     Form data:
-        file  — 图片文件 (png/jpeg/webp/bmp, 最大 20MB)
-        type  — 用途标识 (可选: "pose" / "canny" / "depth" / "i2i")
+        file      — 图片文件 (png/jpeg/webp/bmp, 最大 20MB)
+        type      — 用途标识 (可选: "pose" / "canny" / "depth" / "i2i")
+        subfolder — 可选子目录名 (如 "openpose"), 保存到 input/{subfolder}/
 
-    返回: {"filename": "pose_abc123.png"}  (ComfyUI input/ 目录中的文件名)
+    返回: {"filename": "openpose/pose_abc123.png"}  (相对于 input/ 的路径)
     """
     if "file" not in request.files:
         return jsonify({"error": "请上传图片文件"}), 400
@@ -474,13 +493,24 @@ def api_generate_upload_image():
     safe_name = f"comfycarry_{usage}_{uuid.uuid4().hex[:8]}{ext}"
 
     input_dir = os.path.join(COMFYUI_DIR, "input")
-    os.makedirs(input_dir, exist_ok=True)
-    dest = os.path.join(input_dir, safe_name)
+
+    # 可选子目录 (如 openpose / canny / depth)
+    subfolder = request.form.get("subfolder", "").strip()
+    if subfolder:
+        safe_sub = os.path.basename(subfolder)  # 防止路径遍历
+        save_dir = os.path.join(input_dir, safe_sub)
+    else:
+        save_dir = input_dir
+    os.makedirs(save_dir, exist_ok=True)
+    dest = os.path.join(save_dir, safe_name)
 
     file.save(dest)
-    logger.info(f"[generate] 图片已上传: {safe_name} ({size} bytes)")
 
-    result = {"filename": safe_name}
+    # 返回相对于 input/ 的路径
+    rel_name = f"{safe_sub}/{safe_name}" if subfolder else safe_name
+    logger.info(f"[generate] 图片已上传: {rel_name} ({size} bytes)")
+
+    result = {"filename": rel_name}
 
     # 返回图片尺寸 (用于图生图自动填充 width/height)
     try:

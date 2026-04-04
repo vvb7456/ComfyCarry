@@ -7,6 +7,8 @@ export interface ConfirmOptions {
   variant?: 'default' | 'danger'
   confirmText?: string
   cancelText?: string
+  /** When set, show a "Don't ask again" checkbox. Value is the localStorage key. */
+  dontAskKey?: string
 }
 
 export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>

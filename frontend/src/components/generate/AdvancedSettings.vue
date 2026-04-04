@@ -34,9 +34,9 @@ function formatLabel(key: string): string {
 </script>
 
 <template>
-  <details class="adv-settings" :class="{ 'adv-settings--disabled': disabled }" open>
+  <details class="adv-settings" :class="{ 'adv-settings--disabled': disabled }">
     <summary class="adv-summary">
-      <MsIcon name="expand_more" class="adv-summary__arrow" />
+      <MsIcon name="expand_more" color="none" class="adv-summary__arrow" />
       {{ t('generate.advanced.title') }}
     </summary>
 
@@ -133,8 +133,7 @@ function formatLabel(key: string): string {
 
 <style scoped>
 .adv-settings {
-  border-top: 1px solid var(--bd);
-  padding-top: var(--sp-3);
+  padding-top: 0;
 }
 
 .adv-settings--disabled {

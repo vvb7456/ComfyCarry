@@ -34,7 +34,7 @@ function onOverlayClick() {
 
   <main class="content" :class="{ 'sidebar-collapsed': app.sidebarCollapsed }">
     <RouterView v-slot="{ Component }">
-      <KeepAlive :include="['GeneratePage']">
+      <KeepAlive include="GeneratePage">
         <component :is="Component" />
       </KeepAlive>
     </RouterView>

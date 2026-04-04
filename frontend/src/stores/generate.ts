@@ -76,6 +76,10 @@ const STORAGE_KEY = 'comfycarry_generate_params'
 const SCHEMA_VERSION = 2
 const SAVE_DEBOUNCE_MS = 300
 
+function randomSeed(): number {
+  return Math.floor(Math.random() * 4294967295)
+}
+
 // ── Factory ──────────────────────────────────────────────────────────────────
 
 function createDefaultState(config: ModelTypeConfig): ModelState {
@@ -98,14 +102,14 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     sampler: config.defaults.sampler,
     scheduler: config.defaults.scheduler,
     seedMode: 'random',
-    seedValue: -1,
+    seedValue: randomSeed(),
     batch: 1,
     prefix: '[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]',
     format: 'png',
     runMode: 'normal',
     controlNets,
     upscale: { enabled: false, factor: 2, mode: '4x_overlapped_checkboard', tile: 8, downscale: 'lanczos' },
-    hires: { enabled: false, denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: -1 },
+    hires: { enabled: false, denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: randomSeed() },
     i2i: { enabled: false, image: null, denoise: 0.7 },
     activeModule: config.modules[0] || 'lora',
   }
@@ -267,6 +271,14 @@ export const useGenerateStore = defineStore('generate', () => {
               const config = MODEL_TYPES[key] || MODEL_TYPES.sdxl
               state.scheduler = config.defaults.scheduler
             }
+          }
+
+          // Refresh stale -1 seeds from old data
+          if (state.seedMode === 'random' && state.seedValue < 0) {
+            state.seedValue = randomSeed()
+          }
+          if (state.hires?.seedMode === 'random' && state.hires.seedValue < 0) {
+            state.hires.seedValue = randomSeed()
           }
 
           // Merge with defaults to fill any missing fields

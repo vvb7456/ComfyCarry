@@ -62,7 +62,7 @@ function onImgError() {
       <video
         v-if="showVideo"
         :src="imageFallback"
-        muted autoplay loop playsinline preload="metadata"
+        muted autoplay loop playsinline disablepictureinpicture preload="metadata"
       />
       <img
         v-else-if="displaySrc"

@@ -10,18 +10,23 @@ const props = withDefaults(defineProps<{
   pickLabel?: string
   uploadLabel?: string
   pickIcon?: string
+  /** When set, replaces the bottom upload area with a custom action button */
+  actionLabel?: string
+  actionIcon?: string
   disabled?: boolean
   compact?: boolean
 }>(), {
   mode: 'drop',
   accept: '',
   pickIcon: 'folder_open',
+  actionIcon: 'auto_fix_high',
 })
 
 const emit = defineEmits<{
   file: [file: File]
   pick: []
   clear: []
+  action: []
   error: [message: string]
 }>()
 
@@ -148,7 +153,13 @@ defineExpose({ clearFile })
         <span>{{ pickLabel || t('common.upload.pick_label') }}</span>
       </div>
       <div class="upload-zone__divider">{{ t('common.upload.or_divider') }}</div>
-      <div class="upload-zone__drop" @click="triggerPick">
+      <!-- Action variant: custom bottom action (e.g. open preprocess modal) -->
+      <div v-if="actionLabel" class="upload-zone__drop" @click.stop="$emit('action')">
+        <span class="ms">{{ actionIcon }}</span>
+        <span>{{ actionLabel }}</span>
+      </div>
+      <!-- Default: upload local file -->
+      <div v-else class="upload-zone__drop" @click="triggerPick">
         <span class="ms">add_photo_alternate</span>
         <span>{{ uploadLabel || t('common.upload.upload_label') }}</span>
       </div>

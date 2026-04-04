@@ -315,7 +315,7 @@ function badgeColor(type?: string): string | undefined {
             <template v-if="isVideo(img)">
               <video
                 :src="fullImageUrl(img.url)"
-                muted loop playsinline preload="metadata"
+                muted loop playsinline disablepictureinpicture preload="metadata"
               />
               <span class="mm-video-badge">
                 <MsIcon name="videocam" class="ms-sm" /> {{ t('models.meta.video') }}
