@@ -21,6 +21,7 @@ import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import type { SSHKey, SSHStatus } from '@/types/ssh'
 
 defineOptions({ name: 'SSHPage' })
 
@@ -28,25 +29,6 @@ const { t } = useI18n({ useScope: 'global' })
 const { get, post, del } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface SSHStatus {
-  running: boolean
-  pid: number | null
-  port: number
-  active_connections: number
-  password_auth: boolean
-  password_set: boolean
-  pw_sync: boolean
-}
-
-interface SSHKey {
-  fingerprint: string
-  comment: string
-  type: string
-  source: string
-}
 
 // ─── State ────────────────────────────────────────────────────────────────────
 

@@ -7,6 +7,8 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'WizardDeployView' })
+
 const { t } = useI18n({ useScope: 'global' })
 
 const {

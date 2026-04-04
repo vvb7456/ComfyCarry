@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 
+defineOptions({ name: 'RangeField' })
+
 const props = withDefaults(defineProps<{
   modelValue: number
   min: number

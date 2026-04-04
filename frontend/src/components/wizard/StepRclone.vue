@@ -15,6 +15,8 @@ import AlertBanner from '@/components/ui/AlertBanner.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'StepRclone' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, envVars, remoteTypeDefs, nextStep, prevStep } = useWizardState()
 const {

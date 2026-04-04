@@ -8,6 +8,8 @@ import { provideToast } from '@/composables/useToast'
 import { useTheme } from '@/composables/useTheme'
 import { useAppStore } from '@/stores/app'
 
+defineOptions({ name: 'App' })
+
 provideToast()
 useTheme() // initialize theme on app level
 

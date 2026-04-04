@@ -10,6 +10,8 @@ import RangeField from '@/components/form/RangeField.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'BasicSettings' })
+
 defineProps<{
   disabled?: boolean
 }>()

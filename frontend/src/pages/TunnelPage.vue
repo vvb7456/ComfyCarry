@@ -399,7 +399,7 @@ const connInfo = computed(() => {
                   {{ svcStatus.label }}
                 </span>
               </div>
-              <code class="tunnel-svc-detail tunnel-svc-detail--cmd">{{ buildSshCmd(url) }}</code>
+              <code class="tunnel-svc-detail tunnel-svc-detail--cmd text-truncate">{{ buildSshCmd(url) }}</code>
               <div class="tunnel-svc-footer">
                 <span class="tunnel-svc-port">:22 · TCP</span>
                 <span class="tunnel-svc-hint">{{ t('tunnel.services.click_copy') }}</span>
@@ -435,7 +435,7 @@ const connInfo = computed(() => {
                   {{ svcStatus.label }}
                 </span>
               </div>
-              <code class="tunnel-svc-detail tunnel-svc-detail--cmd">{{ buildSshCmd(svc.url) }}</code>
+              <code class="tunnel-svc-detail tunnel-svc-detail--cmd text-truncate">{{ buildSshCmd(svc.url) }}</code>
               <div class="tunnel-svc-footer">
                 <span class="tunnel-svc-port">:{{ svc.port }} · {{ svc.suffix || '' }}.{{ data.domain }}</span>
                 <span class="tunnel-svc-hint">{{ t('tunnel.services.click_copy') }}</span>
@@ -651,7 +651,7 @@ const connInfo = computed(() => {
 .tunnel-svc-card:hover { border-color: var(--ac); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 20%, transparent); }
 /* SSH card: clickable */
 .tunnel-svc-card--ssh { cursor: pointer; }
-.tunnel-svc-detail--cmd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; word-break: normal; }
+.tunnel-svc-detail--cmd { display: block; word-break: normal; }
 .tunnel-svc-footer { display: flex; align-items: center; justify-content: space-between; }
 .tunnel-svc-hint { font-size: .65rem; color: var(--t3); flex-shrink: 0; }
 /* Section subtitle inline with title */

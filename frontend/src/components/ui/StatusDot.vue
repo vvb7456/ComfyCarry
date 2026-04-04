@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+defineOptions({ name: 'StatusDot' })
+
 type DotStatus =
   | 'running'
   | 'stopped'

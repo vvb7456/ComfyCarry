@@ -13,6 +13,8 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'QueuePanel' })
+
 type QueueItem = [number, string, Record<string, unknown>, ...unknown[]]
 
 const props = defineProps<{
@@ -90,7 +92,7 @@ defineExpose({ loadQueue })
       />
       <div v-for="item in queueRunning" :key="item[1]" class="queue-running-item">
         <div class="queue-running-item__row">
-          <span class="queue-id">{{ fmtId(item[1]) }} · {{ t('comfyui.queue.node_count', { count: nodeCount(item) }) }}</span>
+          <span class="queue-id text-truncate">{{ fmtId(item[1]) }} · {{ t('comfyui.queue.node_count', { count: nodeCount(item) }) }}</span>
         </div>
         <ComfyProgressBar
           v-if="execState && execState.promptId === item[1]"
@@ -121,7 +123,7 @@ defineExpose({ loadQueue })
         :message="t('comfyui.queue.no_pending')"
       />
       <div v-for="(item, idx) in queuePending" :key="item[1]" class="queue-pending-item">
-        <span class="queue-id">
+        <span class="queue-id text-truncate">
           #{{ idx + 1 }} · {{ fmtId(item[1]) }} · {{ t('comfyui.queue.node_count', { count: nodeCount(item) }) }}
         </span>
         <BaseButton variant="danger" size="sm" square @click="deleteItem(item[1])">
@@ -155,9 +157,6 @@ defineExpose({ loadQueue })
   font-family: 'IBM Plex Mono', monospace;
   font-size: .75rem;
   color: var(--t3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .queue-pending-item {

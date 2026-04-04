@@ -24,6 +24,8 @@ import { computed, watch, ref, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'BaseModal' })
+
 const props = withDefaults(defineProps<{
   modelValue: boolean
   title?: string
@@ -47,6 +49,8 @@ const props = withDefaults(defineProps<{
   // Visual
   tone?: 'default' | 'info' | 'danger'
   footerAlign?: 'start' | 'end' | 'between'
+  /** Override z-index of the modal overlay (default: 1000) */
+  zIndex?: number
 }>(), {
   size: 'md',
   maxHeight: '90vh',
@@ -147,6 +151,7 @@ const footerClass = computed(() => {
         v-if="show"
         class="modal-overlay"
         :class="{ 'modal-overlay--top': align === 'top' }"
+        :style="props.zIndex ? { zIndex: props.zIndex } : undefined"
         @click="onOverlayClick"
         @keydown="onKeydown"
         tabindex="-1"
@@ -196,7 +201,7 @@ const footerClass = computed(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .55);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;

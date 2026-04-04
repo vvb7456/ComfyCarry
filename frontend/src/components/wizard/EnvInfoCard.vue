@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import type { GpuInfo, PrebuiltInfo } from '@/types/wizard'
 
+defineOptions({ name: 'EnvInfoCard' })
+
 const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{

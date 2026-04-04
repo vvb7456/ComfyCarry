@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
+defineOptions({ name: 'CollapsibleGroup' })
+
 const props = withDefaults(defineProps<{
   title?: string
   count?: number

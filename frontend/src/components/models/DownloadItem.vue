@@ -124,7 +124,7 @@ const isFailed = computed(() => props.task?.status === 'failed')
 
     <!-- Info -->
     <div class="dli-info">
-      <div class="dli-name">
+      <div class="dli-name text-truncate">
         <a v-if="civitaiUrl" :href="civitaiUrl" target="_blank" rel="noopener" @click.stop>{{ name }}</a>
         <span v-else>{{ name }}</span>
       </div>
@@ -258,9 +258,6 @@ const isFailed = computed(() => props.task?.status === 'failed')
 .dli-name {
   font-size: var(--text-sm);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   margin-bottom: 4px;
 }
 

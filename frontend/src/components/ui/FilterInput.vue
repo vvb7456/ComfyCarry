@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
+defineOptions({ name: 'FilterInput' })
+
 const { t } = useI18n({ useScope: 'global' })
 const model = defineModel<string>({ default: '' })
 

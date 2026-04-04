@@ -9,6 +9,8 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 
+defineOptions({ name: 'StepPassword' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, envVars, nextStep, prevStep } = useWizardState()
 

@@ -511,7 +511,7 @@ async function uploadRcloneFile(e: Event) {
           </div>
           <div class="sync-rule-info">
             <div class="sync-rule-name">{{ rule.name }}</div>
-            <div class="sync-rule-detail">
+            <div class="sync-rule-detail text-truncate">
               <template v-if="rule.direction === 'push'">
                 <span style="opacity:.6"><MsIcon name="folder" /></span> {{ rule.local_path }}
                 <span class="sync-flow-arrows"><span>▸</span><span>▸</span><span>▸</span></span>
@@ -711,7 +711,7 @@ async function uploadRcloneFile(e: Event) {
 @keyframes arrowFlow { 0%, 100% { opacity: .2; } 40% { opacity: 1; } 60% { opacity: 1; } 80% { opacity: .2; } }
 .sync-rule-info { flex: 1; min-width: 0; }
 .sync-rule-name { font-weight: 600; font-size: .9rem; }
-.sync-rule-detail { font-size: .78rem; color: var(--t3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
+.sync-rule-detail { font-size: .78rem; color: var(--t3); margin-top: 3px; display: flex; align-items: center; }
 .sync-rule-badges { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
 .sync-rule-badge { font-size: .68rem; padding: 1px 7px; border-radius: 8px; background: var(--bg2); color: var(--t2); border: 1px solid var(--bd); display: inline-flex; align-items: center; gap: 3px; }
 .sync-rule-actions { display: flex; gap: 4px; flex-shrink: 0; }

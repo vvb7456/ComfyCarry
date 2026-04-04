@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'StatCard' })
+
 const props = withDefaults(defineProps<{
   label?: string
   status?: 'info' | 'running' | 'stopped' | 'loading' | 'error'

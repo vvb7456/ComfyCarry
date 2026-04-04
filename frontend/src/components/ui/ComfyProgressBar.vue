@@ -16,6 +16,8 @@ import { useI18n } from 'vue-i18n'
 import type { ExecState } from '@/composables/useExecTracker'
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'ComfyProgressBar' })
+
 const props = defineProps<{
   state: ExecState | null
   elapsed: number          // milliseconds from useExecTracker
@@ -86,7 +88,7 @@ const timeText = computed(() => {
     <div class="comfy-progress-bar-fill" :style="{ width: fillPct + '%' }" />
     <span class="comfy-progress-pulse" />
     <span class="comfy-progress-label"><MsIcon name="bolt" size="xs" /> {{ t('comfyui.status.generating') }}</span>
-    <span v-if="nodeText" class="comfy-progress-node">{{ nodeText }}</span>
+    <span v-if="nodeText" class="comfy-progress-node text-truncate">{{ nodeText }}</span>
     <span class="comfy-progress-steps">{{ stepText }}</span>
     <span class="comfy-progress-time">{{ timeText }}</span>
   </div>
@@ -168,9 +170,6 @@ const timeText = computed(() => {
 .comfy-progress-node {
   color: var(--t2);
   font-size: .78rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 200px;
 }
 

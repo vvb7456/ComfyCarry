@@ -16,6 +16,8 @@ import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 
+defineOptions({ name: 'PromptEditor' })
+
 export interface ToolButton {
   key: string
   icon: string
@@ -58,7 +60,11 @@ function insertAtCursor(target: 'positive' | 'negative', text: string) {
   const newValue = before + sep + text + after
   const newPos = pos + sep.length + text.length
 
-  emit(target === 'positive' ? 'update:positive' : 'update:negative', newValue)
+  if (target === 'positive') {
+    emit('update:positive', newValue)
+  } else {
+    emit('update:negative', newValue)
+  }
 
   // Restore focus and cursor position after Vue re-render
   requestAnimationFrame(() => {

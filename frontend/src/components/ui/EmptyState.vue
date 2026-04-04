@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'EmptyState' })
+
 withDefaults(defineProps<{
   icon?: string
   title?: string

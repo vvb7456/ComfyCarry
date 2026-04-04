@@ -10,6 +10,8 @@ import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'StepDeploy' })
+
 const { t } = useI18n({ useScope: 'global' })
 const {
   config, gpuInfo, prebuiltInfo, detectedImageType, isUnsupported,

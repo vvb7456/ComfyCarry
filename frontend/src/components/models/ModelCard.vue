@@ -86,7 +86,7 @@ function onImgError() {
 
     <!-- Body -->
     <div class="mc-body">
-      <div class="mc-title" :title="title">{{ title }}</div>
+      <div class="mc-title text-truncate" :title="title">{{ title }}</div>
       <div v-if="$slots.meta" class="mc-meta">
         <slot name="meta" />
       </div>
@@ -107,7 +107,7 @@ function onImgError() {
   cursor: pointer;
 }
 .mc:hover {
-  border-color: rgba(124, 92, 252, .4);
+  border-color: color-mix(in srgb, var(--ac) 40%, transparent);
   transform: translateY(-1px);
   box-shadow: var(--sh);
 }
@@ -149,12 +149,12 @@ function onImgError() {
   right: 6px;
   width: 24px;
   height: 24px;
-  background: rgba(0, 0, 0, .55);
+  background: var(--overlay);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--t-inv);
   cursor: zoom-in;
   opacity: 0;
   transition: opacity .2s;
@@ -174,9 +174,6 @@ function onImgError() {
   font-weight: 600;
   margin-bottom: 5px;
   line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .mc:hover .mc-title {
   color: var(--ac);

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'Spinner' })
+
 defineProps<{
   size?: 'sm' | 'md' | 'lg'
 }>()

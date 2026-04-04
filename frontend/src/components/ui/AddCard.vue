@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'AddCard' })
+
 const props = withDefaults(defineProps<{
   label?: string
   size?: 'compact' | 'default'

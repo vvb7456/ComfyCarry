@@ -17,6 +17,7 @@ import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import type { JupyterStatus } from '@/types/jupyter'
 import { fmtBytes } from '@/utils/format'
 
 defineOptions({ name: 'JupyterPage' })
@@ -25,45 +26,6 @@ const { t } = useI18n({ useScope: 'global' })
 const { get, post, del } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface JupyterStatus {
-  online: boolean
-  pm2_status: string
-  version?: string
-  pid?: number
-  port: number
-  cpu?: number
-  memory?: number
-  kernels_count: number
-  sessions_count: number
-  kernelspecs?: Array<{ name: string; display_name: string }>
-  default_kernel?: string
-  kernels?: KernelInfo[]
-  sessions?: SessionInfo[]
-  terminals?: TerminalInfo[]
-}
-
-interface KernelInfo {
-  id: string
-  name: string
-  state: string
-  connections: number
-}
-
-interface SessionInfo {
-  id: string
-  name?: string
-  path: string
-  type: string
-  kernel_name?: string
-  kernel_state?: string
-}
-
-interface TerminalInfo {
-  name: string
-}
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -363,8 +325,8 @@ onUnmounted(() => {
               <MsIcon :name="sess.type === 'notebook' ? 'book_2' : sess.type === 'console' ? 'terminal' : 'description'" />
             </span>
             <div class="jupyter-session-info">
-              <span class="jupyter-session-name">{{ sess.name || sess.path }}</span>
-              <span class="jupyter-session-meta">
+              <span class="jupyter-session-name text-truncate">{{ sess.name || sess.path }}</span>
+              <span class="jupyter-session-meta text-truncate">
                 {{ sess.path }} · {{ sess.kernel_name || '' }}
                 <span :style="`color: ${sess.kernel_state === 'idle' ? 'var(--green)' : sess.kernel_state === 'busy' ? 'var(--amber)' : 'var(--t3)'}`">
                   ({{ sess.kernel_state === 'idle' ? t('jupyter.kernels.idle') : sess.kernel_state === 'busy' ? t('jupyter.kernels.busy') : (sess.kernel_state || '-') }})
@@ -452,7 +414,7 @@ onUnmounted(() => {
 .jupyter-kernel-actions,
 .jupyter-session-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .jupyter-session-icon { font-size: 1.1rem; flex-shrink: 0; }
-.jupyter-session-name { font-weight: 600; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.jupyter-session-meta { font-size: .75rem; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jupyter-session-name { font-weight: 600; font-size: .85rem; }
+.jupyter-session-meta { font-size: .75rem; color: var(--t3); }
 .jupyter-session-info { flex-direction: column; align-items: flex-start; gap: 2px; }
 </style>

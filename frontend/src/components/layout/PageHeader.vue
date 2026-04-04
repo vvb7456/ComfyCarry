@@ -11,6 +11,8 @@ import { useAppStore } from '@/stores/app'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import MsIcon from '../ui/MsIcon.vue'
 
+defineOptions({ name: 'PageHeader' })
+
 defineProps<{
   icon: string
   iconColor?: string

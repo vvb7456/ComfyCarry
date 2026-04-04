@@ -11,6 +11,8 @@ import SecretInput from '@/components/ui/SecretInput.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'StepLlm' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, nextStep, prevStep } = useWizardState()
 const {

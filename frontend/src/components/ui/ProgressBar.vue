@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+defineOptions({ name: 'ProgressBar' })
+
 const props = defineProps<{
   value: number       // current value (e.g. step number)
   max: number         // max value

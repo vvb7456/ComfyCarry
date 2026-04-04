@@ -18,6 +18,8 @@ import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Spinner from './Spinner.vue'
 
+defineOptions({ name: 'ChipSelect' })
+
 export interface ChipOption {
   value: string
   label: string

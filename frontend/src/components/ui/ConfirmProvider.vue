@@ -3,6 +3,8 @@ import { ref, provide } from 'vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { confirmKey, type ConfirmOptions } from '@/composables/useConfirm'
 
+defineOptions({ name: 'ConfirmProvider' })
+
 const visible = ref(false)
 const title = ref<string | undefined>()
 const message = ref('')

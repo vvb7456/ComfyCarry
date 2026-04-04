@@ -213,7 +213,7 @@ function openCivitaiMeta(hit: CivitaiHit) {
     :placeholder="t('models.civitai.search_placeholder')"
     full
     :loading="civitaiLoading"
-    style="margin-bottom: 12px"
+    class="civitai-search"
     @search="civitaiSearch"
   >
     <template #inline>
@@ -317,6 +317,10 @@ function openCivitaiMeta(hit: CivitaiHit) {
 }
 
 /* ── CivitAI Sort Inline ── */
+.civitai-search {
+  margin-bottom: 12px;
+}
+
 .civitai-sort-inline {
   flex-shrink: 0;
   min-width: 85px !important;

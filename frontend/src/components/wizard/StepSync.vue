@@ -10,6 +10,8 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
+defineOptions({ name: 'StepSync' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, nextStep, prevStep } = useWizardState()
 const {

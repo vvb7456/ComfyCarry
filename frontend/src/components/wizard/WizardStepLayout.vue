@@ -3,6 +3,8 @@ import { useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 
+defineOptions({ name: 'WizardStepLayout' })
+
 const { t } = useI18n({ useScope: 'global' })
 
 withDefaults(defineProps<{

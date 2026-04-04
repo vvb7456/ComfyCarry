@@ -6,6 +6,8 @@ import Spinner from './Spinner.vue'
 import StatusDot from './StatusDot.vue'
 import type { LogLine, LogStatus } from '@/composables/useLogStream'
 
+defineOptions({ name: 'LogPanel' })
+
 const props = defineProps<{
   lines: Array<string | LogLine>
   status?: LogStatus

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'ToggleSwitch' })
+
 defineProps<{
   modelValue: boolean
   size?: 'sm' | 'md' | 'lg'

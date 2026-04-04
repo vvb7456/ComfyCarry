@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'TabSwitcher' })
+
 export interface TabItem {
   key: string
   label: string

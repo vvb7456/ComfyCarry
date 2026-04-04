@@ -119,7 +119,7 @@ function updateStrength(index: number, value: number) {
           </button>
         </div>
         <div class="lora-card__body">
-          <div class="lora-card__name" :title="getDisplayName(lora.name)">
+          <div class="lora-card__name text-truncate" :title="getDisplayName(lora.name)">
             {{ getDisplayName(lora.name) }}
           </div>
           <div class="lora-card__strength">
@@ -223,13 +223,13 @@ function updateStrength(index: number, value: number) {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, .55);
+  background: var(--overlay);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--t-inv);
   opacity: 0;
   transition: opacity .15s, background .15s;
   z-index: 2;
@@ -252,13 +252,13 @@ function updateStrength(index: number, value: number) {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, .55);
+  background: var(--overlay);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--t-inv);
   opacity: 0;
   transition: opacity .15s, background .15s;
   z-index: 2;
@@ -272,7 +272,7 @@ function updateStrength(index: number, value: number) {
 
 .lora-card--disabled .lora-card__toggle {
   opacity: 1;
-  background: rgba(0, 0, 0, .7);
+  background: var(--overlay-dark);
 }
 
 .lora-card__toggle:hover {
@@ -287,9 +287,6 @@ function updateStrength(index: number, value: number) {
   font-size: .73rem;
   font-weight: 600;
   color: var(--t1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .lora-card__strength {

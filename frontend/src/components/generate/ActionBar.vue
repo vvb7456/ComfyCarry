@@ -12,6 +12,8 @@ import type { ExecState } from '@/composables/useExecTracker'
 import SplitButton, { type SplitButtonOption } from '@/components/ui/SplitButton.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
 
+defineOptions({ name: 'ActionBar' })
+
 const props = defineProps<{
   execState: ExecState | null
   elapsed: number
@@ -39,7 +41,7 @@ const isRunning = computed(() => props.execState != null)
 
 const runModes = computed<RunModeConfig[]>(() => [
   { key: 'normal', icon: 'play_arrow', label: t('generate.action.run') },
-  { key: 'live', icon: 'loop', label: t('generate.action.run_live'), disabled: true },
+  { key: 'live', icon: 'loop', label: t('generate.action.run_live') },
 ])
 
 const currentRunMode = computed(() =>

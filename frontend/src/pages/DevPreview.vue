@@ -3,6 +3,8 @@ import RangeField from '@/components/form/RangeField.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
 import { ref } from 'vue'
 
+defineOptions({ name: 'DevPreview' })
+
 const steps = ref(20)
 const cfg = ref(7)
 const denoise = ref(0.7)

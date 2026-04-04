@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import Spinner from './Spinner.vue'
 
+defineOptions({ name: 'BaseButton' })
+
 type ButtonVariant = 'default' | 'primary' | 'danger' | 'success' | 'ghost'
 type ButtonSize = 'xs' | 'sm' | 'md' | 'lg'
 

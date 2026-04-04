@@ -10,6 +10,8 @@ import FormField from '@/components/form/FormField.vue'
 import FieldControlRow from '@/components/form/FieldControlRow.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'GitInstallModal' })
+
 defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]

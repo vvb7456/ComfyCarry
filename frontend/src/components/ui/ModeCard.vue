@@ -2,6 +2,8 @@
 import BaseCard from '@/components/ui/BaseCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'ModeCard' })
+
 const props = withDefaults(defineProps<{
   icon?: string
   iconColor?: string

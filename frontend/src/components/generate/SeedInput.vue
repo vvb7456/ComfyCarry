@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+defineOptions({ name: 'SeedInput' })
+
 const props = withDefaults(defineProps<{
   modelValue: number
   mode: 'random' | 'fixed'

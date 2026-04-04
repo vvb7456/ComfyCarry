@@ -8,6 +8,8 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'StepPlugins' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, pluginData, prebuiltInfo, nextStep, prevStep } = useWizardState()
 

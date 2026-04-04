@@ -50,7 +50,7 @@
     "confirm_delete": "确定要重新初始化吗？\n\n将删除整个 ComfyUI 目录（包括所有模型文件），停止 ComfyUI 和同步服务，重新进入部署向导。\n\n模型文件将被永久删除！",
     "confirm_delete_final": "所有模型文件将被永久删除，无法恢复。\n\n确定继续？",
     "in_progress": "正在重新初始化...",
-    "success": "已重置, 正在跳转到部署向导...",
+    "success": "已重置，正在跳转到部署向导...",
     "partial_fail": "部分操作失败"
   },
   "log": {

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'BaseTextarea' })
+
 withDefaults(defineProps<{
   modelValue?: string
   placeholder?: string

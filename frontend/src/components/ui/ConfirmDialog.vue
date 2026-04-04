@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import BaseModal from './BaseModal.vue'
 import BaseButton from './BaseButton.vue'
 
+defineOptions({ name: 'ConfirmDialog' })
+
 const props = defineProps<{
   modelValue: boolean
   title?: string
@@ -44,7 +46,7 @@ function doConfirm() {
 </script>
 
 <template>
-  <BaseModal :model-value="modelValue" @update:model-value="close" :title="title" size="sm" :close-on-overlay="false" :footer-align="showDontAsk ? 'between' : 'end'">
+  <BaseModal :model-value="modelValue" @update:model-value="close" :title="title" size="sm" :close-on-overlay="false" :footer-align="showDontAsk ? 'between' : 'end'" :z-index="1100">
     <p class="confirm-message">{{ message }}</p>
     <template #footer>
       <label v-if="showDontAsk" class="confirm-dont-ask">

@@ -399,7 +399,7 @@ const tunnelStatusText = computed(() => {
       <!-- Sync last log line -->
       <div v-if="data?.sync?.last_log_lines?.length" class="activity-item activity-log">
         <div class="activity-icon"><MsIcon name="brush" /></div>
-        <span class="activity-text activity-log-line">{{ latestSyncLogLine }}</span>
+        <span class="activity-text activity-log-line text-truncate">{{ latestSyncLogLine }}</span>
       </div>
 
       <!-- Empty -->
@@ -516,7 +516,7 @@ a.status-badge:hover { filter: brightness(1.15); box-shadow: 0 0 0 1px currentCo
 .activity-content { flex: 1; min-width: 0; }
 .activity-text { flex: 1; font-size: .85rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .activity-meta { font-size: .75rem; color: var(--t3); margin-left: auto; }
-.activity-log-line { font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.activity-log-line { font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: var(--t2); max-width: 100%; }
 .activity-progress { width: 100%; height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 6px; position: relative; }
 .activity-progress-fill { height: 100%; background: var(--ac); border-radius: 3px; transition: width .3s; }
 .activity-empty { padding: 20px; text-align: left; color: var(--t3); font-size: .85rem; }

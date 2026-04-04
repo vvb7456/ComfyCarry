@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'AlertBanner' })
+
 const props = withDefaults(defineProps<{
   tone?: 'info' | 'success' | 'warning' | 'danger'
   icon?: string

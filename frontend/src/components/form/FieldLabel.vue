@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'FieldLabel' })
+
 defineProps<{
   /** Whether the field is required (shows asterisk) */
   required?: boolean

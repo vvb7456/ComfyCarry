@@ -7,6 +7,8 @@ import OptionCard from '@/components/ui/OptionCard.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
+defineOptions({ name: 'StepAttention' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, prebuiltInfo, nextStep, prevStep } = useWizardState()
 

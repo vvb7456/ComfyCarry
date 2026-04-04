@@ -2,6 +2,8 @@
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'CheckpointSelector' })
+
 export interface CheckpointInfo {
   name: string
   displayName: string
@@ -190,8 +192,8 @@ function onImgError(e: Event) {
 }
 
 .ckpt-card__tag--dim {
-  background: rgba(0, 0, 0, .5);
-  color: rgba(255, 255, 255, .8);
+  background: var(--overlay);
+  color: var(--t-inv-2);
 }
 
 .ckpt-card__info {

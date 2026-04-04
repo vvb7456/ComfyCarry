@@ -17,6 +17,8 @@ import FilterInput from '@/components/ui/FilterInput.vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'ModelPickerModal' })
+
 export interface PickerModelItem {
   name: string
   preview: string | null
@@ -225,7 +227,7 @@ function close() {
             </div>
           </div>
           <div class="model-card__body">
-            <div class="model-card__name">{{ getDisplayName(item) }}</div>
+            <div class="model-card__name text-truncate">{{ getDisplayName(item) }}</div>
           </div>
         </div>
       </div>
@@ -353,8 +355,8 @@ function close() {
 }
 
 .model-card__tag.dim {
-  background: rgba(0, 0, 0, .5);
-  color: rgba(255, 255, 255, .8);
+  background: var(--overlay);
+  color: var(--t-inv-2);
 }
 
 /* Check mark (multi-select) */
@@ -385,9 +387,6 @@ function close() {
   font-size: .73rem;
   font-weight: 600;
   color: var(--t1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Footer count */

@@ -2,6 +2,8 @@
 import { useI18n } from 'vue-i18n'
 import type { DeployStep } from '@/types/wizard'
 
+defineOptions({ name: 'DeployStepList' })
+
 defineProps<{
   steps: DeployStep[]
 }>()

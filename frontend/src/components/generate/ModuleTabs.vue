@@ -14,6 +14,8 @@
 import { computed, nextTick } from 'vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'ModuleTabs' })
+
 export interface SwitchTabItem {
   key: string
   label: string
@@ -94,9 +96,8 @@ function tabClass(tab: SwitchTabItem) {
 <style scoped>
 .switch-tabs {
   display: flex;
-  gap: var(--sp-2, 8px);
+  gap: 0;
   flex-wrap: wrap;
-  margin-bottom: var(--sp-2, 8px);
 }
 
 @media (max-width: 768px) {
@@ -181,7 +182,7 @@ function tabClass(tab: SwitchTabItem) {
 }
 .tab-switch:checked::after {
   transform: translateX(14px);
-  background: #fff;
+  background: var(--t-inv);
 }
 .tab-switch:disabled { cursor: not-allowed; }
 </style>

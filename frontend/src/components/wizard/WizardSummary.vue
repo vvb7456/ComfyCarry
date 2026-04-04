@@ -6,6 +6,8 @@ import { useWizardRclone } from '@/composables/useWizardRclone'
 import { useWizardState } from '@/composables/useWizardState'
 import type { WizardConfig } from '@/types/wizard'
 
+defineOptions({ name: 'WizardSummary' })
+
 const props = defineProps<{
   config: WizardConfig
   importedConfig?: Record<string, any> | null

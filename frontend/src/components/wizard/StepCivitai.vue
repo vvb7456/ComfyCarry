@@ -7,6 +7,8 @@ import FormField from '@/components/form/FormField.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 
+defineOptions({ name: 'StepCivitai' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, envVars, nextStep, prevStep } = useWizardState()
 

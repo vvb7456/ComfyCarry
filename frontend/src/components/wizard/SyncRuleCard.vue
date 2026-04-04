@@ -5,6 +5,8 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import type { SyncTemplate } from '@/types/wizard'
 
+defineOptions({ name: 'SyncRuleCard' })
+
 const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
@@ -57,7 +59,7 @@ function onPathChange(e: Event) {
     <div class="sync-rule-card__check">
       <MsIcon v-if="selected" name="check" size="xs" color="none" />
     </div>
-    <div class="sync-rule-card__name">{{ shortName }}</div>
+    <div class="sync-rule-card__name text-truncate">{{ shortName }}</div>
     <div class="sync-rule-card__method">{{ triggerLabel }} · {{ methodLabel }}</div>
 
     <div class="sync-rule-card__field" @click.stop>
@@ -93,7 +95,7 @@ function onPathChange(e: Event) {
       />
     </div>
 
-    <div class="sync-rule-card__local" :title="template.local_path">
+    <div class="sync-rule-card__local text-truncate" :title="template.local_path">
       <MsIcon name="folder_open" size="xs" />
       {{ template.local_path }}
     </div>
@@ -159,9 +161,6 @@ function onPathChange(e: Event) {
   font-size: .88rem;
   color: var(--t1);
   padding-right: 24px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sync-rule-card__method {
@@ -193,8 +192,5 @@ function onPathChange(e: Event) {
   font-size: .70rem;
   color: var(--t3);
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

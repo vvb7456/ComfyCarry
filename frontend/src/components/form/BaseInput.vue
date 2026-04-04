@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'BaseInput' })
+
 withDefaults(defineProps<{
   modelValue?: string
   type?: string

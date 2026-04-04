@@ -2,24 +2,9 @@
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useI18n } from 'vue-i18n'
+import type { PluginData } from '@/types/plugins'
 
-export interface PluginData {
-  id: string
-  dirName: string
-  title: string
-  description: string
-  repository: string
-  author: string
-  stars: number
-  ver: string
-  activeVersion: string
-  cnrLatest: string
-  registryVersion: string
-  enabled: boolean
-  installed: boolean
-  updateState: boolean
-  lastUpdate: string
-}
+defineOptions({ name: 'PluginCard' })
 
 const props = defineProps<{ plugin: PluginData }>()
 const emit = defineEmits<{
@@ -47,7 +32,7 @@ function displayVersion(): string {
 <template>
   <div class="plugin-item">
     <div class="plugin-item-header">
-      <div class="plugin-item-title">
+      <div class="plugin-item-title text-truncate">
         <a v-if="plugin.repository" :href="plugin.repository" target="_blank">{{ plugin.title }}</a>
         <span v-else>{{ plugin.title }}</span>
       </div>
@@ -90,7 +75,7 @@ function displayVersion(): string {
 .plugin-item { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: clamp(14px, 1.2vw, 20px) clamp(16px, 1.5vw, 24px); margin-bottom: clamp(8px, 0.6vw, 12px); transition: border-color .15s; }
 .plugin-item:hover { border-color: rgba(124, 92, 252, .3); }
 .plugin-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.plugin-item-title { font-size: .92rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plugin-item-title { font-size: .92rem; font-weight: 600; flex: 1; min-width: 0; }
 .plugin-item-title a { color: var(--t1); text-decoration: none; }
 .plugin-item-title a:hover { color: var(--ac); }
 .plugin-item-desc { font-size: .8rem; color: var(--t2); line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

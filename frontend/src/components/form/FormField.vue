@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'FormField' })
+
 defineProps<{
   /** Field label text (alternative to #label slot) */
   label?: string

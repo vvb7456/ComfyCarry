@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+defineOptions({ name: 'NumberInput' })
+
 const props = withDefaults(defineProps<{
   modelValue: number
   min?: number

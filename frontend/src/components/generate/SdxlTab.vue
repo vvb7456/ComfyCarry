@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, toRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
+import { useSdxlModalManager } from '@/composables/generate/useSdxlModalManager'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
-import ModuleTabs, { type SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
-import PromptEditor, { type ToolButton } from '@/components/generate/PromptEditor.vue'
+import ModuleTabs from '@/components/generate/ModuleTabs.vue'
+import PromptEditor from '@/components/generate/PromptEditor.vue'
 import ActionBar from '@/components/generate/ActionBar.vue'
 import BasicSettings from '@/components/generate/BasicSettings.vue'
 import AdvancedSettings from '@/components/generate/AdvancedSettings.vue'
@@ -22,18 +24,12 @@ import PreprocessModal from '@/components/generate/PreprocessModal.vue'
 import TaggerModal from '@/components/generate/TaggerModal.vue'
 import LlmModal from '@/components/generate/LlmModal.vue'
 import EmbeddingModal from '@/components/generate/EmbeddingModal.vue'
+import WildcardModal from '@/components/generate/WildcardModal.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
 import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
-import type { ModelMeta, ModelMetaImage } from '@/types/models'
-import { useImageToImage } from '@/composables/generate/useImageToImage'
-import { useControlNet } from '@/composables/generate/useControlNet'
-import { useModelDependency } from '@/composables/generate/useModelDependency'
-import { useTagInterrogation, TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
-import { useLlmAssist } from '@/composables/generate/useLlmAssist'
-import { useEmbeddingPicker } from '@/composables/generate/useEmbeddingPicker'
+import { TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
 import { CN_MODEL_CONFIGS, UPSCALE_MODEL_CONFIG } from '@/composables/generate/modelDepConfigs'
-import { useToast } from '@/composables/useToast'
 
 defineOptions({ name: 'SdxlTab' })
 
@@ -53,380 +49,78 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const { toast } = useToast()
 const store = useGenerateStore()
 const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
+const {
+  i2i,
+  tagger,
+  _taggerReady,
+  cnPose,
+  cnCanny,
+  cnDepth,
+  depPose,
+  depCanny,
+  depDepth,
+  depUpscale,
+  depTagger,
+  showPPModal,
+  moduleTabs,
+  enabledModules,
+  onModuleToggle,
+  onPPSubmit,
+  handlePreprocessDone,
+  onDepEnter,
+  onUpscaleDepEnter,
+  onDepDownload,
+  onUpscaleDepDownload,
+  onTaggerDepEnter,
+  onTaggerDepDownload,
+  prepareTagger,
+  handleTagDone,
+} = useControlNetOrchestration({
+  options,
+  execState: toRef(props, 'execState'),
+  onRegisterTask: (promptId, type, subtype) => emit('register-task', promptId, type, subtype),
+})
 
-/* ── I2I composable ── */
-const i2i = useImageToImage()
-
-/* ── ControlNet composables (one per type) ── */
-const cnPose = useControlNet('pose', options.controlnetModels)
-const cnCanny = useControlNet('canny', options.controlnetModels)
-const cnDepth = useControlNet('depth', options.controlnetModels)
-const cnMap = { pose: cnPose, canny: cnCanny, depth: cnDepth } as const
-
-/* ── Model Dependency composables (one per CN type) ── */
-const depPose = useModelDependency(CN_MODEL_CONFIGS.pose)
-const depCanny = useModelDependency(CN_MODEL_CONFIGS.canny)
-const depDepth = useModelDependency(CN_MODEL_CONFIGS.depth)
-const depMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
-
-/* ── Upscale Model Dependency ── */
-const depUpscale = useModelDependency(UPSCALE_MODEL_CONFIG)
-let _upscaleReady = false
-
-/* ── Tag Interrogation ── */
-const tagger = useTagInterrogation()
-const depTagger = useModelDependency(TAGGER_MODEL_CONFIG)
-const _taggerReady = ref(false)
-const showTaggerModal = ref(false)
-
-/* ── LLM Assist ── */
-const llm = useLlmAssist()
-const showLlmModal = ref(false)
-
-/* ── Embedding Picker ── */
-const embPicker = useEmbeddingPicker()
-const promptEditorRef = ref<InstanceType<typeof PromptEditor> | null>(null)
-
-/* Preprocess modal visibility per CN type */
-const showPPModal = ref({ pose: false, canny: false, depth: false })
-
-/** Track expected output filename per CN preprocess (for auto-fill on done) */
-const ppExpectedOutput: Record<string, string> = {}
-
-async function onPPSubmit(cnType: 'pose' | 'canny' | 'depth', payload: { file: File | string; params: Record<string, unknown> }) {
-  // Block preprocess if generation is actively running
-  if (props.execState) {
-    toast(t('generate.controlnet.preprocess_blocked'), 'warning')
-    return
-  }
-  // Block if another preprocess is already running
-  const anyRunning = Object.values(cnMap).some(cn => cn.preprocessStatus.value === 'running')
-  if (anyRunning) {
-    toast(t('generate.controlnet.preprocess_blocked'), 'warning')
-    return
-  }
-  const promptId = await cnMap[cnType].submitPreprocess(payload.file, payload.params)
-  if (promptId) {
-    emit('register-task', promptId, 'preprocess', cnType)
-  }
-}
-
-/** Called from GeneratePage when a preprocess task completes via SSE */
-function handlePreprocessDone(cnType: string, success: boolean) {
-  const cn = cnMap[cnType as keyof typeof cnMap]
-  if (!cn) return
-  // The output_filename is stored inside useControlNet's preprocessOutputFile
-  cn.onPreprocessDone(success)
-}
+const {
+  llm,
+  embPicker,
+  wcManager,
+  promptEditorRef,
+  showTaggerModal,
+  showLlmModal,
+  previewOpen,
+  previewIndex,
+  previewUrls,
+  promptTools,
+  showCkptPicker,
+  ckptSelected,
+  showLoraPicker,
+  loraModalPending,
+  loraCountLabel,
+  showLoraDetail,
+  loraDetailMeta,
+  onPreviewClick,
+  onPromptTool,
+  onTaggerApply,
+  onLlmApply,
+  onEmbInsert,
+  onWcInsert,
+  openCkptPicker,
+  onCkptSelect,
+  openLoraPicker,
+  onLoraToggle,
+  onLoraConfirm,
+  openLoraDetail,
+} = useSdxlModalManager({
+  options,
+  previewImages: toRef(props, 'previewImages'),
+  prepareTagger,
+})
 
 defineExpose({ handlePreprocessDone, handleTagDone })
-
-// Check model dependency state when comfyuiDir becomes available
-// Also runs on mount (immediate), passing empty string if ComfyUI not detected yet
-let _depChecked = false
-watch(() => options.comfyuiDir.value, (dir) => {
-  if (!dir && _depChecked) return  // Skip only if we already ran check and dir is still empty
-  _depChecked = true
-  for (const type of ['pose', 'canny', 'depth'] as const) {
-    depMap[type].check(dir).then(() => {
-      // If already dismissed (show=false), mark CN ready
-      if (!depMap[type].show.value) {
-        cnMap[type].ready.value = true
-      }
-    })
-  }
-  // Upscale model dependency
-  depUpscale.check(dir).then(() => {
-    if (!depUpscale.show.value) _upscaleReady = true
-  })
-  // Tagger model dependency
-  depTagger.check(dir).then(() => {
-    if (!depTagger.show.value) _taggerReady.value = true
-  })
-}, { immediate: true })
-
-function onDepEnter(type: 'pose' | 'canny' | 'depth') {
-  cnMap[type].ready.value = true
-  options.refresh()
-}
-
-function onUpscaleDepEnter() {
-  _upscaleReady = true
-  options.refresh()
-}
-
-function onDepDownload(type: 'pose' | 'canny' | 'depth') {
-  const dir = options.comfyuiDir.value
-  if (dir) depMap[type].startDownload(dir)
-}
-
-function onUpscaleDepDownload() {
-  const dir = options.comfyuiDir.value
-  if (dir) depUpscale.startDownload(dir)
-}
-
-/* ── Tag Interrogation ── */
-function onTaggerDepEnter() {
-  _taggerReady.value = true
-  tagger.open()
-}
-
-function onTaggerDepDownload() {
-  const dir = options.comfyuiDir.value
-  if (dir) depTagger.startDownload(dir)
-}
-
-function openTagger() {
-  if (_taggerReady.value) {
-    tagger.open()
-  }
-  showTaggerModal.value = true
-}
-
-function onTaggerApply(tags: string) {
-  if (tags) state.value.positive = tags
-}
-
-/** Watch tagger interrogation submit to register task */
-watch(() => tagger.promptId.value, (pid) => {
-  if (pid) emit('register-task', pid, 'tag', 'interrogate')
-})
-
-/** Called from GeneratePage when a tag interrogation task completes via SSE */
-function handleTagDone(success: boolean) {
-  tagger.onDone(success)
-}
-
-/* ── LLM Assist ── */
-async function openLlm() {
-  await llm.open()
-  showLlmModal.value = true
-}
-
-function onLlmApply(result: { positive: string; negative?: string }) {
-  state.value.positive = result.positive
-  if (result.negative !== undefined) {
-    state.value.negative = result.negative
-  }
-  toast(result.negative !== undefined ? t('generate.llm_modal.used_all') : t('generate.llm_modal.used'), 'success')
-}
-
-/* ── Embedding Insert ── */
-function onEmbInsert(token: string, target: 'positive' | 'negative') {
-  promptEditorRef.value?.insertAtCursor(target, token)
-}
-
-/* ── Prompt toolbar tool handler ── */
-function onPromptTool(key: string) {
-  switch (key) {
-    case 'interrogate':
-      openTagger()
-      break
-    case 'llm-assist':
-      openLlm()
-      break
-    case 'embedding':
-      embPicker.open()
-      break
-    // Future: wildcard
-  }
-}
-
-onUnmounted(() => {
-  depPose.destroy()
-  depCanny.destroy()
-  depDepth.destroy()
-  depUpscale.destroy()
-  depTagger.destroy()
-  llm.close()
-})
-
-/* ── Preview image lightbox ── */
-const previewOpen = ref(false)
-const previewIndex = ref(0)
-const previewUrls = computed(() => props.previewImages.map(img => img.url))
-
-function onPreviewClick(url: string) {
-  const idx = previewUrls.value.indexOf(url)
-  previewIndex.value = idx >= 0 ? idx : 0
-  previewOpen.value = true
-}
-
-/* ── Prompt toolbar buttons ── */
-const promptTools = computed<ToolButton[]>(() => [
-  { key: 'interrogate', icon: 'image_search', label: t('generate.prompt.tools.interrogate'), title: t('generate.prompt.tools.interrogate_title') },
-  { key: 'llm-assist', icon: 'auto_awesome', label: t('generate.prompt.tools.llm_assist'), title: t('generate.prompt.tools.llm_assist_title') },
-  { key: 'embedding', icon: 'link', label: t('generate.prompt.tools.embedding'), title: t('generate.prompt.tools.embedding_title') },
-  { key: 'wildcard', icon: 'shuffle', label: t('generate.prompt.tools.wildcard'), title: t('generate.prompt.tools.wildcard_title') },
-])
-
-/* ── Module tabs ── */
-const moduleTabs = computed<SwitchTabItem[]>(() => [
-  { key: 'lora', label: t('generate.modules.lora'), icon: 'extension' },
-  { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
-  { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new' },
-  { key: 'canny', label: t('generate.modules.canny'), icon: 'border_style' },
-  { key: 'depth', label: t('generate.modules.depth'), icon: 'layers' },
-  { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
-  { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
-])
-
-/* Derive enabled modules from store state */
-const enabledModules = computed(() => {
-  const s = state.value
-  const enabled = new Set<string>()
-  if (s.loras.some(l => l.enabled)) enabled.add('lora')
-  if (s.i2i.enabled) enabled.add('i2i')
-  if (s.controlNets.pose?.enabled) enabled.add('pose')
-  if (s.controlNets.canny?.enabled) enabled.add('canny')
-  if (s.controlNets.depth?.enabled) enabled.add('depth')
-  if (s.upscale.enabled) enabled.add('upscale')
-  if (s.hires.enabled) enabled.add('hires')
-  return enabled
-})
-
-function onModuleToggle(key: string, enabled: boolean) {
-  const s = state.value
-  switch (key) {
-    case 'lora':
-      if (enabled && s.loras.length === 0) {
-        toast(t('generate.lora.empty_warn'), 'warning')
-        return
-      }
-      s.loras.forEach(l => { l.enabled = enabled })
-      break
-    case 'i2i':
-      if (enabled && !s.i2i.image) {
-        toast(t('generate.i2i.select_ref'), 'warning')
-        return
-      }
-      s.i2i.enabled = enabled
-      break
-    case 'pose':
-    case 'canny':
-    case 'depth': {
-      const cnKey = key as 'pose' | 'canny' | 'depth'
-      const cn = cnMap[cnKey]
-      if (enabled && !cn.validateEnable(cn.models.value)) {
-        // Auto-switch to the CN tab so user sees the download gate
-        if (!cn.ready.value) s.activeModule = cnKey
-        return
-      }
-      if (s.controlNets[key]) s.controlNets[key].enabled = enabled
-      break
-    }
-    case 'upscale':
-      if (enabled && !_upscaleReady) {
-        toast(t('generate.upscale.need_model'), 'warning')
-        s.activeModule = 'upscale'
-        return
-      }
-      s.upscale.enabled = enabled
-      break
-    case 'hires':
-      s.hires.enabled = enabled
-      break
-  }
-}
-
-/* ── Checkpoint Picker ── */
-const showCkptPicker = ref(false)
-const ckptSelected = computed(() => new Set(state.value.checkpoint ? [state.value.checkpoint] : []))
-
-function openCkptPicker() {
-  // Refresh options in background (legacy: render first, then refresh)
-  options.refresh()
-  showCkptPicker.value = true
-}
-
-function onCkptSelect(name: string) {
-  state.value.checkpoint = name
-  showCkptPicker.value = false
-  const displayName = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
-  toast(t('generate.toast.selected', { name: displayName.replace(/\.[^.]+$/, '') }), 'success')
-}
-
-/* ── LoRA Picker (confirm-based multi-select) ── */
-const showLoraPicker = ref(false)
-const loraModalPending = ref(new Set<string>())
-const loraCountLabel = computed(() => t('generate.lora.count_selected', { count: loraModalPending.value.size }))
-
-function openLoraPicker() {
-  // Copy current selection to temp state (legacy: _loraModalPending = new Map(_loraSelected))
-  loraModalPending.value = new Set(state.value.loras.map(l => l.name))
-  options.refresh()
-  showLoraPicker.value = true
-}
-
-function onLoraToggle(name: string) {
-  const pending = new Set(loraModalPending.value)
-  if (pending.has(name)) pending.delete(name)
-  else pending.add(name)
-  loraModalPending.value = pending
-}
-
-function onLoraConfirm() {
-  const existing = new Map(state.value.loras.map(l => [l.name, l]))
-  const newLoras = [...loraModalPending.value].map(name => {
-    const prev = existing.get(name)
-    return prev ? { ...prev } : { name, strength: 1.0, enabled: true }
-  })
-  state.value.loras = newLoras
-  showLoraPicker.value = false
-}
-
-/* ── LoRA Detail Modal ── */
-const showLoraDetail = ref(false)
-const loraDetailMeta = ref<ModelMeta | null>(null)
-
-function openLoraDetail(name: string) {
-  const item = options.loras.value.find(l => l.name === name)
-  if (!item) return
-  const info = item.info as Record<string, unknown> | null
-
-  // Build images array: local preview first, then CivitAI images
-  const images: ModelMetaImage[] = []
-  if (item.preview) {
-    images.push({ url: `/api/local_models/preview?path=${encodeURIComponent(item.preview)}` })
-  }
-  const civitImages = info?.images as Array<Record<string, unknown>> | undefined
-  if (civitImages) {
-    for (const img of civitImages) {
-      images.push({
-        url: (img.url as string) || '',
-        type: (img.type as string) || undefined,
-        seed: img.seed as number | string | undefined,
-        steps: img.steps as number | undefined,
-        cfg: img.cfg as number | undefined,
-        sampler: img.sampler as string | undefined,
-        model: img.model as string | undefined,
-        positive: img.positive as string | undefined,
-        negative: img.negative as string | undefined,
-      })
-    }
-  }
-
-  const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
-  const civitId = info?.civitai_id as string | number | undefined
-  loraDetailMeta.value = {
-    name: (info?.name as string) || basename.replace(/\.[^.]+$/, ''),
-    type: 'LORA',
-    baseModel: (info?.baseModel as string) || undefined,
-    id: civitId,
-    versionId: (info?.versionId as string | number) || undefined,
-    versionName: (info?.versionName as string) || undefined,
-    sha256: (info?.sha256 as string) || undefined,
-    filename: basename,
-    civitaiUrl: civitId ? `https://civitai.com/models/${civitId}` : undefined,
-    trainedWords: (info?.trainedWords as string[]) || undefined,
-    images,
-  }
-  showLoraDetail.value = true
-}
 </script>
 
 <template>
@@ -476,89 +170,91 @@ function openLoraDetail(name: string) {
       </div>
     </div>
 
-    <!-- ═══ 下部: 功能模块 ═══ -->
-    <ModuleTabs
-      :tabs="moduleTabs"
-      :active-tab="state.activeModule"
-      :enabled-tabs="enabledModules"
-      @update:active-tab="state.activeModule = $event ?? 'lora'"
-      @toggle="onModuleToggle"
-    />
+    <!-- ═══ 下部: 功能模块 (Tab + Panel 融合卡片) ═══ -->
+    <div class="gen-module-wrap">
+      <ModuleTabs
+        :tabs="moduleTabs"
+        :active-tab="state.activeModule"
+        :enabled-tabs="enabledModules"
+        @update:active-tab="state.activeModule = $event ?? 'lora'"
+        @toggle="onModuleToggle"
+      />
 
-    <!-- 模块面板占位 -->
-    <div v-show="state.activeModule === 'lora'" class="gen-module-panel">
-      <LoraPanel @open-picker="openLoraPicker" @detail="openLoraDetail" />
-    </div>
-    <div v-show="state.activeModule === 'i2i'" class="gen-module-panel">
-      <I2IPanel
-        @pick="i2i.picker.open()"
-        @file="i2i.handleUpload"
-        @clear="i2i.clearImage"
-      />
-    </div>
-    <div v-show="state.activeModule === 'pose'" class="gen-module-panel">
-      <ModelDependencyGate
-        v-if="depPose.show.value"
-        :dep="depPose"
-        :title="CN_MODEL_CONFIGS.pose.title"
-        :min-optional="CN_MODEL_CONFIGS.pose.minOptional"
-        @enter="onDepEnter('pose')"
-        @download="onDepDownload('pose')"
-      />
-      <ControlNetPanel
-        v-else
-        :cn="cnPose"
-        @pick="cnPose.picker.open()"
-        @clear="cnPose.clearImage"
-        @open-preprocess="showPPModal.pose = true"
-      />
-    </div>
-    <div v-show="state.activeModule === 'canny'" class="gen-module-panel">
-      <ModelDependencyGate
-        v-if="depCanny.show.value"
-        :dep="depCanny"
-        :title="CN_MODEL_CONFIGS.canny.title"
-        :min-optional="CN_MODEL_CONFIGS.canny.minOptional"
-        @enter="onDepEnter('canny')"
-        @download="onDepDownload('canny')"
-      />
-      <ControlNetPanel
-        v-else
-        :cn="cnCanny"
-        @pick="cnCanny.picker.open()"
-        @clear="cnCanny.clearImage"
-        @open-preprocess="showPPModal.canny = true"
-      />
-    </div>
-    <div v-show="state.activeModule === 'depth'" class="gen-module-panel">
-      <ModelDependencyGate
-        v-if="depDepth.show.value"
-        :dep="depDepth"
-        :title="CN_MODEL_CONFIGS.depth.title"
-        :min-optional="CN_MODEL_CONFIGS.depth.minOptional"
-        @enter="onDepEnter('depth')"
-        @download="onDepDownload('depth')"
-      />
-      <ControlNetPanel
-        v-else
-        :cn="cnDepth"
-        @pick="cnDepth.picker.open()"
-        @clear="cnDepth.clearImage"
-        @open-preprocess="showPPModal.depth = true"
-      />
-    </div>
-    <div v-show="state.activeModule === 'upscale'" class="gen-module-panel">
-      <ModelDependencyGate
-        v-if="depUpscale.show.value"
-        :dep="depUpscale"
-        :title="UPSCALE_MODEL_CONFIG.title"
-        @enter="onUpscaleDepEnter"
-        @download="onUpscaleDepDownload"
-      />
-      <UpscalePanel v-else />
-    </div>
-    <div v-show="state.activeModule === 'hires'" class="gen-module-panel">
-      <HiResPanel />
+      <!-- 模块面板 -->
+      <div v-show="state.activeModule === 'lora'" class="gen-module-panel">
+        <LoraPanel @open-picker="openLoraPicker" @detail="openLoraDetail" />
+      </div>
+      <div v-show="state.activeModule === 'i2i'" class="gen-module-panel">
+        <I2IPanel
+          @pick="i2i.picker.open()"
+          @file="i2i.handleUpload"
+          @clear="i2i.clearImage"
+        />
+      </div>
+      <div v-show="state.activeModule === 'pose'" class="gen-module-panel">
+        <ModelDependencyGate
+          v-if="depPose.show.value"
+          :dep="depPose"
+          :title="CN_MODEL_CONFIGS.pose.title"
+          :min-optional="CN_MODEL_CONFIGS.pose.minOptional"
+          @enter="onDepEnter('pose')"
+          @download="onDepDownload('pose')"
+        />
+        <ControlNetPanel
+          v-else
+          :cn="cnPose"
+          @pick="cnPose.picker.open()"
+          @clear="cnPose.clearImage"
+          @open-preprocess="showPPModal.pose = true"
+        />
+      </div>
+      <div v-show="state.activeModule === 'canny'" class="gen-module-panel">
+        <ModelDependencyGate
+          v-if="depCanny.show.value"
+          :dep="depCanny"
+          :title="CN_MODEL_CONFIGS.canny.title"
+          :min-optional="CN_MODEL_CONFIGS.canny.minOptional"
+          @enter="onDepEnter('canny')"
+          @download="onDepDownload('canny')"
+        />
+        <ControlNetPanel
+          v-else
+          :cn="cnCanny"
+          @pick="cnCanny.picker.open()"
+          @clear="cnCanny.clearImage"
+          @open-preprocess="showPPModal.canny = true"
+        />
+      </div>
+      <div v-show="state.activeModule === 'depth'" class="gen-module-panel">
+        <ModelDependencyGate
+          v-if="depDepth.show.value"
+          :dep="depDepth"
+          :title="CN_MODEL_CONFIGS.depth.title"
+          :min-optional="CN_MODEL_CONFIGS.depth.minOptional"
+          @enter="onDepEnter('depth')"
+          @download="onDepDownload('depth')"
+        />
+        <ControlNetPanel
+          v-else
+          :cn="cnDepth"
+          @pick="cnDepth.picker.open()"
+          @clear="cnDepth.clearImage"
+          @open-preprocess="showPPModal.depth = true"
+        />
+      </div>
+      <div v-show="state.activeModule === 'upscale'" class="gen-module-panel">
+        <ModelDependencyGate
+          v-if="depUpscale.show.value"
+          :dep="depUpscale"
+          :title="UPSCALE_MODEL_CONFIG.title"
+          @enter="onUpscaleDepEnter"
+          @download="onUpscaleDepDownload"
+        />
+        <UpscalePanel v-else />
+      </div>
+      <div v-show="state.activeModule === 'hires'" class="gen-module-panel">
+        <HiResPanel />
+      </div>
     </div>
 
     <!-- ═══ Picker Modals (Teleport to body) ═══ -->
@@ -670,6 +366,13 @@ function openLoraDetail(name: string) {
       @insert="onEmbInsert"
     />
 
+    <!-- Wildcard Modal -->
+    <WildcardModal
+      v-model="wcManager.visible.value"
+      :wc="wcManager"
+      @insert="onWcInsert"
+    />
+
     <!-- Tagger Modal (handles gate internally when not ready) -->
     <TaggerModal
       v-model="showTaggerModal"
@@ -735,14 +438,61 @@ function openLoraDetail(name: string) {
   inset: 0;
 }
 
-/* ═══ 下部: 模块面板 ═══ */
-.gen-module-panel {
+/* ═══ 下部: 模块容器 (Tab + Panel 融合) ═══ */
+.gen-module-wrap {
   background: var(--bg2);
   border: 1px solid var(--bd);
   border-radius: var(--r-lg);
+}
+
+.gen-module-wrap :deep(.switch-tabs) {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  padding-bottom: 0;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--bd);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  position: relative;
+}
+
+/* 所有 Tab 按钮与分割线重叠 (-1px) */
+.gen-module-wrap :deep(.switch-tab) {
+  position: relative;
+  margin-bottom: -1px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* 非激活 Tab: 退后层, 半透明 + 无底部 border */
+.gen-module-wrap :deep(.switch-tab:not(.active)) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--t3);
+}
+.gen-module-wrap :deep(.switch-tab:not(.active):hover:not(.disabled)) {
+  background: color-mix(in srgb, var(--bg2) 50%, transparent);
+  color: var(--t2);
+}
+
+/* 激活 Tab: 弹出, 与内容区背景一致, 底部 border 断开 */
+.gen-module-wrap :deep(.switch-tab.active) {
+  background: var(--bg2);
+  border-color: var(--bd);
+  border-bottom-color: var(--bg2);
+  color: var(--ac);
+  z-index: 1;
+}
+
+/* 启用但非激活 Tab: 微弱高亮 */
+.gen-module-wrap :deep(.switch-tab.enabled) {
+  background: color-mix(in srgb, var(--ac) 6%, transparent);
+  border-color: transparent;
+  color: var(--t2);
+}
+
+.gen-module-panel {
   padding: var(--sp-4);
   min-height: 120px;
-  margin-top: calc(-1 * var(--sp-2));
 }
 
 /* ── 通用占位 ── */

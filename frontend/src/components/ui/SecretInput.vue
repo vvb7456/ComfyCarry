@@ -3,6 +3,8 @@ import { computed, getCurrentInstance, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'SecretInput' })
+
 const props = withDefaults(defineProps<{
   modelValue?: string
   displayValue?: string

@@ -10,6 +10,8 @@ import SeedInput from '@/components/generate/SeedInput.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'AdvancedSettings' })
+
 defineProps<{
   disabled?: boolean
 }>()

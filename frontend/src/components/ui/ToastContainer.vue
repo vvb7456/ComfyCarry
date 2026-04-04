@@ -2,6 +2,8 @@
 import { useToast } from '@/composables/useToast'
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'ToastContainer' })
+
 const { items, remove } = useToast()
 
 const iconMap: Record<string, string> = {

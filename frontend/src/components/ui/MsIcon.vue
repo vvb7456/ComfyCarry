@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+defineOptions({ name: 'MsIcon' })
+
 const props = defineProps<{
   /** Material Symbols icon name */
   name: string

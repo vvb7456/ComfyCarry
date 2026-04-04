@@ -89,7 +89,7 @@ function formatSize(bytes: number): string {
             <img :src="previewUrlFn(img.name)" :alt="img.name" class="ref-card__img" loading="lazy">
           </div>
           <div class="ref-card__body">
-            <span class="ref-card__name">{{ img.name.split('/').pop() }}</span>
+            <span class="ref-card__name text-truncate">{{ img.name.split('/').pop() }}</span>
             <span class="ref-card__size">{{ formatSize(img.size) }}</span>
           </div>
         </div>
@@ -177,9 +177,6 @@ function formatSize(bytes: number): string {
   display: block;
   font-size: .72rem;
   color: var(--t2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ref-card__size {
   display: block;

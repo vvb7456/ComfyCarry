@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'SectionHeader' })
+
 defineProps<{
   icon?: string
   flush?: boolean

@@ -101,7 +101,7 @@ function formatSize(bytes: number): string {
         class="emb-row"
       >
         <!-- Name -->
-        <div class="emb-row__name" :title="item.path">{{ item.name }}</div>
+        <div class="emb-row__name text-truncate" :title="item.path">{{ item.name }}</div>
 
         <!-- Size -->
         <div class="emb-row__size">{{ formatSize(item.size) }}</div>
@@ -178,9 +178,6 @@ function formatSize(bytes: number): string {
   flex: 1;
   font-size: var(--text-sm);
   color: var(--t1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
 }
 

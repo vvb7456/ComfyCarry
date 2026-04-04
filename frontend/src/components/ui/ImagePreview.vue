@@ -2,6 +2,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import MsIcon from './MsIcon.vue'
 
+defineOptions({ name: 'ImagePreview' })
+
 const props = withDefaults(defineProps<{
   modelValue: boolean
   images: string[]

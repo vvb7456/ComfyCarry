@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onActivated, provide, ref, watch } from 'vue'
+import { computed, onActivated, provide, ref, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
@@ -99,7 +99,30 @@ async function handleRun(_mode: string) {
   }
 }
 
+// ── Live mode auto-rerun (legacy §8.1: rerun 500ms after done) ─────────
+let liveRerunTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleLiveRerun() {
+  cancelLiveRerun()
+  liveRerunTimer = setTimeout(() => {
+    liveRerunTimer = null
+    if (store.currentState.runMode === 'live' && !execState.value) {
+      handleRun('live')
+    }
+  }, 500)
+}
+
+function cancelLiveRerun() {
+  if (liveRerunTimer) {
+    clearTimeout(liveRerunTimer)
+    liveRerunTimer = null
+  }
+}
+
+onBeforeUnmount(cancelLiveRerun)
+
 async function handleStop() {
+  cancelLiveRerun()
   await post('/api/comfyui/interrupt')
   toast(t('generate.toast.interrupt_sent'), 'info')
 }
@@ -166,17 +189,21 @@ const sse = useComfySSE(tracker, {
         queuePanelRef.value?.loadQueue()
         historyPanelRef.value?.loadHistory()
         taskRegistry.cleanup()
+        // Live mode: auto-rerun after successful execution
+        if (store.currentState.runMode === 'live') scheduleLiveRerun()
       } else if (result.type === 'execution_interrupted') {
         toast(t('generate.toast.exec_interrupted'), 'warning')
         preview.clearPreview()
         queuePanelRef.value?.loadQueue()
         historyPanelRef.value?.loadHistory()
         taskRegistry.cleanup()
+        cancelLiveRerun()
       } else if (result.type === 'execution_error') {
         toast(t('generate.error.exec_error_prefix'), 'error')
         preview.clearPreview()
         queuePanelRef.value?.loadQueue()
         taskRegistry.cleanup()
+        cancelLiveRerun()
       }
     }
   },

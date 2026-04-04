@@ -1,4 +1,7 @@
 <script setup lang="ts">
+
+defineOptions({ name: 'WizardStepper' })
+
 const props = defineProps<{
   total: number
   current: number

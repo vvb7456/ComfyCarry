@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, useSlots } from 'vue'
 
+defineOptions({ name: 'BaseCard' })
+
 const props = withDefaults(defineProps<{
   variant?: 'bg2' | 'bg3'
   radius?: 'sm' | 'md' | 'lg'

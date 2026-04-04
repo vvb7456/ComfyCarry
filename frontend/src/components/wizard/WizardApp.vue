@@ -18,6 +18,8 @@ import StepPlugins from './StepPlugins.vue'
 import StepAttention from './StepAttention.vue'
 import StepConfirm from './StepConfirm.vue'
 
+defineOptions({ name: 'WizardApp' })
+
 const { t, locale } = useI18n({ useScope: 'global' })
 const { currentStep, deployState, initLoading, init, totalSteps } = useWizardState()
 

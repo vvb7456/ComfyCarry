@@ -7,6 +7,8 @@ import { computed } from 'vue'
 import MsIcon from '../ui/MsIcon.vue'
 import BaseButton from '../ui/BaseButton.vue'
 
+defineOptions({ name: 'AppSidebar' })
+
 const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()

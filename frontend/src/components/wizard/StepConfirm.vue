@@ -8,6 +8,8 @@ import WizardSummary from './WizardSummary.vue'
 import WizardDeployView from './WizardDeployView.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 
+defineOptions({ name: 'StepConfirm' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { config, deployState, importedConfig, prevStep, goToStep } = useWizardState()
 const { startDeploy, resume } = useWizardDeploy()

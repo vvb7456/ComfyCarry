@@ -20,7 +20,6 @@ const tabs = computed(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
   { key: 'civitai', label: t('models.tabs.civitai'), icon: 'search' },
   { key: 'downloads', label: t('models.tabs.downloads'), icon: 'download' },
-  { key: 'workflow', label: t('models.tabs.workflow'), icon: 'account_tree' },
 ])
 
 // ── Shared Modals ──
@@ -61,10 +60,6 @@ function openPreviewSingle(url: string) {
 
     <div v-show="activeTab === 'downloads'">
       <DownloadsTab :active="activeTab === 'downloads'" />
-    </div>
-
-    <div v-show="activeTab === 'workflow'">
-      <!-- TODO -->
     </div>
 
     <ModelMetaModal v-model="metaOpen" :meta="metaMeta" :show-download="activeTab === 'civitai'" @preview="openPreview" />

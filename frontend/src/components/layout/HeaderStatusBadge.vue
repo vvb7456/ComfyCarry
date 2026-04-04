@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 
+defineOptions({ name: 'HeaderStatusBadge' })
+
 const props = defineProps<{
   running: boolean
   runningLabel: string

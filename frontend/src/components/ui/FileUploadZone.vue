@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+defineOptions({ name: 'FileUploadZone' })
+
 const props = withDefaults(defineProps<{
   mode?: 'drop' | 'pick'
   accept?: string
@@ -122,7 +124,7 @@ defineExpose({ clearFile })
     <!-- Drop mode: file loaded -->
     <div v-if="mode === 'drop' && isLoaded" class="upload-zone__loaded">
       <span class="ms upload-zone__loaded-icon">check_circle</span>
-      <span class="upload-zone__loaded-name">{{ loadedName }}</span>
+      <span class="upload-zone__loaded-name text-truncate">{{ loadedName }}</span>
       <button type="button" class="upload-zone__loaded-clear" @click.stop="clearFile">
         <span class="ms">close</span>
       </button>
@@ -238,7 +240,7 @@ defineExpose({ clearFile })
   padding: 12px 16px; width: 100%;
 }
 .upload-zone__loaded-icon { font-size: 20px; color: var(--green); }
-.upload-zone__loaded-name { font-size: .88rem; color: var(--t1); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-zone__loaded-name { font-size: .88rem; color: var(--t1); flex: 1; }
 .upload-zone__loaded-clear {
   background: none; border: none; color: var(--t3); cursor: pointer;
   padding: 2px; border-radius: 50%; display: inline-flex; align-items: center;

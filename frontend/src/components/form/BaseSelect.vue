@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
 import MsIcon from '../ui/MsIcon.vue'
 
+defineOptions({ name: 'BaseSelect' })
+
 export interface SelectOption {
   value: string | number | boolean
   label: string
@@ -219,7 +221,7 @@ onBeforeUnmount(() => {
     `base-select--${size}`,
   ]" @keydown="onKeydown">
     <div class="base-select__trigger" tabindex="0" @click="toggle">
-      <span class="base-select__text" :class="{ 'base-select__text--ph': isPlaceholder }">{{ selectedLabel }}</span>
+      <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder }">{{ selectedLabel }}</span>
       <MsIcon name="expand_more" size="sm" color="var(--t3)" />
     </div>
     <Teleport to="body" :disabled="!teleport">
@@ -240,7 +242,7 @@ onBeforeUnmount(() => {
             <div
               v-for="(opt, idx) in filteredOptions"
               :key="String(opt.value)"
-              class="base-select__item"
+              class="base-select__item text-truncate"
               :class="{
                 'base-select__item--sel': opt.value === modelValue,
                 'base-select__item--hl': idx === highlightIdx,
@@ -303,9 +305,6 @@ onBeforeUnmount(() => {
 .base-select__text {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .base-select__text--ph { color: var(--t3); }
 
@@ -352,9 +351,6 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   font-size: .85rem;
   color: var(--t1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .base-select--sm .base-select__item {
   padding: 4px 8px;
@@ -398,9 +394,6 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   font-size: .82rem;
   color: var(--t1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .base-select__panel--teleported .base-select__item:hover,
 .base-select__panel--teleported .base-select__item--hl { background: var(--bg3); }

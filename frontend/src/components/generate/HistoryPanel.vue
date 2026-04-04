@@ -12,6 +12,8 @@ import StatusDot from '@/components/ui/StatusDot.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 
+defineOptions({ name: 'HistoryPanel' })
+
 const { t } = useI18n({ useScope: 'global' })
 const { get } = useApiFetch()
 
@@ -90,7 +92,7 @@ defineExpose({ loadHistory })
     :title="t('comfyui.history.total')"
     :default-open="true"
   >
-    <SectionToolbar style="margin-bottom:14px">
+    <SectionToolbar class="history-toolbar">
       <template #start>
         <span class="history-count">
           {{ historyItems.length > 0 ? t('comfyui.history.record_count', { count: historyItems.length }) : '' }}
@@ -105,7 +107,7 @@ defineExpose({ loadHistory })
           ]"
           size="sm"
           @change="loadHistory"
-          style="width:auto;min-width:100px"
+          class="history-select"
         />
         <BaseSelect
           v-model="cardSize"
@@ -115,7 +117,7 @@ defineExpose({ loadHistory })
             { value: 'lg', label: t('comfyui.history.size_lg') },
           ]"
           size="sm"
-          style="width:auto;min-width:100px"
+          class="history-select"
         />
       </template>
     </SectionToolbar>
@@ -177,6 +179,15 @@ defineExpose({ loadHistory })
 .history-count {
   font-size: .82rem;
   color: var(--t3);
+}
+
+.history-toolbar {
+  margin-bottom: 14px;
+}
+
+.history-select {
+  width: auto;
+  min-width: 100px;
 }
 
 /* ── Grid ── */

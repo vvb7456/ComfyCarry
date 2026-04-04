@@ -2,6 +2,8 @@
 import BaseCard from '@/components/ui/BaseCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
+defineOptions({ name: 'OptionCard' })
+
 const props = withDefaults(defineProps<{
   selected?: boolean
   disabled?: boolean

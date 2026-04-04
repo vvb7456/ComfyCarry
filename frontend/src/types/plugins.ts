@@ -42,12 +42,44 @@ export interface BrowseItem {
   version?: string
 }
 
-// ── API Responses ─────────────────────────────────────────────
-
-export interface AvailablePluginsResponse {
-  node_packs?: Record<string, PluginInfo>
-  [key: string]: unknown
+export interface InstalledPlugin {
+  cnrId: string
+  dirName: string
+  title: string
+  description: string
+  repository: string
+  author: string
+  stars: number
+  ver: string
+  activeVersion: string
+  cnrLatest: string
+  enabled: boolean
+  updateState: boolean
 }
+
+export interface PluginData {
+  id: string
+  dirName: string
+  title: string
+  description: string
+  repository: string
+  author: string
+  stars: number
+  ver: string
+  activeVersion: string
+  cnrLatest: string
+  registryVersion: string
+  enabled: boolean
+  installed: boolean
+  updateState: boolean
+  lastUpdate: string
+}
+
+export type PluginStatusFilter = 'all' | 'installed' | 'not-installed' | 'update' | 'disabled'
+export type PluginSortBy = 'stars' | 'update' | 'name'
+export type AvailablePluginsResponse = Record<string, PluginInfo> | { node_packs: Record<string, PluginInfo> }
+
+// ── API Responses ─────────────────────────────────────────────
 
 export interface PluginActionResponse {
   message?: string
