@@ -1,1 +1,0 @@
-import{d as e,g as t,G as s,o as n,C as r}from"./forms-6ZzQg5No.js";const a={class:"field-row"},d=e({name:"FieldControlRow",__name:"FieldControlRow",setup(l){return(o,_)=>(n(),t("div",a,[s(o.$slots,"default",{},void 0,!0)]))}}),i=r(d,[["__scopeId","data-v-e28d02ed"]]);export{i as F};

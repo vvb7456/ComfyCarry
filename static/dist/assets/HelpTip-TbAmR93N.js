@@ -1,1 +1,0 @@
-import{d as t,g as p,o as a,C as s}from"./forms-6ZzQg5No.js";const c=["data-tip"],o=t({name:"HelpTip",__name:"HelpTip",props:{text:{}},setup(e){return(n,_)=>(a(),p("span",{class:"cc-help-tip","data-tip":e.text},"?",8,c))}}),r=s(o,[["__scopeId","data-v-178457ce"]]);export{r as H};
