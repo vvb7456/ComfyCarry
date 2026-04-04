@@ -36,3 +36,6 @@ comfycarry-config-test.json
 
 # Frontend 依赖 (CI/CD 构建)
 frontend/node_modules/
+
+# Frontend 构建产物 (通过 GitHub Release 分发)
+static/dist/

@@ -76,10 +76,20 @@ if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" 
         rm -rf "$DASHBOARD_DIR/comfycarry"
         cp -r "$EXTRACTED/comfycarry" "$DASHBOARD_DIR/comfycarry"
     fi
-    # 复制 static/ 前端模块 (ES Module SPA)
+    # 复制 static/ 前端静态资源 (rclone-setup.bat 等)
     if [ -d "$EXTRACTED/static" ]; then
         rm -rf "$DASHBOARD_DIR/static"
         cp -r "$EXTRACTED/static" "$DASHBOARD_DIR/static"
+    fi
+    # 下载前端构建产物 (从 GitHub Release)
+    echo "  -> 下载前端构建产物..."
+    DIST_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/frontend-dist/frontend-dist.tar.gz"
+    if wget -q -O /tmp/frontend-dist.tar.gz "$DIST_URL"; then
+        tar xzf /tmp/frontend-dist.tar.gz -C "$DASHBOARD_DIR/static/"
+        rm -f /tmp/frontend-dist.tar.gz
+        echo "  ✅ 前端构建产物已下载"
+    else
+        echo "  ⚠️ 前端构建产物下载失败，请检查 Release 是否存在"
     fi
     # 复制 comfycarry_ws_broadcast/ 自定义节点
     if [ -d "$EXTRACTED/comfycarry_ws_broadcast" ]; then

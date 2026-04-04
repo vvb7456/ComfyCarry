@@ -1,9 +1,9 @@
 # ==============================================================================
-# Frontend 构建 & 提交 (GitHub Actions)
+# Frontend 构建 & 发布 (GitHub Actions)
 #
-# 触发: push 到 main 分支且 frontend/ 目录有变化
-# 流程: npm ci → npm run build → 将 static/dist/ 构建产物提交回仓库
-# 目的: bootstrap.sh 下载的 tarball 始终包含最新前端构建
+# 触发: push 到 main 分支且 frontend/ 目录有变化，或手动触发
+# 流程: npm ci → npm run build → 打包 static/dist/ → 上传到 GitHub Release
+# 目的: bootstrap.sh 从 Release 下载前端构建产物，仓库不再包含 dist
 # ==============================================================================
 
 name: Build Frontend
@@ -16,6 +16,9 @@ on:
     branches: [main]
   workflow_dispatch:  # 手动触发
 
+env:
+  RELEASE_TAG: frontend-dist  # 滚动 Release tag
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,8 +28,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,14 +44,20 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Commit dist
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add static/dist/ -f
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: build frontend dist [skip ci]"
-            git push
-          fi
+      - name: Package dist
+        run: tar -czf frontend-dist.tar.gz -C static dist
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Frontend Dist (auto-built)"
+          body: |
+            自动构建的前端产物，由 `frontend-build.yml` 生成。
+            bootstrap.sh 会从此 Release 下载 `frontend-dist.tar.gz`。
+
+            构建时间: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+            触发 commit: ${{ github.sha }}
+          files: frontend-dist.tar.gz
+          make_latest: false
+          prerelease: true
