@@ -1,6 +1,6 @@
 {
   "name": "comfycarry-frontend",
-  "version": "2.5.0",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "scripts": {

@@ -37,7 +37,7 @@ except Exception:
 @bp.route("/api/version")
 def api_version():
     """返回当前部署版本信息"""
-    version_info = {"version": "v2.4", "branch": "main", "commit": ""}
+    version_info = {"version": "v0.2.4", "branch": "main", "commit": ""}
     version_file = os.path.join(SCRIPT_DIR, ".version")
     try:
         if os.path.exists(version_file):

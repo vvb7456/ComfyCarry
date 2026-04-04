@@ -96,7 +96,7 @@ fi
 # Write version info
 COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${BRANCH}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
 cat > "$DASHBOARD_DIR/.version" <<EOF
-version=v2.4
+version=v0.2.4
 branch=${BRANCH}
 commit=${COMMIT_HASH}
 EOF
