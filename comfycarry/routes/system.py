@@ -18,7 +18,7 @@ from flask import Blueprint, jsonify, request, Response
 
 import requests as req_lib
 
-from ..config import SCRIPT_DIR, COMFYUI_URL
+from ..config import SCRIPT_DIR, COMFYUI_URL, APP_VERSION
 from ..utils import _run_cmd
 
 bp = Blueprint("system", __name__)
@@ -37,7 +37,7 @@ except Exception:
 @bp.route("/api/version")
 def api_version():
     """返回当前部署版本信息"""
-    version_info = {"version": "v0.2.4", "branch": "main", "commit": ""}
+    version_info = {"version": APP_VERSION, "branch": "main", "commit": ""}
     version_file = os.path.join(SCRIPT_DIR, ".version")
     try:
         if os.path.exists(version_file):

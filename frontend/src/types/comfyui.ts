@@ -43,11 +43,13 @@ export interface ParamSchema {
 export interface ComfyParamsResponse {
   schema?: Record<string, ParamSchema>
   current?: Record<string, string | number | boolean>
+  raw_args?: string[]
 }
 
 export interface ComfyParamsSaveResponse {
   ok?: boolean
   error?: string
+  args?: string
 }
 
 export interface ComfyQueueResponse {

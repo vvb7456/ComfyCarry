@@ -20,7 +20,7 @@ defineProps<{
   <span
     class="badge"
     :class="{ 'badge--muted': !color }"
-    :style="color ? { color, background: `${color}33` } : undefined"
+    :style="color ? { color, background: `color-mix(in srgb, ${color} 15%, transparent)` } : undefined"
   >
     <slot />
   </span>

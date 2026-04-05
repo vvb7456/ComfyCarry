@@ -13,12 +13,15 @@ import SectionHeader from '@/components/ui/SectionHeader.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import FormField from '@/components/form/FormField.vue'
+import BaseInput from '@/components/form/BaseInput.vue'
+import NumberInput from '@/components/form/NumberInput.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import type {
   ComfyStatus, ParamSchema,
   ComfyParamsResponse, ComfyParamsSaveResponse,
   ComfyVersionsResponse, ComfyVersionSwitchResponse,
 } from '@/types/comfyui'
+import type { ConfirmResult } from '@/composables/useConfirm'
 
 defineOptions({ name: 'SettingsTab' })
 
@@ -68,10 +71,12 @@ async function loadVersions() {
   try {
     const d = await get<ComfyVersionsResponse>('/api/comfyui/versions')
     if (d) {
-      versions.value = d.versions
+      // prepend "nightly" option (always available via git checkout master)
+      versions.value = ['nightly', ...d.versions]
       currentVersion.value = d.current
       latestVersion.value = d.latest
       hasGit.value = d.has_git
+      currentPage.value = 1
     }
   } finally {
     versionsLoading.value = false
@@ -82,7 +87,7 @@ async function switchVersion(tag: string) {
   const confirmMsg = tag === 'nightly'
     ? t('comfyui.settings.switch_confirm_nightly')
     : t('comfyui.settings.switch_confirm', { version: tag })
-  const result = await confirm({
+  const result: ConfirmResult = await confirm({
     message: confirmMsg,
     confirmText: t('comfyui.settings.switch_only'),
     altText: t('comfyui.settings.switch_and_install'),
@@ -102,6 +107,7 @@ async function switchVersion(tag: string) {
       toast(d.message || t('comfyui.settings.switch_success'), 'success')
       if (d.warning) toast(d.warning, 'warning')
       currentVersion.value = d.current || tag
+      await loadVersions()
     } else {
       toast(d?.error || t('comfyui.settings.switch_failed'), 'error')
     }
@@ -112,7 +118,7 @@ async function switchVersion(tag: string) {
 }
 
 function versionLabel(v: string) {
-  if (v === 'nightly') return 'nightly (master)'
+  if (v === 'nightly') return 'master'
   return v
 }
 
@@ -145,7 +151,7 @@ const PARAM_GROUPS = [
 
 watch(() => props.status, (s) => {
   if (s) rawArgs.value = (s.args || []).join(' ')
-})
+}, { immediate: true })
 
 onMounted(() => {
   loadVersions()
@@ -303,7 +309,7 @@ defineExpose({ saveParams, loadParams })
         {{ t('comfyui.console.params') }}
         <HelpTip :text="t('comfyui.console.params_restart_hint')" />
         <template #actions>
-          <span :style="{ color: paramsStatusColor, fontSize: '.78rem' }">{{ paramsStatus }}</span>
+          <span class="params-status-msg" :style="{ color: paramsStatusColor }">{{ paramsStatus }}</span>
           <BaseButton size="sm" variant="primary" @click="saveParams()">
             <MsIcon name="save" size="xs" color="none" /> {{ t('common.btn.save') }}
           </BaseButton>
@@ -311,14 +317,13 @@ defineExpose({ saveParams, loadParams })
       </SectionHeader>
 
       <div class="params-content">
-        <div style="margin-bottom: 12px">
+        <div class="params-raw-args">
           <FormField :label="t('comfyui.settings.raw_args')" density="compact">
-            <input
+            <BaseInput
               v-model="rawArgs"
-              type="text"
               :placeholder="t('comfyui.console.params_placeholder')"
-              class="form-input form-input--mono"
-            >
+              mono
+            />
           </FormField>
         </div>
 
@@ -348,26 +353,25 @@ defineExpose({ saveParams, loadParams })
                     :options="getParamOptions(paramKey, paramsSchema[paramKey])"
                     :disabled="!isParamEnabled(paramsSchema[paramKey])"
                   />
-                  <input
+                  <NumberInput
                     v-else-if="paramsSchema[paramKey].type === 'number'"
-                    type="number"
-                    v-model.number="paramsCurrent[paramKey]"
-                    class="form-number"
+                    :modelValue="Number(paramsCurrent[paramKey]) || 0"
+                    @update:modelValue="v => paramsCurrent[paramKey] = v"
+                    :spinners="false"
                     :disabled="!isParamEnabled(paramsSchema[paramKey])"
-                  >
-                  <input
+                  />
+                  <BaseInput
                     v-else
-                    type="text"
-                    v-model="paramsCurrent[paramKey]"
-                    class="form-input"
+                    :modelValue="String(paramsCurrent[paramKey] ?? '')"
+                    @update:modelValue="v => paramsCurrent[paramKey] = v"
                     :disabled="!isParamEnabled(paramsSchema[paramKey])"
-                  >
+                  />
                 </FormField>
               </template>
             </div>
           </CollapsibleGroup>
         </div>
-        <div v-else-if="status" style="color:var(--t3);font-size:.85rem;padding:8px 0">
+        <div v-else-if="status" class="params-loading-hint">
           {{ t('comfyui.console.params_loading') }}
         </div>
       </div>
@@ -413,7 +417,7 @@ defineExpose({ saveParams, loadParams })
                   <span class="version-item__name">{{ versionLabel(v) }}</span>
                   <Badge v-if="isCurrentVersion(v)" color="var(--green)">{{ t('comfyui.settings.current') }}</Badge>
                   <Badge v-if="isLatestVersion(v) && !isCurrentVersion(v)" color="var(--blue)">{{ t('comfyui.settings.latest') }}</Badge>
-                  <Badge v-if="v === 'nightly'" color="var(--amber)">{{ t('comfyui.settings.unstable') }}</Badge>
+                  <Badge v-if="v === 'nightly'" color="var(--amber)">nightly</Badge>
                 </div>
                 <div class="version-item__actions">
                   <BaseButton
@@ -566,10 +570,17 @@ defineExpose({ saveParams, loadParams })
 
 .param-disabled { opacity: 0.5; }
 
-.form-number {
-  width: 100%;
-  text-align: right;
+.params-status-msg {
+  font-size: var(--text-xs);
 }
-.form-number::-webkit-outer-spin-button,
-.form-number::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.params-raw-args {
+  margin-bottom: var(--sp-3);
+}
+
+.params-loading-hint {
+  color: var(--t3);
+  font-size: var(--text-sm);
+  padding: var(--sp-2) 0;
+}
 </style>

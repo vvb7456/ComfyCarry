@@ -105,8 +105,9 @@ fi
 
 # Write version info
 COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${BRANCH}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || true)
+APP_VERSION=$(python3 -c "import re; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open('$DASHBOARD_DIR/comfycarry/config.py').read()); print(m.group(1) if m else 'unknown')" 2>/dev/null || echo "unknown")
 cat > "$DASHBOARD_DIR/.version" <<EOF
-version=v0.2.4
+version=${APP_VERSION}
 branch=${BRANCH}
 commit=${COMMIT_HASH}
 EOF

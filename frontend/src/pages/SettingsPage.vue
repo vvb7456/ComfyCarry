@@ -31,7 +31,7 @@ const { confirm } = useConfirm()
 
 const activeTab = ref('comfycarry')
 const tabs = computed(() => [
-  { key: 'comfycarry', label: 'ComfyCarry', icon: 'dashboard_customize' },
+  { key: 'comfycarry', label: 'ComfyCarry', icon: 'dashboard' },
   { key: 'civitai', label: 'CivitAI', icon: 'palette' },
   { key: 'llm', label: 'LLM', icon: 'smart_toy' },
 ])

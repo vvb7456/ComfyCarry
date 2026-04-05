@@ -120,9 +120,9 @@ function toggleLang() {
             <template v-if="shortCommit">
               <span style="background:rgba(124,92,252,.15);padding:1px 5px;border-radius:3px;color:var(--ac)">{{ app.branch || 'main' }}</span>
               <span style="margin-left:3px">{{ shortCommit }}</span>
-              <span style="margin-left:3px;color:var(--t3)">{{ app.version || 'v0.2.4' }}</span>
+              <span v-if="app.version" style="margin-left:3px;color:var(--t3)">{{ app.version }}</span>
             </template>
-            <template v-else>{{ app.version || 'v0.2.4' }}</template>
+            <template v-else-if="app.version">{{ app.version }}</template>
           </a>
         </div>
       </div>
