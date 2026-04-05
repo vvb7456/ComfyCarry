@@ -44,7 +44,7 @@ export interface SyncRule {
   method: 'copy' | 'sync' | 'move'
   trigger: 'manual' | 'deploy' | 'watch'
   enabled: boolean
-  filters?: string
+  filters?: string[] | string
 }
 
 export interface SyncTemplate {
@@ -56,6 +56,8 @@ export interface SyncTemplate {
   local_path?: string
   remote_path?: string
   description?: string
+  filters?: string[]
+  watch_interval?: number
 }
 
 export interface SyncSettings {

@@ -194,7 +194,8 @@ def api_sync_remote_browse():
     remote = data.get("remote", "")
     path = data.get("path", "")
     try:
-        cmd = (f'rclone lsjson "{remote}:{path}" --dirs-only '
+        remote_spec = shlex.quote(f"{remote}:{path}")
+        cmd = (f'rclone lsjson {remote_spec} --dirs-only '
                f'-R --max-depth 1 2>/dev/null')
         r = subprocess.run(cmd, shell=True, capture_output=True,
                            text=True, timeout=30)

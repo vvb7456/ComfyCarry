@@ -46,7 +46,8 @@ function getRulePath(templateId: string, defaultPath: string): string {
 
 function onToggle(templateId: string) {
   const remote = remoteOverrides[templateId] || defaultRemoteName.value
-  const path = pathOverrides[templateId] || ''
+  const tpl = [...pullTemplates.value, ...pushTemplates.value].find(t => t.id === templateId)
+  const path = pathOverrides[templateId] || tpl?.remote_path || ''
   toggleRule(templateId, remote, path)
 }
 

@@ -291,13 +291,15 @@ function openAddRule() {
 }
 
 function openEditRule(rule: SyncRule) {
-  ruleForm.value = { ...rule }
+  const filters = Array.isArray(rule.filters) ? rule.filters.join('\n') : (rule.filters || '')
+  ruleForm.value = { ...rule, filters }
   ruleIsEdit.value = true
   addRuleModal.value = true
 }
 
 function applyTemplate(tmpl: SyncTemplate) {
-  ruleForm.value = { ...ruleForm.value, name: tmpl.name, direction: tmpl.direction, method: tmpl.method, trigger: tmpl.trigger, local_path: tmpl.local_path || '', remote_path: tmpl.remote_path || '' }
+  const filters = Array.isArray(tmpl.filters) ? tmpl.filters.join('\n') : ''
+  ruleForm.value = { ...ruleForm.value, name: tmpl.name, direction: tmpl.direction, method: tmpl.method, trigger: tmpl.trigger, local_path: tmpl.local_path || '', remote_path: tmpl.remote_path || '', filters }
 }
 
 async function saveRule() {
@@ -307,9 +309,14 @@ async function saveRule() {
   }
   saveRuleLoading.value = true
   try {
+    // Convert filters from textarea string to array for backend
+    const formData = { ...ruleForm.value }
+    if (typeof formData.filters === 'string') {
+      formData.filters = formData.filters.split('\n').filter(Boolean)
+    }
     const updated = ruleIsEdit.value
-      ? rules.value.map(r => r.id === ruleForm.value.id ? { ...r, ...ruleForm.value } as SyncRule : r)
-      : [...rules.value, { ...ruleForm.value, id: `rule_${Date.now()}`, enabled: true } as SyncRule]
+      ? rules.value.map(r => r.id === formData.id ? { ...r, ...formData } as SyncRule : r)
+      : [...rules.value, { ...formData, id: `rule_${Date.now()}`, enabled: true } as SyncRule]
     const d = await post<RulesSaveResponse>('/api/sync/rules/save', { rules: updated })
     if (d?.ok || d?.rules) {
       rules.value = d.rules || updated

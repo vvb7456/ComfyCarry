@@ -713,7 +713,7 @@ def _step_sync_assets(config):
                     "id": f"wizard-{tpl_id}-{int(time.time())}",
                     "name": tpl.get("name", ""),
                     "remote": wr.get("remote", ""),
-                    "remote_path": wr.get("remote_path", tpl.get("remote_path", "")),
+                    "remote_path": wr.get("remote_path") or tpl.get("remote_path", ""),
                     "local_path": tpl.get("local_path", ""),
                     "direction": tpl.get("direction", "pull"),
                     "method": tpl.get("method", "copy"),
