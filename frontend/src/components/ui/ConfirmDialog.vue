@@ -13,6 +13,8 @@ const props = defineProps<{
   variant?: 'default' | 'danger'
   confirmText?: string
   cancelText?: string
+  altText?: string
+  altVariant?: 'default' | 'primary' | 'danger' | 'success'
   loading?: boolean
   showDontAsk?: boolean
 }>()
@@ -20,6 +22,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   confirm: [dontAsk?: boolean]
+  alt: []
   cancel: []
 }>()
 
@@ -43,6 +46,10 @@ function close() {
 function doConfirm() {
   emit('confirm', dontAsk.value)
 }
+
+function doAlt() {
+  emit('alt')
+}
 </script>
 
 <template>
@@ -55,6 +62,7 @@ function doConfirm() {
       </label>
       <div class="confirm-buttons">
         <BaseButton :disabled="loading" @click="close">{{ cancelLabel }}</BaseButton>
+        <BaseButton v-if="altText" :variant="altVariant ?? 'default'" :disabled="loading" @click="doAlt">{{ altText }}</BaseButton>
         <BaseButton :variant="confirmVariant" :loading="loading" @click="doConfirm">{{ confirmLabel }}</BaseButton>
       </div>
     </template>

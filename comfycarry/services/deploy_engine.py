@@ -546,7 +546,7 @@ def _step_install_comfyui(PY):
     if not Path("/workspace/ComfyUI/main.py").exists():
         _deploy_log("从镜像复制 ComfyUI...")
         _deploy_exec("mkdir -p /workspace/ComfyUI && "
-                     "cp -r /opt/ComfyUI/* /workspace/ComfyUI/")
+                     "cp -a /opt/ComfyUI/. /workspace/ComfyUI/")
     else:
         _deploy_log("ComfyUI 已存在, 跳过复制")
 

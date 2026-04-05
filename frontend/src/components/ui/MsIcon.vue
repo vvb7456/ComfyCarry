@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ICON_CODEPOINTS } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'MsIcon' })
 
@@ -67,6 +68,8 @@ const sizeClass = computed(() => {
   return `ms-${props.size}`
 })
 
+const iconChar = computed(() => ICON_CODEPOINTS[props.name] || props.name)
+
 const iconStyle = computed(() => {
   if (props.color === 'none') return undefined
   const c = props.color || ICON_COLORS[props.name]
@@ -75,5 +78,5 @@ const iconStyle = computed(() => {
 </script>
 
 <template>
-  <span class="ms" :class="sizeClass" :style="iconStyle">{{ name }}</span>
+  <span class="ms" :class="sizeClass" :style="iconStyle">{{ iconChar }}</span>
 </template>

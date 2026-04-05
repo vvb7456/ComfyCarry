@@ -2,6 +2,7 @@
   "title": "ComfyUI",
   "tabs": {
     "console": "Console",
+    "settings": "Settings",
     "plugins": "Plugins"
   },
   "console": {
@@ -157,6 +158,29 @@
     "stopped": "Stopped",
     "generating": "Generating",
     "idle": "Idle"
+  },
+  "settings": {
+    "version_title": "Version Management",
+    "available_versions": "Available Versions",
+    "no_git": "ComfyUI is not a git repository. Version management is unavailable.",
+    "no_versions": "No versions found.",
+    "current": "Current",
+    "latest": "Latest",
+    "unstable": "Unstable",
+    "switch": "Switch",
+    "switch_only": "Switch Only",
+    "switch_and_install": "Switch & Install Deps",
+    "switch_confirm": "Switch ComfyUI to {version}? This will restart ComfyUI.",
+    "switch_confirm_nightly": "Switch to nightly (master)? This is a development version and may be unstable.",
+    "switch_success": "Version switched successfully",
+    "switch_failed": "Version switch failed",
+    "raw_args": "Custom Arguments",
+    "groups": {
+      "memory": "Memory & Performance",
+      "precision": "Precision",
+      "cache": "Cache",
+      "preview": "Preview"
+    }
   },
   "confirm": {
     "restart": "Restart ComfyUI?",

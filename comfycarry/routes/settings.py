@@ -196,13 +196,10 @@ def api_settings_export_config():
     if cf_protocol:
         config["cf_protocol"] = cf_protocol
 
-    # LLM 配置
+    # LLM 配置 (仅导出 provider + provider_keys + 全局参数，不导出冗余的 flat key/model/url)
     llm_provider = _get_config("llm_provider", "")
     if llm_provider:
         config["llm_provider"] = llm_provider
-        config["llm_model"] = _get_config("llm_model", "")
-        config["llm_api_key"] = _get_config("llm_api_key", "")
-        config["llm_base_url"] = _get_config("llm_base_url", "")
         config["llm_temperature"] = _get_config("llm_temperature", 0.7)
         config["llm_max_tokens"] = _get_config("llm_max_tokens", 2000)
         config["llm_stream"] = _get_config("llm_stream", False)
@@ -311,10 +308,12 @@ def api_settings_import_config():
     # LLM 配置
     if data.get("llm_provider"):
         try:
-            _set_config("llm_provider", data["llm_provider"])
-            _set_config("llm_model", data.get("llm_model", ""))
-            _set_config("llm_api_key", data.get("llm_api_key", ""))
-            _set_config("llm_base_url", data.get("llm_base_url", ""))
+            provider = data["llm_provider"]
+            _set_config("llm_provider", provider)
+            prov_keys = data.get("llm_provider_keys", {}).get(provider, {})
+            _set_config("llm_model", prov_keys.get("model", ""))
+            _set_config("llm_api_key", prov_keys.get("api_key", ""))
+            _set_config("llm_base_url", prov_keys.get("base_url", ""))
             _set_config("llm_temperature", data.get("llm_temperature", 0.7))
             _set_config("llm_max_tokens", data.get("llm_max_tokens", 2000))
             _set_config("llm_stream", data.get("llm_stream", False))

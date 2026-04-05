@@ -3,6 +3,8 @@ ComfyCarry — ComfyUI 管理路由
 
 - /api/comfyui/status   — 系统状态 + 启动参数
 - /api/comfyui/params   — 参数定义/更新
+- /api/comfyui/versions — 版本列表
+- /api/comfyui/switch   — 切换版本
 - /api/comfyui/queue     — 任务队列
 - /api/comfyui/interrupt — 中断执行
 - /api/comfyui/history   — 生成历史
@@ -27,6 +29,7 @@ from ..services.comfyui_params import (
     build_comfyui_args,
 )
 from ..services.comfyui_bridge import get_bridge
+from ..services.comfyui_version import get_versions, switch_version
 from ..services.deploy_engine import _detect_python
 
 bp = Blueprint("comfyui", __name__)
@@ -342,3 +345,37 @@ def api_comfyui_logs_stream():
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",
                              "X-Accel-Buffering": "no"})
+
+
+# ====================================================================
+# 版本管理
+# ====================================================================
+
+@bp.route("/api/comfyui/versions")
+def api_comfyui_versions():
+    """获取所有可用 ComfyUI 版本 (git tags)"""
+    fetch = request.args.get("fetch", "true").lower() != "false"
+    return jsonify(get_versions(fetch=fetch))
+
+
+@bp.route("/api/comfyui/switch", methods=["POST"])
+def api_comfyui_switch():
+    """切换 ComfyUI 版本并重启"""
+    data = request.get_json(silent=True) or {}
+    version = data.get("version", "").strip()
+    install_deps = data.get("install_deps", False)
+
+    if not version:
+        return jsonify({"ok": False, "error": "缺少 version 参数"}), 400
+
+    result = switch_version(version, install_deps=install_deps)
+    if not result["ok"]:
+        return jsonify(result), 500
+
+    # 重启 ComfyUI PM2 进程
+    try:
+        subprocess.run(["pm2", "restart", "comfy"], capture_output=True, timeout=15)
+    except Exception:
+        result["warning"] = "版本已切换，但 PM2 重启失败，请手动重启"
+
+    return jsonify(result)

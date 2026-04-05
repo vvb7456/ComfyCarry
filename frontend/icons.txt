@@ -12,3 +12,39 @@ contrast
 # LogPanel.vue — computed followTailIcon
 gps_fixed
 gps_not_fixed
+
+# 间接 icon prop 传递 (SectionHeader, CollapsibleGroup, AppSidebar, ModeCard 等)
+accessibility_new
+auto_fix_high
+border_style
+cached
+content_paste
+dashboard
+dashboard_customize
+dns
+eco
+hd
+history
+image_search
+inventory_2
+layers
+lightbulb
+local_fire_department
+loop
+monitoring
+preview
+psychology
+push_pin
+shuffle
+storage
+sync
+trending_up
+update
+
+# 动态 :icon 绑定
+cloud_off
+
+# ICON_COLORS 中带数字的 key (正则 [a-z_]+ 无法匹配)
+book_2
+hard_drive_2
+package_2

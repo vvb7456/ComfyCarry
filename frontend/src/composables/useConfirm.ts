@@ -7,11 +7,16 @@ export interface ConfirmOptions {
   variant?: 'default' | 'danger'
   confirmText?: string
   cancelText?: string
+  /** Optional third button text. When clicked, confirm() resolves with 'alt' instead of true. */
+  altText?: string
+  /** Variant for the alt button (default: 'default'). */
+  altVariant?: 'default' | 'primary' | 'danger' | 'success'
   /** When set, show a "Don't ask again" checkbox. Value is the localStorage key. */
   dontAskKey?: string
 }
 
-export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
+export type ConfirmResult = boolean | 'alt'
+export type ConfirmFn = (options: ConfirmOptions) => Promise<ConfirmResult>
 
 export const confirmKey: InjectionKey<ConfirmFn> = Symbol('confirm')
 

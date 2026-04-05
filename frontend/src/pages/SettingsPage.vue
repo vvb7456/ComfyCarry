@@ -327,7 +327,14 @@ async function fetchLlmModels() {
     return na.localeCompare(nb)
   })
   llmAllModels.value = models
-  llmModelText.value = models.length > 0 ? t('settings.llm.model.select') : t('settings.llm.model.none_available')
+  if (models.length > 0) {
+    const first = models[0]
+    llmModel.value = first.id
+    llmModelText.value = first.name || first.id
+    selectedLlmModel.value = first
+  } else {
+    llmModelText.value = t('settings.llm.model.none_available')
+  }
   toast(t('settings.llm.model.fetched_count', { count: models.length }), 'success')
 }
 

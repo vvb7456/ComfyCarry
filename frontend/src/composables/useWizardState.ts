@@ -308,10 +308,15 @@ export function useWizardState() {
       if (parsed.ssh_password) { config.ssh_password = parsed.ssh_password; appliedCount++ }
       if (parsed.ssh_keys) config.ssh_keys = parsed.ssh_keys
       if (parsed.ssh_pw_sync !== undefined) config.ssh_pw_sync = parsed.ssh_pw_sync
-      if (parsed.llm_provider) { config.llm_provider = parsed.llm_provider; appliedCount++ }
-      if (parsed.llm_api_key) config.llm_api_key = parsed.llm_api_key
-      if (parsed.llm_base_url) config.llm_base_url = parsed.llm_base_url
-      if (parsed.llm_model) config.llm_model = parsed.llm_model
+      if (parsed.llm_provider) {
+        config.llm_provider = parsed.llm_provider; appliedCount++
+        const provKeys = parsed.llm_provider_keys?.[parsed.llm_provider]
+        if (provKeys) {
+          config.llm_api_key = provKeys.api_key || ''
+          config.llm_base_url = provKeys.base_url || ''
+          config.llm_model = provKeys.model || ''
+        }
+      }
 
       return { ok: true, message: t('wizard.import.success', { count: appliedCount }) }
     } catch (e: any) {

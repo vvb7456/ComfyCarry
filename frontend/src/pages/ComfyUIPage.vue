@@ -13,6 +13,7 @@ import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import HeaderStatusBadge from '@/components/layout/HeaderStatusBadge.vue'
 import ConsoleTab from '@/components/comfyui/ConsoleTab.vue'
+import SettingsTab from '@/components/comfyui/SettingsTab.vue'
 import PluginsTab from '@/components/comfyui/PluginsTab.vue'
 import type { ComfyStatus } from '@/types/comfyui'
 
@@ -28,6 +29,7 @@ const activeTab = ref('console')
 const comfyTabs = computed(() => [
   { key: 'console', label: t('comfyui.tabs.console'), icon: 'terminal' },
   { key: 'plugins', label: t('comfyui.tabs.plugins'), icon: 'package_2' },
+  { key: 'settings', label: t('comfyui.tabs.settings'), icon: 'settings' },
 ])
 
 // Status (shared — used in header badge + ConsoleTab)
@@ -38,6 +40,7 @@ const tracker = useExecTracker()
 const execState = computed(() => tracker.state.value)
 
 const consoleTabRef = ref<InstanceType<typeof ConsoleTab> | null>(null)
+const settingsTabRef = ref<InstanceType<typeof SettingsTab> | null>(null)
 
 const sse = useComfySSE(tracker, {
   onEvent(evt, result) {
@@ -75,7 +78,7 @@ async function loadStatus() {
 async function comfyStart() {
   if (!await post('/api/services/comfy/start')) return
   toast(t('comfyui.toast.starting'), 'info')
-  setTimeout(() => { loadStatus(); consoleTabRef.value?.loadParams() }, 3000)
+  setTimeout(() => { loadStatus(); settingsTabRef.value?.loadParams() }, 3000)
 }
 
 async function comfyStop() {
@@ -87,10 +90,10 @@ async function comfyStop() {
 
 async function comfyRestart() {
   if (!await confirm({ message: t('comfyui.confirm.restart') })) return
-  if (!await consoleTabRef.value?.saveParams(false)) return
+  if (!await settingsTabRef.value?.saveParams(false)) return
   if (!await post('/api/services/comfy/restart')) return
   toast(t('comfyui.toast.restarting'), 'info')
-  setTimeout(() => { loadStatus(); consoleTabRef.value?.loadParams() }, 5000)
+  setTimeout(() => { loadStatus(); settingsTabRef.value?.loadParams() }, 5000)
 }
 </script>
 
@@ -124,6 +127,13 @@ async function comfyRestart() {
         :status="status"
         :exec-state="execState"
         :elapsed="tracker.elapsed.value"
+      />
+    </div>
+
+    <div v-show="activeTab === 'settings'">
+      <SettingsTab
+        ref="settingsTabRef"
+        :status="status"
       />
     </div>
 

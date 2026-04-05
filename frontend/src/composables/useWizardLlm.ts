@@ -75,6 +75,8 @@ export function useWizardLlm() {
         )
         if (preselect) {
           selectModel(preselect)
+        } else if (models.value.length > 0) {
+          selectModel(models.value[0].id)
         }
       } else {
         modelsError.value = d.error || t('wizard.step6.fetch_fail')

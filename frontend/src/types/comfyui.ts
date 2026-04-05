@@ -70,3 +70,21 @@ export interface ComfyHistoryItem {
 export interface ComfyHistoryResponse {
   history?: ComfyHistoryItem[]
 }
+
+// ── Version Management ────────────────────────────────────────
+
+export interface ComfyVersionsResponse {
+  versions: string[]
+  current: string | null
+  latest: string | null
+  has_git: boolean
+}
+
+export interface ComfyVersionSwitchResponse {
+  ok: boolean
+  message?: string
+  error?: string
+  warning?: string
+  previous?: string
+  current?: string
+}

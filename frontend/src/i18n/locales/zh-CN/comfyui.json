@@ -2,6 +2,7 @@
   "title": "ComfyUI",
   "tabs": {
     "console": "控制台",
+    "settings": "设置",
     "plugins": "插件管理"
   },
   "console": {
@@ -157,6 +158,29 @@
     "stopped": "已停止",
     "generating": "正在生成",
     "idle": "空闲中"
+  },
+  "settings": {
+    "version_title": "版本管理",
+    "available_versions": "可用版本",
+    "no_git": "ComfyUI 不是 Git 仓库，无法使用版本管理功能。",
+    "no_versions": "未找到版本。",
+    "current": "当前",
+    "latest": "最新",
+    "unstable": "不稳定",
+    "switch": "切换",
+    "switch_only": "仅切换",
+    "switch_and_install": "切换并安装依赖",
+    "switch_confirm": "确定要将 ComfyUI 切换到 {version} 吗？这将重启 ComfyUI。",
+    "switch_confirm_nightly": "确定切换到 nightly (master) 吗？这是开发版本，可能不稳定。",
+    "switch_success": "版本切换成功",
+    "switch_failed": "版本切换失败",
+    "raw_args": "自定义参数",
+    "groups": {
+      "memory": "内存与性能",
+      "precision": "精度控制",
+      "cache": "缓存",
+      "preview": "预览"
+    }
   },
   "confirm": {
     "restart": "确定要重启 ComfyUI 吗？",
