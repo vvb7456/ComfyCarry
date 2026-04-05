@@ -55,6 +55,8 @@
   "theme_toggle": "切换主题",
   "clipboard_copied": "已复制到剪贴板",
   "no_results": "没有找到匹配的结果",
+  "no_matches": "无匹配项",
+  "search_hint": "搜索…",
   "loading": "加载中...",
   "empty": "暂无数据",
   "filter_hint": "筛选…",

@@ -19,10 +19,12 @@
  *   full         — width: 100% (default: false, natural inline width)
  */
 import { ref, useSlots } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 
 defineOptions({ name: 'SearchInput' })
 
+const { t } = useI18n({ useScope: 'global' })
 const model = defineModel<string>({ default: '' })
 const slots = useSlots()
 
@@ -31,7 +33,7 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   full?: boolean
 }>(), {
-  placeholder: 'Search…',
+  placeholder: '',
   loading: false,
   full: false,
 })
@@ -67,7 +69,7 @@ defineExpose({ focus })
       v-model="model"
       type="text"
       class="search-input__field"
-      :placeholder="placeholder"
+      :placeholder="placeholder || t('common.search_hint')"
       @keydown="onKeydown"
     >
     <button

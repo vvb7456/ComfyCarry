@@ -206,7 +206,7 @@ function onPrev() { prevStep() }
     <!-- Detected remotes -->
     <div v-if="detectedRemotes.length > 0" class="step-rclone__remotes-section">
       <label class="step-rclone__section-label">
-        <MsIcon name="settings_input_antenna" size="sm" style="color: #34d399" />
+        <MsIcon name="settings_input_antenna" size="sm" />
         {{ t('wizard.step3.detected_remotes') }}
       </label>
       <div class="step-rclone__remote-chips">
@@ -219,7 +219,7 @@ function onPrev() { prevStep() }
     <!-- Manually added remotes -->
     <div v-if="config.wizard_remotes.length > 0" class="step-rclone__remotes-section">
       <label class="step-rclone__section-label">
-        <MsIcon name="build" size="sm" style="color: #fb923c" />
+        <MsIcon name="build" size="sm" />
         {{ t('wizard.step3.manual_remotes') }}
       </label>
       <div class="step-rclone__remote-chips">

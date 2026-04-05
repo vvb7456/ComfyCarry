@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import MsIcon from './MsIcon.vue'
+import { lockBodyScroll, unlockBodyScroll } from './BaseModal.vue'
 
 defineOptions({ name: 'ImagePreview' })
 
@@ -26,9 +27,9 @@ watch(() => props.modelValue, (open) => {
   if (open) {
     idx.value = Math.max(0, Math.min(props.initialIndex, total.value - 1))
     loaded.value = false
-    document.body.style.overflow = 'hidden'
+    lockBodyScroll()
   } else {
-    document.body.style.overflow = ''
+    unlockBodyScroll()
   }
 })
 
@@ -52,7 +53,7 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
-  document.body.style.overflow = ''
+  if (props.modelValue) unlockBodyScroll()
 })
 </script>
 

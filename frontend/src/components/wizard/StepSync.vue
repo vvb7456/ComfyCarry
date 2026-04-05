@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
     <!-- Pull rules -->
     <div class="step-sync__panel">
       <h4 class="step-sync__panel-title">
-        <MsIcon name="cloud_download" size="sm" style="color: #60a5fa" />
+        <MsIcon name="cloud_download" size="sm" />
         {{ t('wizard.step4.pull_title') }}
         <HelpTip :text="t('wizard.step4.pull_help')" />
         <span v-if="pullSelectedCount > 0" class="step-sync__section-count">{{ t('wizard.step4.selected_n', { n: pullSelectedCount }) }}</span>
@@ -185,7 +185,7 @@ onBeforeUnmount(() => {
     <!-- Push rules -->
     <div class="step-sync__panel">
       <h4 class="step-sync__panel-title">
-        <MsIcon name="cloud_upload" size="sm" style="color: #34d399" />
+        <MsIcon name="cloud_upload" size="sm" />
         {{ t('wizard.step4.push_title') }}
         <HelpTip :text="t('wizard.step4.push_help')" />
         <span v-if="pushSelectedCount > 0" class="step-sync__section-count">{{ t('wizard.step4.selected_n', { n: pushSelectedCount }) }}</span>

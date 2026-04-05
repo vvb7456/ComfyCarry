@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from '../ui/MsIcon.vue'
 
 defineOptions({ name: 'BaseSelect' })
@@ -48,12 +49,14 @@ const props = withDefaults(defineProps<{
   displayText: '',
   searchable: false,
   searchPlaceholder: '',
-  emptyText: 'No matches',
+  emptyText: '',
   disabled: false,
   size: 'default',
   fit: false,
   teleport: false,
 })
+
+const { t } = useI18n({ useScope: 'global' })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number | boolean]
@@ -238,7 +241,7 @@ onBeforeUnmount(() => {
             @click.stop
           />
           <div ref="listRef" class="base-select__list" tabindex="-1">
-            <div v-if="filteredOptions.length === 0" class="base-select__empty">{{ emptyText }}</div>
+            <div v-if="filteredOptions.length === 0" class="base-select__empty">{{ emptyText || t('common.no_matches') }}</div>
             <div
               v-for="(opt, idx) in filteredOptions"
               :key="String(opt.value)"

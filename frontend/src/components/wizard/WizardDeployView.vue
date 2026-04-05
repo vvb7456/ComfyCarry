@@ -34,7 +34,7 @@ async function onRetry() {
     <h2 class="wizard-deploy__title">
       <MsIcon v-if="status === 'success'" name="check_circle" size="sm" style="color: var(--green)" />
       <MsIcon v-else-if="status === 'error'" name="cancel" size="sm" style="color: var(--red)" />
-      <MsIcon v-else name="settings" size="sm" style="color: #94a3b8" />
+      <MsIcon v-else name="settings" size="sm" />
       <template v-if="status === 'success'">
         {{ t('wizard.deploy.done_title') }}
       </template>
@@ -70,7 +70,7 @@ async function onRetry() {
     <!-- Success buttons -->
     <div v-if="status === 'success'" class="wizard-deploy__actions">
       <BaseButton variant="primary" size="lg" @click="enterDashboard">
-        <MsIcon name="celebration" size="sm" style="color: #fbbf24" />
+        <MsIcon name="celebration" size="sm" />
         {{ t('wizard.deploy.enter') }}
       </BaseButton>
     </div>
@@ -78,11 +78,11 @@ async function onRetry() {
     <!-- Error buttons -->
     <div v-if="status === 'error'" class="wizard-deploy__actions">
       <BaseButton variant="default" @click="emit('backToWizard')">
-        <MsIcon name="arrow_back" size="sm" style="color: #94a3b8" />
+        <MsIcon name="arrow_back" size="sm" />
         {{ t('wizard.deploy.back_to_config') }}
       </BaseButton>
       <BaseButton variant="primary" size="lg" @click="onRetry">
-        <MsIcon name="refresh" size="sm" style="color: #34d399" />
+        <MsIcon name="refresh" size="sm" />
         {{ t('wizard.deploy.retry') }}
       </BaseButton>
     </div>

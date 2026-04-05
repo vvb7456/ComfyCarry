@@ -55,6 +55,8 @@
   "theme_toggle": "Toggle Theme",
   "clipboard_copied": "Copied to clipboard",
   "no_results": "No matching results found",
+  "no_matches": "No matches",
+  "search_hint": "Search\u2026",
   "loading": "Loading...",
   "empty": "No data",
   "filter_hint": "Filter\u2026",

@@ -22,6 +22,7 @@ const ICON_COLORS: Record<string, string> = {
   // Green: success / active / positive
   check_circle: 'var(--green)', check: 'var(--green)', play_arrow: '#34d399',
   cloud_sync: '#34d399', sync: '#34d399', trending_up: '#34d399',
+  cloud_upload: '#34d399', settings_input_antenna: '#34d399',
   add: '#34d399', save: '#34d399', public: '#34d399',
   refresh: '#34d399', arrow_upward: '#34d399',
   // Red: danger / close / stop
@@ -29,10 +30,10 @@ const ICON_COLORS: Record<string, string> = {
   // Amber-Orange: warning / pending / loading
   warning: 'var(--amber)', hourglass_top: 'var(--amber)', timer: '#fb923c',
   bolt: '#fb923c', restart_alt: '#fb923c', pause: '#fbbf24', queue: '#fb923c',
-  assignment: '#fb923c',
+  assignment: '#fb923c', celebration: '#fbbf24',
   // Blue: info / links / download / cloud
   download: '#60a5fa', upload: '#60a5fa', link: '#60a5fa', info: '#60a5fa',
-  cloud: '#60a5fa', language: '#60a5fa', search: '#60a5fa', visibility: '#60a5fa',
+  cloud: '#60a5fa', cloud_download: '#60a5fa', language: '#60a5fa', search: '#60a5fa', visibility: '#60a5fa',
   zoom_in: '#60a5fa', storage: '#60a5fa', content_copy: '#60a5fa', dns: '#60a5fa',
   content_paste: '#60a5fa', arrow_downward: '#60a5fa',
   // Purple: tools / config / meta

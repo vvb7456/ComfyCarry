@@ -6,13 +6,13 @@ let bodyLockCount = 0
 let previousBodyOverflow = ''
 let modalIdCounter = 0
 
-function lockBodyScroll() {
+export function lockBodyScroll() {
   if (bodyLockCount === 0) previousBodyOverflow = document.body.style.overflow
   bodyLockCount += 1
   document.body.style.overflow = 'hidden'
 }
 
-function unlockBodyScroll() {
+export function unlockBodyScroll() {
   if (bodyLockCount === 0) return
   bodyLockCount -= 1
   if (bodyLockCount === 0) document.body.style.overflow = previousBodyOverflow

@@ -171,7 +171,7 @@ function onPrev() { prevStep() }
 
       <div class="step-tunnel__validate-row">
         <BaseButton variant="default" size="sm" :loading="validating" @click="validateCfToken">
-          <MsIcon name="search" size="sm" style="color: #60a5fa" />
+          <MsIcon name="search" size="sm" />
           {{ t('wizard.step2.validate_token') }}
         </BaseButton>
         <span v-if="validateResult" class="step-tunnel__validate-msg" :class="{ 'step-tunnel__validate-msg--ok': validateResult.ok, 'step-tunnel__validate-msg--err': !validateResult.ok }">
