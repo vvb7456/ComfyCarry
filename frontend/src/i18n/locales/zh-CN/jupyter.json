@@ -26,9 +26,6 @@
     "start": "启动",
     "restart": "重启"
   },
-  "error": {
-    "load_failed": "加载失败"
-  },
   "token": {
     "title": "访问令牌"
   },
@@ -47,7 +44,6 @@
   "sessions": {
     "title": "活跃会话",
     "close": "关闭此会话",
-    "close_warning": "关联的内核也将被停止",
     "closed": "会话已关闭"
   },
   "terminals": {
@@ -61,8 +57,7 @@
     "destroyed": "终端 {name} 已销毁"
   },
   "log": {
-    "title": "日志",
-    "loading": "加载中..."
+    "title": "日志"
   },
   "confirm": {
     "stop": "确定要停止 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",

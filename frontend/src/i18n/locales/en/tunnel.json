@@ -7,11 +7,8 @@
   "status": {
     "running": "Running",
     "stopped": "Stopped",
-    "online": "Online",
     "connecting": "Connecting",
     "offline": "Offline",
-    "not_configured": "Not configured",
-    "public_random": "Public Node · Random ID",
     "no_connection": "No connection"
   },
   "services": {
@@ -20,20 +17,13 @@
     "stop": "Stop",
     "restart": "Restart",
     "start": "Start",
-    "fetching_links": "Fetching service links",
-    "open_comfyui": "Open ComfyUI in new window",
-    "open_jupyter": "Open JupyterLab in new window",
-    "starting": "Starting",
     "click_copy": "Click to copy",
     "custom_badge": "Custom",
     "add_service": "Add Service",
-    "route_ready": "Route ready",
-    "edit": "Edit",
-    "loading_failed": "Load failed"
+    "route_ready": "Route ready"
   },
   "log": {
-    "title": "Tunnel Logs",
-    "loading": "Loading..."
+    "title": "Tunnel Logs"
   },
   "setup_hint": {
     "not_configured": "Tunnel not configured. Go to the \"Configuration\" tab to set up.",
@@ -43,12 +33,11 @@
   "config": {
     "public": {
       "title": "Public Node",
-      "recommended": "Recommended",
       "desc": "One-click enable, no domain or CF account needed. Access via ComfyCarry shared tunnel service.",
       "capacity_loading": "Loading capacity...",
-    "capacity": "Capacity",
-    "capacity_full": "Full",
-    "capacity_fetch_failed": "Capacity: unable to fetch"
+      "capacity": "Capacity",
+      "capacity_full": "Full",
+      "capacity_fetch_failed": "Capacity: unable to fetch"
     },
     "custom": {
       "title": "Custom Tunnel",
@@ -57,13 +46,10 @@
     },
     "mode_active": "Active",
     "domain": "Domain",
-    "subdomain_prefix": "Prefix",
-    "domain_placeholder": "mydomain.com",
     "subdomain_help": "Leave subdomain prefix empty for random generation. Public mode uses erocraft.org, custom mode uses your own domain.",
     "protocol": "Transport Protocol",
     "protocol_help": "Cloudflared transport protocol. QUIC may be unstable, HTTP/2 recommended.",
     "protocol_auto": "Auto (Default)",
-    "cf_token": "CF API Token",
     "cf_token_help": "Requires Tunnel Edit + DNS Edit permissions",
     "cf_token_placeholder": "CF Token",
     "validate": "Validate",
@@ -79,11 +65,7 @@
     "custom_hint_active": "Custom Tunnel running · Click \"Save\" after changes to update and restart.",
     "custom_hint_inactive": "Enter CF API Token and domain, then click \"Save\" to auto-create Tunnel, configure DNS and Ingress.",
     "fill_all": "Please fill in all fields",
-    "enter_suffix": "Please enter suffix",
-    "adding_service": "Adding service...",
-    "removing": "Removing...",
-    "updating": "Updating...",
-    "edit_suffix_prompt": "Edit subdomain suffix (current: {current})"
+    "enter_suffix": "Please enter suffix"
   },
   "add_service": {
     "title": "Add Custom Service",
@@ -103,9 +85,7 @@
     "public_enabled": "Public node enabled",
     "public_disabled": "Public node disabled",
     "enable_failed": "Enable failed",
-    "disable_failed": "Disable failed",
     "save_failed": "Save failed",
-    "not_configured": "Tunnel not configured",
     "validating": "Validating",
     "validate_failed": "Validation request failed",
     "removed": "Tunnel removed",
@@ -113,29 +93,21 @@
     "cf_stopped": "CloudFlared stopped",
     "stop_failed": "Stop failed",
     "cf_starting": "cloudflared starting",
-    "start_failed": "Start failed",
     "cf_restarting": "cloudflared restarting",
-    "deleted": "Deleted",
     "service_added": "Service added",
     "add_failed": "Add failed",
-    "service_removed": "Service removed",
-    "subdomain_updated": "Subdomain updated",
-    "update_failed": "Update failed",
-    "backend_error": "Backend connection failed",
-    "ssh_copied": "SSH command copied"
+    "service_removed": "Service removed"
   },
   "confirm": {
     "fill_token_domain": "Please fill in API Token and domain",
     "create_tunnel": "Create Cloudflare Tunnel?\n\nDNS and Ingress will be configured automatically.",
     "remove_tunnel": "Remove Cloudflare Tunnel?\n\nTunnel and DNS records will be deleted, and cloudflared will be stopped.",
-    "delete_queue_item": "Delete this queue item?",
     "config_saved_restart": "Configuration saved. Restart cloudflared to apply.\n\nRestart now?",
     "config_saved_next": "Configuration saved, will take effect on next start",
     "destroy_to_public": "Switch to public mode?\n\nThe custom Tunnel will be destroyed.",
     "switch_to_custom": "Switch to custom Tunnel?\n\nThe public node will be disabled.",
     "update_restart": "This will update the Tunnel configuration and restart cloudflared.\n\nConnections through the Tunnel may briefly disconnect. Continue?",
     "disable_public": "Disable public node?\n\nThe Tunnel will be deleted and all public links will stop working.",
-    "remove_default_service": "is a default service. Removing it will prevent related features from being accessed via Tunnel.\n\nContinue?",
     "remove_custom_service": "Remove custom service \"{suffix}\"?",
     "stop_cloudflared": "Stop cloudflared?\n\nAll connections through the Tunnel will be disconnected.",
     "restart_cloudflared": "Restart cloudflared?\n\nConnections may be briefly interrupted."

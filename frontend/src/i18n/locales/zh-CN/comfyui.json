@@ -5,21 +5,14 @@
     "plugins": "插件管理"
   },
   "console": {
-    "status_cards_loading": "加载中...",
-    "exec_status": "实时执行状态",
     "params": "启动参数",
     "params_placeholder": "main.py --listen 0.0.0.0 --port 8188 ...",
     "params_loading": "加载中...",
     "log_title": "ComfyUI 日志",
-    "log_loading": "加载中...",
     "saved": "已保存",
     "saved_restarting": "已保存，ComfyUI 正在重启",
-    "log_history_failed": "获取日志历史失败",
     "uptime": "运行时间",
     "restart_count": "重启次数: {count}",
-    "status_unavailable": "无法获取状态",
-    "load_failed": "加载失败: {error}",
-    "params_load_failed": "加载参数失败: {error}",
     "params_save_confirm": "保存参数将重启 ComfyUI，确定继续？",
     "params_restart_hint": "修改启动参数后，需要重启 ComfyUI 才会生效。",
     "params_saving": "保存中...",
@@ -137,20 +130,14 @@
     }
   },
   "queue": {
-    "summary": "队列摘要",
     "running": "正在执行",
     "pending": "等待队列",
     "interrupt": "中断",
     "clear": "清空",
-    "none": "无",
     "cleared": "队列已清空",
-    "executing_count": "{count} 执行中",
-    "pending_count": "{count} 等待中",
-    "idle": "空闲",
     "no_running": "无正在执行的任务",
     "no_pending": "无等待中的任务",
     "node_count": "{count} 个节点",
-    "load_failed": "获取队列失败",
     "delete_confirm": "确定要删除此队列项吗？"
   },
   "history": {
@@ -160,19 +147,16 @@
     "size_sm": "紧凑",
     "size_md": "标准",
     "size_lg": "大图",
-    "loading": "加载中...",
     "no_records": "暂无生成记录",
     "record_count": "共 {count} 条记录",
     "no_preview": "无预览图",
-    "image_count": "{count}张",
-    "load_failed": "获取历史失败"
+    "image_count": "{count}张"
   },
   "status": {
     "running": "运行中",
     "stopped": "已停止",
     "generating": "正在生成",
-    "idle": "空闲中",
-    "waiting": "等待中"
+    "idle": "空闲中"
   },
   "confirm": {
     "restart": "确定要重启 ComfyUI 吗？",
@@ -180,18 +164,11 @@
   },
   "toast": {
     "gen_complete": "生成完成",
-    "exec_error": "执行出错",
     "exec_interrupted": "执行已中断",
     "restarting": "ComfyUI 正在重启...",
     "stopped": "ComfyUI 已停止",
     "starting": "ComfyUI 启动中...",
     "interrupt_sent": "已发送中断信号",
-    "vram_freed": "已释放 VRAM",
     "deleted": "已删除"
-  },
-  "error": {
-    "unknown": "未知错误",
-    "exec_error_detail": "执行出错: {error}",
-    "request_failed": "请求失败: {error}"
   }
 }

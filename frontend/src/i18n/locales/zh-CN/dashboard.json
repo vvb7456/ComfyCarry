@@ -2,21 +2,11 @@
   "title": "总览",
   "metrics": {
     "title": "性能指标",
-    "cores": "核",
     "memory": "内存",
     "disk": "磁盘",
-    "used": "已用",
     "free": "空闲"
   },
-  "activity": {
-    "title": "活动",
-    "node": "节点: {node}",
-    "generating": "正在生成",
-    "queued": "{count} 个下载排队中",
-    "idle": "暂无活动"
-  },
   "services": {
-    "title": "服务",
     "name": "服务",
     "status": "状态",
     "uptime": "运行时间",
@@ -27,9 +17,7 @@
     "restart": "重启",
     "action_sent": "已发送 {action} 操作"
   },
-  "environment": "环境",
   "status_bar": {
-    "loading": "加载中...",
     "all_good": "一切就绪，等待任务",
     "open_comfyui": "在新窗口打开 ComfyUI",
     "open_jupyter": "在新窗口打开 JupyterLab",
@@ -39,16 +27,6 @@
     "downloads_waiting": "{count} 个下载等待中",
     "downloading": "下载中..."
   },
-  "svc_table": {
-    "service": "服务",
-    "status": "状态",
-    "uptime": "运行时间",
-    "cpu": "CPU",
-    "memory": "内存",
-    "restarts": "重启",
-    "actions": "操作",
-    "no_services": "未发现服务"
-  },
   "status": {
     "online": "在线",
     "starting": "启动中",
@@ -56,34 +34,13 @@
     "off": "离线",
     "queue": "队列",
     "running": "运行",
-    "waiting": "等待",
-    "pending": "等待中",
     "not_configured": "未配置",
     "connecting": "连接中",
-    "queue_idle": "队列空闲",
-    "generating": "生成中",
-    "idle": "空闲",
-    "active": "活跃",
-    "rules": "条规则"
+    "queue_idle": "队列空闲"
   },
-  "metrics_labels": {
-    "cpu": "CPU",
-    "gpu": "GPU",
-    "memory": "内存",
-    "disk": "磁盘",
-    "available": "可用",
-    "vram": "显存",
-    "temperature": "温度"
-  },
-  "activity_empty": "暂无活动记录",
-  "backend_error": "后端连接失败",
-  "no_records": "暂无生成记录",
   "sections": {
     "activity": "活动",
     "services": "服务",
     "environment": "环境"
-  },
-  "toast": {
-    "action_done": "{action} {name} 完成"
   }
 }

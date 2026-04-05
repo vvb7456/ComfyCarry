@@ -26,9 +26,6 @@
     "start": "Start",
     "restart": "Restart"
   },
-  "error": {
-    "load_failed": "Load failed"
-  },
   "token": {
     "title": "Access Token"
   },
@@ -47,7 +44,6 @@
   "sessions": {
     "title": "Active Sessions",
     "close": "Close this session",
-    "close_warning": "Associated kernel will also be stopped",
     "closed": "Session closed"
   },
   "terminals": {
@@ -61,8 +57,7 @@
     "destroyed": "Terminal {name} destroyed"
   },
   "log": {
-    "title": "Logs",
-    "loading": "Loading..."
+    "title": "Logs"
   },
   "confirm": {
     "stop": "Stop JupyterLab?\n\nActive kernels and sessions will be lost.",

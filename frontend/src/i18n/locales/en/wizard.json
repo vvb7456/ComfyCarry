@@ -1,5 +1,4 @@
 {
-  "title": "ComfyCarry - Setup Wizard",
   "header": "ComfyCarry Setup Wizard",
   "subtitle": "<a href=\"https://github.com/vvb7456/ComfyCarry\" target=\"_blank\" style=\"color:var(--ac);text-decoration:none\">GitHub</a> · All-in-one ComfyUI Management on RunPod / Vast.ai",
   "step_labels": ["Deploy", "Password/SSH", "Tunnel", "Cloud Storage", "Sync Rules", "CivitAI", "LLM", "Plugins", "Attention", "Confirm"],
@@ -8,8 +7,6 @@
     "prev": "Previous",
     "skip": "Skip",
     "deploy": "Deploy",
-    "switch_theme": "Toggle Theme",
-    "back_to_edit": "Go Back",
     "switch_to_en": "Switch to English",
     "switch_to_zh": "切换到中文"
   },
@@ -21,9 +18,6 @@
     "detecting": "Detecting environment...",
     "env_ok": "Environment check passed",
     "env_fail": "Environment check failed",
-    "est_time": "Estimated 2-5 minutes",
-    "import_success": "Configuration imported successfully!",
-    "import_fail": "Import failed",
     "fresh": {
       "title": "Fresh Deployment",
       "desc": "Configure password, tunnel, cloud storage, plugins, then one-click deploy ComfyUI workspace",
@@ -42,17 +36,16 @@
   },
   "step1": {
     "title": "Password & SSH Access",
+    "env_password_hint": "Password detected from DASHBOARD_PASSWORD environment variable",
     "desc": "Set ComfyCarry console password and SSH remote access",
     "password": "ComfyCarry Access Password",
     "password_placeholder": "Enter ComfyCarry access password...",
-    "toggle_pw": "Show/Hide password",
     "confirm_password": "Confirm Password",
     "confirm_placeholder": "Enter password again...",
     "mismatch": "Passwords do not match",
     "ssh_sync": "Also use as SSH Root password",
     "ssh_sync_hint": "(for <code>ssh root{'@'}host</code> login)",
     "ssh_keys": "SSH Public Keys",
-    "ssh_keys_optional": "(Optional)",
     "ssh_keys_hint": "One per line, supports ed25519 / rsa / ecdsa. Paste contents of <code>~/.ssh/id_ed25519.pub</code>",
     "ssh_keys_placeholder": "ssh-ed25519 AAAA... your-key\nssh-rsa AAAA... another-key"
   },
@@ -93,6 +86,7 @@
   },
   "step3": {
     "title": "Cloud Storage",
+    "env_rclone_hint": "Rclone configuration detected from RCLONE_CONF_BASE64 environment variable",
     "desc": "Connect cloud storage for workspace auto-sync",
     "rclone_help": "Rclone is an open-source cloud sync tool supporting OneDrive / Google Drive / S3 / R2 etc. Install Rclone on your local machine, run rclone config to create a Remote, then upload the config file (~/.config/rclone/rclone.conf).",
     "rclone_helper_hint": "Don't have an rclone config? <a href=\"/api/setup/rclone-bundle\" style=\"color:var(--ac);text-decoration:underline;font-weight:600\">Download Setup Helper (Windows)</a> — Unzip and run the bat script, follow the guide to authorize, then come back to upload rclone.conf.",
@@ -145,13 +139,14 @@
     "trigger_manual": "Manual",
     "remote_path": "Remote Path",
     "remote_path_placeholder": "Remote path",
-    "rule_count": "Selected rules: {count} · Can be modified in ComfyCarry Cloud Sync page after deploy",
+
     "selected_n": "{n} selected",
     "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."
   },
   "step5": {
     "title": "CivitAI API Key",
+    "env_civitai_hint": "API Key detected from CIVITAI_TOKEN environment variable",
     "desc": "Configure CivitAI API Key to search and download models in ComfyCarry",
     "api_key_label": "API Key",
     "api_key_placeholder": "Your CivitAI API Key (optional)",
@@ -172,8 +167,6 @@
     "skip_hint": "Can also skip and configure later in ComfyCarry Settings",
     "custom_provider": "Custom (OpenAI Compatible)",
     "base_url_placeholder": "https://api.example.com/v1",
-    "loading": "Loading...",
-    "model_count": "{count} models available",
     "fetch_fail": "Fetch failed",
     "request_fail": "Request failed:",
     "no_models": "No models available"
@@ -195,7 +188,6 @@
     "sa2_desc": "Next-gen Attention solution, faster in some scenarios",
     "sa2_param": "Launch param: --use-sage-attention",
     "fa2_preinstalled": "Pre-installed in image",
-    "fa2_preinstalled_desc": "FA2 pre-installed, optionally install SA2 as well",
     "hint_both": "When both installed, ComfyUI will prioritize FlashAttention-2",
     "hint_fa2": "ComfyUI will launch with --use-flash-attention",
     "hint_sa2": "ComfyUI will launch with --use-sage-attention",
@@ -302,7 +294,6 @@
     "manual_create": "Manual Create",
     "env_var": "Environment Variable",
     "remote_count": "Remote Count",
-    "remotes_detail": "{total} ({manual} manual)",
     "sync_rules": "Sync Rules",
     "rules_count": "{count}",
     "none": "None",

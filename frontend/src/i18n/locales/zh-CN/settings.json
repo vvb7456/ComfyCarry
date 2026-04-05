@@ -1,10 +1,5 @@
 {
   "title": "设置",
-  "tabs": {
-    "comfycarry": "ComfyCarry",
-    "civitai": "CivitAI",
-    "llm": "LLM"
-  },
   "restart_btn": "重启",
   "password": {
     "title": "ComfyCarry 密码",
@@ -21,7 +16,6 @@
     "err_mismatch": "两次输入的密码不一致"
   },
   "api_key": {
-    "title": "ComfyCarry API Key",
     "help": "用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API",
     "regenerate": "重新生成",
     "regenerate_confirm": "确定要重新生成 API Key 吗？\n\n旧的 Key 将立即失效，所有使用旧 Key 的外部应用需要更新。",
@@ -54,14 +48,11 @@
     "partial_fail": "部分操作失败"
   },
   "log": {
-    "title": "ComfyCarry 日志",
-    "loading": "加载中..."
+    "title": "ComfyCarry 日志"
   },
   "restart_confirm": "确定要重启 ComfyCarry 吗？\n\n页面将短暂不可用。",
   "restarting": "ComfyCarry 正在重启, 3 秒后自动刷新...",
   "civitai": {
-    "title": "CivitAI API Key",
-    "desc": "API Key 从 CivitAI 账户设置中生成",
     "key_prefix": "API Key 从",
     "key_link": "CivitAI 账户设置",
     "key_suffix": "中生成",
@@ -79,8 +70,7 @@
       "select_placeholder": "— 选择服务提供商 —",
       "api_key": "API Key",
       "api_key_placeholder": "输入 API Key...",
-      "base_url": "Base URL",
-      "base_url_placeholder": "https://api.example.com/v1"
+      "base_url": "Base URL"
     },
     "model": {
       "title": "模型",
@@ -109,10 +99,8 @@
     },
     "test_btn": "测试连接",
     "save_btn": "保存配置",
-    "testing": "测试中...",
     "test_success": "连接成功",
     "test_failed": "连接失败",
-    "test_error": "请求失败",
     "err_no_provider": "请先选择服务提供商",
     "err_no_key": "请先输入 API Key",
     "err_no_model": "请先选择模型",

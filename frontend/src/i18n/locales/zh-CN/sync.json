@@ -6,24 +6,13 @@
     "config": "配置"
   },
   "remotes": {
-    "add_title": "添加存储服务",
-    "loading": "加载中...",
-    "add_storage": "添加存储",
     "authenticated": "已认证",
     "not_configured": "未配置",
-    "no_capacity": "此存储类型不支持容量查询",
     "click_refresh": "点击刷新查看容量",
-    "refresh_capacity": "刷新容量",
     "used": "已用",
-    "remaining": "剩余",
-    "confirm_delete": "确定删除 Remote",
-    "deleted": "已删除",
-    "querying": "查询中...",
-    "query_failed": "查询失败",
-    "delete_btn": "删除"
+    "remaining": "剩余"
   },
   "remote": {
-    "storage": "存储服务",
     "add": "添加存储",
     "add_modal": "添加存储服务",
     "name": "Remote 名称",
@@ -40,75 +29,26 @@
     "confirm_delete": "确定要删除 Remote「{name}」吗？",
     "deleted": "已删除",
     "delete_failed": "删除失败",
-    "storage_error": "容量查询失败",
     "no_capacity_info": "此存储类型不支持容量查询",
-    "load_storage": "刷新容量",
-    "no_remotes": "暂无存储服务"
+    "load_storage": "刷新容量"
   },
   "rules": {
-    "add_title": "添加同步规则",
-    "add": "添加规则",
-    "edit": "编辑同步规则",
-    "quick_templates": "快捷模板",
     "deploy": "部署时",
     "watch": "监控",
     "manual": "手动",
-    "direction": {
-      "pull": "pull (远程→本地)",
-      "push": "push (本地→远程)"
-    },
-    "method": {
-      "copy": "copy — 复制文件 (保留源端)",
-      "sync": "sync — 镜像同步 (目标多余文件会被删除!)",
-      "move": "move — 移动文件 (完成后删除源端)"
-    },
-    "trigger": {
-      "deploy": "部署时执行",
-      "watch": "持续监控",
-      "manual": "仅手动执行"
-    },
-    "enable": "启用",
-    "disable": "禁用",
-    "delete": "删除规则",
-    "execute": "立即执行",
-    "edit_btn": "编辑",
-    "save": "保存",
-    "executing": "执行中...",
-    "execute_started": "规则已开始执行，查看日志了解进度",
-    "execute_all_confirm": "执行全部「部署时」规则？",
-    "execute_deploy_started": "开始执行部署规则...",
-    "subscribe_confirm": "订阅规则「{name}」？",
     "method_short": {
       "sync": "镜像同步",
       "copy": "复制",
       "move": "移动"
-    },
-    "confirm_delete": "删除规则「{name}」？",
-    "form": {
-      "name": "规则名称",
-      "name_placeholder": "例如：下载工作流",
-      "direction": "方向",
-      "select": "选择...",
-      "remote_path": "远程路径",
-      "browse_remote": "浏览远程目录",
-      "local_path": "本地路径 (相对 ComfyUI)",
-      "browse_local": "浏览本地目录",
-      "method": "方法",
-      "method_tip": "copy: 复制文件，保留源端\nsync: 镜像同步，目标多余文件会被删除\nmove: 移动文件，完成后删除源端\n\n同目录多规则时 copy 会在 move 之前执行，不会冲突",
-      "trigger": "触发方式",
-      "filters": "过滤规则 (每行一条 rclone filter)",
-      "fill_required": "请填写名称、Remote 和本地路径"
     }
   },
   "rule": {
-    "title": "同步规则",
     "add": "添加规则",
     "run": "立即执行",
     "edit": "编辑",
     "disable": "禁用",
     "enable": "启用",
     "delete": "删除规则",
-    "no_rules": "暂无同步规则",
     "edit_modal": "编辑同步规则",
     "add_modal": "添加同步规则",
     "quick_template": "快捷模板",
@@ -135,7 +75,6 @@
     "run_ok": "规则已开始执行，查看日志了解进度"
   },
   "config": {
-    "sync_settings": "同步设置",
     "min_age": {
       "label": "文件稳定延迟",
       "desc": "推送文件时跳过修改时间不足此秒数的文件，防止复制不完整文件",
@@ -149,28 +88,16 @@
     "rclone": {
       "title": "Rclone 配置",
       "placeholder": "加载中...",
-      "upload_local": "上传本地文件",
-      "empty_hint": "暂无配置，可通过上传本地文件或在此直接编辑"
+      "upload_local": "上传本地文件"
     },
     "saved": "已保存",
-    "save_failed": "保存失败",
-    "load_failed": "加载失败",
-    "sync_saved": "同步设置已保存",
-    "settings": "同步设置",
     "file_loaded": "已加载本地配置文件",
     "saving": "保存中...",
-    "save_all": "保存全部",
     "save": "保存"
   },
   "worker": {
     "running": "运行中",
     "stopped": "已停止",
-    "worker_stopped": "Worker 已停止",
-    "worker_started": "Worker 已启动",
-    "worker_restarted": "Sync Worker 已重启",
-    "action_failed": "操作失败",
-    "restart_failed": "重启失败",
-    "title": "Sync Worker",
     "start_ok": "Worker 已启动",
     "stop_ok": "Worker 已停止",
     "restart_ok": "Sync Worker 已重启",
@@ -181,7 +108,6 @@
   },
   "log": {
     "title": "同步日志",
-    "loading": "加载中...",
     "worker_started": "☁️ Sync Worker 已启动",
     "worker_stopped": "🛑 Sync Worker 已停止",
     "worker_stale": "⚠️ 旧 Worker 仍在运行, 等待终止...",
@@ -193,40 +119,6 @@
     "rule_failed": "❌ {name} 失败 (code={code})",
     "rule_timeout": "⏰ {name} 超时 ({seconds}s)",
     "rule_error": "❌ {name} 异常: {error}"
-  },
-  "storage_form": {
-    "name_placeholder": "请填写名称和类型",
-    "select_type": "选择类型...",
-    "fill_field": "请填写 {field}",
-    "create_failed": "创建失败",
-    "name_label": "Remote 名称",
-    "name_example": "例如 myr2",
-    "type_label": "类型",
-    "needs_oauth": "需 OAuth",
-    "oauth_title": "OAuth 授权步骤:",
-    "oauth_step1": "1. 在你本地电脑安装",
-    "oauth_step2": "2. 运行命令获取 token：",
-    "oauth_step3": "3. 完成浏览器授权后，将终端输出的 token JSON 粘贴到下方",
-    "unknown_error": "未知"
-  },
-  "rclone_upload": {
-    "confirm": "确定上传并覆盖当前 rclone 配置？旧配置将备份为 rclone.conf.bak",
-    "empty_file": "文件为空",
-    "upload_failed": "上传失败"
-  },
-  "browse_modal": {
-    "title": "浏览目录",
-    "cancel": "取消",
-    "select": "选择当前目录",
-    "select_dir": "选择当前目录",
-    "remote_title": "浏览远程目录",
-    "local_title": "浏览本地目录",
-    "select_remote_first": "请先选择 Remote",
-    "loading": "加载中...",
-    "no_subdirs_root": "根目录下无子目录",
-    "no_subdirs": "无子目录",
-    "load_failed": "加载失败",
-    "selected": "已选择: {path}"
   },
   "browse": {
     "remote_title": "浏览远程目录",

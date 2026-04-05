@@ -3,10 +3,7 @@
   "actions": {
     "start": "启动",
     "stop": "停止",
-    "restart": "重启",
-    "copy": "复制",
-    "delete": "删除",
-    "cancel": "取消"
+    "restart": "重启"
   },
   "tabs": {
     "status": "服务 & 日志",
@@ -16,14 +13,9 @@
     "running": "运行中",
     "stopped": "已停止",
     "service": "SSH 服务",
-    "listen_port": "监听端口",
     "port": "监听端口",
-    "active_connections": "活跃连接",
     "connections": "活跃连接",
     "password_auth": "密码认证",
-    "enabled": "已启用",
-    "disabled": "已禁用",
-    "set": "已设置",
     "pw_set": "已设置",
     "not_set": "未设置",
     "service_not_running": "服务未启动",
@@ -35,30 +27,17 @@
     "tunnel_not_configured": "Tunnel 未配置 SSH 映射",
     "check_platform": "请查看实例平台获取公网 IP / 端口",
     "not_running": "SSH 未运行，无法连接",
-    "unavailable": "当前无法生成 SSH 连接命令",
-    "via_public_tunnel": "via ComfyCarry 公共 Tunnel",
     "need_cloudflared": "需要本地安装",
     "loading": "加载中..."
   },
   "keys": {
     "title": "授权公钥",
-    "loading": "加载中...",
-    "authenticated": "已认证",
     "env_var": "环境变量",
     "saved": "已保存",
     "add": "添加公钥",
     "add_btn": "添加公钥",
     "add_placeholder": "粘贴一个或多个 SSH 公钥（每行一个）",
-    "confirm_add": "确认添加",
     "add_submit": "确认添加",
-    "added_count": "已添加 {count} 个公钥",
-    "failed_count": "{count} 个失败",
-    "empty_input": "请输入公钥",
-    "add_hint": "粘贴一个或多个 SSH 公钥，每行一个",
-    "confirm_delete": "确认删除此公钥？",
-    "deleted": "已删除",
-    "load_failed": "获取公钥列表失败",
-    "empty": "暂无公钥",
     "delete_btn": "删除公钥"
   },
   "password": {
@@ -70,32 +49,22 @@
     "help": "设置后将自动启用密码认证、PermitRootLogin 并重启 sshd",
     "synced": "SSH 密码已同步为 ComfyCarry 密码",
     "set_success": "密码已设置",
-    "not_set": "SSH 密码未设置",
-    "empty_password": "请输入新密码",
-    "mismatch": "两次密码不一致",
     "too_short": "密码长度至少 4 位",
     "sync_btn": "同步密码",
     "sshd_restarted_suffix": "，已自动启用密码认证并重启 sshd"
   },
   "log": {
-    "title": "SSH 日志",
-    "loading": "加载中..."
+    "title": "SSH 日志"
   },
   "confirm": {
     "stop": "确定要停止 SSH 服务吗？\n\n所有活跃的 SSH 连接将断开。",
     "delete_key": "确定要删除此公钥吗？"
   },
   "toast": {
-    "copied": "已复制",
-    "started": "已启动",
-    "stopped": "已停止",
-    "restarted": "已重启",
-    "status_failed": "获取 SSH 状态失败",
     "action_ok": "操作已提交",
     "key_added": "已添加 {n} 个公钥",
     "key_deleted": "公钥已删除",
     "pw_empty": "请输入新密码",
-    "pw_mismatch": "两次密码不一致",
-    "pw_set": "SSH 密码已设置"
+    "pw_mismatch": "两次密码不一致"
   }
 }

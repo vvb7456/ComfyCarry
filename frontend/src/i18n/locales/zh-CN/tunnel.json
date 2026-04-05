@@ -7,11 +7,8 @@
   "status": {
     "running": "运行中",
     "stopped": "已停止",
-    "online": "在线",
     "connecting": "连接中",
     "offline": "离线",
-    "not_configured": "未配置",
-    "public_random": "公共节点 · 随机ID",
     "no_connection": "无连接"
   },
   "services": {
@@ -20,20 +17,13 @@
     "stop": "停止",
     "restart": "重启",
     "start": "启动",
-    "fetching_links": "获取服务链接中",
-    "open_comfyui": "在新窗口打开 ComfyUI",
-    "open_jupyter": "在新窗口打开 JupyterLab",
-    "starting": "启动中",
     "click_copy": "点击复制",
     "custom_badge": "自定义",
     "add_service": "添加服务",
-    "route_ready": "路由就绪",
-    "edit": "编辑",
-    "loading_failed": "加载失败"
+    "route_ready": "路由就绪"
   },
   "log": {
-    "title": "Tunnel 日志",
-    "loading": "加载中..."
+    "title": "Tunnel 日志"
   },
   "setup_hint": {
     "not_configured": "尚未配置 Tunnel，请前往「配置」tab 设置",
@@ -43,12 +33,11 @@
   "config": {
     "public": {
       "title": "公共节点",
-      "recommended": "推荐",
       "desc": "一键启用，无需域名或 CF 账号。通过 ComfyCarry 共享 Tunnel 服务获得公网访问。",
       "capacity_loading": "容量加载中...",
-    "capacity": "容量",
-    "capacity_full": "已满",
-    "capacity_fetch_failed": "容量: 无法获取"
+      "capacity": "容量",
+      "capacity_full": "已满",
+      "capacity_fetch_failed": "容量: 无法获取"
     },
     "custom": {
       "title": "自定义 Tunnel",
@@ -57,13 +46,10 @@
     },
     "mode_active": "当前启用",
     "domain": "域名",
-    "subdomain_prefix": "前缀",
-    "domain_placeholder": "mydomain.com",
     "subdomain_help": "子域名前缀留空则随机生成。公共模式使用 erocraft.org，自定义模式填写自己的域名。",
     "protocol": "传输协议",
     "protocol_help": "cloudflared 传输层协议。QUIC 可能不稳定，推荐 HTTP/2",
     "protocol_auto": "Auto (默认)",
-    "cf_token": "CF API Token",
     "cf_token_help": "需要 Tunnel Edit + DNS Edit 权限",
     "cf_token_placeholder": "CF Token",
     "validate": "验证",
@@ -79,11 +65,7 @@
     "custom_hint_active": "自定义 Tunnel 运行中 · 修改配置后点击「保存」将更新并重启。",
     "custom_hint_inactive": "填写 CF API Token 和域名后，点击「保存」自动创建 Tunnel、配置 DNS 和 Ingress。",
     "fill_all": "请填写所有字段",
-    "enter_suffix": "请输入后缀",
-    "adding_service": "正在添加服务...",
-    "removing": "正在移除...",
-    "updating": "正在更新...",
-    "edit_suffix_prompt": "修改子域名后缀 (当前: {current})"
+    "enter_suffix": "请输入后缀"
   },
   "add_service": {
     "title": "添加自定义服务",
@@ -103,9 +85,7 @@
     "public_enabled": "公共节点已启用",
     "public_disabled": "公共节点已停用",
     "enable_failed": "启用失败",
-    "disable_failed": "停用失败",
     "save_failed": "保存失败",
-    "not_configured": "Tunnel 未配置",
     "validating": "验证中",
     "validate_failed": "验证请求失败",
     "removed": "Tunnel 已移除",
@@ -113,29 +93,21 @@
     "cf_stopped": "CloudFlared 已停止",
     "stop_failed": "停止失败",
     "cf_starting": "cloudflared 正在启动",
-    "start_failed": "启动失败",
     "cf_restarting": "cloudflared 正在重启",
-    "deleted": "已删除",
     "service_added": "服务已添加",
     "add_failed": "添加失败",
-    "service_removed": "服务已移除",
-    "subdomain_updated": "子域名已更新",
-    "update_failed": "更新失败",
-    "backend_error": "后端连接失败",
-    "ssh_copied": "SSH 命令已复制"
+    "service_removed": "服务已移除"
   },
   "confirm": {
     "fill_token_domain": "请填写 API Token 和域名",
     "create_tunnel": "确定要创建 Cloudflare Tunnel 吗？\n\n将自动配置 DNS 和 Ingress。",
     "remove_tunnel": "确定要移除 Cloudflare Tunnel 吗？\n\n将删除 Tunnel、DNS 记录，并停止 cloudflared。",
-    "delete_queue_item": "确定要删除此队列项吗？",
     "config_saved_restart": "配置已保存，需要重启 cloudflared 才能生效。\n\n立即重启？",
     "config_saved_next": "配置已保存，下次启动生效",
     "destroy_to_public": "确定要切换到公共模式吗？\n\n将销毁当前自定义 Tunnel。",
     "switch_to_custom": "确定要切换到自定义 Tunnel 吗？\n\n将停用公共节点。",
     "update_restart": "将更新现有 Tunnel 配置并重启 cloudflared。\n\n通过 Tunnel 的连接可能会短暂中断，确定继续？",
     "disable_public": "确定要停用公共节点吗？\n\nTunnel 将被删除，所有公网链接将失效。",
-    "remove_default_service": "是默认服务，删除后相关功能将无法通过 Tunnel 访问。\n\n确定继续？",
     "remove_custom_service": "确定要移除自定义服务「{suffix}」吗？",
     "stop_cloudflared": "确定要停止 cloudflared 吗？\n\n所有通过 Tunnel 的连接将断开。",
     "restart_cloudflared": "确定要重启 cloudflared 吗？\n\n连接可能会短暂中断。"

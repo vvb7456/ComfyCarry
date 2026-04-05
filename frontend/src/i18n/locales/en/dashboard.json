@@ -2,21 +2,11 @@
   "title": "Overview",
   "metrics": {
     "title": "Performance Metrics",
-    "cores": "cores",
     "memory": "Memory",
     "disk": "Disk",
-    "used": "used",
     "free": "free"
   },
-  "activity": {
-    "title": "Activity",
-    "node": "Node: {node}",
-    "generating": "Generating",
-    "queued": "{count} downloads queued",
-    "idle": "No activity"
-  },
   "services": {
-    "title": "Services",
     "name": "Service",
     "status": "Status",
     "uptime": "Uptime",
@@ -27,9 +17,7 @@
     "restart": "Restart",
     "action_sent": "{action} action sent"
   },
-  "environment": "Environment",
   "status_bar": {
-    "loading": "Loading...",
     "all_good": "All systems ready, waiting for tasks",
     "open_comfyui": "Open ComfyUI in new window",
     "open_jupyter": "Open JupyterLab in new window",
@@ -39,16 +27,6 @@
     "downloads_waiting": "{count} downloads waiting",
     "downloading": "Downloading..."
   },
-  "svc_table": {
-    "service": "Service",
-    "status": "Status",
-    "uptime": "Uptime",
-    "cpu": "CPU",
-    "memory": "Memory",
-    "restarts": "Restarts",
-    "actions": "Actions",
-    "no_services": "No services found"
-  },
   "status": {
     "online": "Online",
     "starting": "Starting",
@@ -56,34 +34,13 @@
     "off": "Offline",
     "queue": "Queue",
     "running": "Running",
-    "waiting": "Waiting",
-    "pending": "Pending",
     "not_configured": "Not configured",
     "connecting": "Connecting",
-    "queue_idle": "Queue idle",
-    "generating": "Generating",
-    "idle": "Idle",
-    "active": "Active",
-    "rules": "rules"
+    "queue_idle": "Queue idle"
   },
-  "metrics_labels": {
-    "cpu": "CPU",
-    "gpu": "GPU",
-    "memory": "Memory",
-    "disk": "Disk",
-    "available": "Available",
-    "vram": "VRAM",
-    "temperature": "Temperature"
-  },
-  "activity_empty": "No activity records",
-  "backend_error": "Backend connection failed",
-  "no_records": "No generation records",
   "sections": {
     "activity": "Activity",
     "services": "Services",
     "environment": "Environment"
-  },
-  "toast": {
-    "action_done": "{action} {name} done"
   }
 }

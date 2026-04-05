@@ -1,10 +1,5 @@
 {
   "title": "Settings",
-  "tabs": {
-    "comfycarry": "ComfyCarry",
-    "civitai": "CivitAI",
-    "llm": "LLM"
-  },
   "restart_btn": "Restart",
   "password": {
     "title": "ComfyCarry Password",
@@ -21,7 +16,6 @@
     "err_mismatch": "Passwords do not match"
   },
   "api_key": {
-    "title": "ComfyCarry API Key",
     "help": "For external scripts or apps to access the API via X-API-Key / Bearer",
     "regenerate": "Regenerate",
     "regenerate_confirm": "Regenerate API Key?\n\nThe old key will be immediately invalidated. All external apps using the old key will need to be updated.",
@@ -54,14 +48,11 @@
     "partial_fail": "Some operations failed"
   },
   "log": {
-    "title": "ComfyCarry Logs",
-    "loading": "Loading..."
+    "title": "ComfyCarry Logs"
   },
   "restart_confirm": "Restart ComfyCarry?\n\nThe page will be briefly unavailable.",
   "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds...",
   "civitai": {
-    "title": "CivitAI API Key",
-    "desc": "Generate API Key from CivitAI Account Settings",
     "key_prefix": "Generate API Key from",
     "key_link": "CivitAI Account Settings",
     "key_suffix": "",
@@ -79,8 +70,7 @@
       "select_placeholder": "— Select Provider —",
       "api_key": "API Key",
       "api_key_placeholder": "Enter API Key...",
-      "base_url": "Base URL",
-      "base_url_placeholder": "https://api.example.com/v1"
+      "base_url": "Base URL"
     },
     "model": {
       "title": "Model",
@@ -109,10 +99,8 @@
     },
     "test_btn": "Test Connection",
     "save_btn": "Save Config",
-    "testing": "Testing...",
     "test_success": "Connection successful",
     "test_failed": "Connection failed",
-    "test_error": "Request failed",
     "err_no_provider": "Please select a provider first",
     "err_no_key": "Please enter API Key first",
     "err_no_model": "Please select a model first",

@@ -1,5 +1,4 @@
 {
-  "title": "ComfyCarry - 部署向导",
   "header": "ComfyCarry 部署向导",
   "subtitle": "<a href=\"https://github.com/vvb7456/ComfyCarry\" target=\"_blank\" style=\"color:var(--ac);text-decoration:none\">GitHub</a> · RunPod / Vast.ai 上的 ComfyUI 一站式管理",
   "step_labels": ["部署方式", "密码/SSH", "Tunnel", "云存储", "同步规则", "CivitAI", "LLM", "插件", "Attention", "确认部署"],
@@ -8,8 +7,6 @@
     "prev": "上一步",
     "skip": "跳过",
     "deploy": "开始部署",
-    "switch_theme": "切换主题",
-    "back_to_edit": "返回修改",
     "switch_to_en": "Switch to English",
     "switch_to_zh": "切换到中文"
   },
@@ -21,9 +18,6 @@
     "detecting": "正在检测环境...",
     "env_ok": "环境检测通过",
     "env_fail": "环境检测失败",
-    "est_time": "预计 2-5 分钟",
-    "import_success": "配置导入成功！",
-    "import_fail": "导入失败",
     "fresh": {
       "title": "全新部署",
       "desc": "配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境",
@@ -42,17 +36,16 @@
   },
   "step1": {
     "title": "密码与 SSH 访问",
+    "env_password_hint": "已从环境变量 DASHBOARD_PASSWORD 检测到密码，可直接使用或修改",
     "desc": "设置 ComfyCarry 控制台密码及 SSH 远程访问",
     "password": "ComfyCarry 访问密码",
     "password_placeholder": "输入 ComfyCarry 访问密码...",
-    "toggle_pw": "显示/隐藏密码",
     "confirm_password": "确认密码",
     "confirm_placeholder": "再次输入密码...",
     "mismatch": "两次输入的密码不一致",
     "ssh_sync": "同时用作 SSH Root 密码",
     "ssh_sync_hint": "(用于 <code>ssh root{'@'}host</code> 登录)",
     "ssh_keys": "SSH 公钥",
-    "ssh_keys_optional": "(可选)",
     "ssh_keys_hint": "每行一个，支持 ed25519 / rsa / ecdsa。粘贴 <code>~/.ssh/id_ed25519.pub</code> 的内容",
     "ssh_keys_placeholder": "ssh-ed25519 AAAA... your-key\nssh-rsa AAAA... another-key"
   },
@@ -93,6 +86,7 @@
   },
   "step3": {
     "title": "云存储配置",
+    "env_rclone_hint": "已从环境变量 RCLONE_CONF_BASE64 检测到配置",
     "desc": "连接云端存储，实现工作区自动同步",
     "rclone_help": "Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。在本地电脑安装 Rclone 后，运行 rclone config 创建 Remote，配置文件位于 ~/.config/rclone/rclone.conf，上传该文件即可导入。",
     "rclone_helper_hint": "还没有 rclone 配置？<a href=\"/api/setup/rclone-bundle\" style=\"color:var(--ac);text-decoration:underline;font-weight:600\">下载配置助手 (Windows)</a> — 解压后双击 bat 脚本，跟随引导完成网盘授权，配置完成后回到这里上传 rclone.conf 。",
@@ -145,13 +139,13 @@
     "trigger_manual": "手动",
     "remote_path": "云端路径",
     "remote_path_placeholder": "远端路径",
-    "rule_count": "已选规则：{count} · 部署后可在 ComfyCarry 云同步页修改",
     "selected_n": "已选 {n} 个",
     "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."
   },
   "step5": {
     "title": "CivitAI API Key",
+    "env_civitai_hint": "已从环境变量 CIVITAI_TOKEN 检测到 API Key",
     "desc": "配置 CivitAI API Key 以在 ComfyCarry 中搜索和下载模型",
     "api_key_label": "API Key",
     "api_key_placeholder": "你的 CivitAI API Key (可选)",
@@ -172,8 +166,6 @@
     "skip_hint": "也可跳过后在 ComfyCarry 设置中配置",
     "custom_provider": "自定义 (OpenAI 兼容)",
     "base_url_placeholder": "https://api.example.com/v1",
-    "loading": "加载中...",
-    "model_count": "{count} 个可用模型",
     "fetch_fail": "获取失败",
     "request_fail": "请求失败:",
     "no_models": "无可用模型"
@@ -195,7 +187,6 @@
     "sa2_desc": "新一代 Attention 方案，部分场景更快",
     "sa2_param": "启动参数: --use-sage-attention",
     "fa2_preinstalled": "已预装在镜像中",
-    "fa2_preinstalled_desc": "FA2 已预装，可选择额外安装 SA2",
     "hint_both": "两者同时安装时，ComfyUI 将优先使用 FlashAttention-2",
     "hint_fa2": "ComfyUI 将使用 --use-flash-attention 启动",
     "hint_sa2": "ComfyUI 将使用 --use-sage-attention 启动",
@@ -302,7 +293,6 @@
     "manual_create": "手动创建",
     "env_var": "环境变量",
     "remote_count": "Remote 数量",
-    "remotes_detail": "{total} 个 ({manual} 个手动创建)",
     "sync_rules": "同步规则",
     "rules_count": "{count} 条",
     "none": "无",

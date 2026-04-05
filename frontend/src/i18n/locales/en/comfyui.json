@@ -5,21 +5,14 @@
     "plugins": "Plugins"
   },
   "console": {
-    "status_cards_loading": "Loading...",
-    "exec_status": "Execution Status",
     "params": "Launch Parameters",
     "params_placeholder": "main.py --listen 0.0.0.0 --port 8188 ...",
     "params_loading": "Loading...",
     "log_title": "ComfyUI Logs",
-    "log_loading": "Loading...",
     "saved": "Saved",
     "saved_restarting": "Saved, ComfyUI is restarting",
-    "log_history_failed": "Failed to load log history",
     "uptime": "Uptime",
     "restart_count": "Restarts: {count}",
-    "status_unavailable": "Unable to get status",
-    "load_failed": "Load failed: {error}",
-    "params_load_failed": "Failed to load params: {error}",
     "params_save_confirm": "Saving params will restart ComfyUI, continue?",
     "params_restart_hint": "Changes to launch parameters take effect only after ComfyUI restarts.",
     "params_saving": "Saving...",
@@ -137,20 +130,14 @@
     }
   },
   "queue": {
-    "summary": "Queue Summary",
     "running": "Running",
     "pending": "Pending",
     "interrupt": "Interrupt",
     "clear": "Clear",
-    "none": "None",
     "cleared": "Queue cleared",
-    "executing_count": "{count} running",
-    "pending_count": "{count} pending",
-    "idle": "Idle",
     "no_running": "No running tasks",
     "no_pending": "No pending tasks",
     "node_count": "{count} nodes",
-    "load_failed": "Failed to load queue",
     "delete_confirm": "Delete this queue item?"
   },
   "history": {
@@ -160,19 +147,16 @@
     "size_sm": "Compact",
     "size_md": "Standard",
     "size_lg": "Large",
-    "loading": "Loading...",
     "no_records": "No generation records",
     "record_count": "{count} records",
     "no_preview": "No preview",
-    "image_count": "{count} images",
-    "load_failed": "Failed to load history"
+    "image_count": "{count} images"
   },
   "status": {
     "running": "Running",
     "stopped": "Stopped",
     "generating": "Generating",
-    "idle": "Idle",
-    "waiting": "Waiting"
+    "idle": "Idle"
   },
   "confirm": {
     "restart": "Restart ComfyUI?",
@@ -180,18 +164,11 @@
   },
   "toast": {
     "gen_complete": "Generation complete",
-    "exec_error": "Execution error",
     "exec_interrupted": "Execution interrupted",
     "restarting": "ComfyUI is restarting...",
     "stopped": "ComfyUI stopped",
     "starting": "ComfyUI starting...",
     "interrupt_sent": "Interrupt signal sent",
-    "vram_freed": "VRAM freed",
     "deleted": "Deleted"
-  },
-  "error": {
-    "unknown": "Unknown error",
-    "exec_error_detail": "Execution error: {error}",
-    "request_failed": "Request failed: {error}"
   }
 }

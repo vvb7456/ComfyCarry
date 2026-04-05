@@ -1,14 +1,8 @@
 {
   "dashboard": "总览",
-  "comfyui": "ComfyUI",
   "generate": "内容生成",
   "models": "模型管理",
   "tunnel": "隧道",
-  "jupyter": "Jupyter",
   "sync": "云同步",
-  "ssh": "SSH",
-  "settings": "设置",
-  "logout": "登出",
-  "collapse": "收起/展开",
-  "scroll_top": "返回顶部"
+  "settings": "设置"
 }
