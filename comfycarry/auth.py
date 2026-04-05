@@ -15,11 +15,16 @@ LOGIN_PAGE = """<!DOCTYPE html>
 <title>ComfyCarry 登录</title>
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 600; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 700; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Material Symbols Outlined'; font-style: normal; font-weight: 100 700; font-display: swap; src: url('/fonts/MaterialSymbolsOutlined.woff2') format('woff2'); }
+</style>
 <script>
 (() => {
-const THEME_ICONS = { dark: 'dark_mode', light: 'light_mode', system: 'contrast' };
+const THEME_ICONS = { dark: '\\ue51c', light: '\\ue518', system: '\\ueb37' };
 const I18N = {
   'zh-CN': {
     title: 'ComfyCarry 登录',
@@ -63,7 +68,7 @@ function applyTheme(pref) {
   if (isDark) document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', 'light');
   const ico = document.getElementById('theme-toggle-icon');
-  if (ico) ico.textContent = THEME_ICONS[pref] || 'contrast';
+  if (ico) ico.textContent = THEME_ICONS[pref] || '\\ueb37';
 }
 
 function currentText() {
@@ -80,7 +85,7 @@ function renderError() {
   }
   const text = currentText()[key] || '';
   err.innerHTML = text
-    ? `<span class="ms material-symbols-outlined">error</span> ${text}`
+    ? `<span class="ms material-symbols-outlined">\uf8b6</span> ${text}`
     : '';
 }
 
@@ -134,7 +139,7 @@ window.toggleLoginPw = function () {
   const hidden = input.type === 'password';
   input.type = hidden ? 'text' : 'password';
   const icon = btn.querySelector('.ms');
-  if (icon) icon.textContent = hidden ? 'visibility_off' : 'visibility';
+  if (icon) icon.textContent = hidden ? '\\ue8f5' : '\\ue8f4';
   const text = currentText();
   const title = hidden ? text.hide : text.show;
   btn.title = title;
@@ -206,7 +211,7 @@ input::-ms-reveal,input::-ms-clear,input::-webkit-credentials-auto-fill-button{d
 <div class="top-controls">
     <button type="button" class="lang-toggle" id="lang-toggle" onclick="toggleLoginLang()" title="Switch to English">EN</button>
     <button type="button" class="theme-toggle" id="theme-toggle" onclick="cycleTheme()" title="切换主题" aria-label="切换主题">
-        <span class="ms material-symbols-outlined" id="theme-toggle-icon">contrast</span>
+        <span class="ms material-symbols-outlined" id="theme-toggle-icon">\ueb37</span>
     </button>
 </div>
 <div class="card">
@@ -216,10 +221,10 @@ input::-ms-reveal,input::-ms-clear,input::-webkit-credentials-auto-fill-button{d
     <form method="POST" action="/login">
         <div class="err" id="err"></div>
         <div class="input-wrap">
-            <span class="ms material-symbols-outlined input-icon">lock</span>
+            <span class="ms material-symbols-outlined input-icon">\ue899</span>
             <input name="password" id="pw" type="password" placeholder="输入访问密码" autofocus>
             <button type="button" class="toggle-pw" id="pw-toggle" onclick="toggleLoginPw()" tabindex="-1" title="显示" aria-label="显示">
-                <span class="ms material-symbols-outlined">visibility</span>
+                <span class="ms material-symbols-outlined">\ue8f4</span>
             </button>
         </div>
         <button type="submit" class="btn-login" id="btn-login">登录</button>

@@ -44,6 +44,9 @@ update
 # 动态 :icon 绑定
 cloud_off
 
+# WizardSummary — JS 变量传递给 SummaryRow.icon
+skip_next
+
 # ICON_COLORS 中带数字的 key (正则 [a-z_]+ 无法匹配)
 book_2
 hard_drive_2
