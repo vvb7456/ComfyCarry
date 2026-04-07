@@ -13,16 +13,20 @@
   "prompt": {
     "title": "提示词",
     "positive_placeholder": "输入提示词（A1111格式），例如：1girl, solo, long hair, looking at viewer, smile, white dress, outdoors, blue sky, masterpiece, best quality",
+    "positive_label": "正向提示词",
     "negative_placeholder": "输入负面提示词，例如：worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, missing fingers, watermark, text",
+    "negative_label": "反向提示词",
     "tools": {
       "interrogate": "提示词反推",
       "llm_assist": "AI 提示词",
       "embedding": "插入 Embedding",
-      "wildcard": "插入随机提示词",
+      "wildcard": "随机提示词",
       "interrogate_title": "从图片反推提示词标签 (WD14 Tagger)",
       "llm_assist_title": "使用 AI 生成或优化提示词",
       "embedding_title": "浏览并插入 Embedding 向量",
-      "wildcard_title": "管理随机提示词 (Wildcard)"
+      "wildcard_title": "管理随机提示词 (Wildcard)",
+      "prompt_editor": "提示词编辑器",
+      "prompt_editor_title": "可视化提示词编辑器，支持自动补全和标签库"
     },
     "syntax_help_title": "随机提示词语法",
     "help_modal_title": "提示词帮助",

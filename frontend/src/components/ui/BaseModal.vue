@@ -34,7 +34,7 @@ const props = withDefaults(defineProps<{
   iconColor?: string
   ariaLabel?: string
   // Size
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl' | 'full'
   width?: string
   maxHeight?: string
   // Layout
@@ -81,7 +81,7 @@ const hasBodyLock = ref(false)
 const titleId = `base-modal-title-${++modalIdCounter}`
 
 // Size presets
-const sizeWidths: Record<string, string> = { sm: '360px', md: '520px', lg: '720px', xl: '900px', full: '95vw' }
+const sizeWidths: Record<string, string> = { sm: '360px', md: '520px', lg: '720px', xl: '900px', xxl: '1400px', full: '95vw' }
 
 const resolvedMaxWidth = computed(() => {
   if (props.width) return props.width

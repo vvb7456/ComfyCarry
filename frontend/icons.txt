@@ -18,6 +18,7 @@ accessibility_new
 auto_fix_high
 border_style
 cached
+category
 content_paste
 dashboard
 dashboard_customize
@@ -43,6 +44,9 @@ update
 
 # 动态 :icon 绑定
 cloud_off
+
+# ActionBar.vue — 三元表达式 isRunning ? 'stop_circle' : ...
+stop_circle
 
 # WizardSummary — JS 变量传递给 SummaryRow.icon
 skip_next

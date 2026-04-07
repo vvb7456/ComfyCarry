@@ -1,0 +1,97 @@
+{
+  "editor": {
+    "title": "Prompt Editor",
+    "positive": "Positive Prompt",
+    "negative": "Negative Prompt",
+    "confirm": "Confirm",
+    "placeholder": "Type a tag and press Enter or comma…",
+    "translate_input": "Enter prompt, press Enter to translate"
+  },
+  "toolbar": {
+    "favorites": "Favorites",
+    "history": "History",
+    "clear_all": "Clear All",
+    "clear_disabled": "Clear Disabled",
+    "translate_all": "Translate All",
+    "clear_all_confirm": "Clear all tokens?",
+    "embedding": "Embedding"
+  },
+  "chip": {
+    "weight": "Weight",
+    "translate_btn": "Translate",
+    "translate_action": "Translate",
+    "added": "Added"
+  },
+  "autocomplete": {
+    "no_results": "No matching tags"
+  },
+  "tag_browser": {
+    "title": "Tag Library",
+    "hint": "Select a category above to browse tags",
+    "no_subgroups": "No subcategories",
+    "no_tags": "No tags"
+  },
+  "history_modal": {
+    "title": "History & Favorites",
+    "tab_all": "All",
+    "tab_history": "History",
+    "tab_favorites": "Favorites",
+    "empty": "No records yet",
+    "apply": "Apply",
+    "delete": "Delete",
+    "delete_selected": "Delete Selected",
+    "favorite": "Favorite",
+    "unfavorite": "Unfavorite",
+    "confirm_delete": "Delete this record?",
+    "confirm_batch_delete": "Delete {count} selected records?"
+  },
+  "init": {
+    "title": "Prompt Tag Library Required",
+    "description": "The tag library needs to be initialized before using the prompt editor. This will import ~4000 tags and ~50000 Danbooru tags for autocomplete and browsing.",
+    "checking": "Checking data source\u2026",
+    "not_initialized": "Tag library not initialized",
+    "local_status": "Local data file",
+    "remote_status": "Remote download",
+    "available": "Available",
+    "not_available": "Not found",
+    "not_configured": "Not configured",
+    "source_available": "Data source detected",
+    "source_unavailable": "Data source unavailable. No local data file or remote download URL configured.",
+    "import_btn": "Initialize Tag Library",
+    "download_btn": "Download Selected",
+    "data_name": "ComfyCarry Prompt Library",
+    "data_desc": "SDXL prompts with Chinese translations",
+    "required": "Required",
+    "downloading": "Downloading\u2026",
+    "importing": "Importing\u2026",
+    "import_success": "Import completed: {groups} groups, {tags} tags, {danbooru} danbooru",
+    "import_failed": "Import failed",
+    "skip": "Skip for now"
+  },
+  "settings": {
+    "title": "Prompt Library",
+    "translation": {
+      "title": "Translation",
+      "show_translation": "Show Translation Assist",
+      "show_translation_hint": "Show translations in token chips and autocomplete",
+      "provider": "Online Translation Provider",
+      "api_key": "API Key",
+      "source_lang": "Source Language",
+      "target_lang": "Target Language",
+      "auto_detect": "Auto Detect"
+    },
+    "library": {
+      "title": "Tag Library Management",
+      "status": "Status",
+      "initialized": "Initialized",
+      "not_initialized": "Not Initialized",
+      "groups_count": "{count} groups",
+      "tags_count": "{count} tags",
+      "danbooru_count": "{count} danbooru tags",
+      "reinitialize": "Re-initialize",
+      "reinitialize_confirm": "This will clear and re-import all tag data. Continue?",
+      "manual_import": "Manual Import SQL",
+      "manual_import_hint": "Upload custom .sql file to import"
+    }
+  }
+}

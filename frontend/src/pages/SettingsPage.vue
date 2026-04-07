@@ -18,6 +18,7 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import type { LlmProvider, ModelOption, LlmConfigData } from '@/types/settings'
 
 defineOptions({ name: 'SettingsPage' })
@@ -27,11 +28,65 @@ const { get, post, put } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
+// ─── Prompt editor settings ───────────────────────────────────────────────────
+
+const {
+  settings: promptSettings,
+  saving: promptSaving,
+  translateProviders: promptTranslateProviders,
+  load: loadPromptSettings,
+  save: savePromptSettings,
+} = usePromptSettings()
+
+const promptAutocompleteOptions = [
+  { value: 10, label: '10' },
+  { value: 20, label: '20' },
+  { value: 50, label: '50' },
+]
+
+const normalizeEnabled = computed(() =>
+  promptSettings.normalize_comma
+  || promptSettings.normalize_period
+  || promptSettings.normalize_bracket
+  || promptSettings.normalize_underscore
+  || promptSettings.escape_bracket,
+)
+
+function toggleNormalizeAll(on: boolean) {
+  if (on) {
+    // 开启总开关 → 恢复默认值
+    promptSettings.normalize_comma = true
+    promptSettings.normalize_period = true
+    promptSettings.normalize_bracket = true
+  } else {
+    // 关闭总开关 → 全部关闭
+    promptSettings.normalize_comma = false
+    promptSettings.normalize_period = false
+    promptSettings.normalize_bracket = false
+    promptSettings.normalize_underscore = false
+    promptSettings.escape_bracket = false
+  }
+}
+
+const translateProviderOptions = computed(() => [
+  { value: '', label: t('settings.prompt.translation.provider_auto') },
+  ...promptTranslateProviders.value.map(p => ({
+    value: p,
+    label: t(`settings.prompt.translation.providers.${p}`, p),
+  })),
+])
+
+async function onSavePromptSettings() {
+  const ok = await savePromptSettings()
+  if (ok) toast(t('settings.prompt.saved'), 'success')
+}
+
 // ─── Tab state ────────────────────────────────────────────────────────────────
 
 const activeTab = ref('comfycarry')
 const tabs = computed(() => [
   { key: 'comfycarry', label: 'ComfyCarry', icon: 'dashboard' },
+  { key: 'prompt', label: t('settings.prompt.tab_label'), icon: 'edit_note' },
   { key: 'civitai', label: 'CivitAI', icon: 'palette' },
   { key: 'llm', label: 'LLM', icon: 'smart_toy' },
 ])
@@ -121,6 +176,9 @@ function onTabChange(tab: string) {
   }
   if (tab === 'llm' && !llmProvidersLoaded.value) {
     loadLlmTab()
+  }
+  if (tab === 'prompt') {
+    loadPromptSettings()
   }
 }
 
@@ -454,7 +512,7 @@ onUnmounted(() => {
                   input-class="form-input"
                 />
               </FormField>
-              <div style="display:flex;justify-content:flex-end">
+              <div class="btn-row-end">
                 <BaseButton type="submit" variant="primary" size="sm" :disabled="pwSubmitting">
                   <Spinner v-if="pwSubmitting" size="sm" />
                   {{ t('settings.password.update_btn') }}
@@ -479,7 +537,7 @@ onUnmounted(() => {
               style="margin-bottom:12px"
               @copied="copyApiKey"
             />
-            <div style="display:flex;justify-content:flex-end">
+            <div class="btn-row-end">
               <BaseButton variant="danger" size="sm" :disabled="regenLoading" @click="regenerateApiKey">
                 <Spinner v-if="regenLoading" size="sm" />
                 {{ t('settings.api_key.regenerate') }}
@@ -496,7 +554,7 @@ onUnmounted(() => {
             <div style="display:flex;flex-direction:column;gap:12px">
               <div>
                 <p style="font-size:.82rem;color:var(--t2);margin:0 0 8px">{{ t('settings.config.export_desc') }}</p>
-                <div style="display:flex;justify-content:flex-end">
+                <div class="btn-row-end">
                   <BaseButton variant="primary" size="sm" @click="exportConfig">
                     <MsIcon name="upload" color="none" />
                     {{ t('settings.config.export_btn') }}
@@ -505,7 +563,7 @@ onUnmounted(() => {
               </div>
               <div>
                 <p style="font-size:.82rem;color:var(--t2);margin:0 0 8px">{{ t('settings.config.import_desc') }}</p>
-                <div style="display:flex;justify-content:flex-end">
+                <div class="btn-row-end">
                   <BaseButton variant="primary" size="sm" @click="($refs.importFileInput as HTMLInputElement)?.click()">
                     <MsIcon name="download" color="none" />
                     {{ t('settings.config.import_btn') }}
@@ -543,6 +601,87 @@ onUnmounted(() => {
             {{ t('settings.log.title') }}
           </h3>
           <LogPanel :lines="logLines" :status="logStatus" style="height:calc(100% - 50px)" />
+        </div>
+      </div>
+
+      <!-- ═══ Tab: Prompt Editor ═══════════════════════════ -->
+      <div v-show="activeTab === 'prompt'" class="settings-centered">
+        <!-- 翻译设置 -->
+        <BaseCard density="roomy">
+          <h3 class="settings-card-title">
+            <MsIcon name="translate" />
+            {{ t('settings.prompt.translation.title') }}
+          </h3>
+          <FormField :label="t('settings.prompt.translation.show')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.show_translation" />
+          </FormField>
+          <FormField :label="t('settings.prompt.translation.provider')" density="compact">
+            <BaseSelect
+              v-model="promptSettings.translate_provider"
+              :options="translateProviderOptions"
+              :disabled="!promptSettings.show_translation"
+            />
+          </FormField>
+        </BaseCard>
+
+        <!-- 规格化设置 -->
+        <BaseCard density="roomy">
+          <h3 class="settings-card-title" style="margin-bottom:14px">
+            <MsIcon name="auto_fix_high" />
+            {{ t('settings.prompt.normalize.title') }}
+            <span style="margin-left:auto">
+              <ToggleSwitch :model-value="normalizeEnabled" @update:model-value="toggleNormalizeAll" />
+            </span>
+          </h3>
+          <FormField :label="t('settings.prompt.normalize.comma')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.normalize_comma" :disabled="!normalizeEnabled" />
+          </FormField>
+          <FormField :label="t('settings.prompt.normalize.period')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.normalize_period" :disabled="!normalizeEnabled" />
+          </FormField>
+          <FormField :label="t('settings.prompt.normalize.bracket')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.normalize_bracket" :disabled="!normalizeEnabled" />
+          </FormField>
+          <FormField :label="t('settings.prompt.normalize.underscore')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.normalize_underscore" :disabled="!normalizeEnabled" />
+          </FormField>
+          <FormField :label="t('settings.prompt.normalize.escape_bracket')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.escape_bracket" :disabled="!normalizeEnabled" />
+          </FormField>
+        </BaseCard>
+
+        <!-- 自动补全设置 -->
+        <BaseCard density="roomy">
+          <h3 class="settings-card-title">
+            <MsIcon name="auto_awesome" />
+            {{ t('settings.prompt.autocomplete.title') }}
+          </h3>
+          <FormField :label="t('settings.prompt.autocomplete.limit')" density="compact">
+            <BaseSelect
+              v-model="promptSettings.autocomplete_limit"
+              :options="promptAutocompleteOptions"
+            />
+          </FormField>
+        </BaseCard>
+
+        <!-- 标签库设置 -->
+        <BaseCard density="roomy">
+          <h3 class="settings-card-title">
+            <MsIcon name="category" />
+            {{ t('settings.prompt.tag_library.title') }}
+          </h3>
+          <FormField :label="t('settings.prompt.tag_library.show_nsfw')" layout="horizontal" density="compact">
+            <ToggleSwitch v-model="promptSettings.show_nsfw" />
+          </FormField>
+        </BaseCard>
+
+        <!-- 保存按钮 -->
+        <div class="btn-row-end">
+          <BaseButton variant="primary" size="sm" :disabled="promptSaving" @click="onSavePromptSettings">
+            <Spinner v-if="promptSaving" size="sm" />
+            <MsIcon v-else name="save" />
+            {{ t('common.btn.save') }}
+          </BaseButton>
         </div>
       </div>
 
@@ -709,6 +848,12 @@ onUnmounted(() => {
   max-height: calc(100vh - 200px);
   display: flex;
   flex-direction: column;
+}
+
+/* Vue-unique: button row align right */
+.btn-row-end {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Vue-unique: CivitAI / LLM centered layout */

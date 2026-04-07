@@ -207,6 +207,11 @@ def api_settings_export_config():
     if llm_provider_keys:
         config["llm_provider_keys"] = llm_provider_keys
 
+    # 提示词编辑器设置
+    prompt_settings = _get_config("prompt_settings", {})
+    if prompt_settings:
+        config["prompt_settings"] = prompt_settings
+
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -357,6 +362,14 @@ def api_settings_import_config():
             applied.append("ComfyUI 启动参数 (需重启 ComfyUI 生效)")
         except Exception as e:
             errors.append(f"ComfyUI 参数: {e}")
+
+    # 提示词编辑器设置
+    if data.get("prompt_settings") and isinstance(data["prompt_settings"], dict):
+        try:
+            _set_config("prompt_settings", data["prompt_settings"])
+            applied.append("提示词编辑器设置")
+        except Exception as e:
+            errors.append(f"提示词编辑器设置: {e}")
 
     return jsonify({
         "ok": True,

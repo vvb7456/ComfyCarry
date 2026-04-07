@@ -1,0 +1,97 @@
+{
+  "editor": {
+    "title": "提示词编辑器",
+    "positive": "正向提示词",
+    "negative": "反向提示词",
+    "confirm": "确定",
+    "placeholder": "输入标签，按回车或逗号添加…",
+    "translate_input": "输入提示词，按回车翻译"
+  },
+  "toolbar": {
+    "favorites": "收藏",
+    "history": "历史",
+    "clear_all": "清空全部",
+    "clear_disabled": "清空禁用",
+    "translate_all": "翻译全部",
+    "clear_all_confirm": "确定清空所有标签？",
+    "embedding": "Embedding"
+  },
+  "chip": {
+    "weight": "权重",
+    "translate_btn": "翻译",
+    "translate_action": "点击翻译",
+    "added": "已添加"
+  },
+  "autocomplete": {
+    "no_results": "没有匹配的标签"
+  },
+  "tag_browser": {
+    "title": "标签库",
+    "hint": "选择上方分类以浏览标签",
+    "no_subgroups": "暂无子分类",
+    "no_tags": "暂无标签"
+  },
+  "history_modal": {
+    "title": "历史与收藏",
+    "tab_all": "全部",
+    "tab_history": "历史",
+    "tab_favorites": "收藏",
+    "empty": "暂无记录",
+    "apply": "应用",
+    "delete": "删除",
+    "delete_selected": "删除选中",
+    "favorite": "收藏",
+    "unfavorite": "取消收藏",
+    "confirm_delete": "确定删除此记录？",
+    "confirm_batch_delete": "确定删除 {count} 条选中记录？"
+  },
+  "init": {
+    "title": "该功能需下载提示词标签库",
+    "description": "使用提示词编辑器前需要初始化标签库。将导入约 4000 个标签和约 50000 个 Danbooru 标签，用于自动补全和浏览。",
+    "checking": "检测数据源\u2026",
+    "not_initialized": "标签库未初始化",
+    "local_status": "本地数据文件",
+    "remote_status": "远程下载",
+    "available": "可用",
+    "not_available": "未找到",
+    "not_configured": "未配置",
+    "source_available": "检测到数据源",
+    "source_unavailable": "数据源不可用。本地文件不存在，且未配置远程下载地址。",
+    "import_btn": "初始化标签库",
+    "download_btn": "下载选中数据",
+    "data_name": "ComfyCarry Prompt Library",
+    "data_desc": "SDXL 提示词与中文翻译",
+    "required": "必需",
+    "downloading": "下载中\u2026",
+    "importing": "导入中\u2026",
+    "import_success": "导入完成：{groups} 组，{tags} 标签，{danbooru} Danbooru",
+    "import_failed": "导入失败",
+    "skip": "暂时跳过"
+  },
+  "settings": {
+    "title": "提示词库",
+    "translation": {
+      "title": "翻译设置",
+      "show_translation": "显示翻译辅助",
+      "show_translation_hint": "在标签 Chip 和自动补全中显示翻译",
+      "provider": "在线翻译提供商",
+      "api_key": "API Key",
+      "source_lang": "源语言",
+      "target_lang": "目标语言",
+      "auto_detect": "自动检测"
+    },
+    "library": {
+      "title": "标签库管理",
+      "status": "状态",
+      "initialized": "已初始化",
+      "not_initialized": "未初始化",
+      "groups_count": "{count} 组",
+      "tags_count": "{count} 标签",
+      "danbooru_count": "{count} Danbooru 标签",
+      "reinitialize": "重新初始化",
+      "reinitialize_confirm": "这将清空并重新导入所有标签数据，确定继续？",
+      "manual_import": "手动导入 SQL",
+      "manual_import_hint": "上传自定义 .sql 文件导入"
+    }
+  }
+}

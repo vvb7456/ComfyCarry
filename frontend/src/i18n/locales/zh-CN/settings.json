@@ -107,5 +107,39 @@
     "config_saved": "LLM 配置已保存",
     "save_failed": "保存失败",
     "unknown_error": "未知错误"
+  },
+  "prompt": {
+    "tab_label": "提示词",
+    "saved": "提示词设置已保存",
+    "tag_library": {
+      "title": "标签库",
+      "show_nsfw": "显示 NSFW 标签"
+    },
+    "translation": {
+      "title": "翻译",
+      "show": "显示中文翻译",
+      "provider": "翻译引擎",
+      "provider_auto": "自动",
+      "providers": {
+        "local_db": "本地数据库",
+        "mymemory": "MyMemory",
+        "bing": "Bing",
+        "youdao": "有道",
+        "alibaba": "阿里巴巴"
+      }
+    },
+    "normalize": {
+      "title": "规格化",
+      "enable": "启用规格化",
+      "comma": "全角逗号 → 半角逗号",
+      "period": "全角句号 → 半角句号",
+      "bracket": "全角括号 → 半角括号",
+      "underscore": "下划线 → 空格",
+      "escape_bracket": "括号转义 (自动加 \\)"
+    },
+    "autocomplete": {
+      "title": "自动补全",
+      "limit": "补全数量"
+    }
   }
 }

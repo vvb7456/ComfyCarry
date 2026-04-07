@@ -4,6 +4,8 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { useGenerateStore } from '@/stores/generate'
+import { usePromptSettings } from '@/composables/generate/usePromptSettings'
+import { normalizePrompt } from '@/utils/prompt'
 import type { ExecState } from '@/composables/useExecTracker'
 
 interface SubmitResponse {
@@ -122,11 +124,21 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
         end_percent: cn.end,
       }))
 
+    // Normalize prompts before submission
+    const { settings: ps } = usePromptSettings()
+    const nOpts = {
+      comma: ps.normalize_comma,
+      period: ps.normalize_period,
+      bracket: ps.normalize_bracket,
+      underscore: ps.normalize_underscore,
+      escapeBracket: ps.escape_bracket,
+    }
+
     const payload: Record<string, unknown> = {
       model_type: store.activeModelType,
       checkpoint: state.checkpoint,
-      positive_prompt: state.positive,
-      negative_prompt: state.negative,
+      positive_prompt: normalizePrompt(state.positive, nOpts),
+      negative_prompt: normalizePrompt(state.negative, nOpts),
       width: state.width,
       height: state.height,
       batch_size: state.batch,

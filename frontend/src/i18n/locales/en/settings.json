@@ -107,5 +107,39 @@
     "config_saved": "LLM config saved",
     "save_failed": "Save failed",
     "unknown_error": "Unknown error"
+  },
+  "prompt": {
+    "tab_label": "Prompt",
+    "saved": "Prompt settings saved",
+    "tag_library": {
+      "title": "Tag Library",
+      "show_nsfw": "Show NSFW tags"
+    },
+    "translation": {
+      "title": "Translation",
+      "show": "Show Chinese translation",
+      "provider": "Translation engine",
+      "provider_auto": "Auto",
+      "providers": {
+        "local_db": "Local Database",
+        "mymemory": "MyMemory",
+        "bing": "Bing",
+        "youdao": "Youdao",
+        "alibaba": "Alibaba"
+      }
+    },
+    "normalize": {
+      "title": "Normalization",
+      "enable": "Enable normalization",
+      "comma": "Full-width comma → half-width",
+      "period": "Full-width period → half-width",
+      "bracket": "Full-width brackets → half-width",
+      "underscore": "Underscore → space",
+      "escape_bracket": "Escape brackets (auto add \\)"
+    },
+    "autocomplete": {
+      "title": "Autocomplete",
+      "limit": "Max results"
+    }
   }
 }

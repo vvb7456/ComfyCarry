@@ -24,7 +24,7 @@ from .auth import auth_bp, register_auth_middleware
 
 # Route Blueprints
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
-from .routes import generate, downloads, llm, files
+from .routes import generate, downloads, llm, files, prompt_library
 from .routes.ssh import restore_ssh_config
 
 # Services
@@ -64,6 +64,7 @@ def create_app():
     app.register_blueprint(downloads.bp)
     app.register_blueprint(llm.bp)
     app.register_blueprint(files.bp)
+    app.register_blueprint(prompt_library.bp)
     app.register_blueprint(frontend.bp)
 
     # ── 全局认证中间件 ───────────────────────────────────
@@ -133,6 +134,10 @@ def main():
     """入口函数 — 启动 Flask 应用"""
     import atexit
     app = create_app()
+
+    # 执行数据库迁移
+    from .db import db
+    db.migrate()
 
     # 注册引擎清理
     atexit.register(shutdown_engine)

@@ -3,7 +3,7 @@
 defineOptions({ name: 'Spinner' })
 
 defineProps<{
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
 }>()
 </script>
 
@@ -19,6 +19,7 @@ defineProps<{
   border-color: var(--ac) transparent transparent transparent;
   animation: spin .8s linear infinite;
 }
+.spinner--xs  { width: 12px; height: 12px; border-width: 1.5px; }
 .spinner--sm  { width: 16px; height: 16px; border-width: 2px; }
 .spinner--md  { width: 24px; height: 24px; border-width: 3px; }
 .spinner--lg  { width: 36px; height: 36px; border-width: 4px; }

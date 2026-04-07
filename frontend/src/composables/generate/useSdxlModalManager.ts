@@ -49,10 +49,9 @@ export function useSdxlModalManager({
   }
 
   const promptTools = computed(() => [
+    { key: 'prompt-editor', icon: 'edit_note', label: t('generate.prompt.tools.prompt_editor'), title: t('generate.prompt.tools.prompt_editor_title') },
     { key: 'interrogate', icon: 'image_search', label: t('generate.prompt.tools.interrogate'), title: t('generate.prompt.tools.interrogate_title') },
     { key: 'llm-assist', icon: 'auto_awesome', label: t('generate.prompt.tools.llm_assist'), title: t('generate.prompt.tools.llm_assist_title') },
-    { key: 'embedding', icon: 'link', label: t('generate.prompt.tools.embedding'), title: t('generate.prompt.tools.embedding_title') },
-    { key: 'wildcard', icon: 'shuffle', label: t('generate.prompt.tools.wildcard'), title: t('generate.prompt.tools.wildcard_title') },
   ])
 
   function openTagger() {
@@ -85,19 +84,18 @@ export function useSdxlModalManager({
     promptEditorRef.value?.insertAtCursor('positive', token)
   }
 
+  const showPromptEditorModal = ref(false)
+
   function onPromptTool(key: string) {
     switch (key) {
+      case 'prompt-editor':
+        showPromptEditorModal.value = true
+        break
       case 'interrogate':
         openTagger()
         break
       case 'llm-assist':
         void openLlm()
-        break
-      case 'embedding':
-        void embPicker.open()
-        break
-      case 'wildcard':
-        void wcManager.open()
         break
     }
   }
@@ -203,6 +201,7 @@ export function useSdxlModalManager({
     promptEditorRef,
     showTaggerModal,
     showLlmModal,
+    showPromptEditorModal,
     previewOpen,
     previewIndex,
     previewUrls,

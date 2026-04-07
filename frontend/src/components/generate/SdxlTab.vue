@@ -23,8 +23,7 @@ import ModelDependencyGate from '@/components/generate/ModelDependencyGate.vue'
 import PreprocessModal from '@/components/generate/PreprocessModal.vue'
 import TaggerModal from '@/components/generate/TaggerModal.vue'
 import LlmModal from '@/components/generate/LlmModal.vue'
-import EmbeddingModal from '@/components/generate/EmbeddingModal.vue'
-import WildcardModal from '@/components/generate/WildcardModal.vue'
+import PromptEditorModal from '@/components/generate/PromptEditorModal.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
 import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
@@ -91,6 +90,7 @@ const {
   promptEditorRef,
   showTaggerModal,
   showLlmModal,
+  showPromptEditorModal,
   previewOpen,
   previewIndex,
   previewUrls,
@@ -106,8 +106,6 @@ const {
   onPromptTool,
   onTaggerApply,
   onLlmApply,
-  onEmbInsert,
-  onWcInsert,
   openCkptPicker,
   onCkptSelect,
   openLoraPicker,
@@ -359,18 +357,15 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @apply="onLlmApply"
     />
 
-    <!-- Embedding Modal -->
-    <EmbeddingModal
-      v-model="embPicker.visible.value"
-      :picker="embPicker"
-      @insert="onEmbInsert"
-    />
-
-    <!-- Wildcard Modal -->
-    <WildcardModal
-      v-model="wcManager.visible.value"
-      :wc="wcManager"
-      @insert="onWcInsert"
+    <!-- Prompt Editor Modal -->
+    <PromptEditorModal
+      v-model="showPromptEditorModal"
+      :positive="state.positive"
+      :negative="state.negative"
+      :emb-picker="embPicker"
+      :wc-manager="wcManager"
+      @update:positive="state.positive = $event"
+      @update:negative="state.negative = $event"
     />
 
     <!-- Tagger Modal (handles gate internally when not ready) -->

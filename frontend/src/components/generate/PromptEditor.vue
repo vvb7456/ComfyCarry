@@ -87,17 +87,9 @@ defineExpose({ insertAtCursor })
       </button>
     </div>
 
-    <!-- Positive prompt -->
-    <div class="prompt-wrap">
-      <textarea
-        ref="posRef"
-        class="prompt-textarea"
-        :class="{ 'prompt-textarea--tooled': tools.length > 0 }"
-        rows="4"
-        :value="positive"
-        :placeholder="t('generate.prompt.positive_placeholder')"
-        @input="emit('update:positive', ($event.target as HTMLTextAreaElement).value)"
-      />
+    <!-- Unified prompt container: toolbar + positive + negative -->
+    <div class="prompt-container">
+      <!-- Toolbar (above textareas) -->
       <div v-if="tools.length" class="prompt-toolbar">
         <button
           v-for="tool in tools"
@@ -111,11 +103,26 @@ defineExpose({ insertAtCursor })
           <span class="tool-label">{{ tool.label }}</span>
         </button>
       </div>
-    </div>
 
-    <!-- Negative prompt -->
-    <div v-if="showNegative" class="prompt-wrap prompt-wrap--negative">
+      <!-- Positive prompt -->
+      <div class="prompt-label">
+        {{ t('generate.prompt.positive_label') }}
+      </div>
       <textarea
+        ref="posRef"
+        class="prompt-textarea"
+        rows="4"
+        :value="positive"
+        :placeholder="t('generate.prompt.positive_placeholder')"
+        @input="emit('update:positive', ($event.target as HTMLTextAreaElement).value)"
+      />
+
+      <!-- Negative prompt -->
+      <div v-if="showNegative" class="prompt-label prompt-label--neg">
+        {{ t('generate.prompt.negative_label') }}
+      </div>
+      <textarea
+        v-if="showNegative"
         ref="negRef"
         class="prompt-textarea"
         rows="4"
@@ -191,8 +198,8 @@ defineExpose({ insertAtCursor })
 }
 .hdr-icon { font-size: .9rem; color: var(--t3); }
 
-/* ── Prompt wrap: fuses textarea + toolbar ── */
-.prompt-wrap {
+/* ── Unified prompt container ── */
+.prompt-container {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--bd);
@@ -201,9 +208,24 @@ defineExpose({ insertAtCursor })
   transition: border-color .15s;
   min-width: 0;
 }
-.prompt-wrap:focus-within {
-  border-color: var(--ac);
+.prompt-container:focus-within {
+  border-color: var(--bd-f);
 }
+
+
+/* ── Toolbar (top) ── */
+.prompt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 3px 6px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--bd);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.prompt-toolbar::-webkit-scrollbar { display: none; }
 
 /* ── Textarea ── */
 .prompt-textarea {
@@ -219,27 +241,27 @@ defineExpose({ insertAtCursor })
   resize: vertical;
   font-family: inherit;
 }
-.prompt-textarea--tooled {
-  border-radius: 0;
-}
 .prompt-textarea::placeholder {
   color: var(--t3);
   opacity: .7;
 }
 
-/* ── Toolbar ── */
-.prompt-toolbar {
+/* ── Label row ── */
+.prompt-label {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  padding: 3px 6px;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: .66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--t3);
   background: var(--bg2);
-  border-top: 1px solid var(--bd);
-  flex-shrink: 0;
-  overflow-x: auto;
 }
-.prompt-toolbar::-webkit-scrollbar { display: none; }
+.prompt-label--neg {
+  border-top: 1px solid var(--bd);
+}
 
 /* ── Tool button ── */
 .prompt-tool-btn {
@@ -274,9 +296,6 @@ defineExpose({ insertAtCursor })
   .prompt-toolbar { justify-content: flex-start; }
   .tool-label { display: none; }
 }
-
-/* ── Negative spacing ── */
-.prompt-wrap--negative { margin-top: var(--sp-1); }
 
 /* ── Help button ── */
 .prompt-help-btn {

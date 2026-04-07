@@ -14,7 +14,9 @@
   "prompt": {
     "title": "Prompt",
     "positive_placeholder": "Enter prompt (A1111 format), e.g.: 1girl, solo, long hair, looking at viewer, smile, white dress, outdoors, blue sky, masterpiece, best quality",
+    "positive_label": "Positive",
     "negative_placeholder": "Enter negative prompt, e.g.: worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, missing fingers, watermark, text",
+    "negative_label": "Negative",
     "tools": {
       "interrogate": "Interrogate",
       "llm_assist": "AI Prompt",
@@ -23,7 +25,9 @@
       "interrogate_title": "Interrogate tags from image (WD14 Tagger)",
       "llm_assist_title": "Generate or refine prompts with AI",
       "embedding_title": "Browse and insert Embedding vectors",
-      "wildcard_title": "Manage random prompts (Wildcards)"
+      "wildcard_title": "Manage random prompts (Wildcards)",
+      "prompt_editor": "Tag Editor",
+      "prompt_editor_title": "Visual tag editor with autocomplete and tag library"
     },
     "syntax_help_title": "Random prompt syntax",
     "help_modal_title": "Prompt Help",
