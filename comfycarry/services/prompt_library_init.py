@@ -31,8 +31,8 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _DATA_DB = _SCRIPT_DIR.parent.parent / "data" / "comfycarry-prompt-library.db"
 
 # 远程下载
-_DOWNLOAD_URL = "https://pub-98f70f226e1d46138b7d071aeeade599.r2.dev/DB/comfycarry-prompt-library.db"
-_DOWNLOAD_SHA256 = "2304a966c8b96370dc596e1d5143914778ecb2af06399215667f15e2f54815af"
+_DOWNLOAD_URL = "https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/data/comfycarry-prompt-library.db"
+_DOWNLOAD_SHA256 = "651f6734acd96a3b684c99e1b5913c186cfb30ae94f4b5995c623be368735e6c"
 
 # 导入表和字段映射
 _IMPORT_TABLES = [
