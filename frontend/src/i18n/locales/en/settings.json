@@ -50,6 +50,20 @@
   "log": {
     "title": "ComfyCarry Logs"
   },
+  "update": {
+    "title": "Version",
+    "current_version": "Current",
+    "latest_commit": "Latest",
+    "up_to_date": "Already up to date",
+    "update_available": "Update available",
+    "check_btn": "Check for Updates",
+    "apply_btn": "Update Now",
+    "checking": "Checking...",
+    "applying": "Updating...",
+    "check_failed": "Check failed",
+    "done": "Update completed, restarting...",
+    "error": "Update failed"
+  },
   "restart_confirm": "Restart ComfyCarry?\n\nThe page will be briefly unavailable.",
   "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds...",
   "civitai": {

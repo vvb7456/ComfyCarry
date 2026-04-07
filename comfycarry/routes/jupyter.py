@@ -269,7 +269,7 @@ def jupyter_new_terminal():
                           verify=False, timeout=5)
         if r.ok:
             return jsonify(r.json())
-        return jsonify({"error": "Failed to create terminal"}), r.status_code
+        return jsonify({"error": "Failed to create terminal"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -285,7 +285,7 @@ def jupyter_delete_terminal(name):
                             headers=_jupyter_headers(), verify=False, timeout=5)
         if r.ok or r.status_code == 204:
             return jsonify({"ok": True})
-        return jsonify({"error": "Delete terminal failed"}), r.status_code
+        return jsonify({"error": "Delete terminal failed"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -303,7 +303,7 @@ def jupyter_kernel_action(kernel_id, action):
                           headers=_jupyter_headers(), verify=False, timeout=10)
         if r.ok:
             return jsonify({"ok": True})
-        return jsonify({"error": f"Kernel {action} failed"}), r.status_code
+        return jsonify({"error": f"Kernel {action} failed"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -319,7 +319,7 @@ def jupyter_delete_session(session_id):
                             headers=_jupyter_headers(), verify=False, timeout=5)
         if r.ok or r.status_code == 204:
             return jsonify({"ok": True})
-        return jsonify({"error": "Delete session failed"}), r.status_code
+        return jsonify({"error": "Delete session failed"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

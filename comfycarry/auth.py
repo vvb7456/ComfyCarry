@@ -2,11 +2,47 @@
 ComfyCarry — 认证模块 (Login/Logout + check_auth 中间件)
 """
 
+import logging
+
 from flask import Blueprint, request, Response, jsonify, redirect, session
+from flask.sessions import SecureCookieSessionInterface, SecureCookieSession
+from itsdangerous import BadSignature
 
 from . import config
 
 auth_bp = Blueprint("auth", __name__)
+_auth_log = logging.getLogger("comfycarry.auth")
+
+
+# ── 自定义 Session Interface ─────────────────────────────────
+# 容忍 NTP 时钟回调导致的 "future timestamp" (Signature age < 0)
+class DebugSessionInterface(SecureCookieSessionInterface):
+    def open_session(self, app, req):
+        s = self.get_signing_serializer(app)
+        if s is None:
+            return None
+        val = req.cookies.get(self.get_cookie_name(app))
+        if not val:
+            return self.session_class()
+        max_age = int(app.permanent_session_lifetime.total_seconds())
+        try:
+            data = s.loads(val, max_age=max_age)
+            return self.session_class(data)
+        except BadSignature as e:
+            # NTP clock skew: cookie signed slightly in the future
+            # HMAC is valid, only the timestamp check fails — safe to accept
+            if "< 0 seconds" in str(e):
+                try:
+                    data = s.loads(val)  # skip age check
+                    _auth_log.info("session accepted despite clock skew: %s", e)
+                    return self.session_class(data)
+                except BadSignature:
+                    pass
+            _auth_log.warning(
+                "session BadSignature on %s %s | error=%s cookie_len=%d cookie_prefix=%s",
+                req.method, req.path, e, len(val), val[:32],
+            )
+            return self.session_class()
 
 LOGIN_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
@@ -301,5 +337,11 @@ def register_auth_middleware(app):
         if api_key and api_key == config.API_KEY:
             return
         if request.path.startswith("/api/"):
+            cookie_name = app.config.get("SESSION_COOKIE_NAME", "")
+            _auth_log.warning(
+                "401 %s | cookie_present=%s",
+                request.path,
+                cookie_name in request.cookies,
+            )
             return jsonify({"error": "Unauthorized"}), 401
         return redirect("/login")

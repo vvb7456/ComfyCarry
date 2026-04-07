@@ -24,6 +24,13 @@ bp = Blueprint("plugins", __name__)
 
 # ── ComfyUI-Manager 请求辅助 ────────────────────────────────
 
+def _safe_upstream_code(code: int) -> int:
+    """上游 status code → 安全的 Dashboard 响应码 (避免 401/403 被前端误判为 session 过期)"""
+    if 200 <= code < 300:
+        return code
+    return 502
+
+
 def _cm_get(path, params=None, timeout=30):
     """向 ComfyUI-Manager 发送 GET 请求"""
     try:
@@ -60,7 +67,7 @@ def api_plugins_installed():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI，请确认 ComfyUI 正在运行"}), 502
     if r.status_code != 200:
-        return jsonify({"error": f"ComfyUI-Manager 返回 {r.status_code}"}), r.status_code
+        return jsonify({"error": f"ComfyUI-Manager 返回 {r.status_code}"}), _safe_upstream_code(r.status_code)
     try:
         return jsonify(r.json())
     except Exception:
@@ -74,7 +81,7 @@ def api_plugins_available():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI，请确认 ComfyUI 正在运行"}), 502
     if r.status_code != 200:
-        return jsonify({"error": f"ComfyUI-Manager 返回 {r.status_code}"}), r.status_code
+        return jsonify({"error": f"ComfyUI-Manager 返回 {r.status_code}"}), _safe_upstream_code(r.status_code)
     try:
         return jsonify(r.json())
     except Exception:
@@ -87,7 +94,7 @@ def api_plugins_versions(node_name):
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code != 200:
-        return jsonify({"error": f"返回 {r.status_code}"}), r.status_code
+        return jsonify({"error": f"返回 {r.status_code}"}), _safe_upstream_code(r.status_code)
     try:
         return jsonify(r.json())
     except Exception:
@@ -137,7 +144,7 @@ def api_plugins_install():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"安装请求失败: {r.status_code}"}), r.status_code
+        return jsonify({"error": f"安装请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
     _cm_get("/manager/queue/start")
     return jsonify({"ok": True, "message": "已加入安装队列"})
 
@@ -159,7 +166,7 @@ def api_plugins_uninstall():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"卸载请求失败: {r.status_code}"}), r.status_code
+        return jsonify({"error": f"卸载请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
     _cm_get("/manager/queue/start")
     return jsonify({"ok": True, "message": "已加入卸载队列"})
 
@@ -179,7 +186,7 @@ def api_plugins_update():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"更新请求失败: {r.status_code}"}), r.status_code
+        return jsonify({"error": f"更新请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
     _cm_get("/manager/queue/start")
     return jsonify({"ok": True, "message": "已加入更新队列"})
 
@@ -209,7 +216,7 @@ def api_plugins_disable():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"操作失败: {r.status_code}"}), r.status_code
+        return jsonify({"error": f"操作失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
     _cm_get("/manager/queue/start")
     return jsonify({"ok": True, "message": "操作已提交"})
 
@@ -239,7 +246,7 @@ def api_plugins_install_git():
     if r is None:
         return jsonify({"error": "无法连接 ComfyUI"}), 502
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"安装请求失败: {r.status_code}"}), r.status_code
+        return jsonify({"error": f"安装请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
     _cm_get("/manager/queue/start")
     return jsonify({"ok": True, "message": "已加入安装队列"})
 

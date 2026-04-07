@@ -9,6 +9,7 @@ import SecretInput from '@/components/ui/SecretInput.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import FormField from '@/components/form/FormField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
@@ -19,6 +20,7 @@ import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
+import { useAppStore } from '@/stores/app'
 import type { LlmProvider, ModelOption, LlmConfigData } from '@/types/settings'
 
 defineOptions({ name: 'SettingsPage' })
@@ -27,6 +29,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { get, post, put } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
+const app = useAppStore()
 
 // ─── Prompt editor settings ───────────────────────────────────────────────────
 
@@ -120,6 +123,77 @@ const civitaiSaving = ref(false)
 
 const reinitKeepModels = ref(true)
 const reinitLoading = ref(false)
+
+// ─── Update state ─────────────────────────────────────────────────────────────
+
+const updateChecking = ref(false)
+const updateApplying = ref(false)
+const updateInfo = ref<{
+  current_version?: string
+  current_commit?: string
+  latest_version?: string
+  latest_commit?: string
+  latest_message?: string
+  has_update?: boolean
+} | null>(null)
+const updatePhase = ref('')
+
+async function checkUpdate() {
+  updateChecking.value = true
+  updateInfo.value = null
+  const data = await get<{
+    current_version: string
+    current_commit: string
+    latest_version: string
+    latest_commit: string
+    latest_message: string
+    has_update: boolean
+  }>('/api/update/check')
+  updateChecking.value = false
+  if (!data) { toast(t('settings.update.check_failed'), 'error'); return }
+  updateInfo.value = data
+}
+
+async function applyUpdate() {
+  if (!await confirm({ message: t('settings.update.apply_btn') + '?' })) return
+  updateApplying.value = true
+  updatePhase.value = ''
+  try {
+    const resp = await fetch('/api/update/apply', { method: 'POST' })
+    if (!resp.ok || !resp.body) {
+      toast(t('settings.update.error'), 'error')
+      updateApplying.value = false
+      return
+    }
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const ev = JSON.parse(line.slice(6))
+          updatePhase.value = ev.message || ev.phase
+          if (ev.phase === 'done') {
+            toast(t('settings.update.done'), 'success')
+            setTimeout(() => location.reload(), 4000)
+          } else if (ev.phase === 'error') {
+            toast(`${t('settings.update.error')}: ${ev.message}`, 'error')
+            updateApplying.value = false
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    }
+  } catch (e: any) {
+    toast(`${t('settings.update.error')}: ${e.message}`, 'error')
+    updateApplying.value = false
+  }
+}
 
 // ─── LLM state ───────────────────────────────────────────────────────────────
 
@@ -574,6 +648,50 @@ onUnmounted(() => {
             </div>
           </BaseCard>
 
+          <!-- Update -->
+          <BaseCard density="roomy">
+            <h3 class="settings-card-title">
+              <MsIcon name="update" />
+              {{ t('settings.update.title') }}
+            </h3>
+            <div class="update-info">
+              <div class="update-row">
+                <span class="update-label">{{ t('settings.update.current_version') }}</span>
+                <span class="update-value">{{ app.version || '—' }} <code>{{ (app.commit || '').substring(0, 8) || '—' }}</code></span>
+              </div>
+              <div v-if="updateInfo" class="update-row">
+                <span class="update-label">{{ t('settings.update.latest_commit') }}</span>
+                <span class="update-value">{{ updateInfo.latest_version }}</span>
+              </div>
+              <div v-if="updateInfo" class="update-status">
+                <StatusDot :status="updateInfo.has_update ? 'pending' : 'success'" />
+                <span>{{ updateInfo.has_update ? t('settings.update.update_available') : t('settings.update.up_to_date') }}</span>
+              </div>
+            </div>
+            <div v-if="updateApplying && updatePhase" class="update-phase">
+              <Spinner size="sm" />
+              <span>{{ updatePhase }}</span>
+            </div>
+            <div class="btn-row-end" style="gap:8px">
+              <BaseButton size="sm" :disabled="updateChecking || updateApplying" @click="checkUpdate">
+                <Spinner v-if="updateChecking" size="sm" />
+                <MsIcon v-else name="refresh" />
+                {{ t('settings.update.check_btn') }}
+              </BaseButton>
+              <BaseButton
+                v-if="updateInfo?.has_update"
+                variant="primary"
+                size="sm"
+                :disabled="updateApplying"
+                @click="applyUpdate"
+              >
+                <Spinner v-if="updateApplying" size="sm" />
+                <MsIcon v-else name="download" />
+                {{ t('settings.update.apply_btn') }}
+              </BaseButton>
+            </div>
+          </BaseCard>
+
           <!-- Reinitialize -->
           <BaseCard density="roomy" tone="danger" class="reinit-card">
             <h3 class="settings-card-title" style="color:var(--red)">
@@ -878,6 +996,51 @@ onUnmounted(() => {
 /* Vue-unique: reinit danger card */
 .reinit-card {
   border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Vue-unique: update card info */
+.update-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: var(--text-sm);
+}
+.update-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.update-label {
+  color: var(--t3);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.update-value {
+  color: var(--t1);
+}
+.update-value code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--text-xs);
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+}
+.update-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.update-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: var(--text-sm);
+  color: var(--t2);
 }
 
 /* Vue-unique: mono variant for API key display */

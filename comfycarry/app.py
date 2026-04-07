@@ -20,11 +20,11 @@ from .config import (
     _load_session_secret, _get_config,
 )
 from .utils import _get_api_key
-from .auth import auth_bp, register_auth_middleware
+from .auth import auth_bp, register_auth_middleware, DebugSessionInterface
 
 # Route Blueprints
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
-from .routes import generate, downloads, llm, files, prompt_library
+from .routes import generate, downloads, llm, files, prompt_library, update
 from .routes.ssh import restore_ssh_config
 
 # Services
@@ -43,6 +43,7 @@ def create_app():
 
     secret = _load_session_secret()
     app.secret_key = secret
+    app.session_interface = DebugSessionInterface()
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_NAME"] = f"cc_{secret[:8]}"
@@ -65,6 +66,7 @@ def create_app():
     app.register_blueprint(llm.bp)
     app.register_blueprint(files.bp)
     app.register_blueprint(prompt_library.bp)
+    app.register_blueprint(update.bp)
     app.register_blueprint(frontend.bp)
 
     # ── 全局认证中间件 ───────────────────────────────────
