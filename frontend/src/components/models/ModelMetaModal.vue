@@ -8,6 +8,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import Badge from '@/components/ui/Badge.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DownloadButton from './DownloadButton.vue'
 import { useToast } from '@/composables/useToast'
 import { useDownloads } from '@/composables/useDownloads'
 
@@ -26,7 +27,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
-const { localCivitaiIds, downloadingVersionIds, downloadOne } = useDownloads()
+const { getVersionState, downloadOne } = useDownloads()
 
 // ── Version switching ──
 const selectedVersionId = ref<string | number | undefined>()
@@ -82,16 +83,11 @@ const displaySha256 = computed(() =>
 )
 
 // ── Download button state for current version ──
-const dlBtnState = computed<'idle' | 'downloading' | 'local'>(() => {
+const dlBtnState = computed(() => {
   const vid = activeVersion.value?.id ?? props.meta?.versionId
-  if (!vid) return 'idle'
-  if (downloadingVersionIds.value.has(String(vid))) return 'downloading'
   const mid = props.meta?.id
-  if (mid) {
-    const localVers = localCivitaiIds.value.get(String(mid))
-    if (localVers?.has(String(vid))) return 'local'
-  }
-  return 'idle'
+  if (!mid || !vid) return 'idle' as const
+  return getVersionState(mid, vid)
 })
 
 function handleDownload() {
@@ -222,21 +218,11 @@ function badgeColor(type?: string): string | undefined {
                 />
                 <span v-else>{{ displayVersionName }}</span>
                 <!-- Download button (only when opened from CivitAI context) -->
-                <BaseButton
+                <DownloadButton
                   v-if="showDownload && meta.civitaiUrl"
-                  size="sm"
-                  :variant="dlBtnState === 'idle' ? 'primary' : undefined"
-                  :disabled="dlBtnState !== 'idle'"
-                  :class="{ 'mm-dl-done': dlBtnState === 'local', 'mm-dl-busy': dlBtnState === 'downloading' }"
-                  @click="handleDownload"
-                >
-                  <template v-if="dlBtnState === 'local'">{{ t('models.civitai.already_local') }}</template>
-                  <template v-else-if="dlBtnState === 'downloading'">{{ t('models.civitai.downloading') }}</template>
-                  <template v-else>
-                    <MsIcon name="download" size="xs" />
-                    {{ t('models.downloads.download') }}
-                  </template>
-                </BaseButton>
+                  :state="dlBtnState"
+                  @download="handleDownload"
+                />
               </div>
             </td>
           </tr>
@@ -335,11 +321,11 @@ function badgeColor(type?: string): string | undefined {
               <template v-if="img.model"><label>Model</label>{{ img.model }}</template>
               <template v-if="img.positive">
                 <label>Positive</label>
-                <span class="mm-prompt" @click="copyText(img.positive!)" :title="t('models.meta.click_to_copy')">{{ img.positive }}</span>
+                <span class="mm-prompt" @click.stop="copyText(img.positive!)" :title="t('models.meta.click_to_copy')">{{ img.positive }}</span>
               </template>
               <template v-if="img.negative">
                 <label>Negative</label>
-                <span class="mm-prompt" @click="copyText(img.negative!)" :title="t('models.meta.click_to_copy')">{{ img.negative }}</span>
+                <span class="mm-prompt" @click.stop="copyText(img.negative!)" :title="t('models.meta.click_to_copy')">{{ img.negative }}</span>
               </template>
             </figcaption>
           </figure>
@@ -362,11 +348,6 @@ function badgeColor(type?: string): string | undefined {
 .mm-version-select {
   flex: 1;
   min-width: 0;
-}
-.mm-dl-done,
-.mm-dl-busy {
-  opacity: .5;
-  cursor: default;
 }
 
 /* Info table */

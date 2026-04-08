@@ -89,7 +89,7 @@ const groupTabs = computed<FusionTab[]>(() =>
     .filter(g => promptSettings.show_nsfw || !g.is_nsfw)
     .map(g => ({
       key: g.id,
-      label: isZh.value && g.translate ? g.translate : g.name,
+      label: props.showTranslation && isZh.value && g.translate ? g.translate : g.name,
       color: g.color,
     })),
 )
@@ -97,7 +97,7 @@ const groupTabs = computed<FusionTab[]>(() =>
 const subgroupTabs = computed<FusionTab[]>(() =>
   subgroups.value.map(sg => ({
     key: sg.id,
-    label: isZh.value && sg.translate ? sg.translate : sg.name,
+    label: props.showTranslation && isZh.value && sg.translate ? sg.translate : sg.name,
     color: sg.color,
   })),
 )

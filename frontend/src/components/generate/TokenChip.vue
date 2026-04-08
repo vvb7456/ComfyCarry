@@ -19,7 +19,7 @@
 import { computed, ref, nextTick, onUnmounted, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PromptToken, BracketType } from '@/types/prompt-library'
-import { serializeToken } from '@/composables/generate/usePromptEditor'
+import { serializeToken, buildRaw } from '@/composables/generate/usePromptEditor'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -32,11 +32,14 @@ const props = withDefaults(defineProps<{
   showTranslation?: boolean
   draggable?: boolean
   translating?: boolean
+  /** Any chip is currently being dragged — hides all mini toolbars */
+  dragging?: boolean
 }>(), {
   selected: false,
   showTranslation: true,
   draggable: true,
   translating: false,
+  dragging: false,
 })
 
 const emit = defineEmits<{
@@ -58,7 +61,11 @@ let hoverTimer: ReturnType<typeof setTimeout> | null = null
 
 function onMouseEnter() {
   if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
-  hoverTimer = setTimeout(() => { hovered.value = true; hoverTimer = null }, 300)
+  hoverTimer = setTimeout(() => {
+    hovered.value = true
+    updateToolbarPos()
+    hoverTimer = null
+  }, 300)
 }
 function onMouseLeave() {
   if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
@@ -70,17 +77,21 @@ onUnmounted(() => {
 })
 
 // ── Toolbar position (fixed, above chip) ───────────────────────
-const toolbarStyle = computed<CSSProperties>(() => {
-  if (!chipEl.value) return { display: 'none' }
+// Imperatively updated (not computed) because getBoundingClientRect() is
+// not reactive — chip DOM position changes after drag-move don't invalidate a computed.
+const toolbarStyle = ref<CSSProperties>({ display: 'none' })
+
+function updateToolbarPos() {
+  if (!chipEl.value) { toolbarStyle.value = { display: 'none' }; return }
   const rect = chipEl.value.getBoundingClientRect()
-  return {
+  toolbarStyle.value = {
     position: 'fixed',
     left: `${rect.left}px`,
     top: `${rect.top - 4}px`,
     transform: 'translateY(-100%)',
     zIndex: 10000,
   }
-})
+}
 
 // ── Computed styles ────────────────────────────────────────────
 const chipColor = computed(() => {
@@ -95,9 +106,9 @@ const chipColor = computed(() => {
 })
 
 const displayText = computed(() => {
-  // Use the canonical serializer — single source of truth
-  const serialized = serializeToken(props.token)
-  return serialized || props.token.tag
+  // Always show the full structured representation (including brackets/weight),
+  // even when disabled (serializeToken returns '' for disabled tokens)
+  return buildRaw(props.token)
 })
 
 const isWeightType = computed(() =>
@@ -135,11 +146,13 @@ function onWeightChange(val: number) {
 // ── Drag ───────────────────────────────────────────────────────
 function onDragStart(e: DragEvent) {
   if (!props.draggable) return
+  hovered.value = false
   e.dataTransfer?.setData('text/plain', props.token.id)
   emit('drag-start', props.token.id, e)
 }
 
 function onDragEnd(e: DragEvent) {
+  hovered.value = false
   emit('drag-end', e)
 }
 
@@ -259,7 +272,7 @@ function cancelEdit() {
     <!-- Hover mini toolbar (teleported to body) -->
     <Teleport to="body">
       <div
-        v-if="hovered && isWeightType && token.enabled"
+        v-if="hovered && !props.dragging && isWeightType && token.enabled"
         class="chip-toolbar"
         :style="toolbarStyle"
         @mouseenter="onMouseEnter"

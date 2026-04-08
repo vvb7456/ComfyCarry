@@ -20,6 +20,11 @@ export interface LocalModel {
   version_name?: string
   trained_words?: string[]
   links?: string[]
+  source?: string
+  /** Backend capability: can fetch CivitAI info for this file */
+  can_fetch_info?: boolean
+  /** Backend capability: can delete this file */
+  can_delete?: boolean
   images?: Array<{
     url: string
     type?: string

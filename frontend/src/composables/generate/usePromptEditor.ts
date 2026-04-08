@@ -90,6 +90,38 @@ function parseWeight(raw: string): ParsedWeight {
   return { inner: s, weight: 1.0, bracketType: 'none', bracketDepth: 0, explicitWeight: false }
 }
 
+// ── Smart comma-split that respects {} and ${} nesting ─────────
+
+/**
+ * Split a prompt string on commas, but skip commas inside
+ * curly-brace groups ({...}, ${...}) and round-bracket groups
+ * ((emphasis), (a, b)) so structural expressions survive intact.
+ */
+export function splitPromptTokens(prompt: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let start = 0
+
+  for (let i = 0; i < prompt.length; i++) {
+    const ch = prompt[i]
+    if (ch === '{' || ch === '(') {
+      depth++
+    } else if ((ch === '}' || ch === ')') && depth > 0) {
+      depth--
+    } else if (ch === ',' && depth === 0) {
+      const seg = prompt.slice(start, i).trim()
+      if (seg) parts.push(seg)
+      start = i + 1
+    }
+  }
+
+  // Last segment
+  const last = prompt.slice(start).trim()
+  if (last) parts.push(last)
+
+  return parts
+}
+
 // ── Token type classification ──────────────────────────────────
 
 function classifyToken(text: string): TokenType {
@@ -112,18 +144,22 @@ function classifyToken(text: string): TokenType {
  *   depth=0, weight≠1.0  → impossible (updateWeight auto-adds depth=1)
  *
  * Embedding/wildcard/template:
- *   weight=1.0 → plain tag   e.g. "embedding:name"
- *   weight≠1.0 → "(tag:1.50)" e.g. "(embedding:name:1.50)"
+ *   weight=1.0, depth=0 → plain tag   e.g. "embedding:name"
+ *   weight≠1.0          → "(tag:1.50)" e.g. "(embedding:name:1.50)"
+ *   depth>0             → "((tag))"    respects bracketDepth
  */
-function buildRaw(token: PromptToken): string {
+export function buildRaw(token: PromptToken): string {
   if (token.type === 'break') return 'BREAK'
 
-  // Embedding/wildcard/template: support optional weight wrapping
+  // Embedding/wildcard/template: support bracketDepth and weight
   if (token.type === 'embedding' || token.type === 'wildcard' || token.type === 'template') {
-    if (token.weight !== 1.0) {
-      return `(${token.tag}:${token.weight.toFixed(2)})`
-    }
-    return token.tag
+    const depth = Math.max(0, token.bracketDepth)
+    if (depth === 0 && token.weight === 1.0) return token.tag
+    // Build with :weight at innermost if weight≠1.0
+    let s = token.weight !== 1.0 ? `${token.tag}:${token.weight.toFixed(2)}` : token.tag
+    const layers = Math.max(depth, token.weight !== 1.0 ? 1 : 0)
+    for (let i = 0; i < layers; i++) s = `(${s})`
+    return s
   }
 
   const { tag, weight, bracketDepth } = token
@@ -179,7 +215,7 @@ export function usePromptEditor(): UsePromptEditorReturn {
       return tokens.value
     }
 
-    const parts = prompt.split(',').map(s => s.trim()).filter(Boolean)
+    const parts = splitPromptTokens(prompt)
     const result: PromptToken[] = []
 
     for (const part of parts) {
@@ -248,10 +284,20 @@ export function usePromptEditor(): UsePromptEditorReturn {
 
   /**
    * Add a new token at the end.
+   *
+   * When type is 'raw' (default), the text is auto-classified through
+   * classifyToken() so special syntax (BREAK, embedding:xxx, __wc__,
+   * ${...}) is correctly typed from the start.
    */
   function addToken(text: string, type: TokenType = 'raw', color?: string, translate?: string): void {
     if (!text.trim()) return
-    if (type === 'break') {
+
+    // Auto-classify when caller didn't specify a concrete type
+    const parsed = parseWeight(text)
+    const inner = parsed.inner || text
+    const detected = type === 'raw' ? classifyToken(inner) : type
+
+    if (detected === 'break') {
       tokens.value.push({
         id: uid(),
         raw: 'BREAK',
@@ -265,16 +311,17 @@ export function usePromptEditor(): UsePromptEditorReturn {
       })
       return
     }
-    const parsed = type !== 'break' && type !== 'template' ? parseWeight(text) : null
+
+    const useWeight = detected !== 'template'
     tokens.value.push({
       id: uid(),
       raw: text,
-      tag: parsed ? parsed.inner : text,
-      type,
-      weight: parsed?.weight ?? 1.0,
-      bracketType: parsed?.bracketType ?? 'none',
-      bracketDepth: parsed?.bracketDepth ?? 0,
-      explicitWeight: parsed?.explicitWeight ?? false,
+      tag: useWeight ? (parsed.inner || text) : text,
+      type: detected,
+      weight: useWeight ? parsed.weight : 1.0,
+      bracketType: useWeight ? parsed.bracketType : 'none',
+      bracketDepth: useWeight ? parsed.bracketDepth : 0,
+      explicitWeight: useWeight ? parsed.explicitWeight : false,
       enabled: true,
       groupColor: color,
       translate,
@@ -379,6 +426,8 @@ export function usePromptEditor(): UsePromptEditorReturn {
       token.bracketDepth = parsed.bracketDepth
       token.explicitWeight = parsed.explicitWeight
     } else {
+      // Downgrade to 'raw' — caller (onUpdateTag) upgrades to 'tag' if library matches
+      token.type = 'raw'
       token.tag = parsed.inner
       token.weight = parsed.weight
       token.bracketType = parsed.bracketType

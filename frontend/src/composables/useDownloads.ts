@@ -1,6 +1,5 @@
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useApiFetch } from './useApiFetch'
 import { useToast } from './useToast'
 
 // ── Types ──────────────────────────────────────────────
@@ -39,6 +38,12 @@ export interface DownloadTask {
   }
 }
 
+/** Unified version-level state for UI consumption */
+export type VersionState = 'idle' | 'submitting' | 'downloading' | 'paused' | 'installed' | 'failed'
+
+/** Aggregated model-level state for card display */
+export type ModelAggregateState = 'idle' | 'downloading' | 'partial' | 'installed'
+
 // ── Constants ──────────────────────────────────────────
 
 const STORAGE_KEY = 'civitai_cart'
@@ -55,15 +60,25 @@ const polling = ref(false)
 /** civitai_model_id → Set<civitai_version_id> — built from local models API + completed tasks */
 const localCivitaiIds = ref<Map<string, Set<string>>>(new Map())
 
-/** Model IDs with pending POST requests (optimistic UI, cleared after API responds) */
-const pendingModelIds = ref<Set<string>>(new Set())
+/** Backend ResourceState map: "source:modelId:versionId" → state string */
+const resourceStates = ref<Map<string, string>>(new Map())
+
+/** Version IDs with pending POST requests (submitting state, before backend confirms) */
+const submittingVersionIds = ref<Set<string>>(new Set())
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let cartLoaded = false
-let refreshing = false
+/** Promise for the current in-flight refreshStatus, so callers can await the same request */
+let refreshPromise: Promise<void> | null = null
+/** Counter: >0 means a batch operation is in progress, suppress auto-stop */
+let _batchInFlight = 0
 
-// SSE per-task connections
-const sseConnections = new Map<string, EventSource>()
+// Global SSE stream connection (replaces per-task SSE)
+let globalSSE: EventSource | null = null
+
+// Late-bound toast/i18n (set by first useDownloads() call in component setup context)
+let _toast: ReturnType<typeof useToast>['toast'] | null = null
+let _t: ReturnType<typeof useI18n>['t'] | null = null
 
 // ── Cart Helpers ───────────────────────────────────────
 
@@ -92,74 +107,108 @@ function saveCart() {
   } catch { /* ignore */ }
 }
 
-// ── SSE Helpers ────────────────────────────────────────
+// ── SSE & Task Update ──────────────────────────────────
 
-/** Update a single task in-place from an SSE event (real-time progress) */
-function applySSEEvent(downloadId: string, evt: Record<string, unknown>) {
-  const idx = tasks.value.findIndex(t => t.download_id === downloadId)
-  if (idx < 0) return
-  const task = { ...tasks.value[idx] }
-  if (evt.status !== undefined) task.status = evt.status as DownloadTask['status']
-  if (typeof evt.progress === 'number') task.progress = evt.progress
-  if (typeof evt.speed === 'number') task.speed = evt.speed
-  if (typeof evt.completed_bytes === 'number') task.completed_bytes = evt.completed_bytes
-  if (typeof evt.total_bytes === 'number') task.total_bytes = evt.total_bytes
-  if (typeof evt.error === 'string') task.error = evt.error
-  tasks.value[idx] = task
-  tasks.value = [...tasks.value]
+/** Update a single task in-place from event data */
+function applyTaskUpdate(taskData: DownloadTask) {
+  const idx = tasks.value.findIndex(t => t.download_id === taskData.download_id)
+  if (idx >= 0) {
+    tasks.value[idx] = taskData
+    tasks.value = [...tasks.value]
+  }
 }
 
-function openTaskSSE(downloadId: string, onTerminal: () => void) {
-  if (sseConnections.has(downloadId)) return
-  const source = new EventSource(`/api/downloads/${downloadId}/events`)
-  sseConnections.set(downloadId, source)
+/** Merge a single completed task into localCivitaiIds in the same tick */
+function mergeOneTaskIntoLocal(task: DownloadTask) {
+  const mid = String(task.meta.model_id)
+  const vid = task.meta.version_id ? String(task.meta.version_id) : null
+  let versions = localCivitaiIds.value.get(mid)
+  let changed = false
+  if (!versions) {
+    versions = new Set()
+    localCivitaiIds.value.set(mid, versions)
+    changed = true
+  }
+  if (vid && !versions.has(vid)) {
+    versions.add(vid)
+    changed = true
+  }
+  if (changed) {
+    localCivitaiIds.value = new Map(localCivitaiIds.value)
+  }
+}
 
-  source.onmessage = (e) => {
+/** Apply a resource update from global SSE */
+function applyResourceUpdate(data: { resource_key: string; state: string; model_id: string; version_id: string }) {
+  // Update resourceStates map
+  const newMap = new Map(resourceStates.value)
+  if (data.state === 'absent') {
+    newMap.delete(data.resource_key)
+  } else {
+    newMap.set(data.resource_key, data.state)
+  }
+  resourceStates.value = newMap
+
+  // When installed, also merge into localCivitaiIds for backward compatibility
+  if (data.state === 'installed' && data.model_id) {
+    const mid = String(data.model_id)
+    const vid = data.version_id ? String(data.version_id) : null
+    let versions = localCivitaiIds.value.get(mid)
+    let changed = false
+    if (!versions) {
+      versions = new Set()
+      localCivitaiIds.value.set(mid, versions)
+      changed = true
+    }
+    if (vid && !versions.has(vid)) {
+      versions.add(vid)
+      changed = true
+    }
+    if (changed) {
+      localCivitaiIds.value = new Map(localCivitaiIds.value)
+    }
+  }
+}
+
+// ── Global SSE Stream ──────────────────────────────────
+
+function connectGlobalSSE() {
+  if (globalSSE) return
+
+  globalSSE = new EventSource('/api/downloads/stream')
+
+  globalSSE.onmessage = (e) => {
     try {
-      const data = JSON.parse(e.data)
-      if (data.error === '任务已删除') {
-        closeTaskSSE(downloadId)
-        onTerminal()
-        return
-      }
-      applySSEEvent(downloadId, data)
-      if (data.status && TERMINAL_STATES.has(data.status)) {
-        closeTaskSSE(downloadId)
-        onTerminal()
+      const event = JSON.parse(e.data)
+      const { type, data } = event
+
+      if (type === 'task.updated' || type === 'task.progress') {
+        applyTaskUpdate(data as DownloadTask)
+        // When task completes, merge into local (fallback for when resource.updated arrives late)
+        if (data.status === 'complete' && data.meta?.model_id) {
+          mergeOneTaskIntoLocal(data as DownloadTask)
+        }
+      } else if (type === 'resource.updated') {
+        applyResourceUpdate(data)
       }
     } catch { /* ignore */ }
   }
 
-  source.onerror = () => {
-    closeTaskSSE(downloadId)
+  globalSSE.onerror = () => {
+    disconnectGlobalSSE()
+    // Auto-reconnect after 3s
+    setTimeout(() => {
+      if (polling.value) connectGlobalSSE()
+    }, 3000)
   }
 }
 
-function closeTaskSSE(downloadId: string) {
-  const source = sseConnections.get(downloadId)
-  if (source) {
-    source.onmessage = null
-    source.onerror = null
-    source.close()
-    sseConnections.delete(downloadId)
-  }
-}
-
-function closeAllSSE() {
-  for (const [id] of sseConnections) closeTaskSSE(id)
-}
-
-function syncSSEConnections(onTerminal: () => void) {
-  for (const task of tasks.value) {
-    if (ACTIVE_STATES.has(task.status) && !sseConnections.has(task.download_id)) {
-      openTaskSSE(task.download_id, onTerminal)
-    }
-  }
-  for (const [id] of sseConnections) {
-    const task = tasks.value.find(t => t.download_id === id)
-    if (!task || !ACTIVE_STATES.has(task.status)) {
-      closeTaskSSE(id)
-    }
+function disconnectGlobalSSE() {
+  if (globalSSE) {
+    globalSSE.onmessage = null
+    globalSSE.onerror = null
+    globalSSE.close()
+    globalSSE = null
   }
 }
 
@@ -206,12 +255,326 @@ function mergeCompletedIntoLocal(taskList: DownloadTask[]) {
   }
 }
 
+// ── Module-level Polling (singleton, no per-instance closures) ──
+
+/** Refresh task list + resource states from backend snapshot */
+async function _refreshStatus(): Promise<void> {
+  try {
+    const res = await fetch('/api/downloads/snapshot')
+    if (!res.ok) return
+    const r = await res.json()
+
+    // Update tasks
+    if (r?.tasks) {
+      tasks.value = r.tasks
+      mergeCompletedIntoLocal(r.tasks)
+    }
+
+    // Update resource states from snapshot
+    if (r?.resources) {
+      const newMap = new Map<string, string>()
+      for (const [key, view] of Object.entries(r.resources)) {
+        const v = view as { state: string; model_id?: string; version_id?: string }
+        newMap.set(key, v.state)
+        // Also merge installed resources into localCivitaiIds
+        if (v.state === 'installed' && v.model_id) {
+          const mid = String(v.model_id)
+          const vid = v.version_id ? String(v.version_id) : null
+          let versions = localCivitaiIds.value.get(mid)
+          if (!versions) {
+            versions = new Set()
+            localCivitaiIds.value.set(mid, versions)
+          }
+          if (vid) versions.add(vid)
+        }
+      }
+      resourceStates.value = newMap
+      localCivitaiIds.value = new Map(localCivitaiIds.value) // trigger reactivity
+    }
+
+    // Auto-stop polling when no active tasks remain (unless batch is in progress)
+    if (polling.value && _batchInFlight === 0 && r?.tasks && !r.tasks.some((t: DownloadTask) => ACTIVE_STATES.has(t.status))) {
+      stopPolling()
+    }
+  } catch { /* ignore network errors */ }
+}
+
+/** Coalescing refreshStatus: multiple callers await the same in-flight request */
+function refreshStatus(): Promise<void> {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = _refreshStatus().finally(() => { refreshPromise = null })
+  return refreshPromise
+}
+
+function startPolling() {
+  if (pollTimer) {
+    // Already polling — just trigger one refresh for the new caller
+    refreshStatus()
+    return
+  }
+  polling.value = true
+  fetchLocalIndex()
+  refreshStatus()
+  connectGlobalSSE()
+  pollTimer = setInterval(refreshStatus, POLL_INTERVAL)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+  polling.value = false
+  disconnectGlobalSSE()
+}
+
+// ── Submitting state helpers ───────────────────────────
+
+function setSubmitting(vid: string) {
+  submittingVersionIds.value.add(vid)
+  submittingVersionIds.value = new Set(submittingVersionIds.value)
+}
+
+function clearSubmitting(vid: string) {
+  submittingVersionIds.value.delete(vid)
+  submittingVersionIds.value = new Set(submittingVersionIds.value)
+}
+
+// ── Module-level Download Actions ──────────────────────
+
+async function downloadOne(modelId: string, modelType: string, versionId?: number) {
+  const vid = versionId ? String(versionId) : modelId
+
+  // Submitting: immediately mark version
+  setSubmitting(vid)
+
+  let result: { download_id?: string; message?: string; error?: string; existed?: boolean } | null = null
+  try {
+    const res = await fetch('/api/downloads/civitai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_id: modelId, model_type: modelType.toLowerCase(), ...(versionId && { version_id: versionId }) }),
+    })
+    if (res.status === 401) {
+      clearSubmitting(vid)
+      window.location.href = '/login'
+      return
+    }
+    result = await res.json()
+    if (!res.ok) {
+      clearSubmitting(vid)
+      _toast?.(result?.error || `HTTP ${res.status}`, 'error')
+      await refreshStatus()
+      return
+    }
+  } catch (e: unknown) {
+    clearSubmitting(vid)
+    _toast?.((e as Error)?.message || 'Network error', 'error')
+    return
+  }
+
+  if (!result) { clearSubmitting(vid); return }
+  if (result.error) {
+    clearSubmitting(vid)
+    _toast?.(result.error, 'error')
+    await refreshStatus()
+    return
+  }
+  if (result.existed) {
+    _toast?.(result.message || _t?.('models.downloads.already_exists') || 'Already exists', 'warning')
+    await refreshStatus()
+    clearSubmitting(vid)
+    return
+  }
+
+  // Success: start polling, refresh to pick up task, then clear submitting
+  _toast?.(result.message || _t?.('models.downloads.started') || 'Download started', 'success')
+  startPolling()
+  await refreshStatus()
+  clearSubmitting(vid)
+}
+
+async function downloadAllFromCart() {
+  const items = [...cart.value.values()]
+  if (!items.length) return
+
+  // Mark all as submitting
+  for (const item of items) {
+    setSubmitting(item.versionId ? String(item.versionId) : item.modelId)
+  }
+
+  // Guard: prevent auto-stop during batch
+  _batchInFlight++
+
+  // Start polling + SSE before submitting so real-time events arrive during batch
+  startPolling()
+
+  let ok = 0, fail = 0
+  for (const item of items) {
+    const vid = item.versionId ? String(item.versionId) : item.modelId
+    try {
+      const res = await fetch('/api/downloads/civitai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_id: item.modelId,
+          model_type: (item.type || 'Checkpoint').toLowerCase(),
+          ...(item.versionId && { version_id: item.versionId }),
+        }),
+      })
+      const data = await res.json()
+      clearSubmitting(vid)
+      if (res.ok && !data.error) ok++
+      else fail++
+    } catch {
+      clearSubmitting(vid)
+      fail++
+    }
+  }
+
+  _batchInFlight--
+
+  const msg = (_t?.('models.downloads.batch_result', { ok }) || `${ok} started`)
+    + (fail ? (_t?.('models.downloads.batch_fail', { fail }) || `, ${fail} failed`) : '')
+  _toast?.(msg, fail ? 'warning' : 'success')
+  await refreshStatus()
+}
+
+// ── Module-level Download Control ──────────────────────
+
+async function _postControl(url: string) {
+  try {
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+  } catch { /* ignore */ }
+  await refreshStatus()
+}
+
+async function pauseDownload(id: string) { await _postControl(`/api/downloads/${id}/pause`) }
+async function resumeDownload(id: string) { await _postControl(`/api/downloads/${id}/resume`) }
+async function cancelDownload(id: string) { await _postControl(`/api/downloads/${id}/cancel`) }
+
+async function retryDownload(id: string) {
+  try {
+    const res = await fetch(`/api/downloads/${id}/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const data = await res.json()
+    if (data?.error) {
+      _toast?.(data.error, 'error')
+    } else {
+      _toast?.(data.message || _t?.('models.downloads.started') || 'Retrying', 'success')
+      startPolling()
+    }
+  } catch (e: unknown) {
+    _toast?.((e as Error)?.message || 'Network error', 'error')
+  }
+  await refreshStatus()
+}
+
+async function pauseAll() {
+  for (const t of tasks.value) {
+    if (t.status === 'active') await _postControl(`/api/downloads/${t.download_id}/pause`)
+  }
+}
+
+async function resumeAll() {
+  for (const t of tasks.value) {
+    if (t.status === 'paused') await _postControl(`/api/downloads/${t.download_id}/resume`)
+  }
+}
+
+async function clearHistory() {
+  await _postControl('/api/downloads/clear')
+  _toast?.(_t?.('models.downloads.history_cleared') || 'History cleared', 'success')
+}
+
+// ── Selectors (pure functions reading singleton refs) ──
+
+/**
+ * Get the unified state for a specific version.
+ * Priority: submitting > resourceStates > active task > local index > idle
+ * State is monotonically non-regressing: downloading never goes back to idle.
+ */
+function getVersionState(modelId: string | number, versionId: string | number): VersionState {
+  const mid = String(modelId)
+  const vid = String(versionId)
+
+  // 1. Submitting (user just clicked, backend hasn't confirmed yet)
+  if (submittingVersionIds.value.has(vid)) return 'submitting'
+
+  // 2. Backend resource state (authoritative, from global SSE / snapshot)
+  const resourceKey = `civitai:${mid}:${vid}`
+  const rState = resourceStates.value.get(resourceKey)
+  if (rState) {
+    const mapped = mapResourceState(rState)
+    if (mapped !== 'idle') return mapped
+  }
+
+  // 3. Active task exists for this version (fallback for legacy/non-resource tasks)
+  for (const task of tasks.value) {
+    const taskVid = task.meta?.version_id ? String(task.meta.version_id) : null
+    const taskMid = task.meta?.model_id ? String(task.meta.model_id) : null
+    if (taskVid === vid || (!taskVid && taskMid === mid)) {
+      if (task.status === 'active' || task.status === 'queued') return 'downloading'
+      if (task.status === 'paused') return 'paused'
+      if (task.status === 'failed') return 'failed'
+      if (task.status === 'complete') return 'installed'
+    }
+  }
+
+  // 4. Local index (files already on disk)
+  const localVersions = localCivitaiIds.value.get(mid)
+  if (localVersions?.has(vid)) return 'installed'
+
+  return 'idle'
+}
+
+/** Map backend ResourceState string to frontend VersionState */
+function mapResourceState(state: string): VersionState {
+  switch (state) {
+    case 'submit_pending': return 'submitting'
+    case 'downloading': return 'downloading'
+    case 'paused': return 'paused'
+    case 'verifying': return 'downloading' // show as downloading (with spinner)
+    case 'installed': return 'installed'
+    case 'failed': return 'failed'
+    case 'cancelled': return 'idle'
+    case 'absent': return 'idle'
+    default: return 'idle'
+  }
+}
+
+/**
+ * Get aggregated state for a model across its versions.
+ */
+function getModelAggregateState(modelId: string | number, versionIds: (string | number)[]): ModelAggregateState {
+  const mid = String(modelId)
+  let anyDownloading = false
+  let anyInstalled = false
+  let allInstalled = versionIds.length > 0
+
+  for (const vid of versionIds) {
+    const state = getVersionState(mid, vid)
+    if (state === 'submitting' || state === 'downloading' || state === 'paused') anyDownloading = true
+    if (state === 'installed') anyInstalled = true
+    else allInstalled = false
+  }
+
+  if (allInstalled && versionIds.length > 0) return 'installed'
+  if (anyDownloading) return 'downloading'
+  if (anyInstalled) return 'partial'
+  return 'idle'
+}
+
 // ── Composable ─────────────────────────────────────────
 
 export function useDownloads() {
-  const { get, post } = useApiFetch()
+  // Late-bind toast & i18n on first setup-context call
   const { toast } = useToast()
   const { t } = useI18n({ useScope: 'global' })
+  _toast = toast
+  _t = t
 
   loadCart()
 
@@ -232,27 +595,6 @@ export function useDownloads() {
   const failedTasks = computed(() =>
     tasks.value.filter(t => t.status === 'failed'),
   )
-
-  /** Model IDs with active downloads — merges optimistic pending + real task state */
-  const downloadingModelIds = computed(() => {
-    const ids = new Set<string>(pendingModelIds.value)
-    for (const t of tasks.value) {
-      if (ACTIVE_STATES.has(t.status) && t.meta?.model_id) {
-        ids.add(t.meta.model_id)
-      }
-    }
-    return ids
-  })
-
-  const downloadingVersionIds = computed(() => {
-    const ids = new Set<string>()
-    for (const t of tasks.value) {
-      if (ACTIVE_STATES.has(t.status) && t.meta?.version_id) {
-        ids.add(t.meta.version_id)
-      }
-    }
-    return ids
-  })
 
   // ── Cart CRUD ──
 
@@ -295,135 +637,6 @@ export function useDownloads() {
     saveCart()
   }
 
-  // ── Download Actions ──
-
-  async function downloadOne(modelId: string, modelType: string, versionId?: number) {
-    // Optimistic: instantly mark model as downloading (mirrors legacy doDownload behavior)
-    pendingModelIds.value.add(modelId)
-    pendingModelIds.value = new Set(pendingModelIds.value)
-
-    const result = await post<{ download_id?: string; message?: string; error?: string; existed?: boolean }>(
-      '/api/downloads/civitai',
-      { model_id: modelId, model_type: modelType.toLowerCase(), ...(versionId && { version_id: versionId }) },
-    )
-
-    // Clear optimistic state — real state comes from tasks via refreshStatus
-    pendingModelIds.value.delete(modelId)
-    pendingModelIds.value = new Set(pendingModelIds.value)
-
-    if (!result) return
-    if (result.error) { toast(result.error, 'error'); return }
-    if (result.existed) { toast(result.message || t('models.downloads.already_exists'), 'warning'); return }
-    toast(result.message || t('models.downloads.started'), 'success')
-    startPolling()
-    await refreshStatus()
-  }
-
-  async function downloadAll() {
-    const items = cartItems.value
-    if (!items.length) return
-    let ok = 0, fail = 0
-    for (const item of items) {
-      const result = await post<{ error?: string; existed?: boolean }>(
-        '/api/downloads/civitai',
-        {
-          model_id: item.modelId,
-          model_type: (item.type || 'Checkpoint').toLowerCase(),
-          ...(item.versionId && { version_id: item.versionId }),
-        },
-      )
-      if (result && !result.error) ok++
-      else fail++
-    }
-    const msg = t('models.downloads.batch_result', { ok }) + (fail ? t('models.downloads.batch_fail', { fail }) : '')
-    toast(msg, fail ? 'warning' : 'success')
-    if (ok > 0) startPolling()
-    await refreshStatus()
-  }
-
-  // ── Download Control ──
-
-  async function pauseDownload(id: string) {
-    await post(`/api/downloads/${id}/pause`)
-    await refreshStatus()
-  }
-
-  async function resumeDownload(id: string) {
-    await post(`/api/downloads/${id}/resume`)
-    await refreshStatus()
-  }
-
-  async function cancelDownload(id: string) {
-    await post(`/api/downloads/${id}/cancel`)
-    await refreshStatus()
-  }
-
-  async function retryDownload(id: string) {
-    await post(`/api/downloads/${id}/retry`)
-    await refreshStatus()
-  }
-
-  async function pauseAll() {
-    for (const t of activeTasks.value) {
-      if (t.status === 'active') await post(`/api/downloads/${t.download_id}/pause`)
-    }
-    await refreshStatus()
-  }
-
-  async function resumeAll() {
-    for (const t of pausedTasks.value) {
-      await post(`/api/downloads/${t.download_id}/resume`)
-    }
-    await refreshStatus()
-  }
-
-  async function clearHistory() {
-    await post('/api/downloads/clear')
-    await refreshStatus()
-    toast(t('models.downloads.history_cleared'), 'success')
-  }
-
-  // ── Status Polling + SSE ──
-
-  async function refreshStatus() {
-    if (refreshing) return
-    refreshing = true
-    try {
-      const r = await get<{ tasks: DownloadTask[] }>('/api/downloads')
-      if (!r?.tasks) return
-      tasks.value = r.tasks
-      // Merge completed tasks' model/version IDs into localCivitaiIds (instant, no extra API call)
-      mergeCompletedIntoLocal(r.tasks)
-      // Sync SSE: open for active tasks, close for terminal
-      if (polling.value) syncSSEConnections(() => refreshStatus())
-      // Auto-stop polling when no active/queued tasks remain
-      if (polling.value && !r.tasks.some(t => ACTIVE_STATES.has(t.status))) {
-        stopPolling()
-      }
-    } finally {
-      refreshing = false
-    }
-  }
-
-  function startPolling() {
-    if (pollTimer) return
-    polling.value = true
-    fetchLocalIndex()
-    refreshStatus()
-    pollTimer = setInterval(refreshStatus, POLL_INTERVAL)
-  }
-
-  function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer)
-      pollTimer = null
-    }
-    polling.value = false
-    closeAllSSE()
-  }
-
-  onUnmounted(stopPolling)
-
   return {
     // Cart
     cart,
@@ -441,12 +654,14 @@ export function useDownloads() {
     pausedTasks,
     completedTasks,
     failedTasks,
-    downloadingModelIds,
-    downloadingVersionIds,
 
-    // Actions
+    // Selectors (primary API for UI state)
+    getVersionState,
+    getModelAggregateState,
+
+    // Actions (module-level singletons)
     downloadOne,
-    downloadAll,
+    downloadAll: downloadAllFromCart,
     pauseDownload,
     resumeDownload,
     cancelDownload,
@@ -455,7 +670,7 @@ export function useDownloads() {
     resumeAll,
     clearHistory,
 
-    // Polling
+    // Polling (module-level singletons)
     refreshStatus,
     startPolling,
     stopPolling,

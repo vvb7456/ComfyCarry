@@ -138,8 +138,13 @@ def main():
     app = create_app()
 
     # 执行数据库迁移
+    from . import migrations as _migrations  # noqa: F811,F401 — 注册所有表
     from .db import db
     db.migrate()
+
+    # 从 DB 恢复下载资源状态
+    from .services.resource_registry import get_registry
+    get_registry().hydrate_from_db()
 
     # 注册引擎清理
     atexit.register(shutdown_engine)

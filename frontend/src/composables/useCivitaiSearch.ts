@@ -77,8 +77,6 @@ const ATTRIBUTES_TO_RETRIEVE = [
   'lastVersionAtUnix', 'user', 'nsfwLevel', 'availability',
 ]
 
-const CIVITAI_API_BASE = 'https://civitai.com/api/v1'
-
 // ── Helpers ────────────────────────────────────────────
 
 /** Check if every part of the query is a numeric ID or CivitAI URL */
@@ -246,7 +244,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     totalHits.value = result.estimatedTotalHits ?? 0
   }
 
-  // ── CivitAI direct ID lookup ──
+  // ── CivitAI ID lookup via backend proxy ──
   async function lookupByIds(text: string) {
     const mySearchId = _searchId
     const parsed = parseIds(text)
@@ -255,7 +253,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     for (const { id, versionId } of parsed) {
       if (_searchId !== mySearchId) return
       try {
-        const res = await fetch(`${CIVITAI_API_BASE}/models/${id}`)
+        const res = await fetch(`/api/civitai/model/${id}`)
         if (res.ok) {
           const data = await res.json()
           const hit = normalizeApiModel(data)

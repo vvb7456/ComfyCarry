@@ -23,7 +23,7 @@ export interface UsePromptTranslateReturn {
 
   translateWord(word: string): Promise<string>
   translateText(text: string, from?: string, to?: string, provider?: string): Promise<TranslateResult | null>
-  translateTokens(tokens: PromptToken[], onUpdate: (id: string, translate: string) => void): Promise<void>
+  translateTokens(tokens: PromptToken[], onUpdate: (id: string, translate: string) => void, provider?: string): Promise<void>
 }
 
 export function usePromptTranslate(): UsePromptTranslateReturn {
@@ -65,6 +65,7 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
   async function translateTokens(
     tokens: PromptToken[],
     onUpdate: (id: string, translate: string) => void,
+    provider?: string,
   ): Promise<void> {
     const untranslated = tokens.filter(
       t => t.enabled && !t.translate && (t.type === 'tag' || t.type === 'raw'),
@@ -77,7 +78,10 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
       const needRemote: PromptToken[] = []
 
       for (const token of untranslated) {
+        const tagBefore = token.tag
         const local = await translateWord(token.tag)
+        // Staleness guard: tag may have changed during the async call
+        if (token.tag !== tagBefore) continue
         if (local) {
           onUpdate(token.id, local)
         } else {
@@ -87,7 +91,9 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
 
       // Phase 2: Remote API for remaining tokens
       for (const token of needRemote) {
-        const result = await translateText(token.tag)
+        const tagBefore = token.tag
+        const result = await translateText(token.tag, 'en', 'zh', provider)
+        if (token.tag !== tagBefore) continue
         if (result?.translate) {
           onUpdate(token.id, result.translate)
         }

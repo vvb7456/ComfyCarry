@@ -91,6 +91,10 @@ class DownloadEngine:
         self._poller_thread: threading.Thread | None = None
         self._running = False
         self._rpc_id = 0
+        # 状态变化回调: callback(task, old_status, new_status)
+        self._on_status_change: list[Callable] = []
+        # 进度更新回调: callback(task) — 每次 poll 有进度变化时调用
+        self._on_progress: list[Callable] = []
 
     # ── 生命周期 ─────────────────────────────────────────────────────────────
 
@@ -231,14 +235,16 @@ class DownloadEngine:
         # 创建目录
         os.makedirs(save_dir, exist_ok=True)
 
-        # 去重：检查是否已有相同 filename+save_dir 的活跃/排队任务
+        # ── 原子操作: 去重 + 文件检查 + RPC + 写入, 全部在单个 lock 内 ──
         with self._lock:
+            # 去重：同 filename+save_dir 的活跃/排队/暂停任务
             for existing in self._tasks.values():
                 if (existing.filename == filename
                         and existing.save_dir == save_dir
                         and existing.status in (
                             DownloadStatus.ACTIVE,
                             DownloadStatus.QUEUED,
+                            DownloadStatus.PAUSED,
                         )):
                     logger.info(
                         f"[download_engine] 跳过重复下载: {filename} "
@@ -246,84 +252,89 @@ class DownloadEngine:
                     )
                     return existing
 
-        # 检查文件是否已存在且完整 (非空 + 无 .aria2 控制文件)
-        # 返回 task 供调用方使用，但不加入 _tasks 列表（不显示在下载管理中）
-        dest = os.path.join(save_dir, filename)
-        aria2_ctrl = dest + ".aria2"
-        if (os.path.isfile(dest)
-                and os.path.getsize(dest) > 0
-                and not os.path.isfile(aria2_ctrl)):
-            task_meta = dict(meta or {})
-            task_meta["existed"] = True
-            task = DownloadTask(
-                download_id=download_id,
-                url=url,
-                save_dir=save_dir,
-                filename=filename,
-                status=DownloadStatus.COMPLETE,
-                progress=100.0,
-                completed_at=time.time(),
-                meta=task_meta,
-                on_complete=on_complete,
-            )
-            task.total_bytes = os.path.getsize(dest)
-            task.completed_bytes = task.total_bytes
+            # 检查文件是否已存在且完整 (非空 + 无 .aria2 控制文件)
+            dest = os.path.join(save_dir, filename)
+            aria2_ctrl = dest + ".aria2"
+            if (os.path.isfile(dest)
+                    and os.path.getsize(dest) > 0
+                    and not os.path.isfile(aria2_ctrl)):
+                task_meta = dict(meta or {})
+                task_meta["existed"] = True
+                task = DownloadTask(
+                    download_id=download_id,
+                    url=url,
+                    save_dir=save_dir,
+                    filename=filename,
+                    status=DownloadStatus.COMPLETE,
+                    progress=100.0,
+                    completed_at=time.time(),
+                    meta=task_meta,
+                    on_complete=on_complete,
+                )
+                task.total_bytes = os.path.getsize(dest)
+                task.completed_bytes = task.total_bytes
+                logger.info(
+                    f"[download_engine] 文件已存在, 跳过下载: {filename}"
+                )
+                # 回调在 lock 外触发 (避免死锁)
+                fire_existed = True
+                return_task = task
+            else:
+                fire_existed = False
+
+                # 删除空文件 (之前失败遗留)
+                if os.path.isfile(dest) and os.path.getsize(dest) == 0:
+                    try:
+                        os.remove(dest)
+                    except OSError:
+                        pass
+
+                # aria2c addUri 参数
+                options = {
+                    "dir": save_dir,
+                    "out": filename,
+                    "max-connection-per-server": str(_ARIA2_CONNECTIONS),
+                    "split": str(_ARIA2_SPLIT),
+                    "min-split-size": "4M",
+                    "file-allocation": "none",
+                    "auto-file-renaming": "false",
+                    "allow-overwrite": "false",
+                }
+                if headers:
+                    header_list = [f"{k}: {v}" for k, v in headers.items()]
+                    options["header"] = header_list
+
+                task = DownloadTask(
+                    download_id=download_id,
+                    url=url,
+                    save_dir=save_dir,
+                    filename=filename,
+                    meta=meta or {},
+                    on_complete=on_complete,
+                )
+
+                try:
+                    gid = self._rpc_call("aria2.addUri", [[url], options])
+                    task.gid = gid
+                    task.status = DownloadStatus.ACTIVE
+                except Exception as e:
+                    task.status = DownloadStatus.FAILED
+                    task.error = str(e)
+                    logger.error(f"[download_engine] 提交下载失败: {e}")
+
+                self._tasks[download_id] = task
+                return_task = task
+
+        # 回调在 lock 外触发
+        if fire_existed:
+            self._fire_on_complete(return_task)
+
+        if not fire_existed:
             logger.info(
-                f"[download_engine] 文件已存在, 跳过下载: {filename}"
+                f"[download_engine] 提交下载 {download_id}: "
+                f"{filename} → {save_dir}"
             )
-            self._fire_on_complete(task)
-            return task
-
-        # 删除空文件 (之前失败遗留)
-        if os.path.isfile(dest) and os.path.getsize(dest) == 0:
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-
-        # aria2c addUri 参数
-        options = {
-            "dir": save_dir,
-            "out": filename,
-            "max-connection-per-server": str(_ARIA2_CONNECTIONS),
-            "split": str(_ARIA2_SPLIT),
-            "min-split-size": "4M",
-            "file-allocation": "none",
-            "auto-file-renaming": "false",
-            "allow-overwrite": "false",
-        }
-
-        # 自定义请求头
-        if headers:
-            header_list = [f"{k}: {v}" for k, v in headers.items()]
-            options["header"] = header_list
-
-        task = DownloadTask(
-            download_id=download_id,
-            url=url,
-            save_dir=save_dir,
-            filename=filename,
-            meta=meta or {},
-            on_complete=on_complete,
-        )
-
-        try:
-            gid = self._rpc_call("aria2.addUri", [[url], options])
-            task.gid = gid
-            task.status = DownloadStatus.ACTIVE
-        except Exception as e:
-            task.status = DownloadStatus.FAILED
-            task.error = str(e)
-            logger.error(f"[download_engine] 提交下载失败: {e}")
-
-        with self._lock:
-            self._tasks[download_id] = task
-
-        logger.info(
-            f"[download_engine] 提交下载 {download_id}: "
-            f"{filename} → {save_dir}"
-        )
-        return task
+        return return_task
 
     def cancel(self, download_id: str) -> bool:
         """取消下载任务 (支持 active / queued / paused 状态)"""
@@ -357,6 +368,7 @@ class DownloadEngine:
         with self._lock:
             # 仅在任务仍处于可取消状态时标记 — 防止覆盖 poll 线程已设置的终态
             if task.status in (DownloadStatus.QUEUED, DownloadStatus.ACTIVE, DownloadStatus.PAUSED):
+                old_status = task.status
                 task.status = DownloadStatus.CANCELLED
                 task.completed_at = time.time()
             else:
@@ -364,6 +376,9 @@ class DownloadEngine:
 
         # 清理临时文件
         self._cleanup_partial(task)
+
+        # 通知状态变化监听器
+        self._fire_status_change(task, old_status, DownloadStatus.CANCELLED)
 
         # 不立即从 _tasks 中移除 — 保留 CANCELLED 状态让 SSE 端读到终态
         # 后续由 clear_completed() 统一清理
@@ -388,8 +403,10 @@ class DownloadEngine:
                 return False
 
         with self._lock:
+            old_status = task.status
             task.status = DownloadStatus.PAUSED
 
+        self._fire_status_change(task, old_status, DownloadStatus.PAUSED)
         logger.info(f"[download_engine] 已暂停 {download_id}")
         return True
 
@@ -410,8 +427,10 @@ class DownloadEngine:
                 return False
 
         with self._lock:
+            old_status = task.status
             task.status = DownloadStatus.ACTIVE
 
+        self._fire_status_change(task, old_status, DownloadStatus.ACTIVE)
         logger.info(f"[download_engine] 已恢复 {download_id}")
         return True
 
@@ -528,11 +547,13 @@ class DownloadEngine:
                     if file_size > 0 and (
                         task.total_bytes == 0 or file_size >= task.total_bytes
                     ):
+                        old_status = task.status
                         with self._lock:
                             task.status = DownloadStatus.COMPLETE
                             task.progress = 100.0
                             task.completed_bytes = file_size
                             task.completed_at = time.time()
+                        self._fire_status_change(task, old_status, DownloadStatus.COMPLETE)
                         self._fire_on_complete(task)
 
     def _fire_on_complete(self, task: DownloadTask):
@@ -552,8 +573,10 @@ class DownloadEngine:
         completed = int(status.get("completedLength", 0))
         speed = int(status.get("downloadSpeed", 0))
         fire_complete = False
+        old_status = None
 
         with self._lock:
+            old_status = task.status
             task.total_bytes = total
             task.completed_bytes = completed
             task.speed = speed
@@ -592,8 +615,32 @@ class DownloadEngine:
                     task.status = DownloadStatus.CANCELLED
                     task.completed_at = time.time()
 
+        # Fire status change callbacks (outside lock)
+        if task.status != old_status:
+            self._fire_status_change(task, old_status, task.status)
+
+        # Fire progress callbacks (outside lock)
+        self._fire_progress(task)
+
         if fire_complete:
             self._fire_on_complete(task)
+
+    def _fire_status_change(self, task: DownloadTask, old: DownloadStatus,
+                            new: DownloadStatus):
+        """通知所有状态变化监听器"""
+        for cb in self._on_status_change:
+            try:
+                cb(task, old, new)
+            except Exception as e:
+                logger.debug(f"[download_engine] status_change 回调异常: {e}")
+
+    def _fire_progress(self, task: DownloadTask):
+        """通知所有进度监听器"""
+        for cb in self._on_progress:
+            try:
+                cb(task)
+            except Exception as e:
+                logger.debug(f"[download_engine] progress 回调异常: {e}")
 
     def _cleanup_partial(self, task: DownloadTask):
         """清理失败/取消的临时文件和部分下载"""

@@ -30,10 +30,12 @@ const {
   addToCart: dlAddToCart,
   removeFromCart: dlRemoveFromCart,
   isInCart: dlIsInCart,
-  downloadingModelIds: dlDownloadingIds,
+  getModelAggregateState: dlGetModelState,
   downloadOne: dlDownloadOne,
-  localCivitaiIds: dlLocalIds,
   fetchLocalIndex: dlFetchLocalIndex,
+  refreshStatus: dlRefreshStatus,
+  startPolling: dlStartPolling,
+  activeTasks: dlActiveTasks,
 } = useDownloads()
 
 // ── CivitAI Search ──
@@ -59,6 +61,10 @@ watch(() => props.active, (val) => {
   if (val) {
     civitaiActivate()
     dlFetchLocalIndex()
+    // Connect to any in-flight downloads so card states are accurate
+    dlRefreshStatus().then(() => {
+      if (dlActiveTasks.value.length) dlStartPolling()
+    })
   }
 }, { immediate: true })
 
@@ -115,16 +121,9 @@ function toggleCart(hit: CivitaiHit) {
 }
 
 function getDownloadState(hit: CivitaiHit): string {
-  if (dlDownloadingIds.value.has(String(hit.id))) return 'downloading'
-  const localVersions = dlLocalIds.value.get(String(hit.id))
-  if (localVersions && localVersions.size > 0) {
-    const allVersions = hit.versions || (hit.version ? [hit.version] : [])
-    if (allVersions.length > 0 && allVersions.every(v => localVersions.has(String(v.id)))) {
-      return 'local'
-    }
-    return 'partial'
-  }
-  return 'idle'
+  const allVersions = hit.versions || (hit.version ? [hit.version] : [])
+  const versionIds = allVersions.map(v => v.id)
+  return dlGetModelState(hit.id, versionIds)
 }
 
 /** Handle download click — single version direct, multi version opens picker */

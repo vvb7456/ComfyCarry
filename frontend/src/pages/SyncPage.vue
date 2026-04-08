@@ -6,9 +6,11 @@ import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useLogStream } from '@/composables/useLogStream'
+import { useSyncJobs } from '@/composables/useSyncJobs'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
+import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -37,10 +39,10 @@ const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-const activeTab = ref('remotes')
+const activeTab = ref('activity')
 const tabs = computed(() => [
-  { key: 'remotes', label: t('sync.tabs.remotes'), icon: 'storage' },
-  { key: 'rules', label: t('sync.tabs.rules'), icon: 'sync' },
+  { key: 'activity', label: t('sync.tabs.activity'), icon: 'monitoring' },
+  { key: 'storage', label: t('sync.tabs.storage_rules'), icon: 'storage' },
   { key: 'config', label: t('sync.tabs.config'), icon: 'settings' },
 ])
 
@@ -122,16 +124,20 @@ const logStream = useLogStream({
   },
 })
 
+const { jobs: syncJobs, currentJobId, startPolling: startJobsPolling, stopPolling: stopJobsPolling } = useSyncJobs()
+
 const refresh = useAutoRefresh(loadSyncStatus, 10000)
 
 onMounted(() => {
   loadSyncPage()
   refresh.start({ immediate: false })
   logStream.start()
+  startJobsPolling()
 })
 
 onUnmounted(() => {
   refresh.stop()
+  stopJobsPolling()
   // logStream auto-stops via onUnmounted in useLogStream
 })
 
@@ -417,7 +423,7 @@ async function loadConfigTab() {
 function switchTab(tab: string) {
   activeTab.value = tab
   if (tab === 'config') loadConfigTab()
-  if (tab === 'remotes') loadStorageAll()
+  if (tab === 'storage') loadStorageAll()
 }
 
 async function saveConfig() {
@@ -462,8 +468,20 @@ async function uploadRcloneFile(e: Event) {
   <div class="page-body">
     <TabSwitcher :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab" />
 
-    <!-- ===== Remotes Tab ===== -->
-    <div v-show="activeTab === 'remotes'">
+    <!-- ===== Activity Tab ===== -->
+    <div v-show="activeTab === 'activity'">
+      <SyncActivityTab
+        :log-lines="logStream.lines.value"
+        :log-status="logStream.status.value"
+        :jobs="syncJobs"
+        :current-job-id="currentJobId"
+        :rules="rules"
+      />
+    </div>
+
+    <!-- ===== Storage & Rules Tab ===== -->
+    <div v-show="activeTab === 'storage'">
+      <SectionHeader icon="storage" flush>{{ t('sync.tabs.remotes_section') }}</SectionHeader>
       <div class="sync-remotes-grid" style="margin-top:0">
         <div v-for="remote in remotes" :key="remote.name" class="sync-remote-card">
           <div class="sync-remote-header">
@@ -504,13 +522,7 @@ async function uploadRcloneFile(e: Event) {
         <AddCard class="sync-remote-card" :label="t('sync.remote.add')" @click="openAddRemote" />
       </div>
 
-      <!-- Sync logs -->
-      <SectionHeader icon="receipt_long">{{ t('sync.log.title') }}</SectionHeader>
-      <LogPanel :lines="logStream.lines.value" :status="logStream.status.value" />
-    </div>
-
-    <!-- ===== Rules Tab ===== -->
-    <div v-show="activeTab === 'rules'">
+      <SectionHeader icon="sync">{{ t('sync.tabs.rules_section') }}</SectionHeader>
       <div class="rules-list">
         <div v-for="rule in rules" :key="rule.id" class="sync-rule-card" :class="{ disabled: !rule.enabled }">
           <div class="sync-rule-dir">

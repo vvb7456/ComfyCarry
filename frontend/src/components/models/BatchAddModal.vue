@@ -68,8 +68,8 @@ async function submit() {
   let added = 0
   try {
     for (const { modelId, versionId } of parsedIds.value) {
-      // Fetch model info from CivitAI
-      const data = await get<any>(`https://civitai.com/api/v1/models/${modelId}`)
+      // Fetch model info via backend proxy (avoids CORS + auth issues)
+      const data = await get<any>(`/api/civitai/model/${modelId}`)
       if (!data) continue
       const versions = data.modelVersions || []
       const ver = versionId

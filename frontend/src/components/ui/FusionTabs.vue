@@ -30,10 +30,13 @@ const props = withDefaults(defineProps<{
   wrapped?: boolean
   /** Min height for the panel area (only in wrapped mode) */
   minHeight?: string
+  /** Allow deselecting the active tab by clicking it again (default: true) */
+  collapsible?: boolean
 }>(), {
   panelBg: 'var(--bg)',
   size: 'md',
   wrapped: false,
+  collapsible: true,
 })
 
 const emit = defineEmits<{
@@ -46,7 +49,11 @@ const active = computed({
 })
 
 function onClick(tab: FusionTab) {
-  active.value = active.value === tab.key ? null : tab.key
+  if (active.value === tab.key) {
+    if (props.collapsible) active.value = null
+  } else {
+    active.value = tab.key
+  }
 }
 </script>
 

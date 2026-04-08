@@ -58,13 +58,10 @@ const open = computed({
 })
 
 // ── Active tab: positive or negative ───────────────────────────
-// FusionTabs allows deselecting (value → null), but we must always have an active tab
-// to prevent activeEditor falling silently to negEditor. Guard against null.
-const activeTab = ref<'positive' | 'negative' | null>('positive')
-
-watch(activeTab, (v) => {
-  if (v === null) activeTab.value = 'positive'
-})
+const activeTab = ref<'positive' | 'negative'>('positive')
+// Session counter: increments each time the modal opens.
+// Used to discard stale async results from a previous editing session.
+const sessionId = ref(0)
 
 const promptTabs = computed(() => [
   { key: 'positive' as const, label: t('prompt-library.editor.positive') },
@@ -97,6 +94,9 @@ onUnmounted(() => plInit.destroy())
 
 // Parse tokens when modal opens + resolve colors from library
 watch(open, async (isOpen) => {
+  // Increment session counter on every open/close transition so
+  // in-flight async results from the previous state are discarded.
+  sessionId.value++
   if (!isOpen) return
   try {
     // Load editor settings + check init status
@@ -122,16 +122,33 @@ function syncToParent() {
 }
 
 // ── Token event handlers ───────────────────────────────────────
-async function onAdd(text: string) {
-  // Resolve color/translate before adding
-  const resolved = await lib.resolveTags([text])
-  const match = resolved[text]
-  if (match) {
-    activeEditor.value.addToken(text, 'tag', match.color || undefined, match.translate || undefined)
-  } else {
-    activeEditor.value.addToken(text)
-  }
+
+/**
+ * Add token: insert synchronously (preserves paste order), then
+ * asynchronously resolve library color/translate and enrich.
+ */
+function onAdd(text: string) {
+  const editor = activeEditor.value
+  // Synchronous insertion — order is preserved even on rapid-fire adds
+  editor.addToken(text)
   syncToParent()
+
+  // Async enrichment: upgrade raw → tag if library matches
+  const token = editor.tokens.value[editor.tokens.value.length - 1]
+  if (token && (token.type === 'raw' || token.type === 'tag')) {
+    const tagAtAdd = token.tag
+    lib.resolveTags([tagAtAdd]).then(resolved => {
+      // Staleness guard: token may have been edited/removed since
+      if (!editor.tokens.value.includes(token) || token.tag !== tagAtAdd) return
+      const match = resolved[tagAtAdd]
+      if (match) {
+        token.type = 'tag'
+        token.groupColor = match.color || undefined
+        token.translate = match.translate || undefined
+        syncToParent()
+      }
+    })
+  }
 }
 
 function onAddBreak() {
@@ -160,12 +177,18 @@ function onUpdateBracket(id: string, type: BracketType, depth: number) {
 }
 
 async function onUpdateTag(id: string, newTag: string) {
-  activeEditor.value.updateTokenTag(id, newTag)
-  // Re-resolve library color + translate for the updated token
-  const token = activeEditor.value.tokens.value.find(t => t.id === id)
+  const editor = activeEditor.value
+  editor.updateTokenTag(id, newTag)
+  syncToParent()
+
+  // Re-resolve library color + translate asynchronously
+  const token = editor.tokens.value.find(t => t.id === id)
   if (token && (token.type === 'raw' || token.type === 'tag')) {
-    const resolved = await lib.resolveTags([token.tag])
-    const match = resolved[token.tag]
+    const tagAtResolve = token.tag
+    const resolved = await lib.resolveTags([tagAtResolve])
+    // Staleness guard: tag may have changed during await
+    if (token.tag !== tagAtResolve) return
+    const match = resolved[tagAtResolve]
     if (match) {
       token.type = 'tag'
       token.groupColor = match.color || undefined
@@ -173,8 +196,8 @@ async function onUpdateTag(id: string, newTag: string) {
     } else {
       token.type = 'raw'
     }
+    syncToParent()
   }
-  syncToParent()
 }
 
 function onMove(fromIndex: number, toIndex: number) {
@@ -186,21 +209,27 @@ function onMove(fromIndex: number, toIndex: number) {
 const translatingIds = ref(new Set<string>())
 
 async function onTranslate(id: string) {
-  const token = activeEditor.value.tokens.value.find(t => t.id === id)
+  const editor = activeEditor.value
+  const token = editor.tokens.value.find(t => t.id === id)
   if (!token) return
 
+  const tagAtStart = token.tag
   translatingIds.value.add(id)
   try {
+    const provider = promptSettings.translate_provider || undefined
     // Phase 1: local DB (fast)
     const local = await translate.translateWord(token.tag)
+    // Staleness guard: tag may have changed during await
+    if (token.tag !== tagAtStart) return
     if (local) {
-      activeEditor.value.setTokenTranslation(id, local)
+      editor.setTokenTranslation(id, local)
       return
     }
     // Phase 2: remote API fallback
-    const result = await translate.translateText(token.tag, 'en', 'zh')
+    const result = await translate.translateText(token.tag, 'en', 'zh', provider)
+    if (token.tag !== tagAtStart) return
     if (result?.translate && result.translate.toLowerCase() !== token.tag.toLowerCase()) {
-      activeEditor.value.setTokenTranslation(id, result.translate)
+      editor.setTokenTranslation(id, result.translate)
     }
   } finally {
     translatingIds.value.delete(id)
@@ -208,9 +237,11 @@ async function onTranslate(id: string) {
 }
 
 async function onTranslateAll() {
+  const editor = activeEditor.value
   await translate.translateTokens(
-    activeEditor.value.tokens.value,
-    (id, trans) => activeEditor.value.setTokenTranslation(id, trans),
+    editor.tokens.value,
+    (id, trans) => editor.setTokenTranslation(id, trans),
+    promptSettings.translate_provider || undefined,
   )
 }
 
@@ -230,21 +261,26 @@ async function onTranslateSubmit() {
 
   // If pure ASCII (English tag), insert directly without translation
   if (!hasNonAscii(text)) {
-    await onAdd(text)
+    onAdd(text)
     translateInput.value = ''
     return
   }
 
   // Contains non-ASCII → translate zh→en, keep original as translate fallback
+  const editor = activeEditor.value
+  const provider = promptSettings.translate_provider || undefined
+  const sid = sessionId.value
   translating.value = true
   try {
-    const result = await translate.translateText(text, 'zh', 'en')
+    const result = await translate.translateText(text, 'zh', 'en', provider)
+    if (sessionId.value !== sid) return  // stale session
     if (result?.translate) {
       const enTag = result.translate
       // Resolve library color/translate; fall back to user's original Chinese input
       const resolved = await lib.resolveTags([enTag])
+      if (sessionId.value !== sid) return  // stale session
       const match = resolved[enTag]
-      activeEditor.value.addToken(
+      editor.addToken(
         enTag,
         match ? 'tag' : 'raw',
         match?.color || undefined,
@@ -347,6 +383,7 @@ function onWcInsert(token: string) {
         v-model="activeTab"
         :tabs="promptTabs"
         :wrapped="true"
+        :collapsible="false"
       >
         <template #extra>
           <div v-if="promptSettings.show_translation" class="pe-translate-box">

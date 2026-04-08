@@ -7,6 +7,8 @@ import ModelCard from './ModelCard.vue'
 import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import DownloadButton from './DownloadButton.vue'
+import type { ModelAggregateState } from '@/composables/useDownloads'
 
 defineOptions({ name: 'CivitaiModelCard' })
 
@@ -80,7 +82,7 @@ const downloadCount = computed(() =>
 )
 
 // ── Download button state ──
-const dlState = computed(() => props.downloadState || 'idle')
+const dlState = computed<ModelAggregateState>(() => (props.downloadState as ModelAggregateState) || 'idle')
 </script>
 
 <template>
@@ -118,38 +120,10 @@ const dlState = computed(() => props.downloadState || 'idle')
       >
         {{ inCart ? t('models.civitai.unfavorite') : t('models.civitai.favorite') }}
       </BaseButton>
-      <BaseButton
-        v-if="dlState === 'local'"
-        size="sm"
-        disabled
-        class="cc-dl-done"
-      >
-        {{ t('models.civitai.already_local') }}
-      </BaseButton>
-      <BaseButton
-        v-else-if="dlState === 'partial'"
-        size="sm"
-        variant="primary"
-        @click="emit('download', hit)"
-      >
-        {{ t('models.downloads.download') }}
-      </BaseButton>
-      <BaseButton
-        v-else-if="dlState === 'downloading'"
-        size="sm"
-        disabled
-        class="cc-dl-busy"
-      >
-        {{ t('models.civitai.downloading') }}
-      </BaseButton>
-      <BaseButton
-        v-else
-        size="sm"
-        variant="primary"
-        @click="emit('download', hit)"
-      >
-        {{ t('models.downloads.download') }}
-      </BaseButton>
+      <DownloadButton
+        :state="dlState === 'partial' ? 'idle' : dlState === 'installed' ? 'installed' : dlState"
+        @download="emit('download', hit)"
+      />
     </template>
   </ModelCard>
 </template>
@@ -161,11 +135,5 @@ const dlState = computed(() => props.downloadState || 'idle')
   gap: 2px;
   font-size: .75rem;
   color: var(--t2);
-}
-
-.cc-dl-done,
-.cc-dl-busy {
-  opacity: .5;
-  cursor: default;
 }
 </style>

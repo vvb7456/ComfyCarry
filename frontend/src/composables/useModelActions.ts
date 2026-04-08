@@ -75,7 +75,7 @@ export function useModelActions(
   }
 
   async function fetchAll(models: LocalModel[]) {
-    const noInfo = models.filter(m => !m.has_info)
+    const noInfo = models.filter(m => !m.has_info && m.can_fetch_info !== false)
     if (noInfo.length === 0) {
       toast(t('models.local.all_have_info'), 'info')
       return

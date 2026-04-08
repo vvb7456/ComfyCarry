@@ -29,7 +29,8 @@ from ..config import (
 from ..services.sync_engine import (
     _load_sync_rules, _save_sync_rules, _parse_rclone_conf,
     _load_sync_settings, _save_sync_settings,
-    _run_sync_rule, get_sync_log_buffer,
+    _run_sync_rule, get_sync_log_buffer, run_rules_as_job,
+    get_current_job_id,
     is_worker_running, start_sync_worker, stop_sync_worker,
 )
 
@@ -64,6 +65,7 @@ def api_sync_status():
         "rules": rules,
         "templates": SYNC_RULE_TEMPLATES,
         "settings": settings,
+        "current_job_id": get_current_job_id(),
     })
 
 
@@ -310,16 +312,18 @@ def api_sync_rules_run():
 
     if rule_id:
         targets = [r for r in rules if r.get("id") == rule_id and r.get("enabled", True)]
+        trigger_type = "manual"
     else:
         targets = [r for r in rules
                    if r.get("trigger") == "deploy" and r.get("enabled", True)]
+        trigger_type = "deploy"
 
     if not targets:
         return jsonify({"error": "没有找到匹配的规则"}), 404
 
     def _run_targets():
-        for r in targets:
-            _run_sync_rule(r)
+        run_rules_as_job(targets, trigger_type=trigger_type,
+                         trigger_ref=rule_id or "")
 
     threading.Thread(target=_run_targets, daemon=True).start()
     return jsonify({"ok": True, "message": f"开始执行 {len(targets)} 条规则"})
@@ -398,3 +402,43 @@ def api_save_rclone_config():
         remotes = []
     return jsonify({"ok": True,
                     "message": f"配置已保存，检测到 {len(remotes)} 个 remote: {', '.join(remotes)}"})
+
+
+# ====================================================================
+# Sync Job 查询
+# ====================================================================
+
+
+@bp.route("/api/sync/jobs", methods=["GET"])
+def api_sync_jobs():
+    """
+    查询最近 sync job 列表。
+    Query: ?limit=30
+    返回: {"jobs": [...], "current_job_id": "sync-xxx" | null}
+    """
+    from ..services import sync_store as store
+
+    limit = request.args.get("limit", 30, type=int)
+    limit = min(max(limit, 1), 200)
+    jobs = store.get_recent_jobs(limit=limit)
+    current = get_current_job_id()
+    return jsonify({"jobs": jobs, "current_job_id": current})
+
+
+@bp.route("/api/sync/jobs/<job_id>", methods=["GET"])
+def api_sync_job_detail(job_id: str):
+    """
+    查询单个 job 详情 + 事件列表。
+    Query: ?after_id=0&limit=500
+    返回: {"job": {...}, "events": [...]}
+    """
+    from ..services import sync_store as store
+
+    job = store.get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job 不存在"}), 404
+
+    after_id = request.args.get("after_id", 0, type=int)
+    limit = request.args.get("limit", 500, type=int)
+    events = store.get_events(job_id, limit=limit, after_id=after_id)
+    return jsonify({"job": job, "events": events})

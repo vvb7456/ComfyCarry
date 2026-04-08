@@ -1,9 +1,13 @@
 {
   "title": "云同步",
   "tabs": {
+    "activity": "活动",
+    "storage_rules": "存储与规则",
     "remotes": "存储 & 日志",
     "rules": "同步规则",
-    "config": "配置"
+    "config": "配置",
+    "remotes_section": "远程存储",
+    "rules_section": "同步规则"
   },
   "remotes": {
     "authenticated": "已认证",
@@ -115,6 +119,8 @@
     "rule_start_pull": "⬇ {name}: {src} → {dst} ({method})",
     "rule_start_push": "⬆ {name}: {src} → {dst} ({method})",
     "rclone_output": "  {text}",
+    "file_transferred": "  → {name}",
+    "rule_summary": "  📊 {name}: {files} 个文件, {bytes} 字节 @ {speed} B/s",
     "rule_done": "✅ {name} 完成",
     "rule_failed": "❌ {name} 失败 (code={code})",
     "rule_timeout": "⏰ {name} 超时 ({seconds}s)",
@@ -124,5 +130,34 @@
     "remote_title": "浏览远程目录",
     "local_title": "浏览本地目录",
     "select": "选择当前目录"
+  },
+  "activity": {
+    "current_job": "当前同步",
+    "recent_jobs": "最近任务",
+    "no_history": "暂无同步记录",
+    "rules_short": "条规则",
+    "files_short": "个文件",
+    "col_start": "开始",
+    "col_end": "结束",
+    "col_trigger": "触发",
+    "col_path": "路径",
+    "col_files": "文件数",
+    "col_size": "大小",
+    "col_speed": "速度",
+    "col_duration": "耗时"
+  },
+  "job": {
+    "trigger": {
+      "manual": "手动",
+      "watch": "监控",
+      "deploy": "部署"
+    },
+    "status": {
+      "running": "运行中",
+      "success": "已完成",
+      "failed": "失败",
+      "partial": "部分完成",
+      "cancelled": "已取消"
+    }
   }
 }

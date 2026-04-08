@@ -1,9 +1,13 @@
 {
   "title": "Sync",
   "tabs": {
+    "activity": "Activity",
+    "storage_rules": "Storage & Rules",
     "remotes": "Storage & Logs",
     "rules": "Sync Rules",
-    "config": "Configuration"
+    "config": "Configuration",
+    "remotes_section": "Remotes",
+    "rules_section": "Sync Rules"
   },
   "remotes": {
     "authenticated": "Authenticated",
@@ -115,6 +119,8 @@
     "rule_start_pull": "⬇ {name}: {src} → {dst} ({method})",
     "rule_start_push": "⬆ {name}: {src} → {dst} ({method})",
     "rclone_output": "  {text}",
+    "file_transferred": "  → {name}",
+    "rule_summary": "  📊 {name}: {files} files, {bytes} bytes @ {speed} B/s",
     "rule_done": "✅ {name} done",
     "rule_failed": "❌ {name} failed (code={code})",
     "rule_timeout": "⏰ {name} timeout ({seconds}s)",
@@ -124,5 +130,34 @@
     "remote_title": "Browse Remote Directory",
     "local_title": "Browse Local Directory",
     "select": "Select Current Directory"
+  },
+  "activity": {
+    "current_job": "Current Sync",
+    "recent_jobs": "Recent Jobs",
+    "no_history": "No sync history yet",
+    "rules_short": "rules",
+    "files_short": "files",
+    "col_start": "Start",
+    "col_end": "End",
+    "col_trigger": "Trigger",
+    "col_path": "Path",
+    "col_files": "Files",
+    "col_size": "Size",
+    "col_speed": "Speed",
+    "col_duration": "Duration"
+  },
+  "job": {
+    "trigger": {
+      "manual": "Manual",
+      "watch": "Watch",
+      "deploy": "Deploy"
+    },
+    "status": {
+      "running": "Running",
+      "success": "Completed",
+      "failed": "Failed",
+      "partial": "Partial",
+      "cancelled": "Cancelled"
+    }
   }
 }

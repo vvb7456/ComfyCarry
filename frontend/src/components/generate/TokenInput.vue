@@ -16,6 +16,7 @@ import { useI18n } from 'vue-i18n'
 import type { PromptToken, BracketType } from '@/types/prompt-library'
 import type { AutocompleteDisplayItem } from '@/composables/generate/useAutoComplete'
 import { useAutoComplete } from '@/composables/generate/useAutoComplete'
+import { splitPromptTokens } from '@/composables/generate/usePromptEditor'
 import TokenChip from '@/components/generate/TokenChip.vue'
 import AutoCompleteList from '@/components/generate/AutoCompleteList.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -88,13 +89,46 @@ function onInput(e: Event) {
     ac.query.value = val
     return
   }
-  // Comma → commit
+  // Depth-aware comma handling:
+  //   - top-level commas (depth 0 for both {} and ()) = split & commit
+  //   - commas inside {}/() = literal text, don't split
   if (val.includes(',')) {
-    const parts = val.split(',').map(s => s.trim()).filter(Boolean)
-    for (const part of parts) {
-      emit('add', part)
+    // Single-pass scan: track depth for {} and (), find top-level commas
+    let depth = 0
+    let lastTopComma = -1
+    let hasTopLevelComma = false
+
+    for (let i = 0; i < val.length; i++) {
+      const ch = val[i]
+      if (ch === '{' || ch === '(') depth++
+      else if ((ch === '}' || ch === ')') && depth > 0) depth--
+      else if (ch === ',' && depth === 0) {
+        hasTopLevelComma = true
+        lastTopComma = i
+      }
     }
-    clearInput()
+
+    if (!hasTopLevelComma) {
+      // All commas inside structures ({}/()) — don't split
+      ac.query.value = val
+      return
+    }
+
+    if (depth === 0) {
+      // Balanced + has top-level comma → split and commit all
+      const parts = splitPromptTokens(val)
+      for (const part of parts) emit('add', part)
+      clearInput()
+      return
+    }
+
+    // Unbalanced tail — commit prefix up to last top-level comma, keep rest
+    const prefix = val.slice(0, lastTopComma)
+    const suffix = val.slice(lastTopComma + 1).trimStart()
+    const parts = splitPromptTokens(prefix)
+    for (const part of parts) emit('add', part)
+    if (inputRef.value) inputRef.value.value = suffix
+    ac.query.value = suffix
     return
   }
   ac.query.value = val
@@ -198,7 +232,108 @@ function onCompositionEnd(e: Event) {
   ac.query.value = val
 }
 
-// ── Drag & Drop ────────────────────────────────────────────────
+// ── Drag & Drop (row-aware with visual indicator) ──────────────
+
+interface ChipInfo { idx: number; rect: DOMRect }
+interface ChipRow { chips: ChipInfo[]; top: number; bottom: number }
+
+const dropIndicatorStyle = ref<Record<string, string>>({ display: 'none' })
+
+/**
+ * Group chips into visual rows based on their Y position.
+ * Chips within ROW_TOLERANCE px vertically are on the same row.
+ */
+function buildRowMap(chipEls: Element[]): ChipRow[] {
+  const ROW_TOLERANCE = 8
+  const rows: ChipRow[] = []
+  chipEls.forEach((el, idx) => {
+    const rect = (el as HTMLElement).getBoundingClientRect()
+    const existing = rows.find(r => Math.abs(r.top - rect.top) <= ROW_TOLERANCE)
+    if (existing) {
+      existing.chips.push({ idx, rect })
+      existing.bottom = Math.max(existing.bottom, rect.bottom)
+    } else {
+      rows.push({ chips: [{ idx, rect }], top: rect.top, bottom: rect.bottom })
+    }
+  })
+  return rows.sort((a, b) => a.top - b.top)
+}
+
+/** Find which row the cursor Y is over. */
+function findRow(rows: ChipRow[], y: number): ChipRow {
+  for (let i = 0; i < rows.length; i++) {
+    const midBottom = i < rows.length - 1
+      ? (rows[i].bottom + rows[i + 1].top) / 2
+      : Infinity
+    if (y < midBottom) return rows[i]
+  }
+  return rows[rows.length - 1]
+}
+
+/** Within a row, find the insert index based on cursor X. */
+function findIndexInRow(row: ChipRow, x: number): number {
+  let bestIdx = row.chips[row.chips.length - 1].idx + 1 // default: after last
+  let bestDist = Infinity
+  for (const c of row.chips) {
+    const center = c.rect.left + c.rect.width / 2
+    const dist = Math.abs(x - center)
+    if (dist < bestDist) {
+      bestDist = dist
+      bestIdx = x < center ? c.idx : c.idx + 1
+    }
+  }
+  return bestIdx
+}
+
+/** Compute drop indicator position — thin vertical line between chips. */
+function updateIndicator(rows: ChipRow[], dropIdx: number) {
+  // Find the chip at dropIdx (or the one before it)
+  const allChips = rows.flatMap(r => r.chips)
+  if (allChips.length === 0) { dropIndicatorStyle.value = { display: 'none' }; return }
+
+  let refRect: DOMRect
+  let left: number
+
+  if (dropIdx <= 0) {
+    // Before first chip
+    refRect = allChips[0].rect
+    left = refRect.left - 2
+  } else if (dropIdx >= allChips.length) {
+    // After last chip
+    refRect = allChips[allChips.length - 1].rect
+    left = refRect.right + 2
+  } else {
+    // Between two chips — use the right edge of previous
+    const prev = allChips.find(c => c.idx === dropIdx - 1)
+    const next = allChips.find(c => c.idx === dropIdx)
+    if (prev && next) {
+      // If on same row, place between them; if different rows, use next's left
+      if (Math.abs(prev.rect.top - next.rect.top) < 8) {
+        left = (prev.rect.right + next.rect.left) / 2
+        refRect = prev.rect
+      } else {
+        refRect = next.rect
+        left = refRect.left - 2
+      }
+    } else {
+      refRect = (next ?? prev ?? allChips[0]).rect
+      left = next ? refRect.left - 2 : refRect.right + 2
+    }
+  }
+
+  dropIndicatorStyle.value = {
+    position: 'fixed',
+    left: `${left}px`,
+    top: `${refRect!.top}px`,
+    height: `${refRect!.height}px`,
+    width: '2px',
+    background: 'var(--ac)',
+    borderRadius: '1px',
+    pointerEvents: 'none',
+    zIndex: '10000',
+  }
+}
+
 function onChipDragStart(id: string) {
   dragSourceId.value = id
 }
@@ -206,26 +341,21 @@ function onChipDragStart(id: string) {
 function onChipDragEnd() {
   dragSourceId.value = null
   dragOverIndex.value = -1
+  dropIndicatorStyle.value = { display: 'none' }
 }
 
 function onContainerDragOver(e: DragEvent) {
   e.preventDefault()
-  if (!dragSourceId.value) return
-  // Find closest chip to determine drop index
-  const chips = containerRef.value?.querySelectorAll('.token-chip')
-  if (!chips) return
-  let closestIdx = props.tokens.length
-  let closestDist = Infinity
-  chips.forEach((chip, idx) => {
-    const rect = (chip as HTMLElement).getBoundingClientRect()
-    const center = rect.left + rect.width / 2
-    const dist = Math.abs(e.clientX - center)
-    if (dist < closestDist) {
-      closestDist = dist
-      closestIdx = e.clientX < center ? idx : idx + 1
-    }
-  })
-  dragOverIndex.value = closestIdx
+  if (!dragSourceId.value || !containerRef.value) return
+  const chipEls = Array.from(containerRef.value.querySelectorAll('.token-chip'))
+  if (!chipEls.length) return
+
+  const rows = buildRowMap(chipEls)
+  const row = findRow(rows, e.clientY)
+  const dropIdx = findIndexInRow(row, e.clientX)
+
+  dragOverIndex.value = dropIdx
+  updateIndicator(rows, dropIdx)
 }
 
 function onContainerDrop(e: DragEvent) {
@@ -239,6 +369,7 @@ function onContainerDrop(e: DragEvent) {
   }
   dragSourceId.value = null
   dragOverIndex.value = -1
+  dropIndicatorStyle.value = { display: 'none' }
 }
 
 // ── Cleanup ────────────────────────────────────────────────────
@@ -261,6 +392,7 @@ onUnmounted(() => { ac.reset() })
           :selected="token.id === selectedChipId"
           :show-translation="showTranslation"
           :translating="translatingIds?.has(token.id) ?? false"
+          :dragging="!!dragSourceId"
           @remove="emit('remove', $event)"
           @toggle="emit('toggle', $event)"
           @update:weight="(id, w) => emit('update:weight', id, w)"
@@ -295,6 +427,15 @@ onUnmounted(() => { ac.reset() })
         @select="onAcSelect"
       />
     </div>
+
+    <!-- Drop position indicator (teleported so fixed positioning works) -->
+    <Teleport to="body">
+      <div
+        v-if="dragSourceId"
+        class="drop-indicator"
+        :style="dropIndicatorStyle"
+      />
+    </Teleport>
 
     <!-- Toolbar -->
     <div class="token-toolbar">
@@ -442,5 +583,13 @@ onUnmounted(() => { ac.reset() })
 
 @media (max-width: 768px) {
   .tool-label { display: none; }
+}
+</style>
+
+<!-- Drop indicator is Teleported to body — needs global styles -->
+<style>
+.drop-indicator {
+  transition: left .05s, top .05s;
+  box-shadow: 0 0 6px var(--ac);
 }
 </style>

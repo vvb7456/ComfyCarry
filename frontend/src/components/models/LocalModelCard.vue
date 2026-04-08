@@ -44,6 +44,10 @@ const zoomUrl = computed(() => {
 // ── Badge ──
 const badgeColor = computed(() => MODEL_CATEGORY_COLORS[props.model.category])
 
+// ── Capability flags (extra_model_paths may not support fetch/delete) ──
+const canFetchInfo = computed(() => props.model.can_fetch_info !== false)
+const canDelete = computed(() => props.model.can_delete !== false)
+
 // ── Fetch button label ──
 const fetchLabel = computed(() => {
   if (props.fetching) return t('models.local.fetching')
@@ -76,6 +80,7 @@ const fetchLabel = computed(() => {
         {{ t('models.local.details') }}
       </BaseButton>
       <BaseButton
+        v-if="canFetchInfo"
         size="sm"
         :variant="model.has_info ? 'default' : 'primary'"
         :disabled="fetching"
@@ -85,7 +90,7 @@ const fetchLabel = computed(() => {
         <MsIcon v-if="model.has_info && !fetching" name="check" size="xs" />
         {{ fetchLabel }}
       </BaseButton>
-      <BaseButton size="sm" variant="danger" square @click="emit('delete', model)">
+      <BaseButton v-if="canDelete" size="sm" variant="danger" square @click="emit('delete', model)">
         <MsIcon name="delete" />
       </BaseButton>
     </template>

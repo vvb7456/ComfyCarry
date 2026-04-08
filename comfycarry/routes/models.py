@@ -56,6 +56,33 @@ def proxy_search():
 
 
 # ====================================================================
+# CivitAI Model API Proxy (统一前端对 civitai.com 的请求)
+# ====================================================================
+@bp.route("/api/civitai/model/<int:model_id>", methods=["GET"])
+def proxy_civitai_model(model_id: int):
+    """代理 CivitAI v1 models/{id} API, 避免前端直接跨域请求."""
+    try:
+        api_key = _get_api_key()
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "ComfyCarry/1.0",
+        }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        resp = requests.get(
+            f"https://civitai.com/api/v1/models/{model_id}",
+            headers=headers,
+            timeout=30,
+        )
+        return Response(resp.content, status=resp.status_code, mimetype="application/json")
+    except requests.Timeout:
+        return jsonify({"error": "CivitAI API 请求超时"}), 504
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+# ====================================================================
 # 本地模型管理 API
 # ====================================================================
 @bp.route("/api/local_models")
@@ -63,6 +90,7 @@ def api_local_models():
     """扫描本地模型文件"""
     category = request.args.get("category", "all")
     results = []
+    comfy_root = Path(COMFYUI_DIR).resolve()
 
     dirs_to_scan = MODEL_DIRS if category == "all" else {category: MODEL_DIRS.get(category, "")}
 
@@ -196,6 +224,8 @@ def api_local_models():
                         "type": cat,
                         "trained_words": [],
                         "source": "extra_model_paths",
+                        "can_fetch_info": Path(abs_path).resolve().is_relative_to(comfy_root),
+                        "can_delete": Path(abs_path).resolve().is_relative_to(Path("/workspace").resolve()),
                     })
 
     results.sort(key=lambda x: x["modified"], reverse=True)

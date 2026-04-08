@@ -6,6 +6,7 @@ import { useDownloads } from '@/composables/useDownloads'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
+import DownloadButton from './DownloadButton.vue'
 
 defineOptions({ name: 'VersionPickerModal' })
 
@@ -21,29 +22,21 @@ const emit = defineEmits<{
   download: [modelId: string, modelType: string, versionId: number]
 }>()
 
-const { localCivitaiIds, downloadingVersionIds } = useDownloads()
+const { getVersionState } = useDownloads()
 
 const versions = computed(() =>
   props.hit?.versions || (props.hit?.version ? [props.hit.version] : []),
 )
 
-const localVersions = computed(() => {
-  if (!props.hit) return new Set<string>()
-  return localCivitaiIds.value.get(String(props.hit.id)) || new Set<string>()
-})
-
-function isLocal(versionId: number): boolean {
-  return localVersions.value.has(String(versionId))
-}
-
-function isDownloading(versionId: number): boolean {
-  return downloadingVersionIds.value.has(String(versionId))
+function versionState(versionId: number) {
+  if (!props.hit) return 'idle' as const
+  return getVersionState(props.hit.id, versionId)
 }
 
 function handleDownload(versionId: number) {
   if (!props.hit) return
   emit('download', String(props.hit.id), (props.hit.type || 'Checkpoint').toLowerCase(), versionId)
-  emit('update:modelValue', false)
+  // Keep modal open so user sees version button switch to "downloading" state
 }
 </script>
 
@@ -59,36 +52,16 @@ function handleDownload(versionId: number) {
         v-for="v in versions"
         :key="v.id"
         class="vp-item"
-        :class="{ 'vp-item--local': isLocal(v.id) }"
+        :class="{ 'vp-item--local': versionState(v.id) === 'installed' }"
       >
         <div class="vp-info">
           <span class="vp-name">{{ v.name || v.id }}</span>
           <Badge v-if="v.baseModel" size="sm">{{ v.baseModel }}</Badge>
         </div>
-        <BaseButton
-          v-if="isLocal(v.id)"
-          size="sm"
-          disabled
-          class="vp-done"
-        >
-          {{ t('models.civitai.already_local') }}
-        </BaseButton>
-        <BaseButton
-          v-else-if="isDownloading(v.id)"
-          size="sm"
-          disabled
-          class="vp-busy"
-        >
-          {{ t('models.civitai.downloading') }}
-        </BaseButton>
-        <BaseButton
-          v-else
-          size="sm"
-          variant="primary"
-          @click="handleDownload(v.id)"
-        >
-          {{ t('models.downloads.download') }}
-        </BaseButton>
+        <DownloadButton
+          :state="versionState(v.id)"
+          @download="handleDownload(v.id)"
+        />
       </div>
     </div>
 
@@ -133,11 +106,5 @@ function handleDownload(versionId: number) {
 .vp-name {
   font-weight: 500;
   font-size: var(--text-sm);
-}
-
-.vp-done,
-.vp-busy {
-  opacity: .5;
-  cursor: default;
 }
 </style>

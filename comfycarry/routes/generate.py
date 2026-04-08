@@ -907,7 +907,8 @@ def api_generate_submit():
 
 # ── /api/generate/welcome_state ──────────────────────────────────────────────
 
-_WELCOME_STATE_FILE = "/workspace/.generate_welcome.json"
+# DB key prefix for welcome state: "welcome:pose", "welcome:canny", etc.
+_WELCOME_KEY_PREFIX = "welcome:"
 
 
 @bp.route("/api/generate/welcome_state", methods=["GET"])
@@ -915,13 +916,17 @@ def api_generate_welcome_state_get():
     """
     读取欢迎页 dismiss 状态。
     返回: {"pose": true, "canny": true, ...}
-    容器重建后文件不存在 → 返回全 false。
     """
-    try:
-        with open(_WELCOME_STATE_FILE, "r") as f:
-            return jsonify(json.load(f))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return jsonify({})
+    from ..db import db
+    rows = db.fetch_all(
+        "SELECT key, value FROM app_meta WHERE key LIKE ?",
+        (f"{_WELCOME_KEY_PREFIX}%",),
+    )
+    state = {}
+    for row in rows:
+        tab = row["key"][len(_WELCOME_KEY_PREFIX):]
+        state[tab] = row["value"] == "true"
+    return jsonify(state)
 
 
 @bp.route("/api/generate/welcome_state", methods=["POST"])
@@ -935,16 +940,11 @@ def api_generate_welcome_state_post():
     if not tab:
         return jsonify({"error": "tab 必填"}), 400
 
-    state = {}
-    try:
-        with open(_WELCOME_STATE_FILE, "r") as f:
-            state = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-
-    state[tab] = True
-    with open(_WELCOME_STATE_FILE, "w") as f:
-        json.dump(state, f)
+    from ..db import db
+    db.execute(
+        "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
+        (f"{_WELCOME_KEY_PREFIX}{tab}", "true"),
+    )
     return jsonify({"ok": True})
 
 
