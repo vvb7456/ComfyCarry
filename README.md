@@ -1,6 +1,6 @@
 # ComfyCarry
 
-[中文](README.MD) | English
+[中文](README_ZH.md) | English
 
 A cloud management platform for ComfyUI on RunPod / Vast.ai. Ephemeral instances, persistent configs.
 

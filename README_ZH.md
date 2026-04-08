@@ -1,6 +1,6 @@
 # ComfyCarry
 
-[English](README_EN.md) | 中文
+[English](README.md) | 中文
 
 RunPod / Vast.ai 上的 ComfyUI 云端管理平台。用完即毁的实例，永不丢失的配置。
 
