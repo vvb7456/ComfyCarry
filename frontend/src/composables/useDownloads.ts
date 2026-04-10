@@ -395,7 +395,12 @@ async function downloadOne(modelId: string, modelType: string, versionId?: numbe
 }
 
 async function downloadAllFromCart() {
-  const items = [...cart.value.values()]
+  const allItems = [...cart.value.values()]
+  // Skip items that are already installed locally
+  const items = allItems.filter(item => {
+    if (!item.versionId) return true
+    return getVersionState(item.modelId, item.versionId) !== 'installed'
+  })
   if (!items.length) return
 
   // Mark all as submitting

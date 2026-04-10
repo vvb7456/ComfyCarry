@@ -6,7 +6,6 @@ import SectionHeader from '@/components/ui/SectionHeader.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
-import UsageBar from '@/components/ui/UsageBar.vue'
 import Badge from '@/components/ui/Badge.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -32,37 +31,34 @@ const currentJob = computed(() => {
   return props.jobs.find(j => j.job_id === props.currentJobId) || null
 })
 
-const finishedJobs = computed(() =>
-  props.jobs.filter(j => j.job_id !== props.currentJobId)
-)
-
-const currentProgress = computed(() => {
-  const j = currentJob.value
-  if (!j || !j.rule_count) return 0
-  return Math.round(((j.success_count + j.failure_count) / j.rule_count) * 100)
+/** All jobs: current first (if any), then finished sorted by time */
+const allJobs = computed(() => {
+  const finished = props.jobs.filter(j => j.job_id !== props.currentJobId)
+  if (currentJob.value) return [currentJob.value, ...finished]
+  return finished
 })
 
 const triggerColor: Record<string, string> = { manual: 'var(--blue)', watch: 'var(--green)', deploy: 'var(--amber)' }
 
-const barColor = computed(() => {
-  const j = currentJob.value
-  if (j && j.failure_count > 0) return 'var(--amber)'
-  return 'var(--ac)'
-})
-
 // ── Pagination ──
 const PAGE_SIZE = 10
 const page = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(finishedJobs.value.length / PAGE_SIZE)))
+const totalPages = computed(() => Math.max(1, Math.ceil(allJobs.value.length / PAGE_SIZE)))
 const pagedJobs = computed(() => {
   const start = (page.value - 1) * PAGE_SIZE
-  return finishedJobs.value.slice(start, start + PAGE_SIZE)
+  return allJobs.value.slice(start, start + PAGE_SIZE)
 })
 
 // ── Helpers ──
 function ruleOf(job: SyncJob) {
   if (!job.trigger_ref) return null
   return props.rules.find(r => r.id === job.trigger_ref) || null
+}
+
+/** For jobs without trigger_ref, find matching rules by trigger type */
+function matchedRules(job: SyncJob): typeof props.rules {
+  if (job.trigger_ref) return []
+  return props.rules.filter(r => r.enabled && r.trigger === job.trigger_type)
 }
 
 function statusDot(s: string) {
@@ -117,26 +113,12 @@ function jobFiles(job: SyncJob): string[] {
 </script>
 
 <template>
-  <!-- Current Job -->
-  <BaseCard v-if="currentJob" class="current-job-card">
-    <div class="current-job__header">
-      <StatusDot status="loading" />
-      <span class="current-job__label">{{ t('sync.activity.current_job') }}</span>
-      <Badge :color="triggerColor[currentJob.trigger_type]">{{ t(`sync.job.trigger.${currentJob.trigger_type}`) }}</Badge>
-    </div>
-    <UsageBar :percent="currentProgress" :base-color="barColor" :warning="999" :danger="999" style="margin-top:8px" />
-    <div class="current-job__detail">
-      {{ currentJob.success_count + currentJob.failure_count }}/{{ currentJob.rule_count }} {{ t('sync.activity.rules_short') }}
-      <template v-if="currentJob.files_synced"> · {{ currentJob.files_synced }} {{ t('sync.activity.files_short') }}</template>
-    </div>
-  </BaseCard>
-
   <!-- Recent Jobs Table -->
   <SectionHeader icon="history" flush>
     {{ t('sync.activity.recent_jobs') }}
   </SectionHeader>
 
-  <div v-if="finishedJobs.length" class="job-table-wrap">
+  <div v-if="allJobs.length" class="job-table-wrap">
     <div class="job-table-body">
       <table class="job-table">
       <thead>
@@ -154,13 +136,14 @@ function jobFiles(job: SyncJob): string[] {
       </thead>
       <tbody>
         <template v-for="job in pagedJobs" :key="job.job_id">
-          <tr class="job-row" :class="{ 'job-row--expandable': jobFiles(job).length }" @click="jobFiles(job).length && toggleExpand(job.job_id)">
+          <tr class="job-row" :class="{ 'job-row--expandable': jobFiles(job).length, 'job-row--running': job.status === 'running' }" @click="jobFiles(job).length && toggleExpand(job.job_id)">
             <td class="col-status"><StatusDot :status="statusDot(job.status)" size="sm" /></td>
             <td class="col-time">{{ fmtTime(job.started_at) }}</td>
             <td class="col-time">{{ job.finished_at ? fmtTime(job.finished_at) : '-' }}</td>
             <td class="col-trigger"><Badge :color="triggerColor[job.trigger_type]" size="sm">{{ t(`sync.job.trigger.${job.trigger_type}`) }}</Badge></td>
             <td class="col-files">
-              <span v-if="job.summary">{{ job.summary.transfers ?? 0 }}</span>
+              <span v-if="job.status === 'running'">{{ job.success_count + job.failure_count }}/{{ job.rule_count }}</span>
+              <span v-else-if="job.summary">{{ job.summary.transfers ?? 0 }}</span>
               <span v-else>-</span>
               <MsIcon v-if="jobFiles(job).length" :name="expandedJobId === job.job_id ? 'expand_less' : 'expand_more'" size="xxs" class="expand-icon" />
             </td>
@@ -179,6 +162,20 @@ function jobFiles(job: SyncJob): string[] {
                     <MsIcon name="cloud" size="xxs" class="path-icon" /> {{ ruleOf(job)!.remote }}:{{ ruleOf(job)!.remote_path }}
                     <span class="sync-flow-arrows"><span>▸</span><span>▸</span><span>▸</span></span>
                     <MsIcon name="folder" size="xxs" class="path-icon" /> {{ ruleOf(job)!.local_path }}
+                  </template>
+                </span>
+              </template>
+              <template v-else-if="matchedRules(job).length === 1">
+                <span class="path-inline">
+                  <template v-if="matchedRules(job)[0].direction === 'push'">
+                    <MsIcon name="folder" size="xxs" class="path-icon" /> {{ matchedRules(job)[0].local_path }}
+                    <span class="sync-flow-arrows"><span>▸</span><span>▸</span><span>▸</span></span>
+                    <MsIcon name="cloud" size="xxs" class="path-icon" /> {{ matchedRules(job)[0].remote }}:{{ matchedRules(job)[0].remote_path }}
+                  </template>
+                  <template v-else>
+                    <MsIcon name="cloud" size="xxs" class="path-icon" /> {{ matchedRules(job)[0].remote }}:{{ matchedRules(job)[0].remote_path }}
+                    <span class="sync-flow-arrows"><span>▸</span><span>▸</span><span>▸</span></span>
+                    <MsIcon name="folder" size="xxs" class="path-icon" /> {{ matchedRules(job)[0].local_path }}
                   </template>
                 </span>
               </template>
@@ -220,13 +217,6 @@ function jobFiles(job: SyncJob): string[] {
 </template>
 
 <style scoped>
-.current-job-card { margin-bottom: 16px; }
-.current-job__header { display: flex; align-items: center; gap: 8px; }
-.current-job__label { font-weight: 600; font-size: var(--text-sm); }
-.current-job__detail { margin-top: 6px; font-size: var(--text-xs); color: var(--t3); }
-
-.page-info { font-size: var(--text-xs); color: var(--t3); font-variant-numeric: tabular-nums; }
-
 .log-section { margin-top: var(--sp-6); }
 
 .job-table-empty {
@@ -281,6 +271,7 @@ function jobFiles(job: SyncJob): string[] {
 .job-row:hover td { background: var(--bg3); }
 .job-row:last-child td { border-bottom: none; }
 .job-row--expandable { cursor: pointer; }
+.job-row--running td { background: color-mix(in srgb, var(--ac) 6%, transparent); }
 
 .expand-icon { vertical-align: middle; margin-left: 2px; opacity: .5; }
 

@@ -45,9 +45,23 @@ export interface I2IState {
   denoise: number
 }
 
+export interface DisabledToken {
+  raw: string
+  tag: string
+  type: string
+  weight: number
+  bracketType: string
+  bracketDepth: number
+  explicitWeight: boolean
+  index: number       // position in token list when disabled
+  translate?: string  // cached translation
+}
+
 export interface ModelState {
   positive: string
   negative: string
+  positiveDisabled: DisabledToken[]
+  negativeDisabled: DisabledToken[]
   checkpoint: string
   loras: LoraEntry[]
   resolution: string
@@ -92,6 +106,8 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
   return {
     positive: '',
     negative: '',
+    positiveDisabled: [],
+    negativeDisabled: [],
     checkpoint: '',
     loras: [],
     resolution: config.resolutions[0]?.value || '1024x1024',

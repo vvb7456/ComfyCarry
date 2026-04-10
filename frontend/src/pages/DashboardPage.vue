@@ -6,6 +6,7 @@ import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useToast } from '@/composables/useToast'
 import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
+import { useSystemStats } from '@/composables/useSystemStats'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
@@ -14,7 +15,7 @@ import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import type { OverviewData, SyncLogEntry, ServiceEntry } from '@/types/dashboard'
+import type { OverviewData, ActivityData, SyncLogEntry, ServiceEntry } from '@/types/dashboard'
 
 defineOptions({ name: 'DashboardPage' })
 
@@ -24,14 +25,18 @@ const { toast } = useToast()
 
 
 const data = ref<OverviewData | null>(null)
+const activity = ref<ActivityData | null>(null)
 const loading = ref(true)
+
+// Real-time system metrics (GPU / CPU / Memory / Disk) — shared singleton, 3s poll
+const { stats: sysStats } = useSystemStats()
 
 // Exec tracker for real-time progress
 const tracker = useExecTracker()
 const sseActive = ref(false)
 const sse = useComfySSE(tracker, {
-  onEvent(evt) {
-    if (evt.type === 'status') loadOverview()
+  onEvent() {
+    // SSE events: exec progress handled by tracker, no extra fetch needed
   }
 })
 
@@ -43,16 +48,29 @@ async function loadOverview() {
   }
 }
 
-const refresh = useAutoRefresh(loadOverview, 5000)
+async function loadActivity() {
+  const d = await get<ActivityData>('/api/activity')
+  if (d) {
+    activity.value = d
+    loading.value = false
+  }
+}
+
+// Overview poll: 15s (services, tunnel, jupyter, version — slow data)
+const overviewRefresh = useAutoRefresh(loadOverview, 15000)
+// Activity poll: 5s (queue, downloads, sync log — fast data)
+const activityRefresh = useAutoRefresh(loadActivity, 5000)
 
 onMounted(async () => {
-  await loadOverview()
-  refresh.start({ immediate: false })
+  await Promise.all([loadOverview(), loadActivity()])
+  overviewRefresh.start({ immediate: false })
+  activityRefresh.start({ immediate: false })
   sse.start()
 })
 
 onUnmounted(() => {
-  refresh.stop()
+  overviewRefresh.stop()
+  activityRefresh.stop()
   sse.stop()
 })
 
@@ -62,13 +80,6 @@ function fmtBytes(b: number) {
   const u = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(b) / Math.log(1024))
   return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]
-}
-
-// GPU memory from overview API is already in MiB (nvidia-smi --nounits)
-function fmtMB(mb: number) {
-  if (!mb) return '0 MiB'
-  if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GiB'
-  return mb.toFixed(0) + ' MiB'
 }
 
 // Services from overview: memory is bytes, cpu is %, uptime is ms timestamp
@@ -195,7 +206,7 @@ function formatSyncActivityLog(line: string | SyncLogEntry | undefined) {
 }
 
 const latestSyncLogLine = computed(() => {
-  const lines = data.value?.sync?.last_log_lines || []
+  const lines = activity.value?.sync?.last_log_lines || []
   if (!lines.length) return ''
   return formatSyncActivityLog(lines[lines.length - 1])
 })
@@ -205,9 +216,9 @@ const execState = computed(() => tracker.state.value)
 
 // Queue badge class: red if heavy (>5), amber if busy, muted if idle
 const queueBadgeClass = computed(() => {
-  const d = data.value?.comfyui
-  if (!d) return 'muted'
-  const total = (d.queue_running || 0) + (d.queue_pending || 0)
+  const a = activity.value?.comfyui
+  if (!a) return 'muted'
+  const total = (a.queue_running || 0) + (a.queue_pending || 0)
   if (total > 5) return 'red'
   if (total > 0) return 'amber'
   return 'muted'
@@ -261,10 +272,10 @@ const tunnelStatusText = computed(() => {
       </span>
 
       <!-- Queue -->
-      <span v-if="data.comfyui.online" class="status-badge" :class="queueBadgeClass">
+      <span v-if="activity?.comfyui?.online" class="status-badge" :class="queueBadgeClass">
         <MsIcon name="assignment" />
-        <template v-if="data.comfyui.queue_running || data.comfyui.queue_pending">
-          {{ t('dashboard.status_bar.queue_info', { running: data.comfyui.queue_running || 0, pending: data.comfyui.queue_pending || 0 }) }}
+        <template v-if="activity.comfyui.queue_running || activity.comfyui.queue_pending">
+          {{ t('dashboard.status_bar.queue_info', { running: activity.comfyui.queue_running || 0, pending: activity.comfyui.queue_pending || 0 }) }}
         </template>
         <template v-else>{{ t('dashboard.status.queue_idle') }}</template>
       </span>
@@ -296,12 +307,12 @@ const tunnelStatusText = computed(() => {
     </div>
 
     <!-- Metrics Section Title -->
-    <SectionHeader v-if="data?.system" icon="monitoring">{{ t('dashboard.metrics.title') }}</SectionHeader>
+    <SectionHeader v-if="sysStats" icon="monitoring">{{ t('dashboard.metrics.title') }}</SectionHeader>
 
     <!-- Metrics Grid -->
-    <div class="metrics-grid" v-if="data?.system">
+    <div class="metrics-grid" v-if="sysStats">
       <!-- GPU cards -->
-      <div v-for="(gpu, i) in data.system.gpu" :key="i" class="metric-card">
+      <div v-for="(gpu, i) in sysStats.gpu" :key="i" class="metric-card">
         <div class="metric-header">
           <span class="metric-icon"><MsIcon name="memory" /></span>
           <span class="metric-label">{{ gpu.name || 'GPU' }}</span>
@@ -325,12 +336,12 @@ const tunnelStatusText = computed(() => {
           <span class="metric-label">CPU</span>
         </div>
         <div class="metric-main">
-          <span class="metric-value">{{ fmtPct(data.system.cpu.percent) }}</span>
-          <span class="metric-unit">{{ data.system.cpu.cores || '?' }} cores</span>
+          <span class="metric-value">{{ fmtPct(sysStats.cpu.percent) }}</span>
+          <span class="metric-unit">{{ sysStats.cpu.cores || '?' }} cores</span>
         </div>
-        <UsageBar :percent="data.system.cpu.percent" />
+        <UsageBar :percent="sysStats.cpu.percent" />
         <div class="metric-details">
-          <span>Load {{ data.system.cpu.load?.['1m']?.toFixed(1) ?? '?' }}</span>
+          <span>Load {{ sysStats.cpu.load?.['1m']?.toFixed(1) ?? '?' }}</span>
         </div>
       </div>
 
@@ -341,24 +352,24 @@ const tunnelStatusText = computed(() => {
           <span class="metric-label">{{ t('dashboard.metrics.memory') }}</span>
         </div>
         <div class="metric-main">
-          <span class="metric-value">{{ fmtPct(data.system.memory.percent) }}</span>
+          <span class="metric-value">{{ fmtPct(sysStats.memory.percent) }}</span>
         </div>
-        <UsageBar :percent="data.system.memory.percent" />
-        <div class="metric-details">{{ fmtBytes(data.system.memory.used) }} / {{ fmtBytes(data.system.memory.total) }}</div>
+        <UsageBar :percent="sysStats.memory.percent" />
+        <div class="metric-details">{{ fmtBytes(sysStats.memory.used) }} / {{ fmtBytes(sysStats.memory.total) }}</div>
       </div>
 
       <!-- Disk -->
       <div class="metric-card">
         <div class="metric-header">
           <span class="metric-icon"><MsIcon name="hard_drive_2" /></span>
-          <span class="metric-label">{{ t('dashboard.metrics.disk') }} {{ data.system.disk.path }}</span>
+          <span class="metric-label">{{ t('dashboard.metrics.disk') }} {{ sysStats.disk.path }}</span>
         </div>
         <div class="metric-main">
-          <span class="metric-value">{{ fmtPct(data.system.disk.percent) }}</span>
-          <span class="metric-unit">{{ fmtBytes(data.system.disk.free) }} {{ t('dashboard.metrics.free') }}</span>
+          <span class="metric-value">{{ fmtPct(sysStats.disk.percent) }}</span>
+          <span class="metric-unit">{{ fmtBytes(sysStats.disk.free) }} {{ t('dashboard.metrics.free') }}</span>
         </div>
-        <UsageBar :percent="data.system.disk.percent" />
-        <div class="metric-details">{{ fmtBytes(data.system.disk.used) }} / {{ fmtBytes(data.system.disk.total) }}</div>
+        <UsageBar :percent="sysStats.disk.percent" />
+        <div class="metric-details">{{ fmtBytes(sysStats.disk.used) }} / {{ fmtBytes(sysStats.disk.total) }}</div>
       </div>
     </div>
 
@@ -373,7 +384,7 @@ const tunnelStatusText = computed(() => {
       </div>
 
       <!-- Active downloads -->
-      <div v-for="dl in (data?.downloads?.active || [])" :key="dl.filename" class="activity-item activity-download">
+      <div v-for="dl in (activity?.downloads?.active || [])" :key="dl.filename" class="activity-item activity-download">
         <div class="activity-icon"><MsIcon name="download" /></div>
         <div class="activity-content">
           <div class="activity-text">
@@ -385,25 +396,25 @@ const tunnelStatusText = computed(() => {
           </div>
         </div>
       </div>
-      <div v-if="data?.downloads?.queue_count" class="activity-item">
+      <div v-if="activity?.downloads?.queue_count" class="activity-item">
         <div class="activity-icon"><MsIcon name="queue" /></div>
-        <span class="activity-text">{{ t('dashboard.status_bar.downloads_waiting', { count: data.downloads.queue_count }) }}</span>
+        <span class="activity-text">{{ t('dashboard.status_bar.downloads_waiting', { count: activity.downloads.queue_count }) }}</span>
       </div>
 
       <!-- Sync worker status -->
-      <div v-if="data?.sync?.worker_running && data.sync.watch_rules" class="activity-item">
+      <div v-if="activity?.sync?.worker_running && data?.sync?.watch_rules" class="activity-item">
         <div class="activity-icon"><MsIcon name="cloud" /></div>
         <span class="activity-text">{{ t('dashboard.status_bar.sync_monitoring', { count: data.sync.watch_rules }) }}</span>
       </div>
 
       <!-- Sync last log line -->
-      <div v-if="data?.sync?.last_log_lines?.length" class="activity-item activity-log">
+      <div v-if="activity?.sync?.last_log_lines?.length" class="activity-item activity-log">
         <div class="activity-icon"><MsIcon name="brush" /></div>
         <span class="activity-text activity-log-line text-truncate">{{ latestSyncLogLine }}</span>
       </div>
 
       <!-- Empty -->
-      <div v-if="!data?.downloads?.active_count && !(data?.sync?.worker_running && data?.sync?.watch_rules) && !data?.sync?.last_log_lines?.length" class="activity-empty">
+      <div v-if="!activity?.downloads?.active_count && !(activity?.sync?.worker_running && data?.sync?.watch_rules) && !activity?.sync?.last_log_lines?.length" class="activity-empty">
         <MsIcon name="check_circle" size="md" />
         <span style="color:var(--t3);font-size:.85rem">{{ t('dashboard.status_bar.all_good') }}</span>
       </div>
@@ -463,9 +474,9 @@ const tunnelStatusText = computed(() => {
       <span v-if="data.comfyui?.version" class="env-tag">ComfyUI {{ data.comfyui.version }}</span>
       <span v-if="data.comfyui?.pytorch_version" class="env-tag">PyTorch {{ data.comfyui.pytorch_version }}</span>
       <span v-if="data.comfyui?.python_version" class="env-tag">Python {{ data.comfyui.python_version.split(' ')[0] }}</span>
-      <span v-for="gpu in (data.system?.gpu || [])" :key="gpu.name" class="env-tag">{{ gpu.name }} {{ gpu.mem_total }}MB</span>
-      <span v-if="data.system?.cpu?.cores" class="env-tag">{{ data.system.cpu.cores }} CPU cores</span>
-      <span v-if="data.system?.memory?.total" class="env-tag">{{ fmtBytes(data.system.memory.total) }} RAM</span>
+      <span v-for="gpu in (sysStats?.gpu || [])" :key="gpu.name" class="env-tag">{{ gpu.name }} {{ gpu.mem_total }}MB</span>
+      <span v-if="sysStats?.cpu?.cores" class="env-tag">{{ sysStats.cpu.cores }} CPU cores</span>
+      <span v-if="sysStats?.memory?.total" class="env-tag">{{ fmtBytes(sysStats.memory.total) }} RAM</span>
       <span v-if="data.version?.version" class="env-tag">ComfyCarry {{ data.version.version }}</span>
     </div>
 

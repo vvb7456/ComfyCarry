@@ -181,6 +181,21 @@ export function serializeToken(token: PromptToken): string {
   return token.raw
 }
 
+// ── Disabled token snapshot (for persistent storage) ───────────
+
+export interface DisabledTokenSnapshot {
+  raw: string
+  tag: string
+  type: string
+  weight: number
+  bracketType: string
+  bracketDepth: number
+  explicitWeight: boolean
+  index: number
+  translate?: string
+  groupColor?: string
+}
+
 // ── Main composable ────────────────────────────────────────────
 
 export interface UsePromptEditorReturn {
@@ -188,6 +203,9 @@ export interface UsePromptEditorReturn {
 
   parse(prompt: string): PromptToken[]
   serialize(): string
+  serializeEnabled(): string
+  extractDisabled(): DisabledTokenSnapshot[]
+  injectDisabled(disabled: DisabledTokenSnapshot[]): void
   addToken(text: string, type?: TokenType, color?: string, translate?: string): void
   removeToken(id: string): void
   toggleToken(id: string): void
@@ -280,6 +298,67 @@ export function usePromptEditor(): UsePromptEditorReturn {
       .map(serializeToken)
       .filter(Boolean)
       .join(', ')
+  }
+
+  /** Serialize only enabled tokens (for display in parent textarea). */
+  function serializeEnabled(): string {
+    return tokens.value
+      .filter(t => t.enabled)
+      .map(serializeToken)
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  /**
+   * Extract disabled tokens as snapshots for persistent storage.
+   * Captures position (index) so they can be re-injected at the right spot.
+   */
+  function extractDisabled(): DisabledTokenSnapshot[] {
+    return tokens.value
+      .map((t, i) => ({ token: t, index: i }))
+      .filter(({ token }) => !token.enabled)
+      .map(({ token, index }) => ({
+        raw: token.raw,
+        tag: token.tag,
+        type: token.type,
+        weight: token.weight,
+        bracketType: token.bracketType,
+        bracketDepth: token.bracketDepth,
+        explicitWeight: token.explicitWeight,
+        index,
+        translate: token.translate,
+        groupColor: token.groupColor,
+      }))
+  }
+
+  /**
+   * Inject previously-stored disabled tokens back into the token array.
+   * Tokens are inserted at their original index (clamped to array length).
+   */
+  function injectDisabled(disabled: DisabledTokenSnapshot[]): void {
+    if (!disabled.length) return
+    // Sort by index ascending so sequential insertions naturally shift positions
+    const sorted = [...disabled].sort((a, b) => a.index - b.index)
+    const arr = [...tokens.value]
+    for (const d of sorted) {
+      // d.index is the position in the original full array (including disabled);
+      // each prior insertion shifts the array, so d.index is used directly.
+      const insertAt = Math.min(d.index, arr.length)
+      arr.splice(insertAt, 0, {
+        id: uid(),
+        raw: d.raw,
+        tag: d.tag,
+        type: d.type as TokenType,
+        weight: d.weight,
+        bracketType: d.bracketType as BracketType,
+        bracketDepth: d.bracketDepth,
+        explicitWeight: d.explicitWeight,
+        enabled: false,
+        translate: d.translate,
+        groupColor: d.groupColor,
+      })
+    }
+    tokens.value = arr
   }
 
   /**
@@ -460,6 +539,9 @@ export function usePromptEditor(): UsePromptEditorReturn {
     tokens,
     parse,
     serialize,
+    serializeEnabled,
+    extractDisabled,
+    injectDisabled,
     addToken,
     removeToken,
     toggleToken,

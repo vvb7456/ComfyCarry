@@ -2,12 +2,14 @@
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLogStream } from '@/composables/useLogStream'
+import { useSystemStats } from '@/composables/useSystemStats'
 import type { ExecState } from '@/composables/useExecTracker'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import type { ComfyStatus } from '@/types/comfyui'
 
 defineOptions({ name: 'ConsoleTab' })
@@ -19,6 +21,9 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+
+// Real-time system metrics (shared singleton, 3s poll)
+const { stats: sysStats } = useSystemStats()
 
 // Card status
 const comfyCardStatus = computed<'info' | 'running' | 'stopped' | 'loading' | 'error'>(() => {
@@ -45,13 +50,6 @@ onMounted(() => { logStream.start() })
 onUnmounted(() => { logStream.stop() })
 
 // Formatters
-function fmtBytes(b: number) {
-  if (!b) return '0 B'
-  const u = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(b) / Math.log(1024))
-  return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i]
-}
-
 function fmtUptime(pm2Uptime: number) {
   if (!pm2Uptime) return ''
   const up = Date.now() - pm2Uptime
@@ -63,27 +61,34 @@ function fmtUptime(pm2Uptime: number) {
 
 <template>
   <!-- Status cards -->
-  <div class="stat-grid" v-if="status">
-    <StatCard label="ComfyUI" :status="comfyCardStatus" value-size="sm">
-      <template #value>{{ status.online ? (execState ? t('comfyui.status.generating') : t('comfyui.status.idle')) : t('comfyui.status.stopped') }}</template>
-      <template #sub v-if="status.online">
-        v{{ status.system?.comfyui_version || '?' }} · Python {{ status.system?.python_version || '?' }} · PyTorch {{ status.system?.pytorch_version || '?' }}
-      </template>
-      <template #sub v-else>PM2: {{ status.pm2_status }}</template>
-    </StatCard>
+  <div class="stat-grid-wrap">
+    <div v-if="!status || !sysStats" class="stat-grid-loading">
+      <Spinner size="md" />
+    </div>
+    <div v-else class="stat-grid">
+      <StatCard label="ComfyUI" :status="comfyCardStatus" value-size="sm">
+        <template #value>{{ status.online ? (execState ? t('comfyui.status.generating') : t('comfyui.status.idle')) : t('comfyui.status.stopped') }}</template>
+        <template #sub v-if="status.online">
+          v{{ status.system?.comfyui_version || '?' }} · Python {{ status.system?.python_version || '?' }} · PyTorch {{ status.system?.pytorch_version || '?' }}
+        </template>
+        <template #sub v-else>PM2: {{ status.pm2_status }}</template>
+      </StatCard>
 
-    <StatCard v-for="(dev, i) in status.devices" :key="i" :label="dev.name || 'GPU'">
-      <template #value>{{ dev.vram_total > 0 ? (((dev.vram_total - dev.vram_free) / dev.vram_total) * 100).toFixed(0) + '%' : '—' }}</template>
-      <template #sub>
-        VRAM: {{ fmtBytes(dev.vram_total - dev.vram_free) }} / {{ fmtBytes(dev.vram_total) }} · Torch: {{ fmtBytes(dev.torch_vram_total - dev.torch_vram_free) }}
-      </template>
-      <UsageBar :percent="dev.vram_total > 0 ? ((dev.vram_total - dev.vram_free) / dev.vram_total * 100) : 0" />
-    </StatCard>
+      <StatCard v-for="(gpu, i) in sysStats.gpu" :key="i" :label="gpu.name || 'GPU'">
+        <template #value>{{ gpu.util }}%</template>
+        <template #sub>
+          VRAM: {{ gpu.mem_used }}MB / {{ gpu.mem_total }}MB
+          <template v-if="gpu.temp"> · {{ gpu.temp }}°C</template>
+          <template v-if="gpu.power"> · {{ Math.round(gpu.power) }}W</template>
+        </template>
+        <UsageBar :percent="gpu.mem_total > 0 ? (gpu.mem_used / gpu.mem_total * 100) : 0" />
+      </StatCard>
 
-    <StatCard v-if="status.pm2_uptime" :label="t('comfyui.console.uptime')" value-size="sm">
-      <template #value>{{ fmtUptime(status.pm2_uptime) }}</template>
-      <template #sub>{{ t('comfyui.console.restart_count', { count: status.pm2_restarts || 0 }) }}</template>
-    </StatCard>
+      <StatCard v-if="status.pm2_uptime" :label="t('comfyui.console.uptime')" value-size="sm">
+        <template #value>{{ fmtUptime(status.pm2_uptime) }}</template>
+        <template #sub>{{ t('comfyui.console.restart_count', { count: status.pm2_restarts || 0 }) }}</template>
+      </StatCard>
+    </div>
   </div>
 
   <!-- Exec progress bar -->
@@ -93,3 +98,16 @@ function fmtUptime(pm2Uptime: number) {
   <SectionHeader icon="receipt_long">{{ t('comfyui.console.log_title') }}</SectionHeader>
   <LogPanel :lines="logStream.lines.value" :status="logStream.status.value" />
 </template>
+
+<style scoped>
+.stat-grid-wrap {
+  min-height: 110px;
+  margin-bottom: clamp(24px, 2vw, 36px);
+}
+.stat-grid-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 110px;
+}
+</style>

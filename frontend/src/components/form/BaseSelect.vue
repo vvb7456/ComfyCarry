@@ -8,6 +8,7 @@ defineOptions({ name: 'BaseSelect' })
 export interface SelectOption {
   value: string | number | boolean
   label: string
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<{
@@ -79,6 +80,7 @@ const normalizedOptions = computed<SelectOption[]>(() => {
     return {
       value: rec[props.valueKey] ?? rec.value ?? rec.id ?? rec.name ?? '',
       label: String(rec[props.labelKey] || rec.label || rec.name || rec.display_name || rec[props.valueKey] || ''),
+      disabled: !!(rec as Record<string, unknown>).disabled,
     }
   })
 })
@@ -101,6 +103,11 @@ const selectedLabel = computed(() => {
 const isPlaceholder = computed(() => {
   if (props.displayText) return false
   return !normalizedOptions.value.some(o => o.value === props.modelValue)
+})
+
+const isSelectedDisabled = computed(() => {
+  const opt = normalizedOptions.value.find(o => o.value === props.modelValue)
+  return !!opt?.disabled
 })
 
 // Reset highlight when filtered list changes
@@ -126,6 +133,7 @@ function toggle() {
 }
 
 function select(opt: SelectOption) {
+  if (opt.disabled) return
   emit('update:modelValue', opt.value)
   emit('change', opt.value)
   open.value = false
@@ -155,7 +163,7 @@ function onKeydown(e: KeyboardEvent) {
       break
     case 'Enter':
       e.preventDefault()
-      if (highlightIdx.value >= 0 && highlightIdx.value < opts.length) {
+      if (highlightIdx.value >= 0 && highlightIdx.value < opts.length && !opts[highlightIdx.value].disabled) {
         select(opts[highlightIdx.value])
       }
       break
@@ -224,7 +232,7 @@ onBeforeUnmount(() => {
     `base-select--${size}`,
   ]" @keydown="onKeydown">
     <div class="base-select__trigger" tabindex="0" @click="toggle">
-      <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder }">{{ selectedLabel }}</span>
+      <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder, 'base-select__text--muted': isSelectedDisabled }">{{ selectedLabel }}</span>
       <MsIcon name="expand_more" size="sm" color="var(--t3)" />
     </div>
     <Teleport to="body" :disabled="!teleport">
@@ -249,6 +257,7 @@ onBeforeUnmount(() => {
               :class="{
                 'base-select__item--sel': opt.value === modelValue,
                 'base-select__item--hl': idx === highlightIdx,
+                'base-select__item--disabled': opt.disabled,
               }"
               @click="select(opt)"
               @mouseenter="highlightIdx = idx"
@@ -310,6 +319,7 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .base-select__text--ph { color: var(--t3); }
+.base-select__text--muted { color: var(--t3); opacity: .7; }
 
 /* ── Panel ── */
 .base-select__panel {
@@ -362,6 +372,11 @@ onBeforeUnmount(() => {
 .base-select__item:hover,
 .base-select__item--hl { background: var(--bg3); }
 .base-select__item--sel { color: var(--ac); font-weight: 500; }
+.base-select__item--disabled {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
 
 /* ── Empty state ── */
 .base-select__empty {

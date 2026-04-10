@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import type { CartItem, DownloadTask } from '@/composables/useDownloads'
 import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { MODEL_CATEGORY_COLORS } from '@/utils/constants'
 
@@ -17,12 +16,13 @@ const props = defineProps<{
   cartItem?: CartItem
   /** Download task mode */
   task?: DownloadTask
+  /** Whether this item is already installed locally */
+  installed?: boolean
 }>()
 
 const emit = defineEmits<{
   download: [item: CartItem]
   remove: [key: string]
-  versionChange: [key: string, versionId: number, versionName: string, baseModel?: string]
   pause: [id: string]
   resume: [id: string]
   cancel: [id: string]
@@ -65,25 +65,6 @@ const cartKey = computed(() => {
     ? `${props.cartItem.modelId}:${props.cartItem.versionId}`
     : props.cartItem.modelId
 })
-
-const hasMultipleVersions = computed(() =>
-  (props.cartItem?.allVersions?.length || 0) > 1,
-)
-
-const versionOptions = computed(() =>
-  (props.cartItem?.allVersions || []).map(v => ({
-    value: v.id,
-    label: v.name + (v.baseModel ? ` — ${v.baseModel}` : ''),
-  })),
-)
-
-const selectedVersionId = computed(() => props.cartItem?.versionId ?? 0)
-
-function onVersionChange(val: string | number | boolean) {
-  const vid = Number(val)
-  const ver = props.cartItem?.allVersions?.find(v => v.id === vid)
-  if (ver) emit('versionChange', cartKey.value, vid, ver.name, ver.baseModel)
-}
 
 // ── Task-specific ──
 
@@ -129,13 +110,14 @@ const isFailed = computed(() => props.task?.status === 'failed')
         <span v-else>{{ name }}</span>
       </div>
       <div class="dli-meta">
+        <Badge v-if="isCart && installed" color="#10b981" size="sm">{{ t('models.downloads.installed') }}</Badge>
         <Badge v-if="modelType" :color="badgeColor" size="sm">{{ modelType }}</Badge>
         <Badge v-if="cartItem?.baseModel" size="sm">{{ cartItem.baseModel }}</Badge>
         <Badge v-if="task?.meta?.base_model" size="sm">{{ task.meta.base_model }}</Badge>
+        <Badge v-if="isCart && cartItem?.versionName" size="sm">{{ cartItem.versionName }}</Badge>
 
-        <!-- Cart: static version text -->
-        <span v-if="isCart && !hasMultipleVersions && cartItem?.versionName" class="dli-version-text">{{ cartItem.versionName }}</span>
-        <span v-else-if="task?.meta?.version_name" class="dli-version-text">{{ task.meta.version_name }}</span>
+        <!-- Task: version name text -->
+        <span v-if="!isCart && task?.meta?.version_name" class="dli-version-text">{{ task.meta.version_name }}</span>
 
         <!-- Task status labels -->
         <span v-if="isPaused" class="dli-status dli-status--paused">{{ t('models.downloads.paused') }}</span>
@@ -148,15 +130,7 @@ const isFailed = computed(() => props.task?.status === 'failed')
     <div class="dli-actions">
       <!-- Cart actions -->
       <template v-if="isCart">
-        <BaseSelect
-          v-if="hasMultipleVersions"
-          :model-value="selectedVersionId"
-          :options="versionOptions"
-          size="sm"
-          fit
-          @change="onVersionChange"
-        />
-        <BaseButton size="sm" variant="primary" @click="emit('download', cartItem!)">
+        <BaseButton size="sm" variant="primary" :disabled="installed" @click="emit('download', cartItem!)">
           <MsIcon name="download" size="xs" /> {{ t('models.downloads.download') }}
         </BaseButton>
         <BaseButton size="sm" variant="danger" square @click="emit('remove', cartKey)">

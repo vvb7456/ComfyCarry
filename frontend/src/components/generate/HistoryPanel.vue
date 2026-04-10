@@ -8,7 +8,6 @@ import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import StatusDot from '@/components/ui/StatusDot.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 
@@ -147,21 +146,12 @@ defineExpose({ loadHistory })
 
         <!-- Info -->
         <div class="history-card-info">
-          <StatusDot :status="item.completed ? 'running' : 'error'" />
-          <div class="history-card-meta">
-            <div>{{ item.prompt_id.substring(0, 8) }}…</div>
-            <div class="history-card-ts">
-              {{ item.timestamp ? new Date(Number(item.timestamp)).toLocaleString('zh-CN') : '' }}
-            </div>
-          </div>
-          <div v-if="item.images?.length" class="history-card-actions">
-            <span v-if="item.images.length > 1" class="history-card-imgcount">
-              {{ t('comfyui.history.image_count', { count: item.images.length }) }}
-            </span>
-            <BaseButton size="sm" square :title="t('common.btn.download')" @click="downloadAll(item.images)">
-              <MsIcon name="download" color="none" />
-            </BaseButton>
-          </div>
+          <span class="history-card-filename text-truncate" :title="item.images?.[0]?.filename">
+            {{ item.images?.[0]?.filename || item.prompt_id.substring(0, 8) + '…' }}
+          </span>
+          <BaseButton v-if="item.images?.length" size="xs" square :title="t('common.btn.download')" @click="downloadAll(item.images)">
+            <MsIcon name="download" size="xs" color="none" />
+          </BaseButton>
         </div>
       </div>
     </div>
@@ -200,15 +190,12 @@ defineExpose({ loadHistory })
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 6px;
 }
-.history-grid.size-sm .history-card-images { height: 90px; }
-.history-grid.size-sm .history-card-info { padding: 6px 10px; }
-.history-grid.size-sm .history-card-meta { font-size: .68rem; }
+.history-grid.size-sm .history-card-info { padding: 3px 6px; }
 .history-grid.size-lg {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 14px;
 }
-.history-grid.size-lg .history-card-images { height: 220px; }
-.history-grid.size-lg .history-card-info { padding: 14px 18px; }
+.history-grid.size-lg .history-card-info { padding: 6px 10px; }
 
 /* ── Card ── */
 .history-card {
@@ -217,6 +204,9 @@ defineExpose({ loadHistory })
   border-radius: var(--r);
   overflow: hidden;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+  aspect-ratio: 3 / 4;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Image gallery ── */
@@ -224,7 +214,8 @@ defineExpose({ loadHistory })
   display: flex;
   gap: 2px;
   background: var(--bg);
-  height: 140px;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .history-card-images img {
@@ -243,28 +234,15 @@ defineExpose({ loadHistory })
 
 /* ── Info row ── */
 .history-card-info {
-  padding: 10px 14px;
+  padding: 4px 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
-.history-card-meta {
+.history-card-filename {
   flex: 1;
-  font-size: .78rem;
+  font-size: var(--text-xs);
   color: var(--t2);
-}
-.history-card-ts {
-  font-size: .7rem;
-  color: var(--t3);
-}
-.history-card-actions {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.history-card-imgcount {
-  font-size: .68rem;
-  color: var(--t3);
+  min-width: 0;
 }
 </style>

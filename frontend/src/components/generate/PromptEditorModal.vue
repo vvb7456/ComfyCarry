@@ -19,6 +19,7 @@ import { usePromptLibrary } from '@/composables/generate/usePromptLibrary'
 import { usePromptLibraryInit } from '@/composables/generate/usePromptLibraryInit'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { useConfirm } from '@/composables/useConfirm'
+import { useGenerateStore } from '@/stores/generate'
 import { normalizePrompt } from '@/utils/prompt'
 import type { BracketType, PromptTag } from '@/types/prompt-library'
 import type { AutocompleteDisplayItem } from '@/composables/generate/useAutoComplete'
@@ -75,6 +76,7 @@ const translate = usePromptTranslate()
 const lib = usePromptLibrary()
 const plInit = usePromptLibraryInit()
 const { settings: promptSettings, load: loadPromptSettings } = usePromptSettings()
+const genStore = useGenerateStore()
 
 /** Normalize options derived from settings */
 const normalizeOpts = computed(() => ({
@@ -104,6 +106,12 @@ watch(open, async (isOpen) => {
 
     posEditor.parse(normalizePrompt(props.positive, normalizeOpts.value))
     negEditor.parse(normalizePrompt(props.negative, normalizeOpts.value))
+
+    // Restore disabled tokens from store
+    const state = genStore.currentState
+    posEditor.injectDisabled(state.positiveDisabled)
+    negEditor.injectDisabled(state.negativeDisabled)
+
     activeTab.value = 'positive'
 
     // Only resolve colors if library is initialized
@@ -117,8 +125,13 @@ watch(open, async (isOpen) => {
 
 // ── Sync tokens → string → emit (real-time) ───────────────────
 function syncToParent() {
-  emit('update:positive', posEditor.serialize())
-  emit('update:negative', negEditor.serialize())
+  // Emit only enabled tokens as the prompt string
+  emit('update:positive', posEditor.serializeEnabled())
+  emit('update:negative', negEditor.serializeEnabled())
+  // Persist disabled tokens to store
+  const state = genStore.currentState
+  state.positiveDisabled = posEditor.extractDisabled()
+  state.negativeDisabled = negEditor.extractDisabled()
 }
 
 // ── Token event handlers ───────────────────────────────────────
@@ -407,6 +420,7 @@ function onWcInsert(token: string) {
           :show-translation="promptSettings.show_translation"
           :autocomplete-limit="promptSettings.autocomplete_limit"
           :translating-ids="translatingIds"
+          :translate-all-busy="translate.translating.value"
           @add="onAdd"
           @add-break="onAddBreak"
           @remove="onRemove"
@@ -431,6 +445,7 @@ function onWcInsert(token: string) {
           :show-translation="promptSettings.show_translation"
           :autocomplete-limit="promptSettings.autocomplete_limit"
           :translating-ids="translatingIds"
+          :translate-all-busy="translate.translating.value"
           @add="onAdd"
           @add-break="onAddBreak"
           @remove="onRemove"

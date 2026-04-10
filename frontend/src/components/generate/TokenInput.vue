@@ -20,6 +20,7 @@ import { splitPromptTokens } from '@/composables/generate/usePromptEditor'
 import TokenChip from '@/components/generate/TokenChip.vue'
 import AutoCompleteList from '@/components/generate/AutoCompleteList.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 
 defineOptions({ name: 'TokenInput' })
 
@@ -27,6 +28,7 @@ const props = withDefaults(defineProps<{
   tokens: PromptToken[]
   showTranslation?: boolean
   translatingIds?: Set<string>
+  translateAllBusy?: boolean
   autocompleteLimit?: number
 }>(), {
   showTranslation: true,
@@ -212,7 +214,9 @@ function clearInput() {
   ac.reset()
 }
 
-function focusInput() {
+function focusInput(e?: MouseEvent) {
+  // Don't steal focus from inline chip edit inputs
+  if (e && (e.target as HTMLElement)?.closest('.chip-edit-input')) return
   inputRef.value?.focus()
 }
 
@@ -473,9 +477,11 @@ onUnmounted(() => { ac.reset() })
       <button
         v-if="showTranslation"
         class="token-tool-btn"
+        :disabled="translateAllBusy"
         @click="emit('translate-all')"
       >
-        <MsIcon name="translate" size="xs" color="none" />
+        <Spinner v-if="translateAllBusy" size="xs" />
+        <MsIcon v-else name="translate" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.translate_all') }}</span>
       </button>
     </div>

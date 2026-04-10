@@ -112,7 +112,8 @@ export function useWildcardManager(): UseWildcardManagerReturn {
       { content: '' },
     )
     if (!resp?.ok) return null
-    await reload()
+    // Optimistic: append to local list without full reload
+    wildcards.value = [...wildcards.value, { name: fullName, entries: 0 }]
     return fullName
   }
 
@@ -122,7 +123,10 @@ export function useWildcardManager(): UseWildcardManagerReturn {
       { new_name: newName },
     )
     if (!resp?.ok) return false
-    await reload()
+    // Optimistic: update name in local list
+    wildcards.value = wildcards.value.map(w =>
+      w.name === oldName ? { ...w, name: newName } : w,
+    )
     return true
   }
 
@@ -137,14 +141,19 @@ export function useWildcardManager(): UseWildcardManagerReturn {
       { content },
     )
     if (!resp?.ok) return false
-    await reload()
+    // Optimistic: update entry count in local list
+    const lines = content.split('\n').filter(l => l.trim()).length
+    wildcards.value = wildcards.value.map(w =>
+      w.name === name ? { ...w, entries: lines } : w,
+    )
     return true
   }
 
   async function remove(name: string): Promise<boolean> {
     const resp = await del<{ ok?: boolean }>(`/api/generate/wildcard/${encodeURIComponent(name)}`)
     if (!resp?.ok) return false
-    await reload()
+    // Optimistic: remove from local list
+    wildcards.value = wildcards.value.filter(w => w.name !== name)
     return true
   }
 

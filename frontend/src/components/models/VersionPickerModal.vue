@@ -56,6 +56,7 @@ function handleDownload(versionId: number) {
       >
         <div class="vp-info">
           <span class="vp-name">{{ v.name || v.id }}</span>
+          <Badge v-if="versionState(v.id) === 'installed'" color="#10b981" size="sm">{{ t('models.downloads.installed') }}</Badge>
           <Badge v-if="v.baseModel" size="sm">{{ v.baseModel }}</Badge>
         </div>
         <DownloadButton

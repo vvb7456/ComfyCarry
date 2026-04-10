@@ -35,10 +35,12 @@ const selectedVersionId = ref<string | number | undefined>()
 const hasMultipleVersions = computed(() => (props.meta?.versions?.length || 0) > 1)
 
 const versionOptions = computed(() =>
-  (props.meta?.versions || []).map(v => ({
-    value: String(v.id),
-    label: v.name + (v.baseModel ? ` (${v.baseModel})` : ''),
-  })),
+  (props.meta?.versions || []).map(v => {
+    const installed = props.meta?.id && getVersionState(props.meta.id, v.id) === 'installed'
+    let label = v.name + (v.baseModel ? ` (${v.baseModel})` : '')
+    if (installed) label += ` — ${t('models.downloads.installed')}`
+    return { value: String(v.id), label, disabled: !!installed }
+  }),
 )
 
 const activeVersion = computed<ModelMetaVersion | undefined>(() => {

@@ -1,13 +1,5 @@
 // ── ComfyUI Data Types ────────────────────────────────────────
 
-export interface ComfyDevice {
-  name: string
-  vram_total: number
-  vram_free: number
-  torch_vram_total: number
-  torch_vram_free: number
-}
-
 export interface ComfyStatus {
   online: boolean
   pm2_status: string
@@ -16,7 +8,6 @@ export interface ComfyStatus {
     python_version: string
     pytorch_version: string
   }
-  devices: ComfyDevice[]
   queue_running: number
   queue_pending: number
   pm2_uptime: number

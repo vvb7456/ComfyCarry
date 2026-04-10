@@ -10,6 +10,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import CivitaiModelCard from '@/components/models/CivitaiModelCard.vue'
 import VersionPickerModal from '@/components/models/VersionPickerModal.vue'
+import FavoriteVersionModal from '@/components/models/FavoriteVersionModal.vue'
 import type { ModelMeta, ModelMetaImage } from '@/types/models'
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
 
@@ -71,6 +72,8 @@ watch(() => props.active, (val) => {
 // ── Version picker ──
 const vpOpen = ref(false)
 const vpHit = ref<CivitaiHit | null>(null)
+const favOpen = ref(false)
+const favHit = ref<CivitaiHit | null>(null)
 
 // ── Infinite scroll sentinel ──
 const sentinelRef = ref<HTMLElement | null>(null)
@@ -109,6 +112,7 @@ function hitToCartItem(hit: CivitaiHit) {
 
 function toggleCart(hit: CivitaiHit) {
   if (dlIsInCart(hit.id)) {
+    // Remove all versions of this model from cart
     for (const item of dlCartItems.value) {
       if (item.modelId === String(hit.id)) {
         const key = item.versionId ? `${item.modelId}:${item.versionId}` : item.modelId
@@ -116,8 +120,38 @@ function toggleCart(hit: CivitaiHit) {
       }
     }
   } else {
-    dlAddToCart(hitToCartItem(hit))
+    const allVersions = hit.versions || (hit.version ? [hit.version] : [])
+    if (allVersions.length > 1) {
+      // Multi-version: open picker modal
+      favHit.value = hit
+      favOpen.value = true
+    } else {
+      // Single version: add directly
+      dlAddToCart(hitToCartItem(hit))
+    }
   }
+}
+
+function handleFavoriteVersion(modelId: string, versionId: number, versionName: string, baseModel?: string) {
+  const hit = favHit.value
+  if (!hit) return
+  const CDN = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
+  const imgs = hit.images?.length ? hit.images : (hit.version?.images || [])
+  const rawUrl = imgs[0]?.url || ''
+  const imageUrl = rawUrl.startsWith('http') ? rawUrl : rawUrl ? `${CDN}${rawUrl}/width=200/default.jpg` : ''
+  dlAddToCart({
+    modelId,
+    name: hit.name,
+    type: hit.type,
+    imageUrl,
+    versionId,
+    versionName,
+    baseModel,
+  })
+}
+
+function handleUnfavoriteVersion(modelId: string, versionId: number) {
+  dlRemoveFromCart(`${modelId}:${versionId}`)
 }
 
 function getDownloadState(hit: CivitaiHit): string {
@@ -305,6 +339,14 @@ function openCivitaiMeta(hit: CivitaiHit) {
     v-model="vpOpen"
     :hit="vpHit"
     @download="handlePickerDownload"
+  />
+
+  <!-- Favorite Version Modal -->
+  <FavoriteVersionModal
+    v-model="favOpen"
+    :hit="favHit"
+    @favorite="handleFavoriteVersion"
+    @unfavorite="handleUnfavoriteVersion"
   />
 </template>
 

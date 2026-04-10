@@ -125,8 +125,17 @@ function close() {
   show.value = false
 }
 
+// Track mousedown origin to prevent drag-close
+const mouseDownOnOverlay = ref(false)
+
+function onOverlayMousedown(e: MouseEvent) {
+  mouseDownOnOverlay.value = e.target === e.currentTarget
+}
+
 function onOverlayClick(e: MouseEvent) {
-  if (e.target === e.currentTarget && canCloseOverlay.value) close()
+  // Only close if BOTH mousedown and mouseup (click) happened on overlay
+  if (e.target === e.currentTarget && mouseDownOnOverlay.value && canCloseOverlay.value) close()
+  mouseDownOnOverlay.value = false
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -152,6 +161,7 @@ const footerClass = computed(() => {
         class="modal-overlay"
         :class="{ 'modal-overlay--top': align === 'top' }"
         :style="props.zIndex ? { zIndex: props.zIndex } : undefined"
+        @mousedown="onOverlayMousedown"
         @click="onOverlayClick"
         @keydown="onKeydown"
         tabindex="-1"

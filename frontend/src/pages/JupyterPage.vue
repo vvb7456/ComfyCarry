@@ -169,6 +169,15 @@ function terminalUrl(name: string): string | null {
   return `${base}/terminals/${encodeURIComponent(name)}${qs}`
 }
 
+/** Jupyter URL with token appended (if not already present) */
+const jupyterTokenUrl = computed(() => {
+  if (!jupyterUrl.value || !token.value) return ''
+  // If URL already has token param, use as-is
+  if (jupyterUrl.value.includes('token=')) return jupyterUrl.value
+  const sep = jupyterUrl.value.includes('?') ? '&' : '?'
+  return `${jupyterUrl.value}${sep}token=${token.value}`
+})
+
 function copyToken() {
   toast(t('common.clipboard_copied'), 'success')
 }
@@ -286,6 +295,11 @@ onUnmounted(() => {
           input-class="token-input"
           @copied="copyToken"
         />
+        <div v-if="jupyterTokenUrl" class="jupyter-token-link">
+          <a :href="jupyterTokenUrl" target="_blank" rel="noopener">
+            {{ t('jupyter.token.open_jupyter') }} <MsIcon name="open_in_new" size="xs" />
+          </a>
+        </div>
       </BaseCard>
 
       <!-- Active Kernels -->
@@ -360,6 +374,7 @@ onUnmounted(() => {
               :title="t('jupyter.terminals.open')"
             >
               {{ t('jupyter.terminals.label', { name: term.name }) }}
+              <MsIcon name="open_in_new" size="xs" />
             </a>
             <span v-else class="terminal-name">{{ t('jupyter.terminals.label', { name: term.name }) }}</span>
             <BaseButton variant="danger" size="sm" square :title="t('jupyter.terminals.destroy')" @click="deleteTerminal(term.name)">
@@ -386,6 +401,9 @@ onUnmounted(() => {
 
 /* Vue-unique: token input */
 .token-input { width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: .78rem; letter-spacing: .02em; background: var(--bg3); border: 1px solid var(--bd); border-radius: 6px; padding: 6px 72px 6px 10px; color: var(--t1); outline: none; box-sizing: border-box; }
+.jupyter-token-link { font-size: .72rem; color: var(--t3); margin-top: 6px; }
+.jupyter-token-link a { color: var(--ac); text-decoration: none; display: inline-flex; align-items: center; gap: 2px; }
+.jupyter-token-link a:hover { text-decoration: underline; }
 
 /* Vue-unique: terminal name (link / non-link) */
 .terminal-name-link { font-weight: 600; font-size: .85rem; color: var(--t1); text-decoration: none; transition: color .15s; }

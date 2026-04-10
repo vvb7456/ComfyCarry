@@ -161,10 +161,12 @@ const editing = ref(false)
 const editInputRef = ref<HTMLInputElement | null>(null)
 const chipTextRef = ref<HTMLElement | null>(null)
 let clickTimer: ReturnType<typeof setTimeout> | null = null
+let pendingClickX: number | null = null
 
-function onTextClick() {
+function onTextClick(e: MouseEvent) {
   // Single click → start editing (with delay to allow dblclick to cancel)
   if (clickTimer) return
+  pendingClickX = e.clientX
   clickTimer = setTimeout(() => {
     clickTimer = null
     startEditing()
@@ -187,13 +189,23 @@ function onChipDblClick() {
 function startEditing() {
   if (!props.token.enabled) return
   // Capture current text element width before switching to input
-  const textWidth = chipTextRef.value?.offsetWidth ?? 60
+  const textEl = chipTextRef.value
+  const textWidth = textEl?.offsetWidth ?? 60
   editing.value = true
   nextTick(() => {
     if (editInputRef.value) {
-      editInputRef.value.value = displayText.value
+      const text = displayText.value
+      editInputRef.value.value = text
       editInputRef.value.style.width = `${textWidth}px`
-      editInputRef.value.select()
+      editInputRef.value.focus()
+      // Place cursor at approximate click position instead of selecting all
+      if (pendingClickX !== null && textEl) {
+        const rect = textEl.getBoundingClientRect()
+        const ratio = Math.max(0, Math.min(1, (pendingClickX - rect.left) / rect.width))
+        const pos = Math.round(ratio * text.length)
+        editInputRef.value.setSelectionRange(pos, pos)
+      }
+      pendingClickX = null
     }
   })
 }

@@ -41,14 +41,13 @@ bp = Blueprint("comfyui", __name__)
 @bp.route("/api/comfyui/status")
 def api_comfyui_status():
     """获取 ComfyUI 系统状态 + 当前启动参数"""
-    result = {"online": False, "system": {}, "devices": [],
+    result = {"online": False, "system": {},
               "params": {}, "args": []}
     try:
         resp = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
         data = resp.json()
         result["online"] = True
         result["system"] = data.get("system", {})
-        result["devices"] = data.get("devices", [])
     except Exception:
         pass
     try:

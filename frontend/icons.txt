@@ -44,6 +44,7 @@ update
 
 # 动态 :icon 绑定
 cloud_off
+cloud_done
 
 # ActionBar.vue — 三元表达式 isRunning ? 'stop_circle' : ...
 stop_circle

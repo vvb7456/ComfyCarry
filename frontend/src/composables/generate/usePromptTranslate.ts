@@ -26,6 +26,11 @@ export interface UsePromptTranslateReturn {
   translateTokens(tokens: PromptToken[], onUpdate: (id: string, translate: string) => void, provider?: string): Promise<void>
 }
 
+// Module-level translation cache — survives across composable instances
+// so translations persist across modal open/close cycles.
+const _translateCache = new Map<string, string>()
+const TRANSLATE_CACHE_MAX = 2000
+
 export function usePromptTranslate(): UsePromptTranslateReturn {
   const { get, post } = useApiFetch()
   const translating = ref(false)
@@ -33,13 +38,22 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
   /**
    * Fast local DB lookup for a single tag.
    * Returns the translated string or empty string if not found.
+   * Results are cached at module level.
    */
   async function translateWord(word: string): Promise<string> {
     if (!word.trim()) return ''
+    // Check cache first
+    const cached = _translateCache.get(word)
+    if (cached) return cached
     const resp = await get<TranslateWordResult>(
       `/api/prompt-library/translate/word?word=${encodeURIComponent(word)}`,
     )
-    return resp?.translate ?? ''
+    const result = resp?.translate ?? ''
+    if (result) {
+      if (_translateCache.size >= TRANSLATE_CACHE_MAX) _translateCache.clear()
+      _translateCache.set(word, result)
+    }
+    return result
   }
 
   /**
@@ -52,9 +66,19 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
     provider?: string,
   ): Promise<TranslateResult | null> {
     if (!text.trim()) return null
+    // Cache only en→zh tag translations
+    if (from === 'en' && to === 'zh') {
+      const cached = _translateCache.get(text)
+      if (cached) return { translate: cached } as TranslateResult
+    }
     const body: Record<string, unknown> = { text, from, to }
     if (provider) body.provider = provider
-    return post<TranslateResult>('/api/prompt-library/translate', body)
+    const result = await post<TranslateResult>('/api/prompt-library/translate', body)
+    if (result?.translate && from === 'en' && to === 'zh') {
+      if (_translateCache.size >= TRANSLATE_CACHE_MAX) _translateCache.clear()
+      _translateCache.set(text, result.translate)
+    }
+    return result
   }
 
   /**

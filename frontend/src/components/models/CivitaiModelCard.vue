@@ -8,7 +8,7 @@ import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import DownloadButton from './DownloadButton.vue'
-import type { ModelAggregateState } from '@/composables/useDownloads'
+import { useDownloads, type ModelAggregateState } from '@/composables/useDownloads'
 
 defineOptions({ name: 'CivitaiModelCard' })
 
@@ -83,6 +83,27 @@ const downloadCount = computed(() =>
 
 // ── Download button state ──
 const dlState = computed<ModelAggregateState>(() => (props.downloadState as ModelAggregateState) || 'idle')
+
+// ── Installed overlay badges ──
+const { getVersionState } = useDownloads()
+
+/** List of versions that are installed locally */
+const installedVersions = computed(() =>
+  allVersions.value.filter(v => getVersionState(props.hit.id, v.id) === 'installed'),
+)
+
+/** true when all versions installed (single or multi) */
+const allInstalled = computed(() => dlState.value === 'installed')
+
+/** true when some (not all) versions installed in a multi-version model */
+const partialInstalled = computed(() =>
+  !allInstalled.value && installedVersions.value.length > 0,
+)
+
+/** Hover tooltip: list installed version names */
+const installedTooltip = computed(() =>
+  installedVersions.value.map(v => v.name || `v${v.id}`).join(', '),
+)
 </script>
 
 <template>
@@ -100,6 +121,9 @@ const dlState = computed<ModelAggregateState>(() => (props.downloadState as Mode
     </template>
 
     <template #meta>
+      <Badge v-if="allInstalled || partialInstalled" color="#10b981" size="sm" :title="installedTooltip">
+        {{ partialInstalled ? `${t('models.downloads.installed')} ${installedVersions.length}/${versionCount}` : t('models.downloads.installed') }}
+      </Badge>
       <Badge :color="badgeColor">{{ hit.type || '' }}</Badge>
       <Badge v-if="baseModel">{{ baseModel }}</Badge>
       <Badge v-if="versionCount > 1" :title="t('models.civitai.versions_count', { count: versionCount })">v{{ versionCount }}</Badge>

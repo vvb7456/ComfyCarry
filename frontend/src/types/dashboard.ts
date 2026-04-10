@@ -1,15 +1,5 @@
 // ── Dashboard Data Types ──────────────────────────────────────
 
-export interface GpuInfo {
-  name: string
-  util: number
-  mem_used: number
-  mem_total: number
-  temp: number
-  power: number
-  power_limit: number
-}
-
 export interface SyncLogEntry {
   ts?: string
   key?: string
@@ -50,12 +40,6 @@ export interface OverviewData {
     urls: Record<string, string>
     public?: { urls: Record<string, string> }
   }
-  system: {
-    gpu: GpuInfo[]
-    cpu: { percent: number; cores: number; load: Record<string, number> }
-    memory: { percent: number; used: number; total: number }
-    disk: { percent: number; used: number; free: number; total: number; path: string }
-  }
   downloads: {
     active_count: number
     active: DownloadTask[]
@@ -73,3 +57,24 @@ export interface OverviewData {
 }
 
 export type ServiceEntry = OverviewData['services'][number]
+
+/** Fast-changing activity data from GET /api/activity (5s poll) */
+export interface ActivityData {
+  comfyui: {
+    online: boolean
+    queue_running: number
+    queue_pending: number
+    executing?: boolean
+    exec_start_time?: number
+    progress?: { value: number; max: number }
+  }
+  downloads: {
+    active_count: number
+    active: DownloadTask[]
+    queue_count: number
+  }
+  sync: {
+    worker_running: boolean
+    last_log_lines: Array<string | SyncLogEntry>
+  }
+}

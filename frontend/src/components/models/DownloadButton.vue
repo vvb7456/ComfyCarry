@@ -27,7 +27,8 @@ const { t } = useI18n({ useScope: 'global' })
     disabled
     class="dl-btn dl-btn--done"
   >
-    {{ t('models.civitai.already_local') }}
+    <MsIcon name="download" size="xs" />
+    {{ t('models.downloads.download') }}
   </BaseButton>
   <!-- Submitting / downloading -->
   <BaseButton

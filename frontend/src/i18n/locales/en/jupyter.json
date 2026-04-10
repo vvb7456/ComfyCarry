@@ -27,7 +27,8 @@
     "restart": "Restart"
   },
   "token": {
-    "title": "Access Token"
+    "title": "Access Token",
+    "open_jupyter": "Open JupyterLab"
   },
   "kernels": {
     "title": "Active Kernels",

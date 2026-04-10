@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloads } from '@/composables/useDownloads'
 import { useConfirm } from '@/composables/useConfirm'
@@ -20,7 +20,6 @@ const {
   cartItems: dlCartItems,
   cartCount: dlCartCount,
   clearCart: dlClearCart,
-  updateCartVersion: dlUpdateCartVersion,
   removeFromCart: dlRemoveFromCart,
   activeTasks: dlActiveTasks,
   pausedTasks: dlPausedTasks,
@@ -37,11 +36,19 @@ const {
   clearHistory: dlClearHistory,
   startPolling: dlStartPolling,
   stopPolling: dlStopPolling,
+  getVersionState: dlGetVersionState,
 } = useDownloads()
 
 const { confirm } = useConfirm()
 
 const batchAddOpen = ref(false)
+
+// Count of cart items that are NOT yet installed locally
+const downloadableCount = computed(() =>
+  dlCartItems.value.filter(it =>
+    !(it.versionId && dlGetVersionState(it.modelId, it.versionId) === 'installed'),
+  ).length,
+)
 
 // Start/stop polling when tab visibility changes
 watch(() => props.active, (val) => {
@@ -61,8 +68,8 @@ async function handleClearCart() {
       <BaseButton size="sm" @click.stop="batchAddOpen = true">
         <MsIcon name="add" size="xs" /> {{ t('models.downloads.batch_add') }}
       </BaseButton>
-      <BaseButton size="sm" variant="primary" :disabled="!dlCartCount" @click.stop="dlDownloadAll()">
-        {{ t('models.downloads.download_all') }}<template v-if="dlCartCount">({{ dlCartCount }})</template>
+      <BaseButton size="sm" variant="primary" :disabled="!downloadableCount" @click.stop="dlDownloadAll()">
+        {{ t('models.downloads.download_all') }}<template v-if="downloadableCount">({{ downloadableCount }})</template>
       </BaseButton>
       <BaseButton size="sm" variant="danger" :disabled="!dlCartCount" @click.stop="handleClearCart">
         {{ t('models.downloads.clear_all') }}
@@ -73,9 +80,9 @@ async function handleClearCart() {
         v-for="item in dlCartItems"
         :key="item.modelId + ':' + (item.versionId || '')"
         :cart-item="item"
+        :installed="!!(item.versionId && dlGetVersionState(item.modelId, item.versionId) === 'installed')"
         @download="(it) => dlDownloadOne(it.modelId, it.type, it.versionId)"
         @remove="dlRemoveFromCart"
-        @version-change="dlUpdateCartVersion"
       />
     </div>
     <EmptyState v-else icon="push_pin" :message="t('models.downloads.no_pending_hint')" />

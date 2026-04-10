@@ -34,6 +34,7 @@ from .services.download_engine import shutdown_engine
 from .services.sync_engine import (
     _load_sync_rules, start_sync_worker, set_app_logger,
 )
+from .services import system_monitor
 
 
 def create_app():
@@ -156,6 +157,9 @@ def main():
     if civitai_token and not _get_api_key():
         CONFIG_FILE.write_text(json.dumps({"api_key": civitai_token}))
         print(f"  📝 已从环境变量 CIVITAI_TOKEN 导入 API Key")
+
+    # 启动系统指标采集守护线程 (pynvml + psutil, 2s 间隔)
+    system_monitor.start()
 
     # 启动 ComfyUI WS Bridge
     get_bridge()

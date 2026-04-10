@@ -60,7 +60,10 @@ export function useSdxlModalManager({
   }
 
   function onTaggerApply(tags: string) {
-    if (tags) state.value.positive = tags
+    if (tags) {
+      state.value.positive = tags
+      state.value.positiveDisabled = []
+    }
   }
 
   async function openLlm() {
@@ -70,8 +73,10 @@ export function useSdxlModalManager({
 
   function onLlmApply(result: { positive: string; negative?: string }) {
     state.value.positive = result.positive
+    state.value.positiveDisabled = []
     if (result.negative !== undefined) {
       state.value.negative = result.negative
+      state.value.negativeDisabled = []
     }
     toast(result.negative !== undefined ? t('generate.llm_modal.used_all') : t('generate.llm_modal.used'), 'success')
   }

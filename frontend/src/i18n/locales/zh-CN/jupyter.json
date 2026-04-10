@@ -27,7 +27,8 @@
     "restart": "重启"
   },
   "token": {
-    "title": "访问令牌"
+    "title": "访问令牌",
+    "open_jupyter": "打开 JupyterLab"
   },
   "kernels": {
     "title": "活跃内核",

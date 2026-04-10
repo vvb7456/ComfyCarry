@@ -2,10 +2,11 @@
 ComfyCarry — 系统监控 & 服务管理路由
 
 包含:
-- /api/version    — 版本信息
-- (internal)      — system() / services() → 由 /api/overview 聚合
+- /api/version         — 版本信息
+- /api/system/stats    — 实时系统指标 (读缓存, <1ms)
+- (internal)           — api_system() → 由 /api/overview 聚合
 - /api/services/<name>/<action> — 服务控制 (start/stop/restart)
-- /api/logs/<name> — PM2 日志查看
+- /api/logs/<name>     — PM2 日志查看
 """
 
 import json
@@ -20,15 +21,9 @@ import requests as req_lib
 
 from ..config import SCRIPT_DIR, COMFYUI_URL, APP_VERSION
 from ..utils import _run_cmd
+from ..services import system_monitor
 
 bp = Blueprint("system", __name__)
-
-# 初始化 psutil CPU 计数器 (首次调用返回 0%, 后续返回自上次调用以来的真实使用率)
-try:
-    import psutil as _psutil_init
-    _psutil_init.cpu_percent()
-except Exception:
-    pass
 
 
 # ====================================================================
@@ -70,86 +65,20 @@ def api_version():
 
 
 # ====================================================================
+# 实时系统指标 (读 system_monitor 缓存, <1ms)
+# ====================================================================
+@bp.route("/api/system/stats")
+def api_system_stats():
+    """实时系统指标 — GPU / CPU / 内存 / 磁盘 / 网络"""
+    return jsonify(system_monitor.get_stats())
+
+
+# ====================================================================
 # 系统监控 (内部函数, 由 api_overview 聚合调用)
 # ====================================================================
 def api_system():
-    """获取系统信息 (仅供 api_overview 内部调用)"""
-    info = {"cpu": {}, "memory": {}, "disk": {}, "gpu": [], "network": {}, "uptime": ""}
-
-    # CPU
-    try:
-        import psutil
-        info["cpu"]["percent"] = psutil.cpu_percent(interval=None)
-        info["cpu"]["cores"] = psutil.cpu_count()
-        info["cpu"]["freq"] = psutil.cpu_freq()._asdict() if psutil.cpu_freq() else {}
-        load = os.getloadavg()
-        info["cpu"]["load"] = {"1m": load[0], "5m": load[1], "15m": load[2]}
-    except Exception as e:
-        info["cpu"]["error"] = str(e)
-
-    # Memory
-    try:
-        import psutil
-        mem = psutil.virtual_memory()
-        info["memory"] = {
-            "total": mem.total, "used": mem.used, "available": mem.available,
-            "percent": mem.percent
-        }
-    except Exception as e:
-        info["memory"]["error"] = str(e)
-
-    # Disk
-    try:
-        import psutil
-        disk = psutil.disk_usage("/workspace" if os.path.exists("/workspace") else "/")
-        info["disk"] = {
-            "total": disk.total, "used": disk.used, "free": disk.free,
-            "percent": disk.percent, "path": "/workspace"
-        }
-    except Exception as e:
-        info["disk"]["error"] = str(e)
-
-    # GPU (nvidia-smi)
-    try:
-        gpu_out = _run_cmd(
-            "nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free,"
-            "utilization.gpu,temperature.gpu,power.draw,power.limit "
-            "--format=csv,nounits,noheader", timeout=5
-        )
-        for line in gpu_out.strip().split("\n"):
-            if not line.strip():
-                continue
-            parts = [p.strip() for p in line.split(",")]
-            if len(parts) >= 9:
-                info["gpu"].append({
-                    "index": int(parts[0]), "name": parts[1],
-                    "mem_total": int(parts[2]), "mem_used": int(parts[3]),
-                    "mem_free": int(parts[4]), "util": int(parts[5]),
-                    "temp": int(parts[6]),
-                    "power": float(parts[7]) if parts[7] != "[N/A]" else 0,
-                    "power_limit": float(parts[8]) if parts[8] != "[N/A]" else 0,
-                })
-    except Exception:
-        pass
-
-    # Network
-    try:
-        import psutil
-        net = psutil.net_io_counters()
-        info["network"] = {
-            "bytes_sent": net.bytes_sent, "bytes_recv": net.bytes_recv,
-            "packets_sent": net.packets_sent, "packets_recv": net.packets_recv,
-        }
-    except Exception:
-        pass
-
-    # Uptime
-    try:
-        info["uptime"] = _run_cmd("uptime -p", timeout=3)
-    except Exception:
-        pass
-
-    return jsonify(info)
+    """获取系统信息 (仅供 api_overview 内部调用) — 读 monitor 缓存"""
+    return jsonify(system_monitor.get_stats())
 
 
 # ====================================================================
@@ -294,9 +223,6 @@ def api_overview():
                 comfyui["version"] = sys_info.get("comfyui_version", "")
                 comfyui["pytorch_version"] = sys_info.get("pytorch_version", "")
                 comfyui["python_version"] = sys_info.get("python_version", "")
-                devs = d.get("devices", [])
-                if devs:
-                    comfyui["devices"] = devs
         except Exception:
             pass
         try:
@@ -373,14 +299,13 @@ def api_overview():
         result["jupyter"] = {"online": False}
 
     # ── Downloads ──
-    downloads = {"active": [], "queue_count": 0}
+    downloads = {"active": [], "active_count": 0, "queue_count": 0}
     try:
-        from . import models as models_mod
-        dl_resp = models_mod.api_download_status()
-        dl_data = dl_resp.get_json() if hasattr(dl_resp, 'get_json') else json.loads(dl_resp.get_data())
-        active = dl_data.get("active", [])
-        queued = dl_data.get("queue", [])
-        downloads["active"] = active[:3]  # Limit for overview
+        from ..services.download_engine import get_engine as _get_dl_engine
+        tasks = _get_dl_engine().list_tasks()
+        active = [t for t in tasks if t["status"] == "active"]
+        queued = [t for t in tasks if t["status"] == "queued"]
+        downloads["active"] = active[:3]
         downloads["active_count"] = len(active)
         downloads["queue_count"] = len(queued)
     except Exception:
@@ -390,5 +315,64 @@ def api_overview():
     # ── Dashboard 版本 ──
     ver_resp = api_version()
     result["version"] = ver_resp.get_json() if hasattr(ver_resp, 'get_json') else json.loads(ver_resp.get_data())
+
+    return jsonify(result)
+
+
+# ====================================================================
+# 活动状态 API (快变化数据, 5s 轮询)
+# ====================================================================
+@bp.route("/api/activity")
+def api_activity():
+    """快变化数据聚合 — ComfyUI 队列/在线状态 + 下载进度 + Sync 日志"""
+    from ..services import sync_engine, comfyui_bridge
+
+    result = {}
+
+    # ── ComfyUI queue & online ──
+    comfyui = {"online": False, "queue_running": 0, "queue_pending": 0}
+    try:
+        r = req_lib.get(f"{COMFYUI_URL}/queue", timeout=2)
+        if r.ok:
+            comfyui["online"] = True
+            q = r.json()
+            comfyui["queue_running"] = len(q.get("queue_running", []))
+            comfyui["queue_pending"] = len(q.get("queue_pending", []))
+    except Exception:
+        pass
+
+    # Execution state from WS bridge
+    bridge = comfyui_bridge.get_bridge()
+    if bridge and bridge._exec_info:
+        comfyui["executing"] = True
+        comfyui["exec_start_time"] = bridge._exec_info.get("start_time")
+        if bridge._last_progress:
+            comfyui["progress"] = bridge._last_progress
+    else:
+        comfyui["executing"] = False
+    result["comfyui"] = comfyui
+
+    # ── Downloads ──
+    downloads = {"active": [], "active_count": 0, "queue_count": 0}
+    try:
+        from ..services.download_engine import get_engine as _get_dl_engine
+        tasks = _get_dl_engine().list_tasks()
+        active = [t for t in tasks if t["status"] == "active"]
+        queued = [t for t in tasks if t["status"] == "queued"]
+        downloads["active"] = active[:3]
+        downloads["active_count"] = len(active)
+        downloads["queue_count"] = len(queued)
+    except Exception:
+        pass
+    result["downloads"] = downloads
+
+    # ── Sync last log lines ──
+    sync_status = {"worker_running": sync_engine.is_worker_running()}
+    log_buf = sync_engine.get_sync_log_buffer()
+    if log_buf:
+        sync_status["last_log_lines"] = list(log_buf)[-5:]
+    else:
+        sync_status["last_log_lines"] = []
+    result["sync"] = sync_status
 
     return jsonify(result)
