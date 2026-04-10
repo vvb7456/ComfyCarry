@@ -174,3 +174,11 @@ pm2 logs dashboard        # Dashboard logs
 pm2 logs comfy            # ComfyUI logs
 pm2 restart comfy         # Restart ComfyUI
 ```
+
+---
+
+## License
+
+This project is licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
+
+For commercial licensing inquiries, please contact the project maintainers.

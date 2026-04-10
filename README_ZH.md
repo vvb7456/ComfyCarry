@@ -174,3 +174,11 @@ pm2 logs dashboard        # Dashboard 日志
 pm2 logs comfy            # ComfyUI 日志
 pm2 restart comfy         # 重启 ComfyUI
 ```
+
+---
+
+## 许可证
+
+本项目基于 [GNU Affero 通用公共许可证 v3.0 (AGPL-3.0)](LICENSE) 授权。
+
+如需商业许可，请联系项目维护者。
