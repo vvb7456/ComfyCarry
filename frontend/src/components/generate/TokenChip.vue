@@ -145,7 +145,7 @@ function onWeightChange(val: number) {
 
 // ── Drag ───────────────────────────────────────────────────────
 function onDragStart(e: DragEvent) {
-  if (!props.draggable) return
+  if (!props.draggable || editing.value) { e.preventDefault(); return }
   hovered.value = false
   e.dataTransfer?.setData('text/plain', props.token.id)
   emit('drag-start', props.token.id, e)
@@ -243,12 +243,13 @@ function cancelEdit() {
     :class="{
       'token-chip--disabled': !token.enabled,
       'token-chip--selected': selected,
+      'token-chip--editing': editing,
     }"
     :style="{ '--chip-color': chipColor }"
-    :draggable="draggable"
+    :draggable="draggable && !editing"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
-    @dblclick="onChipDblClick"
+    @dblclick="!editing && onChipDblClick()"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
@@ -266,8 +267,10 @@ function cancelEdit() {
         @blur="commitEdit"
         @keydown.enter.prevent="commitEdit"
         @keydown.escape.prevent="cancelEdit"
+        @dblclick.stop
+        @mousedown.stop
       />
-      <span v-else ref="chipTextRef" class="chip-text" @click="onTextClick" @dblclick="onTextDblClick">{{ displayText }}</span>
+      <span v-else ref="chipTextRef" class="chip-text" @click="onTextClick" @dblclick="!editing && onTextDblClick($event)">{{ displayText }}</span>
     </div>
 
     <!-- Bottom row: translate text or clickable translate action -->
@@ -341,6 +344,10 @@ function cancelEdit() {
   border-color: var(--amber);
 }
 
+.token-chip--editing {
+  cursor: text;
+  user-select: text;
+}
 .token-chip--disabled {
   opacity: .4;
   cursor: pointer;

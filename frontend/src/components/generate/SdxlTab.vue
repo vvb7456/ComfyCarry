@@ -25,6 +25,7 @@ import TaggerModal from '@/components/generate/TaggerModal.vue'
 import LlmModal from '@/components/generate/LlmModal.vue'
 import PromptEditorModal from '@/components/generate/PromptEditorModal.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
+import MaskEditorModal from '@/components/generate/MaskEditorModal.vue'
 import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 import { TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
@@ -118,6 +119,21 @@ const {
   prepareTagger,
 })
 
+/** Mask editor: image/mask preview URLs */
+const maskEditorImageUrl = computed(() => {
+  const img = state.value.i2i.image
+  if (!img) return ''
+  return `/api/generate/input_image_preview?name=${encodeURIComponent(img)}`
+})
+const maskEditorMaskUrl = computed(() => {
+  const mask = state.value.i2i.mask
+  if (!mask) return null
+  return `/api/generate/input_image_preview?name=${encodeURIComponent(mask)}`
+})
+async function onMaskApply(blob: Blob) {
+  await i2i.uploadMask(blob)
+}
+
 defineExpose({ handlePreprocessDone, handleTagDone })
 </script>
 
@@ -187,6 +203,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @pick="i2i.picker.open()"
           @file="i2i.handleUpload"
           @clear="i2i.clearImage"
+          @mask-edit="i2i.openMaskEditor"
         />
       </div>
       <div v-show="state.activeModule === 'pose'" class="gen-module-panel">
@@ -296,6 +313,15 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :preview-url-fn="i2i.picker.previewUrl"
       @select="i2i.handleSelect"
       @upload="i2i.handleUpload"
+    />
+
+    <!-- Mask Editor Modal -->
+    <MaskEditorModal
+      v-model="i2i.maskEditorVisible.value"
+      :image-url="maskEditorImageUrl"
+      :mask-url="maskEditorMaskUrl"
+      :on-apply-mask="onMaskApply"
+      :on-clear-mask="() => i2i.clearMask()"
     />
 
     <!-- ControlNet Ref Image Picker Modals -->

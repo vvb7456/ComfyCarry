@@ -43,6 +43,9 @@ export interface I2IState {
   enabled: boolean
   image: string | null
   denoise: number
+  mode: 'i2i' | 'inpaint'
+  mask: string | null
+  growMaskBy: number
 }
 
 export interface DisabledToken {
@@ -126,7 +129,7 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     controlNets,
     upscale: { enabled: false, factor: 2, mode: '4x_overlapped_checkboard', tile: 8, downscale: 'lanczos' },
     hires: { enabled: false, denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: randomSeed() },
-    i2i: { enabled: false, image: null, denoise: 0.7 },
+    i2i: { enabled: false, image: null, denoise: 0.7, mode: 'i2i', mask: null, growMaskBy: 6 },
     activeModule: config.modules[0] || 'lora',
   }
 }
@@ -297,11 +300,19 @@ export const useGenerateStore = defineStore('generate', () => {
             state.hires.seedValue = randomSeed()
           }
 
-          // Merge with defaults to fill any missing fields
+          // Merge with defaults to fill any missing fields (deep for nested objects)
           const config = MODEL_TYPES[key]
           if (config) {
             const defaults = createDefaultState(config)
-            modelStates[key] = { ...defaults, ...state }
+            const merged = { ...defaults, ...state }
+            // Deep-merge nested objects so new fields are not lost
+            for (const k of Object.keys(defaults) as (keyof ModelState)[]) {
+              const dv = defaults[k]
+              if (dv && typeof dv === 'object' && !Array.isArray(dv) && state[k] && typeof state[k] === 'object' && !Array.isArray(state[k])) {
+                ;(merged as any)[k] = { ...dv, ...(state[k] as any) }
+              }
+            }
+            modelStates[key] = merged
           } else {
             modelStates[key] = state
           }

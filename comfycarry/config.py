@@ -14,7 +14,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # ── 版本号 (唯一源) ──────────────────────────────────────────
-APP_VERSION = "v0.3.3"
+APP_VERSION = "v0.3.4"
 
 # ── 核心路径常量 ─────────────────────────────────────────────
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")

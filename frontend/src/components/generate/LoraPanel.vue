@@ -8,7 +8,7 @@
  * - Click card image → (future) open model details
  * - Click delete → remove LoRA (auto-disables if last one removed)
  */
-import { computed, inject } from 'vue'
+import { computed, inject, ref, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
@@ -68,6 +68,34 @@ function toggleEnabled(index: number) {
 
 function updateStrength(index: number, value: number) {
   state.value.loras[index].strength = value
+}
+
+// ── Inline strength editing ──
+const editingIndex = ref<number | null>(null)
+const editRef = ref<HTMLInputElement | null>(null)
+
+function setEditRef(el: unknown) {
+  editRef.value = el as HTMLInputElement | null
+}
+
+async function startStrengthEdit(index: number) {
+  editingIndex.value = index
+  await nextTick()
+  if (editRef.value) {
+    editRef.value.focus()
+    editRef.value.select()
+  }
+}
+
+function commitStrengthEdit(index: number, e: Event) {
+  const raw = parseFloat((e.target as HTMLInputElement).value)
+  editingIndex.value = null
+  if (isNaN(raw)) return
+  state.value.loras[index].strength = Math.max(0, Math.min(2, Math.round(raw * 20) / 20))
+}
+
+function cancelStrengthEdit() {
+  editingIndex.value = null
 }
 </script>
 
@@ -131,7 +159,20 @@ function updateStrength(index: number, value: number) {
               step="0.05"
               @input="updateStrength(i, parseFloat(($event.target as HTMLInputElement).value))"
             />
-            <span class="lora-card__str-val">{{ lora.strength.toFixed(2) }}</span>
+            <span class="lora-card__str-val" :class="{ 'lora-card__str-val--editable': editingIndex !== i }" @click="startStrengthEdit(i)">
+              <input
+                v-if="editingIndex === i"
+                :ref="setEditRef"
+                type="number"
+                class="lora-card__str-edit"
+                :value="lora.strength"
+                min="0" max="2" step="0.05"
+                @blur="commitStrengthEdit(i, $event)"
+                @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+                @keydown.escape.prevent="cancelStrengthEdit"
+              />
+              <template v-else>{{ lora.strength.toFixed(2) }}</template>
+            </span>
           </div>
         </div>
       </div>
@@ -304,11 +345,39 @@ function updateStrength(index: number, value: number) {
 
 .lora-card__str-val {
   flex: 0 0 auto;
-  width: 28px;
+  min-width: 28px;
   text-align: right;
   font-family: 'IBM Plex Mono', monospace;
   font-size: .65rem;
   color: var(--ac);
+  font-weight: 600;
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: background .15s;
+}
+.lora-card__str-val--editable {
+  cursor: pointer;
+}
+.lora-card__str-val--editable:hover {
+  background: var(--bg-in);
+}
+.lora-card__str-edit {
+  width: 3.5ch;
+  padding: 0 1px;
+  border: 1px solid var(--ac);
+  border-radius: 3px;
+  background: var(--bg-in);
+  color: var(--ac);
+  font: inherit;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.lora-card__str-edit::-webkit-inner-spin-button,
+.lora-card__str-edit::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Add card matching grid item height */

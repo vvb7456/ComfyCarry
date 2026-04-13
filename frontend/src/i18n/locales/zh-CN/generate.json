@@ -141,7 +141,26 @@
     "select_ref": "请先选择参考图再启用",
     "pick_from_input": "点击选择参考图",
     "upload_local": "上传本地图片",
-    "uploaded": "参考图已上传"
+    "uploaded": "参考图已上传",
+    "mode_i2i": "图生图",
+    "mode_inpaint": "局部重绘",
+    "edit_mask": "编辑遮罩",
+    "no_image_for_mask": "请先选择参考图",
+    "grow_mask_by": "遮罩扩展",
+    "grow_mask_by_help": "自动扩展遮罩边缘像素数，改善重绘区域与原图的过渡，推荐 4-8"
+  },
+  "mask_editor": {
+    "title": "遮罩编辑器",
+    "brush": "画笔",
+    "eraser": "橡皮擦",
+    "brush_size": "笔刷大小",
+    "clear_all": "清除全部",
+    "invert": "反转",
+    "fit_screen": "适应窗口",
+    "apply": "应用遮罩",
+    "help": "用画笔涂抹需要重绘的区域（红色标记），未标记区域保持不变",
+    "space_pan": "空格+拖拽=平移",
+    "scroll_zoom": "滚轮=缩放"
   },
   "controlnet": {
     "model": "模型",
@@ -342,6 +361,8 @@
     "cn_no_ref": "{type}已启用但未上传参考图，请上传或取消勾选",
     "cn_no_model": "{type}未检测到可用模型，请确认 ComfyUI 已启动",
     "i2i_no_ref": "图生图已启用但未上传参考图，请上传或取消勾选",
+    "inpaint_no_mask": "遮罩未绘制",
+    "inpaint_no_mask_desc": "当前为局部重绘模式但未绘制遮罩，将以标准图生图模式运行。",
     "prompt_id_missing": "未获取到 prompt_id"
   },
   "model_dep": {

@@ -15,6 +15,8 @@ const props = withDefaults(defineProps<{
   editable?: boolean
   valueFormat?: (value: number) => string
   disabled?: boolean
+  /** Soft maximum: slider range goes to `max` but value is clamped to `softMax` */
+  softMax?: number
 }>(), {
   step: 1,
   showValue: true,
@@ -38,8 +40,9 @@ function defaultFormat(v: number): string {
 
 function snap(raw: number): number {
   const s = props.step
+  const ceiling = props.softMax ?? props.max
   const snapped = Math.round((raw - props.min) / s) * s + props.min
-  return Math.max(props.min, Math.min(props.max, +snapped.toFixed(stepPrecision())))
+  return Math.max(props.min, Math.min(ceiling, +snapped.toFixed(stepPrecision())))
 }
 
 /* ── computed ── */
@@ -63,7 +66,14 @@ const computedMarks = computed<string[] | null>(() => {
 /* ── slider ── */
 
 function onSlide(e: Event) {
-  const v = parseFloat((e.target as HTMLInputElement).value)
+  const el = e.target as HTMLInputElement
+  let v = parseFloat(el.value)
+  const ceiling = props.softMax ?? props.max
+  if (v > ceiling) {
+    v = ceiling
+    // Force DOM element back to the clamped position
+    el.value = String(v)
+  }
   emit('update:modelValue', v)
 }
 

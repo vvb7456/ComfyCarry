@@ -234,7 +234,10 @@ defineExpose({ clearFile })
   background: #0006;
   padding: 2px 8px; border-radius: 4px;
   max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  opacity: 0;
+  transition: opacity .15s;
 }
+.upload-zone:hover .upload-zone__fname { opacity: 1; }
 
 .upload-zone__loaded {
   display: flex; align-items: center; gap: 8px;

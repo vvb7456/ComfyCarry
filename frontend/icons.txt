@@ -56,3 +56,8 @@ skip_next
 book_2
 hard_drive_2
 package_2
+
+# MaskEditorModal — 工具栏图标
+ink_eraser
+invert_colors
+fit_screen

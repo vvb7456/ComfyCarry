@@ -98,6 +98,18 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       return null
     }
 
+    // 6b. Inpaint mode: image exists but no mask → ConfirmDialog
+    if (state.i2i.enabled && state.i2i.image && state.i2i.mode === 'inpaint' && !state.i2i.mask) {
+      const proceed = await confirm({
+        title: t('generate.error.inpaint_no_mask'),
+        message: t('generate.error.inpaint_no_mask_desc'),
+        confirmText: t('generate.error.skip_submit'),
+        dontAskKey: 'gen_inpaint_no_mask_warn',
+      })
+      if (!proceed) return null
+      // User confirmed → fall through to standard I2I payload (mask is null)
+    }
+
     // ── Build payload ──────────────────────────────────────────────────────
     // Seed: random mode generates client-side value and writes back to store
     // so user can see/copy the actual seed used (legacy behavior §8.2)
@@ -153,10 +165,19 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       controlnets,
     }
 
-    // I2I
+    // I2I / Inpaint
     if (state.i2i.enabled && state.i2i.image) {
-      payload.i2i_image = state.i2i.image
-      payload.i2i_denoise = state.i2i.denoise
+      if (state.i2i.mode === 'inpaint' && state.i2i.mask) {
+        // Inpaint mode: VAEEncodeForInpaint
+        payload.inpaint_image = state.i2i.image
+        payload.inpaint_mask = state.i2i.mask
+        payload.inpaint_denoise = state.i2i.denoise
+        payload.inpaint_grow_mask_by = state.i2i.growMaskBy
+      } else {
+        // Standard I2I mode (or inpaint without mask after user confirmed)
+        payload.i2i_image = state.i2i.image
+        payload.i2i_denoise = state.i2i.denoise
+      }
     }
 
     // Upscale

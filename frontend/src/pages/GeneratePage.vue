@@ -139,31 +139,32 @@ function onPreprocessComplete(cnType: string, success: boolean) {
 }
 
 // ── SSE event routing ──────────────────────────────────────────────────────
+// All events flow through to the tracker so the button always reflects ComfyUI
+// real state. Auxiliary task completion (preprocess, tag) is handled via routing
+// but NOT suppressed — only the "aftermath" (toast, fetch) is selective.
+let lastRoutedType: string | null = null
+
 const sse = useComfySSE(tracker, {
-  // Intercept auxiliary workflow events (preprocess, tag) BEFORE tracker
-  // — prevents them from hijacking the main progress bar (legacy behavior)
   onBeforeTracker(evt) {
     const promptId = (evt.data?.prompt_id as string) || ''
-    if (!promptId) return false
+    if (!promptId) { lastRoutedType = null; return false }
 
     const routed = taskRegistry.routeEvent(evt)
-    if (!routed) return false
+    lastRoutedType = routed?.target.type ?? null
 
-    // Only suppress non-main tasks from the tracker
-    if (routed.target.type === 'main') return false
-
-    // Handle auxiliary task completion
-    if (evt.type === 'execution_done' || evt.type === 'execution_error' || evt.type === 'execution_interrupted') {
-      const success = evt.type === 'execution_done'
-      if (routed.target.type === 'preprocess' && routed.target.subtype) {
-        onPreprocessComplete(routed.target.subtype as 'pose' | 'canny' | 'depth', success)
-      } else if (routed.target.type === 'tag') {
-        sdxlTabRef.value?.handleTagDone(success)
+    // Handle auxiliary task completion callbacks (preprocess → set image, tag → set tags)
+    if (routed && routed.target.type !== 'main') {
+      if (evt.type === 'execution_done' || evt.type === 'execution_error' || evt.type === 'execution_interrupted') {
+        const success = evt.type === 'execution_done'
+        if (routed.target.type === 'preprocess' && routed.target.subtype) {
+          onPreprocessComplete(routed.target.subtype as 'pose' | 'canny' | 'depth', success)
+        } else if (routed.target.type === 'tag') {
+          sdxlTabRef.value?.handleTagDone(success)
+        }
       }
-      taskRegistry.cleanup()
     }
 
-    return true // suppress from tracker
+    return false // let ALL events through to tracker
   },
 
   onEvent(evt, result) {
@@ -171,7 +172,7 @@ const sse = useComfySSE(tracker, {
       queuePanelRef.value?.loadQueue()
     }
 
-    // Live preview frame (legacy §6.6)
+    // Live preview frame — only for main tasks
     if (evt.type === 'preview_image' && evt.data?.b64) {
       const mainTask = taskRegistry.getMainTask()
       if (mainTask?.status === 'running') {
@@ -181,30 +182,33 @@ const sse = useComfySSE(tracker, {
     }
 
     if (result?.finished) {
-      if (result.type === 'execution_done') {
-        const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
-        const promptId = (evt.data?.prompt_id as string) || ''
-        toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
-        if (promptId) preview.fetchOutputImages(promptId)
-        queuePanelRef.value?.loadQueue()
-        historyPanelRef.value?.loadHistory()
-        taskRegistry.cleanup()
-        // Live mode: auto-rerun after successful execution
-        if (store.currentState.runMode === 'live') scheduleLiveRerun()
-      } else if (result.type === 'execution_interrupted') {
-        toast(t('generate.toast.exec_interrupted'), 'warning')
-        preview.clearPreview()
-        queuePanelRef.value?.loadQueue()
-        historyPanelRef.value?.loadHistory()
-        taskRegistry.cleanup()
-        cancelLiveRerun()
-      } else if (result.type === 'execution_error') {
-        toast(t('generate.error.exec_error_prefix'), 'error')
-        preview.clearPreview()
-        queuePanelRef.value?.loadQueue()
-        taskRegistry.cleanup()
-        cancelLiveRerun()
+      // Only show toast / fetch outputs for main tasks (or unknown = assumed main)
+      const isMain = !lastRoutedType || lastRoutedType === 'main'
+
+      if (isMain) {
+        if (result.type === 'execution_done') {
+          const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
+          const promptId = (evt.data?.prompt_id as string) || ''
+          toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
+          if (promptId) preview.fetchOutputImages(promptId)
+          queuePanelRef.value?.loadQueue()
+          historyPanelRef.value?.loadHistory()
+          // Live mode: auto-rerun after successful execution
+          if (store.currentState.runMode === 'live') scheduleLiveRerun()
+        } else if (result.type === 'execution_interrupted') {
+          toast(t('generate.toast.exec_interrupted'), 'warning')
+          preview.clearPreview()
+          queuePanelRef.value?.loadQueue()
+          historyPanelRef.value?.loadHistory()
+          cancelLiveRerun()
+        } else if (result.type === 'execution_error') {
+          toast(t('generate.error.exec_error_prefix'), 'error')
+          preview.clearPreview()
+          queuePanelRef.value?.loadQueue()
+          cancelLiveRerun()
+        }
       }
+      taskRegistry.cleanup()
     }
   },
 })

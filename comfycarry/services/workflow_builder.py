@@ -271,8 +271,50 @@ class WorkflowBuilder:
         }
         return nid
 
-    # Phase 3+ 占位符:
-    # def add_inpaint_model_conditioning(self, ...): ...
+    # ── Inpaint ──────────────────────────────────────────────────────────────
+
+    def add_load_image_mask(self, filename: str, channel: str = "red") -> str:
+        """
+        LoadImageMask: 从 input/ 目录加载 mask 图片。
+        channel: 使用哪个通道作为 mask — "alpha", "red", "green", "blue"
+        输出: [node_id, 0]=MASK
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "LoadImageMask",
+            "inputs": {
+                "image": filename,
+                "channel": channel,
+            },
+        }
+        return nid
+
+    def add_vae_encode_for_inpaint(
+        self,
+        image_node_id: str,
+        vae_node_id: str,
+        mask_node_id: str,
+        grow_mask_by: int = 6,
+    ) -> str:
+        """
+        VAEEncodeForInpaint: IMAGE + MASK + VAE → LATENT (with noise mask).
+        image_node_id: LoadImage 节点 (output[0]=IMAGE)
+        vae_node_id: CheckpointLoader 节点 (output[2]=VAE)
+        mask_node_id: LoadImageMask 节点 (output[0]=MASK)
+        grow_mask_by: 遮罩扩展像素 (0-64，默认 6)
+        输出: [node_id, 0]=LATENT
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "VAEEncodeForInpaint",
+            "inputs": {
+                "pixels": [image_node_id, 0],
+                "vae": [vae_node_id, 2],
+                "mask": [mask_node_id, 0],
+                "grow_mask_by": grow_mask_by,
+            },
+        }
+        return nid
 
     def add_vae_encode(self, image_node_id: str, vae_node_id: str) -> str:
         """
@@ -443,6 +485,10 @@ def build_sdxl_workflow(params: dict) -> dict:
         hires_seed      (int)       — 二次采样种子，-1 = 随机
         i2i_image       (str)       — 图生图: 已上传到 ComfyUI input/ 的图片文件名 (启用时替换 EmptyLatentImage)
         i2i_denoise     (float)     — 图生图去噪强度 (0.10-0.90)，默认 0.7，值越低越贴近原图
+        inpaint_image   (str)       — 局部重绘: 参考图文件名 (与 i2i_image 互斥)
+        inpaint_mask    (str)       — 局部重绘: mask 图片文件名 (黑白 PNG，白色=重绘区域)
+        inpaint_denoise (float)     — 局部重绘去噪强度 (0.10-1.00)，默认 0.75
+        inpaint_grow_mask_by (int)  — 遮罩扩展像素 (0-64)，默认 6
                                       strength: 0.0-2.0 (默认 1.0)
                                       start_percent: 0.0-1.0 (默认 0.0)
                                       end_percent: 0.0-1.0 (默认 1.0)
@@ -494,12 +540,21 @@ def build_sdxl_workflow(params: dict) -> dict:
         pos_ref = (cn_apply, 0)
         neg_ref = (cn_apply, 1)
 
-    # 4. Latent 来源 (T2I: EmptyLatentImage / I2I: LoadImage + VAEEncode)
+    # 4. Latent 来源 (Inpaint: VAEEncodeForInpaint / I2I: VAEEncode / T2I: EmptyLatentImage)
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
+    inpaint_image = str(params.get("inpaint_image", "")).strip()
+    inpaint_mask = str(params.get("inpaint_mask", "")).strip()
     i2i_image = str(params.get("i2i_image", "")).strip()
     i2i_denoise = 1.0  # T2I 默认全去噪
 
-    if i2i_image:
+    if inpaint_image and inpaint_mask:
+        # 局部重绘: 加载参考图 + mask → VAEEncodeForInpaint
+        inp_load = b.add_load_image(inpaint_image)
+        mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
+        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 64))
+        latent = b.add_vae_encode_for_inpaint(inp_load, ckpt, mask_load, grow)
+        i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
+    elif i2i_image:
         # 图生图: 加载参考图 → VAE 编码为 latent
         i2i_load = b.add_load_image(i2i_image)
         latent = b.add_vae_encode(i2i_load, ckpt)

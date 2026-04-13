@@ -142,7 +142,26 @@
     "select_ref": "Please select a reference image first",
     "pick_from_input": "Select reference image",
     "upload_local": "Upload local image",
-    "uploaded": "Reference image uploaded"
+    "uploaded": "Reference image uploaded",
+    "mode_i2i": "Img2Img",
+    "mode_inpaint": "Inpaint",
+    "edit_mask": "Edit Mask",
+    "no_image_for_mask": "Please select a reference image first",
+    "grow_mask_by": "Grow Mask By",
+    "grow_mask_by_help": "Auto-expand mask edges by this many pixels for smoother transitions between repainted and original areas. Recommended: 4-8"
+  },
+  "mask_editor": {
+    "title": "Mask Editor",
+    "brush": "Brush",
+    "eraser": "Eraser",
+    "brush_size": "Brush Size",
+    "clear_all": "Clear All",
+    "invert": "Invert",
+    "fit_screen": "Fit to Screen",
+    "apply": "Apply Mask",
+    "help": "Use brush to mark areas for regeneration (red overlay), unmarked areas will be preserved",
+    "space_pan": "Space+Drag=Pan",
+    "scroll_zoom": "Scroll=Zoom"
   },
   "controlnet": {
     "model": "Model",
@@ -343,6 +362,8 @@
     "cn_no_ref": "{type} is enabled but no reference uploaded, please upload or uncheck",
     "cn_no_model": "{type} has no available models, please confirm ComfyUI is running",
     "i2i_no_ref": "Img2Img is enabled but no reference uploaded, please upload or uncheck",
+    "inpaint_no_mask": "No mask drawn",
+    "inpaint_no_mask_desc": "Inpaint mode is active but no mask has been drawn. Will run as standard Img2Img instead.",
     "prompt_id_missing": "Failed to get prompt_id"
   },
   "model_dep": {
