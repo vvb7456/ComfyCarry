@@ -23,10 +23,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
         software-properties-common \
-        git git-lfs aria2 rclone jq curl wget ffmpeg \
+        git git-lfs aria2 jq curl wget ffmpeg unzip \
         libgl1 libglib2.0-0 libsm6 libxext6 \
         build-essential openssh-server && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Rclone (Linux 端) — 必须用官方最新版
+# Ubuntu apt 源里的 rclone 是 v1.58.1 (2022)，OneDrive multipart upload 会返回
+# "unauthenticated: Unauthenticated" 401 错误，导致 push 同步失败。
+# 官方一键脚本安装当前稳定版到 /usr/bin/rclone。
+RUN curl -fsSL https://rclone.org/install.sh | bash
 
 # =============================================================================
 # 2. Node.js 20.x + PM2
