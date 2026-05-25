@@ -33,6 +33,21 @@ class WorkflowBuilder:
         self._id_counter += 1
         return nid
 
+    @staticmethod
+    def _ref(ref, default_idx: int = 0) -> list:
+        """
+        归一化节点引用 (str | tuple | list) → [node_id, output_index]。
+
+        - str:        旧 SDXL 调用风格，按 default_idx 解释。例如:
+                        CLIP 默认 1 (CheckpointLoaderSimple),
+                        VAE 默认 2 (CheckpointLoaderSimple),
+                        MODEL 默认 0.
+        - tuple/list: 显式 (node_id, output_index)，用于独立 loader (UNETLoader, CLIPLoader, VAELoader)。
+        """
+        if isinstance(ref, (tuple, list)):
+            return [ref[0], int(ref[1])]
+        return [ref, default_idx]
+
     # ── 基础节点方法 ──────────────────────────────────────────────────────────
 
     def add_checkpoint_loader(self, ckpt_name: str) -> str:
@@ -47,10 +62,87 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_clip_text_encode(self, text: str, clip_node_id: str) -> str:
+    # ── 分离式加载器 (Anima / Flux / SD3 / HiDream / WAN 等) ─────────────────
+
+    def add_unet_loader(self, unet_name: str, weight_dtype: str = "default") -> str:
+        """
+        独立 UNET 加载 — 分离式模型主权重 (放在 ComfyUI/models/diffusion_models/)。
+        weight_dtype: default | fp8_e4m3fn | fp8_e4m3fn_fast | fp8_e5m2
+        输出: [node_id, 0]=MODEL
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "UNETLoader",
+            "inputs": {
+                "unet_name": unet_name,
+                "weight_dtype": weight_dtype,
+            },
+        }
+        return nid
+
+    def add_clip_loader_single(
+        self, clip_name: str, type: str = "stable_diffusion", device: str = "default"
+    ) -> str:
+        """
+        单文件 CLIP/Text-Encoder 加载 — 用于 Anima / Lumina / Pixart 等单文本编码器架构。
+        type: stable_diffusion | qwen_image | lumina2 | pixart | wan | hidream | chroma | ace | ...
+        Anima 实测使用 type=stable_diffusion + qwen_3_06b_base.safetensors。
+        输出: [node_id, 0]=CLIP
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "CLIPLoader",
+            "inputs": {
+                "clip_name": clip_name,
+                "type": type,
+                "device": device,
+            },
+        }
+        return nid
+
+    def add_dual_clip_loader(
+        self, clip_name1: str, clip_name2: str, type: str = "flux", device: str = "default"
+    ) -> str:
+        """
+        双文件 CLIP 加载 — Flux / SD3 等需要两个文本编码器。
+        type: flux | sdxl | sd3 | hunyuan_video | hidream
+        输出: [node_id, 0]=CLIP
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "DualCLIPLoader",
+            "inputs": {
+                "clip_name1": clip_name1,
+                "clip_name2": clip_name2,
+                "type": type,
+                "device": device,
+            },
+        }
+        return nid
+
+    def add_vae_loader(self, vae_name: str) -> str:
+        """
+        独立 VAE 加载 — 分离式模型 VAE (放在 ComfyUI/models/vae/)。
+        输出: [node_id, 0]=VAE
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "VAELoader",
+            "inputs": {
+                "vae_name": vae_name,
+            },
+        }
+        return nid
+
+    # ── 文本/Latent 通用节点 ────────────────────────────────────────────────
+
+    def add_clip_text_encode(self, text: str, clip_ref) -> str:
         """
         CLIP 文本编码 (正向/负向提示词)。
-        clip_node_id: 提供 CLIP 的节点 ID (CheckpointLoader 或 LoraLoader)
+        clip_ref: 提供 CLIP 的节点引用 —
+          - str (向后兼容): CheckpointLoaderSimple / LoraLoader / DualCLIPLoader 等 → 默认 index=1
+            (CheckpointLoaderSimple 的 CLIP 输出在 1; LoraLoader 也在 1)
+          - tuple (node_id, output_index): 独立 CLIPLoader → (node_id, 0)
         输出: [node_id, 0]=CONDITIONING
         """
         nid = self._next_id()
@@ -58,7 +150,7 @@ class WorkflowBuilder:
             "class_type": "CLIPTextEncode",
             "inputs": {
                 "text": text,
-                "clip": [clip_node_id, 1],  # index 1 = CLIP (checkpoint & lora 相同)
+                "clip": self._ref(clip_ref, default_idx=1),
             },
         }
         return nid
@@ -96,8 +188,6 @@ class WorkflowBuilder:
         """
         nid = self._next_id()
         actual_seed = seed if seed >= 0 else random.randint(0, 2**32 - 1)
-        pos = list(positive_ref) if isinstance(positive_ref, tuple) else [positive_ref, 0]
-        neg = list(negative_ref) if isinstance(negative_ref, tuple) else [negative_ref, 0]
         self._nodes[nid] = {
             "class_type": "KSampler",
             "inputs": {
@@ -107,18 +197,20 @@ class WorkflowBuilder:
                 "sampler_name": sampler,
                 "scheduler": scheduler,
                 "denoise": denoise,
-                "model": [model_node_id, 0],
-                "positive": pos,
-                "negative": neg,
-                "latent_image": [latent_node_id, 0],
+                "model": self._ref(model_node_id, default_idx=0),
+                "positive": self._ref(positive_ref, default_idx=0),
+                "negative": self._ref(negative_ref, default_idx=0),
+                "latent_image": self._ref(latent_node_id, default_idx=0),
             },
         }
         return nid
 
-    def add_vae_decode(self, samples_node_id: str, vae_node_id: str) -> str:
+    def add_vae_decode(self, samples_node_id: str, vae_ref) -> str:
         """
         VAE 解码 Latent → Image。
-        vae_node_id: 提供 VAE 的节点 ID (通常是 CheckpointLoader, index 2)
+        vae_ref:
+          - str (向后兼容): CheckpointLoader → 默认 index=2
+          - tuple (node_id, output_index): 独立 VAELoader → (node_id, 0)
         输出: [node_id, 0]=IMAGE
         """
         nid = self._next_id()
@@ -126,7 +218,7 @@ class WorkflowBuilder:
             "class_type": "VAEDecode",
             "inputs": {
                 "samples": [samples_node_id, 0],
-                "vae": [vae_node_id, 2],  # index 2 = VAE (CheckpointLoader)
+                "vae": self._ref(vae_ref, default_idx=2),
             },
         }
         return nid
@@ -182,8 +274,8 @@ class WorkflowBuilder:
 
     def add_lora_loader(
         self,
-        model_node_id: str,
-        clip_node_id: str,
+        model_ref,
+        clip_ref,
         lora_name: str,
         strength_model: float = 1.0,
         strength_clip: float | None = None,
@@ -191,6 +283,7 @@ class WorkflowBuilder:
         """
         LoRA 加载器 — 插入到 model/clip 链路中。
         强度可独立控制 model/clip，默认相同。
+        model_ref / clip_ref 接受 str (旧调用) 或 (node_id, output_index) 元组。
         输出: [node_id, 0]=MODEL, [node_id, 1]=CLIP
         """
         if strength_clip is None:
@@ -202,8 +295,8 @@ class WorkflowBuilder:
                 "lora_name": lora_name,
                 "strength_model": strength_model,
                 "strength_clip": strength_clip,
-                "model": [model_node_id, 0],
-                "clip": [clip_node_id, 1],
+                "model": self._ref(model_ref, default_idx=0),
+                "clip": self._ref(clip_ref, default_idx=1),
             },
         }
         return nid
@@ -292,14 +385,14 @@ class WorkflowBuilder:
     def add_vae_encode_for_inpaint(
         self,
         image_node_id: str,
-        vae_node_id: str,
+        vae_ref,
         mask_node_id: str,
         grow_mask_by: int = 6,
     ) -> str:
         """
         VAEEncodeForInpaint: IMAGE + MASK + VAE → LATENT (with noise mask).
         image_node_id: LoadImage 节点 (output[0]=IMAGE)
-        vae_node_id: CheckpointLoader 节点 (output[2]=VAE)
+        vae_ref: str (CheckpointLoader默认index 2) 或 (node_id, output_index) 元组
         mask_node_id: LoadImageMask 节点 (output[0]=MASK)
         grow_mask_by: 遮罩扩展像素 (0-64，默认 6)
         输出: [node_id, 0]=LATENT
@@ -309,18 +402,18 @@ class WorkflowBuilder:
             "class_type": "VAEEncodeForInpaint",
             "inputs": {
                 "pixels": [image_node_id, 0],
-                "vae": [vae_node_id, 2],
+                "vae": self._ref(vae_ref, default_idx=2),
                 "mask": [mask_node_id, 0],
                 "grow_mask_by": grow_mask_by,
             },
         }
         return nid
 
-    def add_vae_encode(self, image_node_id: str, vae_node_id: str) -> str:
+    def add_vae_encode(self, image_node_id: str, vae_ref) -> str:
         """
         VAE 编码 Image → Latent。
         用于二次采样: 将放大后的图像编码回 latent 空间以供第二次 KSampler 使用。
-        vae_node_id: 提供 VAE 的节点 ID (通常是 CheckpointLoader, index 2)
+        vae_ref: str (CheckpointLoader 默认 index=2) 或 (node_id, output_index) 元组。
         输出: [node_id, 0]=LATENT
         """
         nid = self._next_id()
@@ -328,7 +421,7 @@ class WorkflowBuilder:
             "class_type": "VAEEncode",
             "inputs": {
                 "pixels": [image_node_id, 0],
-                "vae": [vae_node_id, 2],
+                "vae": self._ref(vae_ref, default_idx=2),
             },
         }
         return nid
@@ -657,6 +750,175 @@ def build_sdxl_workflow(params: dict) -> dict:
 
     # 8. PreviewImage — 加入工作流以触发 ComfyUI WS 预览帧广播
     #    (每执行步通过 WS 二进制帧推送 JPEG 预览给所有连接的客户端)
+    b.add_preview_image(final_image)
+
+    return b.build()
+
+
+def build_anima_workflow(params: dict) -> dict:
+    """
+    构建 Anima 工作流 — 分离式架构 (UNet + 单 CLIP + VAE)。
+
+    Anima (CircleStone Labs × Comfy Org, 2B 参数) 实测节点配置:
+      - UNETLoader(unet_name, weight_dtype="default")
+      - CLIPLoader(clip_name="qwen_3_06b_base.safetensors", type="stable_diffusion")
+      - VAELoader(vae_name="qwen_image_vae.safetensors")
+      - EmptyLatentImage (经典 4 通道)
+      - KSampler 默认 steps=30 / cfg=4 / sampler=er_sde / scheduler=simple
+
+    支持模块: LoRA / I2I / Inpaint / HiRes / Upscale (与 SDXL 相同)
+    不支持: ControlNet (生态未适配)
+
+    params 关键字段:
+        unet              (str, 必填) — UNet 文件名 (models/diffusion_models/)
+        clip              (str, 必填) — Text Encoder 文件名 (models/text_encoders/)
+        vae               (str, 必填) — VAE 文件名 (models/vae/)
+        clip_type         (str)       — CLIPLoader type, 默认 "stable_diffusion"
+        unet_weight_dtype (str)       — UNet 权重精度, 默认 "default"
+        其余字段同 build_sdxl_workflow (positive_prompt / loras / hires / i2i / upscale / inpaint 等)
+    """
+    b = WorkflowBuilder()
+
+    # 1. 加载三件套
+    unet_node = b.add_unet_loader(
+        params["unet"],
+        weight_dtype=str(params.get("unet_weight_dtype", "default")),
+    )
+    clip_node = b.add_clip_loader_single(
+        params["clip"],
+        type=str(params.get("clip_type", "stable_diffusion")),
+    )
+    vae_node = b.add_vae_loader(params["vae"])
+
+    model_ref = (unet_node, 0)
+    clip_ref = (clip_node, 0)
+    vae_ref = (vae_node, 0)
+
+    # 2. 链式插入多个 LoRA (节点输出形状与 SDXL 一致: [0]=MODEL, [1]=CLIP)
+    loras = params.get("loras") or []
+    for lora_entry in loras:
+        lora_name = str(lora_entry.get("name", "")).strip()
+        if not lora_name:
+            continue
+        strength = float(lora_entry.get("strength", 1.0))
+        lora_node = b.add_lora_loader(model_ref, clip_ref, lora_name, strength_model=strength)
+        model_ref = (lora_node, 0)
+        clip_ref = (lora_node, 1)
+
+    # 3. 编码提示词
+    positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
+    negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
+    pos_ref = (positive, 0)
+    neg_ref = (negative, 0)
+    # NOTE: Anima Phase 1 暂不支持 ControlNet (生态空缺) — 直接跳过 ControlNet 链路
+
+    # 4. Latent 来源 (Inpaint / I2I / T2I)
+    batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
+    inpaint_image = str(params.get("inpaint_image", "")).strip()
+    inpaint_mask = str(params.get("inpaint_mask", "")).strip()
+    i2i_image = str(params.get("i2i_image", "")).strip()
+    i2i_denoise = 1.0
+
+    if inpaint_image and inpaint_mask:
+        inp_load = b.add_load_image(inpaint_image)
+        mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
+        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 64))
+        latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
+        i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
+    elif i2i_image:
+        i2i_load = b.add_load_image(i2i_image)
+        latent = b.add_vae_encode(i2i_load, vae_ref)
+        i2i_denoise = max(0.10, min(float(params.get("i2i_denoise", 0.7)), 0.90))
+    else:
+        latent = b.add_empty_latent(
+            int(params.get("width", 1024)),
+            int(params.get("height", 1024)),
+            batch_size=batch_size,
+        )
+
+    # 5. 采样 (Anima 推荐 defaults: steps=30 / cfg=4 / er_sde / simple)
+    sampled = b.add_ksampler(
+        model_ref,
+        pos_ref,
+        neg_ref,
+        latent,
+        seed=int(params.get("seed", -1)),
+        steps=int(params.get("steps", 30)),
+        cfg=float(params.get("cfg", 4.0)),
+        sampler=str(params.get("sampler", "er_sde")),
+        scheduler=str(params.get("scheduler", "simple")),
+        denoise=i2i_denoise,
+    )
+
+    # 6. VAE 解码 (独立 VAELoader, index=0)
+    decoded = b.add_vae_decode(sampled, vae_ref)
+
+    # ── 放大链路 (AuraSR 与架构无关，完全复用) ────────────────────────
+    final_image = decoded
+    upscale_enabled = bool(params.get("upscale_enabled", False))
+    if upscale_enabled:
+        upscale_factor = max(1.0, min(float(params.get("upscale_factor", 2)), 4.0))
+        upscale_mode = str(params.get("upscale_mode", "4x_overlapped_checkboard"))
+        if upscale_mode not in ("4x", "4x_overlapped_checkboard", "4x_overlapped_constant"):
+            upscale_mode = "4x_overlapped_checkboard"
+        upscale_tile = int(params.get("upscale_tile_batch_size", 8))
+        downscale_method = str(params.get("upscale_downscale_method", "lanczos"))
+        if downscale_method not in ("lanczos", "bicubic", "bilinear", "area", "nearest-exact"):
+            downscale_method = "lanczos"
+        aurasr = b.add_aurasr_upscale(
+            decoded,
+            model_name="model.safetensors",
+            mode=upscale_mode,
+            tile_batch_size=upscale_tile,
+        )
+        if upscale_factor < 4.0:
+            base_w = int(params.get("width", 1024))
+            base_h = int(params.get("height", 1024))
+            target_w = round(base_w * upscale_factor)
+            target_h = round(base_h * upscale_factor)
+            final_image = b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
+        else:
+            final_image = aurasr
+
+    # ── 二次采样 (HiRes Refine) ────────────────────────────────────────
+    hires_enabled = bool(params.get("hires_enabled", False))
+    if hires_enabled:
+        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
+        hires_steps = max(5, min(int(params.get("hires_steps", 30)), 50))
+        hires_cfg = max(1.0, min(float(params.get("hires_cfg", 4.0)), 20.0))
+        hires_sampler = str(params.get("hires_sampler", "er_sde"))
+        hires_scheduler = str(params.get("hires_scheduler", "simple"))
+        hires_seed = int(params.get("hires_seed", -1))
+        hires_latent = b.add_vae_encode(final_image, vae_ref)
+        hires_sampled = b.add_ksampler(
+            model_ref,
+            positive,  # 复用基础正/负提示词
+            negative,
+            hires_latent,
+            seed=hires_seed,
+            steps=hires_steps,
+            cfg=hires_cfg,
+            sampler=hires_sampler,
+            scheduler=hires_scheduler,
+            denoise=hires_denoise,
+        )
+        final_image = b.add_vae_decode(hires_sampled, vae_ref)
+
+    # 7. 保存图片
+    save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
+    output_format = str(params.get("output_format", "png")).lower()
+    if output_format not in ("png", "jpg", "jpeg", "webp", "tiff", "bmp", "gif"):
+        output_format = "png"
+
+    if '/' in save_prefix_raw:
+        save_output_path, save_filename = save_prefix_raw.rsplit('/', 1)
+    else:
+        save_output_path, save_filename = '', save_prefix_raw
+
+    b.add_save_image(final_image, prefix=save_filename, output_path=save_output_path,
+                     extension=output_format, batch_size=batch_size)
+
+    # 8. PreviewImage
     b.add_preview_image(final_image)
 
     return b.build()

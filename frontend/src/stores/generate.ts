@@ -66,6 +66,10 @@ export interface ModelState {
   positiveDisabled: DisabledToken[]
   negativeDisabled: DisabledToken[]
   checkpoint: string
+  // Anima 三件套 (仅 model_type='anima' 使用)
+  unet: string
+  clip: string
+  vae: string
   loras: LoraEntry[]
   resolution: string
   width: number
@@ -112,6 +116,9 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     positiveDisabled: [],
     negativeDisabled: [],
     checkpoint: '',
+    unet: '',
+    clip: '',
+    vae: '',
     loras: [],
     resolution: config.resolutions[0]?.value || '1024x1024',
     width: 1024,
@@ -244,6 +251,9 @@ export const useGenerateStore = defineStore('generate', () => {
     loraExists?: (name: string) => boolean
     samplerExists?: (name: string) => boolean
     schedulerExists?: (name: string) => boolean
+    unetExists?: (name: string) => boolean
+    clipExists?: (name: string) => boolean
+    vaeExists?: (name: string) => boolean
   }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
@@ -278,6 +288,15 @@ export const useGenerateStore = defineStore('generate', () => {
           if (validators) {
             if (state.checkpoint && validators.checkpointExists && !validators.checkpointExists(state.checkpoint)) {
               state.checkpoint = ''
+            }
+            if (state.unet && validators.unetExists && !validators.unetExists(state.unet)) {
+              state.unet = ''
+            }
+            if (state.clip && validators.clipExists && !validators.clipExists(state.clip)) {
+              state.clip = ''
+            }
+            if (state.vae && validators.vaeExists && !validators.vaeExists(state.vae)) {
+              state.vae = ''
             }
             if (validators.loraExists) {
               state.loras = state.loras.filter(l => validators.loraExists!(l.name))

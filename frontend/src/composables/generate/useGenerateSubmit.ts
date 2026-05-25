@@ -48,7 +48,13 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     // 2. Preprocess check — placeholder for future phases
 
     // 3. Basic validation
-    if (!state.checkpoint) {
+    const modelType = store.activeModelType
+    if (modelType === 'anima') {
+      if (!state.unet || !state.clip || !state.vae) {
+        toast(t('generate.error.no_anima_models'), 'error')
+        return null
+      }
+    } else if (!state.checkpoint) {
       toast(t('generate.error.no_checkpoint'), 'error')
       return null
     }
@@ -147,8 +153,7 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     }
 
     const payload: Record<string, unknown> = {
-      model_type: store.activeModelType,
-      checkpoint: state.checkpoint,
+      model_type: modelType,
       positive_prompt: normalizePrompt(state.positive, nOpts),
       negative_prompt: normalizePrompt(state.negative, nOpts),
       width: state.width,
@@ -163,6 +168,15 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       output_format: state.format,
       loras,
       controlnets,
+    }
+
+    // 架构专属字段
+    if (modelType === 'anima') {
+      payload.unet = state.unet
+      payload.clip = state.clip
+      payload.vae = state.vae
+    } else {
+      payload.checkpoint = state.checkpoint
     }
 
     // I2I / Inpaint

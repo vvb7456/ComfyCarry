@@ -3,10 +3,12 @@
   "gate": {
     "starting": "ComfyUI 正在启动，请稍候…",
     "go_comfyui": "前往 ComfyUI 页启动",
-    "backend_error": "无法连接 Dashboard 服务"
+    "backend_error": "无法连接 Dashboard 服务",
+    "anima_title": "Anima 需下载专用文本编码器与 VAE"
   },
   "tabs": {
     "sdxl": "SDXL",
+    "anima": "Anima",
     "flux": "Flux",
     "history": "队列 & 历史"
   },
@@ -76,7 +78,16 @@
     "steps": "步数",
     "cfg_scale": "CFG Scale",
     "select_checkpoint": "选择 Checkpoint",
-    "search_checkpoint": "搜索 Checkpoint..."
+    "search_checkpoint": "搜索 Checkpoint...",
+    "unet": "UNet 主权重",
+    "clip": "CLIP 文本编码器",
+    "vae": "VAE",
+    "select_unet": "选择 UNet",
+    "select_clip": "选择 CLIP",
+    "select_vae": "选择 VAE",
+    "search_unet": "搜索 UNet...",
+    "search_clip": "搜索 CLIP...",
+    "search_vae": "搜索 VAE..."
   },
   "advanced": {
     "title": "高级设置",
@@ -351,6 +362,8 @@
   },
   "error": {
     "no_checkpoint": "请选择基础模型",
+    "no_anima_models": "请完整选择 UNet / CLIP / VAE 三个模型文件",
+    "cn_disabled_anima": "Anima 架构暂不支持 ControlNet",
     "no_prompt": "请填写画面描述",
     "modules_not_enabled": "部分功能已配置但未启用",
     "modules_not_enabled_desc": "已配置参数但开关未打开，提交后将不会生效。",

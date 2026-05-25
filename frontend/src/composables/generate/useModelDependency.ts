@@ -73,7 +73,9 @@ export interface UseModelDependencyReturn {
 // ── Composable ───────────────────────────────────────────────────────────────
 
 export function useModelDependency(config: ModelDepConfig): UseModelDependencyReturn {
-  const show = ref(false)
+  // 初始 true：避免 check() 异步期间真实表单/面板"闪"出来。
+  // check() 完成后根据 welcome_state 决定是否保留 true（首次未 dismiss）或 set false（已 dismiss）。
+  const show = ref(true)
   const loading = ref(false)
   const models = ref<ModelDep[]>(config.models)
   const modelStatus = ref<Map<string, ModelDepStatus>>(new Map())

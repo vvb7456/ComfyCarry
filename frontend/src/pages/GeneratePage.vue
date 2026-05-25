@@ -15,6 +15,7 @@ import { GenerateOptionsKey } from '@/composables/generate/keys'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import TabSwitcher, { type TabItem } from '@/components/ui/TabSwitcher.vue'
 import SdxlTab from '@/components/generate/SdxlTab.vue'
+import AnimaTab from '@/components/generate/AnimaTab.vue'
 import QueuePanel from '@/components/generate/QueuePanel.vue'
 import HistoryPanel from '@/components/generate/HistoryPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -48,6 +49,9 @@ async function initOptions(forceRefresh = false) {
   store.restore({
     checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
     loraExists: (name) => options.loras.value.some(l => l.name === name),
+    unetExists: (name) => options.unets.value.some(u => u.name === name),
+    clipExists: (name) => options.clips.value.some(c => c.name === name),
+    vaeExists: (name) => options.vaes.value.some(v => v.name === name),
     samplerExists: (name) => options.samplers.value.includes(name),
     schedulerExists: (name) => options.schedulers.value.includes(name),
   })
@@ -69,13 +73,22 @@ onActivated(() => {
   gate.checkNow()
 })
 
-const activeTab = ref('sdxl')
+const activeTab = ref<string>(store.activeModelType === 'anima' ? 'anima' : 'sdxl')
 
 const tabs = computed<TabItem[]>(() => [
   { key: 'sdxl', label: t('generate.tabs.sdxl'), icon: 'image' },
-  { key: 'flux', label: t('generate.tabs.flux'), icon: 'bolt', disabled: true },
+  { key: 'anima', label: t('generate.tabs.anima'), icon: 'palette' },
   { key: 'history', label: t('generate.tabs.history'), icon: 'history', align: 'right' },
 ])
+
+// Sync activeTab -> store model type
+watch(activeTab, (v) => {
+  if (v === 'sdxl' && store.activeModelType !== 'sdxl') {
+    store.switchModelType('sdxl')
+  } else if (v === 'anima' && store.activeModelType !== 'anima') {
+    store.switchModelType('anima')
+  }
+})
 
 // ── Exec tracker + SSE ─────────────────────────────────────────────────────
 const tracker = useExecTracker()
@@ -127,15 +140,20 @@ async function handleStop() {
   toast(t('generate.toast.interrupt_sent'), 'info')
 }
 
-// ── Auxiliary task registration (from SdxlTab) ─────────────────────────────
+// ── Auxiliary task registration (from SdxlTab / AnimaTab) ──────────────────
 const sdxlTabRef = ref<InstanceType<typeof SdxlTab> | null>(null)
+const animaTabRef = ref<InstanceType<typeof AnimaTab> | null>(null)
+
+function activeTabRef() {
+  return activeTab.value === 'anima' ? animaTabRef.value : sdxlTabRef.value
+}
 
 function handleRegisterTask(promptId: string, type: 'preprocess' | 'tag', subtype: string) {
   taskRegistry.registerTask(promptId, type, subtype)
 }
 
 function onPreprocessComplete(cnType: string, success: boolean) {
-  sdxlTabRef.value?.handlePreprocessDone(cnType, success)
+  activeTabRef()?.handlePreprocessDone(cnType, success)
 }
 
 // ── SSE event routing ──────────────────────────────────────────────────────
@@ -159,7 +177,7 @@ const sse = useComfySSE(tracker, {
         if (routed.target.type === 'preprocess' && routed.target.subtype) {
           onPreprocessComplete(routed.target.subtype as 'pose' | 'canny' | 'depth', success)
         } else if (routed.target.type === 'tag') {
-          sdxlTabRef.value?.handleTagDone(success)
+          activeTabRef()?.handleTagDone(success)
         }
       }
     }
@@ -247,6 +265,22 @@ sse.start()
       <div v-show="activeTab === 'sdxl'">
         <SdxlTab
           ref="sdxlTabRef"
+          :exec-state="execState"
+          :elapsed="tracker.elapsed.value"
+          :submitting="submitting"
+          :preview-images="preview.images.value"
+          :preview-loading="preview.loading.value"
+          :preview-current="preview.currentPreview.value"
+          @run="handleRun"
+          @stop="handleStop"
+          @register-task="handleRegisterTask"
+        />
+      </div>
+
+      <!-- Anima Tab -->
+      <div v-show="activeTab === 'anima'">
+        <AnimaTab
+          ref="animaTabRef"
           :exec-state="execState"
           :elapsed="tracker.elapsed.value"
           :submitting="submitting"

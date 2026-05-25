@@ -18,6 +18,13 @@ export interface LoraItem {
   info: Record<string, unknown> | null
 }
 
+/** UNet / CLIP / VAE 单文件项 (Anima 等分离式架构使用) */
+export interface ModelFileItem {
+  name: string
+  preview: string | null
+  arch: string
+}
+
 export interface GenerateOptionsReturn {
   loaded: Ref<boolean>
   loading: Ref<boolean>
@@ -25,6 +32,9 @@ export interface GenerateOptionsReturn {
   schedulers: Ref<string[]>
   checkpoints: ComputedRef<CheckpointItem[]>
   loras: ComputedRef<LoraItem[]>
+  unets: ComputedRef<ModelFileItem[]>
+  clips: ComputedRef<ModelFileItem[]>
+  vaes: ComputedRef<ModelFileItem[]>
   controlnetModels: Ref<Record<string, string[]>>
   comfyuiDir: Ref<string>
   load: () => Promise<void>
@@ -38,10 +48,17 @@ interface OptionsResponse {
   schedulers: string[]
   checkpoints: string[]
   loras: string[]
+  unets: string[]
+  clips: string[]
+  vaes: string[]
   checkpoint_previews: Record<string, string | null>
   lora_previews: Record<string, string | null>
+  unet_previews: Record<string, string | null>
+  clip_previews: Record<string, string | null>
+  vae_previews: Record<string, string | null>
   checkpoint_archs: Record<string, string>
   lora_archs: Record<string, string>
+  unet_archs: Record<string, string>
   lora_triggers: Record<string, string>
   checkpoint_info: Record<string, Record<string, unknown>>
   lora_info: Record<string, Record<string, unknown>>
@@ -64,10 +81,17 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   // Raw data from API
   const rawCheckpoints = ref<string[]>([])
   const rawLoras = ref<string[]>([])
+  const rawUnets = ref<string[]>([])
+  const rawClips = ref<string[]>([])
+  const rawVaes = ref<string[]>([])
   const checkpointPreviews = ref<Record<string, string | null>>({})
   const loraPreviews = ref<Record<string, string | null>>({})
+  const unetPreviews = ref<Record<string, string | null>>({})
+  const clipPreviews = ref<Record<string, string | null>>({})
+  const vaePreviews = ref<Record<string, string | null>>({})
   const checkpointArchs = ref<Record<string, string>>({})
   const loraArchs = ref<Record<string, string>>({})
+  const unetArchs = ref<Record<string, string>>({})
   const loraTriggers = ref<Record<string, string>>({})
   const checkpointInfo = ref<Record<string, Record<string, unknown>>>({})
   const loraInfo = ref<Record<string, Record<string, unknown>>>({})
@@ -92,6 +116,31 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     })),
   )
 
+  const unets = computed<ModelFileItem[]>(() =>
+    rawUnets.value.map(name => ({
+      name,
+      preview: unetPreviews.value[name] ?? null,
+      arch: unetArchs.value[name] ?? 'unknown',
+    })),
+  )
+
+  // CLIP / VAE 不检测架构 (仅 UNet 过滤)
+  const clips = computed<ModelFileItem[]>(() =>
+    rawClips.value.map(name => ({
+      name,
+      preview: clipPreviews.value[name] ?? null,
+      arch: 'unknown',
+    })),
+  )
+
+  const vaes = computed<ModelFileItem[]>(() =>
+    rawVaes.value.map(name => ({
+      name,
+      preview: vaePreviews.value[name] ?? null,
+      arch: 'unknown',
+    })),
+  )
+
   async function fetchOptions(forceRefresh = false) {
     if (loading.value) return
     loading.value = true
@@ -104,10 +153,17 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       schedulers.value = data.schedulers || []
       rawCheckpoints.value = data.checkpoints || []
       rawLoras.value = data.loras || []
+      rawUnets.value = data.unets || []
+      rawClips.value = data.clips || []
+      rawVaes.value = data.vaes || []
       checkpointPreviews.value = data.checkpoint_previews || {}
       loraPreviews.value = data.lora_previews || {}
+      unetPreviews.value = data.unet_previews || {}
+      clipPreviews.value = data.clip_previews || {}
+      vaePreviews.value = data.vae_previews || {}
       checkpointArchs.value = data.checkpoint_archs || {}
       loraArchs.value = data.lora_archs || {}
+      unetArchs.value = data.unet_archs || {}
       loraTriggers.value = data.lora_triggers || {}
       checkpointInfo.value = data.checkpoint_info || {}
       loraInfo.value = data.lora_info || {}
@@ -133,6 +189,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     loaded, loading,
     samplers, schedulers,
     checkpoints, loras,
+    unets, clips, vaes,
     controlnetModels, comfyuiDir,
     load, refresh,
   }

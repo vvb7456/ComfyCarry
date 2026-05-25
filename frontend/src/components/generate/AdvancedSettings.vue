@@ -14,6 +14,8 @@ defineOptions({ name: 'AdvancedSettings' })
 
 defineProps<{
   disabled?: boolean
+  /** Anima 专用：额外在顶部展示 CLIP + VAE 两项 split-file 选择 */
+  showSplitModels?: boolean
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -33,6 +35,14 @@ const formatOptions = [
 function formatLabel(key: string): string {
   return t(`generate.advanced.format_${key}`)
 }
+
+/* ── CLIP / VAE (split-file architectures) ── */
+function basenameNoExt(name: string) {
+  const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
+  return base.replace(/\.[^.]+$/, '')
+}
+const clipOptions = computed(() => options.clips.value.map(c => ({ value: c.name, label: basenameNoExt(c.name) })))
+const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, label: basenameNoExt(v.name) })))
 </script>
 
 <template>
@@ -43,6 +53,30 @@ function formatLabel(key: string): string {
     </summary>
 
     <div class="adv-body">
+      <!-- Row 0 (Anima only): CLIP + VAE split-file selectors -->
+      <div v-if="showSplitModels" class="adv-2col">
+        <div class="field-group">
+          <label class="field-lbl">{{ t('generate.basic.clip') }}</label>
+          <BaseSelect
+            :model-value="state.clip"
+            :options="clipOptions"
+            :disabled="disabled"
+            :placeholder="t('generate.basic.select_clip')"
+            @update:model-value="state.clip = String($event)"
+          />
+        </div>
+        <div class="field-group">
+          <label class="field-lbl">{{ t('generate.basic.vae') }}</label>
+          <BaseSelect
+            :model-value="state.vae"
+            :options="vaeOptions"
+            :disabled="disabled"
+            :placeholder="t('generate.basic.select_vae')"
+            @update:model-value="state.vae = String($event)"
+          />
+        </div>
+      </div>
+
       <!-- Row 1: Sampler + Scheduler -->
       <div class="adv-2col">
         <div class="field-group">

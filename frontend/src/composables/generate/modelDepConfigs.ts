@@ -110,6 +110,44 @@ export const UPSCALE_MODEL_CONFIG: ModelDepConfig = {
   models: [UPSCALE_MODELS.aurasr_v2],
 }
 
+// ── Anima Model Definitions ──────────────────────────────────────────────────
+// Anima 架构需要 UNet + CLIP + VAE 三件套（split-file），其中 UNet 由用户在
+// 主选择器中选择，CLIP / VAE 视为固定附属文件，缺失时由 tab 级 Gate 引导下载。
+// HuggingFace 官方仓库：https://huggingface.co/circlestone-labs/Anima
+
+const ANIMA_MODELS: Record<string, ModelDep> = {
+  qwen3_clip: {
+    id: 'qwen_3_06b_base',
+    name: 'Qwen3 0.6B (CLIP / 文本编码器)',
+    description: 'Anima 专用文本编码器，体积约 1.19 GB',
+    size: '~1.19 GB',
+    required: true,
+    files: [{
+      filename: 'qwen_3_06b_base.safetensors',
+      url: 'https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors?download=true',
+      subdir: 'models/text_encoders',
+    }],
+  },
+  qwen_vae: {
+    id: 'qwen_image_vae',
+    name: 'Qwen Image VAE',
+    description: 'Anima 专用 VAE，体积约 253 MB',
+    size: '~253 MB',
+    required: true,
+    files: [{
+      filename: 'qwen_image_vae.safetensors',
+      url: 'https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors?download=true',
+      subdir: 'models/vae',
+    }],
+  },
+}
+
+export const ANIMA_MODEL_CONFIG: ModelDepConfig = {
+  tab: 'anima',
+  title: 'generate.gate.anima_title',
+  models: [ANIMA_MODELS.qwen3_clip, ANIMA_MODELS.qwen_vae],
+}
+
 export const CN_MODEL_CONFIGS: Record<string, ModelDepConfig> = {
   pose: {
     tab: 'pose',

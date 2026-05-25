@@ -56,6 +56,17 @@ _TYPE_TO_DIR_KEY = {
 # 有效模型文件扩展名
 _MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
+# 分离架构 (split-file): UNet 主权重 应进 diffusion_models 而非 checkpoints。
+# CivitAI 统一将主权重文件标为 "Checkpoint"，需按 baseModel 字段识别重定向。
+_SPLIT_FILE_BASE_KEYWORDS = ("anima", "flux", "sd 3", "sd3", "hidream", "wan", "hunyuan", "lumina", "pixart")
+
+
+def _is_split_file_base_model(base_model: str) -> bool:
+    if not base_model:
+        return False
+    bm = base_model.lower()
+    return any(k in bm for k in _SPLIT_FILE_BASE_KEYWORDS)
+
 
 # ── URL/ID 解析 ──────────────────────────────────────────────────────────────
 
@@ -248,6 +259,11 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
     type_lower = model_type.lower()
     save_dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
 
+    # 分离架构重定向：Checkpoint + (Anima/Flux/SD3/...) → diffusion_models
+    base_model_str = version_data.get("baseModel", "") or ""
+    if type_lower == "checkpoint" and _is_split_file_base_model(base_model_str):
+        save_dir_key = "diffusion_models"
+
     # Early Access / 付费检测
     availability = version_data.get("availability", "Public")
     ea_config = version_data.get("earlyAccessConfig") or {}
@@ -397,6 +413,11 @@ def resolve_save_dir(model_type: str, base_model: str = "") -> str:
     """
     type_lower = model_type.lower()
     dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
+
+    # 分离架构重定向：Checkpoint + split-file baseModel → diffusion_models
+    if type_lower == "checkpoint" and _is_split_file_base_model(base_model):
+        dir_key = "diffusion_models"
+
     rel_dir = MODEL_DIRS.get(dir_key, f"models/{dir_key}")
 
     # 追加 baseModel 子文件夹

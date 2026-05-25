@@ -4,10 +4,12 @@
     "starting": "ComfyUI is starting, please wait…",
 
     "go_comfyui": "Go to ComfyUI page to start",
-    "backend_error": "Cannot connect to Dashboard service"
+    "backend_error": "Cannot connect to Dashboard service",
+    "anima_title": "Anima requires dedicated text encoder & VAE"
   },
   "tabs": {
     "sdxl": "SDXL",
+    "anima": "Anima",
     "flux": "Flux",
     "history": "Queue & History"
   },
@@ -77,7 +79,16 @@
     "steps": "Steps",
     "cfg_scale": "CFG Scale",
     "select_checkpoint": "Select Checkpoint",
-    "search_checkpoint": "Search Checkpoint..."
+    "search_checkpoint": "Search Checkpoint...",
+    "unet": "UNet (Diffusion Model)",
+    "clip": "CLIP Text Encoder",
+    "vae": "VAE",
+    "select_unet": "Select UNet",
+    "select_clip": "Select CLIP",
+    "select_vae": "Select VAE",
+    "search_unet": "Search UNet...",
+    "search_clip": "Search CLIP...",
+    "search_vae": "Search VAE..."
   },
   "advanced": {
     "title": "Advanced Settings",
@@ -352,6 +363,8 @@
   },
   "error": {
     "no_checkpoint": "Please select a checkpoint",
+    "no_anima_models": "Please select UNet / CLIP / VAE for Anima",
+    "cn_disabled_anima": "ControlNet is not available for Anima yet",
     "no_prompt": "Please enter a prompt",
     "modules_not_enabled": "Some features are configured but not enabled",
     "modules_not_enabled_desc": "Parameters are configured but toggles are off. They will not take effect after submission.",

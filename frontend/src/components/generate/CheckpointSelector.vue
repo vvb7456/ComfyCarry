@@ -17,6 +17,10 @@ export interface CheckpointInfo {
 const props = defineProps<{
   selected: CheckpointInfo | null
   disabled?: boolean
+  /** Override default 'select checkpoint' empty label (i18n string already resolved by caller) */
+  emptyLabel?: string
+  /** Override default 'click to change' hint */
+  changeLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +50,7 @@ function onImgError(e: Event) {
     <!-- Empty state -->
     <div v-if="!selected" class="ckpt-empty">
       <span class="ckpt-empty__icon">+</span>
-      <span class="ckpt-empty__text">{{ t('generate.basic.select_checkpoint') }}</span>
+      <span class="ckpt-empty__text">{{ emptyLabel || t('generate.basic.select_checkpoint') }}</span>
     </div>
 
     <!-- Selected state — horizontal: left 30% image | right info -->
@@ -80,7 +84,7 @@ function onImgError(e: Event) {
       </div>
       <div class="ckpt-card__info">
         <div class="ckpt-card__name" :title="selected.displayName">{{ selected.displayName }}</div>
-        <span class="ckpt-card__hint">{{ t('generate.basic.click_change') }}</span>
+        <span class="ckpt-card__hint">{{ changeLabel || t('generate.basic.click_change') }}</span>
       </div>
     </div>
   </div>

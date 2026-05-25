@@ -27,7 +27,12 @@ from flask import Blueprint, jsonify, request
 from ..config import COMFYUI_DIR, COMFYUI_URL
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
-from ..services.workflow_builder import build_sdxl_workflow, build_preprocess_workflow, build_tag_workflow
+from ..services.workflow_builder import (
+    build_sdxl_workflow,
+    build_anima_workflow,
+    build_preprocess_workflow,
+    build_tag_workflow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +171,9 @@ def _detect_arch_from_path(name: str) -> str:
     if len(parts) < 2:
         return "unknown"
     folder = parts[0].lower()
+    # Anima (CivitAI baseModel 子文件夹)
+    if folder == "anima":
+        return "anima"
     # SD 1.x
     if folder in ("sd 1.4", "sd 1.5", "sd 1.5 lcm", "sd 1.5 hyper"):
         return "sd15"
@@ -296,6 +304,13 @@ def _match_arch_from_keys(keys: set[str]) -> str:
     """从 tensor key 名称集合匹配模型架构。"""
     has = lambda prefix: any(k.startswith(prefix) for k in keys)
 
+    # Anima UNet: 所有 tensor key 以 net.blocks. 开头 (685 tensors，唯一特征)
+    if has("net.blocks."):
+        return "anima"
+    # Anima LoRA: keys 形如 lora_unet_blocks_<N>_(cross_attn|self_attn|mlp_layer)_*
+    # 必须在通用 lora_unet_ 检测之前判别
+    if has("lora_unet_blocks_"):
+        return "anima"
     # Flux: double_blocks / single_blocks
     if has("double_blocks."):
         return "flux"
@@ -369,9 +384,12 @@ def _fetch_generate_options() -> dict:
     ]
     DEFAULT = {"samplers": DEFAULT_SAMPLERS, "schedulers": DEFAULT_SCHEDULERS,
                "checkpoints": [], "loras": [],
+               "unets": [], "clips": [], "vaes": [],
                "checkpoint_previews": {}, "lora_previews": {}, "lora_triggers": {},
                "lora_info": {}, "checkpoint_info": {},
                "checkpoint_archs": {}, "lora_archs": {},
+               "unet_previews": {}, "clip_previews": {}, "vae_previews": {},
+               "unet_archs": {},
                "comfyui_dir": COMFYUI_DIR, "controlnet_models": {}}
 
     def _get_combo_list(node_name: str, field: str) -> list:
@@ -391,6 +409,9 @@ def _fetch_generate_options() -> dict:
     schedulers = _get_combo_list("KSampler", "scheduler")
     checkpoints = _get_combo_list("CheckpointLoaderSimple", "ckpt_name")
     loras       = _get_combo_list("LoraLoader", "lora_name")
+    unets       = _get_combo_list("UNETLoader", "unet_name")
+    clips       = _get_combo_list("CLIPLoader", "clip_name")
+    vaes        = _get_combo_list("VAELoader", "vae_name")
 
     if not samplers:
         # ComfyUI 未运行，返回默认值但不缓存
@@ -402,6 +423,9 @@ def _fetch_generate_options() -> dict:
         "schedulers":  schedulers if isinstance(schedulers, list)  else DEFAULT_SCHEDULERS,
         "checkpoints": checkpoints if isinstance(checkpoints, list) else [],
         "loras":       loras       if isinstance(loras, list)       else [],
+        "unets":       unets       if isinstance(unets, list)       else [],
+        "clips":       clips       if isinstance(clips, list)       else [],
+        "vaes":        vaes        if isinstance(vaes, list)        else [],
     }
 
     # ── 扫描预览图 & 元数据 ─────────────────────────────────────────────
@@ -419,6 +443,15 @@ def _fetch_generate_options() -> dict:
     result["checkpoint_archs"] = _scan_model_archs(ckpt_list, "models/checkpoints")
     result["lora_archs"] = _scan_model_archs(lora_list, "models/loras")
     result["comfyui_dir"] = COMFYUI_DIR
+
+    # ── 分离式架构: UNet / CLIP / VAE 预览图 + UNet 架构检测 ────────────
+    unet_list = result["unets"]
+    clip_list = result["clips"]
+    vae_list = result["vaes"]
+    result["unet_previews"] = _scan_model_previews(unet_list, "models/diffusion_models")
+    result["clip_previews"] = _scan_model_previews(clip_list, "models/text_encoders")
+    result["vae_previews"] = _scan_model_previews(vae_list, "models/vae")
+    result["unet_archs"] = _scan_model_archs(unet_list, "models/diffusion_models")
 
     # ── ControlNet 模型 (按类型分组) ───────────────────────────────────
     cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
@@ -699,8 +732,8 @@ def api_generate_input_image_preview():
 # 支持的模型类型 → 对应工作流构建函数
 _BUILDERS = {
     "sdxl": build_sdxl_workflow,
+    "anima": build_anima_workflow,  # 分离式架构: UNet + 单 CLIP + VAE
     # "flux": build_flux_workflow,    ← Phase 2+
-    # "zimage": build_zimage_workflow,
 }
 
 
@@ -738,10 +771,6 @@ def api_generate_submit():
     if model_type not in _BUILDERS:
         return jsonify({"error": f"不支持的模型类型: {model_type}"}), 400
 
-    checkpoint = data.get("checkpoint", "").strip()
-    if not checkpoint:
-        return jsonify({"error": "请选择基础模型 (Checkpoint)"}), 400
-
     positive_prompt = data.get("positive_prompt", "").strip()
     if not positive_prompt:
         return jsonify({"error": "画面描述不能为空"}), 400
@@ -759,11 +788,35 @@ def api_generate_submit():
         logger.warning(f"[generate] 获取 options 失败 (非致命，跳过校验): {e}")
         opts = {}
 
-    ckpt_list = opts.get("checkpoints", [])
-    if ckpt_list and checkpoint not in ckpt_list:
-        return jsonify({
-            "error": f"模型文件未找到: {checkpoint}，请前往模型管理页确认"
-        }), 400
+    # 不同模型类型校验不同字段
+    if model_type == "sdxl":
+        checkpoint = data.get("checkpoint", "").strip()
+        if not checkpoint:
+            return jsonify({"error": "请选择基础模型 (Checkpoint)"}), 400
+        ckpt_list = opts.get("checkpoints", [])
+        if ckpt_list and checkpoint not in ckpt_list:
+            return jsonify({
+                "error": f"模型文件未找到: {checkpoint}，请前往模型管理页确认"
+            }), 400
+    elif model_type == "anima":
+        unet = data.get("unet", "").strip()
+        clip = data.get("clip", "").strip()
+        vae = data.get("vae", "").strip()
+        if not unet or not clip or not vae:
+            return jsonify({
+                "error": "Anima 需选择 UNet / Text Encoder / VAE 三个模型文件"
+            }), 400
+        for key, fname, listkey, label in (
+            ("unet", unet, "unets", "UNet"),
+            ("clip", clip, "clips", "Text Encoder"),
+            ("vae", vae, "vaes", "VAE"),
+        ):
+            file_list = opts.get(listkey, [])
+            if file_list and fname not in file_list:
+                return jsonify({
+                    "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
+                }), 400
+            data[key] = fname
 
     # ── LoRA 文件存在性校验 (支持数组格式) ─────────────────────────────────
     loras = data.get("loras") or []
