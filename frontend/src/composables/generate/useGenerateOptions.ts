@@ -23,6 +23,7 @@ export interface ModelFileItem {
   name: string
   preview: string | null
   arch: string
+  info?: Record<string, unknown> | null
 }
 
 export interface GenerateOptionsReturn {
@@ -62,6 +63,7 @@ interface OptionsResponse {
   lora_triggers: Record<string, string>
   checkpoint_info: Record<string, Record<string, unknown>>
   lora_info: Record<string, Record<string, unknown>>
+  unet_info: Record<string, Record<string, unknown>>
   controlnet_models: Record<string, string[]>
   comfyui_dir: string
 }
@@ -95,6 +97,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const loraTriggers = ref<Record<string, string>>({})
   const checkpointInfo = ref<Record<string, Record<string, unknown>>>({})
   const loraInfo = ref<Record<string, Record<string, unknown>>>({})
+  const unetInfo = ref<Record<string, Record<string, unknown>>>({})
 
   // Structured computed
   const checkpoints = computed<CheckpointItem[]>(() =>
@@ -121,6 +124,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       name,
       preview: unetPreviews.value[name] ?? null,
       arch: unetArchs.value[name] ?? 'unknown',
+      info: unetInfo.value[name] ?? null,
     })),
   )
 
@@ -167,6 +171,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       loraTriggers.value = data.lora_triggers || {}
       checkpointInfo.value = data.checkpoint_info || {}
       loraInfo.value = data.lora_info || {}
+      unetInfo.value = data.unet_info || {}
       controlnetModels.value = data.controlnet_models || {}
       comfyuiDir.value = data.comfyui_dir || ''
 

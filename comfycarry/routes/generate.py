@@ -161,43 +161,69 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     return result
 
 
-def _detect_arch_from_path(name: str) -> str:
+def _arch_from_base_model(base_model: str) -> str:
     """
-    从模型路径中的 baseModel 子文件夹名推断架构。
-    CivitAI 下载时会按 baseModel 创建子文件夹 (如 "SDXL 1.0/model.safetensors")。
-    返回: "sd15" | "sdxl" | "flux" | "sd3" | "unknown"
+    CivitAI baseModel 字符串 → 架构。
+    baseModel 是 CivitAI 的固定枚举 (如 "SD 1.5" / "SDXL 1.0" / "Pony" / "Anima")，
+    sidecar 元数据与下载子文件夹名均为该字符串。
+    返回: "sd15" | "sdxl" | "flux" | "sd3" | "anima" | "unknown"
     """
-    parts = name.replace("\\", "/").split("/")
-    if len(parts) < 2:
+    bm = base_model.strip().lower()
+    if not bm:
         return "unknown"
-    folder = parts[0].lower()
-    # Anima (CivitAI baseModel 子文件夹)
-    if folder == "anima":
+    if bm == "anima":
         return "anima"
     # SD 1.x
-    if folder in ("sd 1.4", "sd 1.5", "sd 1.5 lcm", "sd 1.5 hyper"):
+    if bm in ("sd 1.4", "sd 1.5", "sd 1.5 lcm", "sd 1.5 hyper"):
         return "sd15"
     # SDXL ecosystem (includes Pony, Illustrious, NoobAI)
-    if any(k in folder for k in ("sdxl", "pony", "illustrious", "noobai")):
+    if any(k in bm for k in ("sdxl", "pony", "illustrious", "noobai")):
         return "sdxl"
     # Flux
-    if "flux" in folder:
+    if "flux" in bm:
         return "flux"
     # SD 3.x
-    if folder.startswith("sd 3") or folder == "sd3":
+    if bm.startswith("sd 3") or bm == "sd3":
         return "sd3"
     return "unknown"
 
 
+def _detect_arch_from_sidecar(filepath: str) -> str:
+    """
+    从 CivitAI 下载时保存的 .weilin-info.json sidecar 读取 baseModel 判断架构。
+    无 sidecar / 解析失败 / baseModel 未映射时返回 "unknown"。
+    """
+    try:
+        with open(filepath + ".weilin-info.json", encoding="utf-8") as f:
+            info = json.load(f)
+        return _arch_from_base_model(info.get("baseModel", "") or "")
+    except (OSError, json.JSONDecodeError):
+        return "unknown"
+
+
+def _detect_arch_from_path(name: str) -> str:
+    """
+    从模型路径中的 baseModel 子文件夹名推断架构。
+    CivitAI 下载时会按 baseModel 创建子文件夹 (如 "SDXL 1.0/model.safetensors")。
+    """
+    parts = name.replace("\\", "/").split("/")
+    if len(parts) < 2:
+        return "unknown"
+    return _arch_from_base_model(parts[0])
+
+
 def _detect_arch(filepath: str, name: str = "") -> str:
     """
-    读取模型文件 header 检测架构。
-    支持 safetensors 和 GGUF 格式。
-    返回: "sd15" | "sdxl" | "flux" | "sd3" | "unknown"
-    对 .ckpt / .pt 等不支持的格式返回 "unknown"。
-    当 header 检测为 unknown 时，尝试从路径子文件夹推断。
+    检测模型架构，优先级: sidecar 元数据 > 文件 header > 路径子文件夹。
+    返回: "sd15" | "sdxl" | "flux" | "sd3" | "anima" | "unknown"
+
+    sidecar baseModel 是 CivitAI 官方枚举，不受打包格式影响，最可靠；
+    header 嗅探覆盖无 sidecar 的文件 (rclone 同步/手动上传, 仅 safetensors/GGUF)；
+    路径兜底覆盖 header 读不了的格式 (.ckpt 等)。
     """
-    result = "unknown"
+    result = _detect_arch_from_sidecar(filepath)
+    if result != "unknown":
+        return result
     if filepath.endswith(".safetensors"):
         result = _detect_arch_safetensors(filepath)
     elif filepath.endswith(".gguf"):
@@ -304,8 +330,11 @@ def _match_arch_from_keys(keys: set[str]) -> str:
     """从 tensor key 名称集合匹配模型架构。"""
     has = lambda prefix: any(k.startswith(prefix) for k in keys)
 
-    # Anima UNet: 所有 tensor key 以 net.blocks. 开头 (685 tensors，唯一特征)
-    if has("net.blocks."):
+    # Anima UNet: 裸格式所有 key 以 net.blocks. 开头 (685 tensors)。
+    # civitai 全量打包格式前缀变为 model.diffusion_model.blocks. (无 net. 层)
+    # 并附带 cond_stage_model.qwen3_06b + first_stage_model，会误命中 SD1.5 规则，
+    # 故统一用小写 adaln_modulation 特征子串判别 (PixArt/DiT 系为大写 adaLN_modulation)
+    if has("net.blocks.") or any("adaln_modulation" in k for k in keys):
         return "anima"
     # Anima LoRA: keys 形如 lora_unet_blocks_<N>_(cross_attn|self_attn|mlp_layer)_*
     # 必须在通用 lora_unet_ 检测之前判别
@@ -333,6 +362,10 @@ def _match_arch_from_keys(keys: set[str]) -> str:
         return "sd15"
     # LoRA 检测: lora_te2 = SDXL, 无 te2 + 有 te1/unet = SD1.5
     if has("lora_te2_"):
+        return "sdxl"
+    # UNet-only SDXL LoRA (无 te key): transformer_blocks 索引 >=1 仅 SDXL 存在
+    # (SD1.5 每个 attention 层只有 1 个 transformer block, 索引恒为 0)
+    if has("lora_unet_") and any(re.search(r"transformer_blocks_[1-9]", k) for k in keys):
         return "sdxl"
     if has("lora_te1_") or has("lora_unet_"):
         return "sd15"
@@ -389,7 +422,7 @@ def _fetch_generate_options() -> dict:
                "lora_info": {}, "checkpoint_info": {},
                "checkpoint_archs": {}, "lora_archs": {},
                "unet_previews": {}, "clip_previews": {}, "vae_previews": {},
-               "unet_archs": {},
+               "unet_archs": {}, "unet_info": {},
                "comfyui_dir": COMFYUI_DIR, "controlnet_models": {}}
 
     def _get_combo_list(node_name: str, field: str) -> list:
@@ -452,6 +485,9 @@ def _fetch_generate_options() -> dict:
     result["clip_previews"] = _scan_model_previews(clip_list, "models/text_encoders")
     result["vae_previews"] = _scan_model_previews(vae_list, "models/vae")
     result["unet_archs"] = _scan_model_archs(unet_list, "models/diffusion_models")
+    # UNet: 读元数据 (baseModel 等)，供分离式架构选择器展示；无 trigger words
+    _, unet_info = _scan_lora_metadata(unet_list, "models/diffusion_models")
+    result["unet_info"] = unet_info
 
     # ── ControlNet 模型 (按类型分组) ───────────────────────────────────
     cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
