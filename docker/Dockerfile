@@ -109,13 +109,11 @@ import torchvision; print(f'torchvision=={torchvision.__version__}')" \
     cat /tmp/torch-constraints.txt
 
 # =============================================================================
-# 9. ComfyUI (pinned to release tag — includes Krea2 native support since v0.22.3)
+# 9. ComfyUI
 # =============================================================================
 WORKDIR /opt
-ARG COMFYUI_VERSION=v0.28.0
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
-    git checkout ${COMFYUI_VERSION} && \
     python3.12 -m pip install --constraint /tmp/torch-constraints.txt \
         -r requirements.txt
 
