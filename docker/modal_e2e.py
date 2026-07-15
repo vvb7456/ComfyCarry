@@ -20,9 +20,12 @@
 #   Panel  → ComfyCarry 面板 (5000), 打开后走向导部署 ComfyUI
 #   ComfyUI → 8188, 面板部署完成前访问会 502, 属正常
 #
-# 持久化 (跨会话保留, 不占 GPU 费用, 少量存储费):
-#   comfycarry-workspace → /workspace       (面板代码/配置/日志)
-#   comfycarry-models    → /opt/ComfyUI/models (模型文件, 避免重复下载)
+# 持久化 (跨会话保留, 不占 GPU 费用, 存储费 1TiB 内免费):
+#   comfycarry-workspace 卷挂在 /vol/workspace, 会话启动时将 /workspace 软链过去。
+#   (Modal 禁止把卷挂到镜像内非空路径, 而基础镜像的 /workspace 和
+#    /opt/ComfyUI/models 都非空, 故不能直接挂载)
+#   部署引擎首次部署会 cp -a /opt/ComfyUI → /workspace/ComfyUI (RunPod 网络卷模式),
+#   之后面板代码/配置/插件/模型全部落在 /workspace 下, 单卷即覆盖全部持久化。
 #
 # 注意:
 #   - 首次运行 Modal 需转换 ~20GB 镜像, 冷启动可能 10-20 分钟, 之后有缓存
@@ -31,6 +34,7 @@
 #   - Modal 不执行镜像 CMD, 由本脚本显式拉起 entrypoint.sh
 #   - SSH (22) 用不上, 调试用: modal shell docker/modal_e2e.py::e2e
 # ==============================================================================
+import os
 import subprocess
 import time
 
@@ -47,13 +51,26 @@ app = modal.App("comfycarry-e2e")
 image = modal.Image.from_registry(IMAGE_REF)
 
 workspace_vol = modal.Volume.from_name("comfycarry-workspace", create_if_missing=True)
-models_vol = modal.Volume.from_name("comfycarry-models", create_if_missing=True)
-
 
 VOLUMES = {
-    "/workspace": workspace_vol,
-    "/opt/ComfyUI/models": models_vol,
+    "/vol/workspace": workspace_vol,
 }
+
+
+def _prepare_workspace():
+    """把 /workspace 替换为指向卷 (/vol/workspace) 的软链。
+
+    每个容器都是全新镜像文件系统, /workspace 初始为镜像自带目录;
+    先用 cp -an 把镜像内容并入卷 (不覆盖卷中已有文件), 再替换为软链,
+    使 entrypoint/bootstrap/部署引擎写入 /workspace 的一切都落在卷上。
+    """
+    if not os.path.islink("/workspace"):
+        subprocess.run("cp -an /workspace/. /vol/workspace/ 2>/dev/null || true", shell=True)
+        subprocess.run(["rm", "-rf", "/workspace"], check=True)
+        os.symlink("/vol/workspace", "/workspace")
+    # 镜像 WORKDIR=/workspace, rm 后当前进程 cwd 悬空会让子进程
+    # (PM2/Node 的 uv_cwd) 直接崩溃, 必须切回有效目录
+    os.chdir("/vol/workspace")
 
 
 def _session(hours: float, label: str):
@@ -67,6 +84,8 @@ def _session(hours: float, label: str):
     else:
         deadline = None
         duration_desc = "不限时 — Ctrl+C 或 modal app stop 结束 (24h 硬上限兜底)"
+
+    _prepare_workspace()
 
     with modal.forward(5000) as panel, modal.forward(8188) as comfy:
         print("=" * 60)
@@ -84,11 +103,9 @@ def _session(hours: float, label: str):
                 time.sleep(300)
                 # 定期落盘, 防止会话被硬杀时丢失面板配置/已下载模型
                 workspace_vol.commit()
-                models_vol.commit()
         finally:
             boot.terminate()
             workspace_vol.commit()
-            models_vol.commit()
             print("会话结束, Volume 已保存")
 
 
