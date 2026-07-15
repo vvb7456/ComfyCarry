@@ -20,12 +20,15 @@
 #   Panel  → ComfyCarry 面板 (5000), 打开后走向导部署 ComfyUI
 #   ComfyUI → 8188, 面板部署完成前访问会 502, 属正常
 #
-# 持久化 (跨会话保留, 不占 GPU 费用, 存储费 1TiB 内免费):
-#   comfycarry-workspace 卷挂在 /vol/workspace, 会话启动时将 /workspace 软链过去。
-#   (Modal 禁止把卷挂到镜像内非空路径, 而基础镜像的 /workspace 和
-#    /opt/ComfyUI/models 都非空, 故不能直接挂载)
-#   部署引擎首次部署会 cp -a /opt/ComfyUI → /workspace/ComfyUI (RunPod 网络卷模式),
-#   之后面板代码/配置/插件/模型全部落在 /workspace 下, 单卷即覆盖全部持久化。
+# 存储布局 (混合: 代码本地盘 + 重资产落卷):
+#   生产架构是无状态的 (无持久卷, 模型靠 rclone/CivitAI 同步), /workspace 本就是
+#   容器本地盘。e2e 挂卷只为免去每次重新下载模型的痛苦。代码若放 FUSE 卷上,
+#   Python import 小文件 I/O 会让 ComfyUI 启动慢至 ~4 分钟, 故:
+#   - 容器本地盘 (每会话全新): ComfyUI 代码 (/opt/ComfyUI, /workspace/ComfyUI
+#     软链指向它, 部署引擎因此跳过 20GB 复制)、面板代码 (每会话拉最新 main)、插件
+#   - 卷 /vol/workspace (跨会话): models/ (模型)、comfy_output/ (出图)、
+#     comfy_user/ (工作流)、panel_state/ (向导配置/部署进度/同步规则)、rclone/ (rclone 配置)
+#   (Modal 禁止把卷挂到镜像内非空路径, 故通过软链接入而非直接挂载)
 #
 # 注意:
 #   - 首次运行 Modal 需转换 ~20GB 镜像, 冷启动可能 10-20 分钟, 之后有缓存
@@ -57,20 +60,69 @@ VOLUMES = {
 }
 
 
-def _prepare_workspace():
-    """把 /workspace 替换为指向卷 (/vol/workspace) 的软链。
+def _link_to_vol(local_path: str, vol_dir: str):
+    """把镜像内目录替换为指向卷内目录的软链, 首次把镜像自带内容并入卷 (不覆盖)。"""
+    if os.path.islink(local_path):
+        return
+    os.makedirs(vol_dir, exist_ok=True)
+    subprocess.run(f"cp -an {local_path}/. {vol_dir}/ 2>/dev/null || true", shell=True)
+    subprocess.run(["rm", "-rf", local_path], check=True)
+    os.symlink(vol_dir, local_path)
 
-    每个容器都是全新镜像文件系统, /workspace 初始为镜像自带目录;
-    先用 cp -an 把镜像内容并入卷 (不覆盖卷中已有文件), 再替换为软链,
-    使 entrypoint/bootstrap/部署引擎写入 /workspace 的一切都落在卷上。
+
+def _prepare_workspace():
+    """混合布局: 代码留容器本地盘 (贴近生产的无状态架构), 仅重资产落卷。
+
+    /workspace 保持为容器本地目录 (与生产一致), ComfyUI 代码从本地盘
+    import (FUSE 卷上启动要 ~4 分钟); 模型/出图/工作流/面板状态软链到卷。
     """
-    if not os.path.islink("/workspace"):
-        subprocess.run("cp -an /workspace/. /vol/workspace/ 2>/dev/null || true", shell=True)
-        subprocess.run(["rm", "-rf", "/workspace"], check=True)
-        os.symlink("/vol/workspace", "/workspace")
-    # 镜像 WORKDIR=/workspace, rm 后当前进程 cwd 悬空会让子进程
-    # (PM2/Node 的 uv_cwd) 直接崩溃, 必须切回有效目录
-    os.chdir("/vol/workspace")
+    vol = "/vol/workspace"
+
+    # ── 旧布局迁移: 曾把整个 /workspace 落卷 (含 20GB ComfyUI 代码副本),
+    #    抢救模型/出图/工作流后清理代码副本, 释放卷空间 ──
+    old_comfy = f"{vol}/ComfyUI"
+    if os.path.isdir(old_comfy) and not os.path.islink(old_comfy):
+        for src, dst in ((f"{old_comfy}/models", f"{vol}/models"),
+                         (f"{old_comfy}/output", f"{vol}/comfy_output"),
+                         (f"{old_comfy}/user", f"{vol}/comfy_user")):
+            if os.path.isdir(src) and not os.path.exists(dst):
+                os.rename(src, dst)
+        subprocess.run(["rm", "-rf", old_comfy, f"{vol}/ComfyCarry"], check=False)
+    os.makedirs(f"{vol}/panel_state", exist_ok=True)
+    for fname in (".setup_state.json", ".dashboard_env",
+                  ".sync_rules.json", ".sync_settings.json"):
+        old = f"{vol}/{fname}"
+        if os.path.isfile(old) and not os.path.islink(old):
+            os.rename(old, f"{vol}/panel_state/{fname}")
+
+    # ── 模型 / 出图 / 工作流 → 卷 ──
+    _link_to_vol("/opt/ComfyUI/models", f"{vol}/models")
+    _link_to_vol("/opt/ComfyUI/output", f"{vol}/comfy_output")
+    _link_to_vol("/opt/ComfyUI/user", f"{vol}/comfy_user")
+    # 分离式架构 (Anima 等) 用到的目录, 镜像未预建
+    for sub in ("diffusion_models", "text_encoders", "unet", "clip", "embeddings"):
+        os.makedirs(f"{vol}/models/{sub}", exist_ok=True)
+
+    # ── ComfyUI 本体: 软链让部署引擎跳过 cp -a /opt→/workspace 的 20GB 复制 ──
+    if not os.path.exists("/workspace/ComfyUI"):
+        os.symlink("/opt/ComfyUI", "/workspace/ComfyUI")
+
+    # ── 面板状态 (向导配置/部署进度/同步规则) → 卷, 免每会话重跑向导 ──
+    for fname in (".setup_state.json", ".dashboard_env",
+                  ".sync_rules.json", ".sync_settings.json"):
+        link = f"/workspace/{fname}"
+        if not os.path.islink(link):
+            if os.path.exists(link):
+                subprocess.run(["mv", link, f"{vol}/panel_state/{fname}"], check=True)
+            os.symlink(f"{vol}/panel_state/{fname}", link)
+    # CivitAI 配置存于面板代码目录内 (config.py: CONFIG_FILE), 单独软链
+    os.makedirs("/workspace/ComfyCarry", exist_ok=True)
+    civ = "/workspace/ComfyCarry/.civitai_config.json"
+    if not os.path.islink(civ):
+        os.symlink(f"{vol}/panel_state/.civitai_config.json", civ)
+
+    # ── rclone 配置 → 卷, 同步模块 e2e 免重配 ──
+    _link_to_vol("/root/.config/rclone", f"{vol}/rclone")
 
 
 def _session(hours: float, label: str):
@@ -96,12 +148,8 @@ def _session(hours: float, label: str):
         print("=" * 60)
 
         # 真实生产启动链路: sshd → bootstrap.sh (GitHub main) → pm2 dashboard:5000
-        # FORCE_UPDATE: 卷里已有面板代码时 bootstrap 默认跳过下载,
-        # e2e 必须每次拉最新 main, 否则测的是上次会话留在卷里的旧代码
-        boot = subprocess.Popen(
-            ["bash", "/opt/entrypoint.sh"],
-            env={**os.environ, "FORCE_UPDATE": "true"},
-        )
+        # 面板代码在容器本地盘, 每个会话都是全新下载的最新 main
+        boot = subprocess.Popen(["bash", "/opt/entrypoint.sh"])
 
         try:
             while deadline is None or time.time() < deadline:
