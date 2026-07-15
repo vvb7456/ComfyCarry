@@ -121,7 +121,7 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
 # 10. 常用插件
 # =============================================================================
 WORKDIR /opt/ComfyUI/custom_nodes
-RUN git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Manager && \
+RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone --depth 1 https://github.com/Fannovel16/comfyui_controlnet_aux && \
     git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Impact-Pack && \
     git clone --depth 1 https://github.com/yolain/ComfyUI-Easy-Use && \
@@ -129,7 +129,7 @@ RUN git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Manager && \
     git clone --depth 1 --recursive https://github.com/ssitu/ComfyUI_UltimateSDUpscale && \
     git clone --depth 1 https://github.com/adieyal/comfyui-dynamicprompts && \
     git clone --depth 1 https://github.com/weilin9999/WeiLin-Comfyui-Tools && \
-    git clone --depth 1 https://github.com/GreenLandisaLie/AuraSR-ComfyUI && \
+    git clone --depth 1 https://github.com/vvb7456/AuraSR-ComfyUI.git && \
     git clone --depth 1 https://github.com/ltdrdata/was-node-suite-comfyui && \
     git clone --depth 1 https://github.com/kijai/ComfyUI-KJNodes && \
     git clone --depth 1 https://github.com/BenjaMITM/Enhanced-Civicomfy && \
