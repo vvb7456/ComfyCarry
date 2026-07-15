@@ -796,6 +796,10 @@ def _step_start_services(config, cfg, PY):
     elif sa2_ok:
         attn_flag = "--use-sage-attention"
     comfy_args = f"--listen 0.0.0.0 --port 8188 {attn_flag} --fast --disable-xformers"
+    # 无 GPU 环境 (如 Modal CPU e2e 会话) 优雅降级: ComfyUI 需显式 --cpu 才能启动
+    if not _detect_gpu_info().get("cuda_cap"):
+        _deploy_log("⚠️ 未检测到 GPU, ComfyUI 以 CPU 模式启动 (仅供交互验证, 生成极慢)", "warn")
+        comfy_args += " --cpu"
 
     # 创建 ControlNet 预处理输出子目录
     _deploy_exec("mkdir -p /workspace/ComfyUI/input/openpose /workspace/ComfyUI/input/canny /workspace/ComfyUI/input/depth")

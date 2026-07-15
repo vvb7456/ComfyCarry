@@ -9,9 +9,9 @@
 #   pip install modal
 #   modal setup          # 浏览器完成认证
 #
-# 使用:
-#   modal run docker/modal_e2e.py                # 默认 4 小时会话
-#   modal run docker/modal_e2e.py --hours 1.5    # 自定义时长
+# 使用 (两种模式, 计费按容器存活时间, 与 GPU 利用率无关):
+#   modal run docker/modal_e2e.py::e2e --hours 1.5      # GPU L4, ≈$1.12/h — 真实出图
+#   modal run docker/modal_e2e.py::e2e_cpu --hours 4    # 纯 CPU, ≈$0.11/h — 挂 UI 验证交互/逻辑
 #   Ctrl+C 随时结束 (按秒计费, 结束即停止扣费)
 #
 # 启动后终端会打印两个公网 HTTPS 隧道地址:
@@ -48,24 +48,20 @@ workspace_vol = modal.Volume.from_name("comfycarry-workspace", create_if_missing
 models_vol = modal.Volume.from_name("comfycarry-models", create_if_missing=True)
 
 
-@app.function(
-    image=image,
-    gpu=GPU,
-    cpu=4,
-    memory=16384,
-    timeout=HARD_TIMEOUT_H * 3600,
-    volumes={
-        "/workspace": workspace_vol,
-        "/opt/ComfyUI/models": models_vol,
-    },
-)
-def e2e(hours: float = 4.0):
+VOLUMES = {
+    "/workspace": workspace_vol,
+    "/opt/ComfyUI/models": models_vol,
+}
+
+
+def _session(hours: float, label: str):
+    """公共会话逻辑: 开双隧道 → 走生产启动链路 → 挂住直到超时/Ctrl+C"""
     hours = min(hours, HARD_TIMEOUT_H - 0.1)
     deadline = time.time() + hours * 3600
 
     with modal.forward(5000) as panel, modal.forward(8188) as comfy:
         print("=" * 60)
-        print("  ComfyCarry E2E 会话已启动")
+        print(f"  ComfyCarry E2E 会话已启动 [{label}]")
         print(f"  Panel   : {panel.url}")
         print(f"  ComfyUI : {comfy.url}  (面板部署完成前 502 属正常)")
         print(f"  时长    : {hours:.1f}h (Ctrl+C 提前结束)")
@@ -85,3 +81,29 @@ def e2e(hours: float = 4.0):
             workspace_vol.commit()
             models_vol.commit()
             print("会话结束, Volume 已保存")
+
+
+@app.function(
+    image=image,
+    gpu=GPU,
+    cpu=4,
+    memory=16384,
+    timeout=HARD_TIMEOUT_H * 3600,
+    volumes=VOLUMES,
+)
+def e2e(hours: float = 4.0):
+    """GPU 会话 (L4, ≈$1.12/h) — 真实出图的端到端验证"""
+    _session(hours, f"GPU {GPU}")
+
+
+@app.function(
+    image=image,
+    cpu=2,
+    memory=8192,
+    timeout=HARD_TIMEOUT_H * 3600,
+    volumes=VOLUMES,
+)
+def e2e_cpu(hours: float = 4.0):
+    """纯 CPU 会话 (≈$0.11/h) — 挂 WebUI 验证交互/逻辑, 不跑真实生成。
+    ComfyUI 无 GPU 时以 CPU 模式运行, 生成极慢但接口/交互完整。"""
+    _session(hours, "CPU only")
