@@ -96,7 +96,12 @@ def _session(hours: float, label: str):
         print("=" * 60)
 
         # 真实生产启动链路: sshd → bootstrap.sh (GitHub main) → pm2 dashboard:5000
-        boot = subprocess.Popen(["bash", "/opt/entrypoint.sh"])
+        # FORCE_UPDATE: 卷里已有面板代码时 bootstrap 默认跳过下载,
+        # e2e 必须每次拉最新 main, 否则测的是上次会话留在卷里的旧代码
+        boot = subprocess.Popen(
+            ["bash", "/opt/entrypoint.sh"],
+            env={**os.environ, "FORCE_UPDATE": "true"},
+        )
 
         try:
             while deadline is None or time.time() < deadline:
