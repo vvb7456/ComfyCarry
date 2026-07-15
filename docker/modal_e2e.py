@@ -10,9 +10,11 @@
 #   modal setup          # 浏览器完成认证
 #
 # 使用 (两种模式, 计费按容器存活时间, 与 GPU 利用率无关):
-#   modal run docker/modal_e2e.py::e2e --hours 1.5      # GPU L4, ≈$1.12/h — 真实出图
-#   modal run docker/modal_e2e.py::e2e_cpu --hours 4    # 纯 CPU, ≈$0.11/h — 挂 UI 验证交互/逻辑
-#   Ctrl+C 随时结束 (按秒计费, 结束即停止扣费)
+#   modal run docker/modal_e2e.py::e2e              # GPU L4, ≈$1.12/h — 真实出图
+#   modal run docker/modal_e2e.py::e2e_cpu          # 纯 CPU, ≈$0.11/h — 挂 UI 验证交互/逻辑
+#   不加 --hours 则一直运行, 手动结束; 加 --hours N 到点自动收尾。
+#   结束方式: Ctrl+C, 或 --detach 后用 modal app stop comfycarry-e2e。
+#   兜底: Modal 函数硬上限 24h 强杀 (GPU 模式跑满一天 ≈$27, 建议 GPU 会话给 --hours)
 #
 # 启动后终端会打印两个公网 HTTPS 隧道地址:
 #   Panel  → ComfyCarry 面板 (5000), 打开后走向导部署 ComfyUI
@@ -36,7 +38,7 @@ import modal
 
 IMAGE_REF = "ghcr.io/vvb7456/comfycarry:latest"
 GPU = "L4"
-HARD_TIMEOUT_H = 8  # 决定 timeout 上限, --hours 不能超过它
+HARD_TIMEOUT_H = 24  # Modal 函数 timeout 上限即 24h, 也是 --hours 的封顶值
 
 app = modal.App("comfycarry-e2e")
 
@@ -55,23 +57,30 @@ VOLUMES = {
 
 
 def _session(hours: float, label: str):
-    """公共会话逻辑: 开双隧道 → 走生产启动链路 → 挂住直到超时/Ctrl+C"""
-    hours = min(hours, HARD_TIMEOUT_H - 0.1)
-    deadline = time.time() + hours * 3600
+    """公共会话逻辑: 开双隧道 → 走生产启动链路 → 挂住直到超时/Ctrl+C
+
+    hours <= 0 表示不限时: 一直运行到手动结束 (或 Modal 24h 硬上限强杀)。
+    """
+    if hours > 0:
+        deadline = time.time() + min(hours, HARD_TIMEOUT_H - 0.1) * 3600
+        duration_desc = f"{min(hours, HARD_TIMEOUT_H - 0.1):.1f}h (Ctrl+C 提前结束)"
+    else:
+        deadline = None
+        duration_desc = "不限时 — Ctrl+C 或 modal app stop 结束 (24h 硬上限兜底)"
 
     with modal.forward(5000) as panel, modal.forward(8188) as comfy:
         print("=" * 60)
         print(f"  ComfyCarry E2E 会话已启动 [{label}]")
         print(f"  Panel   : {panel.url}")
         print(f"  ComfyUI : {comfy.url}  (面板部署完成前 502 属正常)")
-        print(f"  时长    : {hours:.1f}h (Ctrl+C 提前结束)")
+        print(f"  时长    : {duration_desc}")
         print("=" * 60)
 
         # 真实生产启动链路: sshd → bootstrap.sh (GitHub main) → pm2 dashboard:5000
         boot = subprocess.Popen(["bash", "/opt/entrypoint.sh"])
 
         try:
-            while time.time() < deadline:
+            while deadline is None or time.time() < deadline:
                 time.sleep(300)
                 # 定期落盘, 防止会话被硬杀时丢失面板配置/已下载模型
                 workspace_vol.commit()
@@ -91,8 +100,9 @@ def _session(hours: float, label: str):
     timeout=HARD_TIMEOUT_H * 3600,
     volumes=VOLUMES,
 )
-def e2e(hours: float = 4.0):
-    """GPU 会话 (L4, ≈$1.12/h) — 真实出图的端到端验证"""
+def e2e(hours: float = 0):
+    """GPU 会话 (L4, ≈$1.12/h) — 真实出图的端到端验证。
+    hours=0 (默认) 不限时, 手动结束; 传 --hours N 到点自动收尾。"""
     _session(hours, f"GPU {GPU}")
 
 
@@ -103,7 +113,8 @@ def e2e(hours: float = 4.0):
     timeout=HARD_TIMEOUT_H * 3600,
     volumes=VOLUMES,
 )
-def e2e_cpu(hours: float = 4.0):
+def e2e_cpu(hours: float = 0):
     """纯 CPU 会话 (≈$0.11/h) — 挂 WebUI 验证交互/逻辑, 不跑真实生成。
-    ComfyUI 无 GPU 时以 CPU 模式运行, 生成极慢但接口/交互完整。"""
+    ComfyUI 无 GPU 时以 CPU 模式运行, 生成极慢但接口/交互完整。
+    hours=0 (默认) 不限时, 手动结束; 传 --hours N 到点自动收尾。"""
     _session(hours, "CPU only")
