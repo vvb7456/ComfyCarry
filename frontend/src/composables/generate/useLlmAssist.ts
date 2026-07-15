@@ -11,6 +11,7 @@
 import { ref, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
+import { useClipboard } from '@/composables/useClipboard'
 import { useI18n } from 'vue-i18n'
 
 export interface LlmResult {
@@ -46,6 +47,7 @@ export interface UseLlmAssistReturn {
 export function useLlmAssist(): UseLlmAssistReturn {
   const { get } = useApiFetch()
   const { toast } = useToast()
+  const { copy } = useClipboard()
   const { t } = useI18n({ useScope: 'global' })
 
   const visible = ref(false)
@@ -247,10 +249,7 @@ export function useLlmAssist(): UseLlmAssistReturn {
     if (target === 'copy') {
       let text = result.value.positive
       if (result.value.negative) text += '\n\n[Negative]\n' + result.value.negative
-      navigator.clipboard.writeText(text).then(
-        () => toast(t('common.clipboard_copied'), 'success'),
-        () => { /* clipboard failed */ },
-      )
+      copy(text)
       return null
     }
 

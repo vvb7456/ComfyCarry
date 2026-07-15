@@ -10,6 +10,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useClipboard } from '@/composables/useClipboard'
 import { TAG_PARAMS_DEF, type useTagInterrogation } from '@/composables/generate/useTagInterrogation'
 import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
 import type { UseModelDependencyReturn } from '@/composables/generate/useModelDependency'
@@ -44,6 +45,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { copy } = useClipboard()
 
 // ── Image preview URL ─────────────────────────────────────────────────────
 
@@ -131,10 +133,7 @@ function onApply() {
 }
 
 function onCopy() {
-  navigator.clipboard.writeText(props.tagger.resultText.value).then(
-    () => { /* toast already in clipboard API */ },
-    () => { /* fallback */ },
-  )
+  copy(props.tagger.resultText.value)
 }
 </script>
 

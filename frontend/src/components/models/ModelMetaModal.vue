@@ -11,6 +11,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import DownloadButton from './DownloadButton.vue'
 import { useToast } from '@/composables/useToast'
 import { useDownloads } from '@/composables/useDownloads'
+import { useClipboard } from '@/composables/useClipboard'
 
 defineOptions({ name: 'ModelMetaModal' })
 
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 const { getVersionState, downloadOne } = useDownloads()
+const { copy } = useClipboard()
 
 // ── Version switching ──
 const selectedVersionId = ref<string | number | undefined>()
@@ -137,10 +139,7 @@ function toggleWord(word: string) {
 }
 
 async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    toast(t('common.clipboard_copied'), 'success')
-  } catch { /* ignore */ }
+  await copy(text)
 }
 
 function copySelectedWords() {

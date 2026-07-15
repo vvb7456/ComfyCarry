@@ -6,6 +6,7 @@ import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useClipboard } from '@/composables/useClipboard'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import AddCard from '@/components/ui/AddCard.vue'
@@ -35,6 +36,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { get, post, del } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
+const { copy } = useClipboard()
 
 const activeTab = ref('status')
 const tabs = computed(() => [
@@ -287,21 +289,7 @@ function buildSshCmd(url: string) {
 
 async function copySshCmd(url: string) {
   if (!url) return
-  const cmd = buildSshCmd(url)
-  try {
-    await navigator.clipboard.writeText(cmd)
-  } catch {
-    // Fallback for restricted clipboard contexts
-    const ta = document.createElement('textarea')
-    ta.value = cmd
-    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;pointer-events:none'
-    document.body.appendChild(ta)
-    ta.focus()
-    ta.select()
-    try { document.execCommand('copy') } catch { /* ignore */ }
-    document.body.removeChild(ta)
-  }
-  toast(t('common.clipboard_copied'), 'success')
+  await copy(buildSshCmd(url))
 }
 
 // Computed services list for status tab

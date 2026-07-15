@@ -59,10 +59,6 @@ async function updateIndicator() {
   indicatorVisible.value = true
 }
 
-function onResize() {
-  updateIndicator()
-}
-
 const indicatorStyle = computed(() => ({
   width: `${indicatorWidth.value}px`,
   transform: `translateX(${indicatorLeft.value}px)`,
@@ -76,17 +72,21 @@ watch(
 )
 
 onMounted(() => {
-  window.addEventListener('resize', onResize)
+  window.addEventListener('resize', updateIndicator)
   updateIndicator()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', onResize)
+  window.removeEventListener('resize', updateIndicator)
 })
 </script>
 
 <template>
-  <div ref="rootRef" class="tab-switcher" role="tablist">
+  <div
+    ref="rootRef"
+    class="tab-switcher"
+    role="tablist"
+  >
     <button
       v-for="(tab, idx) in tabs"
       :key="tab.key"
@@ -122,10 +122,14 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0;
   border-bottom: 1px solid var(--bd);
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* iOS: only allow horizontal panning on the tab bar. Trade-off: a touch
+     that lands on the tab bar cannot be used to scroll the page vertically.
+     In return, iOS no longer interprets diagonal drags as a 2D rubber-band
+     drag of the tab content. */
+  touch-action: pan-x;
 }
 
 .tab-switcher::-webkit-scrollbar {

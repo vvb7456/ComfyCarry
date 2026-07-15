@@ -35,6 +35,16 @@ watch(() => props.modelValue, (open) => {
 
 function close() { emit('update:modelValue', false) }
 
+// Track mousedown origin to prevent drag-close (selecting text/dragging inside the frame)
+const mouseDownOnOverlay = ref(false)
+function onOverlayMousedown(e: MouseEvent) {
+  mouseDownOnOverlay.value = e.target === e.currentTarget
+}
+function onOverlayClick(e: MouseEvent) {
+  if (e.target === e.currentTarget && mouseDownOnOverlay.value) close()
+  mouseDownOnOverlay.value = false
+}
+
 function prev() {
   if (idx.value > 0) { idx.value--; loaded.value = false }
 }
@@ -60,7 +70,7 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="ip-fade">
-      <div v-if="modelValue" class="ip-overlay" @click.self="close">
+      <div v-if="modelValue" class="ip-overlay" @mousedown="onOverlayMousedown" @click="onOverlayClick">
         <!-- Close button -->
         <button class="ip-close" @click="close" aria-label="Close">
           <MsIcon name="close" />

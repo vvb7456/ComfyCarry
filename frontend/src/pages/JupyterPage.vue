@@ -178,10 +178,6 @@ const jupyterTokenUrl = computed(() => {
   return `${jupyterUrl.value}${sep}token=${token.value}`
 })
 
-function copyToken() {
-  toast(t('common.clipboard_copied'), 'success')
-}
-
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
 Promise.all([loadJupyterUrl(), loadToken(), loadStatus()])
@@ -293,7 +289,6 @@ onUnmounted(() => {
           readonly
           copyable
           input-class="token-input"
-          @copied="copyToken"
         />
         <div v-if="jupyterTokenUrl" class="jupyter-token-link">
           <a :href="jupyterTokenUrl" target="_blank" rel="noopener">

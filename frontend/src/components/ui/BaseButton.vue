@@ -4,7 +4,7 @@ import Spinner from './Spinner.vue'
 
 defineOptions({ name: 'BaseButton' })
 
-type ButtonVariant = 'default' | 'primary' | 'danger' | 'success' | 'ghost'
+type ButtonVariant = 'default' | 'primary' | 'danger' | 'success' | 'warning' | 'ghost'
 type ButtonSize = 'xs' | 'sm' | 'md' | 'lg'
 
 const props = withDefaults(defineProps<{
@@ -111,32 +111,42 @@ function onClick(e: MouseEvent) {
 
 /* ── Variant: primary ── */
 .base-btn--primary {
-  background: var(--ac);
-  border-color: var(--ac);
+  background: color-mix(in srgb, var(--ac) 65%, var(--bg3));
+  border-color: color-mix(in srgb, var(--ac) 65%, var(--bg3));
   color: #fff;
 }
 .base-btn--primary:hover:not(.base-btn--disabled) {
-  background: var(--ac2);
+  background: color-mix(in srgb, var(--ac) 80%, var(--bg3));
 }
 
 /* ── Variant: danger ── */
 .base-btn--danger {
   background: transparent;
-  border-color: rgba(248, 113, 113, .3);
-  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 30%, transparent);
+  color: color-mix(in srgb, var(--red) 70%, var(--t2));
 }
 .base-btn--danger:hover:not(.base-btn--disabled) {
-  background: rgba(248, 113, 113, .1);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 
 /* ── Variant: success ── */
 .base-btn--success {
   background: transparent;
-  border-color: rgba(74, 222, 128, .3);
-  color: var(--green);
+  border-color: color-mix(in srgb, var(--green) 30%, transparent);
+  color: color-mix(in srgb, var(--green) 70%, var(--t2));
 }
 .base-btn--success:hover:not(.base-btn--disabled) {
-  background: rgba(74, 222, 128, .1);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+
+/* ── Variant: warning ── */
+.base-btn--warning {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--amber) 30%, transparent);
+  color: color-mix(in srgb, var(--amber) 70%, var(--t2));
+}
+.base-btn--warning:hover:not(.base-btn--disabled) {
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
 }
 
 /* ── Variant: ghost ── */

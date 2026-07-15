@@ -40,6 +40,7 @@ withDefaults(defineProps<{
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .filter-input__icon {
@@ -51,6 +52,9 @@ withDefaults(defineProps<{
 }
 
 .filter-input__field {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
   padding-left: 34px;
   padding-right: 32px;
 }

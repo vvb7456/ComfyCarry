@@ -101,6 +101,17 @@ const editVisible = ref(false)
 const editName = ref('')
 const editContent = ref('')
 const editLoading = ref(false)
+
+// Track mousedown origin to prevent drag-close (selecting text inside the sub-modal)
+const editMouseDownOnOverlay = ref(false)
+function onEditOverlayMousedown(e: MouseEvent) {
+  editMouseDownOnOverlay.value = e.target === e.currentTarget
+}
+function onEditOverlayClick(e: MouseEvent) {
+  if (e.target === e.currentTarget && editMouseDownOnOverlay.value) editVisible.value = false
+  editMouseDownOnOverlay.value = false
+}
+
 async function openEdit(item: WildcardItem) {
   editName.value = item.name
   editContent.value = ''
@@ -125,6 +136,16 @@ async function saveEdit() {
 const newFolderVisible = ref(false)
 const newFolderName = ref('')
 const newFolderInput = ref<HTMLInputElement | null>(null)
+
+// Track mousedown origin to prevent drag-close (selecting text inside the sub-modal)
+const folderMouseDownOnOverlay = ref(false)
+function onFolderOverlayMousedown(e: MouseEvent) {
+  folderMouseDownOnOverlay.value = e.target === e.currentTarget
+}
+function onFolderOverlayClick(e: MouseEvent) {
+  if (e.target === e.currentTarget && folderMouseDownOnOverlay.value) newFolderVisible.value = false
+  folderMouseDownOnOverlay.value = false
+}
 
 function openNewFolder() {
   newFolderName.value = ''
@@ -268,7 +289,7 @@ function onInsert(item: WildcardItem) {
 
   <!-- Edit sub-modal (teleported) -->
   <Teleport to="body">
-    <div v-if="editVisible" class="wc-overlay" @click.self="editVisible = false">
+    <div v-if="editVisible" class="wc-overlay" @mousedown="onEditOverlayMousedown" @click="onEditOverlayClick">
       <div class="wc-edit-box">
         <div class="wc-edit-header">
           <MsIcon name="edit_note" size="sm" color="none" />
@@ -293,7 +314,7 @@ function onInsert(item: WildcardItem) {
 
   <!-- New folder sub-modal (teleported) -->
   <Teleport to="body">
-    <div v-if="newFolderVisible" class="wc-overlay" @click.self="newFolderVisible = false">
+    <div v-if="newFolderVisible" class="wc-overlay" @mousedown="onFolderOverlayMousedown" @click="onFolderOverlayClick">
       <div class="wc-edit-box wc-edit-box--sm">
         <div class="wc-edit-header">
           <MsIcon name="create_new_folder" size="sm" color="none" />

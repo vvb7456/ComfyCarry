@@ -280,10 +280,6 @@ async function changePassword() {
 
 // ─── API Key ──────────────────────────────────────────────────────────────────
 
-function copyApiKey() {
-  toast(t('common.clipboard_copied'), 'success')
-}
-
 async function regenerateApiKey() {
   if (!await confirm({ message: t('settings.api_key.regenerate_confirm'), variant: 'danger' })) return
   regenLoading.value = true
@@ -609,7 +605,6 @@ onUnmounted(() => {
               copyable
               input-class="form-input mono-input"
               style="margin-bottom:12px"
-              @copied="copyApiKey"
             />
             <div class="btn-row-end">
               <BaseButton variant="danger" size="sm" :disabled="regenLoading" @click="regenerateApiKey">

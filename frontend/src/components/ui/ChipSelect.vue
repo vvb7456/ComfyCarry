@@ -24,6 +24,7 @@ export interface ChipOption {
   value: string
   label: string
   count?: number | string
+  title?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -197,6 +198,7 @@ function fmt(c: number | string) {
         :key="o.value"
         class="chip-select__chip"
         :class="{ 'chip-select__chip--active': selectedSet.has(o.value) }"
+        :title="o.title"
         @click="toggleChip(o.value)"
       >
         {{ o.label }}<span v-if="o.count != null" class="chip-select__count">{{ fmt(o.count) }}</span>
@@ -250,8 +252,8 @@ function fmt(c: number | string) {
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  background: rgba(124, 92, 252, .12);
-  border: 1px solid rgba(124, 92, 252, .2);
+  background: color-mix(in srgb, var(--ac) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac) 18%, var(--bd));
   border-radius: 4px;
   font-size: .75rem;
   font-weight: 500;
@@ -263,13 +265,13 @@ function fmt(c: number | string) {
 }
 
 .chip-select__chip:hover {
-  background: rgba(124, 92, 252, .22);
+  background: color-mix(in srgb, var(--ac) 17%, transparent);
 }
 
 .chip-select__chip--active {
-  background: var(--ac);
-  color: #fff;
-  border-color: var(--ac);
+  background: color-mix(in srgb, var(--ac) 22%, transparent);
+  color: var(--ac2);
+  border-color: color-mix(in srgb, var(--ac) 42%, var(--bd));
 }
 
 .chip-select__chip--toggle {
@@ -291,7 +293,7 @@ function fmt(c: number | string) {
 }
 
 .chip-select__chip--active .chip-select__count {
-  color: rgba(255, 255, 255, .7);
+  color: color-mix(in srgb, var(--ac2) 70%, var(--t2));
 }
 
 .chip-select--measurer .chip-select__chip {

@@ -28,6 +28,9 @@ defineProps<{
 
 <style scoped>
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: .75rem;
   padding: 2px 8px;
   border-radius: 4px;
