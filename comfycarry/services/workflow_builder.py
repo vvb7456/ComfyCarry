@@ -532,6 +532,81 @@ class WorkflowBuilder:
         }
         return nid
 
+    # ── SeedVR2 放大引擎 (numz/ComfyUI-SeedVR2_VideoUpscaler) ────────────────
+
+    def add_seedvr2_dit_loader(self, model: str) -> str:
+        """
+        SeedVR2LoadDiTModel — 加载 SeedVR2 DiT 权重 (models/SEEDVR2/)。
+        输出: [node_id, 0]=dit
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SeedVR2LoadDiTModel",
+            "inputs": {
+                "model": model,
+                "device": "cuda:0",
+            },
+        }
+        return nid
+
+    def add_seedvr2_vae_loader(
+        self,
+        encode_tiled: bool = False,
+        decode_tiled: bool = False,
+    ) -> str:
+        """
+        SeedVR2LoadVAEModel — 加载 SeedVR2 专用 VAE。
+        encode_tiled/decode_tiled: 分块编解码，4x 大图必开否则 24GB 卡 OOM。
+        输出: [node_id, 0]=vae
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SeedVR2LoadVAEModel",
+            "inputs": {
+                "model": "ema_vae_fp16.safetensors",
+                "device": "cuda:0",
+                "encode_tiled": bool(encode_tiled),
+                "decode_tiled": bool(decode_tiled),
+            },
+        }
+        return nid
+
+    def add_seedvr2_upscale(
+        self,
+        image_node_id: str,
+        dit_node_id: str,
+        vae_node_id: str,
+        seed: int = -1,
+        resolution: int = 2048,
+        color_correction: str = "lab",
+        input_noise_scale: float = 0.0,
+        latent_noise_scale: float = 0.0,
+    ) -> str:
+        """
+        SeedVR2VideoUpscaler — 一步扩散修复放大 (无文本条件)。
+        resolution: 目标短边像素 (任意倍率)。
+        输出: [node_id, 0]=IMAGE
+        """
+        actual_seed = seed if seed >= 0 else random.randint(0, 2**32 - 1)
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SeedVR2VideoUpscaler",
+            "inputs": {
+                "image": [image_node_id, 0],
+                "dit": [dit_node_id, 0],
+                "vae": [vae_node_id, 0],
+                "seed": actual_seed,
+                "resolution": int(resolution),
+                "max_resolution": 0,
+                "batch_size": 1,
+                "uniform_batch_size": False,
+                "color_correction": color_correction,
+                "input_noise_scale": float(input_noise_scale),
+                "latent_noise_scale": float(latent_noise_scale),
+            },
+        }
+        return nid
+
     # ── 构建 ─────────────────────────────────────────────────────────────────
 
     def build(self) -> dict:
@@ -540,6 +615,79 @@ class WorkflowBuilder:
 
 
 # ── 顶层工作流函数 ────────────────────────────────────────────────────────────
+
+# SeedVR2 DiT 权重白名单 (models/SEEDVR2/, GGUF 变体首版不暴露)
+SEEDVR2_DIT_MODELS = (
+    "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+    "seedvr2_ema_3b_fp16.safetensors",
+    "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+    "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+)
+SEEDVR2_COLOR_CORRECTIONS = ("lab", "wavelet", "wavelet_adaptive", "hsv", "adain", "none")
+
+
+def _add_upscale_chain(b: WorkflowBuilder, decoded: str, params: dict) -> str:
+    """
+    放大链路 (SDXL / Anima 共用)，按 upscale_engine 分流:
+      aurasr (默认) — AuraSR 固定 4x → [ImageScale 缩到目标倍率]
+      seedvr2       — DiT + VAE 加载器 + 一步扩散放大，倍率换算为短边目标像素
+    返回最终 IMAGE 节点 id。
+    """
+    upscale_factor = max(1.0, min(float(params.get("upscale_factor", 2)), 4.0))
+    engine = str(params.get("upscale_engine", "aurasr"))
+
+    if engine == "seedvr2":
+        svr_model = str(params.get("upscale_svr_model", SEEDVR2_DIT_MODELS[0]))
+        if svr_model not in SEEDVR2_DIT_MODELS:
+            svr_model = SEEDVR2_DIT_MODELS[0]
+        color_correction = str(params.get("upscale_svr_color_correction", "lab"))
+        if color_correction not in SEEDVR2_COLOR_CORRECTIONS:
+            color_correction = "lab"
+        input_noise = max(0.0, min(float(params.get("upscale_svr_input_noise", 0.0)), 1.0))
+        latent_noise = max(0.0, min(float(params.get("upscale_svr_latent_noise", 0.0)), 1.0))
+        tiled_vae = bool(params.get("upscale_svr_tiled_vae", False))
+        base_w = int(params.get("width", 1024))
+        base_h = int(params.get("height", 1024))
+        # 共用倍率滑条 → 短边目标像素 (取偶数)
+        resolution = round(min(base_w, base_h) * upscale_factor / 2) * 2
+        dit = b.add_seedvr2_dit_loader(svr_model)
+        vae = b.add_seedvr2_vae_loader(encode_tiled=tiled_vae, decode_tiled=tiled_vae)
+        return b.add_seedvr2_upscale(
+            decoded,
+            dit,
+            vae,
+            seed=int(params.get("seed", -1)),
+            resolution=resolution,
+            color_correction=color_correction,
+            input_noise_scale=input_noise,
+            latent_noise_scale=latent_noise,
+        )
+
+    upscale_mode = str(params.get("upscale_mode", "4x_overlapped_checkboard"))
+    if upscale_mode not in ("4x", "4x_overlapped_checkboard", "4x_overlapped_constant"):
+        upscale_mode = "4x_overlapped_checkboard"
+    # 兼容两组 key: 前端历史上发 upscale_tile / upscale_downscale
+    upscale_tile = int(params.get("upscale_tile_batch_size", params.get("upscale_tile", 8)))
+    downscale_method = str(
+        params.get("upscale_downscale_method", params.get("upscale_downscale", "lanczos"))
+    )
+    if downscale_method not in ("lanczos", "bicubic", "bilinear", "area", "nearest-exact"):
+        downscale_method = "lanczos"
+    aurasr = b.add_aurasr_upscale(
+        decoded,
+        model_name="model.safetensors",
+        mode=upscale_mode,
+        tile_batch_size=upscale_tile,
+    )
+    if upscale_factor < 4.0:
+        # 非 4x: 先 4x 超采再缩回目标尺寸
+        base_w = int(params.get("width", 1024))
+        base_h = int(params.get("height", 1024))
+        target_w = round(base_w * upscale_factor)
+        target_h = round(base_h * upscale_factor)
+        return b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
+    return aurasr
+
 
 def build_sdxl_workflow(params: dict) -> dict:
     """
@@ -561,10 +709,17 @@ def build_sdxl_workflow(params: dict) -> dict:
         loras           (list)      — LoRA 列表: [{name, strength}, ...]
                                       （也兼容旧格式: lora_name + lora_strength）
         upscale_enabled (bool)      — 是否启用 AI 放大 (Phase 2)
-        upscale_factor  (int)       — 放大倍率: 2 / 3 / 4，默认 2
-        upscale_mode    (str)       — 放大模式: 4x / 4x_overlapped_checkboard / 4x_overlapped_constant
-        upscale_tile_batch_size (int) — 分块大小 1-32，默认 8
-        upscale_downscale_method (str) — 缩放算法: lanczos / bicubic / bilinear / area / nearest-exact
+        upscale_engine  (str)       — 放大引擎: aurasr (默认) / seedvr2
+        upscale_factor  (float)     — 放大倍率 1.5-4，默认 2 (两引擎共用)
+        upscale_mode    (str)       — [aurasr] 放大模式: 4x / 4x_overlapped_checkboard / 4x_overlapped_constant
+        upscale_tile_batch_size (int) — [aurasr] 分块大小 1-32，默认 8 (兼容旧 key upscale_tile)
+        upscale_downscale_method (str) — [aurasr] 缩放算法: lanczos / bicubic / bilinear / area / nearest-exact
+                                      (兼容旧 key upscale_downscale)
+        upscale_svr_model (str)     — [seedvr2] DiT 权重文件名，白名单见 SEEDVR2_DIT_MODELS
+        upscale_svr_color_correction (str) — [seedvr2] 色彩校正: lab(默认)/wavelet/wavelet_adaptive/hsv/adain/none
+        upscale_svr_input_noise (float)  — [seedvr2] 输入噪声 0-1，默认 0
+        upscale_svr_latent_noise (float) — [seedvr2] 潜空间噪声 0-1，默认 0
+        upscale_svr_tiled_vae (bool) — [seedvr2] VAE 分块编解码，4x 大图防 OOM，默认 false
         controlnets     (list)      — ControlNet 列表: [{type, model, image, strength, start_percent, end_percent}, ...]
                                       type: "pose" | "canny" | "depth"
                                       model: ControlNet 模型文件名
@@ -676,35 +831,10 @@ def build_sdxl_workflow(params: dict) -> dict:
     # 6. VAE 解码 (VAE 始终来自原始 Checkpoint，index=2)
     decoded = b.add_vae_decode(sampled, ckpt)
 
-    # ── 放大链路 (Phase 2) ───────────────────────────────────────────────
-    # AuraSR 4x → [ImageScale 缩到目标倍率] → 输出
+    # ── 放大链路 (Phase 2, 引擎分流见 _add_upscale_chain) ────────────────
     final_image = decoded
-    upscale_enabled = bool(params.get("upscale_enabled", False))
-    if upscale_enabled:
-        upscale_factor = max(1.0, min(float(params.get("upscale_factor", 2)), 4.0))
-        upscale_mode = str(params.get("upscale_mode", "4x_overlapped_checkboard"))
-        if upscale_mode not in ("4x", "4x_overlapped_checkboard", "4x_overlapped_constant"):
-            upscale_mode = "4x_overlapped_checkboard"
-        upscale_tile = int(params.get("upscale_tile_batch_size", 8))
-        downscale_method = str(params.get("upscale_downscale_method", "lanczos"))
-        if downscale_method not in ("lanczos", "bicubic", "bilinear", "area", "nearest-exact"):
-            downscale_method = "lanczos"
-        # AuraSR 固定 4x
-        aurasr = b.add_aurasr_upscale(
-            decoded,
-            model_name="model.safetensors",
-            mode=upscale_mode,
-            tile_batch_size=upscale_tile,
-        )
-        if upscale_factor < 4.0:
-            # 非 4x: 先 4x 超采再缩回目标尺寸
-            base_w = int(params.get("width", 1024))
-            base_h = int(params.get("height", 1024))
-            target_w = round(base_w * upscale_factor)
-            target_h = round(base_h * upscale_factor)
-            final_image = b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
-        else:
-            final_image = aurasr
+    if bool(params.get("upscale_enabled", False)):
+        final_image = _add_upscale_chain(b, decoded, params)
 
     # ── 二次采样 (HiRes Refine) ─────────────────────────────────────
     # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码
@@ -853,32 +983,10 @@ def build_anima_workflow(params: dict) -> dict:
     # 6. VAE 解码 (独立 VAELoader, index=0)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # ── 放大链路 (AuraSR 与架构无关，完全复用) ────────────────────────
+    # ── 放大链路 (与架构无关, 引擎分流见 _add_upscale_chain) ──────────
     final_image = decoded
-    upscale_enabled = bool(params.get("upscale_enabled", False))
-    if upscale_enabled:
-        upscale_factor = max(1.0, min(float(params.get("upscale_factor", 2)), 4.0))
-        upscale_mode = str(params.get("upscale_mode", "4x_overlapped_checkboard"))
-        if upscale_mode not in ("4x", "4x_overlapped_checkboard", "4x_overlapped_constant"):
-            upscale_mode = "4x_overlapped_checkboard"
-        upscale_tile = int(params.get("upscale_tile_batch_size", 8))
-        downscale_method = str(params.get("upscale_downscale_method", "lanczos"))
-        if downscale_method not in ("lanczos", "bicubic", "bilinear", "area", "nearest-exact"):
-            downscale_method = "lanczos"
-        aurasr = b.add_aurasr_upscale(
-            decoded,
-            model_name="model.safetensors",
-            mode=upscale_mode,
-            tile_batch_size=upscale_tile,
-        )
-        if upscale_factor < 4.0:
-            base_w = int(params.get("width", 1024))
-            base_h = int(params.get("height", 1024))
-            target_w = round(base_w * upscale_factor)
-            target_h = round(base_h * upscale_factor)
-            final_image = b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
-        else:
-            final_image = aurasr
+    if bool(params.get("upscale_enabled", False)):
+        final_image = _add_upscale_chain(b, decoded, params)
 
     # ── 二次采样 (HiRes Refine) ────────────────────────────────────────
     hires_enabled = bool(params.get("hires_enabled", False))

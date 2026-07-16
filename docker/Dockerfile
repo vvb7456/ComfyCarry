@@ -141,7 +141,8 @@ RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone --depth 1 https://github.com/cubiq/ComfyUI_IPAdapter_plus && \
     git clone --depth 1 https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite && \
     git clone --depth 1 https://github.com/cubiq/ComfyUI_essentials && \
-    git clone --depth 1 https://github.com/1038lab/ComfyUI-RMBG
+    git clone --depth 1 https://github.com/1038lab/ComfyUI-RMBG && \
+    git clone --depth 1 https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler
 
 # 逐个安装插件依赖 (失败打印警告但继续, 后续显式安装补救)
 RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f); do \

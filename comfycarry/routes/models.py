@@ -406,6 +406,9 @@ _MODEL_FIELD_WHITELIST: dict[str, dict[str, str]] = {
     "IPAdapterModelLoader":  {"ipadapter_file": "ipadapter"},
     # ── AuraSR-ComfyUI ──
     "AuraSR.AuraSRUpscaler": {"model_name": "upscale_models"},
+    # ── ComfyUI-SeedVR2_VideoUpscaler ──
+    "SeedVR2LoadDiTModel":   {"model": "SEEDVR2"},
+    "SeedVR2LoadVAEModel":   {"model": "SEEDVR2"},
     # ── efficiency-nodes-comfyui ──
     "Eff. Loader SDXL":      {"base_ckpt_name": "checkpoints", "refiner_ckpt_name": "checkpoints", "vae_name": "vae"},
     "Efficient Loader":      {"ckpt_name": "checkpoints", "lora_name": "loras", "vae_name": "vae"},

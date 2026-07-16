@@ -198,9 +198,17 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     if (state.upscale.enabled) {
       payload.upscale_enabled = true
       payload.upscale_factor = state.upscale.factor
+      payload.upscale_engine = state.upscale.engine
       payload.upscale_mode = state.upscale.mode
       payload.upscale_tile = state.upscale.tile
       payload.upscale_downscale = state.upscale.downscale
+      if (state.upscale.engine === 'seedvr2') {
+        payload.upscale_svr_model = state.upscale.svrModel
+        payload.upscale_svr_color_correction = state.upscale.svrColorCorrection
+        payload.upscale_svr_input_noise = state.upscale.svrInputNoise
+        payload.upscale_svr_latent_noise = state.upscale.svrLatentNoise
+        payload.upscale_svr_tiled_vae = state.upscale.svrTiledVae
+      }
     }
 
     // HiRes

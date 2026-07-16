@@ -26,6 +26,12 @@ export interface UpscaleState {
   mode: string
   tile: number
   downscale: string
+  engine: 'aurasr' | 'seedvr2'
+  svrModel: string
+  svrColorCorrection: string
+  svrInputNoise: number
+  svrLatentNoise: number
+  svrTiledVae: boolean
 }
 
 export interface HiResState {
@@ -134,7 +140,15 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     format: 'png',
     runMode: 'normal',
     controlNets,
-    upscale: { enabled: false, factor: 2, mode: '4x_overlapped_checkboard', tile: 8, downscale: 'lanczos' },
+    upscale: {
+      enabled: false, factor: 2, mode: '4x_overlapped_checkboard', tile: 8, downscale: 'lanczos',
+      engine: 'aurasr',
+      svrModel: 'seedvr2_ema_3b_fp8_e4m3fn.safetensors',
+      svrColorCorrection: 'lab',
+      svrInputNoise: 0,
+      svrLatentNoise: 0,
+      svrTiledVae: false,
+    },
     hires: { enabled: false, denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: randomSeed() },
     i2i: { enabled: false, image: null, denoise: 0.7, mode: 'i2i', mask: null, growMaskBy: 6 },
     activeModule: config.modules[0] || 'lora',

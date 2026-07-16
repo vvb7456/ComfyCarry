@@ -102,12 +102,48 @@ const UPSCALE_MODELS: Record<string, ModelDep> = {
       },
     ],
   },
+  seedvr2_3b_fp8: {
+    id: 'seedvr2-3b-fp8',
+    name: 'SeedVR2 3B FP8',
+    description: 'SeedVR2 视频放大，推理显存约 10GB（1024 底图 2x）',
+    size: '~3.4 GB',
+    files: [
+      {
+        filename: 'seedvr2_ema_3b_fp8_e4m3fn.safetensors',
+        url: 'https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors?download=true',
+        subdir: 'models/SEEDVR2',
+      },
+      {
+        filename: 'ema_vae_fp16.safetensors',
+        url: 'https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors?download=true',
+        subdir: 'models/SEEDVR2',
+      },
+    ],
+  },
+  seedvr2_7b_sharp_fp8: {
+    id: 'seedvr2-7b-sharp-fp8',
+    name: 'SeedVR2 7B-sharp FP8',
+    description: 'SeedVR2 7B 锐化版，推理显存约 17GB',
+    size: '~10 GB',
+    files: [
+      {
+        filename: 'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors',
+        url: 'https://huggingface.co/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors?download=true',
+        subdir: 'models/SEEDVR2',
+      },
+      {
+        filename: 'ema_vae_fp16.safetensors',
+        url: 'https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors?download=true',
+        subdir: 'models/SEEDVR2',
+      },
+    ],
+  },
 }
 
 export const UPSCALE_MODEL_CONFIG: ModelDepConfig = {
   tab: 'upscale',
   title: 'generate.upscale.need_download',
-  models: [UPSCALE_MODELS.aurasr_v2],
+  models: [UPSCALE_MODELS.aurasr_v2, UPSCALE_MODELS.seedvr2_3b_fp8, UPSCALE_MODELS.seedvr2_7b_sharp_fp8],
 }
 
 // ── Anima Model Definitions ──────────────────────────────────────────────────
