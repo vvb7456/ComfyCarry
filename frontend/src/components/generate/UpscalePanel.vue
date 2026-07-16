@@ -5,6 +5,7 @@ import { useGenerateStore, type UpscaleState } from '@/stores/generate'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import ChipSelect from '@/components/ui/ChipSelect.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
 defineOptions({ name: 'UpscalePanel' })
@@ -14,9 +15,14 @@ const store = useGenerateStore()
 
 const config = computed<UpscaleState>(() => store.currentState.upscale)
 
-// ── Engine switch ────────────────────────────────────────────────────────
+// ── Engine select (chip 单选) ────────────────────────────────────────────
 
 const isSeedVR2 = computed(() => config.value.engine === 'seedvr2')
+
+const engineOptions = computed(() => [
+  { value: 'aurasr', label: t('generate.upscale.engine_aurasr') },
+  { value: 'seedvr2', label: t('generate.upscale.engine_seedvr2') },
+])
 
 // ── AuraSR options ──────────────────────────────────────────────────────
 
@@ -66,23 +72,12 @@ const sizeHint = computed(() => {
 
 <template>
   <div class="upscale-grid">
-    <!-- Engine switch: AuraSR ⇄ SeedVR2 -->
-    <div class="up-engine-switch">
-      <span
-        class="up-engine-label"
-        :class="{ active: !isSeedVR2 }"
-        @click="config.engine = 'aurasr'"
-      >{{ t('generate.upscale.engine_aurasr') }}</span>
-      <ToggleSwitch
-        :model-value="isSeedVR2"
-        @update:model-value="config.engine = $event ? 'seedvr2' : 'aurasr'"
-      />
-      <span
-        class="up-engine-label"
-        :class="{ active: isSeedVR2 }"
-        @click="config.engine = 'seedvr2'"
-      >{{ t('generate.upscale.engine_seedvr2') }}</span>
-    </div>
+    <!-- Engine select: 点选即切换 -->
+    <ChipSelect
+      :options="engineOptions"
+      :model-value="config.engine"
+      @update:model-value="config.engine = $event as 'aurasr' | 'seedvr2'"
+    />
 
     <!-- ── AuraSR: 上排两个滑条 / 下排两个下拉 ── -->
     <template v-if="!isSeedVR2">
@@ -279,25 +274,6 @@ const sizeHint = computed(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-3);
-}
-
-.up-engine-switch {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.up-engine-label {
-  font-size: var(--text-xs);
-  color: var(--t3);
-  transition: color .15s;
-  cursor: pointer;
-  user-select: none;
-}
-
-.up-engine-label.active {
-  color: var(--t1);
-  font-weight: 500;
 }
 
 .upscale-size-hint {
