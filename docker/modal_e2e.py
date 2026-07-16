@@ -11,7 +11,8 @@
 #
 # 使用 (两种模式, 计费按容器存活时间, 与 GPU 利用率无关):
 #   modal run docker/modal_e2e.py::e2e              # GPU L4, ≈$1.12/h — 真实出图
-#   modal run docker/modal_e2e.py::e2e_cpu          # 纯 CPU, ≈$0.11/h — 挂 UI 验证交互/逻辑
+#   modal run docker/modal_e2e.py::e2e_cpu          # 纯 CPU, ≈$0.11/h — 仅面板 UI 验证
+#                                                     (无 GPU 时 ComfyUI 拒绝启动, 属预期)
 #   不加 --hours 则一直运行, 手动结束; 加 --hours N 到点自动收尾。
 #   结束方式: Ctrl+C, 或 --detach 后用 modal app stop comfycarry-e2e。
 #   兜底: Modal 函数硬上限 24h 强杀 (GPU 模式跑满一天 ≈$27, 建议 GPU 会话给 --hours)
@@ -184,7 +185,7 @@ def e2e(hours: float = 0):
     volumes=VOLUMES,
 )
 def e2e_cpu(hours: float = 0):
-    """纯 CPU 会话 (≈$0.11/h) — 挂 WebUI 验证交互/逻辑, 不跑真实生成。
-    ComfyUI 无 GPU 时以 CPU 模式运行, 生成极慢但接口/交互完整。
+    """纯 CPU 会话 (≈$0.11/h) — 仅验证面板 UI/交互。
+    无 GPU 环境不做降级, ComfyUI 会拒绝启动 (崩溃退出), 属预期行为。
     hours=0 (默认) 不限时, 手动结束; 传 --hours N 到点自动收尾。"""
     _session(hours, "CPU only")

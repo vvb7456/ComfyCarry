@@ -112,7 +112,12 @@ import torchvision; print(f'torchvision=={torchvision.__version__}')" \
 # 9. ComfyUI
 # =============================================================================
 WORKDIR /opt
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
+# 始终取最新正式版 tag (vX.Y.Z), 不跟 master (nightly);
+# 用 git ls-remote 取 tag 而非 GitHub API, 避免 CI 共享 IP 的 API 限流
+RUN COMFY_TAG=$(git ls-remote --refs --tags https://github.com/comfyanonymous/ComfyUI.git 'v*' \
+        | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+' | sort -V | tail -1) && \
+    echo "ComfyUI stable tag: ${COMFY_TAG}" && \
+    git clone --depth 1 --branch "${COMFY_TAG}" https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
     python3.12 -m pip install --constraint /tmp/torch-constraints.txt \
         -r requirements.txt
