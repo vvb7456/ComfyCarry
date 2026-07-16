@@ -169,16 +169,16 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
     show.value = true
     loading.value = false
 
-    // 4. Auto-resume any in-progress download (legacy: _resumeDownload)
+    // 4. Auto-resume all in-progress downloads (页面刷新/切走后回来接上)
     if (comfyuiDir) {
-      const dlModel = config.models.find(m => {
+      const dlEntries: Array<{ model: ModelDep; downloadId: string }> = []
+      for (const m of config.models) {
         const ms = modelStatus.value.get(m.id)
-        return ms?.downloading && ms.downloadId
-      })
-      if (dlModel) {
-        selected.value = new Set([...selected.value, dlModel.id])
-        const ms = modelStatus.value.get(dlModel.id)!
-        _autoResume(ms.downloadId!, dlModel, comfyuiDir)
+        if (ms?.downloading && ms.downloadId) dlEntries.push({ model: m, downloadId: ms.downloadId })
+      }
+      if (dlEntries.length) {
+        selected.value = new Set([...selected.value, ...dlEntries.map(e => e.model.id)])
+        _autoResume(dlEntries, comfyuiDir)
       }
     }
   }
@@ -220,16 +220,17 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
     const total = toDownload.length
 
     try {
-      for (let mi = 0; mi < total; mi++) {
-        if (cancelled) return
-        const model = toDownload[mi]
-        progress.value = { modelIndex: mi, totalModels: total, modelName: model.name, percent: 0, speed: 0 }
-
+      // Phase 1: 先把所有缺失文件一次性提交给下载引擎 (后台并行下载)。
+      // 编排不依赖页面存活 — 中途切页/刷新, 剩余文件仍会继续下载,
+      // 回到页面后由 check() 的自动恢复接管进度展示。
+      const pendingIds = new Map<string, string[]>()  // model.id → download_ids
+      for (const model of toDownload) {
+        const ids: string[] = []
         for (const f of model.files) {
           if (cancelled) return
           const saveDir = comfyuiDir + '/' + f.subdir
 
-          // Check if file already exists
+          // Check if file already exists / already downloading
           const chkRes = await fetch('/api/downloads/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -239,14 +240,7 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
             const chk = await chkRes.json()
             if (chk?.installed) continue
             if (chk?.downloading && chk.download_id) {
-              // Resume existing download
-              const ok = await _waitForDownload(chk.download_id, mi, total, model.name)
-              if (!ok && !cancelled) {
-                error.value = model.name
-                downloading.value = false
-                progress.value = null
-                return
-              }
+              ids.push(chk.download_id)
               continue
             }
           }
@@ -279,14 +273,25 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
           }
           if (dlData?.status === 'complete') continue
 
-          const downloadId = dlData.download_id
-          if (!downloadId) {
+          if (!dlData.download_id) {
             error.value = model.name
             downloading.value = false
             progress.value = null
             return
           }
+          ids.push(dlData.download_id)
+        }
+        pendingIds.set(model.id, ids)
+      }
 
+      // Phase 2: 逐模型等待完成 (仅进度展示; 任务已全部在引擎队列中)
+      for (let mi = 0; mi < total; mi++) {
+        if (cancelled) return
+        const model = toDownload[mi]
+        progress.value = { modelIndex: mi, totalModels: total, modelName: model.name, percent: 0, speed: 0 }
+
+        for (const downloadId of pendingIds.get(model.id) || []) {
+          if (cancelled) return
           const ok = await _waitForDownload(downloadId, mi, total, model.name)
           if (!ok && !cancelled) {
             error.value = model.name
@@ -376,26 +381,25 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
   }
 
   /**
-   * Auto-resume an in-progress download detected during check().
-   * Like legacy _resumeDownload — monitors a single model's download and
-   * then continues with remaining models in startDownload.
+   * Auto-resume in-progress downloads detected during check().
+   * 逐个等待所有进行中的任务, 结束后重新 check() 核对文件真实状态
+   * (一个模型可能有多个文件, check 的 per-model 状态只保留了一个 download_id;
+   * 复查能把遗漏的进行中任务再接上, 直到收敛为全部安装/无任务)。
    */
-  async function _autoResume(downloadId: string, model: ModelDep, comfyuiDir: string) {
+  async function _autoResume(entries: Array<{ model: ModelDep; downloadId: string }>, comfyuiDir: string) {
     downloading.value = true
     cancelled = false
-    progress.value = { modelIndex: 0, totalModels: 1, modelName: model.name, percent: 0, speed: 0 }
 
-    const ok = await _waitForDownload(downloadId, 0, 1, model.name)
-
-    if (ok) {
-      const ms = modelStatus.value.get(model.id)
-      if (ms) { ms.installed = true; ms.downloading = false; ms.downloadId = null }
-      modelStatus.value = new Map(modelStatus.value)
+    for (let i = 0; i < entries.length; i++) {
+      if (cancelled) break
+      const { model, downloadId } = entries[i]
+      progress.value = { modelIndex: i, totalModels: entries.length, modelName: model.name, percent: 0, speed: 0 }
+      await _waitForDownload(downloadId, i, entries.length, model.name)
     }
 
     downloading.value = false
     progress.value = null
-    // Don't auto-continue with other models — let user click download again
+    if (!cancelled) await check(comfyuiDir)
   }
 
   async function cancelDownload(): Promise<void> {
