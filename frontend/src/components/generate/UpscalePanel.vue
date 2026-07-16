@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { useGenerateStore, type UpscaleState } from '@/stores/generate'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
-import TabSwitcher, { type TabItem } from '@/components/ui/TabSwitcher.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
@@ -15,12 +14,9 @@ const store = useGenerateStore()
 
 const config = computed<UpscaleState>(() => store.currentState.upscale)
 
-// ── Engine tabs ──────────────────────────────────────────────────────────
+// ── Engine switch ────────────────────────────────────────────────────────
 
-const engineTabs = computed<TabItem[]>(() => [
-  { key: 'aurasr', label: t('generate.upscale.engine_aurasr') },
-  { key: 'seedvr2', label: t('generate.upscale.engine_seedvr2') },
-])
+const isSeedVR2 = computed(() => config.value.engine === 'seedvr2')
 
 // ── AuraSR options ──────────────────────────────────────────────────────
 
@@ -70,33 +66,63 @@ const sizeHint = computed(() => {
 
 <template>
   <div class="upscale-grid">
-    <!-- Engine switcher -->
-    <TabSwitcher
-      :model-value="config.engine"
-      :tabs="engineTabs"
-      @update:model-value="config.engine = $event as 'aurasr' | 'seedvr2'"
-    />
-
-    <!-- Factor slider (shared) -->
-    <div class="up-cell">
-      <RangeField
-        :model-value="config.factor"
-        :min="1.5"
-        :max="4"
-        :step="0.5"
-        :label="t('generate.upscale.scale')"
-        :marks="['1.5', '2', '2.5', '3', '3.5', '4']"
-        :value-format="(v: number) => v.toFixed(1) + 'x'"
-        @update:model-value="config.factor = $event"
-      >
-        <template #label-append>
-          <span class="upscale-size-hint">{{ sizeHint }}</span>
-        </template>
-      </RangeField>
+    <!-- Engine switch: AuraSR ⇄ SeedVR2 -->
+    <div class="up-engine-switch">
+      <span
+        class="up-engine-label"
+        :class="{ active: !isSeedVR2 }"
+        @click="config.engine = 'aurasr'"
+      >{{ t('generate.upscale.engine_aurasr') }}</span>
+      <ToggleSwitch
+        :model-value="isSeedVR2"
+        @update:model-value="config.engine = $event ? 'seedvr2' : 'aurasr'"
+      />
+      <span
+        class="up-engine-label"
+        :class="{ active: isSeedVR2 }"
+        @click="config.engine = 'seedvr2'"
+      >{{ t('generate.upscale.engine_seedvr2') }}</span>
     </div>
 
-    <!-- ── AuraSR controls ── -->
-    <template v-if="config.engine === 'aurasr'">
+    <!-- ── AuraSR: 上排两个滑条 / 下排两个下拉 ── -->
+    <template v-if="!isSeedVR2">
+      <div class="upscale-grid__row">
+        <!-- Factor slider -->
+        <div class="up-cell">
+          <RangeField
+            :model-value="config.factor"
+            :min="1.5"
+            :max="4"
+            :step="0.5"
+            :label="t('generate.upscale.scale')"
+            :marks="['1.5', '2', '2.5', '3', '3.5', '4']"
+            :value-format="(v: number) => v.toFixed(1) + 'x'"
+            @update:model-value="config.factor = $event"
+          >
+            <template #label-append>
+              <span class="upscale-size-hint">{{ sizeHint }}</span>
+            </template>
+          </RangeField>
+        </div>
+
+        <!-- Tile size slider -->
+        <div class="up-cell">
+          <RangeField
+            :model-value="config.tile"
+            :min="1"
+            :max="32"
+            :step="1"
+            :label="t('generate.upscale.tile_size')"
+            :marks="['1', '16', '32']"
+            @update:model-value="config.tile = $event"
+          >
+            <template #label-append>
+              <HelpTip :text="t('generate.upscale.tile_size_help')" />
+            </template>
+          </RangeField>
+        </div>
+      </div>
+
       <div class="upscale-grid__row">
         <!-- Mode select -->
         <div class="up-cell">
@@ -131,27 +157,44 @@ const sizeHint = computed(() => {
           </div>
         </div>
       </div>
-
-      <!-- Tile size slider -->
-      <div class="up-cell">
-        <RangeField
-          :model-value="config.tile"
-          :min="1"
-          :max="32"
-          :step="1"
-          :label="t('generate.upscale.tile_size')"
-          :marks="['1', '16', '32']"
-          @update:model-value="config.tile = $event"
-        >
-          <template #label-append>
-            <HelpTip :text="t('generate.upscale.tile_size_help')" />
-          </template>
-        </RangeField>
-      </div>
     </template>
 
-    <!-- ── SeedVR2 controls ── -->
+    <!-- ── SeedVR2: 倍率+VAE开关 / 两个下拉 / 两个噪声滑条 ── -->
     <template v-else>
+      <div class="upscale-grid__row">
+        <!-- Factor slider -->
+        <div class="up-cell">
+          <RangeField
+            :model-value="config.factor"
+            :min="1.5"
+            :max="4"
+            :step="0.5"
+            :label="t('generate.upscale.scale')"
+            :marks="['1.5', '2', '2.5', '3', '3.5', '4']"
+            :value-format="(v: number) => v.toFixed(1) + 'x'"
+            @update:model-value="config.factor = $event"
+          >
+            <template #label-append>
+              <span class="upscale-size-hint">{{ sizeHint }}</span>
+            </template>
+          </RangeField>
+        </div>
+
+        <!-- VAE tiled toggle -->
+        <div class="up-cell">
+          <div class="up-field up-field--switch">
+            <label class="field-lbl">
+              {{ t('generate.upscale.svr_tiled_vae') }}
+              <HelpTip :text="t('generate.upscale.svr_tiled_vae_help')" />
+            </label>
+            <ToggleSwitch
+              :model-value="config.svrTiledVae"
+              @update:model-value="config.svrTiledVae = $event"
+            />
+          </div>
+        </div>
+      </div>
+
       <div class="upscale-grid__row">
         <!-- Model select -->
         <div class="up-cell">
@@ -180,20 +223,6 @@ const sizeHint = computed(() => {
               @update:model-value="config.svrColorCorrection = String($event)"
             />
           </div>
-        </div>
-      </div>
-
-      <!-- VAE tiled + noise sliders -->
-      <div class="up-cell">
-        <div class="up-field up-field--row">
-          <label class="field-lbl">
-            {{ t('generate.upscale.svr_tiled_vae') }}
-            <HelpTip :text="t('generate.upscale.svr_tiled_vae_help')" />
-          </label>
-          <ToggleSwitch
-            :model-value="config.svrTiledVae"
-            @update:model-value="config.svrTiledVae = $event"
-          />
         </div>
       </div>
 
@@ -252,6 +281,25 @@ const sizeHint = computed(() => {
   gap: var(--sp-3);
 }
 
+.up-engine-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.up-engine-label {
+  font-size: var(--text-xs);
+  color: var(--t3);
+  transition: color .15s;
+  cursor: pointer;
+  user-select: none;
+}
+
+.up-engine-label.active {
+  color: var(--t1);
+  font-weight: 500;
+}
+
 .upscale-size-hint {
   color: var(--t3);
   font-size: var(--text-xs);
@@ -264,10 +312,12 @@ const sizeHint = computed(() => {
   gap: 4px;
 }
 
-.up-field--row {
+/* VAE 分块开关: 与同排滑条等高, 水平排布垂直居中 */
+.up-field--switch {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  height: 100%;
 }
 
 .up-cell--disabled {
