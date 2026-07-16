@@ -118,6 +118,18 @@ def _restore_comfyui(log):
     if not saved_args:
         saved_args = "--listen 0.0.0.0 --port 8188"
 
+    # 保存的参数可能来自不同硬件的上一会话 (持久卷跨 GPU/CPU 会话复用),
+    # 按当前环境校正 --cpu: 无 GPU 不加会崩溃循环, 有 GPU 不减会静默降速
+    from comfycarry.services.deploy_engine import _detect_gpu_info
+    tokens = saved_args.split()
+    has_gpu = bool(_detect_gpu_info().get("cuda_cap"))
+    if not has_gpu and "--cpu" not in tokens:
+        saved_args += " --cpu"
+        log.warning("未检测到 GPU, ComfyUI 恢复参数追加 --cpu (仅供交互验证, 生成极慢)")
+    elif has_gpu and "--cpu" in tokens:
+        saved_args = " ".join(t for t in tokens if t != "--cpu")
+        log.info("检测到 GPU, 已移除恢复参数中的 --cpu")
+
     py = _detect_python()
     try:
         cmd = (
