@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useGenerateStore, type ControlNetState } from '@/stores/generate'
 import { useRefImagePicker } from './useRefImagePicker'
 import { useToast } from '@/composables/useToast'
+import { cnBranchForFile, type CnBranch } from '@/composables/generate/modelDepConfigs'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -155,10 +156,13 @@ export interface UseControlNetReturn {
  *
  * @param type — 'pose' | 'canny' | 'depth'
  * @param controlnetModels — reactive ref to the full controlnet models map from options
+ * @param branchRef — current tab 的 CN branch ('sdxl' | 'ilnoob' | undefined);
+ *                    用于面板下拉过滤 (A3 三规则: 兼容排前/不兼容隐藏/未知列后)
  */
 export function useControlNet(
   type: CnType,
   controlnetModels: Ref<Record<string, string[]>>,
+  branchRef?: ComputedRef<CnBranch | undefined>,
 ): UseControlNetReturn {
   const store = useGenerateStore()
   const state = computed(() => store.currentState)
@@ -209,16 +213,56 @@ export function useControlNet(
   }
 
   // ── Models ───────────────────────────────────────────────────────────────
+  // A3 三规则过滤 (branch = 当前 tab 的 cnBranch):
+  //   1. 已知且属于当前 branch → 列出且排前, 无选中时自动默认第一个;
+  //   2. 已知但属于另一 branch → 隐藏;
+  //   3. 未知文件 (用户手动安装, 不在 CN_FILE_BRANCH) → 列出, 排在已知兼容项之后。
+  // 无 cnBranch (split 系未启用 CN, 或 config.cnBranch 缺省) → 不过滤, 原样返回 (兼容旧行为)。
 
-  const models = computed<string[]>(() => controlnetModels.value[type] || [])
+  /** 原始 (未过滤) 模型列表, 来自后端 options */
+  const rawModels = computed<string[]>(() => controlnetModels.value[type] || [])
+
+  /** 按 A3 三规则过滤 + 排序后的模型列表 */
+  const models = computed<string[]>(() => {
+    const branch = branchRef?.value
+    if (!branch) return rawModels.value
+    const compat: string[] = []      // 规则 1: 已知 + 兼容 → 排前
+    const unknown: string[] = []     // 规则 3: 未知 → 排后
+    for (const name of rawModels.value) {
+      const fileBranch = cnBranchForFile(name)
+      if (fileBranch === null) {
+        unknown.push(name)            // 规则 3
+      } else if (fileBranch === branch) {
+        compat.push(name)             // 规则 1
+      }
+      // 规则 2: fileBranch !== branch → 隐藏 (跳过)
+    }
+    return [...compat, ...unknown]
+  })
   const hasModels = computed(() => models.value.length > 0)
 
-  // Auto-select first model when list populates and none selected
+  /** 判断当前选中模型是否被规则 2 隐藏 (用于 tab 切换时重置选中) */
+  function isModelHidden(name: string): boolean {
+    const branch = branchRef?.value
+    if (!branch) return false
+    const fileBranch = cnBranchForFile(name)
+    return fileBranch !== null && fileBranch !== branch
+  }
+
+  // Auto-select first model when list populates and none selected (规则 1 的"自动默认第一个")
   watch(models, (list) => {
     if (list.length > 0 && !config.value.model) {
       config.value.model = list[0]
     }
   }, { immediate: true })
+
+  // tab 切换 / branch 变化: 若当前选中项被规则 2 隐藏 → 重置为默认 (兼容项首项, 无则空)
+  watch(() => branchRef?.value, () => {
+    if (config.value.model && isModelHidden(config.value.model)) {
+      const list = models.value
+      config.value.model = list.length > 0 ? list[0] : ''
+    }
+  })
 
   // ── Ref image picker ─────────────────────────────────────────────────────
 

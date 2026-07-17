@@ -11,7 +11,7 @@
  *  - Focus border highlight (--ac color)
  *  - Responsive: mobile hides tool labels, shows icons only
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -30,9 +30,14 @@ const props = withDefaults(defineProps<{
   positive: string
   negative: string
   showNegative?: boolean
+  promptStyle?: 'tags' | 'natural'
+  /** 模型条目 key: 存在 generate.placeholders.positive_<key> 时优先于 promptStyle 通用占位 */
+  modelType?: string
   tools?: ToolButton[]
 }>(), {
   showNegative: true,
+  promptStyle: 'tags',
+  modelType: '',
   tools: () => [],
 })
 
@@ -42,7 +47,23 @@ const emit = defineEmits<{
   'tool': [key: string]
 }>()
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
+
+/** 占位符解析: 按模型 key 的专用占位 (placeholders.positive_<key>) > promptStyle 通用占位 */
+const positivePlaceholder = computed(() => {
+  const perModelKey = `generate.placeholders.positive_${props.modelType}`
+  if (props.modelType && te(perModelKey)) return t(perModelKey)
+  return props.promptStyle === 'natural'
+    ? t('generate.prompt.positive_placeholder_natural')
+    : t('generate.prompt.positive_placeholder')
+})
+
+/** D: 负面占位符同样按模型 key 解析 (placeholders.negative_<key>) > 通用 negative_placeholder */
+const negativePlaceholder = computed(() => {
+  const perModelKey = `generate.placeholders.negative_${props.modelType}`
+  if (props.modelType && te(perModelKey)) return t(perModelKey)
+  return t('generate.prompt.negative_placeholder')
+})
 
 const helpOpen = ref(false)
 const posRef = ref<HTMLTextAreaElement | null>(null)
@@ -108,12 +129,13 @@ defineExpose({ insertAtCursor })
       <div class="prompt-label">
         {{ t('generate.prompt.positive_label') }}
       </div>
+      <!-- 单框模式 (无负面提示词的架构): 正面框加倍占满原双框空间 -->
       <textarea
         ref="posRef"
         class="prompt-textarea"
-        rows="4"
+        :rows="showNegative ? 4 : 9"
         :value="positive"
-        :placeholder="t('generate.prompt.positive_placeholder')"
+        :placeholder="positivePlaceholder"
         @input="emit('update:positive', ($event.target as HTMLTextAreaElement).value)"
       />
 
@@ -127,7 +149,7 @@ defineExpose({ insertAtCursor })
         class="prompt-textarea"
         rows="4"
         :value="negative"
-        :placeholder="t('generate.prompt.negative_placeholder')"
+        :placeholder="negativePlaceholder"
         @input="emit('update:negative', ($event.target as HTMLTextAreaElement).value)"
       />
     </div>
@@ -135,24 +157,44 @@ defineExpose({ insertAtCursor })
     <!-- Syntax help modal -->
     <BaseModal v-model="helpOpen" :title="t('generate.prompt.help_modal_title')" icon="help_outline" size="lg">
       <div class="help-content">
-        <!-- 基础语法 -->
-        <div class="help-section-title">{{ t('generate.prompt.help.basic_title') }}</div>
-        <table class="help-table">
-          <tr v-for="row in [
-            { key: 'comma', example: '1girl, long hair, blue sky' },
-            { key: 'weight_up', example: '(masterpiece:1.4)' },
-            { key: 'weight_down', example: '(blurry:0.5)' },
-            { key: 'embedding', example: 'embedding:easynegative' },
-            { key: 'quality', example: '' },
-          ]" :key="row.key">
-            <td class="help-label">{{ t(`generate.prompt.help.${row.key}`) }}</td>
-            <td>
-              <code v-if="row.example">{{ row.example }}</code>
-              <br v-if="row.example" />
-              <span class="help-desc">{{ t(`generate.prompt.help.${row.key}_desc`) }}</span>
-            </td>
-          </tr>
-        </table>
+        <!-- 基础语法: 按 promptStyle 区分 tag 系 (A1111) 与自然语言系 -->
+        <template v-if="promptStyle === 'natural'">
+          <div class="help-section-title">{{ t('generate.prompt.help.natural_title') }}</div>
+          <table class="help-table">
+            <tr v-for="row in [
+              { key: 'natural_sentence', example: 'A silver-haired girl in a flowing dress stands on a cliff at sunset, cinematic lighting' },
+              { key: 'natural_order', example: '' },
+              { key: 'natural_detail', example: '' },
+              { key: 'natural_no_weight', example: '' },
+            ]" :key="row.key">
+              <td class="help-label">{{ t(`generate.prompt.help.${row.key}`) }}</td>
+              <td>
+                <code v-if="row.example">{{ row.example }}</code>
+                <br v-if="row.example" />
+                <span class="help-desc">{{ t(`generate.prompt.help.${row.key}_desc`) }}</span>
+              </td>
+            </tr>
+          </table>
+        </template>
+        <template v-else>
+          <div class="help-section-title">{{ t('generate.prompt.help.basic_title') }}</div>
+          <table class="help-table">
+            <tr v-for="row in [
+              { key: 'comma', example: '1girl, long hair, blue sky' },
+              { key: 'weight_up', example: '(masterpiece:1.4)' },
+              { key: 'weight_down', example: '(blurry:0.5)' },
+              { key: 'embedding', example: 'embedding:easynegative' },
+              { key: 'quality', example: '' },
+            ]" :key="row.key">
+              <td class="help-label">{{ t(`generate.prompt.help.${row.key}`) }}</td>
+              <td>
+                <code v-if="row.example">{{ row.example }}</code>
+                <br v-if="row.example" />
+                <span class="help-desc">{{ t(`generate.prompt.help.${row.key}_desc`) }}</span>
+              </td>
+            </tr>
+          </table>
+        </template>
 
         <!-- 随机提示词 -->
         <div class="help-section-title">{{ t('generate.prompt.help.random_title') }}</div>
@@ -217,7 +259,6 @@ defineExpose({ insertAtCursor })
 .prompt-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 2px;
   padding: 3px 6px;
   background: var(--bg2);
@@ -226,6 +267,8 @@ defineExpose({ insertAtCursor })
   overflow-x: auto;
 }
 .prompt-toolbar::-webkit-scrollbar { display: none; }
+/* 右对齐但保持溢出可滚动 (justify-content:flex-end 会让左侧溢出内容不可达) */
+.prompt-toolbar > :first-child { margin-left: auto; }
 
 /* ── Textarea ── */
 .prompt-textarea {
@@ -293,7 +336,7 @@ defineExpose({ insertAtCursor })
 }
 
 @media (max-width: 768px) {
-  .prompt-toolbar { justify-content: flex-start; }
+  .prompt-toolbar > :first-child { margin-left: 0; }
   .tool-label { display: none; }
 }
 

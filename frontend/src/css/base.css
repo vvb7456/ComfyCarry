@@ -39,6 +39,7 @@
             --amber: #fbbf24;
             --red: #f87171;
             --pink: #f472b6;
+            --purple: #a78bfa;
             --cyan: #22d3ee;
             /* ── Semantic Colors ── */
             --c-positive: var(--green);
@@ -62,6 +63,7 @@
             --r-md: 8px;
             --r-lg: 12px;
             --r-pill: 9999px;
+            --z-float: 10000;
             --text-xs: .72rem;
             --text-sm: .78rem;
             --text-base: .85rem;
@@ -96,6 +98,7 @@
             --amber: #d97706;
             --red: #dc2626;
             --pink: #db2777;
+            --purple: #8b5cf6;
             --cyan: #0891b2;
             --sh: 0 2px 12px rgba(0, 0, 0, 0.08);
             --overlay: rgba(0, 0, 0, .45);

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useGenerateQueueStore } from '@/stores/generateQueue'
 import type { ExecState } from '@/composables/useExecTracker'
-import type { ComfyQueueResponse } from '@/types/comfyui'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
@@ -23,37 +24,35 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const { get, post } = useApiFetch()
+const { post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-const queueRunning = ref<QueueItem[]>([])
-const queuePending = ref<QueueItem[]>([])
+const queueStore = useGenerateQueueStore()
+const { queueRunning, queuePending } = storeToRefs(queueStore)
 
-async function loadQueue() {
-  const d = await get<ComfyQueueResponse>('/api/comfyui/queue')
-  if (!d) return
-  queueRunning.value = (d.queue_running || []) as QueueItem[]
-  queuePending.value = (d.queue_pending || []) as QueueItem[]
-}
+// 挂载时自行从 store 取数 (规格 E3: 抽屉首开才挂载内容, 此处仅首次挂载时拉一次)
+onMounted(() => {
+  if (queueStore.queueCount === 0) queueStore.loadQueue()
+})
 
 async function interrupt() {
   if (!await post('/api/comfyui/interrupt')) return
   toast(t('comfyui.toast.interrupt_sent'), 'warning')
-  setTimeout(loadQueue, 1000)
+  setTimeout(() => queueStore.loadQueue(), 1000)
 }
 
 async function deleteItem(promptId: string) {
   if (!await confirm({ message: t('comfyui.queue.delete_confirm'), variant: 'danger' })) return
   if (!await post('/api/comfyui/queue/delete', { delete: [promptId] })) return
   toast(t('comfyui.toast.deleted'), 'success')
-  loadQueue()
+  queueStore.loadQueue()
 }
 
 async function clearQueue() {
   if (!await post('/api/comfyui/queue/clear')) return
   toast(t('comfyui.queue.cleared'), 'success')
-  loadQueue()
+  queueStore.loadQueue()
 }
 
 function fmtId(id: string) {
@@ -63,10 +62,6 @@ function fmtId(id: string) {
 function nodeCount(item: QueueItem) {
   return Object.keys(item[2] || {}).length
 }
-
-onMounted(loadQueue)
-
-defineExpose({ loadQueue })
 </script>
 
 <template>

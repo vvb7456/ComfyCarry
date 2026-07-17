@@ -151,8 +151,9 @@ def api_pl_history_add():
     negative = data.get("negative", "")
     if not positive and not negative:
         return jsonify({"error": "At least one of 'positive' or 'negative' is required"}), 400
+    is_favorite = 1 if data.get("is_favorite") else 0
     try:
-        hid = pl.add_history(positive, negative)
+        hid = pl.add_history(positive, negative, is_favorite)
         return jsonify({"success": True, "id": hid}), 201
     except Exception as e:
         logger.error("prompt-library history add error: %s", e)

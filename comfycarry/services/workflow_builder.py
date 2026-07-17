@@ -134,6 +134,23 @@ class WorkflowBuilder:
         }
         return nid
 
+    def add_clip_set_last_layer(self, clip_ref, stop_at_clip_layer: int) -> str:
+        """
+        CLIPSetLastLayer — 截断 CLIP 编码到倒数第 N 层 (clip skip)。
+        clip_ref: 上游 CLIP 输出引用 (CheckpointLoaderSimple 默认 index=1, 或 LoraLoader/CLIPLoader 等)。
+        stop_at_clip_layer: 负数 = 倒数第 N 层 (如 -2 = clip skip 2)。
+        输出: [node_id, 0]=CLIP (接替上游 CLIP 链, 供后续 LoRA / CLIPTextEncode 消费)
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "CLIPSetLastLayer",
+            "inputs": {
+                "stop_at_clip_layer": int(stop_at_clip_layer),
+                "clip": self._ref(clip_ref, default_idx=1),
+            },
+        }
+        return nid
+
     # ── 文本/Latent 通用节点 ────────────────────────────────────────────────
 
     def add_clip_text_encode(self, text: str, clip_ref) -> str:
@@ -155,15 +172,38 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_empty_latent(self, width: int, height: int, batch_size: int = 1) -> str:
+    def add_empty_latent(
+        self, width: int, height: int, batch_size: int = 1,
+        class_type: str = "EmptyLatentImage",
+    ) -> str:
         """
         空 Latent Image。
+        class_type: 节点类型, 默认 "EmptyLatentImage" (anima/krea2);
+                    zimage/flux1 等用 "EmptySD3LatentImage" (16 通道);
+                    flux2 用 "EmptyFlux2LatentImage"。
         输出: [node_id, 0]=LATENT
         """
         nid = self._next_id()
         self._nodes[nid] = {
-            "class_type": "EmptyLatentImage",
+            "class_type": class_type,
             "inputs": {"width": width, "height": height, "batch_size": batch_size},
+        }
+        return nid
+
+    def add_model_sampling_auraflow(self, model_ref, shift: float = 3.0) -> str:
+        """
+        ModelSamplingAuraFlow — 调整模型采样的 shift 参数 (AuraFlow/Z-Image 族)。
+        Z-Image 官方 Turbo/Base 模板均接在 MODEL 链路上 (shift=3.0)。
+        model_ref: 上游 MODEL 引用 (UNETLoader / LoraLoader 输出 index 0)。
+        输出: [node_id, 0]=MODEL (接替上游 MODEL 链)
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "ModelSamplingAuraFlow",
+            "inputs": {
+                "shift": float(shift),
+                "model": self._ref(model_ref, default_idx=0),
+            },
         }
         return nid
 
@@ -342,25 +382,31 @@ class WorkflowBuilder:
         strength: float = 1.0,
         start_percent: float = 0.0,
         end_percent: float = 1.0,
+        vae_ref=None,
     ) -> str:
         """
         应用 ControlNet (ControlNetApplyAdvanced)。
         链式拼接: 多个 ControlNet 顺序应用时，后一个的 pos/neg 接前一个的输出。
         positive_ref / negative_ref: (node_id, output_index) 元组
+        vae_ref: 可选 VAE 引用 — Flux 系 ControlNet 为 latent 空间条件, 必须接 optional vae;
+                 非 None 时 inputs 增加 "vae" key。None 时不含 vae (sdxl 既有行为不变)。
         输出: [node_id, 0]=positive CONDITIONING, [node_id, 1]=negative CONDITIONING
         """
         nid = self._next_id()
+        inputs = {
+            "positive": list(positive_ref),
+            "negative": list(negative_ref),
+            "control_net": [control_net_node_id, 0],
+            "image": [image_node_id, 0],
+            "strength": max(0.0, min(float(strength), 2.0)),
+            "start_percent": max(0.0, min(float(start_percent), 1.0)),
+            "end_percent": max(0.0, min(float(end_percent), 1.0)),
+        }
+        if vae_ref is not None:
+            inputs["vae"] = self._ref(vae_ref)
         self._nodes[nid] = {
             "class_type": "ControlNetApplyAdvanced",
-            "inputs": {
-                "positive": list(positive_ref),
-                "negative": list(negative_ref),
-                "control_net": [control_net_node_id, 0],
-                "image": [image_node_id, 0],
-                "strength": max(0.0, min(float(strength), 2.0)),
-                "start_percent": max(0.0, min(float(start_percent), 1.0)),
-                "end_percent": max(0.0, min(float(end_percent), 1.0)),
-            },
+            "inputs": inputs,
         }
         return nid
 
@@ -695,6 +741,10 @@ def build_sdxl_workflow(params: dict) -> dict:
 
     params 字段:
         checkpoint      (str, 必填) — 模型文件名
+        clip_skip       (int)       — Clip Skip 1~4 (默认 1; >1 时插入 CLIPSetLastLayer,
+                                      stop_at_clip_layer = -clip_skip; Pony/IL/NoobAI = 2)
+        vae             (str)       — VAE 覆盖文件名 (空串 = 跟随 Checkpoint; 非空 → VAELoader,
+                                      工作流中所有 VAE 引用统一改用它, 含 i2i/inpaint/hires/upscale 分支)
         positive_prompt (str, 必填) — 正向提示词
         negative_prompt (str)       — 负向提示词，默认 ""
         width           (int)       — 宽度，默认 1024
@@ -752,6 +802,25 @@ def build_sdxl_workflow(params: dict) -> dict:
     model_ref = ckpt
     clip_ref = ckpt
 
+    # 1.5 Clip Skip (B4): clip_skip>1 → 在 checkpoint loader 之后插入 CLIPSetLastLayer,
+    #     LoRA 链与文本编码消费其输出 (stop_at_clip_layer = -clip_skip)。
+    clip_skip = int(params.get("clip_skip", 1) or 1)
+    if clip_skip > 1:
+        clip_skip_node = b.add_clip_set_last_layer(clip_ref, -clip_skip)
+        # CLIPSetLastLayer 输出 CLIP 在 index=0 (区别于 CheckpointLoaderSimple 的 index=1)
+        clip_ref = (clip_skip_node, 0)
+
+    # 1.6 VAE 覆盖 (B4): vae 非空 → VAELoader 节点, 工作流中所有 VAE 引用统一改用它。
+    #     vae_ref 为单一变量, 后续 t2i decode / i2i·inpaint encode+decode / hires / upscale
+    #     全部引用它, 避免漏改某分支。无覆盖时 vae_ref = ckpt (走 CheckpointLoader index=2)。
+    vae_override = str(params.get("vae", "") or "").strip()
+    if vae_override:
+        vae_loader_node = b.add_vae_loader(vae_override)
+        # VAELoader 输出 VAE 在 index=0 (区别于 CheckpointLoaderSimple 的 index=2)
+        vae_ref = (vae_loader_node, 0)
+    else:
+        vae_ref = ckpt
+
     # 2. 链式插入多个 LoRA
     loras = params.get("loras") or []
 
@@ -796,16 +865,16 @@ def build_sdxl_workflow(params: dict) -> dict:
     i2i_denoise = 1.0  # T2I 默认全去噪
 
     if inpaint_image and inpaint_mask:
-        # 局部重绘: 加载参考图 + mask → VAEEncodeForInpaint
+        # 局部重绘: 加载参考图 + mask → VAEEncodeForInpaint (VAE 引用 vae_ref)
         inp_load = b.add_load_image(inpaint_image)
         mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
         grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 64))
-        latent = b.add_vae_encode_for_inpaint(inp_load, ckpt, mask_load, grow)
+        latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
         i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
     elif i2i_image:
-        # 图生图: 加载参考图 → VAE 编码为 latent
+        # 图生图: 加载参考图 → VAE 编码为 latent (VAE 引用 vae_ref)
         i2i_load = b.add_load_image(i2i_image)
-        latent = b.add_vae_encode(i2i_load, ckpt)
+        latent = b.add_vae_encode(i2i_load, vae_ref)
         i2i_denoise = max(0.10, min(float(params.get("i2i_denoise", 0.7)), 0.90))
     else:
         latent = b.add_empty_latent(
@@ -828,8 +897,8 @@ def build_sdxl_workflow(params: dict) -> dict:
         denoise=i2i_denoise,
     )
 
-    # 6. VAE 解码 (VAE 始终来自原始 Checkpoint，index=2)
-    decoded = b.add_vae_decode(sampled, ckpt)
+    # 6. VAE 解码 (VAE 引用 vae_ref: 覆盖时 = VAELoader, 否则 = Checkpoint index=2)
+    decoded = b.add_vae_decode(sampled, vae_ref)
 
     # ── 放大链路 (Phase 2, 引擎分流见 _add_upscale_chain) ────────────────
     final_image = decoded
@@ -837,7 +906,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         final_image = _add_upscale_chain(b, decoded, params)
 
     # ── 二次采样 (HiRes Refine) ─────────────────────────────────────
-    # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码
+    # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码 (VAE 引用 vae_ref)
     hires_enabled = bool(params.get("hires_enabled", False))
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
@@ -847,7 +916,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         hires_scheduler = str(params.get("hires_scheduler", "normal"))
         hires_seed = int(params.get("hires_seed", -1))
         # VAE 编码: IMAGE → LATENT
-        hires_latent = b.add_vae_encode(final_image, ckpt)
+        hires_latent = b.add_vae_encode(final_image, vae_ref)
         # 第二次 KSampler (使用基础正/负提示词，不带 ControlNet)
         hires_sampled = b.add_ksampler(
             model_ref,
@@ -861,7 +930,7 @@ def build_sdxl_workflow(params: dict) -> dict:
             scheduler=hires_scheduler,
             denoise=hires_denoise,
         )
-        final_image = b.add_vae_decode(hires_sampled, ckpt)
+        final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
     # 7. 保存图片 (WAS Image Save)
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
@@ -885,39 +954,96 @@ def build_sdxl_workflow(params: dict) -> dict:
     return b.build()
 
 
-def build_anima_workflow(params: dict) -> dict:
-    """
-    构建 Anima 工作流 — 分离式架构 (UNet + 单 CLIP + VAE)。
+# 分离式三件套 (UNet + 单 CLIP + VAE) 架构的差异化参数。
+# 新增同构架构 (未来 flux 单 TE 变体等) 在此加 profile + _BUILDERS 注册即可。
+_SPLIT_ARCH_PROFILES = {
+    # Anima (CircleStone Labs, 2B): 实测 er_sde/simple/30步/cfg4
+    "anima": {"clip_type": "stable_diffusion", "steps": 30, "cfg": 4.0,
+              "sampler": "er_sde", "scheduler": "simple"},
+    # Krea 2 (12B SingleStreamDiT): 官方 Turbo 模板 image_krea2_turbo_t2i.json
+    # 实测值 euler/simple/8步/cfg1.0 (cfg=1 等效禁用 CFG; Raw 用户自行调参)
+    "krea2": {"clip_type": "krea2", "steps": 8, "cfg": 1.0,
+              "sampler": "euler", "scheduler": "simple"},
+    # Z-Image Turbo 官方模板 image_z_image_turbo.json 实测值
+    # (Base 用户手动调 25/4.0; ModelSamplingAuraFlow 接在 MODEL 链路 shift=3.0;
+    #  Lumina2 族 CLIPLoader type=lumina2; latent 用 EmptySD3LatentImage 16ch)
+    "zimage": {"clip_type": "lumina2", "steps": 8, "cfg": 1.0,
+               "sampler": "res_multistep", "scheduler": "simple",
+               "latent_class": "EmptySD3LatentImage",
+               "model_sampling": {"class": "auraflow", "shift": 3.0}},
+    # Flux1 dev 官方模板 flux_dev_full_text_to_image.json 实测值
+    # (双 CLIP: clip_l + t5xxl, DualCLIPLoader type=flux;
+    #  EmptySD3LatentImage 16ch; 无 ModelSamplingAuraFlow)
+    "flux1": {"dual_clip_type": "flux", "steps": 20, "cfg": 1.0,
+              "sampler": "euler", "scheduler": "simple",
+              "latent_class": "EmptySD3LatentImage",
+              "controlnet": True},
+}
 
-    Anima (CircleStone Labs × Comfy Org, 2B 参数) 实测节点配置:
-      - UNETLoader(unet_name, weight_dtype="default")
-      - CLIPLoader(clip_name="qwen_3_06b_base.safetensors", type="stable_diffusion")
-      - VAELoader(vae_name="qwen_image_vae.safetensors")
-      - EmptyLatentImage (经典 4 通道)
-      - KSampler 默认 steps=30 / cfg=4 / sampler=er_sde / scheduler=simple
+
+def build_split_workflow(params: dict, arch: str) -> dict:
+    """
+    构建分离式架构 (UNet + CLIP + VAE) 工作流 — 参数按架构 profile 驱动。
+
+    支持架构 (见 _SPLIT_ARCH_PROFILES):
+      - anima:  CircleStone Labs 2B, CLIPLoader type=stable_diffusion, er_sde/simple/30步/cfg4
+      - krea2:  Krea 2 12B SingleStreamDiT, CLIPLoader type=krea2, euler/simple/8步/cfg1.0
+      - zimage: Z-Image (Tongyi/阿里, 6B 单流 DiT), CLIPLoader type=lumina2,
+                res_multistep/simple/8步/cfg1.0, ModelSamplingAuraFlow(shift=3) 接 MODEL 链,
+                latent=EmptySD3LatentImage
+      - flux1:  Flux 1 dev, DualCLIPLoader type=flux (clip_l + t5xxl 双 TE),
+                euler/simple/20步/cfg1.0, latent=EmptySD3LatentImage
+
+    节点拓扑 (各架构同构, 按 profile 差异化加载):
+      UNETLoader(unet_name, weight_dtype="default")
+      CLIPLoader(clip_name, type=<profile.clip_type>)              # 单 TE 架构 (anima/krea2/zimage)
+      DualCLIPLoader(clip_name1, clip_name2, type=<profile.dual_clip_type>)  # 双 TE 架构 (flux1)
+      VAELoader(vae_name)
+      [LoRA 链式插入 — 同时改写 model_ref / clip_ref]
+      [ModelSamplingAuraFlow(shift) — 仅 profile 含 model_sampling 时 (zimage)]
+      CLIPTextEncode ×2 (正/负)
+      EmptyLatentImage / EmptySD3LatentImage (按 profile.latent_class)
+        或 VAEEncodeForInpaint / VAEEncode 用于 I2I/Inpaint
+      KSampler (默认值取自 profile)
+      VAEDecode
+      [可选放大链路]
+      [可选二次采样 HiRes]
+      Image Save + PreviewImage
 
     支持模块: LoRA / I2I / Inpaint / HiRes / Upscale (与 SDXL 相同)
-    不支持: ControlNet (生态未适配)
+    ControlNet: 按 profile["controlnet"] 开关 — flux1 已启用 (Union Pro 2.0, latent 空间 CN
+                 需 vae_ref); 其余架构 (anima/krea2/zimage) profile 无开关, 传入 controlnets 被忽略。
 
     params 关键字段:
         unet              (str, 必填) — UNet 文件名 (models/diffusion_models/)
-        clip              (str, 必填) — Text Encoder 文件名 (models/text_encoders/)
+        clip              (str, 必填) — Text Encoder 文件名 (单 TE 架构) / clip_l (flux1)
+        clip2             (str)       — 第二 Text Encoder 文件名 (仅 dual_clip_type 架构, 如 flux1 的 t5xxl)
         vae               (str, 必填) — VAE 文件名 (models/vae/)
-        clip_type         (str)       — CLIPLoader type, 默认 "stable_diffusion"
+        clip_type         (str)       — CLIPLoader type, 默认取 profile["clip_type"]
         unet_weight_dtype (str)       — UNet 权重精度, 默认 "default"
+        shift             (float)      — ModelSamplingAuraFlow shift, 默认取 profile.model_sampling.shift
         其余字段同 build_sdxl_workflow (positive_prompt / loras / hires / i2i / upscale / inpaint 等)
     """
+    profile = _SPLIT_ARCH_PROFILES.get(arch, _SPLIT_ARCH_PROFILES["anima"])
     b = WorkflowBuilder()
 
-    # 1. 加载三件套
+    # 1. 加载三件套 (flux1 等双 TE 架构走 DualCLIPLoader, 其余单 TE 走 CLIPLoader)
     unet_node = b.add_unet_loader(
         params["unet"],
         weight_dtype=str(params.get("unet_weight_dtype", "default")),
     )
-    clip_node = b.add_clip_loader_single(
-        params["clip"],
-        type=str(params.get("clip_type", "stable_diffusion")),
-    )
+    if "dual_clip_type" in profile:
+        # flux1: 双 CLIP (clip_l + t5xxl) → DualCLIPLoader(type=flux)
+        clip_node = b.add_dual_clip_loader(
+            params["clip"],
+            params["clip2"],
+            type=str(params.get("clip_type", profile["dual_clip_type"])),
+        )
+    else:
+        clip_node = b.add_clip_loader_single(
+            params["clip"],
+            type=str(params.get("clip_type", profile["clip_type"])),
+        )
     vae_node = b.add_vae_loader(params["vae"])
 
     model_ref = (unet_node, 0)
@@ -935,12 +1061,42 @@ def build_anima_workflow(params: dict) -> dict:
         model_ref = (lora_node, 0)
         clip_ref = (lora_node, 1)
 
+    # 2.5 ModelSamplingAuraFlow — Z-Image 等架构接在 LoRA 链之后 (接替 MODEL 链)
+    if "model_sampling" in profile:
+        ms_cfg = profile["model_sampling"]
+        shift = float(params.get("shift", ms_cfg.get("shift", 3.0)))
+        ms_node = b.add_model_sampling_auraflow(model_ref, shift=shift)
+        model_ref = (ms_node, 0)
+
     # 3. 编码提示词
     positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
     negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
     pos_ref = (positive, 0)
     neg_ref = (negative, 0)
-    # NOTE: Anima Phase 1 暂不支持 ControlNet (生态空缺) — 直接跳过 ControlNet 链路
+
+    # 3.5 ControlNet 链式应用 (在 pos/neg 与 KSampler 之间)
+    #   按 profile 开关: 仅 profile["controlnet"]==True 时处理 (flux1 已启用, 其余跳过)。
+    #   仿 build_sdxl_workflow 3.5 段: 每个 apply 接 pos/neg 输出, 链式更新引用。
+    #   差异: flux 系 CN 是 latent 空间条件, ControlNetApplyAdvanced 必须接 optional vae
+    #   (传 vae_ref; sdxl 走 build_sdxl_workflow 不经此函数, 既有行为不变)。
+    if profile.get("controlnet"):
+        controlnets = params.get("controlnets") or []
+        for cn in controlnets:
+            cn_model = str(cn.get("model", "")).strip()
+            cn_image = str(cn.get("image", "")).strip()
+            if not cn_model or not cn_image:
+                continue
+            cn_loader = b.add_controlnet_loader(cn_model)
+            cn_img = b.add_load_image(cn_image)
+            cn_apply = b.add_controlnet_apply_advanced(
+                pos_ref, neg_ref, cn_loader, cn_img,
+                strength=float(cn.get("strength", 1.0)),
+                start_percent=float(cn.get("start_percent", 0.0)),
+                end_percent=float(cn.get("end_percent", 1.0)),
+                vae_ref=vae_ref,
+            )
+            pos_ref = (cn_apply, 0)
+            neg_ref = (cn_apply, 1)
 
     # 4. Latent 来源 (Inpaint / I2I / T2I)
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
@@ -964,19 +1120,20 @@ def build_anima_workflow(params: dict) -> dict:
             int(params.get("width", 1024)),
             int(params.get("height", 1024)),
             batch_size=batch_size,
+            class_type=str(profile.get("latent_class", "EmptyLatentImage")),
         )
 
-    # 5. 采样 (Anima 推荐 defaults: steps=30 / cfg=4 / er_sde / simple)
+    # 5. 采样 (默认值取自 profile)
     sampled = b.add_ksampler(
         model_ref,
         pos_ref,
         neg_ref,
         latent,
         seed=int(params.get("seed", -1)),
-        steps=int(params.get("steps", 30)),
-        cfg=float(params.get("cfg", 4.0)),
-        sampler=str(params.get("sampler", "er_sde")),
-        scheduler=str(params.get("scheduler", "simple")),
+        steps=int(params.get("steps", profile["steps"])),
+        cfg=float(params.get("cfg", profile["cfg"])),
+        sampler=str(params.get("sampler", profile["sampler"])),
+        scheduler=str(params.get("scheduler", profile["scheduler"])),
         denoise=i2i_denoise,
     )
 
@@ -989,13 +1146,14 @@ def build_anima_workflow(params: dict) -> dict:
         final_image = _add_upscale_chain(b, decoded, params)
 
     # ── 二次采样 (HiRes Refine) ────────────────────────────────────────
+    # 缺省值同步取 profile (hires_cfg 下限 clamp 保持 1.0)
     hires_enabled = bool(params.get("hires_enabled", False))
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
-        hires_steps = max(5, min(int(params.get("hires_steps", 30)), 50))
-        hires_cfg = max(1.0, min(float(params.get("hires_cfg", 4.0)), 20.0))
-        hires_sampler = str(params.get("hires_sampler", "er_sde"))
-        hires_scheduler = str(params.get("hires_scheduler", "simple"))
+        hires_steps = max(5, min(int(params.get("hires_steps", profile["steps"])), 50))
+        hires_cfg = max(1.0, min(float(params.get("hires_cfg", profile["cfg"])), 20.0))
+        hires_sampler = str(params.get("hires_sampler", profile["sampler"]))
+        hires_scheduler = str(params.get("hires_scheduler", profile["scheduler"]))
         hires_seed = int(params.get("hires_seed", -1))
         hires_latent = b.add_vae_encode(final_image, vae_ref)
         hires_sampled = b.add_ksampler(
@@ -1030,6 +1188,24 @@ def build_anima_workflow(params: dict) -> dict:
     b.add_preview_image(final_image)
 
     return b.build()
+
+
+def build_anima_workflow(params: dict) -> dict:
+    return build_split_workflow(params, "anima")
+
+
+def build_krea2_workflow(params: dict) -> dict:
+    return build_split_workflow(params, "krea2")
+
+
+def build_zimage_workflow(params: dict) -> dict:
+    """Z-Image (Tongyi/阿里, 6B 单流 DiT) — 委托 build_split_workflow("zimage")。"""
+    return build_split_workflow(params, "zimage")
+
+
+def build_flux1_workflow(params: dict) -> dict:
+    """Flux 1 (dev/schnell/krea 等) — 委托 build_split_workflow("flux1") (双 CLIP)。"""
+    return build_split_workflow(params, "flux1")
 
 
 def build_preprocess_workflow(params: dict) -> dict:
@@ -1132,5 +1308,4 @@ def build_tag_workflow(params: dict) -> dict:
 
 
 # Phase 2+ 扩展占位符:
-# def build_flux_workflow(params): ...
-# def build_zimage_workflow(params): ...
+# def build_flux2_workflow(params): ...  # 采样拓扑不同 (SamplerCustomAdvanced + Flux2Scheduler), 独立 builder

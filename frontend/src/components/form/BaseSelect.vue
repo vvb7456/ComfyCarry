@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFloating, autoUpdate, offset, flip, shift, size as floatingSize } from '@floating-ui/vue'
 import MsIcon from '../ui/MsIcon.vue'
 
 defineOptions({ name: 'BaseSelect' })
@@ -64,12 +65,53 @@ const emit = defineEmits<{
   'change': [value: string | number | boolean]
 }>()
 
-const rootRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
 const searchRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 const search = ref('')
 const highlightIdx = ref(-1)
+
+// ── Floating UI positioning ──────────────────────────────────
+// When teleport is on, use fixed strategy so the panel escapes any
+// overflow:hidden / clipping ancestor. When off, absolute is fine
+// because the panel is a direct child of .base-select (position: relative).
+const { floatingStyles, isPositioned, placement } = useFloating(triggerRef, panelRef, {
+  open,
+  placement: 'bottom-start',
+  strategy: props.teleport ? 'fixed' : 'absolute',
+  middleware: [
+    offset(4),
+    flip({ padding: 8 }),
+    shift({ padding: 8 }),
+    floatingSize({
+      padding: 8,
+      apply({ availableHeight, elements }) {
+        // Clamp the list max-height to the available viewport space
+        const searchH = props.searchable ? 36 : 0
+        const max = Math.max(80, availableHeight - searchH)
+        elements.floating.style.setProperty('--bs-list-max', `${max}px`)
+      },
+    }),
+  ],
+  whileElementsMounted: autoUpdate,
+})
+
+/**
+ * When teleported to <body>, CSS `min-width: 100%` would resolve against the
+ * body (full viewport) instead of the trigger. We must set it inline to match
+ * the trigger's actual width. Non-teleported panels use CSS `min-width: 100%`
+ * which correctly resolves to the .base-select parent width.
+ */
+const panelStyle = computed(() => {
+  if (!props.teleport) return floatingStyles.value
+  const tw = triggerRef.value?.offsetWidth
+  return {
+    ...floatingStyles.value,
+    minWidth: tw ? `${tw}px` : undefined,
+  }
+})
 
 /** Normalize any option shape to SelectOption[] */
 const normalizedOptions = computed<SelectOption[]>(() => {
@@ -114,7 +156,6 @@ const isSelectedDisabled = computed(() => {
 watch(filteredOptions, () => { highlightIdx.value = -1 })
 
 function openPanel() {
-  if (props.teleport) updateTeleportPosition()
   open.value = true
   // Pre-highlight selected item
   const idx = filteredOptions.value.findIndex(o => o.value === props.modelValue)
@@ -138,7 +179,7 @@ function select(opt: SelectOption) {
   emit('change', opt.value)
   open.value = false
   // Return focus to trigger
-  nextTick(() => rootRef.value?.querySelector<HTMLElement>('.base-select__trigger')?.focus())
+  nextTick(() => triggerRef.value?.focus())
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -170,7 +211,7 @@ function onKeydown(e: KeyboardEvent) {
     case 'Escape':
       e.preventDefault()
       open.value = false
-      rootRef.value?.querySelector<HTMLElement>('.base-select__trigger')?.focus()
+      triggerRef.value?.focus()
       break
   }
 }
@@ -182,62 +223,42 @@ function scrollToHighlighted() {
 }
 
 function onClickOutside(e: MouseEvent) {
-  if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
+  if (triggerRef.value && !triggerRef.value.contains(e.target as Node)) {
     // For teleported panels, also check if click is inside the panel
-    if (props.teleport && panelRef.value?.contains(e.target as Node)) return
+    if (panelRef.value?.contains(e.target as Node)) return
     open.value = false
   }
 }
 
-// ── Teleport panel positioning ──────────────────────────────
-const panelRef = ref<HTMLElement | null>(null)
-const teleportStyle = ref<CSSProperties>({})
-
-function updateTeleportPosition() {
-  if (!props.teleport || !rootRef.value) return
-  const trigger = rootRef.value.querySelector('.base-select__trigger') as HTMLElement
-  if (!trigger) return
-  const rect = trigger.getBoundingClientRect()
-  teleportStyle.value = {
-    position: 'fixed',
-    top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    minWidth: `${rect.width}px`,
-    width: 'max-content',
-    zIndex: 9999,
-  }
-}
-
-function onScrollOrResize() {
-  if (open.value && props.teleport) updateTeleportPosition()
-}
-
 onMounted(() => {
   document.addEventListener('click', onClickOutside)
-  window.addEventListener('scroll', onScrollOrResize, true)
-  window.addEventListener('resize', onScrollOrResize)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', onClickOutside)
-  window.removeEventListener('scroll', onScrollOrResize, true)
-  window.removeEventListener('resize', onScrollOrResize)
 })
 </script>
 
 <template>
-  <div ref="rootRef" class="base-select" :class="[
+  <div class="base-select" :class="[
     disabled && 'base-select--disabled',
     open && 'base-select--open',
     fit && 'base-select--fit',
     `base-select--${size}`,
   ]" @keydown="onKeydown">
-    <div class="base-select__trigger" tabindex="0" @click="toggle">
+    <div ref="triggerRef" class="base-select__trigger" tabindex="0" @click="toggle">
       <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder, 'base-select__text--muted': isSelectedDisabled }">{{ selectedLabel }}</span>
       <MsIcon name="expand_more" size="sm" color="var(--t3)" />
     </div>
     <Teleport to="body" :disabled="!teleport">
       <Transition name="bs-fade">
-        <div v-if="open" ref="panelRef" class="base-select__panel" :class="{ 'base-select__panel--teleported': teleport }" :style="teleport ? teleportStyle : undefined">
+        <div
+          v-if="open"
+          ref="panelRef"
+          class="base-select__panel"
+          :class="{ 'base-select__panel--teleported': teleport }"
+          :style="panelStyle"
+          :data-placement="placement"
+        >
           <!-- Search input (when searchable) -->
           <input
             v-if="searchable"
@@ -322,10 +343,8 @@ onBeforeUnmount(() => {
 .base-select__text--muted { color: var(--t3); opacity: .7; }
 
 /* ── Panel ── */
+/* Position is handled by floatingStyles (inline). Only visual properties here. */
 .base-select__panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
   min-width: 100%;
   width: max-content;
   background: var(--bg2);
@@ -401,7 +420,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .base-select__panel--teleported .base-select__list {
-  max-height: 200px;
+  max-height: var(--bs-list-max, 200px);
   overflow-y: auto;
   padding: 4px;
   outline: none;

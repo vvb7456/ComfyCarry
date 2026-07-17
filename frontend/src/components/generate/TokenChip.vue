@@ -19,7 +19,7 @@
 import { computed, ref, nextTick, onUnmounted, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PromptToken, BracketType } from '@/types/prompt-library'
-import { serializeToken, buildRaw } from '@/composables/generate/usePromptEditor'
+import { buildRaw } from '@/composables/generate/usePromptEditor'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -89,7 +89,7 @@ function updateToolbarPos() {
     left: `${rect.left}px`,
     top: `${rect.top - 4}px`,
     transform: 'translateY(-100%)',
-    zIndex: 10000,
+    zIndex: 'var(--z-float)',
   }
 }
 
@@ -98,7 +98,7 @@ const chipColor = computed(() => {
   const { type, groupColor } = props.token
   if (type === 'tag' && groupColor) return groupColor
   const typeColors: Record<string, string> = {
-    embedding: 'var(--purple, #a78bfa)',
+    embedding: 'var(--purple)',
     wildcard: 'var(--blue)',
     template: 'var(--cyan)',
   }
@@ -115,12 +115,10 @@ const isWeightType = computed(() =>
   props.token.type !== 'break' && props.token.type !== 'template',
 )
 
+const isPending = computed(() => props.token.pending === true)
+
 const hasTranslation = computed(() =>
   props.showTranslation && props.token.translate,
-)
-
-const roundDepth = computed(() =>
-  props.token.bracketType === 'round' ? props.token.bracketDepth : 0,
 )
 
 // ── Bracket helpers ────────────────────────────────────────────
@@ -146,6 +144,7 @@ function onWeightChange(val: number) {
 // ── Drag ───────────────────────────────────────────────────────
 function onDragStart(e: DragEvent) {
   if (!props.draggable || editing.value) { e.preventDefault(); return }
+  if (clickTimer) { clearTimeout(clickTimer); clickTimer = null }
   hovered.value = false
   e.dataTransfer?.setData('text/plain', props.token.id)
   emit('drag-start', props.token.id, e)
@@ -170,7 +169,7 @@ function onTextClick(e: MouseEvent) {
   clickTimer = setTimeout(() => {
     clickTimer = null
     startEditing()
-  }, 250)
+  }, 200)
 }
 
 function onTextDblClick(e: Event) {
@@ -187,7 +186,7 @@ function onChipDblClick() {
 }
 
 function startEditing() {
-  if (!props.token.enabled) return
+  if (!props.token.enabled || props.token.pending) return
   // Capture current text element width before switching to input
   const textEl = chipTextRef.value
   const textWidth = textEl?.offsetWidth ?? 60
@@ -231,7 +230,7 @@ function cancelEdit() {
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
-    <span class="chip-top" style="font-weight:600; letter-spacing:.04em; background:color-mix(in srgb, var(--amber) 18%, var(--bg3))">BREAK</span>
+    <span class="chip-top chip-top--break">BREAK</span>
     <button class="chip-close" @click.stop="emit('remove', token.id)">
       <MsIcon name="close" size="xxs" color="none" />
     </button>
@@ -244,9 +243,10 @@ function cancelEdit() {
       'token-chip--disabled': !token.enabled,
       'token-chip--selected': selected,
       'token-chip--editing': editing,
+      'token-chip--pending': isPending,
     }"
     :style="{ '--chip-color': chipColor }"
-    :draggable="draggable && !editing"
+    :draggable="draggable && !editing && !isPending"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
     @dblclick="!editing && onChipDblClick()"
@@ -270,7 +270,10 @@ function cancelEdit() {
         @dblclick.stop
         @mousedown.stop
       />
-      <span v-else ref="chipTextRef" class="chip-text" @click="onTextClick" @dblclick="!editing && onTextDblClick($event)">{{ displayText }}</span>
+      <template v-else>
+        <Spinner v-if="isPending" size="xs" />
+        <span ref="chipTextRef" class="chip-text" @click="onTextClick" @dblclick="!editing && onTextDblClick($event)">{{ displayText }}</span>
+      </template>
     </div>
 
     <!-- Bottom row: translate text or clickable translate action -->
@@ -356,6 +359,9 @@ function cancelEdit() {
   border-color: var(--ac);
   box-shadow: 0 0 0 1px var(--ac);
 }
+.token-chip--pending {
+  opacity: .6;
+}
 
 /* ── Top row: colored bg + tag text ── */
 .chip-top {
@@ -368,6 +374,11 @@ function cancelEdit() {
   color: var(--t1);
   background: color-mix(in srgb, var(--chip-color) 18%, var(--bg3));
   line-height: 1.4;
+}
+.chip-top--break {
+  font-weight: 600;
+  letter-spacing: .04em;
+  background: color-mix(in srgb, var(--amber) 18%, var(--bg3));
 }
 
 .chip-text {
@@ -493,7 +504,7 @@ function cancelEdit() {
 }
 .bracket-btn:hover {
   background: var(--ac);
-  color: #fff;
+  color: var(--t-inv);
   border-color: var(--ac);
 }
 

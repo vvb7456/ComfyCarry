@@ -15,6 +15,7 @@ export interface PromptToken {
   enabled: boolean
   translate?: string
   groupColor?: string
+  pending?: boolean
 }
 
 // ── Tag Library ───────────────────────────────────────────────

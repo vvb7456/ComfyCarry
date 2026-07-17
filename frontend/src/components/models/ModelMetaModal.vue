@@ -10,7 +10,8 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import DownloadButton from './DownloadButton.vue'
 import { useToast } from '@/composables/useToast'
-import { useDownloads } from '@/composables/useDownloads'
+import { useConfirm } from '@/composables/useConfirm'
+import { useDownloads, type VersionDownloadInfo } from '@/composables/useDownloads'
 import { useClipboard } from '@/composables/useClipboard'
 
 defineOptions({ name: 'ModelMetaModal' })
@@ -28,7 +29,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
-const { getVersionState, downloadOne } = useDownloads()
+const { getVersionDownloadInfo, downloadOne, cancelDownload, retryVersion } = useDownloads()
+const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
 // ── Version switching ──
@@ -38,7 +40,7 @@ const hasMultipleVersions = computed(() => (props.meta?.versions?.length || 0) >
 
 const versionOptions = computed(() =>
   (props.meta?.versions || []).map(v => {
-    const installed = props.meta?.id && getVersionState(props.meta.id, v.id) === 'installed'
+    const installed = props.meta?.id && getVersionDownloadInfo(props.meta.id, v.id).state === 'installed'
     let label = v.name + (v.baseModel ? ` (${v.baseModel})` : '')
     if (installed) label += ` — ${t('models.downloads.installed')}`
     return { value: String(v.id), label, disabled: !!installed }
@@ -87,19 +89,39 @@ const displaySha256 = computed(() =>
 )
 
 // ── Download button state for current version ──
-const dlBtnState = computed(() => {
+const dlInfo = computed<VersionDownloadInfo>(() => {
   const vid = activeVersion.value?.id ?? props.meta?.versionId
   const mid = props.meta?.id
-  if (!mid || !vid) return 'idle' as const
-  return getVersionState(mid, vid)
+  if (!mid || !vid) return { state: 'idle', progress: 0, speed: 0, downloadId: null }
+  return getVersionDownloadInfo(mid, vid)
 })
+
+const dlBtnState = computed(() => dlInfo.value.state)
 
 function handleDownload() {
   const mid = props.meta?.id
   const vid = activeVersion.value?.id ?? props.meta?.versionId
   if (!mid) return
+  // A4: failed → retryVersion (engine retry if task still listed, else re-submit)
+  if (dlInfo.value.state === 'failed') {
+    const mtype = (props.meta?.type || 'Checkpoint').toLowerCase()
+    retryVersion(String(mid), mtype, vid ? Number(vid) : undefined)
+    return
+  }
   const mtype = (props.meta?.type || 'Checkpoint').toLowerCase()
   downloadOne(String(mid), mtype, vid ? Number(vid) : undefined)
+}
+
+async function handleCancelDownload() {
+  const id = dlInfo.value.downloadId
+  if (!id) return
+  if (await confirm({
+    message: t('models.downloads.confirm_cancel', { name: props.meta?.name || '' }),
+    variant: 'danger',
+    confirmText: t('common.btn.cancel'),
+  })) {
+    cancelDownload(id)
+  }
 }
 
 // ── Trigger word selection ──
@@ -222,7 +244,11 @@ function badgeColor(type?: string): string | undefined {
                 <DownloadButton
                   v-if="showDownload && meta.civitaiUrl"
                   :state="dlBtnState"
+                  :progress="dlInfo.progress"
+                  :speed="dlInfo.speed"
+                  :cancellable="!!dlInfo.downloadId"
                   @download="handleDownload"
+                  @cancel="handleCancelDownload"
                 />
               </div>
             </td>

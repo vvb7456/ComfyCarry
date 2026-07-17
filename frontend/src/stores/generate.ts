@@ -75,6 +75,8 @@ export interface ModelState {
   // Anima 三件套 (仅 model_type='anima' 使用)
   unet: string
   clip: string
+  // Flux1 双 CLIP (DualCLIPLoader type='flux'); 其余架构留空
+  clip2: string
   vae: string
   loras: LoraEntry[]
   resolution: string
@@ -90,6 +92,10 @@ export interface ModelState {
   prefix: string
   format: string
   runMode: 'normal' | 'live'
+  /** Clip Skip (checkpoint 系专属): 1~4, 默认取 config.defaults.clip_skip ?? 1 */
+  clipSkip: number
+  /** VAE 覆盖 (checkpoint 系专属): 空串 = 跟随 Checkpoint; 非空 = 用独立 VAELoader */
+  vaeOverride: string
   controlNets: Record<string, ControlNetState>
   upscale: UpscaleState
   hires: HiResState
@@ -113,7 +119,14 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
   const cnTypes = ['pose', 'canny', 'depth']
   const controlNets: Record<string, ControlNetState> = {}
   cnTypes.forEach(t => {
-    controlNets[t] = { enabled: false, model: '', strength: 1, start: 0, end: 1, image: null }
+    const d = config.cnDefaults?.[t]
+    controlNets[t] = {
+      enabled: false, model: '',
+      strength: d?.strength ?? 1,
+      start: 0,
+      end: d?.end ?? 1,
+      image: null,
+    }
   })
 
   return {
@@ -124,6 +137,7 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     checkpoint: '',
     unet: '',
     clip: '',
+    clip2: '',
     vae: '',
     loras: [],
     resolution: config.resolutions[0]?.value || '1024x1024',
@@ -139,6 +153,9 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     prefix: '[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]',
     format: 'png',
     runMode: 'normal',
+    // B2: Clip Skip / VAE 覆盖 (checkpoint 系专属); 默认取 config.defaults.clip_skip ?? 1
+    clipSkip: config.defaults.clip_skip ?? 1,
+    vaeOverride: '',
     controlNets,
     upscale: {
       enabled: false, factor: 2, mode: '4x_overlapped_checkboard', tile: 8, downscale: 'lanczos',
@@ -203,6 +220,14 @@ function migrateV1(state: Record<string, unknown>): ModelState | null {
 export const useGenerateStore = defineStore('generate', () => {
   const activeModelType = ref('sdxl')
   const modelStates = reactive<Record<string, ModelState>>({})
+
+  // ── Gate 就绪状态 (不持久化, 不进 restore/persist 白名单) ──
+  // ModelTab 在 dep check 完成处调用 setGateReady(props.modelType, ready)。
+  // 菜单项 status: gateReady[key]===false → 'warn'; undefined 不显示。
+  const gateReady = reactive<Record<string, boolean | undefined>>({})
+  function setGateReady(type: string, ok: boolean) {
+    gateReady[type] = ok
+  }
 
   const currentConfig = computed<ModelTypeConfig>(() => MODEL_TYPES[activeModelType.value] || MODEL_TYPES.sdxl)
   const currentState = computed<ModelState>(() => {
@@ -309,8 +334,19 @@ export const useGenerateStore = defineStore('generate', () => {
             if (state.clip && validators.clipExists && !validators.clipExists(state.clip)) {
               state.clip = ''
             }
+            if (state.clip2 && validators.clipExists && !validators.clipExists(state.clip2)) {
+              state.clip2 = ''
+            }
             if (state.vae && validators.vaeExists && !validators.vaeExists(state.vae)) {
               state.vae = ''
+            }
+            // B2: clipSkip 校验 (1..4) + vaeOverride 校验 (校验通过 vaeExists)
+            if (typeof state.clipSkip !== 'number' || state.clipSkip < 1 || state.clipSkip > 4) {
+              const config = MODEL_TYPES[key] || MODEL_TYPES.sdxl
+              state.clipSkip = config.defaults.clip_skip ?? 1
+            }
+            if (state.vaeOverride && validators.vaeExists && !validators.vaeExists(state.vaeOverride)) {
+              state.vaeOverride = ''
             }
             if (validators.loraExists) {
               state.loras = state.loras.filter(l => validators.loraExists!(l.name))
@@ -356,6 +392,7 @@ export const useGenerateStore = defineStore('generate', () => {
 
   return {
     activeModelType, modelStates,
+    gateReady, setGateReady,
     currentConfig, currentState,
     switchModelType, save, restore, enableAutoSave,
   }

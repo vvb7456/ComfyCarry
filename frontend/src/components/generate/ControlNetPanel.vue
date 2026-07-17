@@ -168,13 +168,14 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
   display: flex;
   gap: var(--sp-4);
   align-items: stretch;
+  max-width: 700px;
+  margin: 0 auto;
 }
 
 .cn-split__params {
   flex: 1;
   min-width: 200px;
   max-width: 420px;
-  order: 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -184,7 +185,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
 .cn-split__media {
   flex: 0 0 auto;
   width: 280px;
-  order: 1;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -232,7 +232,5 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
 @media (max-width: 900px) {
   .cn-split { flex-direction: column; }
   .cn-split__media { max-width: 420px; width: 100%; }
-  .cn-split__params,
-  .cn-split__media { order: unset; }
 }
 </style>

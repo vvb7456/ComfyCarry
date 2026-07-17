@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast'
 import { useGenerateStore } from '@/stores/generate'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { normalizePrompt } from '@/utils/prompt'
+import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 
 interface SubmitResponse {
@@ -49,9 +50,14 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
 
     // 3. Basic validation
     const modelType = store.activeModelType
-    if (modelType === 'anima') {
+    if (MODEL_TYPES[modelType]?.loader === 'split') {
       if (!state.unet || !state.clip || !state.vae) {
-        toast(t('generate.error.no_anima_models'), 'error')
+        toast(t('generate.error.no_split_models'), 'error')
+        return null
+      }
+      // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
+      if (MODEL_TYPES[modelType]?.dualClip && !state.clip2) {
+        toast(t('generate.error.no_split_models'), 'error')
         return null
       }
     } else if (!state.checkpoint) {
@@ -152,8 +158,13 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       escapeBracket: ps.escape_bracket,
     }
 
+    // 软架构条目 (pony/illustrious/noobai) 通过 workflowType 提交 'sdxl',
+    // 后端按 sdxl 工作流编排 (arch 层面相同)。其余 entry 用自身 key。
+    const activeConfig = MODEL_TYPES[modelType]
+    const submitModelType = activeConfig?.workflowType ?? modelType
+
     const payload: Record<string, unknown> = {
-      model_type: modelType,
+      model_type: submitModelType,
       positive_prompt: normalizePrompt(state.positive, nOpts),
       negative_prompt: normalizePrompt(state.negative, nOpts),
       width: state.width,
@@ -171,12 +182,19 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     }
 
     // 架构专属字段
-    if (modelType === 'anima') {
+    if (MODEL_TYPES[modelType]?.loader === 'split') {
       payload.unet = state.unet
       payload.clip = state.clip
       payload.vae = state.vae
+      // DualCLIPLoader 架构 (flux1): 第二个文本编码器
+      if (MODEL_TYPES[modelType]?.dualClip) {
+        payload.clip2 = state.clip2
+      }
     } else {
       payload.checkpoint = state.checkpoint
+      // B3: checkpoint 系专属 — clip_skip (仅 >1 时传) + vae 覆盖 (仅非空时传)
+      if (state.clipSkip > 1) payload.clip_skip = state.clipSkip
+      if (state.vaeOverride) payload.vae = state.vaeOverride
     }
 
     // I2I / Inpaint

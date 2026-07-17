@@ -34,6 +34,41 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("downloads", __name__)
 
+# ComfyUI 根的 realpath (用于 subdir 防路径遍历校验)
+_REAL_COMFYUI_DIR = os.path.realpath(COMFYUI_DIR)
+
+
+def _resolve_check_save_dir(spec: dict) -> str | None:
+    """解析文件检查的目标目录 (save_dir)。
+
+    - 提供 subdir (相对 ComfyUI 根, 如 "models/text_encoders"): 用
+      os.path.join(COMFYUI_DIR, subdir) 解析, 忽略 save_dir; realpath 结果
+      必须位于 COMFYUI_DIR 之下, 否则返回 None (按未安装处理)。
+    - 未提供 subdir: 维持现有 save_dir (绝对路径) 行为, 不做遍历校验。
+    """
+    subdir = (spec.get("subdir") or "").strip()
+    if subdir:
+        save_dir = os.path.join(COMFYUI_DIR, subdir)
+        if not os.path.realpath(save_dir).startswith(_REAL_COMFYUI_DIR + os.sep):
+            return None
+        return save_dir
+    return (spec.get("save_dir") or "").strip()
+
+
+def _check_file_spec(engine, spec: dict) -> dict:
+    """单条文件检查, 返回 {installed, downloading, download_id}。
+
+    目录解析失败 (subdir 越界 / 缺失) 或 filename 缺失时按未安装处理。
+    """
+    filename = (spec.get("filename") or "").strip()
+    if not filename:
+        return {"installed": False, "downloading": False, "download_id": None}
+    save_dir = _resolve_check_save_dir(spec)
+    if not save_dir:
+        return {"installed": False, "downloading": False, "download_id": None}
+    return engine.check_file(save_dir, filename)
+
+
 # ── Registry ↔ Engine 集成 ───────────────────────────────────────────────────
 
 _registry_wired = False
@@ -131,7 +166,12 @@ def api_downloads_check():
 
     请求体:
       单文件: {"save_dir": "/path", "filename": "model.safetensors"}
-      批量:   {"files": [{"save_dir": "...", "filename": "..."}, ...]}
+              或 {"subdir": "models/text_encoders", "filename": "model.safetensors"}
+      批量:   {"files": [{"save_dir"|"subdir": "...", "filename": "..."}, ...]}
+
+    subdir 为相对 ComfyUI 根的目录 (如 "models/text_encoders"), 提供时后端
+    用 os.path.join(COMFYUI_DIR, subdir) 解析并忽略 save_dir; 防路径遍历:
+    realpath 结果必须位于 COMFYUI_DIR 之下, 否则该项按未安装处理.
 
     响应:
       单文件: {"installed": bool, "downloading": bool, "download_id": str|null}
@@ -142,16 +182,16 @@ def api_downloads_check():
 
     # 批量模式
     if "files" in data:
-        results = engine.check_files(data["files"])
+        results = [_check_file_spec(engine, spec) for spec in data["files"]]
         return jsonify({"results": results})
 
     # 单文件模式
-    save_dir = data.get("save_dir", "").strip()
-    filename = data.get("filename", "").strip()
-    if not save_dir or not filename:
-        return jsonify({"error": "save_dir 和 filename 必填"}), 400
-
-    result = engine.check_file(save_dir, filename)
+    result = _check_file_spec(engine, data)
+    if not (data.get("subdir", "").strip() or data.get("save_dir", "").strip()
+            or data.get("filename", "").strip()):
+        return jsonify({"error": "save_dir (或 subdir) 和 filename 必填"}), 400
+    # subdir 路径越界或 filename 缺失时 _check_file_spec 已返回未安装,
+    # 此处统一走正常响应, 避免把非法路径暴露为 4xx
     return jsonify(result)
 
 

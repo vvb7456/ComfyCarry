@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useApiFetch } from '@/composables/useApiFetch'
-import type { ComfyHistoryItem, ComfyHistoryResponse } from '@/types/comfyui'
+import { useGenerateQueueStore } from '@/stores/generateQueue'
+import type { ComfyHistoryItem } from '@/types/comfyui'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
@@ -14,10 +14,14 @@ import ImagePreview from '@/components/ui/ImagePreview.vue'
 defineOptions({ name: 'HistoryPanel' })
 
 const { t } = useI18n({ useScope: 'global' })
-const { get } = useApiFetch()
 
-const historyItems = ref<ComfyHistoryItem[]>([])
-const sortAsc = ref(false)
+const queueStore = useGenerateQueueStore()
+const historyItems = computed(() => queueStore.historyItems)
+const historySortAsc = computed({
+  get: () => queueStore.historySortAsc,
+  set: (v: boolean) => { queueStore.historySortAsc = v },
+})
+
 const cardSize = ref<'sm' | 'md' | 'lg'>('md')
 
 // Image preview
@@ -25,27 +29,86 @@ const previewOpen = ref(false)
 const previewImages = ref<string[]>([])
 const previewIndex = ref(0)
 
-const sortedHistory = computed(() =>
-  sortAsc.value ? [...historyItems.value].reverse() : historyItems.value,
-)
+const sortedHistory = computed(() => historyItems.value)
 
-async function loadHistory() {
-  const d = await get<ComfyHistoryResponse>('/api/comfyui/history?max_items=200')
-  if (!d) return
-  const items = d.history || []
-  historyItems.value = sortAsc.value ? [...items].reverse() : items
+// ── 渲染分页 (规格 E4): 首屏 30 条, 哨兵 IntersectionObserver 触发追加 30 ──
+const PAGE_SIZE = 30
+const visibleCount = ref(PAGE_SIZE)
+const visibleHistory = computed(() => sortedHistory.value.slice(0, visibleCount.value))
+const sentinelRef = ref<HTMLElement | null>(null)
+let io: IntersectionObserver | null = null
+
+function resetPageWindow() {
+  visibleCount.value = PAGE_SIZE
 }
 
-function imgUrl(img: { filename: string; subfolder: string; type: string }) {
+function loadMore() {
+  if (visibleCount.value >= sortedHistory.value.length) return
+  visibleCount.value = Math.min(
+    visibleCount.value + PAGE_SIZE,
+    sortedHistory.value.length,
+  )
+  // 追加后若哨兵仍在视口内, 下一帧再次检查 (确保一次滚动填满视口)
+  nextTick(() => reobserve())
+}
+
+function reobserve() {
+  if (!io || !sentinelRef.value) return
+  io.disconnect()
+  io.observe(sentinelRef.value)
+}
+
+function setupObserver() {
+  if (io) io.disconnect()
+  io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) loadMore()
+    }
+  })
+  if (sentinelRef.value) io.observe(sentinelRef.value)
+}
+
+onMounted(() => {
+  // 抽屉首开挂载 (规格 E3) — 从 store 取数 (未加载或 dirty 则拉取)
+  if (!queueStore.historyLoaded || queueStore.historyDirty) {
+    queueStore.loadHistory()
+  } else {
+    // 已加载但首次挂载: 仍需建立哨兵观察
+    nextTick(() => setupObserver())
+  }
+})
+
+// 数据到达时哨兵 DOM 才出现 — 需重新观察
+watch(() => queueStore.historyItems.length, () => {
+  nextTick(() => reobserve())
+})
+
+onBeforeUnmount(() => {
+  if (io) { io.disconnect(); io = null }
+})
+
+function onSortChange() {
+  resetPageWindow()
+  queueStore.loadHistory()
+  nextTick(() => reobserve())
+}
+
+/** 缩略图 URL — 带 preview=webp;80 转码 (规格 E5) */
+function thumbUrl(img: { filename: string; subfolder: string; type: string }) {
+  return `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}&preview=webp;80`
+}
+
+/** 大图 URL — 不带 preview (规格 E5) */
+function fullUrl(img: { filename: string; subfolder: string; type: string }) {
   return `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`
 }
 
-/** Collect all image URLs across all history items for navigation */
+/** Collect all image URLs across all history items for navigation (full-res) */
 function allImageUrls(): string[] {
   const urls: string[] = []
   for (const item of sortedHistory.value) {
     for (const img of item.images || []) {
-      urls.push(imgUrl(img))
+      urls.push(fullUrl(img))
     }
   }
   return urls
@@ -53,7 +116,6 @@ function allImageUrls(): string[] {
 
 function openPreview(item: ComfyHistoryItem, imgIndex: number) {
   const urls = allImageUrls()
-  // Find the global index of this image
   let globalIdx = 0
   for (const h of sortedHistory.value) {
     if (h.prompt_id === item.prompt_id) {
@@ -68,7 +130,7 @@ function openPreview(item: ComfyHistoryItem, imgIndex: number) {
 }
 
 function downloadImage(filename: string, subfolder: string, type: string) {
-  const url = `/api/comfyui/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${type}`
+  const url = fullUrl({ filename, subfolder, type })
   const a = document.createElement('a')
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a)
 }
@@ -80,9 +142,8 @@ function downloadAll(images: ComfyHistoryItem['images']) {
   )
 }
 
-onMounted(loadHistory)
-
-defineExpose({ loadHistory })
+// 暴露给模板通过 ref 调用 setupObserver (哨兵 ref 挂载后)
+defineExpose({ setupObserver })
 </script>
 
 <template>
@@ -99,13 +160,13 @@ defineExpose({ loadHistory })
       </template>
       <template #end>
         <BaseSelect
-          v-model="sortAsc"
+          v-model="historySortAsc"
           :options="[
             { value: false, label: t('comfyui.history.sort_desc') },
             { value: true, label: t('comfyui.history.sort_asc') },
           ]"
           size="sm"
-          @change="loadHistory"
+          @change="onSortChange"
           class="history-select"
         />
         <BaseSelect
@@ -128,13 +189,13 @@ defineExpose({ loadHistory })
     />
 
     <div v-else :class="['history-grid', 'size-' + cardSize]">
-      <div v-for="item in sortedHistory" :key="item.prompt_id" class="history-card">
+      <div v-for="item in visibleHistory" :key="item.prompt_id" class="history-card">
         <!-- Images -->
         <div v-if="item.images?.length" class="history-card-images">
           <img
             v-for="(img, imgIdx) in item.images"
             :key="img.filename"
-            :src="imgUrl(img)"
+            :src="thumbUrl(img)"
             loading="lazy"
             alt=""
             @click="openPreview(item, imgIdx)"
@@ -154,6 +215,8 @@ defineExpose({ loadHistory })
           </BaseButton>
         </div>
       </div>
+      <!-- 渲染分页哨兵 (规格 E4): 进入视口 → 追加 30 条 -->
+      <div ref="sentinelRef" class="history-sentinel" aria-hidden="true"></div>
     </div>
   </CollapsibleGroup>
 
@@ -244,5 +307,12 @@ defineExpose({ loadHistory })
   font-size: var(--text-xs);
   color: var(--t2);
   min-width: 0;
+}
+
+/* 渲染分页哨兵 (E4): 占据网格末尾一行的占位, 进入视口触发追加 */
+.history-sentinel {
+  grid-column: 1 / -1;
+  height: 1px;
+  min-height: 1px;
 }
 </style>

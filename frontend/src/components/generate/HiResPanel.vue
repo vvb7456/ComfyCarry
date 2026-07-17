@@ -81,6 +81,8 @@ const schedulerOptions = computed(() => options.schedulers.value)
             :model-value="config.sampler"
             :options="samplerOptions"
             :disabled="samplerOptions.length === 0"
+            searchable
+            :search-placeholder="t('generate.advanced.sampler_search')"
             teleport
             @update:model-value="config.sampler = String($event)"
           />
@@ -97,6 +99,8 @@ const schedulerOptions = computed(() => options.schedulers.value)
             :model-value="config.scheduler"
             :options="schedulerOptions"
             :disabled="schedulerOptions.length === 0"
+            searchable
+            :search-placeholder="t('generate.advanced.scheduler_search')"
             teleport
             @update:model-value="config.scheduler = String($event)"
           />
@@ -123,6 +127,7 @@ const schedulerOptions = computed(() => options.schedulers.value)
   flex-direction: column;
   gap: var(--sp-2);
   max-width: 700px;
+  margin: 0 auto;
 }
 
 .hires-grid__row {

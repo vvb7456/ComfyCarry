@@ -13,17 +13,23 @@ interface PromptEditorHandle {
   insertAtCursor: (target: 'positive' | 'negative', text: string) => void
 }
 
-interface UseSdxlModalManagerOptions {
+interface UseModelModalManagerOptions {
   options: GenerateOptionsReturn
   previewImages: Ref<PreviewImage[]>
   prepareTagger: () => void
+  modelField: 'checkpoint' | 'unet'
 }
 
-export function useSdxlModalManager({
+function basename(name: string) {
+  return name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
+}
+
+export function useModelModalManager({
   options,
   previewImages,
   prepareTagger,
-}: UseSdxlModalManagerOptions) {
+  modelField,
+}: UseModelModalManagerOptions) {
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
   const store = useGenerateStore()
@@ -105,20 +111,30 @@ export function useSdxlModalManager({
     }
   }
 
-  const showCkptPicker = ref(false)
-  const ckptSelected = computed(() => new Set(state.value.checkpoint ? [state.value.checkpoint] : []))
+  // ── Model Picker (checkpoint / unet by modelField) ────────────────────────
 
-  function openCkptPicker() {
+  const showModelPicker = ref(false)
+  const modelSelected = computed(() => {
+    const name = modelField === 'unet' ? state.value.unet : state.value.checkpoint
+    return new Set(name ? [name] : [])
+  })
+
+  function openModelPicker() {
     void options.refresh()
-    showCkptPicker.value = true
+    showModelPicker.value = true
   }
 
-  function onCkptSelect(name: string) {
-    state.value.checkpoint = name
-    showCkptPicker.value = false
-    const displayName = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
-    toast(t('generate.toast.selected', { name: displayName.replace(/\.[^.]+$/, '') }), 'success')
+  function onModelSelect(name: string) {
+    if (modelField === 'unet') {
+      state.value.unet = name
+    } else {
+      state.value.checkpoint = name
+    }
+    showModelPicker.value = false
+    toast(t('generate.toast.selected', { name: basename(name).replace(/\.[^.]+$/, '') }), 'success')
   }
+
+  // ── LoRA Picker ────────────────────────────────────────────────────────────
 
   const showLoraPicker = ref(false)
   const loraModalPending = ref(new Set<string>())
@@ -177,17 +193,17 @@ export function useSdxlModalManager({
       }
     }
 
-    const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
+    const bname = basename(name)
     const civitaiId = info?.civitai_id as string | number | undefined
     loraDetailMeta.value = {
-      name: (info?.name as string) || basename.replace(/\.[^.]+$/, ''),
+      name: (info?.name as string) || bname.replace(/\.[^.]+$/, ''),
       type: 'LORA',
       baseModel: (info?.baseModel as string) || undefined,
       id: civitaiId,
-      versionId: (info?.versionId as string | number) || undefined,
+      versionId: (info?.versionId as string | number | undefined) || undefined,
       versionName: (info?.versionName as string) || undefined,
       sha256: (info?.sha256 as string) || undefined,
-      filename: basename,
+      filename: bname,
       civitaiUrl: civitaiId ? `https://civitai.com/models/${civitaiId}` : undefined,
       trainedWords: (info?.trainedWords as string[]) || undefined,
       images,
@@ -211,21 +227,24 @@ export function useSdxlModalManager({
     previewIndex,
     previewUrls,
     promptTools,
-    showCkptPicker,
-    ckptSelected,
+    // Model Picker
+    showModelPicker,
+    modelSelected,
+    openModelPicker,
+    onModelSelect,
+    // LoRA
     showLoraPicker,
     loraModalPending,
     loraCountLabel,
     showLoraDetail,
     loraDetailMeta,
+    // callbacks
     onPreviewClick,
     onPromptTool,
     onTaggerApply,
     onLlmApply,
     onEmbInsert,
     onWcInsert,
-    openCkptPicker,
-    onCkptSelect,
     openLoraPicker,
     onLoraToggle,
     onLoraConfirm,

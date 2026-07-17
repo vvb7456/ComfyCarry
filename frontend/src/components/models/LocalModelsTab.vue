@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLocalModels } from '@/composables/useLocalModels'
 import { useModelActions } from '@/composables/useModelActions'
+import { COMPONENT_FILENAMES } from '@/composables/generate/modelDepConfigs'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import LocalModelCard from '@/components/models/LocalModelCard.vue'
@@ -29,12 +31,24 @@ const {
   textFilter,
   filteredModels,
   availableFolders,
-  totalCount,
-  infoCount,
   loadModels,
 } = useLocalModels()
 
 const { isFetching, fetchInfo, deleteModel, fetchAll, batchProgress } = useModelActions(loadModels)
+
+// ── Component files filter (default off hides dep component files) ──
+const showComponents = ref(false)
+const displayModels = computed(() => {
+  if (showComponents.value) return filteredModels.value
+  return filteredModels.value.filter(m => {
+    const basename = m.rel_path.includes('/')
+      ? m.rel_path.slice(m.rel_path.lastIndexOf('/') + 1)
+      : m.rel_path
+    return !COMPONENT_FILENAMES.has(basename)
+  })
+})
+const displayCount = computed(() => displayModels.value.length)
+const displayInfoCount = computed(() => displayModels.value.filter(m => m.has_info).length)
 
 const categoryOptions = computed(() => [
   { value: 'all', label: t('models.local.all_types') },
@@ -110,11 +124,14 @@ function openMeta(m: LocalModel) {
           {{ t('models.local.fetching_progress', { current: batchProgress.current, total: batchProgress.total, filename: batchProgress.filename }) }}
         </template>
         <template v-else>
-          {{ t('models.local.total_models', { count: totalCount, infoCount }) }}
+          {{ t('models.local.total_models', { count: displayCount, infoCount: displayInfoCount }) }}
         </template>
       </span>
     </template>
     <template #end>
+      <ToggleSwitch v-model="showComponents" size="sm">
+        {{ t('models.local.show_components') }}
+      </ToggleSwitch>
       <BaseSelect
         v-model="categoryFilter"
         :options="categoryOptions"
@@ -131,7 +148,7 @@ function openMeta(m: LocalModel) {
       <BaseButton size="sm" @click="loadModels">
         {{ t('models.local.refresh') }}
       </BaseButton>
-      <BaseButton size="sm" variant="primary" @click="fetchAll(filteredModels)">
+      <BaseButton size="sm" variant="primary" @click="fetchAll(displayModels)">
         {{ t('models.local.fetch_all') }}
       </BaseButton>
     </template>
@@ -140,14 +157,14 @@ function openMeta(m: LocalModel) {
   <LoadingCenter v-if="localLoading" />
 
   <EmptyState
-    v-else-if="filteredModels.length === 0"
+    v-else-if="displayModels.length === 0"
     icon="inventory_2"
     :message="t('models.local.not_found_category')"
   />
 
   <div v-else class="model-grid">
     <LocalModelCard
-      v-for="m in filteredModels"
+      v-for="m in displayModels"
       :key="m.rel_path"
       :model="m"
       :fetching="isFetching(m.abs_path)"

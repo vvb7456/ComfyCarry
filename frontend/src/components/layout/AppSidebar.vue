@@ -45,6 +45,13 @@ const settingsItem: NavItem = {
 
 const currentPage = computed(() => route.name as string)
 
+// 激活态匹配: 'generate' 入口需兼容子路径 (/generate/image, /generate/video 等);
+// 其余按 route.name 精确匹配
+function isNavActive(item: NavItem): boolean {
+  if (item.page === 'generate') return route.path.startsWith('/generate')
+  return currentPage.value === item.page
+}
+
 function navTo(item: NavItem) {
   router.push({ name: item.page })
   if (window.innerWidth <= 768) {
@@ -83,7 +90,7 @@ function toggleLang() {
         v-for="item in navItems"
         :key="item.page"
         class="nav-item"
-        :class="{ active: currentPage === item.page }"
+        :class="{ active: isNavActive(item) }"
         @click="navTo(item)"
       >
         <span class="icon"><MsIcon :name="item.icon" size="md" /></span>
@@ -94,7 +101,7 @@ function toggleLang() {
 
       <button
         class="nav-item"
-        :class="{ active: currentPage === 'settings' }"
+        :class="{ active: isNavActive(settingsItem) }"
         @click="navTo(settingsItem)"
       >
         <span class="icon"><MsIcon :name="settingsItem.icon" size="md" /></span>

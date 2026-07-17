@@ -52,12 +52,33 @@ interface ParsedWeight {
  *   - (tag:1.5) → weight 1.5, depth 1
  *   - ((tag:1.5)) → weight 1.5, depth 2
  */
+function isBracketPair(s: string): boolean {
+  if (!s.startsWith('(') || !s.endsWith(')')) return false
+  let depth = 0
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]
+    if (ch === '\\' && i + 1 < s.length && '(){}'.includes(s[i + 1])) {
+      i++
+      continue
+    }
+    if (ch === '(') depth++
+    else if (ch === ')') {
+      depth--
+      if (depth === 0 && i !== s.length - 1) return false
+    }
+  }
+  return depth === 0
+}
+
 function parseWeight(raw: string): ParsedWeight {
   let s = raw.trim()
 
-  // Strip round bracket layers
+  if (s.startsWith('\\(') || s.endsWith('\\)')) {
+    return { inner: s, weight: 1.0, bracketType: 'none', bracketDepth: 0, explicitWeight: false }
+  }
+
   let roundDepth = 0
-  while (s.startsWith('(') && s.endsWith(')')) {
+  while (s.startsWith('(') && s.endsWith(')') && isBracketPair(s)) {
     roundDepth++
     s = s.slice(1, -1).trim()
   }
@@ -104,18 +125,21 @@ export function splitPromptTokens(prompt: string): string[] {
 
   for (let i = 0; i < prompt.length; i++) {
     const ch = prompt[i]
+    if (ch === '\\' && i + 1 < prompt.length && '(){}|'.includes(prompt[i + 1])) {
+      i++
+      continue
+    }
     if (ch === '{' || ch === '(') {
       depth++
     } else if ((ch === '}' || ch === ')') && depth > 0) {
       depth--
-    } else if (ch === ',' && depth === 0) {
+    } else if ((ch === ',' || ch === '，') && depth === 0) {
       const seg = prompt.slice(start, i).trim()
       if (seg) parts.push(seg)
       start = i + 1
     }
   }
 
-  // Last segment
   const last = prompt.slice(start).trim()
   if (last) parts.push(last)
 
@@ -148,6 +172,11 @@ function classifyToken(text: string): TokenType {
  *   weight≠1.0          → "(tag:1.50)" e.g. "(embedding:name:1.50)"
  *   depth>0             → "((tag))"    respects bracketDepth
  */
+function formatWeight(w: number): string {
+  const s = w.toFixed(2)
+  return s.replace(/\.?0+$/, '') || '0'
+}
+
 export function buildRaw(token: PromptToken): string {
   if (token.type === 'break') return 'BREAK'
 
@@ -156,7 +185,7 @@ export function buildRaw(token: PromptToken): string {
     const depth = Math.max(0, token.bracketDepth)
     if (depth === 0 && token.weight === 1.0) return token.tag
     // Build with :weight at innermost if weight≠1.0
-    let s = token.weight !== 1.0 ? `${token.tag}:${token.weight.toFixed(2)}` : token.tag
+    let s = token.weight !== 1.0 ? `${token.tag}:${formatWeight(token.weight)}` : token.tag
     const layers = Math.max(depth, token.weight !== 1.0 ? 1 : 0)
     for (let i = 0; i < layers; i++) s = `(${s})`
     return s
@@ -169,7 +198,7 @@ export function buildRaw(token: PromptToken): string {
   if (depth === 0) return tag
 
   // Has brackets — build from inside out
-  let s = weight !== 1.0 ? `${tag}:${weight.toFixed(2)}` : tag
+  let s = weight !== 1.0 ? `${tag}:${formatWeight(weight)}` : tag
   for (let i = 0; i < depth; i++) s = `(${s})`
   return s
 }
@@ -177,7 +206,7 @@ export function buildRaw(token: PromptToken): string {
 // ── Serialization ──────────────────────────────────────────────
 
 export function serializeToken(token: PromptToken): string {
-  if (!token.enabled || !token.raw) return ''
+  if (!token.enabled || !token.raw || token.pending) return ''
   return token.raw
 }
 
@@ -295,6 +324,7 @@ export function usePromptEditor(): UsePromptEditorReturn {
    */
   function serialize(): string {
     return tokens.value
+      .filter(t => !t.pending)
       .map(serializeToken)
       .filter(Boolean)
       .join(', ')
@@ -303,7 +333,7 @@ export function usePromptEditor(): UsePromptEditorReturn {
   /** Serialize only enabled tokens (for display in parent textarea). */
   function serializeEnabled(): string {
     return tokens.value
-      .filter(t => t.enabled)
+      .filter(t => t.enabled && !t.pending)
       .map(serializeToken)
       .filter(Boolean)
       .join(', ')
@@ -316,7 +346,7 @@ export function usePromptEditor(): UsePromptEditorReturn {
   function extractDisabled(): DisabledTokenSnapshot[] {
     return tokens.value
       .map((t, i) => ({ token: t, index: i }))
-      .filter(({ token }) => !token.enabled)
+      .filter(({ token }) => !token.enabled && !token.pending)
       .map(({ token, index }) => ({
         raw: token.raw,
         tag: token.tag,

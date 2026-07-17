@@ -16,6 +16,10 @@ defineProps<{
   disabled?: boolean
   /** Anima 专用：额外在顶部展示 CLIP + VAE 两项 split-file 选择 */
   showSplitModels?: boolean
+  /** DualCLIPLoader (flux1): showSplitModels 时额外渲染第二个 CLIP select */
+  dualClip?: boolean
+  /** Checkpoint 系专属: 在主 2×3 网格上方新增 [Clip Skip | VAE] 对称条件行 */
+  showClipSkipVae?: boolean
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -43,7 +47,19 @@ function basenameNoExt(name: string) {
 }
 const clipOptions = computed(() => options.clips.value.map(c => ({ value: c.name, label: basenameNoExt(c.name) })))
 const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, label: basenameNoExt(v.name) })))
-</script>
+
+/* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
+// B1: 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + options.vaes 列表
+const clipSkipOptions = computed(() => [
+  { value: 1, label: t('generate.advanced.clip_skip_default') },
+  { value: 2, label: '2' },
+  { value: 3, label: '3' },
+  { value: 4, label: '4' },
+])
+const vaeOverrideOptions = computed(() => [
+  { value: '', label: t('generate.advanced.vae_override_follow') },
+  ...vaeOptions.value,
+])</script>
 
 <template>
   <details class="adv-settings" :class="{ 'adv-settings--disabled': disabled }">
@@ -54,7 +70,7 @@ const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, 
 
     <div class="adv-body">
       <!-- Row 0 (Anima only): CLIP + VAE split-file selectors -->
-      <div v-if="showSplitModels" class="adv-2col">
+      <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip }">
         <div class="field-group">
           <label class="field-lbl">{{ t('generate.basic.clip') }}</label>
           <BaseSelect
@@ -65,6 +81,16 @@ const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, 
             @update:model-value="state.clip = String($event)"
           />
         </div>
+        <div v-if="dualClip" class="field-group">
+          <label class="field-lbl">{{ t('generate.basic.clip2') }}</label>
+          <BaseSelect
+            :model-value="state.clip2"
+            :options="clipOptions"
+            :disabled="disabled"
+            :placeholder="t('generate.basic.select_clip')"
+            @update:model-value="state.clip2 = String($event)"
+          />
+        </div>
         <div class="field-group">
           <label class="field-lbl">{{ t('generate.basic.vae') }}</label>
           <BaseSelect
@@ -73,6 +99,37 @@ const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, 
             :disabled="disabled"
             :placeholder="t('generate.basic.select_vae')"
             @update:model-value="state.vae = String($event)"
+          />
+        </div>
+      </div>
+
+      <!-- Row 0b (checkpoint 系专属): Clip Skip + VAE 覆盖 (主 2×3 网格上方, 1fr 1fr 对称) -->
+      <div v-if="showClipSkipVae" class="adv-2col">
+        <div class="field-group">
+          <label class="field-lbl">
+            {{ t('generate.advanced.clip_skip') }}
+            <HelpTip :text="t('generate.advanced.clip_skip_help')" />
+          </label>
+          <BaseSelect
+            :model-value="state.clipSkip"
+            :options="clipSkipOptions"
+            :disabled="disabled"
+            @update:model-value="state.clipSkip = Number($event)"
+          />
+        </div>
+        <div class="field-group">
+          <label class="field-lbl">
+            {{ t('generate.advanced.vae_override') }}
+            <HelpTip :text="t('generate.advanced.vae_override_help')" />
+          </label>
+          <BaseSelect
+            :model-value="state.vaeOverride"
+            :options="vaeOverrideOptions"
+            :disabled="disabled"
+            searchable
+            :search-placeholder="t('generate.basic.search_vae')"
+            teleport
+            @update:model-value="state.vaeOverride = String($event)"
           />
         </div>
       </div>
@@ -88,6 +145,9 @@ const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, 
             :model-value="state.sampler"
             :options="options.samplers.value"
             :disabled="disabled"
+            searchable
+            :search-placeholder="t('generate.advanced.sampler_search')"
+            teleport
             @update:model-value="state.sampler = String($event)"
           />
         </div>
@@ -100,6 +160,9 @@ const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, 
             :model-value="state.scheduler"
             :options="options.schedulers.value"
             :disabled="disabled"
+            searchable
+            :search-placeholder="t('generate.advanced.scheduler_search')"
+            teleport
             @update:model-value="state.scheduler = String($event)"
           />
         </div>
@@ -225,8 +288,20 @@ const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, 
   gap: var(--sp-3);
 }
 
+/* ── split-file grid: 2 项 (CLIP/VAE) 或 3 项 (CLIP/CLIP2/VAE) 自适应 ── */
+.adv-split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+.adv-split-grid--3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 @media (max-width: 600px) {
-  .adv-2col {
+  .adv-2col,
+  .adv-split-grid,
+  .adv-split-grid--3 {
     grid-template-columns: 1fr;
   }
 }

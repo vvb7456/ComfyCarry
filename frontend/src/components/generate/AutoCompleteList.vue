@@ -24,6 +24,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [item: AutocompleteDisplayItem]
+  hover: [index: number]
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -74,6 +75,7 @@ const dividerIndex = computed(() => props.items.findIndex(i => i.added))
       ref="listRef"
       class="ac-list"
       :style="positionStyle"
+      @mousedown.prevent
     >
       <!-- Empty state -->
       <div v-if="items.length === 0" class="ac-empty">
@@ -91,7 +93,7 @@ const dividerIndex = computed(() => props.items.findIndex(i => i.added))
             'ac-item--added': item.added,
           }"
           @mousedown.prevent="emit('select', item)"
-          @mouseenter="$event.stopPropagation()"
+          @mouseenter="emit('hover', idx)"
         >
           <span class="ac-tag" v-html="highlightMatch(item.text, query)" />
           <span v-if="showTranslation !== false && item.desc" class="ac-desc">{{ item.desc }}</span>
@@ -109,7 +111,7 @@ const dividerIndex = computed(() => props.items.findIndex(i => i.added))
 <style scoped>
 .ac-list {
   position: fixed;
-  z-index: 10001;
+  z-index: calc(var(--z-float) + 1);
   max-height: 280px;
   min-width: 300px;
   max-width: 500px;
@@ -130,7 +132,6 @@ const dividerIndex = computed(() => props.items.findIndex(i => i.added))
   cursor: pointer;
   transition: background .1s;
 }
-.ac-item:hover,
 .ac-item--active {
   background: var(--bg3);
 }

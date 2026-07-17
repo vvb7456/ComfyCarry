@@ -8,7 +8,8 @@ import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import DownloadButton from './DownloadButton.vue'
-import { useDownloads, type ModelAggregateState } from '@/composables/useDownloads'
+import { useConfirm } from '@/composables/useConfirm'
+import { useDownloads, type ModelAggregateState, type VersionDownloadInfo } from '@/composables/useDownloads'
 
 defineOptions({ name: 'CivitaiModelCard' })
 
@@ -84,8 +85,52 @@ const downloadCount = computed(() =>
 // ── Download button state ──
 const dlState = computed<ModelAggregateState>(() => (props.downloadState as ModelAggregateState) || 'idle')
 
-// ── Installed overlay badges ──
-const { getVersionState } = useDownloads()
+// ── Installed overlay badges + version-level download info ──
+const { getVersionState, getVersionDownloadInfo, cancelDownload, retryVersion } = useDownloads()
+const { confirm } = useConfirm()
+
+/** Current version info for the card's primary version (single-version models). */
+const dlInfo = computed<VersionDownloadInfo>(() => {
+  const v = props.hit.version
+  if (!v?.id) return { state: 'idle', progress: 0, speed: 0, downloadId: null }
+  return getVersionDownloadInfo(props.hit.id, v.id)
+})
+
+/** Map card-level state to the DownloadButton state: installed/idle pass through; downloading→version info state. */
+const dlBtnState = computed(() => {
+  if (dlState.value === 'installed') return 'installed' as const
+  if (dlState.value === 'partial') return 'idle' as const
+  // For a single-version model, surface the granular version state (queued/downloading/verifying/...)
+  return dlInfo.value.state
+})
+
+async function handleCancelDownload() {
+  const id = dlInfo.value.downloadId
+  if (!id) return
+  if (await confirm({
+    message: t('models.downloads.confirm_cancel', { name: props.hit.name || '' }),
+    variant: 'danger',
+    confirmText: t('common.btn.cancel'),
+  })) {
+    cancelDownload(id)
+  }
+}
+
+/** Failed/retry click from card button → retryVersion (A4) */
+function handleCardRetry() {
+  const v = props.hit.version
+  retryVersion(String(props.hit.id), (props.hit.type || 'Checkpoint').toLowerCase(), v?.id)
+}
+
+/** Download button click handler: idle → forward to parent (opens picker or downloads);
+ *  failed → retryVersion (A4). */
+function handleCardDownload() {
+  if (dlBtnState.value === 'failed') {
+    handleCardRetry()
+  } else {
+    emit('download', props.hit)
+  }
+}
 
 /** List of versions that are installed locally */
 const installedVersions = computed(() =>
@@ -145,8 +190,12 @@ const installedTooltip = computed(() =>
         {{ inCart ? t('models.civitai.unfavorite') : t('models.civitai.favorite') }}
       </BaseButton>
       <DownloadButton
-        :state="dlState === 'partial' ? 'idle' : dlState === 'installed' ? 'installed' : dlState"
-        @download="emit('download', hit)"
+        :state="dlBtnState"
+        :progress="dlInfo.progress"
+        :speed="dlInfo.speed"
+        :cancellable="!!dlInfo.downloadId"
+        @download="handleCardDownload"
+        @cancel="handleCancelDownload"
       />
     </template>
   </ModelCard>

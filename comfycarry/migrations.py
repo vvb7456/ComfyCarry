@@ -190,3 +190,30 @@ def _migration_v2(conn):
 
 
 db.register_migration(2, _migration_v2, "sync job/event model")
+
+
+# ── Migration v3 — CivitAI 收藏 ─────────────────────────────
+
+
+def _migration_v3(conn):
+    """新增 civitai_favorites 表 (B 期 — 收藏后端化)。"""
+    stmts = [
+        """CREATE TABLE IF NOT EXISTS civitai_favorites (
+            fav_key           TEXT PRIMARY KEY,
+            model_id          TEXT NOT NULL,
+            version_id        TEXT DEFAULT '',
+            name              TEXT DEFAULT '',
+            model_type        TEXT DEFAULT '',
+            image_url         TEXT DEFAULT '',
+            version_name      TEXT DEFAULT '',
+            base_model        TEXT DEFAULT '',
+            all_versions_json TEXT DEFAULT '[]',
+            created_at        REAL NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_civitai_fav_model ON civitai_favorites(model_id)",
+    ]
+    for sql in stmts:
+        conn.execute(sql)
+
+
+db.register_migration(3, _migration_v3, "civitai favorites")

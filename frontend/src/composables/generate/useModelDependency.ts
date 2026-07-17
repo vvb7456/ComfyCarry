@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { useDownloadsStore } from '@/stores/downloads'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,9 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
 
   let cancelled = false
   let currentDownloadId: string | null = null
-  let activeSSE: EventSource | null = null
+
+  // ── Downloads store (C1: wait-chain re-sourced to pinia store) ──
+  const dlStore = useDownloadsStore()
 
   // ── Check ──────────────────────────────────────────────────────────────
 
@@ -107,13 +110,13 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
       }
     } catch { /* continue */ }
 
-    // 2. Check file existence
-    if (comfyuiDir) {
-      const checkFiles: Array<{ save_dir: string; filename: string; _modelId: string }> = []
+    // 2. Check file existence — 后端根据 subdir 相对 ComfyUI 根解析, 不再依赖 comfyuiDir
+    {
+      const checkFiles: Array<{ subdir: string; filename: string; _modelId: string }> = []
       for (const m of config.models) {
         for (const f of m.files) {
           checkFiles.push({
-            save_dir: comfyuiDir + '/' + f.subdir,
+            subdir: f.subdir,
             filename: f.filename,
             _modelId: m.id,
           })
@@ -154,8 +157,6 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
       } catch {
         _setAllUninstalled()
       }
-    } else {
-      _setAllUninstalled()
     }
 
     // 3. Init selection: installed or required
@@ -322,62 +323,29 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
     }
   }
 
-  function _waitForDownload(downloadId: string, modelIdx: number, totalModels: number, modelName: string): Promise<boolean> {
+  async function _waitForDownload(downloadId: string, modelIdx: number, totalModels: number, modelName: string): Promise<boolean> {
     currentDownloadId = downloadId
-    return new Promise<boolean>((resolve) => {
-      const source = new EventSource(`/api/downloads/${downloadId}/events`)
-      activeSSE = source
+    // Ensure the store is actively streaming task updates (SSE primary + polling fallback)
+    dlStore.startPolling()
 
-      source.onmessage = (e) => {
-        if (cancelled) { _closeSSE(); resolve(false); return }
-        try {
-          const data = JSON.parse(e.data)
-          if (data.error === '任务已删除') { _closeSSE(); resolve(false); return }
-
-          progress.value = {
-            modelIndex: modelIdx,
-            totalModels,
-            modelName,
-            percent: data.progress || 0,
-            speed: data.speed || 0,
-          }
-
-          if (data.status === 'complete') {
-            _closeSSE()
-            currentDownloadId = null
-            resolve(true)
-          } else if (data.status === 'failed' || data.status === 'cancelled') {
-            _closeSSE()
-            currentDownloadId = null
-            resolve(false)
-          }
-        } catch { /* ignore parse errors */ }
+    // Subscribe to store's task list until terminal state (store SSE/polling guarantees convergence).
+    // Pre-check current task progress for immediate UI feedback.
+    const preTask = dlStore.tasks.find(t => t.download_id === downloadId)
+    if (preTask) {
+      progress.value = {
+        modelIndex: modelIdx,
+        totalModels,
+        modelName,
+        percent: preTask.progress || 0,
+        speed: preTask.speed || 0,
       }
-
-      source.onerror = () => {
-        _closeSSE()
-        if (cancelled) { resolve(false); return }
-        // SSE connection lost — fall back to a single poll to check final state
-        fetch(`/api/downloads/${downloadId}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            if (!data) { resolve(false); return }
-            if (data.status === 'complete') { currentDownloadId = null; resolve(true) }
-            else if (data.status === 'failed' || data.status === 'cancelled') { currentDownloadId = null; resolve(false) }
-            else { resolve(false) }  // Connection lost mid-download
-          })
-          .catch(() => resolve(false))
-      }
-    })
-  }
-
-  function _closeSSE() {
-    if (activeSSE) {
-      activeSSE.onmessage = null
-      activeSSE.onerror = null
-      activeSSE.close()
-      activeSSE = null
     }
+
+    const result = await dlStore.watchTaskTerminal(downloadId)
+    currentDownloadId = null
+    if (cancelled) return false
+    if (result === 'absent') return true  // task already cleared → treat as complete
+    return result === 'complete'
   }
 
   /**
@@ -404,7 +372,6 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
 
   async function cancelDownload(): Promise<void> {
     cancelled = true
-    _closeSSE()
     if (currentDownloadId) {
       try {
         await fetch(`/api/downloads/${currentDownloadId}/cancel`, { method: 'POST' })
@@ -432,7 +399,6 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
 
   function destroy() {
     cancelled = true
-    _closeSSE()
     currentDownloadId = null
   }
 

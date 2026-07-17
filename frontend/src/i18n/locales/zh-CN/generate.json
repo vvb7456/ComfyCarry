@@ -4,17 +4,37 @@
     "starting": "ComfyUI 正在启动，请稍候…",
     "go_comfyui": "前往 ComfyUI 页启动",
     "backend_error": "无法连接 Dashboard 服务",
-    "anima_title": "Anima 需下载专用文本编码器与 VAE"
+    "anima_title": "Anima 需下载专用文本编码器与 VAE",
+    "krea2_title": "Krea 2 需下载专用文本编码器与 VAE",
+    "zimage_title": "Z-Image 需下载专用文本编码器与 VAE",
+    "flux1_title": "Flux 1 需下载双文本编码器与 VAE"
+  },
+  "header": {
+    "queue_history": "队列 / 历史",
+    "model_selector_aria": "选择模型",
+    "gate_not_ready": "组件未就绪",
+    "family_sdxl": "SDXL 家族",
+    "model_label": "模型",
+    "task_image": "图像",
+    "task_video": "视频",
+    "task_edit": "编辑"
   },
   "tabs": {
     "sdxl": "SDXL",
     "anima": "Anima",
     "flux": "Flux",
+    "krea2": "Krea 2",
+    "zimage": "Z-Image",
+    "flux1": "Flux 1",
+    "pony": "Pony",
+    "illustrious": "Illustrious",
+    "noobai": "NoobAI",
     "history": "队列 & 历史"
   },
   "prompt": {
     "title": "提示词",
     "positive_placeholder": "输入提示词（A1111格式），例如：1girl, solo, long hair, looking at viewer, smile, white dress, outdoors, blue sky, masterpiece, best quality",
+    "positive_placeholder_natural": "用自然语言描述画面，例如：清晨薄雾弥漫的森林里，一只红狐站在长满青苔的岩石上，逆光，电影感构图，细节丰富",
     "positive_label": "正向提示词",
     "negative_placeholder": "输入负面提示词，例如：worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, missing fingers, watermark, text",
     "negative_label": "反向提示词",
@@ -44,6 +64,15 @@
       "embedding_desc": "使用已安装的 Embedding 向量（可通过工具栏「插入 Embedding」浏览）",
       "quality": "提示词质量",
       "quality_desc": "正向提示词建议包含 masterpiece, best quality。负向提示词建议包含 worst quality, low quality",
+      "natural_title": "自然语言写法",
+      "natural_sentence": "完整句子",
+      "natural_sentence_desc": "用自然语言完整描述画面，模型按语义理解，无需标签堆叠",
+      "natural_order": "描述顺序",
+      "natural_order_desc": "建议按 主体 → 动作/姿态 → 场景 → 光线氛围 → 风格 的顺序组织",
+      "natural_detail": "具体化",
+      "natural_detail_desc": "具体的名词与形容词优于抽象词汇，描述\"什么样\"而不是罗列\"有什么\"",
+      "natural_no_weight": "语法差异",
+      "natural_no_weight_desc": "(词:1.4) 权重与 embedding 语法对此类模型无效或不可靠，直接用文字强调（如 highly detailed）",
       "random_title": "随机提示词",
       "random_pick": "随机选择",
       "random_pick_desc": "→ red hair / green hair / blue hair",
@@ -81,6 +110,7 @@
     "search_checkpoint": "搜索 Checkpoint...",
     "unet": "UNet 主权重",
     "clip": "CLIP 文本编码器",
+    "clip2": "文本编码器 2 (T5)",
     "vae": "VAE",
     "select_unet": "选择 UNet",
     "select_clip": "选择 CLIP",
@@ -92,8 +122,10 @@
   "advanced": {
     "title": "高级设置",
     "sampler": "采样器",
+    "sampler_search": "搜索采样器...",
     "sampler_help": "控制图片生成的算法。euler 速度快且结果稳定，dpmpp_2m 质量更高但稍慢。不确定时用默认值即可",
     "scheduler": "调度器",
+    "scheduler_search": "搜索调度器...",
     "scheduler_help": "控制采样过程中每步的变化幅度。normal 通用性最好，karras 可能产生更细腻的细节。不确定时用默认值即可",
     "seed": "种子",
     "seed_help": "相同种子 + 相同参数 = 相同图片。点击右侧骰子切换随机/固定模式",
@@ -108,7 +140,13 @@
     "format_tiff": "TIFF （高质印刷）",
     "format_bmp": "BMP （位图）",
     "prefix": "文件名前缀",
-    "prefix_help": "生成图片的保存路径和文件名。默认按日期分文件夹、带时间戳命名，确保文件不重名。云同步上传时同名文件会被覆盖，建议保留时间戳"
+    "prefix_help": "生成图片的保存路径和文件名。默认按日期分文件夹、带时间戳命名，确保文件不重名。云同步上传时同名文件会被覆盖，建议保留时间戳",
+    "clip_skip": "Clip Skip",
+    "clip_skip_default": "1 (默认)",
+    "clip_skip_help": "在倒数第 N 层截断 CLIP 编码。Pony 与 Illustrious 需设为 2 才能正确出图；SDXL 基础模型用 1",
+    "vae_override": "VAE",
+    "vae_override_follow": "跟随 Checkpoint",
+    "vae_override_help": "用外置 VAE 文件覆盖 Checkpoint 内置 VAE。部分动漫 Checkpoint (如 Pony) 建议接外置 sdxl_vae 以获得更准确的色彩"
   },
   "preview": {
     "empty": "生成后图片将显示在这里",
@@ -228,6 +266,8 @@
     "method": "放大模式",
     "need_model": "请先安装放大模型",
     "need_download": "该功能需下载高清放大模型",
+    "engine": "放大引擎",
+    "engine_help": "AuraSR：GAN 超分，速度快、边缘锐利立体；SeedVR2：扩散修复放大，纹理还原准、色块干净，耗时与显存占用更高",
     "engine_aurasr": "AuraSR",
     "engine_seedvr2": "SeedVR2",
     "mode_checkboard": "重叠棋盘格（推荐）",
@@ -374,8 +414,8 @@
   },
   "error": {
     "no_checkpoint": "请选择基础模型",
-    "no_anima_models": "请完整选择 UNet / CLIP / VAE 三个模型文件",
-    "cn_disabled_anima": "Anima 架构暂不支持 ControlNet",
+    "no_split_models": "请完整选择 UNet / 文本编码器 / VAE 三个模型文件",
+    "cn_disabled": "该架构暂不支持 ControlNet",
     "no_prompt": "请填写画面描述",
     "modules_not_enabled": "部分功能已配置但未启用",
     "modules_not_enabled_desc": "已配置参数但开关未打开，提交后将不会生效。",
@@ -401,5 +441,21 @@
     "download_failed": "下载失败",
     "all_downloaded": "全部下载完成",
     "enter": "进入"
+  },
+  "picker": {
+    "arch_all": "全部架构",
+    "arch_unknown": "未知",
+    "arch_mismatch_title": "架构不匹配",
+    "arch_mismatch_desc": "该模型架构为 {model_arch}，当前标签页为 {tab_arch}，提交工作流将无法运行。确定选择？",
+    "arch_unknown_desc": "无法识别该模型的架构，若与当前标签页不兼容，工作流将运行失败。确定选择？",
+    "subarch_mismatch_desc": "该模型为 {model_arch} 生态，当前标签页为 {tab_arch}，生态约定不同可能效果不佳。确定选择？"
+  },
+  "placeholders": {
+    "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
+    "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
+    "positive_noobai": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
+    "negative_pony": "score_6, score_5, score_4, worst quality, low quality, bad anatomy, bad hands, watermark",
+    "negative_illustrious": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name",
+    "negative_noobai": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name"
   }
 }

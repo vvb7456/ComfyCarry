@@ -8,6 +8,15 @@ export function fmtBytes(b: number): string {
   return (b / 1073741824).toFixed(2) + ' GB'
 }
 
+/** Format a bytes/s speed value. Empty string for non-positive values (matches existing UI conventions). */
+export function fmtSpeed(bytesPerSec: number): string {
+  if (!bytesPerSec || bytesPerSec <= 0) return ''
+  if (bytesPerSec >= 1073741824) return (bytesPerSec / 1073741824).toFixed(1) + ' GB/s'
+  if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(1) + ' MB/s'
+  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
+  return bytesPerSec + ' B/s'
+}
+
 export function fmtPct(v: number | null | undefined): string {
   return v != null ? v.toFixed(1) + '%' : '—'
 }

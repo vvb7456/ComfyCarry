@@ -5,7 +5,8 @@ import { useImageToImage } from '@/composables/generate/useImageToImage'
 import { useControlNet } from '@/composables/generate/useControlNet'
 import { useModelDependency } from '@/composables/generate/useModelDependency'
 import { useTagInterrogation, TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
-import { CN_MODEL_CONFIGS, UPSCALE_MODEL_CONFIG } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
 import { useToast } from '@/composables/useToast'
@@ -17,12 +18,15 @@ interface UseControlNetOrchestrationOptions {
   options: GenerateOptionsReturn
   execState: Ref<ExecState | null>
   onRegisterTask: RegisterTask
+  /** 本 ModelTab 实例对应的模型 type key (静态, 用于推导 cnBranch) */
+  modelType: string
 }
 
 export function useControlNetOrchestration({
   options,
   execState,
   onRegisterTask,
+  modelType,
 }: UseControlNetOrchestrationOptions) {
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
@@ -31,14 +35,21 @@ export function useControlNetOrchestration({
 
   const i2i = useImageToImage()
 
-  const cnPose = useControlNet('pose', options.controlnetModels)
-  const cnCanny = useControlNet('canny', options.controlnetModels)
-  const cnDepth = useControlNet('depth', options.controlnetModels)
+  // 本 tab 的 CN branch (A2/A3): 由 modelType → MODEL_TYPES[key].cnBranch 推导 (静态)。
+  // pony/sdxl → 'sdxl'; illustrious/noobai → 'ilnoob'; 其余 (无 cnBranch) → undefined (不过滤)。
+  const cnBranch = computed<CnBranch | undefined>(
+    () => (MODEL_TYPES[modelType]?.cnBranch as CnBranch | undefined),
+  )
+
+  const cnPose = useControlNet('pose', options.controlnetModels, cnBranch)
+  const cnCanny = useControlNet('canny', options.controlnetModels, cnBranch)
+  const cnDepth = useControlNet('depth', options.controlnetModels, cnBranch)
   const cnMap = { pose: cnPose, canny: cnCanny, depth: cnDepth } as const
 
-  const depPose = useModelDependency(CN_MODEL_CONFIGS.pose)
-  const depCanny = useModelDependency(CN_MODEL_CONFIGS.canny)
-  const depDepth = useModelDependency(CN_MODEL_CONFIGS.depth)
+  // 依赖 Gate 配置同样按 branch 取 (sdxl → union; ilnoob → 专用), 与下拉过滤同源
+  const depPose = useModelDependency(getCnDepConfig('pose', cnBranch.value))
+  const depCanny = useModelDependency(getCnDepConfig('canny', cnBranch.value))
+  const depDepth = useModelDependency(getCnDepConfig('depth', cnBranch.value))
   const depMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
 
   const depUpscale = useModelDependency(UPSCALE_MODEL_CONFIG)

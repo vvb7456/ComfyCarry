@@ -6,6 +6,7 @@ import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { MODEL_CATEGORY_COLORS } from '@/utils/constants'
+import { fmtBytes, fmtSpeed } from '@/utils/format'
 
 defineOptions({ name: 'DownloadItem' })
 
@@ -68,23 +69,14 @@ const cartKey = computed(() => {
 
 // ── Task-specific ──
 
-const speedText = computed(() => {
-  const s = props.task?.speed || 0
-  if (s <= 0) return ''
-  if (s > 1024 * 1024) return `${(s / (1024 * 1024)).toFixed(1)} MB/s`
-  if (s > 1024) return `${(s / 1024).toFixed(0)} KB/s`
-  return `${s} B/s`
-})
+const speedText = computed(() => fmtSpeed(props.task?.speed || 0))
 
 const progressPct = computed(() => Math.min(props.task?.progress || 0, 100))
 
 const sizeText = computed(() => {
   const total = props.task?.total_bytes || 0
   if (!total) return ''
-  const fmt = (b: number) => b > 1024 * 1024 * 1024
-    ? `${(b / (1024 * 1024 * 1024)).toFixed(1)} GB`
-    : `${(b / (1024 * 1024)).toFixed(0)} MB`
-  return `${fmt(props.task?.completed_bytes || 0)} / ${fmt(total)}`
+  return `${fmtBytes(props.task?.completed_bytes || 0)} / ${fmtBytes(total)}`
 })
 
 const isCart = computed(() => !!props.cartItem)
@@ -93,6 +85,11 @@ const isPaused = computed(() => props.task?.status === 'paused')
 const isQueued = computed(() => props.task?.status === 'queued')
 const isComplete = computed(() => props.task?.status === 'complete')
 const isFailed = computed(() => props.task?.status === 'failed')
+
+/** Whether the progress row should render (active group, even at 0%). */
+const showProgressRow = computed(() =>
+  !isCart.value && !!props.task && (isActive.value || isPaused.value || isQueued.value),
+)
 </script>
 
 <template>
@@ -173,8 +170,8 @@ const isFailed = computed(() => props.task?.status === 'failed')
       </template>
     </div>
 
-    <!-- Progress bar (active/paused downloads only) -->
-    <div v-if="(isActive || isPaused) && progressPct > 0" class="dli-progress">
+    <!-- Progress bar (active/paused/queued downloads — always rendered to keep row height stable) -->
+    <div v-if="showProgressRow" class="dli-progress">
       <div class="dli-progress-info">
         <span v-if="speedText">{{ speedText }}</span>
         <span v-if="sizeText">{{ sizeText }}</span>

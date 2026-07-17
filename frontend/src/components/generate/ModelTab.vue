@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, inject, toRef } from 'vue'
+import { computed, inject, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
-import { useSdxlModalManager } from '@/composables/generate/useSdxlModalManager'
+import { useModelModalManager } from '@/composables/generate/useModelModalManager'
+import { useModelDependency } from '@/composables/generate/useModelDependency'
+import { MODEL_TYPES } from '@/config/model-types'
+import { TAB_DEP_CONFIGS, UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
@@ -29,11 +32,12 @@ import MaskEditorModal from '@/components/generate/MaskEditorModal.vue'
 import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 import { TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
-import { CN_MODEL_CONFIGS, UPSCALE_MODEL_CONFIG } from '@/composables/generate/modelDepConfigs'
+import { useToast } from '@/composables/useToast'
 
-defineOptions({ name: 'SdxlTab' })
+defineOptions({ name: 'ModelTab' })
 
 const props = defineProps<{
+  modelType: string
   execState: ExecState | null
   elapsed: number
   submitting: boolean
@@ -49,9 +53,15 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { toast } = useToast()
 const store = useGenerateStore()
 const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
+
+const config = computed(() => MODEL_TYPES[props.modelType]!)
+const isSplit = computed(() => config.value.loader === 'split')
+const modelField = computed<'checkpoint' | 'unet'>(() => isSplit.value ? 'unet' : 'checkpoint')
+
 const {
   i2i,
   tagger,
@@ -67,7 +77,7 @@ const {
   showPPModal,
   moduleTabs,
   enabledModules,
-  onModuleToggle,
+  onModuleToggle: cnModuleToggle,
   onPPSubmit,
   handlePreprocessDone,
   onDepEnter,
@@ -82,7 +92,70 @@ const {
   options,
   execState: toRef(props, 'execState'),
   onRegisterTask: (promptId, type, subtype) => emit('register-task', promptId, type, subtype),
+  modelType: props.modelType,
 })
+
+/** controlNetEnabled=false 时本地覆盖 moduleTabs (CN 三项 disabled + toast) */
+const localModuleTabs = computed(() => [
+  { key: 'lora', label: t('generate.modules.lora'), icon: 'extension' },
+  { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
+  {
+    key: 'pose',
+    label: t('generate.modules.pose'),
+    icon: 'accessibility_new',
+    disabled: true,
+    title: t('generate.error.cn_disabled'),
+  },
+  {
+    key: 'canny',
+    label: t('generate.modules.canny'),
+    icon: 'border_style',
+    disabled: true,
+    title: t('generate.error.cn_disabled'),
+  },
+  {
+    key: 'depth',
+    label: t('generate.modules.depth'),
+    icon: 'layers',
+    disabled: true,
+    title: t('generate.error.cn_disabled'),
+  },
+  { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
+  { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
+])
+
+const localEnabledModules = computed(() => {
+  const currentState = state.value
+  const enabled = new Set<string>()
+  if (currentState.loras.some((lora) => lora.enabled)) enabled.add('lora')
+  if (currentState.i2i.enabled) enabled.add('i2i')
+  if (currentState.upscale.enabled) enabled.add('upscale')
+  if (currentState.hires.enabled) enabled.add('hires')
+  return enabled
+})
+
+function onLocalModuleToggle(key: string, enabled: boolean) {
+  // 阻止 controlnet 三项 toggle，其余转发给 CN orchestration
+  if (key === 'pose' || key === 'canny' || key === 'depth') {
+    toast(t('generate.error.cn_disabled'), 'warning')
+    return
+  }
+  cnModuleToggle(key, enabled)
+}
+
+const effectiveModuleTabs = computed(() =>
+  config.value.controlNetEnabled ? moduleTabs.value : localModuleTabs.value,
+)
+const effectiveEnabledModules = computed(() =>
+  config.value.controlNetEnabled ? enabledModules.value : localEnabledModules.value,
+)
+function onEffectiveModuleToggle(key: string, enabled: boolean) {
+  if (config.value.controlNetEnabled) {
+    cnModuleToggle(key, enabled)
+  } else {
+    onLocalModuleToggle(key, enabled)
+  }
+}
 
 const {
   llm,
@@ -96,8 +169,10 @@ const {
   previewIndex,
   previewUrls,
   promptTools,
-  showCkptPicker,
-  ckptSelected,
+  showModelPicker,
+  modelSelected,
+  openModelPicker,
+  onModelSelect,
   showLoraPicker,
   loraModalPending,
   loraCountLabel,
@@ -107,17 +182,68 @@ const {
   onPromptTool,
   onTaggerApply,
   onLlmApply,
-  openCkptPicker,
-  onCkptSelect,
   openLoraPicker,
   onLoraToggle,
   onLoraConfirm,
   openLoraDetail,
-} = useSdxlModalManager({
+} = useModelModalManager({
   options,
   previewImages: toRef(props, 'previewImages'),
   prepareTagger,
+  modelField: modelField.value,
 })
+
+/** Tab 级依赖 Gate (split 架构需要 CLIP+VAE) */
+const tabDepConfig = computed(() => TAB_DEP_CONFIGS[props.modelType] ?? null)
+const depTab = tabDepConfig.value ? useModelDependency(tabDepConfig.value) : null
+
+// A2: CN 依赖 Gate 配置按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用)
+const _cnBranch = (MODEL_TYPES[props.modelType]?.cnBranch as CnBranch | undefined)
+const cnDepPose = getCnDepConfig('pose', _cnBranch)
+const cnDepCanny = getCnDepConfig('canny', _cnBranch)
+const cnDepDepth = getCnDepConfig('depth', _cnBranch)
+
+// setup 时立即触发依赖检查 (后端根据 subdir 解析, 不再依赖 options.comfyuiDir)
+if (depTab) depTab.check('')
+
+function onTabDepEnter() {
+  options.refresh()
+}
+function onTabDepDownload() {
+  const dir = options.comfyuiDir.value
+  if (dir && depTab) depTab.startDownload(dir)
+}
+
+const showTabGate = computed(() => depTab?.show.value ?? false)
+
+// B4: Gate 就绪状态接入 — dep check 完成 (showTabGate 变化) 时写入 store
+// 无 depTab 的 entry (sdxl/pony/illustrious/noobai) showTabGate 恒为 false → ready=true
+watch(showTabGate, (gate) => store.setGateReady(props.modelType, !gate), { immediate: true })
+
+/** 高级设置 CLIP / VAE 自动填充: 仅当前激活 tab + split 架构 + 字段为空时填充 */
+function autofillDefaultModels() {
+  if (store.activeModelType !== props.modelType) return
+  if (!isSplit.value || !config.value.defaultModels) return
+
+  const defs = config.value.defaultModels
+  // CLIP
+  if (!state.value.clip && defs.clip) {
+    const found = options.clips.value.find(c => c.name === defs.clip || c.name.endsWith('/' + defs.clip))
+    if (found) state.value.clip = found.name
+  }
+  // CLIP2 (DualCLIPLoader, flux1)
+  if (!state.value.clip2 && defs.clip2) {
+    const found = options.clips.value.find(c => c.name === defs.clip2 || c.name.endsWith('/' + defs.clip2))
+    if (found) state.value.clip2 = found.name
+  }
+  // VAE
+  if (!state.value.vae && defs.vae) {
+    const found = options.vaes.value.find(v => v.name === defs.vae || v.name.endsWith('/' + defs.vae))
+    if (found) state.value.vae = found.name
+  }
+}
+
+watch([() => options.clips.value, () => options.vaes.value, () => store.activeModelType], autofillDefaultModels, { immediate: true })
 
 /** Mask editor: image/mask preview URLs */
 const maskEditorImageUrl = computed(() => {
@@ -138,9 +264,19 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 </script>
 
 <template>
-  <div class="sdxl-tab">
+  <div class="model-tab">
+    <!-- ═══ Tab级 Gate： split 架构 CLIP+VAE 未备时遮盖整个 tab ═══ -->
+    <ModelDependencyGate
+      v-if="showTabGate"
+      :dep="depTab!"
+      :title="t(tabDepConfig!.title)"
+      :min-optional="tabDepConfig!.minOptional"
+      @enter="onTabDepEnter"
+      @download="onTabDepDownload"
+    />
+
     <!-- ═══ 上部: 双列布局 ═══ -->
-    <div class="gen-top-row">
+    <div v-if="!showTabGate" class="gen-top-row">
       <!-- 左列: 控制区 -->
       <div class="gen-ctrl-col">
         <!-- 提示词 -->
@@ -148,7 +284,9 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           ref="promptEditorRef"
           :positive="state.positive"
           :negative="state.negative"
-          :show-negative="true"
+          :show-negative="config.hasNegativePrompt"
+          :prompt-style="config.promptStyle"
+          :model-type="modelType"
           :tools="promptTools"
           @update:positive="state.positive = $event"
           @update:negative="state.negative = $event"
@@ -167,10 +305,13 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <hr class="gen-sep">
 
         <!-- 基础设置 -->
-        <BasicSettings @open-checkpoint="openCkptPicker" />
+        <BasicSettings
+          :model-field="modelField"
+          @open-model="openModelPicker"
+        />
 
         <!-- 高级设置 -->
-        <AdvancedSettings />
+        <AdvancedSettings :show-split-models="isSplit" :dual-clip="config.dualClip" :show-clip-skip-vae="!isSplit" />
       </div>
 
       <!-- 右列: 预览区 -->
@@ -185,13 +326,13 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     </div>
 
     <!-- ═══ 下部: 功能模块 (Tab + Panel 融合卡片) ═══ -->
-    <div class="gen-module-wrap">
+    <div v-if="!showTabGate" class="gen-module-wrap">
       <ModuleTabs
-        :tabs="moduleTabs"
+        :tabs="effectiveModuleTabs"
         :active-tab="state.activeModule"
-        :enabled-tabs="enabledModules"
+        :enabled-tabs="effectiveEnabledModules"
         @update:active-tab="state.activeModule = $event ?? 'lora'"
-        @toggle="onModuleToggle"
+        @toggle="onEffectiveModuleToggle"
       />
 
       <!-- 模块面板 -->
@@ -210,8 +351,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <ModelDependencyGate
           v-if="depPose.show.value"
           :dep="depPose"
-          :title="CN_MODEL_CONFIGS.pose.title"
-          :min-optional="CN_MODEL_CONFIGS.pose.minOptional"
+          :title="cnDepPose.title"
+          :min-optional="cnDepPose.minOptional"
           @enter="onDepEnter('pose')"
           @download="onDepDownload('pose')"
         />
@@ -227,8 +368,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <ModelDependencyGate
           v-if="depCanny.show.value"
           :dep="depCanny"
-          :title="CN_MODEL_CONFIGS.canny.title"
-          :min-optional="CN_MODEL_CONFIGS.canny.minOptional"
+          :title="cnDepCanny.title"
+          :min-optional="cnDepCanny.minOptional"
           @enter="onDepEnter('canny')"
           @download="onDepDownload('canny')"
         />
@@ -244,8 +385,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <ModelDependencyGate
           v-if="depDepth.show.value"
           :dep="depDepth"
-          :title="CN_MODEL_CONFIGS.depth.title"
-          :min-optional="CN_MODEL_CONFIGS.depth.minOptional"
+          :title="cnDepDepth.title"
+          :min-optional="cnDepDepth.minOptional"
           @enter="onDepEnter('depth')"
           @download="onDepDownload('depth')"
         />
@@ -274,13 +415,14 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
     <!-- ═══ Picker Modals (Teleport to body) ═══ -->
     <ModelPickerModal
-      v-model="showCkptPicker"
-      :title="t('generate.basic.select_checkpoint')"
+      v-model="showModelPicker"
+      :title="isSplit ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint')"
       icon="deployed_code"
-      :items="options.checkpoints.value"
-      :selected="ckptSelected"
-      :search-placeholder="t('generate.basic.search_checkpoint')"
-      @select="onCkptSelect"
+      :items="isSplit ? options.unets.value : options.checkpoints.value"
+      :selected="modelSelected"
+      :current-arch="config.pickerArch"
+      :search-placeholder="isSplit ? t('generate.basic.search_unet') : t('generate.basic.search_checkpoint')"
+      @select="onModelSelect"
     />
 
     <ModelPickerModal
@@ -290,6 +432,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :items="options.loras.value"
       :multi="true"
       :selected="loraModalPending"
+      :current-arch="config.pickerArch"
       :search-placeholder="t('generate.lora.search_placeholder')"
       :count-label="loraCountLabel"
       @toggle="onLoraToggle"
@@ -324,8 +467,9 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :on-clear-mask="() => i2i.clearMask()"
     />
 
-    <!-- ControlNet Ref Image Picker Modals -->
+    <!-- ControlNet Ref Image Picker Modals (only when CN enabled) -->
     <RefImageModal
+      v-if="config.controlNetEnabled"
       v-model="cnPose.picker.visible.value"
       :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.bone_map') })"
       icon="accessibility_new"
@@ -337,6 +481,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="cnPose.handleUpload"
     />
     <RefImageModal
+      v-if="config.controlNetEnabled"
       v-model="cnCanny.picker.visible.value"
       :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.edge_map') })"
       icon="border_style"
@@ -348,6 +493,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="cnCanny.handleUpload"
     />
     <RefImageModal
+      v-if="config.controlNetEnabled"
       v-model="cnDepth.picker.visible.value"
       :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.depth_map') })"
       icon="layers"
@@ -359,18 +505,21 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="cnDepth.handleUpload"
     />
 
-    <!-- ControlNet Preprocess Modals -->
+    <!-- ControlNet Preprocess Modals (only when CN enabled) -->
     <PreprocessModal
+      v-if="config.controlNetEnabled"
       v-model="showPPModal.pose"
       type="pose"
       @submit="onPPSubmit('pose', $event)"
     />
     <PreprocessModal
+      v-if="config.controlNetEnabled"
       v-model="showPPModal.canny"
       type="canny"
       @submit="onPPSubmit('canny', $event)"
     />
     <PreprocessModal
+      v-if="config.controlNetEnabled"
       v-model="showPPModal.depth"
       type="depth"
       @submit="onPPSubmit('depth', $event)"
@@ -388,6 +537,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       v-model="showPromptEditorModal"
       :positive="state.positive"
       :negative="state.negative"
+      :show-negative="config.hasNegativePrompt"
       :emb-picker="embPicker"
       :wc-manager="wcManager"
       @update:positive="state.positive = $event"
@@ -413,7 +563,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 </template>
 
 <style scoped>
-.sdxl-tab {
+.model-tab {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);

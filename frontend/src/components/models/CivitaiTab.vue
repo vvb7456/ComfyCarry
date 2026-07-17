@@ -160,14 +160,17 @@ function getDownloadState(hit: CivitaiHit): string {
   return dlGetModelState(hit.id, versionIds)
 }
 
-/** Handle download click — single version direct, multi version opens picker */
+/** Handle download click — partial / multi-version opens picker; single idle downloads directly */
 function handleDownload(hit: CivitaiHit) {
   const allVersions = hit.versions || (hit.version ? [hit.version] : [])
-  if (allVersions.length > 1) {
+  const versionIds = allVersions.map(v => v.id)
+  const aggState = dlGetModelState(hit.id, versionIds)
+  // C3: partial aggregate → open VersionPickerModal so user picks uninstalled version
+  if (aggState === 'partial' || allVersions.length > 1) {
     vpHit.value = hit
     vpOpen.value = true
   } else {
-    // Single version: download directly
+    // Single version (idle/downloading/installed): download directly
     const versionId = hit.version?.id
     dlDownloadOne(String(hit.id), (hit.type || 'Checkpoint').toLowerCase(), versionId)
   }

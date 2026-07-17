@@ -16,6 +16,8 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import { ARCH_LABELS, effectiveArch, familyRoot } from '@/config/model-types'
+import { useConfirm } from '@/composables/useConfirm'
 
 defineOptions({ name: 'ModelPickerModal' })
 
@@ -40,11 +42,14 @@ const props = withDefaults(defineProps<{
   searchPlaceholder?: string
   /** Count label for multi-select footer */
   countLabel?: string
+  /** Current tab's arch (archFilter[0]); when set, arch chips default + mismatch confirm */
+  currentArch?: string
 }>(), {
   icon: 'deployed_code',
   multi: false,
   searchPlaceholder: '',
   countLabel: '',
+  currentArch: '',
 })
 
 const emit = defineEmits<{
@@ -58,29 +63,42 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { confirm } = useConfirm()
 
 // ── Search ──
 const search = ref('')
 
-// ── Folder filter ──
-const activeFolder = ref('')
+// ── Arch filter ──
+const activeArch = ref('')
 
-const folders = computed<ChipOption[]>(() => {
+// ── Arch chips (dynamic from items' effectiveArch field) ──
+const archOptions = computed<ChipOption[]>(() => {
   const set = new Set<string>()
   for (const m of props.items) {
-    const idx = m.name.indexOf('/')
-    if (idx > 0) set.add(m.name.substring(0, idx))
+    const ea = effectiveArch(m)
+    if (ea) set.add(ea)
   }
-  return [...set].sort().map(f => ({ value: f, label: f }))
+  // sort by ARCH_LABELS key order, unknown last
+  const known = [...set].filter(a => a !== 'unknown')
+    .sort((a, b) => {
+      const ia = Object.keys(ARCH_LABELS).indexOf(a)
+      const ib = Object.keys(ARCH_LABELS).indexOf(b)
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+    })
+  const unknown = set.has('unknown') ? ['unknown'] : []
+  return [...known, ...unknown].map(a => ({
+    value: a,
+    label: a === 'unknown' ? t('generate.picker.arch_unknown') : (ARCH_LABELS[a] || a),
+  }))
 })
 
 // ── Filtered items ──
 const filtered = computed(() => {
   let list = props.items
 
-  // Folder filter
-  if (activeFolder.value) {
-    list = list.filter(m => m.name.startsWith(activeFolder.value + '/'))
+  // Arch filter (against effectiveArch)
+  if (activeArch.value) {
+    list = list.filter(m => effectiveArch(m) === activeArch.value)
   }
 
   // Search
@@ -101,7 +119,10 @@ const filtered = computed(() => {
 watch(() => props.modelValue, (open) => {
   if (open) {
     search.value = ''
-    activeFolder.value = ''
+    // default to currentArch if present in items' effectiveArchs, else '全部'
+    const archs = new Set(props.items.map(m => effectiveArch(m)))
+    activeArch.value = (props.currentArch && archs.has(props.currentArch))
+      ? props.currentArch : ''
   }
 })
 
@@ -125,9 +146,9 @@ function getPreviewUrl(item: PickerModelItem): string | null {
 function getModelTag(item: PickerModelItem): string {
   const baseModel = (item.info as Record<string, unknown>)?.baseModel
   if (baseModel && typeof baseModel === 'string') return baseModel
-  if (item.arch && item.arch !== 'unknown') {
-    const labels: Record<string, string> = { sd15: 'SD 1.5', sdxl: 'SDXL', flux: 'Flux', sd3: 'SD3' }
-    return labels[item.arch] || item.arch
+  const ea = effectiveArch(item)
+  if (ea && ea !== 'unknown') {
+    return ARCH_LABELS[ea] || ea
   }
   return ''
 }
@@ -143,7 +164,54 @@ function isPreviewVideo(item: PickerModelItem): boolean {
   return civitImg?.[0]?.type === 'video'
 }
 
-function onCardClick(item: PickerModelItem) {
+async function onCardClick(item: PickerModelItem) {
+  // 三级架构拦截 (规格 F4):
+  //  1. 跨硬架构 (effectiveArch 与 currentArch 的家族根不同): 强警告
+  //  2. 同家族软架构错配 (家族根同为 sdxl, 子架构不同且双方都明确): 软提醒
+  //  3. 家族根同为 sdxl 但一方为通用 'sdxl' (无 sidecar/通用模型): 不拦截
+  //  4. unknown: 现有 unknown confirm 不变
+  // 多选模式下取消勾选不拦截 (移除不兼容项无需确认)
+  const isDeselect = props.multi && props.selected?.has(item.name)
+  if (props.currentArch && !isDeselect) {
+    const itemEffArch = effectiveArch(item)
+    if (itemEffArch !== props.currentArch) {
+      const itemRoot = familyRoot(itemEffArch)
+      const currentRoot = familyRoot(props.currentArch)
+
+      if (itemEffArch === 'unknown') {
+        // (4) unknown confirm 不变
+        const ok = await confirm({
+          title: t('generate.picker.arch_mismatch_title'),
+          message: t('generate.picker.arch_unknown_desc'),
+          dontAskKey: 'picker_arch_mismatch',
+        })
+        if (!ok) return
+      } else if (itemRoot !== currentRoot) {
+        // (1) 跨硬架构: 强警告文案不变
+        const ok = await confirm({
+          title: t('generate.picker.arch_mismatch_title'),
+          message: t('generate.picker.arch_mismatch_desc', {
+            model_arch: ARCH_LABELS[itemEffArch] || itemEffArch,
+            tab_arch: ARCH_LABELS[props.currentArch] || props.currentArch,
+          }),
+          dontAskKey: 'picker_arch_mismatch',
+        })
+        if (!ok) return
+      } else if (itemEffArch !== 'sdxl' && props.currentArch !== 'sdxl') {
+        // (2) 同家族软架构错配: 双方都明确 (非通用 sdxl) → 软提醒
+        const ok = await confirm({
+          title: t('generate.picker.arch_mismatch_title'),
+          message: t('generate.picker.subarch_mismatch_desc', {
+            model_arch: ARCH_LABELS[itemEffArch] || itemEffArch,
+            tab_arch: ARCH_LABELS[props.currentArch] || props.currentArch,
+          }),
+          dontAskKey: 'picker_arch_mismatch',
+        })
+        if (!ok) return
+      }
+      // (3) 家族根同为 sdxl 但一方为通用 'sdxl': 不拦截, 直接放行
+    }
+  }
   if (props.multi) {
     emit('toggle', item.name)
   } else {
@@ -174,13 +242,13 @@ function close() {
         class="picker-search"
       />
       <ChipSelect
-        v-if="folders.length > 0"
-        :options="folders"
-        :model-value="activeFolder"
-        :all-option="t('common.filter.all')"
+        v-if="archOptions.length > 1"
+        :options="archOptions"
+        :model-value="activeArch"
+        :all-option="t('generate.picker.arch_all')"
         :collapsed-rows="1"
         class="picker-chips"
-        @update:model-value="activeFolder = $event as string"
+        @update:model-value="activeArch = $event as string"
       />
     </div>
 

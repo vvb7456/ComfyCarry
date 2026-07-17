@@ -268,12 +268,41 @@ def autocomplete(query: str, limit: int = 20) -> list[dict]:
 
 # ── 历史 / 收藏 ────────────────────────────────────────────
 
-def add_history(positive: str, negative: str = "") -> int:
+def add_history(positive: str, negative: str = "", is_favorite: int = 0) -> int:
     """新增一条历史记录，返回 id"""
-    cursor = db.execute(
-        f"INSERT INTO {T_HISTORY} (positive, negative, created_at) VALUES (?, ?, ?)",
-        (positive, negative, int(time.time())),
+    recent = db.fetch_one(
+        f"SELECT id, positive, negative, is_favorite FROM {T_HISTORY} "
+        f"WHERE is_deleted=0 ORDER BY created_at DESC LIMIT 1"
     )
+    if recent and recent["positive"] == positive and recent["negative"] == negative:
+        if is_favorite and not recent["is_favorite"]:
+            db.execute(
+                f"UPDATE {T_HISTORY} SET is_favorite=1 WHERE id=?",
+                (recent["id"],),
+            )
+        return recent["id"]
+
+    cursor = db.execute(
+        f"INSERT INTO {T_HISTORY} (positive, negative, is_favorite, created_at) "
+        f"VALUES (?, ?, ?, ?)",
+        (positive, negative, is_favorite, int(time.time())),
+    )
+
+    count_row = db.fetch_one(
+        f"SELECT COUNT(*) FROM {T_HISTORY} WHERE is_deleted=0 AND is_favorite=0"
+    )
+    count = count_row[0] if count_row else 0
+    if count > 500:
+        excess = count - 500
+        db.execute(
+            f"UPDATE {T_HISTORY} SET is_deleted=1 "
+            f"WHERE id IN ("
+            f"  SELECT id FROM {T_HISTORY} WHERE is_deleted=0 AND is_favorite=0 "
+            f"  ORDER BY created_at ASC LIMIT ?"
+            f")",
+            (excess,),
+        )
+
     return cursor.lastrowid
 
 

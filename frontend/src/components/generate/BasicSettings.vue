@@ -12,12 +12,15 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'BasicSettings' })
 
-defineProps<{
+const props = withDefaults(defineProps<{
   disabled?: boolean
-}>()
+  modelField?: 'checkpoint' | 'unet'
+}>(), {
+  modelField: 'checkpoint',
+})
 
 const emit = defineEmits<{
-  'open-checkpoint': []
+  'open-model': []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -25,13 +28,14 @@ const store = useGenerateStore()
 const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
 
-/* ── Checkpoint ── */
-const selectedCheckpoint = computed<CheckpointInfo | null>(() => {
-  const name = state.value.checkpoint
+/* ── Checkpoint / UNet (config-driven by modelField) ── */
+const selected = computed<CheckpointInfo | null>(() => {
+  const name = props.modelField === 'unet' ? state.value.unet : state.value.checkpoint
   if (!name) return null
   const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
   const fallbackName = base.replace(/\.[^.]+$/, '')
-  const item = options.checkpoints.value.find(c => c.name === name)
+  const list = props.modelField === 'unet' ? options.unets.value : options.checkpoints.value
+  const item = list.find(c => c.name === name)
   if (item) {
     const info = item.info as Record<string, unknown> | null
     // displayName: prefer CivitAI info.name, fallback to filename
@@ -56,8 +60,8 @@ const selectedCheckpoint = computed<CheckpointInfo | null>(() => {
   return { name, displayName: fallbackName }
 })
 
-function openCheckpointModal() {
-  emit('open-checkpoint')
+function openModelModal() {
+  emit('open-model')
 }
 
 /* ── Resolution ── */
@@ -92,15 +96,14 @@ watch(() => state.value.resolution, (v) => {
     </div>
 
     <div class="basic-grid">
-      <!-- Left: Checkpoint -->
-      <div class="basic-grid__ckpt">
-        <label class="field-lbl">
-          {{ t('generate.basic.checkpoint') }}
-        </label>
+      <!-- Left: Checkpoint / UNet -->
+      <div class="basic-grid__model">
         <CheckpointSelector
-          :selected="selectedCheckpoint"
+          :selected="selected"
+          :empty-label="modelField === 'unet' ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint')"
+          :change-label="t('generate.basic.click_change')"
           :disabled="disabled"
-          @open="openCheckpointModal"
+          @open="openModelModal"
         />
       </div>
 
@@ -201,7 +204,7 @@ watch(() => state.value.resolution, (v) => {
   color: var(--t3);
 }
 
-/* ── 2-column: checkpoint | params ── */
+/* ── 2-column: model | params ── */
 .basic-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -209,17 +212,18 @@ watch(() => state.value.resolution, (v) => {
   align-items: stretch;
 }
 
-.basic-grid__ckpt {
+.basic-grid__model {
   display: flex;
-  flex-direction: column;
+  min-width: 0;
+  min-height: 90px;
 }
 
-.basic-grid__ckpt :deep(.ckpt-selector) {
+.basic-grid__model :deep(.ckpt-selector) {
   flex: 1;
 }
 
-.basic-grid__ckpt :deep(.ckpt-empty),
-.basic-grid__ckpt :deep(.ckpt-card) {
+.basic-grid__model :deep(.ckpt-empty),
+.basic-grid__model :deep(.ckpt-card) {
   height: 100%;
   min-height: 0;
 }

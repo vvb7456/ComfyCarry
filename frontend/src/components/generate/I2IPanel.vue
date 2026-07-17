@@ -2,8 +2,8 @@
 /**
  * I2IPanel — Image-to-Image / Inpainting unified module panel.
  *
- * Layout: horizontal split — left: params (flex:1), right: ref image area (280px).
- * Mode switch (ToggleSwitch): i2i / inpaint — both share the same FileUploadZone.
+ * Layout: horizontal split — left: ref image area (280px), right: params (flex:1).
+ * Mode switch (SegmentedControl): i2i / inpaint — both share the same FileUploadZone.
  * In inpaint mode, extra controls: growMaskBy slider + "Edit Mask" button.
  * In i2i mode, inpaint-specific controls are disabled (greyed out).
  */
@@ -13,7 +13,7 @@ import { useGenerateStore } from '@/stores/generate'
 import RangeField from '@/components/form/RangeField.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useToast } from '@/composables/useToast'
 
@@ -34,6 +34,12 @@ const state = computed(() => store.currentState)
 const isInpaint = computed(() => state.value.i2i.mode === 'inpaint')
 const hasImage = computed(() => !!state.value.i2i.image)
 const hasMask = computed(() => !!state.value.i2i.mask)
+
+/** 模式分段单选: 图生图 / 局部重绘 */
+const modeOptions = computed(() => [
+  { value: 'i2i', label: t('generate.i2i.mode_i2i') },
+  { value: 'inpaint', label: t('generate.i2i.mode_inpaint') },
+])
 
 /** Denoise range: slider always 0.10-1.00, but i2i mode soft-caps at 0.90 */
 const denoiseSoftMax = computed(() => isInpaint.value ? undefined : 0.90)
@@ -90,18 +96,43 @@ function onDenoiseUpdate(v: number) {
 
 <template>
   <div class="i2i-split">
-    <!-- Left: parameters -->
+    <!-- Left: reference image (FileUploadZone pick mode) -->
+    <div class="i2i-split__media">
+      <label class="field-lbl">{{ t('generate.i2i.ref_image') }}</label>
+      <div class="i2i-ref-wrap">
+        <FileUploadZone
+          mode="pick"
+          accept="image/png,image/jpeg,image/webp,image/bmp"
+          :preview="previewUrl"
+          :file-name="displayName"
+          :pick-label="t('generate.i2i.pick_from_input')"
+          :upload-label="t('generate.i2i.upload_local')"
+          pick-icon="image"
+          class="i2i-ref-zone"
+          @pick="emit('pick')"
+          @file="emit('file', $event)"
+          @clear="emit('clear')"
+        />
+        <!-- Mask overlay (shown when inpaint mode + has mask) -->
+        <img
+          v-if="isInpaint && hasMask && hasImage && maskPreviewUrl"
+          :src="maskPreviewUrl"
+          class="i2i-mask-overlay"
+          alt="mask"
+        />
+      </div>
+      <div v-if="resDisplay" class="i2i-ref-res">{{ resDisplay }}</div>
+    </div>
+
+    <!-- Right: parameters -->
     <div class="i2i-split__params">
       <!-- Mode switch -->
-      <div class="i2i-mode-switch">
-        <span class="i2i-mode-label" :class="{ active: !isInpaint }">{{ t('generate.i2i.mode_i2i') }}</span>
-        <ToggleSwitch
-          :model-value="isInpaint"
-          size="md"
-          @update:model-value="state.i2i.mode = $event ? 'inpaint' : 'i2i'"
-        />
-        <span class="i2i-mode-label" :class="{ active: isInpaint }">{{ t('generate.i2i.mode_inpaint') }}</span>
-      </div>
+      <SegmentedControl
+        :options="modeOptions"
+        :model-value="state.i2i.mode"
+        block
+        @update:model-value="state.i2i.mode = $event as 'i2i' | 'inpaint'"
+      />
 
       <!-- Denoise -->
       <RangeField
@@ -148,34 +179,6 @@ function onDenoiseUpdate(v: number) {
         {{ t('generate.i2i.edit_mask') }}
       </BaseButton>
     </div>
-
-    <!-- Right: reference image (FileUploadZone pick mode) -->
-    <div class="i2i-split__media">
-      <label class="field-lbl">{{ t('generate.i2i.ref_image') }}</label>
-      <div class="i2i-ref-wrap">
-        <FileUploadZone
-          mode="pick"
-          accept="image/png,image/jpeg,image/webp,image/bmp"
-          :preview="previewUrl"
-          :file-name="displayName"
-          :pick-label="t('generate.i2i.pick_from_input')"
-          :upload-label="t('generate.i2i.upload_local')"
-          pick-icon="image"
-          class="i2i-ref-zone"
-          @pick="emit('pick')"
-          @file="emit('file', $event)"
-          @clear="emit('clear')"
-        />
-        <!-- Mask overlay (shown when inpaint mode + has mask) -->
-        <img
-          v-if="isInpaint && hasMask && hasImage && maskPreviewUrl"
-          :src="maskPreviewUrl"
-          class="i2i-mask-overlay"
-          alt="mask"
-        />
-      </div>
-      <div v-if="resDisplay" class="i2i-ref-res">{{ resDisplay }}</div>
-    </div>
   </div>
 </template>
 
@@ -184,13 +187,14 @@ function onDenoiseUpdate(v: number) {
   display: flex;
   gap: var(--sp-4);
   align-items: stretch;
+  max-width: 700px;
+  margin: 0 auto;
 }
 
 .i2i-split__params {
   flex: 1;
   min-width: 200px;
   max-width: 420px;
-  order: 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -200,7 +204,6 @@ function onDenoiseUpdate(v: number) {
 .i2i-split__media {
   flex: 0 0 auto;
   width: 280px;
-  order: 1;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -237,23 +240,6 @@ function onDenoiseUpdate(v: number) {
   border-radius: var(--r-md);
 }
 
-/* Mode switch: toggle with left/right labels */
-.i2i-mode-switch {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-.i2i-mode-label {
-  font-size: var(--text-xs);
-  color: var(--t3);
-  transition: color .15s;
-}
-.i2i-mode-label.active {
-  color: var(--t1);
-  font-weight: 500;
-}
-
-
 .i2i-ref-res {
   font-size: .6rem;
   color: var(--t3);
@@ -265,7 +251,5 @@ function onDenoiseUpdate(v: number) {
 @media (max-width: 900px) {
   .i2i-split { flex-direction: column; }
   .i2i-split__media { max-width: 420px; width: 100%; }
-  .i2i-split__params,
-  .i2i-split__media { order: unset; }
 }
 </style>

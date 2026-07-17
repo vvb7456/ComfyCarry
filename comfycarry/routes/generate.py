@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import re
-import struct
 import time
 from datetime import datetime
 
@@ -25,11 +24,15 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
+from ..services.arch_detect import detect_arch
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
 from ..services.workflow_builder import (
     build_sdxl_workflow,
     build_anima_workflow,
+    build_krea2_workflow,
+    build_zimage_workflow,
+    build_flux1_workflow,
     build_preprocess_workflow,
     build_tag_workflow,
 )
@@ -37,6 +40,16 @@ from ..services.workflow_builder import (
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("generate", __name__)
+
+# ── 架构扫描 memo 缓存 ───────────────────────────────────────────────────────
+# filepath → (mtime, size, rules_version, arch)。
+# options 5 分钟 TTL 过期后的重扫, 每个文件 detect 前先 stat, (mtime, size)
+# 未变且 rules_version 与当前一致则直接用缓存值, 否则 detect 后写缓存, 使重扫接近零成本。
+# rules_version 机制: 检测规则表升级 (如新增 flux2/zimage 规则、修 flux1 LoRA 误判) 后,
+# 旧缓存条目的 rules_version 不匹配 → 视为未命中, 强制重判, 防止 mtime 缓存钉死旧误判。
+_rules_VERSION = 3
+_arch_scan_cache: dict[str, tuple[float, int, int, str]] = {}
+
 
 # ── 懒加载缓存: Generate 页面所需的全部选项 ─────────────────────────────────
 _options_cache: dict | None = None
@@ -161,220 +174,11 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     return result
 
 
-def _arch_from_base_model(base_model: str) -> str:
-    """
-    CivitAI baseModel 字符串 → 架构。
-    baseModel 是 CivitAI 的固定枚举 (如 "SD 1.5" / "SDXL 1.0" / "Pony" / "Anima")，
-    sidecar 元数据与下载子文件夹名均为该字符串。
-    返回: "sd15" | "sdxl" | "flux" | "sd3" | "anima" | "unknown"
-    """
-    bm = base_model.strip().lower()
-    if not bm:
-        return "unknown"
-    if bm == "anima":
-        return "anima"
-    # SD 1.x
-    if bm in ("sd 1.4", "sd 1.5", "sd 1.5 lcm", "sd 1.5 hyper"):
-        return "sd15"
-    # SDXL ecosystem (includes Pony, Illustrious, NoobAI)
-    if any(k in bm for k in ("sdxl", "pony", "illustrious", "noobai")):
-        return "sdxl"
-    # Flux
-    if "flux" in bm:
-        return "flux"
-    # SD 3.x
-    if bm.startswith("sd 3") or bm == "sd3":
-        return "sd3"
-    return "unknown"
-
-
-def _detect_arch_from_sidecar(filepath: str) -> str:
-    """
-    从 CivitAI 下载时保存的 .weilin-info.json sidecar 读取 baseModel 判断架构。
-    无 sidecar / 解析失败 / baseModel 未映射时返回 "unknown"。
-    """
-    try:
-        with open(filepath + ".weilin-info.json", encoding="utf-8") as f:
-            info = json.load(f)
-        return _arch_from_base_model(info.get("baseModel", "") or "")
-    except (OSError, json.JSONDecodeError):
-        return "unknown"
-
-
-def _detect_arch_from_path(name: str) -> str:
-    """
-    从模型路径中的 baseModel 子文件夹名推断架构。
-    CivitAI 下载时会按 baseModel 创建子文件夹 (如 "SDXL 1.0/model.safetensors")。
-    """
-    parts = name.replace("\\", "/").split("/")
-    if len(parts) < 2:
-        return "unknown"
-    return _arch_from_base_model(parts[0])
-
-
-def _detect_arch(filepath: str, name: str = "") -> str:
-    """
-    检测模型架构，优先级: sidecar 元数据 > 文件 header > 路径子文件夹。
-    返回: "sd15" | "sdxl" | "flux" | "sd3" | "anima" | "unknown"
-
-    sidecar baseModel 是 CivitAI 官方枚举，不受打包格式影响，最可靠；
-    header 嗅探覆盖无 sidecar 的文件 (rclone 同步/手动上传, 仅 safetensors/GGUF)；
-    路径兜底覆盖 header 读不了的格式 (.ckpt 等)。
-    """
-    result = _detect_arch_from_sidecar(filepath)
-    if result != "unknown":
-        return result
-    if filepath.endswith(".safetensors"):
-        result = _detect_arch_safetensors(filepath)
-    elif filepath.endswith(".gguf"):
-        result = _detect_arch_gguf(filepath)
-    if result == "unknown" and name:
-        result = _detect_arch_from_path(name)
-    return result
-
-
-def _detect_arch_safetensors(filepath: str) -> str:
-    """从 safetensors 文件 header 的 tensor key 名称检测架构。"""
-    try:
-        with open(filepath, "rb") as f:
-            header_len = struct.unpack("<Q", f.read(8))[0]
-            if header_len <= 0 or header_len > 10_000_000:
-                return "unknown"
-            raw = f.read(header_len)
-        header = json.loads(raw)
-        keys = set(k for k in header if k != "__metadata__")
-        return _match_arch_from_keys(keys)
-    except Exception:
-        return "unknown"
-
-
-_GGUF_MAGIC = 0x46554747  # "GGUF" little-endian
-_GGUF_ARCH_MAP = {
-    "flux": "flux", "sd1": "sd15", "sdxl": "sdxl", "sd3": "sd3",
-}
-
-
-def _detect_arch_gguf(filepath: str) -> str:
-    """
-    从 GGUF 文件检测架构。
-    优先读取 general.architecture 元数据，fallback 到 tensor 名称匹配。
-    """
-    try:
-        with open(filepath, "rb") as f:
-            magic = struct.unpack("<I", f.read(4))[0]
-            if magic != _GGUF_MAGIC:
-                return "unknown"
-            _version = struct.unpack("<I", f.read(4))[0]
-            tensor_count = struct.unpack("<Q", f.read(8))[0]
-            kv_count = struct.unpack("<Q", f.read(8))[0]
-
-            # 读取 metadata key-value 对，寻找 general.architecture
-            arch_from_meta = _gguf_scan_metadata(f, kv_count)
-            if arch_from_meta and arch_from_meta in _GGUF_ARCH_MAP:
-                return _GGUF_ARCH_MAP[arch_from_meta]
-
-            # Fallback: 解析 tensor 名称做特征匹配
-            tensor_names = set()
-            for _ in range(min(tensor_count, 500)):
-                name = _gguf_read_string(f)
-                n_dims = struct.unpack("<I", f.read(4))[0]
-                f.read(n_dims * 8 + 4 + 8)  # dims + type + offset
-                # 去除 model.diffusion_model. 前缀
-                if name.startswith("model.diffusion_model."):
-                    name = name[len("model.diffusion_model."):]
-                tensor_names.add(name)
-            return _match_arch_from_keys(tensor_names)
-    except Exception:
-        return "unknown"
-
-
-def _gguf_read_string(f) -> str:
-    """读取 GGUF 格式的 length-prefixed UTF-8 字符串。"""
-    length = struct.unpack("<Q", f.read(8))[0]
-    if length > 1_000_000:
-        raise ValueError("GGUF string too long")
-    return f.read(length).decode("utf-8", errors="replace")
-
-
-def _gguf_skip_value(f, vtype: int):
-    """跳过一个 GGUF metadata value (不解析内容)。"""
-    _FIXED_SIZES = {
-        0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1,
-        10: 8, 11: 8, 12: 8,
-    }
-    if vtype in _FIXED_SIZES:
-        f.read(_FIXED_SIZES[vtype])
-    elif vtype == 8:  # STRING
-        _gguf_read_string(f)
-    elif vtype == 9:  # ARRAY
-        arr_type = struct.unpack("<I", f.read(4))[0]
-        arr_len = struct.unpack("<Q", f.read(8))[0]
-        for _ in range(arr_len):
-            _gguf_skip_value(f, arr_type)
-    else:
-        raise ValueError(f"Unknown GGUF value type: {vtype}")
-
-
-def _gguf_scan_metadata(f, kv_count: int) -> str | None:
-    """扫描 GGUF metadata，返回 general.architecture 的值（如果存在）。"""
-    for _ in range(kv_count):
-        key = _gguf_read_string(f)
-        vtype = struct.unpack("<I", f.read(4))[0]
-        if key == "general.architecture" and vtype == 8:
-            return _gguf_read_string(f)
-        _gguf_skip_value(f, vtype)
-    return None
-
-
-def _match_arch_from_keys(keys: set[str]) -> str:
-    """从 tensor key 名称集合匹配模型架构。"""
-    has = lambda prefix: any(k.startswith(prefix) for k in keys)
-
-    # Anima UNet: 裸格式所有 key 以 net.blocks. 开头 (685 tensors)。
-    # civitai 全量打包格式前缀变为 model.diffusion_model.blocks. (无 net. 层)
-    # 并附带 cond_stage_model.qwen3_06b + first_stage_model，会误命中 SD1.5 规则，
-    # 故统一用小写 adaln_modulation 特征子串判别 (PixArt/DiT 系为大写 adaLN_modulation)
-    if has("net.blocks.") or any("adaln_modulation" in k for k in keys):
-        return "anima"
-    # Anima LoRA: keys 形如 lora_unet_blocks_<N>_(cross_attn|self_attn|mlp_layer)_*
-    # 必须在通用 lora_unet_ 检测之前判别
-    if has("lora_unet_blocks_"):
-        return "anima"
-    # Flux: double_blocks / single_blocks
-    if has("double_blocks."):
-        return "flux"
-    # SD3: joint_blocks
-    if has("joint_blocks."):
-        return "sd3"
-    # SDXL checkpoint: 双 text encoder (conditioner.embedders.1) 或 label_emb
-    if has("conditioner.embedders.1.") or \
-       any(k in keys for k in (
-           "model.diffusion_model.label_emb.0.0.weight",
-           "label_emb.0.0.weight",
-       )):
-        return "sdxl"
-    # SDXL alt: UNet 风格 + add_embedding
-    if has("add_embedding."):
-        return "sdxl"
-    # SD1.5 checkpoint: cond_stage_model / diffusion_model 但无 SDXL 标记
-    if has("cond_stage_model.") or has("model.diffusion_model.") or \
-       has("input_blocks.") or has("down_blocks."):
-        return "sd15"
-    # LoRA 检测: lora_te2 = SDXL, 无 te2 + 有 te1/unet = SD1.5
-    if has("lora_te2_"):
-        return "sdxl"
-    # UNet-only SDXL LoRA (无 te key): transformer_blocks 索引 >=1 仅 SDXL 存在
-    # (SD1.5 每个 attention 层只有 1 个 transformer block, 索引恒为 0)
-    if has("lora_unet_") and any(re.search(r"transformer_blocks_[1-9]", k) for k in keys):
-        return "sdxl"
-    if has("lora_te1_") or has("lora_unet_"):
-        return "sd15"
-    return "unknown"
-
-
 def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
     """
     批量检测模型架构，返回 {name: arch}。
+    基于 (mtime, size, rules_version) 的 memo 缓存:
+    文件未改动且 rules_version 一致时直接复用缓存结果 (规则升级后强制重判)。
     """
     result = {}
     base_dir = os.path.join(COMFYUI_DIR, rel_dir)
@@ -384,7 +188,22 @@ def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
         real_path = os.path.realpath(filepath)
         if not real_path.startswith(real_base + os.sep):
             continue  # 跳过路径遍历
-        result[name] = _detect_arch(filepath, name)
+        # stat 命中检查 (失败按现状跳过 — 不写入缓存)
+        try:
+            st = os.stat(filepath)
+        except OSError:
+            result[name] = detect_arch(filepath, name)
+            continue
+        cached = _arch_scan_cache.get(filepath)
+        # 命中条件: mtime/size 未变 且 rules_version 与当前一致
+        if (cached and cached[0] == st.st_mtime and cached[1] == st.st_size
+                and cached[2] == _rules_VERSION):
+            result[name] = cached[3]
+            continue
+        # 未命中 / 已变动 / 规则升级 → detect 后写缓存
+        arch = detect_arch(filepath, name)
+        _arch_scan_cache[filepath] = (st.st_mtime, st.st_size, _rules_VERSION, arch)
+        result[name] = arch
     return result
 
 
@@ -423,10 +242,15 @@ def _fetch_generate_options() -> dict:
                "checkpoint_archs": {}, "lora_archs": {},
                "unet_previews": {}, "clip_previews": {}, "vae_previews": {},
                "unet_archs": {}, "unet_info": {},
-               "comfyui_dir": COMFYUI_DIR, "controlnet_models": {}}
+               "comfyui_dir": COMFYUI_DIR, "controlnet_models": {},
+               "seedvr2_models": []}
 
     def _get_combo_list(node_name: str, field: str) -> list:
-        """获取节点的下拉选项（同节点缓存，避免重复 HTTP 请求）"""
+        """获取节点的下拉选项（同节点缓存，避免重复 HTTP 请求）
+
+        ComfyUI ≥0.28 将 combo 格式从 [[...options]] 改为
+        ['COMBO', {'options': [...]}]，此处兼容两种。
+        """
         if node_name not in _combo_cache:
             try:
                 r = requests.get(f"{COMFYUI_URL}/object_info/{node_name}", timeout=10)
@@ -436,7 +260,15 @@ def _fetch_generate_options() -> dict:
                 logger.warning(f"[generate] 获取 {node_name} 失败: {e}")
                 _combo_cache[node_name] = {}
         d = _combo_cache.get(node_name, {})
-        return d.get(node_name, {}).get("input", {}).get("required", {}).get(field, [[]])[0] or []
+        raw = d.get(node_name, {}).get("input", {}).get("required", {}).get(field, [])
+        if not raw:
+            return []
+        first = raw[0]
+        if isinstance(first, list):
+            return first
+        if isinstance(first, str) and len(raw) > 1 and isinstance(raw[1], dict):
+            return raw[1].get("options", [])
+        return []
 
     samplers   = _get_combo_list("KSampler", "sampler_name")
     schedulers = _get_combo_list("KSampler", "scheduler")
@@ -492,6 +324,17 @@ def _fetch_generate_options() -> dict:
     # ── ControlNet 模型 (按类型分组) ───────────────────────────────────
     cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
     result["controlnet_models"] = _classify_controlnet_models(cn_list)
+
+    # ── SeedVR2 DiT 模型 (扫描磁盘实际存在的白名单文件) ─────────────────
+    # ComfyUI 的 combo 列表返回节点已知的全部变体（含未下载的 GGUF 等），
+    # 此处直接扫描 models/SEEDVR2/ 仅返回磁盘上存在的 .safetensors 文件。
+    seedvr2_dir = os.path.join(COMFYUI_DIR, "models", "SEEDVR2")
+    svr_models: list[str] = []
+    if os.path.isdir(seedvr2_dir):
+        for fn in sorted(os.listdir(seedvr2_dir)):
+            if fn.endswith(".safetensors") and fn != "ema_vae_fp16.safetensors":
+                svr_models.append(fn)
+    result["seedvr2_models"] = svr_models
 
     _options_cache = result
     _options_cache_time = time.time()
@@ -768,9 +611,19 @@ def api_generate_input_image_preview():
 # 支持的模型类型 → 对应工作流构建函数
 _BUILDERS = {
     "sdxl": build_sdxl_workflow,
-    "anima": build_anima_workflow,  # 分离式架构: UNet + 单 CLIP + VAE
-    # "flux": build_flux_workflow,    ← Phase 2+
+    "anima": build_anima_workflow,    # 分离式架构: UNet + 单 CLIP + VAE
+    "krea2": build_krea2_workflow,    # 分离式架构: UNet + 单 CLIP + VAE
+    "zimage": build_zimage_workflow,  # 分离式架构: UNet + 单 CLIP (lumina2) + VAE + ModelSamplingAuraFlow
+    "flux1": build_flux1_workflow,    # 分离式架构: UNet + 双 CLIP (flux) + VAE
+    # "flux2": build_flux2_workflow,   ← Owner 决策搁置 (采样拓扑不同, 独立 builder)
 }
+
+# 分离式三件套架构集合 (UNet + Text Encoder + VAE), 校验逻辑共用
+# 注: flux2 搁置, 不在此集合 (build_flux2_workflow 未实现)
+_SPLIT_ARCHS = ("anima", "krea2", "zimage", "flux1")
+
+# 需要 dual CLIP (clip + clip2) 的架构集合 — 在 _SPLIT_ARCHS 分支内额外校验 clip2
+_DUAL_CLIP_ARCHS = ("flux1",)
 
 
 @bp.route("/api/generate/submit", methods=["POST"])
@@ -834,13 +687,30 @@ def api_generate_submit():
             return jsonify({
                 "error": f"模型文件未找到: {checkpoint}，请前往模型管理页确认"
             }), 400
-    elif model_type == "anima":
+        # B4: clip_skip 钳制 1..4 (缺省 1, 不传则 builder 走默认行为 = 无 CLIPSetLastLayer)
+        try:
+            clip_skip = int(data.get("clip_skip", 1) or 1)
+        except (TypeError, ValueError):
+            clip_skip = 1
+        data["clip_skip"] = max(1, min(clip_skip, 4))
+        # B4: vae 覆盖 (可选 str, 非空时校验存在于 VAE 列表)
+        vae_override = str(data.get("vae", "") or "").strip()
+        if vae_override:
+            vae_list = opts.get("vaes", [])
+            if vae_list and vae_override not in vae_list:
+                return jsonify({
+                    "error": f"VAE 文件未找到: {vae_override}，请前往模型管理页确认"
+                }), 400
+            data["vae"] = vae_override
+        else:
+            data["vae"] = ""
+    elif model_type in _SPLIT_ARCHS:
         unet = data.get("unet", "").strip()
         clip = data.get("clip", "").strip()
         vae = data.get("vae", "").strip()
         if not unet or not clip or not vae:
             return jsonify({
-                "error": "Anima 需选择 UNet / Text Encoder / VAE 三个模型文件"
+                "error": f"{model_type} 需选择 UNet / Text Encoder / VAE 三个模型文件"
             }), 400
         for key, fname, listkey, label in (
             ("unet", unet, "unets", "UNet"),
@@ -853,6 +723,19 @@ def api_generate_submit():
                     "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
                 }), 400
             data[key] = fname
+        # flux1 等双 CLIP 架构: 额外校验 clip2 (第二 Text Encoder, 如 T5)
+        if model_type in _DUAL_CLIP_ARCHS:
+            clip2 = data.get("clip2", "").strip()
+            if not clip2:
+                return jsonify({
+                    "error": "flux1 需选择两个 Text Encoder (CLIP-L + T5)"
+                }), 400
+            clip_list = opts.get("clips", [])
+            if clip_list and clip2 not in clip_list:
+                return jsonify({
+                    "error": f"Text Encoder 文件未找到: {clip2}，请前往模型管理页确认"
+                }), 400
+            data["clip2"] = clip2
 
     # ── LoRA 文件存在性校验 (支持数组格式) ─────────────────────────────────
     loras = data.get("loras") or []
@@ -940,6 +823,9 @@ def api_generate_submit():
         output_format = "png"
     data["output_format"] = output_format
 
+    original_positive = positive_prompt
+    original_negative = data.get("negative_prompt", "")
+
     # ── 提示词模板展开 (dynamicprompts) ─────────────────────────────────────
     try:
         expander = get_expander()
@@ -990,6 +876,12 @@ def api_generate_submit():
 
     prompt_id = result.get("prompt_id", "")
     logger.info(f"[generate] 提交成功 prompt_id={prompt_id} model={model_type} batch={batch_size}")
+
+    try:
+        from ..services import prompt_library as pl
+        pl.add_history(original_positive, original_negative)
+    except Exception as e:
+        logger.warning(f"[generate] 录入历史失败 (非致命): {e}")
 
     return jsonify({"prompt_id": prompt_id, "status": "queued"})
 

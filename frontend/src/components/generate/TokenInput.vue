@@ -49,6 +49,7 @@ const emit = defineEmits<{
   'clear-all': []
   'clear-disabled': []
   history: []
+  'favorite-current': []
   'open-embedding': []
   'open-wildcard': []
   'select-autocomplete': [item: AutocompleteDisplayItem]
@@ -94,7 +95,7 @@ function onInput(e: Event) {
   // Depth-aware comma handling:
   //   - top-level commas (depth 0 for both {} and ()) = split & commit
   //   - commas inside {}/() = literal text, don't split
-  if (val.includes(',')) {
+  if (val.includes(',') || val.includes('，')) {
     // Single-pass scan: track depth for {} and (), find top-level commas
     let depth = 0
     let lastTopComma = -1
@@ -104,7 +105,7 @@ function onInput(e: Event) {
       const ch = val[i]
       if (ch === '{' || ch === '(') depth++
       else if ((ch === '}' || ch === ')') && depth > 0) depth--
-      else if (ch === ',' && depth === 0) {
+      else if ((ch === ',' || ch === '，') && depth === 0) {
         hasTopLevelComma = true
         lastTopComma = i
       }
@@ -131,6 +132,7 @@ function onInput(e: Event) {
     for (const part of parts) emit('add', part)
     if (inputRef.value) inputRef.value.value = suffix
     ac.query.value = suffix
+    nextTick(() => updateAcPosition())
     return
   }
   ac.query.value = val
@@ -145,13 +147,38 @@ function onKeydown(e: KeyboardEvent) {
     if (e.key === 'ArrowUp') { e.preventDefault(); ac.moveUp(); return }
     if (e.key === 'Tab') {
       e.preventDefault()
-      const item = ac.confirm()
-      if (item) {
-        emit('select-autocomplete', item)
-        clearInput()
-        return
+      if (ac.activeIndex.value >= 0) {
+        const item = ac.confirm()
+        if (item) {
+          emit('select-autocomplete', item)
+          clearInput()
+          return
+        }
+      } else if (ac.results.value.length > 0) {
+        ac.activeIndex.value = 0
+        const item = ac.confirm()
+        if (item) {
+          emit('select-autocomplete', item)
+          clearInput()
+          return
+        }
       }
-      // No active item — fall through to commitInput
+      // No active item and no results — fall through to commitInput
+      commitInput()
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (ac.activeIndex.value >= 0) {
+        const item = ac.confirm()
+        if (item) {
+          emit('select-autocomplete', item)
+          clearInput()
+          return
+        }
+      }
+      // No highlight - commit user's raw input
+      lastEnterTime.value = 0
       commitInput()
       return
     }
@@ -169,7 +196,9 @@ function onKeydown(e: KeyboardEvent) {
       lastEnterTime.value = 0
       return
     }
-    lastEnterTime.value = now
+    // Only track enter time when input is empty (for BREAK detection)
+    if (inputEmpty) lastEnterTime.value = now
+    else lastEnterTime.value = 0
     commitInput()
     return
   }
@@ -231,9 +260,7 @@ function onAcSelect(item: AutocompleteDisplayItem) {
 function onCompositionStart() { composing.value = true }
 function onCompositionEnd(e: Event) {
   composing.value = false
-  // Process composed text through autocomplete
-  const val = (e.target as HTMLInputElement).value
-  ac.query.value = val
+  onInput(e)
 }
 
 // ── Drag & Drop (row-aware with visual indicator) ──────────────
@@ -242,6 +269,7 @@ interface ChipInfo { idx: number; rect: DOMRect }
 interface ChipRow { chips: ChipInfo[]; top: number; bottom: number }
 
 const dropIndicatorStyle = ref<Record<string, string>>({ display: 'none' })
+let rowMapCache: ChipRow[] | null = null
 
 /**
  * Group chips into visual rows based on their Y position.
@@ -334,32 +362,32 @@ function updateIndicator(rows: ChipRow[], dropIdx: number) {
     background: 'var(--ac)',
     borderRadius: '1px',
     pointerEvents: 'none',
-    zIndex: '10000',
+    zIndex: 'var(--z-float)',
   }
 }
 
 function onChipDragStart(id: string) {
   dragSourceId.value = id
+  if (containerRef.value) {
+    const chipEls = Array.from(containerRef.value.querySelectorAll('.token-chip'))
+    if (chipEls.length) rowMapCache = buildRowMap(chipEls)
+  }
 }
 
 function onChipDragEnd() {
   dragSourceId.value = null
   dragOverIndex.value = -1
+  rowMapCache = null
   dropIndicatorStyle.value = { display: 'none' }
 }
 
 function onContainerDragOver(e: DragEvent) {
   e.preventDefault()
-  if (!dragSourceId.value || !containerRef.value) return
-  const chipEls = Array.from(containerRef.value.querySelectorAll('.token-chip'))
-  if (!chipEls.length) return
-
-  const rows = buildRowMap(chipEls)
-  const row = findRow(rows, e.clientY)
+  if (!dragSourceId.value || !rowMapCache) return
+  const row = findRow(rowMapCache, e.clientY)
   const dropIdx = findIndexInRow(row, e.clientX)
-
   dragOverIndex.value = dropIdx
-  updateIndicator(rows, dropIdx)
+  updateIndicator(rowMapCache, dropIdx)
 }
 
 function onContainerDrop(e: DragEvent) {
@@ -373,11 +401,29 @@ function onContainerDrop(e: DragEvent) {
   }
   dragSourceId.value = null
   dragOverIndex.value = -1
+  rowMapCache = null
   dropIndicatorStyle.value = { display: 'none' }
 }
 
 // ── Cleanup ────────────────────────────────────────────────────
-onUnmounted(() => { ac.reset() })
+function onWindowScroll() { updateAcPosition() }
+function onWindowResize() { updateAcPosition() }
+
+watch(() => ac.visible.value, (visible) => {
+  if (visible) {
+    window.addEventListener('scroll', onWindowScroll, { capture: true, passive: true })
+    window.addEventListener('resize', onWindowResize)
+  } else {
+    window.removeEventListener('scroll', onWindowScroll, { capture: true } as EventListenerOptions)
+    window.removeEventListener('resize', onWindowResize)
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', onWindowScroll, { capture: true } as EventListenerOptions)
+  window.removeEventListener('resize', onWindowResize)
+  ac.reset()
+})
 </script>
 
 <template>
@@ -416,6 +462,7 @@ onUnmounted(() => { ac.reset() })
         autocomplete="off"
         @input="onInput"
         @keydown="onKeydown"
+        @blur="ac.dismiss()"
         @compositionstart="onCompositionStart"
         @compositionend="onCompositionEnd"
       />
@@ -429,6 +476,7 @@ onUnmounted(() => { ac.reset() })
         :show-translation="showTranslation"
         :position-style="acPosition"
         @select="onAcSelect"
+        @hover="ac.activeIndex.value = $event"
       />
     </div>
 
@@ -443,33 +491,30 @@ onUnmounted(() => { ac.reset() })
 
     <!-- Toolbar -->
     <div class="token-toolbar">
-      <button class="token-tool-btn" disabled @click="emit('history')">
-        <MsIcon name="bookmark" size="xs" color="none" />
-        <span class="tool-label">{{ t('prompt-library.toolbar.favorites') }}</span>
-      </button>
-      <button class="token-tool-btn" disabled @click="emit('history')">
+      <button class="token-tool-btn" :title="t('prompt-library.toolbar.history_favorites')" @click="emit('history')">
         <MsIcon name="history" size="xs" color="none" />
-        <span class="tool-label">{{ t('prompt-library.toolbar.history') }}</span>
+        <span class="tool-label">{{ t('prompt-library.toolbar.history_favorites') }}</span>
       </button>
-
-      <span class="tool-sep" />
-
-      <button class="token-tool-btn" @click="emit('open-embedding')">
+      <button class="token-tool-btn" :title="t('prompt-library.toolbar.embedding')" @click="emit('open-embedding')">
         <MsIcon name="link" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.embedding') }}</span>
       </button>
-      <button class="token-tool-btn" @click="emit('open-wildcard')">
+      <button class="token-tool-btn" :title="t('prompt-library.toolbar.wildcard')" @click="emit('open-wildcard')">
         <MsIcon name="shuffle" size="xs" color="none" />
-        <span class="tool-label">{{ t('generate.prompt.tools.wildcard') }}</span>
+        <span class="tool-label">{{ t('prompt-library.toolbar.wildcard') }}</span>
       </button>
 
       <span class="tool-spacer" />
 
-      <button class="token-tool-btn" @click="emit('clear-disabled')">
+      <button class="token-tool-btn" :title="t('prompt-library.toolbar.favorite_current')" @click="emit('favorite-current')">
+        <MsIcon name="star" size="xs" color="none" />
+        <span class="tool-label">{{ t('prompt-library.toolbar.favorite_current') }}</span>
+      </button>
+      <button class="token-tool-btn" :title="t('prompt-library.toolbar.clear_disabled')" @click="emit('clear-disabled')">
         <MsIcon name="remove_circle" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.clear_disabled') }}</span>
       </button>
-      <button class="token-tool-btn token-tool-btn--danger" @click="emit('clear-all')">
+      <button class="token-tool-btn token-tool-btn--danger" :title="t('prompt-library.toolbar.clear_all')" @click="emit('clear-all')">
         <MsIcon name="delete" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.clear_all') }}</span>
       </button>
@@ -477,6 +522,7 @@ onUnmounted(() => { ac.reset() })
       <button
         v-if="showTranslation"
         class="token-tool-btn"
+        :title="t('prompt-library.toolbar.translate_all')"
         :disabled="translateAllBusy"
         @click="emit('translate-all')"
       >
@@ -509,7 +555,8 @@ onUnmounted(() => { ac.reset() })
   align-content: flex-start;
   gap: 4px;
   padding: 8px;
-  height: 180px;
+  min-height: 120px;
+  max-height: 280px;
   overflow-y: auto;
   background: var(--bg-in);
   cursor: text;
@@ -579,12 +626,6 @@ onUnmounted(() => { ac.reset() })
 }
 .tool-spacer {
   flex: 1;
-}
-.tool-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--bd);
-  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {

@@ -33,7 +33,7 @@ export interface UsePromptLibraryReturn {
   resolveTags(texts: string[]): Promise<Record<string, { color: string; translate: string }>>
 
   fetchHistory(type?: string, page?: number, size?: number): Promise<PromptHistoryPage | null>
-  addHistory(positive: string, negative?: string): Promise<number | null>
+  addHistory(positive: string, negative?: string, isFavorite?: boolean): Promise<number | null>
   updateHistory(id: number, fields: Record<string, unknown>): Promise<boolean>
   deleteHistory(id: number): Promise<boolean>
   deleteHistoryBatch(ids: number[]): Promise<number>
@@ -118,10 +118,11 @@ export function usePromptLibrary(): UsePromptLibraryReturn {
     )
   }
 
-  async function addHistory(positive: string, negative = ''): Promise<number | null> {
+  async function addHistory(positive: string, negative = '', isFavorite = false): Promise<number | null> {
     const resp = await post<{ success: boolean; id: number }>('/api/prompt-library/history', {
       positive,
       negative,
+      is_favorite: isFavorite ? 1 : 0,
     })
     return resp?.id ?? null
   }

@@ -13,6 +13,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import { fmtSpeed } from '@/utils/format'
 
 defineOptions({ name: 'ModelDependencyGate' })
 
@@ -67,14 +68,6 @@ const progressWidth = computed(() => {
   const p = props.dep.progress.value
   return p ? p.percent + '%' : '0%'
 })
-
-function fmtSpeed(bytesPerSec: number): string {
-  if (!bytesPerSec || bytesPerSec <= 0) return ''
-  if (bytesPerSec >= 1073741824) return (bytesPerSec / 1073741824).toFixed(1) + ' GB/s'
-  if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(1) + ' MB/s'
-  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
-  return bytesPerSec + ' B/s'
-}
 
 function onCardClick(modelId: string) {
   props.dep.toggleSelect(modelId)

@@ -44,10 +44,6 @@ export function normalizePrompt(text: string, opts: NormalizeOptions = DEFAULT_O
   if (opts.underscore) {
     s = s.replace(/_/g, ' ')
   }
-  if (opts.escapeBracket) {
-    // 转义未转义的圆括号: ( → \(  ) → \)  但跳过已有 \( 的
-    s = s.replace(/(?<!\\)\(/g, '\\(').replace(/(?<!\\)\)/g, '\\)')
-  }
 
   // 始终执行的格式化
   s = s

@@ -15,7 +15,13 @@ const router = createRouter({
       component: () => import('@/pages/ComfyUIPage.vue'),
     },
     {
+      // 任务维度子路由骨架 (本期只搭壳): /generate → /generate/image
+      // 未来 /generate/video, /generate/edit 落地后, GeneratePage 拆为 shell + 子任务页
       path: '/generate',
+      redirect: '/generate/image',
+    },
+    {
+      path: '/generate/image',
       name: 'generate',
       component: () => import('@/pages/GeneratePage.vue'),
     },

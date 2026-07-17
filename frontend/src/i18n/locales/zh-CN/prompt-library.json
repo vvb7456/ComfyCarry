@@ -4,17 +4,17 @@
     "positive": "正向提示词",
     "negative": "反向提示词",
     "confirm": "确定",
-    "placeholder": "输入标签，按回车或逗号添加…",
-    "translate_input": "输入提示词，按回车翻译"
+    "placeholder": "输入标签，按回车或逗号添加…"
   },
   "toolbar": {
-    "favorites": "收藏",
-    "history": "历史",
+    "history_favorites": "收藏&历史",
+    "favorite_current": "收藏当前",
     "clear_all": "清空全部",
     "clear_disabled": "清空禁用",
     "translate_all": "翻译全部",
     "clear_all_confirm": "确定清空所有标签？",
-    "embedding": "Embedding"
+    "embedding": "Embedding",
+    "wildcard": "通配符"
   },
   "chip": {
     "weight": "权重",
@@ -43,12 +43,23 @@
     "favorite": "收藏",
     "unfavorite": "取消收藏",
     "confirm_delete": "确定删除此记录？",
-    "confirm_batch_delete": "确定删除 {count} 条选中记录？"
+    "confirm_batch_delete": "确定删除 {count} 条选中记录？",
+    "confirm_replace": "用此历史记录替换当前提示词？",
+    "just_now": "刚刚",
+    "minutes_ago": "{n} 分钟前",
+    "hours_ago": "{n} 小时前",
+    "days_ago": "{n} 天前",
+    "page": "第 {page}/{total} 页",
+    "prev": "上一页",
+    "next": "下一页",
+    "loading": "加载中…",
+    "empty_prompt": "提示词为空，无法收藏",
+    "favorited": "已添加到收藏"
   },
   "init": {
     "title": "该功能需下载提示词标签库",
     "description": "使用提示词编辑器前需要初始化标签库。将导入约 4000 个标签和约 50000 个 Danbooru 标签，用于自动补全和浏览。",
-    "checking": "检测数据源\u2026",
+    "checking": "检测数据源…",
     "not_initialized": "标签库未初始化",
     "local_status": "本地数据文件",
     "remote_status": "远程下载",
@@ -62,8 +73,8 @@
     "data_name": "ComfyCarry Prompt Library",
     "data_desc": "SDXL 提示词与中文翻译",
     "required": "必需",
-    "downloading": "下载中\u2026",
-    "importing": "导入中\u2026",
+    "downloading": "下载中…",
+    "importing": "导入中…",
     "import_success": "导入完成：{groups} 组，{tags} 标签，{danbooru} Danbooru",
     "import_failed": "导入失败",
     "skip": "暂时跳过"

@@ -3,7 +3,8 @@
   "tabs": {
     "local": "本地模型",
     "civitai": "CivitAI",
-    "downloads": "下载管理"
+    "favorites": "收藏",
+    "tasks": "下载任务"
   },
   "local": {
     "all_types": "全部类型",
@@ -34,7 +35,8 @@
     "fetch_complete": "全部完成",
     "fetch_partial": "完成 {success} 个，失败 {fail} 个",
     "confirm_delete_file": "确定删除 {filename}？\n此操作不可恢复！",
-    "details": "详情"
+    "details": "详情",
+    "show_components": "显示组件文件"
   },
   "meta": {
     "title": "模型详情",
@@ -79,7 +81,8 @@
   },
   "downloads": {
     "pending": "收藏",
-    "active": "队列",
+    "active": "进行中",
+    "history": "历史",
     "completed": "已完成",
     "failed": "失败",
     "download_all": "下载全部",
@@ -87,6 +90,7 @@
     "confirm_clear": "确定清空?",
     "no_pending_hint": "暂无收藏模型，从 CivitAI 页添加或点击批量添加",
     "no_active": "无活跃的下载任务",
+    "no_history": "暂无下载历史",
     "waiting": "等待中",
     "paused": "已暂停",
     "no_completed": "暂无已完成的下载",
@@ -103,6 +107,9 @@
     "retry": "重试",
     "download": "下载",
     "installed": "已下载",
+    "resolving": "解析中…",
+    "verifying": "校验中",
+    "confirm_cancel": "取消下载 {name}?",
     "batch_modal_title": "批量添加模型",
     "batch_modal_hint": "每行输入一个 CivitAI 模型链接或 ID，支持多种格式：",
     "batch_modal_placeholder": "粘贴链接或 ID...",

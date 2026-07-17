@@ -37,6 +37,7 @@ export interface GenerateOptionsReturn {
   clips: ComputedRef<ModelFileItem[]>
   vaes: ComputedRef<ModelFileItem[]>
   controlnetModels: Ref<Record<string, string[]>>
+  seedvr2Models: Ref<string[]>
   comfyuiDir: Ref<string>
   load: () => Promise<void>
   refresh: () => Promise<void>
@@ -65,6 +66,7 @@ interface OptionsResponse {
   lora_info: Record<string, Record<string, unknown>>
   unet_info: Record<string, Record<string, unknown>>
   controlnet_models: Record<string, string[]>
+  seedvr2_models: string[]
   comfyui_dir: string
 }
 
@@ -79,6 +81,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const schedulers = ref<string[]>([])
   const comfyuiDir = ref('')
   const controlnetModels = ref<Record<string, string[]>>({})
+  const seedvr2Models = ref<string[]>([])
 
   // Raw data from API
   const rawCheckpoints = ref<string[]>([])
@@ -173,6 +176,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       loraInfo.value = data.lora_info || {}
       unetInfo.value = data.unet_info || {}
       controlnetModels.value = data.controlnet_models || {}
+      seedvr2Models.value = data.seedvr2_models || []
       comfyuiDir.value = data.comfyui_dir || ''
 
       loaded.value = true
@@ -195,7 +199,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     samplers, schedulers,
     checkpoints, loras,
     unets, clips, vaes,
-    controlnetModels, comfyuiDir,
+    controlnetModels, seedvr2Models, comfyuiDir,
     load, refresh,
   }
 }

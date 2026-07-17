@@ -58,7 +58,9 @@ _MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
 # 分离架构 (split-file): UNet 主权重 应进 diffusion_models 而非 checkpoints。
 # CivitAI 统一将主权重文件标为 "Checkpoint"，需按 baseModel 字段识别重定向。
-_SPLIT_FILE_BASE_KEYWORDS = ("anima", "flux", "sd 3", "sd3", "hidream", "wan", "hunyuan", "lumina", "pixart")
+# "flux" 关键词同时覆盖 Flux.2 (flux2 搁置但文件仍需落到 diffusion_models);
+# zimage 三种写法 (z-image / z image / zimage) 全部加入。
+_SPLIT_FILE_BASE_KEYWORDS = ("anima", "flux", "sd 3", "sd3", "hidream", "wan", "hunyuan", "lumina", "pixart", "krea", "z-image", "z image", "zimage")
 
 
 def _is_split_file_base_model(base_model: str) -> bool:

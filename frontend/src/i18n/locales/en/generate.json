@@ -2,20 +2,39 @@
   "title": "Generate",
   "gate": {
     "starting": "ComfyUI is starting, please wait…",
-
     "go_comfyui": "Go to ComfyUI page to start",
     "backend_error": "Cannot connect to Dashboard service",
-    "anima_title": "Anima requires dedicated text encoder & VAE"
+    "anima_title": "Anima requires dedicated text encoder & VAE",
+    "krea2_title": "Krea 2 requires dedicated text encoder & VAE",
+    "zimage_title": "Z-Image requires dedicated text encoder & VAE",
+    "flux1_title": "Flux 1 requires dual text encoders & VAE"
+  },
+  "header": {
+    "queue_history": "Queue / History",
+    "model_selector_aria": "Select model",
+    "gate_not_ready": "Components not ready",
+    "family_sdxl": "SDXL Family",
+    "model_label": "Model",
+    "task_image": "Image",
+    "task_video": "Video",
+    "task_edit": "Edit"
   },
   "tabs": {
     "sdxl": "SDXL",
     "anima": "Anima",
     "flux": "Flux",
+    "krea2": "Krea 2",
+    "zimage": "Z-Image",
+    "flux1": "Flux 1",
+    "pony": "Pony",
+    "illustrious": "Illustrious",
+    "noobai": "NoobAI",
     "history": "Queue & History"
   },
   "prompt": {
     "title": "Prompt",
     "positive_placeholder": "Enter prompt (A1111 format), e.g.: 1girl, solo, long hair, looking at viewer, smile, white dress, outdoors, blue sky, masterpiece, best quality",
+    "positive_placeholder_natural": "Describe the image in natural language, e.g.: A red fox standing on a mossy rock in a misty forest at dawn, backlit, cinematic composition, highly detailed",
     "positive_label": "Positive",
     "negative_placeholder": "Enter negative prompt, e.g.: worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, missing fingers, watermark, text",
     "negative_label": "Negative",
@@ -45,6 +64,15 @@
       "embedding_desc": "Use installed Embedding vectors (browse via toolbar 'Insert Embedding')",
       "quality": "Quality prompts",
       "quality_desc": "Positive: include masterpiece, best quality. Negative: include worst quality, low quality",
+      "natural_title": "Natural Language Style",
+      "natural_sentence": "Full sentences",
+      "natural_sentence_desc": "Describe the image in complete natural language; the model understands semantics — no tag stacking needed",
+      "natural_order": "Description order",
+      "natural_order_desc": "Suggested order: subject → action/pose → scene → lighting & mood → style",
+      "natural_detail": "Be specific",
+      "natural_detail_desc": "Concrete nouns and adjectives beat abstract words; describe \"what it looks like\" rather than listing \"what is there\"",
+      "natural_no_weight": "Syntax differences",
+      "natural_no_weight_desc": "(word:1.4) weighting and embedding syntax are ineffective or unreliable for these models; emphasize with plain words (e.g. highly detailed)",
       "random_title": "Random Prompts",
       "random_pick": "Random pick",
       "random_pick_desc": "→ red hair / green hair / blue hair",
@@ -82,6 +110,7 @@
     "search_checkpoint": "Search Checkpoint...",
     "unet": "UNet (Diffusion Model)",
     "clip": "CLIP Text Encoder",
+    "clip2": "Text Encoder 2 (T5)",
     "vae": "VAE",
     "select_unet": "Select UNet",
     "select_clip": "Select CLIP",
@@ -93,8 +122,10 @@
   "advanced": {
     "title": "Advanced Settings",
     "sampler": "Sampler",
+    "sampler_search": "Search samplers...",
     "sampler_help": "Controls the image generation algorithm. euler is fast and stable, dpmpp_2m produces higher quality but is slightly slower. Use default if unsure",
     "scheduler": "Scheduler",
+    "scheduler_search": "Search schedulers...",
     "scheduler_help": "Controls the magnitude of change at each sampling step. normal is most versatile, karras may produce finer details. Use default if unsure",
     "seed": "Seed",
     "seed_help": "Same seed + same parameters = same image. Click the dice icon to toggle random/fixed mode",
@@ -109,7 +140,13 @@
     "format_tiff": "TIFF (Print Quality)",
     "format_bmp": "BMP (Bitmap)",
     "prefix": "Filename Prefix",
-    "prefix_help": "Save path and filename for generated images. Default uses date folders and timestamps to ensure unique filenames. Cloud sync may overwrite same-named files, keeping timestamps is recommended"
+    "prefix_help": "Save path and filename for generated images. Default uses date folders and timestamps to ensure unique filenames. Cloud sync may overwrite same-named files, keeping timestamps is recommended",
+    "clip_skip": "Clip Skip",
+    "clip_skip_default": "1 (Default)",
+    "clip_skip_help": "Stops CLIP encoding at the Nth-to-last layer. Pony and Illustrious require 2 to produce correct results; SDXL base uses 1",
+    "vae_override": "VAE",
+    "vae_override_follow": "Follow Checkpoint",
+    "vae_override_help": "Override the checkpoint's built-in VAE with an external VAE file. Some anime checkpoints (e.g. Pony) recommend an external sdxl_vae for better color reproduction"
   },
   "preview": {
     "empty": "Generated images will appear here",
@@ -229,6 +266,8 @@
     "method": "Upscale Method",
     "need_model": "Please install an upscale model first",
     "need_download": "This feature requires upscale model download",
+    "engine": "Upscale Engine",
+    "engine_help": "AuraSR: GAN super-resolution — fast with sharp, dimensional edges. SeedVR2: diffusion-based restoration — accurate texture reconstruction and clean flat areas, at higher VRAM and time cost",
     "engine_aurasr": "AuraSR",
     "engine_seedvr2": "SeedVR2",
     "mode_checkboard": "Overlap Checkerboard (Recommended)",
@@ -375,8 +414,8 @@
   },
   "error": {
     "no_checkpoint": "Please select a checkpoint",
-    "no_anima_models": "Please select UNet / CLIP / VAE for Anima",
-    "cn_disabled_anima": "ControlNet is not available for Anima yet",
+    "no_split_models": "Please select UNet / Text Encoder / VAE",
+    "cn_disabled": "ControlNet is not available for this architecture",
     "no_prompt": "Please enter a prompt",
     "modules_not_enabled": "Some features are configured but not enabled",
     "modules_not_enabled_desc": "Parameters are configured but toggles are off. They will not take effect after submission.",
@@ -402,5 +441,21 @@
     "download_failed": "Download failed",
     "all_downloaded": "All downloads complete",
     "enter": "Enter"
+  },
+  "picker": {
+    "arch_all": "All",
+    "arch_unknown": "Unknown",
+    "arch_mismatch_title": "Architecture mismatch",
+    "arch_mismatch_desc": "This model's architecture is {model_arch}, the current tab is {tab_arch}. Submitting the workflow will fail. Select anyway?",
+    "arch_unknown_desc": "Unable to recognize this model's architecture. If it is incompatible with the current tab, the workflow will fail. Select anyway?",
+    "subarch_mismatch_desc": "This model belongs to the {model_arch} ecosystem, the current tab is {tab_arch}. The ecosystem conventions differ and results may be unsatisfactory. Select anyway?"
+  },
+  "placeholders": {
+    "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
+    "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
+    "positive_noobai": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
+    "negative_pony": "score_6, score_5, score_4, worst quality, low quality, bad anatomy, bad hands, watermark",
+    "negative_illustrious": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name",
+    "negative_noobai": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name"
   }
 }

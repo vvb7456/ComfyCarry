@@ -7,6 +7,7 @@ import ImagePreview from '@/components/ui/ImagePreview.vue'
 import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
 import LocalModelsTab from '@/components/models/LocalModelsTab.vue'
 import CivitaiTab from '@/components/models/CivitaiTab.vue'
+import FavoritesTab from '@/components/models/FavoritesTab.vue'
 import DownloadsTab from '@/components/models/DownloadsTab.vue'
 import type { ModelMeta } from '@/types/models'
 
@@ -19,7 +20,8 @@ const activeTab = ref('local')
 const tabs = computed(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
   { key: 'civitai', label: t('models.tabs.civitai'), icon: 'search' },
-  { key: 'downloads', label: t('models.tabs.downloads'), icon: 'download' },
+  { key: 'favorites', label: t('models.tabs.favorites'), icon: 'push_pin' },
+  { key: 'tasks', label: t('models.tabs.tasks'), icon: 'download' },
 ])
 
 // ── Shared Modals ──
@@ -58,8 +60,12 @@ function openPreviewSingle(url: string) {
       <CivitaiTab :active="activeTab === 'civitai'" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
 
-    <div v-show="activeTab === 'downloads'">
-      <DownloadsTab :active="activeTab === 'downloads'" />
+    <div v-show="activeTab === 'favorites'">
+      <FavoritesTab :active="activeTab === 'favorites'" />
+    </div>
+
+    <div v-show="activeTab === 'tasks'">
+      <DownloadsTab :active="activeTab === 'tasks'" />
     </div>
 
     <ModelMetaModal v-model="metaOpen" :meta="metaMeta" :show-download="activeTab === 'civitai'" @preview="openPreview" />

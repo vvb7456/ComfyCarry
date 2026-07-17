@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore, type UpscaleState } from '@/stores/generate'
+import { GenerateOptionsKey } from '@/composables/generate/keys'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import ChipSelect from '@/components/ui/ChipSelect.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
 defineOptions({ name: 'UpscalePanel' })
 
 const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
+const options = inject(GenerateOptionsKey)!
 
 const config = computed<UpscaleState>(() => store.currentState.upscale)
 
@@ -42,12 +44,19 @@ const downscaleOptions = computed(() => [
 
 // ── SeedVR2 options ──────────────────────────────────────────────────────
 
-const svrModelOptions = computed(() => [
-  { value: 'seedvr2_ema_3b_fp8_e4m3fn.safetensors', label: 'SeedVR2 3B FP8 · 3.4GB' },
-  { value: 'seedvr2_ema_3b_fp16.safetensors', label: 'SeedVR2 3B FP16 · 6.8GB' },
-  { value: 'seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors', label: 'SeedVR2 7B FP8 · 10GB' },
-  { value: 'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors', label: 'SeedVR2 7B-sharp FP8 · 10GB' },
-])
+const SEEDVR2_MODEL_LABELS: Record<string, string> = {
+  'seedvr2_ema_3b_fp8_e4m3fn.safetensors': 'SeedVR2 3B FP8 · 3.4GB',
+  'seedvr2_ema_3b_fp16.safetensors': 'SeedVR2 3B FP16 · 6.8GB',
+  'seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors': 'SeedVR2 7B FP8 · 10GB',
+  'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors': 'SeedVR2 7B-sharp FP8 · 10GB',
+}
+
+const svrModelOptions = computed(() =>
+  options.seedvr2Models.value.map(f => ({
+    value: f,
+    label: SEEDVR2_MODEL_LABELS[f] ?? f,
+  })),
+)
 
 const svrColorOptions = computed(() => [
   { value: 'lab', label: 'LAB' },
@@ -72,12 +81,19 @@ const sizeHint = computed(() => {
 
 <template>
   <div class="upscale-grid">
-    <!-- Engine select: 点选即切换 -->
-    <ChipSelect
-      :options="engineOptions"
-      :model-value="config.engine"
-      @update:model-value="config.engine = $event as 'aurasr' | 'seedvr2'"
-    />
+    <!-- Engine select: 分段单选, 点选即切换 -->
+    <div class="up-field">
+      <label class="field-lbl">
+        {{ t('generate.upscale.engine') }}
+        <HelpTip :text="t('generate.upscale.engine_help')" />
+      </label>
+      <SegmentedControl
+        :options="engineOptions"
+        :model-value="config.engine"
+        block
+        @update:model-value="config.engine = $event as 'aurasr' | 'seedvr2'"
+      />
+    </div>
 
     <!-- ── AuraSR: 上排两个滑条 / 下排两个下拉 ── -->
     <template v-if="!isSeedVR2">
@@ -268,6 +284,7 @@ const sizeHint = computed(() => {
   flex-direction: column;
   gap: var(--sp-2);
   max-width: 700px;
+  margin: 0 auto;
 }
 
 .upscale-grid__row {

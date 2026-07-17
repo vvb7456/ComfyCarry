@@ -3,7 +3,8 @@
   "tabs": {
     "local": "Local Models",
     "civitai": "CivitAI",
-    "downloads": "Downloads"
+    "favorites": "Favorites",
+    "tasks": "Downloads"
   },
   "local": {
     "all_types": "All Types",
@@ -34,7 +35,8 @@
     "fetch_complete": "All done",
     "fetch_partial": "{success} succeeded, {fail} failed",
     "confirm_delete_file": "Delete {filename}?\nThis cannot be undone!",
-    "details": "Details"
+    "details": "Details",
+    "show_components": "Show component files"
   },
   "meta": {
     "title": "Model Details",
@@ -80,6 +82,7 @@
   "downloads": {
     "pending": "Favorites",
     "active": "Queue",
+    "history": "History",
     "completed": "Completed",
     "failed": "Failed",
     "download_all": "Download All",
@@ -87,6 +90,7 @@
     "confirm_clear": "Clear all?",
     "no_pending_hint": "No saved models. Add from CivitAI tab or use Batch Add",
     "no_active": "No active downloads",
+    "no_history": "No download history",
     "waiting": "Waiting",
     "paused": "Paused",
     "no_completed": "No completed downloads",
@@ -103,6 +107,9 @@
     "retry": "Retry",
     "download": "Download",
     "installed": "Installed",
+    "resolving": "Resolving…",
+    "verifying": "Verifying",
+    "confirm_cancel": "Cancel download {name}?",
     "batch_modal_title": "Batch Add Models",
     "batch_modal_hint": "Enter one CivitAI model link or ID per line. Supports multiple formats:",
     "batch_modal_placeholder": "Paste links or IDs...",
