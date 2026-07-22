@@ -1,7 +1,9 @@
 """
 ComfyCarry — Companion WebDAV serve 管理 (SHOULD 项 6)
 
-管理常驻 `rclone serve webdav` 进程, 经 cloudflared /dav 路径暴露给客户端。
+管理常驻 `rclone serve webdav` 进程, 绑定 127.0.0.1, 经 Flask 反代
+(/api/companion/dav) 暴露给客户端。数据面走主域名, 自定义/公共 Tunnel +
+直连全通, 不再依赖 cloudflared /dav ingress。
 方案 A (spec §2.1): 不加 --read-only, rclone move 拉完自动删源。
 
 命令:
@@ -13,13 +15,8 @@ ComfyCarry — Companion WebDAV serve 管理 (SHOULD 项 6)
 用 subprocess.Popen 托管, 提供 start/stop/status。
 随 dashboard 生命周期起停 (由 app.main() 调用 start())。
 
-TODO (公共 Tunnel 模式限制):
-    自定义 Tunnel 模式下, /dav 路径 ingress 已在
-    tunnel_manager.TunnelManager._build_ingress 中注入。
-    但**公共 Tunnel 模式** (PublicTunnelClient) 的 ingress 由远程 worker
-    配置, 本仓库无法注入 /dav path 规则。公共模式下 Companion 的
-    WebDAV 拉取不可用, 需用户切换到自定义 Tunnel 模式。二期可考虑在
-    公共 worker 侧统一加入 /dav path 规则。
+rclone serve 绑 127.0.0.1, 对外不可直连; 由 comfycarry/services/dav_proxy.py
+(DavProxyMiddleware) 在 WSGI 层反向代理 /api/companion/dav/* → 127.0.0.1:{port}/dav。
 """
 
 import logging
@@ -45,9 +42,13 @@ def _build_cmd():
         "rclone", "serve", "webdav",
         str(COMPANION_SERVE_ROOT),
         "--addr", f"127.0.0.1:{COMPANION_DAV_PORT}",
-        "--baseurl", "/dav",
+        "--baseurl", "/api/companion/dav",
         "--user", "comfy",
         "--pass", str(DASHBOARD_PASSWORD),
+        # ComfyUI 持续产出新文件; 默认 dir-cache-time 5m 会让新产物长时间
+        # 不出现在 WebDAV 列目录里 (直连路径的 GET/DELETE 不受影响, 但 watch
+        # 自动拉取靠列目录发现新文件)。缩短到 5s 让新产物快速可见。
+        "--dir-cache-time", "5s",
     ]
 
 
@@ -118,12 +119,12 @@ def status():
                 "running": True,
                 "pid": _proc.pid,
                 "addr": f"127.0.0.1:{COMPANION_DAV_PORT}",
-                "baseurl": "/dav",
+                "baseurl": "/api/companion/dav",
                 "serve_root": str(COMPANION_SERVE_ROOT),
             }
         return {
             "running": False,
             "addr": f"127.0.0.1:{COMPANION_DAV_PORT}",
-            "baseurl": "/dav",
+            "baseurl": "/api/companion/dav",
             "serve_root": str(COMPANION_SERVE_ROOT),
         }

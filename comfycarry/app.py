@@ -79,6 +79,13 @@ def create_app():
     # ── 绑定 logger 到 sync engine ──────────────────────
     set_app_logger(app.logger)
 
+    # ── Companion WebDAV 反代中间件 (最外层) ────────────
+    # 在 Flask 路由/鉴权之前拦截 /api/companion/dav/*, 流式转发到本机
+    # rclone serve webdav (127.0.0.1:8688, --baseurl /dav)。
+    from .services.dav_proxy import DavProxyMiddleware
+    from .config import COMPANION_DAV_PORT
+    app.wsgi_app = DavProxyMiddleware(app.wsgi_app, COMPANION_DAV_PORT)
+
     return app
 
 
@@ -200,12 +207,12 @@ def main():
         start_sync_worker()
         print(f"  ☁️  Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
 
-    # 启动 Companion WebDAV serve (rclone serve webdav, 经 cloudflared /dav 暴露)
+    # 启动 Companion WebDAV serve (rclone serve webdav, 经 Flask 反代 /api/companion/dav 暴露)
     try:
         from .services import companion_serve
         from .config import COMPANION_DAV_PORT as _dav_port
         if companion_serve.start():
-            print(f"  📡  Companion WebDAV serve 已启动 (:{_dav_port}/dav)")
+            print(f"  📡  Companion WebDAV serve 已启动 (:{_dav_port}/dav, 反代 /api/companion/dav)")
     except Exception as e:
         print(f"  ⚠️  Companion WebDAV serve 启动失败: {e}")
 
@@ -215,7 +222,7 @@ def main():
     print(f"  ComfyUI:  {cfg.COMFYUI_DIR}")
     print(f"{'='*50}\n")
 
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 
 if __name__ == "__main__":

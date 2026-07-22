@@ -13,6 +13,7 @@ ComfyCarry — Companion 客户端面板后端 (纯 Python)
 
 import json
 import logging
+import os
 import time
 import threading
 import uuid
@@ -49,18 +50,23 @@ def _load_clients():
 
 
 def _save_clients(data):
-    """保存客户端状态"""
+    """保存客户端状态 (临时文件 + 原子替换, 防写一半被中断损坏 JSON)。"""
     COMPANION_CLIENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    COMPANION_CLIENTS_FILE.write_text(
+    tmp = COMPANION_CLIENTS_FILE.with_suffix(COMPANION_CLIENTS_FILE.suffix + ".tmp")
+    tmp.write_text(
         json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+    os.replace(tmp, COMPANION_CLIENTS_FILE)
 
 
 def _infer_dav_url():
     """推断对客户端可用的 WebDAV 地址。
 
+    WebDAV 数据面经 Flask 反代 (/api/companion/dav) 暴露, 不再走 cloudflared
+    /dav ingress, 因此自定义/公共 Tunnel + 直连全通。
+
     优先 X-Forwarded-Proto/Host (经 cloudflared 反代时的真实协议/主机),
-    回退 request.host_url (形如 "https://x.y/"), 拼接 /dav 基础路径。
+    回退 request.host_url (形如 "https://x.y/"), 拼接 /api/companion/dav。
     """
     scheme = request.headers.get("X-Forwarded-Proto", "").strip()
     if not scheme:
@@ -69,9 +75,9 @@ def _infer_dav_url():
     if not host:
         host = request.host_url.rstrip("/")
         if "://" in host:
-            return f"{host}/dav"
-        return f"{scheme}://{host}/dav"
-    return f"{scheme}://{host}/dav"
+            return f"{host}/api/companion/dav"
+        return f"{scheme}://{host}/api/companion/dav"
+    return f"{scheme}://{host}/api/companion/dav"
 
 
 # ═══════════════════════════════════════════════════════════════
