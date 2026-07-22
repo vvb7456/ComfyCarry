@@ -245,6 +245,117 @@ class WorkflowBuilder:
         }
         return nid
 
+    # ── Flux2 采样链节点 (SamplerCustomAdvanced 体系) ───────────────────────
+
+    def add_random_noise(self, seed: int) -> str:
+        """
+        RandomNoise — Flux2 采样链噪声源 (取代 KSampler 内置噪声生成)。
+        seed=-1 → 运行时随机生成。
+        输出: [node_id, 0]=NOISE
+        """
+        nid = self._next_id()
+        actual_seed = seed if seed >= 0 else random.randint(0, 2**32 - 1)
+        self._nodes[nid] = {
+            "class_type": "RandomNoise",
+            "inputs": {"noise_seed": actual_seed},
+        }
+        return nid
+
+    def add_ksampler_select(self, sampler_name: str = "euler") -> str:
+        """
+        KSamplerSelect — 选择采样器 (Flux2 采样链, 与 KSampler 分离)。
+        输出: [node_id, 0]=SAMPLER
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "KSamplerSelect",
+            "inputs": {"sampler_name": sampler_name},
+        }
+        return nid
+
+    def add_flux2_scheduler(self, steps: int, width: int, height: int) -> str:
+        """
+        Flux2Scheduler — Flux2 分辨率相关 sigma 生成器。
+        输出: [node_id, 0]=SIGMAS
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "Flux2Scheduler",
+            "inputs": {
+                "steps": int(steps),
+                "width": int(width),
+                "height": int(height),
+            },
+        }
+        return nid
+
+    def add_flux_guidance(self, conditioning_ref, guidance: float = 4.0) -> str:
+        """
+        FluxGuidance — Flux2 dev 模式 guidance 调整 (插入到正向 conditioning 链)。
+        输出: [node_id, 0]=CONDITIONING
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "FluxGuidance",
+            "inputs": {
+                "guidance": float(guidance),
+                "conditioning": self._ref(conditioning_ref, default_idx=0),
+            },
+        }
+        return nid
+
+    def add_basic_guider(self, model_ref, conditioning_ref) -> str:
+        """
+        BasicGuider — Flux2 dev 模式 guider (无负面, 单 conditioning)。
+        输出: [node_id, 0]=GUIDER
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "BasicGuider",
+            "inputs": {
+                "model": self._ref(model_ref, default_idx=0),
+                "conditioning": self._ref(conditioning_ref, default_idx=0),
+            },
+        }
+        return nid
+
+    def add_cfg_guider(self, model_ref, positive_ref, negative_ref, cfg: float) -> str:
+        """
+        CFGGuider — Flux2 klein 模式 guider (有负面, 真 CFG)。
+        输出: [node_id, 0]=GUIDER
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "CFGGuider",
+            "inputs": {
+                "model": self._ref(model_ref, default_idx=0),
+                "positive": self._ref(positive_ref, default_idx=0),
+                "negative": self._ref(negative_ref, default_idx=0),
+                "cfg": float(cfg),
+            },
+        }
+        return nid
+
+    def add_sampler_custom_advanced(
+        self, noise_ref, guider_ref, sampler_ref, sigmas_ref, latent_ref,
+    ) -> str:
+        """
+        SamplerCustomAdvanced — Flux2 采样器 (取代 KSampler, 分离式噪声/guider/sampler/sigmas)。
+        输出: [node_id, 0]=LATENT
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SamplerCustomAdvanced",
+            "inputs": {
+                "noise": self._ref(noise_ref, default_idx=0),
+                "guider": self._ref(guider_ref, default_idx=0),
+                "sampler": self._ref(sampler_ref, default_idx=0),
+                "sigmas": self._ref(sigmas_ref, default_idx=0),
+                "latent_image": self._ref(latent_ref, default_idx=0),
+            },
+        }
+        return nid
+
     def add_vae_decode(self, samples_node_id: str, vae_ref) -> str:
         """
         VAE 解码 Latent → Image。
@@ -978,6 +1089,18 @@ _SPLIT_ARCH_PROFILES = {
               "sampler": "euler", "scheduler": "simple",
               "latent_class": "EmptySD3LatentImage",
               "controlnet": True},
+    # Chroma (flux schnell 衍生, 单 T5 + 真 CFG + 负面)
+    # CLIPLoader type=chroma; 不设 dual_clip_type → 单 CLIP 路径
+    # 默认 26 步 / cfg 4.0 / euler / simple; EmptySD3LatentImage 16ch
+    "chroma": {"clip_type": "chroma", "steps": 26, "cfg": 4.0,
+               "sampler": "euler", "scheduler": "simple",
+               "latent_class": "EmptySD3LatentImage"},
+    # Flux2 (dev/klein) — 独立 builder (SamplerCustomAdvanced + Flux2Scheduler), 此 profile
+    # 仅用于 _SPLIT_ARCH_PROFILES 注册 (arch 检测 + 加载层标识)。采样不经过 build_split_workflow。
+    # latent=EmptyFlux2LatentImage (128ch, /16, step16); 单 CLIP (type=flux2)。
+    "flux2": {"clip_type": "flux2", "steps": 20, "cfg": 4.0,
+              "sampler": "euler", "scheduler": "simple",
+              "latent_class": "EmptyFlux2LatentImage"},
 }
 
 
@@ -1027,28 +1150,38 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     profile = _SPLIT_ARCH_PROFILES.get(arch, _SPLIT_ARCH_PROFILES["anima"])
     b = WorkflowBuilder()
 
-    # 1. 加载三件套 (flux1 等双 TE 架构走 DualCLIPLoader, 其余单 TE 走 CLIPLoader)
-    unet_node = b.add_unet_loader(
-        params["unet"],
-        weight_dtype=str(params.get("unet_weight_dtype", "default")),
-    )
-    if "dual_clip_type" in profile:
-        # flux1: 双 CLIP (clip_l + t5xxl) → DualCLIPLoader(type=flux)
-        clip_node = b.add_dual_clip_loader(
-            params["clip"],
-            params["clip2"],
-            type=str(params.get("clip_type", profile["dual_clip_type"])),
-        )
+    # §5.1 加载分支: packaging='checkpoint' → CheckpointLoaderSimple (整合包, model/clip/vae 同节点);
+    #                  packaging='split' (默认) → UNETLoader + CLIPLoader + VAELoader (三件套)
+    # CheckpointLoaderSimple 输出 MODEL@0 / CLIP@1 / VAE@2, 恰好落在 _ref 默认索引 →
+    # 下游 LoRA/编码/CN/采样/latent/decode 全部不变, 一次做完全架构吃到整合包形态。
+    packaging = params.get("packaging", "split")
+    if packaging == "checkpoint":
+        ckpt = b.add_checkpoint_loader(params["checkpoint"])
+        model_ref = ckpt
+        clip_ref = ckpt
+        vae_ref = ckpt
     else:
-        clip_node = b.add_clip_loader_single(
-            params["clip"],
-            type=str(params.get("clip_type", profile["clip_type"])),
+        unet_node = b.add_unet_loader(
+            params["unet"],
+            weight_dtype=str(params.get("unet_weight_dtype", "default")),
         )
-    vae_node = b.add_vae_loader(params["vae"])
+        if "dual_clip_type" in profile:
+            # flux1: 双 CLIP (clip_l + t5xxl) → DualCLIPLoader(type=flux)
+            clip_node = b.add_dual_clip_loader(
+                params["clip"],
+                params["clip2"],
+                type=str(params.get("clip_type", profile["dual_clip_type"])),
+            )
+        else:
+            clip_node = b.add_clip_loader_single(
+                params["clip"],
+                type=str(params.get("clip_type", profile["clip_type"])),
+            )
+        vae_node = b.add_vae_loader(params["vae"])
 
-    model_ref = (unet_node, 0)
-    clip_ref = (clip_node, 0)
-    vae_ref = (vae_node, 0)
+        model_ref = (unet_node, 0)
+        clip_ref = (clip_node, 0)
+        vae_ref = (vae_node, 0)
 
     # 2. 链式插入多个 LoRA (节点输出形状与 SDXL 一致: [0]=MODEL, [1]=CLIP)
     loras = params.get("loras") or []
@@ -1208,6 +1341,142 @@ def build_flux1_workflow(params: dict) -> dict:
     return build_split_workflow(params, "flux1")
 
 
+def build_chroma_workflow(params: dict) -> dict:
+    """Chroma (flux schnell 衍生, 单 T5 + 真 CFG + 负面) — 委托 build_split_workflow("chroma")。"""
+    return build_split_workflow(params, "chroma")
+
+
+def build_flux2_workflow(params: dict) -> dict:
+    """
+    Flux2 (dev/klein) — 独立采样 builder (SamplerCustomAdvanced + Flux2Scheduler)。
+
+    guider_mode 分支:
+      - 'basic' (dev):  FluxGuidance(positive, guidance) → BasicGuider(model, positive)
+                        (无负面, guidance 默认 4.0, 20 步)
+      - 'cfg'   (klein): CFGGuider(model, positive, negative, cfg)
+                        (有负面, cfg 5.0 base / 1.0 distilled)
+
+    加载分支 (packaging):
+      - 'split'      (默认): UNETLoader + CLIPLoader(type=flux2, 单) + VAELoader
+      - 'checkpoint' (整合包): CheckpointLoaderSimple (输出 MODEL@0/CLIP@1/VAE@2)
+                               Phase 1 主 agent 抽共享辅助函数后此分支可统一迁移
+
+    节点拓扑:
+      [load: unet+clip+vae | checkpoint]
+      [LoRA 链式插入 — 同时改写 model_ref / clip_ref]
+      CLIPTextEncode(正) [+CLIPTextEncode(负) if cfg]
+      [guider_mode=basic] FluxGuidance → BasicGuider
+      [guider_mode=cfg]   CFGGuider
+      RandomNoise(seed) + KSamplerSelect(sampler) + EmptyFlux2LatentImage(w,h)
+        + Flux2Scheduler(steps,w,h) → SamplerCustomAdvanced → VAEDecode
+      [可选放大链路 (放大在解码后, 与架构无关)]
+      Image Save + PreviewImage
+
+    范围: 仅 t2i + LoRA + 放大。i2i/inpaint/hires 需 SplitSigmas 分段去噪 (未实装),
+    前端 flux2 modules 已相应去除 → 不接这些分支 (避免全量重噪静默忽略参考图)。
+
+    params 关键字段:
+        packaging        (str)   — 'split' (默认) | 'checkpoint'
+        checkpoint       (str)   — [packaging=checkpoint] 整合包文件名
+        unet             (str)   — [packaging=split] UNet 文件名
+        clip             (str)   — [packaging=split] Text Encoder 文件名 (Qwen3/Mistral)
+        vae              (str)   — [packaging=split] VAE 文件名
+        guider_mode      (str)   — 'basic' (dev) | 'cfg' (klein), 默认 'cfg'
+        guidance         (float) — [basic] FluxGuidance 值, 默认 4.0 (兼容 cfg 字段)
+        cfg              (float) — [cfg] CFGGuider 值, 默认 5.0 (base) / 1.0 (distilled)
+        steps            (int)   — 采样步数 (默认 20; distilled klein 4)
+        sampler          (str)   — 采样器 (默认 euler)
+        width/height     (int)   — 须 /16 (现有分辨率预设已满足)
+        其余字段: positive_prompt / negative_prompt / loras / upscale / save_prefix / output_format
+    """
+    b = WorkflowBuilder()
+
+    packaging = params.get("packaging", "split")
+    if packaging == "checkpoint":
+        ckpt = b.add_checkpoint_loader(params["checkpoint"])
+        model_ref = ckpt
+        clip_ref = ckpt
+        vae_ref = ckpt
+    else:
+        unet_node = b.add_unet_loader(
+            params["unet"],
+            weight_dtype=str(params.get("unet_weight_dtype", "default")),
+        )
+        clip_node = b.add_clip_loader_single(params["clip"], type="flux2")
+        vae_node = b.add_vae_loader(params["vae"])
+        model_ref = (unet_node, 0)
+        clip_ref = (clip_node, 0)
+        vae_ref = (vae_node, 0)
+
+    loras = params.get("loras") or []
+    for lora_entry in loras:
+        lora_name = str(lora_entry.get("name", "")).strip()
+        if not lora_name:
+            continue
+        strength = float(lora_entry.get("strength", 1.0))
+        lora_node = b.add_lora_loader(model_ref, clip_ref, lora_name, strength_model=strength)
+        model_ref = (lora_node, 0)
+        clip_ref = (lora_node, 1)
+
+    positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
+    pos_ref = (positive, 0)
+
+    guider_mode = str(params.get("guider_mode", "cfg"))
+
+    if guider_mode == "basic":
+        guidance = float(params.get("guidance", params.get("cfg", 4.0)))
+        guided_pos = b.add_flux_guidance(pos_ref, guidance=guidance)
+        guider = b.add_basic_guider(model_ref, (guided_pos, 0))
+    else:
+        negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
+        neg_ref = (negative, 0)
+        cfg = float(params.get("cfg", 5.0))
+        guider = b.add_cfg_guider(model_ref, pos_ref, neg_ref, cfg)
+
+    batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
+    # flux2 仅 t2i: SamplerCustomAdvanced 用 Flux2Scheduler 全量 sigma (denoise=1)。
+    # i2i/inpaint 需 SplitSigmas 分段去噪 (未实装) — 直接喂编码 latent 会被全量重噪 = 忽略参考图,
+    # 故不接 i2i/inpaint 分支 (前端 flux2 modules 亦已去 i2i/hires)。
+    latent = b.add_empty_latent(
+        int(params.get("width", 1024)),
+        int(params.get("height", 1024)),
+        batch_size=batch_size,
+        class_type="EmptyFlux2LatentImage",
+    )
+
+    seed = int(params.get("seed", -1))
+    noise = b.add_random_noise(seed)
+    sampler = b.add_ksampler_select(str(params.get("sampler", "euler")))
+    steps = int(params.get("steps", 20))
+    sigmas = b.add_flux2_scheduler(
+        steps, int(params.get("width", 1024)), int(params.get("height", 1024)),
+    )
+    sampled = b.add_sampler_custom_advanced(noise, guider, sampler, sigmas, latent)
+
+    decoded = b.add_vae_decode(sampled, vae_ref)
+
+    final_image = decoded
+    if bool(params.get("upscale_enabled", False)):
+        final_image = _add_upscale_chain(b, decoded, params)
+
+    # HiRes 二次采样对 flux2 需另一次 SamplerCustomAdvanced + SplitSigmas 分段去噪 (未实装);
+    # 不能退回普通 KSampler (缺 Flux2Scheduler 的分辨率相关 sigma, 且 dev 无 CFG) → 略过。
+
+    save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
+    output_format = str(params.get("output_format", "png")).lower()
+    if output_format not in ("png", "jpg", "jpeg", "webp", "tiff", "bmp", "gif"):
+        output_format = "png"
+    if '/' in save_prefix_raw:
+        save_output_path, save_filename = save_prefix_raw.rsplit('/', 1)
+    else:
+        save_output_path, save_filename = '', save_prefix_raw
+    b.add_save_image(final_image, prefix=save_filename, output_path=save_output_path,
+                     extension=output_format, batch_size=batch_size)
+    b.add_preview_image(final_image)
+
+    return b.build()
+
+
 def build_preprocess_workflow(params: dict) -> dict:
     """
     构建 ControlNet 预处理工作流。
@@ -1308,4 +1577,4 @@ def build_tag_workflow(params: dict) -> dict:
 
 
 # Phase 2+ 扩展占位符:
-# def build_flux2_workflow(params): ...  # 采样拓扑不同 (SamplerCustomAdvanced + Flux2Scheduler), 独立 builder
+# def build_flux2_workflow(params): ...  # 已实装于上方 (SamplerCustomAdvanced + Flux2Scheduler)

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { MODEL_TYPES } from '@/config/model-types'
+import { COMPONENT_FILENAMES } from '@/composables/generate/modelDepConfigs'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseInput from '@/components/form/BaseInput.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
@@ -40,13 +42,88 @@ function formatLabel(key: string): string {
   return t(`generate.advanced.format_${key}`)
 }
 
-/* ── CLIP / VAE (split-file architectures) ── */
+/* ── CLIP / VAE (split-file architectures) — 推荐置顶 + 其他折叠 ── */
 function basenameNoExt(name: string) {
   const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
   return base.replace(/\.[^.]+$/, '')
 }
-const clipOptions = computed(() => options.clips.value.map(c => ({ value: c.name, label: basenameNoExt(c.name) })))
-const vaeOptions = computed(() => options.vaes.value.map(v => ({ value: v.name, label: basenameNoExt(v.name) })))
+
+// CLIP/TE 推荐名: 文本编码器族 (t5xxl / clip_l / qwen / mistral)
+const RECOMMENDED_CLIP_PATTERN = /(t5xxl|clip_l|qwen|mistral)/i
+// VAE 推荐名: VAE 文件 (含 vae 或以 ae. 开头), 不含 TE 名 (否则会把 t5xxl 等误推为 VAE)
+const RECOMMENDED_VAE_PATTERN = /(vae|^ae\.)/i
+
+const currentDefaultModels = computed(() =>
+  MODEL_TYPES[store.activeModelType]?.defaultModels ?? {},
+)
+
+function fileBaseName(name: string): string {
+  return name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
+}
+
+function isRecommendedClip(name: string, slot: 'clip' | 'clip2'): boolean {
+  const base = fileBaseName(name)
+  const dm = currentDefaultModels.value
+  const dmTarget = slot === 'clip2' ? dm.clip2 : dm.clip
+  if (dmTarget && base === dmTarget) return true
+  if (COMPONENT_FILENAMES.has(base)) return true
+  return RECOMMENDED_CLIP_PATTERN.test(base)
+}
+
+function isRecommendedVae(name: string): boolean {
+  const base = fileBaseName(name)
+  if (currentDefaultModels.value.vae && base === currentDefaultModels.value.vae) return true
+  if (COMPONENT_FILENAMES.has(base)) return true
+  return RECOMMENDED_VAE_PATTERN.test(base)
+}
+
+interface ClipOption { value: string; label: string }
+
+function buildClipLabel(name: string, recommended: boolean): string {
+  const base = basenameNoExt(name)
+  return recommended ? `★ ${base}` : base
+}
+
+const allClipOptions = computed<ClipOption[]>(() => {
+  const recFlags = options.clips.value.map(c => isRecommendedClip(c.name, 'clip'))
+  return options.clips.value.map((c, i) => ({
+    value: c.name,
+    label: buildClipLabel(c.name, recFlags[i]),
+  }))
+})
+const allVaeOptions = computed<ClipOption[]>(() => {
+  const recFlags = options.vaes.value.map(v => isRecommendedVae(v.name))
+  return options.vaes.value.map((v, i) => ({
+    value: v.name,
+    label: buildClipLabel(v.name, recFlags[i]),
+  }))
+})
+
+const recommendedClipOptions = computed<ClipOption[]>(() => {
+  const recs = options.clips.value
+    .filter(c => isRecommendedClip(c.name, 'clip'))
+    .map(c => ({ value: c.name, label: buildClipLabel(c.name, true) }))
+  return recs.length ? recs : allClipOptions.value
+})
+const recommendedVaeOptions = computed<ClipOption[]>(() => {
+  const recs = options.vaes.value
+    .filter(v => isRecommendedVae(v.name))
+    .map(v => ({ value: v.name, label: buildClipLabel(v.name, true) }))
+  return recs.length ? recs : allVaeOptions.value
+})
+
+const showAllClips = ref(false)
+const showAllVaes = ref(false)
+
+const clipOptions = computed<ClipOption[]>(() =>
+  showAllClips.value ? allClipOptions.value : recommendedClipOptions.value,
+)
+const vaeOptions = computed<ClipOption[]>(() =>
+  showAllVaes.value ? allVaeOptions.value : recommendedVaeOptions.value,
+)
+
+const hasOtherClips = computed(() => recommendedClipOptions.value.length < allClipOptions.value.length)
+const hasOtherVaes = computed(() => recommendedVaeOptions.value.length < allVaeOptions.value.length)
 
 /* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
 // B1: 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + options.vaes 列表
@@ -72,7 +149,10 @@ const vaeOverrideOptions = computed(() => [
       <!-- Row 0 (Anima only): CLIP + VAE split-file selectors -->
       <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip }">
         <div class="field-group">
-          <label class="field-lbl">{{ t('generate.basic.clip') }}</label>
+          <label class="field-lbl">
+            {{ t('generate.basic.clip') }}
+            <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+          </label>
           <BaseSelect
             :model-value="state.clip"
             :options="clipOptions"
@@ -80,9 +160,21 @@ const vaeOverrideOptions = computed(() => [
             :placeholder="t('generate.basic.select_clip')"
             @update:model-value="state.clip = String($event)"
           />
+          <button
+            v-if="hasOtherClips"
+            type="button"
+            class="adv-toggle"
+            @click="showAllClips = !showAllClips"
+          >
+            <MsIcon :name="showAllClips ? 'unfold_less' : 'unfold_more'" size="sm" color="var(--ac)" />
+            {{ showAllClips ? t('generate.advanced.clip_filter_recommended_only') : t('generate.advanced.clip_filter_show_all') }}
+          </button>
         </div>
         <div v-if="dualClip" class="field-group">
-          <label class="field-lbl">{{ t('generate.basic.clip2') }}</label>
+          <label class="field-lbl">
+            {{ t('generate.basic.clip2') }}
+            <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+          </label>
           <BaseSelect
             :model-value="state.clip2"
             :options="clipOptions"
@@ -90,9 +182,21 @@ const vaeOverrideOptions = computed(() => [
             :placeholder="t('generate.basic.select_clip')"
             @update:model-value="state.clip2 = String($event)"
           />
+          <button
+            v-if="hasOtherClips"
+            type="button"
+            class="adv-toggle"
+            @click="showAllClips = !showAllClips"
+          >
+            <MsIcon :name="showAllClips ? 'unfold_less' : 'unfold_more'" size="sm" color="var(--ac)" />
+            {{ showAllClips ? t('generate.advanced.clip_filter_recommended_only') : t('generate.advanced.clip_filter_show_all') }}
+          </button>
         </div>
         <div class="field-group">
-          <label class="field-lbl">{{ t('generate.basic.vae') }}</label>
+          <label class="field-lbl">
+            {{ t('generate.basic.vae') }}
+            <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+          </label>
           <BaseSelect
             :model-value="state.vae"
             :options="vaeOptions"
@@ -100,6 +204,15 @@ const vaeOverrideOptions = computed(() => [
             :placeholder="t('generate.basic.select_vae')"
             @update:model-value="state.vae = String($event)"
           />
+          <button
+            v-if="hasOtherVaes"
+            type="button"
+            class="adv-toggle"
+            @click="showAllVaes = !showAllVaes"
+          >
+            <MsIcon :name="showAllVaes ? 'unfold_less' : 'unfold_more'" size="sm" color="var(--ac)" />
+            {{ showAllVaes ? t('generate.advanced.clip_filter_recommended_only') : t('generate.advanced.clip_filter_show_all') }}
+          </button>
         </div>
       </div>
 
@@ -321,6 +434,22 @@ const vaeOverrideOptions = computed(() => [
   font-weight: 500;
   color: var(--t2);
 }
+
+.adv-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: .7rem;
+  font-weight: 500;
+  color: var(--ac);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.adv-toggle:hover { text-decoration: underline; }
 
 /* ── Seed mode badge ── */
 .seed-mode-badge {

@@ -7,7 +7,10 @@
     "anima_title": "Anima 需下载专用文本编码器与 VAE",
     "krea2_title": "Krea 2 需下载专用文本编码器与 VAE",
     "zimage_title": "Z-Image 需下载专用文本编码器与 VAE",
-    "flux1_title": "Flux 1 需下载双文本编码器与 VAE"
+    "flux1_title": "Flux 1 需下载双文本编码器与 VAE",
+    "chroma_title": "Chroma 需下载文本编码器与 VAE",
+    "flux2klein_title": "Flux 2 Klein 需要文本编码器 + VAE",
+    "flux2dev_title": "Flux 2 Dev 需要文本编码器 + VAE"
   },
   "header": {
     "queue_history": "队列 / 历史",
@@ -26,6 +29,9 @@
     "krea2": "Krea 2",
     "zimage": "Z-Image",
     "flux1": "Flux 1",
+    "chroma": "Chroma",
+    "flux2klein": "Flux 2 Klein",
+    "flux2dev": "Flux 2 Dev",
     "pony": "Pony",
     "illustrious": "Illustrious",
     "noobai": "NoobAI",
@@ -108,6 +114,8 @@
     "cfg_scale": "CFG Scale",
     "select_checkpoint": "选择 Checkpoint",
     "search_checkpoint": "搜索 Checkpoint...",
+    "select_model": "选择主模型",
+    "search_model": "搜索模型...",
     "unet": "UNet 主权重",
     "clip": "CLIP 文本编码器",
     "clip2": "文本编码器 2 (T5)",
@@ -146,7 +154,10 @@
     "clip_skip_help": "在倒数第 N 层截断 CLIP 编码。Pony 与 Illustrious 需设为 2 才能正确出图；SDXL 基础模型用 1",
     "vae_override": "VAE",
     "vae_override_follow": "跟随 Checkpoint",
-    "vae_override_help": "用外置 VAE 文件覆盖 Checkpoint 内置 VAE。部分动漫 Checkpoint (如 Pony) 建议接外置 sdxl_vae 以获得更准确的色彩"
+    "vae_override_help": "用外置 VAE 文件覆盖 Checkpoint 内置 VAE。部分动漫 Checkpoint (如 Pony) 建议接外置 sdxl_vae 以获得更准确的色彩",
+    "clip_filter_help": "推荐项已置顶 (★)。非官方编码器可选可用, 但选错类型会导致废图",
+    "clip_filter_show_all": "展开全部",
+    "clip_filter_recommended_only": "只看推荐"
   },
   "preview": {
     "empty": "生成后图片将显示在这里",
@@ -445,10 +456,19 @@
   "picker": {
     "arch_all": "全部架构",
     "arch_unknown": "未知",
+    "packaging_checkpoint": "整合包",
+    "packaging_split": "拆分",
+    "components_missing": "缺少运行组件，点击补齐",
     "arch_mismatch_title": "架构不匹配",
     "arch_mismatch_desc": "该模型架构为 {model_arch}，当前标签页为 {tab_arch}，提交工作流将无法运行。确定选择？",
     "arch_unknown_desc": "无法识别该模型的架构，若与当前标签页不兼容，工作流将运行失败。确定选择？",
-    "subarch_mismatch_desc": "该模型为 {model_arch} 生态，当前标签页为 {tab_arch}，生态约定不同可能效果不佳。确定选择？"
+    "subarch_mismatch_desc": "该模型为 {model_arch} 生态，当前标签页为 {tab_arch}，生态约定不同可能效果不佳。确定选择？",
+    "empty_title": "还没有 {arch} 主模型",
+    "empty_desc": "前往下载页添加模型",
+    "go_to_downloads": "前往下载页",
+    "component_required": "选中模型需要以下组件",
+    "component_ready": "组件已就绪，点击确认使用",
+    "back_to_list": "返回列表"
   },
   "placeholders": {
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",

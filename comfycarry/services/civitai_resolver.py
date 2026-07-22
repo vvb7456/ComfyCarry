@@ -57,13 +57,21 @@ _TYPE_TO_DIR_KEY = {
 _MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
 # 分离架构 (split-file): UNet 主权重 应进 diffusion_models 而非 checkpoints。
-# CivitAI 统一将主权重文件标为 "Checkpoint"，需按 baseModel 字段识别重定向。
-# "flux" 关键词同时覆盖 Flux.2 (flux2 搁置但文件仍需落到 diffusion_models);
-# zimage 三种写法 (z-image / z image / zimage) 全部加入。
-_SPLIT_FILE_BASE_KEYWORDS = ("anima", "flux", "sd 3", "sd3", "hidream", "wan", "hunyuan", "lumina", "pixart", "krea", "z-image", "z image", "zimage")
+# §4.2 废弃盲重定向: CivitAI 整合包与 UNet 都标 "Checkpoint"、baseModel 相同,
+# 下载前无法区分 → 一律先落 checkpoints/, 下载完成后读文件头判 detect_packaging
+# 再归位 (保留 baseModel 子文件夹逻辑)。
+# _SPLIT_FILE_BASE_KEYWORDS 仅用于 §4.2 完成钩子做"是否需要重新归位"的早期短路径:
+# baseModel 不含任何分离架构关键词的 Checkpoint 不必读头, 直接保留在 checkpoints/。
+_SPLIT_FILE_BASE_KEYWORDS = ("anima", "flux", "sd 3", "sd3", "hidream", "wan", "hunyuan", "lumina", "pixart", "krea", "z-image", "z image", "zimage", "chroma")
 
 
 def _is_split_file_base_model(base_model: str) -> bool:
+    """baseModel 是否含分离架构关键词 (用于完成钩子早期短路径)。
+
+    §4.2: 不再用此函数做下载前盲重定向 — 整合包与 UNet baseModel 相同无法区分。
+    仅在下载完成后, baseModel 不含任何分离架构关键词的 Checkpoint 不必读头,
+    直接保留在 checkpoints/。
+    """
     if not base_model:
         return False
     bm = base_model.lower()
@@ -261,10 +269,11 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
     type_lower = model_type.lower()
     save_dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
 
-    # 分离架构重定向：Checkpoint + (Anima/Flux/SD3/...) → diffusion_models
-    base_model_str = version_data.get("baseModel", "") or ""
-    if type_lower == "checkpoint" and _is_split_file_base_model(base_model_str):
-        save_dir_key = "diffusion_models"
+    # §4.2 废弃盲重定向: 不再按 baseModel 把 Checkpoint 一律送 diffusion_models。
+    # CivitAI 整合包与 UNet 主权重 baseModel 相同、type 都是 "Checkpoint",
+    # 下载前无法区分。改为一律先落 checkpoints/, 下载完成后由完成钩子读文件头
+    # 判 detect_packaging 再归位 (见 downloads.py:_on_civitai_complete)。
+    # baseModel 子文件夹逻辑由 resolve_save_dir() 处理。
 
     # Early Access / 付费检测
     availability = version_data.get("availability", "Public")
@@ -406,6 +415,10 @@ def resolve_save_dir(model_type: str, base_model: str = "") -> str:
     """
     CivitAI 模型类型 + base_model → 本地绝对路径.
 
+    §4.2: 不再按 baseModel 把 Checkpoint 盲重定向到 diffusion_models —
+    下载前无法区分整合包 vs UNet。改为永远按 CivitAI type 落 checkpoints/,
+    真正的目录在下载完成后由 _on_civitai_complete 读文件头判 detect_packaging 修正。
+
     Args:
         model_type: CivitAI 类型字符串 (如 "Checkpoint", "LORA")
         base_model: CivitAI baseModel 字符串 (如 "SDXL 1.0", "Pony")
@@ -416,9 +429,10 @@ def resolve_save_dir(model_type: str, base_model: str = "") -> str:
     type_lower = model_type.lower()
     dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
 
-    # 分离架构重定向：Checkpoint + split-file baseModel → diffusion_models
-    if type_lower == "checkpoint" and _is_split_file_base_model(base_model):
-        dir_key = "diffusion_models"
+    # §4.2: 盲重定向已废弃 — 完成钩子按内容归位 (见 downloads.py)
+    # 仅 baseModel 为分离架构关键词的 Checkpoint 才需后续归位判定,
+    # 其余 (SDXL/Pony/SD1.5 整合包) 直接保留 checkpoints/。
+    # 下载初始目录统一用 _TYPE_TO_DIR_KEY (Checkpoint → checkpoints/)。
 
     rel_dir = MODEL_DIRS.get(dir_key, f"models/{dir_key}")
 
@@ -439,6 +453,128 @@ def _sanitize_folder_name(name: str) -> str:
     if '..' in clean:
         clean = clean.replace('..', '_')
     return clean or ""
+
+
+# ── 下载归位 (§4.2) ─────────────────────────────────────────────────────────
+# 下载完成后按文件头判 detect_packaging, 把整合包/UNet 主权重落对目录。
+#   - 整合包 (含 TE+VAE key) → checkpoints/
+#   - 拆分 (UNet-only) → diffusion_models/
+# 非 safetensors / 读头失败 → 保持原位 + warn (用户可手动处理)。
+# baseModel 子文件夹跟随 (保持与 resolve_save_dir 的初始落盘一致)。
+#
+# 关键: ComfyUI 加载节点目录绑定 — CheckpointLoaderSimple 只读 checkpoints/,
+#       UNETLoader 只读 diffusion_models/。文件必须物理落对目录。
+
+def relocate_after_download(model_path: str, base_model: str) -> tuple[str, str]:
+    """下载完成后按内容归位。
+
+    Args:
+        model_path: 下载完成的文件绝对路径
+        base_model: CivitAI baseModel 字符串 (用于子文件夹定位)
+
+    Returns:
+        (new_path, action): action ∈ {'kept', 'moved_ckpt', 'moved_split', 'skip_unreadable'}。
+        new_path 为归位后的最终绝对路径 (可能与入参相同)。
+    """
+    abs_path = Path(model_path).resolve()
+    if not abs_path.is_file():
+        return str(abs_path), 'skip_unreadable'
+
+    # 短路径 1: 非 safetensors (gguf/.ckpt 等) → 默认 split, 但 gguf 在本计划不主动归位
+    # (Phase 5 dev 硬件约束: UNetLoaderGGUF 为后续独立扩展)。
+    if not abs_path.name.lower().endswith('.safetensors'):
+        # GGUF 实践中恒 UNet-only → 应落 diffusion_models/, 但 GGUF 加载节点路径独立,
+        # 当前不做物理移动 (UnetLoaderGGUF 读 models/unet/ 旧路径, 不在此处处理)。
+        return str(abs_path), 'skip_unreadable'
+
+    # 读头判形态
+    from .arch_detect import detect_packaging_from_file
+    pkg = detect_packaging_from_file(str(abs_path))
+
+    # 当前所在目录 key
+    try:
+        rel = abs_path.relative_to(COMFYUI_DIR)
+    except ValueError:
+        return str(abs_path), 'skip_unreadable'
+
+    parts = rel.parts  # ('models', 'checkpoints', '<baseModel sub>', filename) 等
+    if len(parts) < 2 or parts[0] != 'models':
+        return str(abs_path), 'skip_unreadable'
+
+    current_dir_key = parts[1]
+    want_key = 'checkpoints' if pkg == 'checkpoint' else 'diffusion_models'
+
+    if current_dir_key == want_key:
+        return str(abs_path), 'kept'
+
+    # 需要移动: 构建目标目录 (保留 baseModel 子文件夹)
+    rel_dir = MODEL_DIRS.get(want_key, f'models/{want_key}')
+    sub = _sanitize_folder_name(base_model.strip()) if base_model and base_model.strip() else ''
+    if sub:
+        target_dir = os.path.join(COMFYUI_DIR, rel_dir, sub)
+    else:
+        target_dir = os.path.join(COMFYUI_DIR, rel_dir)
+    os.makedirs(target_dir, exist_ok=True)
+    new_path = os.path.join(target_dir, abs_path.name)
+
+    # 同名冲突: 若目标已存在且大小一致, 视为已归位 (移除源副本); 否则覆盖目标。
+    try:
+        if os.path.exists(new_path):
+            try:
+                if os.path.getsize(new_path) == os.path.getsize(abs_path):
+                    os.remove(str(abs_path))
+                    logger.info(f"[civitai_resolver] 归位: 目标已存在同尺寸, 移除源副本 {abs_path.name}")
+                    return new_path, 'moved_ckpt' if pkg == 'checkpoint' else 'moved_split'
+            except OSError:
+                pass
+            os.replace(new_path, new_path + '.bak')  # 备份冲突文件
+        os.rename(str(abs_path), new_path)
+    except OSError as e:
+        logger.warning(f"[civitai_resolver] 归位失败 {abs_path} → {new_path}: {e}")
+        return str(abs_path), 'skip_unreadable'
+
+    action = 'moved_ckpt' if pkg == 'checkpoint' else 'moved_split'
+    logger.info(f"[civitai_resolver] 归位: {abs_path.name} {current_dir_key} → {want_key} ({action})")
+    return new_path, action
+
+
+def update_sidecar_path(old_path: str, new_path: str) -> None:
+    """更新 .weilin-info.json sidecar 的 path 字段 (归位后路径变化)。
+
+    sidecar 与预览图都在原位 — 归位后把它们一并迁到新目录。
+    """
+    old_info = f"{old_path}.weilin-info.json"
+    new_info = f"{new_path}.weilin-info.json"
+    try:
+        if os.path.exists(old_info):
+            with open(old_info, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            # 更新 path / file 字段
+            if 'path' in data:
+                data['path'] = new_path
+            if 'file' in data:
+                # file 字段是相对路径, 不变 (除非跨 models 根, 这里只在 checkpoints↔diffusion_models 间)
+                pass
+            with open(new_info, 'w', encoding='utf-8') as f:
+                json.dump(data, f, sort_keys=False, indent=2, ensure_ascii=False)
+            if old_info != new_info:
+                os.remove(old_info)
+    except Exception as e:
+        logger.warning(f"[civitai_resolver] sidecar 路径更新失败: {e}")
+
+    # 预览图 (.png/.jpg/.jpeg/.webp) 一并迁移
+    old_base = old_path
+    for pext in ('.png', '.jpg', '.jpeg', '.webp'):
+        op = old_base + pext
+        np_ = new_path + pext
+        if os.path.exists(op):
+            try:
+                if os.path.exists(np_) and op != np_:
+                    os.remove(np_)
+                if op != np_:
+                    os.rename(op, np_)
+            except OSError:
+                pass
 
 
 # ── 文件元数据提取 ────────────────────────────────────────────────────────────

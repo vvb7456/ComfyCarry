@@ -24,7 +24,7 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
-from ..services.arch_detect import detect_arch
+from ..services.arch_detect import detect_arch, detect_packaging_from_file
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
 from ..services.workflow_builder import (
@@ -33,6 +33,8 @@ from ..services.workflow_builder import (
     build_krea2_workflow,
     build_zimage_workflow,
     build_flux1_workflow,
+    build_chroma_workflow,
+    build_flux2_workflow,
     build_preprocess_workflow,
     build_tag_workflow,
 )
@@ -47,8 +49,10 @@ bp = Blueprint("generate", __name__)
 # 未变且 rules_version 与当前一致则直接用缓存值, 否则 detect 后写缓存, 使重扫接近零成本。
 # rules_version 机制: 检测规则表升级 (如新增 flux2/zimage 规则、修 flux1 LoRA 误判) 后,
 # 旧缓存条目的 rules_version 不匹配 → 视为未命中, 强制重判, 防止 mtime 缓存钉死旧误判。
-_rules_VERSION = 3
-_arch_scan_cache: dict[str, tuple[float, int, int, str]] = {}
+# v4: flux1 主模型改 _has_sub (修复整合包 double_blocks. 前缀漏匹配) + 新增 detect_packaging。
+_rules_VERSION = 4
+_arch_scan_cache: dict[str, tuple[float, int, int, str, str]] = {}
+# cache value: (mtime, size, rules_version, arch, packaging)
 
 
 # ── 懒加载缓存: Generate 页面所需的全部选项 ─────────────────────────────────
@@ -174,13 +178,15 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     return result
 
 
-def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
+def _scan_model_attrs(names: list[str], rel_dir: str) -> tuple[dict[str, str], dict[str, str]]:
     """
-    批量检测模型架构，返回 {name: arch}。
+    批量检测模型架构 + 打包形态, 返回 ({name: arch}, {name: packaging})。
+    同一次文件读头复用 (arch + packaging 共享 header 解析成本)。
     基于 (mtime, size, rules_version) 的 memo 缓存:
     文件未改动且 rules_version 一致时直接复用缓存结果 (规则升级后强制重判)。
     """
-    result = {}
+    archs: dict[str, str] = {}
+    packagings: dict[str, str] = {}
     base_dir = os.path.join(COMFYUI_DIR, rel_dir)
     real_base = os.path.realpath(base_dir)
     for name in names:
@@ -188,23 +194,31 @@ def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
         real_path = os.path.realpath(filepath)
         if not real_path.startswith(real_base + os.sep):
             continue  # 跳过路径遍历
-        # stat 命中检查 (失败按现状跳过 — 不写入缓存)
         try:
             st = os.stat(filepath)
         except OSError:
-            result[name] = detect_arch(filepath, name)
+            arch = detect_arch(filepath, name)
+            pkg = detect_packaging_from_file(filepath)
+            archs[name] = arch
+            packagings[name] = pkg
             continue
         cached = _arch_scan_cache.get(filepath)
-        # 命中条件: mtime/size 未变 且 rules_version 与当前一致
         if (cached and cached[0] == st.st_mtime and cached[1] == st.st_size
                 and cached[2] == _rules_VERSION):
-            result[name] = cached[3]
+            archs[name] = cached[3]
+            packagings[name] = cached[4]
             continue
-        # 未命中 / 已变动 / 规则升级 → detect 后写缓存
         arch = detect_arch(filepath, name)
-        _arch_scan_cache[filepath] = (st.st_mtime, st.st_size, _rules_VERSION, arch)
-        result[name] = arch
-    return result
+        pkg = detect_packaging_from_file(filepath)
+        _arch_scan_cache[filepath] = (st.st_mtime, st.st_size, _rules_VERSION, arch, pkg)
+        archs[name] = arch
+        packagings[name] = pkg
+    return archs, packagings
+
+
+def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
+    """向后兼容包装: 仅返回 arch 字典 (旧调用方)。"""
+    return _scan_model_attrs(names, rel_dir)[0]
 
 
 def _fetch_generate_options() -> dict:
@@ -242,6 +256,7 @@ def _fetch_generate_options() -> dict:
                "checkpoint_archs": {}, "lora_archs": {},
                "unet_previews": {}, "clip_previews": {}, "vae_previews": {},
                "unet_archs": {}, "unet_info": {},
+               "checkpoint_packagings": {}, "unet_packagings": {},
                "comfyui_dir": COMFYUI_DIR, "controlnet_models": {},
                "seedvr2_models": []}
 
@@ -305,8 +320,11 @@ def _fetch_generate_options() -> dict:
     # Checkpoint: 仅读元数据 (无 trigger words)
     _, ckpt_info = _scan_lora_metadata(ckpt_list, "models/checkpoints")
     result["checkpoint_info"] = ckpt_info
-    result["checkpoint_archs"] = _scan_model_archs(ckpt_list, "models/checkpoints")
-    result["lora_archs"] = _scan_model_archs(lora_list, "models/loras")
+    # Checkpoint / LoRA 架构 + 打包形态 (一次读头, 双结果)
+    ckpt_archs, ckpt_pkgs = _scan_model_attrs(ckpt_list, "models/checkpoints")
+    result["checkpoint_archs"] = ckpt_archs
+    result["checkpoint_packagings"] = ckpt_pkgs
+    result["lora_archs"] = _scan_model_attrs(lora_list, "models/loras")[0]
     result["comfyui_dir"] = COMFYUI_DIR
 
     # ── 分离式架构: UNet / CLIP / VAE 预览图 + UNet 架构检测 ────────────
@@ -316,7 +334,9 @@ def _fetch_generate_options() -> dict:
     result["unet_previews"] = _scan_model_previews(unet_list, "models/diffusion_models")
     result["clip_previews"] = _scan_model_previews(clip_list, "models/text_encoders")
     result["vae_previews"] = _scan_model_previews(vae_list, "models/vae")
-    result["unet_archs"] = _scan_model_archs(unet_list, "models/diffusion_models")
+    unet_archs, unet_pkgs = _scan_model_attrs(unet_list, "models/diffusion_models")
+    result["unet_archs"] = unet_archs
+    result["unet_packagings"] = unet_pkgs
     # UNet: 读元数据 (baseModel 等)，供分离式架构选择器展示；无 trigger words
     _, unet_info = _scan_lora_metadata(unet_list, "models/diffusion_models")
     result["unet_info"] = unet_info
@@ -615,12 +635,13 @@ _BUILDERS = {
     "krea2": build_krea2_workflow,    # 分离式架构: UNet + 单 CLIP + VAE
     "zimage": build_zimage_workflow,  # 分离式架构: UNet + 单 CLIP (lumina2) + VAE + ModelSamplingAuraFlow
     "flux1": build_flux1_workflow,    # 分离式架构: UNet + 双 CLIP (flux) + VAE
-    # "flux2": build_flux2_workflow,   ← Owner 决策搁置 (采样拓扑不同, 独立 builder)
+    "chroma": build_chroma_workflow,  # 分离式架构: UNet + 单 CLIP (chroma) + VAE
+    "flux2": build_flux2_workflow,    # Flux2 (klein/dev) 独立采样 builder (SamplerCustomAdvanced + Flux2Scheduler)
 }
 
 # 分离式三件套架构集合 (UNet + Text Encoder + VAE), 校验逻辑共用
-# 注: flux2 搁置, 不在此集合 (build_flux2_workflow 未实现)
-_SPLIT_ARCHS = ("anima", "krea2", "zimage", "flux1")
+# flux2 走独立 builder 但校验规则与 split 架构同 (unet/clip/vae 三字段)
+_SPLIT_ARCHS = ("anima", "krea2", "zimage", "flux1", "chroma", "flux2")
 
 # 需要 dual CLIP (clip + clip2) 的架构集合 — 在 _SPLIT_ARCHS 分支内额外校验 clip2
 _DUAL_CLIP_ARCHS = ("flux1",)
@@ -705,37 +726,82 @@ def api_generate_submit():
         else:
             data["vae"] = ""
     elif model_type in _SPLIT_ARCHS:
-        unet = data.get("unet", "").strip()
-        clip = data.get("clip", "").strip()
-        vae = data.get("vae", "").strip()
-        if not unet or not clip or not vae:
-            return jsonify({
-                "error": f"{model_type} 需选择 UNet / Text Encoder / VAE 三个模型文件"
-            }), 400
-        for key, fname, listkey, label in (
-            ("unet", unet, "unets", "UNet"),
-            ("clip", clip, "clips", "Text Encoder"),
-            ("vae", vae, "vaes", "VAE"),
-        ):
-            file_list = opts.get(listkey, [])
-            if file_list and fname not in file_list:
+        # §5.2 packaging 校验分流: checkpoint → 校验 checkpoint 字段; split → 校验 unet/clip[/clip2]/vae
+        packaging = str(data.get("packaging", "split"))
+        if packaging not in ("checkpoint", "split"):
+            packaging = "split"
+        data["packaging"] = packaging
+
+        if packaging == "checkpoint":
+            checkpoint = data.get("checkpoint", "").strip()
+            if not checkpoint:
                 return jsonify({
-                    "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
+                    "error": f"{model_type} (整合包) 需选择 Checkpoint 模型文件"
                 }), 400
-            data[key] = fname
-        # flux1 等双 CLIP 架构: 额外校验 clip2 (第二 Text Encoder, 如 T5)
-        if model_type in _DUAL_CLIP_ARCHS:
-            clip2 = data.get("clip2", "").strip()
-            if not clip2:
+            ckpt_list = opts.get("checkpoints", [])
+            # 整合包可能落在 diffusion_models/ (旧下载归位 bug) 也可能在 checkpoints/
+            unet_list = opts.get("unets", [])
+            if ckpt_list and checkpoint not in ckpt_list and unet_list and checkpoint not in unet_list:
                 return jsonify({
-                    "error": "flux1 需选择两个 Text Encoder (CLIP-L + T5)"
+                    "error": f"模型文件未找到: {checkpoint}，请前往模型管理页确认"
                 }), 400
-            clip_list = opts.get("clips", [])
-            if clip_list and clip2 not in clip_list:
+            data["checkpoint"] = checkpoint
+            # 整合包模式: clip_skip (仅 sdxl profile 系, DiT 忽略) + vae 覆盖 (可选)
+            try:
+                clip_skip = int(data.get("clip_skip", 1) or 1)
+            except (TypeError, ValueError):
+                clip_skip = 1
+            data["clip_skip"] = max(1, min(clip_skip, 4))
+            vae_override = str(data.get("vae", "") or "").strip()
+            if vae_override:
+                vae_list = opts.get("vaes", [])
+                if vae_list and vae_override not in vae_list:
+                    return jsonify({
+                        "error": f"VAE 文件未找到: {vae_override}，请前往模型管理页确认"
+                    }), 400
+                data["vae"] = vae_override
+            else:
+                data["vae"] = ""
+        else:
+            unet = data.get("unet", "").strip()
+            clip = data.get("clip", "").strip()
+            vae = data.get("vae", "").strip()
+            if not unet or not clip or not vae:
                 return jsonify({
-                    "error": f"Text Encoder 文件未找到: {clip2}，请前往模型管理页确认"
+                    "error": f"{model_type} 需选择 UNet / Text Encoder / VAE 三个模型文件"
                 }), 400
-            data["clip2"] = clip2
+            for key, fname, listkey, label in (
+                ("unet", unet, "unets", "UNet"),
+                ("clip", clip, "clips", "Text Encoder"),
+                ("vae", vae, "vaes", "VAE"),
+            ):
+                file_list = opts.get(listkey, [])
+                if file_list and fname not in file_list:
+                    return jsonify({
+                        "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
+                    }), 400
+                data[key] = fname
+            # flux1 等双 CLIP 架构: 额外校验 clip2 (第二 Text Encoder, 如 T5)
+            if model_type in _DUAL_CLIP_ARCHS:
+                clip2 = data.get("clip2", "").strip()
+                if not clip2:
+                    return jsonify({
+                        "error": "flux1 需选择两个 Text Encoder (CLIP-L + T5)"
+                    }), 400
+                clip_list = opts.get("clips", [])
+                if clip_list and clip2 not in clip_list:
+                    return jsonify({
+                        "error": f"Text Encoder 文件未找到: {clip2}，请前往模型管理页确认"
+                    }), 400
+                data["clip2"] = clip2
+
+    # ── Flux2 guider_mode 归一化 ──────────────────────────────────────────
+    # basic (dev, 无负面) / cfg (klein, 有负面); 缺省 cfg
+    if model_type == "flux2":
+        guider_mode = str(data.get("guider_mode", "cfg"))
+        if guider_mode not in ("basic", "cfg"):
+            guider_mode = "cfg"
+        data["guider_mode"] = guider_mode
 
     # ── LoRA 文件存在性校验 (支持数组格式) ─────────────────────────────────
     loras = data.get("loras") or []

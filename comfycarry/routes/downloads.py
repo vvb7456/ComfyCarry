@@ -537,6 +537,21 @@ def api_downloads_civitai():
 
     def _on_civitai_complete(task):
         model_path = os.path.join(task.save_dir, task.filename)
+        # §4.2 下载归位: 读文件头判 detect_packaging → 整合包/UNet 落对目录
+        # (CivitAI Checkpoint type 一律先落 checkpoints/, 完成后按内容修正)
+        try:
+            from ..services.civitai_resolver import (
+                relocate_after_download, update_sidecar_path,
+                save_model_metadata, download_preview_image,
+            )
+            base_model = (task.meta or {}).get("base_model", "") or ""
+            new_path, action = relocate_after_download(model_path, base_model)
+            if action in ('moved_ckpt', 'moved_split'):
+                update_sidecar_path(model_path, new_path)
+                model_path = new_path
+        except Exception as e:
+            logger.warning(f"CivitAI 下载归位失败: {e}")
+
         try:
             save_model_metadata(model_path, info)
             download_preview_image(model_path, info.get("images", []))

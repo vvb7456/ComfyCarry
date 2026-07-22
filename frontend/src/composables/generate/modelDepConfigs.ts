@@ -441,12 +441,79 @@ export const FLUX1_MODEL_CONFIG: ModelDepConfig = {
   models: [FLUX1_TE_MODELS.clip_l, FLUX1_TE_MODELS.t5xxl_fp8, AE_VAE_DEP],
 }
 
+export const CHROMA_MODEL_CONFIG: ModelDepConfig = {
+  tab: 'chroma',
+  title: 'generate.gate.chroma_title',
+  models: [FLUX1_TE_MODELS.t5xxl_fp8, AE_VAE_DEP],
+}
+
+// ── Flux2 Model Definitions ──────────────────────────────────────────────────
+// Flux2 公共 VAE: flux2-vae (0.34GB), 与 flux1 的 ae.safetensors 不同。
+// klein TE = Qwen3-4B (qwen_3_4b.safetensors, type=flux2; 可能与 Z-Image 同名文件复用);
+// dev TE  = Mistral-3-Small FP8 (mistral_3_small_flux2_fp8.safetensors, 18GB)。
+// 主模型 (UNet) 由用户自行下载, Gate 不含 UNet 条目。
+// HF URL 已核验 (Comfy-Org/flux2-dev · split_files/; HEAD 200)。
+
+const FLUX2_VAE_DEP: ModelDep = {
+  id: 'flux2_vae',
+  name: 'Flux2 VAE',
+  description: 'Flux2 公共 VAE',
+  size: '~0.34 GB',
+  required: true,
+  files: [{
+    filename: 'flux2-vae.safetensors',
+    url: 'https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors?download=true',
+    subdir: 'models/vae',
+  }],
+}
+
+const FLUX2_KLEIN_TE_DEP: ModelDep = {
+  id: 'qwen3_4b_flux2',
+  name: 'Qwen3-4B (Klein TE)',
+  description: 'Flux2 Klein 文本编码器 (与 Z-Image 同名文件, type=flux2)',
+  size: '~7.5 GB',
+  required: true,
+  files: [{
+    filename: 'qwen_3_4b.safetensors',
+    url: 'https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors?download=true',
+    subdir: 'models/text_encoders',
+  }],
+}
+
+const FLUX2_DEV_TE_DEP: ModelDep = {
+  id: 'mistral_3_small_flux2_fp8',
+  name: 'Mistral-3-Small (Dev TE)',
+  description: 'Flux2 Dev 文本编码器 (FP8)',
+  size: '~18 GB',
+  required: true,
+  files: [{
+    filename: 'mistral_3_small_flux2_fp8.safetensors',
+    url: 'https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors?download=true',
+    subdir: 'models/text_encoders',
+  }],
+}
+
+export const FLUX2_KLEIN_MODEL_CONFIG: ModelDepConfig = {
+  tab: 'flux2klein',
+  title: 'generate.gate.flux2klein_title',
+  models: [FLUX2_KLEIN_TE_DEP, FLUX2_VAE_DEP],
+}
+
+export const FLUX2_DEV_MODEL_CONFIG: ModelDepConfig = {
+  tab: 'flux2dev',
+  title: 'generate.gate.flux2dev_title',
+  models: [FLUX2_DEV_TE_DEP, FLUX2_VAE_DEP],
+}
+
 /** tab key → tab 级依赖 Gate 配置; 无 Gate 的架构 (sdxl) 不在表内 */
 export const TAB_DEP_CONFIGS: Record<string, ModelDepConfig> = {
   anima: ANIMA_MODEL_CONFIG,
   krea2: KREA2_MODEL_CONFIG,
   zimage: ZIMAGE_MODEL_CONFIG,
   flux1: FLUX1_MODEL_CONFIG,
+  chroma: CHROMA_MODEL_CONFIG,
+  flux2klein: FLUX2_KLEIN_MODEL_CONFIG,
+  flux2dev: FLUX2_DEV_MODEL_CONFIG,
 }
 
 /**

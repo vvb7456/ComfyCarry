@@ -5,7 +5,7 @@ import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
-import { useModelDependency } from '@/composables/generate/useModelDependency'
+import { useModelDependency, type UseModelDependencyReturn } from '@/composables/generate/useModelDependency'
 import { MODEL_TYPES } from '@/config/model-types'
 import { TAB_DEP_CONFIGS, UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
@@ -61,6 +61,35 @@ const options = inject(GenerateOptionsKey)!
 const config = computed(() => MODEL_TYPES[props.modelType]!)
 const isSplit = computed(() => config.value.loader === 'split')
 const modelField = computed<'checkpoint' | 'unet'>(() => isSplit.value ? 'unet' : 'checkpoint')
+
+// §5.1 包装形态: 该 tab 支持的形态列表 (supportedPackaging) + 当前选中项的实际形态
+const supportedPackaging = computed(() => config.value.supportedPackaging)
+const hasDualPackaging = computed(() => supportedPackaging.value.length > 1)
+
+// 合并 picker items: 两形态并存时把 checkpoints + unets 合并, 每项带 packaging 字段
+// (单形态时退化为只取对应列表, items 已自带 packaging 字段)
+const mergedPickerItems = computed(() => {
+  if (!hasDualPackaging.value) {
+    return isSplit.value ? options.unets.value : options.checkpoints.value
+  }
+  // 两形态并存: 合并 (checkpoints 在前, unets 在后, 每项 packaging 字段已标注)
+  // 注: useGenerateOptions 已为 checkpoints 标 packaging='checkpoint', unets 标 packaging='split'
+  return [...options.checkpoints.value, ...options.unets.value]
+})
+
+// 当前选中模型的包装形态 (用于驱动 AdvancedSettings 的 split/clip-skip-vae 显示 + submit payload)
+const selectedPackaging = computed<'checkpoint' | 'split'>(() => {
+  if (!hasDualPackaging.value) {
+    return isSplit.value ? 'split' : 'checkpoint'
+  }
+  // 两形态并存: 按选中文件所在目录判定 loader 形态 (ComfyUI 加载节点目录绑定 —
+  // 拆分件在 diffusion_models/=unets 列表, 整合包在 checkpoints/ 列表)。onModelSelect
+  // 互斥写 state.unet XOR state.checkpoint, 故三处 (此处 / onModelSelect / useGenerateSubmit) 一致。
+  if (state.value.unet) return 'split'
+  if (state.value.checkpoint) return 'checkpoint'
+  // 无选中: 退化为该 tab 的首选形态 (supportedPackaging[0])
+  return supportedPackaging.value[0] ?? 'split'
+})
 
 const {
   i2i,
@@ -172,7 +201,7 @@ const {
   showModelPicker,
   modelSelected,
   openModelPicker,
-  onModelSelect,
+  onModelSelect: _onModelSelect,
   showLoraPicker,
   loraModalPending,
   loraCountLabel,
@@ -193,9 +222,40 @@ const {
   modelField: modelField.value,
 })
 
-/** Tab 级依赖 Gate (split 架构需要 CLIP+VAE) */
+// §5.3 合并 picker 模式: 两形态并存时, 按选中项的 packaging 字段决定写 checkpoint 还是 unet
+function onModelSelect(name: string) {
+  if (!hasDualPackaging.value) {
+    _onModelSelect(name)
+    return
+  }
+  // 两形态并存: 按选中文件所在目录 (在哪个列表) 决定 loader — ComfyUI 加载节点目录绑定,
+  // 必须按目录选 (checkpoints/→CheckpointLoaderSimple, diffusion_models/→UNETLoader),
+  // 不能只看检测出的 content 形态 (误放文件 content≠dir 时会崩)。互斥写, 清另一字段。
+  // 不走 _onModelSelect: 其 modelField 快照对双形态 tab 恒为 'checkpoint', 会误写 state.checkpoint。
+  const inCkptDir = options.checkpoints.value.some(m => m.name === name)
+  if (inCkptDir) {
+    state.value.checkpoint = name
+    state.value.unet = ''
+  } else {
+    state.value.unet = name
+    state.value.checkpoint = ''
+  }
+  showModelPicker.value = false
+  toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
+}
+
+/** Tab 级依赖配置 (split 架构需要 CLIP+VAE); 不再整页遮盖, 仅传给 picker modal 组件态 */
 const tabDepConfig = computed(() => TAB_DEP_CONFIGS[props.modelType] ?? null)
-const depTab = tabDepConfig.value ? useModelDependency(tabDepConfig.value) : null
+const depTab: UseModelDependencyReturn | null = tabDepConfig.value ? useModelDependency(tabDepConfig.value) : null
+
+// §6.3 组件就绪被动指示: 拆分件且必需组件未装齐 → 主页卡下方提示 (动作在 picker modal)。
+// 用 modelStatus 判 (不用 depTab.show — 后者与旧 welcome/dismiss 流程耦合, 非纯就绪信号)。
+const componentsMissing = computed(() => {
+  const dep = depTab
+  const cfg = tabDepConfig.value
+  if (selectedPackaging.value !== 'split' || !dep || !cfg) return false
+  return cfg.models.some(m => m.required && !dep.modelStatus.value.get(m.id)?.installed)
+})
 
 // A2: CN 依赖 Gate 配置按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用)
 const _cnBranch = (MODEL_TYPES[props.modelType]?.cnBranch as CnBranch | undefined)
@@ -207,6 +267,7 @@ const cnDepDepth = getCnDepConfig('depth', _cnBranch)
 if (depTab) depTab.check('')
 
 function onTabDepEnter() {
+  store.setGateReady(props.modelType, true)
   options.refresh()
 }
 function onTabDepDownload() {
@@ -214,16 +275,10 @@ function onTabDepDownload() {
   if (dir && depTab) depTab.startDownload(dir)
 }
 
-const showTabGate = computed(() => depTab?.show.value ?? false)
-
-// B4: Gate 就绪状态接入 — dep check 完成 (showTabGate 变化) 时写入 store
-// 无 depTab 的 entry (sdxl/pony/illustrious/noobai) showTabGate 恒为 false → ready=true
-watch(showTabGate, (gate) => store.setGateReady(props.modelType, !gate), { immediate: true })
-
-/** 高级设置 CLIP / VAE 自动填充: 仅当前激活 tab + split 架构 + 字段为空时填充 */
+/** 高级设置 CLIP / VAE 自动填充: 仅当前激活 tab + split 形态 (selectedPackaging) + 字段为空时填充 */
 function autofillDefaultModels() {
   if (store.activeModelType !== props.modelType) return
-  if (!isSplit.value || !config.value.defaultModels) return
+  if (selectedPackaging.value !== 'split' || !config.value.defaultModels) return
 
   const defs = config.value.defaultModels
   // CLIP
@@ -265,18 +320,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
 <template>
   <div class="model-tab">
-    <!-- ═══ Tab级 Gate： split 架构 CLIP+VAE 未备时遮盖整个 tab ═══ -->
-    <ModelDependencyGate
-      v-if="showTabGate"
-      :dep="depTab!"
-      :title="t(tabDepConfig!.title)"
-      :min-optional="tabDepConfig!.minOptional"
-      @enter="onTabDepEnter"
-      @download="onTabDepDownload"
-    />
-
     <!-- ═══ 上部: 双列布局 ═══ -->
-    <div v-if="!showTabGate" class="gen-top-row">
+    <div class="gen-top-row">
       <!-- 左列: 控制区 -->
       <div class="gen-ctrl-col">
         <!-- 提示词 -->
@@ -310,8 +355,25 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @open-model="openModelPicker"
         />
 
+        <!-- §6.3 组件就绪被动指示 (拆分件缺组件 → 提示, 点击进 picker 组件态补齐) -->
+        <button
+          v-if="componentsMissing"
+          type="button"
+          class="gen-comp-missing"
+          @click="openModelPicker"
+        >
+          <span class="gen-comp-missing__dot" />
+          <span class="gen-comp-missing__txt">{{ t('generate.picker.components_missing') }}</span>
+          <span class="gen-comp-missing__arr">›</span>
+        </button>
+
         <!-- 高级设置 -->
-        <AdvancedSettings :show-split-models="isSplit" :dual-clip="config.dualClip" :show-clip-skip-vae="!isSplit" />
+        <!-- 高级设置: 显示源从静态 isSplit 改为 reactive selectedPackaging -->
+        <AdvancedSettings
+          :show-split-models="selectedPackaging === 'split'"
+          :dual-clip="config.dualClip"
+          :show-clip-skip-vae="selectedPackaging === 'checkpoint'"
+        />
       </div>
 
       <!-- 右列: 预览区 -->
@@ -326,7 +388,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     </div>
 
     <!-- ═══ 下部: 功能模块 (Tab + Panel 融合卡片) ═══ -->
-    <div v-if="!showTabGate" class="gen-module-wrap">
+    <div class="gen-module-wrap">
       <ModuleTabs
         :tabs="effectiveModuleTabs"
         :active-tab="state.activeModule"
@@ -416,13 +478,23 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     <!-- ═══ Picker Modals (Teleport to body) ═══ -->
     <ModelPickerModal
       v-model="showModelPicker"
-      :title="isSplit ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint')"
+      :title="hasDualPackaging
+        ? t('generate.basic.select_model')
+        : (isSplit ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint'))"
       icon="deployed_code"
-      :items="isSplit ? options.unets.value : options.checkpoints.value"
+      :items="mergedPickerItems"
       :selected="modelSelected"
       :current-arch="config.pickerArch"
-      :search-placeholder="isSplit ? t('generate.basic.search_unet') : t('generate.basic.search_checkpoint')"
+      :search-placeholder="hasDualPackaging
+        ? t('generate.basic.search_model')
+        : (isSplit ? t('generate.basic.search_unet') : t('generate.basic.search_checkpoint'))"
+      :show-packaging-filter="hasDualPackaging"
+      :dep="depTab"
+      :dep-config="tabDepConfig"
+      :comfyui-dir="options.comfyuiDir.value"
       @select="onModelSelect"
+      @dep-enter="onTabDepEnter"
+      @dep-download="onTabDepDownload"
     />
 
     <ModelPickerModal
@@ -597,6 +669,33 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   border-top: 1px solid var(--bd);
   margin: 0;
 }
+
+/* ── §6.3 组件就绪被动指示 (拆分件缺组件) ── */
+.gen-comp-missing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--amber) 10%, var(--bg2));
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--bd));
+  color: var(--t2);
+  font-size: .8rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s;
+}
+.gen-comp-missing:hover { border-color: var(--amber); }
+.gen-comp-missing__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  flex: none;
+}
+.gen-comp-missing__txt { flex: 1; }
+.gen-comp-missing__arr { color: var(--t3); font-size: 1rem; line-height: 1; }
 
 /* ── 右列: 预览 ── */
 .gen-preview-col {

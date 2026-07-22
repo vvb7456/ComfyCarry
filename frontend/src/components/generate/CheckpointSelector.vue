@@ -12,6 +12,8 @@ export interface CheckpointInfo {
   previewIsVideo?: boolean
   arch?: string
   baseModel?: string
+  /** §5.3 打包形态 (整合包/拆分), 两形态并存 tab 下显示徽章 */
+  packaging?: 'checkpoint' | 'split'
 }
 
 const props = defineProps<{
@@ -81,6 +83,16 @@ function onImgError(e: Event) {
         <!-- Model tag badge -->
         <span v-if="selected.baseModel" class="ckpt-card__tag">{{ selected.baseModel }}</span>
         <span v-else-if="selected.arch && selected.arch !== 'unknown'" class="ckpt-card__tag ckpt-card__tag--dim">{{ selected.arch }}</span>
+        <!-- §5.3 形态徽章 (右上角, 整合包=clay / 拆分=teal) -->
+        <span
+          v-if="selected.packaging"
+          class="ckpt-card__pkg-badge"
+          :class="`ckpt-card__pkg-badge--${selected.packaging}`"
+        >
+          {{ selected.packaging === 'checkpoint'
+            ? t('generate.picker.packaging_checkpoint')
+            : t('generate.picker.packaging_split') }}
+        </span>
       </div>
       <div class="ckpt-card__info">
         <div class="ckpt-card__name" :title="selected.displayName">{{ selected.displayName }}</div>
@@ -198,6 +210,29 @@ function onImgError(e: Event) {
 .ckpt-card__tag--dim {
   background: var(--overlay);
   color: var(--t-inv-2);
+}
+
+/* §5.3 形态徽章 (右上角) */
+.ckpt-card__pkg-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  font-size: .55rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1.4;
+}
+.ckpt-card__pkg-badge--checkpoint {
+  background: #b45309;
+  color: #fff;
+}
+.ckpt-card__pkg-badge--split {
+  background: #0d9488;
+  color: #fff;
 }
 
 .ckpt-card__info {

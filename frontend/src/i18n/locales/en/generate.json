@@ -7,7 +7,10 @@
     "anima_title": "Anima requires dedicated text encoder & VAE",
     "krea2_title": "Krea 2 requires dedicated text encoder & VAE",
     "zimage_title": "Z-Image requires dedicated text encoder & VAE",
-    "flux1_title": "Flux 1 requires dual text encoders & VAE"
+    "flux1_title": "Flux 1 requires dual text encoders & VAE",
+    "chroma_title": "Chroma requires text encoder & VAE",
+    "flux2klein_title": "Flux 2 Klein requires text encoder + VAE",
+    "flux2dev_title": "Flux 2 Dev requires text encoder + VAE"
   },
   "header": {
     "queue_history": "Queue / History",
@@ -26,6 +29,9 @@
     "krea2": "Krea 2",
     "zimage": "Z-Image",
     "flux1": "Flux 1",
+    "chroma": "Chroma",
+    "flux2klein": "Flux 2 Klein",
+    "flux2dev": "Flux 2 Dev",
     "pony": "Pony",
     "illustrious": "Illustrious",
     "noobai": "NoobAI",
@@ -108,6 +114,8 @@
     "cfg_scale": "CFG Scale",
     "select_checkpoint": "Select Checkpoint",
     "search_checkpoint": "Search Checkpoint...",
+    "select_model": "Select Model",
+    "search_model": "Search model...",
     "unet": "UNet (Diffusion Model)",
     "clip": "CLIP Text Encoder",
     "clip2": "Text Encoder 2 (T5)",
@@ -146,7 +154,10 @@
     "clip_skip_help": "Stops CLIP encoding at the Nth-to-last layer. Pony and Illustrious require 2 to produce correct results; SDXL base uses 1",
     "vae_override": "VAE",
     "vae_override_follow": "Follow Checkpoint",
-    "vae_override_help": "Override the checkpoint's built-in VAE with an external VAE file. Some anime checkpoints (e.g. Pony) recommend an external sdxl_vae for better color reproduction"
+    "vae_override_help": "Override the checkpoint's built-in VAE with an external VAE file. Some anime checkpoints (e.g. Pony) recommend an external sdxl_vae for better color reproduction",
+    "clip_filter_help": "Recommended items pinned (★). Unofficial encoders are usable, but wrong type will produce broken images",
+    "clip_filter_show_all": "Show all",
+    "clip_filter_recommended_only": "Recommended only"
   },
   "preview": {
     "empty": "Generated images will appear here",
@@ -445,10 +456,19 @@
   "picker": {
     "arch_all": "All",
     "arch_unknown": "Unknown",
+    "packaging_checkpoint": "All-in-one",
+    "packaging_split": "Split",
+    "components_missing": "Missing components — click to install",
     "arch_mismatch_title": "Architecture mismatch",
     "arch_mismatch_desc": "This model's architecture is {model_arch}, the current tab is {tab_arch}. Submitting the workflow will fail. Select anyway?",
     "arch_unknown_desc": "Unable to recognize this model's architecture. If it is incompatible with the current tab, the workflow will fail. Select anyway?",
-    "subarch_mismatch_desc": "This model belongs to the {model_arch} ecosystem, the current tab is {tab_arch}. The ecosystem conventions differ and results may be unsatisfactory. Select anyway?"
+    "subarch_mismatch_desc": "This model belongs to the {model_arch} ecosystem, the current tab is {tab_arch}. The ecosystem conventions differ and results may be unsatisfactory. Select anyway?",
+    "empty_title": "No {arch} main model yet",
+    "empty_desc": "Go to Downloads to add models",
+    "go_to_downloads": "Go to Downloads",
+    "component_required": "Selected model requires these components",
+    "component_ready": "Components ready, click confirm to use",
+    "back_to_list": "Back to list"
   },
   "placeholders": {
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",

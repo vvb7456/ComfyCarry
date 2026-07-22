@@ -8,8 +8,11 @@ export interface ModelTypeConfig {
   label: string
   icon: string
   archFilter: string[]
-  /** 主模型加载形态: checkpoint 一体化 / split 三件套 (UNet+CLIP+VAE) */
-  loader: 'checkpoint' | 'split'
+  /** 该架构支持的打包形态 (§2/§5.3): 'checkpoint' 整合包 + 'split' 三件套。
+   *  两形态并存时 picker 合并列表 + 形态过滤 chip + 徽章; 单形态时退化为旧行为。 */
+  supportedPackaging: ('checkpoint' | 'split')[]
+  /** [向后兼容] = supportedPackaging 含 'checkpoint' ? 'checkpoint' : 'split' */
+  readonly loader?: 'checkpoint' | 'split'
   /** DualCLIPLoader (flux1): true 时 AdvancedSettings 显示第二个 CLIP select, submit 带 clip2 */
   dualClip?: boolean
   /** ControlNet 生态是否可用 (false 时 pose/canny/depth 模块 disabled) */
@@ -30,7 +33,7 @@ export interface ModelTypeConfig {
   hasNegativePrompt: boolean
   /** 提示词风格: tags = A1111 tag 格式; natural = 自然语言 */
   promptStyle: 'tags' | 'natural'
-  /** 官方推荐默认 CLIP / VAE 文件名 (仅 split 架构, 用于自动填充) */
+  /** 官方推荐默认 CLIP / VAE 文件名 (split 形态, 用于自动填充) */
   defaultModels?: { clip?: string; clip2?: string; vae?: string }
   modules: string[]
   extraParams?: Record<string, string | number | boolean>
@@ -51,7 +54,7 @@ export interface ModelTypeConfig {
 export const ARCH_LABELS: Record<string, string> = {
   sdxl: 'SDXL', sd15: 'SD 1.5', sd3: 'SD 3',
   anima: 'Anima', krea2: 'Krea 2', zimage: 'Z-Image',
-  flux: 'Flux 1', flux2: 'Flux 2',
+  flux: 'Flux 1', flux2: 'Flux 2', chroma: 'Chroma',
   pony: 'Pony', illustrious: 'Illustrious', noobai: 'NoobAI',
   unknown: '?',
 }
@@ -62,7 +65,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'SDXL',
     icon: 'image',
     archFilter: ['sdxl'],
-    loader: 'checkpoint',
+    supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
     cnBranch: 'sdxl',
     logo: sdxlLogo,
@@ -88,7 +91,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'Anima',
     icon: 'palette',
     archFilter: ['anima'],
-    loader: 'split',
+    supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
     pickerArch: 'anima',
     resolutions: [
@@ -115,7 +118,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'Krea 2',
     icon: 'auto_awesome',
     archFilter: ['krea2'],
-    loader: 'split',
+    supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
     logo: krea2Logo,
     pickerArch: 'krea2',
@@ -143,7 +146,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'Z-Image',
     icon: 'bolt',
     archFilter: ['zimage'],
-    loader: 'split',
+    supportedPackaging: ['split'],
     controlNetEnabled: false,  // 官方 CN 模板已出现, 二期评估
     logo: zimageLogo,
     pickerArch: 'zimage',
@@ -170,7 +173,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'Flux 1',
     icon: 'flare',
     archFilter: ['flux'],
-    loader: 'split',
+    supportedPackaging: ['checkpoint', 'split'],
     dualClip: true,
     controlNetEnabled: true,  // FLUX1_CN_SPEC: Union Pro 2.0 FP8 (InstantX/Shakker)
     cnBranch: 'flux',
@@ -201,6 +204,93 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     defaultModels: { clip: 'clip_l.safetensors', clip2: 't5xxl_fp8_e4m3fn_scaled.safetensors', vae: 'ae.safetensors' },
     modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
   },
+  chroma: {
+    key: 'chroma',
+    label: 'Chroma',
+    icon: 'blur_on',
+    archFilter: ['chroma'],
+    supportedPackaging: ['checkpoint', 'split'],
+    controlNetEnabled: false,
+    pickerArch: 'chroma',
+    resolutions: [
+      { label: '1024×1024 (1:1)', value: '1024x1024' },
+      { label: '1152×896 (4:3)', value: '1152x896' },
+      { label: '896×1152 (3:4)', value: '896x1152' },
+      { label: '1216×832 (3:2)', value: '1216x832' },
+      { label: '832×1216 (2:3)', value: '832x1216' },
+      { label: '1344×768 (16:9)', value: '1344x768' },
+      { label: '768×1344 (9:16)', value: '768x1344' },
+      { label: '1536×640 (21:9)', value: '1536x640' },
+      { label: '640×1536 (9:21)', value: '640x1536' },
+    ],
+    defaults: { steps: 26, cfg: 4, sampler: 'euler', scheduler: 'simple' },
+    hasNegativePrompt: true,
+    promptStyle: 'natural',
+    defaultModels: { clip: 't5xxl_fp8_e4m3fn_scaled.safetensors', vae: 'ae.safetensors' },
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+  },
+  // ── Flux2 (Klein 优先, Dev 靠后) ──
+  // 采样拓扑与 flux1 不同: SamplerCustomAdvanced + Flux2Scheduler + FluxGuidance/CFGGuider。
+  // guider_mode 由 extraParams 注入 payload, 后端 build_flux2_workflow 据此分支。
+  flux2klein: {
+    key: 'flux2klein',
+    label: 'Flux 2 Klein',
+    icon: 'child_care',
+    archFilter: ['flux2'],
+    supportedPackaging: ['checkpoint', 'split'],
+    controlNetEnabled: false,
+    pickerArch: 'flux2',
+    // key 为 flux2klein, 但后端 builder / _SPLIT_ARCHS / guider_mode 归一化均以 'flux2' 为键 → 必须提交 flux2
+    workflowType: 'flux2',
+    extraParams: { guider_mode: 'cfg' },
+    resolutions: [
+      { label: '1024×1024 (1:1)', value: '1024x1024' },
+      { label: '1152×896 (4:3)', value: '1152x896' },
+      { label: '896×1152 (3:4)', value: '896x1152' },
+      { label: '1216×832 (3:2)', value: '1216x832' },
+      { label: '832×1216 (2:3)', value: '832x1216' },
+      { label: '1344×768 (16:9)', value: '1344x768' },
+      { label: '768×1344 (9:16)', value: '768x1344' },
+      { label: '1536×640 (21:9)', value: '1536x640' },
+      { label: '640×1536 (9:21)', value: '640x1536' },
+    ],
+    // distilled 默认 (4 步 / cfg 1.0, CFGGuider); base 模型用户手动调 20 步 / cfg 5.0
+    defaults: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'simple' },
+    hasNegativePrompt: true,
+    promptStyle: 'natural',
+    defaultModels: { clip: 'qwen_3_4b.safetensors', vae: 'flux2-vae.safetensors' },
+    // flux2 采样走 SamplerCustomAdvanced, i2i/hires 需 SplitSigmas 分段去噪 (未实装) → 仅 t2i + 放大
+    modules: ['lora', 'upscale'],
+  },
+  flux2dev: {
+    key: 'flux2dev',
+    label: 'Flux 2 Dev',
+    icon: 'memory',
+    archFilter: ['flux2'],
+    supportedPackaging: ['checkpoint', 'split'],
+    controlNetEnabled: false,
+    pickerArch: 'flux2',
+    workflowType: 'flux2',
+    extraParams: { guider_mode: 'basic' },
+    resolutions: [
+      { label: '1024×1024 (1:1)', value: '1024x1024' },
+      { label: '1152×896 (4:3)', value: '1152x896' },
+      { label: '896×1152 (3:4)', value: '896x1152' },
+      { label: '1216×832 (3:2)', value: '1216x832' },
+      { label: '832×1216 (2:3)', value: '832x1216' },
+      { label: '1344×768 (16:9)', value: '1344x768' },
+      { label: '768×1344 (9:16)', value: '768x1344' },
+      { label: '1536×640 (21:9)', value: '1536x640' },
+      { label: '640×1536 (9:21)', value: '640x1536' },
+    ],
+    // dev: guidance 4.0, 20 步, 无负面 (BasicGuider)
+    defaults: { steps: 20, cfg: 4.0, sampler: 'euler', scheduler: 'simple' },
+    hasNegativePrompt: false,
+    promptStyle: 'natural',
+    defaultModels: { clip: 'mistral_3_small_flux2_fp8.safetensors', vae: 'flux2-vae.safetensors' },
+    // flux2 采样走 SamplerCustomAdvanced, i2i/hires 需 SplitSigmas 分段去噪 (未实装) → 仅 t2i + 放大
+    modules: ['lora', 'upscale'],
+  },
   // ── SDXL 软架构 (衍生条目: Pony / Illustrious / NoobAI) ──
   // arch 层面仍是 sdxl, workflow 编排零改动 — 通过 workflowType 提交 sdxl,
   // 由 effectiveArch() 按 sidecar baseModel 判别, picker/拦截分级处理。
@@ -209,7 +299,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'Pony',
     icon: 'favorite',
     archFilter: ['sdxl'],
-    loader: 'checkpoint',
+    supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
     cnBranch: 'sdxl',
     familyOf: 'sdxl',
@@ -237,7 +327,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'Illustrious',
     icon: 'brush',
     archFilter: ['sdxl'],
-    loader: 'checkpoint',
+    supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
     cnBranch: 'ilnoob',
     familyOf: 'sdxl',
@@ -265,7 +355,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     label: 'NoobAI',
     icon: 'auto_fix_high',
     archFilter: ['sdxl'],
-    loader: 'checkpoint',
+    supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
     cnBranch: 'ilnoob',
     familyOf: 'sdxl',
@@ -289,6 +379,19 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
   },
 }
+
+// [向后兼容] 给每个条目加 .loader 派生属性 (supportedPackaging 含 'checkpoint' → 'checkpoint' 否则 'split')
+// 旧代码读 config.loader 仍可工作; 新代码应直接用 supportedPackaging。
+;(() => {
+  for (const key of Object.keys(MODEL_TYPES)) {
+    const cfg = MODEL_TYPES[key] as ModelTypeConfig & { loader?: 'checkpoint' | 'split' }
+    Object.defineProperty(cfg, 'loader', {
+      get() { return this.supportedPackaging.includes('checkpoint') ? 'checkpoint' : 'split' },
+      enumerable: false,
+      configurable: true,
+    })
+  }
+})()
 
 // ── 软架构判别 ──────────────────────────────────────────────────────────────
 

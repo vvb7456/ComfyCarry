@@ -28,6 +28,10 @@ _BASE_MODEL_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("krea2", ("krea",)),
     ("sd15", ("sd 1.4", "sd 1.5")),          # 含 "sd 1.5 lcm" / "sd 1.5 hyper" (子串)
     ("sdxl", ("sdxl", "pony", "illustrious", "noobai")),
+    # Chroma baseModel 必须在 ("flux", ("flux",)) 之前 — Chroma 是 flux schnell 衍生
+    # 但独立架构 (单 T5 + 真 CFG), baseModel "Chroma" 不含 "flux" 关键词, 顺序无冲突,
+    # 仍按"特异性强的在前"惯例放置。
+    ("chroma", ("chroma",)),
     # Z-Image / Flux2 baseModel 映射必须在 ("flux", ("flux",)) 之前 —
     # 否则 CivitAI "Flux.2 Klein" 含 "flux" 会被判为 flux1, 污染 Flux 1 tab 下拉
     ("zimage", ("z-image", "z image", "zimage")),
@@ -248,8 +252,9 @@ _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str]], bool]"]] = [
     # Flux2 kohya LoRA (待校准): 单/双流模块名
     ("flux2", lambda ks: _has_sub(ks, "double_stream_modulation") or _has_prefix(ks, "lora_unet_double_stream_")),
     # ── 以下 flux 规则语义即 flux1 (检测输出用 "flux" 兼容现有 sidecar/缓存) ──
-    # Flux1 主模型: double_blocks / single_blocks (保留原位, 在 flux2 规则之后)
-    ("flux", lambda ks: _has_prefix(ks, "double_blocks.")),
+    # Flux1 主模型: double_blocks / single_blocks — 子串匹配兼容 checkpoint 全量打包的
+    # model.diffusion_model.double_blocks. 前缀 (修复 _has_prefix 漏匹配整合包的 bug, 与 flux2 一致)。
+    ("flux", lambda ks: _has_sub(ks, "double_blocks.")),
     # SD3: joint_blocks
     ("sd3", lambda ks: _has_prefix(ks, "joint_blocks.")),
     # SDXL checkpoint: 双 text encoder (conditioner.embedders.1) 或 label_emb
@@ -283,6 +288,73 @@ def match_arch_from_keys(keys: set[str]) -> str:
         if rule(keys):
             return arch
     return "unknown"
+
+
+# ── 打包形态检测 (整合包 vs 拆分) ─────────────────────────────────────────────
+# 文档 §2 / §4.1: 打包形态是文件属性而非架构属性。含 TE 且含 VAE key → 整合包;
+# 否则 → 拆分 (UNet-only / GGUF 实践中恒 split)。一处检测, 三处复用:
+#   ① 下载归位 ② 选择器形态徽章 ③ builder 加载分支。
+
+# TE (text encoder) key 特征。覆盖各架构实际命名:
+#   - sdxl/sd15:    cond_stage_model.*
+#   - flux1/sd3:    text_encoders.* (DualCLIP 单文件打包用此键)
+#   - DiT 系 (comfy): conditioner.embedders.*
+#   - SD1.5 CLIP:   text_model.*
+#   - Z-Image/Flux2: t5xxl* / qwen* / mistral* (loader 内部分离式 TE, 整合包里这些前缀也存在)
+# 注: 不含 "txt_in." — 它是 Flux transformer 的文本条件输入投影 (非 text encoder),
+#     UNet-only flux 文件也有此键, 会误判 has_te (仅靠 has_vae=False 兜底, 太脆)。
+_TE_MARKERS = (
+    "cond_stage_model.",
+    "text_encoders.",
+    "conditioner.embedders.",
+    "text_model.",
+    "t5xxl",
+    "qwen",
+    "mistral",
+)
+
+# VAE key 特征:
+#   - SD1.5/SDXL: first_stage_model.* (整合包内 VAE 烘焙于此)
+#   - Flux1/Chroma/Z-Image (vae.* 显式, 或 ae 文件烘焙为 vae.*)
+#   - 显式 VAE 节点 key: decoder.conv_in / encoder.down (VAE encoder/decoder 子模块)
+_VAE_MARKERS = (
+    "first_stage_model.",
+    "vae.",
+    "decoder.conv_in",
+    "encoder.down",
+)
+
+
+def detect_packaging(keys: set[str]) -> str:
+    """含 TE 且含 VAE key → 'checkpoint' (整合包); 否则 → 'split' (拆分/UNet-only)。
+
+    输入为 safetensors header 的 tensor key 集合 (不含 ``__metadata__``)。
+    GGUF / 无法读头时调用方应默认 'split' (GGUF 实践中恒 UNet-only)。
+    """
+    has_te = any(any(m in k for m in _TE_MARKERS) for k in keys)
+    has_vae = any(any(m in k for m in _VAE_MARKERS) for k in keys)
+    return "checkpoint" if (has_te and has_vae) else "split"
+
+
+def detect_packaging_from_file(filepath: str) -> str:
+    """从模型文件读取 header 判定打包形态。
+
+    safetensors: 读 header tensor keys → detect_packaging。
+    其他格式 (gguf/.ckpt) / 读头失败 → 'split' (GGUF 实践中恒 UNet-only, .ckpt 兜底)。
+    """
+    if not filepath.endswith(".safetensors"):
+        return "split"
+    try:
+        with open(filepath, "rb") as f:
+            header_len = struct.unpack("<Q", f.read(8))[0]
+            if header_len <= 0 or header_len > 10_000_000:
+                return "split"
+            raw = f.read(header_len)
+        header = json.loads(raw)
+        keys = set(k for k in header if k != "__metadata__")
+        return detect_packaging(keys)
+    except Exception:
+        return "split"
 
 
 # ── 综合检测入口 ─────────────────────────────────────────────────────────────

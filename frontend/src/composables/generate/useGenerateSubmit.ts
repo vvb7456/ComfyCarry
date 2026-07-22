@@ -50,19 +50,29 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
 
     // 3. Basic validation
     const modelType = store.activeModelType
-    if (MODEL_TYPES[modelType]?.loader === 'split') {
+    const activeConfig = MODEL_TYPES[modelType]
+    // §5.3 当前选中模型的包装形态: 两形态并存 tab 下按 state.checkpoint/unet 哪个非空判断
+    // (picker 互斥: 选整合包写 state.checkpoint,选拆分件写 state.unet)
+    const hasDualPackaging = (activeConfig?.supportedPackaging.length ?? 0) > 1
+    const selectedPackaging: 'checkpoint' | 'split' = hasDualPackaging
+      ? (state.checkpoint ? 'checkpoint' : 'split')
+      : (activeConfig?.loader === 'split' ? 'split' : 'checkpoint')
+
+    if (selectedPackaging === 'split') {
       if (!state.unet || !state.clip || !state.vae) {
         toast(t('generate.error.no_split_models'), 'error')
         return null
       }
       // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
-      if (MODEL_TYPES[modelType]?.dualClip && !state.clip2) {
+      if (activeConfig?.dualClip && !state.clip2) {
         toast(t('generate.error.no_split_models'), 'error')
         return null
       }
-    } else if (!state.checkpoint) {
-      toast(t('generate.error.no_checkpoint'), 'error')
-      return null
+    } else {
+      if (!state.checkpoint) {
+        toast(t('generate.error.no_checkpoint'), 'error')
+        return null
+      }
     }
     if (!state.positive.trim()) {
       toast(t('generate.error.no_prompt'), 'error')
@@ -160,7 +170,6 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
 
     // 软架构条目 (pony/illustrious/noobai) 通过 workflowType 提交 'sdxl',
     // 后端按 sdxl 工作流编排 (arch 层面相同)。其余 entry 用自身 key。
-    const activeConfig = MODEL_TYPES[modelType]
     const submitModelType = activeConfig?.workflowType ?? modelType
 
     const payload: Record<string, unknown> = {
@@ -181,13 +190,20 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       controlnets,
     }
 
-    // 架构专属字段
-    if (MODEL_TYPES[modelType]?.loader === 'split') {
+    // 架构专属参数 (extraParams): 注入到 payload 顶层
+    // flux2klein/flux2dev 的 guider_mode 即此机制驱动; 后端按此字段分支
+    if (activeConfig?.extraParams) {
+      Object.assign(payload, activeConfig.extraParams)
+    }
+
+    // 架构专属字段 (按 selectedPackaging 分流, §5.3)
+    payload.packaging = selectedPackaging
+    if (selectedPackaging === 'split') {
       payload.unet = state.unet
       payload.clip = state.clip
       payload.vae = state.vae
       // DualCLIPLoader 架构 (flux1): 第二个文本编码器
-      if (MODEL_TYPES[modelType]?.dualClip) {
+      if (activeConfig?.dualClip) {
         payload.clip2 = state.clip2
       }
     } else {

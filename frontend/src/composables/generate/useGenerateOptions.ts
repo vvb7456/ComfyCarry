@@ -8,6 +8,7 @@ export interface CheckpointItem {
   preview: string | null
   arch: string
   info: Record<string, unknown> | null
+  packaging: 'checkpoint' | 'split'
 }
 
 export interface LoraItem {
@@ -24,6 +25,7 @@ export interface ModelFileItem {
   preview: string | null
   arch: string
   info?: Record<string, unknown> | null
+  packaging?: 'checkpoint' | 'split'
 }
 
 export interface GenerateOptionsReturn {
@@ -61,6 +63,8 @@ interface OptionsResponse {
   checkpoint_archs: Record<string, string>
   lora_archs: Record<string, string>
   unet_archs: Record<string, string>
+  checkpoint_packagings: Record<string, string>
+  unet_packagings: Record<string, string>
   lora_triggers: Record<string, string>
   checkpoint_info: Record<string, Record<string, unknown>>
   lora_info: Record<string, Record<string, unknown>>
@@ -97,6 +101,8 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const checkpointArchs = ref<Record<string, string>>({})
   const loraArchs = ref<Record<string, string>>({})
   const unetArchs = ref<Record<string, string>>({})
+  const checkpointPackagings = ref<Record<string, string>>({})
+  const unetPackagings = ref<Record<string, string>>({})
   const loraTriggers = ref<Record<string, string>>({})
   const checkpointInfo = ref<Record<string, Record<string, unknown>>>({})
   const loraInfo = ref<Record<string, Record<string, unknown>>>({})
@@ -109,6 +115,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       preview: checkpointPreviews.value[name] ?? null,
       arch: checkpointArchs.value[name] ?? 'unknown',
       info: checkpointInfo.value[name] ?? null,
+      packaging: (checkpointPackagings.value[name] as 'checkpoint' | 'split') ?? 'checkpoint',
     })),
   )
 
@@ -128,6 +135,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       preview: unetPreviews.value[name] ?? null,
       arch: unetArchs.value[name] ?? 'unknown',
       info: unetInfo.value[name] ?? null,
+      packaging: (unetPackagings.value[name] as 'checkpoint' | 'split') ?? 'split',
     })),
   )
 
@@ -171,6 +179,8 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       checkpointArchs.value = data.checkpoint_archs || {}
       loraArchs.value = data.lora_archs || {}
       unetArchs.value = data.unet_archs || {}
+      checkpointPackagings.value = data.checkpoint_packagings || {}
+      unetPackagings.value = data.unet_packagings || {}
       loraTriggers.value = data.lora_triggers || {}
       checkpointInfo.value = data.checkpoint_info || {}
       loraInfo.value = data.lora_info || {}

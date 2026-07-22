@@ -11,12 +11,15 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import ModelDependencyGate from '@/components/generate/ModelDependencyGate.vue'
 import { ARCH_LABELS, effectiveArch, familyRoot } from '@/config/model-types'
+import type { ModelDepConfig, UseModelDependencyReturn } from '@/composables/generate/useModelDependency'
 import { useConfirm } from '@/composables/useConfirm'
 
 defineOptions({ name: 'ModelPickerModal' })
@@ -27,6 +30,7 @@ export interface PickerModelItem {
   arch: string
   triggers?: string | null
   info?: Record<string, unknown> | null
+  packaging?: 'checkpoint' | 'split'
 }
 
 const props = withDefaults(defineProps<{
@@ -44,12 +48,24 @@ const props = withDefaults(defineProps<{
   countLabel?: string
   /** Current tab's arch (archFilter[0]); when set, arch chips default + mismatch confirm */
   currentArch?: string
+  /** Tab-level dependency handle (for component-state of split arch). Optional. */
+  dep?: UseModelDependencyReturn | null
+  /** Tab-level dependency config (title/minOptional). Optional. */
+  depConfig?: ModelDepConfig | null
+  /** ComfyUI root dir (passed to dep.startDownload). Optional. */
+  comfyuiDir?: string
+  /** §5.3 两形态并存时显示形态过滤 chip + 卡片徽章 */
+  showPackagingFilter?: boolean
 }>(), {
   icon: 'deployed_code',
   multi: false,
   searchPlaceholder: '',
   countLabel: '',
   currentArch: '',
+  dep: null,
+  depConfig: null,
+  comfyuiDir: '',
+  showPackagingFilter: false,
 })
 
 const emit = defineEmits<{
@@ -60,6 +76,10 @@ const emit = defineEmits<{
   toggle: [name: string]
   /** Multi-select: user confirmed selection */
   confirm: []
+  /** Component-state: dep gate enter (all installed) */
+  depEnter: []
+  /** Component-state: dep download button clicked */
+  depDownload: []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -70,6 +90,8 @@ const search = ref('')
 
 // ── Arch filter ──
 const activeArch = ref('')
+// §5.3 Packaging filter (仅两形态并存时启用)
+const activePackaging = ref<'checkpoint' | 'split' | ''>('')
 
 // ── Arch chips (dynamic from items' effectiveArch field) ──
 const archOptions = computed<ChipOption[]>(() => {
@@ -92,6 +114,12 @@ const archOptions = computed<ChipOption[]>(() => {
   }))
 })
 
+// §5.3 形态过滤 chip options (checkpoint=整合包 clay / split=拆分 teal)
+const packagingOptions = computed<ChipOption[]>(() => [
+  { value: 'checkpoint', label: t('generate.picker.packaging_checkpoint') },
+  { value: 'split', label: t('generate.picker.packaging_split') },
+])
+
 // ── Filtered items ──
 const filtered = computed(() => {
   let list = props.items
@@ -99,6 +127,11 @@ const filtered = computed(() => {
   // Arch filter (against effectiveArch)
   if (activeArch.value) {
     list = list.filter(m => effectiveArch(m) === activeArch.value)
+  }
+
+  // §5.3 Packaging filter (仅 showPackagingFilter 时生效)
+  if (props.showPackagingFilter && activePackaging.value) {
+    list = list.filter(m => (m.packaging ?? 'split') === activePackaging.value)
   }
 
   // Search
@@ -119,6 +152,7 @@ const filtered = computed(() => {
 watch(() => props.modelValue, (open) => {
   if (open) {
     search.value = ''
+    activePackaging.value = ''
     // default to currentArch if present in items' effectiveArchs, else '全部'
     const archs = new Set(props.items.map(m => effectiveArch(m)))
     activeArch.value = (props.currentArch && archs.has(props.currentArch))
@@ -215,12 +249,65 @@ async function onCardClick(item: PickerModelItem) {
   if (props.multi) {
     emit('toggle', item.name)
   } else {
+    // 仅拆分件在组件缺失时进组件下载态; 整合包无需外挂组件 → 直接选中
+    const pkg = item.packaging ?? 'split'
+    if (pkg === 'split' && props.dep && props.depConfig && !depReady.value) {
+      pendingName.value = item.name
+      modalMode.value = 'component'
+      return
+    }
     emit('select', item.name)
   }
 }
 
 function close() {
   emit('update:modelValue', false)
+}
+
+// ── Modal mode: 'list' | 'component' ───────────────────────────────────────
+// component 态: 选中 split 件且组件缺失时切换到 ModelDependencyGate (compact),
+// 关窗不中断下载 (dep composable 实例由父组件持有, modal 只引用)。
+const modalMode = ref<'list' | 'component'>('list')
+const pendingName = ref<string>('')
+const router = useRouter()
+
+const currentArchLabel = computed(() => {
+  if (!props.currentArch) return ''
+  return ARCH_LABELS[props.currentArch] || props.currentArch
+})
+
+const isItemsEmpty = computed(() => props.items.length === 0)
+
+const depReady = computed(() => {
+  const d = props.dep
+  if (!d) return true
+  if (d.loading.value) return false
+  return !d.models.value.some(m =>
+    d.selected.value.has(m.id) && !d.modelStatus.value.get(m.id)?.installed,
+  )
+})
+
+watch(() => props.modelValue, (open) => {
+  if (open) modalMode.value = 'list'
+})
+
+function goToDownloadPage() {
+  close()
+  router.push({ name: 'models' })
+}
+
+function onComponentEnter() {
+  emit('depEnter')
+  if (pendingName.value) {
+    emit('select', pendingName.value)
+    pendingName.value = ''
+  }
+  modalMode.value = 'list'
+  close()
+}
+
+function onComponentDownload() {
+  emit('depDownload')
 }
 </script>
 
@@ -234,75 +321,129 @@ function close() {
     density="default"
     scroll="none"
   >
-    <!-- Search + Chips -->
-    <div class="picker-toolbar">
-      <FilterInput
-        v-model="search"
-        :placeholder="searchPlaceholder"
-        class="picker-search"
+    <!-- ── ① 组件态: 选中拆分件且组件缺失 ── -->
+    <div v-if="modalMode === 'component' && dep && depConfig" class="picker-component-state">
+      <div class="picker-component-title">
+        <MsIcon name="widgets" color="none" />
+        <span>{{ t('generate.picker.component_required') }}</span>
+      </div>
+      <ModelDependencyGate
+        :dep="dep"
+        :title="depConfig.title"
+        :min-optional="depConfig.minOptional"
+        compact
+        @enter="onComponentEnter"
+        @download="onComponentDownload"
       />
-      <ChipSelect
-        v-if="archOptions.length > 1"
-        :options="archOptions"
-        :model-value="activeArch"
-        :all-option="t('generate.picker.arch_all')"
-        :collapsed-rows="1"
-        class="picker-chips"
-        @update:model-value="activeArch = $event as string"
-      />
+      <div class="picker-component-back">
+        <BaseButton size="sm" @click="modalMode = 'list'">
+          <MsIcon name="arrow_back" size="sm" color="none" /> {{ t('generate.picker.back_to_list') }}
+        </BaseButton>
+      </div>
     </div>
 
-    <!-- Grid -->
-    <div class="picker-grid-wrap">
-      <div v-if="filtered.length === 0" class="picker-empty">
-        <MsIcon name="deployed_code_alert" color="none" />
-        <span>{{ t('common.no_results') }}</span>
+    <!-- ── ② 空态: 该 arch 两目录皆空 ── -->
+    <div v-else-if="isItemsEmpty" class="picker-empty-state">
+      <MsIcon name="cloud_download" color="none" class="picker-empty-icon" />
+      <div class="picker-empty-title">{{ t('generate.picker.empty_title', { arch: currentArchLabel }) }}</div>
+      <div class="picker-empty-desc">{{ t('generate.picker.empty_desc') }}</div>
+      <BaseButton variant="primary" @click="goToDownloadPage">
+        <MsIcon name="open_in_new" size="sm" color="none" /> {{ t('generate.picker.go_to_downloads') }}
+      </BaseButton>
+    </div>
+
+    <!-- ── ③ 列表态 ── -->
+    <template v-else>
+      <!-- Search + Chips -->
+      <div class="picker-toolbar">
+        <FilterInput
+          v-model="search"
+          :placeholder="searchPlaceholder"
+          class="picker-search"
+        />
+        <ChipSelect
+          v-if="archOptions.length > 1"
+          :options="archOptions"
+          :model-value="activeArch"
+          :all-option="t('generate.picker.arch_all')"
+          :collapsed-rows="1"
+          class="picker-chips"
+          @update:model-value="activeArch = $event as string"
+        />
+        <!-- §5.3 形态过滤 chip (仅两形态并存时显示) -->
+        <ChipSelect
+          v-if="showPackagingFilter"
+          :options="packagingOptions"
+          :model-value="activePackaging"
+          :all-option="t('generate.picker.arch_all')"
+          :collapsed-rows="1"
+          class="picker-chips picker-chips--packaging"
+          @update:model-value="activePackaging = ($event || '') as 'checkpoint' | 'split' | ''"
+        />
       </div>
-      <div v-else class="picker-grid">
-        <div
-          v-for="item in filtered"
-          :key="item.name"
-          class="model-card"
-          :class="{ 'model-card--selected': selected?.has(item.name) }"
-          :title="getDisplayName(item)"
-          @click="onCardClick(item)"
-        >
-          <div class="model-card__img">
-            <template v-if="getPreviewUrl(item)">
-              <video
-                v-if="isPreviewVideo(item)"
-                :src="getPreviewUrl(item)!"
-                muted autoplay loop playsinline disablepictureinpicture preload="metadata"
-                class="model-card__media"
-              />
-              <img
-                v-else
-                :src="getPreviewUrl(item)!"
-                alt=""
-                loading="lazy"
-                class="model-card__media"
-                @error="($event.target as HTMLImageElement).style.display = 'none'"
-              />
-            </template>
-            <div v-if="!getPreviewUrl(item)" class="model-card__no-img">
-              <MsIcon name="image_not_supported" color="none" />
+
+      <!-- Grid -->
+      <div class="picker-grid-wrap">
+        <div v-if="filtered.length === 0" class="picker-empty">
+          <MsIcon name="deployed_code_alert" color="none" />
+          <span>{{ t('common.no_results') }}</span>
+        </div>
+        <div v-else class="picker-grid">
+          <div
+            v-for="item in filtered"
+            :key="item.name"
+            class="model-card"
+            :class="{ 'model-card--selected': selected?.has(item.name) }"
+            :title="getDisplayName(item)"
+            @click="onCardClick(item)"
+          >
+            <div class="model-card__img">
+              <template v-if="getPreviewUrl(item)">
+                <video
+                  v-if="isPreviewVideo(item)"
+                  :src="getPreviewUrl(item)!"
+                  muted autoplay loop playsinline disablepictureinpicture preload="metadata"
+                  class="model-card__media"
+                />
+                <img
+                  v-else
+                  :src="getPreviewUrl(item)!"
+                  alt=""
+                  loading="lazy"
+                  class="model-card__media"
+                  @error="($event.target as HTMLImageElement).style.display = 'none'"
+                />
+              </template>
+              <div v-if="!getPreviewUrl(item)" class="model-card__no-img">
+                <MsIcon name="image_not_supported" color="none" />
+              </div>
+              <span v-if="getModelTag(item)" class="model-card__tag" :class="{ dim: isArchTag(item) }">
+                {{ getModelTag(item) }}
+              </span>
+              <!-- §5.3 形态徽章 (整合包=clay / 拆分=teal, 仅两形态并存时显示) -->
+              <span
+                v-if="showPackagingFilter && item.packaging"
+                class="model-card__pkg-badge"
+                :class="`model-card__pkg-badge--${item.packaging}`"
+              >
+                {{ item.packaging === 'checkpoint'
+                  ? t('generate.picker.packaging_checkpoint')
+                  : t('generate.picker.packaging_split') }}
+              </span>
+              <div v-if="multi" class="model-card__check">
+                <MsIcon name="check" color="none" />
+              </div>
             </div>
-            <span v-if="getModelTag(item)" class="model-card__tag" :class="{ dim: isArchTag(item) }">
-              {{ getModelTag(item) }}
-            </span>
-            <div v-if="multi" class="model-card__check">
-              <MsIcon name="check" color="none" />
+            <div class="model-card__body">
+              <div class="model-card__name text-truncate">{{ getDisplayName(item) }}</div>
             </div>
-          </div>
-          <div class="model-card__body">
-            <div class="model-card__name text-truncate">{{ getDisplayName(item) }}</div>
           </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- Footer (multi-select only) -->
-    <template v-if="multi" #footer>
+    <template v-if="multi && modalMode !== 'component'" #footer>
       <span class="picker-count">{{ countLabel }}</span>
       <BaseButton @click="close">{{ t('common.btn.cancel') }}</BaseButton>
       <BaseButton variant="primary" @click="emit('confirm')">{{ t('common.btn.confirm') }}</BaseButton>
@@ -427,6 +568,32 @@ function close() {
   color: var(--t-inv-2);
 }
 
+/* §5.3 形态徽章 (右上角, 整合包=clay 棕 / 拆分=teal 青) */
+.model-card__pkg-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  font-size: .55rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1.4;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-card__pkg-badge--checkpoint {
+  background: #b45309;
+  color: #fff;
+}
+.model-card__pkg-badge--split {
+  background: #0d9488;
+  color: #fff;
+}
+
 /* Check mark (multi-select) */
 .model-card__check {
   position: absolute;
@@ -462,5 +629,56 @@ function close() {
   margin-right: auto;
   font-size: .8rem;
   color: var(--t3);
+}
+
+/* ── 空态 (该 arch 两目录皆空) ── */
+.picker-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+}
+
+.picker-empty-icon {
+  font-size: 3.5rem;
+  color: var(--ac);
+  opacity: .55;
+}
+
+.picker-empty-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.picker-empty-desc {
+  font-size: .85rem;
+  color: var(--t3);
+}
+
+/* ── 组件态 ── */
+.picker-component-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+
+.picker-component-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: .9rem;
+  color: var(--t2);
+  font-weight: 500;
+}
+
+.picker-component-back {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-2);
 }
 </style>

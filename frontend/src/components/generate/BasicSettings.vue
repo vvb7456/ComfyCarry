@@ -29,13 +29,18 @@ const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
 
 /* ── Checkpoint / UNet (config-driven by modelField) ── */
+// §5.3 合并 picker: 两形态并存 tab 下 state.checkpoint 或 state.unet 都可能有值,
+// 优先按 modelField 查, 查不到则交叉查另一个列表 (整合包件在 checkpoints, 拆分件在 unets)
 const selected = computed<CheckpointInfo | null>(() => {
   const name = props.modelField === 'unet' ? state.value.unet : state.value.checkpoint
-  if (!name) return null
-  const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
+  // 合并 picker 模式 fallback: 若主字段空但另一字段有值 (两形态并存 tab), 用另一字段
+  const altName = props.modelField === 'unet' ? state.value.checkpoint : state.value.unet
+  const effectiveName = name || altName
+  if (!effectiveName) return null
+  const base = effectiveName.includes('/') ? effectiveName.slice(effectiveName.lastIndexOf('/') + 1) : effectiveName
   const fallbackName = base.replace(/\.[^.]+$/, '')
-  const list = props.modelField === 'unet' ? options.unets.value : options.checkpoints.value
-  const item = list.find(c => c.name === name)
+  // 合并两个列表查找 (合并 picker 模式下件可能在任一列表)
+  const item = [...options.unets.value, ...options.checkpoints.value].find(c => c.name === effectiveName)
   if (item) {
     const info = item.info as Record<string, unknown> | null
     // displayName: prefer CivitAI info.name, fallback to filename
@@ -55,9 +60,14 @@ const selected = computed<CheckpointInfo | null>(() => {
       previewUrl = civitUrl
       previewIsVideo = civitImg?.type === 'video'
     }
-    return { name: item.name, displayName, previewUrl, fallbackUrl: previewUrl ? civitUrl : null, previewIsVideo, arch: item.arch, baseModel }
+    return {
+      name: item.name, displayName, previewUrl,
+      fallbackUrl: previewUrl ? civitUrl : null,
+      previewIsVideo, arch: item.arch, baseModel,
+      packaging: item.packaging,
+    }
   }
-  return { name, displayName: fallbackName }
+  return { name: effectiveName, displayName: fallbackName }
 })
 
 function openModelModal() {
