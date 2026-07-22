@@ -359,6 +359,21 @@ class TunnelManager:
     def _build_ingress(self, services: List[dict]) -> List[dict]:
         """构建 ingress 规则列表"""
         ingress = []
+        # Companion /dav path 规则 (spec §0.3 / §2.1): 在主域名通用规则之前
+        # 插入, 使 ^/dav/ 路径路由到本地 rclone serve webdav 端口, 置于
+        # catch-all (http_status:404) 之前。仅当配置了面板密码时启用。
+        # cloudflared ingress 按顺序匹配, path 规则必须先于该 hostname 的
+        # 通用规则, 否则会被通用规则先捕获。
+        companion_dav_rule = None
+        try:
+            from ..config import COMPANION_DAV_PORT, DASHBOARD_PASSWORD
+            if DASHBOARD_PASSWORD and COMPANION_DAV_PORT:
+                companion_dav_rule = {
+                    "service": f"http://127.0.0.1:{COMPANION_DAV_PORT}",
+                }
+        except Exception:
+            pass
+
         for svc in services:
             protocol = svc.get("protocol", "http")
             # 使用 127.0.0.1 而非 localhost，避免 cloudflared 解析到 IPv6
@@ -367,12 +382,22 @@ class TunnelManager:
             # HTTPS 源站需要跳过 TLS 验证 (自签证书)
             if protocol == "https":
                 origin_req["noTLSVerify"] = True
+            hostname = self._hostname_for(svc)
+            if not svc.get("suffix", ""):
+                # 主域名: 先插 /dav path 规则 (更具体, 先匹配)
+                if companion_dav_rule:
+                    ingress.append({
+                        "hostname": hostname,
+                        "path": "^/dav/",
+                        **companion_dav_rule,
+                    })
             entry = {
-                "hostname": self._hostname_for(svc),
+                "hostname": hostname,
                 "service": service_url,
                 "originRequest": origin_req,
             }
             ingress.append(entry)
+
         ingress.append({"service": "http_status:404"})
         return ingress
 

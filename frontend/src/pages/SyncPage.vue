@@ -7,10 +7,12 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useLogStream } from '@/composables/useLogStream'
 import { useSyncJobs } from '@/composables/useSyncJobs'
+import { useCompanionClients } from '@/composables/useCompanionClients'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
+import CompanionPanel from '@/components/sync/CompanionPanel.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -43,6 +45,7 @@ const activeTab = ref('activity')
 const tabs = computed(() => [
   { key: 'activity', label: t('sync.tabs.activity'), icon: 'monitoring' },
   { key: 'storage', label: t('sync.tabs.storage_rules'), icon: 'storage' },
+  { key: 'clients', label: t('sync.tabs.clients'), icon: 'monitor' },
   { key: 'config', label: t('sync.tabs.config'), icon: 'settings' },
 ])
 
@@ -126,6 +129,29 @@ const logStream = useLogStream({
 
 const { jobs: syncJobs, currentJobId, startPolling: startJobsPolling, stopPolling: stopJobsPolling } = useSyncJobs()
 
+// ── Companion 桌面客户端 ──
+const {
+  clients: companionClients,
+  serve: companionServe,
+  davUrl: companionDavUrl,
+  loading: companionLoading,
+  fetchClients: fetchCompanionClients,
+  forgetClient: forgetCompanionClient,
+  startPolling: startCompanionPolling,
+  stopPolling: stopCompanionPolling,
+} = useCompanionClients({ pollInterval: 20_000 })
+
+async function onForgetCompanion(clientId: string) {
+  if (!await confirm({ message: t('sync.companion.confirm_forget'), variant: 'danger' })) return
+  const ok = await forgetCompanionClient(clientId)
+  if (ok) {
+    toast(t('sync.companion.forgotten'), 'success')
+    await fetchCompanionClients()
+  } else {
+    toast(t('sync.companion.forget_failed'), 'error')
+  }
+}
+
 const refresh = useAutoRefresh(loadSyncStatus, 10000)
 
 onMounted(() => {
@@ -138,6 +164,7 @@ onMounted(() => {
 onUnmounted(() => {
   refresh.stop()
   stopJobsPolling()
+  stopCompanionPolling()
   // logStream auto-stops via onUnmounted in useLogStream
 })
 
@@ -423,7 +450,15 @@ async function loadConfigTab() {
 function switchTab(tab: string) {
   activeTab.value = tab
   if (tab === 'config') loadConfigTab()
-  if (tab === 'storage') loadStorageAll()
+  if (tab === 'storage') {
+    loadStorageAll()
+  }
+  if (tab === 'clients') {
+    fetchCompanionClients()
+    startCompanionPolling()
+  } else {
+    stopCompanionPolling()
+  }
 }
 
 async function saveConfig() {
@@ -559,6 +594,18 @@ async function uploadRcloneFile(e: Event) {
         <!-- Add card -->
         <AddCard class="sync-rule-card" size="compact" :label="t('sync.rule.add')" @click="openAddRule" />
       </div>
+    </div>
+
+    <!-- ===== Clients (Companion) Tab ===== -->
+    <div v-show="activeTab === 'clients'">
+      <CompanionPanel
+        :clients="companionClients"
+        :serve="companionServe"
+        :dav-url="companionDavUrl"
+        :loading="companionLoading"
+        @forget-client="onForgetCompanion"
+        @refresh="fetchCompanionClients"
+      />
     </div>
 
     <!-- ===== Config Tab ===== -->

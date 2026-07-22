@@ -309,6 +309,10 @@ def register_auth_middleware(app):
             return
         if request.path in ("/login", "/favicon.ico", "/api/version"):
             return
+        # Companion 客户端连接: 仅凭面板密码换 API Key, 自身做密码校验,
+        # 在鉴权前放行 (此时客户端无任何凭据)。仅放行该单一 POST 端点。
+        if request.method == "POST" and request.path == "/api/companion/connect":
+            return
         if (
             request.path.startswith("/static/")
             or request.path.startswith("/assets/")

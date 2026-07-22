@@ -6,8 +6,10 @@
     "remotes": "Storage & Logs",
     "rules": "Sync Rules",
     "config": "Configuration",
+    "clients": "Clients",
     "remotes_section": "Remotes",
-    "rules_section": "Sync Rules"
+    "rules_section": "Sync Rules",
+    "companion_section": "Companion Clients"
   },
   "remotes": {
     "authenticated": "Authenticated",
@@ -29,7 +31,7 @@
     "missing_fields": "Required fields missing: {fields}",
     "created": "Created",
     "create_failed": "Create failed",
-    "connecting": "Creating\u2026",
+    "connecting": "Creating…",
     "confirm_delete": "Delete remote \"{name}\"?",
     "deleted": "Deleted",
     "delete_failed": "Delete failed",
@@ -131,6 +133,34 @@
     "local_title": "Browse Local Directory",
     "select": "Select Current Directory"
   },
+  "companion": {
+    "serve_title": "Transfer service",
+    "clients_title": "Clients",
+    "description": "Pull outputs straight to this PC, in parallel with cloud sync.",
+    "serve_state": "WebDAV",
+    "serve_running": "Running",
+    "serve_stopped": "Stopped",
+    "serve_root_label": "Serving",
+    "dav_url": "Address",
+    "online_short": "online",
+    "client_online": "Online",
+    "client_offline": "Offline",
+    "status_idle": "Idle",
+    "status_syncing": "Pulling",
+    "status_pulling": "Pulling",
+    "status_busy": "Pulling",
+    "status_paused": "Paused",
+    "status_error": "Error",
+    "just_now": "now",
+    "never_seen": "never",
+    "no_clients": "No clients connected",
+    "client_rules": "Pull rules",
+    "no_rules": "No rules",
+    "forget": "Forget",
+    "confirm_forget": "Forget this client?",
+    "forgotten": "Client removed",
+    "forget_failed": "Couldn't remove client"
+  },
   "activity": {
     "current_job": "Current Sync",
     "recent_jobs": "Recent Jobs",
@@ -150,7 +180,8 @@
     "trigger": {
       "manual": "Manual",
       "watch": "Watch",
-      "deploy": "Deploy"
+      "deploy": "Deploy",
+      "companion": "Client"
     },
     "status": {
       "running": "Running",

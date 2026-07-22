@@ -47,6 +47,52 @@ export interface SyncRule {
   filters?: string[] | string
 }
 
+// ── Companion (桌面客户端) ──────────────────────────────────
+
+export interface CompanionProgress {
+  file?: string
+  pct?: number
+  speed?: number
+}
+
+/** 客户端上报的只读规则摘要 */
+export interface CompanionRuleSummary {
+  name?: string
+  source?: string
+  local_path?: string
+  method?: string
+  trigger?: string
+  last_result?: string
+}
+
+/** rclone serve webdav 进程状态 */
+export interface CompanionServeStatus {
+  running: boolean
+  pid?: number
+  addr?: string
+  baseurl?: string
+  serve_root?: string
+}
+
+export interface CompanionClient {
+  client_id: string
+  hostname: string
+  app_version: string
+  /** idle | syncing | paused | error */
+  status: string
+  active_rule_id: string
+  progress?: CompanionProgress
+  rule_summaries?: CompanionRuleSummary[]
+  last_seen: number
+  online: boolean
+}
+
+export interface CompanionClientsResponse {
+  clients: CompanionClient[]
+  serve?: CompanionServeStatus
+  dav_url?: string
+}
+
 export interface SyncTemplate {
   id?: string
   name: string

@@ -6,8 +6,10 @@
     "remotes": "存储 & 日志",
     "rules": "同步规则",
     "config": "配置",
+    "clients": "客户端",
     "remotes_section": "远程存储",
-    "rules_section": "同步规则"
+    "rules_section": "同步规则",
+    "companion_section": "Companion 客户端"
   },
   "remotes": {
     "authenticated": "已认证",
@@ -131,6 +133,34 @@
     "local_title": "浏览本地目录",
     "select": "选择当前目录"
   },
+  "companion": {
+    "serve_title": "传输服务",
+    "clients_title": "已连客户端",
+    "description": "直接把产物拉到本机，与网盘同步并行。",
+    "serve_state": "WebDAV",
+    "serve_running": "运行中",
+    "serve_stopped": "未运行",
+    "serve_root_label": "暴露目录",
+    "dav_url": "地址",
+    "online_short": "在线",
+    "client_online": "在线",
+    "client_offline": "离线",
+    "status_idle": "空闲",
+    "status_syncing": "拉取中",
+    "status_pulling": "拉取中",
+    "status_busy": "拉取中",
+    "status_paused": "已暂停",
+    "status_error": "出错",
+    "just_now": "刚刚",
+    "never_seen": "从未",
+    "no_clients": "暂无客户端连接",
+    "client_rules": "拉取规则",
+    "no_rules": "无规则",
+    "forget": "忘记",
+    "confirm_forget": "忘记此客户端？",
+    "forgotten": "已移除客户端",
+    "forget_failed": "移除失败"
+  },
   "activity": {
     "current_job": "当前同步",
     "recent_jobs": "最近任务",
@@ -150,7 +180,8 @@
     "trigger": {
       "manual": "手动",
       "watch": "监控",
-      "deploy": "部署"
+      "deploy": "部署",
+      "companion": "客户端"
     },
     "status": {
       "running": "运行中",

@@ -38,7 +38,7 @@ const allJobs = computed(() => {
   return finished
 })
 
-const triggerColor: Record<string, string> = { manual: 'var(--blue)', watch: 'var(--green)', deploy: 'var(--amber)' }
+const triggerColor: Record<string, string> = { manual: 'var(--blue)', watch: 'var(--green)', deploy: 'var(--amber)', companion: '#a78bfa' }
 
 // ── Pagination ──
 const PAGE_SIZE = 10
@@ -140,7 +140,12 @@ function jobFiles(job: SyncJob): string[] {
             <td class="col-status"><StatusDot :status="statusDot(job.status)" size="sm" /></td>
             <td class="col-time">{{ fmtTime(job.started_at) }}</td>
             <td class="col-time">{{ job.finished_at ? fmtTime(job.finished_at) : '-' }}</td>
-            <td class="col-trigger"><Badge :color="triggerColor[job.trigger_type]" size="sm">{{ t(`sync.job.trigger.${job.trigger_type}`) }}</Badge></td>
+            <td class="col-trigger">
+              <Badge :color="triggerColor[job.trigger_type]" size="sm">
+                <MsIcon v-if="job.trigger_type === 'companion'" name="monitor" size="xxs" />
+                {{ t(`sync.job.trigger.${job.trigger_type}`) }}
+              </Badge>
+            </td>
             <td class="col-files">
               <span v-if="job.status === 'running'">{{ job.success_count + job.failure_count }}/{{ job.rule_count }}</span>
               <span v-else-if="job.summary">{{ job.summary.transfers ?? 0 }}</span>
@@ -283,7 +288,7 @@ function jobFiles(job: SyncJob): string[] {
 
 .col-status { width: 20px; text-align: center; }
 .col-time { width: 70px; font-variant-numeric: tabular-nums; color: var(--t3); white-space: nowrap; }
-.col-trigger { width: 70px; }
+.col-trigger { width: 82px; }
 .col-files { width: 65px; white-space: nowrap; text-align: right; }
 .col-size, .col-speed { width: 60px; white-space: nowrap; text-align: right; }
 .col-dur { width: 50px; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }

@@ -26,6 +26,7 @@ from .auth import auth_bp, register_auth_middleware, DebugSessionInterface
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
 from .routes import generate, downloads, llm, files, prompt_library, update, favorites
 from .routes.ssh import restore_ssh_config
+from .routes import companion
 
 # Services
 from .services.comfyui_bridge import get_bridge
@@ -59,6 +60,7 @@ def create_app():
     app.register_blueprint(plugins.bp)
     app.register_blueprint(settings.bp)
     app.register_blueprint(sync.bp)
+    app.register_blueprint(companion.bp)
     app.register_blueprint(setup.bp)
     app.register_blueprint(jupyter.bp)
     app.register_blueprint(ssh.bp)
@@ -197,6 +199,15 @@ def main():
     if watch_rules:
         start_sync_worker()
         print(f"  ☁️  Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
+
+    # 启动 Companion WebDAV serve (rclone serve webdav, 经 cloudflared /dav 暴露)
+    try:
+        from .services import companion_serve
+        from .config import COMPANION_DAV_PORT as _dav_port
+        if companion_serve.start():
+            print(f"  📡  Companion WebDAV serve 已启动 (:{_dav_port}/dav)")
+    except Exception as e:
+        print(f"  ⚠️  Companion WebDAV serve 启动失败: {e}")
 
     print(f"\n{'='*50}")
     print(f"  🖥️  ComfyCarry v2.4 (Modular)")

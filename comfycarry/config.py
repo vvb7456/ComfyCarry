@@ -404,3 +404,33 @@ REMOTE_TYPE_DEFS = {
                      "help": "在本地执行 <code>rclone authorize \"dropbox\"</code> 获取 token JSON"}],
     },
 }
+
+
+# ── Companion (桌面客户端) 配置 ──────────────────────────────
+# 面板侧 rclone serve webdav 绑定端口 (经 cloudflared /dav 路径暴露)
+try:
+    COMPANION_DAV_PORT = int(os.environ.get("COMPANION_DAV_PORT") or 8688)
+except (ValueError, TypeError):
+    COMPANION_DAV_PORT = 8688
+
+# rclone serve webdav 的内容根 — 默认仅暴露 output/ (安全, 不外泄模型)
+COMPANION_SERVE_ROOT = os.environ.get(
+    "COMPANION_SERVE_ROOT",
+    os.path.join(COMFYUI_DIR, "output"),
+)
+
+# 已知客户端状态文件 (心跳上报)
+COMPANION_CLIENTS_FILE = Path("/workspace/.companion_clients.json")
+
+
+# ── 实例标签 (尽力取已有实例名配置, 无则空) ─────────────────
+def _load_instance_label() -> str:
+    """读取已配置的实例标签 (子域名 / 自定义名), 无则空字符串。"""
+    for key in ("instance_label", "cf_subdomain", "public_tunnel_subdomain"):
+        val = _get_config(key)
+        if val:
+            return val
+    return ""
+
+
+INSTANCE_LABEL = _load_instance_label()
