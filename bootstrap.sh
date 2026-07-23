@@ -76,7 +76,7 @@ if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" 
         rm -rf "$DASHBOARD_DIR/comfycarry"
         cp -r "$EXTRACTED/comfycarry" "$DASHBOARD_DIR/comfycarry"
     fi
-    # 复制 static/ 前端静态资源 (rclone-setup.bat 等)
+    # 复制 static/ 前端静态资源
     if [ -d "$EXTRACTED/static" ]; then
         rm -rf "$DASHBOARD_DIR/static"
         cp -r "$EXTRACTED/static" "$DASHBOARD_DIR/static"

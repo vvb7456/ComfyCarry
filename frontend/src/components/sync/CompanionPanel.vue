@@ -82,6 +82,15 @@ function onForget(c: CompanionClient) {
   <SectionHeader icon="cloud" flush>
     {{ t('sync.companion.serve_title') }}
     <template #actions>
+      <BaseButton
+        variant="ghost"
+        size="xs"
+        href="https://github.com/vvb7456/ComfyCarry-Companion/releases/latest"
+        target="_blank"
+      >
+        <MsIcon name="download" size="xs" />
+        {{ t('sync.companion.download_client_short') }}
+      </BaseButton>
       <BaseButton variant="ghost" size="xs" :disabled="loading" @click="emit('refresh')">
         <MsIcon name="refresh" size="xs" />
       </BaseButton>
@@ -130,9 +139,19 @@ function onForget(c: CompanionClient) {
   <EmptyState
     v-if="!clients.length"
     icon="monitor"
-    density="compact"
-    :message="t('sync.companion.no_clients')"
-  />
+    :title="t('sync.companion.no_clients')"
+    :message="t('sync.companion.no_clients_hint')"
+  >
+    <BaseButton
+      variant="primary"
+      size="sm"
+      href="https://github.com/vvb7456/ComfyCarry-Companion/releases/latest"
+      target="_blank"
+    >
+      <MsIcon name="download" size="xs" />
+      {{ t('sync.companion.download_client') }}
+    </BaseButton>
+  </EmptyState>
 
   <div v-else class="clients-grid">
     <div
