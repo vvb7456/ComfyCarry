@@ -17,9 +17,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import ModelDependencyGate from '@/components/generate/ModelDependencyGate.vue'
 import { ARCH_LABELS, effectiveArch, familyRoot } from '@/config/model-types'
-import type { ModelDepConfig, UseModelDependencyReturn } from '@/composables/generate/useModelDependency'
 import { useConfirm } from '@/composables/useConfirm'
 
 defineOptions({ name: 'ModelPickerModal' })
@@ -48,12 +46,8 @@ const props = withDefaults(defineProps<{
   countLabel?: string
   /** Current tab's arch (archFilter[0]); when set, arch chips default + mismatch confirm */
   currentArch?: string
-  /** Tab-level dependency handle (for component-state of split arch). Optional. */
-  dep?: UseModelDependencyReturn | null
-  /** Tab-level dependency config (title/minOptional). Optional. */
-  depConfig?: ModelDepConfig | null
-  /** ComfyUI root dir (passed to dep.startDownload). Optional. */
-  comfyuiDir?: string
+  /** 当前架构的运行组件是否缺失 (拆分形态卡片显示提示角标) */
+  componentsMissing?: boolean
   /** §5.3 两形态并存时显示形态过滤 chip + 卡片徽章 */
   showPackagingFilter?: boolean
 }>(), {
@@ -62,9 +56,7 @@ const props = withDefaults(defineProps<{
   searchPlaceholder: '',
   countLabel: '',
   currentArch: '',
-  dep: null,
-  depConfig: null,
-  comfyuiDir: '',
+  componentsMissing: false,
   showPackagingFilter: false,
 })
 
@@ -76,10 +68,6 @@ const emit = defineEmits<{
   toggle: [name: string]
   /** Multi-select: user confirmed selection */
   confirm: []
-  /** Component-state: dep gate enter (all installed) */
-  depEnter: []
-  /** Component-state: dep download button clicked */
-  depDownload: []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -249,13 +237,6 @@ async function onCardClick(item: PickerModelItem) {
   if (props.multi) {
     emit('toggle', item.name)
   } else {
-    // 仅拆分件在组件缺失时进组件下载态; 整合包无需外挂组件 → 直接选中
-    const pkg = item.packaging ?? 'split'
-    if (pkg === 'split' && props.dep && props.depConfig && !depReady.value) {
-      pendingName.value = item.name
-      modalMode.value = 'component'
-      return
-    }
     emit('select', item.name)
   }
 }
@@ -264,11 +245,7 @@ function close() {
   emit('update:modelValue', false)
 }
 
-// ── Modal mode: 'list' | 'component' ───────────────────────────────────────
-// component 态: 选中 split 件且组件缺失时切换到 ModelDependencyGate (compact),
-// 关窗不中断下载 (dep composable 实例由父组件持有, modal 只引用)。
-const modalMode = ref<'list' | 'component'>('list')
-const pendingName = ref<string>('')
+// ── Modal mode (list / empty only; component-state removed) ─────────────────
 const router = useRouter()
 
 const currentArchLabel = computed(() => {
@@ -278,36 +255,9 @@ const currentArchLabel = computed(() => {
 
 const isItemsEmpty = computed(() => props.items.length === 0)
 
-const depReady = computed(() => {
-  const d = props.dep
-  if (!d) return true
-  if (d.loading.value) return false
-  return !d.models.value.some(m =>
-    d.selected.value.has(m.id) && !d.modelStatus.value.get(m.id)?.installed,
-  )
-})
-
-watch(() => props.modelValue, (open) => {
-  if (open) modalMode.value = 'list'
-})
-
 function goToDownloadPage() {
   close()
   router.push({ name: 'models' })
-}
-
-function onComponentEnter() {
-  emit('depEnter')
-  if (pendingName.value) {
-    emit('select', pendingName.value)
-    pendingName.value = ''
-  }
-  modalMode.value = 'list'
-  close()
-}
-
-function onComponentDownload() {
-  emit('depDownload')
 }
 </script>
 
@@ -321,29 +271,8 @@ function onComponentDownload() {
     density="default"
     scroll="none"
   >
-    <!-- ── ① 组件态: 选中拆分件且组件缺失 ── -->
-    <div v-if="modalMode === 'component' && dep && depConfig" class="picker-component-state">
-      <div class="picker-component-title">
-        <MsIcon name="widgets" color="none" />
-        <span>{{ t('generate.picker.component_required') }}</span>
-      </div>
-      <ModelDependencyGate
-        :dep="dep"
-        :title="depConfig.title"
-        :min-optional="depConfig.minOptional"
-        compact
-        @enter="onComponentEnter"
-        @download="onComponentDownload"
-      />
-      <div class="picker-component-back">
-        <BaseButton size="sm" @click="modalMode = 'list'">
-          <MsIcon name="arrow_back" size="sm" color="none" /> {{ t('generate.picker.back_to_list') }}
-        </BaseButton>
-      </div>
-    </div>
-
-    <!-- ── ② 空态: 该 arch 两目录皆空 ── -->
-    <div v-else-if="isItemsEmpty" class="picker-empty-state">
+    <!-- ── ① 空态: 该 arch 两目录皆空 ── -->
+    <div v-if="isItemsEmpty" class="picker-empty-state">
       <MsIcon name="cloud_download" color="none" class="picker-empty-icon" />
       <div class="picker-empty-title">{{ t('generate.picker.empty_title', { arch: currentArchLabel }) }}</div>
       <div class="picker-empty-desc">{{ t('generate.picker.empty_desc') }}</div>
@@ -433,6 +362,14 @@ function onComponentDownload() {
               <div v-if="multi" class="model-card__check">
                 <MsIcon name="check" color="none" />
               </div>
+              <!-- 组件缺失提示角标 (拆分形态, 左下角, 不阻断) -->
+              <span
+                v-if="componentsMissing && (item.packaging ?? 'split') === 'split'"
+                class="model-card__dep-hint"
+                :title="t('generate.picker.component_hint')"
+              >
+                <MsIcon name="warning" size="sm" color="none" />
+              </span>
             </div>
             <div class="model-card__body">
               <div class="model-card__name text-truncate">{{ getDisplayName(item) }}</div>
@@ -443,7 +380,7 @@ function onComponentDownload() {
     </template>
 
     <!-- Footer (multi-select only) -->
-    <template v-if="multi && modalMode !== 'component'" #footer>
+    <template v-if="multi" #footer>
       <span class="picker-count">{{ countLabel }}</span>
       <BaseButton @click="close">{{ t('common.btn.cancel') }}</BaseButton>
       <BaseButton variant="primary" @click="emit('confirm')">{{ t('common.btn.confirm') }}</BaseButton>
@@ -659,26 +596,16 @@ function onComponentDownload() {
   color: var(--t3);
 }
 
-/* ── 组件态 ── */
-.picker-component-state {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-2) 0;
-}
-
-.picker-component-title {
+/* 组件缺失提示角标 (拆分形态, 左下角, 不阻断选择) */
+.model-card__dep-hint {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  font-size: .9rem;
-  color: var(--t2);
-  font-weight: 500;
-}
-
-.picker-component-back {
-  display: flex;
   justify-content: center;
-  margin-top: var(--sp-2);
+  color: var(--amber, #f59e0b);
+  pointer-events: none;
 }
 </style>

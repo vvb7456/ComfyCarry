@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { MODEL_TYPES } from '@/config/model-types'
-import { COMPONENT_FILENAMES } from '@/composables/generate/modelDepConfigs'
+import { componentsForSlot, stemOf, type ComponentSlot, type ComponentFile } from '@/config/component-registry'
+import type { SelectOption } from '@/components/form/BaseSelect.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseInput from '@/components/form/BaseInput.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
@@ -14,7 +15,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'AdvancedSettings' })
 
-defineProps<{
+const props = defineProps<{
   disabled?: boolean
   /** Anima 专用：额外在顶部展示 CLIP + VAE 两项 split-file 选择 */
   showSplitModels?: boolean
@@ -22,12 +23,16 @@ defineProps<{
   dualClip?: boolean
   /** Checkpoint 系专属: 在主 2×3 网格上方新增 [Clip Skip | VAE] 对称条件行 */
   showClipSkipVae?: boolean
+  /** 本 tab 的架构 key; 缺省时回退 store.activeModelType (过渡期兼容) */
+  modelType?: string
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
 const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
+
+const arch = computed(() => props.modelType || store.activeModelType)
 
 /* ── Format ── */
 const formatOptions = [
@@ -42,91 +47,116 @@ function formatLabel(key: string): string {
   return t(`generate.advanced.format_${key}`)
 }
 
-/* ── CLIP / VAE (split-file architectures) — 推荐置顶 + 其他折叠 ── */
-function basenameNoExt(name: string) {
+/* ── CLIP / VAE (split-file architectures) — 三分组 (本架构组件/兼容版本/其他文件) ── */
+function basenameNoExt(name: string): string {
   const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
   return base.replace(/\.[^.]+$/, '')
 }
-
-// CLIP/TE 推荐名: 文本编码器族 (t5xxl / clip_l / qwen / mistral)
-const RECOMMENDED_CLIP_PATTERN = /(t5xxl|clip_l|qwen|mistral)/i
-// VAE 推荐名: VAE 文件 (含 vae 或以 ae. 开头), 不含 TE 名 (否则会把 t5xxl 等误推为 VAE)
-const RECOMMENDED_VAE_PATTERN = /(vae|^ae\.)/i
-
-const currentDefaultModels = computed(() =>
-  MODEL_TYPES[store.activeModelType]?.defaultModels ?? {},
-)
 
 function fileBaseName(name: string): string {
   return name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
 }
 
-function isRecommendedClip(name: string, slot: 'clip' | 'clip2'): boolean {
-  const base = fileBaseName(name)
-  const dm = currentDefaultModels.value
-  const dmTarget = slot === 'clip2' ? dm.clip2 : dm.clip
-  if (dmTarget && base === dmTarget) return true
-  if (COMPONENT_FILENAMES.has(base)) return true
-  return RECOMMENDED_CLIP_PATTERN.test(base)
+function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`
+  return `${Math.round(bytes / 1e6)} MB`
 }
 
-function isRecommendedVae(name: string): boolean {
-  const base = fileBaseName(name)
-  if (currentDefaultModels.value.vae && base === currentDefaultModels.value.vae) return true
-  if (COMPONENT_FILENAMES.has(base)) return true
-  return RECOMMENDED_VAE_PATTERN.test(base)
+const GROUP_OFFICIAL = 'generate.advanced.clip_group_official'
+const GROUP_COMPAT = 'generate.advanced.clip_group_compat'
+const GROUP_OTHER = 'generate.advanced.clip_group_other'
+
+interface SlotConfig {
+  group: number // 1 = official, 2 = compat, 3 = other
+  file: ComponentFile | null // 组1命中时的文件 (用于 hint)
 }
 
-interface ClipOption { value: string; label: string }
+/**
+ * 给定 slot 与候选列表，构造三分组并排好序的 SelectOption[]。
+ * 整合包架构 (registry 无条目) → 不分组，平铺全量。
+ */
+function buildSlotOptions(slot: ComponentSlot, candidates: { name: string }[]): SelectOption[] {
+  const files = componentsForSlot(arch.value, slot)
+  if (files.length === 0) {
+    return candidates.map(c => ({ value: c.name, label: basenameNoExt(c.name) }))
+  }
 
-function buildClipLabel(name: string, recommended: boolean): string {
-  const base = basenameNoExt(name)
-  return recommended ? `★ ${base}` : base
+  // 预计算官方文件的判定集合
+  const officialFilenames = new Set(files.map(f => f.filename))
+  const officialStems = new Set<string>()
+  for (const f of files) {
+    officialStems.add(stemOf(f.filename))
+    officialStems.add(f.stem)
+  }
+
+  const configs: SlotConfig[] = candidates.map(c => {
+    const base = fileBaseName(c.name)
+    if (officialFilenames.has(base)) {
+      const f = files.find(x => x.filename === base) || null
+      return { group: 1, file: f }
+    }
+    if (officialStems.has(stemOf(base))) {
+      return { group: 2, file: null }
+    }
+    return { group: 3, file: null }
+  })
+
+  // 稳定排序: 组1→组2→组3, 组内保持原顺序
+  const ordered = candidates.map((_, i) => i)
+  ordered.sort((a, b) => configs[a].group - configs[b].group)
+
+  return ordered.map(i => {
+    const c = candidates[i]
+    const cfg = configs[i]
+    const base = basenameNoExt(c.name)
+    const opt: SelectOption = { value: c.name, label: base }
+    if (cfg.group === 1) {
+      opt.label = `★ ${base}`
+      opt.group = t(GROUP_OFFICIAL)
+      if (cfg.file) opt.hint = formatBytes(cfg.file.bytes)
+    } else if (cfg.group === 2) {
+      opt.label = `☆ ${base}`
+      opt.group = t(GROUP_COMPAT)
+    } else {
+      opt.group = t(GROUP_OTHER)
+    }
+    return opt
+  })
 }
 
-const allClipOptions = computed<ClipOption[]>(() => {
-  const recFlags = options.clips.value.map(c => isRecommendedClip(c.name, 'clip'))
-  return options.clips.value.map((c, i) => ({
-    value: c.name,
-    label: buildClipLabel(c.name, recFlags[i]),
-  }))
-})
-const allVaeOptions = computed<ClipOption[]>(() => {
-  const recFlags = options.vaes.value.map(v => isRecommendedVae(v.name))
-  return options.vaes.value.map((v, i) => ({
-    value: v.name,
-    label: buildClipLabel(v.name, recFlags[i]),
-  }))
-})
+/** 判断某个值是否落在组 3 (其他文件) */
+function isOtherGroup(slot: ComponentSlot, candidates: { name: string }[], value: string): boolean {
+  // 未选择任何文件时不算"不兼容" (空值不该触发警告)
+  if (!value) return false
+  const files = componentsForSlot(arch.value, slot)
+  if (files.length === 0) return false
+  const base = fileBaseName(value)
+  if (files.some(f => f.filename === base)) return false
+  const stems = new Set<string>()
+  for (const f of files) {
+    stems.add(stemOf(f.filename))
+    stems.add(f.stem)
+  }
+  return !stems.has(stemOf(base))
+}
 
-const recommendedClipOptions = computed<ClipOption[]>(() => {
-  const recs = options.clips.value
-    .filter(c => isRecommendedClip(c.name, 'clip'))
-    .map(c => ({ value: c.name, label: buildClipLabel(c.name, true) }))
-  return recs.length ? recs : allClipOptions.value
-})
-const recommendedVaeOptions = computed<ClipOption[]>(() => {
-  const recs = options.vaes.value
-    .filter(v => isRecommendedVae(v.name))
-    .map(v => ({ value: v.name, label: buildClipLabel(v.name, true) }))
-  return recs.length ? recs : allVaeOptions.value
-})
+/** 三分组已排好序的完整列表 (组1 本架构组件 → 组2 兼容版本 → 组3 其他文件)。
+ *  不再做折叠/裁剪: 全部平铺, 官方组件天然在首位。 */
+const clipOptions = computed(() => buildSlotOptions('clip', options.clips.value))
+const clip2Options = computed(() => buildSlotOptions('clip2', options.clips.value))
+const vaeOptions = computed(() => buildSlotOptions('vae', options.vaes.value))
 
-const showAllClips = ref(false)
-const showAllVaes = ref(false)
-
-const clipOptions = computed<ClipOption[]>(() =>
-  showAllClips.value ? allClipOptions.value : recommendedClipOptions.value,
-)
-const vaeOptions = computed<ClipOption[]>(() =>
-  showAllVaes.value ? allVaeOptions.value : recommendedVaeOptions.value,
-)
-
-const hasOtherClips = computed(() => recommendedClipOptions.value.length < allClipOptions.value.length)
-const hasOtherVaes = computed(() => recommendedVaeOptions.value.length < allVaeOptions.value.length)
+const archLabel = computed(() => MODEL_TYPES[arch.value]?.label ?? arch.value)
+const clipIncompatible = computed(() => isOtherGroup('clip', options.clips.value, state.value.clip))
+const clip2Incompatible = computed(() => isOtherGroup('clip2', options.clips.value, state.value.clip2))
+const vaeIncompatible = computed(() => isOtherGroup('vae', options.vaes.value, state.value.vae))
+const hasRegistry = computed(() =>
+  componentsForSlot(arch.value, 'clip').length > 0 ||
+  componentsForSlot(arch.value, 'clip2').length > 0 ||
+  componentsForSlot(arch.value, 'vae').length > 0)
 
 /* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
-// B1: 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + options.vaes 列表
+// B1: 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
 const clipSkipOptions = computed(() => [
   { value: 1, label: t('generate.advanced.clip_skip_default') },
   { value: 2, label: '2' },
@@ -152,6 +182,11 @@ const vaeOverrideOptions = computed(() => [
           <label class="field-lbl">
             {{ t('generate.basic.clip') }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+            <span
+              v-if="hasRegistry && clipIncompatible"
+              class="adv-warn"
+              :title="t('generate.advanced.clip_incompatible', { arch: archLabel })"
+            >{{ t('generate.advanced.clip_incompatible', { arch: archLabel }) }}</span>
           </label>
           <BaseSelect
             :model-value="state.clip"
@@ -160,42 +195,34 @@ const vaeOverrideOptions = computed(() => [
             :placeholder="t('generate.basic.select_clip')"
             @update:model-value="state.clip = String($event)"
           />
-          <button
-            v-if="hasOtherClips"
-            type="button"
-            class="adv-toggle"
-            @click="showAllClips = !showAllClips"
-          >
-            <MsIcon :name="showAllClips ? 'unfold_less' : 'unfold_more'" size="sm" color="var(--ac)" />
-            {{ showAllClips ? t('generate.advanced.clip_filter_recommended_only') : t('generate.advanced.clip_filter_show_all') }}
-          </button>
         </div>
         <div v-if="dualClip" class="field-group">
           <label class="field-lbl">
             {{ t('generate.basic.clip2') }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+            <span
+              v-if="hasRegistry && clip2Incompatible"
+              class="adv-warn"
+              :title="t('generate.advanced.clip_incompatible', { arch: archLabel })"
+            >{{ t('generate.advanced.clip_incompatible', { arch: archLabel }) }}</span>
           </label>
           <BaseSelect
             :model-value="state.clip2"
-            :options="clipOptions"
+            :options="clip2Options"
             :disabled="disabled"
             :placeholder="t('generate.basic.select_clip')"
             @update:model-value="state.clip2 = String($event)"
           />
-          <button
-            v-if="hasOtherClips"
-            type="button"
-            class="adv-toggle"
-            @click="showAllClips = !showAllClips"
-          >
-            <MsIcon :name="showAllClips ? 'unfold_less' : 'unfold_more'" size="sm" color="var(--ac)" />
-            {{ showAllClips ? t('generate.advanced.clip_filter_recommended_only') : t('generate.advanced.clip_filter_show_all') }}
-          </button>
         </div>
         <div class="field-group">
           <label class="field-lbl">
             {{ t('generate.basic.vae') }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+            <span
+              v-if="hasRegistry && vaeIncompatible"
+              class="adv-warn"
+              :title="t('generate.advanced.vae_incompatible', { arch: archLabel })"
+            >{{ t('generate.advanced.vae_incompatible', { arch: archLabel }) }}</span>
           </label>
           <BaseSelect
             :model-value="state.vae"
@@ -204,15 +231,6 @@ const vaeOverrideOptions = computed(() => [
             :placeholder="t('generate.basic.select_vae')"
             @update:model-value="state.vae = String($event)"
           />
-          <button
-            v-if="hasOtherVaes"
-            type="button"
-            class="adv-toggle"
-            @click="showAllVaes = !showAllVaes"
-          >
-            <MsIcon :name="showAllVaes ? 'unfold_less' : 'unfold_more'" size="sm" color="var(--ac)" />
-            {{ showAllVaes ? t('generate.advanced.clip_filter_recommended_only') : t('generate.advanced.clip_filter_show_all') }}
-          </button>
         </div>
       </div>
 
@@ -430,26 +448,26 @@ const vaeOverrideOptions = computed(() => [
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   font-size: .78rem;
   font-weight: 500;
   color: var(--t2);
 }
 
-.adv-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: .7rem;
-  font-weight: 500;
-  color: var(--ac);
-  cursor: pointer;
-  align-self: flex-start;
-}
 
-.adv-toggle:hover { text-decoration: underline; }
+/* ── Incompatible warning ── */
+/* 不兼容提示: 跟在 label 的 HelpTip 右侧, 留间距; 过长时省略 (完整文案见 title) */
+.adv-warn {
+  margin-left: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: .7rem;
+  font-weight: 400;
+  color: var(--amber);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Seed mode badge ── */
 .seed-mode-badge {

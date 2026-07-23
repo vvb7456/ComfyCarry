@@ -3,24 +3,20 @@
   "gate": {
     "starting": "ComfyUI is starting, please wait…",
     "go_comfyui": "Go to ComfyUI page to start",
-    "backend_error": "Cannot connect to Dashboard service",
-    "anima_title": "Anima requires dedicated text encoder & VAE",
-    "krea2_title": "Krea 2 requires dedicated text encoder & VAE",
-    "zimage_title": "Z-Image requires dedicated text encoder & VAE",
-    "flux1_title": "Flux 1 requires dual text encoders & VAE",
-    "chroma_title": "Chroma requires text encoder & VAE",
-    "flux2klein_title": "Flux 2 Klein requires text encoder + VAE",
-    "flux2dev_title": "Flux 2 Dev requires text encoder + VAE"
+    "backend_error": "Cannot connect to Dashboard service"
   },
   "header": {
     "queue_history": "Queue / History",
     "model_selector_aria": "Select model",
     "gate_not_ready": "Components not ready",
-    "family_sdxl": "SDXL Family",
+    "family_sdxl": "SDXL series",
+    "family_flux1": "Flux 1 series",
     "model_label": "Model",
     "task_image": "Image",
     "task_video": "Video",
-    "task_edit": "Edit"
+    "task_edit": "Edit",
+    "family_flux2": "Flux 2 series",
+    "not_ready": "Not ready"
   },
   "tabs": {
     "sdxl": "SDXL",
@@ -28,9 +24,10 @@
     "flux": "Flux",
     "krea2": "Krea 2",
     "zimage": "Z-Image",
-    "flux1": "Flux 1",
+    "flux1": "Flux 1.D",
     "chroma": "Chroma",
-    "flux2klein": "Flux 2 Klein",
+    "flux2klein4b": "Flux 2 Klein 4B",
+    "flux2klein9b": "Flux 2 Klein 9B",
     "flux2dev": "Flux 2 Dev",
     "pony": "Pony",
     "illustrious": "Illustrious",
@@ -155,9 +152,12 @@
     "vae_override": "VAE",
     "vae_override_follow": "Follow Checkpoint",
     "vae_override_help": "Override the checkpoint's built-in VAE with an external VAE file. Some anime checkpoints (e.g. Pony) recommend an external sdxl_vae for better color reproduction",
-    "clip_filter_help": "Recommended items pinned (★). Unofficial encoders are usable, but wrong type will produce broken images",
-    "clip_filter_show_all": "Show all",
-    "clip_filter_recommended_only": "Recommended only"
+    "clip_filter_help": "Official components for this architecture are listed first (★), compatible variants next (☆). Other encoders are selectable but may produce garbage.",
+    "clip_group_official": "Components for this architecture",
+    "clip_group_compat": "Compatible variants",
+    "clip_group_other": "Other files",
+    "clip_incompatible": "Not a {arch} text encoder — generation may fail",
+    "vae_incompatible": "Not a {arch} VAE — generation may fail"
   },
   "preview": {
     "empty": "Generated images will appear here",
@@ -439,7 +439,8 @@
     "i2i_no_ref": "Img2Img is enabled but no reference uploaded, please upload or uncheck",
     "inpaint_no_mask": "No mask drawn",
     "inpaint_no_mask_desc": "Inpaint mode is active but no mask has been drawn. Will run as standard Img2Img instead.",
-    "prompt_id_missing": "Failed to get prompt_id"
+    "prompt_id_missing": "Failed to get prompt_id",
+    "components_not_ready": "Runtime components not ready — download them first"
   },
   "model_dep": {
     "detecting": "Detecting models…",
@@ -452,6 +453,29 @@
     "download_failed": "Download failed",
     "all_downloaded": "All downloads complete",
     "enter": "Enter"
+  },
+  "components": {
+    "title": "Runtime components",
+    "ready": "Components ready · {n} items",
+    "ready_short": "Ready",
+    "missing": "{n} components missing — click to download",
+    "fetch_all": "Download all",
+    "downloading": "Fetching component {i}/{n} · {name}",
+    "failed": "Download failed",
+    "retry": "Retry",
+    "role_text_encoder": "Text encoder",
+    "role_text_encoder_1": "Text encoder 1",
+    "role_text_encoder_2": "Text encoder 2",
+    "role_vae": "VAE",
+    "version": "Version",
+    "tier_standard": "Standard",
+    "tier_lite": "Lite",
+    "tier_full": "Full",
+    "suspect_size": "File size differs from expected — may not be the right file",
+    "error_check": "Component check failed",
+    "error_no_dir": "ComfyUI directory unavailable — cannot download components",
+    "error_submit": "Failed to queue {name}",
+    "error_download": "{name} download failed"
   },
   "picker": {
     "arch_all": "All",
@@ -468,7 +492,8 @@
     "go_to_downloads": "Go to Downloads",
     "component_required": "Selected model requires these components",
     "component_ready": "Components ready, click confirm to use",
-    "back_to_list": "Back to list"
+    "back_to_list": "Back to list",
+    "component_hint": "Requires additional runtime components"
   },
   "placeholders": {
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",

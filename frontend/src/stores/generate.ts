@@ -221,12 +221,13 @@ export const useGenerateStore = defineStore('generate', () => {
   const activeModelType = ref('sdxl')
   const modelStates = reactive<Record<string, ModelState>>({})
 
-  // ── Gate 就绪状态 (不持久化, 不进 restore/persist 白名单) ──
-  // ModelTab 在 dep check 完成处调用 setGateReady(props.modelType, ready)。
-  // 菜单项 status: gateReady[key]===false → 'warn'; undefined 不显示。
-  const gateReady = reactive<Record<string, boolean | undefined>>({})
-  function setGateReady(type: string, ok: boolean) {
-    gateReady[type] = ok
+  // ── 各架构运行组件就绪状态 (不持久化, 不进 restore/persist 白名单) ──
+  // ModelTab 在 dep check 完成处调用 setComponentsReady(type, ready)。
+  // 菜单项 hint: componentsReady[key]===false → '未就绪'; true / undefined 不显示。
+  /** 各架构的运行组件是否就绪; undefined = 尚未检查 */
+  const componentsReady = reactive<Record<string, boolean | undefined>>({})
+  function setComponentsReady(type: string, ready: boolean) {
+    componentsReady[type] = ready
   }
 
   const currentConfig = computed<ModelTypeConfig>(() => MODEL_TYPES[activeModelType.value] || MODEL_TYPES.sdxl)
@@ -392,7 +393,7 @@ export const useGenerateStore = defineStore('generate', () => {
 
   return {
     activeModelType, modelStates,
-    gateReady, setGateReady,
+    componentsReady, setComponentsReady,
     currentConfig, currentState,
     switchModelType, save, restore, enableAutoSave,
   }

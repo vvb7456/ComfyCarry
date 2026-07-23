@@ -12,7 +12,6 @@ import { useComfyGate } from '@/composables/generate/useComfyGate'
 import { useTaskRegistry } from '@/composables/generate/useTaskRegistry'
 import { useGenerateSubmit } from '@/composables/generate/useGenerateSubmit'
 import { useGeneratePreview } from '@/composables/generate/useGeneratePreview'
-import { TAB_DEP_CONFIGS } from '@/composables/generate/modelDepConfigs'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { MODEL_TYPES } from '@/config/model-types'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -62,44 +61,6 @@ async function initOptions(forceRefresh = false) {
   })
   store.enableAutoSave()
   optionsReady.value = true
-  // ── gateReady 全量预检 (规格 D) ──
-  // 对 TAB_DEP_CONFIGS 每个 entry 并发预检 (与 ModelTab 内 check 同接口, mount 时跑一次)
-  // 无依赖配置的 entry (sdxl/pony/illustrious/noobai) 直接置 true
-  precheckAllGateReady()
-}
-
-let gatePrecheckStarted = false
-async function precheckAllGateReady() {
-  if (gatePrecheckStarted) return
-  gatePrecheckStarted = true
-  // 无 dep 配置的架构 key 直接置 ready=true
-  const depKeys = Object.keys(TAB_DEP_CONFIGS)
-  for (const k of Object.keys(MODEL_TYPES)) {
-    if (!depKeys.includes(k)) store.setGateReady(k, true)
-  }
-  // 并发预检有 dep 的 entry (复用 useModelDependency.check 同样的 /api/downloads/check 请求)
-  await Promise.all(depKeys.map(async (tabKey) => {
-    const cfg = TAB_DEP_CONFIGS[tabKey]
-    try {
-      const checkFiles: Array<{ subdir: string; filename: string }> = []
-      for (const m of cfg.models) {
-        for (const f of m.files) checkFiles.push({ subdir: f.subdir, filename: f.filename })
-      }
-      const res = await fetch('/api/downloads/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files: checkFiles }),
-      })
-      if (!res.ok) { store.setGateReady(tabKey, false); return }
-      const data = await res.json()
-      const results: Array<{ installed: boolean }> = data?.results || []
-      // 任一文件未安装 → 未就绪; 否则就绪
-      const allInstalled = results.length === checkFiles.length && results.every(r => r.installed)
-      store.setGateReady(tabKey, allInstalled)
-    } catch {
-      store.setGateReady(tabKey, false)
-    }
-  }))
 }
 
 // Only load options when gate is ready (not eagerly on mount)
@@ -137,64 +98,94 @@ const selectedModelKey = computed<string>({
   },
 })
 
+// ── 架构行 hint (b) ──────────────────────────────────────────────────────
+// 未就绪: 低对比度 hint '未就绪'; 就绪 / 未检查: 无 hint。
+// 状态点已移除 (DropdownMenuItem.status 字段已废弃), 不再传 status。
+function leafHint(cfg: { key: string }): { hint?: string } {
+  if (store.componentsReady[cfg.key] === false) {
+    return { hint: t('generate.header.not_ready') }
+  }
+  return {}
+}
+
 const menuItems = computed<DropdownMenuItem[]>(() => {
   const items: DropdownMenuItem[] = []
-  // 按 familyOf 分组: 家族 key → 子 entries
+  // 按 familyOf 分桶: 家族 key → 子叶子数组
   const families: Record<string, DropdownMenuItem[]> = {}
-  const topLevels: DropdownMenuItem[] = []
 
+  // 构建叶子 (带 hint), 并按 familyOf 分桶
   for (const cfg of Object.values(MODEL_TYPES)) {
-    const status = store.gateReady[cfg.key] === false ? 'warn' as const : undefined
+    const { hint } = leafHint(cfg)
     const leaf: DropdownMenuItem = {
       key: cfg.key,
       label: t(`generate.tabs.${cfg.key}`),
       logo: cfg.logo,
       logoInvertDark: cfg.logoInvertDark,
       letter: cfg.logo ? undefined : (cfg.label.slice(0, 2) || cfg.key.slice(0, 2)),
-      status,
+      hint,
     }
     if (cfg.familyOf) {
       ;(families[cfg.familyOf] ||= []).push(leaf)
     } else {
-      topLevels.push(leaf)
+      items.push(leaf)
     }
   }
 
-  // 合并: 顶级条目中, 若有 familyOf 子组, 把对应顶级条目升级为父组 (加 children)
-  // sdxl 顶级条目 → SDXL 家族父组, children = [sdxl, pony, illustrious, noobai]
-  for (let i = 0; i < topLevels.length; i++) {
-    const top = topLevels[i]
-    const famKey = Object.keys(families).find(k => k === top.key)
-    if (famKey && families[famKey].length) {
-      // 父组: logo 用家族根 logo (sdxl.png), label 用 family label
-      const parentCfg = MODEL_TYPES[top.key]
-      const parent: DropdownMenuItem = {
-        key: `family_${top.key}`,
-        label: t(`generate.header.family_${top.key}`),
-        logo: parentCfg?.logo,
-        logoInvertDark: parentCfg?.logoInvertDark,
-      }
-      // children: 父组行本身不可选中, 子行按家族内顺序 (通用在前)
-      parent.children = [top, ...families[famKey]]
-      items.push(parent)
-      // 从 families 移除已消费的 (避免重复)
-      delete families[famKey]
-    } else {
-      items.push(top)
-    }
-  }
-  // 剩余未被消费的 family 子项 (理论上不会发生, 防御性追加)
+  // 把每个家族挂到对应父组:
+  //  - MODEL_TYPES[fam] 存在 (sdxl): 该顶级条目升级为父组, children = [自身叶子, ...家族子项]
+  //  - MODEL_TYPES[fam] 不存在 (flux2): 纯分组节点, children = [...家族子项], 无自身叶子
+  //    logo 取第一个子项的 logo, letter 取 'F2' 兜底徽章
+  //  顺序天然跟随 MODEL_TYPES 声明顺序 (子项在遍历时已按声明顺序入桶)。
   for (const [famKey, children] of Object.entries(families)) {
     const parentCfg = MODEL_TYPES[famKey]
-    if (!parentCfg) continue
-    items.push({
-      key: `family_${famKey}`,
-      label: t(`generate.header.family_${famKey}`),
-      logo: parentCfg.logo,
-      logoInvertDark: parentCfg.logoInvertDark,
-      children,
-    })
+    if (parentCfg) {
+      // 父组行本身不可选中; 在 items 中找到该顶级叶子并升级为父组
+      const idx = items.findIndex(it => it.key === famKey)
+      const selfLeaf = idx >= 0 ? items[idx] : undefined
+      const parent: DropdownMenuItem = {
+        key: `family_${famKey}`,
+        label: t(`generate.header.family_${famKey}`),
+        logo: parentCfg.logo,
+        logoInvertDark: parentCfg.logoInvertDark,
+        children: selfLeaf ? [selfLeaf, ...children] : children,
+      }
+      if (idx >= 0) items[idx] = parent
+      else items.push(parent)
+    } else {
+      // 纯分组节点: 就地插入到最后一个非家族顶级条目之后
+      const firstChild = children[0]
+      const parent: DropdownMenuItem = {
+        key: `family_${famKey}`,
+        label: t(`generate.header.family_${famKey}`),
+        logo: firstChild?.logo,
+        logoInvertDark: firstChild?.logoInvertDark,
+        letter: firstChild?.logo ? undefined : 'F2',
+        children,
+      }
+      items.push(parent)
+    }
   }
+
+
+  // ── 排序 (用户指定规则): 可展开的分组在上、叶子在下; 各自按发布时间升序 ──
+  // 分组的排序键 = 组内最早的发布时间。
+  const relOf = (key: string) => MODEL_TYPES[key]?.releasedAt ?? '9999-99'
+  const keyOf = (it: DropdownMenuItem) =>
+    it.children?.length
+      ? it.children.map(c => relOf(c.key)).sort()[0]
+      : relOf(it.key)
+
+  // 组内子项按发布时间
+  for (const it of items) {
+    if (it.children?.length) it.children.sort((a, b) => relOf(a.key).localeCompare(relOf(b.key)))
+  }
+  items.sort((a, b) => {
+    const ga = a.children?.length ? 0 : 1
+    const gb = b.children?.length ? 0 : 1
+    if (ga !== gb) return ga - gb
+    return keyOf(a).localeCompare(keyOf(b))
+  })
+
   return items
 })
 

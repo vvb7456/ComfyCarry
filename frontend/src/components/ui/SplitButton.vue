@@ -17,6 +17,8 @@ const props = withDefaults(defineProps<{
   icon?: string
   variant?: 'primary' | 'danger' | 'success'
   disabled?: boolean
+  /** 软禁用: 主按钮视觉置灰但仍可点击 (供父组件 toast 说明原因), 右侧下拉真禁用 */
+  softDisabled?: boolean
   loading?: boolean
   options: SplitButtonOption[]
 }>(), {
@@ -50,7 +52,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div class="split-button" :class="[`split-button--${variant}`]">
+  <div class="split-button" :class="[`split-button--${variant}`, { 'split-button--soft': softDisabled }]">
     <button
       class="split-button__main"
       :disabled="disabled || loading"
@@ -63,7 +65,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
     <button
       class="split-button__arrow"
-      :disabled="disabled || loading"
+      :disabled="disabled || loading || softDisabled"
       @click="toggle"
     >
       <MsIcon name="expand_more" size="xs" color="none" />
@@ -120,6 +122,12 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 .split-button__main:disabled,
 .split-button__arrow:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* 软禁用: 与 :disabled 同款观感, 但主按钮仍可点击 */
+.split-button--soft .split-button__main {
   opacity: .5;
   cursor: not-allowed;
 }

@@ -236,6 +236,13 @@ def _fetch_generate_options() -> dict:
     if _options_cache is not None and (time.time() - _options_cache_time) < 300:
         return _options_cache
 
+    # 走到这里 = 缓存已过期(或从未建立), 本次要真正重算。
+    # _combo_cache 保存的是 ComfyUI /object_info 快照(含 checkpoints/unets/clips/vaes 文件列表),
+    # 过去只有 ?refresh=1 才清 → 新下载的组件在进程存活期间永远不出现在下拉里
+    # (即便用户整页刷新, 因为整页刷新走的是不带 refresh 的 load())。
+    # 与 _options_cache 同周期清除, 让新文件最迟 300s 自动可见。
+    _combo_cache.clear()
+
     DEFAULT_SAMPLERS = [
         "euler", "euler_ancestral", "heun", "dpm_2",
         "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",

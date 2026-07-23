@@ -2,6 +2,7 @@ import sdxlLogo from '@/assets/model-logos/sdxl.png'
 import krea2Logo from '@/assets/model-logos/krea2.png'
 import zimageLogo from '@/assets/model-logos/zimage.png'
 import flux1Logo from '@/assets/model-logos/flux1.png'
+import illustriousLogo from '@/assets/model-logos/illustrious.png'
 
 export interface ModelTypeConfig {
   key: string
@@ -42,12 +43,15 @@ export interface ModelTypeConfig {
   /** 暗色主题下 logo 反色 (纯黑单色 logo 如 flux1/BFL): true → filter: invert(1)
    *  且底板改用透明/深色 (规格 C5) */
   logoInvertDark?: boolean
-  /** 软架构: 所属家族 key (如 'sdxl'); 有此字段 = 二级条目 (衍生) */
+  /** 软架构: 所属家族 key (如 'sdxl'); 有此字段 = 二级条目 (衍生)。
+   *  家族 key 可以不对应 MODEL_TYPES 中的条目 (如 'flux2' 是纯分组, 无同名可选架构)。 */
   familyOf?: string
   /** 提交 payload 的 model_type 覆盖; 软架构条目 = 'sdxl' */
   workflowType?: string
   /** Picker 传给 ModelPickerModal 的 current-arch (显式声明) */
   pickerArch: string
+  /** 发布时间 YYYY-MM (取 HuggingFace 官方仓库创建时间); 架构菜单按此排序 */
+  releasedAt: string
 }
 
 /** 架构 key → 展示标签。新增架构在此加一行 (检测输出的 arch 值为 key)。 */
@@ -70,6 +74,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     cnBranch: 'sdxl',
     logo: sdxlLogo,
     pickerArch: 'sdxl',
+    releasedAt: '2023-07',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -94,6 +99,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
     pickerArch: 'anima',
+    releasedAt: '2026-01',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -122,6 +128,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     controlNetEnabled: false,
     logo: krea2Logo,
     pickerArch: 'krea2',
+    releasedAt: '2026-06',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -150,6 +157,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     controlNetEnabled: false,  // 官方 CN 模板已出现, 二期评估
     logo: zimageLogo,
     pickerArch: 'zimage',
+    releasedAt: '2025-11',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -170,7 +178,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   },
   flux1: {
     key: 'flux1',
-    label: 'Flux 1',
+    label: 'Flux 1.D',
     icon: 'flare',
     archFilter: ['flux'],
     supportedPackaging: ['checkpoint', 'split'],
@@ -186,6 +194,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     // BFL 纯黑单色 logo: 暗色主题下需反色 (规格 C5)
     logoInvertDark: true,
     pickerArch: 'flux',
+    releasedAt: '2024-07',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -211,7 +220,9 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['chroma'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
+    familyOf: 'flux1',
     pickerArch: 'chroma',
+    releasedAt: '2025-08',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -229,18 +240,25 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     defaultModels: { clip: 't5xxl_fp8_e4m3fn_scaled.safetensors', vae: 'ae.safetensors' },
     modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
   },
-  // ── Flux2 (Klein 优先, Dev 靠后) ──
+  // ── Flux2 系列 (Klein 4B / Klein 9B / Dev) ──
   // 采样拓扑与 flux1 不同: SamplerCustomAdvanced + Flux2Scheduler + FluxGuidance/CFGGuider。
   // guider_mode 由 extraParams 注入 payload, 后端 build_flux2_workflow 据此分支。
-  flux2klein: {
-    key: 'flux2klein',
-    label: 'Flux 2 Klein',
+  // Klein 有 4B / 9B 两尺寸, 文本编码器互不兼容 (4B→qwen_3_4b, 9B→qwen_3_8b_fp8mixed),
+  // 且无法从 UNet 可靠判别 → 拆为两个条目由用户显式选择。
+  flux2klein4b: {
+    key: 'flux2klein4b',
+    label: 'Flux 2 Klein 4B',
     icon: 'child_care',
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
+    // Flux 2 同为 Black Forest Labs 出品, 复用官方 BFL logo (纯黑单色, 暗色需反色)
+    logo: flux1Logo,
+    logoInvertDark: true,
     pickerArch: 'flux2',
-    // key 为 flux2klein, 但后端 builder / _SPLIT_ARCHS / guider_mode 归一化均以 'flux2' 为键 → 必须提交 flux2
+    releasedAt: '2026-01',
+    familyOf: 'flux2',
+    // key 为 flux2klein4b, 但后端 builder / _SPLIT_ARCHS / guider_mode 归一化均以 'flux2' 为键 → 必须提交 flux2
     workflowType: 'flux2',
     extraParams: { guider_mode: 'cfg' },
     resolutions: [
@@ -262,6 +280,41 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     // flux2 采样走 SamplerCustomAdvanced, i2i/hires 需 SplitSigmas 分段去噪 (未实装) → 仅 t2i + 放大
     modules: ['lora', 'upscale'],
   },
+  flux2klein9b: {
+    key: 'flux2klein9b',
+    label: 'Flux 2 Klein 9B',
+    icon: 'child_care',
+    archFilter: ['flux2'],
+    supportedPackaging: ['checkpoint', 'split'],
+    controlNetEnabled: false,
+    // Flux 2 同为 Black Forest Labs 出品, 复用官方 BFL logo (纯黑单色, 暗色需反色)
+    logo: flux1Logo,
+    logoInvertDark: true,
+    pickerArch: 'flux2',
+    releasedAt: '2026-01',
+    familyOf: 'flux2',
+    // key 为 flux2klein9b, 但后端 builder / _SPLIT_ARCHS / guider_mode 归一化均以 'flux2' 为键 → 必须提交 flux2
+    workflowType: 'flux2',
+    extraParams: { guider_mode: 'cfg' },
+    resolutions: [
+      { label: '1024×1024 (1:1)', value: '1024x1024' },
+      { label: '1152×896 (4:3)', value: '1152x896' },
+      { label: '896×1152 (3:4)', value: '896x1152' },
+      { label: '1216×832 (3:2)', value: '1216x832' },
+      { label: '832×1216 (2:3)', value: '832x1216' },
+      { label: '1344×768 (16:9)', value: '1344x768' },
+      { label: '768×1344 (9:16)', value: '768x1344' },
+      { label: '1536×640 (21:9)', value: '1536x640' },
+      { label: '640×1536 (9:21)', value: '640x1536' },
+    ],
+    // distilled 默认 (4 步 / cfg 1.0, CFGGuider); base 模型用户手动调 20 步 / cfg 5.0
+    defaults: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'simple' },
+    hasNegativePrompt: true,
+    promptStyle: 'natural',
+    defaultModels: { clip: 'qwen_3_8b_fp8mixed.safetensors', vae: 'flux2-vae.safetensors' },
+    // flux2 采样走 SamplerCustomAdvanced, i2i/hires 需 SplitSigmas 分段去噪 (未实装) → 仅 t2i + 放大
+    modules: ['lora', 'upscale'],
+  },
   flux2dev: {
     key: 'flux2dev',
     label: 'Flux 2 Dev',
@@ -269,7 +322,12 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
+    // Flux 2 同为 Black Forest Labs 出品, 复用官方 BFL logo (纯黑单色, 暗色需反色)
+    logo: flux1Logo,
+    logoInvertDark: true,
     pickerArch: 'flux2',
+    releasedAt: '2025-11',
+    familyOf: 'flux2',
     workflowType: 'flux2',
     extraParams: { guider_mode: 'basic' },
     resolutions: [
@@ -305,6 +363,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     familyOf: 'sdxl',
     workflowType: 'sdxl',
     pickerArch: 'pony',
+    releasedAt: '2023-08',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -329,10 +388,12 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['sdxl'],
     supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
+    logo: illustriousLogo,
     cnBranch: 'ilnoob',
     familyOf: 'sdxl',
     workflowType: 'sdxl',
     pickerArch: 'illustrious',
+    releasedAt: '2024-09',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },
@@ -361,6 +422,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     familyOf: 'sdxl',
     workflowType: 'sdxl',
     pickerArch: 'noobai',
+    releasedAt: '2024-11',
     resolutions: [
       { label: '1024×1024 (1:1)', value: '1024x1024' },
       { label: '1152×896 (4:3)', value: '1152x896' },

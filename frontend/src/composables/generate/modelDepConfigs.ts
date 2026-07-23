@@ -1,5 +1,8 @@
 import type { ModelDep, ModelDepConfig } from './useModelDependency'
 import { TAGGER_MODEL_CONFIG } from './useTagInterrogation'  // 确认无循环依赖 (已核实)
+import {
+  REGISTRY_FILENAMES,
+} from '@/config/component-registry'
 
 // ── CN Model Definitions ─────────────────────────────────────────────────────
 
@@ -30,7 +33,7 @@ const CN_MODELS: Record<string, ModelDep> = {
     id: 'illustrious-canny',
     name: 'Illustrious XL Canny',
     description: 'Illustrious/NoobAI 专用',
-    size: '~1.2 GB',
+    size: '~2.5 GB',
     files: [{
       filename: 'illustriousXLv1.1_canny_fp16.safetensors',
       url: 'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/illustriousXLv1.1_canny_fp16.safetensors?download=true',
@@ -41,7 +44,7 @@ const CN_MODELS: Record<string, ModelDep> = {
     id: 'illustrious-depth',
     name: 'Illustrious XL Depth',
     description: 'Illustrious/NoobAI 专用',
-    size: '~1.2 GB',
+    size: '~2.5 GB',
     files: [{
       filename: 'illustriousXLv1.1_depth_midas_fp16.safetensors',
       url: 'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/illustriousXLv1.1_depth_midas_fp16.safetensors?download=true',
@@ -52,7 +55,7 @@ const CN_MODELS: Record<string, ModelDep> = {
     id: 'dwpose',
     name: 'DWPose 姿态检测器',
     description: 'YOLO + 关键点估计',
-    size: '~200 MB',
+    size: '~352 MB',
     required: true,
     files: [
       {
@@ -71,7 +74,7 @@ const CN_MODELS: Record<string, ModelDep> = {
     id: 'depth-anything-v2',
     name: 'Depth Anything V2',
     description: '深度图估计',
-    size: '~398 MB',
+    size: '~1.34 GB',
     required: true,
     files: [{
       filename: 'depth_anything_v2_vitl.pth',
@@ -99,7 +102,7 @@ const UPSCALE_MODELS: Record<string, ModelDep> = {
     id: 'aurasr-v2',
     name: 'AuraSR v2',
     description: '4× 超分辨率放大',
-    size: '~2.3 GB',
+    size: '~2.47 GB',
     required: true,
     files: [
       {
@@ -118,7 +121,7 @@ const UPSCALE_MODELS: Record<string, ModelDep> = {
     id: 'seedvr2-3b-fp8',
     name: 'SeedVR2 3B FP8',
     description: 'SeedVR2 视频放大，推理显存约 10GB（1024 底图 2x）',
-    size: '~3.4 GB',
+    size: '~3.9 GB',
     files: [
       {
         filename: 'seedvr2_ema_3b_fp8_e4m3fn.safetensors',
@@ -136,7 +139,7 @@ const UPSCALE_MODELS: Record<string, ModelDep> = {
     id: 'seedvr2-7b-sharp-fp8',
     name: 'SeedVR2 7B-sharp FP8',
     description: 'SeedVR2 7B 锐化版，推理显存约 17GB',
-    size: '~10 GB',
+    size: '~8.96 GB',
     files: [
       {
         filename: 'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors',
@@ -156,46 +159,6 @@ export const UPSCALE_MODEL_CONFIG: ModelDepConfig = {
   tab: 'upscale',
   title: 'generate.upscale.need_download',
   models: [UPSCALE_MODELS.aurasr_v2, UPSCALE_MODELS.seedvr2_3b_fp8, UPSCALE_MODELS.seedvr2_7b_sharp_fp8],
-}
-
-// ── Anima Model Definitions ──────────────────────────────────────────────────
-// Anima 架构需要 UNet + CLIP + VAE 三件套（split-file），其中 UNet 由用户在
-// 主选择器中选择，CLIP / VAE 视为固定附属文件，缺失时由 tab 级 Gate 引导下载。
-// HuggingFace 官方仓库：https://huggingface.co/circlestone-labs/Anima
-
-const ANIMA_MODELS: Record<string, ModelDep> = {
-  qwen3_clip: {
-    id: 'qwen_3_06b_base',
-    name: 'Qwen3 0.6B (CLIP / 文本编码器)',
-    description: 'Anima 专用文本编码器，体积约 1.19 GB',
-    size: '~1.19 GB',
-    required: true,
-    files: [{
-      filename: 'qwen_3_06b_base.safetensors',
-      url: 'https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors?download=true',
-      subdir: 'models/text_encoders',
-    }],
-  },
-}
-
-/** 共享 VAE 依赖: Anima 与 Krea 2 均使用同一文件 */
-const QWEN_IMAGE_VAE_DEP: ModelDep = {
-  id: 'qwen_image_vae',
-  name: 'Qwen Image VAE',
-  description: 'Qwen Image VAE (Anima / Krea 2 共用)',
-  size: '~253 MB',
-  required: true,
-  files: [{
-    filename: 'qwen_image_vae.safetensors',
-    url: 'https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors?download=true',
-    subdir: 'models/vae',
-  }],
-}
-
-export const ANIMA_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'anima',
-  title: 'generate.gate.anima_title',
-  models: [ANIMA_MODELS.qwen3_clip, QWEN_IMAGE_VAE_DEP],
 }
 
 export const CN_MODEL_CONFIGS: Record<string, ModelDepConfig> = {
@@ -339,192 +302,14 @@ export function cnBranchForFile(filename: string): CnBranch | null {
   return null
 }
 
-// ── Krea 2 Model Definitions ──────────────────────────────────────────────────
-// Krea 2 架构需要 UNet + CLIP + VAE 三件套（split-file），其中 UNet 由用户在
-// 主选择器中选择，CLIP / VAE 视为固定附属文件，缺失时由 tab 级 Gate 引导下载。
-// HuggingFace 官方仓库：https://huggingface.co/Comfy-Org/Krea-2
-
-const KREA2_MODELS: Record<string, ModelDep> = {
-  qwen3vl_clip: {
-    id: 'qwen3vl_4b',
-    name: 'Qwen3-VL-4B (文本编码器)',
-    description: 'Krea 2 专用文本编码器 (FP8)',
-    size: '~5.24 GB',
-    required: true,
-    files: [{
-      filename: 'qwen3vl_4b_fp8_scaled.safetensors',
-      url: 'https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_fp8_scaled.safetensors?download=true',
-      subdir: 'models/text_encoders',
-    }],
-  },
-}
-
-export const KREA2_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'krea2',
-  title: 'generate.gate.krea2_title',
-  models: [KREA2_MODELS.qwen3vl_clip, QWEN_IMAGE_VAE_DEP],
-}
-
-// ── Z-Image / Flux1 Model Definitions ────────────────────────────────────────
-// Z-Image 与 Flux1 共用同一 VAE (ae.safetensors, 335MB)。
-// Z-Image 专用文本编码器: qwen_3_4b (CLIPLoader type=lumina2)。
-// Flux1 双 CLIP (DualCLIPLoader type=flux): clip_l + t5xxl_fp8_e4m3fn_scaled。
-// 主模型 (UNet/checkpoint) 由用户自行下载, Gate 不含 UNet 条目。
-// HuggingFace 官方仓库：https://huggingface.co/Comfy-Org/z_image_turbo (VAE+TE)
-//   https://huggingface.co/comfyanonymous/flux_text_encoders (Flux1 双 TE)
-
-/** 共享 VAE 依赖: Z-Image 与 Flux1 均使用同一文件 (Flux1 同款 VAE) */
-const AE_VAE_DEP: ModelDep = {
-  id: 'flux_ae',
-  name: 'Flux AE (VAE)',
-  description: 'Z-Image / Flux1 共用 VAE',
-  size: '~335 MB',
-  required: true,
-  files: [{
-    filename: 'ae.safetensors',
-    url: 'https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors?download=true',
-    subdir: 'models/vae',
-  }],
-}
-
-/** Z-Image 专用文本编码器 (CLIPLoader type=lumina2) */
-const QWEN3_4B_TE_DEP: ModelDep = {
-  id: 'qwen3_4b',
-  name: 'Qwen3-4B (文本编码器)',
-  description: 'Z-Image 专用文本编码器',
-  size: '~7.5 GB',
-  required: true,
-  files: [{
-    filename: 'qwen_3_4b.safetensors',
-    url: 'https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors?download=true',
-    subdir: 'models/text_encoders',
-  }],
-}
-
-/** Flux1 双 CLIP (DualCLIPLoader type=flux) */
-const FLUX1_TE_MODELS: Record<string, ModelDep> = {
-  clip_l: {
-    id: 'clip_l',
-    name: 'CLIP-L (文本编码器 1)',
-    description: 'Flux1 双 CLIP 之一',
-    size: '~246 MB',
-    required: true,
-    files: [{
-      filename: 'clip_l.safetensors',
-      url: 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true',
-      subdir: 'models/text_encoders',
-    }],
-  },
-  t5xxl_fp8: {
-    id: 't5xxl_fp8_e4m3fn_scaled',
-    name: 'T5-XXL FP8 (文本编码器 2)',
-    description: 'Flux1 双 CLIP 之一 (FP8 量化)',
-    size: '~4.9 GB',
-    required: true,
-    files: [{
-      filename: 't5xxl_fp8_e4m3fn_scaled.safetensors',
-      url: 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn_scaled.safetensors?download=true',
-      subdir: 'models/text_encoders',
-    }],
-  },
-}
-
-export const ZIMAGE_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'zimage',
-  title: 'generate.gate.zimage_title',
-  models: [QWEN3_4B_TE_DEP, AE_VAE_DEP],
-}
-
-export const FLUX1_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'flux1',
-  title: 'generate.gate.flux1_title',
-  models: [FLUX1_TE_MODELS.clip_l, FLUX1_TE_MODELS.t5xxl_fp8, AE_VAE_DEP],
-}
-
-export const CHROMA_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'chroma',
-  title: 'generate.gate.chroma_title',
-  models: [FLUX1_TE_MODELS.t5xxl_fp8, AE_VAE_DEP],
-}
-
-// ── Flux2 Model Definitions ──────────────────────────────────────────────────
-// Flux2 公共 VAE: flux2-vae (0.34GB), 与 flux1 的 ae.safetensors 不同。
-// klein TE = Qwen3-4B (qwen_3_4b.safetensors, type=flux2; 可能与 Z-Image 同名文件复用);
-// dev TE  = Mistral-3-Small FP8 (mistral_3_small_flux2_fp8.safetensors, 18GB)。
-// 主模型 (UNet) 由用户自行下载, Gate 不含 UNet 条目。
-// HF URL 已核验 (Comfy-Org/flux2-dev · split_files/; HEAD 200)。
-
-const FLUX2_VAE_DEP: ModelDep = {
-  id: 'flux2_vae',
-  name: 'Flux2 VAE',
-  description: 'Flux2 公共 VAE',
-  size: '~0.34 GB',
-  required: true,
-  files: [{
-    filename: 'flux2-vae.safetensors',
-    url: 'https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors?download=true',
-    subdir: 'models/vae',
-  }],
-}
-
-const FLUX2_KLEIN_TE_DEP: ModelDep = {
-  id: 'qwen3_4b_flux2',
-  name: 'Qwen3-4B (Klein TE)',
-  description: 'Flux2 Klein 文本编码器 (与 Z-Image 同名文件, type=flux2)',
-  size: '~7.5 GB',
-  required: true,
-  files: [{
-    filename: 'qwen_3_4b.safetensors',
-    url: 'https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors?download=true',
-    subdir: 'models/text_encoders',
-  }],
-}
-
-const FLUX2_DEV_TE_DEP: ModelDep = {
-  id: 'mistral_3_small_flux2_fp8',
-  name: 'Mistral-3-Small (Dev TE)',
-  description: 'Flux2 Dev 文本编码器 (FP8)',
-  size: '~18 GB',
-  required: true,
-  files: [{
-    filename: 'mistral_3_small_flux2_fp8.safetensors',
-    url: 'https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors?download=true',
-    subdir: 'models/text_encoders',
-  }],
-}
-
-export const FLUX2_KLEIN_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'flux2klein',
-  title: 'generate.gate.flux2klein_title',
-  models: [FLUX2_KLEIN_TE_DEP, FLUX2_VAE_DEP],
-}
-
-export const FLUX2_DEV_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'flux2dev',
-  title: 'generate.gate.flux2dev_title',
-  models: [FLUX2_DEV_TE_DEP, FLUX2_VAE_DEP],
-}
-
-/** tab key → tab 级依赖 Gate 配置; 无 Gate 的架构 (sdxl) 不在表内 */
-export const TAB_DEP_CONFIGS: Record<string, ModelDepConfig> = {
-  anima: ANIMA_MODEL_CONFIG,
-  krea2: KREA2_MODEL_CONFIG,
-  zimage: ZIMAGE_MODEL_CONFIG,
-  flux1: FLUX1_MODEL_CONFIG,
-  chroma: CHROMA_MODEL_CONFIG,
-  flux2klein: FLUX2_KLEIN_MODEL_CONFIG,
-  flux2dev: FLUX2_DEV_MODEL_CONFIG,
-}
-
 /**
  * 所有依赖组件文件名集合 — 模型管理页默认隐藏这些文件。
- * 聚合: TAB_DEP_CONFIGS + CN_MODEL_CONFIGS (legacy) + _CN_BRANCH_CONFIGS 全部 branch 的 models
- * (Set 天然去重, 确保 flux branch 的 flux_union CN 文件也被隐藏)。
+ * 聚合: REGISTRY_FILENAMES (组件表) + CN_MODEL_CONFIGS + _CN_BRANCH_CONFIGS 全部 branch
+ * + UPSCALE_MODEL_CONFIG + TAGGER_MODEL_CONFIG (Set 天然去重)。
  */
 export const COMPONENT_FILENAMES: Set<string> = (() => {
-  const s = new Set<string>()
+  const s = new Set<string>(REGISTRY_FILENAMES)
   const configs = [
-    ...Object.values(TAB_DEP_CONFIGS),
     ...Object.values(CN_MODEL_CONFIGS),
     ...Object.values(_CN_BRANCH_CONFIGS).flatMap(table => Object.values(table)),
     UPSCALE_MODEL_CONFIG,

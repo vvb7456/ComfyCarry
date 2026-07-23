@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, inject, toRef, watch } from 'vue'
+import { computed, inject, ref, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
-import { useModelDependency, type UseModelDependencyReturn } from '@/composables/generate/useModelDependency'
+import { useComponentStatus } from '@/composables/generate/useComponentStatus'
 import { MODEL_TYPES } from '@/config/model-types'
-import { TAB_DEP_CONFIGS, UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
@@ -17,6 +17,7 @@ import BasicSettings from '@/components/generate/BasicSettings.vue'
 import AdvancedSettings from '@/components/generate/AdvancedSettings.vue'
 import PreviewArea from '@/components/generate/PreviewArea.vue'
 import ModelPickerModal from '@/components/generate/ModelPickerModal.vue'
+import ComponentPanel from '@/components/generate/ComponentPanel.vue'
 import LoraPanel from '@/components/generate/LoraPanel.vue'
 import I2IPanel from '@/components/generate/I2IPanel.vue'
 import ControlNetPanel from '@/components/generate/ControlNetPanel.vue'
@@ -87,8 +88,8 @@ const selectedPackaging = computed<'checkpoint' | 'split'>(() => {
   // 互斥写 state.unet XOR state.checkpoint, 故三处 (此处 / onModelSelect / useGenerateSubmit) 一致。
   if (state.value.unet) return 'split'
   if (state.value.checkpoint) return 'checkpoint'
-  // 无选中: 退化为该 tab 的首选形态 (supportedPackaging[0])
-  return supportedPackaging.value[0] ?? 'split'
+  // 无选中: 与 useGenerateSubmit.ts 一致 — 都为空时判 split (若该 tab 支持), 否则 checkpoint
+  return supportedPackaging.value.includes('split') ? 'split' : 'checkpoint'
 })
 
 const {
@@ -244,17 +245,26 @@ function onModelSelect(name: string) {
   toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
 }
 
-/** Tab 级依赖配置 (split 架构需要 CLIP+VAE); 不再整页遮盖, 仅传给 picker modal 组件态 */
-const tabDepConfig = computed(() => TAB_DEP_CONFIGS[props.modelType] ?? null)
-const depTab: UseModelDependencyReturn | null = tabDepConfig.value ? useModelDependency(tabDepConfig.value) : null
+// §6.3 运行组件状态机: 替代旧 tab 级依赖机制 (后者读 welcome_state, dismiss 后永远空)。
+// useComponentStatus 只发 /api/downloads/check, 绝不碰 welcome_state, 无 dismiss 概念。
+// 它内部 watch arch 且 immediate 刷新, 无需手动调首次 refresh。
+const compStatus = useComponentStatus(() => props.modelType, () => options.comfyuiDir.value)
+const componentPanelExpanded = ref(false)
 
-// §6.3 组件就绪被动指示: 拆分件且必需组件未装齐 → 主页卡下方提示 (动作在 picker modal)。
-// 用 modelStatus 判 (不用 depTab.show — 后者与旧 welcome/dismiss 流程耦合, 非纯就绪信号)。
-const componentsMissing = computed(() => {
-  const dep = depTab
-  const cfg = tabDepConfig.value
-  if (selectedPackaging.value !== 'split' || !dep || !cfg) return false
-  return cfg.models.some(m => m.required && !dep.modelStatus.value.get(m.id)?.installed)
+// 就绪状态回流 store (单一真值): 页面级重复预检已删, 菜单状态完全靠各 tab 写入, 故 immediate
+watch(() => compStatus.ready.value, (ready, prev) => {
+  store.setComponentsReady(props.modelType, ready)
+  // 由"未就绪"翻转为"就绪" = 组件刚下载完 → 强制刷新 ComfyUI 选项列表。
+  // 不刷新的话新下载的文本编码器/VAE 不会出现在高级设置的下拉里 (后端 options 带缓存),
+  // 刷新后由 autofillDefaultModels 的 watch 自动填上官方组件。
+  // prev === undefined 表示 immediate 首次执行 (挂载即就绪), 无需刷新。
+  if (ready && prev === false) void options.refresh()
+}, { immediate: true })
+
+// 切到本 tab 时复检组件状态: 组件跨架构共享 (如 ae.safetensors 同时服务 Z-Image/Flux1/Chroma),
+// 在别的 tab 下载完后, 本 tab 的状态与菜单标记会滞留为"未就绪", 切回来时需要复检。
+watch(() => store.activeModelType, (active) => {
+  if (active === props.modelType) void compStatus.refresh()
 })
 
 // A2: CN 依赖 Gate 配置按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用)
@@ -262,18 +272,6 @@ const _cnBranch = (MODEL_TYPES[props.modelType]?.cnBranch as CnBranch | undefine
 const cnDepPose = getCnDepConfig('pose', _cnBranch)
 const cnDepCanny = getCnDepConfig('canny', _cnBranch)
 const cnDepDepth = getCnDepConfig('depth', _cnBranch)
-
-// setup 时立即触发依赖检查 (后端根据 subdir 解析, 不再依赖 options.comfyuiDir)
-if (depTab) depTab.check('')
-
-function onTabDepEnter() {
-  store.setGateReady(props.modelType, true)
-  options.refresh()
-}
-function onTabDepDownload() {
-  const dir = options.comfyuiDir.value
-  if (dir && depTab) depTab.startDownload(dir)
-}
 
 /** 高级设置 CLIP / VAE 自动填充: 仅当前激活 tab + split 形态 (selectedPackaging) + 字段为空时填充 */
 function autofillDefaultModels() {
@@ -299,6 +297,37 @@ function autofillDefaultModels() {
 }
 
 watch([() => options.clips.value, () => options.vaes.value, () => store.activeModelType], autofillDefaultModels, { immediate: true })
+
+// §6.3 生成前置校验: 条件不满足时"软禁用"主生成按钮, 点击弹 toast 说明原因。
+// 返回空串 = 可以生成; 非空 = 禁用原因 (已翻译文案)。
+const runBlockedReason = computed<string>(() => {
+  const st = state.value
+  const pkg = selectedPackaging.value
+
+  // 1. 主模型未选择 (整合包看 checkpoint, 拆分看 unet)
+  const modelPicked = pkg === 'split' ? !!st.unet : !!st.checkpoint
+  if (!modelPicked) return t('generate.error.no_checkpoint')
+
+  // 整合包自带全部组件, 到此即可
+  if (pkg !== 'split') return ''
+
+  // 2. 运行组件未下载 / 下载中 (ready 为假即涵盖两种)
+  if (compStatus.hasComponents.value && !compStatus.ready.value) {
+    return t('generate.error.components_not_ready')
+  }
+
+  // 3. CLIP / CLIP2 / VAE 未在高级设置中选定
+  if (!st.clip || !st.vae || (config.value.dualClip && !st.clip2)) {
+    return t('generate.error.no_split_models')
+  }
+
+  return ''
+})
+
+/** 用户点了软禁用的生成按钮 → toast 说明原因 */
+function onRunBlocked(reason: string) {
+  toast(reason, 'warning')
+}
 
 /** Mask editor: image/mask preview URLs */
 const maskEditorImageUrl = computed(() => {
@@ -343,7 +372,9 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :exec-state="execState"
           :elapsed="elapsed"
           :submitting="submitting"
+          :blocked-reason="runBlockedReason"
           @run="emit('run', $event)"
+          @blocked="onRunBlocked"
           @stop="emit('stop')"
         />
 
@@ -355,17 +386,13 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @open-model="openModelPicker"
         />
 
-        <!-- §6.3 组件就绪被动指示 (拆分件缺组件 → 提示, 点击进 picker 组件态补齐) -->
-        <button
-          v-if="componentsMissing"
-          type="button"
-          class="gen-comp-missing"
-          @click="openModelPicker"
-        >
-          <span class="gen-comp-missing__dot" />
-          <span class="gen-comp-missing__txt">{{ t('generate.picker.components_missing') }}</span>
-          <span class="gen-comp-missing__arr">›</span>
-        </button>
+        <!-- §6.3 运行组件内联面板 (三态: 就绪/缺失/下载中)。packaging=checkpoint 或无组件需求时自渲染为空 -->
+        <ComponentPanel
+          :arch="modelType"
+          :status="compStatus"
+          :packaging="selectedPackaging"
+          v-model:expanded="componentPanelExpanded"
+        />
 
         <!-- 高级设置 -->
         <!-- 高级设置: 显示源从静态 isSplit 改为 reactive selectedPackaging -->
@@ -489,12 +516,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         ? t('generate.basic.search_model')
         : (isSplit ? t('generate.basic.search_unet') : t('generate.basic.search_checkpoint'))"
       :show-packaging-filter="hasDualPackaging"
-      :dep="depTab"
-      :dep-config="tabDepConfig"
-      :comfyui-dir="options.comfyuiDir.value"
+      :components-missing="compStatus.hasComponents.value && !compStatus.ready.value"
       @select="onModelSelect"
-      @dep-enter="onTabDepEnter"
-      @dep-download="onTabDepDownload"
     />
 
     <ModelPickerModal
@@ -669,33 +692,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   border-top: 1px solid var(--bd);
   margin: 0;
 }
-
-/* ── §6.3 组件就绪被动指示 (拆分件缺组件) ── */
-.gen-comp-missing {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--amber) 10%, var(--bg2));
-  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--bd));
-  color: var(--t2);
-  font-size: .8rem;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color .15s;
-}
-.gen-comp-missing:hover { border-color: var(--amber); }
-.gen-comp-missing__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--amber);
-  flex: none;
-}
-.gen-comp-missing__txt { flex: 1; }
-.gen-comp-missing__arr { color: var(--t3); font-size: 1rem; line-height: 1; }
 
 /* ── 右列: 预览 ── */
 .gen-preview-col {

@@ -10,6 +10,10 @@ export interface SelectOption {
   value: string | number | boolean
   label: string
   disabled?: boolean
+  /** 分组标题。相邻的同 group 选项归为一组，在组首渲染一个不可点击的分组头 */
+  group?: string
+  /** 右侧次要小字，如 "已装" / "5.16 GB" */
+  hint?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -119,10 +123,14 @@ const normalizedOptions = computed<SelectOption[]>(() => {
     if (typeof o === 'string') return { value: o, label: o }
     if (typeof o === 'number') return { value: o, label: String(o) }
     const rec = o as Record<string, string | number | boolean>
+    const grp = (rec as Record<string, unknown>).group
+    const hnt = (rec as Record<string, unknown>).hint
     return {
       value: rec[props.valueKey] ?? rec.value ?? rec.id ?? rec.name ?? '',
       label: String(rec[props.labelKey] || rec.label || rec.name || rec.display_name || rec[props.valueKey] || ''),
       disabled: !!(rec as Record<string, unknown>).disabled,
+      group: typeof grp === 'string' ? grp : undefined,
+      hint: typeof hnt === 'string' ? hnt : undefined,
     }
   })
 })
@@ -134,6 +142,23 @@ const filteredOptions = computed(() => {
   return normalizedOptions.value.filter(o =>
     String(o.label).toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q)
   )
+})
+
+type RenderRow =
+  | { kind: 'group', label: string, key: string }
+  | { kind: 'option', opt: SelectOption, idx: number }
+
+const renderRows = computed<RenderRow[]>(() => {
+  const rows: RenderRow[] = []
+  let prevGroup: string | undefined
+  filteredOptions.value.forEach((opt, idx) => {
+    if (opt.group && opt.group !== prevGroup) {
+      rows.push({ kind: 'group', label: opt.group, key: `g:${opt.group}` })
+    }
+    rows.push({ kind: 'option', opt, idx })
+    prevGroup = opt.group
+  })
+  return rows
 })
 
 const selectedLabel = computed(() => {
@@ -271,20 +296,23 @@ onBeforeUnmount(() => {
           />
           <div ref="listRef" class="base-select__list" tabindex="-1">
             <div v-if="filteredOptions.length === 0" class="base-select__empty">{{ emptyText || t('common.no_matches') }}</div>
-            <div
-              v-for="(opt, idx) in filteredOptions"
-              :key="String(opt.value)"
-              class="base-select__item text-truncate"
-              :class="{
-                'base-select__item--sel': opt.value === modelValue,
-                'base-select__item--hl': idx === highlightIdx,
-                'base-select__item--disabled': opt.disabled,
-              }"
-              @click="select(opt)"
-              @mouseenter="highlightIdx = idx"
-            >
-              {{ opt.label }}
-            </div>
+            <template v-for="row in renderRows" :key="row.kind === 'group' ? row.key : String(row.opt.value)">
+              <div v-if="row.kind === 'group'" class="base-select__group">{{ row.label }}</div>
+              <div
+                v-else
+                class="base-select__item"
+                :class="{
+                  'base-select__item--sel': row.opt.value === modelValue,
+                  'base-select__item--hl': row.idx === highlightIdx,
+                  'base-select__item--disabled': row.opt.disabled,
+                }"
+                @click="select(row.opt)"
+                @mouseenter="highlightIdx = row.idx"
+              >
+                <span class="base-select__item-label text-truncate">{{ row.opt.label }}</span>
+                <span v-if="row.opt.hint" class="base-select__hint">{{ row.opt.hint }}</span>
+              </div>
+            </template>
           </div>
         </div>
       </Transition>
@@ -378,11 +406,21 @@ onBeforeUnmount(() => {
 
 /* ── Item ── */
 .base-select__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 6px 12px;
   cursor: pointer;
   border-radius: 4px;
   font-size: .85rem;
   color: var(--t1);
+}
+.base-select__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .base-select--sm .base-select__item {
   padding: 4px 8px;
@@ -395,6 +433,26 @@ onBeforeUnmount(() => {
   opacity: .45;
   cursor: default;
   pointer-events: none;
+}
+
+/* ── Group header ── */
+.base-select__group {
+  padding: 6px 10px 3px;
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: none;
+  letter-spacing: .02em;
+  border-top: 1px solid var(--bd);
+  margin-top: 2px;
+  user-select: none;
+  cursor: default;
+}
+.base-select__group:first-child { border-top: none; margin-top: 0; }
+.base-select__hint {
+  flex: none;
+  font-size: .68rem;
+  color: var(--t3);
 }
 
 /* ── Empty state ── */
@@ -426,6 +484,9 @@ onBeforeUnmount(() => {
   outline: none;
 }
 .base-select__panel--teleported .base-select__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 4px 8px;
   cursor: pointer;
   border-radius: 4px;

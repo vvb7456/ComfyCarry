@@ -18,11 +18,14 @@ const props = defineProps<{
   execState: ExecState | null
   elapsed: number
   submitting?: boolean
+  /** 非空 = 主按钮"软禁用": 视觉置灰但仍可点击, 点击时抛 blocked 由父组件 toast 说明原因 */
+  blockedReason?: string
 }>()
 
 const emit = defineEmits<{
   run: [mode: string]
   stop: []
+  blocked: [reason: string]
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -71,9 +74,13 @@ const splitOptions = computed<SplitButtonOption[]>(() =>
   }))
 )
 
+/** 软禁用仅作用于"运行"态; 执行中的"停止"永远可点 */
+const isBlocked = computed(() => !isRunning.value && !!props.blockedReason)
+
 function onSplitClick() {
-  if (isRunning.value) emit('stop')
-  else emit('run', state.value.runMode)
+  if (isRunning.value) { emit('stop'); return }
+  if (isBlocked.value) { emit('blocked', props.blockedReason!); return }
+  emit('run', state.value.runMode)
 }
 
 function onSplitSelect(key: string) {
@@ -94,6 +101,7 @@ function onSplitSelect(key: string) {
         :icon="splitIcon"
         :variant="splitVariant"
         :options="splitOptions"
+        :soft-disabled="isBlocked"
         :loading="submitting"
         @click="onSplitClick"
         @select="onSplitSelect"

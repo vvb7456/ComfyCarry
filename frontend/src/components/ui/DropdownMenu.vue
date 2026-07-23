@@ -33,8 +33,6 @@ export interface DropdownMenuItem {
   letter?: string
   /** 说明性小字 (可选, 单行, 次要色) */
   hint?: string
-  /** 右侧状态点: 'warn' = 黄点 (本项目: 组件未就绪) */
-  status?: 'warn'
   /** 二级子项 (C2: 下钻式子视图) */
   children?: DropdownMenuItem[]
 }
@@ -376,8 +374,9 @@ defineExpose({ openMenu, closeMenu })
                   <span class="dd-row__label">{{ row.label }}</span>
                   <span v-if="row.hint" class="dd-row__hint">{{ row.hint }}</span>
                   <span class="dd-row__right">
-                    <span v-if="row.status === 'warn'" class="dd-status-dot dd-status-dot--warn" :title="row.hint || ''" />
-                    <MsIcon v-if="row.key === modelValue" name="check" size="xs" color="var(--ac)" class="dd-row__check" />
+                    <span class="dd-row__check-slot">
+                      <MsIcon v-if="row.key === modelValue" name="check" size="xs" color="var(--ac)" class="dd-row__check" />
+                    </span>
                   </span>
                 </div>
               </template>
@@ -557,6 +556,10 @@ defineExpose({ openMenu, closeMenu })
   color: var(--t3);
   font-weight: 400;
   white-space: nowrap;
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dd-row__right {
@@ -576,16 +579,14 @@ defineExpose({ openMenu, closeMenu })
   font-size: 14px;
 }
 
-/* ── 状态点 ── */
-.dd-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dd-status-dot--warn {
-  background: var(--amber);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 25%, transparent);
+/* ── 行尾固定槽位 (避免条件渲染导致列宽抖动) ── */
+.dd-row__check-slot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── C1: 入场/离场动画 (锚点起源 scale + opacity + translateY) ── */
