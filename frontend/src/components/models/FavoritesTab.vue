@@ -29,6 +29,8 @@ const {
   stopPolling: dlStopPolling,
   activeTasks: dlActiveTasks,
   getVersionState: dlGetVersionState,
+  getVersionDownloadInfo: dlGetVersionInfo,
+  cancelDownload: dlCancelDownload,
   tasks: dlTasks,
   loadFavorites: dlLoadFavorites,
 } = useDownloads()
@@ -36,6 +38,30 @@ const {
 const { confirm } = useConfirm()
 
 const batchAddOpen = ref(false)
+const downloadingAll = ref(false)
+
+/** 版本级下载信息 (state + progress/speed/downloadId) — 驱动每行按钮的 spinner */
+function itemInfo(item: CartItem) {
+  return dlGetVersionInfo(item.modelId, item.versionId || item.modelId)
+}
+
+/** hover 取消 — 与 CivitaiModelCard 一致, 先确认再撤 */
+async function handleCancel(item: CartItem) {
+  const id = itemInfo(item).downloadId
+  if (!id) return
+  if (await confirm({ message: t('models.downloads.confirm_cancel', { name: item.name || '' }) })) {
+    await dlCancelDownload(id)
+  }
+}
+
+async function handleDownloadAll() {
+  downloadingAll.value = true
+  try {
+    await dlDownloadAll()
+  } finally {
+    downloadingAll.value = false
+  }
+}
 
 // Count of favorite items that are NOT yet installed locally
 const downloadableCount = computed(() =>
@@ -80,7 +106,13 @@ async function handleClearFavorites() {
       <BaseButton size="sm" @click.stop="batchAddOpen = true">
         <MsIcon name="add" size="xs" /> {{ t('models.downloads.batch_add') }}
       </BaseButton>
-      <BaseButton size="sm" variant="primary" :disabled="!downloadableCount" @click.stop="dlDownloadAll()">
+      <BaseButton
+        size="sm"
+        variant="primary"
+        :disabled="!downloadableCount"
+        :loading="downloadingAll"
+        @click.stop="handleDownloadAll"
+      >
         {{ t('models.downloads.download_all') }}<template v-if="downloadableCount">({{ downloadableCount }})</template>
       </BaseButton>
       <BaseButton size="sm" variant="danger" :disabled="!favCount" @click.stop="handleClearFavorites">
@@ -92,7 +124,12 @@ async function handleClearFavorites() {
         <DownloadItem
           :cart-item="item"
           :installed="!!(item.versionId && dlGetVersionState(item.modelId, item.versionId) === 'installed')"
+          :state="itemInfo(item).state"
+          :progress="itemInfo(item).progress"
+          :speed="itemInfo(item).speed"
+          :download-id="itemInfo(item).downloadId"
           @download="(it) => dlDownloadOne(it.modelId, it.type, it.versionId)"
+          @cancel="() => handleCancel(item)"
           @remove="removeFav"
         />
         <div v-if="failedError(item)" class="fav-error" :title="failedError(item)">

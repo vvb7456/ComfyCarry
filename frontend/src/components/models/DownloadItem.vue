@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CartItem, DownloadTask } from '@/composables/useDownloads'
+import type { CartItem, DownloadTask, VersionState } from '@/composables/useDownloads'
 import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import DownloadButton from '@/components/models/DownloadButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { MODEL_CATEGORY_COLORS } from '@/utils/constants'
 import { fmtBytes, fmtSpeed } from '@/utils/format'
@@ -19,6 +20,13 @@ const props = defineProps<{
   task?: DownloadTask
   /** Whether this item is already installed locally */
   installed?: boolean
+  /** Cart mode: 该版本的下载状态 (驱动按钮 spinner/进度环), 缺省时退回 installed/idle */
+  state?: VersionState
+  /** Cart mode: 进度 % / 速度 B/s (state 为 queued/downloading 时显示) */
+  progress?: number
+  speed?: number
+  /** Cart mode: 有 downloadId 才允许 hover 取消 */
+  downloadId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -80,6 +88,11 @@ const sizeText = computed(() => {
 })
 
 const isCart = computed(() => !!props.cartItem)
+
+/** Cart 按钮状态: 显式 state 优先, 否则按 installed 退回旧行为 */
+const cartState = computed<VersionState>(() =>
+  props.state ?? (props.installed ? 'installed' : 'idle'),
+)
 const isActive = computed(() => props.task?.status === 'active')
 const isPaused = computed(() => props.task?.status === 'paused')
 const isQueued = computed(() => props.task?.status === 'queued')
@@ -127,9 +140,14 @@ const showProgressRow = computed(() =>
     <div class="dli-actions">
       <!-- Cart actions -->
       <template v-if="isCart">
-        <BaseButton size="sm" variant="primary" :disabled="installed" @click="emit('download', cartItem!)">
-          <MsIcon name="download" size="xs" /> {{ t('models.downloads.download') }}
-        </BaseButton>
+        <DownloadButton
+          :state="cartState"
+          :progress="progress || 0"
+          :speed="speed || 0"
+          :cancellable="!!downloadId"
+          @download="emit('download', cartItem!)"
+          @cancel="downloadId && emit('cancel', downloadId)"
+        />
         <BaseButton size="sm" variant="danger" square @click="emit('remove', cartKey)">
           <MsIcon name="delete" />
         </BaseButton>
