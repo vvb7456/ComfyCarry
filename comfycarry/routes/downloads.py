@@ -137,6 +137,17 @@ def _wire_registry():
                 if old_status == DownloadStatus.PAUSED:
                     registry.task_resumed(source, model_id, version_id)
 
+        # 下载完成 → 立即失效 Generate 下拉选项缓存。
+        # 新落盘的 checkpoint / UNet / 文本编码器 / VAE 必须马上能出现在选择器与
+        # 高级设置的下拉里 (用户预期: 组件下完 select 自动出现并选中), 不能等
+        # options 的 300s TTL。放在 emit 之前, 保证前端收到 SSE 完成事件时后端已是新数据。
+        if new_status == DownloadStatus.COMPLETE:
+            try:
+                from .generate import invalidate_options_cache
+                invalidate_options_cache()
+            except Exception as e:
+                logger.debug(f"[downloads] 失效 options 缓存失败 (非致命): {e}")
+
         # Emit task event to global stream
         registry.emit_task_event("task.updated", task.to_dict())
 

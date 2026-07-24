@@ -221,6 +221,20 @@ def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
     return _scan_model_attrs(names, rel_dir)[0]
 
 
+def invalidate_options_cache() -> None:
+    """
+    立即失效下拉选项缓存 (两级: 汇总结果 + ComfyUI object_info 快照)。
+
+    由下载引擎的完成回调调用 (见 routes/downloads.py) —— 文件落盘那一刻即失效,
+    使得随后任意一次 /api/generate/options (无论是否带 refresh=1) 都能看到新文件。
+    这是"下载完成后 CLIP/VAE 下拉立即出现新组件"的后端保证。
+    """
+    global _options_cache, _options_cache_time
+    _options_cache = None
+    _options_cache_time = 0.0
+    _combo_cache.clear()
+
+
 def _fetch_generate_options() -> dict:
     """
     从 ComfyUI /object_info 获取 Generate 页面所需的全部下拉选项:
@@ -240,7 +254,8 @@ def _fetch_generate_options() -> dict:
     # _combo_cache 保存的是 ComfyUI /object_info 快照(含 checkpoints/unets/clips/vaes 文件列表),
     # 过去只有 ?refresh=1 才清 → 新下载的组件在进程存活期间永远不出现在下拉里
     # (即便用户整页刷新, 因为整页刷新走的是不带 refresh 的 load())。
-    # 与 _options_cache 同周期清除, 让新文件最迟 300s 自动可见。
+    # 此处与 _options_cache 同周期清除, 仅作"面板外途径放入文件"(Jupyter/SSH) 的兜底;
+    # 面板内下载走 invalidate_options_cache() 在完成瞬间失效, 不依赖这个 TTL。
     _combo_cache.clear()
 
     DEFAULT_SAMPLERS = [

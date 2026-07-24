@@ -156,8 +156,13 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     })),
   )
 
-  async function fetchOptions(forceRefresh = false) {
-    if (loading.value) return
+  // 进行中的请求句柄。旧实现是 `if (loading.value) return` —— 并发时会把请求**静默丢弃**,
+  // 组件下载完成触发的强制刷新一旦撞上其它加载 (如 onActivated 的 refresh) 就被吞掉,
+  // 表现为"组件下完了但 CLIP/VAE 下拉没更新"。改为: 非强制刷新复用在飞的请求,
+  // 强制刷新排队到其后重跑, 绝不丢弃。
+  let inflight: Promise<void> | null = null
+
+  async function _doFetch(forceRefresh: boolean): Promise<void> {
     loading.value = true
     try {
       const url = forceRefresh ? '/api/generate/options?refresh=1' : '/api/generate/options'
@@ -193,6 +198,15 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     } finally {
       loading.value = false
     }
+  }
+
+  function fetchOptions(forceRefresh = false): Promise<void> {
+    if (inflight) {
+      return forceRefresh ? inflight.then(() => fetchOptions(true)) : inflight
+    }
+    const p = _doFetch(forceRefresh).finally(() => { if (inflight === p) inflight = null })
+    inflight = p
+    return p
   }
 
   async function load() {
