@@ -464,6 +464,12 @@ def _sanitize_folder_name(name: str) -> str:
 #
 # 关键: ComfyUI 加载节点目录绑定 — CheckpointLoaderSimple 只读 checkpoints/,
 #       UNETLoader 只读 diffusion_models/。文件必须物理落对目录。
+#
+# 归位只在 checkpoints/ ↔ diffusion_models/ 之间发生。LoRA/VAE/ControlNet/
+# embedding 等本就没有"整合包"形态, detect_packaging 恒判 split, 若不设限会被
+# 一律搬进 diffusion_models/ (已踩: LoRA 落到 diffusion_models/<baseModel>/)。
+_RELOCATABLE_DIR_KEYS = {'checkpoints', 'diffusion_models'}
+
 
 def relocate_after_download(model_path: str, base_model: str) -> tuple[str, str]:
     """下载完成后按内容归位。
@@ -487,10 +493,6 @@ def relocate_after_download(model_path: str, base_model: str) -> tuple[str, str]
         # 当前不做物理移动 (UnetLoaderGGUF 读 models/unet/ 旧路径, 不在此处处理)。
         return str(abs_path), 'skip_unreadable'
 
-    # 读头判形态
-    from .arch_detect import detect_packaging_from_file
-    pkg = detect_packaging_from_file(str(abs_path))
-
     # 当前所在目录 key
     try:
         rel = abs_path.relative_to(COMFYUI_DIR)
@@ -502,6 +504,14 @@ def relocate_after_download(model_path: str, base_model: str) -> tuple[str, str]
         return str(abs_path), 'skip_unreadable'
 
     current_dir_key = parts[1]
+    # 只在主模型两个目录之间归位: loras/vae/controlnet/embeddings 等原地不动
+    if current_dir_key not in _RELOCATABLE_DIR_KEYS:
+        return str(abs_path), 'kept'
+
+    # 读头判形态
+    from .arch_detect import detect_packaging_from_file
+    pkg = detect_packaging_from_file(str(abs_path))
+
     want_key = 'checkpoints' if pkg == 'checkpoint' else 'diffusion_models'
 
     if current_dir_key == want_key:
