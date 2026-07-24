@@ -42,3 +42,4 @@ static/dist/
 
 # Material Symbols 子集字体 (CI 构建时由 build-fonts.sh 生成)
 frontend/public/fonts/MaterialSymbolsOutlined.woff2
+AGENTS.md
