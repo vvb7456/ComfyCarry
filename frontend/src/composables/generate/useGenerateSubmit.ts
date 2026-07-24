@@ -165,7 +165,6 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       period: ps.normalize_period,
       bracket: ps.normalize_bracket,
       underscore: ps.normalize_underscore,
-      escapeBracket: ps.escape_bracket,
     }
 
     // 软架构条目 (pony/illustrious/noobai) 通过 workflowType 提交 'sdxl',

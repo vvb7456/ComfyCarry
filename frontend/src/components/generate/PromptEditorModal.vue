@@ -90,13 +90,13 @@ const plInit = usePromptLibraryInit()
 const { settings: promptSettings, load: loadPromptSettings } = usePromptSettings()
 const genStore = useGenerateStore()
 
-/** Normalize options derived from settings */
+/** Normalize options derived from settings
+ *  (escape_bracket 不在此列 — 它只作用于插入 tag 时, 见 escapeBrackets()) */
 const normalizeOpts = computed(() => ({
   comma: promptSettings.normalize_comma,
   period: promptSettings.normalize_period,
   bracket: promptSettings.normalize_bracket,
   underscore: promptSettings.normalize_underscore,
-  escapeBracket: promptSettings.escape_bracket,
 }))
 
 const activeEditor = computed(() =>
