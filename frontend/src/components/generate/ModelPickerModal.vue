@@ -304,7 +304,7 @@ function goToDownloadPage() {
           v-if="showPackagingFilter"
           :options="packagingOptions"
           :model-value="activePackaging"
-          :all-option="t('generate.picker.arch_all')"
+          :all-option="t('generate.picker.model_all')"
           :collapsed-rows="1"
           class="picker-chips picker-chips--packaging"
           @update:model-value="activePackaging = ($event || '') as 'checkpoint' | 'split' | ''"

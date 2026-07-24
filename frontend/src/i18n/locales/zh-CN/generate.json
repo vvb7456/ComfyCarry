@@ -479,6 +479,7 @@
   },
   "picker": {
     "arch_all": "全部架构",
+    "model_all": "全部形态",
     "arch_unknown": "未知",
     "packaging_checkpoint": "整合包",
     "packaging_split": "拆分",

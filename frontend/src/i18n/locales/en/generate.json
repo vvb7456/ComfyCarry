@@ -479,6 +479,7 @@
   },
   "picker": {
     "arch_all": "All",
+    "model_all": "All forms",
     "arch_unknown": "Unknown",
     "packaging_checkpoint": "All-in-one",
     "packaging_split": "Split",
