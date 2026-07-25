@@ -76,14 +76,10 @@ if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" 
         rm -rf "$DASHBOARD_DIR/comfycarry"
         cp -r "$EXTRACTED/comfycarry" "$DASHBOARD_DIR/comfycarry"
     fi
-    # 复制 static/ 前端静态资源
-    if [ -d "$EXTRACTED/static" ]; then
-        rm -rf "$DASHBOARD_DIR/static"
-        cp -r "$EXTRACTED/static" "$DASHBOARD_DIR/static"
-    fi
-    # 下载前端构建产物 (从 GitHub Release)
+    # 下载前端构建产物 (从 GitHub Release — dist 已从 git 移除, 不在 tarball 中)
     echo "  -> 下载前端构建产物..."
     DIST_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/frontend-dist/frontend-dist.tar.gz"
+    mkdir -p "$DASHBOARD_DIR/static"
     if wget -q -O /tmp/frontend-dist.tar.gz "$DIST_URL"; then
         tar xzf /tmp/frontend-dist.tar.gz -C "$DASHBOARD_DIR/static/"
         rm -f /tmp/frontend-dist.tar.gz
