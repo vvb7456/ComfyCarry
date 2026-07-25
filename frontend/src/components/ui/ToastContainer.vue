@@ -28,7 +28,8 @@ const iconMap: Record<string, string> = {
 <style scoped>
 .cc-toast-wrap {
   position: fixed;
-  bottom: 24px;
+  /* 后台运行浮动条可见时上抬 (变量含浮动条高度 + 间距; 不可见时变量被移除 → 回落 24px) */
+  bottom: calc(24px + var(--bg-run-bar-lift, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;

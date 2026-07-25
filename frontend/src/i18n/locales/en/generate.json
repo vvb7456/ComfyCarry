@@ -97,7 +97,36 @@
     "run": "Run",
     "stop": "Stop",
     "run_live": "Run (live)",
-    "generating": "Generating"
+    "generating": "Generating",
+    "run_background": "Run (background)"
+  },
+  "background": {
+    "iterations": "Rounds",
+    "iterations_unlimited": "∞",
+    "iterations_help": "Stops automatically after this many rounds; ∞ runs until you stop it",
+    "seed_notice": "Background mode uses random seeds",
+    "mode_busy": "ComfyUI is busy — can't start a background run",
+    "bar_running": "Running in background · round {n}",
+    "bar_running_max": "Running in background · round {n} / {max}",
+    "bar_stopped": "Background run stopped · {n} rounds done",
+    "bar_finished": "Background run finished · {n} rounds done",
+    "bar_elapsed_hm": "Running for {h}h {m}m",
+    "bar_elapsed_m": "Running for {m}m",
+    "btn_stop": "Stop",
+    "btn_dismiss": "Got it",
+    "toast_started": "Background run started",
+    "toast_stopped": "Background run stopped",
+    "toast_blocked": "A background run is active — stop it before submitting",
+    "reason": {
+      "max_reached": "Reached the round limit",
+      "disk_low": "Not enough free disk space",
+      "file_missing": "File not found",
+      "exec_error": "ComfyUI execution error",
+      "comfy_offline": "ComfyUI went offline",
+      "user_stopped": "Stopped manually"
+    },
+    "reason_detail": "{reason}: {detail}",
+    "btn_running": "Running in background"
   },
   "basic": {
     "title": "Basic Settings",

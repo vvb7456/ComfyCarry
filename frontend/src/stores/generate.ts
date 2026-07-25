@@ -91,9 +91,11 @@ export interface ModelState {
   batch: number
   prefix: string
   format: string
-  runMode: 'normal' | 'live'
+  runMode: 'normal' | 'live' | 'background'
   /** Clip Skip (checkpoint 系专属): 1~4, 默认取 config.defaults.clip_skip ?? 1 */
   clipSkip: number
+  /** 后台运行模式: 轮次上限, 0 = 无限 */
+  maxIterations: number
   /** VAE 覆盖 (checkpoint 系专属): 空串 = 跟随 Checkpoint; 非空 = 用独立 VAELoader */
   vaeOverride: string
   controlNets: Record<string, ControlNetState>
@@ -156,6 +158,8 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     // B2: Clip Skip / VAE 覆盖 (checkpoint 系专属); 默认取 config.defaults.clip_skip ?? 1
     clipSkip: config.defaults.clip_skip ?? 1,
     vaeOverride: '',
+    // 后台运行模式: 轮次上限, 0 = 无限
+    maxIterations: 0,
     controlNets,
     upscale: {
       enabled: false, factor: 2, mode: '4x_overlapped_checkboard', tile: 8, downscale: 'lanczos',
@@ -368,6 +372,16 @@ export const useGenerateStore = defineStore('generate', () => {
           }
           if (state.hires?.seedMode === 'random' && state.hires.seedValue < 0) {
             state.hires.seedValue = randomSeed()
+          }
+
+          // Background run maxIterations: 兜底 (旧数据无此字段 → 默认 0 = 无限)
+          if (typeof state.maxIterations !== 'number' || isNaN(state.maxIterations)) {
+            state.maxIterations = 0
+          }
+          // runMode 合法性兜底: 旧值 'onChange' 已被 migrateV1 改为 'normal';
+          // 防御非预期值流进 UI
+          if (state.runMode !== 'normal' && state.runMode !== 'live' && state.runMode !== 'background') {
+            state.runMode = 'normal'
           }
 
           // Merge with defaults to fill any missing fields (deep for nested objects)

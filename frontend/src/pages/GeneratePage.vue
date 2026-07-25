@@ -7,6 +7,7 @@ import { useToast } from '@/composables/useToast'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
+import { useBackgroundRunStore } from '@/stores/backgroundRun'
 import { useGenerateOptions } from '@/composables/generate/useGenerateOptions'
 import { useComfyGate } from '@/composables/generate/useComfyGate'
 import { useTaskRegistry } from '@/composables/generate/useTaskRegistry'
@@ -31,6 +32,21 @@ const { toast } = useToast()
 const { post } = useApiFetch()
 const store = useGenerateStore()
 const queueStore = useGenerateQueueStore()
+// §4.6 后台运行 store: frozen 真相在服务端, 不是本地 ref
+const bg = useBackgroundRunStore()
+const frozen = computed(() => bg.state === 'running')
+
+/**
+ * 后台运行相关的执行 toast 是否该抑制。
+ *
+ * 两种情形:
+ *  - 正在后台跑: 完成提示每轮一条会攒几百个; 报错由浮动条的 stop_reason 统一上报。
+ *  - 刚手动停止: 后端 interrupt 后 ComfyUI 会发 execution_interrupted, 但此时本地
+ *    state 可能已被 /stop 的响应置成 idle, 单看 state 守不住 (竞态), 故用静默窗兜。
+ */
+function bgToastSuppressed() {
+  return bg.state === 'running' || bg.recentlyStopped()
+}
 
 // ── Gate: check ComfyUI online ─────────────────────────────────────────────
 const gate = useComfyGate()
@@ -75,6 +91,8 @@ onActivated(() => {
   if (optionsReady.value) options.refresh()
   // Re-check gate on page re-activation
   gate.checkNow()
+  // §4.6 KeepAlive 切回来重拉后台运行状态 (服务端为准, 避免刷新瞬间闪可编辑)
+  bg.refresh()
 })
 
 // ── 架构选择器 (顶栏左侧 DropdownMenu) ─────────────────────────────────────
@@ -220,9 +238,19 @@ const taskRegistry = useTaskRegistry()
 const preview = useGeneratePreview()
 
 // ── Submit ─────────────────────────────────────────────────────────────────
-const { submitting, submit } = useGenerateSubmit(execState)
+const { submitting, submit, validate, buildPayload } = useGenerateSubmit(execState)
 
-async function handleRun(_mode: string) {
+async function handleRun(mode: string) {
+  // §1 分流: background 模式走后台 start; 其余走现有 submit() 路径 (live 的 scheduleLiveRerun 不动)
+  if (mode === 'background') {
+    if (!(await validate())) return
+    const payload = buildPayload({ randomSeedWriteback: false })
+    await bg.start(payload, { max_iterations: store.currentState.maxIterations })
+    // start 失败 (409 队列非空 / 已在运行) 时 useApiFetch 已 toast 过错误且 state 仍为 idle,
+    // 此处不能无条件报成功, 否则错误与成功两个 toast 同时出现。
+    if (bg.state === 'running') toast(t('generate.background.toast_started'), 'success')
+    return
+  }
   const promptId = await submit()
   if (promptId) {
     taskRegistry.registerTask(promptId, 'main')
@@ -286,6 +314,15 @@ const sse = useComfySSE(tracker, {
     const promptId = (evt.data?.prompt_id as string) || ''
     if (!promptId) { lastRoutedType = null; return false }
 
+    // §4.6 预览帧修复: 后台运行期间, worker 提交的 prompt 从未在前端注册过 →
+    // routeEvent 找不到任务, preview_image 的 mainTask?.status==='running' 判不过, 预览帧不显示。
+    // 修法: 在 routeEvent 之前, 遇到 execution_start 且后台运行中 且该 prompt_id 尚未注册 →
+    // 先 registerTask(pid,'main')。顺序绝对不能反 —— routeEvent 靠 execution_start 把
+    // pending 翻成 running, 先 route 后 register 状态停在 pending, 预览帧仍然不显示。
+    if (evt.type === 'execution_start' && bg.state === 'running' && !taskRegistry.tasks.value.has(promptId)) {
+      taskRegistry.registerTask(promptId, 'main')
+    }
+
     const routed = taskRegistry.routeEvent(evt)
     lastRoutedType = routed?.target.type ?? null
 
@@ -327,7 +364,11 @@ const sse = useComfySSE(tracker, {
         if (result.type === 'execution_done') {
           const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
           const promptId = (evt.data?.prompt_id as string) || ''
-          toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
+          // §4.6 后台运行期间抑制 per-iteration 完成提示 (跑一夜会攒几百个);
+          // 但 fetchOutputImages / loadQueue / loadHistory / markHistoryDirty 照常执行。
+          if (!bgToastSuppressed()) {
+            toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
+          }
           if (promptId) preview.fetchOutputImages(promptId)
           queueStore.loadQueue()
           // 任务完成事件 → 抽屉开着: loadHistory; 关着: markHistoryDirty (规格 E2)
@@ -336,14 +377,16 @@ const sse = useComfySSE(tracker, {
           // Live mode: auto-rerun after successful execution
           if (store.currentState.runMode === 'live') scheduleLiveRerun()
         } else if (result.type === 'execution_interrupted') {
-          toast(t('generate.toast.exec_interrupted'), 'warning')
+          // 后台运行 / 刚手动停止时不弹: 停止是用户自己点的, 浮动条侧已给过提示
+          if (!bgToastSuppressed()) toast(t('generate.toast.exec_interrupted'), 'warning')
           preview.clearPreview()
           queueStore.loadQueue()
           if (drawerOpen.value) queueStore.loadHistory()
           else queueStore.markHistoryDirty()
           cancelLiveRerun()
         } else if (result.type === 'execution_error') {
-          toast(t('generate.error.exec_error_prefix'), 'error')
+          // 后台运行时 worker 会写 stop_reason=exec_error 并由浮动条展示, 这里再弹就是双重提示
+          if (!bgToastSuppressed()) toast(t('generate.error.exec_error_prefix'), 'error')
           preview.clearPreview()
           queueStore.loadQueue()
           cancelLiveRerun()
@@ -384,7 +427,7 @@ sse.start()
     <template v-else>
       <!-- ═══ 顶栏: [任务切换] [模型 ▾] ... [队列/历史 (badge)] ═══ -->
       <div class="gen-header">
-        <div class="gen-header-left">
+        <div class="gen-header-left" :inert="frozen" :class="{ 'gen-header-left--frozen': frozen }">
         <!-- 任务切换 (占位: 视频/编辑未上线为禁用项; 上线时接子路由) -->
         <SegmentedControl
           v-model="activeTask"
@@ -442,6 +485,7 @@ sse.start()
           :preview-images="preview.images.value"
           :preview-loading="preview.loading.value"
           :preview-current="preview.currentPreview.value"
+          :frozen="frozen"
           @run="handleRun"
           @stop="handleStop"
           @register-task="handleRegisterTask"
@@ -522,6 +566,12 @@ sse.start()
 }
 @media (max-width: 640px) {
   .gen-arch-label { display: none; }
+}
+
+/* §4.3 inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
+.gen-header-left--frozen {
+  opacity: .45;
+  cursor: not-allowed;
 }
 
 .gen-arch-selector {

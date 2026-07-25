@@ -32,13 +32,15 @@ class PromptExpander:
         self._wildcards_dir.mkdir(parents=True, exist_ok=True)
         self._wm = WildcardManager(self._wildcards_dir)
 
-    def expand(self, template: str, seed: int = -1) -> str:
+    def expand(self, template: str, seed: int = -1) -> dict:
         """
-        展开一个提示词模板 (单次)。返回展开后的文本。
-        如果无动态语法或展开失败，返回原文。
+        展开一个提示词模板 (单次)。返回 {"text": str, "truncated": bool}。
+
+        空模板 / 展开失败 / 递归引用时: 返回 {"text": 原文或"", "truncated": False}，
+        始终返回 dict，调用方可安全取 result["text"]。
         """
         if not template or not template.strip():
-            return ""
+            return {"text": "", "truncated": False}
         template = template.strip()
 
         if len(template) > MAX_TEMPLATE_LENGTH:
@@ -55,10 +57,10 @@ class PromptExpander:
             results = generator.generate(template, num_images=1)
         except RecursionError:
             logger.warning("[PromptExpander] 检测到递归引用，回退为原文")
-            return template
+            return {"text": template, "truncated": False}
         except Exception as e:
             logger.warning(f"[PromptExpander] 展开失败，回退为原文: {e}")
-            return template
+            return {"text": template, "truncated": False}
 
         text = results[0] if results else template
         truncated = len(text) > MAX_EXPANDED_LENGTH

@@ -45,6 +45,8 @@ const props = defineProps<{
   previewImages: PreviewImage[]
   previewLoading: boolean
   previewCurrent: string | null
+  /** §4.3 冻结: 后台运行中整页只读, 绑在 .gen-ctrl-col / .gen-module-wrap 两个 div 上 */
+  frozen?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -351,8 +353,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   <div class="model-tab">
     <!-- ═══ 上部: 双列布局 ═══ -->
     <div class="gen-top-row">
-      <!-- 左列: 控制区 -->
-      <div class="gen-ctrl-col">
+      <!-- 左列: 控制区 (§4.3 冻结时 inert) -->
+      <div class="gen-ctrl-col" :inert="frozen" :class="{ 'gen-frozen': frozen }">
         <!-- 提示词 -->
         <PromptEditor
           ref="promptEditorRef"
@@ -373,6 +375,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :elapsed="elapsed"
           :submitting="submitting"
           :blocked-reason="runBlockedReason"
+          :frozen="frozen"
           @run="emit('run', $event)"
           @blocked="onRunBlocked"
           @stop="emit('stop')"
@@ -415,7 +418,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     </div>
 
     <!-- ═══ 下部: 功能模块 (Tab + Panel 融合卡片) ═══ -->
-    <div class="gen-module-wrap">
+    <div class="gen-module-wrap" :inert="frozen" :class="{ 'gen-frozen': frozen }">
       <ModuleTabs
         :tabs="effectiveModuleTabs"
         :active-tab="state.activeModule"
@@ -685,6 +688,12 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   flex-direction: column;
   gap: var(--sp-3);
   min-width: 0;
+}
+
+/* §4.3 inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
+.gen-frozen {
+  opacity: .45;
+  cursor: not-allowed;
 }
 
 .gen-sep {

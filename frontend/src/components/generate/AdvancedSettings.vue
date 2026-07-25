@@ -302,20 +302,30 @@ const vaeOverrideOptions = computed(() => [
       <!-- Row 2: Seed + Batch -->
       <div class="adv-2col">
         <div class="field-group">
-          <label class="field-lbl">
-            {{ t('generate.advanced.seed') }}
-            <HelpTip :text="t('generate.advanced.seed_help')" />
-            <span class="seed-mode-badge">
-              {{ state.seedMode === 'random' ? t('generate.advanced.seed_random') : t('generate.advanced.seed_fixed') }}
-            </span>
-          </label>
-          <SeedInput
-            :model-value="state.seedValue"
-            :mode="state.seedMode"
-            :disabled="disabled"
-            @update:model-value="state.seedValue = $event"
-            @update:mode="state.seedMode = $event"
-          />
+          <!-- 后台模式: 种子强制随机 (runMode === 'background', 非冻结状态判定) → SeedInput 替换为禁用观感提示 -->
+          <template v-if="state.runMode === 'background'">
+            <label class="field-lbl">
+              {{ t('generate.advanced.seed') }}
+              <HelpTip :text="t('generate.advanced.seed_help')" />
+            </label>
+            <div class="adv-seed-notice">{{ t('generate.background.seed_notice') }}</div>
+          </template>
+          <template v-else>
+            <label class="field-lbl">
+              {{ t('generate.advanced.seed') }}
+              <HelpTip :text="t('generate.advanced.seed_help')" />
+              <span class="seed-mode-badge">
+                {{ state.seedMode === 'random' ? t('generate.advanced.seed_random') : t('generate.advanced.seed_fixed') }}
+              </span>
+            </label>
+            <SeedInput
+              :model-value="state.seedValue"
+              :mode="state.seedMode"
+              :disabled="disabled"
+              @update:model-value="state.seedValue = $event"
+              @update:mode="state.seedMode = $event"
+            />
+          </template>
         </div>
         <div class="field-group">
           <label class="field-lbl">
@@ -478,5 +488,15 @@ const vaeOverrideOptions = computed(() => [
   background: var(--bg3);
   color: var(--t3);
   margin-left: 2px;
+}
+
+/* ── 后台模式种子禁用提示: 虚线边框 + --t3 文字色 ── */
+.adv-seed-notice {
+  padding: 8px 12px;
+  border: 1px dashed var(--bd);
+  border-radius: 6px;
+  color: var(--t3);
+  font-size: .82rem;
+  background: var(--bg3);
 }
 </style>

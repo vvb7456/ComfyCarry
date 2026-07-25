@@ -27,7 +27,7 @@ interface SubmitResponse {
  * 6. I2I validation: enabled I2I must have image
  */
 export function useGenerateSubmit(execState: Ref<ExecState | null>) {
-  const { post } = useApiFetch()
+  const { post: apiPost } = useApiFetch()
   const { t } = useI18n({ useScope: 'global' })
   const { confirm } = useConfirm()
   const { toast } = useToast()
@@ -35,48 +35,56 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
 
   const submitting = ref(false)
 
-  async function submit(): Promise<string | null> {
-    if (submitting.value) return null
+  /**
+   * §5.3 当前选中模型的包装形态: 两形态并存 tab 下按 state.checkpoint/unet 哪个非空判断
+   * (picker 互斥: 选整合包写 state.checkpoint,选拆分件写 state.unet)。
+   * validate() 与 buildPayload() 各自独立调用, 二者必须得出同一结论, 故抽此处单点推导。
+   * 同一逻辑另见 ModelTab.vue 的 selectedPackaging。
+   */
+  function resolvePackaging() {
+    const state = store.currentState
+    const modelType = store.activeModelType
+    const activeConfig = MODEL_TYPES[modelType]
+    const hasDualPackaging = (activeConfig?.supportedPackaging.length ?? 0) > 1
+    const selectedPackaging: 'checkpoint' | 'split' = hasDualPackaging
+      ? (state.checkpoint ? 'checkpoint' : 'split')
+      : (activeConfig?.loader === 'split' ? 'split' : 'checkpoint')
+    return { modelType, activeConfig, selectedPackaging }
+  }
 
+  async function validate(): Promise<boolean> {
     const state = store.currentState
 
     // 1. Check: not already generating
     if (execState.value) {
       toast(t('generate.toast.wait_workflow'), 'warning')
-      return null
+      return false
     }
 
     // 2. Preprocess check — placeholder for future phases
 
     // 3. Basic validation
-    const modelType = store.activeModelType
-    const activeConfig = MODEL_TYPES[modelType]
-    // §5.3 当前选中模型的包装形态: 两形态并存 tab 下按 state.checkpoint/unet 哪个非空判断
-    // (picker 互斥: 选整合包写 state.checkpoint,选拆分件写 state.unet)
-    const hasDualPackaging = (activeConfig?.supportedPackaging.length ?? 0) > 1
-    const selectedPackaging: 'checkpoint' | 'split' = hasDualPackaging
-      ? (state.checkpoint ? 'checkpoint' : 'split')
-      : (activeConfig?.loader === 'split' ? 'split' : 'checkpoint')
+    const { modelType, activeConfig, selectedPackaging } = resolvePackaging()
 
     if (selectedPackaging === 'split') {
       if (!state.unet || !state.clip || !state.vae) {
         toast(t('generate.error.no_split_models'), 'error')
-        return null
+        return false
       }
       // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
       if (activeConfig?.dualClip && !state.clip2) {
         toast(t('generate.error.no_split_models'), 'error')
-        return null
+        return false
       }
     } else {
       if (!state.checkpoint) {
         toast(t('generate.error.no_checkpoint'), 'error')
-        return null
+        return false
       }
     }
     if (!state.positive.trim()) {
       toast(t('generate.error.no_prompt'), 'error')
-      return null
+      return false
     }
 
     // 4. Inactive module warning (configured but not enabled)
@@ -97,7 +105,7 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
         confirmText: t('generate.error.skip_submit'),
         dontAskKey: 'gen_skip_inactive_warn',
       })
-      if (!proceed) return null
+      if (!proceed) return false
     }
 
     // 5. CN validation: enabled CN must have model + image
@@ -105,11 +113,11 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       if (cn.enabled) {
         if (!cn.model) {
           toast(t('generate.error.cn_no_model', { type }), 'error')
-          return null
+          return false
         }
         if (!cn.image) {
           toast(t('generate.error.cn_no_ref', { type }), 'error')
-          return null
+          return false
         }
       }
     }
@@ -117,7 +125,7 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     // 6. I2I validation: enabled I2I must have image
     if (state.i2i.enabled && !state.i2i.image) {
       toast(t('generate.error.i2i_no_ref'), 'error')
-      return null
+      return false
     }
 
     // 6b. Inpaint mode: image exists but no mask → ConfirmDialog
@@ -128,9 +136,16 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
         confirmText: t('generate.error.skip_submit'),
         dontAskKey: 'gen_inpaint_no_mask_warn',
       })
-      if (!proceed) return null
+      if (!proceed) return false
       // User confirmed → fall through to standard I2I payload (mask is null)
     }
+
+    return true
+  }
+
+  function buildPayload(opts?: { randomSeedWriteback?: boolean }): Record<string, unknown> {
+    const randomSeedWriteback = opts?.randomSeedWriteback ?? true
+    const state = store.currentState
 
     // ── Build payload ──────────────────────────────────────────────────────
     // Seed: random mode generates client-side value and writes back to store
@@ -138,7 +153,9 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     let seed: number
     if (state.seedMode === 'random') {
       seed = Math.floor(Math.random() * 4294967295) // 0 ~ 2^32-1
-      state.seedValue = seed
+      if (randomSeedWriteback) {
+        state.seedValue = seed
+      }
     } else {
       seed = state.seedValue
     }
@@ -166,6 +183,8 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       bracket: ps.normalize_bracket,
       underscore: ps.normalize_underscore,
     }
+
+    const { modelType, activeConfig, selectedPackaging } = resolvePackaging()
 
     // 软架构条目 (pony/illustrious/noobai) 通过 workflowType 提交 'sdxl',
     // 后端按 sdxl 工作流编排 (arch 层面相同)。其余 entry 用自身 key。
@@ -256,17 +275,23 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       let hiresSeed: number
       if (state.hires.seedMode === 'random') {
         hiresSeed = Math.floor(Math.random() * 4294967295)
-        state.hires.seedValue = hiresSeed
+        if (randomSeedWriteback) {
+          state.hires.seedValue = hiresSeed
+        }
       } else {
         hiresSeed = state.hires.seedValue
       }
       payload.hires_seed = hiresSeed
     }
 
+    return payload
+  }
+
+  async function post(payload: Record<string, unknown>): Promise<string | null> {
     // ── Submit ─────────────────────────────────────────────────────────────
     submitting.value = true
     try {
-      const result = await post<SubmitResponse>('/api/generate/submit', payload)
+      const result = await apiPost<SubmitResponse>('/api/generate/submit', payload)
       if (!result?.prompt_id) {
         toast(t('generate.error.prompt_id_missing'), 'error')
         return null
@@ -278,5 +303,11 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
     }
   }
 
-  return { submitting, submit }
+  async function submit(): Promise<string | null> {
+    if (submitting.value) return null
+    if (!(await validate())) return null
+    return post(buildPayload())
+  }
+
+  return { submitting, submit, validate, buildPayload, post }
 }

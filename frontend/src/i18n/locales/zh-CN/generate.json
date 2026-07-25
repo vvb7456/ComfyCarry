@@ -97,7 +97,36 @@
     "run": "运行",
     "stop": "停止",
     "run_live": "运行（实时）",
-    "generating": "正在生成"
+    "generating": "正在生成",
+    "run_background": "运行（后台）"
+  },
+  "background": {
+    "iterations": "轮次",
+    "iterations_unlimited": "∞",
+    "iterations_help": "达到该轮次后自动停止；∞ 表示一直跑到手动停止",
+    "seed_notice": "后台模式使用随机种子",
+    "mode_busy": "ComfyUI 正忙，无法启动后台运行",
+    "bar_running": "后台运行中 · 第 {n} 轮",
+    "bar_running_max": "后台运行中 · 第 {n} 轮 / {max}",
+    "bar_stopped": "后台运行已停止 · 完成 {n} 轮",
+    "bar_finished": "后台运行已结束 · 完成 {n} 轮",
+    "bar_elapsed_hm": "已运行 {h} 小时 {m} 分",
+    "bar_elapsed_m": "已运行 {m} 分",
+    "btn_stop": "停止",
+    "btn_dismiss": "知道了",
+    "toast_started": "后台运行已启动",
+    "toast_stopped": "后台运行已停止",
+    "toast_blocked": "后台运行中，请先停止再提交",
+    "reason": {
+      "max_reached": "达到轮次上限",
+      "disk_low": "磁盘剩余空间不足",
+      "file_missing": "文件未找到",
+      "exec_error": "ComfyUI 执行出错",
+      "comfy_offline": "ComfyUI 已掉线",
+      "user_stopped": "已手动停止"
+    },
+    "reason_detail": "{reason}：{detail}",
+    "btn_running": "后台运行中"
   },
   "basic": {
     "title": "基础设置",

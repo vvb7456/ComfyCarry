@@ -8,7 +8,6 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import type { ExecState } from '@/composables/useExecTracker'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
-import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -72,13 +71,13 @@ function nodeCount(item: QueueItem) {
       :title="t('comfyui.queue.running')"
       :default-open="true"
     >
-      <SectionToolbar>
-        <template #end>
-          <BaseButton variant="danger" size="sm" @click="interrupt">
-            {{ t('comfyui.queue.interrupt') }}
-          </BaseButton>
-        </template>
-      </SectionToolbar>
+      <!-- 中断收进标题行右侧 (CollapsibleGroup 的 title-right 插槽, margin-left:auto 右对齐);
+           header 整行绑了 toggle, 故按钮需 .stop 阻止冒泡, 与 DownloadsTab 的用法一致 -->
+      <template #title-right>
+        <BaseButton variant="danger" size="xs" @click.stop="interrupt">
+          {{ t('comfyui.queue.interrupt') }}
+        </BaseButton>
+      </template>
 
       <EmptyState
         v-if="queueRunning.length === 0"
@@ -104,13 +103,12 @@ function nodeCount(item: QueueItem) {
       :count="queuePending.length"
       :default-open="false"
     >
-      <SectionToolbar>
-        <template #end>
-          <BaseButton size="sm" @click="clearQueue">
-            {{ t('comfyui.queue.clear') }}
-          </BaseButton>
-        </template>
-      </SectionToolbar>
+      <!-- 清空同样收进标题行右侧, 与「正在执行」的中断保持一致 -->
+      <template #title-right>
+        <BaseButton size="xs" @click.stop="clearQueue">
+          {{ t('comfyui.queue.clear') }}
+        </BaseButton>
+      </template>
 
       <EmptyState
         v-if="queuePending.length === 0"

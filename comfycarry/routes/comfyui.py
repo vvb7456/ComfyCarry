@@ -168,6 +168,18 @@ def api_comfyui_queue():
 
 @bp.route("/api/comfyui/interrupt", methods=["POST"])
 def api_comfyui_interrupt():
+    # §3.5 联动: 后台 session 在跑时先停 session 再 interrupt。
+    # 顺序不能反 —— 先 interrupt 再停 session, worker 会把这次中断当成
+    # 「一轮结束」立刻重提。先停 session (worker 退出循环) 再 interrupt,
+    # 所有中断入口语义统一, 前端零改动。
+    # stop_session() 内部已经做了 interrupt + 清队列, 这里直接返回, 不再重复 POST。
+    try:
+        from ..services.background_run import is_running, stop_session
+        if is_running():
+            stop_session()
+            return jsonify({"ok": True})
+    except Exception:
+        pass
     try:
         requests.post(f"{COMFYUI_URL}/interrupt", timeout=5)
         return jsonify({"ok": True})
