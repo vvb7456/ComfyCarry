@@ -8,7 +8,6 @@
   "header": {
     "queue_history": "队列 / 历史",
     "model_selector_aria": "选择模型",
-    "gate_not_ready": "组件未就绪",
     "family_sdxl": "SDXL 系列",
     "family_flux1": "Flux 1 系列",
     "model_label": "模型",
@@ -44,12 +43,8 @@
     "tools": {
       "interrogate": "提示词反推",
       "llm_assist": "AI 提示词",
-      "embedding": "插入 Embedding",
-      "wildcard": "随机提示词",
       "interrogate_title": "从图片反推提示词标签 (WD14 Tagger)",
       "llm_assist_title": "使用 AI 生成或优化提示词",
-      "embedding_title": "浏览并插入 Embedding 向量",
-      "wildcard_title": "管理随机提示词 (Wildcard)",
       "prompt_editor": "提示词编辑器",
       "prompt_editor_title": "可视化提示词编辑器，支持自动补全和标签库"
     },
@@ -97,7 +92,6 @@
     "run": "运行",
     "stop": "停止",
     "run_live": "运行（实时）",
-    "generating": "正在生成",
     "run_background": "运行（后台）"
   },
   "background": {
@@ -105,7 +99,6 @@
     "iterations_unlimited": "∞",
     "iterations_help": "达到该轮次后自动停止；∞ 表示一直跑到手动停止",
     "seed_notice": "后台模式使用随机种子",
-    "mode_busy": "ComfyUI 正忙，无法启动后台运行",
     "bar_running": "后台运行中 · 第 {n} 轮",
     "bar_running_max": "后台运行中 · 第 {n} 轮 / {max}",
     "bar_stopped": "后台运行已停止 · 完成 {n} 轮",
@@ -116,7 +109,6 @@
     "btn_dismiss": "知道了",
     "toast_started": "后台运行已启动",
     "toast_stopped": "后台运行已停止",
-    "toast_blocked": "后台运行中，请先停止再提交",
     "reason": {
       "max_reached": "达到轮次上限",
       "disk_low": "磁盘剩余空间不足",
@@ -130,7 +122,6 @@
   },
   "basic": {
     "title": "基础设置",
-    "checkpoint": "基础模型 (Checkpoint)",
     "click_change": "点击更换模型",
     "resolution": "分辨率",
     "custom": "自定义...",
@@ -142,7 +133,6 @@
     "search_checkpoint": "搜索 Checkpoint...",
     "select_model": "选择主模型",
     "search_model": "搜索模型...",
-    "unet": "UNet 主权重",
     "clip": "CLIP 文本编码器",
     "clip2": "文本编码器 2 (T5)",
     "vae": "VAE",
@@ -150,7 +140,6 @@
     "select_clip": "选择 CLIP",
     "select_vae": "选择 VAE",
     "search_unet": "搜索 UNet...",
-    "search_clip": "搜索 CLIP...",
     "search_vae": "搜索 VAE..."
   },
   "advanced": {
@@ -201,22 +190,13 @@
     "depth": "景深控制",
     "upscale": "高清放大",
     "hires": "二次采样",
-    "enable_lora": "启用 LoRA",
-    "enable_i2i": "启用图生图",
-    "enable_pose": "启用姿势控制",
-    "enable_canny": "启用轮廓控制",
-    "enable_depth": "启用景深控制",
-    "enable_upscale": "启用高清放大",
-    "enable_hires": "启用二次采样"
+    "face": "面部修复"
   },
   "lora": {
     "add": "添加 LoRA",
-    "strength": "LoRA 强度",
     "select": "选择模型",
-    "change": "更换模型",
     "select_title": "选择 LoRA",
     "search_placeholder": "搜索 LoRA...",
-    "not_found": "未找到 LoRA",
     "count_selected": "{count} 个已选",
     "remove": "移除",
     "empty_warn": "请先添加 LoRA 再启用",
@@ -246,7 +226,6 @@
     "clear_all": "清除全部",
     "invert": "反转",
     "fit_screen": "适应窗口",
-    "apply": "应用遮罩",
     "help": "用画笔涂抹需要重绘的区域（红色标记），未标记区域保持不变",
     "space_pan": "空格+拖拽=平移",
     "scroll_zoom": "滚轮=缩放"
@@ -264,14 +243,9 @@
     "ref_pose": "参考图（骨骼图）",
     "ref_canny": "参考图（边缘图）",
     "ref_depth": "参考图（深度图）",
-    "upload_placeholder": "点击选择",
     "need_model": "请先安装 ControlNet 模型",
     "need_ref": "请先上传参考图",
-    "installed": "已安装",
-    "required": "必需",
-    "detecting": "正在检测模型…",
     "need_download": "该功能需下载模型",
-    "download_selected": "下载选中模型",
     "detect_body": "检测身体",
     "detect_fingers": "检测手指",
     "detect_face": "检测面部",
@@ -285,9 +259,6 @@
     "edge_map": "边缘图",
     "depth_map": "深度图",
     "ref_image": "参考图",
-    "remove_ref": "移除参考图",
-    "remove": "移除",
-    "or": "或",
     "generating": "生成{label}",
     "generate_title": "生成{title}",
     "need_download_pose": "该功能需下载姿势控制模型",
@@ -296,7 +267,6 @@
     "select_title": "选择{label}",
     "preprocess": "生成",
     "preprocessing": "正在生成…",
-    "preprocess_done": "生成完成",
     "pick_ref": "点击选择{label}",
     "param_settings": "参数设置",
     "preprocess_blocked": "请等待当前任务完成"
@@ -325,7 +295,6 @@
     "svr_input_noise_help": "0=忠实原图，值越高细节越自由",
     "svr_latent_noise": "潜空间噪声",
     "svr_latent_noise_help": "0=忠实原图，值越高细节越自由",
-    "model_desc": "4× 超分辨率放大",
     "method_help": "重叠棋盘格可消除分块拼接痕迹，适合大多数场景；标准模式速度最快但可能有接缝",
     "tile_size_help": "每次处理的图块数量。值越大速度越快但占用显存越多，显存不足时请降低此值",
     "downscale_method_help": "2x/3x 倍率时，先 4x 超采再缩放到目标尺寸所用的插值算法。4x 时不生效"
@@ -338,6 +307,34 @@
     "sampler": "采样器",
     "scheduler": "调度器",
     "seed": "种子"
+  },
+  "face": {
+    "denoise": "重绘强度",
+    "denoise_low": "0.2 轻修",
+    "denoise_mid": "0.35 推荐",
+    "denoise_high": "0.6 重绘",
+    "denoise_help": "低值保留五官结构只补细节，值越高修复幅度越大但有换脸风险。建议 0.25-0.45。未检测到人脸时按原图输出；多张人脸会全部修复",
+    "steps": "采样步数",
+    "detection_model": "检测模型",
+    "prompt": "面部提示词",
+    "prompt_placeholder": "留空则沿用主提示词。只描述面部：表情 / 皮肤质感 / 妆容…",
+    "prompt_help": "留空则沿用主提示词；填写后只对脸部裁切区生效，可避免主提示词里的场景、服饰词在脸上生成杂物。负向词始终沿用主设置",
+    "mask_mode": "掩码方式",
+    "mask_bbox": "矩形框",
+    "mask_sam": "SAM 轮廓",
+    "mask_mode_help": "修复区域贴回原图的掩码形状。矩形框：按检测框羽化贴回；SAM 轮廓：五官级分割掩码，贴回边界更精确。SAM 未安装时不可选，下载入口在本模块首次进入的引导页",
+    "advanced": "高级参数",
+    "cfg_help": "默认 7。Krea2 / Z-Image / Flux 等蒸馏架构请设为 1。",
+    "guide_size": "参考尺寸",
+    "guide_size_help": "脸部裁切区放大后的短边目标像素，越大细节越多、耗时越长。",
+    "crop_factor": "裁切余量",
+    "crop_factor_help": "裁切框相对人脸框的放大倍数，给下巴、发际留上下文，避免贴回边界断裂。",
+    "bbox_threshold": "检测阈值",
+    "bbox_threshold_help": "低 = 检出更多人脸（可能误检），高 = 更严格。",
+    "feather": "边缘羽化",
+    "feather_help": "贴回原图时的边缘过渡宽度，防止方块接缝。",
+    "need_model": "请先安装面部检测模型",
+    "need_download": "该功能需下载面部修复模型"
   },
   "interrogate": {
     "title": "反推参数",
@@ -360,9 +357,7 @@
     "need_model": "该功能需下载反推模型",
     "modal_title": "提示词反推",
     "start_btn": "开始反推",
-    "copy": "复制",
-    "highest_precision": "最高精度",
-    "lightweight": "轻量快速"
+    "copy": "复制"
   },
   "llm_modal": {
     "title": "AI 提示词",
@@ -391,7 +386,6 @@
   "embedding": {
     "title": "插入 Embedding",
     "search_placeholder": "搜索 Embedding...",
-    "weight": "权重",
     "to_positive": "→ 正向",
     "to_negative": "→ 负向",
     "loading": "加载中...",
@@ -416,19 +410,16 @@
     "create_failed": "创建失败",
     "new_file": "新建 Wildcard",
     "folder_name": "文件夹名称",
-    "create_file": "创建文件",
     "rename": "重命名",
     "rename_failed": "重命名失败",
     "renamed": "已重命名",
     "saved": "Wildcard 已保存",
     "save_failed": "保存失败",
-    "edit_title": "编辑 Wildcard",
     "edit_placeholder": "每行一个条目...",
     "new_folder_title": "新建文件夹",
     "folder_placeholder": "文件夹名称 (如 sdxl, flux, common)",
     "click_rename": "点击重命名",
     "create_folder_failed": "创建文件夹失败",
-    "unknown_file": "未知文件",
     "inserted": "已插入 __{name}__"
   },
   "image_source": {
@@ -447,10 +438,7 @@
     "no_output": "无法获取输出图片，请前往 ComfyUI 页查看",
     "wait_workflow": "请等待当前工作流完成或取消",
     "interrogate_submit_failed": "反推提交失败",
-    "interrogate_result_failed": "获取反推结果失败",
-    "inserted": "已插入 {name}",
-    "meta_not_loaded": "详情功能需要先访问模型管理页加载",
-    "folder_name_required": "请输入文件夹名称"
+    "interrogate_result_failed": "获取反推结果失败"
   },
   "error": {
     "no_checkpoint": "请选择基础模型",
@@ -460,8 +448,6 @@
     "modules_not_enabled": "部分功能已配置但未启用",
     "modules_not_enabled_desc": "已配置参数但开关未打开，提交后将不会生效。",
     "skip_submit": "不启用，直接提交",
-    "enable_submit": "启用并提交",
-    "dont_remind": "不再提示",
     "exec_error_prefix": "ComfyUI 执行出错",
     "cn_no_ref": "{type}已启用但未上传参考图，请上传或取消勾选",
     "cn_no_model": "{type}未检测到可用模型，请确认 ComfyUI 已启动",
@@ -473,20 +459,16 @@
   },
   "model_dep": {
     "detecting": "正在检测模型…",
-    "need_download": "该功能需下载模型",
     "installed": "已安装",
     "required": "必需",
     "download_selected": "下载选中模型",
     "select_at_least_one": "请至少选择一个模型",
-    "downloading": "下载中...",
     "download_failed": "下载失败",
-    "all_downloaded": "全部下载完成",
     "enter": "进入"
   },
   "components": {
     "title": "运行组件",
     "ready": "运行组件就绪 · {n} 项",
-    "ready_short": "就绪",
     "missing": "缺少 {n} 项运行组件，点击下载",
     "fetch_all": "全部下载",
     "downloading": "正在获取运行组件 {i}/{n} · {name}",
@@ -496,11 +478,6 @@
     "role_text_encoder_1": "文本编码器 1",
     "role_text_encoder_2": "文本编码器 2",
     "role_vae": "VAE",
-    "version": "版本",
-    "tier_standard": "标准",
-    "tier_lite": "精简",
-    "tier_full": "完整",
-    "suspect_size": "文件体积与预期不符，可能不是预期文件",
     "error_check": "组件检测失败",
     "error_no_dir": "缺少 ComfyUI 目录，无法下载组件",
     "error_submit": "{name} 提交下载失败",
@@ -512,7 +489,6 @@
     "arch_unknown": "未知",
     "packaging_checkpoint": "整合包",
     "packaging_split": "拆分",
-    "components_missing": "缺少运行组件，点击补齐",
     "arch_mismatch_title": "架构不匹配",
     "arch_mismatch_desc": "该模型架构为 {model_arch}，当前标签页为 {tab_arch}，提交工作流将无法运行。确定选择？",
     "arch_unknown_desc": "无法识别该模型的架构，若与当前标签页不兼容，工作流将运行失败。确定选择？",
@@ -520,9 +496,6 @@
     "empty_title": "还没有 {arch} 主模型",
     "empty_desc": "前往下载页添加模型",
     "go_to_downloads": "前往下载页",
-    "component_required": "选中模型需要以下组件",
-    "component_ready": "组件已就绪，点击确认使用",
-    "back_to_list": "返回列表",
     "component_hint": "选中后需补齐运行组件"
   },
   "placeholders": {

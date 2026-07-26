@@ -38,6 +38,19 @@ export interface LocalModel {
   }>
 }
 
+/**
+ * 视觉资产 / 功能组件分界 — "默认"视图只显示视觉资产。
+ * 语义标准: 换掉该文件, 生成画面的内容/风格会变 → 视觉资产 (用户收藏的模型);
+ * 只服务于流程 (架构配件/结构控制/画质增强/检测分割等) → 功能组件。
+ * 组件目录 (MODEL_DIRS 约 30 个) 会持续增长, 视觉资产目录极稳定 → 枚举后者,
+ * 不在名单的 category 一律算组件。
+ * 注意: unet/diffusion_models/unet_gguf/diffusers 是主模型的不同打包形态, 必须在列。
+ */
+const VISUAL_ASSET_CATEGORIES = new Set([
+  'checkpoints', 'unet', 'diffusion_models', 'unet_gguf', 'diffusers',
+  'loras', 'embeddings', 'hypernetworks',
+])
+
 export function useLocalModels() {
   const { get, post } = useApiFetch()
 
@@ -45,20 +58,22 @@ export function useLocalModels() {
   const loading = ref(false)
   const error = ref('')
 
-  // Filters
-  const categoryFilter = ref('all')
+  // Filters ('default' = 仅视觉资产; 'all' = 含功能组件)
+  const categoryFilter = ref('default')
   const folderFilter = ref('')
   const textFilter = ref('')
 
   // Derived: filtered models
   const filteredByCategory = computed(() => {
+    if (categoryFilter.value === 'default')
+      return models.value.filter(m => VISUAL_ASSET_CATEGORIES.has(m.category))
     if (categoryFilter.value === 'all') return models.value
     return models.value.filter(m => m.category === categoryFilter.value)
   })
 
-  // Available folders based on current category filter
+  // Available folders based on current category filter (聚合视图无单一根目录, 不提供)
   const availableFolders = computed(() => {
-    if (categoryFilter.value === 'all') return []
+    if (categoryFilter.value === 'all' || categoryFilter.value === 'default') return []
     const folders = new Set<string>()
     for (const m of filteredByCategory.value) {
       const idx = m.rel_path.indexOf('/')

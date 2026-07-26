@@ -583,6 +583,105 @@ class WorkflowBuilder:
         }
         return nid
 
+    # ── 面部重绘 (Impact Pack FaceDetailer) ─────────────────────────────────
+
+    def add_ultralytics_detector(self, model_name: str) -> str:
+        """
+        UltralyticsDetectorProvider (ComfyUI-Impact-Subpack) — YOLO 检测器加载。
+        model_name: ComfyUI 枚举格式, 形如 "bbox/face_yolov8m.pt"。
+        输出: [node_id, 0]=BBOX_DETECTOR, [node_id, 1]=SEGM_DETECTOR
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "UltralyticsDetectorProvider",
+            "inputs": {"model_name": model_name},
+        }
+        return nid
+
+    def add_sam_loader(self, model_name: str, device_mode: str = "AUTO") -> str:
+        """
+        SAMLoader (Impact) — SAM 分割模型加载, 供 FaceDetailer 精细掩码。
+        device_mode: AUTO (用时上 GPU、用完释放) | Prefer GPU | CPU
+        输出: [node_id, 0]=SAM_MODEL
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SAMLoader",
+            "inputs": {"model_name": model_name, "device_mode": device_mode},
+        }
+        return nid
+
+    def add_face_detailer(
+        self,
+        image_node_id: str,
+        model_ref,
+        clip_ref,
+        vae_ref,
+        positive_ref,
+        negative_ref,
+        bbox_detector_ref,
+        sam_model_ref=None,
+        seed: int = -1,
+        steps: int = 20,
+        cfg: float = 7.0,
+        sampler: str = "euler",
+        scheduler: str = "normal",
+        denoise: float = 0.35,
+        guide_size: int = 768,
+        crop_factor: float = 1.8,
+        bbox_threshold: float = 0.5,
+        feather: int = 5,
+    ) -> str:
+        """
+        FaceDetailer (Impact Pack) — 检测人脸 → 裁切放大 → 局部低 denoise 重绘 → 贴回。
+        max_size 固定 1024 (恒 ≥ guide_size, 杜绝 guide>max 的矛盾配置);
+        drop_size=20 忽略远景小脸; sam_model_ref=None 时退化为 bbox 矩形掩码。
+        输出: [node_id, 0]=IMAGE (整图); 输出 1 为 cropped_refined (list 型), 勿直接接 IMAGE 口
+        """
+        nid = self._next_id()
+        actual_seed = seed if seed >= 0 else random.randint(0, 2**32 - 1)
+        inputs = {
+            "image": [image_node_id, 0],
+            "model": self._ref(model_ref, default_idx=0),
+            "clip": self._ref(clip_ref, default_idx=1),
+            "vae": self._ref(vae_ref, default_idx=2),
+            "positive": self._ref(positive_ref, default_idx=0),
+            "negative": self._ref(negative_ref, default_idx=0),
+            "bbox_detector": self._ref(bbox_detector_ref, default_idx=0),
+            "guide_size": int(guide_size),
+            "guide_size_for": True,
+            "max_size": 1024,
+            "seed": actual_seed,
+            "steps": int(steps),
+            "cfg": float(cfg),
+            "sampler_name": sampler,
+            "scheduler": scheduler,
+            "denoise": float(denoise),
+            "feather": int(feather),
+            "noise_mask": True,
+            "force_inpaint": True,
+            "bbox_threshold": float(bbox_threshold),
+            "bbox_dilation": 10,
+            "bbox_crop_factor": float(crop_factor),
+            "sam_detection_hint": "center-1",
+            "sam_dilation": 0,
+            "sam_threshold": 0.93,
+            "sam_bbox_expansion": 0,
+            "sam_mask_hint_threshold": 0.7,
+            "sam_mask_hint_use_negative": "False",
+            "drop_size": 20,
+            "wildcard": "",
+            "cycle": 1,
+            "inpaint_model": False,
+            "noise_mask_feather": 20,
+            "tiled_encode": False,
+            "tiled_decode": False,
+        }
+        if sam_model_ref is not None:
+            inputs["sam_model_opt"] = self._ref(sam_model_ref, default_idx=0)
+        self._nodes[nid] = {"class_type": "FaceDetailer", "inputs": inputs}
+        return nid
+
     # ── ControlNet 预处理器节点 ──────────────────────────────────────────────
 
     def add_dw_preprocessor(self, image_node_id: str, resolution: int = 1024,
@@ -781,6 +880,68 @@ SEEDVR2_DIT_MODELS = (
     "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
 )
 SEEDVR2_COLOR_CORRECTIONS = ("lab", "wavelet", "wavelet_adaptive", "hsv", "adain", "none")
+
+
+def _add_face_detailer_chain(
+    b: WorkflowBuilder,
+    image: str,
+    model_ref,
+    clip_ref,
+    vae_ref,
+    positive,
+    negative,
+    params: dict,
+    defaults: dict,
+) -> str:
+    """
+    面部重绘链路 (SDXL / split 共用):
+      UltralyticsDetectorProvider → [SAMLoader] → FaceDetailer
+    face_detailer_prompt 非空 → 用主链末端 clip_ref 独立编码; 空 → 复用主 positive 引用。
+    sampler/scheduler 跟随主采样 (defaults 由调用方按架构注入); cfg 独立参数, 缺省 7.0。
+    返回修脸后的 IMAGE 节点 id。
+    """
+    detection_model = str(params.get("face_detailer_model", "face_yolov8m.pt")).strip()
+    # 只留文件名, 防路径注入; builder 统一拼 ComfyUI 枚举所需的 bbox/ 前缀
+    detection_model = detection_model.replace("\\", "/").split("/")[-1] or "face_yolov8m.pt"
+    bbox = b.add_ultralytics_detector(f"bbox/{detection_model}")
+
+    sam = None
+    if bool(params.get("face_detailer_use_sam", False)):
+        sam = b.add_sam_loader("sam_vit_b_01ec64.pth", device_mode="AUTO")
+
+    face_prompt = str(params.get("face_detailer_prompt", "")).strip()
+    face_positive = (
+        b.add_clip_text_encode(face_prompt, clip_ref) if face_prompt else positive
+    )
+
+    denoise = max(0.1, min(float(params.get("face_detailer_denoise", 0.35)), 0.75))
+    steps = max(5, min(int(params.get("face_detailer_steps", 20)), 40))
+    cfg = max(1.0, min(float(params.get("face_detailer_cfg", 7.0)), 20.0))
+    guide_size = max(256, min(int(params.get("face_detailer_guide_size", 768)), 1024))
+    crop_factor = max(1.2, min(float(params.get("face_detailer_crop_factor", 1.8)), 3.0))
+    bbox_threshold = max(0.1, min(float(params.get("face_detailer_bbox_threshold", 0.5)), 0.9))
+    feather = max(0, min(int(params.get("face_detailer_feather", 5)), 30))
+
+    return b.add_face_detailer(
+        image,
+        model_ref,
+        clip_ref,
+        vae_ref,
+        face_positive,
+        negative,
+        bbox,
+        sam_model_ref=sam,
+        seed=int(params.get("seed", -1)),
+        steps=steps,
+        cfg=cfg,
+        sampler=str(defaults.get("sampler", "euler")),
+        scheduler=str(defaults.get("scheduler", "normal")),
+        denoise=denoise,
+        guide_size=guide_size,
+        crop_factor=crop_factor,
+        bbox_threshold=bbox_threshold,
+        feather=feather,
+    )
 
 
 def _add_upscale_chain(b: WorkflowBuilder, decoded: str, params: dict) -> str:
@@ -1011,6 +1172,20 @@ def build_sdxl_workflow(params: dict) -> dict:
     # 6. VAE 解码 (VAE 引用 vae_ref: 覆盖时 = VAELoader, 否则 = Checkpoint index=2)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
+    # ── 面部重绘 (FR-2 双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
+    # 无 HiRes → 此处 (放大之前, 避免 max_size 压缩致修后脸偏软); 有 HiRes → HiRes 之后
+    face_enabled = bool(params.get("face_detailer_enabled", False))
+    hires_enabled = bool(params.get("hires_enabled", False))
+    _face_defaults = {
+        "sampler": str(params.get("sampler", "euler")),
+        "scheduler": str(params.get("scheduler", "normal")),
+    }
+    if face_enabled and not hires_enabled:
+        decoded = _add_face_detailer_chain(
+            b, decoded, model_ref, clip_ref, vae_ref, positive, negative,
+            params, _face_defaults,
+        )
+
     # ── 放大链路 (Phase 2, 引擎分流见 _add_upscale_chain) ────────────────
     final_image = decoded
     if bool(params.get("upscale_enabled", False)):
@@ -1018,7 +1193,6 @@ def build_sdxl_workflow(params: dict) -> dict:
 
     # ── 二次采样 (HiRes Refine) ─────────────────────────────────────
     # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码 (VAE 引用 vae_ref)
-    hires_enabled = bool(params.get("hires_enabled", False))
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
         hires_steps = max(5, min(int(params.get("hires_steps", 20)), 50))
@@ -1042,6 +1216,13 @@ def build_sdxl_workflow(params: dict) -> dict:
             denoise=hires_denoise,
         )
         final_image = b.add_vae_decode(hires_sampled, vae_ref)
+
+        # ── 面部重绘 (FR-2 双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
+        if face_enabled:
+            final_image = _add_face_detailer_chain(
+                b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
+                params, _face_defaults,
+            )
 
     # 7. 保存图片 (WAS Image Save)
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
@@ -1273,6 +1454,20 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     # 6. VAE 解码 (独立 VAELoader, index=0)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
+    # ── 面部重绘 (FR-2 双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
+    # 无 HiRes → 此处 (放大之前); 有 HiRes → HiRes 之后。缺省采样器/调度器随 profile
+    face_enabled = bool(params.get("face_detailer_enabled", False))
+    hires_enabled = bool(params.get("hires_enabled", False))
+    _face_defaults = {
+        "sampler": str(params.get("sampler", profile["sampler"])),
+        "scheduler": str(params.get("scheduler", profile["scheduler"])),
+    }
+    if face_enabled and not hires_enabled:
+        decoded = _add_face_detailer_chain(
+            b, decoded, model_ref, clip_ref, vae_ref, positive, negative,
+            params, _face_defaults,
+        )
+
     # ── 放大链路 (与架构无关, 引擎分流见 _add_upscale_chain) ──────────
     final_image = decoded
     if bool(params.get("upscale_enabled", False)):
@@ -1280,7 +1475,6 @@ def build_split_workflow(params: dict, arch: str) -> dict:
 
     # ── 二次采样 (HiRes Refine) ────────────────────────────────────────
     # 缺省值同步取 profile (hires_cfg 下限 clamp 保持 1.0)
-    hires_enabled = bool(params.get("hires_enabled", False))
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
         hires_steps = max(5, min(int(params.get("hires_steps", profile["steps"])), 50))
@@ -1302,6 +1496,13 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             denoise=hires_denoise,
         )
         final_image = b.add_vae_decode(hires_sampled, vae_ref)
+
+        # ── 面部重绘 (FR-2 双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
+        if face_enabled:
+            final_image = _add_face_detailer_chain(
+                b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
+                params, _face_defaults,
+            )
 
     # 7. 保存图片
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"

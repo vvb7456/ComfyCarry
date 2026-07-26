@@ -54,6 +54,22 @@ export interface I2IState {
   growMaskBy: number
 }
 
+export interface FaceDetailerState {
+  enabled: boolean
+  /** 检测模型文件名 (不含 bbox/ 前缀, builder 端拼接) */
+  detectionModel: string
+  denoise: number
+  steps: number
+  /** '' = 继承主提示词; 非空 = 独立编码 */
+  prompt: string
+  cfg: number
+  guideSize: number
+  cropFactor: number
+  bboxThreshold: number
+  feather: number
+  useSam: boolean
+}
+
 export interface DisabledToken {
   raw: string
   tag: string
@@ -102,6 +118,7 @@ export interface ModelState {
   upscale: UpscaleState
   hires: HiResState
   i2i: I2IState
+  faceDetailer: FaceDetailerState
   activeModule: string
 }
 
@@ -172,6 +189,11 @@ function createDefaultState(config: ModelTypeConfig): ModelState {
     },
     hires: { enabled: false, denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: randomSeed() },
     i2i: { enabled: false, image: null, denoise: 0.7, mode: 'i2i', mask: null, growMaskBy: 6 },
+    faceDetailer: {
+      enabled: false, detectionModel: 'face_yolov8m.pt', denoise: 0.35, steps: 20,
+      prompt: '', cfg: 7, guideSize: 768, cropFactor: 1.8, bboxThreshold: 0.5,
+      feather: 5, useSam: false,
+    },
     activeModule: config.modules[0] || 'lora',
   }
 }

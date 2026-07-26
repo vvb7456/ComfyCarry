@@ -281,7 +281,8 @@ def _fetch_generate_options() -> dict:
                "unet_archs": {}, "unet_info": {},
                "checkpoint_packagings": {}, "unet_packagings": {},
                "comfyui_dir": COMFYUI_DIR, "controlnet_models": {},
-               "seedvr2_models": []}
+               "seedvr2_models": [],
+               "ultralytics_bbox_models": [], "sam_models": []}
 
     def _get_combo_list(node_name: str, field: str) -> list:
         """获取节点的下拉选项（同节点缓存，避免重复 HTTP 请求）
@@ -378,6 +379,23 @@ def _fetch_generate_options() -> dict:
             if fn.endswith(".safetensors") and fn != "ema_vae_fp16.safetensors":
                 svr_models.append(fn)
     result["seedvr2_models"] = svr_models
+
+    # ── 面部重绘: 检测器与 SAM (扫描磁盘, 照 seedvr2_models 成例) ──────
+    bbox_dir = os.path.join(COMFYUI_DIR, "models", "ultralytics", "bbox")
+    bbox_models: list[str] = []
+    if os.path.isdir(bbox_dir):
+        for fn in sorted(os.listdir(bbox_dir)):
+            if fn.endswith(".pt"):
+                bbox_models.append(fn)
+    result["ultralytics_bbox_models"] = bbox_models
+
+    sams_dir = os.path.join(COMFYUI_DIR, "models", "sams")
+    sam_models: list[str] = []
+    if os.path.isdir(sams_dir):
+        for fn in sorted(os.listdir(sams_dir)):
+            if fn.endswith((".pth", ".pt", ".safetensors")):
+                sam_models.append(fn)
+    result["sam_models"] = sam_models
 
     _options_cache = result
     _options_cache_time = time.time()

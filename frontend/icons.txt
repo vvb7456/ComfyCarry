@@ -61,3 +61,6 @@ package_2
 ink_eraser
 invert_colors
 fit_screen
+
+# FaceDetailerPanel / moduleTabs — .ts 间接引用
+face_retouching_natural

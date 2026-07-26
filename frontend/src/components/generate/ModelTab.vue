@@ -7,7 +7,7 @@ import { useControlNetOrchestration } from '@/composables/generate/useControlNet
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
 import { useComponentStatus } from '@/composables/generate/useComponentStatus'
 import { MODEL_TYPES } from '@/config/model-types'
-import { UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_MODEL_CONFIG, FACE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
@@ -23,6 +23,7 @@ import I2IPanel from '@/components/generate/I2IPanel.vue'
 import ControlNetPanel from '@/components/generate/ControlNetPanel.vue'
 import UpscalePanel from '@/components/generate/UpscalePanel.vue'
 import HiResPanel from '@/components/generate/HiResPanel.vue'
+import FaceDetailerPanel from '@/components/generate/FaceDetailerPanel.vue'
 import ModelDependencyGate from '@/components/generate/ModelDependencyGate.vue'
 import PreprocessModal from '@/components/generate/PreprocessModal.vue'
 import TaggerModal from '@/components/generate/TaggerModal.vue'
@@ -106,6 +107,7 @@ const {
   depDepth,
   depUpscale,
   depTagger,
+  depFace,
   showPPModal,
   moduleTabs,
   enabledModules,
@@ -116,6 +118,8 @@ const {
   onUpscaleDepEnter,
   onDepDownload,
   onUpscaleDepDownload,
+  onFaceDepEnter,
+  onFaceDepDownload,
   onTaggerDepEnter,
   onTaggerDepDownload,
   prepareTagger,
@@ -154,6 +158,9 @@ const localModuleTabs = computed(() => [
   },
   { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
   { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
+  ...(config.value.modules.includes('face')
+    ? [{ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' }]
+    : []),
 ])
 
 const localEnabledModules = computed(() => {
@@ -163,6 +170,7 @@ const localEnabledModules = computed(() => {
   if (currentState.i2i.enabled) enabled.add('i2i')
   if (currentState.upscale.enabled) enabled.add('upscale')
   if (currentState.hires.enabled) enabled.add('hires')
+  if (currentState.faceDetailer.enabled) enabled.add('face')
   return enabled
 })
 
@@ -502,6 +510,16 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       </div>
       <div v-show="state.activeModule === 'hires'" class="gen-module-panel">
         <HiResPanel />
+      </div>
+      <div v-show="state.activeModule === 'face'" class="gen-module-panel">
+        <ModelDependencyGate
+          v-if="depFace.show.value"
+          :dep="depFace"
+          :title="FACE_MODEL_CONFIG.title"
+          @enter="onFaceDepEnter"
+          @download="onFaceDepDownload"
+        />
+        <FaceDetailerPanel v-else />
       </div>
     </div>
 

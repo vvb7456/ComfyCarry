@@ -1,8 +1,4 @@
 import type { ModelDep, ModelDepConfig } from './useModelDependency'
-import { TAGGER_MODEL_CONFIG } from './useTagInterrogation'  // 确认无循环依赖 (已核实)
-import {
-  REGISTRY_FILENAMES,
-} from '@/config/component-registry'
 
 // ── CN Model Definitions ─────────────────────────────────────────────────────
 
@@ -161,6 +157,44 @@ export const UPSCALE_MODEL_CONFIG: ModelDepConfig = {
   models: [UPSCALE_MODELS.aurasr_v2, UPSCALE_MODELS.seedvr2_3b_fp8, UPSCALE_MODELS.seedvr2_7b_sharp_fp8],
 }
 
+// ── 面部重绘 (FaceDetailer) ────────────────────────────────────────────────
+// 检测器必需 (~52MB); SAM 可选增强 (vit_b, 修脸场景足够, vit_h 属过剩)
+const FACE_MODELS: Record<string, ModelDep> = {
+  face_yolov8m: {
+    id: 'face-yolov8m',
+    name: 'YOLOv8 面部检测器',
+    description: '检测画面中的人脸位置（face_yolov8m，mAP50 0.737）',
+    size: '~52 MB',
+    required: true,
+    files: [
+      {
+        filename: 'face_yolov8m.pt',
+        url: 'https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt?download=true',
+        subdir: 'models/ultralytics/bbox',
+      },
+    ],
+  },
+  sam_vit_b: {
+    id: 'sam-vit-b',
+    name: 'SAM 精细掩码',
+    description: '可选：五官级分割掩码，贴回边界更精确',
+    size: '~375 MB',
+    files: [
+      {
+        filename: 'sam_vit_b_01ec64.pth',
+        url: 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth',
+        subdir: 'models/sams',
+      },
+    ],
+  },
+}
+
+export const FACE_MODEL_CONFIG: ModelDepConfig = {
+  tab: 'face',
+  title: 'generate.face.need_download',
+  models: [FACE_MODELS.face_yolov8m, FACE_MODELS.sam_vit_b],
+}
+
 export const CN_MODEL_CONFIGS: Record<string, ModelDepConfig> = {
   pose: {
     tab: 'pose',
@@ -301,22 +335,3 @@ export function cnBranchForFile(filename: string): CnBranch | null {
   }
   return null
 }
-
-/**
- * 所有依赖组件文件名集合 — 模型管理页默认隐藏这些文件。
- * 聚合: REGISTRY_FILENAMES (组件表) + CN_MODEL_CONFIGS + _CN_BRANCH_CONFIGS 全部 branch
- * + UPSCALE_MODEL_CONFIG + TAGGER_MODEL_CONFIG (Set 天然去重)。
- */
-export const COMPONENT_FILENAMES: Set<string> = (() => {
-  const s = new Set<string>(REGISTRY_FILENAMES)
-  const configs = [
-    ...Object.values(CN_MODEL_CONFIGS),
-    ...Object.values(_CN_BRANCH_CONFIGS).flatMap(table => Object.values(table)),
-    UPSCALE_MODEL_CONFIG,
-    TAGGER_MODEL_CONFIG,
-  ]
-  for (const c of configs)
-    for (const m of c.models)
-      for (const f of m.files) s.add(f.filename)
-  return s
-})()

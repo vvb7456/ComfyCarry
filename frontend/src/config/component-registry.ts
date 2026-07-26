@@ -362,16 +362,3 @@ export function stemOf(filename: string): string {
   }
   return s
 }
-
-/** registry 中出现的全部文件名 */
-export const REGISTRY_FILENAMES: Set<string> = (() => {
-  const s = new Set<string>()
-  for (const entry of COMPONENT_REGISTRY) {
-    for (const slot of ['clip', 'clip2', 'vae'] as ComponentSlot[]) {
-      const files = entry.slots[slot]
-      if (!files) continue
-      for (const f of files) s.add(f.filename)
-    }
-  }
-  return s
-})()

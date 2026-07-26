@@ -7,7 +7,8 @@
     "tasks": "下载任务"
   },
   "local": {
-    "all_types": "全部类型",
+    "default_types": "默认",
+    "all_types": "全部文件",
     "checkpoints": "Checkpoints",
     "lora": "LoRA",
     "controlnet": "ControlNet",
@@ -35,8 +36,7 @@
     "fetch_complete": "全部完成",
     "fetch_partial": "完成 {success} 个，失败 {fail} 个",
     "confirm_delete_file": "确定删除 {filename}？\n此操作不可恢复！",
-    "details": "详情",
-    "show_components": "显示组件文件"
+    "details": "详情"
   },
   "meta": {
     "title": "模型详情",

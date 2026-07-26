@@ -121,6 +121,7 @@ WORKDIR /opt/ComfyUI/custom_nodes
 RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone --depth 1 https://github.com/Fannovel16/comfyui_controlnet_aux && \
     git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Impact-Pack && \
+    git clone --depth 1 https://github.com/ltdrdata/ComfyUI-Impact-Subpack && \
     git clone --depth 1 https://github.com/yolain/ComfyUI-Easy-Use && \
     git clone --depth 1 https://github.com/crystian/ComfyUI-Crystools && \
     git clone --depth 1 --recursive https://github.com/ssitu/ComfyUI_UltimateSDUpscale && \

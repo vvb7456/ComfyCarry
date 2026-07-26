@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLocalModels } from '@/composables/useLocalModels'
 import { useModelActions } from '@/composables/useModelActions'
-import { COMPONENT_FILENAMES } from '@/composables/generate/modelDepConfigs'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import LocalModelCard from '@/components/models/LocalModelCard.vue'
@@ -36,28 +34,20 @@ const {
 
 const { isFetching, fetchInfo, deleteModel, fetchAll, batchProgress } = useModelActions(loadModels)
 
-// ── Component files filter (default off hides dep component files) ──
-const showComponents = ref(false)
-const displayModels = computed(() => {
-  if (showComponents.value) return filteredModels.value
-  return filteredModels.value.filter(m => {
-    const basename = m.rel_path.includes('/')
-      ? m.rel_path.slice(m.rel_path.lastIndexOf('/') + 1)
-      : m.rel_path
-    return !COMPONENT_FILENAMES.has(basename)
-  })
-})
-const displayCount = computed(() => displayModels.value.length)
-const displayInfoCount = computed(() => displayModels.value.filter(m => m.has_info).length)
+const displayCount = computed(() => filteredModels.value.length)
+const displayInfoCount = computed(() => filteredModels.value.filter(m => m.has_info).length)
 
+// '默认' = 仅视觉资产 (组件过滤在 useLocalModels 按 category 白名单实现);
+// '全部' 含功能组件, 置末位。
 const categoryOptions = computed(() => [
-  { value: 'all', label: t('models.local.all_types') },
+  { value: 'default', label: t('models.local.default_types') },
   { value: 'checkpoints', label: t('models.local.checkpoints') },
   { value: 'loras', label: t('models.local.lora') },
   { value: 'controlnet', label: t('models.local.controlnet') },
   { value: 'vae', label: t('models.local.vae') },
   { value: 'upscale_models', label: t('models.local.upscale') },
   { value: 'embeddings', label: t('models.local.embeddings') },
+  { value: 'all', label: t('models.local.all_types') },
 ])
 
 const folderOptions = computed(() => [
@@ -129,9 +119,6 @@ function openMeta(m: LocalModel) {
       </span>
     </template>
     <template #end>
-      <ToggleSwitch v-model="showComponents" size="sm">
-        {{ t('models.local.show_components') }}
-      </ToggleSwitch>
       <BaseSelect
         v-model="categoryFilter"
         :options="categoryOptions"
@@ -143,12 +130,12 @@ function openMeta(m: LocalModel) {
         :options="folderOptions"
         size="sm"
         fit
-        :disabled="categoryFilter === 'all'"
+        :disabled="categoryFilter === 'all' || categoryFilter === 'default'"
       />
       <BaseButton size="sm" @click="loadModels">
         {{ t('models.local.refresh') }}
       </BaseButton>
-      <BaseButton size="sm" variant="primary" @click="fetchAll(displayModels)">
+      <BaseButton size="sm" variant="primary" @click="fetchAll(filteredModels)">
         {{ t('models.local.fetch_all') }}
       </BaseButton>
     </template>
@@ -157,14 +144,14 @@ function openMeta(m: LocalModel) {
   <LoadingCenter v-if="localLoading" />
 
   <EmptyState
-    v-else-if="displayModels.length === 0"
+    v-else-if="filteredModels.length === 0"
     icon="inventory_2"
     :message="t('models.local.not_found_category')"
   />
 
   <div v-else class="model-grid">
     <LocalModelCard
-      v-for="m in displayModels"
+      v-for="m in filteredModels"
       :key="m.rel_path"
       :model="m"
       :fetching="isFetching(m.abs_path)"

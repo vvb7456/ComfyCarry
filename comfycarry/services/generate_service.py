@@ -233,6 +233,29 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             return {"error": f"图生图参考图不存在: {i2i_image}，请重新上传"}, 400
         data["i2i_image"] = i2i_image
 
+    # ── 面部重绘参数校验 ────────────────────────────────────────────────────
+    if bool(data.get("face_detailer_enabled", False)):
+        fd_model = str(data.get("face_detailer_model", "face_yolov8m.pt")).strip()
+        fd_model = fd_model.replace("\\", "/").split("/")[-1] or "face_yolov8m.pt"
+        fd_path = os.path.join(COMFYUI_DIR, "models", "ultralytics", "bbox", fd_model)
+        if not os.path.isfile(fd_path):
+            return {"error": f"面部检测模型不存在: {fd_model}，请先在面部模块下载"}, 400
+        data["face_detailer_model"] = fd_model
+        if bool(data.get("face_detailer_use_sam", False)):
+            sam_path = os.path.join(COMFYUI_DIR, "models", "sams", "sam_vit_b_01ec64.pth")
+            if not os.path.isfile(sam_path):
+                # SAM 缺失不阻塞生成: 降级为 bbox 矩形掩码
+                logger.warning("[generate] SAM 权重缺失, 面部重绘降级为 bbox 掩码")
+                data["face_detailer_use_sam"] = False
+        # 数值钳制 (builder 端还有一层, 此处保证入库参数干净)
+        data["face_detailer_denoise"] = max(0.1, min(float(data.get("face_detailer_denoise", 0.35)), 0.75))
+        data["face_detailer_steps"] = max(5, min(int(data.get("face_detailer_steps", 20)), 40))
+        data["face_detailer_cfg"] = max(1.0, min(float(data.get("face_detailer_cfg", 7.0)), 20.0))
+        data["face_detailer_guide_size"] = max(256, min(int(data.get("face_detailer_guide_size", 768)), 1024))
+        data["face_detailer_crop_factor"] = max(1.2, min(float(data.get("face_detailer_crop_factor", 1.8)), 3.0))
+        data["face_detailer_bbox_threshold"] = max(0.1, min(float(data.get("face_detailer_bbox_threshold", 0.5)), 0.9))
+        data["face_detailer_feather"] = max(0, min(int(data.get("face_detailer_feather", 5)), 30))
+
     # ── 保存路径模板解析 ─────────────────────────────────────────────────────
     # 支持 WAS Image Save 标准格式: [time(%Y-%m-%d)], [time(%H%M%S)] 等
     # 兼容旧格式: [date] → YYYY-MM-DD, [time] → HHMMSS

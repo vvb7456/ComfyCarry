@@ -7,7 +7,6 @@ import illustriousLogo from '@/assets/model-logos/illustrious.png'
 export interface ModelTypeConfig {
   key: string
   label: string
-  icon: string
   archFilter: string[]
   /** 该架构支持的打包形态 (§2/§5.3): 'checkpoint' 整合包 + 'split' 三件套。
    *  两形态并存时 picker 合并列表 + 形态过滤 chip + 徽章; 单形态时退化为旧行为。 */
@@ -67,7 +66,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   sdxl: {
     key: 'sdxl',
     label: 'SDXL',
-    icon: 'image',
     archFilter: ['sdxl'],
     supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
@@ -89,12 +87,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     defaults: { steps: 20, cfg: 7.0, sampler: 'euler', scheduler: 'normal' },
     hasNegativePrompt: true,
     promptStyle: 'tags',
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   anima: {
     key: 'anima',
     label: 'Anima',
-    icon: 'palette',
     archFilter: ['anima'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -117,12 +114,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     promptStyle: 'tags',
     defaultModels: { clip: 'qwen_3_06b_base.safetensors', vae: 'qwen_image_vae.safetensors' },
     // ControlNet 模块开关 disabled (Anima 暂无 ControlNet 生态)
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   krea2: {
     key: 'krea2',
     label: 'Krea 2',
-    icon: 'auto_awesome',
     archFilter: ['krea2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -146,12 +142,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     hasNegativePrompt: false,
     promptStyle: 'natural',
     defaultModels: { clip: 'qwen3vl_4b_fp8_scaled.safetensors', vae: 'qwen_image_vae.safetensors' },
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   zimage: {
     key: 'zimage',
     label: 'Z-Image',
-    icon: 'bolt',
     archFilter: ['zimage'],
     supportedPackaging: ['split'],
     controlNetEnabled: false,  // 官方 CN 模板已出现, 二期评估
@@ -174,12 +169,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     hasNegativePrompt: false,
     promptStyle: 'natural',  // 中英双语原生
     defaultModels: { clip: 'qwen_3_4b.safetensors', vae: 'ae.safetensors' },
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   flux1: {
     key: 'flux1',
     label: 'Flux 1.D',
-    icon: 'flare',
     archFilter: ['flux'],
     supportedPackaging: ['checkpoint', 'split'],
     dualClip: true,
@@ -211,12 +205,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     hasNegativePrompt: false,
     promptStyle: 'natural',
     defaultModels: { clip: 'clip_l.safetensors', clip2: 't5xxl_fp8_e4m3fn_scaled.safetensors', vae: 'ae.safetensors' },
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   chroma: {
     key: 'chroma',
     label: 'Chroma',
-    icon: 'blur_on',
     archFilter: ['chroma'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -238,7 +231,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     hasNegativePrompt: true,
     promptStyle: 'natural',
     defaultModels: { clip: 't5xxl_fp8_e4m3fn_scaled.safetensors', vae: 'ae.safetensors' },
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   // ── Flux2 系列 (Klein 4B / Klein 9B / Dev) ──
   // 采样拓扑与 flux1 不同: SamplerCustomAdvanced + Flux2Scheduler + FluxGuidance/CFGGuider。
@@ -248,7 +241,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   flux2klein4b: {
     key: 'flux2klein4b',
     label: 'Flux 2 Klein 4B',
-    icon: 'child_care',
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -283,7 +275,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   flux2klein9b: {
     key: 'flux2klein9b',
     label: 'Flux 2 Klein 9B',
-    icon: 'child_care',
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -318,7 +309,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   flux2dev: {
     key: 'flux2dev',
     label: 'Flux 2 Dev',
-    icon: 'memory',
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -355,7 +345,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   pony: {
     key: 'pony',
     label: 'Pony',
-    icon: 'favorite',
     archFilter: ['sdxl'],
     supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
@@ -379,12 +368,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     defaults: { steps: 25, cfg: 7.0, sampler: 'euler_ancestral', scheduler: 'normal', clip_skip: 2 },
     hasNegativePrompt: true,
     promptStyle: 'tags',
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   illustrious: {
     key: 'illustrious',
     label: 'Illustrious',
-    icon: 'brush',
     archFilter: ['sdxl'],
     supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
@@ -409,12 +397,11 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     defaults: { steps: 28, cfg: 5, sampler: 'euler_ancestral', scheduler: 'normal', clip_skip: 2 },
     hasNegativePrompt: true,
     promptStyle: 'tags',
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
   noobai: {
     key: 'noobai',
     label: 'NoobAI',
-    icon: 'auto_fix_high',
     archFilter: ['sdxl'],
     supportedPackaging: ['checkpoint'],
     controlNetEnabled: true,
@@ -438,7 +425,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     defaults: { steps: 28, cfg: 4.5, sampler: 'euler_ancestral', scheduler: 'normal', clip_skip: 2 },
     hasNegativePrompt: true,
     promptStyle: 'tags',
-    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires'],
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
 }
 

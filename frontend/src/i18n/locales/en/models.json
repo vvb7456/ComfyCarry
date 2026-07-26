@@ -7,7 +7,8 @@
     "tasks": "Downloads"
   },
   "local": {
-    "all_types": "All Types",
+    "default_types": "Default",
+    "all_types": "All Files",
     "checkpoints": "Checkpoints",
     "lora": "LoRA",
     "controlnet": "ControlNet",
@@ -35,8 +36,7 @@
     "fetch_complete": "All done",
     "fetch_partial": "{success} succeeded, {fail} failed",
     "confirm_delete_file": "Delete {filename}?\nThis cannot be undone!",
-    "details": "Details",
-    "show_components": "Show component files"
+    "details": "Details"
   },
   "meta": {
     "title": "Model Details",

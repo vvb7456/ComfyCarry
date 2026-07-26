@@ -14,7 +14,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # ── 版本号 (唯一源) ──────────────────────────────────────────
-APP_VERSION = "v0.4.1"
+APP_VERSION = "v0.4.2"
 
 # ── 核心路径常量 ─────────────────────────────────────────────
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
@@ -258,6 +258,7 @@ DEFAULT_PLUGINS = [
     {"url": "comfycarry_ws_broadcast", "name": "ComfyCarry WS Broadcast", "required": True},
     {"url": "https://github.com/Fannovel16/comfyui_controlnet_aux", "name": "ControlNet Aux"},
     {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack", "name": "Impact Pack"},
+    {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack", "name": "Impact Subpack"},
     {"url": "https://github.com/yolain/ComfyUI-Easy-Use", "name": "Easy Use"},
     {"url": "https://github.com/crystian/ComfyUI-Crystools", "name": "Crystools"},
     {"url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "name": "Ultimate SD Upscale"},

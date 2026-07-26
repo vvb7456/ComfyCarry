@@ -8,7 +8,6 @@
   "header": {
     "queue_history": "Queue / History",
     "model_selector_aria": "Select model",
-    "gate_not_ready": "Components not ready",
     "family_sdxl": "SDXL series",
     "family_flux1": "Flux 1 series",
     "model_label": "Model",
@@ -44,12 +43,8 @@
     "tools": {
       "interrogate": "Interrogate",
       "llm_assist": "AI Prompt",
-      "embedding": "Insert Embedding",
-      "wildcard": "Insert Wildcard",
       "interrogate_title": "Interrogate tags from image (WD14 Tagger)",
       "llm_assist_title": "Generate or refine prompts with AI",
-      "embedding_title": "Browse and insert Embedding vectors",
-      "wildcard_title": "Manage random prompts (Wildcards)",
       "prompt_editor": "Tag Editor",
       "prompt_editor_title": "Visual tag editor with autocomplete and tag library"
     },
@@ -97,7 +92,6 @@
     "run": "Run",
     "stop": "Stop",
     "run_live": "Run (live)",
-    "generating": "Generating",
     "run_background": "Run (background)"
   },
   "background": {
@@ -105,7 +99,6 @@
     "iterations_unlimited": "∞",
     "iterations_help": "Stops automatically after this many rounds; ∞ runs until you stop it",
     "seed_notice": "Background mode uses random seeds",
-    "mode_busy": "ComfyUI is busy — can't start a background run",
     "bar_running": "Running in background · round {n}",
     "bar_running_max": "Running in background · round {n} / {max}",
     "bar_stopped": "Background run stopped · {n} rounds done",
@@ -116,7 +109,6 @@
     "btn_dismiss": "Got it",
     "toast_started": "Background run started",
     "toast_stopped": "Background run stopped",
-    "toast_blocked": "A background run is active — stop it before submitting",
     "reason": {
       "max_reached": "Reached the round limit",
       "disk_low": "Not enough free disk space",
@@ -130,7 +122,6 @@
   },
   "basic": {
     "title": "Basic Settings",
-    "checkpoint": "Checkpoint",
     "click_change": "Click to change model",
     "resolution": "Resolution",
     "custom": "Custom...",
@@ -142,7 +133,6 @@
     "search_checkpoint": "Search Checkpoint...",
     "select_model": "Select Model",
     "search_model": "Search model...",
-    "unet": "UNet (Diffusion Model)",
     "clip": "CLIP Text Encoder",
     "clip2": "Text Encoder 2 (T5)",
     "vae": "VAE",
@@ -150,7 +140,6 @@
     "select_clip": "Select CLIP",
     "select_vae": "Select VAE",
     "search_unet": "Search UNet...",
-    "search_clip": "Search CLIP...",
     "search_vae": "Search VAE..."
   },
   "advanced": {
@@ -201,22 +190,13 @@
     "depth": "Depth Control",
     "upscale": "Upscale",
     "hires": "HiRes Fix",
-    "enable_lora": "Enable LoRA",
-    "enable_i2i": "Enable Img2Img",
-    "enable_pose": "Enable Pose Control",
-    "enable_canny": "Enable Edge Control",
-    "enable_depth": "Enable Depth Control",
-    "enable_upscale": "Enable Upscale",
-    "enable_hires": "Enable HiRes Fix"
+    "face": "Face Fix"
   },
   "lora": {
     "add": "Add LoRA",
-    "strength": "LoRA Strength",
     "select": "Select Model",
-    "change": "Change Model",
     "select_title": "Select LoRA",
     "search_placeholder": "Search LoRA...",
-    "not_found": "No LoRA found",
     "count_selected": "{count} selected",
     "remove": "Remove",
     "empty_warn": "Please add LoRA first before enabling",
@@ -246,7 +226,6 @@
     "clear_all": "Clear All",
     "invert": "Invert",
     "fit_screen": "Fit to Screen",
-    "apply": "Apply Mask",
     "help": "Use brush to mark areas for regeneration (red overlay), unmarked areas will be preserved",
     "space_pan": "Space+Drag=Pan",
     "scroll_zoom": "Scroll=Zoom"
@@ -264,14 +243,9 @@
     "ref_pose": "Reference (Skeleton)",
     "ref_canny": "Reference (Edge)",
     "ref_depth": "Reference (Depth)",
-    "upload_placeholder": "Click to select",
     "need_model": "Please install a ControlNet model first",
     "need_ref": "Please upload a reference image first",
-    "installed": "Installed",
-    "required": "Required",
-    "detecting": "Detecting models…",
     "need_download": "This feature requires model download",
-    "download_selected": "Download Selected",
     "detect_body": "Detect Body",
     "detect_fingers": "Detect Fingers",
     "detect_face": "Detect Face",
@@ -285,9 +259,6 @@
     "edge_map": "Edge Map",
     "depth_map": "Depth Map",
     "ref_image": "Reference Image",
-    "remove_ref": "Remove reference",
-    "remove": "Remove",
-    "or": "or",
     "generating": "Generating {label}",
     "generate_title": "Generate {title}",
     "need_download_pose": "Pose control models required",
@@ -296,7 +267,6 @@
     "select_title": "Select {label}",
     "preprocess": "Generate",
     "preprocessing": "Generating…",
-    "preprocess_done": "Done",
     "pick_ref": "Click to select {label}",
     "param_settings": "Parameter Settings",
     "preprocess_blocked": "Please wait for the current task to finish"
@@ -325,7 +295,6 @@
     "svr_input_noise_help": "0 = faithful to original; higher values allow more creative detail",
     "svr_latent_noise": "Latent Noise",
     "svr_latent_noise_help": "0 = faithful to original; higher values allow more creative detail",
-    "model_desc": "4× Super Resolution",
     "method_help": "Overlap checkerboard eliminates tile seams, suitable for most scenes; standard mode is fastest but may show seams",
     "tile_size_help": "Number of tiles processed at once. Higher values are faster but use more VRAM; reduce if running out of memory",
     "downscale_method_help": "Interpolation algorithm used when scaling from 4x to target size at 2x/3x. Not used at 4x"
@@ -338,6 +307,34 @@
     "sampler": "Sampler",
     "scheduler": "Scheduler",
     "seed": "Seed"
+  },
+  "face": {
+    "denoise": "Detail strength",
+    "denoise_low": "0.2 subtle",
+    "denoise_mid": "0.35 default",
+    "denoise_high": "0.6 heavy",
+    "denoise_help": "Lower values preserve facial structure and only refine details; higher values repaint more but may change identity. Images without detected faces pass through unchanged; all detected faces are refined.",
+    "steps": "Steps",
+    "detection_model": "Detection model",
+    "prompt": "Face prompt",
+    "prompt_placeholder": "Leave empty to inherit the main prompt. Describe the face only: expression / skin / makeup…",
+    "prompt_help": "Empty = inherit the main prompt. When set, it applies only to the face crop, preventing scene/outfit words from painting artifacts on the face. The negative prompt always follows the main settings.",
+    "mask_mode": "Mask mode",
+    "mask_bbox": "Box",
+    "mask_sam": "SAM contour",
+    "mask_mode_help": "Shape of the paste-back mask. Box: feathered rectangle from the detection box; SAM contour: facial-feature segmentation for a cleaner blend. Unavailable until the SAM weight is downloaded from this module’s setup page",
+    "advanced": "Advanced",
+    "cfg_help": "Default 7. Set to 1 for distilled models such as Krea2 / Z-Image / Flux.",
+    "guide_size": "Guide size",
+    "guide_size_help": "Target short-edge resolution of the upscaled face crop. Larger = more detail, slower.",
+    "crop_factor": "Crop factor",
+    "crop_factor_help": "How much context around the face box is included, avoiding seams at the paste-back border.",
+    "bbox_threshold": "Detection threshold",
+    "bbox_threshold_help": "Lower = detect more faces (may include false positives); higher = stricter.",
+    "feather": "Edge feather",
+    "feather_help": "Blend width when pasting the refined face back, preventing visible seams.",
+    "need_model": "Please install the face detection model first",
+    "need_download": "This feature requires face model download"
   },
   "interrogate": {
     "title": "Interrogate Settings",
@@ -360,9 +357,7 @@
     "need_model": "This feature requires downloading a tagger model",
     "modal_title": "Interrogate",
     "start_btn": "Start Interrogation",
-    "copy": "Copy",
-    "highest_precision": "Highest precision",
-    "lightweight": "Lightweight & fast"
+    "copy": "Copy"
   },
   "llm_modal": {
     "title": "AI Prompt",
@@ -390,7 +385,6 @@
   },
   "embedding": {
     "title": "Embedding Selection",
-    "weight": "Weight",
     "to_positive": "→ Positive",
     "to_negative": "→ Negative",
     "loading": "Loading...",
@@ -416,19 +410,16 @@
     "create_failed": "Create failed",
     "new_file": "New Wildcard",
     "folder_name": "Folder Name",
-    "create_file": "Create File",
     "rename": "Rename",
     "rename_failed": "Rename failed",
     "renamed": "Renamed",
     "saved": "Wildcard saved",
     "save_failed": "Save failed",
-    "edit_title": "Edit Wildcard",
     "edit_placeholder": "One item per line...",
     "new_folder_title": "New Folder",
     "folder_placeholder": "Folder name (e.g. sdxl, flux, common)",
     "click_rename": "Click to rename",
     "create_folder_failed": "Create folder failed",
-    "unknown_file": "Unknown file",
     "inserted": "Inserted __{name}__"
   },
   "image_source": {
@@ -447,10 +438,7 @@
     "no_output": "Cannot retrieve output images, please check the ComfyUI page",
     "wait_workflow": "Please wait for current workflow to finish or cancel",
     "interrogate_submit_failed": "Interrogate submit failed",
-    "interrogate_result_failed": "Failed to get interrogate results",
-    "inserted": "Inserted {name}",
-    "meta_not_loaded": "Details require loading Models page first",
-    "folder_name_required": "Please enter a folder name"
+    "interrogate_result_failed": "Failed to get interrogate results"
   },
   "error": {
     "no_checkpoint": "Please select a checkpoint",
@@ -460,8 +448,6 @@
     "modules_not_enabled": "Some features are configured but not enabled",
     "modules_not_enabled_desc": "Parameters are configured but toggles are off. They will not take effect after submission.",
     "skip_submit": "Skip and submit",
-    "enable_submit": "Enable and submit",
-    "dont_remind": "Don't remind again",
     "exec_error_prefix": "ComfyUI execution error",
     "cn_no_ref": "{type} is enabled but no reference uploaded, please upload or uncheck",
     "cn_no_model": "{type} has no available models, please confirm ComfyUI is running",
@@ -473,20 +459,16 @@
   },
   "model_dep": {
     "detecting": "Detecting models…",
-    "need_download": "This feature requires model download",
     "installed": "Installed",
     "required": "Required",
     "download_selected": "Download Selected",
     "select_at_least_one": "Please select at least one model",
-    "downloading": "Downloading...",
     "download_failed": "Download failed",
-    "all_downloaded": "All downloads complete",
     "enter": "Enter"
   },
   "components": {
     "title": "Runtime components",
     "ready": "Components ready · {n} items",
-    "ready_short": "Ready",
     "missing": "{n} components missing — click to download",
     "fetch_all": "Download all",
     "downloading": "Fetching component {i}/{n} · {name}",
@@ -496,11 +478,6 @@
     "role_text_encoder_1": "Text encoder 1",
     "role_text_encoder_2": "Text encoder 2",
     "role_vae": "VAE",
-    "version": "Version",
-    "tier_standard": "Standard",
-    "tier_lite": "Lite",
-    "tier_full": "Full",
-    "suspect_size": "File size differs from expected — may not be the right file",
     "error_check": "Component check failed",
     "error_no_dir": "ComfyUI directory unavailable — cannot download components",
     "error_submit": "Failed to queue {name}",
@@ -512,7 +489,6 @@
     "arch_unknown": "Unknown",
     "packaging_checkpoint": "All-in-one",
     "packaging_split": "Split",
-    "components_missing": "Missing components — click to install",
     "arch_mismatch_title": "Architecture mismatch",
     "arch_mismatch_desc": "This model's architecture is {model_arch}, the current tab is {tab_arch}. Submitting the workflow will fail. Select anyway?",
     "arch_unknown_desc": "Unable to recognize this model's architecture. If it is incompatible with the current tab, the workflow will fail. Select anyway?",
@@ -520,9 +496,6 @@
     "empty_title": "No {arch} main model yet",
     "empty_desc": "Go to Downloads to add models",
     "go_to_downloads": "Go to Downloads",
-    "component_required": "Selected model requires these components",
-    "component_ready": "Components ready, click confirm to use",
-    "back_to_list": "Back to list",
     "component_hint": "Requires additional runtime components"
   },
   "placeholders": {

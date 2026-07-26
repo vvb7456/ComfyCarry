@@ -5,7 +5,7 @@ import { useImageToImage } from '@/composables/generate/useImageToImage'
 import { useControlNet } from '@/composables/generate/useControlNet'
 import { useModelDependency } from '@/composables/generate/useModelDependency'
 import { useTagInterrogation, TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
-import { UPSCALE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_MODEL_CONFIG, FACE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
@@ -54,8 +54,10 @@ export function useControlNetOrchestration({
 
   const depUpscale = useModelDependency(UPSCALE_MODEL_CONFIG)
   const depTagger = useModelDependency(TAGGER_MODEL_CONFIG)
+  const depFace = useModelDependency(FACE_MODEL_CONFIG)
 
   const upscaleReady = ref(false)
+  const faceReady = ref(false)
   const _taggerReady = ref(false)
   const tagger = useTagInterrogation()
   const showPPModal = ref({ pose: false, canny: false, depth: false })
@@ -105,6 +107,12 @@ export function useControlNetOrchestration({
       }
     })
 
+    depFace.check(dir).then(() => {
+      if (!depFace.show.value) {
+        faceReady.value = true
+      }
+    })
+
     depTagger.check(dir).then(() => {
       if (!depTagger.show.value) {
         _taggerReady.value = true
@@ -130,6 +138,16 @@ export function useControlNetOrchestration({
   function onUpscaleDepDownload() {
     const dir = options.comfyuiDir.value
     if (dir) depUpscale.startDownload(dir)
+  }
+
+  function onFaceDepEnter() {
+    faceReady.value = true
+    options.refresh()
+  }
+
+  function onFaceDepDownload() {
+    const dir = options.comfyuiDir.value
+    if (dir) depFace.startDownload(dir)
   }
 
   function onTaggerDepEnter() {
@@ -158,6 +176,9 @@ export function useControlNetOrchestration({
     tagger.onDone(success)
   }
 
+  // face 模块按架构可用 (FR-1): MODEL_TYPES[type].modules 声明 — flux2 系不含
+  const faceModuleAvailable = (MODEL_TYPES[modelType]?.modules ?? []).includes('face')
+
   const moduleTabs = computed(() => [
     { key: 'lora', label: t('generate.modules.lora'), icon: 'extension' },
     { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
@@ -166,6 +187,9 @@ export function useControlNetOrchestration({
     { key: 'depth', label: t('generate.modules.depth'), icon: 'layers' },
     { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
     { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
+    ...(faceModuleAvailable
+      ? [{ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' }]
+      : []),
   ])
 
   const enabledModules = computed(() => {
@@ -179,6 +203,7 @@ export function useControlNetOrchestration({
     if (currentState.controlNets.depth?.enabled) enabled.add('depth')
     if (currentState.upscale.enabled) enabled.add('upscale')
     if (currentState.hires.enabled) enabled.add('hires')
+    if (currentState.faceDetailer.enabled) enabled.add('face')
 
     return enabled
   })
@@ -230,6 +255,16 @@ export function useControlNetOrchestration({
       case 'hires':
         currentState.hires.enabled = enabled
         break
+
+      case 'face':
+        // 阻塞式依赖门 (FR-3): 检测器未就绪时拒绝并跳到本 tab 展示 Gate
+        if (enabled && !faceReady.value) {
+          toast(t('generate.face.need_model'), 'warning')
+          currentState.activeModule = 'face'
+          return
+        }
+        currentState.faceDetailer.enabled = enabled
+        break
     }
   }
 
@@ -239,6 +274,7 @@ export function useControlNetOrchestration({
     depDepth.destroy()
     depUpscale.destroy()
     depTagger.destroy()
+    depFace.destroy()
   })
 
   return {
@@ -253,6 +289,7 @@ export function useControlNetOrchestration({
     depDepth,
     depUpscale,
     depTagger,
+    depFace,
     showPPModal,
     moduleTabs,
     enabledModules,
@@ -263,6 +300,8 @@ export function useControlNetOrchestration({
     onUpscaleDepEnter,
     onDepDownload,
     onUpscaleDepDownload,
+    onFaceDepEnter,
+    onFaceDepDownload,
     onTaggerDepEnter,
     onTaggerDepDownload,
     prepareTagger,

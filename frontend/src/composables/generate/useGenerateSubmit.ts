@@ -284,6 +284,22 @@ export function useGenerateSubmit(execState: Ref<ExecState | null>) {
       payload.hires_seed = hiresSeed
     }
 
+    // 面部重绘 (FaceDetailer)
+    if (state.faceDetailer.enabled) {
+      payload.face_detailer_enabled = true
+      payload.face_detailer_model = state.faceDetailer.detectionModel
+      payload.face_detailer_denoise = state.faceDetailer.denoise
+      payload.face_detailer_steps = state.faceDetailer.steps
+      payload.face_detailer_cfg = state.faceDetailer.cfg
+      payload.face_detailer_guide_size = state.faceDetailer.guideSize
+      payload.face_detailer_crop_factor = state.faceDetailer.cropFactor
+      payload.face_detailer_bbox_threshold = state.faceDetailer.bboxThreshold
+      payload.face_detailer_feather = state.faceDetailer.feather
+      payload.face_detailer_use_sam = state.faceDetailer.useSam
+      const facePrompt = state.faceDetailer.prompt.trim()
+      if (facePrompt) payload.face_detailer_prompt = facePrompt
+    }
+
     return payload
   }
 
