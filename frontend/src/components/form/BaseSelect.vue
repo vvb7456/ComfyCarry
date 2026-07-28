@@ -1,13 +1,9 @@
-<script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useFloating, autoUpdate, offset, flip, shift, size as floatingSize } from '@floating-ui/vue'
-import MsIcon from '../ui/MsIcon.vue'
-
-defineOptions({ name: 'BaseSelect' })
+<script lang="ts">
+/** 单个选项的取值类型。BaseSelect 是泛型组件, 调用点各自推断 T。 */
+export type SelectValue = string | number | boolean
 
 export interface SelectOption {
-  value: string | number | boolean
+  value: SelectValue
   label: string
   disabled?: boolean
   /** 分组标题。相邻的同 group 选项归为一组，在组首渲染一个不可点击的分组头 */
@@ -15,10 +11,19 @@ export interface SelectOption {
   /** 右侧次要小字，如 "已装" / "5.16 GB" */
   hint?: string
 }
+</script>
+
+<script setup lang="ts" generic="T extends SelectValue | SelectValue[] = SelectValue">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useFloating, autoUpdate, offset, flip, shift, size as floatingSize } from '@floating-ui/vue'
+import MsIcon from '../ui/MsIcon.vue'
+
+defineOptions({ name: 'BaseSelect' })
 
 const props = withDefaults(defineProps<{
-  /** Current value (v-model) */
-  modelValue: string | number | boolean
+  /** Current value (v-model). Array when `multiple` is on. */
+  modelValue: T
   /**
    * Options — accepts multiple shapes:
    * - SelectOption[]: canonical {value, label}
@@ -48,6 +53,15 @@ const props = withDefaults(defineProps<{
   fit?: boolean
   /** When true, dropdown panel is teleported to body (for use inside overflow containers) */
   teleport?: boolean
+  /**
+   * Multi-select. modelValue becomes an array; the panel stays open on pick and
+   * each row gets a checkbox. Trigger shows "A, B" or "N selected" past `maxTagText`.
+   */
+  multiple?: boolean
+  /** Trigger text when nothing is selected in multiple mode (falls back to placeholder) */
+  allText?: string
+  /** Show "N selected" instead of a label list once this many are picked (default 2) */
+  maxTagText?: number
 }>(), {
   valueKey: 'value',
   labelKey: 'label',
@@ -60,14 +74,31 @@ const props = withDefaults(defineProps<{
   size: 'default',
   fit: false,
   teleport: false,
+  multiple: false,
+  allText: '',
+  maxTagText: 2,
 })
 
 const { t } = useI18n({ useScope: 'global' })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string | number | boolean]
-  'change': [value: string | number | boolean]
+  'update:modelValue': [value: T]
+  'change': [value: T]
 }>()
+
+/** Current selection as an array, regardless of mode — the one shape all logic uses. */
+const selectedValues = computed<SelectValue[]>(() => {
+  if (props.multiple) {
+    return Array.isArray(props.modelValue) ? props.modelValue : []
+  }
+  return props.modelValue === undefined || props.modelValue === null
+    ? []
+    : [props.modelValue as SelectValue]
+})
+
+function isSelected(v: SelectValue): boolean {
+  return selectedValues.value.includes(v)
+}
 
 const triggerRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
@@ -163,16 +194,26 @@ const renderRows = computed<RenderRow[]>(() => {
 
 const selectedLabel = computed(() => {
   if (props.displayText) return props.displayText
+  if (props.multiple) {
+    const picked = normalizedOptions.value.filter(o => isSelected(o.value))
+    if (picked.length === 0) return props.allText || props.placeholder
+    if (picked.length > props.maxTagText) {
+      return t('common.n_selected', { count: picked.length })
+    }
+    return picked.map(o => o.label).join(', ')
+  }
   const opt = normalizedOptions.value.find(o => o.value === props.modelValue)
   return opt ? opt.label : props.placeholder
 })
 
 const isPlaceholder = computed(() => {
   if (props.displayText) return false
+  if (props.multiple) return selectedValues.value.length === 0
   return !normalizedOptions.value.some(o => o.value === props.modelValue)
 })
 
 const isSelectedDisabled = computed(() => {
+  if (props.multiple) return false
   const opt = normalizedOptions.value.find(o => o.value === props.modelValue)
   return !!opt?.disabled
 })
@@ -183,7 +224,7 @@ watch(filteredOptions, () => { highlightIdx.value = -1 })
 function openPanel() {
   open.value = true
   // Pre-highlight selected item
-  const idx = filteredOptions.value.findIndex(o => o.value === props.modelValue)
+  const idx = filteredOptions.value.findIndex(o => isSelected(o.value))
   highlightIdx.value = idx >= 0 ? idx : 0
   if (props.searchable) {
     search.value = ''
@@ -198,13 +239,35 @@ function toggle() {
   if (open.value) { open.value = false } else { openPanel() }
 }
 
+/** 内部一律按数组算, 对外 emit 时断言回调用点的泛型 T。 */
+function emitValue(v: SelectValue | SelectValue[]) {
+  emit('update:modelValue', v as T)
+  emit('change', v as T)
+}
+
 function select(opt: SelectOption) {
   if (opt.disabled) return
-  emit('update:modelValue', opt.value)
-  emit('change', opt.value)
+
+  if (props.multiple) {
+    // 面板保持打开 —— 多选的常见动作是连点几项, 每次关闭再打开会很烦。
+    const next = isSelected(opt.value)
+      ? selectedValues.value.filter(v => v !== opt.value)
+      : [...selectedValues.value, opt.value]
+    emitValue(next)
+    return
+  }
+
+  emitValue(opt.value)
   open.value = false
   // Return focus to trigger
   nextTick(() => triggerRef.value?.focus())
+}
+
+/** 清空多选 (触发器上的 × )。 */
+function clearAll(e: Event) {
+  e.stopPropagation()
+  if (props.disabled) return
+  emitValue([])
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -272,6 +335,16 @@ onBeforeUnmount(() => {
   ]" @keydown="onKeydown">
     <div ref="triggerRef" class="base-select__trigger" tabindex="0" @click="toggle">
       <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder, 'base-select__text--muted': isSelectedDisabled }">{{ selectedLabel }}</span>
+      <button
+        v-if="multiple && selectedValues.length > 0 && !disabled"
+        class="base-select__clear"
+        type="button"
+        tabindex="-1"
+        :aria-label="t('common.btn.clear')"
+        @click="clearAll"
+      >
+        <MsIcon name="close" size="xs" />
+      </button>
       <MsIcon name="expand_more" size="sm" color="var(--t3)" />
     </div>
     <Teleport to="body" :disabled="!teleport">
@@ -302,13 +375,21 @@ onBeforeUnmount(() => {
                 v-else
                 class="base-select__item"
                 :class="{
-                  'base-select__item--sel': row.opt.value === modelValue,
+                  'base-select__item--sel': isSelected(row.opt.value),
                   'base-select__item--hl': row.idx === highlightIdx,
                   'base-select__item--disabled': row.opt.disabled,
                 }"
+                :role="multiple ? 'menuitemcheckbox' : 'option'"
+                :aria-checked="multiple ? isSelected(row.opt.value) : undefined"
                 @click="select(row.opt)"
                 @mouseenter="highlightIdx = row.idx"
               >
+                <MsIcon
+                  v-if="multiple"
+                  class="base-select__check"
+                  :name="isSelected(row.opt.value) ? 'check_box' : 'check_box_outline_blank'"
+                  size="sm"
+                />
                 <span class="base-select__item-label text-truncate">{{ row.opt.label }}</span>
                 <span v-if="row.opt.hint" class="base-select__hint">{{ row.opt.hint }}</span>
               </div>
@@ -325,9 +406,36 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
 }
+.base-select__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+.base-select__clear:hover {
+  background: var(--bg3);
+  color: var(--t2);
+}
+.base-select__check {
+  flex-shrink: 0;
+  color: var(--t3);
+}
+.base-select__item--sel .base-select__check {
+  color: var(--ac);
+}
 .base-select--fit {
   width: fit-content !important;
-  min-width: 140px;
+  /* 宽度基线见 css/forms.css */
+  min-width: var(--ctl-w-sm);
+  max-width: var(--ctl-w-md);
 }
 .base-select--disabled {
   opacity: .55;

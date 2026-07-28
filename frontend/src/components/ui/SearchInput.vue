@@ -16,7 +16,7 @@
  * Props:
  *   placeholder  — Placeholder text
  *   loading      — Show spinner instead of search icon
- *   full         — width: 100% (default: false, natural inline width)
+ *   full         — 撑满父容器 (默认走 toolbar 宽度基线 --ctl-w-lg)
  */
 import { ref, useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -100,7 +100,10 @@ defineExpose({ focus })
 .search-input {
   display: inline-flex;
   align-items: center;
-  min-width: 200px;
+  /* 宽度基线见 css/forms.css。用 lg 而非 md —— 这里要能粘 CivitAI 链接。 */
+  flex: 1 1 var(--ctl-w-lg);
+  min-width: 0;
+  max-width: var(--ctl-w-lg);
   border: 1px solid var(--bd);
   background: var(--bg);
   border-radius: var(--input-radius, 6px);
@@ -115,6 +118,7 @@ defineExpose({ focus })
 .search-input--full {
   width: 100%;
   flex: 1;
+  max-width: none;
 }
 
 .search-input__field {
@@ -168,8 +172,10 @@ defineExpose({ focus })
   justify-content: center;
   flex-shrink: 0;
   align-self: stretch;
-  min-width: 100px;
-  padding: 0 32px;
+  /* 图标宽度即可 —— min-width:100px + padding:0 32px 在 toolbar 里
+     宽得离谱, 与同排 size="sm" 的下拉完全不协调。 */
+  width: 34px;
+  padding: 0;
   border: none;
   border-radius: 0 calc(var(--input-radius, 6px) - 1px) calc(var(--input-radius, 6px) - 1px) 0;
   background: var(--ac);

@@ -6,7 +6,6 @@
  *   - image: user provides an image → LLM vision interrogation
  *
  * Supports SSE streaming and JSON fallback.
- * Legacy: generate-llm.js
  */
 import { ref, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
@@ -34,7 +33,8 @@ export interface UseLlmAssistReturn {
   inputImageName: Ref<string>
 
   open(): Promise<void>
-  submit(input: string): Promise<void>
+  /** @param promptTarget 后端 PROMPT_REGISTRY 预设 key; 视频架构传 'video', 缺省 'sdxl' */
+  submit(input: string, promptTarget?: string): Promise<void>
   abort(): void
   applyResult(target: 'positive' | 'all' | 'copy'): { positive: string; negative?: string } | null
   close(): void
@@ -117,7 +117,14 @@ export function useLlmAssist(): UseLlmAssistReturn {
 
   // ── Submit: text or image mode ────────────────────────────────────────
 
-  async function submit(textInput: string) {
+  /**
+   * @param promptTarget 后端 `PROMPT_REGISTRY` 的预设 key。视频架构传 'video'
+   *   (运动/镜头四层结构, 见 llm_prompts.VIDEO_SYSTEM_PROMPT); 缺省保持既有 'sdxl' 行为。
+   *   图像模式 (反推) 下后端会先找 `{target}_vision`, 不存在则回退到 `target` 本身
+   *   (llm_engine._build_prompt_messages) —— 故 'video' 无需单独的 video_vision 预设,
+   *   在视频架构下反推图片同样得到运动描述, 符合预期。
+   */
+  async function submit(textInput: string, promptTarget = 'sdxl') {
     if (running.value) return
 
     let body: Record<string, unknown>
@@ -127,7 +134,7 @@ export function useLlmAssist(): UseLlmAssistReturn {
         toast(t('generate.llm_modal.empty_input'), 'warning')
         return
       }
-      body = { input: textInput, target: 'sdxl', stream: streaming.value }
+      body = { input: textInput, target: promptTarget, stream: streaming.value }
     } else {
       // Image mode
       const file = imageFile.value
@@ -150,7 +157,7 @@ export function useLlmAssist(): UseLlmAssistReturn {
           return
         }
       }
-      body = { image: base64, target: 'sdxl', stream: streaming.value }
+      body = { image: base64, target: promptTarget, stream: streaming.value }
     }
 
     running.value = true

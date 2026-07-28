@@ -31,6 +31,7 @@ from ..services.comfyui_params import (
 from ..services.comfyui_bridge import get_bridge
 from ..services.comfyui_version import get_versions, switch_version
 from ..services.deploy_engine import _detect_python
+from ..services.video_thumb import get_video_thumbnail, is_video_filename
 
 bp = Blueprint("comfyui", __name__)
 
@@ -168,7 +169,7 @@ def api_comfyui_queue():
 
 @bp.route("/api/comfyui/interrupt", methods=["POST"])
 def api_comfyui_interrupt():
-    # §3.5 联动: 后台 session 在跑时先停 session 再 interrupt。
+    # 后台 session 在跑时先停 session 再 interrupt。
     # 顺序不能反 —— 先 interrupt 再停 session, worker 会把这次中断当成
     # 「一轮结束」立刻重提。先停 session (worker 退出循环) 再 interrupt,
     # 所有中断入口语义统一, 前端零改动。
@@ -235,11 +236,28 @@ def api_comfyui_history():
             outputs = entry.get("outputs", {})
             images = []
             for node_id, node_out in outputs.items():
+                # ComfyUI 视频节点 (SaveVideo/PreviewVideo) 在节点输出层带
+                # "animated" 字段 (值是 Python 元组 (True,), JSON 序列化为
+                # [true]); 图像节点 (SaveImage/PreviewImage) 也带该字段但
+                # 恒为 (False,)。该字段位于节点输出层, 与 "images" 平级,
+                # 而非单个 image 条目内。这里把它下放到每个 image 条目上,
+                # 让前端按条目判定媒体类型, 不用反查节点结构。
+                node_animated = node_out.get("animated")
+                # 兼容元组/列表/标量三种形态 (元组 JSON→list[True])
+                if isinstance(node_animated, (list, tuple)):
+                    node_animated = bool(node_animated[0]) if node_animated else False
+                else:
+                    node_animated = bool(node_animated)
                 for img in node_out.get("images", []):
+                    filename = img.get("filename", "")
+                    # 扩展名兜底: ComfyUI 对 .mp4/.webm/.mov 等视频产物,
+                    # 即使 animated 字段缺失也能靠扩展名判定媒体类型
+                    ext_is_video = is_video_filename(filename)
                     images.append({
-                        "filename": img.get("filename", ""),
+                        "filename": filename,
                         "subfolder": img.get("subfolder", ""),
                         "type": img.get("type", "output"),
+                        "animated": bool(node_animated or ext_is_video),
                     })
             # 优先 output 类型, 仅在无 output 时回退到 temp
             # 排除 subfolder 以 "input" 开头的图片 (CN 预处理输出)
@@ -284,13 +302,62 @@ def api_comfyui_view():
             params["subfolder"] = subfolder
         if preview:
             params["preview"] = preview
+        # 视频产物 (SaveVideo mp4, moov atom 在文件尾) 的浏览器播放依赖 Range 请求:
+        # 不透传则 Chrome 无法定位元数据 → <video> 灰色、时长恒 0:00。
+        # 故转发 Range/If-Range, 回传 206 与 Content-Range/Accept-Ranges 等头, 并流式输出
+        # (旧实现 resp.content 一次性读全量, timeout=10 对大视频也不够用)。
+        upstream_headers = {"Accept-Encoding": "identity"}
+        for h in ("Range", "If-Range"):
+            v = request.headers.get(h)
+            if v:
+                upstream_headers[h] = v
         resp = requests.get(f"{COMFYUI_URL}/view", params=params,
-                            timeout=10, stream=True)
-        return resp.content, resp.status_code, {
-            "Content-Type": resp.headers.get("Content-Type", "image/png")
-        }
+                            headers=upstream_headers,
+                            timeout=(5, 120), stream=True)
     except Exception:
         return "", 503
+
+    out_headers = {}
+    for h in ("Content-Type", "Content-Length", "Content-Range",
+              "Accept-Ranges", "Content-Disposition", "ETag",
+              "Last-Modified", "Cache-Control"):
+        v = resp.headers.get(h)
+        if v:
+            out_headers[h] = v
+    out_headers.setdefault("Content-Type", "application/octet-stream")
+    # 上游 (aiohttp) 恒支持 Range; 即便本次请求未带 Range 也声明能力,
+    # 浏览器后续分段请求才会发出。
+    out_headers.setdefault("Accept-Ranges", "bytes")
+
+    def stream():
+        try:
+            yield from resp.iter_content(chunk_size=64 * 1024)
+        finally:
+            resp.close()
+
+    return Response(stream(), status=resp.status_code, headers=out_headers)
+
+
+# ====================================================================
+# 视频首帧缩略图 (ffmpeg 抽帧 + 磁盘缓存)
+# ====================================================================
+# 端点最终 URL: GET /api/comfyui/video_thumb
+# 参数签名 (与 /api/comfyui/view 对齐):
+#   filename  (必填) — ComfyUI output 下的文件名 (如 ComfyUI_00001_.mp4)
+#   subfolder (可选) — 子目录 (如 video/Wan2.2_i2v)
+#   type      (可选) — output (默认) / temp / input
+# 返回: image/webp (首帧缩略图), 命中缓存直接返回
+# 失败: 400 缺参 / 404 文件不可达 / 415 非视频或损坏 / 500 缓存目录问题 / 502 ffmpeg 失败
+@bp.route("/api/comfyui/video_thumb")
+def api_comfyui_video_thumb():
+    filename = request.args.get("filename", "")
+    subfolder = request.args.get("subfolder", "")
+    img_type = request.args.get("type", "output")
+    data, err, status = get_video_thumbnail(filename, subfolder, img_type)
+    if data is None:
+        return jsonify({"error": err or "未知错误"}), status
+    return data, 200, {"Content-Type": "image/webp",
+                       "Cache-Control": "public, max-age=86400"}
 
 
 # ====================================================================

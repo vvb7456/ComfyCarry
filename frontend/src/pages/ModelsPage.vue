@@ -9,6 +9,8 @@ import LocalModelsTab from '@/components/models/LocalModelsTab.vue'
 import CivitaiTab from '@/components/models/CivitaiTab.vue'
 import FavoritesTab from '@/components/models/FavoritesTab.vue'
 import DownloadsTab from '@/components/models/DownloadsTab.vue'
+import DownloadDirModal from '@/components/models/DownloadDirModal.vue'
+import { useDownloadsStore } from '@/stores/downloads'
 import type { ModelMeta } from '@/types/models'
 
 defineOptions({ name: 'ModelsPage' })
@@ -23,6 +25,15 @@ const tabs = computed(() => [
   { key: 'favorites', label: t('models.tabs.favorites'), icon: 'push_pin' },
   { key: 'tasks', label: t('models.tabs.tasks'), icon: 'download' },
 ])
+
+// ── 下载目录裁决 ──
+// 后端判不出文件用途时返回 409, store 把载荷放进 pendingClassification。
+// 挂在页面层而非某个 tab —— 搜索页、收藏页的下载都走同一条 store 动作。
+const downloads = useDownloadsStore()
+const dirModalOpen = computed({
+  get: () => downloads.pendingClassification !== null,
+  set: (v: boolean) => { if (!v) downloads.cancelClassification() },
+})
 
 // ── Shared Modals ──
 const metaOpen = ref(false)
@@ -67,6 +78,14 @@ function openPreviewSingle(url: string) {
     <div v-show="activeTab === 'tasks'">
       <DownloadsTab :active="activeTab === 'tasks'" />
     </div>
+
+    <DownloadDirModal
+      v-model="dirModalOpen"
+      :civitai-url="downloads.pendingClassification?.civitaiUrl || ''"
+      :pending-files="downloads.pendingClassification?.files || []"
+      :dir-options="downloads.pendingClassification?.dirOptions || []"
+      @confirm="downloads.resolveClassification"
+    />
 
     <ModelMetaModal v-model="metaOpen" :meta="metaMeta" :show-download="activeTab === 'civitai'" @preview="openPreview" />
     <ImagePreview v-model="previewOpen" :images="previewImages" :initial-index="previewIndex" />

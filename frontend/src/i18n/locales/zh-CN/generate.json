@@ -15,6 +15,7 @@
     "task_video": "视频",
     "task_edit": "编辑",
     "family_flux2": "Flux 2 系列",
+    "family_wan22": "Wan 2.2 系列",
     "not_ready": "未就绪"
   },
   "tabs": {
@@ -31,6 +32,10 @@
     "pony": "Pony",
     "illustrious": "Illustrious",
     "noobai": "NoobAI",
+    "wan22_i2v": "Wan 2.2 图生视频",
+    "wan22_t2v": "Wan 2.2 文生视频",
+    "wan22_5b": "Wan 2.2 5B 轻量",
+    "wan22_5b_hint": "图生 / 文生通用",
     "history": "队列 & 历史"
   },
   "prompt": {
@@ -48,6 +53,8 @@
       "prompt_editor": "提示词编辑器",
       "prompt_editor_title": "可视化提示词编辑器，支持自动补全和标签库"
     },
+    "video_ph": "描述画面如何运动：主体 → 动作 → 镜头 → 场景。例如：女孩转身回眸，长发飘动，镜头缓慢拉近…",
+    "negative_video_ph": "已内置推荐负面提示词，留空即用默认",
     "syntax_help_title": "随机提示词语法",
     "help_modal_title": "提示词帮助",
     "help": {
@@ -140,7 +147,14 @@
     "select_clip": "选择 CLIP",
     "select_vae": "选择 VAE",
     "search_unet": "搜索 UNet...",
-    "search_vae": "搜索 VAE..."
+    "search_vae": "搜索 VAE...",
+    "text_encoder": "文本编码器",
+    "select_text_encoder": "选择文本编码器",
+    "unet_high": "高噪",
+    "unet_low": "低噪",
+    "unet_seg_help": "Wan 2.2 14B 把生成分成两段：先用高噪权重打底，再用低噪权重出细节。两个文件都要选，且必须是同一个模型的两段。",
+    "select_unet_high": "选择高噪权重",
+    "select_unet_low": "选择低噪权重"
   },
   "advanced": {
     "title": "高级设置",
@@ -180,7 +194,33 @@
   "preview": {
     "empty": "生成后图片将显示在这里",
     "offline_title": "ComfyUI 未运行",
-    "offline_desc": "生成功能需要 ComfyUI 服务才能使用"
+    "offline_desc": "生成功能需要 ComfyUI 服务才能使用",
+    "empty_video": "生成后视频将显示在这里"
+  },
+  "video": {
+    "start_frame": "起始画面",
+    "start_frame_not_image": "视频不能作为起始画面，请选择一张图片",
+    "mode_t2v": "文生视频",
+    "mode_i2v": "图生视频",
+    "speed": "速度",
+    "speed_fast": "快速",
+    "speed_std": "标准",
+    "duration": "时长",
+    "frames_hint": "{frames} 帧 · {fps}fps",
+    "seg_both": "双段",
+    "seg_high": "仅高噪",
+    "seg_low": "仅低噪",
+    "composing": "正在合成视频…",
+    "stage": "采样中 · 第 {i} / {n} 段",
+    "download": "下载视频",
+    "speed_help": "快速：4 步出片，负面提示词不生效。标准：20 步，细节更好，耗时约为快速的 5 倍。",
+    "res_fit": "贴合起始画面",
+    "res_preset": "{w}×{h} ({orient} · {tier})",
+    "res_fit_option": "{w}×{h} ({label})",
+    "res_help": "选中尺寸的比例与起始画面不一致时，起始画面会被居中裁切以适配。",
+    "orient_landscape": "横",
+    "orient_portrait": "竖",
+    "orient_square": "方"
   },
   "modules": {
     "lora": "LoRA",
@@ -455,7 +495,10 @@
     "inpaint_no_mask": "遮罩未绘制",
     "inpaint_no_mask_desc": "当前为局部重绘模式但未绘制遮罩，将以标准图生图模式运行。",
     "prompt_id_missing": "未获取到 prompt_id",
-    "components_not_ready": "运行组件未就绪，请先下载"
+    "components_not_ready": "运行组件未就绪，请先下载",
+    "video_same_unet": "高噪与低噪权重不能是同一个文件",
+    "no_start_frame": "请先上传起始画面",
+    "no_unet_pair": "请分别选择高噪与低噪两个权重"
   },
   "model_dep": {
     "detecting": "正在检测模型…",
@@ -481,7 +524,10 @@
     "error_check": "组件检测失败",
     "error_no_dir": "缺少 ComfyUI 目录，无法下载组件",
     "error_submit": "{name} 提交下载失败",
-    "error_download": "{name} 下载失败"
+    "error_download": "{name} 下载失败",
+    "fast_files": "快速模式文件",
+    "fast_files_hint": "仅快速模式需要",
+    "total": "待下载合计 {size}"
   },
   "picker": {
     "arch_all": "全部架构",
@@ -496,8 +542,14 @@
     "empty_title": "还没有 {arch} 主模型",
     "empty_desc": "前往下载页添加模型",
     "go_to_downloads": "前往下载页",
-    "component_hint": "选中后需补齐运行组件"
+    "component_hint": "选中后需补齐运行组件",
+    "empty_video_hint": "尚未检测到该条目权重。可在模型页搜索下载，或将文件放入 diffusion_models 目录"
   },
+  "history": {
+    "make_video": "生成视频",
+    "make_video_ready_elsewhere": "起始画面已备好，在「视频 · 图生视频」里"
+  },
+  "model": {},
   "placeholders": {
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
     "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
@@ -505,5 +557,8 @@
     "negative_pony": "score_6, score_5, score_4, worst quality, low quality, bad anatomy, bad hands, watermark",
     "negative_illustrious": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name",
     "negative_noobai": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name"
+  },
+  "errors": {
+    "state_lost": "目标条目状态不可用，请重试"
   }
 }

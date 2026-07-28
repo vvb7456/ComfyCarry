@@ -18,12 +18,12 @@ export type {
 }
 
 /**
- * Thin composable wrapper around the pinia downloads store (C1).
+ * Thin composable wrapper around the pinia downloads store.
  *
  * Existing consumers (CivitaiTab / DownloadsTab / DownloadItem / modals)
  * keep importing `useDownloads` from this path with the same API surface.
  * Internally the wrapper forwards to the store singleton. Cart-named members
- * are kept as aliases onto the now favorites-backed store state.
+ * are aliases onto the favorites-backed store state.
  */
 export function useDownloads() {
   const store = useDownloadsStore()

@@ -107,7 +107,6 @@ function openMeta(m: LocalModel) {
       <FilterInput
         v-model="textFilter"
         :placeholder="t('models.local.filter_placeholder')"
-        class="local-filter-input"
       />
       <span class="toolbar-status">
         <template v-if="batchProgress.running">
@@ -164,11 +163,6 @@ function openMeta(m: LocalModel) {
 </template>
 
 <style scoped>
-.local-filter-input {
-  flex: 1;
-  max-width: 280px;
-}
-
 .model-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(280px, 22vw, 380px), 1fr));

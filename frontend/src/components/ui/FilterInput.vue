@@ -10,14 +10,17 @@ const model = defineModel<string>({ default: '' })
 withDefaults(defineProps<{
   placeholder?: string
   clearable?: boolean
+  /** 撑满父容器 (modal / 侧栏)。默认走 toolbar 宽度基线 --ctl-w-md。 */
+  full?: boolean
 }>(), {
   placeholder: '',
   clearable: true,
+  full: false,
 })
 </script>
 
 <template>
-  <div class="filter-input">
+  <div class="filter-input" :class="{ 'filter-input--full': full }">
     <MsIcon name="search" size="sm" color="none" class="filter-input__icon" />
     <input
       v-model="model"
@@ -40,7 +43,16 @@ withDefaults(defineProps<{
   position: relative;
   display: flex;
   align-items: center;
+  /* 宽度基线见 css/forms.css —— 不要在调用点各拍一个 max-width */
+  flex: 1 1 var(--ctl-w-md);
   min-width: 0;
+  max-width: var(--ctl-w-md);
+}
+
+.filter-input--full {
+  flex: 1 1 auto;
+  max-width: none;
+  width: 100%;
 }
 
 .filter-input__icon {

@@ -507,6 +507,10 @@ def _step_ssh(config):
         except FileNotFoundError:
             pass
         added = 0
+        # 追加前确保原文件以换行结尾 —— 镜像预置的 key 常无末尾换行, 直接 append 会把
+        # 新 key 粘在它尾部拼成畸形行, 导致该行所有 key 全部失效 (实测踩到过)。
+        from ..routes.ssh import _ensure_trailing_newline
+        _ensure_trailing_newline(ak_file)
         with open(ak_file, "a") as f:
             for key in ssh_keys:
                 key = key.strip()

@@ -1,5 +1,6 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
+import type { ModelTypeConfig } from '@/config/model-types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,8 +66,6 @@ interface OptionsResponse {
   checkpoint_archs: Record<string, string>
   lora_archs: Record<string, string>
   unet_archs: Record<string, string>
-  checkpoint_packagings: Record<string, string>
-  unet_packagings: Record<string, string>
   lora_triggers: Record<string, string>
   checkpoint_info: Record<string, Record<string, unknown>>
   lora_info: Record<string, Record<string, unknown>>
@@ -107,21 +106,21 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const checkpointArchs = ref<Record<string, string>>({})
   const loraArchs = ref<Record<string, string>>({})
   const unetArchs = ref<Record<string, string>>({})
-  const checkpointPackagings = ref<Record<string, string>>({})
-  const unetPackagings = ref<Record<string, string>>({})
   const loraTriggers = ref<Record<string, string>>({})
   const checkpointInfo = ref<Record<string, Record<string, unknown>>>({})
   const loraInfo = ref<Record<string, Record<string, unknown>>>({})
   const unetInfo = ref<Record<string, Record<string, unknown>>>({})
 
   // Structured computed
+  // packaging 由列表归属推导 — checkpoints 列表项 = 整合包, unets 列表项 = 拆分件。
+  // 字段本身保留 (picker 徽章 / 形态过滤 chip / BasicSettings 仍读 item.packaging)。
   const checkpoints = computed<CheckpointItem[]>(() =>
     rawCheckpoints.value.map(name => ({
       name,
       preview: checkpointPreviews.value[name] ?? null,
       arch: checkpointArchs.value[name] ?? 'unknown',
       info: checkpointInfo.value[name] ?? null,
-      packaging: (checkpointPackagings.value[name] as 'checkpoint' | 'split') ?? 'checkpoint',
+      packaging: 'checkpoint',
     })),
   )
 
@@ -141,7 +140,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       preview: unetPreviews.value[name] ?? null,
       arch: unetArchs.value[name] ?? 'unknown',
       info: unetInfo.value[name] ?? null,
-      packaging: (unetPackagings.value[name] as 'checkpoint' | 'split') ?? 'split',
+      packaging: 'split',
     })),
   )
 
@@ -190,8 +189,6 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       checkpointArchs.value = data.checkpoint_archs || {}
       loraArchs.value = data.lora_archs || {}
       unetArchs.value = data.unet_archs || {}
-      checkpointPackagings.value = data.checkpoint_packagings || {}
-      unetPackagings.value = data.unet_packagings || {}
       loraTriggers.value = data.lora_triggers || {}
       checkpointInfo.value = data.checkpoint_info || {}
       loraInfo.value = data.lora_info || {}
@@ -234,4 +231,24 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     controlnetModels, seedvr2Models, ultralyticsBboxModels, samModels, comfyuiDir,
     load, refresh,
   }
+}
+
+// ── 打包形态判定 helper ────────────────────────────────────────────
+// 收敛 ModelTab.selectedPackaging (原 unet 优先) 与 useGenerateSubmit.resolvePackaging
+// (原 checkpoint 优先) 两处互为镜像、优先级相反的实现。正常情况下 (state.checkpoint 与
+// state.unet 互斥) 二者结论本就一致; 脏数据 (两字段同时非空) 下旧实现会分叉, 此 helper
+// 保证两处必然同结论。语义见 docs/DOWNLOAD_PROBE_CONVERGENCE_SPEC.md §4:
+//   1. 视频架构恒 split (supportedPackaging:['split'], 显式短路保留可读性)
+//   2. 单形态 tab 取其唯一形态
+//   3. 否则看文件是否在 checkpoints 列表里 (目录判定 = ComfyUI 加载节点目录绑定)
+// name 为空 (未选) 不在 checkpoints 列表 → 'split', 与双形态 tab 现有默认行为一致。
+export function packagingOf(
+  name: string,
+  config: ModelTypeConfig | undefined,
+  checkpointNames: readonly string[],
+): 'checkpoint' | 'split' {
+  if (config?.mediaType === 'video') return 'split'
+  const sp = config?.supportedPackaging
+  if (sp && sp.length === 1) return sp[0]
+  return checkpointNames.includes(name) ? 'checkpoint' : 'split'
 }

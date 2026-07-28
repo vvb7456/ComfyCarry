@@ -70,6 +70,7 @@ function formatSize(bytes: number): string {
     <FilterInput
       v-model="picker.search.value"
       :placeholder="t('generate.embedding.search_placeholder')"
+      full
       class="emb-search"
     />
 

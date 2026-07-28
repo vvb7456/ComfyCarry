@@ -102,7 +102,7 @@ function handleDownload() {
   const mid = props.meta?.id
   const vid = activeVersion.value?.id ?? props.meta?.versionId
   if (!mid) return
-  // A4: failed → retryVersion (engine retry if task still listed, else re-submit)
+  // failed → retryVersion (engine retry if task still listed, else re-submit)
   if (dlInfo.value.state === 'failed') {
     const mtype = (props.meta?.type || 'Checkpoint').toLowerCase()
     retryVersion(String(mid), mtype, vid ? Number(vid) : undefined)

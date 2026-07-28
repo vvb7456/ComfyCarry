@@ -3,6 +3,7 @@ import { computed, inject, ref, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { packagingOf } from '@/composables/generate/useGenerateOptions'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
 import { useComponentStatus } from '@/composables/generate/useComponentStatus'
@@ -19,6 +20,10 @@ import PreviewArea from '@/components/generate/PreviewArea.vue'
 import ModelPickerModal from '@/components/generate/ModelPickerModal.vue'
 import ComponentPanel from '@/components/generate/ComponentPanel.vue'
 import LoraPanel from '@/components/generate/LoraPanel.vue'
+import FileUploadZone from '@/components/ui/FileUploadZone.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
+import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { COMPONENT_FILENAMES } from '@/config/component-registry'
 import I2IPanel from '@/components/generate/I2IPanel.vue'
 import ControlNetPanel from '@/components/generate/ControlNetPanel.vue'
 import UpscalePanel from '@/components/generate/UpscalePanel.vue'
@@ -46,7 +51,7 @@ const props = defineProps<{
   previewImages: PreviewImage[]
   previewLoading: boolean
   previewCurrent: string | null
-  /** §4.3 冻结: 后台运行中整页只读, 绑在 .gen-ctrl-col / .gen-module-wrap 两个 div 上 */
+  /** 冻结: 后台运行中整页只读, 绑在 .gen-ctrl-col / .gen-module-wrap 两个 div 上 */
   frozen?: boolean
 }>()
 
@@ -66,7 +71,100 @@ const config = computed(() => MODEL_TYPES[props.modelType]!)
 const isSplit = computed(() => config.value.loader === 'split')
 const modelField = computed<'checkpoint' | 'unet'>(() => isSplit.value ? 'unet' : 'checkpoint')
 
-// §5.1 包装形态: 该 tab 支持的形态列表 (supportedPackaging) + 当前选中项的实际形态
+// ── 视频架构派生 ────────────────────────────────────────────────────
+// mediaType==='video' 为视频架构 (Wan 2.2 三条目); 图像架构 (媒体=image) 一字不变。
+const isVideo = computed(() => config.value.mediaType === 'video')
+
+// 起始画面原始尺寸 (派生展示数据, 不进 store): 由本文件的 loadRefSize 探测,
+// 转手喂给 BasicSettings.refWidth/refHeight → VideoSettings「贴合起始画面」推导用。
+const refSize = ref<{ width: number; height: number }>({ width: 0, height: 0 })
+
+// 负面提示词框可见性: 视频快速档 cfg=1.0 时负面无效, 隐藏输入框 (沿用 Krea2 Turbo 先例)。
+// 图像架构恒走 config.hasNegativePrompt (回归保护)。
+const showNegative = computed(() =>
+  config.value.hasNegativePrompt && !(isVideo.value && state.value.fast),
+)
+
+// 当前视频模式 (仅 5B 有意义; 14B 恒 i2v)。
+const videoMode = computed<'t2v' | 'i2v'>(() => {
+  if (config.value.videoModes?.length) {
+    return state.value.video?.mode ?? config.value.videoModes[0]
+  }
+  return 'i2v'
+})
+
+// 5B 的文生/图生开关 — 挂在提示词区块标题行右端 (PromptEditor 的 #header-actions 槽)。
+// 选那个位置是因为切到文生时左侧媒体栏整块消失, 开关必须待在不随之移动的地方。
+const showModeSwitch = computed(() => isVideo.value && (config.value.videoModes?.length ?? 0) > 0)
+const videoModeOptions = computed(() =>
+  (config.value.videoModes ?? []).map(m => ({
+    value: m,
+    label: m === 't2v' ? t('generate.video.mode_t2v') : t('generate.video.mode_i2v'),
+  })),
+)
+function onVideoModeChange(v: string) {
+  if (state.value.video) state.value.video.mode = v as 't2v' | 'i2v'
+}
+
+// 起始画面挂载判定 — 挂在提示词容器左栏 (PromptEditor 的 #media 槽):
+//  - wan22_t2v: 不渲染 (纯文生)
+//  - wan22_i2v: 恒渲染
+//  - wan22_5b:  仅 i2v 模式渲染 (文生模式下左栏整块消失)
+const showStartFrame = computed(() => {
+  if (!isVideo.value) return false
+  if (props.modelType === 'wan22_t2v') return false
+  if (config.value.videoModes?.length) return videoMode.value === 'i2v'
+  return true
+})
+
+// ── 起始画面上传/选择 (复用 FileUploadZone + useRefImagePicker, 与图生图同一套) ──
+const videoPicker = useRefImagePicker('video_ref')
+
+const startFrameName = computed(() => {
+  const n = state.value.video?.refImage ?? ''
+  if (!n) return undefined
+  return n.includes('/') ? n.slice(n.lastIndexOf('/') + 1) : n
+})
+const startFramePreview = computed(() => {
+  const n = state.value.video?.refImage
+  if (!n) return undefined
+  return `/api/generate/input_image_preview?name=${encodeURIComponent(n)}`
+})
+
+/** 起始画面原始像素尺寸 —— 「贴合起始画面」分辨率项的推导输入。
+ *  派生展示数据, 不进 store; 取不到时归 0, 下游退化为档位预设。 */
+function loadRefSize(name: string) {
+  if (!name) {
+    refSize.value = { width: 0, height: 0 }
+    return
+  }
+  const img = new Image()
+  img.onload = () => { refSize.value = { width: img.naturalWidth || 0, height: img.naturalHeight || 0 } }
+  img.onerror = () => { refSize.value = { width: 0, height: 0 } }
+  img.src = `/api/generate/input_image_preview?name=${encodeURIComponent(name)}`
+}
+
+// refImage 任何来源的变化 (手动上传 / picker 选择 / 「生成视频」带入 / t2v 切回) 都要刷新尺寸
+watch(() => state.value.video?.refImage ?? '', (name) => loadRefSize(name), { immediate: true })
+
+function onStartFramePick(name: string) {
+  if (state.value.video) state.value.video.refImage = name
+  videoPicker.close()
+}
+async function onStartFrameUpload(file: File) {
+  const result = await videoPicker.uploadFile(file)
+  if (!result) return
+  if (state.value.video) state.value.video.refImage = result.filename
+  if (result.width && result.height) {
+    refSize.value = { width: result.width, height: result.height }
+  }
+  toast(t('generate.i2i.uploaded'), 'success')
+}
+function onStartFrameClear() {
+  if (state.value.video) state.value.video.refImage = ''
+}
+
+// 包装形态: 该 tab 支持的形态列表 (supportedPackaging) + 当前选中项的实际形态
 const supportedPackaging = computed(() => config.value.supportedPackaging)
 const hasDualPackaging = computed(() => supportedPackaging.value.length > 1)
 
@@ -82,18 +180,12 @@ const mergedPickerItems = computed(() => {
 })
 
 // 当前选中模型的包装形态 (用于驱动 AdvancedSettings 的 split/clip-skip-vae 显示 + submit payload)
-const selectedPackaging = computed<'checkpoint' | 'split'>(() => {
-  if (!hasDualPackaging.value) {
-    return isSplit.value ? 'split' : 'checkpoint'
-  }
-  // 两形态并存: 按选中文件所在目录判定 loader 形态 (ComfyUI 加载节点目录绑定 —
-  // 拆分件在 diffusion_models/=unets 列表, 整合包在 checkpoints/ 列表)。onModelSelect
-  // 互斥写 state.unet XOR state.checkpoint, 故三处 (此处 / onModelSelect / useGenerateSubmit) 一致。
-  if (state.value.unet) return 'split'
-  if (state.value.checkpoint) return 'checkpoint'
-  // 无选中: 与 useGenerateSubmit.ts 一致 — 都为空时判 split (若该 tab 支持), 否则 checkpoint
-  return supportedPackaging.value.includes('split') ? 'split' : 'checkpoint'
-})
+// 调 useGenerateOptions 导出的 packagingOf helper, 与 useGenerateSubmit.resolvePackaging
+// 共用同一判据 —— 两处若用不同判据, 脏数据下会分叉。
+// name = state.checkpoint || state.unet; 未选时 name='' 不在 checkpoints 列表 → 'split'。
+const selectedPackaging = computed<'checkpoint' | 'split'>(() =>
+  packagingOf(state.value.checkpoint || state.value.unet, config.value, options.checkpoints.value.map(m => m.name)),
+)
 
 const {
   i2i,
@@ -183,12 +275,22 @@ function onLocalModuleToggle(key: string, enabled: boolean) {
   cnModuleToggle(key, enabled)
 }
 
-const effectiveModuleTabs = computed(() =>
-  config.value.controlNetEnabled ? moduleTabs.value : localModuleTabs.value,
-)
-const effectiveEnabledModules = computed(() =>
-  config.value.controlNetEnabled ? enabledModules.value : localEnabledModules.value,
-)
+const effectiveModuleTabs = computed(() => {
+  // 视频条目 config.modules === ['lora']: 模块区仅 LoRA, i2i/CN/upscale/hires/face 不出现。
+  if (isVideo.value) {
+    return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'extension' }]
+  }
+  return config.value.controlNetEnabled ? moduleTabs.value : localModuleTabs.value
+})
+const effectiveEnabledModules = computed(() => {
+  // 视频架构: 仅 lora 可启用 (其余模块不渲染也不计启用)
+  if (isVideo.value) {
+    const enabled = new Set<string>()
+    if (state.value.loras.some((lora) => lora.enabled)) enabled.add('lora')
+    return enabled
+  }
+  return config.value.controlNetEnabled ? enabledModules.value : localEnabledModules.value
+})
 function onEffectiveModuleToggle(key: string, enabled: boolean) {
   if (config.value.controlNetEnabled) {
     cnModuleToggle(key, enabled)
@@ -233,8 +335,34 @@ const {
   modelField: modelField.value,
 })
 
-// §5.3 合并 picker 模式: 两形态并存时, 按选中项的 packaging 字段决定写 checkpoint 还是 unet
+// 双 UNet 架构的槽位路由。picker 是同一个 (普通单选), 由这个 ref 记住当前是给哪个槽选。
+// 高噪/低噪不可自动区分, 改为用户显式各选一次。
+const pickerSlot = ref<'high' | 'low' | null>(null)
+
+function openModelPickerFor(slot?: 'high' | 'low') {
+  pickerSlot.value = slot ?? null
+  openModelPicker()
+}
+
+// 合并 picker 模式: 两形态并存时, 按选中文件所在目录 (在哪个列表) 决定写 checkpoint 还是 unet —
+// ComfyUI 加载节点目录绑定, 必须按目录选 (checkpoints/→CheckpointLoaderSimple,
+// diffusion_models/→UNETLoader), 不能只看检测出的 content 形态 (误放文件 content≠dir 时会崩)。
+// 双 UNet: 按 pickerSlot 写 unetHigh 或 unetLow。
+// **不做任何预填/推荐** —— 高噪/低噪无法从文件本身区分, 靠文件名猜出来的建议是噪声。
+// 两个槽都由用户显式各选一次, 面板不替他做判断。
 function onModelSelect(name: string) {
+  if (config.value.dualUnet && pickerSlot.value) {
+    const slot = pickerSlot.value
+    if (slot === 'high') state.value.unetHigh = name
+    else state.value.unetLow = name
+    // 主字段同步为高噪件: runBlockedReason / selectedPackaging / 提交链都读 state.unet
+    state.value.unet = state.value.unetHigh || name
+    showModelPicker.value = false
+    pickerSlot.value = null
+    toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
+    return
+  }
+
   if (!hasDualPackaging.value) {
     _onModelSelect(name)
     return
@@ -255,11 +383,29 @@ function onModelSelect(name: string) {
   toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
 }
 
-// §6.3 运行组件状态机: 替代旧 tab 级依赖机制 (后者读 welcome_state, dismiss 后永远空)。
+// 运行组件状态机: 替代旧 tab 级依赖机制 (后者读 welcome_state, dismiss 后永远空)。
 // useComponentStatus 只发 /api/downloads/check, 绝不碰 welcome_state, 无 dismiss 概念。
 // 它内部 watch arch 且 immediate 刷新, 无需手动调首次 refresh。
-const compStatus = useComponentStatus(() => props.modelType, () => options.comfyuiDir.value)
+// 第三参 = 条件组件上下文: 视频快速档需把 lightning 加速件计入必需集,
+// 否则缺件也会误判为就绪。图像架构无条件组件, fast 传了也无影响。
+const compStatus = useComponentStatus(
+  () => props.modelType,
+  () => options.comfyuiDir.value,
+  () => ({ fast: state.value.fast }),
+)
 const componentPanelExpanded = ref(false)
+
+// Lightning 加速件物理落在 loras/ 目录, 会混进 LoRA 添加入口的选择器。
+// 视频架构下用同源 COMPONENT_FILENAMES 过滤, 不另立名单;
+// 图像架构不过滤 (行为一字不变, 回归保护)。LoraPanel 内部卡片渲染已用同一集合过滤,
+// 这里只管 picker 的 items 绑定。
+const loraPickerItems = computed(() => {
+  if (!isVideo.value) return options.loras.value
+  return options.loras.value.filter(l => {
+    const bname = l.name.includes('/') ? l.name.slice(l.name.lastIndexOf('/') + 1) : l.name
+    return !COMPONENT_FILENAMES.has(bname)
+  })
+})
 
 // 就绪状态回流 store (单一真值): 页面级重复预检已删, 菜单状态完全靠各 tab 写入, 故 immediate
 watch(() => compStatus.ready.value, (ready, prev) => {
@@ -277,7 +423,41 @@ watch(() => store.activeModelType, (active) => {
   if (active === props.modelType) void compStatus.refresh()
 })
 
-// A2: CN 依赖 Gate 配置按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用)
+// 视频架构「隐藏实时模式」: 视频任务无实时预览语义 (分钟级任务), live 模式无意义。
+// ActionBar 已按 mediaType 过滤 runModes; 此处做状态层兜底: 视频架构下若 runMode
+// 被切到 'live' (含历史持久化数据), 立即校正回 'normal', 防止以 live 提交。
+watch(() => state.value.runMode, (mode) => {
+  if (store.activeModelType !== props.modelType) return
+  if (isVideo.value && mode === 'live') {
+    state.value.runMode = 'normal'
+  }
+}, { immediate: true })
+
+// 5B 模式字段兜底: store.createDefaultVideoState 未设 mode (store 层初始化缺口);
+// 此处在消费侧补默认值, 保证 store.video.mode 与 UI/提交链一致。仅当前激活 tab +
+// 视频架构 + 有 videoModes + video 存在但 mode 缺失时写一次 (同 autofillDefaultModels 风格)。
+watch(() => [store.activeModelType, state.value.video] as const, () => {
+  if (store.activeModelType !== props.modelType) return
+  if (!isVideo.value) return
+  const modes = config.value.videoModes
+  if (!modes?.length) return
+  const v = state.value.video
+  if (v && v.mode !== 't2v' && v.mode !== 'i2v') {
+    v.mode = modes[0]
+  }
+}, { immediate: true })
+
+// 视频架构模块区仅 LoRA: 若 activeModule 残留图像架构旧值 (如 'i2i'/'upscale'),
+// 强制校正回 'lora', 保证视频任务模块区只渲染 LoRA 面板。仅当前激活 tab + 视频架构生效。
+watch(() => [store.activeModelType, isVideo.value] as const, () => {
+  if (store.activeModelType !== props.modelType) return
+  if (!isVideo.value) return
+  if (state.value.activeModule !== 'lora') {
+    state.value.activeModule = 'lora'
+  }
+}, { immediate: true })
+
+// CN 依赖 Gate 配置按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用)
 const _cnBranch = (MODEL_TYPES[props.modelType]?.cnBranch as CnBranch | undefined)
 const cnDepPose = getCnDepConfig('pose', _cnBranch)
 const cnDepCanny = getCnDepConfig('canny', _cnBranch)
@@ -308,15 +488,24 @@ function autofillDefaultModels() {
 
 watch([() => options.clips.value, () => options.vaes.value, () => store.activeModelType], autofillDefaultModels, { immediate: true })
 
-// §6.3 生成前置校验: 条件不满足时"软禁用"主生成按钮, 点击弹 toast 说明原因。
+// 生成前置校验: 条件不满足时"软禁用"主生成按钮, 点击弹 toast 说明原因。
 // 返回空串 = 可以生成; 非空 = 禁用原因 (已翻译文案)。
 const runBlockedReason = computed<string>(() => {
   const st = state.value
   const pkg = selectedPackaging.value
 
   // 1. 主模型未选择 (整合包看 checkpoint, 拆分看 unet)
-  const modelPicked = pkg === 'split' ? !!st.unet : !!st.checkpoint
-  if (!modelPicked) return t('generate.error.no_checkpoint')
+  // 双 UNet: 两个槽独立选择, 必须都填且互异 —— 只填一个是常见中间态, 要能说清缺什么
+  if (config.value.dualUnet) {
+    if (!st.unetHigh || !st.unetLow) return t('generate.error.no_unet_pair')
+    if (st.unetHigh === st.unetLow) return t('generate.error.video_same_unet')
+  } else {
+    const modelPicked = pkg === 'split' ? !!st.unet : !!st.checkpoint
+    if (!modelPicked) return t('generate.error.no_checkpoint')
+  }
+
+  // 1b. 视频 i2v 未选起始画面 → 软禁用 + 点击 toast。
+  if (showStartFrame.value && !st.video?.refImage) return t('generate.error.no_start_frame')
 
   // 整合包自带全部组件, 到此即可
   if (pkg !== 'split') return ''
@@ -361,21 +550,49 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   <div class="model-tab">
     <!-- ═══ 上部: 双列布局 ═══ -->
     <div class="gen-top-row">
-      <!-- 左列: 控制区 (§4.3 冻结时 inert) -->
+      <!-- 左列: 控制区 (冻结时 inert) -->
       <div class="gen-ctrl-col" :inert="frozen" :class="{ 'gen-frozen': frozen }">
-        <!-- 提示词 -->
+        <!-- 提示词 (视频的起始画面并入本区块左栏, 5B 模式开关并入标题行右端) -->
         <PromptEditor
           ref="promptEditorRef"
           :positive="state.positive"
           :negative="state.negative"
-          :show-negative="config.hasNegativePrompt"
+          :show-negative="showNegative"
           :prompt-style="config.promptStyle"
           :model-type="modelType"
           :tools="promptTools"
           @update:positive="state.positive = $event"
           @update:negative="state.negative = $event"
           @tool="onPromptTool"
-        />
+        >
+          <!-- 5B 条目内的文生/图生开关 -->
+          <template v-if="showModeSwitch" #header-actions>
+            <SegmentedControl
+              :options="videoModeOptions"
+              :model-value="videoMode"
+              size="sm"
+              :disabled="frozen"
+              @update:model-value="onVideoModeChange(String($event))"
+            />
+          </template>
+
+          <!-- 起始画面 — 与图生图参考图同一组件 -->
+          <template v-if="showStartFrame" #media>
+            <FileUploadZone
+              mode="pick"
+              accept="image/png,image/jpeg,image/webp,image/bmp"
+              :preview="startFramePreview"
+              :file-name="startFrameName"
+              :pick-label="t('generate.i2i.pick_from_input')"
+              :upload-label="t('generate.i2i.upload_local')"
+              pick-icon="image"
+              :disabled="frozen"
+              @pick="videoPicker.open()"
+              @file="onStartFrameUpload"
+              @clear="onStartFrameClear"
+            />
+          </template>
+        </PromptEditor>
 
         <!-- 操作栏 -->
         <ActionBar
@@ -394,10 +611,12 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <!-- 基础设置 -->
         <BasicSettings
           :model-field="modelField"
-          @open-model="openModelPicker"
+          :ref-width="refSize.width"
+          :ref-height="refSize.height"
+          @open-model="openModelPickerFor"
         />
 
-        <!-- §6.3 运行组件内联面板 (三态: 就绪/缺失/下载中)。packaging=checkpoint 或无组件需求时自渲染为空 -->
+        <!-- 运行组件内联面板 (三态: 就绪/缺失/下载中)。packaging=checkpoint 或无组件需求时自渲染为空 -->
         <ComponentPanel
           :arch="modelType"
           :status="compStatus"
@@ -406,11 +625,12 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         />
 
         <!-- 高级设置 -->
-        <!-- 高级设置: 显示源从静态 isSplit 改为 reactive selectedPackaging -->
         <AdvancedSettings
           :show-split-models="selectedPackaging === 'split'"
           :dual-clip="config.dualClip"
-          :show-clip-skip-vae="selectedPackaging === 'checkpoint'"
+          :show-clip-skip-vae="!!config.clipSkipSupport"
+          :model-type="modelType"
+          :media-type="config.mediaType"
         />
       </div>
 
@@ -420,6 +640,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :images="previewImages"
           :loading="previewLoading"
           :current-preview="previewCurrent"
+          :media-type="config.mediaType"
+          :exec-state="isVideo ? execState : null"
           @click-image="onPreviewClick"
         />
       </div>
@@ -545,7 +767,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       v-model="showLoraPicker"
       :title="t('generate.lora.select_title')"
       icon="extension"
-      :items="options.loras.value"
+      :items="loraPickerItems"
       :multi="true"
       :selected="loraModalPending"
       :current-arch="config.pickerArch"
@@ -559,6 +781,20 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     <ModelMetaModal
       v-model="showLoraDetail"
       :meta="loraDetailMeta"
+    />
+
+    <!-- 起始画面 Picker Modal (视频, usage='video_ref') -->
+    <RefImageModal
+      v-if="isVideo"
+      v-model="videoPicker.visible.value"
+      :title="t('generate.video.start_frame')"
+      icon="image"
+      :images="videoPicker.images.value"
+      :loading="videoPicker.loading.value"
+      :uploading="videoPicker.uploading.value"
+      :preview-url-fn="videoPicker.previewUrl"
+      @select="onStartFramePick"
+      @upload="onStartFrameUpload"
     />
 
     <!-- I2I Ref Image Picker Modal -->
@@ -653,7 +889,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       v-model="showPromptEditorModal"
       :positive="state.positive"
       :negative="state.negative"
-      :show-negative="config.hasNegativePrompt"
+      :show-negative="showNegative"
       :emb-picker="embPicker"
       :wc-manager="wcManager"
       @update:positive="state.positive = $event"
@@ -708,7 +944,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   min-width: 0;
 }
 
-/* §4.3 inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
+/* inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
 .gen-frozen {
   opacity: .45;
   cursor: not-allowed;

@@ -217,7 +217,7 @@ export const CN_MODEL_CONFIGS: Record<string, ModelDepConfig> = {
 }
 
 // ── CN 分家: 按 branch 取依赖清单 ──────────────────────────────────────────────
-// A2: pony/sdxl 走 union (sdxl 通用), illustrious/noobai 走专用模型。
+// pony/sdxl 走 union (sdxl 通用), illustrious/noobai 走专用模型。
 // 检测器 (dwpose/depth_anything_v2) 的 required 语义不变, minOptional 保持 1
 // (每 branch 现在只剩一个可选 CN 模型)。
 //

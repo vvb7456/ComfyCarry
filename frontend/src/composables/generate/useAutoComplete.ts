@@ -32,7 +32,7 @@ export interface UseAutoCompleteReturn {
 
 // ── E: Pony 特殊标签组 ──────────────────────────────────────────────────────
 // Pony V6 提示词约定: score_x (质量档) / source_x (画风来源) / rating_x (分级)。
-// 仅在 store.activeModelType === 'pony' 时注入, 按规格给定顺序优先排列。
+// 仅在 store.activeModelType === 'pony' 时注入, 按给定顺序优先排列。
 // 非 pony tab 不注入。常量放在此文件 (与 useAutoComplete 同文件), 注释说明用途。
 const PONY_SPECIAL_TAGS: string[] = [
   'score_9',
@@ -83,6 +83,16 @@ export function useAutoComplete(
     const trimmed = q.trim()
     if (!trimmed) {
       _fetchGen++ // invalidate any in-flight request
+      results.value = []
+      visible.value = false
+      activeIndex.value = -1
+      return
+    }
+    // 提示词收敛: natural 模式 (视频 / krea2 / zimage 等) 不触发 tag 补全弹层。
+    // 判据基于 promptStyle (非 mediaType): 任何 natural 架构都不需要 Danbooru tag 补全。
+    // 早早返回, 不发后端请求, 不弹层 (回归保护: tags 模式行为一字不变)。
+    if (store.currentConfig.promptStyle === 'natural') {
+      _fetchGen++
       results.value = []
       visible.value = false
       activeIndex.value = -1

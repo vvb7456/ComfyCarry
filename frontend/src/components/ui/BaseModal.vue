@@ -186,7 +186,13 @@ const footerClass = computed(() => {
               <div class="modal-header__title-group">
                 <MsIcon v-if="icon" :name="icon" :style="iconColor ? { color: iconColor } : undefined" />
                 <div>
-                  <h3 :id="title ? titleId : undefined" class="modal-title">{{ title }}</h3>
+                  <h3 :id="title ? titleId : undefined" class="modal-title">
+                    {{ title }}
+                    <!-- 标题后的附属元素 (HelpTip 等)。不用 #header 整体覆盖 ——
+                         插槽内容带的是父组件的 scope 标记, 拿不到这里的
+                         .modal-title / .modal-subtitle 等 scoped 样式。 -->
+                    <slot name="title-extra" />
+                  </h3>
                   <p v-if="subtitle" class="modal-subtitle">{{ subtitle }}</p>
                 </div>
               </div>
@@ -242,6 +248,9 @@ const footerClass = computed(() => {
 }
 
 .modal-box--tone-info .modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
   color: var(--ac);
 }
 

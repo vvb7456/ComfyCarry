@@ -32,7 +32,7 @@ async function tryNativeClipboard(text: string): Promise<boolean> {
       return true
     }
   } catch {
-    // fall through to legacy path
+    // fall through to execCommand fallback
   }
   return false
 }

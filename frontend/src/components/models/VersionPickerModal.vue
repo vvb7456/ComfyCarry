@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import type { CivitaiHit } from '@/composables/useCivitaiSearch'
 import { useDownloads, type VersionDownloadInfo } from '@/composables/useDownloads'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDownloadableVersions } from '@/composables/useDownloadableVersions'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import DownloadButton from './DownloadButton.vue'
 
 defineOptions({ name: 'VersionPickerModal' })
@@ -26,9 +28,14 @@ const emit = defineEmits<{
 const { getVersionDownloadInfo, cancelDownload, retryVersion } = useDownloads()
 const { confirm } = useConfirm()
 
-const versions = computed(() =>
+const allVersions = computed(() =>
   props.hit?.versions || (props.hit?.version ? [props.hit.version] : []),
 )
+
+// Generation-Only / 无权重文件的 version 不进下载列表 —— 列出来只会点出一个错误。
+const modelId = computed(() => props.hit?.id ?? null)
+const { downloadable: versions, noneDownloadable, loading: flagsLoading } =
+  useDownloadableVersions(modelId, allVersions, computed(() => props.modelValue))
 
 function versionInfo(versionId: number): VersionDownloadInfo {
   if (!props.hit) return { state: 'idle', progress: 0, speed: 0, downloadId: null }
@@ -38,7 +45,7 @@ function versionInfo(versionId: number): VersionDownloadInfo {
 function handleDownload(versionId: number) {
   if (!props.hit) return
   const info = versionInfo(versionId)
-  // A4: failed → retryVersion; otherwise forward to parent
+  // failed → retryVersion; otherwise forward to parent
   if (info.state === 'failed') {
     retryVersion(String(props.hit.id), (props.hit.type || 'Checkpoint').toLowerCase(), versionId)
     return
@@ -67,7 +74,12 @@ async function handleCancel(versionId: number) {
     :title="t('models.civitai.select_version', { name: hit?.name || '' })"
     size="md"
   >
-    <div class="vp-list">
+    <EmptyState
+      v-if="noneDownloadable"
+      icon="cloud_off"
+      :message="t('models.civitai.no_downloadable_versions')"
+    />
+    <div v-else class="vp-list">
       <div
         v-for="v in versions"
         :key="v.id"

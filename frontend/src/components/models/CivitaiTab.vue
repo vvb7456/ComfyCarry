@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCivitaiSearch, type SortKey } from '@/composables/useCivitaiSearch'
 import { useDownloads } from '@/composables/useDownloads'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
-import ChipSelect from '@/components/ui/ChipSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import CivitaiModelCard from '@/components/models/CivitaiModelCard.vue'
@@ -56,6 +56,28 @@ const {
   loadMore: civitaiLoadMore,
   activate: civitaiActivate,
 } = useCivitaiSearch(civitaiSort)
+
+// ── 筛选器选项 ────────────────────────────────────────────────────────────
+// selectedTypes / selectedBaseModels 本身就是 string[], BaseSelect 开 multiple
+// 后直接双向绑定, 不需要适配层。
+/** facet → BaseSelect 选项; count 走 hint 显示在右侧小字。 */
+function facetOptions(facets: typeof typeFacets) {
+  return computed(() => facets.value.map(f => ({
+    value: f.value,
+    label: f.label,
+    hint: f.count.toLocaleString(),
+  })))
+}
+
+const typeOptions = facetOptions(typeFacets)
+const baseModelOptions = facetOptions(baseModelFacets)
+
+const sortOptions = computed(() => [
+  { value: 'Relevancy', label: t('models.civitai.sort.relevance') },
+  { value: 'Most Downloaded', label: t('models.civitai.sort.downloads') },
+  { value: 'Highest Rated', label: t('models.civitai.sort.rating') },
+  { value: 'Newest', label: t('models.civitai.sort.newest') },
+])
 
 // Auto-activate when tab becomes visible
 watch(() => props.active, (val) => {
@@ -165,7 +187,7 @@ function handleDownload(hit: CivitaiHit) {
   const allVersions = hit.versions || (hit.version ? [hit.version] : [])
   const versionIds = allVersions.map(v => v.id)
   const aggState = dlGetModelState(hit.id, versionIds)
-  // C3: partial aggregate → open VersionPickerModal so user picks uninstalled version
+  // partial aggregate → open VersionPickerModal so user picks uninstalled version
   if (aggState === 'partial' || allVersions.length > 1) {
     vpHit.value = hit
     vpOpen.value = true
@@ -245,60 +267,51 @@ function openCivitaiMeta(hit: CivitaiHit) {
 </script>
 
 <template>
-  <SearchInput
-    :placeholder="t('models.civitai.search_placeholder')"
-    full
-    :loading="civitaiLoading"
-    class="civitai-search"
-    @search="civitaiSearch"
-  >
-    <template #inline>
+  <SectionToolbar>
+    <template #start>
+      <SearchInput
+        :placeholder="t('models.civitai.search_placeholder')"
+        :loading="civitaiLoading"
+        @search="civitaiSearch"
+      />
+      <span v-if="civitaiTotalHits > 0" class="toolbar-status">
+        {{ t('models.civitai.total_results', { count: civitaiTotalHits.toLocaleString() }) }}
+      </span>
+    </template>
+    <template #end>
       <BaseSelect
-        :options="[
-          { value: 'Relevancy', label: t('models.civitai.sort.relevance') },
-          { value: 'Most Downloaded', label: t('models.civitai.sort.downloads') },
-          { value: 'Highest Rated', label: t('models.civitai.sort.rating') },
-          { value: 'Newest', label: t('models.civitai.sort.newest') },
-        ]"
+        v-model="selectedTypes"
+        :options="typeOptions"
+        :disabled="!facetsLoaded"
+        :all-text="t('models.civitai.all_types')"
+        multiple
+        size="sm"
+        fit
+        searchable
+        teleport
+        :search-placeholder="t('models.civitai.filter_type')"
+      />
+      <BaseSelect
+        v-model="selectedBaseModels"
+        :options="baseModelOptions"
+        :disabled="!facetsLoaded"
+        :all-text="t('models.civitai.all_base_models')"
+        multiple
+        size="sm"
+        fit
+        searchable
+        teleport
+        :search-placeholder="t('models.civitai.filter_base_model')"
+      />
+      <BaseSelect
         v-model="civitaiSort"
+        :options="sortOptions"
         size="sm"
         fit
         teleport
-        class="civitai-sort-inline"
       />
     </template>
-  </SearchInput>
-
-  <!-- Facet Filters -->
-  <div class="civitai-filters">
-    <div class="civitai-filter-group">
-      <div class="civitai-filter-label">{{ t('models.civitai.filter_type') }}</div>
-      <ChipSelect
-        v-model="selectedTypes"
-        :options="typeFacets"
-        :loading="!facetsLoaded"
-        multiple
-        :all-option="t('common.btn.all', '全部')"
-        :collapsed-rows="1"
-      />
-    </div>
-    <div class="civitai-filter-group">
-      <div class="civitai-filter-label">{{ t('models.civitai.filter_base_model') }}</div>
-      <ChipSelect
-        v-model="selectedBaseModels"
-        :options="baseModelFacets"
-        :loading="!facetsLoaded"
-        multiple
-        :all-option="t('common.btn.all', '全部')"
-        :collapsed-rows="1"
-      />
-    </div>
-  </div>
-
-  <!-- Result count -->
-  <div v-if="civitaiTotalHits > 0" class="civitai-result-count">
-    {{ t('models.civitai.total_results', { count: civitaiTotalHits.toLocaleString() }) }}
-  </div>
+  </SectionToolbar>
 
   <!-- Error -->
   <EmptyState v-if="civitaiError" icon="error" :message="civitaiError" />
@@ -358,58 +371,6 @@ function openCivitaiMeta(hit: CivitaiHit) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(280px, 22vw, 380px), 1fr));
   gap: clamp(14px, 1.2vw, 22px);
-}
-
-/* ── CivitAI Sort Inline ── */
-.civitai-search {
-  margin-bottom: 12px;
-}
-
-.civitai-sort-inline {
-  flex-shrink: 0;
-  min-width: 85px !important;
-  width: auto !important;
-}
-
-.civitai-sort-inline :deep(.base-select__trigger) {
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  padding: 2px 4px;
-  min-height: unset;
-  font-size: .75rem;
-  gap: 1px;
-}
-
-.civitai-sort-inline :deep(.base-select__trigger .ms) {
-  font-size: 16px;
-}
-
-/* ── CivitAI Facet Filters ── */
-.civitai-filters {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.civitai-filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.civitai-filter-label {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--t3);
-  padding-left: 2px;
-}
-
-.civitai-result-count {
-  font-size: var(--text-xs);
-  color: var(--t3);
-  margin-bottom: 12px;
 }
 
 .civitai-sentinel {

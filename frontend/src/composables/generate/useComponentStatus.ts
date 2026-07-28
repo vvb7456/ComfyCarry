@@ -4,6 +4,7 @@ import { useDownloadsStore } from '@/stores/downloads'
 import {
   requiredComponents,
   type ComponentFile,
+  type ComponentContext,
 } from '@/config/component-registry'
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
@@ -51,6 +52,12 @@ export interface UseComponentStatusReturn {
 export function useComponentStatus(
   arch: MaybeRefOrGetter<string>,
   comfyuiDir?: MaybeRefOrGetter<string>,
+  /**
+   * 条件组件的判定上下文。视频架构须传 `() => ({ fast: state.fast })` ——
+   * 加速件带 `requiredWhen:'fast'`, 只在快速档计入必需集; 不传则加速件永不计入,
+   * 快速档缺件也会误判为就绪。图像架构无条件组件, 可省略。
+   */
+  ctx?: MaybeRefOrGetter<ComponentContext>,
 ): UseComponentStatusReturn {
   const loading = ref(false)
   const files = ref<ComponentFileStatus[]>([])
@@ -110,7 +117,7 @@ export function useComponentStatus(
 
   async function refresh(): Promise<void> {
     const currentArch = toValue(arch)
-    const list = requiredComponents(currentArch)
+    const list = requiredComponents(currentArch, undefined, ctx ? toValue(ctx) : undefined)
 
     // 整合包架构无组件需求 → 清空状态, 直接返回 (不发任何请求)
     if (list.length === 0) {
@@ -405,6 +412,17 @@ export function useComponentStatus(
       { immediate: true },
     ),
   )
+
+  // 条件组件上下文变化时重新判定 (如速度档 快速↔标准 切换会增删加速件)。
+  // 下载进行中不打断, 待其结束后的 refresh 自会带上新 ctx。
+  if (ctx) {
+    stopHandles.push(
+      watch(
+        () => JSON.stringify(toValue(ctx) ?? {}),
+        () => { if (!downloading.value) void refresh() },
+      ),
+    )
+  }
 
   // comfyuiDir 从空变成非空时, 若有进行中的下载则重新接管
   let prevDir = toValue(comfyuiDir) ?? ''

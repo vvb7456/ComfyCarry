@@ -35,7 +35,7 @@ export function useControlNetOrchestration({
 
   const i2i = useImageToImage()
 
-  // 本 tab 的 CN branch (A2/A3): 由 modelType → MODEL_TYPES[key].cnBranch 推导 (静态)。
+  // 本 tab 的 CN branch: 由 modelType → MODEL_TYPES[key].cnBranch 推导 (静态)。
   // pony/sdxl → 'sdxl'; illustrious/noobai → 'ilnoob'; 其余 (无 cnBranch) → undefined (不过滤)。
   const cnBranch = computed<CnBranch | undefined>(
     () => (MODEL_TYPES[modelType]?.cnBranch as CnBranch | undefined),

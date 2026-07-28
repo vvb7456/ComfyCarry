@@ -30,7 +30,7 @@ const { confirm } = useConfirm()
 const queueStore = useGenerateQueueStore()
 const { queueRunning, queuePending } = storeToRefs(queueStore)
 
-// 挂载时自行从 store 取数 (规格 E3: 抽屉首开才挂载内容, 此处仅首次挂载时拉一次)
+// 挂载时自行从 store 取数 (抽屉首开才挂载内容, 此处仅首次挂载时拉一次)
 onMounted(() => {
   if (queueStore.queueCount === 0) queueStore.loadQueue()
 })

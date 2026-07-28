@@ -1,4 +1,4 @@
-import { inject, provide, reactive } from 'vue'
+import { hasInjectionContext, inject, provide, reactive } from 'vue'
 
 export interface ToastItem {
   id: number
@@ -17,9 +17,17 @@ const TOAST_KEY = Symbol('toast')
 let _nextId = 0
 
 /**
- * Provide toast API from App.vue root.
+ * 模块级单例。
+ *
+ * 原先 API 只存在于 App.vue 的组件级 provide 里, 而 **Pinia store 的 setup
+ * 脱离组件实例运行, inject 只能解析 app 级注入**, 拿不到组件级 provide ——
+ * 于是所有 store (downloads / generate ...) 里的 toast 全部静默走 fallback
+ * 分支, 只在 console 打一行 `[toast:error] ...`, 页面上什么都不显示。
+ *
+ * toast 本来就是全局单例, 没有按组件树分实例的必要, 故直接提到模块级。
+ * provide 仍保留 —— ToastContainer 与既有组件的注入路径不变。
  */
-export function provideToast(): ToastAPI {
+function createToastApi(): ToastAPI {
   const items = reactive<ToastItem[]>([])
 
   function toast(message: string, type: ToastItem['type'] = 'info', duration = 3000) {
@@ -35,23 +43,26 @@ export function provideToast(): ToastAPI {
     if (idx !== -1) items.splice(idx, 1)
   }
 
-  const api: ToastAPI = { toast, items, remove }
-  provide(TOAST_KEY, api)
-  return api
+  return { toast, items, remove }
+}
+
+const _sharedApi: ToastAPI = createToastApi()
+
+/**
+ * Provide toast API from App.vue root.
+ */
+export function provideToast(): ToastAPI {
+  provide(TOAST_KEY, _sharedApi)
+  return _sharedApi
 }
 
 /**
  * Inject toast API in any descendant component.
  */
 export function useToast(): ToastAPI {
-  const api = inject<ToastAPI>(TOAST_KEY)
-  if (!api) {
-    // Fallback for usage outside the provide tree (e.g. composables created early)
-    return {
-      toast: (msg, type = 'info') => { console.warn(`[toast:${type}] ${msg}`) },
-      items: [],
-      remove: () => {},
-    }
-  }
-  return api
+  // Vue 3.5 的 inject 把默认值分支嵌在 `if (instance || currentApp)` 内部:
+  // 无注入上下文时 (async 事件回调 / Pinia store setup / 函数体内惰性调用 composable)
+  // inject 直接返回 undefined, 默认值被忽略 —— 仅靠 inject(key, fallback) 形同虚设,
+  // 解构 toast 即抛 TypeError。必须先用 hasInjectionContext() 显式判上下文。
+  return hasInjectionContext() ? inject<ToastAPI>(TOAST_KEY, _sharedApi) : _sharedApi
 }

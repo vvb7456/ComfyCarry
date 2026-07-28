@@ -11,7 +11,10 @@ import json
 import logging
 import os
 import re
+import threading
+import time
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from flask import Blueprint, Response, jsonify, request, send_file
@@ -49,8 +52,15 @@ def proxy_search():
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
-        resp = requests.post(MEILI_URL, headers=headers, json=data, timeout=10)
+        # 30s 而非 10s: Civitai 的 Meilisearch 实测会间歇性慢到 9~15s
+        # (2026-07-28 实测 /health 单次 14.5s), 10s 卡在临界点, 一半请求超时。
+        resp = requests.post(MEILI_URL, headers=headers, json=data, timeout=30)
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
+    except requests.Timeout:
+        # 504 而非 500 —— 是上游慢, 不是本服务出错。前端据此给出可重试的提示。
+        return jsonify({"error": "CivitAI 搜索服务响应超时, 请稍后重试"}), 504
+    except requests.RequestException as e:
+        return jsonify({"error": f"CivitAI 搜索服务不可用: {e}"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -80,6 +90,87 @@ def proxy_civitai_model(model_id: int):
         return jsonify({"error": "CivitAI API 请求超时"}), 504
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
+
+# ====================================================================
+# CivitAI 可下载性 (Generation-Only 过滤)
+# ====================================================================
+# 背景: 作者可以把模型设为 "Generation-Only" —— 只能在 Civitai 站内出图,
+#       不提供权重下载。这类 version 不该出现在下载列表里。
+#
+# 判据来源 (2026-07-28 实测):
+#   - Meilisearch 索引 (前端搜索用):  **没有**任何相关字段。permissions 只是
+#     授权条款; mode/status/availability/locked 在 Generation-Only 模型上与
+#     普通模型完全一致 (null/Published/Public/false)。
+#   - REST v1 /models/{id}:           **没有** canDownload。files 与 downloadUrl
+#     照常返回, 看不出区别。
+#   - 唯一结构化来源: tRPC model.getById → result.data.json.modelVersions[].canDownload
+#     canDownload 为 true 才可下载 (Generation-Only 模型上全部 version 恒为 null)。
+#
+# 佐证: 不带 key 直接 GET /api/download/models/<vid> ——
+#   Pony V6 (可下载)  → 200 application/octet-stream
+#   Babes (Gen-Only)  → 401 Unauthorized
+# 该探测能确诊但每个 version 一次请求, 太重, 故用 tRPC 一次拿全模型。
+#
+# 注意: tRPC 是 Civitai 的内部接口, 不保证稳定。**失败一律放行** (fail-open) ——
+#       宁可多列一个下不了的版本 (下载时仍有 4xx 兜底), 也不能因为接口抖动
+#       把正常模型从列表里抹掉。
+
+_DL_FLAGS_TTL = 600  # 秒
+_dl_flags_cache: dict[int, tuple[float, dict]] = {}
+_dl_flags_lock = threading.Lock()
+
+
+@bp.route("/api/civitai/model/<int:model_id>/download_flags", methods=["GET"])
+def civitai_download_flags(model_id: int):
+    """返回 {version_id: 是否可下载}。
+
+    响应: {"flags": {"290640": true, ...}, "resolved": bool}
+      resolved=False 表示没拿到判据 (接口失败/结构变化), 前端应放行全部版本。
+    """
+    now = time.time()
+    with _dl_flags_lock:
+        cached = _dl_flags_cache.get(model_id)
+        if cached and now - cached[0] < _DL_FLAGS_TTL:
+            return jsonify(cached[1])
+
+    payload = {"flags": {}, "resolved": False}
+    try:
+        inp = quote(json.dumps({"json": {"id": model_id}}, separators=(",", ":")))
+        resp = requests.get(
+            f"https://civitai.com/api/trpc/model.getById?input={inp}",
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://civitai.com/",
+            },
+            timeout=20,
+        )
+        if resp.ok:
+            versions = (
+                resp.json().get("result", {}).get("data", {}).get("json", {}) or {}
+            ).get("modelVersions") or []
+            if versions:
+                payload = {
+                    "flags": {
+                        str(v.get("id")): (v.get("canDownload") is True)
+                        for v in versions
+                        if v.get("id") is not None
+                    },
+                    "resolved": True,
+                }
+    except Exception as e:
+        logger.debug(f"[civitai] download_flags 获取失败 (放行): {e}")
+
+    # 只缓存成功结果。失败 (网络抖动 / resp 非 ok / versions 为空 / 结构变化) 时
+    # payload 仍是 resolved=False 的放行态, 缓存它会让这个模型在整个 TTL 内都拿不到
+    # 判据 —— 一次超时就使 Generation-Only 模型十分钟内无法被正确过滤, 用户会点到
+    # 下不了的版本。失败不写缓存, 下次请求即可重试。
+    if payload["resolved"]:
+        with _dl_flags_lock:
+            _dl_flags_cache[model_id] = (now, payload)
+    return jsonify(payload)
 
 
 # ====================================================================

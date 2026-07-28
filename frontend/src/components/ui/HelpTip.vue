@@ -8,7 +8,11 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 defineOptions({ name: 'HelpTip' })
 
-defineProps<{ text: string }>()
+const props = defineProps<{
+  text: string
+  /** 内容是多行清单时放宽气泡 (默认 280px 会把每条挤成两行)。 */
+  wide?: boolean
+}>()
 
 const open = ref(false)
 const hovering = ref(false)
@@ -89,7 +93,11 @@ onBeforeUnmount(() => {
     <div
       v-if="visible"
       class="cc-help-tip-pop"
-      :class="{ 'pop-top': tipPos.placement === 'top', 'pop-bottom': tipPos.placement === 'bottom' }"
+      :class="{
+        'pop-top': tipPos.placement === 'top',
+        'pop-bottom': tipPos.placement === 'bottom',
+        'cc-help-tip-pop--wide': props.wide,
+      }"
       :style="{ top: tipPos.top + 'px', left: tipPos.left + 'px' }"
     >{{ text }}</div>
   </Teleport>
@@ -130,6 +138,9 @@ onBeforeUnmount(() => {
   z-index: 10000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
   pointer-events: none;
+}
+.cc-help-tip-pop--wide {
+  max-width: 400px;
 }
 .cc-help-tip-pop.pop-top {
   transform: translateY(-100%);

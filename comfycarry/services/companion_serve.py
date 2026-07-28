@@ -1,10 +1,10 @@
 """
-ComfyCarry — Companion WebDAV serve 管理 (SHOULD 项 6)
+ComfyCarry — Companion WebDAV serve 管理
 
 管理常驻 `rclone serve webdav` 进程, 绑定 127.0.0.1, 经 Flask 反代
 (/api/companion/dav) 暴露给客户端。数据面走主域名, 自定义/公共 Tunnel +
 直连全通, 不再依赖 cloudflared /dav ingress。
-方案 A (spec §2.1): 不加 --read-only, rclone move 拉完自动删源。
+不加 --read-only, rclone move 拉完自动删源。
 
 命令:
     rclone serve webdav <COMPANION_SERVE_ROOT>

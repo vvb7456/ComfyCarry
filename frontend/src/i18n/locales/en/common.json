@@ -58,10 +58,10 @@
   "clipboard_empty": "Nothing to copy",
   "no_results": "No matching results found",
   "no_matches": "No matches",
-  "search_hint": "Search\u2026",
+  "search_hint": "Search…",
   "loading": "Loading...",
   "empty": "No data",
-  "filter_hint": "Filter\u2026",
+  "filter_hint": "Filter…",
   "chip_more": "+{n} more",
   "chip_collapse": "Collapse",
   "upload": {
@@ -72,5 +72,6 @@
     "or_divider": "or",
     "unsupported_type": "Unsupported file type: {name}",
     "remove": "Remove"
-  }
+  },
+  "n_selected": "{count} selected"
 }

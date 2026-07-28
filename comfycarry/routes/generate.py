@@ -24,7 +24,7 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
-from ..services.arch_detect import detect_arch, detect_packaging_from_file
+from ..services.arch_detect import detect_arch
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
 from ..services.generate_service import submit_generation
@@ -36,6 +36,7 @@ from ..services.workflow_builder import (
     build_flux1_workflow,
     build_chroma_workflow,
     build_flux2_workflow,
+    build_wan22_workflow,
     build_preprocess_workflow,
     build_tag_workflow,
 )
@@ -50,10 +51,11 @@ bp = Blueprint("generate", __name__)
 # 未变且 rules_version 与当前一致则直接用缓存值, 否则 detect 后写缓存, 使重扫接近零成本。
 # rules_version 机制: 检测规则表升级 (如新增 flux2/zimage 规则、修 flux1 LoRA 误判) 后,
 # 旧缓存条目的 rules_version 不匹配 → 视为未命中, 强制重判, 防止 mtime 缓存钉死旧误判。
-# v4: flux1 主模型改 _has_sub (修复整合包 double_blocks. 前缀漏匹配) + 新增 detect_packaging。
-_rules_VERSION = 4
-_arch_scan_cache: dict[str, tuple[float, int, int, str, str]] = {}
-# cache value: (mtime, size, rules_version, arch, packaging)
+# 缓存值只含 arch (不含 packaging): arch 命中 sidecar 即返回, 有 sidecar 的文件
+# 不会被打开读头。打包形态由前端按列表归属推导, 不在此检测。
+_rules_VERSION = 5
+_arch_scan_cache: dict[str, tuple[float, int, int, str]] = {}
+# cache value: (mtime, size, rules_version, arch)
 
 
 # ── 懒加载缓存: Generate 页面所需的全部选项 ─────────────────────────────────
@@ -102,6 +104,14 @@ def _scan_lora_metadata(names: list[str], rel_dir: str) -> tuple[dict[str, str],
             continue  # 跳过路径遍历
         info_path = f"{model_path}.weilin-info.json"
         if not os.path.exists(info_path):
+            # sidecar 不存在: 若文件位于 baseModel 子文件夹内 (Civitai 下载按
+            # _sanitize_folder_name(baseModel) 建子文件夹, 保留原始 Civitai 字符串),
+            # 用子文件夹名合成一个最小 info (仅 baseModel), 让前端 effectiveArch()
+            # 能做 sdxl→pony/illustrious/noobai 的软架构细分。绝不覆盖真实 sidecar。
+            # 无子文件夹 (顶层文件) 时仍什么都不给。
+            parts = name.replace("\\", "/").split("/")
+            if len(parts) >= 2 and parts[0]:
+                info_result[name] = {"baseModel": parts[0]}
             continue
         try:
             with open(info_path, "r", encoding="utf-8") as f:
@@ -179,15 +189,17 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     return result
 
 
-def _scan_model_attrs(names: list[str], rel_dir: str) -> tuple[dict[str, str], dict[str, str]]:
-    """
-    批量检测模型架构 + 打包形态, 返回 ({name: arch}, {name: packaging})。
-    同一次文件读头复用 (arch + packaging 共享 header 解析成本)。
+def _scan_model_attrs(names: list[str], rel_dir: str) -> dict[str, str]:
+    """批量检测模型架构, 返回 {name: arch}。
+
+    打包形态 (整合包/拆分) 不在此检测 — 「目录 ⇒ 打包形态」由构造保证:
+    文件在 checkpoints/ 列表 → 整合包, 在 unets 列表 → 拆分件 (前端按列表归属推导)。
+    arch 命中 sidecar 即返回, 有 sidecar 的文件不会被打开读头。
+
     基于 (mtime, size, rules_version) 的 memo 缓存:
     文件未改动且 rules_version 一致时直接复用缓存结果 (规则升级后强制重判)。
     """
     archs: dict[str, str] = {}
-    packagings: dict[str, str] = {}
     base_dir = os.path.join(COMFYUI_DIR, rel_dir)
     real_base = os.path.realpath(base_dir)
     for name in names:
@@ -198,28 +210,22 @@ def _scan_model_attrs(names: list[str], rel_dir: str) -> tuple[dict[str, str], d
         try:
             st = os.stat(filepath)
         except OSError:
-            arch = detect_arch(filepath, name)
-            pkg = detect_packaging_from_file(filepath)
-            archs[name] = arch
-            packagings[name] = pkg
+            archs[name] = detect_arch(filepath, name)
             continue
         cached = _arch_scan_cache.get(filepath)
         if (cached and cached[0] == st.st_mtime and cached[1] == st.st_size
                 and cached[2] == _rules_VERSION):
             archs[name] = cached[3]
-            packagings[name] = cached[4]
             continue
         arch = detect_arch(filepath, name)
-        pkg = detect_packaging_from_file(filepath)
-        _arch_scan_cache[filepath] = (st.st_mtime, st.st_size, _rules_VERSION, arch, pkg)
+        _arch_scan_cache[filepath] = (st.st_mtime, st.st_size, _rules_VERSION, arch)
         archs[name] = arch
-        packagings[name] = pkg
-    return archs, packagings
+    return archs
 
 
 def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
-    """向后兼容包装: 仅返回 arch 字典 (旧调用方)。"""
-    return _scan_model_attrs(names, rel_dir)[0]
+    """向后兼容包装: 与 _scan_model_attrs 等价。"""
+    return _scan_model_attrs(names, rel_dir)
 
 
 def invalidate_options_cache() -> None:
@@ -253,9 +259,7 @@ def _fetch_generate_options() -> dict:
 
     # 走到这里 = 缓存已过期(或从未建立), 本次要真正重算。
     # _combo_cache 保存的是 ComfyUI /object_info 快照(含 checkpoints/unets/clips/vaes 文件列表),
-    # 过去只有 ?refresh=1 才清 → 新下载的组件在进程存活期间永远不出现在下拉里
-    # (即便用户整页刷新, 因为整页刷新走的是不带 refresh 的 load())。
-    # 此处与 _options_cache 同周期清除, 仅作"面板外途径放入文件"(Jupyter/SSH) 的兜底;
+    # 与 _options_cache 同周期清除, 作为"面板外途径放入文件"(Jupyter/SSH) 的兜底;
     # 面板内下载走 invalidate_options_cache() 在完成瞬间失效, 不依赖这个 TTL。
     _combo_cache.clear()
 
@@ -279,7 +283,6 @@ def _fetch_generate_options() -> dict:
                "checkpoint_archs": {}, "lora_archs": {},
                "unet_previews": {}, "clip_previews": {}, "vae_previews": {},
                "unet_archs": {}, "unet_info": {},
-               "checkpoint_packagings": {}, "unet_packagings": {},
                "comfyui_dir": COMFYUI_DIR, "controlnet_models": {},
                "seedvr2_models": [],
                "ultralytics_bbox_models": [], "sam_models": []}
@@ -344,11 +347,9 @@ def _fetch_generate_options() -> dict:
     # Checkpoint: 仅读元数据 (无 trigger words)
     _, ckpt_info = _scan_lora_metadata(ckpt_list, "models/checkpoints")
     result["checkpoint_info"] = ckpt_info
-    # Checkpoint / LoRA 架构 + 打包形态 (一次读头, 双结果)
-    ckpt_archs, ckpt_pkgs = _scan_model_attrs(ckpt_list, "models/checkpoints")
-    result["checkpoint_archs"] = ckpt_archs
-    result["checkpoint_packagings"] = ckpt_pkgs
-    result["lora_archs"] = _scan_model_attrs(lora_list, "models/loras")[0]
+    # Checkpoint / LoRA 架构 (打包形态由前端按列表归属推导: checkpoints→整合包, unets→拆分件)
+    result["checkpoint_archs"] = _scan_model_attrs(ckpt_list, "models/checkpoints")
+    result["lora_archs"] = _scan_model_attrs(lora_list, "models/loras")
     result["comfyui_dir"] = COMFYUI_DIR
 
     # ── 分离式架构: UNet / CLIP / VAE 预览图 + UNet 架构检测 ────────────
@@ -358,9 +359,7 @@ def _fetch_generate_options() -> dict:
     result["unet_previews"] = _scan_model_previews(unet_list, "models/diffusion_models")
     result["clip_previews"] = _scan_model_previews(clip_list, "models/text_encoders")
     result["vae_previews"] = _scan_model_previews(vae_list, "models/vae")
-    unet_archs, unet_pkgs = _scan_model_attrs(unet_list, "models/diffusion_models")
-    result["unet_archs"] = unet_archs
-    result["unet_packagings"] = unet_pkgs
+    result["unet_archs"] = _scan_model_attrs(unet_list, "models/diffusion_models")
     # UNet: 读元数据 (baseModel 等)，供分离式架构选择器展示；无 trigger words
     _, unet_info = _scan_lora_metadata(unet_list, "models/diffusion_models")
     result["unet_info"] = unet_info
@@ -678,6 +677,10 @@ _BUILDERS = {
     "flux1": build_flux1_workflow,    # 分离式架构: UNet + 双 CLIP (flux) + VAE
     "chroma": build_chroma_workflow,  # 分离式架构: UNet + 单 CLIP (chroma) + VAE
     "flux2": build_flux2_workflow,    # Flux2 (klein/dev) 独立采样 builder (SamplerCustomAdvanced + Flux2Scheduler)
+    # Wan 2.2 视频三 variant (均走 build_wan22_workflow, variant 由 model_type 推导)
+    "wan22_i2v": lambda params: build_wan22_workflow(params, "i2v"),
+    "wan22_t2v": lambda params: build_wan22_workflow(params, "t2v"),
+    "wan22_5b": lambda params: build_wan22_workflow(params, "5b"),
 }
 
 # 分离式三件套架构集合 (UNet + Text Encoder + VAE), 校验逻辑共用
@@ -686,6 +689,11 @@ _SPLIT_ARCHS = ("anima", "krea2", "zimage", "flux1", "chroma", "flux2")
 
 # 需要 dual CLIP (clip + clip2) 的架构集合 — 在 _SPLIT_ARCHS 分支内额外校验 clip2
 _DUAL_CLIP_ARCHS = ("flux1",)
+
+# Wan 2.2 视频架构集合 — 独立校验分支, 不并入 _SPLIT_ARCHS (后者写死单 unet 必填)。
+# 三 model_type 均走 build_wan22_workflow, variant 由 model_type 推导。
+# 14B (i2v/t2v) 双权重 high/low 必填且互异; 5B 单权重 unet 必填。
+_VIDEO_ARCHS = ("wan22_i2v", "wan22_t2v", "wan22_5b")
 
 
 @bp.route("/api/generate/submit", methods=["POST"])
@@ -715,7 +723,7 @@ def api_generate_submit():
     或错误:
         { "error": "..." }
     """
-    # §3.5 硬闸: 后台 session 运行时拒绝新提交 (服务端保证, 防 GET 返回前窗口期/
+    # 硬闸: 后台 session 运行时拒绝新提交 (服务端保证, 防 GET 返回前窗口期/
     # SSE 断线/前端 bug 让用户点出一次提交)。worker 不走这里 (直接调
     # submit_generation), 故不会自杀。
     from ..services.background_run import is_running
@@ -727,8 +735,8 @@ def api_generate_submit():
     return jsonify(body), status
 
 
-# ── /api/generate/background/* — 后台运行会话 (§3.4) ───────────────────────
-# 四个接口统一返回 §3.4 状态对象 (无 images 字段), 字段名一字不差:
+# ── /api/generate/background/* — 后台运行会话 ────────────────────────
+# 四个接口统一返回状态对象 (无 images 字段), 字段名一字不差:
 #   {state, iteration, max_iterations, started_at, stop_reason}
 
 @bp.route("/api/generate/background/start", methods=["POST"])

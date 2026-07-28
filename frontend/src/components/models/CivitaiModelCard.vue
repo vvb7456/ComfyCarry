@@ -116,14 +116,14 @@ async function handleCancelDownload() {
   }
 }
 
-/** Failed/retry click from card button → retryVersion (A4) */
+/** Failed/retry click from card button → retryVersion */
 function handleCardRetry() {
   const v = props.hit.version
   retryVersion(String(props.hit.id), (props.hit.type || 'Checkpoint').toLowerCase(), v?.id)
 }
 
 /** Download button click handler: idle → forward to parent (opens picker or downloads);
- *  failed → retryVersion (A4). */
+ *  failed → retryVersion. */
 function handleCardDownload() {
   if (dlBtnState.value === 'failed') {
     handleCardRetry()

@@ -3,12 +3,32 @@
  *
  * "运行组件" = 拆分形态 (UNet + TE + VAE) 的模型所需的文本编码器与 VAE 文件。
  * 本文件是唯一定义源, modelDepConfigs.ts 的 TAB_DEP_CONFIGS 从此派生。
+ *
+ * 视频架构 (Wan 2.2) 额外引入 "lightning" 加速件 slot (LoRA, 落 loras/ 目录),
+ * 以及条件 slot 机制: 带 `requiredWhen: 'fast'` 的文件仅在"速度=快速"时计入必需集。
  */
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 
 export type ComponentTier = 'standard' | 'lite' | 'full'
-export type ComponentSlot = 'clip' | 'clip2' | 'vae'
+
+/** slot 类型: clip/clip2/vae (图像架构) + lightning (视频加速件) */
+export type ComponentSlot = 'clip' | 'clip2' | 'vae' | 'lightning'
+
+/**
+ * 条件必需谓词。
+ * - `'fast'` = 仅"速度=快速"档时必需 (Lightning 加速件)
+ * - 缺省 (undefined) = 无条件必需 (普通 TE/VAE)
+ *
+ * 声明式而非函数式: 视频只有"快速/标准"两档, 枚举足够; 且可被序列化/快照。
+ */
+export type RequiredWhen = 'fast'
+
+/** 组件就绪判定上下文 (调用 requiredComponents 时传入)。 */
+export interface ComponentContext {
+  /** 速度档: true=快速 (加速件必需), false/缺省=标准 (加速件不计入必需集) */
+  fast?: boolean
+}
 
 export interface ComponentFile {
   /** 稳定唯一 id */
@@ -26,6 +46,8 @@ export interface ComponentFile {
   tier: ComponentTier
   /** 量化家族词干, 用于"兼容版本"匹配, 如 't5xxl' */
   stem: string
+  /** 条件必需谓词: 'fast' = 仅快速模式必需; 缺省 = 无条件必需 */
+  requiredWhen?: RequiredWhen
 }
 
 export interface ArchComponents {
@@ -106,6 +128,97 @@ const ZIMAGE_QWEN3_4B: ComponentFile = {
   bytes: 8044982048,
   tier: 'standard',
   stem: 'qwen_3_4b',
+}
+
+// ── Wan 2.2 视频组件 (Comfy-Org/Wan_2.2_ComfyUI_Repackaged) ──────────────
+// 三条目 (wan22_i2v / wan22_t2v / wan22_5b) 共享 umt5_xxl FP8 文本编码器;
+// 14B 两档用 wan_2.1_vae (254MB), 5B 用 wan2.2_vae (1.41GB, 16×16×4 压缩)。
+// 字节数取自 HF tree API LFS size (2026-07-27 校验, 8 文件全部 206 可达)。
+
+const WAN_UMT5_XXL_FP8: ComponentFile = {
+  id: 'wan_umt5_xxl_fp8',
+  label: 'UMT5-XXL FP8',
+  filename: 'umt5_xxl_fp8_e4m3fn_scaled.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors?download=true',
+  subdir: 'models/text_encoders',
+  bytes: 6735906897,
+  tier: 'standard',
+  stem: 'umt5_xxl',
+}
+
+const WAN_21_VAE: ComponentFile = {
+  id: 'wan_2_1_vae',
+  label: 'Wan 2.1 VAE',
+  filename: 'wan_2.1_vae.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors?download=true',
+  subdir: 'models/vae',
+  bytes: 253815318,
+  tier: 'standard',
+  stem: 'wan_2_1_vae',
+}
+
+const WAN22_VAE: ComponentFile = {
+  id: 'wan2_2_vae',
+  label: 'Wan 2.2 VAE',
+  filename: 'wan2.2_vae.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors?download=true',
+  subdir: 'models/vae',
+  bytes: 1409400960,
+  tier: 'standard',
+  stem: 'wan2_2_vae',
+}
+
+// ── Lightning 加速 LoRA ────────────────────────────────────────────
+// 仅"速度=快速"档必需 (requiredWhen:'fast'); 落 models/loras/ 目录。
+// i2v 与 t2v 的加速件不通用 (文件名含 i2v/t2v 前缀); 5B 无加速件。
+// 各 1.23 GB (1,226,977,424 字节)。
+
+const WAN22_I2V_LIGHTNING_HI: ComponentFile = {
+  id: 'wan22_i2v_lightning_hi',
+  label: 'I2V Lightning High',
+  filename: 'wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors?download=true',
+  subdir: 'models/loras',
+  bytes: 1226977424,
+  tier: 'standard',
+  stem: 'wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise',
+  requiredWhen: 'fast',
+}
+
+const WAN22_I2V_LIGHTNING_LO: ComponentFile = {
+  id: 'wan22_i2v_lightning_lo',
+  label: 'I2V Lightning Low',
+  filename: 'wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors?download=true',
+  subdir: 'models/loras',
+  bytes: 1226977424,
+  tier: 'standard',
+  stem: 'wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise',
+  requiredWhen: 'fast',
+}
+
+const WAN22_T2V_LIGHTNING_HI: ComponentFile = {
+  id: 'wan22_t2v_lightning_hi',
+  label: 'T2V Lightning High',
+  filename: 'wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors?download=true',
+  subdir: 'models/loras',
+  bytes: 1226977424,
+  tier: 'standard',
+  stem: 'wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise',
+  requiredWhen: 'fast',
+}
+
+const WAN22_T2V_LIGHTNING_LO: ComponentFile = {
+  id: 'wan22_t2v_lightning_lo',
+  label: 'T2V Lightning Low',
+  filename: 'wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors',
+  url: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors?download=true',
+  subdir: 'models/loras',
+  bytes: 1226977424,
+  tier: 'standard',
+  stem: 'wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise',
+  requiredWhen: 'fast',
 }
 
 // ── COMPONENT_REGISTRY ─────────────────────────────────────────────────────────
@@ -277,6 +390,32 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
       vae: [FLUX2_VAE],
     },
   },
+  // ── Wan 2.2 视频三条目 ──────────────────────────────────────────────────
+  // 三条目共享 umt5_xxl FP8 (text_encoders/); 14B 两档用 wan_2.1_vae, 5B 用 wan2.2_vae。
+  // lightning 加速件: i2v/t2v 各 high/low 两件 (requiredWhen:'fast'), 5B 无。
+  {
+    arch: 'wan22_i2v',
+    slots: {
+      clip: [WAN_UMT5_XXL_FP8],
+      vae: [WAN_21_VAE],
+      lightning: [WAN22_I2V_LIGHTNING_HI, WAN22_I2V_LIGHTNING_LO],
+    },
+  },
+  {
+    arch: 'wan22_t2v',
+    slots: {
+      clip: [WAN_UMT5_XXL_FP8],
+      vae: [WAN_21_VAE],
+      lightning: [WAN22_T2V_LIGHTNING_HI, WAN22_T2V_LIGHTNING_LO],
+    },
+  },
+  {
+    arch: 'wan22_5b',
+    slots: {
+      clip: [WAN_UMT5_XXL_FP8],
+      vae: [WAN22_VAE],
+    },
+  },
 ]
 
 // ── 派生函数 ──────────────────────────────────────────────────────────────────
@@ -289,17 +428,49 @@ const _ARCH_INDEX: Map<string, ArchComponents> = (() => {
 
 const TIER_ORDER: Record<ComponentTier, number> = { standard: 0, lite: 1, full: 2 }
 
+/** 所有 slot 的遍历顺序 (含 lightning) */
+const ALL_SLOTS: ComponentSlot[] = ['clip', 'clip2', 'vae', 'lightning']
+
+/** 文件的条件谓词在给定上下文下是否满足 */
+function isRequired(file: ComponentFile, ctx?: ComponentContext): boolean {
+  if (!file.requiredWhen) return true
+  if (file.requiredWhen === 'fast') return ctx?.fast === true
+  return true
+}
+
 /**
- * 该架构在给定档位下的必需文件 (每 slot 取 1 个: 优先 tier 匹配,
- * 否则取 standard, 再否则取第一个)。arch 不在表中返回 []。
+ * 该架构在给定档位/上下文下的必需文件。arch 不在表中返回 []。
+ *
+ * 分两类:
+ * - 无条件文件 (requiredWhen 缺省): 每 slot 取 1 个 (按 tier 优先级), 图像架构的 TE/VAE。
+ * - 条件文件 (requiredWhen:'fast'): 满足 ctx 时该 slot 下全部计入 (high/low 两件都要),
+ *   不满足时整 slot 跳过。用于视频加速件。
+ *
+ * 第二参数 tier 仅影响无条件文件的档位选择; ctx 控制条件 slot 是否计入。
+ * 两者独立, 可组合 (目前视频架构无条件多档位, 图像架构无条件 slot)。
  */
-export function requiredComponents(arch: string, tier?: ComponentTier): ComponentFile[] {
+export function requiredComponents(
+  arch: string,
+  tier?: ComponentTier,
+  ctx?: ComponentContext,
+): ComponentFile[] {
   const entry = _ARCH_INDEX.get(arch)
   if (!entry) return []
   const result: ComponentFile[] = []
-  for (const slot of ['clip', 'clip2', 'vae'] as ComponentSlot[]) {
+  for (const slot of ALL_SLOTS) {
     const files = entry.slots[slot]
     if (!files || files.length === 0) continue
+
+    // 条件文件 (带 requiredWhen): 满足 ctx 时全部计入, 否则整 slot 跳过
+    const conditional = files.filter(f => f.requiredWhen)
+    if (conditional.length > 0) {
+      for (const f of conditional) {
+        if (isRequired(f, ctx)) result.push(f)
+      }
+      continue
+    }
+
+    // 无条件文件: 每 slot 取 1 个 (按 tier 优先级)
     let chosen: ComponentFile | undefined
     if (tier) chosen = files.find(f => f.tier === tier)
     if (!chosen) chosen = files.find(f => f.tier === 'standard')
@@ -328,7 +499,7 @@ export function archsUsingFile(filename: string): string[] {
   const result: string[] = []
   for (const entry of COMPONENT_REGISTRY) {
     let found = false
-    for (const slot of ['clip', 'clip2', 'vae'] as ComponentSlot[]) {
+    for (const slot of ALL_SLOTS) {
       const files = entry.slots[slot]
       if (!files) continue
       if (files.some(f => f.filename === filename)) {
@@ -340,6 +511,23 @@ export function archsUsingFile(filename: string): string[] {
   }
   return result
 }
+
+/**
+ * registry 中所有组件文件名的聚合集合 (含加速件, 不含档位去重)。
+ * 用途: 模型页隐藏 / LoRA 选择器同源过滤。
+ * 加速件文件名必须在此集合内, 否则会泄漏进 LoRA 选择器。
+ */
+export const COMPONENT_FILENAMES: ReadonlySet<string> = (() => {
+  const s = new Set<string>()
+  for (const entry of COMPONENT_REGISTRY) {
+    for (const slot of ALL_SLOTS) {
+      const files = entry.slots[slot]
+      if (!files) continue
+      for (const f of files) s.add(f.filename)
+    }
+  }
+  return s
+})()
 
 /**
  * 剥掉量化/精度后缀得到家族词干, 用于"兼容版本"匹配。

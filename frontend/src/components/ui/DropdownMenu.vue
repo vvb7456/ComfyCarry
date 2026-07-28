@@ -1,18 +1,18 @@
 <script setup lang="ts">
 /**
- * DropdownMenu — Teleport 锚定弹层下拉菜单 (规格 v3 / C1-C5 重做)。
+ * DropdownMenu — Teleport 锚定弹层下拉菜单。
  *
  * 特性:
  *  - Teleport 到 body, 无全屏遮罩, 点击外部/ESC 关闭
  *  - 定位: floating-ui, **transform: false** (用 top/left 避免与 Transition transform 冲突)
- *    (C1: 修"从左上角飞入" bug — 默认 transform 定位与动画 transform 冲突)
- *  - 入场动画 = 锚点起源 scale(0.98→1)+opacity+translateY, origin 按 placement 推导 (C1)
- *  - 二级交互 = 下钻式 (C2): 点击父行 → 面板内容横滑切换为子视图
+ *    (默认 transform 定位与动画 transform 冲突, 会导致面板从左上角飞入)
+ *  - 入场动画 = 锚点起源 scale(0.98→1)+opacity+translateY, origin 按 placement 推导
+ *  - 二级交互 = 下钻式: 点击父行 → 面板内容横滑切换为子视图
  *    (顶部"‹ 返回 + 父组名", 下方列 children); 移除内联折叠
  *  - 打开时若选中 key 在某组 children → 直接进入该组子视图
- *  - 触发器闭合态 ↑/↓ 直接在叶子项扁平序列中循环切换, 不展开菜单 (C3)
- *  - hover 高亮 (次级底色) 与键盘高亮 (底色 + 左 2px accent 竖条) 视觉区分 (C4)
- *  - logo 暗色适配: logoInvertDark=true 时暗色主题 filter: invert(1), 底板透明 (C5)
+ *  - 触发器闭合态 ↑/↓ 直接在叶子项扁平序列中循环切换, 不展开菜单
+ *  - hover 高亮 (次级底色) 与键盘高亮 (底色 + 左 2px accent 竖条) 视觉区分
+ *  - logo 暗色适配: logoInvertDark=true 时暗色主题 filter: invert(1), 底板透明
  *  - 键盘: ↑/↓ 移动高亮; Enter 叶子=选中 / 父行=下钻; 子视图 ArrowLeft/Backspace=返回;
  *    Escape=关闭 (任何层级)
  */
@@ -27,13 +27,13 @@ export interface DropdownMenuItem {
   label: string
   /** 图片资源 URL; 与 letter 二选一 */
   logo?: string
-  /** 暗色主题下 logo 反色 (纯黑单色 logo); C5: filter: invert(1) + 底板透明 */
+  /** 暗色主题下 logo 反色 (纯黑单色 logo): filter: invert(1) + 底板透明 */
   logoInvertDark?: boolean
   /** logo 缺省时字母徽章字符 (1-2 字符) */
   letter?: string
   /** 说明性小字 (可选, 单行, 次要色) */
   hint?: string
-  /** 二级子项 (C2: 下钻式子视图) */
+  /** 二级子项 (下钻式子视图) */
   children?: DropdownMenuItem[]
 }
 
@@ -52,7 +52,7 @@ const triggerRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 
-// ── 当前视图: 'root' | 父组 key (C2 下钻式) ──
+// ── 当前视图: 'root' | 父组 key (下钻式) ──
 const currentView = ref<string>('root')
 
 /** 当前视图对应的行 (root → 顶级 items; 子视图 → 父组的 children) */
@@ -78,7 +78,7 @@ const selectedParentKey = computed<string | null>(() => {
   return null
 })
 
-// ── 叶子扁平序列 (C3: 触发器闭合态 ↑/↓ 在此循环) ──
+// ── 叶子扁平序列 (触发器闭合态 ↑/↓ 在此循环) ──
 const flatLeaves = computed<DropdownMenuItem[]>(() => {
   const out: DropdownMenuItem[] = []
   for (const it of props.items) {
@@ -91,12 +91,12 @@ const flatLeaves = computed<DropdownMenuItem[]>(() => {
   return out
 })
 
-// ── 定位 (floating-ui, C1: transform: false) ──
+// ── 定位 (floating-ui, transform: false) ──
 const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
   open,
   placement: 'bottom-start',
   strategy: 'fixed',
-  transform: false,  // C1: 用 top/left 定位, 避免 transform 与 Transition 冲突
+  transform: false,  // 用 top/left 定位, 避免 transform 与 Transition 冲突
   middleware: [
     offset(8),
     flip({ padding: 8 }),
@@ -112,11 +112,11 @@ const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
   whileElementsMounted: autoUpdate,
 })
 
-// 当前实际 placement (含 flip 后), 用于推导 transform-origin (C1)
+// 当前实际 placement (含 flip 后), 用于推导 transform-origin
 const resolvedPlacement = ref(placement.value)
 watch(placement, (v) => { resolvedPlacement.value = v })
 
-/** transform-origin 按实际 placement 推导 (C1):
+/** transform-origin 按实际 placement 推导:
  *  bottom-start → top left; 翻转后 top-start → bottom left; 右侧对齐 → 右 */
 const originClass = computed(() => {
   const p = resolvedPlacement.value
@@ -128,7 +128,7 @@ const originClass = computed(() => {
 // ── 打开/关闭 ──
 function openMenu() {
   open.value = true
-  // C2: 若选中 key 在某组 children 内 → 直接进入该组子视图 (定位选中项)
+  // 若选中 key 在某组 children 内 → 直接进入该组子视图 (定位选中项)
   currentView.value = selectedParentKey.value || 'root'
 
   // 焦点 + 高亮到当前选中项
@@ -150,7 +150,7 @@ function toggle() {
   else openMenu()
 }
 
-// ── 选择 / 下钻 / 返回 (C2) ──
+// ── 选择 / 下钻 / 返回 ──
 function selectLeaf(item: DropdownMenuItem) {
   emit('update:modelValue', item.key)
   closeMenu()
@@ -170,13 +170,13 @@ function drillBack() {
   nextTick(() => scrollToHighlighted())
 }
 
-// ── 键盘导航 (C2/C3/C4) ──
+// ── 键盘导航 ──
 const highlightIdx = ref(-1)
-// hover 与键盘高亮分离 (C4): hoverIdx = 鼠标停留行; highlightIdx = 键盘高亮行
+// hover 与键盘高亮分离: hoverIdx = 鼠标停留行; highlightIdx = 键盘高亮行
 const hoverIdx = ref(-1)
 
 function onTriggerKeydown(e: KeyboardEvent) {
-  // C3: 菜单关闭且触发器聚焦时, ↑/↓ 直接在叶子扁平序列循环切换, 不展开菜单
+  // 菜单关闭且触发器聚焦时, ↑/↓ 直接在叶子扁平序列循环切换, 不展开菜单
   if (!open.value) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault()
@@ -230,7 +230,7 @@ function handleKeydown(e: KeyboardEvent) {
     }
     case 'ArrowLeft':
     case 'Backspace': {
-      // C2: 子视图内 ArrowLeft/Backspace = 返回一级
+      // 子视图内 ArrowLeft/Backspace = 返回一级
       if (currentView.value !== 'root') {
         e.preventDefault()
         drillBack()
@@ -254,7 +254,7 @@ function scrollToHighlighted() {
 
 function onRowMouseEnter(idx: number) {
   hoverIdx.value = idx
-  // 鼠标进入不抢占键盘高亮 (C4: 两者分离)
+  // 鼠标进入不抢占键盘高亮 (两者分离)
 }
 
 function onRowMouseLeave() {
@@ -305,7 +305,7 @@ defineExpose({ openMenu, closeMenu })
           tabindex="-1"
           @keydown="onPanelKeydown"
         >
-          <!-- 子视图返回行 (C2): 仅 currentView !== 'root' 显示 -->
+          <!-- 子视图返回行: 仅 currentView !== 'root' 显示 -->
           <div
             v-if="currentView !== 'root' && currentParent"
             class="dd-row dd-row--back"
@@ -319,11 +319,11 @@ defineExpose({ openMenu, closeMenu })
             <span class="dd-row__label">{{ currentParent.label }}</span>
           </div>
 
-          <!-- 视图内容 (横滑切换 C2): root 与子视图共用 max-height, 各自滚动 -->
+          <!-- 视图内容 (横滑切换): root 与子视图共用 max-height, 各自滚动 -->
           <Transition :name="'dd-slide-' + (currentView === 'root' ? 'back' : 'in')" mode="out-in">
             <div :key="currentView" class="dd-list">
               <template v-for="(row, idx) in viewRows" :key="row.key">
-                <!-- 父行: 下钻 (C2) -->
+                <!-- 父行: 下钻 -->
                 <div
                   v-if="row.children && row.children.length"
                   class="dd-row dd-row--parent"
@@ -394,7 +394,7 @@ defineExpose({ openMenu, closeMenu })
 }
 
 .dd-panel {
-  position: fixed;  /* strategy: fixed + transform:false → top/left 定位 (C1) */
+  position: fixed;  /* strategy: fixed + transform:false → top/left 定位 */
   top: 0;
   left: 0;
   z-index: 1000;
@@ -432,13 +432,13 @@ defineExpose({ openMenu, closeMenu })
   color: var(--t2);
 }
 
-/* C4: hover 高亮 = 次级底色 (不抢键盘高亮) */
+/* hover 高亮 = 次级底色 (不抢键盘高亮) */
 .dd-row--hover {
   background: color-mix(in srgb, var(--ac) 6%, transparent);
   color: var(--t1);
 }
 
-/* C4: 键盘高亮 = 底色 + 左 2px accent 竖条 */
+/* 键盘高亮 = 底色 + 左 2px accent 竖条 */
 .dd-row--kb {
   background: color-mix(in srgb, var(--ac) 10%, transparent);
   color: var(--t1);
@@ -461,7 +461,7 @@ defineExpose({ openMenu, closeMenu })
   color: var(--t1);
 }
 
-/* 返回行 (C2 子视图顶部) */
+/* 返回行 (子视图顶部) */
 .dd-row--back {
   font-size: var(--text-base);
   color: var(--t2);
@@ -502,13 +502,13 @@ defineExpose({ openMenu, closeMenu })
   overflow: hidden;
 }
 
-/* logo 底板: 中性设计 — 白底 + 1px 边框弱化突兀 (C5) */
+/* logo 底板: 中性设计 — 白底 + 1px 边框弱化突兀 */
 .dd-logo--pad {
   background: #f4f4f5;
   border: 1px solid var(--bd);
 }
 
-/* C5: 暗色主题下纯黑单色 logo 反色; 底板改透明 */
+/* 暗色主题下纯黑单色 logo 反色; 底板改透明 */
 .dd-logo--invert-dark {
   /* data-theme 未设 = 暗色 (见 useTheme.ts: isDark → dataset.theme = '') */
   filter: invert(1);
@@ -569,7 +569,7 @@ defineExpose({ openMenu, closeMenu })
   flex-shrink: 0;
 }
 
-/* ── chevron (C2: 指示下钻, 不再折叠) ── */
+/* ── chevron (指示下钻) ── */
 .dd-row__chevron {
   opacity: .7;
 }
@@ -589,7 +589,7 @@ defineExpose({ openMenu, closeMenu })
   justify-content: center;
 }
 
-/* ── C1: 入场/离场动画 (锚点起源 scale + opacity + translateY) ── */
+/* ── 入场/离场动画 (锚点起源 scale + opacity + translateY) ── */
 /* transform-origin 按 placement 推导 (originClass) */
 .dd-panel.dd-origin-bottom-start { transform-origin: top left; }
 .dd-panel.dd-origin-bottom-end { transform-origin: top right; }
@@ -611,7 +611,7 @@ defineExpose({ openMenu, closeMenu })
   transform: scale(.98) translateY(-2px);
 }
 
-/* ── C2: 子视图横滑切换 ── */
+/* ── 子视图横滑切换 ── */
 .dd-slide-in-enter-active,
 .dd-slide-in-leave-active,
 .dd-slide-back-enter-active,
@@ -635,7 +635,7 @@ defineExpose({ openMenu, closeMenu })
   transform: translateX(30px);  /* 子视图向右滑出 */
 }
 @media (prefers-reduced-motion: reduce) {
-  /* 偏好减少动效: 横滑降级为纯 fade (C2) */
+  /* 偏好减少动效: 横滑降级为纯 fade */
   .dd-slide-in-enter-from,
   .dd-slide-in-leave-to,
   .dd-slide-back-enter-from,

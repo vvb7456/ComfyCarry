@@ -21,7 +21,8 @@ const loaded = ref(false)
 const src = computed(() => props.images[idx.value] || '')
 const total = computed(() => props.images.length)
 const hasNav = computed(() => total.value > 1)
-const isVideo = computed(() => /\.(mp4|webm|mov|avi)(\?|$)/i.test(src.value))
+// URL 形如 /api/comfyui/view?filename=x.mp4&subfolder=... — 扩展名后可能是 ? & 或结尾
+const isVideo = computed(() => /\.(mp4|webm|mov|avi|mkv)([?&]|$)/i.test(src.value))
 
 watch(() => props.modelValue, (open) => {
   if (open) {

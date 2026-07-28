@@ -13,6 +13,7 @@
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { MODEL_TYPES } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 
@@ -31,7 +32,8 @@ const props = withDefaults(defineProps<{
   negative: string
   showNegative?: boolean
   promptStyle?: 'tags' | 'natural'
-  /** 模型条目 key: 存在 generate.placeholders.positive_<key> 时优先于 promptStyle 通用占位 */
+  /** 模型条目 key: 存在 generate.placeholders.positive_<key> 时优先于 promptStyle 通用占位;
+   *  同时用于派生 mediaType (视频占位判据) */
   modelType?: string
   tools?: ToolButton[]
 }>(), {
@@ -49,19 +51,36 @@ const emit = defineEmits<{
 
 const { t, te } = useI18n({ useScope: 'global' })
 
-/** 占位符解析: 按模型 key 的专用占位 (placeholders.positive_<key>) > promptStyle 通用占位 */
+/** 媒体类型派生: 从 modelType 反查 MODEL_TYPES。判据基于 mediaType (非 promptStyle):
+ *  - krea2/zimage: modelType → mediaType='image' → 不命中视频占位 (走 promptStyle 通用占位)
+ *  - wan22_*: modelType → mediaType='video' → 命中视频占位
+ *  两个判据不混用: promptStyle 管工具栏收敛, mediaType 管视频专属文案。 */
+const mediaType = computed<'image' | 'video'>(() =>
+  props.modelType && MODEL_TYPES[props.modelType]?.mediaType === 'video' ? 'video' : 'image',
+)
+
+/** 占位符解析优先级:
+ *  1. 按模型 key 的专用占位 (placeholders.positive_<key>) — 最高, 覆盖一切
+ *  2. 视频架构专属运动引导 (prompt.video_ph) — 仅 mediaType==='video', 基于 mediaType 而非 promptStyle
+ *  3. promptStyle 通用占位 (tags→positive_placeholder / natural→positive_placeholder_natural)
+ *
+ *  边界: krea2/zimage 是 natural+image → 走 3 (positive_placeholder_natural), 不命中 2;
+ *        wan22 是 natural+video → 走 2 (video_ph)。两个判据不混用。
+ */
 const positivePlaceholder = computed(() => {
   const perModelKey = `generate.placeholders.positive_${props.modelType}`
   if (props.modelType && te(perModelKey)) return t(perModelKey)
+  if (mediaType.value === 'video' && te('generate.prompt.video_ph')) return t('generate.prompt.video_ph')
   return props.promptStyle === 'natural'
     ? t('generate.prompt.positive_placeholder_natural')
     : t('generate.prompt.positive_placeholder')
 })
 
-/** D: 负面占位符同样按模型 key 解析 (placeholders.negative_<key>) > 通用 negative_placeholder */
+/** 负面占位符同样按模型 key 解析 (placeholders.negative_<key>) > 视频专属 > 通用 negative_placeholder */
 const negativePlaceholder = computed(() => {
   const perModelKey = `generate.placeholders.negative_${props.modelType}`
   if (props.modelType && te(perModelKey)) return t(perModelKey)
+  if (mediaType.value === 'video' && te('generate.prompt.negative_video_ph')) return t('generate.prompt.negative_video_ph')
   return t('generate.prompt.negative_placeholder')
 })
 
@@ -106,11 +125,16 @@ defineExpose({ insertAtCursor })
       <button class="prompt-help-btn" :title="t('generate.prompt.syntax_help_title')" @click="helpOpen = true">
         <MsIcon name="help_outline" size="sm" color="none" />
       </button>
+      <!-- 标题行右端槽 — 视频 5B 的文生/图生开关挂这里。
+           选它是因为切到文生时左侧媒体栏整块消失, 开关必须待在不随之移动的位置。 -->
+      <div v-if="$slots['header-actions']" class="prompt-hdr-actions">
+        <slot name="header-actions" />
+      </div>
     </div>
 
-    <!-- Unified prompt container: toolbar + positive + negative -->
+    <!-- Unified prompt container: toolbar + (media | fields) -->
     <div class="prompt-container">
-      <!-- Toolbar (above textareas) -->
+      <!-- Toolbar (above everything, full width) -->
       <div v-if="tools.length" class="prompt-toolbar">
         <button
           v-for="tool in tools"
@@ -125,33 +149,44 @@ defineExpose({ insertAtCursor })
         </button>
       </div>
 
-      <!-- Positive prompt -->
-      <div class="prompt-label">
-        {{ t('generate.prompt.positive_label') }}
-      </div>
-      <!-- 单框模式 (无负面提示词的架构): 正面框加倍占满原双框空间 -->
-      <textarea
-        ref="posRef"
-        class="prompt-textarea"
-        :rows="showNegative ? 4 : 9"
-        :value="positive"
-        :placeholder="positivePlaceholder"
-        @input="emit('update:positive', ($event.target as HTMLTextAreaElement).value)"
-      />
+      <!-- 左右分栏 — 左=媒体槽 (视频起始画面), 右=正/负输入框。
+           未传 media 槽时 .prompt-media 不渲染, .prompt-fields 独占整宽,
+           渲染结果与分栏改造前逐像素一致 (图像架构回归保护)。 -->
+      <div class="prompt-body">
+        <div v-if="$slots.media" class="prompt-media">
+          <slot name="media" />
+        </div>
 
-      <!-- Negative prompt -->
-      <div v-if="showNegative" class="prompt-label prompt-label--neg">
-        {{ t('generate.prompt.negative_label') }}
+        <div class="prompt-fields">
+          <!-- Positive prompt -->
+          <div class="prompt-label">
+            {{ t('generate.prompt.positive_label') }}
+          </div>
+          <!-- 单框模式 (无负面提示词的架构): 正面框加倍占满原双框空间 -->
+          <textarea
+            ref="posRef"
+            class="prompt-textarea"
+            :rows="showNegative ? 4 : 9"
+            :value="positive"
+            :placeholder="positivePlaceholder"
+            @input="emit('update:positive', ($event.target as HTMLTextAreaElement).value)"
+          />
+
+          <!-- Negative prompt -->
+          <div v-if="showNegative" class="prompt-label prompt-label--neg">
+            {{ t('generate.prompt.negative_label') }}
+          </div>
+          <textarea
+            v-if="showNegative"
+            ref="negRef"
+            class="prompt-textarea"
+            rows="4"
+            :value="negative"
+            :placeholder="negativePlaceholder"
+            @input="emit('update:negative', ($event.target as HTMLTextAreaElement).value)"
+          />
+        </div>
       </div>
-      <textarea
-        v-if="showNegative"
-        ref="negRef"
-        class="prompt-textarea"
-        rows="4"
-        :value="negative"
-        :placeholder="negativePlaceholder"
-        @input="emit('update:negative', ($event.target as HTMLTextAreaElement).value)"
-      />
     </div>
 
     <!-- Syntax help modal -->
@@ -240,6 +275,13 @@ defineExpose({ insertAtCursor })
 }
 .hdr-icon { font-size: .9rem; color: var(--t3); }
 
+/* 标题行右端槽 (5B 文生/图生开关) */
+.prompt-hdr-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
 /* ── Unified prompt container ── */
 .prompt-container {
   display: flex;
@@ -269,6 +311,42 @@ defineExpose({ insertAtCursor })
 .prompt-toolbar::-webkit-scrollbar { display: none; }
 /* 右对齐但保持溢出可滚动 (justify-content:flex-end 会让左侧溢出内容不可达) */
 .prompt-toolbar > :first-child { margin-left: auto; }
+
+/* ── 分栏 body ── */
+.prompt-body {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+/* 左栏: 媒体 (视频起始画面)。仅在传入 media 槽时渲染。 */
+.prompt-media {
+  flex: 0 0 150px;
+  display: flex;
+  padding: var(--sp-2);
+  border-right: 1px solid var(--bd);
+  background: var(--bg2);
+  min-width: 0;
+}
+.prompt-media > :deep(*) { flex: 1; min-width: 0; }
+
+/* 右栏: 正/负输入框。无媒体槽时独占整宽 = 分栏前的原布局。 */
+.prompt-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 600px) {
+  .prompt-body { flex-direction: column; }
+  .prompt-media {
+    flex: 0 0 auto;
+    height: 180px;
+    border-right: none;
+    border-bottom: 1px solid var(--bd);
+  }
+}
 
 /* ── Textarea ── */
 .prompt-textarea {

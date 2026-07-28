@@ -24,10 +24,31 @@ import requests as http_requests
 
 from ..config import COMFYUI_DIR, MODEL_DIRS
 from ..utils import _sha256_file, read_safetensors_metadata
+from .download_classify import (
+    classify_file,
+    suggest_dir_keys,
+    MANUAL as CLASSIFY_MANUAL,
+    SKIP as CLASSIFY_SKIP,
+    FOLLOW_PRIMARY as CLASSIFY_FOLLOW_PRIMARY,
+)
 
 logger = logging.getLogger(__name__)
 
 _CIVITAI_API_BASE = "https://civitai.com/api/v1"
+
+
+class NoDownloadableFiles(RuntimeError):
+    """该 version 里没有可下载的模型权重。
+
+    与「API 调用失败」性质不同 (那是 RuntimeError → 502), 这是数据本身如此,
+    重试无用, 所以单独一档让路由给出可读的 4xx。
+
+    实测触发场景 (Civitai model 1817671 "Wan Video 2.2"):
+      最新的三个 version ("5B Text-Image-to-Video" / "14B Text-to-Video" /
+      "14B Image-to-Video") 各自**只含一个训练数据 zip**, 没有任何权重文件。
+      版本选择器会把它们列出来, 用户点了却下不到东西。
+    """
+
 
 # CivitAI 模型类型 → ComfyUI MODEL_DIRS key
 _TYPE_TO_DIR_KEY = {
@@ -56,26 +77,41 @@ _TYPE_TO_DIR_KEY = {
 # 有效模型文件扩展名
 _MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
-# 分离架构 (split-file): UNet 主权重 应进 diffusion_models 而非 checkpoints。
-# §4.2 废弃盲重定向: CivitAI 整合包与 UNet 都标 "Checkpoint"、baseModel 相同,
-# 下载前无法区分 → 一律先落 checkpoints/, 下载完成后读文件头判 detect_packaging
-# 再归位 (保留 baseModel 子文件夹逻辑)。
-# _SPLIT_FILE_BASE_KEYWORDS 仅用于 §4.2 完成钩子做"是否需要重新归位"的早期短路径:
-# baseModel 不含任何分离架构关键词的 Checkpoint 不必读头, 直接保留在 checkpoints/。
+# 分离架构关键词。**不再参与目录判定** —— 目录判定已整体迁到
+# services/download_classify.py (依据 docs/DOWNLOAD_CLASSIFICATION_SPEC.md,
+# 判据为 file.type / model.type / 扩展名, 且下载前定目录、不再归位)。
+# 此表仅剩「是否视频架构」等辅助判断在用。
 _SPLIT_FILE_BASE_KEYWORDS = ("anima", "flux", "sd 3", "sd3", "hidream", "wan", "hunyuan", "lumina", "pixart", "krea", "z-image", "z image", "zimage", "chroma")
 
 
 def _is_split_file_base_model(base_model: str) -> bool:
-    """baseModel 是否含分离架构关键词 (用于完成钩子早期短路径)。
+    """baseModel 是否含分离架构关键词。
 
-    §4.2: 不再用此函数做下载前盲重定向 — 整合包与 UNet baseModel 相同无法区分。
-    仅在下载完成后, baseModel 不含任何分离架构关键词的 Checkpoint 不必读头,
-    直接保留在 checkpoints/。
+    历史用途 (下载归位的早期短路径) 已废弃, 见上方注释。
     """
     if not base_model:
         return False
     bm = base_model.lower()
     return any(k in bm for k in _SPLIT_FILE_BASE_KEYWORDS)
+
+
+# ── 视频架构判定 ───────────────────────────────────────────────────────────
+# Civitai baseModel 含 "wan video" 即视为视频架构。当前覆盖 Wan 2.1/2.2 全系
+# (T2V-A14B / I2V-A14B / TI2V-5B)。Hunyuan/LTX 视频架构是二期, 届时在此扩展。
+# 非视频架构 (图像侧 SDXL/Flux/Anima 等) 走原有单文件路径, 行为不变。
+_VIDEO_BASE_MODEL_KEYWORDS = ("wan video",)
+
+
+def is_video_base_model(base_model: str) -> bool:
+    """Civitai baseModel 是否为视频架构 (Wan 2.2 系)。
+
+    视频架构下同一 version 的多个主文件全量下载 (见 select_primary_files);
+    非视频架构保持原有单文件收敛行为 (select_primary_file)。
+    """
+    if not base_model:
+        return False
+    bm = base_model.lower()
+    return any(k in bm for k in _VIDEO_BASE_MODEL_KEYWORDS)
 
 
 # ── URL/ID 解析 ──────────────────────────────────────────────────────────────
@@ -245,10 +281,20 @@ def fetch_model_info(
 
 
 def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
-    """解析 CivitAI 版本 API 响应, 返回标准化结构"""
+    """解析 CivitAI 版本 API 响应, 返回标准化结构
+
+    视频架构 (is_video_base_model) 下额外产出:
+      - selected_files: list[dict]  全部主文件 (多文件全量下载)
+      - pair_group: str            分组标识 (同 version 多文件属于一组, 事实性分组)
+
+    v7: 不再产出 pairs —— high/low 角色曾靠文件名嗅探推断, 而两段权重在文件层面
+    无法区分, 猜出来的角色是噪声, 已整体移除。
+    非视频架构保持原样 (selected_file 单数, 无 selected_files/pair_group)。
+    """
     model_info = version_data.get("model", {})
     model_type = model_info.get("type", "Checkpoint")
     files = version_data.get("files", [])
+    base_model = version_data.get("baseModel", "")
 
     selected = select_primary_file(files)
     if not selected:
@@ -265,27 +311,23 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
         sep = "&" if "?" in download_url else "?"
         download_url += f"{sep}token={api_key}"
 
-    # 模型类型 → 本地目录 key
+    # 目录判定按**文件**粒度进行 (见 download_classify), 这里给的是条目级兜底,
+    # 仅供 UI 展示与旧调用方兼容。真正落盘用的是 resolve_civitai_download()
+    # 里逐文件算出的 dir_key。
     type_lower = model_type.lower()
     save_dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
-
-    # §4.2 废弃盲重定向: 不再按 baseModel 把 Checkpoint 一律送 diffusion_models。
-    # CivitAI 整合包与 UNet 主权重 baseModel 相同、type 都是 "Checkpoint",
-    # 下载前无法区分。改为一律先落 checkpoints/, 下载完成后由完成钩子读文件头
-    # 判 detect_packaging 再归位 (见 downloads.py:_on_civitai_complete)。
-    # baseModel 子文件夹逻辑由 resolve_save_dir() 处理。
 
     # Early Access / 付费检测
     availability = version_data.get("availability", "Public")
     ea_config = version_data.get("earlyAccessConfig") or {}
 
-    return {
+    result = {
         "model_id": model_info.get("id") or version_data.get("modelId"),
         "model_name": model_info.get("name", "Unknown"),
         "version_id": version_data.get("id"),
         "version_name": version_data.get("name", ""),
         "model_type": model_type,
-        "base_model": version_data.get("baseModel", ""),
+        "base_model": base_model,
         "files": files,
         "images": version_data.get("images", []),
         "trained_words": version_data.get("trainedWords", []),
@@ -296,6 +338,24 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
         "early_access_config": ea_config,
         "raw": version_data,
     }
+
+    # 视频架构: 多文件全量下载 (同 version 的全部主文件)
+    # 非视频架构 (图像侧 SDXL/Flux/Anima 等) 不进入此分支, 行为完全不变。
+    if is_video_base_model(base_model):
+        sel_files = select_primary_files(files)
+        if not sel_files:
+            sel_files = [selected]
+        # 分组标识: model_id + version_id (前端据此把同 version 多文件聚为一组)
+        mid = result["model_id"]
+        vid = version_data.get("id")
+        pair_group = f"civitai:{mid}:{vid}" if mid and vid else ""
+        result["selected_files"] = sel_files
+        result["pair_group"] = pair_group
+        result["is_video"] = True
+    else:
+        result["is_video"] = False
+
+    return result
 
 
 # ── 文件选择 ─────────────────────────────────────────────────────────────────
@@ -368,6 +428,73 @@ def select_primary_file(files: list[dict]) -> dict | None:
     return valid[0]
 
 
+def _filter_valid_model_files(files: list[dict]) -> list[dict]:
+    """过滤 Civitai files 数组, 返回有效模型文件 (跳过 Config / 零大小 / 非模型扩展)。
+
+    与 select_primary_file 的过滤逻辑一致, 抽出供复数版复用。
+    """
+    valid = []
+    for f in files:
+        if f.get("type") == "Config":
+            continue
+        name = f.get("name", "")
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in _MODEL_EXTENSIONS and f.get("type") != "Model":
+            continue
+        if f.get("sizeKB", 0) <= 0 and not f.get("downloadUrl"):
+            continue
+        valid.append(f)
+    if not valid:
+        # 降级: 取所有有下载链接的
+        valid = [f for f in files if f.get("downloadUrl")]
+    return valid
+
+
+def select_primary_files(files: list[dict]) -> list[dict]:
+    """视频架构下从 Civitai files 数组选出全部主文件。
+
+    沿用 select_primary_file 的优先级 (primary 标记 → safetensors (pruned 优先)
+    → ckpt → Model 类型), 但 **不再收敛到一个文件**。
+
+    规则:
+      1. 取所有有效模型文件 (_filter_valid_model_files)
+      2. 去重: 同名 + 同 downloadUrl 的重复条目 (Civitai 偶有冗余下载链接)
+      3. 保留 primary 标记的; 若无 primary, 保留全部有效 safetensors/ckpt/Model
+      4. 仍按 pruned 优先排序 (稳定性)
+
+    返回: 文件对象列表 (可能为 1 个或多个)。空数组表示无可用文件。
+    非视频架构不应调用此函数 (走 select_primary_file 单数版)。
+    """
+    if not files:
+        return []
+    valid = _filter_valid_model_files(files)
+    if not valid:
+        return []
+
+    # 去重: 同名同 downloadUrl 视为同一文件 (实测 DaSiWa/Pussy 案例有冗余条目)
+    seen = set()
+    deduped = []
+    for f in valid:
+        key = (f.get("name", ""), f.get("downloadUrl", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(f)
+    valid = deduped
+
+    # primary 标记的文件优先 (Civitai 正常 version 只有一个 primary)
+    primaries = [f for f in valid if f.get("primary")]
+    if primaries:
+        # 多个 primary 时全部保留 (理论上少见, 但防御性处理)
+        return primaries
+
+    # 无 primary: 保留全部有效文件, 按 pruned 优先 + 原序稳定排序
+    def _sort_key(f):
+        name = f.get("name", "").lower()
+        return (0 if "pruned" in name else 1, name)
+    return sorted(valid, key=_sort_key)
+
+
 # ── 文件名处理 ───────────────────────────────────────────────────────────────
 
 def sanitize_filename(name: str, max_length: int = 200) -> str:
@@ -411,38 +538,41 @@ def sanitize_filename(name: str, max_length: int = 200) -> str:
     return name
 
 
-def resolve_save_dir(model_type: str, base_model: str = "") -> str:
+def save_dir_for_key(dir_key: str, base_model: str = "") -> str:
+    """MODEL_DIRS 的 key + base_model → 本地绝对路径。
+
+    baseModel 子文件夹沿用原有约定 (如 models/checkpoints/SDXL 1.0/)。
     """
-    CivitAI 模型类型 + base_model → 本地绝对路径.
-
-    §4.2: 不再按 baseModel 把 Checkpoint 盲重定向到 diffusion_models —
-    下载前无法区分整合包 vs UNet。改为永远按 CivitAI type 落 checkpoints/,
-    真正的目录在下载完成后由 _on_civitai_complete 读文件头判 detect_packaging 修正。
-
-    Args:
-        model_type: CivitAI 类型字符串 (如 "Checkpoint", "LORA")
-        base_model: CivitAI baseModel 字符串 (如 "SDXL 1.0", "Pony")
-
-    Returns:
-        绝对路径 (如 "/workspace/ComfyUI/models/checkpoints/SDXL 1.0")
-    """
-    type_lower = model_type.lower()
-    dir_key = _TYPE_TO_DIR_KEY.get(type_lower, "checkpoints")
-
-    # §4.2: 盲重定向已废弃 — 完成钩子按内容归位 (见 downloads.py)
-    # 仅 baseModel 为分离架构关键词的 Checkpoint 才需后续归位判定,
-    # 其余 (SDXL/Pony/SD1.5 整合包) 直接保留 checkpoints/。
-    # 下载初始目录统一用 _TYPE_TO_DIR_KEY (Checkpoint → checkpoints/)。
-
     rel_dir = MODEL_DIRS.get(dir_key, f"models/{dir_key}")
-
-    # 追加 baseModel 子文件夹
     if base_model and base_model.strip():
         sub = _sanitize_folder_name(base_model.strip())
         if sub:
             rel_dir = os.path.join(rel_dir, sub)
-
     return os.path.join(COMFYUI_DIR, rel_dir)
+
+
+def build_download_url(file_obj: dict, version_id, api_key: str = "") -> str:
+    """构造单个文件的下载 URL: file.downloadUrl 优先, 缺失时按 version_id 兜底,
+    有 api_key 且 URL 里尚无 token 时追加 token query 参数。
+
+    token 走 query 参数而非 Authorization 头 —— Civitai 会 307 到 R2 预签名 URL,
+    预签名自带签名, 再带 Authorization 会被 S3 判双重鉴权返 400。
+    """
+    url = file_obj.get("downloadUrl", "") or f"{_CIVITAI_API_BASE}/download/models/{version_id}"
+    if api_key and api_key.strip() and "token=" not in url:
+        url += ("&" if "?" in url else "?") + f"token={api_key}"
+    return url
+
+
+def resolve_save_dir(model_type: str, base_model: str = "") -> str:
+    """[兼容保留] CivitAI 条目级类型 + base_model → 本地绝对路径。
+
+    真正的落盘目录由 resolve_civitai_download() 逐文件判定
+    (services/download_classify.classify_file)。本函数仅供旧调用方与
+    UI 展示用的条目级兜底。
+    """
+    dir_key = _TYPE_TO_DIR_KEY.get((model_type or "").lower(), "checkpoints")
+    return save_dir_for_key(dir_key, base_model)
 
 
 def _sanitize_folder_name(name: str) -> str:
@@ -455,99 +585,15 @@ def _sanitize_folder_name(name: str) -> str:
     return clean or ""
 
 
-# ── 下载归位 (§4.2) ─────────────────────────────────────────────────────────
-# 下载完成后按文件头判 detect_packaging, 把整合包/UNet 主权重落对目录。
-#   - 整合包 (含 TE+VAE key) → checkpoints/
-#   - 拆分 (UNet-only) → diffusion_models/
-# 非 safetensors / 读头失败 → 保持原位 + warn (用户可手动处理)。
-# baseModel 子文件夹跟随 (保持与 resolve_save_dir 的初始落盘一致)。
+# ── 归位逻辑已删除 ──────────────────────────────────────────────────────────
+# 旧实现 relocate_after_download() 在下载完成后读文件头判内容角色, 再物理移动
+# 文件 (算目标目录 / 建目录 / 处理同名冲突 / 改 sidecar / 搬预览图)。
 #
-# 关键: ComfyUI 加载节点目录绑定 — CheckpointLoaderSimple 只读 checkpoints/,
-#       UNETLoader 只读 diffusion_models/。文件必须物理落对目录。
+# 已整体废弃: 目录改为**下载前**按元数据逐文件判定
+# (services/download_classify.classify_file, 契约见
+#  docs/DOWNLOAD_CLASSIFICATION_SPEC.md)。判不出来的交给用户选, 不再事后补救。
 #
-# 归位只在 checkpoints/ ↔ diffusion_models/ 之间发生。LoRA/VAE/ControlNet/
-# embedding 等本就没有"整合包"形态, detect_packaging 恒判 split, 若不设限会被
-# 一律搬进 diffusion_models/ (已踩: LoRA 落到 diffusion_models/<baseModel>/)。
-_RELOCATABLE_DIR_KEYS = {'checkpoints', 'diffusion_models'}
-
-
-def relocate_after_download(model_path: str, base_model: str) -> tuple[str, str]:
-    """下载完成后按内容归位。
-
-    Args:
-        model_path: 下载完成的文件绝对路径
-        base_model: CivitAI baseModel 字符串 (用于子文件夹定位)
-
-    Returns:
-        (new_path, action): action ∈ {'kept', 'moved_ckpt', 'moved_split', 'skip_unreadable'}。
-        new_path 为归位后的最终绝对路径 (可能与入参相同)。
-    """
-    abs_path = Path(model_path).resolve()
-    if not abs_path.is_file():
-        return str(abs_path), 'skip_unreadable'
-
-    # 短路径 1: 非 safetensors (gguf/.ckpt 等) → 默认 split, 但 gguf 在本计划不主动归位
-    # (Phase 5 dev 硬件约束: UNetLoaderGGUF 为后续独立扩展)。
-    if not abs_path.name.lower().endswith('.safetensors'):
-        # GGUF 实践中恒 UNet-only → 应落 diffusion_models/, 但 GGUF 加载节点路径独立,
-        # 当前不做物理移动 (UnetLoaderGGUF 读 models/unet/ 旧路径, 不在此处处理)。
-        return str(abs_path), 'skip_unreadable'
-
-    # 当前所在目录 key
-    try:
-        rel = abs_path.relative_to(COMFYUI_DIR)
-    except ValueError:
-        return str(abs_path), 'skip_unreadable'
-
-    parts = rel.parts  # ('models', 'checkpoints', '<baseModel sub>', filename) 等
-    if len(parts) < 2 or parts[0] != 'models':
-        return str(abs_path), 'skip_unreadable'
-
-    current_dir_key = parts[1]
-    # 只在主模型两个目录之间归位: loras/vae/controlnet/embeddings 等原地不动
-    if current_dir_key not in _RELOCATABLE_DIR_KEYS:
-        return str(abs_path), 'kept'
-
-    # 读头判形态
-    from .arch_detect import detect_packaging_from_file
-    pkg = detect_packaging_from_file(str(abs_path))
-
-    want_key = 'checkpoints' if pkg == 'checkpoint' else 'diffusion_models'
-
-    if current_dir_key == want_key:
-        return str(abs_path), 'kept'
-
-    # 需要移动: 构建目标目录 (保留 baseModel 子文件夹)
-    rel_dir = MODEL_DIRS.get(want_key, f'models/{want_key}')
-    sub = _sanitize_folder_name(base_model.strip()) if base_model and base_model.strip() else ''
-    if sub:
-        target_dir = os.path.join(COMFYUI_DIR, rel_dir, sub)
-    else:
-        target_dir = os.path.join(COMFYUI_DIR, rel_dir)
-    os.makedirs(target_dir, exist_ok=True)
-    new_path = os.path.join(target_dir, abs_path.name)
-
-    # 同名冲突: 若目标已存在且大小一致, 视为已归位 (移除源副本); 否则覆盖目标。
-    try:
-        if os.path.exists(new_path):
-            try:
-                if os.path.getsize(new_path) == os.path.getsize(abs_path):
-                    os.remove(str(abs_path))
-                    logger.info(f"[civitai_resolver] 归位: 目标已存在同尺寸, 移除源副本 {abs_path.name}")
-                    return new_path, 'moved_ckpt' if pkg == 'checkpoint' else 'moved_split'
-            except OSError:
-                pass
-            os.replace(new_path, new_path + '.bak')  # 备份冲突文件
-        os.rename(str(abs_path), new_path)
-    except OSError as e:
-        logger.warning(f"[civitai_resolver] 归位失败 {abs_path} → {new_path}: {e}")
-        return str(abs_path), 'skip_unreadable'
-
-    action = 'moved_ckpt' if pkg == 'checkpoint' else 'moved_split'
-    logger.info(f"[civitai_resolver] 归位: {abs_path.name} {current_dir_key} → {want_key} ({action})")
-    return new_path, action
-
-
+# update_sidecar_path() 保留 —— 它与归位无关, 供其他改路径的场景复用。
 def update_sidecar_path(old_path: str, new_path: str) -> None:
     """更新 .weilin-info.json sidecar 的 path 字段 (归位后路径变化)。
 
@@ -895,6 +941,7 @@ def resolve_civitai_download(
     version_id: int | None = None,
     api_key: str = "",
     custom_filename: str = "",
+    dir_keys: dict[str, str] | None = None,
 ) -> dict:
     """
     完整的 CivitAI 下载解析流程: 输入 → API 查询 → 文件选择 → 下载参数.
@@ -907,20 +954,42 @@ def resolve_civitai_download(
         version_id: 指定版本 ID (覆盖从 input_str 解析的版本)
         api_key: CivitAI API Key
         custom_filename: 自定义文件名 (可选)
+        dir_keys: {filename: MODEL_DIRS_key} —— 用户在目录选择 modal 里的裁决,
+                  前端二次提交时带回。命中的文件跳过判定直接用该目录。
 
     Returns:
-      {
-        "url": str,           # 下载直链
-        "filename": str,      # 保存文件名
-        "save_dir": str,      # 保存目录绝对路径
-        "model_type": str,    # MODEL_DIRS key
-        "display_name": str,  # 显示名称
-        "info": {...},        # fetch_model_info 返回的完整信息
-      }
+      ① 全部文件都判得出 →
+        {
+          "url": str,          # 第一个文件 (兼容现有单 task 提交)
+          "filename": str,
+          "save_dir": str,
+          "model_type": str,   # 第一个文件的 dir_key
+          "display_name": str, "info": {...}, "is_video": bool,
+          "files": [           # **每个文件各自的目录** (逐文件判定)
+            {"url","filename","dir_key","save_dir","model_type",
+             "pair_group","original_file"}, ...
+          ],
+          "pair_group": str,   # 仅视频架构
+        }
+
+      ② 有文件判不出 → **不提交下载**, 交给前端弹目录选择:
+        {
+          "needs_classification": True,
+          "pending_files": [   # 待用户裁决
+            {"filename","size_kb","model_type","file_type","base_model",
+             "suggested_dir_keys": [...]}, ...
+          ],
+          "resolved_files": [...],   # 已判定的部分, 用户裁决后一并提交
+          "civitai_url": str,        # 详情页, 用户据此判断文件用途
+          "display_name": str, "info": {...}, "is_video": bool,
+        }
+
+      custom_filename 仅作用于第一个文件 (多文件场景下其余用 Civitai 原名)。
+      判定契约见 docs/DOWNLOAD_CLASSIFICATION_SPEC.md。
 
     Raises:
-      ValueError: 输入无效
-      RuntimeError: API 调用失败
+        ValueError: 输入无效
+        RuntimeError: API 调用失败
     """
     # 1. 解析输入
     parsed = parse_civitai_input(input_str)
@@ -934,24 +1003,157 @@ def resolve_civitai_download(
         api_key=api_key,
     )
 
-    # 3. 文件名
-    selected = info["selected_file"]
-    filename = custom_filename or selected.get("name", "model.safetensors")
-    filename = sanitize_filename(filename)
+    base_model = info.get("base_model", "")
+    entry_type = info.get("model_type", "")
 
-    # 4. 保存目录 (按 baseModel 子文件夹分类)
-    save_dir = resolve_save_dir(info["model_type"], info.get("base_model", ""))
+    # 3. 待下载文件集合
+    #    视频架构取同 version 全部主文件; 其余保持原有单文件收敛行为。
+    selected = info["selected_file"]
+    if info.get("is_video"):
+        sel_files = info.get("selected_files") or [selected]
+    else:
+        sel_files = [selected]
+
+    # 4. 逐文件判定目录 (契约见 docs/DOWNLOAD_CLASSIFICATION_SPEC.md)
+    #    关键: 粒度是**文件**不是版本 —— 同一 version 可以同时含主权重 + VAE,
+    #    共用一个 save_dir 会让 VAE 落进 diffusion_models/ 从而在 UI 里消失。
+    file_entries = []
+    pending = []          # 机器判不出的, 交给用户选目录
+    skipped = []          # 判为非资产 (训练数据等) 而跳过的
+    for i, f in enumerate(sel_files):
+        fname = f.get("name", "model.safetensors")
+        # custom_filename 仅作用于第一个文件, 其余用 Civitai 原名 (避免重名)
+        if i == 0 and custom_filename:
+            fname = custom_filename
+        fname = sanitize_filename(fname)
+
+        # 用户已裁决的优先 (前端二次提交时带回), 否则走判定
+        dir_key = (dir_keys or {}).get(fname) or (dir_keys or {}).get(f.get("name", ""))
+        if not dir_key:
+            dir_key = classify_file(
+                model_type=entry_type,
+                file_type=f.get("type", ""),
+                filename=f.get("name", "") or fname,
+                base_model=base_model,
+            )
+
+        if dir_key == CLASSIFY_SKIP:
+            skipped.append(fname)          # 训练集等非资产, 不下载
+            continue
+        if dir_key == CLASSIFY_FOLLOW_PRIMARY:
+            # .yaml/.json 伴随文件跟随主文件 —— 主文件目录稍后回填
+            dir_key = None
+        if dir_key == CLASSIFY_MANUAL:
+            # 探针: 在 MANUAL 分支内、pending.append 之前用一次 HTTP Range
+            # 请求拉文件头判定目录。仅对 .safetensors/.sft + Checkpoint 和
+            # .gguf + 任意 model_type 触发; 其余原样走 MANUAL。
+            # token 已在 furl 的 query 参数里 (见上方拼接), 探针不带 Authorization
+            # 头 —— 跟随 307 到 R2 预签名 URL 时带 auth 会触发 S3 双重鉴权 400。
+            # 401 → ProbeAuthError 向上冒泡 (路由层 toast 且不建任务);
+            # 其它失败 → 落回 pending (现有 409 + DownloadDirModal 流程)。
+            probe_ext = os.path.splitext(fname)[1].lower()
+            probe_applicable = (
+                (probe_ext in (".safetensors", ".sft") and entry_type.lower() == "checkpoint")
+                or probe_ext == ".gguf"
+            )
+            if probe_applicable:
+                probe_furl = build_download_url(f, info.get("version_id"), api_key)
+
+                try:
+                    from .header_probe import probe_download_url, classify_from_probe
+                    head_bytes = probe_download_url(probe_furl)
+                    probe_dir = classify_from_probe(head_bytes, probe_ext, entry_type)
+                except Exception as e:
+                    # 401 不在此吞 —— 让它向上冒泡到路由层 (ProbeAuthError)。
+                    # 这里只接「判不出」的失败: 超时 / 网络错 / 非预期格式 / 解析失败。
+                    from .header_probe import ProbeAuthError
+                    if isinstance(e, ProbeAuthError):
+                        raise
+                    probe_dir = None
+                    logger.debug(f"[civitai_resolver] 探针失败, 落回 MANUAL: {e}")
+
+                if probe_dir:
+                    dir_key = probe_dir
+                # probe_dir 为 None → dir_key 仍为 MANUAL, 落回下方 pending
+
+            if dir_key == CLASSIFY_MANUAL:
+                pending.append({
+                    "filename": fname,
+                    "size_kb": f.get("sizeKB"),
+                    "model_type": entry_type,
+                    "file_type": f.get("type", ""),
+                    "base_model": base_model,
+                    "suggested_dir_keys": suggest_dir_keys(
+                        entry_type, f.get("type", ""), f.get("name", "") or fname, base_model
+                    ),
+                })
+                continue
+
+        furl = build_download_url(f, info.get("version_id"), api_key)
+
+        file_entries.append({
+            "url": furl,
+            "filename": fname,
+            "dir_key": dir_key,
+            "save_dir": save_dir_for_key(dir_key, base_model) if dir_key else "",
+            "model_type": dir_key or "",
+            "pair_group": info.get("pair_group", ""),
+            "original_file": f,
+        })
+
+    # 伴随文件回填: 跟随第一个有确定目录的主文件
+    primary_dir = next((e["save_dir"] for e in file_entries if e["save_dir"]), "")
+    primary_key = next((e["dir_key"] for e in file_entries if e["dir_key"]), "")
+    for e in file_entries:
+        if not e["save_dir"]:
+            e["save_dir"] = primary_dir
+            e["dir_key"] = primary_key
+            e["model_type"] = primary_key
 
     # 5. 显示名称
     display_name = info["model_name"]
     if info["version_name"]:
         display_name += f" - {info['version_name']}"
 
-    return {
-        "url": info["download_url"],
-        "filename": filename,
-        "save_dir": save_dir,
-        "model_type": info["save_dir_key"],
+    # 有文件判不出 → 不提交下载, 让前端弹目录选择。
+    # 一次性把整组待定文件交出去, 用户选完带 dir_keys 重新调用本函数。
+    if pending:
+        mid = info.get("model_id")
+        vid_ = info.get("version_id")
+        civitai_url = f"https://civitai.com/models/{mid}" if mid else ""
+        if civitai_url and vid_:
+            civitai_url += f"?modelVersionId={vid_}"
+        return {
+            "needs_classification": True,
+            "pending_files": pending,
+            "resolved_files": file_entries,     # 已判定的部分, 用户裁决后一并提交
+            "civitai_url": civitai_url,
+            "display_name": display_name,
+            "info": info,
+            "is_video": info.get("is_video", False),
+        }
+
+    if not file_entries:
+        if skipped:
+            raise NoDownloadableFiles(
+                f"「{info.get('version_name') or '该版本'}」只包含训练数据等附件"
+                f"({', '.join(skipped[:3])}), 没有模型权重。"
+                f"请在版本列表里选择带权重文件的版本。"
+            )
+        raise NoDownloadableFiles("该版本没有可下载的模型文件")
+
+    first = file_entries[0]
+    result = {
+        "url": first["url"],
+        "filename": first["filename"],
+        "save_dir": first["save_dir"],
+        "model_type": first["dir_key"],
         "display_name": display_name,
         "info": info,
+        "is_video": info.get("is_video", False),
+        "files": file_entries,
     }
+    if info.get("is_video"):
+        result["pair_group"] = info.get("pair_group", "")
+
+    return result

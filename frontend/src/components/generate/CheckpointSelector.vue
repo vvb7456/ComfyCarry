@@ -12,7 +12,7 @@ export interface CheckpointInfo {
   previewIsVideo?: boolean
   arch?: string
   baseModel?: string
-  /** §5.3 打包形态 (整合包/拆分), 两形态并存 tab 下显示徽章 */
+  /** 打包形态 (整合包/拆分), 两形态并存 tab 下显示徽章 */
   packaging?: 'checkpoint' | 'split'
 }
 
@@ -50,8 +50,10 @@ function onImgError(e: Event) {
     @click="emit('open')"
   >
     <!-- Empty state -->
+    <!-- 空态与其他架构一字不差 — 视频不再换专用长文案 (已移到 picker 空结果态),
+         「+」统一用 MsIcon add (AddCard 同款), 不用字面 '+' -->
     <div v-if="!selected" class="ckpt-empty">
-      <span class="ckpt-empty__icon">+</span>
+      <span class="ckpt-empty__icon"><MsIcon name="add" size="sm" color="none" /></span>
       <span class="ckpt-empty__text">{{ emptyLabel || t('generate.basic.select_checkpoint') }}</span>
     </div>
 
@@ -83,7 +85,7 @@ function onImgError(e: Event) {
         <!-- Model tag badge -->
         <span v-if="selected.baseModel" class="ckpt-card__tag">{{ selected.baseModel }}</span>
         <span v-else-if="selected.arch && selected.arch !== 'unknown'" class="ckpt-card__tag ckpt-card__tag--dim">{{ selected.arch }}</span>
-        <!-- §5.3 形态徽章 (右上角, 整合包=clay / 拆分=teal) -->
+        <!-- 形态徽章 (右上角, 整合包=clay / 拆分=teal) -->
         <span
           v-if="selected.packaging"
           class="ckpt-card__pkg-badge"
@@ -131,8 +133,11 @@ function onImgError(e: Event) {
 }
 
 .ckpt-empty__icon {
-  font-size: 1.2rem;
-  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex-shrink: 0;
 }
 
 .ckpt-selector:hover .ckpt-empty {
@@ -212,7 +217,7 @@ function onImgError(e: Event) {
   color: var(--t-inv-2);
 }
 
-/* §5.3 形态徽章 (右上角) */
+/* 形态徽章 (右上角) */
 .ckpt-card__pkg-badge {
   position: absolute;
   top: 4px;
@@ -234,6 +239,7 @@ function onImgError(e: Event) {
   background: #0d9488;
   color: #fff;
 }
+
 
 .ckpt-card__info {
   flex: 1;

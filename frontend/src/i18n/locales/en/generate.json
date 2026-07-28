@@ -15,6 +15,7 @@
     "task_video": "Video",
     "task_edit": "Edit",
     "family_flux2": "Flux 2 series",
+    "family_wan22": "Wan 2.2 series",
     "not_ready": "Not ready"
   },
   "tabs": {
@@ -31,6 +32,10 @@
     "pony": "Pony",
     "illustrious": "Illustrious",
     "noobai": "NoobAI",
+    "wan22_i2v": "Wan 2.2 Image to Video",
+    "wan22_t2v": "Wan 2.2 Text to Video",
+    "wan22_5b": "Wan 2.2 5B Lite",
+    "wan22_5b_hint": "Image and text modes",
     "history": "Queue & History"
   },
   "prompt": {
@@ -48,6 +53,8 @@
       "prompt_editor": "Tag Editor",
       "prompt_editor_title": "Visual tag editor with autocomplete and tag library"
     },
+    "video_ph": "Describe how the scene moves: subject → action → camera → setting. e.g.: A girl turns and glances back, long hair flowing, camera slowly pushing in…",
+    "negative_video_ph": "A recommended negative prompt is built in — leave empty to use the default",
     "syntax_help_title": "Random prompt syntax",
     "help_modal_title": "Prompt Help",
     "help": {
@@ -140,7 +147,14 @@
     "select_clip": "Select CLIP",
     "select_vae": "Select VAE",
     "search_unet": "Search UNet...",
-    "search_vae": "Search VAE..."
+    "search_vae": "Search VAE...",
+    "text_encoder": "Text Encoder",
+    "select_text_encoder": "Select text encoder",
+    "unet_high": "High noise",
+    "unet_low": "Low noise",
+    "unet_seg_help": "Wan 2.2 14B splits generation into two stages: the high-noise weight lays down the composition, the low-noise weight adds detail. Pick both files — they must be the two halves of the same model.",
+    "select_unet_high": "Select high-noise weight",
+    "select_unet_low": "Select low-noise weight"
   },
   "advanced": {
     "title": "Advanced Settings",
@@ -180,7 +194,33 @@
   "preview": {
     "empty": "Generated images will appear here",
     "offline_title": "ComfyUI Not Running",
-    "offline_desc": "Generate requires ComfyUI service to work"
+    "offline_desc": "Generate requires ComfyUI service to work",
+    "empty_video": "Generated video will appear here"
+  },
+  "video": {
+    "start_frame": "Start frame",
+    "start_frame_not_image": "A video cannot be used as a start frame — please pick an image",
+    "mode_t2v": "Text to Video",
+    "mode_i2v": "Image to Video",
+    "speed": "Speed",
+    "speed_fast": "Fast",
+    "speed_std": "Standard",
+    "duration": "Duration",
+    "frames_hint": "{frames} frames · {fps}fps",
+    "seg_both": "Both",
+    "seg_high": "High only",
+    "seg_low": "Low only",
+    "composing": "Composing video…",
+    "stage": "Sampling · stage {i} / {n}",
+    "download": "Download video",
+    "speed_help": "Fast: 4 steps, negative prompt has no effect. Standard: 20 steps, finer detail, about 5x the time of Fast.",
+    "res_fit": "Fit start frame",
+    "res_preset": "{w}×{h} ({orient} · {tier})",
+    "res_fit_option": "{w}×{h} ({label})",
+    "res_help": "When the selected size has a different aspect ratio from the start frame, the start frame is center-cropped to fit.",
+    "orient_landscape": "Landscape",
+    "orient_portrait": "Portrait",
+    "orient_square": "Square"
   },
   "modules": {
     "lora": "LoRA",
@@ -455,7 +495,10 @@
     "inpaint_no_mask": "No mask drawn",
     "inpaint_no_mask_desc": "Inpaint mode is active but no mask has been drawn. Will run as standard Img2Img instead.",
     "prompt_id_missing": "Failed to get prompt_id",
-    "components_not_ready": "Runtime components not ready — download them first"
+    "components_not_ready": "Runtime components not ready — download them first",
+    "video_same_unet": "High-noise and low-noise weights must be different files",
+    "no_start_frame": "Please upload a start frame first",
+    "no_unet_pair": "Select both the high-noise and low-noise weights"
   },
   "model_dep": {
     "detecting": "Detecting models…",
@@ -481,7 +524,10 @@
     "error_check": "Component check failed",
     "error_no_dir": "ComfyUI directory unavailable — cannot download components",
     "error_submit": "Failed to queue {name}",
-    "error_download": "{name} download failed"
+    "error_download": "{name} download failed",
+    "fast_files": "Fast-mode files",
+    "fast_files_hint": "Only needed in Fast mode",
+    "total": "Total to download · {size}"
   },
   "picker": {
     "arch_all": "All",
@@ -496,8 +542,14 @@
     "empty_title": "No {arch} main model yet",
     "empty_desc": "Go to Downloads to add models",
     "go_to_downloads": "Go to Downloads",
-    "component_hint": "Requires additional runtime components"
+    "component_hint": "Requires additional runtime components",
+    "empty_video_hint": "No weight detected for this tab yet. Search and download it on the Models page, or place the file in the diffusion_models directory"
   },
+  "history": {
+    "make_video": "Make video",
+    "make_video_ready_elsewhere": "Start frame ready in Video · Image to video"
+  },
+  "model": {},
   "placeholders": {
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
     "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
@@ -505,5 +557,8 @@
     "negative_pony": "score_6, score_5, score_4, worst quality, low quality, bad anatomy, bad hands, watermark",
     "negative_illustrious": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name",
     "negative_noobai": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name"
+  },
+  "errors": {
+    "state_lost": "Target model state unavailable, please retry"
   }
 }

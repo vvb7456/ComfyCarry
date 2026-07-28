@@ -3,9 +3,11 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CivitaiHit } from '@/composables/useCivitaiSearch'
 import { useDownloads } from '@/composables/useDownloads'
+import { useDownloadableVersions } from '@/composables/useDownloadableVersions'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'FavoriteVersionModal' })
@@ -25,9 +27,14 @@ const emit = defineEmits<{
 
 const { getVersionState, isInCart, cartItems } = useDownloads()
 
-const versions = computed(() =>
+const allVersions = computed(() =>
   props.hit?.versions || (props.hit?.version ? [props.hit.version] : []),
 )
+
+// 收藏的意义是「之后要下载」, 不可下载的 version 收藏了也没用, 同样过滤。
+const modelId = computed(() => props.hit?.id ?? null)
+const { downloadable: versions, noneDownloadable } =
+  useDownloadableVersions(modelId, allVersions, computed(() => props.modelValue))
 
 function isInstalled(versionId: number) {
   if (!props.hit) return false
@@ -58,7 +65,12 @@ function handleFavorite(v: { id: number; name: string; baseModel?: string }) {
     :title="t('models.civitai.select_fav_version', { name: hit?.name || '' })"
     size="md"
   >
-    <div class="fv-list">
+    <EmptyState
+      v-if="noneDownloadable"
+      icon="cloud_off"
+      :message="t('models.civitai.no_downloadable_versions')"
+    />
+    <div v-else class="fv-list">
       <div
         v-for="v in versions"
         :key="v.id"

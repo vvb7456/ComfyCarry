@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<{
    * Visual variant.
    * - ``default``: top accent bar driven by ``status``.
    * - ``kpi``: compact KPI tile with bottom accent bar driven by ``tone``
-   *   (used by Dashboard summary tiles, see CR §5.9).
+   *   (used by Dashboard summary tiles).
    */
   variant?: 'default' | 'kpi'
   /** Only consumed when ``variant === 'kpi'``. */

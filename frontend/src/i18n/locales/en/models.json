@@ -59,7 +59,7 @@
     "click_to_copy": "Click to copy"
   },
   "civitai": {
-    "search_placeholder": "Search model name / Enter ID / Paste CivitAI URL...",
+    "search_placeholder": "Name, ID or CivitAI URL",
     "sort": {
       "relevance": "Relevance",
       "downloads": "Most Downloaded",
@@ -77,7 +77,10 @@
     "unfavorite": "Remove",
     "versions_count": "{count} versions",
     "already_local": "Local",
-    "downloading": "Downloading"
+    "downloading": "Downloading",
+    "all_types": "All types",
+    "all_base_models": "All base models",
+    "no_downloadable_versions": "This model is generation-only on CivitAI — the creator does not offer weight downloads."
   },
   "downloads": {
     "pending": "Favorites",
@@ -116,5 +119,14 @@
     "batch_modal_parsed": "Detected {count} models",
     "batch_modal_submit": "Add to Favorites",
     "batch_added": "{count} models added to favorites"
+  },
+  "dl_dir": {
+    "title": "Choose download folder",
+    "intro_help": "Match the file name against the CivitAI page:\n· All-in-one checkpoint (SD/SDXL/Pony, 2-7 GB) -> checkpoints\n· Main weights (Flux/Wan/Qwen/Z-Image ...) -> diffusion_models\n· VAE (name often has vae/ae, a few hundred MB) -> vae\n· Text encoder (t5 / umt5 / clip_l / qwen) -> text_encoders\n· Image encoder (clip_vision) -> clip_vision\n· GGUF-quantised main weights -> unet_gguf\nA file in the wrong folder never shows up in ComfyUI.",
+    "placeholder": "Select a folder",
+    "search": "Search folders",
+    "group_likely": "Likely",
+    "group_all": "All folders",
+    "confirm": "Download"
   }
 }

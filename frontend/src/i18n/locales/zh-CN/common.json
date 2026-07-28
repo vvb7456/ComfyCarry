@@ -72,5 +72,6 @@
     "or_divider": "或",
     "unsupported_type": "不支持的文件类型: {name}",
     "remove": "移除"
-  }
+  },
+  "n_selected": "已选 {count} 项"
 }

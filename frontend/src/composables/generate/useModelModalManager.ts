@@ -54,11 +54,23 @@ export function useModelModalManager({
     previewOpen.value = true
   }
 
-  const promptTools = computed(() => [
-    { key: 'prompt-editor', icon: 'edit_note', label: t('generate.prompt.tools.prompt_editor'), title: t('generate.prompt.tools.prompt_editor_title') },
-    { key: 'interrogate', icon: 'image_search', label: t('generate.prompt.tools.interrogate'), title: t('generate.prompt.tools.interrogate_title') },
-    { key: 'llm-assist', icon: 'auto_awesome', label: t('generate.prompt.tools.llm_assist'), title: t('generate.prompt.tools.llm_assist_title') },
-  ])
+  // promptStyle==='natural' 时隐藏 tag 类工具 (提示词编辑器 /
+  //   WD14 反推 — 两者均面向 A1111 tag 体系, 对自然语言架构无意义); AI 助手保留
+  //   (视频提示词更需要它, 且图像 natural 架构如 krea2/zimage 同样受益)。
+  // 判据基于 promptStyle (非 mediaType): krea2/zimage 等「图像+natural」架构也收敛。
+  const isNaturalPrompt = computed(() => store.currentConfig.promptStyle === 'natural')
+
+  const promptTools = computed(() => {
+    const tools = [
+      { key: 'prompt-editor', icon: 'edit_note', label: t('generate.prompt.tools.prompt_editor'), title: t('generate.prompt.tools.prompt_editor_title') },
+      { key: 'interrogate', icon: 'image_search', label: t('generate.prompt.tools.interrogate'), title: t('generate.prompt.tools.interrogate_title') },
+      { key: 'llm-assist', icon: 'auto_awesome', label: t('generate.prompt.tools.llm_assist'), title: t('generate.prompt.tools.llm_assist_title') },
+    ]
+    // natural 模式过滤掉 tag 类工具 (prompt-editor / interrogate), 仅保留 llm-assist
+    return isNaturalPrompt.value
+      ? tools.filter(tool => tool.key === 'llm-assist')
+      : tools
+  })
 
   function openTagger() {
     prepareTagger()
@@ -227,6 +239,7 @@ export function useModelModalManager({
     previewIndex,
     previewUrls,
     promptTools,
+    isNaturalPrompt,
     // Model Picker
     showModelPicker,
     modelSelected,

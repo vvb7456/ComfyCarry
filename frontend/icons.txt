@@ -64,3 +64,9 @@ fit_screen
 
 # FaceDetailerPanel / moduleTabs — .ts 间接引用
 face_retouching_natural
+
+# BaseSelect.vue — multiple 模式的勾选框
+# 注: 提取器按「含 MsIcon 的行」匹配, 多行写法下 :name= 单独成行会被漏掉,
+#     故此处手动补。新增多行 <MsIcon> 时留意同样的坑。
+check_box
+check_box_outline_blank

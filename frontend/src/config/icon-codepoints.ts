@@ -22,6 +22,8 @@ export const ICON_CODEPOINTS: Record<string, string> = {
   'category': '\ue72c',
   'celebration': '\uea65',
   'check': '\ue668',
+  'check_box': '\ue9de',
+  'check_box_outline_blank': '\ue835',
   'check_circle': '\uf0be',
   'checklist': '\ue6b1',
   'chevron_left': '\ue5cb',

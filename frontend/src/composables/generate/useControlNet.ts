@@ -7,7 +7,7 @@ import { cnBranchForFile, type CnBranch } from '@/composables/generate/modelDepC
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-/** Default input/ subfolder for each CN type (legacy: _CN_SUBFOLDER) */
+/** Default input/ subfolder for each CN type */
 const CN_SUBFOLDERS: Record<string, string> = {
   pose: 'openpose',
   canny: 'canny',
@@ -35,7 +35,7 @@ export const CN_LABEL_KEYS: Record<string, string> = {
   depth: 'generate.controlnet.depth_map',
 }
 
-// ── Preprocess param definitions (legacy: _PP_PARAMS_DEF) ───────────────────
+// ── Preprocess param definitions ───────────────────
 
 export interface PPParamDef {
   key: string
@@ -157,7 +157,7 @@ export interface UseControlNetReturn {
  * @param type — 'pose' | 'canny' | 'depth'
  * @param controlnetModels — reactive ref to the full controlnet models map from options
  * @param branchRef — current tab 的 CN branch ('sdxl' | 'ilnoob' | undefined);
- *                    用于面板下拉过滤 (A3 三规则: 兼容排前/不兼容隐藏/未知列后)
+ *                    用于面板下拉过滤 (三规则: 兼容排前/不兼容隐藏/未知列后)
  */
 export function useControlNet(
   type: CnType,
@@ -213,7 +213,7 @@ export function useControlNet(
   }
 
   // ── Models ───────────────────────────────────────────────────────────────
-  // A3 三规则过滤 (branch = 当前 tab 的 cnBranch):
+  // 三规则过滤 (branch = 当前 tab 的 cnBranch):
   //   1. 已知且属于当前 branch → 列出且排前, 无选中时自动默认第一个;
   //   2. 已知但属于另一 branch → 隐藏;
   //   3. 未知文件 (用户手动安装, 不在 CN_FILE_BRANCH) → 列出, 排在已知兼容项之后。
@@ -222,7 +222,7 @@ export function useControlNet(
   /** 原始 (未过滤) 模型列表, 来自后端 options */
   const rawModels = computed<string[]>(() => controlnetModels.value[type] || [])
 
-  /** 按 A3 三规则过滤 + 排序后的模型列表 */
+  /** 按三规则过滤 + 排序后的模型列表 */
   const models = computed<string[]>(() => {
     const branch = branchRef?.value
     if (!branch) return rawModels.value
@@ -274,7 +274,7 @@ export function useControlNet(
 
   function clearImage() {
     config.value.image = null
-    // Note: CN does NOT auto-disable when image is cleared (legacy asymmetry with I2I)
+    // Note: CN does NOT auto-disable when image is cleared (asymmetry with I2I, which does)
   }
 
   async function handleUpload(file: File) {

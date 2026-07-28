@@ -1,10 +1,10 @@
 """
-后台运行模式 — 单例服务 (纯内存, §3.1)
+后台运行模式 — 单例服务 (纯内存)
 
 一个进程内只有一个后台会话。worker 线程每秒轮询 ComfyUI /queue,
 队列空 + 上一轮已落地时 deepcopy 快照 → submit_generation → 等下一轮。
-不订阅 bridge 事件 (理由见 §3.1 对比表: bridge 在 queue.Full 时
-静默踢订阅者, 会把 worker 永久挂死)。
+不订阅 bridge 事件 (bridge 在 queue.Full 时静默踢订阅者, 会把 worker
+永久挂死)。
 
 state/epoch/stats 三者读写全部走同一把 _lock。
 停机一律 state='idle' + 写 stop_reason, 不退避不重试。
@@ -39,7 +39,7 @@ _epoch: int = 0                           # 每次 start/stop +1, 掐掉 in-flig
 _worker_thread: threading.Thread | None = None
 
 
-# ── 停机 code (§3.1 表, 六个值, 严格使用) ───────────────────────────────────
+# ── 停机 code (六个值, 严格使用) ───────────────────────────────────────────
 # max_reached  达上限 (正常结束, UI 绿色✓)
 # disk_low     输出盘剩余 < min_free_disk_gb
 # file_missing 模型/输入图不存在
@@ -70,7 +70,7 @@ def _check_prompt(prompt_id: str) -> tuple[str, str]:
     检查上一轮 prompt_id 的落地情况, 返回 (状态, detail):
       'waiting' — 仍在排队/执行, 继续等
       'landed'  — 已成功完成
-      'error'   — ComfyUI 执行报错 (§3.1 exec_error)
+      'error'   — ComfyUI 执行报错
       'missing' — /history 里查无此条目 (ComfyUI 重启后内存历史清空)
 
     'missing' 必须与 'waiting' 分开: 队列也空 + ComfyUI 在线 + 条目查不到,
@@ -173,7 +173,7 @@ def _delete_prompt(prompt_id: str) -> None:
         pass
 
 
-# ── worker 循环 (§3.1 伪代码) ────────────────────────────────────────────────
+# ── worker 循环 ───────────────────────────────────────────────────────────
 
 def _worker_loop(my_epoch: int) -> None:
     """worker 线程主循环。my_epoch = 启动时的 epoch, 变了即退出。"""
@@ -202,7 +202,7 @@ def _worker_loop(my_epoch: int) -> None:
             time.sleep(_POLL_INTERVAL)
             continue
 
-        # 上一轮 prompt_id 的落地情况: 未落地 → 等; 执行报错 → 停机 (§3.1 exec_error);
+        # 上一轮 prompt_id 的落地情况: 未落地 → 等; 执行报错 → 停机;
         # 条目从 /history 消失且持续超时 → 同样停机, 避免永久空转。
         with _lock:
             last_pid = _stats.get("last_prompt_id", "")
@@ -250,7 +250,7 @@ def _worker_loop(my_epoch: int) -> None:
                 _set_stop("max_reached", f"已达轮次上限 {max_iter}")
             return
 
-        # data = deepcopy(snapshot) (★ §3.3)
+        # data = deepcopy(snapshot)
         with _lock:
             if _epoch != my_epoch:
                 return
@@ -262,7 +262,7 @@ def _worker_loop(my_epoch: int) -> None:
             return
         data = copy.deepcopy(snap)
 
-        # seed 与 hires_seed 都置 -1 (§3.6: 不要自己算随机种子)
+        # seed 与 hires_seed 都置 -1 (不要自己算随机种子)
         data["seed"] = -1
         data["hires_seed"] = -1
 
@@ -357,14 +357,14 @@ def start_session(payload: dict, policy: dict | None = None) -> None:
 
 def stop_session() -> None:
     """
-    §3.1 / §3.5 三步顺序 (顺序不能反):
+    三步顺序 (顺序不能反):
       1. epoch += 1 + state=idle + stop_reason={code:user_stopped,...}
          (让 worker 退出循环; worker 不会再提交)
       2. POST /interrupt  (停止当前 ComfyUI 动作)
       3. 清残留队列 (POST /queue clear)
     幂等: 不在 running 时整体退化为无操作。
     ★ 不能在 idle 时也 interrupt/clear —— 那会打断用户手动发起的生成并清空其队列。
-      陈旧标签页上残留的「停止」按钮正是这种场景 (§S3 多端同步)。
+      陈旧标签页上残留的「停止」按钮正是这种场景。
     """
     global _state, _stop_reason, _epoch
     was_running = False
@@ -395,7 +395,7 @@ def dismiss_stop_reason() -> None:
 
 def snapshot_status() -> dict:
     """
-    §3.4 状态对象 (四个接口统一返回)。字段名一字不差, 没有 images 字段。
+    状态对象 (四个接口统一返回)。字段名一字不差, 没有 images 字段。
     """
     with _lock:
         return {

@@ -88,7 +88,7 @@ export function useModelDependency(config: ModelDepConfig): UseModelDependencyRe
   let cancelled = false
   let currentDownloadId: string | null = null
 
-  // ── Downloads store (C1: wait-chain re-sourced to pinia store) ──
+  // ── Downloads store (wait-chain 由 pinia store 提供) ──
   const dlStore = useDownloadsStore()
 
   // ── Check ──────────────────────────────────────────────────────────────

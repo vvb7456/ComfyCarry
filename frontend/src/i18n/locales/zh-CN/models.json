@@ -59,7 +59,7 @@
     "click_to_copy": "点击复制"
   },
   "civitai": {
-    "search_placeholder": "搜索模型名 / 输入 ID / 粘贴 CivitAI URL...",
+    "search_placeholder": "模型名 / ID / CivitAI 链接",
     "sort": {
       "relevance": "相关性",
       "downloads": "最多下载",
@@ -77,7 +77,10 @@
     "unfavorite": "移除",
     "versions_count": "{count} 个版本",
     "already_local": "已有",
-    "downloading": "下载中"
+    "downloading": "下载中",
+    "all_types": "全部类型",
+    "all_base_models": "全部基础模型",
+    "no_downloadable_versions": "该模型在 CivitAI 上仅供在线生成，作者未提供权重下载。"
   },
   "downloads": {
     "pending": "收藏",
@@ -116,5 +119,14 @@
     "batch_modal_parsed": "识别到 {count} 个模型",
     "batch_modal_submit": "添加到收藏",
     "batch_added": "已添加 {count} 个模型到收藏"
+  },
+  "dl_dir": {
+    "title": "选择下载目录",
+    "intro_help": "对照文件名与 Civitai 详情页选择:\n· 整合包 (SD/SDXL/Pony, 2~7 GB) → checkpoints\n· 主权重 (Flux/Wan/Qwen/Z-Image 等) → diffusion_models\n· VAE (名字多含 vae/ae, 几百 MB) → vae\n· 文本编码器 (t5 / umt5 / clip_l / qwen) → text_encoders\n· 图像编码器 (clip_vision) → clip_vision\n· GGUF 量化主权重 → unet_gguf\n放错目录的文件在 ComfyUI 里不会出现。",
+    "placeholder": "请选择目录",
+    "search": "搜索目录",
+    "group_likely": "可能的目录",
+    "group_all": "全部目录",
+    "confirm": "开始下载"
   }
 }

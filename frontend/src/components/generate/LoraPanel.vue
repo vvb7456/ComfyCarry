@@ -2,17 +2,30 @@
 /**
  * LoraPanel — Displays selected LoRAs with strength sliders + Add button.
  *
- * Legacy behavior:
+ * Legacy behavior (图像架构, mediaType==='image', 一字不变):
  * - Horizontal card grid with preview + strength slider + delete
  * - "Add LoRA" card at the end
  * - Click card image → (future) open model details
  * - Click delete → remove LoRA (auto-disables if last one removed)
+ *
+ * Video behavior (mediaType==='video'):
+ * 卡片与图像架构**完全同构**, 只多一个「段徽章」—— 决定这个 LoRA 挂到哪一段采样器
+ * (双段 / 仅高噪 / 仅低噪, 写入 loras[].apply), 点击循环切换, 默认双段。
+ *
+ * high/low 两段权重在文件层面完全无法区分 (字节数/头部长度/张量 key 全同且无元数据),
+ * 靠文件名猜出来的配对与角色都是噪声。段归属一律由用户显式指定。
+ *
+ * 加速件过滤: Lightning 加速件物理落在 loras/ 目录, 视频架构下用 COMPONENT_FILENAMES
+ * 同源过滤 (精确文件名集合, 不是模式匹配), 不出现在卡片列表中。
  */
 import { computed, inject, ref, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import type { LoraItem } from '@/composables/generate/useGenerateOptions'
+import type { LoraEntry } from '@/stores/generate'
+import { MODEL_TYPES } from '@/config/model-types'
+import { COMPONENT_FILENAMES } from '@/config/component-registry'
 import AddCard from '@/components/ui/AddCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
@@ -27,6 +40,19 @@ const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
 const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
+
+// ── 架构判定 ──
+// store.activeModelType 是当前 tab 的架构 (LoraPanel 在 ModelTab 内, 一 tab 一实例)。
+// isVideo 决定是否启用视频配对折叠; 图像架构恒走原逻辑 (回归保护)。
+const isVideo = computed(
+  () => MODEL_TYPES[store.activeModelType]?.mediaType === 'video',
+)
+
+// 只有双权重条目 (14B) 才存在 high/low 噪声段概念。5B 是单权重架构, 其 LoRA
+// 不分段 —— 若对它做段推导, 文件名含 "high_" 的普通 LoRA 会被误标「仅高噪」。
+const isPaired = computed(
+  () => isVideo.value && MODEL_TYPES[store.activeModelType]?.dualUnet === true,
+)
 
 function getLoraInfo(name: string): LoraItem | undefined {
   return options.loras.value.find(l => l.name === name)
@@ -97,14 +123,68 @@ function commitStrengthEdit(index: number, e: Event) {
 function cancelStrengthEdit() {
   editingIndex.value = null
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// 视频架构: LoRA 段徽章 (无配对、无推断)
+// ════════════════════════════════════════════════════════════════════════════
+
+function basename(name: string): string {
+  return name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
+}
+
+/**
+ * 加速件过滤源: COMPONENT_FILENAMES (精确文件名集合, 不是模式匹配)。
+ * 加速件物理落在 loras/ 目录, 会混进 LoRA 列表, 视频架构下需过滤。
+ */
+function isAccelerator(name: string): boolean {
+  return COMPONENT_FILENAMES.has(basename(name))
+}
+
+/**
+ * 渲染用的 LoRA 列表 —— 图像与视频共用一个模板分支, 差别只在这里。
+ * 携带 index 是因为所有写操作 (强度/启用/删除) 都按 state.loras 的真实下标进行,
+ * 而视频侧过滤掉了加速件, 下标会错位。
+ */
+const visibleLoras = computed<{ lora: LoraEntry; index: number }[]>(() => {
+  const all = state.value.loras.map((lora, index) => ({ lora, index }))
+  if (!isVideo.value) return all
+  return all.filter(x => !isAccelerator(x.lora.name))
+})
+
+/**
+ * 段归属 (loras[].apply): 这是**真实的工作流参数** —— 决定该 LoRA 挂到哪一段采样器,
+ * 不是从文件名猜出来的。默认恒 'both', 由用户点徽章显式改。
+ */
+function initApply(lora: LoraEntry): 'high' | 'low' | 'both' {
+  if (lora.apply === 'high' || lora.apply === 'low' || lora.apply === 'both') {
+    return lora.apply
+  }
+  lora.apply = 'both'
+  return 'both'
+}
+
+/** apply 字段 → 段徽章 i18n key。 */
+function applyBadgeKey(apply: 'high' | 'low' | 'both'): string {
+  return apply === 'both'
+    ? 'generate.video.seg_both'
+    : apply === 'high'
+      ? 'generate.video.seg_high'
+      : 'generate.video.seg_low'
+}
+
+/** 点击段徽章循环切换: 双段 → 仅高噪 → 仅低噪 → 双段。 */
+function cycleApply(lora: LoraEntry) {
+  const cur = initApply(lora)
+  lora.apply = cur === 'both' ? 'high' : cur === 'high' ? 'low' : 'both'
+}
 </script>
 
 <template>
   <div class="lora-panel">
+    <!-- 图像与视频**同一套卡片**: 唯一差异是视频双权重架构多一个段徽章。 -->
     <div class="lora-grid">
-      <!-- Selected LoRA cards -->
       <div
-        v-for="(lora, i) in state.loras"
+        v-for="{ lora, index } in visibleLoras"
         :key="lora.name"
         class="lora-card"
         :class="{ 'lora-card--disabled': !lora.enabled }"
@@ -129,11 +209,23 @@ function cancelStrengthEdit() {
           <div v-if="!getPreviewUrl(lora.name)" class="lora-card__no-img">
             <MsIcon name="extension" color="none" />
           </div>
+
+          <!-- 段徽章: 仅双权重视频架构 (14B)。5B 单权重无分段概念, 图像架构同理。
+               点击循环 双段 → 仅高噪 → 仅低噪。 -->
+          <div v-if="isPaired" class="lora-card__seg-badges">
+            <button
+              class="lora-card__badge lora-card__badge--seg"
+              @click.stop="cycleApply(lora)"
+            >
+              {{ t(applyBadgeKey(initApply(lora))) }}
+            </button>
+          </div>
+
           <!-- Disable toggle (top-left) -->
           <button
             class="lora-card__toggle"
             :title="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
-            @click.stop="toggleEnabled(i)"
+            @click.stop="toggleEnabled(index)"
           >
             <MsIcon :name="lora.enabled ? 'visibility' : 'visibility_off'" color="none" />
           </button>
@@ -141,7 +233,7 @@ function cancelStrengthEdit() {
           <button
             class="lora-card__del"
             :title="t('generate.lora.remove')"
-            @click.stop="removeLora(i)"
+            @click.stop="removeLora(index)"
           >
             <MsIcon name="close" color="none" />
           </button>
@@ -157,17 +249,17 @@ function cancelStrengthEdit() {
               min="0"
               max="2"
               step="0.05"
-              @input="updateStrength(i, parseFloat(($event.target as HTMLInputElement).value))"
+              @input="updateStrength(index, parseFloat(($event.target as HTMLInputElement).value))"
             />
-            <span class="lora-card__str-val" :class="{ 'lora-card__str-val--editable': editingIndex !== i }" @click="startStrengthEdit(i)">
+            <span class="lora-card__str-val" :class="{ 'lora-card__str-val--editable': editingIndex !== index }" @click="startStrengthEdit(index)">
               <input
-                v-if="editingIndex === i"
+                v-if="editingIndex === index"
                 :ref="setEditRef"
                 type="number"
                 class="lora-card__str-edit"
                 :value="lora.strength"
                 min="0" max="2" step="0.05"
-                @blur="commitStrengthEdit(i, $event)"
+                @blur="commitStrengthEdit(index, $event)"
                 @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
                 @keydown.escape.prevent="cancelStrengthEdit"
               />
@@ -330,6 +422,7 @@ function cancelStrengthEdit() {
   color: var(--t1);
 }
 
+
 .lora-card__strength {
   display: flex;
   align-items: center;
@@ -379,6 +472,51 @@ function cancelStrengthEdit() {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ═══ 视频段徽章 ═══ */
+/* 徽章区: 左上角, toggle (top:4px left:4px, 22px) 下方, 不重叠 */
+.lora-card__seg-badges {
+  position: absolute;
+  top: 30px;
+  left: 4px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: calc(100% - 8px);
+}
+
+/* 通用徽章风格: font-size:.6rem; font-weight:600; padding:1px 6px; border-radius:999px */
+.lora-card__badge {
+  font-size: .6rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
+
+/* 段标记: accent 系, 可点击 */
+.lora-card__badge--seg {
+  background: var(--ac);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: filter .15s;
+  font: inherit;
+  text-align: left;
+}
+.lora-card__badge--seg:hover {
+  filter: brightness(1.12);
+}
+.lora-card__badge--seg:active {
+  filter: brightness(0.92);
+}
+
 
 /* Add card matching grid item height */
 .lora-add-card {

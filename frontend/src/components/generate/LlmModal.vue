@@ -13,6 +13,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { UseLlmAssistReturn } from '@/composables/generate/useLlmAssist'
 import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { useGenerateStore } from '@/stores/generate'
+import { MODEL_TYPES } from '@/config/model-types'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
@@ -34,6 +36,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
+const store = useGenerateStore()
 
 // ── Text input ────────────────────────────────────────────────────────
 
@@ -96,9 +99,15 @@ function onClearImage() {
 
 // ── Submit ────────────────────────────────────────────────────────────
 
+/** LLM 预设 target: 视频架构走「运动与镜头」预设, 其余维持 sdxl。
+ *  从当前架构的 mediaType 派生, 不经 props 传递链。 */
+const llmTarget = computed(() =>
+  MODEL_TYPES[store.activeModelType]?.mediaType === 'video' ? 'video' : 'sdxl',
+)
+
 function onSubmit() {
   if (props.llm.running.value) return
-  props.llm.submit(textInput.value)
+  props.llm.submit(textInput.value, llmTarget.value)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -258,7 +267,7 @@ const showNegative = computed(() =>
             <div class="llm-result-block">
               <div class="llm-result-block__label">
                 <MsIcon name="add_circle" size="xs" color="none" />
-                Positive
+                {{ t('generate.prompt.positive_label') }}
               </div>
               <div class="llm-result-block__text llm-result-block__text--pos">{{ llm.result.value.positive }}</div>
             </div>
@@ -266,7 +275,7 @@ const showNegative = computed(() =>
             <div v-if="showNegative" class="llm-result-block">
               <div class="llm-result-block__label">
                 <MsIcon name="remove_circle" size="xs" color="none" />
-                Negative
+                {{ t('generate.prompt.negative_label') }}
               </div>
               <div class="llm-result-block__text llm-result-block__text--neg">{{ llm.result.value.negative }}</div>
             </div>

@@ -356,9 +356,12 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_vae_decode(self, samples_node_id: str, vae_ref) -> str:
+    def add_vae_decode(self, samples_ref, vae_ref) -> str:
         """
         VAE 解码 Latent → Image。
+        samples_ref: 采样器输出引用 — str (旧风格, 默认 index=0) 或 (node_id, output_index) 元组。
+                     不可直接拼 [ref, 0]: tuple 传入会产生嵌套 list, ComfyUI 校验即抛
+                     "unhashable type: 'list'" (Wan22 链路踩过)。
         vae_ref:
           - str (向后兼容): CheckpointLoader → 默认 index=2
           - tuple (node_id, output_index): 独立 VAELoader → (node_id, 0)
@@ -368,7 +371,7 @@ class WorkflowBuilder:
         self._nodes[nid] = {
             "class_type": "VAEDecode",
             "inputs": {
-                "samples": [samples_node_id, 0],
+                "samples": self._ref(samples_ref, default_idx=0),
                 "vae": self._ref(vae_ref, default_idx=2),
             },
         }
@@ -448,6 +451,226 @@ class WorkflowBuilder:
                 "strength_clip": strength_clip,
                 "model": self._ref(model_ref, default_idx=0),
                 "clip": self._ref(clip_ref, default_idx=1),
+            },
+        }
+        return nid
+
+    # ── 视频节点 (Wan 2.2) ───────────────────────────────────────────────────
+
+    def add_model_sampling_sd3(self, model_ref, shift: float = 5.0) -> str:
+        """
+        ModelSamplingSD3 — 调整模型采样的 shift 参数 (Wan/Hunyuan/SD3 族)。
+        Wan 14B shift=5.0, 5B shift=8.0, Hunyuan 1.5 shift=7.0。
+        model_ref: 上游 MODEL 引用 (UNETLoader / LoraLoaderModelOnly 输出 index 0)。
+        输出: [node_id, 0]=MODEL (接替上游 MODEL 链)
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "ModelSamplingSD3",
+            "inputs": {
+                "shift": float(shift),
+                "model": self._ref(model_ref, default_idx=0),
+            },
+        }
+        return nid
+
+    def add_ksampler_advanced(
+        self,
+        model_ref,
+        positive_ref,
+        negative_ref,
+        latent_ref,
+        add_noise: bool = True,
+        steps: int = 20,
+        cfg: float = 7.0,
+        sampler: str = "euler",
+        scheduler: str = "normal",
+        start_at_step: int = 0,
+        end_at_step: int = 20,
+        return_with_leftover_noise: bool = False,
+        seed: int = -1,
+    ) -> str:
+        """
+        KSamplerAdvanced — 双段采样核心 (Wan 14B 高噪/低噪分链)。
+        与 KSampler 的差异: 显式控制 add_noise / start_at_step / end_at_step /
+        return_with_leftover_noise, 用于两段串接采样。
+        add_noise=True 时注入新噪声 (高噪段), False 时复用上段残留噪声 (低噪段)。
+        return_with_leftover_noise=True 时保留噪声给下段 (高噪段), False 时丢弃 (末段)。
+        seed=-1 → 运行时随机生成。
+        输出: [node_id, 0]=LATENT
+        """
+        nid = self._next_id()
+        actual_seed = seed if seed >= 0 else random.randint(0, 2**32 - 1)
+        self._nodes[nid] = {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                # 注意输入名是 noise_seed 而非 seed (KSampler 才叫 seed), 与 ComfyUI object_info 对齐
+                "noise_seed": actual_seed,
+                "steps": int(steps),
+                "cfg": float(cfg),
+                "sampler_name": sampler,
+                "scheduler": scheduler,
+                "add_noise": "enable" if add_noise else "disable",
+                "start_at_step": int(start_at_step),
+                "end_at_step": int(end_at_step),
+                "return_with_leftover_noise": "enable" if return_with_leftover_noise else "disable",
+                "model": self._ref(model_ref, default_idx=0),
+                "positive": self._ref(positive_ref, default_idx=0),
+                "negative": self._ref(negative_ref, default_idx=0),
+                "latent_image": self._ref(latent_ref, default_idx=0),
+            },
+        }
+        return nid
+
+    def add_empty_hunyuan_latent_video(
+        self, width: int, height: int, length: int = 81, batch_size: int = 1,
+    ) -> str:
+        """
+        EmptyHunyuanLatentVideo — Wan 2.2 14B t2v 空 latent。
+        Wan 2.2 14B t2v 官方模板使用此节点 (与 Hunyuan Video 共用)。
+        length = 帧数 = fps × duration + 1 (16fps × 5s = 81)。
+        输出: [node_id, 0]=LATENT
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "EmptyHunyuanLatentVideo",
+            "inputs": {
+                "width": int(width),
+                "height": int(height),
+                "length": int(length),
+                "batch_size": int(batch_size),
+            },
+        }
+        return nid
+
+    def add_wan_image_to_video(
+        self,
+        positive_ref,
+        negative_ref,
+        vae_ref,
+        start_image_ref,
+        width: int,
+        height: int,
+        length: int,
+        batch_size: int = 1,
+        clip_vision_ref=None,
+    ) -> str:
+        """
+        WanImageToVideo — Wan 2.2 14B i2v 起始节点。
+        接收原始 positive/negative + vae + start_image, 同时输出:
+          [0]=改写后的 positive CONDITIONING
+          [1]=改写后的 negative CONDITIONING
+          [2]=latent (基于 start_image 编码)
+        clip_vision_ref: 可选 CLIP-Vision 输出 (Wan 2.2 不需要, 留作扩展)。
+        下游 KSamplerAdvanced 的 positive/negative/latent 应引用本节点的 0/1/2。
+        """
+        nid = self._next_id()
+        inputs = {
+            "positive": self._ref(positive_ref, default_idx=0),
+            "negative": self._ref(negative_ref, default_idx=0),
+            "vae": self._ref(vae_ref, default_idx=0),
+            "start_image": self._ref(start_image_ref, default_idx=0),
+            "width": int(width),
+            "height": int(height),
+            "length": int(length),
+            "batch_size": int(batch_size),
+        }
+        if clip_vision_ref is not None:
+            inputs["clip_vision_output"] = self._ref(clip_vision_ref, default_idx=0)
+        self._nodes[nid] = {
+            "class_type": "WanImageToVideo",
+            "inputs": inputs,
+        }
+        return nid
+
+    def add_wan22_i2v_latent(
+        self,
+        vae_ref,
+        width: int,
+        height: int,
+        length: int,
+        batch_size: int = 1,
+        start_image_ref=None,
+    ) -> str:
+        """
+        Wan22ImageToVideoLatent — Wan 2.2 5B 双模式 latent 节点。
+        vae_ref: 必需输入 (Wan2.2 VAE 输出), t2v/i2v 两模式都要接。
+        start_image_ref=None → t2v 模式 (空 latent);
+        start_image_ref 给定 → i2v 模式 (基于图编码 latent)。
+        官方模板中 LoadImage 为 BYPASS 即 t2v, 接入即 i2v。
+        输出: [node_id, 0]=LATENT
+        """
+        nid = self._next_id()
+        inputs = {
+            "vae": self._ref(vae_ref, default_idx=0),
+            "width": int(width),
+            "height": int(height),
+            "length": int(length),
+            "batch_size": int(batch_size),
+        }
+        if start_image_ref is not None:
+            inputs["start_image"] = self._ref(start_image_ref, default_idx=0)
+        self._nodes[nid] = {
+            "class_type": "Wan22ImageToVideoLatent",
+            "inputs": inputs,
+        }
+        return nid
+
+    def add_create_video(self, images_ref, fps: int = 16) -> str:
+        """
+        CreateVideo — 将 IMAGE 序列封装为 VIDEO (帧率绑定)。
+        Wan 14B fps=16, 5B fps=24 (帧率随条目锁定, 不进 UI)。
+        输出: [node_id, 0]=VIDEO
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "CreateVideo",
+            "inputs": {
+                # 输入名是 fps (FLOAT) 而非 frame_rate, 与 ComfyUI object_info 对齐
+                "fps": float(fps),
+                "images": self._ref(images_ref, default_idx=0),
+            },
+        }
+        return nid
+
+    def add_save_video(
+        self, video_ref, prefix: str = "video/ComfyUI",
+        format: str = "mp4", codec: str = "h264",
+    ) -> str:
+        """
+        SaveVideo — 持久化视频 (mp4/h264 首发锁定, 浏览器与 Companion 兼容最佳)。
+        prefix 含路径分隔时按目录拆分 (如 "video/Wan2.2_i2v")。
+        format: auto | mp4 | webm; codec: auto | h264 | vp9。
+        输出: 无 (末端节点)
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SaveVideo",
+            "inputs": {
+                "video": self._ref(video_ref, default_idx=0),
+                "filename_prefix": prefix,
+                "format": format,
+                "codec": codec,
+            },
+        }
+        return nid
+
+    def add_lora_loader_model_only(
+        self, model_ref, lora_name: str, strength_model: float = 1.0,
+    ) -> str:
+        """
+        LoraLoaderModelOnly — 只改 MODEL 链, 不改 CLIP。
+        用于 Wan 2.2 Lightning 加速件 (high/low 噪声段各挂一件) 及视频 LoRA。
+        model_ref: 上游 MODEL 引用 (UNETLoader / 前一个 LoraLoaderModelOnly 输出 index 0)。
+        输出: [node_id, 0]=MODEL (接替上游 MODEL 链, 无 CLIP 输出)
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "lora_name": lora_name,
+                "strength_model": float(strength_model),
+                "model": self._ref(model_ref, default_idx=0),
             },
         }
         return nid
@@ -1074,7 +1297,7 @@ def build_sdxl_workflow(params: dict) -> dict:
     model_ref = ckpt
     clip_ref = ckpt
 
-    # 1.5 Clip Skip (B4): clip_skip>1 → 在 checkpoint loader 之后插入 CLIPSetLastLayer,
+    # 1.5 Clip Skip: clip_skip>1 → 在 checkpoint loader 之后插入 CLIPSetLastLayer,
     #     LoRA 链与文本编码消费其输出 (stop_at_clip_layer = -clip_skip)。
     clip_skip = int(params.get("clip_skip", 1) or 1)
     if clip_skip > 1:
@@ -1082,7 +1305,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         # CLIPSetLastLayer 输出 CLIP 在 index=0 (区别于 CheckpointLoaderSimple 的 index=1)
         clip_ref = (clip_skip_node, 0)
 
-    # 1.6 VAE 覆盖 (B4): vae 非空 → VAELoader 节点, 工作流中所有 VAE 引用统一改用它。
+    # 1.6 VAE 覆盖: vae 非空 → VAELoader 节点, 工作流中所有 VAE 引用统一改用它。
     #     vae_ref 为单一变量, 后续 t2i decode / i2i·inpaint encode+decode / hires / upscale
     #     全部引用它, 避免漏改某分支。无覆盖时 vae_ref = ckpt (走 CheckpointLoader index=2)。
     vae_override = str(params.get("vae", "") or "").strip()
@@ -1172,7 +1395,7 @@ def build_sdxl_workflow(params: dict) -> dict:
     # 6. VAE 解码 (VAE 引用 vae_ref: 覆盖时 = VAELoader, 否则 = Checkpoint index=2)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # ── 面部重绘 (FR-2 双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
+    # ── 面部重绘 (双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
     # 无 HiRes → 此处 (放大之前, 避免 max_size 压缩致修后脸偏软); 有 HiRes → HiRes 之后
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
@@ -1217,7 +1440,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         )
         final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
-        # ── 面部重绘 (FR-2 双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
+        # ── 面部重绘 (双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
         if face_enabled:
             final_image = _add_face_detailer_chain(
                 b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
@@ -1331,8 +1554,8 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     profile = _SPLIT_ARCH_PROFILES.get(arch, _SPLIT_ARCH_PROFILES["anima"])
     b = WorkflowBuilder()
 
-    # §5.1 加载分支: packaging='checkpoint' → CheckpointLoaderSimple (整合包, model/clip/vae 同节点);
-    #                  packaging='split' (默认) → UNETLoader + CLIPLoader + VAELoader (三件套)
+    # 加载分支: packaging='checkpoint' → CheckpointLoaderSimple (整合包, model/clip/vae 同节点);
+    #           packaging='split' (默认) → UNETLoader + CLIPLoader + VAELoader (三件套)
     # CheckpointLoaderSimple 输出 MODEL@0 / CLIP@1 / VAE@2, 恰好落在 _ref 默认索引 →
     # 下游 LoRA/编码/CN/采样/latent/decode 全部不变, 一次做完全架构吃到整合包形态。
     packaging = params.get("packaging", "split")
@@ -1454,7 +1677,7 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     # 6. VAE 解码 (独立 VAELoader, index=0)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # ── 面部重绘 (FR-2 双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
+    # ── 面部重绘 (双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
     # 无 HiRes → 此处 (放大之前); 有 HiRes → HiRes 之后。缺省采样器/调度器随 profile
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
@@ -1497,7 +1720,7 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         )
         final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
-        # ── 面部重绘 (FR-2 双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
+        # ── 面部重绘 (双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
         if face_enabled:
             final_image = _add_face_detailer_chain(
                 b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
@@ -1560,7 +1783,6 @@ def build_flux2_workflow(params: dict) -> dict:
     加载分支 (packaging):
       - 'split'      (默认): UNETLoader + CLIPLoader(type=flux2, 单) + VAELoader
       - 'checkpoint' (整合包): CheckpointLoaderSimple (输出 MODEL@0/CLIP@1/VAE@2)
-                               Phase 1 主 agent 抽共享辅助函数后此分支可统一迁移
 
     节点拓扑:
       [load: unet+clip+vae | checkpoint]
@@ -1678,6 +1900,296 @@ def build_flux2_workflow(params: dict) -> dict:
     return b.build()
 
 
+# ── Wan 2.2 视频工作流 ───────────────────────────────────────────────────────
+
+# 内置中文负面模板 — 标准档 negative 为空时注入。
+WAN22_DEFAULT_NEGATIVE = (
+    "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，"
+    "静止，整体发灰，最差质量，劣质画面，坏手，变形手，多余手指，"
+    "缺少手指，畸形，丑陋脸，模糊脸，不自然的面部，错误的人体，"
+    "多肢体，畸形肢体，多余肢体，残缺肢体，不自然的姿势，扭曲身体，"
+    "变形身体，不自然的动作，错误动作，不连贯运动，画面闪烁，画面抖动"
+)
+
+# Wan 2.2 Lightning 加速件文件名 — t2v 与 i2v 不通用, high/low 成对。
+WAN22_LIGHTNING_LORAS = {
+    "t2v": {
+        "high": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+        "low": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+    },
+    "i2v": {
+        "high": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+        "low": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+    },
+}
+
+# 帧率随条目锁定: 14B=16fps, 5B=24fps。改帧率即改动作速度, 故不暴露。
+WAN22_FPS = {"t2v": 16, "i2v": 16, "5b": 24}
+
+# shift: 14B=5.0, 5B=8.0。
+WAN22_SHIFT = {"t2v": 5.0, "i2v": 5.0, "5b": 8.0}
+
+# 速度档参数 (仅 14B)。快速档自动注入 high+low 加速件对 (按 variant)。
+WAN22_SPEED_PROFILES = {
+    "fast": {"steps": 4, "split": 2, "cfg": 1.0, "use_negative": False, "inject_lightning": True},
+    "standard": {"steps": 20, "split": None, "cfg": 3.5, "use_negative": True, "inject_lightning": False},
+}
+
+
+def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
+    """
+    Wan 2.2 视频工作流 — 三 variant (t2v/i2v/5b) 平级于 build_flux2_workflow。
+
+    variant 拓扑:
+      - 't2v' (14B 双链): 两 UNETLoader(high/low) → [加速件] → [用户LoRA] →
+        ModelSamplingSD3(shift=5.0) → 两段 KSamplerAdvanced (euler/simple)。
+        latent = EmptyHunyuanLatentVideo。fps=16。
+      - 'i2v' (14B 双链): 与 t2v 同构, latent 换 WanImageToVideo (接 start_image + vae,
+        输出改写后的正/负/latent), 权重与加速件换 i2v 版。fps=16。
+      - '5b'  (单链): 单 UNETLoader → ModelSamplingSD3(shift=8.0) → 单 KSampler
+        (uni_pc/simple/steps=20/cfg=5.0/denoise=1.0)。latent = Wan22ImageToVideoLatent
+        (接 start_image=i2v, 不接=t2v)。fps=24。无速度档。
+
+    速度档 (仅 14B t2v/i2v):
+      - fast:   steps=4, split=2, cfg=1.0, 自动注入对应 variant 的 high+low 加速件对,
+                忽略 negative (cfg=1 无效)。
+      - standard: steps=20 (可调, 默认 20), split=steps//2, cfg=3.5, 不挂加速件,
+                使用 negative, 空则注入内置中文负面模板 WAN22_DEFAULT_NEGATIVE。
+
+    LoRA apply 分链 (仅 14B): loras[].apply ∈ {'high','low','both'}:
+      - 'high' → 挂到高噪段 MODEL 链 (KSamplerAdvanced #1)
+      - 'low'  → 挂到低噪段 MODEL 链 (KSamplerAdvanced #2)
+      - 'both' → 同时挂两段 (默认)
+
+    尾链: VAEDecode → CreateVideo(fps) → SaveVideo(mp4/h264), 前缀对齐日期分目录习惯。
+
+    params 关键字段:
+        unet_high        (str, 14B 必填)   — 高噪段 UNet 文件名 (models/diffusion_models/)
+        unet_low         (str, 14B 必填)   — 低噪段 UNet 文件名
+        unet             (str, 5B 必填)    — 单 UNet 文件名
+        unet_weight_dtype (str)           — UNet 权重精度, 默认 "default"
+        clip             (str, 必填)      — Text Encoder (umt5_xxl)
+        vae              (str, 必填)      — VAE (14B=wan_2.1_vae, 5B=wan2.2_vae)
+        positive_prompt (str, 必填)       — 正向提示词
+        negative_prompt (str)             — 负向提示词 (标准档空则注入内置模板)
+        width            (int)            — 宽度 (14B %16, 5B %32)
+        height           (int)            — 高度
+        duration_s       (float)          — 时长秒 (帧数 = fps×duration+1)
+        length           (int)            — 帧数 (显式覆盖 duration_s 计算)
+        batch_size       (int)            — 批量, 默认 1 (视频恒 1)
+        seed             (int)            — 种子, -1 = 随机
+        steps            (int)            — 标准档步数 (默认 20; 快速档忽略)
+        cfg              (float)          — 标准档 CFG (默认 3.5; 快速档忽略)
+        speed            (str, 14B)       — 'fast' | 'standard' (默认 'fast')
+        start_image      (str, i2v/5b)    — 起始画面文件名 (ComfyUI input/)
+        loras            (list)           — LoRA: [{name, strength, apply}]
+        save_prefix      (str)            — 保存前缀 (默认 "video/ComfyCarry")
+
+    返回值: ComfyUI /prompt API 所需的 prompt dict
+    """
+    if variant not in ("t2v", "i2v", "5b"):
+        raise ValueError(f"不支持的 variant: {variant!r}, 应为 t2v/i2v/5b")
+
+    b = WorkflowBuilder()
+
+    # ── 1. 加载层 ──────────────────────────────────────────────────────────
+    # TE/VAE 全 variant 共用: 单 CLIPLoader(type=wan) + VAELoader。
+    # 14B: 两个 UNETLoader (high/low); 5B: 单 UNETLoader。
+    clip_node = b.add_clip_loader_single(
+        params["clip"], type="wan",
+        device=str(params.get("clip_device", "default")),
+    )
+    vae_node = b.add_vae_loader(params["vae"])
+    clip_ref = (clip_node, 0)
+    vae_ref = (vae_node, 0)
+
+    is_14b = variant in ("t2v", "i2v")
+
+    # ── 2. 提示词编码 (全 variant 共用) ─────────────────────────────────────
+    # 速度档决定 negative 可见性: fast 忽略 negative (cfg=1 无效); standard 使用之。
+    if is_14b:
+        speed = str(params.get("speed", "fast")).lower()
+        if speed not in ("fast", "standard"):
+            speed = "fast"
+        profile = WAN22_SPEED_PROFILES[speed]
+    else:
+        # 5B 无速度档: 恒 standard 风格 (有负面, 不挂加速件)。
+        speed, profile = "standard", WAN22_SPEED_PROFILES["standard"]
+
+    positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
+    pos_ref = (positive, 0)
+
+    if profile["use_negative"]:
+        neg_text = str(params.get("negative_prompt", "")).strip()
+        if not neg_text:
+            neg_text = WAN22_DEFAULT_NEGATIVE
+        negative = b.add_clip_text_encode(neg_text, clip_ref)
+        neg_ref = (negative, 0)
+    else:
+        # fast 档 (cfg=1.0): negative 在采样中不生效, 但**必须是独立节点**, 不能复用 positive。
+        # 原因: i2v 的 WanImageToVideo 会改写正负 conditioning (对 negative 做 mask/concat 处理),
+        # 若正负指向同一节点则其行为未定义; 且官方模板的 negative 始终是独立 CLIPTextEncode。
+        # 用空串编码, 语义上等价于"无负面"且开销极小。
+        negative = b.add_clip_text_encode("", clip_ref)
+        neg_ref = (negative, 0)
+
+    # ── 3. MODEL 链 + latent + 采样 (按 variant 分流) ───────────────────────
+    fps = WAN22_FPS[variant]
+    shift = float(params.get("shift", WAN22_SHIFT[variant]))
+
+    # 帧数: 显式 length 优先, 否则 fps × duration_s + 1。
+    length = int(params.get("length", 0))
+    if length <= 0:
+        duration = float(params.get("duration_s", 5))
+        length = max(1, int(fps * duration) + 1)
+
+    width = int(params.get("width", 640 if is_14b else 1280))
+    height = int(params.get("height", 640 if is_14b else 704))
+    batch_size = max(1, min(int(params.get("batch_size", 1)), 1))  # 视频恒 1
+    seed = int(params.get("seed", -1))
+
+    if is_14b:
+        # 14B 双链
+        unet_high_node = b.add_unet_loader(
+            params["unet_high"],
+            weight_dtype=str(params.get("unet_weight_dtype", "default")),
+        )
+        unet_low_node = b.add_unet_loader(
+            params["unet_low"],
+            weight_dtype=str(params.get("unet_weight_dtype", "default")),
+        )
+        high_model = (unet_high_node, 0)
+        low_model = (unet_low_node, 0)
+
+        # 加速件 (快速档): high/low 各挂一件到对应段, 在用户 LoRA 之前。
+        if profile["inject_lightning"]:
+            lora_pair = WAN22_LIGHTNING_LORAS[variant]
+            high_light = b.add_lora_loader_model_only(
+                high_model, lora_pair["high"], strength_model=1.0,
+            )
+            high_model = (high_light, 0)
+            low_light = b.add_lora_loader_model_only(
+                low_model, lora_pair["low"], strength_model=1.0,
+            )
+            low_model = (low_light, 0)
+
+        # 用户 LoRA 分链挂载 (apply ∈ high/low/both, 默认 both)。
+        for lora_entry in (params.get("loras") or []):
+            lora_name = str(lora_entry.get("name", "")).strip()
+            if not lora_name:
+                continue
+            strength = float(lora_entry.get("strength", 1.0))
+            apply = str(lora_entry.get("apply", "both")).lower()
+            if apply in ("high", "both"):
+                node = b.add_lora_loader_model_only(high_model, lora_name, strength)
+                high_model = (node, 0)
+            if apply in ("low", "both"):
+                node = b.add_lora_loader_model_only(low_model, lora_name, strength)
+                low_model = (node, 0)
+
+        # ModelSamplingSD3(shift) — 两段各接一件。
+        high_ms = b.add_model_sampling_sd3(high_model, shift=shift)
+        low_ms = b.add_model_sampling_sd3(low_model, shift=shift)
+        high_model = (high_ms, 0)
+        low_model = (low_ms, 0)
+
+        # latent 来源: t2v = EmptyHunyuanLatentVideo; i2v = WanImageToVideo。
+        if variant == "i2v":
+            start_image_name = str(params.get("start_image", "")).strip()
+            start_image_node = b.add_load_image(start_image_name)
+            i2v_node = b.add_wan_image_to_video(
+                pos_ref, neg_ref, vae_ref, start_image_node,
+                width=width, height=height, length=length, batch_size=batch_size,
+            )
+            # WanImageToVideo 输出: 0=改写 pos, 1=改写 neg, 2=latent。
+            i2v_pos = (i2v_node, 0)
+            i2v_neg = (i2v_node, 1)
+            latent_ref = (i2v_node, 2)
+        else:
+            latent_ref = (b.add_empty_hunyuan_latent_video(
+                width, height, length=length, batch_size=batch_size,
+            ), 0)
+            i2v_pos = i2v_neg = None
+
+        # 两段 KSamplerAdvanced: #1 add_noise=enable 0→split leftover=enable;
+        #                              #2 add_noise=disable split→steps leftover=disable。
+        steps = int(params.get("steps", profile["steps"]))
+        split = profile["split"]
+        if split is None:
+            split = steps // 2
+        cfg = float(params.get("cfg", profile["cfg"]))
+        sampler = str(params.get("sampler", "euler"))
+        scheduler = str(params.get("scheduler", "simple"))
+
+        # 高噪段: 用 high_model + (i2v 改写后的或原始) pos/neg + latent。
+        ks_pos = i2v_pos if i2v_pos is not None else pos_ref
+        ks_neg = i2v_neg if i2v_neg is not None else neg_ref
+        ks1 = b.add_ksampler_advanced(
+            high_model, ks_pos, ks_neg, latent_ref,
+            add_noise=True, steps=steps, cfg=cfg,
+            sampler=sampler, scheduler=scheduler,
+            start_at_step=0, end_at_step=split,
+            return_with_leftover_noise=True, seed=seed,
+        )
+        # 低噪段: 用 low_model + 同 conditioning + 段1 输出的 latent。
+        ks2 = b.add_ksampler_advanced(
+            low_model, ks_pos, ks_neg, (ks1, 0),
+            add_noise=False, steps=steps, cfg=cfg,
+            sampler=sampler, scheduler=scheduler,
+            start_at_step=split, end_at_step=steps,
+            return_with_leftover_noise=False, seed=seed,
+        )
+        sampled = (ks2, 0)
+    else:
+        # 5B 单链: 单 UNETLoader → ModelSamplingSD3(shift=8.0) → 单 KSampler。
+        unet_node = b.add_unet_loader(
+            params["unet"],
+            weight_dtype=str(params.get("unet_weight_dtype", "default")),
+        )
+        model_ref = (unet_node, 0)
+
+        # 5B 不挂加速件 (无对应 LoRA), 用户 LoRA 仍可挂 (apply 字段忽略, 单链)。
+        for lora_entry in (params.get("loras") or []):
+            lora_name = str(lora_entry.get("name", "")).strip()
+            if not lora_name:
+                continue
+            strength = float(lora_entry.get("strength", 1.0))
+            node = b.add_lora_loader_model_only(model_ref, lora_name, strength)
+            model_ref = (node, 0)
+
+        ms_node = b.add_model_sampling_sd3(model_ref, shift=shift)
+        model_ref = (ms_node, 0)
+
+        # latent: Wan22ImageToVideoLatent (接图=i2v, 不接=t2v; vae 为必需输入)。
+        start_image_name = str(params.get("start_image", "")).strip()
+        latent_node = b.add_wan22_i2v_latent(
+            vae_ref,
+            width, height, length=length, batch_size=batch_size,
+            start_image_ref=(b.add_load_image(start_image_name) if start_image_name else None),
+        )
+        latent_ref = (latent_node, 0)
+
+        steps = int(params.get("steps", 20))
+        cfg = float(params.get("cfg", 5.0))
+        sampler = str(params.get("sampler", "uni_pc"))
+        scheduler = str(params.get("scheduler", "simple"))
+
+        ks = b.add_ksampler(
+            model_ref, pos_ref, neg_ref, latent_ref,
+            seed=seed, steps=steps, cfg=cfg,
+            sampler=sampler, scheduler=scheduler, denoise=1.0,
+        )
+        sampled = (ks, 0)
+
+    # ── 4. 尾链: VAEDecode → CreateVideo(fps) → SaveVideo ──────────────────
+    decoded = b.add_vae_decode(sampled, vae_ref)
+    video = b.add_create_video(decoded, fps=fps)
+    save_prefix = str(params.get("save_prefix", "video/ComfyCarry")).strip() or "video/ComfyCarry"
+    b.add_save_video(video, prefix=save_prefix, format="mp4", codec="h264")
+
+    return b.build()
+
+
 def build_preprocess_workflow(params: dict) -> dict:
     """
     构建 ControlNet 预处理工作流。
@@ -1777,5 +2289,5 @@ def build_tag_workflow(params: dict) -> dict:
     }
 
 
-# Phase 2+ 扩展占位符:
+# 扩展占位符:
 # def build_flux2_workflow(params): ...  # 已实装于上方 (SamplerCustomAdvanced + Flux2Scheduler)

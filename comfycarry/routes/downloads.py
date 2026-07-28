@@ -494,16 +494,22 @@ def api_downloads_civitai():
         "model_type": "checkpoint",
         "version_id": 67890,
         "custom_filename": "my_model.safetensors",
-        "api_key": "..."
+        "api_key": "...",
+        "dir_keys": {"<filename>": "<MODEL_DIRS key>"}   // 用户裁决 (二次提交)
       }
 
     响应:
       {"download_id": "dl-xxx", "status": "active", "message": "...", ...}
+
+      判不出目录时**不提交下载**, 返回 409 + needs_classification, 前端弹目录
+      选择, 用户选完带 dir_keys 重新调本端点。契约见
+      docs/DOWNLOAD_CLASSIFICATION_SPEC.md §5-B。
     """
     from ..services.civitai_resolver import (
         resolve_civitai_download, save_model_metadata, download_preview_image,
-        enrich_model_by_hash,
+        enrich_model_by_hash, NoDownloadableFiles,
     )
+    from ..services.header_probe import ProbeAuthError
     from ..utils import _get_api_key
 
     data = request.get_json(force=True) or {}
@@ -521,6 +527,16 @@ def api_downloads_civitai():
             version_id = None
     custom_filename = data.get("custom_filename", "")
 
+    # 用户在目录选择 modal 里的裁决 (二次提交时带回)。只接受 MODEL_DIRS 里的 key,
+    # 防止前端传任意路径造成目录穿越。
+    dir_keys = {}
+    raw_dir_keys = data.get("dir_keys") or {}
+    if isinstance(raw_dir_keys, dict):
+        for fname, key in raw_dir_keys.items():
+            key = str(key or "").strip()
+            if key and key in MODEL_DIRS:
+                dir_keys[str(fname)] = key
+
     try:
         resolved = resolve_civitai_download(
             input_str=model_input,
@@ -528,11 +544,39 @@ def api_downloads_civitai():
             version_id=version_id,
             api_key=api_key,
             custom_filename=custom_filename,
+            dir_keys=dir_keys or None,
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except ProbeAuthError:
+        # T1 探针收到 401 —— 文件需付费或无权限下载。
+        # 不创建下载任务 (探针是 preflight, 在建任务前拦住)。
+        # 返回 403 + probe_auth 标记, 前端据此 toast 且不进 409 弹窗流程。
+        return jsonify({
+            "error": "该文件需付费或无权限下载",
+            "probe_auth": True,
+        }), 403
+    except NoDownloadableFiles as e:
+        # 422 而非 502 —— 是这个 version 的内容本身没有权重, 重试无用。
+        return jsonify({"error": str(e)}), 422
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
+
+    # 有文件判不出目录 → 不提交下载, 让前端弹目录选择。
+    # 用 409 而非 200: 这是一次**未完成**的提交, 前端必须处理后重试。
+    if resolved.get("needs_classification"):
+        return jsonify({
+            "needs_classification": True,
+            "pending_files": resolved["pending_files"],
+            "civitai_url": resolved.get("civitai_url", ""),
+            "display_name": resolved.get("display_name", ""),
+            "model_id": model_input,
+            "version_id": version_id,
+            # 可选目录全集随响应下发, 前端不再复制一份 MODEL_DIRS (单一事实源)
+            "dir_options": [
+                {"key": k, "path": v} for k, v in sorted(MODEL_DIRS.items())
+            ],
+        }), 409
 
     # Early Access 付费模型检测
     info = resolved["info"]
@@ -547,22 +591,9 @@ def api_downloads_civitai():
         # EarlyAccess 但不收费: 可能仅需登录, 继续尝试下载
 
     def _on_civitai_complete(task):
+        # 目录已在下载**前**逐文件定好 (download_classify), 这里不再有归位/移动 ——
+        # 文件落在哪就是哪, 完成钩子只负责写元数据。
         model_path = os.path.join(task.save_dir, task.filename)
-        # §4.2 下载归位: 读文件头判 detect_packaging → 整合包/UNet 落对目录
-        # (CivitAI Checkpoint type 一律先落 checkpoints/, 完成后按内容修正)
-        try:
-            from ..services.civitai_resolver import (
-                relocate_after_download, update_sidecar_path,
-                save_model_metadata, download_preview_image,
-            )
-            base_model = (task.meta or {}).get("base_model", "") or ""
-            new_path, action = relocate_after_download(model_path, base_model)
-            if action in ('moved_ckpt', 'moved_split'):
-                update_sidecar_path(model_path, new_path)
-                model_path = new_path
-        except Exception as e:
-            logger.warning(f"CivitAI 下载归位失败: {e}")
-
         try:
             save_model_metadata(model_path, info)
             download_preview_image(model_path, info.get("images", []))

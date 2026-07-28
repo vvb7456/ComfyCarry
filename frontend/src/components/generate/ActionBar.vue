@@ -44,12 +44,21 @@ interface RunModeConfig {
 
 const isRunning = computed(() => props.execState != null)
 
-const runModes = computed<RunModeConfig[]>(() => [
-  { key: 'normal', icon: 'play_arrow', label: t('generate.action.run') },
-  { key: 'live', icon: 'loop', label: t('generate.action.run_live') },
+// 视频架构隐藏「运行（实时）」— 仅保留「运行 / 运行（后台）」。
+// 后台运行照常可用 (worker 对时长无假设)。
+const isVideo = computed(() => store.currentConfig.mediaType === 'video')
+
+const runModes = computed<RunModeConfig[]>(() => {
+  const modes: RunModeConfig[] = [
+    { key: 'normal', icon: 'play_arrow', label: t('generate.action.run') },
+  ]
+  if (!isVideo.value) {
+    modes.push({ key: 'live', icon: 'loop', label: t('generate.action.run_live') })
+  }
   // 后台模式: ComfyUI 忙时 disabled (props.execState != null)
-  { key: 'background', icon: 'schedule', label: t('generate.action.run_background'), disabled: isRunning.value },
-])
+  modes.push({ key: 'background', icon: 'schedule', label: t('generate.action.run_background'), disabled: isRunning.value })
+  return modes
+})
 
 const currentRunMode = computed(() =>
   runModes.value.find(m => m.key === state.value.runMode) ?? runModes.value[0]
@@ -122,7 +131,9 @@ function onIterBlur() {
 function onSplitClick() {
   if (isRunning.value) { emit('stop'); return }
   if (isBlocked.value) { emit('blocked', props.blockedReason!); return }
-  emit('run', state.value.runMode)
+  // 视频架构无实时模式: 若 state 残留 live (从图像任务切来/旧数据), 降级为 normal
+  const mode = (isVideo.value && state.value.runMode === 'live') ? 'normal' : state.value.runMode
+  emit('run', mode)
 }
 
 function onSplitSelect(key: string) {

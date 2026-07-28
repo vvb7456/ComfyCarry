@@ -68,6 +68,8 @@ def restore_ssh_config():
             added += 1
 
         if new_lines:
+            # 镜像预置的 key 可能没有末尾换行, 直接 append 会与之粘成一行 (两个 key 一起失效)
+            _ensure_trailing_newline(AUTHORIZED_KEYS_FILE)
             with open(AUTHORIZED_KEYS_FILE, "a") as f:
                 for line in new_lines:
                     f.write(line + "\n")
@@ -332,6 +334,28 @@ def _mark_key_source(keys):
         else:
             k["source"] = "manual"
     return keys
+
+
+def _ensure_trailing_newline(path):
+    """追加写入前, 确保文件以换行结尾。
+
+    authorized_keys 每行一个 key, 以 append 方式加 key 时必须先确认原文件末尾有换行 ——
+    否则新 key 会直接粘在最后一行尾部, 拼成一条畸形行, 导致**该行涉及的所有 key 全部失效**
+    (sshd 认不出, ssh-keygen -lf 报 "not a public key file")。
+
+    实测踩到过: 容器镜像预置的 key 无末尾换行, 面板 wizard 追加公钥后两个 key 一起作废。
+    容器/镜像预置内容不由我们控制, 故追加方必须自己兜住。
+    """
+    try:
+        if not os.path.exists(path) or os.path.getsize(path) == 0:
+            return
+        with open(path, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                with open(path, "ab") as af:
+                    af.write(b"\n")
+    except OSError:
+        pass
 
 
 def _save_keys_to_file(keys):

@@ -14,7 +14,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # ── 版本号 (唯一源) ──────────────────────────────────────────
-APP_VERSION = "v0.4.2"
+APP_VERSION = "v0.5.0"
 
 # ── 核心路径常量 ─────────────────────────────────────────────
 COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
@@ -408,7 +408,7 @@ REMOTE_TYPE_DEFS = {
 
 
 # ── Companion (桌面客户端) 配置 ──────────────────────────────
-# 面板侧 rclone serve webdav 绑定端口 (经 cloudflared /dav 路径暴露)
+# 面板侧 rclone serve webdav 绑定端口 (经 Flask 反代 /api/companion/dav 暴露)
 try:
     COMPANION_DAV_PORT = int(os.environ.get("COMPANION_DAV_PORT") or 8688)
 except (ValueError, TypeError):

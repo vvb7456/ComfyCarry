@@ -1,55 +1,219 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
+import type { PreviewImage, PreviewPhase, VideoMeta } from '@/composables/generate/useGeneratePreview'
+import {
+  derivePreviewPhase,
+  deriveStageSegment,
+  isVideoFile,
+  buildVideoThumbUrl,
+} from '@/composables/generate/useGeneratePreview'
+import type { ExecState } from '@/composables/useExecTracker'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'PreviewArea' })
 
-defineProps<{
+const props = withDefaults(defineProps<{
   images: PreviewImage[]
   loading: boolean
   currentPreview: string | null
-}>()
+  /** 媒体类型: 'image' = 图像架构 (默认, 回归保护); 'video' = 视频架构。
+   *  ModelTab 传 :media-type="config.mediaType"。未传则退化为图像行为。 */
+  mediaType?: 'image' | 'video'
+  /** 执行态: 驱动五态状态机。ModelTab 传 :exec-state="execState"。
+   *  未传 (null) 时 phase 退化为 empty/queued 二态 (回归保护)。 */
+  execState?: ExecState | null
+}>(), {
+  mediaType: 'image',
+  execState: null,
+})
 
 const emit = defineEmits<{
   clickImage: [url: string]
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+
+// ── 五态状态机 ──────────────────────────────────────────────────────
+// phase 仅描述「执行中」的子态; 完成态由 images.length>0 判定 (模板里优先级最高)。
+const phase = computed<PreviewPhase>(() =>
+  derivePreviewPhase({
+    hasOutput: props.images.length > 0,
+    loading: props.loading,
+    execState: props.execState ?? null,
+    livePreview: props.currentPreview,
+    mediaType: props.mediaType,
+  }),
+)
+
+/** 采样段号 (双段「第 n/2 段」); 仅视频架构且双段采样时非 null。 */
+const stageSegment = computed(() =>
+  deriveStageSegment(props.execState ?? null, props.mediaType),
+)
+
+/** 是否显示「采样中·第 n/2 段」标注: 视频架构 + sampling 态 + 双段。 */
+const showStage = computed(() =>
+  props.mediaType === 'video' && phase.value === 'sampling' && stageSegment.value !== null,
+)
+
+/** 是否显示「合成中」文案: 视频架构 + composing 态。 */
+const isComposing = computed(() =>
+  props.mediaType === 'video' && phase.value === 'composing',
+)
+
+// ── 视频元信息 (完成态元信息行, "能拿到多少显示多少") ──────────────────────────
+// url → VideoMeta; 由 <video> loadedmetadata 事件填充。fps 浏览器拿不到, 留 undefined。
+const videoMetaMap = ref<Record<string, VideoMeta>>({})
+
+function onVideoLoadedMetadata(e: Event, url: string, filename: string) {
+  const el = e.target as HTMLVideoElement
+  const meta: VideoMeta = {
+    duration: Number.isFinite(el.duration) ? Math.round(el.duration) : undefined,
+    width: el.videoWidth || undefined,
+    height: el.videoHeight || undefined,
+    format: videoFormat(filename),
+  }
+  videoMetaMap.value = { ...videoMetaMap.value, [url]: meta }
+}
+
+/** 从文件名提取视频格式标签 (扩展名大写)。 */
+function videoFormat(filename: string): string | undefined {
+  const m = filename.match(/\.(mp4|webm|mov|avi|mkv)(\?|$)/i)
+  return m ? m[1].toUpperCase() : undefined
+}
+
+/** 判定产物条目是否为视频 (优先读 animated 标量布尔, 缺失则扩展名兜底)。 */
+function isVideo(img: PreviewImage): boolean {
+  if (typeof img.animated === 'boolean') return img.animated
+  return isVideoFile(img.filename)
+}
+
+/** 构建视频首帧缩略图 URL (GET /api/comfyui/video_thumb)。 */
+function thumbUrl(img: PreviewImage): string {
+  return buildVideoThumbUrl(img)
+}
+
+/** 构建视频下载文件名 (从 URL 参数取 filename)。 */
+function downloadName(url: string): string {
+  try {
+    const u = new URL(url, window.location.origin)
+    return u.searchParams.get('filename') || 'video'
+  } catch {
+    return 'video'
+  }
+}
+
+/** 完成态: 是否有视频产物 (用于决定单图/单视频渲染分支)。 */
+const singleVideo = computed(() =>
+  props.images.length === 1 && isVideo(props.images[0]),
+)
+
+/** 完成态: 多产物网格里的视频项。 */
+function isGridVideo(img: PreviewImage): boolean {
+  return isVideo(img)
+}
+
+// ── 完成态元信息行文案 ({dur}s · {w}×{h} · {fps}fps · {fmt}, 能拿到多少显示多少) ──
+function metaText(img: PreviewImage): string {
+  const meta = videoMetaMap.value[img.url]
+  if (!meta) return ''
+  const parts: string[] = []
+  if (meta.duration) parts.push(`${meta.duration}s`)
+  if (meta.width && meta.height) parts.push(`${meta.width}×${meta.height}`)
+  if (meta.fps) parts.push(`${meta.fps}fps`)
+  if (meta.format) parts.push(meta.format)
+  return parts.join(' · ')
+}
 </script>
 
 <template>
   <div class="gen-preview-card">
-    <!-- Loading spinner -->
-    <div v-if="loading" class="gen-preview-loading">
-      <div class="preview-spinner" />
-    </div>
+    <!-- ═══ 完成态: 有产物 (images.length>0) — 最高优先级 ═══ -->
+    <template v-if="images.length > 0">
+      <!-- 单产物 -->
+      <template v-if="images.length === 1">
+        <!-- 单视频: 内联 <video controls loop muted playsinline> -->
+        <div v-if="singleVideo" class="gen-preview-single gen-preview-video-wrap">
+          <video
+            :src="images[0].url"
+            controls
+            loop
+            muted
+            playsinline
+            class="preview-video"
+            @click="emit('clickImage', images[0].url)"
+            @loadedmetadata="onVideoLoadedMetadata($event, images[0].url, images[0].filename)"
+          />
+          <!-- 元信息行 + 下载 -->
+          <div class="preview-video-meta">
+            <span v-if="metaText(images[0])" class="preview-meta-text">{{ metaText(images[0]) }}</span>
+            <a
+              :href="images[0].url"
+              :download="downloadName(images[0].url)"
+              class="preview-video-download"
+            >
+              <MsIcon name="download" size="sm" color="none" />
+              {{ t('generate.video.download') }}
+            </a>
+          </div>
+        </div>
+        <!-- 单图像: 原样保留 (回归保护, 一字不变) -->
+        <div v-else class="gen-preview-single">
+          <img :src="images[0].url" alt="Generated" @click="emit('clickImage', images[0].url)" />
+        </div>
+      </template>
 
-    <!-- Output images -->
-    <template v-else-if="images.length > 0">
-      <div v-if="images.length === 1" class="gen-preview-single">
-        <img :src="images[0].url" alt="Generated" @click="emit('clickImage', images[0].url)" />
-      </div>
+      <!-- 多产物网格 -->
       <div v-else class="gen-preview-grid">
-        <img
-          v-for="(img, i) in images"
-          :key="i"
-          :src="img.url"
-          alt="Generated"
-          @click="emit('clickImage', img.url)"
-        />
+        <template v-for="(img, i) in images" :key="i">
+          <!-- 视频项: 首帧缩略图 + 播放角标 -->
+          <div v-if="isGridVideo(img)" class="grid-video-item" @click="emit('clickImage', img.url)">
+            <img :src="thumbUrl(img)" :alt="'Video ' + (i + 1)" class="grid-video-thumb" />
+            <div class="grid-video-badge">
+              <MsIcon name="play_arrow" size="sm" color="none" />
+            </div>
+          </div>
+          <!-- 图像项: 原样保留 (回归保护) -->
+          <img
+            v-else
+            :src="img.url"
+            alt="Generated"
+            @click="emit('clickImage', img.url)"
+          />
+        </template>
       </div>
     </template>
 
-    <!-- Live preview frame -->
-    <div v-else-if="currentPreview" class="gen-preview-single">
-      <img :src="currentPreview" alt="Preview" class="preview-live" />
+    <!-- ═══ 执行中态: 合成/采样/排队 (无产物时) ═══ -->
+
+    <!-- 合成中 (视频架构新增态): spinner + 文案 -->
+    <div v-else-if="isComposing" class="gen-preview-loading">
+      <div class="preview-spinner" />
+      <span class="preview-status-text">{{ t('generate.video.composing') }}</span>
     </div>
 
-    <!-- Empty state -->
+    <!-- 采样中: 沿用现有 b64 实时预览帧机制 (视频模型同样发帧, 表现为静帧刷新)。
+         有 currentPreview 时显示实时帧; 视频架构双段采样额外显示「第 n/2 段」标注 -->
+    <div v-else-if="currentPreview" class="gen-preview-single">
+      <img :src="currentPreview" alt="Preview" class="preview-live" />
+      <span v-if="showStage" class="preview-stage-badge">
+        {{ t('generate.video.stage', { i: stageSegment!.current, n: stageSegment!.total }) }}
+      </span>
+    </div>
+
+    <!-- 排队中 (loading 且无实时帧): spinner — 原有图像 path 行为不变 -->
+    <div v-else-if="loading" class="gen-preview-loading">
+      <div class="preview-spinner" />
+    </div>
+
+    <!-- ═══ 空态: 视频架构换文案+图标, 图像架构维持原样 ═══ -->
     <div v-else class="gen-preview-empty">
-      <MsIcon name="image" color="none" class="preview-icon" />
-      <span class="preview-hint">{{ t('generate.preview.empty') }}</span>
+      <MsIcon :name="mediaType === 'video' ? 'videocam' : 'image'" color="none" class="preview-icon" />
+      <span class="preview-hint">{{
+        mediaType === 'video'
+          ? t('generate.preview.empty_video')
+          : t('generate.preview.empty')
+      }}</span>
     </div>
   </div>
 </template>
@@ -66,13 +230,15 @@ const { t } = useI18n({ useScope: 'global' })
   padding: 0;
 }
 
-/* Loading */
+/* Loading / composing / sampling */
 .gen-preview-loading {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--sp-2);
 }
 .preview-spinner {
   width: 36px;
@@ -83,9 +249,14 @@ const { t } = useI18n({ useScope: 'global' })
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.preview-status-text {
+  font-size: .85rem;
+  color: var(--t3);
+}
 
-/* Single image */
+/* Single image / video */
 .gen-preview-single {
+  position: relative;
   height: 100%;
   display: flex;
   align-items: center;
@@ -101,6 +272,46 @@ const { t } = useI18n({ useScope: 'global' })
   transition: opacity .2s;
 }
 .gen-preview-single img:hover { opacity: .9; }
+
+/* Single video player (object-fit:contain, 圆角 var(--r-md)) */
+.gen-preview-video-wrap {
+  flex-direction: column;
+}
+.preview-video {
+  width: 100%;
+  height: 100%;
+  max-height: calc(100% - 32px);
+  object-fit: contain;
+  cursor: pointer;
+  border-radius: var(--r-md);
+  background: #000;
+}
+
+/* Video meta row (元信息 + 下载) */
+.preview-video-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 0;
+  flex-shrink: 0;
+}
+.preview-meta-text {
+  font-size: .8rem;
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+.preview-video-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .82rem;
+  color: var(--ac);
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.preview-video-download:hover { opacity: .8; }
 
 /* Grid for batch */
 .gen-preview-grid {
@@ -121,9 +332,57 @@ const { t } = useI18n({ useScope: 'global' })
 }
 .gen-preview-grid img:hover { opacity: .9; }
 
+/* Grid video item: 首帧缩略图 + 播放角标 */
+.grid-video-item {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  cursor: pointer;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: opacity .2s;
+}
+.grid-video-item:hover { opacity: .9; }
+.grid-video-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--r-md);
+}
+.grid-video-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .6);
+  border-radius: 50%;
+  color: #fff;
+  pointer-events: none;
+}
+
 /* Live preview */
 .preview-live { opacity: 0.85; cursor: default; }
 .preview-live:hover { opacity: 0.85; }
+
+/* Sampling stage badge (「第 n/2 段」) */
+.preview-stage-badge {
+  position: absolute;
+  bottom: var(--sp-2);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, .55);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, .9);
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
 
 /* Empty state */
 .gen-preview-empty {

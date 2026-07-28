@@ -2,6 +2,18 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
+import type { PendingFile, DirOption } from '@/components/models/DownloadDirModal.vue'
+
+/** 后端 409 needs_classification 的载荷 —— 等待用户裁决目录的一次下载提交。 */
+export interface PendingClassification {
+  modelId: string
+  modelType: string
+  versionId?: number
+  displayName: string
+  civitaiUrl: string
+  files: PendingFile[]
+  dirOptions: DirOption[]
+}
 
 // ── Types ──────────────────────────────────────────────
 
@@ -127,7 +139,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   // ── State ──
 
-  /** favorites (formerly cart): Map<cartKey, CartItem> — now backed by /api/favorites */
+  /** favorites: Map<cartKey, CartItem> — backed by /api/favorites */
   const favorites = ref<Map<string, CartItem>>(new Map())
 
   const tasks = ref<DownloadTask[]>([])
@@ -142,6 +154,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
   /** Version IDs with pending POST requests (submitting state, before backend confirms) */
   const submittingVersionIds = ref<Set<string>>(new Set())
 
+  // 待用户裁决目录的下载 (后端 409)。非 null 时 UI 弹 DownloadDirModal。
+  const pendingClassification = ref<PendingClassification | null>(null)
+
   // ── Connection management ──
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -154,7 +169,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   let favoritesLoaded = false
 
-  // ── Favorites API (C2) ──
+  // ── Favorites API ──
 
   /** Load favorites from /api/favorites */
   async function loadFavorites(): Promise<void> {
@@ -561,17 +576,35 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   // ── Download Actions ──
 
-  async function downloadOne(modelId: string, modelType: string, versionId?: number) {
+  async function downloadOne(
+    modelId: string,
+    modelType: string,
+    versionId?: number,
+    dirKeys?: Record<string, string>,
+  ) {
     const vid = versionId ? String(versionId) : modelId
 
     setSubmitting(vid)
 
-    let result: { download_id?: string; message?: string; error?: string; existed?: boolean } | null = null
+    let result: {
+      download_id?: string; message?: string; error?: string; existed?: boolean
+      needs_classification?: boolean
+      probe_auth?: boolean
+      pending_files?: PendingFile[]
+      dir_options?: DirOption[]
+      civitai_url?: string
+      display_name?: string
+    } | null = null
     try {
       const res = await fetch('/api/downloads/civitai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_id: modelId, model_type: modelType.toLowerCase(), ...(versionId && { version_id: versionId }) }),
+        body: JSON.stringify({
+          model_id: modelId,
+          model_type: modelType.toLowerCase(),
+          ...(versionId && { version_id: versionId }),
+          ...(dirKeys && Object.keys(dirKeys).length ? { dir_keys: dirKeys } : {}),
+        }),
       })
       if (res.status === 401) {
         clearSubmitting(vid)
@@ -579,6 +612,28 @@ export const useDownloadsStore = defineStore('downloads', () => {
         return
       }
       result = await res.json()
+      // 403 + probe_auth: 探针收到 401 —— 文件需付费或无权限下载。
+      // 不创建下载任务, 不弹目录选择 modal, 仅 toast 错误。
+      if (res.status === 403 && result?.probe_auth) {
+        clearSubmitting(vid)
+        toast(result?.error || '该文件需付费或无权限下载', 'error')
+        await refreshStatus()
+        return
+      }
+      // 409: 后端判不出目录, 未提交下载 —— 交给 UI 弹目录选择, 用户选完带 dir_keys 重来
+      if (res.status === 409 && result?.needs_classification) {
+        clearSubmitting(vid)
+        pendingClassification.value = {
+          modelId,
+          modelType,
+          versionId,
+          displayName: result.display_name || '',
+          civitaiUrl: result.civitai_url || '',
+          files: result.pending_files || [],
+          dirOptions: result.dir_options || [],
+        }
+        return
+      }
       if (!res.ok) {
         clearSubmitting(vid)
         toast(result?.error || `HTTP ${res.status}`, 'error')
@@ -609,6 +664,19 @@ export const useDownloadsStore = defineStore('downloads', () => {
     startPolling()
     await refreshStatus()
     clearSubmitting(vid)
+  }
+
+  /** 用户在目录选择 modal 里选定后, 带 dir_keys 重新提交同一次下载。 */
+  async function resolveClassification(dirKeys: Record<string, string>) {
+    const p = pendingClassification.value
+    if (!p) return
+    pendingClassification.value = null
+    await downloadOne(p.modelId, p.modelType, p.versionId, dirKeys)
+  }
+
+  /** 用户放弃裁决 —— 该次下载未提交, 直接丢弃。 */
+  function cancelClassification() {
+    pendingClassification.value = null
   }
 
   async function downloadAllFromFavorites() {
@@ -812,7 +880,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   /** Watch a download task's status until it reaches a terminal state.
    *  Resolves immediately if task already terminal or not found.
-   *  Used by useModelDependency (C1 wait-chain re-source). */
+   *  Used by useModelDependency (wait-chain). */
   function watchTaskTerminal(downloadId: string): Promise<'complete' | 'failed' | 'cancelled' | 'absent'> {
     return new Promise((resolve) => {
       const existing = tasks.value.find(t => t.download_id === downloadId)
@@ -873,8 +941,11 @@ export const useDownloadsStore = defineStore('downloads', () => {
     localCivitaiIds,
     resourceStates,
     submittingVersionIds,
+    pendingClassification,
+    resolveClassification,
+    cancelClassification,
 
-    // Favorites (formerly cart) — API-backed
+    // Favorites — API-backed
     favoritesItems,
     favoritesCount,
     loadFavorites,

@@ -10,9 +10,9 @@ import type {
 type QueueItem = [number, string, Record<string, unknown>, ...unknown[]]
 
 /**
- * 队列/历史数据层 (规格 E1) — 生成工作台 ws 回调 + QueuePanel/HistoryPanel 共享 store。
+ * 队列/历史数据层 — 生成工作台 ws 回调 + QueuePanel/HistoryPanel 共享 store。
  * - queue: 实时刷新 (ws status / 完成事件 / 抽屉打开均触发 loadQueue)
- * - history: 一次拉 max_items=200 (ComfyUI /history 无 offset), 渲染层分页 (E4)
+ * - history: 一次拉 max_items=200 (ComfyUI /history 无 offset), 渲染层分页
  *   完成事件时: 抽屉开着 → loadHistory; 关着 → markHistoryDirty, 首开抽屉再 load
  * - historySortAsc 由 HistoryPanel 双向绑定; loadHistory 按其值对 API 响应排序
  */

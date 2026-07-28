@@ -32,7 +32,7 @@ const { toast } = useToast()
 const { post } = useApiFetch()
 const store = useGenerateStore()
 const queueStore = useGenerateQueueStore()
-// §4.6 后台运行 store: frozen 真相在服务端, 不是本地 ref
+// 后台运行 store: frozen 真相在服务端, 不是本地 ref
 const bg = useBackgroundRunStore()
 const frozen = computed(() => bg.state === 'running')
 
@@ -91,7 +91,7 @@ onActivated(() => {
   if (optionsReady.value) options.refresh()
   // Re-check gate on page re-activation
   gate.checkNow()
-  // §4.6 KeepAlive 切回来重拉后台运行状态 (服务端为准, 避免刷新瞬间闪可编辑)
+  // KeepAlive 切回来重拉后台运行状态 (服务端为准, 避免刷新瞬间闪可编辑)
   bg.refresh()
 })
 
@@ -99,11 +99,21 @@ onActivated(() => {
 // 选中 → store.activeModelType 切换 (语义不变, ModelTab 全量 v-show 挂载,
 // 回调按 store.activeModelType 路由的机制严禁改动)。
 // F2 菜单结构: 有 familyOf 的 entry 归入对应父组 children; 无 familyOf 的平铺。
-// ── 任务切换 (占位): 图像已上线; 视频/编辑禁用, 上线时改接子路由驱动 ──
-const activeTask = ref('image')
+// ── 任务切换 ────────────────────────────────────────────────────────────
+// 两个任务各自记忆选中架构。store.activeModelType 已是 computed 派生
+// (读写当前任务 activeModelTypeByTask[activeTask] 的槽), 切任务用 store.switchTask()
+// — 它会把 activeTask 切到该任务并保证对应架构的 modelStates 已初始化。
+// 切回图像任务时回到上次的图像架构 (activeModelTypeByTask.image 槽保留记忆)。
+const activeTask = computed<'image' | 'video' | 'edit'>({
+  get: () => store.activeTask,
+  set: (v) => {
+    if (v === 'image' || v === 'video') store.switchTask(v)
+    // 'edit' 仍为占位 (disabled), 不会触发
+  },
+})
 const taskOptions = computed<SegmentOption[]>(() => [
   { value: 'image', label: t('generate.header.task_image'), icon: 'image' },
-  { value: 'video', label: t('generate.header.task_video'), icon: 'videocam', disabled: true },
+  { value: 'video', label: t('generate.header.task_video'), icon: 'videocam' },
   { value: 'edit', label: t('generate.header.task_edit'), icon: 'edit', disabled: true },
 ])
 
@@ -131,8 +141,14 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
   // 按 familyOf 分桶: 家族 key → 子叶子数组
   const families: Record<string, DropdownMenuItem[]> = {}
 
+  // 菜单按当前任务的 mediaType 过滤 (image 任务只显图像架构, video 任务只显视频架构)。
+  // activeTask 的 mediaType 由 store.activeModelType 派生 (image/video); 'edit' 占位时按 image。
+  const taskMediaType = currentConfig.value.mediaType
+
   // 构建叶子 (带 hint), 并按 familyOf 分桶
   for (const cfg of Object.values(MODEL_TYPES)) {
+    // 按任务媒体类型过滤: 不匹配的架构不进菜单
+    if (cfg.mediaType !== taskMediaType) continue
     const { hint } = leafHint(cfg)
     const leaf: DropdownMenuItem = {
       key: cfg.key,
@@ -212,20 +228,20 @@ const currentConfig = computed(() => MODEL_TYPES[store.activeModelType] || MODEL
 
 // ── 队列/历史抽屉 (顶栏右侧按钮 + Drawer) ──────────────────────────────────
 const drawerOpen = ref(false)
-// 抽屉内容首开才挂载 (规格 E3): Drawer 本身常驻, slot 内容 v-if 首次打开后保留
+// 抽屉内容首开才挂载: Drawer 本身常驻, slot 内容 v-if 首次打开后保留
 const drawerEverOpened = ref(false)
 
 function openDrawer() {
   drawerOpen.value = true
   if (!drawerEverOpened.value) drawerEverOpened.value = true
-  // 队列实时刷新; 历史按 dirty / 未加载决定是否拉取 (规格 E3)
+  // 队列实时刷新; 历史按 dirty / 未加载决定是否拉取
   queueStore.loadQueue()
   if (queueStore.historyDirty || !queueStore.historyLoaded) {
     queueStore.loadHistory()
   }
 }
 
-// badge: 队列任务数 (>0 显示, accent 底) — 读 store (规格 E2)
+// badge: 队列任务数 (>0 显示, accent 底) — 读 store
 const queueCount = computed(() => queueStore.queueCount)
 const isExecuting = computed(() => !!execState.value)
 
@@ -238,10 +254,10 @@ const taskRegistry = useTaskRegistry()
 const preview = useGeneratePreview()
 
 // ── Submit ─────────────────────────────────────────────────────────────────
-const { submitting, submit, validate, buildPayload } = useGenerateSubmit(execState)
+const { submitting, submit, validate, buildPayload } = useGenerateSubmit(execState, options)
 
 async function handleRun(mode: string) {
-  // §1 分流: background 模式走后台 start; 其余走现有 submit() 路径 (live 的 scheduleLiveRerun 不动)
+  // 分流: background 模式走后台 start; 其余走现有 submit() 路径 (live 的 scheduleLiveRerun 不动)
   if (mode === 'background') {
     if (!(await validate())) return
     const payload = buildPayload({ randomSeedWriteback: false })
@@ -258,7 +274,7 @@ async function handleRun(mode: string) {
   }
 }
 
-// ── Live mode auto-rerun (legacy §8.1: rerun 500ms after done) ─────────
+// ── Live mode auto-rerun: rerun 500ms after done ─────────
 let liveRerunTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleLiveRerun() {
@@ -284,6 +300,99 @@ async function handleStop() {
   cancelLiveRerun()
   await post('/api/comfyui/interrupt')
   toast(t('generate.toast.interrupt_sent'), 'info')
+}
+
+// ── 「生成视频」动线 ──────────────────────────────
+// payload = { filename, subfolder, type, prompt_id, animated }。
+// 接线步骤 (前端取回再上传, 零新端点):
+//   1. 切任务 → video; 切条目 → wan22_i2v
+//   2. 用 /api/comfyui/view 取回该产物为 Blob → 转 File
+//   3. 走 /api/generate/upload_image (表单字段 type='video_ref') → 拿 input/ 下文件名
+//   4. 写入 store.currentState.video.refImage, 开启 followRef
+//   失败: 明确 toast, 不静默 (fetch 失败 / 上传失败 / 视频产物不可走 i2v)
+const VIDEO_RE = /\.(mp4|webm|mov|mkv|avi)$/i
+
+interface MakeVideoPayload {
+  filename: string
+  subfolder: string
+  type: string
+  prompt_id: string
+  animated: boolean
+}
+
+async function handleMakeVideo(payload: MakeVideoPayload) {
+  // 视频产物不能作为起始画面 (i2v 需要静图) — 不切走, 只说明原因
+  if (payload.animated || VIDEO_RE.test(payload.filename)) {
+    toast(t('generate.video.start_frame_not_image'), 'warning')
+    return
+  }
+  // 1. 切任务 → video + 切条目 → wan22_i2v (默认 i2v 条目)
+  const TARGET = 'wan22_i2v'
+  store.switchTask('video')
+  store.switchModelType(TARGET)
+
+  const viewParams = new URLSearchParams({
+    filename: payload.filename,
+    subfolder: payload.subfolder || '',
+    type: payload.type || 'output',
+  })
+  const viewUrl = `/api/comfyui/view?${viewParams}`
+
+  // 2. 取回产物为 Blob → 转 File
+  let blob: Blob
+  try {
+    const res = await fetch(viewUrl)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    blob = await res.blob()
+  } catch (e: any) {
+    toast(`${t('generate.history.make_video')}: ${e?.message || 'fetch failed'}`, 'error')
+    return
+  }
+  // 从原文件名推导扩展名 (上传端点按 content_type 映射扩展名, 这里给 Blob 一个带扩展名的文件名)
+  const ext = (payload.filename.toLowerCase().match(/(\.[^.]+)$/)?.[1]) || '.png'
+  const file = new File([blob], `ref_${Date.now()}${ext}`, { type: blob.type || 'image/png' })
+
+  // 3. 上传到 input/ (走既有 upload_image, 表单字段 type='video_ref')
+  const form = new FormData()
+  form.append('file', file)
+  form.append('type', 'video_ref')
+  let uploadedName: string
+  try {
+    const upRes = await fetch('/api/generate/upload_image', { method: 'POST', body: form })
+    if (!upRes.ok) {
+      const body = await upRes.json().catch(() => ({}))
+      throw new Error((body as Record<string, string>).error || `Upload failed (${upRes.status})`)
+    }
+    const upData = await upRes.json() as { filename?: string }
+    // 后端返回 200 但 body 缺 filename 时视为失败 —— 否则会写入 undefined 并误报成功,
+    // 用户随后在提交时才撞上「请先上传起始画面」, 与刚才的成功提示自相矛盾。
+    if (!upData.filename) throw new Error('upload response missing filename')
+    uploadedName = upData.filename
+  } catch (e: any) {
+    toast(`${t('generate.history.make_video')}: ${e?.message || 'upload failed'}`, 'error')
+    return
+  }
+
+  // 4. 写入 refImage + 开启 followRef。
+  // 取回与上传是异步的 (数百毫秒~数秒), 期间用户可能切走条目或切回图像任务 ——
+  // 此时 store.currentState 已不是目标条目, 直接写会把参考图写到别处 (或静默丢弃却提示成功)。
+  // 故按 key 定位目标 state, 而非依赖"当前"状态。
+  const target = store.modelStates[TARGET]
+  if (!target?.video) {
+    toast(`${t('generate.history.make_video')}: ${t('generate.errors.state_lost')}`, 'error')
+    return
+  }
+  target.video.refImage = uploadedName
+  // 分辨率切到「贴合起始画面」哨兵。VideoSettings 挂载/收到尺寸后会重算实际宽高;
+  // 这里先写哨兵, 保证即使用户此刻不在该 tab, 状态也已表达「按这张图的比例出片」。
+  target.video.resolution = 'ref'
+
+  // 用户在等待期间切走了 → 图已备好但不在眼前, 提示里说明去向, 不假装无事发生
+  if (store.activeModelType !== TARGET || store.activeTask !== 'video') {
+    toast(t('generate.history.make_video_ready_elsewhere'), 'info')
+    return
+  }
+  toast(t('generate.history.make_video'), 'success')
 }
 
 // ── Auxiliary task registration (from ModelTab) ─────────────────────────────
@@ -314,7 +423,7 @@ const sse = useComfySSE(tracker, {
     const promptId = (evt.data?.prompt_id as string) || ''
     if (!promptId) { lastRoutedType = null; return false }
 
-    // §4.6 预览帧修复: 后台运行期间, worker 提交的 prompt 从未在前端注册过 →
+    // 后台运行期间, worker 提交的 prompt 从未在前端注册过 →
     // routeEvent 找不到任务, preview_image 的 mainTask?.status==='running' 判不过, 预览帧不显示。
     // 修法: 在 routeEvent 之前, 遇到 execution_start 且后台运行中 且该 prompt_id 尚未注册 →
     // 先 registerTask(pid,'main')。顺序绝对不能反 —— routeEvent 靠 execution_start 把
@@ -343,7 +452,7 @@ const sse = useComfySSE(tracker, {
 
   onEvent(evt, result) {
     if (evt.type === 'status') {
-      // 队列变化事件 → store 刷新 (badge 常显, 保持实时) (规格 E2)
+      // 队列变化事件 → store 刷新 (badge 常显, 保持实时)
       queueStore.loadQueue()
     }
 
@@ -364,14 +473,14 @@ const sse = useComfySSE(tracker, {
         if (result.type === 'execution_done') {
           const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
           const promptId = (evt.data?.prompt_id as string) || ''
-          // §4.6 后台运行期间抑制 per-iteration 完成提示 (跑一夜会攒几百个);
+          // 后台运行期间抑制 per-iteration 完成提示 (跑一夜会攒几百个);
           // 但 fetchOutputImages / loadQueue / loadHistory / markHistoryDirty 照常执行。
           if (!bgToastSuppressed()) {
             toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
           }
           if (promptId) preview.fetchOutputImages(promptId)
           queueStore.loadQueue()
-          // 任务完成事件 → 抽屉开着: loadHistory; 关着: markHistoryDirty (规格 E2)
+          // 任务完成事件 → 抽屉开着: loadHistory; 关着: markHistoryDirty
           if (drawerOpen.value) queueStore.loadHistory()
           else queueStore.markHistoryDirty()
           // Live mode: auto-rerun after successful execution
@@ -493,7 +602,7 @@ sse.start()
       </div>
 
       <!-- ═══ 队列/历史抽屉 (常驻挂载 Drawer, slot 内容首开才挂载) ═══ -->
-      <!-- 规格 E3: Drawer 组件本身常驻 (Teleport), 但 slot 内容 v-if="drawerEverOpened"
+      <!-- Drawer 组件本身常驻 (Teleport), 但 slot 内容 v-if="drawerEverOpened"
            首次打开才挂载 QueuePanel/HistoryPanel (其 onMounted 自行从 store 取数)。 -->
       <Drawer v-model="drawerOpen" :title="t('generate.header.queue_history')" icon="history">
         <template v-if="drawerEverOpened">
@@ -501,7 +610,7 @@ sse.start()
             :exec-state="execState"
             :elapsed="tracker.elapsed.value"
           />
-          <HistoryPanel />
+          <HistoryPanel @make-video="handleMakeVideo" />
         </template>
       </Drawer>
     </template>
@@ -538,7 +647,7 @@ sse.start()
 }
 @keyframes gate-spin { to { transform: rotate(360deg); } }
 
-/* ═══ 新顶栏 (规格 B: 去 border-bottom, 行高紧凑) ═══ */
+/* ═══ 顶栏: 去 border-bottom, 行高紧凑 ═══ */
 .gen-header {
   display: flex;
   align-items: center;
@@ -568,7 +677,7 @@ sse.start()
   .gen-arch-label { display: none; }
 }
 
-/* §4.3 inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
+/* inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
 .gen-header-left--frozen {
   opacity: .45;
   cursor: not-allowed;
@@ -578,7 +687,7 @@ sse.start()
   flex-shrink: 0;
 }
 
-/* 触发器与队列/历史按钮共用同一按钮规格 (规格 B):
+/* 触发器与队列/历史按钮共用同一按钮规格:
    --bg3 底、1px --bd 边框、var(--rs) 圆角、同高度、同 padding;
    hover 边框变亮 (与触发器一致)。 */
 .gen-arch-trigger,

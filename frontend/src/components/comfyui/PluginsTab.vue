@@ -162,7 +162,7 @@ async function installVersion(version: string) {
 <template>
   <SectionToolbar>
     <template #start>
-      <FilterInput v-model="filter" :placeholder="t('plugins.browse.search_placeholder')" class="plugins-filter-input" />
+      <FilterInput v-model="filter" :placeholder="t('plugins.browse.search_placeholder')" />
       <span class="toolbar-status">
         {{ stats }}
         <template v-if="queueProcessing">
@@ -222,11 +222,6 @@ async function installVersion(version: string) {
 </template>
 
 <style scoped>
-.plugins-filter-input {
-  flex: 1;
-  max-width: 400px;
-}
-
 .plugin-list { display: flex; flex-direction: column; }
 .plugins-list-end { height: 1px; }
 .version-list { max-height: 50vh; overflow-y: auto; }

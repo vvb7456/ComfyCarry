@@ -160,7 +160,7 @@ function onKeydown(e: KeyboardEvent) {
   .drawer-panel { width: 100vw !important; }
 }
 
-/* Drawer header 对齐 PageHeader 规格 (F):
+/* Drawer header 对齐 PageHeader 规格:
    PageHeader: min-height 64px, padding 0 clamp(28px,2.5vw,42px),
    h2 font-size 1.15rem/600, icon .ms font-size 28px margin-right 6px。
    抽屉宽度较窄, 左右 padding 缩小至 clamp(20px,2vw,28px) 保持同水平线视觉。 */
@@ -168,8 +168,8 @@ function onKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 64px;  /* 与 PageHeader 同高 (F) */
-  padding: 0 clamp(20px, 2vw, 28px);  /* 与 PageHeader 同水平线视觉 (F) */
+  min-height: 64px;  /* 与 PageHeader 同高 */
+  padding: 0 clamp(20px, 2vw, 28px);  /* 与 PageHeader 同水平线视觉 */
   gap: var(--sp-2);
   border-bottom: 1px solid var(--bd);
   flex-shrink: 0;
@@ -178,20 +178,20 @@ function onKeydown(e: KeyboardEvent) {
 .drawer-header__title-group {
   display: flex;
   align-items: center;
-  gap: 6px;  /* 与 PageHeader h2 .ms margin-right 一致 (F) */
+  gap: 6px;  /* 与 PageHeader h2 .ms margin-right 一致 */
   min-width: 0;
 }
 
-/* 标题字号/字重对齐 PageHeader h2 (F: 1.15rem / 600) */
+/* 标题字号/字重对齐 PageHeader h2 (1.15rem / 600) */
 .drawer-title {
-  font-size: 1.15rem;  /* PageHeader h2 字号 (F) */
-  font-weight: 600;    /* PageHeader h2 字重 (F) */
+  font-size: 1.15rem;  /* PageHeader h2 字号 */
+  font-weight: 600;    /* PageHeader h2 字重 */
   color: var(--t1);
   line-height: 1.1;
   margin: 0;
 }
 
-/* 头部图标尺寸对齐 PageHeader .ms (F: 28px, opsz 28) */
+/* 头部图标尺寸对齐 PageHeader .ms (28px, opsz 28) */
 .drawer-header__title-group :deep(.ms) {
   font-size: 28px;
   vertical-align: -5px;

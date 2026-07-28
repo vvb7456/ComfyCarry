@@ -130,7 +130,7 @@ export function useExecTracker() {
           state.value.currentNode = node
           state.value.executedNodes.add(node)
           if (data.class_type) state.value.nodeNames[node] = data.class_type as string
-          // Clear step progress when switching nodes (matching legacy behavior)
+          // Clear step progress when switching nodes
           state.value.progress = null
         }
         break

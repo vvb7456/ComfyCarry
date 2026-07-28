@@ -348,7 +348,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   }
 
   /** Load facets via an empty search (no query, no filters).
-   *  Deduplicates concurrent calls (same promise reuse pattern as legacy). */
+   *  Deduplicates concurrent calls (same promise reuse pattern). */
   async function loadFacets() {
     if (facetsLoaded.value) return
     if (_facetsPromise) return _facetsPromise

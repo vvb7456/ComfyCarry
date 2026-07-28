@@ -48,7 +48,7 @@ const props = withDefaults(defineProps<{
   currentArch?: string
   /** 当前架构的运行组件是否缺失 (拆分形态卡片显示提示角标) */
   componentsMissing?: boolean
-  /** §5.3 两形态并存时显示形态过滤 chip + 卡片徽章 */
+  /** 两形态并存时显示形态过滤 chip + 卡片徽章 */
   showPackagingFilter?: boolean
 }>(), {
   icon: 'deployed_code',
@@ -62,7 +62,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** Single-select: user clicked a model */
+  /** Single-select: user clicked a model. */
   select: [name: string]
   /** Multi-select: user toggled a model */
   toggle: [name: string]
@@ -78,7 +78,7 @@ const search = ref('')
 
 // ── Arch filter ──
 const activeArch = ref('')
-// §5.3 Packaging filter (仅两形态并存时启用)
+// Packaging filter (仅两形态并存时启用)
 const activePackaging = ref<'checkpoint' | 'split' | ''>('')
 
 // ── Arch chips (dynamic from items' effectiveArch field) ──
@@ -102,7 +102,7 @@ const archOptions = computed<ChipOption[]>(() => {
   }))
 })
 
-// §5.3 形态过滤 chip options (checkpoint=整合包 clay / split=拆分 teal)
+// 形态过滤 chip options (checkpoint=整合包 clay / split=拆分 teal)
 const packagingOptions = computed<ChipOption[]>(() => [
   { value: 'checkpoint', label: t('generate.picker.packaging_checkpoint') },
   { value: 'split', label: t('generate.picker.packaging_split') },
@@ -117,7 +117,7 @@ const filtered = computed(() => {
     list = list.filter(m => effectiveArch(m) === activeArch.value)
   }
 
-  // §5.3 Packaging filter (仅 showPackagingFilter 时生效)
+  // Packaging filter (仅 showPackagingFilter 时生效)
   if (props.showPackagingFilter && activePackaging.value) {
     list = list.filter(m => (m.packaging ?? 'split') === activePackaging.value)
   }
@@ -187,7 +187,7 @@ function isPreviewVideo(item: PickerModelItem): boolean {
 }
 
 async function onCardClick(item: PickerModelItem) {
-  // 三级架构拦截 (规格 F4):
+  // 三级架构拦截:
   //  1. 跨硬架构 (effectiveArch 与 currentArch 的家族根不同): 强警告
   //  2. 同家族软架构错配 (家族根同为 sdxl, 子架构不同且双方都明确): 软提醒
   //  3. 家族根同为 sdxl 但一方为通用 'sdxl' (无 sidecar/通用模型): 不拦截
@@ -275,7 +275,7 @@ function goToDownloadPage() {
     <div v-if="isItemsEmpty" class="picker-empty-state">
       <MsIcon name="cloud_download" color="none" class="picker-empty-icon" />
       <div class="picker-empty-title">{{ t('generate.picker.empty_title', { arch: currentArchLabel }) }}</div>
-      <div class="picker-empty-desc">{{ t('generate.picker.empty_desc') }}</div>
+      <div class="picker-empty-desc">{{ currentArch.startsWith('wan22') ? t('generate.picker.empty_video_hint') : t('generate.picker.empty_desc') }}</div>
       <BaseButton variant="primary" @click="goToDownloadPage">
         <MsIcon name="open_in_new" size="sm" color="none" /> {{ t('generate.picker.go_to_downloads') }}
       </BaseButton>
@@ -288,7 +288,7 @@ function goToDownloadPage() {
         <FilterInput
           v-model="search"
           :placeholder="searchPlaceholder"
-          class="picker-search"
+          full
         />
         <ChipSelect
           v-if="archOptions.length > 1"
@@ -299,7 +299,7 @@ function goToDownloadPage() {
           class="picker-chips"
           @update:model-value="activeArch = $event as string"
         />
-        <!-- §5.3 形态过滤 chip (仅两形态并存时显示) -->
+        <!-- 形态过滤 chip (仅两形态并存时显示) -->
         <ChipSelect
           v-if="showPackagingFilter"
           :options="packagingOptions"
@@ -317,6 +317,7 @@ function goToDownloadPage() {
           <MsIcon name="deployed_code_alert" color="none" />
           <span>{{ t('common.no_results') }}</span>
         </div>
+        <!-- 单文件卡片网格 -->
         <div v-else class="picker-grid">
           <div
             v-for="item in filtered"
@@ -349,7 +350,7 @@ function goToDownloadPage() {
               <span v-if="getModelTag(item)" class="model-card__tag" :class="{ dim: isArchTag(item) }">
                 {{ getModelTag(item) }}
               </span>
-              <!-- §5.3 形态徽章 (整合包=clay / 拆分=teal, 仅两形态并存时显示) -->
+              <!-- 形态徽章 (整合包=clay / 拆分=teal, 仅两形态并存时显示) -->
               <span
                 v-if="showPackagingFilter && item.packaging"
                 class="model-card__pkg-badge"
@@ -394,10 +395,6 @@ function goToDownloadPage() {
   flex-direction: column;
   gap: var(--sp-2);
   margin-bottom: var(--sp-2);
-}
-
-.picker-search {
-  width: 100%;
 }
 
 .picker-chips {
@@ -505,7 +502,7 @@ function goToDownloadPage() {
   color: var(--t-inv-2);
 }
 
-/* §5.3 形态徽章 (右上角, 整合包=clay 棕 / 拆分=teal 青) */
+/* 形态徽章 (右上角, 整合包=clay 棕 / 拆分=teal 青) */
 .model-card__pkg-badge {
   position: absolute;
   top: 4px;

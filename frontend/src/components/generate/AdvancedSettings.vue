@@ -25,6 +25,14 @@ const props = defineProps<{
   showClipSkipVae?: boolean
   /** 本 tab 的架构 key; 缺省时回退 store.activeModelType (过渡期兼容) */
   modelType?: string
+  /**
+   * 媒体类型。'video' 时按惯例 (能力无效则控件整个不出现) 收敛:
+   *  - 隐藏「文件格式」— 视频产物恒 mp4/h264, 无可选项;
+   *  - 隐藏「生成数量」— 后端 _VIDEO_ARCHS 分支恒纠正 batch_size=1;
+   *  - CLIP 标签换「文本编码器」— Wan 用 UMT5, 不是 CLIP。
+   * 默认 'image': 不传时渲染与改动前一字不变 (回归保护)。
+   */
+  mediaType?: 'image' | 'video'
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -33,6 +41,16 @@ const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
 
 const arch = computed(() => props.modelType || store.activeModelType)
+
+/** 视频收敛开关 (见 mediaType prop 注释) */
+const isVideo = computed(() => props.mediaType === 'video')
+/** 文本编码器槽的标签/占位: 视频用中性词, 图像保持既有 "CLIP 文本编码器" */
+const clipLabel = computed(() =>
+  isVideo.value ? t('generate.basic.text_encoder') : t('generate.basic.clip'),
+)
+const clipPlaceholder = computed(() =>
+  isVideo.value ? t('generate.basic.select_text_encoder') : t('generate.basic.select_clip'),
+)
 
 /* ── Format ── */
 const formatOptions = [
@@ -156,7 +174,7 @@ const hasRegistry = computed(() =>
   componentsForSlot(arch.value, 'vae').length > 0)
 
 /* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
-// B1: 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
+// 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
 const clipSkipOptions = computed(() => [
   { value: 1, label: t('generate.advanced.clip_skip_default') },
   { value: 2, label: '2' },
@@ -180,7 +198,7 @@ const vaeOverrideOptions = computed(() => [
       <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip }">
         <div class="field-group">
           <label class="field-lbl">
-            {{ t('generate.basic.clip') }}
+            {{ clipLabel }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
             <span
               v-if="hasRegistry && clipIncompatible"
@@ -192,7 +210,7 @@ const vaeOverrideOptions = computed(() => [
             :model-value="state.clip"
             :options="clipOptions"
             :disabled="disabled"
-            :placeholder="t('generate.basic.select_clip')"
+            :placeholder="clipPlaceholder"
             @update:model-value="state.clip = String($event)"
           />
         </div>
@@ -299,7 +317,9 @@ const vaeOverrideOptions = computed(() => [
         </div>
       </div>
 
-      <!-- Row 2: Seed + Batch -->
+      <!-- Row 2+3 合并为一个 2 列网格, 由 grid 自动流式排布 (行间距 = 原 .adv-body gap, 同值)。
+           图像: 种子|生成数量 / 文件格式|文件名前缀 —— 与合并前逐像素一致。
+           视频: 种子|文件名前缀 —— 隐藏的两项不留空位, 不会出现半空行。 -->
       <div class="adv-2col">
         <div class="field-group">
           <!-- 后台模式: 种子强制随机 (runMode === 'background', 非冻结状态判定) → SeedInput 替换为禁用观感提示 -->
@@ -327,7 +347,8 @@ const vaeOverrideOptions = computed(() => [
             />
           </template>
         </div>
-        <div class="field-group">
+        <!-- 生成数量: 视频不出现 (后端 _VIDEO_ARCHS 恒纠正 batch_size=1) -->
+        <div v-if="!isVideo" class="field-group">
           <label class="field-lbl">
             {{ t('generate.advanced.batch') }}
             <HelpTip :text="t('generate.advanced.batch_help')" />
@@ -341,11 +362,9 @@ const vaeOverrideOptions = computed(() => [
             @update:model-value="state.batch = $event"
           />
         </div>
-      </div>
 
-      <!-- Row 3: Format + Prefix -->
-      <div class="adv-2col">
-        <div class="field-group">
+        <!-- 文件格式: 视频不出现 (产物恒 mp4/h264, 无可选项) -->
+        <div v-if="!isVideo" class="field-group">
           <label class="field-lbl">{{ t('generate.advanced.format') }}</label>
           <BaseSelect
             :model-value="state.format"
@@ -354,6 +373,7 @@ const vaeOverrideOptions = computed(() => [
             @update:model-value="state.format = String($event)"
           />
         </div>
+
         <div class="field-group">
           <label class="field-lbl">
             {{ t('generate.advanced.prefix') }}

@@ -45,7 +45,7 @@ const hasMissing = computed(() => s.missing.value.length > 0)
 const isReady = computed(() => s.ready.value)
 const showSkeleton = computed(() => s.loading.value && s.files.value.length === 0)
 
-// ── 体积格式化 (规格: >=1e9 → X.XX GB, 否则 XXX MB) ──────────────────────────
+// ── 体积格式化 (>=1e9 → X.XX GB, 否则 XXX MB) ──────────────────────────
 
 function fmtSize(bytes: number): string {
   if (bytes >= 1e9) return (bytes / 1e9).toFixed(2) + ' GB'
@@ -53,8 +53,8 @@ function fmtSize(bytes: number): string {
 }
 
 // ── 角色推导 helper ─────────────────────────────────────────────────────────
-// registry 里没有直接 role 字段, 用 componentsForSlot(arch, slot) 对三个 slot
-// 逐个查, 看该文件的 id 落在哪个 slot, 映射到对应 i18n key。
+// registry 里没有直接 role 字段, 用 componentsForSlot(arch, slot) 逐 slot 查,
+// 看该文件的 id 落在哪个 slot, 映射到对应 i18n key。
 
 function roleKeyFor(fileId: string): string | null {
   const arch = props.arch
@@ -69,6 +69,8 @@ function roleKeyFor(fileId: string): string | null {
   if (inClip2) return 'generate.components.role_text_encoder_2'
   const inVae = componentsForSlot(arch, 'vae').some(f => f.id === fileId)
   if (inVae) return 'generate.components.role_vae'
+  const inLightning = componentsForSlot(arch, 'lightning').some(f => f.id === fileId)
+  if (inLightning) return 'generate.components.fast_files'
   return null
 }
 
@@ -76,6 +78,23 @@ function roleText(fileId: string): string {
   const key = roleKeyFor(fileId)
   return key ? t(key) : ''
 }
+
+/** 该文件是否属于 lightning (加速件) slot */
+function isLightningFile(fileId: string): boolean {
+  return componentsForSlot(props.arch, 'lightning').some(f => f.id === fileId)
+}
+
+// ── 待下载合计 (仅未安装文件) ────────────────────────────────────────────────
+
+const missingTotalBytes = computed(() =>
+  s.files.value
+    .filter(f => !f.installed)
+    .reduce((sum, f) => sum + f.file.bytes, 0),
+)
+
+const missingTotalText = computed(() =>
+  t('generate.components.total', { size: fmtSize(missingTotalBytes.value) }),
+)
 
 // ── 折叠态文案 ──────────────────────────────────────────────────────────────
 
@@ -91,12 +110,6 @@ const downloadingText = computed(() => {
   const c = s.current.value
   if (!c) return t('generate.components.downloading', { i: 0, n: 0, name: '' })
   return t('generate.components.downloading', { i: c.index + 1, n: c.total, name: c.name })
-})
-
-const downloadingPercent = computed(() => s.current.value?.percent ?? 0)
-const downloadingSpeed = computed(() => {
-  const sp = s.current.value?.speed ?? 0
-  return fmtSpeed(sp)
 })
 
 // ── 展开切换 ───────────────────────────────────────────────────────────────
@@ -149,10 +162,6 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
     >
       <MsIcon name="download" size="sm" color="var(--ac)" />
       <span class="comp-row__txt">{{ downloadingText }}</span>
-      <span class="comp-row__prog">
-        <span class="comp-row__prog-bar" :style="{ width: downloadingPercent + '%' }" />
-      </span>
-      <span v-if="downloadingSpeed" class="comp-row__speed">{{ downloadingSpeed }}</span>
       <BaseButton variant="ghost" size="xs" @click="onCancelClick">
         {{ t('common.btn.cancel') }}
       </BaseButton>
@@ -210,6 +219,9 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
             />
             <span class="comp-file__label">{{ f.file.label }}</span>
             <span v-if="roleText(f.file.id)" class="comp-file__role">{{ roleText(f.file.id) }}</span>
+            <span v-if="isLightningFile(f.file.id)" class="comp-file__hint">
+              {{ t('generate.components.fast_files_hint') }}
+            </span>
             <span class="comp-file__size">{{ fmtSize(f.file.bytes) }}</span>
 
             <!-- 状态/进度 -->
@@ -231,6 +243,11 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
               </span>
             </span>
           </div>
+        </div>
+
+        <!-- 待下载合计行 (仅未安装文件) -->
+        <div v-if="missingTotalBytes > 0" class="comp-detail__total">
+          <span class="comp-detail__total-label">{{ missingTotalText }}</span>
         </div>
 
         <!-- 错误 -->
@@ -289,28 +306,6 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
 }
 .comp-row--downloading:hover { background: color-mix(in srgb, var(--ac) 12%, var(--bg2)); }
 
-.comp-row__prog {
-  flex: none;
-  width: 80px;
-  height: 4px;
-  background: var(--bg3);
-  border-radius: var(--r-pill);
-  overflow: hidden;
-}
-.comp-row__prog-bar {
-  display: block;
-  height: 100%;
-  background: var(--ac);
-  border-radius: var(--r-pill);
-  transition: width .3s ease;
-}
-.comp-row__speed {
-  flex: none;
-  color: var(--t2);
-  font-size: .72rem;
-  white-space: nowrap;
-}
-
 /* 缺失态: 沿用 gen-comp-missing 的橙色基调 */
 .comp-row--missing {
   background: color-mix(in srgb, var(--amber) 10%, var(--bg2));
@@ -357,12 +352,16 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
   flex: 1;
 }
 
-/* 逐文件行 */
+/* 逐文件行 —— 分隔线画在「后一条的顶部」而非「前一条的底部」。
+   旧写法用 .comp-file:last-of-type 清末条的 border-bottom, 但 :last-of-type 按**标签名**匹配:
+   合计行 .comp-detail__total 同样是 div, 存在时末条文件行就不是最后一个 div, 选择器落空,
+   于是末条的 border-bottom 与合计行的 border-top 叠成两条线 (「双下巴」)。 */
 .comp-file {
   padding: 4px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--bd) 50%, transparent);
 }
-.comp-file:last-of-type { border-bottom: none; }
+.comp-file + .comp-file {
+  border-top: 1px solid color-mix(in srgb, var(--bd) 50%, transparent);
+}
 
 .comp-file__row {
   display: flex;
@@ -430,6 +429,29 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
   font-size: .72rem;
 }
 
+/* 加速件 hint (仅快速模式需要) */
+.comp-file__hint {
+  color: var(--t3);
+  font-size: .7rem;
+  white-space: nowrap;
+}
+
+
+/* 待下载合计行 */
+.comp-detail__total {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 6px;
+  margin-top: 2px;
+  border-top: 1px solid var(--bd);
+}
+.comp-detail__total-label {
+  color: var(--t2);
+  font-size: .76rem;
+  font-weight: 500;
+}
+
 /* 错误提示 */
 .comp-detail__error {
   color: var(--red);
@@ -454,6 +476,5 @@ function fileIcon(f: ComponentFileStatus): { name: string; color: string } {
 @media (max-width: 600px) {
   .comp-file__row { flex-wrap: wrap; }
   .comp-file__status { margin-left: 0; width: 100%; }
-  .comp-row__prog { width: 50px; }
 }
 </style>
