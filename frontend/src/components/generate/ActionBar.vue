@@ -239,8 +239,20 @@ function onSplitSelect(key: string) {
 .action-bar__actions :deep(.split-button__main) {
   min-width: 180px;
 }
+/* 窄屏: 进度条独占一行; 运行按钮全宽。
+   后台模式下轮次胶囊与运行按钮同行 (胶囊按内容宽, 按钮吃掉剩余宽度)。 */
 @media (max-width: 768px) {
-  .action-bar { flex-direction: column; }
-  .action-bar__iter { align-self: flex-start; }
+  .action-bar {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .action-bar__status { flex: 1 0 100%; }
+  .action-bar__iter { flex: 0 0 auto; padding: 6px 10px; }
+  .action-bar__actions { flex: 1 1 auto; min-width: 0; }
+  .action-bar__actions :deep(.split-button) { width: 100%; }
+  .action-bar__actions :deep(.split-button__main) {
+    flex: 1;
+    min-width: 0;
+  }
 }
 </style>

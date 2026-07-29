@@ -9,7 +9,8 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PP_PARAMS_DEF, type CnType } from '@/composables/generate/useControlNet'
-import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { useToast } from '@/composables/useToast'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { toast } = useToast()
 
 const def = computed(() => PP_PARAMS_DEF[props.type])
 const title = computed(() =>
@@ -132,7 +134,7 @@ function onSubmit() {
       <div class="pp-split__media">
         <FileUploadZone
           mode="pick"
-          accept="image/png,image/jpeg,image/webp,image/bmp"
+          :accept="IMAGE_ACCEPT"
           :preview="sourcePreviewUrl"
           :file-name="sourceName"
           :pick-label="t('generate.image_source.from_input')"
@@ -142,6 +144,7 @@ function onSubmit() {
           @pick="onPickInput"
           @file="onFileFromZone"
           @clear="clearSource"
+          @error="toast($event, 'warning')"
         />
       </div>
 

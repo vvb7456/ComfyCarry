@@ -1,11 +1,11 @@
-import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { useImageToImage } from '@/composables/generate/useImageToImage'
 import { useControlNet } from '@/composables/generate/useControlNet'
-import { useModelDependency } from '@/composables/generate/useModelDependency'
-import { useTagInterrogation, TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
-import { UPSCALE_MODEL_CONFIG, FACE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { useDependencyStatus, type UseDependencyStatusReturn } from '@/composables/generate/useDependencyStatus'
+import { useTagInterrogation, TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
+import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
@@ -31,7 +31,8 @@ export function useControlNetOrchestration({
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
   const store = useGenerateStore()
-  const state = computed(() => store.currentState)
+  // 本实例所属架构的 state (ModelTab 全量挂载, 不能用 currentState)
+  const state = computed(() => store.stateFor(modelType))
 
   const i2i = useImageToImage()
 
@@ -41,24 +42,62 @@ export function useControlNetOrchestration({
     () => (MODEL_TYPES[modelType]?.cnBranch as CnBranch | undefined),
   )
 
-  const cnPose = useControlNet('pose', options.controlnetModels, cnBranch)
-  const cnCanny = useControlNet('canny', options.controlnetModels, cnBranch)
-  const cnDepth = useControlNet('depth', options.controlnetModels, cnBranch)
+  const cnPose = useControlNet('pose', options.controlnetModels, cnBranch, modelType)
+  const cnCanny = useControlNet('canny', options.controlnetModels, cnBranch, modelType)
+  const cnDepth = useControlNet('depth', options.controlnetModels, cnBranch, modelType)
   const cnMap = { pose: cnPose, canny: cnCanny, depth: cnDepth } as const
 
-  // 依赖 Gate 配置同样按 branch 取 (sdxl → union; ilnoob → 专用), 与下拉过滤同源
-  const depPose = useModelDependency(getCnDepConfig('pose', cnBranch.value))
-  const depCanny = useModelDependency(getCnDepConfig('canny', cnBranch.value))
-  const depDepth = useModelDependency(getCnDepConfig('depth', cnBranch.value))
+  // ── 依赖状态机 (与运行组件同一套) ──────────────────────────────────────────
+  // 依赖清单按 branch 取 (sdxl → union; ilnoob → 专用), 与面板下拉过滤同源。
+  // 状态只来自磁盘, 没有 dismiss 记忆位: 换架构/删模型/别处下完都会自然收敛。
+
+  const comfyuiDir = () => options.comfyuiDir.value
+  // 模块依赖只在本 tab 激活时体检 (全量挂载下否则是 17×6 次 check)
+  const tabActive = () => store.activeModelType === modelType
+
+  function cnDep(type: ControlNetType): UseDependencyStatusReturn {
+    return useDependencyStatus(
+      () => getCnDepGroup(type, cnBranch.value).rows,
+      {
+        minOptional: () => getCnDepGroup(type, cnBranch.value).minOptional ?? 0,
+        comfyuiDir,
+        enabled: tabActive,
+        source: 'controlnet-dep',
+      },
+    )
+  }
+
+  const depPose = cnDep('pose')
+  const depCanny = cnDep('canny')
+  const depDepth = cnDep('depth')
   const depMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
 
-  const depUpscale = useModelDependency(UPSCALE_MODEL_CONFIG)
-  const depTagger = useModelDependency(TAGGER_MODEL_CONFIG)
-  const depFace = useModelDependency(FACE_MODEL_CONFIG)
+  const depUpscale = useDependencyStatus(() => UPSCALE_DEP_GROUP.rows, {
+    minOptional: UPSCALE_DEP_GROUP.minOptional ?? 0,
+    comfyuiDir,
+    enabled: tabActive,
+    source: 'upscale-dep',
+  })
+  const depTagger = useDependencyStatus(() => TAGGER_DEP_GROUP.rows, {
+    minOptional: TAGGER_DEP_GROUP.minOptional ?? 0,
+    comfyuiDir,
+    enabled: tabActive,
+    source: 'tagger-dep',
+  })
+  const depFace = useDependencyStatus(() => FACE_DEP_GROUP.rows, {
+    minOptional: FACE_DEP_GROUP.minOptional ?? 0,
+    comfyuiDir,
+    enabled: tabActive,
+    source: 'face-dep',
+  })
 
-  const upscaleReady = ref(false)
-  const faceReady = ref(false)
-  const _taggerReady = ref(false)
+  // 依赖由缺失变就绪 = 刚下完 → 刷新 options, 让新模型立刻出现在下拉里
+  for (const dep of [depPose, depCanny, depDepth, depUpscale, depFace]) {
+    watch(() => dep.ready.value, (ready, prev) => {
+      if (ready && prev === false) void options.refresh()
+    })
+  }
+
   const tagger = useTagInterrogation()
   const showPPModal = ref({ pose: false, canny: false, depth: false })
 
@@ -88,82 +127,9 @@ export function useControlNetOrchestration({
     cn.onPreprocessDone(success)
   }
 
-  let depChecked = false
-  watch(() => options.comfyuiDir.value, (dir) => {
-    if (!dir && depChecked) return
-    depChecked = true
-
-    for (const type of ['pose', 'canny', 'depth'] as const) {
-      depMap[type].check(dir).then(() => {
-        if (!depMap[type].show.value) {
-          cnMap[type].ready.value = true
-        }
-      })
-    }
-
-    depUpscale.check(dir).then(() => {
-      if (!depUpscale.show.value) {
-        upscaleReady.value = true
-      }
-    })
-
-    depFace.check(dir).then(() => {
-      if (!depFace.show.value) {
-        faceReady.value = true
-      }
-    })
-
-    depTagger.check(dir).then(() => {
-      if (!depTagger.show.value) {
-        _taggerReady.value = true
-      }
-    })
-  }, { immediate: true })
-
-  function onDepEnter(type: ControlNetType) {
-    cnMap[type].ready.value = true
-    options.refresh()
-  }
-
-  function onUpscaleDepEnter() {
-    upscaleReady.value = true
-    options.refresh()
-  }
-
-  function onDepDownload(type: ControlNetType) {
-    const dir = options.comfyuiDir.value
-    if (dir) depMap[type].startDownload(dir)
-  }
-
-  function onUpscaleDepDownload() {
-    const dir = options.comfyuiDir.value
-    if (dir) depUpscale.startDownload(dir)
-  }
-
-  function onFaceDepEnter() {
-    faceReady.value = true
-    options.refresh()
-  }
-
-  function onFaceDepDownload() {
-    const dir = options.comfyuiDir.value
-    if (dir) depFace.startDownload(dir)
-  }
-
-  function onTaggerDepEnter() {
-    _taggerReady.value = true
-    tagger.open()
-  }
-
-  function onTaggerDepDownload() {
-    const dir = options.comfyuiDir.value
-    if (dir) depTagger.startDownload(dir)
-  }
-
   function prepareTagger() {
-    if (_taggerReady.value) {
-      tagger.open()
-    }
+    // 缺件也照开: 弹窗顶部的状态条会说清缺什么并就地下载
+    tagger.open()
   }
 
   watch(() => tagger.promptId.value, (promptId) => {
@@ -208,6 +174,18 @@ export function useControlNetOrchestration({
     return enabled
   })
 
+  /**
+   * 依赖未就绪时拒绝开启: 提示 + 跳到该模块。
+   * 模块面板顶部常驻状态条, 用户落地即能看到缺什么、就地下载 —— 不再有"提示了
+   * 却无处可去"的死路 (旧 welcome gate dismiss 后就是这个状态)。
+   */
+  function blockOnMissingDep(key: string, dep: UseDependencyStatusReturn, msgKey: string): boolean {
+    if (dep.ready.value) return false
+    toast(t(msgKey), 'warning')
+    state.value.activeModule = key
+    return true
+  }
+
   function onModuleToggle(key: string, enabled: boolean) {
     const currentState = state.value
 
@@ -235,20 +213,14 @@ export function useControlNetOrchestration({
       case 'depth': {
         const cnKey = key as ControlNetType
         const cn = cnMap[cnKey]
-        if (enabled && !cn.validateEnable(cn.models.value)) {
-          if (!cn.ready.value) currentState.activeModule = cnKey
-          return
-        }
+        if (enabled && blockOnMissingDep(cnKey, depMap[cnKey], `generate.controlnet.need_download_${cnKey}`)) return
+        if (enabled && !cn.validateEnable(cn.models.value)) return
         if (currentState.controlNets[key]) currentState.controlNets[key].enabled = enabled
         break
       }
 
       case 'upscale':
-        if (enabled && !upscaleReady.value) {
-          toast(t('generate.upscale.need_model'), 'warning')
-          currentState.activeModule = 'upscale'
-          return
-        }
+        if (enabled && blockOnMissingDep('upscale', depUpscale, 'generate.upscale.need_model')) return
         currentState.upscale.enabled = enabled
         break
 
@@ -257,30 +229,15 @@ export function useControlNetOrchestration({
         break
 
       case 'face':
-        // 阻塞式依赖门 (FR-3): 检测器未就绪时拒绝并跳到本 tab 展示 Gate
-        if (enabled && !faceReady.value) {
-          toast(t('generate.face.need_model'), 'warning')
-          currentState.activeModule = 'face'
-          return
-        }
+        if (enabled && blockOnMissingDep('face', depFace, 'generate.face.need_model')) return
         currentState.faceDetailer.enabled = enabled
         break
     }
   }
 
-  onUnmounted(() => {
-    depPose.destroy()
-    depCanny.destroy()
-    depDepth.destroy()
-    depUpscale.destroy()
-    depTagger.destroy()
-    depFace.destroy()
-  })
-
   return {
     i2i,
     tagger,
-    _taggerReady,
     cnPose,
     cnCanny,
     cnDepth,
@@ -296,14 +253,6 @@ export function useControlNetOrchestration({
     onModuleToggle,
     onPPSubmit,
     handlePreprocessDone,
-    onDepEnter,
-    onUpscaleDepEnter,
-    onDepDownload,
-    onUpscaleDepDownload,
-    onFaceDepEnter,
-    onFaceDepDownload,
-    onTaggerDepEnter,
-    onTaggerDepDownload,
     prepareTagger,
     handleTagDone,
   }

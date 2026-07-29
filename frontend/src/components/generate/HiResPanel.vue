@@ -28,10 +28,10 @@ const schedulerOptions = computed(() => options.schedulers.value)
         <RangeField
           :model-value="config.denoise"
           :min="0.1"
-          :max="0.8"
+          :max="1"
           :step="0.05"
           :label="t('generate.hires.denoise')"
-          :marks="['0.1', '0.45', '0.8']"
+          :marks="2"
           :value-format="(v: number) => v.toFixed(2)"
           editable
           @update:model-value="config.denoise = $event"
@@ -44,11 +44,11 @@ const schedulerOptions = computed(() => options.schedulers.value)
       <div class="hr-cell">
         <RangeField
           :model-value="config.steps"
-          :min="5"
-          :max="50"
+          :min="1"
+          :max="100"
           :step="1"
           :label="t('generate.hires.steps')"
-          :marks="['5', '27', '50']"
+          :marks="2"
           editable
           @update:model-value="config.steps = $event"
         >
@@ -68,7 +68,7 @@ const schedulerOptions = computed(() => options.schedulers.value)
           :max="20"
           :step="0.5"
           :label="'CFG'"
-          :marks="['1', '10', '20']"
+          :marks="2"
           :value-format="(v: number) => v.toFixed(1)"
           editable
           @update:model-value="config.cfg = $event"

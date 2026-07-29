@@ -298,18 +298,18 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 data.pop("cfg", None)
                 data["negative_prompt"] = ""
             else:
-                # 标准档: steps ∈ [10,30], cfg ∈ [1,10]; negative 为空则由 builder 注入内置模板
+                # 标准档: steps ∈ [1,100], cfg ∈ [1,20]; negative 为空则由 builder 注入内置模板
                 try:
                     steps = int(data.get("steps", 20))
                 except (TypeError, ValueError):
                     steps = 20
-                steps = max(10, min(steps, 30))
+                steps = max(1, min(steps, 100))
                 data["steps"] = steps
                 try:
                     cfg = float(data.get("cfg", 3.5))
                 except (TypeError, ValueError):
                     cfg = 3.5
-                cfg = max(1.0, min(cfg, 10.0))
+                cfg = max(1.0, min(cfg, 20.0))
                 data["cfg"] = cfg
         else:
             # 5B 无速度档: 忽略 fast 字段, 清理脏值
@@ -389,13 +389,13 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 logger.warning("[generate] SAM 权重缺失, 面部重绘降级为 bbox 掩码")
                 data["face_detailer_use_sam"] = False
         # 数值钳制 (builder 端还有一层, 此处保证入库参数干净)
-        data["face_detailer_denoise"] = max(0.1, min(float(data.get("face_detailer_denoise", 0.35)), 0.75))
-        data["face_detailer_steps"] = max(5, min(int(data.get("face_detailer_steps", 20)), 40))
+        data["face_detailer_denoise"] = max(0.1, min(float(data.get("face_detailer_denoise", 0.35)), 1.0))
+        data["face_detailer_steps"] = max(1, min(int(data.get("face_detailer_steps", 20)), 100))
         data["face_detailer_cfg"] = max(1.0, min(float(data.get("face_detailer_cfg", 7.0)), 20.0))
-        data["face_detailer_guide_size"] = max(256, min(int(data.get("face_detailer_guide_size", 768)), 1024))
-        data["face_detailer_crop_factor"] = max(1.2, min(float(data.get("face_detailer_crop_factor", 1.8)), 3.0))
+        data["face_detailer_guide_size"] = max(256, min(int(data.get("face_detailer_guide_size", 768)), 2048))
+        data["face_detailer_crop_factor"] = max(1.0, min(float(data.get("face_detailer_crop_factor", 1.8)), 4.0))
         data["face_detailer_bbox_threshold"] = max(0.1, min(float(data.get("face_detailer_bbox_threshold", 0.5)), 0.9))
-        data["face_detailer_feather"] = max(0, min(int(data.get("face_detailer_feather", 5)), 30))
+        data["face_detailer_feather"] = max(0, min(int(data.get("face_detailer_feather", 5)), 100))
 
     # ── 保存路径模板解析 ─────────────────────────────────────────────────────
     # 支持 WAS Image Save 标准格式: [time(%Y-%m-%d)], [time(%H%M%S)] 等

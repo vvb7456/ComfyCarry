@@ -64,16 +64,17 @@ export const TAG_PARAMS_DEF: TagParamDef[] = [
   },
 ]
 
-// ── Built-in models (for welcome gate download) ──────────────────────────────
+// ── 内置模型 (依赖状态条用) ─────────────────────────────────────────────────
 
-import type { ModelDep, ModelDepConfig } from './useModelDependency'
+import type { DepRow } from './useDependencyStatus'
+import type { DepGroup } from './modelDepConfigs'
 
-const TAGGER_MODELS: Record<string, ModelDep> = {
+const TAGGER_MODELS: Record<string, DepRow> = {
   'wd-eva02-large-tagger-v3': {
     id: 'wd-eva02-large-tagger-v3',
-    name: 'WD EVA02 Large v3',
-    description: '最高精度',
-    size: '~1.2 GB',
+    label: 'WD EVA02 Large v3',
+    hint: '最高精度',
+    sizeText: '~1.2 GB',
     files: [
       {
         filename: 'wd-eva02-large-tagger-v3.onnx',
@@ -89,9 +90,9 @@ const TAGGER_MODELS: Record<string, ModelDep> = {
   },
   'wd-vit-tagger-v3': {
     id: 'wd-vit-tagger-v3',
-    name: 'WD ViT v3',
-    description: '轻量快速',
-    size: '~361 MB',
+    label: 'WD ViT v3',
+    hint: '轻量快速',
+    sizeText: '~361 MB',
     files: [
       {
         filename: 'wd-vit-tagger-v3.onnx',
@@ -107,10 +108,9 @@ const TAGGER_MODELS: Record<string, ModelDep> = {
   },
 }
 
-export const TAGGER_MODEL_CONFIG: ModelDepConfig = {
-  tab: 'tagger',
+export const TAGGER_DEP_GROUP: DepGroup = {
   title: 'generate.interrogate.need_model',
-  models: [TAGGER_MODELS['wd-eva02-large-tagger-v3'], TAGGER_MODELS['wd-vit-tagger-v3']],
+  rows: [TAGGER_MODELS['wd-eva02-large-tagger-v3'], TAGGER_MODELS['wd-vit-tagger-v3']],
   minOptional: 1,
 }
 

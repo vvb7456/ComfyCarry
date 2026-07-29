@@ -774,7 +774,7 @@ class WorkflowBuilder:
         image_node_id: LoadImage 节点 (output[0]=IMAGE)
         vae_ref: str (CheckpointLoader默认index 2) 或 (node_id, output_index) 元组
         mask_node_id: LoadImageMask 节点 (output[0]=MASK)
-        grow_mask_by: 遮罩扩展像素 (0-64，默认 6)
+        grow_mask_by: 遮罩扩展像素 (0-128，默认 6)
         输出: [node_id, 0]=LATENT
         """
         nid = self._next_id()
@@ -857,7 +857,7 @@ class WorkflowBuilder:
     ) -> str:
         """
         FaceDetailer (Impact Pack) — 检测人脸 → 裁切放大 → 局部低 denoise 重绘 → 贴回。
-        max_size 固定 1024 (恒 ≥ guide_size, 杜绝 guide>max 的矛盾配置);
+        max_size 取 max(1024, guide_size) (恒 ≥ guide_size, 杜绝 guide>max 的矛盾配置);
         drop_size=20 忽略远景小脸; sam_model_ref=None 时退化为 bbox 矩形掩码。
         输出: [node_id, 0]=IMAGE (整图); 输出 1 为 cropped_refined (list 型), 勿直接接 IMAGE 口
         """
@@ -873,7 +873,7 @@ class WorkflowBuilder:
             "bbox_detector": self._ref(bbox_detector_ref, default_idx=0),
             "guide_size": int(guide_size),
             "guide_size_for": True,
-            "max_size": 1024,
+            "max_size": max(1024, int(guide_size)),
             "seed": actual_seed,
             "steps": int(steps),
             "cfg": float(cfg),
@@ -1137,13 +1137,13 @@ def _add_face_detailer_chain(
         b.add_clip_text_encode(face_prompt, clip_ref) if face_prompt else positive
     )
 
-    denoise = max(0.1, min(float(params.get("face_detailer_denoise", 0.35)), 0.75))
-    steps = max(5, min(int(params.get("face_detailer_steps", 20)), 40))
+    denoise = max(0.1, min(float(params.get("face_detailer_denoise", 0.35)), 1.0))
+    steps = max(1, min(int(params.get("face_detailer_steps", 20)), 100))
     cfg = max(1.0, min(float(params.get("face_detailer_cfg", 7.0)), 20.0))
-    guide_size = max(256, min(int(params.get("face_detailer_guide_size", 768)), 1024))
-    crop_factor = max(1.2, min(float(params.get("face_detailer_crop_factor", 1.8)), 3.0))
+    guide_size = max(256, min(int(params.get("face_detailer_guide_size", 768)), 2048))
+    crop_factor = max(1.0, min(float(params.get("face_detailer_crop_factor", 1.8)), 4.0))
     bbox_threshold = max(0.1, min(float(params.get("face_detailer_bbox_threshold", 0.5)), 0.9))
-    feather = max(0, min(int(params.get("face_detailer_feather", 5)), 30))
+    feather = max(0, min(int(params.get("face_detailer_feather", 5)), 100))
 
     return b.add_face_detailer(
         image,
@@ -1270,8 +1270,8 @@ def build_sdxl_workflow(params: dict) -> dict:
                                       model: ControlNet 模型文件名
                                       image: 已上传到 ComfyUI input/ 的图片文件名
         hires_enabled   (bool)      — 是否启用二次采样
-        hires_denoise   (float)     — 二次采样去噪强度 (0.1-0.8)，默认 0.4
-        hires_steps     (int)       — 二次采样步数 (5-50)，默认 20
+        hires_denoise   (float)     — 二次采样去噪强度 (0.1-1.0)，默认 0.4
+        hires_steps     (int)       — 二次采样步数 (1-100)，默认 20
         hires_cfg       (float)     — 二次采样 CFG scale，默认 7.0
         hires_sampler   (str)       — 二次采样采样器，默认 "euler"
         hires_scheduler (str)       — 二次采样调度器，默认 "normal"
@@ -1281,7 +1281,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         inpaint_image   (str)       — 局部重绘: 参考图文件名 (与 i2i_image 互斥)
         inpaint_mask    (str)       — 局部重绘: mask 图片文件名 (黑白 PNG，白色=重绘区域)
         inpaint_denoise (float)     — 局部重绘去噪强度 (0.10-1.00)，默认 0.75
-        inpaint_grow_mask_by (int)  — 遮罩扩展像素 (0-64)，默认 6
+        inpaint_grow_mask_by (int)  — 遮罩扩展像素 (0-128)，默认 6
                                       strength: 0.0-2.0 (默认 1.0)
                                       start_percent: 0.0-1.0 (默认 0.0)
                                       end_percent: 0.0-1.0 (默认 1.0)
@@ -1363,7 +1363,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         # 局部重绘: 加载参考图 + mask → VAEEncodeForInpaint (VAE 引用 vae_ref)
         inp_load = b.add_load_image(inpaint_image)
         mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
-        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 64))
+        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
         latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
         i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
     elif i2i_image:
@@ -1417,8 +1417,8 @@ def build_sdxl_workflow(params: dict) -> dict:
     # ── 二次采样 (HiRes Refine) ─────────────────────────────────────
     # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码 (VAE 引用 vae_ref)
     if hires_enabled:
-        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
-        hires_steps = max(5, min(int(params.get("hires_steps", 20)), 50))
+        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
+        hires_steps = max(1, min(int(params.get("hires_steps", 20)), 100))
         hires_cfg = max(1.0, min(float(params.get("hires_cfg", 7.0)), 20.0))
         hires_sampler = str(params.get("hires_sampler", "euler"))
         hires_scheduler = str(params.get("hires_scheduler", "normal"))
@@ -1645,7 +1645,7 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     if inpaint_image and inpaint_mask:
         inp_load = b.add_load_image(inpaint_image)
         mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
-        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 64))
+        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
         latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
         i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
     elif i2i_image:
@@ -1699,8 +1699,8 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     # ── 二次采样 (HiRes Refine) ────────────────────────────────────────
     # 缺省值同步取 profile (hires_cfg 下限 clamp 保持 1.0)
     if hires_enabled:
-        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 0.8))
-        hires_steps = max(5, min(int(params.get("hires_steps", profile["steps"])), 50))
+        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
+        hires_steps = max(1, min(int(params.get("hires_steps", profile["steps"])), 100))
         hires_cfg = max(1.0, min(float(params.get("hires_cfg", profile["cfg"])), 20.0))
         hires_sampler = str(params.get("hires_sampler", profile["sampler"]))
         hires_scheduler = str(params.get("hires_scheduler", profile["scheduler"]))

@@ -209,38 +209,41 @@ function cycleApply(lora: LoraEntry) {
           <div v-if="!getPreviewUrl(lora.name)" class="lora-card__no-img">
             <MsIcon name="extension" color="none" />
           </div>
-
-          <!-- 段徽章: 仅双权重视频架构 (14B)。5B 单权重无分段概念, 图像架构同理。
-               点击循环 双段 → 仅高噪 → 仅低噪。 -->
-          <div v-if="isPaired" class="lora-card__seg-badges">
-            <button
-              class="lora-card__badge lora-card__badge--seg"
-              @click.stop="cycleApply(lora)"
-            >
-              {{ t(applyBadgeKey(initApply(lora))) }}
-            </button>
-          </div>
-
-          <!-- Disable toggle (top-left) -->
-          <button
-            class="lora-card__toggle"
-            :title="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
-            @click.stop="toggleEnabled(index)"
-          >
-            <MsIcon :name="lora.enabled ? 'visibility' : 'visibility_off'" color="none" />
-          </button>
-          <!-- Delete button (top-right) -->
-          <button
-            class="lora-card__del"
-            :title="t('generate.lora.remove')"
-            @click.stop="removeLora(index)"
-          >
-            <MsIcon name="close" color="none" />
-          </button>
         </div>
+
+        <!-- 开关 / 删除: 挂在卡片根下 (相对卡片定位)。宽屏时缩略图占满卡片顶部,
+             位置与旧版一致; 窄屏横向卡片下改贴卡片右缘, 不压住小缩略图。 -->
+        <button
+          class="lora-card__toggle"
+          :title="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
+          @click.stop="toggleEnabled(index)"
+        >
+          <MsIcon :name="lora.enabled ? 'visibility' : 'visibility_off'" color="none" />
+        </button>
+        <button
+          class="lora-card__del"
+          :title="t('generate.lora.remove')"
+          @click.stop="removeLora(index)"
+        >
+          <MsIcon name="close" color="none" />
+        </button>
+
         <div class="lora-card__body">
-          <div class="lora-card__name text-truncate" :title="getDisplayName(lora.name)">
-            {{ getDisplayName(lora.name) }}
+          <div class="lora-card__head">
+            <div class="lora-card__name text-truncate" :title="getDisplayName(lora.name)">
+              {{ getDisplayName(lora.name) }}
+            </div>
+            <!-- 段徽章: 仅双权重视频架构 (14B)。5B 单权重无分段概念, 图像架构同理。
+                 点击循环 双段 → 仅高噪 → 仅低噪。
+                 宽屏绝对定位到缩略图左上, 窄屏回流成名字旁的行内 chip。 -->
+            <div v-if="isPaired" class="lora-card__seg-badges">
+              <button
+                class="lora-card__badge lora-card__badge--seg"
+                @click.stop="cycleApply(lora)"
+              >
+                {{ t(applyBadgeKey(initApply(lora))) }}
+              </button>
+            </div>
           </div>
           <div class="lora-card__strength">
             <input
@@ -527,5 +530,90 @@ function cycleApply(lora: LoraEntry) {
 .lora-add-card :deep(.add-card) {
   height: 100%;
   min-height: 180px;
+}
+
+/* ═══ 窄屏: 横向卡片 (左小缩略图 + 右名字/强度), 与主模型卡片同构 ═══
+   竖版 3:4 大图在手机上一张卡就占掉半屏, 挂三四个 LoRA 要滚很久;
+   改成一行一张的矮卡, 高度从 ~260px 降到 ~60px。 */
+@media (max-width: 768px) {
+  .lora-grid {
+    grid-template-columns: 1fr;
+  }
+  .lora-grid :deep(.lora-add-card) {
+    aspect-ratio: auto;
+    flex-direction: row;
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+
+  .lora-card {
+    display: flex;
+    align-items: stretch;
+    min-height: 58px;
+  }
+
+  .lora-card__img {
+    flex: 0 0 64px;
+    width: 64px;
+    aspect-ratio: auto;
+    align-self: stretch;
+  }
+
+  .lora-card__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    /* 右侧留出开关/删除按钮的位置 */
+    padding: 6px 32px 6px 10px;
+  }
+
+  .lora-card__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .lora-card__name {
+    flex: 1;
+    min-width: 0;
+    font-size: .78rem;
+  }
+
+  .lora-card__strength {
+    margin-top: 0;
+    gap: 6px;
+  }
+
+  .lora-card__str-val {
+    font-size: .68rem;
+  }
+
+  /* 段徽章离开缩略图, 回流成名字旁的行内 chip */
+  .lora-card__seg-badges {
+    position: static;
+    flex: 0 0 auto;
+    max-width: none;
+  }
+
+  /* 触屏没有 hover, 开关/删除常显; 竖排贴卡片右缘, 不压住小缩略图 */
+  .lora-card__toggle,
+  .lora-card__del {
+    opacity: 1;
+    width: 20px;
+    height: 20px;
+    right: 5px;
+    left: auto;
+  }
+  .lora-card__toggle {
+    top: 5px;
+  }
+  .lora-card__del {
+    top: auto;
+    bottom: 5px;
+  }
 }
 </style>

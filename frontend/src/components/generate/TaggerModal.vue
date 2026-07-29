@@ -12,8 +12,9 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import { TAG_PARAMS_DEF, type useTagInterrogation } from '@/composables/generate/useTagInterrogation'
-import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
-import type { UseModelDependencyReturn } from '@/composables/generate/useModelDependency'
+import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { useToast } from '@/composables/useToast'
+import type { UseDependencyStatusReturn } from '@/composables/generate/useDependencyStatus'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
@@ -22,7 +23,7 @@ import HelpTip from '@/components/ui/HelpTip.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
-import ModelDependencyGate from '@/components/generate/ModelDependencyGate.vue'
+import DependencyBar from '@/components/generate/DependencyBar.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 
@@ -31,25 +32,24 @@ defineOptions({ name: 'TaggerModal' })
 const props = defineProps<{
   modelValue: boolean
   tagger: ReturnType<typeof useTagInterrogation>
-  ready: boolean
-  dep?: UseModelDependencyReturn
-  depTitle?: string
-  depMinOptional?: number
+  dep: UseDependencyStatusReturn
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   apply: [tags: string]
-  'dep-enter': []
-  'dep-download': []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { toast } = useToast()
 const { copy } = useClipboard()
 
 // ── Image preview URL ─────────────────────────────────────────────────────
 
 const previewUrl = ref('')
+
+/** 依赖状态条展开态 */
+const depExpanded = ref(false)
 
 function updatePreview() {
   // Revoke old blob URL
@@ -143,27 +143,25 @@ function onCopy() {
     :title="t('generate.interrogate.modal_title')"
     icon="image_search"
     icon-color="none"
-    :width="ready ? '900px' : '520px'"
+    width="900px"
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <!-- Gate: model not ready -->
-    <ModelDependencyGate
-      v-if="!ready && dep"
-      :dep="dep"
-      :title="depTitle || ''"
-      :min-optional="depMinOptional"
-      @enter="$emit('dep-enter')"
-      @download="$emit('dep-download')"
+    <!-- 依赖状态条: 常驻顶部, 缺件时就地下载 -->
+    <DependencyBar
+      v-if="dep.has.value"
+      class="tag-dep"
+      :status="dep"
+      :noun="t('generate.dep.noun_tagger')"
+      v-model:expanded="depExpanded"
     />
 
-    <!-- Main content: ready -->
-    <div v-else class="tag-split">
+    <div class="tag-split">
       <!-- ── Left: image + params + submit ── -->
       <div class="tag-left">
         <FileUploadZone
           mode="pick"
-          accept="image/png,image/jpeg,image/webp,image/bmp"
+          :accept="IMAGE_ACCEPT"
           :preview="previewUrl"
           :file-name="sourceName"
           :pick-label="t('generate.image_source.from_input')"
@@ -173,6 +171,7 @@ function onCopy() {
           @pick="onPickInput"
           @file="onFileFromZone"
           @clear="onClearSource"
+          @error="toast($event, 'warning')"
         />
 
         <!-- Parameters -->
@@ -248,7 +247,7 @@ function onCopy() {
         <BaseButton
           size="sm"
           variant="primary"
-          :disabled="!tagger.hasSource.value || tagger.running.value"
+          :disabled="!tagger.hasSource.value || tagger.running.value || !dep.ready.value"
           class="tag-submit-btn"
           @click="onSubmit"
         >
@@ -375,6 +374,10 @@ function onCopy() {
 }
 .tag-text-input::placeholder {
   color: var(--t3);
+}
+
+.tag-dep {
+  margin-bottom: var(--sp-3);
 }
 
 .tag-submit-btn {

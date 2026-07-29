@@ -47,10 +47,10 @@ watch(samInstalled, (ok) => {
         <RangeField
           :model-value="config.denoise"
           :min="0.1"
-          :max="0.75"
+          :max="1"
           :step="0.05"
           :label="t('generate.face.denoise')"
-          :marks="[t('generate.face.denoise_low'), t('generate.face.denoise_mid'), t('generate.face.denoise_high')]"
+          :marks="2"
           :value-format="(v: number) => v.toFixed(2)"
           editable
           @update:model-value="config.denoise = $event"
@@ -63,11 +63,11 @@ watch(samInstalled, (ok) => {
       <div class="fd-cell">
         <RangeField
           :model-value="config.steps"
-          :min="5"
-          :max="40"
+          :min="1"
+          :max="100"
           :step="1"
           :label="t('generate.face.steps')"
-          :marks="['5', '20', '40']"
+          :marks="2"
           editable
           @update:model-value="config.steps = $event"
         />
@@ -128,7 +128,7 @@ watch(samInstalled, (ok) => {
             :max="20"
             :step="0.5"
             :label="'CFG'"
-            :marks="['1', '10', '20']"
+            :marks="2"
             :value-format="(v: number) => v.toFixed(1)"
             editable
             @update:model-value="config.cfg = $event"
@@ -142,10 +142,10 @@ watch(samInstalled, (ok) => {
           <RangeField
             :model-value="config.guideSize"
             :min="256"
-            :max="1024"
+            :max="2048"
             :step="64"
             :label="t('generate.face.guide_size')"
-            :marks="['256', '640', '1024']"
+            :marks="2"
             editable
             @update:model-value="config.guideSize = $event"
           >
@@ -159,11 +159,11 @@ watch(samInstalled, (ok) => {
         <div class="fd-cell">
           <RangeField
             :model-value="config.cropFactor"
-            :min="1.2"
-            :max="3.0"
+            :min="1"
+            :max="4"
             :step="0.1"
             :label="t('generate.face.crop_factor')"
-            :marks="['1.2', '1.8', '3.0']"
+            :marks="2"
             :value-format="(v: number) => v.toFixed(1)"
             editable
             @update:model-value="config.cropFactor = $event"
@@ -180,7 +180,7 @@ watch(samInstalled, (ok) => {
             :max="0.9"
             :step="0.05"
             :label="t('generate.face.bbox_threshold')"
-            :marks="['0.1', '0.5', '0.9']"
+            :marks="2"
             :value-format="(v: number) => v.toFixed(2)"
             editable
             @update:model-value="config.bboxThreshold = $event"
@@ -196,10 +196,10 @@ watch(samInstalled, (ok) => {
           <RangeField
             :model-value="config.feather"
             :min="0"
-            :max="30"
+            :max="100"
             :step="1"
             :label="t('generate.face.feather')"
-            :marks="['0', '15', '30']"
+            :marks="2"
             editable
             @update:model-value="config.feather = $event"
           >
@@ -219,7 +219,7 @@ watch(samInstalled, (ok) => {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  max-width: 700px;
+  max-width: var(--gen-module-w);
   margin: 0 auto;
 }
 

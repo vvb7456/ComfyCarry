@@ -238,10 +238,7 @@ const fps = computed(() => vd.value.fps)
 const maxDur = computed(() => vd.value.maxDurationS)
 const frameCount = computed(() => Math.round(fps.value * video.value.durationS) + 1)
 /** 刻度是静态量程标记, 只放端点与中点 —— 帧数是动态值, 走 label 徽章 */
-const durationMarks = computed(() => {
-  const mid = Math.round((1 + maxDur.value) / 2)
-  return ['1s', `${mid}s`, `${maxDur.value}s`]
-})
+const durationMarkFormat = (v: number) => `${v}s`
 </script>
 
 <template>
@@ -309,7 +306,8 @@ const durationMarks = computed(() => {
         :max="maxDur"
         :step="0.5"
         :label="t('generate.video.duration')"
-        :marks="durationMarks"
+        :marks="2"
+        :mark-format="durationMarkFormat"
         :value-format="(v: number) => `${v}s`"
         :disabled="disabled"
         @update:model-value="video.durationS = $event"
@@ -324,11 +322,11 @@ const durationMarks = computed(() => {
     <div v-if="hasSpeed && !isFast" class="vs-slider-row">
       <RangeField
         :model-value="state.steps"
-        :min="10"
-        :max="30"
+        :min="1"
+        :max="100"
         :step="1"
         :label="t('generate.basic.steps')"
-        :marks="['10', '20', '30']"
+        :marks="2"
         editable
         :disabled="disabled"
         @update:model-value="state.steps = $event"
@@ -339,7 +337,7 @@ const durationMarks = computed(() => {
         :max="20"
         :step="0.5"
         :label="t('generate.basic.cfg_scale')"
-        :marks="['1', '10', '20']"
+        :marks="2"
         :value-format="(v: number) => v.toFixed(1)"
         editable
         :disabled="disabled"

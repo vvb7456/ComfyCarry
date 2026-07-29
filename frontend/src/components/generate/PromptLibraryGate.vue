@@ -8,7 +8,7 @@
  *   - Real-time SSE progress (downloading / importing)
  *   - Skip / dismiss option
  *
- * Visual style matches ModelDependencyGate.
+ * Visual style matches DependencyBar.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -71,7 +71,7 @@ function onImport() {
       <div class="plg-title">{{ t('prompt-library.init.title') }}</div>
     </div>
 
-    <!-- Data card (matches ModelDependencyGate card style) -->
+    <!-- Data card -->
     <div class="plg-card-grid">
       <div class="plg-card plg-card-selected plg-card-locked">
         <div class="plg-card-check">
@@ -159,7 +159,7 @@ function onImport() {
   font-size: var(--text-base);
 }
 
-/* Data card (mirrors ModelDependencyGate card) */
+/* Data card */
 .plg-card-grid {
   display: flex;
   gap: var(--sp-3);

@@ -8,7 +8,7 @@
  */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { InputImage } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, type InputImage } from '@/composables/generate/useRefImagePicker'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -104,7 +104,7 @@ function formatSize(bytes: number): string {
       <input
         ref="fileInputRef"
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/bmp"
+        :accept="IMAGE_ACCEPT"
         style="display: none"
         @change="onFileChange"
       >

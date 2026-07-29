@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore, type UpscaleState } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
@@ -21,10 +21,21 @@ const config = computed<UpscaleState>(() => store.currentState.upscale)
 
 const isSeedVR2 = computed(() => config.value.engine === 'seedvr2')
 
+/** 两个引擎各自的权重是否在磁盘 —— 未装的那一侧禁止切过去 (照面部面板 SAM 成例) */
+const aurasrInstalled = computed(() => options.aurasrInstalled.value)
+const seedvr2Installed = computed(() => options.seedvr2Models.value.length > 0)
+
 const engineOptions = computed(() => [
-  { value: 'aurasr', label: t('generate.upscale.engine_aurasr') },
-  { value: 'seedvr2', label: t('generate.upscale.engine_seedvr2') },
+  { value: 'aurasr', label: t('generate.upscale.engine_aurasr'), disabled: !aurasrInstalled.value },
+  { value: 'seedvr2', label: t('generate.upscale.engine_seedvr2'), disabled: !seedvr2Installed.value },
 ])
+
+// 选中的引擎权重被删 / 持久化状态指向未装的引擎时归位到装了的那个,
+// 避免置灰段呈选中态 (两个都没装时模块开关本身就打不开, 不必处理)
+watch([aurasrInstalled, seedvr2Installed], ([aura, svr]) => {
+  if (config.value.engine === 'aurasr' && !aura && svr) config.value.engine = 'seedvr2'
+  else if (config.value.engine === 'seedvr2' && !svr && aura) config.value.engine = 'aurasr'
+}, { immediate: true })
 
 // ── AuraSR options ──────────────────────────────────────────────────────
 
@@ -106,7 +117,7 @@ const sizeHint = computed(() => {
             :max="4"
             :step="0.5"
             :label="t('generate.upscale.scale')"
-            :marks="['1.5', '2', '2.5', '3', '3.5', '4']"
+            :marks="5"
             :value-format="(v: number) => v.toFixed(1) + 'x'"
             @update:model-value="config.factor = $event"
           >
@@ -124,7 +135,7 @@ const sizeHint = computed(() => {
             :max="32"
             :step="1"
             :label="t('generate.upscale.tile_size')"
-            :marks="['1', '16', '32']"
+            :marks="2"
             @update:model-value="config.tile = $event"
           >
             <template #label-append>
@@ -181,7 +192,7 @@ const sizeHint = computed(() => {
             :max="4"
             :step="0.5"
             :label="t('generate.upscale.scale')"
-            :marks="['1.5', '2', '2.5', '3', '3.5', '4']"
+            :marks="5"
             :value-format="(v: number) => v.toFixed(1) + 'x'"
             @update:model-value="config.factor = $event"
           >
@@ -246,7 +257,7 @@ const sizeHint = computed(() => {
             :max="1"
             :step="0.05"
             :label="t('generate.upscale.svr_input_noise')"
-            :marks="['0', '0.5', '1']"
+            :marks="2"
             :value-format="(v: number) => v.toFixed(2)"
             @update:model-value="config.svrInputNoise = $event"
           >
@@ -264,7 +275,7 @@ const sizeHint = computed(() => {
             :max="1"
             :step="0.05"
             :label="t('generate.upscale.svr_latent_noise')"
-            :marks="['0', '0.5', '1']"
+            :marks="2"
             :value-format="(v: number) => v.toFixed(2)"
             @update:model-value="config.svrLatentNoise = $event"
           >
@@ -283,7 +294,7 @@ const sizeHint = computed(() => {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  max-width: 700px;
+  max-width: var(--gen-module-w);
   margin: 0 auto;
 }
 

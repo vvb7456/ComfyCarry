@@ -6,9 +6,10 @@ import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { packagingOf } from '@/composables/generate/useGenerateOptions'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
-import { useComponentStatus } from '@/composables/generate/useComponentStatus'
+import { useDependencyStatus } from '@/composables/generate/useDependencyStatus'
+import { componentDepRows } from '@/composables/generate/depRows'
 import { MODEL_TYPES } from '@/config/model-types'
-import { UPSCALE_MODEL_CONFIG, FACE_MODEL_CONFIG, getCnDepConfig, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
@@ -18,18 +19,17 @@ import BasicSettings from '@/components/generate/BasicSettings.vue'
 import AdvancedSettings from '@/components/generate/AdvancedSettings.vue'
 import PreviewArea from '@/components/generate/PreviewArea.vue'
 import ModelPickerModal from '@/components/generate/ModelPickerModal.vue'
-import ComponentPanel from '@/components/generate/ComponentPanel.vue'
+import DependencyBar from '@/components/generate/DependencyBar.vue'
 import LoraPanel from '@/components/generate/LoraPanel.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
-import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
 import { COMPONENT_FILENAMES } from '@/config/component-registry'
 import I2IPanel from '@/components/generate/I2IPanel.vue'
 import ControlNetPanel from '@/components/generate/ControlNetPanel.vue'
 import UpscalePanel from '@/components/generate/UpscalePanel.vue'
 import HiResPanel from '@/components/generate/HiResPanel.vue'
 import FaceDetailerPanel from '@/components/generate/FaceDetailerPanel.vue'
-import ModelDependencyGate from '@/components/generate/ModelDependencyGate.vue'
 import PreprocessModal from '@/components/generate/PreprocessModal.vue'
 import TaggerModal from '@/components/generate/TaggerModal.vue'
 import LlmModal from '@/components/generate/LlmModal.vue'
@@ -38,7 +38,7 @@ import RefImageModal from '@/components/generate/RefImageModal.vue'
 import MaskEditorModal from '@/components/generate/MaskEditorModal.vue'
 import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
-import { TAGGER_MODEL_CONFIG } from '@/composables/generate/useTagInterrogation'
+import { TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
 import { useToast } from '@/composables/useToast'
 
 defineOptions({ name: 'ModelTab' })
@@ -190,7 +190,6 @@ const selectedPackaging = computed<'checkpoint' | 'split'>(() =>
 const {
   i2i,
   tagger,
-  _taggerReady,
   cnPose,
   cnCanny,
   cnDepth,
@@ -206,14 +205,6 @@ const {
   onModuleToggle: cnModuleToggle,
   onPPSubmit,
   handlePreprocessDone,
-  onDepEnter,
-  onUpscaleDepEnter,
-  onDepDownload,
-  onUpscaleDepDownload,
-  onFaceDepEnter,
-  onFaceDepDownload,
-  onTaggerDepEnter,
-  onTaggerDepDownload,
   prepareTagger,
   handleTagDone,
 } = useControlNetOrchestration({
@@ -383,15 +374,16 @@ function onModelSelect(name: string) {
   toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
 }
 
-// 运行组件状态机: 替代旧 tab 级依赖机制 (后者读 welcome_state, dismiss 后永远空)。
-// useComponentStatus 只发 /api/downloads/check, 绝不碰 welcome_state, 无 dismiss 概念。
-// 它内部 watch arch 且 immediate 刷新, 无需手动调首次 refresh。
-// 第三参 = 条件组件上下文: 视频快速档需把 lightning 加速件计入必需集,
-// 否则缺件也会误判为就绪。图像架构无条件组件, fast 传了也无影响。
-const compStatus = useComponentStatus(
-  () => props.modelType,
-  () => options.comfyuiDir.value,
-  () => ({ fast: state.value.fast }),
+// 运行组件: 与 ControlNet/放大/面部/反推 用同一个依赖状态机, 唯一真相是磁盘。
+// 清单随 fast 档位变化 (视频快速档要把 lightning 加速件计入必需集, 否则缺件会
+// 误判为就绪), 引擎 watch 清单变化自动重判, 无需手动调首次 refresh。
+const compStatus = useDependencyStatus(
+  () => componentDepRows(props.modelType, { fast: state.value.fast }, t),
+  {
+    comfyuiDir: () => options.comfyuiDir.value,
+    source: 'runtime-component',
+    metaOf: () => ({ arch: props.modelType }),
+  },
 )
 const componentPanelExpanded = ref(false)
 
@@ -457,11 +449,29 @@ watch(() => [store.activeModelType, isVideo.value] as const, () => {
   }
 }, { immediate: true })
 
-// CN 依赖 Gate 配置按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用)
+// CN 依赖清单按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用); 这里只用它的标题
 const _cnBranch = (MODEL_TYPES[props.modelType]?.cnBranch as CnBranch | undefined)
-const cnDepPose = getCnDepConfig('pose', _cnBranch)
-const cnDepCanny = getCnDepConfig('canny', _cnBranch)
-const cnDepDepth = getCnDepConfig('depth', _cnBranch)
+const cnDepPose = getCnDepGroup('pose', _cnBranch)
+const cnDepCanny = getCnDepGroup('canny', _cnBranch)
+const cnDepDepth = getCnDepGroup('depth', _cnBranch)
+
+/** CN 三个模块的依赖句柄, 供生成前置校验按 key 取 */
+const cnDepMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
+
+/** 各依赖状态条的称呼 (进"XX 已就绪 / 缺少 N 项 XX"文案) */
+const depNouns = computed(() => ({
+  pose: t('generate.dep.noun_pose'),
+  canny: t('generate.dep.noun_canny'),
+  depth: t('generate.dep.noun_depth'),
+  upscale: t('generate.dep.noun_upscale'),
+  face: t('generate.dep.noun_face'),
+  components: t('generate.components.title'),
+}))
+
+/** 模块面板顶部状态条的展开态 (每模块各自记) */
+const depExpanded = ref<Record<string, boolean>>({
+  pose: false, canny: false, depth: false, upscale: false, face: false,
+})
 
 /** 高级设置 CLIP / VAE 自动填充: 仅当前激活 tab + split 形态 (selectedPackaging) + 字段为空时填充 */
 function autofillDefaultModels() {
@@ -507,11 +517,21 @@ const runBlockedReason = computed<string>(() => {
   // 1b. 视频 i2v 未选起始画面 → 软禁用 + 点击 toast。
   if (showStartFrame.value && !st.video?.refImage) return t('generate.error.no_start_frame')
 
+  // 1c. 模块已启用但依赖缺件。开关本身会拦, 但 enabled 是持久化的 —— 上次开着、
+  // 这次模型被删/换了架构 (专用 CN 模型按 branch 分家) 都会留下开着却跑不了的状态。
+  for (const cnKey of ['pose', 'canny', 'depth'] as const) {
+    if (st.controlNets[cnKey]?.enabled && !cnDepMap[cnKey].ready.value) {
+      return t(`generate.controlnet.need_download_${cnKey}`)
+    }
+  }
+  if (st.upscale.enabled && !depUpscale.ready.value) return t('generate.upscale.need_model')
+  if (st.faceDetailer.enabled && !depFace.ready.value) return t('generate.face.need_model')
+
   // 整合包自带全部组件, 到此即可
   if (pkg !== 'split') return ''
 
   // 2. 运行组件未下载 / 下载中 (ready 为假即涵盖两种)
-  if (compStatus.hasComponents.value && !compStatus.ready.value) {
+  if (compStatus.has.value && !compStatus.ready.value) {
     return t('generate.error.components_not_ready')
   }
 
@@ -580,7 +600,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           <template v-if="showStartFrame" #media>
             <FileUploadZone
               mode="pick"
-              accept="image/png,image/jpeg,image/webp,image/bmp"
+              :accept="IMAGE_ACCEPT"
               :preview="startFramePreview"
               :file-name="startFrameName"
               :pick-label="t('generate.i2i.pick_from_input')"
@@ -590,6 +610,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
               @pick="videoPicker.open()"
               @file="onStartFrameUpload"
               @clear="onStartFrameClear"
+              @error="toast($event, 'warning')"
             />
           </template>
         </PromptEditor>
@@ -616,11 +637,11 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @open-model="openModelPickerFor"
         />
 
-        <!-- 运行组件内联面板 (三态: 就绪/缺失/下载中)。packaging=checkpoint 或无组件需求时自渲染为空 -->
-        <ComponentPanel
-          :arch="modelType"
+        <!-- 运行组件状态条 (三态: 就绪/缺失/下载中)。整合包或无组件需求时不渲染 -->
+        <DependencyBar
+          v-if="selectedPackaging === 'split' && compStatus.has.value"
           :status="compStatus"
-          :packaging="selectedPackaging"
+          :noun="depNouns.components"
           v-model:expanded="componentPanelExpanded"
         />
 
@@ -670,78 +691,75 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         />
       </div>
       <div v-show="state.activeModule === 'pose'" class="gen-module-panel">
-        <ModelDependencyGate
-          v-if="depPose.show.value"
-          :dep="depPose"
-          :title="cnDepPose.title"
-          :min-optional="cnDepPose.minOptional"
-          @enter="onDepEnter('pose')"
-          @download="onDepDownload('pose')"
+        <DependencyBar
+          v-if="depPose.has.value"
+          class="gen-module-dep"
+          :status="depPose"
+          :noun="depNouns.pose"
+          v-model:expanded="depExpanded.pose"
         />
         <ControlNetPanel
-          v-else
           :cn="cnPose"
           @pick="cnPose.picker.open()"
+          @file="cnPose.handleUpload"
           @clear="cnPose.clearImage"
           @open-preprocess="showPPModal.pose = true"
         />
       </div>
       <div v-show="state.activeModule === 'canny'" class="gen-module-panel">
-        <ModelDependencyGate
-          v-if="depCanny.show.value"
-          :dep="depCanny"
-          :title="cnDepCanny.title"
-          :min-optional="cnDepCanny.minOptional"
-          @enter="onDepEnter('canny')"
-          @download="onDepDownload('canny')"
+        <DependencyBar
+          v-if="depCanny.has.value"
+          class="gen-module-dep"
+          :status="depCanny"
+          :noun="depNouns.canny"
+          v-model:expanded="depExpanded.canny"
         />
         <ControlNetPanel
-          v-else
           :cn="cnCanny"
           @pick="cnCanny.picker.open()"
+          @file="cnCanny.handleUpload"
           @clear="cnCanny.clearImage"
           @open-preprocess="showPPModal.canny = true"
         />
       </div>
       <div v-show="state.activeModule === 'depth'" class="gen-module-panel">
-        <ModelDependencyGate
-          v-if="depDepth.show.value"
-          :dep="depDepth"
-          :title="cnDepDepth.title"
-          :min-optional="cnDepDepth.minOptional"
-          @enter="onDepEnter('depth')"
-          @download="onDepDownload('depth')"
+        <DependencyBar
+          v-if="depDepth.has.value"
+          class="gen-module-dep"
+          :status="depDepth"
+          :noun="depNouns.depth"
+          v-model:expanded="depExpanded.depth"
         />
         <ControlNetPanel
-          v-else
           :cn="cnDepth"
           @pick="cnDepth.picker.open()"
+          @file="cnDepth.handleUpload"
           @clear="cnDepth.clearImage"
           @open-preprocess="showPPModal.depth = true"
         />
       </div>
       <div v-show="state.activeModule === 'upscale'" class="gen-module-panel">
-        <ModelDependencyGate
-          v-if="depUpscale.show.value"
-          :dep="depUpscale"
-          :title="UPSCALE_MODEL_CONFIG.title"
-          @enter="onUpscaleDepEnter"
-          @download="onUpscaleDepDownload"
+        <DependencyBar
+          v-if="depUpscale.has.value"
+          class="gen-module-dep"
+          :status="depUpscale"
+          :noun="depNouns.upscale"
+          v-model:expanded="depExpanded.upscale"
         />
-        <UpscalePanel v-else />
+        <UpscalePanel />
       </div>
       <div v-show="state.activeModule === 'hires'" class="gen-module-panel">
         <HiResPanel />
       </div>
       <div v-show="state.activeModule === 'face'" class="gen-module-panel">
-        <ModelDependencyGate
-          v-if="depFace.show.value"
-          :dep="depFace"
-          :title="FACE_MODEL_CONFIG.title"
-          @enter="onFaceDepEnter"
-          @download="onFaceDepDownload"
+        <DependencyBar
+          v-if="depFace.has.value"
+          class="gen-module-dep"
+          :status="depFace"
+          :noun="depNouns.face"
+          v-model:expanded="depExpanded.face"
         />
-        <FaceDetailerPanel v-else />
+        <FaceDetailerPanel />
       </div>
     </div>
 
@@ -759,7 +777,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         ? t('generate.basic.search_model')
         : (isSplit ? t('generate.basic.search_unet') : t('generate.basic.search_checkpoint'))"
       :show-packaging-filter="hasDualPackaging"
-      :components-missing="compStatus.hasComponents.value && !compStatus.ready.value"
+      :components-missing="compStatus.has.value && !compStatus.ready.value"
       @select="onModelSelect"
     />
 
@@ -900,13 +918,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     <TaggerModal
       v-model="showTaggerModal"
       :tagger="tagger"
-      :ready="_taggerReady"
       :dep="depTagger"
-      :dep-title="TAGGER_MODEL_CONFIG.title"
-      :dep-min-optional="TAGGER_MODEL_CONFIG.minOptional"
       @apply="onTaggerApply"
-      @dep-enter="onTaggerDepEnter"
-      @dep-download="onTaggerDepDownload"
     />
 
     <!-- Preview lightbox -->
@@ -1022,6 +1035,13 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 .gen-module-panel {
   padding: var(--sp-4);
   min-height: 120px;
+}
+
+/* 模块面板顶部的依赖状态条: 常驻一条, 不挡下面的面板内容。
+   宽度与位置跟随下方内容容器 (各面板同为 --gen-module-w 居中), 不占满主容器。 */
+.gen-module-dep {
+  max-width: var(--gen-module-w);
+  margin: 0 auto var(--sp-3);
 }
 
 /* ── 通用占位 ── */

@@ -41,6 +41,8 @@ export interface GenerateOptionsReturn {
   vaes: ComputedRef<ModelFileItem[]>
   controlnetModels: Ref<Record<string, string[]>>
   seedvr2Models: Ref<string[]>
+  /** AuraSR 权重是否在磁盘 (固定两文件, 后端报布尔) */
+  aurasrInstalled: Ref<boolean>
   ultralyticsBboxModels: Ref<string[]>
   samModels: Ref<string[]>
   comfyuiDir: Ref<string>
@@ -72,6 +74,7 @@ interface OptionsResponse {
   unet_info: Record<string, Record<string, unknown>>
   controlnet_models: Record<string, string[]>
   seedvr2_models: string[]
+  aurasr_installed?: boolean
   ultralytics_bbox_models: string[]
   sam_models: string[]
   comfyui_dir: string
@@ -89,6 +92,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const comfyuiDir = ref('')
   const controlnetModels = ref<Record<string, string[]>>({})
   const seedvr2Models = ref<string[]>([])
+  const aurasrInstalled = ref(false)
   const ultralyticsBboxModels = ref<string[]>([])
   const samModels = ref<string[]>([])
 
@@ -195,6 +199,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
       unetInfo.value = data.unet_info || {}
       controlnetModels.value = data.controlnet_models || {}
       seedvr2Models.value = data.seedvr2_models || []
+      aurasrInstalled.value = !!data.aurasr_installed
       ultralyticsBboxModels.value = data.ultralytics_bbox_models || []
       samModels.value = data.sam_models || []
       comfyuiDir.value = data.comfyui_dir || ''
@@ -228,7 +233,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
     samplers, schedulers,
     checkpoints, loras,
     unets, clips, vaes,
-    controlnetModels, seedvr2Models, ultralyticsBboxModels, samModels, comfyuiDir,
+    controlnetModels, seedvr2Models, aurasrInstalled, ultralyticsBboxModels, samModels, comfyuiDir,
     load, refresh,
   }
 }

@@ -60,6 +60,11 @@ function onFileUpload(file: File) {
   handleFile(file)
 }
 
+/** 拖入的文件类型不符 —— 复用同一行状态文本, 不另起提示位 */
+function onFileError(message: string) {
+  fileStatus.value = message
+}
+
 function onSubmitRemote() {
   remoteError.value = ''
   const result = submitRemote(remoteName.value, remoteType.value, { ...remoteParams.value })
@@ -132,7 +137,7 @@ function onPrev() { prevStep() }
 
     <!-- File upload area -->
     <div v-if="selectedMethod === 'file'" class="step-rclone__manual-form">
-      <FileUploadZone accept=".conf,.txt" mode="drop" @file="onFileUpload" />
+      <FileUploadZone accept=".conf,.txt" mode="drop" @file="onFileUpload" @error="onFileError" />
       <span v-if="fileStatus" class="step-rclone__file-status">{{ fileStatus }}</span>
     </div>
 

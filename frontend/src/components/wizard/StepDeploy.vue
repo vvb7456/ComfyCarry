@@ -128,6 +128,7 @@ function onNext() {
         mode="drop"
         @file="onImportFile"
         @clear="clearImport"
+        @error="importError = $event"
       />
 
       <AlertBanner v-if="importError" tone="danger" dense>

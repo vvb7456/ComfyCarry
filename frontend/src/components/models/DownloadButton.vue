@@ -49,16 +49,18 @@ const speedTitle = computed(() => {
 </script>
 
 <template>
-  <!-- Installed / local -->
-  <BaseButton
+  <!-- Installed / local — 「已下载」是一个结果态, 不是被禁用的下载按钮:
+       给对勾 + 成功色, 不用 disabled 的灰态 (那会读成"此处不可用")。
+       模型卡传进来的 installed 仍由调用方判定 (聚合态 = 全部 version 都装了), 本组件只管呈现。 -->
+  <span
     v-if="state === 'installed' || state === 'local'"
-    :size="size"
-    disabled
-    class="dl-btn dl-btn--done"
+    class="dl-btn dl-done"
+    :class="`dl-done--${size}`"
+    :title="t('models.downloads.installed')"
   >
-    <MsIcon name="download" size="xs" />
-    {{ t('models.downloads.download') }}
-  </BaseButton>
+    <MsIcon name="check_circle" size="xs" />
+    {{ t('models.downloads.installed') }}
+  </span>
 
   <!-- Submitting: in-flight request, not cancellable -->
   <BaseButton
@@ -143,11 +145,28 @@ const speedTitle = computed(() => {
 </template>
 
 <style scoped>
-.dl-btn--done,
 .dl-btn--busy {
   opacity: .5;
   cursor: default;
 }
+
+/* 已下载: 与按钮同高同圆角, 但不是按钮 —— 无边框、无 hover、不可点 */
+.dl-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-sm);
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+.dl-done--xs { padding: 2px 8px; font-size: var(--text-xs); }
+.dl-done--sm { padding: 4px 10px; font-size: var(--text-sm); }
+.dl-done--md { padding: 6px 12px; font-size: var(--text-base); }
+.dl-done--lg { padding: 8px 16px; font-size: var(--text-md); }
 /* hover 取消态: 恢复完全不透明与手型光标, 与可点击语义一致 */
 .dl-btn--busy.dl-btn--cancellable:hover {
   opacity: 1;

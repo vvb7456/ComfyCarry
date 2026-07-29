@@ -64,6 +64,9 @@
             --r-lg: 12px;
             --r-pill: 9999px;
             --z-float: 10000;
+            /* 模块面板内容宽度: 生成页各模块面板 (CN/图生图/放大/面部) 与其顶部
+               依赖状态条共用, 保证状态条与下方内容左右对齐 */
+            --gen-module-w: 700px;
             --text-xs: .72rem;
             --text-sm: .78rem;
             --text-base: .85rem;

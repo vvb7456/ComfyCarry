@@ -109,11 +109,6 @@ export interface UseControlNetReturn {
   /** i18n key for the strength help tooltip */
   strengthHelpKey: string
 
-  /** Welcome/ready state — whether user has dismissed the model setup gate */
-  ready: Ref<boolean>
-  /** Whether welcome state is being loaded */
-  readyLoading: Ref<boolean>
-
   /** Available CN models for this type (from options) */
   models: ComputedRef<string[]>
   /** Whether any models are available */
@@ -129,10 +124,6 @@ export interface UseControlNetReturn {
   /** Preprocess timer elapsed (seconds) */
   preprocessElapsed: Ref<number>
 
-  /** Check welcome/ready state from backend */
-  checkReady: () => Promise<void>
-  /** Dismiss welcome gate and mark as ready */
-  dismissWelcome: () => Promise<void>
   /** Set the CN reference image */
   setImage: (filename: string) => void
   /** Clear the CN reference image */
@@ -158,14 +149,18 @@ export interface UseControlNetReturn {
  * @param controlnetModels — reactive ref to the full controlnet models map from options
  * @param branchRef — current tab 的 CN branch ('sdxl' | 'ilnoob' | undefined);
  *                    用于面板下拉过滤 (三规则: 兼容排前/不兼容隐藏/未知列后)
+ * @param modelType — 本实例所属架构 key。ModelTab 是全量 v-show 挂载的, 每个架构
+ *                    都有一个活着的实例; 必须写自己架构的 state —— 写 currentState
+ *                    会让非激活实例的自动选中串写到当前架构上。
  */
 export function useControlNet(
   type: CnType,
   controlnetModels: Ref<Record<string, string[]>>,
-  branchRef?: ComputedRef<CnBranch | undefined>,
+  branchRef: ComputedRef<CnBranch | undefined> | undefined,
+  modelType: string,
 ): UseControlNetReturn {
   const store = useGenerateStore()
-  const state = computed(() => store.currentState)
+  const state = computed(() => store.stateFor(modelType))
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
 
@@ -176,41 +171,6 @@ export function useControlNet(
   // ── Store config ─────────────────────────────────────────────────────────
 
   const config = computed<ControlNetState>(() => state.value.controlNets[type])
-
-  // ── Welcome / ready state ────────────────────────────────────────────────
-
-  const ready = ref(false)
-  const readyLoading = ref(false)
-
-  async function checkReady() {
-    readyLoading.value = true
-    try {
-      const res = await fetch('/api/generate/welcome_state')
-      if (res.ok) {
-        const data = await res.json()
-        ready.value = !!data[type]
-      }
-    } catch {
-      // Fail open — assume not ready
-    } finally {
-      readyLoading.value = false
-    }
-  }
-
-  async function dismissWelcome() {
-    try {
-      const res = await fetch('/api/generate/welcome_state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tab: type }),
-      })
-      if (res.ok) {
-        ready.value = true
-      }
-    } catch {
-      // Silent fail
-    }
-  }
 
   // ── Models ───────────────────────────────────────────────────────────────
   // 三规则过滤 (branch = 当前 tab 的 cnBranch):
@@ -241,28 +201,18 @@ export function useControlNet(
   })
   const hasModels = computed(() => models.value.length > 0)
 
-  /** 判断当前选中模型是否被规则 2 隐藏 (用于 tab 切换时重置选中) */
-  function isModelHidden(name: string): boolean {
-    const branch = branchRef?.value
-    if (!branch) return false
-    const fileBranch = cnBranchForFile(name)
-    return fileBranch !== null && fileBranch !== branch
-  }
-
-  // Auto-select first model when list populates and none selected (规则 1 的"自动默认第一个")
+  // 选中项收敛 (规则 1 的"自动默认第一个"):
+  //   列表非空 且 (未选 或 选中项已不在列表里) → 取首项。
+  // "已不在列表里" 覆盖两种情况: 被规则 2 按 branch 隐藏, 或模型已被删除 —— 二者
+  // 都会让 BaseSelect 找不到值而显示空占位。
+  // 列表为空时不清值: options 尚未加载完时列表也是空的, 清了会误伤持久化的选择。
   watch(models, (list) => {
-    if (list.length > 0 && !config.value.model) {
+    if (!list.length) return
+    const cur = config.value.model
+    if (!cur || !list.includes(cur)) {
       config.value.model = list[0]
     }
   }, { immediate: true })
-
-  // tab 切换 / branch 变化: 若当前选中项被规则 2 隐藏 → 重置为默认 (兼容项首项, 无则空)
-  watch(() => branchRef?.value, () => {
-    if (config.value.model && isModelHidden(config.value.model)) {
-      const list = models.value
-      config.value.model = list.length > 0 ? list[0] : ''
-    }
-  })
 
   // ── Ref image picker ─────────────────────────────────────────────────────
 
@@ -389,10 +339,6 @@ export function useControlNet(
   // ── Validation for enable toggle ─────────────────────────────────────────
 
   function validateEnable(modelList: string[]): boolean {
-    if (!ready.value) {
-      toast(t(`generate.controlnet.need_download_${type}`), 'warning')
-      return false
-    }
     if (modelList.length === 0) {
       toast(t('generate.controlnet.need_model'), 'warning')
       return false
@@ -410,16 +356,12 @@ export function useControlNet(
     config,
     refLabelKey,
     strengthHelpKey,
-    ready,
-    readyLoading,
     models,
     hasModels,
     picker,
     preprocessStatus,
     preprocessPromptId,
     preprocessElapsed,
-    checkReady,
-    dismissWelcome,
     setImage,
     clearImage,
     handleUpload,

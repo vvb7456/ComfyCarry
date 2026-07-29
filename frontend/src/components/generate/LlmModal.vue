@@ -12,7 +12,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { UseLlmAssistReturn } from '@/composables/generate/useLlmAssist'
-import { useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { useToast } from '@/composables/useToast'
 import { useGenerateStore } from '@/stores/generate'
 import { MODEL_TYPES } from '@/config/model-types'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -35,6 +36,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { toast } = useToast()
 const router = useRouter()
 const store = useGenerateStore()
 
@@ -216,7 +218,7 @@ const showNegative = computed(() =>
         <div v-else class="llm-image-area">
           <FileUploadZone
             mode="pick"
-            accept="image/png,image/jpeg,image/webp,image/bmp"
+            :accept="IMAGE_ACCEPT"
             :preview="previewUrl"
             :file-name="imageName"
             :pick-label="t('generate.image_source.from_input')"
@@ -226,6 +228,7 @@ const showNegative = computed(() =>
             @pick="onPickInput"
             @file="onFileFromZone"
             @clear="onClearImage"
+            @error="toast($event, 'warning')"
           />
         </div>
 

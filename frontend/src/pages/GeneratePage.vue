@@ -542,6 +542,7 @@ sse.start()
           v-model="activeTask"
           :options="taskOptions"
           size="md"
+          class="gen-task-switch"
         />
         <!-- 架构选择器: 前置静音小标签提示控件语义 -->
         <span class="gen-arch-label">{{ t('generate.header.model_label') }}</span>
@@ -673,9 +674,6 @@ sse.start()
   user-select: none;
   margin-right: calc(var(--sp-2) * -0.5);
 }
-@media (max-width: 640px) {
-  .gen-arch-label { display: none; }
-}
 
 /* inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
 .gen-header-left--frozen {
@@ -780,6 +778,56 @@ sse.start()
   border-radius: 10px;
   min-width: 18px;
   text-align: center;
+}
+
+/* ═══ 窄屏顶栏: 任务切换独占首行, 架构选择器 + 队列/历史同处次行 ═══
+   .gen-header-left 用 display:contents 把两个左侧控件直接交给顶栏网格排布 ——
+   它同时是 inert 冻结区的载体, 盒子消失后 opacity 落到子元素上 (inert 本身
+   与 display 无关, 照常生效)。 */
+@media (max-width: 768px) {
+  .gen-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+  .gen-header-left {
+    display: contents;
+  }
+  .gen-header-left--frozen > * {
+    opacity: .45;
+  }
+  /* 任务切换: 首行通栏, 三段均分 */
+  .gen-task-switch {
+    grid-column: 1 / -1;
+    display: flex;
+    width: 100%;
+    align-self: stretch;
+  }
+  .gen-task-switch :deep(.seg-control__item) {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+  }
+  /* 静音标签在窄屏一律隐藏 (640 以下的规则上移到此) */
+  .gen-arch-label {
+    display: none;
+  }
+  /* 架构选择器占满次行剩余宽度, 队列按钮贴右 */
+  .gen-arch-selector {
+    justify-self: stretch;
+    min-width: 0;
+  }
+  .gen-arch-trigger {
+    width: 100%;
+  }
+  .gen-arch-trigger__label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* 执行中图标轻微 pulse (CSS, prefers-reduced-motion 降级静态) */

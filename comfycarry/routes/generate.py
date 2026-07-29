@@ -284,7 +284,7 @@ def _fetch_generate_options() -> dict:
                "unet_previews": {}, "clip_previews": {}, "vae_previews": {},
                "unet_archs": {}, "unet_info": {},
                "comfyui_dir": COMFYUI_DIR, "controlnet_models": {},
-               "seedvr2_models": [],
+               "seedvr2_models": [], "aurasr_installed": False,
                "ultralytics_bbox_models": [], "sam_models": []}
 
     def _get_combo_list(node_name: str, field: str) -> list:
@@ -378,6 +378,14 @@ def _fetch_generate_options() -> dict:
             if fn.endswith(".safetensors") and fn != "ema_vae_fp16.safetensors":
                 svr_models.append(fn)
     result["seedvr2_models"] = svr_models
+
+    # ── AuraSR 是否已装 (照 seedvr2_models 成例扫磁盘; 它是固定两文件, 故报布尔)
+    # 放大面板据此禁用未安装那一侧的引擎切换。
+    aura_dir = os.path.join(COMFYUI_DIR, "models", "Aura-SR")
+    result["aurasr_installed"] = (
+        os.path.isfile(os.path.join(aura_dir, "model.safetensors"))
+        and os.path.isfile(os.path.join(aura_dir, "config.json"))
+    )
 
     # ── 面部重绘: 检测器与 SAM (扫描磁盘, 照 seedvr2_models 成例) ──────
     bbox_dir = os.path.join(COMFYUI_DIR, "models", "ultralytics", "bbox")
@@ -783,49 +791,6 @@ def api_generate_background_dismiss():
     dismiss_stop_reason()
     from ..services.background_run import snapshot_status
     return jsonify(snapshot_status())
-
-
-# ── /api/generate/welcome_state ──────────────────────────────────────────────
-
-# DB key prefix for welcome state: "welcome:pose", "welcome:canny", etc.
-_WELCOME_KEY_PREFIX = "welcome:"
-
-
-@bp.route("/api/generate/welcome_state", methods=["GET"])
-def api_generate_welcome_state_get():
-    """
-    读取欢迎页 dismiss 状态。
-    返回: {"pose": true, "canny": true, ...}
-    """
-    from ..db import db
-    rows = db.fetch_all(
-        "SELECT key, value FROM app_meta WHERE key LIKE ?",
-        (f"{_WELCOME_KEY_PREFIX}%",),
-    )
-    state = {}
-    for row in rows:
-        tab = row["key"][len(_WELCOME_KEY_PREFIX):]
-        state[tab] = row["value"] == "true"
-    return jsonify(state)
-
-
-@bp.route("/api/generate/welcome_state", methods=["POST"])
-def api_generate_welcome_state_post():
-    """
-    标记某个 tab 的欢迎页已 dismiss。
-    Body: {"tab": "pose"}  或 {"tab": "upscale"}
-    """
-    data = request.get_json(force=True) or {}
-    tab = data.get("tab", "").strip()
-    if not tab:
-        return jsonify({"error": "tab 必填"}), 400
-
-    from ..db import db
-    db.execute(
-        "INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
-        (f"{_WELCOME_KEY_PREFIX}{tab}", "true"),
-    )
-    return jsonify({"ok": True})
 
 
 # ── /api/generate/tagger_models ──────────────────────────────────────────────

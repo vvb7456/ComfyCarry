@@ -350,9 +350,6 @@
   },
   "face": {
     "denoise": "重绘强度",
-    "denoise_low": "0.2 轻修",
-    "denoise_mid": "0.35 推荐",
-    "denoise_high": "0.6 重绘",
     "denoise_help": "低值保留五官结构只补细节，值越高修复幅度越大但有换脸风险。建议 0.25-0.45。未检测到人脸时按原图输出；多张人脸会全部修复",
     "steps": "采样步数",
     "detection_model": "检测模型",
@@ -500,34 +497,13 @@
     "no_start_frame": "请先上传起始画面",
     "no_unet_pair": "请分别选择高噪与低噪两个权重"
   },
-  "model_dep": {
-    "detecting": "正在检测模型…",
-    "installed": "已安装",
-    "required": "必需",
-    "download_selected": "下载选中模型",
-    "select_at_least_one": "请至少选择一个模型",
-    "download_failed": "下载失败",
-    "enter": "进入"
-  },
   "components": {
     "title": "运行组件",
-    "ready": "运行组件就绪 · {n} 项",
-    "missing": "缺少 {n} 项运行组件，点击下载",
-    "fetch_all": "全部下载",
-    "downloading": "正在获取运行组件 {i}/{n} · {name}",
-    "failed": "获取失败",
-    "retry": "重试",
     "role_text_encoder": "文本编码器",
     "role_text_encoder_1": "文本编码器 1",
     "role_text_encoder_2": "文本编码器 2",
     "role_vae": "VAE",
-    "error_check": "组件检测失败",
-    "error_no_dir": "缺少 ComfyUI 目录，无法下载组件",
-    "error_submit": "{name} 提交下载失败",
-    "error_download": "{name} 下载失败",
-    "fast_files": "快速模式文件",
-    "fast_files_hint": "仅快速模式需要",
-    "total": "待下载合计 {size}"
+    "fast_files_hint": "仅快速模式需要"
   },
   "picker": {
     "arch_all": "全部架构",
@@ -560,5 +536,24 @@
   },
   "errors": {
     "state_lost": "目标条目状态不可用，请重试"
+  },
+  "dep": {
+    "ready": "{noun}已就绪 · {n} 项",
+    "missing": "缺少 {n} 项{noun}",
+    "downloading": "正在获取 {i}/{n} · {name}",
+    "detecting": "正在检测…",
+    "error_check": "依赖检测失败",
+    "error_no_dir": "缺少 ComfyUI 目录，无法下载",
+    "error_submit": "{name} 提交下载失败",
+    "error_download": "{name} 下载失败",
+    "noun_pose": "姿势控制模型",
+    "noun_canny": "轮廓控制模型",
+    "noun_depth": "景深控制模型",
+    "noun_upscale": "放大模型",
+    "noun_face": "面部修复模型",
+    "noun_tagger": "反推模型",
+    "required": "必需",
+    "failed": "获取失败",
+    "optional": "可选"
   }
 }

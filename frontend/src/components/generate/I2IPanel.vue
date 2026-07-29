@@ -13,6 +13,7 @@ import { useGenerateStore } from '@/stores/generate'
 import RangeField from '@/components/form/RangeField.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
+import { IMAGE_ACCEPT } from '@/composables/generate/useRefImagePicker'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useToast } from '@/composables/useToast'
@@ -102,7 +103,7 @@ function onDenoiseUpdate(v: number) {
       <div class="i2i-ref-wrap">
         <FileUploadZone
           mode="pick"
-          accept="image/png,image/jpeg,image/webp,image/bmp"
+          :accept="IMAGE_ACCEPT"
           :preview="previewUrl"
           :file-name="displayName"
           :pick-label="t('generate.i2i.pick_from_input')"
@@ -112,6 +113,7 @@ function onDenoiseUpdate(v: number) {
           @pick="emit('pick')"
           @file="emit('file', $event)"
           @clear="emit('clear')"
+          @error="toast($event, 'warning')"
         />
         <!-- Mask overlay (shown when inpaint mode + has mask) -->
         <img
@@ -140,9 +142,9 @@ function onDenoiseUpdate(v: number) {
         :min="0.10"
         :max="1.0"
         :soft-max="denoiseSoftMax"
-        :step="0.01"
+        :step="0.05"
         :label="t('generate.i2i.denoise')"
-        :marks="['0.10', '0.50', '1.00']"
+        :marks="2"
         :value-format="(v: number) => v.toFixed(2)"
         editable
         @update:model-value="onDenoiseUpdate"
@@ -156,10 +158,10 @@ function onDenoiseUpdate(v: number) {
       <RangeField
         :model-value="state.i2i.growMaskBy"
         :min="0"
-        :max="64"
+        :max="128"
         :step="1"
         :label="t('generate.i2i.grow_mask_by')"
-        :marks="['0', '16', '32', '64']"
+        :marks="4"
         :disabled="!isInpaint"
         editable
         @update:model-value="state.i2i.growMaskBy = Math.max(0, Math.min(64, $event))"
@@ -187,7 +189,7 @@ function onDenoiseUpdate(v: number) {
   display: flex;
   gap: var(--sp-4);
   align-items: stretch;
-  max-width: 700px;
+  max-width: var(--gen-module-w);
   margin: 0 auto;
 }
 

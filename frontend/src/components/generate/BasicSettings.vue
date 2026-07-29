@@ -236,7 +236,7 @@ watch(() => state.value.resolution, (v) => {
               :max="100"
               :step="1"
               :label="t('generate.basic.steps')"
-              :marks="['1', '50', '100']"
+              :marks="2"
               editable
               :disabled="disabled"
               @update:model-value="state.steps = $event"
@@ -247,7 +247,7 @@ watch(() => state.value.resolution, (v) => {
               :max="20"
               :step="0.5"
               :label="t('generate.basic.cfg_scale')"
-              :marks="['1', '10', '20']"
+              :marks="2"
               :value-format="(v: number) => v.toFixed(1)"
               editable
               :disabled="disabled"

@@ -878,10 +878,22 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return { state, progress: 0, speed: 0, downloadId: null }
   }
 
-  /** Watch a download task's status until it reaches a terminal state.
+  /** Watch a download task until it reaches a terminal state.
    *  Resolves immediately if task already terminal or not found.
-   *  Used by useModelDependency (wait-chain). */
-  function watchTaskTerminal(downloadId: string): Promise<'complete' | 'failed' | 'cancelled' | 'absent'> {
+   *
+   *  `onProgress` 在订阅期间随 SSE/轮询实时回调 (百分比已 clamp 到 0–100),
+   *  订阅前的当前值也会立即回调一次 —— 等待链上的进度条由此与下载管理页
+   *  同源, 调用方不必自己 watch tasks。
+   *  Used by useDependencyStatus (wait-chain). */
+  function watchTaskTerminal(
+    downloadId: string,
+    onProgress?: (percent: number, speed: number) => void,
+  ): Promise<'complete' | 'failed' | 'cancelled' | 'absent'> {
+    const emitProgress = (t: DownloadTask | undefined) => {
+      if (!t || !onProgress) return
+      onProgress(Math.min(Math.max(t.progress || 0, 0), 100), t.speed || 0)
+    }
+
     return new Promise((resolve) => {
       const existing = tasks.value.find(t => t.download_id === downloadId)
       if (!existing) {
@@ -901,15 +913,18 @@ export const useDownloadsStore = defineStore('downloads', () => {
       subscribe()
 
       function subscribe() {
+        emitProgress(tasks.value.find(t => t.download_id === downloadId))
         const stop = watch(
-          () => tasks.value.find(t => t.download_id === downloadId)?.status,
-          (st) => {
+          () => tasks.value.find(t => t.download_id === downloadId),
+          (task) => {
+            emitProgress(task)
+            const st = task?.status
             if (st && TERMINAL_STATES.has(st)) {
               stop()
               resolve(st as 'complete' | 'failed' | 'cancelled')
             }
           },
-          { immediate: false },
+          { immediate: false, deep: true },
         )
       }
     })
@@ -987,7 +1002,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     // Local model index
     fetchLocalIndex,
 
-    // Wait-chain helper for useModelDependency
+    // Wait-chain helper for useDependencyStatus
     watchTaskTerminal,
   }
 })

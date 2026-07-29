@@ -115,7 +115,7 @@ export function useDownloads() {
     updateFavoriteVersion: store.updateFavoriteVersion,
     loadFavorites: store.loadFavorites,
 
-    // Wait-chain helper (used by useModelDependency)
+    // Wait-chain helper (used by useDependencyStatus)
     watchTaskTerminal: store.watchTaskTerminal,
   }
 }

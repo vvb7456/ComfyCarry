@@ -11,6 +11,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UseControlNetReturn } from '@/composables/generate/useControlNet'
 import { CN_LABEL_KEYS } from '@/composables/generate/useControlNet'
+import { IMAGE_ACCEPT } from '@/composables/generate/useRefImagePicker'
+import { useToast } from '@/composables/useToast'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
@@ -25,11 +27,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   pick: []
+  /** 拖入本地图片: 底部按钮虽被 actionLabel 换成"从新图片生成", 拖拽通道仍在 */
+  file: [file: File]
   clear: []
   'open-preprocess': []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const { toast } = useToast()
 
 const config = computed(() => props.cn.config.value)
 
@@ -78,7 +83,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
         <FileUploadZone
           v-else
           mode="pick"
-          accept="image/png,image/jpeg,image/webp,image/bmp"
+          :accept="IMAGE_ACCEPT"
           :preview="previewUrl"
           :file-name="displayName"
           :pick-label="pickLabel"
@@ -87,8 +92,10 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           action-icon="auto_fix_high"
           class="cn-ref-zone"
           @pick="emit('pick')"
+          @file="emit('file', $event)"
           @action="emit('open-preprocess')"
           @clear="emit('clear')"
+          @error="toast($event, 'warning')"
         />
       </div>
     </div>
@@ -115,7 +122,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
         :max="2"
         :step="0.05"
         :label="t('generate.controlnet.strength')"
-        :marks="['0.1', '1.0', '2.0']"
+        :marks="2"
         :value-format="(v: number) => v.toFixed(2)"
         editable
         @update:model-value="config.strength = $event"
@@ -132,7 +139,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
         :max="1"
         :step="0.05"
         :label="t('generate.controlnet.start')"
-        :marks="['0', '0.5', '1.0']"
+        :marks="2"
         :value-format="(v: number) => v.toFixed(2)"
         editable
         @update:model-value="config.start = $event"
@@ -149,7 +156,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
         :max="1"
         :step="0.05"
         :label="t('generate.controlnet.end')"
-        :marks="['0', '0.5', '1.0']"
+        :marks="2"
         :value-format="(v: number) => v.toFixed(2)"
         editable
         @update:model-value="config.end = $event"
@@ -168,7 +175,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
   display: flex;
   gap: var(--sp-4);
   align-items: stretch;
-  max-width: 700px;
+  max-width: var(--gen-module-w);
   margin: 0 auto;
 }
 

@@ -447,6 +447,19 @@ export const useGenerateStore = defineStore('generate', () => {
     return modelStates[activeModelType.value]
   })
 
+  /**
+   * 取指定架构的 state (不存在则按该架构默认值建)。
+   * 供"一架构一实例"的组合式使用 —— ModelTab 是全量 v-show 挂载的,
+   * 非激活实例若写 currentState 会串到别的架构上 (CN 模型自动选中曾因此串写)。
+   */
+  function stateFor(type: string): ModelState {
+    const cfg = MODEL_TYPES[type] || MODEL_TYPES.sdxl
+    if (!modelStates[type]) {
+      modelStates[type] = createDefaultState(cfg)
+    }
+    return modelStates[type]
+  }
+
   // ── Auto-save with debounce ──────────────────────────────────────────────
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -687,7 +700,7 @@ export const useGenerateStore = defineStore('generate', () => {
     activeModelType, activeModelTypeByTask, activeTask,
     modelStates,
     componentsReady, setComponentsReady,
-    currentConfig, currentState,
+    currentConfig, currentState, stateFor,
     switchModelType, switchTask, save, restore, enableAutoSave,
   }
 })

@@ -350,9 +350,6 @@
   },
   "face": {
     "denoise": "Detail strength",
-    "denoise_low": "0.2 subtle",
-    "denoise_mid": "0.35 default",
-    "denoise_high": "0.6 heavy",
     "denoise_help": "Lower values preserve facial structure and only refine details; higher values repaint more but may change identity. Images without detected faces pass through unchanged; all detected faces are refined.",
     "steps": "Steps",
     "detection_model": "Detection model",
@@ -500,34 +497,13 @@
     "no_start_frame": "Please upload a start frame first",
     "no_unet_pair": "Select both the high-noise and low-noise weights"
   },
-  "model_dep": {
-    "detecting": "Detecting models…",
-    "installed": "Installed",
-    "required": "Required",
-    "download_selected": "Download Selected",
-    "select_at_least_one": "Please select at least one model",
-    "download_failed": "Download failed",
-    "enter": "Enter"
-  },
   "components": {
     "title": "Runtime components",
-    "ready": "Components ready · {n} items",
-    "missing": "{n} components missing — click to download",
-    "fetch_all": "Download all",
-    "downloading": "Fetching component {i}/{n} · {name}",
-    "failed": "Download failed",
-    "retry": "Retry",
     "role_text_encoder": "Text encoder",
     "role_text_encoder_1": "Text encoder 1",
     "role_text_encoder_2": "Text encoder 2",
     "role_vae": "VAE",
-    "error_check": "Component check failed",
-    "error_no_dir": "ComfyUI directory unavailable — cannot download components",
-    "error_submit": "Failed to queue {name}",
-    "error_download": "{name} download failed",
-    "fast_files": "Fast-mode files",
-    "fast_files_hint": "Only needed in Fast mode",
-    "total": "Total to download · {size}"
+    "fast_files_hint": "Only needed in Fast mode"
   },
   "picker": {
     "arch_all": "All",
@@ -560,5 +536,24 @@
   },
   "errors": {
     "state_lost": "Target model state unavailable, please retry"
+  },
+  "dep": {
+    "ready": "{noun} ready · {n} item(s)",
+    "missing": "{n} {noun} missing",
+    "downloading": "Fetching {i}/{n} · {name}",
+    "detecting": "Checking…",
+    "error_check": "Dependency check failed",
+    "error_no_dir": "ComfyUI directory missing, cannot download",
+    "error_submit": "Failed to submit {name}",
+    "error_download": "{name} download failed",
+    "noun_pose": "pose control models",
+    "noun_canny": "edge control models",
+    "noun_depth": "depth control models",
+    "noun_upscale": "upscale models",
+    "noun_face": "face restore models",
+    "noun_tagger": "tagger models",
+    "required": "Required",
+    "failed": "Fetch failed",
+    "optional": "Optional"
   }
 }

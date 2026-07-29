@@ -1,7 +1,7 @@
 /**
  * usePromptLibraryInit — Tag library initialization composable.
  *
- * Follows useModelDependency pattern:
+ * Follows the dependency-status pattern:
  *   - Check → show gate or not
  *   - SSE-based download + import with real-time progress
  *   - Error detail with recovery hints

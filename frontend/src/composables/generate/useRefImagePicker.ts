@@ -2,6 +2,15 @@ import { ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
+/**
+ * 参考图上传区统一的 accept 白名单 (FileUploadZone 的 accept prop)。
+ * 图生图 / ControlNet / 视频起始画面 / 预处理 / 打标 / LLM 六处共用一份,
+ * 以免加格式时漏改其中某一处。
+ */
+export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/bmp'
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface InputImage {

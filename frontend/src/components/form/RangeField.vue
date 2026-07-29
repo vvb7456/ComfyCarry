@@ -38,9 +38,13 @@ function defaultFormat(v: number): string {
   return v.toFixed(stepPrecision())
 }
 
-function snap(raw: number): number {
+/** 刻度用：按 step 精度格式化并去掉多余的尾随 0（20.0 → 20） */
+function trimmedFormat(v: number): string {
+  return String(+v.toFixed(stepPrecision()))
+}
+
+function snap(raw: number, ceiling = props.softMax ?? props.max): number {
   const s = props.step
-  const ceiling = props.softMax ?? props.max
   const snapped = Math.round((raw - props.min) / s) * s + props.min
   return Math.max(props.min, Math.min(ceiling, +snapped.toFixed(stepPrecision())))
 }
@@ -51,17 +55,40 @@ const formattedValue = computed(() =>
   props.valueFormat ? props.valueFormat(props.modelValue) : defaultFormat(props.modelValue),
 )
 
-const computedMarks = computed<string[] | null>(() => {
+/**
+ * 刻度恒为等分：位置由等分序号决定，数值由该位置的实际取值算出，
+ * 从而「标注数值」与「拖到该处得到的值」一致，视觉上又保持均分。
+ * `marks` 传数字 = 等分段数（刻度个数 = 段数 + 1）；
+ * 传字符串数组 = 自定义文案，按等距平铺（调用方自行保证数值对得上）。
+ */
+const computedMarks = computed<{ label: string, pct: number }[] | null>(() => {
   if (!props.marks) return null
-  if (Array.isArray(props.marks)) return props.marks
-  const n = props.marks
-  const fmt = props.markFormat ?? defaultFormat
-  const result: string[] = []
-  for (let i = 0; i <= n; i++) {
-    result.push(fmt(props.min + (props.max - props.min) * i / n))
+
+  if (Array.isArray(props.marks)) {
+    const arr = props.marks
+    return arr.map((label, i) => ({ label, pct: arr.length > 1 ? i / (arr.length - 1) : 0 }))
   }
-  return result
+
+  const n = props.marks
+  const fmt = props.markFormat ?? trimmedFormat
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const pct = i / n
+    // 刻度描述整条轨道，不受 softMax 影响（软上限只限制取值，不改坐标系）
+    return { label: fmt(snap(props.min + (props.max - props.min) * pct, props.max)), pct }
+  })
 })
+
+/** 滑块拇指宽度：轨道两端各内缩半个拇指，刻度需同步补偿 */
+const THUMB = 16
+
+function markStyle(pct: number) {
+  if (pct <= 0.001) return { left: '0' }
+  if (pct >= 0.999) return { right: '0' }
+  return {
+    left: `calc(${THUMB / 2}px + ${(pct * 100).toFixed(3)}% - ${(pct * THUMB).toFixed(2)}px)`,
+    transform: 'translateX(-50%)',
+  }
+}
 
 /* ── slider ── */
 
@@ -149,7 +176,7 @@ function cancelEdit() {
     />
 
     <div v-if="computedMarks" class="range-field__marks">
-      <span v-for="(m, i) in computedMarks" :key="i">{{ m }}</span>
+      <span v-for="(m, i) in computedMarks" :key="i" :style="markStyle(m.pct)">{{ m.label }}</span>
     </div>
   </div>
 </template>
@@ -227,10 +254,17 @@ function cancelEdit() {
 }
 
 .range-field__marks {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 1em;
   font-size: .68rem;
+  line-height: 1;
   color: var(--t3);
   margin-top: 1px;
+}
+
+.range-field__marks > span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
 }
 </style>
