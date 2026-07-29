@@ -70,8 +70,10 @@ const SAMPLER_NODE_TYPES = new Set([
  * 纯函数: 从执行态派生预览 phase (五态状态机)。
  *
  * 优先级 (从高到低):
- * 1. hasOutput (images.length>0) → 完成态 (返回 'empty', 因 phase 仅描述执行中子态;
- *    PreviewArea 用 images.length>0 判完成)
+ * 1. hasOutput (有产物 且 无执行态) → 完成态 (返回 'empty', 因 phase 仅描述执行中子态;
+ *    PreviewArea 用同一口径判完成)。调用方须自行带上 !execState —— 执行中时上一轮
+ *    产物可能仍挂着 (后台模式逐轮不清), 若按 images.length>0 直接判完成, 采样/合成
+ *    子态会整轮失效。
  * 2. execState 为空:
  *    - loading=true (fetchOutputImages 轮询) → 'queued'
  *    - 否则 → 'empty'
@@ -191,7 +193,8 @@ export function useGeneratePreview() {
   // ── phase / stageSegment 派生 (委托纯函数 derivePreviewPhase / deriveStageSegment) ──
   const phase: ComputedRef<PreviewPhase> = computed(() =>
     derivePreviewPhase({
-      hasOutput: images.value.length > 0,
+      // 完成态 = 有产物且不在执行中 (与 PreviewArea 同口径; 见该处注释)
+      hasOutput: images.value.length > 0 && !_execState?.value,
       loading: loading.value,
       execState: _execState?.value ?? null,
       livePreview: currentPreview.value,

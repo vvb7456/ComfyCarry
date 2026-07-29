@@ -123,10 +123,10 @@ def _restore_comfyui(log):
     except Exception:
         pass
 
-    # 获取保存的启动参数
-    saved_args = _get_config("comfyui_args", "")
-    if not saved_args:
-        saved_args = "--listen 0.0.0.0 --port 8188"
+    # 获取保存的启动参数 (老实例存的参数里没有 --preview-method, 补上, 否则
+    # ComfyUI 按默认的 NoPreviews 起, 生成过程没有任何实时预览)
+    from .services.comfyui_params import ensure_preview_method
+    saved_args = ensure_preview_method(_get_config("comfyui_args", ""))
 
     py = _detect_python()
     try:

@@ -36,6 +36,16 @@ export function useComfySSE(
       try {
         const event = JSON.parse(e.data)
 
+        // 后端队列积压到丢事件 → 本地状态已不可信, 重连拿一份完整快照
+        // (bridge 在 subscribe 时会补发 status / execution_snapshot / progress)
+        if (event.type === 'stream_overflow') {
+          reconnectTimer = setTimeout(start, 200)
+          source?.close()
+          source = null
+          active.value = false
+          return
+        }
+
         // Let caller intercept auxiliary events before tracker
         const suppressed = opts.onBeforeTracker?.(event)
         let result: EventResult | undefined

@@ -35,29 +35,28 @@ export function useTaskRegistry() {
     const task = tasks.value.get(promptId)
     if (!task) return null
 
-    // Update task status based on event type
-    if (event.type === 'execution_start') task.status = 'running'
-    else if (event.type === 'execution_done') task.status = 'done'
+    // Update task status based on event type.
+    // 非终态事件一律把 pending 提升为 running: 注册可能晚于 execution_start
+    // (提交响应回到 JS 的时刻与 SSE 事件到达的时刻是竞态), 只认 execution_start
+    // 会让任务永久卡在 pending。
+    if (event.type === 'execution_done') task.status = 'done'
     else if (event.type === 'execution_error' || event.type === 'execution_interrupted') task.status = 'error'
+    else if (task.status === 'pending') task.status = 'running'
 
     return { target: task }
-  }
-
-  function getMainTask(): TaskEntry | null {
-    for (const task of tasks.value.values()) {
-      if (task.type === 'main' && (task.status === 'pending' || task.status === 'running')) return task
-    }
-    return null
   }
 
   function cleanup() {
     const now = Date.now()
     for (const [id, task] of tasks.value) {
-      if ((task.status === 'done' || task.status === 'error') && now - task.startedAt > 30_000) {
+      const done = task.status === 'done' || task.status === 'error'
+      // 终态 30s 后清理; 未终态的僵尸任务 (排队中被删除的 prompt 等收不到任何
+      // 终态事件) 10 分钟后清理, 避免 Map 在长跑中无限增长。
+      if (now - task.startedAt > (done ? 30_000 : 600_000)) {
         tasks.value.delete(id)
       }
     }
   }
 
-  return { tasks, registerTask, routeEvent, getMainTask, cleanup }
+  return { tasks, registerTask, routeEvent, cleanup }
 }

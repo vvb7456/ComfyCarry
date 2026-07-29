@@ -423,15 +423,6 @@ const sse = useComfySSE(tracker, {
     const promptId = (evt.data?.prompt_id as string) || ''
     if (!promptId) { lastRoutedType = null; return false }
 
-    // 后台运行期间, worker 提交的 prompt 从未在前端注册过 →
-    // routeEvent 找不到任务, preview_image 的 mainTask?.status==='running' 判不过, 预览帧不显示。
-    // 修法: 在 routeEvent 之前, 遇到 execution_start 且后台运行中 且该 prompt_id 尚未注册 →
-    // 先 registerTask(pid,'main')。顺序绝对不能反 —— routeEvent 靠 execution_start 把
-    // pending 翻成 running, 先 route 后 register 状态停在 pending, 预览帧仍然不显示。
-    if (evt.type === 'execution_start' && bg.state === 'running' && !taskRegistry.tasks.value.has(promptId)) {
-      taskRegistry.registerTask(promptId, 'main')
-    }
-
     const routed = taskRegistry.routeEvent(evt)
     lastRoutedType = routed?.target.type ?? null
 
@@ -456,13 +447,20 @@ const sse = useComfySSE(tracker, {
       queueStore.loadQueue()
     }
 
-    // Live preview frame — only for main tasks
-    if (evt.type === 'preview_image' && evt.data?.b64) {
-      const mainTask = taskRegistry.getMainTask()
-      if (mainTask?.status === 'running') {
-        const mime = (evt.data.mime as string) || 'image/jpeg'
-        preview.setLivePreview(`data:${mime};base64,${evt.data.b64}`)
-      }
+    // 新一轮开始 → 清掉上一轮产物与残留实时帧。
+    // 由事件驱动而非提交响应驱动: 后台模式的 prompt 由服务端 worker 提交, 前端根本不走
+    // handleRun; live 模式下提交响应与 execution_start 的先后是竞态 (实测差 2~50ms)。
+    if (evt.type === 'execution_start') {
+      preview.clearPreview()
+    }
+
+    // 实时预览帧。ComfyUI 单队列串行, 同一时刻只有一个 prompt 在跑, 且预览帧是不带
+    // prompt_id 的裸二进制帧 (BinaryEventTypes.PREVIEW_IMAGE) —— 无从归属也无需归属:
+    // 有执行态就是"当前这一轮", 不管是本页提交、后台 worker 提交还是 ComfyUI 原生 UI 提交。
+    // (旧实现按 taskRegistry 的 main 任务状态设闸门, 注册晚于 execution_start 时整轮丢帧。)
+    if (evt.type === 'preview_image' && evt.data?.b64 && execState.value) {
+      const mime = (evt.data.mime as string) || 'image/jpeg'
+      preview.setLivePreview(`data:${mime};base64,${evt.data.b64}`)
     }
 
     if (result?.finished) {

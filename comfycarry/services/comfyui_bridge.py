@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 class ComfyWSBridge:
     """Maintains a WebSocket connection to ComfyUI and broadcasts events via SSE."""
 
+    # ComfyUI protocol.py BinaryEventTypes (见 _on_binary 注释)
+    PREVIEW_IMAGE = 1
+    PREVIEW_IMAGE_WITH_METADATA = 4
+
     def __init__(self, comfyui_url):
         self._ws_url = comfyui_url.replace("http://", "ws://").replace("https://", "wss://")
         self._http_url = comfyui_url.rstrip("/")
@@ -113,30 +117,54 @@ class ComfyWSBridge:
             pass
         return {}
 
+    def _on_binary(self, message):
+        """ComfyUI 二进制帧 → preview_image 事件。
+
+        帧格式 (ComfyUI protocol.py BinaryEventTypes):
+          [4字节 event_type][payload]
+          1 PREVIEW_IMAGE               payload = [4字节 image_type][图像字节]
+          2 UNENCODED_PREVIEW_IMAGE     (服务端内部用, 不会上线)
+          3 TEXT                        payload = UTF-8 文本, **不是图像**
+          4 PREVIEW_IMAGE_WITH_METADATA payload = [4字节 json长度][json][图像字节]
+                                        json: node_id / prompt_id / display_node_id ...
+        旧实现把 3 当成"带元数据的预览图"并按 message[8:] 切片: 收到 TEXT 帧会把一段
+        文本当 JPEG 塞给前端 (破图), 真的 type=4 帧则被整帧丢弃。
+        """
+        try:
+            if len(message) <= 8:
+                return
+            event_type = struct.unpack('>I', message[0:4])[0]
+            meta = None
+            if event_type == self.PREVIEW_IMAGE:
+                img_bytes = message[8:]          # 跳过 image_type 字段
+            elif event_type == self.PREVIEW_IMAGE_WITH_METADATA:
+                mlen = struct.unpack('>I', message[4:8])[0]
+                if len(message) < 8 + mlen:
+                    return
+                try:
+                    meta = json.loads(message[8:8 + mlen].decode('utf-8'))
+                except Exception:
+                    meta = None
+                img_bytes = message[8 + mlen:]
+            else:
+                return  # TEXT 及未知类型: 不是预览图
+            if not img_bytes:
+                return
+            mime = 'image/png' if img_bytes[:4] == b'\x89PNG' else 'image/jpeg'
+            data = {"b64": base64.b64encode(img_bytes).decode('ascii'), "mime": mime}
+            # 元数据帧才有归属信息 (需 feature_flags 协商, 目前未协商 → 恒为 None)
+            if isinstance(meta, dict):
+                for k in ("node_id", "prompt_id", "display_node_id"):
+                    if meta.get(k) is not None:
+                        data[k] = meta[k]
+            self._broadcast({"type": "preview_image", "data": data}, droppable=True)
+        except Exception:
+            pass
+
     def _on_message(self, ws, message):
         """处理 ComfyUI WebSocket 消息 — 使用原生事件信号追踪执行状态"""
         if isinstance(message, bytes):
-            # Binary frame: ComfyUI preview images
-            # 格式: [4字节 event_type][4字节 format][...image bytes...]
-            # event_type=1 = PREVIEW_IMAGE, event_type=3 = PREVIEW_IMAGE_WITH_METADATA
-            try:
-                if len(message) > 8:
-                    event_type = struct.unpack('>I', message[0:4])[0]
-                    # event_type 1 or 3 are preview images
-                    if event_type in (1, 3):
-                        # format bytes: 1=JPEG, 2=PNG (skip, we don't need to distinguish)
-                        img_bytes = message[8:]
-                        b64 = base64.b64encode(img_bytes).decode('ascii')
-                        # Detect mime type from header
-                        mime = 'image/jpeg'
-                        if img_bytes[:4] == b'\x89PNG':
-                            mime = 'image/png'
-                        self._broadcast({
-                            "type": "preview_image",
-                            "data": {"b64": b64, "mime": mime}
-                        })
-            except Exception:
-                pass
+            self._on_binary(message)
             return
         try:
             data = json.loads(message)
@@ -286,10 +314,14 @@ class ComfyWSBridge:
         except Exception:
             pass
 
+    # 队列水位: 超过这条线就开始丢预览帧 (见 _broadcast)
+    _QUEUE_MAX = 200
+    _DROP_WATERMARK = 100
+
     def subscribe(self):
         """Add a new SSE subscriber and return (sub_id, queue)."""
         sub_id = str(uuid.uuid4())
-        q = queue.Queue(maxsize=200)
+        q = queue.Queue(maxsize=self._QUEUE_MAX)
         with self._lock:
             self._subscribers[sub_id] = q
             # 在锁内复制快照 — 防止 WS 线程 (_on_close) 并发清空 _exec_info
@@ -338,16 +370,29 @@ class ComfyWSBridge:
         with self._lock:
             self._subscribers.pop(sub_id, None)
 
-    def _broadcast(self, event):
+    def _broadcast(self, event, droppable=False):
+        """向所有 SSE 订阅者派发事件。
+
+        droppable=True 的事件 (预览帧) 在队列吃紧时直接丢弃 —— 预览帧是一次性的,
+        丢一帧无害, 但它体积大 (base64 后几十~上百 KB)、频率高, 是唯一能把队列
+        顶满的东西。执行事件不可丢: 丢了状态机就错乱。
+
+        队列真的满了也**不再摘除订阅者**: 摘除后 SSE 生成器毫不知情, 会继续
+        每 30s 吐 keepalive, 连接不断、EventSource 不报错、前端不重连 —— 整条
+        事件流静默变哑。改为投递 stream_overflow 让前端主动重连。
+        """
         with self._lock:
-            dead = []
-            for sid, q in self._subscribers.items():
+            for sid, q in list(self._subscribers.items()):
+                if droppable and q.qsize() >= self._DROP_WATERMARK:
+                    continue
                 try:
                     q.put_nowait(event)
                 except queue.Full:
-                    dead.append(sid)
-            for sid in dead:
-                self._subscribers.pop(sid, None)
+                    try:
+                        q.get_nowait()          # 挤掉最旧的一条, 给信号让路
+                        q.put_nowait({"type": "stream_overflow"})
+                    except (queue.Empty, queue.Full):
+                        pass
 
 
 # ── 全局单例 ─────────────────────────────────────────────────

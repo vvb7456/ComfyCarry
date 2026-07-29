@@ -662,7 +662,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :loading="previewLoading"
           :current-preview="previewCurrent"
           :media-type="config.mediaType"
-          :exec-state="isVideo ? execState : null"
+          :exec-state="execState"
           @click-image="onPreviewClick"
         />
       </div>

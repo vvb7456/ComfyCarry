@@ -35,16 +35,22 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 
 // ── 五态状态机 ──────────────────────────────────────────────────────
-// phase 仅描述「执行中」的子态; 完成态由 images.length>0 判定 (模板里优先级最高)。
+// phase 仅描述「执行中」的子态; 完成态 = 有产物且不在执行中。
+// hasOutput 必须带 !execState: 否则上一轮产物还挂着时 (后台模式逐轮不清),
+// phase 恒为 'empty', 采样/合成子态全部失效。
 const phase = computed<PreviewPhase>(() =>
   derivePreviewPhase({
-    hasOutput: props.images.length > 0,
+    hasOutput: props.images.length > 0 && !props.execState,
     loading: props.loading,
     execState: props.execState ?? null,
     livePreview: props.currentPreview,
     mediaType: props.mediaType,
   }),
 )
+
+/** 执行中且已有实时帧 → 实时帧优先于旧产物。
+ *  没有这条, 上一轮的成品图会把本轮的实时预览整轮盖死 (后台模式 100% 必现)。 */
+const showLive = computed(() => !!props.execState && !!props.currentPreview)
 
 /** 采样段号 (双段「第 n/2 段」); 仅视频架构且双段采样时非 null。 */
 const stageSegment = computed(() =>
@@ -128,8 +134,27 @@ function metaText(img: PreviewImage): string {
 
 <template>
   <div class="gen-preview-card">
-    <!-- ═══ 完成态: 有产物 (images.length>0) — 最高优先级 ═══ -->
-    <template v-if="images.length > 0">
+    <!-- ═══ 执行中态 — 最高优先级 ═══
+         执行中永远显示「当前这一轮」: 合成中 → 实时帧。
+         上一轮产物排在其后, 否则后台/live 连跑时旧图会盖死本轮实时预览。 -->
+
+    <!-- 合成中 (视频架构): spinner + 文案 -->
+    <div v-if="isComposing" class="gen-preview-loading">
+      <div class="preview-spinner" />
+      <span class="preview-status-text">{{ t('generate.video.composing') }}</span>
+    </div>
+
+    <!-- 采样中: b64 实时预览帧 (视频模型同样发帧, 表现为静帧刷新)。
+         视频架构双段采样额外显示「第 n/2 段」标注 -->
+    <div v-else-if="showLive" class="gen-preview-single">
+      <img :src="currentPreview!" alt="Preview" class="preview-live" />
+      <span v-if="showStage" class="preview-stage-badge">
+        {{ t('generate.video.stage', { i: stageSegment!.current, n: stageSegment!.total }) }}
+      </span>
+    </div>
+
+    <!-- ═══ 完成态: 有产物 (images.length>0) ═══ -->
+    <template v-else-if="images.length > 0">
       <!-- 单产物 -->
       <template v-if="images.length === 1">
         <!-- 单视频: 内联 <video controls loop muted playsinline> -->
@@ -184,25 +209,8 @@ function metaText(img: PreviewImage): string {
       </div>
     </template>
 
-    <!-- ═══ 执行中态: 合成/采样/排队 (无产物时) ═══ -->
-
-    <!-- 合成中 (视频架构新增态): spinner + 文案 -->
-    <div v-else-if="isComposing" class="gen-preview-loading">
-      <div class="preview-spinner" />
-      <span class="preview-status-text">{{ t('generate.video.composing') }}</span>
-    </div>
-
-    <!-- 采样中: 沿用现有 b64 实时预览帧机制 (视频模型同样发帧, 表现为静帧刷新)。
-         有 currentPreview 时显示实时帧; 视频架构双段采样额外显示「第 n/2 段」标注 -->
-    <div v-else-if="currentPreview" class="gen-preview-single">
-      <img :src="currentPreview" alt="Preview" class="preview-live" />
-      <span v-if="showStage" class="preview-stage-badge">
-        {{ t('generate.video.stage', { i: stageSegment!.current, n: stageSegment!.total }) }}
-      </span>
-    </div>
-
-    <!-- 排队中 (loading 且无实时帧): spinner — 原有图像 path 行为不变 -->
-    <div v-else-if="loading" class="gen-preview-loading">
+    <!-- 排队中 / 取产物中 (无实时帧): spinner -->
+    <div v-else-if="loading || execState" class="gen-preview-loading">
       <div class="preview-spinner" />
     </div>
 

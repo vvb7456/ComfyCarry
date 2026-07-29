@@ -24,6 +24,7 @@ from ..config import (
     _load_setup_state, _save_setup_state,
     _save_dashboard_password,
 )
+from .comfyui_params import DEFAULT_COMFYUI_ARGS
 from .sync_engine import (
     _load_sync_rules, _save_sync_rules, _run_sync_rule,
     start_sync_worker,
@@ -799,7 +800,9 @@ def _step_start_services(config, cfg, PY):
         attn_flag = "--use-flash-attention"
     elif sa2_ok:
         attn_flag = "--use-sage-attention"
-    comfy_args = f"--listen 0.0.0.0 --port 8188 {attn_flag} --fast --disable-xformers"
+    # --preview-method 必须显式给出: ComfyUI 默认 NoPreviews, 漏掉就没有实时预览
+    comfy_args = (f"{DEFAULT_COMFYUI_ARGS} {attn_flag} "
+                  f"--fast --disable-xformers")
 
     # 创建 ControlNet 预处理输出子目录
     _deploy_exec("mkdir -p /workspace/ComfyUI/input/openpose /workspace/ComfyUI/input/canny /workspace/ComfyUI/input/depth")

@@ -156,7 +156,11 @@ def parse_comfyui_args(args):
               for k, v in COMFYUI_PARAM_GROUPS.items()}
     params["listen"] = "0.0.0.0"
     params["port"] = 8188
-    params["preview_method"] = "auto"
+    # 与 ComfyUI 真实默认一致 (cli_args.py: --preview-method 默认 NoPreviews)。
+    # 这里曾填 "auto" —— 命令行没有该 flag 时设置页显示「自动」, 实际进程却没有任何
+    # 实时预览, 用户改一次参数触发重建命令行才"莫名其妙好了"。
+    # 我们想要的默认值 auto 由 DEFAULT_COMFYUI_ARGS 在启动侧显式给出, 不靠解析兜底。
+    params["preview_method"] = "none"
 
     i = 0
     while i < len(args):
@@ -196,3 +200,23 @@ def build_comfyui_args(params):
             args.extend([gv["flag_prefix"], str(int(val))])
 
     return " ".join(args)
+
+
+# ── 首次启动的默认命令行 ─────────────────────────────────────
+# 部署引擎 / 容器重启自动恢复都必须走这里, 不要再手写字符串:
+# 漏掉 --preview-method 就等于 ComfyUI 默认的 NoPreviews, 生成过程没有任何实时预览。
+DEFAULT_COMFYUI_ARGS = "--listen 0.0.0.0 --port 8188 --preview-method auto"
+
+
+def ensure_preview_method(args_str, method="auto"):
+    """给历史遗留的启动参数补上 --preview-method (已有则原样返回)。
+
+    老实例持久化的 comfyui_args 里没有这个 flag, 容器重启后照原样起进程 →
+    仍然没有实时预览。这里只做追加, 不做 parse→build 归一化 (会丢掉用户
+    通过 extra_args 传入的、参数表未收录的 flag)。
+    """
+    if not args_str:
+        return DEFAULT_COMFYUI_ARGS
+    if "--preview-method" in args_str:
+        return args_str
+    return f"{args_str} --preview-method {method}"
