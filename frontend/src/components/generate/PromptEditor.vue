@@ -240,6 +240,7 @@ defineExpose({ insertAtCursor })
             { key: 'random_multi', example: '{2$$cat|dog|bird}' },
             { key: 'wildcard', example: '__hair_color__ hair' },
             { key: 'wildcard_sub', example: '__sdxl/quality__' },
+            { key: 'wildcard_multi', example: '{2$$__hair_color__}' },
             { key: 'variable_lock', example: '${c=!{red|blue}} ${c} dress, ${c} shoes' },
             { key: 'nesting', example: '{a {big|small} cat|a {red|blue} ball}' },
           ]" :key="row.key">

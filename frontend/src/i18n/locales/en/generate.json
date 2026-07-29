@@ -89,6 +89,8 @@
       "wildcard_desc": "→ Random pick from wildcards/hair_color.txt",
       "wildcard_sub": "Subdirectory wildcard",
       "wildcard_sub_desc": "→ Random pick from wildcards/sdxl/quality.txt",
+      "wildcard_multi": "Wildcard multi-select",
+      "wildcard_multi_desc": "→ Picks 2 distinct values from hair_color.txt; {2-3$$__…__} picks 2–3. ",
       "variable_lock": "Variable lock",
       "variable_lock_desc": "→ red dress, red shoes (consistent)",
       "nesting": "Nesting",
