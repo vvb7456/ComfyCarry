@@ -52,11 +52,15 @@ export interface DepRowStatus {
   failed: boolean
 }
 
+/** 折叠态摘要 —— 各行独立下载, 这里汇总当前活跃的那些 */
 export interface DepCurrent {
-  index: number
-  total: number
+  /** 正在下载的行数 */
+  active: number
+  /** 其中第一行的名称 (折叠态只报一个, 数量另给) */
   name: string
+  /** 活跃行的平均进度 */
   percent: number
+  /** 活跃行的速度合计 (bytes/s) */
   speed: number
 }
 
@@ -90,8 +94,9 @@ export interface UseDependencyStatusReturn {
   missing: ComputedRef<DepRowStatus[]>
   /** 未安装的必需行 —— "获取缺失"批量按钮的目标 */
   missingRequired: ComputedRef<DepRowStatus[]>
-  downloading: Ref<boolean>
-  current: Ref<DepCurrent | null>
+  /** 任一行在下载 (派生自行状态 —— 各行互不阻塞) */
+  downloading: ComputedRef<boolean>
+  current: ComputedRef<DepCurrent | null>
   error: Ref<string>
   refresh(): Promise<void>
   /** 下载单行 —— 下载入口一律逐行, 没有批量按钮 */
@@ -110,9 +115,17 @@ export function useDependencyStatus(
   const loading = ref(false)
   const checked = ref(false)
   const rows = ref<DepRowStatus[]>([])
-  const downloading = ref(false)
-  const current = ref<DepCurrent | null>(null)
   const error = ref('')
+
+  /** 正在被等待链盯着的行 id —— 防重复接管 */
+  const watching = new Set<string>()
+  /** 已点下、正在提交给引擎的行 id —— 提交有若干个来回, 这期间也算忙 */
+  const submitting = new Set<string>()
+
+  /** 该行是否忙 (提交中或等待中); 忙的只是行, 状态条整体不上锁 */
+  function isBusy(rowId: string): boolean {
+    return submitting.has(rowId) || watching.has(rowId)
+  }
 
   const dlStore = useDownloadsStore()
   const { t } = useI18n({ useScope: 'global' })
@@ -142,18 +155,46 @@ export function useDependencyStatus(
   /** 未装的必需行 —— 批量"获取缺失"只碰这些 */
   const missingRequired = computed(() => rows.value.filter(r => !r.installed && r.row.required))
 
+  // 下载态一律派生自行: 行与行之间没有互斥, 点第二行不该被第一行的下载挡掉
+  const activeRows = computed(() => rows.value.filter(r => r.downloading))
+  const downloading = computed(() => activeRows.value.length > 0)
+
+  const current = computed<DepCurrent | null>(() => {
+    const active = activeRows.value
+    if (!active.length) return null
+    return {
+      active: active.length,
+      name: active[0].row.label,
+      percent: Math.round(active.reduce((a, r) => a + r.percent, 0) / active.length),
+      speed: active.reduce((a, r) => a + r.speed, 0),
+    }
+  })
+
   // ── refresh() ─────────────────────────────────────────────────────────────
 
+  /**
+   * 按新清单落地行状态。
+   * 正在下载的行沿用原来的状态对象 —— 等待链持有的是对象引用, 换新对象会让
+   * 进行中的进度更新写进一个已经脱离 rows 的孤儿上, 界面看着就"卡住不动"了。
+   */
   function buildStatuses(list: DepRow[]): DepRowStatus[] {
-    return list.map(row => ({
-      row,
-      installed: false,
-      downloading: false,
-      downloadIds: [],
-      percent: 0,
-      speed: 0,
-      failed: false,
-    }))
+    const prev = new Map(rows.value.map(r => [r.row.id, r]))
+    return list.map(row => {
+      const p = prev.get(row.id)
+      if (p && isBusy(row.id)) {
+        p.row = row
+        return p
+      }
+      return {
+        row,
+        installed: false,
+        downloading: false,
+        downloadIds: [],
+        percent: 0,
+        speed: 0,
+        failed: false,
+      }
+    })
   }
 
   async function refresh(): Promise<void> {
@@ -202,9 +243,12 @@ export function useDependencyStatus(
           const s = statuses[flat[i].rowIdx]
           if (!r) { s.installed = false; continue }
           if (!r.installed) s.installed = false
-          if (r.downloading) {
+          // 已被等待链接管的行不动它的下载态: 那边才是权威, 这里再 push 只会攒重复 id
+          if (r.downloading && !isBusy(s.row.id)) {
             s.downloading = true
-            if (r.download_id) s.downloadIds.push(r.download_id)
+            if (r.download_id && !s.downloadIds.includes(r.download_id)) {
+              s.downloadIds.push(r.download_id)
+            }
           }
         }
       } else {
@@ -220,10 +264,12 @@ export function useDependencyStatus(
     checked.value = true
     loading.value = false
 
-    // 自动接管进行中的下载 (刷新/切页回来接上)
-    const inProgress = statuses.filter(s => s.downloading && s.downloadIds.length)
+    // 自动接管进行中的下载 (刷新/切页回来接上); 已在盯的行跳过, 免得等两遍
+    const inProgress = statuses.filter(
+      s => s.downloading && s.downloadIds.length && !isBusy(s.row.id),
+    )
     if (inProgress.length > 0) {
-      await waitRows(inProgress.map(s => ({ status: s, ids: s.downloadIds })))
+      await Promise.all(inProgress.map(s => watchRow(s)))
       await refresh()
     }
   }
@@ -238,25 +284,35 @@ export function useDependencyStatus(
   }
 
   async function _download(targets: DepRowStatus[]): Promise<void> {
-    if (downloading.value) return
-
     const dir = toValue(opts.comfyuiDir) ?? ''
     if (dir === '') {
       error.value = t('generate.dep.error_no_dir')
       return
     }
 
-    if (!targets.length) return
+    // 忙的只是行, 不是整条状态条: 已装或已在下载的行跳过, 其余照常提交
+    const pending = targets.filter(s => !s.installed && !isBusy(s.row.id))
+    if (!pending.length) return
 
-    downloading.value = true
+    // 先占位再发请求: 提交要走 check + POST 若干个来回, 不占位的话连点两下会提交两遍。
+    // 同时把行置为下载中 —— 点了按钮就该有反应, 不等提交往返回来才变样。
+    for (const s of pending) {
+      submitting.add(s.row.id)
+      s.downloading = true
+      s.failed = false
+      s.percent = 0
+      s.speed = 0
+    }
+    rows.value = [...rows.value]
+
     error.value = ''
 
-    const waiting: Array<{ status: DepRowStatus; ids: string[] }> = []
+    const waiting: DepRowStatus[] = []
 
     try {
       // ── 阶段 1: 把所有缺失文件一次性提交给引擎 ──
       // 不逐个等待; 中途切页/关面板不中断下载 (下载由后端引擎跑)。
-      for (const s of targets) {
+      for (const s of pending) {
         const ids: string[] = []
         let rowFailed = false
 
@@ -315,6 +371,7 @@ export function useDependencyStatus(
 
         if (rowFailed) {
           s.failed = true
+          s.downloading = false
           error.value = t('generate.dep.error_submit', { name: s.row.label })
           rows.value = [...rows.value]
           continue
@@ -323,85 +380,76 @@ export function useDependencyStatus(
         if (!ids.length) {
           // 全部文件都已存在 → 直接算装好
           s.installed = true
+          s.downloading = false
           rows.value = [...rows.value]
           continue
         }
 
-        s.downloading = true
         s.downloadIds = ids
         rows.value = [...rows.value]
-        waiting.push({ status: s, ids })
+        waiting.push(s)
       }
 
-      // ── 阶段 2: 逐行等待完成 (仅进度展示; 任务已全在引擎队列里) ──
-      if (waiting.length > 0) await waitRows(waiting)
+      // ── 阶段 2: 各行并行等待完成 (仅进度展示; 任务已全在引擎队列里) ──
+      if (waiting.length > 0) await Promise.all(waiting.map(s => watchRow(s)))
     } catch (e) {
       console.error('[dep] download error:', e)
       error.value = t('generate.dep.failed')
+    } finally {
+      for (const s of pending) submitting.delete(s.row.id)
     }
 
-    downloading.value = false
-    current.value = null
-
-    // 复核真实文件状态
+    // 复核真实文件状态 (别的行可能还在下, refresh 会保住它们的进度)
     await refresh()
   }
 
   /**
-   * 等待若干行的下载结束, 期间把进度同步到行上。
+   * 盯一行下载到终态, 期间把进度同步到行上。
    * 进度来自 downloads store 的等待链 (SSE 主 + 轮询兜底), 与下载管理页同源。
+   * 一行一个等待链, 彼此不排队 —— 行 A 在下的时候行 B 照样能点。
    */
-  async function waitRows(entries: Array<{ status: DepRowStatus; ids: string[] }>): Promise<void> {
-    downloading.value = true
-    const total = entries.length
+  async function watchRow(s: DepRowStatus): Promise<void> {
+    const rowId = s.row.id
+    if (watching.has(rowId)) return
+    watching.add(rowId)
 
     // store 需在流式推送状态 (SSE 优先, 轮询兜底)
     dlStore.startPolling()
 
-    for (let i = 0; i < entries.length; i++) {
-      if (disposed) break
-      const { status: s, ids } = entries[i]
-      s.failed = false
+    const ids = [...s.downloadIds]
+    s.failed = false
 
-      current.value = { index: i, total, name: s.row.label, percent: s.percent, speed: s.speed }
+    // 行进度 = 各文件均值, 速度 = 各文件之和 (行内文件也是并行下的)
+    const pcts = new Array(ids.length).fill(0)
+    const speeds = new Array(ids.length).fill(0)
 
-      // 行进度 = 各文件均值 (已完成的计 100)
-      const pcts = new Array(ids.length).fill(0)
-      let rowOk = true
-
-      for (let k = 0; k < ids.length; k++) {
-        if (disposed) break
-        const result = await dlStore.watchTaskTerminal(ids[k], (percent, speed) => {
+    try {
+      const results = await Promise.all(ids.map((id, k) =>
+        dlStore.watchTaskTerminal(id, (percent, speed) => {
           if (disposed) return
           pcts[k] = percent
+          speeds[k] = speed
           s.percent = Math.round(pcts.reduce((a: number, b: number) => a + b, 0) / ids.length)
-          s.speed = speed
+          s.speed = speeds.reduce((a: number, b: number) => a + b, 0)
           rows.value = [...rows.value]
-          current.value = { index: i, total, name: s.row.label, percent: s.percent, speed: s.speed }
-        })
+        }),
+      ))
 
-        if (result === 'complete' || result === 'absent') {
-          pcts[k] = 100
-          continue
-        }
-        rowOk = false
-        if (result === 'failed') {
-          s.failed = true
-          error.value = t('generate.dep.error_download', { name: s.row.label })
-        }
-        break  // 失败/取消 → 本行不再等剩余文件
-      }
-
+      const rowOk = results.every(r => r === 'complete' || r === 'absent')
       s.downloading = false
       s.downloadIds = []
+      s.speed = 0
       if (rowOk && !disposed) {
         s.installed = true
         s.percent = 100
+      } else if (results.some(r => r === 'failed')) {
+        s.failed = true
+        error.value = t('generate.dep.error_download', { name: s.row.label })
       }
       rows.value = [...rows.value]
+    } finally {
+      watching.delete(rowId)
     }
-
-    current.value = null
   }
 
   // ── 逐行取消 ──────────────────────────────────────────────────────────────
@@ -448,9 +496,8 @@ export function useDependencyStatus(
         const wasEmpty = prevDir === ''
         prevDir = newDir
         if (wasEmpty && newDir !== '') {
-          const inProgress = rows.value.filter(r => r.downloading && r.downloadIds.length)
-          if (inProgress.length > 0) {
-            void waitRows(inProgress.map(r => ({ status: r, ids: r.downloadIds })))
+          for (const r of rows.value) {
+            if (r.downloading && r.downloadIds.length) void watchRow(r)
           }
         }
       },
@@ -461,8 +508,6 @@ export function useDependencyStatus(
     for (const stop of stopHandles) stop()
     stopHandles.length = 0
     disposed = true
-    downloading.value = false
-    current.value = null
   }
 
   // 兜底: 调用方忘记 destroy 也不泄漏

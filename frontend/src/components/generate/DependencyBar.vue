@@ -49,10 +49,12 @@ const missingText = computed(() =>
   t('generate.dep.missing', { noun: props.noun, n: s.missing.value.length }),
 )
 
+// 多行可同时下载: 一行时直接报名字, 多行时报条数 + 其中一个名字
 const downloadingText = computed(() => {
   const c = s.current.value
-  if (!c) return t('generate.dep.downloading', { i: 0, n: 0, name: '' })
-  return t('generate.dep.downloading', { i: c.index + 1, n: c.total, name: c.name })
+  if (!c) return t('generate.dep.downloading_one', { name: '' })
+  if (c.active <= 1) return t('generate.dep.downloading_one', { name: c.name })
+  return t('generate.dep.downloading_many', { n: c.active, name: c.name })
 })
 
 // ── 体积 ────────────────────────────────────────────────────────────────────

@@ -540,7 +540,8 @@
   "dep": {
     "ready": "{noun}已就绪 · {n} 项",
     "missing": "缺少 {n} 项{noun}",
-    "downloading": "正在获取 {i}/{n} · {name}",
+    "downloading_one": "正在获取 · {name}",
+    "downloading_many": "正在获取 {n} 项 · {name} 等",
     "detecting": "正在检测…",
     "error_check": "依赖检测失败",
     "error_no_dir": "缺少 ComfyUI 目录，无法下载",

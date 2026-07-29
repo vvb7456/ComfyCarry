@@ -540,7 +540,8 @@
   "dep": {
     "ready": "{noun} ready · {n} item(s)",
     "missing": "{n} {noun} missing",
-    "downloading": "Fetching {i}/{n} · {name}",
+    "downloading_one": "Fetching · {name}",
+    "downloading_many": "Fetching {n} items · {name}…",
     "detecting": "Checking…",
     "error_check": "Dependency check failed",
     "error_no_dir": "ComfyUI directory missing, cannot download",
