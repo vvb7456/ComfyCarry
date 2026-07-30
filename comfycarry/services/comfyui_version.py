@@ -101,10 +101,15 @@ def switch_version(tag: str, install_deps: bool = False) -> dict:
         install_deps: 切换后是否运行 pip install -r requirements.txt
 
     Returns:
-        {"ok": True, "message": "...", "previous": "...", "current": "..."}
+        {"ok": True, "message_key": "...", "message_params": {...},
+         "previous": "...", "current": "..."}
+        {"ok": False, "error_key": "..."}  (error_params 里的 detail 是原始异常)
+
+        文案一律 key + params: 这个结果由路由原样回传给面板, 回中文成品文案
+        的话英文 locale 下 toast 里会冒中文。
     """
     if not Path(COMFYUI_DIR, ".git").exists():
-        return {"ok": False, "error": "ComfyUI 不是 git 仓库，无法切换版本"}
+        return {"ok": False, "error_key": "comfyui.err.switch_not_git"}
 
     _ensure_safe_directory()
 
@@ -130,13 +135,16 @@ def switch_version(tag: str, install_deps: bool = False) -> dict:
         current = _detect_current_version()
         return {
             "ok": True,
-            "message": f"已切换到 {current}" + (" (已安装依赖)" if install_deps else ""),
+            "message_key": ("comfyui.msg.switched_with_deps" if install_deps
+                            else "comfyui.msg.switched"),
+            "message_params": {"version": current},
             "previous": previous,
             "current": current,
         }
     except Exception as e:
         log.error(f"版本切换失败: {e}")
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error_key": "comfyui.err.switch_failed",
+                "error_params": {"detail": str(e)}}
 
 
 # ── 内部辅助 ─────────────────────────────────────────────────

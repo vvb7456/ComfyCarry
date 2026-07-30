@@ -21,6 +21,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { useAppStore } from '@/stores/app'
+import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
 import type { LlmProvider, ModelOption, LlmConfigData } from '@/types/settings'
 
 defineOptions({ name: 'SettingsPage' })
@@ -264,14 +265,16 @@ async function changePassword() {
   if (pwNew.value.length < 4) { toast(t('settings.password.err_min_length'), 'error'); return }
   if (pwNew.value !== pwConfirm.value) { toast(t('settings.password.err_mismatch'), 'error'); return }
   pwSubmitting.value = true
-  const data = await post<{ message?: string; error?: string }>('/api/settings/password', {
+  const data = await post<ApiErrorBody & { message?: string; error?: string }>('/api/settings/password', {
     current: pwCurrent.value,
     new: pwNew.value,
   })
   pwSubmitting.value = false
   if (!data) return
-  toast(data.message || data.error || '', data.error ? 'error' : 'success')
-  if (!data.error) {
+  if (data.error_key || data.error) {
+    toast(apiErrorText(data, t('settings.password.err_current')), 'error')
+  } else {
+    toast(apiMessageText(data), 'success')
     pwCurrent.value = ''
     pwNew.value = ''
     pwConfirm.value = ''
@@ -291,7 +294,7 @@ async function regenerateApiKey() {
     apiKeyRevealed.value = true
     toast(t('settings.api_key.regenerated'), 'success')
   } else {
-    toast(data.error || t('settings.api_key.regenerate_failed'), 'error')
+    toast(apiErrorText(data, t('settings.api_key.regenerate_failed')), 'error')
   }
 }
 
@@ -304,7 +307,7 @@ async function saveCivitaiKey() {
   const data = await post<{ ok?: boolean; error?: string }>('/api/settings/civitai-key', { api_key: key })
   civitaiSaving.value = false
   if (!data) return
-  toast(data.ok ? t('settings.civitai.saved') : (data.error || t('settings.civitai.save_failed')), data.ok ? 'success' : 'error')
+  toast(data.ok ? t('settings.civitai.saved') : apiErrorText(data, t('settings.civitai.save_failed')), data.ok ? 'success' : 'error')
   if (data.ok) civitaiKey.value = ''
   await loadSettings()
 }
@@ -350,7 +353,7 @@ async function importConfig(event: Event) {
     if (!await confirm({ message: t('settings.config.import_confirm', { date: config._exported_at || t('settings.config.unknown_date') }), variant: 'danger' })) return
     const data = await post<{ message?: string }>('/api/settings/import-config', JSON.parse(text))
     if (!data) return
-    toast(data.message || '', 'success')
+    toast(apiMessageText(data), 'success')
     await loadSettings()
   } catch (e: any) {
     toast(`${t('settings.config.import_failed')}: ${e.message}`, 'error')
@@ -373,14 +376,16 @@ async function reinitialize() {
   if (!keepModels && !await confirm({ message: t('settings.reinit.confirm_delete_final'), variant: 'danger' })) return
   reinitLoading.value = true
   toast(t('settings.reinit.in_progress'), 'info')
-  const data = await post<{ ok?: boolean; errors?: string[] }>('/api/settings/reinitialize', { keep_models: keepModels })
+  const data = await post<{ ok?: boolean; errors?: ApiErrorBody[] }>('/api/settings/reinitialize', { keep_models: keepModels })
   reinitLoading.value = false
   if (!data) return
   if (data.ok) {
     toast(t('settings.reinit.success'), 'success')
     setTimeout(() => location.reload(), 1500)
   } else {
-    toast(`${t('settings.reinit.partial_fail')}: ${(data.errors || []).join('; ')}`, 'error')
+    // 每步各自成败 → errors 是内嵌的 key + params 数组 (settings.py _err_item)
+    const detail = (data.errors || []).map(e => apiErrorText(e)).join('; ')
+    toast(`${t('settings.reinit.partial_fail')}: ${detail}`, 'error')
   }
 }
 
@@ -446,7 +451,7 @@ async function fetchLlmModels() {
   llmFetchingModels.value = false
   if (!data?.ok) {
     llmModelText.value = t('settings.llm.model.fetch_failed')
-    toast(data?.error || t('settings.llm.model.fetch_failed'), 'error')
+    toast(apiErrorText(data, t('settings.llm.model.fetch_failed')), 'error')
     return
   }
   const models = (data.models || []).sort((a, b) => {
@@ -486,7 +491,7 @@ async function saveLlmConfig() {
     llmProviderKeys.value[llmProvider.value] = { api_key: llmApiKey.value, model: llmModel.value, base_url: llmBaseUrl.value }
     toast(t('settings.llm.config_saved'), 'success')
   } else {
-    toast(data.error || t('settings.llm.save_failed'), 'error')
+    toast(apiErrorText(data, t('settings.llm.save_failed')), 'error')
   }
 }
 
@@ -508,7 +513,7 @@ async function testLlmConnection() {
     const extra = [data.latency_ms ? `${data.latency_ms}ms` : '', data.response ? `— ${data.response}` : ''].filter(Boolean).join(' ')
     llmTestResult.value = { ok: true, message: `✓ ${t('settings.llm.test_success')}${extra ? ' ' + extra : ''}` }
   } else {
-    llmTestResult.value = { ok: false, message: `✗ ${t('settings.llm.test_failed')}: ${data.error || t('settings.llm.unknown_error')}` }
+    llmTestResult.value = { ok: false, message: `✗ ${t('settings.llm.test_failed')}: ${apiErrorText(data, t('settings.llm.unknown_error'))}` }
   }
 }
 

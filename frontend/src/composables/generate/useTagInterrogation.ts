@@ -1,6 +1,7 @@
 import { ref, computed, markRaw } from 'vue'
 import { useToast } from '@/composables/useToast'
 import { useI18n } from 'vue-i18n'
+import { apiErrorText } from '@/utils/apiError'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export function useTagInterrogation() {
       const res = await fetch('/api/generate/interrogate', { method: 'POST', body: form })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error((body as Record<string, string>).error || `HTTP ${res.status}`)
+        throw new Error(apiErrorText(body, `HTTP ${res.status}`))
       }
       const data = await res.json()
       promptId.value = data.prompt_id || ''

@@ -19,6 +19,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import type { JupyterStatus } from '@/types/jupyter'
 import { fmtBytes } from '@/utils/format'
+import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
 
 defineOptions({ name: 'JupyterPage' })
 
@@ -102,30 +103,30 @@ async function jupyterAction(action: 'start' | 'stop' | 'restart') {
     if (!await confirm({ message: t(`jupyter.confirm.${action}`) })) return
   }
   actionLoading.value = action
-  const data = await post<{ ok?: boolean; message?: string; error?: string }>(`/api/jupyter/${action}`, {})
+  const data = await post<ApiErrorBody & { ok?: boolean; message?: string }>(`/api/jupyter/${action}`, {})
   actionLoading.value = null
   if (!data) return
   if (data.ok) {
-    toast(data.message || t(`jupyter.toast.${action === 'start' ? 'starting' : action === 'stop' ? 'stopped' : 'restarting'}`), 'success')
+    toast(apiMessageText(data, t(`jupyter.toast.${action === 'start' ? 'starting' : action === 'stop' ? 'stopped' : 'restarting'}`)), 'success')
     setTimeout(() => {
       loadStatus()
       if (action !== 'stop') loadJupyterUrl()
     }, action === 'restart' ? 5000 : action === 'stop' ? 1000 : 3000)
   } else {
-    toast(`${t(`jupyter.toast.${action}_failed`)}: ${data.error || ''}`, 'error')
+    toast(apiErrorText(data, t('jupyter.err.fallback')), 'error')
   }
 }
 
 // ─── Kernel actions ───────────────────────────────────────────────────────────
 
 async function kernelAction(kernelId: string, action: 'interrupt' | 'restart') {
-  const data = await post<{ ok?: boolean; error?: string }>(`/api/jupyter/kernels/${kernelId}/${action}`, {})
+  const data = await post<ApiErrorBody & { ok?: boolean }>(`/api/jupyter/kernels/${kernelId}/${action}`, {})
   if (!data) return
   if (data.ok) {
     toast(action === 'restart' ? t('jupyter.kernels.kernel_restarted') : t('jupyter.kernels.kernel_interrupted'), 'success')
     setTimeout(loadStatus, 1000)
   } else {
-    toast(`${t('jupyter.kernels.action_failed')}: ${data.error || ''}`, 'error')
+    toast(apiErrorText(data, t('jupyter.err.fallback')), 'error')
   }
 }
 
@@ -133,13 +134,13 @@ async function kernelAction(kernelId: string, action: 'interrupt' | 'restart') {
 
 async function closeSession(sessionId: string) {
   if (!await confirm({ message: t('jupyter.confirm.close_session') })) return
-  const data = await del<{ ok?: boolean; error?: string }>(`/api/jupyter/sessions/${sessionId}`)
+  const data = await del<ApiErrorBody & { ok?: boolean }>(`/api/jupyter/sessions/${sessionId}`)
   if (!data) return
   if (data.ok) {
     toast(t('jupyter.sessions.closed'), 'success')
     setTimeout(loadStatus, 1000)
   } else {
-    toast(`${t('jupyter.kernels.action_failed')}: ${data.error || ''}`, 'error')
+    toast(apiErrorText(data, t('jupyter.err.fallback')), 'error')
   }
 }
 

@@ -62,10 +62,16 @@ export interface TunnelValidationResponse {
   ok?: boolean
   account_name?: string
   zone_status?: string
-  message?: string
+  /** 文案走 key + params, 用 utils/apiError.ts 渲染 */
+  message_key?: string
+  message_params?: Record<string, unknown>
+  error_key?: string
+  error_params?: Record<string, unknown>
 }
 
 export interface TunnelActionResponse {
   ok?: boolean
   error?: string
+  error_key?: string
+  error_params?: Record<string, unknown>
 }

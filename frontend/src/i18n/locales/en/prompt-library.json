@@ -1,4 +1,18 @@
 {
+  "err": {
+    "internal": "Internal server error: {detail}",
+    "missing_parent": "Missing 'parent' parameter",
+    "texts_invalid": "texts must be an array (max 200)",
+    "invalid_history_type": "Invalid type, must be: all|history|favorite",
+    "no_json_body": "Request body cannot be empty",
+    "positive_or_negative_required": "At least one of 'positive' or 'negative' is required",
+    "no_valid_fields": "No valid fields to update",
+    "missing_ids": "Missing 'ids' array",
+    "ids_must_be_int_array": "'ids' must be an array of integers",
+    "import_already_running": "Import is already running",
+    "no_source": "Prompt library data source not available",
+    "missing_text": "Missing 'text' parameter"
+  },
   "editor": {
     "title": "Prompt Editor",
     "positive": "Positive Prompt",

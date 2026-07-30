@@ -33,7 +33,10 @@ _policy: dict = {"max_iterations": 0,     # 0 = 无限 (默认)
 _stats: dict = {"iteration": 0,
                 "started_at": 0.0,
                 "last_prompt_id": ""}
-_stop_reason: dict | None = None          # None | {"code": str, "detail": str}
+# None | {"code": str, "detail": str, "error_key": str, "error_params": dict}
+# detail 是上游 (ComfyUI / Provider) 的原文; error_key 是我们自己判定的错误,
+# 由前端翻译 —— 浮动条按 apiErrorText(stop_reason, detail) 渲染。
+_stop_reason: dict | None = None
 _epoch: int = 0                           # 每次 start/stop +1, 掐掉 in-flight 提交
 
 _worker_thread: threading.Thread | None = None
@@ -58,11 +61,17 @@ _HISTORY_MISSING_TIMEOUT = 60.0  # 秒
 
 # ── 内部: 加锁读写的薄封装 ──────────────────────────────────────────────────
 
-def _set_stop(code: str, detail: str = "") -> None:
-    """写 stop_reason + state=idle (已持有 _lock 的内部路径不重复加锁)"""
+def _set_stop(code: str, detail: str = "", *,
+              error_key: str = "", error_params: dict | None = None) -> None:
+    """写 stop_reason + state=idle (已持有 _lock 的内部路径不重复加锁)。
+
+    detail 放上游原文, error_key/error_params 放我们自己的可翻译错误 ——
+    两者都可为空, 浮动条只显示 reason 标签。
+    """
     global _state, _stop_reason
     _state = "idle"
-    _stop_reason = {"code": code, "detail": detail}
+    _stop_reason = {"code": code, "detail": detail,
+                    "error_key": error_key, "error_params": error_params or {}}
 
 
 def _check_prompt(prompt_id: str) -> tuple[str, str]:
@@ -108,7 +117,9 @@ def _check_prompt(prompt_id: str) -> tuple[str, str]:
                     and msg[0] == "execution_error" and isinstance(msg[1], dict):
                 detail = str(msg[1].get("exception_message", "")) or detail
                 break
-        return "error", detail or "ComfyUI 执行报错"
+        # detail 留空: 浮动条已经有 reason 标签 (generate.background.reason.*),
+        # 没有上游原文时不需要再拼一句自造中文
+        return "error", detail
 
     if status.get("completed") is True or entry.get("outputs"):
         return "landed", ""
@@ -275,24 +286,40 @@ def _worker_loop(my_epoch: int) -> None:
             with _lock:
                 if _epoch != my_epoch:
                     return
-                _set_stop("exec_error", f"submit_generation 异常: {e}")
+                _set_stop("exec_error", f"submit_generation: {e}")
             return
 
         # not ok → 停机 (file_missing / exec_error)
         ok = (status == 200)
         if not ok:
             err_text = ""
+            err_key = ""
             if isinstance(body, dict):
+                err_key = str(body.get("error_key", ""))
                 err_text = str(body.get("error", ""))
+            # 分类只看 error_key: submit_generation 已全量 key 化, 原来那套
+            # 中文子串匹配 ("未找到"/"不存在"…) 现在永远匹配不上, 已删
             code = "exec_error"
-            if status == 503 or "未运行" in err_text:
+            if status == 503 or err_key == "generate.err.comfyui_not_running":
                 code = "comfy_offline"
-            elif "未找到" in err_text or "不存在" in err_text or "模型文件" in err_text:
+            elif err_key in (
+                "generate.err.checkpoint_not_found",
+                "generate.err.vae_not_found",
+                "generate.err.model_file_not_found",
+                "generate.err.lora_not_found",
+                "generate.err.start_frame_not_found",
+                "generate.err.cn_image_not_found",
+                "generate.err.i2i_image_not_found",
+                "generate.err.face_model_not_found",
+            ):
                 code = "file_missing"
+            # err_key 是 generate.err.* —— 交给前端翻译, 不能当原文直接显示
             with _lock:
                 if _epoch != my_epoch:
                     return
-                _set_stop(code, err_text)
+                _set_stop(code, err_text,
+                          error_key=err_key,
+                          error_params=body.get("error_params") if isinstance(body, dict) else None)
             return
 
         prompt_id = ""

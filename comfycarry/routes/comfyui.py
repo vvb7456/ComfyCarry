@@ -36,6 +36,14 @@ from ..services.video_thumb import get_video_thumbnail, is_video_filename
 bp = Blueprint("comfyui", __name__)
 
 
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `comfyui.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
+    body = {"error_key": f"comfyui.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
 # ====================================================================
 # ComfyUI 状态 & 参数
 # ====================================================================
@@ -115,7 +123,7 @@ def api_comfyui_params_get():
                 schema[gk]["flag_prefix"] = gv["flag_prefix"]
         return jsonify({"schema": schema, "current": current, "raw_args": raw_args})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("internal", 500, detail=str(e))
 
 
 @bp.route("/api/comfyui/params", methods=["POST"])
@@ -129,7 +137,7 @@ def api_comfyui_params_update():
         try:
             tokens = shlex.split(extra_args)
         except ValueError:
-            return jsonify({"error": "extra_args 格式无效"}), 400
+            return _err("invalid_extra_args")
         args_str = args_str + " " + " ".join(shlex.quote(t) for t in tokens)
 
     py = _detect_python()
@@ -151,7 +159,7 @@ def api_comfyui_params_update():
 
         return jsonify({"ok": True, "args": args_str})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("internal", 500, detail=str(e))
 
 
 # ====================================================================
@@ -164,7 +172,8 @@ def api_comfyui_queue():
         return jsonify(resp.json())
     except Exception:
         return jsonify({"queue_running": [], "queue_pending": [],
-                        "error": "ComfyUI 无法连接"})
+                        "error_key": "comfyui.err.unreachable",
+                        "error_params": {}})
 
 
 @bp.route("/api/comfyui/interrupt", methods=["POST"])
@@ -185,7 +194,7 @@ def api_comfyui_interrupt():
         requests.post(f"{COMFYUI_URL}/interrupt", timeout=5)
         return jsonify({"ok": True})
     except Exception:
-        return jsonify({"error": "ComfyUI 无法连接"}), 503
+        return _err("unreachable", 503)
 
 
 @bp.route("/api/comfyui/queue/delete", methods=["POST"])
@@ -194,13 +203,13 @@ def api_comfyui_queue_delete():
     data = request.get_json(force=True)
     prompt_ids = data.get("delete", [])
     if not prompt_ids:
-        return jsonify({"error": "缺少 delete 参数"}), 400
+        return _err("missing_delete_param")
     try:
         requests.post(f"{COMFYUI_URL}/queue",
                       json={"delete": prompt_ids}, timeout=5)
         return jsonify({"ok": True})
     except Exception:
-        return jsonify({"error": "ComfyUI 无法连接"}), 503
+        return _err("unreachable", 503)
 
 
 @bp.route("/api/comfyui/queue/clear", methods=["POST"])
@@ -211,7 +220,7 @@ def api_comfyui_queue_clear():
                       json={"clear": True}, timeout=5)
         return jsonify({"ok": True})
     except Exception:
-        return jsonify({"error": "ComfyUI 无法连接"}), 503
+        return _err("unreachable", 503)
 
 
 # ====================================================================
@@ -285,7 +294,9 @@ def api_comfyui_history():
         items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
         return jsonify({"history": items[:max_items]})
     except Exception:
-        return jsonify({"history": [], "error": "ComfyUI 无法连接"})
+        return jsonify({"history": [],
+                        "error_key": "comfyui.err.unreachable",
+                        "error_params": {}})
 
 
 @bp.route("/api/comfyui/view")
@@ -355,7 +366,7 @@ def api_comfyui_video_thumb():
     img_type = request.args.get("type", "output")
     data, err, status = get_video_thumbnail(filename, subfolder, img_type)
     if data is None:
-        return jsonify({"error": err or "未知错误"}), status
+        return _err("video_thumb_failed", status, detail=err or "")
     return data, 200, {"Content-Type": "image/webp",
                        "Cache-Control": "public, max-age=86400"}
 
@@ -444,16 +455,17 @@ def api_comfyui_switch():
     install_deps = data.get("install_deps", False)
 
     if not version:
-        return jsonify({"ok": False, "error": "缺少 version 参数"}), 400
+        return _err("missing_version")
 
     result = switch_version(version, install_deps=install_deps)
     if not result["ok"]:
+        # result 本身已经是 key + params 形态 (见 switch_version docstring)
         return jsonify(result), 500
 
     # 重启 ComfyUI PM2 进程
     try:
         subprocess.run(["pm2", "restart", "comfy"], capture_output=True, timeout=15)
     except Exception:
-        result["warning"] = "版本已切换，但 PM2 重启失败，请手动重启"
+        result["warning_key"] = "comfyui.warn.switch_restart"
 
     return jsonify(result)

@@ -1,0 +1,17 @@
+{
+  "err": {
+    "config_fields_required": "Fill in the provider, API key and model",
+    "input_required": "Provide a description or a reference image",
+    "input_too_long": "Input too long (max {max} characters)",
+    "internal": "LLM request failed: {detail}",
+    "json_parse_failed": "Failed to parse model output: {detail}",
+    "max_tokens_range": "Max output length must be between 1 and 100000",
+    "messages_invalid": "Invalid conversation format",
+    "messages_required": "The conversation cannot be empty",
+    "not_configured": "LLM is not configured — set Provider and API Key in Settings first",
+    "temperature_range": "Creativity must be between 0.0 and 2.0",
+    "test_fields_required": "Fill in the provider and API key",
+    "unsupported_provider": "Unsupported provider: {provider}",
+    "unsupported_target": "Unsupported target model: {target}"
+  }
+}

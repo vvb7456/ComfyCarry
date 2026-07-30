@@ -10,6 +10,10 @@ export interface SelectOption {
   group?: string
   /** 右侧次要小字，如 "已装" / "5.16 GB" */
   hint?: string
+  /** 选项前缀图片 URL (品牌 logo 等); 与 icon 二选一, logo 优先 */
+  logo?: string
+  /** 选项前缀 MsIcon 图标名 (无 logo 素材时的后备) */
+  icon?: string
 }
 </script>
 
@@ -156,12 +160,16 @@ const normalizedOptions = computed<SelectOption[]>(() => {
     const rec = o as Record<string, string | number | boolean>
     const grp = (rec as Record<string, unknown>).group
     const hnt = (rec as Record<string, unknown>).hint
+    const lgo = (rec as Record<string, unknown>).logo
+    const ico = (rec as Record<string, unknown>).icon
     return {
       value: rec[props.valueKey] ?? rec.value ?? rec.id ?? rec.name ?? '',
       label: String(rec[props.labelKey] || rec.label || rec.name || rec.display_name || rec[props.valueKey] || ''),
       disabled: !!(rec as Record<string, unknown>).disabled,
       group: typeof grp === 'string' ? grp : undefined,
       hint: typeof hnt === 'string' ? hnt : undefined,
+      logo: typeof lgo === 'string' ? lgo : undefined,
+      icon: typeof ico === 'string' ? ico : undefined,
     }
   })
 })
@@ -190,6 +198,12 @@ const renderRows = computed<RenderRow[]>(() => {
     prevGroup = opt.group
   })
   return rows
+})
+
+/** 当前选中项 (单选) —— trigger 上的 logo / icon 取自它 */
+const selectedOption = computed(() => {
+  if (props.multiple || props.displayText) return undefined
+  return normalizedOptions.value.find(o => o.value === props.modelValue)
 })
 
 const selectedLabel = computed(() => {
@@ -318,11 +332,39 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
+/**
+ * 面板打开期间在 document 上接管键盘。
+ *
+ * 不能只依赖模板上 `.base-select` 的 @keydown: openPanel() 会把焦点移进面板
+ * (searchable → search input, 否则 → list), 而 teleport 模式下面板挂在 <body>,
+ * keydown 的冒泡路径不经过 .base-select —— 方向键/Enter/Esc 会全部失效。
+ */
+function onTriggerKeydown(e: KeyboardEvent) {
+  // 打开期间一律走 document 监听 —— 非 teleport 时事件同样会冒泡到
+  // .base-select, 两边都处理会让方向键一次跳两格
+  if (open.value) return
+  onKeydown(e)
+}
+
+function onDocKeydown(e: KeyboardEvent) {
+  if (!open.value) return
+  const inTrigger = !!triggerRef.value?.contains(e.target as Node)
+  const inPanel = !!panelRef.value?.contains(e.target as Node)
+  if (!inTrigger && !inPanel) return
+  onKeydown(e)
+}
+
+watch(open, (isOpen) => {
+  if (isOpen) document.addEventListener('keydown', onDocKeydown)
+  else document.removeEventListener('keydown', onDocKeydown)
+})
+
 onMounted(() => {
   document.addEventListener('click', onClickOutside)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', onClickOutside)
+  document.removeEventListener('keydown', onDocKeydown)
 })
 </script>
 
@@ -332,8 +374,10 @@ onBeforeUnmount(() => {
     open && 'base-select--open',
     fit && 'base-select--fit',
     `base-select--${size}`,
-  ]" @keydown="onKeydown">
+  ]" @keydown="onTriggerKeydown">
     <div ref="triggerRef" class="base-select__trigger" tabindex="0" @click="toggle">
+      <img v-if="selectedOption?.logo" :src="selectedOption.logo" class="base-select__logo" alt="">
+      <MsIcon v-else-if="selectedOption?.icon" :name="selectedOption.icon" size="sm" />
       <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder, 'base-select__text--muted': isSelectedDisabled }">{{ selectedLabel }}</span>
       <button
         v-if="multiple && selectedValues.length > 0 && !disabled"
@@ -390,6 +434,8 @@ onBeforeUnmount(() => {
                   :name="isSelected(row.opt.value) ? 'check_box' : 'check_box_outline_blank'"
                   size="sm"
                 />
+                <img v-if="row.opt.logo" :src="row.opt.logo" class="base-select__logo" alt="">
+                <MsIcon v-else-if="row.opt.icon" :name="row.opt.icon" size="sm" />
                 <span class="base-select__item-label text-truncate">{{ row.opt.label }}</span>
                 <span v-if="row.opt.hint" class="base-select__hint">{{ row.opt.hint }}</span>
               </div>
@@ -523,6 +569,13 @@ onBeforeUnmount(() => {
   font-size: .85rem;
   color: var(--t1);
 }
+/* 选项 / trigger 上的品牌 logo */
+.base-select__logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 .base-select__item-label {
   flex: 1;
   min-width: 0;
@@ -584,6 +637,9 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,.25);
   overflow: hidden;
+  /* 面板 teleport 到 body 后与 BaseModal 的遮罩 (z-index 1000) 同层,
+     必须显式抬高 —— scoped 的 .base-select__panel z-index 管不到这里。 */
+  z-index: 9999;
 }
 .base-select__panel--teleported .base-select__list {
   max-height: var(--bs-list-max, 200px);
@@ -600,6 +656,9 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   font-size: .82rem;
   color: var(--t1);
+}
+.base-select__panel--teleported .base-select__logo {
+  width: 16px; height: 16px; object-fit: contain; flex-shrink: 0;
 }
 .base-select__panel--teleported .base-select__item:hover,
 .base-select__panel--teleported .base-select__item--hl { background: var(--bg3); }

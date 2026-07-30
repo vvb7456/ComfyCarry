@@ -1,11 +1,13 @@
 /** Formatting utilities — pure functions, no framework dependency */
 
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const
+
 export function fmtBytes(b: number): string {
   if (!b && b !== 0) return '—'
   if (b < 1024) return b + ' B'
-  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'
-  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB'
-  return (b / 1073741824).toFixed(2) + ' GB'
+  // clamp: 网盘容量可以到 TB/PB, 而下标越界会输出 "1234.5 undefined"
+  const i = Math.min(Math.floor(Math.log(b) / Math.log(1024)), BYTE_UNITS.length - 1)
+  return (b / 1024 ** i).toFixed(i >= 3 ? 2 : 1) + ' ' + BYTE_UNITS[i]
 }
 
 /** Format a bytes/s speed value. Empty string for non-positive values (matches existing UI conventions). */

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWizardState } from '@/composables/useWizardState'
 import { useWizardRclone } from '@/composables/useWizardRclone'
@@ -15,9 +15,9 @@ defineOptions({ name: 'StepSync' })
 const { t } = useI18n({ useScope: 'global' })
 const { config, nextStep, prevStep } = useWizardState()
 const {
-  allRemoteNames, pullTemplates, pushTemplates,
+  allRemoteOptions, pullTemplates, pushTemplates,
   isRuleSelected, toggleRule, updateRuleRemote, updateRulePath,
-  defaultRemoteName,
+  defaultRemoteName, remoteOverrides, pathOverrides,
 } = useWizardRclone()
 
 const selectedCount = computed(() => config.wizard_sync_rules.length)
@@ -30,24 +30,20 @@ const pushSelectedCount = computed(() =>
   pushTemplates.value.filter(t => isRuleSelected(t.id)).length,
 )
 
-// Local overrides for unselected cards (not yet in wizard_sync_rules)
-const remoteOverrides = reactive<Record<string, string>>({})
-const pathOverrides = reactive<Record<string, string>>({})
-
 function getRuleRemote(templateId: string): string {
   const rule = config.wizard_sync_rules.find(r => r.template_id === templateId)
-  return rule?.remote || remoteOverrides[templateId] || defaultRemoteName.value
+  return rule?.remote || remoteOverrides.value[templateId] || defaultRemoteName.value
 }
 
 function getRulePath(templateId: string, defaultPath: string): string {
   const rule = config.wizard_sync_rules.find(r => r.template_id === templateId)
-  return rule?.remote_path || pathOverrides[templateId] || defaultPath
+  return rule?.remote_path || pathOverrides.value[templateId] || defaultPath
 }
 
 function onToggle(templateId: string) {
-  const remote = remoteOverrides[templateId] || defaultRemoteName.value
+  const remote = remoteOverrides.value[templateId] || defaultRemoteName.value
   const tpl = [...pullTemplates.value, ...pushTemplates.value].find(t => t.id === templateId)
-  const path = pathOverrides[templateId] || tpl?.remote_path || ''
+  const path = pathOverrides.value[templateId] || tpl?.remote_path || ''
   toggleRule(templateId, remote, path)
 }
 
@@ -56,7 +52,7 @@ function onUpdateRemote(templateId: string, remote: string) {
   if (isRuleSelected(templateId)) {
     updateRuleRemote(templateId, remote)
   } else {
-    remoteOverrides[templateId] = remote
+    remoteOverrides.value[templateId] = remote
   }
 }
 
@@ -65,7 +61,7 @@ function onUpdatePath(templateId: string, path: string) {
   if (isRuleSelected(templateId)) {
     updateRulePath(templateId, path)
   } else {
-    pathOverrides[templateId] = path
+    pathOverrides.value[templateId] = path
   }
 }
 
@@ -152,7 +148,7 @@ onBeforeUnmount(() => {
       </template>
       <BaseSelect
         v-model="defaultRemoteName"
-        :options="allRemoteNames"
+        :options="allRemoteOptions"
         :placeholder="t('wizard.step4.no_remote')"
         fit
       />
@@ -174,7 +170,7 @@ onBeforeUnmount(() => {
           :selected="isRuleSelected(tpl.id)"
           :remote="getRuleRemote(tpl.id)"
           :remote-path="getRulePath(tpl.id, tpl.remote_path)"
-          :remote-options="allRemoteNames"
+          :remote-options="allRemoteOptions"
           @toggle="onToggle(tpl.id)"
           @update:remote="onUpdateRemote(tpl.id, $event)"
           @update:remote-path="onUpdatePath(tpl.id, $event)"
@@ -198,7 +194,7 @@ onBeforeUnmount(() => {
           :selected="isRuleSelected(tpl.id)"
           :remote="getRuleRemote(tpl.id)"
           :remote-path="getRulePath(tpl.id, tpl.remote_path)"
-          :remote-options="allRemoteNames"
+          :remote-options="allRemoteOptions"
           @toggle="onToggle(tpl.id)"
           @update:remote="onUpdateRemote(tpl.id, $event)"
           @update:remote-path="onUpdatePath(tpl.id, $event)"

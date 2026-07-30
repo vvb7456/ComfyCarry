@@ -5,6 +5,7 @@ import type {
   PluginInfo, SyncTemplate, RemoteTypeDef,
   DetectedImageType, SetupStateEnvVars,
 } from '@/types/wizard'
+import { resetRcloneState } from './wizardRcloneState'
 
 const TOTAL_STEPS = 10
 
@@ -329,6 +330,10 @@ export function useWizardState() {
   function selectMode(mode: 'fresh' | 'import') {
     if (mode === 'fresh') {
       importedConfig.value = null
+
+      // rclone / 同步步骤的跨步骤状态是模块级的, 不在 config 里 ——
+      // 不显式清掉的话, 上一轮探测到的 remote 会残留到 Step 3/4
+      resetRcloneState()
 
       // Reset config to defaults, then re-apply env var pre-fills
       const defaults = createDefaultConfig()

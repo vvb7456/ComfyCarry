@@ -95,7 +95,7 @@ def _restore_comfyui(log):
     条件: setup 已完成 + ComfyUI 目录存在 + comfy 进程未运行
     """
     # 检查 setup 是否已完成
-    setup_state_file = os.path.join("/workspace", ".setup_state.json")
+    setup_state_file = cfg.SETUP_STATE_FILE
     try:
         with open(setup_state_file) as f:
             state = json.load(f)
@@ -157,6 +157,16 @@ def main():
     from .services.resource_registry import get_registry
     get_registry().hydrate_from_db()
 
+    # 清理超龄 sync job 记录 (默认保留 7 天) —— 不清的话 sync_jobs /
+    # sync_job_events 只增不减
+    try:
+        from .services import sync_store as _sync_store
+        removed = _sync_store.delete_old_jobs()
+        if removed:
+            app.logger.info(f"[sync] 清理超龄 job 记录 {removed} 条")
+    except Exception as e:
+        app.logger.warning(f"[sync] 清理超龄 job 失败: {e}")
+
     # 注册引擎清理
     atexit.register(shutdown_engine)
 
@@ -195,7 +205,9 @@ def main():
             if result.get("ok"):
                 print(f"  🌐 公共 Tunnel 已恢复: {result.get('random_id', '?')}")
             else:
-                print(f"  ⚠️  公共 Tunnel 恢复失败: {result.get('error', '未知')}")
+                # 启动日志走控制台, 不经前端翻译 —— 这里打 key 本身就够定位
+                print(f"  ⚠️  公共 Tunnel 恢复失败: "
+                      f"{result.get('error_key') or result.get('error', '未知')}")
         except Exception as e:
             print(f"  ⚠️  公共 Tunnel 恢复失败: {e}")
 

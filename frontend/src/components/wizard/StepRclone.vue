@@ -8,6 +8,7 @@ import ModeCard from '@/components/ui/ModeCard.vue'
 import FormField from '@/components/form/FormField.vue'
 import FieldControlRow from '@/components/form/FieldControlRow.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
+import { remoteBrand } from '@/config/remote-logos'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -38,7 +39,10 @@ const currentTypeDef = computed(() => {
 
 const remoteTypeOptions = computed(() => {
   const entries = Object.entries(remoteTypeDefs.value)
-  return entries.map(([key, def]) => ({ value: key, label: def.label }))
+  return entries.map(([key, def]) => {
+    const brand = remoteBrand(key)
+    return { value: key, label: def.label, logo: brand.logo, icon: brand.icon }
+  })
 })
 
 const nextLabel = computed(() => {
@@ -46,9 +50,14 @@ const nextLabel = computed(() => {
   return t('wizard.btn.skip')
 })
 
-// Reset params when type changes
+// 换类型时重置参数, 并预填字段默认值 (与 Sync 页的 onRemoteTypeChange 一致 ——
+// 之前只清空不预填, s3 的 provider / sftp 的 port 会是空的)
 watch(remoteType, () => {
-  remoteParams.value = {}
+  const next: Record<string, string> = {}
+  for (const f of currentTypeDef.value?.fields || []) {
+    if (f.default !== undefined) next[f.key] = f.default
+  }
+  remoteParams.value = next
   remoteError.value = ''
 })
 

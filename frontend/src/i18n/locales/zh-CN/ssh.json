@@ -56,6 +56,23 @@
   "log": {
     "title": "SSH 日志"
   },
+  "err": {
+    "fallback": "操作失败",
+    "no_key": "未提供公钥",
+    "no_fingerprint": "未指定 fingerprint",
+    "key_not_found": "未找到匹配的公钥",
+    "password_empty": "密码不能为空",
+    "password_not_set": "ComfyCarry 密码未设置，无法同步",
+    "password_too_short": "密码长度至少 4 位",
+    "set_password_failed": "设置密码失败：{detail}",
+    "start_failed": "启动失败：{detail}",
+    "stop_failed": "停止 sshd 失败",
+    "restart_failed": "重启 sshd 失败"
+  },
+  "msg": {
+    "already_running": "sshd 已在运行",
+    "not_running": "sshd 未在运行"
+  },
   "confirm": {
     "stop": "确定要停止 SSH 服务吗？\n\n所有活跃的 SSH 连接将断开。",
     "delete_key": "确定要删除此公钥吗？"

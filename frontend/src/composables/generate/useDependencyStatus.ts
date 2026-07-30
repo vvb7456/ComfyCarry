@@ -1,6 +1,7 @@
 import { ref, computed, watch, onScopeDispose, toValue, type Ref, type ComputedRef, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloadsStore } from '@/stores/downloads'
+import { apiErrorText } from '@/utils/apiError'
 
 /**
  * useDependencyStatus — 依赖状态机 (运行组件那套的通用化)。
@@ -354,8 +355,8 @@ export function useDependencyStatus(
               break
             }
             const dlData = await dlRes.json()
-            if (dlData?.error) {
-              console.warn('[dep] submit rejected:', f.filename, dlData.error)
+            if (dlData?.error || dlData?.error_key) {
+              console.warn('[dep] submit rejected:', f.filename, apiErrorText(dlData))
               rowFailed = true
               break
             }

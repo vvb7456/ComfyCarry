@@ -36,6 +36,28 @@ bp = Blueprint("llm", __name__)
 _MAX_INPUT_LEN = 2000
 
 
+# ====================================================================
+# 响应文案 —— key + params, 前端按 `llm.err.<key>` 翻译
+#
+# /api/llm/* 的消费方全是面板前端 (设置页 LLM 标签、向导 Step6、生成页助手),
+# 回中文成品文案的话英文 locale 下会直接冒中文。ok:false 保留 —— 这几个
+# 消费方都按 ok 分支, 不看状态码。
+# ====================================================================
+def _err(key: str, status: int = 400, /, **params):
+    """错误响应。形参位置化 (`/`): 插值参数里有 provider / target 之外还可能
+    有 key / status 这种名字, 不然会和函数自己的形参撞车。"""
+    return jsonify({"ok": False, "error_key": f"llm.err.{key}",
+                    "error_params": params}), status
+
+
+def _exc_err(e: Exception, status: int = 500):
+    """异常 → 响应。LLMError 带 key 的走 key, 否则回落 internal + 原文 detail
+    (那是 Provider SDK 抛的英文报错, 透出原文比造键有用)。"""
+    if getattr(e, "key", ""):
+        return _err(e.key, status, **(getattr(e, "params", {}) or {}))
+    return _err("internal", status, detail=str(e))
+
+
 # ── POST /api/llm/prompt — 提示词生成 ────────────────────────────────────────
 
 @bp.route("/api/llm/prompt", methods=["POST"])
@@ -47,13 +69,13 @@ def api_llm_prompt():
     stream = data.get("stream", True)
 
     if not user_input and not image:
-        return jsonify(ok=False, error="input 或 image 不能同时为空"), 400
+        return _err("input_required")
     if user_input and len(user_input) > _MAX_INPUT_LEN:
-        return jsonify(ok=False, error=f"输入过长 (最大 {_MAX_INPUT_LEN} 字符)"), 400
+        return _err("input_too_long", max=_MAX_INPUT_LEN)
 
     valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
     if target not in valid_targets:
-        return jsonify(ok=False, error=f"不支持的 target: {target}"), 400
+        return _err("unsupported_target", target=target)
 
     if stream:
         return Response(
@@ -66,10 +88,10 @@ def api_llm_prompt():
             result = generate_prompt(user_input, target, image=image)
             return jsonify(ok=True, data=result)
         except ValueError as e:
-            return jsonify(ok=False, error=str(e)), 400
+            return _exc_err(e, 400)
         except Exception as e:
             logger.exception("LLM prompt generation failed")
-            return jsonify(ok=False, error=str(e)), 500
+            return _exc_err(e)
 
 
 # ── POST /api/llm/chat — 通用对话 ────────────────────────────────────────────
@@ -82,12 +104,12 @@ def api_llm_chat():
     stream = data.get("stream", True)
 
     if not messages:
-        return jsonify(ok=False, error="messages 不能为空"), 400
+        return _err("messages_required")
 
     # 验证 messages 格式
     for msg in messages:
         if not isinstance(msg, dict) or "role" not in msg or "content" not in msg:
-            return jsonify(ok=False, error="messages 格式错误"), 400
+            return _err("messages_invalid")
 
     if stream:
         return Response(
@@ -101,7 +123,7 @@ def api_llm_chat():
             return jsonify(ok=True, content=text)
         except Exception as e:
             logger.exception("LLM chat failed")
-            return jsonify(ok=False, error=str(e)), 500
+            return _exc_err(e)
 
 
 # ── GET /api/llm/providers — Provider 列表 ───────────────────────────────────
@@ -152,7 +174,7 @@ def api_llm_config_put():
     # 验证 provider
     provider = data.get("provider", "")
     if provider and provider not in PROVIDER_REGISTRY:
-        return jsonify(ok=False, error=f"不支持的 Provider: {provider}"), 400
+        return _err("unsupported_provider", provider=provider)
 
     # 验证 temperature
     temp = data.get("temperature")
@@ -163,7 +185,7 @@ def api_llm_config_put():
                 raise ValueError
             data["temperature"] = temp
         except (ValueError, TypeError):
-            return jsonify(ok=False, error="temperature 必须在 0.0-2.0 之间"), 400
+            return _err("temperature_range")
 
     # 验证 max_tokens
     mt = data.get("max_tokens")
@@ -174,7 +196,7 @@ def api_llm_config_put():
                 raise ValueError
             data["max_tokens"] = mt
         except (ValueError, TypeError):
-            return jsonify(ok=False, error="max_tokens 必须在 1-100000 之间"), 400
+            return _err("max_tokens_range")
 
     # 验证 stream
     stream = data.get("stream")
@@ -196,9 +218,9 @@ def api_llm_test():
     base_url = data.get("base_url", "")
 
     if not provider or not api_key or not model:
-        return jsonify(ok=False, error="provider, api_key, model 必填"), 400
+        return _err("config_fields_required")
     if provider not in PROVIDER_REGISTRY:
-        return jsonify(ok=False, error=f"不支持的 Provider: {provider}"), 400
+        return _err("unsupported_provider", provider=provider)
 
     result = test_connection(provider, api_key, model, base_url)
     return jsonify(**result)
@@ -213,9 +235,9 @@ def api_llm_models():
     base_url = data.get("base_url", "")
 
     if not provider or not api_key:
-        return jsonify(ok=False, error="provider, api_key 必填"), 400
+        return _err("test_fields_required")
     if provider not in PROVIDER_REGISTRY:
-        return jsonify(ok=False, error=f"不支持的 Provider: {provider}"), 400
+        return _err("unsupported_provider", provider=provider)
 
     result = list_models(provider, api_key, base_url)
     return jsonify(**result)

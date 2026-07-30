@@ -56,6 +56,23 @@
   "log": {
     "title": "SSH Logs"
   },
+  "err": {
+    "fallback": "Operation failed",
+    "no_key": "No public key provided",
+    "no_fingerprint": "No fingerprint specified",
+    "key_not_found": "No matching public key found",
+    "password_empty": "Password cannot be empty",
+    "password_not_set": "ComfyCarry password is not set, cannot sync",
+    "password_too_short": "Password must be at least 4 characters",
+    "set_password_failed": "Failed to set password: {detail}",
+    "start_failed": "Failed to start: {detail}",
+    "stop_failed": "Failed to stop sshd",
+    "restart_failed": "Failed to restart sshd"
+  },
+  "msg": {
+    "already_running": "sshd is already running",
+    "not_running": "sshd is not running"
+  },
   "confirm": {
     "stop": "Stop SSH service?\n\nAll active SSH sessions will be disconnected.",
     "delete_key": "Delete this public key?"

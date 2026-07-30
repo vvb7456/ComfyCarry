@@ -8,6 +8,7 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
+import { apiErrorText } from '@/utils/apiError'
 import type { InitSourceStatus, ImportResult } from '@/types/prompt-library'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
 
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}))
-        throw new Error(errData.error || `HTTP ${resp.status}`)
+        throw new Error(apiErrorText(errData, `HTTP ${resp.status}`))
       }
 
       const reader = resp.body?.getReader()

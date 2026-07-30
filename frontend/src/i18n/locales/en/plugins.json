@@ -1,4 +1,23 @@
 {
+  "err": {
+    "no_comfyui": "Cannot connect to ComfyUI — make sure it is running",
+    "parse_failed": "Failed to parse response",
+    "missing_id": "Missing id field",
+    "upstream_error": "ComfyUI-Manager returned {code}",
+    "install_failed": "Install request failed: {code}",
+    "uninstall_failed": "Uninstall request failed: {code}",
+    "update_failed": "Update request failed: {code}",
+    "action_failed": "Action failed: {code}",
+    "unknown_needs_files": "The unknown version requires a files field",
+    "url_required": "URL cannot be empty"
+  },
+  "msg": {
+    "queued_install": "Added to install queue",
+    "queued_uninstall": "Added to uninstall queue",
+    "queued_update": "Added to update queue",
+    "queued_update_all": "All plugins added to update queue",
+    "action_submitted": "Action submitted"
+  },
   "tabs": {
     "git": "Git Install"
   },

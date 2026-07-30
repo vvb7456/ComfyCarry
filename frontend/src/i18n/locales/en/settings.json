@@ -1,6 +1,26 @@
 {
   "title": "Settings",
   "restart_btn": "Restart",
+  "err": {
+    "invalid_config": "Invalid configuration file",
+    "password_empty": "New password cannot be empty",
+    "password_too_short": "Password must be at least {min} characters",
+    "password_wrong_current": "Current password is incorrect",
+    "reinit_clean_failed": "Failed to clean the ComfyUI directory: {detail}",
+    "reinit_reset_failed": "Failed to reset state: {detail}",
+    "reinit_stop_failed": "Failed to stop services: {detail}",
+    "update": {
+      "already_running": "Update already running",
+      "check_failed": "Update check failed: {detail}"
+    }
+  },
+  "msg": {
+    "password_updated": "Password updated and saved",
+    "restarting": "ComfyCarry is restarting...",
+    "config_imported": "Imported {applied} config items",
+    "config_imported_with_errors": "Imported {applied} config items, {failed} failed",
+    "reinitialized": "Reset complete, refresh to enter Setup Wizard"
+  },
   "password": {
     "title": "ComfyCarry Password",
     "current": "Current Password",

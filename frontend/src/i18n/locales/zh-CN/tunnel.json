@@ -37,7 +37,7 @@
       "capacity_loading": "容量加载中...",
       "capacity": "容量",
       "capacity_full": "已满",
-      "capacity_fetch_failed": "容量: 无法获取"
+      "capacity_fetch_failed": "容量：无法获取"
     },
     "custom": {
       "title": "自定义 Tunnel",
@@ -56,7 +56,7 @@
     "save": "保存",
     "destroy": "销毁 Tunnel",
     "saving": "保存中...",
-    "subdomain_error": "子域名格式错误: 3-32位小写字母、数字或连字符",
+    "subdomain_error": "子域名格式错误：3-32位小写字母、数字或连字符",
     "auto_generate": "留空自动生成",
     "auto_random": "留空随机生成",
     "applying": "正在应用配置...",
@@ -77,6 +77,26 @@
     "suffix_placeholder": "如 app → subdomain-app.domain.com",
     "generated_domain": "生成域名",
     "protocol": "协议"
+  },
+  "err": {
+    "domain_not_in_account": "域名 {domain} 不在此账户中",
+    "fill_service_info": "请填写服务名称、端口和子域名后缀",
+    "internal": "操作失败：{detail}",
+    "invalid_protocol": "无效协议，可选：auto, http2, quic",
+    "invalid_subdomain": "子域名必须为 3-32 位小写字母、数字或连字符",
+    "missing_token_or_domain": "缺少 api_token 或 domain",
+    "network": "网络错误：{detail}",
+    "no_account": "无法获取 Cloudflare 账户信息",
+    "not_configured": "Tunnel 未配置",
+    "not_found": "Tunnel 不存在",
+    "pm2_restart_failed": "隧道服务重启失败",
+    "public_api_unreachable": "无法连接公共 Tunnel 服务：{detail}",
+    "public_no_state": "没有可恢复的公共 Tunnel 状态",
+    "public_register_failed": "公共 Tunnel 注册失败",
+    "start_failed": "启动失败",
+    "stop_failed": "停止失败",
+    "suffix_empty": "新后缀不能为空",
+    "suffix_in_use": "后缀 '{suffix}' 已被服务 '{name}' 使用"
   },
   "toast": {
     "config_applied": "Tunnel 配置已应用",
@@ -111,5 +131,8 @@
     "remove_custom_service": "确定要移除自定义服务「{suffix}」吗？",
     "stop_cloudflared": "确定要停止 cloudflared 吗？\n\n所有通过 Tunnel 的连接将断开。",
     "restart_cloudflared": "确定要重启 cloudflared 吗？\n\n连接可能会短暂中断。"
+  },
+  "msg": {
+    "token_valid": "Token 验证通过"
   }
 }

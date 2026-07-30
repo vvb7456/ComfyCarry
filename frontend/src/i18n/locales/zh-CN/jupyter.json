@@ -73,5 +73,25 @@
     "stop_failed": "停止失败",
     "restarting": "Jupyter 正在重启",
     "restart_failed": "重启失败"
+  },
+  "err": {
+    "fallback": "JupyterLab 操作失败",
+    "not_running": "JupyterLab 未运行",
+    "terminal_create_failed": "创建终端失败：{detail}",
+    "terminal_delete_failed": "销毁终端失败：{detail}",
+    "invalid_action": "无效的操作：{action}",
+    "kernel_action_failed": "内核 {action} 失败：{detail}",
+    "session_delete_failed": "关闭会话失败：{detail}",
+    "logs_failed": "获取日志失败：{detail}",
+    "start_failed": "启动失败：{detail}",
+    "stop_failed": "停止失败：{detail}",
+    "restart_failed": "重启失败：{detail}",
+    "token_not_found": "未找到令牌"
+  },
+  "msg": {
+    "already_running": "JupyterLab 已在运行",
+    "starting": "JupyterLab 启动中...",
+    "stopped": "JupyterLab 已停止",
+    "restarting": "JupyterLab 正在重启..."
   }
 }

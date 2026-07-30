@@ -94,7 +94,8 @@ All optional. The Setup Wizard auto-detects and pre-fills them.
 | `CF_SUBDOMAIN` | Tunnel subdomain prefix | — |
 | `CIVITAI_TOKEN` | CivitAI API Key | — |
 | `RCLONE_CONF_BASE64` | Base64-encoded rclone.conf | — |
-| `COMFYUI_DIR` | ComfyUI path | `/workspace/ComfyUI` |
+| `WORKSPACE_DIR` | Workspace root (the `/` in panel path conventions) | `/workspace` |
+| `COMFYUI_DIR` | ComfyUI path | `$WORKSPACE_DIR/ComfyUI` |
 | `COMFYUI_URL` | ComfyUI internal URL | `http://localhost:8188` |
 | `MANAGER_PORT` | Dashboard port | `5000` |
 | `FORCE_UPDATE` | Force re-download Dashboard files | `false` |

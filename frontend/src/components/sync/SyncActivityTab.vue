@@ -11,6 +11,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { LogLine, LogStatus } from '@/composables/useLogStream'
 import type { SyncJob } from '@/composables/useSyncJobs'
+import { fmtBytes as fmtBytesShared } from '@/utils/format'
 import type { SyncRule } from '@/types/sync'
 
 defineOptions({ name: 'SyncActivityTab' })
@@ -80,12 +81,9 @@ function fmtDuration(job: SyncJob) {
   return `${Math.floor(sec / 60)}m${sec % 60}s`
 }
 
+/** 表格里 0 字节留空 (不显示 "0 B"), 其余走共享格式化 */
 function fmtBytes(bytes: number) {
-  if (bytes <= 0) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  return bytes > 0 ? fmtBytesShared(bytes) : ''
 }
 
 function fmtSpeed(bytesPerSec: number) {

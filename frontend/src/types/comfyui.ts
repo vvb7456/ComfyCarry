@@ -73,11 +73,15 @@ export interface ComfyVersionsResponse {
   has_git: boolean
 }
 
+/** 文案三条通道都是 key + params, 用 utils/apiError.ts 渲染 */
 export interface ComfyVersionSwitchResponse {
   ok: boolean
-  message?: string
-  error?: string
-  warning?: string
+  message_key?: string
+  message_params?: Record<string, unknown>
+  error_key?: string
+  error_params?: Record<string, unknown>
+  warning_key?: string
+  warning_params?: Record<string, unknown>
   previous?: string
   current?: string
 }

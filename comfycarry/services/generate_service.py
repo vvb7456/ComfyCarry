@@ -36,7 +36,7 @@ def submit_generation(data: dict) -> tuple[dict, int]:
 
     返回 (响应体, HTTP 状态码):
       成功: ({"prompt_id": "...", "status": "queued"}, 200)
-      失败: ({"error": "..."}, 400/500/502/503)
+      失败: ({"error_key": "generate.err.<key>", "error_params": {...}}, 400/500/502/503)
     """
     # ── ★ 每轮 deepcopy — 入口即深拷贝, 防止 wildcard 烤死 ──
     data = copy.deepcopy(data)
@@ -52,11 +52,12 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     # ── 基础参数校验 ────────────────────────────────────────────────────────
     model_type = data.get("model_type", "sdxl").strip().lower()
     if model_type not in _BUILDERS:
-        return {"error": f"不支持的模型类型: {model_type}"}, 400
+        return {"error_key": "generate.err.unsupported_model_type",
+                "error_params": {"model_type": model_type}}, 400
 
     positive_prompt = data.get("positive_prompt", "").strip()
     if not positive_prompt:
-        return {"error": "画面描述不能为空"}, 400
+        return {"error_key": "generate.err.empty_prompt"}, 400
 
     # ── 参数范围校验 ────────────────────────────────────────────────────────
     batch_size = max(1, min(int(data.get("batch_size", 1) or 1), 16))
@@ -66,7 +67,7 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     try:
         opts = _fetch_generate_options()
     except requests.exceptions.ConnectionError:
-        return {"error": "ComfyUI 未运行，请先在 ComfyUI 页面启动服务"}, 503
+        return {"error_key": "generate.err.comfyui_not_running"}, 503
     except Exception as e:
         logger.warning(f"[generate] 获取 options 失败 (非致命，跳过校验): {e}")
         opts = {}
@@ -75,11 +76,12 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     if model_type == "sdxl":
         checkpoint = data.get("checkpoint", "").strip()
         if not checkpoint:
-            return {"error": "请选择基础模型 (Checkpoint)"}, 400
+            return {"error_key": "generate.err.no_checkpoint"}, 400
         ckpt_list = opts.get("checkpoints", [])
         if ckpt_list and checkpoint not in ckpt_list:
             return {
-                "error": f"模型文件未找到: {checkpoint}，请前往模型管理页确认"
+                "error_key": "generate.err.checkpoint_not_found",
+                "error_params": {"name": checkpoint},
             }, 400
         # clip_skip 钳制 1..4 (缺省 1, 不传则 builder 走默认行为 = 无 CLIPSetLastLayer)
         try:
@@ -93,7 +95,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             vae_list = opts.get("vaes", [])
             if vae_list and vae_override not in vae_list:
                 return {
-                    "error": f"VAE 文件未找到: {vae_override}，请前往模型管理页确认"
+                    "error_key": "generate.err.vae_not_found",
+                    "error_params": {"name": vae_override},
                 }, 400
             data["vae"] = vae_override
         else:
@@ -109,14 +112,16 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             checkpoint = data.get("checkpoint", "").strip()
             if not checkpoint:
                 return {
-                    "error": f"{model_type} (整合包) 需选择 Checkpoint 模型文件"
+                    "error_key": "generate.err.split_checkpoint_required",
+                    "error_params": {"model_type": model_type},
                 }, 400
             ckpt_list = opts.get("checkpoints", [])
             # 整合包可能落在 diffusion_models/ (旧下载归位 bug) 也可能在 checkpoints/
             unet_list = opts.get("unets", [])
             if ckpt_list and checkpoint not in ckpt_list and unet_list and checkpoint not in unet_list:
                 return {
-                    "error": f"模型文件未找到: {checkpoint}，请前往模型管理页确认"
+                    "error_key": "generate.err.checkpoint_not_found",
+                    "error_params": {"name": checkpoint},
                 }, 400
             data["checkpoint"] = checkpoint
             # clip_skip / vae 覆盖接收+钳制是死代码:
@@ -129,7 +134,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             vae = data.get("vae", "").strip()
             if not unet or not clip or not vae:
                 return {
-                    "error": f"{model_type} 需选择 UNet / Text Encoder / VAE 三个模型文件"
+                    "error_key": "generate.err.split_models_required",
+                    "error_params": {"model_type": model_type},
                 }, 400
             for key, fname, listkey, label in (
                 ("unet", unet, "unets", "UNet"),
@@ -139,7 +145,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 file_list = opts.get(listkey, [])
                 if file_list and fname not in file_list:
                     return {
-                        "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
+                        "error_key": "generate.err.model_file_not_found",
+                        "error_params": {"label": label, "name": fname},
                     }, 400
                 data[key] = fname
             # flux1 等双 CLIP 架构: 额外校验 clip2 (第二 Text Encoder, 如 T5)
@@ -147,12 +154,13 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 clip2 = data.get("clip2", "").strip()
                 if not clip2:
                     return {
-                        "error": "flux1 需选择两个 Text Encoder (CLIP-L + T5)"
+                        "error_key": "generate.err.dual_clip_required",
                     }, 400
                 clip_list = opts.get("clips", [])
                 if clip_list and clip2 not in clip_list:
                     return {
-                        "error": f"Text Encoder 文件未找到: {clip2}，请前往模型管理页确认"
+                        "error_key": "generate.err.model_file_not_found",
+                        "error_params": {"label": "Text Encoder", "name": clip2},
                     }, 400
                 data["clip2"] = clip2
 
@@ -178,9 +186,9 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             unet_high = str(data.get("unet_high", "")).strip()
             unet_low = str(data.get("unet_low", "")).strip()
             if not unet_high or not unet_low:
-                return {"error": "Wan 2.2 14B 需选择高噪 / 低噪两段 UNet 权重"}, 400
+                return {"error_key": "generate.err.wan22_dual_unet_required"}, 400
             if unet_high == unet_low:
-                return {"error": "高噪与低噪 UNet 不能是同一个文件"}, 400
+                return {"error_key": "generate.err.wan22_same_unet"}, 400
             unet_list = opts.get("unets", [])
             for key, fname, label in (
                 ("unet_high", unet_high, "高噪 UNet"),
@@ -188,17 +196,19 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             ):
                 if unet_list and fname not in unet_list:
                     return {
-                        "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
+                        "error_key": "generate.err.model_file_not_found",
+                        "error_params": {"label": label, "name": fname},
                     }, 400
                 data[key] = fname
         else:
             unet = str(data.get("unet", "")).strip()
             if not unet:
-                return {"error": "Wan 2.2 5B 需选择 UNet 权重"}, 400
+                return {"error_key": "generate.err.wan22_unet_required"}, 400
             unet_list = opts.get("unets", [])
             if unet_list and unet not in unet_list:
                 return {
-                    "error": f"UNet 文件未找到: {unet}，请前往模型管理页确认"
+                    "error_key": "generate.err.model_file_not_found",
+                    "error_params": {"label": "UNet", "name": unet},
                 }, 400
             data["unet"] = unet
 
@@ -206,7 +216,7 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         clip = str(data.get("clip", "")).strip()
         vae = str(data.get("vae", "")).strip()
         if not clip or not vae:
-            return {"error": "需选择 Text Encoder / VAE 两个模型文件"}, 400
+            return {"error_key": "generate.err.wan22_te_vae_required"}, 400
         for key, fname, listkey, label in (
             ("clip", clip, "clips", "Text Encoder"),
             ("vae", vae, "vaes", "VAE"),
@@ -214,7 +224,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             file_list = opts.get(listkey, [])
             if file_list and fname not in file_list:
                 return {
-                    "error": f"{label} 文件未找到: {fname}，请前往模型管理页确认"
+                    "error_key": "generate.err.model_file_not_found",
+                    "error_params": {"label": label, "name": fname},
                 }, 400
             data[key] = fname
 
@@ -228,14 +239,20 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             need_start = (mode == "i2v")
         if need_start:
             if not start_image:
-                return {"error": "请先上传起始画面"}, 400
+                return {"error_key": "generate.err.no_start_frame"}, 400
             img_path = os.path.join(input_dir, start_image)
             real_img = os.path.realpath(img_path)
             real_input = os.path.realpath(input_dir)
             if not real_img.startswith(real_input + os.sep):
-                return {"error": f"起始画面路径无效: {start_image}"}, 400
+                return {
+                    "error_key": "generate.err.invalid_start_frame_path",
+                    "error_params": {"name": start_image},
+                }, 400
             if not os.path.isfile(img_path):
-                return {"error": f"起始画面不存在: {start_image}，请重新上传"}, 400
+                return {
+                    "error_key": "generate.err.start_frame_not_found",
+                    "error_params": {"name": start_image},
+                }, 400
             data["start_image"] = start_image
         else:
             # t2v 模式清空, 防止脏值
@@ -245,21 +262,23 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         try:
             width = int(data.get("width", 640 if is_14b else 1280))
         except (TypeError, ValueError):
-            return {"error": "分辨率宽度需为整数"}, 400
+            return {"error_key": "generate.err.invalid_width"}, 400
         try:
             height = int(data.get("height", 640 if is_14b else 704))
         except (TypeError, ValueError):
-            return {"error": "分辨率高度需为整数"}, 400
+            return {"error_key": "generate.err.invalid_height"}, 400
         mod = 16 if is_14b else 32
         if width <= 0 or height <= 0:
-            return {"error": "分辨率宽高需为正整数"}, 400
+            return {"error_key": "generate.err.invalid_resolution"}, 400
         if width % mod != 0 or height % mod != 0:
             return {
-                "error": f"视频分辨率需为 {mod} 的倍数（当前 {width}×{height}）"
+                "error_key": "generate.err.resolution_not_multiple",
+                "error_params": {"mod": mod, "width": width, "height": height},
             }, 400
         if width * height > 921600:
             return {
-                "error": f"视频分辨率超出 720p 预算（{width}×{height} > 1280×720），请降低分辨率"
+                "error_key": "generate.err.resolution_too_large",
+                "error_params": {"width": width, "height": height},
             }, 400
         data["width"] = width
         data["height"] = height
@@ -269,14 +288,15 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         try:
             duration = float(data.get("duration_s", 5))
         except (TypeError, ValueError):
-            return {"error": "时长需为数字"}, 400
+            return {"error_key": "generate.err.invalid_duration"}, 400
         if duration <= 0:
-            return {"error": "时长需大于 0 秒"}, 400
+            return {"error_key": "generate.err.duration_not_positive"}, 400
         # 0.5s 步进: 容忍浮点误差, 四舍五入到 0.5 的倍数
         duration = round(duration * 2) / 2
         if duration > max_duration:
             return {
-                "error": f"时长上限 {max_duration} 秒（当前 {duration} 秒）"
+                "error_key": "generate.err.duration_too_long",
+                "error_params": {"max": max_duration, "current": duration},
             }, 400
         data["duration_s"] = duration
         length = max(1, int(fps * duration) + 1)
@@ -329,7 +349,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         lora_name = str(lora_entry.get("name", "")).strip()
         if lora_name and lora_list and lora_name not in lora_list:
             return {
-                "error": f"LoRA 文件未找到: {lora_name}，请前往模型管理页确认"
+                "error_key": "generate.err.lora_not_found",
+                "error_params": {"name": lora_name},
             }, 400
 
     # 确保归一化后的 loras 写回 data（兼容 workflow_builder 读取）
@@ -349,9 +370,15 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         real_img = os.path.realpath(img_path)
         real_input = os.path.realpath(input_dir)
         if not real_img.startswith(real_input + os.sep):
-            return {"error": f"ControlNet 图片路径无效: {cn_image}"}, 400
+            return {
+                "error_key": "generate.err.invalid_cn_image_path",
+                "error_params": {"name": cn_image},
+            }, 400
         if not os.path.isfile(img_path):
-            return {"error": f"ControlNet 参考图不存在: {cn_image}，请重新上传"}, 400
+            return {
+                "error_key": "generate.err.cn_image_not_found",
+                "error_params": {"name": cn_image},
+            }, 400
         validated_cns.append({
             "type": str(cn.get("type", "")),
             "model": cn_model,
@@ -369,9 +396,15 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         real_img = os.path.realpath(img_path)
         real_input = os.path.realpath(input_dir)
         if not real_img.startswith(real_input + os.sep):
-            return {"error": f"图生图参考图路径无效: {i2i_image}"}, 400
+            return {
+                "error_key": "generate.err.invalid_i2i_image_path",
+                "error_params": {"name": i2i_image},
+            }, 400
         if not os.path.isfile(img_path):
-            return {"error": f"图生图参考图不存在: {i2i_image}，请重新上传"}, 400
+            return {
+                "error_key": "generate.err.i2i_image_not_found",
+                "error_params": {"name": i2i_image},
+            }, 400
         data["i2i_image"] = i2i_image
 
     # ── 面部重绘参数校验 ────────────────────────────────────────────────────
@@ -380,7 +413,10 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         fd_model = fd_model.replace("\\", "/").split("/")[-1] or "face_yolov8m.pt"
         fd_path = os.path.join(COMFYUI_DIR, "models", "ultralytics", "bbox", fd_model)
         if not os.path.isfile(fd_path):
-            return {"error": f"面部检测模型不存在: {fd_model}，请先在面部模块下载"}, 400
+            return {
+                "error_key": "generate.err.face_model_not_found",
+                "error_params": {"name": fd_model},
+            }, 400
         data["face_detailer_model"] = fd_model
         if bool(data.get("face_detailer_use_sam", False)):
             sam_path = os.path.join(COMFYUI_DIR, "models", "sams", "sam_vit_b_01ec64.pth")
@@ -447,7 +483,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         prompt = _BUILDERS[model_type](data)
     except Exception as e:
         logger.exception("[generate] 构建工作流失败")
-        return {"error": f"工作流构建失败: {e}"}, 500
+        return {"error_key": "generate.err.workflow_build_failed",
+                "error_params": {"detail": str(e)}}, 500
 
     # ── 提交到 ComfyUI ───────────────────────────────────────────────────────
     try:
@@ -462,7 +499,7 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         resp.raise_for_status()
         result = resp.json()
     except requests.exceptions.ConnectionError:
-        return {"error": "ComfyUI 未运行，请先在 ComfyUI 页面启动服务"}, 503
+        return {"error_key": "generate.err.comfyui_not_running"}, 503
     except requests.exceptions.HTTPError as e:
         # 透传 ComfyUI 的错误信息
         try:
@@ -471,10 +508,12 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         except Exception:
             err_msg = str(e)
         logger.error(f"[generate] ComfyUI 拒绝 prompt: {err_msg}")
-        return {"error": f"ComfyUI 错误: {err_msg}"}, 502
+        return {"error_key": "generate.err.comfyui_error",
+                "error_params": {"detail": err_msg}}, 502
     except Exception as e:
         logger.exception("[generate] 提交到 ComfyUI 失败")
-        return {"error": f"提交失败: {e}"}, 500
+        return {"error_key": "generate.err.submit_failed",
+                "error_params": {"detail": str(e)}}, 500
 
     prompt_id = result.get("prompt_id", "")
     logger.info(f"[generate] 提交成功 prompt_id={prompt_id} model={model_type} batch={batch_size}")

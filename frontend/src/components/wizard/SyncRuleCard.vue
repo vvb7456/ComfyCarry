@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
+import BaseSelect, { type SelectOption } from '@/components/form/BaseSelect.vue'
 import type { SyncTemplate } from '@/types/wizard'
 
 defineOptions({ name: 'SyncRuleCard' })
@@ -14,7 +14,7 @@ const props = defineProps<{
   selected: boolean
   remote: string
   remotePath: string
-  remoteOptions: string[]
+  remoteOptions: SelectOption[]
 }>()
 
 const emit = defineEmits<{
@@ -23,9 +23,8 @@ const emit = defineEmits<{
   'update:remotePath': [value: string]
 }>()
 
-const shortName = computed(() =>
-  props.template.name.replace(/^[\u2B07\uFE0F\u2B06\u{1F4E5}\u{1F4E4}]+\s*/u, ''),
-)
+// 模板名早年带 ⬇️/⬆️ 前缀, 后端已去掉, 这里不再需要剥离
+const shortName = computed(() => props.template.name)
 
 const methodLabel = computed(() =>
   props.template.method === 'move' ? t('wizard.step4.method_move') : t('wizard.step4.method_keep'),

@@ -78,6 +78,26 @@
     "generated_domain": "Generated Domain",
     "protocol": "Protocol"
   },
+  "err": {
+    "domain_not_in_account": "Domain {domain} is not in this account",
+    "fill_service_info": "Please fill in service name, port and subdomain suffix",
+    "internal": "Operation failed: {detail}",
+    "invalid_protocol": "Invalid protocol, options: auto, http2, quic",
+    "invalid_subdomain": "Subdomain must be 3-32 lowercase letters, numbers or hyphens",
+    "missing_token_or_domain": "Missing api_token or domain",
+    "network": "Network error: {detail}",
+    "no_account": "Unable to fetch Cloudflare account info",
+    "not_configured": "Tunnel not configured",
+    "not_found": "Tunnel not found",
+    "pm2_restart_failed": "Failed to restart the tunnel service",
+    "public_api_unreachable": "Cannot reach the public Tunnel service: {detail}",
+    "public_no_state": "No persisted public Tunnel state to restore",
+    "public_register_failed": "Public Tunnel registration failed",
+    "start_failed": "Start failed",
+    "stop_failed": "Stop failed",
+    "suffix_empty": "New suffix cannot be empty",
+    "suffix_in_use": "Suffix '{suffix}' is already used by service '{name}'"
+  },
   "toast": {
     "config_applied": "Tunnel configuration applied",
     "auto_refresh": "Auto-refreshing in 5 seconds",
@@ -111,5 +131,8 @@
     "remove_custom_service": "Remove custom service \"{suffix}\"?",
     "stop_cloudflared": "Stop cloudflared?\n\nAll connections through the Tunnel will be disconnected.",
     "restart_cloudflared": "Restart cloudflared?\n\nConnections may be briefly interrupted."
+  },
+  "msg": {
+    "token_valid": "Token verified"
   }
 }

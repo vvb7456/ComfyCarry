@@ -14,6 +14,14 @@ auth_bp = Blueprint("auth", __name__)
 _auth_log = logging.getLogger("comfycarry.auth")
 
 
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `auth.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
+    body = {"error_key": f"auth.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
 # ── 自定义 Session Interface ─────────────────────────────────
 # 容忍 NTP 时钟回调导致的 "future timestamp" (Signature age < 0)
 class DebugSessionInterface(SecureCookieSessionInterface):
@@ -298,12 +306,27 @@ def register_auth_middleware(app):
         "/api/llm/models",              # LLM 模型列表 (Wizard Step 6)
     }
 
+    # 部署完成后**不再**免鉴权的 setup 路由 —— 它们会改写向导状态、
+    # 拉起部署或代面板发外部请求, 部署完成后没有合法用途。
+    # 正常的重新部署路径是先调 /api/settings/reinitialize (需鉴权) 删掉
+    # setup state, 那之后 _is_setup_complete() 为假, 这里自然重新放行。
+    # /api/setup/state 与 /api/setup/log_stream 仍始终放行: 只读, 且部署
+    # 完成的瞬间向导页还在轮询它们显示结果。
+    _SETUP_PRIVILEGED_ROUTES = {
+        "/api/setup/save",
+        "/api/setup/deploy",
+        "/api/setup/preview_remotes",
+    }
+
     @app.before_request
     def check_auth():
         """全局鉴权与 Setup Wizard 路由"""
-        # Setup 相关路由始终允许
+        # Setup 相关路由: 部署未完成时全部放行 (此时还没有密码);
+        # 已完成则把写/触发类路由交回正常鉴权, 只读的继续放行。
         if request.path.startswith("/api/setup/") or request.path == "/setup":
-            return
+            if not (config._is_setup_complete()
+                    and request.path in _SETUP_PRIVILEGED_ROUTES):
+                return
         # Setup 阶段额外放行的路由
         if not config._is_setup_complete() and request.path in _SETUP_OPEN_ROUTES:
             return
@@ -323,7 +346,7 @@ def register_auth_middleware(app):
         # 如果尚未完成部署向导, 重定向到向导页
         if not config._is_setup_complete():
             if request.path.startswith("/api/"):
-                return jsonify({"error": "Setup not complete", "setup_required": True}), 503
+                return _err("setup_required", 503, _extra={"setup_required": True})
             if request.path != "/":
                 return redirect("/")
             return  # 让 index() 处理向导页渲染
@@ -347,5 +370,5 @@ def register_auth_middleware(app):
                 request.path,
                 cookie_name in request.cookies,
             )
-            return jsonify({"error": "Unauthorized"}), 401
+            return _err("unauthorized", 401)
         return redirect("/login")

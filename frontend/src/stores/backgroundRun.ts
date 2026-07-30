@@ -4,7 +4,11 @@ import { useApiFetch } from '@/composables/useApiFetch'
 
 export interface BackgroundStopReason {
   code: string
+  /** 上游 (ComfyUI / Provider) 的原文 */
   detail: string
+  /** 我们自己判定的错误, 由前端翻译 (见 utils/apiError.ts) */
+  error_key?: string
+  error_params?: Record<string, unknown>
 }
 
 export interface BackgroundRunPolicy {

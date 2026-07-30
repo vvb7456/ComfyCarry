@@ -1,6 +1,26 @@
 {
   "title": "设置",
   "restart_btn": "重启",
+  "err": {
+    "invalid_config": "无效的配置文件",
+    "password_empty": "新密码不能为空",
+    "password_too_short": "密码至少 {min} 个字符",
+    "password_wrong_current": "当前密码错误",
+    "reinit_clean_failed": "清理 ComfyUI 目录失败：{detail}",
+    "reinit_reset_failed": "重置状态失败：{detail}",
+    "reinit_stop_failed": "停止服务失败：{detail}",
+    "update": {
+      "already_running": "更新已在运行中",
+      "check_failed": "检查更新失败：{detail}"
+    }
+  },
+  "msg": {
+    "password_updated": "密码已更新并持久化保存",
+    "restarting": "ComfyCarry 正在重启...",
+    "config_imported": "已导入 {applied} 项配置",
+    "config_imported_with_errors": "已导入 {applied} 项配置，{failed} 项失败",
+    "reinitialized": "已重置，刷新页面进入 Setup Wizard"
+  },
   "password": {
     "title": "ComfyCarry 密码",
     "current": "当前密码",
@@ -31,7 +51,7 @@
     "exported": "配置已导出",
     "export_failed": "导出失败",
     "invalid_format": "无效的配置文件格式",
-    "import_confirm": "确定要导入配置吗？\n\n导出于: {date}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。",
+    "import_confirm": "确定要导入配置吗？\n\n导出于：{date}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。",
     "import_failed": "导入失败",
     "unknown_date": "未知"
   },
@@ -65,7 +85,7 @@
     "error": "更新失败"
   },
   "restart_confirm": "确定要重启 ComfyCarry 吗？\n\n页面将短暂不可用。",
-  "restarting": "ComfyCarry 正在重启, 3 秒后自动刷新...",
+  "restarting": "ComfyCarry 正在重启，3 秒后自动刷新...",
   "civitai": {
     "key_prefix": "API Key 从",
     "key_link": "CivitAI 账户设置",
@@ -98,14 +118,14 @@
       "no_match": "无匹配模型",
       "select": "点击选择模型",
       "none_available": "无可用模型",
-      "context_fmt": "上下文: {n} tokens",
-      "input_fmt": "输入: ${n}/M",
-      "output_fmt": "输出: ${n}/M"
+      "context_fmt": "上下文：{n} tokens",
+      "input_fmt": "输入：${n}/M",
+      "output_fmt": "输出：${n}/M"
     },
     "params": {
       "title": "参数",
       "temperature": "温度",
-      "temperature_help": "0.0 - 2.0，越高越有创意，越低越稳定。推荐值: 创作类 0.8-1.2，翻译/描述类 0.3-0.5",
+      "temperature_help": "0.0 - 2.0，越高越有创意，越低越稳定。推荐值：创作类 0.8-1.2，翻译/描述类 0.3-0.5",
       "max_tokens": "最大回复长度",
       "max_tokens_help": "以词符数 (token) 计的最大输出长度。提示词生成通常 500-1000 即可，长对话可设更高",
       "stream": "流式传输",

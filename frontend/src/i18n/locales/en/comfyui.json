@@ -194,5 +194,22 @@
     "starting": "ComfyUI starting...",
     "interrupt_sent": "Interrupt signal sent",
     "deleted": "Deleted"
+  },
+  "err": {
+    "internal": "Internal server error: {detail}",
+    "invalid_extra_args": "Invalid extra_args format",
+    "missing_delete_param": "Missing delete parameter",
+    "missing_version": "Missing version parameter",
+    "switch_failed": "Version switch failed: {detail}",
+    "switch_not_git": "ComfyUI is not a git repository, cannot switch version",
+    "unreachable": "Cannot connect to ComfyUI",
+    "video_thumb_failed": "Failed to generate video thumbnail: {detail}"
+  },
+  "msg": {
+    "switched": "Switched to {version}",
+    "switched_with_deps": "Switched to {version} (dependencies installed)"
+  },
+  "warn": {
+    "switch_restart": "Version switched, but the service failed to restart — restart it manually"
   }
 }

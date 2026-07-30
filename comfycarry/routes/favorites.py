@@ -23,6 +23,20 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("favorites", __name__)
 
+
+# ====================================================================
+# 响应文案 —— key + params, 由前端翻译。
+# 收藏是模型管理子页, 复用 models 命名空间: error_key=models.err.<key>
+# (i18n/locales/*/models.json 的 err 对象)。
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `models.err.<key>` 翻译; _extra 是响应体附加顶层字段。"""
+    body = {"error_key": f"models.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
 # 长度上限 (防超长字段入库)
 _MAX_FIELD_LEN = 2048
 
@@ -81,7 +95,7 @@ def api_favorites_create():
     data = request.get_json(silent=True) or {}
     fav = _normalize_fav(data)
     if not fav["model_id"]:
-        return jsonify({"error": "model_id 必填"}), 400
+        return _err("fav_model_id_required")
     store.upsert_favorite(fav)
     # 重新读出 (含计算好的 fav_key)
     return jsonify({"ok": True, "favorite": fav}), 201
@@ -93,7 +107,7 @@ def api_favorites_bulk():
     data = request.get_json(silent=True) or {}
     items = data.get("items")
     if not isinstance(items, list):
-        return jsonify({"error": "items 必须为数组"}), 400
+        return _err("fav_items_not_array")
     cleaned = [_normalize_fav(item) for item in items
                if isinstance(item, dict)]
     n = store.bulk_upsert(cleaned)
@@ -105,7 +119,7 @@ def api_favorites_delete_one(fav_key: str):
     """删除单条收藏, 404 if 不存在。"""
     ok = store.remove_favorite(fav_key)
     if not ok:
-        return jsonify({"error": "收藏不存在"}), 404
+        return _err("fav_not_found", 404)
     return jsonify({"ok": True})
 
 

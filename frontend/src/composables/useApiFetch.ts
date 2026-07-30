@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useToast } from './useToast'
+import { apiErrorText } from '@/utils/apiError'
 
 let _redirecting = false
 function redirectToLogin() {
@@ -36,8 +37,8 @@ export function useApiFetch() {
         }
         let msg = `HTTP ${res.status}`
         try {
-          const body = await res.json()
-          msg = body.error || body.message || msg
+          // error_key 优先 —— 已接 i18n 的端点回传 key+params, 其余回传原文
+          msg = apiErrorText(await res.json(), msg)
         } catch { /* ignore parse error */ }
         error.value = msg
         toast(msg, 'error')
@@ -94,8 +95,7 @@ export function useApiFetch() {
         }
         let msg = `HTTP ${res.status}`
         try {
-          const body = await res.json()
-          msg = body.error || body.message || msg
+          msg = apiErrorText(await res.json(), msg)
         } catch { /* ignore */ }
         error.value = msg
         toast(msg, 'error')

@@ -38,6 +38,18 @@ bp = Blueprint("downloads", __name__)
 _REAL_COMFYUI_DIR = os.path.realpath(COMFYUI_DIR)
 
 
+# ====================================================================
+# 响应文案 —— key + params, 前端按 `models.err.<key>` 翻译
+# (downloads 路由复用 models 命名空间, 与 favorites.py 同策略)
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `models.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
+    body = {"error_key": f"models.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
 def _resolve_check_save_dir(spec: dict) -> str | None:
     """解析文件检查的目标目录 (save_dir)。
 
@@ -200,7 +212,7 @@ def api_downloads_check():
     result = _check_file_spec(engine, data)
     if not (data.get("subdir", "").strip() or data.get("save_dir", "").strip()
             or data.get("filename", "").strip()):
-        return jsonify({"error": "save_dir (或 subdir) 和 filename 必填"}), 400
+        return _err("dl_missing_dir_or_filename")
     # subdir 路径越界或 filename 缺失时 _check_file_spec 已返回未安装,
     # 此处统一走正常响应, 避免把非法路径暴露为 4xx
     return jsonify(result)
@@ -231,9 +243,9 @@ def api_downloads_submit():
     model_type = data.get("model_type", "").strip()
 
     if not url:
-        return jsonify({"error": "url 必填"}), 400
+        return _err("dl_url_required")
     if not filename:
-        return jsonify({"error": "filename 必填"}), 400
+        return _err("dl_filename_required")
 
     # 如果没有 save_dir 但有 model_type, 从 MODEL_DIRS 解析
     if not save_dir and model_type:
@@ -243,7 +255,7 @@ def api_downloads_submit():
         save_dir = os.path.join(COMFYUI_DIR, rel_dir)
 
     if not save_dir:
-        return jsonify({"error": "save_dir 或 model_type 必填"}), 400
+        return _err("dl_save_dir_or_model_type_required")
 
     _wire_registry()
     engine = get_engine()
@@ -264,7 +276,8 @@ def api_downloads_submit():
     resp = task.to_dict()
     if task.meta.get("existed"):
         resp["existed"] = True
-        resp["message"] = f"文件已存在: {filename}"
+        resp["message_key"] = "models.msg.dl_already_exists"
+        resp["message_params"] = {"filename": filename}
 
     return jsonify(resp), 201 if task.status == DownloadStatus.ACTIVE else 200
 
@@ -284,7 +297,7 @@ def api_downloads_get(download_id: str):
     engine = get_engine()
     task = engine.get_task(download_id)
     if not task:
-        return jsonify({"error": "任务不存在"}), 404
+        return _err("dl_task_not_found", 404)
     return jsonify(task.to_dict())
 
 
@@ -296,8 +309,8 @@ def api_downloads_cancel(download_id: str):
     if not ok:
         task = engine.get_task(download_id)
         if not task:
-            return jsonify({"error": "任务不存在"}), 404
-        return jsonify({"error": f"任务状态为 {task.status.value}, 无法取消"}), 409
+            return _err("dl_task_not_found", 404)
+        return _err("dl_cannot_cancel", 409, status=task.status.value)
     return jsonify({"ok": True, "download_id": download_id})
 
 
@@ -309,8 +322,8 @@ def api_downloads_pause(download_id: str):
     if not ok:
         task = engine.get_task(download_id)
         if not task:
-            return jsonify({"error": "任务不存在"}), 404
-        return jsonify({"error": f"任务状态为 {task.status.value}, 无法暂停"}), 409
+            return _err("dl_task_not_found", 404)
+        return _err("dl_cannot_pause", 409, status=task.status.value)
     return jsonify({"ok": True, "download_id": download_id})
 
 
@@ -322,8 +335,8 @@ def api_downloads_resume(download_id: str):
     if not ok:
         task = engine.get_task(download_id)
         if not task:
-            return jsonify({"error": "任务不存在"}), 404
-        return jsonify({"error": f"任务状态为 {task.status.value}, 无法恢复"}), 409
+            return _err("dl_task_not_found", 404)
+        return _err("dl_cannot_resume", 409, status=task.status.value)
     return jsonify({"ok": True, "download_id": download_id})
 
 
@@ -340,7 +353,7 @@ def api_downloads_events(download_id: str):
     engine = get_engine()
     task = engine.get_task(download_id)
     if not task:
-        return jsonify({"error": "任务不存在"}), 404
+        return _err("dl_task_not_found", 404)
 
     def _sse_generator():
         last_progress = -1
@@ -354,7 +367,8 @@ def api_downloads_events(download_id: str):
         while True:
             t = engine.get_task(download_id)
             if not t:
-                yield f"data: {json.dumps({'error': '任务已删除'})}\n\n"
+                yield ("data: " + json.dumps(
+                    {"error_key": "models.err.dl_task_deleted"}) + "\n\n")
                 break
 
             # 进度变化或终态 → 推送数据
@@ -401,9 +415,9 @@ def api_downloads_retry(download_id: str):
     engine = get_engine()
     old_task = engine.get_task(download_id)
     if not old_task:
-        return jsonify({"error": "任务不存在"}), 404
+        return _err("dl_task_not_found", 404)
     if old_task.status != DownloadStatus.FAILED:
-        return jsonify({"error": f"任务状态为 {old_task.status.value}, 无需重试"}), 409
+        return _err("dl_no_retry_needed", 409, status=old_task.status.value)
 
     url = old_task.url
 
@@ -463,10 +477,12 @@ def api_downloads_retry(download_id: str):
     if new_task.status == DownloadStatus.FAILED:
         return jsonify({
             **new_task.to_dict(),
-            "error": new_task.error or "重试提交失败",
-        }), 200  # 200 + error 字段 (兼容前端 useDownloads)
+            "error_key": "models.err.dl_retry_failed",
+            # aria2 原文进 {detail} —— 之前只回通用文案, 用户看不到真实原因
+            "error_params": {"detail": new_task.error or ""},
+        }), 200  # 200 而非 4xx: 响应体带 task 快照, stores/downloads.ts 要用
 
-    return jsonify({**new_task.to_dict(), "message": "已重新提交"}), 201
+    return jsonify({**new_task.to_dict(), "message_key": "models.msg.dl_resubmitted"}), 201
 
 
 @bp.route("/api/downloads/clear", methods=["POST"])
@@ -515,7 +531,7 @@ def api_downloads_civitai():
     data = request.get_json(force=True) or {}
     model_input = str(data.get("model_id", "")).strip()
     if not model_input:
-        return jsonify({"error": "model_id 必填"}), 400
+        return _err("dl_model_id_required")
 
     api_key = data.get("api_key") or _get_api_key()
     model_type = data.get("model_type", "")
@@ -547,20 +563,17 @@ def api_downloads_civitai():
             dir_keys=dir_keys or None,
         )
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _err("dl_civitai_invalid", 400, detail=str(e))
     except ProbeAuthError:
         # T1 探针收到 401 —— 文件需付费或无权限下载。
         # 不创建下载任务 (探针是 preflight, 在建任务前拦住)。
         # 返回 403 + probe_auth 标记, 前端据此 toast 且不进 409 弹窗流程。
-        return jsonify({
-            "error": "该文件需付费或无权限下载",
-            "probe_auth": True,
-        }), 403
+        return _err("dl_probe_auth", 403, _extra={"probe_auth": True})
     except NoDownloadableFiles as e:
         # 422 而非 502 —— 是这个 version 的内容本身没有权重, 重试无用。
-        return jsonify({"error": str(e)}), 422
+        return _err("dl_no_downloadable", 422, detail=str(e))
     except RuntimeError as e:
-        return jsonify({"error": str(e)}), 502
+        return _err("dl_civitai_runtime", 502, detail=str(e))
 
     # 有文件判不出目录 → 不提交下载, 让前端弹目录选择。
     # 用 409 而非 200: 这是一次**未完成**的提交, 前端必须处理后重试。
@@ -584,10 +597,7 @@ def api_downloads_civitai():
         ea = info.get("early_access_config") or {}
         if ea.get("chargeForDownload"):
             price = ea.get("downloadPrice", "?")
-            return jsonify({
-                "error": f"该模型为 Early Access 付费模型，需要 {price} Buzz 才能下载。请在 CivitAI 网站购买后再试。",
-                "early_access": True,
-            }), 403
+            return _err("dl_early_access", 403, price=price, _extra={"early_access": True})
         # EarlyAccess 但不收费: 可能仅需登录, 继续尝试下载
 
     def _on_civitai_complete(task):
@@ -656,19 +666,23 @@ def api_downloads_civitai():
     if task.status == DownloadStatus.FAILED:
         return jsonify({
             **task.to_dict(),
-            "error": task.error or "下载提交失败",
-            "message": f"提交失败: {resolved['display_name']}",
+            "error_key": "models.err.dl_submit_failed",
+            "error_params": {"name": resolved['display_name'],
+                             "detail": task.error or ""},
             "resource_state": registry.get_state("civitai", res_model_id, res_version_id),
         }), 200
 
     if existed:
-        msg = f"该模型已存在: {resolved['display_name']}"
+        msg_key = "models.msg.dl_model_exists"
+        msg_params = {"name": resolved['display_name']}
     else:
-        msg = f"已提交: {resolved['display_name']}"
+        msg_key = "models.msg.dl_submitted"
+        msg_params = {"name": resolved['display_name']}
 
     return jsonify({
         **task.to_dict(),
-        "message": msg,
+        "message_key": msg_key,
+        "message_params": msg_params,
         "existed": existed,
         "resource_state": registry.get_state("civitai", res_model_id, res_version_id),
     }), 201 if task.status == DownloadStatus.ACTIVE else 200

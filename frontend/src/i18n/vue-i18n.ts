@@ -6,6 +6,8 @@ import zhNav from './locales/zh-CN/nav.json'
 import zhDashboard from './locales/zh-CN/dashboard.json'
 import zhComfyui from './locales/zh-CN/comfyui.json'
 import zhModels from './locales/zh-CN/models.json'
+import zhFiles from './locales/zh-CN/files.json'
+import zhSystem from './locales/zh-CN/system.json'
 import zhPlugins from './locales/zh-CN/plugins.json'
 import zhTunnel from './locales/zh-CN/tunnel.json'
 import zhJupyter from './locales/zh-CN/jupyter.json'
@@ -15,12 +17,16 @@ import zhSettings from './locales/zh-CN/settings.json'
 import zhGenerate from './locales/zh-CN/generate.json'
 import zhWizard from './locales/zh-CN/wizard.json'
 import zhPromptLibrary from './locales/zh-CN/prompt-library.json'
+import zhAuth from './locales/zh-CN/auth.json'
+import zhLlm from './locales/zh-CN/llm.json'
 
 import enCommon from './locales/en/common.json'
 import enNav from './locales/en/nav.json'
 import enDashboard from './locales/en/dashboard.json'
 import enComfyui from './locales/en/comfyui.json'
 import enModels from './locales/en/models.json'
+import enFiles from './locales/en/files.json'
+import enSystem from './locales/en/system.json'
 import enPlugins from './locales/en/plugins.json'
 import enTunnel from './locales/en/tunnel.json'
 import enJupyter from './locales/en/jupyter.json'
@@ -30,6 +36,8 @@ import enSettings from './locales/en/settings.json'
 import enGenerate from './locales/en/generate.json'
 import enWizard from './locales/en/wizard.json'
 import enPromptLibrary from './locales/en/prompt-library.json'
+import enAuth from './locales/en/auth.json'
+import enLlm from './locales/en/llm.json'
 
 function detectLanguage(): string {
   const stored = localStorage.getItem('lang')
@@ -45,17 +53,19 @@ const i18n = createI18n({
   messages: {
     'zh-CN': {
       common: zhCommon, nav: zhNav, dashboard: zhDashboard,
-      comfyui: zhComfyui, models: zhModels, plugins: zhPlugins,
-      tunnel: zhTunnel, jupyter: zhJupyter, sync: zhSync,
+      comfyui: zhComfyui, models: zhModels, files: zhFiles, system: zhSystem,
+      plugins: zhPlugins, tunnel: zhTunnel, jupyter: zhJupyter, sync: zhSync,
       ssh: zhSsh, settings: zhSettings, generate: zhGenerate,
       wizard: zhWizard, 'prompt-library': zhPromptLibrary,
+      auth: zhAuth, llm: zhLlm,
     },
     en: {
       common: enCommon, nav: enNav, dashboard: enDashboard,
-      comfyui: enComfyui, models: enModels, plugins: enPlugins,
-      tunnel: enTunnel, jupyter: enJupyter, sync: enSync,
+      comfyui: enComfyui, models: enModels, files: enFiles, system: enSystem,
+      plugins: enPlugins, tunnel: enTunnel, jupyter: enJupyter, sync: enSync,
       ssh: enSsh, settings: enSettings, generate: enGenerate,
       wizard: enWizard, 'prompt-library': enPromptLibrary,
+      auth: enAuth, llm: enLlm,
     },
   },
 })

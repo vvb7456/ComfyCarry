@@ -1,0 +1,18 @@
+{
+  "err": {
+    "path_required": "Path is required",
+    "path_outside": "Path out of bounds: must be inside {root}",
+    "path_is_root": "Cannot operate on the {root} root itself",
+    "not_a_file": "Not a file or does not exist",
+    "not_found": "File not found",
+    "file_too_large": "File too large ({size} bytes), max 10 MB",
+    "cannot_decode": "This file cannot be read as text — read it as binary instead",
+    "is_directory": "Cannot operate on a directory",
+    "content_required": "File content is required",
+    "encoding_error": "Content encoding error: {detail}",
+    "chmod_failed": "chmod failed: {detail}",
+    "unsupported_type": "Unsupported file type",
+    "permission_denied": "Permission denied",
+    "internal": "Operation failed: {detail}"
+  }
+}

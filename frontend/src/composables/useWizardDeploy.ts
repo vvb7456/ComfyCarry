@@ -1,6 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWizardState } from './useWizardState'
+import { apiErrorText } from '@/utils/apiError'
 import type { DeployStep, DeployStatus, DeploySSEEvent, WizardConfig } from '@/types/wizard'
 import type { LogLine } from './useLogStream'
 
@@ -169,7 +170,7 @@ export function useWizardDeploy() {
         })
         const d = await res.json()
         if (!d.ok) {
-          return { ok: false, error: d.error || t('wizard.deploy.start_fail') }
+          return { ok: false, error: apiErrorText(d, t('wizard.deploy.start_fail')) }
         }
       } catch (e: any) {
         return { ok: false, error: `${t('wizard.deploy.request_fail')} ${e.message}` }
@@ -184,7 +185,7 @@ export function useWizardDeploy() {
       })
       const d = await res.json()
       if (!d.ok) {
-        return { ok: false, error: d.error || t('wizard.deploy.start_fail') }
+        return { ok: false, error: apiErrorText(d, t('wizard.deploy.start_fail')) }
       }
     } catch (e: any) {
       return { ok: false, error: `${t('wizard.deploy.request_fail')} ${e.message}` }

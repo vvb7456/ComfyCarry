@@ -57,12 +57,16 @@
     "delete": "Delete Rule",
     "edit_modal": "Edit Sync Rule",
     "add_modal": "Add Sync Rule",
-    "quick_template": "Quick Templates",
+    "quick_template": "Quick Template",
+    "template_placeholder": "Pick a template…",
+    "template_custom": "Custom",
+    "template_search": "Search templates",
     "name": "Rule Name",
     "direction": "Direction",
-    "pull": "pull (Remote → Local)",
-    "push": "push (Local → Remote)",
+    "pull": "Download",
+    "push": "Upload",
     "method": "Method",
+    "method_help": "Copy: adds only, never deletes\nMirror sync: extras on the target get deleted\nMove: source files are deleted after transfer",
     "remote": "Remote",
     "remote_path": "Remote Path",
     "local_path": "Local Path",
@@ -78,7 +82,8 @@
     "confirm_delete": "Delete rule \"{name}\"?",
     "deleted": "Deleted",
     "running": "Running",
-    "run_ok": "Rule started. Check logs for progress"
+    "run_ok": "Rule started. Check logs for progress",
+    "run_failed": "Run failed"
   },
   "config": {
     "min_age": {
@@ -126,12 +131,19 @@
     "rule_done": "✅ {name} done",
     "rule_failed": "❌ {name} failed (code={code})",
     "rule_timeout": "⏰ {name} timeout ({seconds}s)",
-    "rule_error": "❌ {name} error: {error}"
+    "rule_error": "❌ {name} error: {error}",
+    "rule_path_invalid": "❌ {name}: local path is out of bounds or invalid ({path})"
   },
   "browse": {
     "remote_title": "Browse Remote Directory",
     "local_title": "Browse Local Directory",
-    "select": "Select Current Directory"
+    "select": "Select Current Directory",
+    "path_placeholder": "Type or paste a path",
+    "root_local": "workspace",
+    "no_subdirs": "No subdirectories here",
+    "retry": "Retry",
+    "failed": "Failed to list directory",
+    "remote_required": "Pick a remote above first"
   },
   "companion": {
     "serve_title": "Transfer service",
@@ -193,5 +205,60 @@
       "partial": "Partial",
       "cancelled": "Cancelled"
     }
+  },
+  "err": {
+    "browse_no_remote": "Select a remote storage first",
+    "browse_rclone_failed": "Listing failed: {detail}",
+    "browse_rclone_failed_plain": "Listing failed",
+    "browse_timeout": "Listing timed out (30s)",
+    "client_not_found": "Client not found",
+    "config_empty": "Config content cannot be empty",
+    "config_no_section": "Malformed config: at least one [remote] section is required",
+    "conn_test_failed": "Connection test failed: {detail}",
+    "conn_test_failed_plain": "Connection test failed",
+    "conn_test_timeout": "Connection test timed out, please check the settings",
+    "create_failed": "Create failed: {detail}",
+    "delete_failed": "Delete failed: {detail}",
+    "dir_denied": "No permission to read this directory",
+    "dir_failed": "Failed to read directory: {detail}",
+    "dir_missing": "Directory does not exist: {path}",
+    "job_not_found": "Job not found",
+    "job_running": "A sync job is already running, try again later",
+    "name_type_required": "Name and type are required",
+    "param_name_invalid": "Invalid parameter name: {key}",
+    "path_is_root": "Cannot operate on the {root} root itself",
+    "path_outside": "Path out of bounds: must be inside {root}",
+    "path_required": "Path is required",
+    "remote_exists": "Remote storage “{name}” already exists",
+    "remote_name_invalid": "Remote storage name may only contain letters, digits, underscores and hyphens",
+    "remote_name_required": "Missing remote storage name",
+    "remote_type_invalid": "Invalid remote storage type",
+    "rule_bad_shape": "Malformed rule",
+    "rule_direction_invalid": "Rule {label}: invalid direction ({value})",
+    "rule_enabled_invalid": "Rule {label}: invalid enabled value",
+    "rule_filters_invalid": "Rule {label}: filters must be a list of lines",
+    "rule_method_invalid": "Rule {label}: invalid method ({value})",
+    "rule_missing_fields": "Every rule needs an ID, a remote storage and a local path",
+    "rule_path_is_root": "Rule {label}: cannot sync the {root} root itself",
+    "rule_path_outside": "Rule {label}: path out of bounds, must be inside {root}",
+    "rule_path_required": "Rule {label}: local path is required",
+    "rule_remote_invalid": "Rule {label}: invalid remote storage name",
+    "rule_trigger_invalid": "Rule {label}: invalid trigger ({value})",
+    "rules_none_matched": "No matching rule found",
+    "rules_not_array": "Malformed rule data",
+    "settings_numbers": "Minimum age and check interval must be numbers",
+    "storage_auth_expired": "Authorization expired — run rclone config reconnect to re-authorize",
+    "storage_not_found": "Remote storage not found or wrong path",
+    "storage_timeout": "Query timed out",
+    "storage_unsupported": "This storage type does not report quota"
+  },
+  "msg": {
+    "config_saved": "Config saved, found {count} remote storage(s): {remotes}",
+    "remote_created": "Remote storage “{name}” created",
+    "remote_deleted": "Remote storage “{name}” deleted",
+    "rules_saved": "Saved {count} rule(s)",
+    "run_started": "Running {count} rule(s)",
+    "worker_started": "Sync service started",
+    "worker_stopped": "Sync service stopped"
   }
 }

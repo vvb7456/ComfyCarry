@@ -25,7 +25,7 @@ from ..config import (
     SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
     _load_config, _get_config, _set_config,
     _load_setup_state, _save_setup_state, SETUP_STATE_FILE,
-    COMFYUI_DIR,
+    COMFYUI_DIR, WORKSPACE_ROOT,
 )
 from ..utils import _get_api_key
 from ..services.comfyui_params import parse_comfyui_args
@@ -34,6 +34,30 @@ from ..services.sync_engine import (
 )
 
 bp = Blueprint("settings", __name__)
+
+
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `settings.err.<key>` 翻译 error_key。"""
+    body = {"error_key": f"settings.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
+def _err_item(key: str, /, **params) -> dict:
+    """内嵌在 200 响应里的单条错误 (每步各自成败, 请求本身没失败)。
+    形状与 _err 的响应体一致, 前端同样用 apiErrorText 渲染。"""
+    return {"error_key": f"settings.err.{key}", "error_params": params}
+
+
+def _ok(key: str, /, **extra):
+    """成功响应。前端按 `settings.msg.<key>` 翻译 message_key。"""
+    body = {"ok": True, "message_key": f"settings.msg.{key}"}
+    params = extra.pop("params", None)
+    if params:
+        body["message_params"] = params
+    body.update(extra)
+    return jsonify(body)
 
 
 @bp.route("/api/settings", methods=["GET"])
@@ -59,15 +83,15 @@ def api_settings_password():
     new_pw = data.get("new", "").strip()
 
     if not new_pw:
-        return jsonify({"error": "新密码不能为空"}), 400
+        return _err("password_empty")
     if len(new_pw) < 4:
-        return jsonify({"error": "密码至少 4 个字符"}), 400
+        return _err("password_too_short", min=4)
     if current != cfg.DASHBOARD_PASSWORD:
-        return jsonify({"error": "当前密码错误"}), 403
+        return _err("password_wrong_current", 403)
 
     cfg.DASHBOARD_PASSWORD = new_pw
     cfg._save_dashboard_password(new_pw)
-    return jsonify({"ok": True, "message": "密码已更新并持久化保存"})
+    return _ok("password_updated")
 
 
 @bp.route("/api/settings/restart", methods=["POST"])
@@ -76,7 +100,7 @@ def api_settings_restart():
         time.sleep(1)
         subprocess.run("pm2 restart dashboard", shell=True, timeout=15)
     threading.Thread(target=_do_restart, daemon=True).start()
-    return jsonify({"ok": True, "message": "ComfyCarry 正在重启..."})
+    return _ok("restarting")
 
 
 @bp.route("/api/settings/api-key", methods=["POST"])
@@ -228,7 +252,7 @@ def api_settings_import_config():
 
     data = request.get_json(force=True) or {}
     if not data:
-        return jsonify({"error": "无效的配置文件"}), 400
+        return _err("invalid_config")
 
     applied = []
     errors = []
@@ -371,13 +395,10 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"提示词编辑器设置: {e}")
 
-    return jsonify({
-        "ok": True,
-        "applied": applied,
-        "errors": errors,
-        "message": (f"已导入 {len(applied)} 项配置"
-                    + (f", {len(errors)} 项失败" if errors else ""))
-    })
+    msg_key = "config_imported_with_errors" if errors else "config_imported"
+    return _ok(msg_key,
+               params={"applied": len(applied), "failed": len(errors)},
+               applied=applied, errors=errors)
 
 
 @bp.route("/api/settings/reinitialize", methods=["POST"])
@@ -393,7 +414,7 @@ def api_settings_reinitialize():
         subprocess.run("pm2 delete comfy 2>/dev/null || true", shell=True, timeout=15)
         subprocess.run("pm2 delete sync 2>/dev/null || true", shell=True, timeout=15)
     except Exception as e:
-        errors.append(f"停止服务失败: {e}")
+        errors.append(_err_item("reinit_stop_failed", detail=str(e)))
 
     # 2) 强制结束所有可能残留的 ComfyUI 进程
     try:
@@ -410,7 +431,7 @@ def api_settings_reinitialize():
     if comfy_dir.exists():
         try:
             if keep_models:
-                models_tmp = Path("/workspace/.models_backup")
+                models_tmp = WORKSPACE_ROOT / ".models_backup"
                 models_src = comfy_dir / "models"
                 if models_src.exists():
                     subprocess.run(f'mv "{models_src}" "{models_tmp}"',
@@ -423,11 +444,9 @@ def api_settings_reinitialize():
             else:
                 subprocess.run(f'rm -rf "{comfy_dir}"', shell=True, timeout=120)
         except Exception as e:
-            errors.append(f"清理 ComfyUI 目录失败: {e}")
+            errors.append(_err_item("reinit_clean_failed", detail=str(e)))
 
-    for f in [Path("/workspace/cloud_sync.sh"),
-              Path("/workspace/.sync_rules.json"),
-              Path("/workspace/.sync_settings.json")]:
+    for f in [WORKSPACE_ROOT / "cloud_sync.sh", SYNC_RULES_FILE, SYNC_SETTINGS_FILE]:
         try:
             if f.exists():
                 f.unlink()
@@ -448,11 +467,13 @@ def api_settings_reinitialize():
             new_state["deploy_steps_completed"] = preserved_steps
             _save_setup_state(new_state)
     except Exception as e:
-        errors.append(f"重置状态失败: {e}")
+        errors.append(_err_item("reinit_reset_failed", detail=str(e)))
 
     subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=15)
 
     if errors:
-        return jsonify({"ok": False, "errors": errors}), 500
+        # 200 而非 500 —— useApiFetch 对非 2xx 直接返回 null, 回 500 的话前端
+        # 拿不到 errors, 只能显示 "HTTP 500", 部分失败的明细全丢。
+        return jsonify({"ok": False, "errors": errors}), 200
 
-    return jsonify({"ok": True, "message": "已重置，刷新页面进入 Setup Wizard"})
+    return _ok("reinitialized")

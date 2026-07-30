@@ -14,11 +14,19 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # ── 版本号 (唯一源) ──────────────────────────────────────────
-APP_VERSION = "v0.5.1"
+APP_VERSION = "v0.5.2"
 
 # ── 核心路径常量 ─────────────────────────────────────────────
-COMFYUI_DIR = os.environ.get("COMFYUI_DIR", "/workspace/ComfyUI")
-COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://localhost:8188")
+# 面板的路径约定: 对外 (UI / 规则数据 / 文件 API) 一律用 "workspace 根相对路径",
+# 即前导 "/" 代表 WORKSPACE_DIR 而非文件系统根。真实绝对路径只在后端内部出现,
+# 由 resolve_workspace_path() 统一换算。
+# 用 `or` 而非 get 的默认值: 环境变量传空串时 Path("").resolve() 会解析成
+# 当前工作目录, 所有状态文件 (.dashboard_env / .sync_rules.json / DB) 都会
+# 落错地方
+WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR") or "/workspace"
+WORKSPACE_ROOT = Path(WORKSPACE_DIR).resolve()
+COMFYUI_DIR = os.environ.get("COMFYUI_DIR") or os.path.join(WORKSPACE_DIR, "ComfyUI")
+COMFYUI_URL = os.environ.get("COMFYUI_URL") or "http://localhost:8188"
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根目录
 CONFIG_FILE = Path(SCRIPT_DIR) / ".civitai_config.json"
 try:
@@ -30,8 +38,65 @@ except (ValueError, TypeError):
 MEILI_URL = "https://search.civitai.com/multi-search"
 MEILI_BEARER = "8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61"
 
+# ── workspace 路径约定换算 ───────────────────────────────────
+def workspace_relative(real) -> str:
+    """真实绝对路径 → workspace 根相对路径 ("/ComfyUI/output")。
+
+    不在 workspace 内的路径原样返回 (调用方自行决定是否展示)。
+    """
+    norm = os.path.normpath(str(real))
+    base = str(WORKSPACE_ROOT)
+    if norm == base:
+        return "/"
+    if norm.startswith(base + os.sep):
+        return "/" + norm[len(base) + 1:]
+    return norm
+
+
+def resolve_workspace_path(
+    raw, *, allow_root: bool = True
+) -> tuple[Path | None, tuple[str, dict] | None]:
+    """workspace 根相对路径 → 真实绝对路径, 并校验未越界。
+
+    接受三种写法, 结果一致:
+    - "/ComfyUI/models"           — 面板约定 (前导 / 即 workspace 根)
+    - "ComfyUI/models"            — 不带前导 /
+    - "/workspace/ComfyUI/models" — 真实绝对路径 (兼容既有调用方)
+
+    仅做字符串规范化, 不解析符号链接 —— models/ 之类目录常被部署脚本
+    symlink 到外部卷, resolve() 会把这类合法目标误判为越界。".." 逃逸
+    仍会被 normpath 折叠后拦下。
+
+    Returns:
+        (Path, None) 成功 / (None, (i18n key, params)) 失败。
+
+        错误不返回文案而是 key + 插值参数 —— 这些错误会经 API 原样送到面板,
+        由前端按 `sync.err.<key>` 翻译 (与 _sync_log 的 key+params 同一套路)。
+    """
+    s = str(raw or "").strip()
+    if not s:
+        return None, ("path_required", {})
+
+    base = str(WORKSPACE_ROOT)
+    norm = os.path.normpath(s)
+    if os.path.isabs(norm) and (norm == base or norm.startswith(base + os.sep)):
+        target = norm
+    else:
+        target = os.path.normpath(os.path.join(base, norm.lstrip(os.sep)))
+
+    if target != base and not target.startswith(base + os.sep):
+        return None, ("path_outside", {"root": WORKSPACE_DIR})
+    if not allow_root and target == base:
+        return None, ("path_is_root", {"root": WORKSPACE_DIR})
+    return Path(target), None
+
+
+# ComfyUI 目录的 workspace 根相对形式 ("/ComfyUI") — 同步模板等对外文案用
+# rstrip: COMFYUI_DIR 恰为 workspace 根时避免拼出 "//models"
+COMFYUI_REL = workspace_relative(COMFYUI_DIR).rstrip("/")
+
 # ── 持久化配置 (.dashboard_env) ──────────────────────────────
-DASHBOARD_ENV_FILE = Path("/workspace/.dashboard_env")
+DASHBOARD_ENV_FILE = WORKSPACE_ROOT / ".dashboard_env"
 
 
 def _load_config():
@@ -251,7 +316,7 @@ def get_extra_model_paths() -> dict[str, list[str]]:
     return result
 
 # ── Setup Wizard ─────────────────────────────────────────────
-SETUP_STATE_FILE = Path("/workspace/.setup_state.json")
+SETUP_STATE_FILE = WORKSPACE_ROOT / ".setup_state.json"
 
 DEFAULT_PLUGINS = [
     {"url": "https://github.com/ltdrdata/ComfyUI-Manager", "name": "ComfyUI-Manager", "required": True},
@@ -329,7 +394,7 @@ def _save_setup_state(state):
 def _is_setup_complete():
     """检查部署是否已完成"""
     if not SETUP_STATE_FILE.exists():
-        if Path("/workspace/ComfyUI/main.py").exists():
+        if (Path(COMFYUI_DIR) / "main.py").exists():
             return True
         return False
     state = _load_setup_state()
@@ -338,30 +403,30 @@ def _is_setup_complete():
 
 # ── Sync 配置路径 ────────────────────────────────────────────
 RCLONE_CONF = Path(os.path.expanduser("~/.config/rclone/rclone.conf"))
-SYNC_RULES_FILE = Path("/workspace/.sync_rules.json")
-SYNC_SETTINGS_FILE = Path("/workspace/.sync_settings.json")
+SYNC_RULES_FILE = WORKSPACE_ROOT / ".sync_rules.json"
+SYNC_SETTINGS_FILE = WORKSPACE_ROOT / ".sync_settings.json"
 
 
 # ── 同步规则模板 ─────────────────────────────────────────────
 SYNC_RULE_TEMPLATES = [
-    {"id": "tpl-pull-workflows",  "name": "⬇️ 下载工作流",        "direction": "pull", "remote_path": "ComfyCarry/workflow",    "local_path": "user/default/workflows", "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-loras",      "name": "⬇️ 下载 LoRA",         "direction": "pull", "remote_path": "ComfyCarry/loras",       "local_path": "models/loras",           "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-checkpoints","name": "⬇️ 下载 Checkpoints",  "direction": "pull", "remote_path": "ComfyCarry/checkpoints", "local_path": "models/checkpoints",     "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-controlnet", "name": "⬇️ 下载 ControlNet",   "direction": "pull", "remote_path": "ComfyCarry/controlnet",  "local_path": "models/controlnet",      "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-embeddings", "name": "⬇️ 下载 Embeddings",   "direction": "pull", "remote_path": "ComfyCarry/embeddings",  "local_path": "models/embeddings",      "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-vae",        "name": "⬇️ 下载 VAE",          "direction": "pull", "remote_path": "ComfyCarry/vae",         "local_path": "models/vae",             "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-upscale",    "name": "⬇️ 下载 Upscale",      "direction": "pull", "remote_path": "ComfyCarry/upscale",     "local_path": "models/upscale_models",  "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-wildcards",  "name": "⬇️ 下载 Wildcards",    "direction": "pull", "remote_path": "ComfyCarry/wildcards",   "local_path": "wildcards",              "method": "copy", "trigger": "deploy"},
-    {"id": "tpl-pull-input",      "name": "⬇️ 下载 Input 素材",   "direction": "pull", "remote_path": "ComfyCarry/input",       "local_path": "input",                  "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-push-output",     "name": "⬆️ 上传输出 (移动)",    "direction": "push", "remote_path": "ComfyCarry/output",          "local_path": "output",                 "method": "move",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
-    {"id": "tpl-push-output-copy","name": "⬆️ 上传输出 (保留本地)","direction": "push", "remote_path": "ComfyCarry/output",          "local_path": "output",                 "method": "copy",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
-    {"id": "tpl-push-workflows",  "name": "⬆️ 备份工作流",        "direction": "push", "remote_path": "ComfyCarry/workflow",     "local_path": "user/default/workflows", "method": "copy",  "trigger": "manual"},
+    {"id": "tpl-pull-workflows",  "name": "下载工作流",        "direction": "pull", "remote_path": "ComfyCarry/workflow",    "local_path": f"{COMFYUI_REL}/user/default/workflows", "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-loras",      "name": "下载 LoRA",         "direction": "pull", "remote_path": "ComfyCarry/loras",       "local_path": f"{COMFYUI_REL}/models/loras",           "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-checkpoints","name": "下载 Checkpoints",  "direction": "pull", "remote_path": "ComfyCarry/checkpoints", "local_path": f"{COMFYUI_REL}/models/checkpoints",     "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-controlnet", "name": "下载 ControlNet",   "direction": "pull", "remote_path": "ComfyCarry/controlnet",  "local_path": f"{COMFYUI_REL}/models/controlnet",      "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-embeddings", "name": "下载 Embeddings",   "direction": "pull", "remote_path": "ComfyCarry/embeddings",  "local_path": f"{COMFYUI_REL}/models/embeddings",      "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-vae",        "name": "下载 VAE",          "direction": "pull", "remote_path": "ComfyCarry/vae",         "local_path": f"{COMFYUI_REL}/models/vae",             "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-upscale",    "name": "下载 Upscale",      "direction": "pull", "remote_path": "ComfyCarry/upscale",     "local_path": f"{COMFYUI_REL}/models/upscale_models",  "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-pull-wildcards",  "name": "下载 Wildcards",    "direction": "pull", "remote_path": "ComfyCarry/wildcards",   "local_path": f"{COMFYUI_REL}/wildcards",              "method": "copy", "trigger": "deploy"},
+    {"id": "tpl-pull-input",      "name": "下载 Input 素材",   "direction": "pull", "remote_path": "ComfyCarry/input",       "local_path": f"{COMFYUI_REL}/input",                  "method": "copy",  "trigger": "deploy"},
+    {"id": "tpl-push-output",     "name": "上传输出 (移动)",    "direction": "push", "remote_path": "ComfyCarry/output",          "local_path": f"{COMFYUI_REL}/output",                 "method": "move",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
+    {"id": "tpl-push-output-copy","name": "上传输出 (保留本地)","direction": "push", "remote_path": "ComfyCarry/output",          "local_path": f"{COMFYUI_REL}/output",                 "method": "copy",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
+    {"id": "tpl-push-workflows",  "name": "备份工作流",        "direction": "push", "remote_path": "ComfyCarry/workflow",     "local_path": f"{COMFYUI_REL}/user/default/workflows", "method": "copy",  "trigger": "manual"},
 ]
 
 # ── Remote 类型表单定义 ──────────────────────────────────────
 REMOTE_TYPE_DEFS = {
     "s3": {
-        "label": "S3 / Cloudflare R2", "icon": "☁️",
+        "label": "S3 / Cloudflare R2",
         "fields": [
             {"key": "provider", "label": "Provider", "type": "select", "options": ["Cloudflare", "AWS", "Minio", "DigitalOcean", "Wasabi", "Other"], "default": "Cloudflare"},
             {"key": "access_key_id", "label": "Access Key ID", "type": "text", "required": True},
@@ -371,7 +436,7 @@ REMOTE_TYPE_DEFS = {
         ],
     },
     "sftp": {
-        "label": "SFTP", "icon": "🖥️",
+        "label": "SFTP",
         "fields": [
             {"key": "host", "label": "Host", "type": "text", "required": True},
             {"key": "port", "label": "Port", "type": "text", "default": "22"},
@@ -381,7 +446,7 @@ REMOTE_TYPE_DEFS = {
         ],
     },
     "webdav": {
-        "label": "WebDAV", "icon": "🌐",
+        "label": "WebDAV",
         "fields": [
             {"key": "url", "label": "WebDAV URL", "type": "text", "required": True},
             {"key": "user", "label": "用户名", "type": "text"},
@@ -390,17 +455,17 @@ REMOTE_TYPE_DEFS = {
         ],
     },
     "onedrive": {
-        "label": "OneDrive", "icon": "📁", "oauth": True,
+        "label": "OneDrive", "oauth": True,
         "fields": [{"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
                      "help": "在本地执行 <code>rclone authorize \"onedrive\"</code> 获取 token JSON"}],
     },
     "drive": {
-        "label": "Google Drive", "icon": "📂", "oauth": True,
+        "label": "Google Drive", "oauth": True,
         "fields": [{"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
                      "help": "在本地执行 <code>rclone authorize \"drive\"</code> 获取 token JSON"}],
     },
     "dropbox": {
-        "label": "Dropbox", "icon": "📦", "oauth": True,
+        "label": "Dropbox", "oauth": True,
         "fields": [{"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
                      "help": "在本地执行 <code>rclone authorize \"dropbox\"</code> 获取 token JSON"}],
     },
@@ -421,7 +486,7 @@ COMPANION_SERVE_ROOT = os.environ.get(
 )
 
 # 已知客户端状态文件 (心跳上报)
-COMPANION_CLIENTS_FILE = Path("/workspace/.companion_clients.json")
+COMPANION_CLIENTS_FILE = WORKSPACE_ROOT / ".companion_clients.json"
 
 
 # ── 实例标签 (尽力取已有实例名配置, 无则空) ─────────────────

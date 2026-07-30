@@ -30,6 +30,18 @@ from ..services.deploy_engine import (
 bp = Blueprint("setup", __name__)
 
 
+# ====================================================================
+# 响应文案 —— key + params, 前端按 `wizard.err.<key>` 翻译
+# (setup 路由复用 wizard 命名空间, vue-i18n.ts 未注册独立的 setup locale)
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `wizard.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
+    body = {"error_key": f"wizard.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
 @bp.route("/api/setup/state")
 def api_setup_state():
     state = _load_setup_state()
@@ -179,7 +191,7 @@ def api_setup_deploy():
 
     ok, msg = start_deploy(state)
     if not ok:
-        return jsonify({"error": msg}), 409
+        return _err("deploy_already_running", 409)
     return jsonify({"ok": True, "message": msg})
 
 

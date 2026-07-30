@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWizardState } from './useWizardState'
 import type { LlmProvider, LlmModel } from '@/types/wizard'
+import { apiErrorText } from '@/utils/apiError'
 
 const WIZARD_LLM_PROVIDERS: LlmProvider[] = [
   { id: 'openai', name: 'OpenAI' },
@@ -79,7 +80,7 @@ export function useWizardLlm() {
           selectModel(models.value[0].id)
         }
       } else {
-        modelsError.value = d.error || t('wizard.step6.fetch_fail')
+        modelsError.value = apiErrorText(d, t('wizard.step6.fetch_fail'))
       }
     } catch (e: any) {
       modelsError.value = `${t('wizard.step6.request_fail')} ${e.message}`

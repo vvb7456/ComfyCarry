@@ -1,4 +1,23 @@
 {
+  "err": {
+    "no_comfyui": "无法连接 ComfyUI，请确认 ComfyUI 正在运行",
+    "parse_failed": "解析响应失败",
+    "missing_id": "缺少 id 字段",
+    "upstream_error": "ComfyUI-Manager 返回 {code}",
+    "install_failed": "安装请求失败：{code}",
+    "uninstall_failed": "卸载请求失败：{code}",
+    "update_failed": "更新请求失败：{code}",
+    "action_failed": "操作失败：{code}",
+    "unknown_needs_files": "unknown 版本需要提供 files 字段",
+    "url_required": "URL 不能为空"
+  },
+  "msg": {
+    "queued_install": "已加入安装队列",
+    "queued_uninstall": "已加入卸载队列",
+    "queued_update": "已加入更新队列",
+    "queued_update_all": "所有插件已加入更新队列",
+    "action_submitted": "操作已提交"
+  },
   "tabs": {
     "git": "Git 安装"
   },
@@ -13,7 +32,7 @@
     "disable": "禁用",
     "version": "版本",
     "load_failed": "获取已安装列表失败",
-    "stats_text": "共 {total} 个插件, {enabled} 个启用, {update} 个有更新 | 显示 {shown} 个",
+    "stats_text": "共 {total} 个插件，{enabled} 个启用，{update} 个有更新 | 显示 {shown} 个",
     "no_match": "没有匹配的插件",
     "installed_badge": "已安装"
   },
@@ -51,6 +70,6 @@
     "no_version_nightly": "无版本信息 (可能为 nightly 安装)"
   },
   "queue": {
-    "status": "队列: {done}/{total} 完成"
+    "status": "队列：{done}/{total} 完成"
   }
 }

@@ -134,10 +134,13 @@ class PublicTunnelClient:
             )
             data = resp.json()
         except requests.RequestException as e:
-            raise PublicTunnelError(f"无法连接 API: {e}")
+            raise PublicTunnelError(f"无法连接 API: {e}",
+                                    key="public_api_unreachable",
+                                    params={"detail": str(e)})
 
         if not data.get("ok"):
-            raise PublicTunnelError(data.get("error", "注册失败"))
+            raise PublicTunnelError(data.get("error") or "register failed",
+                                    key="" if data.get("error") else "public_register_failed")
 
         self.random_id = data["random_id"]
         self.tunnel_token = data["tunnel_token"]
@@ -211,10 +214,10 @@ class PublicTunnelClient:
         从持久化状态恢复 (重启后调用)。
         不重新注册，只恢复内存状态 + 确保 cloudflared 运行。
 
-        Returns: { "ok": True, "random_id": "..." } 或 {"ok": False, "error": "..."}
+        Returns: {"ok": True, "random_id": "..."} 或 {"ok": False, "error_key": "..."}
         """
         if not self.random_id or not self.tunnel_token:
-            return {"ok": False, "error": "无持久化状态可恢复"}
+            return {"ok": False, "error_key": "tunnel.err.public_no_state"}
 
         # 确保 cloudflared 在运行
         if not self._is_cloudflared_running():
@@ -372,5 +375,12 @@ class PublicTunnelClient:
 
 
 class PublicTunnelError(Exception):
-    """公共 Tunnel 操作错误"""
-    pass
+    """公共 Tunnel 操作错误。
+
+    key/params: 我们自己判定的错误带 i18n key (路由按 `tunnel.err.<key>` 回传);
+    公共 Tunnel API 回的报错不带 key —— 那是上游原文, 当 {detail} 透出。
+    """
+    def __init__(self, message: str, *, key: str = "", params: dict | None = None):
+        super().__init__(message)
+        self.key = key
+        self.params = params or {}

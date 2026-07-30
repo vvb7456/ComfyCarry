@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
+import { apiMessageText } from '@/utils/apiError'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
@@ -31,13 +32,13 @@ async function install() {
   if (!gitUrl.value.startsWith('http')) { toast(t('plugins.git.invalid_url'), 'warning'); return }
   installing.value = true
   status.value = null
-  const d = await post<{ message: string }>('/api/plugins/install_git', { url: gitUrl.value })
+  const d = await post<{ message?: string; message_key?: string }>('/api/plugins/install_git', { url: gitUrl.value })
   installing.value = false
   if (!d) {
     status.value = { ok: false, message: t('plugins.git.request_failed') }
     return
   }
-  status.value = { ok: true, message: d.message }
+  status.value = { ok: true, message: apiMessageText(d) }
   gitUrl.value = ''
   emit('installed')
 }

@@ -19,6 +19,31 @@ from ..config import get_config, set_config
 
 logger = logging.getLogger(__name__)
 
+
+class LLMError(ValueError):
+    """带 i18n key 的 LLM 错误。
+
+    我们自己判定的错误带 key (路由/SSE 按 `llm.err.<key>` 回传给前端翻译);
+    Provider 抛出的原始异常不带 key —— 那是上游英文报错, 当 detail 原样透出。
+    继承 ValueError: 调用方原有的 `except ValueError` 分支不用改。
+    """
+    def __init__(self, message: str, *, key: str = "", params: dict | None = None):
+        super().__init__(message)
+        self.key = key
+        self.params = params or {}
+
+
+def _sse_error(e: Exception) -> str:
+    """异常 → SSE error 事件。带 key 的走 key, 否则回落原文 message。"""
+    key = getattr(e, "key", "")
+    if key:
+        return ('data: ' + json.dumps({
+            "type": "error", "message_key": f"llm.err.{key}",
+            "message_params": getattr(e, "params", {}) or {},
+        }) + '\n\n')
+    return 'data: ' + json.dumps({"type": "error", "message": str(e)}) + '\n\n'
+
+
 # ── 结构化输出 Schema ─────────────────────────────────────────────────────────
 
 class PromptOutput(BaseModel):
@@ -512,7 +537,8 @@ def get_provider_from_config() -> BaseLLMProvider:
     """从当前持久化配置创建 Provider 实例"""
     cfg = get_llm_config()
     if not cfg["provider"] or not cfg["api_key"]:
-        raise ValueError("LLM 未配置，请在设置中配置 Provider 和 API Key")
+        raise LLMError("LLM 未配置，请在设置中配置 Provider 和 API Key",
+                       key="not_configured")
     return create_provider(
         provider_id=cfg["provider"],
         api_key=cfg["api_key"],
@@ -573,7 +599,8 @@ def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: st
 
     valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
     if target not in valid_targets:
-        yield f'data: {json.dumps({"type": "error", "message": f"Unknown target: {target}"})}\n\n'
+        yield _sse_error(LLMError("", key="unsupported_target",
+                                  params={"target": target}))
         return
 
     messages = _build_prompt_messages(user_input, target, image)
@@ -592,7 +619,7 @@ def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: st
             full_text += chunk
             yield f'data: {json.dumps({"type": "chunk", "content": chunk})}\n\n'
     except Exception as e:
-        yield f'data: {json.dumps({"type": "error", "message": str(e)})}\n\n'
+        yield _sse_error(e)
         return
 
     # 解析完整输出
@@ -601,7 +628,8 @@ def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: st
         result = validate_prompt_output(result)
         yield f'data: {json.dumps({"type": "result", "data": result})}\n\n'
     except Exception as e:
-        yield f'data: {json.dumps({"type": "error", "message": f"JSON 解析失败: {e}"})}\n\n'
+        yield _sse_error(LLMError("", key="json_parse_failed",
+                                  params={"detail": str(e)}))
 
     yield "data: [DONE]\n\n"
 
@@ -625,7 +653,7 @@ def chat_stream(messages: list[dict], system: str = "", **kwargs):
             full_text += chunk
             yield f'data: {json.dumps({"type": "chunk", "content": chunk})}\n\n'
     except Exception as e:
-        yield f'data: {json.dumps({"type": "error", "message": str(e)})}\n\n'
+        yield _sse_error(e)
         return
 
     yield f'data: {json.dumps({"type": "done", "content": full_text})}\n\n'

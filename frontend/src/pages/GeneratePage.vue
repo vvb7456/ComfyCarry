@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
 import { useToast } from '@/composables/useToast'
+import { apiErrorText } from '@/utils/apiError'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
@@ -361,7 +362,7 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     const upRes = await fetch('/api/generate/upload_image', { method: 'POST', body: form })
     if (!upRes.ok) {
       const body = await upRes.json().catch(() => ({}))
-      throw new Error((body as Record<string, string>).error || `Upload failed (${upRes.status})`)
+      throw new Error(apiErrorText(body, `Upload failed (${upRes.status})`))
     }
     const upData = await upRes.json() as { filename?: string }
     // 后端返回 200 但 body 缺 filename 时视为失败 —— 否则会写入 undefined 并误报成功,

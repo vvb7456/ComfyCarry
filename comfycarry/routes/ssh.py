@@ -31,6 +31,38 @@ SSHD_CONFIG_FILE = "/etc/ssh/sshd_config"
 SSHD_LOG_FILE = "/var/log/sshd.log"
 
 
+# ====================================================================
+# 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/ssh.json)
+#
+# /api/ssh/* 的唯一消费方是面板前端, 所以这里不再回传中文成品文案:
+# 回传中文的话英文 locale 下 toast 里会直接冒出中文。契约与 sync 路由的
+# _err 完全一致, 前端 apiErrorText() / t() 负责渲染。前端缺条目时会原样
+# 显示 key, 开发期一眼可见。
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `ssh.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
+
+    形参位置化 (`/`): 插值参数里有 key / status 这种名字, 不然会和
+    函数自己的形参撞车。
+    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
+    `**params` 静默吞掉, 顶层字段丢失。
+    """
+    body = {"error_key": f"ssh.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
+def _ok(key: str, /, **extra):
+    """成功响应。前端按 `ssh.msg.<key>` 翻译 message_key。"""
+    body = {"ok": True, "message_key": f"ssh.msg.{key}"}
+    params = extra.pop("params", None)
+    if params:
+        body["message_params"] = params
+    body.update(extra)
+    return jsonify(body)
+
+
 def restore_ssh_config():
     """
     Dashboard 启动时从 .dashboard_env 恢复 SSH 配置。
@@ -459,7 +491,7 @@ def ssh_keys_add():
     data = request.get_json(silent=True) or {}
     raw_input = data.get("keys", "").strip()
     if not raw_input:
-        return jsonify({"error": "未提供公钥"}), 400
+        return _err("no_key")
 
     existing = _load_authorized_keys()
     existing_fps = {k["fingerprint"] for k in existing if k["fingerprint"]}
@@ -505,14 +537,14 @@ def ssh_keys_delete():
     data = request.get_json(silent=True) or {}
     fingerprint = data.get("fingerprint", "").strip()
     if not fingerprint:
-        return jsonify({"error": "未指定 fingerprint"}), 400
+        return _err("no_fingerprint")
 
     keys = _load_authorized_keys()
     original_count = len(keys)
     keys = [k for k in keys if k["fingerprint"] != fingerprint]
 
     if len(keys) == original_count:
-        return jsonify({"error": "未找到匹配的公钥"}), 404
+        return _err("key_not_found", 404)
 
     _save_keys_to_file(keys)
     _persist_keys_to_config(keys)
@@ -525,7 +557,7 @@ def ssh_keys_delete():
         "comment": k["comment"], "source": k["source"],
     } for k in keys]
 
-    return jsonify({"keys": safe_keys, "deleted": True})
+    return jsonify({"ok": True, "keys": safe_keys, "deleted": True})
 
 
 @bp.route("/api/ssh/password", methods=["POST"])
@@ -534,24 +566,24 @@ def ssh_set_password():
     data = request.get_json(silent=True) or {}
     password = data.get("password", "")
     if not password:
-        return jsonify({"error": "密码不能为空"}), 400
+        return _err("password_empty")
 
     # 同步模式: 使用 ComfyCarry Dashboard 密码
     is_sync = password == "_sync_dashboard_password_"
     if is_sync:
         password = _get_config("password", "")
         if not password:
-            return jsonify({"error": "ComfyCarry 密码未设置，无法同步"}), 400
+            return _err("password_not_set")
 
     if len(password) < 4:
-        return jsonify({"error": "密码长度至少 4 位"}), 400
+        return _err("password_too_short")
 
     # 设置密码
     code, _, err = _run(
         f"echo 'root:{password}' | chpasswd", timeout=5
     )
     if code != 0:
-        return jsonify({"error": f"设置密码失败: {err}"}), 500
+        return _err("set_password_failed", 500, detail=err)
 
     # 持久化密码与同步标志到 .dashboard_env
     _set_config("ssh_password", password)
@@ -573,12 +605,12 @@ def ssh_start():
     """启动 sshd"""
     running, _ = _sshd_running()
     if running:
-        return jsonify({"ok": True, "message": "sshd 已在运行"})
+        return _ok("already_running")
 
     _run("mkdir -p /run/sshd", timeout=2)
     code, _, err = _run(f"/usr/sbin/sshd -E {SSHD_LOG_FILE}", timeout=5)
     if code != 0:
-        return jsonify({"error": f"启动失败: {err}"}), 500
+        return _err("start_failed", 500, detail=err)
 
     running, pid = _sshd_running()
     return jsonify({"ok": True, "running": running, "pid": pid})
@@ -589,11 +621,11 @@ def ssh_stop():
     """停止 sshd"""
     running, _ = _sshd_running()
     if not running:
-        return jsonify({"ok": True, "message": "sshd 未在运行"})
+        return _ok("not_running")
 
     stopped = _stop_sshd()
     if not stopped:
-        return jsonify({"error": "停止 sshd 失败"}), 500
+        return _err("stop_failed", 500)
 
     return jsonify({"ok": True, "running": False})
 
@@ -603,7 +635,7 @@ def ssh_restart():
     """重启 sshd"""
     ok = _do_restart_sshd()
     if not ok:
-        return jsonify({"error": "重启 sshd 失败"}), 500
+        return _err("restart_failed", 500)
 
     running, pid = _sshd_running()
     return jsonify({"ok": True, "running": running, "pid": pid})

@@ -11,6 +11,7 @@ import { ref, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useClipboard } from '@/composables/useClipboard'
+import { apiMessageText } from '@/utils/apiError'
 import { useI18n } from 'vue-i18n'
 
 export interface LlmResult {
@@ -229,7 +230,9 @@ export function useLlmAssist(): UseLlmAssistReturn {
           } else if (evt.type === 'result') {
             result.value = evt.data
           } else if (evt.type === 'error') {
-            toast(evt.message || t('generate.llm_modal.failed'), 'error')
+            // SSE 的 error 事件同样是 key + params (llm_engine._sse_error),
+            // 上游 Provider 的原始报错则只有 message
+            toast(apiMessageText(evt, t('generate.llm_modal.failed')), 'error')
           }
         } catch { /* ignore parse error */ }
       }

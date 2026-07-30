@@ -22,6 +22,7 @@ import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useClipboard } from '@/composables/useClipboard'
+import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
 import type { SSHKey, SSHStatus } from '@/types/ssh'
 
 defineOptions({ name: 'SSHPage' })
@@ -159,13 +160,13 @@ const refresher = useAutoRefresh(loadStatus, 10000)
 async function sshAction(action: 'start' | 'stop' | 'restart') {
   if (action === 'stop' && !await confirm({ message: t('ssh.confirm.stop') })) return
   actionLoading.value = action
-  const data = await post<{ message?: string; error?: string }>(`/api/ssh/${action}`, {})
+  const data = await post<ApiErrorBody & { ok?: boolean; running?: boolean; pid?: number | null }>(`/api/ssh/${action}`, {})
   actionLoading.value = null
   if (!data) return
-  if (data.error) {
-    toast(data.error, 'error')
+  if (!data?.ok) {
+    toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
   } else {
-    toast(data.message || t('ssh.toast.action_ok'), 'success')
+    toast(apiMessageText(data, t('ssh.toast.action_ok')), 'success')
     await loadStatus()
     await loadConnectCmd()
   }
@@ -191,10 +192,10 @@ async function addKey() {
 
 async function deleteKey(fingerprint: string) {
   if (!await confirm({ message: t('ssh.confirm.delete_key'), variant: 'danger' })) return
-  const data = await del<{ error?: string }>('/api/ssh/keys', { fingerprint })
+  const data = await del<ApiErrorBody & { ok?: boolean; keys?: SSHKey[] }>('/api/ssh/keys', { fingerprint })
   if (!data) return
-  if (data.error) {
-    toast(data.error, 'error')
+  if (!data?.ok) {
+    toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
   } else {
     toast(t('ssh.toast.key_deleted'), 'success')
     keys.value = keys.value.filter(k => k.fingerprint !== fingerprint)
@@ -221,10 +222,10 @@ async function setPassword() {
     password = pwNew.value
   }
   pwSubmitting.value = true
-  const data = await post<{ error?: string; sshd_restarted?: boolean }>('/api/ssh/password', { password })
+  const data = await post<ApiErrorBody & { ok?: boolean; sshd_restarted?: boolean }>('/api/ssh/password', { password })
   pwSubmitting.value = false
   if (!data) return
-  if (data.error) { toast(data.error, 'error'); return }
+  if (!data?.ok) { toast(apiErrorText(data, t('ssh.err.fallback')), 'error'); return }
   let msg = pwSync.value ? t('ssh.password.synced') : t('ssh.password.set_success')
   if (data.sshd_restarted) msg += t('ssh.password.sshd_restarted_suffix')
   toast(msg, 'success')

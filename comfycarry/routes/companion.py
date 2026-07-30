@@ -1,7 +1,12 @@
 """
 ComfyCarry — Companion 客户端面板后端 (纯 Python)
 
-藍图前缀 /api/companion, JSON 响应, 错误统一 {"error": "..."} + HTTP 状态码。
+藍图前缀 /api/companion, JSON 响应 + HTTP 状态码。
+
+错误文案分两套, 按消费方划分:
+  - 面板前端调的 (/clients 的 DELETE): key + params, 前端翻译;
+  - 桌面客户端调的 (connect / heartbeat / jobs*): 原文 —— 客户端没有 locale
+    表, 而且它只看状态码, 回 key 只会让排障时看到一串没人翻译的标识符。
 契约: docs/COMPANION_DESKTOP_APP_SPEC.md §2.2–§2.5。
 
 面板对 companion 只做两件事:
@@ -31,6 +36,12 @@ from ..services import companion_serve
 
 bp = Blueprint("companion", __name__)
 log = logging.getLogger("comfycarry.companion")
+
+
+def _err(key: str, status: int = 400, /, **params):
+    """面板前端调的端点用: 错误按 `sync.err.<key>` 翻译 (companion 复用 sync 命名空间)。"""
+    return jsonify({"error_key": f"sync.err.{key}", "error_params": params}), status
+
 
 # ── 客户端状态文件读写 ───────────────────────────────────────
 _clients_lock = threading.Lock()
@@ -182,11 +193,14 @@ def api_companion_clients():
 
 @bp.route("/api/companion/clients/<client_id>", methods=["DELETE"])
 def api_companion_client_forget(client_id):
-    """忘记客户端: 从 clients 文件删除该 client_id 的记录。"""
+    """忘记客户端: 从 clients 文件删除该 client_id 的记录。
+
+    这是本蓝图里唯一由面板前端调用的写端点, 所以错误走 key + params (见模块 docstring)。
+    """
     with _clients_lock:
         clients = _load_clients()
         if client_id not in clients:
-            return jsonify({"error": "客户端不存在"}), 404
+            return _err("client_not_found", 404)
         del clients[client_id]
         _save_clients(clients)
     return jsonify({"ok": True})

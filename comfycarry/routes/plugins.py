@@ -58,6 +58,37 @@ def _cm_post(path, json_data=None, text_data=None, timeout=30):
 
 
 # ====================================================================
+# 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/plugins.json)
+#
+# /api/plugins/* 的唯一消费方是面板前端, 错误回传 error_key + error_params,
+# 成功回传 message_key + message_params, 前端按 plugins.err.<key> /
+# plugins.msg.<key> 翻译; 未接 i18n 的端点继续回传 error 原文, apiErrorText()
+# / apiMessageText() 对两种后端都安全。
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `plugins.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
+
+    形参位置化 (`/`): 插值参数里有 code 这种名字, 不然会和函数自己的形参撞车。
+    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
+    `**params` 静默吞掉, 顶层字段丢失。
+    """
+    body = {"error_key": f"plugins.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
+def _ok(key: str, /, **extra):
+    """成功响应。前端按 `plugins.msg.<key>` 翻译 message_key。"""
+    body = {"ok": True, "message_key": f"plugins.msg.{key}"}
+    params = extra.pop("params", None)
+    if params:
+        body["message_params"] = params
+    body.update(extra)
+    return jsonify(body)
+
+
+# ====================================================================
 # 路由
 # ====================================================================
 
@@ -65,13 +96,13 @@ def _cm_post(path, json_data=None, text_data=None, timeout=30):
 def api_plugins_installed():
     r = _cm_get("/customnode/installed", params={"mode": "default"})
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI，请确认 ComfyUI 正在运行"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code != 200:
-        return jsonify({"error": f"ComfyUI-Manager 返回 {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("upstream_error", _safe_upstream_code(r.status_code), code=r.status_code)
     try:
         return jsonify(r.json())
     except Exception:
-        return jsonify({"error": "解析响应失败"}), 500
+        return _err("parse_failed", 500)
 
 
 @bp.route("/api/plugins/available")
@@ -79,26 +110,26 @@ def api_plugins_available():
     r = _cm_get("/customnode/getlist",
                 params={"mode": "remote", "skip_update": "true"}, timeout=60)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI，请确认 ComfyUI 正在运行"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code != 200:
-        return jsonify({"error": f"ComfyUI-Manager 返回 {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("upstream_error", _safe_upstream_code(r.status_code), code=r.status_code)
     try:
         return jsonify(r.json())
     except Exception:
-        return jsonify({"error": "解析响应失败"}), 500
+        return _err("parse_failed", 500)
 
 
 @bp.route("/api/plugins/versions/<path:node_name>")
 def api_plugins_versions(node_name):
     r = _cm_get(f"/customnode/versions/{node_name}")
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code != 200:
-        return jsonify({"error": f"返回 {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("upstream_error", _safe_upstream_code(r.status_code), code=r.status_code)
     try:
         return jsonify(r.json())
     except Exception:
-        return jsonify({"error": "解析响应失败"}), 500
+        return _err("parse_failed", 500)
 
 
 @bp.route("/api/plugins/fetch_updates")
@@ -106,7 +137,7 @@ def api_plugins_fetch_updates():
     r = _cm_get("/customnode/fetch_updates",
                 params={"mode": "remote"}, timeout=120)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     return jsonify({"has_updates": r.status_code == 201,
                     "status_code": r.status_code})
 
@@ -122,7 +153,7 @@ def api_plugins_install():
     data = request.get_json(force=True) or {}
     plugin_id = data.get("id", "").strip()
     if not plugin_id:
-        return jsonify({"error": "缺少 id 字段"}), 400
+        return _err("missing_id", 400)
     version = data.get("version", "unknown")
     payload = {
         "id": plugin_id,
@@ -139,14 +170,14 @@ def api_plugins_install():
     if data.get("files"):
         payload["files"] = data["files"]
     elif version == "unknown":
-        return jsonify({"error": "unknown 版本需要提供 files 字段"}), 400
+        return _err("unknown_needs_files", 400)
     r = _cm_post("/manager/queue/install", json_data=payload)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"安装请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_get("/manager/queue/start")
-    return jsonify({"ok": True, "message": "已加入安装队列"})
+    return _ok("queued_install")
 
 
 @bp.route("/api/plugins/uninstall", methods=["POST"])
@@ -154,7 +185,7 @@ def api_plugins_uninstall():
     data = request.get_json(force=True) or {}
     plugin_id = data.get("id", "").strip()
     if not plugin_id:
-        return jsonify({"error": "缺少 id 字段"}), 400
+        return _err("missing_id", 400)
     payload = {
         "id": plugin_id,
         "version": data.get("version", "unknown"),
@@ -164,11 +195,11 @@ def api_plugins_uninstall():
         payload["files"] = data["files"]
     r = _cm_post("/manager/queue/uninstall", json_data=payload)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"卸载请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("uninstall_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_get("/manager/queue/start")
-    return jsonify({"ok": True, "message": "已加入卸载队列"})
+    return _ok("queued_uninstall")
 
 
 @bp.route("/api/plugins/update", methods=["POST"])
@@ -176,7 +207,7 @@ def api_plugins_update():
     data = request.get_json(force=True) or {}
     plugin_id = data.get("id", "").strip()
     if not plugin_id:
-        return jsonify({"error": "缺少 id 字段"}), 400
+        return _err("missing_id", 400)
     payload = {
         "id": plugin_id,
         "version": data.get("version", "unknown"),
@@ -184,11 +215,11 @@ def api_plugins_update():
     }
     r = _cm_post("/manager/queue/update", json_data=payload)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"更新请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("update_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_get("/manager/queue/start")
-    return jsonify({"ok": True, "message": "已加入更新队列"})
+    return _ok("queued_update")
 
 
 @bp.route("/api/plugins/update_all", methods=["POST"])
@@ -196,9 +227,9 @@ def api_plugins_update_all():
     r = _cm_get("/manager/queue/update_all",
                 params={"mode": "remote"}, timeout=120)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     _cm_get("/manager/queue/start")
-    return jsonify({"ok": True, "message": "所有插件已加入更新队列"})
+    return _ok("queued_update_all")
 
 
 @bp.route("/api/plugins/disable", methods=["POST"])
@@ -206,7 +237,7 @@ def api_plugins_disable():
     data = request.get_json(force=True) or {}
     plugin_id = data.get("id", "").strip()
     if not plugin_id:
-        return jsonify({"error": "缺少 id 字段"}), 400
+        return _err("missing_id", 400)
     payload = {
         "id": plugin_id,
         "version": data.get("version", "unknown"),
@@ -214,11 +245,11 @@ def api_plugins_disable():
     }
     r = _cm_post("/manager/queue/disable", json_data=payload)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"操作失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("action_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_get("/manager/queue/start")
-    return jsonify({"ok": True, "message": "操作已提交"})
+    return _ok("action_submitted")
 
 
 @bp.route("/api/plugins/install_git", methods=["POST"])
@@ -231,7 +262,7 @@ def api_plugins_install_git():
     data = request.get_json(force=True) or {}
     url = data.get("url", "").strip()
     if not url:
-        return jsonify({"error": "URL 不能为空"}), 400
+        return _err("url_required", 400)
     payload = {
         "id": "",
         "version": "unknown",
@@ -244,18 +275,18 @@ def api_plugins_install_git():
     }
     r = _cm_post("/manager/queue/install", json_data=payload, timeout=30)
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     if r.status_code not in (200, 201):
-        return jsonify({"error": f"安装请求失败: {r.status_code}"}), _safe_upstream_code(r.status_code)
+        return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_get("/manager/queue/start")
-    return jsonify({"ok": True, "message": "已加入安装队列"})
+    return _ok("queued_install")
 
 
 @bp.route("/api/plugins/queue_status")
 def api_plugins_queue_status():
     r = _cm_get("/manager/queue/status")
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     try:
         return jsonify(r.json())
     except Exception:
@@ -267,5 +298,5 @@ def api_plugins_queue_status():
 def api_plugins_manager_version():
     r = _cm_get("/manager/version")
     if r is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 502
+        return _err("no_comfyui", 502)
     return jsonify({"version": r.text.strip()})

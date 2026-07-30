@@ -1,7 +1,21 @@
 {
+  "err": {
+    "deploy_already_running": "Deployment is already in progress"
+  },
   "header": "ComfyCarry Setup Wizard",
   "subtitle": "<a href=\"https://github.com/vvb7456/ComfyCarry\" target=\"_blank\" style=\"color:var(--ac);text-decoration:none\">GitHub</a> · All-in-one ComfyUI Management on RunPod / Vast.ai",
-  "step_labels": ["Deploy", "Password/SSH", "Tunnel", "Cloud Storage", "Sync Rules", "CivitAI", "LLM", "Plugins", "Attention", "Confirm"],
+  "step_labels": [
+    "Deploy",
+    "Password/SSH",
+    "Tunnel",
+    "Cloud Storage",
+    "Sync Rules",
+    "CivitAI",
+    "LLM",
+    "Plugins",
+    "Attention",
+    "Confirm"
+  ],
   "btn": {
     "next": "Next",
     "prev": "Previous",
@@ -26,8 +40,7 @@
     "import": {
       "title": "Restore Settings",
       "desc": "Restore all settings from a previously exported config file to quickly rebuild your workspace",
-      "skip_hint": "Skip manual configuration",
-      "time_hint": "Skip manual configuration"
+      "skip_hint": "Skip manual configuration"
     },
     "import_upload": {
       "hint": "Upload a previously exported <code>comfycarry-config.json</code> configuration file",
@@ -137,9 +150,6 @@
     "trigger_deploy": "On deploy",
     "trigger_watch": "Watch",
     "trigger_manual": "Manual",
-    "remote_path": "Remote Path",
-    "remote_path_placeholder": "Remote path",
-
     "selected_n": "{n} selected",
     "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."

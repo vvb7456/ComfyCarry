@@ -76,10 +76,17 @@ DEFAULT_SERVICES = get_default_services()
 
 
 class CFAPIError(Exception):
-    """Cloudflare API 错误"""
-    def __init__(self, message: str, code: int = 0):
+    """Cloudflare API 错误。
+
+    key/params: 我们自己判定的错误带 i18n key (路由按 `tunnel.err.<key>` 回传);
+    CF API 原样透出的报错不带 key —— 它是英文原文, 直接当 {detail} 显示比造键有用。
+    """
+    def __init__(self, message: str, code: int = 0, *,
+                 key: str = "", params: dict | None = None):
         super().__init__(message)
         self.code = code
+        self.key = key
+        self.params = params or {}
 
 
 class TunnelManager:
@@ -102,6 +109,10 @@ class TunnelManager:
         """
         验证 Token 权限。
         Returns: (ok, info_dict)
+
+        info_dict 里的文案一律 key + params (路由原样并进响应体), 由前端翻译 ——
+        这个结果直接显示在面板/向导的校验结果条上, 回中文成品文案的话英文
+        locale 下会冒中文。
         """
         try:
             # 1. Account 访问 (同时验证 token 有效性)
@@ -115,15 +126,21 @@ class TunnelManager:
                          params={"per_page": 1})
 
             return True, {
-                "message": "Token 验证通过",
+                "message_key": "tunnel.msg.token_valid",
                 "account_name": account_name,
                 "zone_status": zone_status,
             }
 
         except CFAPIError as e:
-            return False, {"message": str(e)}
+            if e.key:
+                return False, {"error_key": f"tunnel.err.{e.key}",
+                               "error_params": e.params}
+            # CF API 原文 (英文) 当 detail 透出
+            return False, {"error_key": "tunnel.err.internal",
+                           "error_params": {"detail": str(e)}}
         except requests.RequestException as e:
-            return False, {"message": f"网络错误: {e}"}
+            return False, {"error_key": "tunnel.err.network",
+                           "error_params": {"detail": str(e)}}
 
     def ensure(self, services: Optional[List[dict]] = None) -> dict:
         """
@@ -306,7 +323,7 @@ class TunnelManager:
         """获取 account_id 和 account_name"""
         accounts = self._cf_get("/accounts", params={"per_page": 5})
         if not accounts:
-            raise CFAPIError("无法获取 CF 账户信息")
+            raise CFAPIError("无法获取 CF 账户信息", key="no_account")
         # 返回第一个有 tunnel 权限的账户
         return accounts[0]["id"], accounts[0]["name"]
 
@@ -314,7 +331,9 @@ class TunnelManager:
         """获取 zone_id 和 zone_status"""
         zones = self._cf_get("/zones", params={"name": self.domain, "per_page": 1})
         if not zones:
-            raise CFAPIError(f"域名 {self.domain} 不在此账户中")
+            raise CFAPIError(f"域名 {self.domain} 不在此账户中",
+                             key="domain_not_in_account",
+                             params={"domain": self.domain})
         return zones[0]["id"], zones[0]["status"]
 
     def _find_tunnel(self, account_id: str, name: str) -> Optional[dict]:

@@ -1,0 +1,7 @@
+{
+  "err": {
+    "invalid_action": "Invalid action",
+    "invalid_service": "Invalid service name",
+    "internal": "Operation failed: {detail}"
+  }
+}

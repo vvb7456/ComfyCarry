@@ -1,4 +1,18 @@
 {
+  "err": {
+    "internal": "服务器内部错误：{detail}",
+    "missing_parent": "缺少 'parent' 参数",
+    "texts_invalid": "texts 必须为数组 (最多 200 项)",
+    "invalid_history_type": "type 参数无效，必须为：all|history|favorite",
+    "no_json_body": "请求体不能为空",
+    "positive_or_negative_required": "positive 或 negative 至少需要一项",
+    "no_valid_fields": "没有可更新的有效字段",
+    "missing_ids": "缺少 'ids' 数组",
+    "ids_must_be_int_array": "'ids' 必须为整数数组",
+    "import_already_running": "导入已在进行中",
+    "no_source": "提示词库数据源不可用",
+    "missing_text": "缺少 'text' 参数"
+  },
   "editor": {
     "title": "提示词编辑器",
     "positive": "正向提示词",

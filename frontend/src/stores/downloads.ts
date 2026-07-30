@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
+import { apiErrorText, apiMessageText } from '@/utils/apiError'
 import type { PendingFile, DirOption } from '@/components/models/DownloadDirModal.vue'
 
 /** 后端 409 needs_classification 的载荷 —— 等待用户裁决目录的一次下载提交。 */
@@ -208,7 +209,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        toast(d?.error || `HTTP ${res.status}`, 'error')
+        toast(apiErrorText(d, `HTTP ${res.status}`), 'error')
         favorites.value = prev
         return false
       }
@@ -230,7 +231,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch(`/api/favorites/${encodeURIComponent(key)}`, { method: 'DELETE' })
       if (!res.ok && res.status !== 404) {
         const d = await res.json().catch(() => ({}))
-        toast(d?.error || `HTTP ${res.status}`, 'error')
+        toast(apiErrorText(d, `HTTP ${res.status}`), 'error')
         favorites.value = prev
       }
     } catch (e: unknown) {
@@ -253,7 +254,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch(`/api/favorites?model_id=${encodeURIComponent(String(modelId))}`, { method: 'DELETE' })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        toast(d?.error || `HTTP ${res.status}`, 'error')
+        toast(apiErrorText(d, `HTTP ${res.status}`), 'error')
         favorites.value = prev
       }
     } catch (e: unknown) {
@@ -269,7 +270,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch('/api/favorites', { method: 'DELETE' })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        toast(d?.error || `HTTP ${res.status}`, 'error')
+        toast(apiErrorText(d, `HTTP ${res.status}`), 'error')
         favorites.value = prev
       }
     } catch (e: unknown) {
@@ -306,7 +307,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        toast(d?.error || `HTTP ${res.status}`, 'error')
+        toast(apiErrorText(d, `HTTP ${res.status}`), 'error')
         favorites.value = prev
       }
     } catch (e: unknown) {
@@ -588,6 +589,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     let result: {
       download_id?: string; message?: string; error?: string; existed?: boolean
+      error_key?: string; error_params?: Record<string, unknown>
+      message_key?: string; message_params?: Record<string, unknown>
       needs_classification?: boolean
       probe_auth?: boolean
       pending_files?: PendingFile[]
@@ -616,7 +619,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       // 不创建下载任务, 不弹目录选择 modal, 仅 toast 错误。
       if (res.status === 403 && result?.probe_auth) {
         clearSubmitting(vid)
-        toast(result?.error || '该文件需付费或无权限下载', 'error')
+        toast(apiErrorText(result, t('models.err.dl_probe_auth')), 'error')
         await refreshStatus()
         return
       }
@@ -636,7 +639,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       }
       if (!res.ok) {
         clearSubmitting(vid)
-        toast(result?.error || `HTTP ${res.status}`, 'error')
+        toast(apiErrorText(result, `HTTP ${res.status}`), 'error')
         await refreshStatus()
         return
       }
@@ -647,20 +650,20 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
 
     if (!result) { clearSubmitting(vid); return }
-    if (result.error) {
+    if (result.error_key || result.error) {
       clearSubmitting(vid)
-      toast(result.error, 'error')
+      toast(apiErrorText(result), 'error')
       await refreshStatus()
       return
     }
     if (result.existed) {
-      toast(result.message || t('models.downloads.already_exists') || 'Already exists', 'warning')
+      toast(apiMessageText(result, t('models.downloads.already_exists')), 'warning')
       await refreshStatus()
       clearSubmitting(vid)
       return
     }
 
-    toast(result.message || t('models.downloads.started') || 'Download started', 'success')
+    toast(apiMessageText(result, t('models.downloads.started')), 'success')
     startPolling()
     await refreshStatus()
     clearSubmitting(vid)
@@ -709,7 +712,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
         })
         const data = await res.json()
         clearSubmitting(vid)
-        if (res.ok && !data.error) ok++
+        // 提交失败也会回 200 (响应体带 task 快照), 所以要看 error_key
+        if (res.ok && !data.error_key && !data.error) ok++
         else fail++
       } catch {
         clearSubmitting(vid)
@@ -745,10 +749,10 @@ export const useDownloadsStore = defineStore('downloads', () => {
         headers: { 'Content-Type': 'application/json' },
       })
       const data = await res.json()
-      if (data?.error) {
-        toast(data.error, 'error')
+      if (data?.error_key || data?.error) {
+        toast(apiErrorText(data), 'error')
       } else {
-        toast(data.message || t('models.downloads.started') || 'Retrying', 'success')
+        toast(apiMessageText(data, t('models.downloads.started')), 'success')
         startPolling()
       }
     } catch (e: unknown) {

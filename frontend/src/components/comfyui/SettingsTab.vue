@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { apiErrorText, apiMessageText, apiWarningText } from '@/utils/apiError'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -104,12 +105,14 @@ async function switchVersion(tag: string) {
       install_deps: installDeps,
     })
     if (d?.ok) {
-      toast(d.message || t('comfyui.settings.switch_success'), 'success')
-      if (d.warning) toast(d.warning, 'warning')
+      toast(apiMessageText(d, t('comfyui.settings.switch_success')), 'success')
+      const warnText = apiWarningText(d)
+      if (warnText) toast(warnText, 'warning')
       currentVersion.value = d.current || tag
       await loadVersions()
     } else {
-      toast(d?.error || t('comfyui.settings.switch_failed'), 'error')
+      // 切换失败是 500, useApiFetch 已 toast 过并返回 null; 这里只兜 200+ok:false
+      toast(apiErrorText(d, t('comfyui.settings.switch_failed')), 'error')
     }
   } finally {
     switching.value = false

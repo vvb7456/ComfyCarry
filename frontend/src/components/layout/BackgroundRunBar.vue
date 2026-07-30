@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { useBackgroundRunStore } from '@/stores/backgroundRun'
+import { apiErrorText } from '@/utils/apiError'
 
 defineOptions({ name: 'BackgroundRunBar' })
 
@@ -75,7 +76,9 @@ const reasonLabel = computed(() => {
   return t(`generate.background.reason.${code}`)
 })
 
-const detailLabel = computed(() => store.stopReason?.detail || '')
+/** error_key 优先 (我们自己判定的错误), 否则显示上游原文 */
+const detailLabel = computed(() =>
+  apiErrorText(store.stopReason, store.stopReason?.detail || ''))
 
 const subLabel = computed(() => {
   if (!reasonLabel.value) return ''

@@ -1,3 +1,5 @@
+import type { SyncTemplate as SyncTemplateBase } from './sync'
+
 // ── GPU & Image ──────────────────────────────────────────────
 
 export interface GpuInfo {
@@ -69,18 +71,13 @@ export interface PluginInfo {
 }
 
 // ── Sync Templates (from backend SYNC_RULE_TEMPLATES) ───────
+// 与 sync 页共用同一份定义 —— 两处各写一份时 id / local_path 的可选性和
+// method 的取值集合已经漂移过 (wizard 侧漏了 'sync')。
+// 向导侧的模板都来自后端常量, 这几个字段必有值, 故在此收窄为必填。
 
-export interface SyncTemplate {
-  id: string
-  name: string
-  direction: 'pull' | 'push'
-  remote_path: string
-  local_path: string
-  method: 'copy' | 'move'
-  trigger: 'deploy' | 'watch' | 'manual'
-  watch_interval?: number
-  filters?: string[]
-}
+export type SyncTemplate = Required<
+  Pick<SyncTemplateBase, 'id' | 'name' | 'direction' | 'method' | 'trigger' | 'remote_path' | 'local_path'>
+> & Pick<SyncTemplateBase, 'watch_interval' | 'filters' | 'description'>
 
 // ── Remote Type Definitions (from backend REMOTE_TYPE_DEFS) ─
 
@@ -97,7 +94,6 @@ export interface RemoteFieldDef {
 
 export interface RemoteTypeDef {
   label: string
-  icon: string
   oauth?: boolean
   fields: RemoteFieldDef[]
 }

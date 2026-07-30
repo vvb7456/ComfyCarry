@@ -1,0 +1,7 @@
+{
+  "err": {
+    "invalid_action": "无效的操作",
+    "invalid_service": "无效的服务名",
+    "internal": "操作失败：{detail}"
+  }
+}

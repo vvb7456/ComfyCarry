@@ -94,7 +94,8 @@ ComfyUI-Manager, comfyui_controlnet_aux, ComfyUI-Impact-Pack, ComfyUI-Easy-Use, 
 | `CF_SUBDOMAIN` | Tunnel 子域名前缀 | — |
 | `CIVITAI_TOKEN` | CivitAI API Key | — |
 | `RCLONE_CONF_BASE64` | Base64 编码的 rclone.conf | — |
-| `COMFYUI_DIR` | ComfyUI 路径 | `/workspace/ComfyUI` |
+| `WORKSPACE_DIR` | 工作区根目录 (面板路径约定里的 `/`) | `/workspace` |
+| `COMFYUI_DIR` | ComfyUI 路径 | `$WORKSPACE_DIR/ComfyUI` |
 | `COMFYUI_URL` | ComfyUI 内部 URL | `http://localhost:8188` |
 | `MANAGER_PORT` | Dashboard 端口 | `5000` |
 | `FORCE_UPDATE` | 强制重新下载 Dashboard 文件 | `false` |

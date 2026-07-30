@@ -26,6 +26,7 @@ from ..config import (
     MEILI_URL,
     MODEL_DIRS,
     MODEL_EXTENSIONS,
+    WORKSPACE_ROOT,
     get_extra_model_paths,
 )
 from ..services.civitai_resolver import enrich_model_by_hash
@@ -36,6 +37,14 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("models", __name__)
 
 
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `models.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
+    body = {"error_key": f"models.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
 # ====================================================================
 # CivitAI 搜索代理 (Meilisearch CORS bypass)
 # ====================================================================
@@ -44,7 +53,7 @@ def proxy_search():
     try:
         data = request.get_json(force=True, silent=True)
         if not data:
-            return jsonify({"error": "No JSON body"}), 400
+            return _err("no_json_body")
 
         headers = {
             "Content-Type": "application/json",
@@ -58,11 +67,11 @@ def proxy_search():
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except requests.Timeout:
         # 504 而非 500 —— 是上游慢, 不是本服务出错。前端据此给出可重试的提示。
-        return jsonify({"error": "CivitAI 搜索服务响应超时, 请稍后重试"}), 504
+        return _err("search_timeout", 504)
     except requests.RequestException as e:
-        return jsonify({"error": f"CivitAI 搜索服务不可用: {e}"}), 502
+        return _err("search_unavailable", 502, detail=str(e))
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("internal", 500, detail=str(e))
 
 
 # ====================================================================
@@ -87,9 +96,9 @@ def proxy_civitai_model(model_id: int):
         )
         return Response(resp.content, status=resp.status_code, mimetype="application/json")
     except requests.Timeout:
-        return jsonify({"error": "CivitAI API 请求超时"}), 504
+        return _err("civitai_api_timeout", 504)
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        return _err("civitai_api_failed", 502, detail=str(e))
 
 
 # ====================================================================
@@ -316,7 +325,7 @@ def api_local_models():
                         "trained_words": [],
                         "source": "extra_model_paths",
                         "can_fetch_info": Path(abs_path).resolve().is_relative_to(comfy_root),
-                        "can_delete": Path(abs_path).resolve().is_relative_to(Path("/workspace").resolve()),
+                        "can_delete": Path(abs_path).resolve().is_relative_to(WORKSPACE_ROOT),
                     })
 
     results.sort(key=lambda x: x["modified"], reverse=True)
@@ -330,7 +339,7 @@ def api_model_preview():
     full = Path(COMFYUI_DIR, rel).resolve()
     # 路径安全检查: 必须在 COMFYUI_DIR 内
     if not full.is_relative_to(Path(COMFYUI_DIR).resolve()):
-        return jsonify({"error": "路径越界"}), 403
+        return _err("path_outside", 403)
     if full.is_file():
         return send_file(full)
     return "", 404
@@ -345,10 +354,10 @@ def api_delete_model():
 
     # 安全检查: resolve() + is_relative_to()
     if not abs_path.is_relative_to(comfy_root):
-        return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
+        return _err("not_in_comfy_dir", 403)
 
     if not abs_path.is_file():
-        return jsonify({"error": "文件不存在"}), 404
+        return _err("file_not_found", 404)
 
     deleted = [str(abs_path)]
     abs_path.unlink()
@@ -373,16 +382,16 @@ def api_fetch_model_info():
 
     # 安全检查: resolve() + is_relative_to()
     if not abs_path.is_relative_to(comfy_root):
-        return jsonify({"error": "路径不在 ComfyUI 目录内"}), 403
+        return _err("not_in_comfy_dir", 403)
 
     if not abs_path.is_file():
-        return jsonify({"error": "文件不存在"}), 404
+        return _err("file_not_found", 404)
 
     api_key = _get_api_key()
     info_path = enrich_model_by_hash(str(abs_path), api_key=api_key)
 
     if not info_path:
-        return jsonify({"error": "CivitAI 未找到该模型或请求失败"}), 404
+        return _err("civitai_not_found", 404)
 
     # 返回保存的 info 数据
     try:
@@ -1288,7 +1297,7 @@ def api_parse_workflow():
     """
     data = request.get_json(force=True, silent=True)
     if not data:
-        return jsonify({"error": "No JSON body"}), 400
+        return _err("no_json_body")
 
     prompt = data.get("prompt")
     workflow = data.get("workflow")
@@ -1301,13 +1310,11 @@ def api_parse_workflow():
     elif workflow and isinstance(workflow, dict):
         models, missing_nodes = _extract_models_from_workflow(workflow)
     else:
-        return jsonify({"error": "需要 prompt 或 workflow 字段"}), 400
+        return _err("prompt_or_workflow_required")
 
     # 如果 /object_info 不可用, 提示 ComfyUI 未运行
     if _object_info_cache is None:
-        return jsonify({
-            "error": "ComfyUI 未运行或无法连接, 无法解析工作流模型依赖",
-        }), 503
+        return _err("comfyui_not_running", 503)
 
     # 补全缺失的 exists 字段 (内联 lora / 特殊节点路径)
     # 从 field_map 构建 category → combo 集合, 用 combo basename 匹配
@@ -1362,7 +1369,7 @@ def api_refresh_object_info():
     """手动刷新 /object_info 缓存 (安装/卸载插件后调用)"""
     info = _refresh_object_info()
     if info is None:
-        return jsonify({"error": "无法连接 ComfyUI"}), 503
+        return _err("comfyui_unreachable", 503)
     node_count = len(info)
     model_field_count = sum(
         len(fields) for fields in (_model_field_cache or {}).values()

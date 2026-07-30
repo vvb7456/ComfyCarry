@@ -13,6 +13,7 @@ import LogPanel from '@/components/ui/LogPanel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
 import CompanionPanel from '@/components/sync/CompanionPanel.vue'
+import PathBrowserModal from '@/components/sync/PathBrowserModal.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -26,11 +27,14 @@ import FormField from '@/components/form/FormField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import FieldControlRow from '@/components/form/FieldControlRow.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
+import { remoteBrand } from '@/config/remote-logos'
+import { fmtBytes } from '@/utils/format'
+import { apiErrorText } from '@/utils/apiError'
 import type {
   StorageInfo, SyncTemplate, RemoteField, RemoteTypeDef, Remote,
   SyncRule, SyncSettings,
   SyncStatusResponse, RemotesResponse, StorageResponse,
-  RemoteTypesResponse, RulesSaveResponse, BrowseResponse,
+  RemoteTypesResponse, RulesSaveResponse,
   RcloneConfigResponse, ApiOkResponse,
 } from '@/types/sync'
 
@@ -86,23 +90,66 @@ const newRemoteType = ref('')
 const newRemoteParams = ref<Record<string, string>>({})
 const remoteTypeDef = computed(() => remoteTypes.value[newRemoteType.value] || null)
 const remoteTypeOptions = computed(() =>
-  Object.entries(remoteTypes.value).map(([key, def]) => ({
-    value: key,
-    label: `${def.label} ${def.icon || ''}`.trim(),
-  }))
+  Object.entries(remoteTypes.value).map(([key, def]) => {
+    // 类型层面还没有 provider, s3 先给通用图标; 建好后卡片按 provider 显示 R2 / AWS
+    const brand = remoteBrand(key)
+    return { value: key, label: def.label, logo: brand.logo, icon: brand.icon }
+  })
 )
+
+/** 规则表单的远程存储下拉选项 (Remote 带 params 嵌套对象, 不能直接喂 BaseSelect) */
+const remoteOptions = computed(() =>
+  remotes.value.map(r => {
+    const brand = brandOf(r)
+    return { value: r.name, label: r.display_name || r.name, hint: r.name, logo: brand.logo, icon: brand.icon }
+  })
+)
+
+/** Remote 卡片的品牌标识 (s3 还要看 provider 区分 R2 / AWS) */
+function brandOf(remote: Remote) {
+  return remoteBrand(remote.type, remote.params?.provider)
+}
 
 // Add/edit rule form
 const ruleForm = ref<Partial<SyncRule>>({})
 const ruleIsEdit = ref(false)
 const ruleIsRunning = ref(false)
+/** 模板下拉当前值 (模板 id); 空 = 从零填 */
+const selectedTemplate = ref('')
 
-// Browse modal
-const browseIsRemote = ref(false)
+/** 「自定义」项的哨兵值 —— 用空串会与"未选择"重合, placeholder 就没机会出现 */
+const TEMPLATE_CUSTOM = '__custom__'
+
+const templateOptions = computed(() => [
+  { value: TEMPLATE_CUSTOM, label: t('sync.rule.template_custom') },
+  ...templates.value.map(tmpl => ({
+    value: tmpl.id || tmpl.name,
+    label: tmpl.name,
+    hint: t(`sync.rule.${tmpl.direction}`),
+  })),
+])
+
+const directionOptions = computed(() => [
+  { value: 'pull', label: t('sync.rule.pull') },
+  { value: 'push', label: t('sync.rule.push') },
+])
+
+const methodOptions = computed(() => [
+  { value: 'copy', label: t('sync.rules.method_short.copy') },
+  { value: 'sync', label: t('sync.rules.method_short.sync') },
+  { value: 'move', label: t('sync.rules.method_short.move') },
+])
+
+const triggerOptions = computed(() => [
+  { value: 'manual', label: t('sync.rule.trigger_manual') },
+  { value: 'deploy', label: t('sync.rule.trigger_deploy') },
+  { value: 'watch', label: t('sync.rule.trigger_watch') },
+])
+
+// Browse modal — 目录选择器状态 (逻辑在 PathBrowserModal)
+const browseMode = ref<'local' | 'remote'>('remote')
 const browseTargetField = ref<'remote_path' | 'local_path'>('remote_path')
-const browsePath = ref('/')
-const browseDirs = ref<string[]>([])
-const browseLoading = ref(false)
+const browsePath = ref('')
 
 // Log stream — translate structured entries from backend
 function translateLogEntry(entry: unknown) {
@@ -207,7 +254,7 @@ async function workerAction(action: 'start' | 'stop') {
   try {
     const d = await post<ApiOkResponse>(`/api/sync/worker/${action}`)
     if (d?.ok) toast(t(`sync.worker.${action}_ok`), 'success')
-    else if (d) toast(d.error || t('sync.worker.error'), 'error')
+    else if (d) toast(apiErrorText(d, t('sync.worker.error')), 'error')
     await new Promise(r => setTimeout(r, 1500))
     await loadSyncStatus()
   } finally {
@@ -240,12 +287,6 @@ const triggerLabels: Record<string, string> = { deploy: 'sync.rules.deploy', wat
 const methodLabels: Record<string, string> = { copy: 'sync.rules.method_short.copy', sync: 'sync.rules.method_short.sync', move: 'sync.rules.method_short.move' }
 function triggerLabel(trigger: string) { return t(triggerLabels[trigger] || 'sync.rules.manual') }
 function methodLabel(method: string) { return t(methodLabels[method] || method) }
-function fmtBytes(n: number) {
-  if (!n) return '0 B'
-  const u = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(n) / Math.log(1024))
-  return `${(n / Math.pow(1024, i)).toFixed(1)} ${u[i]}`
-}
 
 // ---- Add Remote ----
 async function openAddRemote() {
@@ -296,7 +337,7 @@ async function submitAddRemote() {
       await loadRemotes()
       loadStorageAll()
     } else if (d) {
-      toast(d.error || t('sync.remote.create_failed'), 'error')
+      toast(apiErrorText(d, t('sync.remote.create_failed')), 'error')
     }
     // d === null means useApiFetch already toasted the HTTP error
   } finally {
@@ -312,14 +353,22 @@ async function deleteRemote(name: string) {
     await loadRemotes()
     delete storageData.value[name]
   } else if (d) {
-    toast(d.error || t('sync.remote.delete_failed'), 'error')
+    toast(apiErrorText(d, t('sync.remote.delete_failed')), 'error')
   }
 }
 
 // ---- Rules ----
+function blankRule(remote?: string): Partial<SyncRule> {
+  return {
+    direction: 'pull', method: 'copy', trigger: 'manual', enabled: true,
+    remote: remote || remotes.value[0]?.name || '',
+  }
+}
+
 function openAddRule() {
-  ruleForm.value = { direction: 'pull', method: 'copy', trigger: 'manual', enabled: true, remote: remotes.value[0]?.name || '' }
+  ruleForm.value = blankRule()
   ruleIsEdit.value = false
+  selectedTemplate.value = ''
   addRuleModal.value = true
 }
 
@@ -330,9 +379,26 @@ function openEditRule(rule: SyncRule) {
   addRuleModal.value = true
 }
 
-function applyTemplate(tmpl: SyncTemplate) {
+/** 选中模板 → 覆盖表单里模板能决定的字段 (remote 由用户选, 不动);
+ *  选「自定义」→ 清回手填态 */
+function onPickTemplate(id: string) {
+  if (id === TEMPLATE_CUSTOM) {
+    ruleForm.value = blankRule(ruleForm.value.remote)
+    return
+  }
+  const tmpl = templates.value.find(x => (x.id || x.name) === id)
+  if (!tmpl) return
   const filters = Array.isArray(tmpl.filters) ? tmpl.filters.join('\n') : ''
-  ruleForm.value = { ...ruleForm.value, name: tmpl.name, direction: tmpl.direction, method: tmpl.method, trigger: tmpl.trigger, local_path: tmpl.local_path || '', remote_path: tmpl.remote_path || '', filters }
+  ruleForm.value = {
+    ...ruleForm.value,
+    name: tmpl.name,
+    direction: tmpl.direction,
+    method: tmpl.method,
+    trigger: tmpl.trigger,
+    local_path: tmpl.local_path || '',
+    remote_path: tmpl.remote_path || '',
+    filters,
+  }
 }
 
 async function saveRule() {
@@ -356,7 +422,7 @@ async function saveRule() {
       toast(t('sync.rule.saved'), 'success')
       addRuleModal.value = false
     } else if (d) {
-      toast(d.error || t('sync.rule.save_failed'), 'error')
+      toast(apiErrorText(d, t('sync.rule.save_failed')), 'error')
     }
   } finally {
     saveRuleLoading.value = false
@@ -377,7 +443,7 @@ async function deleteRule(rule: SyncRule) {
     rules.value = d.rules || updated
     toast(t('sync.rule.deleted'), 'success')
   } else if (d) {
-    toast(d.error || t('sync.rule.save_failed'), 'error')
+    toast(apiErrorText(d, t('sync.rule.save_failed')), 'error')
   }
 }
 
@@ -387,7 +453,7 @@ async function runRule(rule: SyncRule) {
   try {
     const d = await post<ApiOkResponse>('/api/sync/rules/run', { rule_id: rule.id })
     if (d?.ok) toast(t('sync.rule.run_ok'), 'success')
-    else if (d) toast(d.error || t('sync.rule.save_failed'), 'error')
+    else if (d) toast(apiErrorText(d, t('sync.rule.run_failed')), 'error')
   } finally {
     ruleIsRunning.value = false
     setTimeout(loadSyncStatus, 2000)
@@ -395,46 +461,15 @@ async function runRule(rule: SyncRule) {
 }
 
 // ---- Browse ----
-function openBrowse(isRemote: boolean, field: 'remote_path' | 'local_path') {
-  browseIsRemote.value = isRemote
+function openBrowse(mode: 'local' | 'remote', field: 'remote_path' | 'local_path') {
+  browseMode.value = mode
   browseTargetField.value = field
-  browsePath.value = (ruleForm.value[field] as string) || '/'
-  browseDirs.value = []
+  browsePath.value = (ruleForm.value[field] as string) || ''
   browseModal.value = true
-  fetchBrowseDirs(browsePath.value)
 }
 
-async function fetchBrowseDirs(path: string) {
-  browseLoading.value = true
-  browseDirs.value = []
-  const body: Record<string, string> = { path }
-  let d: BrowseResponse | null
-  if (browseIsRemote.value) {
-    body.remote = ruleForm.value.remote ?? ''
-    d = await post<BrowseResponse>('/api/sync/remote/browse', body)
-  } else {
-    d = await post<BrowseResponse>('/api/sync/local/browse', body)
-  }
-  browseLoading.value = false
-  if (d?.ok && d.dirs) browseDirs.value = d.dirs
-}
-
-function browseTo(dir: string) {
-  const newPath = browsePath.value.replace(/\/$/, '') + '/' + dir
-  browsePath.value = newPath
-  fetchBrowseDirs(newPath)
-}
-
-function browseUp() {
-  const parts = browsePath.value.replace(/\/$/, '').split('/')
-  parts.pop()
-  browsePath.value = parts.join('/') || '/'
-  fetchBrowseDirs(browsePath.value)
-}
-
-function selectBrowsePath() {
-  ruleForm.value[browseTargetField.value] = browsePath.value
-  browseModal.value = false
+function onBrowseSelect(path: string) {
+  ruleForm.value[browseTargetField.value] = path
 }
 
 // ---- Config ----
@@ -464,11 +499,13 @@ function switchTab(tab: string) {
 async function saveConfig() {
   cfgSaving.value = true
   try {
-    await Promise.all([
+    // post 失败返回 null 而不是 reject —— Promise.all 照样 resolve,
+    // 不看返回值就会在保存失败后紧接着弹一个"已保存"
+    const [settingsRes, confRes] = await Promise.all([
       post<ApiOkResponse>('/api/sync/settings', { min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value }),
       post<ApiOkResponse>('/api/sync/rclone_config', { config: rcloneConfig.value }),
     ])
-    toast(t('sync.config.saved'), 'success')
+    if (settingsRes && confRes) toast(t('sync.config.saved'), 'success')
   } finally { cfgSaving.value = false }
 }
 
@@ -521,7 +558,14 @@ async function uploadRcloneFile(e: Event) {
         <div v-for="remote in remotes" :key="remote.name" class="sync-remote-card">
           <div class="sync-remote-header">
             <div class="sync-remote-name">
-              {{ remote.icon || '☁️' }} {{ remote.display_name || remote.name }}
+              <img
+                v-if="brandOf(remote).logo"
+                :src="brandOf(remote).logo"
+                class="sync-remote-logo"
+                alt=""
+              >
+              <MsIcon v-else :name="brandOf(remote).icon" />
+              {{ remote.display_name || remote.name }}
               <span class="sync-remote-type">{{ remote.name }} · {{ remote.type }}</span>
             </div>
             <span style="font-size:.75rem;color:var(--t3)">
@@ -535,8 +579,8 @@ async function uploadRcloneFile(e: Event) {
             <span style="font-size:.75rem;color:var(--t3)">{{ t('sync.remote.no_capacity_info') }}</span>
           </div>
           <div class="sync-storage-info" v-else-if="storageData[remote.name]">
-            <template v-if="storageData[remote.name].error">
-              <span style="font-size:.75rem;color:var(--red)">{{ storageData[remote.name].error }}</span>
+            <template v-if="storageData[remote.name].error || storageData[remote.name].error_key">
+              <span style="font-size:.75rem;color:var(--red)">{{ apiErrorText(storageData[remote.name]) }}</span>
             </template>
             <template v-else>
               <div style="font-size:.75rem;white-space:nowrap">{{ t('sync.remotes.used') }}: {{ fmtBytes(storageData[remote.name].used ?? 0) }} / {{ fmtBytes(storageData[remote.name].total ?? 0) }}<template v-if="storageData[remote.name].free"> ({{ t('sync.remotes.remaining') }} {{ fmtBytes(storageData[remote.name].free ?? 0) }})</template></div>
@@ -645,7 +689,7 @@ async function uploadRcloneFile(e: Event) {
         <input v-model="newRemoteName" type="text" :placeholder="t('sync.remote.name_placeholder')" class="form-input">
       </FormField>
       <FormField :label="t('sync.remote.type')" density="compact">
-        <BaseSelect v-model="newRemoteType" :options="remoteTypeOptions" :placeholder="t('sync.remote.select_type')" @change="onRemoteTypeChange" />
+        <BaseSelect v-model="newRemoteType" :options="remoteTypeOptions" :placeholder="t('sync.remote.select_type')" teleport @change="onRemoteTypeChange" />
       </FormField>
       <!-- Dynamic fields -->
       <template v-if="remoteTypeDef">
@@ -656,7 +700,7 @@ async function uploadRcloneFile(e: Event) {
               <HelpTip v-if="field.key === 'token' && remoteTypeDef?.oauth" :text="t('sync.remote.oauth_token_tooltip', { type: newRemoteType })" />
             </template>
             <textarea v-if="field.type === 'textarea'" v-model="newRemoteParams[field.key]" :placeholder="field.placeholder || ''" rows="3" class="form-textarea"></textarea>
-            <BaseSelect v-else-if="field.type === 'select'" v-model="newRemoteParams[field.key]" :options="field.options || []" />
+            <BaseSelect v-else-if="field.type === 'select'" v-model="newRemoteParams[field.key]" :options="field.options || []" teleport />
             <input v-else v-model="newRemoteParams[field.key]" :type="field.type === 'password' ? 'password' : 'text'" :placeholder="field.placeholder || ''" autocomplete="off" class="form-input">
           </FormField>
         </template>
@@ -671,48 +715,52 @@ async function uploadRcloneFile(e: Event) {
 
     <!-- ===== Add/Edit Rule Modal ===== -->
     <BaseModal v-model="addRuleModal" :title="ruleIsEdit ? t('sync.rule.edit_modal') : t('sync.rule.add_modal')" size="md">
-      <!-- Templates -->
-      <div v-if="templates.length && !ruleIsEdit" style="margin-bottom:12px">
-        <div style="font-size:.76rem;color:var(--t3);margin-bottom:4px">{{ t('sync.rule.quick_template') }}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <BaseButton v-for="tmpl in templates" :key="tmpl.name" size="xs" @click="applyTemplate(tmpl)">{{ tmpl.name }}</BaseButton>
-        </div>
-      </div>
+      <!-- 模板: 12 条平铺成 chip 墙太吵, 收进一个可搜索 select -->
+      <FormField v-if="templates.length && !ruleIsEdit" :label="t('sync.rule.quick_template')" density="compact">
+        <BaseSelect
+          v-model="selectedTemplate"
+          :options="templateOptions"
+          searchable
+          teleport
+          :placeholder="t('sync.rule.template_placeholder')"
+          :search-placeholder="t('sync.rule.template_search')"
+          @update:modelValue="onPickTemplate"
+        />
+      </FormField>
       <FormField :label="t('sync.rule.name')" density="compact">
         <input v-model="ruleForm.name" type="text" class="form-input">
       </FormField>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="rule-field-row">
         <FormField :label="t('sync.rule.direction')" density="compact">
-          <BaseSelect v-model="ruleForm.direction!" :options="[
-            { value: 'pull', label: t('sync.rule.pull') },
-            { value: 'push', label: t('sync.rule.push') },
-          ]" />
+          <BaseSelect v-model="ruleForm.direction!" :options="directionOptions" teleport />
         </FormField>
-        <FormField :label="t('sync.rule.method')" density="compact">
-          <BaseSelect v-model="ruleForm.method!" :options="['copy', 'sync', 'move']" />
+        <FormField density="compact">
+          <template #label>
+            {{ t('sync.rule.method') }}
+            <HelpTip :text="t('sync.rule.method_help')" />
+          </template>
+          <BaseSelect v-model="ruleForm.method!" :options="methodOptions" teleport />
         </FormField>
       </div>
-      <FormField :label="t('sync.rule.remote')" density="compact">
-        <BaseSelect v-model="ruleForm.remote!" :options="remotes" value-key="name" label-key="display_name" />
-      </FormField>
+      <div class="rule-field-row">
+        <FormField :label="t('sync.rule.remote')" density="compact">
+          <BaseSelect v-model="ruleForm.remote!" :options="remoteOptions" teleport />
+        </FormField>
+        <FormField :label="t('sync.rule.trigger')" density="compact">
+          <BaseSelect v-model="ruleForm.trigger!" :options="triggerOptions" teleport />
+        </FormField>
+      </div>
       <FormField :label="t('sync.rule.remote_path')" density="compact">
         <FieldControlRow>
-          <input v-model="ruleForm.remote_path" type="text" class="form-input" placeholder="/">
-          <BaseButton size="xs" square @click="openBrowse(true, 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
+          <input v-model="ruleForm.remote_path" type="text" class="form-input" placeholder="ComfyCarry/loras">
+          <BaseButton size="xs" square :title="t('sync.browse.remote_title')" @click="openBrowse('remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
       </FormField>
       <FormField :label="t('sync.rule.local_path')" density="compact">
         <FieldControlRow>
-          <input v-model="ruleForm.local_path" type="text" class="form-input" placeholder="/workspace">
-          <BaseButton size="xs" square @click="openBrowse(false, 'local_path')"><MsIcon name="folder_open" /></BaseButton>
+          <input v-model="ruleForm.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
+          <BaseButton size="xs" square :title="t('sync.browse.local_title')" @click="openBrowse('local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
-      </FormField>
-      <FormField :label="t('sync.rule.trigger')" density="compact">
-        <BaseSelect v-model="ruleForm.trigger!" :options="[
-          { value: 'manual', label: t('sync.rule.trigger_manual') },
-          { value: 'deploy', label: t('sync.rule.trigger_deploy') },
-          { value: 'watch', label: t('sync.rule.trigger_watch') },
-        ]" />
       </FormField>
       <FormField :label="t('sync.rule.filters')" density="compact">
         <textarea v-model="ruleForm.filters" rows="3" class="form-textarea form-textarea--mono" :placeholder="t('sync.rule.filters_placeholder')"></textarea>
@@ -725,43 +773,31 @@ async function uploadRcloneFile(e: Event) {
       </template>
     </BaseModal>
 
-    <!-- ===== Browse Modal ===== -->
-    <BaseModal v-model="browseModal" :title="browseIsRemote ? t('sync.browse.remote_title') : t('sync.browse.local_title')" width="440px">
-      <!-- Breadcrumbs -->
-      <div class="browse-crumbs">
-        <BaseButton size="xs" square :disabled="browsePath === '/'" @click="browseUp"><MsIcon name="arrow_upward" /></BaseButton>
-        <span style="font-size:.78rem;color:var(--t2)">{{ browsePath }}</span>
-      </div>
-      <div v-if="browseLoading" style="text-align:center;padding:16px;color:var(--t3)">{{ t('common.loading') }}</div>
-      <div class="browse-list" v-else>
-        <div v-if="!browseDirs.length" style="text-align:center;color:var(--t3);padding:12px">{{ t('common.empty') }}</div>
-        <button v-for="dir in browseDirs" :key="dir" class="browse-item" @click="browseTo(dir)">
-          <MsIcon name="folder" color="#60a5fa" /> {{ dir }}
-        </button>
-      </div>
-      <template #footer>
-        <BaseButton size="sm" @click="browseModal = false">{{ t('common.btn.cancel') }}</BaseButton>
-        <BaseButton variant="primary" size="sm" @click="selectBrowsePath">{{ t('sync.browse.select') }}: {{ browsePath }}</BaseButton>
-      </template>
-    </BaseModal>
+    <!-- ===== Path Browser ===== -->
+    <PathBrowserModal
+      v-model="browseModal"
+      :mode="browseMode"
+      :remote="ruleForm.remote || ''"
+      :path="browsePath"
+      @select="onBrowseSelect"
+    />
   </div>
 </template>
 
 <style scoped>
+/* 规则表单的两列行 —— 窄屏退化单列 */
+.rule-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 640px) { .rule-field-row { grid-template-columns: 1fr; } }
+
 /* Rules list container */
 .rules-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 16px; }
-
-/* Vue-unique: browse modal */
-.browse-crumbs { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.browse-list { display: flex; flex-direction: column; gap: 2px; max-height: 280px; overflow-y: auto; }
-.browse-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; text-align: left; background: transparent; border: none; border-radius: 4px; cursor: pointer; color: var(--t1); font-size: .85rem; transition: background .12s; }
-.browse-item:hover { background: var(--bg3); }
 
 /* ── Remotes Grid ── */
 .sync-remotes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(300px, 22vw, 420px), 1fr)); gap: clamp(14px, 1.2vw, 22px); margin-top: 8px; }
 .sync-remote-card { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 16px; }
 .sync-remote-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sync-remote-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .95rem; }
+.sync-remote-logo { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
 .sync-remote-type { font-size: .72rem; color: var(--t3); background: var(--bg2); padding: 2px 8px; border-radius: 10px; }
 .sync-storage-info { font-size: .8rem; color: var(--t2); margin-top: 8px; }
 

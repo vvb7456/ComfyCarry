@@ -7,6 +7,7 @@ _run_deploy() 及其所有辅助函数。
 
 import json
 import os
+import re
 import selectors
 import shlex
 import shutil
@@ -17,6 +18,10 @@ from datetime import datetime
 from pathlib import Path
 
 DEPLOY_LOG_FILE = "/workspace/deploy.log"
+
+# rclone remote 名 / 类型 / 配置键的合法字符集 —— 用于挡住 argv 里的
+# "--flag=x" 形态与 shell 元字符 (与 routes/sync.py 的校验保持一致)
+_RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 from ..config import (
     COMFYUI_DIR, CONFIG_FILE, DEFAULT_PLUGINS,
@@ -185,14 +190,18 @@ def _deploy_step(name):
 
 
 def _deploy_exec(cmd, timeout=600, label=""):
-    """执行 shell 命令, 实时推送输出 (带真正的超时保护)"""
+    """执行命令, 实时推送输出 (带真正的超时保护)。
+
+    cmd 传 str 走 shell, 传 list 直接 execve —— 含用户输入的命令请传 list,
+    shell 拼接下参数里的引号/分号会逃逸成命令注入。
+    """
     if label:
         _deploy_log(f"$ {label}")
     proc = None
     try:
         proc = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1
+            cmd, shell=isinstance(cmd, str), stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, bufsize=1
         )
         deadline = time.time() + timeout
         sel = selectors.DefaultSelector()
@@ -693,15 +702,24 @@ def _step_sync_assets(config):
 
     wizard_remotes = config.get("wizard_remotes", [])
     for wr in wizard_remotes:
-        wr_name = wr.get("name", "")
-        wr_type = wr.get("type", "")
-        wr_params = wr.get("params", {})
-        if wr_name and wr_type:
-            cmd = f'rclone config create "{wr_name}" "{wr_type}"'
-            for k, v in wr_params.items():
-                if v:
-                    cmd += f" {k}={shlex.quote(str(v))}"
-            _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
+        wr_name = str(wr.get("name", ""))
+        wr_type = str(wr.get("type", ""))
+        wr_params = wr.get("params", {}) or {}
+        if not (wr_name and wr_type):
+            continue
+        if not (_RCLONE_TOKEN_RE.match(wr_name) and _RCLONE_TOKEN_RE.match(wr_type)):
+            _deploy_log(f"⚠️ 跳过非法 Remote 名/类型: {wr_name!r} {wr_type!r}", "warn")
+            continue
+        cmd = ["rclone", "config", "create", wr_name, wr_type]
+        for k, v in wr_params.items():
+            if not v:
+                continue
+            # key 会作为独立 argv 元素, 但 "--flag=x" 形态会被 rclone 当选项解析
+            if not _RCLONE_TOKEN_RE.match(str(k)):
+                _deploy_log(f"⚠️ 跳过非法参数名: {k!r}", "warn")
+                continue
+            cmd.append(f"{k}={v}")
+        _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
 
     rules = _load_sync_rules()
     if not rules and not config.get("_imported_sync_rules"):
@@ -738,7 +756,8 @@ def _step_sync_assets(config):
         for rule in deploy_rules:
             name = rule.get("name", rule.get("id", "?"))
             _deploy_log(f"执行: {name}...")
-            ok = _run_sync_rule(rule)
+            # _run_sync_rule 返回 (ok, stats) —— 直接判元组恒为真, 失败会被吞掉
+            ok, _stats = _run_sync_rule(rule)
             if not ok:
                 _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warn")
         _deploy_log("✅ 资产同步完成")

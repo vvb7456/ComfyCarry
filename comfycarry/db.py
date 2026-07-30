@@ -12,9 +12,11 @@ import sqlite3
 import threading
 from pathlib import Path
 
+from .config import WORKSPACE_ROOT
+
 log = logging.getLogger(__name__)
 
-DB_PATH = Path("/workspace/.comfycarry.db")
+DB_PATH = WORKSPACE_ROOT / ".comfycarry.db"
 
 
 class Database:

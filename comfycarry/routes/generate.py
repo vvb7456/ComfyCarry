@@ -45,6 +45,23 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("generate", __name__)
 
+
+# ── 错误响应辅助 ─────────────────────────────────────────────────────────────
+# 与 sync 路由同契约: 回传 error_key + error_params, 前端按 `generate.err.<key>`
+# 翻译; str(e) 异常透传放进 params.detail, 不翻译。
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `generate.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
+
+    形参位置化 (`/`): 插值参数里有 key / status / detail 这种名字, 不然会和
+    函数自己的形参撞车。
+    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
+    `**params` 静默吞掉, 顶层字段丢失。
+    """
+    body = {"error_key": f"generate.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
 # ── 架构扫描 memo 缓存 ───────────────────────────────────────────────────────
 # filepath → (mtime, size, rules_version, arch)。
 # options 5 分钟 TTL 过期后的重扫, 每个文件 detect 前先 stat, (mtime, size)
@@ -447,23 +464,23 @@ def api_generate_upload_image():
     返回: {"filename": "openpose/pose_abc123.png"}  (相对于 input/ 的路径)
     """
     if "file" not in request.files:
-        return jsonify({"error": "请上传图片文件"}), 400
+        return _err("no_file_uploaded")
 
     file = request.files["file"]
     if not file or not file.filename:
-        return jsonify({"error": "无效的文件"}), 400
+        return _err("invalid_file")
 
     # 文件类型校验
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_TYPES:
-        return jsonify({"error": f"不支持的图片格式: {content_type}"}), 400
+        return _err("unsupported_image_format", content_type=content_type)
 
     # 文件大小校验
     file.seek(0, 2)
     size = file.tell()
     file.seek(0)
     if size > MAX_IMAGE_SIZE:
-        return jsonify({"error": f"文件过大 ({size // 1024 // 1024}MB)，最大 20MB"}), 400
+        return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=20)
 
     # 生成安全文件名
     import uuid
@@ -523,7 +540,7 @@ def api_generate_preprocess():
 
     pp_type = request.form.get("type", "").strip()
     if pp_type not in ("pose", "canny", "depth"):
-        return jsonify({"error": f"不支持的预处理类型: {pp_type}"}), 400
+        return _err("unsupported_preprocess_type", pp_type=pp_type)
 
     input_dir = os.path.join(COMFYUI_DIR, "input")
     os.makedirs(input_dir, exist_ok=True)
@@ -536,24 +553,24 @@ def api_generate_preprocess():
         safe_name = os.path.basename(input_name)
         src_path = os.path.join(input_dir, safe_name)
         if not os.path.isfile(src_path):
-            return jsonify({"error": f"文件不存在: {safe_name}"}), 404
+            return _err("file_not_found", 404, name=safe_name)
         src_name = safe_name
     elif "file" in request.files:
         file = request.files["file"]
         if not file or not file.filename:
-            return jsonify({"error": "无效的文件"}), 400
+            return _err("invalid_file")
 
         # 文件类型校验
         content_type = file.content_type or ""
         if content_type not in ALLOWED_IMAGE_TYPES:
-            return jsonify({"error": f"不支持的图片格式: {content_type}"}), 400
+            return _err("unsupported_image_format", content_type=content_type)
 
         # 文件大小校验
         file.seek(0, 2)
         size = file.tell()
         file.seek(0)
         if size > MAX_IMAGE_SIZE:
-            return jsonify({"error": f"文件过大 ({size // 1024 // 1024}MB)，最大 20MB"}), 400
+            return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=20)
 
         ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
         ext = ext_map.get(content_type, ".png")
@@ -561,7 +578,7 @@ def api_generate_preprocess():
         dest = os.path.join(input_dir, src_name)
         file.save(dest)
     else:
-        return jsonify({"error": "请上传图片或指定 input 文件名"}), 400
+        return _err("no_image_or_input")
 
     # 解析预处理器参数
     extra_params = {}
@@ -590,7 +607,7 @@ def api_generate_preprocess():
         })
     except Exception as e:
         logger.exception("[generate] 构建预处理工作流失败")
-        return jsonify({"error": f"工作流构建失败: {e}"}), 500
+        return _err("workflow_build_failed", 500, detail=str(e))
 
     # 提交到 ComfyUI
     try:
@@ -600,10 +617,10 @@ def api_generate_preprocess():
         resp.raise_for_status()
         result = resp.json()
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": "ComfyUI 未运行"}), 503
+        return _err("comfyui_offline", 503)
     except Exception as e:
         logger.exception("[generate] 提交预处理工作流失败")
-        return jsonify({"error": f"提交失败: {e}"}), 500
+        return _err("submit_failed", 500, detail=str(e))
 
     prompt_id = result.get("prompt_id", "")
     output_filename = f"{output_name}.png"
@@ -736,7 +753,7 @@ def api_generate_submit():
     # submit_generation), 故不会自杀。
     from ..services.background_run import is_running
     if is_running():
-        return jsonify({"error": "后台运行进行中，请先停止后台会话再手动提交"}), 409
+        return _err("background_running", 409)
 
     data = request.get_json(silent=True) or {}
     body, status = submit_generation(data)
@@ -755,15 +772,15 @@ def api_generate_background_start():
     payload = body.get("payload")
     policy = body.get("policy") or {}
     if not isinstance(payload, dict):
-        return jsonify({"error": "缺少 payload"}), 400
+        return _err("missing_payload")
     # 队列非空 (ComfyUI 正在跑别的) → 409
     if is_queue_busy():
-        return jsonify({"error": "ComfyUI 队列非空，无法启动后台运行"}), 409
+        return _err("queue_busy", 409)
     try:
         start_session(payload, policy)
     except RuntimeError:
         # 已在运行
-        return jsonify({"error": "后台运行已在进行中"}), 409
+        return _err("background_already_running", 409)
     from ..services.background_run import snapshot_status
     return jsonify(snapshot_status())
 
@@ -847,22 +864,22 @@ def api_generate_interrogate():
         safe_name = os.path.basename(input_name)
         src_path = os.path.join(input_dir, safe_name)
         if not os.path.isfile(src_path):
-            return jsonify({"error": f"文件不存在: {safe_name}"}), 404
+            return _err("file_not_found", 404, name=safe_name)
         src_name = safe_name
     elif "file" in request.files:
         file = request.files["file"]
         if not file or not file.filename:
-            return jsonify({"error": "无效的文件"}), 400
+            return _err("invalid_file")
 
         content_type = file.content_type or ""
         if content_type not in ALLOWED_IMAGE_TYPES:
-            return jsonify({"error": f"不支持的图片格式: {content_type}"}), 400
+            return _err("unsupported_image_format", content_type=content_type)
 
         file.seek(0, 2)
         size = file.tell()
         file.seek(0)
         if size > MAX_IMAGE_SIZE:
-            return jsonify({"error": f"文件过大 ({size // 1024 // 1024}MB)，最大 20MB"}), 400
+            return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=20)
 
         ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
         ext = ext_map.get(content_type, ".png")
@@ -870,7 +887,7 @@ def api_generate_interrogate():
         dest = os.path.join(input_dir, src_name)
         file.save(dest)
     else:
-        return jsonify({"error": "请上传图片或指定 input 文件名"}), 400
+        return _err("no_image_or_input")
 
     # 解析参数
     extra_params = {}
@@ -889,7 +906,7 @@ def api_generate_interrogate():
         })
     except Exception as e:
         logger.exception("[generate] 构建反推工作流失败")
-        return jsonify({"error": f"工作流构建失败: {e}"}), 500
+        return _err("workflow_build_failed", 500, detail=str(e))
 
     # 提交到 ComfyUI
     try:
@@ -899,10 +916,10 @@ def api_generate_interrogate():
         resp.raise_for_status()
         result = resp.json()
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": "ComfyUI 未运行"}), 503
+        return _err("comfyui_offline", 503)
     except Exception as e:
         logger.exception("[generate] 提交反推工作流失败")
-        return jsonify({"error": f"提交失败: {e}"}), 500
+        return _err("submit_failed", 500, detail=str(e))
 
     prompt_id = result.get("prompt_id", "")
     logger.info(f"[generate] 反推提交 prompt_id={prompt_id}")
@@ -922,7 +939,7 @@ def api_generate_interrogate_result():
     """
     prompt_id = request.args.get("prompt_id", "").strip()
     if not prompt_id:
-        return jsonify({"error": "prompt_id 必填"}), 400
+        return _err("missing_prompt_id")
 
     try:
         resp = requests.get(f"{COMFYUI_URL}/history/{prompt_id}", timeout=10)
@@ -930,10 +947,10 @@ def api_generate_interrogate_result():
         data = resp.json()
     except Exception as e:
         logger.exception("[generate] 查询反推结果失败")
-        return jsonify({"error": f"查询失败: {e}"}), 500
+        return _err("query_failed", 500, detail=str(e))
 
     if prompt_id not in data:
-        return jsonify({"error": "结果未找到，可能尚未完成"}), 404
+        return _err("result_not_found", 404)
 
     entry = data[prompt_id]
     outputs = entry.get("outputs", {})
@@ -990,9 +1007,9 @@ def api_generate_wildcard_get(name):
         content = expander.get_wildcard_content(name)
         return jsonify({"name": name, "content": content})
     except FileNotFoundError:
-        return jsonify({"error": f"Wildcard 不存在: {name}"}), 404
+        return _err("wildcard_not_found", 404, name=name)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _err("invalid_wildcard_name", detail=str(e))
 
 
 @bp.route("/api/generate/wildcard/<path:name>", methods=["PUT"])
@@ -1005,7 +1022,7 @@ def api_generate_wildcard_save(name):
         expander.save_wildcard(name, content)
         return jsonify({"ok": True})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _err("invalid_wildcard_name", detail=str(e))
 
 
 @bp.route("/api/generate/wildcard/<path:name>", methods=["DELETE"])
@@ -1016,9 +1033,9 @@ def api_generate_wildcard_delete(name):
         expander.delete_wildcard(name)
         return jsonify({"ok": True})
     except FileNotFoundError:
-        return jsonify({"error": f"Wildcard 不存在: {name}"}), 404
+        return _err("wildcard_not_found", 404, name=name)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _err("invalid_wildcard_name", detail=str(e))
 
 
 @bp.route("/api/generate/wildcard-folder/<path:name>", methods=["POST"])
@@ -1029,7 +1046,7 @@ def api_generate_wildcard_folder_create(name):
         expander.create_folder(name)
         return jsonify({"ok": True})
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _err("invalid_wildcard_name", detail=str(e))
 
 
 @bp.route("/api/generate/wildcard/<path:name>/rename", methods=["POST"])
@@ -1038,13 +1055,13 @@ def api_generate_wildcard_rename(name):
     data = request.get_json(silent=True) or {}
     new_name = data.get("new_name", "").strip()
     if not new_name:
-        return jsonify({"error": "缺少 new_name 参数"}), 400
+        return _err("missing_param", param="new_name")
     try:
         expander = get_expander()
         expander.rename_wildcard(name, new_name)
         return jsonify({"ok": True})
     except FileNotFoundError:
-        return jsonify({"error": f"Wildcard 不存在: {name}"}), 404
+        return _err("wildcard_not_found", 404, name=name)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return _err("invalid_wildcard_name", detail=str(e))
 

@@ -70,7 +70,7 @@
     "pick_label": "从 input 选择",
     "upload_label": "拖放或点击上传",
     "or_divider": "或",
-    "unsupported_type": "不支持的文件类型: {name}",
+    "unsupported_type": "不支持的文件类型：{name}",
     "remove": "移除"
   },
   "n_selected": "已选 {count} 项"

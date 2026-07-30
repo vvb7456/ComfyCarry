@@ -1,0 +1,18 @@
+{
+  "err": {
+    "path_required": "请填写路径",
+    "path_outside": "路径越界：必须位于 {root} 内",
+    "path_is_root": "不能直接操作 {root} 根目录",
+    "not_a_file": "不是文件或不存在",
+    "not_found": "文件不存在",
+    "file_too_large": "文件过大（{size} 字节），上限 10 MB",
+    "cannot_decode": "无法以文本方式读取该文件，请改用二进制方式",
+    "is_directory": "无法对目录执行此操作",
+    "content_required": "请提供文件内容",
+    "encoding_error": "内容编码错误：{detail}",
+    "chmod_failed": "设置文件权限失败：{detail}",
+    "unsupported_type": "不支持的文件类型",
+    "permission_denied": "权限不足",
+    "internal": "操作失败：{detail}"
+  }
+}

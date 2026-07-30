@@ -15,10 +15,25 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
+# ── 安全边界: 所有操作限制在 workspace 内 (常量唯一源在 config) ──
+from ..config import WORKSPACE_ROOT
+
 bp = Blueprint("files", __name__)
 
-# ── 安全边界: 所有操作限制在 /workspace 内 ──
-WORKSPACE_ROOT = Path("/workspace").resolve()
+
+# ====================================================================
+# 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/files.json)
+# 契约同 sync.py: error_key=files.err.<key> + error_params; 前端
+# apiErrorText() 查 key, 缺条目原样显示 key。str(e) 原文不翻译, 作为
+# detail 参数透传。
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `files.err.<key>` 翻译; _extra 是响应体附加顶层字段。"""
+    body = {"error_key": f"files.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
 
 # 模型关联文件后缀列表 (用于 companions 模式)
 _COMPANION_SUFFIXES = [
@@ -31,22 +46,24 @@ _COMPANION_SUFFIXES = [
 ]
 
 
-def _validate_path(raw: str, *, allow_root: bool = False) -> tuple[Path | None, str | None]:
+def _validate_path(
+    raw: str, *, allow_root: bool = False
+) -> tuple[Path | None, tuple[str, dict] | None]:
     """验证并解析路径, 确保在 /workspace 内。
 
     支持:
-    - 绝对路径: /workspace/ComfyUI/models/foo.safetensors
-    - 相对路径: ComfyUI/models/foo.safetensors (相对于 /workspace)
+    - 绝对路径: <workspace>/ComfyUI/models/foo.safetensors
+    - 相对路径: ComfyUI/models/foo.safetensors (相对于 workspace 根)
 
     Args:
         allow_root: 是否允许 /workspace 本身 (stat/read 允许, delete 不允许)
 
     Returns:
         (resolved_path, None) on success
-        (None, error_message) on failure
+        (None, (i18n_key, params)) on failure
     """
     if not raw or not raw.strip():
-        return None, "path is required"
+        return None, ("path_required", {})
 
     p = Path(raw.strip())
     if not p.is_absolute():
@@ -54,9 +71,9 @@ def _validate_path(raw: str, *, allow_root: bool = False) -> tuple[Path | None, 
     resolved = p.resolve()
 
     if not resolved.is_relative_to(WORKSPACE_ROOT):
-        return None, "Path outside /workspace boundary"
+        return None, ("path_outside", {"root": str(WORKSPACE_ROOT)})
     if not allow_root and resolved == WORKSPACE_ROOT:
-        return None, "Cannot operate on /workspace root"
+        return None, ("path_is_root", {"root": str(WORKSPACE_ROOT)})
 
     return resolved, None
 
@@ -106,7 +123,7 @@ def api_delete_files():
         raw_paths = [str(data["path"])]
 
     if not raw_paths:
-        return jsonify({"error": "path or paths is required"}), 400
+        return _err("path_required")
 
     recursive: bool = bool(data.get("recursive", False))
     companions: bool = bool(data.get("companions", False))
@@ -117,11 +134,15 @@ def api_delete_files():
     for raw in raw_paths:
         target, err = _validate_path(raw)
         if err:
-            errors.append({"path": raw, "error": err})
+            # err = (key, params); per-item 错误内嵌在 200 响应里, 前端按需渲染
+            errors.append({"path": raw,
+                           "error_key": f"files.err.{err[0]}",
+                           "error_params": err[1]})
             continue
 
         if not target.exists():
-            errors.append({"path": raw, "error": "Not found"})
+            errors.append({"path": raw,
+                           "error_key": "files.err.not_found"})
             continue
 
         try:
@@ -134,18 +155,21 @@ def api_delete_files():
 
             elif target.is_dir():
                 if not recursive:
-                    errors.append({"path": raw, "error": "Is a directory — set recursive=true"})
+                    errors.append({"path": raw,
+                                   "error_key": "files.err.is_directory"})
                     continue
                 shutil.rmtree(target)
                 deleted.append(str(target))
 
             else:
-                errors.append({"path": raw, "error": "Unsupported file type"})
+                errors.append({"path": raw,
+                               "error_key": "files.err.unsupported_type"})
 
         except PermissionError:
-            errors.append({"path": raw, "error": "Permission denied"})
+            errors.append({"path": raw, "error_key": "files.err.permission_denied"})
         except OSError as e:
-            errors.append({"path": raw, "error": str(e)})
+            errors.append({"path": raw, "error_key": "files.err.internal",
+                           "error_params": {"detail": str(e)}})
 
     return jsonify({
         "ok": len(errors) == 0,
@@ -176,7 +200,7 @@ def api_files_stat():
     raw = request.args.get("path", "")
     target, err = _validate_path(raw, allow_root=True)
     if err:
-        return jsonify({"error": err}), 400
+        return _err(err[0], 400, **err[1])
 
     if not target.exists():
         return jsonify({"exists": False, "path": str(target)})
@@ -214,15 +238,15 @@ def api_files_read():
     raw = request.args.get("path", "")
     target, err = _validate_path(raw)
     if err:
-        return jsonify({"error": err}), 400
+        return _err(err[0], 400, **err[1])
 
     if not target.is_file():
-        return jsonify({"error": "Not a file or does not exist"}), 404
+        return _err("not_a_file", 404)
 
     # 限制读取大小 (10 MB)
     size = target.stat().st_size
     if size > 10 * 1024 * 1024:
-        return jsonify({"error": f"File too large ({size} bytes), max 10 MB"}), 413
+        return _err("file_too_large", 413, size=size, max=10 * 1024 * 1024)
 
     is_binary = request.args.get("binary", "").lower() in ("1", "true", "yes")
 
@@ -243,9 +267,9 @@ def api_files_read():
                 "path": str(target),
             })
     except UnicodeDecodeError:
-        return jsonify({"error": "Cannot decode file as text — try binary=true"}), 422
+        return _err("cannot_decode", 422)
     except OSError as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("internal", 500, detail=str(e))
 
 
 # ─────────────────────────────────────────────────────────
@@ -275,18 +299,18 @@ def api_files_write():
     raw = data.get("path", "")
     target, err = _validate_path(raw)
     if err:
-        return jsonify({"error": err}), 400
+        return _err(err[0], 400, **err[1])
 
     # 不允许写入目录路径
     if target.exists() and target.is_dir():
-        return jsonify({"error": "Cannot write to a directory"}), 400
+        return _err("is_directory")
 
     # 解析内容
     content_text = data.get("content")
     content_b64 = data.get("content_base64")
 
     if content_text is None and content_b64 is None:
-        return jsonify({"error": "content or content_base64 is required"}), 400
+        return _err("content_required")
 
     # 自动创建父目录
     if data.get("mkdir", True):
@@ -307,9 +331,9 @@ def api_files_write():
             target.write_text(content_text, encoding=encoding)
             size = target.stat().st_size
     except (ValueError, UnicodeEncodeError) as e:
-        return jsonify({"error": f"Content encoding error: {e}"}), 400
+        return _err("encoding_error", 400, detail=str(e))
     except OSError as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("internal", 500, detail=str(e))
 
     # 设置文件权限
     mode = data.get("mode")
@@ -317,7 +341,7 @@ def api_files_write():
         try:
             os.chmod(target, int(mode, 8))
         except (ValueError, OSError) as e:
-            return jsonify({"error": f"chmod failed: {e}"}), 500
+            return _err("chmod_failed", 500, detail=str(e))
 
     return jsonify({
         "ok": True,

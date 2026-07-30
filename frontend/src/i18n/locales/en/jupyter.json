@@ -73,5 +73,25 @@
     "stop_failed": "Stop failed",
     "restarting": "Jupyter restarting",
     "restart_failed": "Restart failed"
+  },
+  "err": {
+    "fallback": "JupyterLab operation failed",
+    "not_running": "JupyterLab is not running",
+    "terminal_create_failed": "Failed to create terminal: {detail}",
+    "terminal_delete_failed": "Failed to delete terminal: {detail}",
+    "invalid_action": "Invalid action: {action}",
+    "kernel_action_failed": "Kernel {action} failed: {detail}",
+    "session_delete_failed": "Failed to close session: {detail}",
+    "logs_failed": "Failed to fetch logs: {detail}",
+    "start_failed": "Start failed: {detail}",
+    "stop_failed": "Stop failed: {detail}",
+    "restart_failed": "Restart failed: {detail}",
+    "token_not_found": "Token not found"
+  },
+  "msg": {
+    "already_running": "JupyterLab is already running",
+    "starting": "JupyterLab starting...",
+    "stopped": "JupyterLab stopped",
+    "restarting": "JupyterLab restarting..."
   }
 }

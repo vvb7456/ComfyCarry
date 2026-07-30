@@ -27,6 +27,19 @@ bp = Blueprint("system", __name__)
 
 
 # ====================================================================
+# 响应文案 —— key + params, 由前端翻译 (i18n/locales/*/system.json)
+# 契约同 sync.py: error_key=system.err.<key> + error_params; str(e)
+# 原文不翻译, 作为 detail 参数透传。
+# ====================================================================
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `system.err.<key>` 翻译; _extra 是响应体附加顶层字段。"""
+    body = {"error_key": f"system.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
+# ====================================================================
 # 版本信息 API
 # ====================================================================
 @bp.route("/api/version")
@@ -112,9 +125,9 @@ def api_services():
 def api_service_action(name, action):
     """控制服务: restart, stop, start"""
     if action not in ("restart", "stop", "start"):
-        return jsonify({"error": "Invalid action"}), 400
+        return _err("invalid_action")
     if not re.match(r'^[\w\-]+$', name):
-        return jsonify({"error": "Invalid service name"}), 400
+        return _err("invalid_service")
     out = _run_cmd(f"pm2 {action} {name}", timeout=10)
     return jsonify({"ok": True, "output": out})
 
@@ -126,7 +139,7 @@ def api_service_action(name, action):
 def api_logs(name):
     """获取 PM2 日志"""
     if not re.match(r'^[\w\-]+$', name):
-        return jsonify({"logs": "", "error": "Invalid service name"}), 400
+        return _err("invalid_service")
     try:
         lines = int(request.args.get("lines", "100"))
         lines = min(max(lines, 1), 1000)
@@ -136,14 +149,14 @@ def api_logs(name):
         out = _run_cmd(f"pm2 logs {name} --nostream --lines {lines}", timeout=5)
         return jsonify({"logs": out})
     except Exception as e:
-        return jsonify({"logs": "", "error": str(e)})
+        return _err("internal", 500, detail=str(e))
 
 
 @bp.route("/api/logs/<name>/stream")
 def api_logs_stream(name):
     """SSE — PM2 实时日志流"""
     if not re.match(r'^[\w\-]+$', name):
-        return jsonify({"error": "Invalid service name"}), 400
+        return _err("invalid_service")
 
     def generate():
         proc = None

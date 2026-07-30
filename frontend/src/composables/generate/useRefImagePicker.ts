@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
+import { apiErrorText } from '@/utils/apiError'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        toast((body as Record<string, string>).error || `Upload failed (${res.status})`, 'error')
+        toast(apiErrorText(body, `Upload failed (${res.status})`), 'error')
         return null
       }
       const data = await res.json() as UploadResult

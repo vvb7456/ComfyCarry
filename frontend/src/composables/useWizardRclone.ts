@@ -1,16 +1,20 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWizardState } from './useWizardState'
-import type { DetectedRemote, RemoteFieldDef } from '@/types/wizard'
-
-type RcloneMethod = '' | 'file' | 'manual' | 'base64_env'
-
-// Module-level refs so state survives across composable calls (step 3 → step 4)
-const _defaultRemoteName = ref('')
-const _selectedMethod = ref<RcloneMethod>('')
-const _detectedRemotes = ref<DetectedRemote[]>([])
-const _fileStatus = ref('')
-let _detectTimer: ReturnType<typeof setTimeout> | null = null
+import type { RemoteFieldDef } from '@/types/wizard'
+import type { SelectOption } from '@/components/form/BaseSelect.vue'
+import { remoteBrand } from '@/config/remote-logos'
+import {
+  type RcloneMethod,
+  defaultRemoteNameRef as _defaultRemoteName,
+  selectedMethodRef as _selectedMethod,
+  detectedRemotesRef as _detectedRemotes,
+  fileStatusRef as _fileStatus,
+  remoteOverrides as _remoteOverrides,
+  pathOverrides as _pathOverrides,
+  setDetectTimer,
+  clearDetectTimer,
+} from './wizardRcloneState'
 
 export function useWizardRclone() {
   const { t } = useI18n({ useScope: 'global' })
@@ -25,6 +29,17 @@ export function useWizardRclone() {
     _detectedRemotes.value.forEach(r => names.add(r.name))
     config.wizard_remotes.forEach(r => names.add(r.name))
     return [...names]
+  })
+
+  /** 同上, 但带品牌 logo —— 给 BaseSelect 用 (名字相同时保留先出现的类型) */
+  const allRemoteOptions = computed<SelectOption[]>(() => {
+    const byName = new Map<string, string>()
+    _detectedRemotes.value.forEach(r => { if (!byName.has(r.name)) byName.set(r.name, r.type) })
+    config.wizard_remotes.forEach(r => { if (!byName.has(r.name)) byName.set(r.name, r.type) })
+    return [...byName].map(([name, type]) => {
+      const brand = remoteBrand(type, undefined)
+      return { value: name, label: name, logo: brand.logo, icon: brand.icon }
+    })
   })
 
   // ── Method selection ────────────────────────────────────────
@@ -75,8 +90,8 @@ export function useWizardRclone() {
   // ── Remote detection ────────────────────────────────────────
 
   function debouncedDetect() {
-    if (_detectTimer) clearTimeout(_detectTimer)
-    _detectTimer = setTimeout(() => detectRemotes(), 300)
+    clearDetectTimer()
+    setDetectTimer(setTimeout(() => detectRemotes(), 300))
   }
 
   async function detectRemotes() {
@@ -159,6 +174,11 @@ export function useWizardRclone() {
   function toggleRule(templateId: string, remote: string, remotePath: string) {
     const idx = config.wizard_sync_rules.findIndex(r => r.template_id === templateId)
     if (idx >= 0) {
+      // 取消勾选前把已选的 remote / 路径存回 overrides ——
+      // 不然重新勾选时会回落到默认值, 用户之前的选择白填了
+      const removed = config.wizard_sync_rules[idx]
+      if (removed.remote) _remoteOverrides.value[templateId] = removed.remote
+      if (removed.remote_path) _pathOverrides.value[templateId] = removed.remote_path
       config.wizard_sync_rules.splice(idx, 1)
     } else {
       config.wizard_sync_rules.push({ template_id: templateId, remote, remote_path: remotePath })
@@ -219,7 +239,11 @@ export function useWizardRclone() {
   }
 
   function initFromEnv() {
-    if (hasRcloneEnv.value) {
+    // 环境变量只提供"首次进入时的默认值"。此前这里是无条件覆盖, 用户在
+    // Step 3 改选手动创建后前进再后退, 选择就被弹回环境变量。
+    const notChosenYet = !_selectedMethod.value
+      && (!config.rclone_config_method || config.rclone_config_method === 'skip')
+    if (hasRcloneEnv.value && notChosenYet) {
       _selectedMethod.value = 'base64_env'
       config.rclone_config_method = 'base64_env'
       config._rclone_display_method = 'base64_env'
@@ -248,6 +272,9 @@ export function useWizardRclone() {
     // Computed
     hasRcloneEnv,
     allRemoteNames,
+    allRemoteOptions,
+    remoteOverrides: _remoteOverrides,
+    pathOverrides: _pathOverrides,
     pullTemplates,
     pushTemplates,
     defaultRemoteName,

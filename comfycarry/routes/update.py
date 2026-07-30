@@ -25,6 +25,14 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("update", __name__)
 
+
+def _err(key: str, status: int = 400, /, **params):
+    """错误响应。前端按 `settings.err.update.<key>` 翻译 —— 面板更新 UI 在
+    设置页, 所以复用 settings 命名空间, 单开一层 update 分组。"""
+    return jsonify({"error_key": f"settings.err.update.{key}",
+                    "error_params": params}), status
+
+
 _REPO_OWNER = "vvb7456"
 _REPO_NAME = "ComfyCarry"
 _BRANCH = "main"
@@ -110,7 +118,7 @@ def api_update_check():
 
     except Exception as e:
         logger.error("update check failed: %s", e)
-        return jsonify({"error": str(e)}), 500
+        return _err("check_failed", 500, detail=str(e))
 
 
 # ====================================================================
@@ -127,10 +135,10 @@ def api_update_apply():
     global _update_running
 
     if _update_running:
-        return jsonify({"error": "Update already running"}), 409
+        return _err("already_running", 409)
 
     if not _update_lock.acquire(blocking=False):
-        return jsonify({"error": "Update already running"}), 409
+        return _err("already_running", 409)
 
     def sse_stream():
         global _update_running

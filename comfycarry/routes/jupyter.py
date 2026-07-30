@@ -31,6 +31,34 @@ bp = Blueprint("jupyter", __name__)
 PM2_NAME = "jupyter"
 
 
+# ── 错误响应辅助 ──
+# /api/jupyter/* 的唯一消费方是面板前端, 回传中文成品文案的话英文 locale 下
+# toast 里会直接冒出中文。改为回传 error_key + error_params, 前端 apiErrorText()
+# 负责渲染。需要保留 ok:false 语义的 (如 action 端点) 传 _extra={"ok": False}。
+# 异常原文 (str(e) / stderr) 作为 detail 参数透传, 前端在 detail 插值位呈现。
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `jupyter.err.<key>` 翻译; _extra 为响应体附加顶层字段。
+
+    形参位置化 (`/`): 插值参数里有 key / status / action 这种名字, 不然会撞车。
+    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
+    `**params` 静默吞掉, 顶层字段丢失。
+    """
+    body = {"error_key": f"jupyter.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
+def _ok(key: str, /, **extra):
+    """成功响应。前端按 `jupyter.msg.<key>` 翻译 message_key。"""
+    body = {"ok": True, "message_key": f"jupyter.msg.{key}"}
+    params = extra.pop("params", None)
+    if params:
+        body["message_params"] = params
+    body.update(extra)
+    return jsonify(body)
+
+
 # ── 动态检测 ─────────────────────────────────────────────────
 
 def _detect_port() -> int | None:
@@ -264,14 +292,14 @@ def jupyter_new_terminal():
     try:
         base = _jupyter_url()
         if not base:
-            return jsonify({"error": "JupyterLab 未运行"}), 503
+            return _err("not_running", 503)
         r = requests.post(f"{base}/api/terminals", headers=_jupyter_headers(),
                           verify=False, timeout=5)
         if r.ok:
             return jsonify(r.json())
-        return jsonify({"error": "Failed to create terminal"}), 502
+        return _err("terminal_create_failed", 502, detail=r.text)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("terminal_create_failed", 500, detail=str(e))
 
 
 @bp.route("/api/jupyter/terminals/<name>", methods=["DELETE"])
@@ -280,32 +308,32 @@ def jupyter_delete_terminal(name):
     try:
         base = _jupyter_url()
         if not base:
-            return jsonify({"error": "JupyterLab 未运行"}), 503
+            return _err("not_running", 503)
         r = requests.delete(f"{base}/api/terminals/{name}",
                             headers=_jupyter_headers(), verify=False, timeout=5)
         if r.ok or r.status_code == 204:
             return jsonify({"ok": True})
-        return jsonify({"error": "Delete terminal failed"}), 502
+        return _err("terminal_delete_failed", 502, detail=r.text)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("terminal_delete_failed", 500, detail=str(e))
 
 
 @bp.route("/api/jupyter/kernels/<kernel_id>/<action>", methods=["POST"])
 def jupyter_kernel_action(kernel_id, action):
     """内核操作: restart, interrupt"""
     if action not in ("restart", "interrupt"):
-        return jsonify({"error": "Invalid action"}), 400
+        return _err("invalid_action", 400, action=action)
     try:
         base = _jupyter_url()
         if not base:
-            return jsonify({"error": "JupyterLab 未运行"}), 503
+            return _err("not_running", 503)
         r = requests.post(f"{base}/api/kernels/{kernel_id}/{action}",
                           headers=_jupyter_headers(), verify=False, timeout=10)
         if r.ok:
             return jsonify({"ok": True})
-        return jsonify({"error": f"Kernel {action} failed"}), 502
+        return _err("kernel_action_failed", 502, action=action, detail=r.text)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("kernel_action_failed", 500, action=action, detail=str(e))
 
 
 @bp.route("/api/jupyter/sessions/<session_id>", methods=["DELETE"])
@@ -314,14 +342,14 @@ def jupyter_delete_session(session_id):
     try:
         base = _jupyter_url()
         if not base:
-            return jsonify({"error": "JupyterLab 未运行"}), 503
+            return _err("not_running", 503)
         r = requests.delete(f"{base}/api/sessions/{session_id}",
                             headers=_jupyter_headers(), verify=False, timeout=5)
         if r.ok or r.status_code == 204:
             return jsonify({"ok": True})
-        return jsonify({"error": "Delete session failed"}), 502
+        return _err("session_delete_failed", 502, detail=r.text)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err("session_delete_failed", 500, detail=str(e))
 
 
 @bp.route("/api/jupyter/logs")
@@ -339,7 +367,8 @@ def jupyter_logs():
         clean = ansi_re.sub('', raw)
         return jsonify({"logs": clean})
     except Exception as e:
-        return jsonify({"logs": "", "error": str(e)})
+        return jsonify({"logs": "", "error_key": "jupyter.err.logs_failed",
+                        "error_params": {"detail": str(e)}})
 
 
 @bp.route("/api/jupyter/logs/stream")
@@ -386,7 +415,7 @@ def jupyter_start():
     """启动 JupyterLab (PM2)"""
     pm2 = _pm2_status()
     if pm2 == "online":
-        return jsonify({"ok": True, "message": "JupyterLab 已在运行"})
+        return _ok("already_running")
 
     # 清除 token 缓存 (Jupyter 自动生成新 token)
     global _cached_token
@@ -410,10 +439,10 @@ def jupyter_start():
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
         subprocess.run("pm2 save 2>/dev/null", shell=True)
         if r.returncode == 0:
-            return jsonify({"ok": True, "message": "JupyterLab 启动中..."})
-        return jsonify({"ok": False, "error": r.stderr or "启动失败"}), 500
+            return _ok("starting")
+        return _err("start_failed", 500, _extra={"ok": False}, detail=(r.stderr or "").strip())
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return _err("start_failed", 500, _extra={"ok": False}, detail=str(e))
 
 
 @bp.route("/api/jupyter/stop", methods=["POST"])
@@ -424,9 +453,9 @@ def jupyter_stop():
                        shell=True, timeout=10)
         global _cached_token
         _cached_token = None
-        return jsonify({"ok": True, "message": "JupyterLab 已停止"})
+        return _ok("stopped")
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return _err("stop_failed", 500, _extra={"ok": False}, detail=str(e))
 
 
 @bp.route("/api/jupyter/restart", methods=["POST"])
@@ -438,10 +467,10 @@ def jupyter_restart():
         global _cached_token
         _cached_token = None
         if r.returncode == 0:
-            return jsonify({"ok": True, "message": "JupyterLab 正在重启..."})
-        return jsonify({"ok": False, "error": "重启失败 (进程可能不存在)"}), 500
+            return _ok("restarting")
+        return _err("restart_failed", 500, _extra={"ok": False}, detail=(r.stderr or "").strip())
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return _err("restart_failed", 500, _extra={"ok": False}, detail=str(e))
 
 
 @bp.route("/api/jupyter/token")
@@ -450,4 +479,4 @@ def jupyter_token_endpoint():
     token = _detect_token()
     if token:
         return jsonify({"token": token})
-    return jsonify({"token": "", "error": "未找到令牌"})
+    return _err("token_not_found", 200, _extra={"token": ""})

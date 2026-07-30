@@ -16,11 +16,22 @@ import time
 import uuid
 
 from ..config import (
-    COMFYUI_DIR, RCLONE_CONF, SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
+    RCLONE_CONF, SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
+    resolve_workspace_path,
 )
 
 
+def _local_abs(rule_path: str) -> str | None:
+    """规则里的 local_path (workspace 根相对) → 真实绝对路径。越界返回 None。"""
+    target, err = resolve_workspace_path(rule_path, allow_root=False)
+    return None if err else str(target)
+
+
 # ── 同步规则 CRUD ────────────────────────────────────────────
+
+# 规则 / 设置文件的写锁 —— 面板保存与 deploy 阶段落盘可能并发
+_rules_file_lock = threading.Lock()
+_settings_file_lock = threading.Lock()
 
 def _load_sync_rules():
     """加载同步规则"""
@@ -32,11 +43,21 @@ def _load_sync_rules():
     return []
 
 
+def _atomic_write_json(path, data):
+    """同目录临时文件 + os.replace 原子替换。
+
+    直接 write_text 时进程在写入中途退出会留下截断 JSON, 而 _load_sync_rules
+    对损坏文件的兜底是返回 [] —— 等于规则全丢。
+    """
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def _save_sync_rules(rules):
-    """保存同步规则"""
-    SYNC_RULES_FILE.write_text(
-        json.dumps(rules, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    """保存同步规则 (原子写 + 串行化, 防并发保存互相覆盖)"""
+    with _rules_file_lock:
+        _atomic_write_json(SYNC_RULES_FILE, rules)
 
 
 # ── Rclone 配置解析 ──────────────────────────────────────────
@@ -89,7 +110,8 @@ def _load_sync_settings():
 
 def _save_sync_settings(settings):
     """保存全局同步设置"""
-    SYNC_SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
+    with _settings_file_lock:
+        _atomic_write_json(SYNC_SETTINGS_FILE, settings)
 
 
 # ── Sync Worker ──────────────────────────────────────────────
@@ -102,11 +124,14 @@ _sync_current_proc_lock = threading.Lock()
 _sync_log_buffer = []
 _sync_log_lock = threading.Lock()
 
-# Job 追踪 — _current_job_id 是模块级变量（跨线程可见）
-_current_job_id: str | None = None
+# Job 追踪。
+# _current_job.job_id / .rule_id 是 thread-local: 日志归属必须按执行线程算 ——
+# 用模块级单变量时, 后开始的 job 会覆盖它, 前一个 job 的后续事件就写进了
+# 别人的记录里 (worker 跑 watch job 时用户点手动执行即可复现)。
+# _running_job_ids 只服务 get_current_job_id() (给 API 显示"正在跑哪个")。
+_current_job = threading.local()   # .job_id / .rule_id
+_running_job_ids: list[str] = []
 _current_job_id_lock = threading.Lock()
-# rule_id 只在执行线程内使用，用 thread-local 即可
-_current_job = threading.local()   # _current_job.rule_id
 
 # 引用 Flask app logger (延迟绑定)
 _app_logger = None
@@ -128,9 +153,8 @@ def _sync_log(key, params=None, level="info"):
             _sync_log_buffer[:] = _sync_log_buffer[-300:]
     if _app_logger:
         _app_logger.debug(f"[sync] {key} {params or {}}")
-    # DB 双写 — 有活跃 job 时写入 sync_job_events
-    with _current_job_id_lock:
-        job_id = _current_job_id
+    # DB 双写 — 有活跃 job 时写入 sync_job_events (按执行线程归属)
+    job_id = getattr(_current_job, "job_id", None)
     if job_id:
         try:
             from . import sync_store as store
@@ -210,7 +234,7 @@ def _run_sync_rule_inner(rule):
     """_run_sync_rule 的内部实现。返回 (ok: bool, stats: dict)。"""
     remote = rule.get("remote", "")
     remote_path = rule.get("remote_path", "")
-    local_rel = rule.get("local_path", "")
+    local_path = rule.get("local_path", "")
     method = rule.get("method", "sync")
     direction = rule.get("direction", "pull")
     filters = rule.get("filters", [])
@@ -220,7 +244,11 @@ def _run_sync_rule_inner(rule):
     # 设置当前 rule_id 供 _sync_log DB 双写使用
     _current_job.rule_id = rule_id
 
-    local_abs = os.path.join(COMFYUI_DIR, local_rel)
+    local_abs = _local_abs(local_path)
+    if local_abs is None:
+        # 独立 key: 插值参数里塞中文句子的话, 英文 locale 下会是英文模板+中文插值
+        _sync_log("rule_path_invalid", {"name": name, "path": local_path}, "error")
+        return False, {}
     os.makedirs(local_abs, exist_ok=True)
 
     remote_spec = f"{remote}:{remote_path}"
@@ -290,9 +318,9 @@ def _run_sync_rule_inner(rule):
 
 
 def get_current_job_id() -> str | None:
-    """返回当前正在执行的 job_id (跨线程安全)。"""
+    """返回当前正在执行的 job_id (跨线程安全)。多个并发 job 时返回最早开始的那个。"""
     with _current_job_id_lock:
-        return _current_job_id
+        return _running_job_ids[0] if _running_job_ids else None
 
 
 def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
@@ -302,7 +330,6 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
     创建 DB job 记录，逐条执行规则，统计成功/失败，最后 finish。
     返回 job_id。
     """
-    global _current_job_id
     job_id = f"sync-{uuid.uuid4().hex[:12]}"
     rule_count = len(rules)
 
@@ -315,10 +342,11 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
         if _app_logger:
             _app_logger.warning(f"[sync] create_job failed: {e}")
 
-    # 设置当前 job (模块级，跨线程可见)
-    with _current_job_id_lock:
-        _current_job_id = job_id
+    # 本线程的 job 归属 (thread-local, 不会被并发 job 覆盖)
+    _current_job.job_id = job_id
     _current_job.rule_id = ""
+    with _current_job_id_lock:
+        _running_job_ids.append(job_id)
 
     success_count = 0
     failure_count = 0
@@ -393,8 +421,10 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
             if _app_logger:
                 _app_logger.warning(f"[sync] finish_job failed: {e}")
 
+        _current_job.job_id = None
         with _current_job_id_lock:
-            _current_job_id = None
+            if job_id in _running_job_ids:
+                _running_job_ids.remove(job_id)
 
     return job_id
 
@@ -403,45 +433,60 @@ def _sync_worker_loop():
     """后台线程: 持续执行 watch 类型规则"""
     _sync_log("worker_started")
     while not _sync_worker_stop.is_set():
-        rules = _load_sync_rules()
-        watch_rules = [r for r in rules if r.get("trigger") == "watch" and r.get("enabled", True)]
-        if not watch_rules:
-            _sync_worker_stop.wait(30)
-            continue
-        method_order = {"copy": 0, "sync": 1, "move": 2}
-        watch_rules.sort(key=lambda r: method_order.get(r.get("method", "sync"), 1))
-
-        # 过滤: push 规则只在有真实文件时执行
-        runnable = []
-        for rule in watch_rules:
-            if _sync_worker_stop.is_set():
-                break
-            if rule.get("direction") == "push":
-                local_abs = os.path.join(COMFYUI_DIR, rule.get("local_path", ""))
-                if os.path.isdir(local_abs):
-                    has_real = False
-                    try:
-                        for root, dirs, files in os.walk(local_abs):
-                            dirs[:] = [d for d in dirs if not d.startswith('.')]
-                            for f in files:
-                                if not f.startswith('.') and not f.startswith('_'):
-                                    has_real = True
-                                    break
-                            if has_real:
-                                break
-                    except FileNotFoundError:
-                        continue
-                    if not has_real:
-                        continue
-            runnable.append(rule)
-
-        if runnable and not _sync_worker_stop.is_set():
-            run_rules_as_job(runnable, trigger_type="watch")
-
-        settings = _load_sync_settings()
-        wait = max(settings.get("watch_interval", 60), 5)
-        _sync_worker_stop.wait(wait)
+        try:
+            _sync_worker_tick()
+        except Exception as e:
+            # 单轮出错不能让 worker 静默死掉 —— 之前 os.walk 撞上无读权限的
+            # 子目录就会把线程带走, is_worker_running() 变假且没有任何线索
+            _sync_log("worker_error", {"error": str(e)}, "error")
+            if _app_logger:
+                _app_logger.exception("[sync] worker tick failed")
+            _sync_worker_stop.wait(10)
     _sync_log("worker_stopped")
+
+
+def _has_syncable_files(local_abs: str) -> bool:
+    """目录下是否有非隐藏、非下划线开头的真实文件 (push 规则的执行前提)。"""
+    try:
+        for root, dirs, files in os.walk(local_abs):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for f in files:
+                if not f.startswith('.') and not f.startswith('_'):
+                    return True
+    except OSError:
+        # FileNotFoundError / PermissionError 等一律当作"没有可同步文件"
+        return False
+    return False
+
+
+def _sync_worker_tick():
+    """worker 的单轮迭代 (异常由 _sync_worker_loop 兜住)"""
+    rules = _load_sync_rules()
+    watch_rules = [r for r in rules
+                   if r.get("trigger") == "watch" and r.get("enabled", True)]
+    if not watch_rules:
+        _sync_worker_stop.wait(30)
+        return
+    method_order = {"copy": 0, "sync": 1, "move": 2}
+    watch_rules.sort(key=lambda r: method_order.get(r.get("method", "sync"), 1))
+
+    # 过滤: push 规则只在有真实文件时执行
+    runnable = []
+    for rule in watch_rules:
+        if _sync_worker_stop.is_set():
+            break
+        if rule.get("direction") == "push":
+            local_abs = _local_abs(rule.get("local_path", ""))
+            if local_abs and os.path.isdir(local_abs) and not _has_syncable_files(local_abs):
+                continue
+        runnable.append(rule)
+
+    if runnable and not _sync_worker_stop.is_set():
+        run_rules_as_job(runnable, trigger_type="watch")
+
+    settings = _load_sync_settings()
+    wait = max(settings.get("watch_interval", 60), 5)
+    _sync_worker_stop.wait(wait)
 
 
 def is_worker_running():

@@ -18,6 +18,36 @@ bp = Blueprint("tunnel", __name__)
 # cloudflared --metrics 端点 (两种模式统一使用)
 _CF_METRICS_URL = "http://localhost:20241"
 
+
+# ── 错误响应辅助 ──
+# /api/tunnel/* 的唯一消费方是面板前端, 回传中文成品文案的话英文 locale 下
+# toast 里会直接冒出中文。改为回传 error_key + error_params, 前端 apiErrorText()
+# 负责渲染。tunnel.py 的成功响应大多用 {"ok": True/False, ...} 自定义, 不走
+# _ok; 错误统一走 _err, 需要保留 ok:false 语义的 (如 200 状态码软错误) 传
+# _extra={"ok": False}。
+def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    """错误响应。前端按 `tunnel.err.<key>` 翻译; _extra 为响应体附加顶层字段。
+
+    形参位置化 (`/`): 插值参数里有 key / status 这种名字, 不然会撞车。
+    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
+    `**params` 静默吞掉, 顶层字段丢失。
+    """
+    body = {"error_key": f"tunnel.err.{key}", "error_params": params}
+    if _extra:
+        body.update(_extra)
+    return jsonify(body), status
+
+
+def _cf_err(e, status: int = 400):
+    """CFAPIError / PublicTunnelError → 响应。
+
+    异常自带 key 的用它, 否则回落 internal + 原文 detail —— 那种是 CF API 或
+    公共 Tunnel API 直接返回的报错, 透出原文比造键有用。
+    """
+    if getattr(e, "key", ""):
+        return _err(e.key, status, **(e.params or {}))
+    return _err("internal", status, detail=str(e))
+
 # ── Tunnel 状态 TTL 缓存 ──
 # CF API 调用延迟高 (每次 2-4s, 共 3 次 ≈ 6-12s), 缓存 30 秒
 _tunnel_cache: dict = {"data": None, "ts": 0.0}
@@ -238,7 +268,7 @@ def api_tunnel_provision():
     subdomain = data.get("subdomain", "")
 
     if not api_token or not domain:
-        return jsonify({"ok": False, "error": "缺少 api_token 或 domain"}), 400
+        return _err("missing_token_or_domain", 400)
 
     # 如果当前在公共 Tunnel 模式, 先释放
     if get_config("tunnel_mode", "") == "public":
@@ -267,9 +297,7 @@ def api_tunnel_provision():
     try:
         result = mgr.ensure(services)
     except CFAPIError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
-
-    # 持久化到 config (可被 export 导出)
+        return _cf_err(e)
     set_config("cf_api_token", api_token)
     set_config("cf_domain", domain)
     set_config("cf_subdomain", mgr.subdomain)
@@ -291,7 +319,7 @@ def api_tunnel_teardown():
     """删除 Tunnel + DNS, 停止 cloudflared, 清除 config"""
     mgr = _get_manager()
     if not mgr:
-        return jsonify({"ok": False, "error": "Tunnel 未配置"}), 400
+        return _err("not_configured", 400)
 
     ok = mgr.teardown()
 
@@ -315,26 +343,26 @@ def api_tunnel_restart():
         r = subprocess.run("pm2 restart cf-tunnel 2>/dev/null", shell=True,
                            capture_output=True, text=True, timeout=10)
         if r.returncode != 0:
-            return jsonify({"ok": False, "error": "PM2 重启失败"}), 500
+            return _err("pm2_restart_failed", 500)
         return jsonify({"ok": True})
 
     # 自定义模式
     mgr = _get_manager()
     if not mgr:
-        return jsonify({"ok": False, "error": "Tunnel 未配置"}), 400
+        return _err("not_configured", 400)
 
     from ..services.tunnel_manager import CFAPIError
     try:
         account_id, _ = mgr._get_account()
         tunnel = mgr._find_tunnel(account_id, mgr.tunnel_name)
         if not tunnel:
-            return jsonify({"ok": False, "error": "Tunnel 不存在"}), 404
+            return _err("not_found", 404)
 
         token = mgr._get_tunnel_token(account_id, tunnel["id"])
         mgr.start_cloudflared(token)
         return jsonify({"ok": True})
     except CFAPIError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+        return _cf_err(e)
 
 
 @bp.route("/api/tunnel/stop", methods=["POST"])
@@ -343,7 +371,7 @@ def api_tunnel_stop():
     r = subprocess.run("pm2 stop cf-tunnel 2>/dev/null", shell=True,
                        capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
-        return jsonify({"ok": False, "error": "停止失败"}), 500
+        return _err("stop_failed", 500)
     return jsonify({"ok": True})
 
 
@@ -353,7 +381,7 @@ def api_tunnel_start():
     r = subprocess.run("pm2 start cf-tunnel 2>/dev/null", shell=True,
                        capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
-        return jsonify({"ok": False, "error": "启动失败"}), 500
+        return _err("start_failed", 500)
     return jsonify({"ok": True})
 
 
@@ -370,14 +398,14 @@ def api_tunnel_add_service():
     protocol = data.get("protocol", "http")
 
     if not name or not port or not suffix:
-        return jsonify({"ok": False, "error": "请填写服务名称、端口和子域名后缀"}), 400
+        return _err("fill_service_info", 400)
 
     # 保存到自定义服务列表
     custom = _get_custom_services()
     # 检查是否已存在
     for s in custom:
         if s["suffix"] == suffix:
-            return jsonify({"ok": False, "error": f"后缀 '{suffix}' 已被服务 '{s['name']}' 使用"}), 400
+            return _err("suffix_in_use", 400, suffix=suffix, name=s['name'])
 
     custom.append({"name": name, "port": int(port), "suffix": suffix, "protocol": protocol})
     set_config("cf_custom_services", json.dumps(custom))
@@ -404,7 +432,7 @@ def api_tunnel_update_subdomain(suffix):
     data = request.get_json(force=True)
     new_suffix = data.get("new_suffix", "").strip()
     if not new_suffix:
-        return jsonify({"ok": False, "error": "新后缀不能为空"}), 400
+        return _err("suffix_empty", 400)
 
     custom = _get_custom_services()
     found = False
@@ -471,7 +499,7 @@ def api_tunnel_public_enable():
         _invalidate_tunnel_cache()
         return jsonify(result)
     except PublicTunnelError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+        return _cf_err(e)
 
 
 @bp.route("/api/tunnel/public/disable", methods=["POST"])
@@ -500,7 +528,7 @@ def api_tunnel_set_protocol():
     data = request.get_json(force=True)
     protocol = data.get("protocol", "auto")
     if protocol not in ("auto", "http2", "quic"):
-        return jsonify({"ok": False, "error": "无效协议，可选: auto, http2, quic"}), 400
+        return _err("invalid_protocol", 400)
 
     set_config("cf_protocol", protocol)
     return jsonify({"ok": True, "protocol": protocol, "restart_required": True})
@@ -547,7 +575,7 @@ def api_tunnel_subdomain():
     if subdomain:
         import re
         if not re.match(r"^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$", subdomain):
-            return jsonify({"ok": False, "error": "子域名必须为 3-32 位小写字母、数字或连字符"}), 400
+            return _err("invalid_subdomain", 400)
 
     set_config("public_tunnel_subdomain", subdomain)
     return jsonify({"ok": True, "subdomain": subdomain})
@@ -579,7 +607,7 @@ def _reprovision_services():
     """重新 provision 所有服务 (默认 + 自定义)"""
     mgr = _get_manager()
     if not mgr:
-        return jsonify({"ok": False, "error": "Tunnel 未配置"}), 400
+        return _err("not_configured", 400)
 
     from ..services.tunnel_manager import get_default_services, CFAPIError
 
@@ -604,7 +632,7 @@ def _reprovision_services():
         _invalidate_tunnel_cache()
         return jsonify({"ok": True, "urls": result["urls"]})
     except CFAPIError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+        return _cf_err(e)
 
 # ═══════════════════════════════════════════════════════════════
 # Tunnel 日志

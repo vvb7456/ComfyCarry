@@ -6,6 +6,7 @@ import { usePluginFiltering } from '@/composables/usePluginFiltering'
 import { usePluginQueue } from '@/composables/usePluginQueue'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { apiMessageText } from '@/utils/apiError'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -120,23 +121,23 @@ async function installPlugin(id: string, version = 'latest') {
   if (pack.files) payload.files = pack.files
   if (pack.repository || pack.reference) payload.repository = pack.repository || pack.reference
   const d = await post<PluginActionResponse>('/api/plugins/install', payload)
-  if (d?.message) { toast(d.message, 'success'); startQueuePoll() }
+  if (d?.ok) { toast(apiMessageText(d), 'success'); startQueuePoll() }
 }
 
 async function uninstallPlugin(p: PluginData) {
   if (!await confirm({ message: t('plugins.confirm.uninstall_name', { title: p.title || p.id }), variant: 'danger' })) return
   const d = await post<PluginActionResponse>('/api/plugins/uninstall', { id: p.id, version: p.ver })
-  if (d?.message) { toast(d.message, 'success'); startQueuePoll() }
+  if (d?.ok) { toast(apiMessageText(d), 'success'); startQueuePoll() }
 }
 
 async function updatePlugin(p: PluginData) {
   const d = await post<PluginActionResponse>('/api/plugins/update', { id: p.id, version: p.ver })
-  if (d?.message) { toast(d.message, 'success'); startQueuePoll() }
+  if (d?.ok) { toast(apiMessageText(d), 'success'); startQueuePoll() }
 }
 
 async function togglePlugin(p: PluginData) {
   const d = await post<PluginActionResponse>('/api/plugins/disable', { id: p.id, version: p.ver })
-  if (d?.message) { toast(d.message, 'success'); startQueuePoll() }
+  if (d?.ok) { toast(apiMessageText(d), 'success'); startQueuePoll() }
 }
 
 // ── Version modal ──

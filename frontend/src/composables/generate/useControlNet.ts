@@ -4,6 +4,7 @@ import { useGenerateStore, type ControlNetState } from '@/stores/generate'
 import { useRefImagePicker } from './useRefImagePicker'
 import { useToast } from '@/composables/useToast'
 import { cnBranchForFile, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { apiErrorText } from '@/utils/apiError'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -296,7 +297,7 @@ export function useControlNet(
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        toast((body as Record<string, string>).error || `Preprocess failed (${res.status})`, 'error')
+        toast(apiErrorText(body, `Preprocess failed (${res.status})`), 'error')
         preprocessStatus.value = 'error'
         stopPPTimer()
         return null
