@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CartItem, DownloadTask, VersionState } from '@/composables/useDownloads'
+import type { FavoriteItem, DownloadTask, VersionState } from '@/composables/useDownloads'
 import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import DownloadButton from '@/components/models/DownloadButton.vue'
@@ -14,23 +14,23 @@ defineOptions({ name: 'DownloadItem' })
 const { t } = useI18n()
 
 const props = defineProps<{
-  /** Cart item mode */
-  cartItem?: CartItem
+  /** Favorite item mode */
+  favoriteItem?: FavoriteItem
   /** Download task mode */
   task?: DownloadTask
   /** Whether this item is already installed locally */
   installed?: boolean
-  /** Cart mode: 该版本的下载状态 (驱动按钮 spinner/进度环), 缺省时退回 installed/idle */
+  /** Favorite mode: 该版本的下载状态 (驱动按钮 spinner/进度环), 缺省时退回 installed/idle */
   state?: VersionState
-  /** Cart mode: 进度 % / 速度 B/s (state 为 queued/downloading 时显示) */
+  /** Favorite mode: 进度 % / 速度 B/s (state 为 queued/downloading 时显示) */
   progress?: number
   speed?: number
-  /** Cart mode: 有 downloadId 才允许 hover 取消 */
+  /** Favorite mode: 有 downloadId 才允许 hover 取消 */
   downloadId?: string | null
 }>()
 
 const emit = defineEmits<{
-  download: [item: CartItem]
+  download: [item: FavoriteItem]
   remove: [key: string]
   pause: [id: string]
   resume: [id: string]
@@ -41,15 +41,15 @@ const emit = defineEmits<{
 // ── Shared display ──
 
 const name = computed(() =>
-  props.cartItem?.name || props.task?.meta?.model_name || props.task?.filename || 'Unknown',
+  props.favoriteItem?.name || props.task?.meta?.model_name || props.task?.filename || 'Unknown',
 )
 
 const imageUrl = computed(() =>
-  props.cartItem?.imageUrl || props.task?.meta?.image_url || '',
+  props.favoriteItem?.imageUrl || props.task?.meta?.image_url || '',
 )
 
 const modelType = computed(() =>
-  props.cartItem?.type || props.task?.meta?.model_type || '',
+  props.favoriteItem?.type || props.task?.meta?.model_type || '',
 )
 
 const badgeColor = computed(() => {
@@ -62,17 +62,17 @@ const badgeColor = computed(() => {
 })
 
 const civitaiUrl = computed(() => {
-  const id = props.cartItem?.modelId || props.task?.meta?.model_id
+  const id = props.favoriteItem?.modelId || props.task?.meta?.model_id
   return id ? `https://civitai.com/models/${id}` : ''
 })
 
-// ── Cart-specific ──
+// ── Favorite-specific ──
 
-const cartKey = computed(() => {
-  if (!props.cartItem) return ''
-  return props.cartItem.versionId
-    ? `${props.cartItem.modelId}:${props.cartItem.versionId}`
-    : props.cartItem.modelId
+const favoriteKey = computed(() => {
+  if (!props.favoriteItem) return ''
+  return props.favoriteItem.versionId
+    ? `${props.favoriteItem.modelId}:${props.favoriteItem.versionId}`
+    : props.favoriteItem.modelId
 })
 
 // ── Task-specific ──
@@ -87,10 +87,10 @@ const sizeText = computed(() => {
   return `${fmtBytes(props.task?.completed_bytes || 0)} / ${fmtBytes(total)}`
 })
 
-const isCart = computed(() => !!props.cartItem)
+const isFavorite = computed(() => !!props.favoriteItem)
 
-/** Cart 按钮状态: 显式 state 优先, 否则按 installed 退回旧行为 */
-const cartState = computed<VersionState>(() =>
+/** Favorite 按钮状态: 显式 state 优先, 否则按 installed 退回旧行为 */
+const favoriteState = computed<VersionState>(() =>
   props.state ?? (props.installed ? 'installed' : 'idle'),
 )
 const isActive = computed(() => props.task?.status === 'active')
@@ -101,7 +101,7 @@ const isFailed = computed(() => props.task?.status === 'failed')
 
 /** Whether the progress row should render (active group, even at 0%). */
 const showProgressRow = computed(() =>
-  !isCart.value && !!props.task && (isActive.value || isPaused.value || isQueued.value),
+  !isFavorite.value && !!props.task && (isActive.value || isPaused.value || isQueued.value),
 )
 </script>
 
@@ -120,14 +120,14 @@ const showProgressRow = computed(() =>
         <span v-else>{{ name }}</span>
       </div>
       <div class="dli-meta">
-        <Badge v-if="isCart && installed" color="#10b981" size="sm">{{ t('models.downloads.installed') }}</Badge>
+        <Badge v-if="isFavorite && installed" color="#10b981" size="sm">{{ t('models.downloads.installed') }}</Badge>
         <Badge v-if="modelType" :color="badgeColor" size="sm">{{ modelType }}</Badge>
-        <Badge v-if="cartItem?.baseModel" size="sm">{{ cartItem.baseModel }}</Badge>
+        <Badge v-if="favoriteItem?.baseModel" size="sm">{{ favoriteItem.baseModel }}</Badge>
         <Badge v-if="task?.meta?.base_model" size="sm">{{ task.meta.base_model }}</Badge>
-        <Badge v-if="isCart && cartItem?.versionName" size="sm">{{ cartItem.versionName }}</Badge>
+        <Badge v-if="isFavorite && favoriteItem?.versionName" size="sm">{{ favoriteItem.versionName }}</Badge>
 
         <!-- Task: version name text -->
-        <span v-if="!isCart && task?.meta?.version_name" class="dli-version-text">{{ task.meta.version_name }}</span>
+        <span v-if="!isFavorite && task?.meta?.version_name" class="dli-version-text">{{ task.meta.version_name }}</span>
 
         <!-- Task status labels -->
         <span v-if="isPaused" class="dli-status dli-status--paused">{{ t('models.downloads.paused') }}</span>
@@ -138,17 +138,17 @@ const showProgressRow = computed(() =>
 
     <!-- Actions -->
     <div class="dli-actions">
-      <!-- Cart actions -->
-      <template v-if="isCart">
+      <!-- Favorite actions -->
+      <template v-if="isFavorite">
         <DownloadButton
-          :state="cartState"
+          :state="favoriteState"
           :progress="progress || 0"
           :speed="speed || 0"
           :cancellable="!!downloadId"
-          @download="emit('download', cartItem!)"
+          @download="emit('download', favoriteItem!)"
           @cancel="downloadId && emit('cancel', downloadId)"
         />
-        <BaseButton size="sm" variant="danger" square @click="emit('remove', cartKey)">
+        <BaseButton size="sm" variant="danger" square @click="emit('remove', favoriteKey)">
           <MsIcon name="delete" />
         </BaseButton>
       </template>

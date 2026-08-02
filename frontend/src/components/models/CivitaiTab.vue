@@ -27,10 +27,10 @@ const { t } = useI18n({ useScope: 'global' })
 
 // ── Downloads (singleton) ──
 const {
-  cartItems: dlCartItems,
-  addToCart: dlAddToCart,
-  removeFromCart: dlRemoveFromCart,
-  isInCart: dlIsInCart,
+  favoritesItems: dlFavItems,
+  addFavorite: dlAddFavorite,
+  removeFavorite: dlRemoveFavorite,
+  isInFavorites: dlIsInFavorites,
   getModelAggregateState: dlGetModelState,
   downloadOne: dlDownloadOne,
   fetchLocalIndex: dlFetchLocalIndex,
@@ -112,8 +112,8 @@ watch(sentinelRef, (el) => {
   observer.observe(el)
 })
 
-// ── Cart helpers ──
-function hitToCartItem(hit: CivitaiHit) {
+// ── Favorite helpers ──
+function hitToFavoriteItem(hit: CivitaiHit) {
   const CDN = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
   const imgs = hit.images?.length ? hit.images : (hit.version?.images || [])
   const rawUrl = imgs[0]?.url || ''
@@ -132,13 +132,13 @@ function hitToCartItem(hit: CivitaiHit) {
   }
 }
 
-function toggleCart(hit: CivitaiHit) {
-  if (dlIsInCart(hit.id)) {
-    // Remove all versions of this model from cart
-    for (const item of dlCartItems.value) {
+function toggleFavorite(hit: CivitaiHit) {
+  if (dlIsInFavorites(hit.id)) {
+    // Remove all versions of this model from favorites
+    for (const item of dlFavItems.value) {
       if (item.modelId === String(hit.id)) {
         const key = item.versionId ? `${item.modelId}:${item.versionId}` : item.modelId
-        dlRemoveFromCart(key)
+        dlRemoveFavorite(key)
       }
     }
   } else {
@@ -149,7 +149,7 @@ function toggleCart(hit: CivitaiHit) {
       favOpen.value = true
     } else {
       // Single version: add directly
-      dlAddToCart(hitToCartItem(hit))
+      dlAddFavorite(hitToFavoriteItem(hit))
     }
   }
 }
@@ -161,7 +161,7 @@ function handleFavoriteVersion(modelId: string, versionId: number, versionName: 
   const imgs = hit.images?.length ? hit.images : (hit.version?.images || [])
   const rawUrl = imgs[0]?.url || ''
   const imageUrl = rawUrl.startsWith('http') ? rawUrl : rawUrl ? `${CDN}${rawUrl}/width=200/default.jpg` : ''
-  dlAddToCart({
+  dlAddFavorite({
     modelId,
     name: hit.name,
     type: hit.type,
@@ -173,7 +173,7 @@ function handleFavoriteVersion(modelId: string, versionId: number, versionName: 
 }
 
 function handleUnfavoriteVersion(modelId: string, versionId: number) {
-  dlRemoveFromCart(`${modelId}:${versionId}`)
+  dlRemoveFavorite(`${modelId}:${versionId}`)
 }
 
 function getDownloadState(hit: CivitaiHit): string {
@@ -325,10 +325,10 @@ function openCivitaiMeta(hit: CivitaiHit) {
       v-for="hit in civitaiHits"
       :key="hit.id"
       :hit="hit"
-      :in-cart="dlIsInCart(hit.id)"
+      :is-favorite="dlIsInFavorites(hit.id)"
       :download-state="getDownloadState(hit)"
       @details="openCivitaiMeta"
-      @toggle-cart="toggleCart"
+      @toggle-favorite="toggleFavorite"
       @download="handleDownload"
       @preview="(url: string) => emit('openPreview', url)"
     />

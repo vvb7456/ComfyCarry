@@ -14,7 +14,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # ── 版本号 (唯一源) ──────────────────────────────────────────
-APP_VERSION = "v0.5.2"
+APP_VERSION = "v0.5.3"
 
 # ── 核心路径常量 ─────────────────────────────────────────────
 # 面板的路径约定: 对外 (UI / 规则数据 / 文件 API) 一律用 "workspace 根相对路径",

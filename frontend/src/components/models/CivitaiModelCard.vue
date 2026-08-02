@@ -17,14 +17,14 @@ const { t } = useI18n()
 
 const props = defineProps<{
   hit: CivitaiHit
-  inCart?: boolean
+  isFavorite?: boolean
   /** 'idle' | 'downloading' | 'local' */
   downloadState?: string
 }>()
 
 const emit = defineEmits<{
   details: [hit: CivitaiHit]
-  toggleCart: [hit: CivitaiHit]
+  toggleFavorite: [hit: CivitaiHit]
   download: [hit: CivitaiHit]
   preview: [url: string]
 }>()
@@ -184,10 +184,10 @@ const installedTooltip = computed(() =>
       </BaseButton>
       <BaseButton
         size="sm"
-        :variant="inCart ? 'danger' : 'default'"
-        @click="emit('toggleCart', hit)"
+        :variant="isFavorite ? 'danger' : 'default'"
+        @click="emit('toggleFavorite', hit)"
       >
-        {{ inCart ? t('models.civitai.unfavorite') : t('models.civitai.favorite') }}
+        {{ isFavorite ? t('models.civitai.unfavorite') : t('models.civitai.favorite') }}
       </BaseButton>
       <DownloadButton
         :state="dlBtnState"

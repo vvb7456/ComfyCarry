@@ -9,7 +9,7 @@ import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import DownloadItem from '@/components/models/DownloadItem.vue'
 import BatchAddModal from '@/components/models/BatchAddModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import type { CartItem } from '@/composables/useDownloads'
+import type { FavoriteItem } from '@/composables/useDownloads'
 
 /**
  * FavoritesPanel — 收藏列表, 挂在模型页的「收藏&下载」抽屉里。
@@ -40,12 +40,12 @@ const batchAddOpen = ref(false)
 const downloadingAll = ref(false)
 
 /** 版本级下载信息 (state + progress/speed/downloadId) — 驱动每行按钮的 spinner */
-function itemInfo(item: CartItem) {
+function itemInfo(item: FavoriteItem) {
   return dlGetVersionInfo(item.modelId, item.versionId || item.modelId)
 }
 
 /** hover 取消 — 与 CivitaiModelCard 一致, 先确认再撤 */
-async function handleCancel(item: CartItem) {
+async function handleCancel(item: FavoriteItem) {
   const id = itemInfo(item).downloadId
   if (!id) return
   if (await confirm({ message: t('models.downloads.confirm_cancel', { name: item.name || '' }) })) {
@@ -71,7 +71,7 @@ const downloadableCount = computed(() =>
 
 // For each favorite item, surface the error text if the matching task is failed.
 // Resolves "toast 一闪即逝" by showing a persistent red error badge + tooltip.
-function failedError(item: CartItem): string {
+function failedError(item: FavoriteItem): string {
   const mid = String(item.modelId)
   const vid = item.versionId ? String(item.versionId) : mid
   const task = dlTasks.value.find(t => {
@@ -110,7 +110,7 @@ async function handleClearFavorites() {
     <div v-if="favItems.length" class="fav-section-list">
       <div v-for="item in favItems" :key="item.modelId + ':' + (item.versionId || '')" class="fav-row">
         <DownloadItem
-          :cart-item="item"
+          :favorite-item="item"
           :installed="!!(item.versionId && dlGetVersionState(item.modelId, item.versionId) === 'installed')"
           :state="itemInfo(item).state"
           :progress="itemInfo(item).progress"

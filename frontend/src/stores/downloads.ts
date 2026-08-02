@@ -18,7 +18,7 @@ export interface PendingClassification {
 
 // ── Types ──────────────────────────────────────────────
 
-export interface CartItem {
+export interface FavoriteItem {
   modelId: string
   name: string
   type: string
@@ -73,7 +73,7 @@ const IDLE_DISCONNECT_MS = 60_000
 const ACTIVE_STATES = new Set<string>(['active', 'queued', 'paused'])
 const TERMINAL_STATES = new Set<string>(['complete', 'failed', 'cancelled'])
 
-// ── Favorites (CartItem) ↔ API snake_case mapping ──────
+// ── Favorites (FavoriteItem) ↔ API snake_case mapping ──────
 
 interface FavoriteApi {
   model_id: string
@@ -87,7 +87,7 @@ interface FavoriteApi {
   fav_key?: string
 }
 
-function cartToApi(item: CartItem): FavoriteApi {
+function favoriteToApi(item: FavoriteItem): FavoriteApi {
   return {
     model_id: item.modelId,
     ...(item.versionId !== undefined && { version_id: item.versionId }),
@@ -100,7 +100,7 @@ function cartToApi(item: CartItem): FavoriteApi {
   }
 }
 
-function apiToCart(f: Record<string, unknown>): CartItem {
+function apiToFavorite(f: Record<string, unknown>): FavoriteItem {
   return {
     modelId: String(f.model_id ?? ''),
     name: String(f.name ?? ''),
@@ -113,7 +113,7 @@ function apiToCart(f: Record<string, unknown>): CartItem {
   }
 }
 
-function cartKey(modelId: string, versionId?: number): string {
+function favoriteKey(modelId: string, versionId?: number): string {
   return versionId ? `${modelId}:${versionId}` : modelId
 }
 
@@ -140,8 +140,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   // ── State ──
 
-  /** favorites: Map<cartKey, CartItem> — backed by /api/favorites */
-  const favorites = ref<Map<string, CartItem>>(new Map())
+  /** favorites: Map<favoriteKey, FavoriteItem> — backed by /api/favorites */
+  const favorites = ref<Map<string, FavoriteItem>>(new Map())
 
   const tasks = ref<DownloadTask[]>([])
   const polling = ref(false)
@@ -180,21 +180,21 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch('/api/favorites')
       if (!res.ok) return
       const data = await res.json()
-      const list: Array<CartItem & { fav_key?: string }> = (data?.favorites || []).map((f: Record<string, unknown>) => apiToCart(f))
-      const m = new Map<string, CartItem>()
+      const list: Array<FavoriteItem & { fav_key?: string }> = (data?.favorites || []).map((f: Record<string, unknown>) => apiToFavorite(f))
+      const m = new Map<string, FavoriteItem>()
       for (const item of list) {
         const key = item.fav_key
           ? String(item.fav_key)
-          : cartKey(item.modelId, item.versionId)
+          : favoriteKey(item.modelId, item.versionId)
         const { fav_key: _omit, ...pureItem } = item
-        m.set(key, pureItem as CartItem)
+        m.set(key, pureItem as FavoriteItem)
       }
       favorites.value = m
     } catch { /* ignore */ }
   }
 
-  async function addFavorite(item: CartItem): Promise<boolean> {
-    const key = cartKey(item.modelId, item.versionId)
+  async function addFavorite(item: FavoriteItem): Promise<boolean> {
+    const key = favoriteKey(item.modelId, item.versionId)
     if (favorites.value.has(key)) return false
     // optimistic insert
     const prev = new Map(favorites.value)
@@ -205,7 +205,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cartToApi(item)),
+        body: JSON.stringify(favoriteToApi(item)),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -290,8 +290,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function updateFavoriteVersion(key: string, versionId: number, versionName: string, baseModel?: string): Promise<void> {
     const item = favorites.value.get(key)
     if (!item) return
-    const updated: CartItem = { ...item, versionId, versionName, baseModel: baseModel || item.baseModel }
-    const newKey = cartKey(item.modelId, versionId)
+    const updated: FavoriteItem = { ...item, versionId, versionName, baseModel: baseModel || item.baseModel }
+    const newKey = favoriteKey(item.modelId, versionId)
     const prev = new Map(favorites.value)
     const m = new Map(prev)
     m.delete(key)
@@ -303,7 +303,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cartToApi(updated)),
+        body: JSON.stringify(favoriteToApi(updated)),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))

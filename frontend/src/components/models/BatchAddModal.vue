@@ -5,7 +5,7 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useToast } from '@/composables/useToast'
 import { useApiFetch } from '@/composables/useApiFetch'
-import { useDownloads, type CartItem } from '@/composables/useDownloads'
+import { useDownloads, type FavoriteItem } from '@/composables/useDownloads'
 
 defineOptions({ name: 'BatchAddModal' })
 
@@ -21,7 +21,7 @@ const emit = defineEmits<{
 
 const { toast } = useToast()
 const { get } = useApiFetch()
-const { addToCart } = useDownloads()
+const { addFavorite } = useDownloads()
 
 const inputText = ref('')
 const loading = ref(false)
@@ -80,7 +80,7 @@ async function submit() {
         ? (imgs[0].url.startsWith('http') ? imgs[0].url : `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${imgs[0].url}/width=450/default.jpg`)
         : ''
 
-      const item: CartItem = {
+      const item: FavoriteItem = {
         modelId: String(data.id),
         name: data.name || 'Unknown',
         type: data.type || 'Checkpoint',
@@ -90,7 +90,7 @@ async function submit() {
         baseModel: ver?.baseModel,
         allVersions: versions.map((v: any) => ({ id: v.id, name: v.name, baseModel: v.baseModel })),
       }
-      if (addToCart(item)) added++
+      if (await addFavorite(item)) added++
     }
     toast(t('models.downloads.batch_added', { count: added }), 'success')
     inputText.value = ''

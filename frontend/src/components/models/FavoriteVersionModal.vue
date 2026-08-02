@@ -25,7 +25,7 @@ const emit = defineEmits<{
   unfavorite: [modelId: string, versionId: number]
 }>()
 
-const { getVersionState, isInCart, cartItems } = useDownloads()
+const { getVersionState, isInFavorites, favoritesItems } = useDownloads()
 
 const allVersions = computed(() =>
   props.hit?.versions || (props.hit?.version ? [props.hit.version] : []),
@@ -44,7 +44,7 @@ function isInstalled(versionId: number) {
 function isFavorited(versionId: number) {
   if (!props.hit) return false
   const mid = String(props.hit.id)
-  return cartItems.value.some(it => it.modelId === mid && it.versionId === versionId)
+  return favoritesItems.value.some(it => it.modelId === mid && it.versionId === versionId)
 }
 
 function handleFavorite(v: { id: number; name: string; baseModel?: string }) {
