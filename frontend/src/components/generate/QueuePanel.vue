@@ -72,7 +72,7 @@ function nodeCount(item: QueueItem) {
       :default-open="true"
     >
       <!-- 中断收进标题行右侧 (CollapsibleGroup 的 title-right 插槽, margin-left:auto 右对齐);
-           header 整行绑了 toggle, 故按钮需 .stop 阻止冒泡, 与 DownloadsTab 的用法一致 -->
+           header 整行绑了 toggle, 故按钮需 .stop 阻止冒泡, 与 DownloadsPanel 的用法一致 -->
       <template #title-right>
         <BaseButton variant="danger" size="xs" @click.stop="interrupt">
           {{ t('comfyui.queue.interrupt') }}

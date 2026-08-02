@@ -76,6 +76,18 @@ def serve_logo_small():
     return _serve_public_file("logo-small.png", mimetype="image/png")
 
 
+@bp.route("/logo-mark.svg")
+def serve_logo_mark():
+    """侧栏用的标记 (展开与折叠共用)。"""
+    return _serve_public_file("logo-mark.svg", mimetype="image/svg+xml")
+
+
+@bp.route("/logo-tile.svg")
+def serve_logo_tile():
+    """应用图标底板 —— 上面几个 png / ico 的源文件, 见 frontend/scripts/build-icons.sh。"""
+    return _serve_public_file("logo-tile.svg", mimetype="image/svg+xml")
+
+
 @bp.route("/fonts/<path:filename>")
 def serve_fonts(filename):
     fonts_dir = (DIST_DIR / "fonts").resolve()

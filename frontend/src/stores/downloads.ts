@@ -731,16 +731,32 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   // ── Download Control ──
 
-  async function _postControl(url: string) {
+  /** 裸 POST, 不刷新 —— 批量操作用它, 刷新留到最后统一做一次 */
+  async function _post(url: string) {
     try {
       await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
     } catch { /* ignore */ }
+  }
+
+  async function _postControl(url: string) {
+    await _post(url)
     await refreshStatus()
   }
 
   async function pauseDownload(id: string) { await _postControl(`/api/downloads/${id}/pause`) }
-  async function resumeDownload(id: string) { await _postControl(`/api/downloads/${id}/resume`) }
   async function cancelDownload(id: string) { await _postControl(`/api/downloads/${id}/cancel`) }
+
+  /**
+   * 恢复后必须重新建连接: 全部任务都暂停时没有活跃任务, 连接早已被空闲断开
+   * 或 _refreshStatus 的自动停止收掉了, 不重连的话进度条会停在恢复的那一刻。
+   * 顺序不能反 —— startPolling 内部的 refreshStatus 若在 resume 生效前跑,
+   * 看到的仍是 paused, 会立刻把自己停掉。downloadOne / retryDownload 早就这么做,
+   * resume 是漏网的一条。
+   */
+  async function resumeDownload(id: string) {
+    await _postControl(`/api/downloads/${id}/resume`)
+    startPolling()
+  }
 
   async function retryDownload(id: string) {
     try {
@@ -761,10 +777,30 @@ export const useDownloadsStore = defineStore('downloads', () => {
     await refreshStatus()
   }
 
-  async function pauseAll() {
-    for (const t of tasks.value) {
-      if (t.status === 'active') await _postControl(`/api/downloads/${t.download_id}/pause`)
+  /**
+   * 批量启停: N 个请求并发, 快照只在最后取一次。
+   *
+   * 原实现是 `for … await _postControl(…)`, 每轮串行等一个 POST + 一个全量快照 ——
+   * 10 个任务就是 20 次往返, 而中间 9 次快照的结果全被下一次覆盖。
+   * _batchInFlight 压住 _refreshStatus 的自动停止: pauseAll 途中一旦某次快照
+   * 撞上"已经没有活跃任务"的瞬间, 连接会被掐掉, 剩下的请求就没人接了。
+   */
+  async function _bulkControl(ids: string[], action: 'pause' | 'resume') {
+    if (!ids.length) return
+    _batchInFlight++
+    try {
+      await Promise.all(ids.map(id => _post(`/api/downloads/${id}/${action}`)))
+    } finally {
+      _batchInFlight--
     }
+    await refreshStatus()
+  }
+
+  async function pauseAll() {
+    await _bulkControl(
+      tasks.value.filter(t => t.status === 'active').map(t => t.download_id),
+      'pause',
+    )
   }
 
   /**
@@ -788,9 +824,11 @@ export const useDownloadsStore = defineStore('downloads', () => {
   }
 
   async function resumeAll() {
-    for (const t of tasks.value) {
-      if (t.status === 'paused') await _postControl(`/api/downloads/${t.download_id}/resume`)
-    }
+    await _bulkControl(
+      tasks.value.filter(t => t.status === 'paused').map(t => t.download_id),
+      'resume',
+    )
+    startPolling()  // 同 resumeDownload: 恢复后要重新建连接才有进度
   }
 
   async function clearHistory() {

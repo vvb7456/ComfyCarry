@@ -63,18 +63,21 @@ const props = withDefaults(defineProps<{
   overflow: hidden;
 }
 
-/* ── Default variant: top accent bar driven by status ── */
+/* ── Default variant: 顶部色条只在真的表达状态时出现 ──
+   'info' 是 status 的默认值, 意味着"没传状态"。此前它也画一条蓝色条,
+   于是 SSH / ComfyUI 页上出现绿-蓝-蓝-绿这种与语义无关的彩条。
+   现在 info 不画条, 只有 running / stopped / loading / error 才着色。 */
 .stat-card--v-default::before {
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: var(--blue);
+  background: transparent;
   opacity: .6;
   border-radius: var(--r) var(--r) 0 0;
 }
 
-.stat-card--v-default.stat-card--info::before { background: var(--blue); }
+.stat-card--v-default.stat-card--info::before { background: transparent; }
 .stat-card--v-default.stat-card--running::before { background: var(--green); }
 .stat-card--v-default.stat-card--stopped::before { background: color-mix(in srgb, var(--t3) 80%, var(--bd)); }
 .stat-card--v-default.stat-card--loading::before { background: var(--amber); }

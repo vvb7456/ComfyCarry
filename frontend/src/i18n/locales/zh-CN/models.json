@@ -2,9 +2,11 @@
   "title": "模型管理",
   "tabs": {
     "local": "本地模型",
-    "civitai": "CivitAI",
-    "favorites": "收藏",
-    "tasks": "下载任务"
+    "civitai": "CivitAI"
+  },
+  "drawer": {
+    "title": "收藏&下载",
+    "has_failed": "有下载失败，点击查看"
   },
   "local": {
     "default_types": "默认",

@@ -173,7 +173,7 @@ onMounted(() => {
 .wizard-header h1 {
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #7c5cfc, #e879f9);
+  background: linear-gradient(135deg, var(--ac), var(--ac2));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;

@@ -11,7 +11,6 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import HeaderStatusBadge from '@/components/layout/HeaderStatusBadge.vue'
 import ConsoleTab from '@/components/comfyui/ConsoleTab.vue'
 import SettingsTab from '@/components/comfyui/SettingsTab.vue'
 import PluginsTab from '@/components/comfyui/PluginsTab.vue'
@@ -34,6 +33,19 @@ const comfyTabs = computed(() => [
 
 // Status (shared — used in header badge + ConsoleTab)
 const status = ref<ComfyStatus | null>(null)
+
+// 页头「打开 ComfyUI」链接。地址只有隧道配好之后才存在 (后端不提供本地直连兜底:
+// 端口可配、RunPod 又在反代后面), 解析不出来时标题就退回纯文本。
+const comfyUrl = ref('')
+
+async function loadComfyUrl() {
+  const d = await get<{ urls?: Record<string, string>; public?: { urls?: Record<string, string> } }>(
+    '/api/tunnel/status',
+  )
+  const urls: Record<string, string> = { ...(d?.urls || {}), ...(d?.public?.urls || {}) }
+  const hit = Object.entries(urls).find(([name]) => name.toLowerCase().includes('comfyui'))
+  comfyUrl.value = hit ? hit[1] : ''
+}
 
 // Exec + SSE (shared — used for toasts + ConsoleTab progress bar)
 const tracker = useExecTracker()
@@ -60,6 +72,7 @@ const refresh = useAutoRefresh(loadStatus, 10000)
 
 onMounted(() => {
   loadStatus()
+  loadComfyUrl()
   refresh.start({ immediate: false })
   sse.start()
 })
@@ -98,16 +111,17 @@ async function comfyRestart() {
 </script>
 
 <template>
-  <PageHeader icon="terminal" :title="t('comfyui.title')">
-    <template #badge>
-      <HeaderStatusBadge
-        v-if="status"
-        :running="status.pm2_status === 'online'"
-        :running-label="t('comfyui.status.running')"
-        :stopped-label="t('comfyui.status.stopped')"
-      />
-    </template>
-    <template #controls>
+  <PageHeader
+    :title="t('comfyui.title')"
+    :service="status ? {
+      status: status.pm2_status === 'online' ? 'running' : 'stopped',
+      label: status.pm2_status === 'online' ? t('comfyui.status.running') : t('comfyui.status.stopped'),
+    } : undefined"
+    :launch="comfyUrl && status?.online
+      ? { href: comfyUrl, label: t('comfyui.open') }
+      : undefined"
+  >
+    <template #actions>
       <span v-if="status">
         <template v-if="status.online">
           <BaseButton @click="comfyStop"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>

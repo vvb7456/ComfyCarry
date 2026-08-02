@@ -5,7 +5,9 @@ import { useAppStore } from '@/stores/app'
 import { switchLanguage } from '@/i18n/vue-i18n'
 import { computed } from 'vue'
 import MsIcon from '../ui/MsIcon.vue'
-import BaseButton from '../ui/BaseButton.vue'
+// 主题切换是全局偏好, 与页面无关 —— 从每页的 PageHeader 移到这里,
+// 和同为全局偏好的语言切换放在一起
+import ThemeToggle from '../ui/ThemeToggle.vue'
 
 defineOptions({ name: 'AppSidebar' })
 
@@ -81,8 +83,8 @@ function toggleLang() {
     >◀</button>
 
     <div class="sidebar-logo">
-      <img src="/logo.png" alt="ComfyCarry" class="logo-icon" width="36" height="36" />
-      <span class="logo-text">ComfyCarry</span>
+      <img src="/logo-mark.svg" alt="ComfyCarry" class="logo-icon" width="28" height="28" />
+      <span class="logo-text" aria-hidden="true">Comfy<span class="logo-text__b">Carry</span></span>
     </div>
 
     <div class="sidebar-nav">
@@ -111,26 +113,22 @@ function toggleLang() {
 
     <div class="sidebar-footer">
       <div class="footer-expanded">
-        <div class="footer-logout-row">
+        <div class="footer-tools">
           <button
-            class="lang-toggle"
+            class="tool-btn"
             :title="locale === 'zh-CN' ? t('common.lang.switch_en') : t('common.lang.switch_zh')"
             @click="toggleLang()"
           >{{ locale === 'zh-CN' ? 'EN' : '中' }}</button>
-          <BaseButton href="/logout" size="sm" style="font-size:.72rem;flex:1;text-align:center;justify-content:center">
+          <ThemeToggle class="tool-btn" />
+          <a class="tool-btn" href="/logout" :title="t('common.btn.logout')">
             <MsIcon name="logout" />
-            {{ t('common.btn.logout') }}
-          </BaseButton>
-        </div>
-        <div style="text-align:center">
-          <a :href="commitUrl" target="_blank" style="font-size:.68rem;color:var(--t3);text-decoration:none;font-family:'IBM Plex Mono',monospace" :title="shortCommit ? `${app.branch}@${shortCommit}` : ''">
-            <template v-if="shortCommit">
-              <span style="background:rgba(124,92,252,.15);padding:1px 5px;border-radius:3px;color:var(--ac)">{{ app.branch || 'main' }}</span>
-              <span style="margin-left:3px">{{ shortCommit }}</span>
-              <span v-if="app.version" style="margin-left:3px;color:var(--t3)">{{ app.version }}</span>
-            </template>
-            <template v-else-if="app.version">{{ app.version }}</template>
           </a>
+          <a
+            class="ver"
+            :href="commitUrl"
+            target="_blank"
+            :title="shortCommit ? `${app.branch}@${shortCommit} ${app.version || ''}`.trim() : ''"
+          >{{ app.version || shortCommit }}</a>
         </div>
       </div>
       <div class="footer-collapsed">
@@ -148,6 +146,7 @@ function toggleLang() {
             @click="setLang('en')"
           >EN</button>
         </div>
+        <div class="footer-theme-collapsed"><ThemeToggle /></div>
         <a href="/logout" :title="t('common.btn.logout')" style="color:var(--t3);font-size:.9rem">
           <MsIcon name="logout" />
         </a>
@@ -155,3 +154,11 @@ function toggleLang() {
     </div>
   </nav>
 </template>
+
+<style scoped>
+.footer-theme-collapsed {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+</style>

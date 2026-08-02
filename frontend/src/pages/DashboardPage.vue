@@ -242,7 +242,7 @@ const tunnelStatusText = computed(() => {
 </script>
 
 <template>
-  <PageHeader icon="dashboard" :title="t('dashboard.title')" />
+  <PageHeader :title="t('dashboard.title')" />
 
   <div class="page-body">
     <!-- Status Bar -->
@@ -348,7 +348,7 @@ const tunnelStatusText = computed(() => {
       <!-- Memory -->
       <div class="metric-card">
         <div class="metric-header">
-          <span class="metric-icon"><MsIcon name="memory" color="#a78bfa" /></span>
+          <span class="metric-icon"><MsIcon name="memory" /></span>
           <span class="metric-label">{{ t('dashboard.metrics.memory') }}</span>
         </div>
         <div class="metric-main">
@@ -376,8 +376,9 @@ const tunnelStatusText = computed(() => {
     <!-- Activity Feed -->
     <SectionHeader icon="trending_up">{{ t('dashboard.sections.activity') }}</SectionHeader>
     <div class="activity-feed">
-      <!-- Exec progress — always visible (idle placeholder when not executing) -->
-      <div class="activity-item activity-executing">
+      <!-- Exec progress — 仅在真的有任务时占一行。
+           空闲时下方「一切就绪」已经说了同一件事, 不再重复一句「空闲中」。 -->
+      <div v-if="execState" class="activity-item activity-executing">
         <div class="activity-content">
           <ComfyProgressBar :state="execState" :elapsed="tracker.elapsed.value" compact />
         </div>
@@ -415,7 +416,7 @@ const tunnelStatusText = computed(() => {
 
       <!-- Empty -->
       <div v-if="!activity?.downloads?.active_count && !(activity?.sync?.worker_running && data?.sync?.watch_rules) && !activity?.sync?.last_log_lines?.length" class="activity-empty">
-        <MsIcon name="check_circle" size="md" />
+        <MsIcon name="check_circle" size="md" color="var(--green)" />
         <span style="color:var(--t3);font-size:.85rem">{{ t('dashboard.status_bar.all_good') }}</span>
       </div>
     </div>
@@ -507,7 +508,7 @@ a.status-badge:hover { filter: brightness(1.15); box-shadow: 0 0 0 1px currentCo
 /* ── Metric Cards ── */
 .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .metric-card { background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--r); padding: 16px 18px; transition: border-color .2s; }
-.metric-card:hover { border-color: rgba(124, 92, 252, .3); }
+.metric-card:hover { border-color: color-mix(in srgb, var(--ac) 34%, transparent); }
 .metric-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .metric-icon { font-size: 1rem; }
 .metric-label { font-size: .78rem; color: var(--t2); font-weight: 500; }
@@ -542,7 +543,7 @@ a.status-badge:hover { filter: brightness(1.15); box-shadow: 0 0 0 1px currentCo
 .svc-table { width: 100%; border-collapse: collapse; }
 .svc-table th { text-align: left; padding: clamp(10px, 0.9vw, 16px) clamp(14px, 1.2vw, 22px); font-size: .78rem; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--bd); }
 .svc-table td { padding: clamp(10px, 0.9vw, 16px) clamp(14px, 1.2vw, 22px); border-bottom: 1px solid rgba(42, 42, 58, .3); vertical-align: middle; }
-.svc-table tr:hover { background: rgba(124, 92, 252, .03); }
+.svc-table tr:hover { background: color-mix(in srgb, var(--ac) 5%, transparent); }
 .svc-status { display: inline-flex; align-items: center; gap: 5px; font-size: .82rem; font-weight: 500; }
 .svc-actions { display: flex; gap: 4px; }
 </style>

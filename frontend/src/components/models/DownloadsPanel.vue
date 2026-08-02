@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, computed } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloads } from '@/composables/useDownloads'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -7,9 +7,12 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import DownloadItem from '@/components/models/DownloadItem.vue'
 
-defineOptions({ name: 'DownloadsTab' })
-
-const props = defineProps<{ active: boolean }>()
+/**
+ * DownloadsPanel — 下载任务 (进行中 / 历史), 挂在模型页的「收藏&下载」抽屉里。
+ *
+ * 不感知自己是否可见: 连接由抽屉打开时统一触发, 见 ModelsPage.openDrawer()。
+ */
+defineOptions({ name: 'DownloadsPanel' })
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -25,8 +28,6 @@ const {
   pauseAll: dlPauseAll,
   resumeAll: dlResumeAll,
   clearHistory: dlClearHistory,
-  startPolling: dlStartPolling,
-  stopPolling: dlStopPolling,
   tasks: dlTasks,
 } = useDownloads()
 
@@ -46,12 +47,6 @@ const historyTasks = computed(() => {
 const failedInHistory = computed(() =>
   historyTasks.value.filter(t => t.status === 'failed').length,
 )
-
-// Start/stop polling when tab visibility changes
-watch(() => props.active, (val) => {
-  if (val) dlStartPolling()
-  else if (!dlActiveTasks.value.length) dlStopPolling()
-}, { immediate: true })
 </script>
 
 <template>

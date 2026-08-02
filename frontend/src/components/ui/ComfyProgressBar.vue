@@ -92,9 +92,9 @@ const timeText = computed(() => {
     <span class="comfy-progress-steps">{{ stepText }}</span>
     <span class="comfy-progress-time">{{ timeText }}</span>
   </div>
-  <!-- Idle: placeholder -->
-  <div v-else class="comfy-progress-bar comfy-progress-bar--idle" :class="{ 'comfy-progress-bar--compact': compact }">
-    <span class="comfy-progress-label comfy-progress-label--idle">
+  <!-- Idle: 收成一行静音文字, 不再是一个全宽占位框 -->
+  <div v-else class="comfy-progress-bar--idle" :class="{ 'comfy-progress-bar--compact': compact }">
+    <span class="comfy-progress-label--idle">
       <MsIcon name="hourglass_empty" size="xs" /> {{ t('comfyui.status.idle') }}
     </span>
   </div>
@@ -158,13 +158,38 @@ const timeText = computed(() => {
   gap: 2px;
 }
 
+/* ── 空闲态 ──
+   不画框, 但**保留与 active 态完全一致的盒模型** —— 下面这三条 padding /
+   border / min-height 必须和 .comfy-progress-bar 逐字对齐。
+   原因: 生成页 ActionBar 是 align-items:stretch, 行高由最高的子项决定。
+   空闲态一旦比 active 矮, 主生成按钮就会跟着忽高忽低 (实测差 12.7px)。
+   边框用 transparent: 占住位置, 不产生视觉重量。 */
+.comfy-progress-bar--idle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 2px solid transparent;
+  min-height: 40px;
+  /* 字号也要一致 —— 差 .02rem 会让行盒差 0.5px, 按钮照样跳 */
+  font-size: .82rem;
+}
+
+/* 紧凑模式同理, 与 .comfy-progress-bar--compact 的盒模型对齐 */
+.comfy-progress-bar--idle.comfy-progress-bar--compact {
+  margin-top: 6px;
+  padding: 8px 12px;
+  min-height: 32px;
+  font-size: .72rem;
+}
+
 .comfy-progress-label--idle {
   color: var(--t3);
   font-weight: 500;
-}
-
-.comfy-progress-bar--idle {
-  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
 }
 
 .comfy-progress-node {

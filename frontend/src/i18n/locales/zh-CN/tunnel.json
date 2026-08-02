@@ -9,7 +9,8 @@
     "stopped": "已停止",
     "connecting": "连接中",
     "offline": "离线",
-    "no_connection": "无连接"
+    "no_connection": "无连接",
+    "unconfigured": "未配置"
   },
   "services": {
     "title": "服务",

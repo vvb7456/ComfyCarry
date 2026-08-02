@@ -9,7 +9,8 @@
     "stopped": "Stopped",
     "connecting": "Connecting",
     "offline": "Offline",
-    "no_connection": "No connection"
+    "no_connection": "No connection",
+    "unconfigured": "Not configured"
   },
   "services": {
     "title": "Services",

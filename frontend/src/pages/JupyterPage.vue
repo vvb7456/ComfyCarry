@@ -4,14 +4,12 @@ import { useI18n } from 'vue-i18n'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import HeaderStatusBadge from '@/components/layout/HeaderStatusBadge.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
@@ -194,17 +192,17 @@ onUnmounted(() => {
 
 <template>
   <div class="jupyter-page">
-    <PageHeader icon="book_2" :title="t('jupyter.title')">
-      <template #badge>
-        <HeaderStatusBadge
-          v-if="status"
-          :running="isRunning"
-          :running-label="t('jupyter.status.running')"
-          :stopped-label="t('jupyter.status.stopped')"
-        />
-        <Spinner v-else-if="statusLoading" size="sm" />
-      </template>
-      <template #controls>
+    <PageHeader
+      :title="t('jupyter.title')"
+      :service="status ? {
+        status: isRunning ? 'running' : 'stopped',
+        label: isRunning ? t('jupyter.status.running') : t('jupyter.status.stopped'),
+      } : undefined"
+      :launch="jupyterTokenUrl && isRunning
+        ? { href: jupyterTokenUrl, label: t('jupyter.token.open_jupyter') }
+        : undefined"
+    >
+      <template #actions>
         <span v-if="status">
           <template v-if="isRunning">
             <BaseButton :disabled="actionLoading !== null" @click="jupyterAction('stop')">
@@ -284,18 +282,13 @@ onUnmounted(() => {
 
       <!-- Token -->
       <SectionHeader icon="key">{{ t('jupyter.token.title') }}</SectionHeader>
-      <BaseCard density="default">
+      <BaseCard density="default" class="measure">
         <SecretInput
           v-model="token"
           readonly
           copyable
           input-class="token-input"
         />
-        <div v-if="jupyterTokenUrl" class="jupyter-token-link">
-          <a :href="jupyterTokenUrl" target="_blank" rel="noopener">
-            {{ t('jupyter.token.open_jupyter') }} <MsIcon name="open_in_new" size="xs" />
-          </a>
-        </div>
       </BaseCard>
 
       <!-- Active Kernels -->
@@ -397,10 +390,6 @@ onUnmounted(() => {
 
 /* Vue-unique: token input */
 .token-input { width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: .78rem; letter-spacing: .02em; background: var(--bg3); border: 1px solid var(--bd); border-radius: 6px; padding: 6px 72px 6px 10px; color: var(--t1); outline: none; box-sizing: border-box; }
-.jupyter-token-link { font-size: .72rem; color: var(--t3); margin-top: 6px; }
-.jupyter-token-link a { color: var(--ac); text-decoration: none; display: inline-flex; align-items: center; gap: 2px; }
-.jupyter-token-link a:hover { text-decoration: underline; }
-
 /* Vue-unique: terminal name (link / non-link) */
 .terminal-name-link { font-weight: 600; font-size: .85rem; color: var(--t1); text-decoration: none; transition: color .15s; }
 .terminal-name-link:hover { color: var(--ac); }

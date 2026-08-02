@@ -2,9 +2,11 @@
   "title": "Models",
   "tabs": {
     "local": "Local Models",
-    "civitai": "CivitAI",
-    "favorites": "Favorites",
-    "tasks": "Downloads"
+    "civitai": "CivitAI"
+  },
+  "drawer": {
+    "title": "Favorites & Downloads",
+    "has_failed": "A download failed — open to review"
   },
   "local": {
     "default_types": "Default",

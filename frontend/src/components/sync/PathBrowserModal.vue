@@ -181,7 +181,7 @@ function confirmSelect() {
       <div v-else-if="!dirs.length" class="pb-hint">{{ t('sync.browse.no_subdirs') }}</div>
       <template v-else>
         <button v-for="dir in dirs" :key="dir" class="pb-item" @click="enterDir(dir)">
-          <MsIcon name="folder" color="#60a5fa" /> {{ dir }}
+          <MsIcon name="folder" /> {{ dir }}
         </button>
       </template>
     </div>

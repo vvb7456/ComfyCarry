@@ -73,7 +73,7 @@ function displayVersion(): string {
 
 <style scoped>
 .plugin-item { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: clamp(14px, 1.2vw, 20px) clamp(16px, 1.5vw, 24px); margin-bottom: clamp(8px, 0.6vw, 12px); transition: border-color .15s; }
-.plugin-item:hover { border-color: rgba(124, 92, 252, .3); }
+.plugin-item:hover { border-color: color-mix(in srgb, var(--ac) 34%, transparent); }
 .plugin-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .plugin-item-title { font-size: .92rem; font-weight: 600; flex: 1; min-width: 0; }
 .plugin-item-title a { color: var(--t1); text-decoration: none; }

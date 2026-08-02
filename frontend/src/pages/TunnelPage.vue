@@ -15,7 +15,6 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import ModeCard from '@/components/ui/ModeCard.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import HeaderStatusBadge from '@/components/layout/HeaderStatusBadge.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
@@ -335,16 +334,18 @@ const connInfo = computed(() => {
 </script>
 
 <template>
-  <PageHeader icon="language" :title="t('tunnel.title')">
-    <template #badge>
-      <HeaderStatusBadge
-        v-if="data"
-        :running="data.cloudflared === 'online'"
-        :running-label="t('tunnel.status.running')"
-        :stopped-label="t('tunnel.status.stopped')"
-      />
-    </template>
-    <template #controls>
+  <PageHeader
+    :title="t('tunnel.title')"
+    :service="data ? {
+      status: !data.configured && data.tunnel_mode !== 'public'
+        ? 'unconfigured'
+        : (data.cloudflared === 'online' ? 'running' : 'stopped'),
+      label: !data.configured && data.tunnel_mode !== 'public'
+        ? t('tunnel.status.unconfigured')
+        : (data.cloudflared === 'online' ? t('tunnel.status.running') : t('tunnel.status.stopped')),
+    } : undefined"
+  >
+    <template #actions>
       <span v-if="data && (data.configured || data.tunnel_mode === 'public')">
         <template v-if="tunnelStatus === 'online' || tunnelStatus === 'connecting'">
           <BaseButton @click="tunnelStop"><MsIcon name="stop" /> {{ t('tunnel.services.stop') }}</BaseButton>

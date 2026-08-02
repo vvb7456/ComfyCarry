@@ -20,7 +20,7 @@ export type {
 /**
  * Thin composable wrapper around the pinia downloads store.
  *
- * Existing consumers (CivitaiTab / DownloadsTab / DownloadItem / modals)
+ * Existing consumers (CivitaiTab / DownloadsPanel / DownloadItem / modals)
  * keep importing `useDownloads` from this path with the same API surface.
  * Internally the wrapper forwards to the store singleton. Cart-named members
  * are aliases onto the favorites-backed store state.

@@ -19,7 +19,6 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import HeaderStatusBadge from '@/components/layout/HeaderStatusBadge.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
@@ -518,15 +517,14 @@ async function uploadRcloneFile(e: Event) {
 </script>
 
 <template>
-  <PageHeader icon="cloud_sync" :title="t('sync.title')">
-    <template #badge>
-      <HeaderStatusBadge
-        :running="workerRunning"
-        :running-label="t('sync.worker.running')"
-        :stopped-label="t('sync.worker.stopped')"
-      />
-    </template>
-    <template #controls>
+  <PageHeader
+    :title="t('sync.title')"
+    :service="{
+      status: workerRunning ? 'running' : 'stopped',
+      label: workerRunning ? t('sync.worker.running') : t('sync.worker.stopped'),
+    }"
+  >
+    <template #actions>
       <span>
         <BaseButton v-if="!workerRunning" :disabled="workerLoading" @click="workerAction('start')"><MsIcon name="play_arrow" /> {{ t('sync.worker.start') }}</BaseButton>
         <template v-else>

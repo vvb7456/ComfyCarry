@@ -1,5 +1,6 @@
 {
   "title": "ComfyUI",
+  "open": "打开 ComfyUI",
   "tabs": {
     "console": "控制台",
     "settings": "设置",

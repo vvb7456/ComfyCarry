@@ -205,21 +205,21 @@ document.addEventListener('DOMContentLoaded', function () {
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* ── 深色主题 (默认) ── */
-:root{--l-bg:#06060c;--l-card:rgba(18,18,30,.75);--l-card-bd:rgba(124,92,252,.15);--l-input-bg:rgba(10,10,18,.7);--l-input-bd:#2a2a3e;--l-t1:#e8e8f0;--l-t3:#68688a;--l-orb-op:.15;--l-shadow:rgba(0,0,0,.4)}
+:root{--l-bg:#06060c;--l-card:rgba(18,18,30,.75);--l-card-bd:rgba(84,112,234,.15);--l-input-bg:rgba(10,10,18,.7);--l-input-bd:#2a2a3e;--l-t1:#e8e8f0;--l-t3:#68688a;--l-orb-op:.15;--l-shadow:rgba(0,0,0,.4)}
 /* ── 浅色主题 ── */
-html[data-theme="light"]{--l-bg:#f0f0f5;--l-card:rgba(255,255,255,.82);--l-card-bd:rgba(124,92,252,.18);--l-input-bg:rgba(245,245,250,.9);--l-input-bd:#d0d0e0;--l-t1:#1a1a2e;--l-t3:#888;--l-orb-op:.1;--l-shadow:rgba(0,0,0,.08)}
+html[data-theme="light"]{--l-bg:#f0f0f5;--l-card:rgba(255,255,255,.82);--l-card-bd:rgba(84,112,234,.18);--l-input-bg:rgba(245,245,250,.9);--l-input-bd:#d0d0e0;--l-t1:#1a1a2e;--l-t3:#888;--l-orb-op:.1;--l-shadow:rgba(0,0,0,.08)}
 body{font-family:'IBM Plex Sans','IBM Plex Sans SC',-apple-system,sans-serif;background:var(--l-bg);color:var(--l-t1);min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:clamp(15px,1.1vw,21px);overflow:hidden}
 /* 背景动画 */
 .bg{position:fixed;inset:0;z-index:0;overflow:hidden}
 .bg .orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:var(--l-orb-op);animation:drift 20s ease-in-out infinite}
-.bg .orb:nth-child(1){width:400px;height:400px;background:#7c5cfc;top:-10%;left:-5%;animation-delay:0s}
-.bg .orb:nth-child(2){width:350px;height:350px;background:#e879f9;bottom:-10%;right:-5%;animation-delay:-7s}
+.bg .orb:nth-child(1){width:400px;height:400px;background:#5470ea;top:-10%;left:-5%;animation-delay:0s}
+.bg .orb:nth-child(2){width:350px;height:350px;background:#7a97ff;bottom:-10%;right:-5%;animation-delay:-7s}
 .bg .orb:nth-child(3){width:300px;height:300px;background:#38bdf8;top:50%;left:60%;animation-delay:-14s}
 @keyframes drift{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(30px,-40px) scale(1.05)}50%{transform:translate(-20px,30px) scale(.95)}75%{transform:translate(40px,20px) scale(1.02)}}
 /* 顶部控制区 */
 .top-controls{position:fixed;top:16px;right:16px;z-index:2;display:flex;align-items:center;gap:6px}
 .theme-toggle{background:none;border:none;color:var(--l-t1);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;transition:color .2s;appearance:none;-webkit-appearance:none}
-.theme-toggle:hover{color:#7c5cfc}
+.theme-toggle:hover{color:#5470ea}
 .theme-toggle .ms{font-size:20px;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20}
 .lang-toggle{background:rgba(255,255,255,.06);border:1px solid var(--l-card-bd);color:var(--l-t1);border-radius:4px;font-size:.68rem;font-weight:600;padding:4px 8px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;letter-spacing:.03em;white-space:nowrap;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 html[data-theme="light"] .lang-toggle{background:rgba(255,255,255,.72)}
@@ -229,17 +229,20 @@ html[data-theme="light"] .lang-toggle:hover{background:rgba(255,255,255,.92)}
 .card{position:relative;z-index:1;background:var(--l-card);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--l-card-bd);border-radius:20px;padding:clamp(36px,3.5vw,56px);width:clamp(360px,28vw,440px);max-width:92vw;box-shadow:0 8px 32px var(--l-shadow)}
 /* Logo */
 .logo{text-align:center;margin-bottom:clamp(28px,2.5vw,40px)}
-.logo h1{font-size:clamp(1.6rem,2vw,2.1rem);font-weight:700;background:linear-gradient(135deg,#7c5cfc,#e879f9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.logo img{width:clamp(52px,5vw,64px);height:auto;display:block;margin:0 auto 14px}
+.logo h1{font-size:clamp(1.6rem,2vw,2.1rem);font-weight:700;letter-spacing:-.5px;color:var(--l-t1)}
+.logo h1 b{color:#7189f5;font-weight:inherit}
+html[data-theme="light"] .logo h1 b{color:#3f57c9}
 /* 输入框 */
 .input-wrap{position:relative;margin-bottom:clamp(18px,1.5vw,24px)}
 .input-wrap .ms.input-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--l-t3);font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20;pointer-events:none}
 .input-wrap input{width:100%;padding:clamp(11px,1.2vw,16px) 44px;background:var(--l-input-bg);color:var(--l-t1);border:1px solid var(--l-input-bd);border-radius:12px;font-size:clamp(.9rem,1vw,1.05rem);font-family:inherit;transition:border-color .2s,box-shadow .2s}
-.input-wrap input:focus{border-color:#7c5cfc;outline:none;box-shadow:0 0 0 3px rgba(124,92,252,.12)}
+.input-wrap input:focus{border-color:#5470ea;outline:none;box-shadow:0 0 0 3px rgba(84,112,234,.12)}
 .input-wrap .toggle-pw{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;line-height:1;color:var(--l-t3);opacity:.6;transition:opacity .15s}
 .input-wrap .toggle-pw:hover{opacity:1}
 .toggle-pw .ms{font-size:20px;font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}
 /* 按钮 */
-.btn-login{width:100%;padding:clamp(11px,1.2vw,16px);background:linear-gradient(135deg,#7c5cfc,#9078ff);color:#fff;border:none;border-radius:12px;font-size:clamp(.9rem,1vw,1.05rem);cursor:pointer;font-weight:600;font-family:inherit;transition:opacity .15s,transform .1s;letter-spacing:.3px}
+.btn-login{width:100%;padding:clamp(11px,1.2vw,16px);background:linear-gradient(135deg,#5470ea,#7189f5);color:#fff;border:none;border-radius:12px;font-size:clamp(.9rem,1vw,1.05rem);cursor:pointer;font-weight:600;font-family:inherit;transition:opacity .15s,transform .1s;letter-spacing:.3px}
 .btn-login:hover{opacity:.9}
 .btn-login:active{transform:scale(.98)}
 /* 错误提示 */
@@ -261,7 +264,8 @@ input::-ms-reveal,input::-ms-clear,input::-webkit-credentials-auto-fill-button{d
 </div>
 <div class="card">
     <div class="logo">
-        <h1>ComfyCarry</h1>
+        <img src="/logo.png" alt="" width="64" height="64">
+        <h1>Comfy<b>Carry</b></h1>
     </div>
     <form method="POST" action="/login">
         <div class="err" id="err"></div>
@@ -340,7 +344,10 @@ def register_auth_middleware(app):
             request.path.startswith("/static/")
             or request.path.startswith("/assets/")
             or request.path.startswith("/fonts/")
-            or request.path in ("/apple-touch-icon.png", "/logo.png", "/logo-small.png")
+            or request.path in (
+                "/apple-touch-icon.png", "/logo.png", "/logo-small.png",
+                "/logo-mark.svg", "/logo-tile.svg",
+            )
         ):
             return
         # 如果尚未完成部署向导, 重定向到向导页

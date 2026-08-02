@@ -529,14 +529,7 @@ onUnmounted(() => {
 
 <template>
   <div class="settings-page">
-    <PageHeader icon="settings" :title="t('settings.title')">
-      <template #controls>
-        <BaseButton @click="restartDashboard">
-          <MsIcon name="refresh" />
-          {{ t('settings.restart_btn') }}
-        </BaseButton>
-      </template>
-    </PageHeader>
+    <PageHeader :title="t('settings.title')" />
 
     <div class="page-body">
       <TabSwitcher :tabs="tabs" v-model="activeTab" @update:model-value="onTabChange" />
@@ -673,6 +666,12 @@ onUnmounted(() => {
               <span>{{ updatePhase }}</span>
             </div>
             <div class="btn-row-end" style="gap:8px">
+              <!-- 「重启面板」的对象是面板本身而不是设置页, 按页头准入判据不该在页头,
+                   放在版本卡里与检查更新同区 -->
+              <BaseButton size="sm" @click="restartDashboard">
+                <MsIcon name="restart_alt" />
+                {{ t('settings.restart_btn') }}
+              </BaseButton>
               <BaseButton size="sm" :disabled="updateChecking || updateApplying" @click="checkUpdate">
                 <Spinner v-if="updateChecking" size="sm" />
                 <MsIcon v-else name="refresh" />
@@ -888,7 +887,7 @@ onUnmounted(() => {
         <!-- Parameters -->
         <BaseCard density="roomy">
           <h3 class="settings-card-title">
-            <MsIcon name="tune" color="#fbbf24" />
+            <MsIcon name="tune" />
             {{ t('settings.llm.params.title') }}
           </h3>
           <FormField density="compact">

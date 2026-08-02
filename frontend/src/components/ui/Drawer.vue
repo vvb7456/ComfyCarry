@@ -1,10 +1,13 @@
 <script setup lang="ts">
 /**
- * Drawer — 右侧滑出面板。
+ * Drawer — 右侧滑出面板。承载"我发起的任务的进度与结果": 生成页的队列/历史、
+ * 模型页的收藏&下载。判据是这类内容不是浏览目的地, 且在页面之外仍然存在,
+ * 用户需要一边做别的一边瞥一眼 —— 所以它盖在正文上, 而不是占一个 tab。
  *
  * 复用 BaseModal 的遮罩 / ESC / 滚动锁定模式, 但:
- *  - 内容常驻挂载: 关闭时 transform 移出 + visibility:hidden, 不得 v-if 销毁内容
- *    (QueuePanel/HistoryPanel 的 ref 被 ws 回调调用, 必须存活)。
+ *  - 内容常驻挂载: 关闭时 transform 移出 + visibility:hidden, 不得 v-if 销毁内容。
+ *    面板内的组件可能持有被外部回调 (ws / SSE) 调用的 ref, 销毁会让回调打空。
+ *    首开才挂载由调用方用 v-if 控制, 挂载后不再卸载。
  *  - 右侧滑出而非居中弹窗, 260ms ease 滑入; 窄屏 (<640px) 100vw。
  */
 import { computed, watch, ref, onUnmounted } from 'vue'
@@ -126,7 +129,11 @@ function onKeydown(e: KeyboardEvent) {
   position: fixed;
   inset: 0;
   background: var(--overlay);
-  z-index: 1000;
+  /* 990: 高于页面内一切浮层 (BackgroundRunBar 900), 但**低于 BaseModal 的 1000**。
+     抽屉里会弹模态 (批量添加 / 下载目录裁决), 两者都 Teleport 到 body, 同层时
+     只靠挂载先后决胜负 —— 而抽屉是常驻挂载的, 同层会永远压住后弹的模态。
+     差一级把这件事变成结构性保证, 不再依赖组件在模板里的书写顺序。 */
+  z-index: 990;
   visibility: hidden;
   opacity: 0;
   transition: opacity .26s ease, visibility .26s ease;

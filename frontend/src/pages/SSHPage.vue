@@ -15,7 +15,6 @@ import HelpTip from '@/components/ui/HelpTip.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import FormField from '@/components/form/FormField.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import HeaderStatusBadge from '@/components/layout/HeaderStatusBadge.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
@@ -255,17 +254,14 @@ onUnmounted(() => {
 
 <template>
   <div class="ssh-page">
-    <PageHeader icon="key" :title="t('ssh.title')">
-      <template #badge>
-        <HeaderStatusBadge
-          v-if="status"
-          :running="status.running"
-          :running-label="t('ssh.status.running')"
-          :stopped-label="t('ssh.status.stopped')"
-        />
-        <Spinner v-else-if="statusLoading" size="sm" />
-      </template>
-      <template #controls>
+    <PageHeader
+      :title="t('ssh.title')"
+      :service="status ? {
+        status: status.running ? 'running' : 'stopped',
+        label: status.running ? t('ssh.status.running') : t('ssh.status.stopped'),
+      } : undefined"
+    >
+      <template #actions>
         <span v-if="status">
           <BaseButton v-if="!status.running" :disabled="actionLoading !== null" @click="sshAction('start')">
             <MsIcon name="play_arrow" /> {{ t('ssh.actions.start') }}
@@ -283,7 +279,6 @@ onUnmounted(() => {
     </PageHeader>
 
     <div class="page-body">
-      <!-- Tabs -->
       <TabSwitcher :tabs="tabs" v-model="activeTab" @update:model-value="onTabChange" />
 
       <!-- ─── Status Tab ───────────────────────────────────────────────── -->
@@ -318,7 +313,7 @@ onUnmounted(() => {
 
         <!-- SSH connect command -->
         <SectionHeader icon="content_paste" flush>{{ t('ssh.connect.title') }}</SectionHeader>
-        <BaseCard density="default">
+        <BaseCard density="default" class="measure">
           <div v-if="connectCmdLoading" style="color:var(--t3);font-size:.85rem">
             {{ t('ssh.connect.loading') }}
           </div>

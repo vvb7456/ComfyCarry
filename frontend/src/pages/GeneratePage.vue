@@ -20,6 +20,7 @@ import PageHeader from '@/components/layout/PageHeader.vue'
 import DropdownMenu, { type DropdownMenuItem } from '@/components/ui/DropdownMenu.vue'
 import SegmentedControl, { type SegmentOption } from '@/components/ui/SegmentedControl.vue'
 import Drawer from '@/components/ui/Drawer.vue'
+import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
 import ModelTab from '@/components/generate/ModelTab.vue'
 import QueuePanel from '@/components/generate/QueuePanel.vue'
 import HistoryPanel from '@/components/generate/HistoryPanel.vue'
@@ -509,7 +510,7 @@ sse.start()
 </script>
 
 <template>
-  <PageHeader icon="palette" :title="t('generate.title')" />
+  <PageHeader :title="t('generate.title')" />
   <div class="page-body">
     <!-- Gate overlay when ComfyUI is not ready -->
     <div v-if="gate.state.value !== 'ready'" class="gen-gate-overlay">
@@ -569,14 +570,13 @@ sse.start()
         </div>
 
         <!-- 右: 队列/历史按钮 (ghost 风格, badge + 执行中 pulse) -->
-        <button class="gen-queue-btn" @click="openDrawer">
-          <MsIcon
-            name="history"
-            :class="{ 'gen-queue-btn__icon--pulse': isExecuting }"
-          />
-          <span class="gen-queue-btn__label">{{ t('generate.header.queue_history') }}</span>
-          <span v-if="queueCount > 0" class="gen-queue-btn__badge">{{ queueCount }}</span>
-        </button>
+        <DrawerTrigger
+          icon="history"
+          :label="t('generate.header.queue_history')"
+          :badge="queueCount"
+          :pulse="isExecuting"
+          @click="openDrawer"
+        />
       </div>
 
       <!-- Model Tabs (config-driven, 全量 v-show 挂载) -->
@@ -684,11 +684,9 @@ sse.start()
   flex-shrink: 0;
 }
 
-/* 触发器与队列/历史按钮共用同一按钮规格:
-   --bg3 底、1px --bd 边框、var(--rs) 圆角、同高度、同 padding;
-   hover 边框变亮 (与触发器一致)。 */
-.gen-arch-trigger,
-.gen-queue-btn {
+/* 架构触发器的按钮规格 —— 与 ui/DrawerTrigger.vue 同底 (--bg3 底、1px --bd 边框、
+   var(--rs) 圆角、同高度同 padding、hover 边框变亮)。改这里要同步改那边。 */
+.gen-arch-trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -705,8 +703,7 @@ sse.start()
   flex-shrink: 0;
   position: relative;
 }
-.gen-arch-trigger:hover,
-.gen-queue-btn:hover {
+.gen-arch-trigger:hover {
   border-color: var(--bd-f);
 }
 
@@ -755,29 +752,7 @@ sse.start()
   transform: rotate(180deg);
 }
 
-/* 队列/历史按钮 — 共用 .gen-arch-trigger 同规格 (上), 仅以下为独有覆盖 */
-.gen-queue-btn {
-  color: var(--t2); /* 次级文字色 (主操作 = 架构触发器, 此为辅助) */
-}
-.gen-queue-btn:hover {
-  color: var(--t1); /* hover 时升主色 (border 由共用规则变亮) */
-}
-
-.gen-queue-btn__label {
-  white-space: nowrap;
-}
-
-/* badge: 队列任务数 (>0 显示, accent 底) */
-.gen-queue-btn__badge {
-  background: var(--ac);
-  color: #fff;
-  font-size: .68rem;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-}
+/* 队列/历史按钮的样式 (底色/badge/pulse) 已提取到 ui/DrawerTrigger.vue, 模型页共用 */
 
 /* ═══ 窄屏顶栏: 任务切换独占首行, 架构选择器 + 队列/历史同处次行 ═══
    .gen-header-left 用 display:contents 把两个左侧控件直接交给顶栏网格排布 ——
@@ -829,18 +804,5 @@ sse.start()
   }
 }
 
-/* 执行中图标轻微 pulse (CSS, prefers-reduced-motion 降级静态) */
-.gen-queue-btn__icon--pulse {
-  animation: gen-queue-pulse 1.6s ease-in-out infinite;
-}
-@keyframes gen-queue-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .5; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .gen-queue-btn__icon--pulse {
-    animation: none;
-  }
-}
 </style>
 

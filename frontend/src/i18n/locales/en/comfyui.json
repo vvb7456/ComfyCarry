@@ -1,5 +1,6 @@
 {
   "title": "ComfyUI",
+  "open": "Open ComfyUI",
   "tabs": {
     "console": "Console",
     "settings": "Settings",

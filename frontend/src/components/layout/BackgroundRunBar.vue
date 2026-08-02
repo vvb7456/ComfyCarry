@@ -257,10 +257,14 @@ onUnmounted(() => {
   background: var(--bd);
 }
 
-/* reset .ms vertical-align for flex layout */
+/* reset .ms vertical-align for flex layout。
+   align-self:center 是必需的, 不是保险: .ms 是无固有宽度的 inline-block,
+   作为 flex item 一旦被交叉轴拉伸就会撑满整条, 而 __spin 带 rotate 动画 ——
+   旋转一个整条宽的盒子, 字形会绕条中心画大圆飞出去 (踩过, 见下方断点注释)。 */
 .bg-run-bar__body .ms {
   vertical-align: 0;
   flex-shrink: 0;
+  align-self: center;
 }
 
 .bg-run-bar__spin {
@@ -282,14 +286,17 @@ onUnmounted(() => {
     transform: none;
     max-width: none;
   }
+  /* 不要改成 column + align-items:stretch —— 那会把 .ms 图标 span 拉成整条宽,
+     叠上 __spin 的 rotate 动画后, 字形绕条中心以 ~155px 半径画圆, 而浮动条
+     没有 overflow:hidden, spinner 就飞到屏幕上到处跑 (v0.4.1 引入的故障)。
+     改为保持 row + wrap: 图标与标题同行, 只让按钮独占一行。 */
   .bg-run-bar__body {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
+    justify-content: flex-start;
+    row-gap: 4px;
   }
   .bg-run-bar__btn {
     margin-left: 0;
-    width: 100%;
+    flex: 1 0 100%;
   }
 }
 </style>

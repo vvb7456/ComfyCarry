@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="ComfyCarry">
+  <title>ComfyCarry</title>
+  <!-- 应用图标底板。这是 logo.png / logo-small.png / apple-touch-icon.png /
+       favicon.ico 的源文件, 改完用 scripts/build-icons.sh 重新生成栅格图。 -->
+  <defs>
+    <linearGradient id="ccTile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6b83f2"/>
+      <stop offset="1" stop-color="#3b4fc4"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="43" fill="url(#ccTile)"/>
+  <g transform="translate(42 42) scale(3.375)" fill="none" stroke="#fff"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 5H5.5v22H11M21 5h5.5v22H21" stroke-width="2.3"/>
+  </g>
+  <g transform="translate(42 42) scale(3.375)" fill="#fff">
+    <circle cx="13.2" cy="11" r="2.5"/>
+    <circle cx="13.2" cy="21" r="2.5"/>
+    <circle cx="19" cy="16" r="2.5"/>
+  </g>
+</svg>

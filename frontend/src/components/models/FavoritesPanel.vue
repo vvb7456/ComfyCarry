@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloads } from '@/composables/useDownloads'
 import { useConfirm } from '@/composables/useConfirm'
@@ -11,9 +11,13 @@ import BatchAddModal from '@/components/models/BatchAddModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { CartItem } from '@/composables/useDownloads'
 
-defineOptions({ name: 'FavoritesTab' })
-
-const props = defineProps<{ active: boolean }>()
+/**
+ * FavoritesPanel — 收藏列表, 挂在模型页的「收藏&下载」抽屉里。
+ *
+ * 不感知自己是否可见: 取数 (loadFavorites) 与连接 (startPolling/refreshStatus)
+ * 由抽屉打开时统一触发, 见 ModelsPage.openDrawer()。
+ */
+defineOptions({ name: 'FavoritesPanel' })
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -24,15 +28,10 @@ const {
   removeFavorite: removeFav,
   downloadOne: dlDownloadOne,
   downloadAll: dlDownloadAll,
-  refreshStatus: dlRefreshStatus,
-  startPolling: dlStartPolling,
-  stopPolling: dlStopPolling,
-  activeTasks: dlActiveTasks,
   getVersionState: dlGetVersionState,
   getVersionDownloadInfo: dlGetVersionInfo,
   cancelDownload: dlCancelDownload,
   tasks: dlTasks,
-  loadFavorites: dlLoadFavorites,
 } = useDownloads()
 
 const { confirm } = useConfirm()
@@ -83,17 +82,6 @@ function failedError(item: CartItem): string {
   if (task?.status === 'failed' && task.error) return task.error
   return ''
 }
-
-// Start/stop polling when tab visibility changes; ensure favorites loaded
-watch(() => props.active, (val) => {
-  if (val) {
-    dlLoadFavorites()
-    dlStartPolling()
-    dlRefreshStatus()
-  } else if (!dlActiveTasks.value.length) {
-    dlStopPolling()
-  }
-}, { immediate: true })
 
 async function handleClearFavorites() {
   if (await confirm({ message: t('models.downloads.confirm_clear') })) clearFav()

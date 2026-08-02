@@ -50,7 +50,7 @@ if (deployState.value === 'deploying') {
     @next="onDeploy"
   >
     <template #icon>
-      <MsIcon name="checklist" size="sm" color="#a78bfa" />
+      <MsIcon name="checklist" size="sm" />
     </template>
 
     <template #footer>

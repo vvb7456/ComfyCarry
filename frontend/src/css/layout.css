@@ -4,7 +4,7 @@
 
         /* ── Sidebar ── */
         .sidebar {
-            width: clamp(200px, 14vw, 260px);
+            width: clamp(184px, 12.5vw, 208px);
             background: var(--bg2);
             border-right: 1px solid var(--bd);
             display: flex;
@@ -21,6 +21,7 @@
             width: 56px
         }
 
+        /* min-height 与 .page-header 严格一致 —— 两者的底边线要接成一条 */
         .sidebar-logo {
             padding: 0 16px;
             min-height: 64px;
@@ -32,34 +33,37 @@
             overflow: hidden
         }
 
+        /* 标记 (logo-mark.svg) 展开与折叠都在场 —— 展开时只剩光秃秃的文字, 不像标识。
+           标记自带品牌渐变, 深浅两种底都成立, 所以只要一份文件、不随主题换图。 */
         .sidebar-logo .logo-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
+            width: 28px;
+            height: 28px;
             flex-shrink: 0;
-            transition: width .25s, height .25s;
-            display: none
+            transition: width .25s, height .25s
         }
 
+        /* 渐变吃在标记里, 字标实心 —— 渐变填充"文字"才是 AI 模板的视觉签名。
+           颜色留在 DOM 文字上, 这样浅色主题不用另出一份图。 */
         .sidebar-logo .logo-text {
-            font-size: 1.35rem;
+            font-size: 1.3rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #7c5cfc, #e879f9);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            color: transparent
+            letter-spacing: -.02em;
+            color: var(--t1)
         }
 
+        .sidebar-logo .logo-text__b {
+            color: var(--ac)
+        }
+
+        /* 竖向 padding 归零: 20px + 30px 图标 = 70px 会让折叠后的分隔线比展开态低 6px */
         .sidebar.collapsed .sidebar-logo {
-            padding: 20px 12px;
+            padding: 0 12px;
             justify-content: center
         }
 
         .sidebar.collapsed .sidebar-logo .logo-icon {
-            display: block;
-            width: 30px;
-            height: 30px
+            width: 26px;
+            height: 26px
         }
 
         .sidebar.collapsed .sidebar-logo .logo-text {
@@ -141,19 +145,19 @@
         }
 
         .nav-item:hover {
-            background: rgba(124, 92, 252, .05);
+            background: color-mix(in srgb, var(--ac) 6%, transparent);
             color: var(--t1)
         }
 
         .nav-item.active {
             color: var(--ac);
             border-left-color: var(--ac);
-            background: rgba(124, 92, 252, .08)
+            background: color-mix(in srgb, var(--ac) 10%, transparent)
         }
 
         .sidebar.collapsed .nav-item.active {
             border-left-color: transparent;
-            background: rgba(124, 92, 252, .12)
+            background: color-mix(in srgb, var(--ac) 14%, transparent)
         }
 
         .nav-item .icon {
@@ -175,7 +179,7 @@
         }
 
         .sidebar-footer {
-            padding: 12px 20px;
+            padding: 10px 16px;
             border-top: 1px solid var(--bd);
             font-size: .75rem;
             color: var(--t3);
@@ -199,32 +203,60 @@
             display: block
         }
 
-        /* ── Footer Logout Row ── */
-        .footer-logout-row {
+        /* ── Footer 工具条 ──
+           语言 / 主题 / 登出 全部收成等宽方钮, 版本号推到同一行末尾。
+           三个都是"工具"不是"目的地", 图标 + tooltip 就够; 给登出配文字反而
+           让最不常用的动作拿到最大的视觉权重 —— 之前那一行 183px 正好占满,
+           英文 "Logout" 会挤出去。 */
+        .footer-tools {
             display: flex;
+            align-items: center;
             gap: 6px;
-            margin-bottom: 8px;
-            align-items: stretch;
         }
 
-        .lang-toggle {
+        .footer-tools .ver {
+            margin-left: auto;
+            font-size: .66rem;
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--t3);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .footer-tools .ver:hover {
+            color: var(--t2);
+        }
+
+        /* 语言(文字) / 主题(图标) / 登出(图标) 共用同一个方钮规格 */
+        .sidebar-footer .footer-tools .tool-btn {
+            width: 30px;
+            height: 30px;
+            flex: 0 0 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background: var(--bg2);
             border: 1px solid var(--bd);
+            border-radius: 6px;
             color: var(--t2);
-            border-radius: 4px;
-            font-size: .68rem;
+            font-size: .66rem;
             font-weight: 600;
-            padding: 4px 8px;
-            cursor: pointer;
-            transition: background .15s, color .15s, border-color .15s;
             letter-spacing: .03em;
-            white-space: nowrap;
-            flex-shrink: 0;
+            font-family: inherit;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .15s, color .15s, border-color .15s;
         }
 
-        .lang-toggle:hover {
+        .sidebar-footer .footer-tools .tool-btn:hover {
             background: var(--bg3);
             color: var(--t1);
+            border-color: var(--t3);
+        }
+
+        .sidebar-footer .footer-tools .tool-btn .ms {
+            font-size: 18px;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
         }
 
         /* ── Language Switcher ── */
@@ -293,7 +325,7 @@
 
         /* ── Content ── */
         .content {
-            margin-left: clamp(200px, 14vw, 260px);
+            margin-left: clamp(184px, 12.5vw, 208px);
             flex: 1;
             height: 100vh;
             overflow-y: auto;
@@ -305,17 +337,33 @@
         }
 
         .page-body {
-            padding: clamp(20px, 2vw, 32px) clamp(28px, 2.5vw, 42px)
+            padding: clamp(20px, 2vw, 32px) var(--page-pad)
         }
 
-        /* ── Page Header ── */
+        /* ── 限宽跟内容类型走, 不跟页面走 ──
+           页面级 max-width 是钝器: 它会连表格和卡片网格一起收窄, 还会在全宽的
+           页头里制造左右死区。表格 / 网格 / 日志用满宽度是收益; 只有下面这两类
+           内容需要约束行长, 谁需要谁加。 */
+        .measure {
+            max-width: 720px
+        }
+
+        /* 要复制的短字符串 (连接命令 / 令牌 / 密钥), 拉宽只会更难选中 */
+        .measure-sm {
+            max-width: 560px
+        }
+
+        /* ── Page Header ──
+           一行, 高度恒定 64px —— 与 .sidebar-logo 严格同高, 两者的底边线接成一条
+           贯穿视口的横线。改这里的高度必须同步改那里。
+           分区导航 (tabs) 不在这块里, 它在 .page-body 顶部, 见 PageHeader.vue 注释。 */
         .page-header {
-            padding: 0 clamp(28px, 2.5vw, 42px);
+            padding: 0 var(--page-pad);
             min-height: 64px;
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 10px;
             background: rgba(10, 10, 15, .8);
             backdrop-filter: blur(12px);
             position: sticky;
@@ -323,42 +371,11 @@
             z-index: 40
         }
 
-        .page-header h2 {
-            font-size: 1.15rem;
-            font-weight: 600
-        }
-
-        .page-header h2 .ms {
-            font-size: 28px;
-            vertical-align: -5px;
-            margin-right: 6px;
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 28;
-        }
-
-        .page-title-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .page-status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: .78rem;
-            font-weight: 500;
-            padding: 3px 10px;
-            border-radius: var(--rs);
-            background: var(--bg3);
-            border: 1px solid var(--bd);
-            line-height: 1;
-        }
-
-        .page-status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            display: inline-block;
+        /* 各页把动作按钮包在 <span v-if> 里时, 让包装层不产生盒子, 否则 gap 失效。
+           这条必须留在全局 CSS —— 写进 PageHeader 的 scoped 样式会失效, 因为
+           插槽内容带的是父组件的 scope id, 匹配不到子组件的选择器。 */
+        .page-header__actions>span {
+            display: contents
         }
 
         /* ── Theme Toggle Button ── */
@@ -384,17 +401,6 @@
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
         }
 
-        /* ── Top-right toolbar ── */
-        .top-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 6px
-        }
-
-        .top-toolbar>span {
-            display: contents
-        }
-
         /* ── Scroll-to-top FAB ── */
         .scroll-top-fab {
             position: fixed;
@@ -411,7 +417,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 12px rgba(124, 92, 252, .4);
+            box-shadow: 0 2px 12px color-mix(in srgb, var(--ac) 40%, transparent);
             opacity: 0;
             transform: translateY(20px);
             pointer-events: none;
@@ -487,9 +493,11 @@
         }
 
         /* ── Stat Grid (shared across pages: Dashboard, ComfyUI, SSH, etc.) ── */
+        /* 最小列宽用固定值而非 vw —— 内容区加了 1280px 上限后, 18vw 在宽屏上
+           会大于实际可用列宽, 导致 4 张卡被挤成 3+1 换行。 */
         .stat-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(clamp(240px, 18vw, 320px), 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: clamp(16px, 1.2vw, 24px);
             margin-bottom: clamp(24px, 2vw, 36px)
         }
@@ -498,6 +506,12 @@
         @media(max-width:768px) {
             .mobile-menu-btn {
                 display: inline-flex
+            }
+
+            .page-header {
+                padding: 0 14px;
+                min-height: 56px;
+                gap: 8px
             }
 
             .sidebar {
@@ -515,29 +529,6 @@
 
             .content {
                 margin-left: 0 !important
-            }
-
-            .page-header {
-                padding-left: 14px;
-                padding-right: 12px;
-                min-height: auto;
-                flex-wrap: wrap;
-                gap: 4px 0;
-                padding-top: 10px;
-                padding-bottom: 10px
-            }
-
-            .page-header h2 .ms {
-                display: none
-            }
-
-            .page-title-group {
-                flex: 1;
-                min-width: 0
-            }
-
-            .top-toolbar {
-                gap: 4px
             }
 
             .stat-grid,

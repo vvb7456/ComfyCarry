@@ -25,6 +25,9 @@ const normalizedLines = computed<LogLine[]>(() => props.lines.map((line) => {
   return line
 }))
 
+/** 无日志时面板收成一行 —— 不再留一个 500px 的空黑盒占满首屏 */
+const isEmpty = computed(() => normalizedLines.value.length === 0 && props.status !== 'loading')
+
 const statusDot = computed(() => {
   switch (props.status) {
     case 'live': return 'running'
@@ -73,7 +76,8 @@ function toggleFollowTail() {
 <template>
   <div
     class="log-panel"
-    :style="{ height: height ?? '500px' }"
+    :class="{ 'log-panel--empty': isEmpty }"
+    :style="{ height: isEmpty ? 'auto' : (height ?? '320px') }"
   >
     <div class="log-panel__toolbar">
       <span class="log-panel__status">
@@ -199,9 +203,14 @@ function toggleFollowTail() {
 }
 
 .log-panel__empty {
-  padding: var(--sp-4);
-  text-align: center;
+  padding: var(--sp-3) var(--sp-4);
   color: var(--t3);
   font-size: var(--text-sm);
+}
+
+/* 空态: 只保留工具条 + 一行说明, 不撑出空盒子
+   (即便调用方传了 height 也让位 — 空黑盒没有任何信息价值) */
+.log-panel--empty .log-panel__body {
+  display: none;
 }
 </style>
