@@ -126,7 +126,6 @@ RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone --depth 1 https://github.com/crystian/ComfyUI-Crystools && \
     git clone --depth 1 --recursive https://github.com/ssitu/ComfyUI_UltimateSDUpscale && \
     git clone --depth 1 https://github.com/adieyal/comfyui-dynamicprompts && \
-    git clone --depth 1 https://github.com/weilin9999/WeiLin-Comfyui-Tools && \
     git clone --depth 1 https://github.com/vvb7456/AuraSR-ComfyUI.git && \
     git clone --depth 1 https://github.com/ltdrdata/was-node-suite-comfyui && \
     git clone --depth 1 https://github.com/kijai/ComfyUI-KJNodes && \

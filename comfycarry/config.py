@@ -328,7 +328,6 @@ DEFAULT_PLUGINS = [
     {"url": "https://github.com/crystian/ComfyUI-Crystools", "name": "Crystools"},
     {"url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "name": "Ultimate SD Upscale"},
     {"url": "https://github.com/adieyal/comfyui-dynamicprompts", "name": "Dynamic Prompts"},
-    {"url": "https://github.com/weilin9999/WeiLin-Comfyui-Tools", "name": "WeiLin Tools"},
     {"url": "https://github.com/GreenLandisaLie/AuraSR-ComfyUI", "name": "AuraSR"},
     {"url": "https://github.com/ltdrdata/was-node-suite-comfyui", "name": "WAS Node Suite"},
     {"url": "https://github.com/kijai/ComfyUI-KJNodes", "name": "KJNodes"},
