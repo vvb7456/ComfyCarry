@@ -2,9 +2,18 @@
   "title": "ComfyUI",
   "open": "打开 ComfyUI",
   "tabs": {
-    "console": "控制台",
-    "settings": "设置",
+    "overview": "运行概览",
+    "settings": "配置与版本",
     "plugins": "插件管理"
+  },
+  "overview": {
+    "runtime": "运行状态",
+    "environment": "运行环境",
+    "queue": "任务队列",
+    "queue_idle": "队列空闲",
+    "queue_summary": "执行中 {running} · 等待中 {pending}",
+    "uptime_summary": "已运行 {uptime} · 重启 {count} 次",
+    "current_execution": "当前任务"
   },
   "console": {
     "params": "启动参数",
@@ -161,12 +170,10 @@
     "idle": "空闲中"
   },
   "settings": {
-    "version_title": "版本管理",
     "available_versions": "可用版本",
     "no_git": "ComfyUI 不是 Git 仓库，无法使用版本管理功能。",
     "no_versions": "未找到版本。",
     "current": "当前",
-    "latest": "最新",
     "unstable": "不稳定",
     "switch": "切换",
     "switch_only": "仅切换",
@@ -175,13 +182,30 @@
     "switch_confirm_nightly": "确定切换到 nightly (master) 吗？这是开发版本，可能不稳定。",
     "switch_success": "版本切换成功",
     "switch_failed": "版本切换失败",
-    "raw_args": "自定义参数",
+    "extra_args": "额外命令行参数",
+    "extra_args_desc": "只填写上方设置未覆盖的参数；结构化设置生成的参数会自动合并。",
+    "extra_args_placeholder": "例如 --disable-metadata --dont-print-server",
+    "command_preview": "启动命令",
+    "save_restart": "保存并重启",
+    "current_version": "当前版本",
+    "custom_build": "自定义提交",
+    "channels_title": "选择更新通道",
+    "recommended": "推荐",
+    "stable_channel": "最新稳定版",
+    "nightly_channel": "Nightly 开发版",
+    "switch_to": "切换到 {version}",
+    "use_nightly": "切换到 nightly",
+    "other_versions": "其他稳定版本",
     "groups": {
       "memory": "内存与性能",
       "precision": "精度控制",
       "cache": "缓存",
       "preview": "预览"
     }
+  },
+  "plugins": {
+    "offline_title": "ComfyUI 未运行",
+    "offline_desc": "插件目录由 ComfyUI-Manager 提供。请先从页头启动 ComfyUI，再管理插件。"
   },
   "confirm": {
     "restart": "确定要重启 ComfyUI 吗？",

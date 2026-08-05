@@ -169,6 +169,7 @@ if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
     pm2 start "$PYTHON_BIN" --name dashboard \
         --interpreter none \
         --log /workspace/dashboard.log \
+        --merge-logs \
         --time \
         -- "$DASHBOARD_DIR/workspace_manager.py" 5000
     pm2 save 2>/dev/null || true
@@ -181,7 +182,7 @@ fi
 pm2 delete jupyter 2>/dev/null || true
 pm2 start jupyter-lab --name jupyter \
     --interpreter none \
-    --log /workspace/jupyter.log --time \
+    --log /workspace/jupyter.log --merge-logs --time \
     -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
     --ServerApp.root_dir=/workspace \
     --ServerApp.language=zh_CN

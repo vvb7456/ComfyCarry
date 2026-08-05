@@ -30,6 +30,7 @@ defineOptions({ name: 'PluginsTab' })
 
 const props = defineProps<{
   online?: boolean
+  active?: boolean
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -37,12 +38,11 @@ const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-// ── State ──
 const loading = ref(false)
 const error = ref('')
+const loaded = ref(false)
 let getlistCache: Record<string, PluginInfo> = {}
 
-// Modals
 const gitModalOpen = ref(false)
 const versionModalOpen = ref(false)
 const versionModalTitle = ref('')
@@ -61,7 +61,9 @@ const {
   setAvailablePlugins,
   setInstalledPlugins,
 } = usePluginFiltering()
+
 const stats = computed(() => t('plugins.browse.stats_text', { count: filteredPlugins.value.length }))
+
 const {
   queueProcessing,
   queueStatus,
@@ -73,8 +75,8 @@ const {
   onIdle: loadData,
 })
 
-// ── Data loading ──
 async function loadData() {
+  if (loading.value || props.online === false) return
   loading.value = true
   error.value = ''
   try {
@@ -83,37 +85,28 @@ async function loadData() {
       get<AvailablePluginsResponse>('/api/plugins/available'),
     ])
 
-    if (availableData) {
-      getlistCache = setAvailablePlugins(availableData)
-    }
-
+    if (availableData) getlistCache = setAvailablePlugins(availableData)
     if (!installedData) {
       error.value = t('plugins.installed.load_failed')
       return
     }
 
     setInstalledPlugins(installedData, getlistCache)
+    loaded.value = true
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  if (props.online !== false) {
-    loadData()
-    pollQueue()
-  }
-})
+function activateWorkspace() {
+  if (!props.active || props.online === false) return
+  if (!loaded.value) loadData()
+  pollQueue()
+}
 
-// Auto-load when coming online
-watch(() => props.online, (val) => {
-  if (val && unifiedPlugins.value.length === 0) {
-    loadData()
-    pollQueue()
-  }
-})
+onMounted(activateWorkspace)
+watch([() => props.active, () => props.online], activateWorkspace)
 
-// ── Plugin actions ──
 async function installPlugin(id: string, version = 'latest') {
   toast(t('plugins.toast.installing_name', { id }), 'info')
   const pack = getlistCache[id] || {}
@@ -140,7 +133,6 @@ async function togglePlugin(p: PluginData) {
   if (d?.ok) { toast(apiMessageText(d), 'success'); startQueuePoll() }
 }
 
-// ── Version modal ──
 async function openVersionModal(id: string, title: string) {
   versionModalId.value = id
   versionModalTitle.value = t('plugins.version_picker.title_name', { name: title || id })
@@ -161,55 +153,62 @@ async function installVersion(version: string) {
 </script>
 
 <template>
-  <SectionToolbar>
-    <template #start>
-      <FilterInput v-model="filter" :placeholder="t('plugins.browse.search_placeholder')" />
-      <span class="toolbar-status">
-        {{ stats }}
-        <template v-if="queueProcessing">
-          &nbsp;· <MsIcon name="hourglass_top" /> {{ queueStatus }}
-        </template>
-      </span>
-    </template>
-    <template #end>
-      <BaseButton size="sm" :disabled="loading" @click="loadData">{{ t('plugins.installed.refresh') }}</BaseButton>
-      <BaseButton size="sm" @click="gitModalOpen = true"><MsIcon name="link" /> {{ t('plugins.tabs.git') }}</BaseButton>
-      <BaseSelect v-model="statusFilter" :options="[
-        { value: 'all', label: t('plugins.installed.all_status') },
-        { value: 'installed', label: t('plugins.installed.enabled') },
-        { value: 'not-installed', label: t('plugins.browse.not_installed') },
-        { value: 'update', label: t('plugins.installed.has_update') },
-        { value: 'disabled', label: t('plugins.installed.disabled') },
-      ]" size="sm" fit />
-      <BaseSelect v-model="sortBy" :options="[
-        { value: 'stars', label: t('plugins.browse.sort_stars') },
-        { value: 'update', label: t('plugins.browse.sort_update') },
-        { value: 'name', label: t('plugins.browse.sort_name') },
-      ]" size="sm" fit />
-    </template>
-  </SectionToolbar>
+  <EmptyState
+    v-if="online === false"
+    icon="cloud_off"
+    :title="t('comfyui.plugins.offline_title')"
+    :message="t('comfyui.plugins.offline_desc')"
+  />
 
-  <AlertBanner v-if="error" tone="danger" dense>{{ error }}</AlertBanner>
-  <LoadingCenter v-if="loading && unifiedPlugins.length === 0">{{ t('common.status.loading') }}</LoadingCenter>
-  <EmptyState v-else-if="currentPage.length === 0" icon="search_off" :message="t('plugins.installed.no_match')" />
-  <div v-else class="plugin-list">
-    <PluginCard
-      v-for="p in currentPage"
-      :key="p.id"
-      :plugin="p"
-      @install="installPlugin(p.id)"
-      @uninstall="uninstallPlugin(p)"
-      @update="updatePlugin(p)"
-      @toggle="togglePlugin(p)"
-      @version="openVersionModal(p.id, p.title)"
-    />
-  </div>
-  <div ref="listEndEl" class="plugins-list-end" />
+  <template v-else>
+    <SectionToolbar>
+      <template #start>
+        <FilterInput v-model="filter" :placeholder="t('plugins.browse.search_placeholder')" />
+        <span class="toolbar-status">
+          {{ stats }}
+          <template v-if="queueProcessing">
+            &nbsp;· <MsIcon name="hourglass_top" /> {{ queueStatus }}
+          </template>
+        </span>
+      </template>
+      <template #end>
+        <BaseButton size="sm" :disabled="loading" @click="loadData">{{ t('plugins.installed.refresh') }}</BaseButton>
+        <BaseButton size="sm" @click="gitModalOpen = true"><MsIcon name="link" /> {{ t('plugins.tabs.git') }}</BaseButton>
+        <BaseSelect v-model="statusFilter" :options="[
+          { value: 'all', label: t('plugins.installed.all_status') },
+          { value: 'installed', label: t('plugins.installed.installed_badge') },
+          { value: 'not-installed', label: t('plugins.browse.not_installed') },
+          { value: 'update', label: t('plugins.installed.has_update') },
+          { value: 'disabled', label: t('plugins.installed.disabled') },
+        ]" size="sm" fit />
+        <BaseSelect v-model="sortBy" :options="[
+          { value: 'stars', label: t('plugins.browse.sort_stars') },
+          { value: 'update', label: t('plugins.browse.sort_update') },
+          { value: 'name', label: t('plugins.browse.sort_name') },
+        ]" size="sm" fit />
+      </template>
+    </SectionToolbar>
 
-  <!-- Git Install Modal -->
+    <AlertBanner v-if="error" tone="danger" dense>{{ error }}</AlertBanner>
+    <LoadingCenter v-if="loading && unifiedPlugins.length === 0">{{ t('common.status.loading') }}</LoadingCenter>
+    <EmptyState v-else-if="currentPage.length === 0" icon="search_off" :message="t('plugins.installed.no_match')" />
+    <div v-else class="plugin-list">
+      <PluginCard
+        v-for="p in currentPage"
+        :key="p.id"
+        :plugin="p"
+        @install="installPlugin(p.id)"
+        @uninstall="uninstallPlugin(p)"
+        @update="updatePlugin(p)"
+        @toggle="togglePlugin(p)"
+        @version="openVersionModal(p.id, p.title)"
+      />
+    </div>
+    <div ref="listEndEl" class="plugins-list-end" />
+  </template>
+
   <GitInstallModal v-model="gitModalOpen" @installed="startQueuePoll" />
 
-  <!-- Version Picker Modal -->
   <BaseModal v-model="versionModalOpen" :title="versionModalTitle" width="480px">
     <LoadingCenter v-if="versionLoading" />
     <EmptyState v-else-if="versionList.length === 0" density="compact" :message="t('plugins.version_picker.no_version_nightly')" />

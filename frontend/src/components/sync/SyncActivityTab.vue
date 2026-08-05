@@ -19,6 +19,10 @@ defineOptions({ name: 'SyncActivityTab' })
 const props = defineProps<{
   logLines: Array<string | LogLine>
   logStatus?: LogStatus
+  logHasMore?: boolean
+  logLoadingMore?: boolean
+  logPrepending?: boolean
+  logOnScroll?: (el: HTMLElement) => void
   jobs: SyncJob[]
   currentJobId: string | null
   rules: SyncRule[]
@@ -215,7 +219,7 @@ function jobFiles(job: SyncJob): string[] {
   <!-- Live Log -->
   <div class="log-section">
     <SectionHeader icon="receipt_long" flush>{{ t('sync.log.title') }}</SectionHeader>
-    <LogPanel :lines="logLines" :status="logStatus" />
+    <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
   </div>
 </template>
 

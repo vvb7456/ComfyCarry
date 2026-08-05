@@ -97,8 +97,8 @@ const tabs = computed(() => [
 
 // ─── Log stream ───────────────────────────────────────────────────────────────
 
-const { lines: logLines, status: logStatus, start: logStart, stop: logStop } = useLogStream({
-  historyUrl: '/api/logs/dashboard?lines=100',
+const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
+  historyUrl: '/api/logs/dashboard',
   streamUrl: '/api/logs/dashboard/stream',
 })
 
@@ -717,7 +717,7 @@ onUnmounted(() => {
             <MsIcon name="receipt_long" />
             {{ t('settings.log.title') }}
           </h3>
-          <LogPanel :lines="logLines" :status="logStatus" style="height:calc(100% - 50px)" />
+          <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" style="height:calc(100% - 50px)" />
         </div>
       </div>
 

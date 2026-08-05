@@ -354,60 +354,23 @@ def jupyter_delete_session(session_id):
 
 @bp.route("/api/jupyter/logs")
 def jupyter_logs():
-    """获取 Jupyter 日志 (PM2)"""
-    lines = min(int(request.args.get("lines", "200")), 2000)
+    """获取 Jupyter 日志 history (行号游标分页, 读 /workspace/jupyter.log)"""
+    from ..services.log_service import read_history
     try:
-        r = subprocess.run(
-            f"pm2 logs {PM2_NAME} --nostream --lines {lines} 2>/dev/null",
-            shell=True, capture_output=True, text=True, timeout=5
-        )
-        raw = r.stdout + r.stderr
-        # 移除 ANSI 颜色码
-        ansi_re = re.compile(r'\x1b\[[0-9;]*m')
-        clean = ansi_re.sub('', raw)
-        return jsonify({"logs": clean})
-    except Exception as e:
-        return jsonify({"logs": "", "error_key": "jupyter.err.logs_failed",
-                        "error_params": {"detail": str(e)}})
+        lines = int(request.args.get("lines", "200"))
+    except (ValueError, TypeError):
+        lines = 200
+    before = request.args.get("before")
+    before = int(before) if before and before.isdigit() else None
+    return jsonify(read_history("/workspace/jupyter.log", before=before, lines=lines))
 
 
 @bp.route("/api/jupyter/logs/stream")
 def jupyter_logs_stream():
-    """SSE — PM2 Jupyter 日志实时流"""
-    def generate():
-        proc = None
-        try:
-            proc = subprocess.Popen(
-                ["pm2", "logs", PM2_NAME, "--raw", "--lines", "50"],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1
-            )
-            for line in iter(proc.stdout.readline, ''):
-                if not line:
-                    break
-                line = line.rstrip('\n')
-                if not line:
-                    continue
-                lvl = "info"
-                if re.search(r'error|exception|traceback', line, re.I):
-                    lvl = "error"
-                elif re.search(r'warn', line, re.I):
-                    lvl = "warn"
-                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            if proc:
-                try:
-                    proc.kill()
-                    proc.stdout.close()
-                    proc.wait(timeout=5)
-                except Exception:
-                    pass
-
-    return Response(generate(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache",
-                             "X-Accel-Buffering": "no"})
+    """SSE - Jupyter 日志实时流 (tail -f /workspace/jupyter.log)"""
+    from ..services.log_service import stream_tail
+    return Response(stream_tail("/workspace/jupyter.log"), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @bp.route("/api/jupyter/start", methods=["POST"])
@@ -422,22 +385,25 @@ def jupyter_start():
     _cached_token = None
 
     if pm2 == "not_found":
-        # 首次启动 — 创建 PM2 进程
+        # 首次启动 - 创建 PM2 进程
+        from ..services.log_service import clean_pm2_env
+        env = clean_pm2_env()
         cmd = (
             f'pm2 start jupyter-lab --name {PM2_NAME} '
             f'--interpreter none '
-            f'--log /workspace/jupyter.log --time '
+            f'--log /workspace/jupyter.log --merge-logs --time '
             f'-- --ip=0.0.0.0 --port=8888 --no-browser --allow-root '
             f'--ServerApp.root_dir=/workspace '
             f'--ServerApp.language=zh_CN'
         )
     else:
-        # 已存在但 stopped/errored — 重启
+        # 已存在但 stopped/errored - 重启
+        env = None
         cmd = f'pm2 restart {PM2_NAME}'
 
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
-        subprocess.run("pm2 save 2>/dev/null", shell=True)
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10, env=env)
+        subprocess.run("pm2 save 2>/dev/null", shell=True, env=env)
         if r.returncode == 0:
             return _ok("starting")
         return _err("start_failed", 500, _extra={"ok": False}, detail=(r.stderr or "").strip())

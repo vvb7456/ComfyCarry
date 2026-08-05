@@ -130,14 +130,17 @@ def _restore_comfyui(log):
 
     py = _detect_python()
     try:
+        # 清掉 pm2 注入的日志路径环境变量, 否则覆盖 --log (见 log_service.clean_pm2_env)
+        from .services.log_service import clean_pm2_env
+        env = clean_pm2_env()
         cmd = (
             f'cd {comfy_dir} && pm2 start {py} --name comfy '
-            f'--interpreter none --log /workspace/comfy.log --time '
+            f'--interpreter none --log /workspace/comfy.log --merge-logs --time '
             f'--restart-delay 3000 --max-restarts 10 '
             f'-- main.py {saved_args}'
         )
-        subprocess.run(cmd, shell=True, timeout=30)
-        subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5)
+        subprocess.run(cmd, shell=True, timeout=30, env=env)
+        subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5, env=env)
         log.info(f"ComfyUI 已自动恢复 (args: {saved_args})")
     except Exception as e:
         log.warning(f"ComfyUI 自动恢复失败: {e}")

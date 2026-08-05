@@ -57,6 +57,8 @@ const props = withDefaults(defineProps<{
   fit?: boolean
   /** When true, dropdown panel is teleported to body (for use inside overflow containers) */
   teleport?: boolean
+  /** Optional upper bound for the dropdown option list (in px). */
+  maxListHeight?: number
   /**
    * Multi-select. modelValue becomes an array; the panel stays open on pick and
    * each row gets a checkbox. Trigger shows "A, B" or "N selected" past `maxTagText`.
@@ -129,7 +131,10 @@ const { floatingStyles, isPositioned, placement } = useFloating(triggerRef, pane
       apply({ availableHeight, elements }) {
         // Clamp the list max-height to the available viewport space
         const searchH = props.searchable ? 36 : 0
-        const max = Math.max(80, availableHeight - searchH)
+        const availableMax = Math.max(80, availableHeight - searchH)
+        const max = props.maxListHeight == null
+          ? availableMax
+          : Math.min(Math.max(80, props.maxListHeight), availableMax)
         elements.floating.style.setProperty('--bs-list-max', `${max}px`)
       },
     }),

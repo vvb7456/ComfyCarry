@@ -144,7 +144,7 @@ def set_app_logger(logger):
 
 
 def _sync_log(key, params=None, level="info"):
-    """写结构化日志到内存 buffer + DB event (双写)"""
+    """写结构化日志到内存 buffer + DB event (双写) + 落盘 /workspace/sync.log (JSONL)"""
     ts = time.strftime("%H:%M:%S")
     entry = {"ts": ts, "key": key, "params": params or {}, "level": level}
     with _sync_log_lock:
@@ -153,7 +153,14 @@ def _sync_log(key, params=None, level="info"):
             _sync_log_buffer[:] = _sync_log_buffer[-300:]
     if _app_logger:
         _app_logger.debug(f"[sync] {key} {params or {}}")
-    # DB 双写 — 有活跃 job 时写入 sync_job_events (按执行线程归属)
+    # 落盘 JSONL: 前端读文件后逐行 JSON.parse 还原结构化, 再走 translateLogEntry 翻译。
+    # 这样 sync 面板和其他日志面板统一用 log_service 读文件, 不再走内存 buffer 取数。
+    try:
+        with open("/workspace/sync.log", "a") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+    # DB 双写 - 有活跃 job 时写入 sync_job_events (按执行线程归属)
     job_id = getattr(_current_job, "job_id", None)
     if job_id:
         try:

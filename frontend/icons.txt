@@ -26,6 +26,7 @@ dns
 eco
 hd
 history
+hourglass_top
 image_search
 inventory_2
 layers
@@ -70,3 +71,7 @@ face_retouching_natural
 #     故此处手动补。新增多行 <MsIcon> 时留意同样的坑。
 check_box
 check_box_outline_blank
+
+# VersionCard.vue — BaseSelect option.icon 间接引用
+verified
+experiment

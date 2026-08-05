@@ -135,63 +135,88 @@ def api_service_action(name, action):
 # ====================================================================
 # 日志 API
 # ====================================================================
+_pm2_names_cache: tuple[float, set[str]] | None = None
+_PM2_CACHE_TTL = 3.0  # 秒, 避免每个日志请求都跑 pm2 jlist
+
+def _pm2_log_path(name: str) -> str | None:
+    """返回进程的合并日志文件路径 /workspace/<name>.log。
+
+    所有 pm2 进程在启动时都带 ``--log /workspace/<name>.log --merge-logs`` (bootstrap
+    负责 dashboard/jupyter, app.py 负责 comfy), out+err 合并到这一个文件。
+    进程存在性查 jlist (3s 缓存, 不存在则返回 None), 路径用约定而非 jlist 的
+    pm_out_log_path (后者在 resurrect 恢复的旧配置下指向默认 ~/.pm2/logs/)。
+
+    注: cf-tunnel 的日志文件是 /workspace/tunnel.log (非 cf-tunnel.log),
+    但 tunnel 页走自己的 /api/tunnel/logs 端点, 不经过这里。
+    """
+    global _pm2_names_cache
+    import time as _time
+    now = _time.time()
+    if _pm2_names_cache and (now - _pm2_names_cache[0]) < _PM2_CACHE_TTL:
+        names = _pm2_names_cache[1]
+    else:
+        try:
+            proc = subprocess.run(["pm2", "jlist"], capture_output=True, text=True, timeout=5)
+            if proc.returncode != 0:
+                return None
+            apps = json.loads(proc.stdout or "[]")
+            names = {a.get("name", "") for a in apps}
+            _pm2_names_cache = (now, names)
+        except Exception:
+            return None
+    return f"/workspace/{name}.log" if name in names else None
+
+
 @bp.route("/api/logs/<name>")
 def api_logs(name):
-    """获取 PM2 日志"""
+    """获取 PM2 进程日志 history (行号游标分页)。
+
+    - ?lines=N           末尾 N 行 (默认 100)
+    - ?before=K&lines=N  第 K 行 (含) 之前的 N 行 (往上滚懒加载)
+    返回 {"entries": [{line, text, level}], "total": 文件总行数}。
+    """
     if not re.match(r'^[\w\-]+$', name):
         return _err("invalid_service")
+    path = _pm2_log_path(name)
+    if not path:
+        return jsonify({"entries": [], "total": 0})
+
     try:
         lines = int(request.args.get("lines", "100"))
-        lines = min(max(lines, 1), 1000)
     except (ValueError, TypeError):
         lines = 100
-    try:
-        out = _run_cmd(f"pm2 logs {name} --nostream --lines {lines}", timeout=5)
-        return jsonify({"logs": out})
-    except Exception as e:
-        return _err("internal", 500, detail=str(e))
+    before = request.args.get("before")
+    before = int(before) if before and before.isdigit() else None
+
+    from ..services.log_service import read_history
+    return jsonify(read_history(path, before=before, lines=lines))
 
 
 @bp.route("/api/logs/<name>/stream")
 def api_logs_stream(name):
-    """SSE — PM2 实时日志流"""
+    """SSE - PM2 进程日志实时流 (tail -f 日志文件)。
+
+    服务没跑时文件仍在磁盘, tail -f 照常打开 -> onopen 触发, 不卡 loading。
+    """
     if not re.match(r'^[\w\-]+$', name):
         return _err("invalid_service")
+    path = _pm2_log_path(name)
+    if not path:
+        # 进程不存在: 保持 SSE 挂起 (定期心跳), 每轮检查进程是否出现,
+        # 出现则结束心跳让 EventSource 重连到真正的 tail -f。
+        def heartbeat():
+            import time as _time
+            while True:
+                yield ": heartbeat\n\n"
+                _time.sleep(15)
+                if _pm2_log_path(name):
+                    return
+        return Response(heartbeat(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    def generate():
-        proc = None
-        try:
-            proc = subprocess.Popen(
-                ["pm2", "logs", name, "--raw", "--lines", "0"],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1
-            )
-            for line in iter(proc.stdout.readline, ''):
-                if not line:
-                    break
-                line = line.rstrip('\n')
-                if not line:
-                    continue
-                lvl = "info"
-                if re.search(r'error|exception|traceback', line, re.I):
-                    lvl = "error"
-                elif re.search(r'warn', line, re.I):
-                    lvl = "warn"
-                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            if proc:
-                try:
-                    proc.kill()
-                    proc.stdout.close()
-                    proc.wait(timeout=5)
-                except Exception:
-                    pass
-
-    return Response(generate(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache",
-                             "X-Accel-Buffering": "no"})
+    from ..services.log_service import stream_tail
+    return Response(stream_tail(path), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ====================================================================

@@ -12,7 +12,7 @@ import SectionHeader from '@/components/ui/SectionHeader.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import type { ComfyStatus } from '@/types/comfyui'
 
-defineOptions({ name: 'ConsoleTab' })
+defineOptions({ name: 'ConsoleSection' })
 
 const props = defineProps<{
   status: ComfyStatus | null
@@ -34,10 +34,12 @@ const comfyCardStatus = computed<'info' | 'running' | 'stopped' | 'loading' | 'e
   return 'stopped'
 })
 
+const queueTotal = computed(() => (props.status?.queue_running || 0) + (props.status?.queue_pending || 0))
+
 // Log stream
-const logStream = useLogStream({
-  historyUrl: '/api/logs/comfy?lines=200',
-  streamUrl: '/api/comfyui/logs/stream',
+const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
+  historyUrl: '/api/logs/comfy',
+  streamUrl: '/api/logs/comfy/stream',
   classify(line) {
     if (/error|exception|traceback/i.test(line)) return 'log-error'
     if (/warn/i.test(line)) return 'log-warn'
@@ -46,8 +48,8 @@ const logStream = useLogStream({
   },
 })
 
-onMounted(() => { logStream.start() })
-onUnmounted(() => { logStream.stop() })
+onMounted(() => { logStart() })
+onUnmounted(() => { logStop() })
 
 // Formatters
 function fmtUptime(pm2Uptime: number) {
@@ -66,10 +68,10 @@ function fmtUptime(pm2Uptime: number) {
       <Spinner size="md" />
     </div>
     <div v-else class="stat-grid">
-      <StatCard label="ComfyUI" :status="comfyCardStatus" value-size="sm">
+      <StatCard :label="t('comfyui.overview.runtime')" :status="comfyCardStatus" value-size="sm">
         <template #value>{{ status.online ? (execState ? t('comfyui.status.generating') : t('comfyui.status.idle')) : t('comfyui.status.stopped') }}</template>
         <template #sub v-if="status.online">
-          v{{ status.system?.comfyui_version || '?' }} · Python {{ status.system?.python_version || '?' }} · PyTorch {{ status.system?.pytorch_version || '?' }}
+          {{ t('comfyui.overview.uptime_summary', { uptime: fmtUptime(status.pm2_uptime), count: status.pm2_restarts || 0 }) }}
         </template>
         <template #sub v-else>PM2: {{ status.pm2_status }}</template>
       </StatCard>
@@ -84,30 +86,42 @@ function fmtUptime(pm2Uptime: number) {
         <UsageBar :percent="gpu.mem_total > 0 ? (gpu.mem_used / gpu.mem_total * 100) : 0" />
       </StatCard>
 
-      <StatCard v-if="status.pm2_uptime" :label="t('comfyui.console.uptime')" value-size="sm">
-        <template #value>{{ fmtUptime(status.pm2_uptime) }}</template>
-        <template #sub>{{ t('comfyui.console.restart_count', { count: status.pm2_restarts || 0 }) }}</template>
+      <StatCard :label="t('comfyui.overview.queue')" :status="queueTotal > 0 ? 'loading' : 'info'" value-size="sm">
+        <template #value>{{ queueTotal > 0 ? queueTotal : t('comfyui.overview.queue_idle') }}</template>
+        <template #sub>{{ t('comfyui.overview.queue_summary', { running: status.queue_running || 0, pending: status.queue_pending || 0 }) }}</template>
+      </StatCard>
+
+      <StatCard :label="t('comfyui.overview.environment')" value-size="sm">
+        <template #value>ComfyUI {{ status.system?.comfyui_version || '?' }}</template>
+        <template #sub>Python {{ status.system?.python_version || '?' }} · PyTorch {{ status.system?.pytorch_version || '?' }}</template>
       </StatCard>
     </div>
   </div>
 
-  <!-- Exec progress bar -->
-  <ComfyProgressBar :state="execState" :elapsed="elapsed" />
+  <!-- 只有确有当前任务时才占据页面空间；空闲状态已由运行卡片表达。 -->
+  <div v-if="execState" class="execution-block">
+    <SectionHeader icon="bolt" flush>{{ t('comfyui.overview.current_execution') }}</SectionHeader>
+    <ComfyProgressBar :state="execState" :elapsed="elapsed" />
+  </div>
 
   <!-- Log -->
   <SectionHeader icon="receipt_long">{{ t('comfyui.console.log_title') }}</SectionHeader>
-  <LogPanel :lines="logStream.lines.value" :status="logStream.status.value" />
+  <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" height="clamp(18rem, 42vh, 32rem)" />
 </template>
 
 <style scoped>
 .stat-grid-wrap {
-  min-height: 110px;
-  margin-bottom: clamp(24px, 2vw, 36px);
+  min-height: 7rem;
+  margin-bottom: clamp(1rem, 1.5vw, 1.5rem);
 }
 .stat-grid-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 110px;
+  min-height: 7rem;
+}
+
+.execution-block {
+  margin-bottom: var(--sp-5);
 }
 </style>

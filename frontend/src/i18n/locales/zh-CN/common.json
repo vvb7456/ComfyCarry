@@ -44,12 +44,12 @@
     "title": "日志",
     "clear": "清空日志",
     "empty": "暂无输出",
-    "live": "实时",
-    "standby": "就绪",
+    "standby": "已连接",
     "loading": "加载中",
     "error": "连接错误",
     "follow_on": "始终跟随最新行",
-    "follow_off": "取消跟随最新行"
+    "follow_off": "取消跟随最新行",
+    "loading_more": "加载更早日志..."
   },
   "scroll_top": "返回顶部",
   "theme_toggle": "切换主题",

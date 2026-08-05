@@ -2,7 +2,7 @@
  * useSystemStats — Shared singleton composable for real-time system metrics.
  *
  * Polls GET /api/system/stats every 3s.
- * Multiple consumers (DashboardPage, ConsoleTab) share one polling loop.
+ * Multiple consumers (DashboardPage, ConsoleSection) share one polling loop.
  * Auto-start on first mount, auto-stop when all consumers unmount.
  */
 import { ref, onMounted, onUnmounted, type Ref } from 'vue'

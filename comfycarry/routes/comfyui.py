@@ -10,12 +10,10 @@ ComfyCarry — ComfyUI 管理路由
 - /api/comfyui/history   — 生成历史
 - /api/comfyui/view      — 图片代理
 - /api/comfyui/events    — SSE 实时事件
-- /api/comfyui/logs/stream — SSE 日志流
 """
 
 import json
 import queue
-import re
 import shlex
 import subprocess
 
@@ -126,6 +124,39 @@ def api_comfyui_params_get():
         return _err("internal", 500, detail=str(e))
 
 
+def restart_comfyui(args_str: str = "") -> bool:
+    """用 delete + start 重建 comfy 进程 (不能用 pm2 restart -- 后者沿用 dump 旧配置,
+    会丢 --log /workspace/comfy.log, 日志回默认 ~/.pm2/logs/, 前端面板看不到)。
+
+    args_str 为空时用已保存的 comfyui_args。返回是否成功。
+    """
+    if not args_str:
+        from ..config import _get_config
+        from ..services.comfyui_params import ensure_preview_method
+        args_str = ensure_preview_method(_get_config("comfyui_args", ""))
+    py = _detect_python()
+    try:
+        # 清掉 pm2 注入的日志路径环境变量, 否则它们覆盖 --log 命令行参数
+        # (pm2 把 pm_log_path 等注入被管理进程, dashboard 继承后调 pm2 start
+        # 时这些环境变量被传给 pm2 CLI, 覆盖 --log /workspace/comfy.log)。
+        from ..services.log_service import clean_pm2_env
+        env = clean_pm2_env()
+        subprocess.run("pm2 delete comfy 2>/dev/null || true", shell=True, timeout=10, env=env)
+        import time as _time
+        _time.sleep(1)
+        cmd = (
+            f'cd {COMFYUI_DIR} && pm2 start {py} --name comfy '
+            f'--interpreter none --log /workspace/comfy.log --merge-logs --time '
+            f'--restart-delay 3000 --max-restarts 10 '
+            f'-- main.py {args_str}'
+        )
+        subprocess.run(cmd, shell=True, timeout=30, check=True, env=env)
+        subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5, env=env)
+        return True
+    except Exception:
+        return False
+
+
 @bp.route("/api/comfyui/params", methods=["POST"])
 def api_comfyui_params_update():
     """更新 ComfyUI 启动参数并重启"""
@@ -140,26 +171,13 @@ def api_comfyui_params_update():
             return _err("invalid_extra_args")
         args_str = args_str + " " + " ".join(shlex.quote(t) for t in tokens)
 
-    py = _detect_python()
+    if not restart_comfyui(args_str):
+        return _err("internal", 500)
 
-    try:
-        subprocess.run("pm2 delete comfy 2>/dev/null || true",
-                       shell=True, timeout=10)
-        cmd = (
-            f'cd {COMFYUI_DIR} && pm2 start {py} --name comfy '
-            f'--interpreter none --log /workspace/comfy.log --time '
-            f'--restart-delay 3000 --max-restarts 10 '
-            f'-- main.py {args_str}'
-        )
-        subprocess.run(cmd, shell=True, timeout=30, check=True)
-        subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5)
+    # 持久化到 .dashboard_env (容器重启后可恢复)
+    _set_config("comfyui_args", args_str)
 
-        # 持久化到 .dashboard_env (容器重启后可恢复)
-        _set_config("comfyui_args", args_str)
-
-        return jsonify({"ok": True, "args": args_str})
-    except Exception as e:
-        return _err("internal", 500, detail=str(e))
+    return jsonify({"ok": True, "args": args_str})
 
 
 # ====================================================================
@@ -397,44 +415,6 @@ def api_comfyui_events():
                              "X-Accel-Buffering": "no"})
 
 
-@bp.route("/api/comfyui/logs/stream")
-def api_comfyui_logs_stream():
-    """SSE — pm2 log lines for comfy in real-time."""
-    def generate():
-        proc = None
-        try:
-            proc = subprocess.Popen(
-                ["pm2", "logs", "comfy", "--raw", "--lines", "50"],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1
-            )
-            for line in iter(proc.stdout.readline, ''):
-                if not line:
-                    break
-                line = line.rstrip('\n')
-                if not line:
-                    continue
-                lvl = "info"
-                if re.search(r'error|exception|traceback', line, re.I):
-                    lvl = "error"
-                elif re.search(r'warn', line, re.I):
-                    lvl = "warn"
-                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            if proc:
-                try:
-                    proc.kill()
-                    proc.stdout.close()
-                    proc.wait(timeout=5)
-                except Exception:
-                    pass
-
-    return Response(generate(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache",
-                             "X-Accel-Buffering": "no"})
-
 
 # ====================================================================
 # 版本管理
@@ -462,10 +442,8 @@ def api_comfyui_switch():
         # result 本身已经是 key + params 形态 (见 switch_version docstring)
         return jsonify(result), 500
 
-    # 重启 ComfyUI PM2 进程
-    try:
-        subprocess.run(["pm2", "restart", "comfy"], capture_output=True, timeout=15)
-    except Exception:
+    # 重启 ComfyUI (delete + start, 不能用 pm2 restart -- 会丢 --log)
+    if not restart_comfyui():
         result["warning_key"] = "comfyui.warn.switch_restart"
 
     return jsonify(result)

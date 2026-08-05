@@ -11,8 +11,8 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
-import ConsoleTab from '@/components/comfyui/ConsoleTab.vue'
-import SettingsTab from '@/components/comfyui/SettingsTab.vue'
+import ConsoleSection from '@/components/comfyui/ConsoleSection.vue'
+import ParamsCard from '@/components/comfyui/ParamsCard.vue'
 import PluginsTab from '@/components/comfyui/PluginsTab.vue'
 import type { ComfyStatus } from '@/types/comfyui'
 
@@ -23,15 +23,15 @@ const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-// Tabs
-const activeTab = ref('console')
-const comfyTabs = computed(() => [
-  { key: 'console', label: t('comfyui.tabs.console'), icon: 'terminal' },
-  { key: 'plugins', label: t('comfyui.tabs.plugins'), icon: 'package_2' },
-  { key: 'settings', label: t('comfyui.tabs.settings'), icon: 'settings' },
+// 页面按用户任务划分为三个稳定工作区。插件目录是浏览目的地，不是临时任务抽屉。
+const activeTab = ref('overview')
+const tabs = computed(() => [
+  { key: 'overview', label: t('comfyui.tabs.overview'), icon: 'monitoring' },
+  { key: 'settings', label: t('comfyui.tabs.settings'), icon: 'tune' },
+  { key: 'plugins', label: t('comfyui.tabs.plugins'), icon: 'extension' },
 ])
 
-// Status (shared — used in header badge + ConsoleTab)
+// Status (shared - used in header badge + ConsoleSection)
 const status = ref<ComfyStatus | null>(null)
 
 // 页头「打开 ComfyUI」链接。地址只有隧道配好之后才存在 (后端不提供本地直连兜底:
@@ -47,12 +47,11 @@ async function loadComfyUrl() {
   comfyUrl.value = hit ? hit[1] : ''
 }
 
-// Exec + SSE (shared — used for toasts + ConsoleTab progress bar)
+// Exec + SSE (shared - used for toasts + ConsoleSection progress bar)
 const tracker = useExecTracker()
 const execState = computed(() => tracker.state.value)
 
-const consoleTabRef = ref<InstanceType<typeof ConsoleTab> | null>(null)
-const settingsTabRef = ref<InstanceType<typeof SettingsTab> | null>(null)
+const paramsRef = ref<InstanceType<typeof ParamsCard> | null>(null)
 
 const sse = useComfySSE(tracker, {
   onEvent(evt, result) {
@@ -91,7 +90,7 @@ async function loadStatus() {
 async function comfyStart() {
   if (!await post('/api/services/comfy/start')) return
   toast(t('comfyui.toast.starting'), 'info')
-  setTimeout(() => { loadStatus(); settingsTabRef.value?.loadParams() }, 3000)
+  setTimeout(() => { loadStatus(); paramsRef.value?.loadParams() }, 3000)
 }
 
 async function comfyStop() {
@@ -103,10 +102,12 @@ async function comfyStop() {
 
 async function comfyRestart() {
   if (!await confirm({ message: t('comfyui.confirm.restart') })) return
-  if (!await settingsTabRef.value?.saveParams(false)) return
-  if (!await post('/api/services/comfy/restart')) return
+  // saveParams(false) 走 POST /api/comfyui/params, 后端 restart_comfyui 做
+  // pm2 delete + start --log (清 pm2 环境变量让 --log 生效)。
+  // 不能再额外调 /api/services/comfy/restart (pm2 restart 会丢 --log)。
+  if (!await paramsRef.value?.saveParams(false)) return
   toast(t('comfyui.toast.restarting'), 'info')
-  setTimeout(() => { loadStatus(); settingsTabRef.value?.loadParams() }, 5000)
+  setTimeout(() => { loadStatus(); paramsRef.value?.loadParams() }, 5000)
 }
 </script>
 
@@ -133,26 +134,30 @@ async function comfyRestart() {
   </PageHeader>
 
   <div class="page-body">
-    <TabSwitcher v-model="activeTab" :tabs="comfyTabs" />
+    <TabSwitcher v-model="activeTab" :tabs="tabs" />
 
-    <div v-show="activeTab === 'console'">
-      <ConsoleTab
-        ref="consoleTabRef"
+    <div v-show="activeTab === 'overview'">
+      <ConsoleSection
         :status="status"
         :exec-state="execState"
         :elapsed="tracker.elapsed.value"
       />
     </div>
 
-    <div v-show="activeTab === 'settings'">
-      <SettingsTab
-        ref="settingsTabRef"
-        :status="status"
-      />
+    <div v-show="activeTab === 'settings'" class="settings-workspace">
+      <ParamsCard ref="paramsRef" :active="activeTab === 'settings'" />
     </div>
 
     <div v-show="activeTab === 'plugins'">
-      <PluginsTab :online="!!status?.online" />
+      <PluginsTab :online="status?.online" :active="activeTab === 'plugins'" />
     </div>
   </div>
 </template>
+
+<style scoped>
+.settings-workspace {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+}
+</style>

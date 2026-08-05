@@ -63,8 +63,8 @@ const pwConfirm = ref('')
 const pwSubmitting = ref(false)
 
 // log stream
-const { lines: logLines, status: logStatus, start: logStart, stop: logStop } = useLogStream({
-  historyUrl: '/api/ssh/logs?lines=200',
+const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
+  historyUrl: '/api/ssh/logs',
   streamUrl: '/api/ssh/logs/stream',
   classify(line) {
     if (/error|fatal|fail/i.test(line)) return 'log-error'
@@ -340,7 +340,7 @@ onUnmounted(() => {
 
         <!-- Log -->
         <SectionHeader icon="receipt_long">{{ t('ssh.log.title') }}</SectionHeader>
-        <LogPanel :lines="logLines" :status="logStatus" />
+        <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
       </div>
 
       <!-- ─── Config Tab ───────────────────────────────────────────────── -->

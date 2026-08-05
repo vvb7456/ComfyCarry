@@ -28,7 +28,7 @@ bp = Blueprint("ssh", __name__)
 
 AUTHORIZED_KEYS_FILE = os.path.expanduser("~/.ssh/authorized_keys")
 SSHD_CONFIG_FILE = "/etc/ssh/sshd_config"
-SSHD_LOG_FILE = "/var/log/sshd.log"
+SSHD_LOG_FILE = "/workspace/sshd.log"
 
 
 # ====================================================================
@@ -643,58 +643,21 @@ def ssh_restart():
 
 @bp.route("/api/ssh/logs")
 def ssh_logs():
-    """获取 sshd 日志 (最后 N 行)"""
-    lines = min(int(request.args.get("lines", "200")), 2000)
+    """获取 sshd 日志 history (行号游标分页, 读 /workspace/sshd.log)"""
+    from ..services.log_service import read_history
     try:
-        if not os.path.exists(SSHD_LOG_FILE):
-            return jsonify({"logs": ""})
-        code, out, _ = _run(f"tail -n {lines} {SSHD_LOG_FILE}", timeout=5)
-        return jsonify({"logs": out if code == 0 else ""})
-    except Exception as e:
-        return jsonify({"logs": "", "error": str(e)})
+        lines = int(request.args.get("lines", "200"))
+    except (ValueError, TypeError):
+        lines = 200
+    before = request.args.get("before")
+    before = int(before) if before and before.isdigit() else None
+    return jsonify(read_history(SSHD_LOG_FILE, before=before, lines=lines))
 
 
 @bp.route("/api/ssh/logs/stream")
 def ssh_logs_stream():
-    """SSE — sshd 日志实时流 (tail -f)"""
-    def generate():
-        proc = None
-        try:
-            # 确保日志文件存在
-            if not os.path.exists(SSHD_LOG_FILE):
-                with open(SSHD_LOG_FILE, "w"):
-                    pass
-
-            proc = subprocess.Popen(
-                ["tail", "-n", "50", "-f", SSHD_LOG_FILE],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1
-            )
-            for line in iter(proc.stdout.readline, ''):
-                if not line:
-                    break
-                line = line.rstrip('\n')
-                if not line:
-                    continue
-                lvl = "info"
-                if re.search(r'error|fatal|fail', line, re.I):
-                    lvl = "error"
-                elif re.search(r'warn|invalid|refused', line, re.I):
-                    lvl = "warn"
-                elif re.search(r'accepted|session opened|publickey', line, re.I):
-                    lvl = "info"
-                yield f"data: {json.dumps({'line': line, 'level': lvl}, ensure_ascii=False)}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            if proc:
-                try:
-                    proc.kill()
-                    proc.stdout.close()
-                    proc.wait(timeout=5)
-                except Exception:
-                    pass
-
-    return Response(generate(), mimetype="text/event-stream",
+    """SSE - sshd 日志实时流 (tail -f /workspace/sshd.log)"""
+    from ..services.log_service import stream_tail
+    return Response(stream_tail(SSHD_LOG_FILE), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",
                              "X-Accel-Buffering": "no"})

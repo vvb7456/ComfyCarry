@@ -335,13 +335,15 @@ class PublicTunnelClient:
         self._stop_cloudflared()
 
         protocol = get_config("cf_protocol", "auto")
+        from .log_service import clean_pm2_env
+        env = clean_pm2_env()
         try:
             subprocess.run(
                 f'pm2 start cloudflared --name cf-tunnel '
-                f'--interpreter none --log /workspace/tunnel.log --time '
+                f'--interpreter none --log /workspace/tunnel.log --merge-logs --time '
                 f'-- tunnel --protocol {shlex.quote(protocol)} '
                 f'--metrics localhost:20241 run --token {shlex.quote(token)}',
-                shell=True, capture_output=True, text=True, timeout=15,
+                shell=True, capture_output=True, text=True, timeout=15, env=env,
             )
             log.info(f"cloudflared (cf-tunnel) 已通过 PM2 启动 (protocol={protocol})")
         except Exception as e:

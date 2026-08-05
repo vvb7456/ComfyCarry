@@ -51,7 +51,7 @@ async function onRetry() {
       <DeployStepList :steps="steps" />
       <LogPanel
         :lines="logLines"
-        :status="status === 'deploying' ? 'live' : status === 'error' ? 'error' : 'standby'"
+        :status="status === 'error' ? 'error' : 'standby'"
         height="100%"
         class="wizard-deploy__log"
       />

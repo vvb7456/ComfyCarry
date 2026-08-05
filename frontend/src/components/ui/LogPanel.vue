@@ -8,11 +8,23 @@ import type { LogLine, LogStatus } from '@/composables/useLogStream'
 
 defineOptions({ name: 'LogPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   lines: Array<string | LogLine>
   status?: LogStatus
   height?: string
-}>()
+  /** 是否还有更早历史可加载 (有则滚顶时触发, 由 useLogStream 提供) */
+  hasMore?: boolean
+  /** 正在加载更早历史 (滚顶时显示顶部指示) */
+  loadingMore?: boolean
+  /** prepend 历史行中 (跳过 scrollToBottom, 避免用户上滚时被拉回底部) */
+  prepending?: boolean
+  /** 滚动事件回调 (传入滚动元素, 由 useLogStream.onScroll 处理懒加载) */
+  onScroll?: (el: HTMLElement) => void
+}>(), {
+  hasMore: false,
+  loadingMore: false,
+  prepending: false,
+})
 
 const { t } = useI18n({ useScope: 'global' })
 const el = ref<HTMLElement | null>(null)
@@ -25,20 +37,19 @@ const normalizedLines = computed<LogLine[]>(() => props.lines.map((line) => {
   return line
 }))
 
-/** 无日志时面板收成一行 —— 不再留一个 500px 的空黑盒占满首屏 */
+/** 无日志时面板收成一行 -- 不再留一个 500px 的空黑盒占满首屏 */
 const isEmpty = computed(() => normalizedLines.value.length === 0 && props.status !== 'loading')
 
 const statusDot = computed(() => {
   switch (props.status) {
-    case 'live': return 'running'
     case 'error': return 'error'
-    default: return 'idle' // standby / loading / undefined
+    case 'loading': return 'loading'
+    default: return 'running' // standby = tail -f 连上了
   }
 })
 
 const statusLabel = computed(() => {
   switch (props.status) {
-    case 'live': return t('common.log.live')
     case 'error': return t('common.log.error')
     case 'loading': return t('common.log.loading')
     default: return t('common.log.standby')
@@ -60,7 +71,8 @@ async function scrollToBottom() {
 }
 
 watch(() => props.lines.length, async () => {
-  if (followTail.value) {
+  // prepend 历史行时跳过滚底 (用户在上方阅读, 不应被拉回底部)
+  if (followTail.value && !props.prepending) {
     await scrollToBottom()
   }
 })
@@ -69,6 +81,12 @@ function toggleFollowTail() {
   followTail.value = !followTail.value
   if (followTail.value) {
     void scrollToBottom()
+  }
+}
+
+function handleScroll() {
+  if (props.onScroll && el.value) {
+    props.onScroll(el.value)
   }
 }
 </script>
@@ -97,7 +115,11 @@ function toggleFollowTail() {
       </button>
       <slot name="toolbar" />
     </div>
-    <pre ref="el" class="log-panel__body"><span
+    <!-- 顶部加载指示: 往上滚懒加载时显示 -->
+    <div v-if="loadingMore" class="log-panel__load-more">
+      <Spinner size="sm" /> <span>{{ t('common.log.loading_more') }}</span>
+    </div>
+    <pre ref="el" class="log-panel__body" @scroll="handleScroll"><span
         v-for="(line, i) in normalizedLines"
         :key="i"
         class="log-line"
@@ -173,6 +195,17 @@ function toggleFollowTail() {
   transform: scale(1.08);
 }
 
+.log-panel__load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px;
+  font-size: var(--text-xs);
+  color: var(--t3);
+  border-bottom: 1px solid var(--bd);
+}
+
 .log-panel__body {
   flex: 1;
   overflow-y: auto;
@@ -182,7 +215,9 @@ function toggleFollowTail() {
   line-height: 1.55;
   color: var(--t2);
   white-space: pre-wrap;
-  word-break: break-all;
+  /* 只在单个超长 token (URL/路径) 撑破容器时才断它, 正常词不被拆。 */
+  overflow-wrap: anywhere;
+  word-break: normal;
   margin: 0;
 }
 
@@ -208,8 +243,7 @@ function toggleFollowTail() {
   font-size: var(--text-sm);
 }
 
-/* 空态: 只保留工具条 + 一行说明, 不撑出空盒子
-   (即便调用方传了 height 也让位 — 空黑盒没有任何信息价值) */
+/* 空态: 只保留工具条 + 一行说明, 不撑出空盒子 */
 .log-panel--empty .log-panel__body {
   display: none;
 }

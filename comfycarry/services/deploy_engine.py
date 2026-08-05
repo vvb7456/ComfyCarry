@@ -189,7 +189,7 @@ def _deploy_step(name):
         _deploy_log_lines.append(entry)
 
 
-def _deploy_exec(cmd, timeout=600, label=""):
+def _deploy_exec(cmd, timeout=600, label="", env=None):
     """执行命令, 实时推送输出 (带真正的超时保护)。
 
     cmd 传 str 走 shell, 传 list 直接 execve —— 含用户输入的命令请传 list,
@@ -201,7 +201,7 @@ def _deploy_exec(cmd, timeout=600, label=""):
     try:
         proc = subprocess.Popen(
             cmd, shell=isinstance(cmd, str), stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, text=True, bufsize=1
+            stderr=subprocess.STDOUT, text=True, bufsize=1, env=env,
         )
         deadline = time.time() + timeout
         sel = selectors.DefaultSelector()
@@ -534,7 +534,7 @@ def _step_ssh(config):
     # 重启 sshd 使配置生效
     subprocess.run(
         "pkill sshd 2>/dev/null; sleep 0.5; "
-        "/usr/sbin/sshd -E /var/log/sshd.log 2>/dev/null || true",
+        "/usr/sbin/sshd -E /workspace/sshd.log 2>/dev/null || true",
         shell=True, timeout=10
     )
     _deploy_log("✅ sshd 已重启")
@@ -827,11 +827,14 @@ def _step_start_services(config, cfg, PY):
     _deploy_exec("mkdir -p /workspace/ComfyUI/input/openpose /workspace/ComfyUI/input/canny /workspace/ComfyUI/input/depth")
 
     _deploy_exec("pm2 delete comfy 2>/dev/null || true")
+    # 清掉 pm2 注入的日志路径环境变量 (见 log_service.clean_pm2_env)
+    from .log_service import clean_pm2_env
     _deploy_exec(
         f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '
-        f'--interpreter none --log /workspace/comfy.log --time '
+        f'--interpreter none --log /workspace/comfy.log --merge-logs --time '
         f'--restart-delay 3000 --max-restarts 10 '
-        f'-- main.py {comfy_args}'
+        f'-- main.py {comfy_args}',
+        env=clean_pm2_env(),
     )
 
     _deploy_exec("pm2 save 2>/dev/null || true")

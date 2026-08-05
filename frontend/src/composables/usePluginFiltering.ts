@@ -131,7 +131,7 @@ export function usePluginFiltering() {
       )
     }
 
-    if (activeStatus === 'installed') result = result.filter((plugin) => plugin.installed && plugin.enabled)
+    if (activeStatus === 'installed') result = result.filter((plugin) => plugin.installed)
     else if (activeStatus === 'not-installed') result = result.filter((plugin) => !plugin.installed)
     else if (activeStatus === 'update') result = result.filter((plugin) => plugin.updateState)
     else if (activeStatus === 'disabled') result = result.filter((plugin) => plugin.installed && !plugin.enabled)

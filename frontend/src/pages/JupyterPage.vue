@@ -38,8 +38,8 @@ const pm2Status = computed(() => status.value?.pm2_status || 'unknown')
 const isRunning = computed(() => status.value?.online || pm2Status.value === 'online')
 
 // log stream
-const { lines: logLines, status: logStatus, start: logStart, stop: logStop } = useLogStream({
-  historyUrl: '/api/jupyter/logs?lines=200',
+const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
+  historyUrl: '/api/jupyter/logs',
   streamUrl: '/api/jupyter/logs/stream',
   classify(line) {
     if (/error|exception|traceback/i.test(line)) return 'log-error'
@@ -377,7 +377,7 @@ onUnmounted(() => {
 
       <!-- Log -->
       <SectionHeader icon="receipt_long">{{ t('jupyter.log.title') }}</SectionHeader>
-      <LogPanel :lines="logLines" :status="logStatus" />
+      <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
     </div>
   </div>
 </template>

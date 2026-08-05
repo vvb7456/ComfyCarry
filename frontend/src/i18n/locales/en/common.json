@@ -44,12 +44,12 @@
     "title": "Logs",
     "clear": "Clear Logs",
     "empty": "No output yet.",
-    "live": "Live",
-    "standby": "Standby",
+    "standby": "Connected",
     "loading": "Loading",
     "error": "Error",
     "follow_on": "Always follow latest line",
-    "follow_off": "Stop following latest line"
+    "follow_off": "Stop following latest line",
+    "loading_more": "Loading older logs..."
   },
   "scroll_top": "Back to top",
   "theme_toggle": "Toggle Theme",

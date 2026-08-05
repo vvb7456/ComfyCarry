@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onActivated, provide, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, onActivated, onDeactivated, provide, ref, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
@@ -242,6 +242,13 @@ function openDrawer() {
     queueStore.loadHistory()
   }
 }
+
+// KeepAlive 下切走是 onDeactivated 而非 onUnmounted: 抽屉随页面失活关闭,
+// 顺带释放 Drawer 的 body 滚动锁 (其 watch close 分支 / onUnmounted 都不会在
+// deactivation 时触发), 避免遮罩与滚动锁泄漏到目标页。
+onDeactivated(() => {
+  drawerOpen.value = false
+})
 
 // badge: 队列任务数 (>0 显示, accent 底) — 读 store
 const queueCount = computed(() => queueStore.queueCount)

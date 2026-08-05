@@ -111,28 +111,26 @@ def api_sync_status():
 
 
 # ====================================================================
-# Sync SSE 日志流
+# Sync 日志 (读 /workspace/sync.log JSONL, 复用 log_service)
 # ====================================================================
+@bp.route("/api/sync/logs")
+def api_sync_logs():
+    """获取 sync 日志 history (行号游标分页, 读 /workspace/sync.log JSONL)"""
+    from ..services.log_service import read_history
+    try:
+        lines = int(request.args.get("lines", "200"))
+    except (ValueError, TypeError):
+        lines = 200
+    before = request.args.get("before")
+    before = int(before) if before and before.isdigit() else None
+    return jsonify(read_history("/workspace/sync.log", before=before, lines=lines))
+
+
 @bp.route("/api/sync/logs/stream")
 def api_sync_logs_stream():
-    """SSE: 轮询 sync log buffer 推送结构化日志"""
-    def generate():
-        last_count = 0
-        try:
-            while True:
-                entries = get_sync_log_buffer()
-                current_count = len(entries)
-                if current_count > last_count:
-                    for entry in entries[last_count:]:
-                        yield f"data: {json.dumps(entry)}\n\n"
-                    last_count = current_count
-                elif current_count < last_count:
-                    last_count = current_count
-                time.sleep(2)
-        except GeneratorExit:
-            pass
-
-    return Response(generate(), mimetype="text/event-stream",
+    """SSE: sync 日志实时流 (tail -f /workspace/sync.log JSONL)"""
+    from ..services.log_service import stream_tail
+    return Response(stream_tail("/workspace/sync.log"), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 

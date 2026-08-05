@@ -151,26 +151,25 @@ const browseTargetField = ref<'remote_path' | 'local_path'>('remote_path')
 const browsePath = ref('')
 
 // Log stream — translate structured entries from backend
-function translateLogEntry(entry: unknown) {
-  if (!entry || typeof entry !== 'object' || !('key' in entry)) {
-    if (typeof entry === 'string') return entry
-    return null
-  }
-  const e = entry as Record<string, unknown>
-  const text = `[${e.ts}] ${t('sync.log.' + e.key, (e.params || {}) as Record<string, unknown>)}`
-  return { text, level: (e.level || 'info') as string }
+// Log stream - sync 日志落盘成 JSONL, 读文件后逐行 JSON.parse 还原结构化再翻译
+function translateSyncJsonl(text: string): { text: string; level?: string } {
+  try {
+    const e = JSON.parse(text)
+    if (e && typeof e === 'object' && 'key' in e) {
+      return {
+        text: `[${e.ts}] ${t('sync.log.' + e.key, (e.params || {}) as Record<string, unknown>)}`,
+        level: (e.level || 'info') as string,
+      }
+    }
+  } catch { /* 非 JSON, 原样返回 */ }
+  return { text }
 }
 
-const logStream = useLogStream({
-  historyUrl: '/api/sync/status',
+const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
+  historyUrl: '/api/sync/logs',
   streamUrl: '/api/sync/logs/stream',
   maxLines: 500,
-  historyExtract: (data) => ((data as SyncStatusResponse)?.log_lines || []).map(translateLogEntry).filter((e): e is NonNullable<typeof e> => !!e),
-  parseMessage: (data) => {
-    try {
-      return translateLogEntry(JSON.parse(data))
-    } catch { return data }
-  },
+  transformText: translateSyncJsonl,
 })
 
 const { jobs: syncJobs, currentJobId, startPolling: startJobsPolling, stopPolling: stopJobsPolling } = useSyncJobs()
@@ -203,7 +202,7 @@ const refresh = useAutoRefresh(loadSyncStatus, 10000)
 onMounted(() => {
   loadSyncPage()
   refresh.start({ immediate: false })
-  logStream.start()
+  logStart()
   startJobsPolling()
 })
 
@@ -541,8 +540,12 @@ async function uploadRcloneFile(e: Event) {
     <!-- ===== Activity Tab ===== -->
     <div v-show="activeTab === 'activity'">
       <SyncActivityTab
-        :log-lines="logStream.lines.value"
-        :log-status="logStream.status.value"
+        :log-lines="logLines"
+        :log-status="logStatus"
+        :log-has-more="logHasMore"
+        :log-loading-more="logLoadingMore"
+        :log-prepending="logPrepending"
+        :log-on-scroll="logOnScroll"
         :jobs="syncJobs"
         :current-job-id="currentJobId"
         :rules="rules"

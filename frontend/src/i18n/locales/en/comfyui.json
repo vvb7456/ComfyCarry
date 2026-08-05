@@ -2,9 +2,18 @@
   "title": "ComfyUI",
   "open": "Open ComfyUI",
   "tabs": {
-    "console": "Console",
-    "settings": "Settings",
-    "plugins": "Plugins"
+    "overview": "Runtime",
+    "settings": "Configuration & Version",
+    "plugins": "Plugin Manager"
+  },
+  "overview": {
+    "runtime": "Runtime",
+    "environment": "Environment",
+    "queue": "Task Queue",
+    "queue_idle": "Queue idle",
+    "queue_summary": "{running} running · {pending} pending",
+    "uptime_summary": "Up {uptime} · {count} restarts",
+    "current_execution": "Current Task"
   },
   "console": {
     "params": "Launch Parameters",
@@ -161,12 +170,10 @@
     "idle": "Idle"
   },
   "settings": {
-    "version_title": "Version Management",
     "available_versions": "Available Versions",
     "no_git": "ComfyUI is not a git repository. Version management is unavailable.",
     "no_versions": "No versions found.",
     "current": "Current",
-    "latest": "Latest",
     "unstable": "Unstable",
     "switch": "Switch",
     "switch_only": "Switch Only",
@@ -175,13 +182,30 @@
     "switch_confirm_nightly": "Switch to nightly (master)? This is a development version and may be unstable.",
     "switch_success": "Version switched successfully",
     "switch_failed": "Version switch failed",
-    "raw_args": "Custom Arguments",
+    "extra_args": "Additional CLI Arguments",
+    "extra_args_desc": "Only add arguments not covered above. Structured settings are merged automatically.",
+    "extra_args_placeholder": "For example: --disable-metadata --dont-print-server",
+    "command_preview": "Launch command",
+    "save_restart": "Save & Restart",
+    "current_version": "Current Version",
+    "custom_build": "Custom commit",
+    "channels_title": "Choose an Update Channel",
+    "recommended": "Recommended",
+    "stable_channel": "Latest Stable",
+    "nightly_channel": "Nightly",
+    "switch_to": "Switch to {version}",
+    "use_nightly": "Switch to nightly",
+    "other_versions": "Other Stable Releases",
     "groups": {
       "memory": "Memory & Performance",
       "precision": "Precision",
       "cache": "Cache",
       "preview": "Preview"
     }
+  },
+  "plugins": {
+    "offline_title": "ComfyUI is stopped",
+    "offline_desc": "The plugin directory is provided by ComfyUI-Manager. Start ComfyUI from the page header to manage plugins."
   },
   "confirm": {
     "restart": "Restart ComfyUI?",

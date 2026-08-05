@@ -71,8 +71,8 @@ const addSvcPreview = computed(() => {
 })
 
 // Log stream
-const logStream = useLogStream({
-  historyUrl: '/api/tunnel/logs?lines=200',
+const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
+  historyUrl: '/api/tunnel/logs',
   streamUrl: '/api/tunnel/logs/stream',
   classify(line) {
     if (/error|ERR|exception/i.test(line)) return 'log-error'
@@ -87,12 +87,12 @@ const refresh = useAutoRefresh(loadTunnelStatus, 10000)
 onMounted(() => {
   loadTunnelStatus()
   refresh.start({ immediate: false })
-  logStream.start()
+  logStart()
 })
 
 onUnmounted(() => {
   refresh.stop()
-  logStream.stop()
+  logStop()
 })
 
 async function loadTunnelStatus() {
@@ -469,7 +469,7 @@ const connInfo = computed(() => {
 
       <!-- Log -->
       <SectionHeader icon="receipt_long">{{ t('tunnel.log.title') }}</SectionHeader>
-      <LogPanel :lines="logStream.lines.value" :status="logStream.status.value" />
+      <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
     </div>
 
     <!-- ===== Config Tab ===== -->
