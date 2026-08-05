@@ -24,7 +24,6 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_DIR, COMFYUI_URL
-from ..services.arch_detect import detect_arch
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
 from ..services.generate_service import submit_generation
@@ -62,116 +61,47 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
         body.update(_extra)
     return jsonify(body), status
 
-# ── 架构扫描 memo 缓存 ───────────────────────────────────────────────────────
-# filepath → (mtime, size, rules_version, arch)。
-# options 5 分钟 TTL 过期后的重扫, 每个文件 detect 前先 stat, (mtime, size)
-# 未变且 rules_version 与当前一致则直接用缓存值, 否则 detect 后写缓存, 使重扫接近零成本。
-# rules_version 机制: 检测规则表升级 (如新增 flux2/zimage 规则、修 flux1 LoRA 误判) 后,
-# 旧缓存条目的 rules_version 不匹配 → 视为未命中, 强制重判, 防止 mtime 缓存钉死旧误判。
-# 缓存值只含 arch (不含 packaging): arch 命中 sidecar 即返回, 有 sidecar 的文件
-# 不会被打开读头。打包形态由前端按列表归属推导, 不在此检测。
-_rules_VERSION = 5
-_arch_scan_cache: dict[str, tuple[float, int, int, str]] = {}
-# cache value: (mtime, size, rules_version, arch)
-
-
 # ── 懒加载缓存: Generate 页面所需的全部选项 ─────────────────────────────────
 _options_cache: dict | None = None
 _options_cache_time: float = 0.0
 _combo_cache: dict = {}  # _get_combo_list 的 object_info 缓存
 
 
-def _scan_model_previews(names: list[str], rel_dir: str) -> dict[str, str | None]:
-    """
-    扫描模型文件旁的同名预览图，返回 {name: preview_rel_path}。
-    rel_dir 为相对 COMFYUI_DIR 的模型目录 (如 "models/checkpoints")。
-    """
-    result = {}
-    base_dir = os.path.join(COMFYUI_DIR, rel_dir)
-    real_base = os.path.realpath(base_dir)
-    for name in names:
-        model_path = os.path.join(base_dir, name)
-        real_path = os.path.realpath(model_path)
-        if not real_path.startswith(real_base + os.sep):
-            continue  # 跳过路径遍历
-        base_no_ext = os.path.splitext(model_path)[0]
-        preview = None
-        for pext in (".jpg", ".png", ".jpeg", ".webp"):
-            ppath = base_no_ext + pext
-            if os.path.exists(ppath):
-                preview = os.path.relpath(ppath, COMFYUI_DIR)
-                break
-        result[name] = preview
-    return result
+def _metadata_preview(row: dict | None) -> str | None:
+    if not row or not row.get("preview_url"):
+        return None
+    return row["preview_url"]
 
 
-def _scan_lora_metadata(names: list[str], rel_dir: str) -> tuple[dict[str, str], dict[str, dict]]:
-    """
-    扫描 LoRA 的 .weilin-info.json 文件，一次性提取 trigger words 和详细元数据。
-    返回 (triggers_dict, info_dict)。
-    """
-    triggers = {}
-    info_result = {}
-    base_dir = os.path.join(COMFYUI_DIR, rel_dir)
-    real_base = os.path.realpath(base_dir)
-    for name in names:
-        model_path = os.path.join(base_dir, name)
-        real_path = os.path.realpath(model_path)
-        if not real_path.startswith(real_base + os.sep):
-            continue  # 跳过路径遍历
-        info_path = f"{model_path}.weilin-info.json"
-        if not os.path.exists(info_path):
-            # sidecar 不存在: 若文件位于 baseModel 子文件夹内 (Civitai 下载按
-            # _sanitize_folder_name(baseModel) 建子文件夹, 保留原始 Civitai 字符串),
-            # 用子文件夹名合成一个最小 info (仅 baseModel), 让前端 effectiveArch()
-            # 能做 sdxl→pony/illustrious/noobai 的软架构细分。绝不覆盖真实 sidecar。
-            # 无子文件夹 (顶层文件) 时仍什么都不给。
-            parts = name.replace("\\", "/").split("/")
-            if len(parts) >= 2 and parts[0]:
-                info_result[name] = {"baseModel": parts[0]}
-            continue
-        try:
-            with open(info_path, "r", encoding="utf-8") as f:
-                info = json.load(f)
-            # trigger words
-            words = [w.get("word", "") for w in info.get("trainedWords", []) if w.get("word")]
-            if words:
-                triggers[name] = ", ".join(words)
-            # 详细元数据
-            entry = {}
-            if info.get("name"):
-                entry["name"] = info["name"]
-            if info.get("trainedWords"):
-                # Normalize: [{word: "a"}, {word: "b, c"}] → ["a", "b", "c"]
-                raw_tw = [w.get("word", "") for w in info["trainedWords"] if w.get("word")]
-                normalized = []
-                seen = set()
-                for w in raw_tw:
-                    for part in (p.strip() for p in w.split(",") if p.strip()):
-                        if part not in seen:
-                            seen.add(part)
-                            normalized.append(part)
-                entry["trainedWords"] = normalized
-            if info.get("baseModel"):
-                entry["baseModel"] = info["baseModel"]
-            civitai_raw = info.get("raw", {}).get("civitai", {})
-            civitai_model_id = civitai_raw.get("modelId")
-            if civitai_model_id:
-                entry["civitai_id"] = civitai_model_id
-            civitai_version_id = civitai_raw.get("id")
-            if civitai_version_id:
-                entry["versionId"] = civitai_version_id
-            civitai_version_name = civitai_raw.get("name")
-            if civitai_version_name:
-                entry["versionName"] = civitai_version_name
-            if info.get("sha256"):
-                entry["sha256"] = info["sha256"]
-            if info.get("images"):
-                entry["images"] = info["images"][:6]
-            info_result[name] = entry
-        except Exception:
-            pass
-    return triggers, info_result
+def _generate_info(row: dict | None) -> dict:
+    """把数据库规范字段适配为生成页现有的紧凑展示结构。"""
+    if not row:
+        return {}
+    images = []
+    for image in (row.get("images") or [])[:6]:
+        meta = image.get("meta") or {}
+        images.append({
+            "url": image.get("url", ""),
+            "type": image.get("type", "image"),
+            "seed": meta.get("seed"),
+            "steps": meta.get("steps"),
+            "cfg": meta.get("cfg_scale"),
+            "sampler": meta.get("sampler"),
+            "model": meta.get("model"),
+            "positive": meta.get("prompt", ""),
+            "negative": meta.get("negative_prompt", ""),
+        })
+    return {
+        "local_model_id": row.get("id"),
+        "name": row.get("display_name") or row.get("filename", ""),
+        "trainedWords": row.get("trigger_words") or [],
+        "baseModel": row.get("base_model", ""),
+        "civitai_id": row.get("source_model_id", ""),
+        "versionId": row.get("source_version_id", ""),
+        "versionName": row.get("source_version_name", ""),
+        "sha256": row.get("sha256", ""),
+        "images": images,
+    }
 
 
 def _classify_controlnet_models(names: list[str]) -> dict:
@@ -206,45 +136,6 @@ def _classify_controlnet_models(names: list[str]) -> dict:
     return result
 
 
-def _scan_model_attrs(names: list[str], rel_dir: str) -> dict[str, str]:
-    """批量检测模型架构, 返回 {name: arch}。
-
-    打包形态 (整合包/拆分) 不在此检测 — 「目录 ⇒ 打包形态」由构造保证:
-    文件在 checkpoints/ 列表 → 整合包, 在 unets 列表 → 拆分件 (前端按列表归属推导)。
-    arch 命中 sidecar 即返回, 有 sidecar 的文件不会被打开读头。
-
-    基于 (mtime, size, rules_version) 的 memo 缓存:
-    文件未改动且 rules_version 一致时直接复用缓存结果 (规则升级后强制重判)。
-    """
-    archs: dict[str, str] = {}
-    base_dir = os.path.join(COMFYUI_DIR, rel_dir)
-    real_base = os.path.realpath(base_dir)
-    for name in names:
-        filepath = os.path.join(base_dir, name)
-        real_path = os.path.realpath(filepath)
-        if not real_path.startswith(real_base + os.sep):
-            continue  # 跳过路径遍历
-        try:
-            st = os.stat(filepath)
-        except OSError:
-            archs[name] = detect_arch(filepath, name)
-            continue
-        cached = _arch_scan_cache.get(filepath)
-        if (cached and cached[0] == st.st_mtime and cached[1] == st.st_size
-                and cached[2] == _rules_VERSION):
-            archs[name] = cached[3]
-            continue
-        arch = detect_arch(filepath, name)
-        _arch_scan_cache[filepath] = (st.st_mtime, st.st_size, _rules_VERSION, arch)
-        archs[name] = arch
-    return archs
-
-
-def _scan_model_archs(names: list[str], rel_dir: str) -> dict[str, str]:
-    """向后兼容包装: 与 _scan_model_attrs 等价。"""
-    return _scan_model_attrs(names, rel_dir)
-
-
 def invalidate_options_cache() -> None:
     """
     立即失效下拉选项缓存 (两级: 汇总结果 + ComfyUI object_info 快照)。
@@ -271,6 +162,15 @@ def _fetch_generate_options() -> dict:
     ComfyUI 未运行时返回内置默认值（不缓存，下次重试）。
     """
     global _options_cache, _options_cache_time
+    # Disk is authoritative: models can arrive through Sync, Wizard, Jupyter,
+    # or a mounted volume without an in-process download callback.
+    try:
+        from ..services.model_meta_store import reconcile_model_index
+        sync_summary = reconcile_model_index()
+        if any(sync_summary.get(key) for key in ("inserted", "updated", "removed")):
+            invalidate_options_cache()
+    except Exception:
+        logger.exception("[generate] model index reconcile failed")
     if _options_cache is not None and (time.time() - _options_cache_time) < 300:
         return _options_cache
 
@@ -352,34 +252,74 @@ def _fetch_generate_options() -> dict:
         "vaes":        vaes        if isinstance(vaes, list)        else [],
     }
 
-    # ── 扫描预览图 & 元数据 ─────────────────────────────────────────────
+    # ── 从模型索引批量读取预览图与元数据 ────────────────────────────────
     ckpt_list = result["checkpoints"]
     lora_list = result["loras"]
-    result["checkpoint_previews"] = _scan_model_previews(ckpt_list, "models/checkpoints")
-    result["lora_previews"] = _scan_model_previews(lora_list, "models/loras")
-    # LoRA: 一次性读取 trigger words + 详细元数据 (避免双重文件 I/O)
-    lora_triggers, lora_info = _scan_lora_metadata(lora_list, "models/loras")
-    result["lora_triggers"] = lora_triggers
-    result["lora_info"] = lora_info
-    # Checkpoint: 仅读元数据 (无 trigger words)
-    _, ckpt_info = _scan_lora_metadata(ckpt_list, "models/checkpoints")
-    result["checkpoint_info"] = ckpt_info
-    # Checkpoint / LoRA 架构 (打包形态由前端按列表归属推导: checkpoints→整合包, unets→拆分件)
-    result["checkpoint_archs"] = _scan_model_attrs(ckpt_list, "models/checkpoints")
-    result["lora_archs"] = _scan_model_attrs(lora_list, "models/loras")
-    result["comfyui_dir"] = COMFYUI_DIR
-
-    # ── 分离式架构: UNet / CLIP / VAE 预览图 + UNet 架构检测 ────────────
     unet_list = result["unets"]
     clip_list = result["clips"]
     vae_list = result["vaes"]
-    result["unet_previews"] = _scan_model_previews(unet_list, "models/diffusion_models")
-    result["clip_previews"] = _scan_model_previews(clip_list, "models/text_encoders")
-    result["vae_previews"] = _scan_model_previews(vae_list, "models/vae")
-    result["unet_archs"] = _scan_model_attrs(unet_list, "models/diffusion_models")
-    # UNet: 读元数据 (baseModel 等)，供分离式架构选择器展示；无 trigger words
-    _, unet_info = _scan_lora_metadata(unet_list, "models/diffusion_models")
-    result["unet_info"] = unet_info
+    from ..services.model_meta_store import get_generation_metadata
+    metadata = get_generation_metadata([
+        "checkpoints", "loras", "diffusion_models", "text_encoders", "vae",
+    ])
+
+    def _rows(names: list[str], category: str) -> dict[str, dict]:
+        return {
+            name: row
+            for name in names
+            if (row := metadata.get((category, name))) is not None
+        }
+
+    checkpoint_rows = _rows(ckpt_list, "checkpoints")
+    lora_rows = _rows(lora_list, "loras")
+    unet_rows = _rows(unet_list, "diffusion_models")
+    clip_rows = _rows(clip_list, "text_encoders")
+    vae_rows = _rows(vae_list, "vae")
+
+    result["checkpoint_previews"] = {
+        name: _metadata_preview(checkpoint_rows.get(name)) for name in ckpt_list
+    }
+    result["lora_previews"] = {
+        name: _metadata_preview(lora_rows.get(name)) for name in lora_list
+    }
+    result["lora_triggers"] = {
+        name: ", ".join(row.get("trigger_words") or [])
+        for name, row in lora_rows.items()
+        if row.get("trigger_words")
+    }
+    result["lora_info"] = {
+        name: _generate_info(row) for name, row in lora_rows.items()
+    }
+    result["checkpoint_info"] = {
+        name: _generate_info(row) for name, row in checkpoint_rows.items()
+    }
+    result["checkpoint_archs"] = {
+        name: row.get("architecture", "unknown")
+        for name, row in checkpoint_rows.items()
+    }
+    result["lora_archs"] = {
+        name: row.get("architecture", "unknown")
+        for name, row in lora_rows.items()
+    }
+    result["comfyui_dir"] = COMFYUI_DIR
+
+    # ── 分离式架构：UNet / CLIP / VAE ──────────────────────────────────
+    result["unet_previews"] = {
+        name: _metadata_preview(unet_rows.get(name)) for name in unet_list
+    }
+    result["clip_previews"] = {
+        name: _metadata_preview(clip_rows.get(name)) for name in clip_list
+    }
+    result["vae_previews"] = {
+        name: _metadata_preview(vae_rows.get(name)) for name in vae_list
+    }
+    result["unet_archs"] = {
+        name: row.get("architecture", "unknown")
+        for name, row in unet_rows.items()
+    }
+    result["unet_info"] = {
+        name: _generate_info(row) for name, row in unet_rows.items()
+    }
 
     # ── ControlNet 模型 (按类型分组) ───────────────────────────────────
     cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
@@ -1064,4 +1004,3 @@ def api_generate_wildcard_rename(name):
         return _err("wildcard_not_found", 404, name=name)
     except ValueError as e:
         return _err("invalid_wildcard_name", detail=str(e))
-

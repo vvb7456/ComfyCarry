@@ -37,8 +37,6 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 
 # 模型关联文件后缀列表 (用于 companions 模式)
 _COMPANION_SUFFIXES = [
-    ".weilin-info.json",  # 元数据 (追加到完整文件名后)
-    ".civitai.info",      # 旧版 CivitAI 元数据 (追加到完整文件名后)
     ".jpg",               # 预览图 (替换扩展名)
     ".jpeg",
     ".png",
@@ -84,12 +82,7 @@ def _delete_companions(file_path: Path) -> list[str]:
     base_no_ext = file_path.with_suffix("")
 
     for suffix in _COMPANION_SUFFIXES:
-        # .weilin-info.json and .civitai.info append to full filename
-        # image suffixes replace the file extension
-        if suffix.startswith(".weilin") or suffix.startswith(".civitai"):
-            companion = Path(str(file_path) + suffix)
-        else:
-            companion = base_no_ext.with_suffix(suffix)
+        companion = base_no_ext.with_suffix(suffix)
 
         if companion.exists() and companion.is_file():
             companion.unlink()

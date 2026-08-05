@@ -21,7 +21,6 @@ import json
 import logging
 import os
 import queue
-import threading
 import time
 
 from flask import Blueprint, Response, jsonify, request
@@ -29,6 +28,7 @@ from flask import Blueprint, Response, jsonify, request
 from ..config import COMFYUI_DIR, MODEL_DIRS
 from ..services.download_engine import get_engine, DownloadStatus
 from ..services.resource_registry import get_registry
+from ..utils import _sha256_file
 
 logger = logging.getLogger(__name__)
 
@@ -470,6 +470,14 @@ def api_downloads_retry(download_id: str):
         if new_task.status == DownloadStatus.FAILED:
             registry.task_failed(source, res_model_id, res_version_id,
                                  new_task.error)
+        elif new_task.status == DownloadStatus.COMPLETE:
+            registry.task_complete(
+                source,
+                res_model_id,
+                res_version_id,
+                new_task.save_dir,
+                new_task.filename,
+            )
         else:
             registry.task_submitted(source, res_model_id, res_version_id,
                                     new_task.download_id)
@@ -482,7 +490,8 @@ def api_downloads_retry(download_id: str):
             "error_params": {"detail": new_task.error or ""},
         }), 200  # 200 而非 4xx: 响应体带 task 快照, stores/downloads.ts 要用
 
-    return jsonify({**new_task.to_dict(), "message_key": "models.msg.dl_resubmitted"}), 201
+    status = 201 if new_task.status == DownloadStatus.ACTIVE else 200
+    return jsonify({**new_task.to_dict(), "message_key": "models.msg.dl_resubmitted"}), status
 
 
 @bp.route("/api/downloads/clear", methods=["POST"])
@@ -522,9 +531,10 @@ def api_downloads_civitai():
       docs/DOWNLOAD_CLASSIFICATION_SPEC.md §5-B。
     """
     from ..services.civitai_resolver import (
-        resolve_civitai_download, save_model_metadata, download_preview_image,
-        enrich_model_by_hash, NoDownloadableFiles,
+        resolve_civitai_download, download_preview_image,
+        extract_file_trigger_words, NoDownloadableFiles,
     )
+    from ..services.model_meta_store import register_downloaded_model
     from ..services.header_probe import ProbeAuthError
     from ..utils import _get_api_key
 
@@ -601,23 +611,20 @@ def api_downloads_civitai():
         # EarlyAccess 但不收费: 可能仅需登录, 继续尝试下载
 
     def _on_civitai_complete(task):
-        # 目录已在下载**前**逐文件定好 (download_classify), 这里不再有归位/移动 ——
-        # 文件落在哪就是哪, 完成钩子只负责写元数据。
+        # 目录已在下载前逐文件定好；完成钩子在终态广播前登记模型元数据。
         model_path = os.path.join(task.save_dir, task.filename)
-        try:
-            save_model_metadata(model_path, info)
-            download_preview_image(model_path, info.get("images", []))
-        except Exception as e:
-            logger.warning(f"CivitAI 元数据保存失败: {e}")
-
-        # 异步二次丰富: SHA256 → by-hash API → 覆写完整元数据 (含 modelId + images.meta)
-        def _enrich():
-            try:
-                enrich_model_by_hash(model_path, api_key=api_key)
-            except Exception as e:
-                logger.warning(f"CivitAI 异步 enrich 失败: {e}")
-
-        threading.Thread(target=_enrich, daemon=True).start()
+        sha256 = _sha256_file(model_path)
+        if not sha256:
+            raise RuntimeError("SHA256 计算失败")
+        download_preview_image(model_path, info.get("images", []))
+        detail = register_downloaded_model(
+            model_path=model_path,
+            category=resolved.get("model_type", "") or info.get("save_dir_key", ""),
+            source_data=info,
+            sha256=sha256,
+            file_trigger_words=extract_file_trigger_words(model_path),
+        )
+        task.meta["local_model_id"] = detail["id"]
 
     engine = get_engine()
     _wire_registry()
@@ -645,6 +652,7 @@ def api_downloads_civitai():
             "model_type": info.get("model_type", ""),
             "base_model": info.get("base_model", ""),
             "image_url": (info.get("images") or [{}])[0].get("url", ""),
+            "completion_requires_callback": True,
         },
     )
 

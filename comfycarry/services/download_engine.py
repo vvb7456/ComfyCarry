@@ -19,6 +19,7 @@ import subprocess
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
@@ -71,13 +72,16 @@ class DownloadTask:
     completed_at: float = 0.0
     # 调用方自定义 metadata (如 model_type, source 等)
     meta: dict = field(default_factory=dict)
-    # 下载完成时的回调 (在 poll 线程中调用, 签名: callback(task))
+    # 下载完成时的回调 (在完成工作线程中调用, 签名: callback(task))
     on_complete: Callable | None = field(default=None, repr=False)
+    # 下载文件已完成、业务登记尚未提交时锁定用户状态操作。
+    completion_in_progress: bool = field(default=False, repr=False)
 
     def to_dict(self) -> dict:
         d = asdict(self)
         d["status"] = self.status.value
         d.pop("on_complete", None)
+        d.pop("completion_in_progress", None)
         return d
 
 
@@ -87,9 +91,19 @@ class DownloadEngine:
     def __init__(self):
         self._tasks: dict[str, DownloadTask] = {}  # download_id → task
         self._lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         self._aria2_proc: subprocess.Popen | None = None
         self._poller_thread: threading.Thread | None = None
+        # 完成回调可能需要对数 GB 文件计算 SHA256，或访问远端下载预览图。
+        # 单独使用有界线程池，避免阻塞 aria2 状态轮询线程，同时避免每个任务
+        # 创建一个无界线程。
+        self._completion_executor = ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="dl-completion",
+        )
+        self._completion_executor_shutdown = False
+        self._completion_futures: dict[str, object] = {}
         self._running = False
+        self._poller_generation = 0
         self._rpc_id = 0
         # 状态变化回调: callback(task, old_status, new_status)
         self._on_status_change: list[Callable] = []
@@ -100,34 +114,94 @@ class DownloadEngine:
 
     def start(self):
         """启动 aria2c RPC daemon + 状态轮询线程"""
-        if self._running:
-            return
+        with self._lifecycle_lock:
+            if self._running:
+                return
+            # ThreadPoolExecutor 一旦 shutdown 后不可复用；stop/start 同一
+            # 实例时必须创建新池，否则完成任务会全部转 FAILED。
+            if self._completion_executor_shutdown:
+                self._completion_executor = ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="dl-completion",
+                )
+                self._completion_executor_shutdown = False
 
-        self._start_aria2_daemon()
-        self._running = True
-        self._poller_thread = threading.Thread(
-            target=self._poll_loop, daemon=True, name="dl-engine-poller",
-        )
-        self._poller_thread.start()
+            self._start_aria2_daemon()
+            self._poller_generation += 1
+            generation = self._poller_generation
+            self._running = True
+            self._poller_thread = threading.Thread(
+                target=self._poll_loop,
+                args=(generation,),
+                daemon=True,
+                name="dl-engine-poller",
+            )
+            self._poller_thread.start()
         logger.info("[download_engine] 引擎已启动")
 
     def stop(self):
         """关闭引擎"""
-        self._running = False
-        if self._aria2_proc:
-            try:
-                self._rpc_call("aria2.shutdown")
-            except Exception:
-                pass
-            try:
-                self._aria2_proc.terminate()
-                self._aria2_proc.wait(timeout=5)
-            except Exception:
+        with self._lifecycle_lock:
+            self._running = False
+            # 使正在 RPC/sleep 中的旧 poller 失效，避免随后的 start 将它
+            # 重新变成第二个轮询线程。
+            self._poller_generation += 1
+            poller = self._poller_thread
+
+            if self._aria2_proc:
                 try:
-                    self._aria2_proc.kill()
+                    self._rpc_call("aria2.shutdown")
                 except Exception:
                     pass
-            self._aria2_proc = None
+                try:
+                    self._aria2_proc.terminate()
+                    self._aria2_proc.wait(timeout=5)
+                except Exception:
+                    try:
+                        self._aria2_proc.kill()
+                    except Exception:
+                        pass
+                self._aria2_proc = None
+
+            # cancel_futures 不会调用被取消的 worker；为这些任务补终态，
+            # 否则 completion_in_progress 会永久锁住任务且 SSE 无终态。
+            cancelled: list[tuple[DownloadTask, DownloadStatus]] = []
+            with self._lock:
+                futures = list(self._completion_futures.items())
+            for task_id, future in futures:
+                if not future.cancel():
+                    continue
+                with self._lock:
+                    self._completion_futures.pop(task_id, None)
+                    task = self._tasks.get(task_id)
+                    if (task is None or not task.completion_in_progress
+                            or task.status in (
+                                DownloadStatus.COMPLETE,
+                                DownloadStatus.FAILED,
+                                DownloadStatus.CANCELLED,
+                            )):
+                        continue
+                    old_status = task.status
+                    task.status = DownloadStatus.FAILED
+                    task.error = "引擎停止时取消完成登记"
+                    task.completed_at = time.time()
+                    task.completion_in_progress = False
+                    cancelled.append((task, old_status))
+
+            executor = self._completion_executor
+            self._completion_executor_shutdown = True
+            try:
+                executor.shutdown(wait=False, cancel_futures=True)
+            except TypeError:  # Python < 3.9
+                executor.shutdown(wait=False)
+
+            # 在生命周期锁内等待旧 poller 退出，阻止 start() 在此期间
+            # 创建新 poller。generation 负责最终退出条件，join 只需等待
+            # 当前 RPC 轮询返回。
+            if poller and poller is not threading.current_thread():
+                poller.join(timeout=6)
+
+        for task, old_status in cancelled:
+            self._fire_status_change(task, old_status, DownloadStatus.FAILED)
         logger.info("[download_engine] 引擎已停止")
 
     def _start_aria2_daemon(self):
@@ -342,6 +416,8 @@ class DownloadEngine:
             task = self._tasks.get(download_id)
             if not task:
                 return False
+            if task.completion_in_progress:
+                return False
             if task.status not in (
                 DownloadStatus.QUEUED,
                 DownloadStatus.ACTIVE,
@@ -367,7 +443,8 @@ class DownloadEngine:
 
         with self._lock:
             # 仅在任务仍处于可取消状态时标记 — 防止覆盖 poll 线程已设置的终态
-            if task.status in (DownloadStatus.QUEUED, DownloadStatus.ACTIVE, DownloadStatus.PAUSED):
+            if (not task.completion_in_progress
+                    and task.status in (DownloadStatus.QUEUED, DownloadStatus.ACTIVE, DownloadStatus.PAUSED)):
                 old_status = task.status
                 task.status = DownloadStatus.CANCELLED
                 task.completed_at = time.time()
@@ -392,6 +469,8 @@ class DownloadEngine:
             task = self._tasks.get(download_id)
             if not task:
                 return False
+            if task.completion_in_progress:
+                return False
             if task.status not in (DownloadStatus.QUEUED, DownloadStatus.ACTIVE):
                 return False
 
@@ -403,6 +482,9 @@ class DownloadEngine:
                 return False
 
         with self._lock:
+            if (task.completion_in_progress
+                    or task.status not in (DownloadStatus.QUEUED, DownloadStatus.ACTIVE)):
+                return False
             old_status = task.status
             task.status = DownloadStatus.PAUSED
 
@@ -427,6 +509,8 @@ class DownloadEngine:
                 return False
 
         with self._lock:
+            if task.completion_in_progress or task.status != DownloadStatus.PAUSED:
+                return False
             old_status = task.status
             task.status = DownloadStatus.ACTIVE
 
@@ -500,18 +584,20 @@ class DownloadEngine:
             ]
             for did in to_remove:
                 del self._tasks[did]
+                self._completion_futures.pop(did, None)
         return len(to_remove)
 
     def clear_task(self, download_id: str):
         """移除单个任务记录"""
         with self._lock:
             self._tasks.pop(download_id, None)
+            self._completion_futures.pop(download_id, None)
 
     # ── 状态轮询 ─────────────────────────────────────────────────────────────
 
-    def _poll_loop(self):
+    def _poll_loop(self, generation: int):
         """后台线程: 定期轮询 aria2c 状态并更新任务"""
-        while self._running:
+        while self._running and generation == self._poller_generation:
             try:
                 self._sync_all_tasks()
             except Exception as e:
@@ -541,30 +627,101 @@ class DownloadEngine:
                 # GID 可能已过期 (下载完成后 aria2c 清理)
                 # 检查文件是否已存在, 且大小与已知 total_bytes 匹配
                 dest = os.path.join(task.save_dir, task.filename)
-                if os.path.isfile(dest):
+                aria2_partial = dest + ".aria2"
+                if os.path.isfile(dest) and not os.path.isfile(aria2_partial):
                     file_size = os.path.getsize(dest)
                     # 只有文件非空, 且 (无已知总大小 或 大小匹配) 时才标记完成
                     if file_size > 0 and (
                         task.total_bytes == 0 or file_size >= task.total_bytes
                     ):
-                        old_status = task.status
                         with self._lock:
-                            task.status = DownloadStatus.COMPLETE
+                            if (task.completion_in_progress
+                                    or task.status not in (
+                                        DownloadStatus.QUEUED,
+                                        DownloadStatus.ACTIVE,
+                                        DownloadStatus.PAUSED,
+                                    )):
+                                continue
+                            old_status = task.status
                             task.progress = 100.0
                             task.completed_bytes = file_size
                             task.completed_at = time.time()
-                        self._fire_status_change(task, old_status, DownloadStatus.COMPLETE)
-                        self._fire_on_complete(task)
+                            task.completion_in_progress = True
+                        self._schedule_completion(task, old_status)
 
-    def _fire_on_complete(self, task: DownloadTask):
-        """安全地触发完成回调"""
-        if task.on_complete:
-            try:
-                task.on_complete(task)
-            except Exception as e:
-                logger.error(f"[download_engine] on_complete 回调异常: {e}")
-            finally:
-                task.on_complete = None  # 只触发一次
+    def _fire_on_complete(self, task: DownloadTask) -> bool:
+        """在完成事件广播前触发回调，并返回回调是否成功。"""
+        if not task.on_complete:
+            return True
+        callback = task.on_complete
+        try:
+            callback(task)
+            with self._lock:
+                # 只清理本次已经执行的回调。若调用方在回调内替换了回调，
+                # 不应误删新回调（通常用于失败后重试）。
+                if task.on_complete is callback:
+                    task.on_complete = None
+            return True
+        except Exception as e:
+            logger.error(f"[download_engine] on_complete 回调异常: {e}")
+            with self._lock:
+                if task.meta.get("completion_requires_callback"):
+                    task.status = DownloadStatus.FAILED
+                    task.error = f"完成下载后的登记失败: {e}"
+                    task.completed_at = time.time()
+                elif task.on_complete is callback:
+                    task.on_complete = None
+            return False
+
+    def _schedule_completion(self, task: DownloadTask,
+                             old_status: DownloadStatus) -> None:
+        """异步执行完成回调，再广播唯一的终态事件。
+
+        ``completion_in_progress`` 已在调用方持锁设置，因此 aria2 的重复
+        complete 通知、GID 丢失后的文件探测以及用户操作都不会重复提交回调。
+        """
+        try:
+            # 在任务锁内完成 submit+登记，stop() 不会看到“已置位但尚未
+            # 纳入 futures 表”的窄窗口。
+            with self._lock:
+                future = self._completion_executor.submit(
+                    self._complete_task, task, old_status,
+                )
+                self._completion_futures[task.download_id] = future
+        except RuntimeError as e:
+            # 引擎停止期间 executor 可能拒绝新任务。不能让任务永远卡在
+            # completion_in_progress；将其标记失败并广播终态。
+            logger.error(f"[download_engine] 提交完成回调失败: {e}")
+            with self._lock:
+                task.status = DownloadStatus.FAILED
+                task.error = f"完成下载后的登记失败: {e}"
+                task.completed_at = time.time()
+                task.completion_in_progress = False
+                final_status = task.status
+            self._fire_status_change(task, old_status, final_status)
+
+    def _complete_task(self, task: DownloadTask,
+                       old_status: DownloadStatus) -> None:
+        """完成工作线程入口；任何未预期异常都转换为 FAILED。"""
+        try:
+            self._fire_on_complete(task)
+        except Exception as e:  # 防御回调实现之外的线程异常
+            logger.exception("[download_engine] 完成处理异常")
+            with self._lock:
+                task.status = DownloadStatus.FAILED
+                task.error = f"完成下载后的登记失败: {e}"
+                task.completed_at = time.time()
+
+        with self._lock:
+            if task.status != DownloadStatus.FAILED:
+                task.status = DownloadStatus.COMPLETE
+            task.completion_in_progress = False
+            final_status = task.status
+            self._completion_futures.pop(task.download_id, None)
+
+        # 回调/登记完成后才广播终态，确保监听方收到 COMPLETE 时 DB 已可读。
+        if final_status != old_status:
+            self._fire_status_change(task, old_status, final_status)
 
     def _update_task(self, task: DownloadTask, status: dict):
         """根据 aria2c tellStatus 结果更新任务"""
@@ -576,6 +733,16 @@ class DownloadEngine:
         old_status = None
 
         with self._lock:
+            if task.status in (
+                DownloadStatus.COMPLETE,
+                DownloadStatus.FAILED,
+                DownloadStatus.CANCELLED,
+            ):
+                return
+            # 完成回调可能正在计算哈希/写入索引；aria2 的迟到状态不应
+            # 覆盖“文件已完成”的事实，也不得触发 FAILED 清理文件。
+            if task.completion_in_progress:
+                return
             old_status = task.status
             task.total_bytes = total
             task.completed_bytes = completed
@@ -593,10 +760,11 @@ class DownloadEngine:
             elif aria2_status == "paused":
                 task.status = DownloadStatus.PAUSED
             elif aria2_status == "complete":
-                task.status = DownloadStatus.COMPLETE
-                task.progress = 100.0
-                task.completed_at = time.time()
-                fire_complete = True
+                if not task.completion_in_progress:
+                    task.progress = 100.0
+                    task.completed_at = time.time()
+                    task.completion_in_progress = True
+                    fire_complete = True
             elif aria2_status == "error":
                 task.status = DownloadStatus.FAILED
                 error_code = status.get("errorCode", "")
@@ -615,15 +783,19 @@ class DownloadEngine:
                     task.status = DownloadStatus.CANCELLED
                     task.completed_at = time.time()
 
+        # 完成回调先登记业务数据，再向监听器广播终态。
+        if fire_complete:
+            self._schedule_completion(task, old_status)
+
         # Fire status change callbacks (outside lock)
-        if task.status != old_status:
+        # complete 的终态由完成工作线程在业务回调结束后广播；轮询线程此处
+        # 只发送进度，避免回调尚未写入 DB 就提前发送 COMPLETE/FAILED，或产生
+        # 重复的终态事件。
+        if not fire_complete and task.status != old_status:
             self._fire_status_change(task, old_status, task.status)
 
         # Fire progress callbacks (outside lock)
         self._fire_progress(task)
-
-        if fire_complete:
-            self._fire_on_complete(task)
 
     def _fire_status_change(self, task: DownloadTask, old: DownloadStatus,
                             new: DownloadStatus):

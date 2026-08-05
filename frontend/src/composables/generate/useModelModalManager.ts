@@ -6,7 +6,6 @@ import { useEmbeddingPicker } from '@/composables/generate/useEmbeddingPicker'
 import { useWildcardManager } from '@/composables/generate/useWildcardManager'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
-import type { ModelMeta, ModelMetaImage } from '@/types/models'
 import { useToast } from '@/composables/useToast'
 
 interface PromptEditorHandle {
@@ -175,51 +174,13 @@ export function useModelModalManager({
   }
 
   const showLoraDetail = ref(false)
-  const loraDetailMeta = ref<ModelMeta | null>(null)
+  const loraDetailModelId = ref<number | null>(null)
 
   function openLoraDetail(name: string) {
     const item = options.loras.value.find((lora) => lora.name === name)
-    if (!item) return
-
-    const info = item.info as Record<string, unknown> | null
-    const images: ModelMetaImage[] = []
-
-    if (item.preview) {
-      images.push({ url: `/api/local_models/preview?path=${encodeURIComponent(item.preview)}` })
-    }
-
-    const civitaiImages = info?.images as Array<Record<string, unknown>> | undefined
-    if (civitaiImages) {
-      for (const image of civitaiImages) {
-        images.push({
-          url: (image.url as string) || '',
-          type: (image.type as string) || undefined,
-          seed: image.seed as number | string | undefined,
-          steps: image.steps as number | undefined,
-          cfg: image.cfg as number | undefined,
-          sampler: image.sampler as string | undefined,
-          model: image.model as string | undefined,
-          positive: image.positive as string | undefined,
-          negative: image.negative as string | undefined,
-        })
-      }
-    }
-
-    const bname = basename(name)
-    const civitaiId = info?.civitai_id as string | number | undefined
-    loraDetailMeta.value = {
-      name: (info?.name as string) || bname.replace(/\.[^.]+$/, ''),
-      type: 'LORA',
-      baseModel: (info?.baseModel as string) || undefined,
-      id: civitaiId,
-      versionId: (info?.versionId as string | number | undefined) || undefined,
-      versionName: (info?.versionName as string) || undefined,
-      sha256: (info?.sha256 as string) || undefined,
-      filename: bname,
-      civitaiUrl: civitaiId ? `https://civitai.com/models/${civitaiId}` : undefined,
-      trainedWords: (info?.trainedWords as string[]) || undefined,
-      images,
-    }
+    const id = item?.info?.local_model_id
+    if (typeof id !== 'number' || !Number.isFinite(id)) return
+    loraDetailModelId.value = id
     showLoraDetail.value = true
   }
 
@@ -250,7 +211,7 @@ export function useModelModalManager({
     loraModalPending,
     loraCountLabel,
     showLoraDetail,
-    loraDetailMeta,
+    loraDetailModelId,
     // callbacks
     onPreviewClick,
     onPromptTool,

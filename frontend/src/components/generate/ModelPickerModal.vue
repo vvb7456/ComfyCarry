@@ -18,6 +18,7 @@ import FilterInput from '@/components/ui/FilterInput.vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { ARCH_LABELS, effectiveArch, familyRoot } from '@/config/model-types'
+import { localModelPreviewUrl } from '@/utils/modelPreview'
 import { useConfirm } from '@/composables/useConfirm'
 
 defineOptions({ name: 'ModelPickerModal' })
@@ -157,7 +158,7 @@ function getDisplayName(item: PickerModelItem): string {
 }
 
 function getPreviewUrl(item: PickerModelItem): string | null {
-  if (item.preview) return `/api/local_models/preview?path=${encodeURIComponent(item.preview)}`
+  if (item.preview) return localModelPreviewUrl(item.preview)
   // CivitAI fallback
   const civitImg = (item.info as Record<string, unknown>)?.images as Array<Record<string, unknown>> | undefined
   const first = civitImg?.[0]
@@ -190,7 +191,7 @@ async function onCardClick(item: PickerModelItem) {
   // 三级架构拦截:
   //  1. 跨硬架构 (effectiveArch 与 currentArch 的家族根不同): 强警告
   //  2. 同家族软架构错配 (家族根同为 sdxl, 子架构不同且双方都明确): 软提醒
-  //  3. 家族根同为 sdxl 但一方为通用 'sdxl' (无 sidecar/通用模型): 不拦截
+  //  3. 家族根同为 sdxl 但一方为通用 'sdxl' (无细分来源信息): 不拦截
   //  4. unknown: 现有 unknown confirm 不变
   // 多选模式下取消勾选不拦截 (移除不兼容项无需确认)
   const isDeselect = props.multi && props.selected?.has(item.name)

@@ -20,12 +20,12 @@ export interface BatchProgress {
 export function useModelActions(
   loadModels: () => Promise<void>,
 ) {
-  const { post } = useApiFetch()
+  const { post, del } = useApiFetch()
   const { confirm } = useConfirm()
   const { toast } = useToast()
   const { t } = useI18n({ useScope: 'global' })
 
-  /** Tracks abs_paths currently being fetched */
+  /** Tracks model IDs currently being enriched. */
   const fetchingSet = reactive(new Set<string>())
   const batchProgress = reactive<BatchProgress>({
     running: false,
@@ -34,24 +34,23 @@ export function useModelActions(
     filename: '',
   })
 
-  function isFetching(absPath: string): boolean {
-    return fetchingSet.has(absPath)
+  function isFetching(modelId: number): boolean {
+    return fetchingSet.has(String(modelId))
   }
 
   async function fetchInfo(model: LocalModel) {
-    if (fetchingSet.has(model.abs_path)) return
+    const key = String(model.id)
+    if (fetchingSet.has(key)) return
 
-    fetchingSet.add(model.abs_path)
+    fetchingSet.add(key)
     try {
-      const result = await post<{ ok: boolean }>('/api/local_models/fetch_info', {
-        abs_path: model.abs_path,
-      })
-      if (result?.ok) {
+      const result = await post<{ ok?: boolean; model?: unknown }>(`/api/local_models/${model.id}/enrich`)
+      if (result && result.ok !== false) {
         toast(`${model.filename} ${t('models.local.fetch_success')}`, 'success')
         await loadModels()
       }
     } finally {
-      fetchingSet.delete(model.abs_path)
+      fetchingSet.delete(key)
     }
   }
 
@@ -64,11 +63,8 @@ export function useModelActions(
     })
     if (!ok) return
 
-    const result = await post<{ ok: boolean; deleted: string[] }>('/api/files/delete', {
-      path: model.abs_path,
-      companions: true,
-    })
-    if (result?.ok) {
+    const result = await del<{ ok?: boolean }>(`/api/local_models/${model.id}`)
+    if (result && result.ok !== false) {
       toast(`${t('models.local.deleted')} ${model.filename}`, 'success')
       await loadModels()
     }
@@ -89,24 +85,42 @@ export function useModelActions(
 
     batchProgress.running = true
     batchProgress.total = noInfo.length
+    batchProgress.current = 0
+    batchProgress.filename = ''
     let successCount = 0
     let failCount = 0
 
     try {
-      for (let i = 0; i < noInfo.length; i++) {
-        const m = noInfo[i]
-        batchProgress.current = i + 1
-        batchProgress.filename = m.filename
-
-        try {
-          const result = await post('/api/local_models/fetch_info', { abs_path: m.abs_path })
-          if (result) successCount++
-          else failCount++
-        } catch (e) {
-          failCount++
-          console.error(m.filename, e)
+      // Hashing large model files is expensive, so keep a small bounded pool
+      // instead of making the whole batch strictly serial.  IDs are added to
+      // the shared set before each request so card-level actions cannot start
+      // a duplicate enrich while a worker owns that model.
+      let nextIndex = 0
+      const worker = async () => {
+        while (true) {
+          const index = nextIndex++
+          if (index >= noInfo.length) return
+          const m = noInfo[index]
+          const key = String(m.id)
+          fetchingSet.add(key)
+          try {
+            const result = await post<{ ok?: boolean }>(`/api/local_models/${m.id}/enrich`)
+            if (result && result.ok !== false) successCount++
+            else failCount++
+          } catch (e) {
+            failCount++
+            console.error(m.filename, e)
+          } finally {
+            fetchingSet.delete(key)
+            batchProgress.current = successCount + failCount
+            batchProgress.filename = m.filename
+          }
         }
       }
+      await Promise.all(Array.from(
+        { length: Math.min(2, noInfo.length) },
+        () => worker(),
+      ))
     } finally {
       batchProgress.running = false
     }

@@ -392,7 +392,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   },
   // ── SDXL 软架构 (衍生条目: Pony / Illustrious / NoobAI) ──
   // arch 层面仍是 sdxl, workflow 编排零改动 — 通过 workflowType 提交 sdxl,
-  // 由 effectiveArch() 按 sidecar baseModel 判别, picker/拦截分级处理。
+  // 由 effectiveArch() 按模型索引中的 baseModel 判别, picker/拦截分级处理。
   pony: {
     key: 'pony',
     label: 'Pony',
@@ -655,9 +655,9 @@ const _SUB_ARCH_RULES: Array<{ key: string, matches: string[] }> = [
 /**
  * effectiveArch — 软架构判别 (纯前端)。
  * item.arch !== 'sdxl' → 原样返回 (非 sdxl 家族不判别);
- * item.arch === 'sdxl' 时按 sidecar baseModel (item.info.baseModel) 小写匹配:
+ * item.arch === 'sdxl' 时按模型索引 baseModel (item.info.baseModel) 小写匹配:
  * 含 "pony" → 'pony'; 含 "illustrious"/"ilxl" → 'illustrious'; 含 "noob" → 'noobai';
- * 其余/无 sidecar → 'sdxl'。
+ * 其余/无细分来源信息 → 'sdxl'。
  */
 export function effectiveArch(item: ArchAwareItem): string {
   if (item.arch !== 'sdxl') return item.arch

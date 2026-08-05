@@ -5,7 +5,7 @@ comfycarry/services/arch_detect.py
 
 从 routes/generate.py 抽出的模型架构检测逻辑:
   - arch_from_base_model: CivitAI baseModel 字符串 → 架构
-  - detect_arch: 多源检测 (sidecar > header > 路径)
+  - detect_arch: 多源检测 (header > 路径)
   - match_arch_from_keys: 从 safetensors/gguf tensor key 集合判定架构
     (张量结构完全相同, 只能靠文件名区分 — 供下载配对与前端配对复用)
 
@@ -82,7 +82,7 @@ def arch_from_base_model(base_model: str) -> str:
     CivitAI baseModel 字符串 → 架构。
     baseModel 是 CivitAI 的固定枚举 (如 "SD 1.5" / "SDXL 1.0" / "Pony" / "Anima"
     / "Z-Image Turbo" / "Flux.2 Klein" / "Wan Video 2.2 I2V-A14B" / "Hunyuan Video"
-    / "LTXV 2.3")，sidecar 元数据与下载子文件夹名均为该字符串。
+    / "LTXV 2.3")，下载子文件夹名沿用该字符串。
     返回: "sd15" | "sdxl" | "flux" | "flux2" | "sd3" | "anima" | "krea2" | "zimage"
           | "wan22_i2v" | "wan22_t2v" | "wan22_5b" | "wan21" | "wan" | "hunyuan"
           | "ltxv" | "chroma" | "unknown"
@@ -96,21 +96,7 @@ def arch_from_base_model(base_model: str) -> str:
     return "unknown"
 
 
-# ── 侧路径检测: sidecar / 路径 ──────────────────────────────────────────────
-
-def _detect_arch_from_sidecar(filepath: str) -> str:
-    """
-    从 CivitAI 下载时保存的 .weilin-info.json sidecar 读取 baseModel 判断架构。
-    无 sidecar / 解析失败 / baseModel 未映射时返回 "unknown"。
-    """
-    try:
-        with open(filepath + ".weilin-info.json", encoding="utf-8") as f:
-            info = json.load(f)
-        return arch_from_base_model(info.get("baseModel", "") or "")
-    except (OSError, json.JSONDecodeError):
-        return "unknown"
-
-
+# ── 路径检测 ────────────────────────────────────────────────────────────────
 def _detect_arch_from_path(name: str) -> str:
     """
     从模型路径中的 baseModel 子文件夹名推断架构。
@@ -396,7 +382,7 @@ _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str], dict | None], bool]"]] = [
     ("flux2", lambda ks, sh: _has_sub(ks, "double_stream_modulation_img")),
     # Flux2 kohya LoRA (待校准): 单/双流模块名
     ("flux2", lambda ks, sh: _has_sub(ks, "double_stream_modulation") or _has_prefix(ks, "lora_unet_double_stream_")),
-    # ── 以下 flux 规则语义即 flux1 (检测输出用 "flux" 兼容现有 sidecar/缓存) ──
+    # ── 以下 flux 规则语义即 flux1，检测输出沿用架构键 "flux" ──
     # Flux1 主模型: double_blocks / single_blocks — 子串匹配兼容 checkpoint 全量打包的
     # model.diffusion_model.double_blocks. 前缀 (修复 _has_prefix 漏匹配整合包的 bug, 与 flux2 一致)。
     ("flux", lambda ks, sh: _has_sub(ks, "double_blocks.")),
@@ -506,10 +492,8 @@ def detect_packaging(keys: set[str], shapes: dict | None = None) -> str:
 # 随之删除的还有 _DIFFUSION_MARKERS / _AE_ENCODER_PREFIXES / _AE_DECODER_PREFIXES
 # —— 它们只服务于上面两个函数。
 #
-# detect_packaging_from_file() (路径版) 已删除: 本地扫描侧的 packaging
-# 检测下线, 形态改由「文件在哪个列表/目录」推导 (见 routes/generate.py
-# _scan_model_attrs docstring)。detect_packaging(keys, shapes) 保留, 供
-# header_probe.py 下载前探针使用。
+# detect_packaging_from_file() (路径版) 已删除: 本地模型形态由索引中的 category
+# 推导。detect_packaging(keys, shapes) 保留, 供 header_probe.py 下载前探针使用。
 #
 # **保留** detect_packaging / match_arch_from_keys / detect_arch 及其 markers:
 # 那些服务于「本地已有模型的架构识别」(生成页选主权重时判 SDXL/Flux/Wan),
@@ -557,20 +541,18 @@ def _wan_subvariant_from_filename(filename: str) -> str | None:
 
 def detect_arch(filepath: str, name: str = "") -> str:
     """
-    检测模型架构，优先级: sidecar 元数据 > 文件 header > 路径子文件夹 > 文件名兜底。
+    检测模型架构，优先级: 文件 header > 路径子文件夹 > 文件名兜底。
     返回: "sd15" | "sdxl" | "flux" | "flux2" | "sd3" | "anima" | "krea2" | "zimage"
           | "chroma" | "wan22_i2v" | "wan22_t2v" | "wan22_5b" | "wan21" | "wan"
           | "hunyuan" | "ltxv" | "unknown"
 
-    sidecar baseModel 是 CivitAI 官方枚举，不受打包格式影响，最可靠；
-    header 嗅探覆盖无 sidecar 的文件 (rclone 同步/手动上传, 仅 safetensors/GGUF)；
+    下载与 enrich 流程优先通过 arch_from_base_model() 使用 CivitAI 官方枚举；
+    本函数的 header 嗅探覆盖基础索引记录 (仅 safetensors/GGUF)；
     路径兜底覆盖 header 读不了的格式 (.ckpt 等)。
     Wan 文件名兜底: header 只判出通用 "wan" (GGUF 无形状 / 5B 与 14B-t2v key 名同构)
     时, 用文件名细化为 wan22_5b / wan22_i2v / wan22_t2v。
     """
-    result = _detect_arch_from_sidecar(filepath)
-    if result != "unknown":
-        return result
+    result = "unknown"
     if filepath.endswith(".safetensors"):
         result = _detect_arch_safetensors(filepath)
     elif filepath.endswith(".gguf"):

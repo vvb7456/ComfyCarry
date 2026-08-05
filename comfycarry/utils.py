@@ -35,7 +35,10 @@ def _sha256_file(filepath):
     try:
         with open(filepath, "rb") as f:
             while True:
-                chunk = f.read(65536)
+                # Large model files are commonly several GiB.  A 4 MiB read
+                # keeps syscall overhead low without materially increasing
+                # memory pressure during concurrent requests.
+                chunk = f.read(4 * 1024 * 1024)
                 if not chunk:
                     break
                 sha.update(chunk)

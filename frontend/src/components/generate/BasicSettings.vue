@@ -10,6 +10,7 @@ import NumberInput from '@/components/form/NumberInput.vue'
 import RangeField from '@/components/form/RangeField.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import { localModelPreviewUrl } from '@/utils/modelPreview'
 
 defineOptions({ name: 'BasicSettings' })
 
@@ -60,7 +61,7 @@ function describe(name: string): CheckpointInfo | null {
   return {
     name,
     displayName: (info?.name as string) || base.replace(/\.[^.]+$/, ''),
-    previewUrl: item?.preview ? `/api/local_models/preview?path=${encodeURIComponent(item.preview)}` : null,
+    previewUrl: localModelPreviewUrl(item?.preview),
     arch: item?.arch,
     baseModel: info?.baseModel as string | undefined,
   }
@@ -88,7 +89,7 @@ const selected = computed<CheckpointInfo | null>(() => {
     let previewUrl: string | null = null
     let previewIsVideo = false
     if (item.preview) {
-      previewUrl = `/api/local_models/preview?path=${encodeURIComponent(item.preview)}`
+      previewUrl = localModelPreviewUrl(item.preview)
     }
     // CivitAI image fallback
     const civitImages = info?.images as Array<{ url?: string; type?: string }> | undefined

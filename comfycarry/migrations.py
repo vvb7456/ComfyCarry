@@ -100,22 +100,35 @@ def _migration_v1(conn):
 
         # ── Model Index ──
         """CREATE TABLE IF NOT EXISTS models (
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename            TEXT NOT NULL,
-            category            TEXT NOT NULL,
-            relative_path       TEXT NOT NULL,
-            size_bytes          INTEGER NOT NULL DEFAULT 0,
-            file_hash           TEXT NOT NULL DEFAULT '',
-            name                TEXT NOT NULL DEFAULT '',
-            base_model          TEXT NOT NULL DEFAULT '',
-            civitai_model_id    TEXT NOT NULL DEFAULT '',
-            civitai_version_id  TEXT NOT NULL DEFAULT '',
-            trigger_words_json  TEXT NOT NULL DEFAULT '[]',
-            metadata_json       TEXT NOT NULL DEFAULT '{}',
-            preview_path        TEXT NOT NULL DEFAULT '',
-            disk_modified_at    REAL NOT NULL DEFAULT 0,
-            created_at          REAL NOT NULL,
-            updated_at          REAL NOT NULL
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            real_path             TEXT NOT NULL,
+            filename              TEXT NOT NULL,
+            category              TEXT NOT NULL,
+            relative_path         TEXT NOT NULL,
+            storage_type          TEXT NOT NULL DEFAULT 'primary',
+
+            size_bytes            INTEGER NOT NULL DEFAULT 0,
+            file_mtime            REAL NOT NULL DEFAULT 0,
+            sha256                TEXT NOT NULL DEFAULT '',
+
+            display_name          TEXT NOT NULL DEFAULT '',
+            model_type            TEXT NOT NULL DEFAULT '',
+            architecture          TEXT NOT NULL DEFAULT 'unknown',
+            base_model            TEXT NOT NULL DEFAULT '',
+
+            trigger_words_json    TEXT NOT NULL DEFAULT '[]',
+            trigger_sources_json  TEXT NOT NULL DEFAULT '{}',
+
+            source_type           TEXT NOT NULL DEFAULT '',
+            source_model_id       TEXT NOT NULL DEFAULT '',
+            source_version_id     TEXT NOT NULL DEFAULT '',
+            source_version_name   TEXT NOT NULL DEFAULT '',
+
+            details_json          TEXT NOT NULL DEFAULT '{}',
+            has_info              INTEGER NOT NULL DEFAULT 0,
+
+            created_at            REAL NOT NULL,
+            updated_at            REAL NOT NULL
         )""",
 
         # ── Prompt Library 索引 ──
@@ -134,11 +147,11 @@ def _migration_v1(conn):
 
         # ── Model Index 索引 ──
         "CREATE INDEX IF NOT EXISTS idx_models_category     ON models(category)",
-        "CREATE INDEX IF NOT EXISTS idx_models_civitai      ON models(civitai_model_id, civitai_version_id)",
-        "CREATE INDEX IF NOT EXISTS idx_models_hash         ON models(file_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_models_source       ON models(source_type, source_model_id, source_version_id)",
+        "CREATE INDEX IF NOT EXISTS idx_models_hash         ON models(sha256)",
 
         # ── Model 唯一约束 ──
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_models_path   ON models(category, relative_path)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_models_real_path ON models(real_path)",
     ]
     for sql in stmts:
         conn.execute(sql)

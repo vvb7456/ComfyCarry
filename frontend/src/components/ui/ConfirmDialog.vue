@@ -75,6 +75,17 @@ function doAlt() {
   color: var(--t1);
   line-height: 1.6;
   white-space: pre-line;
+  /* Long filenames (no spaces) can stretch the modal off-screen; break them
+     at any boundary and clamp to a single visible line with an ellipsis. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
   margin: 0;
 }
 

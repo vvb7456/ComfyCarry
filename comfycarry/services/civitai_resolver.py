@@ -8,7 +8,7 @@ ComfyCarry — CivitAI Resolver
   2. API 调用   — 获取模型版本信息 + 下载链接
   3. 文件选择   — 启发式选择最佳文件 (safetensors 优先)
   4. 目录映射   — CivitAI 模型类型 → ComfyUI 本地路径
-  5. 元数据保存 — .weilin-info.json + 预览图 (兼容 WeiLin-Comfyui-Tools)
+  5. 元数据归一化 — 为 SQLite 模型索引提供来源数据和预览图
 """
 
 import json
@@ -587,52 +587,12 @@ def _sanitize_folder_name(name: str) -> str:
 
 # ── 归位逻辑已删除 ──────────────────────────────────────────────────────────
 # 旧实现 relocate_after_download() 在下载完成后读文件头判内容角色, 再物理移动
-# 文件 (算目标目录 / 建目录 / 处理同名冲突 / 改 sidecar / 搬预览图)。
+# 文件 (算目标目录 / 建目录 / 处理同名冲突 / 搬预览图)。
 #
 # 已整体废弃: 目录改为**下载前**按元数据逐文件判定
 # (services/download_classify.classify_file, 契约见
 #  docs/DOWNLOAD_CLASSIFICATION_SPEC.md)。判不出来的交给用户选, 不再事后补救。
 #
-# update_sidecar_path() 保留 —— 它与归位无关, 供其他改路径的场景复用。
-def update_sidecar_path(old_path: str, new_path: str) -> None:
-    """更新 .weilin-info.json sidecar 的 path 字段 (归位后路径变化)。
-
-    sidecar 与预览图都在原位 — 归位后把它们一并迁到新目录。
-    """
-    old_info = f"{old_path}.weilin-info.json"
-    new_info = f"{new_path}.weilin-info.json"
-    try:
-        if os.path.exists(old_info):
-            with open(old_info, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            # 更新 path / file 字段
-            if 'path' in data:
-                data['path'] = new_path
-            if 'file' in data:
-                # file 字段是相对路径, 不变 (除非跨 models 根, 这里只在 checkpoints↔diffusion_models 间)
-                pass
-            with open(new_info, 'w', encoding='utf-8') as f:
-                json.dump(data, f, sort_keys=False, indent=2, ensure_ascii=False)
-            if old_info != new_info:
-                os.remove(old_info)
-    except Exception as e:
-        logger.warning(f"[civitai_resolver] sidecar 路径更新失败: {e}")
-
-    # 预览图 (.png/.jpg/.jpeg/.webp) 一并迁移
-    old_base = old_path
-    for pext in ('.png', '.jpg', '.jpeg', '.webp'):
-        op = old_base + pext
-        np_ = new_path + pext
-        if os.path.exists(op):
-            try:
-                if os.path.exists(np_) and op != np_:
-                    os.remove(np_)
-                if op != np_:
-                    os.rename(op, np_)
-            except OSError:
-                pass
-
-
 # ── 文件元数据提取 ────────────────────────────────────────────────────────────
 
 def extract_file_trigger_words(model_path: str) -> list[str]:
@@ -690,132 +650,9 @@ def extract_file_trigger_words(model_path: str) -> list[str]:
     return words
 
 
-# ── 元数据保存 ───────────────────────────────────────────────────────────────
-
-def save_model_metadata(
-    model_path: str,
-    info: dict,
-    sha256: str = "",
-    file_trigger_words: list[str] | None = None,
-) -> str:
-    """
-    保存模型元数据为 .weilin-info.json (兼容 WeiLin-Comfyui-Tools 格式).
-
-    Args:
-        model_path: 模型文件绝对路径
-        info: fetch_model_info() 返回的信息
-        sha256: SHA256 哈希 (可选, 下载后计算)
-        file_trigger_words: 从 safetensors 文件提取的触发词 (可选)
-
-    Returns:
-        info 文件路径
-    """
-    abs_path = Path(model_path).resolve()
-    comfy_root = Path(COMFYUI_DIR).resolve()
-
-    # 计算 weilin 兼容的相对路径
-    try:
-        rel_from_comfy = abs_path.relative_to(comfy_root)
-        rel_parts = rel_from_comfy.parts
-        # 路径格式: models/<type>/[subdir/]filename — 去掉前两级得到相对路径
-        if len(rel_parts) > 2 and rel_parts[0] == "models":
-            file_rel = str(Path(*rel_parts[2:]))
-        else:
-            file_rel = abs_path.name
-    except ValueError:
-        file_rel = abs_path.name
-
-    raw = info.get("raw", {})
-    model_name = info.get("model_name", "")
-    version_name = info.get("version_name", "")
-    display_name = f"{model_name} - {version_name}" if version_name else model_name
-
-    info_data = {
-        "file": file_rel,
-        "path": str(abs_path),
-        "sha256": sha256.upper() if sha256 else "",
-        "name": display_name,
-        "type": info.get("model_type", ""),
-        "baseModel": info.get("base_model", ""),
-        "images": [],
-        "trainedWords": [],
-        "links": [],
-        "raw": {"civitai": raw},
-    }
-
-    # 触发词 (normalize: 按逗号拆分不规范条目, 去重保序)
-    seen_words: set[str] = set()
-    for w in info.get("trained_words", []):
-        parts = [p.strip() for p in w.split(",") if p.strip()]
-        for part in parts:
-            if part not in seen_words:
-                seen_words.add(part)
-                info_data["trainedWords"].append({"word": part, "civitai": True})
-
-    # 文件元数据触发词 (去重: 跳过已有的 CivitAI 词)
-    for w in (file_trigger_words or []):
-        if w not in seen_words:
-            seen_words.add(w)
-            info_data["trainedWords"].append({"word": w, "civitai": False})
-
-    # Links
-    model_id = info.get("model_id")
-    version_id = info.get("version_id")
-    if model_id:
-        link = f"https://civitai.com/models/{model_id}"
-        if version_id:
-            link += f"?modelVersionId={version_id}"
-        info_data["links"].append(link)
-        info_data["links"].append(f"{_CIVITAI_API_BASE}/model-versions/{version_id}")
-
-    # 图片 (weilin 兼容格式)
-    for img in info.get("images", []):
-        img_url = img.get("url", "")
-        if not img_url:
-            continue
-        img_id = os.path.splitext(os.path.basename(img_url))[0] if img_url else None
-        img_entry = {
-            "url": img_url,
-            "civitaiUrl": f"https://civitai.com/images/{img_id}" if img_id else None,
-            "type": img.get("type", "image"),
-            "width": img.get("width"),
-            "height": img.get("height"),
-            "nsfwLevel": img.get("nsfwLevel"),
-        }
-        meta = img.get("meta") or {}
-        if meta:
-            img_entry["seed"] = meta.get("seed")
-            img_entry["positive"] = meta.get("prompt", "")
-            img_entry["negative"] = meta.get("negativePrompt", "")
-            img_entry["steps"] = meta.get("steps")
-            img_entry["sampler"] = meta.get("sampler")
-            img_entry["cfg"] = meta.get("cfgScale")
-            img_entry["model"] = meta.get("Model")
-            img_entry["resources"] = meta.get("resources")
-        info_data["images"].append(img_entry)
-
-    # 写入文件 (原子替换: 先写临时文件再 rename, 防止中途崩溃留下损坏 JSON)
-    info_path = str(abs_path) + ".weilin-info.json"
-    tmp_path = info_path + ".tmp"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(info_data, f, sort_keys=False, indent=2, ensure_ascii=False)
-        os.replace(tmp_path, info_path)
-    except Exception as e:
-        logger.warning(f"[civitai_resolver] 保存元数据失败: {e}")
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        return None
-
-    logger.info(f"[civitai_resolver] 已保存元数据: {info_path}")
-    return info_path
-
-
 def normalize_version_data(version_data: dict) -> dict:
     """
-    将 CivitAI 版本 API 原始响应转换为 save_model_metadata() 期望的 info 格式.
+    将 CivitAI 版本 API 原始响应转换为模型元数据 store 使用的 info 格式.
 
     适用于 by-hash / model-versions / models 等任何返回版本级数据的 API 响应。
     不做文件选择或下载 URL 构建, 仅提取元数据字段。
@@ -834,25 +671,46 @@ def normalize_version_data(version_data: dict) -> dict:
     }
 
 
-def enrich_model_by_hash(model_path: str, api_key: str = "") -> str | None:
+def enrich_model_by_hash(
+    model_path: str,
+    api_key: str = "",
+    local_model_id: int | None = None,
+) -> dict | None:
     """
-    通过 SHA256 by-hash API 获取完整元数据并保存 (含 modelId + images.meta).
-
-    用于下载完成后的异步二次丰富, 以及 fetch_info 手动触发。
+    通过 SHA256 by-hash API 获取完整元数据并更新 models 表。
 
     Returns:
-        info 文件路径, 或 None (失败时)
+        完整模型详情，或 None（来源中未找到时）
     """
     abs_path = Path(model_path).resolve()
     if not abs_path.is_file():
         logger.warning(f"[civitai_resolver] enrich: 文件不存在 {abs_path}")
         return None
 
-    # SHA256
-    sha256 = _sha256_file(str(abs_path))
+    from .model_meta_store import get_or_compute_model_sha256
+    from ..db import db
+
+    if local_model_id is None:
+        row = db.fetch_one(
+            "SELECT id FROM models WHERE real_path = ?",
+            (str(abs_path),),
+        )
+        if row is None:
+            logger.warning(f"[civitai_resolver] enrich: 模型索引中不存在 {abs_path}")
+            return None
+        local_model_id = int(row["id"])
+
+    # Reuse the indexed hash while size + mtime still match.  A newly
+    # computed hash is persisted before the remote request, including the
+    # CivitAI 404 path, so retries do not scan a multi-GB file again.
+    sha256 = get_or_compute_model_sha256(local_model_id, abs_path, _sha256_file)
     if not sha256:
         logger.warning(f"[civitai_resolver] enrich: SHA256 计算失败 {abs_path}")
         return None
+
+    # Extract local trigger words before contacting CivitAI.  They remain
+    # useful even when the hash is not present in the remote catalogue.
+    file_words = extract_file_trigger_words(str(abs_path))
 
     # by-hash API
     headers = {}
@@ -864,6 +722,13 @@ def enrich_model_by_hash(model_path: str, api_key: str = "") -> str | None:
         resp = http_requests.get(url, headers=headers, timeout=30)
         if resp.status_code == 404:
             logger.info(f"[civitai_resolver] enrich: CivitAI 未找到 {sha256[:16]}...")
+            from .model_meta_store import enrich_model
+            enrich_model(
+                model_id=local_model_id,
+                source_data={},
+                sha256=sha256,
+                file_trigger_words=file_words,
+            )
             return None
         resp.raise_for_status()
         version_data = resp.json()
@@ -874,16 +739,19 @@ def enrich_model_by_hash(model_path: str, api_key: str = "") -> str | None:
     info = normalize_version_data(version_data)
 
     # 从 safetensors 文件头提取训练触发词
-    file_words = extract_file_trigger_words(str(abs_path))
-
-    # 保存元数据 (覆写已有的 weilin-info.json)
-    info_path = save_model_metadata(str(abs_path), info, sha256=sha256, file_trigger_words=file_words)
-
     # 更新预览图 (by-hash 返回的 images 可能更丰富)
     download_preview_image(str(abs_path), info.get("images", []))
 
+    from .model_meta_store import enrich_model
+    detail = enrich_model(
+        model_id=local_model_id,
+        source_data=info,
+        sha256=sha256,
+        file_trigger_words=file_words,
+    )
+
     logger.info(f"[civitai_resolver] enrich 完成: {abs_path.name}")
-    return info_path
+    return detail
 
 
 def download_preview_image(model_path: str, images: list[dict]) -> str | None:

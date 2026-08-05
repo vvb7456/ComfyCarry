@@ -36,7 +36,7 @@ import LlmModal from '@/components/generate/LlmModal.vue'
 import PromptEditorModal from '@/components/generate/PromptEditorModal.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
 import MaskEditorModal from '@/components/generate/MaskEditorModal.vue'
-import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
+import LocalModelModal from '@/components/models/LocalModelModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 import { TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
 import { useToast } from '@/composables/useToast'
@@ -310,7 +310,7 @@ const {
   loraModalPending,
   loraCountLabel,
   showLoraDetail,
-  loraDetailMeta,
+  loraDetailModelId,
   onPreviewClick,
   onPromptTool,
   onTaggerApply,
@@ -795,10 +795,10 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @confirm="onLoraConfirm"
     />
 
-    <!-- LoRA Detail Modal -->
-    <ModelMetaModal
+    <!-- LoRA Detail Modal (local model, details loaded by numeric ID) -->
+    <LocalModelModal
       v-model="showLoraDetail"
-      :meta="loraDetailMeta"
+      :model-id="loraDetailModelId"
     />
 
     <!-- 起始画面 Picker Modal (视频, usage='video_ref') -->

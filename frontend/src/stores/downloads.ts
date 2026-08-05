@@ -460,13 +460,19 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch('/api/local_models?category=all')
       if (!res.ok) return
       const data = await res.json()
-      const models: Array<{ civitai_id?: number | string; civitai_version_id?: number | string }> = data.models || []
+      const models: Array<{
+        source_model_id?: number | string
+        source_version_id?: number | string
+        source?: { model_id?: number | string; version_id?: number | string }
+      }> = data.models || []
       const newMap = new Map<string, Set<string>>()
       for (const m of models) {
-        if (!m.civitai_id) continue
-        const mid = String(m.civitai_id)
+        const midValue = m.source_model_id ?? m.source?.model_id
+        if (!midValue) continue
+        const mid = String(midValue)
         if (!newMap.has(mid)) newMap.set(mid, new Set())
-        if (m.civitai_version_id) newMap.get(mid)!.add(String(m.civitai_version_id))
+        const versionId = m.source_version_id ?? m.source?.version_id
+        if (versionId) newMap.get(mid)!.add(String(versionId))
       }
       localCivitaiIds.value = newMap
     } catch { /* ignore */ }

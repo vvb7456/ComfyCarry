@@ -10,13 +10,12 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import LocalModelCard from '@/components/models/LocalModelCard.vue'
-import type { ModelMeta, ModelMetaImage } from '@/types/models'
 import type { LocalModel } from '@/composables/useLocalModels'
 
 defineOptions({ name: 'LocalModelsTab' })
 
 const emit = defineEmits<{
-  openMeta: [meta: ModelMeta]
+  openLocal: [model: LocalModel]
   openPreview: [url: string]
 }>()
 
@@ -59,45 +58,8 @@ onMounted(() => {
   loadModels()
 })
 
-function localToMeta(m: LocalModel): ModelMeta {
-  const images: ModelMetaImage[] = []
-  if (m.has_preview && m.preview_path) {
-    images.push({ url: `/api/local_models/preview?path=${encodeURIComponent(m.preview_path)}` })
-  }
-  if (m.images) {
-    for (const img of m.images) {
-      images.push({
-        url: img.url,
-        type: img.type,
-        seed: img.seed,
-        steps: img.steps,
-        cfg: img.cfg,
-        sampler: img.sampler,
-        model: img.model,
-        positive: img.positive,
-        negative: img.negative,
-      })
-    }
-  }
-  return {
-    name: m.name,
-    type: m.category,
-    baseModel: m.base_model,
-    id: m.civitai_id,
-    versionId: m.civitai_version_id,
-    versionName: m.version_name,
-    sha256: m.sha256,
-    filename: m.filename,
-    civitaiUrl: m.civitai_id
-      ? `https://civitai.com/models/${m.civitai_id}`
-      : undefined,
-    trainedWords: m.trained_words,
-    images,
-  }
-}
-
 function openMeta(m: LocalModel) {
-  emit('openMeta', localToMeta(m))
+  emit('openLocal', m)
 }
 </script>
 
@@ -151,9 +113,9 @@ function openMeta(m: LocalModel) {
   <div v-else class="model-grid">
     <LocalModelCard
       v-for="m in filteredModels"
-      :key="m.rel_path"
+      :key="m.id"
       :model="m"
-      :fetching="isFetching(m.abs_path)"
+      :fetching="isFetching(m.id)"
       @details="openMeta"
       @fetch-info="fetchInfo"
       @delete="deleteModel"

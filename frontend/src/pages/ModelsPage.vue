@@ -6,7 +6,8 @@ import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
-import ModelMetaModal from '@/components/models/ModelMetaModal.vue'
+import CivitaiModelModal from '@/components/models/CivitaiModelModal.vue'
+import LocalModelModal from '@/components/models/LocalModelModal.vue'
 import LocalModelsTab from '@/components/models/LocalModelsTab.vue'
 import CivitaiTab from '@/components/models/CivitaiTab.vue'
 import FavoritesPanel from '@/components/models/FavoritesPanel.vue'
@@ -15,6 +16,7 @@ import DownloadDirModal from '@/components/models/DownloadDirModal.vue'
 import { useDownloads } from '@/composables/useDownloads'
 import { useDownloadsStore } from '@/stores/downloads'
 import type { ModelMeta } from '@/types/models'
+import type { LocalModel } from '@/composables/useLocalModels'
 
 defineOptions({ name: 'ModelsPage' })
 
@@ -94,15 +96,22 @@ const dirModalOpen = computed({
 })
 
 // ── Shared Modals ──
-const metaOpen = ref(false)
-const metaMeta = ref<ModelMeta | null>(null)
+const civitaiOpen = ref(false)
+const civitaiMeta = ref<ModelMeta | null>(null)
+const localOpen = ref(false)
+const localModel = ref<LocalModel | null>(null)
 const previewOpen = ref(false)
 const previewImages = ref<string[]>([])
 const previewIndex = ref(0)
 
 function openMeta(meta: ModelMeta) {
-  metaMeta.value = meta
-  metaOpen.value = true
+  civitaiMeta.value = meta
+  civitaiOpen.value = true
+}
+
+function openLocal(model: LocalModel) {
+  localModel.value = model
+  localOpen.value = true
 }
 
 function openPreview(images: string[], index = 0) {
@@ -134,7 +143,7 @@ function openPreviewSingle(url: string) {
     </TabSwitcher>
 
     <div v-show="activeTab === 'local'">
-      <LocalModelsTab @open-meta="openMeta" @open-preview="openPreviewSingle" />
+      <LocalModelsTab @open-local="openLocal" @open-preview="openPreviewSingle" />
     </div>
 
     <div v-show="activeTab === 'civitai'">
@@ -163,7 +172,8 @@ function openPreviewSingle(url: string) {
       @confirm="downloads.resolveClassification"
     />
 
-    <ModelMetaModal v-model="metaOpen" :meta="metaMeta" :show-download="activeTab === 'civitai'" @preview="openPreview" />
+    <LocalModelModal v-model="localOpen" :model="localModel" @preview="openPreview" />
+    <CivitaiModelModal v-model="civitaiOpen" :meta="civitaiMeta" :show-download="activeTab === 'civitai'" @preview="openPreview" />
     <ImagePreview v-model="previewOpen" :images="previewImages" :initial-index="previewIndex" />
   </div>
 </template>

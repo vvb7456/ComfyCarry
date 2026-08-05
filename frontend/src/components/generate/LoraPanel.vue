@@ -28,6 +28,7 @@ import { MODEL_TYPES } from '@/config/model-types'
 import { COMPONENT_FILENAMES } from '@/config/component-registry'
 import AddCard from '@/components/ui/AddCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import { localModelPreviewUrl } from '@/utils/modelPreview'
 
 defineOptions({ name: 'LoraPanel' })
 
@@ -69,7 +70,7 @@ function getDisplayName(name: string): string {
 function getPreviewUrl(name: string): string | null {
   const info = getLoraInfo(name)
   if (!info) return null
-  if (info.preview) return `/api/local_models/preview?path=${encodeURIComponent(info.preview)}`
+  if (info.preview) return localModelPreviewUrl(info.preview)
   // CivitAI fallback
   const civitImg = (info.info as Record<string, unknown>)?.images as Array<Record<string, unknown>> | undefined
   const first = civitImg?.[0]

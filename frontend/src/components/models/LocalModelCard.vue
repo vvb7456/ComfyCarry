@@ -27,17 +27,19 @@ const { t } = useI18n({ useScope: 'global' })
 
 // ── Image props for ModelCard ──
 const previewUrl = computed(() => {
-  if (props.model.has_preview && props.model.preview_path)
-    return `/api/local_models/preview?path=${encodeURIComponent(props.model.preview_path)}`
-  return ''
+  return props.model.has_preview && props.model.preview_url
+    ? props.model.preview_url
+    : ''
 })
 
-const civitaiImage = computed(() => props.model.civitai_image || '')
-const isVideo = computed(() => props.model.civitai_image_type === 'video')
+const remotePreviewUrl = computed(() => props.model.remote_preview_url || '')
+const remotePreviewType = computed(() => props.model.remote_preview_type || 'image')
+const isVideo = computed(() => remotePreviewType.value === 'video')
 
 const zoomUrl = computed(() => {
-  if (civitaiImage.value && !isVideo.value) return civitaiImage.value
   if (previewUrl.value) return previewUrl.value
+  if (isVideo.value) return ''
+  if (remotePreviewUrl.value) return remotePreviewUrl.value
   return ''
 })
 
@@ -45,8 +47,8 @@ const zoomUrl = computed(() => {
 const badgeColor = computed(() => MODEL_CATEGORY_COLORS[props.model.category])
 
 // ── Capability flags (extra_model_paths may not support fetch/delete) ──
-const canFetchInfo = computed(() => props.model.can_fetch_info !== false)
-const canDelete = computed(() => props.model.can_delete !== false)
+const canFetchInfo = computed(() => props.model.can_fetch_info)
+const canDelete = computed(() => props.model.can_delete)
 
 // ── Fetch button label ──
 const fetchLabel = computed(() => {
@@ -58,9 +60,9 @@ const fetchLabel = computed(() => {
 <template>
   <ModelCard
     :image-src="previewUrl"
-    :image-fallback="civitaiImage"
+    :image-fallback="remotePreviewUrl"
     :is-video="isVideo"
-    :title="model.name"
+    :title="model.display_name || model.filename"
     :zoom-url="zoomUrl"
     @click="emit('details', model)"
     @preview="(url) => emit('preview', url)"
@@ -72,6 +74,7 @@ const fetchLabel = computed(() => {
     <template #meta>
       <Badge :color="badgeColor">{{ model.category.toUpperCase() }}</Badge>
       <Badge v-if="model.base_model">{{ model.base_model }}</Badge>
+      <Badge v-else-if="model.architecture && model.architecture !== 'unknown'">{{ model.architecture }}</Badge>
       <span class="mc-size">{{ fmtBytes(model.size_bytes) }}</span>
     </template>
 

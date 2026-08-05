@@ -156,6 +156,12 @@ def main():
     from .db import db
     db.migrate()
 
+    # 当前实例的模型文件与 SQLite 索引在启动时完成一次校对；运行期由下载、
+    # enrich 和删除事件直接维护。
+    from .services.model_meta_store import reconcile_model_index
+    model_sync = reconcile_model_index()
+    app.logger.info("[models] 启动校对完成: %s", model_sync)
+
     # 从 DB 恢复下载资源状态
     from .services.resource_registry import get_registry
     get_registry().hydrate_from_db()
