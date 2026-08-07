@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
 import type { PendingFile, DirOption } from '@/components/models/DownloadDirModal.vue'
+import { HUGGINGFACE_MODELS } from '@/config/huggingface-models'
+import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
 
 /** 后端 409 needs_classification 的载荷 —— 等待用户裁决目录的一次下载提交。 */
 export interface PendingClassification {
@@ -26,6 +28,8 @@ export interface FavoriteItem {
   versionId?: number
   versionName?: string
   baseModel?: string
+  /** 收藏来源 (civitai / huggingface)。后端暂不持久化, 收藏重载后靠 modelId 负号兜底识别 */
+  source?: string
   allVersions?: Array<{ id: number; name: string; baseModel?: string }>
 }
 
@@ -83,6 +87,7 @@ interface FavoriteApi {
   image_url?: string
   version_name?: string
   base_model?: string
+  source?: string
   all_versions?: Array<{ id: number; name: string; baseModel?: string }>
   fav_key?: string
 }
@@ -96,6 +101,7 @@ function favoriteToApi(item: FavoriteItem): FavoriteApi {
     image_url: item.imageUrl,
     ...(item.versionName !== undefined && { version_name: item.versionName }),
     ...(item.baseModel !== undefined && { base_model: item.baseModel }),
+    ...(item.source !== undefined && { source: item.source }),
     ...(item.allVersions && { all_versions: item.allVersions }),
   }
 }
@@ -106,6 +112,7 @@ function apiToFavorite(f: Record<string, unknown>): FavoriteItem {
     name: String(f.name ?? ''),
     type: String(f.model_type ?? ''),
     imageUrl: String(f.image_url ?? ''),
+    ...(f.source !== undefined && f.source !== null && { source: String(f.source) }),
     ...(f.version_id !== undefined && f.version_id !== null && { versionId: Number(f.version_id) }),
     ...(f.version_name !== undefined && f.version_name !== null && { versionName: String(f.version_name) }),
     ...(f.base_model !== undefined && f.base_model !== null && { baseModel: String(f.base_model) }),
@@ -130,6 +137,36 @@ function mapResourceState(state: string): VersionState {
     case 'absent': return 'idle'
     default: return 'idle'
   }
+}
+
+// ── Hugging Face 白名单分派 (SPEC §5-C / §6-D) ──────────────
+
+/** 负整数模型 ID 即 HF 白名单条目 (SPEC §5-C: 模型 ID 为人工分配稳定负整数) */
+function isHuggingFaceId(modelId: number | string): boolean {
+  return Number(modelId) < 0
+}
+
+/** 白名单版本查找: 版本号缺省或未命中时回落默认版本 model.version */
+function findHuggingFaceVersion(
+  modelId: number | string,
+  versionId?: number | string,
+): { model: HuggingFaceModel; version: HuggingFaceVersion } | null {
+  const mid = Number(modelId)
+  const model = HUGGINGFACE_MODELS.find(m => m.id === mid)
+  if (!model) return null
+  const vid = versionId != null ? Number(versionId) : model.version.id
+  const version = model.versions.find(v => v.id === vid) || model.version
+  return { model, version }
+}
+
+/** 后端资源 key 前缀: 负 ID → huggingface, 正 ID → civitai (SPEC §7-D) */
+function sourcePrefixFor(modelId: number | string): 'huggingface' | 'civitai' {
+  return isHuggingFaceId(modelId) ? 'huggingface' : 'civitai'
+}
+
+/** 拼接后端资源 key: "source:modelId:versionId" */
+function resourceKeyFor(modelId: number | string, versionId: number | string): string {
+  return `${sourcePrefixFor(modelId)}:${String(modelId)}:${String(versionId)}`
 }
 
 // ── Store ──────────────────────────────────────────────
@@ -589,6 +626,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
     versionId?: number,
     dirKeys?: Record<string, string>,
   ) {
+    // 负整数 ID 命中 HF 白名单 → 走白名单通用提交 (SPEC §6-D)
+    if (isHuggingFaceId(modelId)) return downloadHuggingFaceVersion(modelId, versionId)
+
     const vid = versionId ? String(versionId) : modelId
 
     setSubmitting(vid)
@@ -605,10 +645,11 @@ export const useDownloadsStore = defineStore('downloads', () => {
       display_name?: string
     } | null = null
     try {
-      const res = await fetch('/api/downloads/civitai', {
+      const res = await fetch('/api/downloads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          source: 'civitai',
           model_id: modelId,
           model_type: modelType.toLowerCase(),
           ...(versionId && { version_id: versionId }),
@@ -675,6 +716,118 @@ export const useDownloadsStore = defineStore('downloads', () => {
     clearSubmitting(vid)
   }
 
+  /**
+   * Hugging Face 白名单下载提交 (SPEC §6-D / §6-E)。
+   * meta 携带白名单完整登记数据; 提交状态 / toast / 轮询 / 快照刷新沿用 downloadOne 流程。
+   * 返回 true 表示任务已提交 (含 existed), false 表示提交失败, 供批量收藏分派计数。
+   */
+  async function downloadHuggingFaceVersion(
+    modelId: number | string,
+    versionId?: number | string,
+  ): Promise<boolean> {
+    const found = findHuggingFaceVersion(modelId, versionId)
+    if (!found) {
+      toast('Hugging Face 白名单中未找到该模型', 'error')
+      return false
+    }
+    const { model, version } = found
+    const vid = String(version.id)
+
+    setSubmitting(vid)
+
+    // meta 严格按 SPEC §6-E 契约, 后端完成回调直接据此登记 SQLite
+    const meta = {
+      source: 'huggingface',
+      model_id: String(model.id),
+      version_id: String(version.id),
+      model_name: model.name,
+      version_name: version.name,
+      model_type: model.type,
+      category: version.file.modelType,
+      base_model: version.baseModel,
+      architecture: version.file.architecture,
+      image_url: model.images[0]?.url || version.images[0]?.url || '',
+      sha256: version.file.sha256,
+      size_bytes: version.file.sizeBytes,
+      trained_words: version.trainedWords,
+      images: version.images,
+      author: model.user.username,
+      source_url: model.sourceUrl,
+      completion_requires_callback: true,
+    }
+
+    let result: {
+      download_id?: string; message?: string; error?: string; existed?: boolean
+      error_key?: string; error_params?: Record<string, unknown>
+      message_key?: string; message_params?: Record<string, unknown>
+      needs_classification?: boolean
+      probe_auth?: boolean
+    } | null = null
+    try {
+      const res = await fetch('/api/downloads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'huggingface',
+          url: version.file.url,
+          model_type: version.file.modelType,
+          filename: version.file.filename,
+          meta,
+        }),
+      })
+      if (res.status === 401) {
+        clearSubmitting(vid)
+        window.location.href = '/login'
+        return false
+      }
+      result = await res.json()
+      // 403 + probe_auth: 与 civitai 路径一致 —— 文件需付费或无权限下载
+      if (res.status === 403 && result?.probe_auth) {
+        clearSubmitting(vid)
+        toast(apiErrorText(result, t('models.err.dl_probe_auth')), 'error')
+        await refreshStatus()
+        return false
+      }
+      // 409 needs_classification: 白名单 model_type 直接定目录, 理论不命中; 兜底按错误提示
+      if (res.status === 409 && result?.needs_classification) {
+        clearSubmitting(vid)
+        toast(apiErrorText(result, `HTTP ${res.status}`), 'error')
+        await refreshStatus()
+        return false
+      }
+      if (!res.ok) {
+        clearSubmitting(vid)
+        toast(apiErrorText(result, `HTTP ${res.status}`), 'error')
+        await refreshStatus()
+        return false
+      }
+    } catch (e: unknown) {
+      clearSubmitting(vid)
+      toast((e as Error)?.message || 'Network error', 'error')
+      return false
+    }
+
+    if (!result) { clearSubmitting(vid); return false }
+    if (result.error_key || result.error) {
+      clearSubmitting(vid)
+      toast(apiErrorText(result), 'error')
+      await refreshStatus()
+      return false
+    }
+    if (result.existed) {
+      toast(apiMessageText(result, t('models.downloads.already_exists')), 'warning')
+      await refreshStatus()
+      clearSubmitting(vid)
+      return true
+    }
+
+    toast(apiMessageText(result, t('models.downloads.started')), 'success')
+    startPolling()
+    await refreshStatus()
+    clearSubmitting(vid)
+    return true
+  }
+
   /** 用户在目录选择 modal 里选定后, 带 dir_keys 重新提交同一次下载。 */
   async function resolveClassification(dirKeys: Record<string, string>) {
     const p = pendingClassification.value
@@ -706,11 +859,19 @@ export const useDownloadsStore = defineStore('downloads', () => {
     let ok = 0, fail = 0
     for (const item of items) {
       const vid = item.versionId ? String(item.versionId) : item.modelId
+      // HF 白名单收藏 (source 字段优先, 重载后靠负 ID 兜底) → 走白名单通用提交
+      if (item.source === 'huggingface' || isHuggingFaceId(item.modelId)) {
+        const submitted = await downloadHuggingFaceVersion(item.modelId, item.versionId)
+        if (submitted) ok++
+        else fail++
+        continue
+      }
       try {
-        const res = await fetch('/api/downloads/civitai', {
+        const res = await fetch('/api/downloads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            source: 'civitai',
             model_id: item.modelId,
             model_type: (item.type || 'Checkpoint').toLowerCase(),
             ...(item.versionId && { version_id: item.versionId }),
@@ -854,7 +1015,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     if (submittingVersionIds.value.has(vid)) return 'submitting'
 
-    const resourceKey = `civitai:${mid}:${vid}`
+    // 资源 key: "source:modelId:versionId", 前缀按 ID 正负号动态选择 (SPEC §7-D)
+    const resourceKey = resourceKeyFor(mid, vid)
     const rState = resourceStates.value.get(resourceKey)
     if (rState) {
       const mapped = mapResourceState(rState)

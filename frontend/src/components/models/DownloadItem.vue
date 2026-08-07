@@ -63,7 +63,9 @@ const badgeColor = computed(() => {
 
 const civitaiUrl = computed(() => {
   const id = props.favoriteItem?.modelId || props.task?.meta?.model_id
-  return id ? `https://civitai.com/models/${id}` : ''
+  // 负整数 ID 为 HF 白名单模型, 无 CivitAI 页面, 隐藏链接 (SPEC §4-E)
+  if (!id || Number(id) < 0) return ''
+  return `https://civitai.com/models/${id}`
 })
 
 // ── Favorite-specific ──

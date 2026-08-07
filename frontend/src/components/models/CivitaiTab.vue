@@ -6,13 +6,15 @@ import { useDownloads } from '@/composables/useDownloads'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
+import CivitaiFilterPopover from '@/components/models/CivitaiFilterPopover.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import CivitaiModelCard from '@/components/models/CivitaiModelCard.vue'
 import VersionPickerModal from '@/components/models/VersionPickerModal.vue'
 import FavoriteVersionModal from '@/components/models/FavoriteVersionModal.vue'
-import type { ModelMeta, ModelMetaImage } from '@/types/models'
-import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
+import type { ModelMeta } from '@/types/models'
+import type { CivitaiHit } from '@/composables/useCivitaiSearch'
+import { remoteHitToMeta } from '@/utils/remote-model-meta'
 
 defineOptions({ name: 'CivitaiTab' })
 
@@ -40,7 +42,10 @@ const {
 } = useDownloads()
 
 // ── CivitAI Search ──
-const civitaiSort = ref<SortKey>('Relevancy')
+// Empty-query browsing is ranked by downloads; text searches switch to relevance.
+const civitaiSort = ref<SortKey>('Most Downloaded')
+const queryInput = ref('')
+const sortTouched = ref(false)
 const {
   hits: civitaiHits,
   loading: civitaiLoading,
@@ -55,17 +60,18 @@ const {
   search: civitaiSearch,
   loadMore: civitaiLoadMore,
   activate: civitaiActivate,
+  applyFilters,
 } = useCivitaiSearch(civitaiSort)
 
 // ── 筛选器选项 ────────────────────────────────────────────────────────────
-// selectedTypes / selectedBaseModels 本身就是 string[], BaseSelect 开 multiple
+// selectedTypes / selectedBaseModels 本身就是 string[], ChipSelect 开 multiple
 // 后直接双向绑定, 不需要适配层。
-/** facet → BaseSelect 选项; count 走 hint 显示在右侧小字。 */
+/** facet → ChipSelect 选项; count 作为 chip 右侧的小字。 */
 function facetOptions(facets: typeof typeFacets) {
   return computed(() => facets.value.map(f => ({
     value: f.value,
     label: f.label,
-    hint: f.count.toLocaleString(),
+    count: f.count,
   })))
 }
 
@@ -78,6 +84,39 @@ const sortOptions = computed(() => [
   { value: 'Highest Rated', label: t('models.civitai.sort.rating') },
   { value: 'Newest', label: t('models.civitai.sort.newest') },
 ])
+
+function isExactQuery(text: string): boolean {
+  const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
+  return parts.length > 0 && parts.every(p =>
+    /^\d+$/.test(p.trim()) || /civitai\.com\/models\/\d+/.test(p.trim()),
+  )
+}
+
+const exactQuery = computed(() => isExactQuery(queryInput.value.trim()))
+
+function handleSearch(query: string) {
+  queryInput.value = query
+  submitCurrentQuery()
+}
+
+function submitCurrentQuery() {
+  const query = queryInput.value.trim()
+  if (!sortTouched.value) {
+    if (!query) civitaiSort.value = 'Most Downloaded'
+    else civitaiSort.value = 'Relevancy'
+  }
+  civitaiSearch(query)
+}
+
+function handleFilterApply(types: string[], baseModels: string[]) {
+  applyFilters(types, baseModels)
+  submitCurrentQuery()
+}
+
+function handleSortChange() {
+  sortTouched.value = true
+  if (!exactQuery.value) civitaiSearch(queryInput.value.trim())
+}
 
 // Auto-activate when tab becomes visible
 watch(() => props.active, (val) => {
@@ -204,65 +243,8 @@ function handlePickerDownload(modelId: string, modelType: string, versionId: num
 }
 
 // ── CivitAI → MetaModal ──
-function convertImages(imgs: CivitaiImage[]): ModelMetaImage[] {
-  const out: ModelMetaImage[] = []
-  for (const img of imgs) {
-    if (!img.url) continue
-    const url = img.url.startsWith('http')
-      ? img.url
-      : `https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/${img.url}/default.jpg`
-    const m = img.meta
-    out.push({
-      url,
-      type: img.type,
-      ...(m && {
-        seed: m.seed,
-        steps: m.steps,
-        cfg: m.cfgScale,
-        sampler: m.sampler,
-        positive: m.prompt,
-        negative: m.negativePrompt,
-      }),
-    })
-  }
-  return out
-}
-
-function normalizeWords(words?: (string | { word: string })[]): string[] {
-  if (!words?.length) return []
-  return words.map(w => typeof w === 'string' ? w : w.word).filter(Boolean)
-}
-
-function civitaiToMeta(h: CivitaiHit): ModelMeta {
-  const allImgs = h.images?.length ? h.images : (h.version?.images || [])
-  return {
-    name: h.name || 'Unknown',
-    type: h.type,
-    baseModel: h.version?.baseModel,
-    id: h.id,
-    versionId: h.version?.id,
-    versionName: h.version?.name,
-    author: h.user?.username,
-    civitaiUrl: `https://civitai.com/models/${h.id}`,
-    stats: {
-      downloads: h.metrics?.downloadCount,
-      likes: h.metrics?.thumbsUpCount,
-    },
-    trainedWords: normalizeWords(h.version?.trainedWords),
-    images: convertImages(allImgs),
-    versions: (h.versions || []).map(v => ({
-      id: v.id,
-      name: v.name,
-      baseModel: v.baseModel,
-      images: convertImages(v.images || []),
-      trainedWords: normalizeWords(v.trainedWords),
-      hashes: v.hashes,
-    })),
-  }
-}
-
 function openCivitaiMeta(hit: CivitaiHit) {
-  emit('openMeta', civitaiToMeta(hit))
+  emit('openMeta', remoteHitToMeta(hit))
 }
 </script>
 
@@ -270,46 +252,34 @@ function openCivitaiMeta(hit: CivitaiHit) {
   <SectionToolbar>
     <template #start>
       <SearchInput
+        v-model="queryInput"
         :placeholder="t('models.civitai.search_placeholder')"
         :loading="civitaiLoading"
-        @search="civitaiSearch"
+        full
+        @search="handleSearch"
+      />
+      <CivitaiFilterPopover
+        :types="selectedTypes"
+        :base-models="selectedBaseModels"
+        :type-options="typeOptions"
+        :base-model-options="baseModelOptions"
+        :disabled="!facetsLoaded"
+        :exact-mode="exactQuery"
+        @apply="handleFilterApply"
+      />
+      <BaseSelect
+        class="civitai-sort"
+        v-model="civitaiSort"
+        :options="sortOptions"
+        :disabled="exactQuery"
+        size="sm"
+        fit
+        teleport
+        @change="handleSortChange"
       />
       <span v-if="civitaiTotalHits > 0" class="toolbar-status">
         {{ t('models.civitai.total_results', { count: civitaiTotalHits.toLocaleString() }) }}
       </span>
-    </template>
-    <template #end>
-      <BaseSelect
-        v-model="selectedTypes"
-        :options="typeOptions"
-        :disabled="!facetsLoaded"
-        :all-text="t('models.civitai.all_types')"
-        multiple
-        size="sm"
-        fit
-        searchable
-        teleport
-        :search-placeholder="t('models.civitai.filter_type')"
-      />
-      <BaseSelect
-        v-model="selectedBaseModels"
-        :options="baseModelOptions"
-        :disabled="!facetsLoaded"
-        :all-text="t('models.civitai.all_base_models')"
-        multiple
-        size="sm"
-        fit
-        searchable
-        teleport
-        :search-placeholder="t('models.civitai.filter_base_model')"
-      />
-      <BaseSelect
-        v-model="civitaiSort"
-        :options="sortOptions"
-        size="sm"
-        fit
-        teleport
-      />
     </template>
   </SectionToolbar>
 
@@ -376,5 +346,48 @@ function openCivitaiMeta(hit: CivitaiHit) {
 .civitai-sentinel {
   padding: 24px 0;
   min-height: 60px;
+}
+
+/* Remote search controls stay on one compact row; narrow screens scroll it. */
+:deep(.section-toolbar) {
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+:deep(.section-toolbar-start) {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+:deep(.section-toolbar-start .search-input) {
+  min-width: 160px;
+}
+
+:deep(.section-toolbar-start .civitai-sort) {
+  --ctl-w-sm: 128px;
+  --ctl-w-md: 160px;
+}
+
+:deep(.section-toolbar-start .civitai-sort .base-select__trigger) {
+  min-height: 34px;
+}
+
+:deep(.section-toolbar-start .toolbar-status) {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  :deep(.section-toolbar-start .search-input) {
+    min-width: 80px;
+  }
+
+  :deep(.section-toolbar-start .civitai-sort) {
+    --ctl-w-sm: 110px;
+    --ctl-w-md: 120px;
+  }
+
+  :deep(.section-toolbar-start .toolbar-status) {
+    display: none;
+  }
 }
 </style>

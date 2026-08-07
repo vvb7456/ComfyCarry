@@ -88,6 +88,10 @@ const displaySha256 = computed(() =>
   activeVersion.value?.hashes?.SHA256 || props.meta?.sha256 || '',
 )
 
+// ── Source link (CivitAI / Hugging Face 共用) ──
+const sourceUrl = computed(() => props.meta?.sourceUrl || props.meta?.civitaiUrl)
+const sourceLabel = computed(() => props.meta?.sourceLabel || t('models.meta.view_on_civitai'))
+
 // ── Download button state for current version ──
 const dlInfo = computed<VersionDownloadInfo>(() => {
   const vid = activeVersion.value?.id ?? props.meta?.versionId
@@ -200,6 +204,15 @@ function badgeColor(type?: string): string | undefined {
   if (!type) return undefined
   return MODEL_CATEGORY_COLORS[type]
 }
+
+// ── 文件大小格式化 ──
+function fmtSize(bytes?: number): string {
+  if (!bytes) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(1) + ' KB'
+  if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + ' MB'
+  return (bytes / 1024 ** 3).toFixed(2) + ' GB'
+}
 </script>
 
 <template>
@@ -242,7 +255,7 @@ function badgeColor(type?: string): string | undefined {
                 <span v-else>{{ displayVersionName }}</span>
                 <!-- Download button (only when opened from CivitAI context) -->
                 <DownloadButton
-                  v-if="showDownload && meta.civitaiUrl"
+                  v-if="showDownload && sourceUrl"
                   :state="dlBtnState"
                   :progress="dlInfo.progress"
                   :speed="dlInfo.speed"
@@ -257,13 +270,13 @@ function badgeColor(type?: string): string | undefined {
             <td>{{ t('models.meta.author') }}</td>
             <td>{{ meta.author }}</td>
           </tr>
-          <tr v-if="meta.civitaiUrl">
-            <td>{{ t('models.meta.link') }}</td>
-            <td><a :href="meta.civitaiUrl" target="_blank" rel="noopener">{{ t('models.meta.view_on_civitai') }} ↗</a></td>
+          <tr v-if="meta.sizeBytes">
+            <td>{{ t('models.meta.size') }}</td>
+            <td>{{ fmtSize(meta.sizeBytes) }}</td>
           </tr>
-          <tr v-if="displaySha256">
-            <td>SHA256</td>
-            <td class="mm-hash">{{ displaySha256 }}</td>
+          <tr v-if="sourceUrl">
+            <td>{{ t('models.meta.link') }}</td>
+            <td><a :href="sourceUrl" target="_blank" rel="noopener">{{ sourceLabel }} ↗</a></td>
           </tr>
           <tr v-if="meta.stats">
             <td>{{ t('models.meta.stats') }}</td>
@@ -276,6 +289,14 @@ function badgeColor(type?: string): string | undefined {
           <tr v-if="meta.filename">
             <td>{{ t('models.meta.file') }}</td>
             <td class="mm-hash">{{ meta.filename }}</td>
+          </tr>
+          <tr v-if="displaySha256">
+            <td>SHA256</td>
+            <td class="mm-hash">{{ displaySha256 }}</td>
+          </tr>
+          <tr v-if="meta.description">
+            <td>{{ t('models.meta.description') }}</td>
+            <td class="mm-desc">{{ meta.description }}</td>
           </tr>
         </tbody>
       </table>
@@ -383,6 +404,7 @@ function badgeColor(type?: string): string | undefined {
 .mm-table td:first-child { color: var(--t3); white-space: nowrap; width: 100px; font-weight: 500; }
 .mm-table a { color: var(--ac); }
 .mm-hash { word-break: break-all; font-family: monospace; font-size: .75rem; }
+.mm-desc { line-height: 1.5; color: var(--t2); }
 
 /* Sections */
 .mm-section { margin-top: var(--sp-4); }

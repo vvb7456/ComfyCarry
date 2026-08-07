@@ -237,6 +237,13 @@ def api_downloads_submit():
       {"download_id": "dl-abc123", "status": "active", ...}
     """
     data = request.get_json(force=True) or {}
+    # CivitAI 来源 → 走原 /api/downloads/civitai 全套逻辑 (source 为顶层字段)
+    if data.get("source") == "civitai":
+        return _handle_civitai_source(data)
+    # Hugging Face 来源 → 通用 URL 下载 + 白名单元数据完成登记 (SPEC §7-A)
+    if data.get("source") == "huggingface":
+        return _handle_huggingface_source(data)
+
     url = data.get("url", "").strip()
     save_dir = data.get("save_dir", "").strip()
     filename = data.get("filename", "").strip()
@@ -508,13 +515,13 @@ def api_downloads_clear():
     return jsonify({"ok": True, "cleared": count})
 
 
-@bp.route("/api/downloads/civitai", methods=["POST"])
-def api_downloads_civitai():
+def _handle_civitai_source(data: dict):
     """
-    提交 CivitAI 模型下载任务.
+    处理 CivitAI 来源 (source == 'civitai') 的下载 — 原 /api/downloads/civitai 逻辑。
 
     请求体:
       {
+        "source": "civitai",
         "model_id": "12345" 或 CivitAI URL,
         "model_type": "checkpoint",
         "version_id": 67890,
@@ -538,7 +545,6 @@ def api_downloads_civitai():
     from ..services.header_probe import ProbeAuthError
     from ..utils import _get_api_key
 
-    data = request.get_json(force=True) or {}
     model_input = str(data.get("model_id", "")).strip()
     if not model_input:
         return _err("dl_model_id_required")
@@ -694,6 +700,112 @@ def api_downloads_civitai():
         "existed": existed,
         "resource_state": registry.get_state("civitai", res_model_id, res_version_id),
     }), 201 if task.status == DownloadStatus.ACTIVE else 200
+
+
+def _handle_huggingface_source(data: dict):
+    """
+    处理 Hugging Face 来源 (source == 'huggingface') 的下载。
+
+    请求体 (白名单契约, SPEC §2-C / §6-E):
+      {
+        "source": "huggingface",
+        "url": "https://huggingface.co/.../resolve/main/model.safetensors",
+        "model_type": "checkpoints",
+        "filename": "model.safetensors",
+        "meta": {
+          "model_id": "-100001", "version_id": "-10000101",
+          "model_name": "...", "version_name": "...", "category": "checkpoints",
+          "model_type": "Checkpoint", "base_model": "SDXL 1.0",
+          "architecture": "sdxl", "sha256": "...", "size_bytes": 0,
+          "trained_words": [...], "images": [...], "author": "...", "source_url": "..."
+        }
+      }
+
+    目录按 model_type → MODEL_DIRS 解析 (与通用路径一致), 不做目录裁决。
+    文件下载完成后由 _on_huggingface_complete 把任务携带的白名单元数据直接登记到
+    模型索引 (SPEC §7-B)。响应结构与通用下载一致 (download_id / status /
+    existed / message_key 等)。
+    """
+    from ..services.model_meta_store import register_downloaded_model
+
+    url = data.get("url", "").strip()
+    filename = data.get("filename", "").strip()
+    model_type = data.get("model_type", "").strip()
+    meta = data.get("meta") or {}
+    if not isinstance(meta, dict):
+        meta = {}
+
+    if not url:
+        return _err("dl_url_required")
+    if not filename:
+        return _err("dl_filename_required")
+
+    # 与通用路径相同的 model_type → MODEL_DIRS 目录解析 (不新造)
+    rel_dir = MODEL_DIRS.get(model_type)
+    if not rel_dir:
+        rel_dir = f"models/{model_type}" if model_type else "models/other"
+    save_dir = os.path.join(COMFYUI_DIR, rel_dir)
+
+    def _on_huggingface_complete(task):
+        # 白名单元数据直接登记; 回调期间不读取模型文件内容 (SPEC §7-B / §11-B-4)。
+        model_path = os.path.join(task.save_dir, task.filename)
+        detail = register_downloaded_model(
+            model_path=model_path,
+            category=task.meta["category"],
+            source_data=task.meta,
+            sha256=task.meta["sha256"],
+            file_trigger_words=[],
+        )
+        task.meta["local_model_id"] = detail["id"]
+
+    # 任务 meta: 白名单字段 + 强制完成登记回调 (前端已传则尊重, 缺省补 true)
+    task_meta = dict(meta)
+    task_meta.setdefault("source", "huggingface")
+    task_meta.setdefault("category", model_type)
+    task_meta.setdefault("completion_requires_callback", True)
+
+    _wire_registry()
+    engine = get_engine()
+    registry = get_registry()
+
+    # Registry: 标记资源为 submit_pending (资源 key: huggingface:<model_id>:<version_id>)
+    res_model_id = str(meta.get("model_id", ""))
+    res_version_id = str(meta.get("version_id", ""))
+    registry.submit_pending("huggingface", res_model_id, res_version_id, meta={
+        "model_name": meta.get("model_name", ""),
+        "model_type": meta.get("model_type", ""),
+    })
+
+    task = engine.submit(
+        url=url,
+        save_dir=save_dir,
+        filename=filename,
+        meta=task_meta,
+        headers=data.get("headers"),
+        on_complete=_on_huggingface_complete,
+    )
+
+    # 立即持久化新任务 (消除首次提交→首个 poll tick 之间的空窗)
+    _persist_task(task)
+
+    existed = task.meta.get("existed", False)
+
+    # Registry: 更新资源状态 (已存在文件时 engine 已触发完成回调登记, 走 mark_installed)
+    if task.status == DownloadStatus.FAILED:
+        registry.task_failed("huggingface", res_model_id, res_version_id, task.error)
+    elif existed:
+        registry.mark_installed("huggingface", res_model_id, res_version_id, emit=True)
+    else:
+        registry.task_submitted("huggingface", res_model_id, res_version_id,
+                                task.download_id)
+
+    resp = task.to_dict()
+    if existed:
+        resp["existed"] = True
+        resp["message_key"] = "models.msg.dl_already_exists"
+        resp["message_params"] = {"filename": filename}
+
+    return jsonify(resp), 201 if task.status == DownloadStatus.ACTIVE else 200
 
 
 # SSE 轮询间隔 (秒)

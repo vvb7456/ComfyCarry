@@ -1,4 +1,4 @@
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, type Ref } from 'vue'
 import { useApiFetch } from './useApiFetch'
 
 // ── Types ──────────────────────────────────────────────
@@ -224,8 +224,8 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     }
 
     const data = await post<any>('/api/search', body as any)
-    if (_searchId !== mySearchId) return
-    if (!data?.results?.[0]) return
+    if (_searchId !== mySearchId) return false
+    if (!data?.results?.[0]) return false
 
     const result = data.results[0]
     const newHits: CivitaiHit[] = result.hits ?? []
@@ -242,6 +242,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     }
 
     totalHits.value = result.estimatedTotalHits ?? 0
+    return true
   }
 
   // ── CivitAI ID lookup via backend proxy ──
@@ -278,6 +279,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
       }
     }
 
+    if (_searchId !== mySearchId) return
     hits.value = results
     totalHits.value = results.length
   }
@@ -285,7 +287,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   // ── Smart search dispatcher ──
   async function search(query: string) {
     const q = query.trim()
-    ++_searchId
+    const mySearchId = ++_searchId
     loading.value = true
     errorMsg.value = ''
     page.value = 0
@@ -301,7 +303,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
       errorMsg.value = e?.message || 'Search failed'
       console.error('Search error:', e)
     } finally {
-      loading.value = false
+      if (_searchId === mySearchId) loading.value = false
     }
   }
 
@@ -312,15 +314,16 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     if (lastQuery.value && isIdQuery(lastQuery.value)) return
 
     loading.value = true
+    const mySearchId = _searchId
     const nextPage = page.value + 1
 
     try {
-      await searchMeili(lastQuery.value, nextPage, true)
-      page.value = nextPage
+      const applied = await searchMeili(lastQuery.value, nextPage, true)
+      if (applied && _searchId === mySearchId) page.value = nextPage
     } catch (e: any) {
-      errorMsg.value = e?.message || '加载更多失败'
+      if (_searchId === mySearchId) errorMsg.value = e?.message || '加载更多失败'
     } finally {
-      loading.value = false
+      if (_searchId === mySearchId) loading.value = false
     }
   }
 
@@ -389,18 +392,12 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     return cache.get(modelId)
   }
 
-  // ── Re-search when sort or filters change ──
-  watch(sortKey, () => {
-    if (hits.value.length > 0 || lastQuery.value) {
-      search(lastQuery.value)
-    }
-  })
-
-  watch([selectedTypes, selectedBaseModels], () => {
-    if (hits.value.length > 0 || lastQuery.value) {
-      search(lastQuery.value)
-    }
-  })
+  /** Apply a filter selection without issuing a request. The toolbar owns the
+   * draft values and calls search() once the user presses its Apply button. */
+  function applyFilters(types: string[], baseModels: string[]) {
+    selectedTypes.value = [...types]
+    selectedBaseModels.value = [...baseModels]
+  }
 
   // ── Reset all state ──
   function reset() {
@@ -435,6 +432,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
 
     // Methods
     search,
+    applyFilters,
     loadMore,
     loadFacets,
     activate,

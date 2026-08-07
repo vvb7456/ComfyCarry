@@ -9,6 +9,7 @@ import ImagePreview from '@/components/ui/ImagePreview.vue'
 import CivitaiModelModal from '@/components/models/CivitaiModelModal.vue'
 import LocalModelModal from '@/components/models/LocalModelModal.vue'
 import LocalModelsTab from '@/components/models/LocalModelsTab.vue'
+import HuggingFaceTab from '@/components/models/HuggingFaceTab.vue'
 import CivitaiTab from '@/components/models/CivitaiTab.vue'
 import FavoritesPanel from '@/components/models/FavoritesPanel.vue'
 import DownloadsPanel from '@/components/models/DownloadsPanel.vue'
@@ -23,11 +24,12 @@ defineOptions({ name: 'ModelsPage' })
 const { t } = useI18n({ useScope: 'global' })
 
 // ── Tabs ──
-// 只剩「看哪个来源的模型」两项。收藏与下载任务是流水线状态不是浏览目的地,
+// 按「看哪个来源的模型」区分。收藏与下载任务是流水线状态不是浏览目的地,
 // 已收进右侧抽屉 (见下)。
 const activeTab = ref('local')
 const tabs = computed(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
+  { key: 'huggingface', label: t('models.tabs.huggingface'), icon: 'verified' },
   { key: 'civitai', label: t('models.tabs.civitai'), icon: 'search' },
 ])
 
@@ -146,6 +148,10 @@ function openPreviewSingle(url: string) {
       <LocalModelsTab @open-local="openLocal" @open-preview="openPreviewSingle" />
     </div>
 
+    <div v-show="activeTab === 'huggingface'">
+      <HuggingFaceTab :active="activeTab === 'huggingface'" @open-meta="openMeta" @open-preview="openPreviewSingle" />
+    </div>
+
     <div v-show="activeTab === 'civitai'">
       <CivitaiTab :active="activeTab === 'civitai'" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
@@ -173,7 +179,7 @@ function openPreviewSingle(url: string) {
     />
 
     <LocalModelModal v-model="localOpen" :model="localModel" @preview="openPreview" />
-    <CivitaiModelModal v-model="civitaiOpen" :meta="civitaiMeta" :show-download="activeTab === 'civitai'" @preview="openPreview" />
+    <CivitaiModelModal v-model="civitaiOpen" :meta="civitaiMeta" :show-download="activeTab === 'civitai' || activeTab === 'huggingface'" @preview="openPreview" />
     <ImagePreview v-model="previewOpen" :images="previewImages" :initial-index="previewIndex" />
   </div>
 </template>

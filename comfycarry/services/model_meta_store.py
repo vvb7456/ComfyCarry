@@ -242,6 +242,8 @@ def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
     )
     model_type = _source_value(data, model, "model_type", "type")
     base_model = _source_value(data, model, "base_model", "baseModel")
+    # 白名单等显式声明的架构优先, 缺失时回退到 base_model 推断
+    explicit_arch = _text(data.get("architecture")) or _text(model.get("architecture"))
 
     source_type = _text(data.get("source_type"))
     source = data.get("source")
@@ -279,6 +281,19 @@ def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
         images_value = details.get("images", [])
     images = _normalize_images(images_value)
 
+    # HF 白名单平铺字段 → details_json 扩展 (仅新增键兼容, 不影响 civitai 读取)
+    details_extra: dict[str, Any] = {}
+    for key in ("author", "image_url", "source_url"):
+        value = data.get(key)
+        if value not in (None, ""):
+            details_extra[key] = _text(value)
+    size_bytes = data.get("size_bytes")
+    if size_bytes not in (None, ""):
+        try:
+            details_extra["size_bytes"] = int(size_bytes)
+        except (TypeError, ValueError):
+            pass
+
     # CivitAI links are deterministic and therefore available even when the
     # resolver did not include a pre-built links list.
     if source_type == "civitai" and model_id not in (None, ""):
@@ -302,11 +317,12 @@ def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
         "display_name": display_name,
         "model_type": _text(model_type),
         "base_model": _text(base_model),
-        "architecture": arch_from_base_model(_text(base_model)),
+        "architecture": explicit_arch or arch_from_base_model(_text(base_model)),
         "civitai_words": _normalize_words(trained_words),
         "file_words": _normalize_words(file_words),
         "links": links,
         "images": images,
+        "details_extra": details_extra,
         "has_source": has_source,
         "has_images": "images" in data or "images" in details,
         # Generated CivitAI links count as source detail even when the resolver
@@ -586,6 +602,7 @@ def register_downloaded_model(
             file_trigger_words or source["file_words"],
         )
         details = _details_from_values(source["links"], source["images"])
+        details.update(source.get("details_extra") or {})
         if existing:
             old_details = _json_load(old.get("details_json", "{}"), {})
             if not isinstance(old_details, dict):
@@ -664,6 +681,7 @@ def enrich_model(
             details["links"] = source["links"]
         if source["has_images"]:
             details["images"] = source["images"]
+        details.update(source.get("details_extra") or {})
         values = {
             "size_bytes": size_bytes,
             "file_mtime": file_mtime,

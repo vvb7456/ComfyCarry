@@ -2,6 +2,7 @@
   "title": "模型管理",
   "tabs": {
     "local": "本地模型",
+    "huggingface": "官方模型",
     "civitai": "CivitAI"
   },
   "drawer": {
@@ -65,7 +66,9 @@
     "collapse": "收起",
     "sample_images": "示例图片",
     "video": "视频",
-    "click_to_copy": "点击复制"
+    "click_to_copy": "点击复制",
+    "size": "大小",
+    "description": "简介"
   },
   "civitai": {
     "search_placeholder": "模型名 / ID / CivitAI 链接",
@@ -77,8 +80,14 @@
     },
     "filter_type": "类型",
     "filter_base_model": "Base Model",
+    "filter_button": "筛选",
+    "filter_apply": "应用",
+    "filter_clear": "清除",
+    "filter_search_base_model": "搜索基础模型…",
+    "exact_mode": "精确查找",
+    "filter_exact_disabled": "精确查找时不支持筛选和排序",
     "no_results": "没有找到匹配的模型",
-    "total_results": "共 {count} 个结果",
+    "total_results": "约 {count} 个结果",
     "select_version": "选择版本 - {name}",
     "select_fav_version": "收藏版本 - {name}",
     "details": "详情",
@@ -90,6 +99,14 @@
     "all_types": "全部类型",
     "all_base_models": "全部基础模型",
     "no_downloadable_versions": "该模型在 CivitAI 上仅供在线生成，作者未提供权重下载。"
+  },
+  "huggingface": {
+    "filter_type": "类型",
+    "filter_base_model": "Base Model",
+    "total_results": "共 {count} 个结果",
+    "all_types": "全部类型",
+    "all_base_models": "全部基础模型",
+    "empty": "没有匹配的模型"
   },
   "downloads": {
     "pending": "收藏",

@@ -100,6 +100,35 @@ export const ARCH_LABELS: Record<string, string> = {
   wan22: 'Wan 2.2', wan: 'Wan', wan21: 'Wan 2.1',
   wan22_i2v: 'Wan 2.2 图生视频', wan22_t2v: 'Wan 2.2 文生视频', wan22_5b: 'Wan 2.2 5B',
   hunyuan: 'HunyuanVideo', ltxv: 'LTX-V',
+  // ComfyUI detect_unet_config 全架构覆盖 (arch_detect.py 合入)
+  // CivitAI baseModel 枚举有的严格用原文; CivitAI 无的用 ComfyUI image_model 官方名
+  stablecascade: 'Stable Cascade',  // CivitAI
+  auraflow: 'AuraFlow',             // CivitAI
+  mochi: 'Mochi',                   // CivitAI
+  minimax_h3: 'MiniMax H3',         // CivitAI
+  pixart: 'PixArt',                 // CivitAI (PixArt a / PixArt E 合并)
+  hunyuan3d: 'Hunyuan3D',           // CivitAI
+  boogu: 'Boogu',                   // CivitAI
+  mage_flow: 'MageFlow',            // CivitAI
+  ideogram4: 'Ideogram 4.0',        // CivitAI
+  lumina2: 'Lumina',                // CivitAI
+  // ComfyUI 独有 (CivitAI 无枚举, 用 ComfyUI image_model 官方名)
+  stableaudio: 'Stable Audio', hydit: 'Hunyuan DiT',
+  cosmos: 'Cosmos', cosmos_predict2: 'Cosmos Predict 2',
+  pid: 'PiD', seedvr2: 'SeedVR2',
+  depthanything3: 'Depth Anything 3', sam3: 'SAM 3', joyimage: 'JoyImage',
+  chroma_radiance: 'Chroma Radiance', ovis: 'Ovis',
+  longcat: 'LongCat',
+  'ace1.5': 'ACE 1.5',
+  // 补全 arch_detect 全架构 (审计 Q6)
+  hidream: 'HiDream', cogvideox: 'CogVideoX', ernie: 'Ernie Image',
+  lens: 'Lens', qwen: 'Qwen Image', acestep: 'ACE-Step',
+  svd: 'SVD', kandinsky5: 'Kandinsky 5', pixeldit: 'PixelDiT',
+  newbie: 'NewBie', omnigen2: 'OmniGen2', triposplat: 'TripoSplat',
+  lotus: 'Lotus', rtdetr: 'RT-DETR', t5: 'T5', qwen35: 'Qwen 3.5',
+  sdpose: 'SDPose', hunyuanimage: 'Hunyuan Image',
+  // 放大模型 (非扩散, arch_detect 张量结构判别)
+  realesrgan: 'Real-ESRGAN', esrgan: 'ESRGAN',
   unknown: '?',
 }
 

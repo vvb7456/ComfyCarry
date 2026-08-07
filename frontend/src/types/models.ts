@@ -30,6 +30,11 @@ export interface ModelMeta {
   sha256?: string
   filename?: string
   civitaiUrl?: string
+  sourceUrl?: string
+  sourceLabel?: string
+  channel?: 'civitai' | 'huggingface'
+  sizeBytes?: number
+  description?: string
   stats?: { downloads?: number; likes?: number }
   trainedWords?: string[]
   images?: ModelMetaImage[]

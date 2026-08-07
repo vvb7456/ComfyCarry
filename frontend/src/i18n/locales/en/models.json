@@ -2,6 +2,7 @@
   "title": "Models",
   "tabs": {
     "local": "Local Models",
+    "huggingface": "Official Models",
     "civitai": "CivitAI"
   },
   "drawer": {
@@ -65,7 +66,9 @@
     "collapse": "Collapse",
     "sample_images": "Sample Images",
     "video": "Video",
-    "click_to_copy": "Click to copy"
+    "click_to_copy": "Click to copy",
+    "size": "Size",
+    "description": "Description"
   },
   "civitai": {
     "search_placeholder": "Name, ID or CivitAI URL",
@@ -77,8 +80,14 @@
     },
     "filter_type": "Type",
     "filter_base_model": "Base Model",
+    "filter_button": "Filter",
+    "filter_apply": "Apply",
+    "filter_clear": "Clear",
+    "filter_search_base_model": "Search base models…",
+    "exact_mode": "Direct lookup",
+    "filter_exact_disabled": "Filters and sorting are unavailable for direct model lookup",
     "no_results": "No matching models found",
-    "total_results": "{count} results",
+    "total_results": "About {count} results",
     "select_version": "Select Version - {name}",
     "select_fav_version": "Favorite Version - {name}",
     "details": "Details",
@@ -90,6 +99,14 @@
     "all_types": "All types",
     "all_base_models": "All base models",
     "no_downloadable_versions": "This model is generation-only on CivitAI — the creator does not offer weight downloads."
+  },
+  "huggingface": {
+    "filter_type": "Type",
+    "filter_base_model": "Base Model",
+    "total_results": "{count} results",
+    "all_types": "All types",
+    "all_base_models": "All base models",
+    "empty": "No matching models"
   },
   "downloads": {
     "pending": "Favorites",
