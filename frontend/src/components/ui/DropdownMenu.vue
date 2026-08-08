@@ -12,7 +12,7 @@
  *  - 打开时若选中 key 在某组 children → 直接进入该组子视图
  *  - 触发器闭合态 ↑/↓ 直接在叶子项扁平序列中循环切换, 不展开菜单
  *  - hover 高亮 (次级底色) 与键盘高亮 (底色 + 左 2px accent 竖条) 视觉区分
- *  - logo 暗色适配: logoInvertDark=true 时暗色主题 filter: invert(1), 底板透明
+ *  - logo 暗色适配: 纯黑/单色 logo 设置 logoInvertDark=true 时暗色主题 filter: invert(1), 底板透明
  *  - 键盘: ↑/↓ 移动高亮; Enter 叶子=选中 / 父行=下钻; 子视图 ArrowLeft/Backspace=返回;
  *    Escape=关闭 (任何层级)
  */
@@ -27,7 +27,7 @@ export interface DropdownMenuItem {
   label: string
   /** 图片资源 URL; 与 letter 二选一 */
   logo?: string
-  /** 暗色主题下 logo 反色 (纯黑单色 logo): filter: invert(1) + 底板透明 */
+  /** 暗色主题下 logo 反色 (仅纯黑/单色 logo): filter: invert(1) + 底板透明 */
   logoInvertDark?: boolean
   /** logo 缺省时字母徽章字符 (1-2 字符) */
   letter?: string

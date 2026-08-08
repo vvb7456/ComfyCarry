@@ -43,6 +43,66 @@ COMFYUI_PARAM_GROUPS = {
             "sage": "--use-sage-attention",
         },
     },
+    "upcast_attention": {
+        "label": "注意力上采样",
+        "type": "select",
+        "help": "Attention 计算上采样到更高精度。黑图/花屏时可尝试强制上采样；禁用仅用于排查",
+        "options": [
+            ("default", "默认"),
+            ("force", "强制上采样"),
+            ("off", "禁用上采样"),
+        ],
+        "flag_map": {
+            "force": "--force-upcast-attention",
+            "off": "--dont-upcast-attention",
+        },
+    },
+    "reserve_vram": {
+        "label": "显存预留 (GB)",
+        "type": "number",
+        "help": "为操作系统/其他软件预留的显存 (GB)。大显存跑大模型时防止与桌面环境抢显存导致 OOM",
+        "flag_prefix": "--reserve-vram",
+    },
+    "vram_headroom": {
+        "label": "动态显存余量 (GB)",
+        "type": "number",
+        "help": "DynamicVRAM 在默认之上额外保持空闲的显存 (GB)。频繁 OOM 时可适当调大",
+        "flag_prefix": "--vram-headroom",
+    },
+    "async_offload": {
+        "label": "异步权重卸载",
+        "type": "select",
+        "help": "采样时异步预取权重到显存，减少加载停顿。Nvidia 平台默认启用",
+        "options": [
+            ("default", "默认"),
+            ("on", "启用"),
+            ("off", "禁用"),
+        ],
+        "flag_map": {
+            "on": "--async-offload",
+            "off": "--disable-async-offload",
+        },
+    },
+    "dynamic_vram": {
+        "label": "动态显存调度",
+        "type": "select",
+        "help": "DynamicVRAM 按实际显存压力动态调度模型加载。异常反复 OOM 时可禁用，改用估算式加载",
+        "options": [
+            ("default", "默认"),
+            ("on", "强制启用"),
+            ("off", "禁用"),
+        ],
+        "flag_map": {
+            "on": "--enable-dynamic-vram",
+            "off": "--disable-dynamic-vram",
+        },
+    },
+    "cuda_device": {
+        "label": "CUDA 设备",
+        "type": "text",
+        "help": "使用的 GPU 编号 (逗号分隔，如 0 或 0,1)。其余设备对 ComfyUI 不可见；留空使用全部",
+        "flag_prefix": "--cuda-device",
+    },
     "disable_xformers": {
         "label": "xFormers",
         "type": "select",
@@ -63,10 +123,12 @@ COMFYUI_PARAM_GROUPS = {
             ("default", "默认 (自动)"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
             ("fp8_e4m3fn", "FP8 (e4m3fn)"), ("fp8_e5m2", "FP8 (e5m2)"),
+            ("fp8_e8m0fnu", "FP8 (e8m0fnu)"),
         ],
         "flag_map": {
             "fp32": "--fp32-unet", "fp16": "--fp16-unet", "bf16": "--bf16-unet",
             "fp8_e4m3fn": "--fp8_e4m3fn-unet", "fp8_e5m2": "--fp8_e5m2-unet",
+            "fp8_e8m0fnu": "--fp8_e8m0fnu-unet",
         },
     },
     "vae_precision": {
@@ -110,6 +172,30 @@ COMFYUI_PARAM_GROUPS = {
             "enabled": "--fast",
         },
     },
+    "fp16_intermediates": {
+        "label": "中间张量 FP16",
+        "type": "select",
+        "help": "节点间的中间张量改用 FP16 传输（实验性），可减少显存占用，个别工作流可能精度损失",
+        "options": [
+            ("default", "关闭"),
+            ("enabled", "启用"),
+        ],
+        "flag_map": {
+            "enabled": "--fp16-intermediates",
+        },
+    },
+    "force_channels_last": {
+        "label": "Channels Last",
+        "type": "select",
+        "help": "推理时强制 channels last 张量布局。部分 GPU（如 AMD）可提速，个别工作流可能变慢",
+        "options": [
+            ("default", "关闭"),
+            ("enabled", "启用"),
+        ],
+        "flag_map": {
+            "enabled": "--force-channels-last",
+        },
+    },
     "preview_method": {
         "label": "预览方式",
         "type": "select",
@@ -119,6 +205,70 @@ COMFYUI_PARAM_GROUPS = {
             ("latent2rgb", "Latent2RGB"), ("taesd", "TAESD"),
         ],
         "flag_prefix": "--preview-method",
+    },
+    "preview_size": {
+        "label": "预览最大尺寸",
+        "type": "number",
+        "help": "采样预览图的最大边长。调小可减少预览开销，调大预览更清晰",
+        "flag_prefix": "--preview-size",
+        # 预览方式为 none (无预览) 时尺寸无意义
+        "depends_on": {"preview_method": "!none"},
+    },
+    "disable_metadata": {
+        "label": "输出元数据",
+        "type": "select",
+        "help": "默认在输出文件中写入生成参数 (prompt/seed 等)。禁用后文件更干净、体积略小，但无法从文件回溯生成信息",
+        "options": [
+            ("default", "写入元数据"),
+            ("disabled", "禁用写入"),
+        ],
+        "flag_map": {
+            "disabled": "--disable-metadata",
+        },
+    },
+    "fast_disk": {
+        "label": "磁盘优先加载",
+        "type": "select",
+        "help": "模型权重走 page cache 而非匿名内存，大幅降低内存占用 (大模型场景尤其明显)。NVMe 盘推荐启用",
+        "options": [
+            ("default", "关闭"),
+            ("enabled", "启用"),
+        ],
+        "flag_map": {
+            "enabled": "--fast-disk",
+        },
+    },
+    "mmap": {
+        "label": "MMAP 文件映射",
+        "type": "select",
+        "help": "ckpt/pt 文件用 mmap 加载、safetensors 不用 mmap，进一步降低内存占用",
+        "options": [
+            ("default", "默认"),
+            ("mmap", "启用 mmap"),
+            ("no_mmap", "禁用 mmap"),
+        ],
+        "flag_map": {
+            "mmap": "--mmap-torch-files",
+            "no_mmap": "--disable-mmap",
+        },
+    },
+    "pinned_memory": {
+        "label": "Pinned 内存",
+        "type": "select",
+        "help": "Pinned memory 加速 CPU→GPU 传输但不可回收。内存紧张时可禁用",
+        "options": [
+            ("default", "默认"),
+            ("off", "禁用"),
+        ],
+        "flag_map": {
+            "off": "--disable-pinned-memory",
+        },
+    },
+    "max_upload_size": {
+        "label": "上传上限 (MB)",
+        "type": "number",
+        "help": "ComfyUI 侧的最大上传体积 (MB)。面板上传另有自己的限制，这里设大一点作为兜底",
+        "flag_prefix": "--max-upload-size",
     },
     "cache": {
         "label": "缓存策略",
@@ -152,7 +302,7 @@ for _gk, _gv in COMFYUI_PARAM_GROUPS.items():
 
 def parse_comfyui_args(args):
     """从命令行参数列表解析为结构化参数字典"""
-    params = {k: (0 if v["type"] == "number" else "default")
+    params = {k: (0 if v["type"] == "number" else ("default" if v["type"] == "select" else ""))
               for k, v in COMFYUI_PARAM_GROUPS.items()}
     params["listen"] = "0.0.0.0"
     params["port"] = 8188
@@ -169,16 +319,38 @@ def parse_comfyui_args(args):
             params["listen"] = args[i + 1]; i += 2; continue
         elif a == "--port" and i + 1 < len(args):
             params["port"] = int(args[i + 1]); i += 2; continue
-        elif a == "--preview-method" and i + 1 < len(args):
-            params["preview_method"] = args[i + 1]; i += 2; continue
         elif a == "--cache-lru" and i + 1 < len(args):
             params["cache"] = "lru"
             params["cache_lru_size"] = int(args[i + 1]); i += 2; continue
         elif a in _FLAG_TO_PARAM:
             gk, val = _FLAG_TO_PARAM[a]
             params[gk] = val
+        else:
+            # 通用 flag_prefix 回显: 遍历参数表找匹配的 flag 并读取下一个值
+            for gk, gv in COMFYUI_PARAM_GROUPS.items():
+                if gv.get("flag_prefix") == a and i + 1 < len(args):
+                    params[gk] = args[i + 1]
+                    i += 2
+                    break
+            else:
+                i += 1
+            continue
         i += 1
     return params
+
+
+def _depends_satisfied(params, gv):
+    """depends_on 条件检查。值以 '!' 开头表示「不等于」；
+    其余为「等于」。条件不满足时字段不产出命令行 flag。"""
+    for dep_key, dep_val in (gv.get("depends_on") or {}).items():
+        cur = params.get(dep_key)
+        if isinstance(dep_val, str) and dep_val.startswith("!"):
+            if str(cur) == dep_val[1:]:
+                return False
+        else:
+            if str(cur) != str(dep_val):
+                return False
+    return True
 
 
 def build_comfyui_args(params):
@@ -188,16 +360,22 @@ def build_comfyui_args(params):
 
     for gk, gv in COMFYUI_PARAM_GROUPS.items():
         val = params.get(gk)
-        if val is None or val == "default" or val is False:
+        if val is None or val == "default" or val is False or val == "":
+            continue
+        # 联动条件不满足 → 不产出 flag (如 preview_method=none 时 preview_size 无效)
+        if not _depends_satisfied(params, gv):
             continue
         if gv["type"] == "select" and "flag_map" in gv and val in gv["flag_map"]:
             args.append(gv["flag_map"][val])
         elif gv["type"] == "select" and "flag_prefix" in gv and val != "default":
             args.extend([gv["flag_prefix"], str(val)])
-        elif gv["type"] == "number" and "flag_prefix" in gv and val is not None:
-            if gk == "cache_lru_size" and params.get("cache") != "lru":
+        elif gv["type"] == "number" and "flag_prefix" in gv:
+            # 0 = 未设置 (默认值), 不产出 flag (含字符串 '0', 如命令行回显)
+            if val in (0, "", None) or str(val) == "0":
                 continue
             args.extend([gv["flag_prefix"], str(int(val))])
+        elif gv["type"] == "text" and "flag_prefix" in gv:
+            args.extend([gv["flag_prefix"], str(val)])
 
     return " ".join(args)
 

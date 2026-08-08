@@ -104,7 +104,6 @@ function buildSlotOptions(slot: ComponentSlot, candidates: { name: string }[]): 
   const officialStems = new Set<string>()
   for (const f of files) {
     officialStems.add(stemOf(f.filename))
-    officialStems.add(f.stem)
   }
 
   const configs: SlotConfig[] = candidates.map(c => {
@@ -153,7 +152,6 @@ function isOtherGroup(slot: ComponentSlot, candidates: { name: string }[], value
   const stems = new Set<string>()
   for (const f of files) {
     stems.add(stemOf(f.filename))
-    stems.add(f.stem)
   }
   return !stems.has(stemOf(base))
 }
@@ -164,14 +162,20 @@ const clipOptions = computed(() => buildSlotOptions('clip', options.clips.value)
 const clip2Options = computed(() => buildSlotOptions('clip2', options.clips.value))
 const vaeOptions = computed(() => buildSlotOptions('vae', options.vaes.value))
 
+/* ── 音频 VAE (MiniMax H3 音视频一体; 与 vae 同池三分组) ── */
+const hasAudioVae = computed(() => componentsForSlot(arch.value, 'audio_vae').length > 0)
+const audioVaeOptions = computed(() => buildSlotOptions('audio_vae', options.vaes.value))
+
 const archLabel = computed(() => MODEL_TYPES[arch.value]?.label ?? arch.value)
 const clipIncompatible = computed(() => isOtherGroup('clip', options.clips.value, state.value.clip))
 const clip2Incompatible = computed(() => isOtherGroup('clip2', options.clips.value, state.value.clip2))
 const vaeIncompatible = computed(() => isOtherGroup('vae', options.vaes.value, state.value.vae))
+const audioVaeIncompatible = computed(() => isOtherGroup('audio_vae', options.vaes.value, state.value.audioVae))
 const hasRegistry = computed(() =>
   componentsForSlot(arch.value, 'clip').length > 0 ||
   componentsForSlot(arch.value, 'clip2').length > 0 ||
-  componentsForSlot(arch.value, 'vae').length > 0)
+  componentsForSlot(arch.value, 'vae').length > 0 ||
+  componentsForSlot(arch.value, 'audio_vae').length > 0)
 
 /* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
 // 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
@@ -195,7 +199,7 @@ const vaeOverrideOptions = computed(() => [
 
     <div class="adv-body">
       <!-- Row 0 (Anima only): CLIP + VAE split-file selectors -->
-      <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip }">
+      <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip || hasAudioVae }">
         <div class="field-group">
           <label class="field-lbl">
             {{ clipLabel }}
@@ -248,6 +252,25 @@ const vaeOverrideOptions = computed(() => [
             :disabled="disabled"
             :placeholder="t('generate.basic.select_vae')"
             @update:model-value="state.vae = String($event)"
+          />
+        </div>
+        <!-- 音频 VAE (MiniMax H3 音视频一体必需件; 复用 VAE 同款三分组与不兼容提示) -->
+        <div v-if="hasAudioVae" class="field-group">
+          <label class="field-lbl">
+            {{ t('generate.basic.audio_vae') }}
+            <HelpTip :text="t('generate.advanced.clip_filter_help')" />
+            <span
+              v-if="hasRegistry && audioVaeIncompatible"
+              class="adv-warn"
+              :title="t('generate.advanced.vae_incompatible', { arch: archLabel })"
+            >{{ t('generate.advanced.vae_incompatible', { arch: archLabel }) }}</span>
+          </label>
+          <BaseSelect
+            :model-value="state.audioVae"
+            :options="audioVaeOptions"
+            :disabled="disabled"
+            :placeholder="t('generate.basic.select_audio_vae')"
+            @update:model-value="state.audioVae = String($event)"
           />
         </div>
       </div>

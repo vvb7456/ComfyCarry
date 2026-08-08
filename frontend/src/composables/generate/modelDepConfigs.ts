@@ -1,10 +1,15 @@
-import type { DepRow } from './useDependencyStatus'
+import type { DepRow, DepFileSpec } from './useDependencyStatus'
+import { HF_VERSION_INDEX, MODEL_TYPE_DIRS } from '@/config/huggingface-models'
 
 /**
  * 各功能模块的依赖清单。
  *
  * 全部是 useDependencyStatus 认得的 DepRow —— 运行组件、ControlNet、放大、
  * 面部修复、反推共用同一个状态机与同一个展示组件, 这里只描述"要哪些文件"。
+ *
+ * 模型文件优先锚定 HF 白名单 (hfFile): 文件事实 (url/size/sha256/目录) 单一来源,
+ * 下载走 huggingface 统一通道 (完成即登记 SQLite + 状态与 HF 标签页同步)。
+ * 仅 custom_nodes 辅助件与非 HF 源文件保留手写 url。
  */
 export interface DepGroup {
   /** 展开态标题的 i18n key */
@@ -14,6 +19,25 @@ export interface DepGroup {
   minOptional?: number
 }
 
+// ── 白名单锚点工具 ────────────────────────────────────────────────────────────
+
+function hfFile(versionId: number): DepFileSpec {
+  const hit = HF_VERSION_INDEX.get(versionId)
+  if (!hit) throw new Error(`modelDepConfigs: 白名单版本 ${versionId} 不存在`)
+  const file = hit.version.file
+  const subdir = MODEL_TYPE_DIRS[file.modelType]
+  if (!subdir) throw new Error(`modelDepConfigs: modelType ${file.modelType} 无目录映射`)
+  return { filename: file.filename, url: file.url, subdir, hf: hit }
+}
+
+function hfBytes(...versionIds: number[]): number {
+  return versionIds.reduce((sum, vid) => {
+    const hit = HF_VERSION_INDEX.get(vid)
+    if (!hit) throw new Error(`modelDepConfigs: 白名单版本 ${vid} 不存在`)
+    return sum + hit.version.file.sizeBytes
+  }, 0)
+}
+
 // ── ControlNet ───────────────────────────────────────────────────────────────
 
 const CN_MODELS: Record<string, DepRow> = {
@@ -21,49 +45,33 @@ const CN_MODELS: Record<string, DepRow> = {
     id: 'xinsir-union-promax',
     label: 'Xinsir Union ProMax',
     hint: 'SDXL/Pony 通用',
-    sizeText: '~2.5 GB',
+    bytes: hfBytes(-10000362),
     required: true,
-    files: [{
-      filename: 'diffusion_pytorch_model_promax.safetensors',
-      url: 'https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/diffusion_pytorch_model_promax.safetensors?download=true',
-      subdir: 'models/controlnet',
-    }],
+    files: [hfFile(-10000362)],
   },
   pose_dedicated: {
     id: 'windsingai-openpose',
     label: 'windsingai OpenPose',
     hint: 'Illustrious/NoobAI 专用',
-    sizeText: '~2.5 GB',
+    bytes: hfBytes(-10000363),
     required: true,
-    files: [{
-      filename: 'openpose_s6000.safetensors',
-      url: 'https://huggingface.co/windsingai/openpose/resolve/main/openpose_s6000.safetensors?download=true',
-      subdir: 'models/controlnet',
-    }],
+    files: [hfFile(-10000363)],
   },
   canny_dedicated: {
     id: 'illustrious-canny',
     label: 'Illustrious XL Canny',
     hint: 'Illustrious/NoobAI 专用',
-    sizeText: '~2.5 GB',
+    bytes: hfBytes(-10000364),
     required: true,
-    files: [{
-      filename: 'illustriousXLv1.1_canny_fp16.safetensors',
-      url: 'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/illustriousXLv1.1_canny_fp16.safetensors?download=true',
-      subdir: 'models/controlnet',
-    }],
+    files: [hfFile(-10000364)],
   },
   depth_dedicated: {
     id: 'illustrious-depth',
     label: 'Illustrious XL Depth',
     hint: 'Illustrious/NoobAI 专用',
-    sizeText: '~2.5 GB',
+    bytes: hfBytes(-10000365),
     required: true,
-    files: [{
-      filename: 'illustriousXLv1.1_depth_midas_fp16.safetensors',
-      url: 'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/illustriousXLv1.1_depth_midas_fp16.safetensors?download=true',
-      subdir: 'models/controlnet',
-    }],
+    files: [hfFile(-10000365)],
   },
   dwpose: {
     id: 'dwpose',
@@ -71,6 +79,7 @@ const CN_MODELS: Record<string, DepRow> = {
     hint: '姿态检测',
     sizeText: '~352 MB',
     required: true,
+    // custom_nodes 检测器 ckpt, 不属模型索引范畴 → 通用通道
     files: [
       {
         filename: 'yolox_l.onnx',
@@ -90,6 +99,7 @@ const CN_MODELS: Record<string, DepRow> = {
     hint: '深度估计',
     sizeText: '~1.34 GB',
     required: true,
+    // custom_nodes 检测器 ckpt, 不属模型索引范畴 → 通用通道
     files: [{
       filename: 'depth_anything_v2_vitl.pth',
       url: 'https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true',
@@ -100,13 +110,9 @@ const CN_MODELS: Record<string, DepRow> = {
     id: 'flux-union-pro2-fp8',
     label: 'Union Pro 2.0 FP8',
     hint: 'Flux 1 专用',
-    sizeText: '~2.14 GB',
+    bytes: hfBytes(-10000366),
     required: true,
-    files: [{
-      filename: 'FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8.safetensors',
-      url: 'https://huggingface.co/ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8/resolve/main/diffusion_pytorch_model.safetensors?download=true',
-      subdir: 'models/controlnet',
-    }],
+    files: [hfFile(-10000366)],
   },
 }
 
@@ -117,16 +123,14 @@ const UPSCALE_MODELS: Record<string, DepRow> = {
     id: 'aurasr-v2',
     label: 'AuraSR v2',
     hint: '4× 超分辨率放大',
-    sizeText: '~2.47 GB',
+    // bytes 仅含白名单锚定的权重件; 伴生 config.json 非模型文件未计入 (数百字节, 忽略)
+    bytes: hfBytes(-10000371),
     files: [
+      hfFile(-10000371),
       {
+        // 配套配置文件, 非模型文件不入白名单 → 通用通道
         filename: 'config.json',
         url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true',
-        subdir: 'models/Aura-SR',
-      },
-      {
-        filename: 'model.safetensors',
-        url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors?download=true',
         subdir: 'models/Aura-SR',
       },
     ],
@@ -135,37 +139,15 @@ const UPSCALE_MODELS: Record<string, DepRow> = {
     id: 'seedvr2-3b-fp8',
     label: 'SeedVR2 3B FP8',
     hint: '视频放大，显存约 10GB',
-    sizeText: '~3.9 GB',
-    files: [
-      {
-        filename: 'seedvr2_ema_3b_fp8_e4m3fn.safetensors',
-        url: 'https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors?download=true',
-        subdir: 'models/SEEDVR2',
-      },
-      {
-        filename: 'ema_vae_fp16.safetensors',
-        url: 'https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors?download=true',
-        subdir: 'models/SEEDVR2',
-      },
-    ],
+    bytes: hfBytes(-10000368, -10000369),
+    files: [hfFile(-10000368), hfFile(-10000369)],
   },
   seedvr2_7b_sharp_fp8: {
     id: 'seedvr2-7b-sharp-fp8',
     label: 'SeedVR2 7B-sharp FP8',
     hint: '锐化版，显存约 17GB',
-    sizeText: '~8.96 GB',
-    files: [
-      {
-        filename: 'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors',
-        url: 'https://huggingface.co/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors?download=true',
-        subdir: 'models/SEEDVR2',
-      },
-      {
-        filename: 'ema_vae_fp16.safetensors',
-        url: 'https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors?download=true',
-        subdir: 'models/SEEDVR2',
-      },
-    ],
+    bytes: hfBytes(-10000370, -10000369),
+    files: [hfFile(-10000370), hfFile(-10000369)],
   },
 }
 
@@ -184,19 +166,17 @@ const FACE_MODELS: Record<string, DepRow> = {
     id: 'face-yolov8m',
     label: 'YOLOv8 面部检测器',
     hint: '检测人脸位置',
-    sizeText: '~52 MB',
+    bytes: hfBytes(-10000367),
     required: true,
-    files: [{
-      filename: 'face_yolov8m.pt',
-      url: 'https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt?download=true',
-      subdir: 'models/ultralytics/bbox',
-    }],
+    files: [hfFile(-10000367)],
   },
   sam_vit_b: {
     id: 'sam-vit-b',
     label: 'SAM 精细掩码',
     hint: '五官级分割掩码，边界更精确',
     sizeText: '~375 MB',
+    // Meta 官方源 (dl.fbaipublicfiles.com/segment_anything, facebookresearch/segment-anything);
+    // HF 无官方仓库 (facebook/sam-vit-base 是 transformers 格式转换, 非 Impact Pack 用的原始 .pth) → 通用通道
     files: [{
       filename: 'sam_vit_b_01ec64.pth',
       url: 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth',

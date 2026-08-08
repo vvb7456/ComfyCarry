@@ -43,10 +43,14 @@ let paramsStatusTimer: ReturnType<typeof setTimeout> | null = null
 const LRU_CACHE_SIZE_PRESETS = ['16', '32', '64', '128', '256']
 
 const PARAM_GROUPS = [
-  { key: 'memory', icon: 'memory', params: ['vram', 'attention', 'disable_xformers', 'fast'] },
-  { key: 'precision', icon: 'tune', params: ['unet_precision', 'vae_precision', 'text_enc_precision'] },
+  { key: 'memory', icon: 'memory', params: ['vram', 'reserve_vram', 'vram_headroom', 'async_offload', 'dynamic_vram', 'cuda_device'] },
+  { key: 'attention', icon: 'bolt', params: ['attention', 'disable_xformers', 'fast', 'upcast_attention'] },
+  { key: 'precision', icon: 'tune', params: ['unet_precision', 'vae_precision', 'text_enc_precision', 'fp16_intermediates', 'force_channels_last'] },
   { key: 'cache', icon: 'cached', params: ['cache', 'cache_lru_size'] },
-  { key: 'preview', icon: 'preview', params: ['preview_method'] },
+  { key: 'preview', icon: 'preview', params: ['preview_method', 'preview_size'] },
+  { key: 'output', icon: 'description', params: ['disable_metadata'] },
+  { key: 'disk', icon: 'storage', params: ['fast_disk', 'mmap', 'pinned_memory'] },
+  { key: 'network', icon: 'cloud_upload', params: ['max_upload_size'] },
 ]
 
 onMounted(loadParams)
@@ -166,9 +170,13 @@ function getParamOptions(paramKey: string, schema: ParamSchema) {
 
 function isParamEnabled(schema: ParamSchema) {
   if (!schema.depends_on) return true
-  return Object.entries(schema.depends_on).every(([depKey, depValue]) =>
-    String(paramsCurrent.value[depKey]) === String(depValue),
-  )
+  return Object.entries(schema.depends_on).every(([depKey, depValue]) => {
+    // 值以 '!' 开头表示「不等于」条件 (如 preview_method != none)
+    if (typeof depValue === 'string' && depValue.startsWith('!')) {
+      return String(paramsCurrent.value[depKey]) !== depValue.slice(1)
+    }
+    return String(paramsCurrent.value[depKey]) === String(depValue)
+  })
 }
 
 function formSnapshot() {
@@ -186,6 +194,8 @@ const currentCommand = computed(() => {
     const mapped = schema.flag_map?.[String(value)]
     if (mapped) args.push(mapped)
     else if (schema.flag_prefix && value !== 'default' && value !== '' && value !== false) {
+      // number 类型 0 = 未设置, 不产出 flag (与后端 build_comfyui_args 对齐)
+      if (schema.type === 'number' && value === 0) continue
       args.push(schema.flag_prefix, String(value))
     } else if (schema.flag && value === true) {
       args.push(schema.flag)
@@ -477,6 +487,8 @@ defineExpose({ saveParams, loadParams })
 }
 
 .param-group__fields :deep(.base-select) { width: 100%; }
+/* NumberInput 根是 flex 自适应容器, 撑满右侧控件区与 select/input 对齐 */
+.param-group__fields :deep(.number-input) { width: 100%; }
 .param-disabled { opacity: .45; }
 
 .params-actions {

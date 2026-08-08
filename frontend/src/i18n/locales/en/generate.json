@@ -16,6 +16,7 @@
     "task_edit": "Edit",
     "family_flux2": "Flux 2 series",
     "family_wan22": "Wan 2.2 series",
+    "family_minimax_h3": "MiniMax H3 series",
     "not_ready": "Not ready"
   },
   "tabs": {
@@ -36,6 +37,10 @@
     "wan22_t2v": "Wan 2.2 Text to Video",
     "wan22_5b": "Wan 2.2 5B Lite",
     "wan22_5b_hint": "Image and text modes",
+    "minimax_h3": "MiniMax H3 AV",
+    "minimax_h3_hint": "Text / start-end frames · native audio",
+    "minimax_h3_ref": "MiniMax H3 Reference",
+    "minimax_h3_ref_hint": "Driven by image / video / audio references",
     "history": "Queue & History"
   },
   "prompt": {
@@ -152,6 +157,8 @@
     "search_vae": "Search VAE...",
     "text_encoder": "Text Encoder",
     "select_text_encoder": "Select text encoder",
+    "audio_vae": "Audio VAE",
+    "select_audio_vae": "Select audio VAE",
     "unet_high": "High noise",
     "unet_low": "Low noise",
     "unet_seg_help": "Wan 2.2 14B splits generation into two stages: the high-noise weight lays down the composition, the low-noise weight adds detail. Pick both files — they must be the two halves of the same model.",
@@ -201,6 +208,7 @@
   },
   "video": {
     "start_frame": "Start frame",
+    "last_frame": "Last frame (optional)",
     "start_frame_not_image": "A video cannot be used as a start frame — please pick an image",
     "mode_t2v": "Text to Video",
     "mode_i2v": "Image to Video",
@@ -222,7 +230,25 @@
     "res_help": "When the selected size has a different aspect ratio from the start frame, the start frame is center-cropped to fit.",
     "orient_landscape": "Landscape",
     "orient_portrait": "Portrait",
-    "orient_square": "Square"
+    "orient_square": "Square",
+    "refs_title": "References",
+    "refs_empty": "No reference media yet",
+    "refs_add_image": "Add image",
+    "refs_add_video": "Add video",
+    "refs_add_audio": "Add audio",
+    "refs_help": "Reference media guide",
+    "refs_help_syntax_title": "Prompt syntax",
+    "refs_help_syntax_a": "Reference assets in the prompt as <Picture 1>, <Video 1>, <Audio 1>; numbers are per-type order, matching the tile badges on the left",
+    "refs_help_syntax_b": "Example: The character's appearance follows <Picture 1>, with the camera move of <Video 1>, singing in the style of <Audio 1>",
+    "refs_help_usage_title": "Usage tips",
+    "refs_help_usage_a": "Assign each reference an explicit job (character look / scene / style / camera / motion / voice timbre / music style…)",
+    "refs_help_usage_b": "Video references drive motion, camera and editing rhythm; audio references drive timbre, melody, rhythm or music style",
+    "refs_help_limits_title": "Limits",
+    "refs_help_limits_a": "Images ≤ 9; videos ≤ 3 clips (2–15 s each, ≤ 15 s total); audio ≤ 3 clips (2–15 s each, ≤ 15 s total)",
+    "refs_help_limits_b": "Mixed inputs ≤ 12 files in total; audio cannot be the sole reference — pair it with an image or video",
+    "refs_help_formats_title": "Formats & sizes",
+    "refs_help_formats_a": "Video: H.264 / H.265 (MP4), ≤ 50 MB per file",
+    "refs_help_formats_b": "Audio: WAV / MP3, ≤ 15 MB per file; Images: JPG / PNG / WEBP…, ≤ 20 MB per file"
   },
   "modules": {
     "lora": "LoRA",
@@ -497,7 +523,15 @@
     "components_not_ready": "Runtime components not ready — download them first",
     "video_same_unet": "High-noise and low-noise weights must be different files",
     "no_start_frame": "Please upload a start frame first",
-    "no_unet_pair": "Select both the high-noise and low-noise weights"
+    "no_unet_pair": "Select both the high-noise and low-noise weights",
+    "minimax_h3_unet_required": "MiniMax H3 requires a UNet weight",
+    "minimax_h3_te_vae_required": "Please select Text Encoder / Video VAE / Audio VAE",
+    "minimax_h3_refs_required": "Please add at least one reference",
+    "minimax_h3_refs_audio_requires_visual": "Audio cannot be the only reference — add an image or video too",
+    "minimax_h3_refs_images_too_many": "At most {limit} images (currently {current})",
+    "minimax_h3_refs_videos_too_many": "At most {limit} videos (currently {current})",
+    "minimax_h3_refs_audios_too_many": "At most {limit} audio files (currently {current})",
+    "minimax_h3_refs_total_too_many": "At most {limit} references in total (currently {current})"
   },
   "components": {
     "title": "Runtime components",
@@ -505,6 +539,7 @@
     "role_text_encoder_1": "Text encoder 1",
     "role_text_encoder_2": "Text encoder 2",
     "role_vae": "VAE",
+    "role_audio_vae": "Audio VAE",
     "fast_files_hint": "Only needed in Fast mode"
   },
   "picker": {
@@ -529,6 +564,7 @@
   },
   "model": {},
   "placeholders": {
+    "positive_minimax_h3_ref": "Describe the scene, motion and sound; cite reference media as <Picture 1>, <Video 1>, <Audio 1>…",
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
     "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
     "positive_noobai": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
@@ -594,9 +630,22 @@
     "wan22_same_unet": "High-noise and low-noise UNet cannot be the same file",
     "wan22_unet_required": "Wan 2.2 5B requires a UNet weight",
     "wan22_te_vae_required": "Please select Text Encoder / VAE model files",
+    "minimax_h3_unet_required": "MiniMax H3 requires a UNet weight",
+    "minimax_h3_te_vae_required": "Please select Text Encoder / Video VAE / Audio VAE",
+    "minimax_h3_refs_required": "Please add at least one reference",
+    "refs_invalid": "Invalid reference data",
+    "minimax_h3_refs_images_too_many": "At most {limit} images (currently {current})",
+    "minimax_h3_refs_videos_too_many": "At most {limit} videos (currently {current})",
+    "minimax_h3_refs_audios_too_many": "At most {limit} audio files (currently {current})",
+    "minimax_h3_refs_total_too_many": "At most {limit} references in total (currently {current})",
+    "invalid_ref_path": "Invalid reference path: {name}",
+    "ref_not_found": "Reference not found: {name}, please re-upload",
+    "unsupported_media_format": "Unsupported media format: {content_type}",
     "no_start_frame": "Please upload a start frame first",
     "invalid_start_frame_path": "Invalid start frame path: {name}",
     "start_frame_not_found": "Start frame not found: {name}, please re-upload",
+    "invalid_last_frame_path": "Invalid last frame path: {name}",
+    "last_frame_not_found": "Last frame not found: {name}, please re-upload",
     "invalid_width": "Resolution width must be an integer",
     "invalid_height": "Resolution height must be an integer",
     "invalid_resolution": "Resolution width and height must be positive integers",

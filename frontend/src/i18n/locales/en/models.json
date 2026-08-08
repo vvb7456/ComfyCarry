@@ -161,6 +161,7 @@
     "civitai_not_found": "CivitAI did not find this model or the request failed",
     "comfyui_not_running": "ComfyUI is not running or unreachable, cannot parse workflow model dependencies",
     "comfyui_unreachable": "Cannot connect to ComfyUI",
+    "dl_interrupted": "Download interrupted by a service restart — please retry",
     "dl_cannot_cancel": "Task status is {status}, cannot cancel",
     "dl_cannot_pause": "Task status is {status}, cannot pause",
     "dl_cannot_resume": "Task status is {status}, cannot resume",

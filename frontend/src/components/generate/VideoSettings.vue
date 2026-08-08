@@ -49,8 +49,9 @@ const state = computed(() => store.currentState)
 const video = computed(() => state.value.video!)
 const vd = computed(() => config.value.videoDefaults!)
 
-/* ── 像素预算 (W×H ≤ 921600) ── */
+/* ── 像素预算 (W×H): 架构可覆盖 (minimax_h3.maxPixels); 缺省 921600 (Wan 720p) ── */
 const PIXEL_BUDGET = 921600
+const pixelBudget = computed(() => vd.value.maxPixels ?? PIXEL_BUDGET)
 
 /** 哨兵值 — 与图像页 state.resolution 的 'custom' 同构 */
 const RES_FIT = 'ref'
@@ -103,7 +104,7 @@ const hasRef = computed(() => props.refWidth > 0 && props.refHeight > 0)
 /** 贴合项的推导尺寸 (无起始画面时为 null) */
 const fitSize = computed(() => {
   if (!hasRef.value) return null
-  return deriveFitSize(props.refWidth, props.refHeight, PIXEL_BUDGET, vd.value.divisor)
+  return deriveFitSize(props.refWidth, props.refHeight, pixelBudget.value, vd.value.divisor)
 })
 
 type Orient = 'landscape' | 'portrait' | 'square'
@@ -221,22 +222,39 @@ watch(
 function onCustomWidth(raw: number) {
   const d = vd.value.divisor
   let w = snap(raw, d)
-  const maxW = Math.floor(PIXEL_BUDGET / video.value.height / d) * d
+  const maxW = Math.floor(pixelBudget.value / video.value.height / d) * d
   if (w > maxW) w = maxW
   video.value.width = w
 }
 function onCustomHeight(raw: number) {
   const d = vd.value.divisor
   let h = snap(raw, d)
-  const maxH = Math.floor(PIXEL_BUDGET / video.value.width / d) * d
+  const maxH = Math.floor(pixelBudget.value / video.value.width / d) * d
   if (h > maxH) h = maxH
   video.value.height = h
 }
 
-/* ── 时长 (0.5s 步进, 1 → maxDurationS, frames = fps×duration + 1) ── */
+/* ── 时长 (步进 0.5s, 1 → maxDurationS, frames = fps×duration + 1) ── */
 const fps = computed(() => vd.value.fps)
 const maxDur = computed(() => vd.value.maxDurationS)
-const frameCount = computed(() => Math.round(fps.value * video.value.durationS) + 1)
+/** 时长滑块下限 / 步进: 架构可覆盖 (H3 整数秒 4-15); 缺省 1 / 0.5 (Wan) */
+const durationMin = computed(() => vd.value.durationMin ?? 1)
+const durationStep = computed(() => vd.value.durationStep ?? 0.5)
+/**
+ * 帧数徽章。缺省 frames = round(fps×duration) + 1 (Wan 惯例);
+ * 若 vd.frameGrid 存在 (H3 = 17), 帧数对齐到 (offset + k×grid) 网格:
+ *   n = round(fps×durationS), 从 n 起向上找第一个满足 (n−offset) % grid === 0 的值。
+ */
+const frameCount = computed(() => {
+  const grid = vd.value.frameGrid
+  if (grid) {
+    const offset = vd.value.frameGridOffset ?? 0
+    let n = Math.round(fps.value * video.value.durationS)
+    while ((n - offset) % grid !== 0) n++
+    return n
+  }
+  return Math.round(fps.value * video.value.durationS) + 1
+})
 /** 刻度是静态量程标记, 只放端点与中点 —— 帧数是动态值, 走 label 徽章 */
 const durationMarkFormat = (v: number) => `${v}s`
 </script>
@@ -298,13 +316,13 @@ const durationMarkFormat = (v: number) => `${v}s`
       </div>
     </div>
 
-    <!-- 时长 (0.5s 步进; 帧数走 label 徽章) -->
+    <!-- 时长 (步进 0.5s; 帧数走 label 徽章) -->
     <div class="field-group">
       <RangeField
         :model-value="video.durationS"
-        :min="1"
+        :min="durationMin"
         :max="maxDur"
-        :step="0.5"
+        :step="durationStep"
         :label="t('generate.video.duration')"
         :marks="2"
         :mark-format="durationMarkFormat"

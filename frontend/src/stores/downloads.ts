@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
+import { buildHuggingFaceDownloadBody } from '@/utils/hfDownload'
 import type { PendingFile, DirOption } from '@/components/models/DownloadDirModal.vue'
 import { HUGGINGFACE_MODELS } from '@/config/huggingface-models'
 import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
@@ -735,26 +736,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     setSubmitting(vid)
 
-    // meta 严格按 SPEC §6-E 契约, 后端完成回调直接据此登记 SQLite
-    const meta = {
-      source: 'huggingface',
-      model_id: String(model.id),
-      version_id: String(version.id),
-      model_name: model.name,
-      version_name: version.name,
-      model_type: model.type,
-      category: version.file.modelType,
-      base_model: version.baseModel,
-      architecture: version.file.architecture,
-      image_url: model.images[0]?.url || version.images[0]?.url || '',
-      sha256: version.file.sha256,
-      size_bytes: version.file.sizeBytes,
-      trained_words: version.trainedWords,
-      images: version.images,
-      author: model.user.username,
-      source_url: model.sourceUrl,
-      completion_requires_callback: true,
-    }
+    // 请求体契约唯一实现在 utils/hfDownload.ts (运行组件依赖条共用)
+    const body = buildHuggingFaceDownloadBody(model, version)
 
     let result: {
       download_id?: string; message?: string; error?: string; existed?: boolean
@@ -767,13 +750,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const res = await fetch('/api/downloads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source: 'huggingface',
-          url: version.file.url,
-          model_type: version.file.modelType,
-          filename: version.file.filename,
-          meta,
-        }),
+        body: JSON.stringify(body),
       })
       if (res.status === 401) {
         clearSubmitting(vid)

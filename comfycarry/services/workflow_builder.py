@@ -289,6 +289,26 @@ class WorkflowBuilder:
         }
         return nid
 
+    def add_basic_scheduler(self, model_ref, scheduler: str, steps: int,
+                            denoise: float = 1.0) -> str:
+        """
+        BasicScheduler — 通用 sigma 生成器 (SamplerCustomAdvanced 采样链)。
+        MiniMax H3 官方模板: scheduler='simple', steps=20, denoise=1.0。
+        model_ref: 上游 MODEL 引用 (UNETLoader 输出 index 0)。
+        输出: [node_id, 0]=SIGMAS
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "BasicScheduler",
+            "inputs": {
+                "model": self._ref(model_ref, default_idx=0),
+                "scheduler": scheduler,
+                "steps": int(steps),
+                "denoise": float(denoise),
+            },
+        }
+        return nid
+
     def add_flux_guidance(self, conditioning_ref, guidance: float = 4.0) -> str:
         """
         FluxGuidance — Flux2 dev 模式 guidance 调整 (插入到正向 conditioning 链)。
@@ -370,6 +390,23 @@ class WorkflowBuilder:
         nid = self._next_id()
         self._nodes[nid] = {
             "class_type": "VAEDecode",
+            "inputs": {
+                "samples": self._ref(samples_ref, default_idx=0),
+                "vae": self._ref(vae_ref, default_idx=2),
+            },
+        }
+        return nid
+
+    def add_vae_decode_audio(self, samples_ref, vae_ref) -> str:
+        """
+        VAEDecodeAudio — 解码音轨 latent → AUDIO (视频专用音频 VAE)。
+        MiniMax H3 (FL2VA) 使用独立的音频 VAE, 与视频 VAE 分离。
+        samples_ref / vae_ref 约定同 add_vae_decode (str 向后兼容 / tuple 显式 index)。
+        输出: [node_id, 0]=AUDIO
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "VAEDecodeAudio",
             "inputs": {
                 "samples": self._ref(samples_ref, default_idx=0),
                 "vae": self._ref(vae_ref, default_idx=2),
@@ -616,20 +653,157 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_create_video(self, images_ref, fps: int = 16) -> str:
+    def add_minimax_h3_image_to_video(
+        self,
+        clip_ref,
+        vae_ref,
+        prompt: str,
+        width: int,
+        height: int,
+        length: int,
+        first_frame_ref=None,
+        last_frame_ref=None,
+    ) -> str:
         """
-        CreateVideo — 将 IMAGE 序列封装为 VIDEO (帧率绑定)。
-        Wan 14B fps=16, 5B fps=24 (帧率随条目锁定, 不进 UI)。
+        MiniMaxH3ImageToVideo — MiniMax H3 (FL2VA) 视频条件节点 (t2v/i2v 共用)。
+        输出: [0]=positive(CONDITIONING), [1]=LATENT。
+        t2v 不接 first/last_frame; i2v 接 first_frame (可选 last_frame)。
+        clip_ref: CLIPLoader 输出 (index 0); vae_ref: VAELoader 输出 (index 0)。
+        """
+        nid = self._next_id()
+        inputs = {
+            "clip": self._ref(clip_ref, default_idx=0),
+            "vae": self._ref(vae_ref, default_idx=0),
+            "prompt": prompt,
+            "width": int(width),
+            "height": int(height),
+            "length": int(length),
+        }
+        if first_frame_ref is not None:
+            inputs["first_frame"] = self._ref(first_frame_ref, 0)
+        if last_frame_ref is not None:
+            inputs["last_frame"] = self._ref(last_frame_ref, 0)
+        self._nodes[nid] = {
+            "class_type": "MiniMaxH3ImageToVideo",
+            "inputs": inputs,
+        }
+        return nid
+
+    # ── MiniMax H3 Ref2VA 参考节点 ─────────────────────────────────────────
+
+    def add_load_video(self, file_name: str) -> str:
+        """
+        LoadVideo — 加载 input/ 目录下的视频文件 (Ref2VA 参考视频源)。
+        file_name: 文件名 (不含路径)。
         输出: [node_id, 0]=VIDEO
         """
         nid = self._next_id()
         self._nodes[nid] = {
-            "class_type": "CreateVideo",
+            "class_type": "LoadVideo",
             "inputs": {
-                # 输入名是 fps (FLOAT) 而非 frame_rate, 与 ComfyUI object_info 对齐
-                "fps": float(fps),
-                "images": self._ref(images_ref, default_idx=0),
+                "file": file_name,
             },
+        }
+        return nid
+
+    def add_get_video_components(self, video_ref) -> str:
+        """
+        GetVideoComponents — 拆解 VIDEO → 帧序列 IMAGE + AUDIO + fps + bit_depth。
+        输出: [0]=images(IMAGE), [1]=audio(AUDIO), [2]=fps, [3]=bit_depth。
+        参考视频取 [0] 帧序列 接入 MiniMaxH3ReferenceToVideo.ref_video_N。
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "GetVideoComponents",
+            "inputs": {
+                "video": self._ref(video_ref, 0),
+            },
+        }
+        return nid
+
+    def add_load_audio(self, file_name: str) -> str:
+        """
+        LoadAudio — 加载 input/ 目录下的音频文件 (Ref2VA 参考音频源)。
+        file_name: 文件名 (不含路径)。
+        输出: [node_id, 0]=AUDIO
+        """
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "LoadAudio",
+            "inputs": {
+                "audio": file_name,
+            },
+        }
+        return nid
+
+    def add_minimax_h3_reference_to_video(
+        self,
+        clip_ref,
+        vae_ref,
+        audio_vae_ref,
+        prompt: str,
+        width: int,
+        height: int,
+        length: int,
+        ref_image_size: str = "match",
+        image_refs=None,
+        video_refs=None,
+        audio_refs=None,
+    ) -> str:
+        """
+        MiniMaxH3ReferenceToVideo — Ref2VA 参考条件节点 (clip 驱动 + 图/视频/音频参考)。
+        输出: [0]=positive(CONDITIONING), [1]=LATENT。
+        动态 autogrow 输入按「聚合槽.前缀名」嵌套 key 传参 (v3 schema 契约,
+        执行时由 ComfyUI 聚合为 dict 传 execute):
+          ref_images.ref_image_0..8    (IMAGE)  — 参考图片, 每个 self._ref(image_ref, 0)
+          ref_videos.ref_video_0..2    (IMAGE)  — 参考视频帧序列, 每个 self._ref(video_ref, 0)
+          ref_audios.ref_audio_0..2    (AUDIO)  — 参考音频, 每个 self._ref(audio_ref, 0)
+        本期不接 ref_video_audios.ref_video_audio_N (源视频音轨配对留后续)。
+        注: 用裸 key (ref_image_N) 会通过 /prompt 校验但在 execute 阶段报
+        "unexpected keyword argument 'ref_image_0'" (autogrow 聚合失败)。
+        image_refs/video_refs/audio_refs: 引用列表 (str | (nid, idx) 元组), 按序展开。
+        ref_image_size: "match" (按参考图尺寸匹配) | "max"。
+        """
+        nid = self._next_id()
+        inputs = {
+            "clip": self._ref(clip_ref, default_idx=0),
+            "vae": self._ref(vae_ref, default_idx=0),
+            "audio_vae": self._ref(audio_vae_ref, default_idx=0),
+            "prompt": prompt,
+            "width": int(width),
+            "height": int(height),
+            "length": int(length),
+            "ref_image_size": ref_image_size,
+        }
+        for i, ref in enumerate(image_refs or []):
+            inputs[f"ref_images.ref_image_{i}"] = self._ref(ref, 0)
+        for i, ref in enumerate(video_refs or []):
+            inputs[f"ref_videos.ref_video_{i}"] = self._ref(ref, 0)
+        for i, ref in enumerate(audio_refs or []):
+            inputs[f"ref_audios.ref_audio_{i}"] = self._ref(ref, 0)
+        self._nodes[nid] = {
+            "class_type": "MiniMaxH3ReferenceToVideo",
+            "inputs": inputs,
+        }
+        return nid
+
+    def add_create_video(self, images_ref, fps: int = 16, audio_ref=None) -> str:
+        """
+        CreateVideo — 将 IMAGE 序列封装为 VIDEO (帧率绑定), 可附音轨。
+        Wan 14B fps=16, 5B fps=24; MiniMax H3 fps=24 (帧率随条目锁定, 不进 UI)。
+        audio_ref: 可选音频 (VAEDecodeAudio 输出), 非 None 时 inputs 增加 "audio" key。
+        输出: [node_id, 0]=VIDEO
+        """
+        nid = self._next_id()
+        inputs = {
+            "fps": float(fps),
+            "images": self._ref(images_ref, default_idx=0),
+        }
+        if audio_ref is not None:
+            inputs["audio"] = self._ref(audio_ref, 0)
+        self._nodes[nid] = {
+            "class_type": "CreateVideo",
+            "inputs": inputs,
         }
         return nid
 
@@ -2186,6 +2360,227 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
     video = b.add_create_video(decoded, fps=fps)
     save_prefix = str(params.get("save_prefix", "video/ComfyCarry")).strip() or "video/ComfyCarry"
     b.add_save_video(video, prefix=save_prefix, format="mp4", codec="h264")
+
+    return b.build()
+
+
+# ── MiniMax H3 视频工作流 ──────────────────────────────────────────────────
+
+# MiniMax H3 (FL2VA, t2v/i2v) — CFG-distilled, 无 negative / cfg。
+H3_FPS = 24
+H3_DURATION_RANGE = (4, 15)      # 整数秒
+H3_FRAME_GRID = 17               # length = 17k+5
+H3_FRAME_GRID_OFFSET = 5
+H3_MAX_PIXELS = 768 * 1344
+H3_DEFAULT_SAMPLER = "res_multistep"
+H3_DEFAULT_SCHEDULER = "simple"
+
+
+def h3_align_length(frames: int) -> int:
+    """返回 ≥ frames 的最小 17k+5 值 (MiniMax H3 帧网格约束)。"""
+    k = max(0, (int(frames) - H3_FRAME_GRID_OFFSET + H3_FRAME_GRID - 1) // H3_FRAME_GRID)
+    return H3_FRAME_GRID * k + H3_FRAME_GRID_OFFSET
+
+
+def _h3_shared_setup(params: dict):
+    """
+    H3 家族 (FL2VA / Ref2VA) 公共前半段: 加载层 + 分辨率/帧数/种子/步数解析。
+    返回: (builder, clip_node, vae_node, audio_vae_node, unet_node,
+           length, width, height, seed, steps)
+    """
+    b = WorkflowBuilder()
+
+    # ── 加载层: CLIP / 视频 VAE / 音频 VAE / UNet ────────────────────────────
+    clip_node = b.add_clip_loader_single(
+        params["clip"], type="minimax",
+        device=str(params.get("clip_device", "default")),
+    )
+    vae_node = b.add_vae_loader(params["vae"])
+    audio_vae_node = b.add_vae_loader(params["audio_vae"])
+    unet_node = b.add_unet_loader(
+        params["unet"],
+        weight_dtype=str(params.get("unet_weight_dtype", "default")),
+    )
+
+    # 帧数: 显式 length 优先, 否则按 duration_s×24 对齐 17k+5 兜底。
+    length = int(params.get("length", 0))
+    if length <= 0:
+        duration = float(params.get("duration_s", 5))
+        length = h3_align_length(int(round(H3_FPS * duration)))
+    width = int(params.get("width", 1344))
+    height = int(params.get("height", 768))
+    seed = int(params.get("seed", -1))
+    steps = int(params.get("steps", 20))
+    return b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps
+
+
+def _h3_sampling_and_tail(b: WorkflowBuilder, unet_node, cond_latent, seed: int,
+                          steps: int, vae_node, audio_vae_node, params: dict):
+    """
+    H3 家族公共后半段: 采样链 (RandomNoise + BasicGuider + KSamplerSelect +
+    BasicScheduler → SamplerCustomAdvanced) + 尾链 (VAEDecode + VAEDecodeAudio →
+    CreateVideo(fps=24, audio) → SaveVideo)。节点就地写入 builder。
+    """
+    # ── 采样链: RandomNoise + BasicGuider + KSamplerSelect + BasicScheduler ──
+    noise = b.add_random_noise(seed)
+    guider = b.add_basic_guider((unet_node, 0), (cond_latent, 0))
+    sampler = b.add_ksampler_select(str(params.get("sampler", H3_DEFAULT_SAMPLER)))
+    sigmas = b.add_basic_scheduler(
+        (unet_node, 0),
+        str(params.get("scheduler", H3_DEFAULT_SCHEDULER)),
+        steps, denoise=1.0,
+    )
+    sampled = b.add_sampler_custom_advanced(
+        noise, guider, sampler, sigmas, (cond_latent, 1),
+    )
+
+    # ── 尾链: 视频解码 + 音频解码 → CreateVideo(fps=24, audio) → SaveVideo ──
+    video_img = b.add_vae_decode(sampled, (vae_node, 0))
+    audio = b.add_vae_decode_audio(sampled, (audio_vae_node, 0))
+    video = b.add_create_video(video_img, fps=H3_FPS, audio_ref=audio)
+    save_prefix = str(params.get("save_prefix", "video/MiniMax_H3")).strip() or "video/MiniMax_H3"
+    b.add_save_video(video, prefix=save_prefix, format="mp4", codec="h264")
+
+
+def build_minimax_h3_workflow(params: dict, variant: str = "i2v") -> dict:
+    """
+    MiniMax H3 (FL2VA) 视频工作流 — t2v / i2v 双模式。
+
+    节点链 (顺序搭建):
+      1. CLIPLoader(type=minimax) + VAELoader(视频 VAE) + VAELoader(音频 VAE) + UNETLoader
+      2. (仅 i2v) LoadImage(start_image) / LoadImage(last_image)
+      3. MiniMaxH3ImageToVideo(clip, vae, prompt, w, h, length) → [0]=positive, [1]=LATENT
+      4. RandomNoise(seed) + BasicGuider(unet, cond) + KSamplerSelect + BasicScheduler
+         → SamplerCustomAdvanced(noise, guider, sampler, sigmas, latent)
+      5. VAEDecode(视频) + VAEDecodeAudio(音频) → CreateVideo(fps=24, audio) → SaveVideo(mp4/h264)
+
+    特征: CFG-distilled → 无 negative、无 cfg、无 CLIPTextEncode 节点。
+    length 满足 17k+5 (k≥0); 官方默认 fps=24, sampler=res_multistep, scheduler=simple,
+    steps=20, denoise=1.0, 分辨率 1344×768, MAX_PIXELS=1032192, divisor=32。
+
+    params 关键字段:
+        unet             (str, 必填)     — UNet 文件名 (models/diffusion_models/)
+        clip             (str, 必填)     — Text Encoder (CLIPLoader type=minimax)
+        vae              (str, 必填)     — 视频 VAE
+        audio_vae        (str, 必填)     — 音频 VAE (独立, 供 VAEDecodeAudio)
+        unet_weight_dtype (str)          — UNet 权重精度, 默认 "default"
+        clip_device      (str)           — CLIP 设备, 默认 "default"
+        positive_prompt  (str)           — 正向提示词 (MiniMaxH3ImageToVideo.prompt)
+        width            (int)           — 宽度 (默认 1344, 须 %32)
+        height           (int)           — 高度 (默认 768, 须 %32)
+        length           (int)           — 帧数 (须 17k+5; 无则由 duration_s×24 对齐兜底)
+        duration_s       (float)         — 时长秒 (length 缺失时兜底计算)
+        seed             (int)           — 种子, -1 = 随机
+        steps            (int)           — 采样步数 (默认 20)
+        sampler          (str)           — 采样器 (默认 "res_multistep")
+        scheduler        (str)           — 调度器 (默认 "simple")
+        start_image      (str, i2v)      — 首帧文件名 (ComfyUI input/)
+        last_image       (str, i2v 可选) — 尾帧文件名
+        save_prefix      (str)           — 保存前缀 (默认 "video/MiniMax_H3")
+
+    返回值: ComfyUI /prompt API 所需的 prompt dict
+    """
+    if variant not in ("t2v", "i2v"):
+        raise ValueError(f"不支持的 variant: {variant!r}, 应为 t2v/i2v")
+
+    b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps = \
+        _h3_shared_setup(params)
+
+    # ── 2. (仅 i2v) 首/尾帧加载 ─────────────────────────────────────────────
+    load_start = load_last = None
+    if variant == "i2v":
+        start_image = str(params.get("start_image", "")).strip()
+        if start_image:
+            load_start = b.add_load_image(start_image)
+        last_image = str(params.get("last_image", "")).strip()
+        if last_image:
+            load_last = b.add_load_image(last_image)
+
+    # ── 3. 条件节点: MiniMaxH3ImageToVideo → [0]=positive, [1]=LATENT ───────
+    cond_latent = b.add_minimax_h3_image_to_video(
+        (clip_node, 0), (vae_node, 0),
+        str(params.get("positive_prompt", "")),
+        width, height, length,
+        first_frame_ref=load_start, last_frame_ref=load_last,
+    )
+
+    # ── 4 + 5. 采样链 + 尾链 ────────────────────────────────────────────────
+    _h3_sampling_and_tail(b, unet_node, cond_latent, seed, steps, vae_node, audio_vae_node, params)
+
+    return b.build()
+
+
+def build_minimax_h3_ref_workflow(params: dict) -> dict:
+    """
+    MiniMax H3 (FL2VA) Ref2VA 参考生成视频工作流。
+
+    节点链 (顺序搭建):
+      1. CLIPLoader(type=minimax) + VAELoader(视频 VAE) + VAELoader(音频 VAE) + UNETLoader
+      2. 参考分组 (保持原顺序):
+           image → LoadImage → ref_image_N
+           video → LoadVideo → GetVideoComponents → ref_video_N 接 (gvc, 0)
+           audio → LoadAudio → ref_audio_N
+      3. MiniMaxH3ReferenceToVideo(clip, vae, audio_vae, prompt, w, h, length,
+                                    ref_image_N / ref_video_N / ref_audio_N)
+         → [0]=positive, [1]=LATENT
+      4. RandomNoise(seed) + BasicGuider(unet, cond) + KSamplerSelect + BasicScheduler
+         → SamplerCustomAdvanced(noise, guider, sampler, sigmas, latent)
+      5. VAEDecode(视频) + VAEDecodeAudio(音频) → CreateVideo(fps=24, audio) → SaveVideo(mp4/h264)
+
+    特征: 与 FL2VA 同 (CFG-distilled, 无 negative/cfg/CLIPTextEncode);
+    length 满足 17k+5, fps=24, sampler=res_multistep, scheduler=simple。
+    本期不接 ref_video_audio_N (源视频音轨配对留后续)。
+
+    params 关键字段:
+        unet / clip / vae / audio_vae  (str, 必填) — 与 FL2VA 相同
+        refs          (list, 必填) — 参考列表, 每项 {"type": "image"|"video"|"audio", "name": str};
+                        name 为 ComfyUI input/ 下文件名。空列表抛 ValueError。
+        positive_prompt  (str)     — 正向提示词
+        width / height   (int)     — 分辨率 (默认 1344×768, 须 %32)
+        length           (int)     — 帧数 (须 17k+5; 无则由 duration_s×24 对齐兜底)
+        duration_s       (float)   — 时长秒 (length 缺失时兜底计算)
+        seed             (int)     — 种子, -1 = 随机
+        steps            (int)     — 采样步数 (默认 20)
+        sampler / scheduler (str)  — 采样器/调度器 (默认 res_multistep / simple)
+        save_prefix      (str)     — 保存前缀 (默认 "video/MiniMax_H3")
+
+    返回值: ComfyUI /prompt API 所需的 prompt dict
+    """
+    refs = params.get("refs") or []
+    if not refs:
+        raise ValueError("refs 不能为空")
+
+    b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps = \
+        _h3_shared_setup(params)
+
+    # ── 2. 参考分组: image / video / audio 各归其列, 保持原顺序 ──────────────
+    image_refs: list = []
+    video_refs: list = []
+    audio_refs: list = []
+    for item in refs:
+        rtype = item.get("type")
+        name = str(item.get("name", ""))
+        if rtype == "image":
+            image_refs.append(b.add_load_image(name))
+        elif rtype == "video":
+            lv = b.add_load_video(name)
+            gvc = b.add_get_video_components(lv)
+            video_refs.append((gvc, 0))
+        elif rtype == "audio":
+            audio_refs.append(b.add_load_audio(name))
+        else:
+            raise ValueError(f"不支持的 ref type: {rtype!r}")
+
+    # ── 3. 条件节点: MiniMaxH3ReferenceToVideo → [0]=positive, [1]=LATENT ───
+    cond_latent = b.add_minimax_h3_reference_to_video(
+        (clip_node, 0), (vae_node, 0), (audio_vae_node, 0),
+        str(params.get("positive_prompt", "")),
+        width, height, length,
+        image_refs=image_refs, video_refs=video_refs, audio_refs=audio_refs,
+    )
+
+    # ── 4 + 5. 采样链 + 尾链 ────────────────────────────────────────────────
+    _h3_sampling_and_tail(b, unet_node, cond_latent, seed, steps, vae_node, audio_vae_node, params)
 
     return b.build()
 

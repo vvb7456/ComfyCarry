@@ -32,12 +32,12 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { page: 'dashboard', icon: 'dashboard',    labelKey: 'nav.dashboard' },
-  { page: 'comfyui',   icon: 'terminal',     label: 'ComfyUI' },
   { page: 'generate',  icon: 'palette',      labelKey: 'nav.generate' },
   { page: 'models',    icon: 'extension',    labelKey: 'nav.models' },
+  { page: 'comfyui',   icon: 'terminal',     label: 'ComfyUI' },
+  { page: 'sync',      icon: 'cloud_sync',   labelKey: 'nav.sync' },
   { page: 'tunnel',    icon: 'language',     labelKey: 'nav.tunnel' },
   { page: 'jupyter',   icon: 'book_2',       label: 'Jupyter' },
-  { page: 'sync',      icon: 'cloud_sync',   labelKey: 'nav.sync' },
   { page: 'ssh',       icon: 'key',          label: 'SSH' },
 ]
 

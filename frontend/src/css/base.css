@@ -170,7 +170,7 @@
             font-family: 'Material Symbols Outlined';
             font-style: normal;
             font-weight: 100 700;
-            src: url('/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
+            src: url('/fonts/MaterialSymbolsOutlined.woff2?v=3') format('woff2');
             font-display: swap;
         }
 

@@ -96,6 +96,8 @@ export const ICON_CODEPOINTS: Record<string, string> = {
   'menu': '\ue5d2',
   'monitor': '\uef5b',
   'monitoring': '\uf190',
+  'movie': '\ue684',
+  'music_note': '\ue405',
   'notes': '\ue26c',
   'open_in_new': '\ue89e',
   'package_2': '\uf569',

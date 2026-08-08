@@ -73,7 +73,8 @@
           "fp16": "FP16",
           "bf16": "BF16",
           "fp8_e4m3fn": "FP8 (e4m3fn)",
-          "fp8_e5m2": "FP8 (e5m2)"
+          "fp8_e5m2": "FP8 (e5m2)",
+          "fp8_e8m0fnu": "FP8 (e8m0fnu)"
         }
       },
       "vae_precision": {
@@ -137,6 +138,102 @@
           "128": "128",
           "256": "256"
         }
+      },
+      "upcast_attention": {
+        "label": "Attention Upcast",
+        "help": "Upcast attention computation to higher precision. Try forcing when output is black/garbled; disabling is for debugging only.",
+        "options": {
+          "default": "Default",
+          "force": "Force upcast",
+          "off": "Disable upcast"
+        }
+      },
+      "reserve_vram": {
+        "label": "Reserved VRAM (GB)",
+        "help": "VRAM reserved for the OS / other software (GB). Helps avoid OOM when running large models on big GPUs alongside a desktop."
+      },
+      "vram_headroom": {
+        "label": "Dynamic VRAM Headroom (GB)",
+        "help": "Extra VRAM kept free by DynamicVRAM on top of the default. Increase if you keep hitting OOM."
+      },
+      "async_offload": {
+        "label": "Async Weight Offload",
+        "help": "Prefetch weights to VRAM asynchronously during sampling to reduce stalls. Enabled by default on Nvidia.",
+        "options": {
+          "default": "Default",
+          "on": "Enabled",
+          "off": "Disabled"
+        }
+      },
+      "dynamic_vram": {
+        "label": "Dynamic VRAM",
+        "help": "DynamicVRAM schedules model loading by actual VRAM pressure. Disable if you hit repeated unexplained OOM to switch to estimate-based loading.",
+        "options": {
+          "default": "Default",
+          "on": "Force enable",
+          "off": "Disable"
+        }
+      },
+      "cuda_device": {
+        "label": "CUDA Devices",
+        "help": "GPU ids this instance uses (comma-separated, e.g. 0 or 0,1). Other devices become invisible to ComfyUI; leave empty to use all."
+      },
+      "fp16_intermediates": {
+        "label": "FP16 Intermediates",
+        "help": "Experimental: use FP16 for intermediate tensors between nodes. Saves VRAM; some workflows may lose precision.",
+        "options": {
+          "default": "Off",
+          "enabled": "On"
+        }
+      },
+      "force_channels_last": {
+        "label": "Channels Last",
+        "help": "Force channels-last tensor layout during inference. Faster on some GPUs (e.g. AMD); slower on some workflows.",
+        "options": {
+          "default": "Off",
+          "enabled": "On"
+        }
+      },
+      "preview_size": {
+        "label": "Preview Max Size",
+        "help": "Maximum edge size of sampler preview images. Lower reduces preview overhead, higher gives clearer previews."
+      },
+      "disable_metadata": {
+        "label": "Output Metadata",
+        "help": "Writes generation params (prompt/seed etc.) into output files by default. Disabling keeps files cleaner and slightly smaller but you can no longer trace generation info from the file.",
+        "options": {
+          "default": "Write metadata",
+          "disabled": "Disable writing"
+        }
+      },
+      "fast_disk": {
+        "label": "Disk-Backed Loading",
+        "help": "Prefer disk-backed dynamic loading over unpinned RAM, greatly reducing memory usage (especially for large models). Recommended with NVMe.",
+        "options": {
+          "default": "Off",
+          "enabled": "On"
+        }
+      },
+      "mmap": {
+        "label": "MMAP File Mapping",
+        "help": "Use mmap when loading ckpt/pt files and disable mmap for safetensors, further reducing memory usage.",
+        "options": {
+          "default": "Default",
+          "mmap": "Enable mmap",
+          "no_mmap": "Disable mmap"
+        }
+      },
+      "pinned_memory": {
+        "label": "Pinned Memory",
+        "help": "Pinned memory speeds up CPU→GPU transfers but cannot be reclaimed. Disable when system memory is tight.",
+        "options": {
+          "default": "Default",
+          "off": "Disable"
+        }
+      },
+      "max_upload_size": {
+        "label": "Upload Limit (MB)",
+        "help": "Max upload size on the ComfyUI side (MB). The panel has its own stricter limit; set this higher as a fallback."
       }
     }
   },
@@ -200,7 +297,11 @@
       "memory": "Memory & Performance",
       "precision": "Precision",
       "cache": "Cache",
-      "preview": "Preview"
+      "preview": "Preview",
+      "attention": "Attention",
+      "output": "Output",
+      "disk": "Memory & Disk",
+      "network": "Network & Upload"
     }
   },
   "plugins": {

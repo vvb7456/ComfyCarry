@@ -149,10 +149,11 @@ defineExpose({ insertAtCursor })
         </button>
       </div>
 
-      <!-- 左右分栏 — 左=媒体槽 (视频起始画面), 右=正/负输入框。
+      <!-- 分栏 — 左=媒体槽 (视频起始画面), 中=正/负输入框, 右=media-right 槽
+           (H3 尾帧; 首帧 | 提示词 | 尾帧 三栏)。
            未传 media 槽时 .prompt-media 不渲染, .prompt-fields 独占整宽,
            渲染结果与分栏改造前逐像素一致 (图像架构回归保护)。 -->
-      <div class="prompt-body">
+      <div class="prompt-body" :class="{ 'prompt-body--3col': $slots['media-right'] }">
         <div v-if="$slots.media" class="prompt-media">
           <slot name="media" />
         </div>
@@ -185,6 +186,11 @@ defineExpose({ insertAtCursor })
             :placeholder="negativePlaceholder"
             @input="emit('update:negative', ($event.target as HTMLTextAreaElement).value)"
           />
+        </div>
+
+        <!-- 右媒体栏 (H3 尾帧): 首帧 | 提示词 | 尾帧 三栏 -->
+        <div v-if="$slots['media-right']" class="prompt-media prompt-media--right">
+          <slot name="media-right" />
         </div>
       </div>
     </div>
@@ -320,16 +326,26 @@ defineExpose({ insertAtCursor })
   min-width: 0;
 }
 
-/* 左栏: 媒体 (视频起始画面)。仅在传入 media 槽时渲染。 */
+/* 媒体栏 (视频起始画面; H3 时左右各一栏, 提示词夹中间)。仅在传入对应槽时渲染。
+   栏内纵向排布 (小标题 + 上传区); 单个子项 (wan22) 时渲染结果与旧版一致。 */
 .prompt-media {
   flex: 0 0 150px;
   display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
   padding: var(--sp-2);
   border-right: 1px solid var(--bd);
   background: var(--bg2);
   min-width: 0;
 }
-.prompt-media > :deep(*) { flex: 1; min-width: 0; }
+.prompt-media--right { border-right: none; border-left: 1px solid var(--bd); }
+.prompt-media > :deep(.upload-zone) { flex: 1; min-width: 0; min-height: 0; }
+
+/* 三栏形态 (H3 首尾帧): 首帧 | 提示词 | 尾帧 ≈ 1:4:1。
+   媒体列上限 150px (与单栏形态同宽), min-width 保底 pick 形态可用性;
+   宽容器时余量全部归提示词列。 */
+.prompt-body--3col .prompt-media { flex: 1 1 0; min-width: 104px; max-width: 150px; }
+.prompt-body--3col .prompt-fields { flex: 4 1 0; }
 
 /* 右栏: 正/负输入框。无媒体槽时独占整宽 = 分栏前的原布局。 */
 .prompt-fields {
@@ -341,12 +357,20 @@ defineExpose({ insertAtCursor })
 
 @media (max-width: 600px) {
   .prompt-body { flex-direction: column; }
-  .prompt-media {
+  /* 三栏退回纵向堆叠; 媒体列高度自适应 (下限 180px): 单上传区 (wan22) 内容
+     不足 180px 时仍撑满 180px 与旧版一致; H3 两栏各自独立渲染, 不裁切。 */
+  .prompt-media,
+  .prompt-body--3col .prompt-media {
     flex: 0 0 auto;
-    height: 180px;
+    height: auto;
+    min-height: 180px;
+    min-width: 0;
+    max-width: none;
     border-right: none;
+    border-left: none;
     border-bottom: 1px solid var(--bd);
   }
+  .prompt-media--right { border-bottom: none; border-top: 1px solid var(--bd); }
 }
 
 /* ── Textarea ── */

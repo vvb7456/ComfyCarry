@@ -128,7 +128,9 @@ class ResourceRegistry:
                 if state_str in ("downloading", "paused", "verifying",
                                  "submit_pending"):
                     state_str = "failed"
-                    error = "实例重启中断"
+                    # 用 i18n key 而非硬编码中文: 前端对 error 做 translate-if-key,
+                    # 找不到 key 时原样显示 (兼容 aria2/civitai 自由文本错误)
+                    error = "models.err.dl_interrupted"
                 else:
                     error = row.get("last_error", "")
 
@@ -195,7 +197,7 @@ class ResourceRegistry:
                 # 活跃状态改为 failed (aria2c GID 丢失)
                 if status_str in ("queued", "active", "paused"):
                     status_str = "failed"
-                    error = "实例重启中断，请重试"
+                    error = "models.err.dl_interrupted"
                     completed_at = now
                     # 也更新 DB
                     try:

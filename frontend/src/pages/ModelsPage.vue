@@ -145,7 +145,7 @@ function openPreviewSingle(url: string) {
     </TabSwitcher>
 
     <div v-show="activeTab === 'local'">
-      <LocalModelsTab @open-local="openLocal" @open-preview="openPreviewSingle" />
+      <LocalModelsTab :active="activeTab === 'local'" @open-local="openLocal" @open-preview="openPreviewSingle" />
     </div>
 
     <div v-show="activeTab === 'huggingface'">

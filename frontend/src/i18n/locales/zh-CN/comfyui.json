@@ -73,7 +73,8 @@
           "fp16": "FP16",
           "bf16": "BF16",
           "fp8_e4m3fn": "FP8 (e4m3fn)",
-          "fp8_e5m2": "FP8 (e5m2)"
+          "fp8_e5m2": "FP8 (e5m2)",
+          "fp8_e8m0fnu": "FP8 (e8m0fnu)"
         }
       },
       "vae_precision": {
@@ -137,6 +138,102 @@
           "128": "128",
           "256": "256"
         }
+      },
+      "upcast_attention": {
+        "label": "注意力上采样",
+        "help": "Attention 计算上采样到更高精度。黑图/花屏时可尝试强制上采样；禁用仅用于排查。",
+        "options": {
+          "default": "默认",
+          "force": "强制上采样",
+          "off": "禁用上采样"
+        }
+      },
+      "reserve_vram": {
+        "label": "显存预留 (GB)",
+        "help": "为操作系统/其他软件预留的显存 (GB)。大显存跑大模型时防止与桌面环境抢显存导致 OOM。"
+      },
+      "vram_headroom": {
+        "label": "动态显存余量 (GB)",
+        "help": "DynamicVRAM 在默认之上额外保持空闲的显存 (GB)。频繁 OOM 时可适当调大。"
+      },
+      "async_offload": {
+        "label": "异步权重卸载",
+        "help": "采样时异步预取权重到显存，减少加载停顿。Nvidia 平台默认启用。",
+        "options": {
+          "default": "默认",
+          "on": "启用",
+          "off": "禁用"
+        }
+      },
+      "dynamic_vram": {
+        "label": "动态显存调度",
+        "help": "DynamicVRAM 按实际显存压力动态调度模型加载。异常反复 OOM 时可禁用，改用估算式加载。",
+        "options": {
+          "default": "默认",
+          "on": "强制启用",
+          "off": "禁用"
+        }
+      },
+      "cuda_device": {
+        "label": "CUDA 设备",
+        "help": "使用的 GPU 编号（逗号分隔，如 0 或 0,1）。其余设备对 ComfyUI 不可见；留空使用全部。"
+      },
+      "fp16_intermediates": {
+        "label": "中间张量 FP16",
+        "help": "节点间的中间张量改用 FP16 传输（实验性），可减少显存占用，个别工作流可能精度损失。",
+        "options": {
+          "default": "关闭",
+          "enabled": "启用"
+        }
+      },
+      "force_channels_last": {
+        "label": "Channels Last",
+        "help": "推理时强制 channels last 张量布局。部分 GPU（如 AMD）可提速，个别工作流可能变慢。",
+        "options": {
+          "default": "关闭",
+          "enabled": "启用"
+        }
+      },
+      "preview_size": {
+        "label": "预览最大尺寸",
+        "help": "采样预览图的最大边长。调小可减少预览开销，调大预览更清晰。"
+      },
+      "disable_metadata": {
+        "label": "输出元数据",
+        "help": "默认在输出文件中写入生成参数（prompt/seed 等）。禁用后文件更干净、体积略小，但无法从文件回溯生成信息。",
+        "options": {
+          "default": "写入元数据",
+          "disabled": "禁用写入"
+        }
+      },
+      "fast_disk": {
+        "label": "磁盘优先加载",
+        "help": "模型权重走 page cache 而非匿名内存，大幅降低内存占用（大模型场景尤其明显）。NVMe 盘推荐启用。",
+        "options": {
+          "default": "关闭",
+          "enabled": "启用"
+        }
+      },
+      "mmap": {
+        "label": "MMAP 文件映射",
+        "help": "ckpt/pt 文件用 mmap 加载、safetensors 不用 mmap，进一步降低内存占用。",
+        "options": {
+          "default": "默认",
+          "mmap": "启用 mmap",
+          "no_mmap": "禁用 mmap"
+        }
+      },
+      "pinned_memory": {
+        "label": "Pinned 内存",
+        "help": "Pinned memory 加速 CPU→GPU 传输但不可回收。内存紧张时可禁用。",
+        "options": {
+          "default": "默认",
+          "off": "禁用"
+        }
+      },
+      "max_upload_size": {
+        "label": "上传上限 (MB)",
+        "help": "ComfyUI 侧的最大上传体积 (MB)。面板上传另有自己的限制，这里设大一点作为兜底。"
       }
     }
   },
@@ -200,7 +297,11 @@
       "memory": "内存与性能",
       "precision": "精度控制",
       "cache": "缓存",
-      "preview": "预览"
+      "preview": "预览",
+      "attention": "注意力优化",
+      "output": "输出",
+      "disk": "内存与磁盘",
+      "network": "网络与上传"
     }
   },
   "plugins": {

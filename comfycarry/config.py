@@ -14,7 +14,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # ── 版本号 (唯一源) ──────────────────────────────────────────
-APP_VERSION = "v0.5.5"
+APP_VERSION = "v0.6.0"
 
 # ── 核心路径常量 ─────────────────────────────────────────────
 # 面板的路径约定: 对外 (UI / 规则数据 / 文件 API) 一律用 "workspace 根相对路径",
@@ -217,6 +217,7 @@ MODEL_DIRS = {
     "vae_approx": "models/vae_approx",
     "configs": "models/configs",
     # 第三方节点常用目录
+    "seedvr2": "models/SEEDVR2",
     "ultralytics": "models/ultralytics",
     "ultralytics_bbox": "models/ultralytics/bbox",
     "ultralytics_segm": "models/ultralytics/segm",

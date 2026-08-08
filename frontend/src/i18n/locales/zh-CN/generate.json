@@ -16,6 +16,7 @@
     "task_edit": "编辑",
     "family_flux2": "Flux 2 系列",
     "family_wan22": "Wan 2.2 系列",
+    "family_minimax_h3": "MiniMax H3 系列",
     "not_ready": "未就绪"
   },
   "tabs": {
@@ -36,6 +37,10 @@
     "wan22_t2v": "Wan 2.2 文生视频",
     "wan22_5b": "Wan 2.2 5B 轻量",
     "wan22_5b_hint": "图生 / 文生通用",
+    "minimax_h3": "MiniMax H3 音视频",
+    "minimax_h3_hint": "文生 / 首尾帧 · 原生音频",
+    "minimax_h3_ref": "MiniMax H3 参考生成",
+    "minimax_h3_ref_hint": "图 / 视频 / 音频参考驱动",
     "history": "队列 & 历史"
   },
   "prompt": {
@@ -152,6 +157,8 @@
     "search_vae": "搜索 VAE...",
     "text_encoder": "文本编码器",
     "select_text_encoder": "选择文本编码器",
+    "audio_vae": "音频 VAE",
+    "select_audio_vae": "选择音频 VAE",
     "unet_high": "高噪",
     "unet_low": "低噪",
     "unet_seg_help": "Wan 2.2 14B 把生成分成两段：先用高噪权重打底，再用低噪权重出细节。两个文件都要选，且必须是同一个模型的两段。",
@@ -201,6 +208,7 @@
   },
   "video": {
     "start_frame": "起始画面",
+    "last_frame": "结束画面（可选）",
     "start_frame_not_image": "视频不能作为起始画面，请选择一张图片",
     "mode_t2v": "文生视频",
     "mode_i2v": "图生视频",
@@ -222,7 +230,25 @@
     "res_help": "选中尺寸的比例与起始画面不一致时，起始画面会被居中裁切以适配。",
     "orient_landscape": "横",
     "orient_portrait": "竖",
-    "orient_square": "方"
+    "orient_square": "方",
+    "refs_title": "参考素材",
+    "refs_empty": "尚未添加参考素材",
+    "refs_add_image": "添加图片",
+    "refs_add_video": "添加视频",
+    "refs_add_audio": "添加音频",
+    "refs_help": "参考素材使用说明",
+    "refs_help_syntax_title": "引用语法",
+    "refs_help_syntax_a": "在提示词中用 <Picture 1>、<Video 1>、<Audio 1> 引用素材；编号按类别内顺序，与左侧素材块角标一致",
+    "refs_help_syntax_b": "示例：The character's appearance follows <Picture 1>, with the camera move of <Video 1>, singing in the style of <Audio 1>",
+    "refs_help_usage_title": "使用要点",
+    "refs_help_usage_a": "给每个参考素材分配明确职责（角色外观 / 场景 / 风格 / 运镜 / 运动 / 音色 / 音乐风格…）",
+    "refs_help_usage_b": "视频参考提供运动、运镜与剪辑节奏；音频参考提供音色、旋律、节奏或音乐风格",
+    "refs_help_limits_title": "数量限制",
+    "refs_help_limits_a": "图片 ≤ 9 张；视频 ≤ 3 段（每段 2–15 秒，总时长 ≤ 15 秒）；音频 ≤ 3 段（每段 2–15 秒）",
+    "refs_help_limits_b": "混合输入总文件数 ≤ 12；音频不能作为唯一参考，须搭配图片或视频",
+    "refs_help_formats_title": "格式与大小",
+    "refs_help_formats_a": "视频：H.264 / H.265（MP4），单文件 ≤ 50 MB",
+    "refs_help_formats_b": "音频：WAV / MP3，单文件 ≤ 15 MB；图片：JPG / PNG / WEBP 等，单文件 ≤ 20 MB"
   },
   "modules": {
     "lora": "LoRA",
@@ -497,7 +523,15 @@
     "components_not_ready": "运行组件未就绪，请先下载",
     "video_same_unet": "高噪与低噪权重不能是同一个文件",
     "no_start_frame": "请先上传起始画面",
-    "no_unet_pair": "请分别选择高噪与低噪两个权重"
+    "no_unet_pair": "请分别选择高噪与低噪两个权重",
+    "minimax_h3_unet_required": "MiniMax H3 需选择 UNet 权重",
+    "minimax_h3_te_vae_required": "需选择文本编码器 / 视频 VAE / 音频 VAE",
+    "minimax_h3_refs_required": "请至少添加一个参考素材",
+    "minimax_h3_refs_audio_requires_visual": "音频不能作为唯一参考，请同时添加图片或视频",
+    "minimax_h3_refs_images_too_many": "图片最多 {limit} 个（当前 {current}）",
+    "minimax_h3_refs_videos_too_many": "视频最多 {limit} 个（当前 {current}）",
+    "minimax_h3_refs_audios_too_many": "音频最多 {limit} 个（当前 {current}）",
+    "minimax_h3_refs_total_too_many": "参考素材总数最多 {limit} 个（当前 {current}）"
   },
   "components": {
     "title": "运行组件",
@@ -505,6 +539,7 @@
     "role_text_encoder_1": "文本编码器 1",
     "role_text_encoder_2": "文本编码器 2",
     "role_vae": "VAE",
+    "role_audio_vae": "音频 VAE",
     "fast_files_hint": "仅快速模式需要"
   },
   "picker": {
@@ -529,6 +564,7 @@
   },
   "model": {},
   "placeholders": {
+    "positive_minimax_h3_ref": "描述画面、运动与声音，用 <Picture 1>、<Video 1>、<Audio 1> 引用参考素材…",
     "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
     "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
     "positive_noobai": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
@@ -594,9 +630,22 @@
     "wan22_same_unet": "高噪与低噪 UNet 不能是同一个文件",
     "wan22_unet_required": "Wan 2.2 5B 需选择 UNet 权重",
     "wan22_te_vae_required": "需选择 Text Encoder / VAE 两个模型文件",
+    "minimax_h3_unet_required": "MiniMax H3 需选择 UNet 权重",
+    "minimax_h3_te_vae_required": "需选择 Text Encoder / 视频 VAE / 音频 VAE",
+    "minimax_h3_refs_required": "请至少添加一个参考素材",
+    "refs_invalid": "参考素材数据无效",
+    "minimax_h3_refs_images_too_many": "图片最多 {limit} 个（当前 {current}）",
+    "minimax_h3_refs_videos_too_many": "视频最多 {limit} 个（当前 {current}）",
+    "minimax_h3_refs_audios_too_many": "音频最多 {limit} 个（当前 {current}）",
+    "minimax_h3_refs_total_too_many": "参考素材总数最多 {limit} 个（当前 {current}）",
+    "invalid_ref_path": "参考素材路径无效：{name}",
+    "ref_not_found": "参考素材不存在：{name}，请重新上传",
+    "unsupported_media_format": "不支持的媒体格式：{content_type}",
     "no_start_frame": "请先上传起始画面",
     "invalid_start_frame_path": "起始画面路径无效：{name}",
     "start_frame_not_found": "起始画面不存在：{name}，请重新上传",
+    "invalid_last_frame_path": "结束画面路径无效：{name}",
+    "last_frame_not_found": "结束画面不存在：{name}，请重新上传",
     "invalid_width": "分辨率宽度需为整数",
     "invalid_height": "分辨率高度需为整数",
     "invalid_resolution": "分辨率宽高需为正整数",

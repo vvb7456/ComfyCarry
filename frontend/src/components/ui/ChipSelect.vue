@@ -268,10 +268,16 @@ function fmt(c: number | string) {
   background: color-mix(in srgb, var(--ac) 17%, transparent);
 }
 
+.chip-select__chip--active:hover {
+  background: color-mix(in srgb, var(--ac) 78%, var(--bg3));
+  border-color: color-mix(in srgb, var(--ac) 85%, var(--bd));
+}
+
 .chip-select__chip--active {
-  background: color-mix(in srgb, var(--ac) 22%, transparent);
-  color: var(--ac2);
-  border-color: color-mix(in srgb, var(--ac) 42%, var(--bd));
+  background: color-mix(in srgb, var(--ac) 65%, var(--bg3));
+  color: #fff;
+  font-weight: 600;
+  border-color: color-mix(in srgb, var(--ac) 70%, var(--bd));
 }
 
 .chip-select__chip--toggle {
@@ -293,7 +299,7 @@ function fmt(c: number | string) {
 }
 
 .chip-select__chip--active .chip-select__count {
-  color: color-mix(in srgb, var(--ac2) 70%, var(--t2));
+  color: var(--t-inv-2);
 }
 
 .chip-select--measurer .chip-select__chip {

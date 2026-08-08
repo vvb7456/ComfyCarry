@@ -36,6 +36,8 @@ from ..services.workflow_builder import (
     build_chroma_workflow,
     build_flux2_workflow,
     build_wan22_workflow,
+    build_minimax_h3_workflow,
+    build_minimax_h3_ref_workflow,
     build_preprocess_workflow,
     build_tag_workflow,
 )
@@ -391,14 +393,42 @@ def api_generate_options():
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/bmp"}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MB
 
+# ── 上传媒体映射表 (api_generate_upload_image 专用) ──
+# 每项: 媒体类别 → (允许 content_type 集合, content_type→扩展名, 大小上限)
+# 图像保持既有行为逐字不变 (20MB); 视频 50MB; 音频 15MB。
+_UPLOAD_MEDIA_TYPES = {
+    "image": (
+        ALLOWED_IMAGE_TYPES,
+        {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"},
+        MAX_IMAGE_SIZE,
+    ),
+    "video": (
+        {"video/mp4", "video/webm", "video/quicktime"},
+        {"video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov"},
+        50 * 1024 * 1024,
+    ),
+    "audio": (
+        {"audio/mpeg", "audio/wav", "audio/flac", "audio/ogg", "audio/mp4", "audio/aac"},
+        {"audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/flac": ".flac",
+         "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/aac": ".aac"},
+        15 * 1024 * 1024,
+    ),
+}
+
+
 @bp.route("/api/generate/upload_image", methods=["POST"])
 def api_generate_upload_image():
     """
-    上传图片到 ComfyUI input/ 目录 (供 ControlNet / Img2Img 使用)。
+    上传媒体文件到 ComfyUI input/ 目录。
+
+    支持三类媒体 (供 MiniMax H3 Ref2VA 参考条目 / ControlNet / Img2Img 使用):
+        image — png/jpeg/webp/bmp, 最大 20MB
+        video — mp4/webm/mov, 最大 50MB
+        audio — mp3/wav/flac/ogg/m4a/aac, 最大 15MB
 
     Form data:
-        file      — 图片文件 (png/jpeg/webp/bmp, 最大 20MB)
-        type      — 用途标识 (可选: "pose" / "canny" / "depth" / "i2i")
+        file      — 媒体文件
+        type      — 用途标识 (可选: "pose" / "canny" / "depth" / "i2i" / "ref")
         subfolder — 可选子目录名 (如 "openpose"), 保存到 input/{subfolder}/
 
     返回: {"filename": "openpose/pose_abc123.png"}  (相对于 input/ 的路径)
@@ -410,23 +440,35 @@ def api_generate_upload_image():
     if not file or not file.filename:
         return _err("invalid_file")
 
-    # 文件类型校验
+    # 文件类型校验: 按媒体类别匹配, 未命中时报对应错误键
     content_type = file.content_type or ""
-    if content_type not in ALLOWED_IMAGE_TYPES:
-        return _err("unsupported_image_format", content_type=content_type)
+    media_type = None
+    allowed = set()
+    ext_map: dict = {}
+    max_size = 0
+    for mt, (allow, exts, msize) in _UPLOAD_MEDIA_TYPES.items():
+        if content_type in allow:
+            media_type, allowed, ext_map, max_size = mt, allow, exts, msize
+            break
+    if media_type is None:
+        # 图像类型不支持仍用 unsupported_image_format; 其余用 unsupported_media_format
+        if content_type.startswith("image/"):
+            return _err("unsupported_image_format", content_type=content_type)
+        return _err("unsupported_media_format", content_type=content_type)
 
-    # 文件大小校验
+    # 文件大小校验 (按媒体类别上限)
     file.seek(0, 2)
     size = file.tell()
     file.seek(0)
-    if size > MAX_IMAGE_SIZE:
-        return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=20)
+    limit_mb = max_size // (1024 * 1024)
+    if size > max_size:
+        return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=limit_mb)
 
     # 生成安全文件名
     import uuid
     usage = request.form.get("type", "ref")
-    ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
-    ext = ext_map.get(content_type, ".png")
+    ext_fallback = {"image": ".png", "video": ".mp4", "audio": ".mp3"}.get(media_type, ".png")
+    ext = ext_map.get(content_type, ext_fallback)
     safe_name = f"comfycarry_{usage}_{uuid.uuid4().hex[:8]}{ext}"
 
     input_dir = os.path.join(COMFYUI_DIR, "input")
@@ -445,17 +487,18 @@ def api_generate_upload_image():
 
     # 返回相对于 input/ 的路径
     rel_name = f"{safe_sub}/{safe_name}" if subfolder else safe_name
-    logger.info(f"[generate] 图片已上传: {rel_name} ({size} bytes)")
+    logger.info(f"[generate] 媒体已上传: {rel_name} ({size} bytes, {media_type})")
 
     result = {"filename": rel_name}
 
-    # 返回图片尺寸 (用于图生图自动填充 width/height)
-    try:
-        from PIL import Image as PILImage
-        with PILImage.open(dest) as img:
-            result["width"], result["height"] = img.size
-    except Exception:
-        pass
+    # 返回图片尺寸 (仅图像, 用于图生图自动填充 width/height)
+    if media_type == "image":
+        try:
+            from PIL import Image as PILImage
+            with PILImage.open(dest) as img:
+                result["width"], result["height"] = img.size
+        except Exception:
+            pass
 
     return jsonify(result)
 
@@ -646,6 +689,10 @@ _BUILDERS = {
     "wan22_i2v": lambda params: build_wan22_workflow(params, "i2v"),
     "wan22_t2v": lambda params: build_wan22_workflow(params, "t2v"),
     "wan22_5b": lambda params: build_wan22_workflow(params, "5b"),
+    # MiniMax H3 (FL2VA) 视频 — t2v/i2v 由 params["mode"] 决定 (缺省 i2v)
+    "minimax_h3": lambda params: build_minimax_h3_workflow(params, params.get("mode") or "i2v"),
+    # MiniMax H3 Ref2VA 参考生成 — refs 承载参考条目 (图/视频/音频)
+    "minimax_h3_ref": build_minimax_h3_ref_workflow,
 }
 
 # 分离式三件套架构集合 (UNet + Text Encoder + VAE), 校验逻辑共用
@@ -658,7 +705,9 @@ _DUAL_CLIP_ARCHS = ("flux1",)
 # Wan 2.2 视频架构集合 — 独立校验分支, 不并入 _SPLIT_ARCHS (后者写死单 unet 必填)。
 # 三 model_type 均走 build_wan22_workflow, variant 由 model_type 推导。
 # 14B (i2v/t2v) 双权重 high/low 必填且互异; 5B 单权重 unet 必填。
-_VIDEO_ARCHS = ("wan22_i2v", "wan22_t2v", "wan22_5b")
+# MiniMax H3 (minimax_h3) 走独立校验子分支 (build_minimax_h3_workflow);
+# minimax_h3_ref (Ref2VA) 与 minimax_h3 共用通用校验 + 独立 refs 校验。
+_VIDEO_ARCHS = ("wan22_i2v", "wan22_t2v", "wan22_5b", "minimax_h3", "minimax_h3_ref")
 
 
 @bp.route("/api/generate/submit", methods=["POST"])

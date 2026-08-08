@@ -35,7 +35,9 @@ import TaggerModal from '@/components/generate/TaggerModal.vue'
 import LlmModal from '@/components/generate/LlmModal.vue'
 import PromptEditorModal from '@/components/generate/PromptEditorModal.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
+import RefMediaPanel from '@/components/generate/RefMediaPanel.vue'
 import MaskEditorModal from '@/components/generate/MaskEditorModal.vue'
+import type { RefItem } from '@/stores/generate'
 import LocalModelModal from '@/components/models/LocalModelModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 import { TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
@@ -107,14 +109,32 @@ function onVideoModeChange(v: string) {
 }
 
 // 起始画面挂载判定 — 挂在提示词容器左栏 (PromptEditor 的 #media 槽):
-//  - wan22_t2v: 不渲染 (纯文生)
-//  - wan22_i2v: 恒渲染
-//  - wan22_5b:  仅 i2v 模式渲染 (文生模式下左栏整块消失)
+//  - 条目内双模式 (wan22_5b/minimax_h3): 仅 i2v 模式渲染 (文生模式下左栏整块消失)
+//  - 无 videoModes 的条目: 按 modelType 的 t2v 语义判断 (wan22_t2v = 纯文生不渲染,
+//    wan22_i2v 等其余视频条目恒渲染)。原硬编码 'wan22_t2v' 判据由该语义泛化覆盖。
 const showStartFrame = computed(() => {
   if (!isVideo.value) return false
-  if (props.modelType === 'wan22_t2v') return false
+  // Ref2VA 参考生成条目无起始画面 (左媒体栏让位给 RefMediaPanel)
+  if (props.modelType === 'minimax_h3_ref') return false
   if (config.value.videoModes?.length) return videoMode.value === 'i2v'
-  return true
+  return !props.modelType.includes('t2v')
+})
+
+// 末帧挂载判定 (MiniMax H3 首尾帧): 仅 minimax_h3 且 i2v 模式时渲染。
+// 其余架构恒 false (不渲染), 末帧是可选项, 不阻断生成。
+const showLastFrame = computed(() => props.modelType === 'minimax_h3' && videoMode.value === 'i2v')
+
+// 参考素材面板挂载判定 (MiniMax H3 Ref2VA): 左媒体栏渲染 RefMediaPanel,
+// 与 showStartFrame 分支互斥 (两者不会同时渲染)。
+const showRefPanel = computed(() => props.modelType === 'minimax_h3_ref')
+
+// state.video 可能为 undefined (图像架构); 参考素材面板仅视频架构渲染,
+// 这里用 computed getter/setter 包裹 v-model, 避免模板里直接解包 undefined。
+const videoRefs = computed<RefItem[]>({
+  get: () => state.value.video?.refs ?? [],
+  set: (v) => {
+    if (state.value.video) state.value.video.refs = v
+  },
 })
 
 // ── 起始画面上传/选择 (复用 FileUploadZone + useRefImagePicker, 与图生图同一套) ──
@@ -162,6 +182,34 @@ async function onStartFrameUpload(file: File) {
 }
 function onStartFrameClear() {
   if (state.value.video) state.value.video.refImage = ''
+}
+
+// ── 末画面上传/选择 (MiniMax H3 首尾帧; 复用同一套 FileUploadZone + picker) ──
+const lastFramePicker = useRefImagePicker('video_last_frame')
+
+const lastFrameName = computed(() => {
+  const n = state.value.video?.lastImage ?? ''
+  if (!n) return undefined
+  return n.includes('/') ? n.slice(n.lastIndexOf('/') + 1) : n
+})
+const lastFramePreview = computed(() => {
+  const n = state.value.video?.lastImage
+  if (!n) return undefined
+  return `/api/generate/input_image_preview?name=${encodeURIComponent(n)}`
+})
+
+function onLastFramePick(name: string) {
+  if (state.value.video) state.value.video.lastImage = name
+  lastFramePicker.close()
+}
+async function onLastFrameUpload(file: File) {
+  const result = await lastFramePicker.uploadFile(file)
+  if (!result) return
+  if (state.value.video) state.value.video.lastImage = result.filename
+  toast(t('generate.i2i.uploaded'), 'success')
+}
+function onLastFrameClear() {
+  if (state.value.video) state.value.video.lastImage = ''
 }
 
 // 包装形态: 该 tab 支持的形态列表 (supportedPackaging) + 当前选中项的实际形态
@@ -494,6 +542,11 @@ function autofillDefaultModels() {
     const found = options.vaes.value.find(v => v.name === defs.vae || v.name.endsWith('/' + defs.vae))
     if (found) state.value.vae = found.name
   }
+  // 音频 VAE (MiniMax H3; 与 vae 同池匹配)
+  if (!state.value.audioVae && defs.audioVae) {
+    const found = options.vaes.value.find(v => v.name === defs.audioVae || v.name.endsWith('/' + defs.audioVae))
+    if (found) state.value.audioVae = found.name
+  }
 }
 
 watch([() => options.clips.value, () => options.vaes.value, () => store.activeModelType], autofillDefaultModels, { immediate: true })
@@ -516,6 +569,14 @@ const runBlockedReason = computed<string>(() => {
 
   // 1b. 视频 i2v 未选起始画面 → 软禁用 + 点击 toast。
   if (showStartFrame.value && !st.video?.refImage) return t('generate.error.no_start_frame')
+
+  // 1b'. Ref2VA 参考生成: 至少一个参考素材 (图/视频/音频均可) → 软禁用 + 点击 toast。
+  //      音频不能作为唯一参考 (官方约束) → 同样软禁用。
+  if (showRefPanel.value) {
+    const refs = st.video?.refs ?? []
+    if (!refs.length) return t('generate.error.minimax_h3_refs_required')
+    if (refs.every(r => r.type === 'audio')) return t('generate.error.minimax_h3_refs_audio_requires_visual')
+  }
 
   // 1c. 模块已启用但依赖缺件。开关本身会拦, 但 enabled 是持久化的 —— 上次开着、
   // 这次模型被删/换了架构 (专用 CN 模型按 branch 分家) 都会留下开着却跑不了的状态。
@@ -596,8 +657,10 @@ defineExpose({ handlePreprocessDone, handleTagDone })
             />
           </template>
 
-          <!-- 起始画面 — 与图生图参考图同一组件 -->
+          <!-- 起始画面 — 与图生图参考图同一组件。
+               H3 首尾帧: 首帧 | 提示词 | 尾帧 三栏 (尾帧走 media-right 槽) -->
           <template v-if="showStartFrame" #media>
+            <p v-if="showLastFrame" class="model-tab__frame-lbl">{{ t('generate.video.start_frame') }}</p>
             <FileUploadZone
               mode="pick"
               :accept="IMAGE_ACCEPT"
@@ -610,6 +673,31 @@ defineExpose({ handlePreprocessDone, handleTagDone })
               @pick="videoPicker.open()"
               @file="onStartFrameUpload"
               @clear="onStartFrameClear"
+              @error="toast($event, 'warning')"
+            />
+          </template>
+
+          <!-- 参考素材 (MiniMax H3 Ref2VA) — 左媒体栏 (既有「左侧媒体」形态;
+               面板内部滚动, 不撑高容器), 与起始画面互斥 -->
+          <template v-if="showRefPanel" #media>
+            <RefMediaPanel v-model:refs="videoRefs" :disabled="frozen" />
+          </template>
+
+          <!-- 结束画面 (MiniMax H3 i2v 首尾帧; 可选) — 右媒体栏 -->
+          <template v-if="showLastFrame" #media-right>
+            <p class="model-tab__frame-lbl">{{ t('generate.video.last_frame') }}</p>
+            <FileUploadZone
+              mode="pick"
+              :accept="IMAGE_ACCEPT"
+              :preview="lastFramePreview"
+              :file-name="lastFrameName"
+              :pick-label="t('generate.i2i.pick_from_input')"
+              :upload-label="t('generate.i2i.upload_local')"
+              pick-icon="image"
+              :disabled="frozen"
+              @pick="lastFramePicker.open()"
+              @file="onLastFrameUpload"
+              @clear="onLastFrameClear"
               @error="toast($event, 'warning')"
             />
           </template>
@@ -813,6 +901,20 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :preview-url-fn="videoPicker.previewUrl"
       @select="onStartFramePick"
       @upload="onStartFrameUpload"
+    />
+
+    <!-- 结束画面 Picker Modal (MiniMax H3, usage='video_last_frame') -->
+    <RefImageModal
+      v-if="showLastFrame"
+      v-model="lastFramePicker.visible.value"
+      :title="t('generate.video.last_frame')"
+      icon="image"
+      :images="lastFramePicker.images.value"
+      :loading="lastFramePicker.loading.value"
+      :uploading="lastFramePicker.uploading.value"
+      :preview-url-fn="lastFramePicker.previewUrl"
+      @select="onLastFramePick"
+      @upload="onLastFrameUpload"
     />
 
     <!-- I2I Ref Image Picker Modal -->
@@ -1055,4 +1157,13 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   color: var(--t3);
 }
 .gen-placeholder--sm { padding: var(--sp-2) var(--sp-3); }
+
+/* ── 首/尾帧 (MiniMax H3 首尾帧) 媒体栏小标题: 与 .field-lbl 同款。
+      纵向间距由 .prompt-media 的 gap 负责, 自身 margin 归零 ── */
+.model-tab__frame-lbl {
+  margin: 0;
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--t2);
+}
 </style>

@@ -565,7 +565,10 @@ sse.start()
               :aria-label="t('generate.header.model_selector_aria')"
             >
               <!-- 当前模型 logo(20px 底板) / 字母徽章 -->
-              <span class="gen-arch-logo" :class="{ 'gen-arch-logo--pad': currentConfig.logo }">
+              <span
+                class="gen-arch-logo"
+                :class="{ 'gen-arch-logo--pad': currentConfig.logo }"
+              >
                 <img v-if="currentConfig.logo" :src="currentConfig.logo" :alt="currentConfig.label" />
                 <span v-else class="gen-arch-logo__letter">{{ currentConfig.label.slice(0, 2) }}</span>
               </span>
@@ -812,4 +815,3 @@ sse.start()
 }
 
 </style>
-

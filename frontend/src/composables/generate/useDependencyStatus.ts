@@ -2,6 +2,8 @@ import { ref, computed, watch, onScopeDispose, toValue, type Ref, type ComputedR
 import { useI18n } from 'vue-i18n'
 import { useDownloadsStore } from '@/stores/downloads'
 import { apiErrorText } from '@/utils/apiError'
+import { buildHuggingFaceDownloadBody } from '@/utils/hfDownload'
+import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
 
 /**
  * useDependencyStatus — 依赖状态机 (运行组件那套的通用化)。
@@ -20,6 +22,12 @@ export interface DepFileSpec {
   url: string
   /** 相对 ComfyUI 根的目录 */
   subdir: string
+  /**
+   * HF 白名单锚点 (可选)。存在时下载改走 huggingface 统一通道
+   * (完成即登记 SQLite + resource_registry 状态与 HF 标签页同步);
+   * 缺省走通用 URL 通道 (custom_nodes 辅助件 / 非 HF 源)。
+   */
+  hf?: { model: HuggingFaceModel; version: HuggingFaceVersion }
 }
 
 export interface DepRow {
@@ -335,19 +343,25 @@ export function useDependencyStatus(
           } catch { /* check 失败则继续尝试提交 */ }
 
           try {
+            // 有白名单锚点 → huggingface 统一通道 (目录按 model_type 由后端解析,
+            // 完成自动登记 SQLite + resource_registry); 否则通用 URL 通道
+            // (custom_nodes 辅助件 / 非 HF 源)。
+            const payload = f.hf
+              ? buildHuggingFaceDownloadBody(f.hf.model, f.hf.version)
+              : {
+                  url: f.url,
+                  save_dir: saveDir,
+                  filename: f.filename,
+                  meta: {
+                    source: opts.source || 'model-dependency',
+                    model: s.row.label,
+                    ...(opts.metaOf ? opts.metaOf(s.row) : {}),
+                  },
+                }
             const dlRes = await fetch('/api/downloads', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                url: f.url,
-                save_dir: saveDir,
-                filename: f.filename,
-                meta: {
-                  source: opts.source || 'model-dependency',
-                  model: s.row.label,
-                  ...(opts.metaOf ? opts.metaOf(s.row) : {}),
-                },
-              }),
+              body: JSON.stringify(payload),
             })
             if (!dlRes.ok) {
               console.warn('[dep] submit failed:', f.filename, dlRes.status)

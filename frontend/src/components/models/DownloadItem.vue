@@ -11,7 +11,15 @@ import { fmtBytes, fmtSpeed } from '@/utils/format'
 
 defineOptions({ name: 'DownloadItem' })
 
-const { t } = useI18n()
+const { t, te } = useI18n()
+
+// 后端错误可能是 i18n key (如 models.err.dl_interrupted) 也可能是自由文本
+// (aria2/civitai 错误原文): 命中 key 就翻译, 否则原样显示。
+const errorText = computed(() => {
+  const e = props.task?.error
+  if (!e) return ''
+  return te(e) ? t(e) : e
+})
 
 const props = defineProps<{
   /** Favorite item mode */
@@ -134,7 +142,7 @@ const showProgressRow = computed(() =>
         <!-- Task status labels -->
         <span v-if="isPaused" class="dli-status dli-status--paused">{{ t('models.downloads.paused') }}</span>
         <span v-if="isQueued" class="dli-status dli-status--queued">{{ t('models.downloads.waiting') }}</span>
-        <span v-if="isFailed && task?.error" class="dli-status dli-status--error">{{ task.error }}</span>
+        <span v-if="isFailed && task?.error" class="dli-status dli-status--error">{{ errorText }}</span>
       </div>
     </div>
 

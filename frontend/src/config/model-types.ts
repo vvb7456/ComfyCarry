@@ -1,12 +1,15 @@
+// Stability AI mark (official icon, no wordmark): https://stability.ai/
 import sdxlLogo from '@/assets/model-logos/sdxl.png'
 import krea2Logo from '@/assets/model-logos/krea2.png'
-import zimageLogo from '@/assets/model-logos/zimage.png'
-import flux1Logo from '@/assets/model-logos/flux1.png'
-import illustriousLogo from '@/assets/model-logos/illustrious.png'
-// Wan 官方 logo 的字标部分 (来源 github.com/Wan-Video/Wan2.2 assets/logo.png)。
-// 刻意不用其图形符号 —— 那是阿里通义系共用标记, 与 zimage.png 几何完全相同,
-// 三个 wan tab 会与 Z-Image tab 撞脸。字标形式亦与 illustrious.png 一致。
-import wanLogo from '@/assets/model-logos/wan.png'
+import tongyiLogo from '@/assets/model-logos/tongyi.png'
+import minimaxLogo from '@/assets/model-logos/minimax.png'
+import flux1Logo from '@/assets/model-logos/flux1.svg'
+import illustriousLogo from '@/assets/model-logos/illustrious.svg'
+// Wan official symbol cropped from the official Wan2.1/Wan2.2 logo asset
+// (the wordmark is intentionally omitted):
+// https://github.com/Wan-Video/Wan2.1/blob/main/assets/logo.png .
+// Z-Image and Wan are both Tongyi/Alibaba projects, so sharing this
+// organization mark is intentional.
 
 export interface ModelTypeConfig {
   key: string
@@ -42,13 +45,13 @@ export interface ModelTypeConfig {
   /** 提示词风格: tags = A1111 tag 格式; natural = 自然语言 */
   promptStyle: 'tags' | 'natural'
   /** 官方推荐默认 CLIP / VAE 文件名 (split 形态, 用于自动填充) */
-  defaultModels?: { clip?: string; clip2?: string; vae?: string }
+  defaultModels?: { clip?: string; clip2?: string; vae?: string; audioVae?: string }
   modules: string[]
   extraParams?: Record<string, string | number | boolean>
   /** Logo 资产 URL (静态 import); 缺省走字母徽章 */
   logo?: string
-  /** 暗色主题下 logo 反色 (纯黑单色 logo 如 flux1/BFL): true → filter: invert(1)
-   *  且底板改用透明/深色 */
+  /** 暗色主题下 logo 反色 (仅纯黑/单色 logo): true → filter: invert(1)
+   *  且底板改用透明/深色; 彩色 logo 不应启用 */
   logoInvertDark?: boolean
   /** 软架构: 所属家族 key (如 'sdxl'); 有此字段 = 二级条目 (衍生)。
    *  家族 key 可以不对应 MODEL_TYPES 中的条目 (如 'flux2' 是纯分组, 无同名可选架构)。 */
@@ -74,8 +77,8 @@ export interface ModelTypeConfig {
     maxDurationS: number
     /** 宽高整除约束 (14B=16 / 5B=32) */
     divisor: number
-    /** ModelSamplingSD3 shift (14B=5.0 / 5B=8.0) */
-    shift: number
+    /** ModelSamplingSD3 shift (14B=5.0 / 5B=8.0); H3 (FL2V) 无 shift 不设 */
+    shift?: number
     presets: {
       [tier: string]: {
         landscape: { width: number; height: number }
@@ -85,6 +88,16 @@ export interface ModelTypeConfig {
     }
     /** 速度开关 (仅 14B): true 时 UI 显示快速/标准 SegmentedControl; 5B 不设 = 无开关 */
     speedToggle?: boolean
+    /** 时长滑块下限 (秒); 缺省 1 (H3 = 4) */
+    durationMin?: number
+    /** 时长滑块步进 (秒); 缺省 0.5 (H3 = 1, 整数秒) */
+    durationStep?: number
+    /** 帧长对齐网格 (H3 = 17, 帧数须 ≡ frameGridOffset mod frameGrid); 缺省 = 不约束 */
+    frameGrid?: number
+    /** 帧长对齐网格偏移 (H3 = 5, 即 17k+5); 仅 frameGrid 存在时有意义 */
+    frameGridOffset?: number
+    /** 像素预算 (W×H); 缺省 921600 (Wan 720p) */
+    maxPixels?: number
   }
   /** 条目内可切换的视频模式 (单条目双模式, 如 5B 的 t2v/i2v); 14B t2v/i2v 为独立条目不设此字段 */
   videoModes?: ('t2v' | 'i2v')[]
@@ -224,7 +237,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['zimage'],
     supportedPackaging: ['split'],
     controlNetEnabled: false,  // 官方 CN 模板已出现, 二期评估
-    logo: zimageLogo,
+    logo: tongyiLogo,
     pickerArch: 'zimage',
     releasedAt: '2025-11',
     mediaType: 'image',
@@ -260,8 +273,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       depth: { strength: 0.8, end: 0.8 },
     },
     logo: flux1Logo,
-    // BFL 纯黑单色 logo: 暗色主题下需反色
-    logoInvertDark: true,
+    // Black Forest Labs official standalone symbol, transparent/no wordmark:
+    // https://bfl.ai/brand
     pickerArch: 'flux',
     releasedAt: '2024-07',
     mediaType: 'image',
@@ -321,9 +334,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
-    // Flux 2 同为 Black Forest Labs 出品, 复用官方 BFL logo (纯黑单色, 暗色需反色)
+    // Flux 2 is also published by Black Forest Labs; reuse its official symbol.
     logo: flux1Logo,
-    logoInvertDark: true,
     pickerArch: 'flux2',
     releasedAt: '2026-01',
     familyOf: 'flux2',
@@ -356,9 +368,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
-    // Flux 2 同为 Black Forest Labs 出品, 复用官方 BFL logo (纯黑单色, 暗色需反色)
+    // Flux 2 is also published by Black Forest Labs; reuse its official symbol.
     logo: flux1Logo,
-    logoInvertDark: true,
     pickerArch: 'flux2',
     releasedAt: '2026-01',
     familyOf: 'flux2',
@@ -391,11 +402,10 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     archFilter: ['flux2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
-    // Flux 2 同为 Black Forest Labs 出品, 复用官方 BFL logo (纯黑单色, 暗色需反色)
+    // Flux 2 is also published by Black Forest Labs; reuse its official symbol.
     logo: flux1Logo,
-    logoInvertDark: true,
     pickerArch: 'flux2',
-    releasedAt: '2025-11',
+    releasedAt: '2026-01',
     familyOf: 'flux2',
     mediaType: 'image',
     workflowType: 'flux2',
@@ -520,7 +530,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   wan22_i2v: {
     key: 'wan22_i2v',
     label: 'Wan 2.2 i2v',
-    logo: wanLogo,
+    logo: tongyiLogo,
     archFilter: ['wan22_i2v', 'wan'],
     supportedPackaging: ['split'],
     // 14B 双 UNet (high/low 两件 fp8); 视频主权重用户自行获取, 落盘后 arch_detect 配对识别
@@ -565,7 +575,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   wan22_t2v: {
     key: 'wan22_t2v',
     label: 'Wan 2.2 t2v',
-    logo: wanLogo,
+    logo: tongyiLogo,
     archFilter: ['wan22_t2v', 'wan'],
     supportedPackaging: ['split'],
     // 与 i2v 完全同构, 权重不同 (t2v 专用 high/low), 无起始画面区块
@@ -609,7 +619,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   wan22_5b: {
     key: 'wan22_5b',
     label: 'Wan 2.2 5B',
-    logo: wanLogo,
+    logo: tongyiLogo,
     archFilter: ['wan22_5b', 'wan'],
     supportedPackaging: ['split'],
     // 5B 单权重双模式 (t2v/i2v), 不走双 UNet; LoadImage bypass 即模式切换
@@ -648,6 +658,99 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
           landscape: { width: 1280, height: 704 },
           portrait: { width: 704, height: 1280 },
           square: { width: 960, height: 960 },
+        },
+      },
+    },
+  },
+  minimax_h3: {
+    key: 'minimax_h3',
+    label: 'MiniMax H3',
+    logo: minimaxLogo,
+    archFilter: ['minimax_h3'],
+    supportedPackaging: ['split'],
+    // H3 (FL2V) 单权重双模式 (t2v/i2v); 本期无 LoRA (modules [])
+    dualUnet: false,
+    controlNetEnabled: false,
+    mediaType: 'video',
+    modules: [],  // 本期不支持 LoRA
+    promptStyle: 'natural',
+    hasNegativePrompt: false,  // CFG-distilled, 无负面提示词
+    pickerArch: 'minimax_h3',
+    releasedAt: '2026-08',
+    resolutions: [],
+    // CFG-distilled 默认: 20 步 / cfg 1.0 / res_multistep / simple; 后端默认 sampler/scheduler 无需前端传
+    defaults: { steps: 20, cfg: 1.0, sampler: 'res_multistep', scheduler: 'simple' },
+    defaultModels: {
+      clip: 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
+      vae: 'minimax_h3_video_vae_fp16.safetensors',
+      audioVae: 'minimax_h3_audio_vae_fp32.safetensors',
+    },
+    // 条目内 t2v/i2v 模式开关 (同 5B); i2v 支持首尾帧
+    videoModes: ['t2v', 'i2v'],
+    videoDefaults: {
+      fps: 24,
+      maxDurationS: 15,  // 整数秒 4-15
+      durationMin: 4,  // 最短 4 秒
+      durationStep: 1,  // 整数秒步进 (H3 无 0.5s)
+      divisor: 32,
+      // 帧长须落在 17k+5 网格 (FL2V latent 约束); 无 shift/speedToggle
+      frameGrid: 17,
+      frameGridOffset: 5,
+      maxPixels: 1032192,  // 预算 ≈ 1344×768
+      presets: {
+        '768p': {
+          landscape: { width: 1344, height: 768 },
+          portrait: { width: 768, height: 1344 },
+          square: { width: 768, height: 768 },
+        },
+      },
+    },
+  },
+  // ── MiniMax H3 Ref2VA (参考生成) — minimax_h3 的衍生条目 ──
+  // 单一编排 (无 videoModes), 由多路参考素材 (图/视频/音频) 驱动生成。
+  // 复用 minimax_h3 的架构/组件/默认参数, 仅 familyOf 归入 H3 家族组,
+  // 提交走独立 'h3ref' 分支 (payload 契约与 minimax_h3 不同, 见 useGenerateSubmit)。
+  minimax_h3_ref: {
+    key: 'minimax_h3_ref',
+    label: 'MiniMax H3 Ref',
+    logo: minimaxLogo,
+    archFilter: ['minimax_h3'],
+    supportedPackaging: ['split'],
+    // Ref2VA 无 LoRA 支持 (同 minimax_h3)
+    dualUnet: false,
+    controlNetEnabled: false,
+    mediaType: 'video',
+    // 归入 minimax_h3 家族组 (F2 菜单: H3 升级为组, 含自身叶子 + 本条目)
+    familyOf: 'minimax_h3',
+    modules: [],
+    promptStyle: 'natural',
+    hasNegativePrompt: false,  // CFG-distilled, 无负面提示词
+    pickerArch: 'minimax_h3',
+    releasedAt: '2026-08',
+    resolutions: [],
+    // CFG-distilled 默认: 20 步 / cfg 1.0 / res_multistep / simple; 后端默认 sampler/scheduler 无需前端传
+    defaults: { steps: 20, cfg: 1.0, sampler: 'res_multistep', scheduler: 'simple' },
+    defaultModels: {
+      clip: 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
+      vae: 'minimax_h3_video_vae_fp16.safetensors',
+      audioVae: 'minimax_h3_audio_vae_fp32.safetensors',
+    },
+    // 单一编排: 无 videoModes (参考生成无 t2v/i2v 之分)
+    videoDefaults: {
+      fps: 24,
+      maxDurationS: 15,  // 整数秒 4-15
+      durationMin: 4,  // 最短 4 秒
+      durationStep: 1,  // 整数秒步进 (H3 无 0.5s)
+      divisor: 32,
+      // 帧长须落在 17k+5 网格 (FL2V latent 约束); 无 shift/speedToggle
+      frameGrid: 17,
+      frameGridOffset: 5,
+      maxPixels: 1032192,  // 预算 ≈ 1344×768
+      presets: {
+        '768p': {
+          landscape: { width: 1344, height: 768 },
+          portrait: { width: 768, height: 1344 },
+          square: { width: 768, height: 768 },
         },
       },
     },

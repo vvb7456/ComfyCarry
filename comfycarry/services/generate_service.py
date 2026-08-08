@@ -22,8 +22,108 @@ import requests
 from ..config import COMFYUI_DIR, COMFYUI_URL
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
+from ..services.workflow_builder import (
+    H3_DURATION_RANGE,
+    H3_FPS,
+    H3_MAX_PIXELS,
+    h3_align_length,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
+    """
+    MiniMax H3 家族 (FL2VA) 通用校验 — minimax_h3 / minimax_h3_ref 共用。
+
+    校验并归一化 (顺序与 P1 minimax_h3 分支逐字一致):
+      - unet / clip / vae / audio_vae 必填 + 文件列表校验
+      - 分辨率: %32 整除, W×H ≤ H3_MAX_PIXELS
+      - 时长: 整数秒钳 [4,15], length = h3_align_length(duration×24) 写回
+      - batch_size=1; steps 钳 [1,100]; pop cfg/negative_prompt/speed/fast
+    起始画面 / refs 校验不在本函数 (由各分支单独处理)。
+
+    返回: (错误响应 dict | None, HTTP 状态码); None 表示校验通过。
+    """
+    # ── 主权重: 单 unet 必填 ──
+    unet = str(data.get("unet", "")).strip()
+    if not unet:
+        return {"error_key": "generate.err.minimax_h3_unet_required"}, 400
+    unet_list = opts.get("unets", [])
+    if unet_list and unet not in unet_list:
+        return {
+            "error_key": "generate.err.model_file_not_found",
+            "error_params": {"label": "UNet", "name": unet},
+        }, 400
+    data["unet"] = unet
+
+    # ── TE / 视频 VAE / 音频 VAE 必填 ──
+    clip = str(data.get("clip", "")).strip()
+    vae = str(data.get("vae", "")).strip()
+    audio_vae = str(data.get("audio_vae", "")).strip()
+    if not clip or not vae or not audio_vae:
+        return {"error_key": "generate.err.minimax_h3_te_vae_required"}, 400
+    for key, fname, listkey, label in (
+        ("clip", clip, "clips", "Text Encoder"),
+        ("vae", vae, "vaes", "VAE"),
+        ("audio_vae", audio_vae, "vaes", "Audio VAE"),
+    ):
+        file_list = opts.get(listkey, [])
+        if file_list and fname not in file_list:
+            return {
+                "error_key": "generate.err.model_file_not_found",
+                "error_params": {"label": label, "name": fname},
+            }, 400
+        data[key] = fname
+
+    # ── 分辨率: %32 整除; W×H ≤ H3_MAX_PIXELS ──
+    try:
+        width = int(data.get("width", 1344))
+    except (TypeError, ValueError):
+        return {"error_key": "generate.err.invalid_width"}, 400
+    try:
+        height = int(data.get("height", 768))
+    except (TypeError, ValueError):
+        return {"error_key": "generate.err.invalid_height"}, 400
+    if width <= 0 or height <= 0:
+        return {"error_key": "generate.err.invalid_resolution"}, 400
+    if width % 32 != 0 or height % 32 != 0:
+        return {
+            "error_key": "generate.err.resolution_not_multiple",
+            "error_params": {"mod": 32, "width": width, "height": height},
+        }, 400
+    if width * height > H3_MAX_PIXELS:
+        return {
+            "error_key": "generate.err.resolution_too_large",
+            "error_params": {"width": width, "height": height},
+        }, 400
+    data["width"] = width
+    data["height"] = height
+
+    # ── 时长: 整数秒钳制 [min, max]; length = h3_align_length(duration×24) ──
+    h3_min, h3_max = H3_DURATION_RANGE
+    try:
+        duration = int(float(data.get("duration_s", 5)))
+    except (TypeError, ValueError):
+        return {"error_key": "generate.err.invalid_duration"}, 400
+    if duration < h3_min or duration > h3_max:
+        return {
+            "error_key": "generate.err.invalid_duration",
+            "error_params": {"min": h3_min, "max": h3_max, "current": duration},
+        }, 400
+    data["duration_s"] = duration
+    data["length"] = h3_align_length(duration * H3_FPS)
+
+    # ── batch 恒 1; steps 钳 [1,100]; pop 无用字段 (H3 无 CFG/负面/速度档) ──
+    data["batch_size"] = 1
+    try:
+        steps = int(data.get("steps", 20))
+    except (TypeError, ValueError):
+        steps = 20
+    data["steps"] = max(1, min(steps, 100))
+    for k in ("cfg", "negative_prompt", "speed", "fast"):
+        data.pop(k, None)
+    return None, 200
 
 
 def submit_generation(data: dict) -> tuple[dict, int]:
@@ -177,164 +277,307 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     #   wan22_i2v → "i2v" (14B 双权重), wan22_t2v → "t2v" (14B 双权重),
     #   wan22_5b → "5b" (单权重, 条目内 t2v/i2v 模式开关)。
     if model_type in _VIDEO_ARCHS:
-        variant = {"wan22_i2v": "i2v", "wan22_t2v": "t2v", "wan22_5b": "5b"}[model_type]
-        is_14b = variant in ("t2v", "i2v")
-        fps = 16 if is_14b else 24  # 帧率随条目锁定
+        if model_type == "minimax_h3":
+            # ── MiniMax H3 (FL2VA) 独立校验子分支 ──
+            # CFG-distilled: 无 negative / cfg; 单 UNETLoader + 单 CLIPLoader + 双 VAELoader
+            # (视频 VAE + 音频 VAE)。length 满足 17k+5, 由 duration_s×24 对齐。
+            mode = str(data.get("mode", "i2v")).strip().lower()
+            if mode not in ("t2v", "i2v"):
+                mode = "i2v"
+            data["mode"] = mode
 
-        # ── 主权重: 14B 双权重必填且互异; 5B 单权重必填 ──
-        if is_14b:
-            unet_high = str(data.get("unet_high", "")).strip()
-            unet_low = str(data.get("unet_low", "")).strip()
-            if not unet_high or not unet_low:
-                return {"error_key": "generate.err.wan22_dual_unet_required"}, 400
-            if unet_high == unet_low:
-                return {"error_key": "generate.err.wan22_same_unet"}, 400
-            unet_list = opts.get("unets", [])
-            for key, fname, label in (
-                ("unet_high", unet_high, "高噪 UNet"),
-                ("unet_low", unet_low, "低噪 UNet"),
+            # ── 通用校验 (unet/clip/vae/audio_vae/分辨率/时长/batch/steps/pop) ──
+            err, status = _validate_h3_common(data, opts)
+            if err is not None:
+                return err, status
+
+            # ── 起始画面: i2v 必填; t2v 清空 ──
+            # (路径三段校验与 wan22 完全一致: input_dir / realpath 越界 / 存在性)
+            input_dir = os.path.join(COMFYUI_DIR, "input")
+            real_input = os.path.realpath(input_dir)
+            start_image = str(data.get("start_image", "")).strip()
+            if mode == "i2v":
+                if not start_image:
+                    return {"error_key": "generate.err.no_start_frame"}, 400
+                img_path = os.path.join(input_dir, start_image)
+                real_img = os.path.realpath(img_path)
+                if not real_img.startswith(real_input + os.sep):
+                    return {
+                        "error_key": "generate.err.invalid_start_frame_path",
+                        "error_params": {"name": start_image},
+                    }, 400
+                if not os.path.isfile(img_path):
+                    return {
+                        "error_key": "generate.err.start_frame_not_found",
+                        "error_params": {"name": start_image},
+                    }, 400
+                data["start_image"] = start_image
+            else:
+                data["start_image"] = ""
+
+            # ── 尾帧 (可选): 提供则走同样路径三段校验, 缺省清空 ──
+            last_image = str(data.get("last_image", "")).strip()
+            if last_image:
+                last_path = os.path.join(input_dir, last_image)
+                real_last = os.path.realpath(last_path)
+                if not real_last.startswith(real_input + os.sep):
+                    return {
+                        "error_key": "generate.err.invalid_last_frame_path",
+                        "error_params": {"name": last_image},
+                    }, 400
+                if not os.path.isfile(last_path):
+                    return {
+                        "error_key": "generate.err.last_frame_not_found",
+                        "error_params": {"name": last_image},
+                    }, 400
+                data["last_image"] = last_image
+            else:
+                data["last_image"] = ""
+            if mode == "t2v":
+                data["last_image"] = ""
+
+            # 校验完成, 落入下方通用提交链路 (LoRA / controlnet / save_prefix / 构建 / POST)
+        elif model_type == "minimax_h3_ref":
+            # ── MiniMax H3 Ref2VA 参考生成 校验子分支 ──
+            # 通用校验 (与 FL2VA 同) + refs 结构/计数/路径三段校验, 归一化后
+            # 落入下方通用提交链路。起始画面不适用 (参考条目标识由 refs 承载)。
+            err, status = _validate_h3_common(data, opts)
+            if err is not None:
+                return err, status
+
+            # ── refs 结构校验: 必须是非空 list, 每项 dict + type∈{image,video,audio} + name 非空 ──
+            refs_raw = data.get("refs")
+            if not isinstance(refs_raw, list) or not refs_raw:
+                return {"error_key": "generate.err.minimax_h3_refs_required"}, 400
+            refs: list[dict] = []
+            n_img = n_vid = n_aud = 0
+            for item in refs_raw:
+                if not isinstance(item, dict):
+                    return {"error_key": "generate.err.minimax_h3_refs_invalid"}, 400
+                rtype = item.get("type")
+                name = item.get("name")
+                if rtype not in ("image", "video", "audio") \
+                        or not isinstance(name, str) or not name.strip():
+                    return {"error_key": "generate.err.minimax_h3_refs_invalid"}, 400
+                name = name.strip()
+                if rtype == "image":
+                    n_img += 1
+                elif rtype == "video":
+                    n_vid += 1
+                else:
+                    n_aud += 1
+                refs.append({"type": rtype, "name": name})
+
+            # ── 计数上限: 图 ≤9 / 视频 ≤3 / 音频 ≤3 / 混合总数 ≤12 ──
+            if n_img > 9:
+                return {
+                    "error_key": "generate.err.minimax_h3_refs_images_too_many",
+                    "error_params": {"limit": 9, "current": n_img},
+                }, 400
+            if n_vid > 3:
+                return {
+                    "error_key": "generate.err.minimax_h3_refs_videos_too_many",
+                    "error_params": {"limit": 3, "current": n_vid},
+                }, 400
+            if n_aud > 3:
+                return {
+                    "error_key": "generate.err.minimax_h3_refs_audios_too_many",
+                    "error_params": {"limit": 3, "current": n_aud},
+                }, 400
+            if len(refs) > 12:
+                return {
+                    "error_key": "generate.err.minimax_h3_refs_total_too_many",
+                    "error_params": {"limit": 12, "current": len(refs)},
+                }, 400
+
+            # ── 音频不能作为唯一参考 (官方约束): 须搭配图片或视频 ──
+            if n_img == 0 and n_vid == 0 and n_aud > 0:
+                return {
+                    "error_key": "generate.err.minimax_h3_refs_audio_requires_visual",
+                }, 400
+
+            # ── 路径三段校验 (与起始画面同款: input_dir / realpath 越界 / 存在性) ──
+            input_dir = os.path.join(COMFYUI_DIR, "input")
+            real_input = os.path.realpath(input_dir)
+            for ref in refs:
+                ref_path = os.path.join(input_dir, ref["name"])
+                real_ref = os.path.realpath(ref_path)
+                if not real_ref.startswith(real_input + os.sep):
+                    return {
+                        "error_key": "generate.err.invalid_ref_path",
+                        "error_params": {"name": ref["name"]},
+                    }, 400
+                if not os.path.isfile(ref_path):
+                    return {
+                        "error_key": "generate.err.ref_not_found",
+                        "error_params": {"name": ref["name"]},
+                    }, 400
+
+            # ── 归一化写回: 精简 refs; 清空起始画面相关字段 (ref 条目不需要) ──
+            data["refs"] = refs
+            data["start_image"] = ""
+            data["last_image"] = ""
+            data.pop("mode", None)
+        else:
+
+            variant = {"wan22_i2v": "i2v", "wan22_t2v": "t2v", "wan22_5b": "5b"}[model_type]
+            is_14b = variant in ("t2v", "i2v")
+            fps = 16 if is_14b else 24  # 帧率随条目锁定
+
+            # ── 主权重: 14B 双权重必填且互异; 5B 单权重必填 ──
+            if is_14b:
+                unet_high = str(data.get("unet_high", "")).strip()
+                unet_low = str(data.get("unet_low", "")).strip()
+                if not unet_high or not unet_low:
+                    return {"error_key": "generate.err.wan22_dual_unet_required"}, 400
+                if unet_high == unet_low:
+                    return {"error_key": "generate.err.wan22_same_unet"}, 400
+                unet_list = opts.get("unets", [])
+                for key, fname, label in (
+                    ("unet_high", unet_high, "高噪 UNet"),
+                    ("unet_low", unet_low, "低噪 UNet"),
+                ):
+                    if unet_list and fname not in unet_list:
+                        return {
+                            "error_key": "generate.err.model_file_not_found",
+                            "error_params": {"label": label, "name": fname},
+                        }, 400
+                    data[key] = fname
+            else:
+                unet = str(data.get("unet", "")).strip()
+                if not unet:
+                    return {"error_key": "generate.err.wan22_unet_required"}, 400
+                unet_list = opts.get("unets", [])
+                if unet_list and unet not in unet_list:
+                    return {
+                        "error_key": "generate.err.model_file_not_found",
+                        "error_params": {"label": "UNet", "name": unet},
+                    }, 400
+                data["unet"] = unet
+
+            # ── TE / VAE 必填 ──
+            clip = str(data.get("clip", "")).strip()
+            vae = str(data.get("vae", "")).strip()
+            if not clip or not vae:
+                return {"error_key": "generate.err.wan22_te_vae_required"}, 400
+            for key, fname, listkey, label in (
+                ("clip", clip, "clips", "Text Encoder"),
+                ("vae", vae, "vaes", "VAE"),
             ):
-                if unet_list and fname not in unet_list:
+                file_list = opts.get(listkey, [])
+                if file_list and fname not in file_list:
                     return {
                         "error_key": "generate.err.model_file_not_found",
                         "error_params": {"label": label, "name": fname},
                     }, 400
                 data[key] = fname
-        else:
-            unet = str(data.get("unet", "")).strip()
-            if not unet:
-                return {"error_key": "generate.err.wan22_unet_required"}, 400
-            unet_list = opts.get("unets", [])
-            if unet_list and unet not in unet_list:
-                return {
-                    "error_key": "generate.err.model_file_not_found",
-                    "error_params": {"label": "UNet", "name": unet},
-                }, 400
-            data["unet"] = unet
 
-        # ── TE / VAE 必填 ──
-        clip = str(data.get("clip", "")).strip()
-        vae = str(data.get("vae", "")).strip()
-        if not clip or not vae:
-            return {"error_key": "generate.err.wan22_te_vae_required"}, 400
-        for key, fname, listkey, label in (
-            ("clip", clip, "clips", "Text Encoder"),
-            ("vae", vae, "vaes", "VAE"),
-        ):
-            file_list = opts.get(listkey, [])
-            if file_list and fname not in file_list:
-                return {
-                    "error_key": "generate.err.model_file_not_found",
-                    "error_params": {"label": label, "name": fname},
-                }, 400
-            data[key] = fname
-
-        # ── 起始画面: i2v 必填; 5b 仅 mode=='i2v' 时必填 ──
-        # (input_dir 与 i2i 校验块共用, 此处就地定义 — ControlNet 块在更后面)
-        input_dir = os.path.join(COMFYUI_DIR, "input")
-        start_image = str(data.get("start_image", "")).strip()
-        need_start = variant == "i2v"
-        if variant == "5b":
-            mode = str(data.get("mode", "")).strip().lower()
-            need_start = (mode == "i2v")
-        if need_start:
-            if not start_image:
-                return {"error_key": "generate.err.no_start_frame"}, 400
-            img_path = os.path.join(input_dir, start_image)
-            real_img = os.path.realpath(img_path)
-            real_input = os.path.realpath(input_dir)
-            if not real_img.startswith(real_input + os.sep):
-                return {
-                    "error_key": "generate.err.invalid_start_frame_path",
-                    "error_params": {"name": start_image},
-                }, 400
-            if not os.path.isfile(img_path):
-                return {
-                    "error_key": "generate.err.start_frame_not_found",
-                    "error_params": {"name": start_image},
-                }, 400
-            data["start_image"] = start_image
-        else:
-            # t2v 模式清空, 防止脏值
-            data["start_image"] = ""
-
-        # ── 分辨率: 14B %16, 5B %32; W×H ≤ 921600 (720p 预算) ──
-        try:
-            width = int(data.get("width", 640 if is_14b else 1280))
-        except (TypeError, ValueError):
-            return {"error_key": "generate.err.invalid_width"}, 400
-        try:
-            height = int(data.get("height", 640 if is_14b else 704))
-        except (TypeError, ValueError):
-            return {"error_key": "generate.err.invalid_height"}, 400
-        mod = 16 if is_14b else 32
-        if width <= 0 or height <= 0:
-            return {"error_key": "generate.err.invalid_resolution"}, 400
-        if width % mod != 0 or height % mod != 0:
-            return {
-                "error_key": "generate.err.resolution_not_multiple",
-                "error_params": {"mod": mod, "width": width, "height": height},
-            }, 400
-        if width * height > 921600:
-            return {
-                "error_key": "generate.err.resolution_too_large",
-                "error_params": {"width": width, "height": height},
-            }, 400
-        data["width"] = width
-        data["height"] = height
-
-        # ── 时长 / 帧数: frames = fps×duration+1, 上限 14B=7s / 5B=5s, 0.5s 步进 ──
-        max_duration = 7 if is_14b else 5
-        try:
-            duration = float(data.get("duration_s", 5))
-        except (TypeError, ValueError):
-            return {"error_key": "generate.err.invalid_duration"}, 400
-        if duration <= 0:
-            return {"error_key": "generate.err.duration_not_positive"}, 400
-        # 0.5s 步进: 容忍浮点误差, 四舍五入到 0.5 的倍数
-        duration = round(duration * 2) / 2
-        if duration > max_duration:
-            return {
-                "error_key": "generate.err.duration_too_long",
-                "error_params": {"max": max_duration, "current": duration},
-            }, 400
-        data["duration_s"] = duration
-        length = max(1, int(fps * duration) + 1)
-        data["length"] = length
-
-        # ── batch 恒 1 (视频不支持批量) ──
-        # 传入 >1 时纠正为 1 (静默纠正, 不报错 — 避免前端 batch 状态残留阻塞提交)
-        data["batch_size"] = 1
-
-        # ── 速度档 (仅 14B): fast / standard ──
-        if is_14b:
-            speed = str(data.get("speed", "fast")).strip().lower()
-            if speed not in ("fast", "standard"):
-                speed = "fast"
-            data["speed"] = speed
-            if speed == "fast":
-                # 快速档: steps/split/cfg 由 builder 常量决定, 丢弃 negative (cfg=1 无效)
-                data.pop("steps", None)
-                data.pop("cfg", None)
-                data["negative_prompt"] = ""
+            # ── 起始画面: i2v 必填; 5b 仅 mode=='i2v' 时必填 ──
+            # (input_dir 与 i2i 校验块共用, 此处就地定义 — ControlNet 块在更后面)
+            input_dir = os.path.join(COMFYUI_DIR, "input")
+            start_image = str(data.get("start_image", "")).strip()
+            need_start = variant == "i2v"
+            if variant == "5b":
+                mode = str(data.get("mode", "")).strip().lower()
+                need_start = (mode == "i2v")
+            if need_start:
+                if not start_image:
+                    return {"error_key": "generate.err.no_start_frame"}, 400
+                img_path = os.path.join(input_dir, start_image)
+                real_img = os.path.realpath(img_path)
+                real_input = os.path.realpath(input_dir)
+                if not real_img.startswith(real_input + os.sep):
+                    return {
+                        "error_key": "generate.err.invalid_start_frame_path",
+                        "error_params": {"name": start_image},
+                    }, 400
+                if not os.path.isfile(img_path):
+                    return {
+                        "error_key": "generate.err.start_frame_not_found",
+                        "error_params": {"name": start_image},
+                    }, 400
+                data["start_image"] = start_image
             else:
-                # 标准档: steps ∈ [1,100], cfg ∈ [1,20]; negative 为空则由 builder 注入内置模板
-                try:
-                    steps = int(data.get("steps", 20))
-                except (TypeError, ValueError):
-                    steps = 20
-                steps = max(1, min(steps, 100))
-                data["steps"] = steps
-                try:
-                    cfg = float(data.get("cfg", 3.5))
-                except (TypeError, ValueError):
-                    cfg = 3.5
-                cfg = max(1.0, min(cfg, 20.0))
-                data["cfg"] = cfg
-        else:
-            # 5B 无速度档: 忽略 fast 字段, 清理脏值
-            data.pop("speed", None)
-            data.pop("fast", None)
+                # t2v 模式清空, 防止脏值
+                data["start_image"] = ""
+
+            # ── 分辨率: 14B %16, 5B %32; W×H ≤ 921600 (720p 预算) ──
+            try:
+                width = int(data.get("width", 640 if is_14b else 1280))
+            except (TypeError, ValueError):
+                return {"error_key": "generate.err.invalid_width"}, 400
+            try:
+                height = int(data.get("height", 640 if is_14b else 704))
+            except (TypeError, ValueError):
+                return {"error_key": "generate.err.invalid_height"}, 400
+            mod = 16 if is_14b else 32
+            if width <= 0 or height <= 0:
+                return {"error_key": "generate.err.invalid_resolution"}, 400
+            if width % mod != 0 or height % mod != 0:
+                return {
+                    "error_key": "generate.err.resolution_not_multiple",
+                    "error_params": {"mod": mod, "width": width, "height": height},
+                }, 400
+            if width * height > 921600:
+                return {
+                    "error_key": "generate.err.resolution_too_large",
+                    "error_params": {"width": width, "height": height},
+                }, 400
+            data["width"] = width
+            data["height"] = height
+
+            # ── 时长 / 帧数: frames = fps×duration+1, 上限 14B=7s / 5B=5s, 0.5s 步进 ──
+            max_duration = 7 if is_14b else 5
+            try:
+                duration = float(data.get("duration_s", 5))
+            except (TypeError, ValueError):
+                return {"error_key": "generate.err.invalid_duration"}, 400
+            if duration <= 0:
+                return {"error_key": "generate.err.duration_not_positive"}, 400
+            # 0.5s 步进: 容忍浮点误差, 四舍五入到 0.5 的倍数
+            duration = round(duration * 2) / 2
+            if duration > max_duration:
+                return {
+                    "error_key": "generate.err.duration_too_long",
+                    "error_params": {"max": max_duration, "current": duration},
+                }, 400
+            data["duration_s"] = duration
+            length = max(1, int(fps * duration) + 1)
+            data["length"] = length
+
+            # ── batch 恒 1 (视频不支持批量) ──
+            # 传入 >1 时纠正为 1 (静默纠正, 不报错 — 避免前端 batch 状态残留阻塞提交)
+            data["batch_size"] = 1
+
+            # ── 速度档 (仅 14B): fast / standard ──
+            if is_14b:
+                speed = str(data.get("speed", "fast")).strip().lower()
+                if speed not in ("fast", "standard"):
+                    speed = "fast"
+                data["speed"] = speed
+                if speed == "fast":
+                    # 快速档: steps/split/cfg 由 builder 常量决定, 丢弃 negative (cfg=1 无效)
+                    data.pop("steps", None)
+                    data.pop("cfg", None)
+                    data["negative_prompt"] = ""
+                else:
+                    # 标准档: steps ∈ [1,100], cfg ∈ [1,20]; negative 为空则由 builder 注入内置模板
+                    try:
+                        steps = int(data.get("steps", 20))
+                    except (TypeError, ValueError):
+                        steps = 20
+                    steps = max(1, min(steps, 100))
+                    data["steps"] = steps
+                    try:
+                        cfg = float(data.get("cfg", 3.5))
+                    except (TypeError, ValueError):
+                        cfg = 3.5
+                    cfg = max(1.0, min(cfg, 20.0))
+                    data["cfg"] = cfg
+            else:
+                # 5B 无速度档: 忽略 fast 字段, 清理脏值
+                data.pop("speed", None)
+                data.pop("fast", None)
 
     # ── LoRA 文件存在性校验 (支持数组格式) ─────────────────────────────────
     loras = data.get("loras") or []

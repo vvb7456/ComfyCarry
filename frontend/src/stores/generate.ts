@@ -14,6 +14,13 @@ export interface LoraEntry {
   apply?: 'high' | 'low' | 'both'
 }
 
+/** 单条参考素材 (MiniMax H3 Ref2VA): type 为素材类别, name 为 input/ 内文件名。
+ *  同 type 内的顺序即引用编号 (<Picture 1> / <Video 1> / <Audio 1>)。 */
+export interface RefItem {
+  type: 'image' | 'video' | 'audio'
+  name: string
+}
+
 /** 视频生成态 (仅 mediaType:'video' 架构的 ModelState 使用)。
  *  durationS 滑块 0.5s 步进; width/height 取自档位 presets 并按整除吸附;
  *  refImage = 起始画面文件名 (i2v 必填)。
@@ -26,10 +33,13 @@ export interface LoraEntry {
 export interface VideoState {
   mode?: 't2v' | 'i2v'
   refImage: string
+  lastImage: string
   resolution: string
   durationS: number
   width: number
   height: number
+  /** 多路参考素材 (MiniMax H3 Ref2VA, 单条目 'minimax_h3_ref'); 其余架构恒 [] */
+  refs: RefItem[]
 }
 
 export interface ControlNetState {
@@ -118,6 +128,8 @@ export interface ModelState {
   // Flux1 双 CLIP (DualCLIPLoader type='flux'); 其余架构留空
   clip2: string
   vae: string
+  // 音频 VAE (MiniMax H3 音视频一体); 其余架构留空
+  audioVae: string
   loras: LoraEntry[]
   resolution: string
   width: number
@@ -154,20 +166,23 @@ export interface ModelState {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'comfycarry_generate_params'
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 const SAVE_DEBOUNCE_MS = 300
 
 /** 视频架构的默认视频态: 从 config.videoDefaults 推导。
- *  durationS 默认 5; width/height 取 720p 档 landscape (档位表); refImage 空。
- *  resolution 默认指向那一档预设本身 (自洽: 下拉选中项与 width/height 一致);
+ *  durationS 默认 5; width/height 取默认档 landscape (优先 720p, 缺失时回退到第一个档位, 如 H3 的 768p);
+ *  refImage 空。resolution 默认指向那一档预设本身 (自洽: 下拉选中项与 width/height 一致);
  *  用户上传起始画面后由 VideoSettings 自动切到 'ref' (贴合项)。 */
 export function createDefaultVideoState(config: ModelTypeConfig): VideoState {
   const vd = config.videoDefaults
-  const p720 = vd?.presets?.['720p']
+  const presets = vd?.presets
+  const p720 = presets?.['720p'] ?? Object.values(presets ?? {})[0]
   const w = p720?.landscape?.width ?? 1280
   const h = p720?.landscape?.height ?? 720
   return {
     refImage: '',
+    lastImage: '',
+    refs: [],
     resolution: `${w}x${h}`,
     durationS: 5,
     width: w,
@@ -213,6 +228,7 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
     clip: '',
     clip2: '',
     vae: '',
+    audioVae: '',
     loras: [],
     resolution: config.resolutions[0]?.value || '1024x1024',
     width: 1024,
@@ -317,7 +333,7 @@ export function migrateV1(state: Record<string, unknown>): ModelState | null {
 function normalizeVideoState(raw: unknown, config: ModelTypeConfig | undefined): VideoState {
   const def: VideoState = config
     ? createDefaultVideoState(config)
-    : { refImage: '', resolution: '1280x720', durationS: 5, width: 1280, height: 720 }
+    : { refImage: '', lastImage: '', refs: [], resolution: '1280x720', durationS: 5, width: 1280, height: 720 }
 
   const existing = raw as Record<string, unknown> | undefined
   if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return def
@@ -333,6 +349,15 @@ function normalizeVideoState(raw: unknown, config: ModelTypeConfig | undefined):
 
   const merged: VideoState = {
     refImage: typeof existing.refImage === 'string' ? existing.refImage : '',
+    lastImage: typeof existing.lastImage === 'string' ? existing.lastImage : '',
+    refs: Array.isArray(existing.refs)
+      ? (existing.refs as unknown[]).filter((r): r is RefItem => {
+          const it = r as Partial<RefItem> | null | undefined
+          return !!it && typeof it === 'object'
+            && typeof it.name === 'string'
+            && (it.type === 'image' || it.type === 'video' || it.type === 'audio')
+        })
+      : [],
     resolution,
     durationS: Number(existing.durationS) > 0 ? Number(existing.durationS) : 5,
     width: Number(existing.width) > 0 ? Number(existing.width) : def.width,
@@ -360,6 +385,25 @@ export function migrateV3(state: Record<string, unknown>, key: string): ModelSta
       s.video = normalizeVideoState(s.video, config)
     } else if ('video' in s) {
       delete s.video
+    }
+    return s as unknown as ModelState
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Migrate v4 → v5: 为 MiniMax H3 补全新字段 (不丢弃既有数据)。
+ * v4 ModelState 缺 audioVae; 视频态缺 lastImage (首尾帧的末帧)。
+ * 图像架构与 wan 三条目的既有数据无任何变化 (仅补空串)。
+ */
+export function migrateV4(state: Record<string, unknown>, key: string): ModelState | null {
+  try {
+    const s = state as Record<string, unknown>
+    if (typeof s.audioVae !== 'string') s.audioVae = ''
+    const config = MODEL_TYPES[key]
+    if (config?.mediaType === 'video') {
+      s.video = normalizeVideoState(s.video, config)
     }
     return s as unknown as ModelState
   } catch {
@@ -600,6 +644,14 @@ export const useGenerateStore = defineStore('generate', () => {
           // v2 路径已由 migrateV2 内的 normalizeVideoState 直接产出 v4 形态, 此处只补 v3 数据。
           if (version === 3) {
             const migrated = migrateV3(rawState as Record<string, unknown>, key)
+            if (!migrated) continue
+            state = migrated
+          }
+
+          // Migrate from v4 → v5 (补 audioVae / video.lastImage 缺省)
+          // v2/v3 路径已由各自 migrate 内的 normalizeVideoState 产出当前形态, 此处只补 v4 数据。
+          if (version === 4) {
+            const migrated = migrateV4(rawState as Record<string, unknown>, key)
             if (!migrated) continue
             state = migrated
           }

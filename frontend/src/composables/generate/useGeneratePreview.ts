@@ -43,12 +43,13 @@ export function isVideoFile(filename: string): boolean {
 
 /** 合成阶段节点 class_type 集合:
  *  executing 事件进入这些节点时切入「合成中」态。
- *  - VAEDecode / VAEDecodeTiled: 视频 VAE 解码 (耗时主体)
+ *  - VAEDecode / VAEDecodeTiled / VAEDecodeAudio: 视频/音频 VAE 解码 (耗时主体)
  *  - CreateVideo / SaveVideo / PreviewVideo: 视频封装落盘
  *  注意: PreviewImage 亦纳入 (部分工作流用它展示中间帧), 但仅 video 架构生效。 */
 const COMPOSING_NODE_TYPES = new Set([
   'VAEDecode',
   'VAEDecodeTiled',
+  'VAEDecodeAudio',
   'CreateVideo',
   'SaveVideo',
   'SaveAnimatedWEBP',

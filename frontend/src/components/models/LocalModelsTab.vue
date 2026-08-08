@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLocalModels } from '@/composables/useLocalModels'
 import { useModelActions } from '@/composables/useModelActions'
@@ -13,6 +13,10 @@ import LocalModelCard from '@/components/models/LocalModelCard.vue'
 import type { LocalModel } from '@/composables/useLocalModels'
 
 defineOptions({ name: 'LocalModelsTab' })
+
+const props = defineProps<{
+  active?: boolean
+}>()
 
 const emit = defineEmits<{
   openLocal: [model: LocalModel]
@@ -56,6 +60,13 @@ const folderOptions = computed(() => [
 
 onMounted(() => {
   loadModels()
+})
+
+// 切回本 tab 时重新加载本地模型 —— 其他 tab (HF/Civitai) 下载完成后,
+// 本列表不会自己知道; 上次挂载后下载的模型要靠这次刷新才能出现
+// (v-show 常驻不重新挂载, 只靠 onMounted 会漏)。
+watch(() => props.active, (val) => {
+  if (val) loadModels()
 })
 
 function openMeta(m: LocalModel) {

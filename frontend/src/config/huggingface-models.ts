@@ -16,8 +16,8 @@
  * FLUX.2 klein 门控仓库, 共 225 条。
  *
  * 可用 ID (下一个):
- *   模型 ID: -100265
- *   版本 ID: -10000356
+ *   模型 ID: -100281
+ *   版本 ID: -10000381
  */
 
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
@@ -34,6 +34,9 @@ export interface HuggingFaceFile {
     | 'upscale_models'
     | 'diffusion_models'
     | 'text_encoders'
+    | 'ultralytics_bbox'
+    | 'seedvr2'
+    | 'aura-sr'
   architecture: string
   sizeBytes: number
   sha256: string
@@ -9132,6 +9135,114 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
          'vae', 'minimax_h3_video_vae_fp16.safetensors', 'vae/minimax_h3_video_vae_fp16.safetensors',
          5207808496, '7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522', 'fp16',
          'MiniMax H3 视频编解码器 VAE, FP16', t + 'video_minimax_h3_i2v-1.webp'),
+      mk(-100265, -10000356, 'MiniMax H3 FL2V INT8 ConvRot', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
+         'diffusion_models', 'minimax_h3_fl2va_pruned_int8_convrot.safetensors', 'diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors',
+         20970379616, 'e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a', 'int8_convrot',
+         'MiniMax H3 图生视频 (FL2V), pruned INT8 ConvRot 量化版, 官方推荐档, 音视频一体生成', t + 'video_minimax_h3_i2v-1.webp'),
+      mk(-100266, -10000357, 'MiniMax H3 REF2V INT8 ConvRot', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
+         'diffusion_models', 'minimax_h3_ref2va_pruned_int8_convrot.safetensors', 'diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors',
+         20970379616, '9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779', 'int8_convrot',
+         'MiniMax H3 参考视频生成 (REF2V), pruned INT8 ConvRot 量化版, 官方推荐档, 参考图/视频驱动生成', t + 'video_minimax_h3_r2v-1.webp'),
+      mk(-100267, -10000358, 'MiniMax H3 Qwen3-VL 32B TE NVFP4', 'TextEncoder', 'MiniMax H3', 'minimax_h3',
+         'text_encoders', 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors', 'text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
+         15687142551, '35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6', 'nvfp4_awq',
+         'MiniMax H3 文本编码器 (Qwen3-VL 32B), NVFP4 AWQ 量化版, 官方推荐档, 16-24GB 显存友好', t + 'video_minimax_h3_t2v-1.webp'),
+       mk(-100268, -10000359, 'MiniMax H3 Audio VAE', 'VAE', 'MiniMax H3', 'minimax_h3',
+          'vae', 'minimax_h3_audio_vae_fp32.safetensors', 'vae/minimax_h3_audio_vae_fp32.safetensors',
+          605254808, '8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48', 'fp32',
+          'MiniMax H3 音频编解码器 VAE, FP32, 音视频同出必需件', t + 'video_minimax_h3_i2v-1.webp'),
+    ]
+  })(),
+
+  // ── 运行组件联动补充 (2026-08-07, 全部经 HF API 核实 size/lfs.oid) ──
+  // 生成页「运行组件」依赖条引用的模型文件: 文本编码器/ControlNet/检测器/放大权重。
+  // 与 component-registry.ts / modelDepConfigs.ts 通过 version id 锚定, 下载走
+  // huggingface 统一通道 (完成即登记 SQLite + resource_registry 状态同步)。
+  // 不含 custom_nodes 辅助件 (DWPose/DepthAnything/WD tagger) 与非 HF 源 SAM。
+  ...(() => {
+    const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
+                arch: string, modelType: string, fn: string, repo: string, path: string,
+                size: number, sha: string, verName: string, desc: string,
+                thumb: string, dl: number, likes: number, author: string) => {
+      const img = thumb ? [{ url: thumb, type: 'image' as const }] : []
+      const v = { id: vid, name: verName, baseModel, images: [...img] as any,
+                  trainedWords: [] as string[], hashes: { SHA256: sha },
+                  file: { url: `https://huggingface.co/${repo}/resolve/main/${path}`, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
+      return { id, name, type, metrics: { downloadCount: dl, thumbsUpCount: likes },
+               images: [...img] as any, user: { username: author },
+               sourceUrl: `https://huggingface.co/${repo}`, description: desc, version: v, versions: [v] } as any
+    }
+    const wt = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/'
+    return [
+      mk(-100269, -10000360, 'Mistral 3 Small Flux.2 FP4', 'TextEncoder', 'Flux.2', 'flux2',
+         'text_encoders', 'mistral_3_small_flux2_fp4_mixed.safetensors', 'Comfy-Org/flux2-dev',
+         'split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors',
+         12275678071, '1ee1ff334d78228d73049ef0ee4fcd21c1700536b5a45c06547af057f92463a7', 'fp4_mixed',
+         'Flux.2 Dev 文本编码器 (Mistral-3-Small), FP4 混合量化轻量档, 运行组件引用',
+         wt + 'output/image_flux2_fp8.png', 1505066, 285, 'Comfy-Org'),
+      mk(-100270, -10000361, 'Qwen 3 4B FP8 Mixed', 'TextEncoder', 'Z-Image', 'zimage',
+         'text_encoders', 'qwen_3_4b_fp8_mixed.safetensors', 'Comfy-Org/z_image_turbo',
+         'split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors',
+         5631994051, '72450b19758172c5a7273cf7de729d1c17e7f434a104a00167624cba94f68f15', 'fp8_mixed',
+         'Z-Image 文本编码器 (Qwen3-4B), FP8 混合量化轻量档, 运行组件引用',
+         wt + 'templates/image_z_image_turbo-1.webp', 5204347, 801, 'Comfy-Org'),
+      mk(-100271, -10000362, 'ControlNet Union SDXL ProMax', 'ControlNet', 'SDXL 1.0', 'sdxl',
+         'controlnet', 'diffusion_pytorch_model_promax.safetensors', 'xinsir/controlnet-union-sdxl-1.0',
+         'diffusion_pytorch_model_promax.safetensors',
+         2513342408, '9fae2e50cb431bfcbe05822b59ec2228df545ef27f711dea8949e9f4ed9f7cdc', 'promax',
+         'SDXL/Pony 通用 ControlNet Union ProMax (xinsir), 运行组件引用',
+         'https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/images/ControlNet++.png', 96846, 1803, 'xinsir'),
+      mk(-100272, -10000363, 'OpenPose Illustrious S6000', 'ControlNet', 'Illustrious', 'illustrious',
+         'controlnet', 'openpose_s6000.safetensors', 'windsingai/openpose',
+         'openpose_s6000.safetensors',
+         2502140008, '0d8bacf24534dc6f2716f5d0ffa6085571928776f8687565ef290a17d9f3615c', 's6000',
+         'Illustrious/NoobAI 专用 OpenPose ControlNet, 运行组件引用',
+         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/windsingai/openpose.png', 0, 1, 'windsingai'),
+      mk(-100273, -10000364, 'Illustrious XL Canny FP16', 'ControlNet', 'Illustrious', 'illustrious',
+         'controlnet', 'illustriousXLv1.1_canny_fp16.safetensors', 'MIC-Lab/illustriousXLv1.1_controlnet',
+         'illustriousXLv1.1_canny_fp16.safetensors',
+         2502139104, '3255c963a219a20040d2bef913216dd03d6da958068f5e69548dfe6e66528bcd', 'fp16',
+         'Illustrious/NoobAI 专用 Canny ControlNet (MIC-Lab), 运行组件引用',
+         'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/example/example_illustriousXLv1.1_canny/88004.png', 0, 12, 'MIC-Lab'),
+      mk(-100274, -10000365, 'Illustrious XL Depth Midas FP16', 'ControlNet', 'Illustrious', 'illustrious',
+         'controlnet', 'illustriousXLv1.1_depth_midas_fp16.safetensors', 'MIC-Lab/illustriousXLv1.1_controlnet',
+         'illustriousXLv1.1_depth_midas_fp16.safetensors',
+         2502139104, '14d168497226d3563b5a30bd7a72f73f98c263bf03780a5d473fb3b0afc44e17', 'fp16',
+         'Illustrious/NoobAI 专用 Depth (MiDaS) ControlNet (MIC-Lab), 运行组件引用',
+         'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/example/example_illustriousXLv1.1_depth/6uof8bk5.png', 0, 12, 'MIC-Lab'),
+      mk(-100275, -10000366, 'FLUX.1 Dev CN Union Pro 2.0 FP8', 'ControlNet', 'Flux.1', 'flux',
+         'controlnet', 'FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8.safetensors',
+         'ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8', 'diffusion_pytorch_model.safetensors',
+         2140902936, '393fc2a298b93ffe39f2db3f0d2ce11dfba62d44b7aa3c1dd3380d4a1be04deb', 'fp8',
+         'Flux.1 专用 ControlNet Union Pro 2.0 FP8, 落盘名重命名以区分, 运行组件引用',
+         'https://huggingface.co/ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8/resolve/main/images/canny.png', 2709, 58, 'ABDALLALSWAITI'),
+      mk(-100276, -10000367, 'YOLOv8 Face Detector', 'Detector', 'Ultralytics', 'ultralytics',
+         'ultralytics_bbox', 'face_yolov8m.pt', 'Bingsu/adetailer', 'face_yolov8m.pt',
+         52026019, '717923c19b3f4bbf5250b728f1fa6b2cb72a33aed1d236ea9caf0e21ad943e5f', 'yolov8m',
+         'YOLOv8 面部检测器 (FaceDetailer 必需), 运行组件引用',
+         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Bingsu/adetailer.png', 10086784, 757, 'Bingsu'),
+      mk(-100277, -10000368, 'SeedVR2 3B FP8', 'Upscaler', 'SeedVR2', 'seedvr2',
+         'seedvr2', 'seedvr2_ema_3b_fp8_e4m3fn.safetensors', 'numz/SeedVR2_comfyUI',
+         'seedvr2_ema_3b_fp8_e4m3fn.safetensors',
+         3391544696, '3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff', '3b_fp8',
+         'SeedVR2 视频放大 3B FP8, 显存约 10GB, 运行组件引用',
+         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/numz/SeedVR2_comfyUI.png', 207242, 298, 'numz'),
+      mk(-100278, -10000369, 'SeedVR2 EMA VAE FP16', 'VAE', 'SeedVR2', 'seedvr2',
+         'seedvr2', 'ema_vae_fp16.safetensors', 'numz/SeedVR2_comfyUI', 'ema_vae_fp16.safetensors',
+         501324814, '20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1', 'fp16',
+         'SeedVR2 视频放大配套 VAE (3B/7B 共用), 运行组件引用',
+         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/numz/SeedVR2_comfyUI.png', 207242, 298, 'numz'),
+      mk(-100279, -10000370, 'SeedVR2 7B Sharp FP8', 'Upscaler', 'SeedVR2', 'seedvr2',
+         'seedvr2', 'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors', 'AInVFX/SeedVR2_comfyUI',
+         'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors',
+         8466296338, '0d2c5b8be0fda94351149c5115da26aef4f4932a7a2a928c6f184dda9186e0be', '7b_sharp_fp8',
+         'SeedVR2 视频放大 7B 锐化版 FP8, 显存约 17GB, 运行组件引用',
+         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/AInVFX/SeedVR2_comfyUI.png', 55788, 72, 'AInVFX'),
+      mk(-100280, -10000371, 'AuraSR v2', 'Upscaler', 'AuraSR', 'aurasr',
+         'aura-sr', 'model.safetensors', 'fal/AuraSR-v2', 'model.safetensors',
+         2470247916, '8a80b4546f3f49b9095733cb9699030409339e2f4eb0ae9c1ada14c7d21d4dde', 'v2',
+         'AuraSR v2 4× 超分辨率放大权重 (需与同目录 config.json 配套), 运行组件引用',
+         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/fal/AuraSR-v2.png', 749, 340, 'fal'),
     ]
   })(),
 
@@ -9176,42 +9287,72 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
          'loras', 'krea2_style_reference.safetensors', 'Comfy-Org/Krea-2', 'loras/krea2_style_reference.safetensors',
          457111760, 'f50df5a9e62e4be8aa926a63dd5bb1a64770c4004f763c1208007ae13daa82b8', 'v1.0',
          'Krea 2 风格参考 LoRA', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/thumbnail/image_krea2_turbo_int8_image_style_reference.png', 10, 417, 'Comfy-Org'),
-    mk(-100256, -10000344, 'Mage-Flow INT8', 'DiffusionModel', 'Mage-Flow', 'mage_flow',
+    mk(-100256, -10000372, 'Mage-Flow INT8', 'DiffusionModel', 'Mage-Flow', 'mage_flow',
          'diffusion_models', 'mage_flow_int8_convrot.safetensors', 'Comfy-Org/Mage-Flow', 'diffusion_models/mage_flow_int8_convrot.safetensors',
          4159146848, 'e081068163d7793b7e0d54ae2a773d3ac1c0d5b099c09b69dcbff36448485ae8', 'int8',
          'Mage-Flow 4B 文生图主模型 INT8, 微软开源, 原生 512-2048 分辨率', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png', 103268, 120, 'Comfy-Org'),
-    mk(-100257, -10000343, 'Mage-Flow Turbo INT8', 'DiffusionModel', 'Mage-Flow', 'mage_flow',
+    mk(-100257, -10000373, 'Mage-Flow Turbo INT8', 'DiffusionModel', 'Mage-Flow', 'mage_flow',
          'diffusion_models', 'mage_flow_turbo_int8_convrot.safetensors', 'Comfy-Org/Mage-Flow', 'diffusion_models/mage_flow_turbo_int8_convrot.safetensors',
          4159146840, '327c3967a5190ea52e453ec3dd81ba168e37a2a0ff2c763aa3e9260bbbe1913c', 'int8',
          'Mage-Flow Turbo 4 步蒸馏 INT8, 约 0.6s/图 (A100)', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow_turbo.png', 103268, 120, 'Comfy-Org'),
-    mk(-100258, -10000342, 'Mage-Flow VAE BF16', 'VAE', 'Mage-Flow', 'mage_flow',
+    mk(-100258, -10000374, 'Mage-Flow VAE BF16', 'VAE', 'Mage-Flow', 'mage_flow',
          'vae', 'mage_flow_vae_bf16.safetensors', 'Comfy-Org/Mage-Flow', 'vae/mage_flow_vae_bf16.safetensors',
          345053056, '34e076dc1e8a15321e1e07be5111d59cf16dd10b804b7c7e20b4de29013427e0', 'bf16',
          'Mage-Flow 专属 VAE, BF16', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png', 103268, 120, 'Comfy-Org'),
-    mk(-100259, -10000341, 'MelBandRoFormer FP16', 'DiffusionModel', 'MelBandRoFormer', 'unknown',
+    mk(-100259, -10000375, 'MelBandRoFormer FP16', 'DiffusionModel', 'MelBandRoFormer', 'unknown',
          'diffusion_models', 'MelBandRoformer_fp16.safetensors', 'Kijai/MelBandRoFormer_comfy', 'MelBandRoformer_fp16.safetensors',
          456479072, '6119aef379a6c7264e0b37db65ae1e6488b8ca4a00baf56d6d244737b8488226', 'fp16',
          'MelBandRoFormer 音乐人声/伴奏分离模型, 需 ComfyUI-MelBandRoFormer 自定义节点', '', 89830, 43, 'Kijai'),
-    mk(-100260, -10000340, 'CLIP-Vision H', 'TextEncoder', 'Wan 2.1', 'wan21',
+    mk(-100260, -10000376, 'CLIP-Vision H', 'TextEncoder', 'Wan 2.1', 'wan21',
          'text_encoders', 'clip_vision_h.safetensors', 'Comfy-Org/Wan_2.1_ComfyUI_repackaged', 'split_files/clip_vision/clip_vision_h.safetensors',
          1264219396, '64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161', 'v1.0',
          'CLIP-ViT-H 视觉编码器, Wan 2.1 图生视频使用', '', 2236045, 948, 'Comfy-Org'),
-    mk(-100261, -10000339, 'Flux.1 Redux Dev', 'DiffusionModel', 'Flux.1 D', 'flux',
+    mk(-100261, -10000377, 'Flux.1 Redux Dev', 'DiffusionModel', 'Flux.1 D', 'flux',
          'diffusion_models', 'flux1-redux-dev.safetensors', 'Comfy-Org/flux1-redux-dev', 'flux1-redux-dev.safetensors',
          129063232, 'a1b3bdcb4bdc58ce04874b9ca776d61fc3e914bb6beab41efb63e4e2694dca45', 'dev',
          'Flux.1 Redux Dev 风格迁移模型', '', 5351, 6, 'Comfy-Org'),
-    mk(-100262, -10000338, 'CLIP-Vision G', 'TextEncoder', 'SDXL', 'sdxl',
+    mk(-100262, -10000378, 'CLIP-Vision G', 'TextEncoder', 'SDXL', 'sdxl',
          'text_encoders', 'clip_vision_g.safetensors', 'comfyanonymous/clip_vision_g', 'clip_vision_g.safetensors',
          3689911098, '9908329b3ead722a693ea400fab1d7c9ec91d6736fd194a94d20d793457f9c2e', 'v1.0',
          'CLIP-ViT-G 视觉编码器, SDXL Revision 使用', '', 0, 76, 'comfyanonymous'),
-    mk(-100263, -10000337, 'SigCLIP Vision Patch14 384', 'TextEncoder', 'Flux.1 D', 'flux',
+    mk(-100263, -10000379, 'SigCLIP Vision Patch14 384', 'TextEncoder', 'Flux.1 D', 'flux',
          'text_encoders', 'sigclip_vision_patch14_384.safetensors', 'Comfy-Org/HunyuanVideo_1.5_repackaged', 'split_files/clip_vision/sigclip_vision_patch14_384.safetensors',
          856505640, '1fee501deabac72f0ed17610307d7131e3e9d1e838d0363aa3c2b97a6e03fb33', 'v1.0',
          'SigCLIP 视觉编码器, Flux.1 USO/Redux 使用', '', 447893, 94, 'Comfy-Org'),
-    mk(-100264, -10000336, 'USO Flux.1 Projector V1', 'DiffusionModel', 'Flux.1 D', 'flux',
+    mk(-100264, -10000380, 'USO Flux.1 Projector V1', 'DiffusionModel', 'Flux.1 D', 'flux',
          'diffusion_models', 'uso-flux1-projector-v1.safetensors', 'Comfy-Org/USO_1.0_Repackaged', 'split_files/model_patches/uso-flux1-projector-v1.safetensors',
          21548200, '9a0dfcd6644e3acaf6995625562ab0af1f9cf048bf739c7e5822ee106fb44311', 'v1.0',
          'USO 1.0 projector, Flux.1 Dev 参考图生成', '', 28770, 18, 'Comfy-Org')
     ]
   })(),
 ]
+
+// ── 派生索引 ──────────────────────────────────────────────────────────────────
+
+/** version id → { model, version } 反查索引。运行组件按 version id 锚定白名单。 */
+export const HF_VERSION_INDEX: ReadonlyMap<number, { model: HuggingFaceModel; version: HuggingFaceVersion }> = (() => {
+  const m = new Map<number, { model: HuggingFaceModel; version: HuggingFaceVersion }>()
+  for (const model of HUGGINGFACE_MODELS) {
+    for (const version of model.versions) m.set(version.id, { model, version })
+  }
+  return m
+})()
+
+/**
+ * modelType → 相对 ComfyUI 根的落盘目录。与后端 config.py MODEL_DIRS 逐键一致
+ * (白名单下载通道按 model_type 解析目录; 前端依赖条体检按此拼 subdir)。
+ * 新增 modelType 必须同步后端 MODEL_DIRS, 否则下载目录解析回落 models/{modelType}。
+ */
+export const MODEL_TYPE_DIRS: Record<HuggingFaceFile['modelType'], string> = {
+  checkpoints: 'models/checkpoints',
+  loras: 'models/loras',
+  controlnet: 'models/controlnet',
+  vae: 'models/vae',
+  embeddings: 'models/embeddings',
+  upscale_models: 'models/upscale_models',
+  diffusion_models: 'models/diffusion_models',
+  text_encoders: 'models/text_encoders',
+  ultralytics_bbox: 'models/ultralytics/bbox',
+  seedvr2: 'models/SEEDVR2',
+  'aura-sr': 'models/Aura-SR',
+}

@@ -45,10 +45,12 @@ export function useGenerateSubmit(
    * `{"wan22_i2v": "i2v", "wan22_t2v": "t2v", "wan22_5b": "5b"}` 映射逐字一致。
    * 非 _VIDEO_ARCHS 条目返回 null。
    */
-  function videoVariant(modelType: string): 'i2v' | 't2v' | '5b' | null {
+  function videoVariant(modelType: string): 'i2v' | 't2v' | '5b' | 'h3' | 'h3ref' | null {
     if (modelType === 'wan22_i2v') return 'i2v'
     if (modelType === 'wan22_t2v') return 't2v'
     if (modelType === 'wan22_5b') return '5b'
+    if (modelType === 'minimax_h3') return 'h3'
+    if (modelType === 'minimax_h3_ref') return 'h3ref'
     return null
   }
 
@@ -87,8 +89,9 @@ export function useGenerateSubmit(
     // 视频架构走独立校验分支 (对齐后端 _VIDEO_ARCHS, 不走图像的 split/checkpoint 逻辑)
     if (activeConfig?.mediaType === 'video') {
       const variant = videoVariant(modelType)
-      // 14B 双 UNet (unet_high/unet_low 必填且互异); 5B 单 unet 必填
-      if (variant && variant !== '5b') {
+      const isH3 = variant === 'h3' || variant === 'h3ref'
+      // 14B 双 UNet (unet_high/unet_low 必填且互异); 5B/H3 单 unet 必填
+      if (variant && variant !== '5b' && !isH3) {
         if (!state.unetHigh || !state.unetLow) {
           toast(t('generate.error.no_unet_pair'), 'error')
           return false
@@ -101,12 +104,17 @@ export function useGenerateSubmit(
         }
       } else {
         if (!state.unet) {
-          toast(t('generate.error.no_split_models'), 'error')
+          toast(t(isH3 ? 'generate.error.minimax_h3_unet_required' : 'generate.error.no_split_models'), 'error')
           return false
         }
       }
-      // TE / VAE 必填
-      if (!state.clip || !state.vae) {
+      // TE / VAE 必填; H3 另需音频 VAE (音视频一体必需件)
+      if (isH3) {
+        if (!state.clip || !state.vae || !state.audioVae) {
+          toast(t('generate.error.minimax_h3_te_vae_required'), 'error')
+          return false
+        }
+      } else if (!state.clip || !state.vae) {
         toast(t('generate.error.no_split_models'), 'error')
         return false
       }
@@ -114,16 +122,43 @@ export function useGenerateSubmit(
         toast(t('generate.error.no_prompt'), 'error')
         return false
       }
-      // 起始画面: i2v 必填; 5b 仅 mode=='i2v' 时必填
+      // 起始画面: i2v 必填; 5b/h3 仅 mode=='i2v' 时必填 (h3 末帧可选, 不阻断)
       const v = state.video
       let needStart = variant === 'i2v'
-      if (variant === '5b' && v?.mode) {
+      if ((variant === '5b' || isH3) && v?.mode) {
         needStart = v.mode === 'i2v'
       }
       if (needStart && !v?.refImage) {
         // 与 ModelTab.runBlockedReason 用同一条文案 (阻断只有一种表达)
         toast(t('generate.error.no_start_frame'), 'error')
         return false
+      }
+      // Ref2VA 参考生成: 参考素材非空 + 组内/总数配额前端预检 (后端同样拦截, 这里少一次往返)
+      if (variant === 'h3ref') {
+        const refs = v?.refs ?? []
+        if (refs.length === 0) {
+          toast(t('generate.error.minimax_h3_refs_required'), 'error')
+          return false
+        }
+        const img = refs.filter(r => r.type === 'image').length
+        const vid = refs.filter(r => r.type === 'video').length
+        const aud = refs.filter(r => r.type === 'audio').length
+        if (img > 9) {
+          toast(t('generate.error.minimax_h3_refs_images_too_many', { limit: 9, current: img }), 'error')
+          return false
+        }
+        if (vid > 3) {
+          toast(t('generate.error.minimax_h3_refs_videos_too_many', { limit: 3, current: vid }), 'error')
+          return false
+        }
+        if (aud > 3) {
+          toast(t('generate.error.minimax_h3_refs_audios_too_many', { limit: 3, current: aud }), 'error')
+          return false
+        }
+        if (refs.length > 12) {
+          toast(t('generate.error.minimax_h3_refs_total_too_many', { limit: 12, current: refs.length }), 'error')
+          return false
+        }
       }
       // 视频架构无 CN/i2i/face/hires/upscale 模块 (config.modules 仅 ['lora']), 跳过后续图像校验
       return true
@@ -264,15 +299,70 @@ export function useGenerateSubmit(
 
     // ── 视频架构: 独立 payload 组装 (对齐后端 _VIDEO_ARCHS 分支) ──
     // 字段名与 generate_service.py:183-329 逐字对齐:
-    //   model_type = 细粒度 key (wan22_i2v/wan22_t2v/wan22_5b), 不能用 workflowType 'wan22'
+    //   model_type = 细粒度 key (wan22_i2v/wan22_t2v/wan22_5b/minimax_h3), 不能用 workflowType 'wan22'
     //   14B: unet_high / unet_low / clip / vae
     //   5B: unet / clip / vae
     //   start_image (i2v 必填) / mode (仅 5b) / width / height / duration_s / speed (仅 14b) / batch_size 恒 1
+    //   minimax_h3: unet / clip / vae / audio_vae / start_image / last_image / mode (t2v|i2v) / steps
+    //   minimax_h3_ref (Ref2VA): unet / clip / vae / audio_vae / refs (图/视频/音频) / steps;
+    //     无 mode/start_image/last_image/negative/cfg/speed
     // 图像侧 payload 组装一字不变 (回归保护): 视频早返回, 不走下面的图像分支。
     if (activeConfig?.mediaType === 'video') {
       const variant = videoVariant(modelType)
-      const is14b = variant === 'i2v' || variant === 't2v'
       const v = state.video
+
+      // ── MiniMax H3 (FL2V): CFG-distilled 单权重双模式, 首尾帧 + 音视频一体 ──
+      if (variant === 'h3') {
+        const isI2v = v?.mode === 'i2v'
+        const h3payload: Record<string, unknown> = {
+          model_type: modelType,
+          mode: isI2v ? 'i2v' : 't2v',
+          positive_prompt: normalizePrompt(state.positive, nOpts),
+          unet: state.unet,
+          clip: state.clip,
+          vae: state.vae,
+          audio_vae: state.audioVae,
+          start_image: isI2v ? (v?.refImage ?? '') : '',
+          last_image: isI2v ? (v?.lastImage ?? '') : '',
+          width: v?.width ?? state.width,
+          height: v?.height ?? state.height,
+          duration_s: Math.round(v?.durationS ?? 5),  // 整数秒 4-15
+          batch_size: 1,  // 视频不支持批量 (后端恒纠正为 1)
+          seed,
+          steps: state.steps,  // CFG-distilled 无 cfg/speed; 默认 20
+          save_prefix: state.prefix,
+          output_format: 'png',  // 通过后端 output_format 枚举校验; 视频走 SaveVideo, 该字段被忽略
+          loras,
+        }
+        return h3payload
+      }
+
+      // ── MiniMax H3 Ref2VA (参考生成): 图/视频/音频多参考素材驱动 ──
+      // payload 契约 (与后端逐字对齐): 无 mode/start_image/last_image/negative/cfg/speed;
+      // refs = {type, name}[] 精简数组, 同 type 内顺序 = 引用编号。
+      if (variant === 'h3ref') {
+        const h3refPayload: Record<string, unknown> = {
+          model_type: modelType,
+          positive_prompt: normalizePrompt(state.positive, nOpts),
+          unet: state.unet,
+          clip: state.clip,
+          vae: state.vae,
+          audio_vae: state.audioVae,
+          refs: (v?.refs ?? []).map(r => ({ type: r.type, name: r.name })),
+          width: v?.width ?? state.width,
+          height: v?.height ?? state.height,
+          duration_s: Math.round(v?.durationS ?? 5),  // 整数秒 4-15
+          batch_size: 1,  // 视频不支持批量
+          seed,
+          steps: state.steps,  // CFG-distilled 无 cfg/speed; 默认 20
+          save_prefix: state.prefix,
+          output_format: 'png',
+          loras: [],  // Ref2VA 无 LoRA 支持 (契约固定空数组)
+        }
+        return h3refPayload
+      }
+
+      const is14b = variant === 'i2v' || variant === 't2v'
       // start_image: i2v 必填; 5b 仅 mode=='i2v' 时
       let needStart = variant === 'i2v'
       if (variant === '5b' && v?.mode) needStart = v.mode === 'i2v'

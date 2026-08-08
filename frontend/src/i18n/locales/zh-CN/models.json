@@ -161,6 +161,7 @@
     "civitai_not_found": "CivitAI 未找到该模型或请求失败",
     "comfyui_not_running": "ComfyUI 未运行或无法连接，无法解析工作流模型依赖",
     "comfyui_unreachable": "无法连接 ComfyUI",
+    "dl_interrupted": "下载任务因服务重启而中断，请重新下载",
     "dl_cannot_cancel": "任务状态为 {status}，无法取消",
     "dl_cannot_pause": "任务状态为 {status}，无法暂停",
     "dl_cannot_resume": "任务状态为 {status}，无法恢复",

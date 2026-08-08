@@ -75,3 +75,7 @@ check_box_outline_blank
 # VersionCard.vue — BaseSelect option.icon 间接引用
 verified
 experiment
+
+# RefMediaPanel.vue — MiniMax H3 Ref2VA 参考素材面板 (视频 movie / 音频 music_note)
+movie
+music_note
