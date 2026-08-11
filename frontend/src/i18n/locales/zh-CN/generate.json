@@ -95,7 +95,7 @@
       "wildcard_sub": "子目录通配符",
       "wildcard_sub_desc": "→ 从 wildcards/sdxl/quality.txt 随机选取",
       "wildcard_multi": "通配符多选",
-      "wildcard_multi_desc": "→ 从 hair_color.txt 取 2 个不重复值；{2-3$$__…__} 取 2~3 个。",
+      "wildcard_multi_desc": "→ 从 hair_color.txt 取 2 个不重复值；\\{2-3$$__…__\\} 取 2~3 个。",
       "variable_lock": "变量锁定",
       "variable_lock_desc": "→ red dress, red shoes（两处一致）",
       "nesting": "嵌套",
