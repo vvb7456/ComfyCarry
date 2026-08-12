@@ -80,9 +80,9 @@ RUN python3.12 -m pip install \
 # =============================================================================
 # 6. FlashAttention-2 (预编译 wheel — 全架构: sm80/86/89/90/100/120)
 # =============================================================================
-COPY wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl /tmp/wheels/
-RUN python3.12 -m pip install /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl && \
-    rm -rf /tmp/wheels
+RUN --mount=type=bind,source=wheels,target=/tmp/wheels,ro \
+    python3.12 -m pip install \
+        /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
 
 # =============================================================================
 # 7. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
