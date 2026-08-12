@@ -45,6 +45,8 @@ const props = withDefaults(defineProps<{
   displayText?: string
   /** Enable search input in the dropdown panel */
   searchable?: boolean
+  /** Allow a searched string to be committed as the value (single-select only). */
+  allowCustom?: boolean
   /** Placeholder text for the search input */
   searchPlaceholder?: string
   /** Text shown when search yields no results */
@@ -74,6 +76,7 @@ const props = withDefaults(defineProps<{
   placeholder: '',
   displayText: '',
   searchable: false,
+  allowCustom: false,
   searchPlaceholder: '',
   emptyText: '',
   disabled: false,
@@ -188,6 +191,19 @@ const filteredOptions = computed(() => {
   )
 })
 
+const customValue = computed(() => search.value.trim())
+const exactSearchOption = computed(() => {
+  const value = customValue.value.toLowerCase()
+  if (!value) return undefined
+  return normalizedOptions.value.find(option =>
+    String(option.value).toLowerCase() === value
+    || option.label.toLowerCase() === value
+  )
+})
+const canUseCustomValue = computed(() =>
+  props.allowCustom && !props.multiple && !!customValue.value && !exactSearchOption.value,
+)
+
 type RenderRow =
   | { kind: 'group', label: string, key: string }
   | { kind: 'option', opt: SelectOption, idx: number }
@@ -222,12 +238,17 @@ const selectedLabel = computed(() => {
     return picked.map(o => o.label).join(', ')
   }
   const opt = normalizedOptions.value.find(o => o.value === props.modelValue)
-  return opt ? opt.label : props.placeholder
+  if (opt) return opt.label
+  if (props.allowCustom && !props.multiple && props.modelValue !== '') {
+    return String(props.modelValue)
+  }
+  return props.placeholder
 })
 
 const isPlaceholder = computed(() => {
   if (props.displayText) return false
   if (props.multiple) return selectedValues.value.length === 0
+  if (props.allowCustom && props.modelValue !== '') return false
   return !normalizedOptions.value.some(o => o.value === props.modelValue)
 })
 
@@ -242,11 +263,16 @@ watch(filteredOptions, () => { highlightIdx.value = -1 })
 
 function openPanel() {
   open.value = true
+  if (props.searchable) {
+    const hasSelectedOption = normalizedOptions.value.some(o => o.value === props.modelValue)
+    search.value = props.allowCustom && !hasSelectedOption && typeof props.modelValue === 'string'
+      ? props.modelValue
+      : ''
+  }
   // Pre-highlight selected item
   const idx = filteredOptions.value.findIndex(o => isSelected(o.value))
   highlightIdx.value = idx >= 0 ? idx : 0
   if (props.searchable) {
-    search.value = ''
     nextTick(() => searchRef.value?.focus())
   } else {
     nextTick(() => listRef.value?.focus())
@@ -282,6 +308,17 @@ function select(opt: SelectOption) {
   nextTick(() => triggerRef.value?.focus())
 }
 
+function commitCustomValue() {
+  if (!props.allowCustom || props.multiple || !customValue.value) return
+  if (exactSearchOption.value) {
+    select(exactSearchOption.value)
+    return
+  }
+  emitValue(customValue.value)
+  open.value = false
+  nextTick(() => triggerRef.value?.focus())
+}
+
 /** 清空多选 (触发器上的 × )。 */
 function clearAll(e: Event) {
   e.stopPropagation()
@@ -301,11 +338,13 @@ function onKeydown(e: KeyboardEvent) {
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault()
+      if (opts.length === 0) break
       highlightIdx.value = (highlightIdx.value + 1) % opts.length
       scrollToHighlighted()
       break
     case 'ArrowUp':
       e.preventDefault()
+      if (opts.length === 0) break
       highlightIdx.value = (highlightIdx.value - 1 + opts.length) % opts.length
       scrollToHighlighted()
       break
@@ -313,6 +352,8 @@ function onKeydown(e: KeyboardEvent) {
       e.preventDefault()
       if (highlightIdx.value >= 0 && highlightIdx.value < opts.length && !opts[highlightIdx.value].disabled) {
         select(opts[highlightIdx.value])
+      } else if (props.allowCustom) {
+        commitCustomValue()
       }
       break
     case 'Escape':
@@ -417,7 +458,15 @@ onBeforeUnmount(() => {
             @click.stop
           />
           <div ref="listRef" class="base-select__list" tabindex="-1">
-            <div v-if="filteredOptions.length === 0" class="base-select__empty">{{ emptyText || t('common.no_matches') }}</div>
+            <div
+              v-if="canUseCustomValue"
+              class="base-select__item base-select__item--custom"
+              @click="commitCustomValue"
+            >
+              <MsIcon name="edit" size="sm" />
+              <span class="base-select__item-label text-truncate">{{ t('common.use_custom_value', { value: customValue }) }}</span>
+            </div>
+            <div v-if="filteredOptions.length === 0 && !canUseCustomValue" class="base-select__empty">{{ emptyText || t('common.no_matches') }}</div>
             <template v-for="row in renderRows" :key="row.kind === 'group' ? row.key : String(row.opt.value)">
               <div v-if="row.kind === 'group'" class="base-select__group">{{ row.label }}</div>
               <div

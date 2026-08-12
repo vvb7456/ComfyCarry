@@ -1,10 +1,11 @@
 """
 ComfyCarry — LLM Engine
 
-3 个 Provider 覆盖所有主流 LLM 服务:
-  - OpenAICompatProvider  → OpenAI / DeepSeek / OpenRouter / 自定义
-  - AnthropicProvider     → Claude
-  - GeminiProvider        → Google AI Studio
+4 个协议适配器覆盖当前 LLM 服务:
+  - OpenAICompatProvider   → OpenAI Chat Completions 兼容端点
+  - OpenAIResponsesProvider → OpenAI Responses 兼容端点
+  - AnthropicProvider      → Anthropic Messages 兼容端点
+  - GeminiProvider         → Google AI Studio
 
 统一接口: chat() / chat_stream() / generate_prompt()
 """
@@ -49,7 +50,7 @@ def _sse_error(e: Exception) -> str:
 class PromptOutput(BaseModel):
     """提示词生成的结构化输出"""
     positive: str = Field(description="正面提示词")
-    negative: str = Field(description="反面提示词（Flux 模型为空字符串）")
+    negative: str = Field(description="反面提示词；目标模型不支持时为空字符串")
 
 
 # ── JSON 解析容错 ─────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ class OpenAICompatProvider(BaseLLMProvider):
     name = "openai_compat"
 
     PRESET = {
-        "openai":     {"base_url": "https://api.openai.com/v1",    "default_model": "gpt-4o-mini"},
+        "openai":     {"base_url": "https://api.openai.com/v1",    "default_model": "gpt-5-mini"},
         "deepseek":   {"base_url": "https://api.deepseek.com",     "default_model": "deepseek-chat"},
         "openrouter": {"base_url": "https://openrouter.ai/api/v1", "default_model": "openai/gpt-4o-mini"},
     }
@@ -220,6 +221,114 @@ class OpenAICompatProvider(BaseLLMProvider):
             return parse_llm_json(text)
 
 
+# ── OpenAI Responses Provider ─────────────────────────────────────────────────
+
+class OpenAIResponsesProvider(OpenAICompatProvider):
+    """OpenAI Responses API 及兼容端点。
+
+    Responses 与 Chat Completions 的消息、token 参数、结构化输出和流事件均不
+    同，必须作为独立协议适配，不能只替换 URL。
+    """
+
+    name = "openai_responses"
+    supports_json_schema = True
+
+    @staticmethod
+    def _prepare_input(messages):
+        instructions = []
+        inputs = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if role in ("system", "developer"):
+                if isinstance(content, str):
+                    instructions.append(content)
+                else:
+                    instructions.append(str(content))
+                continue
+
+            if isinstance(content, list):
+                converted = []
+                for part in content:
+                    part_type = part.get("type")
+                    if part_type in ("text", "input_text"):
+                        converted.append({
+                            "type": "input_text",
+                            "text": part.get("text", ""),
+                        })
+                    elif part_type in ("image_url", "input_image"):
+                        image = part.get("image_url", "")
+                        if isinstance(image, dict):
+                            image = image.get("url", "")
+                        converted.append({
+                            "type": "input_image",
+                            "image_url": image,
+                        })
+                content = converted
+            inputs.append({"role": role, "content": content})
+
+        return "\n\n".join(instructions), inputs
+
+    @staticmethod
+    def _responses_kwargs(kwargs):
+        mapped = dict(kwargs)
+        mapped.pop("response_format", None)
+        if "max_tokens" in mapped:
+            mapped["max_output_tokens"] = mapped.pop("max_tokens")
+        return mapped
+
+    def list_models(self):
+        """模型目录仍是所有 OpenAI API 格式共用的 `/models`。"""
+        return OpenAICompatProvider.list_models(self)
+
+    def chat(self, messages, **kwargs):
+        instructions, inputs = self._prepare_input(messages)
+        resp = self.client.responses.create(
+            model=self.model,
+            instructions=instructions or None,
+            input=inputs,
+            **self._responses_kwargs(kwargs),
+        )
+        return resp.output_text or ""
+
+    def chat_stream(self, messages, **kwargs):
+        instructions, inputs = self._prepare_input(messages)
+        stream = self.client.responses.create(
+            model=self.model,
+            instructions=instructions or None,
+            input=inputs,
+            stream=True,
+            **self._responses_kwargs(kwargs),
+        )
+        for event in stream:
+            event_type = (event.get("type") if isinstance(event, dict)
+                          else getattr(event, "type", ""))
+            if event_type != "response.output_text.delta":
+                continue
+            delta = (event.get("delta", "") if isinstance(event, dict)
+                     else getattr(event, "delta", ""))
+            if delta:
+                yield delta
+
+    def chat_structured(self, messages, **kwargs):
+        instructions, inputs = self._prepare_input(messages)
+        try:
+            resp = self.client.responses.parse(
+                model=self.model,
+                instructions=instructions or None,
+                input=inputs,
+                text_format=PromptOutput,
+                **self._responses_kwargs(kwargs),
+            )
+            parsed = getattr(resp, "output_parsed", None)
+            if parsed:
+                return parsed.model_dump()
+        except Exception as e:
+            logger.warning("Responses structured parse failed, falling back: %s", e)
+
+        return parse_llm_json(self.chat(messages, **kwargs))
+
+
 # ── Anthropic Provider ────────────────────────────────────────────────────────
 
 class AnthropicProvider(BaseLLMProvider):
@@ -228,10 +337,11 @@ class AnthropicProvider(BaseLLMProvider):
     name = "anthropic"
     supports_json_schema = False
 
-    def __init__(self, api_key: str, model: str, **_):
+    def __init__(self, api_key: str, model: str, base_url: str = "", **_):
         from anthropic import Anthropic
-        self.client = Anthropic(api_key=api_key)
+        self.client = Anthropic(api_key=api_key, base_url=base_url or None)
         self.model = model
+        self._base_url = base_url or ""
 
     @staticmethod
     def _split_system(messages):
@@ -460,12 +570,38 @@ class GeminiProvider(BaseLLMProvider):
 # ── Provider Registry ─────────────────────────────────────────────────────────
 
 PROVIDER_REGISTRY = {
-    "openai":     {"cls": OpenAICompatProvider, "name": "OpenAI"},
-    "deepseek":   {"cls": OpenAICompatProvider, "name": "DeepSeek"},
-    "openrouter": {"cls": OpenAICompatProvider, "name": "OpenRouter"},
-    "anthropic":  {"cls": AnthropicProvider,    "name": "Anthropic"},
-    "gemini":     {"cls": GeminiProvider,        "name": "Google AI Studio"},
-    "custom":     {"cls": OpenAICompatProvider, "name": "自定义 (OpenAI 兼容)"},
+    "openai": {
+        "name": "OpenAI",
+        "adapter": OpenAIResponsesProvider,
+    },
+    "deepseek": {
+        "name": "DeepSeek",
+        "adapter": OpenAICompatProvider,
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "adapter": OpenAICompatProvider,
+    },
+    "anthropic": {
+        "name": "Anthropic",
+        "adapter": AnthropicProvider,
+    },
+    "gemini": {
+        "name": "Google AI Studio",
+        "adapter": GeminiProvider,
+    },
+    "custom_openai": {
+        "name": "自定义（OpenAI 兼容）",
+        "adapter": OpenAICompatProvider,
+    },
+    "custom_responses": {
+        "name": "自定义（OpenAI Responses）",
+        "adapter": OpenAIResponsesProvider,
+    },
+    "custom_anthropic": {
+        "name": "自定义（Anthropic）",
+        "adapter": AnthropicProvider,
+    },
 }
 
 PROVIDER_CAPABILITIES = {
@@ -474,30 +610,34 @@ PROVIDER_CAPABILITIES = {
     "gemini":     {"json_schema": True,  "vision": True,  "image_gen": True},
     "deepseek":   {"json_schema": False, "vision": False, "image_gen": False},
     "openrouter": {"json_schema": True,  "vision": True,  "image_gen": False},
-    "custom":     {"json_schema": False, "vision": True,  "image_gen": False},
+    "custom_openai": {"json_schema": False, "vision": True, "image_gen": False},
+    "custom_responses": {"json_schema": True, "vision": True, "image_gen": False},
+    "custom_anthropic": {"json_schema": False, "vision": True, "image_gen": False},
 }
 
 
-def create_provider(provider_id: str, api_key: str, model: str, base_url: str = "") -> BaseLLMProvider:
-    """根据 provider_id 创建 Provider 实例"""
+def create_provider(provider_id: str, api_key: str, model: str,
+                    base_url: str = "") -> BaseLLMProvider:
+    """根据固定 Provider ID 创建对应协议适配器。"""
     entry = PROVIDER_REGISTRY.get(provider_id)
     if not entry:
         raise ValueError(f"Unknown provider: {provider_id}")
 
-    cls = entry["cls"]
-    if cls == OpenAICompatProvider:
-        preset = OpenAICompatProvider.PRESET.get(provider_id, {})
-        effective_url = base_url or preset.get("base_url", "")
-        return cls(api_key=api_key, model=model, base_url=effective_url)
-    return cls(api_key=api_key, model=model)
+    preset = OpenAICompatProvider.PRESET.get(provider_id, {})
+    effective_url = base_url if provider_id.startswith("custom_") else preset.get("base_url", "")
+    adapter = entry["adapter"]
+    if adapter is GeminiProvider:
+        return GeminiProvider(api_key=api_key, model=model)
+    return adapter(api_key=api_key, model=model, base_url=effective_url)
 
 
 # ── LLM Engine (高层接口) ─────────────────────────────────────────────────────
 
 def get_llm_config() -> dict:
     """获取当前 LLM 配置"""
+    provider = get_config("llm_provider", "")
     return {
-        "provider": get_config("llm_provider", ""),
+        "provider": provider,
         "model": get_config("llm_model", ""),
         "api_key": get_config("llm_api_key", ""),
         "base_url": get_config("llm_base_url", ""),
@@ -510,7 +650,8 @@ def get_llm_config() -> dict:
 
 def save_llm_config(data: dict):
     """保存 LLM 配置"""
-    for key in ("provider", "model", "api_key", "base_url", "temperature", "max_tokens", "stream"):
+    for key in ("provider", "model", "api_key", "base_url",
+                "temperature", "max_tokens", "stream"):
         if key in data:
             set_config(f"llm_{key}", data[key])
 
@@ -676,7 +817,8 @@ def chat_sync(messages: list[dict], system: str = "", **kwargs) -> str:
     return provider.chat(messages, **extra)
 
 
-def test_connection(provider_id: str, api_key: str, model: str, base_url: str = "") -> dict:
+def test_connection(provider_id: str, api_key: str, model: str,
+                    base_url: str = "") -> dict:
     """测试 LLM 连接是否有效"""
     import time
 
@@ -698,7 +840,8 @@ def test_connection(provider_id: str, api_key: str, model: str, base_url: str = 
 def list_models(provider_id: str, api_key: str, base_url: str = "") -> dict:
     """动态获取 Provider 的可用模型列表"""
     try:
-        provider = create_provider(provider_id, api_key, model="", base_url=base_url)
+        provider = create_provider(
+            provider_id, api_key, model="", base_url=base_url)
         models = provider.list_models()
         return {"ok": True, "models": models}
     except Exception as e:

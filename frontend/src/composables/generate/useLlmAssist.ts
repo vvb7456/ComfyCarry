@@ -34,7 +34,7 @@ export interface UseLlmAssistReturn {
   inputImageName: Ref<string>
 
   open(): Promise<void>
-  /** @param promptTarget 后端 PROMPT_REGISTRY 预设 key; 视频架构传 'video', 缺省 'sdxl' */
+  /** @param promptTarget 后端 PROMPT_REGISTRY 的模型专属预设 key，缺省 'sdxl' */
   submit(input: string, promptTarget?: string): Promise<void>
   abort(): void
   applyResult(target: 'positive' | 'all' | 'copy'): { positive: string; negative?: string } | null
@@ -119,11 +119,10 @@ export function useLlmAssist(): UseLlmAssistReturn {
   // ── Submit: text or image mode ────────────────────────────────────────
 
   /**
-   * @param promptTarget 后端 `PROMPT_REGISTRY` 的预设 key。视频架构传 'video'
-   *   (运动/镜头四层结构, 见 llm_prompts.VIDEO_SYSTEM_PROMPT); 缺省保持既有 'sdxl' 行为。
-   *   图像模式 (反推) 下后端会先找 `{target}_vision`, 不存在则回退到 `target` 本身
-   *   (llm_engine._build_prompt_messages) —— 故 'video' 无需单独的 video_vision 预设,
-   *   在视频架构下反推图片同样得到运动描述, 符合预期。
+   * @param promptTarget 后端 `PROMPT_REGISTRY` 的模型专属预设 key。调用方按当前
+   *   模型与视频模式精确选择；缺省保持既有 'sdxl' 行为。
+   *   图像模式（反推）下后端会先找 `{target}_vision`，不存在则回退到模型本身的
+   *   预设；用户消息同时携带图片，预设会据可见内容生成该模型适用的提示词。
    */
   async function submit(textInput: string, promptTarget = 'sdxl') {
     if (running.value) return
@@ -158,7 +157,13 @@ export function useLlmAssist(): UseLlmAssistReturn {
           return
         }
       }
-      body = { image: base64, target: promptTarget, stream: streaming.value }
+      // 视频 target 会通过 textInput 携带时长等系统上下文；普通图片反推保持为空。
+      body = {
+        image: base64,
+        ...(textInput.trim() ? { input: textInput } : {}),
+        target: promptTarget,
+        stream: streaming.value,
+      }
     }
 
     running.value = true

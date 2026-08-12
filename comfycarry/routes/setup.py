@@ -114,7 +114,7 @@ def api_setup_save():
             set_config("llm_provider", data["llm_provider"])
         if data.get("llm_api_key"):
             set_config("llm_api_key", data["llm_api_key"])
-        if data.get("llm_base_url"):
+        if "llm_base_url" in data:
             set_config("llm_base_url", data["llm_base_url"])
         if data.get("llm_model"):
             set_config("llm_model", data["llm_model"])
@@ -229,4 +229,3 @@ def api_setup_log_stream():
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",
                              "X-Accel-Buffering": "no"})
-

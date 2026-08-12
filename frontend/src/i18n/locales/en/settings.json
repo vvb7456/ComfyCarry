@@ -100,16 +100,30 @@
   "llm": {
     "provider": {
       "title": "Service Provider",
+      "help": "Official entries use preset endpoints; for third-party endpoints, choose the matching custom entry.",
       "label": "Provider",
       "select_placeholder": "— Select Provider —",
+      "openai": "OpenAI",
+      "deepseek": "DeepSeek",
+      "openrouter": "OpenRouter",
+      "anthropic": "Anthropic",
+      "gemini": "Google Gemini",
+      "custom_openai": "Custom (OpenAI Compatible)",
+      "custom_responses": "Custom (OpenAI Responses)",
+      "custom_anthropic": "Custom (Anthropic)",
       "api_key": "API Key",
       "api_key_placeholder": "Enter API Key...",
-      "base_url": "Base URL"
+      "base_url": "Base URL",
+      "base_url_placeholder_openai": "API root, e.g. https://api.example.com/v1",
+      "base_url_placeholder_anthropic": "API root, e.g. https://api.example.com (do not include /v1/messages)",
+      "base_url_help_openai": "Enter the API root; do not include /chat/completions or /responses.",
+      "base_url_help_anthropic": "Enter the API root; do not include /v1/messages."
     },
     "model": {
       "title": "Model",
       "label": "Model",
       "refresh_hint": "Refresh to fetch model list",
+      "input_placeholder": "Select or enter a model name",
       "search_placeholder": "Search models...",
       "fetch_title": "Fetch model list",
       "fetching": "Fetching...",
@@ -137,7 +151,7 @@
     "test_failed": "Connection failed",
     "err_no_provider": "Please select a provider first",
     "err_no_key": "Please enter API Key first",
-    "err_no_model": "Please select a model first",
+    "err_no_model": "Please select or enter a model first",
     "config_saved": "LLM config saved",
     "save_failed": "Save failed",
     "unknown_error": "Unknown error"

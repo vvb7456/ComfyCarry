@@ -51,9 +51,11 @@ const llmProviderLabels: Record<string, string> = {
   openai: 'OpenAI',
   deepseek: 'DeepSeek',
   openrouter: 'OpenRouter',
-  anthropic: 'Anthropic (Claude)',
+  anthropic: 'Anthropic',
   gemini: 'Google Gemini',
-  custom: t('wizard.step6.custom_provider'),
+  custom_openai: t('wizard.step6.custom_openai'),
+  custom_responses: t('wizard.step6.custom_responses'),
+  custom_anthropic: t('wizard.step6.custom_anthropic'),
 }
 
 function configured(v: unknown): SummaryRow['icon'] {

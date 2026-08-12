@@ -9,6 +9,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
+import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'StepLlm' })
@@ -17,14 +18,14 @@ const { t } = useI18n({ useScope: 'global' })
 const { config, nextStep, prevStep } = useWizardState()
 const {
   providers, models, modelsLoading, modelsError,
-  showBaseUrl, showModelGroup,
+  showBaseUrl, baseUrlPlaceholder, baseUrlHelp, showModelGroup,
   onProviderChange, fetchModels, initStep,
 } = useWizardLlm()
 
 const providerOptions = computed(() =>
   providers.value.map(p => ({
     value: p.id,
-    label: p.id === 'custom' ? t('wizard.step6.custom_provider') : p.name,
+    label: p.name,
   })),
 )
 
@@ -68,7 +69,11 @@ function onPrev() { prevStep() }
     @prev="onPrev"
     @next="onNext"
   >
-    <FormField :label="t('wizard.step6.provider')">
+    <FormField>
+      <template #label>
+        {{ t('wizard.step6.provider') }}
+        <HelpTip :text="t('wizard.step6.provider_help')" />
+      </template>
       <BaseSelect
         :model-value="config.llm_provider"
         :options="providerOptions"
@@ -84,12 +89,16 @@ function onPrev() { prevStep() }
       />
     </FormField>
 
-    <FormField v-if="showBaseUrl" :label="t('wizard.step6.base_url')">
+    <FormField v-if="showBaseUrl">
+      <template #label>
+        {{ t('wizard.step6.base_url') }}
+        <HelpTip :text="baseUrlHelp" />
+      </template>
       <input
         v-model="config.llm_base_url"
         type="text"
         class="form-input"
-        :placeholder="t('wizard.step6.base_url_placeholder')"
+        :placeholder="baseUrlPlaceholder"
       />
     </FormField>
 
@@ -99,8 +108,9 @@ function onPrev() { prevStep() }
           <BaseSelect
             v-model="config.llm_model"
             :options="modelOptions"
-            :placeholder="t('wizard.step6.model_placeholder')"
             searchable
+            allow-custom
+            :placeholder="t('wizard.step6.model_placeholder')"
             :search-placeholder="t('wizard.step6.search_model')"
             class="step-llm__model-select"
           />

@@ -34,6 +34,14 @@ export interface LlmProvider {
   name: string
 }
 
+export interface LlmProviderConfig {
+  api_key?: string
+  model?: string
+  base_url?: string
+  /** Preserve provider-specific fields returned by the backend. */
+  [key: string]: unknown
+}
+
 export interface ModelOption {
   id: string
   name?: string
@@ -43,7 +51,7 @@ export interface ModelOption {
 
 export interface LlmConfigData {
   provider?: string
-  provider_keys?: Record<string, { api_key?: string; model?: string; base_url?: string }>
+  provider_keys?: Record<string, LlmProviderConfig>
   base_url?: string
   temperature?: number
   max_tokens?: number

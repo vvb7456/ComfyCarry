@@ -4,14 +4,25 @@ import { useWizardState } from './useWizardState'
 import type { LlmProvider, LlmModel } from '@/types/wizard'
 import { apiErrorText } from '@/utils/apiError'
 
-const WIZARD_LLM_PROVIDERS: LlmProvider[] = [
-  { id: 'openai', name: 'OpenAI' },
-  { id: 'deepseek', name: 'DeepSeek' },
-  { id: 'openrouter', name: 'OpenRouter' },
-  { id: 'anthropic', name: 'Anthropic (Claude)' },
-  { id: 'gemini', name: 'Google Gemini' },
-  { id: 'custom', name: '自定义 (OpenAI 兼容)' },
+type WizardLlmProviderOption = LlmProvider & {
+  labelKey: string
+  baseUrlKind: 'openai' | 'anthropic' | 'none'
+}
+
+const WIZARD_LLM_PROVIDERS: WizardLlmProviderOption[] = [
+  { id: 'openai', name: '', labelKey: 'wizard.step6.openai', baseUrlKind: 'none' },
+  { id: 'deepseek', name: '', labelKey: 'wizard.step6.deepseek', baseUrlKind: 'none' },
+  { id: 'openrouter', name: '', labelKey: 'wizard.step6.openrouter', baseUrlKind: 'none' },
+  { id: 'anthropic', name: '', labelKey: 'wizard.step6.anthropic', baseUrlKind: 'none' },
+  { id: 'gemini', name: '', labelKey: 'wizard.step6.gemini', baseUrlKind: 'none' },
+  { id: 'custom_openai', name: '', labelKey: 'wizard.step6.custom_openai', baseUrlKind: 'openai' },
+  { id: 'custom_responses', name: '', labelKey: 'wizard.step6.custom_responses', baseUrlKind: 'openai' },
+  { id: 'custom_anthropic', name: '', labelKey: 'wizard.step6.custom_anthropic', baseUrlKind: 'anthropic' },
 ]
+
+function providerOption(providerId: string): WizardLlmProviderOption | undefined {
+  return WIZARD_LLM_PROVIDERS.find(p => p.id === providerId)
+}
 
 export function useWizardLlm() {
   const { t } = useI18n({ useScope: 'global' })
@@ -23,13 +34,23 @@ export function useWizardLlm() {
   const inited = ref(false)
 
   const providers = computed(() =>
-    WIZARD_LLM_PROVIDERS.map(p =>
-      p.id === 'custom' ? { ...p, name: t('wizard.step6.custom_provider') } : p
-    )
+    WIZARD_LLM_PROVIDERS.map(p => ({ ...p, name: t(p.labelKey) }))
   )
 
-  /** Show base_url field only for custom provider */
-  const showBaseUrl = computed(() => config.llm_provider === 'custom')
+  const showBaseUrl = computed(() => {
+    const kind = providerOption(config.llm_provider)?.baseUrlKind
+    return !!kind && kind !== 'none'
+  })
+  const baseUrlPlaceholder = computed(() =>
+    providerOption(config.llm_provider)?.baseUrlKind === 'anthropic'
+      ? t('wizard.step6.base_url_placeholder_anthropic')
+      : t('wizard.step6.base_url_placeholder_openai'),
+  )
+  const baseUrlHelp = computed(() =>
+    providerOption(config.llm_provider)?.baseUrlKind === 'anthropic'
+      ? t('wizard.step6.base_url_help_anthropic')
+      : t('wizard.step6.base_url_help_openai'),
+  )
 
   /** Show model group when a provider is selected */
   const showModelGroup = computed(() => !!config.llm_provider)
@@ -37,9 +58,8 @@ export function useWizardLlm() {
   // ── Get provider display name ───────────────────────────────
 
   function getProviderName(id: string): string {
-    if (id === 'custom') return t('wizard.step6.custom_provider')
-    const p = WIZARD_LLM_PROVIDERS.find(p => p.id === id)
-    return p?.name || id
+    const p = providerOption(id)
+    return p ? t(p.labelKey) : id
   }
 
   // ── Provider change ─────────────────────────────────────────
@@ -76,7 +96,7 @@ export function useWizardLlm() {
         )
         if (preselect) {
           selectModel(preselect)
-        } else if (models.value.length > 0) {
+        } else if (!config.llm_model && models.value.length > 0) {
           selectModel(models.value[0].id)
         }
       } else {
@@ -118,6 +138,8 @@ export function useWizardLlm() {
 
     // Computed
     showBaseUrl,
+    baseUrlPlaceholder,
+    baseUrlHelp,
     showModelGroup,
 
     // Actions

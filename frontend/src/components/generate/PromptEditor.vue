@@ -51,6 +51,42 @@ const emit = defineEmits<{
 
 const { t, te } = useI18n({ useScope: 'global' })
 
+/** 当前模型的提示词帮助；未知模型回退 SDXL。 */
+const modelGuidePath = computed(() => {
+  const path = `generate.prompt.help.models.${props.modelType}`
+  // vue-i18n 的 te() 只可靠检查叶子 key；对 models.<id> 对象本身检查会返回 false。
+  return props.modelType && te(`${path}.title`) ? path : 'generate.prompt.help.models.sdxl'
+})
+
+/** HelpTip 不显示不适用的负面提示词行。 */
+const NO_NEGATIVE_GUIDE_MODELS = new Set([
+  'krea2',
+  'zimage',
+  'flux1',
+  'flux2klein4b',
+  'flux2klein9b',
+  'flux2dev',
+  'minimax_h3',
+  'minimax_h3_ref',
+])
+
+const showNegativeGuide = computed(() =>
+  props.showNegative && !NO_NEGATIVE_GUIDE_MODELS.has(props.modelType),
+)
+
+const modelGuideRows = computed(() => [
+  { key: 'format', label: t('generate.prompt.help.format_label') },
+  { key: 'order', label: t('generate.prompt.help.order_label') },
+  { key: 'special', label: t('generate.prompt.help.special_label') },
+  // 不适用时不显示负面提示词行。
+  ...(showNegativeGuide.value
+    ? [{ key: 'negative', label: t('generate.prompt.help.negative_label') }]
+    : []),
+].map(row => ({
+  ...row,
+  text: t(`${modelGuidePath.value}.${row.key}`),
+})))
+
 /** 媒体类型派生: 从 modelType 反查 MODEL_TYPES。判据基于 mediaType (非 promptStyle):
  *  - krea2/zimage: modelType → mediaType='image' → 不命中视频占位 (走 promptStyle 通用占位)
  *  - wan22_*: modelType → mediaType='video' → 命中视频占位
@@ -198,44 +234,13 @@ defineExpose({ insertAtCursor })
     <!-- Syntax help modal -->
     <BaseModal v-model="helpOpen" :title="t('generate.prompt.help_modal_title')" icon="help_outline" size="lg">
       <div class="help-content">
-        <!-- 基础语法: 按 promptStyle 区分 tag 系 (A1111) 与自然语言系 -->
-        <template v-if="promptStyle === 'natural'">
-          <div class="help-section-title">{{ t('generate.prompt.help.natural_title') }}</div>
-          <table class="help-table">
-            <tr v-for="row in [
-              { key: 'natural_sentence', example: 'A silver-haired girl in a flowing dress stands on a cliff at sunset, cinematic lighting' },
-              { key: 'natural_order', example: '' },
-              { key: 'natural_detail', example: '' },
-              { key: 'natural_no_weight', example: '' },
-            ]" :key="row.key">
-              <td class="help-label">{{ t(`generate.prompt.help.${row.key}`) }}</td>
-              <td>
-                <code v-if="row.example">{{ row.example }}</code>
-                <br v-if="row.example" />
-                <span class="help-desc">{{ t(`generate.prompt.help.${row.key}_desc`) }}</span>
-              </td>
-            </tr>
-          </table>
-        </template>
-        <template v-else>
-          <div class="help-section-title">{{ t('generate.prompt.help.basic_title') }}</div>
-          <table class="help-table">
-            <tr v-for="row in [
-              { key: 'comma', example: '1girl, long hair, blue sky' },
-              { key: 'weight_up', example: '(masterpiece:1.4)' },
-              { key: 'weight_down', example: '(blurry:0.5)' },
-              { key: 'embedding', example: 'embedding:easynegative' },
-              { key: 'quality', example: '' },
-            ]" :key="row.key">
-              <td class="help-label">{{ t(`generate.prompt.help.${row.key}`) }}</td>
-              <td>
-                <code v-if="row.example">{{ row.example }}</code>
-                <br v-if="row.example" />
-                <span class="help-desc">{{ t(`generate.prompt.help.${row.key}_desc`) }}</span>
-              </td>
-            </tr>
-          </table>
-        </template>
+        <div class="help-model-title">{{ t(`${modelGuidePath}.title`) }}</div>
+        <table class="help-table">
+          <tr v-for="row in modelGuideRows" :key="row.key">
+            <td class="help-label">{{ row.label }}</td>
+            <td><span class="help-desc">{{ row.text }}</span></td>
+          </tr>
+        </table>
 
         <!-- 随机提示词 -->
         <div class="help-section-title">{{ t('generate.prompt.help.random_title') }}</div>
@@ -469,6 +474,11 @@ defineExpose({ insertAtCursor })
   font-size: .88rem;
   line-height: 1.7;
 }
+.help-model-title {
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--t1);
+}
 .help-section-title {
   font-weight: 600;
   color: var(--t1);
@@ -497,6 +507,7 @@ defineExpose({ insertAtCursor })
 }
 .help-desc {
   color: var(--t3);
+  white-space: pre-line;
 }
 .help-content code {
   font-family: monospace;

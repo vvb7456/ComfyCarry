@@ -58,6 +58,7 @@
   "clipboard_empty": "Nothing to copy",
   "no_results": "No matching results found",
   "no_matches": "No matches",
+  "use_custom_value": "Use “{value}”",
   "search_hint": "Search…",
   "loading": "Loading...",
   "empty": "No data",

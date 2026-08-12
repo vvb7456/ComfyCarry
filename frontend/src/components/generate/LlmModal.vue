@@ -15,7 +15,6 @@ import type { UseLlmAssistReturn } from '@/composables/generate/useLlmAssist'
 import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
 import { useToast } from '@/composables/useToast'
 import { useGenerateStore } from '@/stores/generate'
-import { MODEL_TYPES } from '@/config/model-types'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
@@ -101,15 +100,54 @@ function onClearImage() {
 
 // ── Submit ────────────────────────────────────────────────────────────
 
-/** LLM 预设 target: 视频架构走「运动与镜头」预设, 其余维持 sdxl。
- *  从当前架构的 mediaType 派生, 不经 props 传递链。 */
-const llmTarget = computed(() =>
-  MODEL_TYPES[store.activeModelType]?.mediaType === 'video' ? 'video' : 'sdxl',
-)
+/** 静态模型与 LLM prompt 预设一一对应；视频双模式条目在下方动态分流。 */
+const STATIC_LLM_TARGETS: Record<string, string> = {
+  sdxl: 'sdxl',
+  anima: 'anima',
+  krea2: 'krea2',
+  zimage: 'zimage',
+  flux1: 'flux',
+  chroma: 'chroma',
+  flux2klein4b: 'flux2klein4b',
+  flux2klein9b: 'flux2klein9b',
+  flux2dev: 'flux2dev',
+  pony: 'pony',
+  illustrious: 'illustrious',
+  noobai: 'noobai',
+  wan22_i2v: 'wan22_i2v',
+  wan22_t2v: 'wan22_t2v',
+  minimax_h3_ref: 'minimax_h3_ref',
+}
+
+/** 根据模型和视频模式选择 LLM prompt。 */
+const llmTarget = computed(() => {
+  const modelType = store.activeModelType
+  const video = store.currentState.video
+
+  if (modelType === 'wan22_5b') {
+    return video?.mode === 't2v' ? 'wan22_5b_t2v' : 'wan22_5b_i2v'
+  }
+
+  if (modelType === 'minimax_h3') {
+    if (video?.mode === 't2v') return 'minimax_h3_t2v'
+    return video?.lastImage ? 'minimax_h3_fl2v' : 'minimax_h3_i2v'
+  }
+
+  // 未知的未来条目安全回退 SDXL，避免向严格校验的 API 发送无效 target。
+  return STATIC_LLM_TARGETS[modelType] ?? 'sdxl'
+})
 
 function onSubmit() {
   if (props.llm.running.value) return
-  props.llm.submit(textInput.value, llmTarget.value)
+  // 图片反推不携带用户之前在文字 tab 的草稿；视频的时长是系统上下文，两种模式都要发送。
+  let input = props.llm.mode.value === 'image' ? '' : textInput.value
+  if (llmTarget.value.startsWith('wan22_') || llmTarget.value.startsWith('minimax_h3_')) {
+    const duration = store.currentState.video?.durationS
+    if (duration) {
+      input += `\n\n系统补充的生成参数（不是画面内容）：目标视频时长为 ${duration.toFixed(2)} 秒。`
+    }
+  }
+  props.llm.submit(input, llmTarget.value)
 }
 
 function onKeydown(e: KeyboardEvent) {

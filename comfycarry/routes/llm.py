@@ -132,6 +132,8 @@ def api_llm_chat():
 def api_llm_providers():
     providers = []
     for pid, entry in PROVIDER_REGISTRY.items():
+        if entry.get("hidden"):
+            continue
         caps = PROVIDER_CAPABILITIES.get(pid, {})
         info = {
             "id": pid,
@@ -141,9 +143,9 @@ def api_llm_providers():
             "supports_image_gen": caps.get("image_gen", False),
             "requires": ["api_key"],
         }
-        if pid in ("custom", "openrouter"):
+        if pid == "openrouter" or pid.startswith("custom"):
             info["supports_custom_model"] = True
-        if pid == "custom":
+        if pid.startswith("custom"):
             info["requires"] = ["api_key", "base_url"]
         if pid == "gemini":
             info["notes"] = "免费额度 1500 次/天"
@@ -221,7 +223,6 @@ def api_llm_test():
         return _err("config_fields_required")
     if provider not in PROVIDER_REGISTRY:
         return _err("unsupported_provider", provider=provider)
-
     result = test_connection(provider, api_key, model, base_url)
     return jsonify(**result)
 
@@ -238,6 +239,5 @@ def api_llm_models():
         return _err("test_fields_required")
     if provider not in PROVIDER_REGISTRY:
         return _err("unsupported_provider", provider=provider)
-
     result = list_models(provider, api_key, base_url)
     return jsonify(**result)

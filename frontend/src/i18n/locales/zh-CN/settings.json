@@ -100,16 +100,30 @@
   "llm": {
     "provider": {
       "title": "服务提供商",
+      "help": "官方项使用预设地址；第三方端点请选择与其接口一致的自定义项。",
       "label": "服务商",
       "select_placeholder": "— 选择服务提供商 —",
+      "openai": "OpenAI",
+      "deepseek": "DeepSeek",
+      "openrouter": "OpenRouter",
+      "anthropic": "Anthropic",
+      "gemini": "Google Gemini",
+      "custom_openai": "自定义（OpenAI 兼容）",
+      "custom_responses": "自定义（OpenAI Responses）",
+      "custom_anthropic": "自定义（Anthropic）",
       "api_key": "API Key",
       "api_key_placeholder": "输入 API Key...",
-      "base_url": "Base URL"
+      "base_url": "Base URL",
+      "base_url_placeholder_openai": "API 根地址，例如 https://api.example.com/v1",
+      "base_url_placeholder_anthropic": "API 根地址，例如 https://api.example.com（不要包含 /v1/messages）",
+      "base_url_help_openai": "填写 API 根地址，不要填写 /chat/completions 或 /responses。",
+      "base_url_help_anthropic": "填写 API 根地址，不要填写 /v1/messages。"
     },
     "model": {
       "title": "模型",
       "label": "模型",
       "refresh_hint": "刷新获取模型列表",
+      "input_placeholder": "选择或输入模型名称",
       "search_placeholder": "搜索模型...",
       "fetch_title": "获取模型列表",
       "fetching": "获取中...",
@@ -137,7 +151,7 @@
     "test_failed": "连接失败",
     "err_no_provider": "请先选择服务提供商",
     "err_no_key": "请先输入 API Key",
-    "err_no_model": "请先选择模型",
+    "err_no_model": "请先选择或输入模型",
     "config_saved": "LLM 配置已保存",
     "save_failed": "保存失败",
     "unknown_error": "未知错误"

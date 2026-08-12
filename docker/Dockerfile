@@ -65,7 +65,8 @@ RUN python3.12 -m pip install --upgrade pip setuptools wheel && \
     python3.12 -m pip install --ignore-installed \
         flask flask-cors requests websocket-client && \
     python3.12 -m pip install \
-        openai anthropic google-genai && \
+        'openai==1.109.1' 'anthropic==0.46.0' 'google-genai==1.75.0' \
+        'pydantic>=2.0,<3' 'httpx>=0.27,<1' && \
     python3.12 -m pip install jupyterlab-language-pack-zh-CN
 
 # =============================================================================

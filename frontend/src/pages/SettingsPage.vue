@@ -22,7 +22,11 @@ import { useConfirm } from '@/composables/useConfirm'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { useAppStore } from '@/stores/app'
 import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
-import type { LlmProvider, ModelOption, LlmConfigData } from '@/types/settings'
+import type {
+  LlmProviderConfig,
+  ModelOption,
+  LlmConfigData,
+} from '@/types/settings'
 
 defineOptions({ name: 'SettingsPage' })
 
@@ -198,13 +202,11 @@ async function applyUpdate() {
 
 // ─── LLM state ───────────────────────────────────────────────────────────────
 
-const llmProviders = ref<LlmProvider[]>([])
 const llmProvidersLoaded = ref(false)
 const llmProvider = ref('')
 const llmApiKey = ref('')
 const llmBaseUrl = ref('')
 const llmModel = ref('')
-const llmModelText = ref('')
 const llmTemperature = ref(0.7)
 const llmMaxTokens = ref(2000)
 const llmStream = ref(true)
@@ -223,13 +225,56 @@ const llmFetchingModels = ref(false)
 const llmSaving = ref(false)
 const llmTesting = ref(false)
 const llmTestResult = ref<{ ok: boolean; message: string } | null>(null)
-const llmProviderKeys = ref<Record<string, { api_key?: string; model?: string; base_url?: string }>>({})
+const llmProviderKeys = ref<Record<string, LlmProviderConfig>>({})
+
+type LlmProviderOption = {
+  id: string
+  labelKey: string
+  baseUrlKind: 'openai' | 'anthropic' | 'none'
+}
+
+/** Provider IDs encode the wire protocol so the UI cannot create an invalid
+ * provider/protocol pair. */
+const LLM_PROVIDER_OPTIONS: LlmProviderOption[] = [
+  { id: 'openai', labelKey: 'settings.llm.provider.openai', baseUrlKind: 'none' },
+  { id: 'deepseek', labelKey: 'settings.llm.provider.deepseek', baseUrlKind: 'none' },
+  { id: 'openrouter', labelKey: 'settings.llm.provider.openrouter', baseUrlKind: 'none' },
+  { id: 'anthropic', labelKey: 'settings.llm.provider.anthropic', baseUrlKind: 'none' },
+  { id: 'gemini', labelKey: 'settings.llm.provider.gemini', baseUrlKind: 'none' },
+  { id: 'custom_openai', labelKey: 'settings.llm.provider.custom_openai', baseUrlKind: 'openai' },
+  { id: 'custom_responses', labelKey: 'settings.llm.provider.custom_responses', baseUrlKind: 'openai' },
+  { id: 'custom_anthropic', labelKey: 'settings.llm.provider.custom_anthropic', baseUrlKind: 'anthropic' },
+]
+
+function providerOption(providerId: string): LlmProviderOption | undefined {
+  return LLM_PROVIDER_OPTIONS.find(p => p.id === providerId)
+}
+
+const llmProviderOptions = computed(() =>
+  LLM_PROVIDER_OPTIONS.map(option => ({
+    value: option.id,
+    label: t(option.labelKey),
+  })),
+)
 
 const llmModelSelectOptions = computed(() =>
   llmAllModels.value.map(m => ({ value: m.id, label: m.name || m.id }))
 )
 
-const showLlmBaseUrl = computed(() => llmProvider.value === 'custom')
+const showLlmBaseUrl = computed(() => {
+  const kind = providerOption(llmProvider.value)?.baseUrlKind
+  return !!kind && kind !== 'none'
+})
+const llmBaseUrlHelp = computed(() =>
+  providerOption(llmProvider.value)?.baseUrlKind === 'anthropic'
+    ? t('settings.llm.provider.base_url_help_anthropic')
+    : t('settings.llm.provider.base_url_help_openai'),
+)
+const llmBaseUrlPlaceholder = computed(() =>
+  providerOption(llmProvider.value)?.baseUrlKind === 'anthropic'
+    ? t('settings.llm.provider.base_url_placeholder_anthropic')
+    : t('settings.llm.provider.base_url_placeholder_openai'),
+)
 
 // ─── Load settings ────────────────────────────────────────────────────────────
 
@@ -392,12 +437,8 @@ async function reinitialize() {
 // ─── LLM ─────────────────────────────────────────────────────────────────────
 
 async function loadLlmTab() {
-  const [provData, cfgData] = await Promise.all([
-    get<{ providers: LlmProvider[] }>('/api/llm/providers'),
-    get<{ ok: boolean; data?: LlmConfigData }>('/api/llm/config'),
-  ])
+  const cfgData = await get<{ ok: boolean; data?: LlmConfigData }>('/api/llm/config')
   llmProvidersLoaded.value = true
-  if (provData?.providers) llmProviders.value = provData.providers
   if (cfgData?.ok && cfgData.data) {
     const cfg = cfgData.data
     llmProviderKeys.value = cfg.provider_keys || {}
@@ -405,12 +446,12 @@ async function loadLlmTab() {
     const savedProv = llmProviderKeys.value[cfg.provider || '']
     if (savedProv?.api_key) llmApiKey.value = savedProv.api_key
     if (cfg.base_url) llmBaseUrl.value = cfg.base_url
+    else if (savedProv?.base_url) llmBaseUrl.value = savedProv.base_url
     if (cfg.temperature != null) llmTemperature.value = cfg.temperature
     if (cfg.max_tokens != null) llmMaxTokens.value = cfg.max_tokens
     llmStream.value = !!cfg.stream
     if (cfg.model) {
       llmModel.value = cfg.model
-      llmModelText.value = cfg.model
     }
   }
 }
@@ -423,26 +464,20 @@ function onLlmProviderChange() {
   selectedLlmModel.value = null
   if (saved?.model) {
     llmModel.value = saved.model
-    llmModelText.value = saved.model
   } else {
     llmModel.value = ''
-    llmModelText.value = t('settings.llm.model.refresh_hint')
   }
 }
 
 function selectLlmModel(value: string | number | boolean) {
   const model = llmAllModels.value.find(m => m.id === value)
-  if (model) {
-    llmModelText.value = model.name || model.id
-    selectedLlmModel.value = model
-  }
+  selectedLlmModel.value = model || null
 }
 
 async function fetchLlmModels() {
   if (!llmProvider.value) { toast(t('settings.llm.err_no_provider'), 'error'); return }
   if (!llmApiKey.value) { toast(t('settings.llm.err_no_key'), 'error'); return }
   llmFetchingModels.value = true
-  llmModelText.value = t('settings.llm.model.fetching')
   const data = await post<{ ok?: boolean; models?: ModelOption[]; error?: string }>('/api/llm/models', {
     provider: llmProvider.value,
     api_key: llmApiKey.value,
@@ -450,7 +485,6 @@ async function fetchLlmModels() {
   })
   llmFetchingModels.value = false
   if (!data?.ok) {
-    llmModelText.value = t('settings.llm.model.fetch_failed')
     toast(apiErrorText(data, t('settings.llm.model.fetch_failed')), 'error')
     return
   }
@@ -460,13 +494,12 @@ async function fetchLlmModels() {
     return na.localeCompare(nb)
   })
   llmAllModels.value = models
-  if (models.length > 0) {
+  if (llmModel.value) {
+    selectedLlmModel.value = models.find(model => model.id === llmModel.value) || null
+  } else if (models.length > 0) {
     const first = models[0]
     llmModel.value = first.id
-    llmModelText.value = first.name || first.id
     selectedLlmModel.value = first
-  } else {
-    llmModelText.value = t('settings.llm.model.none_available')
   }
   toast(t('settings.llm.model.fetched_count', { count: models.length }), 'success')
 }
@@ -482,13 +515,18 @@ async function saveLlmConfig() {
     temperature: llmTemperature.value,
     max_tokens: llmMaxTokens.value,
     stream: llmStream.value,
+    base_url: llmBaseUrl.value,
   }
-  if (llmBaseUrl.value) body.base_url = llmBaseUrl.value
   const data = await put<{ ok?: boolean; error?: string }>('/api/llm/config', body)
   llmSaving.value = false
   if (!data) return
   if (data.ok) {
-    llmProviderKeys.value[llmProvider.value] = { api_key: llmApiKey.value, model: llmModel.value, base_url: llmBaseUrl.value }
+    llmProviderKeys.value[llmProvider.value] = {
+      ...llmProviderKeys.value[llmProvider.value],
+      api_key: llmApiKey.value,
+      model: llmModel.value,
+      base_url: llmBaseUrl.value,
+    }
     toast(t('settings.llm.config_saved'), 'success')
   } else {
     toast(apiErrorText(data, t('settings.llm.save_failed')), 'error')
@@ -841,9 +879,10 @@ onUnmounted(() => {
           <h3 class="settings-card-title">
             <MsIcon name="smart_toy" />
             {{ t('settings.llm.provider.title') }}
+            <HelpTip :text="t('settings.llm.provider.help')" />
           </h3>
           <FormField :label="t('settings.llm.provider.label')" density="compact">
-            <BaseSelect v-model="llmProvider" :options="llmProviders" value-key="id" label-key="name" :placeholder="t('settings.llm.provider.select_placeholder')" @change="onLlmProviderChange" />
+            <BaseSelect v-model="llmProvider" :options="llmProviderOptions" :placeholder="t('settings.llm.provider.select_placeholder')" @change="onLlmProviderChange" />
           </FormField>
           <FormField :label="t('settings.llm.provider.api_key')" density="compact">
             <SecretInput
@@ -853,8 +892,12 @@ onUnmounted(() => {
               input-class="form-input"
             />
           </FormField>
-          <FormField v-if="showLlmBaseUrl" :label="t('settings.llm.provider.base_url')" density="compact">
-            <input type="url" v-model="llmBaseUrl" class="form-input" placeholder="https://..." />
+          <FormField v-if="showLlmBaseUrl" density="compact">
+            <template #label>
+              {{ t('settings.llm.provider.base_url') }}
+              <HelpTip :text="llmBaseUrlHelp" />
+            </template>
+            <input type="url" v-model="llmBaseUrl" class="form-input" :placeholder="llmBaseUrlPlaceholder" />
           </FormField>
         </BaseCard>
 
@@ -870,8 +913,8 @@ onUnmounted(() => {
                 v-model="llmModel"
                 :options="llmModelSelectOptions"
                 searchable
-                :display-text="llmModelText"
-                :placeholder="t('settings.llm.model.refresh_hint')"
+                allow-custom
+                :placeholder="t('settings.llm.model.input_placeholder')"
                 :search-placeholder="t('settings.llm.model.search_placeholder')"
                 :empty-text="t('settings.llm.model.no_match')"
                 @change="selectLlmModel"

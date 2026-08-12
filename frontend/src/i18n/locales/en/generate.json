@@ -60,9 +60,134 @@
     },
     "video_ph": "Describe how the scene moves: subject → action → camera → setting. e.g.: A girl turns and glances back, long hair flowing, camera slowly pushing in…",
     "negative_video_ph": "A recommended negative prompt is built in — leave empty to use the default",
-    "syntax_help_title": "Random prompt syntax",
+    "syntax_help_title": "Model prompt and random syntax help",
     "help_modal_title": "Prompt Help",
     "help": {
+      "format_label": "Format",
+      "order_label": "Recommended order",
+      "special_label": "Example",
+      "negative_label": "Negative prompt",
+      "models": {
+        "sdxl": {
+          "title": "SDXL (tag style)",
+          "format": "Use English tags or short phrases separated by commas. A few key elements may be emphasized with (tag:1.1).",
+          "order": "Quality/style → subject/count → appearance/clothing → pose/action → composition/camera → lighting/background.",
+          "special": "masterpiece, best quality, 1girl, red dress, standing in a garden, soft sunlight, medium shot",
+          "negative": "Use the negative box for low quality, anatomy errors, text/watermarks and other exclusions; keep the same comma-tag format."
+        },
+        "anima": {
+          "title": "Anima (Danbooru/Gelbooru tags)",
+          "format": "Use lowercase English tags or phrases separated by commas. Replace ordinary underscores with spaces; keep underscores in score_* tags.",
+          "order": "Quality/meta/year/safety → count → character → series → @artist → appearance, action, composition and setting.",
+          "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, @artist, red dress, outdoors",
+          "negative": "Start from worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, chromatic aberration, then tailor it to the scene."
+        },
+        "krea2": {
+          "title": "Krea 2 (natural language)",
+          "format": "Write a short natural-language paragraph (Chinese or English) with observable subjects, materials and setting; avoid Danbooru tag piles.",
+          "order": "Subject → appearance/material → action or relationship → environment → lighting/composition → style.",
+          "special": "A red ceramic teapot on a walnut table, morning window light from the left, close product photograph.",
+          "negative": "Krea 2 Turbo does not use a negative prompt. Leave it empty and express exclusions as the desired positive result."
+        },
+        "zimage": {
+          "title": "Z-Image (natural language)",
+          "format": "Use complete Chinese or English sentences describing the subject, action, spatial relationships and visible text.",
+          "order": "Subject/count → appearance and action → scene → composition/text content → lighting and style.",
+          "special": "雨夜的便利店门口，红色灯牌清晰写着“营业中”，广角街拍，湿漉地面反光。",
+          "negative": "Leave empty. Rewrite exclusions as the desired positive result."
+        },
+        "flux1": {
+          "title": "Flux 1 (natural language)",
+          "format": "Use complete English sentences or a short paragraph describing relationships, materials and space; do not stack Danbooru tags.",
+          "order": "Subject/relationship → appearance/material → action → environment → light/color → composition and style.",
+          "special": "A red-haired woman reading beside a tall window, warm late-afternoon light, quiet library, medium shot, editorial photography.",
+          "negative": "Leave empty. Rewrite exclusions as the desired positive result."
+        },
+        "chroma": {
+          "title": "Chroma (natural language)",
+          "format": "Use coherent English prose describing the subject, action, setting, lighting and style.",
+          "order": "Subject → relationship/action → scene and objects → lighting/colors → camera and artistic style.",
+          "special": "Blue glass bottles and sliced citrus on dark stone, soft side light, tactile editorial still life.",
+          "negative": "Use short English phrases for unwanted elements or artifacts, such as blurry, malformed details, watermark."
+        },
+        "flux2klein4b": {
+          "title": "Flux 2 Klein 4B (natural language)",
+          "format": "Use a natural-language paragraph: state the subject and relationships first, then materials, space, light and composition; avoid tag piles.",
+          "order": "Subject/relationship → action → environment/material → lighting/color → camera and style.",
+          "special": "A compact silver robot repairs a bicycle in a bright workshop, precise hand placement, clean overhead light, wide shot.",
+          "negative": "Leave empty. Describe the desired state with positive sentences."
+        },
+        "flux2klein9b": {
+          "title": "Flux 2 Klein 9B (natural language)",
+          "format": "Use a natural-language paragraph: state the subject and relationships first, then materials, space, light and composition; avoid tag piles.",
+          "order": "Subject/relationship → action → environment/material → lighting/color → camera and style.",
+          "special": "A compact silver robot repairs a bicycle in a bright workshop, precise hand placement, clean overhead light, wide shot.",
+          "negative": "Leave empty. Describe the desired state with positive sentences."
+        },
+        "flux2dev": {
+          "title": "Flux 2 Dev (natural language)",
+          "format": "Write a natural-language English paragraph describing subject, spatial relationships, materials and mood; do not replace sentences with tag piles.",
+          "order": "Subject/relationship → action → environmental detail → lighting/color → composition and style.",
+          "special": "A cyclist crosses a rain-soaked night market, red signs reflected on the road, camera at street level, documentary photograph.",
+          "negative": "Leave empty. Describe the desired state with positive sentences."
+        },
+        "pony": {
+          "title": "Pony (score tags)",
+          "format": "Use comma-separated tags; start with the full score prefix score_9, score_8_up, score_7_up, score_6_up, and do not mix in masterpiece.",
+          "order": "Score/source → count and character → appearance/clothing → pose/action → composition → scene and lighting.",
+          "special": "score_9, score_8_up, score_7_up, score_6_up, source_anime, rating_safe, 1girl, red dress, looking at viewer",
+          "negative": "You may start with score_5, score_4, score_3, score_2, score_1, followed by exclusions such as bad anatomy/hands and watermark."
+        },
+        "illustrious": {
+          "title": "Illustrious (prose / tag hybrid)",
+          "format": "Official guidance supports precise natural language, Danbooru tags, or a hybrid; quality prefixes are optional rather than mandatory.",
+          "order": "Quality/aesthetic → subject and character → appearance/clothing → pose/action → composition/camera → background and light.",
+          "special": "1girl, red dress, holding an umbrella, rain, city street. She stands beneath a blue shop awning while traffic passes behind her.",
+          "negative": "Common exclusions include low quality, bad anatomy/hands, extra digits, watermark, signature and artist name; remove irrelevant items."
+        },
+        "noobai": {
+          "title": "NoobAI (tag style)",
+          "format": "Use comma-separated English tags; the common exact prefix is masterpiece, best quality, newest, absurdres, highres, safe.",
+          "order": "1girl/1boy → character → series → artists → special → general → other (omit details that are not visible).",
+          "special": "masterpiece, best quality, newest, absurdres, highres, safe, 1girl, character, series, artist:name, red dress, outdoors",
+          "negative": "The official base list includes nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral, semi-anthro; remove terms that conflict with the user's goal."
+        },
+        "wan22_i2v": {
+          "title": "Wan 2.2 I2V (image to video)",
+          "format": "Write a short natural-language English paragraph; the first frame already defines appearance, so focus on feasible motion, timing and camera.",
+          "order": "First-frame retention → subject motion/speed → camera movement → environment and lighting change.",
+          "special": "She slowly turns toward the window and smiles; her hair moves in a light breeze as the camera gently pushes in.",
+          "negative": "Standard mode can use short exclusions; in Fast mode (CFG=1) negative prompts have no effect, so leave it empty."
+        },
+        "wan22_t2v": {
+          "title": "Wan 2.2 T2V (text to video)",
+          "format": "Write a natural-language English paragraph that introduces subject appearance and setting, then describes one continuous action; do not stack tags.",
+          "order": "Subject/appearance → continuous action/rhythm → camera movement → environment, lighting and mood.",
+          "special": "A woman walks through a rainy street and looks back; the camera tracks forward while neon reflections ripple across the road.",
+          "negative": "Standard mode can use short exclusions; in Fast mode (CFG=1) negative prompts have no effect, so leave it empty."
+        },
+        "wan22_5b": {
+          "title": "Wan 2.2 5B (T2V / I2V)",
+          "format": "Use natural language: T2V writes the complete subject and setting; I2V follows the first frame and mainly writes motion and camera.",
+          "order": "Subject/first-frame retention → action and rhythm → camera → environment and lighting change.",
+          "special": "T2V: A paper boat drifts downstream as the camera follows. I2V: The boat rocks gently while the camera pans left.",
+          "negative": "Use short English phrases for jitter, flicker, deformation, text and watermarks."
+        },
+        "minimax_h3": {
+          "title": "MiniMax H3 (T2VA / I2VA)",
+          "format": "Use natural English with fixed fields in order: integrated_multimodal_description → overall_soundscape → non_diegetic_music; for I2V/FL2V put keyframe alignment on the first line.",
+          "order": "Put action, camera, dialogue and diegetic sound in integrated_multimodal_description → summarize ambient/action sounds in overall_soundscape → write audience-only music in non_diegetic_music.",
+          "special": "integrated_multimodal_description: [Shot 1] ... <d>[English] Hello</d>\noverall_soundscape: ...\nnon_diegetic_music: N/A",
+          "negative": "CFG-distilled H3 does not use a negative prompt; leave it empty instead of adding a generic quality list."
+        },
+        "minimax_h3_ref": {
+          "title": "MiniMax H3 Ref2VA (reference video)",
+          "format": "Use natural English with six fixed sections: subject_definitions → summary → retention_analysis → detailed_description → overall_soundscape → non_diegetic_music.",
+          "order": "Define subjects and reference bindings first, then retention/replacement rules and timed motion/camera, ending with audio and music.",
+          "special": "subject_definitions: <Subject 1> ...\nsummary: [reference generation] ...\nretention_analysis: <Subject 1>: fully_preserved - ...\ndetailed_description: [Shot 1] ...",
+          "negative": "Ref2VA has no negative prompt; put dialogue/SFX/ambient audio in overall_soundscape and music or N/A in non_diegetic_music."
+        }
+      },
       "basic_title": "Basic Syntax",
       "comma": "Comma-separated",
       "comma_desc": "Describe each element with a phrase, separated by commas",
@@ -87,13 +212,13 @@
       "random_pick": "Random pick",
       "random_pick_desc": "→ red hair / green hair / blue hair",
       "random_weight": "Weighted",
-      "random_weight_desc": "→ masterpiece (80%) / best quality (20%)",
+      "random_weight_desc": "→ red hair (80%) / blue hair (20%)",
       "random_multi": "Multi-select",
       "random_multi_desc": "→ cat, dog / cat, bird / dog, bird",
       "wildcard": "Wildcard",
       "wildcard_desc": "→ Random pick from wildcards/hair_color.txt",
       "wildcard_sub": "Subdirectory wildcard",
-      "wildcard_sub_desc": "→ Random pick from wildcards/sdxl/quality.txt",
+      "wildcard_sub_desc": "→ Random pick from wildcards/common/lighting.txt",
       "wildcard_multi": "Wildcard multi-select",
       "wildcard_multi_desc": "→ Picks 2 distinct values from hair_color.txt; \\{2-3$$__…__\\} picks 2–3. ",
       "variable_lock": "Variable lock",
@@ -564,13 +689,34 @@
   },
   "model": {},
   "placeholders": {
-    "positive_minimax_h3_ref": "Describe the scene, motion and sound; cite reference media as <Picture 1>, <Video 1>, <Audio 1>…",
-    "positive_pony": "score_9, score_8_up, score_7_up, source_anime, 1girl, solo, looking at viewer, smile, masterpiece, best quality",
+    "positive_sdxl": "masterpiece, best quality, 1girl, solo, long hair, white dress, looking at viewer, outdoors, blue sky",
+    "positive_anima": "masterpiece, best quality, score_7, safe, 1girl, solo, character, series, @artist, long hair, school uniform, standing outdoors",
+    "positive_krea2": "A cinematic product photo of a red ceramic teapot on a wooden table, soft morning window light, shallow depth of field",
+    "positive_zimage": "A quiet red fox stands on a mossy rock in a misty forest at dawn, backlit, cinematic composition, detailed fur",
+    "positive_flux1": "A red-haired woman in a linen dress walks through a sunlit greenhouse, leaves casting soft shadows, cinematic 35mm composition",
+    "positive_chroma": "An editorial still life of blue glass and citrus on a dark stone table, soft side light, tactile texture, calm modern mood",
+    "positive_flux2klein4b": "A small sailboat crosses a violet ocean at sunset, warm reflections on the water, wide cinematic framing and crisp atmospheric detail",
+    "positive_flux2klein9b": "A small sailboat crosses a violet ocean at sunset, warm reflections on the water, wide cinematic framing and crisp atmospheric detail",
+    "positive_flux2dev": "A rain-soaked night market glows with red and cyan signs; a cyclist passes through the foreground, realistic reflections and documentary composition",
+    "positive_pony": "score_9, score_8_up, score_7_up, score_6_up, source_anime, 1girl, solo, long hair, school uniform, looking at viewer",
     "positive_illustrious": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
-    "positive_noobai": "masterpiece, best quality, very aesthetic, absurdres, highres, 1girl, solo, looking at viewer, smile, detailed background",
-    "negative_pony": "score_6, score_5, score_4, worst quality, low quality, bad anatomy, bad hands, watermark",
+    "positive_noobai": "masterpiece, best quality, newest, absurdres, highres, safe, 1girl, character, series, artist:name, long hair, gentle smile, detailed background",
+    "positive_wan22_i2v": "The subject remains still, then slowly turns toward the camera; hair moves in a soft breeze, camera gently pushes in, warm afternoon light",
+    "positive_wan22_t2v": "A woman walks slowly through a rain-soaked street, turns to look back, and smiles; the camera tracks forward as neon reflections ripple",
+    "positive_wan22_5b": "T2V: a paper boat drifts down a stream as the camera follows; I2V: the boat rocks gently, water ripples, and the camera pans left",
+    "positive_minimax_h3": "integrated_multimodal_description: [Shot 1] ...\noverall_soundscape: ...\nnon_diegetic_music: N/A",
+    "positive_minimax_h3_ref": "subject_definitions: <Subject 1> ...\nsummary: [reference generation] ...\nretention_analysis: <Subject 1>: fully_preserved - ...\ndetailed_description: [Shot 1] ...\noverall_soundscape: ...\nnon_diegetic_music: N/A",
+    "negative_sdxl": "worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, watermark, text",
+    "negative_anima": "worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, chromatic aberration",
+    "negative_chroma": "blurry, malformed details, text, watermark, compression artifacts",
+    "negative_flux2klein4b": "Usually leave empty; only add short exclusions in a tested workflow",
+    "negative_flux2klein9b": "Usually leave empty; only add short exclusions in a tested workflow",
+    "negative_pony": "score_5, score_4, score_3, score_2, score_1, bad anatomy, bad hands, watermark",
     "negative_illustrious": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name",
-    "negative_noobai": "worst quality, low quality, bad anatomy, bad hands, extra digits, watermark, signature, artist name"
+    "negative_noobai": "nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral, semi-anthro",
+    "negative_wan22_i2v": "blurry motion, jitter, flicker, distorted anatomy, extra limbs, text, watermark",
+    "negative_wan22_t2v": "blurry motion, jitter, flicker, distorted anatomy, extra limbs, text, watermark",
+    "negative_wan22_5b": "blurry motion, jitter, flicker, distorted anatomy, text, watermark"
   },
   "errors": {
     "state_lost": "Target model state unavailable, please retry"
