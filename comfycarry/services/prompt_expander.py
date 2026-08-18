@@ -30,7 +30,6 @@ class PromptExpander:
     def __init__(self, wildcards_dir: str | Path):
         self._wildcards_dir = Path(wildcards_dir)
         self._wildcards_dir.mkdir(parents=True, exist_ok=True)
-        self._wm = WildcardManager(self._wildcards_dir)
 
     def expand(self, template: str, seed: int = -1) -> dict:
         """
@@ -48,7 +47,9 @@ class PromptExpander:
 
         actual_seed = seed if seed >= 0 else None
         generator = RandomPromptGenerator(
-            wildcard_manager=self._wm,
+            # WildcardManager 会惰性缓存文件树和值。每次展开都新建实例，
+            # 确保请求之间发生的磁盘文件变化能够立即生效。
+            wildcard_manager=WildcardManager(self._wildcards_dir),
             seed=actual_seed,
             ignore_whitespace=True,
         )
@@ -68,10 +69,6 @@ class PromptExpander:
             logger.info(f"[PromptExpander] 扩展结果被截断: {len(text)} → {MAX_EXPANDED_LENGTH}")
             text = text[:MAX_EXPANDED_LENGTH]
         return {"text": text, "truncated": truncated}
-
-    def reload(self):
-        """刷新 WildcardManager 缓存 (文件变更后调用)"""
-        self._wm = WildcardManager(self._wildcards_dir)
 
     # ── Wildcard 文件管理 ──────────────────────────────────────────────
 
@@ -123,7 +120,6 @@ class PromptExpander:
             raise ValueError("Invalid wildcard path")
         fpath.parent.mkdir(parents=True, exist_ok=True)
         fpath.write_text(content, encoding="utf-8")
-        self.reload()
 
     def list_folders(self) -> list[str]:
         """列出 wildcards 目录下所有子文件夹 (含空目录，排除隐藏目录)"""
@@ -169,7 +165,6 @@ class PromptExpander:
             raise ValueError("Invalid target path")
         dst.parent.mkdir(parents=True, exist_ok=True)
         src.rename(dst)
-        self.reload()
 
     def delete_wildcard(self, name: str) -> None:
         """删除一个 wildcard 文件"""
@@ -180,7 +175,6 @@ class PromptExpander:
             fpath = self._wildcards_dir / (safe + ext)
             if fpath.is_file() and fpath.resolve().is_relative_to(self._wildcards_dir.resolve()):
                 fpath.unlink()
-                self.reload()
                 return
         raise FileNotFoundError(f"Wildcard not found: {name}")
 

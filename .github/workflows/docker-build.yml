@@ -1,9 +1,9 @@
 # ==============================================================================
-# ComfyUI Docker 镜像构建 & 推送 (GitHub Actions)
+# ComfyCarry 生产镜像构建 & 推送 (GitHub Actions)
 #
-# 触发: 手动 / push docker/ 或 .github/workflows/docker-build.yml
-# 产物: ghcr.io/vvb7456/comfycarry:latest + :cu130-torch291
-#        <dockerhub_user>/comfycarry:latest + :cu130-torch291 (Docker Hub)
+# 基线: NVIDIA cudnn-runtime + 最小 CUDA 编译链
+# 触发: 手动 / push 生产 Dockerfile、入口脚本或本工作流
+# 产物: latest + cu130-torch291 + cu130-torch291-runtime-minimal
 # ==============================================================================
 
 name: Build & Push Docker Image
@@ -14,8 +14,13 @@ on:
     paths:
       - "docker/Dockerfile"
       - "docker/entrypoint.sh"
+      - "docker/comfycarry-banner.txt"
       - ".github/workflows/docker-build.yml"
     branches: [main]
+
+concurrency:
+  group: docker-production-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -89,8 +94,10 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal
           # 不生成 attestation/provenance (避免 manifest list 问题)
           provenance: false
           sbom: false
@@ -101,4 +108,6 @@ jobs:
       - name: Verify pushed image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal
           docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
+          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal

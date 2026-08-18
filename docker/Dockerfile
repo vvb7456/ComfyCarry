@@ -1,47 +1,71 @@
+# syntax=docker/dockerfile:1.7
 # ==============================================================================
-# ComfyUI 通用 Docker 镜像 (cu130-torch291) — GitHub Actions CI 构建
-# 支持: Ampere (A100/30xx) | Ada (40xx) | Hopper (H100) | Blackwell (50xx/B200)
+# ComfyCarry Docker 镜像 (CUDA 13.0 / PyTorch 2.9.1)
 #
-# 基于 runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
-# 预装: Python 3.12, PyTorch 2.9.1+cu130, ComfyUI, FA2, SA2(运行时选装), 常用插件
+# 正式生产基线：NVIDIA cudnn-runtime + 最小 CUDA 编译链。
+# CI 发布 latest、cu130-torch291 与 cu130-torch291-runtime-minimal。
+# 支持: Ampere (A100/30xx) | Ada (40xx) | Hopper (H100) | Blackwell (50xx/B200)
 # ==============================================================================
 
-FROM runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404
+FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04@sha256:6477166585af57524a052c59c611d23007a40fed605f8034684af2596e2a9ffb
 
 LABEL maintainer="ComfyCarry"
-LABEL description="Universal ComfyUI image — Ampere/Ada/Hopper/Blackwell"
-LABEL version="cu130-torch291"
+LABEL description="ComfyCarry runtime-minimal — CUDA 13.0 / PyTorch 2.9.1"
+LABEL version="cu130-torch291-runtime-minimal"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    HOME=/root \
+    RP_WORKSPACE=/workspace \
+    HF_HOME=/workspace/.cache/huggingface \
+    UV_CACHE_DIR=/workspace/.cache/uv \
+    VIRTUALENV_OVERRIDE_APP_DATA=/workspace/.cache/virtualenv \
+    HF_HUB_ENABLE_HF_TRANSFER=1 \
+    HF_XET_HIGH_PERFORMANCE=1 \
+    CUDA_HOME=/usr/local/cuda \
+    TZ=Etc/UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
 # =============================================================================
-# 1. 系统依赖
+# 1. 系统依赖 + 最小 CUDA 编译链
 # =============================================================================
+# cuda-minimal-build 保留 nvcc、CUDA runtime headers、CCCL/NVVM/PTX 组件，
+# 支持 SAM2 以及常见 torch.utils.cpp_extension；不安装 Nsight、完整数学库
+# development/static packages 等约 2 GiB 的 devel 增量。
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-        software-properties-common \
-        git git-lfs aria2 jq curl wget ffmpeg unzip \
-        libgl1 libglib2.0-0 libsm6 libxext6 \
-        build-essential openssh-server && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+        cuda-minimal-build-13-0=13.0.0-1 \
+        ca-certificates curl wget gnupg gawk \
+        python3.12 python3.12-dev python3.12-venv python3-pip \
+        python-is-python3 \
+        git git-lfs aria2 jq ffmpeg unzip tar gzip rsync \
+        libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+        build-essential cmake pkg-config \
+        libjpeg-dev libpng-dev libtiff-dev \
+        libffi-dev libssl-dev libnuma-dev \
+        openssh-server passwd procps iproute2 && \
+    nvcc --version && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Rclone (Linux 端) — 必须用官方最新版
-# Ubuntu apt 源里的 rclone 是 v1.58.1 (2022)，OneDrive multipart upload 会返回
-# "unauthenticated: Unauthenticated" 401 错误，导致 push 同步失败。
-# 官方一键脚本安装当前稳定版到 /usr/bin/rclone。
+# Rclone 使用官方稳定版，避免 Ubuntu 仓库旧版本的 OneDrive multipart 问题。
 RUN curl -fsSL https://rclone.org/install.sh | bash
 
 # =============================================================================
 # 2. Node.js 20.x + PM2
 # =============================================================================
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y --no-install-recommends nodejs && \
     npm install -g pm2 && \
-    pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # 3. Cloudflared
@@ -51,48 +75,47 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
         | tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null && \
     echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' \
         | tee /etc/apt/sources.list.d/cloudflared.list && \
-    apt-get update -qq && apt-get install -y cloudflared && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get update -qq && \
+    apt-get install -y --no-install-recommends cloudflared && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
-# 4. Python 基础包 + Dashboard 依赖
+# 4. Python、PyTorch、Jupyter 与 Dashboard 依赖
 # =============================================================================
-# 移除 PEP 668 EXTERNALLY-MANAGED 标记 (允许 CM 的 uv/pip 安装插件依赖)
-RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED
-RUN python3.12 -m pip install --upgrade pip setuptools wheel && \
+RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED && \
+    python3.12 -m pip install --upgrade --ignore-installed pip setuptools wheel && \
     python3.12 -m pip install \
-        packaging ninja einops numpy psutil && \
+        torch==2.9.1 \
+        torchvision==0.24.1 \
+        torchaudio==2.9.1 \
+        --index-url https://download.pytorch.org/whl/cu130 && \
+    python3.12 -m pip install \
+        packaging ninja einops numpy psutil virtualenv uv nvidia-ml-py \
+        hf_transfer && \
     python3.12 -m pip install --ignore-installed \
         flask flask-cors requests websocket-client && \
     python3.12 -m pip install \
         'openai==1.109.1' 'anthropic==0.46.0' 'google-genai==1.75.0' \
         'pydantic>=2.0,<3' 'httpx>=0.27,<1' && \
-    python3.12 -m pip install jupyterlab-language-pack-zh-CN
+    python3.12 -m pip install \
+        jupyterlab notebook==7.4.2 ipywidgets jupyter-archive \
+        jupyterlab-language-pack-zh-CN
 
 # =============================================================================
-# 5. torchvision (CUDA 版)
-#    基础镜像只有 torch + torchaudio, 没有 torchvision
-#    注意: 必须锁定 0.24.1 — cu130 索引中的 0.25.0 是为 torch 2.10.x 编译的,
-#    与基础镜像的 torch 2.9.1+cu130 (RunPod 自定义 ABI) 存在 C++ 符号不兼容
-# =============================================================================
-RUN python3.12 -m pip install \
-    torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu130
-
-# =============================================================================
-# 6. FlashAttention-2 (预编译 wheel — 全架构: sm80/86/89/90/100/120)
+# 5. FlashAttention-2 (预编译 wheel — 全架构: sm80/86/89/90/100/120)
 # =============================================================================
 RUN --mount=type=bind,source=wheels,target=/tmp/wheels,ro \
     python3.12 -m pip install \
         /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
 
 # =============================================================================
-# 7. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
-#    deploy_engine.py 检测 GPU → 安装对应 wheel
+# 6. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
 # =============================================================================
 COPY wheels/sageattention-2.2.0-cp312-cp312-linux_x86_64_sm*.whl /opt/wheels/sa2/
 
 # =============================================================================
-# 8. 生成 torch 约束文件 (后续步骤复用, 防止依赖覆盖预装版本)
+# 7. 生成 torch 约束文件，防止插件依赖覆盖已验证版本
 # =============================================================================
 RUN python3.12 -c "\
 import torch; print(f'torch=={torch.__version__}'); \
@@ -102,11 +125,9 @@ import torchvision; print(f'torchvision=={torchvision.__version__}')" \
     cat /tmp/torch-constraints.txt
 
 # =============================================================================
-# 9. ComfyUI
+# 8. ComfyUI
 # =============================================================================
 WORKDIR /opt
-# 始终取最新正式版 tag (vX.Y.Z), 不跟 master (nightly);
-# 用 git ls-remote 取 tag 而非 GitHub API, 避免 CI 共享 IP 的 API 限流
 RUN COMFY_TAG=$(git ls-remote --refs --tags https://github.com/comfyanonymous/ComfyUI.git 'v*' \
         | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+' | sort -V | tail -1) && \
     echo "ComfyUI stable tag: ${COMFY_TAG}" && \
@@ -116,7 +137,7 @@ RUN COMFY_TAG=$(git ls-remote --refs --tags https://github.com/comfyanonymous/Co
         -r requirements.txt
 
 # =============================================================================
-# 10. 常用插件
+# 9. 常用插件
 # =============================================================================
 WORKDIR /opt/ComfyUI/custom_nodes
 RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
@@ -142,7 +163,6 @@ RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone --depth 1 https://github.com/1038lab/ComfyUI-RMBG && \
     git clone --depth 1 https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler
 
-# 逐个安装插件依赖 (失败打印警告但继续, 后续显式安装补救)
 RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f); do \
         echo "========================================" && \
         echo ">>> Installing: $req" && \
@@ -152,70 +172,75 @@ RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f
     done
 
 # =============================================================================
-# 11. 显式安装易遗漏 / 补充依赖
+# 10. 显式安装易遗漏 / 补充依赖
 # =============================================================================
 RUN python3.12 -m pip install \
     diffusers clip_interrogator peft open-clip-torch timm ftfy \
-    color-matcher mss dill \
-    "git+https://github.com/facebookresearch/sam2.git"
+    color-matcher mss dill
+
+# SAM2 默认编译 connected-components CUDA 扩展。显式指定全架构并禁止静默
+# 降级，确保 minimal-build 工具链在 CI 中真实可用。
+RUN TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0" \
+    SAM2_BUILD_ALLOW_ERRORS=0 \
+    python3.12 -m pip install \
+        "git+https://github.com/facebookresearch/sam2.git"
 
 RUN python3.12 -m pip install \
     numba matplotlib dynamicprompts==0.30.2 \
     aiosqlite uuid7 deepdiff piexif segment-anything py-cpuinfo
 
 RUN python3.12 -m pip install \
-    hf_transfer aiohttp opencv-python-headless scikit-image \
+    aiohttp opencv-python-headless scikit-image \
     accelerate transformers safetensors onnxruntime-gpu
 
 RUN python3.12 -m pip install \
     gguf insightface imageio imageio-ffmpeg
 
 # =============================================================================
-# 12. 目录结构 & 标记
+# 11. 目录结构 & 预构建标记
 # =============================================================================
 WORKDIR /workspace
 RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_models,Aura-SR,sams} \
              /opt/ComfyUI/{output,input} \
              /opt/ComfyUI/user/default/workflows \
-             /root/.config/rclone && \
+             /root/.config/rclone \
+             /workspace/.cache/{huggingface,uv,virtualenv} && \
     ln -snf /workspace /root/workspace && \
-    touch ~/.no_auto_tmux && \
+    touch /root/.no_auto_tmux && \
     python3.12 -c "\
 import json, datetime, torch; \
 info = { \
-    'version': '3.0', \
+    'version': '3.1-runtime-minimal', \
     'build_date': datetime.datetime.now().strftime('%Y-%m-%d'), \
     'python': '3.12', \
     'torch': torch.__version__, \
     'cuda_toolkit': torch.version.cuda or '', \
     'fa2': True, \
     'sa2_archs': ['sm80','sm86','sm89','sm90','sm100','sm120'], \
-    'base_image': 'runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404', \
+    'base_image': 'nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04', \
+    'cuda_build_toolchain': 'cuda-minimal-build-13-0', \
 }; \
 open('/opt/.comfycarry-prebuilt','w').write(json.dumps(info, indent=2))"
 
 # =============================================================================
-# 13. 入口脚本
+# 12. 入口脚本与交互式 Shell 品牌信息
 # =============================================================================
 COPY entrypoint.sh /opt/entrypoint.sh
 RUN chmod +x /opt/entrypoint.sh
 
-# =============================================================================
-# 14. Brand — 替换 RunPod 登录横幅
-# =============================================================================
 COPY comfycarry-banner.txt /etc/runpod.txt
-RUN sed -i '/docs\.runpod\.io/d' /root/.bashrc
+RUN touch /root/.bashrc && \
+    sed -i '/docs\.runpod\.io/d' /root/.bashrc && \
+    echo '[ -f /etc/runpod.txt ] && cat /etc/runpod.txt' >> /root/.bashrc
 
 # =============================================================================
-# 15. 清理
+# 13. 清理
 # =============================================================================
-# 移除插件 requirements.txt 中的 git+ URL (这些包已在步骤 11 安装,
-# 保留会导致 deploy 阶段 pip 重复 clone+build, 浪费 ~90s)
 RUN find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f \
         -exec sed -i '/^git+/d' {} \;
 
 RUN rm -rf /tmp/* /var/tmp/* && \
     python3.12 -m pip cache purge 2>/dev/null || true
 
-EXPOSE 5000 8188 22
+EXPOSE 5000 8188 8888 22
 CMD ["/opt/entrypoint.sh"]
