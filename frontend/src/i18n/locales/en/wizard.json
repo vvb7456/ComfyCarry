@@ -3,7 +3,6 @@
     "deploy_already_running": "Deployment is already in progress"
   },
   "header": "ComfyCarry Setup Wizard",
-  "subtitle": "<a href=\"https://github.com/vvb7456/ComfyCarry\" target=\"_blank\" style=\"color:var(--ac);text-decoration:none\">GitHub</a> · All-in-one ComfyUI Management on RunPod / Vast.ai",
   "step_labels": [
     "Deploy",
     "Password/SSH",
@@ -223,7 +222,7 @@
     "gpu_label": "GPU",
     "no_gpu": "No CUDA GPU detected",
     "image_label": "Image",
-    "prebuilt_image": "Pre-built Image",
+    "prebuilt_image": "ComfyCarry",
     "gpu_too_old": "Insufficient GPU compute capability",
     "gpu_too_old_detail": "FlashAttention 2 requires Ampere (sm_80) or newer architecture. Please choose an instance with RTX 30xx / A100 / RTX 40xx or newer GPU.",
     "no_gpu_detail": "ComfyUI requires NVIDIA GPU. Please deploy on a GPU instance, or check CUDA driver installation.",

@@ -105,6 +105,7 @@ const slots = useSlots()
 
 .wizard-step__footer {
   display: flex;
+  justify-content: flex-end;
   gap: 14px;
   margin-top: 28px;
 }

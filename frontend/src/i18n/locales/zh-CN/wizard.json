@@ -3,7 +3,6 @@
     "deploy_already_running": "部署已在进行中"
   },
   "header": "ComfyCarry 部署向导",
-  "subtitle": "<a href=\"https://github.com/vvb7456/ComfyCarry\" target=\"_blank\" style=\"color:var(--ac);text-decoration:none\">GitHub</a> · RunPod / Vast.ai 上的 ComfyUI 一站式管理",
   "step_labels": [
     "部署方式",
     "密码/SSH",
@@ -223,7 +222,7 @@
     "gpu_label": "GPU",
     "no_gpu": "未检测到 CUDA GPU",
     "image_label": "镜像",
-    "prebuilt_image": "预构建镜像",
+    "prebuilt_image": "ComfyCarry",
     "gpu_too_old": "GPU 算力不足",
     "gpu_too_old_detail": "FlashAttention 2 需要 Ampere (sm_80) 及以上架构。请选择配备 RTX 30xx / A100 / RTX 40xx 及以上 GPU 的实例。",
     "no_gpu_detail": "ComfyUI 需要 NVIDIA GPU 运行。请在 GPU 实例上部署，或检查 CUDA 驱动是否正确安装。",

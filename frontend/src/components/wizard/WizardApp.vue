@@ -57,7 +57,6 @@ onMounted(() => {
     <div v-else class="wizard-container">
       <div class="wizard-header">
         <h1>{{ t('wizard.header') }}</h1>
-        <p v-html="t('wizard.subtitle')" />
       </div>
 
       <!-- Progress bar (hidden during deploy) -->
@@ -177,12 +176,6 @@ onMounted(() => {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-
-.wizard-header p {
-  color: var(--t3);
-  font-size: .95rem;
-  margin-top: 8px;
 }
 
 .wizard-app__stepper {
