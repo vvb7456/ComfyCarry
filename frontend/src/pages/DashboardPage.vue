@@ -450,15 +450,15 @@ const tunnelStatusText = computed(() => {
             <td>
               <div class="svc-actions">
                 <template v-if="svc.status === 'online'">
-                  <BaseButton variant="danger" size="sm" square :aria-label="t('dashboard.services.stop')" :title="t('dashboard.services.stop')" @click="svcAction(svc.name, 'stop')">
+                  <BaseButton variant="danger" size="sm" square :aria-label="t('common.btn.stop')" :title="t('common.btn.stop')" @click="svcAction(svc.name, 'stop')">
                     <MsIcon name="stop" />
                   </BaseButton>
-                  <BaseButton size="sm" square :aria-label="t('dashboard.services.restart')" :title="t('dashboard.services.restart')" @click="svcAction(svc.name, 'restart')">
-                    <MsIcon name="refresh" />
+                  <BaseButton size="sm" square :aria-label="t('common.btn.restart')" :title="t('common.btn.restart')" @click="svcAction(svc.name, 'restart')">
+                    <MsIcon name="restart_alt" />
                   </BaseButton>
                 </template>
                 <template v-else>
-                  <BaseButton variant="success" size="sm" square :aria-label="t('dashboard.services.start')" :title="t('dashboard.services.start')" @click="svcAction(svc.name, 'start')">
+                  <BaseButton variant="success" size="sm" square :aria-label="t('common.btn.start')" :title="t('common.btn.start')" @click="svcAction(svc.name, 'start')">
                     <MsIcon name="play_arrow" />
                   </BaseButton>
                 </template>

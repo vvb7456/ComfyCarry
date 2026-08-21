@@ -1,6 +1,13 @@
 {
   "title": "设置",
   "restart_btn": "重启",
+  "unsaved": {
+    "title": "未保存的更改",
+    "message": "设置已修改但未保存。继续操作前请选择：",
+    "message_banner": "存在未保存的更改",
+    "discard": "放弃更改",
+    "cancel": "留在本页"
+  },
   "err": {
     "invalid_config": "无效的配置文件",
     "password_empty": "新密码不能为空",
@@ -146,7 +153,6 @@
       "stream_help": "开启后 LLM 将逐字输出响应。关闭可避免部分平台在流式模式下的内容过滤问题"
     },
     "test_btn": "测试连接",
-    "save_btn": "保存配置",
     "test_success": "连接成功",
     "test_failed": "连接失败",
     "err_no_provider": "请先选择服务提供商",

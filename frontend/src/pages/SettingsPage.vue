@@ -1,5 +1,16 @@
+<script lang="ts">
+// 模块级快照 (ref): usePromptSettings 的 settings 是模块级共享状态,
+// 组件销毁重建时组件级 ref 会重置, 导致误报 dirty。
+// 快照必须与表单同生命周期 (模块级), 用 ref (而非 let) 保持响应式,
+// 否则 computed 无法追踪 let 赋值, banner 不会在保存/放弃后消失。
+// ref 在 <script setup> 的 import 中声明, SFC 编译合并两块为同一模块作用域。
+// llm 表单是组件级状态, llmSnapshot 随之声明在 setup 内 (与表单同生命周期)。
+import { ref } from 'vue'
+const promptSnapshot = ref('')
+</script>
+
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
@@ -11,6 +22,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
+import UnsavedBanner from '@/components/ui/UnsavedBanner.vue'
 import FormField from '@/components/form/FormField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import FieldControlRow from '@/components/form/FieldControlRow.vue'
@@ -19,6 +31,7 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { useAppStore } from '@/stores/app'
 import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
@@ -40,6 +53,7 @@ const app = useAppStore()
 
 const {
   settings: promptSettings,
+  loaded: promptLoaded,
   saving: promptSaving,
   translateProviders: promptTranslateProviders,
   load: loadPromptSettings,
@@ -83,11 +97,6 @@ const translateProviderOptions = computed(() => [
     label: t(`settings.prompt.translation.providers.${p}`, p),
   })),
 ])
-
-async function onSavePromptSettings() {
-  const ok = await savePromptSettings()
-  if (ok) toast(t('settings.prompt.saved'), 'success')
-}
 
 // ─── Tab state ────────────────────────────────────────────────────────────────
 
@@ -276,6 +285,78 @@ const llmBaseUrlPlaceholder = computed(() =>
     : t('settings.llm.provider.base_url_placeholder_openai'),
 )
 
+// ─── 未保存守卫 (prompt / llm 表单) ─────────────────────────────────────────
+// dirty = 表单值 ≠ 基线 (最近一次服务端确认值), 不耦合 activeTab。
+// 基线只在「加载成功 / 保存成功」时更新; 首次加载完成前 dirty 恒为 false,
+// 避免挂载时快照初值 ('') 与表单默认值不等造成误报 dirty。
+// 注意: 本节必须位于 LLM state 声明之后 —— useUnsavedGuard 对 Ref 型 dirty
+// 会立即求值 (watch immediate), getter 先于 llmProvidersLoaded 等声明执行会 TDZ。
+
+function snapshotPrompt(): string {
+  return JSON.stringify(promptSettings)
+}
+
+function snapshotLlm(): string {
+  return JSON.stringify({
+    provider: llmProvider.value,
+    api_key: llmApiKey.value,
+    base_url: llmBaseUrl.value,
+    model: llmModel.value,
+    temperature: llmTemperature.value,
+    max_tokens: llmMaxTokens.value,
+    stream: llmStream.value,
+  })
+}
+
+const llmSnapshot = ref('')
+
+const promptFormDirty = computed(() => promptLoaded.value && snapshotPrompt() !== promptSnapshot.value)
+const llmFormDirty = computed(() => llmProvidersLoaded.value && snapshotLlm() !== llmSnapshot.value)
+
+// banner 可见性: 当前 tab 对应的表单 dirty 时才显示
+const showBanner = computed(() =>
+  (activeTab.value === 'prompt' && promptFormDirty.value)
+  || (activeTab.value === 'llm' && llmFormDirty.value),
+)
+
+const guard = useUnsavedGuard({
+  isDirty: computed(() => promptFormDirty.value || llmFormDirty.value),
+  saveAction: async () => {
+    if (promptFormDirty.value) {
+      const ok = await savePromptSettings()
+      if (ok) { promptSnapshot.value = snapshotPrompt(); toast(t('settings.prompt.saved'), 'success') }
+      return ok
+    }
+    if (llmFormDirty.value) {
+      const ok = await saveLlmConfig()
+      if (ok) { llmSnapshot.value = snapshotLlm() }
+      return ok
+    }
+    return true
+  },
+  discardAction: async () => {
+    // 守卫拦截所有离开路径, 同一时刻至多一个表单 dirty; 双分支为防御性保留
+    if (promptFormDirty.value) {
+      try { await loadPromptSettings(true) } finally { promptSnapshot.value = snapshotPrompt() }
+    }
+    if (llmFormDirty.value) {
+      try { await loadLlmTab() } finally { llmSnapshot.value = snapshotLlm() }
+    }
+  },
+  texts: () => ({
+    title: t('settings.unsaved.title'),
+    message: t('settings.unsaved.message'),
+    confirmSave: t('common.btn.save'),
+    confirmDiscard: t('settings.unsaved.discard'),
+    cancel: t('settings.unsaved.cancel'),
+  }),
+})
+guard.guardRouteLeave()
+
+// banner 按钮: 直接走 save/discard (无守卫确认)
+const guardSaveFromBanner = () => guard.save()
+const guardDiscardFromBanner = () => guard.discard()
+
 // ─── Load settings ────────────────────────────────────────────────────────────
 
 async function loadSettings() {
@@ -287,18 +368,21 @@ async function loadSettings() {
 
 // ─── Tab switch ───────────────────────────────────────────────────────────────
 
-function onTabChange(tab: string) {
+async function onTabChange(tab: string) {
+  // 离开 prompt/llm 表单 tab 时守卫未保存更改
+  if (!(await guard.guardTabSwitch())) return
   activeTab.value = tab
   if (tab === 'comfycarry') {
     logStart()
   } else {
     logStop()
   }
-  if (tab === 'llm' && !llmProvidersLoaded.value) {
-    loadLlmTab()
-  }
+  // 守卫保证进入时必然无未保存更改, 可安全用服务端值刷新基线
+  if (tab === 'llm' && !llmProvidersLoaded.value) await loadLlmTab()
   if (tab === 'prompt') {
-    loadPromptSettings()
+    // 强制重载: 基线以服务端实际值为准, 避免其他入口改动造成快照漂移
+    await loadPromptSettings(true)
+    promptSnapshot.value = snapshotPrompt()
   }
 }
 
@@ -454,6 +538,7 @@ async function loadLlmTab() {
       llmModel.value = cfg.model
     }
   }
+  llmSnapshot.value = snapshotLlm()
 }
 
 function onLlmProviderChange() {
@@ -504,9 +589,9 @@ async function fetchLlmModels() {
   toast(t('settings.llm.model.fetched_count', { count: models.length }), 'success')
 }
 
-async function saveLlmConfig() {
-  if (!llmProvider.value) { toast(t('settings.llm.err_no_provider'), 'error'); return }
-  if (!llmApiKey.value) { toast(t('settings.llm.err_no_key'), 'error'); return }
+async function saveLlmConfig(): Promise<boolean> {
+  if (!llmProvider.value) { toast(t('settings.llm.err_no_provider'), 'error'); return false }
+  if (!llmApiKey.value) { toast(t('settings.llm.err_no_key'), 'error'); return false }
   llmSaving.value = true
   const body: Record<string, unknown> = {
     provider: llmProvider.value,
@@ -519,7 +604,7 @@ async function saveLlmConfig() {
   }
   const data = await put<{ ok?: boolean; error?: string }>('/api/llm/config', body)
   llmSaving.value = false
-  if (!data) return
+  if (!data) return false
   if (data.ok) {
     llmProviderKeys.value[llmProvider.value] = {
       ...llmProviderKeys.value[llmProvider.value],
@@ -528,8 +613,10 @@ async function saveLlmConfig() {
       base_url: llmBaseUrl.value,
     }
     toast(t('settings.llm.config_saved'), 'success')
+    return true
   } else {
     toast(apiErrorText(data, t('settings.llm.save_failed')), 'error')
+    return false
   }
 }
 
@@ -570,7 +657,18 @@ onUnmounted(() => {
     <PageHeader :title="t('settings.title')" />
 
     <div class="page-body">
-      <TabSwitcher :tabs="tabs" v-model="activeTab" @update:model-value="onTabChange" />
+      <TabSwitcher :tabs="tabs" :model-value="activeTab" @update:model-value="onTabChange" />
+
+      <!-- 未保存守卫 banner (prompt/llm 表单 dirty 时显示) -->
+      <UnsavedBanner
+        :visible="showBanner"
+        :message="t('settings.unsaved.message_banner')"
+        :save-label="t('common.btn.save')"
+        :discard-label="t('settings.unsaved.discard')"
+        :saving="promptSaving || llmSaving"
+        @save="guardSaveFromBanner"
+        @discard="guardDiscardFromBanner"
+      />
 
       <!-- ═══ Tab: ComfyCarry ═══════════════════════════════ -->
       <div v-show="activeTab === 'comfycarry'" class="settings-grid">
@@ -619,8 +717,7 @@ onUnmounted(() => {
                 />
               </FormField>
               <div class="btn-row-end">
-                <BaseButton type="submit" variant="primary" size="sm" :disabled="pwSubmitting">
-                  <Spinner v-if="pwSubmitting" size="sm" />
+                <BaseButton type="submit" variant="primary" size="sm" :loading="pwSubmitting">
                   {{ t('settings.password.update_btn') }}
                 </BaseButton>
               </div>
@@ -643,8 +740,7 @@ onUnmounted(() => {
               style="margin-bottom:12px"
             />
             <div class="btn-row-end">
-              <BaseButton variant="danger" size="sm" :disabled="regenLoading" @click="regenerateApiKey">
-                <Spinner v-if="regenLoading" size="sm" />
+              <BaseButton variant="danger" size="sm" :loading="regenLoading" @click="regenerateApiKey">
                 {{ t('settings.api_key.regenerate') }}
               </BaseButton>
             </div>
@@ -661,7 +757,7 @@ onUnmounted(() => {
                 <p style="font-size:.82rem;color:var(--t2);margin:0 0 8px">{{ t('settings.config.export_desc') }}</p>
                 <div class="btn-row-end">
                   <BaseButton variant="primary" size="sm" @click="exportConfig">
-                    <MsIcon name="upload" color="none" />
+                    <MsIcon name="download" color="none" />
                     {{ t('settings.config.export_btn') }}
                   </BaseButton>
                 </div>
@@ -670,7 +766,7 @@ onUnmounted(() => {
                 <p style="font-size:.82rem;color:var(--t2);margin:0 0 8px">{{ t('settings.config.import_desc') }}</p>
                 <div class="btn-row-end">
                   <BaseButton variant="primary" size="sm" @click="($refs.importFileInput as HTMLInputElement)?.click()">
-                    <MsIcon name="download" color="none" />
+                    <MsIcon name="upload" color="none" />
                     {{ t('settings.config.import_btn') }}
                   </BaseButton>
                   <input ref="importFileInput" type="file" accept=".json" @change="importConfig" style="display:none" />
@@ -710,9 +806,8 @@ onUnmounted(() => {
                 <MsIcon name="restart_alt" />
                 {{ t('settings.restart_btn') }}
               </BaseButton>
-              <BaseButton size="sm" :disabled="updateChecking || updateApplying" @click="checkUpdate">
-                <Spinner v-if="updateChecking" size="sm" />
-                <MsIcon v-else name="refresh" />
+              <BaseButton size="sm" :disabled="updateChecking || updateApplying" :loading="updateChecking" @click="checkUpdate">
+                <MsIcon v-if="!updateChecking" name="refresh" />
                 {{ t('settings.update.check_btn') }}
               </BaseButton>
               <BaseButton
@@ -720,10 +815,10 @@ onUnmounted(() => {
                 variant="primary"
                 size="sm"
                 :disabled="updateApplying"
+                :loading="updateApplying"
                 @click="applyUpdate"
               >
-                <Spinner v-if="updateApplying" size="sm" />
-                <MsIcon v-else name="download" />
+                <MsIcon v-if="!updateApplying" name="download" />
                 {{ t('settings.update.apply_btn') }}
               </BaseButton>
             </div>
@@ -741,8 +836,7 @@ onUnmounted(() => {
                 <input type="checkbox" v-model="reinitKeepModels" class="form-checkbox" />
                 {{ t('settings.reinit.keep_models') }}
               </label>
-              <BaseButton variant="danger" size="sm" :disabled="reinitLoading" @click="reinitialize">
-                <Spinner v-if="reinitLoading" size="sm" />
+              <BaseButton variant="danger" size="sm" :loading="reinitLoading" @click="reinitialize">
                 {{ t('settings.reinit.btn') }}
               </BaseButton>
             </div>
@@ -829,15 +923,6 @@ onUnmounted(() => {
             <ToggleSwitch v-model="promptSettings.show_nsfw" />
           </FormField>
         </BaseCard>
-
-        <!-- 保存按钮 -->
-        <div class="btn-row-end">
-          <BaseButton variant="primary" size="sm" :disabled="promptSaving" @click="onSavePromptSettings">
-            <Spinner v-if="promptSaving" size="sm" />
-            <MsIcon v-else name="save" />
-            {{ t('common.btn.save') }}
-          </BaseButton>
-        </div>
       </div>
 
       <!-- ═══ Tab: CivitAI ═══════════════════════════════ -->
@@ -861,8 +946,8 @@ onUnmounted(() => {
             />
           </FormField>
           <div style="display:flex;gap:8px;justify-content:flex-end">
-            <BaseButton variant="primary" size="sm" :disabled="civitaiSaving" @click="saveCivitaiKey">
-              <Spinner v-if="civitaiSaving" size="sm" />
+            <BaseButton variant="primary" size="sm" :loading="civitaiSaving" @click="saveCivitaiKey">
+              <MsIcon v-if="!civitaiSaving" name="save" />
               {{ t('common.btn.save') }}
             </BaseButton>
             <BaseButton variant="danger" size="sm" square :title="t('common.btn.clear')" @click="clearCivitaiKey">
@@ -874,7 +959,7 @@ onUnmounted(() => {
 
       <!-- ═══ Tab: LLM ═══════════════════════════════ -->
       <div v-show="activeTab === 'llm'" class="settings-centered">
-        <!-- Provider & API Key -->
+        <!-- Provider & Model (合并卡片) -->
         <BaseCard density="roomy">
           <h3 class="settings-card-title">
             <MsIcon name="smart_toy" />
@@ -899,14 +984,6 @@ onUnmounted(() => {
             </template>
             <input type="url" v-model="llmBaseUrl" class="form-input" :placeholder="llmBaseUrlPlaceholder" />
           </FormField>
-        </BaseCard>
-
-        <!-- Model -->
-        <BaseCard density="roomy">
-          <h3 class="settings-card-title">
-            <MsIcon name="deployed_code" />
-            {{ t('settings.llm.model.title') }}
-          </h3>
           <FormField :label="t('settings.llm.model.label')" :hint="llmModelInfo" density="compact">
             <FieldControlRow>
               <BaseSelect
@@ -919,12 +996,26 @@ onUnmounted(() => {
                 :empty-text="t('settings.llm.model.no_match')"
                 @change="selectLlmModel"
               />
-              <BaseButton size="sm" :disabled="llmFetchingModels" :title="t('settings.llm.model.fetch_title')" @click="fetchLlmModels">
-                <Spinner v-if="llmFetchingModels" size="sm" />
-                <MsIcon v-else name="refresh" color="var(--ac)" />
+              <BaseButton size="sm" :disabled="llmFetchingModels" :loading="llmFetchingModels" :title="t('settings.llm.model.fetch_title')" @click="fetchLlmModels">
+                <MsIcon v-if="!llmFetchingModels" name="refresh" color="var(--ac)" />
               </BaseButton>
             </FieldControlRow>
           </FormField>
+          <!-- 测试连接 (合并卡片内) -->
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)">
+            <span
+              v-if="llmTestResult"
+              style="font-size:.85rem;margin-right:auto"
+              :style="{ color: llmTestResult.ok ? 'var(--green)' : 'var(--red)' }"
+            >
+              {{ llmTestResult.message }}
+            </span>
+            <span v-else style="margin-right:auto"></span>
+            <BaseButton size="sm" :loading="llmTesting" @click="testLlmConnection">
+              <MsIcon v-if="!llmTesting" name="wifi_tethering" />
+              {{ t('settings.llm.test_btn') }}
+            </BaseButton>
+          </div>
         </BaseCard>
 
         <!-- Parameters -->
@@ -964,30 +1055,6 @@ onUnmounted(() => {
               <ToggleSwitch v-model="llmStream" />
             </template>
           </FormField>
-        </BaseCard>
-
-        <!-- Save & Test -->
-        <BaseCard density="roomy">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span
-              v-if="llmTestResult"
-              style="font-size:.85rem;margin-right:auto"
-              :style="{ color: llmTestResult.ok ? 'var(--green)' : 'var(--red)' }"
-            >
-              {{ llmTestResult.message }}
-            </span>
-            <span v-else style="margin-right:auto"></span>
-            <BaseButton size="sm" :disabled="llmTesting" @click="testLlmConnection">
-              <Spinner v-if="llmTesting" size="sm" />
-              <MsIcon v-else name="wifi_tethering" />
-              {{ t('settings.llm.test_btn') }}
-            </BaseButton>
-            <BaseButton variant="primary" size="sm" :disabled="llmSaving" @click="saveLlmConfig">
-              <Spinner v-if="llmSaving" size="sm" />
-              <MsIcon v-else name="save" />
-              {{ t('settings.llm.save_btn') }}
-            </BaseButton>
-          </div>
         </BaseCard>
       </div>
     </div>

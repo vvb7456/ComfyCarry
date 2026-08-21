@@ -100,7 +100,7 @@ async function loadTunnelStatus() {
   if (d) data.value = d
 }
 
-function switchTab(tab: string) {
+async function switchTab(tab: string) {
   activeTab.value = tab
   if (tab === 'config') loadConfigTab()
 }
@@ -348,10 +348,10 @@ const connInfo = computed(() => {
     <template #actions>
       <span v-if="data && (data.configured || data.tunnel_mode === 'public')">
         <template v-if="tunnelStatus === 'online' || tunnelStatus === 'connecting'">
-          <BaseButton @click="tunnelStop"><MsIcon name="stop" /> {{ t('tunnel.services.stop') }}</BaseButton>
-          <BaseButton @click="() => tunnelRestart()"><MsIcon name="restart_alt" /> {{ t('tunnel.services.restart') }}</BaseButton>
+          <BaseButton @click="tunnelStop"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>
+          <BaseButton @click="() => tunnelRestart()"><MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}</BaseButton>
         </template>
-        <BaseButton v-else @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('tunnel.services.start') }}</BaseButton>
+        <BaseButton v-else @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
       </span>
     </template>
   </PageHeader>
@@ -574,6 +574,7 @@ const connInfo = computed(() => {
         <!-- Actions -->
         <div class="cfg-actions">
           <BaseButton variant="primary" :disabled="cfgSaving" @click="saveTunnelConfig">
+            <MsIcon v-if="!cfgSaving" name="save" size="xs" color="none" />
             {{ cfgSaving ? t('tunnel.config.saving') : t('tunnel.config.save') }}
           </BaseButton>
           <BaseButton v-if="data?.configured || data?.tunnel_mode === 'public'" variant="danger" @click="destroyTunnel">

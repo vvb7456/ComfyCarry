@@ -15,9 +15,6 @@
   "services": {
     "title": "服务",
     "node": "节点",
-    "stop": "停止",
-    "restart": "重启",
-    "start": "启动",
     "click_copy": "点击复制",
     "custom_badge": "自定义",
     "add_service": "添加服务",
@@ -54,9 +51,7 @@
     "cf_token_help": "需要 Tunnel Edit + DNS Edit 权限",
     "cf_token_placeholder": "CF Token",
     "validate": "验证",
-    "save": "保存",
     "destroy": "销毁 Tunnel",
-    "saving": "保存中...",
     "subdomain_error": "子域名格式错误：3-32位小写字母、数字或连字符",
     "auto_generate": "留空自动生成",
     "auto_random": "留空随机生成",
@@ -66,7 +61,9 @@
     "custom_hint_active": "自定义 Tunnel 运行中 · 修改配置后点击「保存」将更新并重启。",
     "custom_hint_inactive": "填写 CF API Token 和域名后，点击「保存」自动创建 Tunnel、配置 DNS 和 Ingress。",
     "fill_all": "请填写所有字段",
-    "enter_suffix": "请输入后缀"
+    "enter_suffix": "请输入后缀",
+    "save": "保存",
+    "saving": "保存中..."
   },
   "add_service": {
     "title": "添加自定义服务",

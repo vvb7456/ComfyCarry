@@ -21,11 +21,6 @@
     "kernels_count": "Kernels",
     "sessions_count": "Sessions"
   },
-  "actions": {
-    "stop": "Stop",
-    "start": "Start",
-    "restart": "Restart"
-  },
   "token": {
     "title": "Access Token",
     "open_jupyter": "Open JupyterLab"

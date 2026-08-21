@@ -12,9 +12,6 @@
     "uptime": "Uptime",
     "restarts": "Restarts",
     "actions": "Actions",
-    "start": "Start",
-    "stop": "Stop",
-    "restart": "Restart",
     "action_sent": "{action} action sent"
   },
   "status_bar": {

@@ -206,14 +206,14 @@ onUnmounted(() => {
         <span v-if="status">
           <template v-if="isRunning">
             <BaseButton :disabled="actionLoading !== null" @click="jupyterAction('stop')">
-              <MsIcon name="stop" /> {{ t('jupyter.actions.stop') }}
+              <MsIcon name="stop" /> {{ t('common.btn.stop') }}
             </BaseButton>
             <BaseButton :disabled="actionLoading !== null" @click="jupyterAction('restart')">
-              <MsIcon name="restart_alt" /> {{ t('jupyter.actions.restart') }}
+              <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
             </BaseButton>
           </template>
           <BaseButton v-else :disabled="actionLoading !== null" @click="jupyterAction('start')">
-            <MsIcon name="play_arrow" /> {{ t('jupyter.actions.start') }}
+            <MsIcon name="play_arrow" /> {{ t('common.btn.start') }}
           </BaseButton>
         </span>
       </template>
@@ -313,7 +313,9 @@ onUnmounted(() => {
               <BaseButton size="sm" square :title="t('jupyter.kernels.interrupt')" @click="kernelAction(kernel.id, 'interrupt')">
                 <MsIcon name="pause" />
               </BaseButton>
-              <BaseButton size="sm" square :title="t('jupyter.kernels.restart')" @click="kernelAction(kernel.id, 'restart')">↻</BaseButton>
+              <BaseButton size="sm" square :title="t('jupyter.kernels.restart')" @click="kernelAction(kernel.id, 'restart')">
+                <MsIcon name="restart_alt" />
+              </BaseButton>
             </div>
           </div>
         </BaseCard>

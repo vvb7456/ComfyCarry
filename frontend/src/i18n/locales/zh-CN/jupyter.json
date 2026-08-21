@@ -21,11 +21,6 @@
     "kernels_count": "内核",
     "sessions_count": "会话"
   },
-  "actions": {
-    "stop": "停止",
-    "start": "启动",
-    "restart": "重启"
-  },
   "token": {
     "title": "访问令牌",
     "open_jupyter": "打开 JupyterLab"

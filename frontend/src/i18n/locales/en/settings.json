@@ -1,6 +1,13 @@
 {
   "title": "Settings",
   "restart_btn": "Restart",
+  "unsaved": {
+    "title": "Unsaved changes",
+    "message": "Settings have been modified but not saved. Choose an action to proceed:",
+    "message_banner": "Unsaved changes",
+    "discard": "Discard changes",
+    "cancel": "Stay on this tab"
+  },
   "err": {
     "invalid_config": "Invalid configuration file",
     "password_empty": "New password cannot be empty",
@@ -146,7 +153,6 @@
       "stream_help": "When enabled, LLM will output response token by token. Disable to avoid content filtering issues on some platforms"
     },
     "test_btn": "Test Connection",
-    "save_btn": "Save Config",
     "test_success": "Connection successful",
     "test_failed": "Connection failed",
     "err_no_provider": "Please select a provider first",

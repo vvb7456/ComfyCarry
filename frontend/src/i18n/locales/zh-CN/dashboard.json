@@ -12,9 +12,6 @@
     "uptime": "运行时间",
     "restarts": "重启",
     "actions": "操作",
-    "start": "启动",
-    "stop": "停止",
-    "restart": "重启",
     "action_sent": "已发送 {action} 操作"
   },
   "status_bar": {

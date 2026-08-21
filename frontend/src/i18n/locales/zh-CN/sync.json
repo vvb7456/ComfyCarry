@@ -103,8 +103,11 @@
     },
     "saved": "已保存",
     "file_loaded": "已加载本地配置文件",
-    "saving": "保存中...",
-    "save": "保存"
+    "unsaved_title": "未保存的更改",
+    "unsaved_message": "同步配置已修改但未保存。继续操作前请选择：",
+    "unsaved_message_banner": "存在未保存的更改",
+    "unsaved_discard": "放弃更改",
+    "unsaved_cancel": "留在本页"
   },
   "worker": {
     "running": "运行中",
@@ -112,10 +115,7 @@
     "start_ok": "Worker 已启动",
     "stop_ok": "Worker 已停止",
     "restart_ok": "Sync Worker 已重启",
-    "error": "操作失败",
-    "stop": "停止",
-    "restart": "重启",
-    "start": "启动"
+    "error": "操作失败"
   },
   "log": {
     "title": "同步日志",

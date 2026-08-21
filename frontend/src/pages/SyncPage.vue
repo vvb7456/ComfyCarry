@@ -8,7 +8,9 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useLogStream } from '@/composables/useLogStream'
 import { useSyncJobs } from '@/composables/useSyncJobs'
 import { useCompanionClients } from '@/composables/useCompanionClients'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import UnsavedBanner from '@/components/ui/UnsavedBanner.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
@@ -74,6 +76,40 @@ const cfgMinAge = ref(60)
 const cfgWatchInterval = ref(60)
 const rcloneConfig = ref('')
 const cfgSaving = ref(false)
+
+// 配置 tab 未保存守卫: dirty = 表单值 ≠ 基线 (最近一次服务端确认值), 不耦合 activeTab。
+// 首次加载完成前 dirty 恒为 false, 避免挂载时快照初值 ('') 与表单默认值不等造成误报 dirty
+const cfgSnapshot = ref('')
+const cfgLoaded = ref(false)
+const cfgDirty = computed(() =>
+  cfgLoaded.value
+  && JSON.stringify({ min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value, rclone: rcloneConfig.value })
+    !== cfgSnapshot.value,
+)
+const syncGuard = useUnsavedGuard({
+  isDirty: cfgDirty,
+  saveAction: saveConfig,
+  discardAction: async () => {
+    // 无论 loadConfigTab 成败都同步快照: 失败时表单保持原样, 快照对齐后不再误报 dirty
+    try {
+      await loadConfigTab()
+    } finally {
+      cfgSnapshot.value = snapshotCfg()
+    }
+  },
+  texts: () => ({
+    title: t('sync.config.unsaved_title'),
+    message: t('sync.config.unsaved_message'),
+    confirmSave: t('common.btn.save'),
+    confirmDiscard: t('sync.config.unsaved_discard'),
+    cancel: t('sync.config.unsaved_cancel'),
+  }),
+})
+syncGuard.guardRouteLeave()
+
+function snapshotCfg(): string {
+  return JSON.stringify({ min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value, rclone: rcloneConfig.value })
+}
 
 // Modals
 const addRemoteModal = ref(false)
@@ -478,11 +514,15 @@ async function loadConfigTab() {
   ])
   if (sd) { cfgMinAge.value = sd.min_age ?? 60; cfgWatchInterval.value = sd.watch_interval ?? 60 }
   if (rc?.config !== undefined) rcloneConfig.value = rc.config
+  cfgLoaded.value = true
+  cfgSnapshot.value = snapshotCfg()
 }
 
-function switchTab(tab: string) {
+async function switchTab(tab: string) {
+  // 离开 config tab 时守卫未保存更改
+  if (!(await syncGuard.guardTabSwitch())) return
   activeTab.value = tab
-  if (tab === 'config') loadConfigTab()
+  if (tab === 'config') await loadConfigTab()
   if (tab === 'storage') {
     loadStorageAll()
   }
@@ -494,7 +534,7 @@ function switchTab(tab: string) {
   }
 }
 
-async function saveConfig() {
+async function saveConfig(): Promise<boolean> {
   cfgSaving.value = true
   try {
     // post 失败返回 null 而不是 reject —— Promise.all 照样 resolve,
@@ -503,7 +543,12 @@ async function saveConfig() {
       post<ApiOkResponse>('/api/sync/settings', { min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value }),
       post<ApiOkResponse>('/api/sync/rclone_config', { config: rcloneConfig.value }),
     ])
-    if (settingsRes && confRes) toast(t('sync.config.saved'), 'success')
+    if (settingsRes && confRes) {
+      toast(t('sync.config.saved'), 'success')
+      cfgSnapshot.value = snapshotCfg()
+      return true
+    }
+    return false
   } finally { cfgSaving.value = false }
 }
 
@@ -525,10 +570,10 @@ async function uploadRcloneFile(e: Event) {
   >
     <template #actions>
       <span>
-        <BaseButton v-if="!workerRunning" :disabled="workerLoading" @click="workerAction('start')"><MsIcon name="play_arrow" /> {{ t('sync.worker.start') }}</BaseButton>
+        <BaseButton v-if="!workerRunning" :disabled="workerLoading" @click="workerAction('start')"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
         <template v-else>
-          <BaseButton :disabled="workerLoading" @click="workerAction('stop')"><MsIcon name="stop" /> {{ t('sync.worker.stop') }}</BaseButton>
-          <BaseButton :disabled="workerLoading" @click="workerRestart()"><MsIcon name="restart_alt" /> {{ t('sync.worker.restart') }}</BaseButton>
+          <BaseButton :disabled="workerLoading" @click="workerAction('stop')"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>
+          <BaseButton :disabled="workerLoading" @click="workerRestart()"><MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}</BaseButton>
         </template>
       </span>
     </template>
@@ -536,6 +581,17 @@ async function uploadRcloneFile(e: Event) {
 
   <div class="page-body">
     <TabSwitcher :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab" />
+
+    <!-- 未保存守卫 banner (config tab 表单 dirty 时显示) -->
+    <UnsavedBanner
+      :visible="activeTab === 'config' && cfgDirty"
+      :message="t('sync.config.unsaved_message_banner')"
+      :save-label="t('common.btn.save')"
+      :discard-label="t('sync.config.unsaved_discard')"
+      :saving="cfgSaving"
+      @save="syncGuard.save"
+      @discard="syncGuard.discard"
+    />
 
     <!-- ===== Activity Tab ===== -->
     <div v-show="activeTab === 'activity'">
@@ -670,18 +726,16 @@ async function uploadRcloneFile(e: Event) {
         </BaseCard>
       </div>
 
-      <SectionHeader icon="description">{{ t('sync.config.rclone.title') }}</SectionHeader>
+      <SectionHeader icon="description">
+        {{ t('sync.config.rclone.title') }}
+        <template #actions>
+          <BaseButton size="sm" @click="($refs.rcloneFileInput as HTMLInputElement)?.click()">
+            <MsIcon name="upload" size="xs" color="none" /> {{ t('sync.config.rclone.upload_local') }}
+          </BaseButton>
+          <input ref="rcloneFileInput" type="file" accept=".conf,.txt" style="display:none" @change="uploadRcloneFile">
+        </template>
+      </SectionHeader>
       <textarea v-model="rcloneConfig" class="form-textarea form-textarea--mono rclone-config-editor" spellcheck="false" :placeholder="t('sync.config.rclone.placeholder')"></textarea>
-
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:12px 0">
-        <BaseButton @click="($refs.rcloneFileInput as HTMLInputElement)?.click()">
-          <MsIcon name="upload" /> {{ t('sync.config.rclone.upload_local') }}
-        </BaseButton>
-        <input ref="rcloneFileInput" type="file" accept=".conf,.txt" style="display:none" @change="uploadRcloneFile">
-        <BaseButton variant="primary" :disabled="cfgSaving" @click="saveConfig">
-          {{ cfgSaving ? t('sync.config.saving') : t('sync.config.save') }}
-        </BaseButton>
-      </div>
     </div>
 
     <!-- ===== Add Remote Modal ===== -->
@@ -769,6 +823,7 @@ async function uploadRcloneFile(e: Event) {
       <template #footer>
         <BaseButton size="sm" :disabled="saveRuleLoading" @click="addRuleModal = false">{{ t('common.btn.cancel') }}</BaseButton>
         <BaseButton variant="primary" size="sm" :disabled="saveRuleLoading" @click="saveRule">
+          <MsIcon v-if="!saveRuleLoading" name="save" size="xs" color="none" />
           {{ saveRuleLoading ? t('common.loading') : t('common.btn.save') }}
         </BaseButton>
       </template>

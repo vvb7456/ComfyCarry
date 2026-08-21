@@ -306,7 +306,7 @@ function onInsert(item: WildcardItem) {
         />
         <div class="wc-edit-footer">
           <BaseButton size="sm" @click="editVisible = false">{{ t('common.btn.cancel') }}</BaseButton>
-          <BaseButton size="sm" variant="primary" :loading="editLoading" @click="saveEdit">{{ t('common.btn.save') }}</BaseButton>
+          <BaseButton size="sm" variant="primary" :loading="editLoading" @click="saveEdit"><MsIcon name="save" size="xs" color="none" /> {{ t('common.btn.save') }}</BaseButton>
         </div>
       </div>
     </div>

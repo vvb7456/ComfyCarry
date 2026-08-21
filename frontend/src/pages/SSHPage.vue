@@ -6,7 +6,6 @@ import LogPanel from '@/components/ui/LogPanel.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -264,14 +263,14 @@ onUnmounted(() => {
       <template #actions>
         <span v-if="status">
           <BaseButton v-if="!status.running" :disabled="actionLoading !== null" @click="sshAction('start')">
-            <MsIcon name="play_arrow" /> {{ t('ssh.actions.start') }}
+            <MsIcon name="play_arrow" /> {{ t('common.btn.start') }}
           </BaseButton>
           <template v-else>
             <BaseButton :disabled="actionLoading !== null" @click="sshAction('stop')">
-              <MsIcon name="stop" /> {{ t('ssh.actions.stop') }}
+              <MsIcon name="stop" /> {{ t('common.btn.stop') }}
             </BaseButton>
             <BaseButton :disabled="actionLoading !== null" @click="sshAction('restart')">
-              <MsIcon name="restart_alt" /> {{ t('ssh.actions.restart') }}
+              <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
             </BaseButton>
           </template>
         </span>
@@ -386,8 +385,7 @@ onUnmounted(() => {
                 />
                 <div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px">
                   <BaseButton size="sm" @click="showAddKey = false">{{ t('common.btn.cancel') }}</BaseButton>
-                  <BaseButton variant="primary" size="sm" :disabled="addingKey || !newKeysText.trim()" @click="addKey">
-                    <Spinner v-if="addingKey" size="sm" />
+                  <BaseButton variant="primary" size="sm" :disabled="!newKeysText.trim()" :loading="addingKey" @click="addKey">
                     {{ t('ssh.keys.add_submit') }}
                   </BaseButton>
                 </div>
@@ -441,8 +439,7 @@ onUnmounted(() => {
                     <span style="font-size:.82rem">{{ t('ssh.password.use_comfycarry') }}</span>
                     <HelpTip :text="t('ssh.password.help')" />
                   </label>
-                  <BaseButton type="submit" variant="primary" size="sm" :disabled="pwSubmitting">
-                    <Spinner v-if="pwSubmitting" size="sm" />
+                  <BaseButton type="submit" variant="primary" size="sm" :loading="pwSubmitting">
                     {{ pwSync ? t('ssh.password.sync_btn') : t('ssh.password.set_btn') }}
                   </BaseButton>
                 </div>

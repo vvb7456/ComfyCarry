@@ -1,10 +1,5 @@
 {
   "title": "SSH",
-  "actions": {
-    "start": "启动",
-    "stop": "停止",
-    "restart": "重启"
-  },
   "tabs": {
     "status": "服务 & 日志",
     "config": "密钥 & 密码"

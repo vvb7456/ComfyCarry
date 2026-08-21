@@ -15,9 +15,6 @@
   "services": {
     "title": "Services",
     "node": "Node",
-    "stop": "Stop",
-    "restart": "Restart",
-    "start": "Start",
     "click_copy": "Click to copy",
     "custom_badge": "Custom",
     "add_service": "Add Service",
@@ -54,9 +51,7 @@
     "cf_token_help": "Requires Tunnel Edit + DNS Edit permissions",
     "cf_token_placeholder": "CF Token",
     "validate": "Validate",
-    "save": "Save",
     "destroy": "Destroy Tunnel",
-    "saving": "Saving...",
     "subdomain_error": "Subdomain format error: 3-32 chars, lowercase letters, numbers or hyphens",
     "auto_generate": "Leave empty to auto-generate",
     "auto_random": "Leave empty for random",
@@ -66,7 +61,9 @@
     "custom_hint_active": "Custom Tunnel running · Click \"Save\" after changes to update and restart.",
     "custom_hint_inactive": "Enter CF API Token and domain, then click \"Save\" to auto-create Tunnel, configure DNS and Ingress.",
     "fill_all": "Please fill in all fields",
-    "enter_suffix": "Please enter suffix"
+    "enter_suffix": "Please enter suffix",
+    "save": "Save",
+    "saving": "Saving..."
   },
   "add_service": {
     "title": "Add Custom Service",

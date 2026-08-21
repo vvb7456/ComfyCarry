@@ -103,8 +103,11 @@
     },
     "saved": "Saved",
     "file_loaded": "Local config file loaded",
-    "saving": "Saving...",
-    "save": "Save"
+    "unsaved_title": "Unsaved changes",
+    "unsaved_message": "Sync settings have been modified but not saved. Choose an action to proceed:",
+    "unsaved_message_banner": "Unsaved changes",
+    "unsaved_discard": "Discard changes",
+    "unsaved_cancel": "Stay on this tab"
   },
   "worker": {
     "running": "Running",
@@ -112,10 +115,7 @@
     "start_ok": "Worker started",
     "stop_ok": "Worker stopped",
     "restart_ok": "Sync Worker restarted",
-    "error": "Action failed",
-    "stop": "Stop",
-    "restart": "Restart",
-    "start": "Start"
+    "error": "Action failed"
   },
   "log": {
     "title": "Sync Logs",
