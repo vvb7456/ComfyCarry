@@ -969,6 +969,13 @@ onUnmounted(() => {
           <FormField :label="t('settings.llm.provider.label')" density="compact">
             <BaseSelect v-model="llmProvider" :options="llmProviderOptions" :placeholder="t('settings.llm.provider.select_placeholder')" @change="onLlmProviderChange" />
           </FormField>
+          <FormField v-if="showLlmBaseUrl" density="compact">
+            <template #label>
+              {{ t('settings.llm.provider.base_url') }}
+              <HelpTip :text="llmBaseUrlHelp" />
+            </template>
+            <input type="url" v-model="llmBaseUrl" class="form-input" :placeholder="llmBaseUrlPlaceholder" />
+          </FormField>
           <FormField :label="t('settings.llm.provider.api_key')" density="compact">
             <SecretInput
               v-model="llmApiKey"
@@ -976,13 +983,6 @@ onUnmounted(() => {
               autocomplete="off"
               input-class="form-input"
             />
-          </FormField>
-          <FormField v-if="showLlmBaseUrl" density="compact">
-            <template #label>
-              {{ t('settings.llm.provider.base_url') }}
-              <HelpTip :text="llmBaseUrlHelp" />
-            </template>
-            <input type="url" v-model="llmBaseUrl" class="form-input" :placeholder="llmBaseUrlPlaceholder" />
           </FormField>
           <FormField :label="t('settings.llm.model.label')" :hint="llmModelInfo" density="compact">
             <FieldControlRow>

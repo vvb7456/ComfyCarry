@@ -82,13 +82,6 @@ function onPrev() { prevStep() }
       />
     </FormField>
 
-    <FormField :label="t('wizard.step6.api_key')">
-      <SecretInput
-        v-model="config.llm_api_key"
-        :placeholder="t('wizard.step6.api_key_placeholder')"
-      />
-    </FormField>
-
     <FormField v-if="showBaseUrl">
       <template #label>
         {{ t('wizard.step6.base_url') }}
@@ -99,6 +92,13 @@ function onPrev() { prevStep() }
         type="text"
         class="form-input"
         :placeholder="baseUrlPlaceholder"
+      />
+    </FormField>
+
+    <FormField :label="t('wizard.step6.api_key')">
+      <SecretInput
+        v-model="config.llm_api_key"
+        :placeholder="t('wizard.step6.api_key_placeholder')"
       />
     </FormField>
 

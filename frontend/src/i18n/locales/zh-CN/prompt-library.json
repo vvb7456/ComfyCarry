@@ -92,31 +92,5 @@
     "import_success": "导入完成：{groups} 组，{tags} 标签，{danbooru} Danbooru",
     "import_failed": "导入失败",
     "skip": "暂时跳过"
-  },
-  "settings": {
-    "title": "提示词库",
-    "translation": {
-      "title": "翻译设置",
-      "show_translation": "显示翻译辅助",
-      "show_translation_hint": "在标签 Chip 和自动补全中显示翻译",
-      "provider": "在线翻译提供商",
-      "api_key": "API Key",
-      "source_lang": "源语言",
-      "target_lang": "目标语言",
-      "auto_detect": "自动检测"
-    },
-    "library": {
-      "title": "标签库管理",
-      "status": "状态",
-      "initialized": "已初始化",
-      "not_initialized": "未初始化",
-      "groups_count": "{count} 组",
-      "tags_count": "{count} 标签",
-      "danbooru_count": "{count} Danbooru 标签",
-      "reinitialize": "重新初始化",
-      "reinitialize_confirm": "这将清空并重新导入所有标签数据，确定继续？",
-      "manual_import": "手动导入 SQL",
-      "manual_import_hint": "上传自定义 .sql 文件导入"
-    }
   }
 }

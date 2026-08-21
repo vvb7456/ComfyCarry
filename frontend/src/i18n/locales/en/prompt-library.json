@@ -92,31 +92,5 @@
     "import_success": "Import completed: {groups} groups, {tags} tags, {danbooru} danbooru",
     "import_failed": "Import failed",
     "skip": "Skip for now"
-  },
-  "settings": {
-    "title": "Prompt Library",
-    "translation": {
-      "title": "Translation",
-      "show_translation": "Show Translation Assist",
-      "show_translation_hint": "Show translations in token chips and autocomplete",
-      "provider": "Online Translation Provider",
-      "api_key": "API Key",
-      "source_lang": "Source Language",
-      "target_lang": "Target Language",
-      "auto_detect": "Auto Detect"
-    },
-    "library": {
-      "title": "Tag Library Management",
-      "status": "Status",
-      "initialized": "Initialized",
-      "not_initialized": "Not Initialized",
-      "groups_count": "{count} groups",
-      "tags_count": "{count} tags",
-      "danbooru_count": "{count} danbooru tags",
-      "reinitialize": "Re-initialize",
-      "reinitialize_confirm": "This will clear and re-import all tag data. Continue?",
-      "manual_import": "Manual Import SQL",
-      "manual_import_hint": "Upload custom .sql file to import"
-    }
   }
 }
