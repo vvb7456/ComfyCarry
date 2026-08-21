@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import Drawer from '@/components/ui/Drawer.vue'
@@ -22,16 +23,25 @@ import type { LocalModel } from '@/composables/useLocalModels'
 defineOptions({ name: 'ModelsPage' })
 
 const { t } = useI18n({ useScope: 'global' })
+const route = useRoute()
 
 // ── Tabs ──
 // 按「看哪个来源的模型」区分。收藏与下载任务是流水线状态不是浏览目的地,
-// 已收进右侧抽屉 (见下)。
-const activeTab = ref('local')
+// 已收进右侧抽屉 (见下)。支持 query (?tab=civitai) 用于外部跳转直接定位 tab。
+const validTabs = new Set(['local', 'huggingface', 'civitai'])
+const initialTab = validTabs.has(route.query.tab as string) ? (route.query.tab as string) : 'local'
+const activeTab = ref(initialTab)
 const tabs = computed(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
   { key: 'huggingface', label: t('models.tabs.huggingface'), icon: 'verified' },
   { key: 'civitai', label: t('models.tabs.civitai'), icon: 'search' },
 ])
+
+// CivitaiTab 预选类型 (来自 picker 空态跳转 ?type=LORA); 仅首次挂载时生效
+const civitaiInitialType = computed(() => {
+  const v = route.query.type
+  return typeof v === 'string' && v ? v : ''
+})
 
 // ── 收藏&下载抽屉 ──────────────────────────────────────────────────────────
 const {
@@ -153,7 +163,7 @@ function openPreviewSingle(url: string) {
     </div>
 
     <div v-show="activeTab === 'civitai'">
-      <CivitaiTab :active="activeTab === 'civitai'" @open-meta="openMeta" @open-preview="openPreviewSingle" />
+      <CivitaiTab :active="activeTab === 'civitai'" :initial-type="civitaiInitialType" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
 
     <!-- ═══ 收藏&下载抽屉 (常驻挂载 Drawer, slot 内容首开才挂载) ═══

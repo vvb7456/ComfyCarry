@@ -679,6 +679,8 @@
     "subarch_mismatch_desc": "This model belongs to the {model_arch} ecosystem, the current tab is {tab_arch}. The ecosystem conventions differ and results may be unsatisfactory. Select anyway?",
     "empty_title": "No {arch} main model yet",
     "empty_desc": "Go to Downloads to add models",
+    "empty_lora_title": "No LoRA models yet",
+    "empty_lora_desc": "Go to Downloads to add LoRAs",
     "go_to_downloads": "Go to Downloads",
     "component_hint": "Requires additional runtime components",
     "empty_video_hint": "No weight detected for this tab yet. Search and download it on the Models page, or place the file in the diffusion_models directory"

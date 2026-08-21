@@ -258,7 +258,11 @@ const isItemsEmpty = computed(() => props.items.length === 0)
 
 function goToDownloadPage() {
   close()
-  router.push({ name: 'models' })
+  // 空态按钮 → 项目内模型页的 CivitAI 搜索 tab (LoRA 模式自动过滤 LORA 类型)
+  router.push({
+    name: 'models',
+    query: { tab: 'civitai', ...(props.multi ? { type: 'LORA' } : {}) },
+  })
 }
 </script>
 
@@ -275,8 +279,16 @@ function goToDownloadPage() {
     <!-- ── ① 空态: 该 arch 两目录皆空 ── -->
     <div v-if="isItemsEmpty" class="picker-empty-state">
       <MsIcon name="cloud_download" color="none" class="picker-empty-icon" />
-      <div class="picker-empty-title">{{ t('generate.picker.empty_title', { arch: currentArchLabel }) }}</div>
-      <div class="picker-empty-desc">{{ currentArch.startsWith('wan22') ? t('generate.picker.empty_video_hint') : t('generate.picker.empty_desc') }}</div>
+      <div class="picker-empty-title">{{
+        multi
+          ? t('generate.picker.empty_lora_title')
+          : t('generate.picker.empty_title', { arch: currentArchLabel })
+      }}</div>
+      <div class="picker-empty-desc">{{
+        multi
+          ? t('generate.picker.empty_lora_desc')
+          : (currentArch.startsWith('wan22') ? t('generate.picker.empty_video_hint') : t('generate.picker.empty_desc'))
+      }}</div>
       <BaseButton variant="primary" @click="goToDownloadPage">
         <MsIcon name="open_in_new" size="sm" color="none" /> {{ t('generate.picker.go_to_downloads') }}
       </BaseButton>

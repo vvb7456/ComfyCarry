@@ -679,6 +679,8 @@
     "subarch_mismatch_desc": "该模型为 {model_arch} 生态，当前标签页为 {tab_arch}，生态约定不同可能效果不佳。确定选择？",
     "empty_title": "还没有 {arch} 主模型",
     "empty_desc": "前往下载页添加模型",
+    "empty_lora_title": "还没有 LoRA 模型",
+    "empty_lora_desc": "前往下载页添加 LoRA",
     "go_to_downloads": "前往下载页",
     "component_hint": "选中后需补齐运行组件",
     "empty_video_hint": "尚未检测到该条目权重。可在模型页搜索下载，或将文件放入 diffusion_models 目录"

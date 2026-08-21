@@ -18,7 +18,7 @@ import { remoteHitToMeta } from '@/utils/remote-model-meta'
 
 defineOptions({ name: 'CivitaiTab' })
 
-const props = defineProps<{ active: boolean }>()
+const props = defineProps<{ active: boolean; initialType?: string }>()
 
 const emit = defineEmits<{
   openMeta: [meta: ModelMeta]
@@ -119,8 +119,14 @@ function handleSortChange() {
 }
 
 // Auto-activate when tab becomes visible
+let initialTypeApplied = false
 watch(() => props.active, (val) => {
   if (val) {
+    // 外部跳转预选类型 (仅首次激活应用一次, 避免覆盖用户后续操作)
+    if (props.initialType && !initialTypeApplied) {
+      initialTypeApplied = true
+      applyFilters([props.initialType], [])
+    }
     civitaiActivate()
     dlFetchLocalIndex()
     // Connect to any in-flight downloads so card states are accurate
