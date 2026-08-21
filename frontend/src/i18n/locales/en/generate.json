@@ -78,8 +78,8 @@
         "anima": {
           "title": "Anima (Danbooru/Gelbooru tags)",
           "format": "Use lowercase English tags or phrases separated by commas. Replace ordinary underscores with spaces; keep underscores in score_* tags.",
-          "order": "Quality/meta/year/safety → count → character → series → @artist → appearance, action, composition and setting.",
-          "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, @artist, red dress, outdoors",
+          "order": "Quality/meta/year/safety → count → character → series → {'@'}artist → appearance, action, composition and setting.",
+          "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, {'@'}artist, red dress, outdoors",
           "negative": "Start from worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, chromatic aberration, then tailor it to the scene."
         },
         "krea2": {
@@ -692,7 +692,7 @@
   "model": {},
   "placeholders": {
     "positive_sdxl": "masterpiece, best quality, 1girl, solo, long hair, white dress, looking at viewer, outdoors, blue sky",
-    "positive_anima": "masterpiece, best quality, score_7, safe, 1girl, solo, character, series, @artist, long hair, school uniform, standing outdoors",
+    "positive_anima": "masterpiece, best quality, score_7, safe, 1girl, solo, character, series, {'@'}artist, long hair, school uniform, standing outdoors",
     "positive_krea2": "A cinematic product photo of a red ceramic teapot on a wooden table, soft morning window light, shallow depth of field",
     "positive_zimage": "A quiet red fox stands on a mossy rock in a misty forest at dawn, backlit, cinematic composition, detailed fur",
     "positive_flux1": "A red-haired woman in a linen dress walks through a sunlit greenhouse, leaves casting soft shadows, cinematic 35mm composition",

@@ -127,7 +127,7 @@
     "rule_start_push": "⬆ {name}: {src} → {dst} ({method})",
     "rclone_output": "  {text}",
     "file_transferred": "  → {name}",
-    "rule_summary": "  📊 {name}: {files} 个文件，{bytes} 字节 @ {speed} B/s",
+    "rule_summary": "  📊 {name}: {files} 个文件，{bytes} 字节 {'@'} {speed} B/s",
     "rule_done": "✅ {name} 完成",
     "rule_failed": "❌ {name} 失败 (code={code})",
     "rule_timeout": "⏰ {name} 超时 ({seconds}s)",

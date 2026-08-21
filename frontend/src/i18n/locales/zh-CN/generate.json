@@ -78,8 +78,8 @@
         "anima": {
           "title": "Anima（Danbooru/Gelbooru 标签）",
           "format": "英文小写标签或短语，逗号分隔。普通标签把下划线写成空格，score_* 保留下划线。",
-          "order": "质量/meta/年份/安全 → 人数 → 角色 → 作品 → @artist → 外观、动作、构图与场景。",
-          "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, @artist, red dress, outdoors",
+          "order": "质量/meta/年份/安全 → 人数 → 角色 → 作品 → {'@'}artist → 外观、动作、构图与场景。",
+          "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, {'@'}artist, red dress, outdoors",
           "negative": "建议以 worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, chromatic aberration 为基础，再按场景增删。"
         },
         "krea2": {
@@ -692,7 +692,7 @@
   "model": {},
   "placeholders": {
     "positive_sdxl": "masterpiece, best quality, 1girl, solo, long hair, white dress, looking at viewer, outdoors, blue sky",
-    "positive_anima": "masterpiece, best quality, score_7, safe, 1girl, solo, character, series, @artist, long hair, school uniform, standing outdoors",
+    "positive_anima": "masterpiece, best quality, score_7, safe, 1girl, solo, character, series, {'@'}artist, long hair, school uniform, standing outdoors",
     "positive_krea2": "A cinematic product photo of a red ceramic teapot on a wooden table, soft morning window light, shallow depth of field",
     "positive_zimage": "A quiet red fox stands on a mossy rock in a misty forest at dawn, backlit, cinematic composition, detailed fur",
     "positive_flux1": "A red-haired woman in a linen dress walks through a sunlit greenhouse, leaves casting soft shadows, cinematic 35mm composition",
