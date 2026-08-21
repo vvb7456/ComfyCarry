@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
@@ -35,10 +35,7 @@ const paramsSchema = ref<Record<string, ParamSchema>>({})
 const paramsCurrent = ref<Record<string, string | number | boolean>>({})
 const loading = ref(false)
 const saving = ref(false)
-const paramsStatus = ref('')
-const paramsStatusTone = ref<'neutral' | 'success' | 'danger'>('neutral')
 const savedSnapshot = ref('')
-let paramsStatusTimer: ReturnType<typeof setTimeout> | null = null
 
 const LRU_CACHE_SIZE_PRESETS = ['16', '32', '64', '128', '256']
 
@@ -54,10 +51,6 @@ const PARAM_GROUPS = [
 ]
 
 onMounted(loadParams)
-
-onUnmounted(() => {
-  if (paramsStatusTimer) clearTimeout(paramsStatusTimer)
-})
 
 async function loadParams() {
   loading.value = true
@@ -79,20 +72,6 @@ function normalizeCacheLruSize() {
   if (!LRU_CACHE_SIZE_PRESETS.includes(current) && !/^[1-9]\d*$/.test(current)) {
     paramsCurrent.value.cache_lru_size = '16'
   }
-}
-
-function clearParamsStatus() {
-  paramsStatus.value = ''
-  paramsStatusTone.value = 'neutral'
-  if (paramsStatusTimer) {
-    clearTimeout(paramsStatusTimer)
-    paramsStatusTimer = null
-  }
-}
-
-function scheduleParamsStatusClear(delay = 5000) {
-  if (paramsStatusTimer) clearTimeout(paramsStatusTimer)
-  paramsStatusTimer = setTimeout(clearParamsStatus, delay)
 }
 
 function collectParams() {
@@ -211,9 +190,7 @@ watch(() => paramsCurrent.value.cache, (cache) => {
 
 async function saveParams(withConfirm = true): Promise<boolean> {
   if (withConfirm && !await confirm({ message: t('comfyui.console.params_save_confirm') })) return false
-  clearParamsStatus()
   saving.value = true
-  paramsStatus.value = t('comfyui.console.params_saving')
   const d = await post<ComfyParamsSaveResponse>('/api/comfyui/params', {
     params: collectParams(),
     extra_args: extraArgs.value.trim(),
@@ -222,19 +199,15 @@ async function saveParams(withConfirm = true): Promise<boolean> {
 
   if (d?.ok) {
     savedSnapshot.value = formSnapshot()
-    paramsStatus.value = t('comfyui.console.saved_restarting')
-    paramsStatusTone.value = 'success'
     toast(t('comfyui.console.params_restart_toast'), 'success')
-    scheduleParamsStatusClear()
     return true
   }
 
-  paramsStatus.value = d?.error || t('comfyui.console.params_save_failed')
-  paramsStatusTone.value = 'danger'
+  toast(d?.error || t('comfyui.console.params_save_failed'), 'error')
   return false
 }
 
-defineExpose({ saveParams, loadParams })
+defineExpose({ saveParams, loadParams, isDirty, saving })
 </script>
 
 <template>
@@ -322,26 +295,6 @@ defineExpose({ saveParams, loadParams })
             </template>
           </div>
         </BaseCard>
-      </div>
-
-      <div class="params-actions">
-        <span
-          v-if="paramsStatus"
-          class="params-status-msg"
-          :class="`params-status-msg--${paramsStatusTone}`"
-        >
-          <MsIcon :name="paramsStatusTone === 'success' ? 'check_circle' : paramsStatusTone === 'danger' ? 'error' : 'sync'" size="xs" />
-          {{ paramsStatus }}
-        </span>
-        <BaseButton
-          variant="primary"
-          :loading="saving"
-          :disabled="!isDirty"
-          @click="saveParams()"
-        >
-          <MsIcon name="restart_alt" size="xs" color="none" />
-          {{ t('comfyui.settings.save_restart') }}
-        </BaseButton>
       </div>
     </template>
   </div>
@@ -490,27 +443,6 @@ defineExpose({ saveParams, loadParams })
 /* NumberInput 根是 flex 自适应容器, 撑满右侧控件区与 select/input 对齐 */
 .param-group__fields :deep(.number-input) { width: 100%; }
 .param-disabled { opacity: .45; }
-
-.params-actions {
-  position: sticky;
-  bottom: var(--sp-3);
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-3);
-}
-
-.params-status-msg {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--t3);
-  font-size: var(--text-xs);
-}
-
-.params-status-msg--success { color: var(--green); }
-.params-status-msg--danger { color: var(--red); }
 
 @media (max-width: 900px) {
   .params-groups { grid-template-columns: 1fr; }

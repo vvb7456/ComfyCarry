@@ -150,6 +150,7 @@ watch(
     <TabSwitcher
       :model-value="activeTab"
       :tabs="tabs"
+      :sticky="false"
       @update:model-value="onTabChange"
     />
 

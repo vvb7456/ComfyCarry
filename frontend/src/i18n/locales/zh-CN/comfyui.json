@@ -28,7 +28,13 @@
     "params_restart_hint": "修改启动参数后，需要重启 ComfyUI 才会生效。",
     "params_saving": "保存中...",
     "params_restart_toast": "ComfyUI 正在使用新参数重启...",
-    "params_save_failed": "保存失败"
+    "params_save_failed": "保存失败",
+    "unsaved_changes": "存在未保存的更改，需保存并重启 ComfyUI 后生效",
+    "unsaved_confirm_title": "未保存的更改",
+    "unsaved_confirm_msg": "启动参数已修改但未保存。切换标签页将要执行的操作：",
+    "unsaved_confirm_save_restart": "保存并重启",
+    "unsaved_confirm_discard": "放弃更改",
+    "unsaved_confirm_cancel": "留在本页"
   },
   "params": {
     "fields": {

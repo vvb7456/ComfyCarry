@@ -28,7 +28,13 @@
     "params_restart_hint": "Changes to launch parameters take effect only after ComfyUI restarts.",
     "params_saving": "Saving...",
     "params_restart_toast": "ComfyUI is restarting with new params...",
-    "params_save_failed": "Save failed"
+    "params_save_failed": "Save failed",
+    "unsaved_changes": "Unsaved changes. Save and restart ComfyUI to apply.",
+    "unsaved_confirm_title": "Unsaved changes",
+    "unsaved_confirm_msg": "Launch parameters have been modified but not saved. Choose an action to proceed:",
+    "unsaved_confirm_save_restart": "Save & Restart",
+    "unsaved_confirm_discard": "Discard changes",
+    "unsaved_confirm_cancel": "Stay on this tab"
   },
   "params": {
     "fields": {

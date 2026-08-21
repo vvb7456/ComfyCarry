@@ -15,10 +15,14 @@ export interface TabItem {
   align?: 'right'
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   tabs: TabItem[]
   modelValue: string
-}>()
+  /** 页面级 tab 默认吸附在 .content 滚动容器顶部; modal 内部的 tab 传 false */
+  sticky?: boolean
+}>(), {
+  sticky: true,
+})
 
 const emit = defineEmits<{
   'update:modelValue': [key: string]
@@ -85,6 +89,7 @@ onBeforeUnmount(() => {
   <div
     ref="rootRef"
     class="tab-switcher"
+    :class="{ 'tab-switcher--sticky': props.sticky }"
     role="tablist"
   >
     <button
@@ -130,6 +135,18 @@ onBeforeUnmount(() => {
      In return, iOS no longer interprets diagonal drags as a 2D rubber-band
      drag of the tab content. */
   touch-action: pan-x;
+}
+
+/* 页面级 tab 吸附在 .page-header (sticky, 高 --page-header-h) 之下。
+   用负 margin 吃掉 .page-body 的 padding-top, 同时 padding-top 保留原间距,
+   让 sticky 时背景能向上延伸到 header 底边, 不漏出下方滚动内容。 */
+.tab-switcher--sticky {
+  position: sticky;
+  top: var(--page-header-h);
+  z-index: 10;
+  background: var(--bg);
+  margin-top: calc(-1 * var(--page-body-pt));
+  padding-top: var(--page-body-pt);
 }
 
 .tab-switcher::-webkit-scrollbar {

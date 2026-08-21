@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
@@ -10,6 +11,7 @@ import { useComfySSE } from '@/composables/useComfySSE'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import AlertBanner from '@/components/ui/AlertBanner.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import ConsoleSection from '@/components/comfyui/ConsoleSection.vue'
 import ParamsCard from '@/components/comfyui/ParamsCard.vue'
@@ -52,6 +54,8 @@ const tracker = useExecTracker()
 const execState = computed(() => tracker.state.value)
 
 const paramsRef = ref<InstanceType<typeof ParamsCard> | null>(null)
+const paramsDirty = computed(() => !!paramsRef.value?.isDirty)
+const paramsSaving = computed(() => !!paramsRef.value?.saving)
 
 const sse = useComfySSE(tracker, {
   onEvent(evt, result) {
@@ -109,6 +113,57 @@ async function comfyRestart() {
   toast(t('comfyui.toast.restarting'), 'info')
   setTimeout(() => { loadStatus(); paramsRef.value?.loadParams() }, 5000)
 }
+
+// 未保存守卫: 点击 banner 内按钮保存并重启
+async function saveAndRestart() {
+  await paramsRef.value?.saveParams()
+  setTimeout(() => { loadStatus(); paramsRef.value?.loadParams() }, 5000)
+}
+
+// banner 内"放弃更改": 重新加载参数清掉 dirty
+async function discardChanges() {
+  await paramsRef.value?.loadParams()
+}
+
+// 切走 settings tab 守卫: isDirty 时弹 confirm 拦截。
+// 选 primary(保存并重启) → saveParams(false) 跳过二次确认直接切换
+// 选 alt(放弃更改) → loadParams() 重置快照再切换
+// 取消 → 留在 settings
+// 返回值: true=允许切换, false=拦截
+async function confirmLeaveWithUnsaved(): Promise<boolean> {
+  const result = await confirm({
+    title: t('comfyui.console.unsaved_confirm_title'),
+    message: t('comfyui.console.unsaved_confirm_msg'),
+    variant: 'danger',
+    confirmText: t('comfyui.console.unsaved_confirm_save_restart'),
+    altText: t('comfyui.console.unsaved_confirm_discard'),
+    altVariant: 'danger',
+    cancelText: t('comfyui.console.unsaved_confirm_cancel'),
+  })
+  if (result === true) {
+    if (!await paramsRef.value?.saveParams(false)) return false
+    setTimeout(() => { loadStatus(); paramsRef.value?.loadParams() }, 5000)
+    return true
+  }
+  if (result === 'alt') {
+    await paramsRef.value?.loadParams()
+    return true
+  }
+  return false
+}
+
+async function onTabChange(next: string) {
+  if (activeTab.value === 'settings' && next !== 'settings' && paramsDirty.value) {
+    if (!await confirmLeaveWithUnsaved()) return
+  }
+  activeTab.value = next
+}
+
+// 路由级守卫: 离开 ComfyUI 页 (侧边栏导航 / 浏览器前进后退 / 其他页内 router-link) 都会触发
+onBeforeRouteLeave(async () => {
+  if (!paramsDirty.value) return true
+  return await confirmLeaveWithUnsaved()
+})
 </script>
 
 <template>
@@ -134,7 +189,37 @@ async function comfyRestart() {
   </PageHeader>
 
   <div class="page-body">
-    <TabSwitcher v-model="activeTab" :tabs="tabs" />
+    <TabSwitcher :model-value="activeTab" :tabs="tabs" @update:model-value="onTabChange" />
+
+    <!-- 未保存守卫: 钉在 TabSwitcher 下方, 仅 settings tab 显示 -->
+    <AlertBanner
+      v-if="activeTab === 'settings' && paramsDirty"
+      tone="warning"
+      icon="save"
+      class="unsaved-banner"
+    >
+      <div class="unsaved-banner__row">
+        <span>{{ t('comfyui.console.unsaved_changes') }}</span>
+        <div class="unsaved-banner__actions">
+          <BaseButton
+            size="sm"
+            :disabled="paramsSaving"
+            @click="discardChanges"
+          >
+            {{ t('comfyui.console.unsaved_confirm_discard') }}
+          </BaseButton>
+          <BaseButton
+            variant="primary"
+            size="sm"
+            :loading="paramsSaving"
+            @click="saveAndRestart"
+          >
+            <MsIcon name="restart_alt" size="xs" color="none" />
+            {{ t('comfyui.settings.save_restart') }}
+          </BaseButton>
+        </div>
+      </div>
+    </AlertBanner>
 
     <div v-show="activeTab === 'overview'">
       <ConsoleSection
@@ -159,5 +244,29 @@ async function comfyRestart() {
   display: grid;
   gap: var(--sp-4);
   width: 100%;
+}
+
+.unsaved-banner {
+  margin-bottom: var(--sp-3);
+  /* 钉在 TabSwitcher 下方。TabSwitcher sticky 后总占位高 = --page-body-pt (上移的 padding) + --tab-switcher-row-h。
+     banner top = header + TabSwitcher 总高 + 间距。所有尺寸走 CSS var, 尺寸调整只需改 layout.css / TabSwitcher。 */
+  position: sticky;
+  top: calc(var(--page-header-h) + var(--page-body-pt) + var(--tab-switcher-row-h) + var(--sp-3));
+  z-index: 9;
+}
+
+.unsaved-banner__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.unsaved-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
 }
 </style>

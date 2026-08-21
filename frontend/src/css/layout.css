@@ -337,7 +337,7 @@
         }
 
         .page-body {
-            padding: clamp(20px, 2vw, 32px) var(--page-pad)
+            padding: var(--page-body-pt) var(--page-pad)
         }
 
         /* ── 限宽跟内容类型走, 不跟页面走 ──
@@ -355,11 +355,20 @@
 
         /* ── Page Header ──
            一行, 高度恒定 64px —— 与 .sidebar-logo 严格同高, 两者的底边线接成一条
-           贯穿视口的横线。改这里的高度必须同步改那里。
+           贯穿视口的横线。改这里的高度必须同步改那里, 以及 --page-header-h。
            分区导航 (tabs) 不在这块里, 它在 .page-body 顶部, 见 PageHeader.vue 注释。 */
+        :root {
+            --page-header-h: 64px;
+            /* .page-body 上方留白, TabSwitcher sticky 时用负 margin 吃掉这块, banner 定位要算入 */
+            --page-body-pt: clamp(20px, 2vw, 32px);
+            /* TabSwitcher tab 行高 (padding 10×2 + 文字 22 + 底边线 1)。
+               banner 等下游 sticky 元素定位要叠加; 与 TabSwitcher 样式任一改动同步。 */
+            --tab-switcher-row-h: 43px;
+        }
+
         .page-header {
             padding: 0 var(--page-pad);
-            min-height: 64px;
+            min-height: var(--page-header-h);
             border-bottom: 1px solid var(--bd);
             display: flex;
             align-items: center;
@@ -512,6 +521,11 @@
                 padding: 0 14px;
                 min-height: 56px;
                 gap: 8px
+            }
+
+            /* 移动端页头更矮, 同步变量让 TabSwitcher sticky top 跟随 */
+            :root {
+                --page-header-h: 56px;
             }
 
             .sidebar {
