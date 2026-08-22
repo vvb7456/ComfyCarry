@@ -328,6 +328,7 @@
     "deleted": "Deleted"
   },
   "err": {
+    "args_check_failed": "Cannot read ComfyUI launch argument definitions. The ComfyUI installation may be incomplete; the operation was cancelled",
     "internal": "Internal server error: {detail}",
     "invalid_extra_args": "Invalid extra_args format",
     "missing_delete_param": "Missing delete parameter",
@@ -335,6 +336,7 @@
     "switch_failed": "Version switch failed: {detail}",
     "switch_not_git": "ComfyUI is not a git repository, cannot switch version",
     "unreachable": "Cannot connect to ComfyUI",
+    "unsupported_args": "Current ComfyUI version does not support launch arguments: {flags}",
     "video_thumb_failed": "Failed to generate video thumbnail: {detail}"
   },
   "msg": {

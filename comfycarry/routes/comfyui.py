@@ -124,17 +124,32 @@ def api_comfyui_params_get():
         return _err("internal", 500, detail=str(e))
 
 
-def restart_comfyui(args_str: str = "") -> bool:
+def restart_comfyui(args_str: str = "") -> tuple[bool, dict | None]:
     """用 delete + start 重建 comfy 进程 (不能用 pm2 restart -- 后者沿用 dump 旧配置,
     会丢 --log /workspace/comfy.log, 日志回默认 ~/.pm2/logs/, 前端面板看不到)。
 
-    args_str 为空时用已保存的 comfyui_args。返回是否成功。
+    args_str 为空时用已保存的 comfyui_args。启动前以磁盘上的 ComfyUI 源码
+    校验参数有效性 (上游删掉的 flag 会让进程起不来并被 pm2 反复拉起),
+    校验不通过时不碰 pm2。
+
+    返回 (是否成功, 错误体)。错误体为 {"error_key", "error_params"} 形态,
+    与 _err() 的响应契约一致, 可直接 jsonify 给前端 toast; 成功时为 None。
     """
     if not args_str:
         from ..config import _get_config
         from ..services.comfyui_params import ensure_preview_method
         args_str = ensure_preview_method(_get_config("comfyui_args", ""))
     py = _detect_python()
+
+    from ..services.comfyui_args_check import check_comfyui_args
+    check_ok, unsupported = check_comfyui_args(args_str, python=py)
+    if not check_ok:
+        return False, {"error_key": "comfyui.err.args_check_failed"}
+    if unsupported:
+        return False, {
+            "error_key": "comfyui.err.unsupported_args",
+            "error_params": {"flags": ", ".join(unsupported)},
+        }
     try:
         # 清掉 pm2 注入的日志路径环境变量, 否则它们覆盖 --log 命令行参数
         # (pm2 把 pm_log_path 等注入被管理进程, dashboard 继承后调 pm2 start
@@ -152,9 +167,10 @@ def restart_comfyui(args_str: str = "") -> bool:
         )
         subprocess.run(cmd, shell=True, timeout=30, check=True, env=env)
         subprocess.run("pm2 save 2>/dev/null || true", shell=True, timeout=5, env=env)
-        return True
-    except Exception:
-        return False
+        return True, None
+    except Exception as e:
+        return False, {"error_key": "comfyui.err.internal",
+                       "error_params": {"detail": str(e)}}
 
 
 @bp.route("/api/comfyui/params", methods=["POST"])
@@ -171,8 +187,9 @@ def api_comfyui_params_update():
             return _err("invalid_extra_args")
         args_str = args_str + " " + " ".join(shlex.quote(t) for t in tokens)
 
-    if not restart_comfyui(args_str):
-        return _err("internal", 500)
+    ok, err_body = restart_comfyui(args_str)
+    if not ok:
+        return jsonify(err_body), 500
 
     # 持久化到 .dashboard_env (容器重启后可恢复)
     _set_config("comfyui_args", args_str)
@@ -186,8 +203,9 @@ def api_comfyui_restart():
 
     供插件管理等场景独立触发重启; 参数页的重启走 params POST (保存+重启)。
     """
-    if not restart_comfyui():
-        return _err("internal", 500)
+    ok, err_body = restart_comfyui()
+    if not ok:
+        return jsonify(err_body), 500
     return jsonify({"ok": True})
 
 
@@ -453,8 +471,15 @@ def api_comfyui_switch():
         # result 本身已经是 key + params 形态 (见 switch_version docstring)
         return jsonify(result), 500
 
-    # 重启 ComfyUI (delete + start, 不能用 pm2 restart -- 会丢 --log)
-    if not restart_comfyui():
-        result["warning_key"] = "comfyui.warn.switch_restart"
+    # 重启 ComfyUI (delete + start, 不能用 pm2 restart -- 会丢 --log)。
+    # 版本已切换成功, 重启失败只降级为警告; 若是参数校验不通过, 警告里
+    # 带上具体失效的 flag (新版本没有旧参数)。
+    ok, err_body = restart_comfyui()
+    if not ok:
+        if err_body and err_body.get("error_key") == "comfyui.err.unsupported_args":
+            result["warning_key"] = err_body["error_key"]
+            result["warning_params"] = err_body.get("error_params", {})
+        else:
+            result["warning_key"] = "comfyui.warn.switch_restart"
 
     return jsonify(result)

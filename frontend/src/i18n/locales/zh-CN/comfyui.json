@@ -328,6 +328,7 @@
     "deleted": "已删除"
   },
   "err": {
+    "args_check_failed": "无法读取 ComfyUI 启动参数定义，ComfyUI 安装可能不完整，已取消本次操作",
     "internal": "服务器内部错误：{detail}",
     "invalid_extra_args": "extra_args 格式无效",
     "missing_delete_param": "缺少 delete 参数",
@@ -335,6 +336,7 @@
     "switch_failed": "版本切换失败：{detail}",
     "switch_not_git": "ComfyUI 不是 git 仓库，无法切换版本",
     "unreachable": "ComfyUI 无法连接",
+    "unsupported_args": "当前 ComfyUI 版本不支持启动参数：{flags}",
     "video_thumb_failed": "生成视频缩略图失败：{detail}"
   },
   "msg": {

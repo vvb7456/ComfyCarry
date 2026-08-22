@@ -92,7 +92,9 @@ async function loadStatus() {
 
 // Header actions
 async function comfyStart() {
-  if (!await post('/api/services/comfy/start')) return
+  // 走 /api/comfyui/restart (delete+start): 启动前校验参数, errored 进程也能
+  // 自愈; 不能用 /api/services/comfy/start —— pm2 start 沿用旧 dump 配置绕过校验。
+  if (!await post('/api/comfyui/restart')) return
   toast(t('comfyui.toast.starting'), 'info')
   setTimeout(() => { loadStatus(); paramsRef.value?.loadParams() }, 3000)
 }
