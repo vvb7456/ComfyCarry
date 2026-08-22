@@ -42,21 +42,20 @@
         "label": "VRAM 管理",
         "help": "控制模型显存分配策略。默认自动检测，High VRAM 适合大显存 GPU 不卸载模型，Low VRAM 适合小显存拆分推理。",
         "options": {
-          "default": "默认 (自动)",
-          "gpu-only": "GPU Only (全部保留在 GPU)",
-          "highvram": "High VRAM (模型不卸载)",
-          "normalvram": "Normal VRAM (强制正常模式)",
-          "lowvram": "Low VRAM (拆分 UNet)",
-          "novram": "No VRAM (极限低显存)"
+          "default": "默认",
+          "gpu-only": "GPU Only",
+          "highvram": "High VRAM",
+          "lowvram": "Low VRAM",
+          "novram": "No VRAM"
         }
       },
       "attention": {
         "label": "Attention 方案",
         "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。FlashAttention 和 SageAttention 可在 Setup Wizard 中安装。",
         "options": {
-          "default": "默认 (自动选择)",
-          "pytorch-cross": "PyTorch SDPA (推荐)",
-          "split-cross": "Split Cross Attention (省显存)",
+          "default": "默认",
+          "pytorch-cross": "PyTorch SDPA",
+          "split-cross": "Split Cross Attention",
           "quad-cross": "Sub-Quadratic",
           "flash": "FlashAttention",
           "sage": "SageAttention"
@@ -74,7 +73,7 @@
         "label": "UNet 精度",
         "help": "控制 UNet 推理精度。FP8 可明显降低显存占用，BF16 适合 Ampere 及更新架构。",
         "options": {
-          "default": "默认 (自动)",
+          "default": "默认",
           "fp32": "FP32",
           "fp16": "FP16",
           "bf16": "BF16",
@@ -87,18 +86,18 @@
         "label": "VAE 精度",
         "help": "控制 VAE 解码精度。FP32 最稳，FP16/BF16 更快；如果出现黑图，可尝试改回 FP32。",
         "options": {
-          "default": "默认 (自动)",
+          "default": "默认",
           "fp32": "FP32",
           "fp16": "FP16",
           "bf16": "BF16",
-          "cpu": "CPU (在 CPU 上运行)"
+          "cpu": "CPU"
         }
       },
       "text_enc_precision": {
         "label": "Text Encoder 精度",
         "help": "控制文本编码器精度。一般保持默认即可，FP8 可进一步节省显存。",
         "options": {
-          "default": "默认 (自动)",
+          "default": "默认",
           "fp32": "FP32",
           "fp16": "FP16",
           "bf16": "BF16",
@@ -129,7 +128,7 @@
         "help": "控制节点输出缓存方式。只有选择 LRU 时，下方的 LRU 缓存大小才会生效；经典模式更激进、更快，但占用更多内存。",
         "options": {
           "default": "默认",
-          "classic": "经典 (Aggressive)",
+          "classic": "经典",
           "lru": "LRU",
           "none": "禁用"
         }
