@@ -311,6 +311,12 @@ class ComfyWSBridge:
                 self._exec_info = None
                 self._last_progress = None
 
+            # ── ComfyUI-Manager 队列事件 (插件装/卸/更新进度) ──
+            # Manager 经 send_sync(sid=None) 广播, bridge 天然在收件人之列,
+            # 无需 ws_broadcast 插件。转发为下划线命名与其他事件风格一致。
+            elif msg_type == "cm-queue-status":
+                self._broadcast({"type": "cm_queue_status", "data": msg_data})
+
         except Exception:
             pass
 

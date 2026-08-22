@@ -12,6 +12,7 @@ ComfyCarry — 设置路由
 """
 
 import json
+import shutil
 import subprocess
 import threading
 import time
@@ -431,18 +432,17 @@ def api_settings_reinitialize():
     if comfy_dir.exists():
         try:
             if keep_models:
-                models_tmp = WORKSPACE_ROOT / ".models_backup"
-                models_src = comfy_dir / "models"
-                if models_src.exists():
-                    subprocess.run(f'mv "{models_src}" "{models_tmp}"',
-                                   shell=True, timeout=60)
-                subprocess.run(f'rm -rf "{comfy_dir}"', shell=True, timeout=120)
-                if models_tmp.exists():
-                    comfy_dir.mkdir(parents=True, exist_ok=True)
-                    subprocess.run(f'mv "{models_tmp}" "{models_src}"',
-                                   shell=True, timeout=60)
+                # 原地保留 models/input/output, 只删除 comfy_dir 下其余内容
+                # (不做 mv 备份/还原, 避免大目录移动耗时且中途失败丢数据)
+                for child in comfy_dir.iterdir():
+                    if child.name in ("models", "input", "output"):
+                        continue
+                    if child.is_dir() and not child.is_symlink():
+                        shutil.rmtree(child, ignore_errors=True)
+                    else:
+                        child.unlink(missing_ok=True)
             else:
-                subprocess.run(f'rm -rf "{comfy_dir}"', shell=True, timeout=120)
+                shutil.rmtree(comfy_dir)
         except Exception as e:
             errors.append(_err_item("reinit_clean_failed", detail=str(e)))
 

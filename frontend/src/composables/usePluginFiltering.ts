@@ -65,13 +65,19 @@ export function usePluginFiltering() {
   let observer: IntersectionObserver | null = null
 
   const unifiedPlugins = computed<PluginData[]>(() => {
-    const installedMap = new Map(installedPlugins.value.map((plugin) => [plugin.cnrId, plugin]))
+    // 大小写不敏感匹配: getlist 键保留注册表原始大小写 (如 "ComfyUI-WanVideoWrapper"),
+    // 而 installed 的 cnr_id 恒为小写 ("comfyui-wanvideowrapper")。精确匹配会把
+    // 同一插件拆成两行 —— 注册表行显示"未安装", 回退行才是真实状态。
+    const installedMap = new Map<string, InstalledPlugin>()
+    for (const plugin of installedPlugins.value) {
+      if (plugin.cnrId) installedMap.set(plugin.cnrId.toLowerCase(), plugin)
+    }
     const seen = new Set<string>()
     const result: PluginData[] = []
 
     for (const browseItem of browseItems.value) {
-      seen.add(browseItem.id)
-      const installed = installedMap.get(browseItem.id)
+      seen.add(browseItem.id.toLowerCase())
+      const installed = installedMap.get(browseItem.id.toLowerCase())
       result.push({
         id: browseItem.id,
         dirName: installed?.dirName || '',
@@ -92,7 +98,7 @@ export function usePluginFiltering() {
     }
 
     for (const plugin of installedPlugins.value) {
-      const key = plugin.cnrId || plugin.dirName
+      const key = (plugin.cnrId || plugin.dirName).toLowerCase()
       if (seen.has(key)) continue
 
       seen.add(key)

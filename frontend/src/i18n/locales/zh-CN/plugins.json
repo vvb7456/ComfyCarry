@@ -16,7 +16,9 @@
     "queued_uninstall": "已加入卸载队列",
     "queued_update": "已加入更新队列",
     "queued_update_all": "所有插件已加入更新队列",
-    "action_submitted": "操作已提交"
+    "action_submitted": "操作已提交",
+    "enabled": "启用指令已提交，重启后生效",
+    "disabled": "禁用指令已提交，重启后生效"
   },
   "tabs": {
     "git": "Git 安装"
@@ -71,5 +73,17 @@
   },
   "queue": {
     "status": "队列：{done}/{total} 完成"
+  },
+  "restart": {
+    "banner_msg": "插件变更已完成，需重启 ComfyUI 生效",
+    "pending_badge": "待生效",
+    "now": "立即重启",
+    "later": "稍后",
+    "restarting": "正在重启 ComfyUI，请稍候…",
+    "done": "ComfyUI 已重启，变更已生效",
+    "timeout": "等待 ComfyUI 恢复超时，请稍后手动检查状态"
+  },
+  "row": {
+    "dismiss_error": "知道了"
   }
 }

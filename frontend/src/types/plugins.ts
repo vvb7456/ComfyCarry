@@ -99,3 +99,34 @@ export interface QueueStatusResponse {
 export interface UpdateCheckResponse {
   has_updates?: boolean
 }
+
+// ── 待重启变更集 (pending_restart) ────────────────────────────
+
+export type PendingRestartChange = 'added' | 'removed' | 'changed'
+
+export interface PendingRestartPack {
+  /** custom_nodes 目录名 (installed 列表的键) */
+  id: string
+  change: PendingRestartChange
+  cnr_id?: string
+  aux_id?: string
+}
+
+export interface PendingRestartResponse {
+  needs_restart?: boolean
+  packs?: PendingRestartPack[]
+}
+
+// ── Manager 队列事件 (bridge 转发的 cm-queue-status) ─────────
+
+export interface CMQueueStatusData {
+  status?: 'in_progress' | 'done'
+  /** ui_id — 提交操作时前端生成的 uuid */
+  target?: string
+  ui_target?: string
+  /** ui_id → 'success' | 'skip' | 错误原文 */
+  nodepack_result?: Record<string, string>
+  model_result?: Record<string, string>
+  total_count?: number
+  done_count?: number
+}

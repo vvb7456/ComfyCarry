@@ -65,9 +65,9 @@
   "reinit": {
     "title": "重新初始化",
     "help": "删除 ComfyUI 并重新进入部署向导。系统依赖和 PyTorch 保留",
-    "keep_models": "保留模型文件",
+    "keep_models": "保留模型文件与产物",
     "btn": "重新初始化",
-    "confirm_keep": "确定要重新初始化吗？\n\n将删除 ComfyUI 安装（保留模型文件），停止 ComfyUI 和同步服务，重新进入部署向导。\n\n系统依赖、PyTorch、Tunnel 不受影响。",
+    "confirm_keep": "确定要重新初始化吗？\n\n将删除 ComfyUI 安装（保留 models/input/output 中的模型文件与产物），停止 ComfyUI 和同步服务，重新进入部署向导。\n\n系统依赖、PyTorch、Tunnel 不受影响。",
     "confirm_delete": "确定要重新初始化吗？\n\n将删除整个 ComfyUI 目录（包括所有模型文件），停止 ComfyUI 和同步服务，重新进入部署向导。\n\n模型文件将被永久删除！",
     "confirm_delete_final": "所有模型文件将被永久删除，无法恢复。\n\n确定继续？",
     "in_progress": "正在重新初始化...",

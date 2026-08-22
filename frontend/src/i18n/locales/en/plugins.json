@@ -16,7 +16,9 @@
     "queued_uninstall": "Added to uninstall queue",
     "queued_update": "Added to update queue",
     "queued_update_all": "All plugins added to update queue",
-    "action_submitted": "Action submitted"
+    "action_submitted": "Action submitted",
+    "enabled": "Enable request submitted — takes effect after restart",
+    "disabled": "Disable request submitted — takes effect after restart"
   },
   "tabs": {
     "git": "Git Install"
@@ -71,5 +73,17 @@
   },
   "queue": {
     "status": "Queue: {done}/{total} done"
+  },
+  "restart": {
+    "banner_msg": "Plugin changes completed — restart ComfyUI to apply",
+    "pending_badge": "Pending",
+    "now": "Restart Now",
+    "later": "Later",
+    "restarting": "Restarting ComfyUI, please wait…",
+    "done": "ComfyUI restarted, changes applied",
+    "timeout": "Timed out waiting for ComfyUI — please check its status manually"
+  },
+  "row": {
+    "dismiss_error": "Dismiss"
   }
 }

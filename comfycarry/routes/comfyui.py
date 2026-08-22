@@ -180,6 +180,17 @@ def api_comfyui_params_update():
     return jsonify({"ok": True, "args": args_str})
 
 
+@bp.route("/api/comfyui/restart", methods=["POST"])
+def api_comfyui_restart():
+    """重启 ComfyUI (pm2 delete + start, 沿用已保存的启动参数, 保留 --log)。
+
+    供插件管理等场景独立触发重启; 参数页的重启走 params POST (保存+重启)。
+    """
+    if not restart_comfyui():
+        return _err("internal", 500)
+    return jsonify({"ok": True})
+
+
 # ====================================================================
 # 队列/控制
 # ====================================================================

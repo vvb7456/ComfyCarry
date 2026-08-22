@@ -65,9 +65,9 @@
   "reinit": {
     "title": "Re-initialize",
     "help": "Delete ComfyUI and return to setup wizard. System dependencies and PyTorch are preserved",
-    "keep_models": "Keep model files",
+    "keep_models": "Keep model files & outputs",
     "btn": "Re-initialize",
-    "confirm_keep": "Re-initialize?\n\nThis will delete ComfyUI installation (keeping model files), stop ComfyUI and sync services, and return to the setup wizard.\n\nSystem dependencies, PyTorch, and Tunnel are not affected.",
+    "confirm_keep": "Re-initialize?\n\nThis will delete the ComfyUI installation (keeping model files and outputs in models/input/output), stop ComfyUI and sync services, and return to the setup wizard.\n\nSystem dependencies, PyTorch, and Tunnel are not affected.",
     "confirm_delete": "Re-initialize?\n\nThis will delete the entire ComfyUI directory (including all model files), stop ComfyUI and sync services, and return to the setup wizard.\n\nModel files will be permanently deleted!",
     "confirm_delete_final": "All model files will be permanently deleted and cannot be recovered.\n\nContinue?",
     "in_progress": "Re-initializing...",
