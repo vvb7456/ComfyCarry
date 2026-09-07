@@ -169,3 +169,40 @@ export interface ApiOkResponse {
   message?: string
   error?: string
 }
+
+// ── OAuth 授权会话 (网盘「登录授权」向导, spec §2.2) ──────────
+
+/**
+ * 授权会话状态机 (后端 OAuthSessionManager 单例):
+ * idle → starting → url_ready → exchanging → done, 失败/超时/取消 → error/idle
+ */
+export type OAuthPhase = 'idle' | 'starting' | 'url_ready' | 'exchanging' | 'done' | 'error'
+
+/** GET /api/sync/remote/oauth/status 响应 (轮询, 2s) */
+export interface OAuthStatusResponse {
+  phase: OAuthPhase
+  /** phase=url_ready 时的供应商授权页 URL (后端已完成 307 解析, 非容器本机 /auth 链接) */
+  provider_url?: string
+  /** phase=error 时的原始错误 */
+  error?: string
+  /** 当前会话的 remote 类型 (409 恢复时判断会话是否属于当前选择的类型) */
+  remote_type?: string
+}
+
+/**
+ * POST /api/sync/remote/oauth/{start,paste,cancel} 响应。
+ * 成功: {ok:true, phase:...}; 失败沿用 ApiOkResponse 错误信封。
+ * token 永不出现在这些响应里 (spec §2.2 铁律)。
+ */
+export interface OAuthSessionResponse extends ApiOkResponse {
+  phase?: OAuthPhase
+}
+
+/** POST /api/sync/remote/create 请求体 — oauth=true 时后端从刚完成的授权会话取 token */
+export interface RemoteCreateRequest {
+  name: string
+  type: string
+  params?: Record<string, string>
+  /** true = 走 OAuth 会话创建 (token 全程在后端, 前端不经手) */
+  oauth?: boolean
+}

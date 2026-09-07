@@ -461,8 +461,14 @@ REMOTE_TYPE_DEFS = {
     },
     "drive": {
         "label": "Google Drive", "oauth": True,
-        "fields": [{"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
-                     "help": "在本地执行 <code>rclone authorize \"drive\"</code> 获取 token JSON"}],
+        "fields": [
+            {"key": "client_id", "label": "Client ID", "type": "text",
+             "help": "可选。rclone 共享 client_id 将于 2026 年退役, 建议自建: https://rclone.org/drive/#making-your-own-client_id"},
+            {"key": "client_secret", "label": "Client Secret", "type": "text",
+             "help": "与 Client ID 配套, 见 https://rclone.org/drive/#making-your-own-client_id"},
+            {"key": "token", "label": "OAuth Token", "type": "textarea", "required": True,
+             "help": "在本地执行 <code>rclone authorize \"drive\"</code> 获取 token JSON"},
+        ],
     },
     "dropbox": {
         "label": "Dropbox", "oauth": True,

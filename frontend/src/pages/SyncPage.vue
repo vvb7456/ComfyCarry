@@ -14,6 +14,7 @@ import StatusDot from '@/components/ui/StatusDot.vue'
 import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
 import CompanionPanel from '@/components/sync/CompanionPanel.vue'
 import PathBrowserModal from '@/components/sync/PathBrowserModal.vue'
+import OAuthWizard from '@/components/sync/OAuthWizard.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -284,6 +285,17 @@ function onRemoteTypeChange() {
   }
 }
 
+/** remote 创建成功后的统一收尾 (普通表单与 OAuth 向导共用): 关 modal + 刷新列表 */
+async function onRemoteCreated() {
+  toast(t('sync.remote.created'), 'success')
+  addRemoteModal.value = false
+  newRemoteName.value = ''
+  newRemoteType.value = ''
+  newRemoteParams.value = {}
+  await loadRemotes()
+  loadStorageAll()
+}
+
 async function submitAddRemote() {
   const name = newRemoteName.value.trim()
   if (!name || !newRemoteType.value) {
@@ -307,13 +319,7 @@ async function submitAddRemote() {
   try {
     const d = await post<ApiOkResponse>('/api/sync/remote/create', { name, type: newRemoteType.value, params: newRemoteParams.value })
     if (d?.ok) {
-      toast(t('sync.remote.created'), 'success')
-      addRemoteModal.value = false
-      newRemoteName.value = ''
-      newRemoteType.value = ''
-      newRemoteParams.value = {}
-      await loadRemotes()
-      loadStorageAll()
+      await onRemoteCreated()
     } else if (d) {
       toast(apiErrorText(d, t('sync.remote.create_failed')), 'error')
     }
@@ -614,8 +620,19 @@ async function switchTab(tab: string) {
       <FormField :label="t('sync.remote.type')" density="compact">
         <BaseSelect v-model="newRemoteType" :options="remoteTypeOptions" :placeholder="t('sync.remote.select_type')" teleport @change="onRemoteTypeChange" />
       </FormField>
-      <!-- Dynamic fields -->
-      <template v-if="remoteTypeDef">
+      <!-- oauth 类型: 内容整体替换为「登录授权」向导 (名称/类型沿用上方两个字段);
+           关闭/取消的会话清理由向导内部通过 model-value watcher 统一处理 -->
+      <OAuthWizard
+        v-if="remoteTypeDef?.oauth"
+        :model-value="addRemoteModal"
+        :types="remoteTypes"
+        :name="newRemoteName"
+        :type="newRemoteType"
+        @created="onRemoteCreated"
+        @cancel="addRemoteModal = false"
+      />
+      <!-- Dynamic fields (非 oauth 类型, 行为不变) -->
+      <template v-else-if="remoteTypeDef">
         <template v-for="field in remoteTypeDef.fields || []" :key="field.key">
           <FormField density="compact" :hint="(field.help && !(field.key === 'token' && remoteTypeDef?.oauth)) ? field.help : undefined">
             <template #label>
@@ -628,7 +645,7 @@ async function switchTab(tab: string) {
           </FormField>
         </template>
       </template>
-      <template #footer>
+      <template v-if="!remoteTypeDef?.oauth" #footer>
         <BaseButton size="sm" :disabled="addRemoteLoading" @click="addRemoteModal = false">{{ t('common.btn.cancel') }}</BaseButton>
         <BaseButton variant="primary" size="sm" :disabled="addRemoteLoading" @click="submitAddRemote">
           {{ addRemoteLoading ? t('sync.remote.connecting') : t('common.btn.add') }}

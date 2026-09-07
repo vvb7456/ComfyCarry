@@ -4,6 +4,7 @@ ComfyCarry — Cloud Sync v2 路由
 - /api/sync/status           — Worker 状态 & 规则 & 模板 & 日志
 - /api/sync/remotes          — rclone remote 列表
 - /api/sync/remote/create|delete|browse — Remote 管理
+- /api/sync/remote/oauth/*   — OAuth authorize 中继 (start/status/paste/cancel)
 - /api/sync/remote/types     — Remote 类型定义
 - /api/sync/storage          — 容量查询
 - /api/sync/rules/save|run   — 规则保存/执行
@@ -17,6 +18,9 @@ import re
 import subprocess
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
 import requests
 from flask import Blueprint, jsonify, request, Response
@@ -135,6 +139,260 @@ def api_sync_logs_stream():
 
 
 # ====================================================================
+# OAuth relay — 面板代跑 `rclone authorize`
+#
+# rclone authorize 会在本机 127.0.0.1:53682 起一个一次性 webserver 等回调,
+# 但用户浏览器根本够不到容器里的这个端口, 所以由后端中转:
+#   1. start:   Popen 拉起 rclone authorize (--auth-no-open-browser);
+#   2. rclone 往 stderr 打 /auth 链接 → 后端 GET 一次, 307 的 Location
+#      就是供应商真实授权页, 经 status 交给前端展示;
+#   3. 用户授权后被 302 到 127.0.0.1:53682/?code=..&state=.. (浏览器打不开,
+#      复制地址栏粘回面板) → paste 把 query 原样转发给 rclone;
+#   4. rclone 校验 state、换 token, stdout 打印 ---> {json} <---End paste
+#      后退出。token 只存内存会话、建远程时并入 argv, 绝不进任何 HTTP 响应。
+# ====================================================================
+_OAUTH_AUTH_URL_RE = re.compile(r'http://127\.0\.0\.1:53682/auth\?state=\S+')
+# paste 的转发目标硬编码 —— 用户粘贴 URL 里的 host/port 一律不采信, 否则
+# code/state 会被塞给任意内网端点 (SSRF)
+_OAUTH_CALLBACK_TARGET = "http://127.0.0.1:53682/"
+_OAUTH_SESSION_TIMEOUT = 600  # 秒。懒超时: 只在 status/paste 处理时顺手检查
+_OAUTH_ACTIVE_PHASES = ("starting", "url_ready", "exchanging")
+
+
+class _OAuthNoRedirect(urllib.request.HTTPRedirectHandler):
+    """禁跟随重定向: redirect_request 返回 None 时 3xx 会以 HTTPError 抛出,
+    Location 头就挂在异常对象上。"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OAUTH_OPENER = urllib.request.build_opener(_OAuthNoRedirect)
+
+# 单活动会话: 一个 dict + 一把锁, 不做状态机类。start/cancel 时整个换新
+# dict —— 旧会话的读线程还攥着旧对象引用, 写它不影响新会话。
+_oauth_lock = threading.Lock()
+_oauth_session: dict = {"phase": "idle"}
+
+
+def _oauth_fetch_provider_url(auth_url: str) -> str | None:
+    """GET rclone 的 /auth 链接, 取 307 的 Location = 供应商真实授权 URL。"""
+    try:
+        _OAUTH_OPENER.open(auth_url, timeout=15)
+    except urllib.error.HTTPError as e:
+        if 300 <= e.code < 400:
+            return e.headers.get("Location")
+    except Exception:
+        pass
+    return None
+
+
+def _oauth_maybe_capture_url(sess: dict, line: str):
+    """输出行里出现 /auth 链接就换成供应商授权 URL 存会话。
+    NOTICE 在 stderr, 个别版本走 stdout, 两个读线程都调这里兜底。"""
+    m = _OAUTH_AUTH_URL_RE.search(line)
+    if not m or sess.get("provider_url"):
+        return
+    provider = _oauth_fetch_provider_url(m.group(0))
+    with _oauth_lock:
+        if provider:
+            sess["provider_url"] = provider
+            if sess.get("phase") == "starting":
+                sess["phase"] = "url_ready"
+
+
+def _oauth_pick_error(err_lines: list[str]) -> str:
+    """从 rclone 输出里挑一行像样的错误 (端口占用要原样透传)。"""
+    lines = [l for l in err_lines if l.strip()]
+    in_use = [l for l in lines if "address already in use" in l.lower()]
+    if in_use:
+        return in_use[-1]
+    lines = [l for l in lines if "DEBUG" not in l] or lines
+    return lines[-1] if lines else ""
+
+
+def _oauth_read_stderr(proc, sess: dict, err_lines: list):
+    """读 stderr: 收诊断行 + 侦测 /auth 链接。进程退出后 readline 到 EOF,
+    线程自然结束。"""
+    for line in iter(proc.stderr.readline, ""):
+        line = line.rstrip("\n")
+        err_lines.append(line)
+        _oauth_maybe_capture_url(sess, line)
+
+
+def _oauth_read_stdout(proc, sess: dict, err_lines: list, t_err: threading.Thread):
+    """读 stdout: 截 ---> / <---End paste 之间的 token JSON 存会话 (永不外发);
+    进程退出后按退出码 + token 解析结果定夺 done / error。"""
+    token_lines: list[str] | None = None
+    for line in iter(proc.stdout.readline, ""):
+        line = line.rstrip("\n")
+        if token_lines is not None:
+            if "<---End paste" in line:
+                token = "\n".join(token_lines).strip()
+                try:
+                    json.loads(token)
+                except ValueError:
+                    token = ""
+                if token:
+                    with _oauth_lock:
+                        sess["token"] = token
+                token_lines = None
+            elif line.strip():
+                token_lines.append(line)
+            continue
+        if re.search(r'--->\s*$', line):
+            token_lines = []
+            continue
+        _oauth_maybe_capture_url(sess, line)
+
+    code = proc.wait()
+    t_err.join(timeout=10)  # 等诊断输出收完再定夺
+    with _oauth_lock:
+        if sess.get("phase") == "error":  # timeout/cancel 已标记, 不覆盖
+            return
+        if sess.get("token"):
+            sess["phase"] = "done"
+            return
+        sess["phase"] = "error"
+        sess["error"] = _oauth_pick_error(err_lines) or f"rclone exit code {code}"
+
+
+def _oauth_check_timeout():
+    """懒超时: 会话太老且进程还吊着就杀掉。调用方需持有 _oauth_lock。"""
+    sess = _oauth_session
+    proc = sess.get("proc")
+    if (sess.get("phase") in _OAUTH_ACTIVE_PHASES and proc
+            and proc.poll() is None
+            and time.time() - sess.get("created", 0) > _OAUTH_SESSION_TIMEOUT):
+        proc.kill()
+        sess["phase"] = "error"
+        sess["error"] = "timeout"
+
+
+def _oauth_spawn(remote_type: str, client_id: str, client_secret: str) -> dict:
+    """拉起 rclone authorize + 两个读线程。调用方需持有 _oauth_lock。"""
+    global _oauth_session
+    cmd = ["rclone", "authorize", remote_type]
+    if remote_type == "drive" and client_id and client_secret:
+        cmd += [client_id, client_secret]
+    cmd.append("--auth-no-open-browser")
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, errors="replace")
+    sess = {
+        "phase": "starting",
+        "proc": proc,
+        "remote_type": remote_type,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "provider_url": None,
+        "token": None,
+        "error": None,
+        "created": time.time(),
+    }
+    _oauth_session = sess
+    err_lines: list[str] = []
+    t_err = threading.Thread(target=_oauth_read_stderr,
+                             args=(proc, sess, err_lines), daemon=True)
+    t_err.start()
+    threading.Thread(target=_oauth_read_stdout,
+                     args=(proc, sess, err_lines, t_err), daemon=True).start()
+    return sess
+
+
+@bp.route("/api/sync/remote/oauth/start", methods=["POST"])
+def api_sync_oauth_start():
+    """开始 OAuth 授权: 拉起 rclone authorize, 之后轮询 status 拿授权页 URL。"""
+    data = request.get_json(force=True)
+    rtype = (data.get("type") or "").strip()
+    tdef = REMOTE_TYPE_DEFS.get(rtype)
+    if not tdef or not tdef.get("oauth"):
+        return _err("invalid_type")
+    client_id = (data.get("client_id") or "").strip()
+    client_secret = (data.get("client_secret") or "").strip()
+    with _oauth_lock:
+        sess = _oauth_session
+        proc = sess.get("proc")
+        if (sess.get("phase") in _OAUTH_ACTIVE_PHASES
+                and proc and proc.poll() is None):
+            return _err("session_active", 409)
+        # 起新会话前清场: 本会话残留进程 + 上次没杀干净的孤儿 authorize
+        if proc and proc.poll() is None:
+            proc.kill()
+        try:
+            subprocess.run(["pkill", "-f", "rclone authorize"],
+                           capture_output=True, timeout=5)
+        except Exception:
+            pass
+        try:
+            _oauth_spawn(rtype, client_id, client_secret)
+        except Exception as e:
+            return _err("oauth_start_failed", 500, detail=str(e))
+    return jsonify({"ok": True, "phase": "starting"})
+
+
+@bp.route("/api/sync/remote/oauth/status")
+def api_sync_oauth_status():
+    """轮询授权进度。phase:
+    idle → starting → url_ready → (paste) exchanging → done / error"""
+    with _oauth_lock:
+        _oauth_check_timeout()
+        sess = _oauth_session
+        out = {"phase": sess.get("phase", "idle")}
+        for k in ("remote_type", "provider_url", "error"):
+            if sess.get(k):
+                out[k] = sess[k]
+    return jsonify(out)
+
+
+@bp.route("/api/sync/remote/oauth/paste", methods=["POST"])
+def api_sync_oauth_paste():
+    """用户把回调 URL (浏览器打不开的那条) 粘回面板, 后端替浏览器 GET 一次。
+    转发成功只是进入 exchanging, 最终成败由 status 轮询 (退出码 + token)。"""
+    data = request.get_json(force=True)
+    url = (data.get("url") or "").strip()
+    try:
+        qs = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+    except ValueError:
+        return _err("invalid_callback")
+    # 只认回调该有的四个键, 其余参数一律丢弃
+    pick = {k: qs[k][0] for k in ("code", "state", "error", "error_description")
+            if qs.get(k)}
+    if not pick.get("code") or not pick.get("state"):
+        return _err("invalid_callback")
+    with _oauth_lock:
+        _oauth_check_timeout()
+        if _oauth_session.get("phase") != "url_ready":
+            return _err("oauth_paste_not_ready", 409)
+        # 目标是常量, 用户 URL 解析出的 host/port 绝不参与
+        target = f"{_OAUTH_CALLBACK_TARGET}?{urllib.parse.urlencode(pick)}"
+    try:
+        _OAUTH_OPENER.open(target, timeout=30)
+    except urllib.error.HTTPError as e:
+        # 3xx 是我们故意不跟随的结果, 同样算 "rclone 已收到回调"
+        if not 200 <= e.code < 400:
+            return _err("oauth_callback_rejected", 400, detail=f"HTTP {e.code}")
+    except Exception as e:
+        return _err("oauth_relay_unreachable", 502, detail=str(e))
+    with _oauth_lock:
+        if _oauth_session.get("phase") == "url_ready":
+            _oauth_session["phase"] = "exchanging"
+            return jsonify({"ok": True, "phase": "exchanging"})
+    return _err("oauth_paste_not_ready", 409)
+
+
+@bp.route("/api/sync/remote/oauth/cancel", methods=["POST"])
+def api_sync_oauth_cancel():
+    """放弃当前授权会话, 杀进程回 idle。"""
+    global _oauth_session
+    with _oauth_lock:
+        proc = _oauth_session.get("proc")
+        if proc and proc.poll() is None:
+            proc.kill()
+        _oauth_session = {"phase": "idle"}
+    return jsonify({"ok": True, "phase": "idle"})
+
+
+# ====================================================================
 # Remote 管理
 # ====================================================================
 # rclone.conf 里可以下发给前端的配置项白名单。其余一律不出后端 ——
@@ -164,10 +422,28 @@ def api_sync_remotes():
 
 @bp.route("/api/sync/remote/create", methods=["POST"])
 def api_sync_remote_create():
+    global _oauth_session
     data = request.get_json(force=True)
     name = data.get("name", "").strip()
     rtype = data.get("type", "").strip()
     params = data.get("params", {})
+    oauth_used = bool(data.get("oauth"))
+
+    # OAuth 中继建远程: token 从 authorize 会话取 (前端只有 URL/状态,
+    # token 永不经前端回传)。会话须已 done 且类型一致; 失败路径保留会话,
+    # 修好参数 (如改名) 可直接重试, 不必重新授权。
+    if oauth_used:
+        with _oauth_lock:
+            sess = _oauth_session
+            if (sess.get("phase") != "done" or sess.get("remote_type") != rtype
+                    or not sess.get("token")):
+                return _err("oauth_not_ready", 409)
+            params = dict(params)
+            params["token"] = sess["token"]
+            if sess.get("client_id"):
+                params["client_id"] = sess["client_id"]
+            if sess.get("client_secret"):
+                params["client_secret"] = sess["client_secret"]
 
     if not name or not rtype:
         return _err("name_type_required")
@@ -222,6 +498,11 @@ def api_sync_remote_create():
                        capture_output=True, text=True, timeout=10)
         return _err("conn_test_failed", 400, detail=str(e))
 
+    if oauth_used:
+        # 成功后清会话, token 不在内存多留
+        with _oauth_lock:
+            if _oauth_session.get("phase") == "done":
+                _oauth_session = {"phase": "idle"}
     return _ok("remote_created", params={"name": name})
 
 
