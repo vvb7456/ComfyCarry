@@ -101,7 +101,7 @@ def api_setup_save():
         "install_fa2", "install_sa2",
         "wizard_sync_rules", "wizard_remotes",
         "_imported_sync_rules", "_imported_sync_rules_count",
-        "ssh_password", "ssh_keys", "ssh_pw_sync",
+        "ssh_keys", "ssh_pw_follow",
         "llm_provider", "llm_api_key", "llm_base_url", "llm_model",
     }
     for k, v in data.items():

@@ -290,7 +290,7 @@ const connInfo = computed(() => {
     <div v-else class="not-configured-hint">
       <BaseCard density="roomy">
         <EmptyState icon="language" :message="t('tunnel.setup_hint.not_configured')">
-          <BaseButton variant="primary" size="sm" @click="router.push({ name: 'settings-tunnel' })">
+          <BaseButton variant="primary" size="sm" @click="router.push({ name: 'settings', query: { section: 'connect', focus: 'tunnel' } })">
             <MsIcon name="settings" /> {{ t('tunnel.setup_hint.open_settings') }}
           </BaseButton>
         </EmptyState>

@@ -2,7 +2,7 @@
   "title": "SSH",
   "tabs": {
     "status": "Service & Logs",
-    "config": "Keys & Passwords"
+    "config": "Keys"
   },
   "status": {
     "running": "Running",
@@ -35,19 +35,6 @@
     "add_submit": "Add",
     "delete_btn": "Delete key"
   },
-  "password": {
-    "title": "Root Password",
-    "new": "New Password",
-    "confirm": "Confirm Password",
-    "set_btn": "Set Password",
-    "use_comfycarry": "Use ComfyCarry Password",
-    "help": "Setting a password will enable password auth, PermitRootLogin, and restart sshd",
-    "synced": "SSH password synced to ComfyCarry password",
-    "set_success": "Password set",
-    "too_short": "Password must be at least 4 characters",
-    "sync_btn": "Sync Password",
-    "sshd_restarted_suffix": ", password auth enabled and sshd restarted"
-  },
   "log": {
     "title": "SSH Logs"
   },
@@ -56,10 +43,9 @@
     "no_key": "No public key provided",
     "no_fingerprint": "No fingerprint specified",
     "key_not_found": "No matching public key found",
-    "password_empty": "Password cannot be empty",
-    "password_not_set": "ComfyCarry password is not set, cannot sync",
-    "password_too_short": "Password must be at least 4 characters",
-    "set_password_failed": "Failed to set password: {detail}",
+    "password_not_set": "ComfyCarry password is not set, cannot enable password follow",
+    "set_password_failed": "Failed to set SSH password",
+    "lockout_risk": "No public key configured; disabling password login may lock you out of SSH",
     "start_failed": "Failed to start: {detail}",
     "stop_failed": "Failed to stop sshd",
     "restart_failed": "Failed to restart sshd"
@@ -75,8 +61,6 @@
   "toast": {
     "action_ok": "Action submitted",
     "key_added": "Added {n} key(s)",
-    "key_deleted": "Key deleted",
-    "pw_empty": "Please enter a new password",
-    "pw_mismatch": "Passwords do not match"
+    "key_deleted": "Key deleted"
   }
 }

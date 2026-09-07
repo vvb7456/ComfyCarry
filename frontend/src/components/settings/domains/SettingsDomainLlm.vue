@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * 设置 tab: LLM — Provider/模型/参数。
- * group 式布局; 守卫经 useSettingsGuard 注册给 shell。
+ * 设置模块: LLM 服务 — Provider/模型/参数。
+ * 单页 v3: 模块头 dirty 时浮现保存, 无放弃按钮; onMounted 加载 + 本地 skeleton/错误重试;
+ * dirty 经 useSettingsGuard 只读登记, 离开守卫由 SettingsPage 统一处理。
  * 模型下拉展开时自动刷新一次模型列表 (无刷新按钮)。
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import SettingsGroup from '@/components/settings/SettingsGroup.vue'
+import SettingsModule from '@/components/settings/SettingsModule.vue'
 import SettingsGroupToggleRow from '@/components/settings/SettingsGroupToggleRow.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -15,11 +16,11 @@ import HelpTip from '@/components/ui/HelpTip.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
-import { useSettingsGuard } from '@/composables/useSettingsGuard'
+import { useSettingsGuard } from '@/composables'
 import { apiErrorText, type ApiErrorBody } from '@/utils/apiError'
 import type { LlmProviderConfig, ModelOption, LlmConfigData } from '@/types/settings'
 
-defineOptions({ name: 'SettingsTabLlm' })
+defineOptions({ name: 'SettingsDomainLlm' })
 
 const { t } = useI18n({ useScope: 'global' })
 const { get, put, post } = useApiFetch()
@@ -258,157 +259,172 @@ async function testLlmConnection() {
   }
 }
 
-// ─── 守卫注册 ──
-const guardHub = useSettingsGuard()
-const provider = {
-  isDirty: () => llmFormDirty.value,
-  isSaving: () => llmSaving.value,
-  save: saveLlmConfig,
-  discard: async () => {
-    try { await loadLlmTab() } finally { llmSnapshot.value = snapshotLlm() }
-  },
+// ─── 卡片级保存/放弃 ──
+async function save(): Promise<boolean> {
+  return saveLlmConfig()
 }
 
-// ─── 加载失败态 (async setup 由 Suspense 门控首渲, 失败显示错误+重试) ──
+// ── 放弃: 走离开守卫「放弃并离开」(组件卸载即丢), 模块内不提供按钮 ──
+
+// ─── onMounted 加载 (替代 async setup; skeleton 门控首渲防默认值跳变) ──
+const loading = ref(true)
 const loadError = ref(false)
 
-async function retryLoad(): Promise<void> {
+async function loadAll(): Promise<void> {
+  loading.value = true
   await loadLlmTab()
+  loading.value = false
 }
 
-// async setup: 数据就绪后才挂载渲染
-await loadLlmTab()
-onMounted(() => guardHub.register(provider))
-onUnmounted(() => guardHub.unregister(provider))
+// ─── dirty 登记 (只读) ──
+const guardHub = useSettingsGuard()
+const dirtyEntry = {
+  id: 'llm',
+  label: () => t('settings.domains.llm'),
+  isDirty: () => llmFormDirty.value,
+}
+
+onMounted(() => {
+  guardHub.register(dirtyEntry)
+  void loadAll()
+})
+onUnmounted(() => guardHub.unregister(dirtyEntry))
 </script>
 
 <template>
-  <div class="tab-panel settings-centered">
+  <SettingsModule
+    id="settings-focus-llm"
+    :title="t('settings.domains.llm')"
+    :dirty="llmFormDirty"
+    :saving="llmSaving"
+    :disabled="loading || loadError"
+    @save="save"
+  >
+
+    <div v-if="loading" class="settings-skeleton" aria-hidden="true">
+      <div v-for="i in 3" :key="i" class="settings-skeleton__row">
+        <div class="settings-skeleton__lines">
+          <div class="settings-skeleton__line settings-skeleton__line--text" />
+          <div class="settings-skeleton__line settings-skeleton__line--text-sm" />
+        </div>
+        <div class="settings-skeleton__line settings-skeleton__line--control" />
+      </div>
+    </div>
+
     <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
-    <SettingsGroup v-if="loadError">
+    <div v-else-if="loadError">
       <EmptyState icon="cloud_off" :message="t('common.load_failed')">
-        <BaseButton size="sm" @click="retryLoad">{{ t('common.btn.retry') }}</BaseButton>
+        <BaseButton size="sm" @click="loadAll">{{ t('common.btn.retry') }}</BaseButton>
       </EmptyState>
-    </SettingsGroup>
+    </div>
 
-    <SettingsGroup
-      v-else
-      icon="smart_toy"
-      :title="t('settings.llm.provider.title')"
-      :help="t('settings.llm.provider.help')"
-    >
+    <div v-else class="settings-lines">
       <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.llm.provider.label') }}</div>
-          <div class="settings-row__desc">{{ t('settings.llm.provider.label_desc') }}</div>
-        </div>
-        <div class="settings-row__control">
-          <BaseSelect
-            v-model="llmProvider"
-            :options="llmProviderOptions"
-            :placeholder="t('settings.llm.provider.select_placeholder')"
-            @change="onLlmProviderChange"
-          />
-        </div>
-      </div>
-      <div v-if="showLlmBaseUrl" class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.llm.provider.base_url') }}</div>
-          <div class="settings-row__desc">{{ llmBaseUrlHelp }}</div>
-        </div>
-        <div class="settings-row__control">
-          <input type="url" v-model="llmBaseUrl" class="form-input" :placeholder="llmBaseUrlPlaceholder" />
-        </div>
-      </div>
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.llm.provider.api_key') }}</div>
-          <div class="settings-row__desc">{{ t('settings.llm.provider.api_key_desc') }}</div>
-        </div>
-        <div class="settings-row__control">
-          <SecretInput
-            v-model="llmApiKey"
-            :placeholder="t('settings.llm.provider.api_key_placeholder')"
-            autocomplete="off"
-          />
-        </div>
-      </div>
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">
-            {{ t('settings.llm.model.label') }}
-            <HelpTip :text="t('settings.llm.model.model_help')" />
+          <div class="settings-row__text">
+            <div class="settings-row__label">
+              {{ t('settings.llm.provider.label') }}
+              <HelpTip :text="t('settings.llm.provider.help')" />
+            </div>
+            <div class="settings-row__desc">{{ t('settings.llm.provider.label_desc') }}</div>
           </div>
-          <div v-if="llmModelInfo" class="settings-row__desc">{{ llmModelInfo }}</div>
+          <div class="settings-row__control">
+            <BaseSelect
+              v-model="llmProvider"
+              :options="llmProviderOptions"
+              :placeholder="t('settings.llm.provider.select_placeholder')"
+              @change="onLlmProviderChange"
+            />
+          </div>
         </div>
-        <div class="settings-row__control">
-          <BaseSelect
-            v-model="llmModel"
-            :options="llmModelSelectOptions"
-            searchable
-            allow-custom
-            :placeholder="t('settings.llm.model.input_placeholder')"
-            :search-placeholder="t('settings.llm.model.search_placeholder')"
-            :empty-text="t('settings.llm.model.no_match')"
-            @change="selectLlmModel"
-            @open="onModelSelectOpen"
-          />
+        <div v-if="showLlmBaseUrl" class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.llm.provider.base_url') }}</div>
+            <div class="settings-row__desc">{{ llmBaseUrlHelp }}</div>
+          </div>
+          <div class="settings-row__control">
+            <input type="url" v-model="llmBaseUrl" class="form-input" :placeholder="llmBaseUrlPlaceholder" />
+          </div>
         </div>
-      </div>
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.llm.provider.api_key') }}</div>
+            <div class="settings-row__desc">{{ t('settings.llm.provider.api_key_desc') }}</div>
+          </div>
+          <div class="settings-row__control">
+            <SecretInput
+              v-model="llmApiKey"
+              :placeholder="t('settings.llm.provider.api_key_placeholder')"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">
+              {{ t('settings.llm.model.label') }}
+              <HelpTip :text="t('settings.llm.model.model_help')" />
+            </div>
+            <div v-if="llmModelInfo" class="settings-row__desc">{{ llmModelInfo }}</div>
+          </div>
+          <div class="settings-row__control settings-row__control--stack">
+            <div class="settings-row__control-row">
+              <BaseSelect
+                v-model="llmModel"
+                :options="llmModelSelectOptions"
+                searchable
+                allow-custom
+                :placeholder="t('settings.llm.model.input_placeholder')"
+                :search-placeholder="t('settings.llm.model.search_placeholder')"
+                :empty-text="t('settings.llm.model.no_match')"
+                @change="selectLlmModel"
+                @open="onModelSelectOpen"
+              />
+              <BaseButton size="sm" :loading="llmTesting" :title="t('settings.llm.test_title')" @click="testLlmConnection">
+                {{ t('settings.llm.test_btn') }}
+              </BaseButton>
+            </div>
+            <div
+              v-if="llmTestResult"
+              class="settings-row__feedback"
+              :class="llmTestResult.ok ? 'settings-row__feedback--ok' : 'settings-row__feedback--err'"
+            >
+              {{ llmTestResult.ok ? '✓' : '✗' }} {{ llmTestResult.message }}
+            </div>
+          </div>
+        </div>
 
-      <!-- 测试连接: 动作行 (title+subtitle 左 + 按钮右, 结果为 feedback 文案) -->
-      <div class="settings-action">
-        <div class="settings-action__text">
-          <div class="settings-action__title">{{ t('settings.llm.test_title') }}</div>
-          <div class="settings-row__desc">{{ t('settings.llm.test_desc') }}</div>
-          <div
-            v-if="llmTestResult"
-            class="settings-row__feedback"
-            :class="llmTestResult.ok ? 'settings-row__feedback--ok' : 'settings-row__feedback--err'"
-          >
-            {{ llmTestResult.ok ? '✓' : '✗' }} {{ llmTestResult.message }}
-          </div>
-        </div>
-        <BaseButton size="sm" :loading="llmTesting" @click="testLlmConnection">
-          {{ t('settings.llm.test_btn') }}
-        </BaseButton>
-      </div>
-    </SettingsGroup>
 
-    <SettingsGroup icon="tune" :title="t('settings.llm.params.title')">
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">
-            {{ t('settings.llm.params.temperature') }}
-            <HelpTip :text="t('settings.llm.params.temperature_help')" />
+              <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">
+              {{ t('settings.llm.params.temperature') }}
+              <HelpTip :text="t('settings.llm.params.temperature_help')" />
+            </div>
+            <div class="settings-row__desc">{{ t('settings.llm.params.temperature_desc') }}</div>
           </div>
-          <div class="settings-row__desc">{{ t('settings.llm.params.temperature_desc') }}</div>
-        </div>
-        <div class="settings-row__control">
-          <input type="number" v-model.number="llmTemperature" min="0" max="2" step="0.1" class="form-number" />
-        </div>
-      </div>
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">
-            {{ t('settings.llm.params.max_tokens') }}
-            <HelpTip :text="t('settings.llm.params.max_tokens_help')" />
+          <div class="settings-row__control">
+            <input type="number" v-model.number="llmTemperature" min="0" max="2" step="0.1" class="form-number" />
           </div>
-          <div class="settings-row__desc">{{ t('settings.llm.params.max_tokens_desc') }}</div>
         </div>
-        <div class="settings-row__control">
-          <input type="number" v-model.number="llmMaxTokens" min="100" max="16000" step="100" class="form-number" />
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">
+              {{ t('settings.llm.params.max_tokens') }}
+              <HelpTip :text="t('settings.llm.params.max_tokens_help')" />
+            </div>
+            <div class="settings-row__desc">{{ t('settings.llm.params.max_tokens_desc') }}</div>
+          </div>
+          <div class="settings-row__control">
+            <input type="number" v-model.number="llmMaxTokens" min="100" max="16000" step="100" class="form-number" />
+          </div>
         </div>
-      </div>
-      <SettingsGroupToggleRow
-        :label="t('settings.llm.params.stream')"
-        :desc="t('settings.llm.params.stream_desc')"
-        :help="t('settings.llm.params.stream_help')"
-        v-model="llmStream"
-      />
-    </SettingsGroup>
-  </div>
+        <SettingsGroupToggleRow
+          :label="t('settings.llm.params.stream')"
+          :desc="t('settings.llm.params.stream_desc')"
+          :help="t('settings.llm.params.stream_help')"
+          v-model="llmStream"
+        />
+      
+    </div>
+  </SettingsModule>
 </template>
-
-<style scoped>
-</style>

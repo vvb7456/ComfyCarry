@@ -1,12 +1,28 @@
 {
   "title": "设置",
   "restart_btn": "重启",
+  "section": {
+    "panel": "面板",
+    "genmodels": "生成与模型",
+    "connect": "连接与同步",
+    "about": "关于"
+  },
+  "domains": {
+    "auth": "登录与认证",
+    "configmgmt": "配置管理",
+    "prompt": "提示词编辑器",
+    "llm": "LLM 服务",
+    "civitai": "CivitAI",
+    "sync": "云同步",
+    "tunnel": "隧道"
+  },
   "unsaved": {
     "title": "未保存的更改",
-    "message": "设置已修改但未保存。继续操作前请选择：",
-    "message_banner": "存在未保存的更改",
-    "discard": "放弃更改",
-    "cancel": "留在本页"
+    "leave_message": "以下模块有未保存的更改：{modules}",
+    "go_fix": "去处理",
+    "discard_leave": "放弃并离开",
+    "chip": "{n} 处未保存",
+    "chip_tip": "跳到第一个未保存的模块"
   },
   "err": {
     "invalid_config": "无效的配置文件",
@@ -29,7 +45,7 @@
     "reinitialized": "已重置，刷新页面进入 Setup Wizard"
   },
   "password": {
-    "title": "ComfyCarry 密码",
+    "title": "修改密码",
     "current": "当前密码",
     "current_placeholder": "输入当前密码",
     "new": "新密码",
@@ -45,16 +61,27 @@
     "row_desc": "修改登录 ComfyCarry 面板的密码",
     "change_btn": "修改密码"
   },
+  "ssh_password": {
+    "label": "SSH 密码跟随",
+    "desc": "root 的 SSH 登录密码自动跟随面板密码更新",
+    "help": "开启时会将 root 密码重置为当前面板密码并重启 sshd；面板登录不受影响",
+    "enabled_toast": "SSH 密码跟随已开启，root 密码已同步为面板密码",
+    "disabled_toast": "SSH 密码跟随已关闭，SSH 仅允许公钥登录",
+    "lockout_title": "关闭 SSH 密码登录",
+    "lockout_confirm": "当前没有配置任何公钥，关闭后将无法通过密码登录 SSH，确定？",
+    "lockout_btn": "仍然关闭"
+  },
   "api_key": {
-    "help": "用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API",
+    "help": "外部脚本或应用以 X-API-Key / Bearer 请求头携带它调用面板 API",
     "regenerate": "重新生成",
     "regenerate_confirm": "确定要重新生成 API Key 吗？旧 Key 将立即失效。",
     "regenerated": "API Key 已重新生成",
     "regenerate_failed": "重新生成失败",
-    "title": "API Key"
+    "title": "ComfyCarry API 密钥",
+    "row_desc": "外部脚本访问 API 的凭证"
   },
   "config": {
-    "title": "导入/导出配置",
+    "title": "配置管理",
     "export_desc": "将所有设置导出为 JSON 文件",
     "export_btn": "导出",
     "import_desc": "从 JSON 备份文件恢复设置",
@@ -70,6 +97,7 @@
   },
   "reinit": {
     "title": "重新初始化",
+    "desc": "重置 ComfyUI 安装并重新进入部署向导",
     "btn": "重新初始化",
     "keep_models": "保留模型文件与产物",
     "confirm": "确定要重新初始化吗？ComfyUI 安装将被重置，并重新进入部署向导。",
@@ -79,10 +107,9 @@
     "partial_fail": "部分操作失败"
   },
   "about": {
-    "title": "关于",
     "desc": "让 ComfyUI 的部署、管理与创作更轻松。",
-    "version": "版本",
     "project_info": "项目信息",
+    "version": "版本",
     "github": "GitHub",
     "dockerhub": "Docker Hub",
     "credit_prefix": "由 ",
@@ -110,7 +137,7 @@
   "restart_confirm": "确定要重启 ComfyCarry 吗？\n\n页面将短暂不可用。",
   "restarting": "ComfyCarry 正在重启，3 秒后自动刷新...",
   "civitai": {
-    "key_title": "API 密钥",
+    "key_title": "CivitAI API 密钥",
     "key_desc_prefix": "在",
     "key_link": "CivitAI 账户设置",
     "key_desc_suffix": "中生成，用于模型搜索与下载",
@@ -121,7 +148,6 @@
     "cleared": "API Key 已清除",
     "err_empty": "请输入 API Key",
     "nsfw": {
-      "title": "NSFW 内容",
       "help": "浏览级别决定展示哪些模型；模糊开关决定已出现的 NSFW 图片是否打码",
       "level_label": "浏览级别",
       "level_desc": "决定搜索结果中展示哪些模型",
@@ -134,29 +160,24 @@
       "blur_desc": "预览图打码，点击后显示原图"
     }
   },
-  "sync": {
-    "title": "云同步",
-    "help": "同步引擎的运行参数"
-  },
+  "sync": {},
   "tunnel": {
-    "title": "Tunnel",
-    "help": "通过 Cloudflare Tunnel 从公网访问本工作区",
     "mode": {
       "label": "模式",
-      "desc": "隧道的接入方式",
+      "desc": "公共模式使用内置域名，自定义模式使用自有域名",
       "off": "关闭",
       "public": "公共",
       "custom": "自定义"
     },
     "subdomain": "子域名",
     "root_domain": "根域名",
-    "subdomain_desc": "留空自动分配",
-    "subdomain_placeholder": "mytunnel",
-    "custom_subdomain_desc": "与根域名组合为最终访问地址",
-    "root_domain_desc": "需已在 Cloudflare 托管",
+    "subdomain_desc": "访问地址的前缀",
+    "subdomain_placeholder": "留空自动生成",
+    "custom_subdomain_desc": "访问地址的前缀",
+    "root_domain_desc": "访问地址的主域",
     "root_domain_placeholder": "example.com",
     "token_label": "API Token",
-    "token_desc": "需 Tunnel 与 DNS 编辑权限",
+    "token_desc": "用于创建隧道与域名解析",
     "token_placeholder": "粘贴 API Token",
     "subdomain_error": "子域名格式无效",
     "protocol": "传输协议",
@@ -175,11 +196,12 @@
       "off": "确定要关闭 Tunnel 吗？现有隧道与域名映射将被移除。",
       "destroy_to_public": "切换到公共 Tunnel 将移除当前自定义隧道，继续吗？",
       "update_restart": "将使用新参数重建隧道并重启，继续吗？"
-    }
+    },
+    "root_domain_help": "需已在 Cloudflare 托管",
+    "token_help": "需具有 Tunnel 与 DNS 的编辑权限"
   },
   "llm": {
     "provider": {
-      "title": "服务提供商",
       "help": "官方项使用预设地址；第三方端点请选择与其接口一致的自定义项。",
       "label": "服务商",
       "select_placeholder": "选择服务商",
@@ -191,7 +213,7 @@
       "custom_openai": "自定义（OpenAI 兼容）",
       "custom_responses": "自定义（OpenAI Responses）",
       "custom_anthropic": "自定义（Anthropic）",
-      "api_key": "API 密钥",
+      "api_key": "服务商 API 密钥",
       "api_key_placeholder": "粘贴 API 密钥",
       "base_url": "基础 URL",
       "base_url_placeholder_openai": "https://api.example.com/v1",
@@ -202,7 +224,6 @@
       "api_key_desc": "当前服务商的访问密钥"
     },
     "model": {
-      "title": "模型",
       "label": "模型",
       "refresh_hint": "刷新获取模型列表",
       "input_placeholder": "选择或输入模型名称",
@@ -220,7 +241,6 @@
       "model_help": "展开下拉时自动获取模型列表；也可直接输入模型名称"
     },
     "params": {
-      "title": "参数",
       "temperature": "温度",
       "temperature_desc": "控制回复的随机性（0–2）",
       "max_tokens": "最大回复长度",
@@ -233,7 +253,6 @@
     },
     "test_title": "测试连接",
     "test_btn": "测试",
-    "test_desc": "使用当前配置发送一次真实请求",
     "test_success": "连接成功",
     "test_failed": "连接失败",
     "err_no_provider": "请先选择服务提供商",
@@ -244,15 +263,12 @@
     "unknown_error": "未知错误"
   },
   "prompt": {
-    "tab_label": "提示词",
     "saved": "提示词设置已保存",
     "tag_library": {
-      "title": "标签库",
       "show_nsfw": "显示 NSFW 标签",
       "show_nsfw_desc": "在标签列表与自动补全中包含 NSFW 标签"
     },
     "translation": {
-      "title": "翻译",
       "show": "显示中文翻译",
       "show_desc": "在提示词下方显示中文对照",
       "provider": "翻译引擎",
@@ -267,22 +283,20 @@
       }
     },
     "normalize": {
-      "title": "规格化",
       "enable": "启用规格化",
       "enable_desc": "提交前自动清理标点与符号",
       "comma": "半角逗号",
-      "comma_desc": "将全角逗号（，）替换为半角逗号（,）",
+      "comma_desc": "将「，」替换为「,」",
       "period": "半角句号",
-      "period_desc": "将全角句号（。）替换为半角句号（.）",
+      "period_desc": "将「。」替换为「.」",
       "bracket": "半角括号",
-      "bracket_desc": "将全角括号（）替换为半角括号 ()",
+      "bracket_desc": "将「（）」替换为「()」",
       "underscore": "下划线转空格",
-      "underscore_desc": "将标签中的下划线（_）替换为空格",
+      "underscore_desc": "将「_」替换为空格",
       "escape_bracket": "括号转义",
-      "escape_bracket_desc": "自动为括号添加反斜杠（\\），保留权重语法"
+      "escape_bracket_desc": "自动为括号添加「\\\\」，避免被解析为权重语法"
     },
     "autocomplete": {
-      "title": "自动补全",
       "limit": "补全数量",
       "limit_desc": "输入时提示的候选标签数"
     }

@@ -267,10 +267,8 @@ function openPanel() {
   open.value = true
   emit('open')
   if (props.searchable) {
-    const hasSelectedOption = normalizedOptions.value.some(o => o.value === props.modelValue)
-    search.value = props.allowCustom && !hasSelectedOption && typeof props.modelValue === 'string'
-      ? props.modelValue
-      : ''
+    // 搜索框恒空: 预填当前值会把列表过滤到只剩选中项, 首次下拉应展示完整列表
+    search.value = ''
   }
   // Pre-highlight selected item
   const idx = filteredOptions.value.findIndex(o => isSelected(o.value))

@@ -117,7 +117,7 @@ const sections = computed<SummarySection[]>(() => {
       rows: [
         { label: t('wizard.summary.password'), value: c.password ? t('wizard.summary.configured') : t('wizard.summary.not_set'), icon: configured(c.password), green: !!c.password, active: !!c.password },
         { label: t('wizard.summary.tunnel'), value: tunnelValue, icon: tunnelIcon, active: c.tunnel_mode === 'public' || !!c.cf_api_token },
-        { label: t('wizard.summary.ssh_password'), value: c.ssh_password ? t('wizard.summary.configured') : t('wizard.summary.skipped'), icon: configured(c.ssh_password), green: !!c.ssh_password, active: !!c.ssh_password },
+        { label: t('wizard.summary.ssh_pw_follow'), value: c.ssh_pw_follow !== false ? t('wizard.summary.ssh_pw_follow_on') : t('wizard.summary.ssh_pw_follow_off'), icon: configured(c.ssh_pw_follow !== false), green: c.ssh_pw_follow !== false, active: c.ssh_pw_follow !== false },
         { label: t('wizard.summary.ssh_keys'), value: c.ssh_keys.length ? t('wizard.summary.keys_count', { count: c.ssh_keys.length }) : t('wizard.summary.skipped'), icon: configured(c.ssh_keys.length), green: c.ssh_keys.length > 0, active: c.ssh_keys.length > 0 },
       ],
     },

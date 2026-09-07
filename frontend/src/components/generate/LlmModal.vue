@@ -178,7 +178,7 @@ function onCopy() {
 
 function goSettings() {
   emit('update:modelValue', false)
-  router.push({ name: 'settings-llm' })
+  router.push({ name: 'settings', query: { section: 'genmodels', focus: 'llm' } })
 }
 
 // ── Submit button label ───────────────────────────────────────────────

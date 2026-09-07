@@ -17,21 +17,13 @@ const { config, envVars, nextStep, prevStep } = useWizardState()
 const confirmPassword = ref(config.password || '')
 const sshKeysText = ref((config.ssh_keys || []).join('\n'))
 
-// SSH password sync checkbox
-const sshPwSync = computed({
-  get: () => config.ssh_pw_sync !== false,
-  set: (v: boolean) => { config.ssh_pw_sync = v },
-})
-
-// Sync SSH password when checkbox is on
-watch(() => config.password, (pw) => {
-  if (sshPwSync.value) {
-    config.ssh_password = pw
-  }
-})
-
-watch(sshPwSync, (sync) => {
-  if (sync) config.ssh_password = config.password
+// SSH 密码跟随开关 (默认开, 与面板密码保持一致)。
+// 默认值在此物化: 否则用户不拨动开关时 config.ssh_pw_follow 恒为
+// undefined, 部署端 _step_ssh 会按 False 处理, 与 UI/摘要展示矛盾。
+if (config.ssh_pw_follow === undefined) config.ssh_pw_follow = true
+const sshPwFollow = computed({
+  get: () => config.ssh_pw_follow !== false,
+  set: (v: boolean) => { config.ssh_pw_follow = v },
 })
 
 // Sync SSH keys from textarea
@@ -93,10 +85,10 @@ function onPrev() {
 
     <!-- SSH section -->
     <div class="step-password__ssh-section">
-      <ToggleSwitch v-model="sshPwSync">
+      <ToggleSwitch v-model="sshPwFollow">
         <span class="step-password__ssh-label">
-          {{ t('wizard.step1.ssh_sync') }}
-          <span class="step-password__ssh-hint" v-html="t('wizard.step1.ssh_sync_hint')" />
+          {{ t('wizard.step1.ssh_pw_follow') }}
+          <span class="step-password__ssh-hint" v-html="t('wizard.step1.ssh_pw_follow_hint')" />
         </span>
       </ToggleSwitch>
 

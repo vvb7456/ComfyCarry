@@ -12,6 +12,7 @@ ComfyCarry — 设置路由
 """
 
 import json
+import logging
 import shutil
 import subprocess
 import threading
@@ -33,6 +34,8 @@ from ..services.comfyui_params import parse_comfyui_args
 from ..services.sync_engine import (
     stop_sync_worker, _save_sync_settings,
 )
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("settings", __name__)
 
@@ -94,6 +97,18 @@ def api_settings_password():
 
     cfg.DASHBOARD_PASSWORD = new_pw
     cfg._save_dashboard_password(new_pw)
+
+    # SSH 密码跟随钩子 (v2, spec §5.1): 跟随开启时 root 密码即时同步新面板
+    # 密码。chpasswd 即时生效, 无需重启 sshd。
+    # 函数内导入 ssh.py, 杜绝 ssh ↔ settings 循环导入 (ssh.py 恢复逻辑将来
+    # 若反向引用 settings 的配置, 模块级 import 就会成环)。
+    # 失败不阻断改密响应 (容器无 sshd 时 chpasswd 通常仍可用, 稳妥容错),
+    # 仅记 warning —— 下次改密或容器重启时会再次同步。
+    if _get_config("ssh_pw_follow", False):
+        from .ssh import chpasswd_root
+        if not chpasswd_root(new_pw):
+            log.warning("SSH 密码跟随: chpasswd 同步新面板密码失败")
+
     return _ok("password_updated")
 
 
@@ -234,16 +249,12 @@ def api_settings_export_config():
     if tunnel_mode and tunnel_mode != "public":
         config["tunnel_mode"] = tunnel_mode
 
-    # SSH 配置
+    # SSH 配置 (只导出跟随开关布尔, 与现有"仅真值才写键"风格一致)
     ssh_keys = _get_config("ssh_keys", [])
     if ssh_keys:
         config["ssh_keys"] = ssh_keys
-    ssh_password = _get_config("ssh_password", "")
-    if ssh_password:
-        config["ssh_password"] = ssh_password
-    ssh_pw_sync = _get_config("ssh_pw_sync", False)
-    if ssh_pw_sync:
-        config["ssh_pw_sync"] = ssh_pw_sync
+    if _get_config("ssh_pw_follow", False):
+        config["ssh_pw_follow"] = True
 
     # Tunnel 协议
     cf_protocol = _get_config("cf_protocol", "")
@@ -362,15 +373,29 @@ def api_settings_import_config():
         _set_config("tunnel_mode", data["tunnel_mode"])
         applied.append("Tunnel 模式")
 
-    # SSH 配置
+    # SSH 配置 (ssh_pw_follow 按新语义应用)
     if data.get("ssh_keys"):
         _set_config("ssh_keys", data["ssh_keys"])
         applied.append("SSH 公钥")
-    if data.get("ssh_password"):
-        _set_config("ssh_password", data["ssh_password"])
-        applied.append("SSH 密码")
-    if "ssh_pw_sync" in data:
-        _set_config("ssh_pw_sync", data["ssh_pw_sync"])
+    follow = data.get("ssh_pw_follow")
+    if follow is not None:
+        from .ssh import _apply_password_follow  # 函数内导入, 避免循环导入
+        # 导入是非交互场景, force 恒按 false 处理:
+        # - follow=true  → 复用与端点相同的内部应用逻辑 (chpasswd 当前面板
+        #   密码 + 开密码认证 + 重启 sshd + 落 flag)。password 若也在导入
+        #   文件里, 上面已先行应用, 这里同步的即导入后的面板密码, 语义一致。
+        # - follow=false → 无有效公钥时会被 lockout 硬拦截: 此时仅落开关
+        #   flag、不改 sshd_config, 记入 errors 提示 —— 导入文件不应把用户
+        #   锁死在 SSH 之外, 由用户稍后在设置页自行处理 (重启后 restore 会
+        #   按落下的 flag 生效)。
+        applied_ok, err, _extra = _apply_password_follow(bool(follow))
+        if applied_ok:
+            applied.append("SSH 密码跟随")
+        elif err["error_key"] == "lockout_risk":
+            _set_config("ssh_pw_follow", bool(follow))
+            errors.append("SSH 密码跟随: 当前无有效公钥, 仅保存开关状态, 未改动 sshd (lockout 防护)")
+        else:
+            errors.append(f"SSH 密码跟随: {err['error_key']}")
 
     # LLM 配置
     if data.get("llm_provider"):

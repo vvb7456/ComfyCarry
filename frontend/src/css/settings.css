@@ -1,24 +1,18 @@
-/* ── Settings page: group 式布局公共样式 ──
-   规范: 组 = SettingsGroup (组头 icon+title+helptip+collapse);
-   行 = .settings-row (左 label+desc / 右控件, hairline 分隔)。
-   引用方: SettingsPage 及其各 tab 组件。 */
+/* ── Settings: list/group 布局公共样式 (单页 v3 视觉规则) ──
+   规范 (docs/SETTINGS_V2_OAUTH_SSH_SPEC.md §4, 2026-09-07 修订):
+   - 层级只靠字号/颜色/留白/icon 区分, 不用卡片底色块;
+   - 全页唯一分割线 = .settings-lines 内相邻行之间的 hairline;
+   - 模块 (.settings-module, L2) = kicker 灰标题, dirty 时浮现保存按钮;
+   - 小节 (.settings-sub, L3) = icon + 标题, --t2;
+   - 行 = .settings-row (左 label+desc / 右控件)。 */
 
-/* 行: 水平两栏, 左侧文案右侧控件 */
+/* ── 行: 水平两栏, 左侧文案右侧控件 ── */
 .settings-row {
     display: flex;
     align-items: center;
     gap: var(--sp-4, 16px);
-    padding: 14px 0;
+    padding: 12px 0;
     min-width: 0;
-}
-
-/* 行首/末行贴边 (组头下方分隔线已存在, 首行不需要额外上内边距) */
-.settings-row:first-child {
-    padding-top: 12px;
-}
-
-.settings-row:last-child {
-    padding-bottom: 0;
 }
 
 .settings-row__text {
@@ -41,6 +35,16 @@
     color: var(--t3);
 }
 
+/* 行级禁用: 主控件不可操作时 (如隧道非当前模式的行), 文本侧同步降灰 —
+   控件自身的 :disabled 样式只覆盖控件, 不提醒"这行整个不可用" */
+.settings-row--disabled .settings-row__label {
+    color: var(--t3);
+}
+
+.settings-row--disabled .settings-row__desc {
+    opacity: .5;
+}
+
 .settings-row__control {
     flex-shrink: 0;
     display: flex;
@@ -49,6 +53,8 @@
     /* 控件定宽列: 所有输入型控件统一等宽 (select/input/secret/number/segmented) */
     width: min(340px, 44%);
     min-width: 180px;
+    /* 列内尾部对齐: 输入型控件 width:100% 不受影响, 纯按钮/开关贴右缘与其他行对齐 */
+    justify-content: flex-end;
 }
 
 /* 控件列内自适应: SecretInput / SegmentedControl 根元素无固有宽度, 统一撑满列宽 */
@@ -57,10 +63,11 @@
     width: 100%;
 }
 
-/* 控件列竖排 (range+刻度 / 输入+校验反馈 等多元素组合) */
+/* 控件列竖排 (range+刻度 / 输入+校验反馈 等多元素组合); 纵向主轴重置回起点 */
 .settings-row__control--stack {
     flex-direction: column;
     align-items: stretch;
+    justify-content: flex-start;
 }
 
 /* 控件列内的组合行: 输入控件 flex:1 + 右侧图标/动作按钮 */
@@ -75,20 +82,6 @@
 .settings-row__control-row > :first-child {
     flex: 1;
     min-width: 0;
-}
-
-/* 动作行: 左侧 title+subtitle (与设置行同构) + 右侧按钮 */
-.settings-action__text {
-    flex: 1;
-    min-width: 0;
-}
-
-.settings-action__title {
-    margin: 0;
-    font-size: .9rem;
-    font-weight: 600;
-    color: var(--t1);
-    line-height: 1.4;
 }
 
 /* 通栏行: 控件占满整行 (textarea / range) */
@@ -113,17 +106,33 @@
 .settings-row__feedback--ok { color: var(--green); }
 .settings-row__feedback--err { color: var(--red); }
 
-/* 动作行: 说明文字左 + 按钮右 (导出/导入/重启等立即动作) */
+/* ── 行间 hairline: 全页唯一分割线, 只存在于 .settings-lines 内 ──
+   首行不带上线 (上方由标题承担分段), 末行不带下线 (模块/小节由留白收束)。 */
+.settings-lines > * + * {
+    border-top: 1px solid color-mix(in srgb, var(--bd) 55%, transparent);
+}
+
+/* ── 动作行: 说明文字左 + 按钮右 (导出/导入等立即动作) ── */
 .settings-action {
     display: flex;
     align-items: center;
     gap: var(--sp-4, 16px);
-    padding: 14px 0;
+    padding: 12px 0;
     min-width: 0;
 }
 
-.settings-action:first-child { padding-top: 12px; }
-.settings-action:last-child { padding-bottom: 0; }
+.settings-action__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-action__title {
+    margin: 0;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--t1);
+    line-height: 1.4;
+}
 
 .settings-action__copy {
     flex: 1;
@@ -136,14 +145,6 @@
 
 .settings-action .base-btn {
     flex-shrink: 0;
-}
-
-/* 卡片底部操作行 (组内或组外右对齐按钮) */
-.settings-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--sp-2, 8px);
-    margin-top: 14px;
 }
 
 /* 说明横幅 (上下文提示, 非校验) */
@@ -165,10 +166,129 @@
     margin-top: 1px;
 }
 
-/* 组间留白: settings-centered 列内相邻 SettingsGroup 间距 */
-.settings-centered > .settings-group + .settings-group,
-.settings-centered > * + .settings-group {
+/* ── 间距系统: 分区 → 模块 → 小节 → 行 ── */
+.settings-section {
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+/* L1 分区标题: 与吸顶导航 chip 同 icon 同文, 页面正文的"路牌"; 居中与导航呼应 */
+.settings-section__title {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--t1);
+    letter-spacing: -.01em;
+}
+
+.settings-section__title .ms {
+    font-size: 1.2rem;
+    color: var(--t2);
+}
+
+.settings-section + .settings-section {
+    margin-top: 48px;
+}
+
+/* 关于: 特殊尾分区 — 无标题, 纯内容直接呈现, 与上一分区拉开更大间距 */
+.settings-section + .settings-section--about {
+    margin-top: 72px;
+}
+
+/* L1 → 首个模块 / 模块之间 */
+.settings-section > .settings-module {
     margin-top: 32px;
+}
+
+.settings-section > .settings-module:first-of-type {
+    margin-top: 20px;
+}
+
+/* 模块头 → 内容 */
+.settings-module__body {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 吸顶 TabSwitcher 实际占高 ≈ page-body-pt + tab-switcher-row-h + 8,
+   再留一点呼吸; 锚点滚动定位 (section / focus) 统一用它防标题被吸顶遮挡 */
+.settings-section,
+.settings-module,
+[id^="settings-focus-"] {
+    scroll-margin-top: calc(var(--page-body-pt) + var(--tab-switcher-row-h) + 16px);
+}
+
+/* 离开守卫「去处理」跳转高亮: 短促呼吸一次, 指示目标模块 */
+@keyframes settings-domain-flash {
+    0% { background: color-mix(in srgb, var(--ac) 14%, transparent); }
+    100% { background: transparent; }
+}
+
+.settings-domain--flash {
+    animation: settings-domain-flash 1.2s ease-out;
+    border-radius: var(--rs);
+}
+
+/* ── 模块加载骨架屏 (onMounted 加载模式; 高度尽量贴近渲染后行高, 降低 CLS) ── */
+.settings-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 14px 0 6px;
+}
+
+.settings-skeleton__row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.settings-skeleton__line {
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(
+        90deg,
+        var(--bg2) 25%,
+        color-mix(in srgb, var(--t1) 7%, var(--bg2)) 50%,
+        var(--bg2) 75%
+    );
+    background-size: 200% 100%;
+    animation: settings-skeleton-pulse 1.4s ease infinite;
+}
+
+.settings-skeleton__line--text {
+    flex: 0 1 38%;
+    min-width: 90px;
+}
+
+.settings-skeleton__line--text-sm {
+    flex: 0 1 26%;
+    min-width: 60px;
+    height: 9px;
+}
+
+.settings-skeleton__line--control {
+    flex: none;
+    width: min(340px, 44%);
+    height: 30px;
+    margin-left: auto;
+}
+
+.settings-skeleton__lines {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+}
+
+@keyframes settings-skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 @media (max-width: 640px) {

@@ -475,39 +475,31 @@ def _step_rclone(config):
 
 
 def _step_ssh(config):
-    """STEP 3.5: SSH 配置 (密码 + 公钥)"""
-    ssh_password = config.get("ssh_password", "")
+    """STEP 3.5: SSH 配置 (密码跟随 + 公钥)"""
+    ssh_pw_follow = bool(config.get("ssh_pw_follow", False))
     ssh_keys = config.get("ssh_keys", [])
-    ssh_pw_sync = config.get("ssh_pw_sync", False)
-    if not ssh_password and not ssh_keys:
+    if not ssh_pw_follow and not ssh_keys:
         return
     _deploy_step("setup_ssh")
     from comfycarry.config import set_config as _sc2
-    if ssh_pw_sync:
-        _sc2("ssh_pw_sync", True)
-    if ssh_password:
-        code = subprocess.run(
-            f"echo 'root:{shlex.quote(ssh_password)}' | chpasswd",
-            shell=True, capture_output=True, timeout=5
-        ).returncode
-        if code == 0:
-            _sc2("ssh_password", ssh_password)
-            # 启用密码认证
-            subprocess.run(
-                "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' "
-                "/etc/ssh/sshd_config 2>/dev/null || true",
-                shell=True, timeout=5
-            )
-            subprocess.run(
-                "sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' "
-                "/etc/ssh/sshd_config 2>/dev/null || true",
-                shell=True, timeout=5
-            )
-            _deploy_log("✅ SSH Root 密码已设置")
+
+    # 跟随开启: 复用 ssh 路由的应用逻辑 (chpasswd + 开密码认证 + 重启 sshd
+    # + 落 ssh_pw_follow 标志)。注意面板密码在 _step_start_services 末尾才
+    # 写入 cfg.DASHBOARD_PASSWORD, 此时必须把向导收集的密码显式传入。
+    sshd_restarted = False
+    if ssh_pw_follow:
+        from ..routes.ssh import _apply_password_follow
+        ok, err, extra = _apply_password_follow(
+            True, password=config.get("password") or None
+        )
+        if ok:
+            # 重启结果以 helper 实际返回为准, 失败时末尾统一补一次重启
+            sshd_restarted = bool(extra and extra.get("sshd_restarted"))
+            _deploy_log("✅ SSH Root 密码已同步面板密码")
         else:
-            _deploy_log("⚠️ SSH 密码设置失败", "warn")
+            _deploy_log(f"⚠️ SSH 密码跟随设置失败 ({err['error_key']})", "warn")
+
     if ssh_keys and isinstance(ssh_keys, list):
-        import os
         ak_file = os.path.expanduser("~/.ssh/authorized_keys")
         os.makedirs(os.path.dirname(ak_file), exist_ok=True)
         existing = set()
@@ -531,12 +523,11 @@ def _step_ssh(config):
         os.chmod(ak_file, 0o600)
         _sc2("ssh_keys", ssh_keys)
         _deploy_log(f"✅ SSH 公钥已添加 ({added} 个新增, 共 {len(ssh_keys)} 个)")
-    # 重启 sshd 使配置生效
-    subprocess.run(
-        "pkill sshd 2>/dev/null; sleep 0.5; "
-        "/usr/sbin/sshd -E /workspace/sshd.log 2>/dev/null || true",
-        shell=True, timeout=10
-    )
+
+    # 重启 sshd 使配置生效 (跟随分支成功时内部已重启过, 不必重复)
+    if not sshd_restarted:
+        from ..routes.ssh import _do_restart_sshd
+        _do_restart_sshd()
     _deploy_log("✅ sshd 已重启")
 
 

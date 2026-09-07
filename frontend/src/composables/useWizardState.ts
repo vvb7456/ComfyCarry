@@ -24,7 +24,6 @@ function createDefaultConfig(): WizardConfig {
     plugins: [],
     install_fa2: false,
     install_sa2: false,
-    ssh_password: '',
     ssh_keys: [],
     wizard_sync_rules: [],
     wizard_remotes: [],
@@ -152,7 +151,7 @@ export function useWizardState() {
       if (state.wizard_sync_rules) config.wizard_sync_rules = state.wizard_sync_rules
       if (state.install_fa2 !== undefined) config.install_fa2 = state.install_fa2
       if (state.install_sa2 !== undefined) config.install_sa2 = state.install_sa2
-      if (state.ssh_password) config.ssh_password = state.ssh_password
+      if (state.ssh_pw_follow !== undefined) config.ssh_pw_follow = state.ssh_pw_follow
       if (state.ssh_keys) config.ssh_keys = state.ssh_keys
       if (state.llm_provider) config.llm_provider = state.llm_provider
       if (state.llm_api_key) config.llm_api_key = state.llm_api_key
@@ -306,9 +305,8 @@ export function useWizardState() {
       if (parsed.install_fa2 !== undefined) config.install_fa2 = parsed.install_fa2
       if (parsed.install_sa2 !== undefined) config.install_sa2 = parsed.install_sa2
       if (parsed.tunnel_mode && parsed.tunnel_mode !== 'public') { config.tunnel_mode = parsed.tunnel_mode; appliedCount++ }
-      if (parsed.ssh_password) { config.ssh_password = parsed.ssh_password; appliedCount++ }
+      if (parsed.ssh_pw_follow !== undefined) config.ssh_pw_follow = parsed.ssh_pw_follow
       if (parsed.ssh_keys) config.ssh_keys = parsed.ssh_keys
-      if (parsed.ssh_pw_sync !== undefined) config.ssh_pw_sync = parsed.ssh_pw_sync
       if (parsed.llm_provider) {
         config.llm_provider = parsed.llm_provider; appliedCount++
         const provKeys = parsed.llm_provider_keys?.[parsed.llm_provider]

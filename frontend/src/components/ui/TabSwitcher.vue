@@ -14,6 +14,8 @@ export interface TabItem {
   iconColor?: string
   badge?: string | number
   disabled?: boolean
+  /** 未保存状态小圆点 (设置页分区导航用), 纯展示 */
+  dot?: boolean
   /** Push this tab to the right side (adds auto margin spacer before the first right-aligned tab) */
   align?: 'right'
 }
@@ -86,6 +88,7 @@ function selectTab(tab: TabItem) {
         />
         <span>{{ tab.label }}</span>
         <span v-if="tab.badge" class="tab-switcher__badge">{{ tab.badge }}</span>
+        <span v-if="tab.dot" class="tab-switcher__dot" aria-label="unsaved" />
       </button>
     </div>
 
@@ -226,6 +229,16 @@ function selectTab(tab: TabItem) {
   font-size: .68rem;
   padding: 1px 6px;
   border-radius: 10px;
+  margin-left: 2px;
+}
+
+/* 未保存状态小圆点 (设置页分区导航): 与 label 同行的纯 CSS 圆点 */
+.tab-switcher__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--c-caution, #e8a33d);
   margin-left: 2px;
 }
 

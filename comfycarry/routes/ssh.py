@@ -3,17 +3,17 @@ ComfyCarry — SSH 管理路由
 
 管理容器 sshd 服务、公钥、Root 密码
 
-- /api/ssh/status   — SSH 状态概览
-- /api/ssh/keys     — 公钥列表 / 添加 / 删除
-- /api/ssh/password — 设置 Root 密码
-- /api/ssh/start    — 启动 sshd
-- /api/ssh/stop     — 停止 sshd
-- /api/ssh/restart  — 重启 sshd
-- /api/ssh/logs      — 历史日志
-- /api/ssh/logs/stream — SSE 实时日志流
+- /api/ssh/status        — SSH 状态概览
+- /api/ssh/keys          — 公钥列表 / 添加 / 删除
+- /api/ssh/password-follow — SSH 密码跟随面板密码 开关 (spec §5.1)
+- /api/ssh/start         — 启动 sshd
+- /api/ssh/stop          — 停止 sshd
+- /api/ssh/restart       — 重启 sshd
+- /api/ssh/logs          — 历史日志
+- /api/ssh/logs/stream   — SSE 实时日志流
 """
 
-import json
+import logging
 import os
 import re
 import subprocess
@@ -22,7 +22,10 @@ import time
 
 from flask import Blueprint, Response, jsonify, request
 
+from .. import config as cfg
 from ..config import _get_config, _set_config
+
+log = logging.getLogger("ssh")
 
 bp = Blueprint("ssh", __name__)
 
@@ -67,11 +70,10 @@ def restore_ssh_config():
     """
     Dashboard 启动时从 .dashboard_env 恢复 SSH 配置。
     - 恢复 ssh_keys → authorized_keys
-    - 恢复 ssh_password → chpasswd + PasswordAuthentication + PermitRootLogin
+    - 按 ssh_pw_follow 语义恢复密码状态 (spec §5.1):
+        follow=true  → root 密码同步为当前面板密码 + 密码认证开启
+        follow=false → 密码认证关闭 (公钥 root 登录不受影响)
     """
-    import logging
-    log = logging.getLogger("ssh")
-
     # ── 恢复公钥 ──
     saved_keys = _get_config("ssh_keys", [])
     if saved_keys and isinstance(saved_keys, list):
@@ -114,18 +116,31 @@ def restore_ssh_config():
             _set_config("ssh_keys", valid_saved)
             log.info(f"SSH: 清理了 {len(saved_keys) - len(valid_saved)} 个无效配置 key")
 
-    # ── 恢复密码 ──
-    saved_pw = _get_config("ssh_password", "")
-    if saved_pw:
-        code, _, err = _run(f"echo 'root:{saved_pw}' | chpasswd", timeout=5)
-        if code == 0:
+    # ── 恢复密码跟随状态 ──
+    # ssh_pw_follow 是三态: None(从未配置) / True / False。仅当显式设置过开关
+    # 才动 sshd_config —— 全新实例保持镜像默认配置, 避免把从未配置过 SSH 的
+    # 容器默认密码登录给关掉。
+    follow_raw = _get_config("ssh_pw_follow", None)
+    pw_applied = False
+    if follow_raw is not None:
+        if bool(follow_raw):
+            # 跟随模式: root 密码 = 当前面板密码 (启动时加载值; 运行期改密由
+            # settings.py 的改密钩子即时同步)
+            if not cfg.DASHBOARD_PASSWORD:
+                log.warning("SSH: 面板密码为空, 跳过 chpasswd (跟随模式)")
+            elif chpasswd_root(cfg.DASHBOARD_PASSWORD):
+                log.info("SSH: root 密码已同步面板密码 (跟随模式)")
+            else:
+                log.warning("SSH: chpasswd 同步面板密码失败 (跟随模式)")
             _set_sshd_password_auth(True)
-            log.info("SSH: 从配置恢复 root 密码 + 启用密码认证")
         else:
-            log.warning(f"SSH: 恢复密码失败: {err}")
+            # 非跟随: 确保密码登录关闭 (PermitRootLogin=prohibit-password,
+            # 公钥 root 登录不受影响)
+            _set_sshd_password_auth(False)
+        pw_applied = True
 
     # ── 重启 sshd 以应用配置 (使用 -E 日志) ──
-    if saved_keys or saved_pw:
+    if saved_keys or pw_applied:
         _do_restart_sshd()
         log.info("SSH: 已重启 sshd 以应用恢复的配置")
 
@@ -143,6 +158,27 @@ def _run(cmd, timeout=5):
         return -1, "", "timeout"
     except Exception as e:
         return -1, "", str(e)
+
+
+def chpasswd_root(password):
+    """用 chpasswd 设置 root 密码, 返回是否成功。供本模块与 settings.py 改密钩子复用。
+
+    必须 argv 列表 + stdin 传密码, 不得走 shell 拼接: 旧实现 f-string 拼
+    `echo 'root:{pw}' | chpasswd`, 密码含单引号/反引号/$ 时会被 shell 解释,
+    轻则设置失败重则注入执行。列表形式 + input= 让密码完全不过 shell。
+    """
+    try:
+        r = subprocess.run(
+            ["chpasswd"],
+            input=f"root:{password}",
+            text=True,
+            capture_output=True,
+            timeout=5,
+        )
+        return r.returncode == 0
+    except (subprocess.TimeoutExpired, OSError) as e:
+        log.warning(f"SSH: chpasswd 执行失败: {e}")
+        return False
 
 
 def _sshd_running():
@@ -406,7 +442,13 @@ def _persist_keys_to_config(keys):
 
 
 def _set_sshd_password_auth(enable):
-    """修改 sshd_config 的 PasswordAuthentication 和 PermitRootLogin"""
+    """修改 sshd_config 的 PasswordAuthentication 和 PermitRootLogin
+
+    enable=True : PasswordAuthentication yes + PermitRootLogin yes (允许 root 密码登录)
+    enable=False: PasswordAuthentication no + PermitRootLogin prohibit-password
+                  —— 关闭密码登录但保留公钥 root 登录, PermitRootLogin 不能
+                  一并设成 no, 否则无密码实例会被彻底锁死在 SSH 之外。
+    """
     try:
         with open(SSHD_CONFIG_FILE, "r") as f:
             content = f.read()
@@ -422,15 +464,15 @@ def _set_sshd_password_auth(enable):
         if count == 0:
             content = content.rstrip() + f"\nPasswordAuthentication {new_val}\n"
 
-        # PermitRootLogin — 设置密码时需要允许 root 密码登录
-        if enable:
-            content, count = re.subn(
-                r"^#?\s*PermitRootLogin\s+\S+",
-                "PermitRootLogin yes",
-                content, flags=re.MULTILINE
-            )
-            if count == 0:
-                content = content.rstrip() + "\nPermitRootLogin yes\n"
+        # PermitRootLogin — 开启跟随=允许 root 密码登录; 关闭=仅允许公钥登录
+        root_val = "yes" if enable else "prohibit-password"
+        content, count = re.subn(
+            r"^#?\s*PermitRootLogin\s+\S+",
+            f"PermitRootLogin {root_val}",
+            content, flags=re.MULTILINE
+        )
+        if count == 0:
+            content = content.rstrip() + f"\nPermitRootLogin {root_val}\n"
 
         with open(SSHD_CONFIG_FILE, "w") as f:
             f.write(content)
@@ -445,6 +487,62 @@ def _do_restart_sshd():
     _run("mkdir -p /run/sshd", timeout=2)
     code, _, err = _run(f"/usr/sbin/sshd -E {SSHD_LOG_FILE}", timeout=5)
     return code == 0
+
+
+def _apply_password_follow(enabled, *, force=False, password=None):
+    """应用「SSH 密码跟随面板密码」开关 (spec §5.1)。
+
+    /api/ssh/password-follow 端点、settings.py 导入配置与部署向导
+    _step_ssh 共用本函数。
+
+    返回 (ok, err, extra):
+      ok=True  → err=None,
+                 extra = {"sshd_restarted": bool, "keys_count": int}
+      ok=False → err = {"error_key": str, "error_params": dict, "status": int}
+                 (error_key 与 _err 约定一致, 前端按 ssh.err.<key> 翻译)
+
+    enabled=True (开启跟随):
+      chpasswd(面板密码) → PasswordAuthentication yes / PermitRootLogin yes
+      → 重启 sshd → ssh_pw_follow=true。
+      password 为 None 时用 cfg.DASHBOARD_PASSWORD; 部署向导调用时向导收集
+      的新密码尚未写入 cfg (改密在 _step_start_services 末尾才执行), 由
+      _step_ssh 显式传入。
+    enabled=False (关闭密码登录):
+      后端硬拦截 (安全边界必须在这里, 前端 confirm 只是 UX —— API 可被直接
+      调用绕过): 无有效公钥且未 force → lockout_risk, 不做任何变更。
+      执行 PasswordAuthentication no / PermitRootLogin prohibit-password
+      (保留公钥 root 登录) → 重启 sshd → ssh_pw_follow=false。
+    """
+    if enabled:
+        pw = password if password is not None else cfg.DASHBOARD_PASSWORD
+        if not pw:
+            return False, {"error_key": "password_not_set", "error_params": {},
+                           "status": 400}, None
+        if not chpasswd_root(pw):
+            return False, {"error_key": "set_password_failed", "error_params": {},
+                           "status": 500}, None
+        _set_sshd_password_auth(True)
+        restarted = _do_restart_sshd()
+        _set_config("ssh_pw_follow", True)
+        log.info("SSH: 密码跟随已开启 (root 密码同步面板密码)")
+        return True, None, {
+            "sshd_restarted": restarted,
+            "keys_count": len(_load_authorized_keys()),
+        }
+
+    keys_count = len(_load_authorized_keys())
+    if keys_count == 0 and not force:
+        log.warning("SSH: 拒绝关闭密码登录: 无有效公钥且未 force (lockout 防护)")
+        return False, {"error_key": "lockout_risk", "error_params": {},
+                       "status": 409}, {"keys_count": 0}
+    _set_sshd_password_auth(False)
+    restarted = _do_restart_sshd()
+    _set_config("ssh_pw_follow", False)
+    log.info("SSH: 密码登录已关闭 (公钥登录不受影响)")
+    return True, None, {
+        "sshd_restarted": restarted,
+        "keys_count": keys_count,
+    }
 
 
 # ── API 端点 ──────────────────────────────────────────────────
@@ -463,7 +561,9 @@ def ssh_status():
         "password_auth": sshd_cfg["password_auth"],
         "root_login": sshd_cfg["root_login"],
         "password_set": _password_set(),
-        "pw_sync": bool(_get_config("ssh_pw_sync", False)),
+        # SSH 密码跟随开关 (spec §5.1), 前端开关初始态用 pw_follow + keys_count
+        "pw_follow": bool(_get_config("ssh_pw_follow", False)),
+        "keys_count": len(_load_authorized_keys()),
     })
 
 
@@ -560,43 +660,26 @@ def ssh_keys_delete():
     return jsonify({"ok": True, "keys": safe_keys, "deleted": True})
 
 
-@bp.route("/api/ssh/password", methods=["POST"])
-def ssh_set_password():
-    """设置 Root 密码 (支持同步 ComfyCarry 密码)"""
+@bp.route("/api/ssh/password-follow", methods=["POST"])
+def ssh_pw_follow_toggle():
+    """SSH 密码跟随面板密码 开关 (spec §5.1)。
+
+    请求体: {"enabled": bool, "force"?: bool}
+    force 仅在 enabled=false 时有意义: 确认无公钥锁死 SSH 的风险。
+    """
     data = request.get_json(silent=True) or {}
-    password = data.get("password", "")
-    if not password:
-        return _err("password_empty")
+    enabled = bool(data.get("enabled"))
+    force = bool(data.get("force"))
 
-    # 同步模式: 使用 ComfyCarry Dashboard 密码
-    is_sync = password == "_sync_dashboard_password_"
-    if is_sync:
-        password = _get_config("password", "")
-        if not password:
-            return _err("password_not_set")
-
-    if len(password) < 4:
-        return _err("password_too_short")
-
-    # 设置密码
-    code, _, err = _run(
-        f"echo 'root:{password}' | chpasswd", timeout=5
-    )
-    if code != 0:
-        return _err("set_password_failed", 500, detail=err)
-
-    # 持久化密码与同步标志到 .dashboard_env
-    _set_config("ssh_password", password)
-    _set_config("ssh_pw_sync", is_sync)
-
-    # 确保 PasswordAuthentication + PermitRootLogin 为 yes，并重启 sshd
-    _set_sshd_password_auth(True)
-    _do_restart_sshd()
+    ok, err, extra = _apply_password_follow(enabled, force=force)
+    if not ok:
+        return _err(err["error_key"], err["status"], **err["error_params"])
 
     return jsonify({
         "ok": True,
-        "password_auth_enabled": True,
-        "sshd_restarted": True,
+        "password_auth_enabled": enabled,
+        "sshd_restarted": extra["sshd_restarted"],
+        "keys_count": extra["keys_count"],
     })
 
 

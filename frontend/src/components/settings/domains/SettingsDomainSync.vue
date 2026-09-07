@@ -1,20 +1,22 @@
 <script setup lang="ts">
 /**
- * 设置 tab: 云同步 — 同步参数 (min_age / watch_interval)。
- * 守卫式表单: dirty → shell banner / 路由拦截, 无保存按钮。
- * rclone 配置编辑已移除 (后续另想它法)。
+ * 设置模块: 云同步 — 同步参数 (min_age / watch_interval)。
+ * 单页 v3: 模块头 (SettingsModule) dirty 时浮现保存, 无放弃按钮
+ * (放弃走离开守卫); onMounted 加载 + 本地 skeleton/错误重试;
+ * dirty 经 useSettingsGuard 只读登记, 离开守卫由 SettingsPage 统一处理。
+ * rclone 配置编辑已移除 (oauth 向导替代, 见 sync 设置)。
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import SettingsGroup from '@/components/settings/SettingsGroup.vue'
+import SettingsModule from '@/components/settings/SettingsModule.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
-import { useSettingsGuard } from '@/composables/useSettingsGuard'
+import { useSettingsGuard } from '@/composables'
 import { apiErrorText } from '@/utils/apiError'
 
-defineOptions({ name: 'SettingsTabSync' })
+defineOptions({ name: 'SettingsDomainSync' })
 
 const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
@@ -45,6 +47,7 @@ async function loadConfig(): Promise<void> {
   cfgSnapshot.value = snapshotCfg()
 }
 
+// ── 保存 (卡片级) ──
 async function saveConfig(): Promise<boolean> {
   cfgSaving.value = true
   try {
@@ -64,46 +67,60 @@ async function saveConfig(): Promise<boolean> {
   }
 }
 
-// ── 守卫注册 ──
-const guardHub = useSettingsGuard()
-const provider = {
-  isDirty: () => cfgDirty.value,
-  isSaving: () => cfgSaving.value,
-  save: saveConfig,
-  discard: async () => {
-    // 无论 loadConfig 成败都同步快照: 失败时表单保持原样, 快照对齐后不再误报 dirty
-    try { await loadConfig() } finally { cfgSnapshot.value = snapshotCfg() }
-  },
-}
+// ── 放弃: 走离开守卫「放弃并离开」(组件卸载即丢), 域内不提供按钮 ──
 
-// ── 加载失败态 (async setup 由 Suspense 门控首渲, 失败显示错误+重试) ──
+// ── onMounted 加载 (替代 async setup; skeleton 门控首渲防默认值跳变) ──
+const loading = ref(true)
 const loadError = ref(false)
 
-async function retryLoad(): Promise<void> {
+async function loadAll(): Promise<void> {
+  loading.value = true
   await loadConfig()
+  loading.value = false
 }
 
-// async setup: 数据就绪后才挂载渲染
-await loadConfig()
-onMounted(() => guardHub.register(provider))
-onUnmounted(() => guardHub.unregister(provider))
+// ── dirty 登记 (只读) ──
+const guardHub = useSettingsGuard()
+const dirtyEntry = {
+  id: 'sync',
+  label: () => t('settings.domains.sync'),
+  isDirty: () => cfgDirty.value,
+}
+
+onMounted(() => {
+  guardHub.register(dirtyEntry)
+  void loadAll()
+})
+onUnmounted(() => guardHub.unregister(dirtyEntry))
 </script>
 
 <template>
-  <div class="tab-panel settings-centered">
-    <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
-    <SettingsGroup v-if="loadError">
-      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
-        <BaseButton size="sm" @click="retryLoad">{{ t('common.btn.retry') }}</BaseButton>
-      </EmptyState>
-    </SettingsGroup>
+  <SettingsModule
+    id="settings-focus-sync"
+    :title="t('settings.domains.sync')"
+    :dirty="cfgDirty"
+    :saving="cfgSaving"
+    :disabled="loading || loadError"
+    @save="saveConfig"
+  >
+    <div v-if="loading" class="settings-skeleton" aria-hidden="true">
+      <div v-for="i in 2" :key="i" class="settings-skeleton__row">
+        <div class="settings-skeleton__lines">
+          <div class="settings-skeleton__line settings-skeleton__line--text" />
+          <div class="settings-skeleton__line settings-skeleton__line--text-sm" />
+        </div>
+        <div class="settings-skeleton__line settings-skeleton__line--control" />
+      </div>
+    </div>
 
-    <SettingsGroup
-      v-else
-      icon="cloud_sync"
-      :title="t('settings.sync.title')"
-      :help="t('settings.sync.help')"
-    >
+    <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
+    <div v-else-if="loadError">
+      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
+        <BaseButton size="sm" @click="loadAll">{{ t('common.btn.retry') }}</BaseButton>
+      </EmptyState>
+    </div>
+
+    <div v-else class="settings-lines">
       <div class="settings-row">
         <div class="settings-row__text">
           <div class="settings-row__label">{{ t('sync.config.min_age.label') }}</div>
@@ -122,6 +139,6 @@ onUnmounted(() => guardHub.unregister(provider))
           <input v-model.number="cfgWatchInterval" type="number" min="10" class="form-number">
         </div>
       </div>
-    </SettingsGroup>
-  </div>
+    </div>
+  </SettingsModule>
 </template>

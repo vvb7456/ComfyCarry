@@ -1,29 +1,29 @@
 <script setup lang="ts">
 /**
- * 设置 tab: Tunnel — 模式 (关闭/公共/自定义) + 参数。
- * 守卫式表单: dirty → shell banner / 路由拦截。
- * 「关闭」与模式/参数变更都在守卫保存时统一生效:
- *   - off:   销毁现有 tunnel (public → release / custom → teardown)
- *   - public: 释放自定义 tunnel (如有) → enable public
- *   - custom: 校验 token → (public 需先 disable) → provision
+ * 设置模块: 隧道 — 模式 (关闭/公共/自定义) + 参数; 三模式恒显全部行,
+ * 按模式 disable 不可操作列 (高度稳定不跳变), 公共模式根域名固定内置域名。
+ * 单页 v3: 模块头 dirty 时浮现「保存」(文案与其他模块统一, 废弃「应用隧道配置」),
+ * 点击走原有 confirm 流程 (关闭/重建/切换模式时二次确认, 可能 teardown/provision);
+ * 无放弃按钮 (放弃走离开守卫)。
+ * onMounted 加载 + 本地 skeleton/错误重试; dirty 经 useSettingsGuard 只读登记。
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import SettingsGroup from '@/components/settings/SettingsGroup.vue'
-import SettingsGroupToggleRow from '@/components/settings/SettingsGroupToggleRow.vue'
+import SettingsModule from '@/components/settings/SettingsModule.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
+import HelpTip from '@/components/ui/HelpTip.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { useSettingsGuard } from '@/composables/useSettingsGuard'
+import { useSettingsGuard } from '@/composables'
 import { apiErrorText } from '@/utils/apiError'
-import type { TunnelConfigResponse, TunnelValidationResponse, TunnelActionResponse } from '@/types/tunnel'
+import type { TunnelConfigResponse, TunnelActionResponse } from '@/types/tunnel'
 
-defineOptions({ name: 'SettingsTabTunnel' })
+defineOptions({ name: 'SettingsDomainTunnel' })
 
 const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
@@ -58,6 +58,9 @@ function snapshot(): string {
 
 const cfgDirty = computed(() => cfgLoaded.value && snapshot() !== cfgSnapshot.value)
 
+/** 根域名展示值: 公共模式固定内置域名 (不可改), 其余显示用户配置 */
+const domainDisplay = computed(() => (mode.value === 'public' ? 'erocraft.org' : cfgDomain.value))
+
 const modeOptions = computed(() => [
   { value: 'off', label: t('settings.tunnel.mode.off') },
   { value: 'public', label: t('settings.tunnel.mode.public') },
@@ -86,8 +89,8 @@ async function loadConfig(): Promise<void> {
   cfgSnapshot.value = snapshot()
 }
 
-// ── 保存 (守卫调用): 按模式差异应用变更 ──
-async function saveConfig(): Promise<boolean> {
+// ── 应用 (卡片级): 按模式差异应用变更, 含 confirm/teardown 流程 ──
+async function applyConfig(): Promise<boolean> {
   cfgSaving.value = true
   try {
     // 协议始终先保存 (重启 cloudflared 后生效)
@@ -117,7 +120,7 @@ async function saveConfig(): Promise<boolean> {
 
     // ── 模式切换 ──
     if (mode.value === 'off') {
-      // 关闭 = 销毁 (守卫保存即意图, 再加一道 confirm)
+      // 关闭 = 销毁 (应用即意图, 再加一道 confirm)
       if (!await confirm({ message: t('settings.tunnel.confirm.off'), variant: 'danger' })) return false
       if (serverMode.value === 'public') {
         if (!await post('/api/tunnel/public/disable')) return false
@@ -185,101 +188,131 @@ async function validateToken() {
   else cfgValidResult.value = { ok: false, message: apiErrorText(d, t('settings.tunnel.validate_failed')) }
 }
 
-// ── 守卫注册 ──
-const guardHub = useSettingsGuard()
-const provider = {
-  isDirty: () => cfgDirty.value,
-  isSaving: () => cfgSaving.value,
-  save: saveConfig,
-  discard: async () => {
-    try { await loadConfig() } finally { cfgSnapshot.value = snapshot() }
-  },
-}
+// ── 放弃: 走离开守卫「放弃并离开」(组件卸载即丢), 模块内不提供按钮 ──
 
-// ── 加载失败态 (async setup 由 Suspense 门控首渲, 失败显示错误+重试) ──
+// ── onMounted 加载 (替代 async setup; skeleton 门控首渲防默认值跳变) ──
+const loading = ref(true)
 const loadError = ref(false)
 
-async function retryLoad(): Promise<void> {
+async function loadAll(): Promise<void> {
+  loading.value = true
   await loadConfig()
+  loading.value = false
 }
 
-// async setup: 数据就绪后才挂载渲染
-await loadConfig()
-onMounted(() => guardHub.register(provider))
-onUnmounted(() => guardHub.unregister(provider))
+// ── dirty 登记 (只读) ──
+const guardHub = useSettingsGuard()
+const dirtyEntry = {
+  id: 'tunnel',
+  label: () => t('settings.domains.tunnel'),
+  isDirty: () => cfgDirty.value,
+}
+
+onMounted(() => {
+  guardHub.register(dirtyEntry)
+  void loadAll()
+})
+onUnmounted(() => guardHub.unregister(dirtyEntry))
 </script>
 
 <template>
-  <div class="tab-panel settings-centered">
-    <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
-    <SettingsGroup v-if="loadError">
-      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
-        <BaseButton size="sm" @click="retryLoad">{{ t('common.btn.retry') }}</BaseButton>
-      </EmptyState>
-    </SettingsGroup>
+  <SettingsModule
+    id="settings-focus-tunnel"
+    :title="t('settings.domains.tunnel')"
+    :dirty="cfgDirty"
+    :saving="cfgSaving"
+    :disabled="loading || loadError"
+    @save="applyConfig"
+  >
 
-    <SettingsGroup
-      v-else
-      icon="language"
-      :title="t('settings.tunnel.title')"
-      :help="t('settings.tunnel.help')"
-    >
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.tunnel.mode.label') }}</div>
-          <div class="settings-row__desc">{{ t('settings.tunnel.mode.desc') }}</div>
+    <div v-if="loading" class="settings-skeleton" aria-hidden="true">
+      <div v-for="i in 3" :key="i" class="settings-skeleton__row">
+        <div class="settings-skeleton__lines">
+          <div class="settings-skeleton__line settings-skeleton__line--text" />
+          <div class="settings-skeleton__line settings-skeleton__line--text-sm" />
         </div>
-        <div class="settings-row__control">
-          <SegmentedControl
-            :model-value="mode"
-            :options="modeOptions"
-            size="md"
-            block
-            @update:model-value="v => mode = v as TunnelMode"
-          />
-        </div>
+        <div class="settings-skeleton__line settings-skeleton__line--control" />
       </div>
+    </div>
 
-      <template v-if="mode === 'public'">
+    <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
+    <div v-else-if="loadError">
+      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
+        <BaseButton size="sm" @click="loadAll">{{ t('common.btn.retry') }}</BaseButton>
+      </EmptyState>
+    </div>
+
+    <div v-else class="settings-lines">
         <div class="settings-row">
           <div class="settings-row__text">
-            <div class="settings-row__label">{{ t('settings.tunnel.subdomain') }}</div>
-            <div class="settings-row__desc">{{ t('settings.tunnel.subdomain_desc') }}</div>
+            <div class="settings-row__label">{{ t('settings.tunnel.mode.label') }}</div>
+            <div class="settings-row__desc">{{ t('settings.tunnel.mode.desc') }}</div>
           </div>
           <div class="settings-row__control">
-            <input v-model="cfgSubdomain" type="text" class="form-input" :placeholder="t('settings.tunnel.subdomain_placeholder')">
+            <SegmentedControl
+              :model-value="mode"
+              :options="modeOptions"
+              size="md"
+              block
+              @update:model-value="v => mode = v as TunnelMode"
+            />
           </div>
         </div>
-      </template>
 
-      <template v-if="mode === 'custom'">
-        <div class="settings-row">
+        <!-- 三模式恒显所有行: disable 不可操作列, 避免 v-if 切换导致高度跳变 -->
+        <div class="settings-row" :class="{ 'settings-row--disabled': mode === 'off' }">
           <div class="settings-row__text">
             <div class="settings-row__label">{{ t('settings.tunnel.subdomain') }}</div>
-            <div class="settings-row__desc">{{ t('settings.tunnel.custom_subdomain_desc') }}</div>
+            <div class="settings-row__desc">{{ mode === 'public' ? t('settings.tunnel.subdomain_desc') : t('settings.tunnel.custom_subdomain_desc') }}</div>
           </div>
           <div class="settings-row__control">
-            <input v-model="cfgSubdomain" type="text" class="form-input" :placeholder="t('settings.tunnel.subdomain_placeholder')">
+            <input
+              v-model="cfgSubdomain"
+              type="text"
+              class="form-input"
+              :disabled="mode === 'off'"
+              :placeholder="t('settings.tunnel.subdomain_placeholder')"
+            >
           </div>
         </div>
-        <div class="settings-row">
+
+        <div class="settings-row" :class="{ 'settings-row--disabled': mode !== 'custom' }">
           <div class="settings-row__text">
-            <div class="settings-row__label">{{ t('settings.tunnel.root_domain') }}</div>
+            <div class="settings-row__label">
+              {{ t('settings.tunnel.root_domain') }}
+              <HelpTip :text="t('settings.tunnel.root_domain_help')" />
+            </div>
             <div class="settings-row__desc">{{ t('settings.tunnel.root_domain_desc') }}</div>
           </div>
           <div class="settings-row__control">
-            <input v-model="cfgDomain" type="text" class="form-input" :placeholder="t('settings.tunnel.root_domain_placeholder')">
+            <input
+              :value="domainDisplay"
+              type="text"
+              class="form-input"
+              :disabled="mode !== 'custom'"
+              :placeholder="t('settings.tunnel.root_domain_placeholder')"
+              @input="cfgDomain = ($event.target as HTMLInputElement).value"
+            >
           </div>
         </div>
-        <div class="settings-row">
+
+        <div class="settings-row" :class="{ 'settings-row--disabled': mode !== 'custom' }">
           <div class="settings-row__text">
-            <div class="settings-row__label">{{ t('settings.tunnel.token_label') }}</div>
+            <div class="settings-row__label">
+              {{ t('settings.tunnel.token_label') }}
+              <HelpTip :text="t('settings.tunnel.token_help')" />
+            </div>
             <div class="settings-row__desc">{{ t('settings.tunnel.token_desc') }}</div>
           </div>
           <div class="settings-row__control settings-row__control--stack">
             <div class="settings-row__control-row">
-              <SecretInput v-model="cfgToken" autocomplete="off" :placeholder="t('settings.tunnel.token_placeholder')" />
-              <BaseButton size="sm" :disabled="cfgValidating" @click="validateToken">{{ t('settings.tunnel.validate') }}</BaseButton>
+              <SecretInput
+                v-model="cfgToken"
+                :disabled="mode !== 'custom'"
+                autocomplete="off"
+                :placeholder="t('settings.tunnel.token_placeholder')"
+              />
+              <BaseButton size="sm" :disabled="mode !== 'custom' || cfgValidating" @click="validateToken">{{ t('settings.tunnel.validate') }}</BaseButton>
             </div>
             <div
               v-if="cfgValidResult"
@@ -290,24 +323,24 @@ onUnmounted(() => guardHub.unregister(provider))
             </div>
           </div>
         </div>
-      </template>
 
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.tunnel.protocol') }}</div>
-          <div class="settings-row__desc">{{ t('settings.tunnel.protocol_desc') }}</div>
+        <div class="settings-row" :class="{ 'settings-row--disabled': mode === 'off' }">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.tunnel.protocol') }}</div>
+            <div class="settings-row__desc">{{ t('settings.tunnel.protocol_desc') }}</div>
+          </div>
+          <div class="settings-row__control">
+            <BaseSelect
+              v-model="cfgProtocol"
+              :disabled="mode === 'off'"
+              :options="[
+                { value: 'auto', label: t('settings.tunnel.protocol_auto') },
+                { value: 'http2', label: 'HTTP/2' },
+                { value: 'quic', label: 'QUIC' },
+              ]"
+            />
+          </div>
         </div>
-        <div class="settings-row__control">
-          <BaseSelect v-model="cfgProtocol" :options="[
-            { value: 'auto', label: t('settings.tunnel.protocol_auto') },
-            { value: 'http2', label: 'HTTP/2' },
-            { value: 'quic', label: 'QUIC' },
-          ]" />
-        </div>
-      </div>
-    </SettingsGroup>
-  </div>
+    </div>
+  </SettingsModule>
 </template>
-
-<style scoped>
-</style>

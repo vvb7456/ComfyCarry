@@ -7,12 +7,9 @@ import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
-import SecretInput from '@/components/ui/SecretInput.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import HelpTip from '@/components/ui/HelpTip.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
-import FormField from '@/components/form/FormField.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
@@ -53,12 +50,6 @@ const actionLoading = ref<'start' | 'stop' | 'restart' | null>(null)
 const showAddKey = ref(false)
 const newKeysText = ref('')
 const addingKey = ref(false)
-
-// password form
-const pwSync = ref(false)
-const pwNew = ref('')
-const pwConfirm = ref('')
-const pwSubmitting = ref(false)
 
 // log stream
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
@@ -197,38 +188,6 @@ async function deleteKey(fingerprint: string) {
     toast(t('ssh.toast.key_deleted'), 'success')
     keys.value = keys.value.filter(k => k.fingerprint !== fingerprint)
   }
-}
-
-// ─── Password ─────────────────────────────────────────────────────────────────
-
-function onPwSyncChange() {
-  if (pwSync.value) {
-    pwNew.value = ''
-    pwConfirm.value = ''
-  }
-}
-
-async function setPassword() {
-  let password: string
-  if (pwSync.value) {
-    password = '_sync_dashboard_password_'
-  } else {
-    if (!pwNew.value) { toast(t('ssh.toast.pw_empty'), 'error'); return }
-    if (pwNew.value.length < 4) { toast(t('ssh.password.too_short'), 'error'); return }
-    if (pwNew.value !== pwConfirm.value) { toast(t('ssh.toast.pw_mismatch'), 'error'); return }
-    password = pwNew.value
-  }
-  pwSubmitting.value = true
-  const data = await post<ApiErrorBody & { ok?: boolean; sshd_restarted?: boolean }>('/api/ssh/password', { password })
-  pwSubmitting.value = false
-  if (!data) return
-  if (!data?.ok) { toast(apiErrorText(data, t('ssh.err.fallback')), 'error'); return }
-  let msg = pwSync.value ? t('ssh.password.synced') : t('ssh.password.set_success')
-  if (data.sshd_restarted) msg += t('ssh.password.sshd_restarted_suffix')
-  toast(msg, 'success')
-  pwNew.value = ''
-  pwConfirm.value = ''
-  await loadStatus()
 }
 
 // ─── Copy ─────────────────────────────────────────────────────────────────────
@@ -388,57 +347,6 @@ onUnmounted(() => {
             <AddCard class="ssh-key-card" size="compact" :label="t('ssh.keys.add_btn')" @click="showAddKey = true" />
           </template>
         </div>
-
-        <!-- Password column -->
-        <div>
-          <SectionHeader icon="lock" flush>{{ t('ssh.password.title') }}</SectionHeader>
-          <BaseCard density="default">
-            <form @submit.prevent="setPassword" autocomplete="off">
-              <input
-                type="text"
-                name="username"
-                autocomplete="username"
-                tabindex="-1"
-                aria-hidden="true"
-                style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"
-              />
-              <div style="display:flex;flex-direction:column;gap:10px">
-                <SecretInput
-                  v-model="pwNew"
-                  is-password
-                  :disabled="pwSync"
-                  autocomplete="new-password"
-                  :placeholder="pwSync ? t('ssh.password.use_comfycarry') : t('ssh.password.new')"
-                  input-class="form-input"
-                />
-                <SecretInput
-                  v-model="pwConfirm"
-                  is-password
-                  :disabled="pwSync"
-                  autocomplete="new-password"
-                  :placeholder="pwSync ? t('ssh.password.use_comfycarry') : t('ssh.password.confirm')"
-                  input-class="form-input"
-                />
-
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                  <label class="form-checkbox-label">
-                    <input
-                      type="checkbox"
-                      v-model="pwSync"
-                      @change="onPwSyncChange"
-                      class="form-checkbox"
-                    />
-                    <span style="font-size:.82rem">{{ t('ssh.password.use_comfycarry') }}</span>
-                    <HelpTip :text="t('ssh.password.help')" />
-                  </label>
-                  <BaseButton type="submit" variant="primary" size="sm" :loading="pwSubmitting">
-                    {{ pwSync ? t('ssh.password.sync_btn') : t('ssh.password.set_btn') }}
-                  </BaseButton>
-                </div>
-              </div>
-            </form>
-          </BaseCard>
-        </div>
       </div>
     </div>
   </div>
@@ -462,13 +370,6 @@ onUnmounted(() => {
 .ssh-source-badge { font-size: .68rem; padding: 1px 6px; border-radius: 3px; margin-left: 6px; }
 .ssh-source-badge--env { background: var(--bg4); color: var(--amber); }
 .ssh-source-badge--config { background: var(--bg4); color: var(--cyan); }
-
-/* Vue-unique: checkbox label row */
-.form-checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
-
-/* Vue-unique: form input (page-level variant) */
-.form-input { width: 100%; font-size: .85rem; background: var(--bg); border: 1px solid var(--bd); border-radius: 6px; padding: 8px 12px; color: var(--t1); outline: none; box-sizing: border-box; }
-.form-input:focus { border-color: var(--ac); }
 
 /* Vue-unique: slide-down transition */
 .slide-down-enter-active,

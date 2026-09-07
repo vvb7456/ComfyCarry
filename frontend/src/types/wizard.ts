@@ -44,7 +44,6 @@ export interface WizardConfig {
   plugins: string[]
   install_fa2: boolean
   install_sa2: boolean
-  ssh_password: string
   ssh_keys: string[]
   wizard_sync_rules: WizardSyncRule[]
   wizard_remotes: WizardRemote[]
@@ -58,8 +57,8 @@ export interface WizardConfig {
   _imported_sync_rules?: boolean
   /** Runtime-only: count of imported sync rules for summary display */
   _imported_sync_rules_count?: number
-  /** Runtime-only: SSH password syncs with dashboard password */
-  ssh_pw_sync?: boolean
+  /** Runtime-only: allow SSH login with the dashboard password (default on) */
+  ssh_pw_follow?: boolean
 }
 
 // ── Plugins ──────────────────────────────────────────────────
@@ -182,7 +181,7 @@ export interface SetupState {
   deploy_error: string
   wizard_sync_rules?: WizardSyncRule[]
   wizard_remotes?: WizardRemote[]
-  ssh_password?: string
+  ssh_pw_follow?: boolean
   ssh_keys?: string[]
 
   // Enriched by the endpoint

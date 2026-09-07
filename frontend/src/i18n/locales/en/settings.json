@@ -1,12 +1,28 @@
 {
   "title": "Settings",
   "restart_btn": "Restart",
+  "section": {
+    "panel": "Panel",
+    "genmodels": "Generation & Models",
+    "connect": "Connection & Sync",
+    "about": "About"
+  },
+  "domains": {
+    "auth": "Login & Authentication",
+    "configmgmt": "Configuration",
+    "prompt": "Prompt Editor",
+    "llm": "LLM Service",
+    "civitai": "CivitAI",
+    "sync": "Cloud Sync",
+    "tunnel": "Tunnel"
+  },
   "unsaved": {
     "title": "Unsaved changes",
-    "message": "Settings have been modified but not saved. Choose an action to proceed:",
-    "message_banner": "Unsaved changes",
-    "discard": "Discard changes",
-    "cancel": "Stay on this tab"
+    "leave_message": "The following modules have unsaved changes: {modules}",
+    "go_fix": "Review",
+    "discard_leave": "Discard and leave",
+    "chip": "{n} unsaved",
+    "chip_tip": "Jump to the first unsaved module"
   },
   "err": {
     "invalid_config": "Invalid configuration file",
@@ -29,7 +45,7 @@
     "reinitialized": "Reset complete, refresh to enter Setup Wizard"
   },
   "password": {
-    "title": "ComfyCarry Password",
+    "title": "Change Password",
     "current": "Current Password",
     "current_placeholder": "Enter current password",
     "new": "New Password",
@@ -45,16 +61,27 @@
     "row_desc": "Change the password for the ComfyCarry panel",
     "change_btn": "Change password"
   },
+  "ssh_password": {
+    "label": "SSH password follow",
+    "desc": "The root SSH password follows panel password changes",
+    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected",
+    "enabled_toast": "SSH password follow enabled, root password synced to the panel password",
+    "disabled_toast": "SSH password follow disabled, SSH only allows public key login",
+    "lockout_title": "Disable SSH password login",
+    "lockout_confirm": "No public key is configured. After disabling, you will not be able to log in to SSH with a password. Continue?",
+    "lockout_btn": "Disable anyway"
+  },
   "api_key": {
-    "help": "For external scripts or apps to access the API via X-API-Key / Bearer",
+    "help": "Carried as X-API-Key / Bearer header when external scripts or apps call the panel API",
     "regenerate": "Regenerate",
     "regenerate_confirm": "Regenerate API Key? The old key will stop working immediately.",
     "regenerated": "API Key regenerated",
     "regenerate_failed": "Regeneration failed",
-    "title": "API Key"
+    "title": "ComfyCarry API Key",
+    "row_desc": "Credential for external scripts to access the API"
   },
   "config": {
-    "title": "Import/Export Config",
+    "title": "Configuration",
     "export_desc": "Export all settings to a JSON file",
     "export_btn": "Export",
     "import_desc": "Restore settings from a JSON backup",
@@ -70,6 +97,7 @@
   },
   "reinit": {
     "title": "Re-initialize",
+    "desc": "Reset the ComfyUI installation and reopen the setup wizard",
     "btn": "Re-initialize",
     "keep_models": "Keep model files & outputs",
     "confirm": "Re-initialize? The ComfyUI installation will be reset and the setup wizard reopened.",
@@ -79,10 +107,9 @@
     "partial_fail": "Some operations failed"
   },
   "about": {
-    "title": "About",
     "desc": "A simpler way to deploy, manage, and create with ComfyUI.",
+    "project_info": "Project Info",
     "version": "Version",
-    "project_info": "Project",
     "github": "GitHub",
     "dockerhub": "Docker Hub",
     "credit_prefix": "Powered by ",
@@ -110,7 +137,7 @@
   "restart_confirm": "Restart ComfyCarry?\n\nThe page will be briefly unavailable.",
   "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds...",
   "civitai": {
-    "key_title": "API Key",
+    "key_title": "CivitAI API Key",
     "placeholder": "Paste API Key",
     "saved": "API Key saved",
     "save_failed": "Save failed",
@@ -118,7 +145,6 @@
     "cleared": "API Key cleared",
     "err_empty": "Please enter API Key",
     "nsfw": {
-      "title": "NSFW Content",
       "help": "Browsing level controls which models are shown; the blur switch masks NSFW images of shown content",
       "level_label": "Browsing level",
       "level_desc": "Which models are shown in search results",
@@ -134,19 +160,14 @@
     "key_link": "CivitAI account settings",
     "key_desc_suffix": "; used for model search and downloads"
   },
-  "sync": {
-    "title": "Cloud Sync",
-    "help": "Sync engine runtime parameters"
-  },
+  "sync": {},
   "tunnel": {
-    "title": "Tunnel",
-    "help": "Expose this workspace to the internet via Cloudflare Tunnel",
     "mode": {
       "label": "Mode",
       "off": "Off",
       "public": "Public",
       "custom": "Custom",
-      "desc": "How the tunnel is exposed"
+      "desc": "Public uses a built-in domain; custom uses your own domain"
     },
     "subdomain": "Subdomain",
     "root_domain": "Root domain",
@@ -168,18 +189,19 @@
       "destroy_to_public": "Switching to the public tunnel will remove the current custom tunnel. Continue?",
       "update_restart": "The tunnel will be rebuilt with the new parameters and restarted. Continue?"
     },
-    "subdomain_desc": "Leave empty for auto assignment",
-    "subdomain_placeholder": "mytunnel",
-    "custom_subdomain_desc": "Combined with the root domain to form the final address",
-    "root_domain_desc": "Must be hosted on Cloudflare",
+    "subdomain_desc": "Prefix of the access URL",
+    "subdomain_placeholder": "Auto-generated if empty",
+    "custom_subdomain_desc": "Prefix of the access URL",
+    "root_domain_desc": "Main domain of the access URL",
     "root_domain_placeholder": "example.com",
     "token_label": "API Token",
-    "token_desc": "Requires Tunnel and DNS edit permissions",
-    "protocol_desc": "Connection to the Cloudflare edge"
+    "token_desc": "Creates the tunnel and DNS records",
+    "protocol_desc": "Connection to the Cloudflare edge",
+    "root_domain_help": "Must be hosted on Cloudflare",
+    "token_help": "Requires Tunnel and DNS edit permissions"
   },
   "llm": {
     "provider": {
-      "title": "Service Provider",
       "help": "Official entries use preset endpoints; for third-party endpoints, choose the matching custom entry.",
       "label": "Provider",
       "select_placeholder": "Select provider",
@@ -191,7 +213,7 @@
       "custom_openai": "Custom (OpenAI Compatible)",
       "custom_responses": "Custom (OpenAI Responses)",
       "custom_anthropic": "Custom (Anthropic)",
-      "api_key": "API Key",
+      "api_key": "Provider API Key",
       "api_key_placeholder": "Paste API Key",
       "base_url": "Base URL",
       "base_url_placeholder_openai": "https://api.example.com/v1",
@@ -202,7 +224,6 @@
       "api_key_desc": "Access key for the selected provider"
     },
     "model": {
-      "title": "Model",
       "label": "Model",
       "refresh_hint": "Refresh to fetch model list",
       "input_placeholder": "Select or enter a model name",
@@ -220,7 +241,6 @@
       "model_help": "Fetched automatically when the dropdown opens; you can also type a model name directly"
     },
     "params": {
-      "title": "Parameters",
       "temperature": "Temperature",
       "max_tokens": "Max Response Length",
       "stream": "Streaming",
@@ -232,7 +252,6 @@
       "stream_help": "Some platforms filter streamed content strictly; turn off if needed"
     },
     "test_btn": "Test",
-    "test_desc": "Send one real request with the current configuration",
     "test_success": "Connection successful",
     "test_failed": "Connection failed",
     "err_no_provider": "Please select a provider first",
@@ -244,15 +263,12 @@
     "test_title": "Test connection"
   },
   "prompt": {
-    "tab_label": "Prompt",
     "saved": "Prompt settings saved",
     "tag_library": {
-      "title": "Tag Library",
       "show_nsfw": "Show NSFW tags",
       "show_nsfw_desc": "Include NSFW tags in tag lists and autocomplete"
     },
     "translation": {
-      "title": "Translation",
       "show": "Show Chinese translation",
       "provider": "Translation engine",
       "provider_auto": "Auto",
@@ -267,7 +283,6 @@
       "provider_desc": "Service used for Chinese translation; Auto = pick by availability"
     },
     "normalize": {
-      "title": "Normalization",
       "enable": "Enable normalization",
       "comma": "Half-width commas",
       "period": "Half-width periods",
@@ -282,7 +297,6 @@
       "escape_bracket_desc": "Automatically add backslashes (\\\\) before brackets to keep weight syntax"
     },
     "autocomplete": {
-      "title": "Autocomplete",
       "limit": "Max results",
       "limit_desc": "Number of suggested tags while typing"
     }

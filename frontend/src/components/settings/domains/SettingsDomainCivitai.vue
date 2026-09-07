@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * 设置 tab: CivitAI — API Key + NSFW 浏览设置 (两级)。
- * 守卫式表单: dirty → shell banner / 路由拦截, 无保存按钮。
+ * 设置模块: CivitAI — API Key + NSFW 浏览设置 (两级)。
+ * 单页 v3: 模块头 dirty 时浮现保存, 无放弃按钮; onMounted 加载 + 本地 skeleton/错误重试;
+ * dirty 经 useSettingsGuard 只读登记, 离开守卫由 SettingsPage 统一处理。
  * NSFW 两级:
  *  - 浏览级别三档 (仅PG=1 / PG–R=7 / 全部=31): 控制出现的模型内容范围
  *  - 模糊 NSFW 开关: 已出现内容中 NSFW 图是否模糊
@@ -9,8 +10,9 @@
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import SettingsGroup from '@/components/settings/SettingsGroup.vue'
+import SettingsModule from '@/components/settings/SettingsModule.vue'
 import SettingsGroupToggleRow from '@/components/settings/SettingsGroupToggleRow.vue'
+import HelpTip from '@/components/ui/HelpTip.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -18,10 +20,10 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useCivitaiNsfw } from '@/composables/useCivitaiNsfw'
 import { useToast } from '@/composables/useToast'
-import { useSettingsGuard } from '@/composables/useSettingsGuard'
+import { useSettingsGuard } from '@/composables'
 import { apiErrorText } from '@/utils/apiError'
 
-defineOptions({ name: 'SettingsTabCivitai' })
+defineOptions({ name: 'SettingsDomainCivitai' })
 
 const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
@@ -76,7 +78,7 @@ async function loadSettings() {
   nsfwLoaded.value = true
 }
 
-// ── 保存 (守卫调用) ──
+// ── 保存 (卡片级) ──
 async function saveAll(): Promise<boolean> {
   civitaiSaving.value = true
   try {
@@ -108,93 +110,108 @@ async function saveAll(): Promise<boolean> {
   }
 }
 
-function discardAll(): Promise<void> {
-  return loadSettings()
-}
+// ── 放弃: 走离开守卫「放弃并离开」(组件卸载即丢), 模块内不提供按钮 ──
 
 const { save: saveNsfwShared } = useCivitaiNsfw()
 
-// ── 守卫注册 ──
-const guardHub = useSettingsGuard()
-const provider = {
-  isDirty: () => keyDirty.value || nsfwDirty.value,
-  isSaving: () => civitaiSaving.value,
-  save: saveAll,
-  discard: discardAll,
-}
-
-// ── 加载失败态 (async setup 由 Suspense 门控首渲, 失败显示错误+重试) ──
+// ── onMounted 加载 (替代 async setup; skeleton 门控首渲防默认值跳变) ──
+const loading = ref(true)
 const loadError = ref(false)
 
-async function retryLoad(): Promise<void> {
+async function loadAll(): Promise<void> {
+  loading.value = true
   await loadSettings()
+  loading.value = false
 }
 
-onUnmounted(() => guardHub.unregister(provider))
+// ── dirty 登记 (只读) ──
+const guardHub = useSettingsGuard()
+const dirtyEntry = {
+  id: 'civitai',
+  label: () => t('settings.domains.civitai'),
+  isDirty: () => keyDirty.value || nsfwDirty.value,
+}
 
-// async setup: 数据就绪后才挂载渲染
-await loadSettings()
-onMounted(() => guardHub.register(provider))
+onMounted(() => {
+  guardHub.register(dirtyEntry)
+  void loadAll()
+})
+onUnmounted(() => guardHub.unregister(dirtyEntry))
 </script>
 
 <template>
-  <div class="tab-panel settings-centered">
-    <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
-    <SettingsGroup v-if="loadError">
-      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
-        <BaseButton size="sm" @click="retryLoad">{{ t('common.btn.retry') }}</BaseButton>
-      </EmptyState>
-    </SettingsGroup>
+  <SettingsModule
+    id="settings-focus-civitai"
+    :title="t('settings.domains.civitai')"
+    :dirty="keyDirty || nsfwDirty"
+    :saving="civitaiSaving"
+    :disabled="loading || loadError"
+    @save="saveAll"
+  >
 
-    <template v-else>
-    <SettingsGroup icon="key" :title="t('settings.civitai.key_title')">
+    <div v-if="loading" class="settings-skeleton" aria-hidden="true">
+      <div v-for="i in 2" :key="i" class="settings-skeleton__row">
+        <div class="settings-skeleton__lines">
+          <div class="settings-skeleton__line settings-skeleton__line--text" />
+          <div class="settings-skeleton__line settings-skeleton__line--text-sm" />
+        </div>
+        <div class="settings-skeleton__line settings-skeleton__line--control" />
+      </div>
+    </div>
+
+    <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
+    <div v-else-if="loadError">
+      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
+        <BaseButton size="sm" @click="loadAll">{{ t('common.btn.retry') }}</BaseButton>
+      </EmptyState>
+    </div>
+
+    <div v-else class="settings-lines">
       <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.civitai.key_title') }}</div>
-          <div class="settings-row__desc">
-            {{ t('settings.civitai.key_desc_prefix') }}
-            <a href="https://civitai.com/user/account" target="_blank" class="key-desc-link">{{ t('settings.civitai.key_link') }}</a>
-            {{ t('settings.civitai.key_desc_suffix') }}
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.civitai.key_title') }}</div>
+            <div class="settings-row__desc">
+              {{ t('settings.civitai.key_desc_prefix') }}
+              <a href="https://civitai.com/user/account" target="_blank" class="key-desc-link">{{ t('settings.civitai.key_link') }}</a>
+              {{ t('settings.civitai.key_desc_suffix') }}
+            </div>
+          </div>
+          <div class="settings-row__control">
+            <SecretInput
+              v-model="civitaiKey"
+              :placeholder="t('settings.civitai.placeholder')"
+              autocomplete="off"
+            />
           </div>
         </div>
-        <div class="settings-row__control">
-          <SecretInput
-            v-model="civitaiKey"
-            :placeholder="t('settings.civitai.placeholder')"
-            autocomplete="off"
-          />
-        </div>
-      </div>
-    </SettingsGroup>
+      
 
-    <SettingsGroup
-      icon="visibility_off"
-      :title="t('settings.civitai.nsfw.title')"
-      :help="t('settings.civitai.nsfw.help')"
-    >
-      <div class="settings-row">
-        <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('settings.civitai.nsfw.level_label') }}</div>
-          <div class="settings-row__desc">{{ t('settings.civitai.nsfw.level_desc') }}</div>
+              <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">
+              {{ t('settings.civitai.nsfw.level_label') }}
+              <HelpTip :text="t('settings.civitai.nsfw.help')" />
+            </div>
+            <div class="settings-row__desc">{{ t('settings.civitai.nsfw.level_desc') }}</div>
+          </div>
+          <div class="settings-row__control">
+            <SegmentedControl
+              :model-value="String(nsfwLevelDraft)"
+              :options="nsfwLevelOptions"
+              size="md"
+              block
+              @update:model-value="v => nsfwLevelDraft = Number(v)"
+            />
+          </div>
         </div>
-        <div class="settings-row__control">
-          <SegmentedControl
-            :model-value="String(nsfwLevelDraft)"
-            :options="nsfwLevelOptions"
-            size="md"
-            block
-            @update:model-value="v => nsfwLevelDraft = Number(v)"
-          />
-        </div>
-      </div>
-      <SettingsGroupToggleRow
-        :label="t('settings.civitai.nsfw.blur')"
-        :desc="t('settings.civitai.nsfw.blur_desc')"
-        v-model="nsfwBlurDraft"
-      />
-    </SettingsGroup>
-    </template>
-  </div>
+        <SettingsGroupToggleRow
+          :label="t('settings.civitai.nsfw.blur')"
+          :desc="t('settings.civitai.nsfw.blur_desc')"
+          v-model="nsfwBlurDraft"
+        />
+      
+    </div>
+  </SettingsModule>
 </template>
 
 <style scoped>
