@@ -1,0 +1,184 @@
+/* ── Settings page: group 式布局公共样式 ──
+   规范: 组 = SettingsGroup (组头 icon+title+helptip+collapse);
+   行 = .settings-row (左 label+desc / 右控件, hairline 分隔)。
+   引用方: SettingsPage 及其各 tab 组件。 */
+
+/* 行: 水平两栏, 左侧文案右侧控件 */
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4, 16px);
+    padding: 14px 0;
+    min-width: 0;
+}
+
+/* 行首/末行贴边 (组头下方分隔线已存在, 首行不需要额外上内边距) */
+.settings-row:first-child {
+    padding-top: 12px;
+}
+
+.settings-row:last-child {
+    padding-bottom: 0;
+}
+
+.settings-row__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-row__label {
+    margin: 0;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--t1);
+    line-height: 1.4;
+}
+
+.settings-row__desc {
+    margin-top: 2px;
+    font-size: .78rem;
+    line-height: 1.5;
+    color: var(--t3);
+}
+
+.settings-row__control {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2, 8px);
+    /* 控件定宽列: 所有输入型控件统一等宽 (select/input/secret/number/segmented) */
+    width: min(340px, 44%);
+    min-width: 180px;
+}
+
+/* 控件列内自适应: SecretInput / SegmentedControl 根元素无固有宽度, 统一撑满列宽 */
+.settings-row__control .secret-input,
+.settings-row__control .seg-control {
+    width: 100%;
+}
+
+/* 控件列竖排 (range+刻度 / 输入+校验反馈 等多元素组合) */
+.settings-row__control--stack {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+/* 控件列内的组合行: 输入控件 flex:1 + 右侧图标/动作按钮 */
+.settings-row__control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.settings-row__control-row > :first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 动作行: 左侧 title+subtitle (与设置行同构) + 右侧按钮 */
+.settings-action__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-action__title {
+    margin: 0;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--t1);
+    line-height: 1.4;
+}
+
+/* 通栏行: 控件占满整行 (textarea / range) */
+.settings-row--block {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.settings-row--block .settings-row__control {
+    width: 100%;
+    min-width: 0;
+}
+
+/* 行内校验结果 (✓/✗), 控件列下方 */
+.settings-row__feedback {
+    margin-top: 4px;
+    font-size: .78rem;
+    line-height: 1.5;
+}
+
+.settings-row__feedback--ok { color: var(--green); }
+.settings-row__feedback--err { color: var(--red); }
+
+/* 动作行: 说明文字左 + 按钮右 (导出/导入/重启等立即动作) */
+.settings-action {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4, 16px);
+    padding: 14px 0;
+    min-width: 0;
+}
+
+.settings-action:first-child { padding-top: 12px; }
+.settings-action:last-child { padding-bottom: 0; }
+
+.settings-action__copy {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: .8rem;
+    line-height: 1.5;
+    color: var(--t2);
+}
+
+.settings-action .base-btn {
+    flex-shrink: 0;
+}
+
+/* 卡片底部操作行 (组内或组外右对齐按钮) */
+.settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--sp-2, 8px);
+    margin-top: 14px;
+}
+
+/* 说明横幅 (上下文提示, 非校验) */
+.settings-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--bd);
+    border-radius: var(--rs);
+    background: var(--bg2);
+    color: var(--t2);
+    font-size: .8rem;
+    line-height: 1.55;
+}
+
+.settings-note > .ms {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* 组间留白: settings-centered 列内相邻 SettingsGroup 间距 */
+.settings-centered > .settings-group + .settings-group,
+.settings-centered > * + .settings-group {
+    margin-top: 32px;
+}
+
+@media (max-width: 640px) {
+    .settings-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .settings-row__control {
+        width: 100%;
+        min-width: 0;
+    }
+}

@@ -11,6 +11,7 @@ export const ICON_CODEPOINTS: Record<string, string> = {
   'article': '\uef87',
   'auto_awesome': '\ue65f',
   'auto_fix_high': '\ue663',
+  'autorenew': '\ue863',
   'block': '\uf08c',
   'bolt': '\uea0b',
   'book_2': '\uf53e',

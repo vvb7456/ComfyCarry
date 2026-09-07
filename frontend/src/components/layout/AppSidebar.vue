@@ -74,9 +74,10 @@ const navGroups: NavGroup[] = [
 const currentPage = computed(() => route.name as string)
 
 // 激活态匹配: 'generate' 入口需兼容子路径 (/generate/image, /generate/video 等);
-// 其余按 route.name 精确匹配
+// 'settings' 同理 (子路由 /settings/* 归属设置页); 其余按 route.name 精确匹配
 function isNavActive(item: NavItem): boolean {
   if (item.page === 'generate') return route.path.startsWith('/generate')
+  if (item.page === 'settings') return route.path.startsWith('/settings')
   return currentPage.value === item.page
 }
 

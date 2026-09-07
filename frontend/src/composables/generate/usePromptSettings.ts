@@ -44,8 +44,9 @@ export function usePromptSettings() {
   const { get, put } = useApiFetch()
 
   /** 从后端加载设置 (首次调用时执行，后续跳过; force=true 强制重新获取) */
-  async function load(force = false) {
-    if (loaded.value && !force) return
+  /** 拉取设置; force=true 强制重载基线。返回是否成功 (失败时保持原状态) */
+  async function load(force = false): Promise<boolean> {
+    if (loaded.value && !force) return true
     const res = await get<PromptEditorSettings & {
       translate_providers?: string[]
     }>('/api/prompt-library/settings')
@@ -65,7 +66,9 @@ export function usePromptSettings() {
       translateProviders.value = res.translate_providers ?? []
       loaded.value = true
       snapshot.value = takeSnapshot()
+      return true
     }
+    return false
   }
 
   /** 保存设置到后端 */

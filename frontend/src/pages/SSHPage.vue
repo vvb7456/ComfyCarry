@@ -335,7 +335,7 @@ onUnmounted(() => {
       </div>
 
       <!-- ─── Config Tab ───────────────────────────────────────────────── -->
-      <div v-show="activeTab === 'config'" class="tab-panel ssh-auth-grid">
+      <div v-show="activeTab === 'config'" class="tab-panel settings-centered">
         <!-- SSH Keys column -->
         <div>
           <SectionHeader icon="lock" flush>{{ t('ssh.keys.title') }}</SectionHeader>
@@ -477,10 +477,6 @@ onUnmounted(() => {
 .slide-down-leave-to { max-height: 0; opacity: 0; }
 .slide-down-enter-to,
 .slide-down-leave-from { max-height: 300px; opacity: 1; }
-
-/* ── SSH Auth Grid ── */
-.ssh-auth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 1.5vw, 28px); align-items: start; }
-@media (max-width: 900px) { .ssh-auth-grid { grid-template-columns: 1fr; } }
 
 /* ── Key Cards ── */
 .ssh-key-card { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }

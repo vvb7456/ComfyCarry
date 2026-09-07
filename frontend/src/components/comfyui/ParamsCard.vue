@@ -318,14 +318,14 @@ defineExpose({ saveParams, loadParams, isDirty, saving })
 
 .params-groups {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--sp-4);
   align-items: stretch;
 }
 
 .runtime-baseline {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr);
+  grid-template-columns: 1fr;
   gap: var(--sp-5);
   align-items: stretch;
   --card-py-roomy: 20px;
@@ -374,8 +374,8 @@ defineExpose({ saveParams, loadParams, isDirty, saving })
 
 .runtime-version {
   min-width: 0;
-  padding-left: var(--sp-5);
-  border-left: 1px solid var(--bd);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--bd);
 }
 
 .param-group {
@@ -443,21 +443,6 @@ defineExpose({ saveParams, loadParams, isDirty, saving })
 /* NumberInput 根是 flex 自适应容器, 撑满右侧控件区与 select/input 对齐 */
 .param-group__fields :deep(.number-input) { width: 100%; }
 .param-disabled { opacity: .45; }
-
-@media (max-width: 900px) {
-  .params-groups { grid-template-columns: 1fr; }
-
-  .runtime-baseline {
-    grid-template-columns: 1fr;
-  }
-
-  .runtime-version {
-    padding-top: var(--sp-4);
-    padding-left: 0;
-    border-top: 1px solid var(--bd);
-    border-left: none;
-  }
-}
 
 @media (max-width: 640px) {
   .runtime-extra {

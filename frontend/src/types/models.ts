@@ -1,6 +1,8 @@
 export interface ModelMetaImage {
   url: string
   type?: string
+  /** 图级 NSFW 分级 (1=SFW, 2/4/8/16/32=NSFW); hide/blur 判断依据 */
+  nsfwLevel?: string | number
   seed?: number | string
   steps?: number
   cfg?: number

@@ -1,5 +1,8 @@
 {
   "title": "模型管理",
+  "nsfw": {
+    "reveal_hint": "NSFW 内容已模糊，点击查看原图"
+  },
   "tabs": {
     "local": "本地模型",
     "huggingface": "官方模型",

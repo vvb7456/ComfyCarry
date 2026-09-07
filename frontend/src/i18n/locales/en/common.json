@@ -16,7 +16,8 @@
     "show": "Show",
     "hide": "Hide",
     "clear": "Clear",
-    "logout": "Logout"
+    "logout": "Logout",
+    "retry": "Retry"
   },
   "status": {
     "loading": "Loading...",
@@ -61,6 +62,7 @@
   "use_custom_value": "Use “{value}”",
   "search_hint": "Search…",
   "loading": "Loading...",
+  "load_failed": "Failed to load",
   "empty": "No data",
   "filter_hint": "Filter…",
   "chip_more": "+{n} more",

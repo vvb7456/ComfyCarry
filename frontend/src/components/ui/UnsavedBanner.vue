@@ -70,6 +70,9 @@ const emit = defineEmits<{
   border: 1px solid color-mix(in srgb, var(--c-caution) 25%, var(--bd));
   color: var(--c-caution);
   margin-bottom: var(--sp-3);
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* 吸附在 TabSwitcher 下方: .page-body 上方留白 + TabSwitcher 行高 + 间距 (变量见 layout.css) */

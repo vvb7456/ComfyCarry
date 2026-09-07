@@ -40,27 +40,33 @@
     "err_current": "请输入当前密码",
     "err_new": "请输入新密码",
     "err_min_length": "密码至少 4 个字符",
-    "err_mismatch": "两次输入的密码不一致"
+    "err_mismatch": "两次输入的密码不一致",
+    "row_label": "登录密码",
+    "row_desc": "修改登录 ComfyCarry 面板的密码",
+    "change_btn": "修改密码"
   },
   "api_key": {
     "help": "用于外部脚本或应用通过 X-API-Key / Bearer 方式访问 API",
     "regenerate": "重新生成",
     "regenerate_confirm": "确定要重新生成 API Key 吗？旧 Key 将立即失效。",
     "regenerated": "API Key 已重新生成",
-    "regenerate_failed": "重新生成失败"
+    "regenerate_failed": "重新生成失败",
+    "title": "API Key"
   },
   "config": {
     "title": "导入/导出配置",
-    "export_desc": "导出 ComfyCarry 的所有配置为 JSON 文件",
-    "export_btn": "导出配置",
-    "import_desc": "从 JSON 文件恢复配置",
-    "import_btn": "导入配置",
+    "export_desc": "将所有设置导出为 JSON 文件",
+    "export_btn": "导出",
+    "import_desc": "从 JSON 备份文件恢复设置",
+    "import_btn": "导入",
     "exported": "配置已导出",
     "export_failed": "导出失败",
     "invalid_format": "无效的配置文件格式",
     "import_confirm": "确定要导入配置吗？\n\n导出于：{date}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。",
     "import_failed": "导入失败",
-    "unknown_date": "未知"
+    "unknown_date": "未知",
+    "export_title": "导出配置",
+    "import_title": "导入配置"
   },
   "reinit": {
     "title": "重新初始化",
@@ -81,11 +87,6 @@
     "dockerhub": "Docker Hub",
     "credit_prefix": "由 ",
     "credit_suffix": " 开发"
-  },
-  "maintenance": {
-    "title": "维护",
-    "restart_desc": "重启 ComfyCarry 服务",
-    "reinit_desc": "重新进入部署向导"
   },
   "update": {
     "up_to_date": "已是最新版本",
@@ -109,22 +110,79 @@
   "restart_confirm": "确定要重启 ComfyCarry 吗？\n\n页面将短暂不可用。",
   "restarting": "ComfyCarry 正在重启，3 秒后自动刷新...",
   "civitai": {
-    "key_prefix": "API Key 从",
+    "key_title": "API 密钥",
+    "key_desc_prefix": "在",
     "key_link": "CivitAI 账户设置",
-    "key_suffix": "中生成",
-    "placeholder": "输入 CivitAI API Key...",
+    "key_desc_suffix": "中生成，用于模型搜索与下载",
+    "placeholder": "粘贴 API 密钥",
     "saved": "API Key 已保存",
     "save_failed": "保存失败",
     "clear_confirm": "确定要清除 CivitAI API Key 吗？",
     "cleared": "API Key 已清除",
-    "err_empty": "请输入 API Key"
+    "err_empty": "请输入 API Key",
+    "nsfw": {
+      "title": "NSFW 内容",
+      "help": "浏览级别决定展示哪些模型；模糊开关决定已出现的 NSFW 图片是否打码",
+      "level_label": "浏览级别",
+      "level_desc": "决定搜索结果中展示哪些模型",
+      "level": {
+        "pg": "全年龄",
+        "pg_r": "成人",
+        "all": "全部"
+      },
+      "blur": "模糊 NSFW 图片",
+      "blur_desc": "预览图打码，点击后显示原图"
+    }
+  },
+  "sync": {
+    "title": "云同步",
+    "help": "同步引擎的运行参数"
+  },
+  "tunnel": {
+    "title": "Tunnel",
+    "help": "通过 Cloudflare Tunnel 从公网访问本工作区",
+    "mode": {
+      "label": "模式",
+      "desc": "隧道的接入方式",
+      "off": "关闭",
+      "public": "公共",
+      "custom": "自定义"
+    },
+    "subdomain": "子域名",
+    "root_domain": "根域名",
+    "subdomain_desc": "留空自动分配",
+    "subdomain_placeholder": "mytunnel",
+    "custom_subdomain_desc": "与根域名组合为最终访问地址",
+    "root_domain_desc": "需已在 Cloudflare 托管",
+    "root_domain_placeholder": "example.com",
+    "token_label": "API Token",
+    "token_desc": "需 Tunnel 与 DNS 编辑权限",
+    "token_placeholder": "粘贴 API Token",
+    "subdomain_error": "子域名格式无效",
+    "protocol": "传输协议",
+    "protocol_desc": "与 Cloudflare 边缘的连接方式",
+    "protocol_auto": "自动",
+    "validate": "验证",
+    "validating": "验证中",
+    "validate_failed": "验证失败",
+    "need_token_domain": "请填写 API Token 与域名",
+    "enabling_public": "正在启用公共 Tunnel...",
+    "enable_failed": "启用失败",
+    "applying": "正在应用配置...",
+    "applied": "配置已生效",
+    "save_failed": "保存失败",
+    "confirm": {
+      "off": "确定要关闭 Tunnel 吗？现有隧道与域名映射将被移除。",
+      "destroy_to_public": "切换到公共 Tunnel 将移除当前自定义隧道，继续吗？",
+      "update_restart": "将使用新参数重建隧道并重启，继续吗？"
+    }
   },
   "llm": {
     "provider": {
       "title": "服务提供商",
       "help": "官方项使用预设地址；第三方端点请选择与其接口一致的自定义项。",
       "label": "服务商",
-      "select_placeholder": "— 选择服务提供商 —",
+      "select_placeholder": "选择服务商",
       "openai": "OpenAI",
       "deepseek": "DeepSeek",
       "openrouter": "OpenRouter",
@@ -133,13 +191,15 @@
       "custom_openai": "自定义（OpenAI 兼容）",
       "custom_responses": "自定义（OpenAI Responses）",
       "custom_anthropic": "自定义（Anthropic）",
-      "api_key": "API密钥",
-      "api_key_placeholder": "输入 API密钥...",
-      "base_url": "基础URL",
-      "base_url_placeholder_openai": "API 根地址，例如 https://api.example.com/v1",
-      "base_url_placeholder_anthropic": "API 根地址，例如 https://api.example.com（不要包含 /v1/messages）",
-      "base_url_help_openai": "填写 API 根地址，不要填写 /chat/completions 或 /responses。",
-      "base_url_help_anthropic": "填写 API 根地址，不要填写 /v1/messages。"
+      "api_key": "API 密钥",
+      "api_key_placeholder": "粘贴 API 密钥",
+      "base_url": "基础 URL",
+      "base_url_placeholder_openai": "https://api.example.com/v1",
+      "base_url_placeholder_anthropic": "https://api.example.com",
+      "base_url_desc_openai": "API 根地址，不含 /chat/completions 或 /responses",
+      "base_url_desc_anthropic": "API 根地址，不含 /v1/messages",
+      "label_desc": "当前使用的 LLM 服务商",
+      "api_key_desc": "当前服务商的访问密钥"
     },
     "model": {
       "title": "模型",
@@ -156,18 +216,24 @@
       "none_available": "无可用模型",
       "context_fmt": "上下文：{n} tokens",
       "input_fmt": "输入：${n}/M",
-      "output_fmt": "输出：${n}/M"
+      "output_fmt": "输出：${n}/M",
+      "model_help": "展开下拉时自动获取模型列表；也可直接输入模型名称"
     },
     "params": {
       "title": "参数",
       "temperature": "温度",
-      "temperature_help": "0.0 - 2.0，越高越有创意，越低越稳定。推荐值：创作类 0.8-1.2，翻译/描述类 0.3-0.5",
+      "temperature_desc": "控制回复的随机性（0–2）",
       "max_tokens": "最大回复长度",
-      "max_tokens_help": "以词符数 (token) 计的最大输出长度。提示词生成通常 500-1000 即可，长对话可设更高",
+      "max_tokens_desc": "单次回复的最大 token 数",
       "stream": "流式传输",
-      "stream_help": "开启后 LLM 将逐字输出响应。关闭可避免部分平台在流式模式下的内容过滤问题"
+      "stream_desc": "逐字输出回复",
+      "temperature_help": "创作类建议 0.8–1.2；翻译、描述类建议 0.3–0.5",
+      "max_tokens_help": "提示词生成 500–1000 即可；长对话可设更高",
+      "stream_help": "部分平台在流式模式下内容过滤严格，可关闭"
     },
-    "test_btn": "测试连接",
+    "test_title": "测试连接",
+    "test_btn": "测试",
+    "test_desc": "使用当前配置发送一次真实请求",
     "test_success": "连接成功",
     "test_failed": "连接失败",
     "err_no_provider": "请先选择服务提供商",
@@ -182,12 +248,15 @@
     "saved": "提示词设置已保存",
     "tag_library": {
       "title": "标签库",
-      "show_nsfw": "显示 NSFW 标签"
+      "show_nsfw": "显示 NSFW 标签",
+      "show_nsfw_desc": "在标签列表与自动补全中包含 NSFW 标签"
     },
     "translation": {
       "title": "翻译",
       "show": "显示中文翻译",
+      "show_desc": "在提示词下方显示中文对照",
       "provider": "翻译引擎",
+      "provider_desc": "中文翻译使用的服务，自动 = 按可用性选择",
       "provider_auto": "自动",
       "providers": {
         "local_db": "本地数据库",
@@ -200,15 +269,22 @@
     "normalize": {
       "title": "规格化",
       "enable": "启用规格化",
-      "comma": "全角逗号 → 半角逗号",
-      "period": "全角句号 → 半角句号",
-      "bracket": "全角括号 → 半角括号",
-      "underscore": "下划线 → 空格",
-      "escape_bracket": "括号转义 (自动加 \\)"
+      "enable_desc": "提交前自动清理标点与符号",
+      "comma": "半角逗号",
+      "comma_desc": "将全角逗号（，）替换为半角逗号（,）",
+      "period": "半角句号",
+      "period_desc": "将全角句号（。）替换为半角句号（.）",
+      "bracket": "半角括号",
+      "bracket_desc": "将全角括号（）替换为半角括号 ()",
+      "underscore": "下划线转空格",
+      "underscore_desc": "将标签中的下划线（_）替换为空格",
+      "escape_bracket": "括号转义",
+      "escape_bracket_desc": "自动为括号添加反斜杠（\\），保留权重语法"
     },
     "autocomplete": {
       "title": "自动补全",
-      "limit": "补全数量"
+      "limit": "补全数量",
+      "limit_desc": "输入时提示的候选标签数"
     }
   }
 }

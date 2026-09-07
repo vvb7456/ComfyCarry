@@ -24,7 +24,8 @@
     "title": "Tunnel Logs"
   },
   "setup_hint": {
-    "not_configured": "Tunnel not configured. Go to the \"Configuration\" tab to set up.",
+    "not_configured": "Tunnel not configured.",
+    "open_settings": "Open Settings",
     "quick_public": "Quick Enable Public Node",
     "custom_config": "Custom Configuration"
   },

@@ -6,6 +6,8 @@ import { useApiFetch } from './useApiFetch'
 export interface CivitaiImage {
   url: string
   type?: string
+  /** 图级 NSFW 分级 (1=SFW, 2/4/8/16/32=NSFW); hide/blur 判断依据 */
+  nsfwLevel?: string | number
   meta?: {
     seed?: number | string
     steps?: number
@@ -133,6 +135,7 @@ function normalizeApiModel(m: any): CivitaiHit {
     images: latestVersion?.images?.map((img: any) => ({
       url: img.url,
       type: img.type,
+      nsfwLevel: img.nsfwLevel,
     })),
     version: latestVersion
       ? {
@@ -142,6 +145,7 @@ function normalizeApiModel(m: any): CivitaiHit {
           images: latestVersion.images?.map((img: any) => ({
             url: img.url,
             type: img.type,
+            nsfwLevel: img.nsfwLevel,
           })),
         }
       : undefined,
@@ -149,7 +153,7 @@ function normalizeApiModel(m: any): CivitaiHit {
       id: v.id,
       name: v.name,
       baseModel: v.baseModel,
-      images: v.images?.map((img: any) => ({ url: img.url, type: img.type })),
+      images: v.images?.map((img: any) => ({ url: img.url, type: img.type, nsfwLevel: img.nsfwLevel })),
     })),
     user: m.creator ? { username: m.creator.username } : undefined,
     nsfwLevel: m.nsfwLevel ?? m.nsfw,
@@ -266,9 +270,9 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
                 id: match.id,
                 name: match.name,
                 baseModel: match.baseModel,
-                images: match.images?.map((img: any) => ({ url: img.url, type: img.type })),
+                images: match.images?.map((img: any) => ({ url: img.url, type: img.type, nsfwLevel: img.nsfwLevel })),
               }
-              hit.images = match.images?.map((img: any) => ({ url: img.url, type: img.type }))
+              hit.images = match.images?.map((img: any) => ({ url: img.url, type: img.type, nsfwLevel: img.nsfwLevel }))
             }
           }
           cache.set(hit.id, hit)

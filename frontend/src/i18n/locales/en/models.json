@@ -1,5 +1,8 @@
 {
   "title": "Models",
+  "nsfw": {
+    "reveal_hint": "NSFW content is blurred. Click to reveal."
+  },
   "tabs": {
     "local": "Local Models",
     "huggingface": "Official Models",

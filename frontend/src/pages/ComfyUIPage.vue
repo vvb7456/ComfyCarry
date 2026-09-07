@@ -213,7 +213,7 @@ async function onTabChange(next: string) {
       />
     </div>
 
-    <div v-show="activeTab === 'settings'" class="tab-panel settings-workspace">
+    <div v-show="activeTab === 'settings'" class="tab-panel settings-centered">
       <ParamsCard ref="paramsRef" :active="activeTab === 'settings'" />
     </div>
 
@@ -222,11 +222,3 @@ async function onTabChange(next: string) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.settings-workspace {
-  display: grid;
-  gap: var(--sp-4);
-  width: 100%;
-}
-</style>

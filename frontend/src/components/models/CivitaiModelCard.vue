@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CivitaiHit } from '@/composables/useCivitaiSearch'
+import { useCivitaiNsfw } from '@/composables/useCivitaiNsfw'
 import { fmtCompact } from '@/utils/format'
 import { modelCategoryColor, modelCategoryLabel } from '@/utils/constants'
 import ModelCard from './ModelCard.vue'
@@ -33,10 +34,18 @@ const emit = defineEmits<{
 // ── Image ──
 const CDN_PREFIX = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
 
+// ── NSFW 浏览级别 ──
+// 级别未开放的图不作为封面 (优先挑允许的图); 开放但需模糊的传遮罩给 ModelCard。
+const { levelAllows, shouldBlur } = useCivitaiNsfw()
+
 const imageObj = computed(() => {
   const imgs = props.hit.images?.length ? props.hit.images : (props.hit.version?.images || [])
-  return imgs[0] || null
+  if (!imgs.length) return null
+  const allowed = imgs.find(img => levelAllows(img.nsfwLevel))
+  return allowed || null
 })
+
+const isNsfwMedia = computed(() => shouldBlur(imageObj.value?.nsfwLevel))
 
 const isVideo = computed(() => imageObj.value?.type === 'video')
 
@@ -148,6 +157,7 @@ const installedTooltip = computed(() =>
     :is-video="isVideo"
     :title="hit.name || t('models.local.no_preview')"
     :zoom-url="zoomUrl"
+    :nsfw-blur="isNsfwMedia"
     @click="emit('details', hit)"
     @preview="(url) => emit('preview', url)"
   >

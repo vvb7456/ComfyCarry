@@ -29,6 +29,7 @@ export function convertImages(imgs: CivitaiImage[]): ModelMetaImage[] {
         positive: m.prompt,
         negative: m.negativePrompt,
       }),
+      ...(img.nsfwLevel != null && { nsfwLevel: img.nsfwLevel }),
     })
   }
   return out

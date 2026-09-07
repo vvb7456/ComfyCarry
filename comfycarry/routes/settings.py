@@ -71,6 +71,8 @@ def api_settings_get():
                             else "***"),
         "civitai_key": civitai_key,
         "civitai_key_set": bool(civitai_key),
+        "civitai_nsfw_level": _get_config("civitai_nsfw_level", 7),
+        "civitai_nsfw_blur": _get_config("civitai_nsfw_blur", True),
         "api_key": cfg.API_KEY,
         "comfyui_dir": cfg.COMFYUI_DIR,
         "comfyui_url": cfg.COMFYUI_URL,
@@ -121,6 +123,33 @@ def api_settings_civitai_key():
     key = data.get("api_key", "").strip()
     CONFIG_FILE.write_text(json.dumps({"api_key": key}))
     return jsonify({"ok": True, "civitai_key_set": bool(key)})
+
+
+@bp.route("/api/settings/civitai-nsfw", methods=["POST"])
+def api_settings_civitai_nsfw():
+    """CivitAI NSFW 浏览设置 (两级, 对齐 civitai.com 语义):
+    - browsing_level: 浏览级别 bitmask (1=PG, 2=PG13, 4=R, 8=X, 16=XXX),
+      决定各级内容是否出现
+    - blur: 已出现内容中 NSFW 图是否前端模糊
+    Civitai API 不提供服务端 blur (CDN 只有原图), 过滤/模糊全部由前端执行。"""
+    data = request.get_json(force=True) or {}
+    level = data.get("browsing_level")
+    blur = data.get("blur")
+    if level is not None:
+        try:
+            level = int(level)
+        except (TypeError, ValueError):
+            return _err("invalid_config")
+        if not (1 <= level <= 31):
+            return _err("invalid_config")
+        _set_config("civitai_nsfw_level", level)
+    if blur is not None:
+        _set_config("civitai_nsfw_blur", bool(blur))
+    return jsonify({
+        "ok": True,
+        "browsing_level": _get_config("civitai_nsfw_level", 7),
+        "blur": _get_config("civitai_nsfw_blur", True),
+    })
 
 
 @bp.route("/api/settings/export-config")
@@ -236,6 +265,14 @@ def api_settings_export_config():
     prompt_settings = _get_config("prompt_settings", {})
     if prompt_settings:
         config["prompt_settings"] = prompt_settings
+
+    # CivitAI NSFW 浏览设置
+    civitai_nsfw_level = _get_config("civitai_nsfw_level", "")
+    if civitai_nsfw_level != "":
+        config["civitai_nsfw_level"] = civitai_nsfw_level
+    civitai_nsfw_blur = _get_config("civitai_nsfw_blur", "")
+    if civitai_nsfw_blur != "":
+        config["civitai_nsfw_blur"] = civitai_nsfw_blur
 
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
@@ -395,6 +432,20 @@ def api_settings_import_config():
             applied.append("提示词编辑器设置")
         except Exception as e:
             errors.append(f"提示词编辑器设置: {e}")
+
+    # CivitAI NSFW 浏览设置
+    if data.get("civitai_nsfw_level") or data.get("civitai_nsfw_blur") is not None:
+        try:
+            if data.get("civitai_nsfw_level"):
+                level = int(data["civitai_nsfw_level"])
+                if not (1 <= level <= 31):
+                    raise ValueError(f"out of range: {level}")
+                _set_config("civitai_nsfw_level", level)
+            if data.get("civitai_nsfw_blur") is not None:
+                _set_config("civitai_nsfw_blur", bool(data["civitai_nsfw_blur"]))
+            applied.append("CivitAI NSFW 浏览设置")
+        except Exception as e:
+            errors.append(f"CivitAI NSFW: {e}")
 
     msg_key = "config_imported_with_errors" if errors else "config_imported"
     return _ok(msg_key,

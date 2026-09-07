@@ -93,6 +93,8 @@ const { t } = useI18n({ useScope: 'global' })
 const emit = defineEmits<{
   'update:modelValue': [value: T]
   'change': [value: T]
+  /** 下拉面板展开 (首次打开时触发一次, 面板保持打开不重复触发) */
+  'open': []
 }>()
 
 /** Current selection as an array, regardless of mode — the one shape all logic uses. */
@@ -263,6 +265,7 @@ watch(filteredOptions, () => { highlightIdx.value = -1 })
 
 function openPanel() {
   open.value = true
+  emit('open')
   if (props.searchable) {
     const hasSelectedOption = normalizedOptions.value.some(o => o.value === props.modelValue)
     search.value = props.allowCustom && !hasSelectedOption && typeof props.modelValue === 'string'

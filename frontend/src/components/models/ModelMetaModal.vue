@@ -12,6 +12,7 @@ import DownloadButton from './DownloadButton.vue'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useDownloads, type VersionDownloadInfo } from '@/composables/useDownloads'
+import { useCivitaiNsfw } from '@/composables/useCivitaiNsfw'
 import { useClipboard } from '@/composables/useClipboard'
 
 defineOptions({ name: 'ModelMetaModal' })
@@ -32,6 +33,19 @@ const { toast } = useToast()
 const { getVersionDownloadInfo, downloadOne, cancelDownload, retryVersion } = useDownloads()
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
+
+// ── NSFW 浏览级别 (级别未开放的图不进 gallery; 开放且需模糊的加遮罩) ──
+const { levelAllows, shouldBlur } = useCivitaiNsfw()
+const nsfwRevealed = ref<Set<number>>(new Set())
+
+function isNsfwBlur(img: ModelMetaImage, i: number): boolean {
+  return shouldBlur(img.nsfwLevel) && !nsfwRevealed.value.has(i)
+}
+
+function revealNsfw(i: number) {
+  nsfwRevealed.value.add(i)
+  nsfwRevealed.value = new Set(nsfwRevealed.value)
+}
 
 // ── Version switching ──
 const selectedVersionId = ref<string | number | undefined>()
@@ -63,9 +77,11 @@ const activeVersion = computed<ModelMetaVersion | undefined>(() => {
 })
 
 // Use version-specific data when available, fallback to top-level meta
-const displayImages = computed<ModelMetaImage[]>(() =>
-  activeVersion.value?.images?.length ? activeVersion.value.images : (props.meta?.images || []),
-)
+const displayImages = computed<ModelMetaImage[]>(() => {
+  const versions = activeVersion.value?.images?.length ? activeVersion.value.images : (props.meta?.images || [])
+  // 级别未开放的示例图直接不进 gallery (与卡片封面选取同口径); 全不允许则区块隐藏
+  return versions.filter(img => levelAllows(img.nsfwLevel))
+})
 
 // Full-size URLs for gallery preview navigation (images + videos)
 const galleryImageUrls = computed(() =>
@@ -341,9 +357,15 @@ function fmtSize(bytes?: number): string {
           {{ t('models.meta.sample_images') }}
         </div>
         <div class="mm-gallery">
-          <figure v-for="(img, i) in displayImages" :key="i" class="mm-figure" @click="emit('preview', galleryImageUrls, i)">
+          <figure
+            v-for="(img, i) in displayImages"
+            :key="i"
+            class="mm-figure"
+            @click="emit('preview', galleryImageUrls, i)"
+          >
             <template v-if="isVideo(img)">
               <video
+                :class="{ 'mm-nsfw-blurred': isNsfwBlur(img, i) }"
                 :src="fullImageUrl(img.url)"
                 muted loop playsinline disablepictureinpicture preload="metadata"
               />
@@ -353,10 +375,20 @@ function fmtSize(bytes?: number): string {
             </template>
             <img
               v-else
+              :class="{ 'mm-nsfw-blurred': isNsfwBlur(img, i) }"
               :src="resolveImageUrl(img.url)"
               alt=""
               loading="lazy"
             />
+            <button
+              v-if="isNsfwBlur(img, i)"
+              type="button"
+              class="mm-nsfw-overlay"
+              :title="t('models.nsfw.reveal_hint')"
+              @click.stop="revealNsfw(i)"
+            >
+              <MsIcon name="visibility_off" />
+            </button>
             <figcaption v-if="hasCaption(img)" class="mm-caption">
               <template v-if="img.seed"><label>Seed</label>{{ img.seed }}</template>
               <template v-if="img.steps"><label>Steps</label>{{ img.steps }}</template>
@@ -451,6 +483,20 @@ function fmtSize(bytes?: number): string {
 }
 .mm-figure { cursor: zoom-in; }
 .mm-figure video { cursor: pointer; }
+/* NSFW blur 遮罩 (Civitai blur 模式): 点击眼睛揭开单张 */
+.mm-nsfw-blurred {
+  filter: blur(22px) saturate(.8);
+}
+.mm-nsfw-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; padding: 0;
+  color: #fff; cursor: pointer; z-index: 1;
+}
+.mm-nsfw-overlay .ms {
+  filter: drop-shadow(0 1px 4px rgb(0 0 0 / 50%));
+  font-size: 24px;
+}
 .mm-video-badge {
   position: absolute; top: 6px; left: 6px;
   background: rgba(0, 0, 0, .65); color: #fff;

@@ -178,7 +178,7 @@ function onCopy() {
 
 function goSettings() {
   emit('update:modelValue', false)
-  router.push({ name: 'settings', query: { tab: 'llm' } })
+  router.push({ name: 'settings-llm' })
 }
 
 // ── Submit button label ───────────────────────────────────────────────

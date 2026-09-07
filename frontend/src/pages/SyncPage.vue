@@ -8,9 +8,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useLogStream } from '@/composables/useLogStream'
 import { useSyncJobs } from '@/composables/useSyncJobs'
 import { useCompanionClients } from '@/composables/useCompanionClients'
-import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
-import UnsavedBanner from '@/components/ui/UnsavedBanner.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
@@ -32,10 +30,10 @@ import { fmtBytes } from '@/utils/format'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
 import type {
   StorageInfo, SyncTemplate, RemoteField, RemoteTypeDef, Remote,
-  SyncRule, SyncSettings,
+  SyncRule,
   SyncStatusResponse, RemotesResponse, StorageResponse,
   RemoteTypesResponse, RulesSaveResponse, RemoteDeleteResponse,
-  RcloneConfigResponse, ApiOkResponse,
+  ApiOkResponse,
 } from '@/types/sync'
 
 defineOptions({ name: 'SyncPage' })
@@ -50,7 +48,6 @@ const tabs = computed(() => [
   { key: 'activity', label: t('sync.tabs.activity'), icon: 'monitoring' },
   { key: 'storage', label: t('sync.tabs.storage_rules'), icon: 'storage' },
   { key: 'clients', label: t('sync.tabs.clients'), icon: 'monitor' },
-  { key: 'config', label: t('sync.tabs.config'), icon: 'settings' },
 ])
 
 // ---------- State ----------
@@ -69,46 +66,6 @@ const noCapacityTypes = new Set(['s3', 'webdav', 'ftp', 'swift', 'http', 'azureb
 // Rules
 const rules = ref<SyncRule[]>([])
 const templates = ref<SyncTemplate[]>([])
-
-// Config
-const cfgMinAge = ref(60)
-const cfgWatchInterval = ref(60)
-const rcloneConfig = ref('')
-const cfgSaving = ref(false)
-
-// 配置 tab 未保存守卫: dirty = 表单值 ≠ 基线 (最近一次服务端确认值), 不耦合 activeTab。
-// 首次加载完成前 dirty 恒为 false, 避免挂载时快照初值 ('') 与表单默认值不等造成误报 dirty
-const cfgSnapshot = ref('')
-const cfgLoaded = ref(false)
-const cfgDirty = computed(() =>
-  cfgLoaded.value
-  && JSON.stringify({ min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value, rclone: rcloneConfig.value })
-    !== cfgSnapshot.value,
-)
-const syncGuard = useUnsavedGuard({
-  isDirty: cfgDirty,
-  saveAction: saveConfig,
-  discardAction: async () => {
-    // 无论 loadConfigTab 成败都同步快照: 失败时表单保持原样, 快照对齐后不再误报 dirty
-    try {
-      await loadConfigTab()
-    } finally {
-      cfgSnapshot.value = snapshotCfg()
-    }
-  },
-  texts: () => ({
-    title: t('sync.config.unsaved_title'),
-    message: t('sync.config.unsaved_message'),
-    confirmSave: t('common.btn.save'),
-    confirmDiscard: t('sync.config.unsaved_discard'),
-    cancel: t('sync.config.unsaved_cancel'),
-  }),
-})
-syncGuard.guardRouteLeave()
-
-function snapshotCfg(): string {
-  return JSON.stringify({ min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value, rclone: rcloneConfig.value })
-}
 
 // Modals
 const addRemoteModal = ref(false)
@@ -506,23 +463,8 @@ function onBrowseSelect(path: string) {
   ruleForm.value[browseTargetField.value] = path
 }
 
-// ---- Config ----
-async function loadConfigTab() {
-  const [sd, rc] = await Promise.all([
-    get<SyncSettings>('/api/sync/settings'),
-    get<RcloneConfigResponse>('/api/sync/rclone_config'),
-  ])
-  if (sd) { cfgMinAge.value = sd.min_age ?? 60; cfgWatchInterval.value = sd.watch_interval ?? 60 }
-  if (rc?.config !== undefined) rcloneConfig.value = rc.config
-  cfgLoaded.value = true
-  cfgSnapshot.value = snapshotCfg()
-}
-
 async function switchTab(tab: string) {
-  // 离开 config tab 时守卫未保存更改
-  if (!(await syncGuard.guardTabSwitch())) return
   activeTab.value = tab
-  if (tab === 'config') await loadConfigTab()
   if (tab === 'storage') {
     loadStorageAll()
   }
@@ -532,31 +474,6 @@ async function switchTab(tab: string) {
   } else {
     stopCompanionPolling()
   }
-}
-
-async function saveConfig(): Promise<boolean> {
-  cfgSaving.value = true
-  try {
-    // post 失败返回 null 而不是 reject —— Promise.all 照样 resolve,
-    // 不看返回值就会在保存失败后紧接着弹一个"已保存"
-    const [settingsRes, confRes] = await Promise.all([
-      post<ApiOkResponse>('/api/sync/settings', { min_age: cfgMinAge.value, watch_interval: cfgWatchInterval.value }),
-      post<ApiOkResponse>('/api/sync/rclone_config', { config: rcloneConfig.value }),
-    ])
-    if (settingsRes && confRes) {
-      toast(t('sync.config.saved'), 'success')
-      cfgSnapshot.value = snapshotCfg()
-      return true
-    }
-    return false
-  } finally { cfgSaving.value = false }
-}
-
-async function uploadRcloneFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  rcloneConfig.value = await file.text()
-  toast(t('sync.config.file_loaded'), 'success')
 }
 </script>
 
@@ -573,17 +490,6 @@ async function uploadRcloneFile(e: Event) {
         </span>
       </template>
     </TabSwitcher>
-
-    <!-- 未保存守卫 banner (config tab 表单 dirty 时显示) -->
-    <UnsavedBanner
-      :visible="activeTab === 'config' && cfgDirty"
-      :message="t('sync.config.unsaved_message_banner')"
-      :save-label="t('common.btn.save')"
-      :discard-label="t('sync.config.unsaved_discard')"
-      :saving="cfgSaving"
-      @save="syncGuard.save"
-      @discard="syncGuard.discard"
-    />
 
     <!-- ===== Activity Tab ===== -->
     <div v-show="activeTab === 'activity'" class="tab-panel">
@@ -698,35 +604,6 @@ async function uploadRcloneFile(e: Event) {
         :loading="companionLoading"
         @refresh="fetchCompanionClients"
       />
-    </div>
-
-    <!-- ===== Config Tab ===== -->
-    <div v-show="activeTab === 'config'" class="tab-panel">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-        <BaseCard density="roomy">
-          <FormField :label="t('sync.config.min_age.label')" :hint="t('sync.config.min_age.desc')" layout="horizontal">
-            <input v-model.number="cfgMinAge" type="number" min="0" class="form-number" style="width:72px;text-align:center">
-            <span style="color:var(--t3);font-size:.78rem">{{ t('sync.config.min_age.unit') }}</span>
-          </FormField>
-        </BaseCard>
-        <BaseCard density="roomy">
-          <FormField :label="t('sync.config.watch_interval.label')" :hint="t('sync.config.watch_interval.desc')" layout="horizontal">
-            <input v-model.number="cfgWatchInterval" type="number" min="10" class="form-number" style="width:72px;text-align:center">
-            <span style="color:var(--t3);font-size:.78rem">{{ t('sync.config.watch_interval.unit') }}</span>
-          </FormField>
-        </BaseCard>
-      </div>
-
-      <SectionHeader icon="description">
-        {{ t('sync.config.rclone.title') }}
-        <template #actions>
-          <BaseButton size="sm" @click="($refs.rcloneFileInput as HTMLInputElement)?.click()">
-            <MsIcon name="upload" size="xs" color="none" /> {{ t('sync.config.rclone.upload_local') }}
-          </BaseButton>
-          <input ref="rcloneFileInput" type="file" accept=".conf,.txt" style="display:none" @change="uploadRcloneFile">
-        </template>
-      </SectionHeader>
-      <textarea v-model="rcloneConfig" class="form-textarea form-textarea--mono rclone-config-editor" spellcheck="false" :placeholder="t('sync.config.rclone.placeholder')"></textarea>
     </div>
 
     <!-- ===== Add Remote Modal ===== -->
@@ -865,7 +742,4 @@ async function uploadRcloneFile(e: Event) {
 .sync-rule-badge { font-size: .68rem; padding: 1px 7px; border-radius: 8px; background: var(--bg2); color: var(--t2); border: 1px solid var(--bd); display: inline-flex; align-items: center; gap: 3px; }
 .sync-rule-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .sync-rule-actions button { font-size: .75rem; padding: 4px 8px; }
-
-/* ── Rclone Config Editor ── */
-.rclone-config-editor { width: 100%; min-height: 400px; max-height: 600px; font-family: 'IBM Plex Mono', monospace; font-size: .78rem; line-height: 1.5; background: var(--bg3); color: var(--t1); border: 1px solid var(--bd); border-radius: var(--r); padding: 12px; resize: vertical; white-space: pre; overflow: auto; }
 </style>

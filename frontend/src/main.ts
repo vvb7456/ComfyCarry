@@ -9,6 +9,7 @@ import './css/base.css'
 import './css/layout.css'
 import './css/dashboard.css'
 import './css/forms.css'
+import './css/settings.css'
 
 const app = createApp(App)
 

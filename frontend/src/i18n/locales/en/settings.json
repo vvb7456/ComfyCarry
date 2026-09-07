@@ -40,27 +40,33 @@
     "err_current": "Please enter current password",
     "err_new": "Please enter new password",
     "err_min_length": "Password must be at least 4 characters",
-    "err_mismatch": "Passwords do not match"
+    "err_mismatch": "Passwords do not match",
+    "row_label": "Login password",
+    "row_desc": "Change the password for the ComfyCarry panel",
+    "change_btn": "Change password"
   },
   "api_key": {
     "help": "For external scripts or apps to access the API via X-API-Key / Bearer",
     "regenerate": "Regenerate",
     "regenerate_confirm": "Regenerate API Key? The old key will stop working immediately.",
     "regenerated": "API Key regenerated",
-    "regenerate_failed": "Regeneration failed"
+    "regenerate_failed": "Regeneration failed",
+    "title": "API Key"
   },
   "config": {
     "title": "Import/Export Config",
-    "export_desc": "Export all ComfyCarry configuration as a JSON file",
-    "export_btn": "Export Config",
-    "import_desc": "Restore configuration from a JSON file",
-    "import_btn": "Import Config",
+    "export_desc": "Export all settings to a JSON file",
+    "export_btn": "Export",
+    "import_desc": "Restore settings from a JSON backup",
+    "import_btn": "Import",
     "exported": "Configuration exported",
     "export_failed": "Export failed",
     "invalid_format": "Invalid configuration file format",
     "import_confirm": "Import configuration?\n\nExported on: {date}\nThis will overwrite current password, API Key, Tunnel config, sync rules, etc.",
     "import_failed": "Import failed",
-    "unknown_date": "Unknown"
+    "unknown_date": "Unknown",
+    "export_title": "Export config",
+    "import_title": "Import config"
   },
   "reinit": {
     "title": "Re-initialize",
@@ -81,11 +87,6 @@
     "dockerhub": "Docker Hub",
     "credit_prefix": "Powered by ",
     "credit_suffix": ""
-  },
-  "maintenance": {
-    "title": "Maintenance",
-    "restart_desc": "Restart the ComfyCarry service",
-    "reinit_desc": "Open the setup wizard again"
   },
   "update": {
     "up_to_date": "Already up to date",
@@ -109,22 +110,79 @@
   "restart_confirm": "Restart ComfyCarry?\n\nThe page will be briefly unavailable.",
   "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds...",
   "civitai": {
-    "key_prefix": "Generate API Key from",
-    "key_link": "CivitAI Account Settings",
-    "key_suffix": "",
-    "placeholder": "Enter CivitAI API Key...",
+    "key_title": "API Key",
+    "placeholder": "Paste API Key",
     "saved": "API Key saved",
     "save_failed": "Save failed",
     "clear_confirm": "Clear CivitAI API Key?",
     "cleared": "API Key cleared",
-    "err_empty": "Please enter API Key"
+    "err_empty": "Please enter API Key",
+    "nsfw": {
+      "title": "NSFW Content",
+      "help": "Browsing level controls which models are shown; the blur switch masks NSFW images of shown content",
+      "level_label": "Browsing level",
+      "level_desc": "Which models are shown in search results",
+      "level": {
+        "pg": "PG only",
+        "pg_r": "PG–R",
+        "all": "All"
+      },
+      "blur": "Blur NSFW images",
+      "blur_desc": "Blur previews, click to reveal"
+    },
+    "key_desc_prefix": "Generated from ",
+    "key_link": "CivitAI account settings",
+    "key_desc_suffix": "; used for model search and downloads"
+  },
+  "sync": {
+    "title": "Cloud Sync",
+    "help": "Sync engine runtime parameters"
+  },
+  "tunnel": {
+    "title": "Tunnel",
+    "help": "Expose this workspace to the internet via Cloudflare Tunnel",
+    "mode": {
+      "label": "Mode",
+      "off": "Off",
+      "public": "Public",
+      "custom": "Custom",
+      "desc": "How the tunnel is exposed"
+    },
+    "subdomain": "Subdomain",
+    "root_domain": "Root domain",
+    "subdomain_error": "Invalid subdomain format",
+    "token_placeholder": "Paste API Token",
+    "protocol": "Transport protocol",
+    "protocol_auto": "Auto",
+    "validate": "Validate",
+    "validating": "Validating",
+    "validate_failed": "Validation failed",
+    "need_token_domain": "API Token and domain are required",
+    "enabling_public": "Enabling public tunnel...",
+    "enable_failed": "Failed to enable",
+    "applying": "Applying configuration...",
+    "applied": "Configuration applied",
+    "save_failed": "Save failed",
+    "confirm": {
+      "off": "Turn off the tunnel? Existing tunnel and DNS mappings will be removed.",
+      "destroy_to_public": "Switching to the public tunnel will remove the current custom tunnel. Continue?",
+      "update_restart": "The tunnel will be rebuilt with the new parameters and restarted. Continue?"
+    },
+    "subdomain_desc": "Leave empty for auto assignment",
+    "subdomain_placeholder": "mytunnel",
+    "custom_subdomain_desc": "Combined with the root domain to form the final address",
+    "root_domain_desc": "Must be hosted on Cloudflare",
+    "root_domain_placeholder": "example.com",
+    "token_label": "API Token",
+    "token_desc": "Requires Tunnel and DNS edit permissions",
+    "protocol_desc": "Connection to the Cloudflare edge"
   },
   "llm": {
     "provider": {
       "title": "Service Provider",
       "help": "Official entries use preset endpoints; for third-party endpoints, choose the matching custom entry.",
       "label": "Provider",
-      "select_placeholder": "— Select Provider —",
+      "select_placeholder": "Select provider",
       "openai": "OpenAI",
       "deepseek": "DeepSeek",
       "openrouter": "OpenRouter",
@@ -134,12 +192,14 @@
       "custom_responses": "Custom (OpenAI Responses)",
       "custom_anthropic": "Custom (Anthropic)",
       "api_key": "API Key",
-      "api_key_placeholder": "Enter API Key...",
+      "api_key_placeholder": "Paste API Key",
       "base_url": "Base URL",
-      "base_url_placeholder_openai": "API root, e.g. https://api.example.com/v1",
-      "base_url_placeholder_anthropic": "API root, e.g. https://api.example.com (do not include /v1/messages)",
-      "base_url_help_openai": "Enter the API root; do not include /chat/completions or /responses.",
-      "base_url_help_anthropic": "Enter the API root; do not include /v1/messages."
+      "base_url_placeholder_openai": "https://api.example.com/v1",
+      "base_url_placeholder_anthropic": "https://api.example.com",
+      "base_url_desc_openai": "API root URL, without /chat/completions or /responses",
+      "base_url_desc_anthropic": "API root URL, without /v1/messages",
+      "label_desc": "LLM provider currently in use",
+      "api_key_desc": "Access key for the selected provider"
     },
     "model": {
       "title": "Model",
@@ -156,18 +216,23 @@
       "none_available": "No models available",
       "context_fmt": "Context: {n} tokens",
       "input_fmt": "Input: ${n}/M",
-      "output_fmt": "Output: ${n}/M"
+      "output_fmt": "Output: ${n}/M",
+      "model_help": "Fetched automatically when the dropdown opens; you can also type a model name directly"
     },
     "params": {
       "title": "Parameters",
       "temperature": "Temperature",
-      "temperature_help": "0.0 - 2.0. Higher = more creative, lower = more stable. Recommended: creative 0.8-1.2, translation/description 0.3-0.5",
       "max_tokens": "Max Response Length",
-      "max_tokens_help": "Maximum output length in tokens. Prompt generation usually needs 500-1000, longer conversations may need more",
       "stream": "Streaming",
-      "stream_help": "When enabled, LLM will output response token by token. Disable to avoid content filtering issues on some platforms"
+      "temperature_desc": "Randomness of the reply (0–2)",
+      "max_tokens_desc": "Maximum tokens per reply",
+      "stream_desc": "Stream the reply word by word",
+      "temperature_help": "0.8–1.2 for creative tasks; 0.3–0.5 for translation and descriptions",
+      "max_tokens_help": "500–1000 is enough for prompt generation; raise it for long conversations",
+      "stream_help": "Some platforms filter streamed content strictly; turn off if needed"
     },
-    "test_btn": "Test Connection",
+    "test_btn": "Test",
+    "test_desc": "Send one real request with the current configuration",
     "test_success": "Connection successful",
     "test_failed": "Connection failed",
     "err_no_provider": "Please select a provider first",
@@ -175,14 +240,16 @@
     "err_no_model": "Please select or enter a model first",
     "config_saved": "LLM config saved",
     "save_failed": "Save failed",
-    "unknown_error": "Unknown error"
+    "unknown_error": "Unknown error",
+    "test_title": "Test connection"
   },
   "prompt": {
     "tab_label": "Prompt",
     "saved": "Prompt settings saved",
     "tag_library": {
       "title": "Tag Library",
-      "show_nsfw": "Show NSFW tags"
+      "show_nsfw": "Show NSFW tags",
+      "show_nsfw_desc": "Include NSFW tags in tag lists and autocomplete"
     },
     "translation": {
       "title": "Translation",
@@ -195,20 +262,29 @@
         "bing": "Bing",
         "youdao": "Youdao",
         "alibaba": "Alibaba"
-      }
+      },
+      "show_desc": "Show a Chinese translation below the prompt",
+      "provider_desc": "Service used for Chinese translation; Auto = pick by availability"
     },
     "normalize": {
       "title": "Normalization",
       "enable": "Enable normalization",
-      "comma": "Full-width comma → half-width",
-      "period": "Full-width period → half-width",
-      "bracket": "Full-width brackets → half-width",
-      "underscore": "Underscore → space",
-      "escape_bracket": "Escape brackets (auto add \\)"
+      "comma": "Half-width commas",
+      "period": "Half-width periods",
+      "bracket": "Half-width brackets",
+      "underscore": "Underscore to space",
+      "escape_bracket": "Bracket escaping",
+      "enable_desc": "Clean up punctuation and symbols before submit",
+      "comma_desc": "Replace full-width commas (，) with half-width (,)",
+      "period_desc": "Replace full-width periods (。) with half-width (.)",
+      "bracket_desc": "Replace full-width brackets () with half-width ()",
+      "underscore_desc": "Replace underscores (_) in tags with spaces",
+      "escape_bracket_desc": "Automatically add backslashes (\\\\) before brackets to keep weight syntax"
     },
     "autocomplete": {
       "title": "Autocomplete",
-      "limit": "Max results"
+      "limit": "Max results",
+      "limit_desc": "Number of suggested tags while typing"
     }
   }
 }

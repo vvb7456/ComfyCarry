@@ -24,7 +24,8 @@
     "title": "Tunnel 日志"
   },
   "setup_hint": {
-    "not_configured": "尚未配置 Tunnel，请前往「配置」tab 设置",
+    "not_configured": "尚未配置 Tunnel",
+    "open_settings": "打开设置",
     "quick_public": "一键启用公共节点",
     "custom_config": "自定义配置"
   },

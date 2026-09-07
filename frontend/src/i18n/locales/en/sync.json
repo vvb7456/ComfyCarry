@@ -89,14 +89,12 @@
   },
   "config": {
     "min_age": {
-      "label": "File Stability Delay",
-      "desc": "Skip files modified within this many seconds when pushing, to prevent copying incomplete files",
-      "unit": "sec"
+      "label": "Sync delay",
+      "desc": "Wait a while after a file changes before syncing, in seconds"
     },
     "watch_interval": {
-      "label": "Check Interval",
-      "desc": "How often (seconds) the worker checks for file changes and performs sync",
-      "unit": "sec"
+      "label": "Check interval",
+      "desc": "Check for file changes and sync at intervals, in seconds"
     },
     "rclone": {
       "title": "Rclone Configuration",
