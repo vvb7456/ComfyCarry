@@ -4,7 +4,6 @@
   "section": {
     "panel": "面板",
     "genmodels": "生成与模型",
-    "connect": "连接与同步",
     "about": "关于"
   },
   "domains": {
@@ -12,8 +11,7 @@
     "configmgmt": "配置管理",
     "prompt": "提示词编辑器",
     "llm": "LLM 服务",
-    "civitai": "CivitAI",
-    "sync": "云同步"
+    "civitai": "CivitAI"
   },
   "unsaved": {
     "title": "未保存的更改",
@@ -148,7 +146,6 @@
       "blur_desc": "预览图打码，点击后显示原图"
     }
   },
-  "sync": {},
   "llm": {
     "provider": {
       "help": "官方项使用预设地址；第三方端点请选择与其接口一致的自定义项。",

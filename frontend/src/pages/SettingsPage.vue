@@ -6,7 +6,7 @@
  * 保存边界, kicker 灰头 + dirty 浮现保存) → 行。无三级小节: 行 label 自足,
  * 多余标题层会稀释层级对比。
  *
- * 定位: `#/settings?section=connect&focus=sync` 查询参数直达;
+ * 定位: `#/settings?section=panel` 查询参数直达;
  *   页内导航用 router.replace 更新 query (不产生历史记录)。
  *
  * 守卫: useSettingsGuard 只读 dirty 登记 + 模块级保存 (模块头浮现按钮),
@@ -28,7 +28,6 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useSettingsGuard } from '@/composables'
 import SettingsSectionPanel from '@/components/settings/sections/SettingsSectionPanel.vue'
 import SettingsSectionGenModels from '@/components/settings/sections/SettingsSectionGenModels.vue'
-import SettingsSectionConnect from '@/components/settings/sections/SettingsSectionConnect.vue'
 import SettingsAboutFooter from '@/components/settings/sections/SettingsAboutFooter.vue'
 
 defineOptions({ name: 'SettingsPage' })
@@ -42,7 +41,7 @@ const { toast } = useToast()
 
 // ─── 分区定义 ────────────────────────────────────────────────────────────────
 
-const SECTION_KEYS = ['panel', 'genmodels', 'connect', 'about'] as const
+const SECTION_KEYS = ['panel', 'genmodels', 'about'] as const
 type SectionKey = (typeof SECTION_KEYS)[number]
 
 /** focus id → 所属分区 (panel 内四个锚点为 group 级) */
@@ -52,7 +51,6 @@ const FOCUS_SECTIONS: Record<string, SectionKey> = {
   'prompt': 'genmodels',
   'llm': 'genmodels',
   'civitai': 'genmodels',
-  'sync': 'connect',
 }
 
 function normalizeSection(v: unknown): SectionKey | null {
@@ -75,7 +73,6 @@ const sectionTabs = computed(() => {
   return [
     { key: 'panel', label: t('settings.section.panel'), icon: 'dashboard', dot: dotFor([]) },
     { key: 'genmodels', label: t('settings.section.genmodels'), icon: 'palette', dot: dotFor(['prompt', 'llm', 'civitai']) },
-    { key: 'connect', label: t('settings.section.connect'), icon: 'cloud_sync', dot: dotFor(['sync']) },
     { key: 'about', label: t('settings.section.about'), icon: 'info', dot: false },
   ]
 })
@@ -292,12 +289,6 @@ async function restartDashboard() {
     <section id="settings-section-genmodels" class="settings-section" data-section="genmodels">
       <h2 class="settings-section__title"><MsIcon name="palette" />{{ t('settings.section.genmodels') }}</h2>
       <SettingsSectionGenModels />
-    </section>
-
-    <!-- 连接与同步: 云同步 (隧道已迁入 Tunnel 页) -->
-    <section id="settings-section-connect" class="settings-section" data-section="connect">
-      <h2 class="settings-section__title"><MsIcon name="cloud_sync" />{{ t('settings.section.connect') }}</h2>
-      <SettingsSectionConnect />
     </section>
 
     <!-- 关于: 特殊尾分区 — 无标题 (nav chip 独有), 纯 about 内容直接呈现 -->

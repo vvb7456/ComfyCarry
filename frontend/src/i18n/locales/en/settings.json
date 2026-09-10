@@ -4,7 +4,6 @@
   "section": {
     "panel": "Panel",
     "genmodels": "Generation & Models",
-    "connect": "Connection & Sync",
     "about": "About"
   },
   "domains": {
@@ -12,8 +11,7 @@
     "configmgmt": "Configuration",
     "prompt": "Prompt Editor",
     "llm": "LLM Service",
-    "civitai": "CivitAI",
-    "sync": "Cloud Sync"
+    "civitai": "CivitAI"
   },
   "unsaved": {
     "title": "Unsaved changes",
@@ -148,7 +146,6 @@
     "key_link": "CivitAI account settings",
     "key_desc_suffix": "; used for model search and downloads"
   },
-  "sync": {},
   "llm": {
     "provider": {
       "help": "Official entries use preset endpoints; for third-party endpoints, choose the matching custom entry.",

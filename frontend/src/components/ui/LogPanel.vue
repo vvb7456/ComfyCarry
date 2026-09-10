@@ -20,15 +20,39 @@ const props = withDefaults(defineProps<{
   prepending?: boolean
   /** 滚动事件回调 (传入滚动元素, 由 useLogStream.onScroll 处理懒加载) */
   onScroll?: (el: HTMLElement) => void
+  /** 统一分区标题栏 (传入后替代外层 SectionHeader; 缺省保持原行为) */
+  title?: string
+  /** title 存在时标题栏可点击折叠/展开 */
+  collapsible?: boolean
+  /** 初始折叠状态 (仅 collapsible 时生效) */
+  defaultCollapsed?: boolean
 }>(), {
   hasMore: false,
   loadingMore: false,
   prepending: false,
+  collapsible: false,
+  defaultCollapsed: false,
 })
 
 const { t } = useI18n({ useScope: 'global' })
 const el = ref<HTMLElement | null>(null)
 const followTail = ref(true)
+
+/** 折叠状态: 仅 title + collapsible 时可由标题栏切换 */
+const collapsed = ref(!!props.defaultCollapsed)
+const isCollapsed = computed(() => !!props.title && props.collapsible && collapsed.value)
+
+/** 折叠时只保留标题行, 不撑高度 */
+const panelHeight = computed(() => {
+  if (isCollapsed.value || isEmpty.value) return 'auto'
+  return props.height ?? '320px'
+})
+
+function onHeadClick() {
+  if (!props.title || !props.collapsible) return
+  collapsed.value = !collapsed.value
+  if (!collapsed.value && followTail.value) void scrollToBottom()
+}
 
 const normalizedLines = computed<LogLine[]>(() => props.lines.map((line) => {
   if (typeof line === 'string') {
@@ -94,40 +118,61 @@ function handleScroll() {
 <template>
   <div
     class="log-panel"
-    :class="{ 'log-panel--empty': isEmpty }"
-    :style="{ height: isEmpty ? 'auto' : (height ?? '320px') }"
+    :class="{ 'log-panel--empty': isEmpty, 'log-panel--collapsed': isCollapsed }"
+    :style="{ height: panelHeight }"
   >
-    <div class="log-panel__toolbar">
-      <span class="log-panel__status">
-        <Spinner v-if="status === 'loading'" size="sm" class="log-panel__spinner" />
-        <StatusDot v-else :status="statusDot" size="sm" />
-        <span class="log-panel__label">{{ statusLabel }}</span>
-      </span>
-      <button
-        type="button"
-        class="log-panel__tail-btn"
-        :class="{ 'log-panel__tail-btn--active': followTail }"
-        :title="followTailTitle"
-        :aria-label="followTailTitle"
-        @click="toggleFollowTail"
-      >
-        <MsIcon :name="followTailIcon" size="sm" />
-      </button>
-      <slot name="toolbar" />
-    </div>
-    <!-- 顶部加载指示: 往上滚懒加载时显示 -->
-    <div v-if="loadingMore" class="log-panel__load-more">
-      <Spinner size="sm" /> <span>{{ t('common.log.loading_more') }}</span>
-    </div>
-    <pre ref="el" class="log-panel__body" @scroll="handleScroll"><span
-        v-for="(line, i) in normalizedLines"
-        :key="i"
-        class="log-line"
-        :class="line.className"
-      >{{ line.text }}</span></pre>
-    <div v-if="!normalizedLines.length && status !== 'loading'" class="log-panel__empty">
-      <slot name="empty">{{ t('common.log.empty') }}</slot>
-    </div>
+    <!-- 统一分区标题栏 (可选): 替代外层 SectionHeader, collapsible 时可折叠 -->
+    <button
+      v-if="title"
+      type="button"
+      class="log-panel__head"
+      :class="{ 'log-panel__head--toggle': collapsible }"
+      :tabindex="collapsible ? undefined : -1"
+      :aria-expanded="collapsible ? !isCollapsed : undefined"
+      @click="onHeadClick"
+    >
+      <MsIcon name="receipt_long" class="log-panel__head-icon" />
+      <span class="log-panel__head-title">{{ title }}</span>
+      <MsIcon
+        v-if="collapsible"
+        :name="isCollapsed ? 'expand_more' : 'expand_less'"
+        class="log-panel__head-chevron"
+      />
+    </button>
+
+    <template v-if="!isCollapsed">
+      <div class="log-panel__toolbar">
+        <span class="log-panel__status">
+          <Spinner v-if="status === 'loading'" size="sm" class="log-panel__spinner" />
+          <StatusDot v-else :status="statusDot" size="sm" />
+          <span class="log-panel__label">{{ statusLabel }}</span>
+        </span>
+        <button
+          type="button"
+          class="log-panel__tail-btn"
+          :class="{ 'log-panel__tail-btn--active': followTail }"
+          :title="followTailTitle"
+          :aria-label="followTailTitle"
+          @click="toggleFollowTail"
+        >
+          <MsIcon :name="followTailIcon" size="sm" />
+        </button>
+        <slot name="toolbar" />
+      </div>
+      <!-- 顶部加载指示: 往上滚懒加载时显示 -->
+      <div v-if="loadingMore" class="log-panel__load-more">
+        <Spinner size="sm" /> <span>{{ t('common.log.loading_more') }}</span>
+      </div>
+      <pre ref="el" class="log-panel__body" @scroll="handleScroll"><span
+          v-for="(line, i) in normalizedLines"
+          :key="i"
+          class="log-line"
+          :class="line.className"
+        >{{ line.text }}</span></pre>
+      <div v-if="!normalizedLines.length && status !== 'loading'" class="log-panel__empty">
+        <slot name="empty">{{ t('common.log.empty') }}</slot>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -139,6 +184,61 @@ function handleScroll() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* ── 统一分区标题栏 (title prop) ──
+   与 SectionHeader 同一视觉口径: 图标 22px + .95rem/600 标题 + 右侧折叠箭头 */
+.log-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--bd);
+  background: transparent;
+  color: var(--t1);
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.log-panel__head--toggle {
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.log-panel__head--toggle:hover {
+  background: color-mix(in srgb, var(--t1) 5%, transparent);
+}
+
+.log-panel__head-icon {
+  flex: none;
+  color: var(--t2);
+  /* MsIcon 根节点即 .ms, class 直接落在它上面 (非后代), 故不用 :deep */
+  font-size: 22px;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 22;
+}
+
+.log-panel__head-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.log-panel__head-chevron {
+  flex: none;
+  color: var(--t3);
+  transition: color .15s ease;
+}
+
+.log-panel__head--toggle:hover .log-panel__head-chevron {
+  color: var(--t1);
+}
+
+.log-panel--collapsed .log-panel__head {
+  border-bottom: 0;
 }
 
 .log-panel__toolbar {

@@ -1,15 +1,79 @@
 {
   "title": "Sync",
   "tabs": {
-    "activity": "Activity",
-    "storage_rules": "Storage & Rules",
-    "remotes": "Storage & Logs",
-    "rules": "Sync Rules",
-    "config": "Configuration",
-    "clients": "Clients",
-    "remotes_section": "Remotes",
-    "rules_section": "Sync Rules",
-    "companion_section": "Companion Clients"
+    "sync": "Sync",
+    "clients": "Clients"
+  },
+  "hero": {
+    "unconfigured": {
+      "title": "Sync not configured",
+      "subtitle": "Add cloud storage and create sync rules to sync models and outputs automatically."
+    },
+    "running": {
+      "title": "Syncing",
+      "subtitle": "Syncing, {done}/{total} rules done."
+    },
+    "auth_expired": {
+      "title": "Storage authorization expired",
+      "subtitle": "A storage needs re-authorization. Please reconnect."
+    },
+    "idle": {
+      "title": "Sync service running",
+      "subtitle": "Auto sync is running.",
+      "subtitle_done": "Auto sync is running; last sync transferred {files} files ({bytes}).",
+      "subtitle_failed": "Auto sync is running; last sync failed with {failed}/{total} rules failed."
+    },
+    "stopped": {
+      "title": "Sync service stopped",
+      "subtitle": "Auto sync is stopped.",
+      "subtitle_done": "Auto sync is stopped; last sync transferred {files} files ({bytes}).",
+      "subtitle_failed": "Auto sync is stopped; last sync failed with {failed}/{total} rules failed."
+    },
+    "action": {
+      "add_storage": "Add Storage",
+      "reconnect": "Reconnect",
+      "start": "Start auto sync"
+    },
+    "worker_stop": "Stop auto sync",
+    "facts": {
+      "worker": "Auto sync",
+      "worker_running": "Running",
+      "worker_stopped": "Stopped",
+      "rules": "Rules",
+      "storages": "Storage",
+      "watch_interval": "Interval"
+    }
+  },
+  "storage": {
+    "title": "Storage",
+    "add": "Add Storage"
+  },
+  "rules_section": {
+    "title": "Sync Rules",
+    "empty": "No sync rules yet"
+  },
+  "records": {
+    "title": "Recent Syncs",
+    "empty": "No sync history yet",
+    "rules_count": "{count} rules",
+    "progress": "{done}/{total} done",
+    "files_bytes": "{files} files · {bytes}",
+    "detail": "View details"
+  },
+  "detail": {
+    "title": "Sync Record",
+    "rules": "Rules",
+    "trigger": "Trigger",
+    "started": "Started",
+    "finished": "Finished",
+    "duration": "Duration",
+    "files": "Files",
+    "size": "Size",
+    "speed": "Speed",
+    "file_list": "Files",
+    "events": "Events",
+    "no_events": "No events",
+    "load_more": "Load more"
   },
   "remotes": {
     "authenticated": "Authenticated",
@@ -112,6 +176,7 @@
     "run_failed": "Run failed"
   },
   "config": {
+    "title": "Sync Settings",
     "min_age": {
       "label": "Sync delay",
       "desc": "Wait a while after a file changes before syncing, in seconds"
@@ -120,25 +185,16 @@
       "label": "Check interval",
       "desc": "Check for file changes and sync at intervals, in seconds"
     },
-    "rclone": {
-      "title": "Rclone Configuration",
-      "placeholder": "Loading...",
-      "upload_local": "Upload Local File"
-    },
     "saved": "Saved",
-    "file_loaded": "Local config file loaded",
-    "unsaved_title": "Unsaved changes",
-    "unsaved_message": "Sync settings have been modified but not saved. Choose an action to proceed:",
-    "unsaved_message_banner": "Unsaved changes",
-    "unsaved_discard": "Discard changes",
-    "unsaved_cancel": "Stay on this tab",
-    "save_failed": "Save failed"
+    "save_failed": "Save failed",
+    "discard_confirm": "Sync settings have been modified but not saved. Discard changes?",
+    "discard": "Discard changes"
   },
   "worker": {
     "running": "Running",
     "stopped": "Stopped",
-    "start_ok": "Worker started",
-    "stop_ok": "Worker stopped",
+    "start_ok": "Auto sync started",
+    "stop_ok": "Auto sync stopped",
     "restart_ok": "Sync Worker restarted",
     "error": "Action failed"
   },
@@ -176,6 +232,15 @@
     "serve_title": "Transfer service",
     "clients_title": "Connected Clients",
     "description": "Pull outputs straight to this PC, in parallel with cloud sync.",
+    "hero_online": "{count} client(s) online",
+    "hero_offline": "No clients online",
+    "copy_dav": "Copy address",
+    "refresh": "Refresh client list",
+    "facts": {
+      "listen": "Listen",
+      "root": "Serving",
+      "online": "Online"
+    },
     "serve_state": "WebDAV",
     "serve_running": "Running",
     "serve_stopped": "Stopped",
@@ -197,21 +262,6 @@
     "client_rules": "Pull rules",
     "no_rules": "No rules"
   },
-  "activity": {
-    "current_job": "Current Sync",
-    "recent_jobs": "Recent Jobs",
-    "no_history": "No sync history yet",
-    "rules_short": "rules",
-    "files_short": "files",
-    "col_start": "Start",
-    "col_end": "End",
-    "col_trigger": "Trigger",
-    "col_path": "Path",
-    "col_files": "Files",
-    "col_size": "Size",
-    "col_speed": "Speed",
-    "col_duration": "Duration"
-  },
   "job": {
     "trigger": {
       "manual": "Manual",
@@ -226,6 +276,15 @@
       "partial": "Partial",
       "cancelled": "Cancelled"
     }
+  },
+  "msg": {
+    "config_saved": "Config saved, found {count} remote storage(s): {remotes}",
+    "remote_created": "Remote storage “{name}” created",
+    "remote_deleted": "Remote storage “{name}” deleted",
+    "rules_saved": "Saved {count} rule(s)",
+    "run_started": "Running {count} rule(s)",
+    "worker_started": "Sync service started",
+    "worker_stopped": "Sync service stopped"
   },
   "err": {
     "browse_no_remote": "Select a remote storage first",
@@ -276,15 +335,6 @@
     "storage_timeout": "Query timed out",
     "storage_unsupported": "This storage type does not report quota",
     "oauth_drives_failed": "Failed to fetch drives list: {detail}"
-  },
-  "msg": {
-    "config_saved": "Config saved, found {count} remote storage(s): {remotes}",
-    "remote_created": "Remote storage “{name}” created",
-    "remote_deleted": "Remote storage “{name}” deleted",
-    "rules_saved": "Saved {count} rule(s)",
-    "run_started": "Running {count} rule(s)",
-    "worker_started": "Sync service started",
-    "worker_stopped": "Sync service stopped"
   },
   "providers": {
     "drive_desc": "Sign in with Google",
