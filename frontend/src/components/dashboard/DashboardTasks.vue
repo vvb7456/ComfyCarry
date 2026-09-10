@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import StatusDot from '@/components/ui/StatusDot.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { fmtBytes, fmtSpeed } from '@/utils/format'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { ActivityData, DownloadTask } from '@/types/dashboard'
@@ -97,11 +97,8 @@ function formatDlSize(completed?: number, total?: number): string {
       </div>
     </div>
 
-    <!-- Idle minimal row -->
-    <div v-else class="dash-tasks-idle">
-      <StatusDot status="running" size="sm" />
-      <span>{{ t('dashboard.current.idle_desc') }}</span>
-    </div>
+    <!-- 空闲：与最近生成的空态同一副形态（居中静音一行，不套容器，也没有状态点） -->
+    <EmptyState v-else :message="t('dashboard.current.idle_desc')" />
   </section>
 </template>
 
@@ -110,7 +107,7 @@ function formatDlSize(completed?: number, total?: number): string {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--ac);
   text-decoration: none;
   font-weight: 500;
@@ -137,17 +134,6 @@ function formatDlSize(completed?: number, total?: number): string {
 }
 
 /* ── Section 1: Real-time Tasks ── */
-.dash-tasks-idle {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  border-radius: var(--r-md);
-  color: var(--t3);
-  font-size: var(--text-sm);
-}
 
 .dash-tasks-loading {
   min-height: 80px;
@@ -207,13 +193,13 @@ function formatDlSize(completed?: number, total?: number): string {
 }
 
 .dash-task-name {
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--t1);
 }
 
 .dash-task-meta {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--t3);
   font-family: var(--font-tabular);
 }
@@ -223,7 +209,7 @@ function formatDlSize(completed?: number, total?: number): string {
 }
 
 .dash-task-sub {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--t3);
 }
 

@@ -337,6 +337,13 @@
             white-space: nowrap
         }
 
+        /* 行列表容器：配合 ListRow 使用（行本身负责发丝线与骨架） */
+        .list-plain {
+            list-style: none;
+            margin: 0;
+            padding: 0
+        }
+
         .flex-center {
             display: flex;
             align-items: center;

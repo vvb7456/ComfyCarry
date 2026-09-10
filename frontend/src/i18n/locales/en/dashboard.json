@@ -10,13 +10,13 @@
   "hero": {
     "ready_title": "Workspace Ready",
     "busy_title": "Generating",
-    "busy_sub_no_progress": "Generating · Queue {count}",
+    "busy_sub_no_progress": "Queue {count}",
     "starting_title": "Starting ComfyUI",
-    "starting_sub": "Launching ComfyUI service...",
+    "starting_sub": "Starting the ComfyUI process.",
     "stopped_title": "ComfyUI Stopped",
-    "stopped_sub": "Service is currently not running",
+    "stopped_sub": "Start it to open the Web UI in your browser.",
     "fault_title": "ComfyUI Failed",
-    "fault_sub": "Process exited unexpectedly, check logs or retry",
+    "fault_sub": "The process exited unexpectedly. Check the logs.",
     "unavailable_title": "Service Unavailable",
     "unavailable_sub": "Unable to connect to ComfyCarry backend"
   },
@@ -41,7 +41,7 @@
   "current": {
     "title": "In Progress",
     "idle": "Idle",
-    "idle_desc": "Queue is idle. No tasks currently executing.",
+    "idle_desc": "No tasks running.",
     "downloading": "Downloading Model"
   },
   "services": {
@@ -50,6 +50,7 @@
     "jupyter": "Jupyter",
     "sync": "Cloud Sync",
     "tunnel": "Tunnel",
+    "dashboard": "ComfyCarry panel",
     "generating": "Generating",
     "online": "Online",
     "starting": "Starting",
@@ -60,11 +61,11 @@
     "not_configured": "Not configured",
     "sync_running": "Running",
     "action_sent": "{action} action sent",
-    "name": "Service",
-    "status": "Status",
-    "uptime": "Uptime",
-    "restarts": "Restarts",
-    "actions_col": "Actions"
+    "memory": "RAM",
+    "meta_uptime": "Uptime {value}",
+    "meta_cpu": "CPU {value}",
+    "meta_memory": "RAM {value}",
+    "meta_restarts": "Restarts {value}"
   },
   "gpu": {
     "title": "GPU VRAM",
@@ -80,7 +81,8 @@
   },
   "diagnostics": {
     "title": "Status & Environment",
-    "summary": "{online} / {total} Services Online"
+    "summary": "{online} / {total} Services Online",
+    "cores": "{n} cores"
   },
   "time": {
     "just_now": "Just now",

@@ -443,7 +443,6 @@ const totalServiceCount = computed(() => {
         :initial-loading="initialLoading"
         :data="data"
         :sys-stats="sysStats"
-        :app-version="appVersion"
         :ordered-services="orderedServices"
         :online-service-count="onlineServiceCount"
         :total-service-count="totalServiceCount"

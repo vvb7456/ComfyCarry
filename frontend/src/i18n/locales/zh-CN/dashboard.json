@@ -10,13 +10,13 @@
   "hero": {
     "ready_title": "工作区就绪",
     "busy_title": "正在生成",
-    "busy_sub_no_progress": "生成中 · 队列 {count}",
+    "busy_sub_no_progress": "队列 {count}",
     "starting_title": "ComfyUI 启动中",
-    "starting_sub": "正在拉起 ComfyUI 服务...",
+    "starting_sub": "正在启动 ComfyUI 进程。",
     "stopped_title": "ComfyUI 已停止",
-    "stopped_sub": "服务当前未运行",
+    "stopped_sub": "启动后可在浏览器打开 Web UI。",
     "fault_title": "ComfyUI 启动失败",
-    "fault_sub": "进程异常退出，请查看日志或重试",
+    "fault_sub": "进程异常退出，请查看日志。",
     "unavailable_title": "服务暂不可用",
     "unavailable_sub": "无法连接到 ComfyCarry 服务"
   },
@@ -41,7 +41,7 @@
   "current": {
     "title": "正在进行",
     "idle": "空闲",
-    "idle_desc": "当前队列空闲，暂无执行中任务",
+    "idle_desc": "暂无执行中的任务",
     "downloading": "下载模型"
   },
   "services": {
@@ -50,6 +50,7 @@
     "jupyter": "Jupyter",
     "sync": "云同步",
     "tunnel": "隧道",
+    "dashboard": "ComfyCarry 面板",
     "generating": "生成中",
     "online": "在线",
     "starting": "启动中",
@@ -60,11 +61,11 @@
     "not_configured": "未配置",
     "sync_running": "运行",
     "action_sent": "已发送 {action} 操作",
-    "name": "服务",
-    "status": "状态",
-    "uptime": "运行时间",
-    "restarts": "重启",
-    "actions_col": "操作"
+    "memory": "内存",
+    "meta_uptime": "运行时间 {value}",
+    "meta_cpu": "CPU {value}",
+    "meta_memory": "内存 {value}",
+    "meta_restarts": "重启 {value} 次"
   },
   "gpu": {
     "title": "GPU 显存",
@@ -80,7 +81,8 @@
   },
   "diagnostics": {
     "title": "状态与环境",
-    "summary": "{online} / {total} 服务在线"
+    "summary": "{online} / {total} 服务在线",
+    "cores": "{n} 核"
   },
   "time": {
     "just_now": "刚刚",

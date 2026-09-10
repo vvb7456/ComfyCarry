@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 defineOptions({ name: 'DashboardGallery' })
 
@@ -126,18 +128,18 @@ onMounted(() => {
     </div>
 
     <!-- Unavailable / Failed State -->
-    <div v-else-if="queueStore.historyFailed && recentOutputs.length === 0" class="dash-recent__empty">
-      <span>{{ t('dashboard.recent.unavailable') }}</span>
-      <button class="dash-retry-link" @click="queueStore.loadHistory()">
+    <EmptyState
+      v-else-if="queueStore.historyFailed && recentOutputs.length === 0"
+      :message="t('dashboard.recent.unavailable')"
+    >
+      <BaseButton variant="ghost" size="sm" @click="queueStore.loadHistory()">
         <MsIcon name="refresh" size="xs" />
-        <span>{{ t('dashboard.recent.retry') }}</span>
-      </button>
-    </div>
+        {{ t('dashboard.recent.retry') }}
+      </BaseButton>
+    </EmptyState>
 
     <!-- Empty -->
-    <div v-else-if="recentOutputs.length === 0" class="dash-recent__empty">
-      {{ t('dashboard.recent.empty') }}
-    </div>
+    <EmptyState v-else-if="recentOutputs.length === 0" :message="t('dashboard.recent.empty')" />
 
     <!-- Output Cards (Single Row, Never Wrap) -->
     <div v-else class="dash-output-grid">
@@ -187,7 +189,7 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--ac);
   text-decoration: none;
   font-weight: 500;
@@ -296,14 +298,14 @@ onMounted(() => {
 }
 
 .dash-output-name {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--t1);
   margin-bottom: 2px;
 }
 
 .dash-output-meta {
-  font-size: var(--text-xxs);
+  font-size: var(--text-xs);
   color: var(--t3);
   font-family: var(--font-tabular);
 }
@@ -314,37 +316,6 @@ onMounted(() => {
   background: color-mix(in srgb, var(--t3) 12%, transparent);
   border-radius: var(--r-md);
   animation: pulse 1.5s ease-in-out infinite;
-}
-
-.dash-recent__empty {
-  min-height: 110px;
-  background: var(--bg2);
-  border: 1px dashed var(--bd);
-  border-radius: var(--r-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  color: var(--t3);
-  font-size: var(--text-sm);
-}
-
-.dash-retry-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  color: var(--ac);
-  font-size: var(--text-xs);
-  cursor: pointer;
-  padding: 0;
-  margin-top: 2px;
-}
-
-.dash-retry-link:hover {
-  text-decoration: underline;
 }
 
 @media (max-width: 900px) {

@@ -59,7 +59,7 @@ const { t } = useI18n({ useScope: 'global' })
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon name="terminal" />
+            <MsIcon name="terminal" size="md" />
           </div>
           <a
             v-if="dashboardState === 'ready' || dashboardState === 'busy'"
@@ -98,7 +98,7 @@ const { t } = useI18n({ useScope: 'global' })
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon name="book_2" />
+            <MsIcon name="book_2" size="md" />
           </div>
           <a
             v-if="data?.jupyter?.online && jupyterUrl"
@@ -128,7 +128,7 @@ const { t } = useI18n({ useScope: 'global' })
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon name="cloud_sync" />
+            <MsIcon name="cloud_sync" size="md" />
           </div>
           <router-link to="/sync" class="dash-svc-card__cta">
             <span class="dash-svc-card__cta-text">{{ t('dashboard.actions.manage') }}</span>
@@ -145,7 +145,7 @@ const { t } = useI18n({ useScope: 'global' })
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon name="language" />
+            <MsIcon name="language" size="md" />
           </div>
           <router-link to="/tunnel" class="dash-svc-card__cta">
             <span class="dash-svc-card__cta-text">{{ tunnelConfigured ? t('dashboard.actions.manage') : t('dashboard.actions.config') }}</span>
@@ -209,7 +209,7 @@ const { t } = useI18n({ useScope: 'global' })
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--ac);
   background: none;
   border: none;
@@ -245,7 +245,7 @@ const { t } = useI18n({ useScope: 'global' })
 }
 
 .dash-svc-card__name {
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--t1);
   margin-bottom: 4px;
@@ -255,7 +255,7 @@ const { t } = useI18n({ useScope: 'global' })
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--t3);
 }
 
