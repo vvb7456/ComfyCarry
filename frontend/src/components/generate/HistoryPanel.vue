@@ -316,8 +316,15 @@ defineExpose({ setupObserver })
           <span class="history-card-filename text-truncate" :title="item.images?.[0]?.filename">
             {{ item.images?.[0]?.filename || item.prompt_id.substring(0, 8) + '…' }}
           </span>
-          <BaseButton v-if="item.images?.length" size="xs" square :title="t('common.btn.download')" @click="downloadAll(item.images)">
-            <MsIcon name="download" size="xs" color="none" />
+          <BaseButton
+            v-if="item.images?.length"
+            size="xs"
+            icon-only
+            :aria-label="t('common.btn.download')"
+            :title="t('common.btn.download')"
+            @click="downloadAll(item.images)"
+          >
+            <MsIcon name="download" />
           </BaseButton>
         </div>
       </div>
@@ -336,7 +343,7 @@ defineExpose({ setupObserver })
 
 <style scoped>
 .history-count {
-  font-size: .82rem;
+  font-size: var(--text-sm);
   color: var(--t3);
 }
 
@@ -407,7 +414,7 @@ defineExpose({ setupObserver })
   align-items: center;
   justify-content: center;
   color: var(--t3);
-  font-size: .78rem;
+  font-size: var(--text-sm);
 }
 
 /* ── 视频角标 (▶ 时长): 右下角半透明黑底胶囊 ── */
@@ -418,7 +425,7 @@ defineExpose({ setupObserver })
   padding: 2px 7px;
   background: rgba(0, 0, 0, .6);
   border-radius: 999px;
-  font-size: .62rem;
+  font-size: var(--text-xxs);
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   color: #fff;
@@ -450,7 +457,7 @@ defineExpose({ setupObserver })
   background: rgba(10, 10, 15, .82);
   border: 1px solid var(--ac);
   color: #fff;
-  font-size: .7rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   border-radius: 999px;
   cursor: pointer;

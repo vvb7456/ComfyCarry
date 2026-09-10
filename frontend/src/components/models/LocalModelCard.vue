@@ -95,7 +95,15 @@ const fetchLabel = computed(() => {
         <MsIcon v-if="model.has_info && !fetching" name="check" size="xs" />
         {{ fetchLabel }}
       </BaseButton>
-      <BaseButton v-if="canDelete" size="sm" variant="danger" square @click="emit('delete', model)">
+      <BaseButton
+        v-if="canDelete"
+        variant="danger"
+        size="sm"
+        icon-only
+        :aria-label="t('models.local.delete')"
+        :title="t('models.local.delete')"
+        @click="emit('delete', model)"
+      >
         <MsIcon name="delete" />
       </BaseButton>
     </template>

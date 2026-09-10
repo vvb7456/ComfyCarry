@@ -107,8 +107,8 @@ async function handleClearFavorites() {
         {{ t('models.downloads.clear_all') }}
       </BaseButton>
     </template>
-    <div v-if="favItems.length" class="fav-section-list">
-      <div v-for="item in favItems" :key="item.modelId + ':' + (item.versionId || '')" class="fav-row">
+    <ul v-if="favItems.length" class="list-plain fav-list">
+      <li v-for="item in favItems" :key="item.modelId + ':' + (item.versionId || '')">
         <DownloadItem
           :favorite-item="item"
           :installed="!!(item.versionId && dlGetVersionState(item.modelId, item.versionId) === 'installed')"
@@ -124,31 +124,25 @@ async function handleClearFavorites() {
           <MsIcon name="error" size="xs" />
           <span>{{ failedError(item) }}</span>
         </div>
-      </div>
-    </div>
-    <EmptyState v-else icon="push_pin" :message="t('models.downloads.no_pending_hint')" />
+      </li>
+    </ul>
+    <EmptyState v-else icon="push_pin" :message="t('models.downloads.no_pending_hint')" density="compact" />
   </CollapsibleGroup>
 
   <BatchAddModal v-model="batchAddOpen" />
 </template>
 
 <style scoped>
-.fav-section-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.fav-row {
-  position: relative;
+/* 收藏列表: 行组件负责骨架, 容器只负责发丝线 */
+.fav-list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
 }
 
 .fav-error {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 2px;
-  padding: 2px 8px;
+  padding: 0 0 10px 60px;
   font-size: var(--text-xs);
   color: var(--red);
 }

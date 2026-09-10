@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloads } from '@/composables/useDownloads'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import DownloadItem from '@/components/models/DownloadItem.vue'
@@ -64,17 +65,17 @@ const failedInHistory = computed(() =>
         {{ t('models.downloads.pause_all') }}
       </BaseButton>
     </template>
-    <div v-if="inProgressTasks.length" class="dl-section-list">
-      <DownloadItem
-        v-for="task in inProgressTasks"
-        :key="task.download_id"
-        :task="task"
-        @pause="dlPause"
-        @resume="dlResume"
-        @cancel="dlCancel"
-      />
-    </div>
-    <EmptyState v-else icon="download" :message="t('models.downloads.no_active')" />
+    <ul v-if="inProgressTasks.length" class="list-plain dl-list">
+      <li v-for="task in inProgressTasks" :key="task.download_id">
+        <DownloadItem
+          :task="task"
+          @pause="dlPause"
+          @resume="dlResume"
+          @cancel="dlCancel"
+        />
+      </li>
+    </ul>
+    <EmptyState v-else icon="download" :message="t('models.downloads.no_active')" density="compact" />
   </CollapsibleGroup>
 
   <!-- History: complete + failed merged -->
@@ -85,41 +86,26 @@ const failedInHistory = computed(() =>
     :default-open="false"
   >
     <template #title-right>
-      <span v-if="failedInHistory" class="dl-fail-badge">{{ failedInHistory }}</span>
+      <Badge v-if="failedInHistory" tone="negative">{{ failedInHistory }}</Badge>
       <BaseButton v-if="historyTasks.length" size="xs" @click.stop="dlClearHistory()">
         {{ t('models.downloads.clear_history') }}
       </BaseButton>
     </template>
-    <div v-if="historyTasks.length" class="dl-section-list">
-      <DownloadItem
-        v-for="task in historyTasks"
-        :key="task.download_id"
-        :task="task"
-        @retry="dlRetry"
-      />
-    </div>
-    <EmptyState v-else icon="history" :message="t('models.downloads.no_history')" />
+    <ul v-if="historyTasks.length" class="list-plain dl-list">
+      <li v-for="task in historyTasks" :key="task.download_id">
+        <DownloadItem
+          :task="task"
+          @retry="dlRetry"
+        />
+      </li>
+    </ul>
+    <EmptyState v-else icon="history" :message="t('models.downloads.no_history')" density="compact" />
   </CollapsibleGroup>
 </template>
 
 <style scoped>
-.dl-section-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.dl-fail-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-size: var(--text-xs);
-  color: #fff;
-  background: var(--red);
-  border-radius: 9px;
-  margin-right: 4px;
+/* 下载任务列表: 行组件负责骨架, 容器只发丝线分隔 */
+.dl-list > li + li {
+  border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
 }
 </style>

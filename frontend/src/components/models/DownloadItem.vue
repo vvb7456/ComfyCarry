@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import type { FavoriteItem, DownloadTask, VersionState } from '@/composables/useDownloads'
 import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import DownloadButton from '@/components/models/DownloadButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
@@ -65,6 +66,10 @@ const modelType = computed(() =>
 const badgeColor = computed(() => modelCategoryColor(modelType.value))
 const badgeLabel = computed(() => modelCategoryLabel(modelType.value))
 
+const baseModelText = computed(() =>
+  props.favoriteItem?.baseModel || props.task?.meta?.base_model || '',
+)
+
 const civitaiUrl = computed(() => {
   const id = props.favoriteItem?.modelId || props.task?.meta?.model_id
   // 负整数 ID 为 HF 白名单模型, 无 CivitAI 页面, 隐藏链接 (SPEC §4-E)
@@ -109,36 +114,91 @@ const isFailed = computed(() => props.task?.status === 'failed')
 const showProgressRow = computed(() =>
   !isFavorite.value && !!props.task && (isActive.value || isPaused.value || isQueued.value),
 )
+
+// ── 状态表达: 圆点 + 状态词 (ListRow 同口径) ──
+type DlState = 'active' | 'paused' | 'queued' | 'failed' | 'completed'
+
+const stateKey = computed<DlState | ''>(() => {
+  if (isFavorite.value) return ''
+  if (isActive.value) return 'active'
+  if (isPaused.value) return 'paused'
+  if (isQueued.value) return 'queued'
+  if (isFailed.value) return 'failed'
+  if (isComplete.value) return 'completed'
+  return ''
+})
+
+const stateDot = computed<'running' | 'loading' | 'stopped' | 'error'>(() => {
+  switch (stateKey.value) {
+    case 'active':
+    case 'completed':
+      return 'running'
+    case 'paused':
+    case 'queued':
+      return 'loading'
+    case 'failed':
+      return 'error'
+    default:
+      return 'stopped'
+  }
+})
+
+const stateText = computed(() => {
+  const k = stateKey.value
+  if (!k) return ''
+  if (k === 'active') return t('models.downloads.downloading')
+  if (k === 'queued') return t('models.downloads.waiting')
+  return t(`models.downloads.${k}`)
+})
+
+/** 副行事实: 版本名 + 速度 / 大小 / 进度 (任务模式) */
+const taskFacts = computed(() => {
+  if (isFavorite.value) return []
+  const out: string[] = []
+  const version = props.task?.meta?.version_name
+  if (version) out.push(version)
+  if (showProgressRow.value) {
+    if (speedText.value) out.push(speedText.value)
+    if (sizeText.value) out.push(sizeText.value)
+    out.push(`${progressPct.value.toFixed(1)}%`)
+  }
+  return out
+})
 </script>
 
 <template>
-  <div class="dli" :class="{ 'dli--failed': isFailed }">
+  <div class="dli">
     <!-- Thumbnail -->
     <div class="dli-thumb">
       <img v-if="imageUrl" :src="imageUrl" alt="" loading="lazy" @error="($event.target as HTMLImageElement).style.display='none'">
       <MsIcon v-else name="image_not_supported" />
     </div>
 
-    <!-- Info -->
-    <div class="dli-info">
-      <div class="dli-name text-truncate">
-        <a v-if="civitaiUrl" :href="civitaiUrl" target="_blank" rel="noopener" @click.stop>{{ name }}</a>
-        <span v-else>{{ name }}</span>
+    <!-- Main -->
+    <div class="dli-main">
+      <div class="dli-head">
+        <a v-if="civitaiUrl" class="dli-name" :href="civitaiUrl" target="_blank" rel="noopener" @click.stop>{{ name }}</a>
+        <span v-else class="dli-name">{{ name }}</span>
+
+        <span v-if="stateText" class="dli-state">
+          <StatusDot :status="stateDot" size="sm" />
+          {{ stateText }}
+        </span>
+
+        <Badge v-if="isFavorite && installed" color="#10b981">{{ t('models.downloads.installed') }}</Badge>
+        <Badge v-if="modelType" :color="badgeColor">{{ badgeLabel }}</Badge>
+        <Badge v-if="baseModelText">{{ baseModelText }}</Badge>
+        <Badge v-if="isFavorite && favoriteItem?.versionName">{{ favoriteItem.versionName }}</Badge>
       </div>
-      <div class="dli-meta">
-        <Badge v-if="isFavorite && installed" color="#10b981" size="sm">{{ t('models.downloads.installed') }}</Badge>
-        <Badge v-if="modelType" :color="badgeColor" size="sm">{{ badgeLabel }}</Badge>
-        <Badge v-if="favoriteItem?.baseModel" size="sm">{{ favoriteItem.baseModel }}</Badge>
-        <Badge v-if="task?.meta?.base_model" size="sm">{{ task.meta.base_model }}</Badge>
-        <Badge v-if="isFavorite && favoriteItem?.versionName" size="sm">{{ favoriteItem.versionName }}</Badge>
 
-        <!-- Task: version name text -->
-        <span v-if="!isFavorite && task?.meta?.version_name" class="dli-version-text">{{ task.meta.version_name }}</span>
+      <div v-if="taskFacts.length" class="dli-facts">
+        <span v-for="fact in taskFacts" :key="fact">{{ fact }}</span>
+      </div>
 
-        <!-- Task status labels -->
-        <span v-if="isPaused" class="dli-status dli-status--paused">{{ t('models.downloads.paused') }}</span>
-        <span v-if="isQueued" class="dli-status dli-status--queued">{{ t('models.downloads.waiting') }}</span>
-        <span v-if="isFailed && task?.error" class="dli-status dli-status--error">{{ errorText }}</span>
+      <div v-if="isFailed && task?.error" class="dli-error">{{ errorText }}</div>
+
+      <div v-if="showProgressRow" class="dli-progress">
+        <UsageBar :percent="progressPct" :height="5" />
       </div>
     </div>
 
@@ -154,34 +214,74 @@ const showProgressRow = computed(() =>
           @download="emit('download', favoriteItem!)"
           @cancel="downloadId && emit('cancel', downloadId)"
         />
-        <BaseButton size="sm" variant="danger" square @click="emit('remove', favoriteKey)">
+        <BaseButton
+          variant="danger"
+          size="sm"
+          icon-only
+          :aria-label="t('models.downloads.remove')"
+          :title="t('models.downloads.remove')"
+          @click="emit('remove', favoriteKey)"
+        >
           <MsIcon name="delete" />
         </BaseButton>
       </template>
 
       <!-- Active download actions -->
       <template v-else-if="isActive">
-        <BaseButton size="sm" square @click="emit('pause', task!.download_id)">
+        <BaseButton
+          size="sm"
+          icon-only
+          :aria-label="t('models.downloads.pause')"
+          :title="t('models.downloads.pause')"
+          @click="emit('pause', task!.download_id)"
+        >
           <MsIcon name="pause" />
         </BaseButton>
-        <BaseButton size="sm" variant="danger" square @click="emit('cancel', task!.download_id)">
+        <BaseButton
+          variant="danger"
+          size="sm"
+          icon-only
+          :aria-label="t('common.btn.cancel')"
+          :title="t('common.btn.cancel')"
+          @click="emit('cancel', task!.download_id)"
+        >
           <MsIcon name="close" />
         </BaseButton>
       </template>
 
       <!-- Paused actions -->
       <template v-else-if="isPaused">
-        <BaseButton size="sm" square @click="emit('resume', task!.download_id)">
+        <BaseButton
+          size="sm"
+          icon-only
+          :aria-label="t('models.downloads.resume')"
+          :title="t('models.downloads.resume')"
+          @click="emit('resume', task!.download_id)"
+        >
           <MsIcon name="play_arrow" />
         </BaseButton>
-        <BaseButton size="sm" variant="danger" square @click="emit('cancel', task!.download_id)">
+        <BaseButton
+          variant="danger"
+          size="sm"
+          icon-only
+          :aria-label="t('common.btn.cancel')"
+          :title="t('common.btn.cancel')"
+          @click="emit('cancel', task!.download_id)"
+        >
           <MsIcon name="close" />
         </BaseButton>
       </template>
 
       <!-- Queued actions -->
       <template v-else-if="isQueued">
-        <BaseButton size="sm" variant="danger" square @click="emit('cancel', task!.download_id)">
+        <BaseButton
+          variant="danger"
+          size="sm"
+          icon-only
+          :aria-label="t('common.btn.cancel')"
+          :title="t('common.btn.cancel')"
+          @click="emit('cancel', task!.download_id)"
+        >
           <MsIcon name="close" />
         </BaseButton>
       </template>
@@ -193,33 +293,18 @@ const showProgressRow = computed(() =>
         </BaseButton>
       </template>
     </div>
-
-    <!-- Progress bar (active/paused/queued downloads — always rendered to keep row height stable) -->
-    <div v-if="showProgressRow" class="dli-progress">
-      <div class="dli-progress-info">
-        <span v-if="speedText">{{ speedText }}</span>
-        <span v-if="sizeText">{{ sizeText }}</span>
-        <span>{{ progressPct.toFixed(1) }}%</span>
-      </div>
-      <UsageBar :percent="progressPct" :height="5" />
-    </div>
   </div>
 </template>
 
 <style scoped>
+/* 下载任务行: 对齐 ListRow 骨架, 但首列是多媒体的 48px 缩略图 (媒体预览保留)。
+   行本身透明、无边框, 分隔线由外层 ul.list-plain 的 li 发丝线承担。 */
 .dli {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 12px;
-  padding: 10px 14px;
-  background: var(--bg3);
-  border: 1px solid var(--bd);
-  border-radius: var(--rs);
-  flex-wrap: wrap;
-}
-
-.dli--failed {
-  border-color: rgba(239, 68, 68, .3);
+  align-items: start;
+  padding: 14px 0;
 }
 
 /* ── Thumbnail ── */
@@ -229,7 +314,6 @@ const showProgressRow = computed(() =>
   border-radius: var(--r-xs);
   overflow: hidden;
   background: var(--bg-in);
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -242,71 +326,79 @@ const showProgressRow = computed(() =>
   object-fit: cover;
 }
 
-/* ── Info ── */
-.dli-info {
-  flex: 1;
+/* ── Main ── */
+.dli-main {
   min-width: 0;
 }
 
-.dli-name {
-  font-size: var(--text-sm);
-  font-weight: 600;
+.dli-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 4px;
 }
 
-.dli-name a {
-  color: inherit;
+.dli-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--t1);
   text-decoration: none;
 }
-.dli-name a:hover {
+.dli-name:hover {
   color: var(--ac);
 }
 
-.dli-meta {
-  display: flex;
-  gap: 6px;
+.dli-state {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-}
-
-.dli-version-text {
+  gap: 6px;
   font-size: var(--text-xs);
   color: var(--t2);
 }
 
-.dli-status {
-  font-size: var(--text-xs);
-}
-
-.dli-status--paused {
-  color: var(--amber);
-}
-
-.dli-status--queued {
+.dli-facts {
+  display: flex;
+  flex-wrap: wrap;
   color: var(--t3);
+  font-size: var(--text-xs);
+  font-family: var(--font-tabular);
+}
+.dli-facts > span + span::before {
+  content: '·';
+  margin: 0 6px;
 }
 
-.dli-status--error {
+.dli-error {
+  margin-top: 4px;
+  font-size: var(--text-xs);
   color: var(--red);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* ── Progress ── */
+.dli-progress {
+  margin-top: 8px;
 }
 
 /* ── Actions ── */
 .dli-actions {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
 }
 
-/* ── Progress ── */
-.dli-progress {
-  width: 100%;
-}
+@media (max-width: 768px) {
+  .dli {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+  }
 
-.dli-progress-info {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--text-xs);
-  color: var(--t2);
-  margin-bottom: 3px;
+  .dli-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
 }
 </style>

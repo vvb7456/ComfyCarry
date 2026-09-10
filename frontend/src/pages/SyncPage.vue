@@ -1024,13 +1024,13 @@ function switchTab(tab: string) {
       <FormField :label="t('sync.rule.remote_path')" density="compact">
         <FieldControlRow>
           <input v-model="ruleForm.remote_path" type="text" class="form-input" placeholder="ComfyCarry/loras">
-          <BaseButton size="xs" square :title="t('sync.browse.remote_title')" @click="openBrowse('remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
+          <BaseButton size="xs" icon-only :title="t('sync.browse.remote_title')" @click="openBrowse('remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
       </FormField>
       <FormField :label="t('sync.rule.local_path')" density="compact">
         <FieldControlRow>
           <input v-model="ruleForm.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
-          <BaseButton size="xs" square :title="t('sync.browse.local_title')" @click="openBrowse('local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
+          <BaseButton size="xs" icon-only :title="t('sync.browse.local_title')" @click="openBrowse('local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
       </FormField>
       <FormField :label="t('sync.rule.filters')" density="compact">

@@ -98,7 +98,7 @@ function onPathChange(e: Event) {
         <BaseButton
           v-if="browsable"
           size="xs"
-          square
+          icon-only
           class="sync-rule-card__browse"
           :aria-label="t('sync.dir.browse')"
           @click="emit('browse')"

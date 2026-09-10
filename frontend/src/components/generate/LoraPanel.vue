@@ -284,10 +284,6 @@ function cycleApply(lora: LoraEntry) {
 </template>
 
 <style scoped>
-.lora-panel {
-  /* inherits parent padding from gen-module-panel */
-}
-
 .lora-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -419,7 +415,7 @@ function cycleApply(lora: LoraEntry) {
 }
 
 .lora-card__name {
-  font-size: .73rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--t1);
 }
@@ -442,8 +438,8 @@ function cycleApply(lora: LoraEntry) {
   flex: 0 0 auto;
   min-width: 28px;
   text-align: right;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: .65rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xxs);
   color: var(--ac);
   font-weight: 600;
   padding: 0 2px;
@@ -488,9 +484,9 @@ function cycleApply(lora: LoraEntry) {
   max-width: calc(100% - 8px);
 }
 
-/* 通用徽章风格: font-size:.6rem; font-weight:600; padding:1px 6px; border-radius:999px */
+/* 通用徽章风格: 紧凑字号 + 圆角胶囊 */
 .lora-card__badge {
-  font-size: .6rem;
+  font-size: var(--text-xxs);
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 999px;
@@ -576,7 +572,7 @@ function cycleApply(lora: LoraEntry) {
   .lora-card__name {
     flex: 1;
     min-width: 0;
-    font-size: .78rem;
+    font-size: var(--text-sm);
   }
 
   .lora-card__strength {
@@ -585,7 +581,7 @@ function cycleApply(lora: LoraEntry) {
   }
 
   .lora-card__str-val {
-    font-size: .68rem;
+    font-size: var(--text-xxs);
   }
 
   /* 段徽章离开缩略图, 回流成名字旁的行内 chip */
