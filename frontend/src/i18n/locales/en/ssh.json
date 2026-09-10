@@ -1,39 +1,70 @@
 {
   "title": "SSH",
-  "tabs": {
-    "status": "Service & Logs",
-    "config": "Keys"
+  "hero": {
+    "running": {
+      "title": "SSH Running",
+      "subtitle": "SSH service is online; connect via the tunnel address or the local port."
+    },
+    "starting": {
+      "title": "Starting SSH",
+      "subtitle": "Starting the SSH service."
+    },
+    "stopping": {
+      "title": "Stopping SSH",
+      "subtitle": "Stopping the SSH service."
+    },
+    "restarting": {
+      "title": "Restarting SSH",
+      "subtitle": "Restarting the SSH service."
+    },
+    "stopped": {
+      "title": "SSH Stopped",
+      "subtitle": "Start it to connect via the tunnel address or the local port."
+    },
+    "action": {
+      "copy": "Copy connection command",
+      "start": "Start SSH"
+    }
   },
-  "status": {
-    "running": "Running",
-    "stopped": "Stopped",
-    "service": "SSH Service",
-    "port": "Listen Port",
-    "connections": "Active Connections",
-    "password_auth": "Password Auth",
-    "pw_set": "Set",
-    "not_set": "Not Set",
-    "service_not_running": "Service not running",
-    "root_password": "Root Password"
+  "facts": {
+    "port": "Listen port",
+    "auth": "Auth",
+    "auth_follow": "Password follows panel",
+    "auth_password": "Password auth",
+    "auth_key_only": "Public key only",
+    "connections": "Active connections",
+    "tunnel": "Connection",
+    "tunnel_on": "Tunnel",
+    "tunnel_off": "Local port"
   },
   "connect": {
-    "title": "Connect",
-    "hint": "ssh root{'@'}<instance-public-ip> -p <mapped-port>",
-    "tunnel_not_configured": "Tunnel has no SSH mapping configured",
-    "check_platform": "Check your instance platform for public IP / port",
-    "not_running": "SSH not running, cannot connect",
+    "title": "Connection command",
+    "loading": "Loading...",
+    "copy_cmd": "Copy connection command",
     "need_cloudflared": "Requires local installation of",
-    "loading": "Loading..."
+    "local_hint": "No tunnel SSH mapping detected; connect via the local port."
   },
   "keys": {
     "title": "Authorized Keys",
-    "env_var": "Env Variable",
-    "saved": "Saved",
-    "add": "Add Key",
+    "unnamed": "Unnamed key",
+    "source_env": "Env Variable",
+    "source_saved": "Saved",
     "add_btn": "Add Key",
     "add_placeholder": "Paste one or more SSH public keys (one per line)",
     "add_submit": "Add",
-    "delete_btn": "Delete key"
+    "delete_btn": "Delete key",
+    "empty": "No public keys yet"
+  },
+  "settings": {
+    "title": "SSH Settings",
+    "label": "SSH password follow",
+    "desc": "The root SSH password follows panel password changes",
+    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected",
+    "enabled_toast": "SSH password follow enabled, root password synced to the panel password",
+    "disabled_toast": "SSH password follow disabled, SSH only allows public key login",
+    "lockout_title": "Disable SSH password login",
+    "lockout_confirm": "No public key is configured. After disabling, you will not be able to log in to SSH with a password. Continue?",
+    "lockout_btn": "Disable anyway"
   },
   "log": {
     "title": "SSH Logs"

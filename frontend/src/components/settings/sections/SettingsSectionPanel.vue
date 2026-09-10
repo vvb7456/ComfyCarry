@@ -1,16 +1,15 @@
 <script setup lang="ts">
 /**
  * 设置分区: 面板 — 两个即时动作模块 (单页 v3: L2 模块 + 行, 无草稿态无守卫):
- *   1. 登录与认证: 修改登录密码 (modal) / SSH 使用面板密码 (开关) / API Key (只读+重生成)
+ *   1. 登录与认证: 修改登录密码 (modal) / API Key (只读+重生成)
  *   2. 配置管理: 导出配置 / 导入配置
  * 重新初始化已归位 About 区 (SettingsAboutFooter, 与原版一致)。
- * onMounted 加载 /api/settings 与 /api/ssh/status (SSH 开关初始态取 pw_follow,
- * 加载中禁用); API Key 行失败就地重试, SSH 开关失败同。
+ * SSH 密码跟随已迁入 SSH 页页内设置 (C05), 此处不再保留。
+ * onMounted 加载 /api/settings; API Key 行失败就地重试。
  */
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import SettingsModule from '@/components/settings/SettingsModule.vue'
-import SettingsGroupToggleRow from '@/components/settings/SettingsGroupToggleRow.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -21,7 +20,6 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
-import type { SSHStatus } from '@/types/ssh'
 
 defineOptions({ name: 'SettingsSectionPanel' })
 
@@ -43,78 +41,6 @@ function openPwModal() {
   pwNew.value = ''
   pwConfirm.value = ''
   pwModalOpen.value = true
-}
-
-// ─── SSH 密码跟随 (即时开关, 无 dirty; spec §5.1) ────────────────────────────
-
-const sshPwFollow = ref(false)
-const sshPwFollowLoading = ref(true)
-const sshPwFollowError = ref(false)
-const sshPwFollowSubmitting = ref(false)
-
-async function loadSshFollow() {
-  sshPwFollowError.value = false
-  const data = await get<SSHStatus>('/api/ssh/status')
-  if (!data) {
-    sshPwFollowError.value = true
-    sshPwFollowLoading.value = false
-    return
-  }
-  sshPwFollow.value = !!data.pw_follow
-  sshPwFollowLoading.value = false
-}
-
-type PwFollowResponse = ApiErrorBody & { ok?: boolean; password_auth_enabled?: boolean }
-
-/** password-follow 专用请求。不走 useApiFetch: 409 lockout_risk 要按状态码
- *  分支进确认框, 且错误提示由本组件按分支处理, 避免 useApiFetch 的自动
- *  toast 在确认流程里双重弹出 (封装方式同 OAuthWizard 的 oauthFetch)。 */
-async function pwFollowFetch(body: { enabled: boolean; force?: boolean }) {
-  try {
-    const res = await fetch('/api/ssh/password-follow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (res.status === 401) {
-      window.location.href = '/login'
-      return { status: 401, data: null as PwFollowResponse | null }
-    }
-    let data: PwFollowResponse | null = null
-    try { data = await res.json() as PwFollowResponse } catch { /* 空响应体 */ }
-    return { status: res.status, data }
-  } catch {
-    return { status: 0, data: null as PwFollowResponse | null }
-  }
-}
-
-/** 应用开关。v-model 已乐观更新, 失败/取消在这里回弹。 */
-async function applyPwFollow(enabled: boolean, force = false) {
-  sshPwFollowSubmitting.value = true
-  const { status, data } = await pwFollowFetch({ enabled, force })
-  sshPwFollowSubmitting.value = false
-
-  // 无公钥锁死防护: 后端 409 未做任何变更 → danger 确认后 force 重发, 取消回弹
-  if (status === 409 && data?.error_key === 'ssh.err.lockout_risk') {
-    const go = await confirm({
-      title: t('settings.ssh_password.lockout_title'),
-      message: t('settings.ssh_password.lockout_confirm'),
-      variant: 'danger',
-      confirmText: t('settings.ssh_password.lockout_btn'),
-    })
-    if (go) { await applyPwFollow(false, true); return }
-    sshPwFollow.value = true
-    return
-  }
-
-  if (status !== 200 || !data?.ok) {
-    // 后端 error_key (ssh.err.*) 已接 i18n, apiErrorText 翻译; 网络层失败落回兜底
-    toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
-    sshPwFollow.value = !enabled
-    return
-  }
-  sshPwFollow.value = data.password_auth_enabled ?? enabled
-  toast(t(enabled ? 'settings.ssh_password.enabled_toast' : 'settings.ssh_password.disabled_toast'), 'success')
 }
 
 // ─── API Key state ───────────────────────────────────────────────────────────
@@ -211,7 +137,6 @@ async function importConfig(event: Event) {
 
 onMounted(() => {
   void loadSettings().finally(() => { apiKeyLoading.value = false })
-  void loadSshFollow()
 })
 </script>
 
@@ -237,25 +162,6 @@ onMounted(() => {
             </BaseButton>
           </div>
         </div>
-
-        <!-- SSH 使用面板密码 (即时开关, spec §5.1; lockout 走 force 流程) -->
-        <div v-if="sshPwFollowError" class="settings-row">
-          <div class="settings-row__text">
-            <div class="settings-row__label">{{ t('settings.ssh_password.label') }}</div>
-          </div>
-          <div class="settings-row__control">
-            <BaseButton size="sm" @click="loadSshFollow">{{ t('common.btn.retry') }}</BaseButton>
-          </div>
-        </div>
-        <SettingsGroupToggleRow
-          v-else
-          :label="t('settings.ssh_password.label')"
-          :desc="t('settings.ssh_password.desc')"
-          :help="t('settings.ssh_password.help')"
-          :model-value="sshPwFollow"
-          :disabled="sshPwFollowLoading || sshPwFollowSubmitting"
-          @update:model-value="applyPwFollow"
-        />
 
         <!-- API Key (只读 + 重新生成) -->
         <div class="settings-row">

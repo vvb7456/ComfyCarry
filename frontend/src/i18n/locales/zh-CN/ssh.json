@@ -1,39 +1,70 @@
 {
   "title": "SSH",
-  "tabs": {
-    "status": "服务 & 日志",
-    "config": "公钥管理"
+  "hero": {
+    "running": {
+      "title": "SSH 运行中",
+      "subtitle": "SSH 服务在线，可通过隧道地址或本机端口登录。"
+    },
+    "starting": {
+      "title": "SSH 启动中",
+      "subtitle": "正在启动 SSH 服务。"
+    },
+    "stopping": {
+      "title": "SSH 停止中",
+      "subtitle": "正在停止 SSH 服务。"
+    },
+    "restarting": {
+      "title": "SSH 重启中",
+      "subtitle": "正在重启 SSH 服务。"
+    },
+    "stopped": {
+      "title": "SSH 已停止",
+      "subtitle": "启动后可通过隧道地址或本机端口登录。"
+    },
+    "action": {
+      "copy": "复制连接命令",
+      "start": "启动 SSH"
+    }
   },
-  "status": {
-    "running": "运行中",
-    "stopped": "已停止",
-    "service": "SSH 服务",
+  "facts": {
     "port": "监听端口",
+    "auth": "认证",
+    "auth_follow": "密码跟随面板密码",
+    "auth_password": "密码认证",
+    "auth_key_only": "仅公钥登录",
     "connections": "活跃连接",
-    "password_auth": "密码认证",
-    "pw_set": "已设置",
-    "not_set": "未设置",
-    "service_not_running": "服务未启动",
-    "root_password": "Root 密码"
+    "tunnel": "连接方式",
+    "tunnel_on": "隧道连接",
+    "tunnel_off": "本机直连"
   },
   "connect": {
     "title": "连接命令",
-    "hint": "ssh root{'@'}<实例公网地址> -p <映射端口>",
-    "tunnel_not_configured": "Tunnel 未配置 SSH 映射",
-    "check_platform": "请查看实例平台获取公网 IP / 端口",
-    "not_running": "SSH 未运行，无法连接",
-    "need_cloudflared": "需要本地安装",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "copy_cmd": "复制连接命令",
+    "need_cloudflared": "请先在本地计算机安装",
+    "local_hint": "未检测到隧道 SSH 映射，使用本机端口直连。"
   },
   "keys": {
     "title": "授权公钥",
-    "env_var": "环境变量",
-    "saved": "已保存",
-    "add": "添加公钥",
+    "unnamed": "未命名公钥",
+    "source_env": "环境变量",
+    "source_saved": "已保存",
     "add_btn": "添加公钥",
     "add_placeholder": "粘贴一个或多个 SSH 公钥（每行一个）",
-    "add_submit": "确认添加",
-    "delete_btn": "删除公钥"
+    "add_submit": "添加",
+    "delete_btn": "删除公钥",
+    "empty": "尚未添加公钥"
+  },
+  "settings": {
+    "title": "SSH 设置",
+    "label": "SSH 密码跟随",
+    "desc": "root 的 SSH 登录密码自动跟随面板密码更新",
+    "help": "开启时会将 root 密码重置为当前面板密码并重启 sshd；面板登录不受影响",
+    "enabled_toast": "SSH 密码跟随已开启，root 密码已同步为面板密码",
+    "disabled_toast": "SSH 密码跟随已关闭，SSH 仅允许公钥登录",
+    "lockout_title": "关闭 SSH 密码登录",
+    "lockout_confirm": "当前没有配置任何公钥，关闭后将无法通过密码登录 SSH，确定？",
+    "lockout_btn": "仍然关闭"
   },
   "log": {
     "title": "SSH 日志"

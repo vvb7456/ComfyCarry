@@ -1,15 +1,32 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+/**
+ * SSHPage — SSH 单列页 (C05)。
+ *
+ * 结构: 页头 (停止/重启 + 设置) → Hero → 运行事实 → 连接命令 → 授权公钥 → 日志。
+ * 合并原「服务 & 日志 / 公钥管理」两个 Tab: 公钥区始终可管理, 即使服务停止;
+ * 连接命令区只在 sshd 运行时出现 (停止时状态与启动由 Hero 承担)。
+ *
+ * Hero 状态机:
+ *   running(ok)        运行中, 主操作「复制连接命令」
+ *   starting(warn+busy) 启动中, 无操作
+ *   stopping(warn+busy) 停止中, 无操作
+ *   restarting(warn+busy) 重启中, 无操作
+ *   stopped(off)       已停止, 主操作「启动 SSH」
+ *
+ * 连接命令沿用原有 connectCmd 状态机 (先看 sshd 是否运行, 再取 /api/tunnel/status):
+ *   有隧道 SSH 映射 → cloudflared ProxyCommand; 无映射 → 本机端口直连。
+ */
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import ServiceHero from '@/components/ui/ServiceHero.vue'
+import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
-import AddCard from '@/components/ui/AddCard.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
-import StatCard from '@/components/ui/StatCard.vue'
-import LoadingCenter from '@/components/ui/LoadingCenter.vue'
-import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
+import LoadingCenter from '@/components/ui/LoadingCenter.vue'
+import SSHSettingsModal from '@/components/ssh/SSHSettingsModal.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
@@ -29,29 +46,27 @@ const { copy } = useClipboard()
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const activeTab = ref('status')
-const tabs = computed(() => [
-  { key: 'status', label: t('ssh.tabs.status'), icon: 'link' },
-  { key: 'config', label: t('ssh.tabs.config'), icon: 'settings' },
-])
-
 const status = ref<SSHStatus | null>(null)
 const statusLoading = ref(true)
 const connectCmd = ref<string | null>(null)
 const connectCmdLoading = ref(true)
-const connectCmdState = ref<'loading' | 'ready' | 'not_running' | 'tunnel_missing'>('loading')
+const connectCmdState = ref<'loading' | 'tunnel' | 'local' | 'not_running'>('loading')
 const keys = ref<SSHKey[]>([])
 const keysLoading = ref(false)
+const deletingFp = ref<string | null>(null)
 
-// action loading
 const actionLoading = ref<'start' | 'stop' | 'restart' | null>(null)
+const acting = computed(() => actionLoading.value !== null)
 
-// add-key form
+const settingsOpen = ref(false)
+
+// 添加公钥 (行内表单, 支持多行批量)
 const showAddKey = ref(false)
 const newKeysText = ref('')
 const addingKey = ref(false)
 
-// log stream
+// ─── 日志流 ───────────────────────────────────────────────────────────────────
+
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/ssh/logs',
   streamUrl: '/api/ssh/logs/stream',
@@ -73,6 +88,11 @@ async function loadStatus() {
   }
 }
 
+/** 本机直连命令: 无隧道时按本地容器场景生成, 端口回落 ssh 默认 22。 */
+function localSshCmd(): string {
+  return 'ssh root@localhost'
+}
+
 async function loadConnectCmd() {
   connectCmdLoading.value = true
   if (status.value && !status.value.running) {
@@ -84,14 +104,14 @@ async function loadConnectCmd() {
   const data = await get<{ urls?: Record<string, string>; tunnel_mode?: string; public?: { urls?: Record<string, string> } }>('/api/tunnel/status')
   connectCmdLoading.value = false
   if (!data) {
-    connectCmd.value = null
-    connectCmdState.value = 'tunnel_missing'
+    connectCmd.value = localSshCmd()
+    connectCmdState.value = 'local'
     return
   }
 
   let sshHost: string | null = null
 
-  // Check custom tunnel urls (keyed by service name)
+  // 自定义隧道地址 (按服务名索引)
   const urls = data.urls || {}
   for (const [name, url] of Object.entries(urls)) {
     if ((name as string).toLowerCase() === 'ssh') {
@@ -100,7 +120,7 @@ async function loadConnectCmd() {
     }
   }
 
-  // Check public tunnel urls
+  // 公共隧道地址
   if (!sshHost && data.tunnel_mode === 'public' && data.public?.urls) {
     const pubUrls = data.public.urls
     const sshUrl = pubUrls.ssh || pubUrls.SSH
@@ -111,11 +131,18 @@ async function loadConnectCmd() {
 
   if (sshHost) {
     connectCmd.value = `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${sshHost}`
-    connectCmdState.value = 'ready'
+    connectCmdState.value = 'tunnel'
   } else {
-    connectCmd.value = null
-    connectCmdState.value = 'tunnel_missing'
+    connectCmd.value = localSshCmd()
+    connectCmdState.value = 'local'
   }
+}
+
+/** 自动刷新: 仅在 running 发生变化时才重取连接命令, 避免每轮都打 tunnel 接口。 */
+async function refreshStatus() {
+  const prevRunning = status.value?.running
+  await loadStatus()
+  if (status.value?.running !== prevRunning) await loadConnectCmd()
 }
 
 async function loadKeys() {
@@ -125,23 +152,9 @@ async function loadKeys() {
   if (data) keys.value = data.keys || []
 }
 
-// ─── Tab switch ───────────────────────────────────────────────────────────────
+// ─── Auto-refresh ─────────────────────────────────────────────────────────────
 
-function onTabChange(tab: string) {
-  activeTab.value = tab
-  if (tab === 'status') {
-    logStart()
-    refresher.resume()
-  } else {
-    logStop()
-    refresher.pause()
-    loadKeys()
-  }
-}
-
-// ─── Auto-refresh (status tab only) ──────────────────────────────────────────
-
-const refresher = useAutoRefresh(loadStatus, 10000)
+const refresher = useAutoRefresh(refreshStatus, 10000)
 
 // ─── Service actions ──────────────────────────────────────────────────────────
 
@@ -162,6 +175,10 @@ async function sshAction(action: 'start' | 'stop' | 'restart') {
 
 // ─── SSH keys ─────────────────────────────────────────────────────────────────
 
+function keyBadges(key: SSHKey): string[] {
+  return [key.type, key.source === 'env' ? t('ssh.keys.source_env') : t('ssh.keys.source_saved')]
+}
+
 async function addKey() {
   const text = newKeysText.value.trim()
   if (!text) return
@@ -178,9 +195,16 @@ async function addKey() {
   }
 }
 
+function cancelAddKey() {
+  showAddKey.value = false
+  newKeysText.value = ''
+}
+
 async function deleteKey(fingerprint: string) {
   if (!await confirm({ message: t('ssh.confirm.delete_key'), variant: 'danger' })) return
+  deletingFp.value = fingerprint
   const data = await del<ApiErrorBody & { ok?: boolean; keys?: SSHKey[] }>('/api/ssh/keys', { fingerprint })
+  deletingFp.value = null
   if (!data) return
   if (!data?.ok) {
     toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
@@ -190,6 +214,62 @@ async function deleteKey(fingerprint: string) {
   }
 }
 
+// ─── Hero 状态机 ──────────────────────────────────────────────────────────────
+
+type HeroState = 'running' | 'starting' | 'stopping' | 'restarting' | 'stopped'
+
+const heroState = computed<HeroState>(() => {
+  if (actionLoading.value === 'start') return 'starting'
+  if (actionLoading.value === 'restart') return 'restarting'
+  if (actionLoading.value === 'stop') return 'stopping'
+  return status.value?.running ? 'running' : 'stopped'
+})
+
+const heroTone = computed(() => ({
+  running: 'ok',
+  starting: 'warn',
+  stopping: 'warn',
+  restarting: 'warn',
+  stopped: 'off',
+}[heroState.value] as 'ok' | 'warn' | 'off'))
+
+const heroBusy = computed(() => ['starting', 'stopping', 'restarting'].includes(heroState.value))
+const heroTitle = computed(() => t(`ssh.hero.${heroState.value}.title`))
+const heroSubtitle = computed(() => t(`ssh.hero.${heroState.value}.subtitle`))
+const heroAction = computed<'copy' | 'start' | null>(() => {
+  if (heroState.value === 'running') return 'copy'
+  if (heroState.value === 'stopped') return 'start'
+  return null
+})
+
+// ─── 运行事实 ─────────────────────────────────────────────────────────────────
+
+const authFact = computed(() => {
+  const s = status.value
+  if (!s) return ''
+  if (s.pw_follow) return t('ssh.facts.auth_follow')
+  if (s.password_auth) return t('ssh.facts.auth_password')
+  return t('ssh.facts.auth_key_only')
+})
+
+const factsList = computed<{ label: string; value: string }[]>(() => {
+  const s = status.value
+  if (!s) return []
+  // 配置事实停机仍显示, 运行期字段随状态显示
+  const out: { label: string; value: string }[] = [
+    { label: t('ssh.facts.port'), value: String(s.port) },
+    { label: t('ssh.facts.auth'), value: authFact.value },
+    { label: t('ssh.facts.connections'), value: String(s.active_connections) },
+  ]
+  if (s.running && (connectCmdState.value === 'tunnel' || connectCmdState.value === 'local')) {
+    out.push({
+      label: t('ssh.facts.tunnel'),
+      value: connectCmdState.value === 'tunnel' ? t('ssh.facts.tunnel_on') : t('ssh.facts.tunnel_off'),
+    })
+  }
+  return out
+})
+
 // ─── Copy ─────────────────────────────────────────────────────────────────────
 
 function copyCmd() {
@@ -197,11 +277,18 @@ function copyCmd() {
   copy(connectCmd.value)
 }
 
+function onSettingsChanged() {
+  void loadStatus()
+}
+
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-loadStatus().then(loadConnectCmd)
-logStart()
-refresher.start({ immediate: false })
+onMounted(() => {
+  void loadStatus().then(loadConnectCmd)
+  void loadKeys()
+  logStart()
+  refresher.start({ immediate: false })
+})
 
 onUnmounted(() => {
   logStop()
@@ -210,180 +297,243 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="ssh-page">
-    <div class="page-body">
-      <TabSwitcher :title="t('ssh.title')" :tabs="tabs" v-model="activeTab" @update:model-value="onTabChange">
-        <template #extra>
-          <span v-if="status" class="page-actions">
-            <BaseButton v-if="!status.running" size="sm" :disabled="actionLoading !== null" @click="sshAction('start')">
-              <MsIcon name="play_arrow" /> {{ t('common.btn.start') }}
-            </BaseButton>
-            <template v-else>
-              <BaseButton size="sm" :disabled="actionLoading !== null" @click="sshAction('stop')">
-                <MsIcon name="stop" /> {{ t('common.btn.stop') }}
-              </BaseButton>
-              <BaseButton size="sm" :disabled="actionLoading !== null" @click="sshAction('restart')">
-                <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
-              </BaseButton>
-            </template>
-          </span>
-        </template>
-      </TabSwitcher>
-
-      <!-- ─── Status Tab ───────────────────────────────────────────────── -->
-      <!-- ─── Status Tab ───────────────────────────────────────────────── -->
-      <div v-show="activeTab === 'status'" class="tab-panel">
-        <!-- Stat cards -->
-        <LoadingCenter v-if="statusLoading && !status">
-          {{ t('common.status.loading') }}
-        </LoadingCenter>
-        <div v-else-if="status" class="stat-grid">
-          <StatCard :label="t('ssh.status.service')" :status="status.running ? 'running' : 'stopped'" value-size="sm">
-            <template #value>{{ status.running ? t('ssh.status.running') : t('ssh.status.stopped') }}</template>
-            <template #sub>{{ status.running ? `PID: ${status.pid || '-'}` : t('ssh.status.service_not_running') }}</template>
-          </StatCard>
-          <StatCard :label="t('ssh.status.port')" value-size="sm">
-            <template #value>{{ status.port }}</template>
-            <template #sub>TCP</template>
-          </StatCard>
-          <StatCard :label="t('ssh.status.connections')" value-size="sm">
-            <template #value>{{ status.active_connections }}</template>
-            <template #sub>ESTABLISHED</template>
-          </StatCard>
-          <StatCard :label="t('ssh.status.password_auth')" :status="status.password_auth ? 'running' : 'stopped'" value-size="sm">
-            <template #value>{{ status.password_auth ? t('common.status.enabled') : t('common.status.disabled') }}</template>
-            <template #sub>
-              {{ t('ssh.status.root_password') }}:
-              <span :style="{ color: status.password_set ? 'var(--green)' : 'var(--amber)' }">
-                {{ status.password_set ? t('ssh.status.pw_set') : t('ssh.status.not_set') }}
-              </span>
-            </template>
-          </StatCard>
-        </div>
-
-        <!-- SSH connect command -->
-        <SectionHeader icon="content_paste" flush>{{ t('ssh.connect.title') }}</SectionHeader>
-        <BaseCard density="default" class="measure">
-          <div v-if="connectCmdLoading" style="color:var(--t3);font-size:.85rem">
-            {{ t('ssh.connect.loading') }}
-          </div>
-          <template v-else-if="connectCmdState === 'ready' && connectCmd">
-            <div class="connect-cmd-row">
-              <code class="connect-cmd-code">{{ connectCmd }}</code>
-              <BaseButton variant="ghost" size="sm" square :title="t('common.btn.copy')" @click="copyCmd">
-                <MsIcon name="content_copy" />
-              </BaseButton>
-            </div>
-            <div class="connect-cmd-hint">
-              {{ t('ssh.connect.need_cloudflared') }}
-              <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener">cloudflared</a>
-            </div>
-          </template>
-          <div v-else-if="connectCmdState === 'not_running'" class="connect-cmd-fallback">
-            <div><MsIcon name="info" /> {{ t('ssh.connect.not_running') }}</div>
-          </div>
-          <div v-else class="connect-cmd-fallback">
-            <div><MsIcon name="info" /> {{ t('ssh.connect.tunnel_not_configured') }}{{ t('ssh.connect.check_platform') }}</div>
-            <code class="connect-cmd-code">{{ t('ssh.connect.hint') }}</code>
-          </div>
-        </BaseCard>
-
-        <!-- Log -->
-        <SectionHeader icon="receipt_long">{{ t('ssh.log.title') }}</SectionHeader>
-        <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
+  <div class="page-body">
+    <div class="page-header-row">
+      <div class="page-title-wrap">
+        <h1 class="page-title">{{ t('ssh.title') }}</h1>
       </div>
-
-      <!-- ─── Config Tab ───────────────────────────────────────────────── -->
-      <div v-show="activeTab === 'config'" class="tab-panel settings-centered">
-        <!-- SSH Keys column -->
-        <div>
-          <SectionHeader icon="lock" flush>{{ t('ssh.keys.title') }}</SectionHeader>
-
-          <!-- Key list -->
-          <LoadingCenter v-if="keysLoading" style="padding:24px 0" />
-          <template v-else>
-            <div v-for="key in keys" :key="key.fingerprint" class="ssh-key-card">
-              <div class="ssh-key-info">
-                <div class="ssh-key-type">
-                  <MsIcon name="key" />
-                  {{ key.type }}
-                  <span class="ssh-source-badge" :class="key.source === 'env' ? 'ssh-source-badge--env' : 'ssh-source-badge--config'">
-                    {{ key.source === 'env' ? t('ssh.keys.env_var') : t('ssh.keys.saved') }}
-                  </span>
-                </div>
-                <div class="ssh-key-fp">{{ key.fingerprint }}</div>
-                <div v-if="key.comment" class="ssh-key-comment">{{ key.comment }}</div>
-              </div>
-              <BaseButton
-                variant="danger"
-                size="sm"
-                square
-                :title="t('ssh.keys.delete_btn')"
-                @click="deleteKey(key.fingerprint)"
-              >
-                <MsIcon name="delete" />
-              </BaseButton>
-            </div>
-
-            <!-- Add key form (inserted above the add-card so the add-card remains last) -->
-            <Transition name="slide-down">
-              <div v-if="showAddKey" class="ssh-add-key-card">
-                <textarea
-                  v-model="newKeysText"
-                  class="form-textarea form-textarea--mono"
-                  style="height:100px;resize:vertical"
-                  :placeholder="t('ssh.keys.add_placeholder')"
-                />
-                <div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px">
-                  <BaseButton size="sm" @click="showAddKey = false">{{ t('common.btn.cancel') }}</BaseButton>
-                  <BaseButton variant="primary" size="sm" :disabled="!newKeysText.trim()" :loading="addingKey" @click="addKey">
-                    {{ t('ssh.keys.add_submit') }}
-                  </BaseButton>
-                </div>
-              </div>
-            </Transition>
-
-            <!-- Add-card (always kept as the last item) -->
-            <AddCard class="ssh-key-card" size="compact" :label="t('ssh.keys.add_btn')" @click="showAddKey = true" />
-          </template>
-        </div>
-      </div>
+      <span class="page-header-row__spacer" />
+      <span v-if="status?.running" class="page-actions">
+        <BaseButton size="sm" :loading="actionLoading === 'stop'" :disabled="acting" @click="sshAction('stop')">
+          <MsIcon name="stop" /> {{ t('common.btn.stop') }}
+        </BaseButton>
+        <BaseButton size="sm" :loading="actionLoading === 'restart'" :disabled="acting" @click="sshAction('restart')">
+          <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
+        </BaseButton>
+      </span>
+      <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('ssh.settings.title')" @click="settingsOpen = true">
+        <MsIcon name="settings" />
+      </BaseButton>
     </div>
+
+    <div class="page-col">
+      <LoadingCenter v-if="statusLoading && !status" style="padding:60px 0" />
+
+      <template v-else-if="status">
+        <!-- Hero + 运行事实 -->
+        <ServiceHero
+          icon="key"
+          :title="heroTitle"
+          :subtitle="heroSubtitle"
+          :tone="heroTone"
+          :busy="heroBusy"
+        >
+          <template v-if="heroAction" #actions>
+            <BaseButton v-if="heroAction === 'copy'" variant="primary" @click="copyCmd">
+              {{ t('ssh.hero.action.copy') }}
+            </BaseButton>
+            <BaseButton
+              v-else
+              variant="primary"
+              :loading="actionLoading === 'start'"
+              :disabled="acting"
+              @click="sshAction('start')"
+            >
+              {{ t('ssh.hero.action.start') }}
+            </BaseButton>
+          </template>
+          <template v-if="factsList.length" #facts>
+            <span v-for="fact in factsList" :key="fact.label">{{ fact.label }}<b>{{ fact.value }}</b></span>
+          </template>
+        </ServiceHero>
+
+        <!-- 连接命令 (仅运行时) -->
+        <section v-if="status.running" class="ssh-block">
+          <SectionHeader icon="link">{{ t('ssh.connect.title') }}</SectionHeader>
+          <div class="connect-card">
+            <span v-if="connectCmdLoading" class="connect-loading">{{ t('ssh.connect.loading') }}</span>
+            <template v-else-if="connectCmd">
+              <div class="connect-row">
+                <code class="connect-code">{{ connectCmd }}</code>
+                <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('ssh.connect.copy_cmd')" @click="copyCmd">
+                  <MsIcon name="content_copy" />
+                </BaseButton>
+              </div>
+              <div v-if="connectCmdState === 'tunnel'" class="connect-hint">
+                {{ t('ssh.connect.need_cloudflared') }}
+                <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener">cloudflared</a>
+              </div>
+              <div v-else class="connect-hint">{{ t('ssh.connect.local_hint') }}</div>
+            </template>
+          </div>
+        </section>
+
+        <!-- 授权公钥 (停机仍可管理) -->
+        <section class="ssh-block">
+          <SectionHeader icon="key">
+            {{ t('ssh.keys.title') }}
+            <span class="ssh-count">{{ keys.length }}</span>
+            <template #actions>
+              <BaseButton size="sm" @click="showAddKey = true">
+                <MsIcon name="add" /> {{ t('ssh.keys.add_btn') }}
+              </BaseButton>
+            </template>
+          </SectionHeader>
+
+          <Transition name="slide-down">
+            <div v-if="showAddKey" class="ssh-add-key">
+              <textarea
+                v-model="newKeysText"
+                class="form-textarea form-textarea--mono"
+                style="height:100px;resize:vertical"
+                :placeholder="t('ssh.keys.add_placeholder')"
+              />
+              <div class="ssh-add-key__actions">
+                <BaseButton size="sm" @click="cancelAddKey">{{ t('common.btn.cancel') }}</BaseButton>
+                <BaseButton variant="primary" size="sm" :disabled="!newKeysText.trim()" :loading="addingKey" @click="addKey">
+                  {{ t('ssh.keys.add_submit') }}
+                </BaseButton>
+              </div>
+            </div>
+          </Transition>
+
+          <LoadingCenter v-if="keysLoading && !keys.length" style="padding:24px 0" />
+          <ul v-else-if="keys.length" class="list-plain ssh-keys">
+            <ListRow
+              v-for="key in keys"
+              :key="key.fingerprint"
+              icon="key"
+              :title="key.comment || t('ssh.keys.unnamed')"
+              :badges="keyBadges(key)"
+              :facts="[key.fingerprint]"
+            >
+              <template #actions>
+                <BaseButton
+                  variant="danger"
+                  size="sm"
+                  icon-only
+                  :aria-label="t('ssh.keys.delete_btn')"
+                  :loading="deletingFp === key.fingerprint"
+                  @click="deleteKey(key.fingerprint)"
+                >
+                  <MsIcon name="delete" />
+                </BaseButton>
+              </template>
+            </ListRow>
+          </ul>
+          <EmptyState v-else icon="key" :message="t('ssh.keys.empty')" density="compact" />
+        </section>
+
+        <!-- 日志 (默认展开) -->
+        <section class="ssh-block">
+          <SectionHeader icon="receipt_long">{{ t('ssh.log.title') }}</SectionHeader>
+          <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
+        </section>
+      </template>
+    </div>
+
+    <!-- 页内设置: SSH 密码跟随 -->
+    <SSHSettingsModal v-model="settingsOpen" @changed="onSettingsChanged" />
   </div>
 </template>
 
 <style scoped>
+/* 分区节奏: Hero → 连接命令 → 授权公钥 → 日志 28px */
+.ssh-block {
+  margin-top: 28px;
+}
 
+.ssh-count {
+  margin-left: 6px;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--t3);
+}
 
-/* Vue-unique: page wrapper */
-.ssh-page { display: flex; flex-direction: column; height: 100%; }
+/* ── 连接命令 ── */
+.connect-card {
+  padding: 14px 16px;
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  background: var(--bg2);
+}
 
-/* Vue-unique: SSH connect command display */
-.connect-cmd-row { display: flex; align-items: center; gap: 8px; }
-.connect-cmd-code { flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: .8rem; color: var(--t1); background: var(--bg); padding: 8px 12px; border-radius: var(--rs); overflow-x: auto; white-space: nowrap; }
-.connect-cmd-hint { font-size: .72rem; color: var(--t3); margin-top: 4px; }
-.connect-cmd-hint a { color: var(--ac); text-decoration: none; }
-.connect-cmd-hint a:hover { text-decoration: underline; text-underline-offset: 3px; }
-.connect-cmd-fallback { display: flex; flex-direction: column; gap: 6px; color: var(--t3); font-size: .82rem; }
+.connect-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-/* Vue-unique: SSH key source badge */
-.ssh-source-badge { font-size: .68rem; padding: 1px 6px; border-radius: 3px; margin-left: 6px; }
-.ssh-source-badge--env { background: var(--bg4); color: var(--amber); }
-.ssh-source-badge--config { background: var(--bg4); color: var(--cyan); }
+.connect-code {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-x: auto;
+  white-space: nowrap;
+}
 
-/* Vue-unique: slide-down transition */
+.connect-hint {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--t3);
+}
+
+.connect-hint a {
+  color: var(--ac);
+  text-decoration: none;
+}
+
+.connect-hint a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.connect-loading {
+  font-size: var(--text-sm);
+  color: var(--t3);
+}
+
+/* ── 公钥 ── 指纹用等宽 (ListRow facts 默认 tabular, 这里收紧为 mono) */
+.ssh-keys :deep(.list-row__facts) {
+  font-family: var(--font-mono);
+}
+
+.ssh-add-key {
+  padding: 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  background: var(--bg2);
+}
+
+.ssh-add-key__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── 行内表单展开过渡 ── */
 .slide-down-enter-active,
-.slide-down-leave-active { transition: all .2s ease; overflow: hidden; }
-.slide-down-enter-from,
-.slide-down-leave-to { max-height: 0; opacity: 0; }
-.slide-down-enter-to,
-.slide-down-leave-from { max-height: 300px; opacity: 1; }
+.slide-down-leave-active {
+  transition: all .2s ease;
+  overflow: hidden;
+}
 
-/* ── Key Cards ── */
-.ssh-key-card { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-.ssh-key-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.ssh-key-type { font-size: .82rem; font-weight: 600; color: var(--t1); display: flex; align-items: center; gap: 6px; }
-.ssh-key-fp { font-family: 'IBM Plex Mono', monospace; font-size: .75rem; color: var(--t2); word-break: break-all; }
-.ssh-key-comment { font-size: .72rem; color: var(--t3); }
-.ssh-add-key-card { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 14px; margin-bottom: 8px; }
+.slide-down-enter-from,
+.slide-down-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.slide-down-enter-to,
+.slide-down-leave-from {
+  max-height: 300px;
+  opacity: 1;
+}
 </style>

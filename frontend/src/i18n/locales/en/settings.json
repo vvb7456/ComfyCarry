@@ -60,16 +60,6 @@
     "row_desc": "Change the password for the ComfyCarry panel",
     "change_btn": "Change password"
   },
-  "ssh_password": {
-    "label": "SSH password follow",
-    "desc": "The root SSH password follows panel password changes",
-    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected",
-    "enabled_toast": "SSH password follow enabled, root password synced to the panel password",
-    "disabled_toast": "SSH password follow disabled, SSH only allows public key login",
-    "lockout_title": "Disable SSH password login",
-    "lockout_confirm": "No public key is configured. After disabling, you will not be able to log in to SSH with a password. Continue?",
-    "lockout_btn": "Disable anyway"
-  },
   "api_key": {
     "help": "Carried as X-API-Key / Bearer header when external scripts or apps call the panel API",
     "regenerate": "Regenerate",
