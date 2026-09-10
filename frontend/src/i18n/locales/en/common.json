@@ -17,7 +17,8 @@
     "hide": "Hide",
     "clear": "Clear",
     "logout": "Logout",
-    "retry": "Retry"
+    "retry": "Retry",
+    "done": "Done"
   },
   "status": {
     "loading": "Loading...",

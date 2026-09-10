@@ -3,7 +3,7 @@ import { useToast } from './useToast'
 import { apiErrorText } from '@/utils/apiError'
 
 let _redirecting = false
-function redirectToLogin() {
+export function redirectToLogin() {
   if (_redirecting) return
   _redirecting = true
   window.location.href = '/login'

@@ -150,9 +150,18 @@ export interface BrowseResponse {
   error_params?: Record<string, unknown>
 }
 
-export interface RcloneConfigResponse {
-  config: string
-  exists: boolean
+/**
+ * staged 凭据 (browse/mkdir 的可选参数): 凭据不经落盘直接探测远程 ——
+ * env 注入 RCLONE_CONFIG_* 由后端执行, 三种来源互斥:
+ * - wizard: true → 服务端 setup state 的 wizard_remotes 计划
+ * - oauth:  true → 服务端 authorize 会话 (dashboard OAuth 流程)
+ * - params: 直传 (dashboard 非 OAuth 流程, 与最终 create 同参)
+ */
+export interface StagedCreds {
+  wizard?: boolean
+  oauth?: boolean
+  type?: string
+  params?: Record<string, string>
 }
 
 /**
@@ -205,4 +214,28 @@ export interface RemoteCreateRequest {
   params?: Record<string, string>
   /** true = 走 OAuth 会话创建 (token 全程在后端, 前端不经手) */
   oauth?: boolean
+  /** true = 同名 remote 原地替换凭据 (规则不受影响); 缺省同名时后端返回 409 */
+  overwrite?: boolean
+}
+
+/** 驱动器/云端硬盘条目 (GET /api/sync/remote/oauth/drives, spec §3.2) */
+export interface OAuthDriveItem {
+  id: string
+  name: string
+  /** OneDrive: personal | business | documentLibrary; Drive: 共享盘为空或省略 */
+  type?: string
+}
+
+/** GET /api/sync/remote/oauth/drives 响应 */
+export interface DrivesResponse extends ApiOkResponse {
+  drives?: OAuthDriveItem[]
+}
+
+/** POST /api/setup/wizard_remote 请求体 (spec §3.3) */
+export interface WizardRemoteRequest {
+  name: string
+  type: string
+  params?: Record<string, string>
+  /** true = 同名条目原地替换; 缺省同名时后端返回 400 */
+  overwrite?: boolean
 }

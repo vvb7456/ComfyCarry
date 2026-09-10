@@ -20,48 +20,41 @@
   },
   "remote": {
     "add": "Add Storage",
-    "add_modal": "Add Storage Service",
     "name": "Remote Name",
     "name_placeholder": "e.g. myr2",
-    "type": "Type",
-    "select_type": "Select type...",
-    "oauth_token_tooltip": "1. Install rclone on your local machine\n2. Run rclone authorize \"{type}\"\n3. Paste the token JSON here after completing browser auth",
-    "fill_required": "Please fill in name and type",
     "invalid_name": "Name can only contain letters, numbers, underscores and hyphens",
     "missing_fields": "Required fields missing: {fields}",
-    "created": "Created",
     "create_failed": "Create failed",
-    "connecting": "Creating…",
-    "confirm_delete": "Delete remote \"{name}\"?",
-    "confirm_delete_with_rules": "Delete remote \"{name}\"?\n{count} rule(s) reference this storage and will also be deleted.",
-    "deleted": "Deleted",
-    "deleted_with_rules": "\"{name}\" deleted, {count} rule(s) referencing it cleaned up",
-    "delete_failed": "Delete failed",
+    "confirm_disconnect": "Disconnect remote storage \"{name}\"?",
+    "confirm_disconnect_with_rules": "Disconnect remote storage \"{name}\"?\n{count} rule(s) reference this storage and will also be deleted.",
+    "disconnected": "Disconnected",
+    "disconnected_with_rules": "\"{name}\" disconnected, {count} rule(s) referencing it cleaned up",
+    "disconnect_failed": "Disconnect failed",
     "no_capacity_info": "This storage type doesn't support capacity queries",
-    "load_storage": "Refresh Capacity"
+    "load_storage": "Refresh Capacity",
+    "disconnect": "Disconnect",
+    "reconnect": "Reconnect"
   },
   "oauth": {
-    "step_prepare": "Prepare",
-    "step_authorize": "Authorize",
-    "step_create": "Create Remote",
-    "start": "Sign in & Authorize",
-    "starting": "Starting authorization…",
-    "open_auth_page": "Open Authorization Page in New Tab",
-    "localhost_hint": "After granting access, the browser will land on a localhost page that fails to open — this is expected. Copy the full URL from the address bar and paste it below.",
-    "google_unverified_hint": "With a Google account you may see an \"unverified app\" warning page — click \"Continue\"; this behaves the same as a local rclone authorize.",
-    "paste_label": "Callback URL",
+    "connect_provider": "Connect {provider}",
+    "sign_in_browser": "Sign in via browser",
+    "start_with_provider": "Sign in with {provider}",
+    "start_drive": "Sign in with Google",
+    "start_onedrive": "Sign in with your Microsoft account",
+    "start_dropbox": "Sign in with Dropbox",
+    "page_opened": "Authorization page opened in browser",
+    "reopen": "Reopen",
+    "reconnect": "Switch Account",
+    "done_status": "Authorized",
+    "drive_advanced": "Advanced",
+    "my_drive": "My Drive",
+    "localhost_hint": "After granting access, the browser will land on a localhost page that fails to open. Copy the full URL from the address bar and paste it below.",
     "paste_placeholder": "Paste the full URL from the browser address bar",
-    "paste_submit": "Submit",
     "paste_required": "Paste the callback URL first",
-    "exchanging": "Exchanging token…",
-    "done_title": "Authorized",
-    "done_hint": "Token is ready. Click \"Create Remote\" to finish (a connectivity test runs automatically).",
-    "create": "Create Remote",
+    "not_done_yet": "Authorization is not complete yet; finish it in the card first",
+    "drives_failed": "Failed to load drives. Please retry.",
+    "drives_required": "Drive information is missing. Please reconnect your account.",
     "back": "Back",
-    "advanced_manual": "Advanced: paste token manually",
-    "manual_create": "Create with Token",
-    "drive_client_hint": "rclone's built-in shared client_id is being retired during 2026 — providing your own Google Cloud client_id / client_secret is recommended (optional):",
-    "drive_client_link": "Official guide",
     "invalid_callback": "Invalid callback URL: copy the full address from the browser address bar after authorizing and try again",
     "paste_failed": "Failed to submit callback URL",
     "start_failed": "Failed to start authorization",
@@ -69,8 +62,7 @@
     "session_active_other": "An authorization session for another provider ({type}) is in progress; finish or cancel it first",
     "session_lost": "Authorization session expired (dashboard may have restarted); please start again",
     "poll_failed": "Failed to poll authorization status; please start again",
-    "error_unknown": "Authorization failed",
-    "onedrive_enterprise_hint": "For OneDrive business/team drives, auto-matching the main drive is not supported yet — use WebDAV or a locally configured rclone instead"
+    "error_unknown": "Authorization failed"
   },
   "rules": {
     "deploy": "On Deploy",
@@ -139,7 +131,8 @@
     "unsaved_message": "Sync settings have been modified but not saved. Choose an action to proceed:",
     "unsaved_message_banner": "Unsaved changes",
     "unsaved_discard": "Discard changes",
-    "unsaved_cancel": "Stay on this tab"
+    "unsaved_cancel": "Stay on this tab",
+    "save_failed": "Save failed"
   },
   "worker": {
     "running": "Running",
@@ -175,7 +168,9 @@
     "no_subdirs": "No subdirectories here",
     "retry": "Retry",
     "failed": "Failed to list directory",
-    "remote_required": "Pick a remote above first"
+    "remote_required": "Pick a remote above first",
+    "mkdir_btn": "New Folder",
+    "mkdir_failed": "Failed to create directory"
   },
   "companion": {
     "serve_title": "Transfer service",
@@ -237,9 +232,10 @@
     "browse_rclone_failed": "Listing failed: {detail}",
     "browse_rclone_failed_plain": "Listing failed",
     "browse_timeout": "Listing timed out (30s)",
-    "config_empty": "Config content cannot be empty",
-    "config_no_section": "Malformed config: at least one [remote] section is required",
-    "config_dup_section": "Duplicate section(s): {names}. Merge or rename them first.",
+    "mkdir_path_required": "Directory name is required",
+    "mkdir_rclone_failed": "Failed to create directory: {detail}",
+    "mkdir_rclone_failed_plain": "Failed to create directory",
+    "mkdir_timeout": "Creating directory timed out, check your network and retry",
     "conn_test_failed": "Connection test failed: {detail}",
     "conn_test_failed_plain": "Connection test failed",
     "oauth_start_failed": "Failed to start authorization: {detail}",
@@ -278,7 +274,8 @@
     "storage_auth_expired": "Authorization expired — run rclone config reconnect to re-authorize",
     "storage_not_found": "Remote storage not found or wrong path",
     "storage_timeout": "Query timed out",
-    "storage_unsupported": "This storage type does not report quota"
+    "storage_unsupported": "This storage type does not report quota",
+    "oauth_drives_failed": "Failed to fetch drives list: {detail}"
   },
   "msg": {
     "config_saved": "Config saved, found {count} remote storage(s): {remotes}",
@@ -288,5 +285,35 @@
     "run_started": "Running {count} rule(s)",
     "worker_started": "Sync service started",
     "worker_stopped": "Sync service stopped"
+  },
+  "providers": {
+    "drive_desc": "Sign in with Google",
+    "onedrive_desc": "Sign in with Microsoft",
+    "dropbox_desc": "Sign in with Dropbox",
+    "s3_desc": "Connect with Access Key",
+    "webdav_desc": "Connect with WebDAV URL",
+    "sftp_desc": "Connect with SSH Server"
+  },
+  "dir": {
+    "drive_label": "Google Drive",
+    "onedrive_label": "Drive",
+    "bucket_label": "Bucket",
+    "browse": "Browse"
+  },
+  "overwrite": {
+    "confirm": "Remote \"{name}\" already exists with the same type. Overwrite existing credentials?",
+    "btn": "Overwrite Credentials"
+  },
+  "empty": {
+    "title": "No Cloud Storage Connected",
+    "desc": "Connect to sync models and generation outputs",
+    "add_btn": "Add Storage"
+  },
+  "flow": {
+    "next": "Next",
+    "create_rules": "Create sync rules"
+  },
+  "steps": {
+    "connect": "Connect"
   }
 }

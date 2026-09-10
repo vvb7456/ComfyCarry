@@ -12,10 +12,13 @@ const props = withDefaults(defineProps<{
   description?: string
   icon?: string
   iconColor?: string
+  /** 底色档位 (透传 BaseCard): 在 bg3 底的弹窗内使用时传 bg2 以保持对比 */
+  variant?: 'bg2' | 'bg3'
 }>(), {
   selected: false,
   disabled: false,
   locked: false,
+  variant: 'bg3',
 })
 
 const emit = defineEmits<{
@@ -31,6 +34,7 @@ function onClick() {
 <template>
   <BaseCard
     density="roomy"
+    :variant="variant"
     class="option-card"
     :class="{
       'option-card--selected': selected || locked,

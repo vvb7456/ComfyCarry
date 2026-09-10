@@ -20,48 +20,41 @@
   },
   "remote": {
     "add": "添加存储",
-    "add_modal": "添加存储服务",
     "name": "远程存储名称",
     "name_placeholder": "例如 myr2",
-    "type": "类型",
-    "select_type": "选择类型...",
-    "oauth_token_tooltip": "1. 在本地电脑安装 rclone\n2. 运行 rclone authorize \"{type}\"\n3. 完成浏览器授权后将 token JSON 粘贴到此处",
-    "fill_required": "请填写名称和类型",
     "invalid_name": "名称仅允许字母、数字、下划线和短横线",
     "missing_fields": "请填写必填项：{fields}",
-    "created": "已创建",
     "create_failed": "创建失败",
-    "connecting": "创建中…",
-    "confirm_delete": "确定要删除远程存储「{name}」吗？",
-    "confirm_delete_with_rules": "确定要删除远程存储「{name}」吗？\n有 {count} 条规则引用该存储，将一并删除。",
-    "deleted": "已删除",
-    "deleted_with_rules": "「{name}」已删除，并清理了 {count} 条引用该存储的规则",
-    "delete_failed": "删除失败",
+    "confirm_disconnect": "确定要断开远程存储「{name}」吗？",
+    "confirm_disconnect_with_rules": "确定要断开远程存储「{name}」吗？\n有 {count} 条规则引用该存储，将一并删除。",
+    "disconnected": "已断开",
+    "disconnected_with_rules": "「{name}」已断开，并清理了 {count} 条引用该存储的规则",
+    "disconnect_failed": "断开失败",
     "no_capacity_info": "此存储类型不支持容量查询",
-    "load_storage": "刷新容量"
+    "load_storage": "刷新容量",
+    "disconnect": "断开",
+    "reconnect": "重新连接"
   },
   "oauth": {
-    "step_prepare": "登录准备",
-    "step_authorize": "登录授权",
-    "step_create": "创建存储",
-    "start": "登录授权",
-    "starting": "正在启动授权…",
-    "open_auth_page": "在新标签页打开授权页",
-    "localhost_hint": "完成授权后，浏览器会跳转到一个打不开的 localhost 页面 —— 这是预期行为。请复制浏览器地址栏的完整 URL，粘贴到下方。",
-    "google_unverified_hint": "使用 Google 账号时可能看到「未验证应用」警告页，点击「继续」即可，与本地 rclone authorize 行为一致。",
-    "paste_label": "回调地址",
+    "connect_provider": "连接 {provider}",
+    "sign_in_browser": "在浏览器中完成登录",
+    "start_with_provider": "使用 {provider} 登录",
+    "start_drive": "使用 Google 账号登录",
+    "start_onedrive": "使用微软账号登录",
+    "start_dropbox": "使用 Dropbox 账号登录",
+    "page_opened": "已在浏览器中打开授权页面",
+    "reopen": "重新打开",
+    "reconnect": "更换账号",
+    "done_status": "授权完成",
+    "drive_advanced": "高级",
+    "my_drive": "我的云端硬盘",
+    "localhost_hint": "完成授权后，浏览器会跳转到一个打不开的 localhost 页面。请复制浏览器地址栏的完整 URL，粘贴到下方。",
     "paste_placeholder": "粘贴浏览器地址栏的完整 URL",
-    "paste_submit": "提交",
     "paste_required": "请先粘贴回调 URL",
-    "exchanging": "正在换取令牌…",
-    "done_title": "授权成功",
-    "done_hint": "令牌已就绪，点击「创建存储」完成配置（将自动进行连通性测试）。",
-    "create": "创建存储",
+    "not_done_yet": "授权尚未完成，请先在卡片内完成授权",
+    "drives_failed": "无法加载驱动器列表，请重试",
+    "drives_required": "缺少驱动器信息，请重新连接账号",
     "back": "返回",
-    "advanced_manual": "高级：手动粘贴 Token",
-    "manual_create": "使用 Token 创建",
-    "drive_client_hint": "rclone 内置的共享 client_id 将于 2026 年内退役，建议填写你自己的 Google Cloud client_id / client_secret（可选）：",
-    "drive_client_link": "查看官方教程",
     "invalid_callback": "回调 URL 格式错误：请复制授权完成后浏览器地址栏的完整地址再试",
     "paste_failed": "提交回调地址失败",
     "start_failed": "启动授权失败",
@@ -69,8 +62,7 @@
     "session_active_other": "已有另一个网盘（{type}）的授权会话进行中，请先完成或稍后再试",
     "session_lost": "授权会话已失效（面板可能已重启），请重新开始授权",
     "poll_failed": "授权状态查询失败，请重新开始授权",
-    "error_unknown": "授权出错",
-    "onedrive_enterprise_hint": "若为 OneDrive 企业版/团队盘，当前暂不支持自动匹配主盘，可改用 WebDAV 或本地 rclone 配置"
+    "error_unknown": "授权出错"
   },
   "rules": {
     "deploy": "部署时",
@@ -139,7 +131,8 @@
     "unsaved_message": "同步配置已修改但未保存。继续操作前请选择：",
     "unsaved_message_banner": "存在未保存的更改",
     "unsaved_discard": "放弃更改",
-    "unsaved_cancel": "留在本页"
+    "unsaved_cancel": "留在本页",
+    "save_failed": "保存失败"
   },
   "worker": {
     "running": "运行中",
@@ -175,7 +168,9 @@
     "no_subdirs": "该目录下没有子目录",
     "retry": "重试",
     "failed": "读取目录失败",
-    "remote_required": "请先在上方选择一个远程存储"
+    "remote_required": "请先在上方选择一个远程存储",
+    "mkdir_btn": "新建目录",
+    "mkdir_failed": "新建目录失败"
   },
   "companion": {
     "serve_title": "传输服务",
@@ -237,9 +232,10 @@
     "browse_rclone_failed": "列目录失败：{detail}",
     "browse_rclone_failed_plain": "列目录失败",
     "browse_timeout": "列目录超时（30 秒）",
-    "config_empty": "配置内容不能为空",
-    "config_no_section": "配置格式错误：至少需要一个 [remote] 段",
-    "config_dup_section": "配置存在同名段：{names}。请合并或重命名后重试。",
+    "mkdir_path_required": "请填写要创建的目录名",
+    "mkdir_rclone_failed": "新建目录失败：{detail}",
+    "mkdir_rclone_failed_plain": "新建目录失败",
+    "mkdir_timeout": "新建目录超时，请检查网络后重试",
     "conn_test_failed": "连接测试失败：{detail}",
     "conn_test_failed_plain": "连接测试失败",
     "oauth_start_failed": "启动授权失败：{detail}",
@@ -278,7 +274,8 @@
     "storage_auth_expired": "认证已过期，请运行 rclone config reconnect 重新授权",
     "storage_not_found": "远程存储不存在或路径错误",
     "storage_timeout": "查询超时",
-    "storage_unsupported": "此存储类型不支持容量查询"
+    "storage_unsupported": "此存储类型不支持容量查询",
+    "oauth_drives_failed": "拉取驱动器列表失败：{detail}"
   },
   "msg": {
     "config_saved": "配置已保存，检测到 {count} 个远程存储：{remotes}",
@@ -288,5 +285,35 @@
     "run_started": "开始执行 {count} 条规则",
     "worker_started": "同步服务已启动",
     "worker_stopped": "同步服务已停止"
+  },
+  "providers": {
+    "drive_desc": "Google 账号登录",
+    "onedrive_desc": "微软账号登录",
+    "dropbox_desc": "Dropbox 账号登录",
+    "s3_desc": "Access Key 连接",
+    "webdav_desc": "服务器地址连接",
+    "sftp_desc": "SSH 服务器连接"
+  },
+  "dir": {
+    "drive_label": "云端硬盘",
+    "onedrive_label": "驱动器",
+    "bucket_label": "存储桶",
+    "browse": "浏览"
+  },
+  "overwrite": {
+    "confirm": "远程存储「{name}」已存在相同类型的配置，是否覆盖已有存储凭据？",
+    "btn": "覆盖已有凭据"
+  },
+  "empty": {
+    "title": "未连接云存储",
+    "desc": "连接后可同步模型与生成结果",
+    "add_btn": "添加存储"
+  },
+  "flow": {
+    "next": "下一步",
+    "create_rules": "创建同步规则"
+  },
+  "steps": {
+    "connect": "连接"
   }
 }

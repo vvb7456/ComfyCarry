@@ -17,7 +17,8 @@
     "hide": "隐藏",
     "clear": "清空",
     "logout": "登出",
-    "retry": "重试"
+    "retry": "重试",
+    "done": "完成"
   },
   "status": {
     "loading": "加载中...",
