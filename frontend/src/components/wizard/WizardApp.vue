@@ -3,6 +3,8 @@ import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { switchLanguage } from '@/i18n/vue-i18n'
 import { useWizardState } from '@/composables/useWizardState'
+import ConfirmProvider from '@/components/ui/ConfirmProvider.vue'
+import ToastContainer from '@/components/ui/ToastContainer.vue'
 import WizardStepper from '@/components/ui/WizardStepper.vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -38,6 +40,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <ConfirmProvider>
   <div class="wizard-app">
     <div class="wizard-app__toolbar">
       <button
@@ -56,7 +59,9 @@ onMounted(() => {
     <!-- Main Wizard -->
     <div v-else class="wizard-container">
       <div class="wizard-header">
-        <h1>{{ t('wizard.header') }}</h1>
+        <img src="/logo-mark.svg" alt="" class="wizard-header__logo" width="64" height="64" />
+        <h1>Comfy<span class="wizard-header__brand-b">Carry</span></h1>
+        <p class="wizard-header__subtitle">{{ t('wizard.subtitle') }}</p>
       </div>
 
       <!-- Progress bar (hidden during deploy) -->
@@ -81,6 +86,8 @@ onMounted(() => {
       <StepConfirm v-else-if="currentStep === 9 || deployState !== 'idle'" />
     </div>
   </div>
+  <ToastContainer />
+  </ConfirmProvider>
 </template>
 
 <style scoped>
@@ -171,13 +178,31 @@ onMounted(() => {
   margin-bottom: 36px;
 }
 
+/* 上下布置的品牌块, 同设置-关于: logo 居中在上, 字标在下 */
+.wizard-header__logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+}
+
+/* 与主项目字标一致: 实心 --t1, "Carry" 高亮 --ac */
 .wizard-header h1 {
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--ac), var(--ac2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: -.02em;
+  color: var(--t1);
+}
+
+.wizard-header__brand-b {
+  color: var(--ac);
+}
+
+.wizard-header__subtitle {
+  margin-top: 6px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--t2);
 }
 
 .wizard-app__stepper {

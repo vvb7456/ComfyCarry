@@ -11,7 +11,6 @@ const TOTAL_STEPS = 10
 
 function createDefaultConfig(): WizardConfig {
   return {
-    image_type: 'prebuilt',
     password: '',
     tunnel_mode: '',
     cf_api_token: '',
@@ -121,12 +120,10 @@ export function useWizardState() {
       activeTunnelMode.value = state.active_tunnel_mode || ''
       activeTunnelUrls.value = state.active_tunnel_urls || {}
 
-      // Set image_type based on detection
-      config.image_type = isUnsupported.value ? 'unsupported' : 'prebuilt'
-
       // Default plugins
-      const selectedUrls = state.plugins || pluginData.value.map(p => p.url)
-      config.plugins = selectedUrls
+      // 注意: state 里的 wizard_remotes / wizard_sync_rules 等部署快照字段
+      // 不回填 —— 会话外无草稿, 仅在部署中/失败恢复快照时灌入 (_applyDeployPlan)
+      config.plugins = state.plugins || pluginData.value.map(p => p.url)
 
       // ── Env var pre-fill ────────────────────────────────
       const ev = envVars.value
@@ -136,39 +133,14 @@ export function useWizardState() {
       if (ev.cf_subdomain) config.cf_subdomain = ev.cf_subdomain
       if (ev.civitai_token) config.civitai_token = ev.civitai_token
 
-      // ── Restore from saved state ──────────────────────
-      if (state.password && !config.password) config.password = state.password
-      if (state.cf_api_token && !config.cf_api_token) config.cf_api_token = state.cf_api_token
-      if (state.cf_domain && !config.cf_domain) config.cf_domain = state.cf_domain
-      if (state.cf_subdomain && !config.cf_subdomain) config.cf_subdomain = state.cf_subdomain
-      if (state.civitai_token && !config.civitai_token) config.civitai_token = state.civitai_token
-      if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
-        config.rclone_config_method = state.rclone_config_method as WizardConfig['rclone_config_method']
-        if (state.rclone_config_value) config.rclone_config_value = state.rclone_config_value
+      // ── Deploy state machine ─────────────────────────────
+      // 会话外无草稿: 刷新即从 step 0 重来 (仅 env 预填)。唯一要恢复的是
+      // 服务端有真实进度的部署 —— 灌回部署计划快照供重试, 并回到部署视图。
+      const deployInProgress = state.deploy_started && !state.deploy_completed
+      if (deployInProgress || state.deploy_error) {
+        _applyDeployPlan(state)
       }
-      if (state.plugins) config.plugins = state.plugins
-      if (state.wizard_remotes) config.wizard_remotes = state.wizard_remotes
-      if (state.wizard_sync_rules) config.wizard_sync_rules = state.wizard_sync_rules
-      if (state.install_fa2 !== undefined) config.install_fa2 = state.install_fa2
-      if (state.install_sa2 !== undefined) config.install_sa2 = state.install_sa2
-      if (state.ssh_pw_follow !== undefined) config.ssh_pw_follow = state.ssh_pw_follow
-      if (state.ssh_keys) config.ssh_keys = state.ssh_keys
-      if (state.llm_provider) config.llm_provider = state.llm_provider
-      if (state.llm_api_key) config.llm_api_key = state.llm_api_key
-      if (state.llm_base_url) config.llm_base_url = state.llm_base_url
-      if (state.llm_model) config.llm_model = state.llm_model
-      if (state._imported_sync_rules) {
-        config._imported_sync_rules = true
-        config._imported_sync_rules_count = state._imported_sync_rules_count || 0
-      }
-
-      // ── Restore step position ────────────────────────
-      if (typeof state.current_step === 'number' && state.current_step > 0) {
-        currentStep.value = state.current_step
-      }
-
-      // ── Resume deploy if in progress ──────────────────
-      if (state.deploy_started && !state.deploy_completed) {
+      if (deployInProgress) {
         deployState.value = 'deploying'
       } else if (state.deploy_error) {
         deployState.value = 'error'
@@ -181,31 +153,43 @@ export function useWizardState() {
     }
   }
 
-  // ── Save current config to backend ─────────────────────────
-
-  function saveConfig() {
-    fetch('/api/setup/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...config, current_step: currentStep.value }),
-    }).catch(() => { /* best-effort persist */ })
+  /** 部署计划快照 → 本地镜像 (仅在部署已启动后刷新页面时调用) */
+  function _applyDeployPlan(state: SetupState) {
+    if (state.password) config.password = state.password
+    if (state.cf_api_token) config.cf_api_token = state.cf_api_token
+    if (state.cf_domain) config.cf_domain = state.cf_domain
+    if (state.cf_subdomain) config.cf_subdomain = state.cf_subdomain
+    if (state.public_tunnel_subdomain) config.public_tunnel_subdomain = state.public_tunnel_subdomain
+    if (state.tunnel_mode) config.tunnel_mode = state.tunnel_mode as WizardConfig['tunnel_mode']
+    if (state.civitai_token) config.civitai_token = state.civitai_token
+    if (state.rclone_config_method && state.rclone_config_method !== 'skip') {
+      // 导入链路透传: 'base64' 来自导入 JSON / 设置页导入, wizard 自身只产生 'manual'
+      config.rclone_config_method = state.rclone_config_method as WizardConfig['rclone_config_method']
+      config._rclone_display_method = state.rclone_config_method
+    }
+    if (state.plugins) config.plugins = state.plugins
+    if (state.wizard_remotes) config.wizard_remotes = state.wizard_remotes
+    if (state.wizard_sync_rules) config.wizard_sync_rules = state.wizard_sync_rules
+    if (state.install_fa2 !== undefined) config.install_fa2 = state.install_fa2
+    if (state.install_sa2 !== undefined) config.install_sa2 = state.install_sa2
+    if (state.ssh_pw_follow !== undefined) config.ssh_pw_follow = state.ssh_pw_follow
+    if (state.ssh_keys) config.ssh_keys = state.ssh_keys
+    if (state.llm_provider) config.llm_provider = state.llm_provider
+    if (state.llm_api_key) config.llm_api_key = state.llm_api_key
+    if (state.llm_base_url) config.llm_base_url = state.llm_base_url
+    if (state.llm_model) config.llm_model = state.llm_model
+    if (state._imported_sync_rules) {
+      config._imported_sync_rules = true
+      config._imported_sync_rules_count = state._imported_sync_rules_count || 0
+    }
   }
 
   // ── Step Navigation ────────────────────────────────────────
 
   function nextStep() {
-    saveConfig()
-
     // Step 1: password validation
     if (currentStep.value === 1) {
       if (!config.password) return false
-    }
-
-    // Step 3: rclone completeness
-    if (currentStep.value === 3) {
-      const m = config._rclone_display_method || config.rclone_config_method
-      if (m === 'file' && !config.rclone_config_value) return false
-      if (m === 'manual' && config.wizard_remotes.length === 0) return false
     }
 
     // Import mode: step 0 → last step
@@ -214,10 +198,12 @@ export function useWizardState() {
       return true
     }
 
-    // Skip step 4 when no rclone and no manual remotes
+    // Skip step 4 (sync rules) when leaving step 3 without any remote:
+    // 无 wizard_remotes 计划时规则无从谈起; step 3 的「选了 provider 必须创建
+    // 成功」由 StepRclone.onNext 拦截, 不在此校验
     if (currentStep.value === 3) {
-      const m = config._rclone_display_method || config.rclone_config_method
-      if ((!m || m === 'skip') && config.wizard_remotes.length === 0) {
+      if (config.wizard_remotes.length === 0
+        && (config.rclone_config_method === 'skip' || !config.rclone_config_method)) {
         currentStep.value = 5
         return true
       }
@@ -231,18 +217,16 @@ export function useWizardState() {
   }
 
   function prevStep() {
-    saveConfig()
-
     // Import mode: from last step back to step 0
     if (currentStep.value === TOTAL_STEPS - 1 && importedConfig.value) {
       currentStep.value = 0
       return true
     }
 
-    // Skip step 4 when going back from step 5 without rclone
+    // Skip step 4 when going back from step 5 without any remote (mirror of nextStep)
     if (currentStep.value === 5) {
-      const m = config._rclone_display_method || config.rclone_config_method
-      if ((!m || m === 'skip') && config.wizard_remotes.length === 0) {
+      if (config.wizard_remotes.length === 0
+        && (config.rclone_config_method === 'skip' || !config.rclone_config_method)) {
         currentStep.value = 3
         return true
       }
@@ -274,7 +258,6 @@ export function useWizardState() {
 
       // Store raw import data — will be applied to backend at deploy time
       importedConfig.value = parsed
-      config.image_type = 'prebuilt'
 
       // Apply parsed values to local wizard config
       let appliedCount = 0
@@ -284,7 +267,7 @@ export function useWizardState() {
       if (parsed.cf_subdomain) config.cf_subdomain = parsed.cf_subdomain
       if (parsed.civitai_token) { config.civitai_token = parsed.civitai_token; appliedCount++ }
       if (parsed.rclone_config_base64) {
-        config.rclone_config_method = 'file'
+        config.rclone_config_method = 'base64'
         config._rclone_display_method = 'base64'
         config.rclone_config_value = parsed.rclone_config_base64
         appliedCount++
@@ -329,15 +312,14 @@ export function useWizardState() {
     if (mode === 'fresh') {
       importedConfig.value = null
 
-      // rclone / 同步步骤的跨步骤状态是模块级的, 不在 config 里 ——
-      // 不显式清掉的话, 上一轮探测到的 remote 会残留到 Step 3/4
+      // 服务端草稿在页面加载 (/api/setup/state) 时已重置, 这里只清前端
+      // 跨步骤状态 —— 不显式清掉的话, 上一轮的表单残留会漏进 Step 3/4
       resetRcloneState()
 
       // Reset config to defaults, then re-apply env var pre-fills
       const defaults = createDefaultConfig()
       Object.assign(config, defaults)
 
-      config.image_type = isUnsupported.value ? 'unsupported' : 'prebuilt'
       config.plugins = pluginData.value.map(p => p.url)
 
       const ev = envVars.value
@@ -372,7 +354,6 @@ export function useWizardState() {
 
     // Actions
     init,
-    saveConfig,
     nextStep,
     prevStep,
     goToStep,

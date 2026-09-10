@@ -57,7 +57,6 @@ function onPrev() { prevStep() }
   <WizardStepLayout
     :title="t('wizard.step7.title')"
     icon="extension"
-    icon-color="#a78bfa"
     :description="isPrebuilt ? t('wizard.step7.prebuilt_subtitle') : t('wizard.step7.desc')"
     @prev="onPrev"
     @next="onNext"

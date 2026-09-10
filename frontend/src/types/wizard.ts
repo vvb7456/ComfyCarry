@@ -1,4 +1,4 @@
-import type { SyncTemplate as SyncTemplateBase } from './sync'
+import type { SyncTemplate as SyncTemplateBase, ApiOkResponse } from './sync'
 
 // ── GPU & Image ──────────────────────────────────────────────
 
@@ -27,18 +27,29 @@ export interface WizardSyncRule {
 export interface WizardRemote {
   name: string
   type: string
-  params: Record<string, unknown>
+  /** 凭据只存服务端 (/api/setup/wizard_remote), 前端镜像不含 params */
+  params?: Record<string, unknown>
+  /** S3 存储桶 (参与规则路径首段; 后端安全投影, 非敏感) */
+  bucket?: string
+  drive_id?: string
+  drive_type?: string
+  team_drive?: string
+}
+
+/** POST /api/setup/wizard_remote(/delete) 响应: 剥离 params 的安全投影 */
+export interface WizardRemotesResponse extends ApiOkResponse {
+  wizard_remotes?: WizardRemote[]
 }
 
 export interface WizardConfig {
-  image_type: string
   password: string
   tunnel_mode: '' | 'public' | 'custom'
   cf_api_token: string
   cf_domain: string
   cf_subdomain: string
   public_tunnel_subdomain?: string
-  rclone_config_method: 'skip' | 'file' | 'manual' | 'base64_env'
+  /** 'skip' 无凭据; 'manual' 凭据内联在 wizard_remotes; 'base64' 仅由导入链路透传 (wizard 不产生) */
+  rclone_config_method: 'skip' | 'manual' | 'base64'
   rclone_config_value: string
   civitai_token: string
   plugins: string[]
@@ -97,13 +108,6 @@ export interface RemoteTypeDef {
   fields: RemoteFieldDef[]
 }
 
-// ── Detected Remote (from POST /api/setup/preview_remotes) ──
-
-export interface DetectedRemote {
-  name: string
-  type: string
-}
-
 // ── LLM ──────────────────────────────────────────────────────
 
 export interface LlmProvider {
@@ -158,15 +162,13 @@ export interface SetupStateEnvVars {
   cf_subdomain?: string
   civitai_token?: string
   rclone_config_method?: string
-  rclone_has_env?: boolean
   public_tunnel?: boolean
 }
 
 export interface SetupState {
-  completed: boolean
-  current_step: number
-  image_type: string
   password: string
+  tunnel_mode?: string
+  public_tunnel_subdomain?: string
   cf_api_token: string
   cf_domain: string
   cf_subdomain: string
@@ -194,9 +196,8 @@ export interface SetupState {
   active_tunnel_urls?: Record<string, string>
   sync_templates: SyncTemplate[]
   remote_type_defs: Record<string, RemoteTypeDef>
-  has_rclone_config: boolean
 
-  // LLM fields (saved via /api/setup/save)
+  // LLM fields (deploy plan snapshot)
   llm_provider?: string
   llm_api_key?: string
   llm_base_url?: string

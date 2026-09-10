@@ -1,30 +1,44 @@
 <script setup lang="ts">
+/**
+ * SyncRuleCard — 同步规则卡片 (wizard step4 使用)。
+ *
+ * 经典卡片布局: 整卡点击切换选中, 右上角圆形选中角标, 名称 + 触发/方式
+ * meta + 远程路径 + 本地路径。字段常驻展示 (未选中也可见 —— 清单语义,
+ * 一眼看清每条规则会做什么)。
+ *
+ * remote 字段为可选 API (remoteOptions 非空时渲染); wizard 单存储语义下
+ * 不传 → 无该字段, remote 隐式取计划。
+ * browsable: 路径旁的目录选择器按钮 (PathBrowserModal)。
+ */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect, { type SelectOption } from '@/components/form/BaseSelect.vue'
 import type { SyncTemplate } from '@/types/wizard'
 
 defineOptions({ name: 'SyncRuleCard' })
 
-const { t } = useI18n({ useScope: 'global' })
-
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   template: SyncTemplate
   selected: boolean
   remote: string
   remotePath: string
   remoteOptions: SelectOption[]
-}>()
+  /** 显示远程目录浏览按钮 (父组件监听 browse 打开 PathBrowser) */
+  browsable?: boolean
+}>(), {
+  browsable: false,
+})
 
 const emit = defineEmits<{
   toggle: []
   'update:remote': [value: string]
   'update:remotePath': [value: string]
+  browse: []
 }>()
 
-// 模板名早年带 ⬇️/⬆️ 前缀, 后端已去掉, 这里不再需要剥离
-const shortName = computed(() => props.template.name)
+const { t } = useI18n({ useScope: 'global' })
 
 const methodLabel = computed(() =>
   props.template.method === 'move' ? t('wizard.step4.method_move') : t('wizard.step4.method_keep'),
@@ -39,13 +53,8 @@ const triggerLabel = computed(() => {
   }
 })
 
-function onToggle() {
-  emit('toggle')
-}
-
 function onPathChange(e: Event) {
-  const val = (e.target as HTMLInputElement).value
-  emit('update:remotePath', val)
+  emit('update:remotePath', (e.target as HTMLInputElement).value)
 }
 </script>
 
@@ -53,45 +62,50 @@ function onPathChange(e: Event) {
   <div
     class="sync-rule-card"
     :class="{ 'sync-rule-card--selected': selected }"
-    @click="onToggle"
+    @click="emit('toggle')"
   >
     <div class="sync-rule-card__check">
       <MsIcon v-if="selected" name="check" size="xs" color="none" />
     </div>
-    <div class="sync-rule-card__name text-truncate">{{ shortName }}</div>
+    <div class="sync-rule-card__name text-truncate">{{ template.name }}</div>
     <div class="sync-rule-card__method">{{ triggerLabel }} · {{ methodLabel }}</div>
 
-    <div class="sync-rule-card__field" @click.stop>
+    <!-- 远程存储 (仅 dashboard 多存储场景; wizard 单存储不传 options) -->
+    <div v-if="remoteOptions.length > 0" class="sync-rule-card__field" @click.stop>
       <label>{{ t('wizard.step4.remote_label') }}</label>
       <BaseSelect
-        v-if="remoteOptions.length > 0"
         :model-value="remote"
         :options="remoteOptions"
         size="sm"
         teleport
         @update:model-value="(v: string | number | boolean) => emit('update:remote', String(v))"
       />
-      <input
-        v-else
-        type="text"
-        class="form-input sync-rule-card__input"
-        :value="remote"
-        :placeholder="t('wizard.step4.remote_placeholder')"
-        @input="(e: Event) => emit('update:remote', (e.target as HTMLInputElement).value)"
-        @click.stop
-      />
     </div>
 
+    <!-- 远程路径: 直输 + 目录选择器 -->
     <div class="sync-rule-card__field" @click.stop>
       <label>{{ t('wizard.step4.remote_path_label') }}</label>
-      <input
-        type="text"
-        class="form-input sync-rule-card__input"
-        :value="remotePath"
-        :placeholder="t('wizard.step4.remote_path_placeholder')"
-        @input="onPathChange"
-        @click.stop
-      />
+      <div class="sync-rule-card__path">
+        <input
+          type="text"
+          class="form-input sync-rule-card__input"
+          :value="remotePath"
+          :placeholder="t('wizard.step4.remote_path_placeholder')"
+          spellcheck="false"
+          @input="onPathChange"
+          @click.stop
+        >
+        <BaseButton
+          v-if="browsable"
+          size="xs"
+          square
+          class="sync-rule-card__browse"
+          :aria-label="t('sync.dir.browse')"
+          @click="emit('browse')"
+        >
+          <MsIcon name="folder_open" size="xs" />
+        </BaseButton>
+      </div>
     </div>
 
     <div class="sync-rule-card__local text-truncate" :title="template.local_path">
@@ -177,6 +191,18 @@ function onPathChange(e: Event) {
   color: var(--t3);
   display: block;
   margin-bottom: 2px;
+}
+
+.sync-rule-card__path {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sync-rule-card__path .sync-rule-card__input {
+  flex: 1;
+  min-width: 0;
 }
 
 .sync-rule-card__input {

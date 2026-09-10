@@ -1,14 +1,17 @@
 {
   "err": {
-    "deploy_already_running": "Deployment is already in progress"
+    "deploy_already_running": "Deployment is already in progress",
+    "deploy_mode_invalid": "Invalid deployment request mode",
+    "deploy_retry_unavailable": "No deployment plan is available to retry. Return to setup to configure it again."
   },
-  "header": "ComfyCarry Setup Wizard",
+  "header": "ComfyCarry",
+  "subtitle": "Setup Wizard",
   "step_labels": [
     "Deploy",
     "Password/SSH",
     "Tunnel",
     "Cloud Storage",
-    "Sync Rules",
+    "Directory & Rules",
     "CivitAI",
     "LLM",
     "Plugins",
@@ -33,13 +36,11 @@
     "env_fail": "Environment check failed",
     "fresh": {
       "title": "Fresh Deployment",
-      "desc": "Configure password, tunnel, cloud storage, plugins, then one-click deploy ComfyUI workspace",
-      "time_hint": "Estimated 2-5 minutes"
+      "desc": "Configure password, tunnel, cloud storage, plugins, then one-click deploy ComfyUI workspace"
     },
     "import": {
       "title": "Restore Settings",
-      "desc": "Restore all settings from a previously exported config file to quickly rebuild your workspace",
-      "skip_hint": "Skip manual configuration"
+      "desc": "Restore all settings from a previously exported config file to quickly rebuild your workspace"
     },
     "import_upload": {
       "hint": "Upload a previously exported <code>comfycarry-config.json</code> configuration file",
@@ -55,8 +56,7 @@
     "confirm_password": "Confirm Password",
     "confirm_placeholder": "Enter password again...",
     "mismatch": "Passwords do not match",
-    "ssh_pw_follow": "Allow SSH login with dashboard password",
-    "ssh_pw_follow_hint": "(keeps the SSH root password in sync with the ComfyCarry password, for <code>ssh root{'@'}host</code> login)",
+    "ssh_pw_follow": "Use the same password for SSH",
     "ssh_keys": "SSH Public Keys",
     "ssh_keys_hint": "One per line, supports ed25519 / rsa / ecdsa. Paste contents of <code>~/.ssh/id_ed25519.pub</code>",
     "ssh_keys_placeholder": "ssh-ed25519 AAAA... your-key\nssh-rsa AAAA... another-key"
@@ -97,59 +97,26 @@
     "validate_error": "Validation request failed:"
   },
   "step3": {
-    "title": "Cloud Storage",
-    "env_rclone_hint": "Rclone configuration detected from RCLONE_CONF_BASE64 environment variable",
-    "desc": "Connect cloud storage for workspace auto-sync",
-    "rclone_help": "Rclone is an open-source cloud sync tool supporting OneDrive / Google Drive / S3 / R2 etc. Download ComfyCarry Companion to authorize your cloud and export rclone.conf, or run rclone config manually on your local machine, then upload the config file (~/.config/rclone/rclone.conf).",
-    "rclone_helper_hint": "No rclone config yet? <a href=\"https://github.com/vvb7456/ComfyCarry-Companion/releases/latest\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--ac);text-decoration:underline;font-weight:600\">Download ComfyCarry Companion (Windows)</a> — authorize your cloud in the desktop app, export rclone.conf, then come back to upload it.",
-    "env_var": "Environment Variable",
-    "env_var_desc": "Use existing RCLONE_CONF_BASE64",
-    "upload_file": "Upload File",
-    "upload_file_desc": "Upload local rclone.conf file",
-    "manual_create": "Manual Create",
-    "manual_create_desc": "Interactively create a new Remote",
-    "select_rclone_file": "Select rclone.conf file",
-    "remote_name": "Remote Name",
-    "remote_name_placeholder": "e.g. myr2",
-    "remote_type": "Type",
-    "select_type": "Select type...",
-    "add_remote": "Add Remote",
-    "detected_remotes": "Detected Remotes",
-    "manual_remotes": "Manually Added Remotes",
-    "needs_oauth": "(Requires OAuth)",
-    "upload_required": "Please upload rclone.conf file first",
-    "remote_required": "Please add at least one Remote first",
-    "url_remote_hint": "URL config will be downloaded during deploy, Remote name can be entered in the next step",
-    "env_remote_hint": "Will be read from environment variable, Remote names auto-detected during deploy",
-    "oauth_title": "OAuth Authorization Steps:",
-    "oauth_step1": "1. Install rclone on your local computer",
-    "oauth_step2": "2. Run: rclone authorize \"{type}\"",
-    "oauth_step3": "3. Paste the token JSON from terminal output below",
-    "name_type_required": "Please fill in name and type",
-    "name_invalid": "Name can only contain letters, numbers, underscores, and hyphens",
-    "remote_exists": "Remote \"{name}\" already exists",
-    "field_required": "Please fill in {field}",
-    "remote_added": "Remote \"{name}\" added",
-    "remove": "Remove"
+    "title": "Connect Cloud Storage",
+    "desc": "Connect cloud storage for workspace auto-sync.",
+    "rclone_help": "Rclone is an open-source cloud sync tool supporting OneDrive / Google Drive / S3 / R2 etc. OAuth providers can be authorized directly in the panel; you can also run rclone config locally and bring an existing rclone.conf via Import Config."
   },
   "step4": {
     "title": "Sync Rules",
-    "desc": "Choose content to sync. Rules can be freely added/modified later in ComfyCarry Cloud Sync page.",
-    "default_remote": "Default Remote",
-    "default_remote_hint": "Changes apply to all rules automatically. You can also set different Remotes per rule",
+    "desc": "Choose what to sync and where to store it",
     "remote_label": "Remote",
     "remote_path_label": "Remote Path",
     "pull_title": "Deploy Pull",
-    "pull_help": "Download files from cloud to local ComfyUI during deployment. Cloud files are not deleted. Suitable for models, LoRA, workflows and other reusable resources.",
+    "pull_help": "Download from cloud to local ComfyUI during deployment. Cloud files are never deleted. Good for models, LoRAs, workflows and other reusable assets.",
     "push_title": "Auto Push",
-    "push_help": "Continuously monitor local directory changes and auto-push new/modified files to cloud. Suitable for generated images, workflows and other content that needs backup.",
-    "no_remote": "(No Remote available)",
+    "push_help": "Watch local directories at runtime and auto-upload new/modified files to cloud. Good for generated images and other content that needs backup.",
+    "selected_n": "{n} selected",
+    "output_label": "Upload output",
     "method_move": "Move",
     "method_keep": "Keep local",
     "trigger_deploy": "On deploy",
     "trigger_watch": "Watch",
     "trigger_manual": "Manual",
-    "selected_n": "{n} selected",
     "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."
   },
@@ -271,19 +238,19 @@
   },
   "steps": {
     "install_deps": "Install System Dependencies",
-    "install_deps_skip": "Install System Dependencies ✅ (Done)",
+    "install_deps_skip": "Install System Dependencies",
     "setup_public_tunnel": "Configure Public Tunnel",
     "setup_cf_tunnel": "Configure Cloudflare Tunnel",
-    "setup_tunnel_skip": "Cloudflare Tunnel (Skipped)",
+    "setup_tunnel_skip": "Cloudflare Tunnel",
     "setup_rclone": "Configure Rclone",
     "setup_ssh": "Configure SSH Access",
     "check_pytorch": "Check Pre-installed PyTorch",
     "install_comfyui": "Install ComfyUI",
-    "install_comfyui_skip": "Install ComfyUI ✅ (Done)",
+    "install_comfyui_skip": "Install ComfyUI",
     "health_check": "ComfyUI Health Check",
-    "health_check_skip": "ComfyUI Health Check ✅ (Done)",
-    "install_attn_user_skip": "Install Accelerators ⏭ (User Skipped)",
-    "install_attn_skip": "Install Accelerators ✅ (Done)",
+    "health_check_skip": "ComfyUI Health Check",
+    "install_attn_user_skip": "Install Accelerators",
+    "install_attn_skip": "Install Accelerators",
     "install_attn": "Install Accelerators ({parts})",
     "install_plugins": "Install Plugins",
     "sync_assets": "Sync Cloud Assets",
@@ -312,9 +279,8 @@
     "keys_count": "{count}",
     "cloud_sync": "Cloud Storage & Sync",
     "rclone_config": "Rclone Config",
-    "file_upload": "File Upload",
     "manual_create": "Manual Create",
-    "env_var": "Environment Variable",
+    "imported_conf": "Imported rclone.conf",
     "remote_count": "Remote Count",
     "sync_rules": "Sync Rules",
     "rules_count": "{count}",
@@ -332,5 +298,15 @@
     "items_set": "Configured {count}",
     "attn": "Attention Acceleration",
     "install": "Install"
+  },
+  "setup": {
+    "err": {
+      "name_type_required": "Name and type are required",
+      "remote_name_invalid": "Name can only contain letters, numbers, underscores and hyphens",
+      "remote_type_invalid": "Invalid remote storage type",
+      "wizard_remote_exists": "Storage \"{name}\" already exists",
+      "wizard_remote_source_missing": "The original storage connection is no longer available. Please configure it again.",
+      "oauth_not_ready": "Authorization session is not ready or has expired; please log in and authorize again"
+    }
   }
 }

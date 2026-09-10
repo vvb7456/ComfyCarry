@@ -57,7 +57,6 @@ function onPrev() {
   <WizardStepLayout
     :title="t('wizard.step1.title')"
     icon="lock"
-    icon-color="#fbbf24"
     :description="t('wizard.step1.desc')"
     :next-disabled="nextDisabled"
     @prev="onPrev"
@@ -88,7 +87,6 @@ function onPrev() {
       <ToggleSwitch v-model="sshPwFollow">
         <span class="step-password__ssh-label">
           {{ t('wizard.step1.ssh_pw_follow') }}
-          <span class="step-password__ssh-hint" v-html="t('wizard.step1.ssh_pw_follow_hint')" />
         </span>
       </ToggleSwitch>
 
@@ -117,11 +115,6 @@ function onPrev() {
 
 .step-password__ssh-label {
   font-size: .88rem;
-}
-
-.step-password__ssh-hint {
-  font-size: .72rem;
-  color: var(--t3);
 }
 
 .step-password__ssh-textarea {

@@ -1,14 +1,17 @@
 {
   "err": {
-    "deploy_already_running": "部署已在进行中"
+    "deploy_already_running": "部署已在进行中",
+    "deploy_mode_invalid": "部署请求类型无效",
+    "deploy_retry_unavailable": "没有可重试的部署计划，请返回向导重新配置"
   },
-  "header": "ComfyCarry 部署向导",
+  "header": "ComfyCarry",
+  "subtitle": "部署向导",
   "step_labels": [
     "部署方式",
     "密码/SSH",
     "Tunnel",
     "云存储",
-    "同步规则",
+    "目录与规则",
     "CivitAI",
     "LLM",
     "插件",
@@ -33,13 +36,11 @@
     "env_fail": "环境检测失败",
     "fresh": {
       "title": "全新部署",
-      "desc": "配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境",
-      "time_hint": "预计 2-5 分钟"
+      "desc": "配置密码、Tunnel、云存储、插件等参数，然后一键部署 ComfyUI 工作环境"
     },
     "import": {
       "title": "恢复设置",
-      "desc": "从之前导出的配置文件恢复所有设置，快速重建工作环境",
-      "skip_hint": "跳过手动配置"
+      "desc": "从之前导出的配置文件恢复所有设置，快速重建工作环境"
     },
     "import_upload": {
       "hint": "上传之前导出的 <code>comfycarry-config.json</code> 配置文件",
@@ -55,8 +56,7 @@
     "confirm_password": "确认密码",
     "confirm_placeholder": "再次输入密码...",
     "mismatch": "两次输入的密码不一致",
-    "ssh_pw_follow": "允许 SSH 使用面板密码登录",
-    "ssh_pw_follow_hint": "(开启后 SSH root 密码与 ComfyCarry 密码保持一致，用于 <code>ssh root{'@'}host</code> 登录)",
+    "ssh_pw_follow": "SSH 使用相同密码",
     "ssh_keys": "SSH 公钥",
     "ssh_keys_hint": "每行一个，支持 ed25519 / rsa / ecdsa。粘贴 <code>~/.ssh/id_ed25519.pub</code> 的内容",
     "ssh_keys_placeholder": "ssh-ed25519 AAAA... your-key\nssh-rsa AAAA... another-key"
@@ -97,59 +97,26 @@
     "validate_error": "验证请求失败："
   },
   "step3": {
-    "title": "云存储配置",
-    "env_rclone_hint": "已从环境变量 RCLONE_CONF_BASE64 检测到配置",
-    "desc": "连接云端存储，实现工作区自动同步",
-    "rclone_help": "Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。可下载 ComfyCarry Companion 在客户端完成网盘授权并导出 rclone.conf，也可在本地手动运行 rclone config，配置完成后上传该文件即可。",
-    "rclone_helper_hint": "还没有 rclone 配置？下载 <a href=\"https://github.com/vvb7456/ComfyCarry-Companion/releases/latest\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--ac);text-decoration:underline;font-weight:600\">ComfyCarry Companion (Windows)</a> —— 在客户端完成网盘授权，导出 rclone.conf 后回到这里上传。",
-    "env_var": "环境变量",
-    "env_var_desc": "使用已设置的 RCLONE_CONF_BASE64",
-    "upload_file": "上传文件",
-    "upload_file_desc": "上传本地 rclone.conf 文件",
-    "manual_create": "手动创建",
-    "manual_create_desc": "交互式创建新的远程存储",
-    "select_rclone_file": "选择 rclone.conf 文件",
-    "remote_name": "远程存储名称",
-    "remote_name_placeholder": "例如 myr2",
-    "remote_type": "类型",
-    "select_type": "选择类型...",
-    "add_remote": "添加远程存储",
-    "detected_remotes": "已检测到的远程存储",
-    "manual_remotes": "手动添加的远程存储",
-    "needs_oauth": "(需 OAuth)",
-    "upload_required": "请先上传 rclone.conf 文件",
-    "remote_required": "请先添加至少一个远程存储",
-    "url_remote_hint": "URL 配置将在部署时下载，远程存储名在下一步可手动输入",
-    "env_remote_hint": "将从环境变量读取，远程存储名在部署时自动检测",
-    "oauth_title": "OAuth 授权步骤：",
-    "oauth_step1": "1. 在本地电脑安装 rclone",
-    "oauth_step2": "2. 运行：rclone authorize \"{type}\"",
-    "oauth_step3": "3. 将终端输出的 token JSON 粘贴到下方",
-    "name_type_required": "请填写名称和类型",
-    "name_invalid": "名称只能包含字母、数字、下划线和短横线",
-    "remote_exists": "远程存储 \"{name}\" 已存在",
-    "field_required": "请填写 {field}",
-    "remote_added": "远程存储 \"{name}\" 已添加",
-    "remove": "移除"
+    "title": "连接云存储",
+    "desc": "连接云端存储，实现工作区自动同步。",
+    "rclone_help": "Rclone 是开源云存储同步工具，支持 OneDrive / Google Drive / S3 / R2 等。OAuth 提供商可直接在面板内完成授权；也可在本地运行 rclone config 后经「导入配置」带入已有 rclone.conf。"
   },
   "step4": {
-    "title": "同步规则配置",
-    "desc": "选择需要同步的内容，部署后可在 ComfyCarry「云同步」页面自由增删改。",
-    "default_remote": "默认远程存储",
-    "default_remote_hint": "更改后自动应用到所有规则，也可单独为每条规则选择不同远程存储",
+    "title": "同步规则",
+    "desc": "选择需要同步的文件与存储目录",
     "remote_label": "远程存储",
     "remote_path_label": "远程路径",
     "pull_title": "部署拉取",
-    "pull_help": "部署时从云端下载对应目录的文件到本地 ComfyUI，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。",
+    "pull_help": "部署时从云端下载到本地，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。",
     "push_title": "自动推送",
-    "push_help": "运行期间持续监控本地目录变化，自动将新增/修改的文件推送到云端。适合生成图、工作流等需要备份的内容。",
-    "no_remote": "（无可用远程存储）",
+    "push_help": "运行期间监控本地目录变化，自动上传新增/修改的文件到云端。适合生成图等需要备份的内容。",
+    "selected_n": "已选 {n} 个",
+    "output_label": "上传输出",
     "method_move": "移动",
     "method_keep": "保留本地",
     "trigger_deploy": "部署执行",
     "trigger_watch": "持续监控",
     "trigger_manual": "手动",
-    "selected_n": "已选 {n} 个",
     "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."
   },
@@ -271,19 +238,19 @@
   },
   "steps": {
     "install_deps": "安装系统依赖",
-    "install_deps_skip": "安装系统依赖 ✅ (已完成)",
+    "install_deps_skip": "安装系统依赖",
     "setup_public_tunnel": "配置公共 Tunnel",
     "setup_cf_tunnel": "配置 Cloudflare Tunnel",
-    "setup_tunnel_skip": "Cloudflare Tunnel (跳过)",
+    "setup_tunnel_skip": "Cloudflare Tunnel",
     "setup_rclone": "配置 Rclone",
     "setup_ssh": "配置 SSH 访问",
     "check_pytorch": "检查预装 PyTorch",
     "install_comfyui": "安装 ComfyUI",
-    "install_comfyui_skip": "安装 ComfyUI ✅ (已完成)",
+    "install_comfyui_skip": "安装 ComfyUI",
     "health_check": "ComfyUI 健康检查",
-    "health_check_skip": "ComfyUI 健康检查 ✅ (已完成)",
-    "install_attn_user_skip": "安装加速组件 ⏭ (用户跳过)",
-    "install_attn_skip": "安装加速组件 ✅ (已完成)",
+    "health_check_skip": "ComfyUI 健康检查",
+    "install_attn_user_skip": "安装加速组件",
+    "install_attn_skip": "安装加速组件",
     "install_attn": "安装加速组件 ({parts})",
     "install_plugins": "安装插件",
     "sync_assets": "同步云端资产",
@@ -312,9 +279,8 @@
     "keys_count": "{count} 个",
     "cloud_sync": "云存储与同步",
     "rclone_config": "Rclone 配置",
-    "file_upload": "文件上传",
     "manual_create": "手动创建",
-    "env_var": "环境变量",
+    "imported_conf": "导入的 rclone.conf",
     "remote_count": "远程存储数量",
     "sync_rules": "同步规则",
     "rules_count": "{count} 条",
@@ -332,5 +298,15 @@
     "items_set": "已设置 {count} 项",
     "attn": "Attention 加速",
     "install": "安装"
+  },
+  "setup": {
+    "err": {
+      "name_type_required": "请填写名称和类型",
+      "remote_name_invalid": "名称只能包含字母、数字、下划线和短横线",
+      "remote_type_invalid": "远程存储类型无效",
+      "wizard_remote_exists": "存储「{name}」已存在",
+      "wizard_remote_source_missing": "原存储连接已失效，请重新配置连接",
+      "oauth_not_ready": "授权会话未就绪或已失效，请重新完成登录授权"
+    }
   }
 }

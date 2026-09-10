@@ -12,7 +12,6 @@ withDefaults(defineProps<{
   title: string
   description?: string
   icon?: string
-  iconColor?: string
   showPrev?: boolean
   showNext?: boolean
   nextLabel?: string
@@ -38,7 +37,7 @@ const slots = useSlots()
   <div class="wizard-step">
     <h2 class="wizard-step__title">
       <slot name="icon">
-        <MsIcon v-if="icon" :name="icon" size="sm" :color="iconColor || 'none'" />
+        <MsIcon v-if="icon" :name="icon" size="sm" />
       </slot>
       {{ title }}
     </h2>

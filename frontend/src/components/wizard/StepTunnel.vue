@@ -71,7 +71,6 @@ function onPrev() { prevStep() }
   <WizardStepLayout
     :title="t('wizard.step2.title')"
     icon="language"
-    icon-color="#60a5fa"
     :description="t('wizard.step2.desc')"
     :next-label="nextLabel"
     :next-disabled="nextDisabled"

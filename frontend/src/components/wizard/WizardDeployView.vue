@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useWizardDeploy } from '@/composables/useWizardDeploy'
+import { useToast } from '@/composables/useToast'
 import DeployStepList from './DeployStepList.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -10,6 +11,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 defineOptions({ name: 'WizardDeployView' })
 
 const { t } = useI18n({ useScope: 'global' })
+const { toast } = useToast()
 
 const {
   steps, logLines, status, elapsed, errorMsg, attnWarnings,
@@ -25,15 +27,16 @@ function enterDashboard() {
 }
 
 async function onRetry() {
-  await retry()
+  const result = await retry()
+  if (!result.ok) toast(result.error || t('wizard.deploy.start_fail'), 'error')
 }
 </script>
 
 <template>
   <div class="wizard-deploy">
     <h2 class="wizard-deploy__title">
-      <MsIcon v-if="status === 'success'" name="check_circle" size="sm" style="color: var(--green)" />
-      <MsIcon v-else-if="status === 'error'" name="cancel" size="sm" style="color: var(--red)" />
+      <MsIcon v-if="status === 'success'" name="check_circle" size="sm" />
+      <MsIcon v-else-if="status === 'error'" name="cancel" size="sm" />
       <MsIcon v-else name="settings" size="sm" />
       <template v-if="status === 'success'">
         {{ t('wizard.deploy.done_title') }}

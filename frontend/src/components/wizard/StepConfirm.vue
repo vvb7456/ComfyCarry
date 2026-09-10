@@ -42,7 +42,6 @@ if (deployState.value === 'deploying') {
     v-if="deployState === 'idle'"
     :title="t('wizard.step9.title')"
     icon="checklist"
-    icon-color="#a78bfa"
     :description="t('wizard.step9.desc')"
     :next-label="t('wizard.btn.deploy')"
     next-variant="success"

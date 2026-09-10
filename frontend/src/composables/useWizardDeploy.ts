@@ -25,7 +25,7 @@ let _sseCompleted = false
 
 export function useWizardDeploy() {
   const { t } = useI18n({ useScope: 'global' })
-  const { config, deployState, saveConfig, importedConfig } = useWizardState()
+  const { config, deployState, importedConfig } = useWizardState()
 
   // ── Elapsed timer ───────────────────────────────────────────
 
@@ -157,11 +157,9 @@ export function useWizardDeploy() {
 
   // ── Start deploy ────────────────────────────────────────────
 
-  async function startDeploy(): Promise<{ ok: boolean; error?: string }> {
-    saveConfig()
-
+  async function startDeploy(retryOnly = false): Promise<{ ok: boolean; error?: string }> {
     // Apply imported config to backend at deploy time (deferred from file upload)
-    if (importedConfig.value) {
+    if (!retryOnly && importedConfig.value) {
       try {
         const res = await fetch('/api/settings/import-config', {
           method: 'POST',
@@ -181,7 +179,7 @@ export function useWizardDeploy() {
       const res = await fetch('/api/setup/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(retryOnly ? { mode: 'retry' } : config),
       })
       const d = await res.json()
       if (!d.ok) {
@@ -204,12 +202,8 @@ export function useWizardDeploy() {
   // ── Retry deploy ────────────────────────────────────────────
 
   async function retry(): Promise<{ ok: boolean; error?: string }> {
-    steps.value = []
-    logLines.value = []
-    errorMsg.value = ''
-    attnWarnings.value = []
-    status.value = 'idle'
-    return startDeploy()
+    // 原计划和凭据留在服务端，刷新后的本地镜像不参与重试。
+    return startDeploy(true)
   }
 
   // ── Resume (reconnect to ongoing deploy) ────────────────────

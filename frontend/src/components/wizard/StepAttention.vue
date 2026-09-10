@@ -55,7 +55,6 @@ function onPrev() { prevStep() }
   <WizardStepLayout
     :title="t('wizard.step8.title')"
     icon="bolt"
-    icon-color="#fbbf24"
     :description="t('wizard.step8.desc')"
     :next-label="nextLabel"
     @prev="onPrev"
@@ -70,7 +69,6 @@ function onPrev() { prevStep() }
       <OptionCard
         class="step-attn__card"
         icon="local_fire_department"
-        icon-color="#fb923c"
         title="FlashAttention-2"
         :description="fa2Locked ? t('wizard.step8.fa2_preinstalled') : t('wizard.step8.fa2_desc')"
         :selected="fa2Selected"
@@ -83,7 +81,6 @@ function onPrev() { prevStep() }
       <OptionCard
         class="step-attn__card"
         icon="eco"
-        icon-color="#34d399"
         title="SageAttention-2"
         :description="t('wizard.step8.sa2_desc')"
         :selected="config.install_sa2"

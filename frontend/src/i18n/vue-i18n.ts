@@ -57,7 +57,7 @@ const i18n = createI18n({
       plugins: zhPlugins, tunnel: zhTunnel, jupyter: zhJupyter, sync: zhSync,
       ssh: zhSsh, settings: zhSettings, generate: zhGenerate,
       wizard: zhWizard, 'prompt-library': zhPromptLibrary,
-      auth: zhAuth, llm: zhLlm,
+      auth: zhAuth, llm: zhLlm, setup: { err: zhWizard.setup.err },
     },
     en: {
       common: enCommon, nav: enNav, dashboard: enDashboard,
@@ -65,7 +65,7 @@ const i18n = createI18n({
       plugins: enPlugins, tunnel: enTunnel, jupyter: enJupyter, sync: enSync,
       ssh: enSsh, settings: enSettings, generate: enGenerate,
       wizard: enWizard, 'prompt-library': enPromptLibrary,
-      auth: enAuth, llm: enLlm,
+      auth: enAuth, llm: enLlm, setup: { err: enWizard.setup.err },
     },
   },
 })

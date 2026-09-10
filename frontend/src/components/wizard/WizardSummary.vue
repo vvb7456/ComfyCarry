@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import { useWizardRclone } from '@/composables/useWizardRclone'
 import { useWizardState } from '@/composables/useWizardState'
 import type { WizardConfig } from '@/types/wizard'
 
@@ -15,16 +14,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const { allRemoteNames, loadImportedRemotes } = useWizardRclone()
 const { syncTemplates } = useWizardState()
-
-// Self-healing: if rclone config exists but remotes weren't detected
-// (e.g. page reload after import), re-detect them
-onMounted(() => {
-  if (props.config.rclone_config_value && allRemoteNames.value.length === 0) {
-    loadImportedRemotes(props.config.rclone_config_value)
-  }
-})
 
 const syncRulesCount = computed(() => {
   const c = props.config
@@ -36,7 +26,6 @@ interface SummaryRow {
   label: string
   value: string
   icon?: string
-  green?: boolean
   active?: boolean
 }
 
@@ -82,15 +71,14 @@ const sections = computed<SummarySection[]>(() => {
     tunnelIcon = 'build'
   }
 
-  /* ── rclone method ── */
+  /* ── rclone method ('base64' 仅来自导入链路, wizard 自身只产生 skip/manual) ── */
   const rcloneLabels: Record<string, string> = {
     skip: t('wizard.summary.skipped'),
-    file: t('wizard.summary.file_upload'),
     manual: t('wizard.summary.manual_create'),
-    base64_env: t('wizard.summary.env_var'),
+    base64: t('wizard.summary.imported_conf'),
   }
   const rcloneIcons: Record<string, string> = {
-    skip: 'skip_next', file: 'folder_open', manual: 'build', base64_env: 'key',
+    skip: 'skip_next', manual: 'build', base64: 'folder_open',
   }
   const dm = c.rclone_config_method
 
@@ -115,17 +103,17 @@ const sections = computed<SummarySection[]>(() => {
     {
       title: t('wizard.summary.network_security'),
       rows: [
-        { label: t('wizard.summary.password'), value: c.password ? t('wizard.summary.configured') : t('wizard.summary.not_set'), icon: configured(c.password), green: !!c.password, active: !!c.password },
+        { label: t('wizard.summary.password'), value: c.password ? t('wizard.summary.configured') : t('wizard.summary.not_set'), icon: configured(c.password), active: !!c.password },
         { label: t('wizard.summary.tunnel'), value: tunnelValue, icon: tunnelIcon, active: c.tunnel_mode === 'public' || !!c.cf_api_token },
-        { label: t('wizard.summary.ssh_pw_follow'), value: c.ssh_pw_follow !== false ? t('wizard.summary.ssh_pw_follow_on') : t('wizard.summary.ssh_pw_follow_off'), icon: configured(c.ssh_pw_follow !== false), green: c.ssh_pw_follow !== false, active: c.ssh_pw_follow !== false },
-        { label: t('wizard.summary.ssh_keys'), value: c.ssh_keys.length ? t('wizard.summary.keys_count', { count: c.ssh_keys.length }) : t('wizard.summary.skipped'), icon: configured(c.ssh_keys.length), green: c.ssh_keys.length > 0, active: c.ssh_keys.length > 0 },
+        { label: t('wizard.summary.ssh_pw_follow'), value: c.ssh_pw_follow !== false ? t('wizard.summary.ssh_pw_follow_on') : t('wizard.summary.ssh_pw_follow_off'), icon: configured(c.ssh_pw_follow !== false), active: c.ssh_pw_follow !== false },
+        { label: t('wizard.summary.ssh_keys'), value: c.ssh_keys.length ? t('wizard.summary.keys_count', { count: c.ssh_keys.length }) : t('wizard.summary.skipped'), icon: configured(c.ssh_keys.length), active: c.ssh_keys.length > 0 },
       ],
     },
     {
       title: t('wizard.summary.cloud_sync'),
       rows: [
         { label: t('wizard.summary.rclone_config'), value: rcloneLabels[c._rclone_display_method || dm] ?? rcloneLabels[dm] ?? dm, icon: rcloneIcons[c._rclone_display_method || dm] ?? rcloneIcons[dm] ?? 'article', active: dm !== 'skip' },
-        { label: t('wizard.summary.remote_count'), value: allRemoteNames.value.length ? t('wizard.summary.keys_count', { count: allRemoteNames.value.length }) : t('wizard.summary.keys_count', { count: 0 }), active: allRemoteNames.value.length > 0 },
+        { label: t('wizard.summary.remote_count'), value: c.wizard_remotes.length ? c.wizard_remotes.map(r => r.name).join(', ') : t('wizard.summary.none'), active: c.wizard_remotes.length > 0 },
         { label: t('wizard.summary.sync_rules'), value: syncRulesCount.value ? t('wizard.summary.rules_count', { count: syncRulesCount.value }) : t('wizard.summary.none'), active: syncRulesCount.value > 0 },
         ...(c.wizard_sync_rules.length ? [{ label: t('wizard.summary.rule_details'), value: c.wizard_sync_rules.map(r => {
           const tpl = syncTemplates.value.find(t => t.id === r.template_id)
@@ -137,7 +125,7 @@ const sections = computed<SummarySection[]>(() => {
     {
       title: t('wizard.summary.models_plugins'),
       rows: [
-        { label: t('wizard.summary.civitai'), value: c.civitai_token ? t('wizard.summary.configured') : t('wizard.summary.skipped'), icon: configured(c.civitai_token), green: !!c.civitai_token, active: !!c.civitai_token },
+        { label: t('wizard.summary.civitai'), value: c.civitai_token ? t('wizard.summary.configured') : t('wizard.summary.skipped'), icon: configured(c.civitai_token), active: !!c.civitai_token },
         { label: t('wizard.summary.plugin_count'), value: t('wizard.summary.plugins_detail', { count: c.plugins.length }), active: c.plugins.length > 0 },
       ],
     },
@@ -145,15 +133,15 @@ const sections = computed<SummarySection[]>(() => {
       title: t('wizard.summary.llm'),
       rows: [
         { label: t('wizard.summary.llm_provider'), value: c.llm_provider ? (llmProviderLabels[c.llm_provider] || c.llm_provider) : t('wizard.summary.skipped'), icon: c.llm_provider ? undefined : 'skip_next', active: !!c.llm_provider },
-        { label: t('wizard.summary.llm_api_key'), value: c.llm_api_key ? t('wizard.summary.configured') : t('wizard.summary.not_configured'), icon: configured(c.llm_api_key), green: !!c.llm_api_key, active: !!c.llm_api_key },
+        { label: t('wizard.summary.llm_api_key'), value: c.llm_api_key ? t('wizard.summary.configured') : t('wizard.summary.not_configured'), icon: configured(c.llm_api_key), active: !!c.llm_api_key },
         ...(c.llm_model ? [{ label: t('wizard.summary.llm_model'), value: c.llm_model, active: true }] : []),
       ],
     },
     {
       title: t('wizard.summary.attn'),
       rows: [
-        { label: 'FlashAttention-2', value: c.install_fa2 ? t('wizard.summary.install') : t('wizard.summary.skipped'), icon: configured(c.install_fa2), green: !!c.install_fa2, active: !!c.install_fa2 },
-        { label: 'SageAttention-2', value: c.install_sa2 ? t('wizard.summary.install') : t('wizard.summary.skipped'), icon: configured(c.install_sa2), green: !!c.install_sa2, active: !!c.install_sa2 },
+        { label: 'FlashAttention-2', value: c.install_fa2 ? t('wizard.summary.install') : t('wizard.summary.skipped'), icon: configured(c.install_fa2), active: !!c.install_fa2 },
+        { label: 'SageAttention-2', value: c.install_sa2 ? t('wizard.summary.install') : t('wizard.summary.skipped'), icon: configured(c.install_sa2), active: !!c.install_sa2 },
       ],
     },
   ]
@@ -189,7 +177,6 @@ const sections = computed<SummarySection[]>(() => {
                 v-if="row.icon"
                 :name="row.icon"
                 size="xs"
-                :color="row.green ? 'var(--green)' : 'none'"
               />
               {{ row.value }}
             </span>
