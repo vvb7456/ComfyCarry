@@ -178,15 +178,25 @@ def api_companion_clients():
 def api_companion_job_create():
     """创建 companion job (映射 sync_store.create_job, trigger_type="companion")。
 
-    body: {rule_id, rule_count?, client_id?} (rule_count 缺省 0)
+    body: {rule_id, rule_count?, client_id?, rule_snapshot?, rule_snapshots?}
+      - rule_snapshot / rule_snapshots: 客户端可提交服务端可用的展示快照;
+      - 未提交快照时按 rule_id 从当前规则表补齐;
+      - 规则已不存在时写入 id 与触发信息, 其余字段空值, 保证历史仍能
+        显示任务数量与事件结果。
     返回: {ok:true, job_id:"companion-..."}
     """
     from ..services import sync_store as store
+    from ..services.sync_engine import _load_sync_rules, build_rule_snapshot
 
     data = request.get_json(silent=True) or {}
     rule_id = data.get("rule_id", "")
     client_id = data.get("client_id", "")
     rule_count = int(data.get("rule_count", 0) or 0)
+
+    snapshots = _companion_rule_snapshots(data, rule_id,
+                                          _load_sync_rules, build_rule_snapshot)
+    if not rule_count and snapshots:
+        rule_count = len(snapshots)
 
     job_id = f"companion-{uuid.uuid4().hex[:12]}"
     store.create_job(
@@ -194,9 +204,30 @@ def api_companion_job_create():
         trigger_type="companion",
         trigger_ref=rule_id,
         rule_count=rule_count,
+        rules=snapshots,
     )
     log.info("companion job created: %s (client=%s rule=%s)", job_id, client_id, rule_id)
     return jsonify({"ok": True, "job_id": job_id})
+
+
+def _companion_rule_snapshots(data, rule_id, load_rules, build_snapshot):
+    """整理 companion 任务的规则快照。
+
+    优先级: 客户端提交的 rule_snapshots / rule_snapshot → 当前规则表补齐 →
+    规则已不存在时的最小快照 (id + 触发信息, 其余空值)。
+    """
+    raw_list = data.get("rule_snapshots")
+    if isinstance(raw_list, list) and raw_list:
+        return [build_snapshot(s) for s in raw_list if isinstance(s, dict)]
+    raw = data.get("rule_snapshot")
+    if isinstance(raw, dict):
+        return [build_snapshot(raw)]
+    if rule_id:
+        rule = next((r for r in load_rules() if r.get("id") == rule_id), None)
+        if rule:
+            return [build_snapshot(rule)]
+        return [build_snapshot({"id": rule_id, "trigger": "companion"})]
+    return []
 
 
 @bp.route("/api/companion/jobs/<job_id>/events", methods=["POST"])

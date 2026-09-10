@@ -330,6 +330,22 @@ def get_current_job_id() -> str | None:
         return _running_job_ids[0] if _running_job_ids else None
 
 
+# 执行规则写入历史记录时保留的展示字段 (其余运行时字段不落快照)
+_RULE_SNAPSHOT_FIELDS = (
+    "id", "name", "direction", "method",
+    "remote", "remote_path", "local_path", "trigger",
+)
+
+
+def build_rule_snapshot(rule: dict) -> dict:
+    """从规则字典提取展示快照, 缺失字段补空串。
+
+    快照用于历史记录在规则被编辑/删除后继续显示名称与流向, 只保留展示
+    需要的字段, 授权等敏感信息仍由 remote 配置管理。
+    """
+    return {k: str(rule.get(k) or "") for k in _RULE_SNAPSHOT_FIELDS}
+
+
 def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
                      trigger_ref: str = "") -> str:
     """
@@ -339,12 +355,14 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
     """
     job_id = f"sync-{uuid.uuid4().hex[:12]}"
     rule_count = len(rules)
+    snapshots = [build_rule_snapshot(r) for r in rules]
 
     # 创建 DB job
     try:
         from . import sync_store as store
         store.create_job(job_id, trigger_type=trigger_type,
-                         trigger_ref=trigger_ref, rule_count=rule_count)
+                         trigger_ref=trigger_ref, rule_count=rule_count,
+                         rules=snapshots)
     except Exception as e:
         if _app_logger:
             _app_logger.warning(f"[sync] create_job failed: {e}")

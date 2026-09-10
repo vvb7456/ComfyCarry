@@ -177,6 +177,7 @@ def _migration_v2(conn):
             failure_count   INTEGER NOT NULL DEFAULT 0,
             files_synced    INTEGER NOT NULL DEFAULT 0,
             summary_json    TEXT NOT NULL DEFAULT '{}',
+            rules_json      TEXT NOT NULL DEFAULT '[]',
             started_at      REAL NOT NULL,
             finished_at     REAL
         )""",

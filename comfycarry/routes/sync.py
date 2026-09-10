@@ -1095,17 +1095,25 @@ def api_sync_settings_save():
 @bp.route("/api/sync/jobs", methods=["GET"])
 def api_sync_jobs():
     """
-    查询最近 sync job 列表。
-    Query: ?limit=30
-    返回: {"jobs": [...], "current_job_id": "sync-xxx" | null}
+    分页查询 sync job 列表 (按开始时间倒序)。
+    Query: ?page=1&limit=5
+    返回: {"jobs": [...], "current_job_id": "sync-xxx" | null,
+           "page": 1, "limit": 5, "total": 0}
     """
     from ..services import sync_store as store
 
-    limit = request.args.get("limit", 30, type=int)
+    page = request.args.get("page", 1, type=int)
+    limit = request.args.get("limit", 5, type=int)
     limit = min(max(limit, 1), 200)
-    jobs = store.get_recent_jobs(limit=limit)
+    jobs, total, page = store.get_jobs_page(page=page, limit=limit)
     current = get_current_job_id()
-    return jsonify({"jobs": jobs, "current_job_id": current})
+    return jsonify({
+        "jobs": jobs,
+        "current_job_id": current,
+        "page": page,
+        "limit": limit,
+        "total": total,
+    })
 
 
 @bp.route("/api/sync/jobs/<job_id>", methods=["GET"])

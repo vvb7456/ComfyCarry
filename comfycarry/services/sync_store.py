@@ -7,6 +7,7 @@ ComfyCarry — Sync 持久化层
 
 import json
 import logging
+import math
 import time
 
 from ..db import db
@@ -19,15 +20,21 @@ log = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════
 
 def create_job(job_id: str, *, trigger_type: str = "manual",
-               trigger_ref: str = "", rule_count: int = 0) -> None:
-    """创建新的 sync job 记录。"""
+               trigger_ref: str = "", rule_count: int = 0,
+               rules: list[dict] | None = None) -> None:
+    """创建新的 sync job 记录。
+
+    rules 是本次执行规则的展示快照 (SyncJobRuleSnapshot 列表)。落库为
+    rules_json, 规则后续被编辑/删除也不影响历史回看。
+    """
     now = time.time()
+    rules_json = json.dumps(rules or [], ensure_ascii=False)
     db.execute(
         """INSERT INTO sync_jobs
                (job_id, trigger_type, trigger_ref, status, rule_count,
-                started_at)
-           VALUES (?, ?, ?, 'running', ?, ?)""",
-        (job_id, trigger_type, trigger_ref, rule_count, now),
+                rules_json, started_at)
+           VALUES (?, ?, ?, 'running', ?, ?, ?)""",
+        (job_id, trigger_type, trigger_ref, rule_count, rules_json, now),
     )
 
 
@@ -73,6 +80,37 @@ def get_recent_jobs(limit: int = 30) -> list[dict]:
         (limit,),
     )
     return [_row_to_dict(r) for r in rows]
+
+
+def count_jobs() -> int:
+    """保留期内 job 总数 (与分页查询同一数据集合)。"""
+    row = db.fetch_one("SELECT COUNT(*) FROM sync_jobs")
+    return row[0] if row else 0
+
+
+def get_jobs_page(*, page: int = 1, limit: int = 5) -> tuple[list[dict], int, int]:
+    """分页读取 job。返回 (jobs, total, 归一化后的 page)。
+
+    - 排序 started_at DESC, job_id DESC —— 同一 started_at 时仍稳定。
+    - page / limit 小于 1 时兜底为 1; 超出末页归一化到最后一页。
+    - 空集合 page 固定为 1。
+    """
+    total = count_jobs()
+    limit = max(int(limit), 1)
+    page = max(int(page), 1)
+    if total == 0:
+        page = 1
+    else:
+        max_page = max(1, math.ceil(total / limit))
+        if page > max_page:
+            page = max_page
+    offset = (page - 1) * limit
+    rows = db.fetch_all(
+        "SELECT * FROM sync_jobs "
+        "ORDER BY started_at DESC, job_id DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
+    return [_row_to_dict(r) for r in rows], total, page
 
 
 def get_running_job() -> dict | None:
