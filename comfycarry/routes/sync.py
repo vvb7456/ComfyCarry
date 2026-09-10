@@ -13,6 +13,7 @@ ComfyCarry — Cloud Sync v2 路由
 """
 
 import json
+import os
 import re
 import subprocess
 import threading
@@ -80,6 +81,71 @@ def _ok(key: str, /, **extra):
         body["message_params"] = params
     body.update(extra)
     return jsonify(body)
+
+
+# ====================================================================
+# Staged rclone —— 凭据只经环境变量临时注入, 不落任何 conf 文件。
+#
+# 语义: 浏览目录 / 新建目录是「无副作用探测」, 发生在用户最终「确定」之前
+# (dashboard 保存 → remote/create 落盘; wizard 部署 → deploy_engine 落盘)。
+# 凭据来源三种:
+#   - params: 前端直接传 (dashboard 非 OAuth 表单, 与最终 create 同参)
+#   - oauth:  服务端 authorize 会话 (token 永不经前端回传)
+#   - wizard: setup state 的 wizard_remotes 计划 (凭据在服务端)
+# ====================================================================
+def _staged_env(remote, rtype, params):
+    """staged 凭据 → RCLONE_CONFIG_<REMOTE>_<KEY> 环境变量 (rclone 官方机制,
+    remote 名与 key 大写、配置 key 的 - 转 _; conf 文件完全不需要存在)。
+
+    注意只有配置 key 做 - → _ 替换, remote 名仅 upper —— rclone 按
+    RCLONE_CONFIG_<REMOTE 大写>_ 匹配 remote (名字里的 - 原样保留),
+    对 remote 名也替换的话 my-drive 会变成 MY_DRIVE 而匹配不到。"""
+    prefix = f"RCLONE_CONFIG_{remote.upper()}_"
+    env = {f"{prefix}TYPE": rtype}
+    for k, v in (params or {}).items():
+        if v and _RCLONE_TOKEN_RE.match(str(k)):
+            env[f"{prefix}{str(k).upper().replace('-', '_')}"] = str(v)
+    return env
+
+
+def _resolve_staged_creds(remote, data):
+    """解析请求体里的 staged 凭据 → (rtype, params, err_response)。
+
+    三种来源互斥, 前端按场景选一种:
+      staged.wizard=true  → setup state 计划 (wizard step4 目录选择)
+      staged.oauth=true   → authorize 会话 (dashboard OAuth 流程目录态)
+      staged.params={...} → 表单直传 (dashboard 非 OAuth 流程目录态)
+    """
+    staged = data.get("staged") or {}
+    if staged.get("wizard"):
+        # 内存草稿是事实源 (快照只留给进程死后的失败会话恢复)
+        from ..services import wizard_draft
+        for r in wizard_draft.get_remotes():
+            if isinstance(r, dict) and r.get("name") == remote:
+                return r.get("type", ""), dict(r.get("params") or {}), None
+        return None, None, _soft_err("browse_no_remote")
+    if staged.get("oauth"):
+        with _oauth_lock:
+            sess = _oauth_session
+            if sess.get("phase") != "done" or not sess.get("token"):
+                return None, None, _soft_err("oauth_not_ready")
+            params = {"token": sess["token"]}
+            if sess.get("client_id"):
+                params["client_id"] = sess["client_id"]
+            if sess.get("client_secret"):
+                params["client_secret"] = sess["client_secret"]
+            return sess.get("remote_type", ""), params, None
+    if staged.get("params"):
+        return staged.get("type", ""), dict(staged["params"]), None
+    return None, None, None  # 非 staged 调用, 走主 conf 中已有的 remote
+
+
+def _run_staged_rclone(args, remote, rtype, params, timeout):
+    """以 staged 凭据跑 rclone 子进程 (env 注入, 主 conf 不动)。"""
+    env = os.environ.copy()
+    env.update(_staged_env(remote, rtype, params))
+    return subprocess.run(["rclone", *args], capture_output=True,
+                          text=True, timeout=timeout, env=env)
 
 
 # ====================================================================
@@ -172,6 +238,14 @@ _OAUTH_OPENER = urllib.request.build_opener(_OAuthNoRedirect)
 # dict —— 旧会话的读线程还攥着旧对象引用, 写它不影响新会话。
 _oauth_lock = threading.Lock()
 _oauth_session: dict = {"phase": "idle"}
+
+
+def clear_oauth_session():
+    """清空已完成的 OAuth 会话。"""
+    global _oauth_session
+    with _oauth_lock:
+        if _oauth_session.get("phase") == "done":
+            _oauth_session = {"phase": "idle"}
 
 
 def _oauth_fetch_provider_url(auth_url: str) -> str | None:
@@ -392,6 +466,142 @@ def api_sync_oauth_cancel():
     return jsonify({"ok": True, "phase": "idle"})
 
 
+@bp.route("/api/sync/remote/oauth/drives")
+def api_sync_oauth_drives():
+    """驱动器发现 (OneDrive / Google Drive)。
+
+    会话 phase=done 且 remote_type ∈ {onedrive, drive} 时，
+    解析会话 token JSON 的 access_token 发送 HTTP 请求。
+    结果不缓存。锁在获取 token 后立刻释放，HTTP 请求不持锁。
+    """
+    with _oauth_lock:
+        _oauth_check_timeout()
+        sess = _oauth_session
+        phase = sess.get("phase")
+        remote_type = sess.get("remote_type")
+        token_str = sess.get("token")
+
+    if phase != "done" or remote_type not in ("onedrive", "drive") or not token_str:
+        return _err("oauth_not_ready", 409)
+
+    try:
+        token_obj = json.loads(token_str) if isinstance(token_str, str) else token_str
+        access_token = token_obj.get("access_token") if isinstance(token_obj, dict) else None
+    except Exception:
+        access_token = None
+
+    if not access_token:
+        return _err("oauth_not_ready", 409)
+
+    if remote_type == "onedrive":
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        }
+
+        def _graph_get(url: str):
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                raw = resp.read()
+                text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+                return json.loads(text)
+
+        # 个人账号的 /me/drives 除默认盘外还会混入微软系统库 (相册/ODC/
+        # Bundles, 名字是 GUID 或固定串, 甚至连 root 都查不动), 且部分账号
+        # 该端点直接 403 "Database Is Read Only" (rclone#9794)。/me/drive
+        # 才是用户默认盘的权威来源, 两个都查, 各自可失败。
+        me_drive = None
+        try:
+            d = _graph_get("https://graph.microsoft.com/v1.0/me/drive")
+            if isinstance(d, dict) and d.get("id"):
+                me_drive = {
+                    "id": str(d["id"]),
+                    "type": str(d.get("driveType") or ""),
+                    "name": str(d.get("name") or ""),
+                }
+        except Exception:
+            pass
+
+        listed = []
+        try:
+            data = _graph_get("https://graph.microsoft.com/v1.0/me/drives")
+            raw_items = data.get("value") if isinstance(data, dict) else None
+            if isinstance(raw_items, list):
+                listed = [
+                    {
+                        "id": str(d.get("id") or ""),
+                        "type": str(d.get("driveType") or ""),
+                        "name": str(d.get("name") or ""),
+                    }
+                    for d in raw_items
+                    if isinstance(d, dict) and d.get("id")
+                ]
+                # 同 id 重复条目 (如 Bundles_xxx 与 OneDrive 同 id) 只留一个
+                seen = set()
+                listed = [d for d in listed
+                          if d["id"] not in seen and not seen.add(d["id"])]
+        except Exception:
+            pass
+
+        if not me_drive and not listed:
+            return _err("oauth_drives_failed", 502, detail="me/drive and me/drives both failed")
+
+        # 个人账号: 其余条目全是系统库, 只留默认盘 (rclone#4068 同款兜底,
+        # 且比 rclone 更进一步 —— rclone 仍把垃圾条目原样列给用户选)。
+        # business 账号: documentLibrary 是合法目标, 默认盘只置顶不过滤。
+        if me_drive:
+            if me_drive["type"] == "personal":
+                drives = [me_drive]
+            else:
+                drives = [me_drive] + [d for d in listed if d["id"] != me_drive["id"]]
+        else:
+            drives = listed
+        return jsonify({"drives": drives})
+
+    elif remote_type == "drive":
+        req = urllib.request.Request(
+            "https://www.googleapis.com/drive/v3/drives?pageSize=100",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                raw = resp.read()
+                text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+                data = json.loads(text)
+        except urllib.error.HTTPError as e:
+            detail = f"HTTP {e.code}"
+            try:
+                upstream = json.loads(e.read()).get("error", {})
+                message = upstream.get("message", "")
+                reasons = [item["reason"] for item in upstream.get("errors", [])
+                           if item.get("reason")]
+                detail = ": ".join(filter(None, [detail, message, ", ".join(reasons)]))
+            except (ValueError, TypeError, AttributeError):
+                pass
+            return _err("oauth_drives_failed", 502, detail=detail)
+        except Exception as e:
+            return _err("oauth_drives_failed", 502, detail=str(e))
+
+        raw_items = data.get("drives")
+        if not isinstance(raw_items, list):
+            raw_items = []
+        shared_drives = [
+            {
+                "id": str(d.get("id") or ""),
+                "name": str(d.get("name") or ""),
+            }
+            for d in raw_items
+            if isinstance(d, dict)
+        ]
+        drives = [{"id": "", "name": "My Drive"}] + shared_drives
+        return jsonify({"drives": drives})
+
+    return _err("oauth_not_ready", 409)
+
+
 # ====================================================================
 # Remote 管理
 # ====================================================================
@@ -428,6 +638,9 @@ def api_sync_remote_create():
     rtype = data.get("type", "").strip()
     params = data.get("params", {})
     oauth_used = bool(data.get("oauth"))
+    # 显式覆盖: 同名 remote 原地替换凭据 (rclone config create 对已存在的段
+    # 是更新语义), 引用它的规则不受影响 —— 重新授权/换号场景不应破坏规则。
+    overwrite = bool(data.get("overwrite"))
 
     # OAuth 中继建远程: token 从 authorize 会话取 (前端只有 URL/状态,
     # token 永不经前端回传)。会话须已 done 且类型一致; 失败路径保留会话,
@@ -453,8 +666,15 @@ def api_sync_remote_create():
         return _err("remote_type_invalid")
 
     existing = [r["name"] for r in _parse_rclone_conf()]
-    if name in existing:
+    if name in existing and not overwrite:
         return _err("remote_exists", 409, name=name)
+
+    # 回滚删除只针对"本次新建"的 remote; 覆盖模式下旧配置已被新参数更新,
+    # 删除反而会让引用它的规则全部悬空, 且旧凭据也回不去 —— 保留现状让用户重试
+    def _rollback_new():
+        if name not in existing:
+            subprocess.run(["rclone", "config", "delete", name],
+                           capture_output=True, text=True, timeout=10)
 
     # Step 1: Create the remote config (non-interactive to skip OAuth web server)
     # 一律 list 参数 —— 配置值里的引号/分号在 shell 拼接下会逃逸成命令注入
@@ -483,26 +703,21 @@ def api_sync_remote_create():
         )
         if test.returncode != 0:
             # Rollback: delete the broken remote
-            subprocess.run(["rclone", "config", "delete", name],
-                           capture_output=True, text=True, timeout=10)
+            _rollback_new()
             err_msg = test.stderr.strip() or test.stdout.strip()
             if err_msg:
                 return _err("conn_test_failed", 400, detail=err_msg)
             return _err("conn_test_failed_plain", 400)
     except subprocess.TimeoutExpired:
-        subprocess.run(["rclone", "config", "delete", name],
-                       capture_output=True, text=True, timeout=10)
+        _rollback_new()
         return _err("conn_test_timeout", 400)
     except Exception as e:
-        subprocess.run(["rclone", "config", "delete", name],
-                       capture_output=True, text=True, timeout=10)
+        _rollback_new()
         return _err("conn_test_failed", 400, detail=str(e))
 
     if oauth_used:
         # 成功后清会话, token 不在内存多留
-        with _oauth_lock:
-            if _oauth_session.get("phase") == "done":
-                _oauth_session = {"phase": "idle"}
+        clear_oauth_session()
     return _ok("remote_created", params={"name": name})
 
 
@@ -543,7 +758,7 @@ def api_sync_remote_delete():
 
 @bp.route("/api/sync/remote/browse", methods=["POST"])
 def api_sync_remote_browse():
-    """列出 remote 上某层目录。
+    """列出 remote 上某层目录 (staged 可选: 凭据经 env 临时注入, 不落盘)。
 
     path 原样交给 rclone —— 前导 "/" 的含义由后端类型决定 (s3 / webdav /
     drive / dropbox / onedrive 都会 Trim 掉; sftp 则区分 home 相对与
@@ -559,11 +774,26 @@ def api_sync_remote_browse():
         return _soft_err("browse_no_remote")
     if not _RCLONE_TOKEN_RE.match(remote):
         return _soft_err("remote_name_invalid")
+
+    staged_env = None
+    if data.get("staged"):
+        rtype, params, err = _resolve_staged_creds(remote, data)
+        if err:
+            return err
+        if not rtype:
+            return _soft_err("remote_type_invalid")
+        staged_env = (rtype, params)
+
     try:
-        r = subprocess.run(
-            ["rclone", "lsjson", f"{remote}:{path}", "--dirs-only", "--max-depth", "1"],
-            capture_output=True, text=True, timeout=30,
-        )
+        if staged_env:
+            r = _run_staged_rclone(
+                ["lsjson", f"{remote}:{path}", "--dirs-only", "--max-depth", "1"],
+                remote, staged_env[0], staged_env[1], timeout=30)
+        else:
+            r = subprocess.run(
+                ["rclone", "lsjson", f"{remote}:{path}", "--dirs-only", "--max-depth", "1"],
+                capture_output=True, text=True, timeout=30,
+            )
         if r.returncode != 0:
             err = (r.stderr or "").strip().splitlines()
             if err:
@@ -576,6 +806,51 @@ def api_sync_remote_browse():
         return _soft_err("browse_timeout")
     except Exception as e:
         return _soft_err("browse_rclone_failed", detail=str(e))
+
+
+@bp.route("/api/sync/remote/mkdir", methods=["POST"])
+def api_sync_remote_mkdir():
+    """在 remote 上创建目录 (staged 可选, 语义同 browse)。
+
+    浏览器「新建目录」用: wizard 在部署前把目录建进网盘, 部署拉取时直接
+    可用; dashboard 在保存前预建。mkdir 幂等 (已存在不报错)。
+    """
+    data = request.get_json(force=True)
+    remote = (data.get("remote") or "").strip()
+    path = (data.get("path") or "").strip()
+    if not remote:
+        return _soft_err("browse_no_remote")
+    if not _RCLONE_TOKEN_RE.match(remote):
+        return _soft_err("remote_name_invalid")
+    if not path:
+        return _soft_err("mkdir_path_required")
+
+    staged_env = None
+    if data.get("staged"):
+        rtype, params, err = _resolve_staged_creds(remote, data)
+        if err:
+            return err
+        if not rtype:
+            return _soft_err("remote_type_invalid")
+        staged_env = (rtype, params)
+
+    try:
+        if staged_env:
+            r = _run_staged_rclone(["mkdir", f"{remote}:{path}"],
+                                   remote, staged_env[0], staged_env[1], timeout=60)
+        else:
+            r = subprocess.run(["rclone", "mkdir", f"{remote}:{path}"],
+                               capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            err = (r.stderr or "").strip().splitlines()
+            if err:
+                return _soft_err("mkdir_rclone_failed", detail=err[-1])
+            return _soft_err("mkdir_rclone_failed_plain")
+        return jsonify({"ok": True})
+    except subprocess.TimeoutExpired:
+        return _soft_err("mkdir_timeout")
+    except Exception as e:
+        return _soft_err("mkdir_rclone_failed", detail=str(e))
 
 
 @bp.route("/api/sync/local/browse", methods=["POST"])

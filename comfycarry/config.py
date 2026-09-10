@@ -349,18 +349,19 @@ _setup_state_lock = threading.Lock()
 
 
 def _load_setup_state():
-    """加载 Setup Wizard 状态"""
+    """加载 Setup Wizard 状态 (部署快照)。
+
+    快照字段分两类:
+    - 状态机: deploy_started/completed/error/steps_completed (进程重启后
+      恢复部署视图/失败重试/跳过耗时步骤)
+    - 部署计划: deploy 提交时写入, deploy_engine 逐字段消费
+    无草稿字段 —— 向导会话态在内存 (services/wizard_draft.py)。
+    """
     defaults = {
-        "completed": False,
-        "current_step": 0,
-        "image_type": "prebuilt",
         "password": "",
-        "cloudflared_token": "",
         "cf_api_token": "",
         "cf_domain": "",
         "cf_subdomain": "",
-        "rclone_config_method": "",
-        "rclone_config_value": "",
         "civitai_token": "",
         "plugins": [p["url"] for p in DEFAULT_PLUGINS],
         "install_fa2": False,
@@ -369,12 +370,15 @@ def _load_setup_state():
         "deploy_completed": False,
         "deploy_error": "",
         "deploy_steps_completed": [],
-        "deploy_log": [],
     }
+    # 幽灵 key 兼容清除: 旧版本写过的字段不再有任何读取, 加载时直接丢弃
+    _ghost_keys = {"completed", "cloudflared_token", "image_type", "deploy_log"}
     with _setup_state_lock:
         if SETUP_STATE_FILE.exists():
             try:
                 state = json.loads(SETUP_STATE_FILE.read_text(encoding="utf-8"))
+                for k in _ghost_keys:
+                    state.pop(k, None)
                 for k, v in defaults.items():
                     if k not in state:
                         state[k] = v

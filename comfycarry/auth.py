@@ -74,21 +74,35 @@ def register_auth_middleware(app):
 
     # Setup 阶段额外放行的精确路由 (集中维护)
     _SETUP_OPEN_ROUTES = {
-        "/api/settings/import-config",  # 配置导入
-        "/api/tunnel/validate",         # Tunnel 验证 (Wizard Step 2)
-        "/api/llm/models",              # LLM 模型列表 (Wizard Step 6)
+        "/api/settings/import-config",    # 配置导入
+        "/api/tunnel/validate",           # Tunnel 验证 (Wizard Step 2)
+        "/api/tunnel/public/status",      # 公共节点容量 (Wizard Step 2)
+        "/api/llm/models",                # LLM 模型列表 (Wizard Step 6)
+        "/api/sync/remote/oauth/start",   # OAuth authorize 启动 (Wizard Step 4)
+        "/api/sync/remote/oauth/status",  # OAuth 状态轮询
+        "/api/sync/remote/oauth/paste",   # OAuth 回调 URL 提交
+        "/api/sync/remote/oauth/cancel",  # OAuth 取消
+        "/api/sync/remote/oauth/drives",  # OAuth 驱动器发现
+        "/api/sync/remote/browse",        # 远程目录浏览 (Wizard Step 4 目录选择器, staged)
+        "/api/sync/remote/mkdir",         # 远程目录新建 (同上)
     }
 
-    # 部署完成后**不再**免鉴权的 setup 路由 —— 它们会改写向导状态、
-    # 拉起部署或代面板发外部请求, 部署完成后没有合法用途。
+    # 部署完成后**不再**免鉴权的 setup 路由 —— deploy/wizard_remote 会改写
+    # 向导状态、拉起部署或代面板发外部请求; state/log_stream 虽只读, 但 state
+    # 响应含部署计划里的密码与各项 API 凭据, log_stream 会流出部署日志, 而
+    # wizard 前端只在 setup 未完成时才会加载 (frontend.index 那之后不再下发
+    # wizard.html), 部署完成后没有合法消费方。
+    # 部署完成的瞬间已建立的 log_stream SSE 不受影响 (中间件只在请求建立时
+    # 校验), done 事件送达后前端即 close()。
     # 正常的重新部署路径是先调 /api/settings/reinitialize (需鉴权) 删掉
-    # setup state, 那之后 _is_setup_complete() 为假, 这里自然重新放行。
-    # /api/setup/state 与 /api/setup/log_stream 仍始终放行: 只读, 且部署
-    # 完成的瞬间向导页还在轮询它们显示结果。
+    # setup state 和 ComfyUI 目录, 那之后 _is_setup_complete() 为假, 这里
+    # 自然重新放行。
     _SETUP_PRIVILEGED_ROUTES = {
-        "/api/setup/save",
+        "/api/setup/state",
+        "/api/setup/wizard_remote",
+        "/api/setup/wizard_remote/delete",
         "/api/setup/deploy",
-        "/api/setup/preview_remotes",
+        "/api/setup/log_stream",
     }
 
     @app.before_request

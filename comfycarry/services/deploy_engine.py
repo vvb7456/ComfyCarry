@@ -317,7 +317,9 @@ def _run_deploy(config):
         try:
             state = _load_setup_state()
             state["deploy_error"] = str(e)
-            state["deploy_started"] = False
+            # deploy_started 必须保持 True —— 它是失败会话可恢复的标记:
+            # wizard_draft 懒恢复 / setup.state 的失败判定都依赖它;
+            # 置 False 会让快照凭据在重试时被空草稿覆盖 (凭据丢失)
             _save_setup_state(state)
         except Exception:
             pass
@@ -442,32 +444,25 @@ def _step_tunnel(config):
 
 
 def _step_rclone(config):
-    """STEP 3: Rclone 配置"""
+    """STEP 3: Rclone conf 落地 (仅导入链路: method='base64', conf 内容来自
+    导入 JSON 配置 / 设置页导入; wizard 的凭据走 wizard_remotes, 见 _step_sync_assets)"""
     import base64 as _b64
     rclone_method = config.get("rclone_config_method", "skip")
     rclone_value = config.get("rclone_config_value", "")
-    if rclone_method == "base64_env":
-        rclone_method = "base64"
-        rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
-    elif rclone_method == "file":
-        rclone_method = "base64"
-    if rclone_method != "skip" and rclone_value:
-        _deploy_step("setup_rclone")
-        _deploy_exec("mkdir -p ~/.config/rclone")
-        if rclone_method == "url":
-            _deploy_log(f"从 URL 下载 rclone.conf...")
-            _deploy_exec(f'curl -fsSL {shlex.quote(rclone_value)} -o ~/.config/rclone/rclone.conf')
-        elif rclone_method == "base64":
-            _deploy_log("从 Base64 解码 rclone.conf...")
-            try:
-                conf_text = _b64.b64decode(rclone_value).decode("utf-8")
-                Path.home().joinpath(".config/rclone/rclone.conf").write_text(
-                    conf_text, encoding="utf-8"
-                )
-            except Exception as e:
-                _deploy_log(f"Base64 解码失败: {e}", "error")
-        _deploy_exec("chmod 600 ~/.config/rclone/rclone.conf")
-        _deploy_exec("rclone listremotes", label="检测 remotes")
+    if rclone_method != "base64" or not rclone_value:
+        return
+    _deploy_step("setup_rclone")
+    _deploy_exec("mkdir -p ~/.config/rclone")
+    _deploy_log("从 Base64 解码 rclone.conf...")
+    try:
+        conf_text = _b64.b64decode(rclone_value).decode("utf-8")
+        Path.home().joinpath(".config/rclone/rclone.conf").write_text(
+            conf_text, encoding="utf-8"
+        )
+    except Exception as e:
+        _deploy_log(f"Base64 解码失败: {e}", "error")
+    _deploy_exec("chmod 600 ~/.config/rclone/rclone.conf")
+    _deploy_exec("rclone listremotes", label="检测 remotes")
 
 
 def _step_ssh(config):
@@ -675,19 +670,16 @@ def _step_sync_assets(config):
     """STEP 8: 执行 deploy 同步规则"""
     rclone_method = config.get("rclone_config_method", "skip")
     rclone_value = config.get("rclone_config_value", "")
-    if rclone_method == "base64_env":
-        rclone_method = "base64"
-        rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
-    elif rclone_method == "file":
-        rclone_method = "base64"
 
-    if rclone_method == "skip" or not rclone_value:
+    has_rclone_conf = (rclone_method != "skip" and bool(rclone_value))
+    wizard_remotes = config.get("wizard_remotes", [])
+
+    if not has_rclone_conf and not wizard_remotes:
         _deploy_log("未配置 Rclone, 跳过资产同步")
         return
 
     _deploy_step("sync_assets")
 
-    wizard_remotes = config.get("wizard_remotes", [])
     for wr in wizard_remotes:
         wr_name = str(wr.get("name", ""))
         wr_type = str(wr.get("type", ""))
@@ -697,7 +689,10 @@ def _step_sync_assets(config):
         if not (_RCLONE_TOKEN_RE.match(wr_name) and _RCLONE_TOKEN_RE.match(wr_type)):
             _deploy_log(f"⚠️ 跳过非法 Remote 名/类型: {wr_name!r} {wr_type!r}", "warn")
             continue
-        cmd = ["rclone", "config", "create", wr_name, wr_type]
+        # --non-interactive 必须: OAuth 类型 (onedrive/drive) 即使带了 token,
+        # 交互模式也会进 authorize 流程在 127.0.0.1:53682 起 webserver 等回调
+        # (容器里浏览器打不开, 直接挂死到超时)。dashboard remote/create 同此参数。
+        cmd = ["rclone", "config", "create", wr_name, wr_type, "--non-interactive"]
         for k, v in wr_params.items():
             if not v:
                 continue
@@ -756,19 +751,14 @@ def _step_start_services(config, cfg, PY):
     """STEP 10: 启动服务 + 完成"""
     _deploy_step("start_services")
 
-    rclone_method = config.get("rclone_config_method", "skip")
-    rclone_value = config.get("rclone_config_value", "")
-    if rclone_method == "base64_env":
-        rclone_method = "base64"
-        rclone_value = os.environ.get("RCLONE_CONF_BASE64", "")
-
-    if rclone_method != "skip" and rclone_value:
-        rules = _load_sync_rules()
-        watch_rules = [r for r in rules
-                       if r.get("trigger") == "watch" and r.get("enabled", True)]
-        if watch_rules:
-            start_sync_worker()
-            _deploy_log(f"✅ Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
+    # watch worker 的启动只看规则本身: conf 可能来自 base64 导入, remote
+    # 也可能来自 wizard_remotes (OAuth 链路), 不能用 conf 有无做代理判断
+    rules = _load_sync_rules()
+    watch_rules = [r for r in rules
+                   if r.get("trigger") == "watch" and r.get("enabled", True)]
+    if watch_rules:
+        start_sync_worker()
+        _deploy_log(f"✅ Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
 
     civitai_token = config.get("civitai_token", "")
     if civitai_token:
@@ -849,8 +839,12 @@ def _step_start_services(config, cfg, PY):
         if want_sa2:
             attn_warnings.append("SageAttention-2")
     state["attn_install_warnings"] = attn_warnings
+    # 部署成功后不再保留向导 remote 凭据快照；失败/重试期间才需要它。
+    state["wizard_remotes"] = []
     # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
     _save_setup_state(state)
+    from . import wizard_draft
+    wizard_draft.reset()
 
     gpu_info = _detect_gpu_info()
     _deploy_log(
