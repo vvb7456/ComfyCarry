@@ -10,6 +10,9 @@ export interface GpuInfo {
   temp: number
   power: number
   power_limit: number
+  clock_sm: number | null   // SM 核心频率 MHz
+  fan: number | null        // 风扇转速 %
+  temp_limit: number | null // 温度降频阈值 °C
 }
 
 export interface SystemStats {

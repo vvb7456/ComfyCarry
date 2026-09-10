@@ -39,6 +39,23 @@ def _collect_gpu() -> list[dict]:
                 power_limit = pynvml.nvmlDeviceGetPowerManagementLimit(h) / 1000
             except Exception:
                 power_limit = 0
+            # SM 核心频率 (MHz)；0 是有效读数，读取失败/不支持为 None
+            try:
+                clock_sm = pynvml.nvmlDeviceGetClockInfo(
+                    h, getattr(pynvml, "NVML_CLOCK_SM", None))
+            except Exception:
+                clock_sm = None
+            # 风扇转速 (%)；0 是有效读数，读取失败/不支持为 None
+            try:
+                fan = pynvml.nvmlDeviceGetFanSpeed(h)
+            except Exception:
+                fan = None
+            # 温度降频阈值 (°C)；读取失败/不支持为 None
+            try:
+                temp_limit = pynvml.nvmlDeviceGetTemperatureThreshold(
+                    h, getattr(pynvml, "NVML_TEMPERATURE_THRESHOLD_SLOWDOWN", None))
+            except Exception:
+                temp_limit = None
             name = pynvml.nvmlDeviceGetName(h)
             if isinstance(name, bytes):
                 name = name.decode("utf-8", errors="replace")
@@ -52,6 +69,9 @@ def _collect_gpu() -> list[dict]:
                 "temp": temp,
                 "power": round(power, 1),
                 "power_limit": round(power_limit, 1),
+                "clock_sm": clock_sm,
+                "fan": fan,
+                "temp_limit": temp_limit,
             })
         pynvml.nvmlShutdown()
     except Exception:
