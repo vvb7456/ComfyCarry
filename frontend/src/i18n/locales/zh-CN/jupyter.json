@@ -1,45 +1,47 @@
 {
   "title": "JupyterLab",
-  "status": {
-    "running": "运行中",
-    "stopped": "已停止",
-    "error": "出错",
-    "not_created": "未创建"
+  "hero": {
+    "running": { "title": "JupyterLab 运行中", "subtitle": "服务运行中，可打开 JupyterLab 使用 Notebook 与终端。" },
+    "starting": { "title": "JupyterLab 启动中", "subtitle": "正在启动 JupyterLab 服务。" },
+    "stopped": { "title": "JupyterLab 已停止", "subtitle": "已停止，活跃内核与会话已结束。" },
+    "not_created": { "title": "尚未创建 JupyterLab", "subtitle": "启动后可在浏览器中运行 Notebook 与终端。" },
+    "failed": { "title": "JupyterLab 运行出错", "subtitle": "启动失败，详情见 Jupyter 日志。" },
+    "action": {
+      "open": "打开 JupyterLab",
+      "start": "启动 JupyterLab"
+    }
   },
-  "hint": {
-    "not_created": "点击「启动」创建 JupyterLab 进程",
-    "stopped": "进程已停止，点击「启动」恢复",
-    "error": "进程出错，请查看日志",
-    "not_running": "Jupyter 服务未运行或无法连接"
-  },
-  "info": {
+  "facts": {
+    "port": "监听端口",
+    "address": "访问地址",
     "version": "版本",
-    "pid": "PID",
-    "port": "端口",
     "cpu": "CPU",
     "memory": "内存",
-    "kernels_count": "内核",
-    "sessions_count": "会话"
+    "kernels": "活跃内核",
+    "sessions": "活跃会话",
+    "terminals": "终端"
   },
   "token": {
-    "title": "访问令牌",
-    "open_jupyter": "打开 JupyterLab"
+    "title": "访问令牌"
   },
   "kernels": {
     "title": "活跃内核",
     "available": "可用内核",
+    "default": "默认内核",
     "idle": "空闲",
     "busy": "忙碌",
-    "connections": "连接",
-    "interrupt": "中断",
-    "restart": "重启",
+    "unknown": "未知",
+    "connections": "个连接",
+    "interrupt": "中断内核",
+    "restart": "重启内核",
+    "empty": "暂无活跃内核",
     "kernel_restarted": "内核已重启",
-    "kernel_interrupted": "内核已中断",
-    "action_failed": "操作失败"
+    "kernel_interrupted": "内核已中断"
   },
   "sessions": {
     "title": "活跃会话",
     "close": "关闭此会话",
+    "empty": "暂无活跃会话",
     "closed": "会话已关闭"
   },
   "terminals": {
@@ -47,10 +49,12 @@
     "new": "新建终端",
     "label": "终端 {name}",
     "created": "终端 {name} 已创建",
-    "open": "点击打开终端",
+    "open": "打开终端",
     "destroy": "销毁终端",
     "destroy_confirm": "确定要销毁终端 {name} 吗？",
-    "destroyed": "终端 {name} 已销毁"
+    "destroyed": "终端 {name} 已销毁",
+    "last_activity": "最后活动",
+    "empty": "暂无终端"
   },
   "log": {
     "title": "日志"
@@ -82,11 +86,5 @@
     "stop_failed": "停止失败：{detail}",
     "restart_failed": "重启失败：{detail}",
     "token_not_found": "未找到令牌"
-  },
-  "msg": {
-    "already_running": "JupyterLab 已在运行",
-    "starting": "JupyterLab 启动中...",
-    "stopped": "JupyterLab 已停止",
-    "restarting": "JupyterLab 正在重启..."
   }
 }

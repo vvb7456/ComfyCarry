@@ -10,6 +10,7 @@ export interface KernelInfo {
   name: string
   state: string
   connections: number
+  last_activity?: string
 }
 
 export interface SessionInfo {
@@ -19,10 +20,12 @@ export interface SessionInfo {
   type: string
   kernel_name?: string
   kernel_state?: string
+  kernel_id?: string
 }
 
 export interface TerminalInfo {
   name: string
+  last_activity?: string
 }
 
 export interface JupyterStatus {
@@ -35,6 +38,7 @@ export interface JupyterStatus {
   memory?: number
   kernels_count: number
   sessions_count: number
+  terminals_count?: number
   kernelspecs?: KernelSpecInfo[]
   default_kernel?: string
   kernels?: KernelInfo[]
