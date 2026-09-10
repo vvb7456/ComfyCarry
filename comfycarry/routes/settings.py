@@ -24,7 +24,7 @@ from pathlib import Path
 from .. import config as cfg
 from ..config import (
     CONFIG_FILE, DEFAULT_PLUGINS,
-    SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
+    SYNC_RULES_FILE, SYNC_SETTINGS_FILE, RCLONE_CONF,
     _load_config, _get_config, _set_config,
     _load_setup_state, _save_setup_state, SETUP_STATE_FILE,
     COMFYUI_DIR, WORKSPACE_ROOT,
@@ -522,7 +522,8 @@ def api_settings_reinitialize():
         except Exception as e:
             errors.append(_err_item("reinit_clean_failed", detail=str(e)))
 
-    for f in [WORKSPACE_ROOT / "cloud_sync.sh", SYNC_RULES_FILE, SYNC_SETTINGS_FILE]:
+    for f in [WORKSPACE_ROOT / "cloud_sync.sh", SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
+              RCLONE_CONF]:
         try:
             if f.exists():
                 f.unlink()

@@ -10,7 +10,6 @@ ComfyCarry — Cloud Sync v2 路由
 - /api/sync/rules/save|run   — 规则保存/执行
 - /api/sync/worker/start|stop — Worker 控制
 - /api/sync/settings         — 全局设置
-- /api/sync/rclone_config    — 直接编辑 rclone.conf
 """
 
 import json
@@ -26,8 +25,9 @@ import requests
 from flask import Blueprint, jsonify, request, Response
 
 from ..config import (
-    RCLONE_CONF, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
+    SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
     resolve_workspace_path, workspace_relative,
+    _RCLONE_TOKEN_RE,
 )
 from ..services.sync_engine import (
     _load_sync_rules, _save_sync_rules, _parse_rclone_conf,
@@ -39,9 +39,9 @@ from ..services.sync_engine import (
 
 bp = Blueprint("sync", __name__)
 
-# rclone remote 名 / 类型 / 配置键的合法字符集。校验的意义不只是转义 ——
-# list 参数下 "--config=x" 这种 key 仍会被 rclone 当选项解析。
-_RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
+# rclone remote 名 / 类型 / 配置键的合法字符集 (_RCLONE_TOKEN_RE, config.py)。
+# 校验的意义不只是转义 —— list 参数下 "--config=x" 这种 key 仍会被 rclone
+# 当选项解析。
 
 
 # ====================================================================
@@ -810,57 +810,6 @@ def api_sync_settings_save():
         return _err("settings_numbers")
     _save_sync_settings(settings)
     return jsonify({"ok": True, "settings": settings})
-
-
-# ====================================================================
-# Rclone 配置直接编辑
-# ====================================================================
-@bp.route("/api/sync/rclone_config", methods=["GET"])
-def api_get_rclone_config():
-    if not RCLONE_CONF.exists():
-        return jsonify({"config": "", "exists": False})
-    raw = RCLONE_CONF.read_text(encoding="utf-8")
-    return jsonify({"config": raw, "exists": True})
-
-
-@bp.route("/api/sync/rclone_config", methods=["POST"])
-def api_save_rclone_config():
-    data = request.get_json(force=True)
-    config_text = data.get("config", "")
-    if not config_text.strip():
-        return _err("config_empty")
-    sections = re.findall(r'^\[.+\]', config_text, re.MULTILINE)
-    if not sections:
-        return _err("config_no_section")
-    # rclone.conf 是 INI 格式, rclone 的解析器对同名 section 会把键合并到一处,
-    # 而我们的 _parse_rclone_conf 会得到两个同名条目 —— 这会让 /remotes 列表
-    # 出现重复卡片、/storage 后者覆盖前者、按 name 删除又删不干净。在源头
-    # 拒绝, 比让 UI 陷入无法自洽的状态要简单。
-    seen: set[str] = set()
-    dup: set[str] = set()
-    for sec in sections:
-        name = sec.strip("[]")
-        if name in seen:
-            dup.add(name)
-        seen.add(name)
-    if dup:
-        return _err("config_dup_section", 400,
-                    names=", ".join(sorted(dup)))
-    if RCLONE_CONF.exists():
-        RCLONE_CONF.with_suffix('.conf.bak').write_text(
-            RCLONE_CONF.read_text(encoding="utf-8"), encoding="utf-8")
-    RCLONE_CONF.parent.mkdir(parents=True, exist_ok=True)
-    RCLONE_CONF.write_text(config_text, encoding="utf-8")
-    RCLONE_CONF.chmod(0o600)
-    try:
-        r = subprocess.run(["rclone", "listremotes"],
-                           capture_output=True, text=True, timeout=5)
-        remotes = [l.strip().rstrip(':') for l in r.stdout.strip().split('\n')
-                   if l.strip()]
-    except Exception:
-        remotes = []
-    return _ok("config_saved",
-               params={"count": len(remotes), "remotes": ", ".join(remotes)})
 
 
 # ====================================================================

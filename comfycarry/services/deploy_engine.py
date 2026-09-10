@@ -7,7 +7,6 @@ _run_deploy() 及其所有辅助函数。
 
 import json
 import os
-import re
 import selectors
 import shlex
 import shutil
@@ -19,15 +18,12 @@ from pathlib import Path
 
 DEPLOY_LOG_FILE = "/workspace/deploy.log"
 
-# rclone remote 名 / 类型 / 配置键的合法字符集 —— 用于挡住 argv 里的
-# "--flag=x" 形态与 shell 元字符 (与 routes/sync.py 的校验保持一致)
-_RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
-
 from ..config import (
     COMFYUI_DIR, CONFIG_FILE, DEFAULT_PLUGINS,
     SYNC_RULE_TEMPLATES,
     _load_setup_state, _save_setup_state,
     _save_dashboard_password,
+    _RCLONE_TOKEN_RE,
 )
 from .comfyui_params import DEFAULT_COMFYUI_ARGS
 from .sync_engine import (

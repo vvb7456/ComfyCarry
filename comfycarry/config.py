@@ -7,6 +7,7 @@ ComfyCarry — 共享配置、常量、配置文件读写工具
 import json
 import logging
 import os
+import re
 import secrets
 import threading
 from pathlib import Path
@@ -422,6 +423,9 @@ SYNC_RULE_TEMPLATES = [
     {"id": "tpl-push-output-copy","name": "上传输出 (保留本地)","direction": "push", "remote_path": "ComfyCarry/output",          "local_path": f"{COMFYUI_REL}/output",                 "method": "copy",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
     {"id": "tpl-push-workflows",  "name": "备份工作流",        "direction": "push", "remote_path": "ComfyCarry/workflow",     "local_path": f"{COMFYUI_REL}/user/default/workflows", "method": "copy",  "trigger": "manual"},
 ]
+
+# rclone remote 名 / 类型 / 配置键的合法字符集
+_RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 # ── Remote 类型表单定义 ──────────────────────────────────────
 REMOTE_TYPE_DEFS = {
