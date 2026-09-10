@@ -426,8 +426,16 @@ onUnmounted(() => {
 
         <!-- 日志 (默认展开) -->
         <section class="ssh-block">
-          <SectionHeader icon="receipt_long">{{ t('ssh.log.title') }}</SectionHeader>
-          <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
+          <LogPanel
+            :title="t('ssh.log.title')"
+            collapsible
+            :lines="logLines"
+            :status="logStatus"
+            :has-more="logHasMore"
+            :loading-more="logLoadingMore"
+            :prepending="logPrepending"
+            :on-scroll="logOnScroll"
+          />
         </section>
       </template>
     </div>

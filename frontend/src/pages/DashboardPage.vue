@@ -10,6 +10,7 @@ import { useSystemStats } from '@/composables/useSystemStats'
 import { useAppStore } from '@/stores/app'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import DashboardHero from '@/components/dashboard/DashboardHero.vue'
 import DashboardTasks from '@/components/dashboard/DashboardTasks.vue'
 import DashboardServices from '@/components/dashboard/DashboardServices.vue'
@@ -36,6 +37,8 @@ const activity = ref<ActivityData | null>(null)
 const initialLoading = ref(true)
 const refreshing = ref(false)
 const startingComfy = ref(false)
+// 服务行动作提交期间的状态 (loading/disabled 由 DashboardDiagnostics 消费)
+const actingSvc = ref<{ name: string; action: string } | null>(null)
 
 // 组件卸载后不再执行的延迟任务 (启动反馈轮询等)
 const pendingTimers = new Set<ReturnType<typeof setTimeout>>()
@@ -115,15 +118,23 @@ async function startComfyUI() {
 }
 
 async function svcAction(name: string, action: string) {
+  if (actingSvc.value) return
+  actingSvc.value = { name, action }
   let res
   if (name === 'sync-worker') {
     res = await post(`/api/sync/worker/${action}`)
   } else {
     res = await post(`/api/services/${name}/${action}`)
   }
-  if (!res) return
+  if (!res) {
+    actingSvc.value = null
+    return
+  }
   toast(t('dashboard.services.action_sent', { action }), 'info')
-  later(loadOverview, 2000)
+  later(() => {
+    actingSvc.value = null
+    loadOverview()
+  }, 2000)
 }
 
 // ── Auto Refresh ──────────────────────────────────────────────────────
@@ -374,17 +385,19 @@ const totalServiceCount = computed(() => {
         <h1 class="page-title">{{ t('dashboard.title') }}</h1>
       </div>
 
-      <!-- Right-aligned refresh button -->
-      <button
-        type="button"
-        class="dash-refresh-btn"
+      <!-- Right-aligned refresh tool button -->
+      <div class="page-header-row__spacer"></div>
+      <BaseButton
+        variant="ghost"
+        size="sm"
+        icon-only
         :disabled="refreshing"
         :aria-label="t('dashboard.refresh')"
         :title="t('dashboard.refresh')"
         @click="refreshAll"
       >
         <MsIcon name="refresh" :class="{ 'dash-spin': refreshing }" />
-      </button>
+      </BaseButton>
     </div>
 
     <!-- ── Constrained Centered Content Container ── -->
@@ -446,6 +459,7 @@ const totalServiceCount = computed(() => {
         :ordered-services="orderedServices"
         :online-service-count="onlineServiceCount"
         :total-service-count="totalServiceCount"
+        :acting="actingSvc"
         @svc-action="svcAction"
       />
     </div>
@@ -453,32 +467,6 @@ const totalServiceCount = computed(() => {
 </template>
 
 <style scoped>
-/* ── Full-Width Page Header Row ── */
-.dash-refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--rs);
-  border: 1px solid var(--bd);
-  background: var(--bg2);
-  color: var(--t2);
-  cursor: pointer;
-  margin-left: auto;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.dash-refresh-btn:hover {
-  color: var(--t1);
-  border-color: color-mix(in srgb, var(--ac) 34%, transparent);
-}
-
-.dash-refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .dash-spin {
   animation: spin 0.8s linear infinite;
 }

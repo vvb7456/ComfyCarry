@@ -212,13 +212,4 @@ function formatDlSize(completed?: number, total?: number): string {
   font-size: var(--text-sm);
   color: var(--t3);
 }
-
-.dash-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--bd);
-  border-top-color: var(--ac);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
 </style>

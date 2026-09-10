@@ -41,8 +41,7 @@
   "current": {
     "title": "正在进行",
     "idle": "空闲",
-    "idle_desc": "暂无执行中的任务",
-    "downloading": "下载模型"
+    "idle_desc": "暂无执行中的任务"
   },
   "services": {
     "title": "服务与连接",

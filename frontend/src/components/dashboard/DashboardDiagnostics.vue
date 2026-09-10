@@ -17,6 +17,8 @@ const props = defineProps<{
   orderedServices: ServiceEntry[]
   onlineServiceCount: number
   totalServiceCount: number
+  /** 正在执行的动作: 行内动作提交期间互斥 (loading 精确到按钮, disabled 覆盖同行) */
+  acting?: { name: string; action: string } | null
 }>()
 
 const emit = defineEmits<{
@@ -183,6 +185,8 @@ const envFacts = computed(() => {
               icon-only
               :title="`${t('common.btn.stop')} ${svcName(svc.name)}`"
               :aria-label="`${t('common.btn.stop')} ${svcName(svc.name)}`"
+              :disabled="!!acting"
+              :loading="acting?.name === svc.name && acting?.action === 'stop'"
               @click="emit('svcAction', svc.name, 'stop')"
             >
               <MsIcon name="stop" />
@@ -194,6 +198,8 @@ const envFacts = computed(() => {
               icon-only
               :title="`${t('common.btn.restart')} ${svcName(svc.name)}`"
               :aria-label="`${t('common.btn.restart')} ${svcName(svc.name)}`"
+              :disabled="!!acting"
+              :loading="acting?.name === svc.name && acting?.action === 'restart'"
               @click="emit('svcAction', svc.name, 'restart')"
             >
               <MsIcon name="restart_alt" />
@@ -205,6 +211,8 @@ const envFacts = computed(() => {
               icon-only
               :title="`${t('common.btn.start')} ${svcName(svc.name)}`"
               :aria-label="`${t('common.btn.start')} ${svcName(svc.name)}`"
+              :disabled="!!acting"
+              :loading="acting?.name === svc.name && acting?.action === 'start'"
               @click="emit('svcAction', svc.name, 'start')"
             >
               <MsIcon name="play_arrow" />
@@ -249,7 +257,7 @@ const envFacts = computed(() => {
   margin-top: 2px;
   padding-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   color: var(--t3);
 }
 

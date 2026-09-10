@@ -403,10 +403,18 @@ function openAddSvc() {
           <EmptyState v-else icon="link" :message="t('tunnel.services.empty')" density="compact" />
         </section>
 
-        <!-- 日志 -->
+        <!-- 日志 (默认展开) -->
         <section v-if="configured" class="tunnel-block">
-          <SectionHeader icon="receipt_long">{{ t('tunnel.log.title') }}</SectionHeader>
-          <LogPanel :lines="logLines" :status="logStatus" :has-more="logHasMore" :loading-more="logLoadingMore" :prepending="logPrepending" :on-scroll="logOnScroll" />
+          <LogPanel
+            :title="t('tunnel.log.title')"
+            collapsible
+            :lines="logLines"
+            :status="logStatus"
+            :has-more="logHasMore"
+            :loading-more="logLoadingMore"
+            :prepending="logPrepending"
+            :on-scroll="logOnScroll"
+          />
         </section>
       </template>
     </div>

@@ -41,8 +41,7 @@
   "current": {
     "title": "In Progress",
     "idle": "Idle",
-    "idle_desc": "No tasks running.",
-    "downloading": "Downloading Model"
+    "idle_desc": "No tasks running."
   },
   "services": {
     "title": "Services & Connections",
