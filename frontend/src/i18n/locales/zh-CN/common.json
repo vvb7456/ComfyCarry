@@ -77,5 +77,11 @@
     "unsupported_type": "不支持的文件类型：{name}",
     "remove": "移除"
   },
-  "n_selected": "已选 {count} 项"
+  "n_selected": "已选 {count} 项",
+  "pagination": {
+    "total": "共 {count} 条",
+    "page_of": "第 {page} / {total} 页",
+    "prev": "上一页",
+    "next": "下一页"
+  }
 }

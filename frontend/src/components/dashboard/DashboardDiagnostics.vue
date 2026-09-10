@@ -180,6 +180,7 @@ const envFacts = computed(() => {
               v-if="svc.status === 'online'"
               variant="ghost"
               size="sm"
+              icon-only
               :title="`${t('common.btn.stop')} ${svcName(svc.name)}`"
               :aria-label="`${t('common.btn.stop')} ${svcName(svc.name)}`"
               @click="emit('svcAction', svc.name, 'stop')"
@@ -190,6 +191,7 @@ const envFacts = computed(() => {
               v-if="svc.status === 'online'"
               variant="ghost"
               size="sm"
+              icon-only
               :title="`${t('common.btn.restart')} ${svcName(svc.name)}`"
               :aria-label="`${t('common.btn.restart')} ${svcName(svc.name)}`"
               @click="emit('svcAction', svc.name, 'restart')"
@@ -200,6 +202,7 @@ const envFacts = computed(() => {
               v-else
               variant="ghost"
               size="sm"
+              icon-only
               :title="`${t('common.btn.start')} ${svcName(svc.name)}`"
               :aria-label="`${t('common.btn.start')} ${svcName(svc.name)}`"
               @click="emit('svcAction', svc.name, 'start')"

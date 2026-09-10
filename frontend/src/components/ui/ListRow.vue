@@ -8,7 +8,9 @@
  * 用法（外层必须是 `<ul class="list-plain">`，行本身是 `<li>`）：
  *   <ul class="list-plain">
  *     <ListRow icon="terminal" title="ComfyUI" :status="{ tone: 'running', text: '在线' }" :facts="['运行时间 3h', 'CPU 1.2%']">
- *       <template #actions><BaseButton … /></template>
+ *       <template #actions>
+ *         <BaseButton variant="ghost" size="sm" icon-only aria-label="停止"><MsIcon name="stop" /></BaseButton>
+ *       </template>
  *     </ListRow>
  *   </ul>
  *
@@ -16,9 +18,9 @@
  *   1. 图标列 26px、与标题首行光学对齐；没有图标时整列省略，不留空位
  *   2. 状态 = 圆点 + 静音文字 —— 颜色只给圆点；彩色状态词请改用徽章
  *   3. 副行事实等宽小字、自动 `·` 分隔；缺值不要传空串进来（不渲染 `-`）
- *   4. 行尾动作是**长方形**（42×32，与同行的文字按钮等高），不是正方形；命中区靠 min 尺寸
- *      保证 ≥40×32（触屏 ≥40 高）。动作图标由组件统一为 20px（约占盒子 6 成），
- *      调用方传 `size="sm"`、不传 `square`，也不用管图标大小
+ *   4. 行尾动作统一为 BaseButton 的 `size="sm" icon-only variant="ghost"`
+ *      （长方形约 42×32、触屏 44 高），尺寸来源已收敛到 BaseButton 的 iconOnly；
+ *      行这里只负责排列与 4px 间距。纯图标按钮请始终带 `aria-label`
  *   5. 一个行最多 3 个动作，更多请收进 DropdownMenu；危险动作永远排最右
  */
 import MsIcon from './MsIcon.vue'
@@ -166,31 +168,13 @@ withDefaults(defineProps<{
   margin: 0 6px;
 }
 
+/* 行尾按钮为 BaseButton `size="sm" icon-only variant="ghost"`：长方形 42×32
+   （触屏 44 高）、图标 20px 的尺寸来源已收敛到 BaseButton 的 iconOnly，
+   这里只保留排列与间距，避免双重来源。 */
 .list-row__actions {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-/* 行内动作按钮是长方形（不是正方形）：左右 10px 内边距 + 20px 图标 ≈ 42×32，
-   与同一行的文字按钮等高。min-* 只保证下限（命中区），不加宽高比约束。
-   图标与盒子的比例约 0.63 —— 盒子被撑大时图标必须跟着变大，
-   否则就是"小图标漂在大盒子里"，比原来更难看。 */
-.list-row__actions :deep(.base-btn) {
-  min-width: 40px;
-  min-height: 32px;
-}
-
-.list-row__actions :deep(.ms) {
-  font-size: 20px;
-  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
-}
-
-/* 触屏只加大盒子（命中优先），图标不再放大 */
-@media (pointer: coarse) {
-  .list-row__actions :deep(.base-btn) {
-    min-height: 40px;
-  }
 }
 
 @media (max-width: 768px) {

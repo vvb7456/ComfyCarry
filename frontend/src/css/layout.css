@@ -441,6 +441,17 @@
             min-height: 100%;
         }
 
+        /* ── 服务页内容列 ──
+           五页共用：Tunnel / SSH / JupyterLab / 云同步 / ComfyUI。
+           正文最大 1080px 居中；min-width: 0 防止作为 grid/flex 子项时被内容撑破。
+           生成与模型页保持全宽，不使用该类。 */
+        .page-col {
+            width: 100%;
+            max-width: 1080px;
+            margin: 0 auto;
+            min-width: 0;
+        }
+
         /* ── 限宽跟内容类型走, 不跟页面走 ──
            页面级 max-width 是钝器: 它会连表格和卡片网格一起收窄, 还会在全宽的
            页头里制造左右死区。表格 / 网格 / 日志用满宽度是收益; 只有下面这两类

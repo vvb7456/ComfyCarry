@@ -77,5 +77,11 @@
     "unsupported_type": "Unsupported file type: {name}",
     "remove": "Remove"
   },
-  "n_selected": "{count} selected"
+  "n_selected": "{count} selected",
+  "pagination": {
+    "total": "{count} total",
+    "page_of": "Page {page} / {total}",
+    "prev": "Previous page",
+    "next": "Next page"
+  }
 }
