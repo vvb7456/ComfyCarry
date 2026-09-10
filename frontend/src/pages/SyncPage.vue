@@ -282,14 +282,14 @@ const heroSubtitle = computed(() => {
   return t(`sync.hero.${s}.subtitle`)
 })
 
-const heroFacts = computed<{ label: string; value: string }[]>(() => {
+const factsList = computed<{ label: string; value: string }[]>(() => {
   const out = [
-    { label: t('sync.hero.facts.worker'), value: workerRunning.value ? t('sync.hero.facts.worker_running') : t('sync.hero.facts.worker_stopped') },
-    { label: t('sync.hero.facts.rules'), value: String(rules.value.length) },
-    { label: t('sync.hero.facts.storages'), value: String(remotes.value.length) },
+    { label: t('sync.facts.worker'), value: workerRunning.value ? t('sync.facts.worker_running') : t('sync.facts.worker_stopped') },
+    { label: t('sync.facts.rules'), value: String(rules.value.length) },
+    { label: t('sync.facts.storages'), value: String(remotes.value.length) },
   ]
   if (settings.value) {
-    out.push({ label: t('sync.hero.facts.watch_interval'), value: `${settings.value.watch_interval}s` })
+    out.push({ label: t('sync.facts.watch_interval'), value: `${settings.value.watch_interval}s` })
   }
   return out
 })
@@ -672,11 +672,12 @@ function switchTab(tab: string) {
             v-if="workerRunning"
             size="sm"
             :disabled="workerLoading"
+            :loading="workerLoading"
             @click="workerAction('stop')"
           >
             <MsIcon name="stop" /> {{ t('sync.hero.worker_stop') }}
           </BaseButton>
-          <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('sync.config.title')" @click="settingsOpen = true">
+          <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('sync.settings.title')" @click="settingsOpen = true">
             <MsIcon name="settings" />
           </BaseButton>
         </span>
@@ -708,7 +709,7 @@ function switchTab(tab: string) {
             </BaseButton>
           </template>
           <template #facts>
-            <span v-for="fact in heroFacts" :key="fact.label">{{ fact.label }}<b>{{ fact.value }}</b></span>
+            <span v-for="fact in factsList" :key="fact.label">{{ fact.label }}<b>{{ fact.value }}</b></span>
           </template>
         </ServiceHero>
 
@@ -1024,13 +1025,13 @@ function switchTab(tab: string) {
       <FormField :label="t('sync.rule.remote_path')" density="compact">
         <FieldControlRow>
           <input v-model="ruleForm.remote_path" type="text" class="form-input" placeholder="ComfyCarry/loras">
-          <BaseButton size="xs" icon-only :title="t('sync.browse.remote_title')" @click="openBrowse('remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
+          <BaseButton size="sm" icon-only :aria-label="t('sync.browse.remote_title')" :title="t('sync.browse.remote_title')" @click="openBrowse('remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
       </FormField>
       <FormField :label="t('sync.rule.local_path')" density="compact">
         <FieldControlRow>
           <input v-model="ruleForm.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
-          <BaseButton size="xs" icon-only :title="t('sync.browse.local_title')" @click="openBrowse('local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
+          <BaseButton size="sm" icon-only :aria-label="t('sync.browse.local_title')" :title="t('sync.browse.local_title')" @click="openBrowse('local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
       </FormField>
       <FormField :label="t('sync.rule.filters')" density="compact">

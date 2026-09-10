@@ -73,15 +73,6 @@ def get_job(job_id: str) -> dict | None:
     return _row_to_dict(row) if row else None
 
 
-def get_recent_jobs(limit: int = 30) -> list[dict]:
-    """读取最近 N 个 job (按开始时间倒序)。"""
-    rows = db.fetch_all(
-        "SELECT * FROM sync_jobs ORDER BY started_at DESC LIMIT ?",
-        (limit,),
-    )
-    return [_row_to_dict(r) for r in rows]
-
-
 def count_jobs() -> int:
     """保留期内 job 总数 (与分页查询同一数据集合)。"""
     row = db.fetch_one("SELECT COUNT(*) FROM sync_jobs")

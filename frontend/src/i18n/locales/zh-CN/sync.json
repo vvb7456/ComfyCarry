@@ -34,15 +34,7 @@
       "reconnect": "重新连接",
       "start": "启动自动同步"
     },
-    "worker_stop": "停止自动同步",
-    "facts": {
-      "worker": "自动同步",
-      "worker_running": "运行中",
-      "worker_stopped": "已停止",
-      "rules": "规则",
-      "storages": "存储",
-      "watch_interval": "检查间隔"
-    }
+    "worker_stop": "停止自动同步"
   },
   "storage": {
     "title": "存储",
@@ -79,8 +71,7 @@
     "authenticated": "已认证",
     "not_configured": "未配置",
     "click_refresh": "点击刷新查看容量",
-    "used": "已用",
-    "remaining": "剩余"
+    "used": "已用"
   },
   "remote": {
     "add": "添加存储",
@@ -175,24 +166,7 @@
     "run_ok": "规则已开始执行，查看日志了解进度",
     "run_failed": "执行失败"
   },
-  "config": {
-    "title": "同步设置",
-    "min_age": {
-      "label": "同步延迟",
-      "desc": "文件修改后等待一段时间后再同步，单位秒"
-    },
-    "watch_interval": {
-      "label": "检查间隔",
-      "desc": "每隔一段时间检查一次文件变化并执行同步，单位秒"
-    },
-    "saved": "已保存",
-    "save_failed": "保存失败",
-    "discard_confirm": "同步设置已修改但未保存，确定要放弃更改吗？",
-    "discard": "放弃更改"
-  },
   "worker": {
-    "running": "运行中",
-    "stopped": "已停止",
     "start_ok": "自动同步已启动",
     "stop_ok": "自动同步已停止",
     "restart_ok": "Sync Worker 已重启",
@@ -229,9 +203,7 @@
     "mkdir_failed": "新建目录失败"
   },
   "companion": {
-    "serve_title": "传输服务",
     "clients_title": "已连接的客户端",
-    "description": "直接把产物拉到本机，与网盘同步并行。",
     "hero_online": "{count} 台客户端在线",
     "hero_offline": "暂无客户端在线",
     "copy_dav": "复制地址",
@@ -241,12 +213,6 @@
       "root": "暴露目录",
       "online": "在线"
     },
-    "serve_state": "WebDAV",
-    "serve_running": "运行中",
-    "serve_stopped": "未运行",
-    "serve_root_label": "暴露目录",
-    "dav_url": "地址",
-    "online_short": "在线",
     "status_idle": "空闲",
     "status_syncing": "拉取中",
     "status_pulling": "拉取中",
@@ -259,7 +225,6 @@
     "no_clients_hint": "安装桌面客户端，将生成的文件同步到本地。",
     "download_client": "下载 Windows 客户端",
     "download_client_short": "下载客户端",
-    "client_rules": "拉取规则",
     "no_rules": "无规则"
   },
   "job": {
@@ -355,9 +320,7 @@
     "btn": "覆盖已有凭据"
   },
   "empty": {
-    "title": "未连接云存储",
-    "desc": "连接后可同步模型与生成结果",
-    "add_btn": "添加存储"
+    "desc": "连接后可同步模型与生成结果"
   },
   "flow": {
     "next": "下一步",
@@ -365,5 +328,28 @@
   },
   "steps": {
     "connect": "连接"
+  },
+  "settings": {
+    "title": "同步设置",
+    "min_age": {
+      "label": "同步延迟",
+      "desc": "文件修改后等待一段时间后再同步，单位秒"
+    },
+    "watch_interval": {
+      "label": "检查间隔",
+      "desc": "每隔一段时间检查一次文件变化并执行同步，单位秒"
+    },
+    "saved": "已保存",
+    "save_failed": "保存失败",
+    "discard_confirm": "同步设置已修改但未保存，确定要放弃更改吗？",
+    "discard": "放弃更改"
+  },
+  "facts": {
+    "worker": "自动同步",
+    "worker_running": "运行中",
+    "worker_stopped": "已停止",
+    "rules": "规则",
+    "storages": "存储",
+    "watch_interval": "检查间隔"
   }
 }

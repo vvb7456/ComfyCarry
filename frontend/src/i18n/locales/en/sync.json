@@ -34,15 +34,7 @@
       "reconnect": "Reconnect",
       "start": "Start auto sync"
     },
-    "worker_stop": "Stop auto sync",
-    "facts": {
-      "worker": "Auto sync",
-      "worker_running": "Running",
-      "worker_stopped": "Stopped",
-      "rules": "Rules",
-      "storages": "Storage",
-      "watch_interval": "Interval"
-    }
+    "worker_stop": "Stop auto sync"
   },
   "storage": {
     "title": "Storage",
@@ -79,8 +71,7 @@
     "authenticated": "Authenticated",
     "not_configured": "Not configured",
     "click_refresh": "Click refresh to view capacity",
-    "used": "Used",
-    "remaining": "Remaining"
+    "used": "Used"
   },
   "remote": {
     "add": "Add Storage",
@@ -175,24 +166,7 @@
     "run_ok": "Rule started. Check logs for progress",
     "run_failed": "Run failed"
   },
-  "config": {
-    "title": "Sync Settings",
-    "min_age": {
-      "label": "Sync delay",
-      "desc": "Wait a while after a file changes before syncing, in seconds"
-    },
-    "watch_interval": {
-      "label": "Check interval",
-      "desc": "Check for file changes and sync at intervals, in seconds"
-    },
-    "saved": "Saved",
-    "save_failed": "Save failed",
-    "discard_confirm": "Sync settings have been modified but not saved. Discard changes?",
-    "discard": "Discard changes"
-  },
   "worker": {
-    "running": "Running",
-    "stopped": "Stopped",
     "start_ok": "Auto sync started",
     "stop_ok": "Auto sync stopped",
     "restart_ok": "Sync Worker restarted",
@@ -229,9 +203,7 @@
     "mkdir_failed": "Failed to create directory"
   },
   "companion": {
-    "serve_title": "Transfer service",
     "clients_title": "Connected Clients",
-    "description": "Pull outputs straight to this PC, in parallel with cloud sync.",
     "hero_online": "{count} client(s) online",
     "hero_offline": "No clients online",
     "copy_dav": "Copy address",
@@ -241,12 +213,6 @@
       "root": "Serving",
       "online": "Online"
     },
-    "serve_state": "WebDAV",
-    "serve_running": "Running",
-    "serve_stopped": "Stopped",
-    "serve_root_label": "Serving",
-    "dav_url": "Address",
-    "online_short": "online",
     "status_idle": "Idle",
     "status_syncing": "Pulling",
     "status_pulling": "Pulling",
@@ -259,7 +225,6 @@
     "no_clients_hint": "Install the desktop client to sync generated files to your PC.",
     "download_client": "Download Windows Client",
     "download_client_short": "Download Client",
-    "client_rules": "Pull rules",
     "no_rules": "No rules"
   },
   "job": {
@@ -355,9 +320,7 @@
     "btn": "Overwrite Credentials"
   },
   "empty": {
-    "title": "No Cloud Storage Connected",
-    "desc": "Connect to sync models and generation outputs",
-    "add_btn": "Add Storage"
+    "desc": "Connect to sync models and generation outputs"
   },
   "flow": {
     "next": "Next",
@@ -365,5 +328,28 @@
   },
   "steps": {
     "connect": "Connect"
+  },
+  "settings": {
+    "title": "Sync Settings",
+    "min_age": {
+      "label": "Sync delay",
+      "desc": "Wait a while after a file changes before syncing, in seconds"
+    },
+    "watch_interval": {
+      "label": "Check interval",
+      "desc": "Check for file changes and sync at intervals, in seconds"
+    },
+    "saved": "Saved",
+    "save_failed": "Save failed",
+    "discard_confirm": "Sync settings have been modified but not saved. Discard changes?",
+    "discard": "Discard changes"
+  },
+  "facts": {
+    "worker": "Auto sync",
+    "worker_running": "Running",
+    "worker_stopped": "Stopped",
+    "rules": "Rules",
+    "storages": "Storage",
+    "watch_interval": "Interval"
   }
 }

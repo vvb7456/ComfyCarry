@@ -185,7 +185,7 @@ const taskFacts = computed(() => {
           {{ stateText }}
         </span>
 
-        <Badge v-if="isFavorite && installed" color="#10b981">{{ t('models.downloads.installed') }}</Badge>
+        <Badge v-if="isFavorite && installed" color="var(--green)">{{ t('models.downloads.installed') }}</Badge>
         <Badge v-if="modelType" :color="badgeColor">{{ badgeLabel }}</Badge>
         <Badge v-if="baseModelText">{{ baseModelText }}</Badge>
         <Badge v-if="isFavorite && favoriteItem?.versionName">{{ favoriteItem.versionName }}</Badge>

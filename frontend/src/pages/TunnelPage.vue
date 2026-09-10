@@ -433,7 +433,7 @@ function openAddSvc() {
       <FormField :label="t('tunnel.add_service.suffix')" density="compact">
         <input v-model="addSvcSuffix" type="text" :placeholder="t('tunnel.add_service.suffix_placeholder')" class="form-input">
         <template #below>
-          <div style="font-size:.72rem;color:var(--t3)">
+          <div class="add-svc-preview">
             {{ t('tunnel.add_service.generated_domain') }}: <code>{{ addSvcPreview }}</code>
           </div>
         </template>
@@ -464,6 +464,11 @@ function openAddSvc() {
   margin-left: 6px;
   font-size: var(--text-sm);
   font-weight: 400;
+  color: var(--t3);
+}
+
+.add-svc-preview {
+  font-size: var(--text-xs);
   color: var(--t3);
 }
 </style>

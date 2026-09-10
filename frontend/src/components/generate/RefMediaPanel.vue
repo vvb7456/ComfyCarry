@@ -223,7 +223,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         <button
           type="button"
           class="ref-tile__del"
-          :title="t('common.delete')"
+          :title="t('common.btn.delete')"
           :disabled="disabled"
           @click="removeRef(i)"
         >

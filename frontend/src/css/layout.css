@@ -524,28 +524,6 @@
             white-space: nowrap;
         }
 
-        .title-launch-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--t3);
-            text-decoration: none;
-            transition: color .15s ease, transform .15s ease;
-            vertical-align: middle;
-            margin-left: 2px;
-            padding: 0;
-            line-height: 1;
-        }
-
-        .title-launch-icon:hover {
-            color: var(--ac);
-            transform: translate(1px, -1px);
-        }
-
-        .title-launch-icon .ms {
-            font-size: 14px;
-        }
-
         .page-title-divider {
             width: 1px;
             height: 16px;
@@ -570,14 +548,6 @@
         .settings-col {
             display: grid;
             gap: clamp(16px, 1.5vw, 24px);
-        }
-
-        .settings-centered {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            max-width: 760px;
-            margin: 8px auto 0;
         }
 
         /* ── Mobile Menu ── */
@@ -618,16 +588,6 @@
             display: block
         }
 
-        /* ── Stat Grid (shared across pages: Dashboard, ComfyUI, SSH, etc.) ── */
-        /* 最小列宽用固定值而非 vw —— 内容区加了 1280px 上限后, 18vw 在宽屏上
-           会大于实际可用列宽, 导致 4 张卡被挤成 3+1 换行。 */
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: clamp(16px, 1.2vw, 24px);
-            margin-bottom: clamp(24px, 2vw, 36px)
-        }
-
         /* ── Responsive ── */
         @media(max-width:768px) {
             .mobile-menu-btn {
@@ -656,7 +616,6 @@
                 margin-left: 0 !important
             }
 
-            .stat-grid,
             .metrics-grid {
                 grid-template-columns: 1fr
             }

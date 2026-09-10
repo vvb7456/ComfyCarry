@@ -97,13 +97,13 @@ function onPathChange(e: Event) {
         >
         <BaseButton
           v-if="browsable"
-          size="xs"
+          size="sm"
           icon-only
           class="sync-rule-card__browse"
           :aria-label="t('sync.dir.browse')"
           @click="emit('browse')"
         >
-          <MsIcon name="folder_open" size="xs" />
+          <MsIcon name="folder_open" />
         </BaseButton>
       </div>
     </div>

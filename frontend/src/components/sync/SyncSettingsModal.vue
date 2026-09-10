@@ -81,10 +81,10 @@ async function onSave(): Promise<void> {
       watch_interval: watchInterval.value,
     })
     if (!d?.ok) {
-      toast(apiErrorText(d, t('sync.config.save_failed')), 'error')
+      toast(apiErrorText(d, t('sync.settings.save_failed')), 'error')
       return
     }
-    toast(t('sync.config.saved'), 'success')
+    toast(t('sync.settings.saved'), 'success')
     snapshot.value = currentSnapshot()
     emit('saved')
     emit('update:modelValue', false)
@@ -98,9 +98,9 @@ async function requestClose(): Promise<void> {
   if (saving.value) return
   if (dirty.value) {
     const r = await confirm({
-      message: t('sync.config.discard_confirm'),
+      message: t('sync.settings.discard_confirm'),
       variant: 'danger',
-      confirmText: t('sync.config.discard'),
+      confirmText: t('sync.settings.discard'),
       cancelText: t('common.btn.cancel'),
     })
     if (r !== true) return
@@ -112,7 +112,7 @@ async function requestClose(): Promise<void> {
 <template>
   <BaseModal
     :model-value="modelValue"
-    :title="t('sync.config.title')"
+    :title="t('sync.settings.title')"
     width="600px"
     :close-on-overlay="!saving"
     :close-on-esc="!saving"
@@ -136,8 +136,8 @@ async function requestClose(): Promise<void> {
     <div v-else class="settings-lines">
       <div class="settings-row">
         <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('sync.config.min_age.label') }}</div>
-          <div class="settings-row__desc">{{ t('sync.config.min_age.desc') }}</div>
+          <div class="settings-row__label">{{ t('sync.settings.min_age.label') }}</div>
+          <div class="settings-row__desc">{{ t('sync.settings.min_age.desc') }}</div>
         </div>
         <div class="settings-row__control">
           <input v-model.number="minAge" type="number" min="0" class="form-number">
@@ -145,8 +145,8 @@ async function requestClose(): Promise<void> {
       </div>
       <div class="settings-row">
         <div class="settings-row__text">
-          <div class="settings-row__label">{{ t('sync.config.watch_interval.label') }}</div>
-          <div class="settings-row__desc">{{ t('sync.config.watch_interval.desc') }}</div>
+          <div class="settings-row__label">{{ t('sync.settings.watch_interval.label') }}</div>
+          <div class="settings-row__desc">{{ t('sync.settings.watch_interval.desc') }}</div>
         </div>
         <div class="settings-row__control">
           <input v-model.number="watchInterval" type="number" min="5" class="form-number">

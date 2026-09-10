@@ -21,9 +21,7 @@
     "done": "Done"
   },
   "status": {
-    "loading": "Loading...",
-    "enabled": "Enabled",
-    "disabled": "Disabled"
+    "loading": "Loading..."
   },
   "sidebar": {
     "toggle": "Collapse/Expand"

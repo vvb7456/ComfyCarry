@@ -311,8 +311,7 @@
     "size_lg": "大图",
     "no_records": "暂无生成记录",
     "record_count": "共 {count} 条记录",
-    "no_preview": "无预览图",
-    "image_count": "{count}张"
+    "no_preview": "无预览图"
   },
   "status": {
     "generating": "正在生成",

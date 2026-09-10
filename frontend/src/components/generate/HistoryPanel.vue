@@ -318,7 +318,7 @@ defineExpose({ setupObserver })
           </span>
           <BaseButton
             v-if="item.images?.length"
-            size="xs"
+            size="sm"
             icon-only
             :aria-label="t('common.btn.download')"
             :title="t('common.btn.download')"

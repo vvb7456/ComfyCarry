@@ -311,8 +311,7 @@
     "size_lg": "Large",
     "no_records": "No generation records",
     "record_count": "{count} records",
-    "no_preview": "No preview",
-    "image_count": "{count} images"
+    "no_preview": "No preview"
   },
   "status": {
     "generating": "Generating",
