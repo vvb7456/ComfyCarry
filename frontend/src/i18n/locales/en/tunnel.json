@@ -1,5 +1,33 @@
 {
   "title": "Tunnel",
+  "hero": {
+    "unconfigured": {
+      "title": "Tunnel not connected",
+      "subtitle": "Configure a tunnel to reach ComfyUI, Jupyter, and SSH over the public internet."
+    },
+    "connecting": {
+      "title": "Connecting tunnel",
+      "subtitle": "Establishing the public connection."
+    },
+    "online": {
+      "title": "Tunnel connected",
+      "subtitle": "Public entry points ready for {count} services."
+    },
+    "stopped": {
+      "title": "Tunnel stopped",
+      "subtitle": "Public entry points are temporarily unavailable."
+    },
+    "failed": {
+      "title": "Tunnel connection failed",
+      "subtitle": "Connection error. See the Tunnel logs for details."
+    },
+    "action": {
+      "connect_public": "Connect Public Node",
+      "connect_custom": "Use Custom Tunnel",
+      "start": "Start Tunnel",
+      "retry": "Retry"
+    }
+  },
   "tabs": {
     "status": "Service & Logs",
     "config": "Configuration"
@@ -12,13 +40,25 @@
     "no_connection": "No connection",
     "unconfigured": "Not configured"
   },
+  "facts": {
+    "mode": "Mode",
+    "mode_public": "Public Node",
+    "mode_custom": "Custom",
+    "tunnel_id": "Tunnel ID",
+    "node": "Node"
+  },
   "services": {
     "title": "Services",
     "node": "Node",
     "click_copy": "Click to copy",
     "custom_badge": "Custom",
     "add_service": "Add Service",
-    "route_ready": "Route ready"
+    "route_ready": "Route ready",
+    "open": "Open {name}",
+    "copy_addr": "Copy {name} address",
+    "copy_ssh": "Copy SSH command",
+    "remove": "Remove {name}",
+    "empty": "No services"
   },
   "log": {
     "title": "Tunnel Logs"
@@ -111,6 +151,8 @@
     "remove_failed": "Remove failed",
     "cf_stopped": "CloudFlared stopped",
     "stop_failed": "Stop failed",
+    "start_failed": "Start failed",
+    "restart_failed": "Restart failed",
     "cf_starting": "cloudflared starting",
     "cf_restarting": "cloudflared restarting",
     "service_added": "Service added",
@@ -130,6 +172,48 @@
     "remove_custom_service": "Remove custom service \"{suffix}\"?",
     "stop_cloudflared": "Stop cloudflared?\n\nAll connections through the Tunnel will be disconnected.",
     "restart_cloudflared": "Restart cloudflared?\n\nConnections may be briefly interrupted."
+  },
+  "settings": {
+    "title": "Tunnel Settings",
+    "mode": {
+      "label": "Mode",
+      "desc": "Public uses a built-in domain; custom uses your own domain",
+      "off": "Off",
+      "public": "Public",
+      "custom": "Custom"
+    },
+    "subdomain": "Subdomain",
+    "root_domain": "Root domain",
+    "subdomain_desc": "Prefix of the access URL",
+    "subdomain_placeholder": "Auto-generated if empty",
+    "custom_subdomain_desc": "Prefix of the access URL",
+    "root_domain_desc": "Main domain of the access URL",
+    "root_domain_placeholder": "example.com",
+    "token_label": "API Token",
+    "token_desc": "Creates the tunnel and DNS records",
+    "token_placeholder": "Paste API Token",
+    "subdomain_error": "Invalid subdomain format",
+    "protocol": "Transport protocol",
+    "protocol_desc": "Connection to the Cloudflare edge",
+    "protocol_auto": "Auto",
+    "validate": "Validate",
+    "validating": "Validating",
+    "validate_failed": "Validation failed",
+    "need_token_domain": "API Token and domain are required",
+    "enabling_public": "Enabling public tunnel...",
+    "enable_failed": "Failed to enable",
+    "applying": "Applying configuration...",
+    "applied": "Configuration applied",
+    "save_failed": "Save failed",
+    "discard": "Discard",
+    "discard_confirm": "Settings have unsaved changes. Discard them?",
+    "confirm": {
+      "off": "Turn off the tunnel? Existing tunnel and DNS mappings will be removed.",
+      "destroy_to_public": "Switching to the public tunnel will remove the current custom tunnel. Continue?",
+      "update_restart": "The tunnel will be rebuilt with the new parameters and restarted. Continue?"
+    },
+    "root_domain_help": "Must be hosted on Cloudflare",
+    "token_help": "Requires Tunnel and DNS edit permissions"
   },
   "msg": {
     "token_valid": "Token verified"

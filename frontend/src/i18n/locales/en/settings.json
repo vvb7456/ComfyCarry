@@ -13,8 +13,7 @@
     "prompt": "Prompt Editor",
     "llm": "LLM Service",
     "civitai": "CivitAI",
-    "sync": "Cloud Sync",
-    "tunnel": "Tunnel"
+    "sync": "Cloud Sync"
   },
   "unsaved": {
     "title": "Unsaved changes",
@@ -160,45 +159,6 @@
     "key_desc_suffix": "; used for model search and downloads"
   },
   "sync": {},
-  "tunnel": {
-    "mode": {
-      "label": "Mode",
-      "off": "Off",
-      "public": "Public",
-      "custom": "Custom",
-      "desc": "Public uses a built-in domain; custom uses your own domain"
-    },
-    "subdomain": "Subdomain",
-    "root_domain": "Root domain",
-    "subdomain_error": "Invalid subdomain format",
-    "token_placeholder": "Paste API Token",
-    "protocol": "Transport protocol",
-    "protocol_auto": "Auto",
-    "validate": "Validate",
-    "validating": "Validating",
-    "validate_failed": "Validation failed",
-    "need_token_domain": "API Token and domain are required",
-    "enabling_public": "Enabling public tunnel...",
-    "enable_failed": "Failed to enable",
-    "applying": "Applying configuration...",
-    "applied": "Configuration applied",
-    "save_failed": "Save failed",
-    "confirm": {
-      "off": "Turn off the tunnel? Existing tunnel and DNS mappings will be removed.",
-      "destroy_to_public": "Switching to the public tunnel will remove the current custom tunnel. Continue?",
-      "update_restart": "The tunnel will be rebuilt with the new parameters and restarted. Continue?"
-    },
-    "subdomain_desc": "Prefix of the access URL",
-    "subdomain_placeholder": "Auto-generated if empty",
-    "custom_subdomain_desc": "Prefix of the access URL",
-    "root_domain_desc": "Main domain of the access URL",
-    "root_domain_placeholder": "example.com",
-    "token_label": "API Token",
-    "token_desc": "Creates the tunnel and DNS records",
-    "protocol_desc": "Connection to the Cloudflare edge",
-    "root_domain_help": "Must be hosted on Cloudflare",
-    "token_help": "Requires Tunnel and DNS edit permissions"
-  },
   "llm": {
     "provider": {
       "help": "Official entries use preset endpoints; for third-party endpoints, choose the matching custom entry.",

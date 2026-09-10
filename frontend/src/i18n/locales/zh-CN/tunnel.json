@@ -1,5 +1,33 @@
 {
   "title": "隧道",
+  "hero": {
+    "unconfigured": {
+      "title": "尚未连接隧道",
+      "subtitle": "配置隧道后，可通过公网访问 ComfyUI、Jupyter 和 SSH。"
+    },
+    "connecting": {
+      "title": "正在连接隧道",
+      "subtitle": "正在建立公网连接。"
+    },
+    "online": {
+      "title": "隧道已连接",
+      "subtitle": "已为 {count} 项服务建立公网入口。"
+    },
+    "stopped": {
+      "title": "隧道已停止",
+      "subtitle": "公网入口暂时不可用。"
+    },
+    "failed": {
+      "title": "隧道连接失败",
+      "subtitle": "连接异常，详情见 Tunnel 日志。"
+    },
+    "action": {
+      "connect_public": "连接公共节点",
+      "connect_custom": "使用自定义隧道",
+      "start": "启动隧道",
+      "retry": "重试"
+    }
+  },
   "tabs": {
     "status": "服务 & 日志",
     "config": "配置"
@@ -12,13 +40,25 @@
     "no_connection": "无连接",
     "unconfigured": "未配置"
   },
+  "facts": {
+    "mode": "模式",
+    "mode_public": "公共节点",
+    "mode_custom": "自定义",
+    "tunnel_id": "隧道标识",
+    "node": "连接节点"
+  },
   "services": {
     "title": "服务",
     "node": "节点",
     "click_copy": "点击复制",
     "custom_badge": "自定义",
     "add_service": "添加服务",
-    "route_ready": "路由就绪"
+    "route_ready": "路由就绪",
+    "open": "打开 {name}",
+    "copy_addr": "复制 {name} 地址",
+    "copy_ssh": "复制 SSH 连接命令",
+    "remove": "移除 {name}",
+    "empty": "暂无服务"
   },
   "log": {
     "title": "Tunnel 日志"
@@ -111,6 +151,8 @@
     "remove_failed": "移除失败",
     "cf_stopped": "CloudFlared 已停止",
     "stop_failed": "停止失败",
+    "start_failed": "启动失败",
+    "restart_failed": "重启失败",
     "cf_starting": "cloudflared 正在启动",
     "cf_restarting": "cloudflared 正在重启",
     "service_added": "服务已添加",
@@ -130,6 +172,48 @@
     "remove_custom_service": "确定要移除自定义服务「{suffix}」吗？",
     "stop_cloudflared": "确定要停止 cloudflared 吗？\n\n所有通过 Tunnel 的连接将断开。",
     "restart_cloudflared": "确定要重启 cloudflared 吗？\n\n连接可能会短暂中断。"
+  },
+  "settings": {
+    "title": "隧道设置",
+    "mode": {
+      "label": "模式",
+      "desc": "公共模式使用内置域名，自定义模式使用自有域名",
+      "off": "关闭",
+      "public": "公共",
+      "custom": "自定义"
+    },
+    "subdomain": "子域名",
+    "root_domain": "根域名",
+    "subdomain_desc": "访问地址的前缀",
+    "subdomain_placeholder": "留空自动生成",
+    "custom_subdomain_desc": "访问地址的前缀",
+    "root_domain_desc": "访问地址的主域",
+    "root_domain_placeholder": "example.com",
+    "token_label": "API Token",
+    "token_desc": "用于创建隧道与域名解析",
+    "token_placeholder": "粘贴 API Token",
+    "subdomain_error": "子域名格式无效",
+    "protocol": "传输协议",
+    "protocol_desc": "与 Cloudflare 边缘的连接方式",
+    "protocol_auto": "自动",
+    "validate": "验证",
+    "validating": "验证中",
+    "validate_failed": "验证失败",
+    "need_token_domain": "请填写 API Token 与域名",
+    "enabling_public": "正在启用公共 Tunnel...",
+    "enable_failed": "启用失败",
+    "applying": "正在应用配置...",
+    "applied": "配置已生效",
+    "save_failed": "保存失败",
+    "discard": "放弃更改",
+    "discard_confirm": "设置尚未保存，确定要放弃更改吗？",
+    "confirm": {
+      "off": "确定要关闭 Tunnel 吗？现有隧道与域名映射将被移除。",
+      "destroy_to_public": "切换到公共 Tunnel 将移除当前自定义隧道，继续吗？",
+      "update_restart": "将使用新参数重建隧道并重启，继续吗？"
+    },
+    "root_domain_help": "需已在 Cloudflare 托管",
+    "token_help": "需具有 Tunnel 与 DNS 的编辑权限"
   },
   "msg": {
     "token_valid": "Token 验证通过"

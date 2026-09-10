@@ -13,8 +13,7 @@
     "prompt": "提示词编辑器",
     "llm": "LLM 服务",
     "civitai": "CivitAI",
-    "sync": "云同步",
-    "tunnel": "隧道"
+    "sync": "云同步"
   },
   "unsaved": {
     "title": "未保存的更改",
@@ -160,45 +159,6 @@
     }
   },
   "sync": {},
-  "tunnel": {
-    "mode": {
-      "label": "模式",
-      "desc": "公共模式使用内置域名，自定义模式使用自有域名",
-      "off": "关闭",
-      "public": "公共",
-      "custom": "自定义"
-    },
-    "subdomain": "子域名",
-    "root_domain": "根域名",
-    "subdomain_desc": "访问地址的前缀",
-    "subdomain_placeholder": "留空自动生成",
-    "custom_subdomain_desc": "访问地址的前缀",
-    "root_domain_desc": "访问地址的主域",
-    "root_domain_placeholder": "example.com",
-    "token_label": "API Token",
-    "token_desc": "用于创建隧道与域名解析",
-    "token_placeholder": "粘贴 API Token",
-    "subdomain_error": "子域名格式无效",
-    "protocol": "传输协议",
-    "protocol_desc": "与 Cloudflare 边缘的连接方式",
-    "protocol_auto": "自动",
-    "validate": "验证",
-    "validating": "验证中",
-    "validate_failed": "验证失败",
-    "need_token_domain": "请填写 API Token 与域名",
-    "enabling_public": "正在启用公共 Tunnel...",
-    "enable_failed": "启用失败",
-    "applying": "正在应用配置...",
-    "applied": "配置已生效",
-    "save_failed": "保存失败",
-    "confirm": {
-      "off": "确定要关闭 Tunnel 吗？现有隧道与域名映射将被移除。",
-      "destroy_to_public": "切换到公共 Tunnel 将移除当前自定义隧道，继续吗？",
-      "update_restart": "将使用新参数重建隧道并重启，继续吗？"
-    },
-    "root_domain_help": "需已在 Cloudflare 托管",
-    "token_help": "需具有 Tunnel 与 DNS 的编辑权限"
-  },
   "llm": {
     "provider": {
       "help": "官方项使用预设地址；第三方端点请选择与其接口一致的自定义项。",
