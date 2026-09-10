@@ -1,340 +1,169 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+/**
+ * VersionCard — 「版本与启动」分区的只读展示 (C08, 需求 8.1)。
+ *
+ * 两行: 当前版本 (release / nightly 分类 + 切换入口) 与一行启动命令 (复制)。
+ * 版本切换进入 VersionSwitchModal; 启动命令由主页按已保存配置生成后传入。
+ */
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useApiFetch } from '@/composables/useApiFetch'
-import { useToast } from '@/composables/useToast'
-import { useConfirm } from '@/composables/useConfirm'
-import { apiMessageText, apiWarningText, apiErrorText } from '@/utils/apiError'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
-import Spinner from '@/components/ui/Spinner.vue'
-import BaseSelect, { type SelectOption } from '@/components/form/BaseSelect.vue'
-import type {
-  ComfyVersionsResponse, ComfyVersionSwitchResponse,
-} from '@/types/comfyui'
-import type { ConfirmResult } from '@/composables/useConfirm'
+import VersionSwitchModal from './VersionSwitchModal.vue'
+import { useApiFetch } from '@/composables/useApiFetch'
+import { useClipboard } from '@/composables/useClipboard'
+import type { ComfyVersionsResponse } from '@/types/comfyui'
 
 defineOptions({ name: 'VersionCard' })
 
-const props = defineProps<{ active?: boolean }>()
+const props = defineProps<{ command: string }>()
+
+const emit = defineEmits<{ switched: [] }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const { get, post } = useApiFetch()
-const { toast } = useToast()
-const { confirm } = useConfirm()
+const { get } = useApiFetch()
+const { copy } = useClipboard()
 
-const versions = ref<string[]>([])
 const currentVersion = ref<string | null>(null)
-const latestVersion = ref<string | null>(null)
 const hasGit = ref(true)
-const versionsLoading = ref(false)
-const switching = ref(false)
-const switchTarget = ref<string | null>(null)
-const selectedVersion = ref('')
-const loaded = ref(false)
+const switchingOpen = ref(false)
 
 const currentIsNightly = computed(() => currentVersion.value === 'nightly')
 const currentIsRelease = computed(() => /^v\d+\.\d+\.\d+$/.test(currentVersion.value || ''))
-const currentIsCustom = computed(() => {
-  const current = currentVersion.value
-  return !!current && current !== 'nightly' && !/^v\d+\.\d+\.\d+$/.test(current)
-})
 
-/**
- * Keep every switch target in one searchable menu. Group metadata is rendered
- * by BaseSelect as non-clickable headings, so stable/nightly/history stay
- * visually distinct without taking up separate cards or a paginated list.
- */
-const versionOptions = computed<SelectOption[]>(() => {
-  const options: SelectOption[] = []
-
-  if (latestVersion.value) {
-    options.push({
-      value: latestVersion.value,
-      label: latestVersion.value,
-      group: t('comfyui.settings.stable_channel'),
-      hint: currentVersion.value === latestVersion.value
-        ? t('comfyui.settings.current')
-        : t('comfyui.settings.recommended'),
-      icon: 'verified',
-    })
-  }
-
-  options.push({
-    value: 'nightly',
-    label: 'nightly',
-    group: t('comfyui.settings.nightly_channel'),
-    hint: currentVersion.value === 'nightly'
-      ? t('comfyui.settings.current')
-      : t('comfyui.settings.unstable'),
-    icon: 'experiment',
-  })
-
-  const historical = versions.value.filter(v => v !== latestVersion.value && v !== 'nightly')
-  historical.forEach((version) => {
-    options.push({
-      value: version,
-      label: version,
-      group: t('comfyui.settings.other_versions'),
-      hint: currentVersion.value === version ? t('comfyui.settings.current') : undefined,
-    })
-  })
-
-  // A detached commit/hash cannot be selected as a checkout target, but it
-  // should still be represented when it is the active build so the select
-  // remains truthful instead of showing an unexplained empty value.
-  const current = currentVersion.value
-  if (current && currentIsCustom.value && !options.some(o => o.value === current)) {
-    options.push({
-      value: current,
-      label: current,
-      group: t('comfyui.settings.current_version'),
-      hint: t('comfyui.settings.custom_build'),
-      disabled: true,
-      icon: 'deployed_code',
-    })
-  }
-
-  return options
-})
-
-const selectedIsCurrent = computed(() => !!selectedVersion.value && selectedVersion.value === currentVersion.value)
 async function loadVersions() {
-  if (versionsLoading.value) return
-  versionsLoading.value = true
-  try {
-    const d = await get<ComfyVersionsResponse>('/api/comfyui/versions')
-    if (d) {
-      versions.value = d.versions || []
-      currentVersion.value = d.current
-      latestVersion.value = d.latest
-      hasGit.value = d.has_git
-      // Keep the select anchored to the active build after refresh/switch.
-      selectedVersion.value = d.current || ''
-      loaded.value = true
-    }
-  } finally {
-    versionsLoading.value = false
-  }
+  const d = await get<ComfyVersionsResponse>('/api/comfyui/versions')
+  if (!d) return
+  currentVersion.value = d.current
+  hasGit.value = d.has_git
 }
 
-function activateWorkspace() {
-  if (props.active && !loaded.value) loadVersions()
+onMounted(loadVersions)
+
+function onSwitched() {
+  void loadVersions()
+  emit('switched')
 }
 
-onMounted(activateWorkspace)
-watch(() => props.active, activateWorkspace)
-
-async function switchVersion(tag: string) {
-  const confirmMsg = tag === 'nightly'
-    ? t('comfyui.settings.switch_confirm_nightly')
-    : t('comfyui.settings.switch_confirm', { version: tag })
-  const result: ConfirmResult = await confirm({
-    message: confirmMsg,
-    confirmText: t('comfyui.settings.switch_only'),
-    altText: t('comfyui.settings.switch_and_install'),
-    altVariant: 'primary',
-  })
-  if (!result) {
-    selectedVersion.value = currentVersion.value || ''
-    return
-  }
-
-  switching.value = true
-  switchTarget.value = tag
-  let applied = false
-  try {
-    const d = await post<ComfyVersionSwitchResponse>('/api/comfyui/switch', {
-      version: tag,
-      install_deps: result === 'alt',
-    })
-    if (d?.ok) {
-      applied = true
-      toast(apiMessageText(d, t('comfyui.settings.switch_success')), 'success')
-      const warnText = apiWarningText(d)
-      if (warnText) toast(warnText, 'warning')
-      currentVersion.value = d.current || tag
-      await loadVersions()
-    } else {
-      toast(apiErrorText(d, t('comfyui.settings.switch_failed')), 'error')
-    }
-  } finally {
-    if (!applied) selectedVersion.value = currentVersion.value || ''
-    switching.value = false
-    switchTarget.value = null
-  }
-}
-
-function switchSelectedVersion() {
-  if (!selectedVersion.value || selectedIsCurrent.value) return
-  switchVersion(selectedVersion.value)
+function copyCommand() {
+  if (props.command) void copy(props.command)
 }
 </script>
 
 <template>
-  <div class="version-control">
-    <div v-if="versionsLoading && !loaded" class="version-loading">
-      <Spinner size="sm" />
-      <span>{{ t('common.status.loading') }}</span>
+  <div class="version-block">
+    <div class="version-row">
+      <span class="version-row__k">{{ t('comfyui.version.current') }}</span>
+      <span class="version-row__v">
+        <b>{{ currentVersion || 'unknown' }}</b>
+        <Badge v-if="currentIsNightly" tone="caution">nightly</Badge>
+        <Badge v-else-if="currentIsRelease" tone="neutral">release</Badge>
+      </span>
+      <div class="version-row__actions">
+        <BaseButton
+          size="sm"
+          :disabled="!hasGit"
+          @click="switchingOpen = true"
+        >
+          <MsIcon name="swap_horiz" size="xs" /> {{ t('comfyui.version.switch') }}
+        </BaseButton>
+      </div>
     </div>
 
-    <AlertBanner v-else-if="!hasGit" tone="danger" icon="error">
+    <div class="version-row">
+      <span class="version-row__k">{{ t('comfyui.version.command') }}</span>
+      <code class="version-row__code">{{ command || '—' }}</code>
+      <div class="version-row__actions">
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          icon-only
+          :aria-label="t('comfyui.version.copy_command')"
+          :disabled="!command"
+          @click="copyCommand"
+        >
+          <MsIcon name="content_copy" />
+        </BaseButton>
+      </div>
+    </div>
+
+    <AlertBanner v-if="!hasGit" tone="danger" icon="error" dense class="version-block__banner">
       {{ t('comfyui.settings.no_git') }}
     </AlertBanner>
 
-    <template v-else-if="loaded">
-      <div class="version-control__summary">
-        <div class="version-control__heading">
-          <span class="version-control__icon"><MsIcon name="deployed_code" /></span>
-          <h3>{{ t('comfyui.settings.current_version') }}</h3>
-        </div>
-        <span class="version-control__current">
-          <strong>{{ currentVersion || 'unknown' }}</strong>
-          <Badge v-if="currentIsNightly" tone="caution">nightly</Badge>
-          <Badge v-else-if="currentIsRelease" tone="neutral">release</Badge>
-        </span>
-      </div>
-
-      <div class="version-control__actions">
-        <BaseSelect
-          v-model="selectedVersion"
-          class="version-control__select"
-          :options="versionOptions"
-          :placeholder="t('comfyui.settings.channels_title')"
-          :search-placeholder="t('comfyui.settings.available_versions')"
-          :empty-text="t('comfyui.settings.no_versions')"
-          :max-list-height="240"
-          searchable
-          teleport
-          :disabled="switching"
-        />
-        <BaseButton
-          variant="primary"
-          :loading="!!switchTarget && switchTarget === selectedVersion"
-          :disabled="!selectedVersion || selectedIsCurrent || switching"
-          @click="switchSelectedVersion"
-        >
-          <MsIcon name="swap_horiz" size="xs" /> {{ t('comfyui.settings.switch') }}
-        </BaseButton>
-        <BaseButton
-          square
-          :loading="versionsLoading"
-          :disabled="switching"
-          :aria-label="t('plugins.installed.refresh')"
-          :title="t('plugins.installed.refresh')"
-          @click="loadVersions"
-        >
-          <MsIcon name="refresh" size="xs" />
-        </BaseButton>
-      </div>
-    </template>
+    <VersionSwitchModal v-model="switchingOpen" @saved="onSwitched" />
   </div>
 </template>
 
 <style scoped>
-.version-control {
+.version-block {
   display: grid;
-  gap: var(--sp-3);
-  min-width: 0;
 }
 
-.version-loading {
-  display: flex;
+.version-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
-  justify-content: center;
-  gap: var(--sp-3);
-  min-height: 104px;
+  padding: 14px 0;
+}
+
+.version-row + .version-row {
+  border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
+}
+
+.version-row__k {
   color: var(--t3);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
-.version-control__summary,
-.version-control__current,
-.version-control__actions {
+.version-row__v {
   display: flex;
   align-items: center;
-}
-
-.version-control__summary {
-  display: grid;
-  align-items: stretch;
-  gap: 0;
-}
-
-.version-control__heading {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding-bottom: var(--sp-4);
-  margin-bottom: var(--sp-3);
-  border-bottom: 1px solid var(--bd);
-}
-
-.version-control__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  color: var(--ac);
-  background: color-mix(in srgb, var(--ac) 10%, var(--bg3));
-  border-radius: var(--r-md);
-}
-
-.version-control__icon :deep(.ms) { font-size: 20px; }
-
-.version-control__heading h3 {
-  margin: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
   color: var(--t1);
   font-size: var(--text-md);
   font-weight: 600;
 }
 
-.version-control__current {
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  min-width: 0;
-  padding-top: 2px;
-}
-
-.version-control__current strong {
+.version-row__v b {
+  font-family: var(--font-mono);
   overflow: hidden;
-  color: var(--t1);
-  font-family: var(--font-mono, monospace);
-  font-size: var(--text-sm);
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.version-control__actions {
-  gap: var(--sp-3);
-}
-
-.version-control__select {
-  flex: 1;
+.version-row__code {
   min-width: 0;
+  color: var(--t2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
-.version-control__actions > :deep(.base-btn) {
-  flex-shrink: 0;
+.version-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.version-block__banner {
+  margin-top: var(--sp-2);
 }
 
 @media (max-width: 600px) {
-  .version-control__actions {
-    display: grid;
+  .version-row {
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
 
-  .version-control__select {
+  .version-row__k {
     grid-column: 1 / -1;
-  }
-
-  .version-control__actions > :deep(.base-btn:not(.base-btn--square)) {
-    width: 100%;
   }
 }
 </style>

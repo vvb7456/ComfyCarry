@@ -33,6 +33,7 @@
     "enable": "Enable",
     "disable": "Disable",
     "version": "Version",
+    "remove": "Uninstall",
     "load_failed": "Failed to load installed list",
     "stats_text": "{total} plugins, {enabled} enabled, {update} updates | Showing {shown}",
     "no_match": "No matching plugins",

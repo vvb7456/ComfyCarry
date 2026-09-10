@@ -1,42 +1,91 @@
 {
   "title": "ComfyUI",
-  "open": "Open ComfyUI",
   "tabs": {
-    "overview": "Runtime",
-    "settings": "Configuration & Version",
-    "plugins": "Plugin Manager"
+    "run": "Runtime",
+    "plugins": "Plugins"
   },
-  "overview": {
-    "runtime": "Runtime",
-    "environment": "Environment",
-    "queue": "Task Queue",
-    "queue_idle": "Queue idle",
-    "queue_summary": "{running} running · {pending} pending",
-    "uptime_summary": "Up {uptime} · {count} restarts",
-    "current_execution": "Current Task"
+  "hero": {
+    "idle": {
+      "title": "ComfyUI is running",
+      "subtitle": "Idle, waiting for tasks."
+    },
+    "executing": {
+      "title": "ComfyUI is running",
+      "subtitle": "Executing the current task.",
+      "subtitle_pending": "Executing a task, with {count} more in the queue."
+    },
+    "starting": {
+      "title": "ComfyUI is starting",
+      "subtitle": "Starting…"
+    },
+    "stopped": {
+      "title": "ComfyUI is stopped",
+      "subtitle": "Service stopped. Start it to open the Web UI in your browser."
+    },
+    "failed": {
+      "title": "ComfyUI failed",
+      "subtitle": "The process exited unexpectedly. See the ComfyUI logs for details."
+    },
+    "action": {
+      "open": "Open ComfyUI",
+      "interrupt": "Interrupt",
+      "start": "Start ComfyUI",
+      "retry": "Retry"
+    }
   },
-  "console": {
-    "params": "Launch Parameters",
-    "params_placeholder": "main.py --listen 0.0.0.0 --port 8188 ...",
-    "params_loading": "Loading...",
-    "log_title": "ComfyUI Logs",
-    "saved": "Saved",
-    "saved_restarting": "Saved, ComfyUI is restarting",
-    "uptime": "Uptime",
-    "restart_count": "Restarts: {count}",
-    "params_save_confirm": "Saving params will restart ComfyUI, continue?",
-    "params_restart_hint": "Changes to launch parameters take effect only after ComfyUI restarts.",
-    "params_saving": "Saving...",
-    "params_restart_toast": "ComfyUI is restarting with new params...",
-    "params_save_failed": "Save failed",
-    "unsaved_changes": "Unsaved changes. Save and restart ComfyUI to apply.",
-    "unsaved_confirm_title": "Unsaved changes",
-    "unsaved_confirm_msg": "Launch parameters have been modified but not saved. Choose an action to proceed:",
-    "unsaved_confirm_save_restart": "Save & Restart",
-    "unsaved_confirm_discard": "Discard changes",
-    "unsaved_confirm_cancel": "Stay on this tab"
+  "facts": {
+    "port": "Port",
+    "address": "Address",
+    "version": "Version",
+    "queue": "Queue"
+  },
+  "sections": {
+    "current_execution": "Current Execution",
+    "gpu": "GPU",
+    "version": "Version & Launch",
+    "log": "ComfyUI Logs"
+  },
+  "exec": {
+    "queue_waiting": "{count} waiting"
+  },
+  "gpu": {
+    "empty": "No GPU detected",
+    "utilization": "Utilization",
+    "memory": "Memory",
+    "temperature": "Temperature",
+    "power": "Power",
+    "clock": "Core clock",
+    "free": "Free",
+    "fan": "Fan speed",
+    "limit": "Limit"
+  },
+  "version": {
+    "current": "Current Version",
+    "command": "Launch Command",
+    "switch": "Switch Version",
+    "copy_command": "Copy launch command",
+    "switch_title": "Switch ComfyUI Version"
   },
   "params": {
+    "title": "Launch Parameters",
+    "loading": "Loading...",
+    "changed": "{count} changed",
+    "unchanged": "No changes",
+    "discard": "Discard Changes",
+    "save_restart": "Save & Restart",
+    "save_confirm": "Saving params will restart ComfyUI, continue?",
+    "restart_toast": "ComfyUI is restarting with new params...",
+    "save_failed": "Save failed",
+    "discard_confirm": "Launch parameters have been modified. Discard the changes?",
+    "extra_args": "Additional CLI Arguments",
+    "extra_args_desc": "Only add arguments not covered above. Structured settings are merged automatically.",
+    "extra_args_placeholder": "For example: --disable-metadata --dont-print-server",
+    "groups": {
+      "vram": "VRAM & Memory",
+      "precision": "Precision",
+      "speed": "Speed & Cache",
+      "misc": "Other"
+    },
     "fields": {
       "vram": {
         "label": "VRAM Management",
@@ -266,8 +315,6 @@
     "image_count": "{count} images"
   },
   "status": {
-    "running": "Running",
-    "stopped": "Stopped",
     "generating": "Generating",
     "idle": "Idle"
   },
@@ -284,30 +331,13 @@
     "switch_confirm_nightly": "Switch to nightly (master)? This is a development version and may be unstable.",
     "switch_success": "Version switched successfully",
     "switch_failed": "Version switch failed",
-    "extra_args": "Additional CLI Arguments",
-    "extra_args_desc": "Only add arguments not covered above. Structured settings are merged automatically.",
-    "extra_args_placeholder": "For example: --disable-metadata --dont-print-server",
-    "command_preview": "Launch command",
-    "save_restart": "Save & Restart",
     "current_version": "Current Version",
     "custom_build": "Custom commit",
     "channels_title": "Choose an Update Channel",
     "recommended": "Recommended",
     "stable_channel": "Latest Stable",
     "nightly_channel": "Nightly",
-    "switch_to": "Switch to {version}",
-    "use_nightly": "Switch to nightly",
-    "other_versions": "Other Stable Releases",
-    "groups": {
-      "memory": "Memory & Performance",
-      "precision": "Precision",
-      "cache": "Cache",
-      "preview": "Preview",
-      "attention": "Attention",
-      "output": "Output",
-      "disk": "Memory & Disk",
-      "network": "Network & Upload"
-    }
+    "other_versions": "Other Stable Releases"
   },
   "plugins": {
     "offline_title": "ComfyUI is stopped",

@@ -311,7 +311,9 @@ async function restartNow() {
           </span>
         </template>
         <template #end>
-          <BaseButton size="sm" :disabled="loading" @click="() => loadData()">{{ t('plugins.installed.refresh') }}</BaseButton>
+          <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('plugins.installed.refresh')" :disabled="loading" @click="() => loadData()">
+            <MsIcon name="refresh" />
+          </BaseButton>
           <BaseButton size="sm" @click="gitModalOpen = true"><MsIcon name="link" /> {{ t('plugins.tabs.git') }}</BaseButton>
           <BaseSelect v-model="statusFilter" :options="[
             { value: 'all', label: t('plugins.installed.all_status') },
@@ -332,7 +334,7 @@ async function restartNow() {
     <AlertBanner v-if="error" tone="danger" dense>{{ error }}</AlertBanner>
     <LoadingCenter v-if="loading && unifiedPlugins.length === 0">{{ t('common.status.loading') }}</LoadingCenter>
     <EmptyState v-else-if="currentPage.length === 0" icon="search_off" :message="t('plugins.installed.no_match')" />
-    <div v-else class="plugin-list">
+    <ul v-else class="list-plain">
       <PluginCard
         v-for="p in currentPage"
         :key="p.id"
@@ -346,7 +348,7 @@ async function restartNow() {
         @toggle="togglePlugin(p)"
         @version="openVersionModal(p.id, p.title)"
       />
-    </div>
+    </ul>
     <div ref="listEndEl" class="plugins-list-end" />
   </template>
 
@@ -365,7 +367,6 @@ async function restartNow() {
 </template>
 
 <style scoped>
-.plugin-list { display: flex; flex-direction: column; }
 .plugins-list-end { height: 1px; }
 .version-list { max-height: 50vh; overflow-y: auto; }
 .version-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--bd); font-size: .88rem; }

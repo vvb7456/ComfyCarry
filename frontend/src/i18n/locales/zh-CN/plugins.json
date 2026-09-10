@@ -33,6 +33,7 @@
     "enable": "启用",
     "disable": "禁用",
     "version": "版本",
+    "remove": "卸载",
     "load_failed": "获取已安装列表失败",
     "stats_text": "共 {total} 个插件，{enabled} 个启用，{update} 个有更新 | 显示 {shown} 个",
     "no_match": "没有匹配的插件",

@@ -1,8 +1,15 @@
 <script setup lang="ts">
+/**
+ * PluginCard — 插件对象行 (C08, 需求 8.3)。
+ *
+ * 对齐 ListRow 骨架: 图标 + 主行 (名称链接 / 分类徽章) + 描述 + 事实行 + 行尾纯图标操作。
+ * 危险操作 (删除) 置于末位; 进行中的操作转 spinner 并禁用其余按钮。
+ */
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import { useI18n } from 'vue-i18n'
+import Badge from '@/components/ui/Badge.vue'
 import type { PluginData } from '@/types/plugins'
 
 defineOptions({ name: 'PluginCard' })
@@ -16,6 +23,7 @@ const props = defineProps<{
   /** 有变更待重启生效 */
   pending?: boolean
 }>()
+
 const emit = defineEmits<{
   install: []
   uninstall: []
@@ -42,72 +50,235 @@ function displayVersion(): string {
   }
   return p.registryVersion || ''
 }
+
+const facts = computed<string[]>(() => {
+  const p = props.plugin
+  const out: string[] = []
+  const source = p.id || p.dirName
+  if (source) out.push(source)
+  const version = displayVersion()
+  if (version) {
+    out.push(p.installed && p.activeVersion === 'nightly' ? version : `v${version}`)
+  }
+  if (p.cnrLatest && p.installed && p.cnrLatest !== version) out.push(`latest ${p.cnrLatest}`)
+  if ((p.stars ?? 0) > 0) out.push(`${p.stars}`)
+  if (p.author) out.push(p.author)
+  if (p.lastUpdate && !p.installed) out.push(p.lastUpdate.slice(0, 10))
+  return out
+})
 </script>
 
 <template>
-  <div class="plugin-item">
-    <div class="plugin-item-header">
-      <div class="plugin-item-title text-truncate">
-        <a v-if="plugin.repository" :href="plugin.repository" target="_blank">{{ plugin.title }}</a>
-        <span v-else>{{ plugin.title }}</span>
-      </div>
-      <span v-if="pending" class="plugin-badge pending">{{ t('plugins.restart.pending_badge') }}</span>
-      <span v-if="plugin.updateState" class="plugin-badge update">{{ t('plugins.installed.has_update') }}</span>
-      <template v-if="plugin.installed">
-        <span v-if="!plugin.enabled" class="plugin-badge disabled">{{ t('plugins.installed.disabled') }}</span>
-        <span v-else class="plugin-badge installed">{{ t('plugins.installed.installed_badge') }}</span>
-      </template>
-      <span v-else class="plugin-badge not-installed">{{ t('plugins.browse.not_installed') }}</span>
-    </div>
-    <div v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</div>
-    <div class="plugin-item-meta">
-      <span><MsIcon name="extension" /> {{ plugin.id || plugin.dirName }}</span>
-      <span v-if="displayVersion()" :style="plugin.activeVersion === 'nightly' ? { color: 'var(--cyan)' } : undefined">
-        <template v-if="plugin.installed && plugin.activeVersion === 'nightly'"><MsIcon name="build" /> {{ displayVersion() }}</template>
-        <template v-else>v{{ displayVersion() }}</template>
-      </span>
-      <span v-if="plugin.cnrLatest && plugin.installed" style="color:var(--t3)">(latest: {{ plugin.cnrLatest }})</span>
-      <span v-if="(plugin.stars ?? 0) > 0"><MsIcon name="star" /> {{ plugin.stars }}</span>
-      <span v-if="plugin.author"><MsIcon name="person" /> {{ plugin.author }}</span>
-      <span v-if="plugin.lastUpdate && !plugin.installed"><MsIcon name="schedule" /> {{ plugin.lastUpdate.slice(0, 10) }}</span>
-      <div class="plugin-item-actions">
+  <li class="plugin-row">
+    <span class="plugin-row__icon" aria-hidden="true"><MsIcon name="extension" size="md" /></span>
+
+    <div class="plugin-row__main">
+      <div class="plugin-row__head">
+        <a
+          v-if="plugin.repository"
+          class="plugin-row__title"
+          :href="plugin.repository"
+          target="_blank"
+          rel="noopener"
+        >{{ plugin.title }}</a>
+        <span v-else class="plugin-row__title">{{ plugin.title }}</span>
+
+        <Badge v-if="pending" tone="caution">{{ t('plugins.restart.pending_badge') }}</Badge>
+        <Badge v-if="plugin.updateState" tone="caution">{{ t('plugins.installed.has_update') }}</Badge>
         <template v-if="plugin.installed">
-          <BaseButton v-if="plugin.updateState" variant="success" size="sm" :loading="op === 'update'" :disabled="busy" @click="emit('update')">{{ t('plugins.installed.update') }}</BaseButton>
-          <BaseButton size="sm" :disabled="busy" @click="emit('version')">{{ t('plugins.installed.version') }}</BaseButton>
-          <BaseButton v-if="!plugin.enabled" variant="primary" size="sm" :loading="op === 'toggle'" :disabled="busy" @click="emit('toggle')">{{ t('plugins.installed.enable') }}</BaseButton>
-          <BaseButton v-else size="sm" :loading="op === 'toggle'" :disabled="busy" @click="emit('toggle')">{{ t('plugins.installed.disable') }}</BaseButton>
-          <BaseButton variant="danger" size="sm" square :loading="op === 'uninstall'" :disabled="busy" @click="emit('uninstall')"><MsIcon name="delete" /></BaseButton>
+          <Badge v-if="!plugin.enabled" tone="neutral">{{ t('plugins.installed.disabled') }}</Badge>
+          <Badge v-else tone="positive">{{ t('plugins.installed.installed_badge') }}</Badge>
         </template>
-        <template v-else>
-          <BaseButton variant="primary" size="sm" :loading="op === 'install'" :disabled="busy" @click="emit('install')">{{ t('plugins.browse.install') }}</BaseButton>
-          <BaseButton size="sm" :disabled="busy" @click="emit('version')">{{ t('plugins.installed.version') }}</BaseButton>
-        </template>
+        <Badge v-else tone="neutral">{{ t('plugins.browse.not_installed') }}</Badge>
+      </div>
+
+      <div v-if="plugin.description" class="plugin-row__desc">{{ plugin.description }}</div>
+
+      <div v-if="facts.length" class="plugin-row__facts">
+        <span v-for="fact in facts" :key="fact">{{ fact }}</span>
       </div>
     </div>
-    <div v-if="errVisible && error" class="plugin-item-error">
-      <span class="plugin-item-error-msg">{{ error }}</span>
+
+    <div class="plugin-row__actions">
+      <template v-if="plugin.installed">
+        <BaseButton
+          v-if="plugin.updateState"
+          variant="ghost" size="sm" icon-only
+          :aria-label="t('plugins.installed.update')"
+          :loading="op === 'update'"
+          :disabled="busy"
+          @click="emit('update')"
+        >
+          <MsIcon name="update" />
+        </BaseButton>
+        <BaseButton
+          variant="ghost" size="sm" icon-only
+          :aria-label="t('plugins.installed.version')"
+          :disabled="busy"
+          @click="emit('version')"
+        >
+          <MsIcon name="swap_horiz" />
+        </BaseButton>
+        <BaseButton
+          variant="ghost" size="sm" icon-only
+          :aria-label="plugin.enabled ? t('plugins.installed.disable') : t('plugins.installed.enable')"
+          :loading="op === 'toggle'"
+          :disabled="busy"
+          @click="emit('toggle')"
+        >
+          <MsIcon :name="plugin.enabled ? 'pause' : 'play_arrow'" />
+        </BaseButton>
+        <BaseButton
+          variant="danger" size="sm" icon-only
+          :aria-label="t('plugins.installed.remove')"
+          :loading="op === 'uninstall'"
+          :disabled="busy"
+          @click="emit('uninstall')"
+        >
+          <MsIcon name="delete" />
+        </BaseButton>
+      </template>
+      <template v-else>
+        <BaseButton
+          variant="ghost" size="sm" icon-only
+          :aria-label="t('plugins.browse.install')"
+          :loading="op === 'install'"
+          :disabled="busy"
+          @click="emit('install')"
+        >
+          <MsIcon name="download" />
+        </BaseButton>
+        <BaseButton
+          variant="ghost" size="sm" icon-only
+          :aria-label="t('plugins.installed.version')"
+          :disabled="busy"
+          @click="emit('version')"
+        >
+          <MsIcon name="swap_horiz" />
+        </BaseButton>
+      </template>
+    </div>
+
+    <div v-if="errVisible && error" class="plugin-row__error">
+      <span class="plugin-row__error-msg">{{ error }}</span>
       <BaseButton size="sm" @click="errVisible = false">{{ t('plugins.row.dismiss_error') }}</BaseButton>
     </div>
-  </div>
+  </li>
 </template>
 
 <style scoped>
-.plugin-item { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: clamp(14px, 1.2vw, 20px) clamp(16px, 1.5vw, 24px); margin-bottom: clamp(8px, 0.6vw, 12px); transition: border-color .15s; }
-.plugin-item:hover { border-color: color-mix(in srgb, var(--ac) 34%, transparent); }
-.plugin-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.plugin-item-title { font-size: .92rem; font-weight: 600; flex: 1; min-width: 0; }
-.plugin-item-title a { color: var(--t1); text-decoration: none; }
-.plugin-item-title a:hover { color: var(--ac); }
-.plugin-item-desc { font-size: .8rem; color: var(--t2); line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.plugin-item-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: .75rem; color: var(--t3); }
-.plugin-item-meta > span { display: inline-flex; align-items: center; gap: 4px; }
-.plugin-item-actions { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
-.plugin-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
-.plugin-badge.installed { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
-.plugin-badge.update { background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
-.plugin-badge.disabled { background: color-mix(in srgb, var(--t3) 14%, transparent); color: var(--t3); }
-.plugin-badge.not-installed { background: color-mix(in srgb, var(--blue) 14%, transparent); color: var(--blue); }
-.plugin-badge.pending { background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
-.plugin-item-error { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: var(--rs, 6px); background: color-mix(in srgb, var(--c-negative) 8%, var(--bg3)); border: 1px solid color-mix(in srgb, var(--c-negative) 25%, var(--bd)); }
-.plugin-item-error-msg { flex: 1; min-width: 0; font-size: .78rem; line-height: 1.45; color: var(--c-negative); word-break: break-word; white-space: pre-wrap; }
+.plugin-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 0;
+}
+
+.plugin-row + .plugin-row {
+  border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
+}
+
+.plugin-row__icon {
+  display: inline-flex;
+  color: var(--t2);
+  line-height: 1;
+  margin-top: 3px;
+}
+
+.plugin-row__icon :deep(.ms) {
+  font-size: 22px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 22;
+}
+
+.plugin-row__main {
+  min-width: 0;
+}
+
+.plugin-row__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.plugin-row__title {
+  color: var(--t1);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.plugin-row__title:hover {
+  color: var(--ac);
+}
+
+.plugin-row__desc {
+  color: var(--t2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.plugin-row__facts {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  color: var(--t3);
+  font-size: var(--text-xs);
+  font-family: var(--font-tabular);
+}
+
+.plugin-row__facts > span + span::before {
+  content: '·';
+  margin: 0 6px;
+}
+
+.plugin-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plugin-row__error {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--rs);
+  background: color-mix(in srgb, var(--c-negative) 8%, var(--bg3));
+  border: 1px solid color-mix(in srgb, var(--c-negative) 25%, var(--bd));
+}
+
+.plugin-row__error-msg {
+  flex: 1;
+  min-width: 0;
+  color: var(--c-negative);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 768px) {
+  .plugin-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .plugin-row__actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+
+  .plugin-row__error {
+    grid-column: 1 / -1;
+  }
+}
 </style>
