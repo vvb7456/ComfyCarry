@@ -144,7 +144,6 @@ const reinitKeepModels = ref(true)
 const reinitLoading = ref(false)
 
 async function reinitialize() {
-  reinitKeepModels.value = true
   if (!await confirm({
     message: t('settings.reinit.confirm'),
     confirmText: t('settings.reinit.btn'),
@@ -152,7 +151,6 @@ async function reinitialize() {
     checkboxDefault: true,
     checkboxRef: reinitKeepModels,
   })) return
-  if (!reinitKeepModels.value && !await confirm({ message: t('settings.reinit.confirm_delete_final') })) return
   reinitLoading.value = true
   toast(t('settings.reinit.in_progress'), 'info')
   const data = await post<{ ok?: boolean; errors?: ApiErrorBody[] }>('/api/settings/reinitialize', { keep_models: reinitKeepModels.value })

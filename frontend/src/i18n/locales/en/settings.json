@@ -100,8 +100,7 @@
     "desc": "Reset the ComfyUI installation and reopen the setup wizard",
     "btn": "Re-initialize",
     "keep_models": "Keep model files & outputs",
-    "confirm": "Re-initialize? The ComfyUI installation will be reset and the setup wizard reopened.",
-    "confirm_delete_final": "When \"Keep model files\" is unchecked, the entire ComfyUI directory (including all model files) will be permanently deleted and cannot be recovered.\n\nContinue?",
+    "confirm": "Re-initialize ComfyCarry?",
     "in_progress": "Re-initializing...",
     "success": "Reset complete, redirecting to setup wizard...",
     "partial_fail": "Some operations failed"

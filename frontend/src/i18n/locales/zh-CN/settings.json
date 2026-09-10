@@ -100,8 +100,7 @@
     "desc": "重置 ComfyUI 安装并重新进入部署向导",
     "btn": "重新初始化",
     "keep_models": "保留模型文件与产物",
-    "confirm": "确定要重新初始化吗？ComfyUI 安装将被重置，并重新进入部署向导。",
-    "confirm_delete_final": "未勾选保留模型时，整个 ComfyUI 目录（含所有模型文件）将被永久删除，无法恢复。\n\n确定继续？",
+    "confirm": "是否重新初始化ComfyCarry？",
     "in_progress": "正在重新初始化...",
     "success": "已重置，正在跳转到部署向导...",
     "partial_fail": "部分操作失败"

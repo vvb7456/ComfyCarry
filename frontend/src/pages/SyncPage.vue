@@ -14,11 +14,12 @@ import StatusDot from '@/components/ui/StatusDot.vue'
 import SyncActivityTab from '@/components/sync/SyncActivityTab.vue'
 import CompanionPanel from '@/components/sync/CompanionPanel.vue'
 import PathBrowserModal from '@/components/sync/PathBrowserModal.vue'
-import OAuthWizard from '@/components/sync/OAuthWizard.vue'
+import AddStorageModal from '@/components/sync/AddStorageModal.vue'
 import AddCard from '@/components/ui/AddCard.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
@@ -30,7 +31,7 @@ import { remoteBrand } from '@/config/remote-logos'
 import { fmtBytes } from '@/utils/format'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
 import type {
-  StorageInfo, SyncTemplate, RemoteField, RemoteTypeDef, Remote,
+  StorageInfo, SyncTemplate, RemoteTypeDef, Remote,
   SyncRule,
   SyncStatusResponse, RemotesResponse, StorageResponse,
   RemoteTypesResponse, RulesSaveResponse, RemoteDeleteResponse,
@@ -69,25 +70,13 @@ const rules = ref<SyncRule[]>([])
 const templates = ref<SyncTemplate[]>([])
 
 // Modals
-const addRemoteModal = ref(false)
+const addStorageModalOpen = ref(false)
 const addRuleModal = ref(false)
 const browseModal = ref(false)
-const addRemoteLoading = ref(false)
 const saveRuleLoading = ref(false)
 
-// Add remote form
+// Add storage
 const remoteTypes = ref<Record<string, RemoteTypeDef>>({})
-const newRemoteName = ref('')
-const newRemoteType = ref('')
-const newRemoteParams = ref<Record<string, string>>({})
-const remoteTypeDef = computed(() => remoteTypes.value[newRemoteType.value] || null)
-const remoteTypeOptions = computed(() =>
-  Object.entries(remoteTypes.value).map(([key, def]) => {
-    // 类型层面还没有 provider, s3 先给通用图标; 建好后卡片按 provider 显示 R2 / AWS
-    const brand = remoteBrand(key)
-    return { value: key, label: def.label, logo: brand.logo, icon: brand.icon }
-  })
-)
 
 /** 规则表单的远程存储下拉选项 (Remote 带 params 嵌套对象, 不能直接喂 BaseSelect) */
 const remoteOptions = computed(() =>
@@ -134,14 +123,12 @@ const methodOptions = computed(() => [
 
 const triggerOptions = computed(() => [
   { value: 'manual', label: t('sync.rule.trigger_manual') },
-  { value: 'deploy', label: t('sync.rule.trigger_deploy') },
   { value: 'watch', label: t('sync.rule.trigger_watch') },
 ])
 
-// Browse modal — 目录选择器状态 (逻辑在 PathBrowserModal)
+// Browse modal — 目录选择器状态 (逻辑在 PathBrowserModal; 打开即根目录不预填)
 const browseMode = ref<'local' | 'remote'>('remote')
 const browseTargetField = ref<'remote_path' | 'local_path'>('remote_path')
-const browsePath = ref('')
 
 // Log stream — translate structured entries from backend
 // Log stream - sync 日志落盘成 JSONL, 读文件后逐行 JSON.parse 还原结构化再翻译
@@ -262,71 +249,37 @@ function storagePct(info: StorageInfo | undefined) {
 }
 
 // ---- Badge label helpers ----
+// 存量 deploy 规则 (wizard 创建) 徽章仍按「部署时」展示, 保留其语义
 const triggerLabels: Record<string, string> = { deploy: 'sync.rules.deploy', watch: 'sync.rules.watch', manual: 'sync.rules.manual' }
 const methodLabels: Record<string, string> = { copy: 'sync.rules.method_short.copy', sync: 'sync.rules.method_short.sync', move: 'sync.rules.method_short.move' }
 function triggerLabel(trigger: string) { return t(triggerLabels[trigger] || 'sync.rules.manual') }
 function methodLabel(method: string) { return t(methodLabels[method] || method) }
 
 // ---- Add Remote ----
+/** 「重新连接」预填: 打开弹窗时自动选中该 provider 并填 name, 关闭后清空 */
+const reconnectPreset = ref<{ type?: string; name?: string } | undefined>()
+
 async function openAddRemote() {
-  newRemoteName.value = ''; newRemoteType.value = ''; newRemoteParams.value = {}
   const d = await get<RemoteTypesResponse>('/api/sync/remote/types')
   if (d?.types) remoteTypes.value = d.types
-  addRemoteModal.value = true
+  addStorageModalOpen.value = true
 }
 
-function onRemoteTypeChange() {
-  newRemoteParams.value = {}
-  const def = remoteTypeDef.value
-  if (def?.fields) {
-    for (const f of def.fields) {
-      if (f.default !== undefined) newRemoteParams.value[f.key] = f.default
-    }
-  }
+function openReconnect(remote: Remote) {
+  reconnectPreset.value = { type: remote.type, name: remote.name }
+  openAddRemote()
 }
 
-/** remote 创建成功后的统一收尾 (普通表单与 OAuth 向导共用): 关 modal + 刷新列表 */
-async function onRemoteCreated() {
-  toast(t('sync.remote.created'), 'success')
-  addRemoteModal.value = false
-  newRemoteName.value = ''
-  newRemoteType.value = ''
-  newRemoteParams.value = {}
+function clearReconnectPreset() {
+  reconnectPreset.value = undefined
+}
+
+/** 存储创建成功: 刷新列表; 勾选了「创建同步规则」时打开规则弹窗并预填该存储 */
+async function onRemoteCreated(remote: { name: string; type: string; openRuleModal?: boolean }) {
+  reconnectPreset.value = undefined
   await loadRemotes()
   loadStorageAll()
-}
-
-async function submitAddRemote() {
-  const name = newRemoteName.value.trim()
-  if (!name || !newRemoteType.value) {
-    toast(t('sync.remote.fill_required'), 'warning')
-    return
-  }
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-    toast(t('sync.remote.invalid_name'), 'warning')
-    return
-  }
-  // Check required dynamic fields
-  const def = remoteTypeDef.value
-  if (def?.fields) {
-    const missing = def.fields.filter((f: RemoteField) => f.required && !newRemoteParams.value[f.key]?.trim())
-    if (missing.length) {
-      toast(t('sync.remote.missing_fields', { fields: missing.map((f: RemoteField) => f.label).join(', ') }), 'warning')
-      return
-    }
-  }
-  addRemoteLoading.value = true
-  try {
-    const d = await post<ApiOkResponse>('/api/sync/remote/create', { name, type: newRemoteType.value, params: newRemoteParams.value })
-    if (d?.ok) {
-      await onRemoteCreated()
-    } else if (d) {
-      toast(apiErrorText(d, t('sync.remote.create_failed')), 'error')
-    }
-    // d === null means useApiFetch already toasted the HTTP error
-  } finally {
-    addRemoteLoading.value = false
-  }
+  if (remote.openRuleModal) openAddRule(remote.name)
 }
 
 async function deleteRemote(name: string) {
@@ -335,22 +288,22 @@ async function deleteRemote(name: string) {
   // 本地 rules 可能与服务端有偏差 (多标签页), 实际清理数以服务端返回为准。
   const affectedRules = rules.value.filter(r => r.remote === name)
   const msg = affectedRules.length > 0
-    ? t('sync.remote.confirm_delete_with_rules', { name, count: affectedRules.length })
-    : t('sync.remote.confirm_delete', { name })
+    ? t('sync.remote.confirm_disconnect_with_rules', { name, count: affectedRules.length })
+    : t('sync.remote.confirm_disconnect', { name })
   if (!await confirm({ message: msg, variant: 'danger' })) return
   const d = await post<RemoteDeleteResponse>('/api/sync/remote/delete', { name })
   if (d?.ok) {
     const removed = d.rules_removed ?? 0
     if (removed > 0) {
-      toast(t('sync.remote.deleted_with_rules', { name, count: removed }), 'success')
+      toast(t('sync.remote.disconnected_with_rules', { name, count: removed }), 'success')
       await loadSyncStatus()
     } else {
-      toast(apiMessageText(d, t('sync.remote.deleted')), 'success')
+      toast(apiMessageText(d, t('sync.remote.disconnected')), 'success')
     }
     await loadRemotes()
     delete storageData.value[name]
   } else if (d) {
-    toast(apiErrorText(d, t('sync.remote.delete_failed')), 'error')
+    toast(apiErrorText(d, t('sync.remote.disconnect_failed')), 'error')
   }
 }
 
@@ -362,8 +315,8 @@ function blankRule(remote?: string): Partial<SyncRule> {
   }
 }
 
-function openAddRule() {
-  ruleForm.value = blankRule()
+function openAddRule(presetRemote?: string) {
+  ruleForm.value = blankRule(presetRemote)
   ruleIsEdit.value = false
   selectedTemplate.value = ''
   addRuleModal.value = true
@@ -371,7 +324,12 @@ function openAddRule() {
 
 function openEditRule(rule: SyncRule) {
   const filters = Array.isArray(rule.filters) ? rule.filters.join('\n') : (rule.filters || '')
-  ruleForm.value = { ...rule, filters }
+  // 触发方式 select 无「部署时」选项: 编辑存量 deploy 规则时映射为手动 (保存即转手动)
+  ruleForm.value = {
+    ...rule,
+    filters,
+    trigger: rule.trigger === 'deploy' ? 'manual' : rule.trigger,
+  }
   ruleIsEdit.value = true
   addRuleModal.value = true
 }
@@ -391,7 +349,8 @@ function onPickTemplate(id: string) {
     name: tmpl.name,
     direction: tmpl.direction,
     method: tmpl.method,
-    trigger: tmpl.trigger,
+    // dashboard 无「部署时」语义 (那是 wizard 部署时的规则), 模板的 deploy 一律映射为手动
+    trigger: tmpl.trigger === 'deploy' ? 'manual' : tmpl.trigger,
     local_path: tmpl.local_path || '',
     remote_path: tmpl.remote_path || '',
     filters,
@@ -461,7 +420,6 @@ async function runRule(rule: SyncRule) {
 function openBrowse(mode: 'local' | 'remote', field: 'remote_path' | 'local_path') {
   browseMode.value = mode
   browseTargetField.value = field
-  browsePath.value = (ruleForm.value[field] as string) || ''
   browseModal.value = true
 }
 
@@ -515,7 +473,17 @@ async function switchTab(tab: string) {
     <!-- ===== Storage & Rules Tab ===== -->
     <div v-show="activeTab === 'storage'" class="tab-panel">
       <SectionHeader icon="storage" flush>{{ t('sync.tabs.remotes_section') }}</SectionHeader>
-      <div class="sync-remotes-grid" style="margin-top:0">
+      <EmptyState
+        v-if="remotes.length === 0"
+        icon="cloud"
+        :title="t('sync.empty.title')"
+        :message="t('sync.empty.desc')"
+      >
+        <BaseButton variant="primary" @click="openAddRemote">
+          {{ t('sync.empty.add_btn') }}
+        </BaseButton>
+      </EmptyState>
+      <div v-else class="sync-remotes-grid sync-remotes-grid--flush">
         <div v-for="remote in remotes" :key="remote.name" class="sync-remote-card">
           <div class="sync-remote-header">
             <div class="sync-remote-name">
@@ -552,9 +520,19 @@ async function switchTab(tab: string) {
             <span style="font-size:.75rem;color:var(--t3);cursor:pointer" @click="loadStorage(remote.name)">{{ t('sync.remotes.click_refresh') }}</span>
           </div>
 
-          <div style="margin-top:8px;display:flex;gap:4px;justify-content:flex-end">
+          <div class="sync-remote-actions">
+            <BaseButton
+              v-if="storageData[remote.name]?.error_key === 'sync.err.storage_auth_expired'"
+              variant="primary"
+              size="sm"
+              @click="openReconnect(remote)"
+            >
+              {{ t('sync.remote.reconnect') }}
+            </BaseButton>
             <BaseButton v-if="!noCapacityTypes.has(remote.type)" size="sm" square :disabled="storageLoading[remote.name]" :title="t('sync.remote.load_storage')" @click="loadStorage(remote.name)"><MsIcon name="refresh" /></BaseButton>
-            <BaseButton variant="danger" size="sm" square :title="t('sync.rule.delete')" @click="deleteRemote(remote.name)"><MsIcon name="delete" /></BaseButton>
+            <BaseButton variant="danger" size="sm" @click="deleteRemote(remote.name)">
+              {{ t('sync.remote.disconnect') }}
+            </BaseButton>
           </div>
         </div>
 
@@ -597,7 +575,7 @@ async function switchTab(tab: string) {
           </div>
         </div>
         <!-- Add card -->
-        <AddCard class="sync-rule-card" size="compact" :label="t('sync.rule.add')" @click="openAddRule" />
+        <AddCard class="sync-rule-card" size="compact" :label="t('sync.rule.add')" @click="openAddRule()" />
       </div>
     </div>
 
@@ -612,46 +590,15 @@ async function switchTab(tab: string) {
       />
     </div>
 
-    <!-- ===== Add Remote Modal ===== -->
-    <BaseModal v-model="addRemoteModal" :title="t('sync.remote.add_modal')" size="md">
-      <FormField :label="t('sync.remote.name')" density="compact">
-        <input v-model="newRemoteName" type="text" :placeholder="t('sync.remote.name_placeholder')" class="form-input">
-      </FormField>
-      <FormField :label="t('sync.remote.type')" density="compact">
-        <BaseSelect v-model="newRemoteType" :options="remoteTypeOptions" :placeholder="t('sync.remote.select_type')" teleport @change="onRemoteTypeChange" />
-      </FormField>
-      <!-- oauth 类型: 内容整体替换为「登录授权」向导 (名称/类型沿用上方两个字段);
-           关闭/取消的会话清理由向导内部通过 model-value watcher 统一处理 -->
-      <OAuthWizard
-        v-if="remoteTypeDef?.oauth"
-        :model-value="addRemoteModal"
-        :types="remoteTypes"
-        :name="newRemoteName"
-        :type="newRemoteType"
-        @created="onRemoteCreated"
-        @cancel="addRemoteModal = false"
-      />
-      <!-- Dynamic fields (非 oauth 类型, 行为不变) -->
-      <template v-else-if="remoteTypeDef">
-        <template v-for="field in remoteTypeDef.fields || []" :key="field.key">
-          <FormField density="compact" :hint="(field.help && !(field.key === 'token' && remoteTypeDef?.oauth)) ? field.help : undefined">
-            <template #label>
-              {{ field.label }}<template v-if="field.required && !(field.key === 'token' && remoteTypeDef?.oauth)"> *</template>
-              <HelpTip v-if="field.key === 'token' && remoteTypeDef?.oauth" :text="t('sync.remote.oauth_token_tooltip', { type: newRemoteType })" />
-            </template>
-            <textarea v-if="field.type === 'textarea'" v-model="newRemoteParams[field.key]" :placeholder="field.placeholder || ''" rows="3" class="form-textarea"></textarea>
-            <BaseSelect v-else-if="field.type === 'select'" v-model="newRemoteParams[field.key]" :options="field.options || []" teleport />
-            <input v-else v-model="newRemoteParams[field.key]" :type="field.type === 'password' ? 'password' : 'text'" :placeholder="field.placeholder || ''" autocomplete="off" class="form-input">
-          </FormField>
-        </template>
-      </template>
-      <template v-if="!remoteTypeDef?.oauth" #footer>
-        <BaseButton size="sm" :disabled="addRemoteLoading" @click="addRemoteModal = false">{{ t('common.btn.cancel') }}</BaseButton>
-        <BaseButton variant="primary" size="sm" :disabled="addRemoteLoading" @click="submitAddRemote">
-          {{ addRemoteLoading ? t('sync.remote.connecting') : t('common.btn.add') }}
-        </BaseButton>
-      </template>
-    </BaseModal>
+    <!-- ===== Add Storage Modal (v3) ===== -->
+    <AddStorageModal
+      v-model="addStorageModalOpen"
+      :existing-remotes="remotes"
+      :remote-types="remoteTypes"
+      :preset="reconnectPreset"
+      @created="onRemoteCreated"
+      @close="clearReconnectPreset"
+    />
 
     <!-- ===== Add/Edit Rule Modal ===== -->
     <BaseModal v-model="addRuleModal" :title="ruleIsEdit ? t('sync.rule.edit_modal') : t('sync.rule.add_modal')" size="md">
@@ -714,12 +661,11 @@ async function switchTab(tab: string) {
       </template>
     </BaseModal>
 
-    <!-- ===== Path Browser ===== -->
+    <!-- ===== Path Browser (打开即根目录, 不预填) ===== -->
     <PathBrowserModal
       v-model="browseModal"
       :mode="browseMode"
       :remote="ruleForm.remote || ''"
-      :path="browsePath"
       @select="onBrowseSelect"
     />
   </div>
@@ -735,12 +681,14 @@ async function switchTab(tab: string) {
 
 /* ── Remotes Grid ── */
 .sync-remotes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(300px, 22vw, 420px), 1fr)); gap: clamp(14px, 1.2vw, 22px); margin-top: 8px; }
+.sync-remotes-grid--flush { margin-top: 0; }
 .sync-remote-card { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 16px; }
 .sync-remote-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sync-remote-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .95rem; }
 .sync-remote-logo { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
 .sync-remote-type { font-size: .72rem; color: var(--t3); background: var(--bg2); padding: 2px 8px; border-radius: 10px; }
 .sync-storage-info { font-size: .8rem; color: var(--t2); margin-top: 8px; }
+.sync-remote-actions { margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
 
 /* ── Rule Cards ── */
 .sync-rule-card { background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--r); padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 14px; }
