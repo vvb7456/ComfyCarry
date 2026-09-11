@@ -142,7 +142,7 @@ export function useModelModalManager({
       state.value.checkpoint = name
     }
     showModelPicker.value = false
-    toast(t('generate.toast.selected', { name: basename(name).replace(/\.[^.]+$/, '') }), 'success')
+    toast(t('generate.msg.selected', { name: basename(name).replace(/\.[^.]+$/, '') }), 'success')
   }
 
   // ── LoRA Picker ────────────────────────────────────────────────────────────

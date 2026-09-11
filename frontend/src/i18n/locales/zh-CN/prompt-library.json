@@ -16,8 +16,7 @@
   "editor": {
     "title": "提示词编辑器",
     "positive": "正向提示词",
-    "negative": "反向提示词",
-    "confirm": "确定",
+    "negative": "负面提示词",
     "placeholder": "输入标签，按回车或逗号添加…"
   },
   "toolbar": {
@@ -32,7 +31,6 @@
   },
   "chip": {
     "weight": "权重",
-    "translate_btn": "翻译",
     "translate_action": "点击翻译",
     "added": "已添加"
   },
@@ -40,24 +38,19 @@
     "no_results": "没有匹配的标签"
   },
   "tag_browser": {
-    "title": "标签库",
     "hint": "选择上方分类以浏览标签",
     "no_subgroups": "暂无子分类",
     "no_tags": "暂无标签"
   },
   "history_modal": {
     "title": "历史与收藏",
-    "tab_all": "全部",
     "tab_history": "历史",
     "tab_favorites": "收藏",
     "empty": "暂无记录",
-    "apply": "应用",
     "delete": "删除",
-    "delete_selected": "删除选中",
     "favorite": "收藏",
     "unfavorite": "取消收藏",
     "confirm_delete": "确定删除此记录？",
-    "confirm_batch_delete": "确定删除 {count} 条选中记录？",
     "confirm_replace": "用此历史记录替换当前提示词？",
     "just_now": "刚刚",
     "minutes_ago": "{n} 分钟前",
@@ -72,25 +65,12 @@
   },
   "init": {
     "title": "该功能需下载提示词标签库",
-    "description": "使用提示词编辑器前需要初始化标签库。将导入约 4000 个标签和约 50000 个 Danbooru 标签，用于自动补全和浏览。",
     "checking": "检测数据源…",
-    "not_initialized": "标签库未初始化",
-    "local_status": "本地数据文件",
-    "remote_status": "远程下载",
-    "available": "可用",
-    "not_available": "未找到",
-    "not_configured": "未配置",
-    "source_available": "检测到数据源",
-    "source_unavailable": "数据源不可用。本地文件不存在，且未配置远程下载地址。",
-    "import_btn": "初始化标签库",
     "download_btn": "下载选中数据",
     "data_name": "ComfyCarry Prompt Library",
     "data_desc": "SDXL 提示词与中文翻译",
     "required": "必需",
     "downloading": "下载中…",
-    "importing": "导入中…",
-    "import_success": "导入完成：{groups} 组，{tags} 标签，{danbooru} Danbooru",
-    "import_failed": "导入失败",
-    "skip": "暂时跳过"
+    "importing": "导入中…"
   }
 }

@@ -24,13 +24,12 @@
     },
     "failed": {
       "title": "ComfyUI 运行出错",
-      "subtitle": "进程异常退出，详情见 ComfyUI 日志。"
+      "subtitle": "服务异常退出，详情见 ComfyUI 日志。"
     },
     "action": {
       "open": "打开 ComfyUI",
       "interrupt": "中断执行",
-      "start": "启动 ComfyUI",
-      "retry": "重试"
+      "start": "启动 ComfyUI"
     }
   },
   "facts": {
@@ -98,7 +97,7 @@
       },
       "attention": {
         "label": "Attention 方案",
-        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。FlashAttention 和 SageAttention 可在 Setup Wizard 中安装。",
+        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。FlashAttention 和 SageAttention 可在部署向导中安装。",
         "options": {
           "default": "默认",
           "pytorch-cross": "PyTorch SDPA",
@@ -328,7 +327,6 @@
     "switch_confirm_nightly": "确定切换到 nightly (master) 吗？这是开发版本，可能不稳定。",
     "switch_success": "版本切换成功",
     "switch_failed": "版本切换失败",
-    "current_version": "当前版本",
     "custom_build": "自定义提交",
     "channels_title": "选择更新通道",
     "recommended": "推荐",
@@ -344,15 +342,6 @@
     "restart": "确定要重启 ComfyUI 吗？",
     "stop": "确定要停止 ComfyUI 吗？"
   },
-  "toast": {
-    "gen_complete": "生成完成",
-    "exec_interrupted": "执行已中断",
-    "restarting": "ComfyUI 正在重启...",
-    "stopped": "ComfyUI 已停止",
-    "starting": "ComfyUI 启动中...",
-    "interrupt_sent": "已发送中断信号",
-    "deleted": "已删除"
-  },
   "err": {
     "args_check_failed": "无法读取 ComfyUI 启动参数定义，ComfyUI 安装可能不完整，已取消本次操作",
     "internal": "服务器内部错误：{detail}",
@@ -367,7 +356,14 @@
   },
   "msg": {
     "switched": "已切换到 {version}",
-    "switched_with_deps": "已切换到 {version}（已安装依赖）"
+    "switched_with_deps": "已切换到 {version}（已安装依赖）",
+    "gen_complete": "生成完成",
+    "exec_interrupted": "执行已中断",
+    "restarting": "ComfyUI 正在重启...",
+    "stopped": "ComfyUI 已停止",
+    "starting": "ComfyUI 启动中...",
+    "interrupt_sent": "已发送中断信号",
+    "deleted": "已删除"
   },
   "warn": {
     "switch_restart": "版本已切换，但服务重启失败，请手动重启"

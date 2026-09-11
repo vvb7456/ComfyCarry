@@ -4,7 +4,6 @@
     "deploy_mode_invalid": "Invalid deployment request mode",
     "deploy_retry_unavailable": "No deployment plan is available to retry. Return to setup to configure it again."
   },
-  "header": "ComfyCarry",
   "subtitle": "Setup Wizard",
   "step_labels": [
     "Deploy",
@@ -43,8 +42,7 @@
       "desc": "Restore all settings from a previously exported config file to quickly rebuild your workspace"
     },
     "import_upload": {
-      "hint": "Upload a previously exported <code>comfycarry-config.json</code> configuration file",
-      "select_file": "Select File"
+      "hint": "Upload a previously exported <code>comfycarry-config.json</code> configuration file"
     }
   },
   "step1": {
@@ -66,14 +64,12 @@
     "desc": "Configure Cloudflare Tunnel for stable public access (ComfyUI / SSH / JupyterLab)",
     "public": {
       "title": "Public Node",
-      "recommended": "Recommended",
       "desc": "One-click setup, no domain or CF account needed. Get public access through ComfyCarry shared nodes.",
       "capacity_loading": "Loading capacity...",
       "capacity_info": "Capacity: {active} / {max}",
       "capacity_full": "(Full)",
       "capacity_error": "Capacity: Unable to fetch",
-      "subdomain_placeholder": "Leave empty to auto-generate (e.g. cc-a1b2c3d4)",
-      "subdomain_hint": "Set this to keep the same address when switching instances. 3-32 lowercase letters, numbers, or hyphens."
+      "subdomain_placeholder": "Leave empty to auto-generate (e.g. cc-a1b2c3d4)"
     },
     "current_active": "Active",
     "custom": {
@@ -91,8 +87,6 @@
     "subdomain_prefix_placeholder": "Leave empty to auto-generate (e.g. cc-a1b2c3d4)",
     "validate_token": "Validate Token",
     "validate_empty": "Please fill in API Token and domain",
-    "validating": "Validating...",
-    "validate_account": "· Account:",
     "validate_fail": "Validation failed",
     "validate_error": "Validation request failed:"
   },
@@ -111,13 +105,11 @@
     "push_title": "Auto Push",
     "push_help": "Watch local directories at runtime and auto-upload new/modified files to cloud. Good for generated images and other content that needs backup.",
     "selected_n": "{n} selected",
-    "output_label": "Upload output",
     "method_move": "Move",
     "method_keep": "Keep local",
     "trigger_deploy": "On deploy",
     "trigger_watch": "Watch",
     "trigger_manual": "Manual",
-    "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."
   },
   "step5": {
@@ -149,14 +141,12 @@
     "model_placeholder": "Select or enter a model name",
     "search_model": "Search models...",
     "fetch_models": "Fetch Models",
-    "skip_hint": "Can also skip and configure later in ComfyCarry Settings",
     "base_url_placeholder_openai": "https://api.example.com/v1",
     "base_url_placeholder_anthropic": "https://api.example.com (do not include /v1/messages)",
     "base_url_help_openai": "Enter the API root; do not include /chat/completions or /responses.",
     "base_url_help_anthropic": "Enter the API root; do not include /v1/messages.",
     "fetch_fail": "Fetch failed",
-    "request_fail": "Request failed:",
-    "no_models": "No models available"
+    "request_fail": "Request failed:"
   },
   "step7": {
     "title": "Custom Node Plugins",
@@ -189,21 +179,12 @@
     "gpu_label": "GPU",
     "no_gpu": "No CUDA GPU detected",
     "image_label": "Image",
-    "prebuilt_image": "ComfyCarry",
-    "gpu_too_old": "Insufficient GPU compute capability",
-    "gpu_too_old_detail": "FlashAttention 2 requires Ampere (sm_80) or newer architecture. Please choose an instance with RTX 30xx / A100 / RTX 40xx or newer GPU.",
-    "no_gpu_detail": "ComfyUI requires NVIDIA GPU. Please deploy on a GPU instance, or check CUDA driver installation.",
-    "unsupported": "Unsupported environment",
-    "unsupported_detail": "Current environment is missing required runtime components. Please create an instance using the ComfyCarry pre-built image:"
+    "prebuilt_image": "ComfyCarry"
   },
   "env_hint": {
-    "password_detected": "Password detected from DASHBOARD_PASSWORD environment variable",
-    "civitai_detected": "API Key detected from CIVITAI_TOKEN environment variable",
-    "rclone_detected": "Rclone configuration detected from RCLONE_CONF_BASE64 environment variable",
     "cf_detected": "CF configuration detected from environment variables",
     "tunnel_active_public": "Tunnel is active (Public Node: {url}). To modify, use the Dashboard Tunnel page",
-    "tunnel_active_custom": "Tunnel is active (Custom mode). To modify, use the Dashboard Tunnel page",
-    "public_tunnel_detected": "Configuration detected from PUBLIC_TUNNEL environment variable, public tunnel auto-selected"
+    "tunnel_active_custom": "Tunnel is active (Custom mode). To modify, use the Dashboard Tunnel page"
   },
   "deploy": {
     "deploying": "Deploying...",
@@ -211,28 +192,19 @@
     "elapsed": "Elapsed: {time}",
     "elapsed_format": "{min} min {sec} sec",
     "elapsed_sec": "{sec} sec",
-    "done": "Deployment Complete",
     "done_title": "Deployment Complete",
     "done_msg": "Deployment complete!",
     "failed": "Deployment Failed",
     "failed_title": "Deployment Failed",
     "enter": "Enter ComfyCarry",
     "retry": "Retry Deploy",
-    "retrying": "Deploying... (Smart Retry)",
     "back_to_config": "Back to Configuration",
     "start_fail": "Deploy start failed:",
     "request_fail": "Request failed:",
-    "error_banner": "Error: {error}",
-    "error_abnormal": "Deploy process terminated abnormally",
-    "error_retry_hint": "Completed steps will be skipped on retry to save time.",
-    "attn_warn": "{names} installation failed, fell back to PyTorch SDPA. You can click \"Retry Deploy\" or reconfigure in ComfyUI page launch parameters later.",
-    "last_incomplete": "Previous deployment incomplete:",
-    "retry_hint": "Click \"Retry Deploy\" to automatically skip completed steps."
+    "attn_warn": "{names} installation failed, fell back to PyTorch SDPA. You can click \"Retry Deploy\" or reconfigure in ComfyUI page launch parameters later."
   },
   "import": {
     "invalid_format": "Invalid configuration file format",
-    "fail": "Import failed:",
-    "unknown_error": "Unknown error",
     "success": "Import successful! Restored {count} settings. Click \"Next\" to review and start deployment.",
     "parse_fail": "File parse failed:"
   },

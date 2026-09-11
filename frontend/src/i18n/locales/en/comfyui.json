@@ -24,13 +24,12 @@
     },
     "failed": {
       "title": "ComfyUI failed",
-      "subtitle": "The process exited unexpectedly. See the ComfyUI logs for details."
+      "subtitle": "The service exited unexpectedly. See the ComfyUI logs for details."
     },
     "action": {
       "open": "Open ComfyUI",
       "interrupt": "Interrupt",
-      "start": "Start ComfyUI",
-      "retry": "Retry"
+      "start": "Start ComfyUI"
     }
   },
   "facts": {
@@ -328,7 +327,6 @@
     "switch_confirm_nightly": "Switch to nightly (master)? This is a development version and may be unstable.",
     "switch_success": "Version switched successfully",
     "switch_failed": "Version switch failed",
-    "current_version": "Current Version",
     "custom_build": "Custom commit",
     "channels_title": "Choose an Update Channel",
     "recommended": "Recommended",
@@ -344,15 +342,6 @@
     "restart": "Restart ComfyUI?",
     "stop": "Stop ComfyUI?"
   },
-  "toast": {
-    "gen_complete": "Generation complete",
-    "exec_interrupted": "Execution interrupted",
-    "restarting": "ComfyUI is restarting...",
-    "stopped": "ComfyUI stopped",
-    "starting": "ComfyUI starting...",
-    "interrupt_sent": "Interrupt signal sent",
-    "deleted": "Deleted"
-  },
   "err": {
     "args_check_failed": "Cannot read ComfyUI launch argument definitions. The ComfyUI installation may be incomplete; the operation was cancelled",
     "internal": "Internal server error: {detail}",
@@ -367,7 +356,14 @@
   },
   "msg": {
     "switched": "Switched to {version}",
-    "switched_with_deps": "Switched to {version} (dependencies installed)"
+    "switched_with_deps": "Switched to {version} (dependencies installed)",
+    "gen_complete": "Generation complete",
+    "exec_interrupted": "Execution interrupted",
+    "restarting": "ComfyUI is restarting...",
+    "stopped": "ComfyUI stopped",
+    "starting": "ComfyUI starting...",
+    "interrupt_sent": "Interrupt signal sent",
+    "deleted": "Deleted"
   },
   "warn": {
     "switch_restart": "Version switched, but the service failed to restart — restart it manually"

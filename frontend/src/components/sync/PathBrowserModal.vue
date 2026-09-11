@@ -269,7 +269,7 @@ function confirmSelect() {
       <div v-else-if="error" class="pb-error">
         <MsIcon name="error" />
         <span>{{ error }}</span>
-        <BaseButton size="xs" @click="load">{{ t('sync.browse.retry') }}</BaseButton>
+        <BaseButton size="xs" @click="load">{{ t('common.btn.retry') }}</BaseButton>
       </div>
       <div v-else-if="!dirs.length" class="pb-hint">{{ t('sync.browse.no_subdirs') }}</div>
       <template v-else>

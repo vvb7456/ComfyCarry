@@ -6,20 +6,14 @@
     "stopped": { "title": "JupyterLab Stopped", "subtitle": "Stopped. Active kernels and sessions have ended." },
     "not_created": { "title": "JupyterLab Not Created", "subtitle": "Start it to run notebooks and terminals in the browser." },
     "failed": { "title": "JupyterLab Error", "subtitle": "Failed to start. See the Jupyter logs for details." },
-    "action": {
-      "open": "Open JupyterLab",
-      "start": "Start JupyterLab"
-    }
+    "action": { "open": "Open JupyterLab", "start": "Start JupyterLab" }
   },
   "facts": {
     "port": "Port",
     "address": "Address",
     "version": "Version",
     "cpu": "CPU",
-    "memory": "Memory",
-    "kernels": "Kernels",
-    "sessions": "Sessions",
-    "terminals": "Terminals"
+    "memory": "Memory"
   },
   "token": {
     "title": "Access Token"
@@ -33,14 +27,14 @@
     "unknown": "Unknown",
     "connections": "connections",
     "interrupt": "Interrupt kernel",
-    "restart": "Restart kernel",
+    "restart": "Restart Kernel",
     "empty": "No active kernels",
     "kernel_restarted": "Kernel restarted",
     "kernel_interrupted": "Kernel interrupted"
   },
   "sessions": {
     "title": "Active Sessions",
-    "close": "Close this session",
+    "close": "Close This Session",
     "empty": "No active sessions",
     "closed": "Session closed"
   },
@@ -49,7 +43,7 @@
     "new": "New Terminal",
     "label": "Terminal {name}",
     "created": "Terminal {name} created",
-    "open": "Open terminal",
+    "open": "Open Terminal",
     "destroy": "Destroy terminal",
     "destroy_confirm": "Destroy terminal {name}?",
     "destroyed": "Terminal {name} destroyed",
@@ -61,17 +55,8 @@
   },
   "confirm": {
     "stop": "Stop JupyterLab?\n\nActive kernels and sessions will be lost.",
-    "stop_warning": "Active kernels and sessions will be lost",
     "restart": "Restart JupyterLab?\n\nActive kernels and sessions will be lost.",
     "close_session": "Close this session?\n\nThe associated kernel will also be stopped."
-  },
-  "toast": {
-    "starting": "JupyterLab starting...",
-    "start_failed": "Start failed",
-    "stopped": "JupyterLab stopped",
-    "stop_failed": "Stop failed",
-    "restarting": "Jupyter restarting",
-    "restart_failed": "Restart failed"
   },
   "err": {
     "fallback": "JupyterLab operation failed",
@@ -81,10 +66,15 @@
     "invalid_action": "Invalid action: {action}",
     "kernel_action_failed": "Kernel {action} failed: {detail}",
     "session_delete_failed": "Failed to close session: {detail}",
-    "logs_failed": "Failed to fetch logs: {detail}",
     "start_failed": "Start failed: {detail}",
     "stop_failed": "Stop failed: {detail}",
     "restart_failed": "Restart failed: {detail}",
     "token_not_found": "Token not found"
+  },
+  "msg": {
+    "already_running": "JupyterLab is already running",
+    "starting": "Starting JupyterLab",
+    "stopped": "JupyterLab stopped",
+    "restarting": "Restarting JupyterLab"
   }
 }

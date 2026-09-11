@@ -682,11 +682,11 @@ function switchTab(tab: string) {
           :busy="heroBusy"
         >
           <template v-if="heroState === 'unconfigured'" #actions>
-            <BaseButton variant="primary" @click="openAddRemote">{{ t('sync.hero.action.add_storage') }}</BaseButton>
+            <BaseButton variant="primary" @click="openAddRemote">{{ t('sync.storage.add') }}</BaseButton>
           </template>
           <template v-else-if="heroState === 'auth_expired'" #actions>
             <BaseButton v-if="authIssueRemote" variant="primary" @click="openReconnect(authIssueRemote)">
-              {{ t('sync.hero.action.reconnect') }}
+              {{ t('sync.remote.reconnect') }}
             </BaseButton>
           </template>
           <template v-else-if="heroState === 'stopped'" #actions>

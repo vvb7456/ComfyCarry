@@ -331,7 +331,7 @@ onBeforeUnmount(cancelLiveRerun)
 async function handleStop() {
   cancelLiveRerun()
   await post('/api/comfyui/interrupt')
-  toast(t('generate.toast.interrupt_sent'), 'info')
+  toast(t('generate.msg.interrupt_sent'), 'info')
 }
 
 // ── 「生成视频」动线 ──────────────────────────────
@@ -506,7 +506,7 @@ const sse = useComfySSE(tracker, {
           // 后台运行期间抑制 per-iteration 完成提示 (跑一夜会攒几百个);
           // 但 fetchOutputImages / loadQueue / loadHistory / markHistoryDirty 照常执行。
           if (!bgToastSuppressed()) {
-            toast(`${t('generate.toast.gen_complete')}${elapsed}`, 'success')
+            toast(`${t('generate.msg.gen_complete')}${elapsed}`, 'success')
           }
           if (promptId) preview.fetchOutputImages(promptId)
           queueStore.loadQueue()
@@ -517,7 +517,7 @@ const sse = useComfySSE(tracker, {
           if (store.currentState.runMode === 'live') scheduleLiveRerun()
         } else if (result.type === 'execution_interrupted') {
           // 后台运行 / 刚手动停止时不弹: 停止是用户自己点的, 浮动条侧已给过提示
-          if (!bgToastSuppressed()) toast(t('generate.toast.exec_interrupted'), 'warning')
+          if (!bgToastSuppressed()) toast(t('generate.msg.exec_interrupted'), 'warning')
           preview.clearPreview()
           queueStore.loadQueue()
           if (drawerOpen.value) queueStore.loadHistory()

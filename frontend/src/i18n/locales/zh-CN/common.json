@@ -31,19 +31,7 @@
     "switch_zh": "切换到中文",
     "switch_en": "Switch to English"
   },
-  "unit": {
-    "items": "个",
-    "seconds": "秒"
-  },
-  "filter": {
-    "all": "全部",
-    "all_types": "全部类型",
-    "all_status": "全部状态",
-    "all_folders": "全部文件夹"
-  },
   "log": {
-    "title": "日志",
-    "clear": "清空日志",
     "empty": "暂无输出",
     "standby": "已连接",
     "loading": "加载中",
@@ -52,7 +40,6 @@
     "follow_off": "取消跟随最新行",
     "loading_more": "加载更早日志..."
   },
-  "scroll_top": "返回顶部",
   "theme_toggle": "切换主题",
   "clipboard_copied": "已复制到剪贴板",
   "clipboard_failed": "复制失败",
@@ -63,7 +50,6 @@
   "search_hint": "搜索…",
   "loading": "加载中...",
   "load_failed": "加载失败",
-  "empty": "暂无数据",
   "filter_hint": "筛选…",
   "chip_more": "+{n} 更多",
   "chip_collapse": "收起",
@@ -73,8 +59,7 @@
     "pick_label": "从 input 选择",
     "upload_label": "拖放或点击上传",
     "or_divider": "或",
-    "unsupported_type": "不支持的文件类型：{name}",
-    "remove": "移除"
+    "unsupported_type": "不支持的文件类型：{name}"
   },
   "n_selected": "已选 {count} 项",
   "pagination": {

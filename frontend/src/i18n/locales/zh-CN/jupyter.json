@@ -6,20 +6,14 @@
     "stopped": { "title": "JupyterLab 已停止", "subtitle": "已停止，活跃内核与会话已结束。" },
     "not_created": { "title": "尚未创建 JupyterLab", "subtitle": "启动后可在浏览器中运行 Notebook 与终端。" },
     "failed": { "title": "JupyterLab 运行出错", "subtitle": "启动失败，详情见 Jupyter 日志。" },
-    "action": {
-      "open": "打开 JupyterLab",
-      "start": "启动 JupyterLab"
-    }
+    "action": { "open": "打开 JupyterLab", "start": "启动 JupyterLab" }
   },
   "facts": {
     "port": "监听端口",
     "address": "访问地址",
     "version": "版本",
     "cpu": "CPU",
-    "memory": "内存",
-    "kernels": "活跃内核",
-    "sessions": "活跃会话",
-    "terminals": "终端"
+    "memory": "内存"
   },
   "token": {
     "title": "访问令牌"
@@ -61,17 +55,8 @@
   },
   "confirm": {
     "stop": "确定要停止 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",
-    "stop_warning": "活跃的内核和会话将丢失",
     "restart": "确定要重启 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",
     "close_session": "确定要关闭此会话吗？\n\n关联的内核也将被停止。"
-  },
-  "toast": {
-    "starting": "JupyterLab 启动中...",
-    "start_failed": "启动失败",
-    "stopped": "JupyterLab 已停止",
-    "stop_failed": "停止失败",
-    "restarting": "Jupyter 正在重启",
-    "restart_failed": "重启失败"
   },
   "err": {
     "fallback": "JupyterLab 操作失败",
@@ -81,10 +66,15 @@
     "invalid_action": "无效的操作：{action}",
     "kernel_action_failed": "内核 {action} 失败：{detail}",
     "session_delete_failed": "关闭会话失败：{detail}",
-    "logs_failed": "获取日志失败：{detail}",
     "start_failed": "启动失败：{detail}",
     "stop_failed": "停止失败：{detail}",
     "restart_failed": "重启失败：{detail}",
     "token_not_found": "未找到令牌"
+  },
+  "msg": {
+    "already_running": "JupyterLab 已在运行",
+    "starting": "正在启动 JupyterLab",
+    "stopped": "JupyterLab 已停止",
+    "restarting": "正在重启 JupyterLab"
   }
 }

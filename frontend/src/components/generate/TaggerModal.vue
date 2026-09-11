@@ -274,7 +274,7 @@ function onCopy() {
             </BaseButton>
             <BaseButton size="sm" @click="onCopy">
               <MsIcon name="content_copy" size="xs" color="none" />
-              {{ t('generate.interrogate.copy') }}
+              {{ t('common.btn.copy') }}
             </BaseButton>
           </div>
         </div>

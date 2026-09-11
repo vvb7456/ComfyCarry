@@ -24,8 +24,7 @@
     "action": {
       "connect_public": "连接公共节点",
       "connect_custom": "使用自定义隧道",
-      "start": "启动隧道",
-      "retry": "重试"
+      "start": "启动隧道"
     }
   },
   "facts": {
@@ -138,8 +137,8 @@
       "destroy_to_public": "切换到公共 Tunnel 将移除当前自定义隧道，继续吗？",
       "update_restart": "将使用新参数重建隧道并重启，继续吗？"
     },
-    "root_domain_help": "需已在 Cloudflare 托管",
-    "token_help": "需具有 Tunnel 与 DNS 的编辑权限"
+    "root_domain_help": "需已在 Cloudflare 托管。",
+    "token_help": "需具有 Tunnel 与 DNS 的编辑权限。"
   },
   "msg": {
     "token_valid": "Token 验证通过"

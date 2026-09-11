@@ -354,7 +354,7 @@ function openAddSvc() {
               <BaseButton @click="openSettings('custom')">{{ t('tunnel.hero.action.connect_custom') }}</BaseButton>
             </template>
             <BaseButton v-else-if="heroState === 'stopped'" variant="primary" :loading="pendingAction === 'start'" @click="tunnelStartByMode">{{ t('tunnel.hero.action.start') }}</BaseButton>
-            <BaseButton v-else-if="heroState === 'failed'" variant="primary" :loading="pendingAction === 'start'" @click="tunnelStartByMode">{{ t('tunnel.hero.action.retry') }}</BaseButton>
+            <BaseButton v-else-if="heroState === 'failed'" variant="primary" :loading="pendingAction === 'start'" @click="tunnelStartByMode">{{ t('common.btn.retry') }}</BaseButton>
           </template>
           <template v-if="factsList.length" #facts>
             <span v-for="fact in factsList" :key="fact.label">{{ fact.label }}<b>{{ fact.value }}</b></span>

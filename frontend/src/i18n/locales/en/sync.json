@@ -30,9 +30,7 @@
       "subtitle_failed": "Auto sync is stopped; last sync failed with {failed}/{total} rules failed."
     },
     "action": {
-      "add_storage": "Add Storage",
-      "reconnect": "Reconnect",
-      "start": "Start auto sync"
+      "start": "Start Auto Sync"
     },
     "worker_stop": "Stop auto sync"
   },
@@ -71,7 +69,8 @@
     "authenticated": "Authenticated",
     "not_configured": "Not configured",
     "click_refresh": "Click refresh to view capacity",
-    "used": "Used"
+    "used": "Used",
+    "remaining": "Free"
   },
   "remote": {
     "add": "Add Storage",
@@ -187,7 +186,9 @@
     "rule_failed": "❌ {name} failed (code={code})",
     "rule_timeout": "⏰ {name} timeout ({seconds}s)",
     "rule_error": "❌ {name} error: {error}",
-    "rule_path_invalid": "❌ {name}: local path is out of bounds or invalid ({path})"
+    "rule_path_invalid": "❌ {name}: local path is out of bounds or invalid ({path})",
+    "rclone_killed": "rclone process was killed",
+    "worker_error": "Sync worker error: {error}"
   },
   "browse": {
     "remote_title": "Browse Remote Directory",
@@ -196,7 +197,6 @@
     "path_placeholder": "Type or paste a path",
     "root_local": "workspace",
     "no_subdirs": "No subdirectories here",
-    "retry": "Retry",
     "failed": "Failed to list directory",
     "remote_required": "Pick a remote above first",
     "mkdir_btn": "New Folder",
@@ -207,7 +207,7 @@
     "hero_online": "{count} client(s) online",
     "hero_offline": "No clients online",
     "copy_dav": "Copy address",
-    "refresh": "Refresh client list",
+    "refresh": "Refresh Client List",
     "facts": {
       "listen": "Listen",
       "root": "Serving",
@@ -243,7 +243,6 @@
     }
   },
   "msg": {
-    "config_saved": "Config saved, found {count} remote storage(s): {remotes}",
     "remote_created": "Remote storage “{name}” created",
     "remote_deleted": "Remote storage “{name}” deleted",
     "rules_saved": "Saved {count} rule(s)",
@@ -287,9 +286,6 @@
     "rule_filters_invalid": "Rule {label}: filters must be a list of lines",
     "rule_method_invalid": "Rule {label}: invalid method ({value})",
     "rule_missing_fields": "Every rule needs an ID, a remote storage and a local path",
-    "rule_path_is_root": "Rule {label}: cannot sync the {root} root itself",
-    "rule_path_outside": "Rule {label}: path out of bounds, must be inside {root}",
-    "rule_path_required": "Rule {label}: local path is required",
     "rule_remote_invalid": "Rule {label}: invalid remote storage name",
     "rule_trigger_invalid": "Rule {label}: invalid trigger ({value})",
     "rules_none_matched": "No matching rule found",
@@ -298,8 +294,14 @@
     "storage_auth_expired": "Authorization expired — run rclone config reconnect to re-authorize",
     "storage_not_found": "Remote storage not found or wrong path",
     "storage_timeout": "Query timed out",
-    "storage_unsupported": "This storage type does not report quota",
-    "oauth_drives_failed": "Failed to fetch drives list: {detail}"
+    "storage_unsupported": "This storage type doesn't support capacity queries",
+    "oauth_drives_failed": "Failed to fetch drives list: {detail}",
+    "invalid_type": "This storage type does not support OAuth",
+    "session_active": "An authorization session is already active",
+    "invalid_callback": "Invalid callback URL",
+    "oauth_paste_not_ready": "Authorization is not ready; get the authorization link first",
+    "oauth_callback_rejected": "Authorization callback rejected: {detail}",
+    "oauth_relay_unreachable": "Cannot reach the authorization service: {detail}"
   },
   "providers": {
     "drive_desc": "Sign in with Google",

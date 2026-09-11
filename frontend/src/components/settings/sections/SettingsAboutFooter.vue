@@ -229,7 +229,11 @@ async function reinitialize() {
         </a>
       </div>
       <p class="about-credit">
-        {{ t('settings.about.credit_prefix') }}<a class="about-author" :href="erocraftUrl" target="_blank" rel="noopener noreferrer" lang="zh-CN">艾萝工坊</a>{{ t('settings.about.credit_suffix') }}
+        <i18n-t keypath="settings.about.credit" tag="span">
+          <template #link>
+            <a class="about-author" :href="erocraftUrl" target="_blank" rel="noopener noreferrer" lang="zh-CN">艾萝工坊</a>
+          </template>
+        </i18n-t>
       </p>
       <p class="about-copyright" lang="en">© {{ copyrightRange }} Erocraft</p>
     </footer>

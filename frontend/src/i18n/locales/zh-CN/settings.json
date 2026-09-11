@@ -46,7 +46,7 @@
     "current": "当前密码",
     "current_placeholder": "输入当前密码",
     "new": "新密码",
-    "new_placeholder": "输入新密码 (至少 4 个字符)",
+    "new_placeholder": "输入新密码",
     "confirm": "确认新密码",
     "confirm_placeholder": "再次输入新密码",
     "update_btn": "更新密码",
@@ -59,7 +59,7 @@
     "change_btn": "修改密码"
   },
   "api_key": {
-    "help": "外部脚本或应用以 X-API-Key / Bearer 请求头携带它调用面板 API",
+    "help": "外部脚本或应用以 X-API-Key / Bearer 请求头携带它调用面板 API。",
     "regenerate": "重新生成",
     "regenerate_confirm": "确定要重新生成 API Key 吗？旧 Key 将立即失效。",
     "regenerated": "API Key 已重新生成",
@@ -68,7 +68,6 @@
     "row_desc": "外部脚本访问 API 的凭证"
   },
   "config": {
-    "title": "配置管理",
     "export_desc": "将所有设置导出为 JSON 文件",
     "export_btn": "导出",
     "import_desc": "从 JSON 备份文件恢复设置",
@@ -83,11 +82,9 @@
     "import_title": "导入配置"
   },
   "reinit": {
-    "title": "重新初始化",
-    "desc": "重置 ComfyUI 安装并重新进入部署向导",
     "btn": "重新初始化",
     "keep_models": "保留模型文件与产物",
-    "confirm": "是否重新初始化ComfyCarry？",
+    "confirm": "确定要重新初始化 ComfyCarry 吗？\n\n所有配置与服务将重置。",
     "in_progress": "正在重新初始化...",
     "success": "已重置，正在跳转到部署向导...",
     "partial_fail": "部分操作失败"
@@ -98,8 +95,7 @@
     "version": "版本",
     "github": "GitHub",
     "dockerhub": "Docker Hub",
-    "credit_prefix": "由 ",
-    "credit_suffix": " 开发"
+    "credit": "由 {link} 开发"
   },
   "update": {
     "up_to_date": "已是最新版本",
@@ -116,7 +112,6 @@
       "restarting": "正在重启 ComfyCarry…",
       "done": "更新完成，正在重新载入…"
     },
-    "check_failed": "检查失败",
     "done": "更新完成，正在重启...",
     "error": "更新失败"
   },
@@ -124,17 +119,13 @@
   "restarting": "ComfyCarry 正在重启，3 秒后自动刷新...",
   "civitai": {
     "key_title": "CivitAI API 密钥",
-    "key_desc_prefix": "在",
     "key_link": "CivitAI 账户设置",
-    "key_desc_suffix": "中生成，用于模型搜索与下载",
     "placeholder": "粘贴 API 密钥",
     "saved": "API Key 已保存",
     "save_failed": "保存失败",
-    "clear_confirm": "确定要清除 CivitAI API Key 吗？",
     "cleared": "API Key 已清除",
-    "err_empty": "请输入 API Key",
     "nsfw": {
-      "help": "浏览级别决定展示哪些模型；模糊开关决定已出现的 NSFW 图片是否打码",
+      "help": "浏览级别决定展示哪些模型；模糊开关决定已出现的 NSFW 图片是否打码。",
       "level_label": "浏览级别",
       "level_desc": "决定搜索结果中展示哪些模型",
       "level": {
@@ -144,7 +135,8 @@
       },
       "blur": "模糊 NSFW 图片",
       "blur_desc": "预览图打码，点击后显示原图"
-    }
+    },
+    "key_desc": "在 {link} 中生成，用于模型搜索与下载"
   },
   "llm": {
     "provider": {
@@ -171,20 +163,14 @@
     },
     "model": {
       "label": "模型",
-      "refresh_hint": "刷新获取模型列表",
       "input_placeholder": "选择或输入模型名称",
       "search_placeholder": "搜索模型...",
-      "fetch_title": "获取模型列表",
-      "fetching": "获取中...",
       "fetch_failed": "获取失败",
-      "fetched_count": "获取到 {count} 个模型",
       "no_match": "无匹配模型",
-      "select": "点击选择模型",
-      "none_available": "无可用模型",
       "context_fmt": "上下文：{n} tokens",
       "input_fmt": "输入：${n}/M",
       "output_fmt": "输出：${n}/M",
-      "model_help": "展开下拉时自动获取模型列表；也可直接输入模型名称"
+      "model_help": "展开下拉时自动获取模型列表；也可直接输入模型名称。"
     },
     "params": {
       "temperature": "温度",
@@ -193,9 +179,9 @@
       "max_tokens_desc": "单次回复的最大 token 数",
       "stream": "流式传输",
       "stream_desc": "逐字输出回复",
-      "temperature_help": "创作类建议 0.8–1.2；翻译、描述类建议 0.3–0.5",
-      "max_tokens_help": "提示词生成 500–1000 即可；长对话可设更高",
-      "stream_help": "部分平台在流式模式下内容过滤严格，可关闭"
+      "temperature_help": "创作类建议 0.8–1.2；翻译、描述类建议 0.3–0.5。",
+      "max_tokens_help": "提示词生成 500–1000 即可；长对话可设更高。",
+      "stream_help": "部分平台在流式模式下内容过滤严格，可关闭。"
     },
     "test_title": "测试连接",
     "test_btn": "测试",

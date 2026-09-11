@@ -46,7 +46,7 @@
     "current": "Current Password",
     "current_placeholder": "Enter current password",
     "new": "New Password",
-    "new_placeholder": "Enter new password (at least 4 characters)",
+    "new_placeholder": "Enter new password",
     "confirm": "Confirm New Password",
     "confirm_placeholder": "Enter new password again",
     "update_btn": "Update Password",
@@ -56,10 +56,10 @@
     "err_mismatch": "Passwords do not match",
     "row_label": "Login password",
     "row_desc": "Change the password for the ComfyCarry panel",
-    "change_btn": "Change password"
+    "change_btn": "Change Password"
   },
   "api_key": {
-    "help": "Carried as X-API-Key / Bearer header when external scripts or apps call the panel API",
+    "help": "Carried as X-API-Key / Bearer header when external scripts or apps call the panel API.",
     "regenerate": "Regenerate",
     "regenerate_confirm": "Regenerate API Key? The old key will stop working immediately.",
     "regenerated": "API Key regenerated",
@@ -68,7 +68,6 @@
     "row_desc": "Credential for external scripts to access the API"
   },
   "config": {
-    "title": "Configuration",
     "export_desc": "Export all settings to a JSON file",
     "export_btn": "Export",
     "import_desc": "Restore settings from a JSON backup",
@@ -83,11 +82,9 @@
     "import_title": "Import config"
   },
   "reinit": {
-    "title": "Re-initialize",
-    "desc": "Reset the ComfyUI installation and reopen the setup wizard",
     "btn": "Re-initialize",
     "keep_models": "Keep model files & outputs",
-    "confirm": "Re-initialize ComfyCarry?",
+    "confirm": "Re-initialize ComfyCarry?\n\nAll configuration and services will be reset.",
     "in_progress": "Re-initializing...",
     "success": "Reset complete, redirecting to setup wizard...",
     "partial_fail": "Some operations failed"
@@ -98,8 +95,7 @@
     "version": "Version",
     "github": "GitHub",
     "dockerhub": "Docker Hub",
-    "credit_prefix": "Powered by ",
-    "credit_suffix": ""
+    "credit": "Powered by {link}"
   },
   "update": {
     "up_to_date": "Already up to date",
@@ -116,7 +112,6 @@
       "restarting": "Restarting ComfyCarry…",
       "done": "Update complete; reloading…"
     },
-    "check_failed": "Check failed",
     "done": "Update completed, restarting...",
     "error": "Update failed"
   },
@@ -127,11 +122,9 @@
     "placeholder": "Paste API Key",
     "saved": "API Key saved",
     "save_failed": "Save failed",
-    "clear_confirm": "Clear CivitAI API Key?",
     "cleared": "API Key cleared",
-    "err_empty": "Please enter API Key",
     "nsfw": {
-      "help": "Browsing level controls which models are shown; the blur switch masks NSFW images of shown content",
+      "help": "Browsing level controls which models are shown; the blur switch masks NSFW images of shown content.",
       "level_label": "Browsing level",
       "level_desc": "Which models are shown in search results",
       "level": {
@@ -142,9 +135,8 @@
       "blur": "Blur NSFW images",
       "blur_desc": "Blur previews, click to reveal"
     },
-    "key_desc_prefix": "Generated from ",
     "key_link": "CivitAI account settings",
-    "key_desc_suffix": "; used for model search and downloads"
+    "key_desc": "Generated from {link}; used for model search and downloads"
   },
   "llm": {
     "provider": {
@@ -171,20 +163,14 @@
     },
     "model": {
       "label": "Model",
-      "refresh_hint": "Refresh to fetch model list",
       "input_placeholder": "Select or enter a model name",
       "search_placeholder": "Search models...",
-      "fetch_title": "Fetch model list",
-      "fetching": "Fetching...",
       "fetch_failed": "Fetch failed",
-      "fetched_count": "Fetched {count} models",
       "no_match": "No matching models",
-      "select": "Click to select model",
-      "none_available": "No models available",
       "context_fmt": "Context: {n} tokens",
       "input_fmt": "Input: ${n}/M",
       "output_fmt": "Output: ${n}/M",
-      "model_help": "Fetched automatically when the dropdown opens; you can also type a model name directly"
+      "model_help": "Fetched automatically when the dropdown opens; you can also type a model name directly."
     },
     "params": {
       "temperature": "Temperature",
@@ -193,9 +179,9 @@
       "temperature_desc": "Randomness of the reply (0–2)",
       "max_tokens_desc": "Maximum tokens per reply",
       "stream_desc": "Stream the reply word by word",
-      "temperature_help": "0.8–1.2 for creative tasks; 0.3–0.5 for translation and descriptions",
-      "max_tokens_help": "500–1000 is enough for prompt generation; raise it for long conversations",
-      "stream_help": "Some platforms filter streamed content strictly; turn off if needed"
+      "temperature_help": "0.8–1.2 for creative tasks; 0.3–0.5 for translation and descriptions.",
+      "max_tokens_help": "500–1000 is enough for prompt generation; raise it for long conversations.",
+      "stream_help": "Some platforms filter streamed content strictly; turn off if needed."
     },
     "test_btn": "Test",
     "test_success": "Connection successful",
@@ -229,7 +215,7 @@
       "provider_desc": "Service used for Chinese translation; Auto = pick by availability"
     },
     "normalize": {
-      "enable": "Enable normalization",
+      "enable": "Enable Normalization",
       "comma": "Half-width commas",
       "period": "Half-width periods",
       "bracket": "Half-width brackets",

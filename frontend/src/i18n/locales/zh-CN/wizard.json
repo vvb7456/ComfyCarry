@@ -4,7 +4,6 @@
     "deploy_mode_invalid": "部署请求类型无效",
     "deploy_retry_unavailable": "没有可重试的部署计划，请返回向导重新配置"
   },
-  "header": "ComfyCarry",
   "subtitle": "部署向导",
   "step_labels": [
     "部署方式",
@@ -43,8 +42,7 @@
       "desc": "从之前导出的配置文件恢复所有设置，快速重建工作环境"
     },
     "import_upload": {
-      "hint": "上传之前导出的 <code>comfycarry-config.json</code> 配置文件",
-      "select_file": "选择文件"
+      "hint": "上传之前导出的 <code>comfycarry-config.json</code> 配置文件"
     }
   },
   "step1": {
@@ -66,14 +64,12 @@
     "desc": "配置 Cloudflare Tunnel 获得稳定的公网访问（ComfyUI / SSH / JupyterLab）",
     "public": {
       "title": "公共节点",
-      "recommended": "推荐",
       "desc": "一键启用，无需域名或 CF 账号。通过 ComfyCarry 共享节点获得公网访问。",
       "capacity_loading": "容量加载中...",
       "capacity_info": "容量：{active} / {max}",
       "capacity_full": "(已满)",
       "capacity_error": "容量：无法获取",
-      "subdomain_placeholder": "留空自动生成 (如 cc-a1b2c3d4)",
-      "subdomain_hint": "设置后换实例时可保持相同地址。3-32位小写字母、数字或连字符。"
+      "subdomain_placeholder": "留空自动生成 (如 cc-a1b2c3d4)"
     },
     "current_active": "当前启用",
     "custom": {
@@ -91,8 +87,6 @@
     "subdomain_prefix_placeholder": "留空则随机生成 (如 cc-a1b2c3d4)",
     "validate_token": "验证 Token",
     "validate_empty": "请填写 API Token 和域名",
-    "validating": "验证中...",
-    "validate_account": "· 账户：",
     "validate_fail": "验证失败",
     "validate_error": "验证请求失败："
   },
@@ -111,13 +105,11 @@
     "push_title": "自动推送",
     "push_help": "运行期间监控本地目录变化，自动上传新增/修改的文件到云端。适合生成图等需要备份的内容。",
     "selected_n": "已选 {n} 个",
-    "output_label": "上传输出",
     "method_move": "移动",
     "method_keep": "保留本地",
     "trigger_deploy": "部署执行",
     "trigger_watch": "持续监控",
     "trigger_manual": "手动",
-    "remote_placeholder": "remote",
     "remote_path_placeholder": "/ComfyUI/..."
   },
   "step5": {
@@ -149,14 +141,12 @@
     "model_placeholder": "选择或输入模型名称",
     "search_model": "搜索模型...",
     "fetch_models": "获取模型",
-    "skip_hint": "也可跳过后在 ComfyCarry 设置中配置",
     "base_url_placeholder_openai": "https://api.example.com/v1",
     "base_url_placeholder_anthropic": "https://api.example.com（不要包含 /v1/messages）",
     "base_url_help_openai": "填写 API 根地址，不要填写 /chat/completions 或 /responses。",
     "base_url_help_anthropic": "填写 API 根地址，不要填写 /v1/messages。",
     "fetch_fail": "获取失败",
-    "request_fail": "请求失败：",
-    "no_models": "无可用模型"
+    "request_fail": "请求失败："
   },
   "step7": {
     "title": "自定义节点插件",
@@ -189,21 +179,12 @@
     "gpu_label": "GPU",
     "no_gpu": "未检测到 CUDA GPU",
     "image_label": "镜像",
-    "prebuilt_image": "ComfyCarry",
-    "gpu_too_old": "GPU 算力不足",
-    "gpu_too_old_detail": "FlashAttention 2 需要 Ampere (sm_80) 及以上架构。请选择配备 RTX 30xx / A100 / RTX 40xx 及以上 GPU 的实例。",
-    "no_gpu_detail": "ComfyUI 需要 NVIDIA GPU 运行。请在 GPU 实例上部署，或检查 CUDA 驱动是否正确安装。",
-    "unsupported": "不支持的运行环境",
-    "unsupported_detail": "当前环境缺少必要的运行时组件。请使用 ComfyCarry 预构建镜像创建实例："
+    "prebuilt_image": "ComfyCarry"
   },
   "env_hint": {
-    "password_detected": "已从环境变量 DASHBOARD_PASSWORD 检测到密码，可直接使用或修改",
     "tunnel_active_public": "Tunnel 已启用（公共节点：{url}），如需修改请在 Dashboard Tunnel 页操作",
     "tunnel_active_custom": "Tunnel 已启用（自定义模式），如需修改请在 Dashboard Tunnel 页操作",
-    "cf_detected": "已从环境变量检测到 CF 配置",
-    "public_tunnel_detected": "已从环境变量 PUBLIC_TUNNEL 检测到配置，公共 Tunnel 已自动选择",
-    "rclone_detected": "已从环境变量 RCLONE_CONF_BASE64 检测到配置",
-    "civitai_detected": "已从环境变量 CIVITAI_TOKEN 检测到 API Key"
+    "cf_detected": "已从环境变量检测到 CF 配置"
   },
   "deploy": {
     "deploying": "正在部署...",
@@ -211,28 +192,19 @@
     "elapsed": "已用时：{time}",
     "elapsed_format": "{min} 分 {sec} 秒",
     "elapsed_sec": "{sec} 秒",
-    "done": "部署完成",
     "done_title": "部署完成",
     "done_msg": "部署完成！",
     "failed": "部署失败",
     "failed_title": "部署失败",
     "enter": "进入 ComfyCarry",
     "retry": "重试部署",
-    "retrying": "正在部署... (智能重试)",
     "back_to_config": "返回修改配置",
     "start_fail": "部署启动失败：",
     "request_fail": "请求失败：",
-    "error_banner": "错误：{error}",
-    "error_abnormal": "部署进程异常终止",
-    "error_retry_hint": "已完成的步骤会在重试时自动跳过，节省时间。",
-    "attn_warn": "{names} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。",
-    "last_incomplete": "上次部署未完成：",
-    "retry_hint": "点击「重试部署」将自动跳过已完成的步骤。"
+    "attn_warn": "{names} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。"
   },
   "import": {
     "invalid_format": "无效的配置文件格式",
-    "fail": "导入失败：",
-    "unknown_error": "未知错误",
     "success": "导入成功！已恢复 {count} 项配置。点击「下一步」查看配置摘要并开始部署。",
     "parse_fail": "文件解析失败："
   },

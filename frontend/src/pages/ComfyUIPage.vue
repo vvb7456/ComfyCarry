@@ -122,10 +122,10 @@ const sse = useComfySSE(tracker, {
     if (result?.finished) {
       if (result.type === 'execution_done') {
         const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
-        toast(`${t('comfyui.toast.gen_complete')}${elapsed}`, 'success')
+        toast(`${t('comfyui.msg.gen_complete')}${elapsed}`, 'success')
         loadStatus()
       } else if (result.type === 'execution_interrupted') {
-        toast(t('comfyui.toast.exec_interrupted'), 'warning')
+        toast(t('comfyui.msg.exec_interrupted'), 'warning')
       }
     }
   },
@@ -203,7 +203,7 @@ async function comfyStart() {
   const d = await post<{ ok?: boolean }>('/api/comfyui/restart')
   actionLoading.value = null
   if (!d?.ok) return
-  toast(t('comfyui.toast.starting'), 'info')
+  toast(t('comfyui.msg.starting'), 'info')
   setTimeout(loadStatus, 3000)
 }
 
@@ -213,7 +213,7 @@ async function comfyStop() {
   const d = await post('/api/services/comfy/stop')
   actionLoading.value = null
   if (!d) return
-  toast(t('comfyui.toast.stopped'), 'success')
+  toast(t('comfyui.msg.stopped'), 'success')
   setTimeout(loadStatus, 1000)
 }
 
@@ -224,7 +224,7 @@ async function comfyRestart() {
   const d = await post<{ ok?: boolean }>('/api/comfyui/restart')
   actionLoading.value = null
   if (!d?.ok) return
-  toast(t('comfyui.toast.restarting'), 'info')
+  toast(t('comfyui.msg.restarting'), 'info')
   setTimeout(loadStatus, 5000)
 }
 
@@ -233,7 +233,7 @@ async function comfyInterrupt() {
   const d = await post('/api/comfyui/interrupt')
   actionLoading.value = null
   if (!d) return
-  toast(t('comfyui.toast.interrupt_sent'), 'warning')
+  toast(t('comfyui.msg.interrupt_sent'), 'warning')
 }
 
 // ── 参数保存 / 版本切换 ────────────────────────────────────────
@@ -317,7 +317,7 @@ function onVersionSwitched() {
               :disabled="acting"
               @click="comfyStart"
             >
-              {{ t('comfyui.hero.action.retry') }}
+              {{ t('common.btn.retry') }}
             </BaseButton>
           </template>
           <template v-if="factsList.length" #facts>

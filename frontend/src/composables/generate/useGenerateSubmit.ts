@@ -77,7 +77,7 @@ export function useGenerateSubmit(
 
     // 1. Check: not already generating
     if (execState.value) {
-      toast(t('generate.toast.wait_workflow'), 'warning')
+      toast(t('generate.msg.wait_workflow'), 'warning')
       return false
     }
 
@@ -537,7 +537,7 @@ export function useGenerateSubmit(
         toast(t('generate.error.prompt_id_missing'), 'error')
         return null
       }
-      toast(t('generate.toast.queued'), 'success')
+      toast(t('generate.msg.queued'), 'success')
       return result.prompt_id
     } finally {
       submitting.value = false

@@ -171,9 +171,11 @@ onUnmounted(() => guardHub.unregister(dirtyEntry))
           <div class="settings-row__text">
             <div class="settings-row__label">{{ t('settings.civitai.key_title') }}</div>
             <div class="settings-row__desc">
-              {{ t('settings.civitai.key_desc_prefix') }}
-              <a href="https://civitai.com/user/account" target="_blank" class="link">{{ t('settings.civitai.key_link') }}</a>
-              {{ t('settings.civitai.key_desc_suffix') }}
+              <i18n-t keypath="settings.civitai.key_desc" tag="span">
+                <template #link>
+                  <a href="https://civitai.com/user/account" target="_blank" class="link">{{ t('settings.civitai.key_link') }}</a>
+                </template>
+              </i18n-t>
             </div>
           </div>
           <div class="settings-row__control">

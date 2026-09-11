@@ -230,7 +230,7 @@ export function useTagInterrogation() {
     } catch (e: any) {
       status.value = 'idle'
       startTime.value = 0
-      toast(t('generate.toast.interrogate_submit_failed') + ': ' + (e?.message || e), 'error')
+      toast(t('generate.msg.interrogate_submit_failed') + ': ' + (e?.message || e), 'error')
     }
   }
 
@@ -252,7 +252,7 @@ export function useTagInterrogation() {
           toast(t('generate.interrogate.empty_result'), 'warning')
         }
       } catch {
-        toast(t('generate.toast.interrogate_result_failed'), 'error')
+        toast(t('generate.msg.interrogate_result_failed'), 'error')
       }
     } else if (!success) {
       toast(t('generate.interrogate.failed'), 'error')

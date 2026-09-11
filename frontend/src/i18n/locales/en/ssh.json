@@ -22,7 +22,7 @@
       "subtitle": "Start it to connect via the tunnel address or the local port."
     },
     "action": {
-      "copy": "Copy connection command",
+      "copy": "Copy Connection Command",
       "start": "Start SSH"
     }
   },
@@ -52,19 +52,19 @@
     "add_btn": "Add Key",
     "add_placeholder": "Paste one or more SSH public keys (one per line)",
     "add_submit": "Add",
-    "delete_btn": "Delete key",
+    "delete_btn": "Delete Key",
     "empty": "No public keys yet"
   },
   "settings": {
     "title": "SSH Settings",
     "label": "SSH password follow",
     "desc": "The root SSH password follows panel password changes",
-    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected",
+    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected.",
     "enabled_toast": "SSH password follow enabled, root password synced to the panel password",
     "disabled_toast": "SSH password follow disabled, SSH only allows public key login",
     "lockout_title": "Disable SSH password login",
     "lockout_confirm": "No public key is configured. After disabling, you will not be able to log in to SSH with a password. Continue?",
-    "lockout_btn": "Disable anyway"
+    "lockout_btn": "Disable Anyway"
   },
   "log": {
     "title": "SSH Logs"

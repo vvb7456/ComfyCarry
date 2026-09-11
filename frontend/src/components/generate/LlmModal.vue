@@ -333,7 +333,7 @@ const showNegative = computed(() =>
             </BaseButton>
             <BaseButton size="sm" @click="onCopy">
               <MsIcon name="content_copy" size="xs" color="none" />
-              {{ t('generate.llm_modal.copy') }}
+              {{ t('common.btn.copy') }}
             </BaseButton>
           </div>
         </div>

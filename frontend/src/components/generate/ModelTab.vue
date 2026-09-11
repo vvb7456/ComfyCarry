@@ -398,7 +398,7 @@ function onModelSelect(name: string) {
     state.value.unet = state.value.unetHigh || name
     showModelPicker.value = false
     pickerSlot.value = null
-    toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
+    toast(t('generate.msg.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
     return
   }
 
@@ -419,7 +419,7 @@ function onModelSelect(name: string) {
     state.value.checkpoint = ''
   }
   showModelPicker.value = false
-  toast(t('generate.toast.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
+  toast(t('generate.msg.selected', { name: name.split('/').pop()!.replace(/\.[^.]+$/, '') }), 'success')
 }
 
 // 运行组件: 与 ControlNet/放大/面部/反推 用同一个依赖状态机, 唯一真相是磁盘。

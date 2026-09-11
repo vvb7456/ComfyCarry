@@ -16,16 +16,16 @@
     "queued_uninstall": "已加入卸载队列",
     "queued_update": "已加入更新队列",
     "queued_update_all": "所有插件已加入更新队列",
-    "action_submitted": "操作已提交",
     "enabled": "启用指令已提交，重启后生效",
-    "disabled": "禁用指令已提交，重启后生效"
+    "disabled": "禁用指令已提交，重启后生效",
+    "install_version": "安装此版本",
+    "installing_name": "正在安装 {id}..."
   },
   "tabs": {
     "git": "Git 安装"
   },
   "installed": {
     "all_status": "全部状态",
-    "enabled": "已启用",
     "disabled": "已禁用",
     "has_update": "有更新",
     "refresh": "刷新",
@@ -35,8 +35,7 @@
     "version": "版本",
     "remove": "卸载",
     "load_failed": "获取已安装列表失败",
-    "stats_text": "共 {total} 个插件，{enabled} 个启用，{update} 个有更新 | 显示 {shown} 个",
-    "no_match": "没有匹配的插件",
+    "no_match": "暂无匹配的插件",
     "installed_badge": "已安装"
   },
   "browse": {
@@ -58,17 +57,10 @@
     "installing_btn": "安装中...",
     "request_failed": "请求失败"
   },
-  "toast": {
-    "installing": "安装中",
-    "install_version": "安装此版本",
-    "installing_name": "正在安装 {id}..."
-  },
   "confirm": {
-    "uninstall": "确定要卸载插件吗",
     "uninstall_name": "确定要卸载插件 \"{title}\" 吗？"
   },
   "version_picker": {
-    "title": "选择插件版本",
     "title_name": "{name} - 版本选择",
     "no_version_nightly": "无版本信息 (可能为 nightly 安装)",
     "placeholder": "选择要安装的版本",

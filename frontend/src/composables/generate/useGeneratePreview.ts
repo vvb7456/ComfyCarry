@@ -239,7 +239,7 @@ export function useGeneratePreview() {
     }
 
     // All retries exhausted — toast warning
-    toast(t('generate.toast.no_output'), 'warning')
+    toast(t('generate.msg.no_output'), 'warning')
     loading.value = false
   }
 

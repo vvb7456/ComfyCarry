@@ -45,7 +45,7 @@ async function interrupt() {
   acting.value = 'interrupt'
   try {
     if (!await post('/api/comfyui/interrupt')) return
-    toast(t('comfyui.toast.interrupt_sent'), 'warning')
+    toast(t('comfyui.msg.interrupt_sent'), 'warning')
     setTimeout(() => queueStore.loadQueue(), 1000)
   } finally {
     acting.value = null
@@ -58,7 +58,7 @@ async function deleteItem(promptId: string) {
   acting.value = promptId
   try {
     if (!await post('/api/comfyui/queue/delete', { delete: [promptId] })) return
-    toast(t('comfyui.toast.deleted'), 'success')
+    toast(t('comfyui.msg.deleted'), 'success')
     queueStore.loadQueue()
   } finally {
     acting.value = null

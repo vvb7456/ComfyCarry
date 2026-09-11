@@ -30,8 +30,6 @@
       "subtitle_failed": "自动同步已停止；上次同步失败，{failed}/{total} 条规则失败。"
     },
     "action": {
-      "add_storage": "添加存储",
-      "reconnect": "重新连接",
       "start": "启动自动同步"
     },
     "worker_stop": "停止自动同步"
@@ -71,7 +69,8 @@
     "authenticated": "已认证",
     "not_configured": "未配置",
     "click_refresh": "点击刷新查看容量",
-    "used": "已用"
+    "used": "已用",
+    "remaining": "剩余"
   },
   "remote": {
     "add": "添加存储",
@@ -187,7 +186,9 @@
     "rule_failed": "❌ {name} 失败 (code={code})",
     "rule_timeout": "⏰ {name} 超时 ({seconds}s)",
     "rule_error": "❌ {name} 异常：{error}",
-    "rule_path_invalid": "❌ {name}: 本地路径越界或非法 ({path})"
+    "rule_path_invalid": "❌ {name}: 本地路径越界或非法 ({path})",
+    "rclone_killed": "rclone 进程已被终止",
+    "worker_error": "同步服务内部错误：{error}"
   },
   "browse": {
     "remote_title": "浏览远程目录",
@@ -196,7 +197,6 @@
     "path_placeholder": "直接输入或粘贴路径",
     "root_local": "workspace",
     "no_subdirs": "该目录下没有子目录",
-    "retry": "重试",
     "failed": "读取目录失败",
     "remote_required": "请先在上方选择一个远程存储",
     "mkdir_btn": "新建目录",
@@ -243,7 +243,6 @@
     }
   },
   "msg": {
-    "config_saved": "配置已保存，检测到 {count} 个远程存储：{remotes}",
     "remote_created": "远程存储「{name}」已创建",
     "remote_deleted": "远程存储「{name}」已删除",
     "rules_saved": "已保存 {count} 条规则",
@@ -287,9 +286,6 @@
     "rule_filters_invalid": "规则 {label}：过滤规则必须是文本列表",
     "rule_method_invalid": "规则 {label}：方式取值非法（{value}）",
     "rule_missing_fields": "每条规则都要有 ID、远程存储和本地路径",
-    "rule_path_is_root": "规则 {label}：不能直接同步 {root} 根目录",
-    "rule_path_outside": "规则 {label}：路径越界，必须位于 {root} 内",
-    "rule_path_required": "规则 {label}：请填写本地路径",
     "rule_remote_invalid": "规则 {label}：远程存储名称非法",
     "rule_trigger_invalid": "规则 {label}：触发方式取值非法（{value}）",
     "rules_none_matched": "没有找到匹配的规则",
@@ -299,7 +295,13 @@
     "storage_not_found": "远程存储不存在或路径错误",
     "storage_timeout": "查询超时",
     "storage_unsupported": "此存储类型不支持容量查询",
-    "oauth_drives_failed": "拉取驱动器列表失败：{detail}"
+    "oauth_drives_failed": "拉取驱动器列表失败：{detail}",
+    "invalid_type": "该存储类型不支持 OAuth 授权",
+    "session_active": "已有授权会话进行中，请先完成或取消",
+    "invalid_callback": "回调地址无效",
+    "oauth_paste_not_ready": "授权尚未就绪，请先获取授权链接",
+    "oauth_callback_rejected": "授权回调被拒绝：{detail}",
+    "oauth_relay_unreachable": "无法连接授权服务：{detail}"
   },
   "providers": {
     "drive_desc": "Google 账号登录",

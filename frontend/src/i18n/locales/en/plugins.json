@@ -16,16 +16,16 @@
     "queued_uninstall": "Added to uninstall queue",
     "queued_update": "Added to update queue",
     "queued_update_all": "All plugins added to update queue",
-    "action_submitted": "Action submitted",
     "enabled": "Enable request submitted — takes effect after restart",
-    "disabled": "Disable request submitted — takes effect after restart"
+    "disabled": "Disable request submitted — takes effect after restart",
+    "install_version": "Install this version",
+    "installing_name": "Installing {id}..."
   },
   "tabs": {
     "git": "Git Install"
   },
   "installed": {
     "all_status": "All Status",
-    "enabled": "Enabled",
     "disabled": "Disabled",
     "has_update": "Has Update",
     "refresh": "Refresh",
@@ -35,7 +35,6 @@
     "version": "Version",
     "remove": "Uninstall",
     "load_failed": "Failed to load installed list",
-    "stats_text": "{total} plugins, {enabled} enabled, {update} updates | Showing {shown}",
     "no_match": "No matching plugins",
     "installed_badge": "Installed"
   },
@@ -58,17 +57,10 @@
     "installing_btn": "Installing...",
     "request_failed": "Request failed"
   },
-  "toast": {
-    "installing": "Installing",
-    "install_version": "Install this version",
-    "installing_name": "Installing {id}..."
-  },
   "confirm": {
-    "uninstall": "Uninstall this plugin?",
     "uninstall_name": "Uninstall plugin \"{title}\"?"
   },
   "version_picker": {
-    "title": "Select Plugin Version",
     "title_name": "{name} - Version Selection",
     "no_version_nightly": "No version info (possibly nightly install)",
     "placeholder": "Select a version to install",

@@ -247,7 +247,7 @@ const gpuTempColor = computed(() => {
             @click="emit('refreshAll')"
           >
             <MsIcon name="refresh" />
-            {{ t('dashboard.actions.retry') }}
+            {{ t('common.btn.retry') }}
           </BaseButton>
         </template>
       </div>

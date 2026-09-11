@@ -200,7 +200,7 @@ async function submitOp(op: OpKind, endpoint: string, payload: Record<string, un
 }
 
 async function installPlugin(id: string, version = 'latest') {
-  toast(t('plugins.toast.installing_name', { id }), 'info')
+  toast(t('plugins.msg.installing_name', { id }), 'info')
   const pack = getlistCache[id] || {}
   const payload: Record<string, unknown> = { id, version: pack.version || 'unknown', selected_version: version }
   if (pack.files) payload.files = pack.files
@@ -378,7 +378,7 @@ async function restartNow() {
     <template #footer>
       <BaseButton @click="versionModalOpen = false">{{ t('common.btn.cancel') }}</BaseButton>
       <BaseButton variant="primary" :disabled="!selectedVersion" @click="installVersion(selectedVersion)">
-        {{ t('plugins.toast.install_version') }}
+        {{ t('plugins.msg.install_version') }}
       </BaseButton>
     </template>
   </BaseModal>

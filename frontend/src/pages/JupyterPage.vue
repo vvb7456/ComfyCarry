@@ -189,9 +189,9 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   // 运行期字段随状态显示
   if (addressHost.value) out.push({ label: t('jupyter.facts.address'), value: addressHost.value })
   if (s.version) out.push({ label: t('jupyter.facts.version'), value: `v${s.version}` })
-  out.push({ label: t('jupyter.facts.kernels'), value: String(s.kernels_count ?? 0) })
-  out.push({ label: t('jupyter.facts.sessions'), value: String(s.sessions_count ?? 0) })
-  out.push({ label: t('jupyter.facts.terminals'), value: String(s.terminals_count ?? s.terminals?.length ?? 0) })
+  out.push({ label: t('jupyter.kernels.title'), value: String(s.kernels_count ?? 0) })
+  out.push({ label: t('jupyter.sessions.title'), value: String(s.sessions_count ?? 0) })
+  out.push({ label: t('jupyter.terminals.title'), value: String(s.terminals_count ?? s.terminals?.length ?? 0) })
   if (s.cpu !== undefined) out.push({ label: t('jupyter.facts.cpu'), value: `${s.cpu.toFixed(1)}%` })
   if (s.memory) out.push({ label: t('jupyter.facts.memory'), value: fmtBytes(s.memory) })
   return out
@@ -269,7 +269,7 @@ async function jupyterAction(action: 'start' | 'stop' | 'restart') {
   actionLoading.value = null
   if (!data) return
   if (data.ok) {
-    toast(apiMessageText(data, t(`jupyter.toast.${action === 'start' ? 'starting' : action === 'stop' ? 'stopped' : 'restarting'}`)), 'success')
+    toast(apiMessageText(data, t(`jupyter.msg.${action === 'start' ? 'starting' : action === 'stop' ? 'stopped' : 'restarting'}`)), 'success')
     setTimeout(() => {
       loadStatus()
       if (action !== 'stop') loadJupyterUrl()

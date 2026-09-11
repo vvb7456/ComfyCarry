@@ -24,8 +24,7 @@
     "action": {
       "connect_public": "Connect Public Node",
       "connect_custom": "Use Custom Tunnel",
-      "start": "Start Tunnel",
-      "retry": "Retry"
+      "start": "Start Tunnel"
     }
   },
   "facts": {
@@ -138,8 +137,8 @@
       "destroy_to_public": "Switching to the public tunnel will remove the current custom tunnel. Continue?",
       "update_restart": "The tunnel will be rebuilt with the new parameters and restarted. Continue?"
     },
-    "root_domain_help": "Must be hosted on Cloudflare",
-    "token_help": "Requires Tunnel and DNS edit permissions"
+    "root_domain_help": "Must be hosted on Cloudflare.",
+    "token_help": "Requires Tunnel and DNS edit permissions."
   },
   "msg": {
     "token_valid": "Token verified"

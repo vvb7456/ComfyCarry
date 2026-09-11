@@ -59,7 +59,7 @@ export function useModelActions(
       title: t('models.local.confirm_delete'),
       message: t('models.local.confirm_delete_file', { filename: model.filename }),
       variant: 'danger',
-      confirmText: t('models.local.delete'),
+      confirmText: t('common.btn.delete'),
     })
     if (!ok) return
 

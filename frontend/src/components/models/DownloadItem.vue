@@ -289,7 +289,7 @@ const taskFacts = computed(() => {
       <!-- Failed actions -->
       <template v-else-if="isFailed">
         <BaseButton size="sm" @click="emit('retry', task!.download_id)">
-          <MsIcon name="refresh" size="xs" /> {{ t('models.downloads.retry') }}
+          <MsIcon name="refresh" size="xs" /> {{ t('common.btn.retry') }}
         </BaseButton>
       </template>
     </div>

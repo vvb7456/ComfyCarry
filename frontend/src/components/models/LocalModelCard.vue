@@ -99,8 +99,8 @@ const fetchLabel = computed(() => {
         variant="danger"
         size="sm"
         icon-only
-        :aria-label="t('models.local.delete')"
-        :title="t('models.local.delete')"
+        :aria-label="t('common.btn.delete')"
+        :title="t('common.btn.delete')"
         @click="emit('delete', model)"
       >
         <MsIcon name="delete" />
