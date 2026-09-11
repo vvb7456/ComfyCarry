@@ -93,7 +93,7 @@ const padded = computed(() => props.padding)
 }
 
 .base-card--tone-danger {
-  border-color: rgba(239, 68, 68, 0.25);
+  border-color: color-mix(in srgb, var(--red) 25%, transparent);
 }
 
 .base-card--interactive:hover {

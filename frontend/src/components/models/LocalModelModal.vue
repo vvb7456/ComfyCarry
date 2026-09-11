@@ -215,11 +215,11 @@ function openImage(index: number) {
           <tr><td>{{ t('models.meta.file') }}</td><td class="lm-mono">{{ detail.relative_path }}</td></tr>
           <tr><td>{{ t('models.local.size') }}</td><td>{{ fmtBytes(detail.size_bytes) }}</td></tr>
           <tr v-if="detail.sha256"><td>SHA256</td><td class="lm-mono">{{ detail.sha256 }}</td></tr>
-          <tr><td>{{ t('models.local.source') }}</td><td><a v-if="sourceUrl()" :href="sourceUrl()" target="_blank" rel="noopener" class="lm-source-link">{{ sourceLabel() }} <MsIcon name="open_in_new" class="ms-sm" /></a><template v-else>{{ sourceLabel() }}</template></td></tr>
+          <tr><td>{{ t('models.local.source') }}</td><td><a v-if="sourceUrl()" :href="sourceUrl()" target="_blank" rel="noopener" class="link lm-source-link">{{ sourceLabel() }} <MsIcon name="open_in_new" class="ms-sm" /></a><template v-else>{{ sourceLabel() }}</template></td></tr>
           <tr v-if="detail.source.version_name"><td>{{ t('models.meta.version') }}</td><td>{{ detail.source.version_name }}</td></tr>
           <tr v-for="link in visibleLinks" :key="link.type + link.url">
             <td>{{ link.type }}</td>
-            <td><a :href="link.url" target="_blank" rel="noopener">{{ link.url }} <MsIcon name="open_in_new" class="ms-sm" /></a></td>
+            <td><a class="link" :href="link.url" target="_blank" rel="noopener">{{ link.url }} <MsIcon name="open_in_new" class="ms-sm" /></a></td>
           </tr>
         </tbody>
       </table>
@@ -228,7 +228,7 @@ function openImage(index: number) {
         <div class="lm-section-title"><MsIcon name="label" size="sm" /> {{ t('models.meta.trigger_words') }}</div>
         <div class="lm-word-actions">
           <span class="lm-word-count">{{ selectedWords.size ? t('models.meta.selected_count', { count: selectedWords.size }) : t('models.meta.click_to_select') }}</span>
-          <BaseButton size="sm" variant="success" @click="copySelectedWords">{{ t('models.meta.copy_selected') }}</BaseButton>
+          <BaseButton size="sm" @click="copySelectedWords">{{ t('models.meta.copy_selected') }}</BaseButton>
           <BaseButton size="sm" @click="copyAllWords">{{ t('models.meta.copy_all') }}</BaseButton>
         </div>
         <div ref="twListRef" class="lm-words" :class="{ collapsed: twCollapsed }">
@@ -270,8 +270,7 @@ function openImage(index: number) {
 .lm-table { width: 100%; font-size: var(--text-base); border-collapse: collapse; margin-bottom: var(--sp-4); }
 .lm-table td { padding: 7px 10px; border-bottom: 1px solid var(--bd); vertical-align: top; }
 .lm-table td:first-child { color: var(--t3); white-space: nowrap; width: 100px; font-weight: 500; }
-.lm-table a { color: var(--ac); word-break: break-all; text-decoration: none; }
-.lm-table a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.lm-table a { word-break: break-all; }
 .lm-source-link { white-space: nowrap; }
 .lm-mono { word-break: break-all; font-family: monospace; font-size: .78rem; }
 .lm-section { margin-top: var(--sp-4); }

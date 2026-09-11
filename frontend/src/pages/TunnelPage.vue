@@ -26,7 +26,6 @@ import { apiErrorText } from '@/utils/apiError'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
-import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -70,6 +69,7 @@ const addSvcPreview = computed(() => {
 })
 
 // ── 日志流 ──
+const logOpen = ref(true)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/tunnel/logs',
   streamUrl: '/api/tunnel/logs/stream',
@@ -404,18 +404,20 @@ function openAddSvc() {
           <EmptyState v-else icon="link" :message="t('tunnel.services.empty')" density="compact" />
         </section>
 
-        <!-- 日志 (默认展开) -->
+        <!-- 日志 (默认展开, 折叠标题与分区标题同构) -->
         <section v-if="configured" class="tunnel-block">
-          <CollapsibleGroup icon="terminal" :title="t('tunnel.log.title')">
-            <LogPanel
-              :lines="logLines"
-              :status="logStatus"
-              :has-more="logHasMore"
-              :loading-more="logLoadingMore"
-              :prepending="logPrepending"
-              :on-scroll="logOnScroll"
-            />
-          </CollapsibleGroup>
+          <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
+            {{ t('tunnel.log.title') }}
+          </SectionHeader>
+          <LogPanel
+            v-show="logOpen"
+            :lines="logLines"
+            :status="logStatus"
+            :has-more="logHasMore"
+            :loading-more="logLoadingMore"
+            :prepending="logPrepending"
+            :on-scroll="logOnScroll"
+          />
         </section>
       </template>
     </div>
@@ -456,9 +458,9 @@ function openAddSvc() {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 服务 → 日志 28px */
+/* 分区节奏: Hero → 服务 → 日志 (--section-gap, 与总览一致) */
 .tunnel-block {
-  margin-top: 28px;
+  margin-top: var(--section-gap);
 }
 
 .tunnel-count {

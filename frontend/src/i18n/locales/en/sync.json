@@ -49,8 +49,8 @@
     "empty": "No sync history yet",
     "rules_count": "{count} rules",
     "progress": "{done}/{total} done",
-    "files_bytes": "{files} files · {bytes}",
-    "detail": "View details"
+    "detail": "View details",
+    "files_synced": "Synced {count} files"
   },
   "detail": {
     "title": "Sync Record",

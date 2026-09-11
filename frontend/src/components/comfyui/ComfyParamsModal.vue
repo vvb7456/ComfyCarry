@@ -4,8 +4,8 @@
  *
  * 原 ParamsCard 的表单迁入 600px BaseModal, 字段按「显存与内存 / 精度 / 速度与缓存 /
  * 其他」四组组织。字段控件、默认值与 depends_on 联动仍取后端 schema。
- * 修改过的分组在分组标签上显示圆点; 底部显示已修改项数 + 放弃更改 + 保存并重启。
- * Esc / 遮罩 / 关闭按钮统一经过未保存检查 (同 TunnelSettingsModal)。
+ * 修改过的分组在分组标签上显示圆点; 底部显示已修改项数 + 取消 + 保存并重启。
+ * 保存需重启 ComfyUI 是按钮明示的常识, 取消 / Esc / 遮罩 / 关闭按钮一律丢弃改动直接关闭。
  *
  * 表单状态保留在本组件内: 组件常驻挂载, BaseModal 关闭只销毁插槽, 不销毁这里的 ref。
  * 保存成功通过 saved 事件把新的启动命令回传主页。
@@ -24,6 +24,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import {
   LRU_CACHE_SIZE_PRESETS,
   collectParams,
@@ -170,6 +171,14 @@ const activeParams = computed(() => {
   return group.params as readonly string[]
 })
 
+const groupOptions = computed(() =>
+  PARAM_GROUPS.map(g => ({
+    value: g.key,
+    label: t(`comfyui.params.groups.${g.key}`),
+    dot: groupDirty(g.key),
+  })),
+)
+
 // cache 策略变化时同步 lru 大小 (与后端默认值口径一致)
 watch(() => paramsCurrent.value.cache, (cache) => {
   if (cache !== 'lru') paramsCurrent.value.cache_lru_size = '16'
@@ -181,6 +190,13 @@ function discardChanges() {
   paramsCurrent.value = cloneParams(savedCurrent.value)
   extraArgs.value = savedExtraArgs.value
   normalizeCacheLruSize()
+}
+
+/** 取消: 丢弃全部改动并直接关闭 (footer 取消按钮) */
+function cancelAndClose() {
+  if (saving.value) return
+  discardChanges()
+  emit('update:modelValue', false)
 }
 
 async function save() {
@@ -202,19 +218,12 @@ async function save() {
   }
 }
 
-/** 关闭守卫: 取消 / Esc / 遮罩 / 关闭按钮统一经过未保存检查 */
-async function requestClose() {
-  if (saving.value) return
-  if (isDirty.value) {
-    const r = await confirm({
-      message: t('comfyui.params.discard_confirm'),
-      variant: 'danger',
-      confirmText: t('comfyui.params.discard'),
-      cancelText: t('common.btn.cancel'),
-    })
-    if (r !== true) return
-  }
-  emit('update:modelValue', false)
+/**
+ * 关闭 (Esc / 遮罩 / 关闭按钮): 与取消一致 —— 丢弃全部改动后直接关闭。
+ * 保存需重启 ComfyUI 是按钮明示的常识, 关闭即放弃, 无需二次确认守卫。
+ */
+function requestClose() {
+  cancelAndClose()
 }
 </script>
 
@@ -237,21 +246,12 @@ async function requestClose() {
     </EmptyState>
 
     <template v-else-if="loaded">
-      <div class="param-tabs" role="tablist">
-        <button
-          v-for="group in PARAM_GROUPS"
-          :key="group.key"
-          type="button"
-          role="tab"
-          class="param-tab"
-          :class="{ 'param-tab--active': activeGroup === group.key }"
-          :aria-selected="activeGroup === group.key"
-          @click="activeGroup = group.key"
-        >
-          {{ t(`comfyui.params.groups.${group.key}`) }}
-          <span v-if="groupDirty(group.key)" class="param-tab__dot" aria-hidden="true" />
-        </button>
-      </div>
+      <SegmentedControl
+        v-model="activeGroup"
+        :options="groupOptions"
+        block
+        class="param-group-switch"
+      />
 
       <div class="param-list">
         <template v-for="paramKey in activeParams" :key="paramKey">
@@ -310,8 +310,8 @@ async function requestClose() {
       <span class="param-footer-note">
         {{ dirtyCount ? t('comfyui.params.changed', { count: dirtyCount }) : t('comfyui.params.unchanged') }}
       </span>
-      <BaseButton :disabled="!isDirty || saving" @click="discardChanges">
-        {{ t('comfyui.params.discard') }}
+      <BaseButton :disabled="saving" @click="cancelAndClose">
+        {{ t('common.btn.cancel') }}
       </BaseButton>
       <BaseButton
         variant="primary"
@@ -336,48 +336,9 @@ async function requestClose() {
   font-size: var(--text-sm);
 }
 
-.param-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
+/* 分组切换全宽, 与下方参数列表拉开间距 */
+.param-group-switch {
   margin-bottom: var(--sp-3);
-  background: var(--bg4);
-  border: 1px solid var(--bd);
-  border-radius: var(--rs);
-}
-
-.param-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border: 0;
-  border-radius: calc(var(--rs) - 3px);
-  background: transparent;
-  color: var(--t2);
-  font-family: inherit;
-  font-size: var(--text-xs);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .15s ease, color .15s ease;
-}
-
-.param-tab:hover:not(.param-tab--active) {
-  color: var(--t1);
-}
-
-.param-tab--active {
-  background: color-mix(in srgb, var(--ac) 65%, var(--bg3));
-  color: #fff;
-  font-weight: 500;
-}
-
-.param-tab__dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--c-caution, #e8a33d);
 }
 
 .param-list {
@@ -421,12 +382,6 @@ async function requestClose() {
 }
 
 @media (max-width: 560px) {
-  .param-tabs {
-    display: flex;
-    width: 100%;
-    overflow-x: auto;
-  }
-
   .param-list :deep(.form-field--h) {
     flex-direction: column;
     align-items: stretch;

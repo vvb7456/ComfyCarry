@@ -244,7 +244,7 @@ const footerClass = computed(() => {
 .modal-box--tone-default {}
 
 .modal-box--tone-info {
-  border-color: rgba(96, 165, 250, .38);
+  border-color: color-mix(in srgb, var(--blue) 38%, transparent);
 }
 
 .modal-box--tone-info .modal-title {
@@ -255,7 +255,7 @@ const footerClass = computed(() => {
 }
 
 .modal-box--tone-danger {
-  border-color: rgba(239, 68, 68, .42);
+  border-color: color-mix(in srgb, var(--red) 42%, transparent);
 }
 
 .modal-box--tone-danger .modal-title {

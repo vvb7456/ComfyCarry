@@ -16,17 +16,17 @@
  * 连接命令沿用原有 connectCmd 状态机 (先看 sshd 是否运行, 再取 /api/tunnel/status):
  *   有隧道 SSH 映射 → cloudflared ProxyCommand; 无映射 → 本机端口直连。
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
-import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import SSHSettingsModal from '@/components/ssh/SSHSettingsModal.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
@@ -68,6 +68,8 @@ const addingKey = ref(false)
 
 // ─── 日志流 ───────────────────────────────────────────────────────────────────
 
+// ── 日志流 ──
+const logOpen = ref(true)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/ssh/logs',
   streamUrl: '/api/ssh/logs/stream',
@@ -190,16 +192,15 @@ async function addKey() {
   if (data.errors?.length) toast(data.errors.join(', '), 'error')
   if (data.added > 0) {
     toast(t('ssh.toast.key_added', { n: data.added }), 'success')
-    newKeysText.value = ''
     showAddKey.value = false
     await loadKeys()
   }
 }
 
-function cancelAddKey() {
-  showAddKey.value = false
-  newKeysText.value = ''
-}
+// 弹窗关闭 (按钮 / 遮罩 / Esc) 时清空输入
+watch(showAddKey, (open) => {
+  if (!open) newKeysText.value = ''
+})
 
 async function deleteKey(fingerprint: string) {
   if (!await confirm({ message: t('ssh.confirm.delete_key'), variant: 'danger' })) return
@@ -362,7 +363,7 @@ onUnmounted(() => {
               </div>
               <div v-if="connectCmdState === 'tunnel'" class="connect-hint">
                 {{ t('ssh.connect.need_cloudflared') }}
-                <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener">cloudflared</a>
+                <a class="link" href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener">cloudflared<MsIcon name="open_in_new" /></a>
               </div>
               <div v-else class="connect-hint">{{ t('ssh.connect.local_hint') }}</div>
             </template>
@@ -381,29 +382,12 @@ onUnmounted(() => {
             </template>
           </SectionHeader>
 
-          <Transition name="slide-down">
-            <div v-if="showAddKey" class="ssh-add-key">
-              <textarea
-                v-model="newKeysText"
-                class="form-textarea form-textarea--mono"
-                style="height:100px;resize:vertical"
-                :placeholder="t('ssh.keys.add_placeholder')"
-              />
-              <div class="ssh-add-key__actions">
-                <BaseButton size="sm" @click="cancelAddKey">{{ t('common.btn.cancel') }}</BaseButton>
-                <BaseButton variant="primary" size="sm" :disabled="!newKeysText.trim()" :loading="addingKey" @click="addKey">
-                  {{ t('ssh.keys.add_submit') }}
-                </BaseButton>
-              </div>
-            </div>
-          </Transition>
-
           <LoadingCenter v-if="keysLoading && !keys.length" style="padding:24px 0" />
           <ul v-else-if="keys.length" class="list-plain ssh-keys">
             <ListRow
               v-for="key in keys"
               :key="key.fingerprint"
-              icon="key"
+              icon="fingerprint"
               :title="key.comment || t('ssh.keys.unnamed')"
               :badges="keyBadges(key)"
               :facts="[key.fingerprint]"
@@ -425,31 +409,49 @@ onUnmounted(() => {
           <EmptyState v-else icon="key" :message="t('ssh.keys.empty')" density="compact" />
         </section>
 
-        <!-- 日志 (默认展开) -->
+        <!-- 日志 (默认展开, 折叠标题与分区标题同构) -->
         <section class="ssh-block">
-          <CollapsibleGroup icon="terminal" :title="t('ssh.log.title')">
-            <LogPanel
-              :lines="logLines"
-              :status="logStatus"
-              :has-more="logHasMore"
-              :loading-more="logLoadingMore"
-              :prepending="logPrepending"
-              :on-scroll="logOnScroll"
-            />
-          </CollapsibleGroup>
+          <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
+            {{ t('ssh.log.title') }}
+          </SectionHeader>
+          <LogPanel
+            v-show="logOpen"
+            :lines="logLines"
+            :status="logStatus"
+            :has-more="logHasMore"
+            :loading-more="logLoadingMore"
+            :prepending="logPrepending"
+            :on-scroll="logOnScroll"
+          />
         </section>
       </template>
     </div>
 
     <!-- 页内设置: SSH 密码跟随 -->
     <SSHSettingsModal v-model="settingsOpen" @changed="onSettingsChanged" />
+
+    <!-- 添加公钥: 页脚主操作 -->
+    <BaseModal v-model="showAddKey" :title="t('ssh.keys.add_btn')" size="md">
+      <textarea
+        v-model="newKeysText"
+        class="form-textarea form-textarea--mono"
+        style="height:120px;resize:vertical"
+        :placeholder="t('ssh.keys.add_placeholder')"
+      />
+      <template #footer>
+        <BaseButton @click="showAddKey = false">{{ t('common.btn.cancel') }}</BaseButton>
+        <BaseButton variant="primary" :disabled="!newKeysText.trim()" :loading="addingKey" @click="addKey">
+          {{ t('ssh.keys.add_submit') }}
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 连接命令 → 授权公钥 → 日志 28px */
+/* 分区节奏: Hero → 连接命令 → 授权公钥 → 日志 (--section-gap, 与总览一致) */
 .ssh-block {
-  margin-top: 28px;
+  margin-top: var(--section-gap);
 }
 
 .ssh-count {
@@ -510,39 +512,5 @@ onUnmounted(() => {
 /* ── 公钥 ── 指纹用等宽 (ListRow facts 默认 tabular, 这里收紧为 mono) */
 .ssh-keys :deep(.list-row__facts) {
   font-family: var(--font-mono);
-}
-
-.ssh-add-key {
-  padding: 14px;
-  margin-bottom: 8px;
-  border: 1px solid var(--bd);
-  border-radius: var(--r);
-  background: var(--bg2);
-}
-
-.ssh-add-key__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-/* ── 行内表单展开过渡 ── */
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all .2s ease;
-  overflow: hidden;
-}
-
-.slide-down-enter-from,
-.slide-down-leave-to {
-  max-height: 0;
-  opacity: 0;
-}
-
-.slide-down-enter-to,
-.slide-down-leave-from {
-  max-height: 300px;
-  opacity: 1;
 }
 </style>

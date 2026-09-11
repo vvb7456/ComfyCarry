@@ -44,7 +44,6 @@ if (deployState.value === 'deploying') {
     icon="checklist"
     :description="t('wizard.step9.desc')"
     :next-label="t('wizard.btn.deploy')"
-    next-variant="success"
     @prev="onPrev"
     @next="onDeploy"
   >

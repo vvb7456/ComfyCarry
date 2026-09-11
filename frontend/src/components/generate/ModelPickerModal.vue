@@ -534,11 +534,11 @@ function goToDownloadPage() {
   text-overflow: ellipsis;
 }
 .model-card__pkg-badge--checkpoint {
-  background: #b45309;
+  background: var(--tag-packaging-checkpoint);
   color: #fff;
 }
 .model-card__pkg-badge--split {
-  background: #0d9488;
+  background: var(--tag-packaging-split);
   color: #fff;
 }
 

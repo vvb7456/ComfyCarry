@@ -78,7 +78,7 @@ function handleFavorite(v: { id: number; name: string; baseModel?: string }) {
       >
         <div class="fv-info">
           <span class="fv-name">{{ v.name || v.id }}</span>
-          <Badge v-if="isInstalled(v.id)" color="#10b981" size="sm">{{ t('models.downloads.installed') }}</Badge>
+          <Badge v-if="isInstalled(v.id)" tone="positive" size="sm">{{ t('models.downloads.installed') }}</Badge>
           <Badge v-if="v.baseModel" size="sm">{{ v.baseModel }}</Badge>
         </div>
         <BaseButton

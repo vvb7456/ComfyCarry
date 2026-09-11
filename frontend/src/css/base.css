@@ -50,6 +50,10 @@
             --c-caution: var(--amber);
             --c-negative: var(--red);
             --c-neutral: var(--t3);
+            /* 包形态分类角标 (整合包 checkpoint / 拆分 split): 卡片缩略图上的
+               深底白字, 属分类色层, 独立于主题 (dark/light 共用) */
+            --tag-packaging-checkpoint: #b45309;
+            --tag-packaging-split: #0d9488;
             --r: 12px;
             --rs: 8px;
             --sh: 0 4px 24px rgba(0, 0, 0, 0.5);
@@ -70,6 +74,9 @@
             /* 页面左右留白 — .page-body 与 PageHeader 共用, 保证页头标题、
                tab 条、正文三者左边界对齐成一条线 */
             --page-pad: clamp(28px, 2.5vw, 42px);
+            /* 页面分区节奏 — 五页服务区 (*-block) 与总览 (.dash-section) 共用:
+               section 间距响应式 (<800px 28px, ≥1143px 40px) */
+            --section-gap: clamp(28px, 3.5vw, 40px);
             /* 模块面板内容宽度: 生成页各模块面板 (CN/图生图/放大/面部) 与其顶部
                依赖状态条共用, 保证状态条与下方内容左右对齐 */
             --gen-module-w: 700px;
@@ -229,6 +236,26 @@
             font-size: 48px;
             vertical-align: -10px;
             font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48;
+        }
+
+        /* ── 标准文本链接 ──
+           accent 色 + hover 下划线; 链接内图标用 .ms-* 尺寸类, 全局已有
+           规则阻止下划线蔓延到图标上。标题式链接与按钮式链接不适用。 */
+        .link {
+            color: var(--ac);
+            text-decoration: none;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        /* 链接内图标跟随文字大小 (1em), 与文字光学对齐 */
+        .link .ms {
+            font-size: 1em;
+            vertical-align: -0.14em;
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
         }
 
         /* ── Global: Modern Auto-hiding Scrollbar ── */

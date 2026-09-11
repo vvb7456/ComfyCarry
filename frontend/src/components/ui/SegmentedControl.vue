@@ -18,6 +18,8 @@ export interface SegmentOption {
   icon?: string
   /** 单选项禁用 (如未上线的占位选项) */
   disabled?: boolean
+  /** 未保存状态小圆点 (纯展示, TabItem.dot 同构) */
+  dot?: boolean
 }
 
 const props = withDefaults(defineProps<{
@@ -117,6 +119,7 @@ onBeforeUnmount(() => {
     >
       <MsIcon v-if="opt.icon" :name="opt.icon" size="sm" color="none" class="seg-control__icon" />
       <span>{{ opt.label }}</span>
+      <span v-if="opt.dot" class="seg-control__dot" aria-label="unsaved" />
     </button>
   </div>
 </template>
@@ -215,6 +218,16 @@ onBeforeUnmount(() => {
 .seg-control__icon {
   font-size: 15px;
   margin-right: 4px;
+}
+
+/* 未保存状态小圆点 */
+.seg-control__dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--c-caution, #e8a33d);
+  margin-left: 2px;
 }
 
 /* md 档: 页面级主控件 (如生成工作台任务切换) */

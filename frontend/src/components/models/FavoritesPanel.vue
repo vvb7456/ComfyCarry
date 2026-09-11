@@ -96,7 +96,6 @@ async function handleClearFavorites() {
       </BaseButton>
       <BaseButton
         size="sm"
-        variant="primary"
         :disabled="!downloadableCount"
         :loading="downloadingAll"
         @click.stop="handleDownloadAll"

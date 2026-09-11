@@ -2,7 +2,8 @@
 /**
  * ListPagination — 服务端分页的纯展示控件，与 ListRow 组合使用。
  *
- * 左侧显示总条数，右侧显示「当前页 / 总页数」和上一页、下一页图标按钮。
+ * 居中单组布局: 上一页箭头 + 「当前页 / 总页数」+ 下一页箭头。
+ * 总数由所在分区的计数承载, 这里不再重复显示。
  * 组件只负责合法页码、首末页与 loading 禁用；请求与列表数据由调用方负责。
  * total <= pageSize 时整体隐藏，空列表（total=0）由页面空态承接。
  *
@@ -62,70 +63,48 @@ function go(target: number) {
 
 <template>
   <div v-if="visible" class="list-pagination">
-    <span class="list-pagination__total">
-      {{ t('common.pagination.total', { count: total }) }}
+    <BaseButton
+      variant="ghost"
+      size="sm"
+      icon-only
+      :disabled="!canPrev"
+      :aria-label="t('common.pagination.prev')"
+      @click="go(currentPage - 1)"
+    >
+      <MsIcon name="chevron_left" />
+    </BaseButton>
+    <span class="list-pagination__page">
+      {{ t('common.pagination.page_of', { page: currentPage, total: totalPages }) }}
     </span>
-    <div class="list-pagination__controls">
-      <span class="list-pagination__page">
-        {{ t('common.pagination.page_of', { page: currentPage, total: totalPages }) }}
-      </span>
-      <div class="list-pagination__actions">
-        <BaseButton
-          variant="ghost"
-          size="sm"
-          icon-only
-          :disabled="!canPrev"
-          :aria-label="t('common.pagination.prev')"
-          @click="go(currentPage - 1)"
-        >
-          <MsIcon name="chevron_left" />
-        </BaseButton>
-        <BaseButton
-          variant="ghost"
-          size="sm"
-          icon-only
-          :disabled="!canNext"
-          :aria-label="t('common.pagination.next')"
-          @click="go(currentPage + 1)"
-        >
-          <MsIcon name="chevron_right" />
-        </BaseButton>
-      </div>
-    </div>
+    <BaseButton
+      variant="ghost"
+      size="sm"
+      icon-only
+      :disabled="!canNext"
+      :aria-label="t('common.pagination.next')"
+      @click="go(currentPage + 1)"
+    >
+      <MsIcon name="chevron_right" />
+    </BaseButton>
   </div>
 </template>
 
 <style scoped>
-/* 与设计稿 .cc-jobs-pager 同构：小字、静音色、上下 10px 留白 */
+/* 居中单组: 箭头 + 页码 + 箭头 (标准分页形态); 小字、静音色 */
 .list-pagination {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: center;
+  gap: var(--sp-2);
   padding-top: 10px;
   font-size: var(--text-xs);
   color: var(--t3);
 }
 
-.list-pagination__total,
 .list-pagination__page {
   font-family: var(--font-tabular);
-}
-
-.list-pagination__controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-left: auto;
-}
-
-.list-pagination__page {
   white-space: nowrap;
-}
-
-.list-pagination__actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  min-width: 5.5em;
+  text-align: center;
 }
 </style>

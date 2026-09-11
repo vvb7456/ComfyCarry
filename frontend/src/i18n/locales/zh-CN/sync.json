@@ -49,8 +49,8 @@
     "empty": "暂无同步记录",
     "rules_count": "{count} 条规则",
     "progress": "已完成 {done}/{total}",
-    "files_bytes": "{files} 个文件 · {bytes}",
-    "detail": "查看详情"
+    "detail": "查看详情",
+    "files_synced": "已同步 {count} 个文件"
   },
   "detail": {
     "title": "同步记录",

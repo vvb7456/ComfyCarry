@@ -288,7 +288,7 @@ function fmtSize(bytes?: number): string {
           </tr>
           <tr v-if="sourceUrl">
             <td>{{ t('models.meta.link') }}</td>
-            <td><a :href="sourceUrl" target="_blank" rel="noopener">{{ sourceLabel }} <MsIcon name="open_in_new" class="ms-sm" /></a></td>
+            <td><a class="link" :href="sourceUrl" target="_blank" rel="noopener">{{ sourceLabel }} <MsIcon name="open_in_new" class="ms-sm" /></a></td>
           </tr>
           <tr v-if="meta.stats">
             <td>{{ t('models.meta.stats') }}</td>
@@ -326,7 +326,7 @@ function fmtSize(bytes?: number): string {
                 ? t('models.meta.selected_count', { count: selectedWords.size })
                 : t('models.meta.click_to_select') }}
             </span>
-            <BaseButton size="sm" variant="success" @click="copySelectedWords">
+            <BaseButton size="sm" @click="copySelectedWords">
               {{ t('models.meta.copy_selected') }}
             </BaseButton>
             <BaseButton size="sm" @click="copyAllWords">
@@ -430,8 +430,6 @@ function fmtSize(bytes?: number): string {
 .mm-table { width: 100%; font-size: var(--text-base); border-collapse: collapse; margin-bottom: var(--sp-4); }
 .mm-table td { padding: 7px 10px; border-bottom: 1px solid var(--bd); vertical-align: top; }
 .mm-table td:first-child { color: var(--t3); white-space: nowrap; width: 100px; font-weight: 500; }
-.mm-table a { color: var(--ac); text-decoration: none; }
-.mm-table a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .mm-hash { word-break: break-all; font-family: monospace; font-size: .75rem; }
 .mm-desc { line-height: 1.5; color: var(--t2); }
 

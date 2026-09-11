@@ -70,7 +70,10 @@
   "version_picker": {
     "title": "Select Plugin Version",
     "title_name": "{name} - Version Selection",
-    "no_version_nightly": "No version info (possibly nightly install)"
+    "no_version_nightly": "No version info (possibly nightly install)",
+    "placeholder": "Select a version to install",
+    "search": "Search versions",
+    "empty": "No matching versions"
   },
   "queue": {
     "status": "Queue: {done}/{total} done"

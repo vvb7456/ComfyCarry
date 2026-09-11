@@ -65,10 +65,10 @@ const { t } = useI18n({ useScope: 'global' })
             v-if="dashboardState === 'ready' || dashboardState === 'busy'"
             :href="comfyUrl || undefined"
             target="_blank"
-            class="dash-svc-card__cta"
+            class="link dash-svc-card__cta"
           >
             <span class="dash-svc-card__cta-text">{{ isComfyBusy ? t('dashboard.actions.view') : t('dashboard.actions.open') }}</span>
-            <MsIcon name="open_in_new" size="xs" />
+            <MsIcon name="open_in_new" />
           </a>
           <button
             v-else-if="dashboardState === 'stopped'"
@@ -104,10 +104,10 @@ const { t } = useI18n({ useScope: 'global' })
             v-if="data?.jupyter?.online && jupyterUrl"
             :href="jupyterUrl"
             target="_blank"
-            class="dash-svc-card__cta"
+            class="link dash-svc-card__cta"
           >
             <span class="dash-svc-card__cta-text">{{ t('dashboard.actions.open') }}</span>
-            <MsIcon name="open_in_new" size="xs" />
+            <MsIcon name="open_in_new" />
           </a>
           <router-link
             v-else
@@ -221,22 +221,13 @@ const { t } = useI18n({ useScope: 'global' })
 }
 
 .dash-svc-card__cta:hover {
-  text-decoration: none;
   opacity: 0.85;
 }
 
+/* router-link / button 变体的 hover 下划线反馈 (外部链接由 .link 提供) */
 .dash-svc-card__cta:hover .dash-svc-card__cta-text {
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-
-.dash-svc-card__cta .ms {
-  text-decoration: none !important;
-  transition: transform 0.15s ease;
-}
-
-.dash-svc-card__cta:hover .ms {
-  transform: translate(1px, -1px);
 }
 
 .dash-svc-card__cta:disabled {

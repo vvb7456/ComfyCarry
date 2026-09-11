@@ -11,7 +11,7 @@
  *   - 存储/规则使用 ListRow; OAuth 向导、容量刷新、模板、路径浏览、过滤规则全部保留。
  *   - 最近同步接 C02 服务端分页 (每页 5) + C01 ListPagination; 历史页保持页码与滚动,
  *     回到第一页恢复轮询。详情进入 SyncJobDetailModal, 使用执行时规则快照。
- *   - 日志默认收起 (CollapsibleGroup 折叠标题)。
+ *   - 日志默认收起 (SectionHeader 折叠标题)。
  *
  * 客户端 Tab: Companion Hero (在线数 / WebDAV 复制 / 下载) + 客户端 ListRow。
  */
@@ -30,7 +30,6 @@ import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import ListPagination from '@/components/ui/ListPagination.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
-import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -146,6 +145,7 @@ function translateSyncJsonl(text: string): { text: string; level?: string } {
   return { text }
 }
 
+const logOpen = ref(false)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart } = useLogStream({
   historyUrl: '/api/sync/logs',
   streamUrl: '/api/sync/logs/stream',
@@ -307,25 +307,6 @@ function needsReconnect(remote: Remote): boolean {
 function storagePct(info: StorageInfo | undefined) {
   if (!info || !info.total || !info.used) return 0
   return Math.round((info.used / info.total) * 100)
-}
-
-function capacityFact(remote: Remote): string {
-  if (noCapacityTypes.has(remote.type)) return t('sync.remote.no_capacity_info')
-  const info = storageData.value[remote.name]
-  if (!info) return t('sync.remotes.click_refresh')
-  if (info.error || info.error_key) return apiErrorText(info)
-  return `${t('sync.remotes.used')} ${fmtBytes(info.used ?? 0)} / ${fmtBytes(info.total ?? 0)}`
-}
-
-function hasCapacityBar(remote: Remote): boolean {
-  if (noCapacityTypes.has(remote.type)) return false
-  const info = storageData.value[remote.name]
-  return !!info && !info.error && !info.error_key && (info.total ?? 0) > 0
-}
-
-function remoteFacts(remote: Remote): string[] {
-  const type = remote.params?.provider ? `${remote.type} · ${remote.params.provider}` : remote.type
-  return [type, capacityFact(remote)]
 }
 
 // ── Remote 创建 / 删除 ──
@@ -559,15 +540,19 @@ function statusText(status: string): string {
   return t(key)
 }
 
-function jobIcon(status: string): string {
-  if (status === 'running') return 'sync'
-  if (status === 'success') return 'cloud_done'
-  if (status === 'failed') return 'error'
-  if (status === 'partial') return 'warning'
-  return 'block'
+function jobDirIcon(job: SyncJob): string {
+  const rules = job.rules ?? []
+  if (rules.length === 1) return rules[0].direction === 'push' ? 'arrow_upward' : 'arrow_downward'
+  if (rules.length > 1) return 'swap_horiz'
+  return 'sync'
 }
 
-function jobLabel(job: SyncJob): string {
+function jobTitle(job: SyncJob): string {
+  return t('sync.records.files_synced', { count: job.files_synced })
+}
+
+/** 规则信息: 单规则显示名称, 多规则显示条数 (快照缺失时回退 rule_count) */
+function jobRulesFact(job: SyncJob): string {
   const rules = job.rules ?? []
   if (rules.length === 1) return rules[0].name || rules[0].id
   return t('sync.records.rules_count', { count: rules.length || job.rule_count })
@@ -586,9 +571,7 @@ function jobTransfers(job: SyncJob): string {
   if (job.status === 'running') {
     return t('sync.records.progress', { done: job.success_count + job.failure_count, total: job.rule_count })
   }
-  if (job.summary) {
-    return t('sync.records.files_bytes', { files: job.files_synced, bytes: fmtBytes(job.summary.bytes ?? 0) })
-  }
+  if (job.summary?.bytes) return fmtBytes(job.summary.bytes)
   return ''
 }
 
@@ -602,7 +585,7 @@ function fmtJobTime(epoch: number): string {
 }
 
 function jobFacts(job: SyncJob): string[] {
-  return [fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
+  return [jobRulesFact(job), fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
 }
 
 // ── 客户端展示 ──
@@ -728,22 +711,52 @@ function switchTab(tab: string) {
             </template>
           </SectionHeader>
 
-          <ul v-if="remotes.length" class="list-plain sync-remotes">
-            <ListRow
-              v-for="remote in remotes"
-              :key="remote.name"
-              :icon="brandOf(remote).icon"
-              :title="remote.display_name || remote.name"
-              :title-tooltip="remote.name"
-              :status="remote.has_auth
-                ? { tone: 'running', text: t('sync.remotes.authenticated') }
-                : { tone: 'error', text: t('sync.remotes.not_configured') }"
-              :facts="remoteFacts(remote)"
-            >
-              <template v-if="hasCapacityBar(remote)" #extra>
-                <UsageBar :percent="storagePct(storageData[remote.name])" />
-              </template>
-              <template #actions>
+          <div v-if="remotes.length" class="sync-remotes-grid">
+            <div v-for="remote in remotes" :key="remote.name" class="sync-remote-card">
+              <div class="sync-remote-card__head">
+                <img
+                  v-if="brandOf(remote).logo"
+                  :src="brandOf(remote).logo"
+                  class="sync-remote-card__logo-img"
+                  alt=""
+                >
+                <MsIcon v-else :name="brandOf(remote).icon" class="sync-remote-card__logo" />
+                <div class="sync-remote-card__name">
+                  {{ remote.display_name || remote.name }}
+                  <span class="sync-remote-card__type">{{ remote.name }} · {{ remote.type }}</span>
+                </div>
+                <span class="sync-remote-card__auth">
+                  <StatusDot :status="remote.has_auth ? 'running' : 'error'" size="sm" />
+                  {{ remote.has_auth ? t('sync.remotes.authenticated') : t('sync.remotes.not_configured') }}
+                </span>
+              </div>
+
+              <!-- 容量: 不支持查询 / 错误 / 正常 (文案 + 用量条) / 未加载 (点击刷新) -->
+              <div class="sync-remote-card__cap">
+                <span v-if="noCapacityTypes.has(remote.type)" class="sync-remote-card__cap-note">
+                  {{ t('sync.remote.no_capacity_info') }}
+                </span>
+                <span
+                  v-else-if="storageData[remote.name] && (storageData[remote.name].error || storageData[remote.name].error_key)"
+                  class="sync-remote-card__cap-err"
+                >{{ apiErrorText(storageData[remote.name]) }}</span>
+                <template v-else-if="storageData[remote.name]">
+                  <span class="sync-remote-card__cap-line">
+                    {{ t('sync.remotes.used') }} {{ fmtBytes(storageData[remote.name].used ?? 0) }} / {{ fmtBytes(storageData[remote.name].total ?? 0) }}
+                    <template v-if="storageData[remote.name].free">
+                      ({{ t('sync.remotes.remaining') }} {{ fmtBytes(storageData[remote.name].free ?? 0) }})
+                    </template>
+                  </span>
+                  <UsageBar :percent="storagePct(storageData[remote.name])" />
+                </template>
+                <span
+                  v-else
+                  class="sync-remote-card__cap-note is-click"
+                  @click="loadStorage(remote.name)"
+                >{{ t('sync.remotes.click_refresh') }}</span>
+              </div>
+
+              <div class="sync-remote-card__actions">
                 <BaseButton
                   v-if="needsReconnect(remote)"
                   variant="ghost" size="sm" icon-only
@@ -768,9 +781,9 @@ function switchTab(tab: string) {
                 >
                   <MsIcon name="delete" />
                 </BaseButton>
-              </template>
-            </ListRow>
-          </ul>
+              </div>
+            </div>
+          </div>
           <EmptyState v-else icon="cloud" :message="t('sync.empty.desc')" density="compact">
             <BaseButton size="sm" @click="openAddRemote">
               <MsIcon name="add" /> {{ t('sync.storage.add') }}
@@ -843,8 +856,8 @@ function switchTab(tab: string) {
             <ListRow
               v-for="job in syncJobs"
               :key="job.job_id"
-              :icon="jobIcon(job.status)"
-              :title="jobLabel(job)"
+              :icon="jobDirIcon(job)"
+              :title="jobTitle(job)"
               :status="{ tone: statusTone(job.status), text: statusText(job.status) }"
               :facts="jobFacts(job)"
             >
@@ -857,7 +870,7 @@ function switchTab(tab: string) {
                   :aria-label="t('sync.records.detail')"
                   @click="openDetail(job.job_id)"
                 >
-                  <MsIcon name="visibility" />
+                  <MsIcon name="receipt_long" />
                 </BaseButton>
               </template>
             </ListRow>
@@ -873,18 +886,20 @@ function switchTab(tab: string) {
           />
         </section>
 
-        <!-- 同步日志 (默认收起) -->
+        <!-- 同步日志 (默认收起, 折叠标题与分区标题同构) -->
         <section class="sync-block">
-          <CollapsibleGroup icon="terminal" :title="t('sync.log.title')" :default-open="false">
-            <LogPanel
-              :lines="logLines"
-              :status="logStatus"
-              :has-more="logHasMore"
-              :loading-more="logLoadingMore"
-              :prepending="logPrepending"
-              :on-scroll="logOnScroll"
-            />
-          </CollapsibleGroup>
+          <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
+            {{ t('sync.log.title') }}
+          </SectionHeader>
+          <LogPanel
+            v-show="logOpen"
+            :lines="logLines"
+            :status="logStatus"
+            :has-more="logHasMore"
+            :loading-more="logLoadingMore"
+            :prepending="logPrepending"
+            :on-scroll="logOnScroll"
+          />
         </section>
       </template>
 
@@ -1061,9 +1076,9 @@ function switchTab(tab: string) {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 存储 → 规则 → 最近同步 → 日志 28px */
+/* 分区节奏: Hero → 存储 → 规则 → 最近同步 → 日志 (--section-gap, 与总览一致) */
 .sync-block {
-  margin-top: 28px;
+  margin-top: var(--section-gap);
 }
 
 .sync-count {
@@ -1076,10 +1091,92 @@ function switchTab(tab: string) {
 /* 规则表单的两列行 —— 窄屏退化单列 */
 .rule-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-/* 存储容量条: 行内 facts 下方的紧凑轨道 */
-.sync-remotes :deep(.list-row__main .usage-bar) {
-  margin-top: 6px;
-  max-width: 260px;
+/* 存储卡片: 自适应网格 (设计稿 cc-storage 同构) */
+.sync-remotes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.sync-remote-card {
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.sync-remote-card__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.sync-remote-card__logo {
+  font-size: 22px;
+  color: var(--t2);
+}
+
+.sync-remote-card__logo-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.sync-remote-card__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.sync-remote-card__type {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--t3);
+  font-family: var(--font-mono);
+}
+
+.sync-remote-card__auth {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--t2);
+  white-space: nowrap;
+}
+
+.sync-remote-card__cap {
+  font-size: 11.5px;
+  color: var(--t3);
+  display: grid;
+  gap: 6px;
+}
+
+.sync-remote-card__cap-err {
+  color: var(--red);
+}
+
+.sync-remote-card__cap-note.is-click {
+  cursor: pointer;
+}
+
+.sync-remote-card__cap-note.is-click:hover {
+  color: var(--t1);
+}
+
+.sync-remote-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 /* 规则路径用等宽 (ListRow facts 默认 tabular) */

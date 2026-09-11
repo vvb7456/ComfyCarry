@@ -6,7 +6,7 @@
  */
 
 .dash-section {
-  margin-top: clamp(28px, 3.5vw, 40px);
+  margin-top: var(--section-gap);
 }
 
 .dash-section-header {

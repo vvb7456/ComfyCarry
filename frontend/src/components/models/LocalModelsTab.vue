@@ -109,7 +109,7 @@ function openMeta(m: LocalModel) {
         <BaseButton size="sm" @click="loadModels">
           {{ t('models.local.refresh') }}
         </BaseButton>
-        <BaseButton size="sm" variant="primary" @click="fetchAll(filteredModels)">
+        <BaseButton size="sm" @click="fetchAll(filteredModels)">
           {{ t('models.local.fetch_all') }}
         </BaseButton>
       </template>

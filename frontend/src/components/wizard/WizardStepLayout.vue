@@ -15,14 +15,12 @@ withDefaults(defineProps<{
   showPrev?: boolean
   showNext?: boolean
   nextLabel?: string
-  nextVariant?: 'primary' | 'success'
   loading?: boolean
   nextDisabled?: boolean
 }>(), {
   showPrev: true,
   showNext: true,
   nextLabel: undefined as string | undefined,
-  nextVariant: 'primary',
 })
 
 const emit = defineEmits<{
@@ -62,7 +60,7 @@ const slots = useSlots()
         >{{ t('wizard.btn.prev') }}</BaseButton>
         <BaseButton
           v-if="showNext"
-          :variant="nextVariant === 'success' ? 'success' : 'primary'"
+          variant="primary"
           size="lg"
           :disabled="nextDisabled"
           :loading="loading"

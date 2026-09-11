@@ -166,7 +166,7 @@ const installedTooltip = computed(() =>
     </template>
 
     <template #meta>
-      <Badge v-if="allInstalled || partialInstalled" color="#10b981" size="sm" :title="installedTooltip">
+      <Badge v-if="allInstalled || partialInstalled" tone="positive" size="sm" :title="installedTooltip">
         {{ partialInstalled ? `${t('models.downloads.installed')} ${installedVersions.length}/${versionCount}` : t('models.downloads.installed') }}
       </Badge>
       <Badge :color="badgeColor">{{ badgeLabel }}</Badge>
@@ -179,12 +179,11 @@ const installedTooltip = computed(() =>
     </template>
 
     <template #actions>
-      <BaseButton size="sm" variant="success" @click="emit('details', hit)">
+      <BaseButton size="sm" @click="emit('details', hit)">
         {{ t('models.civitai.details') }}
       </BaseButton>
       <BaseButton
         size="sm"
-        :variant="isFavorite ? 'danger' : 'default'"
         @click="emit('toggleFavorite', hit)"
       >
         {{ isFavorite ? t('models.civitai.unfavorite') : t('models.civitai.favorite') }}

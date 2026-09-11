@@ -55,6 +55,11 @@ const versionModalTitle = ref('')
 const versionModalId = ref('')
 const versionList = ref<string[]>([])
 const versionLoading = ref(false)
+const selectedVersion = ref('')
+
+const versionOptions = computed(() =>
+  versionList.value.map(v => ({ value: v, label: v })),
+)
 
 // ── 待重启事实 (服务端 diff: 启动快照 vs 当前磁盘) ──────────
 const pendingRestart = ref<PendingRestartPack[]>([])
@@ -234,9 +239,11 @@ async function openVersionModal(id: string, title: string) {
   versionModalOpen.value = true
   versionLoading.value = true
   versionList.value = []
+  selectedVersion.value = ''
   const versions = await get<(string | Record<string, string>)[]>(`/api/plugins/versions/${encodeURIComponent(id)}`)
   if (versions) {
     versionList.value = versions.map(v => typeof v === 'string' ? v : v.version || JSON.stringify(v))
+    selectedVersion.value = versionList.value[0] ?? ''
   }
   versionLoading.value = false
 }
@@ -354,20 +361,29 @@ async function restartNow() {
 
   <GitInstallModal v-model="gitModalOpen" @installed="startQueuePoll" />
 
-  <BaseModal v-model="versionModalOpen" :title="versionModalTitle" width="480px">
+  <BaseModal v-model="versionModalOpen" :title="versionModalTitle" width="520px">
     <LoadingCenter v-if="versionLoading" />
     <EmptyState v-else-if="versionList.length === 0" density="compact" :message="t('plugins.version_picker.no_version_nightly')" />
-    <div v-else class="version-list">
-      <div v-for="ver in versionList" :key="ver" class="version-row">
-        <span>{{ ver }}</span>
-        <BaseButton variant="primary" size="sm" @click="installVersion(ver)">{{ t('plugins.toast.install_version') }}</BaseButton>
-      </div>
-    </div>
+    <BaseSelect
+      v-else
+      v-model="selectedVersion"
+      :options="versionOptions"
+      :placeholder="t('plugins.version_picker.placeholder')"
+      :search-placeholder="t('plugins.version_picker.search')"
+      :empty-text="t('plugins.version_picker.empty')"
+      :max-list-height="260"
+      searchable
+      teleport
+    />
+    <template #footer>
+      <BaseButton @click="versionModalOpen = false">{{ t('common.btn.cancel') }}</BaseButton>
+      <BaseButton variant="primary" :disabled="!selectedVersion" @click="installVersion(selectedVersion)">
+        {{ t('plugins.toast.install_version') }}
+      </BaseButton>
+    </template>
   </BaseModal>
 </template>
 
 <style scoped>
 .plugins-list-end { height: 1px; }
-.version-list { max-height: 50vh; overflow-y: auto; }
-.version-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--bd); font-size: .88rem; }
 </style>

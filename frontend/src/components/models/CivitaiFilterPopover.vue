@@ -222,10 +222,15 @@ onBeforeUnmount(removeDocumentListeners)
   cursor: pointer;
 }
 
-.civitai-filter__trigger:hover:not(:disabled),
+.civitai-filter__trigger:hover:not(:disabled) {
+  border-color: var(--bd-f);
+  color: var(--t1);
+}
+
 .civitai-filter__trigger.is-active {
-  border-color: var(--ac);
-  color: var(--ac);
+  border-color: var(--bd-f);
+  background: var(--bg3);
+  color: var(--t1);
 }
 
 .civitai-filter__trigger:disabled {
@@ -318,9 +323,14 @@ onBeforeUnmount(removeDocumentListeners)
 }
 
 .civitai-filter__apply {
-  border: 1px solid var(--ac);
-  background: var(--ac);
+  border: 1px solid color-mix(in srgb, var(--ac) 65%, var(--bg3));
+  background: color-mix(in srgb, var(--ac) 65%, var(--bg3));
   color: #fff;
+}
+
+.civitai-filter__apply:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ac) 80%, var(--bg3));
+  background: color-mix(in srgb, var(--ac) 80%, var(--bg3));
 }
 
 .civitai-filter__actions button:disabled {

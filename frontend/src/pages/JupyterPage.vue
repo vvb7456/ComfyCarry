@@ -22,7 +22,6 @@ import { useI18n } from 'vue-i18n'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
-import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -66,6 +65,8 @@ type RowStatus = { tone: 'running' | 'stopped' | 'loading' | 'error'; text: stri
 
 // ─── 日志流 ───────────────────────────────────────────────────────────────────
 
+// ── 日志流 ──
+const logOpen = ref(true)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/jupyter/logs',
   streamUrl: '/api/jupyter/logs/stream',
@@ -418,9 +419,7 @@ onUnmounted(() => {
         <!-- 访问令牌 (仅运行时存在) -->
         <section v-if="isRunning" class="jupyter-block">
           <SectionHeader icon="key">{{ t('jupyter.token.title') }}</SectionHeader>
-          <div class="measure-sm">
-            <SecretInput v-model="token" readonly copyable input-class="jupyter-token-input" />
-          </div>
+          <SecretInput v-model="token" readonly copyable input-class="jupyter-token-input" />
         </section>
 
         <!-- 活跃内核 (运行时显示, 空则紧凑空行) -->
@@ -449,7 +448,7 @@ onUnmounted(() => {
             <ListRow
               v-for="kernel in status.kernels"
               :key="kernel.id"
-              icon="memory"
+              icon="developer_board"
               :title="kernel.name"
               :title-tooltip="kernel.id"
               :status="kernelStatus(kernel)"
@@ -532,7 +531,7 @@ onUnmounted(() => {
             <ListRow
               v-for="terminal in status.terminals"
               :key="terminal.name"
-              icon="terminal"
+              icon="code_blocks"
               :title="t('jupyter.terminals.label', { name: terminal.name })"
               :facts="terminalFacts(terminal)"
             >
@@ -562,18 +561,20 @@ onUnmounted(() => {
           <EmptyState v-else icon="terminal" :message="t('jupyter.terminals.empty')" density="compact" />
         </section>
 
-        <!-- 日志 (默认展开, 停机仍可读) -->
+        <!-- 日志 (默认展开, 停机仍可读; 折叠标题与分区标题同构) -->
         <section class="jupyter-block">
-          <CollapsibleGroup icon="terminal" :title="t('jupyter.log.title')">
-            <LogPanel
-              :lines="logLines"
-              :status="logStatus"
-              :has-more="logHasMore"
-              :loading-more="logLoadingMore"
-              :prepending="logPrepending"
-              :on-scroll="logOnScroll"
-            />
-          </CollapsibleGroup>
+          <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
+            {{ t('jupyter.log.title') }}
+          </SectionHeader>
+          <LogPanel
+            v-show="logOpen"
+            :lines="logLines"
+            :status="logStatus"
+            :has-more="logHasMore"
+            :loading-more="logLoadingMore"
+            :prepending="logPrepending"
+            :on-scroll="logOnScroll"
+          />
         </section>
       </template>
     </div>
@@ -581,9 +582,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 令牌 → 内核 → 会话 → 终端 → 日志 28px */
+/* 分区节奏: Hero → 令牌 → 内核 → 会话 → 终端 → 日志 (--section-gap, 与总览一致) */
 .jupyter-block {
-  margin-top: 28px;
+  margin-top: var(--section-gap);
 }
 
 .jupyter-count {

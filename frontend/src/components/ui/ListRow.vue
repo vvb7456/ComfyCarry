@@ -1,3 +1,18 @@
+<script lang="ts">
+export type BadgeTone = 'positive' | 'caution' | 'negative' | 'neutral'
+
+export interface ListRowBadge {
+  text: string
+  tone?: BadgeTone
+}
+
+export interface ListRowFact {
+  text: string
+  /** 有值时该事实渲染为外链 (项目标准链接样式: accent 色 + open_in_new + hover 下划线) */
+  href?: string
+}
+</script>
+
 <script setup lang="ts">
 /**
  * ListRow — 全站统一的「对象行」。
@@ -38,10 +53,12 @@ withDefaults(defineProps<{
   titleTooltip?: string
   /** 主行状态：圆点 + 词 */
   status?: { tone: 'running' | 'stopped' | 'loading' | 'error'; text: string }
-  /** 主行徽章（分类标签，不表达状态） */
-  badges?: string[]
-  /** 副行事实（等宽小字，组件负责分隔） */
-  facts?: string[]
+  /** 主行徽章（分类/状态标签）；对象形式可带语义色 */
+  badges?: Array<string | ListRowBadge>
+  /** 描述行（head 与 facts 之间的普通文本，最多两行截断） */
+  description?: string
+  /** 副行事实（等宽小字，组件负责分隔）；对象形式带 href 时渲染为外链 */
+  facts?: Array<string | ListRowFact>
   /** 整行可点：只用于导航，不做有副作用的动作 */
   clickable?: boolean
   /** 停用态（例如被禁用的同步规则） */
@@ -71,10 +88,24 @@ withDefaults(defineProps<{
           <StatusDot :status="status.tone" size="sm" />
           {{ status.text }}
         </span>
-        <Badge v-for="badge in badges" :key="badge">{{ badge }}</Badge>
+        <Badge
+          v-for="badge in badges"
+          :key="typeof badge === 'string' ? badge : badge.text"
+          :tone="typeof badge === 'string' ? undefined : badge.tone"
+        >{{ typeof badge === 'string' ? badge : badge.text }}</Badge>
       </div>
+      <div v-if="description" class="list-row__desc">{{ description }}</div>
       <div v-if="facts.length" class="list-row__facts">
-        <span v-for="fact in facts" :key="fact">{{ fact }}</span>
+        <span v-for="fact in facts" :key="typeof fact === 'string' ? fact : fact.text">
+          <a
+            v-if="typeof fact !== 'string' && fact.href"
+            class="link"
+            :href="fact.href"
+            target="_blank"
+            rel="noopener"
+          >{{ fact.text }}<MsIcon name="open_in_new" class="ms-sm" /></a>
+          <template v-else>{{ typeof fact === 'string' ? fact : fact.text }}</template>
+        </span>
       </div>
       <slot name="extra" />
     </div>
@@ -147,6 +178,18 @@ withDefaults(defineProps<{
   color: var(--t1);
 }
 
+/* 描述行: 普通字色, 最多两行 */
+.list-row__desc {
+  color: var(--t2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
 .list-row__status {
   display: inline-flex;
   align-items: center;
@@ -170,11 +213,14 @@ withDefaults(defineProps<{
 
 /* 行尾按钮为 BaseButton `size="sm" icon-only variant="ghost"`：长方形 42×32
    （触屏 44 高）、图标 20px 的尺寸来源已收敛到 BaseButton 的 iconOnly，
-   这里只保留排列与间距，避免双重来源。 */
+   这里只保留排列与间距，避免双重来源。
+   align-self: center —— 相对「整个行」垂直居中（行高由最高的左侧内容决定，
+   与左侧文字行数无关）；设计稿 .cc-rule/.cc-service 同为整行居中 */
 .list-row__actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  align-self: center;
 }
 
 @media (max-width: 768px) {

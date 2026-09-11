@@ -123,7 +123,6 @@ const speedTitle = computed(() => {
   <BaseButton
     v-else-if="state === 'failed'"
     :size="size"
-    variant="danger"
     class="dl-btn"
     @click="emit('download')"
   >
@@ -135,7 +134,6 @@ const speedTitle = computed(() => {
   <BaseButton
     v-else
     :size="size"
-    variant="primary"
     class="dl-btn"
     @click="emit('download')"
   >

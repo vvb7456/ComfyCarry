@@ -81,13 +81,12 @@ const fetchLabel = computed(() => {
     </template>
 
     <template #actions>
-      <BaseButton size="sm" variant="success" @click="emit('details', model)">
+      <BaseButton size="sm" @click="emit('details', model)">
         {{ t('models.local.details') }}
       </BaseButton>
       <BaseButton
         v-if="canFetchInfo"
         size="sm"
-        :variant="model.has_info ? 'default' : 'primary'"
         :disabled="fetching"
         :title="model.has_info ? t('models.local.refetch_tip') : ''"
         @click="emit('fetchInfo', model)"

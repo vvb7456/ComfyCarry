@@ -432,6 +432,8 @@ function cycleApply(lora: LoraEntry) {
   flex: 1;
   min-width: 0;
   height: 3px;
+  accent-color: var(--ac);
+  cursor: pointer;
 }
 
 .lora-card__str-val {

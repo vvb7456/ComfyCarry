@@ -58,7 +58,7 @@ const inlineStyle = computed(() =>
   line-height: 1.5;
 }
 .badge--muted {
-  background: rgba(100, 116, 139, .15);
+  background: color-mix(in srgb, var(--t3) 15%, transparent);
   color: var(--t2);
 }
 

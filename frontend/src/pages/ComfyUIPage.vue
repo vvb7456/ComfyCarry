@@ -266,11 +266,10 @@ function onVersionSwitched() {
           <BaseButton
             variant="ghost"
             size="sm"
-            icon-only
             :aria-label="t('comfyui.params.title')"
             @click="paramsOpen = true"
           >
-            <MsIcon name="settings" />
+            <MsIcon name="settings" /> {{ t('common.btn.settings') }}
           </BaseButton>
         </template>
       </TabSwitcher>
@@ -368,9 +367,9 @@ function onVersionSwitched() {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 当前执行 → GPU → 版本 → 日志 28px */
+/* 分区节奏: Hero → 当前执行 → GPU → 版本 → 日志 (--section-gap, 与总览一致) */
 .comfy-block {
-  margin-top: 28px;
+  margin-top: var(--section-gap);
 }
 
 .comfy-hint {

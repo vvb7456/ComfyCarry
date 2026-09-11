@@ -70,7 +70,10 @@
   "version_picker": {
     "title": "选择插件版本",
     "title_name": "{name} - 版本选择",
-    "no_version_nightly": "无版本信息 (可能为 nightly 安装)"
+    "no_version_nightly": "无版本信息 (可能为 nightly 安装)",
+    "placeholder": "选择要安装的版本",
+    "search": "搜索版本",
+    "empty": "无匹配版本"
   },
   "queue": {
     "status": "队列：{done}/{total} 完成"
