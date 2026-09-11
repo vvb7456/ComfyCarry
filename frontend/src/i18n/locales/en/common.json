@@ -18,7 +18,8 @@
     "clear": "Clear",
     "logout": "Logout",
     "retry": "Retry",
-    "done": "Done"
+    "done": "Done",
+    "settings": "Settings"
   },
   "status": {
     "loading": "Loading..."

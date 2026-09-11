@@ -280,12 +280,12 @@ function confirmSelect() {
     </div>
 
     <template #footer>
-      <BaseButton size="sm" @click="show = false">{{ t('common.btn.cancel') }}</BaseButton>
-      <BaseButton v-if="mode === 'remote'" size="sm" :disabled="loading || !!error" @click="openMkdir">
+      <BaseButton @click="show = false">{{ t('common.btn.cancel') }}</BaseButton>
+      <BaseButton v-if="mode === 'remote'" :disabled="loading || !!error" @click="openMkdir">
         <MsIcon name="create_new_folder" size="xs" color="none" />
         {{ t('sync.browse.mkdir_btn') }}
       </BaseButton>
-      <BaseButton variant="primary" size="sm" :disabled="!!error" @click="confirmSelect">
+      <BaseButton variant="primary" :disabled="!!error" @click="confirmSelect">
         {{ t('sync.browse.select') }}
       </BaseButton>
     </template>
@@ -314,8 +314,8 @@ function confirmSelect() {
       {{ mkdirError }}
     </p>
     <template #footer>
-      <BaseButton size="sm" @click="mkdirOpen = false">{{ t('common.btn.cancel') }}</BaseButton>
-      <BaseButton variant="primary" size="sm" :loading="creating" :disabled="!mkdirValid" @click="createDir">
+      <BaseButton @click="mkdirOpen = false">{{ t('common.btn.cancel') }}</BaseButton>
+      <BaseButton variant="primary" :loading="creating" :disabled="!mkdirValid" @click="createDir">
         {{ t('sync.browse.mkdir_btn') }}
       </BaseButton>
     </template>

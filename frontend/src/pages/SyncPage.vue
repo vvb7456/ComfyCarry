@@ -11,7 +11,7 @@
  *   - 存储/规则使用 ListRow; OAuth 向导、容量刷新、模板、路径浏览、过滤规则全部保留。
  *   - 最近同步接 C02 服务端分页 (每页 5) + C01 ListPagination; 历史页保持页码与滚动,
  *     回到第一页恢复轮询。详情进入 SyncJobDetailModal, 使用执行时规则快照。
- *   - 日志默认收起 (LogPanel 统一折叠标题)。
+ *   - 日志默认收起 (CollapsibleGroup 折叠标题)。
  *
  * 客户端 Tab: Companion Hero (在线数 / WebDAV 复制 / 下载) + 客户端 ListRow。
  */
@@ -30,6 +30,7 @@ import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import ListPagination from '@/components/ui/ListPagination.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
+import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -567,13 +568,15 @@ function jobIcon(status: string): string {
 }
 
 function jobLabel(job: SyncJob): string {
-  if (job.rules.length === 1) return job.rules[0].name || job.rules[0].id
-  return t('sync.records.rules_count', { count: job.rules.length || job.rule_count })
+  const rules = job.rules ?? []
+  if (rules.length === 1) return rules[0].name || rules[0].id
+  return t('sync.records.rules_count', { count: rules.length || job.rule_count })
 }
 
 function jobFlow(job: SyncJob): string {
-  if (job.rules.length !== 1) return ''
-  const r = job.rules[0]
+  const rules = job.rules ?? []
+  if (rules.length !== 1) return ''
+  const r = rules[0]
   return r.direction === 'push'
     ? `${r.local_path} → ${r.remote}:${r.remote_path}`
     : `${r.remote}:${r.remote_path} → ${r.local_path}`
@@ -677,8 +680,8 @@ function switchTab(tab: string) {
           >
             <MsIcon name="stop" /> {{ t('sync.hero.worker_stop') }}
           </BaseButton>
-          <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('sync.settings.title')" @click="settingsOpen = true">
-            <MsIcon name="settings" />
+          <BaseButton variant="ghost" size="sm" :aria-label="t('sync.settings.title')" @click="settingsOpen = true">
+            <MsIcon name="settings" /> {{ t('common.btn.settings') }}
           </BaseButton>
         </span>
       </template>
@@ -872,17 +875,16 @@ function switchTab(tab: string) {
 
         <!-- 同步日志 (默认收起) -->
         <section class="sync-block">
-          <LogPanel
-            :title="t('sync.log.title')"
-            collapsible
-            default-collapsed
-            :lines="logLines"
-            :status="logStatus"
-            :has-more="logHasMore"
-            :loading-more="logLoadingMore"
-            :prepending="logPrepending"
-            :on-scroll="logOnScroll"
-          />
+          <CollapsibleGroup icon="terminal" :title="t('sync.log.title')" :default-open="false">
+            <LogPanel
+              :lines="logLines"
+              :status="logStatus"
+              :has-more="logHasMore"
+              :loading-more="logLoadingMore"
+              :prepending="logPrepending"
+              :on-scroll="logOnScroll"
+            />
+          </CollapsibleGroup>
         </section>
       </template>
 

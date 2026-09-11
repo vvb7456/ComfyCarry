@@ -2,13 +2,14 @@
 /**
  * ConsoleSection — ComfyUI 日志分区 (C08)。
  *
- * 运行页最后一块: 接入统一 LogPanel (标题栏 + 可折叠, 默认展开),
+ * 运行页最后一块: 日志 (CollapsibleGroup 折叠标题, 默认展开),
  * 数据源沿用现有 useLogStream 的 comfy 历史 + SSE 流。
  */
 import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLogStream } from '@/composables/useLogStream'
 import LogPanel from '@/components/ui/LogPanel.vue'
+import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 
 defineOptions({ name: 'ConsoleSection' })
 
@@ -30,15 +31,15 @@ onUnmounted(() => { logStop() })
 </script>
 
 <template>
-  <LogPanel
-    :title="t('comfyui.sections.log')"
-    collapsible
-    :lines="logLines"
-    :status="logStatus"
-    :has-more="logHasMore"
-    :loading-more="logLoadingMore"
-    :prepending="logPrepending"
-    :on-scroll="logOnScroll"
-    height="clamp(18rem, 42vh, 32rem)"
-  />
+  <CollapsibleGroup icon="terminal" :title="t('comfyui.sections.log')">
+    <LogPanel
+      :lines="logLines"
+      :status="logStatus"
+      :has-more="logHasMore"
+      :loading-more="logLoadingMore"
+      :prepending="logPrepending"
+      :on-scroll="logOnScroll"
+      height="clamp(18rem, 42vh, 32rem)"
+    />
+  </CollapsibleGroup>
 </template>

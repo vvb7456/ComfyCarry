@@ -26,6 +26,7 @@ import { apiErrorText } from '@/utils/apiError'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
+import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -330,8 +331,8 @@ function openAddSvc() {
         </template>
         <BaseButton v-else size="sm" :loading="pendingAction === 'start'" :disabled="acting" @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
       </span>
-      <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('tunnel.settings.title')" @click="openSettings()">
-        <MsIcon name="settings" />
+      <BaseButton variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
+        <MsIcon name="settings" /> {{ t('common.btn.settings') }}
       </BaseButton>
     </div>
 
@@ -405,16 +406,16 @@ function openAddSvc() {
 
         <!-- 日志 (默认展开) -->
         <section v-if="configured" class="tunnel-block">
-          <LogPanel
-            :title="t('tunnel.log.title')"
-            collapsible
-            :lines="logLines"
-            :status="logStatus"
-            :has-more="logHasMore"
-            :loading-more="logLoadingMore"
-            :prepending="logPrepending"
-            :on-scroll="logOnScroll"
-          />
+          <CollapsibleGroup icon="terminal" :title="t('tunnel.log.title')">
+            <LogPanel
+              :lines="logLines"
+              :status="logStatus"
+              :has-more="logHasMore"
+              :loading-more="logLoadingMore"
+              :prepending="logPrepending"
+              :on-scroll="logOnScroll"
+            />
+          </CollapsibleGroup>
         </section>
       </template>
     </div>

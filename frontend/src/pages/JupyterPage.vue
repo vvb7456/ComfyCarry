@@ -22,6 +22,7 @@ import { useI18n } from 'vue-i18n'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
+import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -388,7 +389,7 @@ onUnmounted(() => {
               target="_blank"
               rel="noopener"
             >
-              {{ t('jupyter.hero.action.open') }}
+              <MsIcon name="open_in_new" /> {{ t('jupyter.hero.action.open') }}
             </BaseButton>
             <BaseButton
               v-else-if="heroAction === 'retry'"
@@ -563,16 +564,16 @@ onUnmounted(() => {
 
         <!-- 日志 (默认展开, 停机仍可读) -->
         <section class="jupyter-block">
-          <LogPanel
-            :title="t('jupyter.log.title')"
-            collapsible
-            :lines="logLines"
-            :status="logStatus"
-            :has-more="logHasMore"
-            :loading-more="logLoadingMore"
-            :prepending="logPrepending"
-            :on-scroll="logOnScroll"
-          />
+          <CollapsibleGroup icon="terminal" :title="t('jupyter.log.title')">
+            <LogPanel
+              :lines="logLines"
+              :status="logStatus"
+              :has-more="logHasMore"
+              :loading-more="logLoadingMore"
+              :prepending="logPrepending"
+              :on-scroll="logOnScroll"
+            />
+          </CollapsibleGroup>
         </section>
       </template>
     </div>

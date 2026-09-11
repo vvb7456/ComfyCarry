@@ -310,12 +310,11 @@ async function requestClose() {
       <span class="param-footer-note">
         {{ dirtyCount ? t('comfyui.params.changed', { count: dirtyCount }) : t('comfyui.params.unchanged') }}
       </span>
-      <BaseButton size="sm" :disabled="!isDirty || saving" @click="discardChanges">
+      <BaseButton :disabled="!isDirty || saving" @click="discardChanges">
         {{ t('comfyui.params.discard') }}
       </BaseButton>
       <BaseButton
         variant="primary"
-        size="sm"
         :disabled="!isDirty || loading || loadError"
         :loading="saving"
         @click="save"

@@ -291,7 +291,7 @@ function onVersionSwitched() {
           <template v-if="heroState !== 'starting'" #actions>
             <template v-if="heroState === 'idle' || heroState === 'executing'">
               <BaseButton variant="primary" :href="effectiveComfyUrl" target="_blank" rel="noopener">
-                {{ t('comfyui.hero.action.open') }}
+                <MsIcon name="open_in_new" /> {{ t('comfyui.hero.action.open') }}
               </BaseButton>
               <BaseButton
                 v-if="heroState === 'executing'"

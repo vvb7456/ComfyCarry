@@ -11,7 +11,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UsageBar from '@/components/ui/UsageBar.vue'
-import { fmtBytes } from '@/utils/format'
 import type { GpuInfo } from '@/types/system'
 
 defineOptions({ name: 'GpuMetricsCard' })
@@ -31,7 +30,8 @@ function num(v: number | null | undefined, unit = ''): string {
 
 /** 显存读数 (MB) 换算成可读容量 */
 function mb(v: number | null | undefined): string {
-  return has(v) ? fmtBytes(v * 1024 * 1024) : '—'
+  // 与总览 Hero 一致: MiB → GB 四舍五入一位小数
+  return has(v) ? `${(v / 1024).toFixed(1)} GB` : '—'
 }
 
 function pct(part: number | null | undefined, whole: number | null | undefined): number {

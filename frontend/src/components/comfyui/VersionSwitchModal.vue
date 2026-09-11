@@ -199,12 +199,11 @@ async function switchSelectedVersion() {
     />
 
     <template #footer>
-      <BaseButton size="sm" :disabled="switching" @click="emit('update:modelValue', false)">
+      <BaseButton :disabled="switching" @click="emit('update:modelValue', false)">
         {{ t('common.btn.cancel') }}
       </BaseButton>
       <BaseButton
         variant="primary"
-        size="sm"
         :disabled="!hasGit || !selectedVersion || selectedIsCurrent || versionsLoading"
         :loading="switching"
         @click="switchSelectedVersion"

@@ -172,6 +172,7 @@ def _row_to_dict(row) -> dict:
             try:
                 d[key.removesuffix("_json")] = json.loads(d[key])
             except (json.JSONDecodeError, TypeError):
-                d[key.removesuffix("_json")] = {}
+                # rules_json 是数组字段, 损坏时兜底为 []; 其余 ({}) 结构
+                d[key.removesuffix("_json")] = [] if key == "rules_json" else {}
             del d[key]
     return d

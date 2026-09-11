@@ -175,7 +175,7 @@ const eventRows = computed(() => events.value.map(e => ({
       <!-- 规则快照 -->
       <section class="detail-section">
         <h4 class="detail-section__title">{{ t('sync.detail.rules') }}</h4>
-        <ul v-if="job.rules.length" class="detail-rules">
+        <ul v-if="(job.rules ?? []).length" class="detail-rules">
           <li v-for="r in job.rules" :key="r.id" class="detail-rule">
             <MsIcon :name="directionIcon(r.direction)" size="sm" class="detail-rule__dir" />
             <div class="detail-rule__main">
@@ -216,7 +216,7 @@ const eventRows = computed(() => events.value.map(e => ({
     </div>
 
     <template #footer>
-      <BaseButton size="sm" @click="emit('update:modelValue', false)">{{ t('common.btn.close') }}</BaseButton>
+      <BaseButton @click="emit('update:modelValue', false)">{{ t('common.btn.close') }}</BaseButton>
     </template>
   </BaseModal>
 </template>

@@ -155,10 +155,9 @@ async function requestClose(): Promise<void> {
     </div>
 
     <template #footer>
-      <BaseButton size="sm" :disabled="saving" @click="requestClose()">{{ t('common.btn.cancel') }}</BaseButton>
+      <BaseButton :disabled="saving" @click="requestClose()">{{ t('common.btn.cancel') }}</BaseButton>
       <BaseButton
         variant="primary"
-        size="sm"
         :disabled="!dirty || loading || loadError"
         :loading="saving"
         @click="onSave"

@@ -33,7 +33,8 @@ export interface SyncJob {
   failure_count: number
   files_synced: number
   summary: SyncJobSummary | null
-  rules: SyncJobRuleSnapshot[]
+  /** 执行时规则快照; 旧库未补 rules_json 列的历史行可能缺失 */
+  rules?: SyncJobRuleSnapshot[]
   started_at: number
   finished_at: number | null
 }

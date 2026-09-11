@@ -151,10 +151,10 @@ function onCancel() {
     </div>
 
     <template #footer>
-      <BaseButton variant="default" size="sm" @click="onCancel">
+      <BaseButton variant="default" @click="onCancel">
         {{ t('common.btn.cancel') }}
       </BaseButton>
-      <BaseButton variant="primary" size="sm" :loading="applying" @click="onApply">
+      <BaseButton variant="primary" :loading="applying" @click="onApply">
         {{ t('common.btn.confirm') }}
       </BaseButton>
     </template>

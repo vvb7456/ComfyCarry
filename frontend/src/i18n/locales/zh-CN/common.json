@@ -18,7 +18,8 @@
     "clear": "清空",
     "logout": "登出",
     "retry": "重试",
-    "done": "完成"
+    "done": "完成",
+    "settings": "设置"
   },
   "status": {
     "loading": "加载中..."

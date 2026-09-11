@@ -263,7 +263,7 @@ onMounted(() => {
       </FormField>
     </form>
     <template #footer>
-      <BaseButton variant="primary" size="sm" :loading="pwSubmitting" @click="changePassword">
+      <BaseButton variant="primary" :loading="pwSubmitting" @click="changePassword">
         {{ t('settings.password.update_btn') }}
       </BaseButton>
     </template>

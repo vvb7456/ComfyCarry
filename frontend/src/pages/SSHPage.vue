@@ -21,6 +21,7 @@ import { useI18n } from 'vue-i18n'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
+import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -311,8 +312,8 @@ onUnmounted(() => {
           <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
         </BaseButton>
       </span>
-      <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('ssh.settings.title')" @click="settingsOpen = true">
-        <MsIcon name="settings" />
+      <BaseButton variant="ghost" size="sm" :aria-label="t('ssh.settings.title')" @click="settingsOpen = true">
+        <MsIcon name="settings" /> {{ t('common.btn.settings') }}
       </BaseButton>
     </div>
 
@@ -330,7 +331,7 @@ onUnmounted(() => {
         >
           <template v-if="heroAction" #actions>
             <BaseButton v-if="heroAction === 'copy'" variant="primary" @click="copyCmd">
-              {{ t('ssh.hero.action.copy') }}
+              <MsIcon name="content_copy" /> {{ t('ssh.hero.action.copy') }}
             </BaseButton>
             <BaseButton
               v-else
@@ -426,16 +427,16 @@ onUnmounted(() => {
 
         <!-- 日志 (默认展开) -->
         <section class="ssh-block">
-          <LogPanel
-            :title="t('ssh.log.title')"
-            collapsible
-            :lines="logLines"
-            :status="logStatus"
-            :has-more="logHasMore"
-            :loading-more="logLoadingMore"
-            :prepending="logPrepending"
-            :on-scroll="logOnScroll"
-          />
+          <CollapsibleGroup icon="terminal" :title="t('ssh.log.title')">
+            <LogPanel
+              :lines="logLines"
+              :status="logStatus"
+              :has-more="logHasMore"
+              :loading-more="logLoadingMore"
+              :prepending="logPrepending"
+              :on-scroll="logOnScroll"
+            />
+          </CollapsibleGroup>
         </section>
       </template>
     </div>

@@ -158,7 +158,7 @@ function close(): void {
     </div>
 
     <template #footer>
-      <BaseButton size="sm" :disabled="submitting" @click="close">{{ t('common.btn.close') }}</BaseButton>
+      <BaseButton :disabled="submitting" @click="close">{{ t('common.btn.close') }}</BaseButton>
     </template>
   </BaseModal>
 </template>
