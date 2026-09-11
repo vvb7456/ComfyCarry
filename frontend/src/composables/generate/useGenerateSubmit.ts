@@ -533,7 +533,9 @@ export function useGenerateSubmit(
     submitting.value = true
     try {
       const result = await apiPost<SubmitResponse>('/api/generate/submit', payload)
-      if (!result?.prompt_id) {
+      // 非 2xx 已由 useApiFetch 统一提示 (error_key 翻译); 这里只判响应体
+      if (!result) return null
+      if (!result.prompt_id) {
         toast(t('generate.error.prompt_id_missing'), 'error')
         return null
       }

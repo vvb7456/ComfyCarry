@@ -56,7 +56,8 @@ export const useBackgroundRunStore = defineStore('backgroundRun', () => {
   }
 
   async function refresh() {
-    const d = await get<BackgroundRunResponse>(API_BASE)
+    // 5s 轮询: 失败静默 (状态由浮动条呈现, 不逐次弹错误)
+    const d = await get<BackgroundRunResponse>(API_BASE, { silent: true })
     if (d) apply(d)
   }
 
@@ -73,10 +74,13 @@ export const useBackgroundRunStore = defineStore('backgroundRun', () => {
     return Date.now() - stoppedAt < STOP_QUIET_MS
   }
 
-  async function stop() {
+  /** @returns 是否成功停止 (非 2xx 已由 useApiFetch 提示) */
+  async function stop(): Promise<boolean> {
     stoppedAt = Date.now()
     const d = await post<BackgroundRunResponse>(`${API_BASE}/stop`)
-    if (d) apply(d)
+    if (!d) return false
+    apply(d)
+    return true
   }
 
   async function dismiss() {

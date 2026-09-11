@@ -88,6 +88,7 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
     try {
       const d = await get<JobsListResponse>(
         `/api/sync/jobs?page=${requested}&limit=${pageSize.value}`,
+        { silent: true },
       )
       if (seq !== reqSeq || !d) return
       jobs.value = d.jobs
@@ -128,14 +129,14 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
   }
 
   // ── Fetch single job detail + events (独立于页码) ──
-  async function fetchJobDetail(jobId: string, afterId = 0, limit = 500) {
-    return get<JobDetailResponse>(`/api/sync/jobs/${jobId}?after_id=${afterId}&limit=${limit}`)
+  async function fetchJobDetail(jobId: string, afterId = 0, limit = 500, silent = false) {
+    return get<JobDetailResponse>(`/api/sync/jobs/${jobId}?after_id=${afterId}&limit=${limit}`, { silent })
   }
 
-  /** 读取当前运行任务详情 (Hero 用, 不受历史页码影响) */
+  /** 读取当前运行任务详情 (Hero 用, 不受历史页码影响; 随轮询刷新 → 静默) */
   async function fetchCurrentJobDetail(afterId = 0, limit = 500) {
     if (!currentJobId.value) return null
-    return fetchJobDetail(currentJobId.value, afterId, limit)
+    return fetchJobDetail(currentJobId.value, afterId, limit, true)
   }
 
   // ── Polling ──

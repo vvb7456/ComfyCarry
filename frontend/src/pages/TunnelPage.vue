@@ -95,7 +95,7 @@ onUnmounted(() => {
 })
 
 async function loadTunnelStatus() {
-  const d = await get<TunnelData>('/api/tunnel/status?refresh=1')
+  const d = await get<TunnelData>('/api/tunnel/status?refresh=1', { silent: true })
   if (d) data.value = d
 }
 
@@ -248,7 +248,9 @@ async function tunnelStop() {
   pendingAction.value = 'stop'
   const d = await post<TunnelActionResponse>('/api/tunnel/stop')
   pendingAction.value = null
-  toast(d?.ok ? t('tunnel.toast.cf_stopped') : apiErrorText(d, t('tunnel.toast.stop_failed')), d?.ok ? 'success' : 'error')
+  // 非 2xx (含 error_key) 已由 useApiFetch 统一提示; 这里只判业务层 ok, 避免二次弹
+  if (!d) return
+  toast(d.ok ? t('tunnel.toast.cf_stopped') : apiErrorText(d, t('tunnel.toast.stop_failed')), d.ok ? 'success' : 'error')
   setTimeout(loadTunnelStatus, 1500)
 }
 
@@ -256,7 +258,8 @@ async function tunnelStart() {
   pendingAction.value = 'start'
   const d = await post<TunnelActionResponse>('/api/tunnel/start')
   pendingAction.value = null
-  if (!d?.ok) { toast(apiErrorText(d, t('tunnel.toast.start_failed')), 'error'); return }
+  if (!d) return
+  if (!d.ok) { toast(apiErrorText(d, t('tunnel.toast.start_failed')), 'error'); return }
   toast(t('tunnel.toast.cf_starting'), 'info')
   setTimeout(loadTunnelStatus, 2000)
 }
@@ -266,7 +269,8 @@ async function tunnelRestart(skipConfirm = false) {
   pendingAction.value = 'restart'
   const d = await post<TunnelActionResponse>('/api/tunnel/restart')
   pendingAction.value = null
-  if (!d?.ok) { toast(apiErrorText(d, t('tunnel.toast.restart_failed')), 'error'); return }
+  if (!d) return
+  if (!d.ok) { toast(apiErrorText(d, t('tunnel.toast.restart_failed')), 'error'); return }
   toast(t('tunnel.toast.cf_restarting'), 'info')
   setTimeout(loadTunnelStatus, 3000)
 }
@@ -300,14 +304,16 @@ function removeAria(row: ServiceRow) { return t('tunnel.services.remove', { name
 async function removeService(suffix: string) {
   if (!await confirm({ message: t('tunnel.confirm.remove_custom_service', { suffix }), variant: 'danger' })) return
   const d = await del<TunnelActionResponse>(`/api/tunnel/services/${encodeURIComponent(suffix)}`)
-  if (d?.ok) { toast(t('tunnel.toast.service_removed'), 'success'); setTimeout(loadTunnelStatus, 2000) }
+  if (!d) return
+  if (d.ok) { toast(t('tunnel.toast.service_removed'), 'success'); setTimeout(loadTunnelStatus, 2000) }
   else toast(apiErrorText(d, t('tunnel.toast.remove_failed')), 'error')
 }
 
 async function submitAddSvc() {
   if (!addSvcName.value || !addSvcPort.value || !addSvcSuffix.value) { toast(t('tunnel.config.fill_all'), 'warning'); return }
   const d = await post<TunnelActionResponse>('/api/tunnel/services', { name: addSvcName.value, port: parseInt(addSvcPort.value), suffix: addSvcSuffix.value, protocol: addSvcProto.value })
-  if (d?.ok) { toast(t('tunnel.toast.service_added'), 'success'); addSvcModal.value = false; setTimeout(loadTunnelStatus, 2000) }
+  if (!d) return
+  if (d.ok) { toast(t('tunnel.toast.service_added'), 'success'); addSvcModal.value = false; setTimeout(loadTunnelStatus, 2000) }
   else toast(apiErrorText(d, t('tunnel.toast.add_failed')), 'error')
 }
 

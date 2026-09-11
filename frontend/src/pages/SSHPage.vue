@@ -84,7 +84,7 @@ const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: lo
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 async function loadStatus() {
-  const data = await get<SSHStatus>('/api/ssh/status')
+  const data = await get<SSHStatus>('/api/ssh/status', { silent: true })
   if (data) {
     status.value = data
     statusLoading.value = false
@@ -104,7 +104,7 @@ async function loadConnectCmd() {
     connectCmdState.value = 'not_running'
     return
   }
-  const data = await get<{ urls?: Record<string, string>; tunnel_mode?: string; public?: { urls?: Record<string, string> } }>('/api/tunnel/status')
+  const data = await get<{ urls?: Record<string, string>; tunnel_mode?: string; public?: { urls?: Record<string, string> } }>('/api/tunnel/status', { silent: true })
   connectCmdLoading.value = false
   if (!data) {
     connectCmd.value = localSshCmd()

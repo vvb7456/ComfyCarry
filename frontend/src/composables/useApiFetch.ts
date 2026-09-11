@@ -9,6 +9,16 @@ export function redirectToLogin() {
   window.location.href = '/login'
 }
 
+export interface FetchCallOptions {
+  /**
+   * 失败时不弹全局错误 toast (仍写入 error 状态并返回 null)。
+   *
+   * 供轮询 / 自动刷新使用: 后端持续报错时, 非静默请求会每 3–15s 弹一条同样的
+   * 错误, 把 toast 刷屏。用户主动发起的动作一律保持非静默。
+   */
+  silent?: boolean
+}
+
 /**
  * Unified HTTP client composable.
  * Wraps fetch with loading/error state, JSON parsing, and toast on error.
@@ -21,6 +31,7 @@ export function useApiFetch() {
   async function request<T = unknown>(
     url: string,
     opts: RequestInit = {},
+    call: FetchCallOptions = {},
   ): Promise<T | null> {
     loading.value = true
     error.value = null
@@ -41,7 +52,7 @@ export function useApiFetch() {
           msg = apiErrorText(await res.json(), msg)
         } catch { /* ignore parse error */ }
         error.value = msg
-        toast(msg, 'error')
+        if (!call.silent) toast(msg, 'error')
         return null
       }
       // Handle 204 No Content
@@ -50,40 +61,52 @@ export function useApiFetch() {
     } catch (e: any) {
       const msg = e?.message || 'Network error'
       error.value = msg
-      toast(msg, 'error')
+      if (!call.silent) toast(msg, 'error')
       return null
     } finally {
       loading.value = false
     }
   }
 
-  async function get<T = unknown>(url: string): Promise<T | null> {
-    return request<T>(url, { method: 'GET' })
+  async function get<T = unknown>(url: string, call: FetchCallOptions = {}): Promise<T | null> {
+    return request<T>(url, { method: 'GET' }, call)
   }
 
-  async function post<T = unknown>(url: string, body?: Record<string, unknown> | unknown[]): Promise<T | null> {
+  async function post<T = unknown>(
+    url: string,
+    body?: Record<string, unknown> | unknown[],
+    call: FetchCallOptions = {},
+  ): Promise<T | null> {
     return request<T>(url, {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
+    }, call)
   }
 
-  async function put<T = unknown>(url: string, body?: Record<string, unknown> | unknown[]): Promise<T | null> {
+  async function put<T = unknown>(
+    url: string,
+    body?: Record<string, unknown> | unknown[],
+    call: FetchCallOptions = {},
+  ): Promise<T | null> {
     return request<T>(url, {
       method: 'PUT',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
+    }, call)
   }
 
-  async function del<T = unknown>(url: string, body?: Record<string, unknown>): Promise<T | null> {
+  async function del<T = unknown>(
+    url: string,
+    body?: Record<string, unknown>,
+    call: FetchCallOptions = {},
+  ): Promise<T | null> {
     return request<T>(url, {
       method: 'DELETE',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
+    }, call)
   }
 
   /** Raw fetch without JSON parsing (for file uploads, etc.) */
-  async function raw(url: string, opts: RequestInit = {}): Promise<Response | null> {
+  async function raw(url: string, opts: RequestInit = {}, call: FetchCallOptions = {}): Promise<Response | null> {
     loading.value = true
     error.value = null
     try {
@@ -98,14 +121,14 @@ export function useApiFetch() {
           msg = apiErrorText(await res.json(), msg)
         } catch { /* ignore */ }
         error.value = msg
-        toast(msg, 'error')
+        if (!call.silent) toast(msg, 'error')
         return null
       }
       return res
     } catch (e: any) {
       const msg = e?.message || 'Network error'
       error.value = msg
-      toast(msg, 'error')
+      if (!call.silent) toast(msg, 'error')
       return null
     } finally {
       loading.value = false

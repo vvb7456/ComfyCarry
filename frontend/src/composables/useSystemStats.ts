@@ -25,7 +25,7 @@ async function poll() {
   if (fetching || !apiFetch) return
   fetching = true
   try {
-    const d = await apiFetch.get<SystemStats>('/api/system/stats')
+    const d = await apiFetch.get<SystemStats>('/api/system/stats', { silent: true })
     if (d) stats.value = d
   } finally {
     fetching = false

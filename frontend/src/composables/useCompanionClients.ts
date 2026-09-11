@@ -53,8 +53,8 @@ export function useCompanionClients(opts?: { pollInterval?: number }) {
     loading.value = true
     try {
       const [d, td] = await Promise.all([
-        get<CompanionClientsResponse>('/api/companion/clients'),
-        get<TunnelData>('/api/tunnel/status'),
+        get<CompanionClientsResponse>('/api/companion/clients', { silent: true }),
+        get<TunnelData>('/api/tunnel/status', { silent: true }),
       ])
       if (d) {
         clients.value = d.clients || []

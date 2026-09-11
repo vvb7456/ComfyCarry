@@ -7,6 +7,7 @@ import ToastContainer from '@/components/ui/ToastContainer.vue'
 import ConfirmProvider from '@/components/ui/ConfirmProvider.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { provideToast } from '@/composables/useToast'
+import { useExecNotifications } from '@/composables/useExecNotifications'
 import { useTheme } from '@/composables/useTheme'
 import { useAppStore } from '@/stores/app'
 import { useBackgroundRunStore } from '@/stores/backgroundRun'
@@ -15,6 +16,8 @@ defineOptions({ name: 'App' })
 
 provideToast()
 useTheme() // initialize theme on app level
+// 执行终态通知器: App 级常驻, 全站唯一的完成/中断/出错提示出口 (与页面无关)
+useExecNotifications()
 
 const app = useAppStore()
 const backgroundRun = useBackgroundRunStore()

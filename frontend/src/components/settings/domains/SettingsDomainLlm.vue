@@ -177,7 +177,9 @@ async function fetchLlmModels(): Promise<boolean> {
     base_url: llmBaseUrl.value,
   })
   llmFetchingModels.value = false
-  if (!data?.ok) {
+  // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok, 避免同一次失败弹两条
+  if (!data) return false
+  if (!data.ok) {
     toast(apiErrorText(data, t('settings.llm.model.fetch_failed')), 'error')
     return false
   }

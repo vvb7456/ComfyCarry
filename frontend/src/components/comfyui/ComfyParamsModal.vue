@@ -207,14 +207,16 @@ async function save() {
     extra_args: extraArgs.value.trim(),
   })
   saving.value = false
-  if (d?.ok) {
+  // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok, 避免同一次失败弹两条
+  if (!d) return
+  if (d.ok) {
     savedCurrent.value = cloneParams(paramsCurrent.value)
     savedExtraArgs.value = extraArgs.value
     toast(t('comfyui.params.restart_toast'), 'success')
     emit('saved', d.args || '')
     emit('update:modelValue', false)
   } else {
-    toast(d?.error || t('comfyui.params.save_failed'), 'error')
+    toast(d.error || t('comfyui.params.save_failed'), 'error')
   }
 }
 

@@ -80,7 +80,9 @@ async function onSave(): Promise<void> {
       min_age: minAge.value,
       watch_interval: watchInterval.value,
     })
-    if (!d?.ok) {
+    // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok, 避免同一次失败弹两条
+    if (!d) return
+    if (!d.ok) {
       toast(apiErrorText(d, t('sync.settings.save_failed')), 'error')
       return
     }

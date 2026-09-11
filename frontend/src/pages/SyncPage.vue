@@ -190,7 +190,7 @@ async function loadRemotes() {
 }
 
 async function loadSyncStatus() {
-  const d = await get<SyncStatusResponse>('/api/sync/status')
+  const d = await get<SyncStatusResponse>('/api/sync/status', { silent: true })
   if (d) {
     workerRunning.value = !!d.worker_running
     if (d.rules) rules.value = d.rules
@@ -221,7 +221,7 @@ async function loadHeroJob() {
     currentJob.value = d?.job ?? null
   } else {
     currentJob.value = null
-    const d = await get<{ jobs: SyncJob[] }>('/api/sync/jobs?page=1&limit=1')
+    const d = await get<{ jobs: SyncJob[] }>('/api/sync/jobs?page=1&limit=1', { silent: true })
     latestJob.value = d?.jobs?.[0] ?? null
   }
 }

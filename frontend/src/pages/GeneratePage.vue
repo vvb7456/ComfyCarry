@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
-import { useToast } from '@/composables/useToast'
+import { useToast, provideToastScope, muteToastScope, unmuteToastScope } from '@/composables/useToast'
 import { apiErrorText } from '@/utils/apiError'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
@@ -34,6 +34,9 @@ const router = useRouter()
 const route = useRoute()
 
 const { t } = useI18n({ useScope: 'global' })
+// toast 作用域: 本页被 KeepAlive 常驻, 失活时静音本子树所有提示 (见 useToast),
+// 避免切走后仍从"看不见的页面"弹提示。SSE / 善后 / live 续跑一概不受影响。
+provideToastScope('generate')
 const { toast } = useToast()
 const { post } = useApiFetch()
 const store = useGenerateStore()
@@ -42,18 +45,6 @@ const queueStore = useGenerateQueueStore()
 const bg = useBackgroundRunStore()
 const app = useAppStore()
 const frozen = computed(() => bg.state === 'running')
-
-/**
- * 后台运行相关的执行 toast 是否该抑制。
- *
- * 两种情形:
- *  - 正在后台跑: 完成提示每轮一条会攒几百个; 报错由浮动条的 stop_reason 统一上报。
- *  - 刚手动停止: 后端 interrupt 后 ComfyUI 会发 execution_interrupted, 但此时本地
- *    state 可能已被 /stop 的响应置成 idle, 单看 state 守不住 (竞态), 故用静默窗兜。
- */
-function bgToastSuppressed() {
-  return bg.state === 'running' || bg.recentlyStopped()
-}
 
 // ── Gate: check ComfyUI online ─────────────────────────────────────────────
 const gate = useComfyGate()
@@ -95,6 +86,8 @@ watch(() => gate.state.value, (newState, oldState) => {
 }, { immediate: true })
 
 onActivated(() => {
+  // 回到本页: 解除 toast 静音
+  unmuteToastScope('generate')
   if (optionsReady.value) options.refresh()
   // Re-check gate on page re-activation
   gate.checkNow()
@@ -269,7 +262,10 @@ watch(drawerOpen, (open) => {
 // KeepAlive 下切走是 onDeactivated 而非 onUnmounted: 抽屉随页面失活关闭,
 // 顺带释放 Drawer 的 body 滚动锁 (其 watch close 分支 / onUnmounted 都不会在
 // deactivation 时触发), 避免遮罩与滚动锁泄漏到目标页。
+// 同时静音本页 toast 作用域 —— SSE 与 live 续跑照常, 只是不再从看不见的页面弹
+// 过程性提示 (error 仍放行, 见 useToast)。
 onDeactivated(() => {
+  muteToastScope('generate')
   drawerOpen.value = false
 })
 
@@ -330,7 +326,8 @@ onBeforeUnmount(cancelLiveRerun)
 
 async function handleStop() {
   cancelLiveRerun()
-  await post('/api/comfyui/interrupt')
+  // 失败已由 useApiFetch 提示; 不要再报"已发送", 否则错误 + 成功两条并存
+  if (!await post('/api/comfyui/interrupt')) return
   toast(t('generate.msg.interrupt_sent'), 'info')
 }
 
@@ -496,18 +493,15 @@ const sse = useComfySSE(tracker, {
     }
 
     if (result?.finished) {
-      // Only show toast / fetch outputs for main tasks (or unknown = assumed main)
+      // 终态提示 (完成 / 中断 / 出错) 由 App 级 useExecNotifications 统一发出。
+      // 这里只保留善后: 产物拉取、队列/历史刷新、live 续跑 —— 页面失活期间照常执行,
+      // live 模式切走后继续自动续跑正是靠它 (设计意图, 不要在这里加可见性判断)。
+      // Only show fetch outputs for main tasks (or unknown = assumed main)
       const isMain = !lastRoutedType || lastRoutedType === 'main'
 
       if (isMain) {
         if (result.type === 'execution_done') {
-          const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
           const promptId = (evt.data?.prompt_id as string) || ''
-          // 后台运行期间抑制 per-iteration 完成提示 (跑一夜会攒几百个);
-          // 但 fetchOutputImages / loadQueue / loadHistory / markHistoryDirty 照常执行。
-          if (!bgToastSuppressed()) {
-            toast(`${t('generate.msg.gen_complete')}${elapsed}`, 'success')
-          }
           if (promptId) preview.fetchOutputImages(promptId)
           queueStore.loadQueue()
           // 任务完成事件 → 抽屉开着: loadHistory; 关着: markHistoryDirty
@@ -516,16 +510,12 @@ const sse = useComfySSE(tracker, {
           // Live mode: auto-rerun after successful execution
           if (store.currentState.runMode === 'live') scheduleLiveRerun()
         } else if (result.type === 'execution_interrupted') {
-          // 后台运行 / 刚手动停止时不弹: 停止是用户自己点的, 浮动条侧已给过提示
-          if (!bgToastSuppressed()) toast(t('generate.msg.exec_interrupted'), 'warning')
           preview.clearPreview()
           queueStore.loadQueue()
           if (drawerOpen.value) queueStore.loadHistory()
           else queueStore.markHistoryDirty()
           cancelLiveRerun()
         } else if (result.type === 'execution_error') {
-          // 后台运行时 worker 会写 stop_reason=exec_error 并由浮动条展示, 这里再弹就是双重提示
-          if (!bgToastSuppressed()) toast(t('generate.error.exec_error_prefix'), 'error')
           preview.clearPreview()
           queueStore.loadQueue()
           cancelLiveRerun()

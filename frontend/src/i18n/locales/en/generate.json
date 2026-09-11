@@ -612,7 +612,6 @@
     "modules_not_enabled": "Some features are configured but not enabled",
     "modules_not_enabled_desc": "Parameters are configured but toggles are off. They will not take effect after submission.",
     "skip_submit": "Skip and submit",
-    "exec_error_prefix": "ComfyUI execution error",
     "cn_no_ref": "{type} is enabled but no reference uploaded, please upload or uncheck",
     "cn_no_model": "{type} has no available models, please confirm ComfyUI is running",
     "i2i_no_ref": "Img2Img is enabled but no reference uploaded, please upload or uncheck",
@@ -788,8 +787,6 @@
   },
   "msg": {
     "interrupt_sent": "Interrupt request sent",
-    "gen_complete": "Generation complete",
-    "exec_interrupted": "Execution interrupted",
     "selected": "Selected {name}",
     "queued": "Queued",
     "no_output": "Cannot retrieve output images, please check the ComfyUI page",

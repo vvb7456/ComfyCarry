@@ -86,7 +86,7 @@ const isRunning = computed(() => !!status.value && (status.value.online || pm2St
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 async function loadStatus() {
-  const data = await get<JupyterStatus>('/api/jupyter/status')
+  const data = await get<JupyterStatus>('/api/jupyter/status', { silent: true })
   if (data) {
     status.value = data
     statusLoading.value = false
@@ -95,7 +95,7 @@ async function loadStatus() {
 
 /** 有隧道用隧道入口 (自定义 + 公共), 无隧道在 effectiveJupyterUrl 里回落本机直连。 */
 async function loadJupyterUrl() {
-  const data = await get<{ urls?: Record<string, string>; public?: { urls?: Record<string, string> } }>('/api/tunnel/status')
+  const data = await get<{ urls?: Record<string, string>; public?: { urls?: Record<string, string> } }>('/api/tunnel/status', { silent: true })
   if (!data) {
     jupyterUrl.value = ''
     return
@@ -111,7 +111,7 @@ async function loadJupyterUrl() {
 }
 
 async function loadToken() {
-  const data = await get<{ token: string }>('/api/jupyter/token')
+  const data = await get<{ token: string }>('/api/jupyter/token', { silent: true })
   if (data?.token) token.value = data.token
 }
 

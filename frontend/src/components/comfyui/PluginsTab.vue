@@ -259,7 +259,9 @@ async function restartNow() {
   restarting.value = true
   try {
     const d = await post<PluginActionResponse>('/api/comfyui/restart', {})
-    if (!d?.ok) {
+    // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok
+    if (!d) return
+    if (!d.ok) {
       toast(apiErrorText(d) || t('plugins.restart.restarting'), 'error')
       return
     }
@@ -268,7 +270,8 @@ async function restartNow() {
     let backOnline = false
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 3000))
-      const s = await get<{ online?: boolean }>('/api/comfyui/status')
+      // 停机期间每次探测都会失败 —— 静默, 结果由下方的 done/timeout 汇总
+      const s = await get<{ online?: boolean }>('/api/comfyui/status', { silent: true })
       if (s?.online) { backOnline = true; break }
     }
     await loadData(true)

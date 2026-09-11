@@ -97,7 +97,9 @@ async function saveAll(): Promise<boolean> {
         '/api/settings/civitai-key',
         { api_key: civitaiKey.value.trim() },
       )
-      if (!data?.ok) {
+      // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok
+      if (!data) return false
+      if (!data.ok) {
         toast(apiErrorText(data, t('settings.civitai.save_failed')), 'error')
         return false
       }

@@ -66,11 +66,13 @@ async function submit() {
   if (!parsedIds.value.length) return
   loading.value = true
   let added = 0
+  let failed = 0
   try {
     for (const { modelId, versionId } of parsedIds.value) {
       // Fetch model info via backend proxy (avoids CORS + auth issues)
-      const data = await get<any>(`/api/civitai/model/${modelId}`)
-      if (!data) continue
+      // 逐条探测静默失败: 由末尾的汇总 toast 统一汇报, 否则 N 个无效 ID 会弹 N 条错误
+      const data = await get<any>(`/api/civitai/model/${modelId}`, { silent: true })
+      if (!data) { failed++; continue }
       const versions = data.modelVersions || []
       const ver = versionId
         ? versions.find((v: any) => String(v.id) === versionId) || versions[0]
@@ -91,8 +93,11 @@ async function submit() {
         allVersions: versions.map((v: any) => ({ id: v.id, name: v.name, baseModel: v.baseModel })),
       }
       if (await addFavorite(item)) added++
+      else failed++
     }
-    toast(t('models.downloads.batch_added', { count: added }), 'success')
+    const msg = t('models.downloads.batch_added', { count: added })
+      + (failed ? t('models.downloads.batch_fail', { fail: failed }) : '')
+    toast(msg, failed ? 'warning' : 'success')
     inputText.value = ''
     emit('update:modelValue', false)
   } finally {

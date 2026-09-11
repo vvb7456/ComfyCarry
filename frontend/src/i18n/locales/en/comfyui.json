@@ -359,6 +359,7 @@
     "switched_with_deps": "Switched to {version} (dependencies installed)",
     "gen_complete": "Generation complete",
     "exec_interrupted": "Execution interrupted",
+    "exec_error": "ComfyUI execution error",
     "restarting": "ComfyUI is restarting...",
     "stopped": "ComfyUI stopped",
     "starting": "ComfyUI starting...",

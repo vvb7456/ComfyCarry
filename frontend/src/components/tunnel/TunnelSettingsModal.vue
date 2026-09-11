@@ -55,6 +55,22 @@ const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
+/**
+ * 统一判定动作结果并提示。
+ *
+ * 非 2xx (含 error_key) 已由 useApiFetch 统一提示 —— 这里拿到 null 直接当失败
+ * 返回, **不再**用自己的 fallback 文案补一条, 否则同一次失败会弹两条。
+ * 只有 HTTP 200 + ok:false 这种"业务层失败"才由本组件出文案。
+ */
+function actionFailed(d: TunnelActionResponse | null, fallbackKey: string): boolean {
+  if (!d) return true
+  if (!d.ok) {
+    toast(apiErrorText(d, t(fallbackKey)), 'error')
+    return true
+  }
+  return false
+}
+
 const mode = ref<TunnelMode>('off')
 const cfgSubdomain = ref('')
 const cfgDomain = ref('')
@@ -168,13 +184,13 @@ async function applyConfig(): Promise<boolean> {
           if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
           toast(t('tunnel.settings.enabling_public'), 'info')
           const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
-          if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.enable_failed')), 'error'); return false }
+          if (actionFailed(d, 'tunnel.settings.enable_failed')) return false
           return done()
         }
         // 协议写在 cloudflared 启动命令行里, 需重启进程才会生效
         if (cfgProtocol.value !== serverProtocol.value) {
           const d = await post<TunnelActionResponse>('/api/tunnel/restart')
-          if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.save_failed')), 'error'); return false }
+          if (actionFailed(d, 'tunnel.settings.save_failed')) return false
         }
         return done()
       }
@@ -184,7 +200,7 @@ async function applyConfig(): Promise<boolean> {
       const d = await post<TunnelActionResponse>('/api/tunnel/provision', {
         api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value,
       })
-      if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.save_failed')), 'error'); return false }
+      if (actionFailed(d, 'tunnel.settings.save_failed')) return false
       return done()
     }
 
@@ -211,7 +227,7 @@ async function applyConfig(): Promise<boolean> {
       if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
       toast(t('tunnel.settings.enabling_public'), 'info')
       const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
-      if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.enable_failed')), 'error'); return false }
+      if (actionFailed(d, 'tunnel.settings.enable_failed')) return false
       return done()
     }
 
@@ -222,7 +238,7 @@ async function applyConfig(): Promise<boolean> {
     const d = await post<TunnelActionResponse>('/api/tunnel/provision', {
       api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value,
     })
-    if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.save_failed')), 'error'); return false }
+    if (actionFailed(d, 'tunnel.settings.save_failed')) return false
     return done()
   } finally {
     cfgSaving.value = false
@@ -240,10 +256,7 @@ function validateCustom(): boolean {
 /** 销毁自定义隧道: 后端 teardown 失败时仍回 200 + {ok:false}, 必须按响应体判断 */
 async function teardownCustom(): Promise<boolean> {
   const d = await post<TunnelActionResponse>('/api/tunnel/teardown')
-  if (!d?.ok) {
-    toast(apiErrorText(d, t('tunnel.settings.save_failed')), 'error')
-    return false
-  }
+  if (actionFailed(d, 'tunnel.settings.save_failed')) return false
   return true
 }
 

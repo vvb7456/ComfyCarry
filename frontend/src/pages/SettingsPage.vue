@@ -248,7 +248,8 @@ onBeforeUnmount(() => {
 
 async function restartDashboard() {
   if (!await confirm({ message: t('settings.restart_confirm') })) return
-  await post('/api/settings/restart', {})
+  // 失败已由 useApiFetch 提示; 不要再报"正在重启"并刷新页面
+  if (!await post('/api/settings/restart', {})) return
   toast(t('settings.restarting'), 'info')
   setTimeout(() => location.reload(), 3000)
 }

@@ -359,6 +359,7 @@
     "switched_with_deps": "已切换到 {version}（已安装依赖）",
     "gen_complete": "生成完成",
     "exec_interrupted": "执行已中断",
+    "exec_error": "ComfyUI 执行出错",
     "restarting": "ComfyUI 正在重启...",
     "stopped": "ComfyUI 已停止",
     "starting": "ComfyUI 启动中...",

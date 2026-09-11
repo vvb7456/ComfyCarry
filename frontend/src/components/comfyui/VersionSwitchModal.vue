@@ -148,7 +148,9 @@ async function switchSelectedVersion() {
       version: tag,
       install_deps: result === 'alt',
     })
-    if (d?.ok) {
+    // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok (finally 会回弹选择)
+    if (!d) return
+    if (d.ok) {
       applied = true
       toast(apiMessageText(d, t('comfyui.settings.switch_success')), 'success')
       const warnText = apiWarningText(d)

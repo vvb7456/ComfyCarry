@@ -88,6 +88,7 @@ const addressHost = computed(() => {
 async function loadComfyUrl() {
   const d = await get<{ urls?: Record<string, string>; public?: { urls?: Record<string, string> } }>(
     '/api/tunnel/status',
+    { silent: true },
   )
   const urls: Record<string, string> = { ...(d?.urls || {}), ...(d?.public?.urls || {}) }
   const hit = Object.entries(urls).find(([name]) => name.toLowerCase().includes('comfyui'))
@@ -95,7 +96,7 @@ async function loadComfyUrl() {
 }
 
 async function loadStatus() {
-  const d = await get<ComfyStatus>('/api/comfyui/status')
+  const d = await get<ComfyStatus>('/api/comfyui/status', { silent: true })
   if (d) status.value = d
 }
 
@@ -103,7 +104,7 @@ async function loadStatus() {
 const launchCommand = ref('')
 
 async function loadLaunchCommand() {
-  const d = await get<ComfyParamsResponse>('/api/comfyui/params')
+  const d = await get<ComfyParamsResponse>('/api/comfyui/params', { silent: true })
   if (!d) return
   const schema = d.schema || {}
   const current = d.current || {}
@@ -119,14 +120,10 @@ const { stats: sysStats } = useSystemStats()
 
 const sse = useComfySSE(tracker, {
   onEvent(evt, result) {
-    if (result?.finished) {
-      if (result.type === 'execution_done') {
-        const elapsed = result.data?.elapsed ? ` (${result.data.elapsed}s)` : ''
-        toast(`${t('comfyui.msg.gen_complete')}${elapsed}`, 'success')
-        loadStatus()
-      } else if (result.type === 'execution_interrupted') {
-        toast(t('comfyui.msg.exec_interrupted'), 'warning')
-      }
+    // 终态提示 (完成 / 中断 / 出错) 由 App 级 useExecNotifications 统一发出 ——
+    // 页面只负责自己的可视化刷新, 避免多订阅者各弹一条。
+    if (result?.finished && result.type === 'execution_done') {
+      loadStatus()
     }
   },
 })

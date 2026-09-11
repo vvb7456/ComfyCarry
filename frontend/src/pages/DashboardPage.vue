@@ -70,7 +70,7 @@ const sse = useComfySSE(tracker, {
 
 // ── Fetch Overview & Activity ─────────────────────────────────────────
 async function loadOverview() {
-  const d = await get<OverviewData>('/api/overview')
+  const d = await get<OverviewData>('/api/overview', { silent: true })
   if (d) {
     data.value = d
   }
@@ -78,7 +78,7 @@ async function loadOverview() {
 }
 
 async function loadActivity() {
-  const d = await get<ActivityData>('/api/activity')
+  const d = await get<ActivityData>('/api/activity', { silent: true })
   if (d) {
     activity.value = d
   }

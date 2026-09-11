@@ -14,8 +14,8 @@ const store = useBackgroundRunStore()
 
 /** 手动停止: 后端不写 stop_reason, 浮动条直接消失, 由这里给一个轻提示 */
 async function onStop() {
-  await store.stop()
-  toast(t('generate.background.toast_stopped'), 'info')
+  // 失败已由 useApiFetch 提示; 不要再报"已停止", 否则错误 + 成功两条并存
+  if (await store.stop()) toast(t('generate.background.toast_stopped'), 'info')
 }
 
 const barRef = ref<HTMLElement | null>(null)
