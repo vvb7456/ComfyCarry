@@ -31,8 +31,7 @@
     },
     "action": {
       "start": "Start Auto Sync"
-    },
-    "worker_stop": "Stop auto sync"
+    }
   },
   "storage": {
     "title": "Storage",
@@ -206,7 +205,10 @@
     "clients_title": "Connected Clients",
     "hero_online": "{count} client(s) online",
     "hero_offline": "No clients online",
-    "copy_dav": "Copy address",
+    "hero_hint": "Install the desktop client to sync generated files to your local computer.",
+    "hero_no_addr": "Connection address unavailable. Use your instance's public address and port to connect the client.",
+    "copy_host": "Copy address",
+    "configure_tunnel": "Configure Tunnel",
     "refresh": "Refresh Client List",
     "facts": {
       "listen": "Listen",
@@ -221,10 +223,7 @@
     "status_error": "Error",
     "just_now": "now",
     "never_seen": "never",
-    "no_clients": "No clients connected",
-    "no_clients_hint": "Install the desktop client to sync generated files to your PC.",
     "download_client": "Download Windows Client",
-    "download_client_short": "Download Client",
     "no_rules": "No rules"
   },
   "job": {
@@ -248,7 +247,8 @@
     "rules_saved": "Saved {count} rule(s)",
     "run_started": "Running {count} rule(s)",
     "worker_started": "Sync service started",
-    "worker_stopped": "Sync service stopped"
+    "worker_stopped": "Sync service stopped",
+    "worker_restart": "Sync service restarted"
   },
   "err": {
     "browse_no_remote": "Select a remote storage first",
@@ -301,7 +301,8 @@
     "invalid_callback": "Invalid callback URL",
     "oauth_paste_not_ready": "Authorization is not ready; get the authorization link first",
     "oauth_callback_rejected": "Authorization callback rejected: {detail}",
-    "oauth_relay_unreachable": "Cannot reach the authorization service: {detail}"
+    "oauth_relay_unreachable": "Cannot reach the authorization service: {detail}",
+    "worker_restart_failed": "Failed to restart auto sync"
   },
   "providers": {
     "drive_desc": "Sign in with Google",

@@ -76,6 +76,7 @@
     "public_api_unreachable": "Cannot reach the public Tunnel service: {detail}",
     "public_no_state": "No persisted public Tunnel state to restore",
     "public_register_failed": "Public Tunnel registration failed",
+    "public_start_failed": "Public Tunnel registered, but cloudflared failed to start",
     "start_failed": "Start failed",
     "stop_failed": "Stop failed",
     "suffix_empty": "New suffix cannot be empty",

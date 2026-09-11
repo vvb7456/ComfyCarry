@@ -28,6 +28,10 @@ export type ServiceHeroTone = 'ok' | 'warn' | 'bad' | 'off'
  *     </template>
  *   </ServiceHero>
  *
+ * 动作按钮图标规范: 只有三类操作在 hero 上带图标 —— 打开外部链接 (`open_in_new`)、
+ * 复制一段文本 (`content_copy`)、下载到本地计算机 (`download`)。启动 / 停止 / 重启 /
+ * 配置 / 页面跳转等动作一律纯文字, 不要为「视觉对齐」补图标。
+ *
  * facts 是「标签 + 值」的紧凑事实项（值用 <b> 承载），组件负责行容器与键值样式。
  */
 import MsIcon from './MsIcon.vue'

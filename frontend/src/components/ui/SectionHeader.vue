@@ -36,8 +36,8 @@ function toggle() {
     :tabindex="collapsible ? 0 : undefined"
     :aria-expanded="collapsible ? expanded : undefined"
     @click="toggle"
-    @keydown.enter.prevent="toggle"
-    @keydown.space.prevent="toggle"
+    @keydown.enter.self.prevent="toggle"
+    @keydown.space.self.prevent="toggle"
   >
     <div class="section-title">
       <MsIcon v-if="icon" :name="icon" />

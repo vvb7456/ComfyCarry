@@ -302,10 +302,12 @@ def api_tunnel_provision():
     set_config("cf_domain", domain)
     set_config("cf_subdomain", mgr.subdomain)
 
-    # 启动 cloudflared
-    mgr.start_cloudflared(result["tunnel_token"])
+    # 启动 cloudflared; 起不来要如实报错 (CF 侧 Tunnel/配置已保存, 可重试重启)
+    started = mgr.start_cloudflared(result["tunnel_token"])
 
     _invalidate_tunnel_cache()
+    if not started:
+        return _err("start_failed", 500, _extra={"ok": False})
     return jsonify({
         "ok": True,
         "tunnel_id": result["tunnel_id"],
@@ -339,11 +341,14 @@ def api_tunnel_restart():
     tunnel_mode = get_config("tunnel_mode", "")
 
     if tunnel_mode == "public":
-        # 公共模式: 直接 PM2 重启
-        r = subprocess.run("pm2 restart cf-tunnel 2>/dev/null", shell=True,
-                           capture_output=True, text=True, timeout=10)
-        if r.returncode != 0:
-            return _err("pm2_restart_failed", 500)
+        # 公共模式: 用当前协议重建 cloudflared。pm2 restart 会沿用旧命令行,
+        # 改协议后不生效; 重建需要持久化的 tunnel_token。
+        from ..services.public_tunnel import PublicTunnelClient
+        client = PublicTunnelClient()
+        if not client.tunnel_token:
+            return _err("public_no_state", 400)
+        if not client._start_cloudflared(client.tunnel_token):
+            return _err("pm2_restart_failed", 500, _extra={"ok": False})
         return jsonify({"ok": True})
 
     # 自定义模式
@@ -359,7 +364,8 @@ def api_tunnel_restart():
             return _err("not_found", 404)
 
         token = mgr._get_tunnel_token(account_id, tunnel["id"])
-        mgr.start_cloudflared(token)
+        if not mgr.start_cloudflared(token):
+            return _err("pm2_restart_failed", 500, _extra={"ok": False})
         return jsonify({"ok": True})
     except CFAPIError as e:
         return _cf_err(e)
@@ -627,9 +633,11 @@ def _reprovision_services():
 
     try:
         result = mgr.ensure(services)
-        # 重启 cloudflared
-        mgr.start_cloudflared(result["tunnel_token"])
+        # 重启 cloudflared; 起不来要如实报错 (服务配置已保存)
+        started = mgr.start_cloudflared(result["tunnel_token"])
         _invalidate_tunnel_cache()
+        if not started:
+            return _err("pm2_restart_failed", 500, _extra={"ok": False})
         return jsonify({"ok": True, "urls": result["urls"]})
     except CFAPIError as e:
         return _cf_err(e)

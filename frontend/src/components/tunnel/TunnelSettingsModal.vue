@@ -27,7 +27,7 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorText } from '@/utils/apiError'
-import type { TunnelConfigResponse, TunnelActionResponse } from '@/types/tunnel'
+import type { TunnelConfigResponse, TunnelActionResponse, TunnelSubdomainResponse } from '@/types/tunnel'
 
 defineOptions({ name: 'TunnelSettingsModal' })
 
@@ -68,6 +68,10 @@ const cfgSnapshot = ref('')
 
 /** 服务端当前实际状态 (off/public/custom) */
 const serverMode = ref<TunnelMode>('off')
+/** 服务端已生效的子域名 (公共/自定义各存一处), 用于判断是否需要重新注册 */
+const serverSubdomain = ref('')
+/** 服务端已生效的传输协议, 用于判断是否需要重启 cloudflared */
+const serverProtocol = ref('auto')
 
 const loading = ref(false)
 const loadError = ref(false)
@@ -101,14 +105,27 @@ async function loadConfig(preset: TunnelMode | null): Promise<void> {
     loadError.value = true
     return
   }
-  loadError.value = false
   let next: TunnelMode = 'off'
   if (status.tunnel_mode === 'public') next = 'public'
   else if (status.configured) next = 'custom'
+  // 子域名按当前模式读取: 公共模式存于 public_tunnel_subdomain,
+  // 不在 /api/tunnel/config 的 cf_subdomain 中 (后者是自定义隧道专用)。
+  let subdomain = cfg.subdomain || ''
+  if (next === 'public') {
+    const pub = await get<TunnelSubdomainResponse>('/api/tunnel/public/subdomain')
+    if (!pub) {
+      loadError.value = true
+      return
+    }
+    subdomain = pub.subdomain || ''
+  }
+  loadError.value = false
   serverMode.value = next
   mode.value = next
   cfgProtocol.value = status.cf_protocol || 'auto'
-  cfgSubdomain.value = cfg.subdomain || ''
+  cfgSubdomain.value = subdomain
+  serverSubdomain.value = subdomain
+  serverProtocol.value = cfgProtocol.value
   cfgDomain.value = next === 'public' ? '' : (cfg.domain || '')
   cfgToken.value = next === 'custom' ? (cfg.api_token || '') : ''
   cfgLoaded.value = true
@@ -145,7 +162,20 @@ async function applyConfig(): Promise<boolean> {
           toast(t('tunnel.settings.subdomain_error'), 'warning')
           return false
         }
-        if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
+        // 公共子域名在 register 时由 Worker 分配, 只改配置不会改变当前公网地址,
+        // 必须重新注册才会生效 (register 内部会先 release 旧隧道)。
+        if (sub !== serverSubdomain.value) {
+          if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
+          toast(t('tunnel.settings.enabling_public'), 'info')
+          const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
+          if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.enable_failed')), 'error'); return false }
+          return done()
+        }
+        // 协议写在 cloudflared 启动命令行里, 需重启进程才会生效
+        if (cfgProtocol.value !== serverProtocol.value) {
+          const d = await post<TunnelActionResponse>('/api/tunnel/restart')
+          if (!d?.ok) { toast(apiErrorText(d, t('tunnel.settings.save_failed')), 'error'); return false }
+        }
         return done()
       }
       // custom 参数更新: 需完整参数后重新 provision
@@ -165,14 +195,14 @@ async function applyConfig(): Promise<boolean> {
       if (serverMode.value === 'public') {
         if (!await post('/api/tunnel/public/disable')) return false
       } else if (serverMode.value === 'custom') {
-        if (!await post('/api/tunnel/teardown')) return false
+        if (!await teardownCustom()) return false
       }
       return done()
     }
 
     if (mode.value === 'public') {
       if (serverMode.value === 'custom' && !await confirm({ message: t('tunnel.settings.confirm.destroy_to_public'), variant: 'danger' })) return false
-      if (serverMode.value === 'custom' && !await post('/api/tunnel/teardown')) return false
+      if (serverMode.value === 'custom' && !await teardownCustom()) return false
       const sub = cfgSubdomain.value.trim().toLowerCase()
       if (sub && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(sub)) {
         toast(t('tunnel.settings.subdomain_error'), 'warning')
@@ -202,6 +232,16 @@ async function applyConfig(): Promise<boolean> {
 function validateCustom(): boolean {
   if (!cfgToken.value || !cfgDomain.value) {
     toast(t('tunnel.settings.need_token_domain'), 'warning')
+    return false
+  }
+  return true
+}
+
+/** 销毁自定义隧道: 后端 teardown 失败时仍回 200 + {ok:false}, 必须按响应体判断 */
+async function teardownCustom(): Promise<boolean> {
+  const d = await post<TunnelActionResponse>('/api/tunnel/teardown')
+  if (!d?.ok) {
+    toast(apiErrorText(d, t('tunnel.settings.save_failed')), 'error')
     return false
   }
   return true

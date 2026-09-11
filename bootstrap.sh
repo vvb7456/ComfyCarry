@@ -139,7 +139,8 @@ mgr = TunnelManager(
 
 try:
     result = mgr.ensure()
-    mgr.start_cloudflared(result['tunnel_token'])
+    if not mgr.start_cloudflared(result['tunnel_token']):
+        raise RuntimeError('cloudflared 启动失败')
     print(f'https://{mgr.subdomain}.{mgr.domain}')
 except Exception as e:
     print('', file=sys.stderr)

@@ -76,6 +76,7 @@
     "public_api_unreachable": "无法连接公共 Tunnel 服务：{detail}",
     "public_no_state": "没有可恢复的公共 Tunnel 状态",
     "public_register_failed": "公共 Tunnel 注册失败",
+    "public_start_failed": "公共 Tunnel 已注册，但 cloudflared 启动失败",
     "start_failed": "启动失败",
     "stop_failed": "停止失败",
     "suffix_empty": "新后缀不能为空",

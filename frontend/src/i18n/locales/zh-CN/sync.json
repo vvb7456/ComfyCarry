@@ -31,8 +31,7 @@
     },
     "action": {
       "start": "启动自动同步"
-    },
-    "worker_stop": "停止自动同步"
+    }
   },
   "storage": {
     "title": "存储",
@@ -206,7 +205,10 @@
     "clients_title": "已连接的客户端",
     "hero_online": "{count} 台客户端在线",
     "hero_offline": "暂无客户端在线",
-    "copy_dav": "复制地址",
+    "hero_hint": "安装桌面客户端，将生成的文件同步到本地计算机。",
+    "hero_no_addr": "无法获取连接地址，请使用实例的公网地址和端口连接客户端。",
+    "copy_host": "复制地址",
+    "configure_tunnel": "配置隧道",
     "refresh": "刷新客户端列表",
     "facts": {
       "listen": "监听",
@@ -221,10 +223,7 @@
     "status_error": "出错",
     "just_now": "刚刚",
     "never_seen": "从未",
-    "no_clients": "暂无客户端连接",
-    "no_clients_hint": "安装桌面客户端，将生成的文件同步到本地。",
     "download_client": "下载 Windows 客户端",
-    "download_client_short": "下载客户端",
     "no_rules": "无规则"
   },
   "job": {
@@ -248,7 +247,8 @@
     "rules_saved": "已保存 {count} 条规则",
     "run_started": "开始执行 {count} 条规则",
     "worker_started": "同步服务已启动",
-    "worker_stopped": "同步服务已停止"
+    "worker_stopped": "同步服务已停止",
+    "worker_restart": "同步服务已重启"
   },
   "err": {
     "browse_no_remote": "请先选择一个远程存储",
@@ -301,7 +301,8 @@
     "invalid_callback": "回调地址无效",
     "oauth_paste_not_ready": "授权尚未就绪，请先获取授权链接",
     "oauth_callback_rejected": "授权回调被拒绝：{detail}",
-    "oauth_relay_unreachable": "无法连接授权服务：{detail}"
+    "oauth_relay_unreachable": "无法连接授权服务：{detail}",
+    "worker_restart_failed": "重启自动同步失败"
   },
   "providers": {
     "drive_desc": "Google 账号登录",

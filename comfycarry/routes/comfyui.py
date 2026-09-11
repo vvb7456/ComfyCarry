@@ -61,6 +61,7 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 def api_comfyui_status():
     """获取 ComfyUI 系统状态 + 当前启动参数"""
     result = {"online": False, "system": {},
+              "queue_running": 0, "queue_pending": 0,
               "params": {}, "args": [], "port": comfyui_port()}
     try:
         resp = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
@@ -69,6 +70,14 @@ def api_comfyui_status():
         result["system"] = data.get("system", {})
     except Exception:
         pass
+    # 队列计数: Hero 副标题与「运行事实」的等待任务数都读这两个字段
+    if result["online"]:
+        try:
+            q = requests.get(f"{COMFYUI_URL}/queue", timeout=5).json()
+            result["queue_running"] = len(q.get("queue_running") or [])
+            result["queue_pending"] = len(q.get("queue_pending") or [])
+        except Exception:
+            pass
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
                            capture_output=True, text=True, timeout=5)

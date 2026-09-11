@@ -431,9 +431,10 @@ def _step_tunnel(config):
                 # 启动 cloudflared (如已在运行则跳过, 避免断开 SSE)
                 if _is_cf_tunnel_online():
                     _deploy_log("✅ cloudflared 已在运行，跳过重启 (ingress 已通过 API 更新)")
-                else:
-                    mgr.start_cloudflared(result["tunnel_token"])
+                elif mgr.start_cloudflared(result["tunnel_token"]):
                     _deploy_log("✅ cloudflared 已启动")
+                else:
+                    _deploy_log("⚠️ cloudflared 启动失败", "warn")
 
         except CFAPIError as e:
             _deploy_log(f"⚠️ Tunnel 配置失败: {e}", "warn")

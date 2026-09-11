@@ -8,7 +8,7 @@ ComfyCarry — Cloud Sync v2 路由
 - /api/sync/remote/types     — Remote 类型定义
 - /api/sync/storage          — 容量查询
 - /api/sync/rules/save|run   — 规则保存/执行
-- /api/sync/worker/start|stop — Worker 控制
+- /api/sync/worker/start|stop|restart — Worker 控制
 - /api/sync/settings         — 全局设置
 """
 
@@ -1062,6 +1062,14 @@ def api_sync_worker_start():
 def api_sync_worker_stop_route():
     stop_sync_worker()
     return _ok("worker_stopped")
+
+
+@bp.route("/api/sync/worker/restart", methods=["POST"])
+def api_sync_worker_restart_route():
+    """重启 worker: start_sync_worker 内部先停旧线程 (并终止在跑的 rclone)。"""
+    if not start_sync_worker():
+        return _err("worker_restart_failed", 500)
+    return _ok("worker_restart")
 
 
 # ====================================================================

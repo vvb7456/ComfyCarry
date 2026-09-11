@@ -3,7 +3,8 @@
  * SyncPage — 云同步页 (C07)。
  *
  * 页头两个 Tab: 同步 / 客户端。页头承接设置 (min_age / watch_interval 弹窗)
- * 与自动同步停止; Hero 按状态承接启动自动同步 / 重新连接 / 添加存储。
+ * 与自动同步的停止 / 重启 (与其他服务页一致, 仅由 worker 运行状态决定是否出现);
+ * Hero 按状态承接启动自动同步 / 重新连接 / 添加存储。
  *
  * 同步 Tab 顺序: Hero → 存储 → 同步规则 → 最近同步 (默认展开) → 日志 (默认收起)。
  *   - Hero 数据 = worker 状态 + 当前任务 (fetchCurrentJobDetail) + 最近结果;
@@ -13,10 +14,12 @@
  *     回到第一页恢复轮询。详情进入 SyncJobDetailModal, 使用执行时规则快照。
  *   - 日志默认收起 (SectionHeader 折叠标题)。
  *
- * 客户端 Tab: Companion Hero (在线数 / WebDAV 复制 / 下载) + 客户端 ListRow。
+ * 客户端 Tab: Companion Hero (主标题与色调只看客户端在线数; 副标题与第二按钮随面板
+ *   公网地址是否可用切换; 下载客户端入口只由 Hero 承接) + 客户端 ListRow (区块头只留刷新)。
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useToast } from '@/composables/useToast'
@@ -58,6 +61,7 @@ import type {
 defineOptions({ name: 'SyncPage' })
 
 const { t } = useI18n({ useScope: 'global' })
+const router = useRouter()
 const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
@@ -72,7 +76,8 @@ const tabs = computed(() => [
 
 // ── Worker / 设置 ──
 const workerRunning = ref(false)
-const workerLoading = ref(false)
+const actionLoading = ref<'start' | 'stop' | 'restart' | null>(null)
+const acting = computed(() => actionLoading.value !== null)
 const settings = ref<SyncSettings | null>(null)
 
 // ── 存储 ──
@@ -124,7 +129,8 @@ const latestJob = ref<SyncJob | null>(null)
 const {
   clients: companionClients,
   serve: companionServe,
-  davUrl: companionDavUrl,
+  hostUrl: companionHostUrl,
+  tunnelOnline: companionTunnelOnline,
   loading: companionLoading,
   fetchClients: fetchCompanionClients,
   startPolling: startCompanionPolling,
@@ -221,8 +227,8 @@ async function loadHeroJob() {
 }
 
 // ── Worker ──
-async function workerAction(action: 'start' | 'stop') {
-  workerLoading.value = true
+async function workerAction(action: 'start' | 'stop' | 'restart') {
+  actionLoading.value = action
   try {
     const d = await post<ApiOkResponse>(`/api/sync/worker/${action}`)
     if (d?.ok) toast(t(`sync.worker.${action}_ok`), 'success')
@@ -230,7 +236,7 @@ async function workerAction(action: 'start' | 'stop') {
     await new Promise(r => setTimeout(r, 1200))
     await loadSyncStatus()
   } finally {
-    workerLoading.value = false
+    actionLoading.value = null
   }
 }
 
@@ -623,6 +629,23 @@ function clientFacts(c: CompanionClient): string[] {
 const onlineCount = computed(() => companionClients.value.filter(c => c.online).length)
 const clientHeroOnline = computed(() => onlineCount.value > 0)
 
+/**
+ * Companion Hero 两个正交维度:
+ *   - 主标题 + 色调: **只看有没有客户端在线** —— 有 → ok (绿) + 「N 台客户端在线」,
+ *     没有 → off (灰) + 「暂无客户端在线」。tunnel 完全不参与: 地址有无是 tunnel
+ *     模块的事, 本模块不替别的模块报警告。
+ *   - 副标题 + 第二按钮: 只看面板公网地址是否可用。隧道服务未启动 **或** 取不到
+ *     面板公网地址 (取「或」: 进程没起 / 连接中 / 面板先于 tunnel 启动导致 url 为空)
+ *     → 「无法获取连接地址」+「配置隧道」; 否则 → 安装提示 +「复制地址」。
+ */
+const clientHeroNoAddr = computed(() => !companionTunnelOnline.value || !companionHostUrl.value)
+
+const clientHeroTone = computed<'ok' | 'off'>(() => clientHeroOnline.value ? 'ok' : 'off')
+
+const clientHeroSubtitle = computed(() => clientHeroNoAddr.value
+  ? t('sync.companion.hero_no_addr')
+  : t('sync.companion.hero_hint'))
+
 const clientFactsList = computed<{ label: string; value: string }[]>(() => {
   const out: { label: string; value: string }[] = []
   const addr = companionServe.value?.addr
@@ -632,8 +655,9 @@ const clientFactsList = computed<{ label: string; value: string }[]>(() => {
   return out
 })
 
-async function copyDav() {
-  if (companionDavUrl.value) await copy(companionDavUrl.value)
+/** 复制面板公网主域名 (客户端拿它 + 面板密码换 WebDAV 地址)。 */
+async function copyHostUrl() {
+  if (companionHostUrl.value) await copy(companionHostUrl.value)
 }
 
 // ── 页签切换 ──
@@ -653,20 +677,27 @@ function switchTab(tab: string) {
   <div class="page-body">
     <TabSwitcher :title="t('sync.title')" :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab">
       <template #extra>
-        <span class="page-actions">
+        <span v-if="workerRunning" class="page-actions">
           <BaseButton
-            v-if="workerRunning"
             size="sm"
-            :disabled="workerLoading"
-            :loading="workerLoading"
+            :loading="actionLoading === 'stop'"
+            :disabled="acting"
             @click="workerAction('stop')"
           >
-            <MsIcon name="stop" /> {{ t('sync.hero.worker_stop') }}
+            <MsIcon name="stop" /> {{ t('common.btn.stop') }}
           </BaseButton>
-          <BaseButton variant="ghost" size="sm" :aria-label="t('sync.settings.title')" @click="settingsOpen = true">
-            <MsIcon name="settings" /> {{ t('common.btn.settings') }}
+          <BaseButton
+            size="sm"
+            :loading="actionLoading === 'restart'"
+            :disabled="acting"
+            @click="workerAction('restart')"
+          >
+            <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
           </BaseButton>
         </span>
+        <BaseButton variant="ghost" size="sm" :aria-label="t('sync.settings.title')" @click="settingsOpen = true">
+          <MsIcon name="settings" /> {{ t('common.btn.settings') }}
+        </BaseButton>
       </template>
     </TabSwitcher>
 
@@ -690,7 +721,7 @@ function switchTab(tab: string) {
             </BaseButton>
           </template>
           <template v-else-if="heroState === 'stopped'" #actions>
-            <BaseButton variant="primary" :loading="workerLoading" @click="workerAction('start')">
+            <BaseButton variant="primary" :loading="actionLoading === 'start'" :disabled="acting" @click="workerAction('start')">
               {{ t('sync.hero.action.start') }}
             </BaseButton>
           </template>
@@ -726,7 +757,6 @@ function switchTab(tab: string) {
                   <span class="sync-remote-card__type">{{ remote.name }} · {{ remote.type }}</span>
                 </div>
                 <span class="sync-remote-card__auth">
-                  <StatusDot :status="remote.has_auth ? 'running' : 'error'" size="sm" />
                   {{ remote.has_auth ? t('sync.remotes.authenticated') : t('sync.remotes.not_configured') }}
                 </span>
               </div>
@@ -908,20 +938,22 @@ function switchTab(tab: string) {
         <ServiceHero
           icon="monitor"
           :title="clientHeroOnline ? t('sync.companion.hero_online', { count: onlineCount }) : t('sync.companion.hero_offline')"
-          :subtitle="clientHeroOnline ? companionDavUrl : t('sync.companion.no_clients_hint')"
-          :tone="clientHeroOnline ? 'ok' : 'off'"
+          :subtitle="clientHeroSubtitle"
+          :tone="clientHeroTone"
         >
           <template #actions>
-            <BaseButton v-if="clientHeroOnline" variant="primary" :disabled="!companionDavUrl" @click="copyDav">
-              {{ t('sync.companion.copy_dav') }}
-            </BaseButton>
             <BaseButton
-              v-else
               variant="primary"
               href="https://github.com/vvb7456/ComfyCarry-Companion/releases/latest"
               target="_blank"
             >
-              {{ t('sync.companion.download_client') }}
+              <MsIcon name="download" /> {{ t('sync.companion.download_client') }}
+            </BaseButton>
+            <BaseButton v-if="!clientHeroNoAddr" @click="copyHostUrl">
+              <MsIcon name="content_copy" /> {{ t('sync.companion.copy_host') }}
+            </BaseButton>
+            <BaseButton v-else @click="router.push('/tunnel')">
+              {{ t('sync.companion.configure_tunnel') }}
             </BaseButton>
           </template>
           <template #facts>
@@ -935,13 +967,6 @@ function switchTab(tab: string) {
             <span class="sync-count">{{ companionClients.length }}</span>
             <template #actions>
               <BaseButton
-                size="sm"
-                href="https://github.com/vvb7456/ComfyCarry-Companion/releases/latest"
-                target="_blank"
-              >
-                <MsIcon name="download" /> {{ t('sync.companion.download_client_short') }}
-              </BaseButton>
-              <BaseButton
                 variant="ghost" size="sm" icon-only
                 :aria-label="t('sync.companion.refresh')"
                 :disabled="companionLoading"
@@ -952,7 +977,7 @@ function switchTab(tab: string) {
             </template>
           </SectionHeader>
 
-          <ul v-if="companionClients.length" class="list-plain sync-clients">
+          <ul class="list-plain sync-clients">
             <ListRow
               v-for="c in companionClients"
               :key="c.client_id"
@@ -975,21 +1000,6 @@ function switchTab(tab: string) {
               </template>
             </ListRow>
           </ul>
-          <EmptyState
-            v-else
-            icon="monitor"
-            :title="t('sync.companion.no_clients')"
-            :message="t('sync.companion.no_clients_hint')"
-            density="compact"
-          >
-            <BaseButton
-              size="sm"
-              href="https://github.com/vvb7456/ComfyCarry-Companion/releases/latest"
-              target="_blank"
-            >
-              <MsIcon name="download" /> {{ t('sync.companion.download_client') }}
-            </BaseButton>
-          </EmptyState>
         </section>
       </template>
     </div>

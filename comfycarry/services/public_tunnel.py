@@ -148,12 +148,17 @@ class PublicTunnelClient:
 
         log.info(f"公共 Tunnel 注册成功: {self.random_id}")
 
-        # 启动 cloudflared
-        self._start_cloudflared(self.tunnel_token)
-
-        # 持久化
+        # 先落盘再启动: 远程注册已经成功, 本地状态必须先持久化 —— 否则
+        # cloudflared 启动失败时进程内状态丢失, 该隧道在 Worker 侧会变成
+        # 无人认领的残留 (再也没法 release)。落盘后 restore() 或重试
+        # register() 都能把它接回来。
         set_config("tunnel_mode", "public")
         self._save_persisted_state()
+
+        # 启动 cloudflared。失败必须上报: 调用方 (路由 → 前端) 依赖 ok 判断
+        # 是否提示成功, 忽略返回值会把「隧道没起来」显示成「已生效」。
+        if not self._start_cloudflared(self.tunnel_token):
+            raise PublicTunnelError("cloudflared 启动失败", key="public_start_failed")
 
         return {
             "ok": True,
@@ -219,9 +224,10 @@ class PublicTunnelClient:
         if not self.random_id or not self.tunnel_token:
             return {"ok": False, "error_key": "tunnel.err.public_no_state"}
 
-        # 确保 cloudflared 在运行
+        # 确保 cloudflared 在运行; 起不来同样不能回 ok:true
         if not self._is_cloudflared_running():
-            self._start_cloudflared(self.tunnel_token)
+            if not self._start_cloudflared(self.tunnel_token):
+                return {"ok": False, "error_key": "tunnel.err.public_start_failed"}
 
         log.info(f"公共 Tunnel 恢复成功: {self.random_id}")
         return {"ok": True, "random_id": self.random_id}
@@ -329,8 +335,8 @@ class PublicTunnelClient:
         ]
         return services
 
-    def _start_cloudflared(self, token: str):
-        """通过 PM2 启动 cloudflared"""
+    def _start_cloudflared(self, token: str) -> bool:
+        """通过 PM2 启动 cloudflared。返回是否启动成功。"""
         # 先确保没有旧进程
         self._stop_cloudflared()
 
@@ -338,16 +344,23 @@ class PublicTunnelClient:
         from .log_service import clean_pm2_env
         env = clean_pm2_env()
         try:
-            subprocess.run(
+            r = subprocess.run(
                 f'pm2 start cloudflared --name cf-tunnel '
                 f'--interpreter none --log /workspace/tunnel.log --merge-logs --time '
                 f'-- tunnel --protocol {shlex.quote(protocol)} '
                 f'--metrics localhost:20241 run --token {shlex.quote(token)}',
                 shell=True, capture_output=True, text=True, timeout=15, env=env,
             )
+            if r.returncode != 0:
+                log.error(f"启动 cloudflared 失败 (rc={r.returncode}): {r.stderr}")
+                return False
+            # 与 ComfyUI / 自定义隧道路径一致: 入 dump, 容器重启可被 pm2 resurrect
+            subprocess.run("pm2 save 2>/dev/null", shell=True, timeout=5, env=env)
             log.info(f"cloudflared (cf-tunnel) 已通过 PM2 启动 (protocol={protocol})")
+            return True
         except Exception as e:
             log.error(f"启动 cloudflared 失败: {e}")
+            return False
 
     def _stop_cloudflared(self):
         """通过 PM2 停止 cloudflared"""
