@@ -22,6 +22,23 @@
 
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
 
+/**
+ * 白名单内的双语展示文案。
+ *
+ * 白名单是独立维护的数据文件, 不接入 i18n locale —— 文案与模型条目同源同审,
+ * 改模型时一并改描述, 避免 locale key 与模型 ID 两处维护。前端按当前界面
+ * 语言取值, 见 `localizedText()`。
+ */
+export interface LocalizedText {
+  zh: string
+  en: string
+}
+
+/** 按界面语言取白名单文案; 目标语言为空时回退另一语言。 */
+export function localizedText(text: LocalizedText, locale: string): string {
+  return locale.startsWith('zh') ? (text.zh || text.en) : (text.en || text.zh)
+}
+
 export interface HuggingFaceFile {
   url: string
   filename: string
@@ -63,7 +80,8 @@ export interface HuggingFaceModel extends Omit<CivitaiHit, 'version' | 'versions
   images: CivitaiImage[]
   user: { username: string }
   sourceUrl: string
-  description: string
+  /** 双语描述: 白名单独立维护, 不走 i18n locale */
+  description: LocalizedText
   version: HuggingFaceVersion
   versions: HuggingFaceVersion[]
 }
@@ -100,7 +118,7 @@ const sdXlBaseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sdxl_refiner_prompt_example-1.webp', type: 'image' }],
   user: { username: 'stabilityai' },
   sourceUrl: 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0',
-  description: 'SDXL 1.0 官方 base, 通用高质量文生图',
+  description: { zh: 'SDXL 1.0 官方 base, 通用高质量文生图', en: 'SDXL 1.0 official base, general high-quality text-to-image' },
   version: sdXlBaseVersion,
   versions: [sdXlBaseVersion],
 }
@@ -135,7 +153,7 @@ const sd15PrunedModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/archived/image2image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive',
-  description: 'SD1.5 官方归档 fp16 剪枝整合包, 基础文生图',
+  description: { zh: 'SD1.5 官方归档 fp16 剪枝整合包, 基础文生图', en: 'SD1.5 official archive fp16 pruned checkpoint, basic text-to-image' },
   version: sd15PrunedVersion,
   versions: [sd15PrunedVersion],
 }
@@ -170,7 +188,7 @@ const flux1DevFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux1_dev_uso_reference_image_gen-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-dev',
-  description: 'Flux.1 dev FP8 量化整合包, 通用文生图',
+  description: { zh: 'Flux.1 dev FP8 量化整合包, 通用文生图', en: 'Flux.1 dev FP8 quantized checkpoint, general text-to-image' },
   version: flux1DevFp8Version,
   versions: [flux1DevFp8Version],
 }
@@ -207,7 +225,7 @@ const flux2DevFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-dev',
-  description: 'Flux.2 Dev fp8 文生图/编辑',
+  description: { zh: 'Flux.2 Dev fp8 文生图/编辑', en: 'Flux.2 Dev fp8 text-to-image/editing' },
   version: flux2DevFp8Version,
   versions: [flux2DevFp8Version],
 }
@@ -242,7 +260,7 @@ const zImageModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/z_image',
-  description: 'Z-Image 文生图',
+  description: { zh: 'Z-Image 文生图', en: 'Z-Image text-to-image' },
   version: zImageVersion,
   versions: [zImageVersion],
 }
@@ -277,7 +295,7 @@ const wan22_5bModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_5B_ti2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 ti2v 5B 图生视频',
+  description: { zh: 'Wan 2.2 ti2v 5B 图生视频', en: 'Wan 2.2 ti2v 5B image-to-video' },
   version: wan22_5bVersion,
   versions: [wan22_5bVersion],
 }
@@ -314,7 +332,7 @@ const flux2TurboLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_fp8-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-dev',
-  description: 'Flux.2 dev Turbo 加速 LoRA (ByteZSzn v2, ComfyUI 官方 repackaged)',
+  description: { zh: 'Flux.2 dev Turbo 加速 LoRA (ByteZSzn v2, ComfyUI 官方 repackaged)', en: 'Flux.2 dev Turbo accelerator LoRA (ByteZSzn v2, ComfyUI official repackaged)' },
   version: flux2TurboLoraVersion,
   versions: [flux2TurboLoraVersion],
 }
@@ -349,7 +367,7 @@ const ltx2DistillLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_canny_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2',
-  description: 'LTX-2 蒸馏 LoRA (8 步, CFG=1, 应用于完整版 19B)',
+  description: { zh: 'LTX-2 蒸馏 LoRA (8 步, CFG=1, 应用于完整版 19B)', en: 'LTX-2 distillation LoRA (8 steps, CFG=1, for the 19B full version)' },
   version: ltx2DistillLoraVersion,
   versions: [ltx2DistillLoraVersion],
 }
@@ -384,7 +402,7 @@ const wan22I2vLightningLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_rob_split_stack_qwen_multi_wan22-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 i2v 4 步加速 LoRA (high noise, ComfyUI 官方 repackaged)',
+  description: { zh: 'Wan 2.2 i2v 4 步加速 LoRA (high noise, ComfyUI 官方 repackaged)', en: 'Wan 2.2 i2v 4-step accelerator LoRA (high noise, ComfyUI official repackaged)' },
   version: wan22I2vLightningLoraVersion,
   versions: [wan22I2vLightningLoraVersion],
 }
@@ -421,7 +439,7 @@ const sd35CannyCnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sd3.5_large_canny_controlnet_example-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/stable-diffusion-3.5-controlnets_ComfyUI_repackaged',
-  description: 'SD 3.5 Large 的 Canny 边缘 ControlNet',
+  description: { zh: 'SD 3.5 Large 的 Canny 边缘 ControlNet', en: 'Canny edge ControlNet for SD 3.5 Large' },
   version: sd35CannyCnVersion,
   versions: [sd35CannyCnVersion],
 }
@@ -456,7 +474,7 @@ const sd35DepthCnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sd3.5_large_depth-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/stable-diffusion-3.5-controlnets_ComfyUI_repackaged',
-  description: 'SD 3.5 Large 的深度图 ControlNet',
+  description: { zh: 'SD 3.5 Large 的深度图 ControlNet', en: 'Depth ControlNet for SD 3.5 Large' },
   version: sd35DepthCnVersion,
   versions: [sd35DepthCnVersion],
 }
@@ -491,7 +509,7 @@ const sd15DepthCnModel: HuggingFaceModel = {
   images: [{ url: 'https://huggingface.co/lllyasviel/control_v11f1p_sd15_depth/resolve/539f99181d33db39cf1af2e517cd8056785f0a87/images/image_out.png', type: 'image' }],
   user: { username: 'comfyanonymous' },
   sourceUrl: 'https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors',
-  description: 'SD1.5 专用 Depth ControlNet v1.1，ComfyUI 可直接加载的 safetensors/FP16 转换版',
+  description: { zh: 'SD1.5 专用 Depth ControlNet v1.1，ComfyUI 可直接加载的 safetensors/FP16 转换版', en: 'SD1.5 Depth ControlNet v1.1, safetensors/FP16 conversion loadable directly by ComfyUI' },
   version: sd15DepthCnVersion,
   versions: [sd15DepthCnVersion],
 }
@@ -526,7 +544,7 @@ const sd15CannyCnModel: HuggingFaceModel = {
   images: [{ url: 'https://huggingface.co/lllyasviel/control_v11p_sd15_canny/resolve/115a470d547982438f70198e353a921996e2e819/images/image_out.png', type: 'image' }],
   user: { username: 'comfyanonymous' },
   sourceUrl: 'https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors',
-  description: 'SD1.5 专用 Canny ControlNet v1.1，ComfyUI 可直接加载的 safetensors/FP16 转换版',
+  description: { zh: 'SD1.5 专用 Canny ControlNet v1.1，ComfyUI 可直接加载的 safetensors/FP16 转换版', en: 'SD1.5 Canny ControlNet v1.1, safetensors/FP16 conversion loadable directly by ComfyUI' },
   version: sd15CannyCnVersion,
   versions: [sd15CannyCnVersion],
 }
@@ -561,7 +579,7 @@ const sd15PoseCnModel: HuggingFaceModel = {
   images: [{ url: 'https://huggingface.co/lllyasviel/control_v11p_sd15_openpose/resolve/9ae9f970358db89e211b87c915f9535c6686d5ba/images/image_out.png', type: 'image' }],
   user: { username: 'comfyanonymous' },
   sourceUrl: 'https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors',
-  description: 'SD1.5 专用 OpenPose ControlNet v1.1，ComfyUI 可直接加载的 safetensors/FP16 转换版',
+  description: { zh: 'SD1.5 专用 OpenPose ControlNet v1.1，ComfyUI 可直接加载的 safetensors/FP16 转换版', en: 'SD1.5 OpenPose ControlNet v1.1, safetensors/FP16 conversion loadable directly by ComfyUI' },
   version: sd15PoseCnVersion,
   versions: [sd15PoseCnVersion],
 }
@@ -598,7 +616,7 @@ const wan21VaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template-Animation_Trajectory_Control_Wan_ATI-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 官方 VAE (bf16 版), Wan 2.1/2.2 14B 视频生成通用',
+  description: { zh: 'Wan 2.1 官方 VAE (bf16 版), Wan 2.1/2.2 14B 视频生成通用', en: 'Wan 2.1 official VAE (bf16), for Wan 2.1/2.2 14B video generation' },
   version: wan21VaeVersion,
   versions: [wan21VaeVersion],
 }
@@ -633,7 +651,7 @@ const fluxAeVaeModel: HuggingFaceModel = {
   images: [],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/z_image_turbo',
-  description: 'Z-Image 专属 VAE (与 FLUX.1/Chroma 共用同一文件)',
+  description: { zh: 'Z-Image 专属 VAE (与 FLUX.1/Chroma 共用同一文件)', en: 'Dedicated VAE for Z-Image (same file shared with FLUX.1/Chroma)' },
   version: fluxAeVaeVersion,
   versions: [fluxAeVaeVersion],
 }
@@ -668,7 +686,7 @@ const sdVaeFtMseModel: HuggingFaceModel = {
   images: [{ url: 'https://huggingface.co/stabilityai/stable-diffusion-decoder-finetune/resolve/e21db4dc8d4f2675c2ffef479c4c893e83bceada/eval/ae-decoder-tuning-reconstructions/merged/00037_merged.png', type: 'image' }],
   user: { username: 'stabilityai' },
   sourceUrl: 'https://huggingface.co/stabilityai/sd-vae-ft-mse-original',
-  description: 'SD 1.5/SDXL 通用微调 VAE (ft-MSE, 人物/细节重建更佳)',
+  description: { zh: 'SD 1.5/SDXL 通用微调 VAE (ft-MSE, 人物/细节重建更佳)', en: 'SD 1.5/SDXL general fine-tuned VAE (ft-MSE, better people/detail reconstruction)' },
   version: sdVaeFtMseVersion,
   versions: [sdVaeFtMseVersion],
 }
@@ -705,7 +723,7 @@ const fluxClipLModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux1_krea_dev-1.webp', type: 'image' }],
   user: { username: 'comfyanonymous' },
   sourceUrl: 'https://huggingface.co/comfyanonymous/flux_text_encoders',
-  description: 'CLIP-L 文本编码器, Flux 1 双 CLIP 之一 (HiDream / HunyuanVideo 2.0 共用)',
+  description: { zh: 'CLIP-L 文本编码器, Flux 1 双 CLIP 之一 (HiDream / HunyuanVideo 2.0 共用)', en: 'CLIP-L text encoder, one of Flux 1\'s dual CLIPs (shared with HiDream / HunyuanVideo 2.0)' },
   version: fluxClipLVersion,
   versions: [fluxClipLVersion],
 }
@@ -740,7 +758,7 @@ const fluxT5xxlFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_kontext_dev_basic-1.webp', type: 'image' }],
   user: { username: 'comfyanonymous' },
   sourceUrl: 'https://huggingface.co/comfyanonymous/flux_text_encoders',
-  description: 'T5-XXL FP8 文本编码器, Flux 1 双 CLIP 之一 (Chroma / HiDream 共用)',
+  description: { zh: 'T5-XXL FP8 文本编码器, Flux 1 双 CLIP 之一 (Chroma / HiDream 共用)', en: 'T5-XXL FP8 text encoder, one of Flux 1\'s dual CLIPs (shared with Chroma / HiDream)' },
   version: fluxT5xxlFp8Version,
   versions: [fluxT5xxlFp8Version],
 }
@@ -775,7 +793,7 @@ const wanUmt5Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_chrono_edit_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'UM-T5-XXL FP8 文本编码器, Wan 2.1/2.2 全系使用',
+  description: { zh: 'UM-T5-XXL FP8 文本编码器, Wan 2.1/2.2 全系使用', en: 'UM-T5-XXL FP8 text encoder, used across Wan 2.1/2.2' },
   version: wanUmt5Version,
   versions: [wanUmt5Version],
 }
@@ -812,7 +830,7 @@ const realEsrganModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_rob_realistic_2k_images_quick_variations-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Real-ESRGAN_repackaged',
-  description: 'Real-ESRGAN 4x 通用放大模型',
+  description: { zh: 'Real-ESRGAN 4x 通用放大模型', en: 'Real-ESRGAN 4x general upscaler' },
   version: realEsrganVersion,
   versions: [realEsrganVersion],
 }
@@ -847,7 +865,7 @@ const ultraSharpModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_mjm_airt_machIne-1.webp', type: 'image' }],
   user: { username: 'Kim2091' },
   sourceUrl: 'https://huggingface.co/Kim2091/UltraSharp',
-  description: '4x 通用放大模型 (ESRGAN), 擅长 JPEG 压缩图',
+  description: { zh: '4x 通用放大模型 (ESRGAN), 擅长 JPEG 压缩图', en: '4x general upscaler (ESRGAN), good with JPEG-compressed images' },
   version: ultraSharpVersion,
   versions: [ultraSharpVersion],
 }
@@ -885,7 +903,7 @@ const dreamShaper8PrunedModel: HuggingFaceModel = {
   images: [{ url: 'https://huggingface.co/Lykon/DreamShaper/resolve/main/1.png', type: 'image' }],
   user: { username: 'Lykon' },
   sourceUrl: 'https://huggingface.co/Lykon/DreamShaper',
-  description: 'DreamShaper 8, 经典 SD1.5 通用文生图整合包 (剪枝版)',
+  description: { zh: 'DreamShaper 8, 经典 SD1.5 通用文生图整合包 (剪枝版)', en: 'DreamShaper 8, classic general-purpose SD1.5 text-to-image checkpoint (pruned)' },
   version: dreamShaper8PrunedVersion,
   versions: [dreamShaper8PrunedVersion],
 }
@@ -921,7 +939,7 @@ const juggernautXLV9RunDiffusionPhotoV2Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_hellorob_facegen_skindetail_upscale-1.webp', type: 'image' }],
   user: { username: 'RunDiffusion' },
   sourceUrl: 'https://huggingface.co/RunDiffusion/Juggernaut-XL-v9',
-  description: 'Juggernaut XL V9, SDXL 写实人像/摄影风格整合包',
+  description: { zh: 'Juggernaut XL V9, SDXL 写实人像/摄影风格整合包', en: 'Juggernaut XL V9, SDXL photorealistic portrait/photography checkpoint' },
   version: juggernautXLV9RunDiffusionPhotoV2Version,
   versions: [juggernautXLV9RunDiffusionPhotoV2Version],
 }
@@ -957,7 +975,7 @@ const netaYumev35PretrainedAllInOneModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_netayume_lumina_t2i-1.webp', type: 'image' }],
   user: { username: 'duongve' },
   sourceUrl: 'https://huggingface.co/duongve/NetaYume-Lumina-Image-2.0',
-  description: 'NetaYume, 基于 Lumina Image 2.0 的动漫风格文生图整合包 (内置 Gemma2 TE + Flux VAE)',
+  description: { zh: 'NetaYume, 基于 Lumina Image 2.0 的动漫风格文生图整合包 (内置 Gemma2 TE + Flux VAE)', en: 'NetaYume, anime-style Lumina Image 2.0 checkpoint (bundled Gemma2 TE + Flux VAE)' },
   version: netaYumev35PretrainedAllInOneVersion,
   versions: [netaYumev35PretrainedAllInOneVersion],
 }
@@ -993,7 +1011,7 @@ const flux1SchnellFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_schnell-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-schnell',
-  description: 'Flux.1 schnell FP8 量化整合包, 少步数快速文生图',
+  description: { zh: 'Flux.1 schnell FP8 量化整合包, 少步数快速文生图', en: 'Flux.1 schnell FP8 quantized checkpoint, few-step fast text-to-image' },
   version: flux1SchnellFp8Version,
   versions: [flux1SchnellFp8Version],
 }
@@ -1029,7 +1047,7 @@ const hidreamO1ImageBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_hidream_o1-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-O1-Image',
-  description: 'HiDream-O1 Image bf16, 通用文生图/图生图',
+  description: { zh: 'HiDream-O1 Image bf16, 通用文生图/图生图', en: 'HiDream-O1 Image bf16, general text-to-image/image-to-image' },
   version: hidreamO1ImageBf16Version,
   versions: [hidreamO1ImageBf16Version],
 }
@@ -1065,7 +1083,7 @@ const hidreamO1ImageDevFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_hidream_o1_dev-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-O1-Image',
-  description: 'HiDream-O1 Image Dev FP8 缩放版, 低显存文生图',
+  description: { zh: 'HiDream-O1 Image Dev FP8 缩放版, 低显存文生图', en: 'HiDream-O1 Image Dev FP8 scaled variant, low-VRAM text-to-image' },
   version: hidreamO1ImageDevFp8ScaledVersion,
   versions: [hidreamO1ImageDevFp8ScaledVersion],
 }
@@ -1101,7 +1119,7 @@ const juggernautXLV9Rdphoto2LightningModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_image_upscale_supir-1.webp', type: 'image' }],
   user: { username: 'AiWise' },
   sourceUrl: 'https://huggingface.co/AiWise/Juggernaut-XL-V9-GE-RDPhoto2-Lightning_4S',
-  description: 'Juggernaut XL V9 RDPhoto2 Lightning, SDXL 4步超快写实生图',
+  description: { zh: 'Juggernaut XL V9 RDPhoto2 Lightning, SDXL 4步超快写实生图', en: 'Juggernaut XL V9 RDPhoto2 Lightning, SDXL 4-step ultra-fast photorealistic generation' },
   version: juggernautXLV9Rdphoto2LightningVersion,
   versions: [juggernautXLV9Rdphoto2LightningVersion],
 }
@@ -1137,7 +1155,7 @@ const ltx219bDevFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_canny_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2',
-  description: 'LTX-2 19B dev FP8, 音视频联合生成 (图/文生视频+音频)',
+  description: { zh: 'LTX-2 19B dev FP8, 音视频联合生成 (图/文生视频+音频)', en: 'LTX-2 19B dev FP8, joint audio-video generation (image/text to video + audio)' },
   version: ltx219bDevFp8Version,
   versions: [ltx219bDevFp8Version],
 }
@@ -1173,7 +1191,7 @@ const ltx219bDevModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_i2v_lora-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2',
-  description: 'LTX-2 19B dev bf16 完整版, 音视频联合生成',
+  description: { zh: 'LTX-2 19B dev bf16 完整版, 音视频联合生成', en: 'LTX-2 19B dev bf16 full version, joint audio-video generation' },
   version: ltx219bDevVersion,
   versions: [ltx219bDevVersion],
 }
@@ -1209,7 +1227,7 @@ const ltx219bDistilledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_canny_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2',
-  description: 'LTX-2 19B distilled, 8步蒸馏版音视频生成',
+  description: { zh: 'LTX-2 19B distilled, 8步蒸馏版音视频生成', en: 'LTX-2 19B distilled, 8-step distilled audio-video generation' },
   version: ltx219bDistilledVersion,
   versions: [ltx219bDistilledVersion],
 }
@@ -1245,7 +1263,7 @@ const ltx2322bDevFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_image_speech_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-fp8',
-  description: 'LTX-2.3 22B dev FP8, 高质量音视频联合生成',
+  description: { zh: 'LTX-2.3 22B dev FP8, 高质量音视频联合生成', en: 'LTX-2.3 22B dev FP8, high-quality joint audio-video generation' },
   version: ltx2322bDevFp8Version,
   versions: [ltx2322bDevFp8Version],
 }
@@ -1281,7 +1299,7 @@ const ltx2322bDevModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_lora_remove_subtitles_from_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3',
-  description: 'LTX-2.3 22B dev bf16 完整版, 高质量音视频联合生成',
+  description: { zh: 'LTX-2.3 22B dev bf16 完整版, 高质量音视频联合生成', en: 'LTX-2.3 22B dev bf16 full version, high-quality joint audio-video generation' },
   version: ltx2322bDevVersion,
   versions: [ltx2322bDevVersion],
 }
@@ -1317,7 +1335,7 @@ const ltx2322bDistilledFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_style_transition-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-fp8',
-  description: 'LTX-2.3 22B distilled FP8, 8步蒸馏版音视频生成',
+  description: { zh: 'LTX-2.3 22B distilled FP8, 8步蒸馏版音视频生成', en: 'LTX-2.3 22B distilled FP8, 8-step distilled audio-video generation' },
   version: ltx2322bDistilledFp8Version,
   versions: [ltx2322bDistilledFp8Version],
 }
@@ -1353,7 +1371,7 @@ const ltxVideo2bV095Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/ltxv_image_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-Video',
-  description: 'LTX-Video 2B v0.9.5, 实时图生视频',
+  description: { zh: 'LTX-Video 2B v0.9.5, 实时图生视频', en: 'LTX-Video 2B v0.9.5, real-time image-to-video' },
   version: ltxVideo2bV095Version,
   versions: [ltxVideo2bV095Version],
 }
@@ -1389,7 +1407,7 @@ const ltxVideo2bV09Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/ltxv_text_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-Video',
-  description: 'LTX-Video 2B v0.9, 实时文生视频',
+  description: { zh: 'LTX-Video 2B v0.9, 实时文生视频', en: 'LTX-Video 2B v0.9, real-time text-to-video' },
   version: ltxVideo2bV09Version,
   versions: [ltxVideo2bV09Version],
 }
@@ -1425,7 +1443,7 @@ const sd35LargeFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sd3.5_large_blur-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/stable-diffusion-3.5-fp8',
-  description: 'SD3.5 Large FP8 整合包 (内置文本编码器), 高质量文生图',
+  description: { zh: 'SD3.5 Large FP8 整合包 (内置文本编码器), 高质量文生图', en: 'SD3.5 Large FP8 checkpoint (bundled text encoders), high-quality text-to-image' },
   version: sd35LargeFp8ScaledVersion,
   versions: [sd35LargeFp8ScaledVersion],
 }
@@ -1461,7 +1479,7 @@ const sdXlRefiner10Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sdxl_refiner_prompt_example-1.webp', type: 'image' }],
   user: { username: 'stabilityai' },
   sourceUrl: 'https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0',
-  description: 'SDXL 1.0 refiner, 配合 base 精修图像细节',
+  description: { zh: 'SDXL 1.0 refiner, 配合 base 精修图像细节', en: 'SDXL 1.0 refiner, refines image detail on top of the base' },
   version: sdXlRefiner10Version,
   versions: [sdXlRefiner10Version],
 }
@@ -1497,7 +1515,7 @@ const sdXlTurbo10Fp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sdxlturbo_example-1.webp', type: 'image' }],
   user: { username: 'stabilityai' },
   sourceUrl: 'https://huggingface.co/stabilityai/sdxl-turbo',
-  description: 'SDXL Turbo, 1-4步极速文生图',
+  description: { zh: 'SDXL Turbo, 1-4步极速文生图', en: 'SDXL Turbo, 1-4 step ultra-fast text-to-image' },
   version: sdXlTurbo10Fp16Version,
   versions: [sdXlTurbo10Fp16Version],
 }
@@ -1533,7 +1551,7 @@ const svdXtModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/txt_to_image_to_video-1.webp', type: 'image' }],
   user: { username: 'stabilityai' },
   sourceUrl: 'https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt',
-  description: 'Stable Video Diffusion XT, 图生视频 (25帧)',
+  description: { zh: 'Stable Video Diffusion XT, 图生视频 (25帧)', en: 'Stable Video Diffusion XT, image-to-video (25 frames)' },
   version: svdXtVersion,
   versions: [svdXtVersion],
 }
@@ -1570,7 +1588,7 @@ const chroma1HDFp8mixedModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_chroma_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Chroma1-HD_repackaged',
-  description: 'Chroma1 HD 文生图 fp8 混合精度',
+  description: { zh: 'Chroma1 HD 文生图 fp8 混合精度', en: 'Chroma1 HD text-to-image, fp8 mixed precision' },
   version: chroma1HDFp8mixedVersion,
   versions: [chroma1HDFp8mixedVersion],
 }
@@ -1606,7 +1624,7 @@ const fireRedImageEdit11TransformerModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_firered_image_edit1_1-1.webp', type: 'image' }],
   user: { username: 'FireRedTeam' },
   sourceUrl: 'https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.1-ComfyUI',
-  description: 'FireRed Image Edit 1.1 通用图像编辑 transformer',
+  description: { zh: 'FireRed Image Edit 1.1 通用图像编辑 transformer', en: 'FireRed Image Edit 1.1 general image-editing transformer' },
   version: fireRedImageEdit11TransformerVersion,
   versions: [fireRedImageEdit11TransformerVersion],
 }
@@ -1642,7 +1660,7 @@ const newBieImageExp01Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_newbieimage_exp0_1-t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/NewBie-image-Exp0.1_repackaged',
-  description: 'NewBie Image Exp0.1 文生图',
+  description: { zh: 'NewBie Image Exp0.1 文生图', en: 'NewBie Image Exp0.1 text-to-image' },
   version: newBieImageExp01Bf16Version,
   versions: [newBieImageExp01Bf16Version],
 }
@@ -1678,7 +1696,7 @@ const wan21WanMoveFp8ScaledE4m3fnKJModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_rob_wan_ati_motion_control-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled',
-  description: 'Wan 2.1 WanMove 运动控制模型 (i2v 架构)',
+  description: { zh: 'Wan 2.1 WanMove 运动控制模型 (i2v 架构)', en: 'Wan 2.1 WanMove motion-control model (i2v architecture)' },
   version: wan21WanMoveFp8ScaledE4m3fnKJVersion,
   versions: [wan21WanMoveFp8ScaledE4m3fnKJVersion],
 }
@@ -1714,7 +1732,7 @@ const wan21I2V14B480pFp8E4m3fnScaledKJModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_1_infinitetalk-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled',
-  description: 'Wan 2.1 i2v 480p 14B 图生视频',
+  description: { zh: 'Wan 2.1 i2v 480p 14B 图生视频', en: 'Wan 2.1 i2v 480p 14B image-to-video' },
   version: wan21I2V14B480pFp8E4m3fnScaledKJVersion,
   versions: [wan21I2V14B480pFp8E4m3fnScaledKJVersion],
 }
@@ -1750,7 +1768,7 @@ const wan21I2VATI14BFp8E4m3fnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template-Animation_Trajectory_Control_Wan_ATI-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 i2v ATI 动画轨迹控制 14B',
+  description: { zh: 'Wan 2.1 i2v ATI 动画轨迹控制 14B', en: 'Wan 2.1 i2v ATI animation trajectory control 14B' },
   version: wan21I2VATI14BFp8E4m3fnVersion,
   versions: [wan21I2VATI14BFp8E4m3fnVersion],
 }
@@ -1786,7 +1804,7 @@ const wan21VACEModule14BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_shane_video_restyle-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 VACE 视频编辑模块 14B',
+  description: { zh: 'Wan 2.1 VACE 视频编辑模块 14B', en: 'Wan 2.1 VACE video editing module 14B' },
   version: wan21VACEModule14BBf16Version,
   versions: [wan21VACEModule14BBf16Version],
 }
@@ -1822,7 +1840,7 @@ const wan22Animate14BFp8E4m3fnScaledKJModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_purz_wan22_animate_auto_character_replace-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled',
-  description: 'Wan 2.2 Animate 14B 动画/换装人物驱动 (i2v 架构)',
+  description: { zh: 'Wan 2.2 Animate 14B 动画/换装人物驱动 (i2v 架构)', en: 'Wan 2.2 Animate 14B animation/character-swap driving (i2v architecture)' },
   version: wan22Animate14BFp8E4m3fnScaledKJVersion,
   versions: [wan22Animate14BFp8E4m3fnScaledKJVersion],
 }
@@ -1858,7 +1876,7 @@ const acestepV15TurboModel: HuggingFaceModel = {
   images: [],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'ACE-Step 1.5 Turbo 文生音频',
+  description: { zh: 'ACE-Step 1.5 Turbo 文生音频', en: 'ACE-Step 1.5 Turbo text-to-audio' },
   version: acestepV15TurboVersion,
   versions: [acestepV15TurboVersion],
 }
@@ -1894,7 +1912,7 @@ const acestepV15XlBaseBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_ace_step1_5_xl_base-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'ACE-Step 1.5 XL Base 文生音频',
+  description: { zh: 'ACE-Step 1.5 XL Base 文生音频', en: 'ACE-Step 1.5 XL Base text-to-audio' },
   version: acestepV15XlBaseBf16Version,
   versions: [acestepV15XlBaseBf16Version],
 }
@@ -1930,7 +1948,7 @@ const acestepV15XlSftBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_ace_step1_5_xl_sft-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'ACE-Step 1.5 XL SFT 文生音频',
+  description: { zh: 'ACE-Step 1.5 XL SFT 文生音频', en: 'ACE-Step 1.5 XL SFT text-to-audio' },
   version: acestepV15XlSftBf16Version,
   versions: [acestepV15XlSftBf16Version],
 }
@@ -1966,7 +1984,7 @@ const acestepV15XlTurboBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_ace_step1_5_xl_turbo-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'ACE-Step 1.5 XL Turbo 文生音频',
+  description: { zh: 'ACE-Step 1.5 XL Turbo 文生音频', en: 'ACE-Step 1.5 XL Turbo text-to-audio' },
   version: acestepV15XlTurboBf16Version,
   versions: [acestepV15XlTurboBf16Version],
 }
@@ -2002,7 +2020,7 @@ const animaBaseV10Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_base_v1-1.webp', type: 'image' }],
   user: { username: 'circlestone-labs' },
   sourceUrl: 'https://huggingface.co/circlestone-labs/Anima',
-  description: 'Anima 基础版文生图',
+  description: { zh: 'Anima 基础版文生图', en: 'Anima base text-to-image' },
   version: animaBaseV10Version,
   versions: [animaBaseV10Version],
 }
@@ -2038,7 +2056,7 @@ const animaPreview3BaseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_preview-1.webp', type: 'image' }],
   user: { username: 'circlestone-labs' },
   sourceUrl: 'https://huggingface.co/circlestone-labs/Anima',
-  description: 'Anima Preview3 预览版文生图',
+  description: { zh: 'Anima Preview3 预览版文生图', en: 'Anima Preview3 text-to-image (preview)' },
   version: animaPreview3BaseVersion,
   versions: [animaPreview3BaseVersion],
 }
@@ -2074,7 +2092,7 @@ const capybaraV01Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/Image_capybara_v0_1_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged',
-  description: 'Capybara v0.1 图像编辑 (基于 HunyuanVideo 1.5 架构)',
+  description: { zh: 'Capybara v0.1 图像编辑 (基于 HunyuanVideo 1.5 架构)', en: 'Capybara v0.1 image editing (HunyuanVideo 1.5 architecture)' },
   version: capybaraV01Version,
   versions: [capybaraV01Version],
 }
@@ -2110,7 +2128,7 @@ const causalForcingFramewiseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_causal_forcing_i2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/TalmajM/causal_forcing_framewise_ComfyUI_repackaged',
-  description: 'Causal Forcing 帧级自回归视频生成 (基于 Wan 2.1, 支持 t2v/i2v)',
+  description: { zh: 'Causal Forcing 帧级自回归视频生成 (基于 Wan 2.1, 支持 t2v/i2v)', en: 'Causal Forcing frame-level autoregressive video generation (Wan 2.1 based, t2v/i2v)' },
   version: causalForcingFramewiseVersion,
   versions: [causalForcingFramewiseVersion],
 }
@@ -2146,7 +2164,7 @@ const chromaRadianceX0Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_chroma1_radiance_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Chroma1-Radiance_Repackaged',
-  description: 'Chroma1 Radiance 文生图 x0',
+  description: { zh: 'Chroma1 Radiance 文生图 x0', en: 'Chroma1 Radiance text-to-image x0' },
   version: chromaRadianceX0Version,
   versions: [chromaRadianceX0Version],
 }
@@ -2182,7 +2200,7 @@ const chronoEdit14BFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_chrono_edit_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'ChronoEdit 14B 时间控制图像编辑 (基于 Wan 2.2 i2v 架构)',
+  description: { zh: 'ChronoEdit 14B 时间控制图像编辑 (基于 Wan 2.2 i2v 架构)', en: 'ChronoEdit 14B temporal-control image editing (Wan 2.2 i2v architecture)' },
   version: chronoEdit14BFp16Version,
   versions: [chronoEdit14BFp16Version],
 }
@@ -2218,7 +2236,7 @@ const ernieImageTurboModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ernie_image_turbo-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ERNIE-Image',
-  description: 'ERNIE Image Turbo 文生图',
+  description: { zh: 'ERNIE Image Turbo 文生图', en: 'ERNIE Image Turbo text-to-image' },
   version: ernieImageTurboVersion,
   versions: [ernieImageTurboVersion],
 }
@@ -2254,7 +2272,7 @@ const ernieImageModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ernie_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ERNIE-Image',
-  description: 'ERNIE Image 文生图',
+  description: { zh: 'ERNIE Image 文生图', en: 'ERNIE Image text-to-image' },
   version: ernieImageVersion,
   versions: [ernieImageVersion],
 }
@@ -2290,7 +2308,7 @@ const flux2Klein4bFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_distilled-1.webp', type: 'image' }],
   user: { username: 'black-forest-labs' },
   sourceUrl: 'https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8',
-  description: 'Flux.2 Klein 4B fp8 文生图/编辑',
+  description: { zh: 'Flux.2 Klein 4B fp8 文生图/编辑', en: 'Flux.2 Klein 4B fp8 text-to-image/editing' },
   version: flux2Klein4bFp8Version,
   versions: [flux2Klein4bFp8Version],
 }
@@ -2326,7 +2344,7 @@ const flux2Klein4bModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-klein',
-  description: 'Flux.2 Klein 4B 文生图/编辑',
+  description: { zh: 'Flux.2 Klein 4B 文生图/编辑', en: 'Flux.2 Klein 4B text-to-image/editing' },
   version: flux2Klein4bVersion,
   versions: [flux2Klein4bVersion],
 }
@@ -2362,7 +2380,7 @@ const flux2Klein9bKvFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_9b_kv_image_edit-1.webp', type: 'image' }],
   user: { username: 'black-forest-labs' },
   sourceUrl: 'https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-kv-fp8',
-  description: 'Flux.2 Klein 9B KV 缓存版 fp8 图像编辑',
+  description: { zh: 'Flux.2 Klein 9B KV 缓存版 fp8 图像编辑', en: 'Flux.2 Klein 9B KV-cache variant, fp8 image editing' },
   version: flux2Klein9bKvFp8Version,
   versions: [flux2Klein9bKvFp8Version],
 }
@@ -2398,7 +2416,7 @@ const flux2KleinBase4bFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_base-1.webp', type: 'image' }],
   user: { username: 'black-forest-labs' },
   sourceUrl: 'https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4b-fp8',
-  description: 'Flux.2 Klein Base 4B fp8 文生图',
+  description: { zh: 'Flux.2 Klein Base 4B fp8 文生图', en: 'Flux.2 Klein Base 4B fp8 text-to-image' },
   version: flux2KleinBase4bFp8Version,
   versions: [flux2KleinBase4bFp8Version],
 }
@@ -2434,7 +2452,7 @@ const flux2KleinBase4bModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-klein',
-  description: 'Flux.2 Klein Base 4B 文生图',
+  description: { zh: 'Flux.2 Klein Base 4B 文生图', en: 'Flux.2 Klein Base 4B text-to-image' },
   version: flux2KleinBase4bVersion,
   versions: [flux2KleinBase4bVersion],
 }
@@ -2470,7 +2488,7 @@ const flux1FillDevOneRewardTransformerFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux.1_fill_dev_OneReward-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/OneReward_repackaged',
-  description: 'Flux.1 Fill Dev OneReward 图像修复/编辑 fp8',
+  description: { zh: 'Flux.1 Fill Dev OneReward 图像修复/编辑 fp8', en: 'Flux.1 Fill Dev OneReward inpainting/editing, fp8' },
   version: flux1FillDevOneRewardTransformerFp8Version,
   versions: [flux1FillDevOneRewardTransformerFp8Version],
 }
@@ -2506,7 +2524,7 @@ const flux1CannyDevModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_canny_model_example-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-dev',
-  description: 'Flux.1 Canny Dev 边缘控制文生图',
+  description: { zh: 'Flux.1 Canny Dev 边缘控制文生图', en: 'Flux.1 Canny Dev edge-controlled text-to-image' },
   version: flux1CannyDevVersion,
   versions: [flux1CannyDevVersion],
 }
@@ -2542,7 +2560,7 @@ const flux1DevKontextFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_kontext_dev_basic-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI',
-  description: 'Flux.1 Dev Kontext 多图上下文图像编辑 fp8',
+  description: { zh: 'Flux.1 Dev Kontext 多图上下文图像编辑 fp8', en: 'Flux.1 Dev Kontext multi-image context editing, fp8' },
   version: flux1DevKontextFp8ScaledVersion,
   versions: [flux1DevKontextFp8ScaledVersion],
 }
@@ -2578,7 +2596,7 @@ const flux1DevModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_dev_checkpoint_example-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-dev',
-  description: 'Flux.1 Dev 文生图',
+  description: { zh: 'Flux.1 Dev 文生图', en: 'Flux.1 Dev text-to-image' },
   version: flux1DevVersion,
   versions: [flux1DevVersion],
 }
@@ -2614,7 +2632,7 @@ const flux1FillDevModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_fill_inpaint_example-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-dev',
-  description: 'Flux.1 Fill Dev 图像修复/编辑',
+  description: { zh: 'Flux.1 Fill Dev 图像修复/编辑', en: 'Flux.1 Fill Dev inpainting/editing' },
   version: flux1FillDevVersion,
   versions: [flux1FillDevVersion],
 }
@@ -2650,7 +2668,7 @@ const flux1KreaDevFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux1_krea_dev-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/FLUX.1-Krea-dev_ComfyUI',
-  description: 'Flux.1 Krea Dev 实时风格控制文生图 fp8',
+  description: { zh: 'Flux.1 Krea Dev 实时风格控制文生图 fp8', en: 'Flux.1 Krea Dev real-time style-controlled text-to-image, fp8' },
   version: flux1KreaDevFp8ScaledVersion,
   versions: [flux1KreaDevFp8ScaledVersion],
 }
@@ -2686,7 +2704,7 @@ const flux1SchnellModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_schnell_full_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-schnell',
-  description: 'Flux.1 Schnell 快速文生图',
+  description: { zh: 'Flux.1 Schnell 快速文生图', en: 'Flux.1 Schnell fast text-to-image' },
   version: flux1SchnellVersion,
   versions: [flux1SchnellVersion],
 }
@@ -2722,7 +2740,7 @@ const hidreamE11Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_e1_1-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'HiDream E1.1 文生图/图像编辑',
+  description: { zh: 'HiDream E1.1 文生图/图像编辑', en: 'HiDream E1.1 text-to-image/image editing' },
   version: hidreamE11Bf16Version,
   versions: [hidreamE11Bf16Version],
 }
@@ -2758,7 +2776,7 @@ const hidreamE1FullBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_e1_full-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'HiDream E1 Full 文生图/图像编辑',
+  description: { zh: 'HiDream E1 Full 文生图/图像编辑', en: 'HiDream E1 Full text-to-image/image editing' },
   version: hidreamE1FullBf16Version,
   versions: [hidreamE1FullBf16Version],
 }
@@ -2794,7 +2812,7 @@ const hidreamI1DevFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_i1_dev-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'HiDream I1 Dev fp8 文生图/编辑',
+  description: { zh: 'HiDream I1 Dev fp8 文生图/编辑', en: 'HiDream I1 Dev fp8 text-to-image/editing' },
   version: hidreamI1DevFp8Version,
   versions: [hidreamI1DevFp8Version],
 }
@@ -2830,7 +2848,7 @@ const hidreamI1FastFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_i1_fast-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'HiDream I1 Fast fp8 快速文生图',
+  description: { zh: 'HiDream I1 Fast fp8 快速文生图', en: 'HiDream I1 Fast fp8 fast text-to-image' },
   version: hidreamI1FastFp8Version,
   versions: [hidreamI1FastFp8Version],
 }
@@ -2866,7 +2884,7 @@ const hidreamI1FullFp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_i1_full-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'HiDream I1 Full fp8 文生图/编辑',
+  description: { zh: 'HiDream I1 Full fp8 文生图/编辑', en: 'HiDream I1 Full fp8 text-to-image/editing' },
   version: hidreamI1FullFp8Version,
   versions: [hidreamI1FullFp8Version],
 }
@@ -2902,7 +2920,7 @@ const humo17BFp8E4m3fnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_humo-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HuMo_ComfyUI',
-  description: 'HuMo 17B 音频驱动人物视频生成 (基于 Wan 架构)',
+  description: { zh: 'HuMo 17B 音频驱动人物视频生成 (基于 Wan 架构)', en: 'HuMo 17B audio-driven human video generation (Wan architecture)' },
   version: humo17BFp8E4m3fnVersion,
   versions: [humo17BFp8E4m3fnVersion],
 }
@@ -2938,7 +2956,7 @@ const hunyuanVideoT2v720pBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hunyuan_video_text_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_repackaged',
-  description: 'Hunyuan Video t2v 720p 文生视频',
+  description: { zh: 'Hunyuan Video t2v 720p 文生视频', en: 'HunyuanVideo t2v 720p text-to-video' },
   version: hunyuanVideoT2v720pBf16Version,
   versions: [hunyuanVideoT2v720pBf16Version],
 }
@@ -2974,7 +2992,7 @@ const hunyuanvideo151080pSrDistilledFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_hunyuan_video_1.5_720p_i2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged',
-  description: 'Hunyuan Video 1.5 1080p 超分蒸馏',
+  description: { zh: 'Hunyuan Video 1.5 1080p 超分蒸馏', en: 'HunyuanVideo 1.5 1080p upscaling distillation' },
   version: hunyuanvideo151080pSrDistilledFp16Version,
   versions: [hunyuanvideo151080pSrDistilledFp16Version],
 }
@@ -3010,7 +3028,7 @@ const hunyuanvideo15720pI2vFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_hunyuan_video_1.5_720p_i2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged',
-  description: 'Hunyuan Video 1.5 720p 图生视频',
+  description: { zh: 'Hunyuan Video 1.5 720p 图生视频', en: 'HunyuanVideo 1.5 720p image-to-video' },
   version: hunyuanvideo15720pI2vFp16Version,
   versions: [hunyuanvideo15720pI2vFp16Version],
 }
@@ -3046,7 +3064,7 @@ const hunyuanvideo15720pT2vFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_hunyuan_video_1.5_720p_t2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged',
-  description: 'Hunyuan Video 1.5 720p 文生视频',
+  description: { zh: 'Hunyuan Video 1.5 720p 文生视频', en: 'HunyuanVideo 1.5 720p text-to-video' },
   version: hunyuanvideo15720pT2vFp16Version,
   versions: [hunyuanvideo15720pT2vFp16Version],
 }
@@ -3082,7 +3100,7 @@ const kandinsky5liteI2v5sModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_kandinsky5_i2v-1.webp', type: 'image' }],
   user: { username: 'kandinskylab' },
   sourceUrl: 'https://huggingface.co/kandinskylab/Kandinsky-5.0-I2V-Lite-5s',
-  description: 'Kandinsky 5.0 Lite i2v 5 秒图生视频',
+  description: { zh: 'Kandinsky 5.0 Lite i2v 5 秒图生视频', en: 'Kandinsky 5.0 Lite i2v 5-second image-to-video' },
   version: kandinsky5liteI2v5sVersion,
   versions: [kandinsky5liteI2v5sVersion],
 }
@@ -3118,7 +3136,7 @@ const kandinsky5liteT2iModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_kandinsky5_t2i-1.webp', type: 'image' }],
   user: { username: 'kandinskylab' },
   sourceUrl: 'https://huggingface.co/kandinskylab/Kandinsky-5.0-T2I-Lite',
-  description: 'Kandinsky 5.0 Lite 文生图',
+  description: { zh: 'Kandinsky 5.0 Lite 文生图', en: 'Kandinsky 5.0 Lite text-to-image' },
   version: kandinsky5liteT2iVersion,
   versions: [kandinsky5liteT2iVersion],
 }
@@ -3154,7 +3172,7 @@ const kandinsky5liteT2vSft5sModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_kandinsky5_t2v-1.webp', type: 'image' }],
   user: { username: 'kandinskylab' },
   sourceUrl: 'https://huggingface.co/kandinskylab/Kandinsky-5.0-T2V-Lite-sft-5s',
-  description: 'Kandinsky 5.0 Lite t2v SFT 5 秒文生视频',
+  description: { zh: 'Kandinsky 5.0 Lite t2v SFT 5 秒文生视频', en: 'Kandinsky 5.0 Lite t2v SFT 5-second text-to-video' },
   version: kandinsky5liteT2vSft5sVersion,
   versions: [kandinsky5liteT2vSft5sVersion],
 }
@@ -3190,7 +3208,7 @@ const lensBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_lens_t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Lens',
-  description: 'Lens 文生图 (GPT-OSS 文本编码 + Flux.2 架构)',
+  description: { zh: 'Lens 文生图 (GPT-OSS 文本编码 + Flux.2 架构)', en: 'Lens text-to-image (GPT-OSS text encoder + Flux.2 architecture)' },
   version: lensBf16Version,
   versions: [lensBf16Version],
 }
@@ -3226,7 +3244,7 @@ const lensTurboBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_lens_turbo_t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Lens',
-  description: 'Lens Turbo 快速文生图',
+  description: { zh: 'Lens Turbo 快速文生图', en: 'Lens Turbo fast text-to-image' },
   version: lensTurboBf16Version,
   versions: [lensTurboBf16Version],
 }
@@ -3262,7 +3280,7 @@ const longcatImageBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_longcat_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/LongCat-Image',
-  description: 'LongCat-Image 文生图',
+  description: { zh: 'LongCat-Image 文生图', en: 'LongCat-Image text-to-image' },
   version: longcatImageBf16Version,
   versions: [longcatImageBf16Version],
 }
@@ -3298,7 +3316,7 @@ const longcatImageEditBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_longcat_image_edit-1.webp', type: 'image' }],
   user: { username: 'TalmajM' },
   sourceUrl: 'https://huggingface.co/TalmajM/LongCat-Image-Edit_ComfyUI_repackaged',
-  description: 'LongCat-Image Edit 图像编辑',
+  description: { zh: 'LongCat-Image Edit 图像编辑', en: 'LongCat-Image Edit image editing' },
   version: longcatImageEditBf16Version,
   versions: [longcatImageEditBf16Version],
 }
@@ -3334,7 +3352,7 @@ const lotusDepthDV11Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_depth_lora_example-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/lotus',
-  description: 'Lotus 单目深度估计模型',
+  description: { zh: 'Lotus 单目深度估计模型', en: 'Lotus monocular depth estimation model' },
   version: lotusDepthDV11Version,
   versions: [lotusDepthDV11Version],
 }
@@ -3370,7 +3388,7 @@ const ltx219bDistilledTransformerOnlyBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx_2_audio_to_video-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/LTXV2_comfy',
-  description: 'LTX-2 19B Distilled 蒸馏视频生成 transformer',
+  description: { zh: 'LTX-2 19B Distilled 蒸馏视频生成 transformer', en: 'LTX-2 19B Distilled video-generation transformer' },
   version: ltx219bDistilledTransformerOnlyBf16Version,
   versions: [ltx219bDistilledTransformerOnlyBf16Version],
 }
@@ -3406,7 +3424,7 @@ const ltx2322bDevTransformerOnlyBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_obscura_remova_lora_remove_object_from_video-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/LTX2.3_comfy',
-  description: 'LTX-2.3 22B Dev 视频生成 transformer',
+  description: { zh: 'LTX-2.3 22B Dev 视频生成 transformer', en: 'LTX-2.3 22B Dev video-generation transformer' },
   version: ltx2322bDevTransformerOnlyBf16Version,
   versions: [ltx2322bDevTransformerOnlyBf16Version],
 }
@@ -3442,7 +3460,7 @@ const omnigen2Fp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_omnigen2_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Omnigen2_ComfyUI_repackaged',
-  description: 'OmniGen2 通用文生图/图像编辑',
+  description: { zh: 'OmniGen2 通用文生图/图像编辑', en: 'OmniGen2 general text-to-image/image editing' },
   version: omnigen2Fp16Version,
   versions: [omnigen2Fp16Version],
 }
@@ -3478,7 +3496,7 @@ const ovisImageBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ovis_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Ovis-Image',
-  description: 'Ovis-Image 文生图',
+  description: { zh: 'Ovis-Image 文生图', en: 'Ovis-Image text-to-image' },
   version: ovisImageBf16Version,
   versions: [ovisImageBf16Version],
 }
@@ -3514,7 +3532,7 @@ const pidFlux11024To40964stepBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_pid_latent_upscale_dit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/PixelDiT',
-  description: 'PiD Flux.1 1024→4096 像素级 4 步超分',
+  description: { zh: 'PiD Flux.1 1024→4096 像素级 4 步超分', en: 'PiD Flux.1 1024→4096 pixel-space 4-step upscaling' },
   version: pidFlux11024To40964stepBf16Version,
   versions: [pidFlux11024To40964stepBf16Version],
 }
@@ -3550,7 +3568,7 @@ const pixeldit1300m1024pxBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_pixeldit_t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/PixelDiT',
-  description: 'PixelDiT 1.3B 1024px 像素空间文生图',
+  description: { zh: 'PixelDiT 1.3B 1024px 像素空间文生图', en: 'PixelDiT 1.3B 1024px pixel-space text-to-image' },
   version: pixeldit1300m1024pxBf16Version,
   versions: [pixeldit1300m1024pxBf16Version],
 }
@@ -3586,7 +3604,7 @@ const qwenImage2512Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_text_prompt_to_360hdr.app-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
-  description: 'Qwen-Image 2512 文生图/编辑',
+  description: { zh: 'Qwen-Image 2512 文生图/编辑', en: 'Qwen-Image 2512 text-to-image/editing' },
   version: qwenImage2512Bf16Version,
   versions: [qwenImage2512Bf16Version],
 }
@@ -3622,7 +3640,7 @@ const qwenImage2512Fp8E4m3fnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
-  description: 'Qwen-Image 2512 fp8 文生图/编辑',
+  description: { zh: 'Qwen-Image 2512 fp8 文生图/编辑', en: 'Qwen-Image 2512 fp8 text-to-image/editing' },
   version: qwenImage2512Fp8E4m3fnVersion,
   versions: [qwenImage2512Fp8E4m3fnVersion],
 }
@@ -3658,7 +3676,7 @@ const qwenImageEdit2509Fp8E4m3fnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2509-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: 'Qwen-Image Edit 2509 fp8 图像编辑',
+  description: { zh: 'Qwen-Image Edit 2509 fp8 图像编辑', en: 'Qwen-Image Edit 2509 fp8 image editing' },
   version: qwenImageEdit2509Fp8E4m3fnVersion,
   versions: [qwenImageEdit2509Fp8E4m3fnVersion],
 }
@@ -3694,7 +3712,7 @@ const qwenImageEdit2511Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image-qwen_image_edit_2511_lora_inflation-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: 'Qwen-Image Edit 2511 图像编辑',
+  description: { zh: 'Qwen-Image Edit 2511 图像编辑', en: 'Qwen-Image Edit 2511 image editing' },
   version: qwenImageEdit2511Bf16Version,
   versions: [qwenImageEdit2511Bf16Version],
 }
@@ -3730,7 +3748,7 @@ const qwenImageEditFp8E4m3fnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: 'Qwen-Image Edit fp8 图像编辑',
+  description: { zh: 'Qwen-Image Edit fp8 图像编辑', en: 'Qwen-Image Edit fp8 image editing' },
   version: qwenImageEditFp8E4m3fnVersion,
   versions: [qwenImageEditFp8E4m3fnVersion],
 }
@@ -3766,7 +3784,7 @@ const qwenImageFp8E4m3fnModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
-  description: 'Qwen-Image fp8 文生图',
+  description: { zh: 'Qwen-Image fp8 文生图', en: 'Qwen-Image fp8 text-to-image' },
   version: qwenImageFp8E4m3fnVersion,
   versions: [qwenImageFp8E4m3fnVersion],
 }
@@ -3802,7 +3820,7 @@ const qwenImageLayeredBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_layered-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Layered_ComfyUI',
-  description: 'Qwen-Image Layered 分层图像生成',
+  description: { zh: 'Qwen-Image Layered 分层图像生成', en: 'Qwen-Image Layered layered image generation' },
   version: qwenImageLayeredBf16Version,
   versions: [qwenImageLayeredBf16Version],
 }
@@ -3838,7 +3856,7 @@ const qwenImageLayeredControlBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_layered_control-1.webp', type: 'image' }],
   user: { username: 'DiffSynth-Studio' },
   sourceUrl: 'https://huggingface.co/DiffSynth-Studio/Qwen-Image-Layered-Control',
-  description: 'Qwen-Image Layered Control 分层控制图像生成',
+  description: { zh: 'Qwen-Image Layered Control 分层控制图像生成', en: 'Qwen-Image Layered Control layered image generation' },
   version: qwenImageLayeredControlBf16Version,
   versions: [qwenImageLayeredControlBf16Version],
 }
@@ -3874,7 +3892,7 @@ const rtDetrV4XHgnetFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_sdpose_multi_person-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/SDPose',
-  description: 'RT-DETR v4-X-HGNet 目标检测模型 (SDPose 用)',
+  description: { zh: 'RT-DETR v4-X-HGNet 目标检测模型 (SDPose 用)', en: 'RT-DETR v4-X-HGNet object detector (used by SDPose)' },
   version: rtDetrV4XHgnetFp16Version,
   versions: [rtDetrV4XHgnetFp16Version],
 }
@@ -3910,7 +3928,7 @@ const triposplatFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/3d_triposplat_image_to_gaussian_splat-1.webp', type: 'image' }],
   user: { username: 'VAST-AI' },
   sourceUrl: 'https://huggingface.co/VAST-AI/TripoSplat',
-  description: 'TripoSplat 单图生成 3D 高斯泼溅',
+  description: { zh: 'TripoSplat 单图生成 3D 高斯泼溅', en: 'TripoSplat single-image to 3D Gaussian splatting' },
   version: triposplatFp16Version,
   versions: [triposplatFp16Version],
 }
@@ -3946,7 +3964,7 @@ const voidPass1Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_void_video_inpainting-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/void-model',
-  description: 'VOID 视频物体删除 inpainting pass1',
+  description: { zh: 'VOID 视频物体删除 inpainting pass1', en: 'VOID video object removal, inpainting pass 1' },
   version: voidPass1Version,
   versions: [voidPass1Version],
 }
@@ -3982,7 +4000,7 @@ const voidPass2Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_void_video_inpainting-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/void-model',
-  description: 'VOID 视频物体删除 inpainting pass2',
+  description: { zh: 'VOID 视频物体删除 inpainting pass2', en: 'VOID video object removal, inpainting pass 2' },
   version: voidPass2Version,
   versions: [voidPass2Version],
 }
@@ -4018,7 +4036,7 @@ const wan21Flf2v720p14BFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/wan2.1_flf2v_720_f16-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 FLF2V 首尾帧到视频 14B 720p',
+  description: { zh: 'Wan 2.1 FLF2V 首尾帧到视频 14B 720p', en: 'Wan 2.1 FLF2V first-last-frame to video, 14B 720p' },
   version: wan21Flf2v720p14BFp16Version,
   versions: [wan21Flf2v720p14BFp16Version],
 }
@@ -4054,7 +4072,7 @@ const wan21FunCameraV1113BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_fun_camera_v1.1_1.3B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 Fun-Camera 相机控制 1.3B',
+  description: { zh: 'Wan 2.1 Fun-Camera 相机控制 1.3B', en: 'Wan 2.1 Fun-Camera camera control 1.3B' },
   version: wan21FunCameraV1113BBf16Version,
   versions: [wan21FunCameraV1113BBf16Version],
 }
@@ -4090,7 +4108,7 @@ const wan21FunCameraV1114BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_fun_camera_v1.1_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 Fun-Camera 相机控制 14B',
+  description: { zh: 'Wan 2.1 Fun-Camera 相机控制 14B', en: 'Wan 2.1 Fun-Camera camera control 14B' },
   version: wan21FunCameraV1114BBf16Version,
   versions: [wan21FunCameraV1114BBf16Version],
 }
@@ -4126,7 +4144,7 @@ const wan21FunControl13BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/wan2.1_fun_control-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 Fun-Control 视频控制 1.3B',
+  description: { zh: 'Wan 2.1 Fun-Control 视频控制 1.3B', en: 'Wan 2.1 Fun-Control video control 1.3B' },
   version: wan21FunControl13BBf16Version,
   versions: [wan21FunControl13BBf16Version],
 }
@@ -4162,7 +4180,7 @@ const wan21FunInp13BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/wan2.1_fun_inp-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 Fun-Inpaint 视频修复 1.3B',
+  description: { zh: 'Wan 2.1 Fun-Inpaint 视频修复 1.3B', en: 'Wan 2.1 Fun-Inpaint video inpainting 1.3B' },
   version: wan21FunInp13BBf16Version,
   versions: [wan21FunInp13BBf16Version],
 }
@@ -4198,7 +4216,7 @@ const wan21I2v480p14BFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_to_video_wan-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 i2v 480p 14B 图生视频',
+  description: { zh: 'Wan 2.1 i2v 480p 14B 图生视频', en: 'Wan 2.1 i2v 480p 14B image-to-video' },
   version: wan21I2v480p14BFp16Version,
   versions: [wan21I2v480p14BFp16Version],
 }
@@ -4234,7 +4252,7 @@ const wan21T2v13BFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/text_to_video_wan-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 t2v 1.3B 文生视频',
+  description: { zh: 'Wan 2.1 t2v 1.3B 文生视频', en: 'Wan 2.1 t2v 1.3B text-to-video' },
   version: wan21T2v13BFp16Version,
   versions: [wan21T2v13BFp16Version],
 }
@@ -4270,7 +4288,7 @@ const wan21T2v14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_alpha_t2v_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 t2v 14B fp8 文生视频',
+  description: { zh: 'Wan 2.1 t2v 14B fp8 文生视频', en: 'Wan 2.1 t2v 14B fp8 text-to-video' },
   version: wan21T2v14BFp8ScaledVersion,
   versions: [wan21T2v14BFp8ScaledVersion],
 }
@@ -4306,7 +4324,7 @@ const wan21Vace13BFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan_vace_14B_ref2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 VACE 视频编辑 1.3B',
+  description: { zh: 'Wan 2.1 VACE 视频编辑 1.3B', en: 'Wan 2.1 VACE video editing 1.3B' },
   version: wan21Vace13BFp16Version,
   versions: [wan21Vace13BFp16Version],
 }
@@ -4342,7 +4360,7 @@ const wan21Vace14BFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_sirolim_seamless_loop-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 VACE 视频编辑 14B',
+  description: { zh: 'Wan 2.1 VACE 视频编辑 14B', en: 'Wan 2.1 VACE video editing 14B' },
   version: wan21Vace14BFp16Version,
   versions: [wan21Vace14BFp16Version],
 }
@@ -4378,7 +4396,7 @@ const wan22FunCameraHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_fun_camera-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Camera 相机控制 high_noise 14B (i2v)',
+  description: { zh: 'Wan 2.2 Fun-Camera 相机控制 high_noise 14B (i2v)', en: 'Wan 2.2 Fun-Camera camera control high_noise 14B (i2v)' },
   version: wan22FunCameraHighNoise14BFp8ScaledVersion,
   versions: [wan22FunCameraHighNoise14BFp8ScaledVersion],
 }
@@ -4414,7 +4432,7 @@ const wan22FunCameraLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_fun_camera-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Camera 相机控制 low_noise 14B (i2v)',
+  description: { zh: 'Wan 2.2 Fun-Camera 相机控制 low_noise 14B (i2v)', en: 'Wan 2.2 Fun-Camera camera control low_noise 14B (i2v)' },
   version: wan22FunCameraLowNoise14BFp8ScaledVersion,
   versions: [wan22FunCameraLowNoise14BFp8ScaledVersion],
 }
@@ -4450,7 +4468,7 @@ const wan22FunControl5BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_5B_fun_control-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Control 视频控制 5B',
+  description: { zh: 'Wan 2.2 Fun-Control 视频控制 5B', en: 'Wan 2.2 Fun-Control video control 5B' },
   version: wan22FunControl5BBf16Version,
   versions: [wan22FunControl5BBf16Version],
 }
@@ -4486,7 +4504,7 @@ const wan22FunControlHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_fun_control-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Control 视频控制 high_noise 14B (i2v)',
+  description: { zh: 'Wan 2.2 Fun-Control 视频控制 high_noise 14B (i2v)', en: 'Wan 2.2 Fun-Control video control high_noise 14B (i2v)' },
   version: wan22FunControlHighNoise14BFp8ScaledVersion,
   versions: [wan22FunControlHighNoise14BFp8ScaledVersion],
 }
@@ -4522,7 +4540,7 @@ const wan22FunControlLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_fun_control-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Control 视频控制 low_noise 14B (i2v)',
+  description: { zh: 'Wan 2.2 Fun-Control 视频控制 low_noise 14B (i2v)', en: 'Wan 2.2 Fun-Control video control low_noise 14B (i2v)' },
   version: wan22FunControlLowNoise14BFp8ScaledVersion,
   versions: [wan22FunControlLowNoise14BFp8ScaledVersion],
 }
@@ -4558,7 +4576,7 @@ const wan22FunInpaint5BBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_5B_fun_inpaint-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Inpaint 视频修复 5B',
+  description: { zh: 'Wan 2.2 Fun-Inpaint 视频修复 5B', en: 'Wan 2.2 Fun-Inpaint video inpainting 5B' },
   version: wan22FunInpaint5BBf16Version,
   versions: [wan22FunInpaint5BBf16Version],
 }
@@ -4594,7 +4612,7 @@ const wan22FunInpaintHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_fun_inpaint-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Inpaint 视频修复 high_noise 14B (i2v)',
+  description: { zh: 'Wan 2.2 Fun-Inpaint 视频修复 high_noise 14B (i2v)', en: 'Wan 2.2 Fun-Inpaint video inpainting high_noise 14B (i2v)' },
   version: wan22FunInpaintHighNoise14BFp8ScaledVersion,
   versions: [wan22FunInpaintHighNoise14BFp8ScaledVersion],
 }
@@ -4630,7 +4648,7 @@ const wan22FunInpaintLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_fun_inpaint-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 Fun-Inpaint 视频修复 low_noise 14B (i2v)',
+  description: { zh: 'Wan 2.2 Fun-Inpaint 视频修复 low_noise 14B (i2v)', en: 'Wan 2.2 Fun-Inpaint video inpainting low_noise 14B (i2v)' },
   version: wan22FunInpaintLowNoise14BFp8ScaledVersion,
   versions: [wan22FunInpaintLowNoise14BFp8ScaledVersion],
 }
@@ -4666,7 +4684,7 @@ const wan22I2vHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_rob_split_stack_qwen_multi_wan22-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 i2v high_noise 14B 图生视频',
+  description: { zh: 'Wan 2.2 i2v high_noise 14B 图生视频', en: 'Wan 2.2 i2v high_noise 14B image-to-video' },
   version: wan22I2vHighNoise14BFp8ScaledVersion,
   versions: [wan22I2vHighNoise14BFp8ScaledVersion],
 }
@@ -4702,7 +4720,7 @@ const wan22I2vLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_rob_split_stack_qwen_multi_wan22-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 i2v low_noise 14B 图生视频',
+  description: { zh: 'Wan 2.2 i2v low_noise 14B 图生视频', en: 'Wan 2.2 i2v low_noise 14B image-to-video' },
   version: wan22I2vLowNoise14BFp8ScaledVersion,
   versions: [wan22I2vLowNoise14BFp8ScaledVersion],
 }
@@ -4738,7 +4756,7 @@ const wan22S2v14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_s2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 S2V 音频驱动视频 14B (基于 t2v)',
+  description: { zh: 'Wan 2.2 S2V 音频驱动视频 14B (基于 t2v)', en: 'Wan 2.2 S2V audio-driven video 14B (t2v based)' },
   version: wan22S2v14BFp8ScaledVersion,
   versions: [wan22S2v14BFp8ScaledVersion],
 }
@@ -4774,7 +4792,7 @@ const wan22T2vHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_t2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 t2v high_noise 14B 文生视频',
+  description: { zh: 'Wan 2.2 t2v high_noise 14B 文生视频', en: 'Wan 2.2 t2v high_noise 14B text-to-video' },
   version: wan22T2vHighNoise14BFp8ScaledVersion,
   versions: [wan22T2vHighNoise14BFp8ScaledVersion],
 }
@@ -4810,7 +4828,7 @@ const wan22T2vLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_t2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 t2v low_noise 14B 文生视频',
+  description: { zh: 'Wan 2.2 t2v low_noise 14B 文生视频', en: 'Wan 2.2 t2v low_noise 14B text-to-video' },
   version: wan22T2vLowNoise14BFp8ScaledVersion,
   versions: [wan22T2vLowNoise14BFp8ScaledVersion],
 }
@@ -4846,7 +4864,7 @@ const zImageTurboBf16Model: HuggingFaceModel = {
   images: [],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/z_image_turbo',
-  description: 'Z-Image Turbo 快速文生图',
+  description: { zh: 'Z-Image Turbo 快速文生图', en: 'Z-Image Turbo fast text-to-image' },
   version: zImageTurboBf16Version,
   versions: [zImageTurboBf16Version],
 }
@@ -4883,7 +4901,7 @@ const fireRedImageEdit10Lightning8stepsV10Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_firered_image_edit1_1-1.webp', type: 'image' }],
   user: { username: 'FireRedTeam' },
   sourceUrl: 'https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.0-ComfyUI',
-  description: 'FireRed-Image-Edit 图像编辑模型 8 步 Lightning 加速 LoRA',
+  description: { zh: 'FireRed-Image-Edit 图像编辑模型 8 步 Lightning 加速 LoRA', en: '8-step Lightning accelerator LoRA for FireRed-Image-Edit' },
   version: fireRedImageEdit10Lightning8stepsV10Version,
   versions: [fireRedImageEdit10Lightning8stepsV10Version],
 }
@@ -4919,7 +4937,7 @@ const flux2TurboLoRAComfyuiModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2-1.webp', type: 'image' }],
   user: { username: 'ByteZSzn' },
   sourceUrl: 'https://huggingface.co/ByteZSzn/Flux.2-Turbo-ComfyUI',
-  description: 'Flux.2 dev Turbo 加速 LoRA (ByteZSzn, LoraLoaderModelOnly)',
+  description: { zh: 'Flux.2 dev Turbo 加速 LoRA (ByteZSzn, LoraLoaderModelOnly)', en: 'Flux.2 dev Turbo accelerator LoRA (ByteZSzn, LoraLoaderModelOnly)' },
   version: flux2TurboLoRAComfyuiVersion,
   versions: [flux2TurboLoRAComfyuiVersion],
 }
@@ -4955,7 +4973,7 @@ const qWENEDITACTIONV1Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_qwen_image_edit_2511_systms_action-1.webp', type: 'image' }],
   user: { username: 'systms' },
   sourceUrl: 'https://huggingface.co/systms/SYSTMS-ACTION-LoRA-Qwen-Image-Edit-2511',
-  description: '风格 LoRA, 将任意物体变成玩具/可动人偶 (触发词 "action the ...")',
+  description: { zh: '风格 LoRA, 将任意物体变成玩具/可动人偶 (触发词 "action the ...")', en: 'Style LoRA that turns any object into a toy/action figure (trigger "action the ...")' },
   version: qWENEDITACTIONV1Version,
   versions: [qWENEDITACTIONV1Version],
 }
@@ -4991,7 +5009,7 @@ const qwenEdit2509MultipleAnglesModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates-1_click_multiple_scene_angles-v1.0-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: '多角度/镜头移动控制 LoRA (dx8152, 无触发词)',
+  description: { zh: '多角度/镜头移动控制 LoRA (dx8152, 无触发词)', en: 'Multi-angle/camera-move control LoRA (dx8152, no trigger)' },
   version: qwenEdit2509MultipleAnglesVersion,
   versions: [qwenEdit2509MultipleAnglesVersion],
 }
@@ -5027,7 +5045,7 @@ const qwenImage2512Lightning4stepsV10Fp32Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-2512-Lightning',
-  description: 'Qwen Image 2512 4 步蒸馏加速 LoRA (Lightning)',
+  description: { zh: 'Qwen Image 2512 4 步蒸馏加速 LoRA (Lightning)', en: 'Qwen Image 2512 4-step distillation accelerator LoRA (Lightning)' },
   version: qwenImage2512Lightning4stepsV10Fp32Version,
   versions: [qwenImage2512Lightning4stepsV10Fp32Version],
 }
@@ -5063,7 +5081,7 @@ const qwenImageEdit2509Anything2RealAlphaModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates-image_to_real-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: '风格转写实 LoRA (Anything2Real, 任意画风转照片, 强度 0.75-0.9)',
+  description: { zh: '风格转写实 LoRA (Anything2Real, 任意画风转照片, 强度 0.75-0.9)', en: 'Style-to-photoreal LoRA (Anything2Real, any art style to photo, strength 0.75-0.9)' },
   version: qwenImageEdit2509Anything2RealAlphaVersion,
   versions: [qwenImageEdit2509Anything2RealAlphaVersion],
 }
@@ -5099,7 +5117,7 @@ const qwenImageEdit2509FusionModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates-qwen_image_edit-crop_and_stitch-fusion-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: '图像融合/产品溶图 LoRA (dx8152, 触发词 "溶图")',
+  description: { zh: '图像融合/产品溶图 LoRA (dx8152, 触发词 "溶图")', en: 'Image blending/product compositing LoRA (dx8152, trigger "溶图")' },
   version: qwenImageEdit2509FusionVersion,
   versions: [qwenImageEdit2509FusionVersion],
 }
@@ -5135,7 +5153,7 @@ const qwenImageEdit2509LightMigrationModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates-portrait_light_migration-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: '光照迁移/二次打光 LoRA (dx8152)',
+  description: { zh: '光照迁移/二次打光 LoRA (dx8152)', en: 'Lighting transfer/relighting LoRA (dx8152)' },
   version: qwenImageEdit2509LightMigrationVersion,
   versions: [qwenImageEdit2509LightMigrationVersion],
 }
@@ -5171,7 +5189,7 @@ const qwenImageEdit2509Lightning4stepsV10Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2509-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-Lightning',
-  description: 'Qwen Image Edit 2509 4 步蒸馏加速 LoRA (Lightning)',
+  description: { zh: 'Qwen Image Edit 2509 4 步蒸馏加速 LoRA (Lightning)', en: 'Qwen Image Edit 2509 4-step distillation accelerator LoRA (Lightning)' },
   version: qwenImageEdit2509Lightning4stepsV10Bf16Version,
   versions: [qwenImageEdit2509Lightning4stepsV10Bf16Version],
 }
@@ -5207,7 +5225,7 @@ const qwenImageEdit2509Lightning8stepsV10Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates-image_to_real-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-Lightning',
-  description: 'Qwen Image Edit 2509 8 步蒸馏加速 LoRA (Lightning)',
+  description: { zh: 'Qwen Image Edit 2509 8 步蒸馏加速 LoRA (Lightning)', en: 'Qwen Image Edit 2509 8-step distillation accelerator LoRA (Lightning)' },
   version: qwenImageEdit2509Lightning8stepsV10Bf16Version,
   versions: [qwenImageEdit2509Lightning8stepsV10Bf16Version],
 }
@@ -5243,7 +5261,7 @@ const qwenImageEdit2509RelightModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2509_relight-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI',
-  description: '重打光 LoRA (dx8152, 触发词 "重新照明")',
+  description: { zh: '重打光 LoRA (dx8152, 触发词 "重新照明")', en: 'Relighting LoRA (dx8152, trigger "重新照明")' },
   version: qwenImageEdit2509RelightVersion,
   versions: [qwenImageEdit2509RelightVersion],
 }
@@ -5279,7 +5297,7 @@ const qwenImageEdit2511Lightning4stepsV10Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2511-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning',
-  description: 'Qwen Image Edit 2511 4 步蒸馏加速 LoRA (Lightning)',
+  description: { zh: 'Qwen Image Edit 2511 4 步蒸馏加速 LoRA (Lightning)', en: 'Qwen Image Edit 2511 4-step distillation accelerator LoRA (Lightning)' },
   version: qwenImageEdit2511Lightning4stepsV10Bf16Version,
   versions: [qwenImageEdit2511Lightning4stepsV10Bf16Version],
 }
@@ -5315,7 +5333,7 @@ const qwenImageEditLightning4stepsV10Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-Lightning',
-  description: 'Qwen Image Edit 4 步蒸馏加速 LoRA (Lightning 早期版)',
+  description: { zh: 'Qwen Image Edit 4 步蒸馏加速 LoRA (Lightning 早期版)', en: 'Qwen Image Edit 4-step distillation accelerator LoRA (early Lightning)' },
   version: qwenImageEditLightning4stepsV10Bf16Version,
   versions: [qwenImageEditLightning4stepsV10Bf16Version],
 }
@@ -5351,7 +5369,7 @@ const qwenImageLightning4stepsV10Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512_controlnet-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-Lightning',
-  description: 'Qwen Image 4 步蒸馏加速 LoRA (Lightning)',
+  description: { zh: 'Qwen Image 4 步蒸馏加速 LoRA (Lightning)', en: 'Qwen Image 4-step distillation accelerator LoRA (Lightning)' },
   version: qwenImageLightning4stepsV10Version,
   versions: [qwenImageLightning4stepsV10Version],
 }
@@ -5387,7 +5405,7 @@ const qwenImageLightning8stepsV10Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Qwen-Image-Lightning',
-  description: 'Qwen Image 8 步蒸馏加速 LoRA (Lightning)',
+  description: { zh: 'Qwen Image 8 步蒸馏加速 LoRA (Lightning)', en: 'Qwen Image 8-step distillation accelerator LoRA (Lightning)' },
   version: qwenImageLightning8stepsV10Version,
   versions: [qwenImageLightning8stepsV10Version],
 }
@@ -5423,7 +5441,7 @@ const sYSTMSINFL8LoRAQwenImageEdit2511Model: HuggingFaceModel = {
   images: [],
   user: { username: 'systms' },
   sourceUrl: 'https://huggingface.co/systms/SYSTMS-INFL8-LoRA-Qwen-Image-Edit-2511',
-  description: '',
+  description: { zh: 'Qwen Image Edit 2511 8 步加速 LoRA (SYSTMS)', en: 'Qwen Image Edit 2511 8-step accelerator LoRA (SYSTMS)' },
   version: sYSTMSINFL8LoRAQwenImageEdit2511Version,
   versions: [sYSTMSINFL8LoRAQwenImageEdit2511Version],
 }
@@ -5459,7 +5477,7 @@ const wan22LightningI2VA14B4stepsLoraHIGHFp16Model: HuggingFaceModel = {
   images: [],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.2 i2v 4 步加速 LoRA (high noise, Kijai 旧版)',
+  description: { zh: 'Wan 2.2 i2v 4 步加速 LoRA (high noise, Kijai 旧版)', en: 'Wan 2.2 i2v 4-step accelerator LoRA (high noise, Kijai legacy)' },
   version: wan22LightningI2VA14B4stepsLoraHIGHFp16Version,
   versions: [wan22LightningI2VA14B4stepsLoraHIGHFp16Version],
 }
@@ -5495,7 +5513,7 @@ const wan22LightningI2VA14B4stepsLoraLOWFp16Model: HuggingFaceModel = {
   images: [],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.2 i2v 4 步加速 LoRA (low noise, Kijai 旧版)',
+  description: { zh: 'Wan 2.2 i2v 4 步加速 LoRA (low noise, Kijai 旧版)', en: 'Wan 2.2 i2v 4-step accelerator LoRA (low noise, Kijai legacy)' },
   version: wan22LightningI2VA14B4stepsLoraLOWFp16Version,
   versions: [wan22LightningI2VA14B4stepsLoraLOWFp16Version],
 }
@@ -5531,7 +5549,7 @@ const wan21CausVid14BT2VLoraRank32Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_shane_video_restyle-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 T2V 14B CausVid 蒸馏 LoRA (实验性, v1)',
+  description: { zh: 'Wan 2.1 T2V 14B CausVid 蒸馏 LoRA (实验性, v1)', en: 'Wan 2.1 T2V 14B CausVid distillation LoRA (experimental, v1)' },
   version: wan21CausVid14BT2VLoraRank32Version,
   versions: [wan21CausVid14BT2VLoraRank32Version],
 }
@@ -5567,7 +5585,7 @@ const wan21CausVid14BT2VLoraRank32V2Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_shane_change_any_objects-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 T2V 14B CausVid 蒸馏 LoRA v2 (剪枝版, 仅 attention 层)',
+  description: { zh: 'Wan 2.1 T2V 14B CausVid 蒸馏 LoRA v2 (剪枝版, 仅 attention 层)', en: 'Wan 2.1 T2V 14B CausVid distillation LoRA v2 (pruned, attention layers only)' },
   version: wan21CausVid14BT2VLoraRank32V2Version,
   versions: [wan21CausVid14BT2VLoraRank32V2Version],
 }
@@ -5603,7 +5621,7 @@ const wan21CausVidBidirect2T2V13BLoraRank32Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan_vace_14B_ref2v-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 T2V 1.3B CausVid 蒸馏 LoRA (实验性)',
+  description: { zh: 'Wan 2.1 T2V 1.3B CausVid 蒸馏 LoRA (实验性)', en: 'Wan 2.1 T2V 1.3B CausVid distillation LoRA (experimental)' },
   version: wan21CausVidBidirect2T2V13BLoraRank32Version,
   versions: [wan21CausVidBidirect2T2V13BLoraRank32Version],
 }
@@ -5639,7 +5657,7 @@ const wan21T2V14BLightx2vCfgStepDistillLoraRank32Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template-Animation_Trajectory_Control_Wan_ATI-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏加速 LoRA (rank32)',
+  description: { zh: 'Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏加速 LoRA (rank32)', en: 'Wan 2.1 T2V 14B lightx2v CFG+step distillation accelerator LoRA (rank 32)' },
   version: wan21T2V14BLightx2vCfgStepDistillLoraRank32Version,
   versions: [wan21T2V14BLightx2vCfgStepDistillLoraRank32Version],
 }
@@ -5675,7 +5693,7 @@ const wanAnimateRelightLoraFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_purz_wan22_animate_auto_character_replace-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.2 Animate 角色替换重打光 LoRA (relighting)',
+  description: { zh: 'Wan 2.2 Animate 角色替换重打光 LoRA (relighting)', en: 'Wan 2.2 Animate character-swap relighting LoRA' },
   version: wanAnimateRelightLoraFp16Version,
   versions: [wanAnimateRelightLoraFp16Version],
 }
@@ -5711,7 +5729,7 @@ const wuliQwenImage2512TurboLoRA2stepsV10Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2512_with_2steps_lora-1.webp', type: 'image' }],
   user: { username: 'Wuli-art' },
   sourceUrl: 'https://huggingface.co/Wuli-art/Qwen-Image-2512-Turbo-LoRA-2-Steps',
-  description: 'Qwen Image 2512 2 步 Turbo 加速 LoRA (Wuli 团队)',
+  description: { zh: 'Qwen Image 2512 2 步 Turbo 加速 LoRA (Wuli 团队)', en: 'Qwen Image 2512 2-step Turbo accelerator LoRA (Wuli team)' },
   version: wuliQwenImage2512TurboLoRA2stepsV10Bf16Version,
   versions: [wuliQwenImage2512TurboLoRA2stepsV10Bf16Version],
 }
@@ -5747,7 +5765,7 @@ const chronoeditDistillLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_chrono_edit_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'NVIDIA ChronoEdit 图像编辑模型 8 步蒸馏加速 LoRA (基于 Wan 2.1 I2V 14B)',
+  description: { zh: 'NVIDIA ChronoEdit 图像编辑模型 8 步蒸馏加速 LoRA (基于 Wan 2.1 I2V 14B)', en: '8-step distillation accelerator LoRA for NVIDIA ChronoEdit (Wan 2.1 I2V 14B based)' },
   version: chronoeditDistillLoraVersion,
   versions: [chronoeditDistillLoraVersion],
 }
@@ -5783,7 +5801,7 @@ const flux1DepthDevLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux_depth_lora_example-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux1-dev',
-  description: 'FLUX.1 depth 深度条件控制 LoRA',
+  description: { zh: 'FLUX.1 depth 深度条件控制 LoRA', en: 'FLUX.1 depth-conditioned control LoRA' },
   version: flux1DepthDevLoraVersion,
   versions: [flux1DepthDevLoraVersion],
 }
@@ -5819,7 +5837,7 @@ const gemma312bItAbliteratedLoraRank64Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_image_speech_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2',
-  description: 'LTX-2 文本编码器 LoRA (Gemma 3 12B abliterated, rank 64)',
+  description: { zh: 'LTX-2 文本编码器 LoRA (Gemma 3 12B abliterated, rank 64)', en: 'LTX-2 text-encoder LoRA (Gemma 3 12B abliterated, rank 64)' },
   version: gemma312bItAbliteratedLoraRank64Bf16Version,
   versions: [gemma312bItAbliteratedLoraRank64Bf16Version],
 }
@@ -5855,7 +5873,7 @@ const googlyeyesLtx23Rank32Step03000Model: HuggingFaceModel = {
   images: [],
   user: { username: 'TheBurgstall' },
   sourceUrl: 'https://huggingface.co/TheBurgstall/ltx-2.3-googlyeyes-lora',
-  description: '',
+  description: { zh: 'LTX-2.3 搞怪眼球(googly eyes)风格 LoRA (rank32, step03000)', en: 'LTX-2.3 googly-eyes style LoRA (rank 32, step 03000)' },
   version: googlyeyesLtx23Rank32Step03000Version,
   versions: [googlyeyesLtx23Rank32Step03000Version],
 }
@@ -5891,7 +5909,7 @@ const gummycandyQwenModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_sugar_coated_gummy_style_qwen-1.webp', type: 'image' }],
   user: { username: 'enigmatic' },
   sourceUrl: 'https://huggingface.co/enigmatic/gummycandy_qwen',
-  description: '软糖(gummy)风格 LoRA, 把物体/动物变成半透明糖霜软糖',
+  description: { zh: '软糖(gummy)风格 LoRA, 把物体/动物变成半透明糖霜软糖', en: 'Gummy style LoRA, turns objects/animals into translucent frosted gummies' },
   version: gummycandyQwenVersion,
   versions: [gummycandyQwenVersion],
 }
@@ -5927,7 +5945,7 @@ const illustration10QwenImageModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_qwen_image_illustration_lora-1.webp', type: 'image' }],
   user: { username: 'alvdansen' },
   sourceUrl: 'https://huggingface.co/alvdansen/illustration-1.0-qwen-image',
-  description: '插画/漫画/动漫综合风格 LoRA (无需触发词)',
+  description: { zh: '插画/漫画/动漫综合风格 LoRA (无需触发词)', en: 'Illustration/comic/anime mixed-style LoRA (no trigger needed)' },
   version: illustration10QwenImageVersion,
   versions: [illustration10QwenImageVersion],
 }
@@ -5963,7 +5981,7 @@ const lightx2v14BT2VCfgStepDistillLoraAdaptiveRankQuantile015Bf16Model: HuggingF
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_product_scene_transformation-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏 LoRA (自适应 rank)',
+  description: { zh: 'Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏 LoRA (自适应 rank)', en: 'Wan 2.1 T2V 14B lightx2v CFG+step distillation LoRA (adaptive rank)' },
   version: lightx2v14BT2VCfgStepDistillLoraAdaptiveRankQuantile015Bf16Version,
   versions: [lightx2v14BT2VCfgStepDistillLoraAdaptiveRankQuantile015Bf16Version],
 }
@@ -5999,7 +6017,7 @@ const lightx2vI2V14B480pCfgStepDistillRank128Bf16Model: HuggingFaceModel = {
   images: [],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 I2V 14B 480p lightx2v CFG+步数蒸馏加速 LoRA (rank128)',
+  description: { zh: 'Wan 2.1 I2V 14B 480p lightx2v CFG+步数蒸馏加速 LoRA (rank128)', en: 'Wan 2.1 I2V 14B 480p lightx2v CFG+step distillation accelerator LoRA (rank 128)' },
   version: lightx2vI2V14B480pCfgStepDistillRank128Bf16Version,
   versions: [lightx2vI2V14B480pCfgStepDistillRank128Bf16Version],
 }
@@ -6035,7 +6053,7 @@ const lightx2vI2V14B480pCfgStepDistillRank64Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_purz_wan22_animate_auto_character_replace-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 I2V 14B 480p lightx2v CFG+步数蒸馏加速 LoRA (rank64)',
+  description: { zh: 'Wan 2.1 I2V 14B 480p lightx2v CFG+步数蒸馏加速 LoRA (rank64)', en: 'Wan 2.1 I2V 14B 480p lightx2v CFG+step distillation accelerator LoRA (rank 64)' },
   version: lightx2vI2V14B480pCfgStepDistillRank64Bf16Version,
   versions: [lightx2vI2V14B480pCfgStepDistillRank64Bf16Version],
 }
@@ -6071,7 +6089,7 @@ const lightx2vT2V14BCfgStepDistillV2LoraRank64Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_alpha_t2v_14B-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏 LoRA v2 (rank64)',
+  description: { zh: 'Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏 LoRA v2 (rank64)', en: 'Wan 2.1 T2V 14B lightx2v CFG+step distillation LoRA v2 (rank 64)' },
   version: lightx2vT2V14BCfgStepDistillV2LoraRank64Bf16Version,
   versions: [lightx2vT2V14BCfgStepDistillV2LoraRank64Bf16Version],
 }
@@ -6107,7 +6125,7 @@ const ltx219bIcLoraCannyControlModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_canny_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Canny-Control',
-  description: 'LTX-2 IC-LoRA Canny 边缘结构控制',
+  description: { zh: 'LTX-2 IC-LoRA Canny 边缘结构控制', en: 'LTX-2 IC-LoRA Canny edge-structure control' },
   version: ltx219bIcLoraCannyControlVersion,
   versions: [ltx219bIcLoraCannyControlVersion],
 }
@@ -6143,7 +6161,7 @@ const ltx219bIcLoraDepthControlModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_depth_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Depth-Control',
-  description: 'LTX-2 IC-LoRA 深度结构控制',
+  description: { zh: 'LTX-2 IC-LoRA 深度结构控制', en: 'LTX-2 IC-LoRA depth-structure control' },
   version: ltx219bIcLoraDepthControlVersion,
   versions: [ltx219bIcLoraDepthControlVersion],
 }
@@ -6179,7 +6197,7 @@ const ltx219bIcLoraPoseControlModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_pose_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Pose-Control',
-  description: 'LTX-2 IC-LoRA 姿态结构控制',
+  description: { zh: 'LTX-2 IC-LoRA 姿态结构控制', en: 'LTX-2 IC-LoRA pose-structure control' },
   version: ltx219bIcLoraPoseControlVersion,
   versions: [ltx219bIcLoraPoseControlVersion],
 }
@@ -6215,7 +6233,7 @@ const ltx219bLoraCameraControlDollyLeftModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_i2v-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2-19b-LoRA-Camera-Control-Dolly-Left',
-  description: 'LTX-2 镜头运动控制 LoRA (Dolly Left 左移)',
+  description: { zh: 'LTX-2 镜头运动控制 LoRA (Dolly Left 左移)', en: 'LTX-2 camera-motion control LoRA (Dolly Left)' },
   version: ltx219bLoraCameraControlDollyLeftVersion,
   versions: [ltx219bLoraCameraControlDollyLeftVersion],
 }
@@ -6251,7 +6269,7 @@ const ltx2322bDistilledLora38411Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_obscura_remova_lora_remove_object_from_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3',
-  description: 'LTX-2.3 蒸馏 LoRA v1.1 (8 步, CFG=1)',
+  description: { zh: 'LTX-2.3 蒸馏 LoRA v1.1 (8 步, CFG=1)', en: 'LTX-2.3 distillation LoRA v1.1 (8 steps, CFG=1)' },
   version: ltx2322bDistilledLora38411Version,
   versions: [ltx2322bDistilledLora38411Version],
 }
@@ -6287,7 +6305,7 @@ const ltx2322bDistilledLora384Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_image_speech_to_video-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3',
-  description: 'LTX-2.3 蒸馏 LoRA (8 步, CFG=1)',
+  description: { zh: 'LTX-2.3 蒸馏 LoRA (8 步, CFG=1)', en: 'LTX-2.3 distillation LoRA (8 steps, CFG=1)' },
   version: ltx2322bDistilledLora384Version,
   versions: [ltx2322bDistilledLora384Version],
 }
@@ -6323,7 +6341,7 @@ const ltx2322bIcLoraOutpaintModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_lora_video_outpainting-1.webp', type: 'image' }],
   user: { username: 'oumoumad' },
   sourceUrl: 'https://huggingface.co/oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint',
-  description: 'LTX-2.3 IC-LoRA 视频画布外扩 (outpaint, 黑色区域填充)',
+  description: { zh: 'LTX-2.3 IC-LoRA 视频画布外扩 (outpaint, 黑色区域填充)', en: 'LTX-2.3 IC-LoRA video canvas outpainting (black-area fill)' },
   version: ltx2322bIcLoraOutpaintVersion,
   versions: [ltx2322bIcLoraOutpaintVersion],
 }
@@ -6359,7 +6377,7 @@ const ltx2322bIcLoraUnionControlRef05Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_3_ic_lora-1.webp', type: 'image' }],
   user: { username: 'Lightricks' },
   sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control',
-  description: 'LTX-2.3 IC-LoRA 统一结构控制 (canny+depth+pose, 参考降采样 0.5)',
+  description: { zh: 'LTX-2.3 IC-LoRA 统一结构控制 (canny+depth+pose, 参考降采样 0.5)', en: 'LTX-2.3 IC-LoRA unified structure control (canny+depth+pose, reference downsample 0.5)' },
   version: ltx2322bIcLoraUnionControlRef05Version,
   versions: [ltx2322bIcLoraUnionControlRef05Version],
 }
@@ -6395,7 +6413,7 @@ const ltx23IdLoraTalkvid3kModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_image_speech_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2.3',
-  description: 'LTX-2.3 人物身份保持 LoRA (TalkVid-3K, 说话/口播场景)',
+  description: { zh: 'LTX-2.3 人物身份保持 LoRA (TalkVid-3K, 说话/口播场景)', en: 'LTX-2.3 identity-preserving LoRA (TalkVid-3K, talking-head scenes)' },
   version: ltx23IdLoraTalkvid3kVersion,
   versions: [ltx23IdLoraTalkvid3kVersion],
 }
@@ -6431,7 +6449,7 @@ const ltx2SquishModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_i2v_lora-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2',
-  description: 'LTX-2 挤压变形风格 LoRA (触发词 "squish it")',
+  description: { zh: 'LTX-2 挤压变形风格 LoRA (触发词 "squish it")', en: 'LTX-2 squish-distortion style LoRA (trigger "squish it")' },
   version: ltx2SquishVersion,
   versions: [ltx2SquishVersion],
 }
@@ -6467,7 +6485,7 @@ const ltx23TransitionModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_style_transition-1.webp', type: 'image' }],
   user: { username: 'joyfox' },
   sourceUrl: 'https://huggingface.co/valiantcat/LTX-2.3-Transition-LORA',
-  description: 'LTX-2.3 场景/角色转场变形 LoRA (触发词 zhuanchang)',
+  description: { zh: 'LTX-2.3 场景/角色转场变形 LoRA (触发词 zhuanchang)', en: 'LTX-2.3 scene/character transition morph LoRA (trigger "zhuanchang")' },
   version: ltx23TransitionVersion,
   versions: [ltx23TransitionVersion],
 }
@@ -6503,7 +6521,7 @@ const ltx2322bDistilled11LoraDynamicFro09AvgRank111Bf16Model: HuggingFaceModel =
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_3_i2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2.3',
-  description: 'LTX-2.3 蒸馏 LoRA v1.1 (动态 rank, 平均 111, bf16)',
+  description: { zh: 'LTX-2.3 蒸馏 LoRA v1.1 (动态 rank, 平均 111, bf16)', en: 'LTX-2.3 distillation LoRA v1.1 (dynamic rank, avg 111, bf16)' },
   version: ltx2322bDistilled11LoraDynamicFro09AvgRank111Bf16Version,
   versions: [ltx2322bDistilled11LoraDynamicFro09AvgRank111Bf16Version],
 }
@@ -6539,7 +6557,7 @@ const pixelArtStyleZImageTurboModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/basic_switch_node-1.webp', type: 'image' }],
   user: { username: 'tarn59' },
   sourceUrl: 'https://huggingface.co/tarn59/pixel_art_style_lora_z_image_turbo',
-  description: 'Z-Image Turbo 像素画风格 LoRA (触发词 "Pixel art style.")',
+  description: { zh: 'Z-Image Turbo 像素画风格 LoRA (触发词 "Pixel art style.")', en: 'Z-Image Turbo pixel-art style LoRA (trigger "Pixel art style.")' },
   version: pixelArtStyleZImageTurboVersion,
   versions: [pixelArtStyleZImageTurboVersion],
 }
@@ -6575,7 +6593,7 @@ const qwen360Diffusion2512Int8Bf16V2Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_qwen_Image_2512_360_lora-1.webp', type: 'image' }],
   user: { username: 'ProGamerGov' },
   sourceUrl: 'https://huggingface.co/ProGamerGov/qwen-360-diffusion',
-  description: '360° 全景 equirectangular 生成 LoRA (基于 Qwen Image 2512, rank128)',
+  description: { zh: '360° 全景 equirectangular 生成 LoRA (基于 Qwen Image 2512, rank128)', en: '360° equirectangular panorama LoRA (Qwen Image 2512, rank 128)' },
   version: qwen360Diffusion2512Int8Bf16V2Version,
   versions: [qwen360Diffusion2512Int8Bf16V2Version],
 }
@@ -6611,7 +6629,7 @@ const qwenImageEdit2511MultipleAnglesLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_rob_split_stack_qwen_multi_wan22-1.webp', type: 'image' }],
   user: { username: 'fal' },
   sourceUrl: 'https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA',
-  description: '多角度相机控制 LoRA (fal, 96 机位, 触发词 <sks> 方位词)',
+  description: { zh: '多角度相机控制 LoRA (fal, 96 机位, 触发词 <sks> 方位词)', en: 'Multi-angle camera control LoRA (fal, 96 camera positions, trigger <sks> + direction word)' },
   version: qwenImageEdit2511MultipleAnglesLoraVersion,
   versions: [qwenImageEdit2511MultipleAnglesLoraVersion],
 }
@@ -6647,7 +6665,7 @@ const qwenImageUnionDiffsynthLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_union_control_lora-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-DiffSynth-ControlNets',
-  description: 'Qwen Image 统一结构控制 LoRA (canny/depth/pose/lineart/softedge/normal/openpose)',
+  description: { zh: 'Qwen Image 统一结构控制 LoRA (canny/depth/pose/lineart/softedge/normal/openpose)', en: 'Qwen Image unified structure-control LoRA (canny/depth/pose/lineart/softedge/normal/openpose)' },
   version: qwenImageUnionDiffsynthLoraVersion,
   versions: [qwenImageUnionDiffsynthLoraVersion],
 }
@@ -6683,7 +6701,7 @@ const removalTimestepAlpha21740Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux.1_fill_dev_OneReward-1.webp', type: 'image' }],
   user: { username: 'lrzjason' },
   sourceUrl: 'https://huggingface.co/lrzjason/ObjectRemovalFluxFill',
-  description: 'Flux Fill 物体移除 LoRA (Object Removal v2.0, 需遮罩, 非商用)',
+  description: { zh: 'Flux Fill 物体移除 LoRA (Object Removal v2.0, 需遮罩, 非商用)', en: 'Flux Fill object-removal LoRA (Object Removal v2.0, needs a mask, non-commercial)' },
   version: removalTimestepAlpha21740Version,
   versions: [removalTimestepAlpha21740Version],
 }
@@ -6719,7 +6737,7 @@ const usoFlux1DitLoraV1Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux1_dev_uso_reference_image_gen-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/USO_1.0_Repackaged',
-  description: '字节跳动 USO 统一风格/主体定制 LoRA (需配合 projector model patch)',
+  description: { zh: '字节跳动 USO 统一风格/主体定制 LoRA (需配合 projector model patch)', en: 'ByteDance USO unified style/subject customization LoRA (needs the projector model patch)' },
   version: usoFlux1DitLoraV1Version,
   versions: [usoFlux1DitLoraV1Version],
 }
@@ -6755,7 +6773,7 @@ const wan22I2vA14bHighNoiseLoraRank64Lightx2v4step1022Model: HuggingFaceModel = 
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_mjm_airt_machIne-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Wan2.2-Distill-Loras',
-  description: 'Wan 2.2 i2v 4 步蒸馏 LoRA (high noise, rank64, lightx2v)',
+  description: { zh: 'Wan 2.2 i2v 4 步蒸馏 LoRA (high noise, rank64, lightx2v)', en: 'Wan 2.2 i2v 4-step distillation LoRA (high noise, rank 64, lightx2v)' },
   version: wan22I2vA14bHighNoiseLoraRank64Lightx2v4step1022Version,
   versions: [wan22I2vA14bHighNoiseLoraRank64Lightx2v4step1022Version],
 }
@@ -6791,7 +6809,7 @@ const wan22I2vA14bLowNoiseLoraRank64Lightx2v4step1022Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_mjm_airt_machIne-1.webp', type: 'image' }],
   user: { username: 'lightx2v' },
   sourceUrl: 'https://huggingface.co/lightx2v/Wan2.2-Distill-Loras',
-  description: 'Wan 2.2 i2v 4 步蒸馏 LoRA (low noise, rank64, lightx2v)',
+  description: { zh: 'Wan 2.2 i2v 4 步蒸馏 LoRA (low noise, rank64, lightx2v)', en: 'Wan 2.2 i2v 4-step distillation LoRA (low noise, rank 64, lightx2v)' },
   version: wan22I2vA14bLowNoiseLoraRank64Lightx2v4step1022Version,
   versions: [wan22I2vA14bLowNoiseLoraRank64Lightx2v4step1022Version],
 }
@@ -6827,7 +6845,7 @@ const wan22I2vLightx2v4stepsLoraV1LowNoiseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_rob_split_stack_qwen_multi_wan22-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 i2v 4 步加速 LoRA (low noise, ComfyUI 官方 repackaged)',
+  description: { zh: 'Wan 2.2 i2v 4 步加速 LoRA (low noise, ComfyUI 官方 repackaged)', en: 'Wan 2.2 i2v 4-step accelerator LoRA (low noise, ComfyUI official repackaged)' },
   version: wan22I2vLightx2v4stepsLoraV1LowNoiseVersion,
   versions: [wan22I2vLightx2v4stepsLoraV1LowNoiseVersion],
 }
@@ -6863,7 +6881,7 @@ const wan22T2vLightx2v4stepsLoraV11HighNoiseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_s2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 t2v 4 步加速 LoRA v1.1 (high noise)',
+  description: { zh: 'Wan 2.2 t2v 4 步加速 LoRA v1.1 (high noise)', en: 'Wan 2.2 t2v 4-step accelerator LoRA v1.1 (high noise)' },
   version: wan22T2vLightx2v4stepsLoraV11HighNoiseVersion,
   versions: [wan22T2vLightx2v4stepsLoraV11HighNoiseVersion],
 }
@@ -6899,7 +6917,7 @@ const wan22T2vLightx2v4stepsLoraV11LowNoiseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_14B_t2v-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 t2v 4 步加速 LoRA v1.1 (low noise)',
+  description: { zh: 'Wan 2.2 t2v 4 步加速 LoRA v1.1 (low noise)', en: 'Wan 2.2 t2v 4-step accelerator LoRA v1.1 (low noise)' },
   version: wan22T2vLightx2v4stepsLoraV11LowNoiseVersion,
   versions: [wan22T2vLightx2v4stepsLoraV11LowNoiseVersion],
 }
@@ -6935,7 +6953,7 @@ const wanAlpha21RgbaLoraModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_alpha_t2v_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 A14B RGBA 透明通道(alpha)生成 LoRA',
+  description: { zh: 'Wan 2.1 A14B RGBA 透明通道(alpha)生成 LoRA', en: 'Wan 2.1 A14B RGBA alpha-channel generation LoRA' },
   version: wanAlpha21RgbaLoraVersion,
   versions: [wanAlpha21RgbaLoraVersion],
 }
@@ -6972,7 +6990,7 @@ const qwenImage2512FunControlnetUnion2602Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512_controlnet-1.webp', type: 'image' }],
   user: { username: 'alibaba-pai' },
   sourceUrl: 'https://huggingface.co/alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union',
-  description: 'Qwen-Image-2512 的 Fun Union ControlNet (Canny/HED/Depth/Pose/MLSD/Scribble/Gray)',
+  description: { zh: 'Qwen-Image-2512 的 Fun Union ControlNet (Canny/HED/Depth/Pose/MLSD/Scribble/Gray)', en: 'Fun Union ControlNet for Qwen-Image-2512 (Canny/HED/Depth/Pose/MLSD/Scribble/Gray)' },
   version: qwenImage2512FunControlnetUnion2602Version,
   versions: [qwenImage2512FunControlnetUnion2602Version],
 }
@@ -7008,7 +7026,7 @@ const qwenImageInstantXControlNetInpaintingModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_instantx_inpainting_controlnet-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets',
-  description: 'Qwen-Image 的 InstantX ControlNet (Inpainting 重绘)',
+  description: { zh: 'Qwen-Image 的 InstantX ControlNet (Inpainting 重绘)', en: 'InstantX ControlNet for Qwen-Image (inpainting)' },
   version: qwenImageInstantXControlNetInpaintingVersion,
   versions: [qwenImageInstantXControlNetInpaintingVersion],
 }
@@ -7044,7 +7062,7 @@ const qwenImageInstantXControlNetUnionModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_instantx_controlnet-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets',
-  description: 'Qwen-Image 的 InstantX Union ControlNet (多条件统一)',
+  description: { zh: 'Qwen-Image 的 InstantX Union ControlNet (多条件统一)', en: 'InstantX Union ControlNet for Qwen-Image (unified multi-condition)' },
   version: qwenImageInstantXControlNetUnionVersion,
   versions: [qwenImageInstantXControlNetUnionVersion],
 }
@@ -7080,7 +7098,7 @@ const sd35LargeControlnetBlurModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/sd3.5_large_blur-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/stable-diffusion-3.5-controlnets_ComfyUI_repackaged',
-  description: 'SD 3.5 Large 的模糊 ControlNet',
+  description: { zh: 'SD 3.5 Large 的模糊 ControlNet', en: 'Blur ControlNet for SD 3.5 Large' },
   version: sd35LargeControlnetBlurVersion,
   versions: [sd35LargeControlnetBlurVersion],
 }
@@ -7117,7 +7135,7 @@ const wan21VAEFp32Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_ingi_infl8-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'Wan 2.1 官方 VAE (fp32 版), 精度更高但体积更大',
+  description: { zh: 'Wan 2.1 官方 VAE (fp32 版), 精度更高但体积更大', en: 'Wan 2.1 official VAE (fp32), higher precision but larger' },
   version: wan21VAEFp32Version,
   versions: [wan21VAEFp32Version],
 }
@@ -7153,7 +7171,7 @@ const ace15VaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_ace_step1_5_xl_base-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'Ace-Step 1.5 音乐生成模型的音频 VAE',
+  description: { zh: 'Ace-Step 1.5 音乐生成模型的音频 VAE', en: 'Audio VAE for the ACE-Step 1.5 music generation model' },
   version: ace15VaeVersion,
   versions: [ace15VaeVersion],
 }
@@ -7189,7 +7207,7 @@ const cogvideoxVaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_void_video_inpainting-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/void-model',
-  description: 'VOID 视频抠除模型 (基于 CogVideoX-2b) 的 VAE',
+  description: { zh: 'VOID 视频抠除模型 (基于 CogVideoX-2b) 的 VAE', en: 'VAE for the VOID video object-removal model (CogVideoX-2b based)' },
   version: cogvideoxVaeVersion,
   versions: [cogvideoxVaeVersion],
 }
@@ -7225,7 +7243,7 @@ const flux2VaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/3d_triposplat_image_to_gaussian_splat-1.webp', type: 'image' }],
   user: { username: 'VAST-AI' },
   sourceUrl: 'https://huggingface.co/VAST-AI/TripoSplat',
-  description: 'FLUX.2 系列专用的 Tripo VAE (也用于 TripoSplat 3D 管线)',
+  description: { zh: 'FLUX.2 系列专用的 Tripo VAE (也用于 TripoSplat 3D 管线)', en: 'Tripo VAE for the FLUX.2 family (also used in the TripoSplat 3D pipeline)' },
   version: flux2VaeVersion,
   versions: [flux2VaeVersion],
 }
@@ -7261,7 +7279,7 @@ const fullEncoderSmallDecoderModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2-1.webp', type: 'image' }],
   user: { username: 'black-forest-labs' },
   sourceUrl: 'https://huggingface.co/black-forest-labs/FLUX.2-small-decoder',
-  description: 'FLUX.2 Small Decoder — 蒸馏版小解码器 VAE (解码更快、省显存)',
+  description: { zh: 'FLUX.2 Small Decoder — 蒸馏版小解码器 VAE (解码更快、省显存)', en: 'FLUX.2 Small Decoder — distilled compact decoder VAE (faster decoding, lower VRAM)' },
   version: fullEncoderSmallDecoderVersion,
   versions: [fullEncoderSmallDecoderVersion],
 }
@@ -7297,7 +7315,7 @@ const hunyuanVideoVaeBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hunyuan_video_text_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_repackaged',
-  description: '混元视频 HunyuanVideo 的 VAE (bf16)',
+  description: { zh: '混元视频 HunyuanVideo 的 VAE (bf16)', en: 'VAE for HunyuanVideo (bf16)' },
   version: hunyuanVideoVaeBf16Version,
   versions: [hunyuanVideoVaeBf16Version],
 }
@@ -7333,7 +7351,7 @@ const hunyuanvideo15VaeFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/Image_capybara_v0_1_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged',
-  description: '混元视频 1.5 (HunyuanVideo 1.5 / Capybara) 的 VAE',
+  description: { zh: '混元视频 1.5 (HunyuanVideo 1.5 / Capybara) 的 VAE', en: 'VAE for HunyuanVideo 1.5 (HunyuanVideo 1.5 / Capybara)' },
   version: hunyuanvideo15VaeFp16Version,
   versions: [hunyuanvideo15VaeFp16Version],
 }
@@ -7369,7 +7387,7 @@ const qwenImageLayeredVaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_layered-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image-Layered_ComfyUI',
-  description: 'Qwen-Image-Layered 分层 RGBA 分解模型的专属 VAE',
+  description: { zh: 'Qwen-Image-Layered 分层 RGBA 分解模型的专属 VAE', en: 'Dedicated VAE for the Qwen-Image-Layered RGBA decomposition model' },
   version: qwenImageLayeredVaeVersion,
   versions: [qwenImageLayeredVaeVersion],
 }
@@ -7405,7 +7423,7 @@ const qwenImageVaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image-qwen_image_edit_2511_lora_inflation-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
-  description: 'Qwen-Image 系列 VAE (Qwen-Image 2.0/Edit/2512 共用)',
+  description: { zh: 'Qwen-Image 系列 VAE (Qwen-Image 2.0/Edit/2512 共用)', en: 'VAE for the Qwen-Image family (shared by Qwen-Image 2.0/Edit/2512)' },
   version: qwenImageVaeVersion,
   versions: [qwenImageVaeVersion],
 }
@@ -7441,7 +7459,7 @@ const triposplatVaeDecoderFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/3d_triposplat_image_to_gaussian_splat-1.webp', type: 'image' }],
   user: { username: 'VAST-AI' },
   sourceUrl: 'https://huggingface.co/VAST-AI/TripoSplat',
-  description: 'TripoSplat 3D 高斯泼溅生成的 VAE 解码器',
+  description: { zh: 'TripoSplat 3D 高斯泼溅生成的 VAE 解码器', en: 'VAE decoder for TripoSplat 3D Gaussian splatting' },
   version: triposplatVaeDecoderFp16Version,
   versions: [triposplatVaeDecoderFp16Version],
 }
@@ -7477,7 +7495,7 @@ const wan22VaeModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2_2_5B_fun_control-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.2 5B 专属 VAE (16×16×4 压缩)',
+  description: { zh: 'Wan 2.2 5B 专属 VAE (16×16×4 压缩)', en: 'Dedicated VAE for Wan 2.2 5B (16×16×4 compression)' },
   version: wan22VaeVersion,
   versions: [wan22VaeVersion],
 }
@@ -7513,7 +7531,7 @@ const wan21Vae2Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_chrono_edit_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
-  description: 'Wan 2.1 VAE (Wan 2.2 14B 复用同款)',
+  description: { zh: 'Wan 2.1 VAE (Wan 2.2 14B 复用同款)', en: 'Wan 2.1 VAE (the same one is reused by Wan 2.2 14B)' },
   version: wan21Vae2Version,
   versions: [wan21Vae2Version],
 }
@@ -7549,7 +7567,7 @@ const wanAlpha21VaeAlphaChannelModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_alpha_t2v_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 Alpha 的 Alpha 通道 VAE (透明通道)',
+  description: { zh: 'Wan 2.1 Alpha 的 Alpha 通道 VAE (透明通道)', en: 'Alpha-channel VAE for Wan 2.1 Alpha (transparency)' },
   version: wanAlpha21VaeAlphaChannelVersion,
   versions: [wanAlpha21VaeAlphaChannelVersion],
 }
@@ -7585,7 +7603,7 @@ const wanAlpha21VaeRgbChannelModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan2.1_alpha_t2v_14B-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'Wan 2.1 Alpha 的 RGB 通道 VAE',
+  description: { zh: 'Wan 2.1 Alpha 的 RGB 通道 VAE', en: 'RGB-channel VAE for Wan 2.1 Alpha' },
   version: wanAlpha21VaeRgbChannelVersion,
   versions: [wanAlpha21VaeRgbChannelVersion],
 }
@@ -7622,7 +7640,7 @@ const byt5SmallGlyphxlFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/Image_capybara_v0_1_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged',
-  description: 'ByT5-small 字形/文本渲染编码器, HunyuanVideo 1.5 双 CLIP 之一 (HunyuanImage 2.1 同样使用)',
+  description: { zh: 'ByT5-small 字形/文本渲染编码器, HunyuanVideo 1.5 双 CLIP 之一 (HunyuanImage 2.1 同样使用)', en: 'ByT5-small glyph/text-rendering encoder, one of HunyuanVideo 1.5\'s dual CLIPs (also used by HunyuanImage 2.1)' },
   version: byt5SmallGlyphxlFp16Version,
   versions: [byt5SmallGlyphxlFp16Version],
 }
@@ -7658,7 +7676,7 @@ const clipGHidreamModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_e1_1-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'CLIP-G 文本编码器, HiDream I1 四编码器之一',
+  description: { zh: 'CLIP-G 文本编码器, HiDream I1 四编码器之一', en: 'CLIP-G text encoder, one of HiDream I1\'s four encoders' },
   version: clipGHidreamVersion,
   versions: [clipGHidreamVersion],
 }
@@ -7694,7 +7712,7 @@ const clipLHidreamModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_e1_1-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'CLIP-L 文本编码器, HiDream I1 四编码器之一',
+  description: { zh: 'CLIP-L 文本编码器, HiDream I1 四编码器之一', en: 'CLIP-L text encoder, one of HiDream I1\'s four encoders' },
   version: clipLHidreamVersion,
   versions: [clipLHidreamVersion],
 }
@@ -7730,7 +7748,7 @@ const ernieImagePromptEnhancerModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ernie_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ERNIE-Image',
-  description: 'ERNIE-Image 提示词增强文本编码器',
+  description: { zh: 'ERNIE-Image 提示词增强文本编码器', en: 'ERNIE-Image prompt-enhancement text encoder' },
   version: ernieImagePromptEnhancerVersion,
   versions: [ernieImagePromptEnhancerVersion],
 }
@@ -7766,7 +7784,7 @@ const gemma4E4bItFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_hidream_o1-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/gemma-4',
-  description: 'Gemma-4 E4B 指令文本编码器, HiDream O1 使用',
+  description: { zh: 'Gemma-4 E4B 指令文本编码器, HiDream O1 使用', en: 'Gemma-4 E4B instruction text encoder, used by HiDream O1' },
   version: gemma4E4bItFp8ScaledVersion,
   versions: [gemma4E4bItFp8ScaledVersion],
 }
@@ -7802,7 +7820,7 @@ const gemma22bItElmBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_pixeldit_t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/PixelDiT',
-  description: 'Gemma-2-2B + ELM 文本编码器, NVIDIA PixelDiT 使用',
+  description: { zh: 'Gemma-2-2B + ELM 文本编码器, NVIDIA PixelDiT 使用', en: 'Gemma-2-2B + ELM text encoder, used by NVIDIA PixelDiT' },
   version: gemma22bItElmBf16Version,
   versions: [gemma22bItElmBf16Version],
 }
@@ -7838,7 +7856,7 @@ const gemma22bItElmFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/utility_pid_latent_upscale_dit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/PixelDiT',
-  description: 'Gemma-2-2B + ELM FP8 文本编码器, NVIDIA PixelDiT 使用',
+  description: { zh: 'Gemma-2-2B + ELM FP8 文本编码器, NVIDIA PixelDiT 使用', en: 'Gemma-2-2B + ELM FP8 text encoder, used by NVIDIA PixelDiT' },
   version: gemma22bItElmFp8ScaledVersion,
   versions: [gemma22bItElmFp8ScaledVersion],
 }
@@ -7874,7 +7892,7 @@ const gemma312BItModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_lora_googly_eyes-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2',
-  description: 'Gemma-3-12B 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)',
+  description: { zh: 'Gemma-3-12B 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)', en: 'Gemma-3-12B instruction text encoder for LTX-2 19B (shared with LTX-2.3)' },
   version: gemma312BItVersion,
   versions: [gemma312BItVersion],
 }
@@ -7910,7 +7928,7 @@ const gemma312BItFp4MixedModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_image_speech_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2',
-  description: 'Gemma-3-12B FP4 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)',
+  description: { zh: 'Gemma-3-12B FP4 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)', en: 'Gemma-3-12B FP4 instruction text encoder for LTX-2 19B (shared with LTX-2.3)' },
   version: gemma312BItFp4MixedVersion,
   versions: [gemma312BItFp4MixedVersion],
 }
@@ -7946,7 +7964,7 @@ const gemma312BItFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx_2_audio_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ltx-2',
-  description: 'Gemma-3-12B FP8 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)',
+  description: { zh: 'Gemma-3-12B FP8 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)', en: 'Gemma-3-12B FP8 instruction text encoder for LTX-2 19B (shared with LTX-2.3)' },
   version: gemma312BItFp8ScaledVersion,
   versions: [gemma312BItFp8ScaledVersion],
 }
@@ -7982,7 +8000,7 @@ const gemma34bItBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_newbieimage_exp0_1-t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/NewBie-image-Exp0.1_repackaged',
-  description: 'Gemma-3-4B 文本编码器, NewBie-Image Exp0.1 (Lumina-Image 2.0 系) 使用',
+  description: { zh: 'Gemma-3-4B 文本编码器, NewBie-Image Exp0.1 (Lumina-Image 2.0 系) 使用', en: 'Gemma-3-4B text encoder, used by NewBie-Image Exp0.1 (Lumina-Image 2.0 family)' },
   version: gemma34bItBf16Version,
   versions: [gemma34bItBf16Version],
 }
@@ -8018,7 +8036,7 @@ const gptOss20bNvfp4Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_lens_t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Lens',
-  description: 'GPT-OSS-20B NVFP4 文本编码器, Microsoft Lens 使用',
+  description: { zh: 'GPT-OSS-20B NVFP4 文本编码器, Microsoft Lens 使用', en: 'GPT-OSS-20B NVFP4 text encoder, used by Microsoft Lens' },
   version: gptOss20bNvfp4Version,
   versions: [gptOss20bNvfp4Version],
 }
@@ -8054,7 +8072,7 @@ const jinaClipV2Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_newbieimage_exp0_1-t2i-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/NewBie-image-Exp0.1_repackaged',
-  description: 'Jina-CLIP-v2 编码器, NewBie-Image Exp0.1 双编码器之一',
+  description: { zh: 'Jina-CLIP-v2 编码器, NewBie-Image Exp0.1 双编码器之一', en: 'Jina-CLIP-v2 encoder, one of NewBie-Image Exp0.1\'s dual encoders' },
   version: jinaClipV2Bf16Version,
   versions: [jinaClipV2Bf16Version],
 }
@@ -8090,7 +8108,7 @@ const llama318bInstructFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hidream_e1_1-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI',
-  description: 'Llama-3.1-8B 指令文本编码器, HiDream I1 四编码器之一',
+  description: { zh: 'Llama-3.1-8B 指令文本编码器, HiDream I1 四编码器之一', en: 'Llama-3.1-8B instruction text encoder, one of HiDream I1\'s four encoders' },
   version: llama318bInstructFp8ScaledVersion,
   versions: [llama318bInstructFp8ScaledVersion],
 }
@@ -8126,7 +8144,7 @@ const llavaLlama3Fp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/hunyuan_video_text_to_video-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanVideo_repackaged',
-  description: 'LLaVA-Llama3 多模态文本编码器, HunyuanVideo 2.0 双 CLIP 之一',
+  description: { zh: 'LLaVA-Llama3 多模态文本编码器, HunyuanVideo 2.0 双 CLIP 之一', en: 'LLaVA-Llama3 multimodal text encoder, one of HunyuanVideo 2.0\'s dual CLIPs' },
   version: llavaLlama3Fp8ScaledVersion,
   versions: [llavaLlama3Fp8ScaledVersion],
 }
@@ -8162,7 +8180,7 @@ const ltx219bEmbeddingsConnectorDistillBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx_2_audio_to_video-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/LTXV2_comfy',
-  description: 'LTX-2 19B 蒸馏版 embeddings 连接器 (Gemma-3 嵌入转 LTX 格式)',
+  description: { zh: 'LTX-2 19B 蒸馏版 embeddings 连接器 (Gemma-3 嵌入转 LTX 格式)', en: 'LTX-2 19B distilled embeddings connector (converts Gemma-3 embeddings to LTX format)' },
   version: ltx219bEmbeddingsConnectorDistillBf16Version,
   versions: [ltx219bEmbeddingsConnectorDistillBf16Version],
 }
@@ -8198,7 +8216,7 @@ const ltx23TextProjectionBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template_ltx2_3_obscura_remova_lora_remove_object_from_video-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/LTX2.3_comfy',
-  description: 'LTX-2.3 文本投影模块 (Gemma-3 嵌入转 LTX 2.3 格式)',
+  description: { zh: 'LTX-2.3 文本投影模块 (Gemma-3 嵌入转 LTX 2.3 格式)', en: 'LTX-2.3 text projection module (converts Gemma-3 embeddings to LTX 2.3 format)' },
   version: ltx23TextProjectionBf16Version,
   versions: [ltx23TextProjectionBf16Version],
 }
@@ -8234,7 +8252,7 @@ const ministral33bModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ernie_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ERNIE-Image',
-  description: 'Ministral-3-3B 文本编码器, ERNIE-Image 提示理解使用',
+  description: { zh: 'Ministral-3-3B 文本编码器, ERNIE-Image 提示理解使用', en: 'Ministral-3-3B text encoder, used by ERNIE-Image for prompt understanding' },
   version: ministral33bVersion,
   versions: [ministral33bVersion],
 }
@@ -8270,7 +8288,7 @@ const mistral3SmallFlux2Bf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-dev',
-  description: 'Mistral-3-Small 文本编码器, Flux.2 Dev 使用',
+  description: { zh: 'Mistral-3-Small 文本编码器, Flux.2 Dev 使用', en: 'Mistral-3-Small text encoder, used by Flux.2 Dev' },
   version: mistral3SmallFlux2Bf16Version,
   versions: [mistral3SmallFlux2Bf16Version],
 }
@@ -8306,7 +8324,7 @@ const mistral3SmallFlux2Fp8Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_fp8-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-dev',
-  description: 'Mistral-3-Small FP8 文本编码器, Flux.2 Dev 使用',
+  description: { zh: 'Mistral-3-Small FP8 文本编码器, Flux.2 Dev 使用', en: 'Mistral-3-Small FP8 text encoder, used by Flux.2 Dev' },
   version: mistral3SmallFlux2Fp8Version,
   versions: [mistral3SmallFlux2Fp8Version],
 }
@@ -8342,7 +8360,7 @@ const ovis25Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ovis_text_to_image-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Ovis-Image',
-  description: 'Ovis 2.5 多模态文本编码器, Ovis-Image 使用',
+  description: { zh: 'Ovis 2.5 多模态文本编码器, Ovis-Image 使用', en: 'Ovis 2.5 multimodal text encoder, used by Ovis-Image' },
   version: ovis25Version,
   versions: [ovis25Version],
 }
@@ -8378,7 +8396,7 @@ const qwen352bBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_stable_audio_3_medium-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen3.5',
-  description: 'Qwen3.5-2B LLM 文本模型 (图像描述/提示词反推等 LLM 用途)',
+  description: { zh: 'Qwen3.5-2B LLM 文本模型 (图像描述/提示词反推等 LLM 用途)', en: 'Qwen3.5-2B LLM text model (image captioning, prompt interrogation and other LLM uses)' },
   version: qwen352bBf16Version,
   versions: [qwen352bBf16Version],
 }
@@ -8414,7 +8432,7 @@ const qwen354bBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/llm_qwen3_5_text_gen-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen3.5',
-  description: 'Qwen3.5-4B LLM 文本模型 (图像描述/提示词反推等 LLM 用途)',
+  description: { zh: 'Qwen3.5-4B LLM 文本模型 (图像描述/提示词反推等 LLM 用途)', en: 'Qwen3.5-4B LLM text model (image captioning, prompt interrogation and other LLM uses)' },
   version: qwen354bBf16Version,
   versions: [qwen354bBf16Version],
 }
@@ -8450,7 +8468,7 @@ const qwen06bAce15Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_ace_step1_5_xl_base-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'Qwen-0.6B 文本编码器, AceStep 1.5 音频模型使用',
+  description: { zh: 'Qwen-0.6B 文本编码器, AceStep 1.5 音频模型使用', en: 'Qwen-0.6B text encoder, used by the ACE-Step 1.5 audio model' },
   version: qwen06bAce15Version,
   versions: [qwen06bAce15Version],
 }
@@ -8486,7 +8504,7 @@ const qwen17bAce15Model: HuggingFaceModel = {
   images: [],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'Qwen-1.7B 文本编码器, AceStep 1.5 音频模型使用',
+  description: { zh: 'Qwen-1.7B 文本编码器, AceStep 1.5 音频模型使用', en: 'Qwen-1.7B text encoder, used by the ACE-Step 1.5 audio model' },
   version: qwen17bAce15Version,
   versions: [qwen17bAce15Version],
 }
@@ -8522,7 +8540,7 @@ const qwen25Vl7bModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/Image_capybara_v0_1_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/HunyuanImage_2.1_ComfyUI',
-  description: 'Qwen2.5-VL-7B 多模态文本编码器, HunyuanImage 2.1 使用 (Qwen-Image / HunyuanVideo 1.5 共用)',
+  description: { zh: 'Qwen2.5-VL-7B 多模态文本编码器, HunyuanImage 2.1 使用 (Qwen-Image / HunyuanVideo 1.5 共用)', en: 'Qwen2.5-VL-7B multimodal text encoder for HunyuanImage 2.1 (shared with Qwen-Image / HunyuanVideo 1.5)' },
   version: qwen25Vl7bVersion,
   versions: [qwen25Vl7bVersion],
 }
@@ -8558,7 +8576,7 @@ const qwen25Vl7bFp8ScaledModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image-qwen_image_edit_2511_lora_inflation-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
-  description: 'Qwen2.5-VL-7B FP8 多模态文本编码器, Qwen-Image 使用 (HunyuanVideo 1.5 / HunyuanImage 2.1 共用)',
+  description: { zh: 'Qwen2.5-VL-7B FP8 多模态文本编码器, Qwen-Image 使用 (HunyuanVideo 1.5 / HunyuanImage 2.1 共用)', en: 'Qwen2.5-VL-7B FP8 multimodal text encoder for Qwen-Image (shared with HunyuanVideo 1.5 / HunyuanImage 2.1)' },
   version: qwen25Vl7bFp8ScaledVersion,
   versions: [qwen25Vl7bFp8ScaledVersion],
 }
@@ -8594,7 +8612,7 @@ const qwen25VlFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_omnigen2_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Omnigen2_ComfyUI_repackaged',
-  description: 'Qwen2.5-VL 文本编码器, OmniGen2 使用',
+  description: { zh: 'Qwen2.5-VL 文本编码器, OmniGen2 使用', en: 'Qwen2.5-VL text encoder, used by OmniGen2' },
   version: qwen25VlFp16Version,
   versions: [qwen25VlFp16Version],
 }
@@ -8630,7 +8648,7 @@ const qwen306bBaseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_base_v1-1.webp', type: 'image' }],
   user: { username: 'circlestone-labs' },
   sourceUrl: 'https://huggingface.co/circlestone-labs/Anima',
-  description: 'Qwen3-0.6B 文本编码器, Anima 使用',
+  description: { zh: 'Qwen3-0.6B 文本编码器, Anima 使用', en: 'Qwen3-0.6B text encoder, used by Anima' },
   version: qwen306bBaseVersion,
   versions: [qwen306bBaseVersion],
 }
@@ -8666,7 +8684,7 @@ const qwen34bModel: HuggingFaceModel = {
   images: [],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/z_image_turbo',
-  description: 'Qwen3-4B 文本编码器, Z-Image Turbo 使用 (Flux.2 Klein 4B 共用同一 Qwen3-4B)',
+  description: { zh: 'Qwen3-4B 文本编码器, Z-Image Turbo 使用 (Flux.2 Klein 4B 共用同一 Qwen3-4B)', en: 'Qwen3-4B text encoder, used by Z-Image Turbo (Flux.2 Klein 4B shares the same Qwen3-4B)' },
   version: qwen34bVersion,
   versions: [qwen34bVersion],
 }
@@ -8702,7 +8720,7 @@ const qwen38bModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_doc_workbox_klein_9b_image_extend-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b',
-  description: 'Qwen3-8B 文本编码器, Flux.2 Klein 9B 使用',
+  description: { zh: 'Qwen3-8B 文本编码器, Flux.2 Klein 9B 使用', en: 'Qwen3-8B text encoder, used by Flux.2 Klein 9B' },
   version: qwen38bVersion,
   versions: [qwen38bVersion],
 }
@@ -8738,7 +8756,7 @@ const qwen38bFp8mixedModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_9b_kv_image_edit-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/flux2-klein-9B',
-  description: 'Qwen3-8B FP8 文本编码器, Flux.2 Klein 9B 使用',
+  description: { zh: 'Qwen3-8B FP8 文本编码器, Flux.2 Klein 9B 使用', en: 'Qwen3-8B FP8 text encoder, used by Flux.2 Klein 9B' },
   version: qwen38bFp8mixedVersion,
   versions: [qwen38bFp8mixedVersion],
 }
@@ -8774,7 +8792,7 @@ const qwen4bAce15Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_ace_step1_5_xl_base-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files',
-  description: 'Qwen-4B 文本编码器, AceStep 1.5 音频模型使用',
+  description: { zh: 'Qwen-4B 文本编码器, AceStep 1.5 音频模型使用', en: 'Qwen-4B text encoder, used by the ACE-Step 1.5 audio model' },
   version: qwen4bAce15Version,
   versions: [qwen4bAce15Version],
 }
@@ -8810,7 +8828,7 @@ const t5BaseModel: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_stable_audio_example-1.webp', type: 'image' }],
   user: { username: 'ComfyUI-Wiki' },
   sourceUrl: 'https://huggingface.co/ComfyUI-Wiki/t5-base',
-  description: 'T5-Base 通用文本编码器, Stable Audio Open 1.0 等音频工作流使用',
+  description: { zh: 'T5-Base 通用文本编码器, Stable Audio Open 1.0 等音频工作流使用', en: 'T5-Base general text encoder, used by Stable Audio Open 1.0 and other audio workflows' },
   version: t5BaseVersion,
   versions: [t5BaseVersion],
 }
@@ -8846,7 +8864,7 @@ const t5gemmaBBUl2Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/audio_stable_audio_3_medium-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/stable-audio-3',
-  description: 'T5+Gemma UL2 文本编码器, Stable Audio 3.0 使用',
+  description: { zh: 'T5+Gemma UL2 文本编码器, Stable Audio 3.0 使用', en: 'T5+Gemma UL2 text encoder, used by Stable Audio 3.0' },
   version: t5gemmaBBUl2Version,
   versions: [t5gemmaBBUl2Version],
 }
@@ -8882,7 +8900,7 @@ const t5xxlFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/flux1_krea_dev-1.webp', type: 'image' }],
   user: { username: 'comfyanonymous' },
   sourceUrl: 'https://huggingface.co/comfyanonymous/flux_text_encoders',
-  description: 'T5-XXL 文本编码器, Flux 1 双 CLIP 之一 (Chroma / HiDream 共用)',
+  description: { zh: 'T5-XXL 文本编码器, Flux 1 双 CLIP 之一 (Chroma / HiDream 共用)', en: 'T5-XXL text encoder, one of Flux 1\'s dual CLIPs (shared with Chroma / HiDream)' },
   version: t5xxlFp16Version,
   versions: [t5xxlFp16Version],
 }
@@ -8918,7 +8936,7 @@ const umt5XxlEncBf16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/template-Animation_Trajectory_Control_Wan_ATI-1.webp', type: 'image' }],
   user: { username: 'Kijai' },
   sourceUrl: 'https://huggingface.co/Kijai/WanVideo_comfy',
-  description: 'UM-T5-XXL 文本编码器, Wan 2.1/2.2 全系使用',
+  description: { zh: 'UM-T5-XXL 文本编码器, Wan 2.1/2.2 全系使用', en: 'UM-T5-XXL text encoder, used across Wan 2.1/2.2' },
   version: umt5XxlEncBf16Version,
   versions: [umt5XxlEncBf16Version],
 }
@@ -8954,7 +8972,7 @@ const umt5XxlFp16Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/templates_product_scene_transformation-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged',
-  description: 'UM-T5-XXL FP16 文本编码器, Wan 2.1/2.2 全系使用',
+  description: { zh: 'UM-T5-XXL FP16 文本编码器, Wan 2.1/2.2 全系使用', en: 'UM-T5-XXL FP16 text encoder, used across Wan 2.1/2.2' },
   version: umt5XxlFp16Version,
   versions: [umt5XxlFp16Version],
 }

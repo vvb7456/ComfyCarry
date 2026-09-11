@@ -1,5 +1,7 @@
 import type { ModelMeta, ModelMetaImage } from '@/types/models'
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
+import { localizedText, type LocalizedText } from '@/config/huggingface-models'
+import i18n from '@/i18n/vue-i18n'
 
 // ── 远程模型 → ModelMeta 转换 ─────────────────────────────────────────────
 // CivitAI 标签页与 Hugging Face 标签页共用的展示模型转换逻辑。两个标签页都把
@@ -80,11 +82,14 @@ export function remoteHitToMeta(h: CivitaiHit, opts?: RemoteMetaOptions): ModelM
     channel,
   }
   if (channel === 'huggingface') {
-    const hfHit = h as CivitaiHit & { sourceUrl?: string; description?: string }
+    const hfHit = h as CivitaiHit & { sourceUrl?: string; description?: LocalizedText }
     const hfVersion = h.version as { file?: { sizeBytes?: number; filename?: string } } | undefined
     meta.sourceUrl = opts?.sourceUrl ?? hfHit.sourceUrl
     meta.sourceLabel = 'Hugging Face'
+    // 白名单描述是双语字段, 按当前界面语言取值 (不接入 i18n locale)
     meta.description = hfHit.description
+      ? localizedText(hfHit.description, String(i18n.global.locale.value))
+      : undefined
     meta.sizeBytes = hfVersion?.file?.sizeBytes
     meta.filename = hfVersion?.file?.filename
   } else {
