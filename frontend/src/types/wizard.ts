@@ -138,7 +138,7 @@ export interface DeployDoneEvent {
 
 export interface DeployLogEvent {
   type: 'log'
-  level: 'info' | 'warn' | 'error' | 'output'
+  level: 'info' | 'warn' | 'error' | 'success' | 'output'
   msg: string
   time?: string
 }

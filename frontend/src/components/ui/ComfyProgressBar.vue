@@ -4,9 +4,9 @@
  *
  * Two modes:
  *   1. Active (state provided):
- *      [ ●  ⚡ 正在生成   3/12 KSampler   15/20 (75%)   0:24 ]
+ *      [ ● 正在生成   3/12 KSampler   15/20 (75%)   0:24 ]
  *   2. Idle (state is null):
- *      [ ⏳ 空闲 ]   — placeholder that reserves layout height
+ *      [ 空闲 ]   — placeholder that reserves layout height
  *
  * Props accept ExecState + elapsed directly from useExecTracker().
  * When state is null, renders idle placeholder to prevent layout shifts.

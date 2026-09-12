@@ -235,6 +235,10 @@ function handleScroll() {
   color: var(--amber);
 }
 
+.log-line.log-success {
+  color: var(--green);
+}
+
 .log-line.log-info {
   color: var(--ac);
 }

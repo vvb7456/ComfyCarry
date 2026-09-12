@@ -93,7 +93,7 @@ done <<< "$ALL_ICONS"
 UNICODES="${UNICODES#,}"
 
 if [ -n "$MISSING" ]; then
-    echo "  ⚠️ Missing codepoints for:${MISSING}"
+    echo "  Missing codepoints for:${MISSING}"
 fi
 
 ICON_COUNT=$(echo "$ALL_ICONS" | wc -l)

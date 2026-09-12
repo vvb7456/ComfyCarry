@@ -30,18 +30,18 @@ cd "$(dirname "$0")"
 
 # 检查必要文件
 if [ ! -f "${DOCKERFILE}" ]; then
-    echo "❌ ${DOCKERFILE} 不存在"
+    echo "${DOCKERFILE} 不存在"
     exit 1
 fi
 
 if [ ! -f "wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl" ]; then
-    echo "❌ FA2 wheel 不存在: wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl"
+    echo "FA2 wheel 不存在: wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl"
     exit 1
 fi
 
 SA2_COUNT=$(ls wheels/sageattention-*.whl 2>/dev/null | wc -l)
 if [ "$SA2_COUNT" -lt 6 ]; then
-    echo "❌ SA2 wheel 不足 (需要 6 个, 找到 $SA2_COUNT 个)"
+    echo "SA2 wheel 不足 (需要 6 个, 找到 $SA2_COUNT 个)"
     exit 1
 fi
 
@@ -62,7 +62,7 @@ DOCKER_BUILDKIT=1 docker build \
 
 echo ""
 echo "================================================="
-echo "  ✅ 构建完成: ${FULL_IMAGE_NAME}"
+echo "  构建完成: ${FULL_IMAGE_NAME}"
 echo ""
 echo "  镜像大小:"
 docker images "${FULL_IMAGE_NAME}" --format "  {{.Size}}"

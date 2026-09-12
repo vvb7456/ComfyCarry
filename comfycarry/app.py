@@ -185,7 +185,7 @@ def main():
     civitai_token = os.environ.get("CIVITAI_TOKEN", "")
     if civitai_token and not _get_api_key():
         CONFIG_FILE.write_text(json.dumps({"api_key": civitai_token}))
-        print(f"  📝 已从环境变量 CIVITAI_TOKEN 导入 API Key")
+        print(f"  已从环境变量 CIVITAI_TOKEN 导入 API Key")
 
     # 启动系统指标采集守护线程 (pynvml + psutil, 2s 间隔)
     system_monitor.start()
@@ -212,13 +212,13 @@ def main():
             client = PublicTunnelClient()
             result = client.restore()
             if result.get("ok"):
-                print(f"  🌐 公共 Tunnel 已恢复: {result.get('random_id', '?')}")
+                print(f"  公共 Tunnel 已恢复: {result.get('random_id', '?')}")
             else:
                 # 启动日志走控制台, 不经前端翻译 —— 这里打 key 本身就够定位
-                print(f"  ⚠️  公共 Tunnel 恢复失败: "
+                print(f"  公共 Tunnel 恢复失败: "
                       f"{result.get('error_key') or result.get('error', '未知')}")
         except Exception as e:
-            print(f"  ⚠️  公共 Tunnel 恢复失败: {e}")
+            print(f"  公共 Tunnel 恢复失败: {e}")
 
     # 启动 watch worker
     rules = _load_sync_rules()
@@ -226,19 +226,19 @@ def main():
                    if r.get("trigger") == "watch" and r.get("enabled", True)]
     if watch_rules:
         start_sync_worker()
-        print(f"  ☁️  Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
+        print(f"  Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
 
     # 启动 Companion WebDAV serve (rclone serve webdav, 经 Flask 反代 /api/companion/dav 暴露)
     try:
         from .services import companion_serve
         from .config import COMPANION_DAV_PORT as _dav_port
         if companion_serve.start():
-            print(f"  📡  Companion WebDAV serve 已启动 (:{_dav_port}/dav, 反代 /api/companion/dav)")
+            print(f"  Companion WebDAV serve 已启动 (:{_dav_port}/dav, 反代 /api/companion/dav)")
     except Exception as e:
-        print(f"  ⚠️  Companion WebDAV serve 启动失败: {e}")
+        print(f"  Companion WebDAV serve 启动失败: {e}")
 
     print(f"\n{'='*50}")
-    print(f"  🖥️  ComfyCarry v2.4 (Modular)")
+    print(f"  ComfyCarry v2.4 (Modular)")
     print(f"  访问地址: http://localhost:{port}")
     print(f"  ComfyUI:  {cfg.COMFYUI_DIR}")
     print(f"{'='*50}\n")

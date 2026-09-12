@@ -68,6 +68,7 @@ export function useLogStream(opts: LogStreamOptions) {
     if (!level) return ''
     if (level === 'error') return 'log-error'
     if (level === 'warn' || level === 'warning') return 'log-warn'
+    if (level === 'success') return 'log-success'
     if (level === 'info') return 'log-info'
     return ''
   }

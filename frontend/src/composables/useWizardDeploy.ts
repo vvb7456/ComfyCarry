@@ -126,8 +126,9 @@ export function useWizardDeploy() {
         const prefix = data.time ? `${data.time}  ` : ''
         const levelClass = data.level === 'error' ? 'log-error'
           : data.level === 'warn' ? 'log-warn'
-            : data.level === 'output' ? ''
-              : ''
+            : data.level === 'success' ? 'log-success'
+              : data.level === 'output' ? ''
+                : ''
         logLines.value.push({
           text: `${prefix}${data.msg}`,
           className: levelClass || undefined,

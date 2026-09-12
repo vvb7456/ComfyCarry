@@ -37,7 +37,7 @@ fi
 if [ -f /tmp/bootstrap.sh ]; then
     bash /tmp/bootstrap.sh
 else
-    echo "⚠️ bootstrap.sh 不可用, 请手动运行:"
+    echo "bootstrap.sh 不可用, 请手动运行:"
     echo "  wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash"
 fi
 

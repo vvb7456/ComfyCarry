@@ -312,7 +312,7 @@ def _run_sync_rule_inner(rule):
                 parts.append(_fmt_bytes(byt))
             if spd:
                 parts.append(f"{_fmt_bytes(spd)}/s")
-            _sync_log("rclone_output", {"text": f"📊 {name}: {' · '.join(parts)}"})
+            _sync_log("rclone_output", {"text": f"{name}: {' · '.join(parts)}"})
 
         if proc.returncode == 0:
             _sync_log("rule_done", {"name": name}, "success")

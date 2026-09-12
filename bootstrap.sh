@@ -27,7 +27,7 @@ touch ~/.no_auto_tmux 2>/dev/null || true
 
 # ── 预构建镜像校验 ──
 if [ ! -f /opt/.comfycarry-prebuilt ]; then
-    echo "  ⚠️  未检测到 ComfyCarry 预构建镜像"
+    echo "  未检测到 ComfyCarry 预构建镜像"
     echo "  请使用官方预构建镜像: erocraft/comfycarry"
 fi
 PYTHON_BIN=python3
@@ -88,14 +88,14 @@ except Exception:
         EXTRACTED="${TMP_EXTRACT}/comfycarry"
         if [ -d "$EXTRACTED" ]; then
             cp -r "$EXTRACTED/." "$DASHBOARD_DIR/"
-            echo "  ✅ ComfyCarry 文件已更新"
+            echo "  ComfyCarry 文件已更新"
         else
-            echo "  ⚠️ 部署包结构异常, 请检查 Release asset"
+            echo "  部署包结构异常, 请检查 Release asset"
         fi
 
         rm -rf "$TMP_TAR" "$TMP_EXTRACT"
     else
-        echo "  ⚠️ 未找到 latest Release (${RELEASE_ASSET}), 请检查是否已发布 Release"
+        echo "  未找到 latest Release (${RELEASE_ASSET}), 请检查是否已发布 Release"
     fi
 else
     echo "  -> ComfyCarry 文件已存在，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"
@@ -144,12 +144,12 @@ try:
     print(f'https://{mgr.subdomain}.{mgr.domain}')
 except Exception as e:
     print('', file=sys.stderr)
-    print(f'⚠️ Tunnel 启动失败: {e}', file=sys.stderr)
+    print(f'Tunnel 启动失败: {e}', file=sys.stderr)
 " 2>/dev/null) || true
     if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
-        echo "  ✅ Tunnel 已启动"
+        echo "  Tunnel 已启动"
     else
-        echo "  ⚠️ Tunnel 启动失败"
+        echo "  Tunnel 启动失败"
     fi
 elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
     echo "  -> 检测到 PUBLIC_TUNNEL, 正在注册公共 Tunnel..."
@@ -166,14 +166,14 @@ try:
         # 输出 dashboard URL
         print(urls.get('dashboard', ''))
     else:
-        print(f'⚠️ {result.get(\"error\", \"未知\")}', file=sys.stderr)
+        print(f'{result.get(\"error\", \"未知\")}', file=sys.stderr)
 except Exception as e:
-    print(f'⚠️ {e}', file=sys.stderr)
+    print(f'{e}', file=sys.stderr)
 " 2>/dev/null) || true
     if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
-        echo "  ✅ 公共 Tunnel 已启用"
+        echo "  公共 Tunnel 已启用"
     else
-        echo "  ⚠️ 公共 Tunnel 启用失败"
+        echo "  公共 Tunnel 启用失败"
     fi
 fi
 
@@ -189,7 +189,7 @@ if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
         -- "$DASHBOARD_DIR/workspace_manager.py" 5000
     pm2 save 2>/dev/null || true
 else
-    echo "❌ ComfyCarry 文件下载失败，请检查网络连接"
+    echo "ComfyCarry 文件下载失败，请检查网络连接"
     exit 1
 fi
 
@@ -202,11 +202,11 @@ pm2 start jupyter-lab --name jupyter \
     --ServerApp.root_dir=/workspace \
     --ServerApp.language=zh_CN
 pm2 save 2>/dev/null || true
-echo "  ✅ JupyterLab 已启动 (port 8888)"
+echo "  JupyterLab 已启动 (port 8888)"
 
 echo ""
 echo "================================================="
-echo "  ✅ ComfyCarry 已启动！"
+echo "  ComfyCarry 已启动！"
 echo ""
 if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
     echo "  → $_TUNNEL_DASHBOARD_URL"

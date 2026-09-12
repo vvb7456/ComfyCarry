@@ -146,7 +146,7 @@ def _install_sa2(py, cuda_cap):
             major = int(cuda_cap.split(".")[0])
             minor = int(cuda_cap.split(".")[1]) if "." in cuda_cap else 0
         except (ValueError, IndexError):
-            _deploy_log(f"⚠️ 无法解析 CUDA Cap: {cuda_cap}", "warn")
+            _deploy_log(f"无法解析 CUDA Cap: {cuda_cap}", "warn")
             return
         if major == 8:
             wheel_suffix = "sm80" if minor <= 0 else "sm86" if minor <= 6 else "sm89"
@@ -158,12 +158,12 @@ def _install_sa2(py, cuda_cap):
             wheel_suffix = "sm120"
 
     if not wheel_suffix:
-        _deploy_log(f"⚠️ 未知 GPU 架构 {cuda_cap}, 跳过 SA2", "warn")
+        _deploy_log(f"未知 GPU 架构 {cuda_cap}, 跳过 SA2", "warn")
         return
 
     whl_src = Path(f"/opt/wheels/sa2/sageattention-2.2.0-cp312-cp312-linux_x86_64_{wheel_suffix}.whl")
     if not whl_src.exists():
-        _deploy_log(f"⚠️ SA2 wheel 不存在: {whl_src}", "warn")
+        _deploy_log(f"SA2 wheel 不存在: {whl_src}", "warn")
         return
 
     # wheel 文件名必须符合 PEP 427, 复制后改名为标准格式
@@ -174,7 +174,7 @@ def _install_sa2(py, cuda_cap):
     _deploy_exec(f'{py} -m pip install "{tmp_whl}" --no-deps --no-cache-dir',
                  label=f"pip install SA2-{wheel_suffix}")
     _deploy_exec(f'rm -f "{tmp_whl}"')
-    _deploy_log(f"✅ SageAttention-2 ({wheel_suffix}) 安装完成")
+    _deploy_log(f"SageAttention-2 ({wheel_suffix}) 安装完成", "success")
 
 
 def _deploy_step(name):
@@ -311,7 +311,7 @@ def _run_deploy(config):
         _step_start_services(config, cfg, PY)
 
     except Exception as e:
-        _deploy_log(f"❌ 部署失败: {e}", "error")
+        _deploy_log(f"部署失败: {e}", "error")
         import traceback
         _deploy_log(traceback.format_exc(), "error")
         try:
@@ -363,7 +363,7 @@ def _step_tunnel(config):
         # 已由 bootstrap 或之前部署启用时跳过
         from comfycarry.config import get_config as _gc_rt
         if _gc_rt("tunnel_mode", "") == "public":
-            _deploy_log("✅ 公共 Tunnel 已通过环境变量启用，跳过重复配置")
+            _deploy_log("公共 Tunnel 已通过环境变量启用，跳过重复配置", "success")
             return
         try:
             from comfycarry.services.public_tunnel import PublicTunnelClient, PublicTunnelError
@@ -374,14 +374,14 @@ def _step_tunnel(config):
                 _sc("public_tunnel_subdomain", pub_subdomain)
             client = PublicTunnelClient()
             result = client.register()
-            _deploy_log(f"✅ 公共 Tunnel 已启用: {result.get('random_id', '?')}")
+            _deploy_log(f"公共 Tunnel 已启用: {result.get('random_id', '?')}", "success")
             urls = result.get("urls", {})
             for name, url in urls.items():
                 _deploy_log(f"  {name}: {url}")
         except PublicTunnelError as e:
-            _deploy_log(f"⚠️ 公共 Tunnel 启用失败: {e}", "warn")
+            _deploy_log(f"公共 Tunnel 启用失败: {e}", "warn")
         except Exception as e:
-            _deploy_log(f"⚠️ 公共 Tunnel 异常: {e}", "warn")
+            _deploy_log(f"公共 Tunnel 异常: {e}", "warn")
     elif cf_api_token and cf_domain:
         _deploy_step("setup_cf_tunnel")
         from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
@@ -393,7 +393,7 @@ def _step_tunnel(config):
         try:
             ok, info = mgr.validate_token()
             if not ok:
-                _deploy_log(f"⚠️ CF Token 问题: {info['message']}", "warn")
+                _deploy_log(f"CF Token 问题: {info['message']}", "warn")
             else:
                 _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
 
@@ -419,7 +419,7 @@ def _step_tunnel(config):
                 services.extend(custom_services)
 
                 result = mgr.ensure(services)
-                _deploy_log(f"✅ Tunnel 已就绪: {mgr.subdomain}.{cf_domain}")
+                _deploy_log(f"Tunnel 已就绪: {mgr.subdomain}.{cf_domain}", "success")
                 for name, url in result["urls"].items():
                     _deploy_log(f"  {name}: {url}")
 
@@ -430,16 +430,16 @@ def _step_tunnel(config):
 
                 # 启动 cloudflared (如已在运行则跳过, 避免断开 SSE)
                 if _is_cf_tunnel_online():
-                    _deploy_log("✅ cloudflared 已在运行，跳过重启 (ingress 已通过 API 更新)")
+                    _deploy_log("cloudflared 已在运行，跳过重启 (ingress 已通过 API 更新)", "success")
                 elif mgr.start_cloudflared(result["tunnel_token"]):
-                    _deploy_log("✅ cloudflared 已启动")
+                    _deploy_log("cloudflared 已启动", "success")
                 else:
-                    _deploy_log("⚠️ cloudflared 启动失败", "warn")
+                    _deploy_log("cloudflared 启动失败", "warn")
 
         except CFAPIError as e:
-            _deploy_log(f"⚠️ Tunnel 配置失败: {e}", "warn")
+            _deploy_log(f"Tunnel 配置失败: {e}", "warn")
         except Exception as e:
-            _deploy_log(f"⚠️ Tunnel 异常: {e}", "warn")
+            _deploy_log(f"Tunnel 异常: {e}", "warn")
     else:
         _deploy_step("setup_tunnel_skip")
 
@@ -487,9 +487,9 @@ def _step_ssh(config):
         if ok:
             # 重启结果以 helper 实际返回为准, 失败时末尾统一补一次重启
             sshd_restarted = bool(extra and extra.get("sshd_restarted"))
-            _deploy_log("✅ SSH Root 密码已同步面板密码")
+            _deploy_log("SSH Root 密码已同步面板密码", "success")
         else:
-            _deploy_log(f"⚠️ SSH 密码跟随设置失败 ({err['error_key']})", "warn")
+            _deploy_log(f"SSH 密码跟随设置失败 ({err['error_key']})", "warn")
 
     if ssh_keys and isinstance(ssh_keys, list):
         ak_file = os.path.expanduser("~/.ssh/authorized_keys")
@@ -514,13 +514,13 @@ def _step_ssh(config):
                     added += 1
         os.chmod(ak_file, 0o600)
         _sc2("ssh_keys", ssh_keys)
-        _deploy_log(f"✅ SSH 公钥已添加 ({added} 个新增, 共 {len(ssh_keys)} 个)")
+        _deploy_log(f"SSH 公钥已添加 ({added} 个新增, 共 {len(ssh_keys)} 个)", "success")
 
     # 重启 sshd 使配置生效 (跟随分支成功时内部已重启过, 不必重复)
     if not sshd_restarted:
         from ..routes.ssh import _do_restart_sshd
         _do_restart_sshd()
-    _deploy_log("✅ sshd 已重启")
+    _deploy_log("sshd 已重启", "success")
 
 
 def _step_check_pytorch(PY):
@@ -582,9 +582,9 @@ def _step_install_comfyui(PY):
     )
 
     if boot_ok:
-        _deploy_log("✅ ComfyUI 健康检查通过")
+        _deploy_log("ComfyUI 健康检查通过", "success")
     else:
-        _deploy_log("❌ ComfyUI 健康检查失败!", "error")
+        _deploy_log("ComfyUI 健康检查失败!", "error")
         try:
             err = Path("/tmp/comfy_boot.log").read_text(errors="ignore")[-500:]
             _deploy_log(f"最后日志: {err}", "error")
@@ -624,9 +624,9 @@ def _step_accelerators(config, PY):
         if cuda_cap:
             _install_sa2(PY, cuda_cap)
         else:
-            _deploy_log("⚠️ 未检测到 GPU, 跳过 SA2", "warn")
+            _deploy_log("未检测到 GPU, 跳过 SA2", "warn")
 
-    _deploy_log("✅ 加速组件安装完成")
+    _deploy_log("加速组件安装完成", "success")
     _mark_step_done("accelerators")
 
 
@@ -662,9 +662,9 @@ def _step_plugins(config, PY):
         if broadcast_dst.exists():
             shutil.rmtree(broadcast_dst)
         shutil.copytree(broadcast_src, broadcast_dst)
-        _deploy_log("✅ comfycarry_ws_broadcast 插件已安装")
+        _deploy_log("comfycarry_ws_broadcast 插件已安装", "success")
     else:
-        _deploy_log("⚠️ comfycarry_ws_broadcast 源目录不存在, 跳过")
+        _deploy_log("comfycarry_ws_broadcast 源目录不存在, 跳过", "warn")
 
 
 def _step_sync_assets(config):
@@ -688,7 +688,7 @@ def _step_sync_assets(config):
         if not (wr_name and wr_type):
             continue
         if not (_RCLONE_TOKEN_RE.match(wr_name) and _RCLONE_TOKEN_RE.match(wr_type)):
-            _deploy_log(f"⚠️ 跳过非法 Remote 名/类型: {wr_name!r} {wr_type!r}", "warn")
+            _deploy_log(f"跳过非法 Remote 名/类型: {wr_name!r} {wr_type!r}", "warn")
             continue
         # --non-interactive 必须: OAuth 类型 (onedrive/drive) 即使带了 token,
         # 交互模式也会进 authorize 流程在 127.0.0.1:53682 起 webserver 等回调
@@ -699,7 +699,7 @@ def _step_sync_assets(config):
                 continue
             # key 会作为独立 argv 元素, 但 "--flag=x" 形态会被 rclone 当选项解析
             if not _RCLONE_TOKEN_RE.match(str(k)):
-                _deploy_log(f"⚠️ 跳过非法参数名: {k!r}", "warn")
+                _deploy_log(f"跳过非法参数名: {k!r}", "warn")
                 continue
             cmd.append(f"{k}={v}")
         _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
@@ -742,8 +742,8 @@ def _step_sync_assets(config):
             # _run_sync_rule 返回 (ok, stats) —— 直接判元组恒为真, 失败会被吞掉
             ok, _stats = _run_sync_rule(rule)
             if not ok:
-                _deploy_log(f"⚠️ {name} 未完全成功, 继续", "warn")
-        _deploy_log("✅ 资产同步完成")
+                _deploy_log(f"{name} 未完全成功, 继续", "warn")
+        _deploy_log("资产同步完成", "success")
     else:
         _deploy_log("没有 deploy 同步规则, 跳过")
 
@@ -759,7 +759,7 @@ def _step_start_services(config, cfg, PY):
                    if r.get("trigger") == "watch" and r.get("enabled", True)]
     if watch_rules:
         start_sync_worker()
-        _deploy_log(f"✅ Sync Worker 已启动 ({len(watch_rules)} 条监控规则)")
+        _deploy_log(f"Sync Worker 已启动 ({len(watch_rules)} 条监控规则)", "success")
 
     civitai_token = config.get("civitai_token", "")
     if civitai_token:
@@ -780,7 +780,7 @@ def _step_start_services(config, cfg, PY):
         )
         fa2_ok = r.returncode == 0
         if not fa2_ok:
-            _deploy_log("⚠️ FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
+            _deploy_log("FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
     if want_sa2:
         r = subprocess.run(
             f'{PY} -c "import sageattention"',
@@ -788,7 +788,7 @@ def _step_start_services(config, cfg, PY):
         )
         sa2_ok = r.returncode == 0
         if not sa2_ok:
-            _deploy_log("⚠️ SageAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
+            _deploy_log("SageAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
     set_config("installed_fa2", fa2_ok)
     set_config("installed_sa2", sa2_ok)
 
@@ -849,7 +849,8 @@ def _step_start_services(config, cfg, PY):
 
     gpu_info = _detect_gpu_info()
     _deploy_log(
-        f"🚀 部署完成! GPU: {gpu_info.get('name', '?')} | "
-        f"CUDA: {gpu_info.get('cuda_cap', '?')}"
+        f"部署完成! GPU: {gpu_info.get('name', '?')} | "
+        f"CUDA: {gpu_info.get('cuda_cap', '?')}",
+        "success",
     )
     _deploy_log("请刷新页面进入 ComfyCarry")

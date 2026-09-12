@@ -168,7 +168,7 @@ RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f
         echo ">>> Installing: $req" && \
         echo "========================================" && \
         python3.12 -m pip install --constraint /tmp/torch-constraints.txt -r "$req" || \
-        echo "⚠️ PARTIAL FAILURE: $req"; \
+        echo "PARTIAL FAILURE: $req"; \
     done
 
 # =============================================================================
