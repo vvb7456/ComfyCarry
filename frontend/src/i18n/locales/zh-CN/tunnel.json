@@ -95,9 +95,50 @@
     "service_removed": "服务已移除"
   },
   "confirm": {
-    "remove_custom_service": "确定要移除自定义服务「{suffix}」吗？",
-    "stop_cloudflared": "确定要停止 cloudflared 吗？\n\n所有通过 Tunnel 的连接将断开。",
-    "restart_cloudflared": "确定要重启 cloudflared 吗？\n\n连接可能会短暂中断。"
+    "stop_cloudflared": {
+      "title": "停止 cloudflared",
+      "message": "所有通过 Tunnel 的连接将断开。"
+    },
+    "restart_cloudflared": {
+      "title": "重启 cloudflared",
+      "message": "当前连接将中断。"
+    },
+    "remove_service": {
+      "title": "移除自定义服务",
+      "message": "「{suffix}」的 Tunnel 映射将被移除。",
+      "button": "移除"
+    },
+    "apply_config": {
+      "title": "应用隧道配置",
+      "message": "将使用新参数重建 Tunnel 并重启 cloudflared。",
+      "button": "重建"
+    },
+    "off": {
+      "title": "关闭 Tunnel",
+      "message": "现有 Tunnel 与域名映射将被移除，此操作无法撤销。",
+      "button": "关闭 Tunnel"
+    },
+    "to_public": {
+      "title": "切换到公共 Tunnel",
+      "message": "当前自定义 Tunnel 与域名映射将被移除，此操作无法撤销。",
+      "button": "切换"
+    },
+    "to_custom": {
+      "title": "切换到自定义 Tunnel",
+      "message": "当前公共 Tunnel 将被释放，此操作无法撤销。",
+      "button": "切换"
+    },
+    "change_public_subdomain": {
+      "title": "更换公共子域名",
+      "message": "公共地址将从「{old}」更换为「{new}」。",
+      "button": "更换",
+      "auto": "自动分配"
+    },
+    "discard": {
+      "title": "放弃更改",
+      "message": "未保存的隧道设置将丢失。",
+      "button": "放弃更改"
+    }
   },
   "settings": {
     "title": "隧道设置",
@@ -131,13 +172,6 @@
     "applying": "正在应用配置...",
     "applied": "配置已生效",
     "save_failed": "保存失败",
-    "discard": "放弃更改",
-    "discard_confirm": "设置尚未保存，确定要放弃更改吗？",
-    "confirm": {
-      "off": "确定要关闭 Tunnel 吗？现有隧道与域名映射将被移除。",
-      "destroy_to_public": "切换到公共 Tunnel 将移除当前自定义隧道，继续吗？",
-      "update_restart": "将使用新参数重建隧道并重启，继续吗？"
-    },
     "root_domain_help": "需已在 Cloudflare 托管。",
     "token_help": "需具有 Tunnel 与 DNS 的编辑权限。"
   },

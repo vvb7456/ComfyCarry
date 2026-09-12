@@ -262,7 +262,11 @@ function terminalUrl(name: string): string | null {
 
 async function jupyterAction(action: 'start' | 'stop' | 'restart') {
   if (action === 'stop' || action === 'restart') {
-    if (!await confirm({ message: t(`jupyter.confirm.${action}`) })) return
+    if (!await confirm({
+      title: t(`jupyter.confirm.${action}.title`),
+      message: t(`jupyter.confirm.${action}.message`),
+      confirmText: t(action === 'stop' ? 'common.btn.stop' : 'common.btn.restart'),
+    })) return
   }
   actionLoading.value = action
   const data = await post<ApiErrorBody & { ok?: boolean; message?: string }>(`/api/jupyter/${action}`, {})
@@ -293,7 +297,11 @@ async function kernelAction(kernelId: string, action: 'interrupt' | 'restart') {
 }
 
 async function closeSession(sessionId: string) {
-  if (!await confirm({ message: t('jupyter.confirm.close_session') })) return
+  if (!await confirm({
+    title: t('jupyter.confirm.close_session.title'),
+    message: t('jupyter.confirm.close_session.message'),
+    confirmText: t('jupyter.confirm.close_session.button'),
+  })) return
   sessionPending.value = sessionId
   const data = await del<ApiErrorBody & { ok?: boolean }>(`/api/jupyter/sessions/${sessionId}`)
   sessionPending.value = null
@@ -316,7 +324,11 @@ async function newTerminal() {
 }
 
 async function deleteTerminal(name: string) {
-  if (!await confirm({ message: t('jupyter.terminals.destroy_confirm', { name }), variant: 'danger' })) return
+  if (!await confirm({
+    title: t('jupyter.confirm.destroy_terminal.title'),
+    message: t('jupyter.confirm.destroy_terminal.message', { name }),
+    confirmText: t('jupyter.confirm.destroy_terminal.button'),
+  })) return
   terminalPending.value = name
   const data = await del<ApiErrorBody & { ok?: boolean }>(`/api/jupyter/terminals/${encodeURIComponent(name)}`)
   terminalPending.value = null

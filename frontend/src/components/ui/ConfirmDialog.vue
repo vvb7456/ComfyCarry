@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from './BaseModal.vue'
@@ -9,6 +9,8 @@ defineOptions({ name: 'ConfirmDialog' })
 
 const props = defineProps<{
   modelValue: boolean
+  /** 每次打开递增 (排队弹窗时 visible 在同 tick 内 false→true, 仅靠 modelValue 无法触发重置) */
+  openSeq?: number
   title?: string
   message: string
   variant?: 'default' | 'danger'
@@ -34,6 +36,7 @@ const { t } = useI18n({ useScope: 'global' })
 
 const dontAsk = ref(false)
 const localCheckbox = ref(false)
+const cancelBtnRef = ref<InstanceType<typeof BaseButton> | null>(null)
 const confirmLabel = computed(() => props.confirmText || t('common.btn.confirm'))
 
 const checkboxChecked = computed<boolean>({
@@ -46,11 +49,19 @@ const checkboxChecked = computed<boolean>({
 
 const hasFooterLeft = computed(() => props.showDontAsk || !!props.checkboxLabel)
 
-// Reset checkboxes when dialog opens
-watch(() => props.modelValue, (open) => {
-  if (open) {
-    dontAsk.value = false
-    if (!props.checkboxRef) localCheckbox.value = props.checkboxInternal ?? false
+// Reset checkboxes when dialog opens; danger variant focuses Cancel to avoid accidental confirm.
+// 监听 [modelValue, openSeq] 元组: 排队续接的弹窗 visible 不变, 只有 openSeq 变化.
+watch(() => [props.modelValue, props.openSeq ?? 0] as const, async ([open]) => {
+  if (!open) return
+  dontAsk.value = false
+  if (!props.checkboxRef) localCheckbox.value = props.checkboxInternal ?? false
+  if (props.variant === 'danger') {
+    await nextTick()
+    // BaseModal 也在 nextTick 聚焦弹窗容器，延迟到宏任务再聚焦取消键
+    window.setTimeout(() => {
+      const el = cancelBtnRef.value?.$el as HTMLElement | undefined
+      el?.focus()
+    }, 0)
   }
 })
 const cancelLabel = computed(() => props.cancelText || t('common.btn.cancel'))
@@ -85,7 +96,7 @@ function doAlt() {
         </label>
       </div>
       <div class="confirm-buttons">
-        <BaseButton :disabled="loading" @click="close">{{ cancelLabel }}</BaseButton>
+        <BaseButton ref="cancelBtnRef" :disabled="loading" @click="close">{{ cancelLabel }}</BaseButton>
         <BaseButton v-if="altText" :variant="altVariant ?? 'default'" :disabled="loading" @click="doAlt">{{ altText }}</BaseButton>
         <BaseButton :variant="confirmVariant" :loading="loading" @click="doConfirm">{{ confirmLabel }}</BaseButton>
       </div>
@@ -99,17 +110,13 @@ function doAlt() {
   color: var(--t1);
   line-height: 1.6;
   white-space: pre-line;
-  /* Long filenames (no spaces) can stretch the modal off-screen; break them
-     at any boundary and clamp to a single visible line with an ellipsis. */
+  /* 长文件名（无空格）可能撑破弹窗，任意处断行；内容超高时滚动而非截断，
+     保证“无法撤销”等后果说明始终完整可见 */
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
+  max-height: 40vh;
+  overflow-y: auto;
   margin: 0;
 }
 

@@ -204,30 +204,35 @@ async function onCardClick(item: PickerModelItem) {
       if (itemEffArch === 'unknown') {
         // (4) unknown confirm 不变
         const ok = await confirm({
-          title: t('generate.picker.arch_mismatch_title'),
-          message: t('generate.picker.arch_unknown_desc'),
+          title: t('generate.confirm.arch_unknown.title'),
+          message: t('generate.confirm.arch_unknown.message', {
+            tab_arch: ARCH_LABELS[props.currentArch] || props.currentArch,
+          }),
+          confirmText: t('generate.confirm.arch_unknown.button'),
           dontAskKey: 'picker_arch_mismatch',
         })
         if (!ok) return
       } else if (itemRoot !== currentRoot) {
         // (1) 跨硬架构: 强警告文案不变
         const ok = await confirm({
-          title: t('generate.picker.arch_mismatch_title'),
-          message: t('generate.picker.arch_mismatch_desc', {
+          title: t('generate.confirm.arch_mismatch.title'),
+          message: t('generate.confirm.arch_mismatch.message', {
             model_arch: ARCH_LABELS[itemEffArch] || itemEffArch,
             tab_arch: ARCH_LABELS[props.currentArch] || props.currentArch,
           }),
+          confirmText: t('generate.confirm.arch_mismatch.button'),
           dontAskKey: 'picker_arch_mismatch',
         })
         if (!ok) return
       } else if (itemEffArch !== 'sdxl' && props.currentArch !== 'sdxl') {
         // (2) 同家族软架构错配: 双方都明确 (非通用 sdxl) → 软提醒
         const ok = await confirm({
-          title: t('generate.picker.arch_mismatch_title'),
-          message: t('generate.picker.subarch_mismatch_desc', {
+          title: t('generate.confirm.arch_subarch_mismatch.title'),
+          message: t('generate.confirm.arch_subarch_mismatch.message', {
             model_arch: ARCH_LABELS[itemEffArch] || itemEffArch,
             tab_arch: ARCH_LABELS[props.currentArch] || props.currentArch,
           }),
+          confirmText: t('generate.confirm.arch_subarch_mismatch.button'),
           dontAskKey: 'picker_arch_mismatch',
         })
         if (!ok) return

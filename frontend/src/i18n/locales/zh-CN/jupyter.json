@@ -45,7 +45,6 @@
     "created": "终端 {name} 已创建",
     "open": "打开终端",
     "destroy": "销毁终端",
-    "destroy_confirm": "确定要销毁终端 {name} 吗？",
     "destroyed": "终端 {name} 已销毁",
     "last_activity": "最后活动",
     "empty": "暂无终端"
@@ -54,9 +53,24 @@
     "title": "日志"
   },
   "confirm": {
-    "stop": "确定要停止 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",
-    "restart": "确定要重启 JupyterLab 吗？\n\n活跃的内核和会话将丢失。",
-    "close_session": "确定要关闭此会话吗？\n\n关联的内核也将被停止。"
+    "stop": {
+      "title": "停止 JupyterLab",
+      "message": "活跃的内核和会话将丢失。"
+    },
+    "restart": {
+      "title": "重启 JupyterLab",
+      "message": "活跃的内核和会话将丢失。"
+    },
+    "close_session": {
+      "title": "关闭会话",
+      "message": "关联的内核将停止。",
+      "button": "关闭会话"
+    },
+    "destroy_terminal": {
+      "title": "销毁终端",
+      "message": "终端「{name}」将被关闭，其中运行的进程将终止。",
+      "button": "销毁"
+    }
   },
   "err": {
     "fallback": "JupyterLab 操作失败",

@@ -81,7 +81,14 @@ async function checkUpdate() {
 }
 
 async function applyUpdate() {
-  if (!await confirm({ message: t('settings.update.apply_btn') + '?' })) return
+  if (!await confirm({
+    title: t('settings.confirm.update.title'),
+    message: t('settings.confirm.update.message', {
+      current: updateInfo.value?.current_version || '—',
+      latest: updateInfo.value?.latest_version || '—',
+    }),
+    confirmText: t('settings.confirm.update.button'),
+  })) return
   updateApplying.value = true
   updatePhase.value = t('settings.update.applying')
   let terminalPhase = false
@@ -145,11 +152,13 @@ const reinitLoading = ref(false)
 
 async function reinitialize() {
   if (!await confirm({
-    message: t('settings.reinit.confirm'),
-    confirmText: t('settings.reinit.btn'),
-    checkboxLabel: t('settings.reinit.keep_models'),
+    title: t('settings.confirm.reinit.title'),
+    message: t('settings.confirm.reinit.message'),
+    confirmText: t('settings.confirm.reinit.button'),
+    checkboxLabel: t('settings.confirm.reinit.checkbox'),
     checkboxDefault: true,
     checkboxRef: reinitKeepModels,
+    variant: 'danger',
   })) return
   reinitLoading.value = true
   toast(t('settings.reinit.in_progress'), 'info')

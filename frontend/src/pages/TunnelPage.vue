@@ -244,7 +244,11 @@ const pendingAction = ref<'start' | 'stop' | 'restart' | null>(null)
 const acting = computed(() => pendingAction.value !== null)
 
 async function tunnelStop() {
-  if (!await confirm({ message: t('tunnel.confirm.stop_cloudflared') })) return
+  if (!await confirm({
+    title: t('tunnel.confirm.stop_cloudflared.title'),
+    message: t('tunnel.confirm.stop_cloudflared.message'),
+    confirmText: t('common.btn.stop'),
+  })) return
   pendingAction.value = 'stop'
   const d = await post<TunnelActionResponse>('/api/tunnel/stop')
   pendingAction.value = null
@@ -265,7 +269,11 @@ async function tunnelStart() {
 }
 
 async function tunnelRestart(skipConfirm = false) {
-  if (!skipConfirm && !await confirm({ message: t('tunnel.confirm.restart_cloudflared') })) return
+  if (!skipConfirm && !await confirm({
+    title: t('tunnel.confirm.restart_cloudflared.title'),
+    message: t('tunnel.confirm.restart_cloudflared.message'),
+    confirmText: t('common.btn.restart'),
+  })) return
   pendingAction.value = 'restart'
   const d = await post<TunnelActionResponse>('/api/tunnel/restart')
   pendingAction.value = null
@@ -302,7 +310,11 @@ function openAria(row: ServiceRow) { return t('tunnel.services.open', { name: ro
 function removeAria(row: ServiceRow) { return t('tunnel.services.remove', { name: row.title }) }
 
 async function removeService(suffix: string) {
-  if (!await confirm({ message: t('tunnel.confirm.remove_custom_service', { suffix }), variant: 'danger' })) return
+  if (!await confirm({
+    title: t('tunnel.confirm.remove_service.title'),
+    message: t('tunnel.confirm.remove_service.message', { suffix }),
+    confirmText: t('tunnel.confirm.remove_service.button'),
+  })) return
   const d = await del<TunnelActionResponse>(`/api/tunnel/services/${encodeURIComponent(suffix)}`)
   if (!d) return
   if (d.ok) { toast(t('tunnel.toast.service_removed'), 'success'); setTimeout(loadTunnelStatus, 2000) }

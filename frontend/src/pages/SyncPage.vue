@@ -340,10 +340,12 @@ async function onRemoteCreated(remote: { name: string; type: string; openRuleMod
 
 async function deleteRemote(name: string) {
   const affectedRules = rules.value.filter(r => r.remote === name)
-  const msg = affectedRules.length > 0
-    ? t('sync.remote.confirm_disconnect_with_rules', { name, count: affectedRules.length })
-    : t('sync.remote.confirm_disconnect', { name })
-  if (!await confirm({ message: msg, variant: 'danger' })) return
+  const scene = affectedRules.length > 0 ? 'disconnect_with_rules' : 'disconnect'
+  if (!await confirm({
+    title: t(`sync.confirm.${scene}.title`),
+    message: t(`sync.confirm.${scene}.message`, { name, count: affectedRules.length }),
+    confirmText: t(`sync.confirm.${scene}.button`),
+  })) return
   const d = await post<RemoteDeleteResponse>('/api/sync/remote/delete', { name })
   if (d?.ok) {
     const removed = d.rules_removed ?? 0
@@ -482,7 +484,11 @@ async function toggleRule(rule: SyncRule) {
 }
 
 async function deleteRule(rule: SyncRule) {
-  if (!await confirm({ message: t('sync.rule.confirm_delete', { name: rule.name }), variant: 'danger' })) return
+  if (!await confirm({
+    title: t('sync.confirm.delete_rule.title'),
+    message: t('sync.confirm.delete_rule.message', { name: rule.name }),
+    confirmText: t('common.btn.delete'),
+  })) return
   const updated = rules.value.filter(r => r.id !== rule.id)
   const d = await post<RulesSaveResponse>('/api/sync/rules/save', { rules: updated })
   if (d?.ok || d?.rules) {

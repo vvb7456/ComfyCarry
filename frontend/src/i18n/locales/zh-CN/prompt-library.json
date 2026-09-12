@@ -25,7 +25,6 @@
     "clear_all": "清空全部",
     "clear_disabled": "清空禁用",
     "translate_all": "翻译全部",
-    "clear_all_confirm": "确定清空所有标签？",
     "embedding": "Embedding",
     "wildcard": "通配符"
   },
@@ -50,8 +49,6 @@
     "delete": "删除",
     "favorite": "收藏",
     "unfavorite": "取消收藏",
-    "confirm_delete": "确定删除此记录？",
-    "confirm_replace": "用此历史记录替换当前提示词？",
     "just_now": "刚刚",
     "minutes_ago": "{n} 分钟前",
     "hours_ago": "{n} 小时前",
@@ -62,6 +59,21 @@
     "loading": "加载中…",
     "empty_prompt": "提示词为空，无法收藏",
     "favorited": "已添加到收藏"
+  },
+  "confirm": {
+    "clear_all": {
+      "title": "清空提示词",
+      "message": "编辑器内的全部标签将被清空。"
+    },
+    "replace": {
+      "title": "替换提示词",
+      "message": "当前编辑器内容将被此历史记录替换。",
+      "button": "替换"
+    },
+    "delete_history": {
+      "title": "删除历史记录",
+      "message": "该历史记录将被删除。"
+    }
   },
   "init": {
     "title": "该功能需下载提示词标签库",

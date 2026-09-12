@@ -198,9 +198,9 @@ export function useGenerateSubmit(
 
     if (inactiveModules.length > 0) {
       const proceed = await confirm({
-        title: t('generate.error.modules_not_enabled'),
-        message: `${t('generate.error.modules_not_enabled_desc')}\n\n${inactiveModules.join(', ')}`,
-        confirmText: t('generate.error.skip_submit'),
+        title: t('generate.confirm.modules_not_enabled.title'),
+        message: t('generate.confirm.modules_not_enabled.message', { modules: inactiveModules.join(', ') }),
+        confirmText: t('generate.confirm.modules_not_enabled.button'),
         dontAskKey: 'gen_skip_inactive_warn',
       })
       if (!proceed) return false
@@ -229,9 +229,9 @@ export function useGenerateSubmit(
     // 6b. Inpaint mode: image exists but no mask → ConfirmDialog
     if (state.i2i.enabled && state.i2i.image && state.i2i.mode === 'inpaint' && !state.i2i.mask) {
       const proceed = await confirm({
-        title: t('generate.error.inpaint_no_mask'),
-        message: t('generate.error.inpaint_no_mask_desc'),
-        confirmText: t('generate.error.skip_submit'),
+        title: t('generate.confirm.inpaint_no_mask.title'),
+        message: t('generate.confirm.inpaint_no_mask.message'),
+        confirmText: t('generate.confirm.inpaint_no_mask.button'),
         dontAskKey: 'gen_inpaint_no_mask_warn',
       })
       if (!proceed) return false

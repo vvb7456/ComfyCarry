@@ -181,6 +181,16 @@ async function applyConfig(): Promise<boolean> {
         // 公共子域名在 register 时由 Worker 分配, 只改配置不会改变当前公网地址,
         // 必须重新注册才会生效 (register 内部会先 release 旧隧道)。
         if (sub !== serverSubdomain.value) {
+          const auto = t('tunnel.confirm.change_public_subdomain.auto')
+          if (!await confirm({
+            title: t('tunnel.confirm.change_public_subdomain.title'),
+            message: t('tunnel.confirm.change_public_subdomain.message', {
+              old: serverSubdomain.value || auto,
+              new: sub || auto,
+            }),
+            confirmText: t('tunnel.confirm.change_public_subdomain.button'),
+            variant: 'danger',
+          })) return false
           if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
           toast(t('tunnel.settings.enabling_public'), 'info')
           const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
@@ -196,7 +206,12 @@ async function applyConfig(): Promise<boolean> {
       }
       // custom 参数更新: 需完整参数后重新 provision
       if (!validateCustom()) return false
-      if (!await confirm({ message: t('tunnel.settings.confirm.update_restart') })) return false
+      if (!await confirm({
+        title: t('tunnel.confirm.apply_config.title'),
+        message: t('tunnel.confirm.apply_config.message'),
+        confirmText: t('tunnel.confirm.apply_config.button'),
+        variant: 'danger',
+      })) return false
       const d = await post<TunnelActionResponse>('/api/tunnel/provision', {
         api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value,
       })
@@ -207,7 +222,12 @@ async function applyConfig(): Promise<boolean> {
     // ── 模式切换 ──
     if (mode.value === 'off') {
       // 关闭 = 销毁 (应用即意图, 再加一道 confirm)
-      if (!await confirm({ message: t('tunnel.settings.confirm.off'), variant: 'danger' })) return false
+      if (!await confirm({
+        title: t('tunnel.confirm.off.title'),
+        message: t('tunnel.confirm.off.message'),
+        confirmText: t('tunnel.confirm.off.button'),
+        variant: 'danger',
+      })) return false
       if (serverMode.value === 'public') {
         if (!await post('/api/tunnel/public/disable')) return false
       } else if (serverMode.value === 'custom') {
@@ -217,7 +237,12 @@ async function applyConfig(): Promise<boolean> {
     }
 
     if (mode.value === 'public') {
-      if (serverMode.value === 'custom' && !await confirm({ message: t('tunnel.settings.confirm.destroy_to_public'), variant: 'danger' })) return false
+      if (serverMode.value === 'custom' && !await confirm({
+        title: t('tunnel.confirm.to_public.title'),
+        message: t('tunnel.confirm.to_public.message'),
+        confirmText: t('tunnel.confirm.to_public.button'),
+        variant: 'danger',
+      })) return false
       if (serverMode.value === 'custom' && !await teardownCustom()) return false
       const sub = cfgSubdomain.value.trim().toLowerCase()
       if (sub && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(sub)) {
@@ -233,7 +258,15 @@ async function applyConfig(): Promise<boolean> {
 
     // → custom
     if (!validateCustom()) return false
-    if (serverMode.value === 'public' && !await post('/api/tunnel/public/disable')) return false
+    if (serverMode.value === 'public') {
+      if (!await confirm({
+        title: t('tunnel.confirm.to_custom.title'),
+        message: t('tunnel.confirm.to_custom.message'),
+        confirmText: t('tunnel.confirm.to_custom.button'),
+        variant: 'danger',
+      })) return false
+      if (!await post('/api/tunnel/public/disable')) return false
+    }
     toast(t('tunnel.settings.applying'), 'info')
     const d = await post<TunnelActionResponse>('/api/tunnel/provision', {
       api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value,
@@ -292,9 +325,9 @@ async function requestClose(): Promise<void> {
   if (cfgSaving.value) return
   if (cfgDirty.value) {
     const r = await confirm({
-      message: t('tunnel.settings.discard_confirm'),
-      variant: 'danger',
-      confirmText: t('tunnel.settings.discard'),
+      title: t('tunnel.confirm.discard.title'),
+      message: t('tunnel.confirm.discard.message'),
+      confirmText: t('tunnel.confirm.discard.button'),
       cancelText: t('common.btn.cancel'),
     })
     if (r !== true) return

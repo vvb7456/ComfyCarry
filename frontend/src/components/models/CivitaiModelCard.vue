@@ -107,9 +107,10 @@ async function handleCancelDownload() {
   const id = dlInfo.value.downloadId
   if (!id) return
   if (await confirm({
-    message: t('models.downloads.confirm_cancel', { name: props.hit.name || '' }),
-    variant: 'danger',
-    confirmText: t('common.btn.cancel'),
+    title: t('models.confirm.cancel_download.title'),
+    message: t('models.confirm.cancel_download.message', { name: props.hit.name || '' }),
+    confirmText: t('models.confirm.cancel_download.button'),
+    cancelText: t('models.confirm.cancel_download.cancel'),
   })) {
     cancelDownload(id)
   }

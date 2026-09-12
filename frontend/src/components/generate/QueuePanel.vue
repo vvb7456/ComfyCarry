@@ -54,7 +54,11 @@ async function interrupt() {
 
 async function deleteItem(promptId: string) {
   if (acting.value) return
-  if (!await confirm({ message: t('comfyui.queue.delete_confirm'), variant: 'danger' })) return
+  if (!await confirm({
+    title: t('comfyui.confirm.queue_delete.title'),
+    message: t('comfyui.confirm.queue_delete.message'),
+    confirmText: t('common.btn.delete'),
+  })) return
   acting.value = promptId
   try {
     if (!await post('/api/comfyui/queue/delete', { delete: [promptId] })) return

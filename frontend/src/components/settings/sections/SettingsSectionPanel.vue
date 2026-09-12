@@ -85,7 +85,11 @@ async function changePassword() {
 }
 
 async function regenerateApiKey() {
-  if (!await confirm({ message: t('settings.api_key.regenerate_confirm') })) return
+  if (!await confirm({
+    title: t('settings.confirm.regenerate_key.title'),
+    message: t('settings.confirm.regenerate_key.message'),
+    confirmText: t('settings.confirm.regenerate_key.button'),
+  })) return
   regenLoading.value = true
   const data = await post<{ ok?: boolean; api_key?: string; error?: string }>('/api/settings/api-key', {})
   regenLoading.value = false
@@ -126,7 +130,12 @@ async function importConfig(event: Event) {
     const text = await file.text()
     const config = JSON.parse(text)
     if (!config._version) { toast(t('settings.config.invalid_format'), 'error'); return }
-    if (!await confirm({ message: t('settings.config.import_confirm', { date: config._exported_at || t('settings.config.unknown_date') }) })) return
+    if (!await confirm({
+      title: t('settings.confirm.import_config.title'),
+      message: t('settings.confirm.import_config.message', { date: config._exported_at || t('settings.config.unknown_date') }),
+      confirmText: t('settings.confirm.import_config.button'),
+      variant: 'danger',
+    })) return
     const data = await post<{ message?: string }>('/api/settings/import-config', JSON.parse(text))
     if (!data) return
     toast(apiMessageText(data), 'success')

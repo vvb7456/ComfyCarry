@@ -58,7 +58,11 @@
     "request_failed": "请求失败"
   },
   "confirm": {
-    "uninstall_name": "确定要卸载插件 \"{title}\" 吗？"
+    "uninstall": {
+      "title": "卸载插件",
+      "message": "插件「{title}」的目录将被删除。",
+      "button": "卸载"
+    }
   },
   "version_picker": {
     "title_name": "{name} - 版本选择",

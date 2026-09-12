@@ -40,17 +40,14 @@
     "fetched": "元数据",
     "all_have_info": "所有模型已有信息",
     "deleted": "已删除",
-    "confirm_delete": "确定删除",
     "total_models": "共 {count} 个模型 · {infoCount} 个已有元数据",
     "no_preview": "无预览",
     "refetch_tip": "重新获取元数据",
     "fetching": "获取中…",
     "not_found_category": "该类别下未找到模型文件",
-    "confirm_fetch_all": "将为 {count} 个模型获取元数据，可能需要较长时间。继续？",
     "fetching_progress": "正在获取 ({current}/{total}): {filename}",
     "fetch_complete": "全部完成",
     "fetch_partial": "完成 {success} 个，失败 {fail} 个",
-    "confirm_delete_file": "确定删除 {filename}？\n此操作不可恢复！",
     "details": "详情"
   },
   "meta": {
@@ -117,7 +114,6 @@
     "failed": "失败",
     "download_all": "下载全部",
     "clear_all": "清空",
-    "confirm_clear": "确定要清空全部收藏吗？",
     "no_pending_hint": "暂无收藏模型，从 CivitAI 页添加或点击批量添加",
     "no_active": "暂无下载任务",
     "no_history": "暂无下载历史",
@@ -140,13 +136,33 @@
     "installed": "已下载",
     "resolving": "解析中…",
     "verifying": "校验中",
-    "confirm_cancel": "确定要取消下载「{name}」吗？",
     "batch_modal_title": "批量添加模型",
     "batch_modal_hint": "每行输入一个 CivitAI 模型链接或 ID，支持多种格式：",
     "batch_modal_placeholder": "粘贴链接或 ID...",
     "batch_modal_parsed": "识别到 {count} 个模型",
     "batch_modal_submit": "添加到收藏",
     "batch_added": "已添加 {count} 个模型到收藏"
+  },
+  "confirm": {
+    "delete_model": {
+      "title": "删除模型",
+      "message": "「{filename}」将被永久删除，此操作无法撤销。"
+    },
+    "fetch_all": {
+      "title": "获取模型元数据",
+      "message": "将为 {count} 个模型获取元数据。",
+      "button": "开始获取"
+    },
+    "cancel_download": {
+      "title": "取消下载",
+      "message": "「{name}」的下载任务将被取消。",
+      "button": "取消下载",
+      "cancel": "继续下载"
+    },
+    "clear_favorites": {
+      "title": "清空收藏",
+      "message": "全部收藏将被清除。"
+    }
   },
   "dl_dir": {
     "title": "选择下载目录",

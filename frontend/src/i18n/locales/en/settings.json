@@ -14,10 +14,6 @@
     "civitai": "CivitAI"
   },
   "unsaved": {
-    "title": "Unsaved changes",
-    "leave_message": "The following modules have unsaved changes: {modules}",
-    "go_fix": "Review",
-    "discard_leave": "Discard and leave",
     "chip": "{n} unsaved",
     "chip_tip": "Jump to the first unsaved module"
   },
@@ -61,7 +57,6 @@
   "api_key": {
     "help": "Carried as X-API-Key / Bearer header when external scripts or apps call the panel API.",
     "regenerate": "Regenerate",
-    "regenerate_confirm": "Regenerate API Key? The old key will stop working immediately.",
     "regenerated": "API Key regenerated",
     "regenerate_failed": "Regeneration failed",
     "title": "ComfyCarry API Key",
@@ -75,7 +70,6 @@
     "exported": "Configuration exported",
     "export_failed": "Export failed",
     "invalid_format": "Invalid configuration file format",
-    "import_confirm": "Import configuration?\n\nExported on: {date}\nThis will overwrite current password, API Key, Tunnel config, sync rules, etc.",
     "import_failed": "Import failed",
     "unknown_date": "Unknown",
     "export_title": "Export config",
@@ -83,8 +77,6 @@
   },
   "reinit": {
     "btn": "Re-initialize",
-    "keep_models": "Keep model files & outputs",
-    "confirm": "Re-initialize ComfyCarry?\n\nAll configuration and services will be reset.",
     "in_progress": "Re-initializing...",
     "success": "Reset complete, redirecting to setup wizard...",
     "partial_fail": "Some operations failed"
@@ -115,7 +107,39 @@
     "done": "Update completed, restarting...",
     "error": "Update failed"
   },
-  "restart_confirm": "Restart ComfyCarry?\n\nThe page will be briefly unavailable.",
+  "confirm": {
+    "unsaved_leave": {
+      "title": "Unsaved Changes",
+      "message": "The following modules have unsaved changes: {modules}",
+      "button": "Review",
+      "alt": "Discard and Leave"
+    },
+    "restart": {
+      "title": "Restart ComfyCarry",
+      "message": "The panel will restart and be unavailable during the process."
+    },
+    "regenerate_key": {
+      "title": "Regenerate API Key",
+      "message": "The old key will be invalidated immediately and cannot be retrieved.",
+      "button": "Regenerate"
+    },
+    "import_config": {
+      "title": "Import Config",
+      "message": "Exported on: {date}. Password, API Key, Tunnel, and sync settings will be overwritten. This cannot be undone.",
+      "button": "Import"
+    },
+    "update": {
+      "title": "Update ComfyCarry",
+      "message": "Will update from {current} to {latest}. The panel will restart automatically when done.",
+      "button": "Update Now"
+    },
+    "reinit": {
+      "title": "Reinitialize ComfyCarry",
+      "message": "All configuration and services will be reset. This cannot be undone.",
+      "button": "Reinitialize",
+      "checkbox": "Keep model files & outputs"
+    }
+  },
   "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds...",
   "civitai": {
     "key_title": "CivitAI API Key",

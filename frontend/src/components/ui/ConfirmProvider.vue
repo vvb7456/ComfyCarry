@@ -7,6 +7,7 @@ import { confirmKey, type ConfirmOptions, type ConfirmResult } from '@/composabl
 defineOptions({ name: 'ConfirmProvider' })
 
 const visible = ref(false)
+const dialogSeq = ref(0)
 const title = ref<string | undefined>()
 const message = ref('')
 const variant = ref<'default' | 'danger'>('default')
@@ -54,6 +55,7 @@ function showDialog(options: ConfirmOptions, resolve: (value: ConfirmResult) => 
   checkboxInternal.value = options.checkboxDefault ?? false
   checkboxRef.value = options.checkboxRef
   resolveFn = resolve
+  dialogSeq.value += 1
   visible.value = true
 }
 
@@ -95,6 +97,7 @@ provide(confirmKey, confirm)
   <slot />
   <ConfirmDialog
     v-model="visible"
+    :open-seq="dialogSeq"
     :title="title"
     :message="message"
     :variant="variant"

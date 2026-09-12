@@ -209,7 +209,11 @@ async function installPlugin(id: string, version = 'latest') {
 }
 
 async function uninstallPlugin(p: PluginData) {
-  if (!await confirm({ message: t('plugins.confirm.uninstall_name', { title: p.title || p.id }), variant: 'danger' })) return
+  if (!await confirm({
+    title: t('plugins.confirm.uninstall.title'),
+    message: t('plugins.confirm.uninstall.message', { title: p.title || p.id }),
+    confirmText: t('plugins.confirm.uninstall.button'),
+  })) return
   await submitOp('uninstall', '/api/plugins/uninstall', {
     id: p.id,
     version: p.ver,

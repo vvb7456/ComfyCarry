@@ -71,7 +71,6 @@
     "changed": "已修改 {count} 项",
     "unchanged": "未修改",
     "save_restart": "保存并重启",
-    "save_confirm": "保存参数将重启 ComfyUI，确定继续？",
     "restart_toast": "ComfyUI 正在使用新参数重启...",
     "save_failed": "保存失败",
     "extra_args": "额外命令行参数",
@@ -296,8 +295,7 @@
     "cleared": "队列已清空",
     "no_running": "无正在执行的任务",
     "no_pending": "无等待中的任务",
-    "node_count": "{count} 个节点",
-    "delete_confirm": "确定要删除此队列项吗？"
+    "node_count": "{count} 个节点"
   },
   "history": {
     "total": "生成历史",
@@ -321,10 +319,6 @@
     "current": "当前",
     "unstable": "不稳定",
     "switch": "切换",
-    "switch_only": "仅切换",
-    "switch_and_install": "切换并安装依赖",
-    "switch_confirm": "确定要将 ComfyUI 切换到 {version} 吗？这将重启 ComfyUI。",
-    "switch_confirm_nightly": "确定切换到 nightly (master) 吗？这是开发版本，可能不稳定。",
     "switch_success": "版本切换成功",
     "switch_failed": "版本切换失败",
     "custom_build": "自定义提交",
@@ -339,8 +333,29 @@
     "offline_desc": "插件目录由 ComfyUI-Manager 提供。请先从页头启动 ComfyUI，再管理插件。"
   },
   "confirm": {
-    "restart": "确定要重启 ComfyUI 吗？",
-    "stop": "确定要停止 ComfyUI 吗？"
+    "stop": {
+      "title": "停止 ComfyUI",
+      "message": "正在执行的任务将中断。"
+    },
+    "restart": {
+      "title": "重启 ComfyUI",
+      "message": "正在执行的任务将中断。"
+    },
+    "save_params": {
+      "title": "保存参数",
+      "message": "保存后将重启 ComfyUI，正在执行的任务将中断。",
+      "button": "保存并重启"
+    },
+    "queue_delete": {
+      "title": "删除队列项",
+      "message": "该任务将从队列中移除。"
+    },
+    "switch_version": {
+      "title": "切换 ComfyUI 版本",
+      "message": "将切换到 {version} 并重启 ComfyUI。",
+      "button": "仅切换",
+      "alt": "切换并安装依赖"
+    }
   },
   "err": {
     "args_check_failed": "无法读取 ComfyUI 启动参数定义，ComfyUI 安装可能不完整，已取消本次操作",

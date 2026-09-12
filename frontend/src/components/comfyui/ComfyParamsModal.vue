@@ -200,7 +200,11 @@ function cancelAndClose() {
 }
 
 async function save() {
-  if (!await confirm({ message: t('comfyui.params.save_confirm') })) return
+  if (!await confirm({
+    title: t('comfyui.confirm.save_params.title'),
+    message: t('comfyui.confirm.save_params.message'),
+    confirmText: t('comfyui.confirm.save_params.button'),
+  })) return
   saving.value = true
   const d = await post<ComfyParamsSaveResponse>('/api/comfyui/params', {
     params: collectParams(paramsSchema.value, paramsCurrent.value),

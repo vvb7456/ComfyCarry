@@ -89,8 +89,9 @@ async function onToggleFavorite(item: PromptHistoryItem) {
 async function onDelete(item: PromptHistoryItem) {
   if (loadingId.value !== null) return
   const yes = await confirm({
-    message: t('prompt-library.history_modal.confirm_delete'),
-    variant: 'danger',
+    title: t('prompt-library.confirm.delete_history.title'),
+    message: t('prompt-library.confirm.delete_history.message'),
+    confirmText: t('common.btn.delete'),
   })
   if (!yes) return
   loadingId.value = item.id

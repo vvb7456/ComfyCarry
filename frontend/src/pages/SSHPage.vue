@@ -162,7 +162,11 @@ const refresher = useAutoRefresh(refreshStatus, 10000)
 // ─── Service actions ──────────────────────────────────────────────────────────
 
 async function sshAction(action: 'start' | 'stop' | 'restart') {
-  if (action === 'stop' && !await confirm({ message: t('ssh.confirm.stop') })) return
+  if (action === 'stop' && !await confirm({
+    title: t('ssh.confirm.stop.title'),
+    message: t('ssh.confirm.stop.message'),
+    confirmText: t('common.btn.stop'),
+  })) return
   actionLoading.value = action
   const data = await post<ApiErrorBody & { ok?: boolean; running?: boolean; pid?: number | null }>(`/api/ssh/${action}`, {})
   actionLoading.value = null
@@ -203,7 +207,11 @@ watch(showAddKey, (open) => {
 })
 
 async function deleteKey(fingerprint: string) {
-  if (!await confirm({ message: t('ssh.confirm.delete_key'), variant: 'danger' })) return
+  if (!await confirm({
+    title: t('ssh.confirm.delete_key.title'),
+    message: t('ssh.confirm.delete_key.message'),
+    confirmText: t('common.btn.delete'),
+  })) return
   deletingFp.value = fingerprint
   const data = await del<ApiErrorBody & { ok?: boolean; keys?: SSHKey[] }>('/api/ssh/keys', { fingerprint })
   deletingFp.value = null

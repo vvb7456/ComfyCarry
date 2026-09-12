@@ -182,9 +182,9 @@ async function submitCreate() {
       return
     }
     const ok = await confirm({
-      message: t('sync.overwrite.confirm', { name: target }),
-      confirmText: t('sync.overwrite.btn'),
-      variant: 'danger',
+      title: t('sync.confirm.overwrite.title'),
+      message: t('sync.confirm.overwrite.message', { name: target }),
+      confirmText: t('sync.confirm.overwrite.button'),
     })
     if (!ok) return
     overwrite = true

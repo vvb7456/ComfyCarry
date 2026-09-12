@@ -58,7 +58,11 @@
     "request_failed": "Request failed"
   },
   "confirm": {
-    "uninstall_name": "Uninstall plugin \"{title}\"?"
+    "uninstall": {
+      "title": "Uninstall Plugin",
+      "message": "The directory of \"{title}\" will be deleted.",
+      "button": "Uninstall"
+    }
   },
   "version_picker": {
     "title_name": "{name} - Version Selection",

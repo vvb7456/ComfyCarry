@@ -87,13 +87,12 @@ async function applyPwFollow(enabled: boolean, force = false): Promise<void> {
   const { status, data } = await pwFollowFetch({ enabled, force })
   submitting.value = false
 
-  // 无公钥锁死防护: 后端 409 未做任何变更 → danger 确认后 force 重发, 取消回弹
+  // 无公钥锁死防护: 后端 409 未做任何变更 → 确认后 force 重发, 取消回弹
   if (status === 409 && data?.error_key === 'ssh.err.lockout_risk') {
     const go = await confirm({
-      title: t('ssh.settings.lockout_title'),
-      message: t('ssh.settings.lockout_confirm'),
-      variant: 'danger',
-      confirmText: t('ssh.settings.lockout_btn'),
+      title: t('ssh.confirm.lockout.title'),
+      message: t('ssh.confirm.lockout.message'),
+      confirmText: t('ssh.confirm.lockout.button'),
     })
     if (go) { await applyPwFollow(false, true); return }
     follow.value = true

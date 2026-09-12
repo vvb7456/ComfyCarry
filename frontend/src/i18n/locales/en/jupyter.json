@@ -45,7 +45,6 @@
     "created": "Terminal {name} created",
     "open": "Open Terminal",
     "destroy": "Destroy terminal",
-    "destroy_confirm": "Destroy terminal {name}?",
     "destroyed": "Terminal {name} destroyed",
     "last_activity": "Last activity",
     "empty": "No terminals"
@@ -54,9 +53,24 @@
     "title": "Logs"
   },
   "confirm": {
-    "stop": "Stop JupyterLab?\n\nActive kernels and sessions will be lost.",
-    "restart": "Restart JupyterLab?\n\nActive kernels and sessions will be lost.",
-    "close_session": "Close this session?\n\nThe associated kernel will also be stopped."
+    "stop": {
+      "title": "Stop JupyterLab",
+      "message": "Active kernels and sessions will be lost."
+    },
+    "restart": {
+      "title": "Restart JupyterLab",
+      "message": "Active kernels and sessions will be lost."
+    },
+    "close_session": {
+      "title": "Close Session",
+      "message": "The associated kernel will stop.",
+      "button": "Close Session"
+    },
+    "destroy_terminal": {
+      "title": "Destroy Terminal",
+      "message": "Terminal \"{name}\" will be closed and its running processes will be terminated.",
+      "button": "Destroy"
+    }
   },
   "err": {
     "fallback": "JupyterLab operation failed",

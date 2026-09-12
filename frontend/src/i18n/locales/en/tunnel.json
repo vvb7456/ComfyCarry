@@ -95,9 +95,50 @@
     "service_removed": "Service removed"
   },
   "confirm": {
-    "remove_custom_service": "Remove custom service \"{suffix}\"?",
-    "stop_cloudflared": "Stop cloudflared?\n\nAll connections through the Tunnel will be disconnected.",
-    "restart_cloudflared": "Restart cloudflared?\n\nConnections may be briefly interrupted."
+    "stop_cloudflared": {
+      "title": "Stop cloudflared",
+      "message": "All connections through the Tunnel will be disconnected."
+    },
+    "restart_cloudflared": {
+      "title": "Restart cloudflared",
+      "message": "Current connections will be interrupted."
+    },
+    "remove_service": {
+      "title": "Remove Custom Service",
+      "message": "The Tunnel mapping for \"{suffix}\" will be removed.",
+      "button": "Remove"
+    },
+    "apply_config": {
+      "title": "Apply Tunnel Config",
+      "message": "The Tunnel will be rebuilt with the new parameters and cloudflared will restart.",
+      "button": "Rebuild"
+    },
+    "off": {
+      "title": "Turn Off Tunnel",
+      "message": "The existing Tunnel and domain mappings will be removed. This cannot be undone.",
+      "button": "Turn Off Tunnel"
+    },
+    "to_public": {
+      "title": "Switch to Public Tunnel",
+      "message": "The current custom Tunnel and domain mappings will be removed. This cannot be undone.",
+      "button": "Switch"
+    },
+    "to_custom": {
+      "title": "Switch to Custom Tunnel",
+      "message": "The current public Tunnel will be released. This cannot be undone.",
+      "button": "Switch"
+    },
+    "change_public_subdomain": {
+      "title": "Change Public Subdomain",
+      "message": "The public address will change from \"{old}\" to \"{new}\".",
+      "button": "Change",
+      "auto": "auto-assigned"
+    },
+    "discard": {
+      "title": "Discard Changes",
+      "message": "Unsaved tunnel settings will be lost.",
+      "button": "Discard Changes"
+    }
   },
   "settings": {
     "title": "Tunnel Settings",
@@ -131,13 +172,6 @@
     "applying": "Applying configuration...",
     "applied": "Configuration applied",
     "save_failed": "Save failed",
-    "discard": "Discard",
-    "discard_confirm": "Settings have unsaved changes. Discard them?",
-    "confirm": {
-      "off": "Turn off the tunnel? Existing tunnel and DNS mappings will be removed.",
-      "destroy_to_public": "Switching to the public tunnel will remove the current custom tunnel. Continue?",
-      "update_restart": "The tunnel will be rebuilt with the new parameters and restarted. Continue?"
-    },
     "root_domain_help": "Must be hosted on Cloudflare.",
     "token_help": "Requires Tunnel and DNS edit permissions."
   },

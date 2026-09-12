@@ -48,7 +48,12 @@ function itemInfo(item: FavoriteItem) {
 async function handleCancel(item: FavoriteItem) {
   const id = itemInfo(item).downloadId
   if (!id) return
-  if (await confirm({ message: t('models.downloads.confirm_cancel', { name: item.name || '' }) })) {
+  if (await confirm({
+    title: t('models.confirm.cancel_download.title'),
+    message: t('models.confirm.cancel_download.message', { name: item.name || '' }),
+    confirmText: t('models.confirm.cancel_download.button'),
+    cancelText: t('models.confirm.cancel_download.cancel'),
+  })) {
     await dlCancelDownload(id)
   }
 }
@@ -84,7 +89,11 @@ function failedError(item: FavoriteItem): string {
 }
 
 async function handleClearFavorites() {
-  if (await confirm({ message: t('models.downloads.confirm_clear') })) clearFav()
+  if (await confirm({
+    title: t('models.confirm.clear_favorites.title'),
+    message: t('models.confirm.clear_favorites.message'),
+    confirmText: t('common.btn.clear'),
+  })) clearFav()
 }
 </script>
 

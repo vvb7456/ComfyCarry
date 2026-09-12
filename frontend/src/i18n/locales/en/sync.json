@@ -78,8 +78,6 @@
     "invalid_name": "Name can only contain letters, numbers, underscores and hyphens",
     "missing_fields": "Required fields missing: {fields}",
     "create_failed": "Create failed",
-    "confirm_disconnect": "Disconnect remote storage \"{name}\"?",
-    "confirm_disconnect_with_rules": "Disconnect remote storage \"{name}\"?\n{count} rule(s) reference this storage and will also be deleted.",
     "disconnected": "Disconnected",
     "disconnected_with_rules": "\"{name}\" disconnected, {count} rule(s) referencing it cleaned up",
     "disconnect_failed": "Disconnect failed",
@@ -158,7 +156,6 @@
     "fill_required": "Please fill in name, remote and local path",
     "saved": "Saved",
     "save_failed": "Save failed",
-    "confirm_delete": "Delete rule \"{name}\"?",
     "deleted": "Deleted",
     "running": "Running",
     "run_ok": "Rule started. Check logs for progress",
@@ -318,9 +315,31 @@
     "bucket_label": "Bucket",
     "browse": "Browse"
   },
-  "overwrite": {
-    "confirm": "Remote \"{name}\" already exists with the same type. Overwrite existing credentials?",
-    "btn": "Overwrite Credentials"
+  "confirm": {
+    "disconnect": {
+      "title": "Disconnect Remote Storage",
+      "message": "The connection to \"{name}\" will be removed.",
+      "button": "Disconnect"
+    },
+    "disconnect_with_rules": {
+      "title": "Disconnect Remote Storage",
+      "message": "The connection to \"{name}\" will be removed, and {count} sync rule(s) referencing it will be deleted.",
+      "button": "Disconnect & Delete Rules"
+    },
+    "delete_rule": {
+      "title": "Delete Sync Rule",
+      "message": "Rule \"{name}\" will be deleted."
+    },
+    "overwrite": {
+      "title": "Overwrite Storage Credentials",
+      "message": "\"{name}\" already exists with the same type. The existing credentials will be replaced.",
+      "button": "Overwrite"
+    },
+    "discard": {
+      "title": "Discard Changes",
+      "message": "Unsaved sync settings will be lost.",
+      "button": "Discard Changes"
+    }
   },
   "empty": {
     "desc": "Connect to sync models and generation outputs"
@@ -343,9 +362,7 @@
       "desc": "Check for file changes and sync at intervals, in seconds"
     },
     "saved": "Saved",
-    "save_failed": "Save failed",
-    "discard_confirm": "Sync settings have been modified but not saved. Discard changes?",
-    "discard": "Discard changes"
+    "save_failed": "Save failed"
   },
   "facts": {
     "worker": "Auto sync",

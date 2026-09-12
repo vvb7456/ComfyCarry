@@ -205,7 +205,11 @@ async function comfyStart() {
 }
 
 async function comfyStop() {
-  if (!await confirm({ message: t('comfyui.confirm.stop') })) return
+  if (!await confirm({
+    title: t('comfyui.confirm.stop.title'),
+    message: t('comfyui.confirm.stop.message'),
+    confirmText: t('common.btn.stop'),
+  })) return
   actionLoading.value = 'stop'
   const d = await post('/api/services/comfy/stop')
   actionLoading.value = null
@@ -215,7 +219,11 @@ async function comfyStop() {
 }
 
 async function comfyRestart() {
-  if (!await confirm({ message: t('comfyui.confirm.restart') })) return
+  if (!await confirm({
+    title: t('comfyui.confirm.restart.title'),
+    message: t('comfyui.confirm.restart.message'),
+    confirmText: t('common.btn.restart'),
+  })) return
   // /api/comfyui/restart 用已保存参数做 pm2 delete + start, 保留 --log。
   actionLoading.value = 'restart'
   const d = await post<{ ok?: boolean }>('/api/comfyui/restart')

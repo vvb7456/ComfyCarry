@@ -61,10 +61,7 @@
     "desc": "The root SSH password follows panel password changes",
     "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected.",
     "enabled_toast": "SSH password follow enabled, root password synced to the panel password",
-    "disabled_toast": "SSH password follow disabled, SSH only allows public key login",
-    "lockout_title": "Disable SSH password login",
-    "lockout_confirm": "No public key is configured. After disabling, you will not be able to log in to SSH with a password. Continue?",
-    "lockout_btn": "Disable Anyway"
+    "disabled_toast": "SSH password follow disabled, SSH only allows public key login"
   },
   "log": {
     "title": "SSH Logs"
@@ -86,8 +83,19 @@
     "not_running": "sshd is not running"
   },
   "confirm": {
-    "stop": "Stop SSH service?\n\nAll active SSH sessions will be disconnected.",
-    "delete_key": "Delete this public key?"
+    "stop": {
+      "title": "Stop SSH Service",
+      "message": "All active SSH connections will be disconnected."
+    },
+    "delete_key": {
+      "title": "Delete Public Key",
+      "message": "This public key will be removed from the SSH authorized list."
+    },
+    "lockout": {
+      "title": "Disable SSH Password Login",
+      "message": "No public key is configured. Password login will be unavailable after disabling.",
+      "button": "Disable Anyway"
+    }
   },
   "toast": {
     "action_ok": "Action submitted",

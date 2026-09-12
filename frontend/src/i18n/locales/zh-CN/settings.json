@@ -14,10 +14,6 @@
     "civitai": "CivitAI"
   },
   "unsaved": {
-    "title": "未保存的更改",
-    "leave_message": "以下模块有未保存的更改：{modules}",
-    "go_fix": "去处理",
-    "discard_leave": "放弃并离开",
     "chip": "{n} 处未保存",
     "chip_tip": "跳到第一个未保存的模块"
   },
@@ -61,7 +57,6 @@
   "api_key": {
     "help": "外部脚本或应用以 X-API-Key / Bearer 请求头携带它调用面板 API。",
     "regenerate": "重新生成",
-    "regenerate_confirm": "确定要重新生成 API Key 吗？旧 Key 将立即失效。",
     "regenerated": "API Key 已重新生成",
     "regenerate_failed": "重新生成失败",
     "title": "ComfyCarry API 密钥",
@@ -75,7 +70,6 @@
     "exported": "配置已导出",
     "export_failed": "导出失败",
     "invalid_format": "无效的配置文件格式",
-    "import_confirm": "确定要导入配置吗？\n\n导出于：{date}\n将覆盖当前的密码、API Key、Tunnel 配置、同步规则等设置。",
     "import_failed": "导入失败",
     "unknown_date": "未知",
     "export_title": "导出配置",
@@ -83,8 +77,6 @@
   },
   "reinit": {
     "btn": "重新初始化",
-    "keep_models": "保留模型文件与产物",
-    "confirm": "确定要重新初始化 ComfyCarry 吗？\n\n所有配置与服务将重置。",
     "in_progress": "正在重新初始化...",
     "success": "已重置，正在跳转到部署向导...",
     "partial_fail": "部分操作失败"
@@ -115,7 +107,39 @@
     "done": "更新完成，正在重启...",
     "error": "更新失败"
   },
-  "restart_confirm": "确定要重启 ComfyCarry 吗？\n\n页面将短暂不可用。",
+  "confirm": {
+    "unsaved_leave": {
+      "title": "未保存的更改",
+      "message": "以下模块有未保存的更改：{modules}",
+      "button": "去处理",
+      "alt": "放弃并离开"
+    },
+    "restart": {
+      "title": "重启 ComfyCarry",
+      "message": "面板将重启，期间页面不可用。"
+    },
+    "regenerate_key": {
+      "title": "重新生成 API Key",
+      "message": "旧 Key 将立即失效且无法找回。",
+      "button": "重新生成"
+    },
+    "import_config": {
+      "title": "导入配置",
+      "message": "导出于：{date}。密码、API Key、Tunnel 与同步设置将被覆盖，此操作无法撤销。",
+      "button": "导入"
+    },
+    "update": {
+      "title": "更新 ComfyCarry",
+      "message": "将从 {current} 更新到 {latest}，更新完成后面板将自动重启。",
+      "button": "立即更新"
+    },
+    "reinit": {
+      "title": "重新初始化 ComfyCarry",
+      "message": "所有配置与服务将被重置，此操作无法撤销。",
+      "button": "重新初始化",
+      "checkbox": "保留模型文件与产物"
+    }
+  },
   "restarting": "ComfyCarry 正在重启，3 秒后自动刷新...",
   "civitai": {
     "key_title": "CivitAI API 密钥",

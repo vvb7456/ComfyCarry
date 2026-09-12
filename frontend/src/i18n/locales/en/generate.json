@@ -580,7 +580,6 @@
     "items": "items",
     "edit_content": "Edit Content",
     "insert_positive": "Insert to Positive Prompt",
-    "confirm_delete": "Confirm Delete Wildcard",
     "deleted": "Deleted",
     "create": "Create",
     "create_failed": "Create failed",
@@ -609,14 +608,9 @@
     "no_split_models": "Please select UNet / Text Encoder / VAE",
     "cn_disabled": "ControlNet is not available for this architecture",
     "no_prompt": "Please enter a prompt",
-    "modules_not_enabled": "Some features are configured but not enabled",
-    "modules_not_enabled_desc": "Parameters are configured but toggles are off. They will not take effect after submission.",
-    "skip_submit": "Skip and submit",
     "cn_no_ref": "{type} is enabled but no reference uploaded, please upload or uncheck",
     "cn_no_model": "{type} has no available models, please confirm ComfyUI is running",
     "i2i_no_ref": "Img2Img is enabled but no reference uploaded, please upload or uncheck",
-    "inpaint_no_mask": "No mask drawn",
-    "inpaint_no_mask_desc": "Inpaint mode is active but no mask has been drawn. Will run as standard Img2Img instead.",
     "prompt_id_missing": "Failed to get the task ID",
     "components_not_ready": "Runtime components not ready — download them first",
     "video_same_unet": "High-noise and low-noise weights must be different files",
@@ -640,16 +634,43 @@
     "role_audio_vae": "Audio VAE",
     "fast_files_hint": "Only needed in Fast mode"
   },
+  "confirm": {
+    "modules_not_enabled": {
+      "title": "Some Features Not Enabled",
+      "message": "The following configured modules are toggled off and will not take effect on submit: {modules}",
+      "button": "Submit Anyway"
+    },
+    "inpaint_no_mask": {
+      "title": "No Mask Drawn",
+      "message": "The job will run as standard Img2Img.",
+      "button": "Submit Anyway"
+    },
+    "arch_unknown": {
+      "title": "Architecture Mismatch",
+      "message": "Unable to recognize this model's architecture. Compatibility with the \"{tab_arch}\" tab is unknown.",
+      "button": "Select Anyway"
+    },
+    "arch_mismatch": {
+      "title": "Architecture Mismatch",
+      "message": "This model's architecture is {model_arch}, the current tab is {tab_arch}. The workflow will not run on submit.",
+      "button": "Select Anyway"
+    },
+    "arch_subarch_mismatch": {
+      "title": "Architecture Mismatch",
+      "message": "This model belongs to the {model_arch} ecosystem, the current tab is {tab_arch}. The two ecosystems differ.",
+      "button": "Select Anyway"
+    },
+    "wildcard_delete": {
+      "title": "Delete Wildcard",
+      "message": "\"{name}\" will be permanently deleted. This cannot be undone."
+    }
+  },
   "picker": {
     "arch_all": "All",
     "model_all": "All forms",
     "arch_unknown": "Unknown",
     "packaging_checkpoint": "All-in-one",
     "packaging_split": "Split",
-    "arch_mismatch_title": "Architecture mismatch",
-    "arch_mismatch_desc": "This model's architecture is {model_arch}, the current tab is {tab_arch}. Submitting the workflow will fail. Select anyway?",
-    "arch_unknown_desc": "Unable to recognize this model's architecture. If it is incompatible with the current tab, the workflow will fail. Select anyway?",
-    "subarch_mismatch_desc": "This model belongs to the {model_arch} ecosystem, the current tab is {tab_arch}. The ecosystem conventions differ and results may be unsatisfactory. Select anyway?",
     "empty_title": "No {arch} main model yet",
     "empty_desc": "Go to Downloads to add models",
     "empty_lora_title": "No LoRA models yet",

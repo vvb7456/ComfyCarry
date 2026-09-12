@@ -55,10 +55,8 @@ export function useUnsavedGuard(opts: {
     const result = await confirm({
       title: texts.title,
       message: texts.message,
-      variant: 'danger',
       confirmText: texts.confirmSave,
       altText: texts.confirmDiscard,
-      altVariant: 'danger',
       cancelText: texts.cancel,
     })
     if (result === true) {

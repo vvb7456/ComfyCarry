@@ -61,10 +61,7 @@
     "desc": "root 的 SSH 登录密码自动跟随面板密码更新",
     "help": "开启时会将 root 密码重置为当前面板密码并重启 sshd；面板登录不受影响。",
     "enabled_toast": "SSH 密码跟随已开启，root 密码已同步为面板密码",
-    "disabled_toast": "SSH 密码跟随已关闭，SSH 仅允许公钥登录",
-    "lockout_title": "关闭 SSH 密码登录",
-    "lockout_confirm": "当前没有配置任何公钥，关闭后将无法通过密码登录 SSH，确定？",
-    "lockout_btn": "仍然关闭"
+    "disabled_toast": "SSH 密码跟随已关闭，SSH 仅允许公钥登录"
   },
   "log": {
     "title": "SSH 日志"
@@ -86,8 +83,19 @@
     "not_running": "sshd 未在运行"
   },
   "confirm": {
-    "stop": "确定要停止 SSH 服务吗？\n\n所有活跃的 SSH 连接将断开。",
-    "delete_key": "确定要删除此公钥吗？"
+    "stop": {
+      "title": "停止 SSH 服务",
+      "message": "所有活跃的 SSH 连接将断开。"
+    },
+    "delete_key": {
+      "title": "删除公钥",
+      "message": "该公钥将从 SSH 授权列表中移除。"
+    },
+    "lockout": {
+      "title": "关闭 SSH 密码登录",
+      "message": "当前未配置任何公钥，关闭后将无法通过密码登录。",
+      "button": "仍然关闭"
+    }
   },
   "toast": {
     "action_ok": "操作已提交",

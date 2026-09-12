@@ -56,8 +56,8 @@ export function useModelActions(
 
   async function deleteModel(model: LocalModel) {
     const ok = await confirm({
-      title: t('models.local.confirm_delete'),
-      message: t('models.local.confirm_delete_file', { filename: model.filename }),
+      title: t('models.confirm.delete_model.title'),
+      message: t('models.confirm.delete_model.message', { filename: model.filename }),
       variant: 'danger',
       confirmText: t('common.btn.delete'),
     })
@@ -78,8 +78,9 @@ export function useModelActions(
     }
 
     const ok = await confirm({
-      message: t('models.local.confirm_fetch_all', { count: noInfo.length }),
-      confirmText: t('models.local.fetch_all'),
+      title: t('models.confirm.fetch_all.title'),
+      message: t('models.confirm.fetch_all.message', { count: noInfo.length }),
+      confirmText: t('models.confirm.fetch_all.button'),
     })
     if (!ok) return
 

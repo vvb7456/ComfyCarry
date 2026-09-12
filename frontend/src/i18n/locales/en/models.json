@@ -40,17 +40,14 @@
     "fetched": "Metadata",
     "all_have_info": "All models already have info",
     "deleted": "Deleted",
-    "confirm_delete": "Confirm delete",
     "total_models": "{count} models · {infoCount} with metadata",
     "no_preview": "No preview",
     "refetch_tip": "Re-fetch metadata from CivitAI",
     "fetching": "Fetching…",
     "not_found_category": "No models found in this category",
-    "confirm_fetch_all": "Will fetch metadata for {count} models, this may take a while. Continue?",
     "fetching_progress": "Fetching ({current}/{total}): {filename}",
     "fetch_complete": "All done",
     "fetch_partial": "{success} succeeded, {fail} failed",
-    "confirm_delete_file": "Delete {filename}?\nThis cannot be undone!",
     "details": "Details"
   },
   "meta": {
@@ -117,7 +114,6 @@
     "failed": "Failed",
     "download_all": "Download All",
     "clear_all": "Clear",
-    "confirm_clear": "Clear all favorites?",
     "no_pending_hint": "No saved models. Add from CivitAI tab or use Batch Add",
     "no_active": "No downloads",
     "no_history": "No download history",
@@ -140,13 +136,33 @@
     "installed": "Installed",
     "resolving": "Resolving…",
     "verifying": "Verifying",
-    "confirm_cancel": "Cancel download \"{name}\"?",
     "batch_modal_title": "Batch Add Models",
     "batch_modal_hint": "Enter one CivitAI model link or ID per line. Supports multiple formats:",
     "batch_modal_placeholder": "Paste links or IDs...",
     "batch_modal_parsed": "Detected {count} models",
     "batch_modal_submit": "Add to Favorites",
     "batch_added": "{count} models added to favorites"
+  },
+  "confirm": {
+    "delete_model": {
+      "title": "Delete Model",
+      "message": "\"{filename}\" will be permanently deleted. This cannot be undone."
+    },
+    "fetch_all": {
+      "title": "Fetch Model Metadata",
+      "message": "Metadata will be fetched for {count} models.",
+      "button": "Start"
+    },
+    "cancel_download": {
+      "title": "Cancel Download",
+      "message": "The download of \"{name}\" will be canceled.",
+      "button": "Cancel Download",
+      "cancel": "Keep Downloading"
+    },
+    "clear_favorites": {
+      "title": "Clear Favorites",
+      "message": "All favorites will be cleared."
+    }
   },
   "dl_dir": {
     "title": "Choose download folder",

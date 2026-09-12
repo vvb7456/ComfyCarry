@@ -100,9 +100,9 @@ async function requestClose(): Promise<void> {
   if (saving.value) return
   if (dirty.value) {
     const r = await confirm({
-      message: t('sync.settings.discard_confirm'),
-      variant: 'danger',
-      confirmText: t('sync.settings.discard'),
+      title: t('sync.confirm.discard.title'),
+      message: t('sync.confirm.discard.message'),
+      confirmText: t('sync.confirm.discard.button'),
       cancelText: t('common.btn.cancel'),
     })
     if (r !== true) return

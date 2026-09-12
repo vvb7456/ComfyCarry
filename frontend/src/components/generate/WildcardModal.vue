@@ -184,8 +184,8 @@ async function onCreate() {
 /* ── Delete ── */
 async function onDelete(item: WildcardItem) {
   const yes = await confirm({
-    title: t('generate.wildcard.confirm_delete'),
-    message: item.name,
+    title: t('generate.confirm.wildcard_delete.title'),
+    message: t('generate.confirm.wildcard_delete.message', { name: item.name }),
     variant: 'danger',
     confirmText: t('common.btn.delete'),
   })

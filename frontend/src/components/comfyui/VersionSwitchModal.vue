@@ -126,13 +126,11 @@ watch(() => props.modelValue, (open) => {
 async function switchSelectedVersion() {
   const tag = selectedVersion.value
   if (!tag || selectedIsCurrent.value) return
-  const confirmMsg = tag === 'nightly'
-    ? t('comfyui.settings.switch_confirm_nightly')
-    : t('comfyui.settings.switch_confirm', { version: tag })
   const result: ConfirmResult = await confirm({
-    message: confirmMsg,
-    confirmText: t('comfyui.settings.switch_only'),
-    altText: t('comfyui.settings.switch_and_install'),
+    title: t('comfyui.confirm.switch_version.title'),
+    message: t('comfyui.confirm.switch_version.message', { version: tag }),
+    confirmText: t('comfyui.confirm.switch_version.button'),
+    altText: t('comfyui.confirm.switch_version.alt'),
     altVariant: 'primary',
   })
   if (!result) {

@@ -78,8 +78,6 @@
     "invalid_name": "名称仅允许字母、数字、下划线和短横线",
     "missing_fields": "请填写必填项：{fields}",
     "create_failed": "创建失败",
-    "confirm_disconnect": "确定要断开远程存储「{name}」吗？",
-    "confirm_disconnect_with_rules": "确定要断开远程存储「{name}」吗？\n有 {count} 条规则引用该存储，将一并删除。",
     "disconnected": "已断开",
     "disconnected_with_rules": "「{name}」已断开，并清理了 {count} 条引用该存储的规则",
     "disconnect_failed": "断开失败",
@@ -158,7 +156,6 @@
     "fill_required": "请填写名称、远程存储和本地路径",
     "saved": "已保存",
     "save_failed": "保存失败",
-    "confirm_delete": "确定要删除规则「{name}」吗？",
     "deleted": "已删除",
     "running": "执行中",
     "run_ok": "规则已开始执行，查看日志了解进度",
@@ -318,9 +315,31 @@
     "bucket_label": "存储桶",
     "browse": "浏览"
   },
-  "overwrite": {
-    "confirm": "远程存储「{name}」已存在相同类型的配置，是否覆盖已有存储凭据？",
-    "btn": "覆盖已有凭据"
+  "confirm": {
+    "disconnect": {
+      "title": "断开远程存储",
+      "message": "「{name}」的连接将被移除。",
+      "button": "断开"
+    },
+    "disconnect_with_rules": {
+      "title": "断开远程存储",
+      "message": "「{name}」的连接将被移除，引用该存储的 {count} 条同步规则将一并删除。",
+      "button": "断开并删除规则"
+    },
+    "delete_rule": {
+      "title": "删除同步规则",
+      "message": "规则「{name}」将被删除。"
+    },
+    "overwrite": {
+      "title": "覆盖存储凭据",
+      "message": "「{name}」已存在同类型配置，原凭据将被替换。",
+      "button": "覆盖"
+    },
+    "discard": {
+      "title": "放弃更改",
+      "message": "未保存的同步设置将丢失。",
+      "button": "放弃更改"
+    }
   },
   "empty": {
     "desc": "连接后可同步模型与生成结果"
@@ -343,9 +362,7 @@
       "desc": "每隔一段时间检查一次文件变化并执行同步，单位秒"
     },
     "saved": "已保存",
-    "save_failed": "保存失败",
-    "discard_confirm": "同步设置已修改但未保存，确定要放弃更改吗？",
-    "discard": "放弃更改"
+    "save_failed": "保存失败"
   },
   "facts": {
     "worker": "自动同步",

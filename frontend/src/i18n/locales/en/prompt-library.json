@@ -25,7 +25,6 @@
     "clear_all": "Clear All",
     "clear_disabled": "Clear Disabled",
     "translate_all": "Translate All",
-    "clear_all_confirm": "Clear all tokens?",
     "embedding": "Embedding",
     "wildcard": "Wildcard"
   },
@@ -50,8 +49,6 @@
     "delete": "Delete",
     "favorite": "Favorite",
     "unfavorite": "Unfavorite",
-    "confirm_delete": "Delete this record?",
-    "confirm_replace": "Replace current prompt with this history item?",
     "just_now": "Just now",
     "minutes_ago": "{n} min ago",
     "hours_ago": "{n} hr ago",
@@ -62,6 +59,21 @@
     "loading": "Loading...",
     "empty_prompt": "Nothing to favorite — prompt is empty",
     "favorited": "Added to favorites"
+  },
+  "confirm": {
+    "clear_all": {
+      "title": "Clear Prompt",
+      "message": "All tokens in the editor will be cleared."
+    },
+    "replace": {
+      "title": "Replace Prompt",
+      "message": "The current editor content will be replaced by this history item.",
+      "button": "Replace"
+    },
+    "delete_history": {
+      "title": "Delete History Record",
+      "message": "This history record will be deleted."
+    }
   },
   "init": {
     "title": "Prompt Tag Library Required",

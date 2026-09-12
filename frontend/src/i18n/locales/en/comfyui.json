@@ -71,7 +71,6 @@
     "changed": "{count} changed",
     "unchanged": "No changes",
     "save_restart": "Save & Restart",
-    "save_confirm": "Saving params will restart ComfyUI, continue?",
     "restart_toast": "ComfyUI is restarting with new params...",
     "save_failed": "Save failed",
     "extra_args": "Additional CLI Arguments",
@@ -296,8 +295,7 @@
     "cleared": "Queue cleared",
     "no_running": "No running tasks",
     "no_pending": "No pending tasks",
-    "node_count": "{count} nodes",
-    "delete_confirm": "Delete this queue item?"
+    "node_count": "{count} nodes"
   },
   "history": {
     "total": "History",
@@ -321,10 +319,6 @@
     "current": "Current",
     "unstable": "Unstable",
     "switch": "Switch",
-    "switch_only": "Switch Only",
-    "switch_and_install": "Switch & Install Deps",
-    "switch_confirm": "Switch ComfyUI to {version}? This will restart ComfyUI.",
-    "switch_confirm_nightly": "Switch to nightly (master)? This is a development version and may be unstable.",
     "switch_success": "Version switched successfully",
     "switch_failed": "Version switch failed",
     "custom_build": "Custom commit",
@@ -339,8 +333,29 @@
     "offline_desc": "The plugin directory is provided by ComfyUI-Manager. Start ComfyUI from the page header to manage plugins."
   },
   "confirm": {
-    "restart": "Restart ComfyUI?",
-    "stop": "Stop ComfyUI?"
+    "stop": {
+      "title": "Stop ComfyUI",
+      "message": "Running tasks will be interrupted."
+    },
+    "restart": {
+      "title": "Restart ComfyUI",
+      "message": "Running tasks will be interrupted."
+    },
+    "save_params": {
+      "title": "Save Parameters",
+      "message": "Saving will restart ComfyUI. Running tasks will be interrupted.",
+      "button": "Save & Restart"
+    },
+    "queue_delete": {
+      "title": "Delete Queue Item",
+      "message": "This task will be removed from the queue."
+    },
+    "switch_version": {
+      "title": "Switch ComfyUI Version",
+      "message": "ComfyUI will switch to {version} and restart.",
+      "button": "Switch Only",
+      "alt": "Switch & Install Deps"
+    }
   },
   "err": {
     "args_check_failed": "Cannot read ComfyUI launch argument definitions. The ComfyUI installation may be incomplete; the operation was cancelled",

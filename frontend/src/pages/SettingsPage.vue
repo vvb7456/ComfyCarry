@@ -213,11 +213,10 @@ async function guardLeave(): Promise<boolean> {
   if (!dirty.length) return true
   const names = dirty.map(d => d.label()).join(' · ')
   const result = await confirm({
-    title: t('settings.unsaved.title'),
-    message: t('settings.unsaved.leave_message', { modules: names }),
-    confirmText: t('settings.unsaved.go_fix'),
-    altText: t('settings.unsaved.discard_leave'),
-    altVariant: 'danger',
+    title: t('settings.confirm.unsaved_leave.title'),
+    message: t('settings.confirm.unsaved_leave.message', { modules: names }),
+    confirmText: t('settings.confirm.unsaved_leave.button'),
+    altText: t('settings.confirm.unsaved_leave.alt'),
     cancelText: t('common.btn.cancel'),
   })
   if (result === true) { scrollToDomain(dirty[0].id); return false } // 取消导航并跳到第一个 dirty 域
@@ -247,7 +246,11 @@ onBeforeUnmount(() => {
 // ─── 页头右上: 重启服务 (与其他服务页统一) ────────────────────────────────────
 
 async function restartDashboard() {
-  if (!await confirm({ message: t('settings.restart_confirm') })) return
+  if (!await confirm({
+    title: t('settings.confirm.restart.title'),
+    message: t('settings.confirm.restart.message'),
+    confirmText: t('common.btn.restart'),
+  })) return
   // 失败已由 useApiFetch 提示; 不要再报"正在重启"并刷新页面
   if (!await post('/api/settings/restart', {})) return
   toast(t('settings.restarting'), 'info')

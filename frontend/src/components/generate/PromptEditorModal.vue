@@ -333,7 +333,11 @@ function hasNonAscii(text: string): boolean {
 }
 
 async function onClearAll() {
-  const yes = await confirm({ message: t('prompt-library.toolbar.clear_all_confirm'), variant: 'danger' })
+  const yes = await confirm({
+    title: t('prompt-library.confirm.clear_all.title'),
+    message: t('prompt-library.confirm.clear_all.message'),
+    confirmText: t('common.btn.clear'),
+  })
   if (!yes) return
   activeEditor.value.clearAll()
   syncToParent()
@@ -360,8 +364,9 @@ async function onHistoryApply(item: { positive: string; negative: string }) {
     negEditor.tokens.value.some(t => t.enabled)
   if (hasContent) {
     const yes = await confirm({
-      message: t('prompt-library.history_modal.confirm_replace'),
-      variant: 'danger',
+      title: t('prompt-library.confirm.replace.title'),
+      message: t('prompt-library.confirm.replace.message'),
+      confirmText: t('prompt-library.confirm.replace.button'),
     })
     if (!yes) return
   }
