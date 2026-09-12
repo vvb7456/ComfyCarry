@@ -11,6 +11,7 @@ import { useGenerateStore } from '@/stores/generate'
 import type { ExecState } from '@/composables/useExecTracker'
 import SplitButton, { type SplitButtonOption } from '@/components/ui/SplitButton.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ActionBar' })
 
@@ -37,7 +38,7 @@ const state = computed(() => store.currentState)
 /* ── Run mode ── */
 interface RunModeConfig {
   key: string
-  icon: string
+  icon: IconName
   label: string
   disabled?: boolean
 }

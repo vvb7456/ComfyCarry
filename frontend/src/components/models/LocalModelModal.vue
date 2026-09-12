@@ -215,11 +215,11 @@ function openImage(index: number) {
           <tr><td>{{ t('models.meta.file') }}</td><td class="lm-mono">{{ detail.relative_path }}</td></tr>
           <tr><td>{{ t('models.local.size') }}</td><td>{{ fmtBytes(detail.size_bytes) }}</td></tr>
           <tr v-if="detail.sha256"><td>SHA256</td><td class="lm-mono">{{ detail.sha256 }}</td></tr>
-          <tr><td>{{ t('models.local.source') }}</td><td><a v-if="sourceUrl()" :href="sourceUrl()" target="_blank" rel="noopener" class="link lm-source-link">{{ sourceLabel() }} <MsIcon name="open_in_new" class="ms-sm" /></a><template v-else>{{ sourceLabel() }}</template></td></tr>
+          <tr><td>{{ t('models.local.source') }}</td><td><a v-if="sourceUrl()" :href="sourceUrl()" target="_blank" rel="noopener" class="link lm-source-link">{{ sourceLabel() }} <MsIcon name="open_in_new" /></a><template v-else>{{ sourceLabel() }}</template></td></tr>
           <tr v-if="detail.source.version_name"><td>{{ t('models.meta.version') }}</td><td>{{ detail.source.version_name }}</td></tr>
           <tr v-for="link in visibleLinks" :key="link.type + link.url">
             <td>{{ link.type }}</td>
-            <td><a class="link" :href="link.url" target="_blank" rel="noopener">{{ link.url }} <MsIcon name="open_in_new" class="ms-sm" /></a></td>
+            <td><a class="link" :href="link.url" target="_blank" rel="noopener">{{ link.url }} <MsIcon name="open_in_new" /></a></td>
           </tr>
         </tbody>
       </table>

@@ -2,13 +2,14 @@
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ThemeToggle' })
 
 const { t } = useI18n({ useScope: 'global' })
 const theme = useTheme()
 
-const iconMap: Record<string, string> = {
+const iconMap: Record<string, IconName> = {
   dark: 'dark_mode',
   light: 'light_mode',
   system: 'contrast',

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'FileUploadZone' })
 
@@ -12,10 +13,10 @@ const props = withDefaults(defineProps<{
   fileName?: string
   pickLabel?: string
   uploadLabel?: string
-  pickIcon?: string
+  pickIcon?: IconName
   /** When set, replaces the bottom upload area with a custom action button */
   actionLabel?: string
-  actionIcon?: string
+  actionIcon?: IconName
   disabled?: boolean
   compact?: boolean
 }>(), {

@@ -7,6 +7,7 @@ import { useWildcardManager } from '@/composables/generate/useWildcardManager'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
 import { useToast } from '@/composables/useToast'
+import type { ToolButton } from '@/components/generate/PromptEditor.vue'
 
 interface PromptEditorHandle {
   insertAtCursor: (target: 'positive' | 'negative', text: string) => void
@@ -60,7 +61,7 @@ export function useModelModalManager({
   const isNaturalPrompt = computed(() => store.currentConfig.promptStyle === 'natural')
 
   const promptTools = computed(() => {
-    const tools = [
+    const tools: ToolButton[] = [
       { key: 'prompt-editor', icon: 'edit_note', label: t('generate.prompt.tools.prompt_editor'), title: t('generate.prompt.tools.prompt_editor_title') },
       { key: 'interrogate', icon: 'image_search', label: t('generate.prompt.tools.interrogate'), title: t('generate.prompt.tools.interrogate_title') },
       { key: 'llm-assist', icon: 'auto_awesome', label: t('generate.prompt.tools.llm_assist'), title: t('generate.prompt.tools.llm_assist_title') },

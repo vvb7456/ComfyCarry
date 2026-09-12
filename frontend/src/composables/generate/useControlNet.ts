@@ -5,6 +5,7 @@ import { useRefImagePicker } from './useRefImagePicker'
 import { useToast } from '@/composables/useToast'
 import { cnBranchForFile, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import { apiErrorText } from '@/utils/apiError'
+import type { IconName } from '@/config/icon-codepoints'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ export interface PPParamDef {
 
 export interface PPTypeDef {
   titleKey: string
-  icon: string
+  icon: IconName
   params: PPParamDef[]
 }
 

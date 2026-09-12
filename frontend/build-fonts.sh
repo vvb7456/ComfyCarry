@@ -2,19 +2,18 @@
 # ==============================================================================
 # Font Build Script
 #
-# 在 CI 环境中运行，生成前端所需的字体文件:
-# - Material Symbols Outlined 子集化 (仅保留使用到的图标)
+# 生成前端所需的字体文件:
+# - Material Symbols Outlined 子集化 (仅保留 icons.txt 列出的图标)
 #
-# 图标名来源 (自动合并去重):
-# 1. 源码中 MsIcon 的 name="xxx" 静态绑定
-# 2. 源码中 :name="... 'xxx' ..." 动态绑定内的字符串字面量
-# 3. 任意组件的 icon="xxx" 静态 prop (SectionHeader/AlertBanner/OptionCard/EmptyState 等
-#    把 icon prop 转传给 MsIcon 的间接调用, 无需在 icons.txt 手动补)
-# 4. 任意组件的 :icon="... 'xxx' ..." 动态绑定内的字符串字面量
-# 5. MsIcon.vue 中 ICON_COLORS 映射表的 key (兼容旧实现)
-# 6. icons.txt 补充清单 (用于 JS 变量/对象/computed 传递等仍无法自动提取的图标)
+# icons.txt 是图标清单的唯一来源:
+# - src/config/icon-codepoints.ts (含 IconName 类型) 由本脚本读取 icons.txt 生成;
+# - 源码里的图标名交给 TypeScript 校验: MsIcon / icon prop 的类型为 IconName,
+#   用了清单外的名字会在编辑器 / vue-tsc 报错, 因此本脚本不再从源码提取图标名
+#   (iconMap / 变量传递等动态引用无法可靠提取, 静态 grep 会误报);
+# - 更新图标清单后必须重跑本脚本, 否则字体子集与 codepoints 会不同步。
 #
 # 输出: frontend/public/fonts/MaterialSymbolsOutlined.woff2
+#       frontend/src/config/icon-codepoints.ts
 # ==============================================================================
 
 set -e
@@ -27,37 +26,22 @@ ICONS_FILE="$SCRIPT_DIR/icons.txt"
 
 echo "=== Font Build ==="
 
-# ── 1. 从源码自动提取图标名 ──
-echo ">>> [1/2] Extracting icon names from source..."
-
-# 1a. MsIcon 静态绑定: <MsIcon ... name="icon_name" ...
-STATIC_ICONS=$(grep -rh --include='*.vue' 'MsIcon' "$SRC_DIR" 2>/dev/null | grep -oP '\bname="[a-z_]+"' | grep -oP '(?<=name=")[a-z_]+' || true)
-
-# 1b. MsIcon 动态绑定: :name="... 'icon_name' ..." 中的单引号字符串
-DYNAMIC_ICONS=$(grep -rh --include='*.vue' 'MsIcon' "$SRC_DIR" 2>/dev/null | grep -oP ":name=\"[^\"]*'" | grep -oP "'[a-z_]+'" | tr -d "'" || true)
-
-# 1c. 任意组件 icon="xxx" 静态 prop (SectionHeader/AlertBanner/OptionCard/EmptyState 等
-#      间接把 icon prop 转传给 MsIcon 的调用点; 扫描所有 .vue, 不限 MsIcon)
-ICON_PROP_STATIC=$(grep -rh --include='*.vue' 'icon="[a-z_0-9]' "$SRC_DIR" 2>/dev/null | grep -oP 'icon="[a-z_0-9]+"' | grep -oP '(?<=icon=")[a-z_0-9]+' || true)
-
-# 1d. 任意组件 :icon="... 'icon_name' ..." 动态绑定内的单引号字符串
-ICON_PROP_DYNAMIC=$(grep -rh --include='*.vue' ":icon=\"[^\"]*'" "$SRC_DIR" 2>/dev/null | grep -oP ":icon=\"[^\"]*'" | grep -oP "'[a-z_0-9]+'" | tr -d "'" || true)
-
-# 1e. JS 对象字面量中的 icon: 'icon_name' 属性 (Tab 配置、菜单等)
-JS_OBJECT_ICONS=$(grep -rh --include='*.vue' --include='*.ts' -oP "icon:\s*'\K[a-z_0-9]+" "$SRC_DIR" 2>/dev/null || true)
-
-# 1g. icons.txt 补充清单 (JS 变量/对象/computed 传递等无法自动提取的图标)
-MANUAL_ICONS=""
-if [ -f "$ICONS_FILE" ]; then
-    MANUAL_ICONS=$(grep -v '^#' "$ICONS_FILE" | grep -v '^\s*$' | tr -d '\r')
+# ── 1. 读取图标清单 ──
+if [ ! -f "$ICONS_FILE" ]; then
+    echo "[ERROR] 找不到图标清单: $ICONS_FILE" >&2
+    exit 1
 fi
 
-# 合并去重
-ALL_ICONS=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${ICON_PROP_STATIC}\n${ICON_PROP_DYNAMIC}\n${JS_OBJECT_ICONS}\n${MANUAL_ICONS}" | grep -v '^\s*$' | sort -u)
-
-AUTO_COUNT=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${ICON_PROP_STATIC}\n${ICON_PROP_DYNAMIC}\n${JS_OBJECT_ICONS}" | grep -v '^\s*$' | sort -u | wc -l)
-TOTAL_COUNT=$(echo "$ALL_ICONS" | wc -l)
-echo "  Auto-extracted: ${AUTO_COUNT}, Manual (icons.txt): +$(echo "$MANUAL_ICONS" | grep -v '^\s*$' | wc -l), Total unique: ${TOTAL_COUNT}"
+ICONS_TMP="/tmp/ms-icons-list.txt"
+# 注释/空行过滤后可能没有剩余行, grep 会以 1 退出; pipefail 下必须放行,
+# 否则走不到下面"清单为空"的友好报错 (全注释文件会直接静默中断)
+grep -v '^[[:space:]]*#' "$ICONS_FILE" | grep -v '^[[:space:]]*$' | tr -d '\r' | sort -u > "$ICONS_TMP" || true
+ICON_COUNT=$(grep -c . "$ICONS_TMP" || true)
+if [ "$ICON_COUNT" -eq 0 ]; then
+    echo "[ERROR] icons.txt 里没有任何图标名 (只有注释或空行?)" >&2
+    exit 1
+fi
+echo ">>> [1/2] icons.txt: ${ICON_COUNT} icons"
 
 # ── 2. Material Symbols Outlined 子集化 ──
 echo ">>> [2/2] Material Symbols subset..."
@@ -85,10 +69,9 @@ font.save('$MS_TTF')
 
 # 解析 codepoint: 优先用上游 codepoints 文件; 若该编码在字体 cmap 中不存在,
 # 则按字形名回退到字体实际编码并告警 (上游文件偶有滞后, 如 movie e684 实际为 e404,
-# 直接信任会导致 pyftsubset 静默丢字形、页面渲染空白)
+# 直接信任会导致 pyftsubset 静默丢字形、页面渲染空白)。
+# 清单里的名字若在字体中完全找不到, 说明拼写错误或图标已从上游移除, 直接失败。
 RESOLVED_FILE="/tmp/ms-icons-resolved.tsv"
-ICONS_TMP="/tmp/ms-icons-list.txt"
-printf '%s\n' "$ALL_ICONS" > "$ICONS_TMP"
 python3 - "$CP_FILE" "$MS_TTF" "$ICONS_TMP" "$RESOLVED_FILE" <<'PYEOF'
 import sys
 from fontTools.ttLib import TTFont
@@ -110,6 +93,7 @@ for codepoint, glyph in cmap.items():
 icons = [line.strip() for line in open(icons_path) if line.strip()]
 resolved = {}
 warnings = []
+missing = []
 for name in icons:
     hexcp = declared.get(name)
     codepoint = int(hexcp, 16) if hexcp else None
@@ -121,8 +105,13 @@ for name in icons:
         chosen = max(candidates)
         resolved[name] = f'{chosen:04x}'
         warnings.append(f'{name}: {hexcp or "(none)"} -> {chosen:04x}')
-    elif hexcp:
-        warnings.append(f'{name}: {hexcp} missing from font')
+    else:
+        missing.append(name)
+
+if missing:
+    print('[ERROR] icons.txt 中以下图标名在 Material Symbols 中不存在, 请检查拼写:',
+          ', '.join(sorted(missing)), file=sys.stderr)
+    sys.exit(1)
 
 with open(resolved_path, 'w') as out:
     for name in sorted(resolved):
@@ -133,13 +122,6 @@ PYEOF
 
 UNICODES=$(awk '{printf ",U+%s", $2}' "$RESOLVED_FILE")
 UNICODES="${UNICODES#,}"
-MISSING=$(comm -23 <(sort -u "$ICONS_TMP") <(cut -d' ' -f1 "$RESOLVED_FILE" | sort -u) | tr '\n' ' ')
-
-if [ -n "${MISSING// /}" ]; then
-    echo "  Missing codepoints for: ${MISSING}"
-fi
-
-ICON_COUNT=$(echo "$ALL_ICONS" | wc -l)
 UNICODE_COUNT=$(wc -l < "$RESOLVED_FILE")
 echo "  Icons: ${ICON_COUNT}, Unicodes: ${UNICODE_COUNT}"
 
@@ -158,10 +140,11 @@ with open(resolved_path) as f:
 
 with open(out_path, 'w') as out:
     out.write('// Auto-generated by build-fonts.sh — DO NOT EDIT\n')
-    out.write('export const ICON_CODEPOINTS: Record<string, string> = {\n')
+    out.write('export const ICON_CODEPOINTS = {\n')
     for name, cp in sorted(entries):
         out.write("  '%s': '\\u%s',\n" % (name, cp))
-    out.write('}\n')
+    out.write('} as const\n\n')
+    out.write('export type IconName = keyof typeof ICON_CODEPOINTS\n')
 PYEOF
 echo "  Generated: $(basename "$CODEPOINT_FILE") (${UNICODE_COUNT} entries)"
 

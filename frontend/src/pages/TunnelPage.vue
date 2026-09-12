@@ -37,6 +37,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import TunnelSettingsModal from '@/components/tunnel/TunnelSettingsModal.vue'
 import { serviceIcon } from '@/config/serviceIdentity'
 import type { TunnelData, TunnelActionResponse } from '@/types/tunnel'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'TunnelPage' })
 
@@ -140,7 +141,7 @@ const heroHasActions = computed(() => ['unconfigured', 'stopped', 'failed'].incl
 interface ServiceRow {
   key: string
   title: string
-  icon: string
+  icon: IconName
   port: number | null
   protocol: string
   url: string

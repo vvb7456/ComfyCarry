@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'SectionHeader' })
 
 const props = withDefaults(defineProps<{
-  icon?: string
+  icon?: IconName
   flush?: boolean
   align?: 'left' | 'center'
   withLines?: boolean

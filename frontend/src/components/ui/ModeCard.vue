@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import BaseCard from '@/components/ui/BaseCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ModeCard' })
 
 const props = withDefaults(defineProps<{
-  icon?: string
+  icon?: IconName
   iconColor?: string
   title?: string
   description?: string
@@ -15,7 +16,6 @@ const props = withDefaults(defineProps<{
   clickable?: boolean
   disabled?: boolean
 }>(), {
-  icon: '',
   iconColor: '',
   title: '',
   description: '',

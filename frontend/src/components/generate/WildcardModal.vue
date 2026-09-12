@@ -294,7 +294,7 @@ function onInsert(item: WildcardItem) {
         <div class="wc-edit-header">
           <MsIcon name="edit_note" size="sm" color="none" />
           <h3 class="wc-edit-title">{{ editName.split('/').pop() }}</h3>
-          <button class="wc-icon-btn" @click="editVisible = false">
+          <button class="wc-icon-btn" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="editVisible = false">
             <MsIcon name="close" size="sm" color="var(--red)" />
           </button>
         </div>
@@ -319,7 +319,7 @@ function onInsert(item: WildcardItem) {
         <div class="wc-edit-header">
           <MsIcon name="create_new_folder" size="sm" color="none" />
           <h3 class="wc-edit-title">{{ t('generate.wildcard.new_folder_title') }}</h3>
-          <button class="wc-icon-btn" @click="newFolderVisible = false">
+          <button class="wc-icon-btn" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="newFolderVisible = false">
             <MsIcon name="close" size="sm" color="var(--red)" />
           </button>
         </div>

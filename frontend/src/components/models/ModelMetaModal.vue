@@ -289,14 +289,14 @@ function fmtSize(bytes?: number): string {
           </tr>
           <tr v-if="sourceUrl">
             <td>{{ t('models.meta.link') }}</td>
-            <td><a class="link" :href="sourceUrl" target="_blank" rel="noopener">{{ sourceLabel }} <MsIcon name="open_in_new" class="ms-sm" /></a></td>
+            <td><a class="link" :href="sourceUrl" target="_blank" rel="noopener">{{ sourceLabel }} <MsIcon name="open_in_new" /></a></td>
           </tr>
           <tr v-if="meta.stats">
             <td>{{ t('models.meta.stats') }}</td>
             <td>
-              <MsIcon name="download" class="ms-sm" /> {{ (meta.stats.downloads || 0).toLocaleString() }}
+              <MsIcon name="download" /> {{ (meta.stats.downloads || 0).toLocaleString() }}
               &nbsp;
-              <MsIcon name="thumb_up" class="ms-sm" /> {{ (meta.stats.likes || 0).toLocaleString() }}
+              <MsIcon name="thumb_up" /> {{ (meta.stats.likes || 0).toLocaleString() }}
             </td>
           </tr>
           <tr v-if="meta.filename">
@@ -318,7 +318,7 @@ function fmtSize(bytes?: number): string {
       <div v-if="displayTrainedWords.length" class="mm-section">
         <div class="mm-section-header">
           <div class="mm-section-title">
-            <MsIcon name="label" class="ms-sm" />
+            <MsIcon name="label" />
             {{ t('models.meta.trigger_words') }}
           </div>
           <div class="mm-tw-actions">
@@ -354,7 +354,7 @@ function fmtSize(bytes?: number): string {
       <!-- Image Gallery -->
       <div v-if="displayImages.length" class="mm-section">
         <div class="mm-section-title">
-          <MsIcon name="image" class="ms-sm" />
+          <MsIcon name="image" />
           {{ t('models.meta.sample_images') }}
         </div>
         <div class="mm-gallery">
@@ -371,7 +371,7 @@ function fmtSize(bytes?: number): string {
                 muted loop playsinline disablepictureinpicture preload="metadata"
               />
               <span class="mm-video-badge">
-                <MsIcon name="movie" class="ms-sm" /> {{ t('models.meta.video') }}
+                <MsIcon name="movie" /> {{ t('models.meta.video') }}
               </span>
             </template>
             <img

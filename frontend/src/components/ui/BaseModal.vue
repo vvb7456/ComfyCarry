@@ -23,6 +23,7 @@ export function unlockBodyScroll() {
 import { computed, watch, ref, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'BaseModal' })
 
@@ -30,7 +31,7 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   title?: string
   subtitle?: string
-  icon?: string
+  icon?: IconName
   iconColor?: string
   ariaLabel?: string
   // Size

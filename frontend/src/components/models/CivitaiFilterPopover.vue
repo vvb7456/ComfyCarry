@@ -135,9 +135,9 @@ onBeforeUnmount(removeDocumentListeners)
       :aria-expanded="open"
       @click="toggle"
     >
-      <MsIcon name="tune" class="ms-sm" />
+      <MsIcon name="tune" />
       <span class="civitai-filter__trigger-label">{{ triggerLabel }}</span>
-      <MsIcon name="expand_more" class="ms-sm" />
+      <MsIcon name="expand_more" />
     </button>
 
     <Teleport to="body">

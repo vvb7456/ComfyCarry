@@ -3,6 +3,7 @@ import { useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'WizardStepLayout' })
 
@@ -11,7 +12,7 @@ const { t } = useI18n({ useScope: 'global' })
 withDefaults(defineProps<{
   title: string
   description?: string
-  icon?: string
+  icon?: IconName
   showPrev?: boolean
   showNext?: boolean
   nextLabel?: string

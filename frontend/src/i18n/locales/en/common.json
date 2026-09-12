@@ -20,7 +20,13 @@
     "logout": "Logout",
     "retry": "Retry",
     "done": "Done",
-    "settings": "Settings"
+    "settings": "Settings",
+    "increase": "Increase",
+    "decrease": "Decrease",
+    "search": "Search",
+    "more_options": "Expand options",
+    "prev_image": "Previous image",
+    "next_image": "Next image"
   },
   "status": {
     "loading": "Loading..."

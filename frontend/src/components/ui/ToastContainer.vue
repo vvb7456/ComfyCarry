@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ToastContainer' })
 
 const { items, remove } = useToast()
 
-const iconMap: Record<string, string> = {
+const iconMap: Record<string, IconName> = {
   success: 'check_circle',
   error: 'error',
   warning: 'warning',

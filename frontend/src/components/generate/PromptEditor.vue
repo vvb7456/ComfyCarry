@@ -16,12 +16,13 @@ import { useI18n } from 'vue-i18n'
 import { MODEL_TYPES } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'PromptEditor' })
 
 export interface ToolButton {
   key: string
-  icon: string
+  icon: IconName
   label: string
   title?: string
   disabled?: boolean

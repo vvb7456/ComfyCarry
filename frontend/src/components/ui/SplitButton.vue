@@ -1,20 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'SplitButton' })
+
+const { t } = useI18n({ useScope: 'global' })
 
 export interface SplitButtonOption {
   key: string
   label: string
-  icon?: string
+  icon?: IconName
   active?: boolean
   disabled?: boolean
 }
 
 const props = withDefaults(defineProps<{
   label: string
-  icon?: string
+  icon?: IconName
   variant?: 'primary' | 'danger' | 'success'
   disabled?: boolean
   /** 软禁用: 主按钮视觉置灰但仍可点击 (供父组件 toast 说明原因), 右侧下拉真禁用 */
@@ -65,6 +69,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
     <button
       class="split-button__arrow"
+      :aria-label="t('common.btn.more_options')"
+      :title="t('common.btn.more_options')"
+      aria-haspopup="true"
+      :aria-expanded="open"
       :disabled="disabled || loading || softDisabled"
       @click="toggle"
     >

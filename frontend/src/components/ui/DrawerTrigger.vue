@@ -14,11 +14,12 @@
  * 退化成一个红点 —— 失败任务本身不在"进行中"里, 但抽屉关着时必须能看见。
  */
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'DrawerTrigger' })
 
 withDefaults(defineProps<{
-  icon: string
+  icon: IconName
   label: string
   /** 正在进行的条数; 0 或不传则不显示计数 */
   badge?: number

@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { DeployStep } from '@/types/wizard'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'DeployStepList' })
 
@@ -11,7 +12,7 @@ defineProps<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-const icons: Record<DeployStep['status'], string> = {
+const icons: Record<DeployStep['status'], IconName> = {
   active: 'hourglass_top',
   done: 'check_circle',
   error: 'cancel',

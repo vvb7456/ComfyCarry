@@ -13,13 +13,14 @@
  */
 import { computed, nextTick } from 'vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ModuleTabs' })
 
 export interface SwitchTabItem {
   key: string
   label: string
-  icon?: string
+  icon?: IconName
   disabled?: boolean
 }
 

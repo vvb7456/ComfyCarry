@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BaseCard from '@/components/ui/BaseCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'OptionCard' })
 
@@ -10,7 +11,7 @@ const props = withDefaults(defineProps<{
   locked?: boolean
   title?: string
   description?: string
-  icon?: string
+  icon?: IconName
   iconColor?: string
   /** 底色档位 (透传 BaseCard): 在 bg3 底的弹窗内使用时传 bg2 以保持对比 */
   variant?: 'bg2' | 'bg3'

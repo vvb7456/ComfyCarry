@@ -41,12 +41,13 @@ export interface ListRowFact {
 import MsIcon from './MsIcon.vue'
 import StatusDot from './StatusDot.vue'
 import Badge from './Badge.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ListRow' })
 
 withDefaults(defineProps<{
   /** Material Symbols 图标名（对象身份图标） */
-  icon?: string
+  icon?: IconName
   /** 主行文字（对象名） */
   title: string
   /** 主行悬停说明：pm2 内部名、完整路径这类排障信息 */
@@ -103,7 +104,7 @@ withDefaults(defineProps<{
             :href="fact.href"
             target="_blank"
             rel="noopener"
-          >{{ fact.text }}<MsIcon name="open_in_new" class="ms-sm" /></a>
+          >{{ fact.text }}<MsIcon name="open_in_new" /></a>
           <template v-else>{{ typeof fact === 'string' ? fact : fact.text }}</template>
         </span>
       </div>

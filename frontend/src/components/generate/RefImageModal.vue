@@ -12,13 +12,14 @@ import { IMAGE_ACCEPT, type InputImage } from '@/composables/generate/useRefImag
 import BaseModal from '@/components/ui/BaseModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'RefImageModal' })
 
 const props = defineProps<{
   modelValue: boolean
   title: string
-  icon?: string
+  icon?: IconName
   images: InputImage[]
   loading: boolean
   uploading: boolean

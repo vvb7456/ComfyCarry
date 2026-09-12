@@ -13,7 +13,7 @@ export interface SelectOption {
   /** 选项前缀图片 URL (品牌 logo 等); 与 icon 二选一, logo 优先 */
   logo?: string
   /** 选项前缀 MsIcon 图标名 (无 logo 素材时的后备) */
-  icon?: string
+  icon?: IconName
 }
 </script>
 
@@ -22,6 +22,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFloating, autoUpdate, offset, flip, shift, size as floatingSize } from '@floating-ui/vue'
 import MsIcon from '../ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
+import { isIconName } from '@/config/icons'
 
 defineOptions({ name: 'BaseSelect' })
 
@@ -179,7 +181,7 @@ const normalizedOptions = computed<SelectOption[]>(() => {
       group: typeof grp === 'string' ? grp : undefined,
       hint: typeof hnt === 'string' ? hnt : undefined,
       logo: typeof lgo === 'string' ? lgo : undefined,
-      icon: typeof ico === 'string' ? ico : undefined,
+      icon: isIconName(ico) ? ico : undefined,
     }
   })
 })

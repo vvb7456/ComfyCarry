@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 import { lockBodyScroll, unlockBodyScroll } from './BaseModal.vue'
 
 defineOptions({ name: 'ImagePreview' })
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -73,12 +76,19 @@ onUnmounted(() => {
     <Transition name="ip-fade">
       <div v-if="modelValue" class="ip-overlay" @mousedown="onOverlayMousedown" @click="onOverlayClick">
         <!-- Close button -->
-        <button class="ip-close" @click="close" aria-label="Close">
+        <button class="ip-close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="close">
           <MsIcon name="close" />
         </button>
 
         <!-- Left arrow -->
-        <button v-if="hasNav" class="ip-arrow ip-arrow--left" :disabled="idx === 0" @click="prev">
+        <button
+          v-if="hasNav"
+          class="ip-arrow ip-arrow--left"
+          :aria-label="t('common.btn.prev_image')"
+          :title="t('common.btn.prev_image')"
+          :disabled="idx === 0"
+          @click="prev"
+        >
           <MsIcon name="chevron_left" />
         </button>
 
@@ -109,7 +119,14 @@ onUnmounted(() => {
         </div>
 
         <!-- Right arrow -->
-        <button v-if="hasNav" class="ip-arrow ip-arrow--right" :disabled="idx >= total - 1" @click="next">
+        <button
+          v-if="hasNav"
+          class="ip-arrow ip-arrow--right"
+          :aria-label="t('common.btn.next_image')"
+          :title="t('common.btn.next_image')"
+          :disabled="idx >= total - 1"
+          @click="next"
+        >
           <MsIcon name="chevron_right" />
         </button>
 

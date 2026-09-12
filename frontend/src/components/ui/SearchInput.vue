@@ -80,7 +80,7 @@ defineExpose({ focus })
       :title="t('common.btn.clear')"
       @click="model = ''; emit('search', ''); focus()"
     >
-      <MsIcon name="close" class="ms-xs" />
+      <MsIcon name="close" size="xs" />
     </button>
 
     <!-- Inline slot for extra controls (e.g. sort dropdown) -->
@@ -89,10 +89,12 @@ defineExpose({ focus })
 
     <button
       class="search-input__submit"
+      :aria-label="t('common.btn.search')"
+      :title="t('common.btn.search')"
       :disabled="loading"
       @click="submit"
     >
-      <MsIcon v-if="!loading" name="search" class="ms-sm" />
+      <MsIcon v-if="!loading" name="search" />
       <span v-else class="search-input__spinner" />
     </button>
   </div>

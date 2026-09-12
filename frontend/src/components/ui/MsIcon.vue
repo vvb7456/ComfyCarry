@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ICON_CODEPOINTS } from '@/config/icon-codepoints'
+import { ICON_CODEPOINTS, type IconName } from '@/config/icon-codepoints'
+import { isIconName, reportUnknownIcon } from '@/config/icons'
 
 defineOptions({ name: 'MsIcon' })
 
 const props = defineProps<{
-  /** Material Symbols icon name */
-  name: string
+  /** Material Symbols 图标名 (icons.txt 全量清单, 由 IconName 类型约束) */
+  name: IconName
   /** Size variant: xxs(12) | xs(16) | sm(18, default) | md(20) | lg(32) | xl(48) */
   size?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   /** 着色。默认继承父级文字色; 仅在表达状态时显式传入语义色变量 */
@@ -47,7 +48,14 @@ const sizeClass = computed(() => {
   return `ms-${props.size}`
 })
 
-const iconChar = computed(() => ICON_CODEPOINTS[props.name] || props.name)
+const iconChar = computed(() => {
+  const name = props.name
+  if (isIconName(name)) return ICON_CODEPOINTS[name]
+  // 理论上不可达: name 是 IconName, 动态来源必须过 isIconName 白名单。
+  // 若仍走到这里 (例如被 as IconName 强转), 开发环境渲染出名字便于定位, 生产环境只报告不露字符。
+  reportUnknownIcon(String(name))
+  return import.meta.env.DEV ? String(name) : ''
+})
 
 const iconStyle = computed(() => {
   // 'none' 保留为显式"继承"写法 (与默认行为一致, 兼容既有调用点)
@@ -57,5 +65,5 @@ const iconStyle = computed(() => {
 </script>
 
 <template>
-  <span class="ms" :class="sizeClass" :style="iconStyle">{{ iconChar }}</span>
+  <span class="ms" :class="sizeClass" :style="iconStyle" aria-hidden="true">{{ iconChar }}</span>
 </template>

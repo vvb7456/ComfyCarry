@@ -16,6 +16,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { fmtBytes } from '@/utils/format'
 import type { SyncJob, SyncJobEvent } from '@/composables/useSyncJobs'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'SyncJobDetailModal' })
 
@@ -100,7 +101,7 @@ function triggerText(trigger: string): string {
   return te(key) ? t(key) : trigger
 }
 
-function directionIcon(direction: string): string {
+function directionIcon(direction: string): IconName {
   return direction === 'push' ? 'arrow_upward' : 'arrow_downward'
 }
 

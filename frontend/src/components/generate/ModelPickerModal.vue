@@ -20,6 +20,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import { ARCH_LABELS, effectiveArch, familyRoot } from '@/config/model-types'
 import { localModelPreviewUrl } from '@/utils/modelPreview'
 import { useConfirm } from '@/composables/useConfirm'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ModelPickerModal' })
 
@@ -35,7 +36,7 @@ export interface PickerModelItem {
 const props = withDefaults(defineProps<{
   modelValue: boolean
   title: string
-  icon?: string
+  icon?: IconName
   items: PickerModelItem[]
   /** Multi-select mode (LoRA). Single-select (Checkpoint) by default. */
   multi?: boolean

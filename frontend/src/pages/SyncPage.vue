@@ -29,6 +29,8 @@ import { useLogStream } from '@/composables/useLogStream'
 import { useSyncJobs, type SyncJob } from '@/composables/useSyncJobs'
 import { useCompanionClients } from '@/composables/useCompanionClients'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import type { TabItem } from '@/components/ui/TabSwitcher.vue'
+import type { IconName } from '@/config/icon-codepoints'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import ListPagination from '@/components/ui/ListPagination.vue'
@@ -69,7 +71,7 @@ const { copy } = useClipboard()
 
 // ── 页签 ──
 const activeTab = ref('sync')
-const tabs = computed(() => [
+const tabs = computed<TabItem[]>(() => [
   { key: 'sync', label: t('sync.tabs.sync'), icon: 'cloud_sync' },
   { key: 'clients', label: t('sync.tabs.clients'), icon: 'devices' },
 ])
@@ -552,7 +554,7 @@ function statusText(status: string): string {
   return t(key)
 }
 
-function jobDirIcon(job: SyncJob): string {
+function jobDirIcon(job: SyncJob): IconName {
   const rules = job.rules ?? []
   if (rules.length === 1) return rules[0].direction === 'push' ? 'arrow_upward' : 'arrow_downward'
   if (rules.length > 1) return 'swap_horiz'

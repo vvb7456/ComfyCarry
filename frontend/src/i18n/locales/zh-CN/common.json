@@ -20,7 +20,13 @@
     "logout": "登出",
     "retry": "重试",
     "done": "完成",
-    "settings": "设置"
+    "settings": "设置",
+    "increase": "增加",
+    "decrease": "减少",
+    "search": "搜索",
+    "more_options": "展开选项",
+    "prev_image": "上一张",
+    "next_image": "下一张"
   },
   "status": {
     "loading": "加载中..."

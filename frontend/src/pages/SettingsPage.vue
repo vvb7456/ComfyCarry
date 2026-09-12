@@ -20,6 +20,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import type { TabItem } from '@/components/ui/TabSwitcher.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
@@ -67,7 +68,7 @@ function normalizeFocus(v: unknown): string | null {
 const guardHub = useSettingsGuard()
 const dirtyList = guardHub.dirtyList
 
-const sectionTabs = computed(() => {
+const sectionTabs = computed<TabItem[]>(() => {
   const dirtyIds = new Set(dirtyList.value.map(d => d.id))
   const dotFor = (keys: string[]) => keys.some(k => dirtyIds.has(k))
   return [

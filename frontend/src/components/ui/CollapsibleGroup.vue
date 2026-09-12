@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'CollapsibleGroup' })
 
 const props = withDefaults(defineProps<{
   title?: string
   count?: number
-  icon?: string
+  icon?: IconName
   suffix?: string
   defaultOpen?: boolean
 }>(), {

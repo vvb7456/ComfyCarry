@@ -13,6 +13,7 @@ import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, getCnDepGroup, type CnBranch } from 
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
+import type { SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
 import PromptEditor from '@/components/generate/PromptEditor.vue'
 import ActionBar from '@/components/generate/ActionBar.vue'
 import BasicSettings from '@/components/generate/BasicSettings.vue'
@@ -263,36 +264,36 @@ const {
 })
 
 /** controlNetEnabled=false 时本地覆盖 moduleTabs (CN 三项 disabled + toast) */
-const localModuleTabs = computed(() => [
-  { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
-  { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
-  {
-    key: 'pose',
-    label: t('generate.modules.pose'),
-    icon: 'accessibility_new',
-    disabled: true,
-    title: t('generate.error.cn_disabled'),
-  },
-  {
-    key: 'canny',
-    label: t('generate.modules.canny'),
-    icon: 'line_curve',
-    disabled: true,
-    title: t('generate.error.cn_disabled'),
-  },
-  {
-    key: 'depth',
-    label: t('generate.modules.depth'),
-    icon: 'terrain',
-    disabled: true,
-    title: t('generate.error.cn_disabled'),
-  },
-  { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
-  { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
-  ...(config.value.modules.includes('face')
-    ? [{ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' }]
-    : []),
-])
+const localModuleTabs = computed<SwitchTabItem[]>(() => {
+  const tabs: SwitchTabItem[] = [
+    { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
+    { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
+    {
+      key: 'pose',
+      label: t('generate.modules.pose'),
+      icon: 'accessibility_new',
+      disabled: true,
+    },
+    {
+      key: 'canny',
+      label: t('generate.modules.canny'),
+      icon: 'line_curve',
+      disabled: true,
+    },
+    {
+      key: 'depth',
+      label: t('generate.modules.depth'),
+      icon: 'terrain',
+      disabled: true,
+    },
+    { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
+    { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
+  ]
+  if (config.value.modules.includes('face')) {
+    tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' })
+  }
+  return tabs
+})
 
 const localEnabledModules = computed(() => {
   const currentState = state.value
@@ -314,7 +315,7 @@ function onLocalModuleToggle(key: string, enabled: boolean) {
   cnModuleToggle(key, enabled)
 }
 
-const effectiveModuleTabs = computed(() => {
+const effectiveModuleTabs = computed<SwitchTabItem[]>(() => {
   // 视频条目 config.modules === ['lora']: 模块区仅 LoRA, i2i/CN/upscale/hires/face 不出现。
   if (isVideo.value) {
     return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'layers' }]

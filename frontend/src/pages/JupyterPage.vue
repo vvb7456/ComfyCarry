@@ -24,6 +24,7 @@ import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
@@ -223,7 +224,7 @@ function kernelFacts(kernel: KernelInfo): string[] {
   return facts
 }
 
-function sessionIcon(type: string): string {
+function sessionIcon(type: string): IconName {
   if (type === 'notebook') return 'book_2'
   if (type === 'console') return 'terminal'
   return 'description'

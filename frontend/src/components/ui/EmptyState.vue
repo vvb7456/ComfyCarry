@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'EmptyState' })
 
 withDefaults(defineProps<{
-  icon?: string
+  icon?: IconName
   title?: string
   message?: string
   density?: 'default' | 'compact'

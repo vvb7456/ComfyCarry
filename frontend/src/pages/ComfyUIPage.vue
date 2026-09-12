@@ -28,6 +28,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import PageTopStack from '@/components/ui/PageTopStack.vue'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import type { TabItem } from '@/components/ui/TabSwitcher.vue'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
@@ -51,7 +52,7 @@ const { confirm } = useConfirm()
 // ── 页签 ───────────────────────────────────────────────────────
 const activeTab = ref('run')
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
-const tabs = computed(() => [
+const tabs = computed<TabItem[]>(() => [
   { key: 'run', label: t('comfyui.tabs.run'), icon: 'terminal' },
   { key: 'plugins', label: t('comfyui.tabs.plugins'), icon: 'extension' },
 ])

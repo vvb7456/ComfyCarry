@@ -5,6 +5,7 @@ import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { useWizardState } from '@/composables/useWizardState'
 import type { WizardConfig } from '@/types/wizard'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'WizardSummary' })
 
@@ -25,7 +26,7 @@ const syncRulesCount = computed(() => {
 interface SummaryRow {
   label: string
   value: string
-  icon?: string
+  icon?: IconName
   active?: boolean
 }
 
@@ -61,7 +62,7 @@ const sections = computed<SummarySection[]>(() => {
 
   /* ── tunnel value ── */
   let tunnelValue = t('wizard.summary.skipped')
-  let tunnelIcon = 'skip_next'
+  let tunnelIcon: IconName = 'skip_next'
   if (c.tunnel_mode === 'public') {
     tunnelValue = t('wizard.summary.public_node')
     if (c.public_tunnel_subdomain) tunnelValue += ` · ${c.public_tunnel_subdomain}.erocraft.org`
@@ -77,7 +78,7 @@ const sections = computed<SummarySection[]>(() => {
     manual: t('wizard.summary.manual_create'),
     base64: t('wizard.summary.imported_conf'),
   }
-  const rcloneIcons: Record<string, string> = {
+  const rcloneIcons: Record<string, IconName> = {
     skip: 'skip_next', manual: 'build', base64: 'folder_open',
   }
   const dm = c.rclone_config_method

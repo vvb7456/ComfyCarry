@@ -8,6 +8,7 @@ import { fmtBytes } from '@/utils/format'
 import type { OverviewData, ServiceEntry } from '@/types/dashboard'
 import type { SystemStats } from '@/types/system'
 import { serviceIcon } from '@/config/serviceIdentity'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'DashboardDiagnostics' })
 
@@ -51,7 +52,7 @@ function svcName(name: string): string {
   return id ? t(`dashboard.services.${id.nameKey}`) : name
 }
 
-function svcIcon(name: string): string {
+function svcIcon(name: string): IconName {
   return serviceIcon(name)
 }
 

@@ -4,13 +4,14 @@ import { useI18n } from 'vue-i18n'
 import { switchLanguage } from '@/i18n/vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'LoginApp' })
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const theme = useTheme()
 
-const themeIconMap: Record<string, string> = {
+const themeIconMap: Record<string, IconName> = {
   dark: 'dark_mode',
   light: 'light_mode',
   system: 'contrast',

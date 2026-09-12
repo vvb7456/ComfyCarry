@@ -1,53 +1,155 @@
-# Material Symbols Outlined — 手动补充清单
-# build-fonts.sh 会自动从源码提取:
-#   - MsIcon 的 name="..." 和 :name="'...'"
-#   - 任意组件的 icon="..." 和 :icon="'...'" (SectionHeader/AlertBanner/OptionCard 等)
-# 此文件仅用于记录仍无法自动提取的间接引用 (JS 变量/对象/computed/三元表达式传递)
+# Material Symbols 图标清单 —— 字体子集的唯一来源。
 #
-# 格式: 一行一个图标名
+# 这里列出的名字会被收进 MaterialSymbolsOutlined.woff2, 并生成
+# src/config/icon-codepoints.ts 的 ICON_CODEPOINTS 与 IconName 类型。
+#
+# 新增图标: 代码里用到的图标名必须同时出现在本文件, 否则 MsIcon 的
+#   TypeScript 类型会报错、字形也不会被打包; 追加后重跑 frontend/build-fonts.sh。
+# 删除图标: 确认代码不再引用后从本文件移除, 同样重跑构建。
+#
+# 格式: 一行一个图标名; # 开头为注释。
 
-# ThemeToggle.vue — iconMap 对象
-dark_mode
-light_mode
-contrast
-
-# LogPanel.vue — computed followTailIcon
-gps_fixed
-gps_not_fixed
-
-# AppSidebar.vue / SettingsPage tabs — JS 对象 icon 字段传递
-dashboard
-dns
-
-# ParamsCard / ModelTab — 配置数组 icon 字段 (.ts/.vue 间接引用)
-hd
-face_retouching_natural
-loop
-
-# BaseSelect.vue — multiple 模式的勾选框
-# 注: 提取器按「含 MsIcon 的行」匹配, 多行写法下 :name= 单独成行会被漏掉,
-#     故此处手动补。新增多行 <MsIcon> 时留意同样的坑。
+accessibility_new
+add
+add_circle
+add_photo_alternate
+arrow_back
+arrow_downward
+arrow_forward
+arrow_upward
+auto_awesome
+auto_fix_high
+autorenew
+bolt
+book_2
+brush
+build
+cancel
+casino
+category
+celebration
+check
 check_box
 check_box_outline_blank
-
-# VersionCard.vue / ModelsPage — BaseSelect option.icon 间接引用
-verified
+check_circle
+checklist
+chevron_left
+chevron_right
+close
+cloud
+cloud_download
+cloud_off
+cloud_sync
+cloud_upload
+commit
+content_copy
+content_paste_go
+contrast
+create_new_folder
+dark_mode
+dashboard
+delete
+delete_sweep
+description
+developer_board
+devices
+dns
+download
+eco
+edit
+edit_note
+error
+error_outline
+expand_less
+expand_more
 experiment
-
-# ActionBar.vue — 三元表达式 isRunning ? 'stop_circle' : ...
-stop_circle
-
-# WizardSummary — JS 变量传递给 SummaryRow.icon
-skip_next
-
-# MaskEditorModal — 工具栏图标 (多行 MsIcon :name 单独成行)
-ink_eraser
-invert_colors
+extension
+face_retouching_natural
+favorite
+file_download_off
+fingerprint
 fit_screen
-
-# RefMediaPanel.vue — MiniMax H3 Ref2VA 参考素材面板 (三元表达式 视频 movie / 音频 music_note)
+folder
+folder_off
+folder_open
+gps_fixed
+gps_not_fixed
+hd
+heart_minus
+help_outline
+history
+hourglass_empty
+hourglass_top
+image
+image_not_supported
+image_search
+info
+ink_eraser
+inventory_2
+invert_colors
+key
+label
+layers
+library_books
+light_mode
+lightbulb
+line_curve
+link
+local_fire_department
+lock
+lock_open
+logout
+loop
+menu
+monitor_heart
 movie
 music_note
-
-# PluginCard — op 字段 'update' 间接传递
+new_releases
+notes
+open_in_new
+pause
+pending
+play_arrow
+progress_activity
+psychology
+public
+receipt_long
+refresh
+remove_circle
+replay
+restart_alt
+rocket_launch
+save
+schedule
+search
+search_off
+sell
+settings
+shuffle
+skip_next
+stop
+stop_circle
+storage
+subject
+swap_horiz
+sync
+terminal
+terrain
+thumb_up
+toggle_off
+toggle_on
+token
+translate
+tune
 update
+upload
+upload_file
+verified
+videocam
+view_in_ar
+visibility
+visibility_off
+vpn_lock
+warning
+web_asset
+zoom_in

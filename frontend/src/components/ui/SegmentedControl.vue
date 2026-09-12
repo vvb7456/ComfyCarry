@@ -8,6 +8,7 @@
  */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import MsIcon from './MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'SegmentedControl' })
 
@@ -15,7 +16,7 @@ export interface SegmentOption {
   value: string
   label: string
   /** 选项图标 (MsIcon name, 可选) */
-  icon?: string
+  icon?: IconName
   /** 单选项禁用 (如未上线的占位选项) */
   disabled?: boolean
   /** 未保存状态小圆点 (纯展示, TabItem.dot 同构) */

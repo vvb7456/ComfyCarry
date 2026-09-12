@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'NumberInput' })
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(defineProps<{
   modelValue: number
@@ -85,10 +88,22 @@ function decrement() {
       @change="onChange"
     />
     <div v-if="spinners && !disabled" class="number-input__spinners">
-      <button type="button" class="number-input__btn" @click="increment">
+      <button
+        type="button"
+        class="number-input__btn"
+        :aria-label="t('common.btn.increase')"
+        :title="t('common.btn.increase')"
+        @click="increment"
+      >
         <MsIcon name="expand_less" size="xxs" color="none" />
       </button>
-      <button type="button" class="number-input__btn" @click="decrement">
+      <button
+        type="button"
+        class="number-input__btn"
+        :aria-label="t('common.btn.decrease')"
+        :title="t('common.btn.decrease')"
+        @click="decrement"
+      >
         <MsIcon name="expand_more" size="xxs" color="none" />
       </button>
     </div>

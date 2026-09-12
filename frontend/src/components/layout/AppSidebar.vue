@@ -8,6 +8,7 @@ import MsIcon from '../ui/MsIcon.vue'
 import { serviceIcon } from '@/config/serviceIdentity'
 // 主题切换是全局偏好, 与页面无关, 和同为全局偏好的语言切换放在一起
 import ThemeToggle from '../ui/ThemeToggle.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'AppSidebar' })
 
@@ -25,7 +26,7 @@ const commitUrl = computed(() =>
 
 interface NavItem {
   page: string
-  icon: string
+  icon: IconName
   labelKey?: string
   label?: string
 }

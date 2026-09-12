@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import MsIcon from './MsIcon.vue'
 import { useAppStore } from '@/stores/app'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'TabSwitcher' })
 
@@ -10,7 +11,7 @@ const app = useAppStore()
 export interface TabItem {
   key: string
   label: string
-  icon?: string
+  icon?: IconName
   iconColor?: string
   badge?: string | number
   disabled?: boolean

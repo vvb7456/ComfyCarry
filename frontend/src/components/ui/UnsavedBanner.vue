@@ -6,6 +6,7 @@
  */
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'UnsavedBanner' })
 
@@ -16,7 +17,7 @@ const props = withDefaults(defineProps<{
   /** 保存按钮文本 (如"保存" / "保存并重启"), 默认用 common.btn.save */
   saveLabel?: string
   /** 保存按钮图标 (如 restart_alt), 默认 save; 由调用方按按钮实际动作传入 */
-  saveIcon?: string
+  saveIcon?: IconName
   /** 放弃按钮文本, 默认 common.btn.* 无对应, 用调用方传入的 discardLabel */
   discardLabel?: string
   saving?: boolean

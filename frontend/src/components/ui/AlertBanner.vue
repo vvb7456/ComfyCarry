@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'AlertBanner' })
 
+const { t } = useI18n({ useScope: 'global' })
+
 const props = withDefaults(defineProps<{
   tone?: 'info' | 'success' | 'warning' | 'danger'
-  icon?: string
+  icon?: IconName
   closable?: boolean
   dense?: boolean
 }>(), {
@@ -16,7 +21,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const visible = defineModel<boolean>('visible', { default: true })
 
-const defaultIcons: Record<string, string> = {
+const defaultIcons: Record<string, IconName> = {
   info: 'info',
   success: 'check_circle',
   warning: 'warning',
@@ -37,7 +42,13 @@ function close() {
     <div class="alert-banner__content">
       <slot />
     </div>
-    <button v-if="closable" class="alert-banner__close" @click="close">
+    <button
+      v-if="closable"
+      class="alert-banner__close"
+      :aria-label="t('common.btn.close')"
+      :title="t('common.btn.close')"
+      @click="close"
+    >
       <MsIcon name="close" size="xs" color="none" />
     </button>
   </div>

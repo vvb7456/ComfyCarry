@@ -8,6 +8,7 @@ import { useTagInterrogation, TAGGER_DEP_GROUP } from '@/composables/generate/us
 import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
+import type { SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
 import { useToast } from '@/composables/useToast'
 
@@ -145,18 +146,21 @@ export function useControlNetOrchestration({
   // face 模块按架构可用 (FR-1): MODEL_TYPES[type].modules 声明 — flux2 系不含
   const faceModuleAvailable = (MODEL_TYPES[modelType]?.modules ?? []).includes('face')
 
-  const moduleTabs = computed(() => [
-    { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
-    { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
-    { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new' },
-    { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve' },
-    { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain' },
-    { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
-    { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
-    ...(faceModuleAvailable
-      ? [{ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' }]
-      : []),
-  ])
+  const moduleTabs = computed<SwitchTabItem[]>(() => {
+    const tabs: SwitchTabItem[] = [
+      { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
+      { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
+      { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new' },
+      { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve' },
+      { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain' },
+      { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
+      { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
+    ]
+    if (faceModuleAvailable) {
+      tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' })
+    }
+    return tabs
+  })
 
   const enabledModules = computed(() => {
     const currentState = state.value

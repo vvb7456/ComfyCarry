@@ -14,13 +14,14 @@ import { computed, watch, ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 import { lockBodyScroll, unlockBodyScroll } from './BaseModal.vue'
+import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'Drawer' })
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
   title?: string
-  icon?: string
+  icon?: IconName
   width?: string
 }>(), {
   width: 'clamp(420px, 42vw, 620px)',

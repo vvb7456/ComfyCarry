@@ -4,11 +4,11 @@
  * 新增服务时只在此登记, 禁止在各页面各写一份 iconMap, 避免同一服务跨页不同图标。
  * 图标语义约定见 components/ui/MsIcon.vue 顶部注释。
  *
- * 注意: 这里是动态映射, build-fonts.sh 不会自动提取这些图标名;
- * 所有取值必须有其他静态调用点或已列入 icons.txt, 新增服务时需一并确认。
+ * 图标名必须同时出现在 frontend/icons.txt (字体子集清单), 否则 IconName 类型会报错。
  */
+import type { IconName } from '@/config/icon-codepoints'
 
-const SERVICE_IDENTITY: Record<string, string> = {
+const SERVICE_IDENTITY: Record<string, IconName> = {
   dashboard: 'dashboard',
   comfycarry: 'dashboard',
   comfyui: 'terminal',
@@ -22,6 +22,6 @@ const SERVICE_IDENTITY: Record<string, string> = {
   ssh: 'key',
 }
 
-export function serviceIcon(name: string, fallback = 'dns'): string {
+export function serviceIcon(name: string, fallback: IconName = 'dns'): IconName {
   return SERVICE_IDENTITY[name.toLowerCase()] ?? fallback
 }

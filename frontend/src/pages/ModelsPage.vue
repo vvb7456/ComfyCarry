@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import type { TabItem } from '@/components/ui/TabSwitcher.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
 import PageTopStack from '@/components/ui/PageTopStack.vue'
@@ -37,7 +38,7 @@ const validTabs = new Set(['local', 'huggingface', 'civitai'])
 const initialTab = validTabs.has(route.query.tab as string) ? (route.query.tab as string) : 'local'
 const activeTab = ref(initialTab)
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
-const tabs = computed(() => [
+const tabs = computed<TabItem[]>(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
   { key: 'huggingface', label: t('models.tabs.huggingface'), icon: 'verified' },
   { key: 'civitai', label: t('models.tabs.civitai'), icon: 'search' },
