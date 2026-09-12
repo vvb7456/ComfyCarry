@@ -131,12 +131,6 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ComfyCarry ${{ steps.tag.outputs.tag }}
-          body: |
-            ${{ steps.changelog.outputs.notes }}
-
-            ---
-
-            `comfycarry-dist.tar.gz` 为完整部署包（后端 + 前端构建产物 + 提示词库数据），
-            bootstrap.sh 与面板内置更新均从此 Release 下载。
+          body: ${{ steps.changelog.outputs.notes }}
           files: ${{ env.ASSET_NAME }}
           make_latest: true
