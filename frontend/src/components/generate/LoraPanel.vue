@@ -208,7 +208,7 @@ function cycleApply(lora: LoraEntry) {
             />
           </template>
           <div v-if="!getPreviewUrl(lora.name)" class="lora-card__no-img">
-            <MsIcon name="extension" color="none" />
+            <MsIcon name="layers" color="none" />
           </div>
         </div>
 
@@ -219,7 +219,7 @@ function cycleApply(lora: LoraEntry) {
           :title="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
           @click.stop="toggleEnabled(index)"
         >
-          <MsIcon :name="lora.enabled ? 'visibility' : 'visibility_off'" color="none" />
+          <MsIcon :name="lora.enabled ? 'toggle_on' : 'toggle_off'" color="none" />
         </button>
         <button
           class="lora-card__del"

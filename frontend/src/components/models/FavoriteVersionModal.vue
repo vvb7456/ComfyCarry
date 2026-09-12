@@ -67,7 +67,7 @@ function handleFavorite(v: { id: number; name: string; baseModel?: string }) {
   >
     <EmptyState
       v-if="noneDownloadable"
-      icon="cloud_off"
+      icon="file_download_off"
       :message="t('models.civitai.no_downloadable_versions')"
     />
     <div v-else class="fv-list">

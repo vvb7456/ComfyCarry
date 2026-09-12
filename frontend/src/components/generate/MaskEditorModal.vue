@@ -124,7 +124,7 @@ function onCancel() {
 
         <div class="mask-editor__actions">
           <BaseButton variant="ghost" size="xs" @click="editor.clearMask()">
-            <MsIcon name="delete" size="xs" />
+            <MsIcon name="delete_sweep" size="xs" />
             {{ t('generate.mask_editor.clear_all') }}
           </BaseButton>
           <BaseButton variant="ghost" size="xs" @click="editor.invertMask()">

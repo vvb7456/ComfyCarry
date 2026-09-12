@@ -163,7 +163,7 @@ watch(
 
       <EmptyState
         v-else-if="items.length === 0"
-        icon="draft"
+        icon="history"
         :message="t('prompt-library.history_modal.empty')"
         density="compact"
       />

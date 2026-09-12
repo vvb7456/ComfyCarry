@@ -98,7 +98,7 @@ async function handleClearFavorites() {
 </script>
 
 <template>
-  <CollapsibleGroup icon="push_pin" :title="t('models.downloads.pending')" :count="favCount">
+  <CollapsibleGroup icon="pending" :title="t('models.downloads.pending')" :count="favCount">
     <template #title-right>
       <BaseButton size="sm" @click.stop="batchAddOpen = true">
         <MsIcon name="add" size="xs" /> {{ t('models.downloads.batch_add') }}
@@ -134,7 +134,7 @@ async function handleClearFavorites() {
         </div>
       </li>
     </ul>
-    <EmptyState v-else icon="push_pin" :message="t('models.downloads.no_pending_hint')" density="compact" />
+    <EmptyState v-else icon="pending" :message="t('models.downloads.no_pending_hint')" density="compact" />
   </CollapsibleGroup>
 
   <BatchAddModal v-model="batchAddOpen" />

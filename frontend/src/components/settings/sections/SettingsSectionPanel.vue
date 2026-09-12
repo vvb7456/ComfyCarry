@@ -154,7 +154,7 @@ onMounted(() => {
   <!-- 模块 1: 登录与认证 (即时动作, 无 dirty) -->
     <SettingsModule id="settings-focus-password" :title="t('settings.domains.auth')">
       <div v-if="apiKeyError" class="settings-lines">
-        <EmptyState icon="cloud_off" :message="t('common.load_failed')">
+        <EmptyState icon="error_outline" :message="t('common.load_failed')">
           <BaseButton size="sm" @click="loadSettings">{{ t('common.btn.retry') }}</BaseButton>
         </EmptyState>
       </div>

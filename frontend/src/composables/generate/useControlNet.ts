@@ -72,7 +72,7 @@ export const PP_PARAMS_DEF: Record<CnType, PPTypeDef> = {
   },
   canny: {
     titleKey: 'generate.controlnet.edge_map',
-    icon: 'border_style',
+    icon: 'line_curve',
     params: [
       { key: 'low_threshold', labelKey: 'generate.controlnet.low_threshold', helpKey: 'generate.controlnet.low_threshold_help', type: 'slider', min: 0, max: 255, step: 1, default: 100 },
       { key: 'high_threshold', labelKey: 'generate.controlnet.high_threshold', helpKey: 'generate.controlnet.high_threshold_help', type: 'slider', min: 0, max: 255, step: 1, default: 200 },
@@ -84,7 +84,7 @@ export const PP_PARAMS_DEF: Record<CnType, PPTypeDef> = {
   },
   depth: {
     titleKey: 'generate.controlnet.depth_map',
-    icon: 'layers',
+    icon: 'terrain',
     params: [
       {
         key: 'resolution', labelKey: 'generate.controlnet.detect_resolution', type: 'select', default: 1024,

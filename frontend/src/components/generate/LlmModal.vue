@@ -324,11 +324,11 @@ const showNegative = computed(() =>
           </div>
           <div class="llm-result-actions">
             <BaseButton size="sm" variant="primary" @click="onUsePrompt">
-              <MsIcon name="input" size="xs" color="none" />
+              <MsIcon name="content_paste_go" size="xs" color="none" />
               {{ t('generate.llm_modal.use_prompt') }}
             </BaseButton>
             <BaseButton size="sm" @click="onUseAll">
-              <MsIcon name="done_all" size="xs" color="none" />
+              <MsIcon name="content_paste_go" size="xs" color="none" />
               {{ t('generate.llm_modal.use_all_prompts') }}
             </BaseButton>
             <BaseButton size="sm" @click="onCopy">

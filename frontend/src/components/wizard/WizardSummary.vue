@@ -112,7 +112,7 @@ const sections = computed<SummarySection[]>(() => {
     {
       title: t('wizard.summary.cloud_sync'),
       rows: [
-        { label: t('wizard.summary.rclone_config'), value: rcloneLabels[c._rclone_display_method || dm] ?? rcloneLabels[dm] ?? dm, icon: rcloneIcons[c._rclone_display_method || dm] ?? rcloneIcons[dm] ?? 'article', active: dm !== 'skip' },
+        { label: t('wizard.summary.rclone_config'), value: rcloneLabels[c._rclone_display_method || dm] ?? rcloneLabels[dm] ?? dm, icon: rcloneIcons[c._rclone_display_method || dm] ?? rcloneIcons[dm] ?? 'tune', active: dm !== 'skip' },
         { label: t('wizard.summary.remote_count'), value: c.wizard_remotes.length ? c.wizard_remotes.map(r => r.name).join(', ') : t('wizard.summary.none'), active: c.wizard_remotes.length > 0 },
         { label: t('wizard.summary.sync_rules'), value: syncRulesCount.value ? t('wizard.summary.rules_count', { count: syncRulesCount.value }) : t('wizard.summary.none'), active: syncRulesCount.value > 0 },
         ...(c.wizard_sync_rules.length ? [{ label: t('wizard.summary.rule_details'), value: c.wizard_sync_rules.map(r => {

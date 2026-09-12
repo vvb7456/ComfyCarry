@@ -216,7 +216,7 @@ const gpuTempColor = computed(() => {
             {{ t('dashboard.actions.start_comfyui') }}
           </BaseButton>
           <BaseButton variant="default" class="dash-btn--pill" @click="router.push('/comfyui')">
-            <MsIcon name="article" />
+            <MsIcon name="subject" />
             {{ t('dashboard.actions.view_logs') }}
           </BaseButton>
         </template>
@@ -224,7 +224,7 @@ const gpuTempColor = computed(() => {
         <!-- Fault -->
         <template v-else-if="dashboardState === 'fault'">
           <BaseButton variant="default" class="dash-btn--pill" @click="router.push('/comfyui')">
-            <MsIcon name="article" />
+            <MsIcon name="subject" />
             {{ t('dashboard.actions.view_logs') }}
           </BaseButton>
           <BaseButton

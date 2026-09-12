@@ -37,7 +37,7 @@ const tags = computed(() => {
       <span class="env-label">{{ t('wizard.env.gpu_label') }}</span>
       <template v-if="gpuInfo">
         <span class="env-value">
-          <MsIcon name="monitor" size="xs" color="none" /> {{ gpuInfo.name }}
+          <MsIcon name="monitor_heart" size="xs" color="none" /> {{ gpuInfo.name }}
         </span>
         <span class="env-meta">{{ smArch }} · {{ gpuInfo.vram_gb }} GB VRAM</span>
       </template>

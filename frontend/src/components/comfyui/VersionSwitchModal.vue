@@ -92,7 +92,7 @@ const versionOptions = computed<SelectOption[]>(() => {
       group: t('comfyui.version.current'),
       hint: t('comfyui.settings.custom_build'),
       disabled: true,
-      icon: 'deployed_code',
+      icon: 'commit',
     })
   }
 

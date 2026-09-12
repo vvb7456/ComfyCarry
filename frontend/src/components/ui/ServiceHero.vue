@@ -19,7 +19,7 @@ export type ServiceHeroTone = 'ok' | 'warn' | 'bad' | 'off'
  * busy 叠在 tone 之上，用旋转表达过渡态；遵循 prefers-reduced-motion: reduce。
  *
  * 用法：
- *   <ServiceHero icon="language" tone="ok" title="隧道已连接" subtitle="已为 2 项服务建立公网入口。">
+ *   <ServiceHero icon="vpn_lock" tone="ok" title="隧道已连接" subtitle="已为 2 项服务建立公网入口。">
  *     <template #actions>
  *       <BaseButton variant="primary" @click="…">打开</BaseButton>
  *     </template>

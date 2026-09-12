@@ -41,8 +41,8 @@ const navGroups: NavGroup[] = [
     titleKey: 'nav.group_workspace',
     items: [
       { page: 'dashboard', icon: 'dashboard', labelKey: 'nav.dashboard' },
-      { page: 'generate',  icon: 'palette',   labelKey: 'nav.generate' },
-      { page: 'models',    icon: 'extension', labelKey: 'nav.models' },
+      { page: 'generate',  icon: 'auto_awesome', labelKey: 'nav.generate' },
+      { page: 'models',    icon: 'view_in_ar',   labelKey: 'nav.models' },
     ],
   },
   {
@@ -58,7 +58,7 @@ const navGroups: NavGroup[] = [
     titleKey: 'nav.group_network',
     items: [
       { page: 'sync',   icon: 'cloud_sync', labelKey: 'nav.sync' },
-      { page: 'tunnel', icon: 'language',   labelKey: 'nav.tunnel' },
+      { page: 'tunnel', icon: 'vpn_lock',   labelKey: 'nav.tunnel' },
       { page: 'ssh',    icon: 'key',        label: 'SSH' },
     ],
   },

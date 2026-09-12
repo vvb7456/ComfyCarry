@@ -19,8 +19,6 @@ gps_not_fixed
 dashboard
 dashboard_customize
 preview
-push_pin
-monitoring
 dns
 
 # ParamsCard / ModelTab — 配置数组 icon 字段 (.ts/.vue 间接引用)

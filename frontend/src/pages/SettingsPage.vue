@@ -71,8 +71,8 @@ const sectionTabs = computed(() => {
   const dirtyIds = new Set(dirtyList.value.map(d => d.id))
   const dotFor = (keys: string[]) => keys.some(k => dirtyIds.has(k))
   return [
-    { key: 'panel', label: t('settings.section.panel'), icon: 'dashboard', dot: dotFor([]) },
-    { key: 'genmodels', label: t('settings.section.genmodels'), icon: 'palette', dot: dotFor(['prompt', 'llm', 'civitai']) },
+    { key: 'panel', label: t('settings.section.panel'), icon: 'settings', dot: dotFor([]) },
+    { key: 'genmodels', label: t('settings.section.genmodels'), icon: 'auto_awesome', dot: dotFor(['prompt', 'llm', 'civitai']) },
     { key: 'about', label: t('settings.section.about'), icon: 'info', dot: false },
   ]
 })
@@ -285,13 +285,13 @@ async function restartDashboard() {
 
     <!-- 面板: 登录与认证 / 配置管理 (无草稿态) -->
     <section id="settings-section-panel" class="settings-section" data-section="panel">
-      <h2 class="settings-section__title"><MsIcon name="dashboard" />{{ t('settings.section.panel') }}</h2>
+      <h2 class="settings-section__title"><MsIcon name="settings" />{{ t('settings.section.panel') }}</h2>
       <SettingsSectionPanel />
     </section>
 
     <!-- 生成与模型: 提示词编辑器 / LLM 服务 / CivitAI -->
     <section id="settings-section-genmodels" class="settings-section" data-section="genmodels">
-      <h2 class="settings-section__title"><MsIcon name="palette" />{{ t('settings.section.genmodels') }}</h2>
+      <h2 class="settings-section__title"><MsIcon name="auto_awesome" />{{ t('settings.section.genmodels') }}</h2>
       <SettingsSectionGenModels />
     </section>
 

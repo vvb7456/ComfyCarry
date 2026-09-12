@@ -52,7 +52,7 @@ const props = withDefaults(defineProps<{
   /** 两形态并存时显示形态过滤 chip + 卡片徽章 */
   showPackagingFilter?: boolean
 }>(), {
-  icon: 'deployed_code',
+  icon: 'view_in_ar',
   multi: false,
   searchPlaceholder: '',
   countLabel: '',
@@ -295,7 +295,7 @@ function goToDownloadPage() {
           : (currentArch.startsWith('wan22') ? t('generate.picker.empty_video_hint') : t('generate.picker.empty_desc'))
       }}</div>
       <BaseButton variant="primary" @click="goToDownloadPage">
-        <MsIcon name="open_in_new" size="sm" color="none" /> {{ t('generate.picker.go_to_downloads') }}
+        <MsIcon name="arrow_forward" size="sm" color="none" /> {{ t('generate.picker.go_to_downloads') }}
       </BaseButton>
     </div>
 
@@ -332,7 +332,7 @@ function goToDownloadPage() {
       <!-- Grid -->
       <div class="picker-grid-wrap">
         <div v-if="filtered.length === 0" class="picker-empty">
-          <MsIcon name="deployed_code_alert" color="none" />
+          <MsIcon name="search_off" color="none" />
           <span>{{ t('common.no_results') }}</span>
         </div>
         <!-- 单文件卡片网格 -->

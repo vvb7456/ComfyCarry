@@ -496,7 +496,7 @@ onUnmounted(() => {
         <span class="tool-label">{{ t('prompt-library.toolbar.history_favorites') }}</span>
       </button>
       <button class="token-tool-btn" :title="t('prompt-library.toolbar.embedding')" @click="emit('open-embedding')">
-        <MsIcon name="link" size="xs" color="none" />
+        <MsIcon name="token" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.embedding') }}</span>
       </button>
       <button class="token-tool-btn" :title="t('prompt-library.toolbar.wildcard')" @click="emit('open-wildcard')">
@@ -515,7 +515,7 @@ onUnmounted(() => {
         <span class="tool-label">{{ t('prompt-library.toolbar.clear_disabled') }}</span>
       </button>
       <button class="token-tool-btn token-tool-btn--danger" :title="t('prompt-library.toolbar.clear_all')" @click="emit('clear-all')">
-        <MsIcon name="delete" size="xs" color="none" />
+        <MsIcon name="delete_sweep" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.clear_all') }}</span>
       </button>
 

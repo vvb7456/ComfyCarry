@@ -71,7 +71,7 @@ const { copy } = useClipboard()
 const activeTab = ref('sync')
 const tabs = computed(() => [
   { key: 'sync', label: t('sync.tabs.sync'), icon: 'cloud_sync' },
-  { key: 'clients', label: t('sync.tabs.clients'), icon: 'monitor' },
+  { key: 'clients', label: t('sync.tabs.clients'), icon: 'devices' },
 ])
 
 // ── Worker / 设置 ──
@@ -866,7 +866,7 @@ function switchTab(tab: string) {
                   :aria-label="rule.enabled ? t('sync.rule.disable') : t('sync.rule.enable')"
                   @click="toggleRule(rule)"
                 >
-                  <MsIcon :name="rule.enabled ? 'block' : 'check_circle'" />
+                  <MsIcon :name="rule.enabled ? 'toggle_on' : 'toggle_off'" />
                 </BaseButton>
                 <BaseButton variant="danger" size="sm" icon-only :aria-label="t('sync.rule.delete')" @click="deleteRule(rule)">
                   <MsIcon name="delete" />
@@ -911,7 +911,7 @@ function switchTab(tab: string) {
               </template>
             </ListRow>
           </ul>
-          <EmptyState v-else icon="cloud_done" :message="t('sync.records.empty')" density="compact" />
+          <EmptyState v-else icon="history" :message="t('sync.records.empty')" density="compact" />
 
           <ListPagination
             :page="jobsPage"
@@ -942,7 +942,7 @@ function switchTab(tab: string) {
       <!-- ═══════════ 客户端 Tab ═══════════ -->
       <template v-else>
         <ServiceHero
-          icon="monitor"
+          icon="devices"
           :title="clientHeroOnline ? t('sync.companion.hero_online', { count: onlineCount }) : t('sync.companion.hero_offline')"
           :subtitle="clientHeroSubtitle"
           :tone="clientHeroTone"
@@ -968,7 +968,7 @@ function switchTab(tab: string) {
         </ServiceHero>
 
         <section class="sync-block">
-          <SectionHeader icon="monitor">
+          <SectionHeader icon="devices">
             {{ t('sync.companion.clients_title') }}
             <span class="sync-count">{{ companionClients.length }}</span>
             <template #actions>
@@ -987,7 +987,7 @@ function switchTab(tab: string) {
             <ListRow
               v-for="c in companionClients"
               :key="c.client_id"
-              icon="monitor"
+              icon="devices"
               :title="c.hostname || c.client_id"
               :title-tooltip="c.client_id"
               :status="clientStatus(c)"

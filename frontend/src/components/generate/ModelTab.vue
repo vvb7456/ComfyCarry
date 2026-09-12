@@ -264,7 +264,7 @@ const {
 
 /** controlNetEnabled=false 时本地覆盖 moduleTabs (CN 三项 disabled + toast) */
 const localModuleTabs = computed(() => [
-  { key: 'lora', label: t('generate.modules.lora'), icon: 'extension' },
+  { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
   { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
   {
     key: 'pose',
@@ -276,14 +276,14 @@ const localModuleTabs = computed(() => [
   {
     key: 'canny',
     label: t('generate.modules.canny'),
-    icon: 'border_style',
+    icon: 'line_curve',
     disabled: true,
     title: t('generate.error.cn_disabled'),
   },
   {
     key: 'depth',
     label: t('generate.modules.depth'),
-    icon: 'layers',
+    icon: 'terrain',
     disabled: true,
     title: t('generate.error.cn_disabled'),
   },
@@ -317,7 +317,7 @@ function onLocalModuleToggle(key: string, enabled: boolean) {
 const effectiveModuleTabs = computed(() => {
   // 视频条目 config.modules === ['lora']: 模块区仅 LoRA, i2i/CN/upscale/hires/face 不出现。
   if (isVideo.value) {
-    return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'extension' }]
+    return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'layers' }]
   }
   return config.value.controlNetEnabled ? moduleTabs.value : localModuleTabs.value
 })
@@ -857,7 +857,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :title="hasDualPackaging
         ? t('generate.basic.select_model')
         : (isSplit ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint'))"
-      icon="deployed_code"
+      icon="view_in_ar"
       :items="mergedPickerItems"
       :selected="modelSelected"
       :current-arch="config.pickerArch"
@@ -872,7 +872,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     <ModelPickerModal
       v-model="showLoraPicker"
       :title="t('generate.lora.select_title')"
-      icon="extension"
+      icon="layers"
       :items="loraPickerItems"
       :multi="true"
       :selected="loraModalPending"
@@ -956,7 +956,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       v-if="config.controlNetEnabled"
       v-model="cnCanny.picker.visible.value"
       :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.edge_map') })"
-      icon="border_style"
+      icon="line_curve"
       :images="cnCanny.picker.images.value"
       :loading="cnCanny.picker.loading.value"
       :uploading="cnCanny.picker.uploading.value"
@@ -968,7 +968,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       v-if="config.controlNetEnabled"
       v-model="cnDepth.picker.visible.value"
       :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.depth_map') })"
-      icon="layers"
+      icon="terrain"
       :images="cnDepth.picker.images.value"
       :loading="cnDepth.picker.loading.value"
       :uploading="cnDepth.picker.uploading.value"

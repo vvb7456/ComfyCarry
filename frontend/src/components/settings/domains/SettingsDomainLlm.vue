@@ -315,7 +315,7 @@ onUnmounted(() => guardHub.unregister(dirtyEntry))
 
     <!-- 加载失败: 错误 + 重试 (不渲染表单, 防止初值冒充服务端值) -->
     <div v-else-if="loadError">
-      <EmptyState icon="cloud_off" :message="t('common.load_failed')">
+      <EmptyState icon="error_outline" :message="t('common.load_failed')">
         <BaseButton size="sm" @click="loadAll">{{ t('common.btn.retry') }}</BaseButton>
       </EmptyState>
     </div>

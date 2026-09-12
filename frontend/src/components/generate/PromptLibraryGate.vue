@@ -67,7 +67,7 @@ function onImport() {
   <!-- Gate content -->
   <div v-else class="plg-gate">
     <div class="plg-header">
-      <MsIcon name="widgets" color="none" class="plg-header-icon" />
+      <MsIcon name="library_books" color="none" class="plg-header-icon" />
       <div class="plg-title">{{ t('prompt-library.init.title') }}</div>
     </div>
 

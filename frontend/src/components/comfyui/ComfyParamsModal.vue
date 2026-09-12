@@ -247,7 +247,7 @@ function requestClose() {
       <span>{{ t('comfyui.params.loading') }}</span>
     </div>
 
-    <EmptyState v-else-if="loadError" icon="cloud_off" :message="t('common.load_failed')">
+    <EmptyState v-else-if="loadError" icon="error_outline" :message="t('common.load_failed')">
       <BaseButton size="sm" @click="loadParams">{{ t('common.btn.retry') }}</BaseButton>
     </EmptyState>
 

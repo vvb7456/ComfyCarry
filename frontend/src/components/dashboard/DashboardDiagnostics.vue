@@ -39,7 +39,7 @@ const diagSummary = computed(() => {
 // pm2 内部名只用于取数据，并留在名称的 title 里供排障时悬停查看。
 const SVC_IDENTITY: Record<string, { nameKey: string; icon: string }> = {
   comfy: { nameKey: 'comfyui', icon: 'terminal' },
-  'cf-tunnel': { nameKey: 'tunnel', icon: 'language' },
+  'cf-tunnel': { nameKey: 'tunnel', icon: 'vpn_lock' },
   jupyter: { nameKey: 'jupyter', icon: 'book_2' },
   'sync-worker': { nameKey: 'sync', icon: 'cloud_sync' },
   dashboard: { nameKey: 'dashboard', icon: 'dashboard' },

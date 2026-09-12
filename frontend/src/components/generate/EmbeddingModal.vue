@@ -60,7 +60,7 @@ function formatSize(bytes: number): string {
   <BaseModal
     :model-value="modelValue"
     :title="t('generate.embedding.title')"
-    icon="link"
+    icon="token"
     icon-color="none"
     width="640px"
     density="default"

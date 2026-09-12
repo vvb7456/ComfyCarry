@@ -141,7 +141,7 @@ function close(): void {
     </div>
 
     <!-- 加载失败: 错误 + 重试 (不渲染开关, 防止初值冒充服务端值) -->
-    <EmptyState v-else-if="loadError" icon="cloud_off" :message="t('common.load_failed')">
+    <EmptyState v-else-if="loadError" icon="error_outline" :message="t('common.load_failed')">
       <BaseButton size="sm" @click="loadState">{{ t('common.btn.retry') }}</BaseButton>
     </EmptyState>
 

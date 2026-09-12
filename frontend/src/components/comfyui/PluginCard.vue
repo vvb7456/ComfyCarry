@@ -126,7 +126,7 @@ const rowBadges = computed<ListRowBadge[]>(() => {
           :disabled="busy"
           @click="emit('toggle')"
         >
-          <MsIcon :name="plugin.enabled ? 'pause' : 'play_arrow'" />
+          <MsIcon :name="plugin.enabled ? 'toggle_on' : 'toggle_off'" />
         </BaseButton>
         <BaseButton
           variant="danger" size="sm" icon-only

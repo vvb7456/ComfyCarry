@@ -232,7 +232,7 @@ function onInsert(item: WildcardItem) {
 
       <!-- Empty -->
       <div v-else-if="wc.filtered.value.length === 0" class="wc-empty">
-        <MsIcon name="draft" size="lg" color="var(--t3)" />
+        <MsIcon name="folder_off" size="lg" color="var(--t3)" />
         <span>{{ t('generate.wildcard.no_files') }}</span>
       </div>
 

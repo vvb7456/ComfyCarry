@@ -150,14 +150,14 @@ interface ServiceRow {
 }
 
 const iconMap: Record<string, string> = {
-  dashboard: 'monitoring', comfycarry: 'monitoring', comfyui: 'palette',
+  dashboard: 'dashboard', comfycarry: 'dashboard', comfyui: 'terminal',
   jupyter: 'book_2', jupyterlab: 'book_2', ssh: 'key',
 }
 const nameMap: Record<string, string> = {
   dashboard: 'Dashboard', comfycarry: 'ComfyCarry', comfyui: 'ComfyUI',
   jupyter: 'JupyterLab', jupyterlab: 'JupyterLab', ssh: 'SSH',
 }
-function svcIcon(name: string) { return iconMap[name.toLowerCase()] || 'language' }
+function svcIcon(name: string) { return iconMap[name.toLowerCase()] || 'vpn_lock' }
 function svcName(name: string) { return nameMap[name.toLowerCase()] || name }
 
 /** 公共节点 url 键 → 后端默认服务 (取真实端口/协议); 匹配不到时用内置兜底 */
@@ -360,7 +360,7 @@ function openAddSvc() {
       <template v-else>
         <!-- Hero + 运行事实 -->
         <ServiceHero
-          icon="language"
+          icon="vpn_lock"
           :title="heroTitle"
           :subtitle="heroSubtitle"
           :tone="heroTone"

@@ -80,7 +80,7 @@ function onImgError(e: Event) {
           @error="onImgError"
         />
         <div v-if="!selected.previewUrl" class="ckpt-card__no-img">
-          <MsIcon name="deployed_code" size="lg" color="none" />
+          <MsIcon name="image_not_supported" size="lg" color="none" />
         </div>
         <!-- Model tag badge -->
         <span v-if="selected.baseModel" class="ckpt-card__tag">{{ selected.baseModel }}</span>

@@ -145,7 +145,7 @@ const { t } = useI18n({ useScope: 'global' })
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon name="language" size="md" />
+            <MsIcon name="vpn_lock" size="md" />
           </div>
           <router-link to="/tunnel" class="dash-svc-card__cta">
             <span class="dash-svc-card__cta-text">{{ tunnelConfigured ? t('dashboard.actions.manage') : t('dashboard.actions.config') }}</span>

@@ -534,7 +534,7 @@ sse.start()
     <!-- Gate overlay when ComfyUI is not ready -->
     <div v-if="gate.state.value !== 'ready'" class="gen-gate-overlay">
       <EmptyState
-        :icon="gate.state.value === 'error' ? 'error' : 'cloud_off'"
+        :icon="gate.state.value === 'error' ? 'error_outline' : 'cloud_off'"
         :title="gate.state.value === 'starting'
           ? t('generate.gate.starting')
           : gate.state.value === 'error'

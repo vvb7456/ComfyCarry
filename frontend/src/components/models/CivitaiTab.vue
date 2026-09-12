@@ -296,7 +296,7 @@ function openCivitaiMeta(hit: CivitaiHit) {
   </Teleport>
 
   <!-- Error -->
-  <EmptyState v-if="civitaiError" icon="error" :message="civitaiError" />
+  <EmptyState v-if="civitaiError" icon="error_outline" :message="civitaiError" />
 
   <!-- Loading (initial) -->
   <LoadingCenter v-else-if="civitaiLoading && civitaiHits.length === 0" />

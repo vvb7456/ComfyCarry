@@ -436,7 +436,7 @@ onUnmounted(() => {
 
         <!-- 活跃内核 (运行时显示, 空则紧凑空行) -->
         <section v-if="isRunning" class="jupyter-block">
-          <SectionHeader icon="memory">
+          <SectionHeader icon="developer_board">
             {{ t('jupyter.kernels.title') }}
             <span class="jupyter-count">{{ status.kernels?.length ?? 0 }}</span>
           </SectionHeader>
@@ -488,12 +488,12 @@ onUnmounted(() => {
               </template>
             </ListRow>
           </ul>
-          <EmptyState v-else icon="memory" :message="t('jupyter.kernels.empty')" density="compact" />
+          <EmptyState v-else icon="developer_board" :message="t('jupyter.kernels.empty')" density="compact" />
         </section>
 
         <!-- 活跃会话 (运行时显示, 空则紧凑空行) -->
         <section v-if="isRunning" class="jupyter-block">
-          <SectionHeader icon="folder_open">
+          <SectionHeader icon="web_asset">
             {{ t('jupyter.sessions.title') }}
             <span class="jupyter-count">{{ status.sessions?.length ?? 0 }}</span>
           </SectionHeader>
@@ -520,7 +520,7 @@ onUnmounted(() => {
               </template>
             </ListRow>
           </ul>
-          <EmptyState v-else icon="folder_open" :message="t('jupyter.sessions.empty')" density="compact" />
+          <EmptyState v-else icon="web_asset" :message="t('jupyter.sessions.empty')" density="compact" />
         </section>
 
         <!-- 终端 (运行时显示; 有独立新增入口, 保留紧凑空行) -->
@@ -543,7 +543,7 @@ onUnmounted(() => {
             <ListRow
               v-for="terminal in status.terminals"
               :key="terminal.name"
-              icon="code_blocks"
+              icon="terminal"
               :title="t('jupyter.terminals.label', { name: terminal.name })"
               :facts="terminalFacts(terminal)"
             >

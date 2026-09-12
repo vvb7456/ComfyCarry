@@ -146,11 +146,11 @@ export function useControlNetOrchestration({
   const faceModuleAvailable = (MODEL_TYPES[modelType]?.modules ?? []).includes('face')
 
   const moduleTabs = computed(() => [
-    { key: 'lora', label: t('generate.modules.lora'), icon: 'extension' },
+    { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
     { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
     { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new' },
-    { key: 'canny', label: t('generate.modules.canny'), icon: 'border_style' },
-    { key: 'depth', label: t('generate.modules.depth'), icon: 'layers' },
+    { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve' },
+    { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain' },
     { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
     { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
     ...(faceModuleAvailable

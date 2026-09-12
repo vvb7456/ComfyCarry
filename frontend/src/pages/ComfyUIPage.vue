@@ -341,17 +341,17 @@ function onVersionSwitched() {
 
         <!-- GPU -->
         <section class="comfy-block">
-          <SectionHeader icon="memory">{{ t('comfyui.sections.gpu') }}</SectionHeader>
+          <SectionHeader icon="monitor_heart">{{ t('comfyui.sections.gpu') }}</SectionHeader>
           <LoadingCenter v-if="!sysStats" style="padding:20px 0" />
           <template v-else-if="sysStats.gpu.length">
             <GpuMetricsCard v-for="(gpu, i) in sysStats.gpu" :key="gpu.index ?? i" :gpu="gpu" />
           </template>
-          <EmptyState v-else density="compact" icon="memory" :message="t('comfyui.gpu.empty')" />
+          <EmptyState v-else density="compact" icon="monitor_heart" :message="t('comfyui.gpu.empty')" />
         </section>
 
         <!-- 版本与启动 -->
         <section class="comfy-block">
-          <SectionHeader icon="deployed_code">{{ t('comfyui.sections.version') }}</SectionHeader>
+          <SectionHeader icon="new_releases">{{ t('comfyui.sections.version') }}</SectionHeader>
           <VersionCard :command="launchCommand" @switched="onVersionSwitched" />
         </section>
 

@@ -269,7 +269,7 @@ function onCopy() {
           <div class="tag-result-tags">{{ tagger.resultText.value }}</div>
           <div class="tag-result-actions">
             <BaseButton size="sm" variant="primary" @click="onApply">
-              <MsIcon name="input" size="xs" color="none" />
+              <MsIcon name="content_paste_go" size="xs" color="none" />
               {{ t('generate.interrogate.use_prompt') }}
             </BaseButton>
             <BaseButton size="sm" @click="onCopy">
