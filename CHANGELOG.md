@@ -2,6 +2,43 @@
 
 本文件记录各正式版本的变更。Release 发布时由 release.yml 自动提取对应 tag 的段落作为 Release 说明。
 
+## v0.8.0 — 2026-09-12
+
+### 新增
+
+- 云同步网盘 OAuth 授权向导：面板内代跑 `rclone authorize` 并截获回调地址，用户粘贴回调 URL 完成 token 交换（token 不回传前端），Google Drive 支持自建 client_id/secret；新增云盘目录列取与远程目录创建接口
+- 云存储连接共享组件（授权 / 添加流程 / 路径浏览）复用于存储管理页与安装向导 step3-4，存储管理改为弹窗式添加与重连；安装向导凭据内存草稿与部署计划提交，staged rclone 试连失败自动回滚新建 remote
+- 同步记录服务端分页与执行规则快照：`sync_jobs` 新增 `rules_json`，规则编辑/删除后历史仍可回看；新增任务详情弹窗（结果 / 规则快照 / 文件清单 / 增量事件流）
+- 同步客户端页 Hero 拆分为在线数与公网地址两个维度，新增 `POST /api/sync/worker/restart`
+- SSH 密码跟随：开启后改密自动同步，无公钥关闭需确认放行；CivitAI NSFW 浏览级别（bitmask 1-31）与封面模糊遮罩，纳入配置导入导出
+- 服务页公共组件 ServiceHero / ListPagination / ListRow / BaseButton iconOnly；ComfyUI 参数迁入分组弹窗（四组 + 已修改项计数 + 未保存守卫）与版本切换独立弹窗；GPU 监控补齐 SM 时钟 / 风扇转速 / 温度上限原生读数
+- 接入 13 个第三方品牌图标（官方/高保真 SVG），侧栏、服务卡、服务页 Hero、页签与关于页改品牌 mark，存储 logo 迁移彩色 SVG
+- 登录页迁移为 Vue 独立入口，本地模型来源行改为可点击外链；Hugging Face 白名单 247 条描述补齐中英双语
+
+### 重构
+
+- 设置页重构为四分区单页（面板 / 生成与模型 / 连接与同步 / 关于）：吸顶 TabSwitcher + scrollspy，L2 模块独立保存，「N 处未保存」跳转首个未保存模块；SSH 连接与公钥管理迁入设置，隧道/云同步设置回迁页内弹窗
+- 总览与 ComfyUI / Jupyter / SSH / 隧道 / 云同步五页统一为单列布局 + 状态机 Hero + ListRow 对象行，列表、分区间距、颜色变量、按钮层级与字号规范全局对齐；五页日志统一折叠标题，云同步默认收起
+- 图标体系收口 `MsIcon`：`icons.txt` 成为字体子集唯一来源，生成 `IconName` 联合类型并接入构建期校验，修正跨页语义错位与 `movie` 字形缺失，纯图标按钮补齐 aria-label/title
+- 确认弹窗统一「标题 + 后果说明 + 按钮」结构（49 处），危险操作默认聚焦取消键；执行终态通知收敛为应用级单一出口并按 prompt_id 幂等去重，轮询/自动刷新改静默
+- i18n 清理死键与重复键 197 条，术语与中英体例统一，补齐后端缺失文案；产品日志去 emoji，成功行改用 success 级别透出
+- 清理死代码与旧实现：StatCard、OAuthWizard、SettingsDomainTunnel/Sync、SyncActivityTab 等
+
+### 修复
+
+- 同步记录兼容旧库：`sync_jobs` 缺 `rules_json` 列或数组字段损坏时不再渲染崩溃
+- 隧道启动/重启失败如实上报（不再返回 ok:true），公共模式用持久化 token 重建 cloudflared；公共 API 响应解析与请求异常分离，非 JSON 响应携带状态码与原文
+- 执行终态与辅助任务（预处理/打标）通知重复、误报修复，ComfyUI 页不再把打标完成误报为生成完成；ComfyUI 状态补队列运行/等待数，不再恒为 0
+- 修复 15 处双错误 toast（useApiFetch 已提示 + 调用点 fallback）与 3 处失败仍提示成功（生成中断 / 重启面板 / 停止后台运行）
+- 修复确认弹窗同一 tick 打开时状态重置失效、SectionHeader 键盘事件冒泡误触折叠
+- 修复非 OAuth 存储动态下拉未注册、Dashboard 诊断加载圈被 scoped 隔离不可见、公共子域名变更未重新注册
+
+### 变更
+
+- 移除 `/api/sync/rclone_config` GET/POST 端点，rclone 配置不再支持直接编辑，统一走存储管理流程
+- 设置页由路由子 tab 改为四分区单页；`/login` 接口改为 POST JSON 配合 Vue 独立入口
+- 同步客户端 `davUrl` 改名为 `hostUrl`，仅识别 dashboard/comfycarry 两个 key，不再猜测其它服务子域名
+
 ## v0.7.1 — 2026-09-06
 
 ### 新增
