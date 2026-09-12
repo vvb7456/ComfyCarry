@@ -132,15 +132,20 @@ class PublicTunnelClient:
                 },
                 timeout=30,
             )
-            data = resp.json()
         except requests.RequestException as e:
             raise PublicTunnelError(f"无法连接 API: {e}",
                                     key="public_api_unreachable",
                                     params={"detail": str(e)})
 
+        # JSON 解析与请求异常分开: 后端 500 等非 JSON 响应不能被误报成
+        # "无法连接", 否则排障方向被带偏 (requests 的 JSONDecodeError
+        # 也是 RequestException 子类, 混在同一个 try 里会被吞掉)。
+        data = self._parse_json_response(resp)
+
         if not data.get("ok"):
-            raise PublicTunnelError(data.get("error") or "register failed",
-                                    key="" if data.get("error") else "public_register_failed")
+            detail = self._extract_error(data)
+            raise PublicTunnelError(detail or "register failed",
+                                    key="" if detail else "public_register_failed")
 
         self.random_id = data["random_id"]
         self.tunnel_token = data["tunnel_token"]
@@ -196,7 +201,7 @@ class PublicTunnelClient:
                     },
                     timeout=15,
                 )
-                data = resp.json()
+                data = self._parse_json_response(resp)
                 if not data.get("ok"):
                     log.warning(f"API release 返回错误: {data}")
             except Exception as e:
@@ -282,6 +287,37 @@ class PublicTunnelClient:
     # ═══════════════════════════════════════════════════
     # 内部方法
     # ═══════════════════════════════════════════════════
+
+    @staticmethod
+    def _parse_json_response(resp: requests.Response) -> dict:
+        """解析 API JSON 响应; 非 JSON / 非对象 → PublicTunnelError。
+
+        与请求异常严格区分: 后端 500 的纯文本 "Internal Server Error"
+        属于「服务端异常响应」, 不是「网络不可达」。
+        """
+        try:
+            data = resp.json()
+        except ValueError as e:
+            snippet = (resp.text or "")[:200]
+            raise PublicTunnelError(
+                f"API 返回非 JSON 响应 (HTTP {resp.status_code}): {snippet}",
+                key="",
+            ) from e
+        if not isinstance(data, dict):
+            raise PublicTunnelError(
+                f"API 返回异常数据格式 (HTTP {resp.status_code})", key="")
+        return data
+
+    @staticmethod
+    def _extract_error(data: dict) -> str:
+        """提取错误原文: 协议字段 error > FastAPI detail > 空字符串。
+
+        FastAPI 校验错误 (422) 的 detail 是对象数组, 取首条 msg 保证可读。
+        """
+        detail = data.get("error") or data.get("detail")
+        if isinstance(detail, list) and detail and isinstance(detail[0], dict):
+            detail = detail[0].get("msg") or detail[0]
+        return str(detail) if detail else ""
 
     def _compute_hmac(self, instance_id: str) -> tuple:
         """
