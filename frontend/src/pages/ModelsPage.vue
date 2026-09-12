@@ -40,8 +40,8 @@ const activeTab = ref(initialTab)
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
 const tabs = computed<TabItem[]>(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
-  { key: 'huggingface', label: t('models.tabs.huggingface'), icon: 'verified' },
-  { key: 'civitai', label: t('models.tabs.civitai'), icon: 'search' },
+  { key: 'huggingface', label: t('models.tabs.huggingface'), brand: 'hf' },
+  { key: 'civitai', label: t('models.tabs.civitai'), brand: 'civitai' },
 ])
 
 // CivitaiTab 预选类型 (来自 picker 空态跳转 ?type=LORA); 仅首次挂载时生效

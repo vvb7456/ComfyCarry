@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/app'
 import { switchLanguage } from '@/i18n/vue-i18n'
 import { computed } from 'vue'
 import MsIcon from '../ui/MsIcon.vue'
-import { serviceIcon } from '@/config/serviceIdentity'
+import ServiceIdentityIcon from '../ui/ServiceIdentityIcon.vue'
 // 主题切换是全局偏好, 与页面无关, 和同为全局偏好的语言切换放在一起
 import ThemeToggle from '../ui/ThemeToggle.vue'
 import type { IconName } from '@/config/icon-codepoints'
@@ -26,7 +26,9 @@ const commitUrl = computed(() =>
 
 interface NavItem {
   page: string
-  icon: IconName
+  icon?: IconName
+  /** 服务身份 (config/serviceIdentity.ts), 优先于 icon */
+  service?: string
   labelKey?: string
   label?: string
 }
@@ -42,7 +44,7 @@ const navGroups: NavGroup[] = [
     key: 'workspace',
     titleKey: 'nav.group_workspace',
     items: [
-      { page: 'dashboard', icon: serviceIcon('dashboard'), labelKey: 'nav.dashboard' },
+      { page: 'dashboard', service: 'dashboard', labelKey: 'nav.dashboard' },
       { page: 'generate',  icon: 'auto_awesome', labelKey: 'nav.generate' },
       { page: 'models',    icon: 'view_in_ar',   labelKey: 'nav.models' },
     ],
@@ -51,17 +53,17 @@ const navGroups: NavGroup[] = [
     key: 'services',
     titleKey: 'nav.group_services',
     items: [
-      { page: 'comfyui', icon: serviceIcon('comfyui'), label: 'ComfyUI' },
-      { page: 'jupyter', icon: serviceIcon('jupyter'), label: 'Jupyter' },
+      { page: 'comfyui', service: 'comfyui', label: 'ComfyUI' },
+      { page: 'jupyter', service: 'jupyter', label: 'Jupyter' },
     ],
   },
   {
     key: 'network',
     titleKey: 'nav.group_network',
     items: [
-      { page: 'sync',   icon: serviceIcon('sync'),   labelKey: 'nav.sync' },
-      { page: 'tunnel', icon: serviceIcon('tunnel'), labelKey: 'nav.tunnel' },
-      { page: 'ssh',    icon: serviceIcon('ssh'),    label: 'SSH' },
+      { page: 'sync',   service: 'sync',   labelKey: 'nav.sync' },
+      { page: 'tunnel', service: 'tunnel', labelKey: 'nav.tunnel' },
+      { page: 'ssh',    service: 'ssh',    label: 'SSH' },
     ],
   },
   {
@@ -138,7 +140,10 @@ function toggleLang() {
             :title="app.sidebarCollapsed ? getLabel(item) : undefined"
             @click="navTo(item)"
           >
-            <span class="icon"><MsIcon :name="item.icon" size="md" /></span>
+            <span class="icon">
+              <ServiceIdentityIcon v-if="item.service" :service="item.service" size="md" />
+              <MsIcon v-else-if="item.icon" :name="item.icon" size="md" />
+            </span>
             <span class="nav-label">{{ getLabel(item) }}</span>
           </button>
         </div>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import MsIcon from './MsIcon.vue'
+import BrandIcon from './BrandIcon.vue'
 import { useAppStore } from '@/stores/app'
+import type { BrandName } from '@/config/brand-icons'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'TabSwitcher' })
@@ -12,6 +14,8 @@ export interface TabItem {
   key: string
   label: string
   icon?: IconName
+  /** 品牌身份图标 (单色); 与 icon 二选一, brand 优先 */
+  brand?: BrandName
   iconColor?: string
   badge?: string | number
   disabled?: boolean
@@ -82,8 +86,13 @@ function selectTab(tab: TabItem) {
         :aria-selected="modelValue === tab.key"
         @click="selectTab(tab)"
       >
+        <BrandIcon
+          v-if="tab.brand"
+          :name="tab.brand"
+          size="sm"
+        />
         <MsIcon
-          v-if="tab.icon"
+          v-else-if="tab.icon"
           :name="tab.icon"
           size="sm"
         />
@@ -251,6 +260,11 @@ function selectTab(tab: TabItem) {
 .tab-switcher__tab--active :deep(.ms) {
   color: var(--ac);
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 18;
+}
+
+/* 品牌单色 mark 跟随选中态: 与上面 MsIcon 同色 */
+.tab-switcher__tab--active :deep(.brand-icon) {
+  color: var(--ac);
 }
 
 .mobile-menu-btn {

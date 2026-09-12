@@ -1,27 +1,35 @@
 /**
  * 服务身份图标单一来源 —— 侧栏、Dashboard 服务卡/诊断、Tunnel 服务行共用。
  *
- * 新增服务时只在此登记, 禁止在各页面各写一份 iconMap, 避免同一服务跨页不同图标。
- * 图标语义约定见 components/ui/MsIcon.vue 顶部注释。
+ * 返回品牌 mark (BrandName) 或 MsIcon 名 (IconName) 二选一:
+ *   - 有官方 mark 的服务 (ComfyUI / Jupyter) 用品牌单色图标;
+ *   - 其余服务继续用 Material Symbols 语义图标。
+ * 页面通过 components/ui/ServiceIdentityIcon.vue 渲染, 不在各页各写一份 iconMap。
  *
- * 图标名必须同时出现在 frontend/icons.txt (字体子集清单), 否则 IconName 类型会报错。
+ * MsIcon 名必须同时出现在 frontend/icons.txt (字体子集清单), 否则 IconName 类型会报错。
  */
+import type { BrandName } from '@/config/brand-icons'
 import type { IconName } from '@/config/icon-codepoints'
 
-const SERVICE_IDENTITY: Record<string, IconName> = {
-  dashboard: 'dashboard',
-  comfycarry: 'dashboard',
-  comfyui: 'terminal',
-  comfy: 'terminal',
-  jupyter: 'book_2',
-  jupyterlab: 'book_2',
-  sync: 'cloud_sync',
-  'sync-worker': 'cloud_sync',
-  tunnel: 'vpn_lock',
-  'cf-tunnel': 'vpn_lock',
-  ssh: 'key',
+export interface ServiceIdentity {
+  brand?: BrandName
+  icon?: IconName
 }
 
-export function serviceIcon(name: string, fallback: IconName = 'dns'): IconName {
-  return SERVICE_IDENTITY[name.toLowerCase()] ?? fallback
+const SERVICE_IDENTITY: Record<string, ServiceIdentity> = {
+  dashboard: { icon: 'dashboard' },
+  comfycarry: { icon: 'dashboard' },
+  comfyui: { brand: 'comfyui' },
+  comfy: { brand: 'comfyui' },
+  jupyter: { brand: 'jupyter' },
+  jupyterlab: { brand: 'jupyter' },
+  sync: { icon: 'cloud_sync' },
+  'sync-worker': { icon: 'cloud_sync' },
+  tunnel: { icon: 'vpn_lock' },
+  'cf-tunnel': { icon: 'vpn_lock' },
+  ssh: { icon: 'key' },
+}
+
+export function serviceIdentity(name: string, fallback: IconName = 'dns'): ServiceIdentity {
+  return SERVICE_IDENTITY[name.toLowerCase()] ?? { icon: fallback }
 }

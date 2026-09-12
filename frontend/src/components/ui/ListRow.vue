@@ -76,11 +76,13 @@ withDefaults(defineProps<{
     :class="{
       'list-row--clickable': clickable,
       'list-row--disabled': disabled,
-      'list-row--no-icon': !icon,
+      'list-row--no-icon': !icon && !$slots.icon,
     }"
   >
-    <span v-if="icon" class="list-row__icon" aria-hidden="true">
-      <MsIcon :name="icon" size="md" />
+    <span v-if="icon || $slots.icon" class="list-row__icon" aria-hidden="true">
+      <slot name="icon">
+        <MsIcon v-if="icon" :name="icon" size="md" />
+      </slot>
     </span>
     <div class="list-row__main">
       <div class="list-row__head">
@@ -159,6 +161,12 @@ withDefaults(defineProps<{
 .list-row__icon :deep(.ms) {
   font-size: 22px;
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 22;
+}
+
+/* 品牌身份图标同样对齐 22px (与上方 MsIcon 同值) */
+.list-row__icon :deep(.brand-icon) {
+  width: 22px;
+  height: 22px;
 }
 
 .list-row__main {

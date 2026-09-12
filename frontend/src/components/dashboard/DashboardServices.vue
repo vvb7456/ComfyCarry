@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import ServiceIdentityIcon from '@/components/ui/ServiceIdentityIcon.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
-import { serviceIcon } from '@/config/serviceIdentity'
 import type { OverviewData, DashboardState } from '@/types/dashboard'
 
 defineOptions({ name: 'DashboardServices' })
@@ -31,15 +31,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-
-// 服务身份图标 (单一来源 config/serviceIdentity.ts); 先取常量避免模板内联
-// serviceIcon('xxx') 被 build-fonts 当图标名提取, 产生 Missing codepoints 误报
-const SVC_ICONS = {
-  comfyui: serviceIcon('comfyui'),
-  jupyter: serviceIcon('jupyter'),
-  sync: serviceIcon('sync'),
-  tunnel: serviceIcon('tunnel'),
-} as const
 </script>
 
 <template>
@@ -69,7 +60,7 @@ const SVC_ICONS = {
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon :name="SVC_ICONS.comfyui" size="md" />
+            <ServiceIdentityIcon service="comfyui" size="md" />
           </div>
           <a
             v-if="dashboardState === 'ready' || dashboardState === 'busy'"
@@ -108,7 +99,7 @@ const SVC_ICONS = {
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon :name="SVC_ICONS.jupyter" size="md" />
+            <ServiceIdentityIcon service="jupyter" size="md" />
           </div>
           <a
             v-if="data?.jupyter?.online && jupyterUrl"
@@ -138,7 +129,7 @@ const SVC_ICONS = {
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon :name="SVC_ICONS.sync" size="md" />
+            <ServiceIdentityIcon service="sync" size="md" />
           </div>
           <router-link to="/sync" class="dash-svc-card__cta">
             <span class="dash-svc-card__cta-text">{{ t('dashboard.actions.manage') }}</span>
@@ -155,7 +146,7 @@ const SVC_ICONS = {
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
-            <MsIcon :name="SVC_ICONS.tunnel" size="md" />
+            <ServiceIdentityIcon service="tunnel" size="md" />
           </div>
           <router-link to="/tunnel" class="dash-svc-card__cta">
             <span class="dash-svc-card__cta-text">{{ tunnelConfigured ? t('dashboard.actions.manage') : t('dashboard.actions.config') }}</span>

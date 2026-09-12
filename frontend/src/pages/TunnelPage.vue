@@ -35,9 +35,8 @@ import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import FormField from '@/components/form/FormField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import TunnelSettingsModal from '@/components/tunnel/TunnelSettingsModal.vue'
-import { serviceIcon } from '@/config/serviceIdentity'
+import ServiceIdentityIcon from '@/components/ui/ServiceIdentityIcon.vue'
 import type { TunnelData, TunnelActionResponse } from '@/types/tunnel'
-import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'TunnelPage' })
 
@@ -141,7 +140,6 @@ const heroHasActions = computed(() => ['unconfigured', 'stopped', 'failed'].incl
 interface ServiceRow {
   key: string
   title: string
-  icon: IconName
   port: number | null
   protocol: string
   url: string
@@ -155,7 +153,6 @@ const nameMap: Record<string, string> = {
   dashboard: 'Dashboard', comfycarry: 'ComfyCarry', comfyui: 'ComfyUI',
   jupyter: 'JupyterLab', jupyterlab: 'JupyterLab', ssh: 'SSH',
 }
-function svcIcon(name: string) { return serviceIcon(name, 'vpn_lock') }
 function svcName(name: string) { return nameMap[name.toLowerCase()] || name }
 
 /** 公共节点 url 键 → 后端默认服务 (取真实端口/协议); 匹配不到时用内置兜底 */
@@ -188,7 +185,7 @@ const serviceRows = computed<ServiceRow[]>(() => {
       const meta = publicMeta(key, d)
       const isSsh = meta.protocol === 'ssh'
       return {
-        key, title: svcName(key), icon: svcIcon(key),
+        key, title: svcName(key),
         port: meta.port, protocol: meta.protocol, url,
         suffix: '', custom: false, isSsh, isTcp: false,
       }
@@ -197,7 +194,7 @@ const serviceRows = computed<ServiceRow[]>(() => {
   return (d.services || []).map(svc => {
     const url = d.urls?.[svc.name] || (svc.suffix ? `https://${svc.suffix}-${d.subdomain}.${d.domain}` : `https://${d.subdomain}.${d.domain}`)
     return {
-      key: svc.name, title: svc.name, icon: svcIcon(svc.name),
+      key: svc.name, title: svc.name,
       port: svc.port, protocol: svc.protocol, url,
       suffix: svc.suffix, custom: svc.custom,
       isSsh: svc.protocol === 'ssh', isTcp: svc.protocol === 'tcp',
@@ -392,10 +389,12 @@ function openAddSvc() {
             <ListRow
               v-for="row in serviceRows"
               :key="row.key"
-              :icon="row.icon"
               :title="row.title"
               :facts="rowFacts(row)"
             >
+              <template #icon>
+                <ServiceIdentityIcon :service="row.key" fallback="vpn_lock" />
+              </template>
               <template #actions>
                 <BaseButton variant="ghost" size="sm" icon-only :aria-label="copyAria(row)" @click="copyRow(row)">
                   <MsIcon name="content_copy" />

@@ -7,8 +7,7 @@ import ListRow from '@/components/ui/ListRow.vue'
 import { fmtBytes } from '@/utils/format'
 import type { OverviewData, ServiceEntry } from '@/types/dashboard'
 import type { SystemStats } from '@/types/system'
-import { serviceIcon } from '@/config/serviceIdentity'
-import type { IconName } from '@/config/icon-codepoints'
+import ServiceIdentityIcon from '@/components/ui/ServiceIdentityIcon.vue'
 
 defineOptions({ name: 'DashboardDiagnostics' })
 
@@ -50,10 +49,6 @@ const SVC_IDENTITY: Record<string, { nameKey: string }> = {
 function svcName(name: string): string {
   const id = SVC_IDENTITY[name]
   return id ? t(`dashboard.services.${id.nameKey}`) : name
-}
-
-function svcIcon(name: string): IconName {
-  return serviceIcon(name)
 }
 
 function fmtSvcMem(bytes: number | string | undefined) {
@@ -173,12 +168,14 @@ const envFacts = computed(() => {
         <ListRow
           v-for="svc in orderedServices"
           :key="svc.name"
-          :icon="svcIcon(svc.name)"
           :title="svcName(svc.name)"
           :title-tooltip="svc.name"
           :status="{ tone: svcStatusTone(svc.status), text: svcStatusText(svc.status) }"
           :facts="svcFacts(svc)"
         >
+          <template #icon>
+            <ServiceIdentityIcon :service="svc.name" />
+          </template>
           <template #actions>
             <BaseButton
               v-if="svc.status === 'online'"

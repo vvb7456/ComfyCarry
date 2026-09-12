@@ -389,7 +389,7 @@ onUnmounted(() => {
       <template v-else-if="status">
         <!-- Hero + 运行事实 -->
         <ServiceHero
-          icon="book_2"
+          brand="jupyter"
           :title="heroTitle"
           :subtitle="heroSubtitle"
           :tone="heroTone"

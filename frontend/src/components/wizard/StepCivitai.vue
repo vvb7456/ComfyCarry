@@ -5,6 +5,7 @@ import { useWizardState } from '@/composables/useWizardState'
 import WizardStepLayout from './WizardStepLayout.vue'
 import FormField from '@/components/form/FormField.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
+import BrandIcon from '@/components/ui/BrandIcon.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 
 defineOptions({ name: 'StepCivitai' })
@@ -25,12 +26,14 @@ function onPrev() { prevStep() }
 <template>
   <WizardStepLayout
     :title="t('wizard.step5.title')"
-    icon="key"
     :description="t('wizard.step5.desc')"
     :next-label="nextLabel"
     @prev="onPrev"
     @next="onNext"
   >
+    <template #icon>
+      <BrandIcon name="civitai" size="sm" />
+    </template>
     <AlertBanner v-if="hasEnvCivitai" tone="info" dense>
       {{ t('wizard.step5.env_civitai_hint') }}
     </AlertBanner>

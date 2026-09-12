@@ -35,13 +35,17 @@ export type ServiceHeroTone = 'ok' | 'warn' | 'bad' | 'off'
  * facts 是「标签 + 值」的紧凑事实项（值用 <b> 承载），组件负责行容器与键值样式。
  */
 import MsIcon from './MsIcon.vue'
+import BrandIcon from './BrandIcon.vue'
+import type { BrandName } from '@/config/brand-icons'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ServiceHero' })
 
 withDefaults(defineProps<{
-  /** Material Symbols 图标名（服务身份图标） */
-  icon: IconName
+  /** Material Symbols 图标名（无品牌 mark 时的服务身份图标） */
+  icon?: IconName
+  /** 品牌身份图标；提供时优先于 icon。运行态(ok)用官方彩色版, 其余状态用单色版并继承状态色 */
+  brand?: BrandName
   title: string
   subtitle: string
   tone: ServiceHeroTone
@@ -61,7 +65,13 @@ withDefaults(defineProps<{
     >
       <div class="service-hero__body">
         <span class="service-hero__icon" aria-hidden="true">
-          <MsIcon :name="icon" />
+          <BrandIcon
+            v-if="brand"
+            :name="brand"
+            :variant="tone === 'ok' ? 'color' : 'mono'"
+            :size="42"
+          />
+          <MsIcon v-else-if="icon" :name="icon" />
         </span>
         <h2 class="service-hero__title">{{ title }}</h2>
         <p class="service-hero__subtitle">{{ subtitle }}</p>

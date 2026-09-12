@@ -287,7 +287,7 @@ function onVersionSwitched() {
       <template v-else>
         <!-- Hero + 运行事实 -->
         <ServiceHero
-          icon="terminal"
+          brand="comfyui"
           :title="heroTitle"
           :subtitle="heroSubtitle"
           :tone="heroTone"
