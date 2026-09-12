@@ -9,6 +9,7 @@
  */
 import { computed, watch, ref, nextTick, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import type { AutocompleteDisplayItem } from '@/composables/generate/useAutoComplete'
 
 defineOptions({ name: 'AutoCompleteList' })
@@ -101,7 +102,7 @@ const dividerIndex = computed(() => props.items.findIndex(i => i.added))
           <span
             v-else-if="(item.hot ?? 0) > 0"
             class="ac-hot"
-          >★ {{ fmtHot(item.hot!) }}</span>
+          ><MsIcon name="local_fire_department" size="xs" color="none" /> {{ fmtHot(item.hot!) }}</span>
         </div>
       </template>
     </div>

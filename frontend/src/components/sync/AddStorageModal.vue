@@ -2,7 +2,7 @@
 /**
  * AddStorageModal — dashboard「添加存储」弹窗薄壳。
  *
- * 流程主体在 AddStorageFlow (两态: 类型 › 连接), 本组件只负责 BaseModal 包装。
+ * 流程主体在 AddStorageFlow (两态: 类型 → 连接), 本组件只负责 BaseModal 包装。
  * 凭据全程零落盘, 关闭即丢弃 —— 无关闭守卫; 仅在关闭路径上清理未完成的
  * OAuth 授权会话 (经 flow.cleanupSession, done 会话留给 create 消费)。
  *

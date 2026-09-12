@@ -260,7 +260,7 @@ export function useTagInterrogation() {
 
     promptId.value = ''
 
-    // ★ Auto-reopen modal if user closed it during interrogation and result arrived
+    // Auto-reopen modal if user closed it during interrogation and result arrived
     if (!visible.value && resultText.value) {
       visible.value = true
     }

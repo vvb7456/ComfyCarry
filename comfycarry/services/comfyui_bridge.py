@@ -81,7 +81,7 @@ class ComfyWSBridge:
                 time.sleep(3)
 
     def _on_open(self, ws):
-        logger.info("[bridge] WS connected ✓")
+        logger.info("[bridge] WS connected")
         self._broadcast({"type": "ws_connected"})
 
     def _on_error(self, ws, error):

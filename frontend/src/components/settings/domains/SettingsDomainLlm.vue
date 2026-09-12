@@ -390,7 +390,7 @@ onUnmounted(() => guardHub.unregister(dirtyEntry))
               class="settings-row__feedback"
               :class="llmTestResult.ok ? 'settings-row__feedback--ok' : 'settings-row__feedback--err'"
             >
-              {{ llmTestResult.ok ? '✓' : '✗' }} {{ llmTestResult.message }}
+              {{ llmTestResult.message }}
             </div>
           </div>
         </div>

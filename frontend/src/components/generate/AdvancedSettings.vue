@@ -128,11 +128,9 @@ function buildSlotOptions(slot: ComponentSlot, candidates: { name: string }[]): 
     const base = basenameNoExt(c.name)
     const opt: SelectOption = { value: c.name, label: base }
     if (cfg.group === 1) {
-      opt.label = `★ ${base}`
       opt.group = t(GROUP_OFFICIAL)
       if (cfg.file) opt.hint = formatBytes(cfg.file.bytes)
     } else if (cfg.group === 2) {
-      opt.label = `☆ ${base}`
       opt.group = t(GROUP_COMPAT)
     } else {
       opt.group = t(GROUP_OTHER)
@@ -178,13 +176,7 @@ const hasRegistry = computed(() =>
   componentsForSlot(arch.value, 'audio_vae').length > 0)
 
 /* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
-// 选项 1/2/3/4 (显示 "1 (默认)" / "2" ...); VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
-const clipSkipOptions = computed(() => [
-  { value: 1, label: t('generate.advanced.clip_skip_default') },
-  { value: 2, label: '2' },
-  { value: 3, label: '3' },
-  { value: 4, label: '4' },
-])
+// Clip Skip: NumberInput 1~4; VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
 const vaeOverrideOptions = computed(() => [
   { value: '', label: t('generate.advanced.vae_override_follow') },
   ...vaeOptions.value,
@@ -282,11 +274,13 @@ const vaeOverrideOptions = computed(() => [
             {{ t('generate.advanced.clip_skip') }}
             <HelpTip :text="t('generate.advanced.clip_skip_help')" />
           </label>
-          <BaseSelect
+          <NumberInput
             :model-value="state.clipSkip"
-            :options="clipSkipOptions"
+            :min="1"
+            :max="4"
+            :step="1"
             :disabled="disabled"
-            @update:model-value="state.clipSkip = Number($event)"
+            @update:model-value="state.clipSkip = $event"
           />
         </div>
         <div class="field-group">

@@ -68,8 +68,8 @@ function isVideo(img: HistoryImage): boolean {
   return hasVideoExt(img.filename)
 }
 
-// ── 视频时长角标 (右下胶囊 ▶ 时长) ──
-// 时长由隐藏 <video preload="metadata"> 的 loadedmetadata 事件按需获取, 拿不到就只显 ▶
+// ── 视频时长角标 (右下胶囊, play_arrow 图标 + 时长) ──
+// 时长由隐藏 <video preload="metadata"> 的 loadedmetadata 事件按需获取, 拿不到就只显图标
 const durationMap = ref<Record<string, number>>({})
 function durKey(img: HistoryImage): string {
   return `${img.type}|${img.subfolder}|${img.filename}`
@@ -284,11 +284,14 @@ defineExpose({ setupObserver })
               loading="lazy"
               alt=""
             >
-            <!-- 视频角标: ▶ 时长; 时长由隐藏 <video> 抽取, 拿不到只显 ▶ -->
+            <!-- 视频角标: play_arrow + 时长; 时长由隐藏 <video> 抽取, 拿不到只显图标 -->
             <span
               v-if="isVideo(img)"
               class="history-thumb-dur"
-            >▶<template v-if="durationMap[durKey(img)] != null">{{ ' ' + fmtDuration(durationMap[durKey(img)]) }}</template></span>
+            >
+              <MsIcon name="play_arrow" size="xxs" color="none" />
+              <template v-if="durationMap[durKey(img)] != null">{{ fmtDuration(durationMap[durKey(img)]) }}</template>
+            </span>
             <!-- 视频时长抽取: preload="metadata" 只取头部, @loadedmetadata 写入时长 Map -->
             <video
               v-if="isVideo(img)"
@@ -417,11 +420,14 @@ defineExpose({ setupObserver })
   font-size: var(--text-sm);
 }
 
-/* ── 视频角标 (▶ 时长): 右下角半透明黑底胶囊 ── */
+/* ── 视频角标 (play_arrow + 时长): 右下角半透明黑底胶囊 ── */
 .history-thumb-dur {
   position: absolute;
   right: 6px;
   bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 2px 7px;
   background: rgba(0, 0, 0, .6);
   border-radius: 999px;

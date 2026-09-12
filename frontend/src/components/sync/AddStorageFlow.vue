@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * AddStorageFlow — 添加存储流 (类型 › 连接) 的流程主体,
+ * AddStorageFlow — 添加存储流 (类型 → 连接) 的流程主体,
  * dashboard「添加存储」弹窗的内容 (外壳见 AddStorageModal)。
  *
  * 与 wizard 的关系: wizard step3 将本流程原生化为向导 step (StepRclone),

@@ -10,11 +10,11 @@ COMFYUI_PARAM_GROUPS = {
         "type": "select",
         "help": "控制模型显存分配策略。默认自动检测，High VRAM 适合大显存GPU不卸载模型，Low VRAM 适合小显存拆分推理",
         "options": [
-            ("default", "默认 (自动)"),
-            ("gpu-only", "GPU Only (全部保留在GPU)"),
-            ("highvram", "High VRAM (模型不卸载)"),
-            ("lowvram", "Low VRAM (拆分 UNet)"),
-            ("novram", "No VRAM (极限低显存)"),
+            ("default", "默认"),
+            ("gpu-only", "GPU Only"),
+            ("highvram", "High VRAM"),
+            ("lowvram", "Low VRAM"),
+            ("novram", "No VRAM"),
         ],
         "flag_map": {
             "gpu-only": "--gpu-only", "highvram": "--highvram",
@@ -27,9 +27,9 @@ COMFYUI_PARAM_GROUPS = {
         "type": "select",
         "help": "PyTorch SDPA 推荐，自动调用最优内核。FlashAttention/SageAttention 可通过 Setup Wizard 安装",
         "options": [
-            ("default", "默认 (自动选择)"),
-            ("pytorch-cross", "PyTorch SDPA (推荐✓)"),
-            ("split-cross", "Split Cross Attention (省VRAM)"),
+            ("default", "默认"),
+            ("pytorch-cross", "PyTorch SDPA"),
+            ("split-cross", "Split Cross Attention"),
             ("quad-cross", "Sub-Quadratic"),
             ("flash", "FlashAttention"),
             ("sage", "SageAttention"),
@@ -119,7 +119,7 @@ COMFYUI_PARAM_GROUPS = {
         "type": "select",
         "help": "控制 UNet 推理精度。FP8 可大幅减少显存占用，适合大模型；BF16 是 Ampere+ 推荐精度",
         "options": [
-            ("default", "默认 (自动)"),
+            ("default", "默认"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
             ("fp8_e4m3fn", "FP8 (e4m3fn)"), ("fp8_e5m2", "FP8 (e5m2)"),
             ("fp8_e8m0fnu", "FP8 (e8m0fnu)"),
@@ -135,9 +135,9 @@ COMFYUI_PARAM_GROUPS = {
         "type": "select",
         "help": "VAE 解码精度。FP32 最稳定，FP16/BF16 更快。黑图时可尝试 FP32",
         "options": [
-            ("default", "默认 (自动)"),
+            ("default", "默认"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
-            ("cpu", "CPU (在CPU上运行)"),
+            ("cpu", "CPU"),
         ],
         "flag_map": {
             "fp32": "--fp32-vae", "fp16": "--fp16-vae",
@@ -149,7 +149,7 @@ COMFYUI_PARAM_GROUPS = {
         "type": "select",
         "help": "文本编码器精度。通常默认即可，FP8 可节省显存",
         "options": [
-            ("default", "默认 (自动)"),
+            ("default", "默认"),
             ("fp32", "FP32"), ("fp16", "FP16"), ("bf16", "BF16"),
             ("fp8_e4m3fn", "FP8 (e4m3fn)"), ("fp8_e5m2", "FP8 (e5m2)"),
         ],
@@ -274,7 +274,7 @@ COMFYUI_PARAM_GROUPS = {
         "type": "select",
         "help": "控制节点输出缓存。仅当选择 LRU 时，LRU 缓存大小才会生效；经典模式缓存更激进、更快，但占用更多内存",
         "options": [
-            ("default", "默认"), ("classic", "经典 (Aggressive)"),
+            ("default", "默认"), ("classic", "经典"),
             ("lru", "LRU"), ("none", "禁用"),
         ],
         "flag_map": {

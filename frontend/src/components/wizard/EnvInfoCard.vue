@@ -24,7 +24,7 @@ const tags = computed(() => {
   const t: Array<{ text: string; green?: boolean }> = []
   if (props.prebuiltInfo.torch) t.push({ text: `PyTorch ${props.prebuiltInfo.torch}` })
   if (props.prebuiltInfo.cuda_toolkit) t.push({ text: `CUDA ${props.prebuiltInfo.cuda_toolkit}` })
-  if (props.prebuiltInfo.fa2) t.push({ text: 'FA2 ✓', green: true })
+  if (props.prebuiltInfo.fa2) t.push({ text: 'FA2', green: true })
   if (props.prebuiltInfo.build_date) t.push({ text: props.prebuiltInfo.build_date.slice(0, 10) })
   return t
 })

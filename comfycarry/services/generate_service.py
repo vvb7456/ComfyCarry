@@ -138,7 +138,7 @@ def submit_generation(data: dict) -> tuple[dict, int]:
       成功: ({"prompt_id": "...", "status": "queued"}, 200)
       失败: ({"error_key": "generate.err.<key>", "error_params": {...}}, 400/500/502/503)
     """
-    # ── ★ 每轮 deepcopy — 入口即深拷贝, 防止 wildcard 烤死 ──
+    # ── 每轮 deepcopy — 入口即深拷贝, 防止 wildcard 烤死 ──
     data = copy.deepcopy(data)
 
     # _BUILDERS / _SPLIT_ARCHS / _DUAL_CLIP_ARCHS / _fetch_generate_options

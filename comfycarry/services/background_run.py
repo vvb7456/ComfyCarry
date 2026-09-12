@@ -43,7 +43,7 @@ _worker_thread: threading.Thread | None = None
 
 
 # ── 停机 code (六个值, 严格使用) ───────────────────────────────────────────
-# max_reached  达上限 (正常结束, UI 绿色✓)
+# max_reached  达上限 (正常结束, UI 绿色)
 # disk_low     输出盘剩余 < min_free_disk_gb
 # file_missing 模型/输入图不存在
 # exec_error   ComfyUI 执行报错 / 提交返回 4xx 5xx
@@ -390,7 +390,7 @@ def stop_session() -> None:
       2. POST /interrupt  (停止当前 ComfyUI 动作)
       3. 清残留队列 (POST /queue clear)
     幂等: 不在 running 时整体退化为无操作。
-    ★ 不能在 idle 时也 interrupt/clear —— 那会打断用户手动发起的生成并清空其队列。
+    不能在 idle 时也 interrupt/clear —— 那会打断用户手动发起的生成并清空其队列。
       陈旧标签页上残留的「停止」按钮正是这种场景。
     """
     global _state, _stop_reason, _epoch
@@ -399,7 +399,7 @@ def stop_session() -> None:
         if _state == "running":
             was_running = True
             _state = "idle"
-            # ★ 手动停止不写 stop_reason —— 本来就是用户自己点的, 不需要浮动条
+            # 手动停止不写 stop_reason —— 本来就是用户自己点的, 不需要浮动条
             # 再报一次「已停止」还要他点「知道了」。点停止的那一端弹个 toast 即可。
             _stop_reason = None
             _epoch += 1
@@ -407,7 +407,7 @@ def stop_session() -> None:
         return
     _interrupt_comfyui()
     _clear_queue()
-    # ★ 不 join worker 线程。stop_session 跑在 Flask 请求线程里, 而 worker 可能正卡在
+    # 不 join worker 线程。stop_session 跑在 Flask 请求线程里, 而 worker 可能正卡在
     #   submit_generation 的 requests.post(timeout=30) 上 —— join 会让「停止」按钮
     #   最长无响应 5 秒, 却换不来任何东西: epoch 已经变了, worker 返回后自己会做
     #   interrupt + queue/delete 补刀, 最终一致由 epoch 保证, 不依赖这里等它退出。

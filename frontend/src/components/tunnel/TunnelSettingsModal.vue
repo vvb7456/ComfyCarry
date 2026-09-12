@@ -437,7 +437,7 @@ async function requestClose(): Promise<void> {
             class="settings-row__feedback"
             :class="cfgValidResult.ok ? 'settings-row__feedback--ok' : 'settings-row__feedback--err'"
           >
-            {{ cfgValidResult.ok ? '✓' : '✗' }} {{ cfgValidResult.message }}
+            {{ cfgValidResult.message }}
           </div>
         </div>
       </div>

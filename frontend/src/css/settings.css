@@ -96,7 +96,7 @@
     min-width: 0;
 }
 
-/* 行内校验结果 (✓/✗), 控件列下方 */
+/* 行内校验结果, 控件列下方 */
 .settings-row__feedback {
     margin-top: 4px;
     font-size: .78rem;

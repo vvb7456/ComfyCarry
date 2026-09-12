@@ -92,28 +92,28 @@ function rowState(r: DepRowStatus): VersionState {
     <div v-if="showSkeleton" class="dep-row dep-row--skeleton">
       <Spinner size="xs" />
       <span class="dep-row__txt dep-row__txt--muted">{{ t('generate.dep.detecting') }}</span>
-      <span class="dep-row__arr">›</span>
+      <MsIcon name="expand_more" size="sm" color="none" class="dep-row__arr" :class="{ 'dep-row__arr--collapsed': !expanded }" />
     </div>
 
     <!-- 下载中 -->
     <div v-else-if="isDownloading" class="dep-row dep-row--downloading" @click="toggleExpand">
       <MsIcon name="download" size="sm" color="var(--ac)" />
       <span class="dep-row__txt">{{ downloadingText }}</span>
-      <span class="dep-row__arr" :class="{ 'dep-row__arr--open': expanded }">›</span>
+      <MsIcon name="expand_more" size="sm" color="none" class="dep-row__arr" :class="{ 'dep-row__arr--collapsed': !expanded }" />
     </div>
 
     <!-- 缺失 -->
     <div v-else-if="hasMissing" class="dep-row dep-row--missing" @click="toggleExpand">
       <MsIcon name="error" size="sm" color="var(--amber)" />
       <span class="dep-row__txt">{{ missingText }}</span>
-      <span class="dep-row__arr" :class="{ 'dep-row__arr--open': expanded }">›</span>
+      <MsIcon name="expand_more" size="sm" color="none" class="dep-row__arr" :class="{ 'dep-row__arr--collapsed': !expanded }" />
     </div>
 
     <!-- 就绪 -->
     <div v-else class="dep-row dep-row--ready" @click="toggleExpand">
       <MsIcon name="check_circle" size="sm" color="var(--green)" />
       <span class="dep-row__txt dep-row__txt--muted">{{ readyText }}</span>
-      <span class="dep-row__arr" :class="{ 'dep-row__arr--open': expanded }">›</span>
+      <MsIcon name="expand_more" size="sm" color="none" class="dep-row__arr" :class="{ 'dep-row__arr--collapsed': !expanded }" />
     </div>
 
     <!-- ═══ 展开态明细 ═══ -->
@@ -186,12 +186,10 @@ function rowState(r: DepRowStatus): VersionState {
 
 .dep-row__arr {
   color: var(--t3);
-  font-size: 1rem;
-  line-height: 1;
   flex: none;
   transition: transform .2s ease;
 }
-.dep-row__arr--open { transform: rotate(90deg); }
+.dep-row__arr--collapsed { transform: rotate(-90deg); }
 
 .dep-row--downloading {
   background: color-mix(in srgb, var(--ac) 8%, var(--bg2));

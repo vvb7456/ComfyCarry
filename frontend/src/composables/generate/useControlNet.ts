@@ -329,7 +329,7 @@ export function useControlNet(
         canny: t('generate.controlnet.edge_map'),
         depth: t('generate.controlnet.depth_map'),
       }
-      toast(t('generate.controlnet.generating', { label: labelMap[type] || type }) + ' ✓', 'success')
+      toast(t('generate.controlnet.generating', { label: labelMap[type] || type }), 'success')
     } else {
       preprocessStatus.value = success ? 'done' : 'error'
     }

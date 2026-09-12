@@ -108,11 +108,6 @@ const fitSize = computed(() => {
 })
 
 type Orient = 'landscape' | 'portrait' | 'square'
-const ORIENT_KEYS: Record<Orient, string> = {
-  landscape: 'generate.video.orient_landscape',
-  portrait: 'generate.video.orient_portrait',
-  square: 'generate.video.orient_square',
-}
 
 /** 全部档位预设摊平成下拉项 (来自 videoDefaults.presets, 不硬编码) */
 const presetEntries = computed(() => {
@@ -124,9 +119,7 @@ const presetEntries = computed(() => {
       if (!p) continue
       out.push({
         value: `${p.width}x${p.height}`,
-        label: t('generate.video.res_preset', {
-          w: p.width, h: p.height, orient: t(ORIENT_KEYS[orient]), tier,
-        }),
+        label: t('generate.video.res_preset', { w: p.width, h: p.height }),
         width: p.width,
         height: p.height,
       })
@@ -141,9 +134,7 @@ const resolutionOptions = computed(() => {
   if (fitSize.value) {
     opts.push({
       value: RES_FIT,
-      label: t('generate.video.res_fit_option', {
-        w: fitSize.value.w, h: fitSize.value.h, label: t('generate.video.res_fit'),
-      }),
+      label: t('generate.video.res_fit_option', { w: fitSize.value.w, h: fitSize.value.h }),
     })
   }
   for (const e of presetEntries.value) opts.push({ value: e.value, label: e.label })
