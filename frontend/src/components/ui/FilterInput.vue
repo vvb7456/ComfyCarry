@@ -31,6 +31,8 @@ withDefaults(defineProps<{
     <button
       v-if="clearable && model"
       class="filter-input__clear"
+      :aria-label="t('common.btn.clear')"
+      :title="t('common.btn.clear')"
       @click="model = ''"
     >
       <MsIcon name="close" size="sm" color="none" />

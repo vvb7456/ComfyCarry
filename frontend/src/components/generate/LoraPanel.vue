@@ -226,7 +226,7 @@ function cycleApply(lora: LoraEntry) {
           :title="t('generate.lora.remove')"
           @click.stop="removeLora(index)"
         >
-          <MsIcon name="close" color="none" />
+          <MsIcon name="remove_circle" color="none" />
         </button>
 
         <div class="lora-card__body">
@@ -372,7 +372,7 @@ function cycleApply(lora: LoraEntry) {
 }
 
 .lora-card__del:hover {
-  background: var(--red);
+  background: var(--overlay-dark);
 }
 
 /* Disable toggle button (top-left) */
@@ -407,7 +407,7 @@ function cycleApply(lora: LoraEntry) {
 }
 
 .lora-card__toggle:hover {
-  background: var(--amber, #f59e0b);
+  background: var(--overlay-dark);
 }
 
 .lora-card__body {

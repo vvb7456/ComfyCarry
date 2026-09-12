@@ -261,7 +261,6 @@ const showNegative = computed(() =>
             :preview="previewUrl"
             :file-name="imageName"
             :pick-label="t('generate.image_source.from_input')"
-            pick-icon="folder_open"
             :upload-label="t('generate.image_source.upload_local')"
             class="llm-image-zone"
             @pick="onPickInput"
@@ -351,7 +350,6 @@ const showNegative = computed(() =>
   <RefImageModal
     v-model="imgPicker.visible.value"
     :title="t('generate.image_source.select_image')"
-    icon="folder_open"
     :images="imgPicker.images.value"
     :loading="imgPicker.loading.value"
     :uploading="imgPicker.uploading.value"

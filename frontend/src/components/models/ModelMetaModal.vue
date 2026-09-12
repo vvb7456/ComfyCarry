@@ -371,7 +371,7 @@ function fmtSize(bytes?: number): string {
                 muted loop playsinline disablepictureinpicture preload="metadata"
               />
               <span class="mm-video-badge">
-                <MsIcon name="videocam" class="ms-sm" /> {{ t('models.meta.video') }}
+                <MsIcon name="movie" class="ms-sm" /> {{ t('models.meta.video') }}
               </span>
             </template>
             <img

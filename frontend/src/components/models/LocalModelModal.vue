@@ -245,7 +245,7 @@ function openImage(index: number) {
           <figure v-if="previewUrl" class="lm-image" @click="openImage(0)"><img :src="previewUrl" alt="" loading="lazy"></figure>
           <figure v-for="(image, index) in images" :key="image.url + index" class="lm-image" @click="openImage(index + (previewUrl ? 1 : 0))">
             <video v-if="image.type === 'video'" :src="image.url" muted loop playsinline preload="metadata" />
-            <span v-if="image.type === 'video'" class="lm-video-badge"><MsIcon name="videocam" size="sm" /> {{ t('models.meta.video') }}</span>
+            <span v-if="image.type === 'video'" class="lm-video-badge"><MsIcon name="movie" size="sm" /> {{ t('models.meta.video') }}</span>
             <img v-else :src="image.url" alt="" loading="lazy">
             <figcaption v-if="hasCaption(image)" class="lm-caption">
               <template v-if="imageMeta(image).seed"><label>Seed</label>{{ imageMeta(image).seed }}</template>

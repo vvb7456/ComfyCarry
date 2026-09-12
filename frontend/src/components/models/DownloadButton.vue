@@ -85,7 +85,7 @@ const speedTitle = computed(() => {
     @click="showCancel && emit('cancel')"
   >
     <template v-if="showCancel">
-      <MsIcon name="close" size="xs" />
+      <MsIcon name="cancel" size="xs" />
       {{ t('common.btn.cancel') }}
     </template>
     <template v-else-if="state === 'queued'">
@@ -126,7 +126,7 @@ const speedTitle = computed(() => {
     class="dl-btn"
     @click="emit('download')"
   >
-    <MsIcon name="refresh" size="xs" />
+    <MsIcon name="replay" size="xs" />
     {{ t('models.downloads.download') }}
   </BaseButton>
 

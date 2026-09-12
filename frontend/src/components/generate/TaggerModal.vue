@@ -165,7 +165,6 @@ function onCopy() {
           :preview="previewUrl"
           :file-name="sourceName"
           :pick-label="t('generate.image_source.from_input')"
-          pick-icon="folder_open"
           :upload-label="t('generate.image_source.upload_local')"
           class="tag-source-zone"
           @pick="onPickInput"
@@ -292,7 +291,6 @@ function onCopy() {
   <RefImageModal
     v-model="tagPicker.visible.value"
     :title="t('generate.image_source.select_image')"
-    icon="folder_open"
     :images="tagPicker.images.value"
     :loading="tagPicker.loading.value"
     :uploading="tagPicker.uploading.value"

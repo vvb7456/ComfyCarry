@@ -76,6 +76,8 @@ defineExpose({ focus })
       v-if="model"
       class="search-input__clear"
       tabindex="-1"
+      :aria-label="t('common.btn.clear')"
+      :title="t('common.btn.clear')"
       @click="model = ''; emit('search', ''); focus()"
     >
       <MsIcon name="close" class="ms-xs" />

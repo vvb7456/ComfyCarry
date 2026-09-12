@@ -17,12 +17,9 @@ gps_not_fixed
 
 # AppSidebar.vue / SettingsPage tabs — JS 对象 icon 字段传递
 dashboard
-dashboard_customize
-preview
 dns
 
 # ParamsCard / ModelTab — 配置数组 icon 字段 (.ts/.vue 间接引用)
-cached
 hd
 face_retouching_natural
 loop
@@ -42,11 +39,6 @@ stop_circle
 
 # WizardSummary — JS 变量传递给 SummaryRow.icon
 skip_next
-
-# ICON_COLORS 中带数字的 key (正则 [a-z_]+ 无法匹配)
-book_2
-hard_drive_2
-package_2
 
 # MaskEditorModal — 工具栏图标 (多行 MsIcon :name 单独成行)
 ink_eraser

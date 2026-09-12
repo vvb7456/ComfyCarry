@@ -307,6 +307,7 @@ async function restartNow() {
         :visible="pendingRestart.length > 0 && !restartDismissed"
         :message="t('plugins.restart.banner_msg')"
         :save-label="t('plugins.restart.now')"
+        save-icon="restart_alt"
         :discard-label="t('plugins.restart.later')"
         :saving="restarting"
         :sticky="false"

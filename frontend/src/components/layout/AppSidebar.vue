@@ -5,6 +5,7 @@ import { useAppStore } from '@/stores/app'
 import { switchLanguage } from '@/i18n/vue-i18n'
 import { computed } from 'vue'
 import MsIcon from '../ui/MsIcon.vue'
+import { serviceIcon } from '@/config/serviceIdentity'
 // 主题切换是全局偏好, 与页面无关, 和同为全局偏好的语言切换放在一起
 import ThemeToggle from '../ui/ThemeToggle.vue'
 
@@ -40,7 +41,7 @@ const navGroups: NavGroup[] = [
     key: 'workspace',
     titleKey: 'nav.group_workspace',
     items: [
-      { page: 'dashboard', icon: 'dashboard', labelKey: 'nav.dashboard' },
+      { page: 'dashboard', icon: serviceIcon('dashboard'), labelKey: 'nav.dashboard' },
       { page: 'generate',  icon: 'auto_awesome', labelKey: 'nav.generate' },
       { page: 'models',    icon: 'view_in_ar',   labelKey: 'nav.models' },
     ],
@@ -49,17 +50,17 @@ const navGroups: NavGroup[] = [
     key: 'services',
     titleKey: 'nav.group_services',
     items: [
-      { page: 'comfyui', icon: 'terminal', label: 'ComfyUI' },
-      { page: 'jupyter', icon: 'book_2',   label: 'Jupyter' },
+      { page: 'comfyui', icon: serviceIcon('comfyui'), label: 'ComfyUI' },
+      { page: 'jupyter', icon: serviceIcon('jupyter'), label: 'Jupyter' },
     ],
   },
   {
     key: 'network',
     titleKey: 'nav.group_network',
     items: [
-      { page: 'sync',   icon: 'cloud_sync', labelKey: 'nav.sync' },
-      { page: 'tunnel', icon: 'vpn_lock',   labelKey: 'nav.tunnel' },
-      { page: 'ssh',    icon: 'key',        label: 'SSH' },
+      { page: 'sync',   icon: serviceIcon('sync'),   labelKey: 'nav.sync' },
+      { page: 'tunnel', icon: serviceIcon('tunnel'), labelKey: 'nav.tunnel' },
+      { page: 'ssh',    icon: serviceIcon('ssh'),    label: 'SSH' },
     ],
   },
   {

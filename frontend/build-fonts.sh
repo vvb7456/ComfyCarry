@@ -43,10 +43,7 @@ ICON_PROP_STATIC=$(grep -rh --include='*.vue' 'icon="[a-z_0-9]' "$SRC_DIR" 2>/de
 # 1d. 任意组件 :icon="... 'icon_name' ..." 动态绑定内的单引号字符串
 ICON_PROP_DYNAMIC=$(grep -rh --include='*.vue' ":icon=\"[^\"]*'" "$SRC_DIR" 2>/dev/null | grep -oP ":icon=\"[^\"]*'" | grep -oP "'[a-z_0-9]+'" | tr -d "'" || true)
 
-# 1e. ICON_COLORS 映射表中的 key (匹配 'icon_name': 模式; 兼容旧实现)
-COLORS_ICONS=$(grep -oP "'[a-z][a-z_0-9]+'\s*:" "$SRC_DIR/components/ui/MsIcon.vue" 2>/dev/null | grep -oP "'[a-z][a-z_0-9]+'" | tr -d "'" || true)
-
-# 1f. JS 对象字面量中的 icon: 'icon_name' 属性 (Tab 配置、菜单等)
+# 1e. JS 对象字面量中的 icon: 'icon_name' 属性 (Tab 配置、菜单等)
 JS_OBJECT_ICONS=$(grep -rh --include='*.vue' --include='*.ts' -oP "icon:\s*'\K[a-z_0-9]+" "$SRC_DIR" 2>/dev/null || true)
 
 # 1g. icons.txt 补充清单 (JS 变量/对象/computed 传递等无法自动提取的图标)
@@ -56,9 +53,9 @@ if [ -f "$ICONS_FILE" ]; then
 fi
 
 # 合并去重
-ALL_ICONS=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${ICON_PROP_STATIC}\n${ICON_PROP_DYNAMIC}\n${COLORS_ICONS}\n${JS_OBJECT_ICONS}\n${MANUAL_ICONS}" | grep -v '^\s*$' | sort -u)
+ALL_ICONS=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${ICON_PROP_STATIC}\n${ICON_PROP_DYNAMIC}\n${JS_OBJECT_ICONS}\n${MANUAL_ICONS}" | grep -v '^\s*$' | sort -u)
 
-AUTO_COUNT=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${ICON_PROP_STATIC}\n${ICON_PROP_DYNAMIC}\n${COLORS_ICONS}\n${JS_OBJECT_ICONS}" | grep -v '^\s*$' | sort -u | wc -l)
+AUTO_COUNT=$(echo -e "${STATIC_ICONS}\n${DYNAMIC_ICONS}\n${ICON_PROP_STATIC}\n${ICON_PROP_DYNAMIC}\n${JS_OBJECT_ICONS}" | grep -v '^\s*$' | sort -u | wc -l)
 TOTAL_COUNT=$(echo "$ALL_ICONS" | wc -l)
 echo "  Auto-extracted: ${AUTO_COUNT}, Manual (icons.txt): +$(echo "$MANUAL_ICONS" | grep -v '^\s*$' | wc -l), Total unique: ${TOTAL_COUNT}"
 

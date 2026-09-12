@@ -216,7 +216,7 @@ function metaText(img: PreviewImage): string {
 
     <!-- ═══ 空态: 视频架构换文案+图标, 图像架构维持原样 ═══ -->
     <div v-else class="gen-preview-empty">
-      <MsIcon :name="mediaType === 'video' ? 'videocam' : 'image'" color="none" class="preview-icon" />
+      <MsIcon :name="mediaType === 'video' ? 'movie' : 'image'" color="none" class="preview-icon" />
       <span class="preview-hint">{{
         mediaType === 'video'
           ? t('generate.preview.empty_video')

@@ -188,7 +188,7 @@ watch(
               @click="onToggleFavorite(item)"
             >
               <MsIcon
-                name="star"
+                :name="item.is_favorite ? 'heart_minus' : 'favorite'"
                 size="xs"
                 :color="item.is_favorite ? undefined : 'var(--t3)'"
               />

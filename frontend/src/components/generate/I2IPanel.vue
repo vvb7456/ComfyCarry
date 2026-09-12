@@ -108,7 +108,6 @@ function onDenoiseUpdate(v: number) {
           :file-name="displayName"
           :pick-label="t('generate.i2i.pick_from_input')"
           :upload-label="t('generate.i2i.upload_local')"
-          pick-icon="image"
           class="i2i-ref-zone"
           @pick="emit('pick')"
           @file="emit('file', $event)"

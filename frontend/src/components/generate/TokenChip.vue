@@ -231,8 +231,13 @@ function cancelEdit() {
     @dragend="onDragEnd"
   >
     <span class="chip-top chip-top--break">BREAK</span>
-    <button class="chip-close" @click.stop="emit('remove', token.id)">
-      <MsIcon name="close" size="xxs" color="none" />
+    <button
+      class="chip-close"
+      :aria-label="t('common.btn.remove')"
+      :title="t('common.btn.remove')"
+      @click.stop="emit('remove', token.id)"
+    >
+      <MsIcon name="remove_circle" size="xxs" color="none" />
     </button>
   </div>
   <div
@@ -254,8 +259,13 @@ function cancelEdit() {
     @dragend="onDragEnd"
   >
     <!-- Close button — absolute top-right -->
-    <button class="chip-close" @click.stop="emit('remove', token.id)">
-      <MsIcon name="close" size="xxs" color="none" />
+    <button
+      class="chip-close"
+      :aria-label="t('common.btn.remove')"
+      :title="t('common.btn.remove')"
+      @click.stop="emit('remove', token.id)"
+    >
+      <MsIcon name="remove_circle" size="xxs" color="none" />
     </button>
 
     <!-- Top row: colored bg + tag text -->
@@ -451,8 +461,8 @@ function cancelEdit() {
   z-index: 1;
 }
 .chip-close:hover {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 15%, transparent);
+  color: var(--t1);
+  background: color-mix(in srgb, var(--t1) 12%, transparent);
 }
 
 /* ── Hover mini toolbar (teleported to body, position: fixed) ── */

@@ -7,6 +7,7 @@ import ListRow from '@/components/ui/ListRow.vue'
 import { fmtBytes } from '@/utils/format'
 import type { OverviewData, ServiceEntry } from '@/types/dashboard'
 import type { SystemStats } from '@/types/system'
+import { serviceIcon } from '@/config/serviceIdentity'
 
 defineOptions({ name: 'DashboardDiagnostics' })
 
@@ -37,12 +38,12 @@ const diagSummary = computed(() => {
 // ── 服务行的身份 ──────────────────────────────────────────────────────
 // 列表按“用户在面板上认识的名字”渲染（ComfyUI / Jupyter / 云同步 / 隧道），
 // pm2 内部名只用于取数据，并留在名称的 title 里供排障时悬停查看。
-const SVC_IDENTITY: Record<string, { nameKey: string; icon: string }> = {
-  comfy: { nameKey: 'comfyui', icon: 'terminal' },
-  'cf-tunnel': { nameKey: 'tunnel', icon: 'vpn_lock' },
-  jupyter: { nameKey: 'jupyter', icon: 'book_2' },
-  'sync-worker': { nameKey: 'sync', icon: 'cloud_sync' },
-  dashboard: { nameKey: 'dashboard', icon: 'dashboard' },
+const SVC_IDENTITY: Record<string, { nameKey: string }> = {
+  comfy: { nameKey: 'comfyui' },
+  'cf-tunnel': { nameKey: 'tunnel' },
+  jupyter: { nameKey: 'jupyter' },
+  'sync-worker': { nameKey: 'sync' },
+  dashboard: { nameKey: 'dashboard' },
 }
 
 function svcName(name: string): string {
@@ -51,7 +52,7 @@ function svcName(name: string): string {
 }
 
 function svcIcon(name: string): string {
-  return SVC_IDENTITY[name]?.icon || 'dns'
+  return serviceIcon(name)
 }
 
 function fmtSvcMem(bytes: number | string | undefined) {

@@ -507,7 +507,7 @@ onUnmounted(() => {
       <span class="tool-spacer" />
 
       <button class="token-tool-btn" :title="t('prompt-library.toolbar.favorite_current')" @click="emit('favorite-current')">
-        <MsIcon name="star" size="xs" color="none" />
+        <MsIcon name="favorite" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.favorite_current') }}</span>
       </button>
       <button class="token-tool-btn" :title="t('prompt-library.toolbar.clear_disabled')" @click="emit('clear-disabled')">

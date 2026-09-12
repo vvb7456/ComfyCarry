@@ -126,7 +126,13 @@ defineExpose({ clearFile })
     <div v-if="mode === 'drop' && isLoaded" class="upload-zone__loaded">
       <MsIcon name="check_circle" color="none" class="upload-zone__loaded-icon" />
       <span class="upload-zone__loaded-name text-truncate">{{ loadedName }}</span>
-      <button type="button" class="upload-zone__loaded-clear" @click.stop="clearFile">
+      <button
+        type="button"
+        class="upload-zone__loaded-clear"
+        :aria-label="t('common.btn.clear')"
+        :title="t('common.btn.clear')"
+        @click.stop="clearFile"
+      >
         <MsIcon name="close" color="none" />
       </button>
     </div>
@@ -143,9 +149,15 @@ defineExpose({ clearFile })
     <!-- Pick mode: with preview -->
     <template v-else-if="isPreview">
       <img :src="preview" class="upload-zone__img" alt="">
-      <span class="upload-zone__clear" @click.stop="$emit('clear')">
+      <button
+        type="button"
+        class="upload-zone__clear"
+        :aria-label="t('common.btn.clear')"
+        :title="t('common.btn.clear')"
+        @click.stop="$emit('clear')"
+      >
         <MsIcon name="close" color="none" />
-      </span>
+      </button>
       <span v-if="fileName" class="upload-zone__fname">{{ fileName }}</span>
     </template>
 
@@ -219,6 +231,8 @@ defineExpose({ clearFile })
   width: 22px; height: 22px;
   display: flex; align-items: center; justify-content: center;
   background: #0000008c;
+  border: none;
+  padding: 0;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
@@ -247,7 +261,7 @@ defineExpose({ clearFile })
   padding: 2px; border-radius: 50%; display: inline-flex; align-items: center;
   transition: color .15s;
 }
-.upload-zone__loaded-clear:hover { color: var(--red); }
+.upload-zone__loaded-clear:hover { color: var(--t1); }
 .upload-zone__loaded-clear .ms { font-size: 18px; }
 
 .upload-zone__pick,

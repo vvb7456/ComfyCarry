@@ -85,7 +85,7 @@ async function onRetry() {
         {{ t('wizard.deploy.back_to_config') }}
       </BaseButton>
       <BaseButton variant="primary" size="lg" @click="onRetry">
-        <MsIcon name="refresh" size="sm" />
+        <MsIcon name="replay" size="sm" />
         {{ t('wizard.deploy.retry') }}
       </BaseButton>
     </div>

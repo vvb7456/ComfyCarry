@@ -87,7 +87,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           :preview="previewUrl"
           :file-name="displayName"
           :pick-label="pickLabel"
-          pick-icon="image"
           :action-label="t('generate.image_source.generate_new')"
           action-icon="auto_fix_high"
           class="cn-ref-zone"

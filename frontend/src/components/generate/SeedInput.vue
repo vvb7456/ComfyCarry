@@ -45,7 +45,6 @@ function onChange(e: Event) {
     <button
       type="button"
       class="seed-input__toggle"
-      :class="{ 'seed-input__toggle--locked': !isRandom }"
       :disabled="disabled"
       :title="isRandom ? 'Random' : 'Fixed'"
       @click="toggleMode"
@@ -118,13 +117,5 @@ function onChange(e: Event) {
 .seed-input__toggle:hover {
   background: var(--bg4);
   color: var(--t1);
-}
-
-.seed-input__toggle--locked {
-  color: var(--amber);
-}
-
-.seed-input__toggle--locked:hover {
-  color: var(--amber);
 }
 </style>

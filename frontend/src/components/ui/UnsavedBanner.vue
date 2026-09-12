@@ -15,12 +15,15 @@ const props = withDefaults(defineProps<{
   message: string
   /** 保存按钮文本 (如"保存" / "保存并重启"), 默认用 common.btn.save */
   saveLabel?: string
+  /** 保存按钮图标 (如 restart_alt), 默认 save; 由调用方按按钮实际动作传入 */
+  saveIcon?: string
   /** 放弃按钮文本, 默认 common.btn.* 无对应, 用调用方传入的 discardLabel */
   discardLabel?: string
   saving?: boolean
   /** banner 是否吸附 (页面级 sticky); modal 内传 false */
   sticky?: boolean
 }>(), {
+  saveIcon: 'save',
   saving: false,
   sticky: true,
 })
@@ -49,7 +52,7 @@ const emit = defineEmits<{
           :loading="saving"
           @click="emit('save')"
         >
-          <MsIcon name="restart_alt" size="xs" color="none" />
+          <MsIcon :name="saveIcon" size="xs" color="none" />
           {{ saveLabel }}
         </BaseButton>
       </div>

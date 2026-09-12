@@ -138,7 +138,6 @@ function onSubmit() {
           :preview="sourcePreviewUrl"
           :file-name="sourceName"
           :pick-label="t('generate.image_source.from_input')"
-          pick-icon="folder_open"
           :upload-label="t('generate.image_source.upload_local')"
           class="pp-source-zone"
           @pick="onPickInput"
@@ -218,7 +217,6 @@ function onSubmit() {
   <RefImageModal
     v-model="ppPicker.visible.value"
     :title="t('generate.image_source.select_image')"
-    icon="folder_open"
     :images="ppPicker.images.value"
     :loading="ppPicker.loading.value"
     :uploading="ppPicker.uploading.value"

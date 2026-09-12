@@ -35,6 +35,7 @@ import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import FormField from '@/components/form/FormField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import TunnelSettingsModal from '@/components/tunnel/TunnelSettingsModal.vue'
+import { serviceIcon } from '@/config/serviceIdentity'
 import type { TunnelData, TunnelActionResponse } from '@/types/tunnel'
 
 defineOptions({ name: 'TunnelPage' })
@@ -149,15 +150,11 @@ interface ServiceRow {
   isTcp: boolean
 }
 
-const iconMap: Record<string, string> = {
-  dashboard: 'dashboard', comfycarry: 'dashboard', comfyui: 'terminal',
-  jupyter: 'book_2', jupyterlab: 'book_2', ssh: 'key',
-}
 const nameMap: Record<string, string> = {
   dashboard: 'Dashboard', comfycarry: 'ComfyCarry', comfyui: 'ComfyUI',
   jupyter: 'JupyterLab', jupyterlab: 'JupyterLab', ssh: 'SSH',
 }
-function svcIcon(name: string) { return iconMap[name.toLowerCase()] || 'vpn_lock' }
+function svcIcon(name: string) { return serviceIcon(name, 'vpn_lock') }
 function svcName(name: string) { return nameMap[name.toLowerCase()] || name }
 
 /** 公共节点 url 键 → 后端默认服务 (取真实端口/协议); 匹配不到时用内置兜底 */

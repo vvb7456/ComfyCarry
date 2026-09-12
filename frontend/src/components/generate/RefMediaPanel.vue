@@ -227,7 +227,7 @@ function refIndex(type: RefItem['type'], i: number): number {
           :disabled="disabled"
           @click="removeRef(i)"
         >
-          <MsIcon name="close" size="xxs" color="none" />
+          <MsIcon name="remove_circle" size="xxs" color="none" />
         </button>
       </div>
     </div>
