@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { isTunnelSwitchFrozen } from './useTunnelSwitch'
 
 /**
  * Periodic auto-refresh composable.
@@ -10,6 +11,8 @@ export function useAutoRefresh(fn: () => Promise<void>, interval: number) {
   const active = ref(false)
 
   async function tick() {
+    // 隧道切换期间冻结所有自动刷新 (window.fetch 已被置换, 发请求也只会挂起)
+    if (isTunnelSwitchFrozen()) return
     if (running) return
     running = true
     try { await fn() } finally { running = false }

@@ -22,6 +22,7 @@ import requests as req_lib
 from ..config import SCRIPT_DIR, COMFYUI_URL, APP_VERSION
 from ..utils import _run_cmd
 from ..services import system_monitor
+from ..services.cf_runtime import active_cf_name
 
 bp = Blueprint("system", __name__)
 
@@ -323,9 +324,10 @@ def api_overview():
         tunnel_info["running"] = tunnel_info["effective_status"] == "online"
     except Exception:
         pass
-    # PM2 status for cf-tunnel (新名称)
+    # PM2 status for cloudflared (当前活跃进程名)
+    cf_name = active_cf_name()
     for svc in result.get("services", {}).get("services", []):
-        if svc.get("name") == "cf-tunnel":
+        if svc.get("name") == cf_name:
             tunnel_info["pm2_status"] = svc.get("status")
             break
     result["tunnel"] = tunnel_info

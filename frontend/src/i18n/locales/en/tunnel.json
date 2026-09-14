@@ -62,9 +62,12 @@
     "protocol": "Protocol"
   },
   "err": {
+    "activate_failed": "Failed to activate the new tunnel",
     "domain_not_in_account": "Domain {domain} is not in this account",
     "fill_service_info": "Please fill in service name, port and subdomain suffix",
+    "health_timeout": "New address health check timed out",
     "internal": "Operation failed: {detail}",
+    "invalid_mode": "Invalid switch mode",
     "invalid_protocol": "Invalid protocol, options: auto, http2, quic",
     "invalid_subdomain": "Subdomain must be 3-32 lowercase letters, numbers or hyphens",
     "missing_token_or_domain": "Missing api_token or domain",
@@ -77,10 +80,18 @@
     "public_no_state": "No persisted public Tunnel state to restore",
     "public_register_failed": "Public Tunnel registration failed",
     "public_start_failed": "Public Tunnel registered, but cloudflared failed to start",
+    "rate_limited": "Too many requests, please try again later",
+    "reserve_expired": "Reservation expired, please start the switch again",
+    "reserve_failed": "Failed to reserve the tunnel",
+    "service_unavailable": "Public Tunnel service is temporarily unavailable",
     "start_failed": "Start failed",
     "stop_failed": "Stop failed",
+    "subdomain_in_use": "This subdomain is already in use",
+    "subdomain_required": "Subdomain is required for a custom tunnel",
     "suffix_empty": "New suffix cannot be empty",
-    "suffix_in_use": "Suffix '{suffix}' is already used by service '{name}'"
+    "suffix_in_use": "Suffix '{suffix}' is already used by service '{name}'",
+    "switch_failed": "Tunnel switch failed",
+    "switch_in_progress": "A switch is already in progress"
   },
   "toast": {
     "remove_failed": "Remove failed",
@@ -174,6 +185,19 @@
     "save_failed": "Save failed",
     "root_domain_help": "Must be hosted on Cloudflare.",
     "token_help": "Requires Tunnel and DNS edit permissions."
+  },
+  "switch": {
+    "title": "Switching tunnel…",
+    "progress": "Verifying the new address. Please keep this page open.",
+    "new_host": "New address: {host}",
+    "direct_hint": "The page will refresh automatically once the switch completes.",
+    "failed_title": "Switch failed",
+    "failed_hint": "The switch failed; the original address has been kept.",
+    "unreachable": "Neither the new nor the old address is reachable. Please handle manually.",
+    "reload": "Reload page",
+    "copy_new": "Copy new address",
+    "no_change": "Tunnel configuration is unchanged",
+    "dismiss": "Dismiss"
   },
   "msg": {
     "token_valid": "Token verified"

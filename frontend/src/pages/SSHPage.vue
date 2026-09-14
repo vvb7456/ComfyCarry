@@ -83,12 +83,16 @@ const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: lo
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
+let statusAppliedAt = 0
 async function loadStatus() {
+  const requestedAt = Date.now()
   const data = await get<SSHStatus>('/api/ssh/status', { silent: true })
-  if (data) {
-    status.value = data
-    statusLoading.value = false
-  }
+  if (!data) return
+  // 乱序响应保护: 动作后紧接的刷新可能被在途的旧轮询覆盖, 导致 hero 闪回
+  if (requestedAt < statusAppliedAt) return
+  statusAppliedAt = requestedAt
+  status.value = data
+  statusLoading.value = false
 }
 
 /** 本机直连命令: 无隧道时按本地容器场景生成, 端口回落 ssh 默认 22。 */
@@ -168,15 +172,19 @@ async function sshAction(action: 'start' | 'stop' | 'restart') {
     confirmText: t('common.btn.stop'),
   })) return
   actionLoading.value = action
-  const data = await post<ApiErrorBody & { ok?: boolean; running?: boolean; pid?: number | null }>(`/api/ssh/${action}`, {})
-  actionLoading.value = null
-  if (!data) return
-  if (!data?.ok) {
-    toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
-  } else {
-    toast(apiMessageText(data, t('ssh.toast.action_ok')), 'success')
-    await loadStatus()
-    await loadConnectCmd()
+  try {
+    const data = await post<ApiErrorBody & { ok?: boolean; running?: boolean; pid?: number | null }>(`/api/ssh/${action}`, {})
+    if (!data) return
+    if (!data?.ok) {
+      toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
+    } else {
+      toast(apiMessageText(data, t('ssh.toast.action_ok')), 'success')
+      // 先拿权威状态再解除动作态, 避免旧快照在 hero 上闪回旧状态
+      await loadStatus()
+      await loadConnectCmd()
+    }
+  } finally {
+    actionLoading.value = null
   }
 }
 

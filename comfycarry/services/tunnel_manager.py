@@ -98,7 +98,9 @@ class TunnelManager:
     def __init__(self, api_token: str, domain: str, subdomain: str = ""):
         self.api_token = api_token
         self.domain = domain
-        self.subdomain = subdomain or self._generate_subdomain()
+        if not (subdomain or "").strip():
+            raise CFAPIError("自定义隧道必须指定子域名", key="subdomain_required")
+        self.subdomain = subdomain
         self.tunnel_name = f"{TUNNEL_NAME_PREFIX}-{self.subdomain}"
 
     # ═══════════════════════════════════════════════════
@@ -187,9 +189,14 @@ class TunnelManager:
             "urls": urls,
         }
 
-    def teardown(self) -> bool:
-        """删除 Tunnel + 所有关联 DNS 记录"""
+    def teardown(self, cf_name: str | None = None) -> bool:
+        """删除 Tunnel + 所有关联 DNS 记录 + 对应 cloudflared 进程。
+
+        cf_name: 要删除的 pm2 进程名; 默认当前活跃进程。
+        """
         try:
+            from .cf_runtime import active_cf_name
+            cf_name = cf_name or active_cf_name()
             account_id, _ = self._get_account()
             zone_id, _ = self._get_zone()
             tunnel = self._find_tunnel(account_id, self.tunnel_name)
@@ -201,7 +208,7 @@ class TunnelManager:
             tunnel_id = tunnel["id"]
 
             # 1. 停止 cloudflared
-            subprocess.run("pm2 delete cf-tunnel 2>/dev/null", shell=True)
+            subprocess.run(f"pm2 delete {shlex.quote(cf_name)} 2>/dev/null", shell=True)
 
             # 2. 删除 DNS 记录 (查找所有指向该 tunnel 的 CNAME)
             tunnel_cname = f"{tunnel_id}.cfargotunnel.com"
@@ -280,18 +287,26 @@ class TunnelManager:
                 "urls": {},
             }
 
-    def start_cloudflared(self, tunnel_token: str) -> bool:
-        """通过 PM2 启动 cloudflared (使用 cf-tunnel 避免与旧进程冲突)"""
+    def start_cloudflared(self, tunnel_token: str, name: str | None = None,
+                          metrics_port: int | None = None) -> bool:
+        """通过 PM2 启动 cloudflared。
+
+        name / metrics_port: 蓝绿切换时用于启动新进程 (如 cf-tunnel-next / 20242);
+        默认使用当前活跃进程名及其对应 metrics 端口。
+        """
         from ..config import get_config
+        from .cf_runtime import active_cf_name, cf_metrics_port
+        name = name or active_cf_name()
+        port = metrics_port or cf_metrics_port(name)
         protocol = get_config("cf_protocol", "auto")
         from .log_service import clean_pm2_env
         env = clean_pm2_env()
-        subprocess.run("pm2 delete cf-tunnel 2>/dev/null", shell=True, env=env)
+        subprocess.run(f"pm2 delete {shlex.quote(name)} 2>/dev/null", shell=True, env=env)
         r = subprocess.run(
-            f'pm2 start cloudflared --name cf-tunnel '
+            f'pm2 start cloudflared --name {shlex.quote(name)} '
             f'--interpreter none --log /workspace/tunnel.log --merge-logs --time '
             f'-- tunnel --protocol {shlex.quote(protocol)} '
-            f'--metrics localhost:20241 run --token {shlex.quote(tunnel_token)}',
+            f'--metrics localhost:{port} run --token {shlex.quote(tunnel_token)}',
             shell=True, capture_output=True, text=True, env=env
         )
         subprocess.run("pm2 save 2>/dev/null", shell=True, env=env)
@@ -300,10 +315,6 @@ class TunnelManager:
     # ═══════════════════════════════════════════════════
     # 内部方法
     # ═══════════════════════════════════════════════════
-
-    def _generate_subdomain(self) -> str:
-        """生成随机子域名前缀"""
-        return f"cc-{secrets.token_hex(4)}"
 
     def _hostname_for(self, svc: dict) -> str:
         """生成服务的完整域名: suffix-subdomain.domain"""

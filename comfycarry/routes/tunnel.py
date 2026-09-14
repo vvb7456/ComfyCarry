@@ -12,11 +12,9 @@ import requests as http_requests
 from flask import Blueprint, Response, jsonify, request
 
 from ..config import get_config, set_config
+from ..services.cf_runtime import active_cf_name, cf_metrics_url
 
 bp = Blueprint("tunnel", __name__)
-
-# cloudflared --metrics 端点 (两种模式统一使用)
-_CF_METRICS_URL = "http://localhost:20241"
 
 
 # ── 错误响应辅助 ──
@@ -60,13 +58,14 @@ def _invalidate_tunnel_cache():
     _tunnel_cache["ts"] = 0.0
 
 
-def _check_cloudflared_ready() -> str:
+def _check_cloudflared_ready(name: str | None = None) -> str:
     """通过 cloudflared metrics /ready 端点检测实际连通性。
 
+    name: pm2 进程名; 默认当前活跃进程。
     Returns: "connected" | "disconnected" | "unknown"
     """
     try:
-        r = http_requests.get(f"{_CF_METRICS_URL}/ready", timeout=2)
+        r = http_requests.get(f"{cf_metrics_url(name)}/ready", timeout=2)
         return "connected" if r.status_code == 200 else "disconnected"
     except Exception:
         return "unknown"
@@ -77,9 +76,11 @@ def _get_manager():
     from ..services.tunnel_manager import TunnelManager
     token = get_config("cf_api_token", "")
     domain = get_config("cf_domain", "")
-    if not token or not domain:
-        return None
     subdomain = get_config("cf_subdomain", "")
+    # 自定义模式子域名必填: 历史随机部署子域名为空时视为未配置,
+    # 由用户补填后重新应用 (见迁移说明)
+    if not token or not domain or not subdomain:
+        return None
     return TunnelManager(token, domain, subdomain)
 
 
@@ -242,9 +243,12 @@ def api_tunnel_validate():
     """
     data = request.get_json(force=True)
     from ..services.tunnel_manager import TunnelManager
+    # 校验 Token 不涉及子域名, 但构造函数要求非空 — 传占位值满足约束,
+    # 该值不会用于任何 CF 调用。
     mgr = TunnelManager(
         api_token=data.get("api_token", ""),
         domain=data.get("domain", ""),
+        subdomain=data.get("subdomain") or "_validate",
     )
     ok, info = mgr.validate_token()
     return jsonify({"ok": ok, **info})
@@ -265,10 +269,12 @@ def api_tunnel_provision():
     data = request.get_json(force=True)
     api_token = data.get("api_token", "")
     domain = data.get("domain", "")
-    subdomain = data.get("subdomain", "")
+    subdomain = (data.get("subdomain") or "").strip()
 
     if not api_token or not domain:
         return _err("missing_token_or_domain", 400)
+    if not subdomain:
+        return _err("subdomain_required", 400)
 
     # 如果当前在公共 Tunnel 模式, 先释放
     if get_config("tunnel_mode", "") == "public":
@@ -330,6 +336,7 @@ def api_tunnel_teardown():
         set_config("cf_domain", "")
         set_config("cf_subdomain", "")
         set_config("cf_custom_services", "")
+        set_config("cf_suffix_overrides", "")
 
     _invalidate_tunnel_cache()
     return jsonify({"ok": ok})
@@ -349,6 +356,7 @@ def api_tunnel_restart():
             return _err("public_no_state", 400)
         if not client._start_cloudflared(client.tunnel_token):
             return _err("pm2_restart_failed", 500, _extra={"ok": False})
+        _invalidate_tunnel_cache()
         return jsonify({"ok": True})
 
     # 自定义模式
@@ -361,33 +369,72 @@ def api_tunnel_restart():
         account_id, _ = mgr._get_account()
         tunnel = mgr._find_tunnel(account_id, mgr.tunnel_name)
         if not tunnel:
-            return _err("not_found", 404)
+            # Tunnel 已被外部删除 (CF 后台误删 / 其它环境清理): 重启语义升级为
+            # 重建 (ensure + 启动), 而不是 404 卡死
+            return _reprovision_services()
 
         token = mgr._get_tunnel_token(account_id, tunnel["id"])
         if not mgr.start_cloudflared(token):
             return _err("pm2_restart_failed", 500, _extra={"ok": False})
+        _invalidate_tunnel_cache()
         return jsonify({"ok": True})
     except CFAPIError as e:
         return _cf_err(e)
 
 
+@bp.route("/api/tunnel/switch", methods=["POST"])
+def api_tunnel_switch():
+    """启动蓝绿隧道切换 (切换即刷新)。
+
+    Request:
+      {"mode": "custom", "api_token": "...", "domain": "...", "subdomain": "..."}
+      {"mode": "public", "subdomain": "..."}   // subdomain 可空 = 随机
+
+    Response 202: {ok, switch_id, old_url, new_url, same_host, services}
+    预留失败直接返回错误, 不启动切换。
+    """
+    from ..services.tunnel_switch import SwitchError, start_switch
+
+    data = request.get_json(force=True) or {}
+    try:
+        body = start_switch(data)
+    except SwitchError as e:
+        return _err(e.key, e.status, **(e.params or {}))
+    _invalidate_tunnel_cache()
+    return jsonify(body), 202
+
+
+@bp.route("/api/tunnel/switch/status", methods=["GET"])
+def api_tunnel_switch_status():
+    """查询切换状态 phase ∈ idle|preparing|starting|ready|finalizing|done|failed"""
+    from ..services.tunnel_switch import get_state
+    state = get_state()
+    # 后台线程写入的是裸 key (与 _err 的入参同源), 对外统一补 tunnel.err. 前缀,
+    # 前端 apiErrorText 才能命中 i18n 条目
+    if state.get("error_key"):
+        state["error_key"] = f"tunnel.err.{state['error_key']}"
+    return jsonify(state)
+
+
 @bp.route("/api/tunnel/stop", methods=["POST"])
 def api_tunnel_stop():
     """停止 cloudflared (PM2)"""
-    r = subprocess.run("pm2 stop cf-tunnel 2>/dev/null", shell=True,
+    r = subprocess.run(f"pm2 stop {active_cf_name()} 2>/dev/null", shell=True,
                        capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
         return _err("stop_failed", 500)
+    _invalidate_tunnel_cache()
     return jsonify({"ok": True})
 
 
 @bp.route("/api/tunnel/start", methods=["POST"])
 def api_tunnel_start():
     """启动 cloudflared (PM2)"""
-    r = subprocess.run("pm2 start cf-tunnel 2>/dev/null", shell=True,
+    r = subprocess.run(f"pm2 start {active_cf_name()} 2>/dev/null", shell=True,
                        capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
         return _err("start_failed", 500)
+    _invalidate_tunnel_cache()
     return jsonify({"ok": True})
 
 
@@ -495,6 +542,7 @@ def api_tunnel_public_enable():
                 set_config("cf_domain", "")
                 set_config("cf_subdomain", "")
                 set_config("cf_custom_services", "")
+                set_config("cf_suffix_overrides", "")
         except Exception as e:
             # 自定义 Tunnel 停止失败不阻塞公共 Tunnel 启用
             pass
@@ -680,13 +728,14 @@ def api_tunnel_logs_stream():
 # ═══════════════════════════════════════════════════════════════
 
 def _get_cloudflared_pm2_status() -> str:
-    """查询 cloudflared PM2 进程状态"""
+    """查询 cloudflared PM2 进程状态 (当前活跃进程名)"""
+    name = active_cf_name()
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
                            capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
             for p in json.loads(r.stdout):
-                if p.get("name") == "cf-tunnel":
+                if p.get("name") == name:
                     return p.get("pm2_env", {}).get("status", "unknown")
     except Exception:
         pass

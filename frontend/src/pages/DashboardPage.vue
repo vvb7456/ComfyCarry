@@ -37,6 +37,17 @@ const activity = ref<ActivityData | null>(null)
 const initialLoading = ref(true)
 const refreshing = ref(false)
 const startingComfy = ref(false)
+// ComfyUI 启动/重启下发时刻 (0 = 无待确认启动)。下发后 dashboardState 固定为
+// starting, 直到拿到不早于该时刻发起的 overview 快照, 避免旧 stopped 闪回。
+const pendingComfyStartAt = ref(0)
+let pendingComfyStartTimer: ReturnType<typeof setTimeout> | null = null
+
+function markPendingComfyStart() {
+  pendingComfyStartAt.value = Date.now()
+  if (pendingComfyStartTimer) clearTimeout(pendingComfyStartTimer)
+  pendingComfyStartTimer = setTimeout(() => { pendingComfyStartAt.value = 0 }, 120_000)
+}
+
 // 服务行动作提交期间的状态 (loading/disabled 由 DashboardDiagnostics 消费)
 const actingSvc = ref<{ name: string; action: string } | null>(null)
 
@@ -69,10 +80,17 @@ const sse = useComfySSE(tracker, {
 })
 
 // ── Fetch Overview & Activity ─────────────────────────────────────────
+let overviewAppliedAt = 0
 async function loadOverview() {
+  const requestedAt = Date.now()
   const d = await get<OverviewData>('/api/overview', { silent: true })
   if (d) {
-    data.value = d
+    // 乱序响应保护: 迟到的旧快照不能覆盖新快照
+    if (requestedAt >= overviewAppliedAt) {
+      overviewAppliedAt = requestedAt
+      data.value = d
+      if (pendingComfyStartAt.value && requestedAt >= pendingComfyStartAt.value) pendingComfyStartAt.value = 0
+    }
   }
   initialLoading.value = false
 }
@@ -104,6 +122,9 @@ async function startComfyUI() {
   try {
     const res = await post('/api/comfyui/restart')
     if (res) {
+      // 重启必定中断当前执行, 立即清掉旧执行态, 不等 ws_disconnected 事件
+      tracker.reset()
+      markPendingComfyStart()
       toast(t('dashboard.actions.starting'), 'info')
       later(() => {
         loadOverview()
@@ -150,6 +171,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   sse.stop()
+  if (pendingComfyStartTimer) clearTimeout(pendingComfyStartTimer)
   for (const id of pendingTimers) clearTimeout(id)
   pendingTimers.clear()
 })
@@ -201,6 +223,10 @@ const dashboardState = computed<DashboardState>(() => {
 
   if (['errored', 'error', 'failed'].includes(pm2)) {
     return 'fault'
+  }
+  // 启动/重启已下发但快照尚未更新: 保持启动中, 避免旧 stopped 闪回
+  if (pendingComfyStartAt.value) {
+    return 'starting'
   }
   if (!comfy?.online && (pm2 === 'online' || pm2 === 'starting' || pm2 === 'launching')) {
     return 'starting'
@@ -328,15 +354,29 @@ const tunnelSvcStatusText = computed(() => {
 
 const svcOrder = ['comfy', 'cf-tunnel', 'jupyter', 'sync-worker', 'dashboard']
 
+// 蓝绿切换后活跃 cloudflared 进程名会在 cf-tunnel / cf-tunnel-next 之间轮换,
+// 两者归一化到同一"隧道槽位", 但保留进程真实名 (服务行动作按真实名下发)。
+function isTunnelName(name: string): boolean {
+  return name === 'cf-tunnel' || name === 'cf-tunnel-next'
+}
+
+function orderSlot(name: string): string {
+  return isTunnelName(name) ? 'cf-tunnel' : name
+}
+
 const orderedServices = computed(() => {
   const raw = data.value?.services as ServiceEntry[] | { services?: ServiceEntry[] } | undefined
   const svcs: ServiceEntry[] = Array.isArray(raw) ? raw : raw?.services || []
-  const map = Object.fromEntries(svcs.map((s) => [s.name, s]))
-  const result = svcOrder.map((n) => map[n]).filter(Boolean)
+  const map = new Map<string, ServiceEntry>()
+  for (const s of svcs) {
+    const slot = orderSlot(s.name)
+    if (!map.has(slot)) map.set(slot, s)
+  }
+  const result = svcOrder.map((n) => map.get(n)).filter((s): s is ServiceEntry => !!s)
   svcs.forEach((s) => {
-    if (!svcOrder.includes(s.name)) result.push(s)
+    if (!svcOrder.includes(orderSlot(s.name))) result.push(s)
   })
-  if (!map['cf-tunnel'] && data.value?.tunnel) {
+  if (!map.has('cf-tunnel') && data.value?.tunnel) {
     const tStatus = data.value.tunnel.effective_status
     result.splice(1, 0, {
       name: 'cf-tunnel',
@@ -347,7 +387,7 @@ const orderedServices = computed(() => {
       restarts: 0,
     })
   }
-  if (!map['sync-worker'] && data.value?.sync) {
+  if (!map.has('sync-worker') && data.value?.sync) {
     result.splice(3, 0, {
       name: 'sync-worker',
       status: data.value.sync.worker_running ? 'online' : 'stopped',

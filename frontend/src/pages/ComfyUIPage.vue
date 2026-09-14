@@ -12,6 +12,10 @@
  *   stopped(off)    pm2 停止/不存在, 主操作「启动 ComfyUI」
  *   failed(bad)     pm2 errored, 主操作「重试」
  *
+ * 注意: 启动/重启/切版本/存参数后, 上一份 status 快照里的 online 仍是旧进程的
+ * (进程已被 delete 但快照未刷新), 直接采信会让 hero 闪回 idle。pendingStartAt
+ * 记录「新进程已下发」的时刻, 在拿到该时刻之后发起的新鲜快照前一律按启动中展示。
+ *
  * 地址解析沿用隧道优先、本地直连兜底。参数表单迁入 ComfyParamsModal,
  * 主页只保留一行由已保存配置生成的启动命令; 参数保存成功后即时更新。
  */
@@ -63,13 +67,30 @@ const actionLoading = ref<'start' | 'stop' | 'restart' | 'interrupt' | null>(nul
 const acting = computed(() => actionLoading.value !== null)
 const paramsOpen = ref(false)
 
+// 新进程下发时刻 (0 = 无待确认启动)。启动/重启/切版本/存参数成功后置位,
+// 直到 loadStatus 拿到不早于该时刻发起的快照才解除; 期间 status 一律视为不可信。
+const pendingStartAt = ref(0)
+let pendingStartTimer: ReturnType<typeof setTimeout> | null = null
+
+function markPendingStart() {
+  pendingStartAt.value = Date.now()
+  if (pendingStartTimer) clearTimeout(pendingStartTimer)
+  // 兜底: 轮询持续失败或进程卡死时, 两分钟后交回常规状态机
+  pendingStartTimer = setTimeout(() => { pendingStartAt.value = 0 }, 120_000)
+  // 重启必定中断当前执行, 立即清掉旧执行态, 不等 ws_disconnected 事件
+  tracker.reset()
+}
+
+/** 可信的在线态: status 在线且没有待确认的新进程 */
+const isOnline = computed(() => !!status.value?.online && !pendingStartAt.value)
+
 const queuePending = computed(() => status.value?.queue_pending || 0)
 const queueTotal = computed(() => (status.value?.queue_running || 0) + (status.value?.queue_pending || 0))
 
 // 隧道优先、本地直连兜底; ComfyUI 离线时地址不可达, 不显示。
 const comfyUrl = ref('')
 const effectiveComfyUrl = computed(() => {
-  if (!status.value?.online) return ''
+  if (!isOnline.value) return ''
   if (comfyUrl.value) return comfyUrl.value
   const port = status.value?.port || 8188
   const host = window.location.hostname || 'localhost'
@@ -96,9 +117,17 @@ async function loadComfyUrl() {
   comfyUrl.value = hit ? hit[1] : ''
 }
 
+let statusAppliedAt = 0
 async function loadStatus() {
+  const requestedAt = Date.now()
   const d = await get<ComfyStatus>('/api/comfyui/status', { silent: true })
-  if (d) status.value = d
+  if (!d) return
+  // 乱序响应保护: 迟到的旧快照不能覆盖新快照
+  if (requestedAt < statusAppliedAt) return
+  statusAppliedAt = requestedAt
+  status.value = d
+  // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
+  if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
 }
 
 // ── 启动命令 (由已保存配置生成) ────────────────────────────────
@@ -142,6 +171,7 @@ onMounted(() => {
 onUnmounted(() => {
   refresh.stop()
   sse.stop()
+  if (pendingStartTimer) clearTimeout(pendingStartTimer)
 })
 
 // ── Hero 状态机 ────────────────────────────────────────────────
@@ -153,6 +183,8 @@ const heroState = computed<HeroState>(() => {
   if (actionLoading.value === 'start' || actionLoading.value === 'restart') return 'starting'
   const s = status.value
   if (!s) return 'starting'
+  // 新进程已下发但快照尚未更新: 保持启动中, 避免旧 online 造成的 idle 闪回
+  if (pendingStartAt.value) return 'starting'
   if (s.online) return executing.value ? 'executing' : 'idle'
   if (s.pm2_status === 'errored') return 'failed'
   if (s.pm2_status === 'launching' || s.pm2_status === 'online') return 'starting'
@@ -185,7 +217,7 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   const out: { label: string; value: string }[] = []
   // 配置事实: 端口停机仍显示
   if (s.port) out.push({ label: t('comfyui.facts.port'), value: String(s.port) })
-  if (!s.online) return out
+  if (!isOnline.value) return out
   // 运行期字段随状态显示
   if (addressHost.value) out.push({ label: t('comfyui.facts.address'), value: addressHost.value })
   const version = s.system?.comfyui_version
@@ -201,6 +233,7 @@ async function comfyStart() {
   const d = await post<{ ok?: boolean }>('/api/comfyui/restart')
   actionLoading.value = null
   if (!d?.ok) return
+  markPendingStart()
   toast(t('comfyui.msg.starting'), 'info')
   setTimeout(loadStatus, 3000)
 }
@@ -230,6 +263,7 @@ async function comfyRestart() {
   const d = await post<{ ok?: boolean }>('/api/comfyui/restart')
   actionLoading.value = null
   if (!d?.ok) return
+  markPendingStart()
   toast(t('comfyui.msg.restarting'), 'info')
   setTimeout(loadStatus, 5000)
 }
@@ -244,6 +278,9 @@ async function comfyInterrupt() {
 
 // ── 参数保存 / 版本切换 ────────────────────────────────────────
 function onParamsSaved(command: string) {
+  // 保存即 delete + start, 参数可能为空 (回退已存值), 两种情况都已触发重启
+  markPendingStart()
+  setTimeout(loadStatus, 5000)
   if (!command) {
     void loadLaunchCommand()
     return
@@ -252,6 +289,7 @@ function onParamsSaved(command: string) {
 }
 
 function onVersionSwitched() {
+  markPendingStart()
   setTimeout(loadStatus, 5000)
 }
 </script>
@@ -261,7 +299,7 @@ function onVersionSwitched() {
     <PageTopStack ref="topStack" :enabled="activeTab === 'plugins'">
       <TabSwitcher :title="t('comfyui.title')" :model-value="activeTab" :tabs="tabs" @update:model-value="activeTab = $event">
         <template #extra>
-          <span v-if="status?.online" class="page-actions">
+          <span v-if="isOnline" class="page-actions">
             <BaseButton size="sm" :loading="actionLoading === 'stop'" :disabled="acting" @click="comfyStop">
               <MsIcon name="stop" /> {{ t('common.btn.stop') }}
             </BaseButton>
@@ -332,7 +370,7 @@ function onVersionSwitched() {
         </ServiceHero>
 
         <!-- 当前执行 (仅在线) -->
-        <section v-if="status.online" class="comfy-block">
+        <section v-if="isOnline" class="comfy-block">
           <SectionHeader icon="bolt">
             {{ t('comfyui.sections.current_execution') }}
             <span v-if="queuePending > 0" class="comfy-hint">{{ t('comfyui.exec.queue_waiting', { count: queuePending }) }}</span>
@@ -364,7 +402,7 @@ function onVersionSwitched() {
     </div>
 
     <div v-show="activeTab === 'plugins'" class="tab-panel">
-      <PluginsTab :online="status?.online" :active="activeTab === 'plugins'" :toolbar-target="topStack?.toolbarTarget" />
+      <PluginsTab :online="isOnline" :active="activeTab === 'plugins'" :toolbar-target="topStack?.toolbarTarget" />
     </div>
 
     <!-- 启动参数弹窗 (常驻: 表单状态保留在组件内) -->

@@ -41,6 +41,7 @@ const diagSummary = computed(() => {
 const SVC_IDENTITY: Record<string, { nameKey: string }> = {
   comfy: { nameKey: 'comfyui' },
   'cf-tunnel': { nameKey: 'tunnel' },
+  'cf-tunnel-next': { nameKey: 'tunnel' },
   jupyter: { nameKey: 'jupyter' },
   'sync-worker': { nameKey: 'sync' },
   dashboard: { nameKey: 'dashboard' },

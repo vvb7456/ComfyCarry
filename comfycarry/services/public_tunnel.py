@@ -20,6 +20,7 @@ from typing import Optional
 import requests
 
 from ..config import get_config, set_config
+from .cf_runtime import active_cf_name, cf_metrics_port
 
 log = logging.getLogger(__name__)
 
@@ -219,6 +220,105 @@ class PublicTunnelClient:
         log.info("公共 Tunnel 已释放")
         return {"ok": True}
 
+    def reserve(self, subdomain: Optional[str] = None) -> dict:
+        """预留公共 Tunnel (不启动 cloudflared, 不删除现有资源)。
+
+        Returns: {"ok": True, "random_id", "subdomain", "urls", "expires_at"}
+        Raises: PublicTunnelError
+        """
+        body = {
+            "instance_id": self.instance_id,
+            "services": self._get_services(),
+        }
+        if subdomain:
+            body["subdomain"] = subdomain
+
+        try:
+            resp = requests.post(
+                f"{API_URL}/api/v1/tunnel/reserve",
+                json=body,
+                headers=self._auth_headers(),
+                timeout=30,
+            )
+        except requests.RequestException as e:
+            raise PublicTunnelError(f"无法连接 API: {e}",
+                                    key="public_api_unreachable",
+                                    params={"detail": str(e)})
+
+        data = self._parse_json_response(resp)
+        if not data.get("ok"):
+            detail = self._extract_error(data)
+            raise PublicTunnelError(
+                detail or "reserve failed",
+                key=self._error_key(resp.status_code, "reserve_failed"),
+                params={"detail": detail} if detail else {},
+            )
+        return data
+
+    def activate(self, random_id: str) -> dict:
+        """激活已预留的公共 Tunnel, 返回 tunnel_token 与 urls。
+
+        Returns: {"ok": True, "tunnel_id", "tunnel_token", "random_id",
+                  "subdomain", "urls"}
+        Raises: PublicTunnelError
+        """
+        try:
+            resp = requests.post(
+                f"{API_URL}/api/v1/tunnel/activate",
+                json={"instance_id": self.instance_id, "random_id": random_id},
+                headers=self._auth_headers(),
+                timeout=60,
+            )
+        except requests.RequestException as e:
+            raise PublicTunnelError(f"无法连接 API: {e}",
+                                    key="public_api_unreachable",
+                                    params={"detail": str(e)})
+
+        data = self._parse_json_response(resp)
+        if not data.get("ok"):
+            detail = self._extract_error(data)
+            # activate 阶段的 409 是预留行状态冲突 (并发处理/已被回收),
+            # 不是子域名占用, 不能沿用 reserve 的 subdomain_in_use 映射
+            key = ("activate_failed" if resp.status_code == 409
+                   else self._error_key(resp.status_code, "activate_failed"))
+            raise PublicTunnelError(
+                detail or "activate failed",
+                key=key,
+                params={"detail": detail} if detail else {},
+            )
+        return data
+
+    def apply_state(self, random_id: str, tunnel_token: str, urls: dict):
+        """把切换后的新状态写入内存并持久化 (不启动进程)。"""
+        self.random_id = random_id
+        self.tunnel_token = tunnel_token
+        self.urls = urls
+        self._save_persisted_state()
+
+    def release_id(self, random_id: Optional[str]) -> bool:
+        """按 random_id 释放任意 Tunnel, 不触碰本地状态 / 不停止进程。
+
+        用于切换编排中回收"旧"或"新预留"隧道。
+        Returns: 是否成功 (失败仅记日志, 由 API cleanup 兜底)。
+        """
+        if not random_id:
+            return True
+        try:
+            resp = requests.post(
+                f"{API_URL}/api/v1/tunnel/release",
+                json={"instance_id": self.instance_id, "random_id": random_id},
+                headers=self._auth_headers(),
+                timeout=15,
+            )
+            data = self._parse_json_response(resp)
+            if not data.get("ok"):
+                log.warning(f"API release({random_id}) 返回错误: {data}")
+                return False
+            return True
+        except Exception as e:
+            log.warning(f"API release({random_id}) 请求失败: {e}")
+            return False
+
     def restore(self) -> dict:
         """
         从持久化状态恢复 (重启后调用)。
@@ -319,6 +419,26 @@ class PublicTunnelClient:
             detail = detail[0].get("msg") or detail[0]
         return str(detail) if detail else ""
 
+    def _auth_headers(self) -> dict:
+        """带 HMAC 签名的请求头 (reserve/activate/release 共用)。"""
+        sig, ts = self._compute_hmac(self.instance_id)
+        return {
+            **API_HEADERS_BASE,
+            "Content-Type": "application/json",
+            "X-ComfyCarry-Auth": sig,
+            "X-Timestamp": ts,
+        }
+
+    @staticmethod
+    def _error_key(status: int, fallback: str) -> str:
+        """HTTP 状态 → 可翻译 error_key。"""
+        return {
+            409: "subdomain_in_use",
+            410: "reserve_expired",
+            429: "rate_limited",
+            503: "service_unavailable",
+        }.get(status, fallback)
+
     def _compute_hmac(self, instance_id: str) -> tuple:
         """
         计算 HMAC-SHA256 签名。
@@ -371,20 +491,27 @@ class PublicTunnelClient:
         ]
         return services
 
-    def _start_cloudflared(self, token: str) -> bool:
-        """通过 PM2 启动 cloudflared。返回是否启动成功。"""
-        # 先确保没有旧进程
-        self._stop_cloudflared()
+    def _start_cloudflared(self, token: str, name: str | None = None,
+                           metrics_port: int | None = None) -> bool:
+        """通过 PM2 启动 cloudflared。返回是否启动成功。
+
+        name / metrics_port: 蓝绿切换时启动新进程 (如 cf-tunnel-next / 20242);
+        默认使用当前活跃进程名及其对应 metrics 端口。
+        """
+        name = name or active_cf_name()
+        port = metrics_port or cf_metrics_port(name)
+        # 先确保没有同名旧进程 (不影响另一个名字的活跃进程)
+        self._stop_cloudflared(name)
 
         protocol = get_config("cf_protocol", "auto")
         from .log_service import clean_pm2_env
         env = clean_pm2_env()
         try:
             r = subprocess.run(
-                f'pm2 start cloudflared --name cf-tunnel '
+                f'pm2 start cloudflared --name {shlex.quote(name)} '
                 f'--interpreter none --log /workspace/tunnel.log --merge-logs --time '
                 f'-- tunnel --protocol {shlex.quote(protocol)} '
-                f'--metrics localhost:20241 run --token {shlex.quote(token)}',
+                f'--metrics localhost:{port} run --token {shlex.quote(token)}',
                 shell=True, capture_output=True, text=True, timeout=15, env=env,
             )
             if r.returncode != 0:
@@ -392,24 +519,27 @@ class PublicTunnelClient:
                 return False
             # 与 ComfyUI / 自定义隧道路径一致: 入 dump, 容器重启可被 pm2 resurrect
             subprocess.run("pm2 save 2>/dev/null", shell=True, timeout=5, env=env)
-            log.info(f"cloudflared (cf-tunnel) 已通过 PM2 启动 (protocol={protocol})")
+            log.info(f"cloudflared ({name}) 已通过 PM2 启动 (protocol={protocol})")
             return True
         except Exception as e:
             log.error(f"启动 cloudflared 失败: {e}")
             return False
 
-    def _stop_cloudflared(self):
-        """通过 PM2 停止 cloudflared"""
+    def _stop_cloudflared(self, name: str | None = None):
+        """通过 PM2 停止 cloudflared (默认当前活跃进程)"""
+        name = name or active_cf_name()
         try:
             subprocess.run(
-                "pm2 stop cf-tunnel 2>/dev/null; pm2 delete cf-tunnel 2>/dev/null",
+                f"pm2 stop {shlex.quote(name)} 2>/dev/null; "
+                f"pm2 delete {shlex.quote(name)} 2>/dev/null",
                 shell=True, capture_output=True, text=True, timeout=10,
             )
         except Exception:
             pass
 
-    def _is_cloudflared_running(self) -> bool:
-        """检查 cloudflared PM2 进程是否在运行"""
+    def _is_cloudflared_running(self, name: str | None = None) -> bool:
+        """检查指定 (默认活跃) cloudflared PM2 进程是否在运行"""
+        name = name or active_cf_name()
         try:
             r = subprocess.run(
                 "pm2 jlist 2>/dev/null",
@@ -417,7 +547,7 @@ class PublicTunnelClient:
             )
             if r.returncode == 0:
                 for p in json.loads(r.stdout):
-                    if p.get("name") == "cf-tunnel":
+                    if p.get("name") == name:
                         return p.get("pm2_env", {}).get("status") == "online"
         except Exception:
             pass

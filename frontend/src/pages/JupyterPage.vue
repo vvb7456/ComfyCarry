@@ -51,8 +51,23 @@ const status = ref<JupyterStatus | null>(null)
 const statusLoading = ref(true)
 const jupyterUrl = ref('')
 const token = ref('')
+// 进程重启后 Jupyter 会生成新 token; 置脏后持续重取, 直到拿到非空令牌
+const tokenDirty = ref(false)
 const actionLoading = ref<'start' | 'stop' | 'restart' | null>(null)
 const acting = computed(() => actionLoading.value !== null)
+
+// 新进程下发时刻 (0 = 无待确认启动)。启动/重启成功后置位, 直到 loadStatus
+// 拿到不早于该时刻发起的快照才解除; 期间旧的 status 快照 (online/pm2_status)
+// 一律不可信, 否则 hero 会闪回 running/stopped。
+const pendingStartAt = ref(0)
+let pendingStartTimer: ReturnType<typeof setTimeout> | null = null
+
+function markPendingStart() {
+  pendingStartAt.value = Date.now()
+  if (pendingStartTimer) clearTimeout(pendingStartTimer)
+  // 兜底: 轮询持续失败或进程卡死时, 两分钟后交回常规状态机
+  pendingStartTimer = setTimeout(() => { pendingStartAt.value = 0 }, 120_000)
+}
 
 // 行内操作互斥: 任一内核/会话/终端动作进行中, 其余行操作一并禁用
 const kernelPending = ref<string | null>(null)
@@ -82,16 +97,23 @@ const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: lo
 // ─── 状态判定 ─────────────────────────────────────────────────────────────────
 
 const pm2Status = computed(() => status.value?.pm2_status || 'unknown')
-const isRunning = computed(() => !!status.value && (status.value.online || pm2Status.value === 'online'))
+/** 可信的运行态: 快照在线且没有待确认的新进程 */
+const isRunning = computed(() => !pendingStartAt.value && !!status.value && (status.value.online || pm2Status.value === 'online'))
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
+let statusAppliedAt = 0
 async function loadStatus() {
+  const requestedAt = Date.now()
   const data = await get<JupyterStatus>('/api/jupyter/status', { silent: true })
-  if (data) {
-    status.value = data
-    statusLoading.value = false
-  }
+  if (!data) return
+  // 乱序响应保护: 迟到的旧快照不能覆盖新快照
+  if (requestedAt < statusAppliedAt) return
+  statusAppliedAt = requestedAt
+  status.value = data
+  statusLoading.value = false
+  // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
+  if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
 }
 
 /** 有隧道用隧道入口 (自定义 + 公共), 无隧道在 effectiveJupyterUrl 里回落本机直连。 */
@@ -111,9 +133,14 @@ async function loadJupyterUrl() {
   jupyterUrl.value = ''
 }
 
-async function loadToken() {
-  const data = await get<{ token: string }>('/api/jupyter/token', { silent: true })
-  if (data?.token) token.value = data.token
+/** force=true 时跳过后端缓存重新检测 (重启后必须, 进程可能晚于轮询就绪) */
+async function loadToken(force = false) {
+  const data = await get<{ token: string }>(`/api/jupyter/token${force ? '?refresh=1' : ''}`, { silent: true })
+  if (!data) return
+  if (data.token) {
+    token.value = data.token
+    tokenDirty.value = false
+  }
 }
 
 const effectiveJupyterUrl = computed(() => {
@@ -125,13 +152,23 @@ const effectiveJupyterUrl = computed(() => {
   return `http://${host}:${status.value.port}`
 })
 
-/** 打开链接: 在访问地址后追加 token (地址已带 token 则原样使用)。 */
+/** 打开链接: 本页令牌已确认刷新时才覆盖地址里的 token; 否则保留地址自带 token (隧道地址可能携带更新值)。 */
 const jupyterTokenUrl = computed(() => {
   const base = effectiveJupyterUrl.value
   if (!base) return ''
-  if (!token.value || base.includes('token=')) return base
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}token=${token.value}`
+  if (tokenDirty.value || !token.value) return base
+  try {
+    const u = new URL(base)
+    if (u.searchParams.get('token') === token.value) return base
+    u.searchParams.set('token', token.value)
+    return u.toString()
+  } catch {
+    if (base.includes('token=')) {
+      return base.replace(/([?&])token=[^&]*/, `$1token=${token.value}`)
+    }
+    const sep = base.includes('?') ? '&' : '?'
+    return `${base}${sep}token=${token.value}`
+  }
 })
 
 /** 事实里只展示主机 (含端口), 完整地址由打开动作承接。 */
@@ -151,6 +188,8 @@ type HeroState = 'running' | 'starting' | 'stopped' | 'not_created' | 'failed'
 
 const heroState = computed<HeroState>(() => {
   if (actionLoading.value === 'start' || actionLoading.value === 'restart') return 'starting'
+  // 新进程已下发但快照尚未更新: 保持启动中, 避免旧 online/pm2_status 造成的闪回
+  if (pendingStartAt.value) return 'starting'
   const pm = pm2Status.value
   if (status.value?.online) return 'running'
   if (pm === 'launching') return 'starting'
@@ -274,10 +313,22 @@ async function jupyterAction(action: 'start' | 'stop' | 'restart') {
   actionLoading.value = null
   if (!data) return
   if (data.ok) {
+    if (action === 'stop') {
+      // 停止后令牌作废, 下次启动重新获取
+      token.value = ''
+      tokenDirty.value = false
+    } else {
+      // 启动/重启: 固定 hero 为启动中, 直到新鲜快照到达; 令牌会随进程更新
+      markPendingStart()
+      tokenDirty.value = true
+    }
     toast(apiMessageText(data, t(`jupyter.msg.${action === 'start' ? 'starting' : action === 'stop' ? 'stopped' : 'restarting'}`)), 'success')
     setTimeout(() => {
       loadStatus()
-      if (action !== 'stop') loadJupyterUrl()
+      if (action !== 'stop') {
+        loadJupyterUrl()
+        loadToken(true)
+      }
     }, action === 'restart' ? 5000 : action === 'stop' ? 1000 : 3000)
   } else {
     toast(apiErrorText(data, t('jupyter.err.fallback')), 'error')
@@ -343,10 +394,10 @@ async function deleteTerminal(name: string) {
 async function refreshStatus() {
   const wasRunning = isRunning.value
   await loadStatus()
-  if (!wasRunning && isRunning.value) {
-    // 服务刚起来, 刷新访问地址与令牌
+  // 服务刚起来, 或重启后令牌尚未取到 (进程可能晚于轮询就绪): 刷新地址与令牌
+  if (isRunning.value && (!wasRunning || tokenDirty.value || !token.value)) {
     void loadJupyterUrl()
-    void loadToken()
+    void loadToken(tokenDirty.value)
   }
 }
 
@@ -363,6 +414,7 @@ onMounted(() => {
 onUnmounted(() => {
   logStop()
   refresher.stop()
+  if (pendingStartTimer) clearTimeout(pendingStartTimer)
 })
 </script>
 

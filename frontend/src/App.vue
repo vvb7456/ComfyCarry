@@ -5,6 +5,7 @@ import AppSidebar from '@/components/layout/AppSidebar.vue'
 import BackgroundRunBar from '@/components/layout/BackgroundRunBar.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
 import ConfirmProvider from '@/components/ui/ConfirmProvider.vue'
+import TunnelSwitchOverlay from '@/components/ui/TunnelSwitchOverlay.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { provideToast } from '@/composables/useToast'
 import { useExecNotifications } from '@/composables/useExecNotifications'
@@ -58,5 +59,6 @@ function onOverlayClick() {
 
   <ToastContainer />
   <BackgroundRunBar />
+  <TunnelSwitchOverlay />
   </ConfirmProvider>
 </template>

@@ -18,6 +18,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import AlertBanner from '@/components/ui/AlertBanner.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
@@ -26,6 +27,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { startSwitch, TunnelSwitchError } from '@/composables/useTunnelSwitch'
 import { apiErrorText } from '@/utils/apiError'
 import type { TunnelConfigResponse, TunnelActionResponse, TunnelSubdomainResponse } from '@/types/tunnel'
 
@@ -88,6 +90,12 @@ const serverMode = ref<TunnelMode>('off')
 const serverSubdomain = ref('')
 /** 服务端已生效的传输协议, 用于判断是否需要重启 cloudflared */
 const serverProtocol = ref('auto')
+/** 服务端已生效的自定义隧道域名/token, 用于无变化特判 */
+const serverDomain = ref('')
+const serverToken = ref('')
+
+/** 应用配置失败时在弹窗内就地展示的错误文本 */
+const cfgError = ref('')
 
 const loading = ref(false)
 const loadError = ref(false)
@@ -103,6 +111,9 @@ function snapshot(): string {
 }
 
 const cfgDirty = computed(() => cfgLoaded.value && snapshot() !== cfgSnapshot.value)
+
+/** 自定义模式缺少子域名: 禁用保存并在行内提示 */
+const subdomainMissing = computed(() => mode.value === 'custom' && !cfgSubdomain.value.trim())
 
 /** 根域名展示值: 公共模式固定内置域名 (不可改), 其余显示用户配置 */
 const domainDisplay = computed(() => (mode.value === 'public' ? PUBLIC_DOMAIN : cfgDomain.value))
@@ -144,6 +155,8 @@ async function loadConfig(preset: TunnelMode | null): Promise<void> {
   serverProtocol.value = cfgProtocol.value
   cfgDomain.value = next === 'public' ? '' : (cfg.domain || '')
   cfgToken.value = next === 'custom' ? (cfg.api_token || '') : ''
+  serverDomain.value = cfgDomain.value
+  serverToken.value = cfgToken.value
   cfgLoaded.value = true
   // 基线取服务端状态; 预选模式落在基线之后, 使其立即进入 dirty (可直接保存)
   cfgSnapshot.value = snapshot()
@@ -154,6 +167,7 @@ async function loadAll(preset: TunnelMode | null = null): Promise<void> {
   loading.value = true
   cfgLoaded.value = false
   cfgValidResult.value = null
+  cfgError.value = ''
   await loadConfig(preset)
   loading.value = false
 }
@@ -162,49 +176,94 @@ watch(() => props.modelValue, (open) => {
   if (open) void loadAll(props.presetMode)
 })
 
-// ── 应用 (弹窗级): 按模式差异应用变更, 含 confirm/teardown 流程 ──
+// ── 应用 (弹窗级): 按模式差异应用变更, 含 confirm/teardown/switch 流程 ──
+
+/** 目标参数是否与服务端当前生效值一致 (模式相同才调用) */
+function isTargetUnchanged(sub: string): boolean {
+  if (mode.value !== serverMode.value) return false
+  if (mode.value === 'off') return true
+  if (mode.value === 'public') return sub === serverSubdomain.value
+  return cfgDomain.value.trim() === serverDomain.value
+    && sub === serverSubdomain.value
+    && cfgToken.value === serverToken.value
+}
+
+function validatePublicSubdomain(sub: string): boolean {
+  if (sub && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(sub)) {
+    toast(t('tunnel.settings.subdomain_error'), 'warning')
+    return false
+  }
+  return true
+}
+
+/** 发起蓝绿切换; 非 202 的失败在弹窗内就地渲染, 不弹 overlay。 */
+async function startSwitchOrReport(payload: {
+  mode: 'custom' | 'public'
+  api_token?: string
+  domain?: string
+  subdomain?: string
+}): Promise<boolean> {
+  try {
+    await startSwitch(payload)
+    return true
+  } catch (e) {
+    if (e instanceof TunnelSwitchError) {
+      cfgError.value = apiErrorText(e.body, t('tunnel.err.switch_failed'))
+    } else {
+      cfgError.value = (e as Error)?.message || t('tunnel.err.switch_failed')
+    }
+    return false
+  }
+}
+
 async function applyConfig(): Promise<boolean> {
   cfgSaving.value = true
+  cfgError.value = ''
   try {
-    // 协议始终先保存 (重启 cloudflared 后生效)
-    if (!await post('/api/tunnel/protocol', { protocol: cfgProtocol.value })) return false
+    const sub = cfgSubdomain.value.trim().toLowerCase()
+    const modeChanged = mode.value !== serverMode.value
+    const protocolChanged = cfgProtocol.value !== serverProtocol.value
+    const targetUnchanged = isTargetUnchanged(sub)
 
-    // ── 模式未变: 仅参数更新 ──
-    if (mode.value === serverMode.value) {
+    // 无变化特判: 模式与目标参数均未变化 (仅协议变化不算无变化) → 不发起切换
+    if (!modeChanged && targetUnchanged && !protocolChanged) {
+      toast(t('tunnel.switch.no_change'), 'info')
+      return true
+    }
+
+    // 自定义模式子域名必填
+    if (mode.value === 'custom' && !sub) {
+      toast(t('tunnel.err.subdomain_required'), 'warning')
+      return false
+    }
+
+    // 协议变更先落盘; 生效由后续 restart (仅协议变) 或切换时的新进程完成
+    if (protocolChanged && !await post('/api/tunnel/protocol', { protocol: cfgProtocol.value })) return false
+
+    // ── 模式未变 ──
+    if (!modeChanged) {
       if (mode.value === 'off') return done()
-      if (mode.value === 'public') {
-        const sub = cfgSubdomain.value.trim().toLowerCase()
-        if (sub && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(sub)) {
-          toast(t('tunnel.settings.subdomain_error'), 'warning')
-          return false
-        }
-        // 公共子域名在 register 时由 Worker 分配, 只改配置不会改变当前公网地址,
-        // 必须重新注册才会生效 (register 内部会先 release 旧隧道)。
-        if (sub !== serverSubdomain.value) {
-          const auto = t('tunnel.confirm.change_public_subdomain.auto')
-          if (!await confirm({
-            title: t('tunnel.confirm.change_public_subdomain.title'),
-            message: t('tunnel.confirm.change_public_subdomain.message', {
-              old: serverSubdomain.value || auto,
-              new: sub || auto,
-            }),
-            confirmText: t('tunnel.confirm.change_public_subdomain.button'),
-            variant: 'danger',
-          })) return false
-          if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
-          toast(t('tunnel.settings.enabling_public'), 'info')
-          const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
-          if (actionFailed(d, 'tunnel.settings.enable_failed')) return false
-          return done()
-        }
-        // 协议写在 cloudflared 启动命令行里, 需重启进程才会生效
-        if (cfgProtocol.value !== serverProtocol.value) {
-          const d = await post<TunnelActionResponse>('/api/tunnel/restart')
-          if (actionFailed(d, 'tunnel.settings.save_failed')) return false
-        }
+      // 仅协议变化: 重启 cloudflared 生效, 不发起切换
+      if (targetUnchanged) {
+        const d = await post<TunnelActionResponse>('/api/tunnel/restart')
+        if (actionFailed(d, 'tunnel.settings.save_failed')) return false
         return done()
       }
-      // custom 参数更新: 需完整参数后重新 provision
+      if (mode.value === 'public') {
+        if (!validatePublicSubdomain(sub)) return false
+        const auto = t('tunnel.confirm.change_public_subdomain.auto')
+        if (!await confirm({
+          title: t('tunnel.confirm.change_public_subdomain.title'),
+          message: t('tunnel.confirm.change_public_subdomain.message', {
+            old: serverSubdomain.value || auto,
+            new: sub || auto,
+          }),
+          confirmText: t('tunnel.confirm.change_public_subdomain.button'),
+          variant: 'danger',
+        })) return false
+        return startSwitchOrReport({ mode: 'public', subdomain: sub })
+      }
+      // custom 目标参数更新
       if (!validateCustom()) return false
       if (!await confirm({
         title: t('tunnel.confirm.apply_config.title'),
@@ -212,16 +271,14 @@ async function applyConfig(): Promise<boolean> {
         confirmText: t('tunnel.confirm.apply_config.button'),
         variant: 'danger',
       })) return false
-      const d = await post<TunnelActionResponse>('/api/tunnel/provision', {
-        api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value,
+      return startSwitchOrReport({
+        mode: 'custom', api_token: cfgToken.value, domain: cfgDomain.value.trim(), subdomain: sub,
       })
-      if (actionFailed(d, 'tunnel.settings.save_failed')) return false
-      return done()
     }
 
     // ── 模式切换 ──
     if (mode.value === 'off') {
-      // 关闭 = 销毁 (应用即意图, 再加一道 confirm)
+      // 关闭 = 销毁 (应用即意图, 再加一道 confirm; 不跳转)
       if (!await confirm({
         title: t('tunnel.confirm.off.title'),
         message: t('tunnel.confirm.off.message'),
@@ -243,44 +300,33 @@ async function applyConfig(): Promise<boolean> {
         confirmText: t('tunnel.confirm.to_public.button'),
         variant: 'danger',
       })) return false
-      if (serverMode.value === 'custom' && !await teardownCustom()) return false
-      const sub = cfgSubdomain.value.trim().toLowerCase()
-      if (sub && !/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(sub)) {
-        toast(t('tunnel.settings.subdomain_error'), 'warning')
-        return false
-      }
-      if (!await post('/api/tunnel/public/subdomain', { subdomain: sub })) return false
-      toast(t('tunnel.settings.enabling_public'), 'info')
-      const d = await post<TunnelActionResponse>('/api/tunnel/public/enable')
-      if (actionFailed(d, 'tunnel.settings.enable_failed')) return false
-      return done()
+      if (!validatePublicSubdomain(sub)) return false
+      return startSwitchOrReport({ mode: 'public', subdomain: sub })
     }
 
     // → custom
     if (!validateCustom()) return false
-    if (serverMode.value === 'public') {
-      if (!await confirm({
-        title: t('tunnel.confirm.to_custom.title'),
-        message: t('tunnel.confirm.to_custom.message'),
-        confirmText: t('tunnel.confirm.to_custom.button'),
-        variant: 'danger',
-      })) return false
-      if (!await post('/api/tunnel/public/disable')) return false
-    }
-    toast(t('tunnel.settings.applying'), 'info')
-    const d = await post<TunnelActionResponse>('/api/tunnel/provision', {
-      api_token: cfgToken.value, domain: cfgDomain.value, subdomain: cfgSubdomain.value,
+    if (serverMode.value === 'public' && !await confirm({
+      title: t('tunnel.confirm.to_custom.title'),
+      message: t('tunnel.confirm.to_custom.message'),
+      confirmText: t('tunnel.confirm.to_custom.button'),
+      variant: 'danger',
+    })) return false
+    return startSwitchOrReport({
+      mode: 'custom', api_token: cfgToken.value, domain: cfgDomain.value.trim(), subdomain: sub,
     })
-    if (actionFailed(d, 'tunnel.settings.save_failed')) return false
-    return done()
   } finally {
     cfgSaving.value = false
   }
 }
 
 function validateCustom(): boolean {
-  if (!cfgToken.value || !cfgDomain.value) {
+  if (!cfgToken.value || !cfgDomain.value.trim()) {
     toast(t('tunnel.settings.need_token_domain'), 'warning')
+    return false
+  }
+  if (!cfgSubdomain.value.trim()) {
+    toast(t('tunnel.err.subdomain_required'), 'warning')
     return false
   }
   return true
@@ -360,7 +406,18 @@ async function requestClose(): Promise<void> {
       <BaseButton size="sm" @click="loadAll()">{{ t('common.btn.retry') }}</BaseButton>
     </EmptyState>
 
-    <div v-else class="settings-lines">
+    <template v-else>
+      <AlertBanner
+        v-if="cfgError"
+        tone="danger"
+        closable
+        class="tunnel-settings-error"
+        @close="cfgError = ''"
+      >
+        {{ cfgError }}
+      </AlertBanner>
+
+      <div class="settings-lines">
       <div class="settings-row">
         <div class="settings-row__text">
           <div class="settings-row__label">{{ t('tunnel.settings.mode.label') }}</div>
@@ -383,7 +440,10 @@ async function requestClose(): Promise<void> {
           <div class="settings-row__label">{{ t('tunnel.settings.subdomain') }}</div>
           <div class="settings-row__desc">{{ mode === 'public' ? t('tunnel.settings.subdomain_desc') : t('tunnel.settings.custom_subdomain_desc') }}</div>
         </div>
-        <div class="settings-row__control">
+        <div
+          class="settings-row__control"
+          :class="{ 'settings-row__control--stack': mode === 'custom' && !cfgSubdomain.trim() }"
+        >
           <input
             v-model="cfgSubdomain"
             type="text"
@@ -391,6 +451,12 @@ async function requestClose(): Promise<void> {
             :disabled="mode === 'off'"
             :placeholder="t('tunnel.settings.subdomain_placeholder')"
           >
+          <div
+            v-if="mode === 'custom' && !cfgSubdomain.trim()"
+            class="settings-row__feedback settings-row__feedback--err"
+          >
+            {{ t('tunnel.err.subdomain_required') }}
+          </div>
         </div>
       </div>
 
@@ -459,11 +525,18 @@ async function requestClose(): Promise<void> {
           />
         </div>
       </div>
-    </div>
+      </div>
+    </template>
 
     <template #footer>
       <BaseButton :disabled="cfgSaving" @click="requestClose()">{{ t('common.btn.cancel') }}</BaseButton>
-      <BaseButton variant="primary" :disabled="!cfgDirty || loading || loadError" :loading="cfgSaving" @click="onSave">{{ t('common.btn.save') }}</BaseButton>
+      <BaseButton variant="primary" :disabled="!cfgDirty || loading || loadError || subdomainMissing" :loading="cfgSaving" @click="onSave">{{ t('common.btn.save') }}</BaseButton>
     </template>
   </BaseModal>
 </template>
+
+<style scoped>
+.tunnel-settings-error {
+  margin-bottom: 12px;
+}
+</style>

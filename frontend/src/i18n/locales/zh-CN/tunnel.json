@@ -62,9 +62,12 @@
     "protocol": "协议"
   },
   "err": {
+    "activate_failed": "新隧道激活失败",
     "domain_not_in_account": "域名 {domain} 不在此账户中",
     "fill_service_info": "请填写服务名称、端口和子域名后缀",
+    "health_timeout": "新地址健康检查超时",
     "internal": "操作失败：{detail}",
+    "invalid_mode": "无效的切换模式",
     "invalid_protocol": "无效协议，可选：auto, http2, quic",
     "invalid_subdomain": "子域名必须为 3-32 位小写字母、数字或连字符",
     "missing_token_or_domain": "缺少 api_token 或 domain",
@@ -77,10 +80,18 @@
     "public_no_state": "没有可恢复的公共 Tunnel 状态",
     "public_register_failed": "公共 Tunnel 注册失败",
     "public_start_failed": "公共 Tunnel 已注册，但 cloudflared 启动失败",
+    "rate_limited": "请求过于频繁，请稍后重试",
+    "reserve_expired": "预留已过期，请重新发起切换",
+    "reserve_failed": "隧道预留失败",
+    "service_unavailable": "公共 Tunnel 服务暂时不可用",
     "start_failed": "启动失败",
     "stop_failed": "停止失败",
+    "subdomain_in_use": "该子域名已被占用",
+    "subdomain_required": "自定义隧道需要填写子域名",
     "suffix_empty": "新后缀不能为空",
-    "suffix_in_use": "后缀 '{suffix}' 已被服务 '{name}' 使用"
+    "suffix_in_use": "后缀 '{suffix}' 已被服务 '{name}' 使用",
+    "switch_failed": "隧道切换失败",
+    "switch_in_progress": "已有切换正在进行"
   },
   "toast": {
     "remove_failed": "移除失败",
@@ -174,6 +185,19 @@
     "save_failed": "保存失败",
     "root_domain_help": "需已在 Cloudflare 托管。",
     "token_help": "需具有 Tunnel 与 DNS 的编辑权限。"
+  },
+  "switch": {
+    "title": "正在切换隧道…",
+    "progress": "正在验证新地址，请勿关闭页面。",
+    "new_host": "新地址：{host}",
+    "direct_hint": "切换完成后将自动刷新。",
+    "failed_title": "切换失败",
+    "failed_hint": "切换失败，已保留原地址。",
+    "unreachable": "新旧地址均无法连接，请手动处理。",
+    "reload": "刷新页面",
+    "copy_new": "复制新地址",
+    "no_change": "隧道配置无变化",
+    "dismiss": "关闭"
   },
   "msg": {
     "token_valid": "Token 验证通过"

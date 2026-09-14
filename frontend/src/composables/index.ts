@@ -1,5 +1,6 @@
 export { useApiFetch } from './useApiFetch'
 export { useAutoRefresh } from './useAutoRefresh'
+export { useTunnelSwitch, startSwitch, isTunnelSwitchFrozen, TunnelSwitchError } from './useTunnelSwitch'
 export { useLogStream } from './useLogStream'
 export { useExecTracker } from './useExecTracker'
 export { useComfySSE } from './useComfySSE'

@@ -151,6 +151,13 @@ def main():
     import atexit
     app = create_app()
 
+    # 隧道切换不跨后端重启: 启动时清为 idle 并清理中断遗留的进程
+    try:
+        from .services.tunnel_switch import reset_on_startup
+        reset_on_startup()
+    except Exception as e:
+        app.logger.warning(f"[tunnel] 清理切换状态失败: {e}")
+
     # 执行数据库迁移
     from . import migrations as _migrations  # noqa: F811,F401 — 注册所有表
     from .db import db

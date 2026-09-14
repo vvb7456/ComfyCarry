@@ -27,6 +27,7 @@ const SERVICE_IDENTITY: Record<string, ServiceIdentity> = {
   'sync-worker': { icon: 'cloud_sync' },
   tunnel: { icon: 'vpn_lock' },
   'cf-tunnel': { icon: 'vpn_lock' },
+  'cf-tunnel-next': { icon: 'vpn_lock' },
   ssh: { icon: 'key' },
 }
 

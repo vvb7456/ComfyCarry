@@ -125,8 +125,12 @@ EOF
 # ── CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册) ──
 _TUNNEL_DASHBOARD_URL=""
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
-    echo "  -> 检测到 CF 配置, 启动 Tunnel..."
-    _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "
+    if [ -z "${CF_SUBDOMAIN:-}" ]; then
+        echo "  -> 错误: 自定义 Tunnel 需要 CF_SUBDOMAIN, 按启动失败处理" >&2
+        echo "  Tunnel 启动失败"
+    else
+        echo "  -> 检测到 CF 配置, 启动 Tunnel..."
+        _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "
 import sys, os
 sys.path.insert(0, '$DASHBOARD_DIR')
 from comfycarry.services.tunnel_manager import TunnelManager
@@ -146,11 +150,12 @@ except Exception as e:
     print('', file=sys.stderr)
     print(f'Tunnel 启动失败: {e}', file=sys.stderr)
 " 2>/dev/null) || true
-    if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
-        echo "  Tunnel 已启动"
-    else
-        echo "  Tunnel 启动失败"
-    fi
+            if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
+                echo "  Tunnel 已启动"
+            else
+                echo "  Tunnel 启动失败"
+            fi
+        fi
 elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
     echo "  -> 检测到 PUBLIC_TUNNEL, 正在注册公共 Tunnel..."
     _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "

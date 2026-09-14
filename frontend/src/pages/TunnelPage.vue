@@ -93,11 +93,32 @@ onMounted(() => {
 onUnmounted(() => {
   refresh.stop()
   logStop()
+  if (pendingStartTimer) clearTimeout(pendingStartTimer)
 })
 
+let statusAppliedAt = 0
 async function loadTunnelStatus() {
+  const requestedAt = Date.now()
   const d = await get<TunnelData>('/api/tunnel/status?refresh=1', { silent: true })
-  if (d) data.value = d
+  if (!d) return
+  // 乱序响应保护: 迟到的旧快照不能覆盖新快照
+  if (requestedAt < statusAppliedAt) return
+  statusAppliedAt = requestedAt
+  data.value = d
+  // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
+  if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
+}
+
+// 新进程下发时刻 (0 = 无待确认启动)。启动/重启成功后置位, 直到 loadTunnelStatus
+// 拿到不早于该时刻发起的快照才解除; 期间旧快照一律不可信。
+const pendingStartAt = ref(0)
+let pendingStartTimer: ReturnType<typeof setTimeout> | null = null
+
+function markPendingStart() {
+  pendingStartAt.value = Date.now()
+  if (pendingStartTimer) clearTimeout(pendingStartTimer)
+  // 兜底: 轮询持续失败或进程卡死时, 两分钟后交回常规状态机
+  pendingStartTimer = setTimeout(() => { pendingStartAt.value = 0 }, 120_000)
 }
 
 // ── 状态判定 ──
@@ -110,6 +131,8 @@ const configured = computed(() => !!data.value && (data.value.configured || isPu
 const heroState = computed<HeroState>(() => {
   const d = data.value
   if (!d || !(d.configured || d.tunnel_mode === 'public')) return 'unconfigured'
+  // 启动/重启已下发但快照尚未更新: 保持连接中, 避免旧 stopped/online 闪回
+  if (pendingStartAt.value) return 'connecting'
   const st = d.effective_status
   if (st === 'online') return 'online'
   if (st === 'connecting' || st === 'starting') return 'connecting'
@@ -259,6 +282,7 @@ async function tunnelStart() {
   pendingAction.value = null
   if (!d) return
   if (!d.ok) { toast(apiErrorText(d, t('tunnel.toast.start_failed')), 'error'); return }
+  markPendingStart()
   toast(t('tunnel.toast.cf_starting'), 'info')
   setTimeout(loadTunnelStatus, 2000)
 }
@@ -274,6 +298,7 @@ async function tunnelRestart(skipConfirm = false) {
   pendingAction.value = null
   if (!d) return
   if (!d.ok) { toast(apiErrorText(d, t('tunnel.toast.restart_failed')), 'error'); return }
+  markPendingStart()
   toast(t('tunnel.toast.cf_restarting'), 'info')
   setTimeout(loadTunnelStatus, 3000)
 }

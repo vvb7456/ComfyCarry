@@ -51,7 +51,9 @@ def get_deploy_log_slice(start):
 # ── 辅助函数 ─────────────────────────────────────────────────
 
 def _is_cf_tunnel_online() -> bool:
-    """检查 cf-tunnel PM2 进程是否在线"""
+    """检查当前活跃 cloudflared PM2 进程是否在线"""
+    from .cf_runtime import active_cf_name
+    name = active_cf_name()
     try:
         r = subprocess.run(
             "pm2 jlist 2>/dev/null", shell=True,
@@ -60,7 +62,7 @@ def _is_cf_tunnel_online() -> bool:
         if r.returncode == 0:
             import json as _json
             for p in _json.loads(r.stdout):
-                if p.get("name") == "cf-tunnel":
+                if p.get("name") == name:
                     return p.get("pm2_env", {}).get("status") == "online"
     except Exception:
         pass
@@ -387,7 +389,10 @@ def _step_tunnel(config):
         from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
         from comfycarry.config import set_config as _sc, get_config as _gc
 
-        cf_subdomain = config.get("cf_subdomain", "")
+        cf_subdomain = config.get("cf_subdomain", "") or _gc("cf_subdomain", "")
+        if not cf_subdomain:
+            _deploy_log("自定义隧道需要子域名 (CF_SUBDOMAIN)，已跳过隧道配置", "error")
+            return
         mgr = TunnelManager(cf_api_token, cf_domain, cf_subdomain)
 
         try:
