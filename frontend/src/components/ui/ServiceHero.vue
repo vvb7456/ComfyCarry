@@ -16,7 +16,8 @@ export type ServiceHeroTone = 'ok' | 'warn' | 'bad' | 'off'
  *   warn → loading（琥珀，脉冲）
  *   bad  → error（红）
  *   off  → stopped（静音灰）
- * busy 叠在 tone 之上，用旋转表达过渡态；遵循 prefers-reduced-motion: reduce。
+ * busy 叠在 tone 之上，用呼吸表达过渡态：只做透明度起伏，图标形状 / 位置 / 尺寸始终不变；
+ * 遵循 prefers-reduced-motion: reduce。
  *
  * 用法：
  *   <ServiceHero icon="vpn_lock" tone="ok" title="隧道已连接" subtitle="已为 2 项服务建立公网入口。">
@@ -49,7 +50,7 @@ withDefaults(defineProps<{
   title: string
   subtitle: string
   tone: ServiceHeroTone
-  /** 过渡态：图标旋转（如连接中 / 启动中） */
+  /** 过渡态：图标呼吸（仅透明度起伏，形状 / 位置 / 尺寸保持不变，如连接中 / 启动中） */
   busy?: boolean
 }>(), {
   busy: false,
@@ -132,17 +133,18 @@ withDefaults(defineProps<{
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 42;
 }
 
-/* busy 优先于 warn：过渡态用旋转，warn 的空闲态用脉冲 */
+/* busy 优先于 warn：过渡态用呼吸（仅透明度起伏，不碰 transform，图标几何完全静止） */
 .service-hero--busy .service-hero__icon {
-  animation: service-hero-spin 1.6s linear infinite;
+  animation: service-hero-breathe 2.4s ease-in-out infinite;
 }
 
 .service-hero--warn:not(.service-hero--busy) .service-hero__icon {
   animation: service-hero-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes service-hero-spin {
-  to { transform: rotate(360deg); }
+@keyframes service-hero-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
 }
 
 @keyframes service-hero-pulse {

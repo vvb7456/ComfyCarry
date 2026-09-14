@@ -157,12 +157,22 @@ export function useExecTracker() {
     }
   }
 
-  function destroy() {
+  /**
+   * 清空执行状态。
+   * - SSE 重连/首次连接时调用: 断线期间错过的 execution_done / ws_disconnected
+   *   会让本地状态残留, 重连后由 bridge 快照重建;
+   * - 重启 ComfyUI 等确定性中断时调用, 不必等事件到达。
+   */
+  function reset() {
     state.value = null
     stopTimer()
   }
 
+  function destroy() {
+    reset()
+  }
+
   onUnmounted(destroy)
 
-  return { state, elapsed, handleEvent, destroy }
+  return { state, elapsed, handleEvent, reset, destroy }
 }

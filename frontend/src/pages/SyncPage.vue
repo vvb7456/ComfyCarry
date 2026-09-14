@@ -191,14 +191,18 @@ async function loadRemotes() {
   if (d?.remotes) remotes.value = d.remotes
 }
 
+let statusAppliedAt = 0
 async function loadSyncStatus() {
+  const requestedAt = Date.now()
   const d = await get<SyncStatusResponse>('/api/sync/status', { silent: true })
-  if (d) {
-    workerRunning.value = !!d.worker_running
-    if (d.rules) rules.value = d.rules
-    if (d.templates) templates.value = d.templates
-    settings.value = d.settings ?? null
-  }
+  if (!d) return
+  // 乱序响应保护: worker 启停后紧接的刷新可能被在途的旧轮询覆盖, 导致 hero 闪回
+  if (requestedAt < statusAppliedAt) return
+  statusAppliedAt = requestedAt
+  workerRunning.value = !!d.worker_running
+  if (d.rules) rules.value = d.rules
+  if (d.templates) templates.value = d.templates
+  settings.value = d.settings ?? null
 }
 
 async function loadStorage(name: string) {

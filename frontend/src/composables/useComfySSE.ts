@@ -26,12 +26,19 @@ export function useComfySSE(
   const active = ref(false)
   let source: EventSource | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let everOpened = false
   const delay = opts.reconnectDelay ?? 3000
 
   function start() {
     stop()
     source = new EventSource('/api/comfyui/events')
-    source.onopen = () => { active.value = true }
+    source.onopen = () => {
+      // 重连后先清空本地执行状态, 再让 bridge 快照 (subscribe 时补发) 重建;
+      // 否则断线期间错过的 execution_done / ws_disconnected 会留下陈旧执行态
+      if (everOpened) tracker.reset()
+      everOpened = true
+      active.value = true
+    }
     source.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data)

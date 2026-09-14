@@ -441,7 +441,10 @@ def jupyter_restart():
 
 @bp.route("/api/jupyter/token")
 def jupyter_token_endpoint():
-    """获取 Jupyter 访问令牌"""
+    """获取 Jupyter 访问令牌; ?refresh=1 跳过缓存重新检测 (进程重启后令牌会变)"""
+    global _cached_token
+    if request.args.get("refresh") == "1":
+        _cached_token = None
     token = _detect_token()
     if token:
         return jsonify({"token": token})
