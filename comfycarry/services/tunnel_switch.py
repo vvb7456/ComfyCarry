@@ -368,7 +368,8 @@ def _run_public(new_random_id: str, subdomain: str, new_name: str, old_name: str
         set_config("cf_subdomain", "")
         # 写回用户选择的子域名 (随机切换清空), 保证设置弹窗重开时显示与实际一致
         set_config("public_tunnel_subdomain", subdomain or "")
-        client.apply_state(new_random_id, token, urls)
+        client.apply_state(new_random_id, token, urls,
+                           subdomain=data.get("subdomain") or "")
         set_config("cf_tunnel_pm2_name", new_name)
         _pm2_delete(old_name)
         _cleanup_old(old_mode, old_cf, old_name, False, old_random_id,

@@ -16,6 +16,7 @@ import subprocess
 import threading
 import time
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -51,6 +52,7 @@ class PublicTunnelClient:
         self.random_id: Optional[str] = None
         self.tunnel_token: Optional[str] = None
         self.urls: Optional[dict] = None
+        self.subdomain: Optional[str] = None
         self.instance_id: str = self._detect_instance_id()
 
         # 从持久化配置恢复运行时状态
@@ -69,6 +71,8 @@ class PublicTunnelClient:
             state["tunnel_token"] = self.tunnel_token
         if self.urls:
             state["urls"] = self.urls
+        if self.subdomain:
+            state["subdomain"] = self.subdomain
         set_config("public_tunnel_state", state if state else "")
 
     def _load_persisted_state(self):
@@ -78,6 +82,7 @@ class PublicTunnelClient:
             self.random_id = state.get("random_id")
             self.tunnel_token = state.get("tunnel_token")
             self.urls = state.get("urls")
+            self.subdomain = state.get("subdomain")
             if self.random_id:
                 log.info(f"从配置恢复公共 Tunnel 状态: {self.random_id}")
 
@@ -89,7 +94,7 @@ class PublicTunnelClient:
     # 公共接口
     # ═══════════════════════════════════════════════════
 
-    def register(self) -> dict:
+    def register(self, subdomain_override: str = "") -> dict:
         """
         注册公共 Tunnel。
         1. 调用 API POST /api/v1/tunnel/register
@@ -97,6 +102,7 @@ class PublicTunnelClient:
         3. 启动 cloudflared (PM2)
         4. 持久化 tunnel_mode=public + 运行时状态
 
+        subdomain_override: 重注册时复用旧地址 (优先于用户自定义配置)。
         Returns: { "ok": True, "urls": {...}, "random_id": "..." }
         Raises: PublicTunnelError
         """
@@ -111,8 +117,9 @@ class PublicTunnelClient:
 
         services = self._get_services()
 
-        # 读取自定义子域名配置
-        subdomain = get_config("public_tunnel_subdomain", "")
+        # 读取自定义子域名配置 (重注册场景由 override 优先, 保持地址不变)
+        subdomain = (subdomain_override or "").strip() \
+            or get_config("public_tunnel_subdomain", "")
 
         body = {
             "instance_id": self.instance_id,
@@ -145,12 +152,17 @@ class PublicTunnelClient:
 
         if not data.get("ok"):
             detail = self._extract_error(data)
-            raise PublicTunnelError(detail or "register failed",
-                                    key="" if detail else "public_register_failed")
+            # 409 (子域名占用) 等按状态码映射为可翻译 key, 前端不再依赖原文
+            raise PublicTunnelError(
+                detail or "register failed",
+                key=self._error_key(resp.status_code, "public_register_failed"),
+                params={"detail": detail} if detail else {},
+            )
 
         self.random_id = data["random_id"]
         self.tunnel_token = data["tunnel_token"]
         self.urls = data.get("urls", {})
+        self.subdomain = data.get("subdomain", "")
 
         log.info(f"公共 Tunnel 注册成功: {self.random_id}")
 
@@ -212,6 +224,7 @@ class PublicTunnelClient:
         self.random_id = None
         self.tunnel_token = None
         self.urls = None
+        self.subdomain = None
 
         # 清除持久化
         set_config("tunnel_mode", "")
@@ -288,11 +301,13 @@ class PublicTunnelClient:
             )
         return data
 
-    def apply_state(self, random_id: str, tunnel_token: str, urls: dict):
+    def apply_state(self, random_id: str, tunnel_token: str, urls: dict,
+                    subdomain: str = ""):
         """把切换后的新状态写入内存并持久化 (不启动进程)。"""
         self.random_id = random_id
         self.tunnel_token = tunnel_token
         self.urls = urls
+        self.subdomain = subdomain
         self._save_persisted_state()
 
     def release_id(self, random_id: Optional[str]) -> bool:
@@ -319,16 +334,84 @@ class PublicTunnelClient:
             log.warning(f"API release({random_id}) 请求失败: {e}")
             return False
 
+    def verify(self) -> bool:
+        """
+        向后端确认持久化的隧道是否仍存活。
+
+        容器长时间停机时, 后台清理任务可能已回收隧道 (宽限期默认 30 分钟);
+        此时旧 tunnel_token 无效, cloudflared 会无限重试
+        "Unauthorized: Tunnel not found" 且不退出 —— 进程在线 ≠ 隧道可用。
+
+        任何失败 (网络 / 后端异常) 一律视为已失效, 由调用方重新注册;
+        注册失败会如实报错, 不存在"看起来恢复了实际不可用"的中间态。
+        """
+        if not self.random_id:
+            return False
+        try:
+            resp = requests.post(
+                f"{API_URL}/api/v1/tunnel/verify",
+                json={"instance_id": self.instance_id, "random_id": self.random_id},
+                headers=self._auth_headers(),
+                timeout=15,
+            )
+            data = self._parse_json_response(resp)
+        except (requests.RequestException, PublicTunnelError) as e:
+            log.warning(f"verify 失败 (视为已失效): {e}")
+            return False
+        return bool(data.get("ok") and data.get("alive"))
+
+    def _persisted_subdomain(self) -> str:
+        """从持久化状态推导旧子域名 (重注册时复用, 保持地址不变)。
+
+        新状态直接存有 subdomain; 存量状态 (无该字段) 从 dashboard URL
+        推导 — 其主机名首段即子域名。
+        """
+        if (self.subdomain or "").strip():
+            return self.subdomain.strip()
+        if self.urls:
+            host = urlparse(self.urls.get("dashboard", "")).hostname or ""
+            if host:
+                return host.split(".")[0]
+        return ""
+
+    def _reregister(self) -> dict:
+        """隧道被后端回收后的重注册: 复用旧子域名保持地址不变。
+
+        撞名 (409) 不重试 — register 开头已 release, 本地状态即"关闭",
+        用户需换子域名手动重新开启。其余失败同样如实上抛由调用方展示。
+        """
+        old_random_id = self.random_id
+        old_subdomain = self._persisted_subdomain()
+        log.info(f"隧道 {old_random_id} 已被后端回收, 重新注册 "
+                 f"(subdomain={old_subdomain or '<随机>'})")
+        try:
+            result = self.register(subdomain_override=old_subdomain)
+        except PublicTunnelError as e:
+            # release 已在 register 内完成, 本地即"关闭"状态
+            log.warning(f"重新注册失败: {e}")
+            return {"ok": False,
+                    "error_key": f"tunnel.err.{e.key}" if e.key
+                    else "tunnel.err.internal",
+                    "error": str(e)}
+        return {"ok": True, "random_id": result.get("random_id"),
+                "recovered": True}
+
     def restore(self) -> dict:
         """
         从持久化状态恢复 (重启后调用)。
-        不重新注册，只恢复内存状态 + 确保 cloudflared 运行。
+        先向后端确认隧道仍存活 — 已失效 (被后台清理回收或无法确认)
+        时带旧子域名重新注册。
 
-        Returns: {"ok": True, "random_id": "..."} 或 {"ok": False, "error_key": "..."}
+        Returns: {"ok": True, "random_id": "...", "recovered": bool}
+                 或 {"ok": False, "error_key": "..."}
         """
         if not self.random_id or not self.tunnel_token:
             return {"ok": False, "error_key": "tunnel.err.public_no_state"}
 
+        if not self.verify():
+            return self._reregister()
+
+        # 存活: 沿用旧 token
         # 确保 cloudflared 在运行; 起不来同样不能回 ok:true
         if not self._is_cloudflared_running():
             if not self._start_cloudflared(self.tunnel_token):

@@ -220,8 +220,9 @@ def main():
     for sub in ("openpose", "canny", "depth"):
         os.makedirs(os.path.join(cfg.COMFYUI_DIR, "input", sub), exist_ok=True)
 
-    # 恢复公共 Tunnel (如果之前是公共模式, 恢复心跳线程)
+    # 恢复公共 Tunnel (如果之前是公共模式)
     # 注意: 首次注册由 bootstrap.sh 完成, Dashboard 只负责 restore
+    # 长时间停机后隧道可能已被后端清理回收, restore 内部会自动重新注册
     tunnel_mode = cfg.get_config("tunnel_mode")
     if tunnel_mode == "public":
         try:
@@ -229,7 +230,11 @@ def main():
             client = PublicTunnelClient()
             result = client.restore()
             if result.get("ok"):
-                print(f"  公共 Tunnel 已恢复: {result.get('random_id', '?')}")
+                if result.get("recovered"):
+                    print(f"  公共 Tunnel 已被后端回收, 自动重新注册成功: "
+                          f"{result.get('random_id', '?')}")
+                else:
+                    print(f"  公共 Tunnel 已恢复: {result.get('random_id', '?')}")
             else:
                 # 启动日志走控制台, 不经前端翻译 —— 这里打 key 本身就够定位
                 print(f"  公共 Tunnel 恢复失败: "
