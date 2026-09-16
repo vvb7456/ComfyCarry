@@ -25,9 +25,9 @@ export interface SyncJobSummary {
 
 export interface SyncJob {
   job_id: string
-  trigger_type: string   // manual | watch | deploy | companion
+  trigger_type: string   // manual | watch | deploy (companion 任务不进本列表)
   trigger_ref: string | null
-  status: string         // running | success | failed | partial | cancelled
+  status: string         // queued | running | success | failed | partial | cancelled | interrupted
   rule_count: number
   success_count: number
   failure_count: number
@@ -35,6 +35,8 @@ export interface SyncJob {
   summary: SyncJobSummary | null
   /** 执行时规则快照; 旧库未补 rules_json 列的历史行可能缺失 */
   rules?: SyncJobRuleSnapshot[]
+  /** 入队时刻; 仅 queued/cancelled 行有意义 */
+  queued_at?: number | null
   started_at: number
   finished_at: number | null
 }
@@ -52,6 +54,7 @@ export interface SyncJobEvent {
 interface JobsListResponse {
   jobs: SyncJob[]
   current_job_id: string | null
+  queued_count?: number
   page: number
   limit: number
   total: number
@@ -73,6 +76,7 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
   const page: Ref<number> = ref(1)
   const pageSize: Ref<number> = ref(opts?.pageSize ?? 5)
   const total = ref(0)
+  const queuedCount = ref(0)
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
   const pollMs = opts?.pollInterval ?? 10_000
@@ -96,6 +100,7 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
       // 以服务端归一化后的页码为准 (空集合 / 越界会回落到有效页)
       page.value = d.page
       total.value = d.total
+      if (typeof d.queued_count === 'number') queuedCount.value = d.queued_count
       // 服务端把请求归一到第一页时, 恢复自动轮询
       if (page.value === 1) ensurePolling()
     } finally {
@@ -139,6 +144,11 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
     return fetchJobDetail(currentJobId.value, afterId, limit, true)
   }
 
+  /** 读取最新一条已结束任务 (Hero 用; finished=1 避免排队任务顶到第一条) */
+  function fetchLatestFinished() {
+    return get<JobsListResponse>('/api/sync/jobs?page=1&limit=1&finished=1', { silent: true })
+  }
+
   // ── Polling ──
   function ensurePolling() {
     if (pollTimer) return
@@ -168,12 +178,14 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
     page,
     pageSize,
     total,
+    queuedCount,
     fetchPage,
     fetchJobs,
     refresh,
     goToPage,
     fetchJobDetail,
     fetchCurrentJobDetail,
+    fetchLatestFinished,
     startPolling,
     stopPolling,
   }

@@ -18,10 +18,23 @@ export interface PrebuiltInfo {
 
 // ── Wizard Config (submitted to POST /api/setup/deploy) ─────
 
+/**
+ * 向导同步规则项 (wizard_sync_rules) —— 仅预设形态:
+ * template_id 为 tpl-*; method 仅上传输出预设覆盖 (移动/保留);
+ * entry_names 是创建时以当前语言固化的子规则名 (部署落库用)。
+ * (后端部署展开仍兼容 template_id === 'custom', 向导 UI 已不再提供)
+ */
 export interface WizardSyncRule {
   template_id: string
   remote: string
-  remote_path: string
+  method?: 'copy' | 'sync' | 'move'
+  entry_names?: string[]
+  name?: string
+  direction?: 'pull' | 'push'
+  trigger?: 'manual' | 'deploy' | 'watch'
+  remote_path?: string
+  local_path?: string
+  filters?: string[]
 }
 
 export interface WizardRemote {
@@ -29,6 +42,8 @@ export interface WizardRemote {
   type: string
   /** 凭据只存服务端 (/api/setup/wizard_remote), 前端镜像不含 params */
   params?: Record<string, unknown>
+  /** 与这份存储绑定的同步文件夹 (预设规则路径的锚点; 非敏感) */
+  root_dir?: string
   /** S3 存储桶 (参与规则路径首段; 后端安全投影, 非敏感) */
   bucket?: string
   drive_id?: string
@@ -81,13 +96,12 @@ export interface PluginInfo {
 }
 
 // ── Sync Templates (from backend SYNC_RULE_TEMPLATES) ───────
-// 与 sync 页共用同一份定义 —— 两处各写一份时 id / local_path 的可选性和
-// method 的取值集合已经漂移过 (wizard 侧漏了 'sync')。
-// 向导侧的模板都来自后端常量, 这几个字段必有值, 故在此收窄为必填。
+// 与 sync 页共用同一份定义 (types/sync.ts)。预设 = 一组子规则,
+// 向导侧的模板来自后端常量, entries 必有值, 在此收窄为必填。
 
 export type SyncTemplate = Required<
-  Pick<SyncTemplateBase, 'id' | 'name' | 'direction' | 'method' | 'trigger' | 'remote_path' | 'local_path'>
-> & Pick<SyncTemplateBase, 'watch_interval' | 'filters' | 'description'>
+  Pick<SyncTemplateBase, 'id' | 'name' | 'direction' | 'entries'>
+> & Pick<SyncTemplateBase, 'name_key' | 'desc_key'>
 
 // ── Remote Type Definitions (from backend REMOTE_TYPE_DEFS) ─
 

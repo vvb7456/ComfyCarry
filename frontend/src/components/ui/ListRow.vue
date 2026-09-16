@@ -32,7 +32,8 @@ export interface ListRowFact {
  * 规范（组件已经在代码里保证，调用方不用重复实现）：
  *   1. 图标列 26px、与标题首行光学对齐；没有图标时整列省略，不留空位
  *   2. 状态 = 圆点 + 静音文字 —— 颜色只给圆点；彩色状态词请改用徽章
- *   3. 副行事实等宽小字、自动 `·` 分隔；缺值不要传空串进来（不渲染 `-`）
+ *   3. 副行事实等宽小字、自动 `·` 分隔；缺值不要传空串进来（不渲染 `-`）；
+ *      富渲染 (行内图标/动画) 用 #facts slot 覆盖默认渲染
  *   4. 行尾动作统一为 BaseButton 的 `size="sm" icon-only variant="ghost"`
  *      （长方形约 42×32、触屏 44 高），尺寸来源已收敛到 BaseButton 的 iconOnly；
  *      行这里只负责排列与 4px 间距。纯图标按钮请始终带 `aria-label`
@@ -98,17 +99,19 @@ withDefaults(defineProps<{
         >{{ typeof badge === 'string' ? badge : badge.text }}</Badge>
       </div>
       <div v-if="description" class="list-row__desc">{{ description }}</div>
-      <div v-if="facts.length" class="list-row__facts">
-        <span v-for="fact in facts" :key="typeof fact === 'string' ? fact : fact.text">
-          <a
-            v-if="typeof fact !== 'string' && fact.href"
-            class="link"
-            :href="fact.href"
-            target="_blank"
-            rel="noopener"
-          >{{ fact.text }}<MsIcon name="open_in_new" /></a>
-          <template v-else>{{ typeof fact === 'string' ? fact : fact.text }}</template>
-        </span>
+      <div v-if="facts.length || $slots.facts" class="list-row__facts">
+        <slot name="facts">
+          <span v-for="fact in facts" :key="typeof fact === 'string' ? fact : fact.text">
+            <a
+              v-if="typeof fact !== 'string' && fact.href"
+              class="link"
+              :href="fact.href"
+              target="_blank"
+              rel="noopener"
+            >{{ fact.text }}<MsIcon name="open_in_new" /></a>
+            <template v-else>{{ typeof fact === 'string' ? fact : fact.text }}</template>
+          </span>
+        </slot>
       </div>
       <slot name="extra" />
     </div>

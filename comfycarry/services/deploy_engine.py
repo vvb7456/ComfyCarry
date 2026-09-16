@@ -21,9 +21,12 @@ DEPLOY_LOG_FILE = "/workspace/deploy.log"
 from ..config import (
     COMFYUI_DIR, CONFIG_FILE, DEFAULT_PLUGINS,
     SYNC_RULE_TEMPLATES,
+    SYNC_RULE_DIRECTIONS, SYNC_RULE_METHODS, SYNC_RULE_TRIGGERS,
+    REMOTE_ROOT_DIR_KEY, join_remote_path,
     _load_setup_state, _save_setup_state,
     _save_dashboard_password,
     _RCLONE_TOKEN_RE,
+    resolve_workspace_path, workspace_relative,
 )
 from .comfyui_params import DEFAULT_COMFYUI_ARGS
 from .sync_engine import (
@@ -672,6 +675,117 @@ def _step_plugins(config, PY):
         _deploy_log("comfycarry_ws_broadcast 源目录不存在, 跳过", "warn")
 
 
+def _expand_wizard_rules(config, wizard_sync_rules) -> list[dict]:
+    """把向导勾选展开为规则列表。
+
+    项两种形态:
+    - 预设:   {template_id: 'tpl-*', remote, method?(覆盖, 上传输出的移动/保留),
+               entry_names?(前端创建时固化的本地化规则名, 缺省用后端兜底名)}
+    - 自定义: {template_id: 'custom', remote, name, direction, method, trigger,
+               remote_path, local_path, filters?}
+
+    预设远程路径 = 该存储的同步文件夹 (root_dir) + 预设相对路径; S3 再前置
+    bucket 作为首段 (rclone s3 路径首段即 bucket)。
+    自定义规则保持原样 —— remote_path 原样使用, 不套同步文件夹。
+    """
+    tpl_map = {t["id"]: t for t in SYNC_RULE_TEMPLATES}
+    # remote → bucket / 同步文件夹前缀表 (wizard_remotes 的凭据在服务端)
+    bucket_map: dict[str, str] = {}
+    root_map: dict[str, str] = {}
+    for wr in config.get("wizard_remotes", []):
+        if not isinstance(wr, dict):
+            continue
+        wr_name = str(wr.get("name", ""))
+        root = str(wr.get("root_dir") or "").strip()
+        if root:
+            root_map[wr_name] = root
+        if wr.get("type") == "s3":
+            bucket = str((wr.get("params") or {}).get("bucket") or "").strip()
+            if bucket:
+                bucket_map[wr_name] = bucket
+
+    ts = int(time.time())
+    new_rules: list[dict] = []
+    for i, wr in enumerate(wizard_sync_rules):
+        if not isinstance(wr, dict):
+            continue
+        remote = str(wr.get("remote", "") or "")
+        if not _RCLONE_TOKEN_RE.match(remote):
+            _deploy_log(f"跳过非法 remote 名: {remote!r}", "warn")
+            continue
+        tpl_id = str(wr.get("template_id", "") or "")
+
+        if tpl_id == "custom":
+            rule = _custom_rule_from_wizard(wr, remote, i, ts)
+            if rule:
+                new_rules.append(rule)
+            continue
+
+        tpl = tpl_map.get(tpl_id)
+        if not tpl:
+            _deploy_log(f"跳过未知预设: {tpl_id!r}", "warn")
+            continue
+        entry_names = wr.get("entry_names")
+        entry_names = entry_names if isinstance(entry_names, list) else []
+        bucket = bucket_map.get(remote)
+        root_dir = root_map.get(remote)
+        if not root_dir:
+            _deploy_log(f"存储 {remote!r} 缺少同步文件夹, 预设路径将不含该层", "warn")
+        for j, entry in enumerate(tpl.get("entries", [])):
+            # bucket 是 S3 的存储根, 同步文件夹在其内, 预设相对路径再往后拼
+            remote_path = join_remote_path(bucket, root_dir, entry.get("remote_path"))
+            # 本地化名: 前端创建时固化; 缺位回退后端兜底名
+            ename = entry_names[j] if j < len(entry_names) and str(entry_names[j]).strip() else entry.get("name", "")
+            new_rules.append({
+                "id": f"wizard-{tpl_id}-{j}-{ts}",
+                "name": str(ename),
+                "remote": remote,
+                "remote_path": remote_path,
+                "local_path": str(entry.get("local_path", "")),
+                "direction": tpl.get("direction", "pull"),
+                "method": wr.get("method") or entry.get("method", "copy"),
+                "trigger": entry.get("trigger", "deploy"),
+                "enabled": True,
+                "filters": entry.get("filters", []),
+            })
+    return new_rules
+
+
+def _custom_rule_from_wizard(wr: dict, remote: str, idx: int, ts: int) -> dict | None:
+    """自定义向导规则 → 规则 (local_path 越界/枚举校验, 非法整条跳过并 warn)。"""
+    local_path = str(wr.get("local_path", "") or "")
+    target, err = resolve_workspace_path(local_path, allow_root=False) if local_path else (None, ("path_required", {}))
+    if err:
+        _deploy_log(f"跳过自定义规则 (本地路径非法 {local_path!r}: {err[0]})", "warn")
+        return None
+    name = str(wr.get("name", "") or "").strip()
+    remote_path = str(wr.get("remote_path", "") or "").strip()
+    if not remote_path:
+        _deploy_log(f"跳过自定义规则 {name!r} (远程路径为空)", "warn")
+        return None
+    direction = wr.get("direction", "pull")
+    method = wr.get("method", "copy")
+    trigger = wr.get("trigger", "manual")
+    if (direction not in SYNC_RULE_DIRECTIONS or method not in SYNC_RULE_METHODS
+            or trigger not in SYNC_RULE_TRIGGERS):
+        _deploy_log(f"跳过自定义规则 {name!r} (direction/method/trigger 取值非法)", "warn")
+        return None
+    filters = wr.get("filters", [])
+    filters = [str(f) for f in filters if isinstance(f, str)] if isinstance(filters, list) else []
+    return {
+        "id": f"wizard-custom-{idx}-{ts}",
+        "name": name or f"rule-{idx}",
+        "remote": remote,
+        "remote_path": remote_path,
+        "local_path": workspace_relative(target),
+        "direction": direction,
+        "method": method,
+        "trigger": trigger,
+        "enabled": True,
+        "filters": filters,
+    }
+
+
 def _step_sync_assets(config):
     """STEP 8: 执行 deploy 同步规则"""
     rclone_method = config.get("rclone_config_method", "skip")
@@ -689,50 +803,37 @@ def _step_sync_assets(config):
     for wr in wizard_remotes:
         wr_name = str(wr.get("name", ""))
         wr_type = str(wr.get("type", ""))
+        wr_root = str(wr.get("root_dir") or "").strip()
         wr_params = wr.get("params", {}) or {}
         if not (wr_name and wr_type):
             continue
         if not (_RCLONE_TOKEN_RE.match(wr_name) and _RCLONE_TOKEN_RE.match(wr_type)):
             _deploy_log(f"跳过非法 Remote 名/类型: {wr_name!r} {wr_type!r}", "warn")
             continue
+        if not wr_root:
+            _deploy_log(f"存储 {wr_name!r} 缺少同步文件夹", "warn")
         # --non-interactive 必须: OAuth 类型 (onedrive/drive) 即使带了 token,
         # 交互模式也会进 authorize 流程在 127.0.0.1:53682 起 webserver 等回调
         # (容器里浏览器打不开, 直接挂死到超时)。dashboard remote/create 同此参数。
         cmd = ["rclone", "config", "create", wr_name, wr_type, "--non-interactive"]
         for k, v in wr_params.items():
-            if not v:
+            if not v or k == REMOTE_ROOT_DIR_KEY:
                 continue
             # key 会作为独立 argv 元素, 但 "--flag=x" 形态会被 rclone 当选项解析
             if not _RCLONE_TOKEN_RE.match(str(k)):
                 _deploy_log(f"跳过非法参数名: {k!r}", "warn")
                 continue
             cmd.append(f"{k}={v}")
+        # 同步文件夹随 conf 一起落盘 (rclone 保存未知键, 运行时不报错)
+        if wr_root:
+            cmd.append(f"{REMOTE_ROOT_DIR_KEY}={wr_root}")
         _deploy_exec(cmd, label=f"创建 Remote: {wr_name}")
 
     rules = _load_sync_rules()
     if not rules and not config.get("_imported_sync_rules"):
         wizard_sync_rules = config.get("wizard_sync_rules", [])
         if wizard_sync_rules:
-            tpl_map = {t["id"]: t for t in SYNC_RULE_TEMPLATES}
-            new_rules = []
-            for wr in wizard_sync_rules:
-                tpl_id = wr.get("template_id", "")
-                tpl = tpl_map.get(tpl_id)
-                if not tpl:
-                    continue
-                rule = {
-                    "id": f"wizard-{tpl_id}-{int(time.time())}",
-                    "name": tpl.get("name", ""),
-                    "remote": wr.get("remote", ""),
-                    "remote_path": wr.get("remote_path") or tpl.get("remote_path", ""),
-                    "local_path": tpl.get("local_path", ""),
-                    "direction": tpl.get("direction", "pull"),
-                    "method": tpl.get("method", "copy"),
-                    "trigger": tpl.get("trigger", "deploy"),
-                    "enabled": True,
-                    "filters": tpl.get("filters", []),
-                }
-                new_rules.append(rule)
+            new_rules = _expand_wizard_rules(config, wizard_sync_rules)
             if new_rules:
                 _save_sync_rules(new_rules)
                 _deploy_log(f"根据向导配置创建了 {len(new_rules)} 条同步规则")

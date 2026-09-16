@@ -42,17 +42,23 @@
     "empty": "No sync rules yet"
   },
   "records": {
-    "title": "Recent Syncs",
-    "empty": "No sync history yet",
+    "title": "Task Records",
+    "empty": "No tasks yet",
     "rules_count": "{count} rules",
     "progress": "{done}/{total} done",
     "detail": "View details",
-    "files_synced": "Synced {count} files"
+    "files_synced": "Synced {count} files",
+    "waiting": "Waiting",
+    "cancel": "Cancel task",
+    "interrupt": "Interrupt task",
+    "cancelled": "Task cancelled",
+    "interrupted": "Task interrupted"
   },
   "detail": {
     "title": "Sync Record",
     "rules": "Rules",
     "trigger": "Trigger",
+    "queued_at": "Queued at",
     "started": "Started",
     "finished": "Finished",
     "duration": "Duration",
@@ -88,13 +94,14 @@
   },
   "oauth": {
     "connect_provider": "Connect {provider}",
-    "sign_in_browser": "Sign in via browser",
     "start_with_provider": "Sign in with {provider}",
     "start_drive": "Sign in with Google",
     "start_onedrive": "Sign in with your Microsoft account",
     "start_dropbox": "Sign in with Dropbox",
-    "page_opened": "Authorization page opened in browser",
     "reopen": "Reopen",
+    "redirecting": "Redirecting to {provider}…",
+    "sign_in_at": "Sign in to {provider} in your browser",
+    "open_now": "Open now",
     "reconnect": "Switch Account",
     "done_status": "Authorized",
     "drive_advanced": "Advanced",
@@ -125,19 +132,59 @@
       "move": "Move"
     }
   },
+  "preset": {
+    "pull_models": {
+      "name": "Download Models",
+      "desc": "Download the whole ```ComfyUI/models``` directory from the remote storage"
+    },
+    "pull_misc": {
+      "name": "Download Workflows & Assets",
+      "desc": "Download ```ComfyUI/user/default/workflows```, ```ComfyUI/wildcards``` and ```ComfyUI/input``` from the remote storage"
+    },
+    "push_models": {
+      "name": "Back Up Models",
+      "desc": "Copy the whole ```ComfyUI/models``` directory to the remote storage"
+    },
+    "push_output": {
+      "name": "Upload Output (Move)",
+      "desc": "Watch ```ComfyUI/output``` and move generated artifacts to the remote storage, deleting them from the instance"
+    },
+    "push_output_copy": {
+      "name": "Upload Output (Copy)",
+      "desc": "Watch ```ComfyUI/output``` and copy generated artifacts to the remote storage"
+    },
+    "push_misc": {
+      "name": "Back Up Workflows & Assets",
+      "desc": "Copy ```ComfyUI/user/default/workflows```, ```ComfyUI/wildcards``` and ```ComfyUI/input``` to the remote storage"
+    },
+    "entry": {
+      "models": "Download Models",
+      "workflows": "Download workflows",
+      "wildcards": "Download Wildcards",
+      "input": "Download input",
+      "push_models": "Back Up Models",
+      "push_workflows": "Back Up workflows",
+      "push_wildcards": "Back Up Wildcards",
+      "push_input": "Back Up input",
+      "push_output": "Upload output"
+    }
+  },
   "rule": {
     "add": "Add Rule",
-    "run": "Run",
+    "run": "Add to Queue",
     "edit": "Edit",
     "disable": "Disable",
     "enable": "Enable",
     "delete": "Delete Rule",
     "edit_modal": "Edit Sync Rule",
     "add_modal": "Add Sync Rule",
-    "quick_template": "Quick Template",
-    "template_placeholder": "Pick a template…",
-    "template_custom": "Custom",
-    "template_search": "Search templates",
+    "remote_select_title": "Choose Storage",
+    "choose_rule": "Choose Rule",
+    "select_storage_ph": "Choose a storage",
+    "custom_title": "Custom Rule",
+    "custom_add": "Custom Rule",
+    "custom_desc": "Customize local path, remote path, direction and trigger",
+    "confirm_title": "Confirm Rule",
     "name": "Rule Name",
     "direction": "Direction",
     "pull": "Download",
@@ -153,12 +200,13 @@
     "trigger_watch": "Continuous watch",
     "filters": "Filters",
     "filters_placeholder": "One rclone filter per line",
-    "fill_required": "Please fill in name, remote and local path",
+    "fill_required": "Please fill in name, remote, remote path and local path",
     "saved": "Saved",
     "save_failed": "Save failed",
+    "save_run": "Save & Queue",
     "deleted": "Deleted",
     "running": "Running",
-    "run_ok": "Rule started. Check logs for progress",
+    "run_ok": "Added to queue",
     "run_failed": "Run failed"
   },
   "worker": {
@@ -171,20 +219,18 @@
     "title": "Sync Logs",
     "worker_started": "Sync Worker started",
     "worker_stopped": "Sync Worker stopped",
-    "worker_stale": "Old Worker still running, waiting to terminate...",
-    "worker_stale_failed": "Old Worker cannot stop, skipping start",
     "rule_start_pull": "Pull {name}: {src} → {dst} ({method})",
     "rule_start_push": "Push {name}: {src} → {dst} ({method})",
     "rclone_output": "  {text}",
     "file_transferred": "  → {name}",
-    "rule_summary": "  {name}: {files} files, {bytes} bytes {'@'} {speed} B/s",
     "rule_done": "{name} done",
     "rule_failed": "{name} failed (code={code})",
     "rule_timeout": "{name} timeout ({seconds}s)",
     "rule_error": "{name} error: {error}",
     "rule_path_invalid": "{name}: local path is out of bounds or invalid ({path})",
     "rclone_killed": "rclone process was killed",
-    "worker_error": "Sync worker error: {error}"
+    "worker_error": "Sync worker error: {error}",
+    "executor_error": "Executor error: {error}"
   },
   "browse": {
     "remote_title": "Browse Remote Directory",
@@ -220,22 +266,22 @@
     "status_error": "Error",
     "just_now": "now",
     "never_seen": "never",
-    "download_client": "Download Windows Client",
-    "no_rules": "No rules"
+    "download_client": "Download Windows Client"
   },
   "job": {
     "trigger": {
       "manual": "Manual",
       "watch": "Watch",
-      "deploy": "Deploy",
-      "companion": "Client"
+      "deploy": "Deploy"
     },
     "status": {
+      "queued": "Queued",
       "running": "Running",
       "success": "Completed",
       "failed": "Failed",
       "partial": "Partial",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "interrupted": "Interrupted"
     }
   },
   "msg": {
@@ -243,6 +289,9 @@
     "remote_deleted": "Remote storage “{name}” deleted",
     "rules_saved": "Saved {count} rule(s)",
     "run_started": "Running {count} rule(s)",
+    "run_queued": "Added to queue ({count} rules)",
+    "job_cancelled": "Task cancelled",
+    "job_interrupted": "Task interrupted",
     "worker_started": "Sync service started",
     "worker_stopped": "Sync service stopped",
     "worker_restart": "Sync service restarted"
@@ -252,6 +301,8 @@
     "browse_rclone_failed": "Listing failed: {detail}",
     "browse_rclone_failed_plain": "Listing failed",
     "browse_timeout": "Listing timed out (30s)",
+    "bucket_required": "Select a bucket for this storage first",
+    "remote_root_required": "A sync folder is required and cannot be the storage root",
     "mkdir_path_required": "Directory name is required",
     "mkdir_rclone_failed": "Failed to create directory: {detail}",
     "mkdir_rclone_failed_plain": "Failed to create directory",
@@ -268,6 +319,8 @@
     "dir_missing": "Directory does not exist: {path}",
     "job_not_found": "Job not found",
     "job_running": "A sync job is already running, try again later",
+    "job_not_queued": "Job is not queued",
+    "job_not_running": "Job is not running",
     "name_type_required": "Name and type are required",
     "param_name_invalid": "Invalid parameter name: {key}",
     "path_is_root": "Cannot operate on the {root} root itself",
@@ -284,6 +337,7 @@
     "rule_method_invalid": "Rule {label}: invalid method ({value})",
     "rule_missing_fields": "Every rule needs an ID, a remote storage and a local path",
     "rule_remote_invalid": "Rule {label}: invalid remote storage name",
+    "rule_remote_path_required": "Rule {label}: remote path is required",
     "rule_trigger_invalid": "Rule {label}: invalid trigger ({value})",
     "rules_none_matched": "No matching rule found",
     "rules_not_array": "Malformed rule data",
@@ -298,8 +352,7 @@
     "invalid_callback": "Invalid callback URL",
     "oauth_paste_not_ready": "Authorization is not ready; get the authorization link first",
     "oauth_callback_rejected": "Authorization callback rejected: {detail}",
-    "oauth_relay_unreachable": "Cannot reach the authorization service: {detail}",
-    "worker_restart_failed": "Failed to restart auto sync"
+    "oauth_relay_unreachable": "Cannot reach the authorization service: {detail}"
   },
   "providers": {
     "drive_desc": "Sign in with Google",
@@ -313,6 +366,14 @@
     "drive_label": "Google Drive",
     "onedrive_label": "Drive",
     "bucket_label": "Bucket",
+    "bucket_placeholder": "Select a bucket",
+    "bucket_failed": "Failed to fetch buckets",
+    "confirm_title": "Confirm storage",
+    "root_label": "Sync folder",
+    "root_placeholder": "Select a folder",
+    "root_browse": "Browse",
+    "edit_creds": "Edit connection info",
+    "folder_new_placeholder": "Folder name",
     "browse": "Browse"
   },
   "confirm": {
@@ -330,6 +391,16 @@
       "title": "Delete Sync Rule",
       "message": "Rule \"{name}\" will be deleted."
     },
+    "start_no_watch": {
+      "title": "Start Auto Sync",
+      "message": "No watch rules configured; auto sync will not transfer anything once started.",
+      "button": "Add Rule"
+    },
+    "start_disabled_watch": {
+      "title": "Start Auto Sync",
+      "message": "{count} watch rule(s) are disabled. They will be re-enabled to resume auto sync.",
+      "button": "Enable & Start"
+    },
     "overwrite": {
       "title": "Overwrite Storage Credentials",
       "message": "\"{name}\" already exists with the same type. The existing credentials will be replaced.",
@@ -346,7 +417,8 @@
   },
   "flow": {
     "next": "Next",
-    "create_rules": "Create sync rules"
+    "connect": "Connect",
+    "save_create": "Save & Create Storage"
   },
   "steps": {
     "connect": "Connect"
@@ -370,6 +442,7 @@
     "worker_stopped": "Stopped",
     "rules": "Rules",
     "storages": "Storage",
+    "queued": "Queue",
     "watch_interval": "Interval"
   }
 }

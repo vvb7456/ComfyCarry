@@ -27,14 +27,16 @@ from flask import Blueprint, jsonify, request, Response
 
 from ..config import (
     SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
+    SYNC_RULE_DIRECTIONS, SYNC_RULE_METHODS, SYNC_RULE_TRIGGERS,
+    REMOTE_ROOT_DIR_KEY, normalize_remote_root_dir,
     resolve_workspace_path, workspace_relative,
     _RCLONE_TOKEN_RE,
 )
 from ..services.sync_engine import (
     _load_sync_rules, _save_sync_rules, _parse_rclone_conf,
     _load_sync_settings, _save_sync_settings,
-    _run_sync_rule, get_sync_log_buffer, run_rules_as_job,
-    get_current_job_id,
+    get_sync_log_buffer,
+    get_current_job_id, enqueue_job, interrupt_active_job,
     is_worker_running, start_sync_worker, stop_sync_worker,
 )
 
@@ -93,6 +95,26 @@ def _ok(key: str, /, **extra):
 #   - oauth:  服务端 authorize 会话 (token 永不经前端回传)
 #   - wizard: setup state 的 wizard_remotes 计划 (凭据在服务端)
 # ====================================================================
+def _obscure(value: str) -> str | None:
+    """明文密码 → rclone obscure 密文。失败返回 None (调用方回退明文)。"""
+    try:
+        r = subprocess.run(["rclone", "obscure", value],
+                           capture_output=True, text=True, timeout=10)
+        out = (r.stdout or "").strip()
+        if r.returncode == 0 and out:
+            return out
+    except Exception:
+        pass
+    return None
+
+
+# 环境变量注入的密码字段必须是 obscure 密文 (rclone 会对 *_PASS 形态的配置
+# 键先解密再用, 明文太短解不开直接报 "input too short - is it obscured?")。
+# 命令行 config create 不受影响 —— rclone 自动 obscure。OAuth token / s3
+# secret_access_key 等非 obscured 字段明文直传, 不在此列。
+_OBSCURED_PARAM_KEYS = {"pass", "key_file_pass", "key_file_pass_pbe"}
+
+
 def _staged_env(remote, rtype, params):
     """staged 凭据 → RCLONE_CONFIG_<REMOTE>_<KEY> 环境变量 (rclone 官方机制,
     remote 名与 key 大写、配置 key 的 - 转 _; conf 文件完全不需要存在)。
@@ -104,7 +126,10 @@ def _staged_env(remote, rtype, params):
     env = {f"{prefix}TYPE": rtype}
     for k, v in (params or {}).items():
         if v and _RCLONE_TOKEN_RE.match(str(k)):
-            env[f"{prefix}{str(k).upper().replace('-', '_')}"] = str(v)
+            val = str(v)
+            if str(k).lower() in _OBSCURED_PARAM_KEYS:
+                val = _obscure(val) or val
+            env[f"{prefix}{str(k).upper().replace('-', '_')}"] = val
     return env
 
 
@@ -125,6 +150,10 @@ def _resolve_staged_creds(remote, data):
                 return r.get("type", ""), dict(r.get("params") or {}), None
         return None, None, _soft_err("browse_no_remote")
     if staged.get("oauth"):
+        # token 从 authorize 会话取 (前端只有 URL/状态)。请求体里随 staged
+        # 传来的非敏感参数 (drive_id / team_drive 等) 需要合并进来, 否则
+        # 浏览的是默认主盘而不是用户在 done 屏选中的驱动器。token 本身不
+        # 允许被前端覆盖。
         with _oauth_lock:
             sess = _oauth_session
             if sess.get("phase") != "done" or not sess.get("token"):
@@ -134,7 +163,13 @@ def _resolve_staged_creds(remote, data):
                 params["client_id"] = sess["client_id"]
             if sess.get("client_secret"):
                 params["client_secret"] = sess["client_secret"]
-            return sess.get("remote_type", ""), params, None
+            rtype = sess.get("remote_type", "")
+        for k, v in (staged.get("params") or {}).items():
+            k = str(k)
+            if k == "token" or not v or not _RCLONE_TOKEN_RE.match(k):
+                continue
+            params[k] = str(v)
+        return rtype, params, None
     if staged.get("params"):
         return staged.get("type", ""), dict(staged["params"]), None
     return None, None, None  # 非 staged 调用, 走主 conf 中已有的 remote
@@ -166,6 +201,8 @@ def api_sync_status():
     except Exception:
         pass
 
+    from ..services import sync_store as store
+
     log_lines = get_sync_log_buffer()
     rules = _load_sync_rules()
     settings = _load_sync_settings()
@@ -177,6 +214,7 @@ def api_sync_status():
         "templates": SYNC_RULE_TEMPLATES,
         "settings": settings,
         "current_job_id": get_current_job_id(),
+        "queued_count": store.count_queued_jobs(),
     })
 
 
@@ -608,7 +646,9 @@ def api_sync_oauth_drives():
 # rclone.conf 里可以下发给前端的配置项白名单。其余一律不出后端 ——
 # pass / password / key_file / user 这些在 params 里对 UI 毫无用处,
 # 只会让密码 (rclone obscure 可逆) 和密钥路径随 API 响应外流。
-_REMOTE_PUBLIC_PARAMS = ("provider", "vendor", "endpoint", "url", "host", "port", "region", "acl")
+# bucket 特例: s3 的 bucket 名非敏感, 且前端要拿它拼规则路径首段
+# (rclone s3 路径首段即 bucket)。
+_REMOTE_PUBLIC_PARAMS = ("provider", "vendor", "endpoint", "url", "host", "port", "region", "acl", "bucket")
 
 
 @bp.route("/api/sync/remotes")
@@ -622,6 +662,7 @@ def api_sync_remotes():
             "name": r["name"],
             "type": t,
             "display_name": type_def.get("label", t),
+            "root_dir": r.get("root_dir", ""),
             "has_auth": bool(r.get("_has_token") or r.get("_has_keys")
                              or r.get("_has_pass")),
             "params": {k: v for k, v in params.items()
@@ -665,6 +706,11 @@ def api_sync_remote_create():
     if not _RCLONE_TOKEN_RE.match(rtype):
         return _err("remote_type_invalid")
 
+    # 同步文件夹 (预设规则路径的锚点) 必填, 且不能是存储根
+    root_dir, root_err = normalize_remote_root_dir(data.get("root_dir"))
+    if root_err:
+        return _err(root_err)
+
     existing = [r["name"] for r in _parse_rclone_conf()]
     if name in existing and not overwrite:
         return _err("remote_exists", 409, name=name)
@@ -685,7 +731,11 @@ def api_sync_remote_create():
         # key 作为独立 argv 元素仍可能是 "--config=x" 这种选项形态
         if not _RCLONE_TOKEN_RE.match(str(k)):
             return _err("param_name_invalid", 400, key=k)
+        if k == REMOTE_ROOT_DIR_KEY:
+            continue
         cmd.append(f"{k}={v}")
+    # 同步文件夹随 conf 一起落盘 (rclone 保存未知键, 运行时不报错)
+    cmd.append(f"{REMOTE_ROOT_DIR_KEY}={root_dir}")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
         if r.returncode != 0:
@@ -749,7 +799,8 @@ def api_sync_remote_delete():
         watch_rules = [r for r in remaining
                        if r.get("trigger") == "watch" and r.get("enabled", True)]
         if not watch_rules:
-            stop_sync_worker()
+            # 自动停: 只回收 watch 调度, 不清用户手动排队的任务
+            stop_sync_worker(cancel_pending=False)
 
     return _ok("remote_deleted",
                params={"name": name},
@@ -936,11 +987,6 @@ def api_sync_storage():
 # ====================================================================
 # 同步规则
 # ====================================================================
-_RULE_DIRECTIONS = ("pull", "push")
-_RULE_METHODS = ("copy", "sync", "move")
-_RULE_TRIGGERS = ("manual", "deploy", "watch")
-
-
 def _normalize_rule(r: dict) -> tuple[dict | None, tuple[str, dict] | None]:
     """校验并规范化一条规则。返回 (规则, None) 或 (None, (i18n key, params))。
 
@@ -953,6 +999,11 @@ def _normalize_rule(r: dict) -> tuple[dict | None, tuple[str, dict] | None]:
     label = r.get("name") or r.get("id") or "?"
     if not r.get("id") or not r.get("remote") or not r.get("local_path"):
         return None, ("rule_missing_fields", {})
+
+    # 远程路径必须非空 —— 空路径在 rclone 里是 remote 根 (S3 即 bucket 列表),
+    # 拿它做 pull/push 会指向整个远端根, 不是用户填漏时的安全默认值
+    if not str(r.get("remote_path") or "").strip():
+        return None, ("rule_remote_path_required", {"label": label})
 
     # local_path 必须是 workspace 根相对路径, 且不得越界 ——
     # sync / move 会删目标端多余文件, 指到 workspace 外风险过大
@@ -968,13 +1019,13 @@ def _normalize_rule(r: dict) -> tuple[dict | None, tuple[str, dict] | None]:
     # 每个字段各自一个 key —— 字段名要出现在用户可见文案里, 用后端英文
     # 字段名当插值参数就会在 UI 上冒出 "direction" 这种行话
     direction = r.get("direction", "pull")
-    if direction not in _RULE_DIRECTIONS:
+    if direction not in SYNC_RULE_DIRECTIONS:
         return None, ("rule_direction_invalid", {"label": label, "value": direction})
     method = r.get("method", "copy")
-    if method not in _RULE_METHODS:
+    if method not in SYNC_RULE_METHODS:
         return None, ("rule_method_invalid", {"label": label, "value": method})
     trigger = r.get("trigger", "manual")
-    if trigger not in _RULE_TRIGGERS:
+    if trigger not in SYNC_RULE_TRIGGERS:
         return None, ("rule_trigger_invalid", {"label": label, "value": trigger})
     r["direction"], r["method"], r["trigger"] = direction, method, trigger
 
@@ -1012,7 +1063,8 @@ def api_sync_rules_save():
     if watch_rules and not is_worker_running():
         start_sync_worker()
     elif not watch_rules:
-        stop_sync_worker()
+        # 自动停: 只回收 watch 调度, 不清用户手动排队的任务
+        stop_sync_worker(cancel_pending=False)
 
     return _ok("rules_saved", params={"count": len(rules)}, rules=rules)
 
@@ -1034,19 +1086,17 @@ def api_sync_rules_run():
     if not targets:
         return _err("rules_none_matched", 404)
 
-    # 已有 job 在跑就不再起新的 —— 单条 rclone 执行本就被 _sync_exec_lock
-    # 串行化, 再堆线程只会让它们排队等锁, 前端也无法表达"两个 job 同时跑"
-    running = get_current_job_id()
-    if running:
-        # job_id 一并回传 —— 前端据此跳到正在跑的那个 job 详情
-        return _err("job_running", 409, _extra={"job_id": running})
+    from ..services import sync_store as store
 
-    def _run_targets():
-        run_rules_as_job(targets, trigger_type=trigger_type,
-                         trigger_ref=rule_id or "")
-
-    threading.Thread(target=_run_targets, daemon=True).start()
-    return _ok("run_started", params={"count": len(targets)})
+    # 一条规则 = 一个任务, 逐条入队, 由常驻执行员顺序执行。
+    # 不再因「忙」返回 409: 忙就排队。
+    job_ids = [
+        enqueue_job([r], trigger_type,
+                    rule_id or r.get("id", ""))
+        for r in targets
+    ]
+    return _ok("run_queued", params={"count": len(targets)},
+               job_id=job_ids[0], queued_count=store.count_queued_jobs())
 
 
 # ====================================================================
@@ -1066,9 +1116,8 @@ def api_sync_worker_stop_route():
 
 @bp.route("/api/sync/worker/restart", methods=["POST"])
 def api_sync_worker_restart_route():
-    """重启 worker: start_sync_worker 内部先停旧线程 (并终止在跑的 rclone)。"""
-    if not start_sync_worker():
-        return _err("worker_restart_failed", 500)
+    """重启 worker: 内部先回收旧调度线程再起新线程, 不打断在跑的任务与队列。"""
+    start_sync_worker()
     return _ok("worker_restart")
 
 
@@ -1113,7 +1162,10 @@ def api_sync_jobs():
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 5, type=int)
     limit = min(max(limit, 1), 200)
-    jobs, total, page = store.get_jobs_page(page=page, limit=limit)
+    # finished=1 只取已结束的行 (Hero 取「上一条已完成任务」)
+    finished = request.args.get("finished") == "1"
+    jobs, total, page = store.get_jobs_page(page=page, limit=limit,
+                                            finished=finished)
     current = get_current_job_id()
     return jsonify({
         "jobs": jobs,
@@ -1121,7 +1173,37 @@ def api_sync_jobs():
         "page": page,
         "limit": limit,
         "total": total,
+        "queued_count": store.count_queued_jobs(),
     })
+
+
+@bp.route("/api/sync/jobs/<job_id>/cancel", methods=["POST"])
+def api_sync_job_cancel(job_id: str):
+    """取消排队中的任务 (已在执行或已结束返回 409)。"""
+    from ..services import sync_store as store
+
+    job = store.get_job(job_id)
+    if not job:
+        return _err("job_not_found", 404)
+    if job.get("status") != "queued":
+        return _err("job_not_queued", 409)
+    # 条件 UPDATE 未命中说明竞态中已开跑/已取消, 同样按"不在队列"处理
+    if not store.cancel_queued_job(job_id):
+        return _err("job_not_queued", 409)
+    return _ok("job_cancelled")
+
+
+@bp.route("/api/sync/jobs/<job_id>/interrupt", methods=["POST"])
+def api_sync_job_interrupt(job_id: str):
+    """中断正在执行的任务: 只中断当前任务, 不影响队列与 watch 调度。"""
+    from ..services import sync_store as store
+
+    job = store.get_job(job_id)
+    if not job:
+        return _err("job_not_found", 404)
+    if job.get("status") != "running" or not interrupt_active_job(job_id):
+        return _err("job_not_running", 409)
+    return _ok("job_interrupted")
 
 
 @bp.route("/api/sync/jobs/<job_id>", methods=["GET"])

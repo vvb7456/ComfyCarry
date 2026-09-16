@@ -97,20 +97,10 @@
   },
   "step4": {
     "title": "Sync Rules",
-    "desc": "Choose what to sync and where to store it",
-    "remote_label": "Remote",
-    "remote_path_label": "Remote Path",
-    "pull_title": "Deploy Pull",
-    "pull_help": "Download from cloud to local ComfyUI during deployment. Cloud files are never deleted. Good for models, LoRAs, workflows and other reusable assets.",
-    "push_title": "Auto Push",
-    "push_help": "Watch local directories at runtime and auto-upload new/modified files to cloud. Good for generated images and other content that needs backup.",
-    "selected_n": "{n} selected",
-    "method_move": "Move",
-    "method_keep": "Keep local",
-    "trigger_deploy": "On deploy",
-    "trigger_watch": "Watch",
-    "trigger_manual": "Manual",
-    "remote_path_placeholder": "/ComfyUI/..."
+    "desc": "Choose what to sync; the first sync runs automatically on deploy",
+    "rules_title": "Pick Rules",
+    "rules_help": "Select a preset to enable it as a whole — remote directories are planned automatically. Manual backups and other rules (including custom ones) can be added in the Sync page after deployment.",
+    "selected_n": "{n} selected"
   },
   "step5": {
     "title": "CivitAI API Key",
@@ -278,7 +268,8 @@
       "remote_type_invalid": "Invalid remote storage type",
       "wizard_remote_exists": "Storage \"{name}\" already exists",
       "wizard_remote_source_missing": "The original storage connection is no longer available. Please configure it again.",
-      "oauth_not_ready": "Authorization session is not ready or has expired; please log in and authorize again"
+      "oauth_not_ready": "Authorization session is not ready or has expired; please log in and authorize again",
+      "remote_root_required": "A sync folder is required and cannot be the storage root"
     }
   }
 }

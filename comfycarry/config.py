@@ -411,21 +411,136 @@ RCLONE_CONF = Path(os.path.expanduser("~/.config/rclone/rclone.conf"))
 SYNC_RULES_FILE = WORKSPACE_ROOT / ".sync_rules.json"
 SYNC_SETTINGS_FILE = WORKSPACE_ROOT / ".sync_settings.json"
 
+# 同步规则字段的合法取值 —— routes/sync 的规则保存校验与
+# deploy_engine 的向导规则展开共用, 避免两处各存一份逐渐漂移。
+SYNC_RULE_DIRECTIONS = ("pull", "push")
+SYNC_RULE_METHODS = ("copy", "sync", "move")
+SYNC_RULE_TRIGGERS = ("manual", "deploy", "watch")
 
-# ── 同步规则模板 ─────────────────────────────────────────────
+# 与远程存储绑定的同步文件夹 —— 存进 rclone.conf 的保留配置键。
+# rclone 会原样保存未知键且运行时忽略 (与 s3 的 bucket 参数同样做法),
+# 因此不必为它新增 DB 表/元数据文件, remote 删除/改名自然跟随 conf。
+# 对外一律以顶层 `root_dir` 暴露, 不混进凭据参数 params。
+REMOTE_ROOT_DIR_KEY = "cc_root_dir"
+
+
+def normalize_remote_root_dir(raw) -> tuple[str | None, str | None]:
+    """校验 remote 的同步文件夹。返回 (值, None) 或 (None, i18n key)。
+
+    同步文件夹是预设规则路径的锚点 (预设相对路径会拼在它之后), 因此必须
+    非空, 且不能是存储根 (空/`.`/`/`); 含 `..` 段也拒绝, 免得锚点被越出。
+    """
+    value = str(raw or "").strip()
+    segments = [seg for seg in value.split("/") if seg not in ("", ".")]
+    if not segments or any(seg == ".." for seg in segments):
+        return None, "remote_root_required"
+    return value, None
+
+
+def join_remote_path(*parts) -> str:
+    """把非空的路径段用 `/` 拼接 (用于 bucket + root_dir + 预设相对路径)。
+
+    仅去掉各段首尾斜杠; 首段若以 `/` 开头则保留前导斜杠, 以免把 sftp 的
+    绝对路径误改成 home 相对路径。
+    """
+    clean = [str(p).strip() for p in parts if str(p or "").strip()]
+    if not clean:
+        return ""
+    joined = "/".join(seg.strip("/") for seg in clean)
+    return "/" + joined if clean[0].startswith("/") else joined
+
+
+
+# ── 同步规则预设 ─────────────────────────────────────────────
+# 预设 = 一组规则 (entries): direction 在预设级, 其余字段在 entry 级。
+# 文案: name_key / desc_key 由前端翻译 (卡片与规则名); name 是后端兜底,
+# 规则名在创建时由前端以当前语言固化落库 (规则名是用户可编辑字段,
+# 不能存 i18n key)。
+# 预设的 remote_path 是「同步文件夹之后」的相对路径 (models/workflows/...)。
+# 展开时前置这份存储的同步文件夹 (root_dir), S3 再前置 bucket 作为首段
+# (rclone s3 路径首段即 bucket)。同步文件夹没有固定默认值, 由用户在连接
+# 存储时选择。
 SYNC_RULE_TEMPLATES = [
-    {"id": "tpl-pull-workflows",  "name": "下载工作流",        "direction": "pull", "remote_path": "ComfyCarry/workflow",    "local_path": f"{COMFYUI_REL}/user/default/workflows", "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-loras",      "name": "下载 LoRA",         "direction": "pull", "remote_path": "ComfyCarry/loras",       "local_path": f"{COMFYUI_REL}/models/loras",           "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-checkpoints","name": "下载 Checkpoints",  "direction": "pull", "remote_path": "ComfyCarry/checkpoints", "local_path": f"{COMFYUI_REL}/models/checkpoints",     "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-controlnet", "name": "下载 ControlNet",   "direction": "pull", "remote_path": "ComfyCarry/controlnet",  "local_path": f"{COMFYUI_REL}/models/controlnet",      "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-embeddings", "name": "下载 Embeddings",   "direction": "pull", "remote_path": "ComfyCarry/embeddings",  "local_path": f"{COMFYUI_REL}/models/embeddings",      "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-vae",        "name": "下载 VAE",          "direction": "pull", "remote_path": "ComfyCarry/vae",         "local_path": f"{COMFYUI_REL}/models/vae",             "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-upscale",    "name": "下载 Upscale",      "direction": "pull", "remote_path": "ComfyCarry/upscale",     "local_path": f"{COMFYUI_REL}/models/upscale_models",  "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-pull-wildcards",  "name": "下载 Wildcards",    "direction": "pull", "remote_path": "ComfyCarry/wildcards",   "local_path": f"{COMFYUI_REL}/wildcards",              "method": "copy", "trigger": "deploy"},
-    {"id": "tpl-pull-input",      "name": "下载 Input 素材",   "direction": "pull", "remote_path": "ComfyCarry/input",       "local_path": f"{COMFYUI_REL}/input",                  "method": "copy",  "trigger": "deploy"},
-    {"id": "tpl-push-output",     "name": "上传输出 (移动)",    "direction": "push", "remote_path": "ComfyCarry/output",          "local_path": f"{COMFYUI_REL}/output",                 "method": "move",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
-    {"id": "tpl-push-output-copy","name": "上传输出 (保留本地)","direction": "push", "remote_path": "ComfyCarry/output",          "local_path": f"{COMFYUI_REL}/output",                 "method": "copy",  "trigger": "watch", "watch_interval": 15, "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
-    {"id": "tpl-push-workflows",  "name": "备份工作流",        "direction": "push", "remote_path": "ComfyCarry/workflow",     "local_path": f"{COMFYUI_REL}/user/default/workflows", "method": "copy",  "trigger": "manual"},
+    {
+        "id": "tpl-pull-models",
+        "name": "下载模型", "name_key": "sync.preset.pull_models.name",
+        "desc_key": "sync.preset.pull_models.desc",
+        "direction": "pull",
+        "entries": [
+            {"name": "模型", "name_key": "sync.preset.entry.models",
+             "local_path": f"{COMFYUI_REL}/models", "remote_path": "models",
+             "method": "copy", "trigger": "deploy"},
+        ],
+    },
+    {
+        "id": "tpl-pull-misc",
+        "name": "下载工作流与素材", "name_key": "sync.preset.pull_misc.name",
+        "desc_key": "sync.preset.pull_misc.desc",
+        "direction": "pull",
+        "entries": [
+            {"name": "工作流", "name_key": "sync.preset.entry.workflows",
+             "local_path": f"{COMFYUI_REL}/user/default/workflows", "remote_path": "workflows",
+             "method": "copy", "trigger": "deploy"},
+            {"name": "Wildcards", "name_key": "sync.preset.entry.wildcards",
+             "local_path": f"{COMFYUI_REL}/wildcards", "remote_path": "wildcards",
+             "method": "copy", "trigger": "deploy"},
+            {"name": "Input 素材", "name_key": "sync.preset.entry.input",
+             "local_path": f"{COMFYUI_REL}/input", "remote_path": "input",
+             "method": "copy", "trigger": "deploy"},
+        ],
+    },
+    {
+        "id": "tpl-push-models",
+        "name": "备份模型", "name_key": "sync.preset.push_models.name",
+        "desc_key": "sync.preset.push_models.desc",
+        "direction": "push",
+        "entries": [
+            {"name": "模型", "name_key": "sync.preset.entry.push_models",
+             "local_path": f"{COMFYUI_REL}/models", "remote_path": "models",
+             "method": "copy", "trigger": "manual"},
+        ],
+    },
+    {
+        "id": "tpl-push-misc",
+        "name": "备份工作流与素材", "name_key": "sync.preset.push_misc.name",
+        "desc_key": "sync.preset.push_misc.desc",
+        "direction": "push",
+        "entries": [
+            {"name": "工作流", "name_key": "sync.preset.entry.push_workflows",
+             "local_path": f"{COMFYUI_REL}/user/default/workflows", "remote_path": "workflows",
+             "method": "copy", "trigger": "manual"},
+            {"name": "Wildcards", "name_key": "sync.preset.entry.push_wildcards",
+             "local_path": f"{COMFYUI_REL}/wildcards", "remote_path": "wildcards",
+             "method": "copy", "trigger": "manual"},
+            {"name": "Input 素材", "name_key": "sync.preset.entry.push_input",
+             "local_path": f"{COMFYUI_REL}/input", "remote_path": "input",
+             "method": "copy", "trigger": "manual"},
+        ],
+    },
+    {
+        "id": "tpl-push-output",
+        "name": "上传输出（移动）", "name_key": "sync.preset.push_output.name",
+        "desc_key": "sync.preset.push_output.desc",
+        "direction": "push",
+        "entries": [
+            {"name": "输出", "name_key": "sync.preset.entry.push_output",
+             "local_path": f"{COMFYUI_REL}/output", "remote_path": "output",
+             "method": "move", "trigger": "watch",
+             "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
+        ],
+    },
+    {
+        "id": "tpl-push-output-copy",
+        "name": "上传输出（保留本地）", "name_key": "sync.preset.push_output_copy.name",
+        "desc_key": "sync.preset.push_output_copy.desc",
+        "direction": "push",
+        "entries": [
+            {"name": "输出", "name_key": "sync.preset.entry.push_output",
+             "local_path": f"{COMFYUI_REL}/output", "remote_path": "output",
+             "method": "copy", "trigger": "watch",
+             "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
+        ],
+    },
 ]
 
 # rclone remote 名 / 类型 / 配置键的合法字符集

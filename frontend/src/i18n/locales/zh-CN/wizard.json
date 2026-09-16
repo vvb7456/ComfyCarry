@@ -97,20 +97,10 @@
   },
   "step4": {
     "title": "同步规则",
-    "desc": "选择需要同步的文件与存储目录",
-    "remote_label": "远程存储",
-    "remote_path_label": "远程路径",
-    "pull_title": "部署拉取",
-    "pull_help": "部署时从云端下载到本地，云端文件不会被删除。适合模型、LoRA、工作流等需要复用的资源。",
-    "push_title": "自动推送",
-    "push_help": "运行期间监控本地目录变化，自动上传新增/修改的文件到云端。适合生成图等需要备份的内容。",
-    "selected_n": "已选 {n} 个",
-    "method_move": "移动",
-    "method_keep": "保留本地",
-    "trigger_deploy": "部署执行",
-    "trigger_watch": "持续监控",
-    "trigger_manual": "手动",
-    "remote_path_placeholder": "/ComfyUI/..."
+    "desc": "选择需要同步的内容，部署时自动完成首次同步",
+    "rules_title": "选择规则",
+    "rules_help": "勾选预设即整组启用，远程目录自动规划。手动备份等其它规则（含自定义规则）可在部署完成后于面板「同步」页添加。",
+    "selected_n": "已选 {n} 项"
   },
   "step5": {
     "title": "CivitAI API Key",
@@ -278,7 +268,8 @@
       "remote_type_invalid": "远程存储类型无效",
       "wizard_remote_exists": "存储「{name}」已存在",
       "wizard_remote_source_missing": "原存储连接已失效，请重新配置连接",
-      "oauth_not_ready": "授权会话未就绪或已失效，请重新完成登录授权"
+      "oauth_not_ready": "授权会话未就绪或已失效，请重新完成登录授权",
+      "remote_root_required": "同步文件夹必填，且不能是存储根目录"
     }
   }
 }

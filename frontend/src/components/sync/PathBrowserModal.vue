@@ -10,15 +10,18 @@
  *    home 相对、"remote:/path" 是服务器文件系统根 —— 语义不同, 面板不能
  *    替用户规范化。
  *
+ * 根语义 (rootPath): 传入后该路径成为浏览器的**不可逾越的根**, 打开即位于
+ * 根上, 面包屑/跳转/路径输入都不能越出根之外。S3 的存储桶就是根 —— 浏览、
+ * 判定 (atRoot)、选中返回值全部围绕"桶内"展开, select 事件返回根内相对路径
+ * (缺省无 rootPath 时根 = remote 端点根, 返回完整路径)。
+ * 路径输入职责由面包屑承担: 点击面包屑的当前段展开为路径输入框 (预填当前
+ * 路径, 可直接键入/粘贴深层路径), 回车跳转, Esc/失焦取消; 点击非当前段照旧
+ * 跳到该目录。锁定根时草稿带根前缀 (bucket/sub) 或直接相对 (sub) 均可。
+ *
  * staged 凭据 (mode=remote 可选): 凭据经 env 临时注入跑 rclone, 不落盘 ——
  * 浏览/新建目录发生在用户最终「确定」之前 (wizard 计划 / dashboard 保存前)。
  *
- * 打开即从根目录浏览, 不预填表单当前值 (与常规文件选择器一致)。
- * 路径输入职责由面包屑承担: 点击面包屑的当前段展开为路径输入框 (预填当前
- * 路径, 可直接键入/粘贴深层路径), 回车跳转, Esc/失焦取消; 点击非当前段照旧
- * 跳到该目录。
- *
- * 新建目录 (仅 remote): footer 按钮 → 小弹窗输入名称 (预填 ComfyCarry),
+ * 新建目录 (仅 remote): footer 按钮 → 小弹窗输入名称 (无默认名),
  * 回车/点按钮即在当前位置创建 (无二次确认), 建完即进入。
  *
  * 后端 browse 端点失败时返回 200 + {ok:false,error}, 错误就地显示在列表位置
@@ -44,7 +47,12 @@ const props = withDefaults(defineProps<{
   remote?: string
   /** staged 凭据 (wizard 计划 / oauth 会话 / 表单直传); 缺省走已落盘 remote */
   staged?: StagedCreds
-}>(), { remote: '', staged: undefined })
+  /** 浏览范围的锁定根 (相对 remote; S3 = 存储桶): 该路径就是根, 不可向上越出,
+   *  select 返回根内相对路径。缺省 = remote 端点根。 */
+  rootPath?: string
+  /** 禁止选择存储根 (同步文件夹必须是一个明确的目录); 根时「选择当前目录」置灰 */
+  forbidRoot?: boolean
+}>(), { remote: '', staged: undefined, rootPath: '', forbidRoot: false })
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
@@ -54,8 +62,11 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const { post } = useApiFetch()
 
+/** 锁定根的段 (rootPath 解析; S3 = ['my-bucket']); 空数组 = 端点根/本地根 */
+const rootSegments = ref<string[]>([])
+/** 当前位置相对锁定根的段 (根上为空; S3 即桶内相对路径) */
 const segments = ref<string[]>([])
-/** 路径是否带前导 "/" —— 本地恒 true, 远程沿用用户原本写法 (见文件头注释) */
+/** 路径是否带前导 "/" —— 本地恒 true, 远程沿用根路径原本写法 (见文件头注释) */
 const rooted = ref(true)
 const dirs = ref<string[]>([])
 const loading = ref(false)
@@ -79,13 +90,20 @@ const show = computed({
   set: (v: boolean) => emit('update:modelValue', v),
 })
 
-const currentPath = computed(() => (rooted.value ? '/' : '') + segments.value.join('/'))
+/** API 请求用完整路径 = 锁定根 + 当前相对段 (S3 浏览必须带桶名) */
+const currentPath = computed(() => {
+  const all = [...rootSegments.value, ...segments.value]
+  return (rooted.value ? '/' : '') + all.join('/')
+})
 
-const rootLabel = computed(() =>
-  props.mode === 'local'
-    ? t('sync.browse.root_local')
-    : `${props.remote}:${rooted.value ? '/' : ''}`
-)
+const rootLabel = computed(() => {
+  if (props.mode === 'local') return t('sync.browse.root_local')
+  if (rootSegments.value.length) {
+    // 锁定根: 面包屑根就是桶本身 (remote:my-bucket), 不再暴露端点根
+    return `${props.remote}:${(rooted.value ? '/' : '') + rootSegments.value.join('/')}`
+  }
+  return `${props.remote}:${rooted.value ? '/' : ''}`
+})
 
 /** 新建目录请求体: staged 凭据透传 */
 function remoteBody(path: string): Record<string, unknown> {
@@ -94,19 +112,16 @@ function remoteBody(path: string): Record<string, unknown> {
   return body
 }
 
-function parsePath(raw: string) {
-  const s = (raw || '').trim()
-  rooted.value = props.mode === 'local' ? true : s.startsWith('/')
-  segments.value = s.split('/').filter(Boolean)
-}
-
 watch(() => props.modelValue, (open) => {
   if (!open) {
     seq += 1
     return
   }
-  // 打开即根目录, 不预填表单当前值 (与常规文件选择器一致)
-  parsePath('')
+  // 打开即位于锁定根上, 不预填表单当前值 (与常规文件选择器一致)
+  const rp = (props.rootPath || '').trim()
+  rooted.value = props.mode === 'local' ? true : rp.startsWith('/')
+  rootSegments.value = rp.split('/').filter(Boolean)
+  segments.value = []
   dirs.value = []
   error.value = ''
   editing.value = false
@@ -177,12 +192,24 @@ function cancelEdit() {
 }
 
 function applyDraft() {
-  if (!draft.value.trim() || draft.value.trim() === currentPath.value) {
+  const raw = draft.value.trim()
+  if (!raw || raw === currentPath.value) {
     editing.value = false
     return
   }
   editing.value = false
-  parsePath(draft.value)
+  const full = raw.split('/').filter(Boolean)
+  if (rootSegments.value.length) {
+    // 锁定根: 草稿按"根内路径"解释; 带根前缀 (my-bucket/sub) 先剥前缀,
+    // 其余 (sub 或越出根的写法) 一律当根内相对段 —— 越界的桶名只会落成
+    // 不存在的子目录, 由后端 browse 报错兜底, 浏览器无法越出根
+    const isRooted = full.length >= rootSegments.value.length
+      && rootSegments.value.every((seg, i) => full[i] === seg)
+    segments.value = isRooted ? full.slice(rootSegments.value.length) : full
+  } else {
+    rooted.value = props.mode === 'local' ? true : raw.startsWith('/')
+    segments.value = full
+  }
   load()
 }
 
@@ -194,7 +221,7 @@ const mkdirValid = computed(() => {
 
 function openMkdir() {
   mkdirError.value = ''
-  newDirName.value = 'ComfyCarry'
+  newDirName.value = ''
   mkdirOpen.value = true
   nextTick(() => {
     mkdirInputRef.value?.focus()
@@ -221,7 +248,18 @@ async function createDir() {
   }
 }
 
+/** 当前是否位于根上: 无锁定根 = 端点根 (home 相对根的空路径或绝对根的 "/");
+ *  有锁定根 (S3) = 桶根 —— forbidRoot 时「选择当前目录」置灰
+ *  (同步文件夹必须是明确目录) */
+const atRoot = computed(() => props.mode === 'remote' && segments.value.length === 0)
+
 function confirmSelect() {
+  if (rootSegments.value.length) {
+    // 锁定根 (S3 桶): select 返回桶内相对路径 (桶内根已被 forbidRoot 挡住)
+    emit('select', segments.value.join('/'))
+    show.value = false
+    return
+  }
   // SFTP 的 home 根是空字符串, 用显式的 "." 保留相对路径语义;
   // 绝对根仍返回 "/", 其他 remote 路径原样透传。
   const selectedPath = currentPath.value || (props.mode === 'remote' && !rooted.value ? '.' : currentPath.value)
@@ -285,7 +323,11 @@ function confirmSelect() {
         <MsIcon name="create_new_folder" size="xs" color="none" />
         {{ t('sync.browse.mkdir_btn') }}
       </BaseButton>
-      <BaseButton variant="primary" :disabled="!!error" @click="confirmSelect">
+      <BaseButton
+        variant="primary"
+        :disabled="!!error || (forbidRoot && atRoot)"
+        @click="confirmSelect"
+      >
         {{ t('sync.browse.select') }}
       </BaseButton>
     </template>
@@ -306,6 +348,7 @@ function confirmSelect() {
       type="text"
       class="form-input"
       spellcheck="false"
+      :placeholder="t('sync.dir.folder_new_placeholder')"
       @keyup.enter="createDir"
       @input="mkdirError = ''"
     >

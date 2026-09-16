@@ -173,6 +173,16 @@ def main():
     from .services.resource_registry import get_registry
     get_registry().hydrate_from_db()
 
+    # 启动对账: 进程重启后把上次残留的 queued/running 本地任务置为 interrupted,
+    # 否则会留下永远排队中的脏记录 (且 finished_at 为 NULL, 清理也删不掉)
+    try:
+        from .services import sync_store as _sync_store
+        orphaned = _sync_store.reconcile_orphan_jobs()
+        if orphaned:
+            app.logger.info(f"[sync] 启动对账: 中断残留任务 {orphaned} 条")
+    except Exception as e:
+        app.logger.warning(f"[sync] 启动对账失败: {e}")
+
     # 清理超龄 sync job 记录 (默认保留 7 天) —— 不清的话 sync_jobs /
     # sync_job_events 只增不减
     try:

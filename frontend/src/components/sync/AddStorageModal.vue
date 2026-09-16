@@ -23,8 +23,8 @@ const props = withDefaults(defineProps<{
   existingRemotes?: Array<{ name: string; type: string }>
   /** 远端类型定义表 */
   remoteTypes?: Record<string, RemoteTypeDef>
-  /** 重连预填: 打开时自动选中对应 provider 并填 name */
-  preset?: { type?: string; name?: string }
+  /** 重连预填: 打开时自动选中对应 provider 并恢复名称/同步文件夹/存储桶 */
+  preset?: { type?: string; name?: string; root_dir?: string; bucket?: string }
 }>(), {
   modelValue: false,
   existingRemotes: () => [],
@@ -33,7 +33,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 存储已创建 (透传自 flow; openRuleModal = 勾选「创建同步规则」) */
+  /** 存储已创建 (透传自 flow; openRuleModal = 点了「保存并创建规则」) */
   created: [remote: { name: string; type: string; openRuleModal: boolean }]
   /** 关闭事件 */
   close: []

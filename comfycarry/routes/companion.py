@@ -4,15 +4,15 @@ ComfyCarry — Companion 客户端面板后端 (纯 Python)
 蓝图前缀 /api/companion, JSON 响应 + HTTP 状态码。
 
 错误文案分两套, 按消费方划分:
-  - 桌面客户端调的 (connect / heartbeat / jobs*): 原文 —— 客户端没有 locale
+  - 桌面客户端调的 (connect / heartbeat): 原文 —— 客户端没有 locale
     表, 而且它只看状态码, 回 key 只会让排障时看到一串没人翻译的标识符。
-契约: docs/COMPANION_DESKTOP_APP_SPEC.md §2.2–§2.5。
+契约: docs/COMPANION_DESKTOP_APP_SPEC.md §2.2–§2.4。
 
 面板对 companion 只做两件事:
   ① 提供数据源 (WebDAV serve, 见 companion_serve 服务);
-  ② 可观测 (谁连着、在拉什么、结果进统一 Activity)。
-拉取规则归客户端所有并本地持久化, 面板不存规则、不做规则 CRUD。
-规则信息由客户端经 heartbeat 上报「只读摘要」(rule_summaries), 面板仅展示。
+  ② 可观测 (谁连着、上报的同步状态)。
+拉取规则归客户端所有, 面板不接收 (rule_summaries 字段直接忽略);
+客户端上报的同步状态只在内存原样保留并展示, 不落库 (见 _clients)。
 
 客户端连接记录只存内存 (见 _clients), 不落盘、不保留离线客户端:
   - heartbeat 直接覆盖该 client_id 的内存条目, last_seen=now;
@@ -23,7 +23,6 @@ ComfyCarry — Companion 客户端面板后端 (纯 Python)
 import logging
 import time
 import threading
-import uuid
 
 from flask import Blueprint, jsonify, request
 
@@ -107,29 +106,21 @@ def api_companion_connect():
 def api_companion_heartbeat():
     """客户端心跳上报。
 
-    body: {client_id, hostname, app_version, status, rule_summaries}
-    rule_summaries: list (客户端上报什么就存什么, 不校验内部结构; 非 list 则存 [])
-    记录 last_seen=now, 供 GET /clients 在线判定。
-
-    active_rule_id / progress 曾由客户端上报, 但面板不展示 (前者从未使用, 后者
-    的进度条已移除), 现从协议中剔除 —— 客户端本地保留即可, 不必再上报。
+    body: {client_id, hostname, app_version, status}
+    面板只在内存记录连接身份、原样 status 与 last_seen (GET /clients 用),
+    供在线判定与展示; 不写数据库。rule_summaries 等规则字段一律忽略。
     """
     data = request.get_json(silent=True) or {}
     client_id = data.get("client_id", "")
     if not client_id:
         return jsonify({"error": "缺少 client_id"}), 400
 
-    rule_summaries = data.get("rule_summaries")
-    if not isinstance(rule_summaries, list):
-        rule_summaries = []
-
     now = time.time()
     info = {
         "client_id": client_id,
         "hostname": data.get("hostname", ""),
         "app_version": data.get("app_version", ""),
-        "status": data.get("status", "idle"),
-        "rule_summaries": rule_summaries,
+        "status": data.get("status", ""),
         "last_seen": now,
     }
     with _clients_lock:
@@ -142,7 +133,6 @@ def api_companion_clients():
     """返回在线客户端 + serve 状态 + dav_url。
 
     返回: {clients:[...], serve:{...}, dav_url:"..."}
-    每个 client 项带 rule_summaries (缺省 [])。
     仅返回 last_seen 在 _ONLINE_TTL 内的客户端; 离线条目不展示也不持久化,
     下次该 client_id 心跳上报时自动重新出现。
     """
@@ -158,8 +148,7 @@ def api_companion_clients():
             "client_id": info.get("client_id", ""),
             "hostname": info.get("hostname", ""),
             "app_version": info.get("app_version", ""),
-            "status": info.get("status", "idle"),
-            "rule_summaries": info.get("rule_summaries", []),
+            "status": info.get("status", ""),
             "last_seen": last_seen,
             "online": True,
         })
@@ -170,119 +159,3 @@ def api_companion_clients():
         "dav_url": _infer_dav_url(),
     })
 
-
-# ═══════════════════════════════════════════════════════════════
-# 2.5 Job 回报 (复用 sync_store)
-# ═══════════════════════════════════════════════════════════════
-@bp.route("/api/companion/jobs", methods=["POST"])
-def api_companion_job_create():
-    """创建 companion job (映射 sync_store.create_job, trigger_type="companion")。
-
-    body: {rule_id, rule_count?, client_id?, rule_snapshot?, rule_snapshots?}
-      - rule_snapshot / rule_snapshots: 客户端可提交服务端可用的展示快照;
-      - 未提交快照时按 rule_id 从当前规则表补齐;
-      - 规则已不存在时写入 id 与触发信息, 其余字段空值, 保证历史仍能
-        显示任务数量与事件结果。
-    返回: {ok:true, job_id:"companion-..."}
-    """
-    from ..services import sync_store as store
-    from ..services.sync_engine import _load_sync_rules, build_rule_snapshot
-
-    data = request.get_json(silent=True) or {}
-    rule_id = data.get("rule_id", "")
-    client_id = data.get("client_id", "")
-    rule_count = int(data.get("rule_count", 0) or 0)
-
-    snapshots = _companion_rule_snapshots(data, rule_id,
-                                          _load_sync_rules, build_rule_snapshot)
-    if not rule_count and snapshots:
-        rule_count = len(snapshots)
-
-    job_id = f"companion-{uuid.uuid4().hex[:12]}"
-    store.create_job(
-        job_id,
-        trigger_type="companion",
-        trigger_ref=rule_id,
-        rule_count=rule_count,
-        rules=snapshots,
-    )
-    log.info("companion job created: %s (client=%s rule=%s)", job_id, client_id, rule_id)
-    return jsonify({"ok": True, "job_id": job_id})
-
-
-def _companion_rule_snapshots(data, rule_id, load_rules, build_snapshot):
-    """整理 companion 任务的规则快照。
-
-    优先级: 客户端提交的 rule_snapshots / rule_snapshot → 当前规则表补齐 →
-    规则已不存在时的最小快照 (id + 触发信息, 其余空值)。
-    """
-    raw_list = data.get("rule_snapshots")
-    if isinstance(raw_list, list) and raw_list:
-        return [build_snapshot(s) for s in raw_list if isinstance(s, dict)]
-    raw = data.get("rule_snapshot")
-    if isinstance(raw, dict):
-        return [build_snapshot(raw)]
-    if rule_id:
-        rule = next((r for r in load_rules() if r.get("id") == rule_id), None)
-        if rule:
-            return [build_snapshot(rule)]
-        return [build_snapshot({"id": rule_id, "trigger": "companion"})]
-    return []
-
-
-@bp.route("/api/companion/jobs/<job_id>/events", methods=["POST"])
-def api_companion_job_event(job_id):
-    """追加事件 (映射 sync_store.add_event)。
-
-    body: {key, rule_id?, level?, params?}
-    返回: {ok:true}
-    """
-    from ..services import sync_store as store
-
-    # 校验 job 存在
-    job = store.get_job(job_id)
-    if not job:
-        return jsonify({"error": "Job 不存在"}), 404
-
-    data = request.get_json(silent=True) or {}
-    key = data.get("key", "")
-    if not key:
-        return jsonify({"error": "缺少 key"}), 400
-
-    store.add_event(
-        job_id,
-        key,
-        rule_id=data.get("rule_id", ""),
-        level=data.get("level", "info"),
-        params=data.get("params"),
-    )
-    return jsonify({"ok": True})
-
-
-@bp.route("/api/companion/jobs/<job_id>/finish", methods=["POST"])
-def api_companion_job_finish(job_id):
-    """收尾 job (映射 sync_store.finish_job)。
-
-    body: {status, success_count?, failure_count?, files_synced?, summary?}
-    返回: {ok:true}
-    """
-    from ..services import sync_store as store
-
-    job = store.get_job(job_id)
-    if not job:
-        return jsonify({"error": "Job 不存在"}), 404
-
-    data = request.get_json(silent=True) or {}
-    status = data.get("status", "success")
-    if status not in ("success", "failed", "partial", "cancelled"):
-        return jsonify({"error": "status 取值非法"}), 400
-
-    store.finish_job(
-        job_id,
-        status=status,
-        success_count=int(data.get("success_count", 0) or 0),
-        failure_count=int(data.get("failure_count", 0) or 0),
-        files_synced=int(data.get("files_synced", 0) or 0),
-        summary=data.get("summary"),
-    )
-    return jsonify({"ok": True})

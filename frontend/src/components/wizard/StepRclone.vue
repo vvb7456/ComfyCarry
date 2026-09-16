@@ -2,11 +2,12 @@
 /**
  * Step 3 连接云存储 —— wizard step 语义的原生化版本。
  *
- * 两区域: 上方 provider 六卡选择区, 下方单卡承载当前 provider 的连接过程:
- * - OAuth: CloudAuthHero identity 模式 (登录 → 粘贴回调+确认 → done 展示
- *   存储名称+驱动器)。授权不需要名称 —— token 在服务端会话, 名称只在
- *   创建 remote (下一步) 时使用
- * - 非 OAuth: 名称 + S3 bucket + 凭据表单同卡展示
+ * 两区域: 上方 provider 六卡选择区, 下方单卡承载当前 provider 的连接过程。
+ * 全部类型统一走 CloudAuthHero (identity):
+ * - OAuth: 登录 → 粘贴回调+确认 → done
+ * - 非 OAuth: 凭据表单 + 「连接」→ done
+ * done 屏统一设置 存储名称 + 挂载根 (驱动器/存储桶) + 同步文件夹 ——
+ * 名称等不再出现在凭据屏; 同步文件夹是预设规则路径的锚点。
  *
  * 单存储语义: 向导只配置一个存储, 剩余的在 dashboard 处理; 重复创建会
  * 替换旧条目 (见 useWizardRclone.ensureCreated)。
@@ -22,9 +23,6 @@ import AlertBanner from '@/components/ui/AlertBanner.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import OptionCard from '@/components/ui/OptionCard.vue'
-import FormField from '@/components/form/FormField.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
-import SecretInput from '@/components/ui/SecretInput.vue'
 import CloudAuthHero from '@/components/sync/CloudAuthHero.vue'
 import type { CloudProvider } from '@/config/cloud-providers'
 import { remoteBrand } from '@/config/remote-logos'
@@ -35,9 +33,9 @@ defineOptions({ name: 'StepRclone' })
 const { t } = useI18n({ useScope: 'global' })
 const { config, remoteTypeDefs, nextStep, prevStep } = useWizardState()
 const {
-  storageType, storageName, storageFields, storageBucket,
+  storageType, storageName, storageFields, storageBucket, storageRootDir,
   storageError, storageOauthParams,
-  currentFields, isOAuthType, cloudProviders,
+  isOAuthType, cloudProviders,
   selectProvider, validateName, validateFields, ensureCreated, invalidateCreatedRemote,
 } = useWizardRclone()
 
@@ -50,7 +48,7 @@ const connected = computed(() => config.wizard_remotes[0] || null)
 
 /** 恢复标记: 进入 step3 时已有连接 (回退重进)。一次性 —— 用于让
  *  CloudAuthHero mount 时直接落 done 第三屏 (凭据在服务端草稿, 无需会话);
- *  用户点「更换账号」重授权后此标记作废, 走正常流程。
+ *  用户点「更换账号 / 修改连接信息」后此标记作废, 走正常流程。
  *  连接后返回本步的场景 (storageType 已有值) 同样是恢复态: 单例里的
  *  storage* 是本会话状态, 服务端草稿里的凭据仍在, 直接落 done 屏。 */
 const restoredOnce = ref(false)
@@ -67,6 +65,7 @@ function storageFingerprint(): string {
     type: storageType.value,
     name: storageName.value,
     bucket: storageBucket.value,
+    root_dir: storageRootDir.value,
     fields: sortedParams(storageFields.value),
     oauth: sortedParams(storageOauthParams.value),
   })
@@ -98,6 +97,7 @@ if (connected.value
   if (connected.value.type === 's3' && connected.value.bucket !== undefined) {
     storageBucket.value = connected.value.bucket
   }
+  storageRootDir.value = connected.value.root_dir || ''
   restoredFingerprint.value = storageFingerprint()
 }
 
@@ -133,12 +133,10 @@ function mergeOAuthParams(currentParams: Record<string, string>): Record<string,
   return merged
 }
 
-/** OAuth 授权完成且驱动器信息就绪后才允许下一步。
- *  驱动器列表拉取中同样置灰 —— 缺 drive_id 的 remote 在目录浏览时
- *  会报 unable to get drive_id and drive_type */
+/** 已选 provider 时, 完成 (done) 屏的名称/挂载根/同步文件夹全部就绪才可前进。
+ *  凭据屏的「连接/登录」是 CloudAuthHero 卡片内的主按钮, 与底部导航无关。 */
 const nextDisabled = computed(() =>
-  !!storageType.value && isOAuthType.value
-  && !cloudAuthHeroRef.value?.readyForCreate,
+  !!storageType.value && !cloudAuthHeroRef.value?.readyForCreate,
 )
 
 /** 已有 remote (本会话创建/失败会话恢复) 时不选 provider 也可直接进 step 4 */
@@ -146,10 +144,6 @@ const hasAnyRemote = computed(() => config.wizard_remotes.length > 0)
 
 const nextLabel = computed(() =>
   (storageType.value || hasAnyRemote.value) ? t('wizard.btn.next') : t('wizard.btn.skip'),
-)
-
-const currentProviderName = computed(() =>
-  cloudProviders.find(p => p.id === storageType.value)?.name || storageType.value,
 )
 
 function onOAuthPhase(phase: OAuthPhase) {
@@ -187,7 +181,7 @@ async function onNext() {
   const restoringSameType = restoredOnce.value && connected.value?.type === storageType.value
   const sourceName = restoringSameType ? connected.value?.name : undefined
   // 恢复态: 凭据原样在服务端草稿, 名称未动 → 无需重建直接进 step4;
-  // 改名、字段、bucket 或驱动器选择 → 走 ensureCreated 保存真实变更。
+  // 改名、字段、bucket、同步文件夹或驱动器选择 → 走 ensureCreated 保存真实变更。
   if (restoredOnce.value
       && !restoredDirty.value
       && !restoredOAuthSelectionChanged()
@@ -203,8 +197,9 @@ async function onNext() {
     // 最终参数 (自建凭据 + drive_id 等) 以保存时点的 getParams 为准
     const currentParams = cloudAuthHeroRef.value?.getParams() || {}
     storageOauthParams.value = mergeOAuthParams(currentParams)
-  } else if ((!restoringSameType || restoredFieldsAvailable.value) && !validateFields()) {
-    return
+  } else if (!restoringSameType || restoredFieldsAvailable.value) {
+    // 非 OAuth 的必填校验在卡片内「连接」按钮已做, 这里兜底再验一次
+    if (!validateFields()) return
   }
 
   creating.value = true
@@ -258,68 +253,26 @@ watch(storageType, (next, previous) => {
     </div>
 
     <!-- 区域 2: 下方单卡 (选中 provider 后) -->
-    <!-- OAuth: CloudAuthHero 单卡承载 登录 → 粘贴确认 → 名称/驱动器;
-         恢复态 (回退重进) 直接落第三屏 done: 名称已恢复, 凭据在服务端草稿 -->
+    <!-- 全类型统一 CloudAuthHero: OAuth 登录 / 非 OAuth 凭据 → done 屏
+         (名称 + 驱动器/存储桶 + 同步文件夹); 恢复态直接落 done, 凭据在服务端草稿,
+         目录浏览走 {wizard:true} staged -->
     <CloudAuthHero
-      v-if="storageType && isOAuthType"
+      v-if="storageType"
       :key="storageType"
       ref="cloudAuthHeroRef"
       v-model:name="storageName"
+      v-model:fields="storageFields"
+      v-model:root-dir="storageRootDir"
+      v-model:bucket="storageBucket"
       :type="storageType"
       :types="remoteTypeDefs"
       identity
       :restored="restoredOnce"
       :restored-params="restoredParams"
+      :staged="restoredOnce ? { wizard: true } : undefined"
       @update:phase="onOAuthPhase"
       @reset="onOAuthReset"
     />
-
-    <!-- 非 OAuth: 名称 + S3 bucket + 凭据表单 -->
-    <div v-else-if="storageType" class="step-rclone__panel">
-      <div class="step-rclone__panel-head">
-        <span class="step-rclone__panel-logo">
-          <img v-if="remoteBrand(storageType).logo" :src="remoteBrand(storageType).logo" alt="">
-          <MsIcon v-else :name="remoteBrand(storageType).icon" size="sm" />
-        </span>
-        <strong>{{ currentProviderName }}</strong>
-      </div>
-
-      <FormField :label="t('sync.remote.name')" density="compact">
-        <input
-          v-model="storageName"
-          type="text"
-          class="form-input"
-          :placeholder="t('sync.remote.name_placeholder')"
-          autocomplete="off"
-        >
-      </FormField>
-
-      <!-- S3 存储桶 (rclone s3 路径首段) -->
-      <FormField v-if="storageType === 's3'" :label="t('sync.dir.bucket_label')" density="compact">
-        <input v-model="storageBucket" type="text" class="form-input" placeholder="comfy-assets" autocomplete="off">
-      </FormField>
-
-      <FormField
-        v-for="field in currentFields"
-        :key="field.key"
-        :label="field.label"
-        density="compact"
-      >
-        <BaseSelect
-          v-if="field.type === 'select'"
-          :model-value="storageFields[field.key] || ''"
-          :options="(field.options || []).map(o => ({ value: o, label: o }))"
-          teleport
-          @update:model-value="(v: string | number | boolean) => storageFields[field.key] = String(v)"
-        />
-        <SecretInput v-else-if="field.type === 'password'" v-model="storageFields[field.key]" :is-password="true" :placeholder="field.placeholder" />
-        <textarea v-else-if="field.type === 'textarea'" v-model="storageFields[field.key]" rows="3" class="form-textarea form-textarea--mono" :placeholder="field.placeholder" />
-        <input v-else v-model="storageFields[field.key]" type="text" class="form-input" :placeholder="field.placeholder" autocomplete="off">
-        <template v-if="field.help" #below>
-          <p class="step-rclone__field-help" v-html="field.help" />
-        </template>
-      </FormField>
-    </div>
 
     <!-- 错误就地提示 -->
     <AlertBanner v-if="storageError" tone="danger" dense>{{ storageError }}</AlertBanner>
@@ -349,46 +302,5 @@ watch(storageType, (next, previous) => {
   height: var(--sp-5);
   object-fit: contain;
   flex: none;
-}
-
-/* 下方单卡 (非 OAuth), 与 CloudAuthHero 的 v-panel 视觉一致 */
-.step-rclone__panel {
-  display: grid;
-  gap: var(--sp-3);
-  background: var(--bg3);
-  border: 1px solid var(--bd);
-  border-radius: var(--rs);
-  padding: var(--sp-4);
-}
-
-.step-rclone__panel-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--t1);
-}
-
-.step-rclone__panel-logo {
-  width: var(--sp-6);
-  height: var(--sp-6);
-  flex: none;
-  border-radius: var(--rs);
-  background: color-mix(in srgb, var(--ac) 8%, transparent);
-  display: grid;
-  place-items: center;
-}
-
-.step-rclone__panel-logo img {
-  width: var(--sp-4);
-  height: var(--sp-4);
-  object-fit: contain;
-}
-
-.step-rclone__field-help {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--t3);
-  line-height: 1.4;
-  overflow-wrap: anywhere;
 }
 </style>

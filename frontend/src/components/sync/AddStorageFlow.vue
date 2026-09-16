@@ -1,15 +1,20 @@
 <script setup lang="ts">
 /**
- * AddStorageFlow — 添加存储流 (类型 → 连接) 的流程主体,
+ * AddStorageFlow — 添加存储流 (类型 → 连接 → done) 的流程主体,
  * dashboard「添加存储」弹窗的内容 (外壳见 AddStorageModal)。
  *
  * 与 wizard 的关系: wizard step3 将本流程原生化为向导 step (StepRclone),
  * 本组件仅服务 dashboard; wizard 场景刷新即放弃, 不复用本组件。
  *
- * - 提交: 点「完成」才 POST /api/sync/remote/create 落盘 (此前凭据零落盘,
- *   关闭弹窗即丢弃, 无放弃守卫); 勾选「创建同步规则」时经 created 事件通知
- *   父组件打开规则弹窗并预填本存储
- * - 错误一律就地展示 (AlertBanner); 底部动作条 (返回/完成 + checkbox) 由本组件渲染
+ * - 类型屏: provider 六卡选择; 底部 取消/下一步
+ * - 连接屏: 全类型统一 CloudAuthHero (embedded 模式 —— 无内嵌按钮/边框)。
+ *   - OAuth: 「使用 xx 登录」留在 hero 内 (此时底部「下一步」disable);
+ *     登录后进入等待态, 粘贴回调后由底部「下一步」验证并自动进入 done 屏
+ *   - 非 OAuth: 填完凭据点底部「下一步」= 连接 (校验+进 done 屏)
+ *   - done 屏 (最后一步): 名称 + 挂载根 + 同步文件夹; 底部 上一步/保存并创建规则
+ * - 提交: 点「保存并创建规则」才 POST /api/sync/remote/create 落盘 (此前凭据
+ *   零落盘, 关闭弹窗即丢弃); 成功后经 created 通知父组件关闭弹窗
+ * - 错误一律就地展示 (AlertBanner); 底部动作条由本组件渲染
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -18,9 +23,6 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorText } from '@/utils/apiError'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import FormField from '@/components/form/FormField.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
-import SecretInput from '@/components/ui/SecretInput.vue'
 import OptionCard from '@/components/ui/OptionCard.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -28,8 +30,7 @@ import CloudAuthHero from '@/components/sync/CloudAuthHero.vue'
 import { CLOUD_PROVIDERS, OAUTH_TYPES, type CloudProvider } from '@/config/cloud-providers'
 import { remoteBrand } from '@/config/remote-logos'
 import type {
-  ApiOkResponse, OAuthPhase,
-  RemoteField, RemoteTypeDef, StagedCreds,
+  ApiOkResponse, OAuthPhase, RemoteTypeDef,
 } from '@/types/sync'
 
 defineOptions({ name: 'AddStorageFlow' })
@@ -37,17 +38,17 @@ defineOptions({ name: 'AddStorageFlow' })
 const props = withDefaults(defineProps<{
   /** 现有存储列表 (查重 / 覆盖确认) */
   existingRemotes?: Array<{ name: string; type: string }>
-  /** 远端类型定义表 (非 oauth 凭据表单按 fields 动态渲染) */
+  /** 远端类型定义表 (OAuth 高级凭据 / 非 OAuth 凭据字段) */
   remoteTypes?: Record<string, RemoteTypeDef>
-  /** 重连预填: 打开时自动选中对应 provider 并填 name */
-  preset?: { type?: string; name?: string }
+  /** 重连预填: 打开时自动选中对应 provider 并恢复名称/同步文件夹/存储桶 */
+  preset?: { type?: string; name?: string; root_dir?: string; bucket?: string }
 }>(), {
   existingRemotes: () => [],
   remoteTypes: () => ({}),
 })
 
 const emit = defineEmits<{
-  /** 存储已创建 (点「完成」落盘成功; openRuleModal = 勾选了「创建同步规则」) */
+  /** 存储已创建 (openRuleModal = 点了「保存并创建规则」, 请求继续添加规则) */
   created: [remote: { name: string; type: string; openRuleModal: boolean }]
   /** flow=0 时请求关闭 (无数据) */
   cancel: []
@@ -58,17 +59,18 @@ const { toast } = useToast()
 const { post } = useApiFetch()
 const { confirm } = useConfirm()
 
-// ── 流程状态 (flow: 0=类型, 1=连接; 规则在弹窗外配置) ──
+// ── 流程状态 (flow: 0=类型, 1=连接, 2=done 最后一步) ──
 const flow = ref(0)
 const type = ref('')
 const name = ref('')
 const fields = ref<Record<string, string>>({})
-const bucket = ref('comfy-assets')
+const rootDir = ref('')
+const bucket = ref('')
 
 const error = ref('')
 const submitting = ref(false)
-/** 完成时勾选「创建同步规则」: 创建成功关闭弹窗后由父组件打开规则弹窗并预填本存储 */
-const createRulesChecked = ref(false)
+/** 粘贴回调验证中 (下一步按钮 loading) */
+const advancing = ref(false)
 
 // OAuth 授权阶段 (经 CloudAuthHero 的 update:phase 同步, 用于下一步按钮 disable)
 const oAuthPhase = ref<OAuthPhase>('idle')
@@ -78,12 +80,8 @@ const cloudAuthHeroRef = ref<InstanceType<typeof CloudAuthHero> | null>(null)
 // ── 提供商 (共享常量, wizard StepRclone 复用) ──
 
 const providers = CLOUD_PROVIDERS
-const currentProvider = computed(() => providers.find(p => p.id === type.value) || null)
 const isOAuthType = computed(() =>
   !!type.value && (props.remoteTypes[type.value]?.oauth ?? OAUTH_TYPES.includes(type.value)),
-)
-const currentFields = computed<RemoteField[]>(() =>
-  type.value ? (props.remoteTypes[type.value]?.fields || []) : [],
 )
 
 function brandOf(typeKey: string) {
@@ -107,6 +105,8 @@ function selectProvider(p: CloudProvider) {
   for (const f of props.remoteTypes[p.id]?.fields || []) {
     if (f.default !== undefined) fields.value[f.key] = f.default
   }
+  rootDir.value = ''
+  bucket.value = ''
   error.value = ''
 }
 
@@ -124,23 +124,37 @@ function validateName(): boolean {
   return true
 }
 
-/** 非 oauth 必填项校验: 按 field.required 收集缺失字段 label */
-function validateFields(): boolean {
-  const missing = currentFields.value
-    .filter(f => f.required && !(fields.value[f.key] || '').trim())
-    .map(f => f.label)
-  if (missing.length > 0) {
-    error.value = t('sync.remote.missing_fields', { fields: missing.join(', ') })
-    return false
-  }
-  return true
+// ── 阶段推进 (0=类型 → 1=连接 → 2=done; done 屏两个保存才落盘) ──
+/** done 屏两个保存的语义: 「保存」仅创建; 「保存并创建规则」创建成功后
+ *  由父组件打开添加规则弹窗并预填本存储 (承接原 checkbox 职责) */
+let nextWantsRules = false
+
+/** 模板点击入口: 主按钮 @click 会传 MouseEvent, 显式无参包装 */
+function onNext(wantsRules?: boolean) {
+  void next(wantsRules === true)
 }
 
-// ── 阶段推进 (0=类型 → 1=连接; 「完成」时才落盘) ──
-async function next() {
-  error.value = ''
+async function next(wantsRules = false) {
+  nextWantsRules = wantsRules
   if (flow.value === 0) {
     flow.value = 1
+    return
+  }
+  if (flow.value === 1) {
+    error.value = ''
+    // 连接屏 → done 屏
+    if (isOAuthType.value) {
+      // 粘贴回调: 由底部「下一步」验证并推进 (保底路径, 主路径是自动轮询 done)。
+      // 错误 (空粘贴/无效回调) 由 CloudAuthHero 就地展示, 不再叠流程级 banner
+      advancing.value = true
+      const ok = await cloudAuthHeroRef.value?.validatePaste()
+      advancing.value = false
+      if (!ok) return
+      flow.value = 2
+    } else {
+      // 非 OAuth: 下一步 = 连接 (凭据校验就地报错; 成功后经相位 watch 自动进 done)
+      cloudAuthHeroRef.value?.connect()
+    }
     return
   }
   await submitCreate()
@@ -148,30 +162,35 @@ async function next() {
 
 function back() {
   error.value = ''
-  if (flow.value === 1) {
+  if (flow.value === 2) {
+    // done 屏点「返回」= 更换账号/修改连接信息: 取消会话回到登录 hero / 凭据屏
     cloudAuthHeroRef.value?.cancel()
+    oAuthPhase.value = 'idle'
+    flow.value = 1
+    return
+  }
+  if (flow.value === 1) {
+    // 连接屏点「返回」回到类型选择; 未完成的 OAuth 会话一并取消
+    cloudAuthHeroRef.value?.cancel()
+    oAuthPhase.value = 'idle'
     flow.value = 0
   }
 }
 
 const primaryLabel = computed(() =>
-  flow.value === 0 ? t('sync.flow.next') : t('common.btn.done'),
+  flow.value === 2 ? t('common.btn.save') : t('sync.flow.next'),
 )
 
-// ── staged 浏览 (目录选择器): 凭据经 env 注入跑 rclone, 不落盘。
-//    OAuth 走会话 (token 永不出后端), 非 OAuth 表单直传 (与最终 create 同参) ──
-const stagedCreds = computed<StagedCreds>(() => {
-  if (isOAuthType.value) return { oauth: true }
-  return { type: type.value, params: { ...fields.value } }
-})
-
 /**
- * 完成: 真实创建 remote (此前凭据仅留内存, 零落盘)。
+ * 保存并创建规则: 真实创建 remote (此前凭据仅留内存, 零落盘)。
  * 查重: 同名同类型 → 覆盖确认 (后端原地替换凭据, 规则不受影响); 同名不同类型 → 报错
  */
 async function submitCreate() {
   if (!validateName()) return
-  if (!isOAuthType.value && !validateFields()) return
+  if (type.value === 's3' && !bucket.value.trim()) {
+    error.value = t('sync.err.bucket_required')
+    return
+  }
 
   const target = name.value.trim()
   const existing = props.existingRemotes.find(r => r.name === target)
@@ -193,17 +212,10 @@ async function submitCreate() {
   submitting.value = true
   error.value = ''
 
-  // 粘贴回调主路径下用户可能不点卡片内「确认」直接点「完成」:
-  // 先吃粘贴框里的 URL 换取令牌。首次点击只推进到 done/驱动器确认屏,
-  // 必须等用户确认名称/驱动器并再次点击才允许落盘创建。
+  // 粘贴回调主路径下用户可能不点「下一步」直接点「保存并创建规则」:
+  // 先吃粘贴框里的 URL 换取令牌。错误由 CloudAuthHero 就地展示。
   if (isOAuthType.value) {
-    const wasDone = !!cloudAuthHeroRef.value?.isDone
     if (!(await cloudAuthHeroRef.value?.validatePaste())) {
-      submitting.value = false
-      error.value = t('sync.oauth.not_done_yet')
-      return
-    }
-    if (!wasDone || !cloudAuthHeroRef.value?.readyForCreate) {
       submitting.value = false
       return
     }
@@ -215,7 +227,8 @@ async function submitCreate() {
   if (type.value === 's3' && bucket.value.trim()) params.bucket = bucket.value.trim()
 
   const d = await post<ApiOkResponse>('/api/sync/remote/create', {
-    name: target, type: type.value, oauth: isOAuthType.value, params, overwrite,
+    name: target, type: type.value, root_dir: rootDir.value.trim(),
+    oauth: isOAuthType.value, params, overwrite,
   })
   submitting.value = false
 
@@ -230,24 +243,31 @@ async function submitCreate() {
   }
 
   toast(t('sync.msg.remote_created', { name: target }), 'success')
-  emit('created', { name: target, type: type.value, openRuleModal: createRulesChecked.value })
+  emit('created', { name: target, type: type.value, openRuleModal: nextWantsRules })
 }
 
 function onOAuthPhase(phase: OAuthPhase) {
   oAuthPhase.value = phase
-  // 驱动器列表由 CloudAuthHero (identity 模式) 在 done 态自行拉取
+  // OAuth 授权完成 (粘贴验证成功 / 自动轮询到 done): 自动进入 done 屏,
+  // 无需用户再点「下一步」; 非 OAuth 的连接成功 (connect) 也经此翻页。
+  if (phase === 'done' && flow.value === 1) flow.value = 2
+  // 挂载根列表 (驱动器/存储桶) 由 CloudAuthHero 在 done 态自行拉取
 }
 
-/** 主按钮 disable: 各态的前置条件不满足时置灰, 而不是点了才报错 */
+/** 主按钮 disable: 各态的前置条件不满足时置灰, 而不是点了才报错。
+ *  OAuth 登录/重登按钮在 CloudAuthHero 卡片内, 与底部导航无关。 */
 const nextDisabled = computed(() => {
-  if (submitting.value) return true
+  if (submitting.value || advancing.value) return true
   if (flow.value === 0) return !type.value
-  // OAuth 连接态: 未开始授权 / 上次授权失败需重登不可前进; 等待态允许
-  // 底部「完成」先完成粘贴回调, done 后则必须等驱动器确认数据就绪。
-  if (flow.value === 1 && isOAuthType.value) {
+  if (flow.value === 2) return !cloudAuthHeroRef.value?.readyForCreate
+  // 连接屏:
+  // - OAuth 未开始授权 / 授权失败需重登 → 不可前进 (须先在 hero 内登录)
+  // - 等待态: 粘贴框为空时不可前进 (点了也只会空报错), 有内容即可验证
+  // - 非 OAuth: 凭据必填项齐备即可连接 (缺失时点击就地报错)
+  if (isOAuthType.value) {
     if (oAuthPhase.value === 'idle' || oAuthPhase.value === 'error') return true
     if (oAuthPhase.value === 'done') return !cloudAuthHeroRef.value?.readyForCreate
-    return false
+    return !cloudAuthHeroRef.value?.hasPaste
   }
   return false
 })
@@ -258,21 +278,25 @@ function resetFlow() {
   type.value = ''
   name.value = ''
   fields.value = {}
-  bucket.value = 'comfy-assets'
+  rootDir.value = ''
+  bucket.value = ''
   error.value = ''
-  createRulesChecked.value = false
   oAuthPhase.value = 'idle'
   applyPreset()
 }
 
-/** preset (重连入口): 自动选中对应 provider 并填 name */
+/** preset (重连预填): 打开时自动选中对应 provider 并恢复名称/同步文件夹/存储桶,
+ *  直落连接屏 (凭据在 rclone.conf, 重连仅需重授权或改同步文件夹) */
 function applyPreset() {
   const p = props.preset
   if (!p?.type) return
   const provider = providers.find(x => x.id === p.type)
   if (!provider) return
-  selectProvider(provider)
+  type.value = p.type
   if (p.name) name.value = p.name
+  if (p.root_dir) rootDir.value = p.root_dir
+  if (p.bucket) bucket.value = p.bucket
+  flow.value = 1
 }
 
 // dashboard 弹窗每次打开都是全新挂载 (BaseModal v-if), 初始态即重置态;
@@ -312,68 +336,43 @@ defineExpose({
       </div>
     </div>
 
-    <!-- 态 1: 连接 (drive/bucket 也在此确定 —— 它们是 remote 的属性) -->
-    <div v-else-if="flow === 1" class="flow-stack">
-      <div class="flow-context">
-        <span class="flow-context-logo">
-          <img v-if="brandOf(type).logo" :src="brandOf(type).logo" alt="" class="flow-logo-sm">
-          <MsIcon v-else :name="brandOf(type).icon" size="sm" />
-        </span>
-        <strong>{{ currentProvider?.name }}</strong>
-        <span>/ {{ t('sync.steps.connect') }}</span>
-      </div>
-      <!-- 非 OAuth: 名称 + 凭据同屏; OAuth 名称在授权完成屏填写 -->
-      <FormField v-if="!isOAuthType" :label="t('sync.remote.name')" density="compact">
-        <input v-model="name" type="text" class="form-input" :placeholder="t('sync.remote.name_placeholder')" autocomplete="off">
-      </FormField>
-
-      <!-- OAuth 模式: 名称在授权完成屏填写 (identity, 对齐 wizard step3) -->
+    <!-- 态 1: 连接 / 态 2: done 最后一步 (全类型统一 CloudAuthHero embedded;
+         key 只含 type: 1/2 态切换是同一实例内部的相位/屏幕变化, 重新挂载会
+         丢掉 OAuth 会话相位导致退回登录 hero) -->
+    <div v-else class="flow-stack">
       <CloudAuthHero
-        v-if="isOAuthType"
+        :key="type"
         ref="cloudAuthHeroRef"
-        :type="type" v-model:name="name" :modal="true" :types="remoteTypes" identity
+        v-model:name="name"
+        v-model:fields="fields"
+        v-model:root-dir="rootDir"
+        v-model:bucket="bucket"
+        :type="type"
+        :types="remoteTypes"
+        :modal="true"
+        identity
+        embedded
         @update:phase="onOAuthPhase"
       />
-
-      <!-- S3 存储桶 (rclone s3 路径首段) -->
-      <FormField v-if="type === 's3'" :label="t('sync.dir.bucket_label')" density="compact">
-        <input v-model="bucket" type="text" class="form-input" placeholder="comfy-assets" autocomplete="off">
-      </FormField>
-
-      <!-- 非 OAuth: 凭据表单按后端 REMOTE_TYPE_DEFS 动态渲染 -->
-      <template v-if="!isOAuthType">
-        <FormField v-for="field in currentFields" :key="field.key" :label="field.label" density="compact">
-          <BaseSelect
-            v-if="field.type === 'select'"
-            :model-value="fields[field.key] || ''"
-            :options="(field.options || []).map(o => ({ value: o, label: o }))"
-            teleport
-            @update:model-value="(v: string | number | boolean) => fields[field.key] = String(v)"
-          />
-          <SecretInput v-else-if="field.type === 'password'" v-model="fields[field.key]" :is-password="true" :placeholder="field.placeholder" />
-          <textarea v-else-if="field.type === 'textarea'" v-model="fields[field.key]" rows="3" class="form-textarea form-textarea--mono" :placeholder="field.placeholder" />
-          <input v-else v-model="fields[field.key]" type="text" class="form-input" :placeholder="field.placeholder" autocomplete="off">
-          <template v-if="field.help" #below>
-            <p class="flow-field-help" v-html="field.help" />
-          </template>
-        </FormField>
-      </template>
     </div>
 
     <!-- 错误就地提示 -->
     <AlertBanner v-if="error" tone="danger" dense>{{ error }}</AlertBanner>
 
-    <!-- 底部动作条: 返回/取消 + checkbox(创建同步规则) + 完成 -->
+    <!-- 底部动作条: 取消(第一屏) / 上一步 + 下一步 / 保存并创建规则 -->
     <div class="flow-footer">
-      <label class="flow-create-rules">
-        <input v-model="createRulesChecked" type="checkbox">
-        <span>{{ t('sync.flow.create_rules') }}</span>
-      </label>
       <span class="flow-footer-spacer" />
-      <BaseButton :disabled="submitting" @click="flow === 0 ? emit('cancel') : back()">
-        {{ flow === 0 ? t('common.btn.cancel') : t('sync.oauth.back') }}
+      <BaseButton v-if="flow === 0" :disabled="submitting" @click="emit('cancel')">
+        {{ t('common.btn.cancel') }}
       </BaseButton>
-      <BaseButton variant="primary" :loading="submitting" :disabled="nextDisabled" @click="next">
+      <BaseButton v-else :disabled="submitting || advancing" @click="back">
+        {{ t('sync.oauth.back') }}
+      </BaseButton>
+      <BaseButton
+        v-if="flow === 2"
+        variant="primary" :loading="submitting" :disabled="nextDisabled" @click="() => onNext(true)"
+      >{{ t('sync.flow.save_create') }}</BaseButton>
+      <BaseButton variant="primary" :loading="submitting || advancing" :disabled="nextDisabled" @click="() => onNext()">
         {{ primaryLabel }}
       </BaseButton>
     </div>
@@ -390,25 +389,8 @@ defineExpose({
 /* 品牌标识 */
 .flow-choice-title { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .flow-logo { width: var(--sp-5); height: var(--sp-5); object-fit: contain; flex: none; }
-.flow-logo-sm { width: var(--sp-4); height: var(--sp-4); object-fit: contain; }
-.flow-context-logo {
-  width: var(--sp-6); height: var(--sp-6); flex: none;
-  border-radius: var(--rs);
-  background: color-mix(in srgb, var(--ac) 8%, transparent);
-  display: grid; place-items: center;
-}
-.flow-context { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--text-base); color: var(--t2); }
-.flow-context strong { font-weight: 600; color: var(--t1); }
 
-.flow-field-help { margin: 0; font-size: var(--text-xs); color: var(--t3); line-height: 1.4; overflow-wrap: anywhere; }
-
-/* 底部动作条: checkbox 左对齐, 按钮靠右 */
-.flow-create-rules {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: .82rem; color: var(--t3);
-  cursor: pointer; user-select: none;
-}
-.flow-create-rules input { accent-color: var(--ac); }
+/* 底部动作条: 按钮靠右 */
 .flow-footer-spacer { flex: 1; }
 .flow-footer { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); }
 </style>

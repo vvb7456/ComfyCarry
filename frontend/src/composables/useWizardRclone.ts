@@ -7,14 +7,13 @@ import { CLOUD_PROVIDERS, OAUTH_TYPES, type CloudProvider } from '@/config/cloud
 import type { WizardRemotesResponse } from '@/types/wizard'
 import type { RemoteField } from '@/types/sync'
 import {
-  pathOverrides as _pathOverrides,
   storageTypeRef, storageNameRef, storageFieldsRef, storageOauthParamsRef,
-  storageBucketRef,
+  storageBucketRef, storageRootDirRef,
   createdRemoteRef, storageErrorRef, invalidateCreatedRemote,
 } from './wizardRcloneState'
 
 export function useWizardRclone() {
-  const { t } = useI18n({ useScope: 'global' })
+  const { t, te } = useI18n({ useScope: 'global' })
   const { config, syncTemplates, remoteTypeDefs } = useWizardState()
   const { post } = useApiFetch()
   const { confirm } = useConfirm()
@@ -28,6 +27,7 @@ export function useWizardRclone() {
   const storageName = storageNameRef
   const storageFields = storageFieldsRef
   const storageBucket = storageBucketRef
+  const storageRootDir = storageRootDirRef
   const storageOauthParams = storageOauthParamsRef
   const storageError = storageErrorRef
 
@@ -58,6 +58,8 @@ export function useWizardRclone() {
       storageNameRef.value = ''
       storageFieldsRef.value = {}
       storageOauthParamsRef.value = {}
+      storageBucketRef.value = ''
+      storageRootDirRef.value = ''
       return
     }
     storageTypeRef.value = p.id
@@ -67,6 +69,8 @@ export function useWizardRclone() {
       if (f.default !== undefined) storageFieldsRef.value[f.key] = f.default
     }
     storageOauthParamsRef.value = {}
+    storageBucketRef.value = ''
+    storageRootDirRef.value = ''
   }
 
   /** 名称校验 (错误写入 storageError, 返回是否通过) */
@@ -110,7 +114,7 @@ export function useWizardRclone() {
    */
   async function ensureCreated(sourceName?: string): Promise<boolean> {
     const target = storageNameRef.value.trim()
-    const paramsKey = JSON.stringify(buildCreateParams())
+    const paramsKey = JSON.stringify({ params: buildCreateParams(), root_dir: storageRootDirRef.value.trim() })
     const cr = createdRemoteRef.value
     if (cr && cr.name === target && cr.type === storageTypeRef.value && cr.paramsKey === paramsKey) {
       return true
@@ -136,7 +140,8 @@ export function useWizardRclone() {
     }
 
     const request: Record<string, unknown> = {
-      name: target, type: storageTypeRef.value, params: buildCreateParams(), overwrite,
+      name: target, type: storageTypeRef.value, params: buildCreateParams(),
+      root_dir: storageRootDirRef.value.trim(), overwrite,
     }
     // 恢复态编辑 OAuth/凭据字段时，服务端用 source_name 从同类型旧草稿
     // 补回 token 等不可由前端持有的参数。新授权/换账号不带此字段。
@@ -155,15 +160,20 @@ export function useWizardRclone() {
       }
       config.wizard_remotes = (d.wizard_remotes || []).filter(r => r.name === target)
 
-      // 存储被替换时, 已选规则的 remote/路径一并迁移到新存储:
+      // 存储被替换时, 已选规则的 remote 一并迁移到新存储:
       // 旧 remote 已从计划删除, 规则若仍指旧名, 部署时 rclone 找不到 remote 必失败。
-      // 路径仅当默认路径派生自旧存储 (bucket 前缀) 时重算, 用户手改过的原样保留。
+      // 预设项的远程路径不再落盘 (部署时按 entry + bucket 重算), 无需迁移路径。
       const newRemote = (d.wizard_remotes || []).find(r => r.name === target)
-        || { name: target, type: storageTypeRef.value, bucket: storageTypeRef.value === 's3' ? storageBucketRef.value.trim() : '' }
+        || {
+          name: target, type: storageTypeRef.value,
+          root_dir: storageRootDirRef.value.trim(),
+          bucket: storageTypeRef.value === 's3' ? storageBucketRef.value.trim() : '',
+        }
       const previousPrimary = previousRemotes[0]
       const storageIdentityChanged = !!previousPrimary
         && (previousPrimary.name !== target
           || previousPrimary.type !== newRemote.type
+          || (previousPrimary.root_dir || '') !== (newRemote.root_dir || '')
           || (previousPrimary.type === 's3' ? (previousPrimary.bucket || '') : '')
             !== (newRemote.type === 's3' ? (newRemote.bucket || '') : ''))
       const wasReplaced = others.length > 0
@@ -171,15 +181,7 @@ export function useWizardRclone() {
         || !!(cr && (cr.name !== target || cr.type !== storageTypeRef.value))
       if (wasReplaced) {
         for (const rule of config.wizard_sync_rules) {
-          const tpl = syncTemplates.value.find(x => x.id === rule.template_id)
-          const oldRemote = previousRemotes.find(r => r.name === rule.remote) || previousPrimary
-          const oldDefault = tpl ? defaultPathForRemote(oldRemote, tpl) : ''
-          const oldPath = rule.remote_path
           rule.remote = target
-          // 仅迁移空路径或原来自动生成的默认路径, 用户自定义路径保持不变。
-          if (tpl && (!oldPath || oldPath === oldDefault)) {
-            rule.remote_path = defaultPathForRemote(newRemote, tpl)
-          }
         }
       }
       return true
@@ -190,13 +192,8 @@ export function useWizardRclone() {
 
   // ── Step 4 同步规则 (单存储: remote 隐式取计划第一条, 无选择逻辑) ──
 
-  const pullTemplates = computed(() =>
-    syncTemplates.value.filter(t => t.direction === 'pull'),
-  )
-
-  const pushTemplates = computed(() =>
-    syncTemplates.value.filter(t => t.direction === 'push'),
-  )
+  /** 全部预设 (不再按上/下行分组) */
+  const presetTemplates = computed(() => syncTemplates.value)
 
   /** 当前存储 (计划第一条; 单存储语义) */
   const currentRemote = computed(() => config.wizard_remotes[0] || null)
@@ -204,42 +201,25 @@ export function useWizardRclone() {
   /** 规则的 remote 名 —— 单存储语义下无选择, 恒取当前存储 */
   const ruleRemoteName = computed(() => currentRemote.value?.name || '')
 
-  /**
-   * 规则默认远程路径: <[bucket/]ComfyCarry>/<模板子路径>。
-   * S3 的 bucket 是 rclone s3 路径首段 (来自服务端安全投影, 与存储计划一致)。
-   */
-  function defaultPathForRemote(remote: { type?: string; bucket?: string } | null | undefined, tpl: { remote_path: string }): string {
-    const bucket = remote?.type === 's3' ? (remote.bucket || '').trim() : ''
-    const prefix = [bucket, 'ComfyCarry'].filter(Boolean).join('/')
-    return `${prefix}/${tpl.remote_path.split('/').pop() || tpl.remote_path}`
-  }
-
-  function defaultPathFor(tpl: { remote_path: string }): string {
-    return defaultPathForRemote(currentRemote.value, tpl)
-  }
-
   function isRuleSelected(templateId: string): boolean {
     return config.wizard_sync_rules.some(r => r.template_id === templateId)
   }
 
-  function toggleRule(templateId: string, remotePath: string) {
+  /** 预设勾选: entry_names 以当前语言固化 (部署落库的规则名) */
+  function toggleRule(templateId: string) {
     const idx = config.wizard_sync_rules.findIndex(r => r.template_id === templateId)
     if (idx >= 0) {
-      // 取消勾选前把已选路径存回 overrides ——
-      // 不然重新勾选时会回落到默认值, 用户之前的选择白填了
-      const removed = config.wizard_sync_rules[idx]
-      if (removed.remote_path) _pathOverrides.value[templateId] = removed.remote_path
       config.wizard_sync_rules.splice(idx, 1)
     } else {
+      const tpl = syncTemplates.value.find(x => x.id === templateId)
+      const entryNames = tpl
+        ? tpl.entries.map(e => (e.name_key && te(e.name_key) ? t(e.name_key) : e.name))
+        : []
       config.wizard_sync_rules.push({
-        template_id: templateId, remote: ruleRemoteName.value, remote_path: remotePath,
+        template_id: templateId, remote: ruleRemoteName.value,
+        entry_names: entryNames,
       })
     }
-  }
-
-  function updateRulePath(templateId: string, path: string) {
-    const rule = config.wizard_sync_rules.find(r => r.template_id === templateId)
-    if (rule) rule.remote_path = path
   }
 
   return {
@@ -248,9 +228,9 @@ export function useWizardRclone() {
     storageName,
     storageFields,
     storageBucket,
+    storageRootDir,
     storageError,
     storageOauthParams,
-    pathOverrides: _pathOverrides,
 
     // Computed (step 3 connect)
     currentFields,
@@ -265,15 +245,12 @@ export function useWizardRclone() {
     invalidateCreatedRemote,
 
     // Computed (step 4 rules)
-    pullTemplates,
-    pushTemplates,
+    presetTemplates,
     currentRemote,
     ruleRemoteName,
 
     // Actions (step 4 rules)
-    defaultPathFor,
     isRuleSelected,
     toggleRule,
-    updateRulePath,
   }
 }

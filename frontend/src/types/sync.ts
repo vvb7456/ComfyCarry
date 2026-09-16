@@ -34,6 +34,8 @@ export interface Remote {
   type: string
   display_name?: string
   has_auth?: boolean
+  /** 与这份存储绑定的同步文件夹 (预设规则路径的锚点; 不是凭据) */
+  root_dir?: string
   /** rclone.conf 里的非敏感配置项 (s3 的 provider 用于选品牌 logo) */
   params?: Record<string, string>
 }
@@ -53,16 +55,6 @@ export interface SyncRule {
 
 // ── Companion (桌面客户端) ──────────────────────────────────
 
-/** 客户端上报的只读规则摘要 */
-export interface CompanionRuleSummary {
-  name?: string
-  source?: string
-  local_path?: string
-  method?: string
-  trigger?: string
-  last_result?: string
-}
-
 /** rclone serve webdav 进程状态 */
 export interface CompanionServeStatus {
   running: boolean
@@ -72,13 +64,13 @@ export interface CompanionServeStatus {
   serve_root?: string
 }
 
+/** 在线客户端 (同步规则由客户端本地持有, 面板不接收) */
 export interface CompanionClient {
   client_id: string
   hostname: string
   app_version: string
-  /** idle | syncing | paused | error */
+  /** 客户端上报的同步状态原文 (面板原样展示, 不落库) */
   status: string
-  rule_summaries?: CompanionRuleSummary[]
   last_seen: number
   online: boolean
 }
@@ -89,17 +81,30 @@ export interface CompanionClientsResponse {
   dav_url?: string
 }
 
-export interface SyncTemplate {
-  id?: string
+/** 预设内的一条子规则 (一对 local↔remote 路径) */
+export interface SyncTemplateEntry {
+  /** 后端兜底名 (前端缺翻译时用) */
   name: string
-  direction: 'pull' | 'push'
+  name_key?: string
+  local_path: string
+  remote_path: string
   method: 'copy' | 'sync' | 'move'
   trigger: 'manual' | 'deploy' | 'watch'
-  local_path?: string
-  remote_path?: string
-  description?: string
   filters?: string[]
-  watch_interval?: number
+}
+
+/**
+ * 同步规则预设 = 一组子规则。
+ * 卡片文案按 name_key / desc_key 翻译; 落库规则名在创建时由前端以当前
+ * 语言固化 (规则名是用户可编辑字段, 不能存 i18n key)。
+ */
+export interface SyncTemplate {
+  id: string
+  name: string
+  name_key?: string
+  desc_key?: string
+  direction: 'pull' | 'push'
+  entries: SyncTemplateEntry[]
 }
 
 export interface SyncSettings {
@@ -118,6 +123,8 @@ export interface SyncStatusResponse {
   settings?: SyncSettings
   /** 正在执行的 job；本页的进度显示走 useSyncJobs 的独立轮询, 这里仅为契约完整 */
   current_job_id?: string | null
+  /** 排队中的任务数 (status='queued') */
+  queued_count?: number
 }
 
 export interface RemotesResponse {
@@ -212,6 +219,8 @@ export interface RemoteCreateRequest {
   name: string
   type: string
   params?: Record<string, string>
+  /** 与这份存储绑定的同步文件夹 (必填, 不能是存储根) */
+  root_dir?: string
   /** true = 走 OAuth 会话创建 (token 全程在后端, 前端不经手) */
   oauth?: boolean
   /** true = 同名 remote 原地替换凭据 (规则不受影响); 缺省同名时后端返回 409 */
@@ -229,13 +238,4 @@ export interface OAuthDriveItem {
 /** GET /api/sync/remote/oauth/drives 响应 */
 export interface DrivesResponse extends ApiOkResponse {
   drives?: OAuthDriveItem[]
-}
-
-/** POST /api/setup/wizard_remote 请求体 (spec §3.3) */
-export interface WizardRemoteRequest {
-  name: string
-  type: string
-  params?: Record<string, string>
-  /** true = 同名条目原地替换; 缺省同名时后端返回 400 */
-  overwrite?: boolean
 }

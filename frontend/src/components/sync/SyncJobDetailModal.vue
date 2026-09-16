@@ -87,7 +87,7 @@ async function loadMoreEvents(): Promise<void> {
 function statusTone(status: string): 'positive' | 'caution' | 'negative' | 'neutral' {
   if (status === 'success') return 'positive'
   if (status === 'failed') return 'negative'
-  if (status === 'running' || status === 'partial') return 'caution'
+  if (status === 'running' || status === 'queued' || status === 'partial') return 'caution'
   return 'neutral'
 }
 
@@ -159,8 +159,12 @@ const eventRows = computed(() => events.value.map(e => ({
 
       <!-- 汇总 -->
       <dl class="detail-dl">
+        <template v-if="job.queued_at">
+          <dt>{{ t('sync.detail.queued_at') }}</dt>
+          <dd>{{ fmtTime(job.queued_at) }}</dd>
+        </template>
         <dt>{{ t('sync.detail.started') }}</dt>
-        <dd>{{ fmtTime(job.started_at) }}</dd>
+        <dd>{{ job.status === 'queued' ? '—' : fmtTime(job.started_at) }}</dd>
         <dt>{{ t('sync.detail.finished') }}</dt>
         <dd>{{ fmtTime(job.finished_at) }}</dd>
         <dt>{{ t('sync.detail.duration') }}</dt>

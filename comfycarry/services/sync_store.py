@@ -21,21 +21,101 @@ log = logging.getLogger(__name__)
 
 def create_job(job_id: str, *, trigger_type: str = "manual",
                trigger_ref: str = "", rule_count: int = 0,
-               rules: list[dict] | None = None) -> None:
+               rules: list[dict] | None = None,
+               status: str = "running",
+               queued_at: float | None = None) -> None:
     """创建新的 sync job 记录。
 
     rules 是本次执行规则的展示快照 (SyncJobRuleSnapshot 列表)。落库为
     rules_json, 规则后续被编辑/删除也不影响历史回看。
+
+    status 默认保持 'running' (不经队列的直接执行); 'queued' 时才写
+    queued_at, 并用入队时刻占位 started_at (执行员接手时覆盖为真实开始时间)。
     """
     now = time.time()
     rules_json = json.dumps(rules or [], ensure_ascii=False)
+    queue_ts = None
+    if status == "queued":
+        queue_ts = queued_at if queued_at is not None else now
     db.execute(
         """INSERT INTO sync_jobs
                (job_id, trigger_type, trigger_ref, status, rule_count,
-                rules_json, started_at)
-           VALUES (?, ?, ?, 'running', ?, ?, ?)""",
-        (job_id, trigger_type, trigger_ref, rule_count, rules_json, now),
+                rules_json, started_at, queued_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (job_id, trigger_type, trigger_ref, status, rule_count,
+         rules_json, now, queue_ts),
     )
+
+
+def mark_job_running(job_id: str) -> bool:
+    """把排队中的 job 置为 running 并覆盖 started_at 为真实开始时刻。
+
+    条件 UPDATE (WHERE status='queued') 是取消竞态安全的关键: 执行员
+    「读 DB 判状态」与「真正开跑」之间存在窗口, cancel 接口可能已把行
+    改成 cancelled; 无条件 UPDATE 会把行改回 running 继续执行。未命中
+    (已被取消/停止清队) 时返回 False, 执行员据此跳过该任务且不改库。
+    """
+    cursor = db.execute(
+        "UPDATE sync_jobs SET status = 'running', started_at = ? "
+        "WHERE job_id = ? AND status = 'queued'",
+        (time.time(), job_id),
+    )
+    return cursor.rowcount > 0
+
+
+def cancel_queued_job(job_id: str) -> bool:
+    """取消排队中的 job (queued_at 保留)。返回是否命中。
+
+    条件 UPDATE 保证只取消尚未开始执行的行; 执行中/已结束的行不命中。
+    """
+    cursor = db.execute(
+        "UPDATE sync_jobs SET status = 'cancelled', finished_at = ? "
+        "WHERE job_id = ? AND status = 'queued'",
+        (time.time(), job_id),
+    )
+    return cursor.rowcount > 0
+
+
+def cancel_all_queued_jobs() -> int:
+    """把所有排队中的 job 置为 cancelled (用户「停止」清队)。返回行数。"""
+    cursor = db.execute(
+        "UPDATE sync_jobs SET status = 'cancelled', finished_at = ? "
+        "WHERE status = 'queued'",
+        (time.time(),),
+    )
+    return cursor.rowcount
+
+
+def has_active_watch_job() -> bool:
+    """是否存在排队中或执行中的 watch 任务 (供 watch 调度去重)。"""
+    row = db.fetch_one(
+        "SELECT 1 FROM sync_jobs WHERE trigger_type = 'watch' "
+        "AND status IN ('queued', 'running') LIMIT 1",
+    )
+    return row is not None
+
+
+def count_queued_jobs() -> int:
+    """排队中的 job 数。"""
+    row = db.fetch_one(
+        "SELECT COUNT(*) FROM sync_jobs WHERE status = 'queued'",
+    )
+    return row[0] if row else 0
+
+
+def reconcile_orphan_jobs() -> int:
+    """启动对账: 把进程重启前残留的 queued/running 任务置为 interrupted。
+
+    finished_at 原本为空时补 now。返回处理的行数 (便于日志)。
+    """
+    now = time.time()
+    cursor = db.execute(
+        "UPDATE sync_jobs SET status = 'interrupted', "
+        "finished_at = COALESCE(finished_at, ?) "
+        "WHERE status IN ('queued', 'running')",
+        (now,),
+    )
+    return cursor.rowcount
 
 
 def finish_job(job_id: str, *, status: str = "success",
@@ -73,20 +153,20 @@ def get_job(job_id: str) -> dict | None:
     return _row_to_dict(row) if row else None
 
 
-def count_jobs() -> int:
-    """保留期内 job 总数 (与分页查询同一数据集合)。"""
-    row = db.fetch_one("SELECT COUNT(*) FROM sync_jobs")
-    return row[0] if row else 0
-
-
-def get_jobs_page(*, page: int = 1, limit: int = 5) -> tuple[list[dict], int, int]:
+def get_jobs_page(*, page: int = 1, limit: int = 5,
+                  finished: bool = False) -> tuple[list[dict], int, int]:
     """分页读取 job。返回 (jobs, total, 归一化后的 page)。
 
-    - 排序 started_at DESC, job_id DESC —— 同一 started_at 时仍稳定。
+    - finished=True 只返回已结束 (finished_at IS NOT NULL) 的行, 供 Hero
+      取「上一条已完成任务」, 避免新排序把排队任务顶到第一条。
+    - 排序三层: running 最前; 其次 queued (按 queued_at ASC, 先入队在上);
+      其余按 started_at DESC (新在上); job_id DESC 兜底。
     - page / limit 小于 1 时兜底为 1; 超出末页归一化到最后一页。
     - 空集合 page 固定为 1。
     """
-    total = count_jobs()
+    where = "WHERE finished_at IS NOT NULL" if finished else ""
+    row = db.fetch_one(f"SELECT COUNT(*) FROM sync_jobs {where}")
+    total = row[0] if row else 0
     limit = max(int(limit), 1)
     page = max(int(page), 1)
     if total == 0:
@@ -98,19 +178,16 @@ def get_jobs_page(*, page: int = 1, limit: int = 5) -> tuple[list[dict], int, in
     offset = (page - 1) * limit
     rows = db.fetch_all(
         "SELECT * FROM sync_jobs "
-        "ORDER BY started_at DESC, job_id DESC LIMIT ? OFFSET ?",
+        f"{where} "
+        "ORDER BY "
+        "CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, "
+        "CASE WHEN status = 'queued' THEN queued_at ELSE NULL END ASC, "
+        "CASE WHEN status = 'queued' THEN NULL ELSE started_at END DESC, "
+        "job_id DESC "
+        "LIMIT ? OFFSET ?",
         (limit, offset),
     )
     return [_row_to_dict(r) for r in rows], total, page
-
-
-def get_running_job() -> dict | None:
-    """读取当前正在运行的 job (最多一个)。"""
-    row = db.fetch_one(
-        "SELECT * FROM sync_jobs WHERE status = 'running' "
-        "ORDER BY started_at DESC LIMIT 1",
-    )
-    return _row_to_dict(row) if row else None
 
 
 def delete_old_jobs(max_age_seconds: int = 7 * 86400) -> int:

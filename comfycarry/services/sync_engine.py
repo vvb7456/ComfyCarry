@@ -9,15 +9,17 @@ ComfyCarry — Cloud Sync v2 引擎
 
 import json
 import os
+import queue
 import re
 import subprocess
 import threading
 import time
 import uuid
+from dataclasses import dataclass
 
 from ..config import (
     RCLONE_CONF, SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
-    resolve_workspace_path,
+    REMOTE_ROOT_DIR_KEY, resolve_workspace_path,
 )
 
 
@@ -74,20 +76,24 @@ def _parse_rclone_conf():
         if m:
             if current:
                 remotes.append(current)
-            current = {"name": m.group(1), "type": "", "params": {},
+            current = {"name": m.group(1), "type": "", "root_dir": "", "params": {},
                        "_has_token": False, "_has_keys": False, "_has_pass": False}
         elif current and '=' in line:
             k, v = line.split('=', 1)
             k, v = k.strip(), v.strip()
             if k == "type":
                 current["type"] = v
+            if k == REMOTE_ROOT_DIR_KEY:
+                # 同步文件夹是 remote 的一等字段, 不是凭据参数
+                current["root_dir"] = v
             if k == "token" and v:
                 current["_has_token"] = True
             if k == "access_key_id" and v:
                 current["_has_keys"] = True
             if k in ("pass", "password", "user", "key_file") and v:
                 current["_has_pass"] = True
-            if k not in ("token", "access_key_id", "secret_access_key", "refresh_token"):
+            if k not in ("token", "access_key_id", "secret_access_key",
+                         "refresh_token", REMOTE_ROOT_DIR_KEY):
                 current["params"][k] = v
     if current:
         remotes.append(current)
@@ -128,10 +134,29 @@ _sync_log_lock = threading.Lock()
 # _current_job.job_id / .rule_id 是 thread-local: 日志归属必须按执行线程算 ——
 # 用模块级单变量时, 后开始的 job 会覆盖它, 前一个 job 的后续事件就写进了
 # 别人的记录里 (worker 跑 watch job 时用户点手动执行即可复现)。
-# _running_job_ids 只服务 get_current_job_id() (给 API 显示"正在跑哪个")。
 _current_job = threading.local()   # .job_id / .rule_id
-_running_job_ids: list[str] = []
-_current_job_id_lock = threading.Lock()
+
+
+# ── 同步任务队列 & 常驻执行员 ─────────────────────────────────
+#
+# 所有同步任务都由唯一执行员顺序执行: 发起人 (run 接口 / watch 调度) 只
+# 入队, 不再各自起线程。排队行立即落库, 因此列表可见、可取消。
+
+@dataclass
+class JobRequest:
+    """队列元素: 一条待执行任务及其规则快照 (原始规则字典, 非展示快照)。"""
+    job_id: str
+    rules: list[dict]
+    trigger_type: str
+    trigger_ref: str
+
+
+_job_queue: "queue.Queue[JobRequest]" = queue.Queue()
+_executor_thread = None                  # 常驻执行员单例
+_executor_lock = threading.Lock()        # 保证执行员单例
+_queue_lock = threading.Lock()           # 入队与停止清队互斥
+_active_job_id: str | None = None        # 执行员当前正在跑的任务
+_active_interrupt = threading.Event()    # 当前任务的中断信号
 
 # 引用 Flask app logger (延迟绑定)
 _app_logger = None
@@ -325,9 +350,22 @@ def _run_sync_rule_inner(rule):
 
 
 def get_current_job_id() -> str | None:
-    """返回当前正在执行的 job_id (跨线程安全)。多个并发 job 时返回最早开始的那个。"""
-    with _current_job_id_lock:
-        return _running_job_ids[0] if _running_job_ids else None
+    """返回执行员当前正在执行的任务 id (无任务时为 None)。"""
+    return _active_job_id
+
+
+def interrupt_active_job(job_id: str) -> bool:
+    """中断当前正在执行的任务。
+
+    job_id 与执行员的活动任务不一致时返回 False (调用方据此拒绝, 避免误杀)。
+    只置中断信号并终止当前 rclone 进程, 不触碰队列与 watch 调度 —— 执行员
+    在该任务收尾后继续下一条。
+    """
+    if not job_id or job_id != _active_job_id:
+        return False
+    _active_interrupt.set()
+    _terminate_current_proc()
+    return True
 
 
 # 执行规则写入历史记录时保留的展示字段 (其余运行时字段不落快照)
@@ -347,40 +385,56 @@ def build_rule_snapshot(rule: dict) -> dict:
 
 
 def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
-                     trigger_ref: str = "") -> str:
+                     trigger_ref: str = "", *, job_id: str | None = None) -> str:
     """
     将一组规则打包为一个 Job 执行。
-    创建 DB job 记录，逐条执行规则，统计成功/失败，最后 finish。
-    返回 job_id。
-    """
-    job_id = f"sync-{uuid.uuid4().hex[:12]}"
-    rule_count = len(rules)
-    snapshots = [build_rule_snapshot(r) for r in rules]
+    逐条执行规则，统计成功/失败，最后 finish。返回 job_id。
 
-    # 创建 DB job
-    try:
+    job_id 为空时保持旧行为: 自建 running 行再执行 (测试与直接调用方)。
+    传入 job_id 时假定行已由 enqueue_job 建为 queued: 不再建行, 开始时用
+    条件 UPDATE 置 running; 未命中 (排队期间被取消/停止清队) 直接返回,
+    不执行规则也不 finish —— 行已是 cancelled 终态。
+
+    注意: 本函数不写 _active_* 模块变量, 只读 _active_interrupt 做中断判定。
+    这些活动状态由执行员循环维护, 避免在别处被调用时误清执行员的现场。
+    """
+    if job_id is None:
+        job_id = f"sync-{uuid.uuid4().hex[:12]}"
+        rule_count = len(rules)
+        snapshots = [build_rule_snapshot(r) for r in rules]
+        # 创建 DB job
+        try:
+            from . import sync_store as store
+            store.create_job(job_id, trigger_type=trigger_type,
+                             trigger_ref=trigger_ref, rule_count=rule_count,
+                             rules=snapshots)
+        except Exception as e:
+            if _app_logger:
+                _app_logger.warning(f"[sync] create_job failed: {e}")
+    else:
         from . import sync_store as store
-        store.create_job(job_id, trigger_type=trigger_type,
-                         trigger_ref=trigger_ref, rule_count=rule_count,
-                         rules=snapshots)
-    except Exception as e:
-        if _app_logger:
-            _app_logger.warning(f"[sync] create_job failed: {e}")
+        # mark_job_running 是条件 UPDATE: 排队期间已被取消/停止清队时未命中,
+        # 该任务不再执行 (行保持 cancelled 终态, 执行员跳过)
+        if not store.mark_job_running(job_id):
+            return job_id
 
     # 本线程的 job 归属 (thread-local, 不会被并发 job 覆盖)
     _current_job.job_id = job_id
     _current_job.rule_id = ""
-    with _current_job_id_lock:
-        _running_job_ids.append(job_id)
 
     success_count = 0
     failure_count = 0
     all_stats: list[dict] = []
-    # 只有 watch 类型受 stop 信号中断; 手动/部署执行不受 worker stop 影响
+    # 只有 watch 类型受 worker stop 信号中断; 手动/部署执行不受其影响
     check_stop = (trigger_type == "watch")
     was_cancelled = False
+    was_interrupted = False
     try:
         for rule in rules:
+            # 中断判定对所有触发类型生效
+            if _active_interrupt.is_set():
+                was_interrupted = True
+                break
             if check_stop and _sync_worker_stop.is_set():
                 was_cancelled = True
                 break
@@ -401,6 +455,10 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
                 )
             except Exception:
                 pass
+            # 进程在规则中被杀时该规则已返回, 这里补一次判定
+            if _active_interrupt.is_set():
+                was_interrupted = True
+                break
     finally:
         # 清理线程局部变量
         _current_job.rule_id = ""
@@ -423,8 +481,10 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
         }
 
         # 决定 job 终态
-        if was_cancelled:
-            status = "cancelled"
+        # 执行中被中断 / watch 调度被停止都是 interrupted; cancelled 仅用于
+        # 「从未开始执行就被取消」, 由 cancel 接口直接落库, 不经过这里
+        if was_interrupted or was_cancelled:
+            status = "interrupted"
         elif failure_count == 0:
             status = "success"
         elif success_count == 0:
@@ -447,11 +507,97 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
                 _app_logger.warning(f"[sync] finish_job failed: {e}")
 
         _current_job.job_id = None
-        with _current_job_id_lock:
-            if job_id in _running_job_ids:
-                _running_job_ids.remove(job_id)
 
     return job_id
+
+
+def enqueue_job(rules: list[dict], trigger_type: str = "manual",
+                trigger_ref: str = "") -> str:
+    """把一组规则加入同步队列, 返回 job_id。
+
+    持 _queue_lock 让「写 queued 行 + 放队列」与「停止清队」整体互斥, 避免
+    出现「DB 还是 queued 但队列里已没有」或反之的半截记录。执行员懒启动。
+    """
+    job_id = f"sync-{uuid.uuid4().hex[:12]}"
+    snapshots = [build_rule_snapshot(r) for r in rules]
+    with _queue_lock:
+        from . import sync_store as store
+        store.create_job(job_id, trigger_type=trigger_type,
+                         trigger_ref=trigger_ref, rule_count=len(rules),
+                         rules=snapshots, status="queued", queued_at=time.time())
+        _job_queue.put(JobRequest(job_id, list(rules), trigger_type, trigger_ref))
+    _ensure_executor()
+    return job_id
+
+
+def _ensure_executor():
+    """确保常驻执行员线程存在 (懒启动单例)。"""
+    global _executor_thread
+    with _executor_lock:
+        if _executor_thread is None or not _executor_thread.is_alive():
+            _executor_thread = threading.Thread(
+                target=_executor_loop, daemon=True, name="sync-executor")
+            _executor_thread.start()
+
+
+def _executor_loop():
+    """常驻执行员: 从队列取任务顺序执行, 队列空时阻塞在 get() 不占资源。
+
+    整体套一层异常保护: 单条任务的意外异常只记日志, 绝不允许常驻执行员
+    线程死亡 (否则后续入队的任务永远无人消费)。
+    """
+    while True:
+        try:
+            req = _job_queue.get()
+            try:
+                _executor_run_one(req)
+            finally:
+                _job_queue.task_done()
+        except Exception as e:
+            _sync_log("executor_error", {"error": str(e)}, "error")
+            if _app_logger:
+                _app_logger.exception("[sync] executor task failed")
+
+
+def _executor_run_one(req: JobRequest):
+    """执行单条队列任务, 维护执行员的活动任务状态。"""
+    global _active_job_id
+    from . import sync_store as store
+
+    # 以 DB 状态为准: 排队期间被取消/停止清队时直接跳过
+    job = store.get_job(req.job_id)
+    if not job or job.get("status") != "queued":
+        return
+    # watch 调度已停止: 丢弃待跑的 watch 任务 (手动任务不受影响)
+    if req.trigger_type == "watch" and _sync_worker_stop.is_set():
+        store.cancel_queued_job(req.job_id)
+        return
+
+    # 活动状态的设置/清理全部放在这里 (不在 run_rules_as_job 里), 避免该
+    # 函数在别处被调用时误清执行员的现场
+    _active_job_id = req.job_id
+    _active_interrupt.clear()
+    try:
+        run_rules_as_job(req.rules, req.trigger_type, req.trigger_ref,
+                         job_id=req.job_id)
+    finally:
+        _active_job_id = None
+
+
+def _terminate_current_proc():
+    """终止当前正在执行的 rclone 子进程 (terminate + wait, kill 兜底)。"""
+    with _sync_current_proc_lock:
+        proc = _sync_current_proc
+        if proc and proc.poll() is None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=3)
+            except (subprocess.TimeoutExpired, OSError):
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+            _sync_log("rclone_killed", level="warn")
 
 
 def _sync_worker_loop():
@@ -507,7 +653,10 @@ def _sync_worker_tick():
         runnable.append(rule)
 
     if runnable and not _sync_worker_stop.is_set():
-        run_rules_as_job(runnable, trigger_type="watch")
+        from . import sync_store as store
+        # 已有 watch 任务在排队或执行时本轮不入队, 防止队列无界堆积
+        if not store.has_active_watch_job():
+            enqueue_job(runnable, trigger_type="watch")
 
     settings = _load_sync_settings()
     wait = max(settings.get("watch_interval", 60), 5)
@@ -520,37 +669,48 @@ def is_worker_running():
 
 
 def start_sync_worker():
-    """启动 sync worker 后台线程"""
+    """启动 sync worker 后台线程 (先回收旧调度, 不丢手动队列)"""
     global _sync_worker_thread
-    stop_sync_worker()
-    if _sync_worker_thread and _sync_worker_thread.is_alive():
-        _sync_log("worker_stale", level="warn")
-        _sync_worker_thread.join(timeout=10)
-        if _sync_worker_thread.is_alive():
-            _sync_log("worker_stale_failed", level="error")
-            return False
+    stop_sync_worker(cancel_pending=False)
     _sync_worker_stop.clear()
     _sync_worker_thread = threading.Thread(target=_sync_worker_loop, daemon=True, name="sync-worker")
     _sync_worker_thread.start()
-    return True
 
 
-def stop_sync_worker():
-    """停止 sync worker 并终止正在执行的 rclone 进程"""
+def stop_sync_worker(*, cancel_pending: bool = True):
+    """停止 watch 调度线程。
+
+    cancel_pending=True (用户「停止」/ 设置页重置): 终止当前任务并把队列里
+    所有 queued 任务标为 cancelled 后清空队列, 停止后无任何排队残留。
+    cancel_pending=False (重启 / 规则变更的内部回收): 只停调度线程, 不杀
+    rclone 进程、不清手动队列。
+
+    执行员线程本身常驻, 不随停止销毁 —— 避免「停线程 / 下次入队再启动」
+    的哨兵竞态; 「停止」的保证由清空队列与 DB 取消提供。
+    """
     global _sync_worker_thread
     _sync_worker_stop.set()
-    # 终止正在执行的 rclone 子进程
-    with _sync_current_proc_lock:
-        if _sync_current_proc and _sync_current_proc.poll() is None:
-            try:
-                _sync_current_proc.terminate()
-                _sync_current_proc.wait(timeout=3)
-            except (subprocess.TimeoutExpired, OSError):
-                try:
-                    _sync_current_proc.kill()
-                except OSError:
-                    pass
-            _sync_log("rclone_killed", level="warn")
+    # worker 现在只调度不执行, join 很快; 不再需要先杀进程才能让线程退出
     if _sync_worker_thread and _sync_worker_thread.is_alive():
         _sync_worker_thread.join(timeout=10)
     _sync_worker_thread = None
+
+    if not cancel_pending:
+        return
+
+    # 快照活动 job: 释放 _queue_lock 后可能有新任务入队并开跑, 若不快照会
+    # 误伤那个 stop 之后才创建的新任务 (cancel_all 不影响它)
+    with _queue_lock:
+        active = _active_job_id
+        from . import sync_store as store
+        store.cancel_all_queued_jobs()
+        while True:
+            try:
+                _job_queue.get_nowait()
+            except queue.Empty:
+                break
+
+    if active:
+        # 经 interrupt_active_job 的 job_id 原子比对兜底: 快照与 set 之间
+        # 旧任务可能已结束、新任务可能已开跑, 比对不一致时放弃中断, 不误杀
+        interrupt_active_job(active)

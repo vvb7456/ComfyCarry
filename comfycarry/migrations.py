@@ -231,3 +231,22 @@ def _migration_v3(conn):
 
 
 db.register_migration(3, _migration_v3, "civitai favorites")
+
+
+# ── Migration v4 — Sync 任务队列化 ──────────────────────────
+
+
+def _migration_v4(conn):
+    """sync_jobs 增加 queued_at 列与排队索引 (同步任务队列化)。"""
+    stmts = [
+        # 入队时刻; 仅 queued/cancelled 行有意义 (取消的行保留以便排查)
+        "ALTER TABLE sync_jobs ADD COLUMN queued_at REAL",
+        # 队列列表按 status 分层、queued 层按 queued_at 排序
+        "CREATE INDEX IF NOT EXISTS idx_sync_jobs_queued "
+        "ON sync_jobs(status, queued_at)",
+    ]
+    for sql in stmts:
+        conn.execute(sql)
+
+
+db.register_migration(4, _migration_v4, "sync job queue")

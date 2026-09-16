@@ -14,13 +14,25 @@ const props = defineProps<{
   importedConfig?: Record<string, any> | null
 }>()
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { syncTemplates } = useWizardState()
+
+/** 预设名本地化: name_key 优先, 缺翻译回退后端兜底名 */
+function templateName(id: string): string {
+  const tpl = syncTemplates.value.find(x => x.id === id)
+  if (!tpl) return id
+  return tpl.name_key && te(tpl.name_key) ? t(tpl.name_key) : tpl.name
+}
 
 const syncRulesCount = computed(() => {
   const c = props.config
   if (c._imported_sync_rules && c._imported_sync_rules_count) return c._imported_sync_rules_count
-  return c.wizard_sync_rules.length
+  // 一个预设展开为多条规则, 这里按实际落库条数统计 (与后端展开一致)
+  return c.wizard_sync_rules.reduce((n, r) => {
+    if (r.template_id === 'custom') return n + 1
+    const tpl = syncTemplates.value.find(x => x.id === r.template_id)
+    return n + (tpl?.entries?.length || 1)
+  }, 0)
 })
 
 interface SummaryRow {
@@ -116,10 +128,7 @@ const sections = computed<SummarySection[]>(() => {
         { label: t('wizard.summary.rclone_config'), value: rcloneLabels[c._rclone_display_method || dm] ?? rcloneLabels[dm] ?? dm, icon: rcloneIcons[c._rclone_display_method || dm] ?? rcloneIcons[dm] ?? 'tune', active: dm !== 'skip' },
         { label: t('wizard.summary.remote_count'), value: c.wizard_remotes.length ? c.wizard_remotes.map(r => r.name).join(', ') : t('wizard.summary.none'), active: c.wizard_remotes.length > 0 },
         { label: t('wizard.summary.sync_rules'), value: syncRulesCount.value ? t('wizard.summary.rules_count', { count: syncRulesCount.value }) : t('wizard.summary.none'), active: syncRulesCount.value > 0 },
-        ...(c.wizard_sync_rules.length ? [{ label: t('wizard.summary.rule_details'), value: c.wizard_sync_rules.map(r => {
-          const tpl = syncTemplates.value.find(t => t.id === r.template_id)
-          return tpl?.name || r.template_id
-        }).join(', '), active: true }] : []),
+        ...(c.wizard_sync_rules.length ? [{ label: t('wizard.summary.rule_details'), value: c.wizard_sync_rules.map(r => templateName(r.template_id)).join(', '), active: true }] : []),
         ...(c._imported_sync_rules && !c.wizard_sync_rules.length ? [{ label: t('wizard.summary.rule_details'), value: t('wizard.summary.imported'), active: true }] : []),
       ],
     },

@@ -14,9 +14,6 @@
  */
 import { ref } from 'vue'
 
-/** 未勾选规则卡片上的用户改动 (templateId → remote_path) */
-export const pathOverrides = ref<Record<string, string>>({})
-
 // ── Step 3 连接云存储 (provider 卡片选中后展开的表单) ────────
 /** 选中的 provider id (''=未选, 可整步跳过) */
 export const storageTypeRef = ref('')
@@ -28,6 +25,8 @@ export const storageFieldsRef = ref<Record<string, string>>({})
 export const storageOauthParamsRef = ref<Record<string, string>>({})
 /** S3 存储桶 (rclone s3 路径首段) */
 export const storageBucketRef = ref('comfy-assets')
+/** 与这份存储绑定的同步文件夹 (预设规则路径的锚点; 在 CloudAuthHero done 屏选) */
+export const storageRootDirRef = ref('')
 /**
  * 本会话已创建的 remote 镜像。paramsKey 是创建参数的序列化 (凭据字段变化
  * 即视为需要重建); wizard 单存储语义下它是唯一的“当前存储”。
@@ -52,12 +51,12 @@ export function invalidateCreatedRemote() {
  * 必须在向导切回「全新部署」时调用 —— 否则上一轮的表单残留会漏进新一轮。
  */
 export function resetRcloneState() {
-  pathOverrides.value = {}
   storageTypeRef.value = ''
   storageNameRef.value = ''
   storageFieldsRef.value = {}
   storageOauthParamsRef.value = {}
   storageBucketRef.value = 'comfy-assets'
+  storageRootDirRef.value = ''
   createdRemoteRef.value = null
   storageErrorRef.value = ''
 }

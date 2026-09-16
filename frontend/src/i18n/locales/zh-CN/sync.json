@@ -42,17 +42,23 @@
     "empty": "暂无同步规则"
   },
   "records": {
-    "title": "最近同步",
-    "empty": "暂无同步记录",
+    "title": "任务记录",
+    "empty": "暂无任务记录",
     "rules_count": "{count} 条规则",
     "progress": "已完成 {done}/{total}",
     "detail": "查看详情",
-    "files_synced": "已同步 {count} 个文件"
+    "files_synced": "已同步 {count} 个文件",
+    "waiting": "等待执行",
+    "cancel": "取消任务",
+    "interrupt": "中断任务",
+    "cancelled": "任务已取消",
+    "interrupted": "任务已中断"
   },
   "detail": {
     "title": "同步记录",
     "rules": "规则",
     "trigger": "触发方式",
+    "queued_at": "入队时间",
     "started": "开始时间",
     "finished": "结束时间",
     "duration": "耗时",
@@ -88,13 +94,14 @@
   },
   "oauth": {
     "connect_provider": "连接 {provider}",
-    "sign_in_browser": "在浏览器中完成登录",
     "start_with_provider": "使用 {provider} 登录",
     "start_drive": "使用 Google 账号登录",
     "start_onedrive": "使用微软账号登录",
     "start_dropbox": "使用 Dropbox 账号登录",
-    "page_opened": "已在浏览器中打开授权页面",
     "reopen": "重新打开",
+    "redirecting": "正在跳转到 {provider}…",
+    "sign_in_at": "在浏览器中登录 {provider}",
+    "open_now": "立即打开",
     "reconnect": "更换账号",
     "done_status": "授权完成",
     "drive_advanced": "高级",
@@ -116,7 +123,7 @@
     "error_unknown": "授权出错"
   },
   "rules": {
-    "deploy": "部署时",
+    "deploy": "部署",
     "watch": "监控",
     "manual": "手动",
     "method_short": {
@@ -125,19 +132,59 @@
       "move": "移动"
     }
   },
+  "preset": {
+    "pull_models": {
+      "name": "下载模型",
+      "desc": "从远程存储下载 ```ComfyUI/models``` 目录的全部文件到当前实例"
+    },
+    "pull_misc": {
+      "name": "下载工作流与素材",
+      "desc": "从远程存储下载 ```ComfyUI/user/default/workflows```、```ComfyUI/wildcards```、```ComfyUI/input``` 到当前实例"
+    },
+    "push_models": {
+      "name": "备份模型",
+      "desc": "将当前实例 ```ComfyUI/models``` 目录的全部文件复制到远程存储"
+    },
+    "push_output": {
+      "name": "上传输出（移动）",
+      "desc": "持续监控 ```ComfyUI/output```，产物生成后移动到远程存储并删除实例中的文件"
+    },
+    "push_output_copy": {
+      "name": "上传输出（复制）",
+      "desc": "持续监控 ```ComfyUI/output```，产物生成后复制到远程存储"
+    },
+    "push_misc": {
+      "name": "备份工作流与素材",
+      "desc": "将当前实例 ```ComfyUI/user/default/workflows```、```ComfyUI/wildcards```、```ComfyUI/input``` 复制到远程存储"
+    },
+    "entry": {
+      "models": "下载模型",
+      "workflows": "下载workflows",
+      "wildcards": "下载Wildcards",
+      "input": "下载input",
+      "push_models": "备份模型",
+      "push_workflows": "备份workflows",
+      "push_wildcards": "备份Wildcards",
+      "push_input": "备份input",
+      "push_output": "上传output"
+    }
+  },
   "rule": {
     "add": "添加规则",
-    "run": "立即执行",
+    "run": "加入队列",
     "edit": "编辑",
     "disable": "禁用",
     "enable": "启用",
     "delete": "删除规则",
     "edit_modal": "编辑同步规则",
     "add_modal": "添加同步规则",
-    "quick_template": "快捷模板",
-    "template_placeholder": "选择模板…",
-    "template_custom": "自定义",
-    "template_search": "搜索模板",
+    "remote_select_title": "选择存储",
+    "choose_rule": "选择规则",
+    "select_storage_ph": "选择存储",
+    "custom_title": "自定义规则",
+    "custom_add": "自定义规则",
+    "custom_desc": "自定义本地路径、远程路径、方向与触发方式",
+    "confirm_title": "确认规则",
     "name": "规则名称",
     "direction": "方向",
     "pull": "下载",
@@ -153,12 +200,13 @@
     "trigger_watch": "持续监控",
     "filters": "过滤规则",
     "filters_placeholder": "每行一条 rclone filter",
-    "fill_required": "请填写名称、远程存储和本地路径",
+    "fill_required": "请填写名称、远程存储、远程路径和本地路径",
     "saved": "已保存",
     "save_failed": "保存失败",
+    "save_run": "保存并加入队列",
     "deleted": "已删除",
     "running": "执行中",
-    "run_ok": "规则已开始执行，查看日志了解进度",
+    "run_ok": "已加入队列",
     "run_failed": "执行失败"
   },
   "worker": {
@@ -171,20 +219,18 @@
     "title": "同步日志",
     "worker_started": "Sync Worker 已启动",
     "worker_stopped": "Sync Worker 已停止",
-    "worker_stale": "旧 Worker 仍在运行，等待终止...",
-    "worker_stale_failed": "旧 Worker 无法停止，跳过启动",
     "rule_start_pull": "拉取 {name}: {src} → {dst} ({method})",
     "rule_start_push": "推送 {name}: {src} → {dst} ({method})",
     "rclone_output": "  {text}",
     "file_transferred": "  → {name}",
-    "rule_summary": "  {name}: {files} 个文件，{bytes} 字节 {'@'} {speed} B/s",
     "rule_done": "{name} 完成",
     "rule_failed": "{name} 失败 (code={code})",
     "rule_timeout": "{name} 超时 ({seconds}s)",
     "rule_error": "{name} 异常：{error}",
     "rule_path_invalid": "{name}: 本地路径越界或非法 ({path})",
     "rclone_killed": "rclone 进程已被终止",
-    "worker_error": "同步服务内部错误：{error}"
+    "worker_error": "同步服务内部错误：{error}",
+    "executor_error": "执行员异常：{error}"
   },
   "browse": {
     "remote_title": "浏览远程目录",
@@ -220,22 +266,22 @@
     "status_error": "出错",
     "just_now": "刚刚",
     "never_seen": "从未",
-    "download_client": "下载 Windows 客户端",
-    "no_rules": "无规则"
+    "download_client": "下载 Windows 客户端"
   },
   "job": {
     "trigger": {
       "manual": "手动",
       "watch": "监控",
-      "deploy": "部署",
-      "companion": "客户端"
+      "deploy": "部署"
     },
     "status": {
+      "queued": "排队中",
       "running": "运行中",
       "success": "已完成",
       "failed": "失败",
       "partial": "部分完成",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "interrupted": "已中断"
     }
   },
   "msg": {
@@ -243,6 +289,9 @@
     "remote_deleted": "远程存储「{name}」已删除",
     "rules_saved": "已保存 {count} 条规则",
     "run_started": "开始执行 {count} 条规则",
+    "run_queued": "已加入队列（{count} 条规则）",
+    "job_cancelled": "任务已取消",
+    "job_interrupted": "任务已中断",
     "worker_started": "同步服务已启动",
     "worker_stopped": "同步服务已停止",
     "worker_restart": "同步服务已重启"
@@ -252,6 +301,8 @@
     "browse_rclone_failed": "列目录失败：{detail}",
     "browse_rclone_failed_plain": "列目录失败",
     "browse_timeout": "列目录超时（30 秒）",
+    "bucket_required": "请先为该存储选择存储桶",
+    "remote_root_required": "同步文件夹必填，且不能是存储根目录",
     "mkdir_path_required": "请填写要创建的目录名",
     "mkdir_rclone_failed": "新建目录失败：{detail}",
     "mkdir_rclone_failed_plain": "新建目录失败",
@@ -268,6 +319,8 @@
     "dir_missing": "目录不存在：{path}",
     "job_not_found": "任务不存在",
     "job_running": "已有同步任务正在执行，请稍后再试",
+    "job_not_queued": "该任务不在队列中",
+    "job_not_running": "该任务未在执行",
     "name_type_required": "名称和类型必填",
     "param_name_invalid": "参数名非法：{key}",
     "path_is_root": "不能直接操作 {root} 根目录",
@@ -284,6 +337,7 @@
     "rule_method_invalid": "规则 {label}：方式取值非法（{value}）",
     "rule_missing_fields": "每条规则都要有 ID、远程存储和本地路径",
     "rule_remote_invalid": "规则 {label}：远程存储名称非法",
+    "rule_remote_path_required": "规则 {label}：远程路径不能为空",
     "rule_trigger_invalid": "规则 {label}：触发方式取值非法（{value}）",
     "rules_none_matched": "没有找到匹配的规则",
     "rules_not_array": "规则数据格式错误",
@@ -298,8 +352,7 @@
     "invalid_callback": "回调地址无效",
     "oauth_paste_not_ready": "授权尚未就绪，请先获取授权链接",
     "oauth_callback_rejected": "授权回调被拒绝：{detail}",
-    "oauth_relay_unreachable": "无法连接授权服务：{detail}",
-    "worker_restart_failed": "重启自动同步失败"
+    "oauth_relay_unreachable": "无法连接授权服务：{detail}"
   },
   "providers": {
     "drive_desc": "Google 账号登录",
@@ -313,6 +366,14 @@
     "drive_label": "云端硬盘",
     "onedrive_label": "驱动器",
     "bucket_label": "存储桶",
+    "bucket_placeholder": "选择存储桶",
+    "bucket_failed": "获取存储桶列表失败",
+    "confirm_title": "确认存储信息",
+    "root_label": "同步文件夹",
+    "root_placeholder": "请选择文件夹",
+    "root_browse": "浏览",
+    "edit_creds": "修改连接信息",
+    "folder_new_placeholder": "文件夹名称",
     "browse": "浏览"
   },
   "confirm": {
@@ -330,6 +391,16 @@
       "title": "删除同步规则",
       "message": "规则「{name}」将被删除。"
     },
+    "start_no_watch": {
+      "title": "启动自动同步",
+      "message": "没有持续监控的同步规则，启动后不会自动同步任何内容。",
+      "button": "添加规则"
+    },
+    "start_disabled_watch": {
+      "title": "启动自动同步",
+      "message": "有 {count} 条持续监控的规则处于禁用状态，启用后将恢复自动同步。",
+      "button": "启用并启动"
+    },
     "overwrite": {
       "title": "覆盖存储凭据",
       "message": "「{name}」已存在同类型配置，原凭据将被替换。",
@@ -346,7 +417,8 @@
   },
   "flow": {
     "next": "下一步",
-    "create_rules": "创建同步规则"
+    "connect": "连接",
+    "save_create": "保存并创建规则"
   },
   "steps": {
     "connect": "连接"
@@ -370,6 +442,7 @@
     "worker_stopped": "已停止",
     "rules": "规则",
     "storages": "存储",
+    "queued": "队列",
     "watch_interval": "检查间隔"
   }
 }

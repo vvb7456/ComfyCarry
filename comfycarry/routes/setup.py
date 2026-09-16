@@ -18,6 +18,7 @@ from flask import Blueprint, Response, jsonify, request
 from ..config import (
     DEFAULT_PLUGINS, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
     SETUP_STATE_FILE, _RCLONE_TOKEN_RE,
+    normalize_remote_root_dir,
     _load_setup_state, _save_setup_state,
     get_config,
 )
@@ -168,6 +169,8 @@ def _draft_safe() -> list[dict]:
         if not isinstance(r, dict):
             continue
         entry = {"name": r.get("name", ""), "type": r.get("type", "")}
+        if r.get("root_dir"):
+            entry["root_dir"] = str(r.get("root_dir"))
         for key in ("bucket", "drive_id", "drive_type", "team_drive"):
             value = (r.get("params") or {}).get(key)
             if value:
@@ -196,6 +199,11 @@ def api_setup_wizard_remote():
         return _err("remote_name_invalid", 400)
     if not _RCLONE_TOKEN_RE.match(rtype) or rtype not in REMOTE_TYPE_DEFS:
         return _err("remote_type_invalid", 400)
+
+    # 同步文件夹 (预设规则路径的锚点) 必填, 且不能是存储根
+    root_dir, root_err = normalize_remote_root_dir(data.get("root_dir"))
+    if root_err:
+        return _err(root_err, 400)
 
     existing = wizard_draft.find_remote(name)
     if existing and not overwrite:
@@ -236,6 +244,7 @@ def api_setup_wizard_remote():
     wizard_draft.upsert_remote({
         "name": name,
         "type": rtype,
+        "root_dir": root_dir,
         "params": params,
     })
     if oauth_used:

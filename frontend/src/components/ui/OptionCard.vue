@@ -15,11 +15,14 @@ const props = withDefaults(defineProps<{
   iconColor?: string
   /** 底色档位 (透传 BaseCard): 在 bg3 底的弹窗内使用时传 bg2 以保持对比 */
   variant?: 'bg2' | 'bg3'
+  /** 隐藏右上角选中角标 (单选场景用高亮边框即可, 无需 √) */
+  hideCheck?: boolean
 }>(), {
   selected: false,
   disabled: false,
   locked: false,
   variant: 'bg3',
+  hideCheck: false,
 })
 
 const emit = defineEmits<{
@@ -47,7 +50,7 @@ function onClick() {
   >
     <!-- checkmark indicator -->
     <span
-      v-if="selected || locked"
+      v-if="(selected || locked) && !hideCheck"
       class="option-card__check"
       :class="{ 'option-card__check--locked': locked }"
     >

@@ -9,7 +9,9 @@
  * 同步 Tab 顺序: Hero → 存储 → 同步规则 → 最近同步 (默认展开) → 日志 (默认收起)。
  *   - Hero 数据 = worker 状态 + 当前任务 (fetchCurrentJobDetail) + 最近结果;
  *     运行中展示已完成规则数/总规则数, 完成后展示文件数与传输摘要。
- *   - 存储/规则使用 ListRow; OAuth 向导、容量刷新、模板、路径浏览、过滤规则全部保留。
+ *   - 存储/规则使用 ListRow; OAuth 向导、容量刷新、路径浏览、过滤规则全部保留;
+ *     添加规则走卡片式引导弹窗 (AddRuleModal: 预设网格 → 详情确认), 编辑复用
+ *     RuleFields。规则副行 = 本地/远程路径 + 流动箭头 (禁用规则箭头静止)。
  *   - 最近同步接 C02 服务端分页 (每页 5) + C01 ListPagination; 历史页保持页码与滚动,
  *     回到第一页恢复轮询。详情进入 SyncJobDetailModal, 使用执行时规则快照。
  *   - 日志默认收起 (SectionHeader 折叠标题)。
@@ -41,11 +43,9 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
-import HelpTip from '@/components/ui/HelpTip.vue'
-import FormField from '@/components/form/FormField.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
-import FieldControlRow from '@/components/form/FieldControlRow.vue'
 import AddStorageModal from '@/components/sync/AddStorageModal.vue'
+import AddRuleModal from '@/components/sync/AddRuleModal.vue'
+import RuleFields from '@/components/sync/RuleFields.vue'
 import PathBrowserModal from '@/components/sync/PathBrowserModal.vue'
 import SyncJobDetailModal from '@/components/sync/SyncJobDetailModal.vue'
 import SyncSettingsModal from '@/components/sync/SyncSettingsModal.vue'
@@ -62,7 +62,7 @@ import type {
 
 defineOptions({ name: 'SyncPage' })
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const { get, post } = useApiFetch()
 const { toast } = useToast()
@@ -96,8 +96,10 @@ const ruleIsRunning = ref(false)
 
 // ── 弹窗 ──
 const addStorageModalOpen = ref(false)
-const reconnectPreset = ref<{ type?: string; name?: string } | undefined>()
+const reconnectPreset = ref<{ type?: string; name?: string; root_dir?: string; bucket?: string } | undefined>()
 const addRuleModal = ref(false)
+const addRulePresetRemote = ref('')
+const editRuleModal = ref(false)
 const browseModal = ref(false)
 const saveRuleLoading = ref(false)
 const settingsOpen = ref(false)
@@ -117,8 +119,11 @@ const {
   page: jobsPage,
   pageSize: jobsPageSize,
   total: jobsTotal,
+  queuedCount,
   goToPage,
+  refresh: refreshJobs,
   fetchCurrentJobDetail,
+  fetchLatestFinished,
   startPolling: startJobsPolling,
   stopPolling: stopJobsPolling,
 } = useSyncJobs({ pageSize: 5 })
@@ -227,7 +232,7 @@ async function loadHeroJob() {
     currentJob.value = d?.job ?? null
   } else {
     currentJob.value = null
-    const d = await get<{ jobs: SyncJob[] }>('/api/sync/jobs?page=1&limit=1', { silent: true })
+    const d = await fetchLatestFinished()
     latestJob.value = d?.jobs?.[0] ?? null
   }
 }
@@ -244,6 +249,47 @@ async function workerAction(action: 'start' | 'stop' | 'restart') {
   } finally {
     actionLoading.value = null
   }
+}
+
+/**
+ * Hero「启动自动同步」: 同步服务停止多半因为持续监控规则被删光/禁用,
+ * 盲目启动只会空转。按规则状态分情况:
+ * - 无 watch 规则 → confirm 引导添加规则
+ * - 存在禁用的 watch 规则 → confirm 启用全部并启动 (保存含 enabled watch
+ *   规则时后端会自动启动 worker)
+ * - 全部启用 → 直接启动
+ */
+async function onHeroStart() {
+  const watchRules = rules.value.filter(r => r.trigger === 'watch')
+  if (!watchRules.length) {
+    const ok = await confirm({
+      title: t('sync.confirm.start_no_watch.title'),
+      message: t('sync.confirm.start_no_watch.message'),
+      confirmText: t('sync.confirm.start_no_watch.button'),
+    })
+    if (ok) openAddRule()
+    return
+  }
+  const disabledCount = watchRules.filter(r => !r.enabled).length
+  if (disabledCount) {
+    const ok = await confirm({
+      title: t('sync.confirm.start_disabled_watch.title'),
+      message: t('sync.confirm.start_disabled_watch.message', { count: disabledCount }),
+      confirmText: t('sync.confirm.start_disabled_watch.button'),
+    })
+    if (!ok) return
+    const updated = rules.value.map(r => r.trigger === 'watch' ? { ...r, enabled: true } : r)
+    const d = await post<RulesSaveResponse>('/api/sync/rules/save', { rules: updated })
+    if (d?.ok || d?.rules) {
+      rules.value = d.rules || updated
+      toast(t('sync.worker.start_ok'), 'success')
+      await loadSyncStatus()
+    } else if (d) {
+      toast(apiErrorText(d, t('sync.worker.error')), 'error')
+    }
+    return
+  }
+  await workerAction('start')
 }
 
 // ── Hero 状态机 ──
@@ -300,6 +346,7 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
     { label: t('sync.facts.worker'), value: workerRunning.value ? t('sync.facts.worker_running') : t('sync.facts.worker_stopped') },
     { label: t('sync.facts.rules'), value: String(rules.value.length) },
     { label: t('sync.facts.storages'), value: String(remotes.value.length) },
+    { label: t('sync.facts.queued'), value: String(queuedCount.value) },
   ]
   if (settings.value) {
     out.push({ label: t('sync.facts.watch_interval'), value: `${settings.value.watch_interval}s` })
@@ -329,8 +376,14 @@ async function openAddRemote() {
 }
 
 function openReconnect(remote: Remote) {
-  reconnectPreset.value = { type: remote.type, name: remote.name }
-  openAddRemote()
+  reconnectPreset.value = {
+    type: remote.type,
+    name: remote.name,
+    root_dir: remote.root_dir,
+    bucket: remote.type === 's3' ? remote.params?.bucket : undefined,
+  }
+  // preset 由 AddStorageModal 挂载时的 immediate watch 消费 (BaseModal v-if, 每次全新挂载)
+  void openAddRemote()
 }
 
 function clearReconnectPreset() {
@@ -377,83 +430,30 @@ const remoteOptions = computed(() =>
   })
 )
 
-function blankRule(remote?: string): Partial<SyncRule> {
-  return {
-    direction: 'pull', method: 'copy', trigger: 'manual', enabled: true,
-    remote: remote || remotes.value[0]?.name || '',
-  }
-}
-
+/** 编辑中的规则 (id 之外的表单字段); filters 以多行文本编辑 */
 const ruleForm = ref<Partial<SyncRule>>({})
-const ruleIsEdit = ref(false)
-const selectedTemplate = ref('')
-const TEMPLATE_CUSTOM = '__custom__'
-
-const templateOptions = computed(() => [
-  { value: TEMPLATE_CUSTOM, label: t('sync.rule.template_custom') },
-  ...templates.value.map(tmpl => ({
-    value: tmpl.id || tmpl.name,
-    label: tmpl.name,
-    hint: t(`sync.rule.${tmpl.direction}`),
-  })),
-])
-
-const directionOptions = computed(() => [
-  { value: 'pull', label: t('sync.rule.pull') },
-  { value: 'push', label: t('sync.rule.push') },
-])
-
-const methodOptions = computed(() => [
-  { value: 'copy', label: t('sync.rules.method_short.copy') },
-  { value: 'sync', label: t('sync.rules.method_short.sync') },
-  { value: 'move', label: t('sync.rules.method_short.move') },
-])
-
-const triggerOptions = computed(() => [
-  { value: 'manual', label: t('sync.rule.trigger_manual') },
-  { value: 'watch', label: t('sync.rule.trigger_watch') },
-])
+const editingRuleId = ref('')
 
 function openAddRule(presetRemote?: string) {
-  ruleForm.value = blankRule(presetRemote)
-  ruleIsEdit.value = false
-  selectedTemplate.value = ''
+  addRulePresetRemote.value = presetRemote || ''
   addRuleModal.value = true
 }
 
 function openEditRule(rule: SyncRule) {
   const filters = Array.isArray(rule.filters) ? rule.filters.join('\n') : (rule.filters || '')
-  ruleForm.value = {
-    ...rule,
-    filters,
-    trigger: rule.trigger === 'deploy' ? 'manual' : rule.trigger,
-  }
-  ruleIsEdit.value = true
-  addRuleModal.value = true
+  ruleForm.value = { ...rule, filters }
+  editingRuleId.value = rule.id
+  editRuleModal.value = true
 }
 
-function onPickTemplate(id: string) {
-  if (id === TEMPLATE_CUSTOM) {
-    ruleForm.value = blankRule(ruleForm.value.remote)
-    return
-  }
-  const tmpl = templates.value.find(x => (x.id || x.name) === id)
-  if (!tmpl) return
-  const filters = Array.isArray(tmpl.filters) ? tmpl.filters.join('\n') : ''
-  ruleForm.value = {
-    ...ruleForm.value,
-    name: tmpl.name,
-    direction: tmpl.direction,
-    method: tmpl.method,
-    trigger: tmpl.trigger === 'deploy' ? 'manual' : tmpl.trigger,
-    local_path: tmpl.local_path || '',
-    remote_path: tmpl.remote_path || '',
-    filters,
-  }
+function onRulesSaved(saved: SyncRule[]) {
+  rules.value = saved
+  void loadSyncStatus()
 }
 
 async function saveRule() {
-  if (!ruleForm.value.name?.trim() || !ruleForm.value.remote || !ruleForm.value.local_path?.trim()) {
+  if (!ruleForm.value.name?.trim() || !ruleForm.value.remote
+      || !ruleForm.value.remote_path?.trim() || !ruleForm.value.local_path?.trim()) {
     toast(t('sync.rule.fill_required'), 'warning')
     return
   }
@@ -463,14 +463,12 @@ async function saveRule() {
     if (typeof formData.filters === 'string') {
       formData.filters = formData.filters.split('\n').filter(Boolean)
     }
-    const updated = ruleIsEdit.value
-      ? rules.value.map(r => r.id === formData.id ? { ...r, ...formData } as SyncRule : r)
-      : [...rules.value, { ...formData, id: `rule_${Date.now()}`, enabled: true } as SyncRule]
+    const updated = rules.value.map(r => r.id === editingRuleId.value ? { ...r, ...formData } as SyncRule : r)
     const d = await post<RulesSaveResponse>('/api/sync/rules/save', { rules: updated })
     if (d?.ok || d?.rules) {
       rules.value = d.rules || updated
       toast(t('sync.rule.saved'), 'success')
-      addRuleModal.value = false
+      editRuleModal.value = false
       await loadSyncStatus()
     } else if (d) {
       toast(apiErrorText(d, t('sync.rule.save_failed')), 'error')
@@ -508,7 +506,6 @@ async function deleteRule(rule: SyncRule) {
 
 async function runRule(rule: SyncRule) {
   ruleIsRunning.value = true
-  toast(t('sync.rule.running') + ': ' + rule.name, 'info')
   try {
     const d = await post<ApiOkResponse>('/api/sync/rules/run', { rule_id: rule.id })
     if (d?.ok) toast(t('sync.rule.run_ok'), 'success')
@@ -516,6 +513,28 @@ async function runRule(rule: SyncRule) {
   } finally {
     ruleIsRunning.value = false
     setTimeout(() => { void loadSyncStatus(); void loadHeroJob() }, 2000)
+  }
+}
+
+/** 取消排队中的任务 (从队列剔除, 状态变「已取消」) */
+async function cancelJob(jobId: string) {
+  const d = await post<ApiOkResponse>(`/api/sync/jobs/${jobId}/cancel`)
+  if (d?.ok) {
+    toast(t('sync.records.cancelled'), 'success')
+    await refreshJobs()
+    await loadHeroJob()
+    await loadSyncStatus()
+  }
+}
+
+/** 中断正在执行的任务 (只影响当前任务, 执行员继续下一条) */
+async function interruptJob(jobId: string) {
+  const d = await post<ApiOkResponse>(`/api/sync/jobs/${jobId}/interrupt`)
+  if (d?.ok) {
+    toast(t('sync.records.interrupted'), 'success')
+    await refreshJobs()
+    await loadHeroJob()
+    await loadSyncStatus()
   }
 }
 
@@ -539,15 +558,9 @@ const methodLabels: Record<string, string> = { copy: 'sync.rules.method_short.co
 function triggerLabel(trigger: string) { return t(triggerLabels[trigger] || 'sync.rules.manual') }
 function methodLabel(method: string) { return t(methodLabels[method] || method) }
 
-function rulePath(rule: SyncRule): string {
-  return rule.direction === 'push'
-    ? `${rule.local_path} → ${rule.remote}:${rule.remote_path}`
-    : `${rule.remote}:${rule.remote_path} → ${rule.local_path}`
-}
-
 // ── 记录展示 ──
 function statusTone(status: string): 'running' | 'stopped' | 'loading' | 'error' {
-  if (status === 'running') return 'loading'
+  if (status === 'running' || status === 'queued') return 'loading'
   if (status === 'success') return 'running'
   if (status === 'failed') return 'error'
   return 'stopped'
@@ -558,14 +571,26 @@ function statusText(status: string): string {
   return t(key)
 }
 
+/** 方向图标: 与添加规则卡片一致 (上行 cloud_upload 绿, 下行 cloud_download 蓝,
+ *  多规则/未知用双向 sync 图标着中性色) */
 function jobDirIcon(job: SyncJob): IconName {
   const rules = job.rules ?? []
-  if (rules.length === 1) return rules[0].direction === 'push' ? 'arrow_upward' : 'arrow_downward'
-  if (rules.length > 1) return 'swap_horiz'
+  if (rules.length === 1) return rules[0].direction === 'push' ? 'cloud_upload' : 'cloud_download'
+  if (rules.length > 1) return 'sync'
   return 'sync'
 }
 
+/** 方向图标配色类 (与 PresetRuleCard 的 dirColor 同一逻辑) */
+function jobDirClass(job: SyncJob): string {
+  const rules = job.rules ?? []
+  if (rules.length === 1 && rules[0].direction === 'push') return 'is-push'
+  if (rules.length === 1) return 'is-pull'
+  return ''
+}
+
 function jobTitle(job: SyncJob): string {
+  // 排队中/执行中文件数还是 0, 显示规则摘要更有意义
+  if (job.status === 'queued' || job.status === 'running') return jobRulesFact(job)
   return t('sync.records.files_synced', { count: job.files_synced })
 }
 
@@ -574,15 +599,6 @@ function jobRulesFact(job: SyncJob): string {
   const rules = job.rules ?? []
   if (rules.length === 1) return rules[0].name || rules[0].id
   return t('sync.records.rules_count', { count: rules.length || job.rule_count })
-}
-
-function jobFlow(job: SyncJob): string {
-  const rules = job.rules ?? []
-  if (rules.length !== 1) return ''
-  const r = rules[0]
-  return r.direction === 'push'
-    ? `${r.local_path} → ${r.remote}:${r.remote_path}`
-    : `${r.remote}:${r.remote_path} → ${r.local_path}`
 }
 
 function jobTransfers(job: SyncJob): string {
@@ -603,6 +619,12 @@ function fmtJobTime(epoch: number): string {
 }
 
 function jobFacts(job: SyncJob): string[] {
+  if (job.status === 'queued') {
+    return [fmtJobTime(job.queued_at ?? 0), t('sync.records.waiting')].filter(Boolean)
+  }
+  if (job.status === 'running') {
+    return [fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
+  }
   return [jobRulesFact(job), fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
 }
 
@@ -617,18 +639,14 @@ function fmtRelative(epoch: number) {
   return new Date(epoch * 1000).toLocaleDateString()
 }
 
-function statusKey(s: string) {
-  const known = ['idle', 'syncing', 'pulling', 'busy', 'paused', 'error']
-  return `sync.companion.status_${known.includes(s) ? s : 'idle'}`
-}
-
-function isPulling(c: CompanionClient) {
-  return ['syncing', 'pulling', 'busy'].includes(c.status || '')
-}
-
+/** 状态展示映射为 i18n; 未知取值原样显示, 不改写成「空闲」 */
 function clientStatus(c: CompanionClient): { tone: 'running' | 'stopped' | 'loading'; text: string } {
-  const tone: 'running' | 'stopped' | 'loading' = isPulling(c) ? 'loading' : (c.online ? 'running' : 'stopped')
-  return { tone, text: t(statusKey(c.status)) }
+  const raw = c.status || ''
+  const key = `sync.companion.status_${raw}`
+  const text = raw && te(key) ? t(key) : raw
+  const tone: 'running' | 'stopped' | 'loading' =
+    ['syncing', 'pulling', 'busy'].includes(raw) ? 'loading' : (c.online ? 'running' : 'stopped')
+  return { tone, text }
 }
 
 function clientFacts(c: CompanionClient): string[] {
@@ -733,7 +751,7 @@ function switchTab(tab: string) {
             </BaseButton>
           </template>
           <template v-else-if="heroState === 'stopped'" #actions>
-            <BaseButton variant="primary" :loading="actionLoading === 'start'" :disabled="acting" @click="workerAction('start')">
+            <BaseButton variant="primary" :loading="actionLoading === 'start'" :disabled="acting" @click="onHeroStart">
               {{ t('sync.hero.action.start') }}
             </BaseButton>
           </template>
@@ -766,7 +784,7 @@ function switchTab(tab: string) {
                 <MsIcon v-else :name="brandOf(remote).icon" class="sync-remote-card__logo" />
                 <div class="sync-remote-card__name">
                   {{ remote.display_name || remote.name }}
-                  <span class="sync-remote-card__type">{{ remote.name }} · {{ remote.type }}</span>
+                  <span class="sync-remote-card__type">{{ remote.name }}</span>
                 </div>
                 <span class="sync-remote-card__auth">
                   {{ remote.has_auth ? t('sync.remotes.authenticated') : t('sync.remotes.not_configured') }}
@@ -826,11 +844,7 @@ function switchTab(tab: string) {
               </div>
             </div>
           </div>
-          <EmptyState v-else icon="cloud" :message="t('sync.empty.desc')" density="compact">
-            <BaseButton size="sm" @click="openAddRemote">
-              <MsIcon name="add" /> {{ t('sync.storage.add') }}
-            </BaseButton>
-          </EmptyState>
+          <EmptyState v-else icon="cloud" :message="t('sync.empty.desc')" density="compact" />
         </section>
 
         <!-- 同步规则 -->
@@ -839,7 +853,7 @@ function switchTab(tab: string) {
             {{ t('sync.rules_section.title') }}
             <span class="sync-count">{{ rules.length }}</span>
             <template #actions>
-              <BaseButton size="sm" @click="openAddRule()">
+              <BaseButton size="sm" :disabled="!remotes.length" @click="openAddRule()">
                 <MsIcon name="add" /> {{ t('sync.rule.add') }}
               </BaseButton>
             </template>
@@ -849,12 +863,34 @@ function switchTab(tab: string) {
             <ListRow
               v-for="rule in rules"
               :key="rule.id"
-              :icon="rule.direction === 'push' ? 'arrow_upward' : 'arrow_downward'"
               :title="rule.name"
               :badges="[triggerLabel(rule.trigger), methodLabel(rule.method)]"
-              :facts="[rulePath(rule)]"
               :disabled="!rule.enabled"
             >
+              <!-- 行首方向图标: 与添加规则卡片一致 (cloud_upload/cloud_download, 下行蓝上行绿) -->
+              <template #icon>
+                <MsIcon
+                  :name="rule.direction === 'push' ? 'cloud_upload' : 'cloud_download'"
+                  size="md"
+                  class="sync-dir-icon"
+                  :class="rule.direction === 'push' ? 'is-push' : 'is-pull'"
+                />
+              </template>
+              <!-- 副行: 本地/远程路径 + 流动箭头 (方向决定两端次序; 停用规则箭头静止) -->
+              <template #facts>
+                <span class="rule-flow">
+                  <template v-if="rule.direction === 'push'">
+                    <span class="rule-flow__seg"><MsIcon name="folder" size="xs" /> {{ rule.local_path }}</span>
+                    <span class="rule-flow__arrows" aria-hidden="true"><span>▸</span><span>▸</span><span>▸</span></span>
+                    <span class="rule-flow__seg"><MsIcon name="cloud" size="xs" /> {{ rule.remote }}:{{ rule.remote_path }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="rule-flow__seg"><MsIcon name="cloud" size="xs" /> {{ rule.remote }}:{{ rule.remote_path }}</span>
+                    <span class="rule-flow__arrows" aria-hidden="true"><span>▸</span><span>▸</span><span>▸</span></span>
+                    <span class="rule-flow__seg"><MsIcon name="folder" size="xs" /> {{ rule.local_path }}</span>
+                  </template>
+                </span>
+              </template>
               <template #actions>
                 <BaseButton
                   variant="ghost" size="sm" icon-only
@@ -880,11 +916,7 @@ function switchTab(tab: string) {
               </template>
             </ListRow>
           </ul>
-          <EmptyState v-else icon="sync" :message="t('sync.rules_section.empty')" density="compact">
-            <BaseButton size="sm" @click="openAddRule()">
-              <MsIcon name="add" /> {{ t('sync.rule.add') }}
-            </BaseButton>
-          </EmptyState>
+          <EmptyState v-else icon="sync" :message="t('sync.rules_section.empty')" density="compact" />
         </section>
 
         <!-- 最近同步 -->
@@ -898,15 +930,37 @@ function switchTab(tab: string) {
             <ListRow
               v-for="job in syncJobs"
               :key="job.job_id"
-              :icon="jobDirIcon(job)"
               :title="jobTitle(job)"
               :status="{ tone: statusTone(job.status), text: statusText(job.status) }"
               :facts="jobFacts(job)"
             >
-              <template v-if="jobFlow(job)" #extra>
-                <div class="record-flow mono">{{ jobFlow(job) }}</div>
+              <!-- 行首方向图标: 与添加规则卡片一致 (多规则双向, 下行蓝上行绿) -->
+              <template #icon>
+                <MsIcon
+                  :name="jobDirIcon(job)"
+                  size="md"
+                  class="sync-dir-icon"
+                  :class="jobDirClass(job)"
+                />
               </template>
               <template #actions>
+                <BaseButton
+                  v-if="job.status === 'queued'"
+                  variant="ghost" size="sm" icon-only
+                  :aria-label="t('sync.records.cancel')"
+                  @click="cancelJob(job.job_id)"
+                >
+                  <MsIcon name="cancel" />
+                </BaseButton>
+                <BaseButton
+                  v-else-if="job.status === 'running'"
+                  variant="ghost" size="sm" icon-only
+                  :aria-label="t('sync.records.interrupt')"
+                  @click="interruptJob(job.job_id)"
+                >
+                  <MsIcon name="stop" />
+                </BaseButton>
+                <!-- 详情入口对排队/运行中的任务同样可用 (弹窗已适配这两种状态) -->
                 <BaseButton
                   variant="ghost" size="sm" icon-only
                   :aria-label="t('sync.records.detail')"
@@ -996,21 +1050,9 @@ function switchTab(tab: string) {
               icon="devices"
               :title="c.hostname || c.client_id"
               :title-tooltip="c.client_id"
-              :status="clientStatus(c)"
+              :status="c.status ? clientStatus(c) : undefined"
               :facts="clientFacts(c)"
-            >
-              <template #extra>
-                <div v-if="c.rule_summaries?.length" class="client-rules">
-                  <div v-for="(r, i) in c.rule_summaries" :key="i" class="client-rule">
-                    <MsIcon name="cloud_download" size="xs" class="client-rule__ic" />
-                    <span class="client-rule__path mono">{{ r.source || 'output' }} → {{ r.local_path || '—' }}</span>
-                    <span v-if="r.method" class="client-rule__chip">{{ methodLabel(r.method) }}</span>
-                    <span v-if="r.trigger" class="client-rule__chip">{{ triggerLabel(r.trigger) }}</span>
-                  </div>
-                </div>
-                <p v-else class="client-rule-empty">{{ t('sync.companion.no_rules') }}</p>
-              </template>
-            </ListRow>
+            />
           </ul>
         </section>
       </template>
@@ -1026,58 +1068,24 @@ function switchTab(tab: string) {
       @close="clearReconnectPreset"
     />
 
-    <BaseModal v-model="addRuleModal" :title="ruleIsEdit ? t('sync.rule.edit_modal') : t('sync.rule.add_modal')" size="md">
-      <FormField v-if="templates.length && !ruleIsEdit" :label="t('sync.rule.quick_template')" density="compact">
-        <BaseSelect
-          v-model="selectedTemplate"
-          :options="templateOptions"
-          searchable
-          teleport
-          :placeholder="t('sync.rule.template_placeholder')"
-          :search-placeholder="t('sync.rule.template_search')"
-          @update:modelValue="onPickTemplate"
-        />
-      </FormField>
-      <FormField :label="t('sync.rule.name')" density="compact">
-        <input v-model="ruleForm.name" type="text" class="form-input">
-      </FormField>
-      <div class="rule-field-row">
-        <FormField :label="t('sync.rule.direction')" density="compact">
-          <BaseSelect v-model="ruleForm.direction!" :options="directionOptions" teleport />
-        </FormField>
-        <FormField density="compact">
-          <template #label>
-            {{ t('sync.rule.method') }}
-            <HelpTip :text="t('sync.rule.method_help')" />
-          </template>
-          <BaseSelect v-model="ruleForm.method!" :options="methodOptions" teleport />
-        </FormField>
-      </div>
-      <div class="rule-field-row">
-        <FormField :label="t('sync.rule.remote')" density="compact">
-          <BaseSelect v-model="ruleForm.remote!" :options="remoteOptions" teleport />
-        </FormField>
-        <FormField :label="t('sync.rule.trigger')" density="compact">
-          <BaseSelect v-model="ruleForm.trigger!" :options="triggerOptions" teleport />
-        </FormField>
-      </div>
-      <FormField :label="t('sync.rule.remote_path')" density="compact">
-        <FieldControlRow>
-          <input v-model="ruleForm.remote_path" type="text" class="form-input" placeholder="ComfyCarry/loras">
-          <BaseButton size="sm" icon-only :aria-label="t('sync.browse.remote_title')" :title="t('sync.browse.remote_title')" @click="openBrowse('remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
-        </FieldControlRow>
-      </FormField>
-      <FormField :label="t('sync.rule.local_path')" density="compact">
-        <FieldControlRow>
-          <input v-model="ruleForm.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
-          <BaseButton size="sm" icon-only :aria-label="t('sync.browse.local_title')" :title="t('sync.browse.local_title')" @click="openBrowse('local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
-        </FieldControlRow>
-      </FormField>
-      <FormField :label="t('sync.rule.filters')" density="compact">
-        <textarea v-model="ruleForm.filters" rows="3" class="form-textarea form-textarea--mono" :placeholder="t('sync.rule.filters_placeholder')"></textarea>
-      </FormField>
+    <AddRuleModal
+      v-model="addRuleModal"
+      :presets="templates"
+      :remotes="remotes"
+      :existing-rules="rules"
+      :preset-remote="addRulePresetRemote"
+      @saved="onRulesSaved"
+    />
+
+    <!-- 编辑规则 (表单主体复用 RuleFields) -->
+    <BaseModal v-model="editRuleModal" :title="t('sync.rule.edit_modal')" size="md">
+      <RuleFields
+        :rule="ruleForm"
+        :remote-options="remoteOptions"
+        @browse="openBrowse"
+      />
       <template #footer>
-        <BaseButton size="sm" :disabled="saveRuleLoading" @click="addRuleModal = false">{{ t('common.btn.cancel') }}</BaseButton>
+        <BaseButton size="sm" :disabled="saveRuleLoading" @click="editRuleModal = false">{{ t('common.btn.cancel') }}</BaseButton>
         <BaseButton variant="primary" size="sm" :disabled="saveRuleLoading" @click="saveRule">
           <MsIcon v-if="!saveRuleLoading" name="save" size="xs" color="none" />
           {{ saveRuleLoading ? t('common.loading') : t('common.btn.save') }}
@@ -1110,8 +1118,60 @@ function switchTab(tab: string) {
   color: var(--t3);
 }
 
-/* 规则表单的两列行 —— 窄屏退化单列 */
-.rule-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* 规则副行: 本地/远程路径 + 流动箭头 (复原早期版本的绿色流向动画;
+   禁用的规则箭头静止且不着色 —— 停止的规则不该看起来还在流动) */
+.rule-flow {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rule-flow__seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-flow__arrows {
+  display: inline-flex;
+  gap: 1px;
+  margin: 0 5px;
+  flex: none;
+}
+
+.rule-flow__arrows span {
+  color: var(--green);
+  font-size: .85rem;
+  font-weight: 700;
+  animation: ruleArrowFlow 1.4s infinite;
+  opacity: .25;
+}
+
+.rule-flow__arrows span:nth-child(2) { animation-delay: .2s; }
+.rule-flow__arrows span:nth-child(3) { animation-delay: .4s; }
+
+@keyframes ruleArrowFlow {
+  0%, 100% { opacity: .2; }
+  40% { opacity: 1; }
+  60% { opacity: 1; }
+  80% { opacity: .2; }
+}
+
+/* ListRow 的 disabled 是整行降透明, 箭头还要额外静止去色 */
+.sync-rules :deep(.list-row--disabled) .rule-flow__arrows span {
+  animation: none;
+  color: var(--t3);
+  opacity: .4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rule-flow__arrows span { animation: none; opacity: .55; }
+}
 
 /* 存储卡片: 自适应网格 (设计稿 cc-storage 同构) */
 .sync-remotes-grid {
@@ -1201,6 +1261,10 @@ function switchTab(tab: string) {
   gap: 6px;
 }
 
+/* 方向图标配色: 与添加规则卡片一致 (下行蓝 / 上行绿) */
+.sync-dir-icon.is-pull { color: var(--blue); }
+.sync-dir-icon.is-push { color: var(--green); }
+
 /* 规则路径用等宽 (ListRow facts 默认 tabular) */
 .sync-rules :deep(.list-row__facts),
 .sync-records :deep(.list-row__facts) {
@@ -1211,62 +1275,8 @@ function switchTab(tab: string) {
   font-family: var(--font-mono);
 }
 
-/* 记录流向: 窄屏收进二级行并隐藏 (优先保留时间/结果/名称/详情) */
-.record-flow {
-  margin-top: 4px;
-  font-size: var(--text-xs);
-  color: var(--t3);
-  overflow-wrap: anywhere;
-}
-
-/* 客户端规则只读镜像 */
-.client-rules {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.client-rule {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.client-rule__ic {
-  flex: none;
-  color: var(--blue);
-}
-
-.client-rule__path {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--text-xs);
-  color: var(--t2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.client-rule__chip {
-  flex: none;
-  font-size: var(--text-xxs, .68rem);
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 6px;
-  background: var(--bg2);
-  color: var(--t2);
-}
-
-.client-rule-empty {
-  margin: 6px 0 0;
-  font-size: var(--text-xs);
-  color: var(--t3);
-}
 
 @media (max-width: 768px) {
-  .rule-field-row { grid-template-columns: 1fr; }
-  .record-flow { display: none; }
+  .rule-flow__arrows { margin: 0 3px; }
 }
 </style>
