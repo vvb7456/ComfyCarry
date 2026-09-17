@@ -637,6 +637,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <!-- 提示词 (视频的起始画面并入本区块左栏, 5B 模式开关并入标题行右端) -->
         <PromptEditor
           ref="promptEditorRef"
+          data-tour="gen-prompt"
           :positive="state.positive"
           :negative="state.negative"
           :show-negative="showNegative"
@@ -704,6 +705,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
         <!-- 操作栏 -->
         <ActionBar
+          data-tour="gen-run"
           :exec-state="execState"
           :elapsed="elapsed"
           :submitting="submitting"
@@ -718,6 +720,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
         <!-- 基础设置 -->
         <BasicSettings
+          data-tour="gen-basic"
           :model-field="modelField"
           :ref-width="refSize.width"
           :ref-height="refSize.height"
@@ -734,6 +737,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
         <!-- 高级设置 -->
         <AdvancedSettings
+          data-tour="gen-advanced"
           :show-split-models="selectedPackaging === 'split'"
           :dual-clip="config.dualClip"
           :show-clip-skip-vae="!!config.clipSkipSupport"
@@ -756,7 +760,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
     </div>
 
     <!-- ═══ 下部: 功能模块 (Tab + Panel 融合卡片) ═══ -->
-    <div class="gen-module-wrap" :inert="frozen" :class="{ 'gen-frozen': frozen }">
+    <div class="gen-module-wrap" data-tour="gen-modules" :inert="frozen" :class="{ 'gen-frozen': frozen }">
       <ModuleTabs
         :tabs="effectiveModuleTabs"
         :active-tab="state.activeModule"

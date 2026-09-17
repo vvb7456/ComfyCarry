@@ -801,6 +801,44 @@
     "minimax_h3_refs_invalid": "Invalid reference media",
     "minimax_h3_refs_audio_requires_visual": "Audio cannot be the only reference; add an image or video"
   },
+  "tour": {
+    "open_aria": "Feature tour",
+    "btn_start": "Start",
+    "btn_skip": "Skip",
+    "btn_prev": "Back",
+    "btn_next": "Next",
+    "btn_done": "Done",
+    "steps": {
+      "welcome": {
+        "title": "Start Generating",
+        "body": "ComfyUI orchestrates generation tasks with workflows; ComfyCarry simplifies them back into an A1111-style web workbench — no need to wire up nodes."
+      },
+      "task": {
+        "title": "Task & Architecture",
+        "body": "Choose to generate images, videos or other outputs, then pick the diffusion model architecture that matches the generation type."
+      },
+      "prompt": {
+        "title": "Prompt",
+        "body": "Describe the image you want in words. Open the Tag Editor to compose prompts visually, or use image interrogation / AI to generate them."
+      },
+      "basic": {
+        "title": "Basic Settings",
+        "body": "Pick the diffusion model for the workflow here, and adjust resolution and sampling steps as needed. Open Advanced Settings for other sampling parameters."
+      },
+      "run": {
+        "title": "Run",
+        "body": "Click the button to run the workflow once. You can also pick Live or Background mode from the dropdown menu to keep the workflow running in a loop."
+      },
+      "modules": {
+        "title": "Feature Modules",
+        "body": "Add LoRAs as needed here, and toggle the other advanced features available in the workflow."
+      },
+      "queue": {
+        "title": "Queue & History",
+        "body": "View the current ComfyUI task queue and generation history here."
+      }
+    }
+  },
   "msg": {
     "interrupt_sent": "Interrupt request sent",
     "selected": "Selected {name}",

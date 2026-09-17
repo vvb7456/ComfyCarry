@@ -11,6 +11,7 @@ import { useGenerateStore } from '@/stores/generate'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import { useBackgroundRunStore } from '@/stores/backgroundRun'
 import { useAppStore } from '@/stores/app'
+import { useProductTour } from '@/composables/useProductTour'
 import { useGenerateOptions } from '@/composables/generate/useGenerateOptions'
 import { useComfyGate } from '@/composables/generate/useComfyGate'
 import { useTaskRegistry } from '@/composables/generate/useTaskRegistry'
@@ -19,6 +20,7 @@ import { useGeneratePreview } from '@/composables/generate/useGeneratePreview'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { MODEL_TYPES } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import ProductTour, { type TourStep } from '@/components/ui/ProductTour.vue'
 import DropdownMenu, { type DropdownMenuItem } from '@/components/ui/DropdownMenu.vue'
 import SegmentedControl, { type SegmentOption } from '@/components/ui/SegmentedControl.vue'
 import Drawer from '@/components/ui/Drawer.vue'
@@ -264,10 +266,89 @@ watch(drawerOpen, (open) => {
 // deactivation 时触发), 避免遮罩与滚动锁泄漏到目标页。
 // 同时静音本页 toast 作用域 —— SSE 与 live 续跑照常, 只是不再从看不见的页面弹
 // 过程性提示 (error 仍放行, 见 useToast)。
+// ── 产品导览 (ProductTour) ───────────────────────────────────────────────
+// 语义: 只要 start 过（走完/跳过/中途切页）就不再自动触发, 手动入口随时可用。
+const tour = useProductTour('generate_tour_done')
+
 onDeactivated(() => {
   muteToastScope('generate')
   drawerOpen.value = false
+  // 导览随页面失活终止（与 drawerOpen 同处; 规范 §8 KeepAlive 切页）,
+  // 避免洞/气泡遮罩残留到目标页 —— 标记已由 start 写入, 重进不再自动触发。
+  // 同时清掉待触发的自动导览延时器: KeepAlive 切页走失活不走红卸载,
+  // 不清的话延时器到点会在别的页面上把遮罩弹出来
+  tour.stop()
+  clearTourAutoTimer()
 })
+
+const tourSteps = computed<TourStep[]>(() => [
+  { title: t('generate.tour.steps.welcome.title'), body: t('generate.tour.steps.welcome.body') },
+  { target: '[data-tour="gen-header"]', placement: 'bottom',
+    title: t('generate.tour.steps.task.title'), body: t('generate.tour.steps.task.body') },
+  { target: '[data-tour="gen-prompt"]', placement: 'bottom',
+    title: t('generate.tour.steps.prompt.title'), body: t('generate.tour.steps.prompt.body') },
+  { target: '[data-tour="gen-basic"], [data-tour="gen-advanced"]', placement: 'bottom',
+    title: t('generate.tour.steps.basic.title'), body: t('generate.tour.steps.basic.body') },
+  { target: '[data-tour="gen-run"]', placement: 'bottom',
+    title: t('generate.tour.steps.run.title'), body: t('generate.tour.steps.run.body') },
+  { target: '[data-tour="gen-modules"]', placement: 'top',
+    title: t('generate.tour.steps.modules.title'), body: t('generate.tour.steps.modules.body') },
+  { target: '[data-tour="gen-queue"]', placement: 'bottom',
+    title: t('generate.tour.steps.queue.title'), body: t('generate.tour.steps.queue.body') },
+])
+
+// 状态由 v-model 收口, close 仅留日志级钩子（后续可接埋点）
+function onTourClose(_reason: 'skip' | 'finish') {}
+
+// 手动入口: 抽屉开着先关（规范 §8, 避免遮罩与抽屉叠层; 自动触发路径已在
+// watch 内检查 drawerOpen, 这里覆盖手动点击的场景）
+function openTour() {
+  if (drawerOpen.value) drawerOpen.value = false
+  tour.start()
+}
+
+// ── 首次自动触发（规范 §7.4）────────────────────────────────────────────
+// 四条件同时满足才触发: gate ready && 非 frozen && 未看过 && 本会话未触发过。
+// 延迟约 600ms 等页面渲染稳定; 会话内一次性标志防 gate 反复 ready 重触发。
+let tourAutoFired = false
+let tourAutoTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearTourAutoTimer() {
+  if (tourAutoTimer) {
+    clearTimeout(tourAutoTimer)
+    tourAutoTimer = null
+  }
+}
+
+function scheduleTourAuto() {
+  if (gate.state.value !== 'ready') return
+  clearTourAutoTimer()
+  tourAutoTimer = setTimeout(() => {
+    tourAutoTimer = null
+    // frozen 时机上后于 gate ready (后台运行先起): 触发瞬间再判一次
+    if (gate.state.value !== 'ready' || frozen.value || tour.isDone.value || tourAutoFired) return
+    // 抽屉开着时不弹 (URL ?panel=queue 直达场景), 避免遮罩与抽屉叠层
+    if (drawerOpen.value) return
+    tourAutoFired = true
+    tour.start()
+  }, 600)
+}
+
+watch(
+  () => gate.state.value,
+  (state) => {
+    if (state === 'ready') scheduleTourAuto()
+  },
+  { immediate: true },
+)
+
+// 切回本页时若仍未看过导览, 重起延时器（失活时被清掉的那次）,
+// 保留「首次进入自动引导」的语义
+onActivated(() => {
+  if (!tourAutoFired) scheduleTourAuto()
+})
+
+onBeforeUnmount(clearTourAutoTimer)
 
 // badge: 队列任务数 (>0 显示, accent 底) — 读 store
 const queueCount = computed(() => queueStore.queueCount)
@@ -566,10 +647,20 @@ sse.start()
               <MsIcon name="menu" />
             </button>
             <h1 class="page-title">{{ t('generate.title') }}</h1>
+            <!-- 产品导览手动入口: 裸 icon (省宽度), 纯前端覆盖层不因 frozen 禁用 -->
+            <button
+              type="button"
+              class="gen-tour-btn"
+              :aria-label="t('generate.tour.open_aria')"
+              @click="openTour"
+            >
+              <MsIcon name="help_outline" size="xs" />
+            </button>
           </div>
           <!-- 右: 队列/历史按钮 (移动端在顶层右侧显示，桌面端靠最右) -->
           <DrawerTrigger
             class="gen-drawer-trigger"
+            data-tour="gen-queue"
             icon="history"
             :label="t('generate.header.queue_history')"
             :badge="queueCount"
@@ -578,7 +669,7 @@ sse.start()
           />
         </div>
 
-        <div class="gen-header-controls" :inert="frozen" :class="{ 'gen-header-controls--frozen': frozen }">
+        <div class="gen-header-controls" data-tour="gen-header" :inert="frozen" :class="{ 'gen-header-controls--frozen': frozen }">
           <span class="page-title-divider" aria-hidden="true" />
           <!-- 任务切换 (占位: 视频/编辑未上线为禁用项; 上线时接子路由) -->
           <SegmentedControl
@@ -651,6 +742,9 @@ sse.start()
           <HistoryPanel @make-video="handleMakeVideo" />
         </template>
       </Drawer>
+
+      <!-- 产品导览: gate 空态不出现（挂在 v-else 分支内） -->
+      <ProductTour v-model="tour.active.value" :steps="tourSteps" @close="onTourClose" />
     </template>
   </div>
 </template>
@@ -706,6 +800,25 @@ sse.start()
 
 .gen-header-top {
   display: contents;
+}
+
+/* 导览入口: 裸 icon 小按钮（先例 PromptEditor .prompt-help-btn）, 紧贴标题右侧 */
+.gen-tour-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+.gen-tour-btn:hover {
+  color: var(--ac);
+  background: var(--bg3);
 }
 
 .gen-header-controls {
