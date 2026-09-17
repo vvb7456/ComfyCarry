@@ -28,8 +28,6 @@ const props = defineProps<{
   favoriteItem?: FavoriteItem
   /** Download task mode */
   task?: DownloadTask
-  /** Whether this item is already installed locally */
-  installed?: boolean
   /** Favorite mode: 该版本的下载状态 (驱动按钮 spinner/进度环), 缺省时退回 installed/idle */
   state?: VersionState
   /** Favorite mode: 进度 % / 速度 B/s (state 为 queued/downloading 时显示) */
@@ -100,10 +98,8 @@ const sizeText = computed(() => {
 
 const isFavorite = computed(() => !!props.favoriteItem)
 
-/** Favorite 按钮状态: 显式 state 优先, 否则按 installed 退回旧行为 */
-const favoriteState = computed<VersionState>(() =>
-  props.state ?? (props.installed ? 'installed' : 'idle'),
-)
+/** Favorite 按钮状态: 显式 state 优先, 缺省 idle */
+const favoriteState = computed<VersionState>(() => props.state ?? 'idle')
 const isActive = computed(() => props.task?.status === 'active')
 const isPaused = computed(() => props.task?.status === 'paused')
 const isQueued = computed(() => props.task?.status === 'queued')
@@ -185,7 +181,6 @@ const taskFacts = computed(() => {
           {{ stateText }}
         </span>
 
-        <Badge v-if="isFavorite && installed" color="var(--green)">{{ t('models.downloads.installed') }}</Badge>
         <Badge v-if="modelType" :color="badgeColor">{{ badgeLabel }}</Badge>
         <Badge v-if="baseModelText">{{ baseModelText }}</Badge>
         <Badge v-if="isFavorite && favoriteItem?.versionName">{{ favoriteItem.versionName }}</Badge>

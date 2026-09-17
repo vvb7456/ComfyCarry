@@ -36,6 +36,7 @@ const modelId = computed(() => props.hit?.id ?? null)
 const { downloadable: versions, noneDownloadable } =
   useDownloadableVersions(modelId, allVersions, computed(() => props.modelValue))
 
+/** 该版本是否已下载到本地 — 收藏弹窗里没有下载按钮表达状态, 只能靠 badge */
 function isInstalled(versionId: number) {
   if (!props.hit) return false
   return getVersionState(props.hit.id, versionId) === 'installed'

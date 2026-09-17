@@ -85,11 +85,9 @@ async function handleCancel(versionId: number) {
         v-for="v in versions"
         :key="v.id"
         class="vp-item"
-        :class="{ 'vp-item--local': versionInfo(v.id).state === 'installed' }"
       >
         <div class="vp-info">
           <span class="vp-name">{{ v.name || v.id }}</span>
-          <Badge v-if="versionInfo(v.id).state === 'installed'" tone="positive" size="sm">{{ t('models.downloads.installed') }}</Badge>
           <Badge v-if="v.baseModel" size="sm">{{ v.baseModel }}</Badge>
         </div>
         <DownloadButton
@@ -128,10 +126,6 @@ async function handleCancel(versionId: number) {
   background: var(--bg2);
   border: 1px solid var(--bd);
   border-radius: var(--rs);
-}
-
-.vp-item--local {
-  opacity: .7;
 }
 
 .vp-info {

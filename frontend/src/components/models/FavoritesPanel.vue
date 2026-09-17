@@ -119,7 +119,6 @@ async function handleClearFavorites() {
       <li v-for="item in favItems" :key="item.modelId + ':' + (item.versionId || '')">
         <DownloadItem
           :favorite-item="item"
-          :installed="!!(item.versionId && dlGetVersionState(item.modelId, item.versionId) === 'installed')"
           :state="itemInfo(item).state"
           :progress="itemInfo(item).progress"
           :speed="itemInfo(item).speed"

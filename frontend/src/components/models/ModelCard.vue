@@ -156,7 +156,10 @@ watch(
 
     <!-- Body -->
     <div class="mc-body">
-      <div class="mc-title text-truncate" :title="title">{{ title }}</div>
+      <div class="mc-title-row">
+        <div class="mc-title text-truncate" :title="title">{{ title }}</div>
+        <slot name="title-badge" />
+      </div>
       <div v-if="$slots.meta" class="mc-meta">
         <slot name="meta" />
       </div>
@@ -267,10 +270,19 @@ watch(
   padding: 12px 14px;
 }
 
+.mc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  min-width: 0;
+}
+
 .mc-title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: .92rem;
   font-weight: 600;
-  margin-bottom: 5px;
   line-height: 1.3;
 }
 .mc:hover .mc-title {

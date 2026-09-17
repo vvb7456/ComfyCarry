@@ -84,8 +84,8 @@ const downloadCount = computed(() => fmtCompact(props.hit.metrics?.downloadCount
 // ── Download button state ──
 const dlState = computed<ModelAggregateState>(() => (props.downloadState as ModelAggregateState) || 'idle')
 
-// ── Installed overlay badges + version-level download info ──
-const { getVersionState, getVersionDownloadInfo, cancelDownload, retryVersion } = useDownloads()
+// ── Version-level download info ──
+const { getVersionDownloadInfo, cancelDownload, retryVersion } = useDownloads()
 const { confirm } = useConfirm()
 
 /** Current version info for the card's primary version (single-version models). */
@@ -131,24 +131,6 @@ function handleCardDownload() {
     emit('download', props.hit)
   }
 }
-
-/** List of versions that are installed locally */
-const installedVersions = computed(() =>
-  allVersions.value.filter(v => getVersionState(props.hit.id, v.id) === 'installed'),
-)
-
-/** true when all versions installed (single or multi) */
-const allInstalled = computed(() => dlState.value === 'installed')
-
-/** true when some (not all) versions installed in a multi-version model */
-const partialInstalled = computed(() =>
-  !allInstalled.value && installedVersions.value.length > 0,
-)
-
-/** Hover tooltip: list installed version names */
-const installedTooltip = computed(() =>
-  installedVersions.value.map(v => v.name || `v${v.id}`).join(', '),
-)
 </script>
 
 <template>
@@ -167,9 +149,6 @@ const installedTooltip = computed(() =>
     </template>
 
     <template #meta>
-      <Badge v-if="allInstalled || partialInstalled" tone="positive" size="sm" :title="installedTooltip">
-        {{ partialInstalled ? `${t('models.downloads.installed')} ${installedVersions.length}/${versionCount}` : t('models.downloads.installed') }}
-      </Badge>
       <Badge :color="badgeColor">{{ badgeLabel }}</Badge>
       <Badge v-if="baseModel">{{ baseModel }}</Badge>
       <Badge v-if="versionCount > 1" :title="t('models.civitai.versions_count', { count: versionCount })">v{{ versionCount }}</Badge>
