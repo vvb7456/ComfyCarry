@@ -8,6 +8,7 @@
  *   </BaseButton>
  * 长方形约 42×32（左右 padding 10 + 20px 图标），触屏 44 高。
  * 尺寸集中在 `iconOnly` 内实现，调用方不要再用 :deep 覆盖。
+ * icon-only 时 title 缺省取 ariaLabel，纯图标按钮无需再手写 :title。
  */
 import { computed } from 'vue'
 import Spinner from './Spinner.vue'
@@ -28,6 +29,8 @@ const props = withDefaults(defineProps<{
   target?: string
   type?: 'button' | 'submit' | 'reset'
   ariaLabel?: string
+  /** hover 提示；icon-only 且未传时自动取 ariaLabel，保证纯图标按钮始终有 hover 文本 */
+  title?: string
 }>(), {
   variant: 'default',
   size: 'md',
@@ -38,6 +41,7 @@ const emit = defineEmits<{ click: [e: MouseEvent] }>()
 
 const tag = computed(() => props.href ? 'a' : 'button')
 const isDisabled = computed(() => props.disabled || props.loading)
+const hoverTitle = computed(() => props.title ?? (props.iconOnly ? props.ariaLabel : undefined))
 
 function onClick(e: MouseEvent) {
   if (isDisabled.value) {
@@ -66,6 +70,7 @@ function onClick(e: MouseEvent) {
     :href="href || undefined"
     :target="href ? target : undefined"
     :aria-label="ariaLabel"
+    :title="hoverTitle"
     :aria-busy="loading || undefined"
     :aria-disabled="(href && isDisabled) || undefined"
     :tabindex="href && isDisabled ? -1 : undefined"

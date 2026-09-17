@@ -652,6 +652,7 @@ sse.start()
               type="button"
               class="gen-tour-btn"
               :aria-label="t('generate.tour.open_aria')"
+              :title="t('generate.tour.open_aria')"
               @click="openTour"
             >
               <MsIcon name="help_outline" size="xs" />
@@ -691,6 +692,7 @@ sse.start()
                 class="gen-arch-trigger"
                 :class="{ 'gen-arch-trigger--open': open }"
                 :aria-label="t('generate.header.model_selector_aria')"
+                :title="t('generate.header.model_selector_aria')"
               >
                 <!-- 当前模型 logo(20px 底板) / 字母徽章 -->
                 <span

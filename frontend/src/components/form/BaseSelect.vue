@@ -434,6 +434,7 @@ onBeforeUnmount(() => {
         type="button"
         tabindex="-1"
         :aria-label="t('common.btn.clear')"
+        :title="t('common.btn.clear')"
         @click="clearAll"
       >
         <MsIcon name="close" size="xs" />
