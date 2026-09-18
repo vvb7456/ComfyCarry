@@ -77,10 +77,13 @@ async function loadData(force = false) {
   loading.value = true
   error.value = ''
   try {
+    // 全部 silent: ComfyUI 重启窗口期 (重启后立即刷新) 三个请求会同时 502,
+    // 非静默会弹三条一样的 "无法连接 ComfyUI" toast 刷屏; 失败由下方 error
+    // banner 与 EmptyState 承载
     const [installedData, availableData, prData] = await Promise.all([
-      get<Record<string, InstalledRaw>>('/api/plugins/installed'),
-      get<AvailablePluginsResponse>('/api/plugins/available'),
-      get<PendingRestartResponse>('/api/plugins/pending_restart'),
+      get<Record<string, InstalledRaw>>('/api/plugins/installed', { silent: true }),
+      get<AvailablePluginsResponse>('/api/plugins/available', { silent: true }),
+      get<PendingRestartResponse>('/api/plugins/pending_restart', { silent: true }),
     ])
     pendingRestart.value = prData?.packs ?? []
 

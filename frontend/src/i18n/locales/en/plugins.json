@@ -70,8 +70,18 @@
       "git": "Install"
     },
     "confirm": {
-      "title": "{kind} plugin \"{name}\"?",
-      "message": "This operation blocks until it completes; it cannot be cancelled or left."
+      "title": "Plugin Changes",
+      "message": "The plugin {plugin} will be {action} and ComfyUI will restart. Do not close or refresh this page.",
+      "switch_version": "The version of plugin {plugin} will be switched and ComfyUI will restart. Do not close or refresh this page.",
+      "action": {
+        "install": "installed",
+        "uninstall": "uninstalled",
+        "update": "updated",
+        "toggle": "toggled",
+        "enable": "enabled",
+        "disable": "disabled",
+        "git": "installed"
+      }
     },
     "running": {
       "install": "Installing \"{name}\"…",

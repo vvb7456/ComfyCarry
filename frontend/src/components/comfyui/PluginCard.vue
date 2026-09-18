@@ -21,6 +21,10 @@ const props = defineProps<{
   pending?: boolean
 }>()
 
+// Manager 是插件管理的依赖自身: unified_uninstall/disable/enable 对它一律
+// 拒绝 (manager_core "ignored: ..."), 只有 update / 版本切换可用
+const isSelfManaged = computed(() => props.plugin.id.toLowerCase() === 'comfyui-manager')
+
 const emit = defineEmits<{
   install: []
   uninstall: []
@@ -99,20 +103,22 @@ const rowBadges = computed<ListRowBadge[]>(() => {
         >
           <MsIcon name="swap_horiz" />
         </BaseButton>
-        <BaseButton
-          variant="ghost" size="sm" icon-only
-          :aria-label="plugin.enabled ? t('plugins.installed.disable') : t('plugins.installed.enable')"
-          @click="emit('toggle')"
-        >
-          <MsIcon :name="plugin.enabled ? 'toggle_on' : 'toggle_off'" />
-        </BaseButton>
-        <BaseButton
-          variant="danger" size="sm" icon-only
-          :aria-label="t('plugins.installed.remove')"
-          @click="emit('uninstall')"
-        >
-          <MsIcon name="delete" />
-        </BaseButton>
+        <template v-if="!isSelfManaged">
+          <BaseButton
+            variant="ghost" size="sm" icon-only
+            :aria-label="plugin.enabled ? t('plugins.installed.disable') : t('plugins.installed.enable')"
+            @click="emit('toggle')"
+          >
+            <MsIcon :name="plugin.enabled ? 'toggle_on' : 'toggle_off'" />
+          </BaseButton>
+          <BaseButton
+            variant="danger" size="sm" icon-only
+            :aria-label="t('plugins.installed.remove')"
+            @click="emit('uninstall')"
+          >
+            <MsIcon name="delete" />
+          </BaseButton>
+        </template>
       </template>
       <template v-else>
         <BaseButton

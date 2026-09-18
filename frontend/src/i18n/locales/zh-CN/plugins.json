@@ -70,8 +70,18 @@
       "git": "安装"
     },
     "confirm": {
-      "title": "确认{kind}「{name}」？",
-      "message": "操作将阻塞执行至完成，期间无法取消或离开本页。"
+      "title": "插件变更",
+      "message": "将要{action}插件{plugin}，并重启ComfyUI，不要关闭或刷新页面。",
+      "switch_version": "将要切换插件{plugin}版本，并重启ComfyUI，不要关闭或刷新页面。",
+      "action": {
+        "install": "安装",
+        "uninstall": "卸载",
+        "update": "更新",
+        "toggle": "切换",
+        "enable": "启用",
+        "disable": "禁用",
+        "git": "安装"
+      }
     },
     "running": {
       "install": "正在安装「{name}」…",

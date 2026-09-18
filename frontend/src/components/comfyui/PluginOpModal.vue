@@ -92,11 +92,19 @@ const isTerminal = computed(() => phase.value === 'done' || phase.value === 'fai
 // ── 提交: confirm (阻塞不可取消, 事前必须确认) → 执行 ────────
 
 async function open(req: PluginOpRequest): Promise<void> {
-  const confirmKind = t(`plugins.op.kind.${req.kind}`)
+  const isVersionSwitch = req.kind === 'install'
+    && req.payload.selected_version !== undefined
+    && req.payload.selected_version !== 'latest'
+  const message = isVersionSwitch
+    ? t('plugins.op.confirm.switch_version', { plugin: req.title })
+    : t('plugins.op.confirm.message', {
+      action: t(`plugins.op.confirm.action.${req.kind}`),
+      plugin: req.title,
+    })
   const ok = await confirm({
-    title: t('plugins.op.confirm.title', { kind: confirmKind, name: req.title }),
-    message: t('plugins.op.confirm.message'),
-    confirmText: confirmKind,
+    title: t('plugins.op.confirm.title'),
+    message,
+    confirmText: t('common.btn.confirm'),
     cancelText: t('common.btn.cancel'),
     variant: req.kind === 'uninstall' ? 'danger' : 'default',
   })
@@ -155,13 +163,17 @@ async function pollOnce(): Promise<void> {
 }
 
 /** SSE 事件入口 (cm_queue_status): done 且本 ui_id 出结果 */
-function onQueueEvent(data: CMQueueStatusData): void {
+async function onQueueEvent(data: CMQueueStatusData): Promise<void> {
   if (phase.value !== 'running') return
   if (data.status !== 'done') return
   const result = data.nodepack_result?.[uiId]
   if (result === undefined) return // 别的任务收尾 (非本弹窗发起)
   stopTimers()
+  phase.value = 'idle' // 立即退出 running, 防 await 期间重复事件重入
   if (result === 'success' || result === 'skip') {
+    // enable/disable 只移目录不动进程, install/update/git 同理 — 均需重启生效;
+    // 与轮询兜底一致, 查 pending_restart diff 决定完成态是否给「立即重启」
+    await checkRestart()
     succeed()
   } else {
     fail(result)
