@@ -253,7 +253,7 @@ function onKeydown(e: KeyboardEvent) {
     const nextIdx = e.shiftKey
       ? (idx <= 0 ? focusables.length - 1 : idx - 1)
       : (idx === focusables.length - 1 ? 0 : idx + 1)
-    focusables[nextIdx].focus()
+    focusables[nextIdx]?.focus()
   }
 }
 

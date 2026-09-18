@@ -40,7 +40,7 @@ function hfBytes(...versionIds: number[]): number {
 
 // ── ControlNet ───────────────────────────────────────────────────────────────
 
-const CN_MODELS: Record<string, DepRow> = {
+const CN_MODELS = {
   union: {
     id: 'xinsir-union-promax',
     label: 'Xinsir Union ProMax',
@@ -142,7 +142,7 @@ const CN_MODELS: Record<string, DepRow> = {
 
 // ── 放大 ─────────────────────────────────────────────────────────────────────
 
-const UPSCALE_MODELS: Record<string, DepRow> = {
+const UPSCALE_MODELS = {
   aurasr_v2: {
     id: 'aurasr-v2',
     label: 'AuraSR v2',
@@ -185,7 +185,7 @@ export const UPSCALE_DEP_GROUP: DepGroup = {
 // ── 面部重绘 (FaceDetailer) ──────────────────────────────────────────────────
 // 检测器必需 (~52MB); SAM 可选增强 (vit_b, 修脸场景足够, vit_h 属过剩)
 
-const FACE_MODELS: Record<string, DepRow> = {
+const FACE_MODELS = {
   face_yolov8m: {
     id: 'face-yolov8m',
     label: 'YOLOv8 面部检测器',

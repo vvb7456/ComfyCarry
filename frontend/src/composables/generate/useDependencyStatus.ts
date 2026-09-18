@@ -171,9 +171,10 @@ export function useDependencyStatus(
   const current = computed<DepCurrent | null>(() => {
     const active = activeRows.value
     if (!active.length) return null
+    const head = active[0] as (typeof active)[number]
     return {
       active: active.length,
-      name: active[0].row.label,
+      name: head.row.label,
       percent: Math.round(active.reduce((a, r) => a + r.percent, 0) / active.length),
       speed: active.reduce((a, r) => a + r.speed, 0),
     }
@@ -249,7 +250,7 @@ export function useDependencyStatus(
         for (const s of statuses) s.installed = true
         for (let i = 0; i < flat.length; i++) {
           const r = results[i]
-          const s = statuses[flat[i].rowIdx]
+          const s = statuses[flat[i]!.rowIdx] as (typeof statuses)[number]
           if (!r) { s.installed = false; continue }
           if (!r.installed) s.installed = false
           // 已被等待链接管的行不动它的下载态: 那边才是权威, 这里再 push 只会攒重复 id

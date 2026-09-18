@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useWizardState } from './useWizardState'
 import type { LlmProvider, LlmModel } from '@/types/wizard'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 
 type WizardLlmProviderOption = LlmProvider & {
   labelKey: string
@@ -97,13 +98,14 @@ export function useWizardLlm() {
         if (preselect) {
           selectModel(preselect)
         } else if (!config.llm_model && models.value.length > 0) {
-          selectModel(models.value[0].id)
+          const first = models.value[0]
+          if (first) selectModel(first.id)
         }
       } else {
         modelsError.value = apiErrorText(d, t('wizard.step6.fetch_fail'))
       }
-    } catch (e: any) {
-      modelsError.value = `${t('wizard.step6.request_fail')} ${e.message}`
+    } catch (e: unknown) {
+      modelsError.value = `${t('wizard.step6.request_fail')} ${errorMessage(e)}`
     } finally {
       modelsLoading.value = false
     }

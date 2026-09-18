@@ -32,11 +32,6 @@ const isFinished = computed(
   () => store.stopReason?.code === 'max_reached',
 )
 
-// 停止: idle 且有 stopReason 且不是 max_reached
-const isStopped = computed(
-  () => store.state === 'idle' && !!store.stopReason && !isFinished.value,
-)
-
 const isRunning = computed(() => store.state === 'running')
 
 const variant = computed<'running' | 'stopped' | 'finished'>(() => {

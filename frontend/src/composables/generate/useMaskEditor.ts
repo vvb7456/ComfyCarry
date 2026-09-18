@@ -1,4 +1,4 @@
-import { ref, computed, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onBeforeUnmount, type Ref } from 'vue'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ export function useMaskEditor() {
     const src = maskData.data
     const dst = tintImageData.data
     for (let i = 0; i < src.length; i += 4) {
-      const brightness = src[i] // R channel (grayscale: R=G=B)
+      const brightness = src[i]! // R channel (grayscale: R=G=B)
       if (brightness > 128) {
         dst[i] = 255     // R
         dst[i + 1] = 51  // G
@@ -287,9 +287,9 @@ export function useMaskEditor() {
     const imageData = maskCtx.getImageData(0, 0, imgWidth, imgHeight)
     const data = imageData.data
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = 255 - data[i]       // R
-      data[i + 1] = 255 - data[i + 1] // G
-      data[i + 2] = 255 - data[i + 2] // B
+      data[i] = 255 - data[i]!           // R
+      data[i + 1] = 255 - data[i + 1]!   // G
+      data[i + 2] = 255 - data[i + 2]!   // B
       // Alpha stays 255
     }
     maskCtx.putImageData(imageData, 0, 0)
@@ -302,7 +302,7 @@ export function useMaskEditor() {
     const data = maskCtx.getImageData(0, 0, imgWidth, imgHeight).data
     // Full scan with early exit — check R channel of each pixel
     for (let i = 0; i < data.length; i += 4) {
-      if (data[i] > 128) return true
+      if (data[i]! > 128) return true
     }
     return false
   }
@@ -366,7 +366,7 @@ export function useMaskEditor() {
     renderCursor(e)
   }
 
-  function onPointerUp(e: PointerEvent) {
+  function onPointerUp(_e: PointerEvent) {
     if (panning) {
       panning = false
       if (displayCanvas) displayCanvas.style.cursor = 'crosshair'

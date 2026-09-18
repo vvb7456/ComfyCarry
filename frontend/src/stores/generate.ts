@@ -486,12 +486,13 @@ export const useGenerateStore = defineStore('generate', () => {
     componentsReady[type] = ready
   }
 
-  const currentConfig = computed<ModelTypeConfig>(() => MODEL_TYPES[activeModelType.value] || MODEL_TYPES.sd15)
+  const currentConfig = computed<ModelTypeConfig>(() => MODEL_TYPES[activeModelType.value] ?? MODEL_TYPES.sd15!)
   const currentState = computed<ModelState>(() => {
-    if (!modelStates[activeModelType.value]) {
-      modelStates[activeModelType.value] = createDefaultState(currentConfig.value)
+    const key = activeModelType.value
+    if (!modelStates[key]) {
+      modelStates[key] = createDefaultState(currentConfig.value)
     }
-    return modelStates[activeModelType.value]
+    return modelStates[key] as ModelState
   })
 
   /**
@@ -500,11 +501,11 @@ export const useGenerateStore = defineStore('generate', () => {
    * 非激活实例若写 currentState 会串到别的架构上 (CN 模型自动选中曾因此串写)。
    */
   function stateFor(type: string): ModelState {
-    const cfg = MODEL_TYPES[type] || MODEL_TYPES.sd15
+    const cfg = MODEL_TYPES[type] ?? MODEL_TYPES.sd15!
     if (!modelStates[type]) {
       modelStates[type] = createDefaultState(cfg)
     }
-    return modelStates[type]
+    return modelStates[type] as ModelState
   }
 
   // ── Auto-save with debounce ──────────────────────────────────────────────
@@ -598,7 +599,7 @@ export const useGenerateStore = defineStore('generate', () => {
       //        video 槽默认 'wan22_i2v' (默认条目)。
       if (version < 3) {
         const oldActive = data.activeModelType
-        const imageKey = (typeof oldActive === 'string' && MODEL_TYPES[oldActive] && MODEL_TYPES[oldActive].mediaType === 'image')
+        const imageKey = (typeof oldActive === 'string' && MODEL_TYPES[oldActive]?.mediaType === 'image')
           ? oldActive : 'sdxl'
         activeModelTypeByTask.image = imageKey
         activeModelTypeByTask.video = 'wan22_i2v'
@@ -613,7 +614,7 @@ export const useGenerateStore = defineStore('generate', () => {
           activeModelTypeByTask.video = vid
         } else if (typeof data.activeModelType === 'string' && MODEL_TYPES[data.activeModelType]) {
           // 兜底: v3 但只存了旧字段 (不应发生, 防御)
-          const cfg = MODEL_TYPES[data.activeModelType]
+          const cfg = MODEL_TYPES[data.activeModelType]!
           if (cfg.mediaType === 'video') {
             activeModelTypeByTask.video = data.activeModelType
           } else {
@@ -684,7 +685,7 @@ export const useGenerateStore = defineStore('generate', () => {
             }
             // clipSkip 校验 (1..4) + vaeOverride 校验 (校验通过 vaeExists)
             if (typeof state.clipSkip !== 'number' || state.clipSkip < 1 || state.clipSkip > 4) {
-              const config = MODEL_TYPES[key] || MODEL_TYPES.sdxl
+              const config = MODEL_TYPES[key] ?? MODEL_TYPES.sdxl!
               state.clipSkip = config.defaults.clip_skip ?? 1
             }
             if (state.vaeOverride && validators.vaeExists && !validators.vaeExists(state.vaeOverride)) {
@@ -694,11 +695,11 @@ export const useGenerateStore = defineStore('generate', () => {
               state.loras = state.loras.filter(l => validators.loraExists!(l.name))
             }
             if (state.sampler && validators.samplerExists && !validators.samplerExists(state.sampler)) {
-              const config = MODEL_TYPES[key] || MODEL_TYPES.sdxl
+              const config = MODEL_TYPES[key] ?? MODEL_TYPES.sdxl!
               state.sampler = config.defaults.sampler
             }
             if (state.scheduler && validators.schedulerExists && !validators.schedulerExists(state.scheduler)) {
-              const config = MODEL_TYPES[key] || MODEL_TYPES.sdxl
+              const config = MODEL_TYPES[key] ?? MODEL_TYPES.sdxl!
               state.scheduler = config.defaults.scheduler
             }
           }
@@ -725,21 +726,21 @@ export const useGenerateStore = defineStore('generate', () => {
           const config = MODEL_TYPES[key]
           if (config) {
             const defaults = createDefaultState(config)
-            const merged = { ...defaults, ...state }
+            const merged: ModelState = { ...defaults, ...state }
             // Deep-merge nested objects so new fields are not lost
             for (const k of Object.keys(defaults) as (keyof ModelState)[]) {
               const dv = defaults[k]
               if (dv && typeof dv === 'object' && !Array.isArray(dv) && state[k] && typeof state[k] === 'object' && !Array.isArray(state[k])) {
-                ;(merged as any)[k] = { ...dv, ...(state[k] as any) }
+                ;(merged[k] as object) = { ...dv, ...(state[k] as object) }
               }
             }
             // video 子对象对图像架构应为 undefined; 迁移/合并后强制对齐 config
             if (config.mediaType !== 'video') {
-              ;(merged as any).video = undefined
+              merged.video = undefined
             } else {
               // 视频架构: 若仍缺 video 态 (极端脏数据), 用默认补
-              if (!(merged as any).video) {
-                ;(merged as any).video = createDefaultVideoState(config)
+              if (!merged.video) {
+                merged.video = createDefaultVideoState(config)
               }
             }
             modelStates[key] = merged

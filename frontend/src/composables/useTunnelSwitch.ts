@@ -15,6 +15,7 @@
  * 终态前不解冻 (跳转即可, 失败态才解冻供用户手动处理)。
  */
 import { computed, ref } from 'vue'
+import { errorMessage } from '@/utils/errorMessage'
 
 export type TunnelSwitchPhase =
   | 'idle' | 'preparing' | 'starting' | 'ready' | 'finalizing' | 'done' | 'failed'
@@ -282,7 +283,7 @@ export async function startSwitch(payload: TunnelSwitchPayload): Promise<void> {
       body: JSON.stringify(payload),
     })
   } catch (e) {
-    throw new TunnelSwitchError((e as Error)?.message || 'network error', 0, null)
+    throw new TunnelSwitchError(errorMessage(e), 0, null)
   }
 
   const body = await parseBody(res)

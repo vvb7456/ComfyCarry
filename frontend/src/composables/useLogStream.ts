@@ -160,7 +160,7 @@ export function useLogStream(opts: LogStreamOptions) {
       data.entries.forEach(e => {
         lines.value.push(makeLine(e.text, e.level, e.line))
       })
-      hasMore.value = lines.value.length > 0 && data.entries[0].line > 1
+      hasMore.value = lines.value.length > 0 && (data.entries[0]?.line ?? 0) > 1
     } else {
       hasMore.value = false
     }

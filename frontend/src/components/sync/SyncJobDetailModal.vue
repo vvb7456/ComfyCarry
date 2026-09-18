@@ -70,7 +70,8 @@ const hasMoreEvents = computed(() => !eventsExhausted.value && events.value.leng
 
 async function loadMoreEvents(): Promise<void> {
   if (!props.jobId || !events.value.length) return
-  const lastId = events.value[events.value.length - 1].id
+  const lastId = events.value[events.value.length - 1]?.id
+  if (lastId === undefined) return
   loadingMore.value = true
   try {
     const d = await get<JobDetailResponse>(`/api/sync/jobs/${props.jobId}?after_id=${lastId}&limit=${EVENT_BATCH}`)

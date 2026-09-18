@@ -61,15 +61,16 @@ export function extractExtraArgs(
   const { withValue, standalone } = knownArgFlags(schema)
   const extras: string[] = []
   for (let i = 0; i < parts.length;) {
-    if (withValue.has(parts[i])) {
+    const part = parts[i] ?? ''
+    if (withValue.has(part)) {
       i += 2
       continue
     }
-    if (standalone.has(parts[i])) {
+    if (standalone.has(part)) {
       i += 1
       continue
     }
-    if (parts[i] !== 'main.py') extras.push(parts[i])
+    if (part !== 'main.py') extras.push(part)
     i += 1
   }
   return extras.join(' ')

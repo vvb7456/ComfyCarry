@@ -300,7 +300,7 @@ export function requiredComponents(
     if (tier) chosen = files.find(f => f.tier === tier)
     if (!chosen) chosen = files.find(f => f.tier === 'standard')
     if (!chosen) chosen = files[0]
-    result.push(chosen)
+    if (chosen) result.push(chosen)
   }
   return result
 }

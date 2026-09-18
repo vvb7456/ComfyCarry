@@ -5,9 +5,9 @@ const _escMap: Record<string, string> = {
 }
 
 export function escHtml(s: unknown): string {
-  return String(s ?? '').replace(/[&<>"']/g, c => _escMap[c])
+  return String(s ?? '').replace(/[&<>"']/g, c => _escMap[c]!)
 }
 
 export function escAttr(s: unknown): string {
-  return String(s ?? '').replace(/[&<>"']/g, c => _escMap[c])
+  return String(s ?? '').replace(/[&<>"']/g, c => _escMap[c]!)
 }

@@ -10,7 +10,6 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import SecretInput from '@/components/ui/SecretInput.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
-import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'StepLlm' })
 

@@ -25,7 +25,7 @@ const emit = defineEmits<{
   unfavorite: [modelId: string, versionId: number]
 }>()
 
-const { getVersionState, isInFavorites, favoritesItems } = useDownloads()
+const { getVersionState, favoritesItems } = useDownloads()
 
 const allVersions = computed(() =>
   props.hit?.versions || (props.hit?.version ? [props.hit.version] : []),

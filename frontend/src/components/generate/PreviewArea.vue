@@ -85,7 +85,7 @@ function onVideoLoadedMetadata(e: Event, url: string, filename: string) {
 /** 从文件名提取视频格式标签 (扩展名大写)。 */
 function videoFormat(filename: string): string | undefined {
   const m = filename.match(/\.(mp4|webm|mov|avi|mkv)(\?|$)/i)
-  return m ? m[1].toUpperCase() : undefined
+  return m?.[1]?.toUpperCase()
 }
 
 /** 判定产物条目是否为视频 (优先读 animated 标量布尔, 缺失则扩展名兜底)。 */
@@ -109,9 +109,14 @@ function downloadName(url: string): string {
   }
 }
 
+/** 单产物分支内取首元素 (调用方已保证 length >= 1)。 */
+function firstImage(): PreviewImage {
+  return props.images[0] as PreviewImage
+}
+
 /** 完成态: 是否有视频产物 (用于决定单图/单视频渲染分支)。 */
 const singleVideo = computed(() =>
-  props.images.length === 1 && isVideo(props.images[0]),
+  props.images.length === 1 && isVideo(firstImage()),
 )
 
 /** 完成态: 多产物网格里的视频项。 */
@@ -160,21 +165,21 @@ function metaText(img: PreviewImage): string {
         <!-- 单视频: 内联 <video controls loop muted playsinline> -->
         <div v-if="singleVideo" class="gen-preview-single gen-preview-video-wrap">
           <video
-            :src="images[0].url"
+            :src="firstImage().url"
             controls
             loop
             muted
             playsinline
             class="preview-video"
-            @click="emit('clickImage', images[0].url)"
-            @loadedmetadata="onVideoLoadedMetadata($event, images[0].url, images[0].filename)"
+            @click="emit('clickImage', firstImage().url)"
+            @loadedmetadata="onVideoLoadedMetadata($event, firstImage().url, firstImage().filename)"
           />
           <!-- 元信息行 + 下载 -->
           <div class="preview-video-meta">
-            <span v-if="metaText(images[0])" class="preview-meta-text">{{ metaText(images[0]) }}</span>
+            <span v-if="metaText(firstImage())" class="preview-meta-text">{{ metaText(firstImage()) }}</span>
             <a
-              :href="images[0].url"
-              :download="downloadName(images[0].url)"
+              :href="firstImage().url"
+              :download="downloadName(firstImage().url)"
               class="preview-video-download"
             >
               <MsIcon name="download" size="sm" color="none" />
@@ -184,7 +189,7 @@ function metaText(img: PreviewImage): string {
         </div>
         <!-- 单图像: 原样保留 (回归保护, 一字不变) -->
         <div v-else class="gen-preview-single">
-          <img :src="images[0].url" alt="Generated" @click="emit('clickImage', images[0].url)" />
+          <img :src="firstImage().url" alt="Generated" @click="emit('clickImage', firstImage().url)" />
         </div>
       </template>
 

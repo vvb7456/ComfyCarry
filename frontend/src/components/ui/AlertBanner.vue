@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { IconName } from '@/config/icon-codepoints'
@@ -28,7 +27,7 @@ const defaultIcons: Record<string, IconName> = {
   danger: 'error',
 }
 
-const iconName = () => props.icon ?? defaultIcons[props.tone]
+const iconName = () => props.icon ?? defaultIcons[props.tone] ?? 'info'
 
 function close() {
   visible.value = false

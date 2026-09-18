@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWizardState } from './useWizardState'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 
 interface TunnelCapacity {
   active_tunnels: number
@@ -103,10 +104,10 @@ export function useWizardTunnel() {
         : { ok: false, message: apiErrorText(d, t('wizard.step2.validate_fail')) }
       validateResult.value = result
       return result
-    } catch (e: any) {
+    } catch (e: unknown) {
       const result: ValidateResult = {
         ok: false,
-        message: `${t('wizard.step2.validate_error')} ${e.message}`,
+        message: `${t('wizard.step2.validate_error')} ${errorMessage(e)}`,
       }
       validateResult.value = result
       return result

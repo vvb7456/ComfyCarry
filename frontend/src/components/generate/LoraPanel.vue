@@ -90,11 +90,13 @@ function removeLora(index: number) {
 }
 
 function toggleEnabled(index: number) {
-  state.value.loras[index].enabled = !state.value.loras[index].enabled
+  const lora = state.value.loras[index]
+  if (lora) lora.enabled = !lora.enabled
 }
 
 function updateStrength(index: number, value: number) {
-  state.value.loras[index].strength = value
+  const lora = state.value.loras[index]
+  if (lora) lora.strength = value
 }
 
 // ── Inline strength editing ──
@@ -118,7 +120,8 @@ function commitStrengthEdit(index: number, e: Event) {
   const raw = parseFloat((e.target as HTMLInputElement).value)
   editingIndex.value = null
   if (isNaN(raw)) return
-  state.value.loras[index].strength = Math.max(0, Math.min(2, Math.round(raw * 20) / 20))
+  const lora = state.value.loras[index]
+  if (lora) lora.strength = Math.max(0, Math.min(2, Math.round(raw * 20) / 20))
 }
 
 function cancelStrengthEdit() {

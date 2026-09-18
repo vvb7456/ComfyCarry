@@ -31,7 +31,6 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 
 const isDownloading = computed(() => props.init.progress.value?.phase === 'downloading')
-const isImporting = computed(() => props.init.progress.value?.phase === 'importing')
 
 const progressText = computed(() => {
   const p = props.init.progress.value

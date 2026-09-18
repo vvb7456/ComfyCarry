@@ -312,7 +312,7 @@ function onTriggerKeydown(e: KeyboardEvent) {
       const next = e.key === 'ArrowDown'
         ? (curIdx < 0 ? 0 : (curIdx + 1) % leaves.length)
         : (curIdx < 0 ? leaves.length - 1 : (curIdx - 1 + leaves.length) % leaves.length)
-      emit('update:modelValue', leaves[next].key)
+      emit('update:modelValue', leaves[next]!.key)
       return
     }
     if (e.key === 'Enter' || e.key === ' ') {
@@ -372,8 +372,9 @@ function handleKeydown(e: KeyboardEvent) {
       scrollToHighlighted()
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      if (subHighlightIdx.value >= 0 && subRows[subHighlightIdx.value]) {
-        selectLeaf(subRows[subHighlightIdx.value])
+      const selected = subRows[subHighlightIdx.value]
+      if (subHighlightIdx.value >= 0 && selected) {
+        selectLeaf(selected)
       }
     } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
       e.preventDefault()

@@ -59,7 +59,7 @@ export function normalizePrompt(text: string, opts: NormalizeOptions = DEFAULT_O
       return `${PLACEHOLDER}${kept.length - 1}${PLACEHOLDER}`
     })
     s = s.replace(/_/g, ' ')
-    s = s.replace(new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, 'g'), (_m, i) => kept[Number(i)])
+    s = s.replace(new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, 'g'), (_m, i) => kept[Number(i)] ?? '')
   }
 
   // 始终执行的格式化

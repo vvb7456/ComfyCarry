@@ -218,7 +218,7 @@ const presetInfoRows = computed(() => {
 
 async function savePreset(runAfter = false) {
   const newRules = buildPresetRules()
-  if (!newRules.length || !newRules[0].remote) {
+  if (!newRules.length || !newRules[0]?.remote) {
     toast(t('sync.rule.fill_required'), 'warning')
     return
   }

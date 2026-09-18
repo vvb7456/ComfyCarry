@@ -5,7 +5,7 @@ import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ToastContainer' })
 
-const { items, remove } = useToast()
+const { items } = useToast()
 
 const iconMap: Record<string, IconName> = {
   success: 'check_circle',

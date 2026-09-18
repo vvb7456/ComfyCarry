@@ -290,7 +290,7 @@ defineExpose({ setupObserver })
               class="history-thumb-dur"
             >
               <MsIcon name="play_arrow" size="xxs" color="none" />
-              <template v-if="durationMap[durKey(img)] != null">{{ fmtDuration(durationMap[durKey(img)]) }}</template>
+              <template v-if="durationMap[durKey(img)!] != null">{{ fmtDuration(durationMap[durKey(img)!]!) }}</template>
             </span>
             <!-- 视频时长抽取: preload="metadata" 只取头部, @loadedmetadata 写入时长 Map -->
             <video

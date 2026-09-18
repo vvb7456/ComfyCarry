@@ -93,14 +93,14 @@ function measure() {
 
   // Layout: [allChip?] [chip0 .. chipN-1] [togglePlaceholder]
   const offset = props.allOption ? 1 : 0
-  const toggleEl = kids[kids.length - 1]
+  const toggleEl = kids[kids.length - 1]!
   const toggleW = toggleEl.offsetWidth
 
   // Detect row number (1-based) for each option chip
   let row = 0, prevTop = -1
   const rows: number[] = []
   for (let i = offset; i < kids.length - 1; i++) {
-    const t = kids[i].offsetTop
+    const t = kids[i]?.offsetTop ?? prevTop
     if (t !== prevTop) { row++; prevTop = t }
     rows.push(row)
   }
@@ -108,7 +108,7 @@ function measure() {
   const maxRow = props.collapsedRows
 
   // All fit?
-  if (!rows.length || rows[rows.length - 1] <= maxRow) {
+  if (!rows.length || (rows[rows.length - 1] ?? 0) <= maxRow) {
     visibleCount.value = Infinity
     return
   }
@@ -116,7 +116,7 @@ function measure() {
   // Find first chip on row > maxRow
   let firstOver = rows.length
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i] > maxRow) { firstOver = i; break }
+    if ((rows[i] ?? 0) > maxRow) { firstOver = i; break }
   }
 
   // Walk back from firstOver to find where toggle fits on the same row
@@ -125,7 +125,7 @@ function measure() {
   let cut = firstOver
   while (cut > 0) {
     const chip = kids[offset + cut - 1]
-    if (chip.offsetLeft + chip.offsetWidth + gap + toggleW <= cw) break
+    if (chip && chip.offsetLeft + chip.offsetWidth + gap + toggleW <= cw) break
     cut--
   }
 

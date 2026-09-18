@@ -34,7 +34,7 @@ const allVersions = computed(() =>
 
 // Generation-Only / 无权重文件的 version 不进下载列表 —— 列出来只会点出一个错误。
 const modelId = computed(() => props.hit?.id ?? null)
-const { downloadable: versions, noneDownloadable, loading: flagsLoading } =
+const { downloadable: versions, noneDownloadable } =
   useDownloadableVersions(modelId, allVersions, computed(() => props.modelValue))
 
 function versionInfo(versionId: number): VersionDownloadInfo {

@@ -94,6 +94,15 @@ const allChosen = computed(() =>
   (props.pendingFiles || []).every(f => !!choices.value[f.filename]),
 )
 
+/** 模板 v-model 取值: 该文件的 choices 键在 watch 中已初始化, 不会缺键。 */
+function choiceOf(filename: string): string {
+  return choices.value[filename] ?? ''
+}
+
+function setChoice(filename: string, value: string) {
+  choices.value = { ...choices.value, [filename]: value }
+}
+
 function fmtSize(kb?: number | null): string {
   if (!kb || kb <= 0) return ''
   const mb = kb / 1024
@@ -142,13 +151,14 @@ function onConfirm() {
           </div>
         </div>
         <BaseSelect
-          v-model="choices[f.filename]"
+          :model-value="choiceOf(f.filename)"
           class="dl-dir__pick"
           :options="optionsFor(f)"
           :placeholder="t('models.dl_dir.placeholder')"
           :search-placeholder="t('models.dl_dir.search')"
           searchable
           teleport
+          @update:model-value="setChoice(f.filename, $event as string)"
         />
       </div>
     </div>

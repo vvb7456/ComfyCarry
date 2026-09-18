@@ -254,6 +254,6 @@ export function packagingOf(
 ): 'checkpoint' | 'split' {
   if (config?.mediaType === 'video') return 'split'
   const sp = config?.supportedPackaging
-  if (sp && sp.length === 1) return sp[0]
+  if (sp && sp.length === 1) return sp[0]!
   return checkpointNames.includes(name) ? 'checkpoint' : 'split'
 }

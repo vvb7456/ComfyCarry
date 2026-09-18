@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 import { buildHuggingFaceDownloadBody } from '@/utils/hfDownload'
 import type { PendingFile, DirOption } from '@/components/models/DownloadDirModal.vue'
 import { HUGGINGFACE_MODELS } from '@/config/huggingface-models'
@@ -253,7 +254,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       }
       return true
     } catch (e: unknown) {
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       favorites.value = prev
       return false
     }
@@ -273,7 +274,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         favorites.value = prev
       }
     } catch (e: unknown) {
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       favorites.value = prev
     }
   }
@@ -296,7 +297,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         favorites.value = prev
       }
     } catch (e: unknown) {
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       favorites.value = prev
     }
   }
@@ -312,7 +313,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         favorites.value = prev
       }
     } catch (e: unknown) {
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       favorites.value = prev
     }
   }
@@ -349,7 +350,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         favorites.value = prev
       }
     } catch (e: unknown) {
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       favorites.value = prev
     }
   }
@@ -693,7 +694,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       }
     } catch (e: unknown) {
       clearSubmitting(vid)
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       return
     }
 
@@ -780,7 +781,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       }
     } catch (e: unknown) {
       clearSubmitting(vid)
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
       return false
     }
 
@@ -916,7 +917,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         startPolling()
       }
     } catch (e: unknown) {
-      toast((e as Error)?.message || 'Network error', 'error')
+      toast(errorMessage(e), 'error')
     }
     await refreshStatus()
   }

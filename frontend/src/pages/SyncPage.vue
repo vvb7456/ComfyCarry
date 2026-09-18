@@ -575,7 +575,7 @@ function statusText(status: string): string {
  *  多规则/未知用双向 sync 图标着中性色) */
 function jobDirIcon(job: SyncJob): IconName {
   const rules = job.rules ?? []
-  if (rules.length === 1) return rules[0].direction === 'push' ? 'cloud_upload' : 'cloud_download'
+  if (rules.length === 1) return rules[0]?.direction === 'push' ? 'cloud_upload' : 'cloud_download'
   if (rules.length > 1) return 'sync'
   return 'sync'
 }
@@ -583,7 +583,7 @@ function jobDirIcon(job: SyncJob): IconName {
 /** 方向图标配色类 (与 PresetRuleCard 的 dirColor 同一逻辑) */
 function jobDirClass(job: SyncJob): string {
   const rules = job.rules ?? []
-  if (rules.length === 1 && rules[0].direction === 'push') return 'is-push'
+  if (rules.length === 1 && rules[0]?.direction === 'push') return 'is-push'
   if (rules.length === 1) return 'is-pull'
   return ''
 }
@@ -597,7 +597,7 @@ function jobTitle(job: SyncJob): string {
 /** 规则信息: 单规则显示名称, 多规则显示条数 (快照缺失时回退 rule_count) */
 function jobRulesFact(job: SyncJob): string {
   const rules = job.rules ?? []
-  if (rules.length === 1) return rules[0].name || rules[0].id
+  if (rules.length === 1) return rules[0]?.name || rules[0]?.id || ''
   return t('sync.records.rules_count', { count: rules.length || job.rule_count })
 }
 
@@ -797,17 +797,17 @@ function switchTab(tab: string) {
                   {{ t('sync.remote.no_capacity_info') }}
                 </span>
                 <span
-                  v-else-if="storageData[remote.name] && (storageData[remote.name].error || storageData[remote.name].error_key)"
+                  v-else-if="storageData[remote.name]?.error || storageData[remote.name]?.error_key"
                   class="sync-remote-card__cap-err"
-                >{{ apiErrorText(storageData[remote.name]) }}</span>
+                >{{ apiErrorText(storageData[remote.name] ?? null) }}</span>
                 <template v-else-if="storageData[remote.name]">
                   <span class="sync-remote-card__cap-line">
-                    {{ t('sync.remotes.used') }} {{ fmtBytes(storageData[remote.name].used ?? 0) }} / {{ fmtBytes(storageData[remote.name].total ?? 0) }}
-                    <template v-if="storageData[remote.name].free">
-                      ({{ t('sync.remotes.remaining') }} {{ fmtBytes(storageData[remote.name].free ?? 0) }})
+                    {{ t('sync.remotes.used') }} {{ fmtBytes(storageData[remote.name]?.used ?? 0) }} / {{ fmtBytes(storageData[remote.name]?.total ?? 0) }}
+                    <template v-if="storageData[remote.name]?.free">
+                      ({{ t('sync.remotes.remaining') }} {{ fmtBytes(storageData[remote.name]?.free ?? 0) }})
                     </template>
                   </span>
-                  <UsageBar :percent="storagePct(storageData[remote.name])" />
+                  <UsageBar :percent="storagePct(storageData[remote.name]!)" />
                 </template>
                 <span
                   v-else

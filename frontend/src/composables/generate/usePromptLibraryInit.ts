@@ -9,6 +9,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 import type { InitSourceStatus, ImportResult } from '@/types/prompt-library'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -146,11 +147,11 @@ export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
       await checkStatus()
       return result
 
-    } catch (e: any) {
-      if (e?.name === 'AbortError') return null
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') return null
       progress.value = null
       importing.value = false
-      error.value = e?.message || 'Import failed'
+      error.value = errorMessage(e) || 'Import failed'
       return null
     }
   }

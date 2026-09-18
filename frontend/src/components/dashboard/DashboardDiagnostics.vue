@@ -130,7 +130,7 @@ const envFacts = computed(() => {
   const python = props.data?.comfyui?.python_version
 
   if (pytorch) facts.push({ label: 'PyTorch', value: pytorch })
-  if (python) facts.push({ label: 'Python', value: python.split(' ')[0] })
+  if (python) facts.push({ label: 'Python', value: python.split(' ')[0] ?? python })
   if (gpu?.name) {
     const vram = gpu.mem_total ? ` ${(gpu.mem_total / 1024).toFixed(0)} GB` : ''
     facts.push({ label: 'GPU', value: `${shortGpuName(gpu.name)}${vram}` })

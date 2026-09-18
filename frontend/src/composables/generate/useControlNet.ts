@@ -172,7 +172,7 @@ export function useControlNet(
 
   // ── Store config ─────────────────────────────────────────────────────────
 
-  const config = computed<ControlNetState>(() => state.value.controlNets[type])
+  const config = computed<ControlNetState>(() => state.value.controlNets[type] as ControlNetState)
 
   // ── Models ───────────────────────────────────────────────────────────────
   // 三规则过滤 (branch = 当前 tab 的 cnBranch):
@@ -212,7 +212,7 @@ export function useControlNet(
     if (!list.length) return
     const cur = config.value.model
     if (!cur || !list.includes(cur)) {
-      config.value.model = list[0]
+      config.value.model = list[0]!
     }
   }, { immediate: true })
 

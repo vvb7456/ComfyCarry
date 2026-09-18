@@ -120,27 +120,29 @@ function buildSlotOptions(slot: ComponentSlot, candidates: { name: string }[]): 
 
   // 稳定排序: 组1→组2→组3, 组内保持原顺序
   const ordered = candidates.map((_, i) => i)
-  ordered.sort((a, b) => configs[a].group - configs[b].group)
+  ordered.sort((a, b) => (configs[a]?.group ?? 3) - (configs[b]?.group ?? 3))
 
-  return ordered.map(i => {
-    const c = candidates[i]
-    const cfg = configs[i]
-    const base = basenameNoExt(c.name)
-    const opt: SelectOption = { value: c.name, label: base }
-    if (cfg.group === 1) {
-      opt.group = t(GROUP_OFFICIAL)
-      if (cfg.file) opt.hint = formatBytes(cfg.file.bytes)
-    } else if (cfg.group === 2) {
-      opt.group = t(GROUP_COMPAT)
-    } else {
-      opt.group = t(GROUP_OTHER)
-    }
-    return opt
-  })
+  return ordered
+    .map(i => ({ c: candidates[i], cfg: configs[i] }))
+    .filter((p): p is { c: { name: string }; cfg: SlotConfig } => !!p.c && !!p.cfg)
+    .map(({ c, cfg }) => {
+      const base = basenameNoExt(c.name)
+      const opt: SelectOption = { value: c.name, label: base }
+      if (cfg.group === 1) {
+        opt.group = t(GROUP_OFFICIAL)
+        if (cfg.file) opt.hint = formatBytes(cfg.file.bytes)
+      } else if (cfg.group === 2) {
+        opt.group = t(GROUP_COMPAT)
+      } else {
+        opt.group = t(GROUP_OTHER)
+      }
+      return opt
+    })
 }
 
 /** 判断某个值是否落在组 3 (其他文件) */
 function isOtherGroup(slot: ComponentSlot, candidates: { name: string }[], value: string): boolean {
+  void candidates
   // 未选择任何文件时不算"不兼容" (空值不该触发警告)
   if (!value) return false
   const files = componentsForSlot(arch.value, slot)

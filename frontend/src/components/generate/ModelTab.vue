@@ -9,7 +9,6 @@ import { useModelModalManager } from '@/composables/generate/useModelModalManage
 import { useDependencyStatus } from '@/composables/generate/useDependencyStatus'
 import { componentDepRows } from '@/composables/generate/depRows'
 import { MODEL_TYPES } from '@/config/model-types'
-import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
@@ -41,7 +40,6 @@ import MaskEditorModal from '@/components/generate/MaskEditorModal.vue'
 import type { RefItem } from '@/stores/generate'
 import LocalModelModal from '@/components/models/LocalModelModal.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
-import { TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
 import { useToast } from '@/composables/useToast'
 
 defineOptions({ name: 'ModelTab' })
@@ -91,7 +89,7 @@ const showNegative = computed(() =>
 // 当前视频模式 (仅 5B 有意义; 14B 恒 i2v)。
 const videoMode = computed<'t2v' | 'i2v'>(() => {
   if (config.value.videoModes?.length) {
-    return state.value.video?.mode ?? config.value.videoModes[0]
+    return state.value.video?.mode ?? config.value.videoModes[0] ?? 'i2v'
   }
   return 'i2v'
 })
@@ -498,12 +496,6 @@ watch(() => [store.activeModelType, isVideo.value] as const, () => {
   }
 }, { immediate: true })
 
-// CN 依赖清单按本 tab 的 cnBranch 取 (sdxl → union; ilnoob → 专用); 这里只用它的标题
-const _cnBranch = (MODEL_TYPES[props.modelType]?.cnBranch as CnBranch | undefined)
-const cnDepPose = getCnDepGroup('pose', _cnBranch)
-const cnDepCanny = getCnDepGroup('canny', _cnBranch)
-const cnDepDepth = getCnDepGroup('depth', _cnBranch)
-
 /** CN 三个模块的依赖句柄, 供生成前置校验按 key 取 */
 const cnDepMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
 
@@ -636,7 +628,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       <div class="gen-ctrl-col" :inert="frozen" :class="{ 'gen-frozen': frozen }">
         <!-- 提示词 (视频的起始画面并入本区块左栏, 5B 模式开关并入标题行右端) -->
         <PromptEditor
-          ref="promptEditorRef"
+          :ref="(el) => { promptEditorRef = (el as { insertAtCursor: (t: 'positive' | 'negative', text: string) => void } | null) }"
           data-tour="gen-prompt"
           :positive="state.positive"
           :negative="state.negative"

@@ -176,8 +176,8 @@ export function useLlmAssist(): UseLlmAssistReturn {
       } else {
         await submitJSON(body)
       }
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
+    } catch (e: unknown) {
+      if (!(e instanceof DOMException && e.name === 'AbortError')) {
         toast(t('generate.llm_modal.error'), 'error')
       }
     }

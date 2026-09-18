@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useToast } from './useToast'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 
 let _redirecting = false
 export function redirectToLogin() {
@@ -58,8 +59,8 @@ export function useApiFetch() {
       // Handle 204 No Content
       if (res.status === 204) return null
       return await res.json() as T
-    } catch (e: any) {
-      const msg = e?.message || 'Network error'
+    } catch (e: unknown) {
+      const msg = errorMessage(e) || 'Network error'
       error.value = msg
       if (!call.silent) toast(msg, 'error')
       return null
@@ -125,8 +126,8 @@ export function useApiFetch() {
         return null
       }
       return res
-    } catch (e: any) {
-      const msg = e?.message || 'Network error'
+    } catch (e: unknown) {
+      const msg = errorMessage(e) || 'Network error'
       error.value = msg
       if (!call.silent) toast(msg, 'error')
       return null

@@ -1,7 +1,8 @@
-import { ref, computed, markRaw } from 'vue'
+import { ref, computed } from 'vue'
 import { useToast } from '@/composables/useToast'
 import { useI18n } from 'vue-i18n'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,10 +68,9 @@ export const TAG_PARAMS_DEF: TagParamDef[] = [
 
 // ── 内置模型 (依赖状态条用) ─────────────────────────────────────────────────
 
-import type { DepRow } from './useDependencyStatus'
 import type { DepGroup } from './modelDepConfigs'
 
-const TAGGER_MODELS: Record<string, DepRow> = {
+const TAGGER_MODELS = {
   'wd-eva02-large-tagger-v3': {
     id: 'wd-eva02-large-tagger-v3',
     label: 'WD EVA02 Large v3',
@@ -227,10 +227,10 @@ export function useTagInterrogation() {
       const data = await res.json()
       promptId.value = data.prompt_id || ''
       if (!promptId.value) throw new Error('No prompt_id returned')
-    } catch (e: any) {
+    } catch (e: unknown) {
       status.value = 'idle'
       startTime.value = 0
-      toast(t('generate.msg.interrogate_submit_failed') + ': ' + (e?.message || e), 'error')
+      toast(t('generate.msg.interrogate_submit_failed') + ': ' + errorMessage(e), 'error')
     }
   }
 

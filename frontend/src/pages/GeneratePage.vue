@@ -6,6 +6,7 @@ import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
 import { useToast, provideToastScope, muteToastScope, unmuteToastScope } from '@/composables/useToast'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
@@ -80,7 +81,7 @@ async function initOptions(forceRefresh = false) {
 }
 
 // Only load options when gate is ready (not eagerly on mount)
-watch(() => gate.state.value, (newState, oldState) => {
+watch(() => gate.state.value, (newState) => {
   if (newState === 'ready') {
     // Force refresh if we previously loaded stale data while offline
     initOptions(options.loaded.value && !optionsReady.value)
@@ -208,7 +209,7 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
   const relOf = (key: string) => MODEL_TYPES[key]?.releasedAt ?? '9999-99'
   const keyOf = (it: DropdownMenuItem) =>
     it.children?.length
-      ? it.children.map(c => relOf(c.key)).sort()[0]
+      ? (it.children.map(c => relOf(c.key)).sort()[0] ?? '9999-99')
       : relOf(it.key)
 
   // 组内子项按发布时间
@@ -221,7 +222,7 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
 })
 
 // 当前选中模型 (用于触发器显示)
-const currentConfig = computed(() => MODEL_TYPES[store.activeModelType] || MODEL_TYPES.sd15)
+const currentConfig = computed(() => MODEL_TYPES[store.activeModelType] ?? MODEL_TYPES.sd15!)
 
 // ── 队列/历史抽屉 (顶栏右侧按钮 + Drawer) ──────────────────────────────────
 const drawerOpen = ref(false)
@@ -454,8 +455,8 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     const res = await fetch(viewUrl)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     blob = await res.blob()
-  } catch (e: any) {
-    toast(`${t('generate.history.make_video')}: ${e?.message || 'fetch failed'}`, 'error')
+  } catch (e: unknown) {
+    toast(`${t('generate.history.make_video')}: ${errorMessage(e) || 'fetch failed'}`, 'error')
     return
   }
   // 从原文件名推导扩展名 (上传端点按 content_type 映射扩展名, 这里给 Blob 一个带扩展名的文件名)
@@ -478,8 +479,8 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     // 用户随后在提交时才撞上「请先上传起始画面」, 与刚才的成功提示自相矛盾。
     if (!upData.filename) throw new Error('upload response missing filename')
     uploadedName = upData.filename
-  } catch (e: any) {
-    toast(`${t('generate.history.make_video')}: ${e?.message || 'upload failed'}`, 'error')
+  } catch (e: unknown) {
+    toast(`${t('generate.history.make_video')}: ${errorMessage(e) || 'upload failed'}`, 'error')
     return
   }
 
@@ -717,7 +718,7 @@ sse.start()
         v-show="store.activeModelType === mt"
       >
         <ModelTab
-          :ref="(el: any) => { modelTabRefs[mt] = el }"
+          :ref="(el) => { modelTabRefs[mt] = (el as InstanceType<typeof ModelTab>) || null }"
           :model-type="mt"
           :exec-state="execState"
           :elapsed="tracker.elapsed.value"

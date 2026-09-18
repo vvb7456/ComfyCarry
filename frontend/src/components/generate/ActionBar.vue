@@ -61,8 +61,10 @@ const runModes = computed<RunModeConfig[]>(() => {
   return modes
 })
 
-const currentRunMode = computed(() =>
-  runModes.value.find(m => m.key === state.value.runMode) ?? runModes.value[0]
+const currentRunMode = computed<RunModeConfig>(() =>
+  runModes.value.find(m => m.key === state.value.runMode)
+  ?? runModes.value[0]
+  ?? { key: 'normal', icon: 'play_arrow', label: t('generate.action.run') },
 )
 
 /* ── SplitButton props ──

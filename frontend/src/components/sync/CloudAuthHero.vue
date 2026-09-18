@@ -444,7 +444,8 @@ const startLabel = computed(() => {
     onedrive: 'sync.oauth.start_onedrive',
     dropbox: 'sync.oauth.start_dropbox',
   }
-  return keys[props.type] ? t(keys[props.type]) : t('sync.oauth.start_with_provider', { provider: providerName.value })
+  const key = keys[props.type]
+  return key ? t(key) : t('sync.oauth.start_with_provider', { provider: providerName.value })
 })
 
 /** 是否在初始态显示 drive 的自建 client_id 折叠 */

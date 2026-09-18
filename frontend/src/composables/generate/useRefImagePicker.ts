@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -94,8 +94,8 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
       // Refresh list so newly uploaded image appears
       loadImages()
       return data
-    } catch (e: any) {
-      toast(e?.message || 'Upload failed', 'error')
+    } catch (e: unknown) {
+      toast(errorMessage(e) || 'Upload failed', 'error')
       return null
     } finally {
       uploading.value = false

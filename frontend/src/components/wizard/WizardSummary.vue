@@ -5,13 +5,14 @@ import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { useWizardState } from '@/composables/useWizardState'
 import type { WizardConfig } from '@/types/wizard'
+import type { ExportedConfig } from '@/types/config-export'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'WizardSummary' })
 
 const props = defineProps<{
   config: WizardConfig
-  importedConfig?: Record<string, any> | null
+  importedConfig?: ExportedConfig | null
 }>()
 
 const { t, te } = useI18n({ useScope: 'global' })

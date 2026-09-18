@@ -39,5 +39,5 @@ export function joinRemotePath(...parts: Array<string | undefined | null>): stri
   const clean = parts.map(p => (p ?? '').trim()).filter(Boolean)
   if (!clean.length) return ''
   const joined = clean.map(p => p.replace(/^\/+|\/+$/g, '')).join('/')
-  return clean[0].startsWith('/') ? `/${joined}` : joined
+  return (clean[0] ?? '').startsWith('/') ? `/${joined}` : joined
 }

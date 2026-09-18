@@ -149,7 +149,7 @@ const execState = computed(() => tracker.state.value)
 const { stats: sysStats } = useSystemStats()
 
 const sse = useComfySSE(tracker, {
-  onEvent(evt, result) {
+  onEvent(_evt, result) {
     // 终态提示 (完成 / 中断 / 出错) 由 App 级 useExecNotifications 统一发出 ——
     // 页面只负责自己的可视化刷新, 避免多订阅者各弹一条。
     if (result?.finished && result.type === 'execution_done') {

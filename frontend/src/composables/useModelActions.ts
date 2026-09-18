@@ -101,7 +101,7 @@ export function useModelActions(
         while (true) {
           const index = nextIndex++
           if (index >= noInfo.length) return
-          const m = noInfo[index]
+          const m = noInfo[index]!
           const key = String(m.id)
           fetchingSet.add(key)
           try {

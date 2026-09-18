@@ -13,7 +13,7 @@ defineOptions({ name: 'StepDeploy' })
 
 const { t } = useI18n({ useScope: 'global' })
 const {
-  config, gpuInfo, prebuiltInfo, detectedImageType, isUnsupported,
+  gpuInfo, prebuiltInfo, detectedImageType, isUnsupported,
   importedConfig, nextStep, handleImportFile,
 } = useWizardState()
 

@@ -135,7 +135,7 @@ watch(sentinelRef, (el) => {
   observer?.disconnect()
   if (!el) return
   observer = new IntersectionObserver(([entry]) => {
-    if (entry.isIntersecting && hasMore.value) {
+    if (entry?.isIntersecting && hasMore.value) {
       visibleCount.value += 60
     }
   }, { rootMargin: '200px' })

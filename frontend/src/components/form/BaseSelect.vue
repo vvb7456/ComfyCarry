@@ -34,7 +34,7 @@ const props = withDefaults(defineProps<{
    * Options — accepts multiple shapes:
    * - SelectOption[]: canonical {value, label}
    * - string[]: auto-converts to {value: s, label: s}
-   * - Record<string, any>[]: uses valueKey/labelKey to map
+   * - Record<string, string | number | boolean>[]: uses valueKey/labelKey to map
    */
   options: SelectOption[] | string[] | Record<string, string | number | boolean>[]
   /** Key to extract value from object options */
@@ -125,7 +125,7 @@ const highlightIdx = ref(-1)
 // When teleport is on, use fixed strategy so the panel escapes any
 // overflow:hidden / clipping ancestor. When off, absolute is fine
 // because the panel is a direct child of .base-select (position: relative).
-const { floatingStyles, isPositioned, placement } = useFloating(triggerRef, panelRef, {
+const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
   open,
   placement: 'bottom-start',
   strategy: props.teleport ? 'fixed' : 'absolute',
@@ -353,8 +353,9 @@ function onKeydown(e: KeyboardEvent) {
       break
     case 'Enter':
       e.preventDefault()
-      if (highlightIdx.value >= 0 && highlightIdx.value < opts.length && !opts[highlightIdx.value].disabled) {
-        select(opts[highlightIdx.value])
+      const highlighted = opts[highlightIdx.value]
+      if (highlightIdx.value >= 0 && highlighted && !highlighted.disabled) {
+        select(highlighted)
       } else if (props.allowCustom) {
         commitCustomValue()
       }

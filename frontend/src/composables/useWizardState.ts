@@ -1,4 +1,4 @@
-import { ref, reactive, computed, type Ref } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
   WizardConfig, SetupState, GpuInfo, PrebuiltInfo,
@@ -6,6 +6,8 @@ import type {
   DetectedImageType, SetupStateEnvVars,
 } from '@/types/wizard'
 import { resetRcloneState } from './wizardRcloneState'
+import { errorMessage } from '@/utils/errorMessage'
+import type { ExportedConfig } from '@/types/config-export'
 
 const TOTAL_STEPS = 10
 
@@ -44,7 +46,7 @@ const pluginData = ref<PluginInfo[]>([])
 const envVars = ref<SetupStateEnvVars>({})
 const syncTemplates = ref<SyncTemplate[]>([])
 const remoteTypeDefs = ref<Record<string, RemoteTypeDef>>({})
-const importedConfig = ref<Record<string, any> | null>(null)
+const importedConfig = ref<ExportedConfig | null>(null)
 const activeTunnelMode = ref('')
 const activeTunnelUrls = ref<Record<string, string>>({})
 const deployState = ref<'idle' | 'deploying' | 'done' | 'error'>('idle')
@@ -103,7 +105,7 @@ export function useWizardState() {
 
       // GPU capability check → override detectedImageType
       if (gpu?.cuda_cap) {
-        const capMajor = parseInt(gpu.cuda_cap.split('.')[0], 10)
+        const capMajor = parseInt(gpu.cuda_cap.split('.')[0] ?? '0', 10)
         if (capMajor > 0 && capMajor < 8) {
           detectedImageType.value = 'unsupported-gpu'
         }
@@ -250,7 +252,7 @@ export function useWizardState() {
   async function handleImportFile(file: File): Promise<{ ok: boolean; message: string }> {
     try {
       const text = await file.text()
-      const parsed = JSON.parse(text)
+      const parsed = JSON.parse(text) as ExportedConfig
 
       if (!parsed._version) {
         return { ok: false, message: t('wizard.import.invalid_format') }
@@ -280,14 +282,15 @@ export function useWizardState() {
         config.plugins = plugins
         appliedCount++
       }
-      if (parsed.sync_rules?.length > 0) {
+      const syncRules = parsed.sync_rules
+      if (syncRules && syncRules.length > 0) {
         config._imported_sync_rules = true
-        config._imported_sync_rules_count = parsed.sync_rules.length
+        config._imported_sync_rules_count = syncRules.length
         appliedCount++
       }
       if (parsed.install_fa2 !== undefined) config.install_fa2 = parsed.install_fa2
       if (parsed.install_sa2 !== undefined) config.install_sa2 = parsed.install_sa2
-      if (parsed.tunnel_mode && parsed.tunnel_mode !== 'public') { config.tunnel_mode = parsed.tunnel_mode; appliedCount++ }
+      if (parsed.tunnel_mode === 'custom') { config.tunnel_mode = 'custom'; appliedCount++ }
       if (parsed.ssh_pw_follow !== undefined) config.ssh_pw_follow = parsed.ssh_pw_follow
       if (parsed.ssh_keys) config.ssh_keys = parsed.ssh_keys
       if (parsed.llm_provider) {
@@ -301,8 +304,8 @@ export function useWizardState() {
       }
 
       return { ok: true, message: t('wizard.import.success', { count: appliedCount }) }
-    } catch (e: any) {
-      return { ok: false, message: `${t('wizard.import.parse_fail')} ${e.message}` }
+    } catch (e: unknown) {
+      return { ok: false, message: `${t('wizard.import.parse_fail')} ${errorMessage(e)}` }
     }
   }
 

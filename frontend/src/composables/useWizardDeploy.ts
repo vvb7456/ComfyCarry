@@ -2,7 +2,8 @@ import { ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWizardState } from './useWizardState'
 import { apiErrorText } from '@/utils/apiError'
-import type { DeployStep, DeployStatus, DeploySSEEvent, WizardConfig } from '@/types/wizard'
+import { errorMessage } from '@/utils/errorMessage'
+import type { DeployStep, DeployStatus, DeploySSEEvent } from '@/types/wizard'
 import type { LogLine } from './useLogStream'
 
 const SSE_RECONNECT_DELAY = 3000
@@ -171,8 +172,8 @@ export function useWizardDeploy() {
         if (!d.ok) {
           return { ok: false, error: apiErrorText(d, t('wizard.deploy.start_fail')) }
         }
-      } catch (e: any) {
-        return { ok: false, error: `${t('wizard.deploy.request_fail')} ${e.message}` }
+      } catch (e: unknown) {
+        return { ok: false, error: `${t('wizard.deploy.request_fail')} ${errorMessage(e)}` }
       }
     }
 
@@ -186,8 +187,8 @@ export function useWizardDeploy() {
       if (!d.ok) {
         return { ok: false, error: apiErrorText(d, t('wizard.deploy.start_fail')) }
       }
-    } catch (e: any) {
-      return { ok: false, error: `${t('wizard.deploy.request_fail')} ${e.message}` }
+    } catch (e: unknown) {
+        return { ok: false, error: `${t('wizard.deploy.request_fail')} ${errorMessage(e)}` }
     }
 
     // Switch to deploying state

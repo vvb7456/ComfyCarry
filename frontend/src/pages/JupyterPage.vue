@@ -292,8 +292,8 @@ function terminalFacts(terminal: TerminalInfo): string[] {
 function terminalUrl(name: string): string | null {
   const base = jupyterTokenUrl.value
   if (!base) return null
-  const [path, query] = base.split('?')
-  const root = path.replace(/\/(lab|tree)\/?$/, '')
+  const [rawPath = '', query] = base.split('?')
+  const root = rawPath.replace(/\/(lab|tree)\/?$/, '')
   const qs = query ? `?${query}` : ''
   return `${root}/terminals/${encodeURIComponent(name)}${qs}`
 }

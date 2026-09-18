@@ -38,7 +38,6 @@ const show = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-const drawerRef = ref<HTMLElement | null>(null)
 const hasBodyLock = ref(false)
 
 watch(() => props.modelValue, (open) => {
@@ -96,7 +95,6 @@ function onKeydown(e: KeyboardEvent) {
       tabindex="-1"
     >
       <aside
-        ref="drawerRef"
         class="drawer-panel"
         :class="{ 'drawer-panel--open': show }"
         :style="{ width: width }"

@@ -43,7 +43,8 @@ export function useCompanionClients(opts?: { pollInterval?: number }) {
     if (t.public?.urls) Object.assign(all, t.public.urls)
     for (const key of ['dashboard', 'comfycarry']) {
       for (const k of Object.keys(all)) {
-        if (k.toLowerCase() === key) return all[k]
+        const v = all[k]
+        if (v !== undefined && k.toLowerCase() === key) return v
       }
     }
     return ''
