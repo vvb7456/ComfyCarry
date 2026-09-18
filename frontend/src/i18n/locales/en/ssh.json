@@ -59,9 +59,7 @@
     "title": "SSH Settings",
     "label": "SSH password follow",
     "desc": "The root SSH password follows panel password changes",
-    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected.",
-    "enabled_toast": "SSH password follow enabled, root password synced to the panel password",
-    "disabled_toast": "SSH password follow disabled, SSH only allows public key login"
+    "help": "Enabling resets the root password to the current panel password and restarts sshd; panel login is unaffected."
   },
   "log": {
     "title": "SSH Logs"
@@ -95,6 +93,11 @@
       "title": "Disable SSH Password Login",
       "message": "No public key is configured. Password login will be unavailable after disabling.",
       "button": "Disable Anyway"
+    },
+    "discard": {
+      "title": "Unsaved Changes",
+      "message": "SSH settings have unsaved changes; discarding will restore the previous values.",
+      "button": "Discard Changes"
     }
   },
   "toast": {

@@ -21,12 +21,10 @@
   },
   "toolbar": {
     "history_favorites": "History & Favorites",
-    "favorite_current": "Star Current",
-    "clear_all": "Clear All",
-    "clear_disabled": "Clear Disabled",
     "translate_all": "Translate All",
     "embedding": "Embedding",
-    "wildcard": "Wildcard"
+    "wildcard": "Wildcard",
+    "settings": "Editor Settings"
   },
   "chip": {
     "weight": "Weight",
@@ -56,15 +54,9 @@
     "page": "Page {page} of {total}",
     "prev": "Previous",
     "next": "Next",
-    "loading": "Loading...",
-    "empty_prompt": "Nothing to favorite — prompt is empty",
-    "favorited": "Added to favorites"
+    "loading": "Loading..."
   },
   "confirm": {
-    "clear_all": {
-      "title": "Clear Prompt",
-      "message": "All tokens in the editor will be cleared."
-    },
     "replace": {
       "title": "Replace Prompt",
       "message": "The current editor content will be replaced by this history item.",
@@ -73,6 +65,50 @@
     "delete_history": {
       "title": "Delete History Record",
       "message": "This history record will be deleted."
+    }
+  },
+  "settings": {
+    "title": "Editor Settings",
+    "saved": "Prompt settings saved",
+    "save_failed": "Save failed",
+    "discard_title": "Unsaved Changes",
+    "discard_message": "Editor settings have unsaved changes; discarding will restore the previous values.",
+    "discard_button": "Discard Changes",
+    "tag_library": {
+      "show_nsfw": "Show NSFW tags",
+      "show_nsfw_desc": "Include NSFW tags in tag lists and autocomplete"
+    },
+    "translation": {
+      "show": "Show Chinese translation",
+      "show_desc": "Show a Chinese translation below the prompt",
+      "provider": "Translation engine",
+      "provider_desc": "Service used for Chinese translation; Auto = pick by availability",
+      "provider_auto": "Auto",
+      "providers": {
+        "local_db": "Local Database",
+        "mymemory": "MyMemory",
+        "bing": "Bing",
+        "youdao": "Youdao",
+        "alibaba": "Alibaba"
+      }
+    },
+    "normalize": {
+      "enable": "Enable Normalization",
+      "enable_desc": "Clean up punctuation and symbols before submit",
+      "comma": "Half-width commas",
+      "comma_desc": "Replace full-width commas (，) with half-width (,)",
+      "period": "Half-width periods",
+      "period_desc": "Replace full-width periods (。) with half-width (.)",
+      "bracket": "Half-width brackets",
+      "bracket_desc": "Replace full-width brackets （） with half-width ()",
+      "underscore": "Underscore to space",
+      "underscore_desc": "Replace underscores (_) in tags with spaces",
+      "escape_bracket": "Bracket escaping",
+      "escape_bracket_desc": "Automatically add backslashes (\\\\) before brackets to keep weight syntax"
+    },
+    "autocomplete": {
+      "limit": "Max results",
+      "limit_desc": "Number of suggested tags while typing"
     }
   },
   "init": {

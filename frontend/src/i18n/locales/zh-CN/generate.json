@@ -544,7 +544,7 @@
     "error": "AI 生成出错",
     "failed": "AI 生成失败",
     "not_configured": "AI 提示词功能需要先配置 LLM 服务",
-    "go_settings": "前往设置",
+    "go_settings": "配置 LLM 服务",
     "no_vision": "当前 LLM 不支持 Vision",
     "result_hint": "描述你想要的画面，AI 将生成对应的提示词",
     "used_all": "已使用全部提示词",
@@ -553,7 +553,8 @@
     "generating": "正在生成…",
     "use_prompt": "使用提示词",
     "use_all_prompts": "使用全部提示词",
-    "image_load_failed": "图片加载失败"
+    "image_load_failed": "图片加载失败",
+    "config_refreshed": "LLM 服务已就绪"
   },
   "embedding": {
     "title": "插入 Embedding",

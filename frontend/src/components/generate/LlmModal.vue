@@ -10,7 +10,6 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import type { UseLlmAssistReturn } from '@/composables/generate/useLlmAssist'
 import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
 import { useToast } from '@/composables/useToast'
@@ -19,6 +18,7 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import RefImageModal from '@/components/generate/RefImageModal.vue'
+import LlmSettingsModal from '@/components/generate/LlmSettingsModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 
@@ -36,8 +36,17 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
-const router = useRouter()
 const store = useGenerateStore()
+
+// ── LLM 服务配置弹窗 (页内设置: 未配置空态与已配置态共用) ──
+
+const settingsOpen = ref(false)
+
+/** 设置保存成功后刷新 llm 配置状态 (configured / modelName / vision) */
+async function onSettingsSaved() {
+  await props.llm.open()
+  toast(t('generate.llm_modal.config_refreshed'), 'success')
+}
 
 // ── Text input ────────────────────────────────────────────────────────
 
@@ -174,13 +183,6 @@ function onCopy() {
   props.llm.applyResult('copy')
 }
 
-// ── Go to settings ────────────────────────────────────────────────────
-
-function goSettings() {
-  emit('update:modelValue', false)
-  router.push({ name: 'settings', query: { section: 'genmodels', focus: 'llm' } })
-}
-
 // ── Submit button label ───────────────────────────────────────────────
 
 const submitLabel = computed(() =>
@@ -210,7 +212,7 @@ const showNegative = computed(() =>
     <div v-if="!llm.configured.value" class="llm-not-configured">
       <MsIcon name="settings" size="xl" color="var(--t3)" />
       <p class="llm-not-configured__text">{{ t('generate.llm_modal.not_configured') }}</p>
-      <BaseButton size="sm" variant="primary" @click="goSettings">
+      <BaseButton size="sm" variant="primary" @click="settingsOpen = true">
         <MsIcon name="settings" size="xs" color="none" />
         {{ t('generate.llm_modal.go_settings') }}
       </BaseButton>
@@ -270,9 +272,18 @@ const showNegative = computed(() =>
           />
         </div>
 
-        <!-- Model label -->
+        <!-- Model label + 设置入口 (换模型/调参数无需离开弹窗) -->
         <div v-if="llm.modelName.value" class="llm-model-label">
-          {{ t('generate.llm_modal.model_label', { model: llm.modelName.value }) }}
+          <span class="llm-model-label__text">{{ t('generate.llm_modal.model_label', { model: llm.modelName.value }) }}</span>
+          <button
+            type="button"
+            class="llm-model-label__settings"
+            :aria-label="t('llm.settings.title')"
+            :title="t('llm.settings.title')"
+            @click="settingsOpen = true"
+          >
+            <MsIcon name="settings" size="xs" color="none" />
+          </button>
         </div>
 
         <!-- Submit button -->
@@ -357,6 +368,9 @@ const showNegative = computed(() =>
     @select="onPickSelect"
     @upload="onPickUpload"
   />
+
+  <!-- LLM 服务配置 (未配置空态与已配置态共用入口) -->
+  <LlmSettingsModal v-model="settingsOpen" @saved="onSettingsSaved" />
 </template>
 
 <style scoped>
@@ -470,9 +484,31 @@ const showNegative = computed(() =>
 
 /* ── Model label ── */
 .llm-model-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--text-xs);
   color: var(--t3);
   padding: 0 2px;
+}
+
+/* 设置入口: 裸 icon 小按钮 (先例 PromptEditor .prompt-help-btn) */
+.llm-model-label__settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+.llm-model-label__settings:hover {
+  color: var(--ac);
+  background: var(--bg3);
 }
 
 /* ── Submit button ── */

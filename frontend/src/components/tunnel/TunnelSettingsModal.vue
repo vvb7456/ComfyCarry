@@ -27,8 +27,10 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useModalCloseGuard } from '@/composables/useModalCloseGuard'
 import { startSwitch, TunnelSwitchError } from '@/composables/useTunnelSwitch'
 import { apiErrorText } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 import type { TunnelConfigResponse, TunnelActionResponse, TunnelSubdomainResponse } from '@/types/tunnel'
 
 defineOptions({ name: 'TunnelSettingsModal' })
@@ -210,7 +212,7 @@ async function startSwitchOrReport(payload: {
     if (e instanceof TunnelSwitchError) {
       cfgError.value = apiErrorText(e.body, t('tunnel.err.switch_failed'))
     } else {
-      cfgError.value = (e as Error)?.message || t('tunnel.err.switch_failed')
+      cfgError.value = errorMessage(e)
     }
     return false
   }
@@ -367,19 +369,17 @@ async function onSave(): Promise<void> {
 }
 
 // ── 关闭守卫: 取消 / Esc / 遮罩 / 关闭按钮统一经过未保存检查 ──
-async function requestClose(): Promise<void> {
-  if (cfgSaving.value) return
-  if (cfgDirty.value) {
-    const r = await confirm({
-      title: t('tunnel.confirm.discard.title'),
-      message: t('tunnel.confirm.discard.message'),
-      confirmText: t('tunnel.confirm.discard.button'),
-      cancelText: t('common.btn.cancel'),
-    })
-    if (r !== true) return
-  }
-  emit('update:modelValue', false)
-}
+const requestClose = useModalCloseGuard({
+  dirty: () => cfgDirty.value,
+  saving: () => cfgSaving.value,
+  texts: {
+    title: () => t('tunnel.confirm.discard.title'),
+    message: () => t('tunnel.confirm.discard.message'),
+    discard: () => t('tunnel.confirm.discard.button'),
+    cancel: () => t('common.btn.cancel'),
+  },
+  onClose: () => emit('update:modelValue', false),
+})
 </script>
 
 <template>

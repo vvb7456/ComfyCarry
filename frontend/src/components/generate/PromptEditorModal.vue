@@ -19,7 +19,6 @@ import { usePromptLibrary } from '@/composables/generate/usePromptLibrary'
 import { usePromptLibraryInit } from '@/composables/generate/usePromptLibraryInit'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { useConfirm } from '@/composables/useConfirm'
-import { useToast } from '@/composables/useToast'
 import { useGenerateStore } from '@/stores/generate'
 import { normalizePrompt } from '@/utils/prompt'
 import type { BracketType, PromptTag, PromptToken } from '@/types/prompt-library'
@@ -34,6 +33,7 @@ import EmbeddingModal from '@/components/generate/EmbeddingModal.vue'
 import WildcardModal from '@/components/generate/WildcardModal.vue'
 import PromptHistoryModal from '@/components/generate/PromptHistoryModal.vue'
 import PromptLibraryGate from '@/components/generate/PromptLibraryGate.vue'
+import PromptSettingsModal from '@/components/generate/PromptSettingsModal.vue'
 
 defineOptions({ name: 'PromptEditorModal' })
 
@@ -56,9 +56,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const { confirm } = useConfirm()
-const { toast } = useToast()
 
 const historyModalVisible = ref(false)
+const settingsModalVisible = ref(false)
 
 const open = computed({
   get: () => props.modelValue,
@@ -332,22 +332,6 @@ function hasNonAscii(text: string): boolean {
   return /[^\x00-\x7F]/.test(text)
 }
 
-async function onClearAll() {
-  const yes = await confirm({
-    title: t('prompt-library.confirm.clear_all.title'),
-    message: t('prompt-library.confirm.clear_all.message'),
-    confirmText: t('common.btn.clear'),
-  })
-  if (!yes) return
-  activeEditor.value.clearAll()
-  syncToParent()
-}
-
-function onClearDisabled() {
-  activeEditor.value.clearDisabled()
-  syncToParent()
-}
-
 function onSelectAutocomplete(item: AutocompleteDisplayItem) {
   if (item.added) return
   activeEditor.value.addToken(escapeBrackets(item.text), 'tag', item.color || undefined, item.desc || undefined)
@@ -378,19 +362,6 @@ async function onHistoryApply(item: { positive: string; negative: string }) {
   historyModalVisible.value = false
   if (plInit.initialized.value) {
     await _resolveTokenColors()
-  }
-}
-
-async function onFavoriteCurrent() {
-  const pos = posEditor.serializeEnabled()
-  const neg = negEditor.serializeEnabled()
-  if (!pos && !neg) {
-    toast(t('prompt-library.history_modal.empty_prompt'), 'warning')
-    return
-  }
-  const id = await lib.addHistory(pos, neg, true)
-  if (id !== null) {
-    toast(t('prompt-library.history_modal.favorited'), 'success')
   }
 }
 
@@ -481,13 +452,11 @@ function onWcInsert(token: string) {
             @translate="onTranslate"
             @translate-all="onTranslateAll"
             @move="onMove"
-            @clear-all="onClearAll"
-            @clear-disabled="onClearDisabled"
-            @select-autocomplete="onSelectAutocomplete"
             @history="onHistory"
-            @favorite-current="onFavoriteCurrent"
             @open-embedding="openEmbedding"
             @open-wildcard="openWildcard"
+            @select-autocomplete="onSelectAutocomplete"
+            @settings="settingsModalVisible = true"
           />
         </div>
       </FusionTabs>
@@ -513,6 +482,7 @@ function onWcInsert(token: string) {
       v-model="historyModalVisible"
       @apply="onHistoryApply"
     />
+    <PromptSettingsModal v-model="settingsModalVisible" />
   </BaseModal>
 </template>
 

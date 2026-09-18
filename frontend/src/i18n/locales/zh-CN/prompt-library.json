@@ -21,12 +21,10 @@
   },
   "toolbar": {
     "history_favorites": "收藏&历史",
-    "favorite_current": "收藏当前",
-    "clear_all": "清空全部",
-    "clear_disabled": "清空禁用",
     "translate_all": "翻译全部",
     "embedding": "Embedding",
-    "wildcard": "通配符"
+    "wildcard": "通配符",
+    "settings": "编辑器设置"
   },
   "chip": {
     "weight": "权重",
@@ -56,15 +54,9 @@
     "page": "第 {page}/{total} 页",
     "prev": "上一页",
     "next": "下一页",
-    "loading": "加载中…",
-    "empty_prompt": "提示词为空，无法收藏",
-    "favorited": "已添加到收藏"
+    "loading": "加载中…"
   },
   "confirm": {
-    "clear_all": {
-      "title": "清空提示词",
-      "message": "编辑器内的全部标签将被清空。"
-    },
     "replace": {
       "title": "替换提示词",
       "message": "当前编辑器内容将被此历史记录替换。",
@@ -73,6 +65,50 @@
     "delete_history": {
       "title": "删除历史记录",
       "message": "该历史记录将被删除。"
+    }
+  },
+  "settings": {
+    "title": "编辑器设置",
+    "saved": "提示词设置已保存",
+    "save_failed": "保存失败",
+    "discard_title": "未保存的更改",
+    "discard_message": "编辑器设置有未保存的更改，放弃后将恢复原值。",
+    "discard_button": "放弃更改",
+    "tag_library": {
+      "show_nsfw": "显示 NSFW 标签",
+      "show_nsfw_desc": "在标签列表与自动补全中包含 NSFW 标签"
+    },
+    "translation": {
+      "show": "显示中文翻译",
+      "show_desc": "在提示词下方显示中文对照",
+      "provider": "翻译引擎",
+      "provider_desc": "中文翻译使用的服务，自动 = 按可用性选择",
+      "provider_auto": "自动",
+      "providers": {
+        "local_db": "本地数据库",
+        "mymemory": "MyMemory",
+        "bing": "Bing",
+        "youdao": "有道",
+        "alibaba": "阿里巴巴"
+      }
+    },
+    "normalize": {
+      "enable": "启用规格化",
+      "enable_desc": "提交前自动清理标点与符号",
+      "comma": "半角逗号",
+      "comma_desc": "将「，」替换为「,」",
+      "period": "半角句号",
+      "period_desc": "将「。」替换为「.」",
+      "bracket": "半角括号",
+      "bracket_desc": "将「（）」替换为「()」",
+      "underscore": "下划线转空格",
+      "underscore_desc": "将「_」替换为空格",
+      "escape_bracket": "括号转义",
+      "escape_bracket_desc": "自动为括号添加「\\\\」，避免被解析为权重语法"
+    },
+    "autocomplete": {
+      "limit": "补全数量",
+      "limit_desc": "输入时提示的候选标签数"
     }
   },
   "init": {

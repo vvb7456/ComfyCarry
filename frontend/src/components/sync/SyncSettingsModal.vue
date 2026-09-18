@@ -16,7 +16,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
-import { useConfirm } from '@/composables/useConfirm'
+import { useModalCloseGuard } from '@/composables/useModalCloseGuard'
 import { apiErrorText } from '@/utils/apiError'
 
 defineOptions({ name: 'SyncSettingsModal' })
@@ -32,7 +32,6 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
 const { toast } = useToast()
-const { confirm } = useConfirm()
 
 const minAge = ref(60)
 const watchInterval = ref(60)
@@ -96,19 +95,17 @@ async function onSave(): Promise<void> {
 }
 
 /** 关闭守卫: 取消 / Esc / 遮罩 / 关闭按钮统一经过未保存检查 */
-async function requestClose(): Promise<void> {
-  if (saving.value) return
-  if (dirty.value) {
-    const r = await confirm({
-      title: t('sync.confirm.discard.title'),
-      message: t('sync.confirm.discard.message'),
-      confirmText: t('sync.confirm.discard.button'),
-      cancelText: t('common.btn.cancel'),
-    })
-    if (r !== true) return
-  }
-  emit('update:modelValue', false)
-}
+const requestClose = useModalCloseGuard({
+  dirty: () => dirty.value,
+  saving: () => saving.value,
+  texts: {
+    title: () => t('sync.confirm.discard.title'),
+    message: () => t('sync.confirm.discard.message'),
+    discard: () => t('sync.confirm.discard.button'),
+    cancel: () => t('common.btn.cancel'),
+  },
+  onClose: () => emit('update:modelValue', false),
+})
 </script>
 
 <template>

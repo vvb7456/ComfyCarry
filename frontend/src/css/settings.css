@@ -1,9 +1,9 @@
-/* ── Settings: list/group 布局公共样式 (单页 v3 视觉规则) ──
-   规范 (docs/SETTINGS_V2_OAUTH_SSH_SPEC.md §4, 2026-09-07 修订):
+/* ── Settings: list/group 布局公共样式 ──
+   设置域已迁回各功能页 (弹窗承载), 本文件是设置行体系 (.settings-row /
+   .settings-lines / .settings-skeleton 等) 的唯一来源, 设置页与各设置弹窗共用:
    - 层级只靠字号/颜色/留白/icon 区分, 不用卡片底色块;
    - 全页唯一分割线 = .settings-lines 内相邻行之间的 hairline;
-   - 模块 (.settings-module, L2) = kicker 灰标题, dirty 时浮现保存按钮;
-   - 小节 (.settings-sub, L3) = icon + 标题, --t2;
+   - 模块 (.settings-module, L2) = kicker 灰标题 (设置页即时动作模块用);
    - 行 = .settings-row (左 label+desc / 右控件)。 */
 
 /* ── 行: 水平两栏, 左侧文案右侧控件 ── */
@@ -84,18 +84,6 @@
     min-width: 0;
 }
 
-/* 通栏行: 控件占满整行 (textarea / range) */
-.settings-row--block {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-}
-
-.settings-row--block .settings-row__control {
-    width: 100%;
-    min-width: 0;
-}
-
 /* 行内校验结果, 控件列下方 */
 .settings-row__feedback {
     margin-top: 4px;
@@ -134,104 +122,16 @@
     line-height: 1.4;
 }
 
-.settings-action__copy {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    font-size: .8rem;
-    line-height: 1.5;
-    color: var(--t2);
-}
-
 .settings-action .base-btn {
     flex-shrink: 0;
 }
 
-/* 说明横幅 (上下文提示, 非校验) */
-.settings-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 14px;
-    border: 1px solid var(--bd);
-    border-radius: var(--rs);
-    background: var(--bg2);
-    color: var(--t2);
-    font-size: .8rem;
-    line-height: 1.55;
-}
 
-.settings-note > .ms {
-    flex-shrink: 0;
-    margin-top: 1px;
-}
-
-/* ── 间距系统: 分区 → 模块 → 小节 → 行 ── */
-.settings-section {
-    max-width: 760px;
-    margin: 0 auto;
-}
-
-/* L1 分区标题: 与吸顶导航 chip 同 icon 同文, 页面正文的"路牌"; 居中与导航呼应 */
-.settings-section__title {
-    margin: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--t1);
-    letter-spacing: -.01em;
-}
-
-.settings-section__title .ms {
-    font-size: 1.2rem;
-    color: var(--t2);
-}
-
-.settings-section + .settings-section {
-    margin-top: 48px;
-}
-
-/* 关于: 特殊尾分区 — 无标题, 纯内容直接呈现, 与上一分区拉开更大间距 */
-.settings-section + .settings-section--about {
-    margin-top: 72px;
-}
-
-/* L1 → 首个模块 / 模块之间 */
-.settings-section > .settings-module {
-    margin-top: 32px;
-}
-
-.settings-section > .settings-module:first-of-type {
-    margin-top: 20px;
-}
-
-/* 模块头 → 内容 */
+/* 模块头 → 内容 (模块头样式在 SettingsModule.vue 内) */
 .settings-module__body {
     margin-top: 12px;
     display: flex;
     flex-direction: column;
-}
-
-/* 吸顶 TabSwitcher 实际占高 ≈ page-body-pt + tab-switcher-row-h + 8,
-   再留一点呼吸; 锚点滚动定位 (section / focus) 统一用它防标题被吸顶遮挡 */
-.settings-section,
-.settings-module,
-[id^="settings-focus-"] {
-    scroll-margin-top: calc(var(--page-body-pt) + var(--tab-switcher-row-h) + 16px);
-}
-
-/* 离开守卫「去处理」跳转高亮: 短促呼吸一次, 指示目标模块 */
-@keyframes settings-domain-flash {
-    0% { background: color-mix(in srgb, var(--ac) 14%, transparent); }
-    100% { background: transparent; }
-}
-
-.settings-domain--flash {
-    animation: settings-domain-flash 1.2s ease-out;
-    border-radius: var(--rs);
 }
 
 /* ── 模块加载骨架屏 (onMounted 加载模式; 高度尽量贴近渲染后行高, 降低 CLS) ── */

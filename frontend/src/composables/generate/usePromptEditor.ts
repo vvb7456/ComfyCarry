@@ -56,8 +56,8 @@ function isBracketPair(s: string): boolean {
   if (!s.startsWith('(') || !s.endsWith(')')) return false
   let depth = 0
   for (let i = 0; i < s.length; i++) {
-    const ch = s[i]
-    if (ch === '\\' && i + 1 < s.length && '(){}'.includes(s[i + 1])) {
+    const ch = s[i] ?? ''
+    if (ch === '\\' && i + 1 < s.length && '(){}'.includes(s[i + 1] ?? '')) {
       i++
       continue
     }
@@ -124,8 +124,8 @@ export function splitPromptTokens(prompt: string): string[] {
   let start = 0
 
   for (let i = 0; i < prompt.length; i++) {
-    const ch = prompt[i]
-    if (ch === '\\' && i + 1 < prompt.length && '(){}|'.includes(prompt[i + 1])) {
+    const ch = prompt[i] ?? ''
+    if (ch === '\\' && i + 1 < prompt.length && '(){}|'.includes(prompt[i + 1] ?? '')) {
       i++
       continue
     }
@@ -241,8 +241,6 @@ export interface UsePromptEditorReturn {
   updateWeight(id: string, weight: number): void
   updateBracket(id: string, bracketType: BracketType, depth: number): void
   moveToken(fromIndex: number, toIndex: number): void
-  clearAll(): void
-  clearDisabled(): void
   setTokenTranslation(id: string, translate: string): void
   updateTokenTag(id: string, newTag: string): void
   enrichTokens(resolved: Record<string, { color: string; translate: string }>): void
@@ -500,14 +498,6 @@ export function usePromptEditor(): UsePromptEditorReturn {
     }
   }
 
-  function clearAll(): void {
-    tokens.value = []
-  }
-
-  function clearDisabled(): void {
-    tokens.value = tokens.value.filter(t => t.enabled)
-  }
-
   function setTokenTranslation(id: string, translate: string): void {
     const token = tokens.value.find(t => t.id === id)
     if (token) token.translate = translate
@@ -578,8 +568,6 @@ export function usePromptEditor(): UsePromptEditorReturn {
     updateWeight,
     updateBracket,
     moveToken,
-    clearAll,
-    clearDisabled,
     setTokenTranslation,
     updateTokenTag,
     enrichTokens,

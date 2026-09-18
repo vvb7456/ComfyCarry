@@ -1,21 +1,9 @@
 {
   "title": "系统设置",
   "restart_btn": "重启",
-  "section": {
-    "panel": "面板",
-    "genmodels": "生成与模型",
-    "about": "关于"
-  },
   "domains": {
     "auth": "登录与认证",
-    "configmgmt": "配置管理",
-    "prompt": "提示词编辑器",
-    "llm": "LLM 服务",
-    "civitai": "CivitAI"
-  },
-  "unsaved": {
-    "chip": "{n} 处未保存",
-    "chip_tip": "跳到第一个未保存的模块"
+    "configmgmt": "配置管理"
   },
   "err": {
     "invalid_config": "无效的配置文件",
@@ -108,12 +96,6 @@
     "error": "更新失败"
   },
   "confirm": {
-    "unsaved_leave": {
-      "title": "未保存的更改",
-      "message": "以下模块有未保存的更改：{modules}",
-      "button": "去处理",
-      "alt": "放弃并离开"
-    },
     "restart": {
       "title": "重启 ComfyCarry",
       "message": "面板将重启，期间页面不可用。"
@@ -140,121 +122,5 @@
       "checkbox": "保留模型文件与产物"
     }
   },
-  "restarting": "ComfyCarry 正在重启，3 秒后自动刷新...",
-  "civitai": {
-    "key_title": "CivitAI API 密钥",
-    "key_link": "CivitAI 账户设置",
-    "placeholder": "粘贴 API 密钥",
-    "saved": "API Key 已保存",
-    "save_failed": "保存失败",
-    "cleared": "API Key 已清除",
-    "nsfw": {
-      "help": "浏览级别决定展示哪些模型；模糊开关决定已出现的 NSFW 图片是否打码。",
-      "level_label": "浏览级别",
-      "level_desc": "决定搜索结果中展示哪些模型",
-      "level": {
-        "pg": "全年龄",
-        "pg_r": "成人",
-        "all": "全部"
-      },
-      "blur": "模糊 NSFW 图片",
-      "blur_desc": "预览图打码，点击后显示原图"
-    },
-    "key_desc": "在 {link} 中生成，用于模型搜索与下载"
-  },
-  "llm": {
-    "provider": {
-      "help": "官方项使用预设地址；第三方端点请选择与其接口一致的自定义项。",
-      "label": "服务商",
-      "select_placeholder": "选择服务商",
-      "openai": "OpenAI",
-      "deepseek": "DeepSeek",
-      "openrouter": "OpenRouter",
-      "anthropic": "Anthropic",
-      "gemini": "Google Gemini",
-      "custom_openai": "自定义（OpenAI 兼容）",
-      "custom_responses": "自定义（OpenAI Responses）",
-      "custom_anthropic": "自定义（Anthropic）",
-      "api_key": "服务商 API 密钥",
-      "api_key_placeholder": "粘贴 API 密钥",
-      "base_url": "基础 URL",
-      "base_url_placeholder_openai": "https://api.example.com/v1",
-      "base_url_placeholder_anthropic": "https://api.example.com",
-      "base_url_desc_openai": "API 根地址，不含 /chat/completions 或 /responses",
-      "base_url_desc_anthropic": "API 根地址，不含 /v1/messages",
-      "label_desc": "当前使用的 LLM 服务商",
-      "api_key_desc": "当前服务商的访问密钥"
-    },
-    "model": {
-      "label": "模型",
-      "input_placeholder": "选择或输入模型名称",
-      "search_placeholder": "搜索模型...",
-      "fetch_failed": "获取失败",
-      "no_match": "无匹配模型",
-      "context_fmt": "上下文：{n} tokens",
-      "input_fmt": "输入：${n}/M",
-      "output_fmt": "输出：${n}/M",
-      "model_help": "展开下拉时自动获取模型列表；也可直接输入模型名称。"
-    },
-    "params": {
-      "temperature": "温度",
-      "temperature_desc": "控制回复的随机性（0–2）",
-      "max_tokens": "最大回复长度",
-      "max_tokens_desc": "单次回复的最大 token 数",
-      "stream": "流式传输",
-      "stream_desc": "逐字输出回复",
-      "temperature_help": "创作类建议 0.8–1.2；翻译、描述类建议 0.3–0.5。",
-      "max_tokens_help": "提示词生成 500–1000 即可；长对话可设更高。",
-      "stream_help": "部分平台在流式模式下内容过滤严格，可关闭。"
-    },
-    "test_title": "测试连接",
-    "test_btn": "测试",
-    "test_success": "连接成功",
-    "test_failed": "连接失败",
-    "err_no_provider": "请先选择服务提供商",
-    "err_no_key": "请先输入 API Key",
-    "err_no_model": "请先选择或输入模型",
-    "config_saved": "LLM 配置已保存",
-    "save_failed": "保存失败",
-    "unknown_error": "未知错误"
-  },
-  "prompt": {
-    "saved": "提示词设置已保存",
-    "tag_library": {
-      "show_nsfw": "显示 NSFW 标签",
-      "show_nsfw_desc": "在标签列表与自动补全中包含 NSFW 标签"
-    },
-    "translation": {
-      "show": "显示中文翻译",
-      "show_desc": "在提示词下方显示中文对照",
-      "provider": "翻译引擎",
-      "provider_desc": "中文翻译使用的服务，自动 = 按可用性选择",
-      "provider_auto": "自动",
-      "providers": {
-        "local_db": "本地数据库",
-        "mymemory": "MyMemory",
-        "bing": "Bing",
-        "youdao": "有道",
-        "alibaba": "阿里巴巴"
-      }
-    },
-    "normalize": {
-      "enable": "启用规格化",
-      "enable_desc": "提交前自动清理标点与符号",
-      "comma": "半角逗号",
-      "comma_desc": "将「，」替换为「,」",
-      "period": "半角句号",
-      "period_desc": "将「。」替换为「.」",
-      "bracket": "半角括号",
-      "bracket_desc": "将「（）」替换为「()」",
-      "underscore": "下划线转空格",
-      "underscore_desc": "将「_」替换为空格",
-      "escape_bracket": "括号转义",
-      "escape_bracket_desc": "自动为括号添加「\\\\」，避免被解析为权重语法"
-    },
-    "autocomplete": {
-      "limit": "补全数量",
-      "limit_desc": "输入时提示的候选标签数"
-    }
-  }
+  "restarting": "ComfyCarry 正在重启，3 秒后自动刷新..."
 }

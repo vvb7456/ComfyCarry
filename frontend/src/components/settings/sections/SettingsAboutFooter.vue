@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * 设置分区: 关于 — 与原版 (SettingsTabComfyCarry 的 About 区) 视觉/功能完全一致。
+ * 设置页关于模块 — 与更新 / 重新初始化 / 项目链接 / 署名。
  * 结构 = about-identity / desc / about-update-block (检查更新 + 重新初始化) /
  * about-project (链接 / 署名)。更新与重新初始化逻辑自原组件原样迁移。
- * 差异: 独立特殊尾分区 (无 L1 标题, 上方 72px 间距顶替原分区标题)。
+ * 原独立尾分区已并入设置页正文顺排 (间距由 SettingsPage 承担)。
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'

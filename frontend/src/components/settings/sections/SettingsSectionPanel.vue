@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * 设置分区: 面板 — 两个即时动作模块 (单页 v3: L2 模块 + 行, 无草稿态无守卫):
+ * 设置页面板模块 — 两个即时动作模块:
  *   1. 登录与认证: 修改登录密码 (modal) / API Key (只读+重生成)
  *   2. 配置管理: 导出配置 / 导入配置
- * 重新初始化已归位 About 区 (SettingsAboutFooter, 与原版一致)。
- * SSH 密码跟随已迁入 SSH 页页内设置 (C05), 此处不再保留。
+ * SSH 密码跟随已迁入 SSH 页页内设置 (C05), 生成域已迁回各功能页。
  * onMounted 加载 /api/settings; API Key 行失败就地重试。
  */
 import { onMounted, ref } from 'vue'
@@ -21,6 +20,7 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
+import { errorMessage } from '@/utils/errorMessage'
 
 defineOptions({ name: 'SettingsSectionPanel' })
 
@@ -36,13 +36,6 @@ const pwCurrent = ref('')
 const pwNew = ref('')
 const pwConfirm = ref('')
 const pwSubmitting = ref(false)
-
-function openPwModal() {
-  pwCurrent.value = ''
-  pwNew.value = ''
-  pwConfirm.value = ''
-  pwModalOpen.value = true
-}
 
 // ─── API Key state ───────────────────────────────────────────────────────────
 
@@ -117,8 +110,8 @@ async function exportConfig() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast(t('settings.config.exported'), 'success')
-  } catch (e: any) {
-    toast(`${t('settings.config.export_failed')}: ${e.message}`, 'error')
+  } catch (e: unknown) {
+    toast(`${t('settings.config.export_failed')}: ${errorMessage(e)}`, 'error')
   }
 }
 
@@ -140,8 +133,8 @@ async function importConfig(event: Event) {
     if (!data) return
     toast(apiMessageText(data), 'success')
     await loadSettings()
-  } catch (e: any) {
-    toast(`${t('settings.config.import_failed')}: ${e.message}`, 'error')
+  } catch (e: unknown) {
+    toast(`${t('settings.config.import_failed')}: ${errorMessage(e)}`, 'error')
   }
 }
 
@@ -151,8 +144,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- 模块 1: 登录与认证 (即时动作, 无 dirty) -->
-    <SettingsModule id="settings-focus-password" :title="t('settings.domains.auth')">
+    <!-- 模块 1: 登录与认证 (即时动作) -->
+    <SettingsModule :title="t('settings.domains.auth')">
       <div v-if="apiKeyError" class="settings-lines">
         <EmptyState icon="error_outline" :message="t('common.load_failed')">
           <BaseButton size="sm" @click="loadSettings">{{ t('common.btn.retry') }}</BaseButton>
@@ -207,8 +200,8 @@ onMounted(() => {
       </div>
     </SettingsModule>
 
-    <!-- 模块 2: 配置管理 (即时动作, 无 dirty) -->
-    <SettingsModule id="settings-focus-config" :title="t('settings.domains.configmgmt')">
+    <!-- 模块 2: 配置管理 (即时动作) -->
+    <SettingsModule :title="t('settings.domains.configmgmt')">
       <div class="settings-lines">
         <div class="settings-action">
           <div class="settings-action__text">

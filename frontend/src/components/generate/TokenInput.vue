@@ -7,7 +7,7 @@
  *   - Comma or Enter commits input text as chip
  *   - Backspace on empty input selects/deletes last chip
  *   - Autocomplete dropdown (debounced, keyboard navigable)
- *   - Toolbar below: favorites/history, clear all, clear disabled, translate all
+ *   - Toolbar below: favorites/history, embedding, wildcard, translate, settings (right-aligned)
  *   - Drag & drop reorder chips
  *   - IME-safe (compositionstart/compositionend guard)
  */
@@ -46,12 +46,10 @@ const emit = defineEmits<{
   translate: [id: string]
   'translate-all': []
   move: [fromIndex: number, toIndex: number]
-  'clear-all': []
-  'clear-disabled': []
   history: []
-  'favorite-current': []
   'open-embedding': []
   'open-wildcard': []
+  settings: []
   'select-autocomplete': [item: AutocompleteDisplayItem]
 }>()
 
@@ -213,7 +211,7 @@ function onKeydown(e: KeyboardEvent) {
         emit('remove', selectedChipId.value)
         selectedChipId.value = null
       } else if (props.tokens.length > 0) {
-        selectedChipId.value = props.tokens[props.tokens.length - 1].id
+        selectedChipId.value = props.tokens[props.tokens.length - 1]?.id ?? null
       }
       return
     }
@@ -291,20 +289,21 @@ function buildRowMap(chipEls: Element[]): ChipRow[] {
   return rows.sort((a, b) => a.top - b.top)
 }
 
-/** Find which row the cursor Y is over. */
+/** Find which row the cursor Y is over (rows 由调用方保证非空)。 */
 function findRow(rows: ChipRow[], y: number): ChipRow {
   for (let i = 0; i < rows.length; i++) {
-    const midBottom = i < rows.length - 1
-      ? (rows[i].bottom + rows[i + 1].top) / 2
-      : Infinity
-    if (y < midBottom) return rows[i]
+    const row = rows[i]
+    const next = rows[i + 1]
+    const midBottom = row && next ? (row.bottom + next.top) / 2 : Infinity
+    if (row && y < midBottom) return row
   }
-  return rows[rows.length - 1]
+  return rows[rows.length - 1] as ChipRow
 }
 
 /** Within a row, find the insert index based on cursor X. */
 function findIndexInRow(row: ChipRow, x: number): number {
-  let bestIdx = row.chips[row.chips.length - 1].idx + 1 // default: after last
+  const lastChip = row.chips[row.chips.length - 1]
+  let bestIdx = (lastChip?.idx ?? -1) + 1 // default: after last
   let bestDist = Infinity
   for (const c of row.chips) {
     const center = c.rect.left + c.rect.width / 2
@@ -326,13 +325,15 @@ function updateIndicator(rows: ChipRow[], dropIdx: number) {
   let refRect: DOMRect
   let left: number
 
+  const firstChip = allChips[0] as { rect: DOMRect }
+  const lastChip2 = allChips[allChips.length - 1] as { rect: DOMRect }
   if (dropIdx <= 0) {
     // Before first chip
-    refRect = allChips[0].rect
+    refRect = firstChip.rect
     left = refRect.left - 2
   } else if (dropIdx >= allChips.length) {
     // After last chip
-    refRect = allChips[allChips.length - 1].rect
+    refRect = lastChip2.rect
     left = refRect.right + 2
   } else {
     // Between two chips — use the right edge of previous
@@ -348,7 +349,7 @@ function updateIndicator(rows: ChipRow[], dropIdx: number) {
         left = refRect.left - 2
       }
     } else {
-      refRect = (next ?? prev ?? allChips[0]).rect
+      refRect = (next ?? prev ?? firstChip).rect
       left = next ? refRect.left - 2 : refRect.right + 2
     }
   }
@@ -489,7 +490,7 @@ onUnmounted(() => {
       />
     </Teleport>
 
-    <!-- Toolbar -->
+    <!-- Toolbar (right-aligned: 收藏与历史 | Embedding | Wildcard | 翻译 | 设置) -->
     <div class="token-toolbar">
       <button class="token-tool-btn" :title="t('prompt-library.toolbar.history_favorites')" @click="emit('history')">
         <MsIcon name="history" size="xs" color="none" />
@@ -504,21 +505,6 @@ onUnmounted(() => {
         <span class="tool-label">{{ t('prompt-library.toolbar.wildcard') }}</span>
       </button>
 
-      <span class="tool-spacer" />
-
-      <button class="token-tool-btn" :title="t('prompt-library.toolbar.favorite_current')" @click="emit('favorite-current')">
-        <MsIcon name="favorite" size="xs" color="none" />
-        <span class="tool-label">{{ t('prompt-library.toolbar.favorite_current') }}</span>
-      </button>
-      <button class="token-tool-btn" :title="t('prompt-library.toolbar.clear_disabled')" @click="emit('clear-disabled')">
-        <MsIcon name="remove_circle" size="xs" color="none" />
-        <span class="tool-label">{{ t('prompt-library.toolbar.clear_disabled') }}</span>
-      </button>
-      <button class="token-tool-btn token-tool-btn--danger" :title="t('prompt-library.toolbar.clear_all')" @click="emit('clear-all')">
-        <MsIcon name="delete_sweep" size="xs" color="none" />
-        <span class="tool-label">{{ t('prompt-library.toolbar.clear_all') }}</span>
-      </button>
-
       <button
         v-if="showTranslation"
         class="token-tool-btn"
@@ -529,6 +515,11 @@ onUnmounted(() => {
         <Spinner v-if="translateAllBusy" size="xs" />
         <MsIcon v-else name="translate" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.translate_all') }}</span>
+      </button>
+
+      <button class="token-tool-btn" :title="t('prompt-library.toolbar.settings')" @click="emit('settings')">
+        <MsIcon name="settings" size="xs" color="none" />
+        <span class="tool-label">{{ t('prompt-library.toolbar.settings') }}</span>
       </button>
     </div>
   </div>
@@ -579,10 +570,11 @@ onUnmounted(() => {
   opacity: .6;
 }
 
-/* ── Toolbar ── */
+/* ── Toolbar (right-aligned) ── */
 .token-toolbar {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   padding: 3px 6px;
   background: var(--bg2);
@@ -616,16 +608,10 @@ onUnmounted(() => {
   color: var(--t2);
   background: transparent;
 }
-.token-tool-btn--danger:hover {
-  color: var(--red);
-}
 
 .tool-label {
   font-size: var(--text-sm);
   font-weight: 500;
-}
-.tool-spacer {
-  flex: 1;
 }
 
 @media (max-width: 768px) {

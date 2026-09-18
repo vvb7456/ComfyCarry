@@ -544,7 +544,7 @@
     "error": "AI generation error",
     "failed": "AI generation failed",
     "not_configured": "AI prompt feature requires LLM service configuration",
-    "go_settings": "Go to Settings",
+    "go_settings": "Configure LLM Service",
     "no_vision": "Current LLM does not support Vision",
     "result_hint": "Describe your scene, AI will generate corresponding prompts",
     "used_all": "All prompts applied",
@@ -553,7 +553,8 @@
     "generating": "Generating…",
     "use_prompt": "Use Prompt",
     "use_all_prompts": "Use All Prompts",
-    "image_load_failed": "Image load failed"
+    "image_load_failed": "Image load failed",
+    "config_refreshed": "LLM service ready"
   },
   "embedding": {
     "title": "Embedding Selection",

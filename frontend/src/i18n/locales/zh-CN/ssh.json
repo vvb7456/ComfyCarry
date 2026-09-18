@@ -59,9 +59,7 @@
     "title": "SSH 设置",
     "label": "SSH 密码跟随",
     "desc": "root 的 SSH 登录密码自动跟随面板密码更新",
-    "help": "开启时会将 root 密码重置为当前面板密码并重启 sshd；面板登录不受影响。",
-    "enabled_toast": "SSH 密码跟随已开启，root 密码已同步为面板密码",
-    "disabled_toast": "SSH 密码跟随已关闭，SSH 仅允许公钥登录"
+    "help": "开启时会将 root 密码重置为当前面板密码并重启 sshd；面板登录不受影响。"
   },
   "log": {
     "title": "SSH 日志"
@@ -95,6 +93,11 @@
       "title": "关闭 SSH 密码登录",
       "message": "当前未配置任何公钥，关闭后将无法通过密码登录。",
       "button": "仍然关闭"
+    },
+    "discard": {
+      "title": "未保存的更改",
+      "message": "SSH 设置有未保存的更改，放弃后将恢复原值。",
+      "button": "放弃更改"
     }
   },
   "toast": {

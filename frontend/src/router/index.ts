@@ -51,8 +51,6 @@ const router = createRouter({
       component: () => import('@/pages/SSHPage.vue'),
     },
     {
-      // 单路由 + 查询参数定位 (spec §3.2): /settings?section=panel
-      // 子路由已废除 — push({name:'settings'}) 即整页, sidebar 空页问题随之消失
       path: '/settings',
       name: 'settings',
       component: () => import('@/pages/SettingsPage.vue'),
