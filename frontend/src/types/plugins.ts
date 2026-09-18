@@ -81,23 +81,10 @@ export type AvailablePluginsResponse = Record<string, PluginInfo> | { node_packs
 
 // ── API Responses ─────────────────────────────────────────────
 
-/** 文案走 key + params (plugins.py 的 _err / _ok), 用 utils/apiError.ts 渲染 */
-export interface PluginActionResponse {
-  ok?: boolean
-  message_key?: string
-  message_params?: Record<string, unknown>
-  error_key?: string
-  error_params?: Record<string, unknown>
-}
-
 export interface QueueStatusResponse {
   is_processing?: boolean
   total_count?: number
   done_count?: number
-}
-
-export interface UpdateCheckResponse {
-  has_updates?: boolean
 }
 
 // ── 待重启变更集 (pending_restart) ────────────────────────────

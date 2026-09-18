@@ -3,11 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { usePluginFiltering } from '@/composables/usePluginFiltering'
-import { usePluginQueue } from '@/composables/usePluginQueue'
-import { usePluginEvents } from '@/composables/usePluginEvents'
 import { useToast } from '@/composables/useToast'
-import { useConfirm } from '@/composables/useConfirm'
-import { apiErrorText, apiMessageText } from '@/utils/apiError'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -17,16 +13,13 @@ import AlertBanner from '@/components/ui/AlertBanner.vue'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
-import UnsavedBanner from '@/components/ui/UnsavedBanner.vue'
 import PluginCard from './PluginCard.vue'
-import GitInstallModal from './GitInstallModal.vue'
+import PluginOpModal, { type PluginOpRequest } from './PluginOpModal.vue'
 import type {
   AvailablePluginsResponse,
-  CMQueueStatusData,
   InstalledRaw,
   PendingRestartPack,
   PendingRestartResponse,
-  PluginActionResponse,
   PluginData,
   PluginInfo,
 } from '@/types/plugins'
@@ -40,16 +33,13 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const { get, post } = useApiFetch()
+const { get } = useApiFetch()
 const { toast } = useToast()
-const { confirm } = useConfirm()
 
 const loading = ref(false)
 const error = ref('')
-const loaded = ref(false)
 let getlistCache: Record<string, PluginInfo> = {}
 
-const gitModalOpen = ref(false)
 const versionModalOpen = ref(false)
 const versionModalTitle = ref('')
 const versionModalId = ref('')
@@ -62,54 +52,9 @@ const versionOptions = computed(() =>
 )
 
 // ── 待重启事实 (服务端 diff: 启动快照 vs 当前磁盘) ──────────
+// 卡片"待重启"角标; 提醒与重启动作由 PluginOpModal 在操作完成时接手。
 const pendingRestart = ref<PendingRestartPack[]>([])
-const restartDismissed = ref(false)
-const restarting = ref(false)
 const pendingIds = computed(() => new Set(pendingRestart.value.map(p => p.id)))
-
-// ── 行级操作状态: uiId → { id, op, ts } ─────────────────────
-// ts 用于 onIdle 兜底清理时的宽限判断 (SSE done 丢失时防永久 spinner)
-type OpKind = 'install' | 'uninstall' | 'update' | 'toggle'
-const activeOps = ref<Record<string, { id: string, op: OpKind, ts: number }>>({})
-const rowErrors = ref<Record<string, string>>({})
-
-function genUiId(): string {
-  return crypto?.randomUUID?.() ?? `dash-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-function rowOp(id: string): OpKind | undefined {
-  for (const op of Object.values(activeOps.value)) {
-    if (op.id === id) return op.op
-  }
-  return undefined
-}
-
-/** SSE 断线等导致 done 事件丢失时, 队列空闲后清理超时未决的操作标记 */
-function clearStaleOps() {
-  const now = Date.now()
-  for (const [uiId, op] of Object.entries(activeOps.value)) {
-    if (now - op.ts > 15000) delete activeOps.value[uiId]
-  }
-}
-
-// ── Manager 队列事件 (bridge 转发的 cm-queue-status) ────────
-function onQueueEvent(data: CMQueueStatusData) {
-  if (data.status !== 'done') return
-  const result = data.nodepack_result || {}
-  if (Object.keys(result).length === 0) return
-  for (const [uiId, res] of Object.entries(result)) {
-    const op = activeOps.value[uiId]
-    if (!op) continue // 非本页发起的操作 (向导页/Git 弹窗等)
-    delete activeOps.value[uiId]
-    if (res !== 'success' && res !== 'skip') {
-      rowErrors.value[op.id] = res
-    }
-  }
-  restartDismissed.value = false
-  loadData()
-}
-
-const { start: startEvents, stop: stopEvents } = usePluginEvents(onQueueEvent)
 
 const {
   filter,
@@ -125,19 +70,8 @@ const {
 
 const stats = computed(() => t('plugins.browse.stats_text', { count: filteredPlugins.value.length }))
 
-const {
-  queueProcessing,
-  queueStatus,
-  pollQueue,
-  startQueuePoll,
-} = usePluginQueue({
-  get,
-  formatStatus: (done, total) => t('plugins.queue.status', { done, total }),
-  onIdle: () => { clearStaleOps(); return loadData() },
-})
-
 async function loadData(force = false) {
-  // force: restartNow 在 ComfyUI 恢复后立即调用, 此时父组件的 online prop 可能
+  // force: PluginOpModal 重启完成后可能立即调用, 此时父组件的 online prop 可能
   // 还停留在停机期 (10s 轮询滞后), 不能因陈旧的 offline 状态放弃刷新
   if (!force && (loading.value || props.online === false)) return
   loading.value = true
@@ -157,7 +91,6 @@ async function loadData(force = false) {
     }
 
     setInstalledPlugins(installedData, getlistCache)
-    loaded.value = true
   } finally {
     loading.value = false
   }
@@ -166,55 +99,40 @@ async function loadData(force = false) {
 function activateWorkspace() {
   if (!props.active || props.online === false) return
   // 每次激活都全量刷新: pending_restart 是服务端事实, 若只在首次加载时拉取,
-  // 用户从别处重启 ComfyUI (参数页/手动) 后回到本页会看到陈旧的横幅状态
+  // 用户从别处重启 ComfyUI (参数页/手动) 后回到本页会看到陈旧的角标状态
   loadData()
-  pollQueue()
-  startEvents()
 }
 
 onMounted(activateWorkspace)
 watch([() => props.active, () => props.online], ([active]) => {
   if (active) activateWorkspace()
-  else stopEvents()
 })
 
-// diff 从无到有 (新变更完成) 时重新亮横幅, 覆盖之前的"稍后"
-watch(pendingRestart, (now, prev) => {
-  if (now.length > 0 && prev.length === 0) restartDismissed.value = false
-})
+// ── 阻塞执行弹窗: 所有插件操作统一走这里 (confirm → 执行 → 结果) ──
 
-// ── 操作提交 ────────────────────────────────────────────────
-async function submitOp(op: OpKind, endpoint: string, payload: Record<string, unknown>) {
-  const id = String(payload.id ?? '')
-  const uiId = genUiId()
-  payload.ui_id = uiId
-  activeOps.value[uiId] = { id, op, ts: Date.now() }
-  delete rowErrors.value[id]
-  const d = await post<PluginActionResponse>(endpoint, payload)
-  if (d?.ok) {
-    toast(apiMessageText(d), 'success')
-    startQueuePoll()
-  } else {
-    delete activeOps.value[uiId]
-  }
+const opModal = ref<InstanceType<typeof PluginOpModal> | null>(null)
+const opModalOpen = ref(false)
+
+function submitOp(kind: PluginOpRequest['kind'], title: string, endpoint: string, payload: Record<string, unknown>) {
+  void opModal.value?.open({ kind, title, endpoint, payload })
+}
+
+/** 弹窗收尾 (含后台继续): 刷新列表与待重启角标 */
+function onOpFinished(_ok: boolean) {
+  void loadData(true)
 }
 
 async function installPlugin(id: string, version = 'latest') {
-  toast(t('plugins.msg.installing_name', { id }), 'info')
   const pack = getlistCache[id] || {}
+  const title = pack.title || id
   const payload: Record<string, unknown> = { id, version: pack.version || 'unknown', selected_version: version }
   if (pack.files) payload.files = pack.files
   if (pack.repository || pack.reference) payload.repository = pack.repository || pack.reference
-  await submitOp('install', '/api/plugins/install', payload)
+  submitOp('install', title, '/api/plugins/install', payload)
 }
 
 async function uninstallPlugin(p: PluginData) {
-  if (!await confirm({
-    title: t('plugins.confirm.uninstall.title'),
-    message: t('plugins.confirm.uninstall.message', { title: p.title || p.id }),
-    confirmText: t('plugins.confirm.uninstall.button'),
-  })) return
-  await submitOp('uninstall', '/api/plugins/uninstall', {
+  submitOp('uninstall', p.title || p.id, '/api/plugins/uninstall', {
     id: p.id,
     version: p.ver,
     // Manager 在 version=="unknown" 时用 files[0] 的 basename 推导目录名;
@@ -224,13 +142,13 @@ async function uninstallPlugin(p: PluginData) {
 }
 
 async function updatePlugin(p: PluginData) {
-  await submitOp('update', '/api/plugins/update', { id: p.id, version: p.ver })
+  submitOp('update', p.title || p.id, '/api/plugins/update', { id: p.id, version: p.ver })
 }
 
 async function togglePlugin(p: PluginData) {
   // Manager 无 enable 端点: 启用走 /enable (install+skip_post_install), 禁用走 /disable
   const target = p.enabled ? 'disable' : 'enable'
-  await submitOp('toggle', `/api/plugins/${target}`, {
+  submitOp('toggle', p.title || p.id, `/api/plugins/${target}`, {
     id: p.id,
     version: p.ver,
     files: p.ver === 'unknown' ? [p.repository || p.dirName] : undefined,
@@ -252,77 +170,42 @@ async function openVersionModal(id: string, title: string) {
   versionLoading.value = false
 }
 
-async function installVersion(version: string) {
+function installVersion(version: string) {
   versionModalOpen.value = false
-  await installPlugin(versionModalId.value, version)
+  void installPlugin(versionModalId.value, version)
 }
 
-// ── 重启 ComfyUI 使变更生效 ─────────────────────────────────
-async function restartNow() {
-  if (restarting.value) return
-  restarting.value = true
-  try {
-    const d = await post<PluginActionResponse>('/api/comfyui/restart', {})
-    // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok
-    if (!d) return
-    if (!d.ok) {
-      toast(apiErrorText(d) || t('plugins.restart.restarting'), 'error')
-      return
-    }
-    toast(t('plugins.restart.restarting'), 'info')
-    // 有界轮询等待恢复在线 (冷启动加载 custom_nodes 可能 30s+); 上限 3 分钟
-    let backOnline = false
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 3000))
-      // 停机期间每次探测都会失败 —— 静默, 结果由下方的 done/timeout 汇总
-      const s = await get<{ online?: boolean }>('/api/comfyui/status', { silent: true })
-      if (s?.online) { backOnline = true; break }
-    }
-    await loadData(true)
-    if (backOnline) {
-      toast(t('plugins.restart.done'), 'success')
-    } else {
-      toast(t('plugins.restart.timeout'), 'error')
-    }
-  } finally {
-    restarting.value = false
+// ── Git 安装: URL 收集 → 阻塞执行弹窗 ────────────────────────
+
+const gitModalOpen = ref(false)
+const gitUrl = ref('')
+
+function submitGitInstall() {
+  const url = gitUrl.value.trim()
+  if (!url.startsWith('http')) {
+    toast(t('plugins.git.invalid_url'), 'warning')
+    return
   }
+  gitModalOpen.value = false
+  submitOp('git', url, '/api/plugins/install_git', { url })
 }
 </script>
 
 <template>
   <EmptyState
-    v-if="online === false && !restarting"
+    v-if="online === false"
     icon="cloud_off"
     :title="t('comfyui.plugins.offline_title')"
     :message="t('comfyui.plugins.offline_desc')"
   />
 
-  <!-- banner 发起的重启: 停机是预期内的, 显示等待态而不是"未运行" -->
-  <LoadingCenter v-else-if="restarting" size="lg">{{ t('plugins.restart.restarting') }}</LoadingCenter>
-
   <template v-else>
     <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
-      <UnsavedBanner
-        :visible="pendingRestart.length > 0 && !restartDismissed"
-        :message="t('plugins.restart.banner_msg')"
-        :save-label="t('plugins.restart.now')"
-        save-icon="restart_alt"
-        :discard-label="t('plugins.restart.later')"
-        :saving="restarting"
-        :sticky="false"
-        @save="restartNow"
-        @discard="restartDismissed = true"
-      />
-
       <SectionToolbar>
         <template #start>
           <FilterInput v-model="filter" :placeholder="t('plugins.browse.search_placeholder')" />
           <span class="toolbar-status">
             {{ stats }}
-            <template v-if="queueProcessing">
-              &nbsp;· <MsIcon name="hourglass_top" /> {{ queueStatus }}
-            </template>
           </span>
         </template>
         <template #end>
@@ -354,8 +237,6 @@ async function restartNow() {
         v-for="p in currentPage"
         :key="p.id"
         :plugin="p"
-        :op="rowOp(p.id)"
-        :error="rowErrors[p.id]"
         :pending="pendingIds.has(p.id)"
         @install="installPlugin(p.id)"
         @uninstall="uninstallPlugin(p)"
@@ -364,11 +245,23 @@ async function restartNow() {
         @version="openVersionModal(p.id, p.title)"
       />
     </ul>
-    <div ref="listEndEl" class="plugins-list-end" />
+    <div :ref="(el) => { listEndEl = (el as HTMLElement | null) }" class="plugins-list-end" />
   </template>
 
-  <GitInstallModal v-model="gitModalOpen" @installed="startQueuePoll" />
+  <!-- Git URL 收集弹窗: 提交转阻塞执行弹窗 -->
+  <BaseModal v-model="gitModalOpen" :title="t('plugins.git.title')" width="560px">
+    <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px">
+      <MsIcon name="link" /> {{ t('plugins.git.desc') }}
+    </p>
+    <form class="git-row" @submit.prevent="submitGitInstall">
+      <input v-model="gitUrl" type="text" class="form-input" :placeholder="t('plugins.git.placeholder')">
+      <BaseButton variant="primary" type="submit" style="padding:8px 20px" :disabled="!gitUrl.trim().startsWith('http')">
+        {{ t('plugins.git.install') }}
+      </BaseButton>
+    </form>
+  </BaseModal>
 
+  <!-- 版本选择弹窗 -->
   <BaseModal v-model="versionModalOpen" :title="versionModalTitle" width="520px">
     <LoadingCenter v-if="versionLoading" />
     <EmptyState v-else-if="versionList.length === 0" density="compact" :message="t('plugins.version_picker.no_version_nightly')" />
@@ -390,8 +283,18 @@ async function restartNow() {
       </BaseButton>
     </template>
   </BaseModal>
+
+  <!-- 阻塞执行弹窗 (常驻挂载; open() 由操作触发) -->
+  <PluginOpModal ref="opModal" v-model="opModalOpen" @finished="onOpFinished" />
 </template>
 
 <style scoped>
 .plugins-list-end { height: 1px; }
+
+.git-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.git-row .form-input { flex: 1; }
 </style>

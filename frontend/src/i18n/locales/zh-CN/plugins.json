@@ -12,14 +12,7 @@
     "url_required": "URL 不能为空"
   },
   "msg": {
-    "queued_install": "已加入安装队列",
-    "queued_uninstall": "已加入卸载队列",
-    "queued_update": "已加入更新队列",
-    "queued_update_all": "所有插件已加入更新队列",
-    "enabled": "启用指令已提交，重启后生效",
-    "disabled": "禁用指令已提交，重启后生效",
-    "install_version": "安装此版本",
-    "installing_name": "正在安装 {id}..."
+    "install_version": "安装此版本"
   },
   "tabs": {
     "git": "Git 安装"
@@ -52,17 +45,7 @@
     "desc": "输入插件的 GitHub 仓库地址，直接克隆并安装",
     "placeholder": "https://github.com/author/ComfyUI-Plugin",
     "install": "安装",
-    "invalid_url": "请输入有效的 URL",
-    "empty_url": "请输入 Git URL",
-    "installing_btn": "安装中...",
-    "request_failed": "请求失败"
-  },
-  "confirm": {
-    "uninstall": {
-      "title": "卸载插件",
-      "message": "插件「{title}」的目录将被删除。",
-      "button": "卸载"
-    }
+    "invalid_url": "请输入有效的 URL"
   },
   "version_picker": {
     "title_name": "{name} - 版本选择",
@@ -71,19 +54,50 @@
     "search": "搜索版本",
     "empty": "无匹配版本"
   },
-  "queue": {
-    "status": "队列：{done}/{total} 完成"
-  },
   "restart": {
-    "banner_msg": "插件变更已完成，需重启 ComfyUI 生效",
     "pending_badge": "待生效",
-    "now": "立即重启",
-    "later": "稍后",
     "restarting": "正在重启 ComfyUI，请稍候…",
     "done": "ComfyUI 已重启，变更已生效",
     "timeout": "等待 ComfyUI 恢复超时，请稍后手动检查状态"
   },
-  "row": {
-    "dismiss_error": "知道了"
+  "op": {
+    "title": "插件操作",
+    "kind": {
+      "install": "安装",
+      "uninstall": "卸载",
+      "update": "更新",
+      "toggle": "开关",
+      "git": "安装"
+    },
+    "confirm": {
+      "title": "确认{kind}「{name}」？",
+      "message": "操作将阻塞执行至完成，期间无法取消或离开本页。"
+    },
+    "running": {
+      "install": "正在安装「{name}」…",
+      "uninstall": "正在卸载「{name}」…",
+      "update": "正在更新「{name}」…",
+      "toggle": "正在切换「{name}」…",
+      "git": "正在安装「{name}」…"
+    },
+    "running_hint": "正在等待 ComfyUI-Manager 队列完成，通常需要十几秒到几分钟",
+    "queue_progress": "队列进度：{done}/{total}",
+    "done": "「{name}」{kind_verb}",
+    "restart_hint": "需重启 ComfyUI 后生效",
+    "restart_now": "立即重启",
+    "failed": "「{name}」{kind}失败",
+    "unknown_error": "未知错误",
+    "timeout_title": "仍在执行中",
+    "timeout_desc": "操作耗时超出预期（网络较慢或依赖较多）。可继续等待，或转入后台继续执行。",
+    "wait_more": "继续等待",
+    "go_background": "后台继续",
+    "background_notice": "操作转入后台继续执行，完成后列表将自动刷新",
+    "kind_verb": {
+      "install": "安装完成",
+      "uninstall": "卸载完成",
+      "update": "更新完成",
+      "toggle": "已切换",
+      "git": "安装完成"
+    }
   }
 }

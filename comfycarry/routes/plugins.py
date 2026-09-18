@@ -6,7 +6,6 @@ ComfyCarry — 插件管理路由 (代理 ComfyUI-Manager)
 - /api/plugins/versions/<name> — 插件版本
 - /api/plugins/fetch_updates  — 拉取更新
 - /api/plugins/install|uninstall|update|disable — 操作队列
-- /api/plugins/update_all     — 一键更新
 - /api/plugins/install_git    — Git URL 安装
 - /api/plugins/queue_status   — 队列状态
 - /api/plugins/manager_version — Manager 版本
@@ -227,7 +226,7 @@ def api_plugins_install():
     if r.status_code not in (200, 201):
         return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("queued_install")
+    return _ok("submitted")
 
 
 @bp.route("/api/plugins/uninstall", methods=["POST"])
@@ -249,7 +248,7 @@ def api_plugins_uninstall():
     if r.status_code not in (200, 201):
         return _err("uninstall_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("queued_uninstall")
+    return _ok("submitted")
 
 
 @bp.route("/api/plugins/update", methods=["POST"])
@@ -269,17 +268,7 @@ def api_plugins_update():
     if r.status_code not in (200, 201):
         return _err("update_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("queued_update")
-
-
-@bp.route("/api/plugins/update_all", methods=["POST"])
-def api_plugins_update_all():
-    r = _cm_get("/manager/queue/update_all",
-                params={"mode": "remote"}, timeout=120)
-    if r is None:
-        return _err("no_comfyui", 502)
-    _cm_post("/manager/queue/start")
-    return _ok("queued_update_all")
+    return _ok("submitted")
 
 
 @bp.route("/api/plugins/disable", methods=["POST"])
@@ -306,7 +295,7 @@ def api_plugins_disable():
     if r.status_code not in (200, 201):
         return _err("action_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("disabled")
+    return _ok("submitted")
 
 
 @bp.route("/api/plugins/enable", methods=["POST"])
@@ -341,7 +330,7 @@ def api_plugins_enable():
     if r.status_code not in (200, 201):
         return _err("action_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("enabled")
+    return _ok("submitted")
 
 
 @bp.route("/api/plugins/install_git", methods=["POST"])
@@ -371,7 +360,7 @@ def api_plugins_install_git():
     if r.status_code not in (200, 201):
         return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("queued_install")
+    return _ok("submitted")
 
 
 @bp.route("/api/plugins/queue_status")

@@ -12,14 +12,7 @@
     "url_required": "URL cannot be empty"
   },
   "msg": {
-    "queued_install": "Added to install queue",
-    "queued_uninstall": "Added to uninstall queue",
-    "queued_update": "Added to update queue",
-    "queued_update_all": "All plugins added to update queue",
-    "enabled": "Enable request submitted — takes effect after restart",
-    "disabled": "Disable request submitted — takes effect after restart",
-    "install_version": "Install this version",
-    "installing_name": "Installing {id}..."
+    "install_version": "Install this version"
   },
   "tabs": {
     "git": "Git Install"
@@ -52,17 +45,7 @@
     "desc": "Enter the GitHub repository URL to clone and install",
     "placeholder": "https://github.com/author/ComfyUI-Plugin",
     "install": "Install",
-    "invalid_url": "Please enter a valid URL",
-    "empty_url": "Please enter a Git URL",
-    "installing_btn": "Installing...",
-    "request_failed": "Request failed"
-  },
-  "confirm": {
-    "uninstall": {
-      "title": "Uninstall Plugin",
-      "message": "The directory of \"{title}\" will be deleted.",
-      "button": "Uninstall"
-    }
+    "invalid_url": "Please enter a valid URL"
   },
   "version_picker": {
     "title_name": "{name} - Version Selection",
@@ -71,19 +54,50 @@
     "search": "Search versions",
     "empty": "No matching versions"
   },
-  "queue": {
-    "status": "Queue: {done}/{total} done"
-  },
   "restart": {
-    "banner_msg": "Plugin changes completed — restart ComfyUI to apply",
     "pending_badge": "Pending",
-    "now": "Restart Now",
-    "later": "Later",
     "restarting": "Restarting ComfyUI, please wait…",
     "done": "ComfyUI restarted, changes applied",
     "timeout": "Timed out waiting for ComfyUI — please check its status manually"
   },
-  "row": {
-    "dismiss_error": "Dismiss"
+  "op": {
+    "title": "Plugin Operation",
+    "kind": {
+      "install": "Install",
+      "uninstall": "Uninstall",
+      "update": "Update",
+      "toggle": "Toggle",
+      "git": "Install"
+    },
+    "confirm": {
+      "title": "{kind} plugin \"{name}\"?",
+      "message": "This operation blocks until it completes; it cannot be cancelled or left."
+    },
+    "running": {
+      "install": "Installing \"{name}\"…",
+      "uninstall": "Uninstalling \"{name}\"…",
+      "update": "Updating \"{name}\"…",
+      "toggle": "Toggling \"{name}\"…",
+      "git": "Installing \"{name}\"…"
+    },
+    "running_hint": "Waiting for the ComfyUI-Manager queue; usually takes seconds to a few minutes",
+    "queue_progress": "Queue progress: {done}/{total}",
+    "done": "\"{name}\" {kind_verb} successfully",
+    "restart_hint": "Takes effect after ComfyUI restarts",
+    "restart_now": "Restart Now",
+    "failed": "Failed to {kind} \"{name}\"",
+    "unknown_error": "Unknown error",
+    "timeout_title": "Still running",
+    "timeout_desc": "The operation is taking longer than expected (slow network or heavy dependencies). You can keep waiting or let it continue in the background.",
+    "wait_more": "Keep Waiting",
+    "go_background": "Continue in Background",
+    "background_notice": "The operation continues in the background; the list will refresh when it finishes",
+    "kind_verb": {
+      "install": "installed",
+      "uninstall": "uninstalled",
+      "update": "updated",
+      "toggle": "toggled",
+      "git": "installed"
+    }
   }
 }
