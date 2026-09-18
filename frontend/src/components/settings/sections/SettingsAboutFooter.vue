@@ -258,17 +258,17 @@ async function reinitialize() {
 }
 .about-logo {
   display: block;
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 16px;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 12px;
 }
 .about-product-name {
   margin: 0;
   color: var(--t1);
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -.015em;
+  letter-spacing: -.02em;
 }
 .about-product-name__b {
   color: var(--ac);

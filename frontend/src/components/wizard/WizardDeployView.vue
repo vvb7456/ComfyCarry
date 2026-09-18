@@ -73,7 +73,6 @@ async function onRetry() {
     <!-- Success buttons -->
     <div v-if="status === 'success'" class="wizard-deploy__actions">
       <BaseButton variant="primary" size="lg" @click="enterDashboard">
-        <MsIcon name="celebration" size="sm" />
         {{ t('wizard.deploy.enter') }}
       </BaseButton>
     </div>

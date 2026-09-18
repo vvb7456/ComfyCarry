@@ -128,7 +128,7 @@ def register_auth_middleware(app):
             or request.path.startswith("/assets/")
             or request.path.startswith("/fonts/")
             or request.path in (
-                "/apple-touch-icon.png", "/logo.png", "/logo-small.png",
+                "/apple-touch-icon.png",
                 "/logo-mark.svg", "/logo-tile.svg",
             )
         ):

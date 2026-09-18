@@ -113,7 +113,7 @@ async function submit() {
 
     <div class="card">
       <div class="logo">
-        <img src="/logo.png" alt="" width="64" height="64">
+        <img src="/logo-mark.svg" alt="" width="48" height="48">
         <h1>Comfy<b>Carry</b></h1>
       </div>
 
@@ -396,17 +396,18 @@ html[data-theme="light"] .lang-toggle:hover {
   margin-bottom: clamp(28px, 2.5vw, 40px);
 }
 
+/* 与字标保持 1.5:1 — 品牌块统一比例 (3vw = 字标 2vw 的 1.5 倍) */
 .logo img {
-  width: clamp(52px, 5vw, 64px);
+  width: clamp(38px, 3vw, 50px);
   height: auto;
   display: block;
-  margin: 0 auto 14px;
+  margin: 0 auto 12px;
 }
 
 .logo h1 {
   font-size: clamp(1.6rem, 2vw, 2.1rem);
   font-weight: 700;
-  letter-spacing: -.5px;
+  letter-spacing: -.02em;
   color: var(--l-t1);
 }
 

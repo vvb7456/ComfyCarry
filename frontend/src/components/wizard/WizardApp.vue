@@ -59,7 +59,7 @@ onMounted(() => {
     <!-- Main Wizard -->
     <div v-else class="wizard-container">
       <div class="wizard-header">
-        <img src="/logo-mark.svg" alt="" class="wizard-header__logo" width="64" height="64" />
+        <img src="/logo-mark.svg" alt="" class="wizard-header__logo" width="48" height="48" />
         <h1>Comfy<span class="wizard-header__brand-b">Carry</span></h1>
         <p class="wizard-header__subtitle">{{ t('wizard.subtitle') }}</p>
       </div>
@@ -178,16 +178,20 @@ onMounted(() => {
   margin-bottom: 36px;
 }
 
-/* 上下布置的品牌块, 同设置-关于: logo 居中在上, 字标在下 */
+/* 上下布置的品牌块, 同设置-关于: logo 居中在上, 字标在下。
+   logo 与字标 (2rem) 保持 1.5:1 — lockup 的常规比例, 2:1 时视觉偏重 */
 .wizard-header__logo {
   display: block;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 14px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
 }
 
-/* 与主项目字标一致: 实心 --t1, "Carry" 高亮 --ac */
+/* 与主项目字标一致: 实心 --t1, "Carry" 高亮 --ac。
+   margin 归零: 浏览器默认 h1 外边距会把 logo 与字标的间距撑到 ~33px,
+   统一为品牌块标准 12px (同登录页/关于页) */
 .wizard-header h1 {
+  margin: 0;
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: -.02em;
@@ -199,7 +203,7 @@ onMounted(() => {
 }
 
 .wizard-header__subtitle {
-  margin-top: 6px;
+  margin-top: 10px;
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--t2);

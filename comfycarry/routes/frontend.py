@@ -79,25 +79,15 @@ def serve_apple_touch_icon():
     return _serve_public_file("apple-touch-icon.png", mimetype="image/png")
 
 
-@bp.route("/logo.png")
-def serve_logo():
-    return _serve_public_file("logo.png", mimetype="image/png")
-
-
-@bp.route("/logo-small.png")
-def serve_logo_small():
-    return _serve_public_file("logo-small.png", mimetype="image/png")
-
-
 @bp.route("/logo-mark.svg")
 def serve_logo_mark():
-    """侧栏用的标记 (展开与折叠共用)。"""
+    """侧栏 / 登录页 / favicon 用的标记。"""
     return _serve_public_file("logo-mark.svg", mimetype="image/svg+xml")
 
 
 @bp.route("/logo-tile.svg")
 def serve_logo_tile():
-    """应用图标底板 —— 上面几个 png / ico 的源文件, 见 frontend/scripts/build-icons.sh。"""
+    """应用图标底板 —— apple-touch-icon.png 的源文件, 见 frontend/scripts/build-icons.sh。"""
     return _serve_public_file("logo-tile.svg", mimetype="image/svg+xml")
 
 
