@@ -3,11 +3,15 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCivitaiSearch, type SortKey } from '@/composables/useCivitaiSearch'
 import { useDownloads } from '@/composables/useDownloads'
+import { useCivitaiSettings } from '@/composables/useCivitaiSettings'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SectionToolbar from '@/components/ui/SectionToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import CivitaiFilterPopover from '@/components/models/CivitaiFilterPopover.vue'
+import CivitaiSettingsModal from '@/components/models/CivitaiSettingsModal.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import CivitaiModelCard from '@/components/models/CivitaiModelCard.vue'
 import VersionPickerModal from '@/components/models/VersionPickerModal.vue'
@@ -30,6 +34,21 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+
+// ── CivitAI 设置 (key gate) ────────────────────────────────────────────────
+// 搜索/下载强制要求 API Key: 未配置时本 tab 呈引导空态, 不发起任何请求。
+const civitaiSettings = useCivitaiSettings()
+const settingsOpen = ref(false)
+const gateLoading = ref(true)
+
+async function refreshSettings(): Promise<void> {
+  gateLoading.value = true
+  await civitaiSettings.load(true)
+  gateLoading.value = false
+}
+
+/** key 未配置 → gate; 其余一切 (搜索/下载/收藏动作) 均以 key 已配置为前提 */
+const needsKey = computed(() => !civitaiSettings.keySet.value)
 
 // ── Downloads (singleton) ──
 const {
@@ -124,20 +143,33 @@ function handleSortChange() {
 
 // Auto-activate when tab becomes visible
 let initialTypeApplied = false
-watch(() => props.active, (val) => {
-  if (val) {
-    // 外部跳转预选类型 (仅首次激活应用一次, 避免覆盖用户后续操作)
-    if (props.initialType && !initialTypeApplied) {
-      initialTypeApplied = true
-      applyFilters([props.initialType], [])
-    }
-    civitaiActivate()
-    dlFetchLocalIndex()
-    // Connect to any in-flight downloads so card states are accurate
-    dlRefreshStatus().then(() => {
-      if (dlActiveTasks.value.length) dlStartPolling()
-    })
+
+/** key 已配置时执行浏览激活 (facets + 初始搜索 + 下载轮询) */
+function activateBrowsing() {
+  // 外部跳转预选类型 (仅首次激活应用一次, 避免覆盖用户后续操作)
+  if (props.initialType && !initialTypeApplied) {
+    initialTypeApplied = true
+    applyFilters([props.initialType], [])
   }
+  civitaiActivate()
+  dlFetchLocalIndex()
+  // Connect to any in-flight downloads so card states are accurate
+  dlRefreshStatus().then(() => {
+    if (dlActiveTasks.value.length) dlStartPolling()
+  })
+}
+
+/** 设置弹窗保存后: 刷新 key 状态, gate 解除 (或首次解除) 即激活浏览 */
+async function onSettingsSaved() {
+  await refreshSettings()
+  if (!needsKey.value && props.active) activateBrowsing()
+}
+
+watch(() => props.active, (val) => {
+  if (!val) return
+  void refreshSettings().then(() => {
+    if (!needsKey.value) activateBrowsing()
+  })
 }, { immediate: true })
 
 // ── Version picker ──
@@ -154,7 +186,7 @@ watch(sentinelRef, (el) => {
   observer?.disconnect()
   if (!el) return
   observer = new IntersectionObserver(([entry]) => {
-    if (entry.isIntersecting && civitaiHasMore.value && !civitaiLoading.value) {
+    if (entry?.isIntersecting && civitaiHasMore.value && !civitaiLoading.value) {
       civitaiLoadMore()
     }
   }, { rootMargin: '200px' })
@@ -259,6 +291,23 @@ function openCivitaiMeta(hit: CivitaiHit) {
 </script>
 
 <template>
+  <!-- Gate: 搜索/下载强制要求 API Key, 未配置时呈引导空态 (工具栏与请求均不出现) -->
+  <EmptyState
+    v-if="active && needsKey && !gateLoading"
+    icon="vpn_lock"
+    :title="t('models.civitai.gate.title')"
+    :message="t('models.civitai.gate.message')"
+    class="civitai-gate"
+  >
+    <BaseButton variant="primary" @click="settingsOpen = true">
+      <MsIcon name="settings" /> {{ t('models.civitai.settings.open_btn') }}
+    </BaseButton>
+  </EmptyState>
+
+  <LoadingCenter v-else-if="active && gateLoading && needsKey" />
+
+  <template v-else>
+  <!-- 工具栏: key 已配置才挂载 (gate 态不占页头) -->
   <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
     <SectionToolbar>
       <template #start>
@@ -288,9 +337,17 @@ function openCivitaiMeta(hit: CivitaiHit) {
           teleport
           @change="handleSortChange"
         />
-        <span v-if="civitaiTotalHits > 0" class="toolbar-status">
-          {{ t('models.civitai.total_results', { count: civitaiTotalHits.toLocaleString() }) }}
-        </span>
+      </template>
+      <template #end>
+        <button
+          type="button"
+          class="civitai-settings-btn"
+          :title="t('models.civitai.settings.title')"
+          @click="settingsOpen = true"
+        >
+          <MsIcon name="settings" />
+          <span class="civitai-settings-btn__label">{{ t('models.civitai.settings.title') }}</span>
+        </button>
       </template>
     </SectionToolbar>
   </Teleport>
@@ -346,6 +403,10 @@ function openCivitaiMeta(hit: CivitaiHit) {
     @favorite="handleFavoriteVersion"
     @unfavorite="handleUnfavoriteVersion"
   />
+  </template>
+
+  <!-- CivitAI 设置 (API Key + NSFW) -->
+  <CivitaiSettingsModal v-model="settingsOpen" @saved="onSettingsSaved" />
 </template>
 
 <style scoped>
@@ -359,6 +420,40 @@ function openCivitaiMeta(hit: CivitaiHit) {
 .civitai-sentinel {
   padding: 24px 0;
   min-height: 60px;
+}
+
+/* Key 引导空态 */
+.civitai-gate {
+  min-height: 320px;
+}
+
+/* 工具栏尾部设置按钮 — 与 CivitaiFilterPopover 触发器同规格 */
+.civitai-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--bd);
+  border-radius: var(--input-radius, 6px);
+  background: var(--bg);
+  color: var(--t2);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.civitai-settings-btn:hover {
+  border-color: var(--bd-f);
+  color: var(--t1);
+}
+
+@media (max-width: 420px) {
+  .civitai-settings-btn__label {
+    display: none;
+  }
 }
 
 /* Remote search controls stay on one compact row; narrow screens scroll it. */
@@ -385,10 +480,6 @@ function openCivitaiMeta(hit: CivitaiHit) {
   min-height: 34px;
 }
 
-:deep(.section-toolbar-start .toolbar-status) {
-  flex: 0 0 auto;
-}
-
 @media (max-width: 720px) {
   :deep(.section-toolbar-start .search-input) {
     min-width: 80px;
@@ -397,10 +488,6 @@ function openCivitaiMeta(hit: CivitaiHit) {
   :deep(.section-toolbar-start .civitai-sort) {
     --ctl-w-sm: 110px;
     --ctl-w-md: 120px;
-  }
-
-  :deep(.section-toolbar-start .toolbar-status) {
-    display: none;
   }
 }
 </style>

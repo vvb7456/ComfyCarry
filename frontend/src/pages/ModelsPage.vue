@@ -18,7 +18,7 @@ import DownloadsPanel from '@/components/models/DownloadsPanel.vue'
 import DownloadDirModal from '@/components/models/DownloadDirModal.vue'
 import { useDownloads } from '@/composables/useDownloads'
 import { useDownloadsStore } from '@/stores/downloads'
-import { useCivitaiNsfw } from '@/composables/useCivitaiNsfw'
+import { useCivitaiSettings } from '@/composables/useCivitaiSettings'
 import type { ModelMeta } from '@/types/models'
 import type { LocalModel } from '@/composables/useLocalModels'
 
@@ -28,8 +28,8 @@ const { t } = useI18n()
 const route = useRoute()
 
 // ── NSFW 浏览级别 (hide/blur/show, 模型卡片/详情/收藏共用) ──
-const { load: loadCivitaiNsfw } = useCivitaiNsfw()
-loadCivitaiNsfw()
+const { load: loadCivitaiSettings } = useCivitaiSettings()
+loadCivitaiSettings()
 
 // ── Tabs ──
 // 按「看哪个来源的模型」区分。收藏与下载任务是流水线状态不是浏览目的地,

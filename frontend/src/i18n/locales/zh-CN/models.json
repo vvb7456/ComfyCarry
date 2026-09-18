@@ -89,14 +89,43 @@
     "exact_mode": "精确查找",
     "filter_exact_disabled": "精确查找时不支持筛选和排序",
     "no_results": "没有找到匹配的模型",
-    "total_results": "约 {count} 个结果",
     "select_version": "选择版本 - {name}",
     "select_fav_version": "收藏版本 - {name}",
     "details": "详情",
     "favorite": "收藏",
     "unfavorite": "移除",
     "versions_count": "{count} 个版本",
-    "no_downloadable_versions": "该模型在 CivitAI 上仅供在线生成，作者未提供权重下载。"
+    "no_downloadable_versions": "该模型在 CivitAI 上仅供在线生成，作者未提供权重下载。",
+    "gate": {
+      "title": "需要 CivitAI API Key",
+      "message": "CivitAI 的搜索与下载需要先配置 API Key，用于访问模型库与下载鉴权。"
+    },
+    "settings": {
+      "title": "CivitAI 设置",
+      "open_btn": "设置 API Key",
+      "key_title": "CivitAI API 密钥",
+      "key_link": "CivitAI 账户设置",
+      "key_desc": "在 {link} 中生成，用于模型搜索与下载",
+      "placeholder": "粘贴 API 密钥",
+      "saved": "API Key 已保存",
+      "cleared": "API Key 已清除",
+      "save_failed": "保存失败",
+      "discard_title": "未保存的更改",
+      "discard_message": "CivitAI 设置有未保存的更改，放弃后将恢复原值。",
+      "discard_button": "放弃更改",
+      "nsfw": {
+        "help": "浏览级别决定展示哪些模型；模糊开关决定已出现的 NSFW 图片是否打码。",
+        "level_label": "浏览级别",
+        "level_desc": "决定搜索结果中展示哪些模型",
+        "level": {
+          "pg": "全年龄",
+          "pg_r": "成人",
+          "all": "全部"
+        },
+        "blur": "模糊 NSFW 图片",
+        "blur_desc": "预览图打码，点击后显示原图"
+      }
+    }
   },
   "huggingface": {
     "filter_type": "类型",
@@ -207,7 +236,9 @@
     "path_outside": "路径越界",
     "preview_not_found": "模型预览图不存在",
     "search_timeout": "CivitAI 搜索服务响应超时，请稍后重试",
-    "search_unavailable": "CivitAI 搜索服务不可用：{detail}"
+    "search_unavailable": "CivitAI 搜索服务不可用：{detail}",
+    "civitai_key_required": "尚未配置 CivitAI API Key，请先在 CivitAI 设置中填写",
+    "dl_civitai_key_required": "尚未配置 CivitAI API Key，请先在 CivitAI 设置中填写"
   },
   "msg": {
     "dl_already_exists": "文件已存在：{filename}",

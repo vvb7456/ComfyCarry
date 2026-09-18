@@ -74,7 +74,7 @@ def api_settings_get():
                             else "***"),
         "civitai_key": civitai_key,
         "civitai_key_set": bool(civitai_key),
-        "civitai_nsfw_level": _get_config("civitai_nsfw_level", 7),
+        "civitai_nsfw_level": _get_config("civitai_nsfw_level", 31),
         "civitai_nsfw_blur": _get_config("civitai_nsfw_blur", True),
         "api_key": cfg.API_KEY,
         "comfyui_dir": cfg.COMFYUI_DIR,
@@ -162,7 +162,7 @@ def api_settings_civitai_nsfw():
         _set_config("civitai_nsfw_blur", bool(blur))
     return jsonify({
         "ok": True,
-        "browsing_level": _get_config("civitai_nsfw_level", 7),
+        "browsing_level": _get_config("civitai_nsfw_level", 31),
         "blur": _get_config("civitai_nsfw_blur", True),
     })
 

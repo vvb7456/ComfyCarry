@@ -549,7 +549,10 @@ def _handle_civitai_source(data: dict):
     if not model_input:
         return _err("dl_model_id_required")
 
-    api_key = data.get("api_key") or _get_api_key()
+    # CivitAI 下载强制要求 API Key (与前端 gate 同一语义)
+    api_key = _get_api_key()
+    if not api_key:
+        return _err("dl_civitai_key_required", 403)
     model_type = data.get("model_type", "")
     version_id = data.get("version_id")
     if version_id:

@@ -44,8 +44,12 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 # ====================================================================
 # CivitAI 搜索代理 (Meilisearch CORS bypass)
 # ====================================================================
+# CivitAI 功能 (搜索/下载) 强制要求 API Key — 前端 gate 之外的后端兜底,
+# 与前端引导空态同一语义: 无 key 一律拒绝, 不做匿名降级。
 @bp.route("/api/search", methods=["POST"])
 def proxy_search():
+    if not _get_api_key():
+        return _err("civitai_key_required", 403)
     try:
         data = request.get_json(force=True, silent=True)
         if not data:
@@ -76,14 +80,15 @@ def proxy_search():
 @bp.route("/api/civitai/model/<int:model_id>", methods=["GET"])
 def proxy_civitai_model(model_id: int):
     """代理 CivitAI v1 models/{id} API, 避免前端直接跨域请求."""
+    api_key = _get_api_key()
+    if not api_key:
+        return _err("civitai_key_required", 403)
     try:
-        api_key = _get_api_key()
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "ComfyCarry/1.0",
+            "Authorization": f"Bearer {api_key}",
         }
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
 
         resp = requests.get(
             f"https://civitai.com/api/v1/models/{model_id}",

@@ -12,7 +12,7 @@ import DownloadButton from './DownloadButton.vue'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useDownloads, type VersionDownloadInfo } from '@/composables/useDownloads'
-import { useCivitaiNsfw } from '@/composables/useCivitaiNsfw'
+import { useCivitaiSettings } from '@/composables/useCivitaiSettings'
 import { useClipboard } from '@/composables/useClipboard'
 
 defineOptions({ name: 'ModelMetaModal' })
@@ -35,7 +35,7 @@ const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
 // ── NSFW 浏览级别 (级别未开放的图不进 gallery; 开放且需模糊的加遮罩) ──
-const { levelAllows, shouldBlur } = useCivitaiNsfw()
+const { levelAllows, shouldBlur } = useCivitaiSettings()
 const nsfwRevealed = ref<Set<number>>(new Set())
 
 function isNsfwBlur(img: ModelMetaImage, i: number): boolean {

@@ -89,14 +89,43 @@
     "exact_mode": "Direct lookup",
     "filter_exact_disabled": "Filters and sorting are unavailable for direct model lookup",
     "no_results": "No matching models found",
-    "total_results": "About {count} results",
     "select_version": "Select Version - {name}",
     "select_fav_version": "Favorite Version - {name}",
     "details": "Details",
     "favorite": "Favorite",
     "unfavorite": "Remove",
     "versions_count": "{count} versions",
-    "no_downloadable_versions": "This model is generation-only on CivitAI — the creator does not offer weight downloads."
+    "no_downloadable_versions": "This model is generation-only on CivitAI — the creator does not offer weight downloads.",
+    "gate": {
+      "title": "CivitAI API Key Required",
+      "message": "Searching and downloading from CivitAI requires an API Key for library access and download authentication."
+    },
+    "settings": {
+      "title": "CivitAI Settings",
+      "open_btn": "Set API Key",
+      "key_title": "CivitAI API Key",
+      "key_link": "CivitAI account settings",
+      "key_desc": "Generated from {link}; used for model search and downloads",
+      "placeholder": "Paste API Key",
+      "saved": "API Key saved",
+      "cleared": "API Key cleared",
+      "save_failed": "Save failed",
+      "discard_title": "Unsaved Changes",
+      "discard_message": "CivitAI settings have unsaved changes; discarding will restore the previous values.",
+      "discard_button": "Discard Changes",
+      "nsfw": {
+        "help": "Browsing level controls which models are shown; the blur switch masks NSFW images of shown content.",
+        "level_label": "Browsing level",
+        "level_desc": "Which models are shown in search results",
+        "level": {
+          "pg": "PG only",
+          "pg_r": "PG–R",
+          "all": "All"
+        },
+        "blur": "Blur NSFW images",
+        "blur_desc": "Blur previews, click to reveal"
+      }
+    }
   },
   "huggingface": {
     "filter_type": "Type",
@@ -207,7 +236,9 @@
     "path_outside": "Path out of bounds",
     "preview_not_found": "Model preview not found",
     "search_timeout": "CivitAI search timed out, please try again later",
-    "search_unavailable": "CivitAI search service unavailable: {detail}"
+    "search_unavailable": "CivitAI search service unavailable: {detail}",
+    "civitai_key_required": "CivitAI API Key is not configured — set it in CivitAI settings first",
+    "dl_civitai_key_required": "CivitAI API Key is not configured — set it in CivitAI settings first"
   },
   "msg": {
     "dl_already_exists": "File already exists: {filename}",
