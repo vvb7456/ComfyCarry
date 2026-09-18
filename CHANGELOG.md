@@ -2,6 +2,33 @@
 
 本文件记录各正式版本的变更。Release 发布时由 release.yml 自动提取对应 tag 的段落作为 Release 说明。
 
+## v0.8.2 — 2026-09-18
+
+### 新增
+
+- 内容生成页产品导览：聚光遮罩六步走查（任务架构 / 提示词 / 基础与高级设置 / 运行 / 功能模块 / 队列历史），ComfyUI 就绪后首次进入自动触发一次，页面标题旁 `?` 图标可随时重放
+- 插件操作改为阻塞式执行弹窗：安装 / 卸载 / 更新 / 开关 / Git 安装统一为确认后阻塞等待 ComfyUI-Manager 队列完成，SSE 与轮询双信号收尾并给出成功 / 失败 / 超时三态，成功后按待重启 diff 提示重启
+- CivitAI 搜索与下载强制要求 API Key：未配置时后端搜索代理、模型详情与下载入口直接返回 403 不做匿名降级，模型页呈引导空态并屏蔽请求，新增 CivitAI 设置弹窗承载 key 与 NSFW 浏览级别
+- 公共隧道停机回收自愈：restore 先向后端校验隧道存活，已失效或无法确认时复用旧子域名自动重新注册
+
+### 重构
+
+- 设置域回迁各功能页：LLM / 提示词 / CivitAI 配置就近迁入内容生成页与模型页弹窗，设置页精简为面板与关于单页；新增 `useModalCloseGuard` 统一 SSH / 同步 / 隧道设置弹窗的未保存关闭确认
+- 前端开启 TypeScript 严格检查（`noUncheckedIndexedAccess` / `noImplicitOverride` / `noFallthroughCasesInSwitch` / `noUnusedLocals` / `noUnusedParameters`）并收敛类型
+- 统一未知异常的错误信息提取（`utils/errorMessage.ts`），各 composable 与组件将 `e: any` 收敛为 unknown
+- 模型已下载状态收敛到下载按钮，移除卡片与版本列表/收藏列表的已下载 badge
+
+### 修复
+
+- 插件页确认弹窗与操作收尾体验修正：确认标题统一「插件变更」，列表加载请求改静默消除重启窗口期的重复连接错误 toast，ComfyUI-Manager 自身行移除启用 / 禁用 / 卸载按钮
+- 内容生成页 token 芯片编辑态占位与删除按钮悬停显示修正
+- 纯图标按钮补齐 hover 提示：`BaseButton` icon-only 缺省取 aria-label，弹窗 / 抽屉 / 下拉等原生图标按钮同步补 title
+
+### 变更
+
+- 移除插件 `update_all` 端点，操作响应文案统一为 submitted
+- 移除设置页分区导航、scrollspy 与模块级保存，移除 `useUnsavedGuard` / `useSettingsGuard` / `UnsavedBanner`
+
 ## v0.8.1 — 2026-09-16
 
 ### 新增
