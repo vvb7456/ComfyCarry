@@ -33,7 +33,7 @@ function mapInstalledPlugins(
 ): InstalledPlugin[] {
   return Object.entries(installedData).map(([dirName, inst]) => {
     const cnrId = inst.cnr_id || ''
-    const registryEntry = availablePlugins[cnrId] || {}
+    const registryEntry: PluginInfo = availablePlugins[cnrId] ?? {}
 
     return {
       dirName,
@@ -41,7 +41,7 @@ function mapInstalledPlugins(
       title: registryEntry.title || dirName,
       description: registryEntry.description || '',
       repository: registryEntry.repository || registryEntry.reference || (inst.aux_id ? `https://github.com/${inst.aux_id}` : ''),
-      author: registryEntry.author || (inst.aux_id ? inst.aux_id.split('/')[0] : ''),
+      author: registryEntry.author ?? (inst.aux_id?.split('/')[0] ?? ''),
       stars: registryEntry.stars ?? 0,
       ver: inst.ver || '',
       activeVersion: registryEntry.active_version || inst.ver || '',
@@ -162,7 +162,7 @@ export function usePluginFiltering() {
     if (!element) return
 
     observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && browseStart.value < filteredPlugins.value.length) {
+      if (entries[0]?.isIntersecting && browseStart.value < filteredPlugins.value.length) {
         browseStart.value += PAGE_SIZE
       }
     }, { rootMargin: '300px' })

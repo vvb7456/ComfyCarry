@@ -59,6 +59,9 @@ export interface HuggingFaceFile {
   sha256: string
 }
 
+/** 手动补充条目的 mk() 工厂返回类型 (HuggingFaceModel 完整形态) */
+type ManualHfModel = HuggingFaceModel & { versions: HuggingFaceVersion[] }
+
 export interface HuggingFaceVersion {
   id: number
   name: string
@@ -9231,14 +9234,14 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
     const t = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/'
     const repo = 'https://huggingface.co/Comfy-Org/MiniMax-H3'
     const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
-                arch: string, modelType: string, fn: string, path: string, size: number,
-                sha: string, verName: string, desc: string, thumb: string) => {
-      const v = { id: vid, name: verName, baseModel, images: [{ url: thumb, type: 'image' as const }],
-                  trainedWords: [] as string[], hashes: { SHA256: sha },
+                arch: string, modelType: HuggingFaceFile['modelType'], fn: string, path: string, size: number,
+                sha: string, verName: string, desc: string, thumb: string): ManualHfModel => {
+      const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: [{ url: thumb, type: 'image' }],
+                  trainedWords: [], hashes: { SHA256: sha },
                   file: { url: `${repo}/resolve/main/${path}`, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
       return { id, name, type, metrics: { downloadCount: 3139920, thumbsUpCount: 886 },
-               images: [{ url: thumb, type: 'image' as const }], user: { username: 'Comfy-Org' },
-               sourceUrl: repo, description: desc, version: v, versions: [v] } as any
+               images: [{ url: thumb, type: 'image' }], user: { username: 'Comfy-Org' },
+               sourceUrl: repo, description: { zh: desc, en: desc }, version: v, versions: [v] }
     }
     return [
       mk(-100245, -10000345, 'MiniMax H3 FL2V FP8', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
@@ -9287,16 +9290,16 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
   // 不含 custom_nodes 辅助件 (DWPose/DepthAnything/WD tagger) 与非 HF 源 SAM。
   ...(() => {
     const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
-                arch: string, modelType: string, fn: string, repo: string, path: string,
+                arch: string, modelType: HuggingFaceFile['modelType'], fn: string, repo: string, path: string,
                 size: number, sha: string, verName: string, desc: string,
-                thumb: string, dl: number, likes: number, author: string) => {
-      const img = thumb ? [{ url: thumb, type: 'image' as const }] : []
-      const v = { id: vid, name: verName, baseModel, images: [...img] as any,
-                  trainedWords: [] as string[], hashes: { SHA256: sha },
+                thumb: string, dl: number, likes: number, author: string): ManualHfModel => {
+      const img: CivitaiImage[] = thumb ? [{ url: thumb, type: 'image' }] : []
+      const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: img,
+                  trainedWords: [], hashes: { SHA256: sha },
                   file: { url: `https://huggingface.co/${repo}/resolve/main/${path}`, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
       return { id, name, type, metrics: { downloadCount: dl, thumbsUpCount: likes },
-               images: [...img] as any, user: { username: author },
-               sourceUrl: `https://huggingface.co/${repo}`, description: desc, version: v, versions: [v] } as any
+               images: img, user: { username: author },
+               sourceUrl: `https://huggingface.co/${repo}`, description: { zh: desc, en: desc }, version: v, versions: [v] }
     }
     const wt = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/'
     return [
@@ -9377,16 +9380,16 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
   // ── 未收录补充: A类(Krea-2/Mage-Flow/Qwen3-VL/MelBandRoFormer) + B类图像(CLIP-Vision/Redux/SigCLIP/USO) ──
   ...(() => {
     const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
-                arch: string, modelType: string, fn: string, repo: string, path: string,
+                arch: string, modelType: HuggingFaceFile['modelType'], fn: string, repo: string, path: string,
                 size: number, sha: string, verName: string, desc: string, thumb: string,
-                dl: number, likes: number, author: string) => {
-      const img = thumb ? [{ url: thumb, type: 'image' as const }] : []
-      const v = { id: vid, name: verName, baseModel, images: [...img] as any,
-                  trainedWords: [] as string[], hashes: { SHA256: sha },
+                dl: number, likes: number, author: string): ManualHfModel => {
+      const img: CivitaiImage[] = thumb ? [{ url: thumb, type: 'image' }] : []
+      const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: img,
+                  trainedWords: [], hashes: { SHA256: sha },
                   file: { url: 'https://huggingface.co/' + repo + '/resolve/main/' + path, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
       return { id, name, type, metrics: { downloadCount: dl, thumbsUpCount: likes },
-               images: [...img] as any, user: { username: author },
-               sourceUrl: 'https://huggingface.co/' + repo, description: desc, version: v, versions: [v] } as any
+               images: img, user: { username: author },
+               sourceUrl: 'https://huggingface.co/' + repo, description: { zh: desc, en: desc }, version: v, versions: [v] }
     }
     return [
     mk(-100250, -10000350, 'Qwen3-VL 4B FP8', 'TextEncoder', 'Krea 2', 'krea2',

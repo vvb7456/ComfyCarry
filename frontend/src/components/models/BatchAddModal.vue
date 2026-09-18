@@ -6,6 +6,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import { useToast } from '@/composables/useToast'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useDownloads, type FavoriteItem } from '@/composables/useDownloads'
+import type { CivitaiApiModel } from '@/composables/useCivitaiSearch'
 
 defineOptions({ name: 'BatchAddModal' })
 
@@ -44,8 +45,9 @@ const parsedIds = computed(() => {
     if (!text) continue
     const urlMatch = text.match(CIVITAI_URL_RE)
     if (urlMatch) {
-      const id = urlMatch[1]
+      const id = urlMatch[1] ?? ''
       const vid = urlMatch[2]
+      if (!id) continue
       const key = vid ? `${id}:${vid}` : id
       if (!seen.has(key)) { seen.add(key); ids.push({ modelId: id, versionId: vid }) }
       continue
@@ -71,11 +73,11 @@ async function submit() {
     for (const { modelId, versionId } of parsedIds.value) {
       // Fetch model info via backend proxy (avoids CORS + auth issues)
       // 逐条探测静默失败: 由末尾的汇总 toast 统一汇报, 否则 N 个无效 ID 会弹 N 条错误
-      const data = await get<any>(`/api/civitai/model/${modelId}`, { silent: true })
+      const data = await get<CivitaiApiModel>(`/api/civitai/model/${modelId}`, { silent: true })
       if (!data) { failed++; continue }
       const versions = data.modelVersions || []
       const ver = versionId
-        ? versions.find((v: any) => String(v.id) === versionId) || versions[0]
+        ? versions.find(v => String(v.id) === versionId) || versions[0]
         : versions[0]
       const imgs = ver?.images || data.images || []
       const imgUrl = imgs[0]?.url
@@ -90,7 +92,7 @@ async function submit() {
         versionId: ver?.id,
         versionName: ver?.name,
         baseModel: ver?.baseModel,
-        allVersions: versions.map((v: any) => ({ id: v.id, name: v.name, baseModel: v.baseModel })),
+        allVersions: versions.map(v => ({ id: v.id, name: v.name || '', baseModel: v.baseModel })),
       }
       if (await addFavorite(item)) added++
       else failed++
