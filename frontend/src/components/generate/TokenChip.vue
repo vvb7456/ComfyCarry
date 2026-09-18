@@ -157,6 +157,9 @@ function onDragEnd(e: DragEvent) {
 
 // ── Inline editing ─────────────────────────────────────────────
 const editing = ref(false)
+const editValue = ref('')
+// 编辑期间的最小宽度: 取原文字宽度, 避免删空后 chip 塌缩 (参考 field-sizing 的 min-size 边界实践)
+const editMinWidth = ref(0)
 const editInputRef = ref<HTMLInputElement | null>(null)
 const chipTextRef = ref<HTMLElement | null>(null)
 let clickTimer: ReturnType<typeof setTimeout> | null = null
@@ -187,21 +190,19 @@ function onChipDblClick() {
 
 function startEditing() {
   if (!props.token.enabled || props.token.pending) return
-  // Capture current text element width before switching to input
+  // Capture current text geometry before switching to input (for cursor placement + min width)
   const textEl = chipTextRef.value
-  const textWidth = textEl?.offsetWidth ?? 60
+  editMinWidth.value = textEl?.offsetWidth ?? 0
+  editValue.value = displayText.value
   editing.value = true
   nextTick(() => {
     if (editInputRef.value) {
-      const text = displayText.value
-      editInputRef.value.value = text
-      editInputRef.value.style.width = `${textWidth}px`
       editInputRef.value.focus()
       // Place cursor at approximate click position instead of selecting all
       if (pendingClickX !== null && textEl) {
         const rect = textEl.getBoundingClientRect()
         const ratio = Math.max(0, Math.min(1, (pendingClickX - rect.left) / rect.width))
-        const pos = Math.round(ratio * text.length)
+        const pos = Math.round(ratio * editValue.value.length)
         editInputRef.value.setSelectionRange(pos, pos)
       }
       pendingClickX = null
@@ -210,7 +211,7 @@ function startEditing() {
 }
 
 function commitEdit() {
-  const val = editInputRef.value?.value.trim()
+  const val = editValue.value.trim()
   editing.value = false
   if (val && val !== displayText.value) {
     emit('update:tag', props.token.id, val)
@@ -273,6 +274,7 @@ function cancelEdit() {
       <input
         v-if="editing"
         ref="editInputRef"
+        v-model="editValue"
         class="chip-edit-input"
         @blur="commitEdit"
         @keydown.enter.prevent="commitEdit"
@@ -280,10 +282,16 @@ function cancelEdit() {
         @dblclick.stop
         @mousedown.stop
       />
-      <template v-else>
-        <Spinner v-if="isPending" size="xs" />
-        <span ref="chipTextRef" class="chip-text" @click="onTextClick" @dblclick="!editing && onTextDblClick($event)">{{ displayText }}</span>
-      </template>
+      <Spinner v-if="isPending && !editing" size="xs" />
+      <!-- 编辑态: 用输入内容撑住 chip 宽高, 并以原文字宽度为下限防止删空后塌缩 -->
+      <span
+        ref="chipTextRef"
+        class="chip-text"
+        :class="{ 'chip-text--ghost': editing }"
+        :style="editing ? { minWidth: `${editMinWidth}px` } : undefined"
+        @click="onTextClick"
+        @dblclick="!editing && onTextDblClick($event)"
+      >{{ editing ? editValue : displayText }}</span>
     </div>
 
     <!-- Bottom row: translate text or clickable translate action -->
@@ -375,10 +383,11 @@ function cancelEdit() {
 
 /* ── Top row: colored bg + tag text ── */
 .chip-top {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 20px 3px 10px;
+  padding: 3px 16px;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--t1);
@@ -397,7 +406,20 @@ function cancelEdit() {
   text-align: center;
 }
 
+/* 编辑态幽灵文字: 仅用于撑住布局, 不可见且不拦截事件。
+   最小高度保证删空后仍保留一行高度。 */
+.chip-text--ghost {
+  visibility: hidden;
+  pointer-events: none;
+  min-width: 2em;
+  min-height: 1.4em;
+}
+
+/* 编辑态: 输入框脱离 flex 居中, 铺满整个 chip-top (含右内边距), 便于点击定位 */
 .chip-edit-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   border: none;
   outline: none;
   background: color-mix(in srgb, var(--ac) 10%, transparent);
@@ -407,7 +429,8 @@ function cancelEdit() {
   font-weight: 500;
   font-family: inherit;
   line-height: inherit;
-  padding: 0;
+  padding: 0 16px;
+  box-sizing: border-box;
   min-width: 2em;
   text-align: center;
 }
@@ -443,8 +466,8 @@ function cancelEdit() {
 /* ── Close button ── */
 .chip-close {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -457,8 +480,22 @@ function cancelEdit() {
   color: var(--t3);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color .15s, background .15s;
+  /* 默认隐藏, 悬停/聚焦时才出现 */
+  opacity: 0;
+  pointer-events: none;
+  transition: color .15s, background .15s, opacity .12s;
   z-index: 1;
+}
+.token-chip:hover .chip-close,
+.chip-close:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* 编辑态下输入框占满 chip-top, 完全隐藏移除按钮 (需覆盖 hover 规则的特异性) */
+.token-chip.token-chip--editing .chip-close,
+.token-chip.token-chip--editing:hover .chip-close {
+  opacity: 0;
+  pointer-events: none;
 }
 .chip-close:hover {
   color: var(--t1);
