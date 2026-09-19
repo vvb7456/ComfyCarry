@@ -119,6 +119,8 @@ defineExpose({ clearFile })
       ref="fileInput"
       type="file"
       :accept="accept"
+      :disabled="disabled"
+      tabindex="-1"
       class="upload-zone__input"
       @change="onInputChange"
     >
@@ -139,13 +141,19 @@ defineExpose({ clearFile })
     </div>
 
     <!-- Drop mode: empty -->
-    <div v-else-if="mode === 'drop'" class="upload-zone__body" @click="triggerPick">
+    <button
+      v-else-if="mode === 'drop'"
+      type="button"
+      class="upload-zone__body"
+      :disabled="disabled"
+      @click="triggerPick"
+    >
       <slot>
         <MsIcon name="upload_file" color="none" class="upload-zone__icon" />
-        <p class="upload-zone__text">{{ t('common.upload.drop_hint') }}</p>
-        <p class="upload-zone__hint">{{ t('common.upload.click_hint') }}</p>
+        <span class="upload-zone__text">{{ t('common.upload.drop_hint') }}</span>
+        <span class="upload-zone__hint">{{ t('common.upload.click_hint') }}</span>
       </slot>
-    </div>
+    </button>
 
     <!-- Pick mode: with preview -->
     <template v-else-if="isPreview">
@@ -164,21 +172,38 @@ defineExpose({ clearFile })
 
     <!-- Pick mode: no preview -->
     <template v-else>
-      <div class="upload-zone__pick" @click="$emit('pick')">
+      <button
+        type="button"
+        class="upload-zone__pick"
+        :disabled="disabled"
+        @click="$emit('pick')"
+      >
         <MsIcon :name="pickIcon" color="none" />
         <span>{{ pickLabel || t('common.upload.pick_label') }}</span>
-      </div>
+      </button>
       <div class="upload-zone__divider">{{ t('common.upload.or_divider') }}</div>
       <!-- Action variant: custom bottom action (e.g. open preprocess modal) -->
-      <div v-if="actionLabel" class="upload-zone__drop" @click.stop="$emit('action')">
+      <button
+        v-if="actionLabel"
+        type="button"
+        class="upload-zone__drop"
+        :disabled="disabled"
+        @click.stop="$emit('action')"
+      >
         <MsIcon :name="actionIcon" color="none" />
         <span>{{ actionLabel }}</span>
-      </div>
+      </button>
       <!-- Default: upload local file -->
-      <div v-else class="upload-zone__drop" @click="triggerPick">
+      <button
+        v-else
+        type="button"
+        class="upload-zone__drop"
+        :disabled="disabled"
+        @click="triggerPick"
+      >
         <MsIcon name="add_photo_alternate" color="none" />
         <span>{{ uploadLabel || t('common.upload.upload_label') }}</span>
-      </div>
+      </button>
     </template>
   </div>
 </template>
@@ -203,7 +228,15 @@ defineExpose({ clearFile })
 .upload-zone--loaded,
 .upload-zone--preview { cursor: default; }
 
-.upload-zone__input { display: none; }
+.upload-zone__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 .upload-zone__body {
   display: flex;
@@ -213,11 +246,15 @@ defineExpose({ clearFile })
   padding: 40px 20px;
   text-align: center;
   width: 100%;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .upload-zone__icon { font-size: 48px; color: var(--t3); margin-bottom: 8px; }
-.upload-zone__text { color: var(--t2); font-size: .9rem; margin: 0; }
-.upload-zone__hint { color: var(--t3); font-size: .8rem; margin: 0; }
+.upload-zone__text { display: block; color: var(--t2); font-size: .9rem; margin: 0; }
+.upload-zone__hint { display: block; color: var(--t3); font-size: .8rem; margin: 0; }
 
 .upload-zone--compact .upload-zone__body { padding: 16px 14px; flex-direction: row; gap: 8px; }
 .upload-zone--compact .upload-zone__icon { font-size: 24px; margin-bottom: 0; }
@@ -268,14 +305,23 @@ defineExpose({ clearFile })
 .upload-zone__pick,
 .upload-zone__drop {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font: inherit;
   color: var(--t3); font-size: var(--text-xs);
   flex: 1; width: 100%; justify-content: center;
+  background: none; border: none;
   cursor: pointer; transition: background .15s;
 }
 .upload-zone__pick:hover,
 .upload-zone__drop:hover { background: color-mix(in srgb, var(--ac) 5%, transparent); }
 .upload-zone__pick .ms,
 .upload-zone__drop .ms { font-size: 2rem; opacity: .4; }
+
+.upload-zone__body:focus-visible,
+.upload-zone__pick:focus-visible,
+.upload-zone__drop:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: -2px;
+}
 
 .upload-zone__divider {
   width: 80%; text-align: center; font-size: .7rem; color: var(--t3);
