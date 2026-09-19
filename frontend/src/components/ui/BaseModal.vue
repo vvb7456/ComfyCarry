@@ -23,6 +23,7 @@ export function unlockBodyScroll() {
 import { computed, watch, ref, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
+import { useModalFocus, queryFocusable } from './useModalFocus'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'BaseModal' })
@@ -80,6 +81,7 @@ const show = computed({
 const boxRef = ref<HTMLElement | null>(null)
 const hasBodyLock = ref(false)
 const titleId = `base-modal-title-${++modalIdCounter}`
+const { captureTrigger, restoreTrigger, trapTab } = useModalFocus()
 
 // Size presets
 const sizeWidths: Record<string, string> = { sm: '360px', md: '520px', lg: '720px', xl: '900px', xxl: '1400px', full: '95vw' }
@@ -105,12 +107,17 @@ watch(() => props.modelValue, (open) => {
       lockBodyScroll()
       hasBodyLock.value = true
     }
+    captureTrigger()
     nextTick(() => {
-      boxRef.value?.focus()
+      // 首个可操作元素优先, 纯展示弹窗焦点停在容器本身
+      const target = boxRef.value ? queryFocusable(boxRef.value)[0] : undefined
+      if (target) target.focus()
+      else boxRef.value?.focus()
     })
   } else if (hasBodyLock.value) {
     unlockBodyScroll()
     hasBodyLock.value = false
+    restoreTrigger()
   }
 })
 
@@ -143,6 +150,14 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && canCloseEsc.value) {
     e.stopPropagation()
     close()
+    return
+  }
+  // Tab 圈定: 焦点在弹窗内 (含容器本身) 时循环; 在外部浮层时不干预
+  if (e.key === 'Tab' && boxRef.value) {
+    const active = document.activeElement
+    if (active === boxRef.value || boxRef.value.contains(active)) {
+      trapTab(e, boxRef.value)
+    }
   }
 }
 

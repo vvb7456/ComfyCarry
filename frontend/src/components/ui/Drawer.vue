@@ -10,10 +10,11 @@
  *    首开才挂载由调用方用 v-if 控制, 挂载后不再卸载。
  *  - 右侧滑出而非居中弹窗, 260ms ease 滑入; 窄屏 (<640px) 100vw。
  */
-import { computed, watch, ref, onUnmounted } from 'vue'
+import { computed, watch, ref, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 import { lockBodyScroll, unlockBodyScroll } from './BaseModal.vue'
+import { useModalFocus, queryFocusable } from './useModalFocus'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'Drawer' })
@@ -39,6 +40,8 @@ const show = computed({
 })
 
 const hasBodyLock = ref(false)
+const panelRef = ref<HTMLElement | null>(null)
+const { captureTrigger, restoreTrigger, trapTab } = useModalFocus()
 
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -46,9 +49,17 @@ watch(() => props.modelValue, (open) => {
       lockBodyScroll()
       hasBodyLock.value = true
     }
+    captureTrigger()
+    nextTick(() => {
+      // 首个可操作元素优先 (常驻挂载, 需等面板可见性类切换后测可见性)
+      const target = panelRef.value ? queryFocusable(panelRef.value)[0] : undefined
+      if (target) target.focus()
+      else panelRef.value?.focus()
+    })
   } else if (hasBodyLock.value) {
     unlockBodyScroll()
     hasBodyLock.value = false
+    restoreTrigger()
   }
 })
 
@@ -79,6 +90,14 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     e.stopPropagation()
     close()
+    return
+  }
+  // Tab 圈定: 焦点在抽屉内 (含容器本身) 时循环; 在外部浮层时不干预
+  if (e.key === 'Tab' && panelRef.value) {
+    const active = document.activeElement
+    if (active === panelRef.value || panelRef.value.contains(active)) {
+      trapTab(e, panelRef.value)
+    }
   }
 }
 </script>
@@ -95,6 +114,7 @@ function onKeydown(e: KeyboardEvent) {
       tabindex="-1"
     >
       <aside
+        ref="panelRef"
         class="drawer-panel"
         :class="{ 'drawer-panel--open': show }"
         :style="{ width: width }"
