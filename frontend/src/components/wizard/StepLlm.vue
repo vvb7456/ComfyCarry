@@ -72,12 +72,15 @@ function onPrev() { prevStep() }
         {{ t('wizard.step6.provider') }}
         <HelpTip :text="t('wizard.step6.provider_help')" />
       </template>
-      <BaseSelect
-        :model-value="config.llm_provider"
-        :options="providerOptions"
-        :placeholder="t('wizard.step6.select_provider')"
-        @update:model-value="handleProviderChange"
-      />
+      <template #default="{ id }">
+        <BaseSelect
+          :id="id"
+          :model-value="config.llm_provider"
+          :options="providerOptions"
+          :placeholder="t('wizard.step6.select_provider')"
+          @update:model-value="handleProviderChange"
+        />
+      </template>
     </FormField>
 
     <FormField v-if="showBaseUrl">
@@ -85,37 +88,46 @@ function onPrev() { prevStep() }
         {{ t('wizard.step6.base_url') }}
         <HelpTip :text="baseUrlHelp" />
       </template>
-      <input
-        v-model="config.llm_base_url"
-        type="text"
-        class="form-input"
-        :placeholder="baseUrlPlaceholder"
-      />
+      <template #default="{ id }">
+        <input
+          :id="id"
+          v-model="config.llm_base_url"
+          type="text"
+          class="form-input"
+          :placeholder="baseUrlPlaceholder"
+        />
+      </template>
     </FormField>
 
     <FormField :label="t('wizard.step6.api_key')">
-      <SecretInput
-        v-model="config.llm_api_key"
-        :placeholder="t('wizard.step6.api_key_placeholder')"
-      />
+      <template #default="{ id }">
+        <SecretInput
+          :id="id"
+          v-model="config.llm_api_key"
+          :placeholder="t('wizard.step6.api_key_placeholder')"
+        />
+      </template>
     </FormField>
 
     <div v-if="showModelGroup" class="step-llm__model-group">
       <FormField :label="t('wizard.step6.model')">
-        <div class="step-llm__model-row">
-          <BaseSelect
-            v-model="config.llm_model"
-            :options="modelOptions"
-            searchable
-            allow-custom
-            :placeholder="t('wizard.step6.model_placeholder')"
-            :search-placeholder="t('wizard.step6.search_model')"
-            class="step-llm__model-select"
-          />
-          <BaseButton variant="default" size="sm" :loading="modelsLoading" @click="handleFetchModels">
-            {{ t('wizard.step6.fetch_models') }}
-          </BaseButton>
-        </div>
+        <template #default="{ id }">
+          <div class="step-llm__model-row">
+            <BaseSelect
+              :id="id"
+              v-model="config.llm_model"
+              :options="modelOptions"
+              searchable
+              allow-custom
+              :placeholder="t('wizard.step6.model_placeholder')"
+              :search-placeholder="t('wizard.step6.search_model')"
+              class="step-llm__model-select"
+            />
+            <BaseButton variant="default" size="sm" :loading="modelsLoading" @click="handleFetchModels">
+              {{ t('wizard.step6.fetch_models') }}
+            </BaseButton>
+          </div>
+        </template>
         <template #below>
           <AlertBanner v-if="modelsError" tone="danger" dense>
             {{ modelsError }}

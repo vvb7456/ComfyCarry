@@ -25,7 +25,7 @@ import MsIcon from '../ui/MsIcon.vue'
 import type { IconName } from '@/config/icon-codepoints'
 import { isIconName } from '@/config/icons'
 
-defineOptions({ name: 'BaseSelect' })
+defineOptions({ name: 'BaseSelect', inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
   /** Current value (v-model). Array when `multiple` is on. */
@@ -442,6 +442,7 @@ onBeforeUnmount(() => {
       aria-haspopup="listbox"
       :aria-controls="listboxId"
       :aria-disabled="disabled || undefined"
+      v-bind="$attrs"
       @click="toggle"
     >
       <img v-if="selectedOption?.logo" :src="selectedOption.logo" class="base-select__logo" alt="">

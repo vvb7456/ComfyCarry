@@ -271,26 +271,31 @@ function requestClose() {
               {{ getParamLabel(paramKey, paramsSchema[paramKey]) }}
               <HelpTip v-if="paramsSchema[paramKey].help" :text="getParamHelp(paramKey, paramsSchema[paramKey])" />
             </template>
-            <BaseSelect
-              v-if="paramsSchema[paramKey].type === 'select' || paramKey === 'cache_lru_size'"
-              :model-value="String(paramsCurrent[paramKey])"
-              :options="getParamOptions(paramKey, paramsSchema[paramKey])"
-              :disabled="!paramEnabled(paramKey)"
-              @update:model-value="v => paramsCurrent[paramKey] = v"
-            />
-            <NumberInput
-              v-else-if="paramsSchema[paramKey].type === 'number'"
-              :model-value="Number(paramsCurrent[paramKey]) || 0"
-              :spinners="false"
-              :disabled="!paramEnabled(paramKey)"
-              @update:model-value="v => paramsCurrent[paramKey] = v"
-            />
-            <BaseInput
-              v-else
-              :model-value="String(paramsCurrent[paramKey] ?? '')"
-              :disabled="!paramEnabled(paramKey)"
-              @update:model-value="v => paramsCurrent[paramKey] = v"
-            />
+            <template #default="{ id }">
+              <BaseSelect
+                v-if="paramsSchema[paramKey].type === 'select' || paramKey === 'cache_lru_size'"
+                :id="id"
+                :model-value="String(paramsCurrent[paramKey])"
+                :options="getParamOptions(paramKey, paramsSchema[paramKey])"
+                :disabled="!paramEnabled(paramKey)"
+                @update:model-value="v => paramsCurrent[paramKey] = v"
+              />
+              <NumberInput
+                v-else-if="paramsSchema[paramKey].type === 'number'"
+                :id="id"
+                :model-value="Number(paramsCurrent[paramKey]) || 0"
+                :spinners="false"
+                :disabled="!paramEnabled(paramKey)"
+                @update:model-value="v => paramsCurrent[paramKey] = v"
+              />
+              <BaseInput
+                v-else
+                :id="id"
+                :model-value="String(paramsCurrent[paramKey] ?? '')"
+                :disabled="!paramEnabled(paramKey)"
+                @update:model-value="v => paramsCurrent[paramKey] = v"
+              />
+            </template>
           </FormField>
         </template>
 
@@ -303,11 +308,14 @@ function requestClose() {
             {{ t('comfyui.params.extra_args') }}
             <HelpTip :text="t('comfyui.params.extra_args_desc')" />
           </template>
-          <BaseInput
-            v-model="extraArgs"
-            mono
-            :placeholder="t('comfyui.params.extra_args_placeholder')"
-          />
+          <template #default="{ id }">
+            <BaseInput
+              :id="id"
+              v-model="extraArgs"
+              mono
+              :placeholder="t('comfyui.params.extra_args_placeholder')"
+            />
+          </template>
         </FormField>
       </div>
     </template>

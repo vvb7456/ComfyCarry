@@ -67,19 +67,27 @@ function onPrev() {
     </AlertBanner>
 
     <FormField :label="t('wizard.step1.password')">
-      <SecretInput
-        v-model="config.password"
-        is-password
-        :placeholder="t('wizard.step1.password_placeholder')"
-      />
+      <template #default="{ id }">
+        <SecretInput
+          :id="id"
+          v-model="config.password"
+          is-password
+          :placeholder="t('wizard.step1.password_placeholder')"
+        />
+      </template>
     </FormField>
 
     <FormField :label="t('wizard.step1.confirm_password')" :error="passwordMismatch ? t('wizard.step1.mismatch') : undefined">
-      <SecretInput
-        v-model="confirmPassword"
-        is-password
-        :placeholder="t('wizard.step1.confirm_placeholder')"
-      />
+      <template #default="{ id, describedby, invalid }">
+        <SecretInput
+          :id="id"
+          v-model="confirmPassword"
+          is-password
+          :placeholder="t('wizard.step1.confirm_placeholder')"
+          :aria-describedby="describedby"
+          :aria-invalid="invalid"
+        />
+      </template>
     </FormField>
 
     <!-- SSH section -->

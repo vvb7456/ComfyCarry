@@ -875,33 +875,40 @@ defineExpose({
 
       <div class="v-identity">
         <FormField :label="t('sync.remote.name')" density="compact">
-          <input
-            v-model="name"
-            type="text"
-            class="form-input"
-            :placeholder="t('sync.remote.name_placeholder')"
-            autocomplete="off"
-          >
+          <template #default="{ id }">
+            <input
+              :id="id"
+              v-model="name"
+              type="text"
+              class="form-input"
+              :placeholder="t('sync.remote.name_placeholder')"
+              autocomplete="off"
+            >
+          </template>
         </FormField>
 
         <!-- 挂载根 select 恒占位 (驱动器/存储桶), 选项延迟加载, 避免布局跳动 -->
         <FormField v-if="hasDrives || isS3" :label="selectLabel" density="compact">
-          <BaseSelect
-            v-if="hasDrives"
-            v-model="selectedDrive"
-            :options="driveOptions"
-            :disabled="drivesLoading || !!drivesError"
-            :placeholder="drivesLoading ? t('common.loading') : ''"
-            teleport
-          />
-          <BaseSelect
-            v-else
-            v-model="bucket"
-            :options="bucketOptions"
-            :disabled="bucketsLoading || !!bucketsError"
-            :placeholder="bucketsLoading ? t('common.loading') : t('sync.dir.bucket_placeholder')"
-            teleport
-          />
+          <template #default="{ id }">
+            <BaseSelect
+              v-if="hasDrives"
+              :id="id"
+              v-model="selectedDrive"
+              :options="driveOptions"
+              :disabled="drivesLoading || !!drivesError"
+              :placeholder="drivesLoading ? t('common.loading') : ''"
+              teleport
+            />
+            <BaseSelect
+              v-else
+              :id="id"
+              v-model="bucket"
+              :options="bucketOptions"
+              :disabled="bucketsLoading || !!bucketsError"
+              :placeholder="bucketsLoading ? t('common.loading') : t('sync.dir.bucket_placeholder')"
+              teleport
+            />
+          </template>
         </FormField>
 
         <AlertBanner v-if="selectError" role="alert" tone="danger" dense class="v-alert">
@@ -920,24 +927,27 @@ defineExpose({
         <!-- 同步文件夹 (与这份存储绑定): 预设规则路径的锚点, 不能是存储根。
              只读 —— 仅经目录浏览器选择, 预防手输奇怪路径 -->
         <FormField :label="t('sync.dir.root_label')" density="compact">
-          <div class="v-root-row">
-            <input
-              :value="rootDir"
-              type="text"
-              class="form-input"
-              :placeholder="t('sync.dir.root_placeholder')"
-              readonly
-              disabled
-            >
-            <BaseButton
-              size="sm"
-              :disabled="!name.trim() || (isS3 && !bucket.trim())"
-              @click="openBrowse"
-            >
-              <MsIcon name="folder_open" size="xs" color="none" />
-              {{ t('sync.dir.root_browse') }}
-            </BaseButton>
-          </div>
+          <template #default="{ id }">
+            <div class="v-root-row">
+              <input
+                :id="id"
+                :value="rootDir"
+                type="text"
+                class="form-input"
+                :placeholder="t('sync.dir.root_placeholder')"
+                readonly
+                disabled
+              >
+              <BaseButton
+                size="sm"
+                :disabled="!name.trim() || (isS3 && !bucket.trim())"
+                @click="openBrowse"
+              >
+                <MsIcon name="folder_open" size="xs" color="none" />
+                {{ t('sync.dir.root_browse') }}
+              </BaseButton>
+            </div>
+          </template>
         </FormField>
 
         <button v-if="!embedded" type="button" class="v-link v-identity-reconnect" @click="isOAuth ? reconnect() : editCreds()">
@@ -957,16 +967,19 @@ defineExpose({
       </div>
 
       <FormField v-for="field in credFields" :key="field.key" :label="field.label" density="compact">
-        <BaseSelect
-          v-if="field.type === 'select'"
-          :model-value="fields[field.key] || ''"
-          :options="(field.options || []).map(o => ({ value: o, label: o }))"
-          teleport
-          @update:model-value="(v: string | number | boolean) => fields[field.key] = String(v)"
-        />
-        <SecretInput v-else-if="field.type === 'password'" v-model="fields[field.key]" :is-password="true" :placeholder="field.placeholder" />
-        <textarea v-else-if="field.type === 'textarea'" v-model="fields[field.key]" rows="3" class="form-textarea form-textarea--mono" :placeholder="field.placeholder" />
-        <input v-else v-model="fields[field.key]" type="text" class="form-input" :placeholder="field.placeholder" autocomplete="off">
+        <template #default="{ id }">
+          <BaseSelect
+            v-if="field.type === 'select'"
+            :id="id"
+            :model-value="fields[field.key] || ''"
+            :options="(field.options || []).map(o => ({ value: o, label: o }))"
+            teleport
+            @update:model-value="(v: string | number | boolean) => fields[field.key] = String(v)"
+          />
+          <SecretInput v-else-if="field.type === 'password'" :id="id" v-model="fields[field.key]" :is-password="true" :placeholder="field.placeholder" />
+          <textarea v-else-if="field.type === 'textarea'" :id="id" v-model="fields[field.key]" rows="3" class="form-textarea form-textarea--mono" :placeholder="field.placeholder" />
+          <input v-else :id="id" v-model="fields[field.key]" type="text" class="form-input" :placeholder="field.placeholder" autocomplete="off">
+        </template>
         <template v-if="field.help" #below>
           <p class="v-field-help" v-html="field.help" />
         </template>
@@ -1075,22 +1088,28 @@ defineExpose({
         <div class="v-advanced-stack">
           <FormField density="compact">
             <template #label>Client ID</template>
-            <input
-              v-model="params.client_id"
-              type="text"
-              class="form-input"
-              placeholder="Google Cloud Client ID"
-              autocomplete="off"
-            >
+            <template #default="{ id }">
+              <input
+                :id="id"
+                v-model="params.client_id"
+                type="text"
+                class="form-input"
+                placeholder="Google Cloud Client ID"
+                autocomplete="off"
+              >
+            </template>
           </FormField>
 
           <FormField density="compact">
             <template #label>Client Secret</template>
-            <SecretInput
-              v-model="params.client_secret"
-              :is-password="true"
-              placeholder="Google Cloud Client Secret"
-            />
+            <template #default="{ id }">
+              <SecretInput
+                :id="id"
+                v-model="params.client_secret"
+                :is-password="true"
+                placeholder="Google Cloud Client Secret"
+              />
+            </template>
           </FormField>
         </div>
       </CollapsibleGroup>

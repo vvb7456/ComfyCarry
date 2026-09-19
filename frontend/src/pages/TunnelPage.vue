@@ -468,13 +468,19 @@ function openAddSvc() {
     <!-- 添加服务弹窗 -->
     <BaseModal v-model="addSvcModal" :title="t('tunnel.add_service.title')" size="md">
       <FormField :label="t('tunnel.add_service.name')" density="compact">
-        <input v-model="addSvcName" type="text" :placeholder="t('tunnel.add_service.name_placeholder')" class="form-input">
+        <template #default="{ id }">
+          <input :id="id" v-model="addSvcName" type="text" :placeholder="t('tunnel.add_service.name_placeholder')" class="form-input">
+        </template>
       </FormField>
       <FormField :label="t('tunnel.add_service.port')" density="compact">
-        <input v-model="addSvcPort" type="number" :placeholder="t('tunnel.add_service.port_placeholder')" class="form-number">
+        <template #default="{ id }">
+          <input :id="id" v-model="addSvcPort" type="number" :placeholder="t('tunnel.add_service.port_placeholder')" class="form-number">
+        </template>
       </FormField>
       <FormField :label="t('tunnel.add_service.suffix')" density="compact">
-        <input v-model="addSvcSuffix" type="text" :placeholder="t('tunnel.add_service.suffix_placeholder')" class="form-input">
+        <template #default="{ id }">
+          <input :id="id" v-model="addSvcSuffix" type="text" :placeholder="t('tunnel.add_service.suffix_placeholder')" class="form-input">
+        </template>
         <template #below>
           <div class="add-svc-preview">
             {{ t('tunnel.add_service.generated_domain') }}: <code>{{ addSvcPreview }}</code>
@@ -482,12 +488,14 @@ function openAddSvc() {
         </template>
       </FormField>
       <FormField :label="t('tunnel.add_service.protocol')" density="compact">
-        <BaseSelect v-model="addSvcProto" :options="[
-          { value: 'http', label: 'HTTP' },
-          { value: 'https', label: 'HTTPS' },
-          { value: 'tcp', label: 'TCP' },
-          { value: 'ssh', label: 'SSH' },
-        ]" />
+        <template #default="{ id }">
+          <BaseSelect :id="id" v-model="addSvcProto" :options="[
+            { value: 'http', label: 'HTTP' },
+            { value: 'https', label: 'HTTPS' },
+            { value: 'tcp', label: 'TCP' },
+            { value: 'ssh', label: 'SSH' },
+          ]" />
+        </template>
       </FormField>
       <template #footer>
         <BaseButton size="sm" @click="addSvcModal = false">{{ t('common.btn.cancel') }}</BaseButton>

@@ -118,9 +118,10 @@ function onPrev() { prevStep() }
     <div v-if="config.tunnel_mode === 'public' && !tunnelLocked" class="step-tunnel__fields">
       <FormField>
         <template #label>{{ t('wizard.step2.subdomain') }} <span class="step-tunnel__optional">{{ t('wizard.common.optional') }}</span></template>
-        <template #default>
+        <template #default="{ id }">
           <div class="step-tunnel__subdomain-row">
             <input
+              :id="id"
               v-model="config.public_tunnel_subdomain"
               type="text"
               class="form-input"
@@ -142,30 +143,39 @@ function onPrev() { prevStep() }
         <template #label-right>
           <span class="step-tunnel__cf-hint" v-html="t('wizard.step2.cf_token_hint')" />
         </template>
-        <SecretInput
-          v-model="config.cf_api_token"
-          is-password
-          :placeholder="t('wizard.step2.cf_token_placeholder')"
-        />
+        <template #default="{ id }">
+          <SecretInput
+            :id="id"
+            v-model="config.cf_api_token"
+            is-password
+            :placeholder="t('wizard.step2.cf_token_placeholder')"
+          />
+        </template>
       </FormField>
 
       <FormField :label="t('wizard.step2.domain')">
-        <input
-          v-model="config.cf_domain"
-          type="text"
-          class="form-input"
-          :placeholder="t('wizard.step2.domain_placeholder')"
-        />
+        <template #default="{ id }">
+          <input
+            :id="id"
+            v-model="config.cf_domain"
+            type="text"
+            class="form-input"
+            :placeholder="t('wizard.step2.domain_placeholder')"
+          />
+        </template>
       </FormField>
 
       <FormField>
         <template #label>{{ t('wizard.step2.subdomain_prefix') }} <span class="step-tunnel__optional">{{ t('wizard.common.optional') }}</span></template>
-        <input
-          v-model="config.cf_subdomain"
-          type="text"
-          class="form-input"
-          :placeholder="t('wizard.step2.subdomain_prefix_placeholder')"
-        />
+        <template #default="{ id }">
+          <input
+            :id="id"
+            v-model="config.cf_subdomain"
+            type="text"
+            class="form-input"
+            :placeholder="t('wizard.step2.subdomain_prefix_placeholder')"
+          />
+        </template>
       </FormField>
 
       <div class="step-tunnel__validate-row">

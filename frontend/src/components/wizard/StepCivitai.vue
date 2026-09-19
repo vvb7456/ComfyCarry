@@ -45,10 +45,13 @@ function onPrev() { prevStep() }
       <template #label-right>
         <span class="step-civitai__hint" v-html="t('wizard.step5.api_key_hint')" />
       </template>
-      <SecretInput
-        v-model="config.civitai_token"
-        :placeholder="t('wizard.step5.api_key_placeholder')"
-      />
+      <template #default="{ id }">
+        <SecretInput
+          :id="id"
+          v-model="config.civitai_token"
+          :placeholder="t('wizard.step5.api_key_placeholder')"
+        />
+      </template>
     </FormField>
   </WizardStepLayout>
 </template>

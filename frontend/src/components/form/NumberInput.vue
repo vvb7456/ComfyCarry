@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
-defineOptions({ name: 'NumberInput' })
+defineOptions({ name: 'NumberInput', inheritAttrs: false })
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -76,6 +76,7 @@ function decrement() {
 <template>
     <div class="number-input" :class="{ 'number-input--has-spinners': spinners }" :style="rootStyle">
     <input
+      v-bind="$attrs"
       type="number"
       class="number-input__field"
       :class="{ 'number-input__field--center': center }"

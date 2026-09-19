@@ -1,15 +1,26 @@
 <script setup lang="ts">
+/**
+ * 字段标签。传 for 时渲染原生 label (点击聚焦控件、读屏器读字段名),
+ * 不传保持 div (纯展示场景, 如列表头/说明行)。
+ */
 
-defineOptions({ name: 'FieldLabel' })
+defineOptions({ name: 'FieldLabel', inheritAttrs: false })
 
-defineProps<{
+const props = defineProps<{
   /** Whether the field is required (shows asterisk) */
   required?: boolean
+  /** 关联控件的 id —— 传入后根元素渲染为 <label :for> */
+  for?: string
 }>()
 </script>
 
 <template>
-  <div class="field-label">
+  <component
+    :is="props.for ? 'label' : 'div'"
+    class="field-label"
+    :for="props.for"
+    v-bind="$attrs"
+  >
     <span class="field-label__text">
       <slot />
       <span v-if="required" class="field-label__req">*</span>
@@ -17,7 +28,7 @@ defineProps<{
     <span v-if="$slots.right" class="field-label__right">
       <slot name="right" />
     </span>
-  </div>
+  </component>
 </template>
 
 <style scoped>

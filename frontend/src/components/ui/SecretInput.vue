@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import MsIcon from './MsIcon.vue'
 
-defineOptions({ name: 'SecretInput' })
+defineOptions({ name: 'SecretInput', inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -113,6 +113,7 @@ async function copySecret() {
 <template>
   <div :class="rootClasses">
     <input
+      v-bind="$attrs"
       :type="inputType"
       :value="inputValue"
       :placeholder="placeholder"

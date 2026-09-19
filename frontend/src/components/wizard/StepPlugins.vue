@@ -107,12 +107,15 @@ function onPrev() { prevStep() }
     </BaseCard>
 
     <FormField :label="t('wizard.step7.extra_plugins')">
-      <textarea
-        v-model="extraPluginsText"
-        class="form-input form-input--textarea"
-        :placeholder="t('wizard.step7.extra_plugins_placeholder')"
-        rows="3"
-      />
+      <template #default="{ id }">
+        <textarea
+          :id="id"
+          v-model="extraPluginsText"
+          class="form-input form-input--textarea"
+          :placeholder="t('wizard.step7.extra_plugins_placeholder')"
+          rows="3"
+        />
+      </template>
     </FormField>
   </WizardStepLayout>
 </template>

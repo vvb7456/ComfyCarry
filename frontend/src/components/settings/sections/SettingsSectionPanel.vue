@@ -237,31 +237,46 @@ onMounted(() => {
         style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"
       />
       <FormField :label="t('settings.password.current')">
-        <SecretInput
-          v-model="pwCurrent"
-          is-password
-          :placeholder="t('settings.password.current_placeholder')"
-          autocomplete="current-password"
-          input-class="form-input"
-        />
+        <template #default="{ id, describedby, invalid }">
+          <SecretInput
+            :id="id"
+            v-model="pwCurrent"
+            is-password
+            :placeholder="t('settings.password.current_placeholder')"
+            autocomplete="current-password"
+            input-class="form-input"
+            :aria-describedby="describedby"
+            :aria-invalid="invalid"
+          />
+        </template>
       </FormField>
       <FormField :label="t('settings.password.new')">
-        <SecretInput
-          v-model="pwNew"
-          is-password
-          :placeholder="t('settings.password.new_placeholder')"
-          autocomplete="new-password"
-          input-class="form-input"
-        />
+        <template #default="{ id, describedby, invalid }">
+          <SecretInput
+            :id="id"
+            v-model="pwNew"
+            is-password
+            :placeholder="t('settings.password.new_placeholder')"
+            autocomplete="new-password"
+            input-class="form-input"
+            :aria-describedby="describedby"
+            :aria-invalid="invalid"
+          />
+        </template>
       </FormField>
       <FormField :label="t('settings.password.confirm')">
-        <SecretInput
-          v-model="pwConfirm"
-          is-password
-          :placeholder="t('settings.password.confirm_placeholder')"
-          autocomplete="new-password"
-          input-class="form-input"
-        />
+        <template #default="{ id, describedby, invalid }">
+          <SecretInput
+            :id="id"
+            v-model="pwConfirm"
+            is-password
+            :placeholder="t('settings.password.confirm_placeholder')"
+            autocomplete="new-password"
+            input-class="form-input"
+            :aria-describedby="describedby"
+            :aria-invalid="invalid"
+          />
+        </template>
       </FormField>
     </form>
     <template #footer>

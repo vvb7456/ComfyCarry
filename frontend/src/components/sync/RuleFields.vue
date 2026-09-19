@@ -56,43 +56,59 @@ const triggerOptions = computed<SelectOption[]>(() => [
 <template>
   <div class="rule-fields">
     <FormField :label="t('sync.rule.name')" density="compact">
-      <input v-model="rule.name" type="text" class="form-input">
+      <template #default="{ id }">
+        <input :id="id" v-model="rule.name" type="text" class="form-input">
+      </template>
     </FormField>
     <div class="rule-fields__row">
       <FormField :label="t('sync.rule.direction')" density="compact">
-        <BaseSelect v-model="rule.direction!" :options="directionOptions" teleport />
+        <template #default="{ id }">
+          <BaseSelect :id="id" v-model="rule.direction!" :options="directionOptions" teleport />
+        </template>
       </FormField>
       <FormField density="compact">
         <template #label>
           {{ t('sync.rule.method') }}
           <HelpTip :text="t('sync.rule.method_help')" />
         </template>
-        <BaseSelect v-model="rule.method!" :options="methodOptions" teleport />
+        <template #default="{ id }">
+          <BaseSelect :id="id" v-model="rule.method!" :options="methodOptions" teleport />
+        </template>
       </FormField>
     </div>
     <div class="rule-fields__row">
       <FormField :label="t('sync.rule.remote')" density="compact">
-        <BaseSelect v-if="!fixedRemote" v-model="rule.remote!" :options="remoteOptions" teleport />
-        <input v-else type="text" class="form-input" :value="fixedRemote" disabled>
+        <template #default="{ id }">
+          <BaseSelect v-if="!fixedRemote" :id="id" v-model="rule.remote!" :options="remoteOptions" teleport />
+          <input v-else :id="id" type="text" class="form-input" :value="fixedRemote" disabled>
+        </template>
       </FormField>
       <FormField :label="t('sync.rule.trigger')" density="compact">
-        <BaseSelect v-model="rule.trigger!" :options="triggerOptions" teleport />
+        <template #default="{ id }">
+          <BaseSelect :id="id" v-model="rule.trigger!" :options="triggerOptions" teleport />
+        </template>
       </FormField>
     </div>
     <FormField :label="t('sync.rule.remote_path')" density="compact">
-      <FieldControlRow>
-        <input v-model="rule.remote_path" type="text" class="form-input" placeholder="MySync/models">
-        <BaseButton size="sm" icon-only :aria-label="t('sync.browse.remote_title')" :title="t('sync.browse.remote_title')" @click="emit('browse', 'remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
-      </FieldControlRow>
+      <template #default="{ id }">
+        <FieldControlRow>
+          <input :id="id" v-model="rule.remote_path" type="text" class="form-input" placeholder="MySync/models">
+          <BaseButton size="sm" icon-only :aria-label="t('sync.browse.remote_title')" :title="t('sync.browse.remote_title')" @click="emit('browse', 'remote', 'remote_path')"><MsIcon name="folder_open" /></BaseButton>
+        </FieldControlRow>
+      </template>
     </FormField>
     <FormField :label="t('sync.rule.local_path')" density="compact">
-      <FieldControlRow>
-        <input v-model="rule.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
-        <BaseButton size="sm" icon-only :aria-label="t('sync.browse.local_title')" :title="t('sync.browse.local_title')" @click="emit('browse', 'local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
-      </FieldControlRow>
+      <template #default="{ id }">
+        <FieldControlRow>
+          <input :id="id" v-model="rule.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
+          <BaseButton size="sm" icon-only :aria-label="t('sync.browse.local_title')" :title="t('sync.browse.local_title')" @click="emit('browse', 'local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
+        </FieldControlRow>
+      </template>
     </FormField>
     <FormField :label="t('sync.rule.filters')" density="compact">
-      <textarea v-model="rule.filters" rows="3" class="form-textarea form-textarea--mono" :placeholder="t('sync.rule.filters_placeholder')"></textarea>
+      <template #default="{ id }">
+        <textarea :id="id" v-model="rule.filters" rows="3" class="form-textarea form-textarea--mono" :placeholder="t('sync.rule.filters_placeholder')"></textarea>
+      </template>
     </FormField>
   </div>
 </template>
