@@ -18,7 +18,7 @@ export interface SelectOption {
 </script>
 
 <script setup lang="ts" generic="T extends SelectValue | SelectValue[] = SelectValue">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFloating, autoUpdate, offset, flip, shift, size as floatingSize } from '@floating-ui/vue'
 import MsIcon from '../ui/MsIcon.vue'
@@ -120,6 +120,13 @@ const listRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 const search = ref('')
 const highlightIdx = ref(-1)
+
+/* aria-activedescendant 播报关联: 选项 id 需组件内唯一前缀 */
+const uid = useId()
+const listboxId = `bs-list-${uid}`
+function optionDomId(value: SelectValue) {
+  return `bs-opt-${uid}-${String(value)}`
+}
 
 // ── Floating UI positioning ──────────────────────────────────
 // When teleport is on, use fixed strategy so the panel escapes any
@@ -330,6 +337,7 @@ function clearAll(e: Event) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (props.disabled) return
   const opts = filteredOptions.value
   if (!open.value) {
     if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
@@ -425,7 +433,17 @@ onBeforeUnmount(() => {
     fit && 'base-select--fit',
     `base-select--${size}`,
   ]" @keydown="onTriggerKeydown">
-    <div ref="triggerRef" class="base-select__trigger" tabindex="0" @click="toggle">
+    <div
+      ref="triggerRef"
+      class="base-select__trigger"
+      role="combobox"
+      :tabindex="disabled ? -1 : 0"
+      :aria-expanded="open"
+      aria-haspopup="listbox"
+      :aria-controls="listboxId"
+      :aria-disabled="disabled || undefined"
+      @click="toggle"
+    >
       <img v-if="selectedOption?.logo" :src="selectedOption.logo" class="base-select__logo" alt="">
       <MsIcon v-else-if="selectedOption?.icon" :name="selectedOption.icon" size="sm" />
       <span class="base-select__text text-truncate" :class="{ 'base-select__text--ph': isPlaceholder, 'base-select__text--muted': isSelectedDisabled }">{{ selectedLabel }}</span>
@@ -462,7 +480,15 @@ onBeforeUnmount(() => {
             class="base-select__search"
             @click.stop
           />
-          <div ref="listRef" class="base-select__list" tabindex="-1">
+          <div
+            ref="listRef"
+            class="base-select__list"
+            :id="listboxId"
+            role="listbox"
+            :aria-multiselectable="multiple || undefined"
+            :aria-activedescendant="highlightIdx >= 0 ? optionDomId(filteredOptions[highlightIdx]!.value) : undefined"
+            tabindex="-1"
+          >
             <div
               v-if="canUseCustomValue"
               class="base-select__item base-select__item--custom"
@@ -482,8 +508,10 @@ onBeforeUnmount(() => {
                   'base-select__item--hl': row.idx === highlightIdx,
                   'base-select__item--disabled': row.opt.disabled,
                 }"
-                :role="multiple ? 'menuitemcheckbox' : 'option'"
-                :aria-checked="multiple ? isSelected(row.opt.value) : undefined"
+                role="option"
+                :id="optionDomId(row.opt.value)"
+                :aria-selected="isSelected(row.opt.value)"
+                :aria-disabled="row.opt.disabled || undefined"
                 @click="select(row.opt)"
                 @mouseenter="highlightIdx = row.idx"
               >
