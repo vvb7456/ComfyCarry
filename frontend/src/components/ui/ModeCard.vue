@@ -5,6 +5,9 @@ import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ModeCard' })
 
+// 根节点渲染为 button: 键盘可达 (Tab/Enter/Space) + 原生禁用。
+// 约束: 卡片 slot 内容不得包含交互元素 (button/a 等), 否则会形成按钮嵌套。
+
 const props = withDefaults(defineProps<{
   icon?: IconName
   iconColor?: string
@@ -38,6 +41,8 @@ function onClick() {
 
 <template>
   <BaseCard
+    tag="button"
+    type="button"
     density="roomy"
     class="mode-card"
     :class="{
@@ -46,6 +51,8 @@ function onClick() {
       'mode-card--clickable': props.clickable && !props.disabled,
       'mode-card--disabled': props.disabled,
     }"
+    :disabled="props.disabled || !props.clickable"
+    :aria-pressed="props.selected"
     :interactive="false"
     @click="onClick"
   >
@@ -73,6 +80,11 @@ function onClick() {
 
 .mode-card--clickable {
   cursor: pointer;
+}
+
+.mode-card--clickable:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 .mode-card--clickable:hover {

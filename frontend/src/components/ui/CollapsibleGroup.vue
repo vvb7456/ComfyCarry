@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, useId } from 'vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { IconName } from '@/config/icon-codepoints'
 
@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
 })
 
 const expanded = ref(props.defaultOpen)
+const bodyId = useId()
 
 function toggle() {
   expanded.value = !expanded.value
@@ -24,19 +25,27 @@ function toggle() {
 
 <template>
   <div class="collapsible-group">
-    <div class="collapsible-group__header" @click="toggle">
-      <MsIcon name="expand_more" size="sm" color="none" class="collapsible-group__arrow" :class="{ 'collapsible-group__arrow--collapsed': !expanded }" />
-      <slot name="header" :expanded="expanded">
-        <MsIcon v-if="icon" :name="icon" size="xs" color="none" class="collapsible-group__icon" />
-        <span class="collapsible-group__title">{{ title }}</span>
-        <span v-if="count != null" class="collapsible-group__count">{{ count }}</span>
-        <span v-if="suffix" class="collapsible-group__suffix">{{ suffix }}</span>
-      </slot>
+    <div class="collapsible-group__header">
+      <button
+        type="button"
+        class="collapsible-group__toggle"
+        :aria-expanded="expanded"
+        :aria-controls="bodyId"
+        @click="toggle"
+      >
+        <MsIcon name="expand_more" size="sm" color="none" class="collapsible-group__arrow" :class="{ 'collapsible-group__arrow--collapsed': !expanded }" />
+        <slot name="header" :expanded="expanded">
+          <MsIcon v-if="icon" :name="icon" size="xs" color="none" class="collapsible-group__icon" />
+          <span class="collapsible-group__title">{{ title }}</span>
+          <span v-if="count != null" class="collapsible-group__count">{{ count }}</span>
+          <span v-if="suffix" class="collapsible-group__suffix">{{ suffix }}</span>
+        </slot>
+      </button>
       <span class="collapsible-group__right">
         <slot name="title-right" />
       </span>
     </div>
-    <div v-show="expanded" class="collapsible-group__body">
+    <div v-show="expanded" :id="bodyId" class="collapsible-group__body">
       <slot />
     </div>
   </div>
@@ -48,10 +57,29 @@ function toggle() {
   align-items: center;
   gap: 6px;
   padding: 6px 0;
-  cursor: pointer;
-  user-select: none;
   font-size: var(--text-base);
   font-weight: 500;
+}
+
+.collapsible-group__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  min-width: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.collapsible-group__toggle:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .collapsible-group__arrow {

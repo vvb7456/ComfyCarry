@@ -5,6 +5,9 @@ import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'OptionCard' })
 
+// 根节点渲染为 button: 键盘可达 (Tab/Enter/Space) + 原生禁用。
+// 约束: 卡片 slot 内容不得包含交互元素 (button/a 等), 否则会形成按钮嵌套。
+
 const props = withDefaults(defineProps<{
   selected?: boolean
   disabled?: boolean
@@ -37,6 +40,8 @@ function onClick() {
 
 <template>
   <BaseCard
+    tag="button"
+    type="button"
     density="roomy"
     :variant="variant"
     class="option-card"
@@ -45,6 +50,8 @@ function onClick() {
       'option-card--disabled': disabled,
       'option-card--locked': locked,
     }"
+    :disabled="disabled"
+    :aria-pressed="selected || locked"
     :interactive="false"
     @click="onClick"
   >
@@ -101,6 +108,11 @@ function onClick() {
 
 .option-card--locked {
   cursor: default;
+}
+
+.option-card:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 .option-card__check {

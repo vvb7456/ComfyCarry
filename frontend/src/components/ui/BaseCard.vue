@@ -10,6 +10,8 @@ const props = withDefaults(defineProps<{
   tone?: 'default' | 'danger'
   interactive?: boolean
   padding?: boolean
+  /** 根元素标签; 交互卡片 (OptionCard/ModeCard) 传 'button' 复用卡片样式 */
+  tag?: string
 }>(), {
   variant: 'bg3',
   radius: 'md',
@@ -17,6 +19,7 @@ const props = withDefaults(defineProps<{
   tone: 'default',
   interactive: false,
   padding: true,
+  tag: 'div',
 })
 
 const slots = useSlots()
@@ -25,7 +28,8 @@ const padded = computed(() => props.padding)
 </script>
 
 <template>
-  <div
+  <component
+    :is="tag"
     class="base-card"
     :class="[
       `base-card--${props.variant}`,
@@ -54,13 +58,18 @@ const padded = computed(() => props.padding)
     <template v-else>
       <slot />
     </template>
-  </div>
+  </component>
 </template>
 
 <style scoped>
 .base-card {
   border: 1px solid var(--bd);
   min-width: 0;
+  /* 以下四项对默认 div 根为 no-op, 在 tag="button" 时抵消 button 默认样式 */
+  display: block;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   --card-py: 12px;
   --card-px: 14px;
   --card-gap: 12px;
