@@ -158,6 +158,7 @@ function onSubmit() {
               <span class="pp-param-row__label">{{ t(p.labelKey) }}</span>
               <ToggleSwitch
                 :model-value="!!paramValues[p.key]"
+                :label="t(p.labelKey)"
                 size="sm"
                 @update:model-value="paramValues[p.key] = $event"
               />

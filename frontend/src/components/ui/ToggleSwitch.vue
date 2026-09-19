@@ -6,6 +6,8 @@ defineProps<{
   modelValue: boolean
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
+  /** 无障碍名称; 开关文字不在本组件内 (slot/label 包裹) 时必传 */
+  label?: string
 }>()
 
 defineEmits<{
@@ -17,9 +19,11 @@ defineEmits<{
   <label class="toggle-wrap" :class="`toggle-wrap--${size ?? 'md'}`">
     <input
       type="checkbox"
+      role="switch"
       class="toggle-input"
       :checked="modelValue"
       :disabled="disabled"
+      :aria-label="label"
       @change="$emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
     />
     <span class="toggle-track">
@@ -31,6 +35,7 @@ defineEmits<{
 
 <style scoped>
 .toggle-wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -42,7 +47,17 @@ defineEmits<{
   cursor: not-allowed;
 }
 
-.toggle-input { display: none; }
+.toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 .toggle-track {
   position: relative;
@@ -73,6 +88,11 @@ defineEmits<{
 
 .toggle-input:checked ~ .toggle-track { background: var(--ac); border-color: var(--ac); }
 .toggle-input:checked ~ .toggle-track .toggle-knob { background: #fff; }
+
+.toggle-input:focus-visible ~ .toggle-track {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--acg);
+}
 
 .toggle-wrap--sm  .toggle-input:checked ~ .toggle-track .toggle-knob { left: 14px; }
 .toggle-wrap--md  .toggle-input:checked ~ .toggle-track .toggle-knob { left: 18px; }

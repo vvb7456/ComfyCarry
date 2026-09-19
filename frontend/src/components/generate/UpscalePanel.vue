@@ -211,6 +211,7 @@ const sizeHint = computed(() => {
             </label>
             <ToggleSwitch
               :model-value="config.svrTiledVae"
+              :label="t('generate.upscale.svr_tiled_vae')"
               @update:model-value="config.svrTiledVae = $event"
             />
           </div>

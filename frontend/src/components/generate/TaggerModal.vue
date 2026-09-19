@@ -220,6 +220,7 @@ function onCopy() {
               </span>
               <ToggleSwitch
                 :model-value="!!tagger.paramValues.value[p.key]"
+                :label="t(p.labelKey)"
                 size="sm"
                 @update:model-value="tagger.paramValues.value[p.key] = $event"
               />

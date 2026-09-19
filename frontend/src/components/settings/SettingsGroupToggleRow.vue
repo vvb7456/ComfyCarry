@@ -35,6 +35,7 @@ defineEmits<{
       <ToggleSwitch
         :model-value="modelValue"
         :disabled="disabled"
+        :label="label"
         @update:model-value="$emit('update:modelValue', $event)"
       />
     </div>
