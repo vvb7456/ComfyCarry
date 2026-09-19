@@ -82,6 +82,19 @@ const collapsible = computed(() => props.collapsedRows > 0)
 const rootRef = ref<HTMLElement>()
 const measurerRef = ref<HTMLElement>()
 const visibleCount = ref(Infinity)
+const moreBtnRef = ref<HTMLButtonElement>()
+const collapseBtnRef = ref<HTMLButtonElement>()
+
+/** 展开/收起后切换按钮会互相替换, 转移焦点避免键盘焦点掉回页面开头 */
+function expand() {
+  expanded.value = true
+  nextTick(() => collapseBtnRef.value?.focus())
+}
+
+function collapse() {
+  expanded.value = false
+  nextTick(() => moreBtnRef.value?.focus())
+}
 
 function measure() {
   if (!collapsible.value) { visibleCount.value = Infinity; return }
@@ -186,37 +199,47 @@ function fmt(c: number | string) {
         <span class="chip-select__loading"><Spinner size="sm" /></span>
       </template>
 
-      <span
+      <button
         v-if="allOption && !(loading && !options.length)"
+        type="button"
         class="chip-select__chip"
         :class="{ 'chip-select__chip--active': isAllActive }"
+        :aria-pressed="isAllActive"
         @click="selectAll"
-      >{{ allOption }}</span>
+      >{{ allOption }}</button>
 
-      <span
+      <button
         v-for="o in displayOptions"
         :key="o.value"
+        type="button"
         class="chip-select__chip"
         :class="{ 'chip-select__chip--active': selectedSet.has(o.value) }"
+        :aria-pressed="selectedSet.has(o.value)"
         :title="o.title"
         @click="toggleChip(o.value)"
       >
         {{ o.label }}<span v-if="o.count != null" class="chip-select__count">{{ fmt(o.count) }}</span>
-      </span>
+      </button>
 
       <!-- "+N 更多" — same style as chips, replaces last overflowing chip -->
-      <span
+      <button
         v-if="hasOverflow && !expanded"
+        ref="moreBtnRef"
+        type="button"
         class="chip-select__chip chip-select__chip--toggle"
-        @click="expanded = true"
-      >{{ t('common.chip_more', { n: overflowN }) }}</span>
+        aria-expanded="false"
+        @click="expand"
+      >{{ t('common.chip_more', { n: overflowN }) }}</button>
 
       <!-- "收起" — same style as chips, appended after all chips -->
-      <span
+      <button
         v-if="hasOverflow && expanded"
+        ref="collapseBtnRef"
+        type="button"
         class="chip-select__chip chip-select__chip--toggle"
-        @click="expanded = false"
-      >{{ t('common.chip_collapse') }}</span>
+        aria-expanded="true"
+        @click="collapse"
+      >{{ t('common.chip_collapse') }}</button>
     </div>
   </div>
 </template>
@@ -255,6 +278,8 @@ function fmt(c: number | string) {
   background: color-mix(in srgb, var(--ac) 11%, transparent);
   border: 1px solid color-mix(in srgb, var(--ac) 18%, var(--bd));
   border-radius: 4px;
+  font: inherit;
+  text-align: left;
   font-size: .75rem;
   font-weight: 500;
   color: var(--ac);
@@ -262,6 +287,11 @@ function fmt(c: number | string) {
   transition: background .15s, color .15s, border-color .15s;
   white-space: nowrap;
   user-select: none;
+}
+
+.chip-select__chip:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
 }
 
 .chip-select__chip:hover {
