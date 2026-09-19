@@ -38,6 +38,10 @@ const validTabs = new Set(['local', 'huggingface', 'civitai'])
 const initialTab = validTabs.has(route.query.tab as string) ? (route.query.tab as string) : 'local'
 const activeTab = ref(initialTab)
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
+/* tab/panel id 配对 (TabSwitcher tabIdFor/panelIdFor), 建立 tab ↔ tabpanel 关联 */
+const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
+const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
+const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
 const tabs = computed<TabItem[]>(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
   { key: 'huggingface', label: t('models.tabs.huggingface'), brand: 'hf' },
@@ -148,7 +152,7 @@ function openPreviewSingle(url: string) {
   <div class="page-body">
     <!-- 触发器走 TabSwitcher 的默认插槽: 与 tab 同处一行 -->
     <PageTopStack ref="topStack">
-      <TabSwitcher :title="t('models.title')" v-model="activeTab" :tabs="tabs">
+      <TabSwitcher ref="tabSwitcher" :title="t('models.title')" v-model="activeTab" :tabs="tabs">
         <DrawerTrigger
           class="models-drawer-trigger"
           icon="download"
@@ -162,15 +166,15 @@ function openPreviewSingle(url: string) {
       </TabSwitcher>
     </PageTopStack>
 
-    <div v-show="activeTab === 'local'" class="tab-panel">
+    <div v-show="activeTab === 'local'" :id="panelId('local')" role="tabpanel" :aria-labelledby="tabId('local')" class="tab-panel">
       <LocalModelsTab :active="activeTab === 'local'" :toolbar-target="topStack?.toolbarTarget" @open-local="openLocal" @open-preview="openPreviewSingle" />
     </div>
 
-    <div v-show="activeTab === 'huggingface'" class="tab-panel">
+    <div v-show="activeTab === 'huggingface'" :id="panelId('huggingface')" role="tabpanel" :aria-labelledby="tabId('huggingface')" class="tab-panel">
       <HuggingFaceTab :active="activeTab === 'huggingface'" :toolbar-target="topStack?.toolbarTarget" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
 
-    <div v-show="activeTab === 'civitai'" class="tab-panel">
+    <div v-show="activeTab === 'civitai'" :id="panelId('civitai')" role="tabpanel" :aria-labelledby="tabId('civitai')" class="tab-panel">
       <CivitaiTab :active="activeTab === 'civitai'" :initial-type="civitaiInitialType" :toolbar-target="topStack?.toolbarTarget" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
 

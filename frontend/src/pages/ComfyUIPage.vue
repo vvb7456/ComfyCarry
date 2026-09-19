@@ -56,6 +56,10 @@ const { confirm } = useConfirm()
 // ── 页签 ───────────────────────────────────────────────────────
 const activeTab = ref('run')
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
+/* tab/panel id 配对 (TabSwitcher tabIdFor/panelIdFor), 建立 tab ↔ tabpanel 关联 */
+const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
+const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
+const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
 const tabs = computed<TabItem[]>(() => [
   { key: 'run', label: t('comfyui.tabs.run'), icon: 'terminal' },
   { key: 'plugins', label: t('comfyui.tabs.plugins'), icon: 'extension' },
@@ -297,7 +301,7 @@ function onVersionSwitched() {
 <template>
   <div class="page-body">
     <PageTopStack ref="topStack" :enabled="activeTab === 'plugins'">
-      <TabSwitcher :title="t('comfyui.title')" :model-value="activeTab" :tabs="tabs" @update:model-value="activeTab = $event">
+      <TabSwitcher ref="tabSwitcher" :title="t('comfyui.title')" :model-value="activeTab" :tabs="tabs" @update:model-value="activeTab = $event">
         <template #extra>
           <span v-if="isOnline" class="page-actions">
             <BaseButton size="sm" :loading="actionLoading === 'stop'" :disabled="acting" @click="comfyStop">
@@ -319,7 +323,7 @@ function onVersionSwitched() {
       </TabSwitcher>
     </PageTopStack>
 
-    <div v-show="activeTab === 'run'" class="page-col">
+    <div v-show="activeTab === 'run'" :id="panelId('run')" role="tabpanel" :aria-labelledby="tabId('run')" class="page-col">
       <LoadingCenter v-if="!status" style="padding:60px 0" />
 
       <template v-else>
@@ -401,7 +405,7 @@ function onVersionSwitched() {
       </template>
     </div>
 
-    <div v-show="activeTab === 'plugins'" class="tab-panel">
+    <div v-show="activeTab === 'plugins'" :id="panelId('plugins')" role="tabpanel" :aria-labelledby="tabId('plugins')" class="tab-panel">
       <PluginsTab :online="isOnline" :active="activeTab === 'plugins'" :toolbar-target="topStack?.toolbarTarget" />
     </div>
 

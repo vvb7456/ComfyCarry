@@ -75,6 +75,10 @@ const tabs = computed<TabItem[]>(() => [
   { key: 'sync', label: t('sync.tabs.sync'), icon: 'cloud_sync' },
   { key: 'clients', label: t('sync.tabs.clients'), icon: 'devices' },
 ])
+/* tab/panel id 配对 (TabSwitcher tabIdFor/panelIdFor), 建立 tab ↔ tabpanel 关联 */
+const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
+const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
+const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
 
 // ── Worker / 设置 ──
 const workerRunning = ref(false)
@@ -705,7 +709,7 @@ function switchTab(tab: string) {
 
 <template>
   <div class="page-body">
-    <TabSwitcher :title="t('sync.title')" :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab">
+    <TabSwitcher ref="tabSwitcher" :title="t('sync.title')" :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab">
       <template #extra>
         <span v-if="workerRunning" class="page-actions">
           <BaseButton
@@ -733,7 +737,7 @@ function switchTab(tab: string) {
 
     <div class="page-col">
       <!-- ═══════════ 同步 Tab ═══════════ -->
-      <template v-if="activeTab === 'sync'">
+      <div v-if="activeTab === 'sync'" :id="panelId('sync')" role="tabpanel" :aria-labelledby="tabId('sync')">
         <!-- Hero -->
         <ServiceHero
           icon="cloud_sync"
@@ -997,10 +1001,10 @@ function switchTab(tab: string) {
             :on-scroll="logOnScroll"
           />
         </section>
-      </template>
+      </div>
 
       <!-- ═══════════ 客户端 Tab ═══════════ -->
-      <template v-else>
+      <div v-else :id="panelId('clients')" role="tabpanel" :aria-labelledby="tabId('clients')">
         <ServiceHero
           icon="devices"
           :title="clientHeroOnline ? t('sync.companion.hero_online', { count: onlineCount }) : t('sync.companion.hero_offline')"
@@ -1055,7 +1059,7 @@ function switchTab(tab: string) {
             />
           </ul>
         </section>
-      </template>
+      </div>
     </div>
 
     <!-- ═══════════ 弹窗 ═══════════ -->

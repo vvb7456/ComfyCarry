@@ -41,6 +41,10 @@ const total = ref(0)
 const loading = ref(false)
 const loadingId = ref<number | null>(null)
 
+/* tab/panel id 配对 (TabSwitcher tabIdFor); 单列表共享内容, panel 标题关联动态指向当前 tab */
+const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
+const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
+
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / SIZE)))
 
 const tabs = computed(() => [
@@ -149,13 +153,15 @@ watch(
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <TabSwitcher
+      ref="tabSwitcher"
       :model-value="activeTab"
       :tabs="tabs"
       :sticky="false"
+      panel-ids="phm-panel"
       @update:model-value="onTabChange"
     />
 
-    <div class="phm-list">
+    <div id="phm-panel" role="tabpanel" :aria-labelledby="tabId(activeTab)" class="phm-list">
       <div v-if="loading" class="phm-loading">
         <Spinner size="md" />
         <span>{{ t('prompt-library.history_modal.loading') }}</span>

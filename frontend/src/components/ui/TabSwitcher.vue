@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import MsIcon from './MsIcon.vue'
 import BrandIcon from './BrandIcon.vue'
 import { useAppStore } from '@/stores/app'
@@ -31,6 +31,11 @@ const props = withDefaults(defineProps<{
   title?: string
   /** 页面级 tab 默认吸附在 .content 滚动容器顶部; modal 内部的 tab 传 false */
   sticky?: boolean
+  /**
+   * 覆盖 tab 的 aria-controls: 所有 tab 共用同一面板时传固定面板 id
+   * (如单列表切换数据源的弹窗); 不传则每个 tab 指向 panelIdFor(key)。
+   */
+  panelIds?: string
 }>(), {
   sticky: true,
 })
@@ -39,6 +44,16 @@ const emit = defineEmits<{
   'update:modelValue': [key: string]
 }>()
 
+/* tab/panel id 配对: 调用方用 tabIdFor(key)/panelIdFor(key) 建立 tab ↔ panel 关联 */
+const uid = useId()
+function tabIdFor(key: string) {
+  return `tab-${uid}-${key}`
+}
+function panelIdFor(key: string) {
+  return `panel-${uid}-${key}`
+}
+defineExpose({ tabIdFor, panelIdFor })
+
 const firstRightIndex = computed(() =>
   props.tabs.findIndex(t => t.align === 'right'),
 )
@@ -46,6 +61,31 @@ const firstRightIndex = computed(() =>
 function selectTab(tab: TabItem) {
   if (tab.disabled || props.modelValue === tab.key) return
   emit('update:modelValue', tab.key)
+}
+
+/**
+ * 方向键导航: 焦点与激活跟随 (selection follows focus), 跳过禁用项。
+ * roving tabindex —— Tab 只停靠激活 tab, 方向键在 tab 间移动。
+ * 从 idx±1 起步循环, 避免首步命中当前 tab 导致左右键看似无效。
+ */
+function onTabKeydown(e: KeyboardEvent, idx: number) {
+  const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+  const isNav = step !== 0 || e.key === 'Home' || e.key === 'End'
+  if (!isNav) return
+  e.preventDefault()
+  const n = props.tabs.length
+  const first = (idx + step + n) % n
+  const from = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : first
+  const dir = e.key === 'Home' ? 1 : e.key === 'End' ? -1 : step
+  for (let k = 0; k < n; k++) {
+    const tab = props.tabs[(from + dir * k + n) % n]
+    if (tab && !tab.disabled) {
+      const el = document.getElementById(tabIdFor(tab.key))
+      if (el) el.focus()
+      selectTab(tab)
+      return
+    }
+  }
 }
 </script>
 
@@ -74,8 +114,10 @@ function selectTab(tab: TabItem) {
     <div class="tab-switcher__tabs">
       <button
         v-for="(tab, idx) in tabs"
+        :id="tabIdFor(tab.key)"
         :key="tab.key"
         type="button"
+        role="tab"
         class="tab-switcher__tab"
         :class="{
           'tab-switcher__tab--active': modelValue === tab.key,
@@ -84,7 +126,10 @@ function selectTab(tab: TabItem) {
         }"
         :disabled="tab.disabled"
         :aria-selected="modelValue === tab.key"
+        :aria-controls="panelIds || panelIdFor(tab.key)"
+        :tabindex="modelValue === tab.key ? 0 : -1"
         @click="selectTab(tab)"
+        @keydown="onTabKeydown($event, idx)"
       >
         <BrandIcon
           v-if="tab.brand"
