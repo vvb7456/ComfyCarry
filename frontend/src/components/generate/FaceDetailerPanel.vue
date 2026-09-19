@@ -78,7 +78,7 @@ watch(samInstalled, (ok) => {
     <div class="face-grid__row">
       <div class="fd-cell">
         <div class="fd-field">
-          <label class="field-lbl">{{ t('generate.face.detection_model') }}</label>
+          <div class="field-lbl">{{ t('generate.face.detection_model') }}</div>
           <BaseSelect
             :model-value="config.detectionModel"
             :options="detectionOptions"
@@ -90,10 +90,10 @@ watch(samInstalled, (ok) => {
       </div>
       <div class="fd-cell">
         <div class="fd-field">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.face.mask_mode') }}
             <HelpTip :text="t('generate.face.mask_mode_help')" />
-          </label>
+          </div>
           <SegmentedControl
             :options="maskOptions"
             :model-value="config.useSam ? 'sam' : 'bbox'"
@@ -106,10 +106,10 @@ watch(samInstalled, (ok) => {
 
     <!-- Row 3: 面部提示词 -->
     <div class="fd-field">
-      <label class="field-lbl">
+      <div class="field-lbl">
         {{ t('generate.face.prompt') }}
         <HelpTip :text="t('generate.face.prompt_help')" />
-      </label>
+      </div>
       <BaseTextarea
         :model-value="config.prompt"
         :placeholder="t('generate.face.prompt_placeholder')"

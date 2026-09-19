@@ -254,10 +254,10 @@ const durationMarkFormat = (v: number) => `${v}s`
   <div class="video-settings" :class="{ 'video-settings--disabled': disabled }">
     <!-- 速度 (仅 speedToggle=true) -->
     <div v-if="hasSpeed" class="field-group">
-      <label class="field-lbl">
+      <div class="field-lbl">
         {{ t('generate.video.speed') }}
         <HelpTip :text="t('generate.video.speed_help')" />
-      </label>
+      </div>
       <SegmentedControl
         :options="speedOptions"
         :model-value="speedValue"
@@ -270,10 +270,10 @@ const durationMarkFormat = (v: number) => `${v}s`
 
     <!-- 分辨率: 单下拉 (含贴合项 / 6 档预设 / 自定义); 与图像页 res-row 同构 -->
     <div class="field-group">
-      <label class="field-lbl">
+      <div class="field-lbl">
         {{ t('generate.basic.resolution') }}
         <HelpTip :text="t('generate.video.res_help')" />
-      </label>
+      </div>
       <div class="res-row">
         <BaseSelect
           :model-value="resolution"

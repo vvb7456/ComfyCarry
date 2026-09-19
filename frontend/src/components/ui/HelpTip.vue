@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// HelpTip — small "?" trigger that shows a tooltip on hover/click.
+// HelpTip — small "?" trigger that shows a tooltip on hover/click/focus.
 //
 // Tooltip is rendered via Teleport to <body> with position:fixed so it
 // is never clipped by ancestor overflow (e.g. modal-body's overflow-y:auto)
 // and never causes layout shift on hover.
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, useId } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'HelpTip' })
 
@@ -13,6 +14,10 @@ const props = defineProps<{
   /** 内容是多行清单时放宽气泡 (默认 280px 会把每条挤成两行)。 */
   wide?: boolean
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
+
+const tipId = useId()
 
 const open = ref(false)
 const hovering = ref(false)
@@ -52,6 +57,12 @@ function hide() {
   hovering.value = false
 }
 
+/** 键盘离开触发器时同时收起固定打开的弹层, 避免遗留无法关闭的气泡 */
+function onBlur() {
+  open.value = false
+  hide()
+}
+
 function toggle(e: Event) {
   e.stopPropagation()
   open.value = !open.value
@@ -81,17 +92,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span
+  <button
     ref="trigger"
+    type="button"
     class="cc-help-tip"
     :class="{ open: visible }"
+    :aria-label="t('common.btn.help')"
+    :aria-expanded="visible"
+    :aria-controls="tipId"
     @click="toggle"
+    @focus="show"
+    @blur="onBlur"
     @mouseenter="show"
     @mouseleave="hide"
-  >?</span>
+  >?</button>
   <Teleport to="body">
     <div
       v-if="visible"
+      :id="tipId"
+      role="tooltip"
       class="cc-help-tip-pop"
       :class="{
         'pop-top': tipPos.placement === 'top',
@@ -113,11 +132,18 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: var(--bd);
   color: var(--t3);
+  font: inherit;
   font-size: .65rem;
+  border: none;
   cursor: help;
   flex-shrink: 0;
   vertical-align: middle;
   margin-left: 4px;
+}
+
+.cc-help-tip:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
 }
 </style>
 

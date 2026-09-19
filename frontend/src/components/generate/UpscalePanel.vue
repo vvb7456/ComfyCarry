@@ -94,10 +94,10 @@ const sizeHint = computed(() => {
   <div class="upscale-grid">
     <!-- Engine select: 分段单选, 点选即切换 -->
     <div class="up-field">
-      <label class="field-lbl">
+      <div class="field-lbl">
         {{ t('generate.upscale.engine') }}
         <HelpTip :text="t('generate.upscale.engine_help')" />
-      </label>
+      </div>
       <SegmentedControl
         :options="engineOptions"
         :model-value="config.engine"
@@ -149,10 +149,10 @@ const sizeHint = computed(() => {
         <!-- Mode select -->
         <div class="up-cell">
           <div class="up-field">
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.upscale.method') }}
               <HelpTip :text="t('generate.upscale.method_help')" />
-            </label>
+            </div>
             <BaseSelect
               :model-value="config.mode"
               :options="modeOptions"
@@ -165,10 +165,10 @@ const sizeHint = computed(() => {
         <!-- Downscale method (disabled at 4x) -->
         <div class="up-cell" :class="{ 'up-cell--disabled': is4x }">
           <div class="up-field">
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.upscale.downscale_method') }}
               <HelpTip :text="t('generate.upscale.downscale_method_help')" />
-            </label>
+            </div>
             <BaseSelect
               :model-value="config.downscale"
               :options="downscaleOptions"
@@ -205,10 +205,10 @@ const sizeHint = computed(() => {
         <!-- VAE tiled toggle -->
         <div class="up-cell">
           <div class="up-field up-field--switch">
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.upscale.svr_tiled_vae') }}
               <HelpTip :text="t('generate.upscale.svr_tiled_vae_help')" />
-            </label>
+            </div>
             <ToggleSwitch
               :model-value="config.svrTiledVae"
               :label="t('generate.upscale.svr_tiled_vae')"
@@ -222,7 +222,7 @@ const sizeHint = computed(() => {
         <!-- Model select -->
         <div class="up-cell">
           <div class="up-field">
-            <label class="field-lbl">{{ t('generate.upscale.svr_model') }}</label>
+            <div class="field-lbl">{{ t('generate.upscale.svr_model') }}</div>
             <BaseSelect
               :model-value="config.svrModel"
               :options="svrModelOptions"
@@ -235,10 +235,10 @@ const sizeHint = computed(() => {
         <!-- Color correction -->
         <div class="up-cell">
           <div class="up-field">
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.upscale.svr_color') }}
               <HelpTip :text="t('generate.upscale.svr_color_help')" />
-            </label>
+            </div>
             <BaseSelect
               :model-value="config.svrColorCorrection"
               :options="svrColorOptions"

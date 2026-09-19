@@ -195,7 +195,7 @@ const vaeOverrideOptions = computed(() => [
       <!-- Row 0 (Anima only): CLIP + VAE split-file selectors -->
       <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip || hasAudioVae }">
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ clipLabel }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
             <span
@@ -203,7 +203,7 @@ const vaeOverrideOptions = computed(() => [
               class="adv-warn"
               :title="t('generate.advanced.clip_incompatible', { arch: archLabel })"
             >{{ t('generate.advanced.clip_incompatible', { arch: archLabel }) }}</span>
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.clip"
             :options="clipOptions"
@@ -213,7 +213,7 @@ const vaeOverrideOptions = computed(() => [
           />
         </div>
         <div v-if="dualClip" class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.basic.clip2') }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
             <span
@@ -221,7 +221,7 @@ const vaeOverrideOptions = computed(() => [
               class="adv-warn"
               :title="t('generate.advanced.clip_incompatible', { arch: archLabel })"
             >{{ t('generate.advanced.clip_incompatible', { arch: archLabel }) }}</span>
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.clip2"
             :options="clip2Options"
@@ -231,7 +231,7 @@ const vaeOverrideOptions = computed(() => [
           />
         </div>
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.basic.vae') }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
             <span
@@ -239,7 +239,7 @@ const vaeOverrideOptions = computed(() => [
               class="adv-warn"
               :title="t('generate.advanced.vae_incompatible', { arch: archLabel })"
             >{{ t('generate.advanced.vae_incompatible', { arch: archLabel }) }}</span>
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.vae"
             :options="vaeOptions"
@@ -250,7 +250,7 @@ const vaeOverrideOptions = computed(() => [
         </div>
         <!-- 音频 VAE (MiniMax H3 音视频一体必需件; 复用 VAE 同款三分组与不兼容提示) -->
         <div v-if="hasAudioVae" class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.basic.audio_vae') }}
             <HelpTip :text="t('generate.advanced.clip_filter_help')" />
             <span
@@ -258,7 +258,7 @@ const vaeOverrideOptions = computed(() => [
               class="adv-warn"
               :title="t('generate.advanced.vae_incompatible', { arch: archLabel })"
             >{{ t('generate.advanced.vae_incompatible', { arch: archLabel }) }}</span>
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.audioVae"
             :options="audioVaeOptions"
@@ -272,10 +272,10 @@ const vaeOverrideOptions = computed(() => [
       <!-- Row 0b (checkpoint 系专属): Clip Skip + VAE 覆盖 (主 2×3 网格上方, 1fr 1fr 对称) -->
       <div v-if="showClipSkipVae" class="adv-2col">
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.advanced.clip_skip') }}
             <HelpTip :text="t('generate.advanced.clip_skip_help')" />
-          </label>
+          </div>
           <NumberInput
             :model-value="state.clipSkip"
             :min="1"
@@ -286,10 +286,10 @@ const vaeOverrideOptions = computed(() => [
           />
         </div>
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.advanced.vae_override') }}
             <HelpTip :text="t('generate.advanced.vae_override_help')" />
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.vaeOverride"
             :options="vaeOverrideOptions"
@@ -305,10 +305,10 @@ const vaeOverrideOptions = computed(() => [
       <!-- Row 1: Sampler + Scheduler -->
       <div class="adv-2col">
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.advanced.sampler') }}
             <HelpTip :text="t('generate.advanced.sampler_help')" />
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.sampler"
             :options="options.samplers.value"
@@ -320,10 +320,10 @@ const vaeOverrideOptions = computed(() => [
           />
         </div>
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.advanced.scheduler') }}
             <HelpTip :text="t('generate.advanced.scheduler_help')" />
-          </label>
+          </div>
           <BaseSelect
             :model-value="state.scheduler"
             :options="options.schedulers.value"
@@ -343,20 +343,20 @@ const vaeOverrideOptions = computed(() => [
         <div class="field-group">
           <!-- 后台模式: 种子强制随机 (runMode === 'background', 非冻结状态判定) → SeedInput 替换为禁用观感提示 -->
           <template v-if="state.runMode === 'background'">
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.advanced.seed') }}
               <HelpTip :text="t('generate.advanced.seed_help')" />
-            </label>
+            </div>
             <div class="adv-seed-notice">{{ t('generate.background.seed_notice') }}</div>
           </template>
           <template v-else>
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.advanced.seed') }}
               <HelpTip :text="t('generate.advanced.seed_help')" />
               <span class="seed-mode-badge">
                 {{ state.seedMode === 'random' ? t('generate.advanced.seed_random') : t('generate.advanced.seed_fixed') }}
               </span>
-            </label>
+            </div>
             <SeedInput
               :model-value="state.seedValue"
               :mode="state.seedMode"
@@ -368,10 +368,10 @@ const vaeOverrideOptions = computed(() => [
         </div>
         <!-- 生成数量: 视频不出现 (后端 _VIDEO_ARCHS 恒纠正 batch_size=1) -->
         <div v-if="!isVideo" class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.advanced.batch') }}
             <HelpTip :text="t('generate.advanced.batch_help')" />
-          </label>
+          </div>
           <NumberInput
             :model-value="state.batch"
             :min="1"
@@ -384,7 +384,7 @@ const vaeOverrideOptions = computed(() => [
 
         <!-- 文件格式: 视频不出现 (产物恒 mp4/h264, 无可选项) -->
         <div v-if="!isVideo" class="field-group">
-          <label class="field-lbl">{{ t('generate.advanced.format') }}</label>
+          <div class="field-lbl">{{ t('generate.advanced.format') }}</div>
           <BaseSelect
             :model-value="state.format"
             :options="formatOptions.map(o => ({ ...o, label: formatLabel(o.value) }))"
@@ -394,10 +394,10 @@ const vaeOverrideOptions = computed(() => [
         </div>
 
         <div class="field-group">
-          <label class="field-lbl">
+          <div class="field-lbl">
             {{ t('generate.advanced.prefix') }}
             <HelpTip :text="t('generate.advanced.prefix_help')" />
-          </label>
+          </div>
           <BaseInput
             :model-value="state.prefix"
             :disabled="disabled"

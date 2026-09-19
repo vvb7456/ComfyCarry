@@ -228,10 +228,10 @@ function onCopy() {
 
             <!-- Text input -->
             <template v-else-if="p.type === 'text'">
-              <label class="tag-param-row__label">
+              <div class="tag-param-row__label">
                 {{ t(p.labelKey) }}
                 <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
-              </label>
+              </div>
               <input
                 type="text"
                 class="tag-text-input"

@@ -137,10 +137,10 @@ function cancelEdit() {
 <template>
   <div class="range-field" :class="{ 'range-field--disabled': disabled }">
     <div v-if="label || showValue" class="range-field__header">
-      <label v-if="label" class="range-field__label">
+      <div v-if="label" class="range-field__label">
         {{ label }}
         <slot name="label-append" />
-      </label>
+      </div>
       <span
         v-if="showValue"
         class="range-field__value"

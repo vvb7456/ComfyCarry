@@ -149,10 +149,10 @@ watch(() => state.value.resolution, (v) => {
       <div class="basic-grid__model" :class="{ 'basic-grid__model--dual': isDualSlot }">
         <template v-if="isDualSlot">
           <div class="dual-slot">
-            <label class="field-lbl">
+            <div class="field-lbl">
               {{ t('generate.basic.unet_high') }}
               <HelpTip :text="t('generate.basic.unet_seg_help')" />
-            </label>
+            </div>
             <CheckpointSelector
               :selected="selectedHigh"
               :empty-label="t('generate.basic.select_unet_high')"
@@ -162,7 +162,7 @@ watch(() => state.value.resolution, (v) => {
             />
           </div>
           <div class="dual-slot">
-            <label class="field-lbl">{{ t('generate.basic.unet_low') }}</label>
+            <div class="field-lbl">{{ t('generate.basic.unet_low') }}</div>
             <CheckpointSelector
               :selected="selectedLow"
               :empty-label="t('generate.basic.select_unet_low')"
@@ -195,7 +195,7 @@ watch(() => state.value.resolution, (v) => {
         <template v-else>
           <!-- Resolution -->
           <div class="field-group">
-            <label class="field-lbl">{{ t('generate.basic.resolution') }}</label>
+            <div class="field-lbl">{{ t('generate.basic.resolution') }}</div>
             <div class="res-row">
               <BaseSelect
                 :model-value="state.resolution"
