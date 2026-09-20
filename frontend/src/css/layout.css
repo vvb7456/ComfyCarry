@@ -356,37 +356,6 @@
         }
 
         /* ── Language Switcher ── */
-        .lang-switcher {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 8px;
-            justify-content: center;
-        }
-
-        .lang-btn {
-            background: var(--bg2);
-            border: 1px solid var(--bd);
-            color: var(--t2);
-            border-radius: 4px;
-            font-size: .68rem;
-            font-weight: 600;
-            padding: 2px 8px;
-            cursor: pointer;
-            transition: background .15s, color .15s, border-color .15s;
-            letter-spacing: .03em;
-        }
-
-        .lang-btn:hover {
-            background: var(--bg3);
-            color: var(--t1);
-        }
-
-        .lang-btn.active {
-            background: var(--ac);
-            border-color: var(--ac);
-            color: var(--t-inv);
-        }
-
         .lang-switcher-collapsed {
             display: flex;
             flex-direction: column;
@@ -450,19 +419,6 @@
             max-width: 1080px;
             margin: 0 auto;
             min-width: 0;
-        }
-
-        /* ── 限宽跟内容类型走, 不跟页面走 ──
-           页面级 max-width 是钝器: 它会连表格和卡片网格一起收窄, 还会在全宽的
-           页头里制造左右死区。表格 / 网格 / 日志用满宽度是收益; 只有下面这两类
-           内容需要约束行长, 谁需要谁加。 */
-        .measure {
-            max-width: 720px
-        }
-
-        /* 要复制的短字符串 (连接命令 / 令牌 / 密钥), 拉宽只会更难选中 */
-        .measure-sm {
-            max-width: 560px
         }
 
         /* ── Page Title & Actions (页内首行 / TabSwitcher 标题区共用) ──
@@ -537,19 +493,6 @@
             gap: var(--sp-2);
         }
 
-        /* ── Settings Grid ── */
-        .settings-grid {
-            display: grid;
-            grid-template-columns: minmax(280px, 420px) 1fr;
-            gap: clamp(16px, 1.5vw, 24px);
-            align-items: start;
-        }
-
-        .settings-col {
-            display: grid;
-            gap: clamp(16px, 1.5vw, 24px);
-        }
-
         /* ── Mobile Menu ── */
         .mobile-menu-btn {
             display: none;
@@ -616,27 +559,8 @@
                 margin-left: 0 !important
             }
 
-            .metrics-grid {
+            .model-grid {
                 grid-template-columns: 1fr
-            }
-
-            .quick-links {
-                flex-wrap: wrap;
-                gap: 6px;
-            }
-
-            .status-bar {
-                flex-wrap: wrap;
-                gap: 4px;
-            }
-
-            .model-grid,
-            .results-grid {
-                grid-template-columns: 1fr
-            }
-
-            .settings-grid {
-                grid-template-columns: 1fr !important
             }
         }
 

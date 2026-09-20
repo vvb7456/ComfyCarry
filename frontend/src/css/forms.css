@@ -78,19 +78,3 @@
     font-family: var(--font-mono);
     font-size: .8rem;
 }
-
-/* ── Range ── */
-.form-range {
-    width: 100%;
-    accent-color: var(--ac);
-    cursor: pointer;
-}
-
-/* ── Checkbox ── */
-.form-checkbox {
-    width: 15px;
-    height: 15px;
-    accent-color: var(--ac);
-    cursor: pointer;
-    flex-shrink: 0;
-}
