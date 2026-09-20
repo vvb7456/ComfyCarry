@@ -60,9 +60,8 @@ def _cm_post(path, json_data=None, text_data=None, timeout=30):
 # 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/plugins.json)
 #
 # /api/plugins/* 的唯一消费方是面板前端, 错误回传 error_key + error_params,
-# 成功回传 message_key + message_params, 前端按 plugins.err.<key> /
-# plugins.msg.<key> 翻译; 未接 i18n 的端点继续回传 error 原文, apiErrorText()
-# / apiMessageText() 对两种后端都安全。
+# 前端按 plugins.err.<key> 翻译; 未接 i18n 的端点继续回传 error 原文,
+# apiErrorText() 对两种后端都安全。成功响应只回传 ok, 前端不消费成功文案。
 # ====================================================================
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
     """错误响应。前端按 `plugins.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
@@ -77,12 +76,9 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
     return jsonify(body), status
 
 
-def _ok(key: str, /, **extra):
-    """成功响应。前端按 `plugins.msg.<key>` 翻译 message_key。"""
-    body = {"ok": True, "message_key": f"plugins.msg.{key}"}
-    params = extra.pop("params", None)
-    if params:
-        body["message_params"] = params
+def _ok(**extra):
+    """成功响应。"""
+    body = {"ok": True}
     body.update(extra)
     return jsonify(body)
 
@@ -226,7 +222,7 @@ def api_plugins_install():
     if r.status_code not in (200, 201):
         return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("submitted")
+    return _ok()
 
 
 @bp.route("/api/plugins/uninstall", methods=["POST"])
@@ -248,7 +244,7 @@ def api_plugins_uninstall():
     if r.status_code not in (200, 201):
         return _err("uninstall_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("submitted")
+    return _ok()
 
 
 @bp.route("/api/plugins/update", methods=["POST"])
@@ -268,7 +264,7 @@ def api_plugins_update():
     if r.status_code not in (200, 201):
         return _err("update_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("submitted")
+    return _ok()
 
 
 @bp.route("/api/plugins/disable", methods=["POST"])
@@ -295,7 +291,7 @@ def api_plugins_disable():
     if r.status_code not in (200, 201):
         return _err("action_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("submitted")
+    return _ok()
 
 
 @bp.route("/api/plugins/enable", methods=["POST"])
@@ -330,7 +326,7 @@ def api_plugins_enable():
     if r.status_code not in (200, 201):
         return _err("action_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("submitted")
+    return _ok()
 
 
 @bp.route("/api/plugins/install_git", methods=["POST"])
@@ -360,7 +356,7 @@ def api_plugins_install_git():
     if r.status_code not in (200, 201):
         return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
-    return _ok("submitted")
+    return _ok()
 
 
 @bp.route("/api/plugins/queue_status")
