@@ -739,7 +739,7 @@ function switchTab(tab: string) {
 
     <div class="page-col">
       <!-- ═══════════ 同步 Tab ═══════════ -->
-      <div v-if="activeTab === 'sync'" :id="panelId('sync')" role="tabpanel" :aria-labelledby="tabId('sync')">
+      <div v-if="activeTab === 'sync'" :id="panelId('sync')" role="tabpanel" :aria-labelledby="tabId('sync')" class="tab-panel">
         <!-- Hero -->
         <ServiceHero
           icon="cloud_sync"
@@ -1006,7 +1006,7 @@ function switchTab(tab: string) {
       </div>
 
       <!-- ═══════════ 客户端 Tab ═══════════ -->
-      <div v-else :id="panelId('clients')" role="tabpanel" :aria-labelledby="tabId('clients')">
+      <div v-else :id="panelId('clients')" role="tabpanel" :aria-labelledby="tabId('clients')" class="tab-panel">
         <ServiceHero
           icon="devices"
           :title="clientHeroOnline ? t('sync.companion.hero_online', { count: onlineCount }) : t('sync.companion.hero_offline')"

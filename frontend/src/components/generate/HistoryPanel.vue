@@ -4,8 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import type { ComfyHistoryItem } from '@/types/comfyui'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
-import AppToolbar from '@/components/ui/AppToolbar.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -32,6 +30,17 @@ const historySortAsc = computed({
 })
 
 const cardSize = ref<'sm' | 'md' | 'lg'>('md')
+
+// 行头切换按钮: 排序方向循环 (desc → asc), 尺寸循环 (sm → md → lg)。
+// 按钮文案即当前生效值, 与 QueuePanel 行头「中断/清空」同位同级 (xs, title-right 槽)。
+function toggleSort() {
+  historySortAsc.value = !historySortAsc.value
+  onSortChange()
+}
+
+function toggleCardSize() {
+  cardSize.value = cardSize.value === 'sm' ? 'md' : cardSize.value === 'md' ? 'lg' : 'sm'
+}
 
 // emit('makeVideo', item) — 带上产物定位信息, 由 GeneratePage 接线跳转
 //  payload 结构见文件末尾注释
@@ -233,35 +242,24 @@ defineExpose({ setupObserver })
     :title="t('comfyui.history.total')"
     :default-open="true"
   >
-    <AppToolbar variant="embedded">
-      <template #status>
-        <span v-if="historyItems.length > 0">
-          {{ t('comfyui.history.record_count', { count: historyItems.length }) }}
-        </span>
-      </template>
-      <template #filters>
-        <BaseSelect
-          v-model="historySortAsc"
-          :options="[
-            { value: false, label: t('comfyui.history.sort_desc') },
-            { value: true, label: t('comfyui.history.sort_asc') },
-          ]"
-          size="sm"
-          fit
-          @change="onSortChange"
-        />
-        <BaseSelect
-          v-model="cardSize"
-          :options="[
-            { value: 'sm', label: t('comfyui.history.size_sm') },
-            { value: 'md', label: t('comfyui.history.size_md') },
-            { value: 'lg', label: t('comfyui.history.size_lg') },
-          ]"
-          size="sm"
-          fit
-        />
-      </template>
-    </AppToolbar>
+    <!-- 排序/尺寸切换收进行头右侧 (同 QueuePanel 的「中断/清空」),
+         点击循环切换, 按钮文案即当前生效值 -->
+    <template #title-right>
+      <BaseButton
+        size="xs"
+        :title="t('comfyui.history.sort_toggle_hint')"
+        @click.stop="toggleSort"
+      >
+        {{ historySortAsc ? t('comfyui.history.sort_asc') : t('comfyui.history.sort_desc') }}
+      </BaseButton>
+      <BaseButton
+        size="xs"
+        :title="t('comfyui.history.size_toggle_hint')"
+        @click.stop="toggleCardSize"
+      >
+        {{ t(`comfyui.history.size_${cardSize}`) }}
+      </BaseButton>
+    </template>
 
     <EmptyState
       v-if="historyItems.length === 0"

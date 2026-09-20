@@ -314,14 +314,6 @@
             outline-offset: 2px
         }
 
-        /* ── Global: Empty State ── */
-        .empty-state {
-            text-align: center;
-            padding: var(--sp-6);
-            color: var(--t3);
-            font-size: var(--text-base)
-        }
-
         /* ── Global: Utility Classes ── */
         .hidden {
             display: none !important

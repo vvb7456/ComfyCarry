@@ -292,6 +292,10 @@ function cycleApply(lora: LoraEntry) {
 </template>
 
 <style scoped>
+.lora-panel {
+  container: lora-panel / inline-size;
+}
+
 .lora-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -537,7 +541,7 @@ function cycleApply(lora: LoraEntry) {
 /* ═══ 窄屏: 横向卡片 (左小缩略图 + 右名字/强度), 与主模型卡片同构 ═══
    竖版 3:4 大图在手机上一张卡就占掉半屏, 挂三四个 LoRA 要滚很久;
    改成一行一张的矮卡, 高度从 ~260px 降到 ~60px。 */
-@media (max-width: 768px) {
+@container lora-panel (max-width: 768px) {
   .lora-grid {
     grid-template-columns: 1fr;
   }

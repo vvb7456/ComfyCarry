@@ -305,8 +305,9 @@
     "size_md": "Standard",
     "size_lg": "Large",
     "no_records": "No generation records",
-    "record_count": "{count} records",
-    "no_preview": "No preview"
+    "no_preview": "No preview",
+    "sort_toggle_hint": "Click to toggle sort direction",
+    "size_toggle_hint": "Click to toggle thumbnail size"
   },
   "status": {
     "generating": "Generating",

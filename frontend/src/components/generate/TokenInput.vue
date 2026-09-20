@@ -536,6 +536,7 @@ onUnmounted(() => {
   border-radius: var(--r-md);
   overflow: hidden;
   transition: border-color .15s;
+  container: token-input / inline-size;
 }
 .token-input-wrap:focus-within {
   border-color: var(--ac);
@@ -616,7 +617,8 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-@media (max-width: 768px) {
+/* 容器窄到放不下文字标签时收成纯图标 (桌面双栏下容器约 460–760px 仍显示) */
+@container token-input (max-width: 440px) {
   .tool-label { display: none; }
 }
 </style>

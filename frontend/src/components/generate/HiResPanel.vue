@@ -126,8 +126,9 @@ const schedulerOptions = computed(() => options.schedulers.value)
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  max-width: 700px;
+  max-width: var(--gen-module-w);
   margin: 0 auto;
+  container: gen-hires / inline-size;
 }
 
 .hires-grid__row {
@@ -150,7 +151,7 @@ const schedulerOptions = computed(() => options.schedulers.value)
   gap: 4px;
 }
 
-@media (max-width: 768px) {
+@container gen-hires (max-width: 520px) {
   .hires-grid__row {
     grid-template-columns: 1fr;
   }

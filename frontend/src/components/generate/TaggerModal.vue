@@ -157,133 +157,135 @@ function onCopy() {
       v-model:expanded="depExpanded"
     />
 
-    <div class="tag-split">
-      <!-- ── Left: image + params + submit ── -->
-      <div class="tag-left">
-        <FileUploadZone
-          mode="pick"
-          :accept="IMAGE_ACCEPT"
-          :preview="previewUrl"
-          :file-name="sourceName"
-          :pick-label="t('generate.image_source.from_input')"
-          :upload-label="t('generate.image_source.upload_local')"
-          class="tag-source-zone"
-          @pick="onPickInput"
-          @file="onFileFromZone"
-          @clear="onClearSource"
-          @error="toast($event, 'warning')"
-        />
+    <div class="tag-wrap">
+      <div class="tag-split">
+        <!-- ── Left: image + params + submit ── -->
+        <div class="tag-left">
+          <FileUploadZone
+            mode="pick"
+            :accept="IMAGE_ACCEPT"
+            :preview="previewUrl"
+            :file-name="sourceName"
+            :pick-label="t('generate.image_source.from_input')"
+            :upload-label="t('generate.image_source.upload_local')"
+            class="tag-source-zone"
+            @pick="onPickInput"
+            @file="onFileFromZone"
+            @clear="onClearSource"
+            @error="toast($event, 'warning')"
+          />
 
-        <!-- Parameters -->
-        <div class="tag-params">
-          <div class="tag-params__title">{{ t('generate.interrogate.title') }}</div>
+          <!-- Parameters -->
+          <div class="tag-params">
+            <div class="tag-params__title">{{ t('generate.interrogate.title') }}</div>
 
-          <div v-for="p in TAG_PARAMS_DEF" :key="p.key" class="tag-param-row" :class="{ 'tag-param-row--block': p.type === 'slider' || p.type === 'text' }">
-            <!-- Select (model) -->
-            <template v-if="p.type === 'select'">
-              <span class="tag-param-row__label">
-                {{ t(p.labelKey) }}
-              </span>
-              <BaseSelect
-                :model-value="tagger.paramValues.value[p.key] as string"
-                :options="p.key === 'model' ? modelOptions : (p.options || [])"
-                :disabled="p.key === 'model' && modelOptions.length === 0"
-                size="sm"
-                teleport
-                class="tag-param-row__select"
-                @update:model-value="tagger.paramValues.value[p.key] = String($event)"
-              />
-            </template>
+            <div v-for="p in TAG_PARAMS_DEF" :key="p.key" class="tag-param-row" :class="{ 'tag-param-row--block': p.type === 'slider' || p.type === 'text' }">
+              <!-- Select (model) -->
+              <template v-if="p.type === 'select'">
+                <span class="tag-param-row__label">
+                  {{ t(p.labelKey) }}
+                </span>
+                <BaseSelect
+                  :model-value="tagger.paramValues.value[p.key] as string"
+                  :options="p.key === 'model' ? modelOptions : (p.options || [])"
+                  :disabled="p.key === 'model' && modelOptions.length === 0"
+                  size="sm"
+                  teleport
+                  class="tag-param-row__select"
+                  @update:model-value="tagger.paramValues.value[p.key] = String($event)"
+                />
+              </template>
 
-            <!-- Slider -->
-            <template v-else-if="p.type === 'slider'">
-              <RangeField
-                :model-value="Number(tagger.paramValues.value[p.key])"
-                :min="p.min!"
-                :max="p.max!"
-                :step="p.step!"
-                :label="t(p.labelKey)"
-                :value-format="(v: number) => v.toFixed(2)"
-                editable
-                @update:model-value="tagger.paramValues.value[p.key] = $event"
-              >
-                <template v-if="p.helpKey" #label-append>
-                  <HelpTip :text="t(p.helpKey)" />
-                </template>
-              </RangeField>
-            </template>
+              <!-- Slider -->
+              <template v-else-if="p.type === 'slider'">
+                <RangeField
+                  :model-value="Number(tagger.paramValues.value[p.key])"
+                  :min="p.min!"
+                  :max="p.max!"
+                  :step="p.step!"
+                  :label="t(p.labelKey)"
+                  :value-format="(v: number) => v.toFixed(2)"
+                  editable
+                  @update:model-value="tagger.paramValues.value[p.key] = $event"
+                >
+                  <template v-if="p.helpKey" #label-append>
+                    <HelpTip :text="t(p.helpKey)" />
+                  </template>
+                </RangeField>
+              </template>
 
-            <!-- Toggle -->
-            <template v-else-if="p.type === 'toggle'">
-              <span class="tag-param-row__label">
-                {{ t(p.labelKey) }}
-                <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
-              </span>
-              <ToggleSwitch
-                :model-value="!!tagger.paramValues.value[p.key]"
-                :label="t(p.labelKey)"
-                size="sm"
-                @update:model-value="tagger.paramValues.value[p.key] = $event"
-              />
-            </template>
+              <!-- Toggle -->
+              <template v-else-if="p.type === 'toggle'">
+                <span class="tag-param-row__label">
+                  {{ t(p.labelKey) }}
+                  <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
+                </span>
+                <ToggleSwitch
+                  :model-value="!!tagger.paramValues.value[p.key]"
+                  :label="t(p.labelKey)"
+                  size="sm"
+                  @update:model-value="tagger.paramValues.value[p.key] = $event"
+                />
+              </template>
 
-            <!-- Text input -->
-            <template v-else-if="p.type === 'text'">
-              <div class="tag-param-row__label">
-                {{ t(p.labelKey) }}
-                <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
-              </div>
-              <input
-                type="text"
-                class="tag-text-input"
-                :value="tagger.paramValues.value[p.key] as string"
-                :placeholder="p.placeholder ? t(p.placeholder) : ''"
-                @input="tagger.paramValues.value[p.key] = ($event.target as HTMLInputElement).value"
-              >
-            </template>
+              <!-- Text input -->
+              <template v-else-if="p.type === 'text'">
+                <div class="tag-param-row__label">
+                  {{ t(p.labelKey) }}
+                  <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
+                </div>
+                <input
+                  type="text"
+                  class="tag-text-input"
+                  :value="tagger.paramValues.value[p.key] as string"
+                  :placeholder="p.placeholder ? t(p.placeholder) : ''"
+                  @input="tagger.paramValues.value[p.key] = ($event.target as HTMLInputElement).value"
+                >
+              </template>
+            </div>
           </div>
+
+          <!-- Submit button -->
+          <BaseButton
+            size="sm"
+            variant="primary"
+            :disabled="!tagger.hasSource.value || tagger.running.value || !dep.ready.value"
+            class="tag-submit-btn"
+            @click="onSubmit"
+          >
+            <MsIcon name="play_arrow" size="xs" color="none" />
+            {{ t('generate.interrogate.start_btn') }}
+          </BaseButton>
         </div>
 
-        <!-- Submit button -->
-        <BaseButton
-          size="sm"
-          variant="primary"
-          :disabled="!tagger.hasSource.value || tagger.running.value || !dep.ready.value"
-          class="tag-submit-btn"
-          @click="onSubmit"
-        >
-          <MsIcon name="play_arrow" size="xs" color="none" />
-          {{ t('generate.interrogate.start_btn') }}
-        </BaseButton>
-      </div>
-
-      <!-- ── Right: result area ── -->
-      <div class="tag-result-area">
-        <!-- Running -->
-        <div v-if="tagger.running.value" class="tag-result-empty">
-          <Spinner size="lg" />
-          <p class="tag-result-hint">{{ t('generate.interrogate.running') }}</p>
-        </div>
-
-        <!-- Has result -->
-        <div v-else-if="tagger.resultText.value" class="tag-result-content">
-          <div class="tag-result-tags">{{ tagger.resultText.value }}</div>
-          <div class="tag-result-actions">
-            <BaseButton size="sm" variant="primary" @click="onApply">
-              <MsIcon name="content_paste_go" size="xs" color="none" />
-              {{ t('generate.interrogate.use_prompt') }}
-            </BaseButton>
-            <BaseButton size="sm" @click="onCopy">
-              <MsIcon name="content_copy" size="xs" color="none" />
-              {{ t('common.btn.copy') }}
-            </BaseButton>
+        <!-- ── Right: result area ── -->
+        <div class="tag-result-area">
+          <!-- Running -->
+          <div v-if="tagger.running.value" class="tag-result-empty">
+            <Spinner size="lg" />
+            <p class="tag-result-hint">{{ t('generate.interrogate.running') }}</p>
           </div>
-        </div>
 
-        <!-- Empty / idle -->
-        <div v-else class="tag-result-empty">
-          <MsIcon name="sell" size="xl" color="var(--t3)" />
-          <p class="tag-result-hint">{{ t('generate.interrogate.result_hint') }}</p>
+          <!-- Has result -->
+          <div v-else-if="tagger.resultText.value" class="tag-result-content">
+            <div class="tag-result-tags">{{ tagger.resultText.value }}</div>
+            <div class="tag-result-actions">
+              <BaseButton size="sm" variant="primary" @click="onApply">
+                <MsIcon name="content_paste_go" size="xs" color="none" />
+                {{ t('generate.interrogate.use_prompt') }}
+              </BaseButton>
+              <BaseButton size="sm" @click="onCopy">
+                <MsIcon name="content_copy" size="xs" color="none" />
+                {{ t('common.btn.copy') }}
+              </BaseButton>
+            </div>
+          </div>
+
+          <!-- Empty / idle -->
+          <div v-else class="tag-result-empty">
+            <MsIcon name="sell" size="xl" color="var(--t3)" />
+            <p class="tag-result-hint">{{ t('generate.interrogate.result_hint') }}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -303,7 +305,12 @@ function onCopy() {
 </template>
 
 <style scoped>
-/* ── Left-right split (legacy: gen-tag-split) ── */
+/* ── Left-right split (legacy: gen-tag-split) ──
+   容器查询按弹窗正文实际宽度判定 (窄屏 modal 铺满视口时同样命中) */
+.tag-wrap {
+  container: tag-wrap / inline-size;
+}
+
 .tag-split {
   display: flex;
   gap: var(--sp-4);
@@ -437,7 +444,7 @@ function onCopy() {
   flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
+@container tag-wrap (max-width: 768px) {
   .tag-split {
     flex-direction: column;
   }

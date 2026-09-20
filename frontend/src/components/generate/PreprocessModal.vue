@@ -130,87 +130,89 @@ function onSubmit() {
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <!-- gen-mod-split: left image + right params -->
-    <div class="pp-split">
-      <!-- Left: image source (FileUploadZone) -->
-      <div class="pp-split__media">
-        <FileUploadZone
-          mode="pick"
-          :accept="IMAGE_ACCEPT"
-          :preview="sourcePreviewUrl"
-          :file-name="sourceName"
-          :pick-label="t('generate.image_source.from_input')"
-          :upload-label="t('generate.image_source.upload_local')"
-          class="pp-source-zone"
-          @pick="onPickInput"
-          @file="onFileFromZone"
-          @clear="clearSource"
-          @error="toast($event, 'warning')"
-        />
-      </div>
-
-      <!-- Right: parameters + submit -->
-      <div class="pp-split__params">
-        <div v-if="def.params.length" class="pp-params">
-          <div class="pp-params__title">{{ t('generate.controlnet.param_settings') }}</div>
-
-          <div v-for="p in def.params" :key="p.key" :class="['pp-param-row', { 'pp-param-row--block': p.type === 'slider' }]">
-            <!-- Toggle -->
-            <template v-if="p.type === 'toggle'">
-              <span class="pp-param-row__label">{{ t(p.labelKey) }}</span>
-              <ToggleSwitch
-                :model-value="!!paramValues[p.key]"
-                :label="t(p.labelKey)"
-                size="sm"
-                @update:model-value="paramValues[p.key] = $event"
-              />
-            </template>
-
-            <!-- Slider (full-width with optional HelpTip) -->
-            <template v-else-if="p.type === 'slider'">
-              <RangeField
-                :model-value="Number(paramValues[p.key])"
-                :min="p.min!"
-                :max="p.max!"
-                :step="p.step!"
-                :label="t(p.labelKey)"
-                editable
-                @update:model-value="paramValues[p.key] = $event"
-              >
-                <template v-if="p.helpKey" #label-append>
-                  <HelpTip :text="t(p.helpKey)" />
-                </template>
-              </RangeField>
-            </template>
-
-            <!-- Select -->
-            <template v-else-if="p.type === 'select'">
-              <span class="pp-param-row__label">
-                {{ t(p.labelKey) }}
-                <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
-              </span>
-              <BaseSelect
-                :model-value="paramValues[p.key] as number"
-                :options="p.options!.map(o => ({ value: o.value, label: o.label }))"
-                size="sm"
-                teleport
-                class="pp-param-row__select"
-                @update:model-value="paramValues[p.key] = Number($event)"
-              />
-            </template>
-          </div>
+    <div class="pp-wrap">
+      <div class="pp-split">
+        <!-- Left: image source (FileUploadZone) -->
+        <div class="pp-split__media">
+          <FileUploadZone
+            mode="pick"
+            :accept="IMAGE_ACCEPT"
+            :preview="sourcePreviewUrl"
+            :file-name="sourceName"
+            :pick-label="t('generate.image_source.from_input')"
+            :upload-label="t('generate.image_source.upload_local')"
+            class="pp-source-zone"
+            @pick="onPickInput"
+            @file="onFileFromZone"
+            @clear="clearSource"
+            @error="toast($event, 'warning')"
+          />
         </div>
 
-        <!-- Submit button at bottom -->
-        <BaseButton
-          size="sm"
-          variant="primary"
-          :disabled="!hasSource"
-          class="pp-submit-btn"
-          @click="onSubmit"
-        >
-          <MsIcon name="play_arrow" size="xs" color="none" />
-          {{ t('generate.image_source.start_generate') }}
-        </BaseButton>
+        <!-- Right: parameters + submit -->
+        <div class="pp-split__params">
+          <div v-if="def.params.length" class="pp-params">
+            <div class="pp-params__title">{{ t('generate.controlnet.param_settings') }}</div>
+
+            <div v-for="p in def.params" :key="p.key" :class="['pp-param-row', { 'pp-param-row--block': p.type === 'slider' }]">
+              <!-- Toggle -->
+              <template v-if="p.type === 'toggle'">
+                <span class="pp-param-row__label">{{ t(p.labelKey) }}</span>
+                <ToggleSwitch
+                  :model-value="!!paramValues[p.key]"
+                  :label="t(p.labelKey)"
+                  size="sm"
+                  @update:model-value="paramValues[p.key] = $event"
+                />
+              </template>
+
+              <!-- Slider (full-width with optional HelpTip) -->
+              <template v-else-if="p.type === 'slider'">
+                <RangeField
+                  :model-value="Number(paramValues[p.key])"
+                  :min="p.min!"
+                  :max="p.max!"
+                  :step="p.step!"
+                  :label="t(p.labelKey)"
+                  editable
+                  @update:model-value="paramValues[p.key] = $event"
+                >
+                  <template v-if="p.helpKey" #label-append>
+                    <HelpTip :text="t(p.helpKey)" />
+                  </template>
+                </RangeField>
+              </template>
+
+              <!-- Select -->
+              <template v-else-if="p.type === 'select'">
+                <span class="pp-param-row__label">
+                  {{ t(p.labelKey) }}
+                  <HelpTip v-if="p.helpKey" :text="t(p.helpKey)" />
+                </span>
+                <BaseSelect
+                  :model-value="paramValues[p.key] as number"
+                  :options="p.options!.map(o => ({ value: o.value, label: o.label }))"
+                  size="sm"
+                  teleport
+                  class="pp-param-row__select"
+                  @update:model-value="paramValues[p.key] = Number($event)"
+                />
+              </template>
+            </div>
+          </div>
+
+          <!-- Submit button at bottom -->
+          <BaseButton
+            size="sm"
+            variant="primary"
+            :disabled="!hasSource"
+            class="pp-submit-btn"
+            @click="onSubmit"
+          >
+            <MsIcon name="play_arrow" size="xs" color="none" />
+            {{ t('generate.image_source.start_generate') }}
+          </BaseButton>
+        </div>
       </div>
     </div>
   </BaseModal>
@@ -229,7 +231,12 @@ function onSubmit() {
 </template>
 
 <style scoped>
-/* ── Left-right split (mirrors gen-mod-split) ── */
+/* ── Left-right split (mirrors gen-mod-split) ──
+   容器查询按弹窗正文实际宽度判定 (窄屏 modal 铺满视口时同样命中) */
+.pp-wrap {
+  container: pp-wrap / inline-size;
+}
+
 .pp-split {
   display: flex;
   gap: var(--sp-4);
@@ -307,7 +314,7 @@ function onSubmit() {
   margin-top: auto;
 }
 
-@media (max-width: 600px) {
+@container pp-wrap (max-width: 600px) {
   .pp-split { flex-direction: column; }
   .pp-split__media { width: 100%; max-width: 320px; }
 }

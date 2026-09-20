@@ -159,6 +159,7 @@ function rowState(r: DepRowStatus): VersionState {
   background: var(--bg2);
   border: 1px solid var(--bd);
   overflow: hidden;
+  container: dep-bar / inline-size;
 }
 
 /* ═══ 折叠态单行 ═══ */
@@ -274,8 +275,8 @@ function rowState(r: DepRowStatus): VersionState {
   max-height: 0;
 }
 
-/* ═══ 移动端 ═══ */
-@media (max-width: 600px) {
+/* ═══ 窄容器 ═══ */
+@container dep-bar (max-width: 600px) {
   .dep-file__row { flex-wrap: wrap; }
   .dep-file__status { margin-left: 0; width: 100%; }
 }

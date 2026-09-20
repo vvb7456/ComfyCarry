@@ -329,11 +329,11 @@ function openCivitaiMeta(hit: CivitaiHit) {
         />
         <BaseButton
           size="sm"
-          icon-only
           :aria-label="t('models.civitai.settings.title')"
           @click="settingsOpen = true"
         >
           <MsIcon name="settings" />
+          <span class="app-toolbar__label">{{ t('common.btn.settings') }}</span>
         </BaseButton>
       </template>
     </AppToolbar>

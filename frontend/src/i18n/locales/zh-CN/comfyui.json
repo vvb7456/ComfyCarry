@@ -305,8 +305,9 @@
     "size_md": "标准",
     "size_lg": "大图",
     "no_records": "暂无生成记录",
-    "record_count": "共 {count} 条记录",
-    "no_preview": "无预览图"
+    "no_preview": "无预览图",
+    "sort_toggle_hint": "点击切换排序方向",
+    "size_toggle_hint": "点击切换缩略图尺寸"
   },
   "status": {
     "generating": "正在生成",

@@ -519,8 +519,9 @@ function refIndex(type: RefItem['type'], i: number): number {
   cursor: not-allowed;
 }
 
-/* 移动端: 媒体列变全宽横带且高度 auto, 网格须显式限高, 否则失去 flex 约束会撑高 */
-@media (max-width: 600px) {
+/* 窄容器 (提示词区变单列): 媒体列变全宽横带且高度 auto, 网格须显式限高,
+   否则失去 flex 约束会撑高 */
+@container gen-prompt (max-width: 600px) {
   .ref-media-panel__grid { max-height: 160px; }
 }
 </style>
