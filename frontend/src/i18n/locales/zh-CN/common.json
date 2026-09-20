@@ -27,7 +27,9 @@
     "search": "搜索",
     "more_options": "展开选项",
     "prev_image": "上一张",
-    "next_image": "下一张"
+    "next_image": "下一张",
+    "open_menu": "打开菜单",
+    "close_menu": "关闭菜单"
   },
   "status": {
     "loading": "加载中..."
@@ -61,6 +63,7 @@
   "filter_hint": "筛选…",
   "chip_more": "+{n} 更多",
   "chip_collapse": "收起",
+  "unsaved": "未保存的修改",
   "upload": {
     "drop_hint": "拖拽文件到此处",
     "click_hint": "或点击选择文件",

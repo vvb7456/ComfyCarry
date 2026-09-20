@@ -7,10 +7,13 @@
  * 用于模式/引擎类切换 (如 Upscale 的 AuraSR/SeedVR2、生成页文/图生视频切换)。
  */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'SegmentedControl' })
+
+const { t } = useI18n({ useScope: 'global' })
 
 export interface SegmentOption {
   value: string
@@ -120,7 +123,7 @@ onBeforeUnmount(() => {
     >
       <MsIcon v-if="opt.icon" :name="opt.icon" size="sm" color="none" class="seg-control__icon" />
       <span>{{ opt.label }}</span>
-      <span v-if="opt.dot" class="seg-control__dot" aria-label="unsaved" />
+      <span v-if="opt.dot" class="seg-control__dot" :aria-label="t('common.unsaved')" />
     </button>
   </div>
 </template>

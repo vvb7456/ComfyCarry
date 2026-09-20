@@ -417,7 +417,7 @@ const totalServiceCount = computed(() => {
         <button
           type="button"
           class="mobile-menu-btn"
-          :aria-label="app.mobileSidebarOpen ? 'Close menu' : 'Open menu'"
+          :aria-label="app.mobileSidebarOpen ? t('common.btn.close_menu') : t('common.btn.open_menu')"
           @click="app.toggleMobileSidebar()"
         >
           <MsIcon name="menu" />

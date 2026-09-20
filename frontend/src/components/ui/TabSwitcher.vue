@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 import BrandIcon from './BrandIcon.vue'
 import { useAppStore } from '@/stores/app'
@@ -8,6 +9,7 @@ import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'TabSwitcher' })
 
+const { t } = useI18n({ useScope: 'global' })
 const app = useAppStore()
 
 export interface TabItem {
@@ -100,7 +102,7 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
         <button
           type="button"
           class="mobile-menu-btn"
-          :aria-label="app.mobileSidebarOpen ? 'Close menu' : 'Open menu'"
+          :aria-label="app.mobileSidebarOpen ? t('common.btn.close_menu') : t('common.btn.open_menu')"
           @click="app.toggleMobileSidebar()"
         >
           <MsIcon name="menu" />
@@ -143,7 +145,7 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
         />
         <span>{{ tab.label }}</span>
         <span v-if="tab.badge" class="tab-switcher__badge">{{ tab.badge }}</span>
-        <span v-if="tab.dot" class="tab-switcher__dot" aria-label="unsaved" />
+        <span v-if="tab.dot" class="tab-switcher__dot" :aria-label="t('common.unsaved')" />
       </button>
     </div>
 

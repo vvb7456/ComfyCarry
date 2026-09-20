@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'SeedInput' })
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(defineProps<{
   modelValue: number
@@ -46,10 +49,11 @@ function onChange(e: Event) {
       type="button"
       class="seed-input__toggle"
       :disabled="disabled"
-      :title="isRandom ? 'Random' : 'Fixed'"
+      :title="isRandom ? t('generate.advanced.seed_fixed') : t('generate.advanced.seed_random')"
+      :aria-label="isRandom ? t('generate.advanced.seed_fixed') : t('generate.advanced.seed_random')"
       @click="toggleMode"
     >
-      <MsIcon :name="isRandom ? 'casino' : 'lock_open'" size="xs" color="none" />
+      <MsIcon :name="isRandom ? 'casino' : 'lock'" size="xs" color="none" />
     </button>
   </div>
 </template>

@@ -27,7 +27,9 @@
     "search": "Search",
     "more_options": "Expand options",
     "prev_image": "Previous image",
-    "next_image": "Next image"
+    "next_image": "Next image",
+    "open_menu": "Open menu",
+    "close_menu": "Close menu"
   },
   "status": {
     "loading": "Loading..."
@@ -61,6 +63,7 @@
   "filter_hint": "Filter…",
   "chip_more": "+{n} more",
   "chip_collapse": "Collapse",
+  "unsaved": "Unsaved changes",
   "upload": {
     "drop_hint": "Drop file here",
     "click_hint": "or click to select",
