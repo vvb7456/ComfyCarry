@@ -513,7 +513,7 @@ defineExpose({ insertAtCursor })
   white-space: pre-line;
 }
 .help-content code {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: .84rem;
   background: var(--bg3);
   padding: 1px 5px;

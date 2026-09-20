@@ -290,7 +290,7 @@ onMounted(() => {
 <style scoped>
 /* Vue-unique: mono variant for API key display */
 .mono-input {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono);
   font-size: .82rem;
   letter-spacing: .5px;
   padding-right: 72px;

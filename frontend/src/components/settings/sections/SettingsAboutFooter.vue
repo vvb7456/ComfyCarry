@@ -288,7 +288,7 @@ async function reinitialize() {
   border-radius: var(--r-xs);
   background: var(--bg2);
   color: var(--t2);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono);
   font-size: .7rem;
 }
 .about-meta-sep {

@@ -212,7 +212,7 @@ function handleScroll() {
   flex: 1;
   overflow-y: auto;
   padding: var(--sp-3);
-  font-family: var(--mono, 'IBM Plex Mono', monospace);
+  font-family: var(--font-mono);
   font-size: .78rem;
   line-height: 1.55;
   color: var(--t2);

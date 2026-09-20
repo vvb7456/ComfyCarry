@@ -126,7 +126,7 @@ function onPrev() {
 }
 
 .step-password__ssh-textarea {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: .82rem;
   resize: vertical;
   width: 100%;

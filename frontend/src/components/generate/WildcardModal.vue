@@ -473,7 +473,7 @@ function onInsert(item: WildcardItem) {
 .wc-edit-textarea {
   flex: 1;
   min-height: 200px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: .85rem;
   padding: var(--sp-2);
   background: var(--bg);

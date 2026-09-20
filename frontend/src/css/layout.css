@@ -313,7 +313,7 @@
         .footer-tools .ver {
             margin-left: auto;
             font-size: .66rem;
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: var(--font-mono);
             color: var(--t3);
             text-decoration: none;
             white-space: nowrap;

@@ -433,7 +433,7 @@ defineExpose({ setupObserver })
   border-radius: 999px;
   font-size: var(--text-xxs);
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   color: #fff;
   line-height: 1.4;
   pointer-events: none;

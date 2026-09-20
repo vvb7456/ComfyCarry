@@ -144,7 +144,7 @@ function onNext() {
   background: rgba(255, 255, 255, .08);
   padding: 1px 6px;
   border-radius: 4px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: .9em;
 }
 

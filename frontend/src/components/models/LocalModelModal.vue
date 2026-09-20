@@ -272,7 +272,7 @@ function openImage(index: number) {
 .lm-table td:first-child { color: var(--t3); white-space: nowrap; width: 100px; font-weight: 500; }
 .lm-table a { word-break: break-all; }
 .lm-source-link { white-space: nowrap; }
-.lm-mono { word-break: break-all; font-family: monospace; font-size: .78rem; }
+.lm-mono { word-break: break-all; font-family: var(--font-mono); font-size: .78rem; }
 .lm-section { margin-top: var(--sp-4); }
 .lm-section-title { font-size: .88rem; font-weight: 600; display: flex; align-items: center; gap: var(--sp-1); margin-bottom: 8px; }
 .lm-word-actions { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }

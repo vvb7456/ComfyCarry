@@ -390,7 +390,7 @@ function refIndex(type: RefItem['type'], i: number): number {
 }
 .ref-help__row:last-child { margin-bottom: 0; }
 .ref-help__code {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: .84rem;
   background: var(--bg3);
   padding: 6px 8px;

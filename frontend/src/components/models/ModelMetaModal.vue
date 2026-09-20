@@ -431,7 +431,7 @@ function fmtSize(bytes?: number): string {
 .mm-table { width: 100%; font-size: var(--text-base); border-collapse: collapse; margin-bottom: var(--sp-4); }
 .mm-table td { padding: 7px 10px; border-bottom: 1px solid var(--bd); vertical-align: top; }
 .mm-table td:first-child { color: var(--t3); white-space: nowrap; width: 100px; font-weight: 500; }
-.mm-hash { word-break: break-all; font-family: monospace; font-size: .75rem; }
+.mm-hash { word-break: break-all; font-family: var(--font-mono); font-size: .75rem; }
 .mm-desc { line-height: 1.5; color: var(--t2); }
 
 /* Sections */

@@ -75,7 +75,7 @@
 /* ── Monospace variant ── */
 .form-input--mono,
 .form-textarea--mono {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--font-mono);
     font-size: .8rem;
 }
 
