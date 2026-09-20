@@ -268,8 +268,7 @@
       "remote_type_invalid": "远程存储类型无效",
       "wizard_remote_exists": "存储「{name}」已存在",
       "wizard_remote_source_missing": "原存储连接已失效，请重新配置连接",
-      "oauth_not_ready": "授权会话未就绪或已失效，请重新完成登录授权",
-      "remote_root_required": "同步文件夹必填，且不能是存储根目录"
+      "oauth_not_ready": "授权会话未就绪或已失效，请重新完成登录授权"
     }
   }
 }

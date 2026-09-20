@@ -109,7 +109,6 @@
     "localhost_hint": "After granting access, the browser will land on a localhost page that fails to open. Copy the full URL from the address bar and paste it below.",
     "paste_placeholder": "Paste the full URL from the browser address bar",
     "paste_required": "Paste the callback URL first",
-    "not_done_yet": "Authorization is not complete yet; finish it in the card first",
     "drives_failed": "Failed to load drives. Please retry.",
     "drives_required": "Drive information is missing. Please reconnect your account.",
     "back": "Back",
@@ -177,7 +176,6 @@
     "enable": "Enable",
     "delete": "Delete Rule",
     "edit_modal": "Edit Sync Rule",
-    "add_modal": "Add Sync Rule",
     "remote_select_title": "Choose Storage",
     "choose_rule": "Choose Rule",
     "select_storage_ph": "Choose a storage",
@@ -205,7 +203,6 @@
     "save_failed": "Save failed",
     "save_run": "Save & Queue",
     "deleted": "Deleted",
-    "running": "Running",
     "run_ok": "Added to queue",
     "run_failed": "Run failed"
   },
@@ -288,7 +285,6 @@
     "remote_created": "Remote storage “{name}” created",
     "remote_deleted": "Remote storage “{name}” deleted",
     "rules_saved": "Saved {count} rule(s)",
-    "run_started": "Running {count} rule(s)",
     "run_queued": "Added to queue ({count} rules)",
     "job_cancelled": "Task cancelled",
     "job_interrupted": "Task interrupted",
@@ -318,7 +314,6 @@
     "dir_failed": "Failed to read directory: {detail}",
     "dir_missing": "Directory does not exist: {path}",
     "job_not_found": "Job not found",
-    "job_running": "A sync job is already running, try again later",
     "job_not_queued": "Job is not queued",
     "job_not_running": "Job is not running",
     "name_type_required": "Name and type are required",
@@ -373,8 +368,7 @@
     "root_placeholder": "Select a folder",
     "root_browse": "Browse",
     "edit_creds": "Edit connection info",
-    "folder_new_placeholder": "Folder name",
-    "browse": "Browse"
+    "folder_new_placeholder": "Folder name"
   },
   "confirm": {
     "disconnect": {
@@ -419,9 +413,6 @@
     "next": "Next",
     "connect": "Connect",
     "save_create": "Save & Create Storage"
-  },
-  "steps": {
-    "connect": "Connect"
   },
   "settings": {
     "title": "Sync Settings",

@@ -268,8 +268,7 @@
       "remote_type_invalid": "Invalid remote storage type",
       "wizard_remote_exists": "Storage \"{name}\" already exists",
       "wizard_remote_source_missing": "The original storage connection is no longer available. Please configure it again.",
-      "oauth_not_ready": "Authorization session is not ready or has expired; please log in and authorize again",
-      "remote_root_required": "A sync folder is required and cannot be the storage root"
+      "oauth_not_ready": "Authorization session is not ready or has expired; please log in and authorize again"
     }
   }
 }
