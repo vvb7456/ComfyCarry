@@ -61,8 +61,6 @@ withDefaults(defineProps<{
   description?: string
   /** 副行事实（等宽小字，组件负责分隔）；对象形式带 href 时渲染为外链 */
   facts?: Array<string | ListRowFact>
-  /** 整行可点：只用于导航，不做有副作用的动作 */
-  clickable?: boolean
   /** 停用态（例如被禁用的同步规则） */
   disabled?: boolean
 }>(), {
@@ -75,7 +73,6 @@ withDefaults(defineProps<{
   <li
     class="list-row"
     :class="{
-      'list-row--clickable': clickable,
       'list-row--disabled': disabled,
       'list-row--no-icon': !icon && !$slots.icon,
     }"
@@ -136,15 +133,6 @@ withDefaults(defineProps<{
 
 .list-row + .list-row {
   border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
-}
-
-.list-row--clickable {
-  cursor: pointer;
-  transition: background .15s ease;
-}
-
-.list-row--clickable:hover {
-  background: var(--bg3);
 }
 
 .list-row--disabled {
