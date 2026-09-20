@@ -43,8 +43,9 @@ function countDecimals(n: number): number {
 }
 
 function validate(v: number): number {
-  // snap to step grid (matching legacy _addValidation behavior)
-  v = Math.round(v / props.step) * props.step
+  // snap to step grid anchored at min (consistent with RangeField)
+  const base = props.min ?? 0
+  v = Math.round((v - base) / props.step) * props.step + base
   v = +v.toFixed(countDecimals(props.step))
   if (props.min != null) v = Math.max(props.min, v)
   if (props.max != null) v = Math.min(props.max, v)
@@ -78,7 +79,7 @@ function decrement() {
     <input
       v-bind="$attrs"
       type="number"
-      class="number-input__field"
+      class="form-number number-input__field"
       :class="{ 'number-input__field--center': center }"
       :value="modelValue"
       :min="min"
@@ -117,35 +118,7 @@ function decrement() {
   display: flex;
 }
 
-.number-input__field {
-  width: 100%;
-  font-size: .85rem;
-  font-family: inherit;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--bd);
-  background: var(--bg);
-  color: var(--t1);
-  outline: none;
-  transition: border-color .15s;
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.number-input__field::-webkit-inner-spin-button,
-.number-input__field::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.number-input__field:focus {
-  border-color: var(--ac);
-}
-
-.number-input__field:disabled {
-  opacity: .55;
-  cursor: not-allowed;
-}
+/* ── .form-number (forms.css) provides the base control look & focus ring ── */
 
 .number-input--has-spinners .number-input__field {
   padding-right: 28px;
