@@ -144,10 +144,6 @@ function onClick() {
   font-size: .95rem;
 }
 
-.option-card__badge {
-  margin-left: auto;
-}
-
 .option-card__desc {
   font-size: .8rem;
   color: var(--t2);
