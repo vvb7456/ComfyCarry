@@ -303,6 +303,7 @@ watch(
 
 .mc-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-top: 8px;
   justify-content: flex-end;

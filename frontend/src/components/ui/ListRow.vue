@@ -18,7 +18,7 @@ export interface ListRowFact {
  * ListRow — 全站统一的「对象行」。
  *
  * 一行 = 图标 + 主行（名称 / 状态 / 徽章）+ 副行（事实）+ 行尾动作。
- * 无背景、无表头，只有行间发丝线；窄屏收成两列、动作换行右对齐。
+ * 无背景、无表头，只有行间发丝线；动作在行尾自适应并严格垂直居中。
  *
  * 用法（外层必须是 `<ul class="list-plain">`，行本身是 `<li>`）：
  *   <ul class="list-plain">
@@ -35,7 +35,7 @@ export interface ListRowFact {
  *   3. 副行事实等宽小字、自动 `·` 分隔；缺值不要传空串进来（不渲染 `-`）；
  *      富渲染 (行内图标/动画) 用 #facts slot 覆盖默认渲染
  *   4. 行尾动作统一为 BaseButton 的 `size="sm" icon-only variant="ghost"`
- *      （长方形约 42×32、触屏 44 高），尺寸来源已收敛到 BaseButton 的 iconOnly；
+ *      （尺寸与同级按钮等高 28px、紧凑正方形），尺寸来源已收敛到 BaseButton 的 iconOnly；
  *      行这里只负责排列与 4px 间距。纯图标按钮请始终带 `aria-label`
  *   5. 一个行最多 3 个动作，更多请收进 DropdownMenu；危险动作永远排最右
  */
@@ -217,8 +217,8 @@ withDefaults(defineProps<{
   margin: 0 6px;
 }
 
-/* 行尾按钮为 BaseButton `size="sm" icon-only variant="ghost"`：长方形 42×32
-   （触屏 44 高）、图标 20px 的尺寸来源已收敛到 BaseButton 的 iconOnly，
+/* 行尾按钮为 BaseButton `size="sm" icon-only variant="ghost"`：等高 28px、
+   图标 18px 的尺寸来源已收敛到 BaseButton 的 iconOnly，
    这里只保留排列与间距，避免双重来源。
    align-self: center —— 相对「整个行」垂直居中（行高由最高的左侧内容决定，
    与左侧文字行数无关）；设计稿 .cc-rule/.cc-service 同为整行居中 */
@@ -232,21 +232,40 @@ withDefaults(defineProps<{
 
 @container list (max-width: 600px) {
   .list-row {
-    grid-template-columns: 22px minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    padding: 12px 0;
   }
 
   .list-row--no-icon {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  /* 移动端首行禁止 Badge 折行：标题超长弹性截断，Badge/状态点常驻同行 */
+  .list-row__head {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .list-row__title {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .list-row__status {
+    flex-shrink: 0;
+  }
+
+  .list-row__head :deep(.badge) {
+    min-width: 0;
+    flex-shrink: 1;
   }
 
   .list-row__actions {
-    grid-column: 2;
-    justify-content: flex-end;
-  }
-
-  .list-row--no-icon .list-row__actions {
-    grid-column: 1;
+    flex-shrink: 0;
   }
 }
 </style>

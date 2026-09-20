@@ -160,11 +160,12 @@ const speedTitle = computed(() => {
   white-space: nowrap;
   cursor: default;
   user-select: none;
+  box-sizing: border-box;
 }
-.dl-done--xs { padding: 2px 8px; font-size: var(--text-xs); }
-.dl-done--sm { padding: 4px 10px; font-size: var(--text-sm); }
-.dl-done--md { padding: 6px 12px; font-size: var(--text-base); }
-.dl-done--lg { padding: 8px 16px; font-size: var(--text-md); }
+.dl-done--xs { min-height: 22px; padding: 2px 8px; font-size: var(--text-xs); }
+.dl-done--sm { min-height: 28px; padding: 4px 10px; font-size: var(--text-sm); }
+.dl-done--md { min-height: 34px; padding: 6px 12px; font-size: var(--text-base); }
+.dl-done--lg { min-height: 40px; padding: 8px 16px; font-size: var(--text-md); }
 /* hover 取消态: 恢复完全不透明与手型光标, 与可点击语义一致 */
 .dl-btn--busy.dl-btn--cancellable:hover {
   opacity: 1;

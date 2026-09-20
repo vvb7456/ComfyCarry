@@ -147,16 +147,22 @@ const stateText = computed(() => {
   return t(`models.downloads.${k}`)
 })
 
-/** 副行事实: 版本名 + 速度 / 大小 / 进度 (任务模式) */
-const taskFacts = computed(() => {
+/** 版本名 (纯文字, 优先弹性截断) */
+const versionName = computed(() => {
+  if (isFavorite.value) return props.favoriteItem?.versionName || ''
+  return props.task?.meta?.version_name || ''
+})
+
+/** 事实指标流 (纯文字, 速度 / 大小 / 进度 或 总大小, 保持不换行) */
+const metricFacts = computed(() => {
   if (isFavorite.value) return []
   const out: string[] = []
-  const version = props.task?.meta?.version_name
-  if (version) out.push(version)
   if (showProgressRow.value) {
     if (speedText.value) out.push(speedText.value)
     if (sizeText.value) out.push(sizeText.value)
     out.push(`${progressPct.value.toFixed(1)}%`)
+  } else if (props.task?.total_bytes) {
+    out.push(fmtBytes(props.task.total_bytes))
   }
   return out
 })
@@ -164,14 +170,15 @@ const taskFacts = computed(() => {
 
 <template>
   <div class="dli">
-    <!-- Thumbnail -->
+    <!-- Thumbnail: 48px 严格垂直居中 -->
     <div class="dli-thumb">
       <img v-if="imageUrl" :src="imageUrl" alt="" loading="lazy" @error="($event.target as HTMLImageElement).style.display='none'">
       <MsIcon v-else name="image_not_supported" />
     </div>
 
-    <!-- Main -->
+    <!-- Main: 严格分行 (Row 1 名称状态 / Row 2 纯Badge / Row 3 进度条 / Row 3或4 事实文本) -->
     <div class="dli-main">
+      <!-- Row 1: 模型名称 + 状态点 (严格单行) -->
       <div class="dli-head">
         <a v-if="civitaiUrl" class="dli-name" :href="civitaiUrl" target="_blank" rel="noopener" @click.stop>{{ name }}</a>
         <span v-else class="dli-name">{{ name }}</span>
@@ -180,21 +187,26 @@ const taskFacts = computed(() => {
           <StatusDot :status="stateDot" size="sm" />
           {{ stateText }}
         </span>
-
-        <Badge v-if="modelType" :color="badgeColor">{{ badgeLabel }}</Badge>
-        <Badge v-if="baseModelText">{{ baseModelText }}</Badge>
-        <Badge v-if="isFavorite && favoriteItem?.versionName">{{ favoriteItem.versionName }}</Badge>
       </div>
 
-      <div v-if="taskFacts.length" class="dli-facts">
-        <span v-for="fact in taskFacts" :key="fact">{{ fact }}</span>
+      <!-- Row 2: 纯 Badge 行 (仅限前 2 个: 模型类型 + 基模架构, 严格单行) -->
+      <div v-if="modelType || baseModelText" class="dli-badges">
+        <Badge v-if="modelType" :color="badgeColor" class="dli-badge">{{ badgeLabel }}</Badge>
+        <Badge v-if="baseModelText" class="dli-badge">{{ baseModelText }}</Badge>
       </div>
 
-      <div v-if="isFailed && task?.error" class="dli-error">{{ errorText }}</div>
-
+      <!-- Row 3 (任务进行中): 细进度条 -->
       <div v-if="showProgressRow" class="dli-progress">
         <UsageBar :percent="progressPct" :height="5" />
       </div>
+
+      <!-- Row 3/4: 版本信息与事实文本 (轻量纯文字, 与历史视觉统一, 绝不折行) -->
+      <div v-if="versionName || metricFacts.length" class="dli-facts">
+        <span v-if="versionName" class="dli-version">{{ versionName }}</span>
+        <span v-for="m in metricFacts" :key="m" class="dli-metric">{{ m }}</span>
+      </div>
+
+      <div v-if="isFailed && task?.error" class="dli-error" :title="errorText">{{ errorText }}</div>
     </div>
 
     <!-- Actions -->
@@ -292,14 +304,13 @@ const taskFacts = computed(() => {
 </template>
 
 <style scoped>
-/* 下载任务行: 对齐 ListRow 骨架, 但首列是多媒体的 48px 缩略图 (媒体预览保留)。
-   行本身透明、无边框, 分隔线由外层 ul.list-plain 的 li 发丝线承担。 */
+/* 下载任务行: 严格三行/四行栅格, 缩略图、主内容、动作按钮在整行严格居中 */
 .dli {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: start;
-  padding: 14px 0;
+  align-items: center;
+  padding: 12px 0;
 }
 
 /* ── Thumbnail ── */
@@ -324,14 +335,20 @@ const taskFacts = computed(() => {
 /* ── Main ── */
 .dli-main {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
 }
 
+/* Row 1: 名称 + 状态点 (严格单行截断) */
 .dli-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .dli-name {
@@ -339,6 +356,11 @@ const taskFacts = computed(() => {
   font-weight: 600;
   color: var(--t1);
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .dli-name:hover {
   color: var(--ac);
@@ -347,53 +369,84 @@ const taskFacts = computed(() => {
 .dli-state {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: var(--text-xs);
   color: var(--t2);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
+/* Row 2: 纯 Badge 行 (严格单行, 允许内部收缩打点) */
+.dli-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.dli-badge {
+  max-width: 110px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+/* Row 3/4: 事实文本行 (版本名等事实, 纯文字) */
 .dli-facts {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
   color: var(--t3);
   font-size: var(--text-xs);
   font-family: var(--font-tabular);
+  min-width: 0;
+  line-height: 1.4;
+}
+.dli-version {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.dli-metric {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .dli-facts > span + span::before {
   content: '·';
   margin: 0 6px;
 }
 
+.dli-progress {
+  margin: 2px 0;
+}
+
 .dli-error {
-  margin-top: 4px;
+  margin-top: 2px;
   font-size: var(--text-xs);
   color: var(--red);
-  line-height: 1.45;
+  line-height: 1.4;
   word-break: break-word;
 }
 
-/* ── Progress ── */
-.dli-progress {
-  margin-top: 8px;
-}
-
-/* ── Actions ── */
+/* ── Actions: 常驻行尾 ── */
 .dli-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
   .dli {
-    grid-template-columns: 48px minmax(0, 1fr);
     gap: 10px;
+    padding: 10px 0;
   }
 
-  .dli-actions {
-    grid-column: 2;
-    justify-content: flex-end;
+  .dli-badge {
+    max-width: 90px;
   }
 }
 </style>

@@ -2,12 +2,13 @@
 /**
  * BaseButton — 全站按钮基类。
  *
- * 行内纯图标按钮的标准用法（对象行 / 分页 / 工具条）：
+ * 行内纯图标按钮的标准用法（对象行 / 分页 / 工具条 / 卡片操作）：
  *   <BaseButton variant="ghost" size="sm" icon-only aria-label="停止">
  *     <MsIcon name="stop" />
  *   </BaseButton>
- * 长方形约 42×32（左右 padding 10 + 20px 图标），触屏 44 高。
- * 尺寸集中在 `iconOnly` 内实现，调用方不要再用 :deep 覆盖。
+ * 纯图标按钮与同级文本按钮严格等高（sm: 28px, md: 34px, xs: 22px, lg: 42px），呈紧凑正方形，
+ * 避免混排时高低错落或撑高父容器。尺寸集中在组件内按 `size` 分级，调用方无需手写尺寸覆盖。
+ * （注：icon-only 强绑定对应档位的标准基准高度 `--btn-h`。若调用方通过 `--btn-py-*` 局部抬高文本按钮高度，同级若有 icon-only 混排需留意可能产生的高度差）
  * icon-only 时 title 缺省取 ariaLabel，纯图标按钮无需再手写 :title。
  */
 import { computed } from 'vue'
@@ -23,7 +24,7 @@ const props = withDefaults(defineProps<{
   size?: ButtonSize
   disabled?: boolean
   loading?: boolean
-  /** 标准行内纯图标按钮形态（长方形，约 42×32；触屏 44 高），标准用法见组件头注释 */
+  /** 纯图标按钮形态（与同级文本按钮等高正方形），标准用法见组件头注释 */
   iconOnly?: boolean
   href?: string
   target?: string
@@ -107,31 +108,72 @@ function onClick(e: MouseEvent) {
   appearance: none;
 }
 
-/* ── Sizes ── */
-.base-btn--xs  { padding: var(--btn-py-xs, 2px) var(--btn-px-xs, 8px);   font-size: var(--btn-font-xs, var(--text-xs)); gap: 3px; }
-.base-btn--sm  { padding: var(--btn-py-sm, 4px) var(--btn-px-sm, 10px);  font-size: var(--btn-font-sm, .78rem); }
-.base-btn--md  { padding: var(--btn-py-md, 7px) var(--btn-px-md, 14px);  font-size: var(--btn-font-md, .82rem); }
-.base-btn--lg  { padding: var(--btn-py-lg, 10px) var(--btn-px-lg, 20px); font-size: var(--btn-font-lg, var(--text-md)); }
-
-/* ── Icon only（标准行内纯图标按钮）──
-   长方形而不是正方形：1px 边框 + 左右各 10px + 20px 图标 ≈ 42×32。
-   尺寸与图标规格集中在这里，行 / 页调用方只传 `size="sm" icon-only variant="ghost"`。
-   触屏只加高命中区（44px），图标不放大。 */
-.base-btn--icon-only {
-  gap: 0;
-  min-width: 42px;
-  min-height: 32px;
-  padding: 0 10px;
+/* ── Sizes (高度基准与常规内边距) ── */
+.base-btn--xs  {
+  --btn-h: 22px;
+  min-height: var(--btn-h);
+  padding: var(--btn-py-xs, 2px) var(--btn-px-xs, 8px);
+  font-size: var(--btn-font-xs, var(--text-xs));
+  gap: 3px;
+}
+.base-btn--sm  {
+  --btn-h: 28px;
+  min-height: var(--btn-h);
+  padding: var(--btn-py-sm, 4px) var(--btn-px-sm, 10px);
+  font-size: var(--btn-font-sm, .78rem);
+}
+.base-btn--md  {
+  --btn-h: 34px;
+  min-height: var(--btn-h);
+  padding: var(--btn-py-md, 7px) var(--btn-px-md, 14px);
+  font-size: var(--btn-font-md, .82rem);
+}
+.base-btn--lg  {
+  --btn-h: 42px;
+  min-height: var(--btn-h);
+  padding: var(--btn-py-lg, 10px) var(--btn-px-lg, 20px);
+  font-size: var(--btn-font-lg, var(--text-md));
 }
 
-.base-btn--icon-only :deep(.ms) {
+/* ── Icon only（纯图标按钮：与同级文本按钮严格等高，呈紧凑正方形）──
+   高度与最小宽度继承 --btn-h，与文本按钮像素级对齐，避免混排撑高或高矮不齐。
+   触屏通过扩展可点击区域（::after）满足大点击域，绝不放大视觉盒模型破坏布局。 */
+.base-btn--icon-only {
+  gap: 0;
+  padding: 0;
+  min-height: var(--btn-h, 34px);
+  height: var(--btn-h, 34px);
+  min-width: var(--btn-h, 34px);
+  width: var(--btn-h, 34px);
+  flex-shrink: 0;
+}
+
+.base-btn--xs.base-btn--icon-only :deep(.ms) {
+  font-size: 14px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 14;
+}
+
+.base-btn--sm.base-btn--icon-only :deep(.ms) {
+  font-size: 18px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 18;
+}
+
+.base-btn--md.base-btn--icon-only :deep(.ms) {
   font-size: 20px;
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
 }
 
+.base-btn--lg.base-btn--icon-only :deep(.ms) {
+  font-size: 24px;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
 @media (pointer: coarse) {
-  .base-btn--icon-only {
-    min-height: 44px;
+  .base-btn--icon-only::after {
+    content: '';
+    position: absolute;
+    /* 仅纵向扩展点击域（避免横向与相邻 4px gap 按钮命中区互相重叠） */
+    inset: -6px 0;
   }
 }
 
