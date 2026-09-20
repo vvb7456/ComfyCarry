@@ -8,7 +8,6 @@ const props = withDefaults(defineProps<{
   radius?: 'sm' | 'md' | 'lg'
   density?: 'compact' | 'default' | 'roomy'
   tone?: 'default' | 'danger'
-  interactive?: boolean
   padding?: boolean
   /** 根元素标签; 交互卡片 (OptionCard/ModeCard) 传 'button' 复用卡片样式 */
   tag?: string
@@ -17,7 +16,6 @@ const props = withDefaults(defineProps<{
   radius: 'md',
   density: 'default',
   tone: 'default',
-  interactive: false,
   padding: true,
   tag: 'div',
 })
@@ -37,7 +35,6 @@ const padded = computed(() => props.padding)
       `base-card--density-${props.density}`,
       `base-card--tone-${props.tone}`,
       {
-        'base-card--interactive': props.interactive,
         'base-card--simple': !structured,
         'base-card--structured': structured,
         'base-card--padded': !structured && padded,
@@ -103,10 +100,6 @@ const padded = computed(() => props.padding)
 
 .base-card--tone-danger {
   border-color: color-mix(in srgb, var(--red) 25%, transparent);
-}
-
-.base-card--interactive:hover {
-  border-color: var(--bd-f);
 }
 
 .base-card--simple.base-card--padded {

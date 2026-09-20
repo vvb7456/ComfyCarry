@@ -52,7 +52,6 @@ function onClick() {
     }"
     :disabled="disabled"
     :aria-pressed="selected || locked"
-    :interactive="false"
     @click="onClick"
   >
     <!-- checkmark indicator -->

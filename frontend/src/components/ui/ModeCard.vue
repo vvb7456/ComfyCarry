@@ -53,7 +53,6 @@ function onClick() {
     }"
     :disabled="props.disabled || !props.clickable"
     :aria-pressed="props.selected"
-    :interactive="false"
     @click="onClick"
   >
     <div class="mode-card-header">
