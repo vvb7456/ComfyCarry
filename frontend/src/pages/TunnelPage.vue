@@ -427,7 +427,7 @@ function openAddSvc() {
                 <BaseButton
                   v-if="!row.isSsh && !row.isTcp && heroOnline && row.url"
                   variant="ghost" size="sm" icon-only :aria-label="openAria(row)"
-                  :href="row.url" target="_blank"
+                  :href="row.url" target="_blank" rel="noopener"
                 >
                   <MsIcon name="open_in_new" />
                 </BaseButton>

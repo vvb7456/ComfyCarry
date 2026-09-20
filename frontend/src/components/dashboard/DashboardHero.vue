@@ -166,6 +166,7 @@ const gpuTempColor = computed(() => {
             v-if="comfyUrl"
             :href="comfyUrl"
             target="_blank"
+            rel="noopener"
             variant="default"
             class="dash-btn--pill"
           >
@@ -188,6 +189,7 @@ const gpuTempColor = computed(() => {
             v-if="comfyUrl"
             :href="comfyUrl"
             target="_blank"
+            rel="noopener"
             variant="default"
             class="dash-btn--pill"
           >

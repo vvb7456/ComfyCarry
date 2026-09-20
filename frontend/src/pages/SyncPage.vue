@@ -1016,6 +1016,7 @@ function switchTab(tab: string) {
               variant="primary"
               href="https://github.com/vvb7456/ComfyCarry-Companion/releases/latest"
               target="_blank"
+              rel="noopener"
             >
               <MsIcon name="download" /> {{ t('sync.companion.download_client') }}
             </BaseButton>

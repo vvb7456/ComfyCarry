@@ -66,6 +66,7 @@ const { t } = useI18n({ useScope: 'global' })
             v-if="dashboardState === 'ready' || dashboardState === 'busy'"
             :href="comfyUrl || undefined"
             target="_blank"
+            rel="noopener"
             class="link dash-svc-card__cta"
           >
             <span class="dash-svc-card__cta-text">{{ isComfyBusy ? t('dashboard.actions.view') : t('dashboard.actions.open') }}</span>
@@ -105,6 +106,7 @@ const { t } = useI18n({ useScope: 'global' })
             v-if="data?.jupyter?.online && jupyterUrl"
             :href="jupyterUrl"
             target="_blank"
+            rel="noopener"
             class="link dash-svc-card__cta"
           >
             <span class="dash-svc-card__cta-text">{{ t('dashboard.actions.open') }}</span>

@@ -172,6 +172,7 @@ function toggleLang() {
             class="ver"
             :href="commitUrl"
             target="_blank"
+            rel="noopener"
             :title="shortCommit ? `${app.branch}@${shortCommit} ${app.version || ''}`.trim() : ''"
           >{{ app.version || shortCommit }}</a>
         </div>

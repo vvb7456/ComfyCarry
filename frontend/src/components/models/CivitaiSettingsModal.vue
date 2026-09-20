@@ -181,7 +181,7 @@ const requestClose = useModalCloseGuard({
           <div class="settings-row__desc">
             <i18n-t keypath="models.civitai.settings.key_desc" tag="span">
               <template #link>
-                <a href="https://civitai.com/user/account" target="_blank" class="link">{{ t('models.civitai.settings.key_link') }}</a>
+                <a href="https://civitai.com/user/account" target="_blank" rel="noopener" class="link">{{ t('models.civitai.settings.key_link') }}</a>
               </template>
             </i18n-t>
           </div>
