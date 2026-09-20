@@ -1,6 +1,7 @@
 {
   "title": "Generate",
   "gate": {
+    "checking": "Checking ComfyUI status…",
     "starting": "ComfyUI is starting, please wait…",
     "go_comfyui": "Go to ComfyUI page to start",
     "backend_error": "Cannot connect to Dashboard service"

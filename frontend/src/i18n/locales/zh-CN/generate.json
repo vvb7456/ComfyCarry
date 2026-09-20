@@ -1,6 +1,7 @@
 {
   "title": "内容生成",
   "gate": {
+    "checking": "正在检查 ComfyUI 状态…",
     "starting": "ComfyUI 正在启动，请稍候…",
     "go_comfyui": "前往 ComfyUI 页启动",
     "backend_error": "无法连接 Dashboard 服务"

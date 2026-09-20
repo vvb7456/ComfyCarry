@@ -53,6 +53,26 @@ const frozen = computed(() => bg.state === 'running')
 const gate = useComfyGate()
 gate.checkNow()
 
+const gateIcon = computed(() => {
+  if (gate.state.value === 'error') return 'error_outline'
+  if (gate.state.value === 'offline') return 'cloud_off'
+  return 'cloud_sync'
+})
+
+const gateTitle = computed(() => {
+  const s = gate.state.value
+  if (s === 'checking') return t('generate.gate.checking')
+  if (s === 'starting') return t('generate.gate.starting')
+  if (s === 'error') return t('generate.gate.backend_error')
+  return t('generate.preview.offline_title')
+})
+
+const gateMessage = computed(() => {
+  const s = gate.state.value
+  if (s === 'starting' || s === 'offline') return t('generate.preview.offline_desc')
+  return undefined
+})
+
 // ── Options: load once, provide to all children ────────────────────────────
 const options = useGenerateOptions()
 provide(GenerateOptionsKey, options)
@@ -616,13 +636,9 @@ sse.start()
     <!-- Gate overlay when ComfyUI is not ready -->
     <div v-if="gate.state.value !== 'ready'" class="gen-gate-overlay">
       <EmptyState
-        :icon="gate.state.value === 'error' ? 'error_outline' : 'cloud_off'"
-        :title="gate.state.value === 'starting'
-          ? t('generate.gate.starting')
-          : gate.state.value === 'error'
-            ? t('generate.gate.backend_error')
-            : t('generate.preview.offline_title')"
-        :message="t('generate.preview.offline_desc')"
+        :icon="gateIcon"
+        :title="gateTitle"
+        :message="gateMessage"
       >
         <router-link v-if="gate.state.value === 'offline'" to="/comfyui" class="gen-gate-link">
           {{ t('generate.gate.go_comfyui') }}
