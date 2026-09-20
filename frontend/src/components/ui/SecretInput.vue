@@ -129,6 +129,7 @@ async function copySecret() {
       type="button"
       class="secret-input__btn secret-input__btn--toggle"
       :title="isRevealed ? t('common.btn.hide') : t('common.btn.show')"
+      :aria-label="isRevealed ? t('common.btn.hide') : t('common.btn.show')"
       @click="toggleVisibility"
     >
       <MsIcon :name="isRevealed ? 'visibility_off' : 'visibility'" size="sm" />
@@ -138,6 +139,7 @@ async function copySecret() {
       type="button"
       class="secret-input__btn secret-input__btn--copy"
       :title="t('common.btn.copy')"
+      :aria-label="t('common.btn.copy')"
       @click="copySecret"
     >
       <MsIcon name="content_copy" size="sm" />
