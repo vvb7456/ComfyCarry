@@ -213,7 +213,7 @@ const footerClass = computed(() => {
                 </div>
               </div>
             </slot>
-            <button v-if="showClose" class="modal-close" @click="close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')">
+            <button type="button" v-if="showClose" class="modal-close" @click="close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')">
               <MsIcon name="close" />
             </button>
           </div>

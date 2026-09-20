@@ -153,7 +153,7 @@ onUnmounted(() => {
         <MsIcon name="progress_activity" size="sm" color="none" class="bg-run-bar__spin" />
         <span class="bg-run-bar__title">{{ runningLabel }}</span>
         <span class="bg-run-bar__sub">{{ elapsedLabel }}</span>
-        <button class="bg-run-bar__btn bg-run-bar__btn--stop" @click="onStop">
+        <button type="button" class="bg-run-bar__btn bg-run-bar__btn--stop" @click="onStop">
           {{ t('generate.background.btn_stop') }}
         </button>
       </template>
@@ -163,7 +163,7 @@ onUnmounted(() => {
           {{ t('generate.background.bar_finished', { n: store.iteration }) }}
         </span>
         <span class="bg-run-bar__sub">{{ subLabel }}</span>
-        <button class="bg-run-bar__btn bg-run-bar__btn--dismiss" @click="store.dismiss()">
+        <button type="button" class="bg-run-bar__btn bg-run-bar__btn--dismiss" @click="store.dismiss()">
           {{ t('generate.background.btn_dismiss') }}
         </button>
       </template>
@@ -173,7 +173,7 @@ onUnmounted(() => {
           {{ t('generate.background.bar_stopped', { n: store.iteration }) }}
         </span>
         <span class="bg-run-bar__sub">{{ subLabel }}</span>
-        <button class="bg-run-bar__btn bg-run-bar__btn--dismiss" @click="store.dismiss()">
+        <button type="button" class="bg-run-bar__btn bg-run-bar__btn--dismiss" @click="store.dismiss()">
           {{ t('generate.background.btn_dismiss') }}
         </button>
       </template>

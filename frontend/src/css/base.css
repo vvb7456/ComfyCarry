@@ -300,7 +300,8 @@
 
         /* ── Global: Focus Visible ── */
         .tab:focus-visible,
-        .nav-item:focus-visible {
+        .nav-item:focus-visible,
+        button:focus-visible {
             outline: 2px solid var(--ac);
             outline-offset: 2px
         }

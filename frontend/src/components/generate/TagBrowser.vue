@@ -140,12 +140,14 @@ const subgroupTabs = computed<FusionTab[]>(() =>
             <template v-else-if="tags.length">
               <div class="tb-tag-grid">
                 <button
+                  type="button"
                   v-for="tag in tags"
                   :key="tag.id"
                   class="tb-tag"
                   :class="{ 'tb-tag--has-desc': props.showTranslation && !!tag.translate }"
                   :style="{ '--chip-color': tag.color }"
                   :title="props.showTranslation ? (tag.translate || tag.text) : tag.text"
+                  :aria-label="props.showTranslation ? (tag.translate || tag.text) : tag.text"
                   @click="onTagClick(tag)"
                 >
                   <span class="tb-tag-top">{{ tag.text }}</span>

@@ -346,7 +346,7 @@ function fmtSize(bytes?: number): string {
             {{ word }}
           </li>
         </ul>
-        <button v-if="twOverflows" class="mm-tw-toggle" :aria-expanded="!twCollapsed" @click="twCollapsed = !twCollapsed">
+        <button type="button" v-if="twOverflows" class="mm-tw-toggle" :aria-expanded="!twCollapsed" @click="twCollapsed = !twCollapsed">
           {{ twCollapsed ? t('models.meta.expand_all', { count: displayTrainedWords.length }) : t('models.meta.collapse') }}
         </button>
       </div>
@@ -386,6 +386,7 @@ function fmtSize(bytes?: number): string {
               type="button"
               class="mm-nsfw-overlay"
               :title="t('models.nsfw.reveal_hint')"
+              :aria-label="t('models.nsfw.reveal_hint')"
               @click.stop="revealNsfw(i)"
             >
               <MsIcon name="visibility_off" />

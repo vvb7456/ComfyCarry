@@ -218,15 +218,19 @@ function cycleApply(lora: LoraEntry) {
         <!-- 开关 / 删除: 挂在卡片根下 (相对卡片定位)。宽屏时缩略图占满卡片顶部,
              位置与旧版一致; 窄屏横向卡片下改贴卡片右缘, 不压住小缩略图。 -->
         <button
+          type="button"
           class="lora-card__toggle"
           :title="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
+          :aria-label="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
           @click.stop="toggleEnabled(index)"
         >
           <MsIcon :name="lora.enabled ? 'toggle_on' : 'toggle_off'" color="none" />
         </button>
         <button
+          type="button"
           class="lora-card__del"
           :title="t('generate.lora.remove')"
+          :aria-label="t('generate.lora.remove')"
           @click.stop="removeLora(index)"
         >
           <MsIcon name="remove_circle" color="none" />
@@ -242,6 +246,7 @@ function cycleApply(lora: LoraEntry) {
                  宽屏绝对定位到缩略图左上, 窄屏回流成名字旁的行内 chip。 -->
             <div v-if="isPaired" class="lora-card__seg-badges">
               <button
+                type="button"
                 class="lora-card__badge lora-card__badge--seg"
                 @click.stop="cycleApply(lora)"
               >

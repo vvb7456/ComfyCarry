@@ -233,6 +233,7 @@ function cancelEdit() {
   >
     <span class="chip-top chip-top--break">BREAK</span>
     <button
+      type="button"
       class="chip-close"
       :aria-label="t('common.btn.remove')"
       :title="t('common.btn.remove')"
@@ -261,6 +262,7 @@ function cancelEdit() {
   >
     <!-- Close button — absolute top-right -->
     <button
+      type="button"
       class="chip-close"
       :aria-label="t('common.btn.remove')"
       :title="t('common.btn.remove')"
@@ -328,9 +330,9 @@ function cancelEdit() {
         </div>
         <span class="toolbar-sep" />
         <div class="bracket-group">
-          <button class="bracket-btn" @click.stop="adjustBracket('round', -1)">&minus;</button>
+          <button type="button" class="bracket-btn" @click.stop="adjustBracket('round', -1)">&minus;</button>
           <span class="bracket-value">()</span>
-          <button class="bracket-btn" @click.stop="adjustBracket('round', 1)">&plus;</button>
+          <button type="button" class="bracket-btn" @click.stop="adjustBracket('round', 1)">&plus;</button>
         </div>
       </div>
     </Teleport>

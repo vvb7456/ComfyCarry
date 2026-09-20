@@ -73,6 +73,7 @@ defineExpose({ focus })
       @keydown="onKeydown"
     >
     <button
+      type="button"
       v-if="model"
       class="search-input__clear"
       tabindex="-1"
@@ -88,6 +89,7 @@ defineExpose({ focus })
     <slot name="inline" />
 
     <button
+      type="button"
       class="search-input__submit"
       :aria-label="t('common.btn.search')"
       :title="t('common.btn.search')"

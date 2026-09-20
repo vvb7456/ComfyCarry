@@ -42,6 +42,7 @@ function close() {
       <slot />
     </div>
     <button
+      type="button"
       v-if="closable"
       class="alert-banner__close"
       :aria-label="t('common.btn.close')"

@@ -29,6 +29,7 @@ withDefaults(defineProps<{
       :placeholder="placeholder || t('common.filter_hint')"
     >
     <button
+      type="button"
       v-if="clearable && model"
       class="filter-input__clear"
       :aria-label="t('common.btn.clear')"

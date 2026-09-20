@@ -159,7 +159,7 @@ defineExpose({ insertAtCursor })
     <div class="gen-s-hdr">
       <MsIcon name="notes" class="hdr-icon" />
       {{ t('generate.prompt.title') }}
-      <button class="prompt-help-btn" :title="t('generate.prompt.syntax_help_title')" @click="helpOpen = true">
+      <button type="button" class="prompt-help-btn" :title="t('generate.prompt.syntax_help_title')" :aria-label="t('generate.prompt.syntax_help_title')" @click="helpOpen = true">
         <MsIcon name="help_outline" size="sm" color="none" />
       </button>
       <!-- 标题行右端槽 — 视频 5B 的文生/图生开关挂这里。
@@ -174,10 +174,12 @@ defineExpose({ insertAtCursor })
       <!-- Toolbar (above everything, full width) -->
       <div v-if="tools.length" class="prompt-toolbar">
         <button
+          type="button"
           v-for="tool in tools"
           :key="tool.key"
           class="prompt-tool-btn"
           :title="tool.title"
+          :aria-label="tool.title"
           :disabled="tool.disabled"
           @click="emit('tool', tool.key)"
         >

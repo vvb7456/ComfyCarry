@@ -119,15 +119,19 @@ function formatSize(bytes: number): string {
 
         <!-- Insert buttons -->
         <button
+          type="button"
           class="emb-insert-btn"
           :title="t('generate.embedding.to_positive_title')"
+          :aria-label="t('generate.embedding.to_positive_title')"
           @click="onInsert(item, 'positive')"
         >
           {{ t('generate.embedding.to_positive') }}
         </button>
         <button
+          type="button"
           class="emb-insert-btn"
           :title="t('generate.embedding.to_negative_title')"
+          :aria-label="t('generate.embedding.to_negative_title')"
           @click="onInsert(item, 'negative')"
         >
           {{ t('generate.embedding.to_negative') }}

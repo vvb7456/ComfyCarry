@@ -303,9 +303,11 @@ defineExpose({ setupObserver })
             ></video>
             <!-- 生成视频入口: 仅图像卡 hover 时显示 -->
             <button
+              type="button"
               v-else
               class="history-thumb-make"
               :title="t('generate.history.make_video')"
+              :aria-label="t('generate.history.make_video')"
               @click.stop="onMakeVideo(img, item)"
             >{{ t('generate.history.make_video') }}</button>
           </div>

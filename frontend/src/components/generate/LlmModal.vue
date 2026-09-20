@@ -225,6 +225,7 @@ const showNegative = computed(() =>
         <!-- Mode tabs -->
         <div class="llm-mode-tabs">
           <button
+            type="button"
             class="llm-mode-tab"
             :class="{ active: llm.mode.value === 'text' }"
             @click="llm.setMode('text')"
@@ -233,10 +234,12 @@ const showNegative = computed(() =>
             {{ t('generate.llm_modal.text_mode') }}
           </button>
           <button
+            type="button"
             class="llm-mode-tab"
             :class="{ active: llm.mode.value === 'image', disabled: !llm.visionSupported.value }"
             :disabled="!llm.visionSupported.value"
             :title="!llm.visionSupported.value ? t('generate.llm_modal.no_vision') : ''"
+            :aria-label="!llm.visionSupported.value ? t('generate.llm_modal.no_vision') : ''"
             @click="llm.setMode('image')"
           >
             <MsIcon name="image" size="xs" color="none" />

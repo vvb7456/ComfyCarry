@@ -76,12 +76,13 @@ onUnmounted(() => {
     <Transition name="ip-fade">
       <div v-if="modelValue" class="ip-overlay" @mousedown="onOverlayMousedown" @click="onOverlayClick">
         <!-- Close button -->
-        <button class="ip-close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="close">
+        <button type="button" class="ip-close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="close">
           <MsIcon name="close" />
         </button>
 
         <!-- Left arrow -->
         <button
+          type="button"
           v-if="hasNav"
           class="ip-arrow ip-arrow--left"
           :aria-label="t('common.btn.prev_image')"
@@ -120,6 +121,7 @@ onUnmounted(() => {
 
         <!-- Right arrow -->
         <button
+          type="button"
           v-if="hasNav"
           class="ip-arrow ip-arrow--right"
           :aria-label="t('common.btn.next_image')"

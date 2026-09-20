@@ -492,23 +492,25 @@ onUnmounted(() => {
 
     <!-- Toolbar (right-aligned: 收藏与历史 | Embedding | Wildcard | 翻译 | 设置) -->
     <div class="token-toolbar">
-      <button class="token-tool-btn" :title="t('prompt-library.toolbar.history_favorites')" @click="emit('history')">
+      <button type="button" class="token-tool-btn" :title="t('prompt-library.toolbar.history_favorites')" :aria-label="t('prompt-library.toolbar.history_favorites')" @click="emit('history')">
         <MsIcon name="history" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.history_favorites') }}</span>
       </button>
-      <button class="token-tool-btn" :title="t('prompt-library.toolbar.embedding')" @click="emit('open-embedding')">
+      <button type="button" class="token-tool-btn" :title="t('prompt-library.toolbar.embedding')" :aria-label="t('prompt-library.toolbar.embedding')" @click="emit('open-embedding')">
         <MsIcon name="token" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.embedding') }}</span>
       </button>
-      <button class="token-tool-btn" :title="t('prompt-library.toolbar.wildcard')" @click="emit('open-wildcard')">
+      <button type="button" class="token-tool-btn" :title="t('prompt-library.toolbar.wildcard')" :aria-label="t('prompt-library.toolbar.wildcard')" @click="emit('open-wildcard')">
         <MsIcon name="shuffle" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.wildcard') }}</span>
       </button>
 
       <button
+        type="button"
         v-if="showTranslation"
         class="token-tool-btn"
         :title="t('prompt-library.toolbar.translate_all')"
+        :aria-label="t('prompt-library.toolbar.translate_all')"
         :disabled="translateAllBusy"
         @click="emit('translate-all')"
       >
@@ -517,7 +519,7 @@ onUnmounted(() => {
         <span class="tool-label">{{ t('prompt-library.toolbar.translate_all') }}</span>
       </button>
 
-      <button class="token-tool-btn" :title="t('prompt-library.toolbar.settings')" @click="emit('settings')">
+      <button type="button" class="token-tool-btn" :title="t('prompt-library.toolbar.settings')" :aria-label="t('prompt-library.toolbar.settings')" @click="emit('settings')">
         <MsIcon name="settings" size="xs" color="none" />
         <span class="tool-label">{{ t('prompt-library.toolbar.settings') }}</span>
       </button>

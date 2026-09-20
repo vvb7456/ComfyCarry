@@ -343,6 +343,7 @@ function openCivitaiMeta(hit: CivitaiHit) {
           type="button"
           class="civitai-settings-btn"
           :title="t('models.civitai.settings.title')"
+          :aria-label="t('models.civitai.settings.title')"
           @click="settingsOpen = true"
         >
           <MsIcon name="settings" />

@@ -141,6 +141,7 @@ watch(
         type="button"
         class="mc-nsfw-overlay"
         :title="t('models.nsfw.reveal_hint')"
+        :aria-label="t('models.nsfw.reveal_hint')"
         @click.stop="onNsfwOverlayClick"
       >
         <MsIcon name="visibility_off" size="sm" />

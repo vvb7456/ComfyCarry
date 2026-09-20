@@ -129,7 +129,7 @@ function onKeydown(e: KeyboardEvent) {
             <MsIcon v-if="icon" :name="icon" />
             <h3 class="drawer-title">{{ title }}</h3>
           </div>
-          <button class="drawer-close" @click="close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')">
+          <button type="button" class="drawer-close" @click="close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')">
             <MsIcon name="close" />
           </button>
         </header>

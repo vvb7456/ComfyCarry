@@ -267,13 +267,13 @@ function onInsert(item: WildcardItem) {
           <span class="wc-row__count">{{ item.entries }} {{ t('generate.wildcard.items') }}</span>
 
           <!-- Actions -->
-          <button class="wc-icon-btn" :title="t('generate.wildcard.edit_content')" @click="openEdit(item)">
+          <button type="button" class="wc-icon-btn" :title="t('generate.wildcard.edit_content')" :aria-label="t('generate.wildcard.edit_content')" @click="openEdit(item)">
             <MsIcon name="edit" size="sm" color="none" />
           </button>
-          <button class="wc-icon-btn" :title="t('generate.wildcard.insert_positive')" @click="onInsert(item)">
+          <button type="button" class="wc-icon-btn" :title="t('generate.wildcard.insert_positive')" :aria-label="t('generate.wildcard.insert_positive')" @click="onInsert(item)">
             <MsIcon name="add_circle" size="sm" color="none" />
           </button>
-          <button class="wc-icon-btn wc-icon-btn--danger" :title="t('common.btn.delete')" @click="onDelete(item)">
+          <button type="button" class="wc-icon-btn wc-icon-btn--danger" :title="t('common.btn.delete')" :aria-label="t('common.btn.delete')" @click="onDelete(item)">
             <MsIcon name="delete" size="sm" color="var(--red)" />
           </button>
         </div>
@@ -294,7 +294,7 @@ function onInsert(item: WildcardItem) {
         <div class="wc-edit-header">
           <MsIcon name="edit_note" size="sm" color="none" />
           <h3 class="wc-edit-title">{{ editName.split('/').pop() }}</h3>
-          <button class="wc-icon-btn" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="editVisible = false">
+          <button type="button" class="wc-icon-btn" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="editVisible = false">
             <MsIcon name="close" size="sm" color="var(--red)" />
           </button>
         </div>
@@ -319,7 +319,7 @@ function onInsert(item: WildcardItem) {
         <div class="wc-edit-header">
           <MsIcon name="create_new_folder" size="sm" color="none" />
           <h3 class="wc-edit-title">{{ t('generate.wildcard.new_folder_title') }}</h3>
-          <button class="wc-icon-btn" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="newFolderVisible = false">
+          <button type="button" class="wc-icon-btn" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="newFolderVisible = false">
             <MsIcon name="close" size="sm" color="var(--red)" />
           </button>
         </div>

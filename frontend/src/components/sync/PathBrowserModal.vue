@@ -294,10 +294,10 @@ function confirmSelect() {
         </BaseButton>
       </template>
       <div v-else class="pb-crumbs">
-        <button class="pb-crumb" :class="{ 'is-current': !segments.length }" @click="goToRoot">{{ rootLabel }}</button>
+        <button type="button" class="pb-crumb" :class="{ 'is-current': !segments.length }" @click="goToRoot">{{ rootLabel }}</button>
         <template v-for="(seg, i) in segments" :key="i">
           <span class="pb-sep">/</span>
-          <button class="pb-crumb" :class="{ 'is-current': i === segments.length - 1 }" @click="goToSegment(i)">{{ seg }}</button>
+          <button type="button" class="pb-crumb" :class="{ 'is-current': i === segments.length - 1 }" @click="goToSegment(i)">{{ seg }}</button>
         </template>
       </div>
     </div>
@@ -311,7 +311,7 @@ function confirmSelect() {
       </div>
       <div v-else-if="!dirs.length" class="pb-hint">{{ t('sync.browse.no_subdirs') }}</div>
       <template v-else>
-        <button v-for="dir in dirs" :key="dir" class="pb-item" @click="enterDir(dir)">
+        <button type="button" v-for="dir in dirs" :key="dir" class="pb-item" @click="enterDir(dir)">
           <MsIcon name="folder" /> {{ dir }}
         </button>
       </template>

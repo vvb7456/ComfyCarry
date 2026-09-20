@@ -232,9 +232,9 @@ function openImage(index: number) {
           <BaseButton size="sm" @click="copyAllWords">{{ t('models.meta.copy_all') }}</BaseButton>
         </div>
         <div ref="twListRef" class="lm-words" :class="{ collapsed: twCollapsed }">
-          <button v-for="word in detail.trigger_words" :key="word" class="lm-word" :class="{ selected: selectedWords.has(word) }" @click="toggleWord(word)">{{ word }}</button>
+          <button type="button" v-for="word in detail.trigger_words" :key="word" class="lm-word" :class="{ selected: selectedWords.has(word) }" @click="toggleWord(word)">{{ word }}</button>
         </div>
-        <button v-if="twOverflows" class="lm-word-toggle" :aria-expanded="!twCollapsed" @click="twCollapsed = !twCollapsed">
+        <button type="button" v-if="twOverflows" class="lm-word-toggle" :aria-expanded="!twCollapsed" @click="twCollapsed = !twCollapsed">
           {{ twCollapsed ? t('models.meta.expand_all', { count: detail.trigger_words.length }) : t('models.meta.collapse') }}
         </button>
       </section>

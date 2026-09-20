@@ -72,6 +72,7 @@ function tabClass(tab: SwitchTabItem) {
 <template>
   <div class="switch-tabs" role="tablist">
     <button
+      type="button"
       v-for="tab in tabs"
       :key="tab.key"
       :class="tabClass(tab)"

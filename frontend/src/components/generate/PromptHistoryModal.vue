@@ -188,8 +188,10 @@ watch(
           </div>
           <div class="phm-item__actions" @click.stop>
             <button
+              type="button"
               class="phm-action-btn"
               :title="item.is_favorite ? t('prompt-library.history_modal.unfavorite') : t('prompt-library.history_modal.favorite')"
+              :aria-label="item.is_favorite ? t('prompt-library.history_modal.unfavorite') : t('prompt-library.history_modal.favorite')"
               :disabled="loadingId === item.id"
               @click="onToggleFavorite(item)"
             >
@@ -200,8 +202,10 @@ watch(
               />
             </button>
             <button
+              type="button"
               class="phm-action-btn phm-action-btn--danger"
               :title="t('prompt-library.history_modal.delete')"
+              :aria-label="t('prompt-library.history_modal.delete')"
               :disabled="loadingId === item.id"
               @click="onDelete(item)"
             >
@@ -214,12 +218,14 @@ watch(
 
     <div v-if="!loading && items.length > 0" class="phm-pagination">
       <button
+        type="button"
         class="phm-page-btn"
         :disabled="page <= 1"
         @click="prevPage"
       >{{ t('prompt-library.history_modal.prev') }}</button>
       <span class="phm-page-info">{{ t('prompt-library.history_modal.page', { page, total: totalPages }) }}</span>
       <button
+        type="button"
         class="phm-page-btn"
         :disabled="page >= totalPages"
         @click="nextPage"

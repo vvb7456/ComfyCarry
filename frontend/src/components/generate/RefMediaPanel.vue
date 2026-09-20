@@ -190,6 +190,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         type="button"
         class="ref-help-btn"
         :title="t('generate.video.refs_help')"
+        :aria-label="t('generate.video.refs_help')"
         @click="helpOpen = true"
       >
         <MsIcon name="help_outline" size="sm" color="none" />
@@ -224,6 +225,7 @@ function refIndex(type: RefItem['type'], i: number): number {
           type="button"
           class="ref-tile__del"
           :title="t('common.btn.delete')"
+          :aria-label="t('common.btn.delete')"
           :disabled="disabled"
           @click="removeRef(i)"
         >
@@ -238,6 +240,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         type="button"
         class="ref-add-btn"
         :title="t('generate.video.refs_add_image')"
+        :aria-label="t('generate.video.refs_add_image')"
         :disabled="disabled || imgAddDisabled"
         @click="imagePicker.open()"
       >
@@ -247,6 +250,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         type="button"
         class="ref-add-btn"
         :title="t('generate.video.refs_add_video')"
+        :aria-label="t('generate.video.refs_add_video')"
         :disabled="disabled || vidAddDisabled"
         @click="triggerUpload('video')"
       >
@@ -256,6 +260,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         type="button"
         class="ref-add-btn"
         :title="t('generate.video.refs_add_audio')"
+        :aria-label="t('generate.video.refs_add_audio')"
         :disabled="disabled || audAddDisabled"
         @click="triggerUpload('audio')"
       >

@@ -44,8 +44,10 @@ onMounted(() => {
   <div class="wizard-app">
     <div class="wizard-app__toolbar">
       <button
+        type="button"
         class="wizard-app__lang-toggle"
         :title="locale === 'zh-CN' ? t('wizard.btn.switch_to_en') : t('wizard.btn.switch_to_zh')"
+        :aria-label="locale === 'zh-CN' ? t('wizard.btn.switch_to_en') : t('wizard.btn.switch_to_zh')"
         @click="toggleLang"
       >{{ locale === 'zh-CN' ? 'EN' : '中' }}</button>
       <ThemeToggle />

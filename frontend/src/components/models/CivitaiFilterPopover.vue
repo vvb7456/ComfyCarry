@@ -131,6 +131,7 @@ onBeforeUnmount(removeDocumentListeners)
       :class="{ 'is-active': selectedCount > 0 }"
       :disabled="disabled || exactMode"
       :title="exactMode ? t('models.civitai.filter_exact_disabled') : triggerLabel"
+      :aria-label="exactMode ? t('models.civitai.filter_exact_disabled') : triggerLabel"
       aria-haspopup="dialog"
       :aria-expanded="open"
       @click="toggle"

@@ -63,6 +63,7 @@ function onClick(tab: FusionTab) {
     <div class="ft-header">
       <div class="ft-tabs" role="tablist">
         <button
+          type="button"
           v-for="tab in tabs"
           :key="tab.key"
           class="ft-tab"
@@ -93,6 +94,7 @@ function onClick(tab: FusionTab) {
   <!-- Bare mode: just the tab bar -->
   <div v-else class="ft-tabs" role="tablist">
     <button
+      type="button"
       v-for="tab in tabs"
       :key="tab.key"
       class="ft-tab"

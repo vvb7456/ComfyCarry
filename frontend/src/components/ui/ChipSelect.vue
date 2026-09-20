@@ -216,6 +216,7 @@ function fmt(c: number | string) {
         :class="{ 'chip-select__chip--active': selectedSet.has(o.value) }"
         :aria-pressed="selectedSet.has(o.value)"
         :title="o.title"
+        :aria-label="o.title"
         @click="toggleChip(o.value)"
       >
         {{ o.label }}<span v-if="o.count != null" class="chip-select__count">{{ fmt(o.count) }}</span>

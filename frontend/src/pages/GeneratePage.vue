@@ -690,6 +690,7 @@ sse.start()
           >
             <template #default="{ open }">
               <button
+                type="button"
                 class="gen-arch-trigger"
                 :class="{ 'gen-arch-trigger--open': open }"
                 :aria-label="t('generate.header.model_selector_aria')"

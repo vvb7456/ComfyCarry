@@ -108,8 +108,10 @@ function toggleLang() {
 <template>
   <nav class="sidebar" :class="{ collapsed: app.sidebarCollapsed, 'mobile-open': app.mobileSidebarOpen }">
     <button
+      type="button"
       class="sidebar-toggle"
       :title="t('common.sidebar.toggle')"
+      :aria-label="t('common.sidebar.toggle')"
       @click="app.toggleSidebar()"
     >
       <MsIcon name="chevron_left" size="xs" />
@@ -133,11 +135,13 @@ function toggleLang() {
         </div>
         <div class="nav-group-items">
           <button
+            type="button"
             v-for="item in group.items"
             :key="item.page"
             class="nav-item"
             :class="{ active: isNavActive(item) }"
             :title="app.sidebarCollapsed ? getLabel(item) : undefined"
+            :aria-label="app.sidebarCollapsed ? getLabel(item) : undefined"
             @click="navTo(item)"
           >
             <span class="icon">
@@ -154,8 +158,10 @@ function toggleLang() {
       <div class="footer-expanded">
         <div class="footer-tools">
           <button
+            type="button"
             class="tool-btn"
             :title="locale === 'zh-CN' ? t('common.lang.switch_en') : t('common.lang.switch_zh')"
+            :aria-label="locale === 'zh-CN' ? t('common.lang.switch_en') : t('common.lang.switch_zh')"
             @click="toggleLang()"
           >{{ locale === 'zh-CN' ? 'EN' : '中' }}</button>
           <ThemeToggle class="tool-btn" />
@@ -173,15 +179,19 @@ function toggleLang() {
       <div class="footer-collapsed">
         <div class="lang-switcher-collapsed">
           <button
+            type="button"
             class="lang-btn-mini"
             :class="{ active: locale === 'zh-CN' }"
             :title="t('common.lang.switch_zh')"
+            :aria-label="t('common.lang.switch_zh')"
             @click="setLang('zh-CN')"
           >中</button>
           <button
+            type="button"
             class="lang-btn-mini"
             :class="{ active: locale === 'en' }"
             :title="t('common.lang.switch_en')"
+            :aria-label="t('common.lang.switch_en')"
             @click="setLang('en')"
           >EN</button>
         </div>

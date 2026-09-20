@@ -58,6 +58,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 <template>
   <div class="split-button" :class="[`split-button--${variant}`, { 'split-button--soft': softDisabled }]">
     <button
+      type="button"
       class="split-button__main"
       :disabled="disabled || loading"
       @click="emit('click')"
@@ -68,6 +69,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
     </button>
 
     <button
+      type="button"
       class="split-button__arrow"
       :aria-label="t('common.btn.more_options')"
       :title="t('common.btn.more_options')"
