@@ -58,6 +58,7 @@ export const ICON_CODEPOINTS = {
   'face_retouching_natural': '\uef4e',
   'favorite': '\ue87e',
   'file_download_off': '\ue4fe',
+  'filter_alt': '\uef4f',
   'fingerprint': '\ue90d',
   'fit_screen': '\uea10',
   'folder': '\ue2c7',

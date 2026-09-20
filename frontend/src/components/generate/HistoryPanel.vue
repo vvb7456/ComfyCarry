@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import type { ComfyHistoryItem } from '@/types/comfyui'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
-import SectionToolbar from '@/components/ui/SectionToolbar.vue'
+import AppToolbar from '@/components/ui/AppToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -233,13 +233,13 @@ defineExpose({ setupObserver })
     :title="t('comfyui.history.total')"
     :default-open="true"
   >
-    <SectionToolbar class="history-toolbar">
-      <template #start>
-        <span class="history-count">
-          {{ historyItems.length > 0 ? t('comfyui.history.record_count', { count: historyItems.length }) : '' }}
+    <AppToolbar variant="embedded">
+      <template #status>
+        <span v-if="historyItems.length > 0">
+          {{ t('comfyui.history.record_count', { count: historyItems.length }) }}
         </span>
       </template>
-      <template #end>
+      <template #filters>
         <BaseSelect
           v-model="historySortAsc"
           :options="[
@@ -247,8 +247,8 @@ defineExpose({ setupObserver })
             { value: true, label: t('comfyui.history.sort_asc') },
           ]"
           size="sm"
+          fit
           @change="onSortChange"
-          class="history-select"
         />
         <BaseSelect
           v-model="cardSize"
@@ -258,10 +258,10 @@ defineExpose({ setupObserver })
             { value: 'lg', label: t('comfyui.history.size_lg') },
           ]"
           size="sm"
-          class="history-select"
+          fit
         />
       </template>
-    </SectionToolbar>
+    </AppToolbar>
 
     <EmptyState
       v-if="historyItems.length === 0"
@@ -347,20 +347,6 @@ defineExpose({ setupObserver })
 </template>
 
 <style scoped>
-.history-count {
-  font-size: var(--text-sm);
-  color: var(--t3);
-}
-
-.history-toolbar {
-  margin-bottom: 14px;
-}
-
-.history-select {
-  width: auto;
-  min-width: 100px;
-}
-
 /* ── Grid ── */
 .history-grid {
   display: grid;

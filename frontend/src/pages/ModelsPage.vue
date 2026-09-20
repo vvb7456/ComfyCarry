@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import type { TabItem } from '@/components/ui/TabSwitcher.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
 import PageTopStack from '@/components/ui/PageTopStack.vue'
@@ -150,20 +151,22 @@ function openPreviewSingle(url: string) {
 
 <template>
   <div class="page-body">
-    <!-- 触发器走 TabSwitcher 的默认插槽: 与 tab 同处一行 -->
+    <!-- 吸顶由 PageTopStack 承担, 页头传 :sticky=false -->
     <PageTopStack ref="topStack">
-      <TabSwitcher ref="tabSwitcher" :title="t('models.title')" v-model="activeTab" :tabs="tabs">
-        <DrawerTrigger
-          class="models-drawer-trigger"
-          icon="download"
-          :label="t('models.drawer.title')"
-          :badge="inProgressCount"
-          :pulse="isRunning"
-          :alert="hasUnseenFailure"
-          :alert-text="t('models.drawer.has_failed')"
-          @click="openDrawer"
-        />
-      </TabSwitcher>
+      <PageHeaderRow :title="t('models.title')" :sticky="false">
+        <TabSwitcher ref="tabSwitcher" v-model="activeTab" :tabs="tabs" />
+        <template #actions>
+          <DrawerTrigger
+            icon="download"
+            :label="t('models.drawer.title')"
+            :badge="inProgressCount"
+            :pulse="isRunning"
+            :alert="hasUnseenFailure"
+            :alert-text="t('models.drawer.has_failed')"
+            @click="openDrawer"
+          />
+        </template>
+      </PageHeaderRow>
     </PageTopStack>
 
     <div v-show="activeTab === 'local'" :id="panelId('local')" role="tabpanel" :aria-labelledby="tabId('local')" class="tab-panel">
@@ -205,10 +208,3 @@ function openPreviewSingle(url: string) {
     <ImagePreview v-model="previewOpen" :images="previewImages" :initial-index="previewIndex" />
   </div>
 </template>
-
-<style scoped>
-/* 触发器贴 tab 行右端 (插槽内容带的是本组件的 scope id, 从这里定样式) */
-.models-drawer-trigger {
-  margin-left: auto;
-}
-</style>

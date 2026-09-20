@@ -9,6 +9,7 @@
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
@@ -39,15 +40,13 @@ async function restartDashboard() {
 
 <template>
   <div class="page-body">
-    <div class="page-header-row">
-      <div class="page-title-wrap">
-        <h1 class="page-title">{{ t('settings.title') }}</h1>
-      </div>
-      <span class="page-header-row__spacer" />
-      <BaseButton variant="ghost" size="sm" :aria-label="t('settings.confirm.restart.title')" @click="restartDashboard">
-        <MsIcon name="restart_alt" /> {{ t('settings.restart_btn') }}
-      </BaseButton>
-    </div>
+    <PageHeaderRow :title="t('settings.title')">
+      <template #actions>
+        <BaseButton variant="ghost" size="sm" :aria-label="t('settings.confirm.restart.title')" @click="restartDashboard">
+          <MsIcon name="restart_alt" /> {{ t('settings.restart_btn') }}
+        </BaseButton>
+      </template>
+    </PageHeaderRow>
 
     <!-- 正文: 760px 限宽列 (与原设置分区一致), 关于并入正文顺排 -->
     <div class="settings-page-col page-col">

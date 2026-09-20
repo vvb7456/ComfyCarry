@@ -173,6 +173,7 @@ withDefaults(defineProps<{
 }
 
 .list-row__title {
+  overflow-wrap: anywhere;
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--t1);
@@ -204,6 +205,11 @@ withDefaults(defineProps<{
   color: var(--t3);
   font-size: var(--text-sm);
   font-family: var(--font-tabular);
+  overflow-wrap: anywhere;
+}
+
+.list-row__facts > span {
+  min-width: 0;
 }
 
 .list-row__facts > span + span::before {
@@ -218,12 +224,13 @@ withDefaults(defineProps<{
    与左侧文字行数无关）；设计稿 .cc-rule/.cc-service 同为整行居中 */
 .list-row__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   align-self: center;
 }
 
-@media (max-width: 768px) {
+@container list (max-width: 600px) {
   .list-row {
     grid-template-columns: 22px minmax(0, 1fr);
     gap: 8px;

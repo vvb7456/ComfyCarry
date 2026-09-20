@@ -204,6 +204,7 @@ const showNegative = computed(() =>
     :title="t('generate.llm_modal.title')"
     icon="auto_awesome"
     icon-color="none"
+    :size="llm.configured.value ? 'xl' : 'md'"
     :width="llm.configured.value ? '900px' : '520px'"
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"

@@ -5,8 +5,7 @@ import { useCivitaiSearch, type SortKey } from '@/composables/useCivitaiSearch'
 import { useDownloads } from '@/composables/useDownloads'
 import { useCivitaiSettings } from '@/composables/useCivitaiSettings'
 import SearchInput from '@/components/ui/SearchInput.vue'
-import SectionToolbar from '@/components/ui/SectionToolbar.vue'
-import BaseSelect from '@/components/form/BaseSelect.vue'
+import AppToolbar from '@/components/ui/AppToolbar.vue'
 import CivitaiFilterPopover from '@/components/models/CivitaiFilterPopover.vue'
 import CivitaiSettingsModal from '@/components/models/CivitaiSettingsModal.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -131,14 +130,11 @@ function submitCurrentQuery() {
   civitaiSearch(query)
 }
 
-function handleFilterApply(types: string[], baseModels: string[]) {
+function handleFilterApply(types: string[], baseModels: string[], sort: string) {
+  if (sort !== civitaiSort.value) sortTouched.value = true
+  civitaiSort.value = sort as SortKey
   applyFilters(types, baseModels)
   submitCurrentQuery()
-}
-
-function handleSortChange() {
-  sortTouched.value = true
-  if (!exactQuery.value) civitaiSearch(queryInput.value.trim())
 }
 
 // Auto-activate when tab becomes visible
@@ -309,8 +305,8 @@ function openCivitaiMeta(hit: CivitaiHit) {
   <template v-else>
   <!-- 工具栏: key 已配置才挂载 (gate 态不占页头) -->
   <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
-    <SectionToolbar>
-      <template #start>
+    <AppToolbar search-full>
+      <template #search>
         <SearchInput
           v-model="queryInput"
           :placeholder="t('models.civitai.search_placeholder')"
@@ -318,39 +314,29 @@ function openCivitaiMeta(hit: CivitaiHit) {
           full
           @search="handleSearch"
         />
+      </template>
+      <template #actions>
         <CivitaiFilterPopover
           :types="selectedTypes"
           :base-models="selectedBaseModels"
           :type-options="typeOptions"
           :base-model-options="baseModelOptions"
+          :sort="civitaiSort"
+          :sort-options="sortOptions"
           :disabled="!facetsLoaded"
           :exact-mode="exactQuery"
           @apply="handleFilterApply"
         />
-        <BaseSelect
-          class="civitai-sort"
-          v-model="civitaiSort"
-          :options="sortOptions"
-          :disabled="exactQuery"
+        <BaseButton
           size="sm"
-          fit
-          teleport
-          @change="handleSortChange"
-        />
-      </template>
-      <template #end>
-        <button
-          type="button"
-          class="civitai-settings-btn"
-          :title="t('models.civitai.settings.title')"
+          icon-only
           :aria-label="t('models.civitai.settings.title')"
           @click="settingsOpen = true"
         >
           <MsIcon name="settings" />
-          <span class="civitai-settings-btn__label">{{ t('models.civitai.settings.title') }}</span>
-        </button>
+        </BaseButton>
       </template>
-    </SectionToolbar>
+    </AppToolbar>
   </Teleport>
 
   <!-- Error -->
@@ -413,8 +399,8 @@ function openCivitaiMeta(hit: CivitaiHit) {
 <style scoped>
 .model-grid {
   display: grid;
-  /* 竖版 3:4 卡片: 列宽收窄, 保证一屏至少两行 */
-  grid-template-columns: repeat(auto-fill, minmax(clamp(240px, 18vw, 320px), 1fr));
+  /* 竖版 3:4 卡片: 桌面端大卡 (240–320px), 外层 min(…,100%) 保证窄容器 (手机+侧栏) 不撑破。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(clamp(240px, 18vw, 320px), 100%), 1fr));
   gap: clamp(14px, 1.2vw, 22px);
 }
 
@@ -428,67 +414,4 @@ function openCivitaiMeta(hit: CivitaiHit) {
   min-height: 320px;
 }
 
-/* 工具栏尾部设置按钮 — 与 CivitaiFilterPopover 触发器同规格 */
-.civitai-settings-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 34px;
-  padding: 0 9px;
-  border: 1px solid var(--bd);
-  border-radius: var(--input-radius, 6px);
-  background: var(--bg);
-  color: var(--t2);
-  font: inherit;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-
-.civitai-settings-btn:hover {
-  border-color: var(--bd-f);
-  color: var(--t1);
-}
-
-@media (max-width: 420px) {
-  .civitai-settings-btn__label {
-    display: none;
-  }
-}
-
-/* Remote search controls stay on one compact row; narrow screens scroll it. */
-:deep(.section-toolbar) {
-  flex-wrap: nowrap;
-  overflow: visible;
-}
-
-:deep(.section-toolbar-start) {
-  flex-wrap: nowrap;
-  min-width: 0;
-}
-
-:deep(.section-toolbar-start .search-input) {
-  min-width: 160px;
-}
-
-:deep(.section-toolbar-start .civitai-sort) {
-  --ctl-w-sm: 128px;
-  --ctl-w-md: 160px;
-}
-
-:deep(.section-toolbar-start .civitai-sort .base-select__trigger) {
-  min-height: 34px;
-}
-
-@media (max-width: 720px) {
-  :deep(.section-toolbar-start .search-input) {
-    min-width: 80px;
-  }
-
-  :deep(.section-toolbar-start .civitai-sort) {
-    --ctl-w-sm: 110px;
-    --ctl-w-md: 120px;
-  }
-}
 </style>

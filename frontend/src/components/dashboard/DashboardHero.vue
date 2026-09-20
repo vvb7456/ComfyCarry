@@ -448,7 +448,9 @@ const gpuTempColor = computed(() => {
   height: 24px;
 }
 
-@media (max-width: 860px) {
+/* Hero 两栏是否成立取决于正文容器能否同时容纳说明区和 GPU 卡片。
+   侧栏展开/收起会改变正文宽度，因此这里查询页面容器而不是视口。 */
+@container page (max-width: 720px) {
   .dash-hero-section {
     grid-template-columns: 1fr;
     gap: 20px;

@@ -31,6 +31,7 @@ import { useLogStream } from '@/composables/useLogStream'
 import { useSyncJobs, type SyncJob } from '@/composables/useSyncJobs'
 import { useCompanionClients } from '@/composables/useCompanionClients'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import type { TabItem } from '@/components/ui/TabSwitcher.vue'
 import type { IconName } from '@/config/icon-codepoints'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
@@ -709,9 +710,10 @@ function switchTab(tab: string) {
 
 <template>
   <div class="page-body">
-    <TabSwitcher ref="tabSwitcher" :title="t('sync.title')" :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab">
-      <template #extra>
-        <span v-if="workerRunning" class="page-actions">
+    <PageHeaderRow :title="t('sync.title')">
+      <TabSwitcher ref="tabSwitcher" :model-value="activeTab" :tabs="tabs" @update:modelValue="switchTab" />
+      <template #actions>
+        <template v-if="workerRunning">
           <BaseButton
             size="sm"
             :loading="actionLoading === 'stop'"
@@ -728,12 +730,12 @@ function switchTab(tab: string) {
           >
             <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
           </BaseButton>
-        </span>
+        </template>
         <BaseButton variant="ghost" size="sm" :aria-label="t('sync.settings.title')" @click="settingsOpen = true">
           <MsIcon name="settings" /> {{ t('common.btn.settings') }}
         </BaseButton>
       </template>
-    </TabSwitcher>
+    </PageHeaderRow>
 
     <div class="page-col">
       <!-- ═══════════ 同步 Tab ═══════════ -->
@@ -1181,7 +1183,8 @@ function switchTab(tab: string) {
 /* 存储卡片: 自适应网格 (设计稿 cc-storage 同构) */
 .sync-remotes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* 300px 是桌面卡片的舒适基线；min(..., 100%) 保证单列窄容器安全收缩。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 14px;
 }
 

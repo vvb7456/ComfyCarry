@@ -24,6 +24,7 @@ import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import type { IconName } from '@/config/icon-codepoints'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SectionHeader from '@/components/ui/SectionHeader.vue'
@@ -420,20 +421,16 @@ onUnmounted(() => {
 
 <template>
   <div class="page-body">
-    <div class="page-header-row">
-      <div class="page-title-wrap">
-        <h1 class="page-title">{{ t('jupyter.title') }}</h1>
-      </div>
-      <span class="page-header-row__spacer" />
-      <span v-if="isRunning" class="page-actions">
+    <PageHeaderRow :title="t('jupyter.title')">
+      <template v-if="isRunning" #actions>
         <BaseButton size="sm" :loading="actionLoading === 'stop'" :disabled="acting" @click="jupyterAction('stop')">
           <MsIcon name="stop" /> {{ t('common.btn.stop') }}
         </BaseButton>
         <BaseButton size="sm" :loading="actionLoading === 'restart'" :disabled="acting" @click="jupyterAction('restart')">
           <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
         </BaseButton>
-      </span>
-    </div>
+      </template>
+    </PageHeaderRow>
 
     <div class="page-col">
       <LoadingCenter v-if="statusLoading && !status" style="padding:60px 0" />

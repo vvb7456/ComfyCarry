@@ -69,6 +69,7 @@ favorite
 file_download_off
 fingerprint
 fit_screen
+filter_alt
 folder
 folder_off
 folder_open

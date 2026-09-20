@@ -7,7 +7,7 @@ import CivitaiModelCard from '@/components/models/CivitaiModelCard.vue'
 import VersionPickerModal from '@/components/models/VersionPickerModal.vue'
 import FavoriteVersionModal from '@/components/models/FavoriteVersionModal.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
-import SectionToolbar from '@/components/ui/SectionToolbar.vue'
+import AppToolbar from '@/components/ui/AppToolbar.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { ModelMeta } from '@/types/models'
@@ -253,17 +253,19 @@ function openModelMeta(hit: CivitaiHit) {
 
 <template>
   <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
-    <SectionToolbar>
-      <template #start>
+    <AppToolbar>
+      <template #search>
         <FilterInput
           v-model="searchQuery"
           :placeholder="t('models.local.filter_placeholder')"
         />
-        <span v-if="filteredModels.length > 0" class="toolbar-status">
+      </template>
+      <template #status>
+        <span v-if="filteredModels.length > 0">
           {{ t('models.huggingface.total_results', { count: filteredModels.length.toLocaleString() }) }}
         </span>
       </template>
-      <template #end>
+      <template #filters>
         <BaseSelect
           v-model="selectedTypes"
           :options="typeOptions"
@@ -287,7 +289,7 @@ function openModelMeta(hit: CivitaiHit) {
           :search-placeholder="t('models.huggingface.filter_base_model')"
         />
       </template>
-    </SectionToolbar>
+    </AppToolbar>
   </Teleport>
 
   <!-- 卡片网格 (增量渲染前 visibleCount 张) -->
@@ -334,8 +336,8 @@ function openModelMeta(hit: CivitaiHit) {
 <style scoped>
 .model-grid {
   display: grid;
-  /* 竖版 3:4 卡片: 列宽收窄, 保证一屏至少两行 */
-  grid-template-columns: repeat(auto-fill, minmax(clamp(240px, 18vw, 320px), 1fr));
+  /* 竖版 3:4 卡片: 桌面端大卡 (240–320px), 外层 min(…,100%) 保证窄容器 (手机+侧栏) 不撑破。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(clamp(240px, 18vw, 320px), 100%), 1fr));
   gap: clamp(14px, 1.2vw, 22px);
 }
 

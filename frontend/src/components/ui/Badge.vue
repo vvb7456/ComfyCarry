@@ -41,7 +41,8 @@ const inlineStyle = computed(() =>
     :style="inlineStyle"
   >
     <i v-if="dot" class="badge__dot" />
-    <slot />
+    <!-- label 包一层: text-overflow 需要块级子容器; 无宽度约束时零影响, 由调用方按需封顶截断 -->
+    <span class="badge__label"><slot /></span>
   </span>
 </template>
 
@@ -56,6 +57,11 @@ const inlineStyle = computed(() =>
   font-weight: 500;
   white-space: nowrap;
   line-height: 1.5;
+  min-width: 0;
+}
+.badge__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .badge--muted {
   background: color-mix(in srgb, var(--t3) 15%, transparent);

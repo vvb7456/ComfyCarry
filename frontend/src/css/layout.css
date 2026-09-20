@@ -393,6 +393,8 @@
             margin-left: var(--sidebar-w, clamp(196px, 13vw, 220px));
             flex: 1;
             height: 100vh;
+            height: 100dvh;
+            min-width: 0;
             overflow-y: auto;
             overflow-x: hidden;
             background: var(--bg-ambient);
@@ -405,9 +407,11 @@
         }
 
         .page-body {
+            container: page / inline-size;
             padding: var(--page-body-pt) var(--page-pad) var(--page-pad);
             box-sizing: border-box;
             min-height: 100%;
+            min-width: 0;
         }
 
         /* ── 服务页内容列 ──
@@ -421,103 +425,15 @@
             min-width: 0;
         }
 
-        /* ── Page Title & Actions (页内首行 / TabSwitcher 标题区共用) ──
-            标题行 min-height 38px 与 .tab-switcher 对齐。 */
+        /* ── Page Header ──
+            页头唯一实现是 PageHeaderRow.vue (scoped): 汉堡/标题/分隔符/
+            主次控件段/动作组/吸顶/600px 容器下放全部内聚, 此处不留宿主样式。 */
         :root {
-            /* .page-body 上方留白, TabSwitcher sticky 时用负 margin 吃掉这块, banner 定位要算入 */
+            /* .page-body 上方留白, 页头吸顶时用负 margin 吃掉这块, banner 定位要算入 */
             --page-body-pt: clamp(16px, 1.8vw, 24px);
-            /* TabSwitcher tab 行高 (padding 6×2 + 文字 26)。
-               banner 等下游 sticky 元素定位要叠加; 与 TabSwitcher 样式任一改动同步。 */
-            --tab-switcher-row-h: 38px;
         }
 
-        /* 移动端 TabSwitcher 为双层布局 (title 行 + tabs 行各占一行, 见
-           TabSwitcher.vue @media ≤768px flex-wrap), 吸顶总高约 88px
-           (title ~32 + gap 8 + tabs ~32 + padding-bottom 8 + margin-top 补偿
-           已含于实测 88px)。下游 sticky 定位变量随之放大, 否则 banner 会
-           盖住 tabs 行 (实测重叠 14px)。 */
-        @media (max-width: 768px) {
-            :root {
-                --tab-switcher-row-h: 72px;
-            }
-        }
-
-        .page-header-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-height: 38px;
-            margin-bottom: var(--sp-4);
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            background: var(--bg-ambient);
-            background-attachment: fixed;
-            margin-top: calc(-1 * var(--page-body-pt));
-            padding-top: var(--page-body-pt);
-            padding-bottom: 8px;
-            mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
-            -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
-        }
-
-        .page-header-row__spacer {
-            flex: 1;
-        }
-
-        .page-title-wrap {
-            display: inline-flex;
-            align-items: center;
-            gap: 2px;
-        }
-
-        .page-title {
-            font-size: 1.05rem;
-            font-weight: 700;
-            letter-spacing: -.015em;
-            color: var(--t1);
-            margin: 0;
-            line-height: 1;
-            white-space: nowrap;
-        }
-
-        .page-title-divider {
-            width: 1px;
-            height: 16px;
-            background: var(--bd);
-            opacity: .8;
-        }
-
-        .page-actions {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--sp-2);
-        }
-
-        /* ── Mobile Menu ── */
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--t2);
-            cursor: pointer;
-            padding: 2px 4px;
-            margin-left: -4px;
-            border-radius: var(--r-xs, 4px);
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            transition: color .15s ease, background .15s ease;
-            line-height: 1;
-        }
-
-        .mobile-menu-btn:hover {
-            color: var(--t1);
-            background: color-mix(in srgb, var(--t1) 6%, transparent);
-        }
-
-        .mobile-menu-btn .ms {
-            font-size: 20px;
-        }
+        /* ── Mobile overlay (侧栏抽屉遮罩, 汉堡按钮在 PageHeaderRow 内) ── */
 
         .mobile-overlay {
             display: none;
@@ -531,17 +447,9 @@
             display: block
         }
 
-        /* ── Responsive ── */
+        /* ── Responsive ──
+            (页头/汉堡的移动端规则在 PageHeaderRow.vue 内) */
         @media(max-width:768px) {
-            .mobile-menu-btn {
-                display: inline-flex;
-            }
-
-            .page-header-row {
-                flex-wrap: wrap;
-                gap: 8px 0;
-            }
-
             .sidebar {
                 transform: translateX(-100%);
                 transition: transform .3s ease
@@ -603,6 +511,12 @@
                 transform: translateY(4px);
             }
         }
+
+        /* ── 吸顶页头的约束 (勿加 transform/filter/will-change 于其上) ──
+           页头透明感 = 自绘 var(--bg-ambient) + background-attachment:fixed,
+           与 .content 的视口锚定光晕逐像素对齐。任何 transform (含 translateZ
+           预热) 都会让 fixed 退化成相对元素盒定位, 光晕错位 → 首帧闪烁。
+           page-fade 过渡因此只用 opacity, 详见下方注释。 */
 
         @media (prefers-reduced-motion: reduce) {
             .page-fade-enter-active,

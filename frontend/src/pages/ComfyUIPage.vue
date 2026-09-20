@@ -31,6 +31,7 @@ import { useSystemStats } from '@/composables/useSystemStats'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import PageTopStack from '@/components/ui/PageTopStack.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
 import type { TabItem } from '@/components/ui/TabSwitcher.vue'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
@@ -301,16 +302,18 @@ function onVersionSwitched() {
 <template>
   <div class="page-body">
     <PageTopStack ref="topStack" :enabled="activeTab === 'plugins'">
-      <TabSwitcher ref="tabSwitcher" :title="t('comfyui.title')" :model-value="activeTab" :tabs="tabs" @update:model-value="activeTab = $event">
-        <template #extra>
-          <span v-if="isOnline" class="page-actions">
+      <!-- 吸顶由 PageTopStack 承担 (仅 plugins tab), 页头传 :sticky=false -->
+      <PageHeaderRow :title="t('comfyui.title')" :sticky="false">
+        <TabSwitcher ref="tabSwitcher" :model-value="activeTab" :tabs="tabs" @update:model-value="activeTab = $event" />
+        <template #actions>
+          <template v-if="isOnline">
             <BaseButton size="sm" :loading="actionLoading === 'stop'" :disabled="acting" @click="comfyStop">
               <MsIcon name="stop" /> {{ t('common.btn.stop') }}
             </BaseButton>
             <BaseButton size="sm" :loading="actionLoading === 'restart'" :disabled="acting" @click="comfyRestart">
               <MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}
             </BaseButton>
-          </span>
+          </template>
           <BaseButton
             variant="ghost"
             size="sm"
@@ -320,7 +323,7 @@ function onVersionSwitched() {
             <MsIcon name="settings" /> {{ t('common.btn.settings') }}
           </BaseButton>
         </template>
-      </TabSwitcher>
+      </PageHeaderRow>
     </PageTopStack>
 
     <div v-show="activeTab === 'run'" :id="panelId('run')" role="tabpanel" :aria-labelledby="tabId('run')" class="page-col">

@@ -221,6 +221,7 @@ watch(samInstalled, (ok) => {
   gap: var(--sp-2);
   max-width: var(--gen-module-w);
   margin: 0 auto;
+  container: gen-face / inline-size;
 }
 
 .face-grid__row {
@@ -243,7 +244,7 @@ watch(samInstalled, (ok) => {
   gap: 4px;
 }
 
-@media (max-width: 768px) {
+@container gen-face (max-width: 520px) {
   .face-grid__row {
     grid-template-columns: 1fr;
   }

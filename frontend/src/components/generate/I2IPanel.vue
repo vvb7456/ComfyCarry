@@ -96,94 +96,101 @@ function onDenoiseUpdate(v: number) {
 </script>
 
 <template>
-  <div class="i2i-split">
-    <!-- Left: reference image (FileUploadZone pick mode) -->
-    <div class="i2i-split__media">
-      <label class="field-lbl">{{ t('generate.i2i.ref_image') }}</label>
-      <div class="i2i-ref-wrap">
-        <FileUploadZone
-          mode="pick"
-          :accept="IMAGE_ACCEPT"
-          :preview="previewUrl"
-          :file-name="displayName"
-          :pick-label="t('generate.i2i.pick_from_input')"
-          :upload-label="t('generate.i2i.upload_local')"
-          class="i2i-ref-zone"
-          @pick="emit('pick')"
-          @file="emit('file', $event)"
-          @clear="emit('clear')"
-          @error="toast($event, 'warning')"
-        />
-        <!-- Mask overlay (shown when inpaint mode + has mask) -->
-        <img
-          v-if="isInpaint && hasMask && hasImage && maskPreviewUrl"
-          :src="maskPreviewUrl"
-          class="i2i-mask-overlay"
-          alt="mask"
-        />
+  <div class="i2i-split-container">
+    <div class="i2i-split">
+      <!-- Left: reference image (FileUploadZone pick mode) -->
+      <div class="i2i-split__media">
+        <label class="field-lbl">{{ t('generate.i2i.ref_image') }}</label>
+        <div class="i2i-ref-wrap">
+          <FileUploadZone
+            mode="pick"
+            :accept="IMAGE_ACCEPT"
+            :preview="previewUrl"
+            :file-name="displayName"
+            :pick-label="t('generate.i2i.pick_from_input')"
+            :upload-label="t('generate.i2i.upload_local')"
+            class="i2i-ref-zone"
+            @pick="emit('pick')"
+            @file="emit('file', $event)"
+            @clear="emit('clear')"
+            @error="toast($event, 'warning')"
+          />
+          <!-- Mask overlay (shown when inpaint mode + has mask) -->
+          <img
+            v-if="isInpaint && hasMask && hasImage && maskPreviewUrl"
+            :src="maskPreviewUrl"
+            class="i2i-mask-overlay"
+            alt="mask"
+          />
+        </div>
+        <div v-if="resDisplay" class="i2i-ref-res">{{ resDisplay }}</div>
       </div>
-      <div v-if="resDisplay" class="i2i-ref-res">{{ resDisplay }}</div>
-    </div>
 
-    <!-- Right: parameters -->
-    <div class="i2i-split__params">
-      <!-- Mode switch -->
-      <SegmentedControl
-        :options="modeOptions"
-        :model-value="state.i2i.mode"
-        block
-        @update:model-value="state.i2i.mode = $event as 'i2i' | 'inpaint'"
-      />
+      <!-- Right: parameters -->
+      <div class="i2i-split__params">
+        <!-- Mode switch -->
+        <SegmentedControl
+          :options="modeOptions"
+          :model-value="state.i2i.mode"
+          block
+          @update:model-value="state.i2i.mode = $event as 'i2i' | 'inpaint'"
+        />
 
-      <!-- Denoise -->
-      <RangeField
-        :model-value="state.i2i.denoise"
-        :min="0.10"
-        :max="1.0"
-        :soft-max="denoiseSoftMax"
-        :step="0.05"
-        :label="t('generate.i2i.denoise')"
-        :marks="2"
-        :value-format="(v: number) => v.toFixed(2)"
-        editable
-        @update:model-value="onDenoiseUpdate"
-      >
-        <template #label-append>
-          <HelpTip :text="t('generate.i2i.denoise_help')" />
-        </template>
-      </RangeField>
+        <!-- Denoise -->
+        <RangeField
+          :model-value="state.i2i.denoise"
+          :min="0.10"
+          :max="1.0"
+          :soft-max="denoiseSoftMax"
+          :step="0.05"
+          :label="t('generate.i2i.denoise')"
+          :marks="2"
+          :value-format="(v: number) => v.toFixed(2)"
+          editable
+          @update:model-value="onDenoiseUpdate"
+        >
+          <template #label-append>
+            <HelpTip :text="t('generate.i2i.denoise_help')" />
+          </template>
+        </RangeField>
 
-      <!-- Grow Mask By (disabled in i2i mode, always visible) -->
-      <RangeField
-        :model-value="state.i2i.growMaskBy"
-        :min="0"
-        :max="128"
-        :step="1"
-        :label="t('generate.i2i.grow_mask_by')"
-        :marks="4"
-        :disabled="!isInpaint"
-        editable
-        @update:model-value="state.i2i.growMaskBy = Math.max(0, Math.min(64, $event))"
-      >
-        <template #label-append>
-          <HelpTip :text="t('generate.i2i.grow_mask_by_help')" />
-        </template>
-      </RangeField>
+        <!-- Grow Mask By (disabled in i2i mode, always visible) -->
+        <RangeField
+          :model-value="state.i2i.growMaskBy"
+          :min="0"
+          :max="128"
+          :step="1"
+          :label="t('generate.i2i.grow_mask_by')"
+          :marks="4"
+          :disabled="!isInpaint"
+          editable
+          @update:model-value="state.i2i.growMaskBy = Math.max(0, Math.min(64, $event))"
+        >
+          <template #label-append>
+            <HelpTip :text="t('generate.i2i.grow_mask_by_help')" />
+          </template>
+        </RangeField>
 
-      <!-- Edit Mask button -->
-      <BaseButton
-        variant="default"
-        :disabled="!isInpaint"
-        size="sm"
-        @click="onEditMask"
-      >
-        {{ t('generate.i2i.edit_mask') }}
-      </BaseButton>
+        <!-- Edit Mask button -->
+        <BaseButton
+          variant="default"
+          :disabled="!isInpaint"
+          size="sm"
+          @click="onEditMask"
+        >
+          {{ t('generate.i2i.edit_mask') }}
+        </BaseButton>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.i2i-split-container {
+  min-width: 0;
+  container: gen-i2i / inline-size;
+}
+
 .i2i-split {
   display: flex;
   gap: var(--sp-4);
@@ -249,7 +256,7 @@ function onDenoiseUpdate(v: number) {
   text-align: center;
 }
 
-@media (max-width: 900px) {
+@container gen-i2i (max-width: 520px) {
   .i2i-split { flex-direction: column; }
   .i2i-split__media { max-width: 420px; width: 100%; }
 }

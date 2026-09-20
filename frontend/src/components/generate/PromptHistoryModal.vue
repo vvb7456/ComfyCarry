@@ -156,7 +156,6 @@ watch(
       ref="tabSwitcher"
       :model-value="activeTab"
       :tabs="tabs"
-      :sticky="false"
       panel-ids="phm-panel"
       @update:model-value="onTabChange"
     />

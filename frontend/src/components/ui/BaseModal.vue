@@ -175,7 +175,10 @@ const footerClass = computed(() => {
       <div
         v-if="show"
         class="modal-overlay"
-        :class="{ 'modal-overlay--top': align === 'top' }"
+        :class="{
+          'modal-overlay--top': align === 'top',
+          'modal-overlay--edge-to-edge': ['lg', 'xl', 'xxl', 'full'].includes(size),
+        }"
         :style="props.zIndex ? { zIndex: props.zIndex } : undefined"
         @mousedown="onOverlayMousedown"
         @click="onOverlayClick"
@@ -190,7 +193,7 @@ const footerClass = computed(() => {
             `modal-box--tone-${tone}`,
             { 'modal-box--scroll-body': scroll === 'body', 'modal-box--scroll-none': scroll === 'none' },
           ]"
-          :style="{ maxWidth: resolvedMaxWidth, maxHeight: resolvedMaxHeight }"
+          :style="{ '--modal-max-width': resolvedMaxWidth, '--modal-max-height': resolvedMaxHeight }"
           tabindex="-1"
           role="dialog"
           aria-modal="true"
@@ -239,6 +242,7 @@ const footerClass = computed(() => {
   justify-content: center;
   z-index: 1000;
   padding: var(--sp-4);
+  overflow-y: auto;
   visibility: visible;
   opacity: 1;
 }
@@ -248,9 +252,11 @@ const footerClass = computed(() => {
   background: var(--bg3);
   border: 1px solid var(--bd);
   border-radius: var(--r);
-  max-width: 520px;
   width: 100%;
-  max-height: 85vh;
+  /* Keep the requested preset/custom limit in a CSS variable so narrow-screen
+     rules can cap it without being defeated by an inline max-width/max-height. */
+  max-width: var(--modal-max-width, 520px);
+  max-height: min(var(--modal-max-height, 85vh), calc(100vh - 32px));
   display: flex;
   flex-direction: column;
   box-shadow: var(--sh);
@@ -317,6 +323,8 @@ const footerClass = computed(() => {
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--t1);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .modal-subtitle {
@@ -343,14 +351,18 @@ const footerClass = computed(() => {
   padding: 12px 16px;
   overflow-y: auto;
   flex: 1;
+  min-width: 0;
 }
 
 .modal-footer {
   padding: 0 16px 12px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--sp-2);
+  min-width: 0;
 }
+.modal-footer > * { min-width: 0; }
 .modal-footer--start { justify-content: flex-start; }
 .modal-footer--between { justify-content: space-between; }
 
@@ -362,11 +374,42 @@ const footerClass = computed(() => {
 .modal-leave-to .modal-box { transform: scale(.95); }
 
 @media (max-width: 768px) {
+  .modal-overlay {
+    padding: 16px;
+  }
+
   .modal-box {
+    max-width: min(var(--modal-max-width, 520px), calc(100vw - 32px));
+    max-height: min(var(--modal-max-height, 85vh), calc(100vh - 32px));
+    border-radius: var(--r);
+  }
+
+  .modal-overlay--edge-to-edge {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .modal-overlay--edge-to-edge .modal-box {
+    width: 100%;
     max-width: 100%;
     max-height: 100vh;
     border-radius: 0;
   }
-  .modal-overlay { padding: 0; }
+
+  .modal-footer {
+    row-gap: 8px;
+  }
+}
+
+@supports (height: 100dvh) {
+  .modal-box {
+    max-height: min(var(--modal-max-height, 85vh), calc(100dvh - 32px));
+  }
+
+  @media (max-width: 768px) {
+    .modal-overlay--edge-to-edge .modal-box {
+      max-height: 100dvh;
+    }
+  }
 }
 </style>

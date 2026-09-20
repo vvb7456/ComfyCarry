@@ -29,7 +29,6 @@
     "all_folders": "全部目录",
     "filter_placeholder": "搜索模型名…",
     "refresh": "刷新",
-    "fetch_all": "全部获取",
     "fetch_info": "获取元数据",
     "loading": "加载中…",
     "detail_failed": "模型详情加载失败",
@@ -38,16 +37,12 @@
     "source": "来源",
     "fetch_success": "获取成功",
     "fetched": "元数据",
-    "all_have_info": "所有模型已有信息",
     "deleted": "已删除",
     "total_models": "共 {count} 个模型 · {infoCount} 个已有元数据",
     "no_preview": "无预览",
     "refetch_tip": "重新获取元数据",
     "fetching": "获取中…",
     "not_found_category": "该类别下未找到模型文件",
-    "fetching_progress": "正在获取 ({current}/{total}): {filename}",
-    "fetch_complete": "全部完成",
-    "fetch_partial": "完成 {success} 个，失败 {fail} 个",
     "details": "详情"
   },
   "meta": {
@@ -80,6 +75,7 @@
       "rating": "最高评分",
       "newest": "最新"
     },
+    "filter_sort": "排序",
     "filter_type": "类型",
     "filter_base_model": "Base Model",
     "filter_button": "筛选",
@@ -176,11 +172,6 @@
     "delete_model": {
       "title": "删除模型",
       "message": "「{filename}」将被永久删除，此操作无法撤销。"
-    },
-    "fetch_all": {
-      "title": "获取模型元数据",
-      "message": "将为 {count} 个模型获取元数据。",
-      "button": "开始获取"
     },
     "cancel_download": {
       "title": "取消下载",

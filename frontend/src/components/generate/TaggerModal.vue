@@ -143,6 +143,7 @@ function onCopy() {
     :title="t('generate.interrogate.modal_title')"
     icon="image_search"
     icon-color="none"
+    size="xl"
     width="900px"
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"

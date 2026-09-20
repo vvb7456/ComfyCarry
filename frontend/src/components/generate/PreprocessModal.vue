@@ -124,6 +124,7 @@ function onSubmit() {
     :title="title"
     :icon="def.icon"
     icon-color="none"
+    size="lg"
     width="720px"
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"

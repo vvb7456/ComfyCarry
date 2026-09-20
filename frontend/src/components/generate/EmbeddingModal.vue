@@ -62,6 +62,7 @@ function formatSize(bytes: number): string {
     :title="t('generate.embedding.title')"
     icon="token"
     icon-color="none"
+    size="lg"
     width="640px"
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"

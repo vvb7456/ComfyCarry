@@ -75,8 +75,8 @@ const fetchLabel = computed(() => {
 
     <template #meta>
       <Badge :color="badgeColor">{{ badgeLabel }}</Badge>
-      <Badge v-if="model.base_model">{{ model.base_model }}</Badge>
-      <Badge v-else-if="model.architecture && model.architecture !== 'unknown'">{{ model.architecture }}</Badge>
+      <Badge v-if="model.base_model" :title="model.base_model">{{ model.base_model }}</Badge>
+      <Badge v-else-if="model.architecture && model.architecture !== 'unknown'" :title="model.architecture">{{ model.architecture }}</Badge>
       <span class="mc-size">{{ fmtBytes(model.size_bytes) }}</span>
     </template>
 

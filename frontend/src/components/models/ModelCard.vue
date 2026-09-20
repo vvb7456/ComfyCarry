@@ -293,9 +293,12 @@ watch(
 .mc-meta {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
   margin-bottom: 6px;
   align-items: center;
+  /* 严格单行: 放不下的 badge 直接被裁掉 (全文有 tooltip/详情弹窗兜底), 保证全网格卡片等高 */
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .mc-actions {

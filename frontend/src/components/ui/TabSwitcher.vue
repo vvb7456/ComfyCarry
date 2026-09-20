@@ -3,14 +3,19 @@ import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
 import BrandIcon from './BrandIcon.vue'
-import { useAppStore } from '@/stores/app'
 import type { BrandName } from '@/config/brand-icons'
 import type { IconName } from '@/config/icon-codepoints'
 
+/**
+ * TabSwitcher — 纯 tab 条 (无页头/无标题/无吸顶)。
+ *
+ * 页面级用法放进 PageHeaderRow 默认插槽 (页头由 PageHeaderRow 统一承担
+ * 汉堡/标题/吸顶); modal 内直接平铺使用 (sticky 相关样式已移入页头层)。
+ * 需要贴行尾时由调用方加 margin-left:auto (如 ModelsPage 触发器)。
+ */
 defineOptions({ name: 'TabSwitcher' })
 
 const { t } = useI18n({ useScope: 'global' })
-const app = useAppStore()
 
 export interface TabItem {
   key: string
@@ -27,20 +32,15 @@ export interface TabItem {
   align?: 'right'
 }
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   tabs: TabItem[]
   modelValue: string
-  title?: string
-  /** 页面级 tab 默认吸附在 .content 滚动容器顶部; modal 内部的 tab 传 false */
-  sticky?: boolean
   /**
    * 覆盖 tab 的 aria-controls: 所有 tab 共用同一面板时传固定面板 id
    * (如单列表切换数据源的弹窗); 不传则每个 tab 指向 panelIdFor(key)。
    */
   panelIds?: string
-}>(), {
-  sticky: true,
-})
+}>()
 
 const emit = defineEmits<{
   'update:modelValue': [key: string]
@@ -92,27 +92,7 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
 </script>
 
 <template>
-  <div
-    class="tab-switcher"
-    :class="{ 'tab-switcher--sticky': props.sticky }"
-    role="tablist"
-  >
-    <div v-if="title || $slots['title-extra']" class="tab-switcher__title-group">
-      <div class="tab-switcher__title-wrap">
-        <button
-          type="button"
-          class="mobile-menu-btn"
-          :aria-label="app.mobileSidebarOpen ? t('common.btn.close_menu') : t('common.btn.open_menu')"
-          @click="app.toggleMobileSidebar()"
-        >
-          <MsIcon name="menu" />
-        </button>
-        <h1 v-if="title" class="tab-switcher__title">{{ title }}</h1>
-        <slot name="title-extra" />
-      </div>
-      <span class="tab-switcher__title-divider" aria-hidden="true" />
-    </div>
-
+  <div class="tab-switcher" role="tablist">
     <div class="tab-switcher__tabs">
       <button
         v-for="(tab, idx) in tabs"
@@ -158,67 +138,20 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
 
 <style scoped>
 .tab-switcher {
-  position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: var(--sp-4);
-  overflow-x: auto;
-  scrollbar-width: none;
-  touch-action: pan-x;
+  min-width: 0;
   min-height: 38px;
-}
-
-.tab-switcher--sticky {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--bg-ambient);
-  background-attachment: fixed;
-  margin-top: calc(-1 * var(--page-body-pt));
-  padding-top: var(--page-body-pt);
-  padding-bottom: 8px;
-  /* 底部向下的柔和渐变消隐蒙版：使得穿过的下方内容自然淡出消失 */
-  mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
-}
-
-.tab-switcher__title-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-
-.tab-switcher__title-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.tab-switcher__title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: -.015em;
-  color: var(--t1);
-  margin: 0;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.tab-switcher__title-divider {
-  width: 1px;
-  height: 16px;
-  background: var(--bd);
-  opacity: .8;
 }
 
 .tab-switcher__tabs {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tab-switcher__extra {
@@ -228,13 +161,16 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
   gap: var(--sp-2);
   padding-right: var(--sp-1);
   flex-shrink: 0;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
-.tab-switcher::-webkit-scrollbar {
+.tab-switcher__tabs::-webkit-scrollbar {
   display: none;
 }
 
 .tab-switcher__tab {
+  white-space: nowrap;
   padding: 6px 12px;
   border-radius: var(--r-sm);
   flex-shrink: 0;
@@ -314,68 +250,20 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
   color: var(--ac);
 }
 
-.mobile-menu-btn {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--t2);
-  cursor: pointer;
-  padding: 2px 4px;
-  margin-left: -4px;
-  border-radius: var(--r-xs, 4px);
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: color .15s ease, background .15s ease;
-  line-height: 1;
-}
-
-.mobile-menu-btn:hover {
-  color: var(--t1);
-  background: color-mix(in srgb, var(--t1) 6%, transparent);
-}
-
-.mobile-menu-btn :deep(.ms) {
-  font-size: 20px;
-}
-
-@media (max-width: 768px) {
+/* 窄屏通栏: 与 PageHeaderRow 的下放断点统一 (600px, 见其注释)。
+   页面正文的可用宽度已扣除侧栏和留白 (modal 内无 page 容器, 该断点不生效)。 */
+@container page (max-width: 600px) {
   .tab-switcher {
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 0;
+    flex-basis: 100%;
     min-height: auto;
   }
 
-  .tab-switcher__title-group {
-    order: 1;
-    margin-right: auto;
-    gap: 6px;
-  }
-
-  .tab-switcher__title-divider {
-    display: none;
-  }
-
-  .tab-switcher__extra {
-    order: 2;
-    margin-left: auto;
-    padding-right: 0;
-  }
-
   .tab-switcher__tabs {
-    order: 3;
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 2px;
     gap: 4px;
-    mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
-  }
-
-  .mobile-menu-btn {
-    display: inline-flex;
   }
 }
 </style>

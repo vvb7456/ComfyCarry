@@ -11,6 +11,7 @@ import { useAppStore } from '@/stores/app'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import DashboardHero from '@/components/dashboard/DashboardHero.vue'
 import DashboardTasks from '@/components/dashboard/DashboardTasks.vue'
 import DashboardServices from '@/components/dashboard/DashboardServices.vue'
@@ -411,34 +412,22 @@ const totalServiceCount = computed(() => {
 
 <template>
   <div class="page-body">
-    <!-- ── Full-Width Page Header Row (Left: Page Title, Right: Refresh Button) ── -->
-    <div class="page-header-row">
-      <div class="page-title-wrap">
-        <button
-          type="button"
-          class="mobile-menu-btn"
-          :aria-label="app.mobileSidebarOpen ? t('common.btn.close_menu') : t('common.btn.open_menu')"
-          @click="app.toggleMobileSidebar()"
+    <!-- ── Page Header Row (Left: Page Title, Right: Refresh Button) ── -->
+    <PageHeaderRow :title="t('dashboard.title')">
+      <template #actions>
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          icon-only
+          :disabled="refreshing"
+          :aria-label="t('dashboard.refresh')"
+          :title="t('dashboard.refresh')"
+          @click="refreshAll"
         >
-          <MsIcon name="menu" />
-        </button>
-        <h1 class="page-title">{{ t('dashboard.title') }}</h1>
-      </div>
-
-      <!-- Right-aligned refresh tool button -->
-      <div class="page-header-row__spacer"></div>
-      <BaseButton
-        variant="ghost"
-        size="sm"
-        icon-only
-        :disabled="refreshing"
-        :aria-label="t('dashboard.refresh')"
-        :title="t('dashboard.refresh')"
-        @click="refreshAll"
-      >
-        <MsIcon name="refresh" :class="{ 'dash-spin': refreshing }" />
-      </BaseButton>
-    </div>
+          <MsIcon name="refresh" :class="{ 'dash-spin': refreshing }" />
+        </BaseButton>
+      </template>
+    </PageHeaderRow>
 
     <!-- ── Constrained Centered Content Container ── -->
     <div class="dash-container">

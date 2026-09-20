@@ -168,8 +168,16 @@ const { t } = useI18n({ useScope: 'global' })
 /* ── Section 2: Core Services Micro Cards ── */
 .dash-svc-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 固定四项，只使用一行四张或两行两张，避免 3 + 1。 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sp-3);
+}
+
+/* 四张卡各留 180px（含内边距），再加三段 12px 间距。 */
+@container page (max-width: 756px) {
+  .dash-svc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .dash-svc-card {
@@ -270,9 +278,4 @@ const { t } = useI18n({ useScope: 'global' })
   height: 12px;
 }
 
-@media (max-width: 768px) {
-  .dash-svc-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 </style>

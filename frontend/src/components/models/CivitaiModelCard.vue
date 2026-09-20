@@ -150,7 +150,7 @@ function handleCardDownload() {
 
     <template #meta>
       <Badge :color="badgeColor">{{ badgeLabel }}</Badge>
-      <Badge v-if="baseModel">{{ baseModel }}</Badge>
+      <Badge v-if="baseModel" :title="baseModel">{{ baseModel }}</Badge>
       <Badge v-if="versionCount > 1" :title="t('models.civitai.versions_count', { count: versionCount })">v{{ versionCount }}</Badge>
       <span class="cc-dl-count">
         <MsIcon name="download" size="xs" />

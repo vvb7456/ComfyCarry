@@ -3,7 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { switchLanguage } from '@/i18n/vue-i18n'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import MsIcon from '../ui/MsIcon.vue'
 import ServiceIdentityIcon from '../ui/ServiceIdentityIcon.vue'
 // 主题切换是全局偏好, 与页面无关, 和同为全局偏好的语言切换放在一起
@@ -16,6 +16,16 @@ const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()
 const app = useAppStore()
+const mobileQuery = window.matchMedia('(max-width: 768px)')
+const isMobile = ref(mobileQuery.matches)
+// 桌面的折叠偏好不影响手机菜单；跨过断点时清理遮罩状态。
+function onViewportChange(event: MediaQueryListEvent) {
+  isMobile.value = event.matches
+  app.closeMobileSidebar()
+}
+onMounted(() => mobileQuery.addEventListener('change', onViewportChange))
+onUnmounted(() => mobileQuery.removeEventListener('change', onViewportChange))
+const isCollapsed = computed(() => app.sidebarCollapsed && !isMobile.value)
 
 const shortCommit = computed(() => (app.commit || '').substring(0, 7))
 const commitUrl = computed(() =>
@@ -87,9 +97,7 @@ function isNavActive(item: NavItem): boolean {
 
 function navTo(item: NavItem) {
   router.push({ name: item.page })
-  if (window.innerWidth <= 768) {
-    app.closeMobileSidebar()
-  }
+  app.closeMobileSidebar()
 }
 
 function getLabel(item: NavItem) {
@@ -106,7 +114,7 @@ function toggleLang() {
 </script>
 
 <template>
-  <nav class="sidebar" :class="{ collapsed: app.sidebarCollapsed, 'mobile-open': app.mobileSidebarOpen }">
+  <nav class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': app.mobileSidebarOpen }">
     <button
       type="button"
       class="sidebar-toggle"
@@ -140,8 +148,8 @@ function toggleLang() {
             :key="item.page"
             class="nav-item"
             :class="{ active: isNavActive(item) }"
-            :title="app.sidebarCollapsed ? getLabel(item) : undefined"
-            :aria-label="app.sidebarCollapsed ? getLabel(item) : undefined"
+            :title="isCollapsed ? getLabel(item) : undefined"
+            :aria-label="isCollapsed ? getLabel(item) : undefined"
             @click="navTo(item)"
           >
             <span class="icon">

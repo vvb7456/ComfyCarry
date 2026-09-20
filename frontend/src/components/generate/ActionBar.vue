@@ -147,47 +147,54 @@ function onSplitSelect(key: string) {
 </script>
 
 <template>
-  <div class="action-bar">
-    <div class="action-bar__status">
-      <ComfyProgressBar :state="execState" :elapsed="elapsed" />
-    </div>
-    <!-- 后台模式轮次上限 (插在进度条右侧、SplitButton 左侧; 进度条 flex:1 自动让出宽度)。
-         单一胶囊: 静音前缀 + 数值, 与 SplitButton 等高同圆角。0 渲染为 ∞。 -->
-    <label
-      v-if="showIterations"
-      class="action-bar__iter"
-      :title="t('generate.background.iterations_help')"
-    >
-      <span class="action-bar__iter-lbl">{{ t('generate.background.iterations') }}</span>
-      <input
-        v-model="iterDisplay"
-        class="action-bar__iter-val"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        spellcheck="false"
-        @focus="onIterFocus"
-        @blur="onIterBlur"
-        @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
-        @keydown.esc.prevent="($event.target as HTMLInputElement).blur()"
+  <div class="action-bar-container">
+    <div class="action-bar">
+      <div class="action-bar__status">
+        <ComfyProgressBar :state="execState" :elapsed="elapsed" />
+      </div>
+      <!-- 后台模式轮次上限 (插在进度条右侧、SplitButton 左侧; 进度条 flex:1 自动让出宽度)。
+           单一胶囊: 静音前缀 + 数值, 与 SplitButton 等高同圆角。0 渲染为 ∞。 -->
+      <label
+        v-if="showIterations"
+        class="action-bar__iter"
+        :title="t('generate.background.iterations_help')"
       >
-    </label>
-    <div class="action-bar__actions">
-      <SplitButton
-        :label="splitLabel"
-        :icon="splitIcon"
-        :variant="splitVariant"
-        :options="splitOptions"
-        :soft-disabled="isBlocked"
-        :loading="submitting"
-        @click="onSplitClick"
-        @select="onSplitSelect"
-      />
+        <span class="action-bar__iter-lbl">{{ t('generate.background.iterations') }}</span>
+        <input
+          v-model="iterDisplay"
+          class="action-bar__iter-val"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          spellcheck="false"
+          @focus="onIterFocus"
+          @blur="onIterBlur"
+          @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
+          @keydown.esc.prevent="($event.target as HTMLInputElement).blur()"
+        >
+      </label>
+      <div class="action-bar__actions">
+        <SplitButton
+          :label="splitLabel"
+          :icon="splitIcon"
+          :variant="splitVariant"
+          :options="splitOptions"
+          :soft-disabled="isBlocked"
+          :loading="submitting"
+          @click="onSplitClick"
+          @select="onSplitSelect"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.action-bar-container {
+  min-width: 0;
+  container: gen-action / inline-size;
+}
+
 .action-bar {
   display: flex;
   align-items: stretch;
@@ -244,7 +251,7 @@ function onSplitSelect(key: string) {
 }
 /* 窄屏: 进度条独占一行; 运行按钮全宽。
    后台模式下轮次胶囊与运行按钮同行 (胶囊按内容宽, 按钮吃掉剩余宽度)。 */
-@media (max-width: 768px) {
+@container gen-action (max-width: 480px) {
   .action-bar {
     flex-wrap: wrap;
     align-items: center;

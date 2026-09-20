@@ -297,6 +297,7 @@ const sizeHint = computed(() => {
   gap: var(--sp-2);
   max-width: var(--gen-module-w);
   margin: 0 auto;
+  container: gen-upscale / inline-size;
 }
 
 .upscale-grid__row {
@@ -338,7 +339,7 @@ const sizeHint = computed(() => {
   gap: 4px;
 }
 
-@media (max-width: 768px) {
+@container gen-upscale (max-width: 520px) {
   .upscale-grid__row {
     grid-template-columns: 1fr;
   }

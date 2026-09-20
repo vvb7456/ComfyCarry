@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
+/**
+ * PageTopStack — 页头 + 分区工具栏的联合吸顶容器 (Models/ComfyUI 用)。
+ *
+ * 内部放 PageHeaderRow (:sticky=false, 吸顶由本容器承担, 避免双重 sticky)
+ * + toolbar 落点 (各 tab 把 AppToolbar Teleport 进来)。
+ * enabled=false 时 (ComfyUI 非 plugins tab) 不吸顶, 页头退化为普通流内容。
+ */
 defineOptions({ name: 'PageTopStack' })
 
 withDefaults(defineProps<{ enabled?: boolean }>(), { enabled: true })
@@ -45,11 +52,7 @@ defineExpose({ toolbarTarget })
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 8px), transparent);
 }
 
-.page-top-stack--enabled > :deep(.tab-switcher) {
-  position: relative;
-  mask-image: none;
-  -webkit-mask-image: none;
-}
+/* 内层 PageHeaderRow 由页面传 :sticky="false", 无需此处覆盖 */
 
 .page-top-stack__toolbar {
   display: flow-root;

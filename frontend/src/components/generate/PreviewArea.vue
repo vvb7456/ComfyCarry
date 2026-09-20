@@ -329,7 +329,8 @@ function metaText(img: PreviewImage): string {
 /* Grid for batch */
 .gen-preview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* 允许最后一个窄列收缩到容器宽度，避免小预览区被 180px 最小列宽撑出横向溢出。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
   gap: var(--sp-2);
   padding: var(--sp-2);
   height: 100%;

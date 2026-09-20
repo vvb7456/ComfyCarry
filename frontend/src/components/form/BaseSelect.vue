@@ -613,7 +613,9 @@ onBeforeUnmount(() => {
 .base-select__text--muted { color: var(--t3); opacity: .7; }
 
 /* ── Panel ── */
-/* Position is handled by floatingStyles (inline). Only visual properties here. */
+/* Position is handled by floatingStyles (inline). Only visual properties here.
+   teleport 模式下本规则与全局块的 .base-select__panel--teleported 同时命中
+   (scoped 属性选择器优先级更高), 层级值必须保持一致 —— 见全局块注释。 */
 .base-select__panel {
   min-width: 100%;
   width: max-content;
@@ -621,7 +623,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--bd);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,.25);
-  z-index: 9999;
+  z-index: calc(var(--z-float) + 1);
   overflow: hidden;
 }
 
@@ -726,8 +728,10 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 24px rgba(0,0,0,.25);
   overflow: hidden;
   /* 面板 teleport 到 body 后与 BaseModal 的遮罩 (z-index 1000) 同层,
-     必须显式抬高 —— scoped 的 .base-select__panel z-index 管不到这里。 */
-  z-index: 9999;
+     必须显式抬高 —— scoped 的 .base-select__panel z-index 管不到这里。
+     取 --z-float + 1 (先例 AutoCompleteList): 下拉可能嵌在同为 --z-float 的
+     浮层内展开 (如 CivitaiFilterPopover 面板里的排序下拉), 必须压过宿主浮层。 */
+  z-index: calc(var(--z-float) + 1);
 }
 .base-select__panel--teleported .base-select__list {
   max-height: var(--bs-list-max, 200px);

@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
+import BaseSelect, { type SelectOption } from '@/components/form/BaseSelect.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'CivitaiFilterPopover' })
@@ -12,6 +13,9 @@ const props = withDefaults(defineProps<{
   baseModels: string[]
   typeOptions: ChipOption[]
   baseModelOptions: ChipOption[]
+  /** 排序 (与类型/基模同为 API 检索参数, 统一收进本面板) */
+  sort: string
+  sortOptions: SelectOption[]
   disabled?: boolean
   exactMode?: boolean
 }>(), {
@@ -20,7 +24,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  apply: [types: string[], baseModels: string[]]
+  apply: [types: string[], baseModels: string[], sort: string]
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -30,6 +34,7 @@ const trigger = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
 const draftTypes = ref<string[]>([])
 const draftBaseModels = ref<string[]>([])
+const draftSort = ref(props.sort)
 const baseModelQuery = ref('')
 
 const { floatingStyles } = useFloating(trigger, panel, {
@@ -44,7 +49,7 @@ const selectedCount = computed(() => props.types.length + props.baseModels.lengt
 const draftHasSelection = computed(() => draftTypes.value.length > 0 || draftBaseModels.value.length > 0)
 const draftChanged = computed(() => {
   const same = (a: string[], b: string[]) => a.length === b.length && new Set(a).size === new Set(b).size && a.every(v => b.includes(v))
-  return !same(draftTypes.value, props.types) || !same(draftBaseModels.value, props.baseModels)
+  return !same(draftTypes.value, props.types) || !same(draftBaseModels.value, props.baseModels) || draftSort.value !== props.sort
 })
 const filteredBaseModelOptions = computed(() => {
   const query = baseModelQuery.value.trim().toLocaleLowerCase()
@@ -66,6 +71,7 @@ const triggerLabel = computed(() => {
 function syncDraft() {
   draftTypes.value = [...props.types]
   draftBaseModels.value = [...props.baseModels]
+  draftSort.value = props.sort
 }
 
 function toggle() {
@@ -94,7 +100,7 @@ function close() {
 }
 
 function apply() {
-  emit('apply', [...draftTypes.value], [...draftBaseModels.value])
+  emit('apply', [...draftTypes.value], [...draftBaseModels.value], draftSort.value)
   close()
 }
 
@@ -103,12 +109,16 @@ function clearFilters() {
   draftBaseModels.value = []
   // Clear is an immediate action, but intentionally leaves the popover open
   // so the user can see the reset state and choose another combination.
-  emit('apply', [], [])
+  // 排序不算筛选条件, 清除时保留。
+  emit('apply', [], [], draftSort.value)
 }
 
 function onDocumentPointerDown(event: PointerEvent) {
   const target = event.target as Node
   if (root.value?.contains(target) || panel.value?.contains(target)) return
+  // 豁免: 排序 BaseSelect teleport 到 <body> 的下拉面板,
+  // 点击其选项不应触发外层 popover 的 outside-close
+  if (target instanceof Element && target.closest('.base-select__panel--teleported')) return
   close()
 }
 
@@ -117,7 +127,7 @@ function onDocumentKeydown(event: KeyboardEvent) {
   close()
 }
 
-watch(() => [props.types, props.baseModels], syncDraft, { deep: true })
+watch(() => [props.types, props.baseModels, props.sort], syncDraft, { deep: true })
 watch(() => props.exactMode, (exact) => { if (exact) close() })
 onBeforeUnmount(removeDocumentListeners)
 </script>
@@ -136,9 +146,9 @@ onBeforeUnmount(removeDocumentListeners)
       :aria-expanded="open"
       @click="toggle"
     >
-      <MsIcon name="tune" />
-      <span class="civitai-filter__trigger-label">{{ triggerLabel }}</span>
-      <MsIcon name="expand_more" />
+      <MsIcon name="filter_alt" />
+      <span class="civitai-filter__trigger-label app-toolbar__label">{{ triggerLabel }}</span>
+      <MsIcon name="expand_more" class="civitai-filter__trigger-caret" />
     </button>
 
     <Teleport to="body">
@@ -172,6 +182,15 @@ onBeforeUnmount(removeDocumentListeners)
           </div>
         </div>
         <div class="civitai-filter__content">
+          <div class="civitai-filter__section">
+            <div class="civitai-filter__label">{{ t('models.civitai.filter_sort') }}</div>
+            <BaseSelect
+              v-model="draftSort"
+              :options="sortOptions"
+              size="sm"
+              teleport
+            />
+          </div>
           <div class="civitai-filter__section">
             <div class="civitai-filter__label">{{ t('models.civitai.filter_type') }}</div>
             <ChipSelect
@@ -211,8 +230,9 @@ onBeforeUnmount(removeDocumentListeners)
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 34px;
-  padding: 0 9px;
+  /* 与 toolbar input (36px) 同高: 筛选入口是 Civitai 的主控件之一 */
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid var(--bd);
   border-radius: var(--input-radius, 6px);
   background: var(--bg);
@@ -357,8 +377,18 @@ onBeforeUnmount(removeDocumentListeners)
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 18%, transparent);
 }
 
-@media (max-width: 420px) {
-  .civitai-filter__trigger-label {
+/* 工具栏窄屏 (<600px): label 由 AppToolbar 通用契约隐藏,
+   这里去掉展开箭头并 ghost 化 (对齐收缩态的 BaseButton 纯图标规格) */
+@container toolbar (max-width: 600px) {
+  .civitai-filter__trigger {
+    min-width: 42px;
+    padding-inline: 0;
+    justify-content: center;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .civitai-filter__trigger-caret {
     display: none;
   }
 }

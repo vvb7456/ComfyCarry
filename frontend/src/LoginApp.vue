@@ -202,7 +202,8 @@ async function submit() {
 }
 
 :global(body) {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .login-page,
@@ -224,11 +225,12 @@ async function submit() {
   --l-shadow: rgba(0, 0, 0, .4);
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  padding: max(32px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
   background: var(--l-bg);
   color: var(--l-t1);
   font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -386,8 +388,7 @@ html[data-theme="light"] .lang-toggle:hover {
   border: 1px solid var(--l-card-bd);
   border-radius: 20px;
   padding: clamp(36px, 3.5vw, 56px);
-  width: clamp(360px, 28vw, 440px);
-  max-width: 92vw;
+  width: min(440px, 100%);
   box-shadow: 0 8px 32px var(--l-shadow);
 }
 
@@ -532,6 +533,21 @@ html[data-theme="light"] .logo h1 b {
   .top-controls {
     top: 12px;
     right: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 32px 20px;
+    border-radius: 16px;
+  }
+
+  .logo { margin-bottom: 28px; }
+}
+
+@media (max-height: 640px) {
+  .login-page {
+    align-items: flex-start;
   }
 }
 </style>

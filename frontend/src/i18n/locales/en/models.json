@@ -29,7 +29,6 @@
     "all_folders": "All Folders",
     "filter_placeholder": "Search model name…",
     "refresh": "Refresh",
-    "fetch_all": "Fetch All",
     "fetch_info": "Get Metadata",
     "loading": "Loading…",
     "detail_failed": "Failed to load model details",
@@ -38,16 +37,12 @@
     "source": "Source",
     "fetch_success": "Fetched successfully",
     "fetched": "Metadata",
-    "all_have_info": "All models already have info",
     "deleted": "Deleted",
     "total_models": "{count} models · {infoCount} with metadata",
     "no_preview": "No preview",
     "refetch_tip": "Re-fetch metadata from CivitAI",
     "fetching": "Fetching…",
     "not_found_category": "No models found in this category",
-    "fetching_progress": "Fetching ({current}/{total}): {filename}",
-    "fetch_complete": "All done",
-    "fetch_partial": "{success} succeeded, {fail} failed",
     "details": "Details"
   },
   "meta": {
@@ -80,6 +75,7 @@
       "rating": "Highest Rated",
       "newest": "Newest"
     },
+    "filter_sort": "Sort",
     "filter_type": "Type",
     "filter_base_model": "Base Model",
     "filter_button": "Filter",
@@ -176,11 +172,6 @@
     "delete_model": {
       "title": "Delete Model",
       "message": "\"{filename}\" will be permanently deleted. This cannot be undone."
-    },
-    "fetch_all": {
-      "title": "Fetch Model Metadata",
-      "message": "Metadata will be fetched for {count} models.",
-      "button": "Start"
     },
     "cancel_download": {
       "title": "Cancel Download",

@@ -5,15 +5,8 @@ import { useConfirm } from './useConfirm'
 import { useToast } from './useToast'
 import type { LocalModel } from './useLocalModels'
 
-export interface BatchProgress {
-  running: boolean
-  current: number
-  total: number
-  filename: string
-}
-
 /**
- * Model action handlers — fetchInfo, deleteModel, fetchAll.
+ * Model action handlers — fetchInfo, deleteModel.
  *
  * Depends on the models list and a reload callback from useLocalModels().
  */
@@ -27,12 +20,6 @@ export function useModelActions(
 
   /** Tracks model IDs currently being enriched. */
   const fetchingSet = reactive(new Set<string>())
-  const batchProgress = reactive<BatchProgress>({
-    running: false,
-    current: 0,
-    total: 0,
-    filename: '',
-  })
 
   function isFetching(modelId: number): boolean {
     return fetchingSet.has(String(modelId))
@@ -70,76 +57,10 @@ export function useModelActions(
     }
   }
 
-  async function fetchAll(models: LocalModel[]) {
-    const noInfo = models.filter(m => !m.has_info && m.can_fetch_info !== false)
-    if (noInfo.length === 0) {
-      toast(t('models.local.all_have_info'), 'info')
-      return
-    }
-
-    const ok = await confirm({
-      title: t('models.confirm.fetch_all.title'),
-      message: t('models.confirm.fetch_all.message', { count: noInfo.length }),
-      confirmText: t('models.confirm.fetch_all.button'),
-    })
-    if (!ok) return
-
-    batchProgress.running = true
-    batchProgress.total = noInfo.length
-    batchProgress.current = 0
-    batchProgress.filename = ''
-    let successCount = 0
-    let failCount = 0
-
-    try {
-      // Hashing large model files is expensive, so keep a small bounded pool
-      // instead of making the whole batch strictly serial.  IDs are added to
-      // the shared set before each request so card-level actions cannot start
-      // a duplicate enrich while a worker owns that model.
-      let nextIndex = 0
-      const worker = async () => {
-        while (true) {
-          const index = nextIndex++
-          if (index >= noInfo.length) return
-          const m = noInfo[index]!
-          const key = String(m.id)
-          fetchingSet.add(key)
-          try {
-            const result = await post<{ ok?: boolean }>(`/api/local_models/${m.id}/enrich`)
-            if (result && result.ok !== false) successCount++
-            else failCount++
-          } catch (e) {
-            failCount++
-            console.error(m.filename, e)
-          } finally {
-            fetchingSet.delete(key)
-            batchProgress.current = successCount + failCount
-            batchProgress.filename = m.filename
-          }
-        }
-      }
-      await Promise.all(Array.from(
-        { length: Math.min(2, noInfo.length) },
-        () => worker(),
-      ))
-    } finally {
-      batchProgress.running = false
-    }
-
-    if (failCount > 0) {
-      toast(t('models.local.fetch_partial', { success: successCount, fail: failCount }), 'warning')
-    } else {
-      toast(t('models.local.fetch_complete'), 'success')
-    }
-    await loadModels()
-  }
-
   return {
     fetchingSet,
     isFetching,
     fetchInfo,
     deleteModel,
-    fetchAll,
-    batchProgress,
   }
 }

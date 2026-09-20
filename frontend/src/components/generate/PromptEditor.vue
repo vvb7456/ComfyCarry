@@ -275,6 +275,7 @@ defineExpose({ insertAtCursor })
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  container: gen-prompt / inline-size;
 }
 
 /* ── Section header ── */
@@ -365,7 +366,7 @@ defineExpose({ insertAtCursor })
   flex-direction: column;
 }
 
-@media (max-width: 600px) {
+@container gen-prompt (max-width: 600px) {
   .prompt-body { flex-direction: column; }
   /* 三栏退回纵向堆叠; 媒体列高度自适应 (下限 180px): 单上传区 (wan22) 内容
      不足 180px 时仍撑满 180px 与旧版一致; H3 两栏各自独立渲染, 不裁切。 */
@@ -448,7 +449,7 @@ defineExpose({ insertAtCursor })
   font-weight: 500;
 }
 
-@media (max-width: 768px) {
+@container gen-prompt (max-width: 600px) {
   .prompt-toolbar > :first-child { margin-left: 0; }
   .tool-label { display: none; }
 }

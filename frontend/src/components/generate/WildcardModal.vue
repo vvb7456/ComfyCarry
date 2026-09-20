@@ -208,6 +208,7 @@ function onInsert(item: WildcardItem) {
     :title="t('generate.wildcard.title')"
     icon="shuffle"
     icon-color="none"
+    size="lg"
     width="700px"
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"

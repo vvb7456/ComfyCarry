@@ -11,7 +11,6 @@ import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import { useBackgroundRunStore } from '@/stores/backgroundRun'
-import { useAppStore } from '@/stores/app'
 import { useProductTour } from '@/composables/useProductTour'
 import { useGenerateOptions } from '@/composables/generate/useGenerateOptions'
 import { useComfyGate } from '@/composables/generate/useComfyGate'
@@ -25,6 +24,7 @@ import ProductTour, { type TourStep } from '@/components/ui/ProductTour.vue'
 import DropdownMenu, { type DropdownMenuItem } from '@/components/ui/DropdownMenu.vue'
 import SegmentedControl, { type SegmentOption } from '@/components/ui/SegmentedControl.vue'
 import Drawer from '@/components/ui/Drawer.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
 import ModelTab from '@/components/generate/ModelTab.vue'
 import QueuePanel from '@/components/generate/QueuePanel.vue'
@@ -46,7 +46,6 @@ const store = useGenerateStore()
 const queueStore = useGenerateQueueStore()
 // 后台运行 store: frozen 真相在服务端, 不是本地 ref
 const bg = useBackgroundRunStore()
-const app = useAppStore()
 const frozen = computed(() => bg.state === 'running')
 
 // ── Gate: check ComfyUI online ─────────────────────────────────────────────
@@ -651,33 +650,74 @@ sse.start()
     </div>
 
     <template v-else>
-      <!-- ═══ 顶栏: [内容生成] | [任务切换] [模型 ▾] ... [队列/历史 (badge)] ═══ -->
-      <div class="gen-header">
-        <div class="gen-header-top">
-          <div class="page-title-wrap">
-            <button
-              type="button"
-              class="mobile-menu-btn"
-              :aria-label="app.mobileSidebarOpen ? t('common.btn.close_menu') : t('common.btn.open_menu')"
-              @click="app.toggleMobileSidebar()"
+      <!-- ═══ 顶栏: 内容生成 ① │ [任务切换] [模型 ▾] ··· [队列/历史 ②]
+          窄屏 (<600px) 由 PageHeaderRow 自动下放: Row1 标题+队列, Row2 任务切换, Row3 模型选择 ═══ -->
+      <PageHeaderRow :title="t('generate.title')">
+        <!-- 产品导览手动入口: 裸 icon (省宽度), 纯前端覆盖层不因 frozen 禁用 -->
+        <template #title-extra>
+          <button
+            type="button"
+            class="gen-tour-btn"
+            :aria-label="t('generate.tour.open_aria')"
+            :title="t('generate.tour.open_aria')"
+            @click="openTour"
+          >
+            <MsIcon name="help_outline" size="xs" />
+          </button>
+        </template>
+
+        <!-- 任务切换 (占位: 视频/编辑未上线为禁用项; 上线时接子路由) -->
+        <div
+          class="gen-header-controls"
+          data-tour="gen-header"
+          :inert="frozen"
+          :class="{ 'gen-header-controls--frozen': frozen }"
+        >
+          <SegmentedControl
+            v-model="activeTask"
+            :options="taskOptions"
+            size="md"
+            class="gen-task-switch"
+          />
+        </div>
+
+        <!-- 架构选择器: 前置静音小标签提示控件语义 -->
+        <template #sub>
+          <div class="gen-header-controls" :inert="frozen" :class="{ 'gen-header-controls--frozen': frozen }">
+            <span class="gen-arch-label">{{ t('generate.header.model_label') }}</span>
+            <DropdownMenu
+              v-model="selectedModelKey"
+              :items="menuItems"
+              :back-label="t('generate.header.back_to_all_models')"
+              class="gen-arch-selector"
             >
-              <MsIcon name="menu" />
-            </button>
-            <h1 class="page-title">{{ t('generate.title') }}</h1>
-            <!-- 产品导览手动入口: 裸 icon (省宽度), 纯前端覆盖层不因 frozen 禁用 -->
-            <button
-              type="button"
-              class="gen-tour-btn"
-              :aria-label="t('generate.tour.open_aria')"
-              :title="t('generate.tour.open_aria')"
-              @click="openTour"
-            >
-              <MsIcon name="help_outline" size="xs" />
-            </button>
+              <template #default="{ open }">
+                <button
+                  type="button"
+                  class="gen-arch-trigger"
+                  :class="{ 'gen-arch-trigger--open': open }"
+                  :aria-label="t('generate.header.model_selector_aria')"
+                  :title="t('generate.header.model_selector_aria')"
+                >
+                  <!-- 当前模型 logo(20px 底板) / 字母徽章 -->
+                  <span
+                    class="gen-arch-logo"
+                    :class="{ 'gen-arch-logo--pad': currentConfig.logo }"
+                  >
+                    <img v-if="currentConfig.logo" :src="currentConfig.logo" :alt="currentConfig.label" />
+                    <span v-else class="gen-arch-logo__letter">{{ currentConfig.label.slice(0, 2) }}</span>
+                  </span>
+                  <span class="gen-arch-trigger__label">{{ t(`generate.tabs.${currentConfig.key}`) }}</span>
+                  <MsIcon name="expand_more" size="sm" color="var(--t3)" :class="{ 'gen-arch-trigger__icon--open': open }" />
+                </button>
+              </template>
+            </DropdownMenu>
           </div>
-          <!-- 右: 队列/历史按钮 (移动端在顶层右侧显示，桌面端靠最右) -->
+        </template>
+
+        <!-- 右: 队列/历史按钮 -->
+        <template #actions>
           <DrawerTrigger
-            class="gen-drawer-trigger"
             data-tour="gen-queue"
             icon="history"
             :label="t('generate.header.queue_history')"
@@ -685,48 +725,8 @@ sse.start()
             :pulse="isExecuting"
             @click="openDrawer"
           />
-        </div>
-
-        <div class="gen-header-controls" data-tour="gen-header" :inert="frozen" :class="{ 'gen-header-controls--frozen': frozen }">
-          <span class="page-title-divider" aria-hidden="true" />
-          <!-- 任务切换 (占位: 视频/编辑未上线为禁用项; 上线时接子路由) -->
-          <SegmentedControl
-            v-model="activeTask"
-            :options="taskOptions"
-            size="md"
-            class="gen-task-switch"
-          />
-          <!-- 架构选择器: 前置静音小标签提示控件语义 -->
-          <span class="gen-arch-label">{{ t('generate.header.model_label') }}</span>
-          <DropdownMenu
-            v-model="selectedModelKey"
-            :items="menuItems"
-            :back-label="t('generate.header.back_to_all_models')"
-            class="gen-arch-selector"
-          >
-            <template #default="{ open }">
-              <button
-                type="button"
-                class="gen-arch-trigger"
-                :class="{ 'gen-arch-trigger--open': open }"
-                :aria-label="t('generate.header.model_selector_aria')"
-                :title="t('generate.header.model_selector_aria')"
-              >
-                <!-- 当前模型 logo(20px 底板) / 字母徽章 -->
-                <span
-                  class="gen-arch-logo"
-                  :class="{ 'gen-arch-logo--pad': currentConfig.logo }"
-                >
-                  <img v-if="currentConfig.logo" :src="currentConfig.logo" :alt="currentConfig.label" />
-                  <span v-else class="gen-arch-logo__letter">{{ currentConfig.label.slice(0, 2) }}</span>
-                </span>
-                <span class="gen-arch-trigger__label">{{ t(`generate.tabs.${currentConfig.key}`) }}</span>
-                <MsIcon name="expand_more" size="sm" color="var(--t3)" :class="{ 'gen-arch-trigger__icon--open': open }" />
-              </button>
-            </template>
-          </DropdownMenu>
-        </div>
-      </div>
+        </template>
+      </PageHeaderRow>
 
       <!-- Model Tabs (config-driven, 全量 v-show 挂载) -->
       <div
@@ -799,27 +799,13 @@ sse.start()
 }
 @keyframes gate-spin { to { transform: rotate(360deg); } }
 
-/* ═══ 顶栏: 桌面端单行 ═══ */
-.gen-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--bg-ambient);
-  background-attachment: fixed;
-  margin-top: calc(-1 * var(--page-body-pt));
-  padding-top: var(--page-body-pt);
-  padding-bottom: 8px;
-  margin-bottom: var(--sp-3);
-  mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
+/* ═══ 顶栏控件段 (任务切换 / 架构选择器): 段内水平排布,
+   吸顶/单行/窄屏下放由 PageHeaderRow 承担 ═══ */
+.gen-header-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--sp-3);
-}
-
-.gen-header-top {
-  display: contents;
+  min-width: 0;
 }
 
 /* 导览入口: 裸 icon 小按钮（先例 PromptEditor .prompt-help-btn）, 紧贴标题右侧 */
@@ -841,17 +827,10 @@ sse.start()
   background: var(--bg3);
 }
 
-.gen-header-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-  order: 2;
-}
-
-.gen-drawer-trigger {
-  order: 3;
-  margin-left: auto;
+/* inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
+.gen-header-controls--frozen {
+  opacity: .45;
+  cursor: not-allowed;
 }
 
 /* 架构选择器前置静音标签: 提示控件语义, 窄屏隐藏 */
@@ -860,12 +839,6 @@ sse.start()
   color: var(--t3);
   user-select: none;
   margin-right: calc(var(--sp-2) * -0.5);
-}
-
-/* inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
-.gen-header-controls--frozen {
-  opacity: .45;
-  cursor: not-allowed;
 }
 
 .gen-arch-selector {
@@ -944,45 +917,9 @@ sse.start()
   transform: rotate(180deg);
 }
 
-/* ═══ 窄屏顶栏: 
-   Row 1: [ ☰ ] 内容生成 -------------- [ 队列/历史 (2) ]
-   Row 2: [ 任务切换 (通栏 3 等分) ]
-   Row 3: [ 模型架构选择器 (通栏全宽) ]
-═══ */
-@media (max-width: 768px) {
-  .gen-header {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--sp-2);
-    width: 100%;
-  }
-
-  .gen-header-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-  }
-
-  .gen-drawer-trigger {
-    order: unset;
-    margin-left: auto;
-  }
-
-  .gen-header-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--sp-2);
-    width: 100%;
-    order: unset;
-  }
-
-  .gen-header-controls .page-title-divider {
-    display: none;
-  }
-
+/* ═══ 窄屏 (<600px): 页头已由 PageHeaderRow 下放为三行
+   (Row1 标题+队列 / Row2 任务切换 / Row3 模型选择), 此处只管控件段通栏 ═══ */
+@container page (max-width: 600px) {
   .gen-arch-label {
     display: none;
   }

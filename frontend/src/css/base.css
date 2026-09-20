@@ -105,6 +105,12 @@
                 var(--bg);
         }
 
+        @media (max-width: 768px) {
+            :root {
+                --page-pad: 16px;
+            }
+        }
+
         /* ── Light Theme (Cool Slate / 冰霜冷钛灰) ── */
         [data-theme="light"] {
             --bg: #ebf0f5;
@@ -163,6 +169,7 @@
             background: var(--bg);
             color: var(--t1);
             min-height: 100vh;
+            min-height: 100dvh;
             line-height: 1.5;
             display: flex
         }
@@ -170,7 +177,8 @@
         #app {
             display: flex;
             width: 100%;
-            min-height: 100vh
+            min-height: 100vh;
+            min-height: 100dvh
         }
 
         /* ── Material Symbols ── */
@@ -327,6 +335,7 @@
 
         /* 行列表容器：配合 ListRow 使用（行本身负责发丝线与骨架） */
         .list-plain {
+            container: list / inline-size;
             list-style: none;
             margin: 0;
             padding: 0

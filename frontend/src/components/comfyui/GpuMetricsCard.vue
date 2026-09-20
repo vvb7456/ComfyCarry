@@ -6,7 +6,7 @@
  * 每张卡固定「标签 → 主数值 → 细条 → 次级事实」四行, 次级事实只用后端原生读数。
  * 条统一主题色, 温度在 temp_limit 有效时按阈值归一化, 缺失时保留中性轨道。
  * null 读数保留结构, 值显示 ——; 0 是有效值照常显示。
- * 手机端 (≤768px) 一块 GPU 收为一张卡, 四组指标顺序不变。
+ * 窄正文 (≤560px) 一块 GPU 收为一张卡, 四组指标顺序不变。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -127,6 +127,13 @@ const metrics = computed(() => {
   gap: 10px;
 }
 
+/* 固定四项；四张 220px 指标卡加三段 10px 间距，不足时成对排列。 */
+@container page (max-width: 910px) {
+  .gpu-block__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .gpu-metric {
   display: grid;
   gap: 8px;
@@ -172,8 +179,8 @@ const metrics = computed(() => {
   color: var(--t2);
 }
 
-/* 手机端: 一块 GPU 收成一张卡, 四组指标顺序不变 */
-@media (max-width: 768px) {
+/* 窄正文: 一块 GPU 收成一张卡, 四组指标顺序不变 */
+@container page (max-width: 560px) {
   .gpu-block {
     padding: 12px 14px;
     border: 1px solid var(--bd);

@@ -66,109 +66,116 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
 </script>
 
 <template>
-  <div class="cn-split">
-    <!-- Left: media area (reference image) -->
-    <div class="cn-split__media">
-      <label class="field-lbl">{{ t(cn.refLabelKey) }}</label>
+  <div class="cn-split-container">
+    <div class="cn-split">
+      <!-- Left: media area (reference image) -->
+      <div class="cn-split__media">
+        <label class="field-lbl">{{ t(cn.refLabelKey) }}</label>
 
-      <div class="cn-media-wrap">
-        <!-- Processing overlay -->
-        <div v-if="isProcessing" class="cn-ref-processing">
-          <Spinner size="sm" />
-          <span>{{ t('generate.controlnet.preprocessing') }}</span>
-          <span v-if="cn.preprocessElapsed.value > 0" class="cn-pp-timer">{{ cn.preprocessElapsed.value }}s</span>
+        <div class="cn-media-wrap">
+          <!-- Processing overlay -->
+          <div v-if="isProcessing" class="cn-ref-processing">
+            <Spinner size="sm" />
+            <span>{{ t('generate.controlnet.preprocessing') }}</span>
+            <span v-if="cn.preprocessElapsed.value > 0" class="cn-pp-timer">{{ cn.preprocessElapsed.value }}s</span>
+          </div>
+
+          <!-- FileUploadZone: pick (top) + action "从新图片生成" (bottom) -->
+          <FileUploadZone
+            v-else
+            mode="pick"
+            :accept="IMAGE_ACCEPT"
+            :preview="previewUrl"
+            :file-name="displayName"
+            :pick-label="pickLabel"
+            :action-label="t('generate.image_source.generate_new')"
+            action-icon="auto_fix_high"
+            class="cn-ref-zone"
+            @pick="emit('pick')"
+            @file="emit('file', $event)"
+            @action="emit('open-preprocess')"
+            @clear="emit('clear')"
+            @error="toast($event, 'warning')"
+          />
+        </div>
+      </div>
+
+      <!-- Right: parameters area -->
+      <div class="cn-split__params">
+        <!-- Model selector -->
+        <div class="cn-field">
+          <label class="field-lbl">{{ t('generate.controlnet.model') }}</label>
+          <BaseSelect
+            :model-value="config.model"
+            :options="modelOptions"
+            :placeholder="cn.hasModels.value ? t('generate.controlnet.model') : t('generate.controlnet.need_model')"
+            :disabled="!cn.hasModels.value"
+            teleport
+            @update:model-value="config.model = String($event)"
+          />
         </div>
 
-        <!-- FileUploadZone: pick (top) + action "从新图片生成" (bottom) -->
-        <FileUploadZone
-          v-else
-          mode="pick"
-          :accept="IMAGE_ACCEPT"
-          :preview="previewUrl"
-          :file-name="displayName"
-          :pick-label="pickLabel"
-          :action-label="t('generate.image_source.generate_new')"
-          action-icon="auto_fix_high"
-          class="cn-ref-zone"
-          @pick="emit('pick')"
-          @file="emit('file', $event)"
-          @action="emit('open-preprocess')"
-          @clear="emit('clear')"
-          @error="toast($event, 'warning')"
-        />
+        <!-- Strength slider -->
+        <RangeField
+          :model-value="config.strength"
+          :min="0.1"
+          :max="2"
+          :step="0.05"
+          :label="t('generate.controlnet.strength')"
+          :marks="2"
+          :value-format="(v: number) => v.toFixed(2)"
+          editable
+          @update:model-value="config.strength = $event"
+        >
+          <template #label-append>
+            <HelpTip :text="t(cn.strengthHelpKey)" />
+          </template>
+        </RangeField>
+
+        <!-- Start step slider -->
+        <RangeField
+          :model-value="config.start"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          :label="t('generate.controlnet.start')"
+          :marks="2"
+          :value-format="(v: number) => v.toFixed(2)"
+          editable
+          @update:model-value="config.start = $event"
+        >
+          <template #label-append>
+            <HelpTip :text="t('generate.controlnet.start_help')" />
+          </template>
+        </RangeField>
+
+        <!-- End step slider -->
+        <RangeField
+          :model-value="config.end"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          :label="t('generate.controlnet.end')"
+          :marks="2"
+          :value-format="(v: number) => v.toFixed(2)"
+          editable
+          @update:model-value="config.end = $event"
+        >
+          <template #label-append>
+            <HelpTip :text="t('generate.controlnet.end_help')" />
+          </template>
+        </RangeField>
       </div>
-    </div>
-
-    <!-- Right: parameters area -->
-    <div class="cn-split__params">
-      <!-- Model selector -->
-      <div class="cn-field">
-        <label class="field-lbl">{{ t('generate.controlnet.model') }}</label>
-        <BaseSelect
-          :model-value="config.model"
-          :options="modelOptions"
-          :placeholder="cn.hasModels.value ? t('generate.controlnet.model') : t('generate.controlnet.need_model')"
-          :disabled="!cn.hasModels.value"
-          teleport
-          @update:model-value="config.model = String($event)"
-        />
-      </div>
-
-      <!-- Strength slider -->
-      <RangeField
-        :model-value="config.strength"
-        :min="0.1"
-        :max="2"
-        :step="0.05"
-        :label="t('generate.controlnet.strength')"
-        :marks="2"
-        :value-format="(v: number) => v.toFixed(2)"
-        editable
-        @update:model-value="config.strength = $event"
-      >
-        <template #label-append>
-          <HelpTip :text="t(cn.strengthHelpKey)" />
-        </template>
-      </RangeField>
-
-      <!-- Start step slider -->
-      <RangeField
-        :model-value="config.start"
-        :min="0"
-        :max="1"
-        :step="0.05"
-        :label="t('generate.controlnet.start')"
-        :marks="2"
-        :value-format="(v: number) => v.toFixed(2)"
-        editable
-        @update:model-value="config.start = $event"
-      >
-        <template #label-append>
-          <HelpTip :text="t('generate.controlnet.start_help')" />
-        </template>
-      </RangeField>
-
-      <!-- End step slider -->
-      <RangeField
-        :model-value="config.end"
-        :min="0"
-        :max="1"
-        :step="0.05"
-        :label="t('generate.controlnet.end')"
-        :marks="2"
-        :value-format="(v: number) => v.toFixed(2)"
-        editable
-        @update:model-value="config.end = $event"
-      >
-        <template #label-append>
-          <HelpTip :text="t('generate.controlnet.end_help')" />
-        </template>
-      </RangeField>
     </div>
   </div>
 </template>
 
 <style scoped>
+.cn-split-container {
+  min-width: 0;
+  container: gen-controlnet / inline-size;
+}
+
 /* Legacy gen-mod-split layout */
 .cn-split {
   display: flex;
@@ -235,7 +242,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
   opacity: .7;
 }
 
-@media (max-width: 900px) {
+@container gen-controlnet (max-width: 520px) {
   .cn-split { flex-direction: column; }
   .cn-split__media { max-width: 420px; width: 100%; }
 }

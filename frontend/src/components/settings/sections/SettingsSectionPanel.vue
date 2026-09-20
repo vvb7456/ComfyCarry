@@ -159,7 +159,7 @@ onMounted(() => {
             <div class="settings-row__label">{{ t('settings.password.row_label') }}</div>
             <div class="settings-row__desc">{{ t('settings.password.row_desc') }}</div>
           </div>
-          <div class="settings-row__control">
+          <div class="settings-row__control settings-row__control--auto">
             <BaseButton size="sm" @click="pwModalOpen = true">
               {{ t('settings.password.change_btn') }}
             </BaseButton>
@@ -203,23 +203,27 @@ onMounted(() => {
     <!-- 模块 2: 配置管理 (即时动作) -->
     <SettingsModule :title="t('settings.domains.configmgmt')">
       <div class="settings-lines">
-        <div class="settings-action">
-          <div class="settings-action__text">
-            <div class="settings-action__title">{{ t('settings.config.export_title') }}</div>
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.config.export_title') }}</div>
             <div class="settings-row__desc">{{ t('settings.config.export_desc') }}</div>
           </div>
-          <BaseButton size="sm" @click="exportConfig">
-            <MsIcon name="download" /> {{ t('settings.config.export_btn') }}
-          </BaseButton>
+          <div class="settings-row__control settings-row__control--auto">
+            <BaseButton size="sm" @click="exportConfig">
+              <MsIcon name="download" /> {{ t('settings.config.export_btn') }}
+            </BaseButton>
+          </div>
         </div>
-        <div class="settings-action">
-          <div class="settings-action__text">
-            <div class="settings-action__title">{{ t('settings.config.import_title') }}</div>
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.config.import_title') }}</div>
             <div class="settings-row__desc">{{ t('settings.config.import_desc') }}</div>
           </div>
-          <BaseButton size="sm" @click="($refs.importFileInput as HTMLInputElement)?.click()">
-            <MsIcon name="upload" /> {{ t('settings.config.import_btn') }}
-          </BaseButton>
+          <div class="settings-row__control settings-row__control--auto">
+            <BaseButton size="sm" @click="($refs.importFileInput as HTMLInputElement)?.click()">
+              <MsIcon name="upload" /> {{ t('settings.config.import_btn') }}
+            </BaseButton>
+          </div>
           <input ref="importFileInput" type="file" accept=".json" @change="importConfig" style="display:none" />
         </div>
       </div>

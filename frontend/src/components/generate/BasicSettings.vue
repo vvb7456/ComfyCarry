@@ -266,6 +266,7 @@ watch(() => state.value.resolution, (v) => {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  container: gen-basic / inline-size;
 }
 
 .basic-settings--disabled {
@@ -332,7 +333,10 @@ watch(() => state.value.resolution, (v) => {
   min-height: 56px;
 }
 
-@media (max-width: 600px) {
+/* 以 BasicSettings 自己的容器宽度决定是否将模型和参数上下排列。
+   顶部工作区保持双栏时，控制列也可能只有约 450px，此时不能继续强行
+   保持第二层双栏。 */
+@container gen-basic (max-width: 600px) {
   .basic-grid {
     grid-template-columns: 1fr;
   }
@@ -394,7 +398,10 @@ watch(() => state.value.resolution, (v) => {
   gap: var(--sp-3);
 }
 
-@media (max-width: 600px) {
+@container gen-basic (max-width: 480px) {
+  .res-row {
+    grid-template-columns: 1fr;
+  }
   .slider-row {
     grid-template-columns: 1fr;
   }

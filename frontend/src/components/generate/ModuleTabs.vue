@@ -70,39 +70,46 @@ function tabClass(tab: SwitchTabItem) {
 </script>
 
 <template>
-  <div class="switch-tabs" role="tablist">
-    <button
-      type="button"
-      v-for="tab in tabs"
-      :key="tab.key"
-      :class="tabClass(tab)"
-      role="tab"
-      :aria-selected="activeKey === tab.key"
-      :disabled="tab.disabled"
-      @click="onTabClick(tab)"
-    >
-        <MsIcon v-if="tab.icon" :name="tab.icon" color="none" class="tab-icon" />
-      <span class="tab-label">{{ tab.label }}</span>
-      <input
-        type="checkbox"
-        class="tab-switch"
-        :checked="enabledTabs.has(tab.key)"
+  <div class="switch-tabs-container">
+    <div class="switch-tabs" role="tablist">
+      <button
+        type="button"
+        v-for="tab in tabs"
+        :key="tab.key"
+        :class="tabClass(tab)"
+        role="tab"
+        :aria-selected="activeKey === tab.key"
         :disabled="tab.disabled"
-        :title="tab.label"
-        @click="onSwitchClick($event, tab)"
+        @click="onTabClick(tab)"
       >
-    </button>
+        <MsIcon v-if="tab.icon" :name="tab.icon" color="none" class="tab-icon" />
+        <span class="tab-label">{{ tab.label }}</span>
+        <input
+          type="checkbox"
+          class="tab-switch"
+          :checked="enabledTabs.has(tab.key)"
+          :disabled="tab.disabled"
+          :title="tab.label"
+          @click="onSwitchClick($event, tab)"
+        >
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.switch-tabs-container {
+  min-width: 0;
+  container: gen-tabs / inline-size;
+}
+
 .switch-tabs {
   display: flex;
   gap: 0;
   flex-wrap: wrap;
 }
 
-@media (max-width: 768px) {
+@container gen-tabs (max-width: 860px) {
   .switch-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;

@@ -63,6 +63,13 @@
     width: 100%;
 }
 
+/* 开关和短按钮按内容靠右，不占输入框的定宽列；窄屏仍与说明同排。 */
+.settings-row__control--auto,
+.settings-row__control--switch {
+    width: auto;
+    min-width: 0;
+}
+
 /* 控件列竖排 (range+刻度 / 输入+校验反馈 等多元素组合); 纵向主轴重置回起点 */
 .settings-row__control--stack {
     flex-direction: column;
@@ -100,31 +107,8 @@
     border-top: 1px solid color-mix(in srgb, var(--bd) 55%, transparent);
 }
 
-/* ── 动作行: 说明文字左 + 按钮右 (导出/导入等立即动作) ── */
-.settings-action {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-4, 16px);
-    padding: 12px 0;
-    min-width: 0;
-}
-
-.settings-action__text {
-    flex: 1;
-    min-width: 0;
-}
-
-.settings-action__title {
-    margin: 0;
-    font-size: .9rem;
-    font-weight: 600;
-    color: var(--t1);
-    line-height: 1.4;
-}
-
-.settings-action .base-btn {
-    flex-shrink: 0;
-}
+/* ── 动作行 (导出/导入等) ──
+   已并入 .settings-row 体系 (settings-row__control--auto)，保持说明和动作同排。 */
 
 
 /* 模块头 → 内容 (模块头样式在 SettingsModule.vue 内) */
@@ -191,13 +175,15 @@
     100% { background-position: -200% 0; }
 }
 
+/* 沿用原有手机断点，只重排输入型行。桌面 520/560/600px 弹窗
+   扣除内边距后仍保持左右布局，不按弹窗正文宽度强制拆行。 */
 @media (max-width: 640px) {
-    .settings-row {
+    .settings-row:not(:has(> .settings-row__control--auto, > .settings-row__control--switch)) {
         flex-direction: column;
         align-items: stretch;
     }
 
-    .settings-row__control {
+    .settings-row__control:not(.settings-row__control--auto):not(.settings-row__control--switch) {
         width: 100%;
         min-width: 0;
     }

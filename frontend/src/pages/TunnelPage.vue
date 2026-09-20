@@ -26,6 +26,7 @@ import { apiErrorText } from '@/utils/apiError'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
 import LogPanel from '@/components/ui/LogPanel.vue'
+import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -357,22 +358,20 @@ function openAddSvc() {
 
 <template>
   <div class="page-body">
-    <div class="page-header-row">
-      <div class="page-title-wrap">
-        <h1 class="page-title">{{ t('tunnel.title') }}</h1>
-      </div>
-      <span class="page-header-row__spacer" />
-      <span v-if="configured" class="page-actions">
-        <template v-if="heroState === 'online' || heroState === 'connecting'">
-          <BaseButton size="sm" :loading="pendingAction === 'stop'" :disabled="acting" @click="tunnelStop"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>
-          <BaseButton size="sm" :loading="pendingAction === 'restart'" :disabled="acting" @click="tunnelRestart()"><MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}</BaseButton>
+    <PageHeaderRow :title="t('tunnel.title')">
+      <template #actions>
+        <template v-if="configured">
+          <template v-if="heroState === 'online' || heroState === 'connecting'">
+            <BaseButton size="sm" :loading="pendingAction === 'stop'" :disabled="acting" @click="tunnelStop"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>
+            <BaseButton size="sm" :loading="pendingAction === 'restart'" :disabled="acting" @click="tunnelRestart()"><MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}</BaseButton>
+          </template>
+          <BaseButton v-else size="sm" :loading="pendingAction === 'start'" :disabled="acting" @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
         </template>
-        <BaseButton v-else size="sm" :loading="pendingAction === 'start'" :disabled="acting" @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
-      </span>
-      <BaseButton variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
-        <MsIcon name="settings" /> {{ t('common.btn.settings') }}
-      </BaseButton>
-    </div>
+        <BaseButton variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
+          <MsIcon name="settings" /> {{ t('common.btn.settings') }}
+        </BaseButton>
+      </template>
+    </PageHeaderRow>
 
     <div class="page-col">
       <LoadingCenter v-if="!data" style="padding:60px 0" />

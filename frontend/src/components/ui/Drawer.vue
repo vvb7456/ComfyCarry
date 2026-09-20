@@ -147,6 +147,7 @@ function onKeydown(e: KeyboardEvent) {
 .drawer-overlay {
   position: fixed;
   inset: 0;
+  height: 100vh;
   background: var(--overlay);
   /* 990: 高于页面内一切浮层 (BackgroundRunBar 900), 但**低于 BaseModal 的 1000**。
      抽屉里会弹模态 (批量添加 / 下载目录裁决), 两者都 Teleport 到 body, 同层时
@@ -167,12 +168,15 @@ function onKeydown(e: KeyboardEvent) {
   top: 0;
   right: 0;
   bottom: 0;
+  height: 100%;
+  max-height: 100vh;
   max-width: 100vw;
   background: var(--bg2);
   border-left: 1px solid var(--bd);
   box-shadow: var(--sh);
   display: flex;
   flex-direction: column;
+  min-height: 0;
   transform: translateX(100%);
   visibility: hidden;
   transition: transform .26s ease, visibility .26s ease;
@@ -183,7 +187,15 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 @media (max-width: 640px) {
-  .drawer-panel { width: 100vw !important; }
+  .drawer-panel {
+    width: 100vw !important;
+    max-width: 100vw;
+  }
+}
+
+@supports (height: 100dvh) {
+  .drawer-overlay { height: 100dvh; }
+  .drawer-panel { max-height: 100dvh; }
 }
 
 /* Drawer header: 64px 高度与侧栏 logo 对齐 (h2 1.15rem/600, icon 28px),
@@ -212,6 +224,8 @@ function onKeydown(e: KeyboardEvent) {
   color: var(--t1);
   line-height: 1.1;
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .drawer-header__title-group :deep(.ms) {
@@ -236,7 +250,28 @@ function onKeydown(e: KeyboardEvent) {
 
 .drawer-body {
   padding: 16px 20px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 640px) {
+  .drawer-header {
+    min-height: 56px;
+    padding: 0 16px;
+  }
+
+  .drawer-title { font-size: 1.05rem; }
+
+  .drawer-header__title-group :deep(.ms) {
+    font-size: 24px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+
+  .drawer-body {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
 }
 </style>

@@ -1029,17 +1029,15 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
+  container: gen-model / inline-size;
 }
 
 /* ═══ 上部: 双列网格 ═══ */
 .gen-top-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
   align-items: stretch;
-}
-@media (max-width: 900px) {
-  .gen-top-row { grid-template-columns: 1fr; }
 }
 
 /* ── 左列 ── */
@@ -1069,12 +1067,27 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 /* ── 右列: 预览 ── */
 .gen-preview-col {
   position: relative;
+  /* 宽度跟随网格列，避免单栏时由最小高度和宽高比反推宽度。 */
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 .gen-preview-col > :deep(*) {
   position: absolute;
   inset: 0;
+}
+
+/* 双栏要求控制区和预览区各自仍有可用宽度。这个判断基于 .model-tab 的实际
+   内容区，能覆盖中等窗口下侧栏展开造成的窄内容区。放在基础规则之后，
+   确保堆叠时预览列的最小高度不会被基础 min-height: 0 覆盖。 */
+@container gen-model (max-width: 860px) {
+  .gen-top-row { grid-template-columns: minmax(0, 1fr); }
+  .gen-preview-col {
+    min-height: 280px;
+    max-height: 560px;
+    aspect-ratio: 4 / 3;
+  }
 }
 
 /* ═══ 下部: 模块容器 (Tab + Panel 融合) ═══ */

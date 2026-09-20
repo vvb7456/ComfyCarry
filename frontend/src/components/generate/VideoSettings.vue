@@ -361,6 +361,7 @@ const durationMarkFormat = (v: number) => `${v}s`
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  container: gen-video / inline-size;
 }
 
 .video-settings--disabled {
@@ -429,7 +430,10 @@ const durationMarkFormat = (v: number) => `${v}s`
   gap: var(--sp-3);
 }
 
-@media (max-width: 600px) {
+@container gen-video (max-width: 480px) {
+  .res-row {
+    grid-template-columns: 1fr;
+  }
   .vs-slider-row {
     grid-template-columns: 1fr;
   }

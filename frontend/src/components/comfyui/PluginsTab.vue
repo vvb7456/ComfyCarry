@@ -10,7 +10,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
-import SectionToolbar from '@/components/ui/SectionToolbar.vue'
+import AppToolbar from '@/components/ui/AppToolbar.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import PluginCard from './PluginCard.vue'
@@ -204,18 +204,14 @@ function submitGitInstall() {
 
   <template v-else>
     <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
-      <SectionToolbar>
-        <template #start>
+      <AppToolbar>
+        <template #search>
           <FilterInput v-model="filter" :placeholder="t('plugins.browse.search_placeholder')" />
-          <span class="toolbar-status">
-            {{ stats }}
-          </span>
         </template>
-        <template #end>
-          <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('plugins.installed.refresh')" :disabled="loading" @click="() => loadData()">
-            <MsIcon name="refresh" />
-          </BaseButton>
-          <BaseButton size="sm" @click="gitModalOpen = true"><MsIcon name="link" /> {{ t('plugins.tabs.git') }}</BaseButton>
+        <template #status>
+          {{ stats }}
+        </template>
+        <template #filters>
           <BaseSelect v-model="statusFilter" :options="[
             { value: 'all', label: t('plugins.installed.all_status') },
             { value: 'installed', label: t('plugins.installed.installed_badge') },
@@ -229,7 +225,16 @@ function submitGitInstall() {
             { value: 'name', label: t('plugins.browse.sort_name') },
           ]" size="sm" fit />
         </template>
-      </SectionToolbar>
+        <template #actions>
+          <BaseButton variant="ghost" size="sm" icon-only :aria-label="t('plugins.installed.refresh')" :disabled="loading" @click="() => loadData()">
+            <MsIcon name="refresh" />
+          </BaseButton>
+          <BaseButton size="sm" @click="gitModalOpen = true">
+            <MsIcon name="extension" />
+            <span class="app-toolbar__label">{{ t('plugins.tabs.git') }}</span>
+          </BaseButton>
+        </template>
+      </AppToolbar>
     </Teleport>
 
     <AlertBanner v-if="error" tone="danger" dense>{{ error }}</AlertBanner>
@@ -254,7 +259,7 @@ function submitGitInstall() {
   <!-- Git URL 收集弹窗: 提交转阻塞执行弹窗 -->
   <BaseModal v-model="gitModalOpen" :title="t('plugins.git.title')" width="560px">
     <p style="font-size:.82rem;color:var(--t2);margin-bottom:12px">
-      <MsIcon name="link" /> {{ t('plugins.git.desc') }}
+      {{ t('plugins.git.desc') }}
     </p>
     <form class="git-row" @submit.prevent="submitGitInstall">
       <input v-model="gitUrl" type="text" class="form-input" :placeholder="t('plugins.git.placeholder')">

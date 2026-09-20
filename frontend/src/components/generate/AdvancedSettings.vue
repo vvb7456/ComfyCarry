@@ -413,6 +413,7 @@ const vaeOverrideOptions = computed(() => [
 <style scoped>
 .adv-settings {
   padding-top: 0;
+  container: gen-advanced / inline-size;
 }
 
 .adv-settings--disabled {
@@ -478,7 +479,7 @@ const vaeOverrideOptions = computed(() => [
   grid-template-columns: 1fr 1fr 1fr;
 }
 
-@media (max-width: 600px) {
+@container gen-advanced (max-width: 600px) {
   .adv-2col,
   .adv-split-grid,
   .adv-split-grid--3 {

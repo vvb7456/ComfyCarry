@@ -3,10 +3,11 @@ import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLocalModels } from '@/composables/useLocalModels'
 import { useModelActions } from '@/composables/useModelActions'
-import SectionToolbar from '@/components/ui/SectionToolbar.vue'
+import AppToolbar from '@/components/ui/AppToolbar.vue'
 import FilterInput from '@/components/ui/FilterInput.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import LocalModelCard from '@/components/models/LocalModelCard.vue'
@@ -36,7 +37,7 @@ const {
   loadModels,
 } = useLocalModels()
 
-const { isFetching, fetchInfo, deleteModel, fetchAll, batchProgress } = useModelActions(loadModels)
+const { isFetching, fetchInfo, deleteModel } = useModelActions(loadModels)
 
 const displayCount = computed(() => filteredModels.value.length)
 const displayInfoCount = computed(() => filteredModels.value.filter(m => m.has_info).length)
@@ -77,22 +78,17 @@ function openMeta(m: LocalModel) {
 
 <template>
   <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
-    <SectionToolbar>
-      <template #start>
+    <AppToolbar>
+      <template #search>
         <FilterInput
           v-model="textFilter"
           :placeholder="t('models.local.filter_placeholder')"
         />
-        <span class="toolbar-status">
-          <template v-if="batchProgress.running">
-            {{ t('models.local.fetching_progress', { current: batchProgress.current, total: batchProgress.total, filename: batchProgress.filename }) }}
-          </template>
-          <template v-else>
-            {{ t('models.local.total_models', { count: displayCount, infoCount: displayInfoCount }) }}
-          </template>
-        </span>
       </template>
-      <template #end>
+      <template #status>
+        {{ t('models.local.total_models', { count: displayCount, infoCount: displayInfoCount }) }}
+      </template>
+      <template #filters>
         <BaseSelect
           v-model="categoryFilter"
           :options="categoryOptions"
@@ -106,14 +102,19 @@ function openMeta(m: LocalModel) {
           fit
           :disabled="categoryFilter === 'all' || categoryFilter === 'default'"
         />
-        <BaseButton size="sm" @click="loadModels">
-          {{ t('models.local.refresh') }}
-        </BaseButton>
-        <BaseButton size="sm" @click="fetchAll(filteredModels)">
-          {{ t('models.local.fetch_all') }}
+      </template>
+      <template #actions>
+        <BaseButton
+          variant="ghost"
+          size="sm"
+          icon-only
+          :aria-label="t('models.local.refresh')"
+          @click="loadModels"
+        >
+          <MsIcon name="refresh" />
         </BaseButton>
       </template>
-    </SectionToolbar>
+    </AppToolbar>
   </Teleport>
 
   <LoadingCenter v-if="localLoading" />
@@ -142,7 +143,8 @@ function openMeta(m: LocalModel) {
 /* 竖版 3:4 卡片: 列宽收窄, 保证一屏至少两行 */
 .model-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(240px, 18vw, 320px), 1fr));
+  /* 桌面端大卡 (240–320px), 外层 min(…,100%) 保证窄容器 (手机+侧栏) 不撑破。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(clamp(240px, 18vw, 320px), 100%), 1fr));
   gap: clamp(14px, 1.2vw, 22px);
 }
 </style>
