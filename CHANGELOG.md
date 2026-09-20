@@ -2,6 +2,37 @@
 
 本文件记录各正式版本的变更。Release 发布时由 release.yml 自动提取对应 tag 的段落作为 Release 说明。
 
+## v0.8.3 — 2026-09-20
+
+### 新增
+
+- 页头与数据工具栏收敛为公共组件：新增 `PageHeaderRow` 统一页头（汉堡 / 标题 / 主次控件 / 动作 / 吸顶 / 窄屏按行下放），新增 `AppToolbar` 统一数据工具栏（搜索 / 状态 / 筛选 / 动作四槽位），替换各页手写页头与 `SectionToolbar`
+- 弹窗与抽屉接入焦点管理 `useModalFocus`：打开时圈定焦点、关闭后恢复到触发元素；「+N 更多 / 收起」等按钮互换场景自动转移焦点
+- `FormField` 作用域插槽下发 `id / describedby / invalid`，表单标签与提示 / 错误文本自动建立控件关联
+
+### 重构
+
+- 全站交互控件无障碍与键盘可达性改造：选项 / 模式卡片、折叠标题、筛选 chip、文件上传区、帮助提示、开关、页签、下拉框统一为原生按钮或视觉隐藏原生控件，补齐 `aria-pressed / aria-expanded / aria-selected` 状态播报与 `combobox / listbox / tab / tabpanel / switch` 语义、页签方向键导航、下拉键盘路径禁用防线
+- 统一按钮尺寸基准：`BaseButton` icon-only 由长方形改为与同级文本按钮严格等高的正方形（xs 22 / sm 28 / md 34 / lg 42），图标字号按档位收敛到组件内，触屏仅纵向扩展点击域避免相邻按钮命中区重叠；`ListRow / DownloadItem / ModelCard` 行列表布局、动作列垂直居中与标题 / 元信息单行截断（tooltip 兜底）统一，`DownloadItem` 重构为分行布局并显示历史任务总大小
+- 响应式断点由视口媒体查询迁移为容器查询（生成页 / 模型页 / GPU 指标卡），网格列宽增加 `min(…, 100%)` 约束防窄容器溢出；`BaseModal / Drawer / LoginApp` 补 `dvh` 与安全区适配，窄屏弹窗改 edge-to-edge，设置页动作行并入 `settings-row` 体系
+
+### 修复
+
+- 生成页加载门区分「检查中」与离线：检查阶段显示「正在检查 ComfyUI 状态…」，不再提前透出「未运行」结论
+- 数字输入步进吸附改以最小值为基准（与 `RangeField` 一致），控件样式接入表单基线
+- 等宽字体统一使用全局 token；密钥输入与纯图标按钮补 `aria-label / title` 与显式 `type`，全局按钮补键盘焦点轮廓
+- 硬编码英文提示（打开 / 关闭菜单、未保存标记、种子模式）纳入翻译，种子按钮图标与提示语义修正
+- 选项卡徽标改左对齐，避让右上角选中角标
+- `BaseSelect` 浮层层级统一 `--z-float+1`，修复浮层内下拉被遮挡；外部链接统一补 `rel="noopener"`
+
+### 变更
+
+- 移除本地模型「全部获取」批量获取元数据功能（含进度状态与文案），`useModelActions` 精简为单模型获取与删除
+- Civitai 排序并入筛选弹层，原工具栏独立排序下拉移除，排序与类型 / Base Model 在筛选面板一并应用
+- 插件操作成功响应不再回传 `message_key / message_params`，成功只回传 `ok`
+- 品牌标记统一：向导 / 登录 / 关于页 logo 与字标比例、间距、字重规范化，favicon 与登录展示图改由透明 `logo-mark.svg` 生成（SVG 主通道 + ICO 回退），删除不再使用的 `logo.png / logo-small.png` 及对应路由与鉴权白名单
+- 清理死代码与冗余：删除 `ListRow` 未使用的 `clickable` 属性、`BaseCard` 未使用的 `interactive` 变体、全局样式表中未引用的工具类，以及前后端均无引用的 13 个 i18n 死键
+
 ## v0.8.2 — 2026-09-18
 
 ### 新增
