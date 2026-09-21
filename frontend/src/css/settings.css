@@ -1,12 +1,10 @@
-/* ── Settings: list/group 布局公共样式 ──
-   设置域已迁回各功能页 (弹窗承载), 本文件是设置行体系 (.settings-row /
+/* 设置域已迁回各功能页 (弹窗承载), 本文件是设置行体系 (.settings-row /
    .settings-lines / .settings-skeleton 等) 的唯一来源, 设置页与各设置弹窗共用:
    - 层级只靠字号/颜色/留白/icon 区分, 不用卡片底色块;
    - 全页唯一分割线 = .settings-lines 内相邻行之间的 hairline;
    - 模块 (.settings-module, L2) = kicker 灰标题 (设置页即时动作模块用);
    - 行 = .settings-row (左 label+desc / 右控件)。 */
 
-/* ── 行: 水平两栏, 左侧文案右侧控件 ── */
 .settings-row {
     display: flex;
     align-items: center;
@@ -35,8 +33,6 @@
     color: var(--t3);
 }
 
-/* 行级禁用: 主控件不可操作时 (如隧道非当前模式的行), 文本侧同步降灰 —
-   控件自身的 :disabled 样式只覆盖控件, 不提醒"这行整个不可用" */
 .settings-row--disabled .settings-row__label {
     color: var(--t3);
 }
@@ -50,14 +46,11 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2, 8px);
-    /* 控件定宽列: 所有输入型控件统一等宽 (select/input/secret/number/segmented) */
     width: min(340px, 44%);
     min-width: 180px;
-    /* 列内尾部对齐: 输入型控件 width:100% 不受影响, 纯按钮/开关贴右缘与其他行对齐 */
     justify-content: flex-end;
 }
 
-/* 控件列内自适应: SecretInput / SegmentedControl 根元素无固有宽度, 统一撑满列宽 */
 .settings-row__control .secret-input,
 .settings-row__control .seg-control {
     width: 100%;
@@ -70,14 +63,12 @@
     min-width: 0;
 }
 
-/* 控件列竖排 (range+刻度 / 输入+校验反馈 等多元素组合); 纵向主轴重置回起点 */
 .settings-row__control--stack {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
 }
 
-/* 控件列内的组合行: 输入控件 flex:1 + 右侧图标/动作按钮 */
 .settings-row__control-row {
     display: flex;
     align-items: center;
@@ -91,7 +82,6 @@
     min-width: 0;
 }
 
-/* 行内校验结果, 控件列下方 */
 .settings-row__feedback {
     margin-top: 4px;
     font-size: .78rem;
@@ -107,11 +97,6 @@
     border-top: 1px solid color-mix(in srgb, var(--bd) 55%, transparent);
 }
 
-/* ── 动作行 (导出/导入等) ──
-   已并入 .settings-row 体系 (settings-row__control--auto)，保持说明和动作同排。 */
-
-
-/* 模块头 → 内容 (模块头样式在 SettingsModule.vue 内) */
 .settings-module__body {
     margin-top: 12px;
     display: flex;

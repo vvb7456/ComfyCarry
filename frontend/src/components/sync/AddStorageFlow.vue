@@ -69,7 +69,6 @@ const bucket = ref('')
 
 const error = ref('')
 const submitting = ref(false)
-/** 粘贴回调验证中 (下一步按钮 loading) */
 const advancing = ref(false)
 
 // OAuth 授权阶段 (经 CloudAuthHero 的 update:phase 同步, 用于下一步按钮 disable)
@@ -88,7 +87,6 @@ function brandOf(typeKey: string) {
   return remoteBrand(typeKey)
 }
 
-// ── 名称唯一性生成与 provider 选择 ──
 function generateUniqueName(base: string): string {
   let res = base
   let n = 2
@@ -110,7 +108,6 @@ function selectProvider(p: CloudProvider) {
   error.value = ''
 }
 
-// ── 校验 ──
 function validateName(): boolean {
   const n = name.value.trim()
   if (!n) {
@@ -142,7 +139,6 @@ async function next(wantsRules = false) {
   }
   if (flow.value === 1) {
     error.value = ''
-    // 连接屏 → done 屏
     if (isOAuthType.value) {
       // 粘贴回调: 由底部「下一步」验证并推进 (保底路径, 主路径是自动轮询 done)。
       // 错误 (空粘贴/无效回调) 由 CloudAuthHero 就地展示, 不再叠流程级 banner
@@ -356,10 +352,8 @@ defineExpose({
       />
     </div>
 
-    <!-- 错误就地提示 -->
     <AlertBanner v-if="error" tone="danger" dense>{{ error }}</AlertBanner>
 
-    <!-- 底部动作条: 取消(第一屏) / 上一步 + 下一步 / 保存并创建规则 -->
     <div class="flow-footer">
       <span class="flow-footer-spacer" />
       <BaseButton v-if="flow === 0" :disabled="submitting" @click="emit('cancel')">

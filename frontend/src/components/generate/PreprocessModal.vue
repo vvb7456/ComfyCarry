@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * PreprocessModal — Modal for generating ControlNet reference images from source images.
- *
- * Legacy: _openPPModal(type) — left-right split (gen-mod-split) inside a 720px modal.
- * Left: FileUploadZone (pick from input / upload local)
- * Right: per-type parameters + submit button
- */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PP_PARAMS_DEF, type CnType } from '@/composables/generate/useControlNet'
@@ -41,8 +34,6 @@ const title = computed(() =>
   t('generate.controlnet.generate_title', { title: t(def.value.titleKey) }),
 )
 
-// ── Image source ──────────────────────────────────────────────────────────
-
 const sourceFile = ref<File | null>(null)
 const sourceInputName = ref('')
 const sourcePreviewUrl = ref('')
@@ -56,7 +47,6 @@ const sourceName = computed(() => {
 })
 const hasSource = computed(() => !!sourceFile.value || !!sourceInputName.value)
 
-// Ref image picker for "from input" (no subfolder — show all images)
 const ppPicker = useRefImagePicker('__pp__', '')
 
 function onPickInput() {
@@ -93,11 +83,7 @@ function clearSource() {
   sourcePreviewUrl.value = ''
 }
 
-// ── Parameters ────────────────────────────────────────────────────────────
-
 const paramValues = ref<Record<string, unknown>>({})
-
-// ── Reset on open ─────────────────────────────────────────────────────────
 
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -107,8 +93,6 @@ watch(() => props.modelValue, (open) => {
     paramValues.value = defaults
   }
 })
-
-// ── Submit ────────────────────────────────────────────────────────────────
 
 function onSubmit() {
   const file = sourceFile.value || sourceInputName.value
@@ -129,10 +113,8 @@ function onSubmit() {
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <!-- gen-mod-split: left image + right params -->
     <div class="pp-wrap">
       <div class="pp-split">
-        <!-- Left: image source (FileUploadZone) -->
         <div class="pp-split__media">
           <FileUploadZone
             mode="pick"
@@ -149,13 +131,11 @@ function onSubmit() {
           />
         </div>
 
-        <!-- Right: parameters + submit -->
         <div class="pp-split__params">
           <div v-if="def.params.length" class="pp-params">
             <div class="pp-params__title">{{ t('generate.controlnet.param_settings') }}</div>
 
             <div v-for="p in def.params" :key="p.key" :class="['pp-param-row', { 'pp-param-row--block': p.type === 'slider' }]">
-              <!-- Toggle -->
               <template v-if="p.type === 'toggle'">
                 <span class="pp-param-row__label">{{ t(p.labelKey) }}</span>
                 <ToggleSwitch
@@ -166,7 +146,6 @@ function onSubmit() {
                 />
               </template>
 
-              <!-- Slider (full-width with optional HelpTip) -->
               <template v-else-if="p.type === 'slider'">
                 <RangeField
                   :model-value="Number(paramValues[p.key])"
@@ -183,7 +162,6 @@ function onSubmit() {
                 </RangeField>
               </template>
 
-              <!-- Select -->
               <template v-else-if="p.type === 'select'">
                 <span class="pp-param-row__label">
                   {{ t(p.labelKey) }}
@@ -201,7 +179,6 @@ function onSubmit() {
             </div>
           </div>
 
-          <!-- Submit button at bottom -->
           <BaseButton
             size="sm"
             variant="primary"
@@ -217,7 +194,6 @@ function onSubmit() {
     </div>
   </BaseModal>
 
-  <!-- Nested RefImageModal for "from input" picker -->
   <RefImageModal
     v-model="ppPicker.visible.value"
     :title="t('generate.image_source.select_image')"
@@ -260,7 +236,6 @@ function onSubmit() {
   gap: var(--sp-3);
 }
 
-/* ── Parameters ── */
 .pp-params {
   flex: 1;
   min-height: 0;
@@ -308,7 +283,6 @@ function onSubmit() {
   max-width: 160px;
 }
 
-/* Submit button at bottom of right column */
 .pp-submit-btn {
   width: 100%;
   margin-top: auto;

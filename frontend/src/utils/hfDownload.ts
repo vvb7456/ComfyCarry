@@ -1,8 +1,6 @@
 import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
 
 /**
- * hfDownload.ts — HF 白名单下载请求体构造 (唯一实现)。
- *
  * 两个入口共用, 保证同一文件无论从哪下载, 任务契约完全一致:
  * - 模型页 HF 标签页 (stores/downloads.ts downloadHuggingFaceVersion)
  * - 生成页运行组件依赖条 (useDependencyStatus, 文件带 hf 锚点时)

@@ -34,9 +34,7 @@ _HOP_BY_HOP = frozenset((
 
 
 class DavProxyMiddleware:
-    """WSGI 中间件: 反向代理 /api/companion/dav/* → 本机 rclone serve。
-
-    用法:
+    """用法:
         app.wsgi_app = DavProxyMiddleware(app.wsgi_app, COMPANION_DAV_PORT)
     """
 
@@ -45,22 +43,13 @@ class DavProxyMiddleware:
         self.port = int(port)
         self.prefix = prefix.rstrip("/")
 
-    # ═══════════════════════════════════════════════════════════════
-    # WSGI 入口
-    # ═══════════════════════════════════════════════════════════════
-
     def __call__(self, environ, start_response):
         path = environ.get("PATH_INFO", "")
 
-        # 只拦截 /api/companion/dav 前缀; 其余原样放行 (零副作用)
         if not (path == self.prefix or path.startswith(self.prefix + "/")):
             return self.app(environ, start_response)
 
         return self._proxy(environ, start_response)
-
-    # ═══════════════════════════════════════════════════════════════
-    # 代理逻辑
-    # ═══════════════════════════════════════════════════════════════
 
     def _build_target_path(self, path):
         """路径原样透传 (rclone serve 的 --baseurl 已设为本前缀 /api/companion/dav)。
@@ -77,7 +66,6 @@ class DavProxyMiddleware:
         return path
 
     def _environ_to_headers(self, environ):
-        """从 WSGI environ 还原请求头 (HTTP_XXX → Xxx-Yyy + CONTENT_TYPE/LENGTH)。"""
         headers = {}
         for key, value in environ.items():
             if key.startswith("HTTP_"):
@@ -103,10 +91,6 @@ class DavProxyMiddleware:
 
     @staticmethod
     def _read_request_body(environ, content_length):
-        """按 CONTENT_LENGTH 流式读请求体 (PROPFIND/PUT 有 body)。
-
-        返回生成器, yield bytes; WSGI input 一般完整可读。
-        """
         if content_length <= 0:
             return
         wsgi_input = environ.get("wsgi.input")
@@ -153,7 +137,6 @@ class DavProxyMiddleware:
                 conn.putheader(name, value)
             conn.endheaders()
 
-            # 流式发送请求体 (PROPFIND/PUT 等)
             if content_length > 0:
                 for chunk in self._read_request_body(environ, content_length):
                     if chunk:
@@ -171,7 +154,6 @@ class DavProxyMiddleware:
             )
             return [body]
 
-        # ── 回传响应 (流式) ─────────────────────────────────
         status_line = f"{resp.status} {resp.reason}"
 
         response_headers = []

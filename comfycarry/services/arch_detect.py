@@ -1,8 +1,4 @@
 """
-comfycarry/services/arch_detect.py
-────────────────────────────────────────
-架构检测 — 纯 stdlib 模块 (json/struct/os/re/typing)。
-
 从 routes/generate.py 抽出的模型架构检测逻辑:
   - arch_from_base_model: CivitAI baseModel 字符串 → 架构
   - detect_arch: 多源检测 (header > 路径)
@@ -37,11 +33,8 @@ import re
 import struct
 from typing import Callable
 
-# ── baseModel 映射 ──────────────────────────────────────────────────────────
-
 # CivitAI baseModel 枚举 -> 架构。子串匹配, 按序求值, 先匹配先赢。
 # 枚举来源: CivitAI /api/v1/enums ActiveBaseModel + BaseModel (2026-08-06 核对, 共 97 项)。
-# 新增架构在此插入一行即可。
 #
 # 视频架构说明:
 #   - wan22_i2v / wan22_t2v / wan22_5b: 本期生成条目 (familyOf='wan22')。
@@ -50,7 +43,6 @@ from typing import Callable
 # 特异性强的在前: "wan video 2.2 i2v" / "t2v" / "ti2v-5b" 都含 "wan video 2.2",
 # 必须把 5B/I2V/T2V 三条排在通用 "wan video" 之前。
 _BASE_MODEL_RULES: list[tuple[str, tuple[str, ...]]] = [
-    # ── CivitAI 官方枚举 (ActiveBaseModel) ──────────────────────────────────
     ("anima", ("anima",)),
     ("krea2", ("krea 2",)),               # CivitAI: "Krea 2" (不含 "Flux.1 Krea" -> flux)
     ("sd15", ("sd 1.4", "sd 1.5")),         # 含 "sd 1.5 lcm" / "sd 1.5 hyper" (子串)
@@ -68,18 +60,16 @@ _BASE_MODEL_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("flux2", ("flux.2", "flux 2", "flux2")),
     ("flux", ("flux",)),                     # CivitAI: Flux.1 S/D/Krea/Kontext
     ("sd3", ("sd 3", "sd3")),
-    # ── ComfyUI 架构对应的 CivitAI baseModel (合入) ──
     # 顺序: AuraFlow 含 "flux"? 否, "auraflow" 不含 "flux" 子串, 但放 flux 后安全。
-    ("auraflow", ("auraflow",)),             # CivitAI: "AuraFlow"
-    ("stablecascade", ("stable cascade",)),  # CivitAI: "Stable Cascade"
-    ("pixart", ("pixart",)),                 # CivitAI: "PixArt a" / "PixArt E"
-    ("mochi", ("mochi",)),                   # CivitAI: "Mochi"
-    ("minimax_h3", ("minimax h3",)),         # CivitAI: "MiniMax H3"
-    ("boogu", ("boogu",)),                   # CivitAI: "Boogu"
-    ("mage_flow", ("mageflow", "mage flow")),  # CivitAI: "MageFlow"
-    ("ideogram4", ("ideogram 4", "ideogram4")),  # CivitAI: "Ideogram 4.0"
+    ("auraflow", ("auraflow",)),
+    ("stablecascade", ("stable cascade",)),
+    ("pixart", ("pixart",)),
+    ("mochi", ("mochi",)),
+    ("minimax_h3", ("minimax h3",)),
+    ("boogu", ("boogu",)),
+    ("mage_flow", ("mageflow", "mage flow")),
+    ("ideogram4", ("ideogram 4", "ideogram4")),
     # ── 视频架构 - 顺序敏感: 2.2 具体条目在通用 wan 之前 ──
-    # Wan 2.2 三条目 (本期生成)。baseModel 取自 Civitai 枚举原文。
     ("wan22_i2v", ("wan video 2.2 i2v-a14b",)),
     ("wan22_t2v", ("wan video 2.2 t2v-a14b",)),
     ("wan22_5b", ("wan video 2.2 ti2v-5b",)),
@@ -93,30 +83,21 @@ _BASE_MODEL_RULES: list[tuple[str, tuple[str, ...]]] = [
     # "Wan Video 14B i2v 480p/720p" / "Wan Video 1.3B t2v" / "Wan Video" (clip/VAE 件)。
     # 不细分 i2v/t2v - 2.1 全系不进生成, 识别到 wan21 一档即可。
     ("wan21", ("wan video 14b", "wan video 1.3b", "wan video")),
-    # Hunyuan Video: Civitai 枚举 "Hunyuan Video"。
     ("hunyuan", ("hunyuan video",)),
     # Hunyuan 1 (HunyuanImage, 图像架构; CivitAI 枚举 "Hunyuan 1")
     ("hunyuanimage", ("hunyuan 1", "hunyuanimage", "hunyuan image")),
     # LTXV: Civitai 枚举 "LTXV 2.3" / "LTXV2" / "LTXV"。
     # 2.3 与旧 0.9.x 合并识别 - 旧版衰退中, 不值得拆条目。
     ("ltxv", ("ltxv 2.3", "ltxv2", "ltxv")),
-    # CogVideoX: CivitAI 枚举 "CogVideoX"
     ("cogvideox", ("cogvideox",)),
-    # HiDream: CivitAI 枚举 "HiDream" / "HiDream-O1"
     ("hidream", ("hidream",)),
-    # Ernie: CivitAI 枚举 "Ernie"
     ("ernie", ("ernie",)),
-    # Lens: CivitAI 枚举 "Lens"
     ("lens", ("lens",)),
     # Qwen 3.5 必须在通用 qwen 之前 ("Qwen 3.5" 含 "qwen")
     ("qwen35", ("qwen 3.5", "qwen3.5")),
-    # Qwen: CivitAI 枚举 "Qwen" / "Qwen 2"
     ("qwen", ("qwen",)),
-    # ACE Audio: CivitAI 枚举 "ACE Audio"
     ("acestep", ("ace audio", "ace-step", "ace step")),
-    # SVD: CivitAI 枚举 "SVD" / "SVD XT"
     ("svd", ("svd", "stable video")),
-    # Hunyuan3D: CivitAI 枚举 "Hunyuan3D"
     ("hunyuan3d", ("hunyuan3d", "hunyuan 3d")),
     # ── HF 白名单独有 (CivitAI 枚举无, 自拟 baseModel 名) ──────────────────
     ("stableaudio", ("stable audio",)),
@@ -139,7 +120,6 @@ _BASE_MODEL_RULES: list[tuple[str, tuple[str, ...]]] = [
 
 def arch_from_base_model(base_model: str) -> str:
     """
-    CivitAI baseModel 字符串 → 架构。
     baseModel 是 CivitAI 的固定枚举 (如 "SD 1.5" / "SDXL 1.0" / "Pony" / "Anima"
     / "Z-Image Turbo" / "Flux.2 Klein" / "Wan Video 2.2 I2V-A14B" / "Hunyuan Video"
     / "LTXV 2.3")，下载子文件夹名沿用该字符串。
@@ -164,10 +144,8 @@ def arch_from_base_model(base_model: str) -> str:
     return "unknown"
 
 
-# ── 路径检测 ────────────────────────────────────────────────────────────────
 def _detect_arch_from_path(name: str) -> str:
     """
-    从模型路径中的 baseModel 子文件夹名推断架构。
     CivitAI 下载时会按 baseModel 创建子文件夹 (如 "SDXL 1.0/model.safetensors")。
     """
     parts = name.replace("\\", "/").split("/")
@@ -175,8 +153,6 @@ def _detect_arch_from_path(name: str) -> str:
         return "unknown"
     return arch_from_base_model(parts[0])
 
-
-# ── safetensors / GGUF header 嗅探 ──────────────────────────────────────────
 
 def _detect_arch_safetensors(filepath: str) -> str:
     """从 safetensors 文件 header 的 tensor key 名称 + 形状检测架构。
@@ -235,10 +211,8 @@ def _detect_arch_gguf(filepath: str) -> str:
             tensor_count = struct.unpack("<Q", f.read(8))[0]
             kv_count = struct.unpack("<Q", f.read(8))[0]
 
-            # 1. 扫描 metadata: 取 general.architecture + orig_shape 数组
             arch_meta, orig_shapes = _gguf_scan_metadata(f, kv_count)
 
-            # 2. 读 tensor info 区: key 名 + shape (dims 反转)
             keys: set[str] = set()
             shapes: dict[str, tuple] = {}
             for _ in range(min(tensor_count, 2000)):
@@ -263,7 +237,6 @@ def _detect_arch_gguf(filepath: str) -> str:
                 if shape:
                     shapes[short] = shape
 
-            # 3. 判别
             if arch_meta and arch_meta in _GGUF_ARCH_MAP:
                 base = _GGUF_ARCH_MAP[arch_meta]
                 if base == "wan":
@@ -281,7 +254,6 @@ def _detect_arch_gguf(filepath: str) -> str:
 
 
 def _gguf_read_string(f) -> str:
-    """读取 GGUF 格式的 length-prefixed UTF-8 字符串。"""
     length = struct.unpack("<Q", f.read(8))[0]
     if length > 1_000_000:
         raise ValueError("GGUF string too long")
@@ -289,7 +261,6 @@ def _gguf_read_string(f) -> str:
 
 
 def _gguf_skip_value(f, vtype: int):
-    """跳过一个 GGUF metadata value (不解析内容)。"""
     _FIXED_SIZES = {
         0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1,
         10: 8, 11: 8, 12: 8,
@@ -342,31 +313,6 @@ def _gguf_scan_metadata(f, kv_count: int) -> tuple[str | None, dict[str, tuple]]
     return arch, orig_shapes
 
 
-# ── tensor key → 架构 (有序规则表) ──────────────────────────────────────────
-
-# ── 架构判别规则表 ────────────────────────────────────────────────────────────
-# 每条规则: (架构名, 判定函数)。按顺序求值, 先匹配先赢, 特异性强的规则必须在前。
-# 新增架构三步走:
-#   1. 找到该架构独有的 tensor key 特征 (以 ComfyUI comfy/model_detection.py 为准)
-#   2. 在下表合适位置插入规则 (LoRA 变体规则紧随主模型规则), 注释写明证据来源
-#   3. 在 tests/test_arch_detection.py 增加正反用例 (裸格式 / checkpoint 全量打包
-#      带 model.diffusion_model. 前缀 / kohya LoRA / diffusers LoRA 四种形态)
-#
-# LoRA 训练格式全景 (每个架构最多需要三条 LoRA 规则):
-#   1. kohya/sd-scripts:     lora_unet_<模块路径下划线>_.lora_down/up
-#   2. diffusers/PEFT:       transformer.<模块路径>.lora_A/lora_B
-#   3. musubi/ai-toolkit:    diffusion_model.<模块路径>.lora_A/lora_B (comfy 原生路径)
-#   靠"架构特有模块名子串 + 前缀"组合判别。
-#
-# 判定函数签名: (keys, shapes) → bool
-#   keys:   tensor key 名集合 (旧规则只用这个)
-#   shapes: 可选 {key_name: shape_tuple} (safetensors header 解析得到; GGUF 裸 key
-#           回退时为 None)。Wan 2.2 三条目细分依赖 shapes — head.modulation 隐藏
-#           维度 (14B=5120 / 5B=3072) 与 patch_embedding 输入通道 (t2v=16 / i2v=36 /
-#           5B=48) 在 key 名层面同构, 必须靠形状区分。无 shapes 时 Wan 规则退化为
-#           key 名判别 (img_emb.proj.0.bias 区分 14B i2v vs t2v), 5B 无法与 14B-t2v
-#           区分 → 由 detect_arch 的文件名兜底 (_wan_subvariant_from_filename) 兜住。
-
 def _has_prefix(keys: set[str], prefix: str) -> bool:
     return any(k.startswith(prefix) for k in keys)
 
@@ -386,7 +332,6 @@ def _shape_of(shapes: dict | None, key: str) -> tuple | None:
         return None
     if key in shapes:
         return shapes[key]
-    # 后缀回退: 找一个以该 key 结尾的形状 (兼容 model.diffusion_model. 前缀打包件)
     for k, v in shapes.items():
         if k == key or k.endswith("." + key):
             return v
@@ -402,7 +347,7 @@ def _is_wan_model(keys: set[str]) -> bool:
 
 
 def _has_suffix(keys: set[str], key: str, suffixes: tuple[str, ...] = ("weight", "scale")) -> bool:
-    """检查 keys 中是否存在 key+suffix 的任一组合 (对齐 ComfyUI any_suffix_in)。
+    """对齐 ComfyUI any_suffix_in。
 
     ComfyUI 部分架构 (chroma/flux) 的 norm 层参数可能是 .weight 或 .scale,
     用此函数兼容两种后缀。精确匹配 key+suffix (非子串), 兼容 model.diffusion_model. 前缀。
@@ -411,7 +356,6 @@ def _has_suffix(keys: set[str], key: str, suffixes: tuple[str, ...] = ("weight",
         full = f"{key}{suf}"
         if full in keys:
             return True
-        # 兼容打包前缀: model.diffusion_model.xxx.weight
         for k in keys:
             if k == full or k.endswith("." + full):
                 return True
@@ -419,39 +363,23 @@ def _has_suffix(keys: set[str], key: str, suffixes: tuple[str, ...] = ("weight",
 
 
 def _is_lora(keys: set[str]) -> bool:
-    """检测文件是否为 LoRA (而非主模型权重)。
-    LoRA 文件的 tensor key 含 lora_down/lora_up (kohya) 或 lora_A/lora_B (diffusers)
-    或 .alpha (rank 标量)。主模型权重不含这些。"""
     return (_has_sub(keys, "lora_down") or _has_sub(keys, "lora_A")
             or _has_sub(keys, "lora_B") or _has_sub(keys, ".alpha"))
 
 
 # ── 架构判别规则表 (以 ComfyUI comfy/model_detection.py detect_unet_config 为准) ──
-# 每条规则: (架构名, 判定函数)。按顺序求值, 先匹配先赢。
 # 顺序严格对齐 ComfyUI detect_unet_config() 的 if 分支顺序, 确保特异性与上游一致。
-#
-# 新增架构三步走:
-#   1. 在 ComfyUI comfy/model_detection.py 找到对应 if 分支的入口判别 key
-#   2. 在下表对应位置插入规则, 注释写明 ComfyUI 源码行号
-#   3. 补测试用例
 #
 # LoRA 训练格式 (ComfyUI 不管 LoRA, 以下为项目自维护):
 #   1. kohya/sd-scripts:     lora_unet_<模块路径下划线>_.lora_down/up
 #   2. diffusers/PEFT:       transformer.<模块路径>.lora_A/lora_B
 #   3. musubi/ai-toolkit:    diffusion_model.<模块路径>.lora_A/lora_B
-#
-# 判定函数签名: (keys, shapes) -> bool
-#   keys:   tensor key 名集合
-#   shapes: 可选 {key_name: shape_tuple} (safetensors header 解析得到; GGUF 裸 key
-#           回退时为 None)。Wan 2.2 三条目细分 + Lumina2/Z-Image dim 区分 +
-#           Mage-Flow / LongCat 形状判据依赖 shapes。
 
 _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str], dict | None], bool]"]] = [
     # ── Wan 2.2 视频系 (ComfyUI detect_unet_config: head.modulation, ~L699)
     #    必须前置: 14B 打包件附带 cond_stage_model 会被 sd15 兜底误吞。
     #    t2v/i2v/5B 靠 patch_embedding 输入通道形状区分。
-    #    5B VAE (Wan2.2_VAE, 16×16×4) 与 14B VAE (Wan2.1_VAE, 4×8×8) 不兼容,
-    #    必须区分 (musubi-tuner 官方文档确认)。
+    #    5B VAE (Wan2.2_VAE, 16×16×4) 与 14B VAE (Wan2.1_VAE, 4×8×8) 不兼容, 必须区分。
     ("wan22_5b", lambda ks, sh: _is_wan_model(ks)
         and _shape_of(sh, "patch_embedding.weight") is not None
         and _shape_of(sh, "patch_embedding.weight")[1] >= 40),
@@ -461,17 +389,13 @@ _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str], dict | None], bool]"]] = [
     ("wan22_t2v", lambda ks, sh: _is_wan_model(ks)
         and _shape_of(sh, "patch_embedding.weight") is not None
         and _shape_of(sh, "patch_embedding.weight")[1] == 16),
-    # 无形状退化 (GGUF / 裸 key): img_emb.proj.0.bias 区分 i2v
     ("wan22_i2v", lambda ks, sh: _is_wan_model(ks)
         and _has_sub(ks, "img_emb.proj.0")),
     ("wan", lambda ks, sh: _is_wan_model(ks)),
-    # Wan kohya LoRA: lora_unet_blocks_N_(self_attn|cross_attn|ffn)_*
-    # 注意: 部分社区 LoRA 只训练 self_attn+ffn 不含 cross_attn, 不能要求 cross_attn
-    # (否则会漏到 anima LoRA 规则被误判)。self_attn+ffn 已足够区分 Wan 与 anima
-    # (anima 用 mlp_layer 而非 ffn)。
+    # 部分社区 kohya LoRA 只训练 self_attn+ffn 不含 cross_attn, 不能要求 cross_attn,
+    # 否则会漏到 anima LoRA 规则被误判 (anima 用 mlp_layer 而非 ffn)。
     ("wan", lambda ks, sh: _has_prefix(ks, "lora_unet_blocks_")
         and _has_sub(ks, "_self_attn_") and _has_sub(ks, "_ffn_")),
-    # Wan musubi/ai-toolkit LoRA
     ("wan", lambda ks, sh: _has_prefix(ks, "diffusion_model.blocks.")
         and _has_sub(ks, ".self_attn.") and _has_sub(ks, ".cross_attn.")),
 
@@ -493,8 +417,6 @@ _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str], dict | None], bool]"]] = [
     # ── HunyuanVideo (ComfyUI L183: txt_in.individual_token_refiner.blocks.0.norm1.weight) ──
     ("hunyuan", lambda ks, sh: _has_sub(ks, "txt_in.individual_token_refiner.blocks.0.norm1.weight")),
 
-    # ── Flux 系 (ComfyUI L235 入口: double_blocks.0.img_attn.norm.key_norm. [weight|scale]
-    #    + img_in.weight 或 distilled_guidance_layer) ──
     # ── Flux 系 (ComfyUI L235 入口: double_blocks.0.img_attn.norm.key_norm. [weight|scale]
     #    AND (img_in.weight OR distilled_guidance_layer.norms.0. [weight|scale]))
     #    入口条件统一判 Flux/Chroma/ChromaRadiance, 内部再分叉 ──
@@ -720,12 +642,9 @@ _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str], dict | None], bool]"]] = [
 
 
 def match_arch_from_keys(keys: set[str], shapes: dict | None = None) -> str:
-    """从 tensor key 名称集合 (+ 可选形状) 匹配模型架构。规则见 _ARCH_KEY_RULES。
+    """规则见 _ARCH_KEY_RULES。
 
-    shapes 为 safetensors header 解析出的 {key_name: shape_tuple}, 仅 Wan 2.2
-    三条目细分 (t2v/i2v/5B) 用到; 旧图像架构规则忽略 shapes。传 None / 空 dict
-    时 Wan 规则退化为 key 名判别 (5B 无法与 14B-t2v 区分)。
-    GGUF 路径不调用此函数细分 Wan (保守返回通用 "wan")。
+    shapes 传 None / 空 dict 时 Wan 规则退化为 key 名判别 (5B 无法与 14B-t2v 区分)。
     """
     for arch, rule in _ARCH_KEY_RULES:
         if rule(keys, shapes):
@@ -733,11 +652,9 @@ def match_arch_from_keys(keys: set[str], shapes: dict | None = None) -> str:
     return "unknown"
 
 
-# ── 打包形态检测 (整合包 vs 拆分) ─────────────────────────────────────────────
-# 打包形态是文件属性而非架构属性。含 TE 且含 VAE key → 整合包;
-# 否则 → 拆分 (UNet-only / GGUF 实践中恒 split)。
-# 调用方: services/header_probe.py (下载前探针)。本地扫描侧 (options API)
-# 已不再调用此判据 — 形态改由文件所在目录/列表归属推导。
+# 打包形态是文件属性而非架构属性。含 TE 且含 VAE key → 整合包; 否则 → split。
+# 本地扫描侧 (options API) 不调用此判据 — 形态改由文件所在目录/列表归属推导。
+# 调用方: services/header_probe.py (下载前探针)。
 
 # TE (text encoder) key 特征。覆盖各架构实际命名:
 #   - sdxl/sd15:    cond_stage_model.*
@@ -746,7 +663,7 @@ def match_arch_from_keys(keys: set[str], shapes: dict | None = None) -> str:
 #   - SD1.5 CLIP:   text_model.*
 #   - Z-Image/Flux2: t5xxl* / qwen* / mistral* (loader 内部分离式 TE, 整合包里这些前缀也存在)
 # 注: 不含 "txt_in." — 它是 Flux transformer 的文本条件输入投影 (非 text encoder),
-#     UNet-only flux 文件也有此键, 会误判 has_te (仅靠 has_vae=False 兜底, 太脆)。
+#     UNet-only flux 文件也有此键, 会误判 has_te。
 _TE_MARKERS = (
     "cond_stage_model.",
     "text_encoders.",
@@ -772,9 +689,6 @@ _VAE_MARKERS = (
 def detect_packaging(keys: set[str], shapes: dict | None = None) -> str:
     """含 TE 且含 VAE key → 'checkpoint' (整合包); 否则 → 'split' (拆分/UNet-only)。
 
-    输入为 safetensors header 的 tensor key 集合 (不含 ``__metadata__``)。
-    GGUF / 无法读头时调用方应默认 'split' (GGUF 实践中恒 UNet-only)。
-
     视频主权重短路: 视频权重永远是 UNet-only, 恒 split。
     Wan 2.2 的 head.modulation 锚点命中即短路, 避免 14B 打包件 (附带 cond_stage_model
     + first_stage_model) 被误判为整合包 — 它们实际仍是分发的 UNet 主权重, TE/VAE
@@ -788,46 +702,10 @@ def detect_packaging(keys: set[str], shapes: dict | None = None) -> str:
     return "checkpoint" if (has_te and has_vae) else "split"
 
 
-# ── 内容角色判定已删除 ──────────────────────────────────────────────────────
-# 旧实现 detect_content_role() / detect_content_role_from_file() 读 safetensors
-# 头, 按张量 key 判「这个文件是整合包 / VAE / UNet」, 供下载后归位决定目标目录。
-#
-# 已整体废弃。目录判定迁到 services/download_classify.py: 改用 Civitai 元数据
-# (file.type / model.type / 扩展名) 在**下载前**逐文件定目录, 判不出的交给用户选。
-# 契约与实测依据见 docs/DOWNLOAD_CLASSIFICATION_SPEC.md。
-#
-# 随之删除的还有 _DIFFUSION_MARKERS / _AE_ENCODER_PREFIXES / _AE_DECODER_PREFIXES
-# —— 它们只服务于上面两个函数。
-#
-# detect_packaging_from_file() (路径版) 已删除: 本地模型形态由索引中的 category
-# 推导。detect_packaging(keys, shapes) 保留, 供 header_probe.py 下载前探针使用。
-#
-# **保留** detect_packaging / match_arch_from_keys / detect_arch 及其 markers:
-# 那些服务于「本地已有模型的架构识别」(生成页选主权重时判 SDXL/Flux/Wan),
-# 与下载归位无关。
-
-
-# ── Wan 子变体判别说明 ──────────────────────────────────────────────────────
-# Wan 2.2 的 t2v/i2v/5B 子变体靠 patch_embedding.weight 的 in_dim (shape[1]) 区分:
-#   t2v=16, i2v=36, 5b=48 (ComfyUI detect_unet_config:715 in_dim)。
-# safetensors 与 GGUF 都能拿到 shape (GGUF tensor info 区的 n_dims+dims 反转即 torch shape),
-# 故与 ComfyUI 走同一条判别路径, 无需文件名兜底。
-# GGUF 带 general.architecture="wan" 元数据时: 5B/i2v 仍用 shape 细分,
-# t2v (in_dim=16) 与 Wan 2.1 无法区分 -> 保守返回通用 "wan"。
-# 旧 _wan_subvariant_from_filename 文件名兜底逻辑已删除 (实测 GGUF shape 可读, 见测试)。
-
-
-# ── 综合检测入口 ─────────────────────────────────────────────────────────────
-
 def detect_arch(filepath: str, name: str = "") -> str:
     """
-    检测模型架构，优先级: 文件 header > 路径子文件夹。
-    返回: 见 arch_from_base_model() 的 arch 列表 (header 嗅探覆盖 ComfyUI
-    detect_unet_config 全部架构分支)。
-
-    下载与 enrich 流程优先通过 arch_from_base_model() 使用 CivitAI 官方枚举；
-    本函数的 header 嗅探覆盖基础索引记录 (safetensors + GGUF, 两者均能拿 shape)；
-    路径兜底覆盖 header 读不了的格式 (.ckpt 等)。
+    header 嗅探覆盖 ComfyUI detect_unet_config 全部架构分支, 覆盖基础索引记录
+    (safetensors + GGUF); 路径兜底覆盖 header 读不了的格式 (.ckpt 等)。
     """
     result = "unknown"
     if filepath.endswith(".safetensors"):

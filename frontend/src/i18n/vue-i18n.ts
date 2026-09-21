@@ -1,6 +1,5 @@
 import { createI18n } from 'vue-i18n'
 
-// ── Static locale imports ──
 import zhCommon from './locales/zh-CN/common.json'
 import zhNav from './locales/zh-CN/nav.json'
 import zhDashboard from './locales/zh-CN/dashboard.json'
@@ -72,7 +71,6 @@ const i18n = createI18n({
 
 export default i18n
 
-/** Switch language and persist to localStorage */
 export function switchLanguage(lng: string) {
   const { locale } = i18n.global
   ;(locale as { value: string }).value = lng

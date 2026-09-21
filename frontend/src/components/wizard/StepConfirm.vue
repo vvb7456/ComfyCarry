@@ -37,7 +37,6 @@ if (deployState.value === 'deploying') {
 </script>
 
 <template>
-  <!-- Confirmation view (before deploy) -->
   <WizardStepLayout
     v-if="deployState === 'idle'"
     :title="t('wizard.step9.title')"
@@ -64,7 +63,6 @@ if (deployState.value === 'deploying') {
     <WizardSummary :config="config" :imported-config="importedConfig" />
   </WizardStepLayout>
 
-  <!-- Deploy in progress / done / error -->
   <WizardDeployView
     v-else
     @back-to-wizard="backToWizard"

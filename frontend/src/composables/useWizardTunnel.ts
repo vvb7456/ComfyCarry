@@ -26,15 +26,11 @@ export function useWizardTunnel() {
   const validating = ref(false)
   const validateResult = ref<ValidateResult | null>(null)
 
-  /** Whether tunnel cards are locked (already configured via bootstrap/env) */
   const tunnelLocked = computed(() => !!activeTunnelMode.value)
-
-  // ── Select tunnel mode ──────────────────────────────────────
 
   function selectMode(mode: 'public' | 'custom') {
     if (tunnelLocked.value) return
     if (config.tunnel_mode === mode) {
-      // Toggle off: deselect current mode
       config.tunnel_mode = ''
       return
     }
@@ -49,8 +45,6 @@ export function useWizardTunnel() {
     config.cf_subdomain = ''
     config.public_tunnel_subdomain = ''
   }
-
-  // ── Load public tunnel capacity ─────────────────────────────
 
   async function loadCapacity() {
     capacityLoading.value = true
@@ -74,8 +68,6 @@ export function useWizardTunnel() {
       capacityLoading.value = false
     }
   }
-
-  // ── Validate CF API Token ───────────────────────────────────
 
   async function validateCfToken(): Promise<ValidateResult> {
     const token = config.cf_api_token.trim()
@@ -116,8 +108,6 @@ export function useWizardTunnel() {
     }
   }
 
-  // ── Init from env vars ────────────────────────────────────
-
   function initFromEnv() {
     const ev = envVars.value
     if (activeTunnelMode.value) {
@@ -130,17 +120,12 @@ export function useWizardTunnel() {
   }
 
   return {
-    // State
     capacity,
     capacityLoading,
     capacityError,
     validating,
     validateResult,
-
-    // Computed
     tunnelLocked,
-
-    // Actions
     selectMode,
     clearMode,
     loadCapacity,

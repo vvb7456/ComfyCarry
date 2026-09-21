@@ -1,12 +1,9 @@
 <script setup lang="ts">
 /**
- * Step 4 同步规则 —— 预设卡网格 (2×2)。
- *
  * - 预设卡 (PresetRuleCard): 整卡勾选启用, 路径不可改 (部署时按 entry +
  *   同步文件夹/bucket 重算); 上传输出是 移动/复制 两张互斥预设卡
  * - 仅提供部署时/监控触发的预设; 手动触发的备份预设与自定义规则不在向导
  *   提供 (dashboard「添加规则」才有) —— 部署向导未完成时相关 API 有守卫
- * - 布局: 2×2 网格
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -63,7 +60,6 @@ function onPrev() { prevStep() }
     @prev="onPrev"
     @next="onNext"
   >
-    <!-- 当前存储 (单存储语义: 所有规则隐式指向它) -->
     <div v-if="currentRemote" class="step-sync__storage">
       <span class="step-sync__storage-logo">
         <img v-if="brandOf(currentRemote.type).logo" :src="brandOf(currentRemote.type).logo" alt="">
@@ -74,7 +70,6 @@ function onPrev() { prevStep() }
       <code v-if="currentRemote.bucket" class="step-sync__storage-bucket">{{ currentRemote.bucket }}</code>
     </div>
 
-    <!-- 预设规则 (单一分组, 网格布局) -->
     <div class="step-sync__panel">
       <h4 class="step-sync__panel-title">
         <MsIcon name="sync" size="sm" />
@@ -97,7 +92,6 @@ function onPrev() { prevStep() }
 </template>
 
 <style scoped>
-/* 存储条 */
 .step-sync__storage {
   display: flex;
   align-items: center;
@@ -163,7 +157,6 @@ function onPrev() { prevStep() }
   color: var(--t3);
 }
 
-/* 卡片网格: 2×2 */
 .step-sync__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -16,18 +16,6 @@ interface SubmitResponse {
   status: string
 }
 
-/**
- * Generate submission composable.
- * 6-step validation → POST /api/generate/submit → returns prompt_id.
- *
- * Validation steps:
- * 1. State check: not already generating
- * 2. Preprocess check: no active preprocess tasks (future)
- * 3. Basic: checkpoint + positive prompt required
- * 4. Inactive module warning: CN/I2I configured but not enabled
- * 5. CN validation: enabled CN must have model + image
- * 6. I2I validation: enabled I2I must have image
- */
 export function useGenerateSubmit(
   execState: Ref<ExecState | null>,
   options: GenerateOptionsReturn,
@@ -75,22 +63,16 @@ export function useGenerateSubmit(
   async function validate(): Promise<boolean> {
     const state = store.currentState
 
-    // 1. Check: not already generating
     if (execState.value) {
       toast(t('generate.msg.wait_workflow'), 'warning')
       return false
     }
 
-    // 2. Preprocess check — placeholder for future phases
-
-    // 3. Basic validation
     const { modelType, activeConfig, selectedPackaging } = resolvePackaging()
 
-    // 视频架构走独立校验分支 (对齐后端 _VIDEO_ARCHS, 不走图像的 split/checkpoint 逻辑)
     if (activeConfig?.mediaType === 'video') {
       const variant = videoVariant(modelType)
       const isH3 = variant === 'h3' || variant === 'h3ref'
-      // 14B 双 UNet (unet_high/unet_low 必填且互异); 5B/H3 单 unet 必填
       if (variant && variant !== '5b' && !isH3) {
         if (!state.unetHigh || !state.unetLow) {
           toast(t('generate.error.no_unet_pair'), 'error')
@@ -160,7 +142,6 @@ export function useGenerateSubmit(
           return false
         }
       }
-      // 视频架构无 CN/i2i/face/hires/upscale 模块 (config.modules 仅 ['lora']), 跳过后续图像校验
       return true
     }
 
@@ -185,7 +166,6 @@ export function useGenerateSubmit(
       return false
     }
 
-    // 4. Inactive module warning (configured but not enabled)
     const inactiveModules: string[] = []
     for (const [type, cn] of Object.entries(state.controlNets)) {
       if (!cn.enabled && cn.image) {
@@ -206,7 +186,6 @@ export function useGenerateSubmit(
       if (!proceed) return false
     }
 
-    // 5. CN validation: enabled CN must have model + image
     for (const [type, cn] of Object.entries(state.controlNets)) {
       if (cn.enabled) {
         if (!cn.model) {
@@ -220,13 +199,11 @@ export function useGenerateSubmit(
       }
     }
 
-    // 6. I2I validation: enabled I2I must have image
     if (state.i2i.enabled && !state.i2i.image) {
       toast(t('generate.error.i2i_no_ref'), 'error')
       return false
     }
 
-    // 6b. Inpaint mode: image exists but no mask → ConfirmDialog
     if (state.i2i.enabled && state.i2i.image && state.i2i.mode === 'inpaint' && !state.i2i.mask) {
       const proceed = await confirm({
         title: t('generate.confirm.inpaint_no_mask.title'),
@@ -235,7 +212,6 @@ export function useGenerateSubmit(
         dontAskKey: 'gen_inpaint_no_mask_warn',
       })
       if (!proceed) return false
-      // User confirmed → fall through to standard I2I payload (mask is null)
     }
 
     return true
@@ -245,9 +221,6 @@ export function useGenerateSubmit(
     const randomSeedWriteback = opts?.randomSeedWriteback ?? true
     const state = store.currentState
 
-    // ── Build payload ──────────────────────────────────────────────────────
-    // Seed: random mode generates client-side value and writes back to store
-    // so user can see/copy the actual seed used
     let seed: number
     if (state.seedMode === 'random') {
       seed = Math.floor(Math.random() * 4294967295) // 0 ~ 2^32-1
@@ -288,7 +261,6 @@ export function useGenerateSubmit(
         end_percent: cn.end,
       }))
 
-    // Normalize prompts before submission
     const { settings: ps } = usePromptSettings()
     const nOpts = {
       comma: ps.normalize_comma,
@@ -297,21 +269,11 @@ export function useGenerateSubmit(
       underscore: ps.normalize_underscore,
     }
 
-    // ── 视频架构: 独立 payload 组装 (对齐后端 _VIDEO_ARCHS 分支) ──
-    // 字段名与 generate_service.py:183-329 逐字对齐:
-    //   model_type = 细粒度 key (wan22_i2v/wan22_t2v/wan22_5b/minimax_h3), 不能用 workflowType 'wan22'
-    //   14B: unet_high / unet_low / clip / vae
-    //   5B: unet / clip / vae
-    //   start_image (i2v 必填) / mode (仅 5b) / width / height / duration_s / speed (仅 14b) / batch_size 恒 1
-    //   minimax_h3: unet / clip / vae / audio_vae / start_image / last_image / mode (t2v|i2v) / steps
-    //   minimax_h3_ref (Ref2VA): unet / clip / vae / audio_vae / refs (图/视频/音频) / steps;
-    //     无 mode/start_image/last_image/negative/cfg/speed
-    // 图像侧 payload 组装一字不变 (回归保护): 视频早返回, 不走下面的图像分支。
+    // 视频架构: 独立 payload 组装, 字段名与后端 generate_service.py 逐字对齐
     if (activeConfig?.mediaType === 'video') {
       const variant = videoVariant(modelType)
       const v = state.video
 
-      // ── MiniMax H3 (FL2V): CFG-distilled 单权重双模式, 首尾帧 + 音视频一体 ──
       if (variant === 'h3') {
         const isI2v = v?.mode === 'i2v'
         const h3payload: Record<string, unknown> = {
@@ -337,9 +299,7 @@ export function useGenerateSubmit(
         return h3payload
       }
 
-      // ── MiniMax H3 Ref2VA (参考生成): 图/视频/音频多参考素材驱动 ──
-      // payload 契约 (与后端逐字对齐): 无 mode/start_image/last_image/negative/cfg/speed;
-      // refs = {type, name}[] 精简数组, 同 type 内顺序 = 引用编号。
+      // Ref2VA: refs = {type, name}[], 同 type 内顺序 = 引用编号
       if (variant === 'h3ref') {
         const h3refPayload: Record<string, unknown> = {
           model_type: modelType,
@@ -363,7 +323,6 @@ export function useGenerateSubmit(
       }
 
       const is14b = variant === 'i2v' || variant === 't2v'
-      // start_image: i2v 必填; 5b 仅 mode=='i2v' 时
       let needStart = variant === 'i2v'
       if (variant === '5b' && v?.mode) needStart = v.mode === 'i2v'
       const startImage = needStart ? (v?.refImage ?? '') : ''
@@ -391,15 +350,12 @@ export function useGenerateSubmit(
       }
       vpayload.clip = state.clip
       vpayload.vae = state.vae
-      // 起始画面 (i2v 必填; t2v 传空串由后端清脏值)
       vpayload.start_image = startImage
-      // 5B 条目内模式开关
       if (variant === '5b' && v?.mode) {
         vpayload.mode = v.mode
       }
       // 时长 (秒) — 后端按 frames = fps×duration+1 换算帧数
       vpayload.duration_s = v?.durationS ?? 5
-      // 速度档 (仅 14B): fast / standard
       if (is14b) {
         vpayload.speed = state.fast ? 'fast' : 'standard'
         // 标准档才传 steps/cfg; 快速档后端丢弃 (builder 常量决定)
@@ -411,8 +367,8 @@ export function useGenerateSubmit(
       return vpayload
     }
 
-    // 软架构条目 (pony/illustrious/noobai) 通过 workflowType 提交 'sdxl',
-    // 后端按 sdxl 工作流编排 (arch 层面相同)。其余 entry 用自身 key。
+    // 软架构条目 (pony/illustrious/noobai) 提交时用 workflowType 'sdxl',
+    // 其余 entry 用自身 key。
     const submitModelType = activeConfig?.workflowType ?? modelType
 
     const payload: Record<string, unknown> = {
@@ -433,45 +389,37 @@ export function useGenerateSubmit(
       controlnets,
     }
 
-    // 架构专属参数 (extraParams): 注入到 payload 顶层
-    // flux2klein/flux2dev 的 guider_mode 即此机制驱动; 后端按此字段分支
+    // 架构专属参数: flux2klein/flux2dev 的 guider_mode 在此注入, 后端按字段分支
     if (activeConfig?.extraParams) {
       Object.assign(payload, activeConfig.extraParams)
     }
 
-    // 架构专属字段 (按 selectedPackaging 分流)
     payload.packaging = selectedPackaging
     if (selectedPackaging === 'split') {
       payload.unet = state.unet
       payload.clip = state.clip
       payload.vae = state.vae
-      // DualCLIPLoader 架构 (flux1): 第二个文本编码器
       if (activeConfig?.dualClip) {
         payload.clip2 = state.clip2
       }
     } else {
       payload.checkpoint = state.checkpoint
-      // checkpoint 系专属 — clip_skip (仅 >1 时传) + vae 覆盖 (仅非空时传)
       if (state.clipSkip > 1) payload.clip_skip = state.clipSkip
       if (state.vaeOverride) payload.vae = state.vaeOverride
     }
 
-    // I2I / Inpaint
     if (state.i2i.enabled && state.i2i.image) {
       if (state.i2i.mode === 'inpaint' && state.i2i.mask) {
-        // Inpaint mode: VAEEncodeForInpaint
         payload.inpaint_image = state.i2i.image
         payload.inpaint_mask = state.i2i.mask
         payload.inpaint_denoise = state.i2i.denoise
         payload.inpaint_grow_mask_by = state.i2i.growMaskBy
       } else {
-        // Standard I2I mode (or inpaint without mask after user confirmed)
         payload.i2i_image = state.i2i.image
         payload.i2i_denoise = state.i2i.denoise
       }
     }
 
-    // Upscale
     if (state.upscale.enabled) {
       payload.upscale_enabled = true
       payload.upscale_factor = state.upscale.factor
@@ -488,7 +436,6 @@ export function useGenerateSubmit(
       }
     }
 
-    // HiRes
     if (state.hires.enabled) {
       payload.hires_enabled = true
       payload.hires_denoise = state.hires.denoise
@@ -496,7 +443,6 @@ export function useGenerateSubmit(
       payload.hires_cfg = state.hires.cfg
       payload.hires_sampler = state.hires.sampler
       payload.hires_scheduler = state.hires.scheduler
-      // HiRes seed: same client-side generation as main seed
       let hiresSeed: number
       if (state.hires.seedMode === 'random') {
         hiresSeed = Math.floor(Math.random() * 4294967295)
@@ -509,7 +455,6 @@ export function useGenerateSubmit(
       payload.hires_seed = hiresSeed
     }
 
-    // 面部重绘 (FaceDetailer)
     if (state.faceDetailer.enabled) {
       payload.face_detailer_enabled = true
       payload.face_detailer_model = state.faceDetailer.detectionModel
@@ -529,7 +474,6 @@ export function useGenerateSubmit(
   }
 
   async function post(payload: Record<string, unknown>): Promise<string | null> {
-    // ── Submit ─────────────────────────────────────────────────────────────
     submitting.value = true
     try {
       const result = await apiPost<SubmitResponse>('/api/generate/submit', payload)

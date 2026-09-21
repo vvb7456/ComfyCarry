@@ -18,8 +18,6 @@ export function useWizardRclone() {
   const { post } = useApiFetch()
   const { confirm } = useConfirm()
 
-  // ── Step 3 连接云存储 ───────────────────────────────────────
-
   const storageType = computed({
     get: () => storageTypeRef.value,
     set: (v: string) => { storageTypeRef.value = v },
@@ -48,7 +46,6 @@ export function useWizardRclone() {
     return res
   }
 
-  /** 选中 provider (点已选卡片 = 取消, 回到可跳过态); 默认值按后端字段定义填充 */
   function selectProvider(p: CloudProvider) {
     // provider 切换后不能再复用上一个 remote 的参数短路结果。
     invalidateCreatedRemote()
@@ -73,7 +70,6 @@ export function useWizardRclone() {
     storageRootDirRef.value = ''
   }
 
-  /** 名称校验 (错误写入 storageError, 返回是否通过) */
   function validateName(): boolean {
     const n = storageNameRef.value.trim()
     if (!n) { storageErrorRef.value = t('sync.err.remote_name_required'); return false }
@@ -81,7 +77,6 @@ export function useWizardRclone() {
     return true
   }
 
-  /** 非 OAuth 必填项校验 (错误写入 storageError, 返回是否通过) */
   function validateFields(): boolean {
     const missing = currentFields.value
       .filter(f => f.required && !(storageFieldsRef.value[f.key] || '').trim())
@@ -192,20 +187,16 @@ export function useWizardRclone() {
 
   // ── Step 4 同步规则 (单存储: remote 隐式取计划第一条, 无选择逻辑) ──
 
-  /** 全部预设 (不再按上/下行分组) */
   const presetTemplates = computed(() => syncTemplates.value)
 
-  /** 当前存储 (计划第一条; 单存储语义) */
   const currentRemote = computed(() => config.wizard_remotes[0] || null)
 
-  /** 规则的 remote 名 —— 单存储语义下无选择, 恒取当前存储 */
   const ruleRemoteName = computed(() => currentRemote.value?.name || '')
 
   function isRuleSelected(templateId: string): boolean {
     return config.wizard_sync_rules.some(r => r.template_id === templateId)
   }
 
-  /** 预设勾选: entry_names 以当前语言固化 (部署落库的规则名) */
   function toggleRule(templateId: string) {
     const idx = config.wizard_sync_rules.findIndex(r => r.template_id === templateId)
     if (idx >= 0) {
@@ -223,7 +214,6 @@ export function useWizardRclone() {
   }
 
   return {
-    // State (aliased from module-level refs)
     storageType,
     storageName,
     storageFields,
@@ -232,24 +222,20 @@ export function useWizardRclone() {
     storageError,
     storageOauthParams,
 
-    // Computed (step 3 connect)
     currentFields,
     isOAuthType,
     cloudProviders: CLOUD_PROVIDERS,
 
-    // Actions (step 3 connect)
     selectProvider,
     validateName,
     validateFields,
     ensureCreated,
     invalidateCreatedRemote,
 
-    // Computed (step 4 rules)
     presetTemplates,
     currentRemote,
     ruleRemoteName,
 
-    // Actions (step 4 rules)
     isRuleSelected,
     toggleRule,
   }

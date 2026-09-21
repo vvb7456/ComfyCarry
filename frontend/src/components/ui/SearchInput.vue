@@ -1,23 +1,4 @@
 <script setup lang="ts">
-/**
- * SearchInput — network/server search input with inline submit button.
- *
- * Unlike FilterInput (instant local filter), SearchInput conveys "submit to search"
- * semantics via an explicit inline search button. Supports Enter key submission.
- *
- * Layout (flex, no absolute positioning):
- *   [ input (flex:1) | clear? | #inline slot | submit button ]
- *
- * The outer container IS the visual input box (border + bg).
- *
- * Slots:
- *   #inline — Extra controls between clear button and submit (e.g. sort dropdown)
- *
- * Props:
- *   placeholder  — Placeholder text
- *   loading      — Show spinner instead of search icon
- *   full         — 撑满父容器 (默认走 toolbar 宽度基线 --ctl-w-lg)
- */
 import { ref, useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
@@ -84,7 +65,6 @@ defineExpose({ focus })
       <MsIcon name="close" size="xs" />
     </button>
 
-    <!-- Inline slot for extra controls (e.g. sort dropdown) -->
     <div v-if="slots.inline" class="search-input__divider" />
     <slot name="inline" />
 

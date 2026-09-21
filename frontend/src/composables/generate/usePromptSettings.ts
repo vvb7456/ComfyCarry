@@ -1,6 +1,4 @@
 /**
- * 提示词编辑器设置 — 全局共享 composable
- *
  * 模块级 ref，多组件导入同一份状态。
  * SettingsPage 和 PromptEditorModal 都可读写。
  */
@@ -8,8 +6,6 @@ import { computed, reactive, readonly, ref } from 'vue'
 
 import type { PromptEditorSettings } from '@/types/prompt-library'
 import { useApiFetch } from '@/composables'
-
-// ── 默认值 ────────────────────────────────────────────────────
 
 const DEFAULTS: PromptEditorSettings = {
   show_translation: true,
@@ -24,8 +20,6 @@ const DEFAULTS: PromptEditorSettings = {
   translate_provider: '',
 }
 
-// ── 模块级共享状态 ─────────────────────────────────────────────
-
 const settings = reactive<PromptEditorSettings>({ ...DEFAULTS })
 const loaded = ref(false)
 const saving = ref(false)
@@ -38,12 +32,9 @@ function takeSnapshot(): string {
 
 const isDirty = computed(() => loaded.value && takeSnapshot() !== snapshot.value)
 
-// ── composable ────────────────────────────────────────────────
-
 export function usePromptSettings() {
   const { get, put } = useApiFetch()
 
-  /** 从后端加载设置 (首次调用时执行，后续跳过; force=true 强制重新获取) */
   /** 拉取设置; force=true 强制重载基线。返回是否成功 (失败时保持原状态) */
   async function load(force = false): Promise<boolean> {
     if (loaded.value && !force) return true
@@ -71,7 +62,6 @@ export function usePromptSettings() {
     return false
   }
 
-  /** 保存设置到后端 */
   async function save(): Promise<boolean> {
     saving.value = true
     try {
@@ -97,7 +87,6 @@ export function usePromptSettings() {
     }
   }
 
-  /** 放弃未保存更改, 重新从后端加载并重置快照 */
   async function discard() {
     await load(true)
   }

@@ -1,15 +1,9 @@
 """
 ComfyCarry — 通用下载引擎 (aria2c JSON-RPC)
 
-所有文件下载统一入口:
-- HuggingFace 模型 (AuraSR、SAM 等)
-- CivitAI 模型 (Phase B)
-- 任意直链 URL
-
-架构:
-  aria2c 以 RPC daemon 模式运行 (127.0.0.1:6800)
-  download_engine 通过 JSON-RPC 提交/查询/取消下载
-  每个下载任务有唯一 download_id, 映射到 aria2c 的 GID
+aria2c 以 RPC daemon 模式运行 (127.0.0.1:6800)
+download_engine 通过 JSON-RPC 提交/查询/取消下载
+每个下载任务有唯一 download_id, 映射到 aria2c 的 GID
 """
 
 import json
@@ -29,13 +23,11 @@ import requests as http_requests  # 避免与 flask.request 冲突
 
 logger = logging.getLogger(__name__)
 
-# ── aria2c RPC 配置 ──────────────────────────────────────────────────────────
 _RPC_HOST = "127.0.0.1"
 _RPC_PORT = 6800
 _RPC_URL = f"http://{_RPC_HOST}:{_RPC_PORT}/jsonrpc"
 _RPC_SECRET = "comfycarry"  # 内部通信, 不需要高安全性
 
-# aria2c 连接参数
 _ARIA2_CONNECTIONS = 16     # 每个任务的连接数 (-x)
 _ARIA2_SPLIT = 16           # 分片数 (-s)
 _ARIA2_MAX_CONCURRENT = 5   # 最大并发下载数
@@ -45,7 +37,6 @@ _POLL_INTERVAL = 1.0
 
 
 class DownloadStatus(str, Enum):
-    """下载状态枚举"""
     QUEUED = "queued"
     ACTIVE = "active"
     PAUSED = "paused"
@@ -56,7 +47,6 @@ class DownloadStatus(str, Enum):
 
 @dataclass
 class DownloadTask:
-    """下载任务元数据"""
     download_id: str
     url: str
     save_dir: str
@@ -70,9 +60,8 @@ class DownloadTask:
     error: str = ""
     created_at: float = field(default_factory=time.time)
     completed_at: float = 0.0
-    # 调用方自定义 metadata (如 model_type, source 等)
     meta: dict = field(default_factory=dict)
-    # 下载完成时的回调 (在完成工作线程中调用, 签名: callback(task))
+    # 在完成工作线程中调用, 签名: callback(task)
     on_complete: Callable | None = field(default=None, repr=False)
     # 下载文件已完成、业务登记尚未提交时锁定用户状态操作。
     completion_in_progress: bool = field(default=False, repr=False)
@@ -86,10 +75,8 @@ class DownloadTask:
 
 
 class DownloadEngine:
-    """通用下载引擎 — aria2c JSON-RPC 封装"""
-
     def __init__(self):
-        self._tasks: dict[str, DownloadTask] = {}  # download_id → task
+        self._tasks: dict[str, DownloadTask] = {}
         self._lock = threading.Lock()
         self._lifecycle_lock = threading.Lock()
         self._aria2_proc: subprocess.Popen | None = None
@@ -109,8 +96,6 @@ class DownloadEngine:
         self._on_status_change: list[Callable] = []
         # 进度更新回调: callback(task) — 每次 poll 有进度变化时调用
         self._on_progress: list[Callable] = []
-
-    # ── 生命周期 ─────────────────────────────────────────────────────────────
 
     def start(self):
         """启动 aria2c RPC daemon + 状态轮询线程"""
@@ -205,8 +190,6 @@ class DownloadEngine:
         logger.info("[download_engine] 引擎已停止")
 
     def _start_aria2_daemon(self):
-        """启动 aria2c RPC daemon 进程"""
-        # 先检查是否已有 aria2c RPC 在运行
         if self._is_rpc_alive():
             logger.info("[download_engine] aria2c RPC 已在运行")
             return
@@ -227,7 +210,6 @@ class DownloadEngine:
             "--daemon=false",  # 前台运行, 由我们管理
         ]
 
-        # 代理支持
         proxy = (
             os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
             or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
@@ -242,7 +224,6 @@ class DownloadEngine:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            # 等待 RPC 就绪
             for _ in range(30):
                 time.sleep(0.2)
                 if self._is_rpc_alive():
@@ -255,17 +236,13 @@ class DownloadEngine:
             logger.error(f"[download_engine] 启动 aria2c 失败: {e}")
 
     def _is_rpc_alive(self) -> bool:
-        """检查 RPC 是否可用"""
         try:
             r = self._rpc_call("aria2.getVersion")
             return "version" in r
         except Exception:
             return False
 
-    # ── JSON-RPC 通信 ────────────────────────────────────────────────────────
-
     def _rpc_call(self, method: str, params: list | None = None) -> dict:
-        """发送 JSON-RPC 2.0 请求"""
         self._rpc_id += 1
         payload = {
             "jsonrpc": "2.0",
@@ -278,8 +255,6 @@ class DownloadEngine:
         if "error" in data:
             raise RuntimeError(f"aria2 RPC error: {data['error']}")
         return data.get("result", {})
-
-    # ── 公共 API ─────────────────────────────────────────────────────────────
 
     def submit(
         self,
@@ -306,10 +281,8 @@ class DownloadEngine:
         """
         download_id = f"dl-{uuid.uuid4().hex[:12]}"
 
-        # 创建目录
         os.makedirs(save_dir, exist_ok=True)
 
-        # ── 原子操作: 去重 + 文件检查 + RPC + 写入, 全部在单个 lock 内 ──
         with self._lock:
             # 去重：同 filename+save_dir 的活跃/排队/暂停任务
             for existing in self._tasks.values():
@@ -326,7 +299,6 @@ class DownloadEngine:
                     )
                     return existing
 
-            # 检查文件是否已存在且完整 (非空 + 无 .aria2 控制文件)
             dest = os.path.join(save_dir, filename)
             aria2_ctrl = dest + ".aria2"
             if (os.path.isfile(dest)
@@ -356,7 +328,6 @@ class DownloadEngine:
             else:
                 fire_existed = False
 
-                # 删除空文件 (之前失败遗留)
                 if os.path.isfile(dest) and os.path.getsize(dest) == 0:
                     try:
                         os.remove(dest)
@@ -451,10 +422,8 @@ class DownloadEngine:
             else:
                 return False
 
-        # 清理临时文件
         self._cleanup_partial(task)
 
-        # 通知状态变化监听器
         self._fire_status_change(task, old_status, DownloadStatus.CANCELLED)
 
         # 不立即从 _tasks 中移除 — 保留 CANCELLED 状态让 SSE 端读到终态
@@ -464,7 +433,6 @@ class DownloadEngine:
         return True
 
     def pause(self, download_id: str) -> bool:
-        """暂停下载任务 (aria2c 支持断点续传)"""
         with self._lock:
             task = self._tasks.get(download_id)
             if not task:
@@ -493,7 +461,6 @@ class DownloadEngine:
         return True
 
     def resume(self, download_id: str) -> bool:
-        """恢复已暂停的下载任务"""
         with self._lock:
             task = self._tasks.get(download_id)
             if not task:
@@ -519,12 +486,10 @@ class DownloadEngine:
         return True
 
     def get_task(self, download_id: str) -> DownloadTask | None:
-        """获取单个任务"""
         with self._lock:
             return self._tasks.get(download_id)
 
     def list_tasks(self) -> list[dict]:
-        """获取所有任务列表"""
         with self._lock:
             return [t.to_dict() for t in self._tasks.values()]
 
@@ -588,15 +553,11 @@ class DownloadEngine:
         return len(to_remove)
 
     def clear_task(self, download_id: str):
-        """移除单个任务记录"""
         with self._lock:
             self._tasks.pop(download_id, None)
             self._completion_futures.pop(download_id, None)
 
-    # ── 状态轮询 ─────────────────────────────────────────────────────────────
-
     def _poll_loop(self, generation: int):
-        """后台线程: 定期轮询 aria2c 状态并更新任务"""
         while self._running and generation == self._poller_generation:
             try:
                 self._sync_all_tasks()
@@ -605,7 +566,6 @@ class DownloadEngine:
             time.sleep(_POLL_INTERVAL)
 
     def _sync_all_tasks(self):
-        """同步所有活跃/排队任务的状态"""
         with self._lock:
             active_tasks = [
                 t for t in self._tasks.values()
@@ -630,7 +590,6 @@ class DownloadEngine:
                 aria2_partial = dest + ".aria2"
                 if os.path.isfile(dest) and not os.path.isfile(aria2_partial):
                     file_size = os.path.getsize(dest)
-                    # 只有文件非空, 且 (无已知总大小 或 大小匹配) 时才标记完成
                     if file_size > 0 and (
                         task.total_bytes == 0 or file_size >= task.total_bytes
                     ):
@@ -650,7 +609,6 @@ class DownloadEngine:
                         self._schedule_completion(task, old_status)
 
     def _fire_on_complete(self, task: DownloadTask) -> bool:
-        """在完成事件广播前触发回调，并返回回调是否成功。"""
         if not task.on_complete:
             return True
         callback = task.on_complete
@@ -702,7 +660,6 @@ class DownloadEngine:
 
     def _complete_task(self, task: DownloadTask,
                        old_status: DownloadStatus) -> None:
-        """完成工作线程入口；任何未预期异常都转换为 FAILED。"""
         try:
             self._fire_on_complete(task)
         except Exception as e:  # 防御回调实现之外的线程异常
@@ -724,7 +681,6 @@ class DownloadEngine:
             self._fire_status_change(task, old_status, final_status)
 
     def _update_task(self, task: DownloadTask, status: dict):
-        """根据 aria2c tellStatus 结果更新任务"""
         aria2_status = status.get("status", "")
         total = int(status.get("totalLength", 0))
         completed = int(status.get("completedLength", 0))
@@ -787,19 +743,16 @@ class DownloadEngine:
         if fire_complete:
             self._schedule_completion(task, old_status)
 
-        # Fire status change callbacks (outside lock)
         # complete 的终态由完成工作线程在业务回调结束后广播；轮询线程此处
         # 只发送进度，避免回调尚未写入 DB 就提前发送 COMPLETE/FAILED，或产生
         # 重复的终态事件。
         if not fire_complete and task.status != old_status:
             self._fire_status_change(task, old_status, task.status)
 
-        # Fire progress callbacks (outside lock)
         self._fire_progress(task)
 
     def _fire_status_change(self, task: DownloadTask, old: DownloadStatus,
                             new: DownloadStatus):
-        """通知所有状态变化监听器"""
         for cb in self._on_status_change:
             try:
                 cb(task, old, new)
@@ -807,7 +760,6 @@ class DownloadEngine:
                 logger.debug(f"[download_engine] status_change 回调异常: {e}")
 
     def _fire_progress(self, task: DownloadTask):
-        """通知所有进度监听器"""
         for cb in self._on_progress:
             try:
                 cb(task)
@@ -815,7 +767,6 @@ class DownloadEngine:
                 logger.debug(f"[download_engine] progress 回调异常: {e}")
 
     def _cleanup_partial(self, task: DownloadTask):
-        """清理失败/取消的临时文件和部分下载"""
         dest = os.path.join(task.save_dir, task.filename)
         aria2_file = dest + ".aria2"
         for f in (dest, aria2_file):
@@ -827,12 +778,10 @@ class DownloadEngine:
                 pass
 
 
-# ── 全局单例 ─────────────────────────────────────────────────────────────────
 _engine: DownloadEngine | None = None
 
 
 def get_engine() -> DownloadEngine:
-    """获取全局下载引擎实例"""
     global _engine
     if _engine is None:
         _engine = DownloadEngine()
@@ -841,7 +790,6 @@ def get_engine() -> DownloadEngine:
 
 
 def shutdown_engine():
-    """关闭全局引擎 (Flask 退出时调用)"""
     global _engine
     if _engine:
         _engine.stop()

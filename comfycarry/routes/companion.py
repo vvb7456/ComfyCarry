@@ -1,8 +1,4 @@
 """
-ComfyCarry — Companion 客户端面板后端 (纯 Python)
-
-蓝图前缀 /api/companion, JSON 响应 + HTTP 状态码。
-
 错误文案分两套, 按消费方划分:
   - 桌面客户端调的 (connect / heartbeat): 原文 —— 客户端没有 locale
     表, 而且它只看状态码, 回 key 只会让排障时看到一串没人翻译的标识符。
@@ -38,14 +34,12 @@ bp = Blueprint("companion", __name__)
 log = logging.getLogger("comfycarry.companion")
 
 
-# ── 客户端在线状态 (纯内存, 不持久化) ─────────────────────────
 _clients_lock = threading.Lock()
 # client_id -> info (与 heartbeat body 同构 + last_seen)。仅在线条目保留,
 # 超过 _ONLINE_TTL 未再上报的条目在 GET /clients 读取时被过滤 (不主动删除,
 # 下次该 client_id 心跳上报时直接覆盖, 避免竞态下丢条目)。
 _clients: dict[str, dict] = {}
 
-# last_seen 在此秒数内视为在线
 _ONLINE_TTL = 45
 
 
@@ -70,9 +64,6 @@ def _infer_dav_url():
     return f"{scheme}://{host}/api/companion/dav"
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2.2 客户端连接 (密码 → API Key)
-# ═══════════════════════════════════════════════════════════════
 @bp.route("/api/companion/connect", methods=["POST"])
 def api_companion_connect():
     """密码换 API Key + WebDAV 连接信息。
@@ -99,9 +90,6 @@ def api_companion_connect():
     })
 
 
-# ═══════════════════════════════════════════════════════════════
-# 2.4 客户端注册 + 心跳
-# ═══════════════════════════════════════════════════════════════
 @bp.route("/api/companion/heartbeat", methods=["POST"])
 def api_companion_heartbeat():
     """客户端心跳上报。

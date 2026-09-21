@@ -27,7 +27,6 @@ const samInstalled = computed(() =>
   options.samModels.value.includes('sam_vit_b_01ec64.pth'),
 )
 
-// 掩码方式：矩形框 (bbox) / SAM 轮廓 — SegmentedControl 模式开关惯例
 const maskOptions = computed(() => [
   { value: 'bbox', label: t('generate.face.mask_bbox') },
   { value: 'sam', label: t('generate.face.mask_sam'), disabled: !samInstalled.value },
@@ -41,7 +40,6 @@ watch(samInstalled, (ok) => {
 
 <template>
   <div class="face-grid">
-    <!-- Row 1: 重绘强度 + 采样步数 -->
     <div class="face-grid__row">
       <div class="fd-cell">
         <RangeField
@@ -74,7 +72,6 @@ watch(samInstalled, (ok) => {
       </div>
     </div>
 
-    <!-- Row 2: 检测模型 + 掩码方式 -->
     <div class="face-grid__row">
       <div class="fd-cell">
         <div class="fd-field">
@@ -104,7 +101,6 @@ watch(samInstalled, (ok) => {
       </div>
     </div>
 
-    <!-- Row 3: 面部提示词 -->
     <div class="fd-field">
       <div class="field-lbl">
         {{ t('generate.face.prompt') }}
@@ -118,7 +114,6 @@ watch(samInstalled, (ok) => {
       />
     </div>
 
-    <!-- 高级参数 (折叠) -->
     <CollapsibleGroup :title="t('generate.face.advanced')" :default-open="false">
       <div class="face-grid__row">
         <div class="fd-cell">

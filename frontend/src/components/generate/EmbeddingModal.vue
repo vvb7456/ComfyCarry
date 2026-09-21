@@ -1,12 +1,4 @@
 <script setup lang="ts">
-/**
- * EmbeddingModal — Browse and insert embeddings into prompts.
- *
- * Layout: 640px BaseModal with search bar + scrollable list.
- * Each row: name | size | weight spinner | [→ 正向] [→ 负向]
- *
- * Legacy: gen-emb-modal in dashboard.html + _openEmbeddingModal / _insertEmbedding in page-generate.js
- */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UseEmbeddingPickerReturn, EmbeddingItem } from '@/composables/generate/useEmbeddingPicker'
@@ -30,7 +22,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-// Per-item weight (defaults to 1.0, tracked locally)
 const weights = ref<Record<string, number>>({})
 
 function getWeight(name: string): number {
@@ -67,7 +58,6 @@ function formatSize(bytes: number): string {
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <!-- Search bar -->
     <FilterInput
       v-model="picker.search.value"
       :placeholder="t('generate.embedding.search_placeholder')"
@@ -75,40 +65,32 @@ function formatSize(bytes: number): string {
       class="emb-search"
     />
 
-    <!-- List area -->
     <div class="emb-list">
-      <!-- Loading -->
       <div v-if="picker.loading.value" class="emb-empty">
         <Spinner size="md" />
         <span>{{ t('generate.embedding.loading') }}</span>
       </div>
 
-      <!-- Load failed / empty -->
       <div v-else-if="picker.embeddings.value.length === 0" class="emb-empty">
         <MsIcon name="warning" size="lg" color="var(--t3)" />
         <span>{{ t('generate.embedding.load_failed') }}</span>
       </div>
 
-      <!-- No match -->
       <div v-else-if="picker.filtered.value.length === 0" class="emb-empty">
         <MsIcon name="search_off" size="lg" color="var(--t3)" />
         <span>{{ t('generate.embedding.no_match') }}</span>
       </div>
 
-      <!-- Items -->
       <div
         v-for="item in picker.filtered.value"
         v-else
         :key="item.path"
         class="emb-row"
       >
-        <!-- Name -->
         <div class="emb-row__name text-truncate" :title="item.path">{{ item.name }}</div>
 
-        <!-- Size -->
         <div class="emb-row__size">{{ formatSize(item.size) }}</div>
 
-        <!-- Weight -->
         <NumberInput
           :model-value="getWeight(item.name)"
           :min="0.1"
@@ -118,7 +100,6 @@ function formatSize(bytes: number): string {
           @update:model-value="setWeight(item.name, $event)"
         />
 
-        <!-- Insert buttons -->
         <button
           type="button"
           class="emb-insert-btn"
@@ -143,12 +124,10 @@ function formatSize(bytes: number): string {
 </template>
 
 <style scoped>
-/* ── Search ── */
 .emb-search {
   margin-bottom: var(--sp-3);
 }
 
-/* ── List ── */
 .emb-list {
   max-height: 400px;
   overflow-y: auto;
@@ -167,7 +146,6 @@ function formatSize(bytes: number): string {
   font-size: var(--text-sm);
 }
 
-/* ── Row ── */
 .emb-row {
   display: flex;
   align-items: center;
@@ -195,13 +173,11 @@ function formatSize(bytes: number): string {
   text-align: right;
 }
 
-/* ── Weight ── */
 .emb-row__weight {
   width: 70px;
   flex-shrink: 0;
 }
 
-/* ── Insert buttons ── */
 .emb-insert-btn {
   font-size: var(--text-xs);
   color: var(--ac);

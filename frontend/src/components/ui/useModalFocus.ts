@@ -1,9 +1,6 @@
 import { onUnmounted } from 'vue'
 
 /**
- * 弹层焦点生命周期 (BaseModal / Drawer 共用):
- *   打开时记录触发器 → 焦点移入容器 → 容器内圈定 Tab → 关闭时恢复触发器。
- *
  * - 圈定只在键盘事件经过容器根时生效; 焦点在容器外的合法浮层
  *   (如 BaseSelect teleport 到 body 的下拉面板) 时不干预。
  * - 恢复焦点仅在触发器仍连接 (未卸载) 时执行, 否则不抢焦点。
@@ -19,7 +16,6 @@ const FOCUSABLE = [
   '[tabindex]:not([disabled])',
 ].join(',')
 
-/** 可见性粗过滤: 隐藏元素与不可聚焦的 tabindex=-1 容器不入圈定序列 */
 function isFocusable(el: Element): boolean {
   if (el.getAttribute('aria-hidden') === 'true') return false
   const rect = el.getBoundingClientRect()
@@ -40,24 +36,17 @@ export function queryFocusable(root: HTMLElement): HTMLElement[] {
 export function useModalFocus() {
   let trigger: HTMLElement | null = null
 
-  /** 打开时调用: 记录当前焦点作为触发器, 返回记录结果 (供调用方决定初始焦点) */
   function captureTrigger(): HTMLElement | null {
     const active = document.activeElement
     trigger = active instanceof HTMLElement && active !== document.body ? active : null
     return trigger
   }
 
-  /** 关闭时调用: 触发器仍在文档中则恢复焦点 */
   function restoreTrigger(): void {
     if (trigger && trigger.isConnected) trigger.focus()
     trigger = null
   }
 
-  /**
-   * Tab 圈定: 在容器根的 keydown 里调用。
-   * 焦点在首/尾可操作元素上继续往外走时循环回另一端;
-   * 容器内无可操作元素时不拦截 (焦点停在容器本身)。
-   */
   function trapTab(e: KeyboardEvent, root: HTMLElement): void {
     if (e.key !== 'Tab') return
     const items = queryFocusable(root)

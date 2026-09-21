@@ -196,7 +196,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '640×512', value: '640x512' },
       { label: '512×640', value: '512x640' },
     ],
-    // SD 1.5 常用采样默认: 20 步 / CFG 7 / Euler a / normal。
     defaults: { steps: 20, cfg: 7.0, sampler: 'euler_ancestral', scheduler: 'normal' },
     hasNegativePrompt: true,
     promptStyle: 'tags',
@@ -449,7 +448,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    // dev: guidance 4.0, 20 步, 无负面 (BasicGuider)
     defaults: { steps: 20, cfg: 4.0, sampler: 'euler', scheduler: 'simple' },
     hasNegativePrompt: false,
     promptStyle: 'natural',
@@ -798,8 +796,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   }
 })()
 
-// ── 软架构判别 ──────────────────────────────────────────────────────────────
-
 export interface ArchAwareItem {
   arch: string
   info?: Record<string, unknown> | null
@@ -812,13 +808,6 @@ const _SUB_ARCH_RULES: Array<{ key: string, matches: string[] }> = [
   { key: 'noobai', matches: ['noob'] },
 ]
 
-/**
- * effectiveArch — 软架构判别 (纯前端)。
- * item.arch !== 'sdxl' → 原样返回 (非 sdxl 家族不判别);
- * item.arch === 'sdxl' 时按模型索引 baseModel (item.info.baseModel) 小写匹配:
- * 含 "pony" → 'pony'; 含 "illustrious"/"ilxl" → 'illustrious'; 含 "noob" → 'noobai';
- * 其余/无细分来源信息 → 'sdxl'。
- */
 export function effectiveArch(item: ArchAwareItem): string {
   if (item.arch !== 'sdxl') return item.arch
   const baseModel = (item.info as Record<string, unknown> | null | undefined)?.baseModel

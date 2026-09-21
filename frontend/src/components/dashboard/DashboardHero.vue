@@ -32,7 +32,6 @@ const emit = defineEmits<{
 const router = useRouter()
 const { t } = useI18n({ useScope: 'global' })
 
-// ── Hero Content ──────────────────────────────────────────────────────
 const heroTitle = computed(() => {
   switch (props.dashboardState) {
     case 'ready':
@@ -90,7 +89,6 @@ const heroSubtitle = computed(() => {
   }
 })
 
-// ── GPU Card Metrics ──────────────────────────────────────────────────
 const primaryGpu = computed(() => {
   if (!props.sysStats?.gpu || props.sysStats.gpu.length === 0) return null
   return props.sysStats.gpu[0]
@@ -141,7 +139,6 @@ const gpuTempColor = computed(() => {
 
 <template>
   <div class="dash-hero-section">
-    <!-- Left: Open Typography & CTA Actions -->
     <div v-if="dashboardState === 'loading'" class="dash-hero__typography dash-hero__skeleton">
       <div class="dash-skeleton dash-skeleton--hero-title"></div>
       <div class="dash-skeleton dash-skeleton--hero-sub"></div>
@@ -156,7 +153,6 @@ const gpuTempColor = computed(() => {
       <p class="dash-hero__sub">{{ heroSubtitle }}</p>
 
       <div class="dash-hero__actions">
-        <!-- Ready -->
         <template v-if="dashboardState === 'ready'">
           <BaseButton variant="primary" class="dash-btn--pill" @click="router.push('/generate/image')">
             <MsIcon name="auto_awesome" />
@@ -175,7 +171,6 @@ const gpuTempColor = computed(() => {
           </BaseButton>
         </template>
 
-        <!-- Busy -->
         <template v-else-if="dashboardState === 'busy'">
           <BaseButton
             variant="primary"
@@ -198,7 +193,6 @@ const gpuTempColor = computed(() => {
           </BaseButton>
         </template>
 
-        <!-- Starting -->
         <template v-else-if="dashboardState === 'starting'">
           <BaseButton variant="default" class="dash-btn--pill" @click="router.push('/comfyui')">
             <MsIcon name="info" />
@@ -206,7 +200,6 @@ const gpuTempColor = computed(() => {
           </BaseButton>
         </template>
 
-        <!-- Stopped -->
         <template v-else-if="dashboardState === 'stopped'">
           <BaseButton
             variant="primary"
@@ -223,7 +216,6 @@ const gpuTempColor = computed(() => {
           </BaseButton>
         </template>
 
-        <!-- Fault -->
         <template v-else-if="dashboardState === 'fault'">
           <BaseButton variant="default" class="dash-btn--pill" @click="router.push('/comfyui')">
             <MsIcon name="subject" />
@@ -240,7 +232,6 @@ const gpuTempColor = computed(() => {
           </BaseButton>
         </template>
 
-        <!-- Unavailable -->
         <template v-else-if="dashboardState === 'unavailable'">
           <BaseButton
             variant="primary"
@@ -255,7 +246,6 @@ const gpuTempColor = computed(() => {
       </div>
     </div>
 
-    <!-- Right: Floating GPU Card -->
     <div v-if="!primaryGpu && initialLoading" class="dash-gpu-card dash-gpu-card--loading">
       <div class="dash-skeleton dash-skeleton--text" style="width:40%"></div>
       <div class="dash-skeleton dash-skeleton--title" style="width:75%;margin:8px 0"></div>
@@ -291,7 +281,6 @@ const gpuTempColor = computed(() => {
 </template>
 
 <style scoped>
-/* ── Open Hero Section ── */
 .dash-hero-section {
   display: grid;
   grid-template-columns: 1fr minmax(280px, 320px);
@@ -342,7 +331,6 @@ const gpuTempColor = computed(() => {
   letter-spacing: -0.01em !important;
 }
 
-/* ── Right Floating GPU Card ── */
 .dash-gpu-card {
   background: var(--bg2);
   border: 1px solid var(--bd);
@@ -404,7 +392,6 @@ const gpuTempColor = computed(() => {
   font-family: var(--font-tabular);
 }
 
-/* ── Skeletons ── */
 .dash-skeleton {
   background: color-mix(in srgb, var(--t3) 14%, transparent);
   border-radius: var(--r-xs);

@@ -18,11 +18,9 @@ import { readonly, ref } from 'vue'
 const NSFW_BLUR_THRESHOLD = 4
 
 const keySet = ref(false)
-const browsingLevel = ref(31) // 默认全部
+const browsingLevel = ref(31)
 const blurNsfw = ref(true)
 const loaded = ref(false)
-
-// ── 模块级共享状态 ─────────────────────────────────────────────
 
 /** 图级 nsfwLevel 是否属于需要模糊的内容 (≥ R) */
 export function isNsfwImageLevel(nsfwLevel?: string | number): boolean {
@@ -38,10 +36,7 @@ export function isLevelAllowed(nsfwLevel: string | number | undefined, level: nu
   return (n & level) !== 0
 }
 
-// ── composable ────────────────────────────────────────────────
-
 export function useCivitaiSettings() {
-  /** 从 /api/settings 读取; 已加载过则跳过 */
   async function load(force = false) {
     if (loaded.value && !force) return
     try {
@@ -53,11 +48,10 @@ export function useCivitaiSettings() {
         if (Number.isFinite(lv) && lv >= 1 && lv <= 31) browsingLevel.value = lv
         blurNsfw.value = data.civitai_nsfw_blur !== false
       }
-    } catch { /* ignore — 保持默认 */ }
+    } catch { }
     loaded.value = true
   }
 
-  /** 保存 NSFW 设置到服务端并同步本地状态 */
   async function save(next: { level?: number; blur?: boolean }): Promise<boolean> {
     try {
       const res = await fetch('/api/settings/civitai-nsfw', {
@@ -78,21 +72,16 @@ export function useCivitaiSettings() {
     }
   }
 
-  /** 浏览级别是否允许该图 (bitmask 交集) */
   const levelAllows = (nsfwLevel?: string | number) => isLevelAllowed(nsfwLevel, browsingLevel.value)
 
-  /** blur 语义: 图是否应加模糊 (开启模糊 且 ≥ R) */
   const shouldBlur = (nsfwLevel?: string | number) =>
     blurNsfw.value && isNsfwImageLevel(nsfwLevel)
 
   return {
-    /** API Key 是否已配置 (CivitAI 功能 gate) */
     keySet: readonly(keySet),
     load,
     save,
-    /** 浏览级别是否允许该图 (bitmask 交集) */
     levelAllows,
-    /** blur 语义: 图是否应加模糊 (开启模糊 且 ≥ R) */
     shouldBlur,
   }
 }

@@ -27,8 +27,6 @@ const { addFavorite } = useDownloads()
 const inputText = ref('')
 const loading = ref(false)
 
-// ── Parse IDs/URLs from text ──
-
 const CIVITAI_URL_RE = /civitai\.com\/models\/(\d+)(?:.*[?&]modelVersionId=(\d+))?/
 const ID_RE = /^\d+$/
 
@@ -61,8 +59,6 @@ const parsedIds = computed(() => {
 })
 
 const parsedCount = computed(() => parsedIds.value.length)
-
-// ── Submit ──
 
 async function submit() {
   if (!parsedIds.value.length) return

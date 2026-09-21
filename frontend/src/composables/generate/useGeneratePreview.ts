@@ -36,7 +36,6 @@ export interface VideoMeta {
 /** 视频扩展名集合 (与后端 is_video_filename / ImagePreview 判定对齐)。 */
 const VIDEO_EXTS = /\.(mp4|webm|mov|avi|mkv)(\?|$)/i
 
-/** 判定文件名是否为视频 (扩展名兜底)。 */
 export function isVideoFile(filename: string): boolean {
   return VIDEO_EXTS.test(filename)
 }
@@ -148,7 +147,6 @@ function buildImageUrl(img: { filename: string; subfolder: string; type: string 
   return `/api/comfyui/view?${params}`
 }
 
-/** 构建视频首帧缩略图 URL (GET /api/comfyui/video_thumb)。 */
 export function buildVideoThumbUrl(img: { filename: string; subfolder: string; type: string }): string {
   const params = new URLSearchParams({
     filename: img.filename,
@@ -158,15 +156,6 @@ export function buildVideoThumbUrl(img: { filename: string; subfolder: string; t
   return `/api/comfyui/video_thumb?${params}`
 }
 
-/**
- * Generate output image preview composable.
- * Fetches output images from /api/comfyui/history after execution.
- * Retries up to 6 times with 1s interval.
- *
- * 五态状态机 + 视频产物支持。
- * - attachExecState() 注入执行态与媒体类型, 驱动 phase / stageSegment 派生。
- *   未注入时 phase 退化为 empty/queued 二态 (图像 path 回归保护)。
- */
 export function useGeneratePreview() {
   const { toast } = useToast()
   const { t } = useI18n({ useScope: 'global' })
@@ -174,7 +163,6 @@ export function useGeneratePreview() {
   const loading = ref(false)
   const currentPreview = ref<string | null>(null)
 
-  // ── 状态机注入点 ──────────────────
   let _execState: Ref<ExecState | null> | null = null
   let _mediaType: Ref<'image' | 'video'> | null = null
 
@@ -188,10 +176,8 @@ export function useGeneratePreview() {
     _mediaType = mediaType
   }
 
-  /** 当前媒体类型 (未注入时默认 image)。 */
   const mediaType = computed<'image' | 'video'>(() => _mediaType?.value ?? 'image')
 
-  // ── phase / stageSegment 派生 (委托纯函数 derivePreviewPhase / deriveStageSegment) ──
   const phase: ComputedRef<PreviewPhase> = computed(() =>
     derivePreviewPhase({
       // 完成态 = 有产物且不在执行中 (与 PreviewArea 同口径; 见该处注释)
@@ -238,7 +224,6 @@ export function useGeneratePreview() {
       }
     }
 
-    // All retries exhausted — toast warning
     toast(t('generate.msg.no_output'), 'warning')
     loading.value = false
   }
@@ -251,8 +236,6 @@ export function useGeneratePreview() {
     images.value = []
     currentPreview.value = null
   }
-
-  /** PreviewArea 的 <video> loadedmetadata 回调调用, 写入视频元信息。 */
 
   return {
     images,

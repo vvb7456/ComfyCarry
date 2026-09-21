@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""refresh_component_sizes.py — 校对/刷新前端配置中组件文件的 HuggingFace 真实体积。
-
-扫描 frontend/src/config/component-registry.ts 与
-frontend/src/composables/generate/modelDepConfigs.ts，用正则提取所有
-HuggingFace 下载 URL，调用 HF API 批量查询每个文件真实体积，
-与源码中声明的体积做比对并打印对照表。
-
-默认只读不写；传入 --write 时才会就地回写实测体积 (最小化正则替换，
-保持其余字符不变)。有任一文件超出 5% 容差时退出码 1，便于 CI 卡点。
-
-用法示例:
-  python3 scripts/refresh_component_sizes.py          # 只校验, 打印对照表
-  python3 scripts/refresh_component_sizes.py --write  # 校验并回写实测体积
-"""
 
 from __future__ import annotations
 
@@ -30,10 +16,9 @@ TARGETS = [
     REPO_ROOT / "frontend" / "src" / "config" / "component-registry.ts",
     REPO_ROOT / "frontend" / "src" / "composables" / "generate" / "modelDepConfigs.ts",
 ]
-TOLERANCE = 0.05  # 5%
+TOLERANCE = 0.05
 TIMEOUT = 25
 
-# HuggingFace 下载 URL 正则: 捕获 owner/repo / revision / path
 # path 部分排除 '?' 使其贪婪匹配到 ?download=true 之前
 HF_URL_RE = re.compile(
     r"https://huggingface\.co/([^/\s]+/[^/\s]+)/resolve/([^/\s]+)/([^\s'\"?]+)(?:\?download=true)?"
@@ -66,7 +51,6 @@ def parse_hf_url(url: str) -> tuple[str, str, str] | None:
 
 
 def fetch_sizes(repo_id: str, revision: str, paths: list[str]) -> dict[str, int | None]:
-    """调用 HF paths-info API 批量查询体积。返回 {path: size or None}。"""
     api_url = f"https://huggingface.co/api/models/{repo_id}/paths-info/{revision}"
     body = json.dumps({"paths": paths}).encode("utf-8")
     headers = {"Content-Type": "application/json"}
@@ -94,13 +78,6 @@ def fetch_sizes(repo_id: str, revision: str, paths: list[str]) -> dict[str, int 
 
 
 def extract_entries(text: str, source_name: str) -> list[dict]:
-    """从源码文本提取每个 HF URL 及其关联的体积声明。
-
-    - component-registry.ts: 每个文件条目内有 bytes: <整数> (在 URL 之后)。
-      向前搜索下一个 URL (或文件末尾) 之前最近的 bytes:。
-    - modelDepConfigs.ts: size: '~X GB' 在模型级别、files 数组之前 (即 URL 之前)。
-      向后搜索 URL 之前最近的 size: 声明。多文件模型共享同一 size:。
-    """
     is_component_registry = "component-registry" in source_name
     url_matches = list(HF_URL_RE.finditer(text))
     if not url_matches:
@@ -134,7 +111,6 @@ def extract_entries(text: str, source_name: str) -> list[dict]:
         for um in url_matches:
             url = um.group(0)
             url_start = um.start()
-            # 向后搜索: URL 之前最近的 size: 声明
             best_sm = None
             for sm in size_matches:
                 if sm.end() <= url_start:
@@ -188,7 +164,6 @@ def main() -> int:
         print("\n未提取到任何 HuggingFace URL，退出。")
         return 0
 
-    # 按 repo_id + revision 聚合，查询体积
     groups: dict[tuple[str, str], list[tuple[Path, dict]]] = {}
     for path, e in all_entries:
         parsed = parse_hf_url(e["url"])
@@ -198,7 +173,7 @@ def main() -> int:
         repo_id, revision, _ = parsed
         groups.setdefault((repo_id, revision), []).append((path, e))
 
-    size_lookup: dict[str, int | None] = {}  # hf_path -> size
+    size_lookup: dict[str, int | None] = {}
     for (repo_id, revision), items in groups.items():
         paths = []
         for _, e in items:
@@ -210,14 +185,12 @@ def main() -> int:
         fetched = fetch_sizes(repo_id, revision, unique_paths)
         size_lookup.update(fetched)
 
-    # 按 (path, span) 分组: modelDepConfigs.ts 中多文件模型共享同一 size: 声明
     # 同一声明 span 下的多个 URL 实测体积求和后与声明值比对
     groups_by_decl: dict[tuple[Path, int, int], list[dict]] = {}
     for path, e in all_entries:
         key = (path, e["span"][0], e["span"][1])
         groups_by_decl.setdefault(key, []).append(e)
 
-    # 对照表
     print("\n" + "=" * 120)
     print(f"{'文件名':<55} {'声明值':>16} {'实测值':>16} {'偏差':>10} {'超容差':>8}")
     print("-" * 120)
@@ -226,7 +199,6 @@ def main() -> int:
     write_patches: dict[Path, list[tuple[int, int, str]]] = {}
 
     for (path, span_start, span_end), entries in groups_by_decl.items():
-        # 收集所有 URL 的实测体积
         actuals: list[tuple[str, int | None]] = []
         for e in entries:
             parsed = parse_hf_url(e["url"])
@@ -239,7 +211,6 @@ def main() -> int:
         declared_raw = entries[0]["declared_raw"]
         kind = entries[0]["kind"]
 
-        # 求和
         total_actual = 0
         all_found = True
         for _name, actual in actuals:
@@ -248,14 +219,12 @@ def main() -> int:
                 break
             total_actual += actual
 
-        # 文件名: 单文件显示文件名，多文件显示 "file1 + file2"
         display_names = [name for name, _ in actuals]
         if len(display_names) == 1:
             display_name = display_names[0]
         else:
             display_name = " + ".join(display_names)
 
-        # 声明值的显示形式: bytes 显示数值；string 显示原始 '~X GB'
         if kind == "bytes":
             decl_disp = f"{declared:,}"
         else:
@@ -290,7 +259,6 @@ def main() -> int:
 
     print("=" * 120)
 
-    # 回写
     if args.write and write_patches:
         print("\n[回写] 更新以下文件:")
         for path, patches in write_patches.items():

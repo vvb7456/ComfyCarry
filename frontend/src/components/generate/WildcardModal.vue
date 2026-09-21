@@ -1,10 +1,5 @@
 <script setup lang="ts">
 /**
- * WildcardModal — Wildcard file manager (CRUD + folder + insert).
- *
- * Layout: 700px BaseModal with folder filter + scrollable list.
- * Sub-views: inline rename, edit sub-modal, new-folder prompt.
- *
  * Legacy: gen-wc-modal / gen-wc-edit-modal / gen-wc-newfolder-modal in dashboard.html
  */
 import { ref, watch, nextTick } from 'vue'
@@ -62,7 +57,6 @@ function onFolderChange(val: string | number | boolean) {
   props.wc.activeFolder.value = v
 }
 
-/* ── Rename inline ── */
 const renamingName = ref<string | null>(null)
 const renameInput = ref('')
 const renameInputEl = ref<HTMLInputElement | null>(null)
@@ -96,7 +90,6 @@ function cancelRename() {
   renamingName.value = null
 }
 
-/* ── Edit sub-modal ── */
 const editVisible = ref(false)
 const editName = ref('')
 const editContent = ref('')
@@ -132,7 +125,6 @@ async function saveEdit() {
   }
 }
 
-/* ── New folder prompt ── */
 const newFolderVisible = ref(false)
 const newFolderName = ref('')
 const newFolderInput = ref<HTMLInputElement | null>(null)
@@ -167,11 +159,9 @@ async function confirmNewFolder() {
   }
 }
 
-/* ── Create wildcard ── */
 async function onCreate() {
   const fullName = await props.wc.createWildcard()
   if (fullName) {
-    // Auto-enter rename mode for the new item
     nextTick(() => {
       const item = props.wc.wildcards.value.find(w => w.name === fullName)
       if (item) startRename(item)
@@ -181,7 +171,6 @@ async function onCreate() {
   }
 }
 
-/* ── Delete ── */
 async function onDelete(item: WildcardItem) {
   const yes = await confirm({
     title: t('generate.confirm.wildcard_delete.title'),
@@ -194,7 +183,6 @@ async function onDelete(item: WildcardItem) {
   if (ok) toast(t('generate.wildcard.deleted'), 'success')
 }
 
-/* ── Insert ── */
 function onInsert(item: WildcardItem) {
   const token = `__${item.name}__`
   emit('insert', token)
@@ -224,27 +212,22 @@ function onInsert(item: WildcardItem) {
       />
     </div>
 
-    <!-- List -->
     <div class="wc-list">
-      <!-- Loading -->
       <div v-if="wc.loading.value" class="wc-empty">
         <Spinner size="md" />
       </div>
 
-      <!-- Empty -->
       <div v-else-if="wc.filtered.value.length === 0" class="wc-empty">
         <MsIcon name="folder_off" size="lg" color="var(--t3)" />
         <span>{{ t('generate.wildcard.no_files') }}</span>
       </div>
 
-      <!-- Items -->
       <template v-else>
         <div
           v-for="item in wc.filtered.value"
           :key="item.name"
           class="wc-row"
         >
-          <!-- Name (click to rename) -->
           <template v-if="renamingName === item.name">
             <input
               ref="renameInputEl"
@@ -264,10 +247,8 @@ function onInsert(item: WildcardItem) {
             {{ item.name.split('/').pop() }}
           </span>
 
-          <!-- Entry count -->
           <span class="wc-row__count">{{ item.entries }} {{ t('generate.wildcard.items') }}</span>
 
-          <!-- Actions -->
           <button type="button" class="wc-icon-btn" :title="t('generate.wildcard.edit_content')" :aria-label="t('generate.wildcard.edit_content')" @click="openEdit(item)">
             <MsIcon name="edit" size="sm" color="none" />
           </button>
@@ -280,7 +261,6 @@ function onInsert(item: WildcardItem) {
         </div>
       </template>
 
-      <!-- New wildcard button -->
       <div class="wc-new-row" @click="onCreate">
         <MsIcon name="add_circle" size="sm" color="var(--ac)" />
         <span>{{ t('generate.wildcard.new_file') }}</span>
@@ -288,7 +268,6 @@ function onInsert(item: WildcardItem) {
     </div>
   </BaseModal>
 
-  <!-- Edit sub-modal (teleported) -->
   <Teleport to="body">
     <div v-if="editVisible" class="wc-overlay" @mousedown="onEditOverlayMousedown" @click="onEditOverlayClick">
       <div class="wc-edit-box">
@@ -313,7 +292,6 @@ function onInsert(item: WildcardItem) {
     </div>
   </Teleport>
 
-  <!-- New folder sub-modal (teleported) -->
   <Teleport to="body">
     <div v-if="newFolderVisible" class="wc-overlay" @mousedown="onFolderOverlayMousedown" @click="onFolderOverlayClick">
       <div class="wc-edit-box wc-edit-box--sm">
@@ -348,7 +326,6 @@ function onInsert(item: WildcardItem) {
 }
 .wc-folder-select { width: 50%; }
 
-/* ── List ── */
 .wc-list {
   max-height: 50vh;
   overflow-y: auto;
@@ -366,7 +343,6 @@ function onInsert(item: WildcardItem) {
   font-size: .86rem;
 }
 
-/* ── Row ── */
 .wc-row {
   display: flex;
   align-items: center;
@@ -402,7 +378,6 @@ function onInsert(item: WildcardItem) {
   outline: none;
 }
 
-/* ── Icon button ── */
 .wc-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -417,7 +392,6 @@ function onInsert(item: WildcardItem) {
 }
 .wc-icon-btn:hover { background: var(--bg3); }
 
-/* ── New wildcard row ── */
 .wc-new-row {
   display: flex;
   align-items: center;

@@ -1,12 +1,3 @@
-"""
-ComfyCarry — 前端页面服务路由
-
-- /              — Dashboard 或 Setup Wizard (来自 static/dist/)
-- /login         — Vue 登录页
-- /favicon.ico   — 图标
-- /assets/<path> — Vite 构建产物资源
-"""
-
 import os
 
 from flask import Blueprint, Response, send_file
@@ -66,7 +57,6 @@ def login_page():
 
 @bp.route("/favicon.ico")
 def serve_favicon():
-    # 优先 dist/ 目录中的 favicon
     dist_ico = DIST_DIR / "favicon.ico"
     ico = str(dist_ico) if dist_ico.exists() else os.path.join(SCRIPT_DIR, "favicon.ico")
     if os.path.exists(ico):
@@ -106,7 +96,6 @@ def serve_fonts(filename):
 
 @bp.route("/assets/<path:filename>")
 def serve_assets(filename):
-    """Serve Vite build output assets (CSS/JS bundles)."""
     assets_dir = (DIST_DIR / "assets").resolve()
     safe_path = (assets_dir / filename).resolve()
     if not str(safe_path).startswith(str(assets_dir) + os.sep):

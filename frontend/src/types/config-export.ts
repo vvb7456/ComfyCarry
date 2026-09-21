@@ -1,11 +1,9 @@
-// ── 配置导出/导入文件格式 ────────────────────────────────────
 // 后端 /api/settings/export-config 生成的 JSON 结构 (settings.py 逐字段核对),
 // 向导导入 (useWizardState.handleImportFile) 与设置页导入共用同一格式。
 // 导入按「有则应用」语义逐字段探测, 所有字段可选。
 
 import type { SyncRule } from './sync'
 
-/** LLM provider 凭据 (llm_provider_keys[provider] 的值) */
 export interface LlmProviderKeys {
   api_key?: string
   base_url?: string
@@ -14,7 +12,6 @@ export interface LlmProviderKeys {
 
 /** 导出的配置文件结构 (_version 缺失即视为非法格式) */
 export interface ExportedConfig {
-  /** 格式版本, 导入侧以此判定合法性 */
   _version: number
   /** ISO 导出时间 */
   _exported_at?: string

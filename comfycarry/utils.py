@@ -1,7 +1,3 @@
-"""
-ComfyCarry — 通用工具函数
-"""
-
 import hashlib
 import json
 import struct
@@ -11,7 +7,6 @@ from .config import CONFIG_FILE
 
 
 def _get_api_key():
-    """获取 CivitAI API Key"""
     if CONFIG_FILE.exists():
         try:
             return json.loads(CONFIG_FILE.read_text()).get("api_key", "")
@@ -21,7 +16,6 @@ def _get_api_key():
 
 
 def _run_cmd(cmd, timeout=10):
-    """运行 shell 命令并返回输出"""
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip()

@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * SegmentedControl — 少量互斥选项的分段单选 (2-4 项)。
- *
- * 与 ChipSelect (搜索/筛选的流式多选 chip) 场景不同:
- * 一体化滑轨内嵌分段, 点选即平滑滑动切换, 活动段填充高亮, 不可取消为空。
- * 用于模式/引擎类切换 (如 Upscale 的 AuraSR/SeedVR2、生成页文/图生视频切换)。
- */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from './MsIcon.vue'
@@ -102,7 +95,6 @@ onBeforeUnmount(() => {
     }"
     role="radiogroup"
   >
-    <!-- 动态平滑滑块 -->
     <div
       class="seg-control__indicator"
       :style="indicatorStyle"
@@ -151,7 +143,6 @@ onBeforeUnmount(() => {
   height: 34px;
 }
 
-/* 动态滑动指示器 */
 .seg-control__indicator {
   position: absolute;
   top: 0;
@@ -224,7 +215,6 @@ onBeforeUnmount(() => {
   margin-right: 4px;
 }
 
-/* 未保存状态小圆点 */
 .seg-control__dot {
   width: 5px;
   height: 5px;
@@ -234,7 +224,6 @@ onBeforeUnmount(() => {
   margin-left: 2px;
 }
 
-/* md 档: 页面级主控件 (如生成工作台任务切换) */
 .seg-control--md .seg-control__item {
   gap: 6px;
   font-size: var(--text-base);

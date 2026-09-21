@@ -1,10 +1,3 @@
-/**
- * paramsCommand — ComfyUI 启动参数 → 命令行 / 额外参数解析。
- *
- * 由原 ParamsCard.vue 迁出: 主页「版本与启动」用它展示已保存配置生成的一行
- * 启动命令, 参数弹窗用它把未收录的 extra_args 从 raw_args 中分离出来。
- * 只做纯计算, 不持有状态。
- */
 import type { ParamSchema } from '@/types/comfyui'
 
 export type ParamValue = string | number | boolean
@@ -50,7 +43,6 @@ function knownArgFlags(schema: Record<string, ParamSchema>) {
   return { withValue, standalone }
 }
 
-/** 从 raw_args 里剔除结构化参数, 返回剩余的用户额外命令行参数 */
 export function extractExtraArgs(
   raw: string[] | string,
   schema: Record<string, ParamSchema>,

@@ -1,10 +1,3 @@
-"""
-ComfyCarry — CivitAI 收藏持久化层
-
-负责 civitai_favorites 表的读写。被 routes/favorites.py 调用。
-风格照 download_store.py (from ..db import db, 纯函数)。
-"""
-
 import json
 import logging
 import time
@@ -14,12 +7,7 @@ from ..db import db
 log = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Favorites CRUD
-# ═══════════════════════════════════════════════════════════════
-
 def list_favorites() -> list[dict]:
-    """读取全部收藏, 按 created_at DESC; all_versions_json 反序列化为 all_versions。"""
     rows = db.fetch_all(
         "SELECT * FROM civitai_favorites ORDER BY created_at DESC"
     )
@@ -27,7 +15,7 @@ def list_favorites() -> list[dict]:
 
 
 def upsert_favorite(fav: dict) -> None:
-    """插入或更新单条收藏; created_at 保留首次值 (存在时不覆盖)。
+    """created_at 保留首次值 (存在时不覆盖)。
 
     fav 必填字段: model_id。可选: version_id, name, model_type, image_url,
     version_name, base_model, all_versions (list[dict])。
@@ -39,7 +27,6 @@ def upsert_favorite(fav: dict) -> None:
         av = []
     all_versions_json = json.dumps(av, ensure_ascii=False)
     now = time.time()
-    # INSERT OR REPLACE, created_at 用 COALESCE 保留首次值
     db.execute(
         """INSERT INTO civitai_favorites
                (fav_key, model_id, version_id, name, model_type,
@@ -71,7 +58,6 @@ def upsert_favorite(fav: dict) -> None:
 
 
 def remove_favorite(fav_key: str) -> bool:
-    """删除单条收藏, 返回是否删到。"""
     cursor = db.execute(
         "DELETE FROM civitai_favorites WHERE fav_key = ?",
         (fav_key,),
@@ -89,7 +75,6 @@ def remove_by_model(model_id: str) -> int:
 
 
 def clear_favorites() -> int:
-    """清空收藏表, 返回删除数。"""
     cursor = db.execute("DELETE FROM civitai_favorites")
     return cursor.rowcount
 
@@ -106,10 +91,6 @@ def bulk_upsert(favs: list[dict]) -> int:
     return count
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Helpers
-# ═══════════════════════════════════════════════════════════════
-
 def _compute_fav_key(fav: dict) -> str:
     """计算 fav_key — "modelId" 或 "modelId:versionId" (同前端 cartKey)。"""
     key = fav.get("fav_key")
@@ -123,7 +104,6 @@ def _compute_fav_key(fav: dict) -> str:
 
 
 def _row_to_dict(row) -> dict:
-    """将 sqlite3.Row 转换为普通 dict, 并解析 all_versions_json。"""
     d = dict(row)
     raw = d.pop("all_versions_json", "[]")
     try:

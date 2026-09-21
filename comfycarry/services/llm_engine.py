@@ -35,7 +35,6 @@ class LLMError(ValueError):
 
 
 def _sse_error(e: Exception) -> str:
-    """异常 → SSE error 事件。带 key 的走 key, 否则回落原文 message。"""
     key = getattr(e, "key", "")
     if key:
         return ('data: ' + json.dumps({
@@ -45,26 +44,18 @@ def _sse_error(e: Exception) -> str:
     return 'data: ' + json.dumps({"type": "error", "message": str(e)}) + '\n\n'
 
 
-# ── 结构化输出 Schema ─────────────────────────────────────────────────────────
-
 class PromptOutput(BaseModel):
-    """提示词生成的结构化输出"""
     positive: str = Field(description="正面提示词")
     negative: str = Field(description="反面提示词；目标模型不支持时为空字符串")
 
 
-# ── JSON 解析容错 ─────────────────────────────────────────────────────────────
-
 def parse_llm_json(text: str) -> dict:
-    """从 LLM 输出中提取 JSON，带多级容错"""
-    # 1. 直接解析
     text = text.strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    # 2. 提取 ```json ... ``` 代码块
     match = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
     if match:
         try:
@@ -72,7 +63,6 @@ def parse_llm_json(text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # 3. 提取第一个 { ... } 块
     match = re.search(r'\{.*\}', text, re.DOTALL)
     if match:
         try:
@@ -80,28 +70,21 @@ def parse_llm_json(text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # 4. 降级: 原始文本作为 positive
     return {"positive": text, "negative": ""}
 
 
 def validate_prompt_output(data: dict) -> dict:
-    """验证并规范化提示词输出字段"""
     return {
         "positive": str(data.get("positive", "")).strip(),
         "negative": str(data.get("negative", "")).strip(),
     }
 
 
-# ── Provider 基类 ─────────────────────────────────────────────────────────────
-
 class BaseLLMProvider:
-    """LLM Provider 抽象基类"""
-
     name: str = "base"
     supports_json_schema: bool = False
 
     def list_models(self) -> list[dict]:
-        """返回可用模型列表 — [{"id": ..., "name": ...}, ...]"""
         raise NotImplementedError
 
     def chat(self, messages: list[dict], **kwargs) -> str:
@@ -111,13 +94,9 @@ class BaseLLMProvider:
         raise NotImplementedError
 
     def chat_structured(self, messages: list[dict], **kwargs) -> dict:
-        """结构化输出 — 子类可覆盖实现原生 json_schema"""
-        # 默认: 普通 chat + parse
         text = self.chat(messages, **kwargs)
         return parse_llm_json(text)
 
-
-# ── OpenAI Compatible Provider ────────────────────────────────────────────────
 
 class OpenAICompatProvider(BaseLLMProvider):
     """OpenAI / DeepSeek / OpenRouter / 自定义 OpenAI 兼容端点"""
@@ -130,7 +109,6 @@ class OpenAICompatProvider(BaseLLMProvider):
         "openrouter": {"base_url": "https://openrouter.ai/api/v1", "default_model": "openai/gpt-4o-mini"},
     }
 
-    # 支持 json_schema strict mode 的模型前缀
     _SCHEMA_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3", "o4"}
 
     def __init__(self, api_key: str, model: str, base_url: str = ""):
@@ -141,7 +119,6 @@ class OpenAICompatProvider(BaseLLMProvider):
         self.supports_json_schema = any(model.startswith(p) for p in self._SCHEMA_MODELS)
 
     def list_models(self):
-        # OpenRouter: 用 HTTP 直接请求获取富数据 (价格/上下文/modality)
         if "openrouter.ai" in self._base_url:
             return self._list_openrouter_models()
 
@@ -206,7 +183,7 @@ class OpenAICompatProvider(BaseLLMProvider):
             except Exception as e:
                 logger.warning("json_schema parse failed, falling back: %s", e)
 
-        # 降级: json_object mode 或纯 prompt
+        # 有些模型不支持 json_schema, 降级到 json_object mode 或纯 prompt
         try:
             resp = self.client.chat.completions.create(
                 model=self.model,
@@ -220,8 +197,6 @@ class OpenAICompatProvider(BaseLLMProvider):
             text = self.chat(messages, **kwargs)
             return parse_llm_json(text)
 
-
-# ── OpenAI Responses Provider ─────────────────────────────────────────────────
 
 class OpenAIResponsesProvider(OpenAICompatProvider):
     """OpenAI Responses API 及兼容端点。
@@ -278,7 +253,6 @@ class OpenAIResponsesProvider(OpenAICompatProvider):
         return mapped
 
     def list_models(self):
-        """模型目录仍是所有 OpenAI API 格式共用的 `/models`。"""
         return OpenAICompatProvider.list_models(self)
 
     def chat(self, messages, **kwargs):
@@ -329,11 +303,7 @@ class OpenAIResponsesProvider(OpenAICompatProvider):
         return parse_llm_json(self.chat(messages, **kwargs))
 
 
-# ── Anthropic Provider ────────────────────────────────────────────────────────
-
 class AnthropicProvider(BaseLLMProvider):
-    """Claude Provider — 使用 Tool Use 模拟结构化输出"""
-
     name = "anthropic"
     supports_json_schema = False
 
@@ -360,7 +330,6 @@ class AnthropicProvider(BaseLLMProvider):
         content = msg.get("content")
         if isinstance(content, str):
             return msg
-        # Multi-part content (text + images)
         parts = []
         for part in content:
             if part.get("type") == "text":
@@ -368,7 +337,6 @@ class AnthropicProvider(BaseLLMProvider):
             elif part.get("type") == "image_url":
                 url = part["image_url"]["url"]
                 if url.startswith("data:"):
-                    # data:image/png;base64,xxxxx
                     header, b64 = url.split(",", 1)
                     mime = header.split(":")[1].split(";")[0]
                     parts.append({
@@ -397,7 +365,6 @@ class AnthropicProvider(BaseLLMProvider):
             max_tokens=kwargs.pop("max_tokens", 2000),
             **kwargs,
         )
-        # Extract text from content blocks
         return "".join(
             block.text for block in resp.content if hasattr(block, "text")
         )
@@ -415,10 +382,8 @@ class AnthropicProvider(BaseLLMProvider):
                 yield text
 
     def chat_structured(self, messages, **kwargs):
-        """使用 Tool Use 强制结构化输出"""
         system_msg, chat_msgs = self._split_system(messages)
         tool_schema = PromptOutput.model_json_schema()
-        # 移除 Pydantic 额外字段
         props = tool_schema.get("properties", {})
         required = tool_schema.get("required", [])
 
@@ -445,16 +410,11 @@ class AnthropicProvider(BaseLLMProvider):
         except Exception as e:
             logger.warning("Anthropic tool_use failed, falling back: %s", e)
 
-        # 降级: 纯文本 + parse
         text = self.chat(messages, **kwargs)
         return parse_llm_json(text)
 
 
-# ── Gemini Provider ───────────────────────────────────────────────────────────
-
 class GeminiProvider(BaseLLMProvider):
-    """Google AI Studio / Gemini Provider"""
-
     name = "gemini"
     supports_json_schema = True
 
@@ -468,14 +428,12 @@ class GeminiProvider(BaseLLMProvider):
         models = []
         for m in self.client.models.list(config={"page_size": 100}).page:
             model_id = m.name
-            # Strip "models/" prefix if present
             if model_id and model_id.startswith("models/"):
                 model_id = model_id[7:]
             models.append({"id": model_id, "name": getattr(m, "display_name", model_id)})
         return models
 
     def _build_contents(self, messages):
-        """将 OpenAI 格式消息转换为 Gemini 格式"""
         system_instruction = None
         contents = []
         for m in messages:
@@ -487,7 +445,6 @@ class GeminiProvider(BaseLLMProvider):
             if isinstance(content, str):
                 contents.append({"role": role, "parts": [{"text": content}]})
             else:
-                # Multi-part content (text + images)
                 parts = []
                 for part in content:
                     if part.get("type") == "text":
@@ -504,7 +461,6 @@ class GeminiProvider(BaseLLMProvider):
         return system_instruction, contents
 
     def _safety_off(self):
-        """关闭所有内容安全过滤"""
         genai = self._genai
         return [
             genai.types.SafetySetting(
@@ -546,7 +502,6 @@ class GeminiProvider(BaseLLMProvider):
                 yield chunk.text
 
     def chat_structured(self, messages, **kwargs):
-        """Gemini 原生 response_schema"""
         genai = self._genai
         system_instruction, contents = self._build_contents(messages)
         try:
@@ -566,8 +521,6 @@ class GeminiProvider(BaseLLMProvider):
             text = self.chat(messages, **kwargs)
             return parse_llm_json(text)
 
-
-# ── Provider Registry ─────────────────────────────────────────────────────────
 
 PROVIDER_REGISTRY = {
     "openai": {
@@ -618,7 +571,6 @@ PROVIDER_CAPABILITIES = {
 
 def create_provider(provider_id: str, api_key: str, model: str,
                     base_url: str = "") -> BaseLLMProvider:
-    """根据固定 Provider ID 创建对应协议适配器。"""
     entry = PROVIDER_REGISTRY.get(provider_id)
     if not entry:
         raise ValueError(f"Unknown provider: {provider_id}")
@@ -631,10 +583,7 @@ def create_provider(provider_id: str, api_key: str, model: str,
     return adapter(api_key=api_key, model=model, base_url=effective_url)
 
 
-# ── LLM Engine (高层接口) ─────────────────────────────────────────────────────
-
 def get_llm_config() -> dict:
-    """获取当前 LLM 配置"""
     provider = get_config("llm_provider", "")
     return {
         "provider": provider,
@@ -649,7 +598,6 @@ def get_llm_config() -> dict:
 
 
 def save_llm_config(data: dict):
-    """保存 LLM 配置"""
     for key in ("provider", "model", "api_key", "base_url",
                 "temperature", "max_tokens", "stream"):
         if key in data:
@@ -668,14 +616,12 @@ def save_llm_config(data: dict):
 
 
 def mask_api_key(key: str) -> str:
-    """遮蔽 API Key (前 4 + 后 4 位)"""
     if not key or len(key) <= 8:
         return "****"
     return f"{key[:4]}...{key[-4:]}"
 
 
 def get_provider_from_config() -> BaseLLMProvider:
-    """从当前持久化配置创建 Provider 实例"""
     cfg = get_llm_config()
     if not cfg["provider"] or not cfg["api_key"]:
         raise LLMError("LLM 未配置，请在设置中配置 Provider 和 API Key",
@@ -689,7 +635,6 @@ def get_provider_from_config() -> BaseLLMProvider:
 
 
 def _build_prompt_messages(user_input: str = "", target: str = "sdxl", image: str = "") -> list[dict]:
-    """构建 prompt messages — 统一文字/图片模式"""
     from .llm_prompts import PROMPT_REGISTRY
 
     if image:
@@ -713,7 +658,6 @@ def _build_prompt_messages(user_input: str = "", target: str = "sdxl", image: st
 
 
 def generate_prompt(user_input: str = "", target: str = "sdxl", image: str = "", **kwargs) -> dict:
-    """同步生成提示词 — 返回 {"positive": ..., "negative": ...}"""
     from .llm_prompts import PROMPT_REGISTRY
 
     valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
@@ -735,7 +679,6 @@ def generate_prompt(user_input: str = "", target: str = "sdxl", image: str = "",
 
 
 def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: str = "", **kwargs):
-    """流式生成提示词 — yield SSE data lines"""
     from .llm_prompts import PROMPT_REGISTRY
 
     valid_targets = [k for k in PROMPT_REGISTRY if not k.endswith("_vision")]
@@ -763,7 +706,6 @@ def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: st
         yield _sse_error(e)
         return
 
-    # 解析完整输出
     try:
         result = parse_llm_json(full_text)
         result = validate_prompt_output(result)
@@ -776,7 +718,6 @@ def generate_prompt_stream(user_input: str = "", target: str = "sdxl", image: st
 
 
 def chat_stream(messages: list[dict], system: str = "", **kwargs):
-    """通用对话流式 — yield SSE data lines"""
     if system:
         messages = [{"role": "system", "content": system}] + messages
 
@@ -802,7 +743,6 @@ def chat_stream(messages: list[dict], system: str = "", **kwargs):
 
 
 def chat_sync(messages: list[dict], system: str = "", **kwargs) -> str:
-    """通用对话同步 — 返回完整文本"""
     if system:
         messages = [{"role": "system", "content": system}] + messages
 
@@ -819,7 +759,6 @@ def chat_sync(messages: list[dict], system: str = "", **kwargs) -> str:
 
 def test_connection(provider_id: str, api_key: str, model: str,
                     base_url: str = "") -> dict:
-    """测试 LLM 连接是否有效"""
     import time
 
     provider = create_provider(provider_id, api_key, model, base_url)
@@ -838,7 +777,6 @@ def test_connection(provider_id: str, api_key: str, model: str,
 
 
 def list_models(provider_id: str, api_key: str, base_url: str = "") -> dict:
-    """动态获取 Provider 的可用模型列表"""
     try:
         provider = create_provider(
             provider_id, api_key, model="", base_url=base_url)

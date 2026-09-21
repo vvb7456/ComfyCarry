@@ -1,10 +1,3 @@
-"""
-ComfyCarry — 部署执行引擎
-
-_run_deploy() 及其所有辅助函数。
-在 Setup Wizard 触发部署后，由后台线程运行。
-"""
-
 import json
 import os
 import selectors
@@ -35,7 +28,6 @@ from .sync_engine import (
 )
 
 
-# ── 共享状态 ─────────────────────────────────────────────────
 _deploy_thread = None
 _deploy_log_lines = []
 _deploy_log_lock = threading.Lock()
@@ -51,10 +43,7 @@ def get_deploy_log_slice(start):
         return _deploy_log_lines[start:], len(_deploy_log_lines)
 
 
-# ── 辅助函数 ─────────────────────────────────────────────────
-
 def _is_cf_tunnel_online() -> bool:
-    """检查当前活跃 cloudflared PM2 进程是否在线"""
     from .cf_runtime import active_cf_name
     name = active_cf_name()
     try:
@@ -73,14 +62,12 @@ def _is_cf_tunnel_online() -> bool:
 
 
 def _detect_image_type():
-    """检测镜像类型: prebuilt / unsupported"""
     if Path("/opt/.comfycarry-prebuilt").exists():
         return "prebuilt"
     return "unsupported"
 
 
 def _read_prebuilt_info():
-    """读取预构建镜像的元信息 (JSON)"""
     marker = Path("/opt/.comfycarry-prebuilt")
     if marker.exists():
         try:
@@ -100,7 +87,6 @@ def _detect_python():
 
 
 def _detect_gpu_info():
-    """检测 GPU 信息"""
     info = {"name": "", "cuda_cap": "", "vram_gb": 0}
     py = _detect_python()
     try:
@@ -122,7 +108,6 @@ def _detect_gpu_info():
 
 
 def _deploy_log(msg, level="info"):
-    """向 SSE 推送一行日志并写入文件"""
     now_str = datetime.now().strftime("%H:%M:%S")
     entry = {"type": "log", "level": level, "msg": msg,
              "time": now_str}
@@ -137,8 +122,6 @@ def _deploy_log(msg, level="info"):
 
 
 def _install_sa2(py, cuda_cap):
-    """从预装 wheel 安装 SageAttention-2"""
-    # 精确匹配
     wheel_map = {
         "8.0": "sm80", "8.6": "sm86", "8.9": "sm89",
         "9.0": "sm90", "10.0": "sm100", "12.0": "sm120"
@@ -183,7 +166,6 @@ def _install_sa2(py, cuda_cap):
 
 
 def _deploy_step(name):
-    """标记一个部署步骤开始"""
     entry = {"type": "step", "name": name,
              "time": datetime.now().strftime("%H:%M:%S")}
     with _deploy_log_lock:
@@ -217,13 +199,11 @@ def _deploy_exec(cmd, timeout=600, label="", env=None):
             if events:
                 line = proc.stdout.readline()
                 if not line:
-                    break  # EOF
+                    break
                 line = line.rstrip()
                 if line:
                     _deploy_log(line, "output")
-            # 即使没有 events (sel 超时), 也检查进程是否已退出
             if proc.poll() is not None:
-                # 读取残留输出
                 for line in proc.stdout:
                     line = line.rstrip()
                     if line:
@@ -253,13 +233,11 @@ def _deploy_exec(cmd, timeout=600, label="", env=None):
 
 
 def _step_done(step_key):
-    """检查某个部署步骤是否在上次尝试中已完成"""
     state = _load_setup_state()
     return step_key in state.get("deploy_steps_completed", [])
 
 
 def _mark_step_done(step_key):
-    """标记步骤完成并持久化"""
     state = _load_setup_state()
     completed = state.get("deploy_steps_completed", [])
     if step_key not in completed:
@@ -268,10 +246,7 @@ def _mark_step_done(step_key):
     _save_setup_state(state)
 
 
-# ── 部署启动 ─────────────────────────────────────────────────
-
 def start_deploy(state_dict):
-    """启动部署线程 (由 setup 路由调用)"""
     global _deploy_thread
     with _deploy_lock:
         if _deploy_thread and _deploy_thread.is_alive():
@@ -287,17 +262,13 @@ def start_deploy(state_dict):
     return True, "部署已启动"
 
 
-# ── 主部署流程 ───────────────────────────────────────────────
-
 def _run_deploy(config):
-    """主部署流程 — 在后台线程运行"""
     from .. import config as cfg
 
     PY = _detect_python()
     _deploy_log(f"使用 Python: {PY}")
 
     try:
-        # 清空/初始化部署日志文件
         try:
             with open(DEPLOY_LOG_FILE, "w", encoding="utf-8") as f:
                 f.write(f"=== ComfyUI Deploy Process Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
@@ -330,10 +301,7 @@ def _run_deploy(config):
             pass
 
 
-# ── 部署步骤 ─────────────────────────────────────────────────
-
 def _step_system_deps(config, PY):
-    """STEP 1: 系统依赖"""
     PIP = f"{PY} -m pip"
     if _step_done("system_deps"):
         _deploy_step("install_deps_skip")
@@ -357,7 +325,6 @@ def _step_system_deps(config, PY):
 
 
 def _step_tunnel(config):
-    """STEP 2: Cloudflare Tunnel"""
     import base64 as _b64
     tunnel_mode = config.get("tunnel_mode", "")
     cf_api_token = config.get("cf_api_token", "")
@@ -405,7 +372,6 @@ def _step_tunnel(config):
             else:
                 _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
 
-                # 构建服务列表: 默认 + 后缀覆盖 + 自定义
                 raw_overrides = _gc("cf_suffix_overrides", "")
                 raw_custom = _gc("cf_custom_services", "")
                 suffix_overrides = {}
@@ -431,7 +397,6 @@ def _step_tunnel(config):
                 for name, url in result["urls"].items():
                     _deploy_log(f"  {name}: {url}")
 
-                # 保存实际使用的 subdomain
                 _sc("cf_api_token", cf_api_token)
                 _sc("cf_domain", cf_domain)
                 _sc("cf_subdomain", mgr.subdomain)
@@ -532,7 +497,6 @@ def _step_ssh(config):
 
 
 def _step_check_pytorch(PY):
-    """STEP 4: 检查预装 PyTorch"""
     _deploy_step("check_pytorch")
     _deploy_exec(
         f'{PY} -c "import torch; print(f\\"PyTorch {{torch.__version__}} '
@@ -541,7 +505,6 @@ def _step_check_pytorch(PY):
 
 
 def _step_install_comfyui(PY):
-    """STEP 5: ComfyUI 安装 + 健康检查"""
     if _step_done("comfyui_install"):
         _deploy_step("install_comfyui_skip")
         _deploy_step("health_check_skip")
@@ -555,7 +518,6 @@ def _step_install_comfyui(PY):
     else:
         _deploy_log("ComfyUI 已存在, 跳过复制")
 
-    # 健康检查
     _deploy_step("health_check")
 
     # 确保端口 8188 未被占用 (可能有旧进程残留)
@@ -602,7 +564,6 @@ def _step_install_comfyui(PY):
 
 
 def _step_accelerators(config, PY):
-    """STEP 6: 加速组件 (FA2/SA2)"""
     want_fa2 = config.get("install_fa2", False)
     want_sa2 = config.get("install_sa2", False)
     if not want_fa2 and not want_sa2:
@@ -639,7 +600,6 @@ def _step_accelerators(config, PY):
 
 
 def _step_plugins(config, PY):
-    """STEP 7: 插件安装"""
     PIP = f"{PY} -m pip"
     _deploy_step("install_plugins")
     plugins = [p for p in config.get("plugins", []) if p]
@@ -662,7 +622,6 @@ def _step_plugins(config, PY):
         timeout=600, label="pip install plugin deps"
     )
 
-    # Install comfycarry_ws_broadcast plugin (WS event broadcast for Dashboard)
     _deploy_log("安装 ComfyCarry WS 广播插件...")
     broadcast_src = Path(__file__).resolve().parent.parent.parent / "comfycarry_ws_broadcast"
     broadcast_dst = Path("/workspace/ComfyUI/custom_nodes/comfycarry_ws_broadcast")
@@ -787,7 +746,6 @@ def _custom_rule_from_wizard(wr: dict, remote: str, idx: int, ts: int) -> dict |
 
 
 def _step_sync_assets(config):
-    """STEP 8: 执行 deploy 同步规则"""
     rclone_method = config.get("rclone_config_method", "skip")
     rclone_value = config.get("rclone_config_value", "")
 
@@ -855,7 +813,6 @@ def _step_sync_assets(config):
 
 
 def _step_start_services(config, cfg, PY):
-    """STEP 10: 启动服务 + 完成"""
     _deploy_step("start_services")
 
     # watch worker 的启动只看规则本身: conf 可能来自 base64 导入, remote
@@ -873,7 +830,6 @@ def _step_start_services(config, cfg, PY):
         _deploy_log("CivitAI API Key 已保存")
 
     _deploy_log("启动 ComfyUI 主服务...")
-    # 验证 FA2/SA2 实际安装结果，据此设置 attention 参数
     from comfycarry.config import set_config
     want_fa2 = config.get("install_fa2", False)
     want_sa2 = config.get("install_sa2", False)
@@ -907,7 +863,6 @@ def _step_start_services(config, cfg, PY):
     comfy_args = (f"{DEFAULT_COMFYUI_ARGS} {attn_flag} "
                   f"--fast --disable-xformers")
 
-    # 创建 ControlNet 预处理输出子目录
     _deploy_exec("mkdir -p /workspace/ComfyUI/input/openpose /workspace/ComfyUI/input/canny /workspace/ComfyUI/input/depth")
 
     _deploy_exec("pm2 delete comfy 2>/dev/null || true")
@@ -923,10 +878,8 @@ def _step_start_services(config, cfg, PY):
 
     _deploy_exec("pm2 save 2>/dev/null || true")
 
-    # 持久化 ComfyUI 启动参数 (容器重启后可恢复)
     set_config("comfyui_args", comfy_args)
 
-    # 完成
     _deploy_step("deploy_done")
 
     new_pw = config.get("password", "")

@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * TunnelSwitchOverlay — 隧道切换全屏遮罩。
- *
- * 挂在 App.vue (ConfirmProvider 内、页面之上)。切换进行中冻结页面交互, 展示
- * 切换进度与新地址 (完整域名, 不脱敏); 失败态提供手动刷新与复制新地址入口。
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Spinner from '@/components/ui/Spinner.vue'

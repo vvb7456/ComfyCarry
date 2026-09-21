@@ -51,8 +51,7 @@ const versionOptions = computed(() =>
   versionList.value.map(v => ({ value: v, label: v })),
 )
 
-// ── 待重启事实 (服务端 diff: 启动快照 vs 当前磁盘) ──────────
-// 卡片"待重启"角标; 提醒与重启动作由 PluginOpModal 在操作完成时接手。
+// 待重启事实 (服务端 diff: 启动快照 vs 当前磁盘)
 const pendingRestart = ref<PendingRestartPack[]>([])
 const pendingIds = computed(() => new Set(pendingRestart.value.map(p => p.id)))
 
@@ -101,8 +100,6 @@ async function loadData(force = false) {
 
 function activateWorkspace() {
   if (!props.active || props.online === false) return
-  // 每次激活都全量刷新: pending_restart 是服务端事实, 若只在首次加载时拉取,
-  // 用户从别处重启 ComfyUI (参数页/手动) 后回到本页会看到陈旧的角标状态
   loadData()
 }
 
@@ -111,8 +108,6 @@ watch([() => props.active, () => props.online], ([active]) => {
   if (active) activateWorkspace()
 })
 
-// ── 阻塞执行弹窗: 所有插件操作统一走这里 (confirm → 执行 → 结果) ──
-
 const opModal = ref<InstanceType<typeof PluginOpModal> | null>(null)
 const opModalOpen = ref(false)
 
@@ -120,7 +115,6 @@ function submitOp(kind: PluginOpRequest['kind'], title: string, endpoint: string
   void opModal.value?.open({ kind, title, endpoint, payload })
 }
 
-/** 弹窗收尾 (含后台继续): 刷新列表与待重启角标 */
 function onOpFinished(_ok: boolean) {
   void loadData(true)
 }
@@ -149,7 +143,6 @@ async function updatePlugin(p: PluginData) {
 }
 
 async function togglePlugin(p: PluginData) {
-  // Manager 无 enable 端点: 启用走 /enable (install+skip_post_install), 禁用走 /disable
   const target = p.enabled ? 'disable' : 'enable'
   submitOp('toggle', p.title || p.id, `/api/plugins/${target}`, {
     id: p.id,

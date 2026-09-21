@@ -1,27 +1,17 @@
 """
-ComfyCarry — 数据库 Schema 定义 (集中式)
-
-所有表/索引在此注册为 migration。各业务模块只负责读写，不负责建表。
-详细 DDL 设计见 docs/db-schema.md。
-
 注意: migration 函数内 **禁止** 使用 executescript()，必须逐条 execute()。
 """
 
 from .db import db
 
-# ── Migration v1 — 全量建表 ─────────────────────────────────
-
 
 def _migration_v1(conn):
-    """创建项目全部核心表。"""
     stmts = [
-        # ── 系统 ──
         """CREATE TABLE IF NOT EXISTS app_meta (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL DEFAULT ''
         )""",
 
-        # ── Prompt Library ──
         """CREATE TABLE IF NOT EXISTS prompt_groups (
             id        INTEGER PRIMARY KEY,
             name      TEXT NOT NULL,
@@ -64,7 +54,6 @@ def _migration_v1(conn):
             is_deleted  INTEGER NOT NULL DEFAULT 0
         )""",
 
-        # ── Download — 任务 ──
         """CREATE TABLE IF NOT EXISTS download_tasks (
             task_id         TEXT PRIMARY KEY,
             resource_key    TEXT NOT NULL DEFAULT '',
@@ -83,7 +72,6 @@ def _migration_v1(conn):
             completed_at    REAL
         )""",
 
-        # ── Download — 资源 ──
         """CREATE TABLE IF NOT EXISTS download_resources (
             resource_key    TEXT PRIMARY KEY,
             source          TEXT NOT NULL,
@@ -98,7 +86,6 @@ def _migration_v1(conn):
             installed_at    REAL
         )""",
 
-        # ── Model Index ──
         """CREATE TABLE IF NOT EXISTS models (
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
             real_path             TEXT NOT NULL,
@@ -131,7 +118,6 @@ def _migration_v1(conn):
             updated_at            REAL NOT NULL
         )""",
 
-        # ── Prompt Library 索引 ──
         "CREATE INDEX IF NOT EXISTS idx_tags_subgroup      ON prompt_tags(subgroup_id)",
         "CREATE INDEX IF NOT EXISTS idx_subgroups_group     ON prompt_subgroups(group_id)",
         "CREATE INDEX IF NOT EXISTS idx_tags_text           ON prompt_tags(text)",
@@ -139,18 +125,15 @@ def _migration_v1(conn):
         "CREATE INDEX IF NOT EXISTS idx_danbooru_hot        ON danbooru_tags(hot DESC)",
         "CREATE INDEX IF NOT EXISTS idx_history_created     ON prompt_history(created_at DESC)",
 
-        # ── Download 索引 ──
         "CREATE INDEX IF NOT EXISTS idx_dl_tasks_resource   ON download_tasks(resource_key)",
         "CREATE INDEX IF NOT EXISTS idx_dl_tasks_status     ON download_tasks(status, updated_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_dl_res_source       ON download_resources(source, model_id, version_id)",
         "CREATE INDEX IF NOT EXISTS idx_dl_res_state        ON download_resources(state, updated_at DESC)",
 
-        # ── Model Index 索引 ──
         "CREATE INDEX IF NOT EXISTS idx_models_category     ON models(category)",
         "CREATE INDEX IF NOT EXISTS idx_models_source       ON models(source_type, source_model_id, source_version_id)",
         "CREATE INDEX IF NOT EXISTS idx_models_hash         ON models(sha256)",
 
-        # ── Model 唯一约束 ──
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_models_real_path ON models(real_path)",
     ]
     for sql in stmts:
@@ -160,13 +143,8 @@ def _migration_v1(conn):
 db.register_migration(1, _migration_v1, "core tables — prompt, download, model")
 
 
-# ── Migration v2 — Sync Job/Event 模型 ──────────────────────
-
-
 def _migration_v2(conn):
-    """新增 sync_jobs + sync_job_events 表 (Phase C)。"""
     stmts = [
-        # ── Sync Jobs ──
         """CREATE TABLE IF NOT EXISTS sync_jobs (
             job_id          TEXT PRIMARY KEY,
             trigger_type    TEXT NOT NULL DEFAULT 'manual',
@@ -182,7 +160,6 @@ def _migration_v2(conn):
             finished_at     REAL
         )""",
 
-        # ── Sync Job Events ──
         """CREATE TABLE IF NOT EXISTS sync_job_events (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             job_id          TEXT NOT NULL,
@@ -193,7 +170,6 @@ def _migration_v2(conn):
             created_at      REAL NOT NULL
         )""",
 
-        # ── Sync 索引 ──
         "CREATE INDEX IF NOT EXISTS idx_sync_jobs_status ON sync_jobs(status, started_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sync_jobs_started ON sync_jobs(started_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sync_events_job ON sync_job_events(job_id, id)",
@@ -206,11 +182,7 @@ def _migration_v2(conn):
 db.register_migration(2, _migration_v2, "sync job/event model")
 
 
-# ── Migration v3 — CivitAI 收藏 ─────────────────────────────
-
-
 def _migration_v3(conn):
-    """新增 civitai_favorites 表 (B 期 — 收藏后端化)。"""
     stmts = [
         """CREATE TABLE IF NOT EXISTS civitai_favorites (
             fav_key           TEXT PRIMARY KEY,
@@ -233,15 +205,10 @@ def _migration_v3(conn):
 db.register_migration(3, _migration_v3, "civitai favorites")
 
 
-# ── Migration v4 — Sync 任务队列化 ──────────────────────────
-
-
 def _migration_v4(conn):
-    """sync_jobs 增加 queued_at 列与排队索引 (同步任务队列化)。"""
     stmts = [
         # 入队时刻; 仅 queued/cancelled 行有意义 (取消的行保留以便排查)
         "ALTER TABLE sync_jobs ADD COLUMN queued_at REAL",
-        # 队列列表按 status 分层、queued 层按 queued_at 排序
         "CREATE INDEX IF NOT EXISTS idx_sync_jobs_queued "
         "ON sync_jobs(status, queued_at)",
     ]

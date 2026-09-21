@@ -27,12 +27,9 @@ function uid(): string {
   return `tk_${++_nextId}_${Date.now().toString(36)}`
 }
 
-// ── Regex patterns for token type detection ────────────────────
 const RE_EMBEDDING = /^embedding:.+/i
 const RE_WILDCARD = /^__[^_].*__$/
 const RE_TEMPLATE = /\{[^}]*\|[^}]*\}|\$\{[^}]+\}/
-
-// ── Weight / bracket parsing ───────────────────────────────────
 
 interface ParsedWeight {
   inner: string
@@ -83,7 +80,6 @@ function parseWeight(raw: string): ParsedWeight {
     s = s.slice(1, -1).trim()
   }
   if (roundDepth > 0) {
-    // Check for explicit :weight at innermost level
     const colonIdx = s.lastIndexOf(':')
     if (colonIdx > 0) {
       const maybeWeight = parseFloat(s.slice(colonIdx + 1))
@@ -97,7 +93,6 @@ function parseWeight(raw: string): ParsedWeight {
         }
       }
     }
-    // No :weight annotation → weight stays 1.0
     return {
       inner: s,
       weight: 1.0,
@@ -107,17 +102,9 @@ function parseWeight(raw: string): ParsedWeight {
     }
   }
 
-  // No brackets
   return { inner: s, weight: 1.0, bracketType: 'none', bracketDepth: 0, explicitWeight: false }
 }
 
-// ── Smart comma-split that respects {} and ${} nesting ─────────
-
-/**
- * Split a prompt string on commas, but skip commas inside
- * curly-brace groups ({...}, ${...}) and round-bracket groups
- * ((emphasis), (a, b)) so structural expressions survive intact.
- */
 export function splitPromptTokens(prompt: string): string[] {
   const parts: string[] = []
   let depth = 0
@@ -146,8 +133,6 @@ export function splitPromptTokens(prompt: string): string[] {
   return parts
 }
 
-// ── Token type classification ──────────────────────────────────
-
 function classifyToken(text: string): TokenType {
   if (/^BREAK$/i.test(text)) return 'break'
   if (RE_EMBEDDING.test(text)) return 'embedding'
@@ -156,22 +141,6 @@ function classifyToken(text: string): TokenType {
   return 'raw' // default; caller upgrades to 'tag' if library match found
 }
 
-// ── Raw string builder ─────────────────────────────────────────
-
-/**
- * Build the raw string representation of a token from its structured fields.
- *
- * Rules:
- *   depth=0, weight=1.0  → "tag"
- *   depth>0, weight=1.0  → "((tag))" (shorthand)
- *   depth>0, weight≠1.0  → "((tag:1.50))" (innermost has :weight)
- *   depth=0, weight≠1.0  → impossible (updateWeight auto-adds depth=1)
- *
- * Embedding/wildcard/template:
- *   weight=1.0, depth=0 → plain tag   e.g. "embedding:name"
- *   weight≠1.0          → "(tag:1.50)" e.g. "(embedding:name:1.50)"
- *   depth>0             → "((tag))"    respects bracketDepth
- */
 function formatWeight(w: number): string {
   const s = w.toFixed(2)
   return s.replace(/\.?0+$/, '') || '0'
@@ -180,11 +149,9 @@ function formatWeight(w: number): string {
 export function buildRaw(token: PromptToken): string {
   if (token.type === 'break') return 'BREAK'
 
-  // Embedding/wildcard/template: support bracketDepth and weight
   if (token.type === 'embedding' || token.type === 'wildcard' || token.type === 'template') {
     const depth = Math.max(0, token.bracketDepth)
     if (depth === 0 && token.weight === 1.0) return token.tag
-    // Build with :weight at innermost if weight≠1.0
     let s = token.weight !== 1.0 ? `${token.tag}:${formatWeight(token.weight)}` : token.tag
     const layers = Math.max(depth, token.weight !== 1.0 ? 1 : 0)
     for (let i = 0; i < layers; i++) s = `(${s})`
@@ -197,20 +164,15 @@ export function buildRaw(token: PromptToken): string {
   // No brackets → plain tag (weight must be 1.0 by invariant)
   if (depth === 0) return tag
 
-  // Has brackets — build from inside out
   let s = weight !== 1.0 ? `${tag}:${formatWeight(weight)}` : tag
   for (let i = 0; i < depth; i++) s = `(${s})`
   return s
 }
 
-// ── Serialization ──────────────────────────────────────────────
-
 export function serializeToken(token: PromptToken): string {
   if (!token.enabled || !token.raw || token.pending) return ''
   return token.raw
 }
-
-// ── Disabled token snapshot (for persistent storage) ───────────
 
 export interface DisabledTokenSnapshot {
   raw: string
@@ -224,8 +186,6 @@ export interface DisabledTokenSnapshot {
   translate?: string
   groupColor?: string
 }
-
-// ── Main composable ────────────────────────────────────────────
 
 export interface UsePromptEditorReturn {
   tokens: Ref<PromptToken[]>
@@ -249,12 +209,7 @@ export interface UsePromptEditorReturn {
 export function usePromptEditor(): UsePromptEditorReturn {
   const tokens = ref<PromptToken[]>([])
 
-  /**
-   * Parse a comma-separated prompt string into PromptToken[].
-   * Token type is initially 'raw' or a special type; callers should
-   * upgrade to 'tag' after checking the library.
-   */
-  function parse(prompt: string): PromptToken[] {
+function parse(prompt: string): PromptToken[] {
     if (!prompt.trim()) {
       tokens.value = []
       return tokens.value
@@ -264,10 +219,6 @@ export function usePromptEditor(): UsePromptEditorReturn {
     const result: PromptToken[] = []
 
     for (const part of parts) {
-      // Parse weight/brackets first, then classify the inner text.
-      // This handles cases like (embedding:name:1.5) correctly:
-      //   parseWeight → inner="embedding:name", weight=1.5
-      //   classifyToken(inner) → 'embedding'
       const parsed = parseWeight(part)
       const inner = parsed.inner || part
       const type = classifyToken(inner)
@@ -297,8 +248,7 @@ export function usePromptEditor(): UsePromptEditorReturn {
           enabled: true,
         })
       } else {
-        // tag or raw — use already-parsed weight / brackets
-        if (!parsed.inner) continue // skip empty tags e.g. ()
+        if (!parsed.inner) continue
         result.push({
           id: uid(),
           raw: part,
@@ -317,9 +267,6 @@ export function usePromptEditor(): UsePromptEditorReturn {
     return result
   }
 
-  /**
-   * Serialize current tokens back to a comma-separated string.
-   */
   function serialize(): string {
     return tokens.value
       .filter(t => !t.pending)
@@ -337,10 +284,6 @@ export function usePromptEditor(): UsePromptEditorReturn {
       .join(', ')
   }
 
-  /**
-   * Extract disabled tokens as snapshots for persistent storage.
-   * Captures position (index) so they can be re-injected at the right spot.
-   */
   function extractDisabled(): DisabledTokenSnapshot[] {
     return tokens.value
       .map((t, i) => ({ token: t, index: i }))
@@ -359,18 +302,11 @@ export function usePromptEditor(): UsePromptEditorReturn {
       }))
   }
 
-  /**
-   * Inject previously-stored disabled tokens back into the token array.
-   * Tokens are inserted at their original index (clamped to array length).
-   */
   function injectDisabled(disabled: DisabledTokenSnapshot[]): void {
     if (!disabled.length) return
-    // Sort by index ascending so sequential insertions naturally shift positions
     const sorted = [...disabled].sort((a, b) => a.index - b.index)
     const arr = [...tokens.value]
     for (const d of sorted) {
-      // d.index is the position in the original full array (including disabled);
-      // each prior insertion shifts the array, so d.index is used directly.
       const insertAt = Math.min(d.index, arr.length)
       arr.splice(insertAt, 0, {
         id: uid(),
@@ -389,17 +325,9 @@ export function usePromptEditor(): UsePromptEditorReturn {
     tokens.value = arr
   }
 
-  /**
-   * Add a new token at the end.
-   *
-   * When type is 'raw' (default), the text is auto-classified through
-   * classifyToken() so special syntax (BREAK, embedding:xxx, __wc__,
-   * ${...}) is correctly typed from the start.
-   */
   function addToken(text: string, type: TokenType = 'raw', color?: string, translate?: string): void {
     if (!text.trim()) return
 
-    // Auto-classify when caller didn't specify a concrete type
     const parsed = parseWeight(text)
     const inner = parsed.inner || text
     const detected = type === 'raw' ? classifyToken(inner) : type
@@ -506,7 +434,6 @@ export function usePromptEditor(): UsePromptEditorReturn {
   function updateTokenTag(id: string, newText: string): void {
     const token = tokens.value.find(t => t.id === id)
     if (!token) return
-    // Parse brackets/weight first, then classify the inner text
     const parsed = parseWeight(newText)
     const inner = parsed.inner || newText
     const type = classifyToken(inner)
@@ -534,15 +461,10 @@ export function usePromptEditor(): UsePromptEditorReturn {
       token.explicitWeight = parsed.explicitWeight
     }
     token.raw = buildRaw(token)
-    // Tag changed — clear stale translation and color
     token.translate = undefined
     token.groupColor = undefined
   }
 
-  /**
-   * Enrich parsed tokens with library color and translate data.
-   * Upgrades 'raw' tokens to 'tag' type when matched.
-   */
   function enrichTokens(resolved: Record<string, { color: string; translate: string }>): void {
     for (const token of tokens.value) {
       if (token.type !== 'raw') continue

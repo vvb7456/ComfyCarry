@@ -37,12 +37,7 @@ const state = computed(() => store.currentState)
 const config = computed(() => store.currentConfig)
 const options = inject(GenerateOptionsKey)!
 
-/** 媒体类型分支: 'video' 时右列渲染 VideoSettings, 'image' 时维持原样 (回归保护) */
 const isVideo = computed(() => config.value.mediaType === 'video')
-
-/* ── Checkpoint / UNet (config-driven by modelField) ── */
-// 合并 picker: 两形态并存 tab 下 state.checkpoint 或 state.unet 都可能有值,
-// 优先按 modelField 查, 查不到则交叉查另一个列表 (整合包件在 checkpoints, 拆分件在 unets)
 
 /**
  * 双 UNet 架构 (Wan 2.2 14B) 渲染**两个独立选择槽**, 不再配对折叠。
@@ -78,20 +73,16 @@ const selected = computed<CheckpointInfo | null>(() => {
   if (!effectiveName) return null
   const base = effectiveName.includes('/') ? effectiveName.slice(effectiveName.lastIndexOf('/') + 1) : effectiveName
   const fallbackName = base.replace(/\.[^.]+$/, '')
-  // 合并两个列表查找 (合并 picker 模式下件可能在任一列表)
   const item = [...options.unets.value, ...options.checkpoints.value].find(c => c.name === effectiveName)
   if (item) {
     const info = item.info as Record<string, unknown> | null
-    // displayName: prefer CivitAI info.name, fallback to filename
     const displayName = (info?.name as string) || fallbackName
     const baseModel = info?.baseModel as string | undefined
-    // previewUrl: local preview → API endpoint; fallback to CivitAI image
     let previewUrl: string | null = null
     let previewIsVideo = false
     if (item.preview) {
       previewUrl = localModelPreviewUrl(item.preview)
     }
-    // CivitAI image fallback
     const civitImages = info?.images as Array<{ url?: string; type?: string }> | undefined
     const civitImg = civitImages?.[0]
     const civitUrl = civitImg?.url?.startsWith?.('http') ? civitImg.url : null
@@ -113,7 +104,6 @@ function openModelModal(slot?: 'high' | 'low') {
   emit('open-model', slot)
 }
 
-/* ── Resolution ── */
 const resolutionPresets = computed(() => {
   const presets = store.currentConfig.resolutions.map(r => ({
     value: r.value,
@@ -125,7 +115,6 @@ const resolutionPresets = computed(() => {
 
 const isCustomRes = computed(() => state.value.resolution === 'custom')
 
-/* sync width/height when selecting a preset */
 watch(() => state.value.resolution, (v) => {
   if (v !== 'custom') {
     const [w, h] = v.split('x').map(Number)
@@ -185,7 +174,6 @@ watch(() => state.value.resolution, (v) => {
       <!-- Right: 视频 → VideoSettings / 图像 → Resolution + Steps/CFG -->
       <div class="basic-grid__params">
         <template v-if="isVideo">
-          <!-- 视频专属基础设置; 模型卡区(左列)保留不变 -->
           <VideoSettings
             :disabled="disabled"
             :ref-width="refWidth"
@@ -193,7 +181,6 @@ watch(() => state.value.resolution, (v) => {
           />
         </template>
         <template v-else>
-          <!-- Resolution -->
           <div class="field-group">
             <div class="field-lbl">{{ t('generate.basic.resolution') }}</div>
             <div class="res-row">

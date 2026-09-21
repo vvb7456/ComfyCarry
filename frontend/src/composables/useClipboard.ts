@@ -1,5 +1,3 @@
-// useClipboard - unified clipboard helper.
-//
 // Why this exists:
 //   `navigator.clipboard.writeText` only works in a "secure context"
 //   (HTTPS or localhost). On LAN/dev installations served over plain
@@ -8,20 +6,12 @@
 //   nothing happened. This composable layers an `execCommand('copy')`
 //   fallback for insecure contexts and centralises toast feedback so
 //   every Copy button behaves identically.
-//
-// Usage:
-//   const { copy } = useClipboard()
-//   await copy(value)                    // toasts default success/failure
-//   await copy(value, { silent: true })  // no toast (caller manages UI)
 import { useToast } from '@/composables/useToast'
 import { useI18n } from 'vue-i18n'
 
 export interface CopyOptions {
-  /** Suppress success/failure toasts (caller will provide its own UI). */
   silent?: boolean
-  /** Override the success toast message. */
   successMessage?: string
-  /** Override the failure toast message. */
   failureMessage?: string
 }
 
@@ -32,7 +22,6 @@ async function tryNativeClipboard(text: string): Promise<boolean> {
       return true
     }
   } catch {
-    // fall through to execCommand fallback
   }
   return false
 }
@@ -41,7 +30,6 @@ function tryLegacyExecCommand(text: string): boolean {
   try {
     const ta = document.createElement('textarea')
     ta.value = text
-    // Visually hide but keep selectable.
     ta.setAttribute('readonly', '')
     ta.style.position = 'fixed'
     ta.style.top = '0'

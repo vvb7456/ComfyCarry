@@ -14,7 +14,6 @@ const props = withDefaults(defineProps<{
   height?: string
   /** 是否还有更早历史可加载 (有则滚顶时触发, 由 useLogStream 提供) */
   hasMore?: boolean
-  /** 正在加载更早历史 (滚顶时显示顶部指示) */
   loadingMore?: boolean
   /** prepend 历史行中 (跳过 scrollToBottom, 避免用户上滚时被拉回底部) */
   prepending?: boolean
@@ -37,7 +36,6 @@ const normalizedLines = computed<LogLine[]>(() => props.lines.map((line) => {
   return line
 }))
 
-/** 无日志时面板收成一行 -- 不再留一个 500px 的空黑盒占满首屏 */
 const isEmpty = computed(() => normalizedLines.value.length === 0 && props.status !== 'loading')
 
 const panelHeight = computed(() => (isEmpty.value ? 'auto' : props.height ?? '320px'))
@@ -73,7 +71,6 @@ async function scrollToBottom() {
 }
 
 watch(() => props.lines.length, async () => {
-  // prepend 历史行时跳过滚底 (用户在上方阅读, 不应被拉回底部)
   if (followTail.value && !props.prepending) {
     await scrollToBottom()
   }
@@ -117,7 +114,6 @@ function handleScroll() {
       </button>
       <slot name="toolbar" />
     </div>
-    <!-- 顶部加载指示: 往上滚懒加载时显示 -->
     <div v-if="loadingMore" class="log-panel__load-more">
       <Spinner size="sm" /> <span>{{ t('common.log.loading_more') }}</span>
     </div>

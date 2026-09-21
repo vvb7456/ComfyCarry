@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class ComfyWSBridge:
-    """Maintains a WebSocket connection to ComfyUI and broadcasts events via SSE."""
-
     # ComfyUI protocol.py BinaryEventTypes (见 _on_binary 注释)
     PREVIEW_IMAGE = 1
     PREVIEW_IMAGE_WITH_METADATA = 4
@@ -39,15 +37,14 @@ class ComfyWSBridge:
         self._ws_url = comfyui_url.replace("http://", "ws://").replace("https://", "wss://")
         self._http_url = comfyui_url.rstrip("/")
         self._client_id = str(uuid.uuid4())
-        self._subscribers = {}   # id -> queue.Queue
+        self._subscribers = {}
         self._lock = threading.Lock()
         self._ws = None
         self._running = False
         self._thread = None
-        # State caches
         self._last_status = None
         self._last_progress = None
-        self._exec_info = None       # Current execution tracking
+        self._exec_info = None
 
     @property
     def client_id(self):
@@ -61,7 +58,6 @@ class ComfyWSBridge:
         self._thread.start()
 
     def _run_loop(self):
-        """Reconnect loop — keeps trying to connect to ComfyUI WS."""
         while self._running:
             try:
                 url = f"{self._ws_url}/ws?clientId={self._client_id}"
@@ -99,7 +95,6 @@ class ComfyWSBridge:
             self._last_progress = None
 
     def _fetch_node_names(self, prompt_id):
-        """从 ComfyUI /queue 获取节点 ID → class_type 映射"""
         try:
             r = requests.get(f"{self._http_url}/queue", timeout=3)
             if r.ok:
@@ -136,7 +131,7 @@ class ComfyWSBridge:
             event_type = struct.unpack('>I', message[0:4])[0]
             meta = None
             if event_type == self.PREVIEW_IMAGE:
-                img_bytes = message[8:]          # 跳过 image_type 字段
+                img_bytes = message[8:]
             elif event_type == self.PREVIEW_IMAGE_WITH_METADATA:
                 mlen = struct.unpack('>I', message[4:8])[0]
                 if len(message) < 8 + mlen:
@@ -162,7 +157,6 @@ class ComfyWSBridge:
             pass
 
     def _on_message(self, ws, message):
-        """处理 ComfyUI WebSocket 消息 — 使用原生事件信号追踪执行状态"""
         if isinstance(message, bytes):
             self._on_binary(message)
             return
@@ -171,7 +165,6 @@ class ComfyWSBridge:
             msg_type = data.get("type", "")
             msg_data = data.get("data", {})
 
-            # ── 队列状态 (广播事件，所有客户端都会收到) ──
             if msg_type == "status":
                 self._last_status = msg_data
                 # WS 重连后 ComfyUI 发送 status — 如果队列空但有残留执行状态，清除
@@ -183,11 +176,9 @@ class ComfyWSBridge:
                         self._last_progress = None
                 self._broadcast({"type": "status", "data": msg_data})
 
-            # ── GPU/CPU 监控 (Crystools 广播) ──
             elif msg_type == "crystools.monitor":
                 self._broadcast({"type": "monitor", "data": msg_data})
 
-            # ── 执行开始 (需要 ws_broadcast 插件) ──
             elif msg_type == "execution_start":
                 prompt_id = msg_data.get("prompt_id")
                 node_names = self._fetch_node_names(prompt_id)
@@ -205,7 +196,6 @@ class ComfyWSBridge:
                     "node_names": node_names,
                 }})
 
-            # ── 缓存命中的节点 ──
             elif msg_type == "execution_cached":
                 cached_nodes = msg_data.get("nodes", [])
                 if self._exec_info:
@@ -216,7 +206,6 @@ class ComfyWSBridge:
                     enriched["prompt_id"] = self._exec_info.get("prompt_id", "")
                 self._broadcast({"type": "execution_cached", "data": enriched})
 
-            # ── 当前执行节点 / 执行完成 ──
             elif msg_type == "executing":
                 node_id = msg_data.get("node")
                 if node_id is None:
@@ -230,11 +219,9 @@ class ComfyWSBridge:
                         self._exec_info = None
                         self._last_progress = None
                 else:
-                    # 正在执行特定节点
                     if self._exec_info:
                         self._exec_info["current_node"] = node_id
                         self._exec_info["nodes"][node_id] = "running"
-                    # Enrich with node class name + prompt_id
                     enriched = dict(msg_data)
                     if self._exec_info:
                         if node_id in self._exec_info.get("node_names", {}):
@@ -242,7 +229,6 @@ class ComfyWSBridge:
                         enriched["prompt_id"] = self._exec_info.get("prompt_id", "")
                     self._broadcast({"type": "executing", "data": enriched})
 
-            # ── 节点完成 ──
             elif msg_type == "executed":
                 node_id = msg_data.get("node")
                 if self._exec_info and node_id:
@@ -254,7 +240,6 @@ class ComfyWSBridge:
                     "prompt_id": msg_data.get("prompt_id"),
                 }})
 
-            # ── 采样步进进度 ──
             elif msg_type == "progress":
                 val = msg_data.get("value", 0)
                 mx = msg_data.get("max", 1)
@@ -267,10 +252,8 @@ class ComfyWSBridge:
                     self._last_progress["prompt_id"] = self._exec_info.get("prompt_id", "")
                 self._broadcast({"type": "progress", "data": self._last_progress})
 
-            # ── 全节点进度状态快照 ──
             elif msg_type == "progress_state":
                 nodes = msg_data.get("nodes", {})
-                # 提取简化视图
                 summary = {}
                 for nid, ndata in nodes.items():
                     summary[nid] = {
@@ -283,7 +266,6 @@ class ComfyWSBridge:
                     "nodes": summary,
                 }})
 
-            # ── 执行成功 ──
             elif msg_type == "execution_success":
                 if self._exec_info:
                     elapsed = time.time() - self._exec_info.get("start_time", time.time())
@@ -294,7 +276,6 @@ class ComfyWSBridge:
                     self._exec_info = None  # 置 None 防止 executing(node=None) 再次触发
                     self._last_progress = None
 
-            # ── 执行错误 ──
             elif msg_type == "execution_error":
                 self._broadcast({"type": "execution_error", "data": {
                     "prompt_id": msg_data.get("prompt_id"),
@@ -305,7 +286,6 @@ class ComfyWSBridge:
                 self._exec_info = None
                 self._last_progress = None
 
-            # ── 执行中断 ──
             elif msg_type == "execution_interrupted":
                 self._broadcast({"type": "execution_interrupted", "data": msg_data})
                 self._exec_info = None
@@ -325,7 +305,6 @@ class ComfyWSBridge:
     _DROP_WATERMARK = 100
 
     def subscribe(self):
-        """Add a new SSE subscriber and return (sub_id, queue)."""
         sub_id = str(uuid.uuid4())
         q = queue.Queue(maxsize=self._QUEUE_MAX)
         with self._lock:
@@ -356,7 +335,6 @@ class ComfyWSBridge:
             except Exception:
                 pass
         if snap_exec:
-            # 发送完整执行快照，包含所有已执行/已缓存节点
             nodes_state = snap_exec.get("nodes", {})
             executed = [nid for nid, st in nodes_state.items() if st in ("running", "done")]
             cached = [nid for nid, st in nodes_state.items() if st == "cached"]
@@ -401,12 +379,10 @@ class ComfyWSBridge:
                         pass
 
 
-# ── 全局单例 ─────────────────────────────────────────────────
 _bridge_instance = None
 
 
 def get_bridge():
-    """获取全局 ComfyWSBridge 实例 (懒初始化)"""
     global _bridge_instance
     if _bridge_instance is None:
         _bridge_instance = ComfyWSBridge(COMFYUI_URL)

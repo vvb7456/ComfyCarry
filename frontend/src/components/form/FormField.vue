@@ -17,17 +17,11 @@ import { computed, ref, useId } from 'vue'
 defineOptions({ name: 'FormField' })
 
 const props = defineProps<{
-  /** Field label text (alternative to #label slot) */
   label?: string
-  /** Whether the field is required (shows asterisk) */
   required?: boolean
-  /** Hint text below the control */
   hint?: string
-  /** Error text below the control (overrides hint when present) */
   error?: string
-  /** Layout density */
   density?: 'default' | 'compact'
-  /** Layout direction: vertical (default) or horizontal (label left, control right) */
   layout?: 'vertical' | 'horizontal'
 }>()
 
@@ -49,7 +43,6 @@ const labelFor = computed(() => (props.label || hasLabelSlot.value) ? controlId 
 
 <template>
   <div class="form-field" :class="[`form-field--${density ?? 'default'}`, layout === 'horizontal' && 'form-field--h']">
-    <!-- Horizontal layout: label+hint on left, control on right -->
     <template v-if="layout === 'horizontal'">
       <div class="form-field__h-left">
         <FieldLabel v-if="label || $slots.label" :required="required" :for="labelFor">
@@ -65,7 +58,6 @@ const labelFor = computed(() => (props.label || hasLabelSlot.value) ? controlId 
         <slot v-bind="{ id: controlId, describedby, invalid }" />
       </div>
     </template>
-    <!-- Vertical layout (default) -->
     <template v-else>
       <FieldLabel v-if="label || $slots.label" :required="required" :for="labelFor">
         <slot name="label" v-bind="{ hasLabelSlot }">{{ label }}</slot>
@@ -94,13 +86,11 @@ export default { components: { FieldLabel } }
   flex-direction: column;
 }
 
-/* Default density — main page forms */
 .form-field--default {
   gap: 6px;
   margin-bottom: 12px;
 }
 
-/* Compact density — modals, wizard */
 .form-field--compact {
   gap: 6px;
   margin-bottom: 10px;
@@ -118,18 +108,15 @@ export default { components: { FieldLabel } }
   color: var(--red);
 }
 
-/* Control slot — flex for inline alignment */
 .form-field__control {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-/* Single block-level controls fill the row */
 .form-field__control > :only-child {
   width: 100%;
 }
 
-/* Horizontal layout: label+hint on left, control on right */
 .form-field--h {
   flex-direction: row;
   align-items: center;

@@ -1,21 +1,4 @@
 <script setup lang="ts">
-/**
- * SSHPage — SSH 单列页 (C05)。
- *
- * 结构: 页头 (停止/重启 + 设置) → Hero → 运行事实 → 连接命令 → 授权公钥 → 日志。
- * 合并原「服务 & 日志 / 公钥管理」两个 Tab: 公钥区始终可管理, 即使服务停止;
- * 连接命令区只在 sshd 运行时出现 (停止时状态与启动由 Hero 承担)。
- *
- * Hero 状态机:
- *   running(ok)        运行中, 主操作「复制连接命令」
- *   starting(warn+busy) 启动中, 无操作
- *   stopping(warn+busy) 停止中, 无操作
- *   restarting(warn+busy) 重启中, 无操作
- *   stopped(off)       已停止, 主操作「启动 SSH」
- *
- * 连接命令沿用原有 connectCmd 状态机 (先看 sshd 是否运行, 再取 /api/tunnel/status):
- *   有隧道 SSH 映射 → cloudflared ProxyCommand; 无映射 → 本机端口直连。
- */
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
@@ -46,8 +29,6 @@ const { toast } = useToast()
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
 const status = ref<SSHStatus | null>(null)
 const statusLoading = ref(true)
 const connectCmd = ref<string | null>(null)
@@ -62,14 +43,10 @@ const acting = computed(() => actionLoading.value !== null)
 
 const settingsOpen = ref(false)
 
-// 添加公钥 (行内表单, 支持多行批量)
 const showAddKey = ref(false)
 const newKeysText = ref('')
 const addingKey = ref(false)
 
-// ─── 日志流 ───────────────────────────────────────────────────────────────────
-
-// ── 日志流 ──
 const logOpen = ref(true)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/ssh/logs',
@@ -81,8 +58,6 @@ const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: lo
     return ''
   },
 })
-
-// ─── API calls ────────────────────────────────────────────────────────────────
 
 let statusAppliedAt = 0
 async function loadStatus() {
@@ -119,7 +94,6 @@ async function loadConnectCmd() {
 
   let sshHost: string | null = null
 
-  // 自定义隧道地址 (按服务名索引)
   const urls = data.urls || {}
   for (const [name, url] of Object.entries(urls)) {
     if ((name as string).toLowerCase() === 'ssh') {
@@ -128,7 +102,6 @@ async function loadConnectCmd() {
     }
   }
 
-  // 公共隧道地址
   if (!sshHost && data.tunnel_mode === 'public' && data.public?.urls) {
     const pubUrls = data.public.urls
     const sshUrl = pubUrls.ssh || pubUrls.SSH
@@ -146,7 +119,6 @@ async function loadConnectCmd() {
   }
 }
 
-/** 自动刷新: 仅在 running 发生变化时才重取连接命令, 避免每轮都打 tunnel 接口。 */
 async function refreshStatus() {
   const prevRunning = status.value?.running
   await loadStatus()
@@ -160,11 +132,7 @@ async function loadKeys() {
   if (data) keys.value = data.keys || []
 }
 
-// ─── Auto-refresh ─────────────────────────────────────────────────────────────
-
 const refresher = useAutoRefresh(refreshStatus, 10000)
-
-// ─── Service actions ──────────────────────────────────────────────────────────
 
 async function sshAction(action: 'start' | 'stop' | 'restart') {
   if (action === 'stop' && !await confirm({
@@ -180,7 +148,6 @@ async function sshAction(action: 'start' | 'stop' | 'restart') {
       toast(apiErrorText(data, t('ssh.err.fallback')), 'error')
     } else {
       toast(apiMessageText(data, t('ssh.toast.action_ok')), 'success')
-      // 先拿权威状态再解除动作态, 避免旧快照在 hero 上闪回旧状态
       await loadStatus()
       await loadConnectCmd()
     }
@@ -188,8 +155,6 @@ async function sshAction(action: 'start' | 'stop' | 'restart') {
     actionLoading.value = null
   }
 }
-
-// ─── SSH keys ─────────────────────────────────────────────────────────────────
 
 function keyBadges(key: SSHKey): string[] {
   return [key.type, key.source === 'env' ? t('ssh.keys.source_env') : t('ssh.keys.source_saved')]
@@ -210,7 +175,6 @@ async function addKey() {
   }
 }
 
-// 弹窗关闭 (按钮 / 遮罩 / Esc) 时清空输入
 watch(showAddKey, (open) => {
   if (!open) newKeysText.value = ''
 })
@@ -232,8 +196,6 @@ async function deleteKey(fingerprint: string) {
     keys.value = keys.value.filter(k => k.fingerprint !== fingerprint)
   }
 }
-
-// ─── Hero 状态机 ──────────────────────────────────────────────────────────────
 
 type HeroState = 'running' | 'starting' | 'stopping' | 'restarting' | 'stopped'
 
@@ -261,8 +223,6 @@ const heroAction = computed<'copy' | 'start' | null>(() => {
   return null
 })
 
-// ─── 运行事实 ─────────────────────────────────────────────────────────────────
-
 const authFact = computed(() => {
   const s = status.value
   if (!s) return ''
@@ -289,8 +249,6 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   return out
 })
 
-// ─── Copy ─────────────────────────────────────────────────────────────────────
-
 function copyCmd() {
   if (!connectCmd.value) return
   copy(connectCmd.value)
@@ -299,8 +257,6 @@ function copyCmd() {
 function onSettingsChanged() {
   void loadStatus()
 }
-
-// ─── Lifecycle ────────────────────────────────────────────────────────────────
 
 onMounted(() => {
   void loadStatus().then(loadConnectCmd)
@@ -337,7 +293,6 @@ onUnmounted(() => {
       <LoadingCenter v-if="statusLoading && !status" style="padding:60px 0" />
 
       <template v-else-if="status">
-        <!-- Hero + 运行事实 -->
         <ServiceHero
           icon="key"
           :title="heroTitle"
@@ -364,7 +319,6 @@ onUnmounted(() => {
           </template>
         </ServiceHero>
 
-        <!-- 连接命令 (仅运行时) -->
         <section v-if="status.running" class="ssh-block">
           <SectionHeader icon="link">{{ t('ssh.connect.title') }}</SectionHeader>
           <div class="connect-card">
@@ -385,7 +339,6 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <!-- 授权公钥 (停机仍可管理) -->
         <section class="ssh-block">
           <SectionHeader icon="key">
             {{ t('ssh.keys.title') }}
@@ -424,7 +377,6 @@ onUnmounted(() => {
           <EmptyState v-else icon="key" :message="t('ssh.keys.empty')" density="compact" />
         </section>
 
-        <!-- 日志 (默认展开, 折叠标题与分区标题同构) -->
         <section class="ssh-block">
           <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
             {{ t('ssh.log.title') }}
@@ -442,10 +394,8 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <!-- 页内设置: SSH 密码跟随 -->
     <SSHSettingsModal v-model="settingsOpen" @changed="onSettingsChanged" />
 
-    <!-- 添加公钥: 页脚主操作 -->
     <BaseModal v-model="showAddKey" :title="t('ssh.keys.add_btn')" size="md">
       <textarea
         v-model="newKeysText"
@@ -464,7 +414,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 连接命令 → 授权公钥 → 日志 (--section-gap, 与总览一致) */
 .ssh-block {
   margin-top: var(--section-gap);
 }
@@ -476,7 +425,6 @@ onUnmounted(() => {
   color: var(--t3);
 }
 
-/* ── 连接命令 ── */
 .connect-card {
   padding: 14px 16px;
   border: 1px solid var(--bd);

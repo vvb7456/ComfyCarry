@@ -1,9 +1,6 @@
 """
 ComfyCarry — Generate 路由
 
-- POST /api/generate/submit  — 提交生成请求 (构建工作流 + POST 到 ComfyUI)
-- GET  /api/generate/options — 获取 sampler / scheduler 选项 (懒加载缓存)
-
 输出图片查看复用现有端点:
   GET /api/comfyui/history?prompt_id=<id>  — 获取特定 prompt 的输出图片信息
   GET /api/comfyui/view                    — 图片文件代理
@@ -48,7 +45,6 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("generate", __name__)
 
 
-# ── 错误响应辅助 ─────────────────────────────────────────────────────────────
 # 与 sync 路由同契约: 回传 error_key + error_params, 前端按 `generate.err.<key>`
 # 翻译; str(e) 异常透传放进 params.detail, 不翻译。
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
@@ -64,10 +60,9 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
         body.update(_extra)
     return jsonify(body), status
 
-# ── 懒加载缓存: Generate 页面所需的全部选项 ─────────────────────────────────
 _options_cache: dict | None = None
 _options_cache_time: float = 0.0
-_combo_cache: dict = {}  # _get_combo_list 的 object_info 缓存
+_combo_cache: dict = {}
 
 
 def _metadata_preview(row: dict | None) -> str | None:
@@ -108,12 +103,6 @@ def _generate_info(row: dict | None) -> dict:
 
 
 def _classify_controlnet_models(names: list[str]) -> dict:
-    """
-    将 ControlNet 模型名按类型分组。
-    根据文件名关键词自动分类: pose/openpose → pose, canny/edge → canny, depth → depth。
-    Union 模型出现在所有类型中。无法识别的归入 "other"。
-    返回: {"pose": [...], "canny": [...], "depth": [...], "other": [...]}
-    """
     import re
     result = {"pose": [], "canny": [], "depth": [], "other": []}
     for name in names:
@@ -154,16 +143,6 @@ def invalidate_options_cache() -> None:
 
 
 def _fetch_generate_options() -> dict:
-    """
-    从 ComfyUI /object_info 获取 Generate 页面所需的全部下拉选项:
-      - samplers     : KSampler 的 sampler_name 选项列表
-      - schedulers   : KSampler 的 scheduler 选项列表
-      - checkpoints  : CheckpointLoaderSimple 的 ckpt_name 列表 (含子目录前缀)
-      - loras        : LoraLoader 的 lora_name 列表 (含子目录前缀)
-
-    结果缓存在模块级变量中（进程生命周期内有效）。
-    ComfyUI 未运行时返回内置默认值（不缓存，下次重试）。
-    """
     global _options_cache, _options_cache_time
     # Disk is authoritative: models can arrive through Sync, Wizard, Jupyter,
     # or a mounted volume without an in-process download callback.
@@ -255,7 +234,6 @@ def _fetch_generate_options() -> dict:
         "vaes":        vaes        if isinstance(vaes, list)        else [],
     }
 
-    # ── 从模型索引批量读取预览图与元数据 ────────────────────────────────
     ckpt_list = result["checkpoints"]
     lora_list = result["loras"]
     unet_list = result["unets"]
@@ -306,7 +284,6 @@ def _fetch_generate_options() -> dict:
     }
     result["comfyui_dir"] = COMFYUI_DIR
 
-    # ── 分离式架构：UNet / CLIP / VAE ──────────────────────────────────
     result["unet_previews"] = {
         name: _metadata_preview(unet_rows.get(name)) for name in unet_list
     }
@@ -324,11 +301,9 @@ def _fetch_generate_options() -> dict:
         name: _generate_info(row) for name, row in unet_rows.items()
     }
 
-    # ── ControlNet 模型 (按类型分组) ───────────────────────────────────
     cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
     result["controlnet_models"] = _classify_controlnet_models(cn_list)
 
-    # ── SeedVR2 DiT 模型 (扫描磁盘实际存在的白名单文件) ─────────────────
     # ComfyUI 的 combo 列表返回节点已知的全部变体（含未下载的 GGUF 等），
     # 此处直接扫描 models/SEEDVR2/ 仅返回磁盘上存在的 .safetensors 文件。
     seedvr2_dir = os.path.join(COMFYUI_DIR, "models", "SEEDVR2")
@@ -347,7 +322,6 @@ def _fetch_generate_options() -> dict:
         and os.path.isfile(os.path.join(aura_dir, "config.json"))
     )
 
-    # ── 面部重绘: 检测器与 SAM (扫描磁盘, 照 seedvr2_models 成例) ──────
     bbox_dir = os.path.join(COMFYUI_DIR, "models", "ultralytics", "bbox")
     bbox_models: list[str] = []
     if os.path.isdir(bbox_dir):
@@ -369,18 +343,8 @@ def _fetch_generate_options() -> dict:
     return result
 
 
-# ── /api/generate/options ────────────────────────────────────────────────────
-
 @bp.route("/api/generate/options")
 def api_generate_options():
-    """
-    返回 Generate 页面所需的全部下拉选项:
-    sampler / scheduler / checkpoints / loras。
-    数据来自 ComfyUI /object_info（懒加载缓存）。
-    ComfyUI 未运行时返回内置默认列表（checkpoints/loras 为空）。
-
-    ?refresh=1  强制清除缓存并重新获取。
-    """
     global _options_cache, _options_cache_time, _combo_cache
     if request.args.get("refresh") == "1":
         _options_cache = None
@@ -389,14 +353,9 @@ def api_generate_options():
     return jsonify(_fetch_generate_options())
 
 
-# ── /api/generate/upload_image ───────────────────────────────────────────────
-
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/bmp"}
-MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MB
+MAX_IMAGE_SIZE = 20 * 1024 * 1024
 
-# ── 上传媒体映射表 (api_generate_upload_image 专用) ──
-# 每项: 媒体类别 → (允许 content_type 集合, content_type→扩展名, 大小上限)
-# 图像保持既有行为逐字不变 (20MB); 视频 50MB; 音频 15MB。
 _UPLOAD_MEDIA_TYPES = {
     "image": (
         ALLOWED_IMAGE_TYPES,
@@ -441,7 +400,6 @@ def api_generate_upload_image():
     if not file or not file.filename:
         return _err("invalid_file")
 
-    # 文件类型校验: 按媒体类别匹配, 未命中时报对应错误键
     content_type = file.content_type or ""
     media_type = None
     allowed = set()
@@ -452,12 +410,10 @@ def api_generate_upload_image():
             media_type, allowed, ext_map, max_size = mt, allow, exts, msize
             break
     if media_type is None:
-        # 图像类型不支持仍用 unsupported_image_format; 其余用 unsupported_media_format
         if content_type.startswith("image/"):
             return _err("unsupported_image_format", content_type=content_type)
         return _err("unsupported_media_format", content_type=content_type)
 
-    # 文件大小校验 (按媒体类别上限)
     file.seek(0, 2)
     size = file.tell()
     file.seek(0)
@@ -465,7 +421,6 @@ def api_generate_upload_image():
     if size > max_size:
         return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=limit_mb)
 
-    # 生成安全文件名
     import uuid
     usage = request.form.get("type", "ref")
     ext_fallback = {"image": ".png", "video": ".mp4", "audio": ".mp3"}.get(media_type, ".png")
@@ -474,7 +429,6 @@ def api_generate_upload_image():
 
     input_dir = os.path.join(COMFYUI_DIR, "input")
 
-    # 可选子目录 (如 openpose / canny / depth)
     subfolder = request.form.get("subfolder", "").strip()
     if subfolder:
         safe_sub = os.path.basename(subfolder)  # 防止路径遍历
@@ -486,13 +440,11 @@ def api_generate_upload_image():
 
     file.save(dest)
 
-    # 返回相对于 input/ 的路径
     rel_name = f"{safe_sub}/{safe_name}" if subfolder else safe_name
     logger.info(f"[generate] 媒体已上传: {rel_name} ({size} bytes, {media_type})")
 
     result = {"filename": rel_name}
 
-    # 返回图片尺寸 (仅图像, 用于图生图自动填充 width/height)
     if media_type == "image":
         try:
             from PIL import Image as PILImage
@@ -503,8 +455,6 @@ def api_generate_upload_image():
 
     return jsonify(result)
 
-
-# ── /api/generate/preprocess ─────────────────────────────────────────────────
 
 @bp.route("/api/generate/preprocess", methods=["POST"])
 def api_generate_preprocess():
@@ -530,10 +480,8 @@ def api_generate_preprocess():
     os.makedirs(input_dir, exist_ok=True)
     uid = _uuid.uuid4().hex[:8]
 
-    # 确定源图片
     input_name = request.form.get("input_name", "").strip()
     if input_name:
-        # 使用 input/ 中已有文件
         safe_name = os.path.basename(input_name)
         src_path = os.path.join(input_dir, safe_name)
         if not os.path.isfile(src_path):
@@ -544,12 +492,10 @@ def api_generate_preprocess():
         if not file or not file.filename:
             return _err("invalid_file")
 
-        # 文件类型校验
         content_type = file.content_type or ""
         if content_type not in ALLOWED_IMAGE_TYPES:
             return _err("unsupported_image_format", content_type=content_type)
 
-        # 文件大小校验
         file.seek(0, 2)
         size = file.tell()
         file.seek(0)
@@ -564,7 +510,6 @@ def api_generate_preprocess():
     else:
         return _err("no_image_or_input")
 
-    # 解析预处理器参数
     extra_params = {}
     params_str = request.form.get("params", "")
     if params_str:
@@ -573,14 +518,12 @@ def api_generate_preprocess():
         except _json.JSONDecodeError:
             pass
 
-    # 预处理输出文件名 → 保存到子目录 (input/openpose, input/canny, input/depth)
     _SUBFOLDER_MAP = {"pose": "openpose", "canny": "canny", "depth": "depth"}
     subfolder = _SUBFOLDER_MAP.get(pp_type, pp_type)
     output_dir = os.path.join(input_dir, subfolder)
     os.makedirs(output_dir, exist_ok=True)
     output_name = f"preprocess_{pp_type}_{uid}"
 
-    # 构建预处理工作流
     try:
         prompt = build_preprocess_workflow({
             "image": src_name,
@@ -593,7 +536,6 @@ def api_generate_preprocess():
         logger.exception("[generate] 构建预处理工作流失败")
         return _err("workflow_build_failed", 500, detail=str(e))
 
-    # 提交到 ComfyUI
     try:
         bridge = get_bridge()
         payload = {"prompt": prompt, "client_id": bridge.client_id}
@@ -608,7 +550,6 @@ def api_generate_preprocess():
 
     prompt_id = result.get("prompt_id", "")
     output_filename = f"{output_name}.png"
-    # 返回带子目录的相对路径（如 "openpose/preprocess_pose_xxx.png"）
     output_relpath = f"{subfolder}/{output_filename}"
     logger.info(f"[generate] 预处理提交 prompt_id={prompt_id} type={pp_type} output={output_relpath}")
 
@@ -618,17 +559,10 @@ def api_generate_preprocess():
     })
 
 
-# ── /api/generate/input_images ───────────────────────────────────────────────
-
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 
 @bp.route("/api/generate/input_images")
 def api_generate_input_images():
-    """
-    列出 ComfyUI input/ 目录中的图片文件 (供参考图选择器使用)。
-    Query params:
-        subfolder — 可选子目录名 (如 "openpose"), 仅列出该子目录中的图片
-    """
     subfolder = request.args.get("subfolder", "").strip()
     input_dir = os.path.join(COMFYUI_DIR, "input")
     if subfolder:
@@ -647,7 +581,6 @@ def api_generate_input_images():
         fpath = os.path.join(scan_dir, f)
         if not os.path.isfile(fpath):
             continue
-        # 返回相对于 input/ 的路径
         rel_name = f"{safe_sub}/{f}" if subfolder else f
         images.append({"name": rel_name, "size": os.path.getsize(fpath)})
     return jsonify({"images": images})
@@ -655,7 +588,6 @@ def api_generate_input_images():
 
 @bp.route("/api/generate/input_image_preview")
 def api_generate_input_image_preview():
-    """返回 ComfyUI input/ 中指定图片的原始文件 (用于缩略图预览)。支持子目录 (如 "openpose/file.png")。"""
     from flask import send_from_directory, abort
     name = request.args.get("name", "")
     if not name or ".." in name:
@@ -668,16 +600,12 @@ def api_generate_input_image_preview():
         abort(403)
     if not os.path.isfile(fpath):
         abort(404)
-    # 分离目录和文件名
     sub_dir = os.path.dirname(name)
     base_name = os.path.basename(name)
     serve_dir = os.path.join(input_dir, sub_dir) if sub_dir else input_dir
     return send_from_directory(serve_dir, base_name)
 
 
-# ── /api/generate/submit ─────────────────────────────────────────────────────
-
-# 支持的模型类型 → 对应工作流构建函数
 _BUILDERS = {
     "sdxl": build_sdxl_workflow,
     # SD 1.5 与 SDXL 共用传统 CheckpointLoaderSimple 工作流，参数校验在
@@ -753,7 +681,6 @@ def api_generate_submit():
     return jsonify(body), status
 
 
-# ── /api/generate/background/* — 后台运行会话 ────────────────────────
 # 四个接口统一返回状态对象 (无 images 字段), 字段名一字不差:
 #   {state, iteration, max_iterations, started_at, stop_reason}
 
@@ -766,13 +693,11 @@ def api_generate_background_start():
     policy = body.get("policy") or {}
     if not isinstance(payload, dict):
         return _err("missing_payload")
-    # 队列非空 (ComfyUI 正在跑别的) → 409
     if is_queue_busy():
         return _err("queue_busy", 409)
     try:
         start_session(payload, policy)
     except RuntimeError:
-        # 已在运行
         return _err("background_already_running", 409)
     from ..services.background_run import snapshot_status
     return jsonify(snapshot_status())
@@ -803,17 +728,8 @@ def api_generate_background_dismiss():
     return jsonify(snapshot_status())
 
 
-# ── /api/generate/tagger_models ──────────────────────────────────────────────
-
 @bp.route("/api/generate/tagger_models", methods=["GET"])
 def api_generate_tagger_models():
-    """
-    扫描 WD14 Tagger 模型目录，返回已安装的模型列表。
-    逻辑与 WD14 Tagger 插件的 get_installed_models() 保持一致:
-      - 扫描 .onnx 文件
-      - 过滤出同时有对应 .csv 文件的
-    返回: {"models": ["wd-vit-tagger-v3", "wd-eva02-large-tagger-v3", ...]}
-    """
     models_dir = os.path.join(COMFYUI_DIR, "custom_nodes", "ComfyUI-WD14-Tagger", "models")
     if not os.path.isdir(models_dir):
         return jsonify({"models": []})
@@ -830,8 +746,6 @@ def api_generate_tagger_models():
     installed.sort()
     return jsonify({"models": installed})
 
-
-# ── /api/generate/interrogate ────────────────────────────────────────────────
 
 @bp.route("/api/generate/interrogate", methods=["POST"])
 def api_generate_interrogate():
@@ -851,7 +765,6 @@ def api_generate_interrogate():
     os.makedirs(input_dir, exist_ok=True)
     uid = _uuid.uuid4().hex[:8]
 
-    # 确定源图片
     input_name = request.form.get("input_name", "").strip()
     if input_name:
         safe_name = os.path.basename(input_name)
@@ -882,7 +795,6 @@ def api_generate_interrogate():
     else:
         return _err("no_image_or_input")
 
-    # 解析参数
     extra_params = {}
     params_str = request.form.get("params", "")
     if params_str:
@@ -891,7 +803,6 @@ def api_generate_interrogate():
         except json.JSONDecodeError:
             pass
 
-    # 构建反推工作流
     try:
         prompt = build_tag_workflow({
             "image": src_name,
@@ -901,7 +812,6 @@ def api_generate_interrogate():
         logger.exception("[generate] 构建反推工作流失败")
         return _err("workflow_build_failed", 500, detail=str(e))
 
-    # 提交到 ComfyUI
     try:
         bridge = get_bridge()
         payload = {"prompt": prompt, "client_id": bridge.client_id}
@@ -958,12 +868,8 @@ def api_generate_interrogate_result():
     return jsonify({"tags": tags, "prompt_id": prompt_id})
 
 
-# ── /api/generate/embeddings ─────────────────────────────────────────────────
-
-
 @bp.route("/api/generate/embeddings")
 def api_generate_embeddings():
-    """列出所有可用的 Embedding 文件"""
     emb_dir = os.path.join(COMFYUI_DIR, "models", "embeddings")
     embeddings = []
     if os.path.isdir(emb_dir):
@@ -982,19 +888,14 @@ def api_generate_embeddings():
     return jsonify({"embeddings": embeddings})
 
 
-# ── /api/generate/wildcards ──────────────────────────────────────────────────
-
-
 @bp.route("/api/generate/wildcards")
 def api_generate_wildcards_list():
-    """列出所有可用 wildcard 文件及文件夹"""
     expander = get_expander()
     return jsonify({"wildcards": expander.list_wildcards(), "folders": expander.list_folders()})
 
 
 @bp.route("/api/generate/wildcard/<path:name>")
 def api_generate_wildcard_get(name):
-    """获取指定 wildcard 文件内容"""
     try:
         expander = get_expander()
         content = expander.get_wildcard_content(name)
@@ -1007,7 +908,6 @@ def api_generate_wildcard_get(name):
 
 @bp.route("/api/generate/wildcard/<path:name>", methods=["PUT"])
 def api_generate_wildcard_save(name):
-    """保存/创建 wildcard 文件"""
     data = request.get_json(silent=True) or {}
     content = data.get("content", "")
     try:
@@ -1020,7 +920,6 @@ def api_generate_wildcard_save(name):
 
 @bp.route("/api/generate/wildcard/<path:name>", methods=["DELETE"])
 def api_generate_wildcard_delete(name):
-    """删除 wildcard 文件"""
     try:
         expander = get_expander()
         expander.delete_wildcard(name)
@@ -1033,7 +932,6 @@ def api_generate_wildcard_delete(name):
 
 @bp.route("/api/generate/wildcard-folder/<path:name>", methods=["POST"])
 def api_generate_wildcard_folder_create(name):
-    """创建 wildcard 子文件夹"""
     try:
         expander = get_expander()
         expander.create_folder(name)
@@ -1044,7 +942,6 @@ def api_generate_wildcard_folder_create(name):
 
 @bp.route("/api/generate/wildcard/<path:name>/rename", methods=["POST"])
 def api_generate_wildcard_rename(name):
-    """重命名 wildcard 文件"""
     data = request.get_json(silent=True) or {}
     new_name = data.get("new_name", "").strip()
     if not new_name:

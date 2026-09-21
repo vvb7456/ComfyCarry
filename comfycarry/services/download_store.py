@@ -1,7 +1,4 @@
 """
-ComfyCarry — Download 持久化层
-
-负责 download_tasks 和 download_resources 两张表的读写。
 被 resource_registry 和 download_engine 调用，route 不直接访问。
 """
 
@@ -14,17 +11,12 @@ from ..db import db
 log = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Resource CRUD
-# ═══════════════════════════════════════════════════════════════
-
 def upsert_resource(resource_key: str, source: str, model_id: str,
                     version_id: str, state: str, *,
                     active_task_id: str = "",
                     last_error: str = "",
                     meta: dict | None = None,
                     installed_at: float | None = None) -> None:
-    """插入或更新 download_resources 记录。"""
     now = time.time()
     meta_json = json.dumps(meta or {}, ensure_ascii=False)
     db.execute(
@@ -49,7 +41,6 @@ def upsert_resource(resource_key: str, source: str, model_id: str,
 
 
 def get_resource(resource_key: str) -> dict | None:
-    """读取单条 resource，返回 dict 或 None。"""
     row = db.fetch_one(
         "SELECT * FROM download_resources WHERE resource_key = ?",
         (resource_key,),
@@ -58,7 +49,6 @@ def get_resource(resource_key: str) -> dict | None:
 
 
 def get_all_resources() -> list[dict]:
-    """读取所有非 absent 状态的 resource。"""
     rows = db.fetch_all(
         "SELECT * FROM download_resources WHERE state != 'absent' "
         "ORDER BY updated_at DESC",
@@ -67,14 +57,9 @@ def get_all_resources() -> list[dict]:
 
 
 def delete_resource(resource_key: str) -> None:
-    """删除 resource 记录。"""
     db.execute("DELETE FROM download_resources WHERE resource_key = ?",
                (resource_key,))
 
-
-# ═══════════════════════════════════════════════════════════════
-#  Task CRUD
-# ═══════════════════════════════════════════════════════════════
 
 def upsert_task(task_id: str, *, resource_key: str = "",
                 url: str = "", save_dir: str = "", filename: str = "",
@@ -83,7 +68,6 @@ def upsert_task(task_id: str, *, resource_key: str = "",
                 speed: int = 0, progress: float = 0,
                 error: str = "", meta: dict | None = None,
                 completed_at: float | None = None) -> None:
-    """插入或更新 download_tasks 记录。"""
     now = time.time()
     meta_json = json.dumps(meta or {}, ensure_ascii=False)
     db.execute(
@@ -109,7 +93,6 @@ def upsert_task(task_id: str, *, resource_key: str = "",
 
 
 def get_task(task_id: str) -> dict | None:
-    """读取单条 task。"""
     row = db.fetch_one(
         "SELECT * FROM download_tasks WHERE task_id = ?",
         (task_id,),
@@ -118,7 +101,6 @@ def get_task(task_id: str) -> dict | None:
 
 
 def get_recent_tasks(limit: int = 100) -> list[dict]:
-    """读取最近 N 条 task (按创建时间倒序)。"""
     rows = db.fetch_all(
         "SELECT * FROM download_tasks ORDER BY created_at DESC LIMIT ?",
         (limit,),
@@ -127,7 +109,6 @@ def get_recent_tasks(limit: int = 100) -> list[dict]:
 
 
 def get_tasks_by_resource(resource_key: str) -> list[dict]:
-    """读取某个 resource 的所有关联 task。"""
     rows = db.fetch_all(
         "SELECT * FROM download_tasks WHERE resource_key = ? "
         "ORDER BY created_at DESC",
@@ -137,12 +118,10 @@ def get_tasks_by_resource(resource_key: str) -> list[dict]:
 
 
 def delete_task(task_id: str) -> None:
-    """删除单条 task。"""
     db.execute("DELETE FROM download_tasks WHERE task_id = ?", (task_id,))
 
 
 def clear_terminal_tasks(max_age_seconds: int = 86400) -> int:
-    """清除超过 max_age 的终态任务，返回删除行数。"""
     cutoff = time.time() - max_age_seconds
     cursor = db.execute(
         "DELETE FROM download_tasks "
@@ -153,12 +132,7 @@ def clear_terminal_tasks(max_age_seconds: int = 86400) -> int:
     return cursor.rowcount
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Helpers
-# ═══════════════════════════════════════════════════════════════
-
 def _row_to_dict(row) -> dict:
-    """将 sqlite3.Row 转换为普通 dict，并解析 *_json 字段。"""
     d = dict(row)
     for key in list(d.keys()):
         if key.endswith("_json"):

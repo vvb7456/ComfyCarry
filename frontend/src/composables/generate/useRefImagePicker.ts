@@ -3,16 +3,12 @@ import { useToast } from '@/composables/useToast'
 import { apiErrorText } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 /**
  * 参考图上传区统一的 accept 白名单 (FileUploadZone 的 accept prop)。
  * 图生图 / ControlNet / 视频起始画面 / 预处理 / 打标 / LLM 六处共用一份,
  * 以免加格式时漏改其中某一处。
  */
 export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/bmp'
-
-// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface InputImage {
   name: string
@@ -25,15 +21,6 @@ export interface UploadResult {
   height?: number
 }
 
-// ── Composable ───────────────────────────────────────────────────────────────
-
-/**
- * Shared composable for picking / uploading reference images.
- * Used by I2I panel and future ControlNet panels.
- *
- * @param usageType — usage label sent with upload (e.g. 'i2i', 'pose')
- * @param subfolder — optional subfolder inside ComfyUI input/ to list
- */
 export function useRefImagePicker(usageType: string, subfolder = '') {
   const { toast } = useToast()
 
@@ -42,7 +29,6 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
   const loading = ref(false)
   const uploading = ref(false)
 
-  /** Open picker modal and load image list */
   async function open() {
     visible.value = true
     await loadImages()
@@ -52,7 +38,6 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
     visible.value = false
   }
 
-  /** Fetch image list from backend */
   async function loadImages() {
     loading.value = true
     try {
@@ -71,7 +56,6 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
     }
   }
 
-  /** Upload a local file to server, returns server filename + dimensions */
   async function uploadFile(file: File): Promise<UploadResult | null> {
     if (uploading.value) return null
     uploading.value = true
@@ -91,7 +75,6 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
         return null
       }
       const data = await res.json() as UploadResult
-      // Refresh list so newly uploaded image appears
       loadImages()
       return data
     } catch (e: unknown) {
@@ -102,7 +85,6 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
     }
   }
 
-  /** Get local preview data URL for a file (before upload completes) */
   function readLocalPreview(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -112,7 +94,6 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
     })
   }
 
-  /** Build preview URL for an image already in ComfyUI input/ */
   function previewUrl(name: string): string {
     return `/api/generate/input_image_preview?name=${encodeURIComponent(name)}`
   }

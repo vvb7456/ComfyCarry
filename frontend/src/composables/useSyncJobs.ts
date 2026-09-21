@@ -1,8 +1,6 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 import { useApiFetch } from './useApiFetch'
 
-// ── Types ────────────────────────────────────────────────────
-
 /** 任务执行时的规则展示快照 (规则被编辑/删除后历史仍可回看) */
 export interface SyncJobRuleSnapshot {
   id: string
@@ -65,8 +63,6 @@ interface JobDetailResponse {
   events: SyncJobEvent[]
 }
 
-// ── Composable ───────────────────────────────────────────────
-
 export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number }) {
   const { get } = useApiFetch()
 
@@ -84,7 +80,6 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
   // 请求序号: 并发请求时只采纳最后一次发出的结果, 避免慢响应覆盖用户新选中的页
   let reqSeq = 0
 
-  // ── Fetch a page from server ──
   async function fetchPage(target: number = page.value) {
     const seq = ++reqSeq
     const requested = Math.max(1, Math.floor(target) || 1)
@@ -133,7 +128,6 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
     }
   }
 
-  // ── Fetch single job detail + events (独立于页码) ──
   async function fetchJobDetail(jobId: string, afterId = 0, limit = 500, silent = false) {
     return get<JobDetailResponse>(`/api/sync/jobs/${jobId}?after_id=${afterId}&limit=${limit}`, { silent })
   }
@@ -149,7 +143,6 @@ export function useSyncJobs(opts?: { pollInterval?: number; pageSize?: number })
     return get<JobsListResponse>('/api/sync/jobs?page=1&limit=1&finished=1', { silent: true })
   }
 
-  // ── Polling ──
   function ensurePolling() {
     if (pollTimer) return
     pollTimer = setInterval(() => { fetchPage(1) }, pollMs)

@@ -1,17 +1,3 @@
-"""
-ComfyCarry — ComfyUI 管理路由
-
-- /api/comfyui/status   — 系统状态 + 启动参数
-- /api/comfyui/params   — 参数定义/更新
-- /api/comfyui/versions — 版本列表
-- /api/comfyui/switch   — 切换版本
-- /api/comfyui/queue     — 任务队列
-- /api/comfyui/interrupt — 中断执行
-- /api/comfyui/history   — 生成历史
-- /api/comfyui/view      — 图片代理
-- /api/comfyui/events    — SSE 实时事件
-"""
-
 import json
 import queue
 import shlex
@@ -25,7 +11,6 @@ from ..config import COMFYUI_URL, COMFYUI_DIR, _set_config
 
 
 def comfyui_port() -> int:
-    """ComfyUI 端口, 来自应用变量 COMFYUI_URL (默认 8188)。"""
     try:
         p = urlparse(COMFYUI_URL).port
         if p:
@@ -54,12 +39,8 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
     return jsonify(body), status
 
 
-# ====================================================================
-# ComfyUI 状态 & 参数
-# ====================================================================
 @bp.route("/api/comfyui/status")
 def api_comfyui_status():
-    """获取 ComfyUI 系统状态 + 当前启动参数"""
     result = {"online": False, "system": {},
               "queue_running": 0, "queue_pending": 0,
               "params": {}, "args": [], "port": comfyui_port()}
@@ -100,7 +81,6 @@ def api_comfyui_status():
 
 @bp.route("/api/comfyui/params", methods=["GET"])
 def api_comfyui_params_get():
-    """获取参数定义 + 当前值"""
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
                            capture_output=True, text=True, timeout=5)
@@ -120,7 +100,6 @@ def api_comfyui_params_get():
             }
             if "options" in gv:
                 opts = list(gv["options"])
-                # 根据安装状态过滤 Attention 选项
                 if gk == "attention":
                     from ..config import _get_config
                     has_fa2 = _get_config("installed_fa2", False)
@@ -196,7 +175,6 @@ def restart_comfyui(args_str: str = "") -> tuple[bool, dict | None]:
 
 @bp.route("/api/comfyui/params", methods=["POST"])
 def api_comfyui_params_update():
-    """更新 ComfyUI 启动参数并重启"""
     data = request.get_json()
     params = data.get("params", {})
     extra_args = data.get("extra_args", "").strip()
@@ -230,9 +208,6 @@ def api_comfyui_restart():
     return jsonify({"ok": True})
 
 
-# ====================================================================
-# 队列/控制
-# ====================================================================
 @bp.route("/api/comfyui/queue")
 def api_comfyui_queue():
     try:
@@ -267,7 +242,6 @@ def api_comfyui_interrupt():
 
 @bp.route("/api/comfyui/queue/delete", methods=["POST"])
 def api_comfyui_queue_delete():
-    """删除指定的待排队 prompt（不影响正在执行的）"""
     data = request.get_json(force=True)
     prompt_ids = data.get("delete", [])
     if not prompt_ids:
@@ -282,7 +256,6 @@ def api_comfyui_queue_delete():
 
 @bp.route("/api/comfyui/queue/clear", methods=["POST"])
 def api_comfyui_queue_clear():
-    """清空所有待排队的 prompt"""
     try:
         requests.post(f"{COMFYUI_URL}/queue",
                       json={"clear": True}, timeout=5)
@@ -291,16 +264,12 @@ def api_comfyui_queue_clear():
         return _err("unreachable", 503)
 
 
-# ====================================================================
-# 历史 & 图片
-# ====================================================================
 @bp.route("/api/comfyui/history")
 def api_comfyui_history():
     max_items = request.args.get("max_items", 5, type=int)
     filter_prompt_id = request.args.get("prompt_id", "").strip()
     try:
         if filter_prompt_id:
-            # 直接获取特定 prompt 的历史 (ComfyUI 支持 /history/{prompt_id})
             resp = requests.get(f"{COMFYUI_URL}/history/{filter_prompt_id}", timeout=10)
             raw = resp.json()
         else:
@@ -346,7 +315,6 @@ def api_comfyui_history():
             # 无有效 output 图片的条目跳过 (如纯预处理工作流)
             if not output_imgs and not filter_prompt_id:
                 continue
-            # 从 status.messages 中提取时间戳
             timestamp = 0
             for msg in status.get("messages", []):
                 if isinstance(msg, list) and len(msg) >= 2:
@@ -417,9 +385,6 @@ def api_comfyui_view():
     return Response(stream(), status=resp.status_code, headers=out_headers)
 
 
-# ====================================================================
-# 视频首帧缩略图 (ffmpeg 抽帧 + 磁盘缓存)
-# ====================================================================
 # 端点最终 URL: GET /api/comfyui/video_thumb
 # 参数签名 (与 /api/comfyui/view 对齐):
 #   filename  (必填) — ComfyUI output 下的文件名 (如 ComfyUI_00001_.mp4)
@@ -439,9 +404,6 @@ def api_comfyui_video_thumb():
                        "Cache-Control": "public, max-age=86400"}
 
 
-# ====================================================================
-# SSE 实时事件流 (ComfyUI WS → SSE 桥接)
-# ====================================================================
 @bp.route("/api/comfyui/events")
 def api_comfyui_events():
     bridge = get_bridge()
@@ -465,21 +427,14 @@ def api_comfyui_events():
                              "X-Accel-Buffering": "no"})
 
 
-
-# ====================================================================
-# 版本管理
-# ====================================================================
-
 @bp.route("/api/comfyui/versions")
 def api_comfyui_versions():
-    """获取所有可用 ComfyUI 版本 (git tags)"""
     fetch = request.args.get("fetch", "true").lower() != "false"
     return jsonify(get_versions(fetch=fetch))
 
 
 @bp.route("/api/comfyui/switch", methods=["POST"])
 def api_comfyui_switch():
-    """切换 ComfyUI 版本并重启"""
     data = request.get_json(silent=True) or {}
     version = data.get("version", "").strip()
     install_deps = data.get("install_deps", False)

@@ -1,9 +1,4 @@
-"""ComfyCarry — 隧道切换编排 (蓝绿)
-
-隧道配置变更时, 先建好新资源并确认新地址健康, 再退役旧进程/旧资源;
-切换失败时回收新资源, 旧配置/旧进程/旧资源原样保留。
-
-状态: 进程内单例 + 持久化到 config ``tunnel_switch_state`` (仅用于状态查询,
+"""状态: 进程内单例 + 持久化到 config ``tunnel_switch_state`` (仅用于状态查询,
 后端重启会中断切换, 启动时清为 idle)。同一时刻只允许一个切换进行中。
 """
 
@@ -70,10 +65,6 @@ def _idle() -> dict:
 _state = _idle()
 
 
-# ═══════════════════════════════════════════════════════════════
-# 状态读写
-# ═══════════════════════════════════════════════════════════════
-
 def _persist_locked():
     set_config("tunnel_switch_state", {
         "phase": _state["phase"],
@@ -114,7 +105,6 @@ def _snapshot() -> dict:
 
 
 def get_state() -> dict:
-    """切换状态 (供 GET /api/tunnel/switch/status)。"""
     with _lock:
         return {
             "phase": _state["phase"],
@@ -130,7 +120,6 @@ def get_state() -> dict:
 
 
 def reset_on_startup():
-    """应用启动时把切换状态清为 idle, 并清理中断遗留的非活跃进程。"""
     with _lock:
         _state.clear()
         _state.update(_idle())
@@ -143,12 +132,7 @@ def reset_on_startup():
         pass
 
 
-# ═══════════════════════════════════════════════════════════════
-# 请求入口
-# ═══════════════════════════════════════════════════════════════
-
 def start_switch(payload: dict) -> dict:
-    """校验并启动切换, 返回 202 响应体。失败抛 SwitchError (不启动切换)。"""
     mode = str(payload.get("mode") or "").strip().lower()
     with _lock:
         if _state["phase"] not in ("idle", "done", "failed"):
@@ -288,10 +272,6 @@ def _begin_public(payload: dict) -> dict:
     return _response()
 
 
-# ═══════════════════════════════════════════════════════════════
-# 后台执行
-# ═══════════════════════════════════════════════════════════════
-
 def _run_custom(api_token: str, domain: str, subdomain: str, services: list,
                 new_name: str, old_name: str, old_mode, old_cf, same_target: bool,
                 old_random_id: str):
@@ -310,7 +290,6 @@ def _run_custom(api_token: str, domain: str, subdomain: str, services: list,
         if not _wait_healthy(_snapshot()["new_url"]):
             raise SwitchError("health_timeout", 504)
 
-        # 新地址已健康 — 落盘新配置并退役旧进程/旧资源
         healthy = True
         _set_phase("finalizing")
         set_config("cf_api_token", api_token)
@@ -386,12 +365,7 @@ def _run_public(new_random_id: str, subdomain: str, new_name: str, old_name: str
         _finish("failed", "switch_failed")
 
 
-# ═══════════════════════════════════════════════════════════════
-# 辅助
-# ═══════════════════════════════════════════════════════════════
-
 def _wait_healthy(url: str) -> bool:
-    """轮询 https://{host}/api/version 直到 200 或总超时。"""
     target = url.rstrip("/") + "/api/version"
     deadline = time.time() + _HEALTH_TIMEOUT
     while time.time() < deadline:
@@ -434,7 +408,6 @@ def _cleanup_new_custom(mgr, new_name: str, same_target: bool = False):
 
 
 def _cleanup_new_public(client, new_name: str, new_random_id: str):
-    """失败回收: 删新进程 + release 新预留/新激活记录。旧资源不动。"""
     _pm2_delete(new_name)
     try:
         if client is None:
@@ -473,7 +446,6 @@ def _cleanup_old(old_mode, old_cf, old_name: str, same_target: bool,
 
 
 def _current_info() -> dict:
-    """当前隧道信息 (旧地址 + 旧 random_id / 旧自定义配置)。"""
     mode = get_config("tunnel_mode", "")
     if mode == "public":
         client = PublicTunnelClient()
@@ -490,7 +462,6 @@ def _current_info() -> dict:
 
 
 def _effective_services() -> list:
-    """默认服务 (应用后缀覆盖) + 自定义服务。"""
     overrides = {}
     custom = []
     try:

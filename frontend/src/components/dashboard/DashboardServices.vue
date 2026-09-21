@@ -45,7 +45,6 @@ const { t } = useI18n({ useScope: 'global' })
       </div>
     </div>
 
-    <!-- Skeletons -->
     <div v-if="initialLoading && !data" class="dash-svc-grid">
       <div v-for="i in 4" :key="i" class="dash-svc-card dash-svc-card--skeleton">
         <div class="dash-skeleton dash-skeleton--icon" style="margin-bottom: 12px"></div>
@@ -54,9 +53,7 @@ const { t } = useI18n({ useScope: 'global' })
       </div>
     </div>
 
-    <!-- 4-Column Micro Cards Grid -->
     <div v-else class="dash-svc-grid">
-      <!-- Card 1: ComfyUI -->
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
@@ -96,7 +93,6 @@ const { t } = useI18n({ useScope: 'global' })
         </div>
       </div>
 
-      <!-- Card 2: Jupyter -->
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
@@ -127,7 +123,6 @@ const { t } = useI18n({ useScope: 'global' })
         </div>
       </div>
 
-      <!-- Card 3: Cloud Sync -->
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
@@ -144,7 +139,6 @@ const { t } = useI18n({ useScope: 'global' })
         </div>
       </div>
 
-      <!-- Card 4: Tunnel -->
       <div class="dash-svc-card">
         <div class="dash-svc-card__top">
           <div class="dash-svc-card__icon">
@@ -165,7 +159,6 @@ const { t } = useI18n({ useScope: 'global' })
 </template>
 
 <style scoped>
-/* ── Section 2: Core Services Micro Cards ── */
 .dash-svc-grid {
   display: grid;
   /* 固定四项，只使用一行四张或两行两张，避免 3 + 1。 */
@@ -261,7 +254,6 @@ const { t } = useI18n({ useScope: 'global' })
   color: var(--t3);
 }
 
-/* ── Skeletons ── */
 .dash-skeleton {
   background: color-mix(in srgb, var(--t3) 14%, transparent);
   border-radius: var(--r-xs);

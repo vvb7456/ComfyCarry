@@ -1,13 +1,4 @@
 <script setup lang="ts">
-/**
- * TaggerModal — WD14 Tag Interrogation modal.
- *
- * Layout: 900px BaseModal, left-right split (320px left + flexible right).
- *   Left: FileUploadZone (pick from input / upload / drag) + parameter panel + submit button
- *   Right: Result area (empty / running spinner / tags + action buttons)
- *
- * Legacy: gen-tag-modal → gen-tag-split (flex left-right)
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
@@ -44,15 +35,11 @@ const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 const { copy } = useClipboard()
 
-// ── Image preview URL ─────────────────────────────────────────────────────
-
 const previewUrl = ref('')
 
-/** 依赖状态条展开态 */
 const depExpanded = ref(false)
 
 function updatePreview() {
-  // Revoke old blob URL
   if (previewUrl.value.startsWith('blob:')) URL.revokeObjectURL(previewUrl.value)
 
   if (props.tagger.sourceFile.value) {
@@ -64,10 +51,7 @@ function updatePreview() {
   }
 }
 
-// Watch source changes
 watch([() => props.tagger.sourceFile.value, () => props.tagger.sourceInputName.value], updatePreview)
-
-// ── Image source display name ─────────────────────────────────────────────
 
 const sourceName = computed(() => {
   if (props.tagger.sourceFile.value) return props.tagger.sourceFile.value.name
@@ -77,8 +61,6 @@ const sourceName = computed(() => {
   }
   return ''
 })
-
-// ── Ref image picker (for "from input" button) ───────────────────────────
 
 const tagPicker = useRefImagePicker('tagger', '')
 
@@ -112,20 +94,14 @@ function onClearSource() {
   props.tagger.clearSource()
 }
 
-// ── Model select options ──────────────────────────────────────────────────
-
 const modelOptions = computed(() =>
   props.tagger.models.value.map(m => ({ value: m, label: m }))
 )
-
-// ── Submit ────────────────────────────────────────────────────────────────
 
 function onSubmit() {
   if (!props.tagger.hasSource.value || props.tagger.running.value) return
   props.tagger.interrogate()
 }
-
-// ── Apply result ──────────────────────────────────────────────────────────
 
 function onApply() {
   const text = props.tagger.applyToPrompt()
@@ -159,7 +135,6 @@ function onCopy() {
 
     <div class="tag-wrap">
       <div class="tag-split">
-        <!-- ── Left: image + params + submit ── -->
         <div class="tag-left">
           <FileUploadZone
             mode="pick"
@@ -175,12 +150,10 @@ function onCopy() {
             @error="toast($event, 'warning')"
           />
 
-          <!-- Parameters -->
           <div class="tag-params">
             <div class="tag-params__title">{{ t('generate.interrogate.title') }}</div>
 
             <div v-for="p in TAG_PARAMS_DEF" :key="p.key" class="tag-param-row" :class="{ 'tag-param-row--block': p.type === 'slider' || p.type === 'text' }">
-              <!-- Select (model) -->
               <template v-if="p.type === 'select'">
                 <span class="tag-param-row__label">
                   {{ t(p.labelKey) }}
@@ -196,7 +169,6 @@ function onCopy() {
                 />
               </template>
 
-              <!-- Slider -->
               <template v-else-if="p.type === 'slider'">
                 <RangeField
                   :model-value="Number(tagger.paramValues.value[p.key])"
@@ -214,7 +186,6 @@ function onCopy() {
                 </RangeField>
               </template>
 
-              <!-- Toggle -->
               <template v-else-if="p.type === 'toggle'">
                 <span class="tag-param-row__label">
                   {{ t(p.labelKey) }}
@@ -228,7 +199,6 @@ function onCopy() {
                 />
               </template>
 
-              <!-- Text input -->
               <template v-else-if="p.type === 'text'">
                 <div class="tag-param-row__label">
                   {{ t(p.labelKey) }}
@@ -245,7 +215,6 @@ function onCopy() {
             </div>
           </div>
 
-          <!-- Submit button -->
           <BaseButton
             size="sm"
             variant="primary"
@@ -258,15 +227,12 @@ function onCopy() {
           </BaseButton>
         </div>
 
-        <!-- ── Right: result area ── -->
         <div class="tag-result-area">
-          <!-- Running -->
           <div v-if="tagger.running.value" class="tag-result-empty">
             <Spinner size="lg" />
             <p class="tag-result-hint">{{ t('generate.interrogate.running') }}</p>
           </div>
 
-          <!-- Has result -->
           <div v-else-if="tagger.resultText.value" class="tag-result-content">
             <div class="tag-result-tags">{{ tagger.resultText.value }}</div>
             <div class="tag-result-actions">
@@ -281,7 +247,6 @@ function onCopy() {
             </div>
           </div>
 
-          <!-- Empty / idle -->
           <div v-else class="tag-result-empty">
             <MsIcon name="sell" size="xl" color="var(--t3)" />
             <p class="tag-result-hint">{{ t('generate.interrogate.result_hint') }}</p>
@@ -291,7 +256,6 @@ function onCopy() {
     </div>
   </BaseModal>
 
-  <!-- Nested RefImageModal for "from input" picker -->
   <RefImageModal
     v-model="tagPicker.visible.value"
     :title="t('generate.image_source.select_image')"
@@ -327,7 +291,6 @@ function onCopy() {
   height: 260px;
 }
 
-/* ── Parameters ── */
 .tag-params {
   display: flex;
   flex-direction: column;
@@ -392,7 +355,6 @@ function onCopy() {
   margin-top: auto;
 }
 
-/* ── Result area ── */
 .tag-result-area {
   flex: 1 1 0;
   min-width: 200px;

@@ -42,7 +42,6 @@ const totalPages = computed(() => {
   return Math.max(1, Math.ceil(props.total / props.pageSize))
 })
 
-// 只有一页（含空列表）时隐藏整个翻页区域
 const visible = computed(() => props.total > props.pageSize)
 
 // 归一化传入的越界页码：显示与派发都收敛到 [1, totalPages]
@@ -90,7 +89,6 @@ function go(target: number) {
 </template>
 
 <style scoped>
-/* 居中单组: 箭头 + 页码 + 箭头 (标准分页形态); 小字、静音色 */
 .list-pagination {
   display: flex;
   align-items: center;

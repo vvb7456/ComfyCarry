@@ -1,12 +1,3 @@
-"""
-ComfyCarry — Setup Wizard 路由
-
-- /api/setup/state           — 向导状态
-- /api/setup/wizard_remote   — 向导 remote 凭据 (创建/删除)
-- /api/setup/deploy          — 提交部署计划并启动部署
-- /api/setup/log_stream      — SSE 部署日志
-"""
-
 import json
 import os
 import threading
@@ -32,12 +23,9 @@ bp = Blueprint("setup", __name__)
 _deploy_submit_lock = threading.Lock()
 
 
-# ====================================================================
 # 响应文案 —— key + params, 前端按 `<prefix>.<key>` 翻译
 # 默认 prefix 为 `setup.err`，deploy 端点保留 `wizard.err`
-# ====================================================================
 def _err(key: str, status: int = 400, /, *, prefix: str = "setup.err", _extra: dict | None = None, **params):
-    """错误响应。前端按 `<prefix>.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
     body = {"error_key": f"{prefix}.{key}", "error_params": params}
     if _extra:
         body.update(_extra)
@@ -46,12 +34,6 @@ def _err(key: str, status: int = 400, /, *, prefix: str = "setup.err", _extra: d
 
 @bp.route("/api/setup/state")
 def api_setup_state():
-    """向导状态。无部署进行时, 各 config 字段仅用于 env 预填之外的只读展示;
-    前端刷新即从 step 0 重来 (会话外无草稿), 只恢复部署状态机。
-
-    例外: 部署失败会话的凭据计划 (进程没死时在内存, 死了在快照) 需要恢复,
-    否则重试部署前 step3/4 无法工作。
-    """
     state = _load_setup_state()
     deploy_in_progress = bool(state.get("deploy_started") and not state.get("deploy_completed"))
     # 刷新放弃未提交编辑；恢复时存储凭据和同步规则必须来自同一份计划。
@@ -98,11 +80,6 @@ def api_setup_state():
 
 
 def _apply_deploy_plan(state, data):
-    """部署计划快照: deploy 提交的 config 即唯一持久化时点 (无草稿, 刷新不保留)。
-
-    wizard_remotes 从内存草稿合并, 按前端镜像过滤 (镜像为空 = 未完成的
-    remote 一并放弃) —— token 不过前端, 只能由服务端草稿补齐。
-    """
     # 保持导入配置但只修改其他字段时，前端没有原始凭据；明确切换为
     # manual/skip 时则不保留。直接重试不经过此函数。
     retained_conf = state.get("rclone_config_value", "") if (
@@ -136,7 +113,6 @@ def _apply_deploy_plan(state, data):
 
 
 def _persist_llm_config(data):
-    """LLM 配置同步进 dashboard env"""
     if data.get("llm_provider") or data.get("llm_api_key"):
         from ..config import get_config, set_config
         if data.get("llm_provider"):
@@ -147,7 +123,6 @@ def _persist_llm_config(data):
             set_config("llm_base_url", data["llm_base_url"])
         if data.get("llm_model"):
             set_config("llm_model", data["llm_model"])
-        # Per-provider key persistence
         provider = data.get("llm_provider", "")
         api_key = data.get("llm_api_key", "")
         if provider and api_key:
@@ -161,8 +136,6 @@ def _persist_llm_config(data):
 
 
 def _draft_safe() -> list[dict]:
-    """草稿的前端安全投影: 剥离 params (含 OAuth token / access key),
-    仅返回名称、类型及恢复路径/驱动器选择所需的非凭据信息。"""
     out = []
     remotes = wizard_draft.get_remotes()
     for r in remotes:
@@ -181,10 +154,6 @@ def _draft_safe() -> list[dict]:
 
 @bp.route("/api/setup/wizard_remote", methods=["POST"])
 def api_setup_wizard_remote():
-    """保存向导配置的远程存储。
-
-    草稿编辑不覆盖已提交的部署快照；source_name 用于复用已有连接凭据。
-    """
     data = request.get_json(force=True) or {}
     name = (data.get("name") or "").strip()
     rtype = (data.get("type") or "").strip()
@@ -255,7 +224,6 @@ def api_setup_wizard_remote():
 
 @bp.route("/api/setup/wizard_remote/delete", methods=["POST"])
 def api_setup_wizard_remote_delete():
-    """删除草稿中的存储；已提交的部署计划保持不变。"""
     data = request.get_json(force=True) or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -264,7 +232,6 @@ def api_setup_wizard_remote_delete():
     wizard_draft.remove_remote(name)
     # 幂等: name 不存在也返回剩余列表, 多标签页/本地镜像偏差不报错
     return jsonify({"ok": True, "wizard_remotes": _draft_safe()})
-
 
 @bp.route("/api/setup/deploy", methods=["POST"])
 def api_setup_deploy():
@@ -318,7 +285,6 @@ def api_setup_log_stream():
                 for line in remaining:
                     yield f"data: {json.dumps(line, ensure_ascii=False)}\n\n"
                 done_evt = {'type': 'done', 'success': True}
-                # 附带 attention 安装警告 (如有)
                 attn_warnings = state.get("attn_install_warnings", [])
                 if attn_warnings:
                     done_evt["attn_warnings"] = attn_warnings

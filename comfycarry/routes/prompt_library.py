@@ -1,22 +1,3 @@
-"""
-ComfyCarry — 提示词库路由
-
-端点:
-  GET    /api/prompt-library/status            标签库状态
-  GET    /api/prompt-library/groups            一级分类
-  GET    /api/prompt-library/subgroups         子分类 (?parent=<group_id>)
-  GET    /api/prompt-library/tags              标签 (?parent=<subgroup_id>)
-  GET    /api/prompt-library/tree              完整树形结构
-  GET    /api/prompt-library/autocomplete      自动补全 (?q=<query>&limit=20)
-  GET    /api/prompt-library/history           历史/收藏 (?type=all&page=1&size=20)
-  POST   /api/prompt-library/history           新增历史
-  PUT    /api/prompt-library/history/<id>      更新历史
-  DELETE /api/prompt-library/history/<id>      删除历史
-  DELETE /api/prompt-library/history/batch     批量删除
-  GET    /api/prompt-library/init/status       初始化数据源状态
-  POST   /api/prompt-library/init              一键导入
-"""
-
 import json
 import logging
 import threading
@@ -34,10 +15,6 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("prompt_library", __name__)
 
 
-# ====================================================================
-# 响应文案 —— key + params, 前端按 `prompt-library.err.<key>` 翻译
-# (命名空间与 vue-i18n.ts 注册的 'prompt-library' 一致)
-# ====================================================================
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
     """错误响应。前端按 `prompt-library.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
     body = {"error_key": f"prompt-library.err.{key}", "error_params": params}
@@ -46,9 +23,6 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
     return jsonify(body), status
 
 
-# ====================================================================
-# 标签库状态
-# ====================================================================
 @bp.route("/api/prompt-library/status", methods=["GET"])
 def api_pl_status():
     try:
@@ -58,9 +32,6 @@ def api_pl_status():
         return _err("internal", 500, detail=str(e))
 
 
-# ====================================================================
-# 标签库只读查询
-# ====================================================================
 @bp.route("/api/prompt-library/groups", methods=["GET"])
 def api_pl_groups():
     try:
@@ -103,16 +74,13 @@ def api_pl_tree():
         return _err("internal", 500, detail=str(e))
 
 
-# ====================================================================
-# 自动补全
-# ====================================================================
 @bp.route("/api/prompt-library/autocomplete", methods=["GET"])
 def api_pl_autocomplete():
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify({"data": []}), 200
     limit = request.args.get("limit", 20, type=int)
-    limit = max(1, min(limit, 100))  # 限制 1-100
+    limit = max(1, min(limit, 100))
     try:
         return jsonify({"data": pl.autocomplete(q, limit)}), 200
     except Exception as e:
@@ -127,7 +95,6 @@ def api_pl_resolve():
     texts = data.get("texts", [])
     if not isinstance(texts, list) or len(texts) > 200:
         return _err("texts_invalid")
-    # 过滤非字符串和空值
     texts = [t for t in texts if isinstance(t, str) and t.strip()]
     try:
         return jsonify({"data": pl.resolve_tags(texts)}), 200
@@ -136,9 +103,6 @@ def api_pl_resolve():
         return _err("internal", 500, detail=str(e))
 
 
-# ====================================================================
-# 历史 / 收藏
-# ====================================================================
 @bp.route("/api/prompt-library/history", methods=["GET"])
 def api_pl_history_list():
     history_type = request.args.get("type", "all")
@@ -213,9 +177,6 @@ def api_pl_history_batch_delete():
         return _err("internal", 500, detail=str(e))
 
 
-# ====================================================================
-# 数据初始化
-# ====================================================================
 @bp.route("/api/prompt-library/init/status", methods=["GET"])
 def api_pl_init_status():
     try:
@@ -227,7 +188,6 @@ def api_pl_init_status():
         return _err("internal", 500, detail=str(e))
 
 
-# 导入状态锁
 _import_lock = threading.Lock()
 _import_progress = {
     "running": False,
@@ -293,7 +253,6 @@ def api_pl_init():
             pl_init.download_source(on_dl_progress)
             yield _sse_msg({"phase": "downloading", "percent": 100})
 
-            # Phase 2: import
             _import_progress["phase"] = "importing"
             yield _sse_msg({"phase": "importing", "step": "", "done": 0, "total": 4})
 
@@ -305,7 +264,6 @@ def api_pl_init():
 
             result = pl_init.import_all(on_import_progress)
 
-            # Phase 3: done
             _import_progress["phase"] = "done"
             _import_progress["result"] = result
             yield _sse_msg({"phase": "done", "result": result})
@@ -333,9 +291,6 @@ def _sse_msg(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-# ====================================================================
-# 翻译
-# ====================================================================
 @bp.route("/api/prompt-library/translate", methods=["POST"])
 def api_pl_translate():
     """翻译文本。body: {text, from?, to?, provider?}"""
@@ -369,16 +324,11 @@ def api_pl_translate_word():
 
 @bp.route("/api/prompt-library/translate/providers", methods=["GET"])
 def api_pl_translate_providers():
-    """获取可用翻译 provider 列表"""
     return jsonify({
         "providers": list(ts.PROVIDERS.keys()),
         "default_chain": ts.DEFAULT_CHAIN,
     }), 200
 
-
-# ====================================================================
-# 编辑器设置
-# ====================================================================
 
 _PROMPT_SETTINGS_KEY = "prompt_settings"
 
@@ -407,7 +357,6 @@ def _get_prompt_settings() -> dict:
 
 @bp.route("/api/prompt-library/settings", methods=["GET"])
 def api_pl_settings_get():
-    """获取提示词编辑器设置"""
     try:
         settings = _get_prompt_settings()
         settings["translate_providers"] = list(ts.PROVIDERS.keys())
@@ -420,7 +369,6 @@ def api_pl_settings_get():
 
 @bp.route("/api/prompt-library/settings", methods=["PUT"])
 def api_pl_settings_put():
-    """保存提示词编辑器设置"""
     try:
         data = request.get_json(force=True) or {}
         # 只保留已知 key，防止注入
@@ -428,7 +376,6 @@ def api_pl_settings_put():
         for key, default in _PROMPT_SETTINGS_DEFAULTS.items():
             if key in data:
                 val = data[key]
-                # 类型校验
                 if isinstance(default, bool):
                     clean[key] = bool(val)
                 elif isinstance(default, int):

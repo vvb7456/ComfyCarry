@@ -1,16 +1,4 @@
 <script setup lang="ts">
-/**
- * TokenInput — Composite token editor.
- *
- * Layout: flex-wrap container of TokenChip + trailing <input>.
- * Features:
- *   - Comma or Enter commits input text as chip
- *   - Backspace on empty input selects/deletes last chip
- *   - Autocomplete dropdown (debounced, keyboard navigable)
- *   - Toolbar below: favorites/history, embedding, wildcard, translate, settings (right-aligned)
- *   - Drag & drop reorder chips
- *   - IME-safe (compositionstart/compositionend guard)
- */
 import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PromptToken, BracketType } from '@/types/prompt-library'
@@ -58,17 +46,15 @@ const { t } = useI18n({ useScope: 'global' })
 const inputRef = ref<HTMLInputElement | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
 const selectedChipId = ref<string | null>(null)
-const composing = ref(false) // IME guard
+const composing = ref(false)
 const dragOverIndex = ref(-1)
 const dragSourceId = ref<string | null>(null)
-const lastEnterTime = ref(0) // for double-Enter BREAK detection
+const lastEnterTime = ref(0)
 
-// ── Autocomplete ───────────────────────────────────────────────
 const existingTags = computed(() => props.tokens.map(t => t.tag))
 const acLimit = computed(() => props.autocompleteLimit)
 const ac = useAutoComplete(existingTags, acLimit)
 
-// Compute autocomplete dropdown position based on input element
 const acPosition = ref<Record<string, string>>({})
 
 function updateAcPosition() {
@@ -81,11 +67,9 @@ function updateAcPosition() {
   }
 }
 
-// ── Input handling ─────────────────────────────────────────────
 function onInput(e: Event) {
   const val = (e.target as HTMLInputElement).value
   updateAcPosition()
-  // Don't process during IME composition
   if (composing.value) {
     ac.query.value = val
     return
@@ -94,7 +78,6 @@ function onInput(e: Event) {
   //   - top-level commas (depth 0 for both {} and ()) = split & commit
   //   - commas inside {}/() = literal text, don't split
   if (val.includes(',') || val.includes('，')) {
-    // Single-pass scan: track depth for {} and (), find top-level commas
     let depth = 0
     let lastTopComma = -1
     let hasTopLevelComma = false
@@ -110,20 +93,17 @@ function onInput(e: Event) {
     }
 
     if (!hasTopLevelComma) {
-      // All commas inside structures ({}/()) — don't split
       ac.query.value = val
       return
     }
 
     if (depth === 0) {
-      // Balanced + has top-level comma → split and commit all
       const parts = splitPromptTokens(val)
       for (const part of parts) emit('add', part)
       clearInput()
       return
     }
 
-    // Unbalanced tail — commit prefix up to last top-level comma, keep rest
     const prefix = val.slice(0, lastTopComma)
     const suffix = val.slice(lastTopComma + 1).trimStart()
     const parts = splitPromptTokens(prefix)
@@ -139,7 +119,6 @@ function onInput(e: Event) {
 function onKeydown(e: KeyboardEvent) {
   if (composing.value) return
 
-  // Autocomplete navigation
   if (ac.visible.value) {
     if (e.key === 'ArrowDown') { e.preventDefault(); ac.moveDown(); return }
     if (e.key === 'ArrowUp') { e.preventDefault(); ac.moveUp(); return }
@@ -161,7 +140,6 @@ function onKeydown(e: KeyboardEvent) {
           return
         }
       }
-      // No active item and no results — fall through to commitInput
       commitInput()
       return
     }
@@ -175,7 +153,6 @@ function onKeydown(e: KeyboardEvent) {
           return
         }
       }
-      // No highlight - commit user's raw input
       lastEnterTime.value = 0
       commitInput()
       return
@@ -183,13 +160,11 @@ function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') { e.stopPropagation(); ac.dismiss(); return }
   }
 
-  // Enter → commit current input or double-Enter → BREAK
   if (e.key === 'Enter') {
     e.preventDefault()
     const now = Date.now()
     const inputEmpty = !inputRef.value?.value.trim()
     if (inputEmpty && now - lastEnterTime.value < 400) {
-      // Double-Enter on empty input → add BREAK
       emit('add-break')
       lastEnterTime.value = 0
       return
@@ -201,7 +176,6 @@ function onKeydown(e: KeyboardEvent) {
     return
   }
 
-  // Backspace on empty → select/delete last chip; on nearly empty → dismiss autocomplete
   if (e.key === 'Backspace') {
     const val = inputRef.value?.value ?? ''
     if (!val) {
@@ -215,14 +189,12 @@ function onKeydown(e: KeyboardEvent) {
       }
       return
     }
-    // Will become empty after this Backspace — proactively dismiss
     if (val.length === 1) {
       ac.dismiss()
     }
     return
   }
 
-  // Any other key clears chip selection
   if (selectedChipId.value) {
     selectedChipId.value = null
   }
@@ -242,26 +214,21 @@ function clearInput() {
 }
 
 function focusInput(e?: MouseEvent) {
-  // Don't steal focus from inline chip edit inputs
   if (e && (e.target as HTMLElement)?.closest('.chip-edit-input')) return
   inputRef.value?.focus()
 }
 
-// ── Autocomplete selection ─────────────────────────────────────
 function onAcSelect(item: AutocompleteDisplayItem) {
   emit('select-autocomplete', item)
   clearInput()
   nextTick(focusInput)
 }
 
-// ── IME composition guards ─────────────────────────────────────
 function onCompositionStart() { composing.value = true }
 function onCompositionEnd(e: Event) {
   composing.value = false
   onInput(e)
 }
-
-// ── Drag & Drop (row-aware with visual indicator) ──────────────
 
 interface ChipInfo { idx: number; rect: DOMRect }
 interface ChipRow { chips: ChipInfo[]; top: number; bottom: number }
@@ -269,10 +236,6 @@ interface ChipRow { chips: ChipInfo[]; top: number; bottom: number }
 const dropIndicatorStyle = ref<Record<string, string>>({ display: 'none' })
 let rowMapCache: ChipRow[] | null = null
 
-/**
- * Group chips into visual rows based on their Y position.
- * Chips within ROW_TOLERANCE px vertically are on the same row.
- */
 function buildRowMap(chipEls: Element[]): ChipRow[] {
   const ROW_TOLERANCE = 8
   const rows: ChipRow[] = []
@@ -289,7 +252,6 @@ function buildRowMap(chipEls: Element[]): ChipRow[] {
   return rows.sort((a, b) => a.top - b.top)
 }
 
-/** Find which row the cursor Y is over (rows 由调用方保证非空)。 */
 function findRow(rows: ChipRow[], y: number): ChipRow {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
@@ -300,10 +262,9 @@ function findRow(rows: ChipRow[], y: number): ChipRow {
   return rows[rows.length - 1] as ChipRow
 }
 
-/** Within a row, find the insert index based on cursor X. */
 function findIndexInRow(row: ChipRow, x: number): number {
   const lastChip = row.chips[row.chips.length - 1]
-  let bestIdx = (lastChip?.idx ?? -1) + 1 // default: after last
+  let bestIdx = (lastChip?.idx ?? -1) + 1
   let bestDist = Infinity
   for (const c of row.chips) {
     const center = c.rect.left + c.rect.width / 2
@@ -316,9 +277,7 @@ function findIndexInRow(row: ChipRow, x: number): number {
   return bestIdx
 }
 
-/** Compute drop indicator position — thin vertical line between chips. */
 function updateIndicator(rows: ChipRow[], dropIdx: number) {
-  // Find the chip at dropIdx (or the one before it)
   const allChips = rows.flatMap(r => r.chips)
   if (allChips.length === 0) { dropIndicatorStyle.value = { display: 'none' }; return }
 
@@ -328,19 +287,15 @@ function updateIndicator(rows: ChipRow[], dropIdx: number) {
   const firstChip = allChips[0] as { rect: DOMRect }
   const lastChip2 = allChips[allChips.length - 1] as { rect: DOMRect }
   if (dropIdx <= 0) {
-    // Before first chip
     refRect = firstChip.rect
     left = refRect.left - 2
   } else if (dropIdx >= allChips.length) {
-    // After last chip
     refRect = lastChip2.rect
     left = refRect.right + 2
   } else {
-    // Between two chips — use the right edge of previous
     const prev = allChips.find(c => c.idx === dropIdx - 1)
     const next = allChips.find(c => c.idx === dropIdx)
     if (prev && next) {
-      // If on same row, place between them; if different rows, use next's left
       if (Math.abs(prev.rect.top - next.rect.top) < 8) {
         left = (prev.rect.right + next.rect.left) / 2
         refRect = prev.rect
@@ -406,7 +361,6 @@ function onContainerDrop(e: DragEvent) {
   dropIndicatorStyle.value = { display: 'none' }
 }
 
-// ── Cleanup ────────────────────────────────────────────────────
 function onWindowScroll() { updateAcPosition() }
 function onWindowResize() { updateAcPosition() }
 
@@ -429,7 +383,6 @@ onUnmounted(() => {
 
 <template>
   <div class="token-input-wrap">
-    <!-- Chip container + trailing input -->
     <div
       ref="containerRef"
       class="token-input"
@@ -468,7 +421,6 @@ onUnmounted(() => {
         @compositionend="onCompositionEnd"
       />
 
-      <!-- Autocomplete dropdown -->
       <AutoCompleteList
         :items="ac.results.value"
         :active-index="ac.activeIndex.value"
@@ -490,7 +442,6 @@ onUnmounted(() => {
       />
     </Teleport>
 
-    <!-- Toolbar (right-aligned: 收藏与历史 | Embedding | Wildcard | 翻译 | 设置) -->
     <div class="token-toolbar">
       <button type="button" class="token-tool-btn" :title="t('prompt-library.toolbar.history_favorites')" :aria-label="t('prompt-library.toolbar.history_favorites')" @click="emit('history')">
         <MsIcon name="history" size="xs" color="none" />
@@ -528,7 +479,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ── Container ── */
 .token-input-wrap {
   display: flex;
   flex-direction: column;
@@ -556,7 +506,6 @@ onUnmounted(() => {
   cursor: text;
 }
 
-/* ── Trailing text input ── */
 .token-text-input {
   flex: 1;
   min-width: 80px;
@@ -573,7 +522,6 @@ onUnmounted(() => {
   opacity: .6;
 }
 
-/* ── Toolbar (right-aligned) ── */
 .token-toolbar {
   display: flex;
   align-items: center;

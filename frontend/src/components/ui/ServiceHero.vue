@@ -1,5 +1,4 @@
 <script lang="ts">
-/** Hero 状态语义：ok=运行/正常，warn=过渡/注意，bad=失败，off=停止/未配置 */
 export type ServiceHeroTone = 'ok' | 'warn' | 'bad' | 'off'
 </script>
 
@@ -89,7 +88,6 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped>
-/* 卡片形态：约 240px 视觉高度，内容组垂直居中；有 / 无动作共用同一留白骨架 */
 .service-hero {
   --tone: var(--t2);
   display: flex;
@@ -182,7 +180,6 @@ withDefaults(defineProps<{
   min-height: 36px;
 }
 
-/* 运行事实：hero 卡片下方的一行键值，无容器；字段多时自然换行 */
 .service-hero__facts {
   display: flex;
   flex-wrap: wrap;

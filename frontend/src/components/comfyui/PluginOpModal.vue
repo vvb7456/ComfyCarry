@@ -1,23 +1,4 @@
 <script setup lang="ts">
-/**
- * PluginOpModal — 插件操作阻塞执行弹窗。
- *
- * 单操作闭环: confirm (阻塞不可取消, 所有操作必经确认) → 提交(install/
- * update/toggle/uninstall/git) → 阻塞等待 Manager 队列跑完 → 结果三态
- * (成功 → 重启确认 / 失败 / 超时)。
- *
- * 阻塞语义 (用户决策): 不做假取消 —— 运行态无任何退出途径, 遮罩/×/Esc 全部
- * 失效; Manager 队列任务本就无法撤销。等待有两道信号:
- *   1. SSE cm_queue_status 事件 (bridge 转发): done + 本 ui_id 出结果 → 即刻收尾
- *   2. 2s 轮询 queue_status 兜底: SSE 断线时靠它发现队列空闲
- * 有界等待: 上限 5 分钟 (Manager 队列自身无超时, 网络挂死可无限卡住); 到点转
- * timeout 态, 给出 [继续等待 / 后台继续] (如实告知, 不是取消)。
- *
- * 成功后接「重启 ComfyUI 使生效」confirm 语义: needs_restart 以 pending_restart
- * 服务端 diff 为准 (git 装的插件不在快照对比内时也会真实出现在 diff 里)。
- * 「立即重启」走 /api/comfyui/restart, 弹窗关闭、后台有界等待恢复并 toast,
- * 用户可去任意页。
- */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
@@ -32,11 +13,8 @@ import Spinner from '@/components/ui/Spinner.vue'
 
 defineOptions({ name: 'PluginOpModal' })
 
-/** 一次阻塞执行的操作描述 */
 export interface PluginOpRequest {
-  /** 展示名 */
   title: string
-  /** install / uninstall / update / toggle / git */
   kind: 'install' | 'uninstall' | 'update' | 'toggle' | 'git'
   endpoint: string
   payload: Record<string, unknown>
@@ -50,7 +28,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 本轮操作已收尾 (成功/失败/后台继续), 调用方刷新列表 */
   finished: [ok: boolean]
 }>()
 
@@ -88,8 +65,6 @@ const failedLabel = computed(() => t('plugins.op.failed', {
   kind: kindLabel.value,
 }))
 const isTerminal = computed(() => phase.value === 'done' || phase.value === 'failed')
-
-// ── 提交: confirm (阻塞不可取消, 事前必须确认) → 执行 ────────
 
 async function open(req: PluginOpRequest): Promise<void> {
   const isVersionSwitch = req.kind === 'install'
@@ -133,8 +108,6 @@ async function run(req: PluginOpRequest): Promise<void> {
   startWaiting()
 }
 
-// ── 等待: 轮询 + 超时 ─────────────────────────────────────────
-
 function startWaiting(): void {
   stopTimers()
   pollTimer = setInterval(() => { void pollOnce() }, POLL_INTERVAL_MS)
@@ -167,12 +140,10 @@ async function onQueueEvent(data: CMQueueStatusData): Promise<void> {
   if (phase.value !== 'running') return
   if (data.status !== 'done') return
   const result = data.nodepack_result?.[uiId]
-  if (result === undefined) return // 别的任务收尾 (非本弹窗发起)
+  if (result === undefined) return
   stopTimers()
   phase.value = 'idle' // 立即退出 running, 防 await 期间重复事件重入
   if (result === 'success' || result === 'skip') {
-    // enable/disable 只移目录不动进程, install/update/git 同理 — 均需重启生效;
-    // 与轮询兜底一致, 查 pending_restart diff 决定完成态是否给「立即重启」
     await checkRestart()
     succeed()
   } else {
@@ -207,8 +178,6 @@ function stopTimers(): void {
   if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null }
   stopEvents()
 }
-
-// ── 结果态动作 ────────────────────────────────────────────────
 
 /** 关闭弹窗 (终态才可关); 结束后刷新列表 */
 function close(ok: boolean): void {
@@ -262,8 +231,6 @@ async function restartComfyUI(): Promise<boolean> {
   return true
 }
 
-// ── 生命周期: 打开由 open() 触发; 卸载清计时器 ─────────────────
-
 watch(() => props.modelValue, (open_) => {
   if (!open_) stopTimers()
 })
@@ -285,7 +252,6 @@ defineExpose({ open })
     :show-close="isTerminal"
     @update:model-value="v => { if (v === false) close(false) }"
   >
-    <!-- 运行态: 阻塞等待 -->
     <div v-if="phase === 'running'" class="op-body">
       <Spinner size="lg" />
       <p class="op-line">{{ runningLabel }}</p>
@@ -293,21 +259,18 @@ defineExpose({ open })
       <p v-else class="op-sub">{{ t('plugins.op.running_hint') }}</p>
     </div>
 
-    <!-- 超时态 -->
     <div v-else-if="phase === 'timeout'" class="op-body">
       <MsIcon name="hourglass_top" size="xl" color="var(--c-caution, #e8a33d)" />
       <p class="op-line">{{ t('plugins.op.timeout_title') }}</p>
       <p class="op-sub">{{ t('plugins.op.timeout_desc') }}</p>
     </div>
 
-    <!-- 成功态: 接重启确认 -->
     <div v-else-if="phase === 'done'" class="op-body">
       <MsIcon name="check_circle" size="xl" color="var(--green)" />
       <p class="op-line">{{ doneLabel }}</p>
       <p v-if="restartReady" class="op-sub">{{ t('plugins.op.restart_hint') }}</p>
     </div>
 
-    <!-- 失败态 -->
     <div v-else-if="phase === 'failed'" class="op-body">
       <MsIcon name="error_outline" size="xl" color="var(--red)" />
       <p class="op-line">{{ failedLabel }}</p>
@@ -315,16 +278,13 @@ defineExpose({ open })
     </div>
 
     <template #footer>
-      <!-- 超时: 继续等待 / 后台继续 -->
       <template v-if="phase === 'timeout'">
         <BaseButton @click="goBackground">{{ t('plugins.op.go_background') }}</BaseButton>
         <BaseButton variant="primary" @click="waitMore">{{ t('plugins.op.wait_more') }}</BaseButton>
       </template>
-      <!-- 成功: 重启或关闭 -->
       <BaseButton v-else-if="phase === 'done'" variant="primary" @click="onDoneAction">
         {{ restartReady ? t('plugins.op.restart_now') : t('common.btn.done') }}
       </BaseButton>
-      <!-- 失败: 关闭 -->
       <BaseButton v-else-if="phase === 'failed'" @click="close(false)">{{ t('common.btn.close') }}</BaseButton>
     </template>
   </BaseModal>

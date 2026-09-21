@@ -1,16 +1,4 @@
 <script setup lang="ts">
-/**
- * PromptEditor — Positive / Negative prompt textareas + toolbar
- *
- * Features:
- *  - Positive textarea with bottom toolbar (variable buttons)
- *  - Optional negative textarea (controlled via `showNegative` prop)
- *  - Help button → opens syntax help modal (BaseModal)
- *  - Toolbar buttons are configurable via `tools` prop (array of ToolButton)
- *  - Each textarea auto‑resizes vertically (CSS resize: vertical)
- *  - Focus border highlight (--ac color)
- *  - Responsive: mobile hides tool labels, shows icons only
- */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MODEL_TYPES } from '@/config/model-types'
@@ -52,14 +40,12 @@ const emit = defineEmits<{
 
 const { t, te } = useI18n({ useScope: 'global' })
 
-/** 当前模型的提示词帮助；未知模型回退 SDXL。 */
 const modelGuidePath = computed(() => {
   const path = `generate.prompt.help.models.${props.modelType}`
   // vue-i18n 的 te() 只可靠检查叶子 key；对 models.<id> 对象本身检查会返回 false。
   return props.modelType && te(`${path}.title`) ? path : 'generate.prompt.help.models.sdxl'
 })
 
-/** HelpTip 不显示不适用的负面提示词行。 */
 const NO_NEGATIVE_GUIDE_MODELS = new Set([
   'krea2',
   'zimage',
@@ -79,7 +65,6 @@ const modelGuideRows = computed(() => [
   { key: 'format', label: t('generate.prompt.help.format_label') },
   { key: 'order', label: t('generate.prompt.help.order_label') },
   { key: 'special', label: t('generate.prompt.help.special_label') },
-  // 不适用时不显示负面提示词行。
   ...(showNegativeGuide.value
     ? [{ key: 'negative', label: t('generate.prompt.help.negative_label') }]
     : []),
@@ -125,7 +110,6 @@ const helpOpen = ref(false)
 const posRef = ref<HTMLTextAreaElement | null>(null)
 const negRef = ref<HTMLTextAreaElement | null>(null)
 
-/** Insert text at current cursor position in the specified textarea */
 function insertAtCursor(target: 'positive' | 'negative', text: string) {
   const ta = target === 'positive' ? posRef.value : negRef.value
   if (!ta) return
@@ -143,7 +127,6 @@ function insertAtCursor(target: 'positive' | 'negative', text: string) {
     emit('update:negative', newValue)
   }
 
-  // Restore focus and cursor position after Vue re-render
   requestAnimationFrame(() => {
     ta.focus()
     ta.setSelectionRange(newPos, newPos)
@@ -155,7 +138,6 @@ defineExpose({ insertAtCursor })
 
 <template>
   <div class="prompt-editor">
-    <!-- Section header -->
     <div class="gen-s-hdr">
       <MsIcon name="notes" class="hdr-icon" />
       {{ t('generate.prompt.title') }}
@@ -169,9 +151,7 @@ defineExpose({ insertAtCursor })
       </div>
     </div>
 
-    <!-- Unified prompt container: toolbar + (media | fields) -->
     <div class="prompt-container">
-      <!-- Toolbar (above everything, full width) -->
       <div v-if="tools.length" class="prompt-toolbar">
         <button
           type="button"
@@ -198,7 +178,6 @@ defineExpose({ insertAtCursor })
         </div>
 
         <div class="prompt-fields">
-          <!-- Positive prompt -->
           <div class="prompt-label">
             {{ t('generate.prompt.positive_label') }}
           </div>
@@ -212,7 +191,6 @@ defineExpose({ insertAtCursor })
             @input="emit('update:positive', ($event.target as HTMLTextAreaElement).value)"
           />
 
-          <!-- Negative prompt -->
           <div v-if="showNegative" class="prompt-label prompt-label--neg">
             {{ t('generate.prompt.negative_label') }}
           </div>
@@ -227,14 +205,12 @@ defineExpose({ insertAtCursor })
           />
         </div>
 
-        <!-- 右媒体栏 (H3 尾帧): 首帧 | 提示词 | 尾帧 三栏 -->
         <div v-if="$slots['media-right']" class="prompt-media prompt-media--right">
           <slot name="media-right" />
         </div>
       </div>
     </div>
 
-    <!-- Syntax help modal -->
     <BaseModal v-model="helpOpen" :title="t('generate.prompt.help_modal_title')" icon="help_outline" size="lg">
       <div class="help-content">
         <div class="help-model-title">{{ t(`${modelGuidePath}.title`) }}</div>
@@ -245,7 +221,6 @@ defineExpose({ insertAtCursor })
           </tr>
         </table>
 
-        <!-- 随机提示词 -->
         <div class="help-section-title">{{ t('generate.prompt.help.random_title') }}</div>
         <table class="help-table">
           <tr v-for="row in [
@@ -278,7 +253,6 @@ defineExpose({ insertAtCursor })
   container: gen-prompt / inline-size;
 }
 
-/* ── Section header ── */
 .gen-s-hdr {
   display: flex;
   align-items: center;
@@ -293,14 +267,12 @@ defineExpose({ insertAtCursor })
 }
 .hdr-icon { font-size: .9rem; color: var(--t3); }
 
-/* 标题行右端槽 (5B 文生/图生开关) */
 .prompt-hdr-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
 }
 
-/* ── Unified prompt container ── */
 .prompt-container {
   display: flex;
   flex-direction: column;
@@ -315,7 +287,6 @@ defineExpose({ insertAtCursor })
 }
 
 
-/* ── Toolbar (top) ── */
 .prompt-toolbar {
   display: flex;
   align-items: center;
@@ -330,7 +301,6 @@ defineExpose({ insertAtCursor })
 /* 右对齐但保持溢出可滚动 (justify-content:flex-end 会让左侧溢出内容不可达) */
 .prompt-toolbar > :first-child { margin-left: auto; }
 
-/* ── 分栏 body ── */
 .prompt-body {
   display: flex;
   align-items: stretch;
@@ -384,7 +354,6 @@ defineExpose({ insertAtCursor })
   .prompt-media--right { border-bottom: none; border-top: 1px solid var(--bd); }
 }
 
-/* ── Textarea ── */
 .prompt-textarea {
   border: none;
   outline: none;
@@ -403,7 +372,6 @@ defineExpose({ insertAtCursor })
   opacity: .7;
 }
 
-/* ── Label row ── */
 .prompt-label {
   display: flex;
   align-items: center;
@@ -420,7 +388,6 @@ defineExpose({ insertAtCursor })
   border-top: 1px solid var(--bd);
 }
 
-/* ── Tool button ── */
 .prompt-tool-btn {
   display: inline-flex;
   align-items: center;
@@ -454,7 +421,6 @@ defineExpose({ insertAtCursor })
   .tool-label { display: none; }
 }
 
-/* ── Help button ── */
 .prompt-help-btn {
   display: inline-flex;
   align-items: center;
@@ -475,7 +441,6 @@ defineExpose({ insertAtCursor })
   background: var(--bg3);
 }
 
-/* ── Help modal content ── */
 .help-content {
   font-size: .88rem;
   line-height: 1.7;

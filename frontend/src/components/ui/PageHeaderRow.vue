@@ -1,23 +1,5 @@
 <script setup lang="ts">
 /**
- * PageHeaderRow — 页头行, 全站唯一页头实现 (汉堡唯一入口)。
- *
- * 宽屏单行:
- *   [汉堡|标题(+title-extra)] │ [default 主控件] [sub 次控件] ···空白··· [actions]
- *
- * 窄屏 (页头容器 <600px, 按可用宽而非设备宽判定; iPad Mini 竖屏 744px 仍单行):
- *   Row1: [汉堡|标题(+extra)] ···空白··· [actions]   ← 动作永不下放
- *   Row2: default 通栏 (有内容才出现)
- *   Row3: sub 通栏    (有内容才出现)
- *   分隔符随下放自动隐藏 (标题与控件不再相邻)。
- *
- * 插槽: title-extra(标题附属) / default(主控件, 触发分隔符) / sub(次控件) /
- *       actions(页面级动作, 贴右)。除 title 外全部可选, 纯标题页成立。
- *
- * 吸顶 (默认开): 负 margin 吃掉 .page-body 顶留白并补回自身 padding,
- * 标题距视口顶恒为 --page-body-pt (16~24px)。宿主自管吸顶时传 sticky=false
- * (PageTopStack 内), 仅复用行结构。
- *
  * 布局约束: 本组件及其祖先链禁加 transform/filter/will-change (吸顶背景走
  * background-attachment:fixed 与 .content 视口光晕对齐, transform 会让其退化
  * 为元素盒定位而错位首帧闪烁, 见 layout.css 吸顶注释)。
@@ -30,7 +12,6 @@ import { useAppStore } from '@/stores/app'
 defineOptions({ name: 'PageHeaderRow' })
 
 withDefaults(defineProps<{
-  /** 页面标题 (h1) */
   title: string
   /** 吸顶 (默认开); 宿主自管吸顶时传 false */
   sticky?: boolean
@@ -42,7 +23,6 @@ const { t } = useI18n({ useScope: 'global' })
 const app = useAppStore()
 const slots = useSlots()
 
-/** 主控件段存在才有分隔符 (标题│主控件); 纯动作页无分隔符 */
 const hasMain = computed(() => !!slots.default)
 </script>
 

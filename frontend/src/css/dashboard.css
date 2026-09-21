@@ -1,6 +1,4 @@
 /* ═══ Dashboard 共享样式 ═════════════════════════════════════════════
- * Dashboard 5 个子组件 (Hero/Tasks/Services/Gallery/Diagnostics) 共用的
- * 小节骨架样式。原先在各组件 scoped style 中逐字重复, 提取至此统一维护。
  * 注意: 使用方组件均为 scoped, 这些类通过全局样式生效, 请勿与
  * 其他页面类名冲突 (dash- 前缀为 Dashboard 专属命名空间)。
  */
@@ -50,7 +48,6 @@
   margin: 0;
 }
 
-/* 小节内联加载圈 (实时任务 / 状态与环境共用; 原在两个组件 scoped 里重复且有一处漏定义) */
 .dash-spinner {
   width: 18px;
   height: 18px;

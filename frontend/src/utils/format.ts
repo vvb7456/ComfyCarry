@@ -1,5 +1,3 @@
-/** Formatting utilities — pure functions, no framework dependency */
-
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const
 
 export function fmtBytes(b: number): string {
@@ -10,7 +8,6 @@ export function fmtBytes(b: number): string {
   return (b / 1024 ** i).toFixed(i >= 3 ? 2 : 1) + ' ' + BYTE_UNITS[i]
 }
 
-/** Format a bytes/s speed value. Empty string for non-positive values (matches existing UI conventions). */
 export function fmtSpeed(bytesPerSec: number): string {
   if (!bytesPerSec || bytesPerSec <= 0) return ''
   if (bytesPerSec >= 1073741824) return (bytesPerSec / 1073741824).toFixed(1) + ' GB/s'

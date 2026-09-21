@@ -24,7 +24,6 @@ _patched = False
 
 
 def _patch_server():
-    """Monkey-patch PromptServer 的 send_json 和 send_bytes 实现广播"""
     global _patched
     if _patched:
         return
@@ -38,11 +37,8 @@ def _patch_server():
     _original_send_bytes = srv.__class__.send_bytes
 
     async def patched_send_json(self, event, data, sid=None):
-        """发送 JSON 事件: 定向事件同时广播给其他客户端"""
         if sid is not None:
-            # 原始定向发送给目标 client
             await _original_send_json(self, event, data, sid)
-            # 复制给所有其他已连接的客户端
             message = {"type": event, "data": data}
             for other_sid, ws in list(self.sockets.items()):
                 if other_sid != sid:
@@ -55,11 +51,8 @@ def _patch_server():
             await _original_send_json(self, event, data, sid)
 
     async def patched_send_bytes(self, event, data, sid=None):
-        """发送二进制事件 (预览图等): 定向事件同时广播给其他客户端"""
         if sid is not None:
-            # 原始定向发送给目标 client
             await _original_send_bytes(self, event, data, sid)
-            # 复制给所有其他客户端
             message = self.encode_bytes(event, data)
             for other_sid, ws in list(self.sockets.items()):
                 if other_sid != sid:
@@ -76,7 +69,6 @@ def _patch_server():
     log.info("[ComfyCarry] WS broadcast patch applied — all execution events will be broadcast to all clients")
 
 
-# === 启动时立即 patch ===
 try:
     _patch_server()
 except Exception as e:

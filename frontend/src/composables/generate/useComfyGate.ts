@@ -3,16 +3,7 @@ import { ref, onUnmounted } from 'vue'
 export type GateState = 'checking' | 'ready' | 'offline' | 'starting' | 'error'
 
 /**
- * ComfyUI online detection gate.
- * Polls /api/comfyui/status when not ready (5s interval).
  * Uses plain fetch to avoid toast spam on expected failures.
- *
- * States:
- * - checking: initial state, first check in progress
- * - ready:    ComfyUI is running and responding
- * - starting: PM2 process is online but HTTP not yet responding
- * - offline:  PM2 process is not running
- * - error:    Cannot reach Dashboard API at all
  */
 export function useComfyGate() {
   const state = ref<GateState>('checking')
@@ -26,7 +17,6 @@ export function useComfyGate() {
         if (data.online) {
           state.value = 'ready'
         } else if (data.pm2_status === 'online') {
-          // PM2 process running but ComfyUI HTTP not ready yet
           state.value = 'starting'
         } else {
           state.value = 'offline'
@@ -38,7 +28,6 @@ export function useComfyGate() {
       state.value = 'error'
     }
 
-    // Auto-manage polling based on state
     if (state.value !== 'ready') {
       if (!timer) timer = setInterval(checkNow, 5000)
     } else {

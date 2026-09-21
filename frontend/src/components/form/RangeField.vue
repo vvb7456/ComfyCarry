@@ -26,8 +26,6 @@ const emit = defineEmits<{
   'update:modelValue': [value: number]
 }>()
 
-/* ── helpers ── */
-
 function stepPrecision(): number {
   const s = String(props.step)
   const dot = s.indexOf('.')
@@ -38,7 +36,6 @@ function defaultFormat(v: number): string {
   return v.toFixed(stepPrecision())
 }
 
-/** 刻度用：按 step 精度格式化并去掉多余的尾随 0（20.0 → 20） */
 function trimmedFormat(v: number): string {
   return String(+v.toFixed(stepPrecision()))
 }
@@ -49,15 +46,11 @@ function snap(raw: number, ceiling = props.softMax ?? props.max): number {
   return Math.max(props.min, Math.min(ceiling, +snapped.toFixed(stepPrecision())))
 }
 
-/* ── computed ── */
-
 const formattedValue = computed(() =>
   props.valueFormat ? props.valueFormat(props.modelValue) : defaultFormat(props.modelValue),
 )
 
 /**
- * 刻度恒为等分：位置由等分序号决定，数值由该位置的实际取值算出，
- * 从而「标注数值」与「拖到该处得到的值」一致，视觉上又保持均分。
  * `marks` 传数字 = 等分段数（刻度个数 = 段数 + 1）；
  * 传字符串数组 = 自定义文案，按等距平铺（调用方自行保证数值对得上）。
  */
@@ -90,8 +83,6 @@ function markStyle(pct: number) {
   }
 }
 
-/* ── slider ── */
-
 function onSlide(e: Event) {
   const el = e.target as HTMLInputElement
   let v = parseFloat(el.value)
@@ -104,8 +95,6 @@ function onSlide(e: Event) {
   emit('update:modelValue', v)
 }
 
-/* ── editable ── */
-
 const editing = ref(false)
 const editRef = ref<HTMLInputElement | null>(null)
 
@@ -114,7 +103,6 @@ async function startEdit() {
   editing.value = true
   await nextTick()
   if (editRef.value) {
-    // auto-size: chars * ch + padding
     const chars = String(props.modelValue).length
     editRef.value.style.width = `${Math.max(4, chars + 2)}ch`
     editRef.value.focus()

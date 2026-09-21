@@ -1,12 +1,3 @@
-"""
-ComfyCarry — Cloud Sync v2 引擎
-
-- 同步规则 CRUD
-- rclone 配置解析
-- Sync Worker 后台线程
-- 同步设置管理
-"""
-
 import json
 import os
 import queue
@@ -29,14 +20,11 @@ def _local_abs(rule_path: str) -> str | None:
     return None if err else str(target)
 
 
-# ── 同步规则 CRUD ────────────────────────────────────────────
-
 # 规则 / 设置文件的写锁 —— 面板保存与 deploy 阶段落盘可能并发
 _rules_file_lock = threading.Lock()
 _settings_file_lock = threading.Lock()
 
 def _load_sync_rules():
-    """加载同步规则"""
     if SYNC_RULES_FILE.exists():
         try:
             return json.loads(SYNC_RULES_FILE.read_text(encoding="utf-8"))
@@ -46,9 +34,7 @@ def _load_sync_rules():
 
 
 def _atomic_write_json(path, data):
-    """同目录临时文件 + os.replace 原子替换。
-
-    直接 write_text 时进程在写入中途退出会留下截断 JSON, 而 _load_sync_rules
+    """直接 write_text 时进程在写入中途退出会留下截断 JSON, 而 _load_sync_rules
     对损坏文件的兜底是返回 [] —— 等于规则全丢。
     """
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -57,15 +43,12 @@ def _atomic_write_json(path, data):
 
 
 def _save_sync_rules(rules):
-    """保存同步规则 (原子写 + 串行化, 防并发保存互相覆盖)"""
+    """防并发保存互相覆盖。"""
     with _rules_file_lock:
         _atomic_write_json(SYNC_RULES_FILE, rules)
 
 
-# ── Rclone 配置解析 ──────────────────────────────────────────
-
 def _parse_rclone_conf():
-    """解析 rclone.conf 返回 remote 列表"""
     remotes = []
     if not RCLONE_CONF.exists():
         return remotes
@@ -100,10 +83,7 @@ def _parse_rclone_conf():
     return remotes
 
 
-# ── 同步设置 ─────────────────────────────────────────────────
-
 def _load_sync_settings():
-    """加载全局同步设置"""
     defaults = {"min_age": 30, "watch_interval": 60}
     try:
         if SYNC_SETTINGS_FILE.exists():
@@ -115,12 +95,9 @@ def _load_sync_settings():
 
 
 def _save_sync_settings(settings):
-    """保存全局同步设置"""
     with _settings_file_lock:
         _atomic_write_json(SYNC_SETTINGS_FILE, settings)
 
-
-# ── Sync Worker ──────────────────────────────────────────────
 
 _sync_worker_thread = None
 _sync_worker_stop = threading.Event()
@@ -169,7 +146,6 @@ def set_app_logger(logger):
 
 
 def _sync_log(key, params=None, level="info"):
-    """写结构化日志到内存 buffer + DB event (双写) + 落盘 /workspace/sync.log (JSONL)"""
     ts = time.strftime("%H:%M:%S")
     entry = {"ts": ts, "key": key, "params": params or {}, "level": level}
     with _sync_log_lock:
@@ -178,14 +154,11 @@ def _sync_log(key, params=None, level="info"):
             _sync_log_buffer[:] = _sync_log_buffer[-300:]
     if _app_logger:
         _app_logger.debug(f"[sync] {key} {params or {}}")
-    # 落盘 JSONL: 前端读文件后逐行 JSON.parse 还原结构化, 再走 translateLogEntry 翻译。
-    # 这样 sync 面板和其他日志面板统一用 log_service 读文件, 不再走内存 buffer 取数。
     try:
         with open("/workspace/sync.log", "a") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         pass
-    # DB 双写 - 有活跃 job 时写入 sync_job_events (按执行线程归属)
     job_id = getattr(_current_job, "job_id", None)
     if job_id:
         try:
@@ -196,17 +169,15 @@ def _sync_log(key, params=None, level="info"):
                 level=level, params=params,
             )
         except Exception:
-            pass  # DB 写入失败不影响主逻辑
+            pass
 
 
 def get_sync_log_buffer():
-    """获取日志缓冲的副本"""
     with _sync_log_lock:
         return list(_sync_log_buffer)
 
 
 def _fmt_bytes(n: int | float) -> str:
-    """Format bytes to human readable string."""
     if n < 1024:
         return f"{int(n)} B"
     if n < 1024 * 1024:
@@ -217,7 +188,6 @@ def _fmt_bytes(n: int | float) -> str:
 
 
 def _parse_rclone_json_logs(stderr_output: str) -> dict:
-    """解析 rclone --use-json-log 的 JSON 日志, 提取传输统计。"""
     stats: dict = {}
     files: list[str] = []
 
@@ -230,13 +200,11 @@ def _parse_rclone_json_logs(stderr_output: str) -> dict:
         except (json.JSONDecodeError, ValueError):
             continue
 
-        # 收集传输的文件名 (INFO 级别, object 字段)
         if entry.get('level') == 'info' and 'object' in entry:
             msg = entry.get('msg', '')
             if any(kw in msg for kw in ('Copied', 'Moved', 'Deleted', 'Updated')):
                 files.append(entry['object'])
 
-        # 结构化统计 (最后一次出现为准)
         if 'stats' in entry and isinstance(entry['stats'], dict):
             s = entry['stats']
             stats.update({
@@ -257,13 +225,11 @@ def _parse_rclone_json_logs(stderr_output: str) -> dict:
 
 
 def _run_sync_rule(rule):
-    """执行单条同步规则 (rclone subprocess), 带并发锁。返回 (ok, stats)。"""
     with _sync_exec_lock:
         return _run_sync_rule_inner(rule)
 
 
 def _run_sync_rule_inner(rule):
-    """_run_sync_rule 的内部实现。返回 (ok: bool, stats: dict)。"""
     remote = rule.get("remote", "")
     remote_path = rule.get("remote_path", "")
     local_path = rule.get("local_path", "")
@@ -273,7 +239,6 @@ def _run_sync_rule_inner(rule):
     name = rule.get("name", rule.get("id", "?"))
     rule_id = rule.get("id", "")
 
-    # 设置当前 rule_id 供 _sync_log DB 双写使用
     _current_job.rule_id = rule_id
 
     local_abs = _local_abs(local_path)
@@ -319,15 +284,13 @@ def _run_sync_rule_inner(rule):
             with _sync_current_proc_lock:
                 _sync_current_proc = None
 
-        # 解析 JSON 日志获取结构化统计
         rule_stats = _parse_rclone_json_logs(stderr)
 
-        # SSE 日志: 结构化事件 (不存 raw log)
         transferred_files = rule_stats.get('files', [])
         for fname in transferred_files[:30]:
             _sync_log("file_transferred", {"name": fname})
 
-        # 统计摘要 — 使用 rclone_output 格式化文本, 兼容 SSE 翻译
+        # 使用 rclone_output 格式化文本, 兼容 SSE 翻译
         xfer = rule_stats.get('transfers', 0)
         byt = rule_stats.get('bytes', 0)
         spd = rule_stats.get('speed', 0)
@@ -350,17 +313,11 @@ def _run_sync_rule_inner(rule):
 
 
 def get_current_job_id() -> str | None:
-    """返回执行员当前正在执行的任务 id (无任务时为 None)。"""
     return _active_job_id
 
 
 def interrupt_active_job(job_id: str) -> bool:
-    """中断当前正在执行的任务。
-
-    job_id 与执行员的活动任务不一致时返回 False (调用方据此拒绝, 避免误杀)。
-    只置中断信号并终止当前 rclone 进程, 不触碰队列与 watch 调度 —— 执行员
-    在该任务收尾后继续下一条。
-    """
+    """job_id 与执行员的活动任务不一致时返回 False (调用方据此拒绝, 避免误杀)。"""
     if not job_id or job_id != _active_job_id:
         return False
     _active_interrupt.set()
@@ -376,9 +333,7 @@ _RULE_SNAPSHOT_FIELDS = (
 
 
 def build_rule_snapshot(rule: dict) -> dict:
-    """从规则字典提取展示快照, 缺失字段补空串。
-
-    快照用于历史记录在规则被编辑/删除后继续显示名称与流向, 只保留展示
+    """快照用于历史记录在规则被编辑/删除后继续显示名称与流向, 只保留展示
     需要的字段, 授权等敏感信息仍由 remote 配置管理。
     """
     return {k: str(rule.get(k) or "") for k in _RULE_SNAPSHOT_FIELDS}
@@ -386,23 +341,13 @@ def build_rule_snapshot(rule: dict) -> dict:
 
 def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
                      trigger_ref: str = "", *, job_id: str | None = None) -> str:
-    """
-    将一组规则打包为一个 Job 执行。
-    逐条执行规则，统计成功/失败，最后 finish。返回 job_id。
-
-    job_id 为空时保持旧行为: 自建 running 行再执行 (测试与直接调用方)。
-    传入 job_id 时假定行已由 enqueue_job 建为 queued: 不再建行, 开始时用
-    条件 UPDATE 置 running; 未命中 (排队期间被取消/停止清队) 直接返回,
-    不执行规则也不 finish —— 行已是 cancelled 终态。
-
-    注意: 本函数不写 _active_* 模块变量, 只读 _active_interrupt 做中断判定。
+    """注意: 本函数不写 _active_* 模块变量, 只读 _active_interrupt 做中断判定。
     这些活动状态由执行员循环维护, 避免在别处被调用时误清执行员的现场。
     """
     if job_id is None:
         job_id = f"sync-{uuid.uuid4().hex[:12]}"
         rule_count = len(rules)
         snapshots = [build_rule_snapshot(r) for r in rules]
-        # 创建 DB job
         try:
             from . import sync_store as store
             store.create_job(job_id, trigger_type=trigger_type,
@@ -418,7 +363,6 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
         if not store.mark_job_running(job_id):
             return job_id
 
-    # 本线程的 job 归属 (thread-local, 不会被并发 job 覆盖)
     _current_job.job_id = job_id
     _current_job.rule_id = ""
 
@@ -431,7 +375,6 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
     was_interrupted = False
     try:
         for rule in rules:
-            # 中断判定对所有触发类型生效
             if _active_interrupt.is_set():
                 was_interrupted = True
                 break
@@ -445,7 +388,6 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
                 failure_count += 1
             if rule_stats:
                 all_stats.append(rule_stats)
-            # 增量更新 DB 进度 (每条规则执行完后)
             try:
                 from . import sync_store as store
                 store.update_job_progress(
@@ -460,10 +402,8 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
                 was_interrupted = True
                 break
     finally:
-        # 清理线程局部变量
         _current_job.rule_id = ""
 
-        # 聚合统计
         total_bytes = sum(s.get('bytes', 0) for s in all_stats)
         total_transfers = sum(s.get('transfers', 0) for s in all_stats)
         total_elapsed = sum(s.get('elapsed', 0) for s in all_stats)
@@ -492,7 +432,6 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
         else:
             status = "partial"
 
-        # Finish DB job
         try:
             from . import sync_store as store
             store.finish_job(
@@ -513,10 +452,8 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
 
 def enqueue_job(rules: list[dict], trigger_type: str = "manual",
                 trigger_ref: str = "") -> str:
-    """把一组规则加入同步队列, 返回 job_id。
-
-    持 _queue_lock 让「写 queued 行 + 放队列」与「停止清队」整体互斥, 避免
-    出现「DB 还是 queued 但队列里已没有」或反之的半截记录。执行员懒启动。
+    """持 _queue_lock 让「写 queued 行 + 放队列」与「停止清队」整体互斥, 避免
+    出现「DB 还是 queued 但队列里已没有」或反之的半截记录。
     """
     job_id = f"sync-{uuid.uuid4().hex[:12]}"
     snapshots = [build_rule_snapshot(r) for r in rules]
@@ -531,7 +468,6 @@ def enqueue_job(rules: list[dict], trigger_type: str = "manual",
 
 
 def _ensure_executor():
-    """确保常驻执行员线程存在 (懒启动单例)。"""
     global _executor_thread
     with _executor_lock:
         if _executor_thread is None or not _executor_thread.is_alive():
@@ -541,9 +477,7 @@ def _ensure_executor():
 
 
 def _executor_loop():
-    """常驻执行员: 从队列取任务顺序执行, 队列空时阻塞在 get() 不占资源。
-
-    整体套一层异常保护: 单条任务的意外异常只记日志, 绝不允许常驻执行员
+    """整体套一层异常保护: 单条任务的意外异常只记日志, 绝不允许常驻执行员
     线程死亡 (否则后续入队的任务永远无人消费)。
     """
     while True:
@@ -560,7 +494,6 @@ def _executor_loop():
 
 
 def _executor_run_one(req: JobRequest):
-    """执行单条队列任务, 维护执行员的活动任务状态。"""
     global _active_job_id
     from . import sync_store as store
 
@@ -585,7 +518,6 @@ def _executor_run_one(req: JobRequest):
 
 
 def _terminate_current_proc():
-    """终止当前正在执行的 rclone 子进程 (terminate + wait, kill 兜底)。"""
     with _sync_current_proc_lock:
         proc = _sync_current_proc
         if proc and proc.poll() is None:
@@ -601,7 +533,6 @@ def _terminate_current_proc():
 
 
 def _sync_worker_loop():
-    """后台线程: 持续执行 watch 类型规则"""
     _sync_log("worker_started")
     while not _sync_worker_stop.is_set():
         try:
@@ -617,7 +548,6 @@ def _sync_worker_loop():
 
 
 def _has_syncable_files(local_abs: str) -> bool:
-    """目录下是否有非隐藏、非下划线开头的真实文件 (push 规则的执行前提)。"""
     try:
         for root, dirs, files in os.walk(local_abs):
             dirs[:] = [d for d in dirs if not d.startswith('.')]
@@ -631,7 +561,6 @@ def _has_syncable_files(local_abs: str) -> bool:
 
 
 def _sync_worker_tick():
-    """worker 的单轮迭代 (异常由 _sync_worker_loop 兜住)"""
     rules = _load_sync_rules()
     watch_rules = [r for r in rules
                    if r.get("trigger") == "watch" and r.get("enabled", True)]
@@ -664,12 +593,10 @@ def _sync_worker_tick():
 
 
 def is_worker_running():
-    """检查 Sync Worker 是否在运行"""
     return _sync_worker_thread is not None and _sync_worker_thread.is_alive()
 
 
 def start_sync_worker():
-    """启动 sync worker 后台线程 (先回收旧调度, 不丢手动队列)"""
     global _sync_worker_thread
     stop_sync_worker(cancel_pending=False)
     _sync_worker_stop.clear()
@@ -678,9 +605,7 @@ def start_sync_worker():
 
 
 def stop_sync_worker(*, cancel_pending: bool = True):
-    """停止 watch 调度线程。
-
-    cancel_pending=True (用户「停止」/ 设置页重置): 终止当前任务并把队列里
+    """cancel_pending=True (用户「停止」/ 设置页重置): 终止当前任务并把队列里
     所有 queued 任务标为 cancelled 后清空队列, 停止后无任何排队残留。
     cancel_pending=False (重启 / 规则变更的内部回收): 只停调度线程, 不杀
     rclone 进程、不清手动队列。

@@ -43,7 +43,6 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   /** local = workspace 根相对; remote = rclone remote */
   mode: 'local' | 'remote'
-  /** mode=remote 时的 remote 名称 */
   remote?: string
   /** staged 凭据 (wizard 计划 / oauth 会话 / 表单直传); 缺省走已落盘 remote */
   staged?: StagedCreds
@@ -73,10 +72,8 @@ const loading = ref(false)
 const error = ref('')
 /** 面包屑编辑态: true 时面包屑行替换为路径输入框 (粘贴/键入深层路径用) */
 const editing = ref(false)
-/** 编辑态输入框的草稿 */
-const draft = ref('')
-/** 新建目录小弹窗 (名称输入) */
-const mkdirOpen = ref(false)
+  const draft = ref('')
+  const mkdirOpen = ref(false)
 const newDirName = ref('')
 const mkdirError = ref('')
 const creating = ref(false)
@@ -105,7 +102,6 @@ const rootLabel = computed(() => {
   return `${props.remote}:${rooted.value ? '/' : ''}`
 })
 
-/** 新建目录请求体: staged 凭据透传 */
 function remoteBody(path: string): Record<string, unknown> {
   const body: Record<string, unknown> = { remote: props.remote, path }
   if (props.staged) body.staged = props.staged
@@ -179,8 +175,6 @@ function goToRoot() {
   load()
 }
 
-// ── 面包屑编辑态: 点击当前段展开, 粘贴/键入深层路径, 回车跳转, Esc/失焦取消 ──
-
 function openEdit() {
   draft.value = currentPath.value
   editing.value = true
@@ -213,7 +207,6 @@ function applyDraft() {
   load()
 }
 
-/** 新建目录: 名称合法 = 非空且不含路径分隔符 */
 const mkdirValid = computed(() => {
   const n = newDirName.value.trim()
   return !!n && !n.includes('/')
@@ -274,9 +267,7 @@ function confirmSelect() {
     :title="mode === 'local' ? t('sync.browse.local_title') : t('sync.browse.remote_title')"
     width="480px"
   >
-    <!-- 顶部: 面包屑 (点击当前段展开为路径输入框, 非当前段跳转; 溢出横向滚动) -->
     <div class="pb-top">
-      <!-- 编辑态: 面包屑临时替换为路径输入框 -->
       <template v-if="editing">
         <input
           ref="draftInputRef"
@@ -333,7 +324,6 @@ function confirmSelect() {
     </template>
   </BaseModal>
 
-  <!-- 新建目录小弹窗: 输入名称, 回车/点按钮即在当前位置创建 (无二次确认) -->
   <BaseModal
     v-model="mkdirOpen"
     :title="t('sync.browse.mkdir_btn')"
@@ -366,7 +356,6 @@ function confirmSelect() {
 </template>
 
 <style scoped>
-/* 顶部行: 面包屑 (点击当前段展开为输入框) */
 .pb-top { display: flex; align-items: center; gap: 4px; }
 .pb-crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
 .pb-edit { flex: 1; min-width: 0; font-size: .78rem; }
@@ -386,7 +375,6 @@ function confirmSelect() {
 .pb-loading { display: flex; align-items: center; justify-content: center; min-height: 180px; flex: 1; }
 .pb-error { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--red); font-size: .8rem; padding: 16px; text-align: center; }
 
-/* 新建目录小弹窗内的错误 */
 .pb-mkdir-err {
   display: flex;
   align-items: center;

@@ -1,23 +1,8 @@
 <script setup lang="ts">
 /**
- * ComfyUIPage — ComfyUI 单列页 (C08)。
- *
- * 页签收敛为运行 / 插件。运行页顺序: Hero → 运行事实 → 当前执行 → GPU →
- * 版本与启动 → 日志。页头承接停止/重启 (在线时) 与设置 (参数弹窗)。
- *
- * Hero 状态机取 ComfyStatus.online / pm2_status 与执行跟踪:
- *   idle(ok)        在线空闲, 主操作「打开 ComfyUI」
- *   executing(ok)   在线执行中, 副标题带等待队列; 操作「打开」+「中断执行」
- *   starting(warn+busy) 启动/重启请求进行中, 或 pm2 在线但 HTTP 未就绪
- *   stopped(off)    pm2 停止/不存在, 主操作「启动 ComfyUI」
- *   failed(bad)     pm2 errored, 主操作「重试」
- *
  * 注意: 启动/重启/切版本/存参数后, 上一份 status 快照里的 online 仍是旧进程的
  * (进程已被 delete 但快照未刷新), 直接采信会让 hero 闪回 idle。pendingStartAt
  * 记录「新进程已下发」的时刻, 在拿到该时刻之后发起的新鲜快照前一律按启动中展示。
- *
- * 地址解析沿用隧道优先、本地直连兜底。参数表单迁入 ComfyParamsModal,
- * 主页只保留一行由已保存配置生成的启动命令; 参数保存成功后即时更新。
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -54,10 +39,8 @@ const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-// ── 页签 ───────────────────────────────────────────────────────
 const activeTab = ref('run')
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
-/* tab/panel id 配对 (TabSwitcher tabIdFor/panelIdFor), 建立 tab ↔ tabpanel 关联 */
 const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
 const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
 const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
@@ -66,7 +49,6 @@ const tabs = computed<TabItem[]>(() => [
   { key: 'plugins', label: t('comfyui.tabs.plugins'), icon: 'extension' },
 ])
 
-// ── 状态 ───────────────────────────────────────────────────────
 const status = ref<ComfyStatus | null>(null)
 const actionLoading = ref<'start' | 'stop' | 'restart' | 'interrupt' | null>(null)
 const acting = computed(() => actionLoading.value !== null)
@@ -86,13 +68,11 @@ function markPendingStart() {
   tracker.reset()
 }
 
-/** 可信的在线态: status 在线且没有待确认的新进程 */
 const isOnline = computed(() => !!status.value?.online && !pendingStartAt.value)
 
 const queuePending = computed(() => status.value?.queue_pending || 0)
 const queueTotal = computed(() => (status.value?.queue_running || 0) + (status.value?.queue_pending || 0))
 
-// 隧道优先、本地直连兜底; ComfyUI 离线时地址不可达, 不显示。
 const comfyUrl = ref('')
 const effectiveComfyUrl = computed(() => {
   if (!isOnline.value) return ''
@@ -131,11 +111,9 @@ async function loadStatus() {
   if (requestedAt < statusAppliedAt) return
   statusAppliedAt = requestedAt
   status.value = d
-  // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
   if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
 }
 
-// ── 启动命令 (由已保存配置生成) ────────────────────────────────
 const launchCommand = ref('')
 
 async function loadLaunchCommand() {
@@ -146,17 +124,13 @@ async function loadLaunchCommand() {
   launchCommand.value = buildLaunchCommand(schema, current, extractExtraArgs(d.raw_args || [], schema))
 }
 
-// ── 执行跟踪 + SSE ─────────────────────────────────────────────
 const tracker = useExecTracker()
 const execState = computed(() => tracker.state.value)
 
-// 系统指标 (共享单例, 3s 轮询) — GPU 卡片消费
 const { stats: sysStats } = useSystemStats()
 
 const sse = useComfySSE(tracker, {
   onEvent(_evt, result) {
-    // 终态提示 (完成 / 中断 / 出错) 由 App 级 useExecNotifications 统一发出 ——
-    // 页面只负责自己的可视化刷新, 避免多订阅者各弹一条。
     if (result?.finished && result.type === 'execution_done') {
       loadStatus()
     }
@@ -220,10 +194,8 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   const s = status.value
   if (!s) return []
   const out: { label: string; value: string }[] = []
-  // 配置事实: 端口停机仍显示
   if (s.port) out.push({ label: t('comfyui.facts.port'), value: String(s.port) })
   if (!isOnline.value) return out
-  // 运行期字段随状态显示
   if (addressHost.value) out.push({ label: t('comfyui.facts.address'), value: addressHost.value })
   const version = s.system?.comfyui_version
   if (version) out.push({ label: t('comfyui.facts.version'), value: version.startsWith('v') ? version : `v${version}` })
@@ -263,7 +235,6 @@ async function comfyRestart() {
     message: t('comfyui.confirm.restart.message'),
     confirmText: t('common.btn.restart'),
   })) return
-  // /api/comfyui/restart 用已保存参数做 pm2 delete + start, 保留 --log。
   actionLoading.value = 'restart'
   const d = await post<{ ok?: boolean }>('/api/comfyui/restart')
   actionLoading.value = null

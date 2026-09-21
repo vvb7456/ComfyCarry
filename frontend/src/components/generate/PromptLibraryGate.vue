@@ -1,15 +1,4 @@
 <script setup lang="ts">
-/**
- * PromptLibraryGate — Initialization gate for the prompt tag library.
- *
- * Shown when the library is not yet initialized. Offers:
- *   - Import from local data file
- *   - Download + import from remote source
- *   - Real-time SSE progress (downloading / importing)
- *   - Skip / dismiss option
- *
- * Visual style matches DependencyBar.
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UsePromptLibraryInitReturn } from '@/composables/generate/usePromptLibraryInit'
@@ -38,7 +27,6 @@ const progressText = computed(() => {
   if (p.phase === 'downloading') {
     return `${t('prompt-library.init.downloading')} ${p.percent}%`
   }
-  // importing: step 1/4, 2/4, etc.
   return p.step ? `${p.step} · ${p.done}/${p.total}` : `${p.done}/${p.total}`
 })
 
@@ -46,7 +34,6 @@ const progressWidth = computed(() => {
   const p = props.init.progress.value
   if (!p) return '0%'
   if (p.phase === 'downloading') return p.percent + '%'
-  // importing: use done/total ratio
   if (p.total > 0) return Math.round(p.done / p.total * 100) + '%'
   return '0%'
 })
@@ -57,20 +44,17 @@ function onImport() {
 </script>
 
 <template>
-  <!-- Loading state -->
   <div v-if="init.loading.value" class="plg-gate">
     <Spinner size="md" />
     <div class="plg-loading-text">{{ t('prompt-library.init.checking') }}</div>
   </div>
 
-  <!-- Gate content -->
   <div v-else class="plg-gate">
     <div class="plg-header">
       <MsIcon name="library_books" color="none" class="plg-header-icon" />
       <div class="plg-title">{{ t('prompt-library.init.title') }}</div>
     </div>
 
-    <!-- Data card -->
     <div class="plg-card-grid">
       <div class="plg-card plg-card-selected plg-card-locked">
         <div class="plg-card-check">
@@ -87,9 +71,7 @@ function onImport() {
       </div>
     </div>
 
-    <!-- Actions area -->
     <div class="plg-actions">
-      <!-- Progress (when downloading or importing) -->
       <div v-if="init.importing.value" class="plg-progress-area">
         <div class="plg-progress-wrap">
           <div class="plg-progress-bar" :style="{ width: progressWidth }" />
@@ -100,13 +82,11 @@ function onImport() {
         </div>
       </div>
 
-      <!-- Error -->
       <div v-else-if="init.error.value" class="plg-error">
         <MsIcon name="error" size="sm" />
         {{ init.error.value }}
       </div>
 
-      <!-- Button row -->
       <div v-else class="plg-btn-row">
         <BaseButton
           variant="primary"
@@ -129,8 +109,6 @@ function onImport() {
   padding: var(--sp-6) var(--sp-4);
   text-align: center;
 }
-
-
 
 .plg-loading-text {
   color: var(--t2);
@@ -158,7 +136,6 @@ function onImport() {
   font-size: var(--text-base);
 }
 
-/* Data card */
 .plg-card-grid {
   display: flex;
   gap: var(--sp-3);
@@ -230,7 +207,6 @@ function onImport() {
   white-space: nowrap;
 }
 
-/* Actions */
 .plg-actions {
   margin-top: var(--sp-4);
   width: 100%;
@@ -262,7 +238,6 @@ function onImport() {
   margin-bottom: var(--sp-2);
 }
 
-/* Progress */
 .plg-progress-area {
   text-align: center;
 }

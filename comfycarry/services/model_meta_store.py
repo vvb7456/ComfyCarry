@@ -37,11 +37,6 @@ _auto_enrich_attempted: set[int] = set()
 _auto_enrich_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="model-enrich")
 
 
-# ---------------------------------------------------------------------------
-# JSON and value normalization
-# ---------------------------------------------------------------------------
-
-
 def _json_load(value: Any, default: Any) -> Any:
     if isinstance(value, (dict, list)):
         return value
@@ -351,11 +346,6 @@ def _details_from_values(links: list[dict[str, str]], images: list[dict[str, Any
     return {"links": links, "images": images}
 
 
-# ---------------------------------------------------------------------------
-# Paths and row conversion
-# ---------------------------------------------------------------------------
-
-
 def _resolve(path: str | os.PathLike[str]) -> Path:
     return Path(path).expanduser().resolve()
 
@@ -397,7 +387,6 @@ def _configured_roots() -> list[tuple[str, Path, str]]:
 
 
 def _path_fields(model_path: Path, category: str) -> tuple[str, str]:
-    """Return relative path and storage type for a model path."""
     path = model_path.resolve()
     for root_category, root, storage_type in _configured_roots():
         if root_category != category:
@@ -436,7 +425,6 @@ def _file_stat(path: Path) -> tuple[int, float]:
 
 
 def _model_row(model_id: int) -> Any:
-    """Read the minimal row needed by hash caching."""
     return db.fetch_one(
         "SELECT sha256, size_bytes, file_mtime FROM models WHERE id = ?",
         (int(model_id),),
@@ -570,11 +558,6 @@ def _transaction() -> Iterator[Any]:
             raise
 
 
-# ---------------------------------------------------------------------------
-# Public CRUD API
-# ---------------------------------------------------------------------------
-
-
 def register_downloaded_model(
     model_path: str,
     category: str,
@@ -582,7 +565,6 @@ def register_downloaded_model(
     sha256: str,
     file_trigger_words: list[str],
 ) -> dict:
-    """Normalize a completed download and upsert its model index row."""
     path = _resolve(model_path)
     source = _normalize_source(source_data)
     relative_path, storage_type = _path_fields(path, _text(category))
@@ -658,7 +640,6 @@ def enrich_model(
     sha256: str,
     file_trigger_words: list[str] | None = None,
 ) -> dict:
-    """Update one model row with normalized source metadata and return its detail."""
     source = _normalize_source(source_data)
     now = time.time()
     with _transaction() as conn:
@@ -713,7 +694,6 @@ def enrich_model(
 
 
 def list_models(category: str | None = None) -> list[dict]:
-    """Read the lightweight fields used by the local model list."""
     sql = _list_select_sql()
     params: tuple[Any, ...] = ()
     if category and category != "all":
@@ -725,7 +705,6 @@ def list_models(category: str | None = None) -> list[dict]:
 
 
 def get_model_detail(model_id: int) -> dict | None:
-    """Read one model row and expand details/trigger/source JSON fields."""
     row = db.fetch_one("SELECT * FROM models WHERE id = ?", (int(model_id),))
     if not row:
         return None
@@ -733,7 +712,6 @@ def get_model_detail(model_id: int) -> dict | None:
 
 
 def get_generation_metadata(categories: list[str]) -> dict[tuple[str, str], dict]:
-    """Batch-read architecture and trigger metadata for generation selectors."""
     cats = [_text(value) for value in categories if _text(value)]
     if not cats:
         return {}
@@ -796,7 +774,6 @@ def get_generation_metadata(categories: list[str]) -> dict[tuple[str, str], dict
 
 
 def delete_model(model_id: int) -> list[str]:
-    """Delete a model file, its registered preview, and the model row."""
     row = db.fetch_one("SELECT * FROM models WHERE id = ?", (int(model_id),))
     if not row:
         return []
@@ -837,18 +814,12 @@ def _run_auto_enrich(model_id: int, model_path: str) -> None:
 
 
 def _queue_auto_enrich(model_id: int, model_path: str) -> None:
-    """Queue at most one best-effort enrich attempt per model per process."""
     with _auto_enrich_lock:
         if model_id in _auto_enrich_attempted or model_id in _auto_enrich_queued:
             return
         _auto_enrich_attempted.add(model_id)
         _auto_enrich_queued.add(model_id)
     _auto_enrich_executor.submit(_run_auto_enrich, model_id, model_path)
-
-
-# ---------------------------------------------------------------------------
-# Startup reconciliation
-# ---------------------------------------------------------------------------
 
 
 def _scan_root(root: Path, category: str, storage_type: str) -> tuple[list[dict[str, Any]], bool]:

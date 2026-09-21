@@ -46,7 +46,6 @@ _LOCKS_SOFT_LIMIT = 512
 
 
 def _get_lock(key: str) -> threading.Lock:
-    """获取 (或创建) 某缓存键专属的进程内锁, 防止同文件并发重复抽帧。"""
     with _locks_guard:
         lk = _extract_locks.get(key)
         if lk is None:
@@ -69,11 +68,9 @@ def _resolve_local_path(filename: str, subfolder: str, img_type: str) -> Path | 
     if not filename:
         return None
     img_type = (img_type or "output").strip() or "output"
-    # ComfyUI 仅 output/temp/input 三类, 限制白名单
     if img_type not in ("output", "temp", "input"):
         return None
     subfolder = (subfolder or "").strip()
-    # 禁止绝对路径与 .. 穿越
     if subfolder.startswith("/") or subfolder.startswith("\\"):
         return None
 
@@ -99,10 +96,6 @@ def _resolve_local_path(filename: str, subfolder: str, img_type: str) -> Path | 
 
 def _fetch_via_comfyui_view(filename: str, subfolder: str, img_type: str,
                            dest: Path) -> bool:
-    """本地路径不可用时, 经 ComfyUI /view 拉取文件到 dest (临时文件)。
-
-    仅 output/temp/input 三类有效。返回是否成功。失败不抛异常。
-    """
     try:
         import requests
         params = {"filename": filename, "type": img_type}
@@ -126,12 +119,10 @@ def _fetch_via_comfyui_view(filename: str, subfolder: str, img_type: str,
 
 
 def _video_exts() -> set[str]:
-    """视为视频的扩展名集合 (小写)。"""
     return {".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v", ".gif"}
 
 
 def is_video_filename(filename: str) -> bool:
-    """扩展名兜底判定: 视频扩展名视为视频。"""
     return Path(filename).suffix.lower() in _video_exts()
 
 
@@ -150,13 +141,7 @@ def _cache_key(src_path: Path) -> str:
 
 
 def _run_ffmpeg_extract(src: Path, dest: Path) -> tuple[bool, str]:
-    """用 ffmpeg 抽首帧转 webp, 写入 dest (临时文件 → 原子 rename)。
-
-    返回 (ok, message)。失败时不残留临时文件。
-    """
     tmp_out = dest.with_suffix(dest.suffix + ".tmp")
-    # -y 覆盖; -i 输入; -frames:v 1 只取一帧; -vf scale 限制长边 480 缩略
-    # 选 webp 编码, 质量 80
     cmd = [
         "ffmpeg", "-y",
         "-i", str(src),
@@ -184,7 +169,6 @@ def _run_ffmpeg_extract(src: Path, dest: Path) -> tuple[bool, str]:
     if proc.returncode != 0 or not tmp_out.is_file():
         _safe_remove(tmp_out)
         stderr_tail = (proc.stderr or "")[-400:] if proc.stderr else ""
-        # ffmpeg 对非视频文件典型 stderr: "Invalid data found when processing input"
         msg = "ffmpeg 抽帧失败"
         if proc.stderr:
             low = proc.stderr.lower()
@@ -194,7 +178,6 @@ def _run_ffmpeg_extract(src: Path, dest: Path) -> tuple[bool, str]:
                 msg = "视频文件损坏或不完整"
         return False, f"{msg}"
 
-    # 原子 rename (同分区, tmp 与 dest 同目录)
     try:
         os.replace(tmp_out, dest)
     except OSError as e:
@@ -233,7 +216,6 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
 
     local_path = _resolve_local_path(filename, subfolder, img_type)
 
-    # 本地不可达 → 尝试经 ComfyUI /view 拉到临时文件再抽帧
     remote_temp: Path | None = None
     if local_path is None:
         tmpdir = Path(tempfile.gettempdir())
@@ -251,17 +233,13 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
         _safe_remove(remote_temp) if remote_temp else None
         return None, f"文件不是视频 ({filename})", 415
 
-    # 缓存键基于源文件 size+mtime (本地文件); 远端拉取的临时文件用路径签名
     if remote_temp is not None:
-        # 远端临时文件: 用临时文件自身 stat 做键, 但每次都新建临时文件 → 永不命中
-        # 改为: 远端场景仍写缓存, 但键基于 filename+subfolder+type 的内容哈希
         sig = f"remote|{filename}|{subfolder}|{img_type}"
         h = hashlib.sha1(sig.encode("utf-8")).hexdigest()[:24]
         cache_name = f"{Path(filename).stem}_{h}.webp"
     else:
         cache_name = _cache_key(local_path)
 
-    # 确保缓存目录存在
     try:
         THUMB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -270,7 +248,6 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
 
     cache_path = THUMB_CACHE_DIR / cache_name
 
-    # 命中缓存: 直接返回
     if cache_path.is_file():
         try:
             data = cache_path.read_bytes()
@@ -279,7 +256,6 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
         except OSError:
             pass  # 缓存读取失败, 降级重抽
 
-    # 进程内去重锁 (同一缓存键串行化)
     lock = _get_lock(cache_name)
     with lock:
         # double-check (持锁后再查一次)
@@ -294,7 +270,6 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
         ok, msg = _run_ffmpeg_extract(local_path, cache_path)
         _safe_remove(remote_temp) if remote_temp else None
         if not ok:
-            # 抽帧失败时清理可能残留的损坏缓存
             _safe_remove(cache_path)
             status = 415 if "不是" in msg or "损坏" in msg else 502
             return None, msg, status

@@ -15,7 +15,7 @@ trap 'rm -rf "$TMP"' EXIT
 CHROME="${CHROME:-google-chrome}"
 command -v "$CHROME" >/dev/null || { echo "需要 google-chrome (或设 CHROME=...)"; exit 1; }
 
-render() {  # render <size> <out> <src-svg>
+render() {
   local n=$1 out=$2 src=$3
   local base
   base="$(basename "$src")"

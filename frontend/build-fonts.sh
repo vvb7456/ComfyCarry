@@ -26,7 +26,6 @@ ICONS_FILE="$SCRIPT_DIR/icons.txt"
 
 echo "=== Font Build ==="
 
-# ── 1. 读取图标清单 ──
 if [ ! -f "$ICONS_FILE" ]; then
     echo "[ERROR] 找不到图标清单: $ICONS_FILE" >&2
     exit 1
@@ -43,7 +42,6 @@ if [ "$ICON_COUNT" -eq 0 ]; then
 fi
 echo ">>> [1/2] icons.txt: ${ICON_COUNT} icons"
 
-# ── 2. Material Symbols Outlined 子集化 ──
 echo ">>> [2/2] Material Symbols subset..."
 
 MS_FULL="/tmp/MaterialSymbolsOutlined-full.woff2"
@@ -53,7 +51,6 @@ MS_OUTPUT="$FONTS_DIR/MaterialSymbolsOutlined.woff2"
 CODEPOINTS_URL="https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints"
 FONT_URL="https://github.com/google/material-design-icons/raw/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.woff2"
 
-# 下载完整字体和 codepoints 映射 (如果已在提取步骤下载则复用)
 wget -q -O "$MS_FULL" "$FONT_URL"
 CP_FILE="/tmp/ms-codepoints.txt"
 [ -f "$CP_FILE" ] || wget -q -O "$CP_FILE" "$CODEPOINTS_URL"

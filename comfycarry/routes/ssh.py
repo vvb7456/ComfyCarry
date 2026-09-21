@@ -1,16 +1,5 @@
 """
-ComfyCarry — SSH 管理路由
-
 管理容器 sshd 服务、公钥、Root 密码
-
-- /api/ssh/status        — SSH 状态概览
-- /api/ssh/keys          — 公钥列表 / 添加 / 删除
-- /api/ssh/password-follow — SSH 密码跟随面板密码 开关 (spec §5.1)
-- /api/ssh/start         — 启动 sshd
-- /api/ssh/stop          — 停止 sshd
-- /api/ssh/restart       — 重启 sshd
-- /api/ssh/logs          — 历史日志
-- /api/ssh/logs/stream   — SSE 实时日志流
 """
 
 import logging
@@ -34,14 +23,12 @@ SSHD_CONFIG_FILE = "/etc/ssh/sshd_config"
 SSHD_LOG_FILE = "/workspace/sshd.log"
 
 
-# ====================================================================
 # 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/ssh.json)
 #
 # /api/ssh/* 的唯一消费方是面板前端, 所以这里不再回传中文成品文案:
 # 回传中文的话英文 locale 下 toast 里会直接冒出中文。契约与 sync 路由的
 # _err 完全一致, 前端 apiErrorText() / t() 负责渲染。前端缺条目时会原样
 # 显示 key, 开发期一眼可见。
-# ====================================================================
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
     """错误响应。前端按 `ssh.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
 
@@ -74,11 +61,9 @@ def restore_ssh_config():
         follow=true  → root 密码同步为当前面板密码 + 密码认证开启
         follow=false → 密码认证关闭 (公钥 root 登录不受影响)
     """
-    # ── 恢复公钥 ──
     saved_keys = _get_config("ssh_keys", [])
     if saved_keys and isinstance(saved_keys, list):
         os.makedirs(os.path.dirname(AUTHORIZED_KEYS_FILE), exist_ok=True)
-        # 加载已有 key (用 raw 字符串去重)
         existing_raw = set()
         try:
             with open(AUTHORIZED_KEYS_FILE, "r") as f:
@@ -86,7 +71,6 @@ def restore_ssh_config():
         except FileNotFoundError:
             pass
 
-        # 只恢复有效且不重复的 key
         added = 0
         new_lines = []
         for key in saved_keys:
@@ -145,10 +129,7 @@ def restore_ssh_config():
         log.info("SSH: 已重启 sshd 以应用恢复的配置")
 
 
-# ── 工具函数 ──────────────────────────────────────────────────
-
 def _run(cmd, timeout=5):
-    """运行 shell 命令, 返回 (returncode, stdout, stderr)"""
     try:
         r = subprocess.run(
             cmd, shell=True, capture_output=True, text=True, timeout=timeout
@@ -182,7 +163,6 @@ def chpasswd_root(password):
 
 
 def _sshd_running():
-    """检查 sshd listener 是否运行, 返回 (running, pid)"""
     for proc in _list_sshd_processes():
         if "Z" in proc["stat"]:
             continue
@@ -198,7 +178,6 @@ def _sshd_running():
 
 
 def _list_sshd_processes():
-    """列出 sshd 进程, 返回 [{pid, stat, args}, ...]"""
     code, out, _ = _run("ps -o pid=,stat=,args= -C sshd", timeout=3)
     if code != 0 or not out:
         return []
@@ -224,12 +203,10 @@ def _list_sshd_processes():
 
 
 def _active_sshd_pids():
-    """返回所有非僵尸 sshd 进程 PID"""
     return [proc["pid"] for proc in _list_sshd_processes() if "Z" not in proc["stat"]]
 
 
 def _stop_sshd():
-    """停止所有非僵尸 sshd 进程, 返回是否已停止"""
     pids = _active_sshd_pids()
     if not pids:
         return True
@@ -250,8 +227,6 @@ def _stop_sshd():
 
 
 def _active_connections():
-    """SSH 活跃连接数"""
-    # 计算 sport = 22 的 ESTABLISHED 连接
     code, out, _ = _run(
         "ss -tn state established '( sport = :22 )' | tail -n +2 | wc -l"
     )
@@ -264,7 +239,6 @@ def _active_connections():
 
 
 def _parse_sshd_config():
-    """解析 sshd_config 中的关键设置"""
     result = {
         "password_auth": True,  # 默认 yes
         "root_login": True,     # 默认 yes
@@ -275,11 +249,9 @@ def _parse_sshd_config():
                 line = line.strip()
                 if line.startswith("#") or not line:
                     continue
-                # PasswordAuthentication
                 m = re.match(r"PasswordAuthentication\s+(yes|no)", line, re.I)
                 if m:
                     result["password_auth"] = m.group(1).lower() == "yes"
-                # PermitRootLogin
                 m = re.match(r"PermitRootLogin\s+(\S+)", line, re.I)
                 if m:
                     val = m.group(1).lower()
@@ -291,20 +263,16 @@ def _parse_sshd_config():
 
 
 def _password_set():
-    """检查 root 是否设置了密码"""
     try:
         with open("/etc/shadow", "r") as f:
             for line in f:
                 if line.startswith("root:"):
                     parts = line.split(":")
                     pw_hash = parts[1] if len(parts) > 1 else ""
-                    # *、!、!! 或空 = 未设置
                     return pw_hash not in ("*", "!", "!!", "")
     except PermissionError:
-        # 尝试通过 passwd -S 命令
         code, out, _ = _run("passwd -S root 2>/dev/null")
         if code == 0:
-            # 输出格式: root P 2024-01-01 ...  (P=有密码, L=锁定, NP=无密码)
             parts = out.split()
             if len(parts) >= 2:
                 return parts[1] == "P"
@@ -312,7 +280,6 @@ def _password_set():
 
 
 def _get_key_fingerprint(key_line):
-    """计算 SSH 公钥的指纹"""
     try:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pub", delete=False) as f:
             f.write(key_line.strip() + "\n")
@@ -320,10 +287,9 @@ def _get_key_fingerprint(key_line):
             code, out, _ = _run(f"ssh-keygen -lf {f.name}")
             os.unlink(f.name)
             if code == 0 and out:
-                # 格式: 256 SHA256:xxxx comment (ED25519)
                 parts = out.split()
                 if len(parts) >= 2:
-                    return parts[1]  # SHA256:...
+                    return parts[1]
     except Exception:
         pass
     return ""
@@ -343,7 +309,6 @@ def _parse_key_line(line, *, strict=False):
     if len(parts) < 2:
         return None
     key_type = parts[0]
-    # 合法的 key 类型前缀
     valid_types = ("ssh-rsa", "ssh-ed25519", "ssh-dss", "ecdsa-sha2-",
                    "sk-ssh-ed25519", "sk-ecdsa-sha2-")
     if not any(key_type.startswith(t) for t in valid_types):
@@ -361,7 +326,6 @@ def _parse_key_line(line, *, strict=False):
 
 
 def _load_authorized_keys():
-    """读取 authorized_keys, 返回 key 列表"""
     keys = []
     try:
         with open(AUTHORIZED_KEYS_FILE, "r") as f:
@@ -375,7 +339,6 @@ def _load_authorized_keys():
 
 
 def _identify_env_keys():
-    """获取环境变量中的 SSH 公钥, 返回原始值集合"""
     env_keys = set()
     for var in ("SSH_PUBLIC_KEY", "PUBLIC_KEY"):
         val = os.environ.get(var, "").strip()
@@ -385,9 +348,7 @@ def _identify_env_keys():
 
 
 def _mark_key_source(keys):
-    """标记每个 key 的来源 (env / manual / config)"""
     env_keys = _identify_env_keys()
-    # 从 .dashboard_env 中恢复的 keys
     config_keys_raw = _get_config("ssh_keys", [])
     config_key_set = set()
     if isinstance(config_keys_raw, list):
@@ -427,7 +388,6 @@ def _ensure_trailing_newline(path):
 
 
 def _save_keys_to_file(keys):
-    """将 key 列表写入 authorized_keys"""
     os.makedirs(os.path.dirname(AUTHORIZED_KEYS_FILE), exist_ok=True)
     with open(AUTHORIZED_KEYS_FILE, "w") as f:
         for k in keys:
@@ -436,7 +396,6 @@ def _save_keys_to_file(keys):
 
 
 def _persist_keys_to_config(keys):
-    """将当前所有 key 持久化到 .dashboard_env"""
     raw_list = [k["raw"] for k in keys]
     _set_config("ssh_keys", raw_list)
 
@@ -455,7 +414,6 @@ def _set_sshd_password_auth(enable):
 
         new_val = "yes" if enable else "no"
 
-        # PasswordAuthentication
         content, count = re.subn(
             r"^#?\s*PasswordAuthentication\s+\S+",
             f"PasswordAuthentication {new_val}",
@@ -482,7 +440,6 @@ def _set_sshd_password_auth(enable):
 
 
 def _do_restart_sshd():
-    """重启 sshd 服务 (带日志文件输出)"""
     _stop_sshd()
     _run("mkdir -p /run/sshd", timeout=2)
     code, _, err = _run(f"/usr/sbin/sshd -E {SSHD_LOG_FILE}", timeout=5)
@@ -545,11 +502,8 @@ def _apply_password_follow(enabled, *, force=False, password=None):
     }
 
 
-# ── API 端点 ──────────────────────────────────────────────────
-
 @bp.route("/api/ssh/status")
 def ssh_status():
-    """SSH 服务状态概览"""
     running, pid = _sshd_running()
     sshd_cfg = _parse_sshd_config()
 
@@ -561,7 +515,6 @@ def ssh_status():
         "password_auth": sshd_cfg["password_auth"],
         "root_login": sshd_cfg["root_login"],
         "password_set": _password_set(),
-        # SSH 密码跟随开关 (spec §5.1), 前端开关初始态用 pw_follow + keys_count
         "pw_follow": bool(_get_config("ssh_pw_follow", False)),
         "keys_count": len(_load_authorized_keys()),
     })
@@ -569,10 +522,8 @@ def ssh_status():
 
 @bp.route("/api/ssh/keys", methods=["GET"])
 def ssh_keys_list():
-    """列出所有公钥"""
     keys = _load_authorized_keys()
     keys = _mark_key_source(keys)
-    # 不返回 raw (太长), 用 fingerprint 标识
     safe_keys = []
     for k in keys:
         safe_keys.append({
@@ -587,7 +538,6 @@ def ssh_keys_list():
 
 @bp.route("/api/ssh/keys", methods=["POST"])
 def ssh_keys_add():
-    """添加公钥 (支持多行)"""
     data = request.get_json(silent=True) or {}
     raw_input = data.get("keys", "").strip()
     if not raw_input:
@@ -617,7 +567,6 @@ def ssh_keys_add():
         _save_keys_to_file(existing)
         _persist_keys_to_config(existing)
 
-    # 重新加载并标记来源
     keys = _load_authorized_keys()
     keys = _mark_key_source(keys)
     safe_keys = [{
@@ -633,7 +582,6 @@ def ssh_keys_add():
 
 @bp.route("/api/ssh/keys", methods=["DELETE"])
 def ssh_keys_delete():
-    """删除指定公钥 (按 fingerprint)"""
     data = request.get_json(silent=True) or {}
     fingerprint = data.get("fingerprint", "").strip()
     if not fingerprint:
@@ -649,7 +597,6 @@ def ssh_keys_delete():
     _save_keys_to_file(keys)
     _persist_keys_to_config(keys)
 
-    # 重新加载
     keys = _load_authorized_keys()
     keys = _mark_key_source(keys)
     safe_keys = [{
@@ -685,7 +632,6 @@ def ssh_pw_follow_toggle():
 
 @bp.route("/api/ssh/start", methods=["POST"])
 def ssh_start():
-    """启动 sshd"""
     running, _ = _sshd_running()
     if running:
         return _ok("already_running")
@@ -701,7 +647,6 @@ def ssh_start():
 
 @bp.route("/api/ssh/stop", methods=["POST"])
 def ssh_stop():
-    """停止 sshd"""
     running, _ = _sshd_running()
     if not running:
         return _ok("not_running")
@@ -715,7 +660,6 @@ def ssh_stop():
 
 @bp.route("/api/ssh/restart", methods=["POST"])
 def ssh_restart():
-    """重启 sshd"""
     ok = _do_restart_sshd()
     if not ok:
         return _err("restart_failed", 500)
@@ -726,7 +670,6 @@ def ssh_restart():
 
 @bp.route("/api/ssh/logs")
 def ssh_logs():
-    """获取 sshd 日志 history (行号游标分页, 读 /workspace/sshd.log)"""
     from ..services.log_service import read_history
     try:
         lines = int(request.args.get("lines", "200"))
@@ -739,7 +682,6 @@ def ssh_logs():
 
 @bp.route("/api/ssh/logs/stream")
 def ssh_logs_stream():
-    """SSE - sshd 日志实时流 (tail -f /workspace/sshd.log)"""
     from ..services.log_service import stream_tail
     return Response(stream_tail(SSHD_LOG_FILE), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache",

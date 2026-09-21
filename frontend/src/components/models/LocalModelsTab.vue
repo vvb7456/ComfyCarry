@@ -140,7 +140,6 @@ function openMeta(m: LocalModel) {
 </template>
 
 <style scoped>
-/* 竖版 3:4 卡片: 列宽收窄, 保证一屏至少两行 */
 .model-grid {
   display: grid;
   /* 桌面端大卡 (240–320px), 外层 min(…,100%) 保证窄容器 (手机+侧栏) 不撑破。 */

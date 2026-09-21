@@ -32,7 +32,6 @@ const { toast } = useToast()
 const app = useAppStore()
 const queueStore = useGenerateQueueStore()
 
-// ── State ─────────────────────────────────────────────────────────────
 const data = ref<OverviewData | null>(null)
 const activity = ref<ActivityData | null>(null)
 const initialLoading = ref(true)
@@ -62,14 +61,11 @@ function later(fn: () => void, ms: number) {
   pendingTimers.add(id)
 }
 
-// ── Real-time system metrics ──────────────────────────────────────────
 const { stats: sysStats } = useSystemStats()
 
-// ── Exec tracker for real-time progress ───────────────────────────────
 const tracker = useExecTracker()
 const execState = computed(() => tracker.state.value)
 
-// ── SSE for ComfyUI execution events ──────────────────────────────────
 const sse = useComfySSE(tracker, {
   onEvent(event) {
     if (event.type === 'execution_done' || event.type === 'execution_error' || event.type === 'execution_interrupted') {
@@ -80,13 +76,11 @@ const sse = useComfySSE(tracker, {
   },
 })
 
-// ── Fetch Overview & Activity ─────────────────────────────────────────
 let overviewAppliedAt = 0
 async function loadOverview() {
   const requestedAt = Date.now()
   const d = await get<OverviewData>('/api/overview', { silent: true })
   if (d) {
-    // 乱序响应保护: 迟到的旧快照不能覆盖新快照
     if (requestedAt >= overviewAppliedAt) {
       overviewAppliedAt = requestedAt
       data.value = d
@@ -159,7 +153,6 @@ async function svcAction(name: string, action: string) {
   }, 2000)
 }
 
-// ── Auto Refresh ──────────────────────────────────────────────────────
 // Dual timer: 5s for fast activity data (tasks/downloads), 15s for slow overview data (PM2/services/system)
 const activityRefresh = useAutoRefresh(loadActivity, 5000)
 const overviewRefresh = useAutoRefresh(loadOverview, 15000)
@@ -177,7 +170,6 @@ onUnmounted(() => {
   pendingTimers.clear()
 })
 
-// ── Computed Properties for Subcomponents ─────────────────────────────
 const tunnelUrls = computed(() => {
   const tObj = data.value?.tunnel
   if (!tObj) return {} as Record<string, string>
@@ -412,7 +404,6 @@ const totalServiceCount = computed(() => {
 
 <template>
   <div class="page-body">
-    <!-- ── Page Header Row (Left: Page Title, Right: Refresh Button) ── -->
     <PageHeaderRow :title="t('dashboard.title')">
       <template #actions>
         <BaseButton
@@ -429,9 +420,7 @@ const totalServiceCount = computed(() => {
       </template>
     </PageHeaderRow>
 
-    <!-- ── Constrained Centered Content Container ── -->
     <div class="dash-container">
-      <!-- ── Section 0: Open Hero Section ── -->
       <DashboardHero
         :dashboard-state="dashboardState"
         :app-version="appVersion"
@@ -447,7 +436,6 @@ const totalServiceCount = computed(() => {
         @refresh-all="refreshAll"
       />
 
-      <!-- ── Section 1: 实时任务 (Real-time Tasks) ── -->
       <DashboardTasks
         :initial-loading="initialLoading"
         :activity="activity"
@@ -456,7 +444,6 @@ const totalServiceCount = computed(() => {
         :active-downloads="activeDownloads"
       />
 
-      <!-- ── Section 2: 基础服务 (Infrastructure Services) ── -->
       <DashboardServices
         :initial-loading="initialLoading"
         :data="data"
@@ -477,10 +464,8 @@ const totalServiceCount = computed(() => {
         @start-comfy-u-i="startComfyUI"
       />
 
-      <!-- ── Section 3: 最近生成 (Gallery) ── -->
       <DashboardGallery />
 
-      <!-- ── Section 4: 状态与环境 (Diagnostics) ── -->
       <DashboardDiagnostics
         :initial-loading="initialLoading"
         :data="data"
@@ -500,7 +485,6 @@ const totalServiceCount = computed(() => {
   animation: spin 0.8s linear infinite;
 }
 
-/* ── Centered Content Container ── */
 .dash-container {
   width: 100%;
   max-width: 1080px;

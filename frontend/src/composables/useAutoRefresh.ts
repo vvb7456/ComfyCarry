@@ -1,10 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 import { isTunnelSwitchFrozen } from './useTunnelSwitch'
 
-/**
- * Periodic auto-refresh composable.
- * Automatically stops on component unmount.
- */
 export function useAutoRefresh(fn: () => Promise<void>, interval: number) {
   let timer: ReturnType<typeof setInterval> | null = null
   let running = false
@@ -35,9 +31,7 @@ export function useAutoRefresh(fn: () => Promise<void>, interval: number) {
 
   onUnmounted(stop)
 
-  /** Alias for start — resume after a pause */
   const resume = start
-  /** Alias for stop — pause without destroying */
   const pause = stop
 
   return { active, start, stop, resume, pause }

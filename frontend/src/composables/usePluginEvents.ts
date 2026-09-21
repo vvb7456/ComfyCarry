@@ -2,9 +2,6 @@ import { onUnmounted, ref } from 'vue'
 import type { CMQueueStatusData } from '@/types/plugins'
 
 /**
- * 订阅 /api/comfyui/events 中 bridge 转发的 ComfyUI-Manager 队列事件
- * (cm_queue_status), 用于插件行级状态跟踪。自动重连, 卸载时关闭。
- *
  * 注意: EventSource 断线重连期间的事件会丢失; 调用方需保留
  * queue_status 轮询的 onIdle 兜底 (清行状态 + 刷列表)。
  */

@@ -43,10 +43,6 @@ function initTheme() {
   mediaQuery.addEventListener('change', handleSystemThemeChange)
 }
 
-/**
- * Theme management composable.
- * Syncs with localStorage and system preference.
- */
 export function useTheme() {
   initTheme()
 

@@ -89,7 +89,7 @@ export function useExecNotifications() {
     source.onmessage = (e) => {
       try {
         handleEvent(JSON.parse(e.data) as BridgeEvent)
-      } catch { /* ignore malformed events */ }
+      } catch { }
     }
     source.onerror = () => {
       source?.close()

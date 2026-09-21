@@ -1,14 +1,4 @@
 <script setup lang="ts">
-/**
- * PromptSettingsModal — 提示词编辑器设置弹窗 (页内就近迁移自设置页)。
- *
- * 内容: 翻译 / 规格化 / 自动补全 / 标签库 NSFW。
- * 数据走 usePromptSettings 全局共享 composable:
- *   - 修改期间底层编辑器即时预览 (共享 reactive);
- *   - 保存成功即全局生效 (snapshot 前移);
- *   - 放弃 (关闭确认) 调 discard() 从服务端重载, 回滚共享状态的未保存改动。
- * 关闭 (取消 / Esc / 遮罩 / 关闭按钮) 统一经过未保存检查。
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -59,12 +49,10 @@ const normalizeEnabled = computed(() =>
 
 function toggleNormalizeAll(on: boolean) {
   if (on) {
-    // 开启总开关 → 恢复默认值
     promptSettings.normalize_comma = true
     promptSettings.normalize_period = true
     promptSettings.normalize_bracket = true
   } else {
-    // 关闭总开关 → 全部关闭
     promptSettings.normalize_comma = false
     promptSettings.normalize_period = false
     promptSettings.normalize_bracket = false
@@ -75,7 +63,6 @@ function toggleNormalizeAll(on: boolean) {
 
 const translateProviderOptions = ref<{ value: string; label: string }[]>([])
 
-// ── 加载: 打开时强制重载, 基线以服务端实际值为准 ──
 const loading = ref(true)
 const loadError = ref(false)
 
@@ -96,7 +83,6 @@ watch(() => props.modelValue, (open) => {
   if (open) void loadAll()
 })
 
-// ── 保存并关闭 ──
 async function onSave(): Promise<void> {
   const ok = await savePromptSettings()
   if (!ok) {
@@ -107,7 +93,6 @@ async function onSave(): Promise<void> {
   emit('update:modelValue', false)
 }
 
-// ── 关闭守卫: dirty 时确认, 放弃则回滚共享状态 (discard 后再关闭) ──
 const requestClose = useModalCloseGuard({
   dirty: () => promptFormDirty.value,
   saving: () => promptSaving.value,
@@ -118,7 +103,6 @@ const requestClose = useModalCloseGuard({
     cancel: () => t('common.btn.cancel'),
   },
   onClose: () => {
-    // 放弃路径: 共享 reactive 已被未保存的改动污染, 从服务端重载回滚
     if (promptFormDirty.value) void discardPromptSettings()
     emit('update:modelValue', false)
   },

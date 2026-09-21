@@ -20,16 +20,13 @@ DB_PATH = WORKSPACE_ROOT / ".comfycarry.db"
 
 
 class Database:
-    """统一 SQLite 管理 — 连接 + migration + 事务辅助"""
 
     def __init__(self, db_path: Path = DB_PATH):
         self._db_path = db_path
         self._conn: sqlite3.Connection | None = None
         self._lock = threading.Lock()
-        self._migrations: dict[int, tuple[str, callable]] = {}  # {version: (name, up_fn)}
+        self._migrations: dict[int, tuple[str, callable]] = {}
         atexit.register(self.close)
-
-    # ── 连接管理 ────────────────────────────────────────────
 
     def _ensure_conn(self) -> sqlite3.Connection:
         """获取连接 (lazy init + WAL + PRAGMA)。调用者必须已持有 _lock。"""
@@ -46,7 +43,6 @@ class Database:
             self._conn.execute("PRAGMA cache_size=-2000")   # 2 MB
             self._conn.execute("PRAGMA busy_timeout=5000")   # 5s 重试
             self._conn.execute("PRAGMA foreign_keys=ON")
-            # 确保 schema_version 表存在
             self._conn.execute(
                 "CREATE TABLE IF NOT EXISTS schema_version "
                 "(version INTEGER PRIMARY KEY)"
@@ -64,10 +60,7 @@ class Database:
                 self._conn = None
                 log.info("[db] SQLite 连接已关闭")
 
-    # ── Migration ───────────────────────────────────────────
-
     def register_migration(self, version: int, up_fn: callable, name: str = ""):
-        """注册一个 migration。version 必须唯一且递增。"""
         if version in self._migrations:
             raise ValueError(f"Migration v{version} 已注册: {self._migrations[version][0]}")
         self._migrations[version] = (name or f"migration_{version}", up_fn)
@@ -102,10 +95,7 @@ class Database:
                     raise
             log.info("[db] 数据库已迁移到 v%d", pending[-1])
 
-    # ── 查询辅助 ────────────────────────────────────────────
-
     def execute(self, sql: str, params=()) -> sqlite3.Cursor:
-        """执行单条 SQL (线程安全，写操作自动包事务)。"""
         with self._lock:
             conn = self._ensure_conn()
             is_write = not sql.lstrip().upper().startswith("SELECT")
@@ -122,7 +112,6 @@ class Database:
                 raise
 
     def execute_many(self, sql: str, seq) -> sqlite3.Cursor:
-        """批量插入 (线程安全)。"""
         with self._lock:
             conn = self._ensure_conn()
             conn.execute("BEGIN")
@@ -135,13 +124,11 @@ class Database:
                 raise
 
     def fetch_one(self, sql: str, params=()) -> sqlite3.Row | None:
-        """查询单行。"""
         with self._lock:
             conn = self._ensure_conn()
             return conn.execute(sql, params).fetchone()
 
     def fetch_all(self, sql: str, params=()) -> list[sqlite3.Row]:
-        """查询多行。"""
         with self._lock:
             conn = self._ensure_conn()
             return conn.execute(sql, params).fetchall()
@@ -166,14 +153,12 @@ class Database:
                 raise
 
     def get_schema_version(self) -> int:
-        """获取当前 schema 版本号。"""
         row = self.fetch_one(
             "SELECT COALESCE(MAX(version), 0) FROM schema_version"
         )
         return row[0] if row else 0
 
     def table_exists(self, table_name: str) -> bool:
-        """检查表是否存在。"""
         row = self.fetch_one(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
             (table_name,),
@@ -189,5 +174,4 @@ class Database:
         return row[0] if row else 0
 
 
-# ── 全局单例 ────────────────────────────────────────────────
 db = Database()

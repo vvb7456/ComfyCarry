@@ -1,17 +1,4 @@
 /**
- * useWildcardManager — Wildcard CRUD composable.
- *
- * Manages wildcard files: list, create, edit, rename, delete, folder management.
- * Insertion handled by parent (via emit → PromptEditor.insertAtCursor).
- *
- * API:
- *   GET    /api/generate/wildcards                       → { wildcards, folders }
- *   GET    /api/generate/wildcard/:name                  → { name, content }
- *   PUT    /api/generate/wildcard/:name                  ← { content }
- *   DELETE /api/generate/wildcard/:name
- *   POST   /api/generate/wildcard/:name/rename           ← { new_name }
- *   POST   /api/generate/wildcard-folder/:name
- *
  * Legacy: _wildcardsCache / _loadWildcards / _newWildcard / _editWildcard / _deleteWildcard in page-generate.js
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
@@ -112,7 +99,6 @@ export function useWildcardManager(): UseWildcardManagerReturn {
       { content: '' },
     )
     if (!resp?.ok) return null
-    // Optimistic: append to local list without full reload
     wildcards.value = [...wildcards.value, { name: fullName, entries: 0 }]
     return fullName
   }
@@ -123,7 +109,6 @@ export function useWildcardManager(): UseWildcardManagerReturn {
       { new_name: newName },
     )
     if (!resp?.ok) return false
-    // Optimistic: update name in local list
     wildcards.value = wildcards.value.map(w =>
       w.name === oldName ? { ...w, name: newName } : w,
     )
@@ -141,7 +126,6 @@ export function useWildcardManager(): UseWildcardManagerReturn {
       { content },
     )
     if (!resp?.ok) return false
-    // Optimistic: update entry count in local list
     const lines = content.split('\n').filter(l => l.trim()).length
     wildcards.value = wildcards.value.map(w =>
       w.name === name ? { ...w, entries: lines } : w,
@@ -152,7 +136,6 @@ export function useWildcardManager(): UseWildcardManagerReturn {
   async function remove(name: string): Promise<boolean> {
     const resp = await del<{ ok?: boolean }>(`/api/generate/wildcard/${encodeURIComponent(name)}`)
     if (!resp?.ok) return false
-    // Optimistic: remove from local list
     wildcards.value = wildcards.value.filter(w => w.name !== name)
     return true
   }

@@ -1,6 +1,4 @@
 """
-ComfyCarry — 共享配置、常量、配置文件读写工具
-
 所有模块共同依赖的基础层，不引入 Flask 依赖。
 """
 
@@ -14,10 +12,8 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-# ── 版本号 (唯一源) ──────────────────────────────────────────
 APP_VERSION = "v0.8.3"
 
-# ── 核心路径常量 ─────────────────────────────────────────────
 # 面板的路径约定: 对外 (UI / 规则数据 / 文件 API) 一律用 "workspace 根相对路径",
 # 即前导 "/" 代表 WORKSPACE_DIR 而非文件系统根。真实绝对路径只在后端内部出现,
 # 由 resolve_workspace_path() 统一换算。
@@ -35,11 +31,9 @@ try:
 except (ValueError, TypeError):
     MANAGER_PORT = 5000
 
-# CivitAI 搜索代理
 MEILI_URL = "https://search.civitai.com/multi-search"
 MEILI_BEARER = "8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61"
 
-# ── workspace 路径约定换算 ───────────────────────────────────
 def workspace_relative(real) -> str:
     """真实绝对路径 → workspace 根相对路径 ("/ComfyUI/output")。
 
@@ -96,12 +90,10 @@ def resolve_workspace_path(
 # rstrip: COMFYUI_DIR 恰为 workspace 根时避免拼出 "//models"
 COMFYUI_REL = workspace_relative(COMFYUI_DIR).rstrip("/")
 
-# ── 持久化配置 (.dashboard_env) ──────────────────────────────
 DASHBOARD_ENV_FILE = WORKSPACE_ROOT / ".dashboard_env"
 
 
 def _load_config():
-    """从 .dashboard_env 加载全部配置"""
     if DASHBOARD_ENV_FILE.exists():
         try:
             return json.loads(DASHBOARD_ENV_FILE.read_text(encoding="utf-8"))
@@ -113,7 +105,6 @@ def _load_config():
 
 
 def _save_config(data):
-    """写入 .dashboard_env"""
     DASHBOARD_ENV_FILE.write_text(
         json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -123,13 +114,11 @@ _config_lock = threading.Lock()
 
 
 def _get_config(key, default=""):
-    """读取单个配置值 (线程安全)"""
     with _config_lock:
         return _load_config().get(key, default)
 
 
 def _set_config(key, value):
-    """写入单个配置值 (线程安全)"""
     with _config_lock:
         data = _load_config()
         data[key] = value
@@ -141,7 +130,6 @@ set_config = _set_config
 get_config = _get_config
 
 
-# ── 密码 ──────────────────────────────────────────────────────
 def _load_dashboard_password():
     """优先 .dashboard_env > 环境变量 > 默认值"""
     pw = _get_config("password")
@@ -161,9 +149,7 @@ def _save_dashboard_password(pw):
 DASHBOARD_PASSWORD = _load_dashboard_password()
 
 
-# ── API Key (用于自动化/脚本调用) ────────────────────────────
 def _load_api_key():
-    """从 .dashboard_env 读 api_key, 不存在则生成并保存"""
     existing = _get_config("api_key")
     if existing:
         return existing
@@ -179,7 +165,6 @@ def _save_api_key(key):
 API_KEY = _load_api_key()
 
 
-# ── Session Secret (持久化 → 重启不掉线) ─────────────────────
 def _load_session_secret():
     """从 .dashboard_env 读 session_secret, 不存在则生成并保存"""
     existing = _get_config("session_secret")
@@ -190,7 +175,6 @@ def _load_session_secret():
     return new_secret
 
 
-# ── 模型目录映射 ─────────────────────────────────────────────
 MODEL_DIRS = {
     "checkpoints": "models/checkpoints",
     "loras": "models/loras",
@@ -242,7 +226,6 @@ MODEL_DIRS = {
 MODEL_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".pth", ".bin", ".gguf"}
 
 
-# ── Extra Model Paths (extra_model_paths.yaml 解析) ──────────
 _extra_model_paths_cache = None
 _extra_model_paths_mtime = 0.0
 _extra_model_paths_lock = threading.Lock()
@@ -296,13 +279,10 @@ def get_extra_model_paths() -> dict[str, list[str]]:
                 continue
             if not isinstance(value, str):
                 continue
-            # value 可以是单行路径或多行（用 | 分隔）
             paths = [p.strip() for p in value.strip().splitlines() if p.strip()]
             for p in paths:
-                # 如果 p 以 # 开头是注释
                 if p.startswith("#"):
                     continue
-                # 去掉行内注释
                 p = p.split("#")[0].strip()
                 if not p:
                     continue
@@ -317,7 +297,6 @@ def get_extra_model_paths() -> dict[str, list[str]]:
         _extra_model_paths_mtime = mtime
     return result
 
-# ── Setup Wizard ─────────────────────────────────────────────
 SETUP_STATE_FILE = WORKSPACE_ROOT / ".setup_state.json"
 
 DEFAULT_PLUGINS = [
@@ -389,7 +368,6 @@ def _load_setup_state():
 
 
 def _save_setup_state(state):
-    """保存 Setup Wizard 状态"""
     with _setup_state_lock:
         SETUP_STATE_FILE.write_text(
             json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -397,7 +375,6 @@ def _save_setup_state(state):
 
 
 def _is_setup_complete():
-    """检查部署是否已完成"""
     if not SETUP_STATE_FILE.exists():
         if (Path(COMFYUI_DIR) / "main.py").exists():
             return True
@@ -406,7 +383,6 @@ def _is_setup_complete():
     return state.get("deploy_completed", False)
 
 
-# ── Sync 配置路径 ────────────────────────────────────────────
 RCLONE_CONF = Path(os.path.expanduser("~/.config/rclone/rclone.conf"))
 SYNC_RULES_FILE = WORKSPACE_ROOT / ".sync_rules.json"
 SYNC_SETTINGS_FILE = WORKSPACE_ROOT / ".sync_settings.json"
@@ -450,8 +426,6 @@ def join_remote_path(*parts) -> str:
     return "/" + joined if clean[0].startswith("/") else joined
 
 
-
-# ── 同步规则预设 ─────────────────────────────────────────────
 # 预设 = 一组规则 (entries): direction 在预设级, 其余字段在 entry 级。
 # 文案: name_key / desc_key 由前端翻译 (卡片与规则名); name 是后端兜底,
 # 规则名在创建时由前端以当前语言固化落库 (规则名是用户可编辑字段,
@@ -546,7 +520,6 @@ SYNC_RULE_TEMPLATES = [
 # rclone remote 名 / 类型 / 配置键的合法字符集
 _RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
-# ── Remote 类型表单定义 ──────────────────────────────────────
 REMOTE_TYPE_DEFS = {
     "s3": {
         "label": "S3 / Cloudflare R2",
@@ -601,7 +574,6 @@ REMOTE_TYPE_DEFS = {
 }
 
 
-# ── Companion (桌面客户端) 配置 ──────────────────────────────
 # 面板侧 rclone serve webdav 绑定端口 (经 Flask 反代 /api/companion/dav 暴露)
 try:
     COMPANION_DAV_PORT = int(os.environ.get("COMPANION_DAV_PORT") or 8688)
@@ -615,7 +587,6 @@ COMPANION_SERVE_ROOT = os.environ.get(
 )
 
 
-# ── 实例标签 (尽力取已有实例名配置, 无则空) ─────────────────
 def _load_instance_label() -> str:
     """读取已配置的实例标签 (子域名 / 自定义名), 无则空字符串。"""
     for key in ("instance_label", "cf_subdomain", "public_tunnel_subdomain"):

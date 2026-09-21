@@ -123,7 +123,6 @@ function onKeydown(e: KeyboardEvent) {
         :aria-label="title"
         tabindex="-1"
       >
-        <!-- 头部 -->
         <header class="drawer-header">
           <div class="drawer-header__title-group">
             <MsIcon v-if="icon" :name="icon" />
@@ -134,7 +133,6 @@ function onKeydown(e: KeyboardEvent) {
           </button>
         </header>
 
-        <!-- body 独立滚动 -->
         <div class="drawer-body">
           <slot />
         </div>

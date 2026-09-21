@@ -1,8 +1,4 @@
-"""ComfyCarry — Tunnel Manager
-
-通过 Cloudflare API 全自动管理 Tunnel 生命周期。
-无本地状态文件 — 每次从 config + CF API 推导当前状态。
-"""
+"""无本地状态文件 — 每次从 config + CF API 推导当前状态。"""
 
 import base64
 import json
@@ -21,11 +17,8 @@ log = logging.getLogger(__name__)
 CF_API_BASE = "https://api.cloudflare.com/client/v4"
 TUNNEL_NAME_PREFIX = "comfycarry"
 
-# ── 服务端口检测 ─────────────────────────────────────────────
 # 不硬编码端口号 — 从环境变量/运行进程推导
-
 def _detect_jupyter() -> dict | None:
-    """检测 Jupyter 端口和协议 (从运行中的进程, 无默认值)"""
     try:
         out = subprocess.run(
             "ps aux | grep '[j]upyter-lab\\|[j]upyter-notebook' | head -1",
@@ -43,14 +36,12 @@ def _detect_jupyter() -> dict | None:
 
 
 def _detect_comfyui_port() -> int:
-    """从 COMFYUI_URL 环境变量解析 ComfyUI 端口"""
     url = os.environ.get("COMFYUI_URL", "http://localhost:8188")
     m = re.search(r':(\d+)', url)
     return int(m.group(1)) if m else 8188
 
 
 def get_default_services() -> List[dict]:
-    """构建默认服务列表 (端口从环境/进程检测)"""
     services = [
         {"name": "ComfyCarry", "port": int(os.environ.get("MANAGER_PORT", 5000)),
          "suffix": "",          "protocol": "http"},
@@ -71,7 +62,6 @@ def get_default_services() -> List[dict]:
 
 
 # 向后兼容: 其他模块 import DEFAULT_SERVICES 时获取检测结果
-# 注意: 模块级别调用, 仅在 import 时执行一次
 DEFAULT_SERVICES = get_default_services()
 
 
@@ -103,10 +93,6 @@ class TunnelManager:
         self.subdomain = subdomain
         self.tunnel_name = f"{TUNNEL_NAME_PREFIX}-{self.subdomain}"
 
-    # ═══════════════════════════════════════════════════
-    # 公共接口
-    # ═══════════════════════════════════════════════════
-
     def validate_token(self) -> Tuple[bool, dict]:
         """
         验证 Token 权限。
@@ -117,13 +103,10 @@ class TunnelManager:
         locale 下会冒中文。
         """
         try:
-            # 1. Account 访问 (同时验证 token 有效性)
             account_id, account_name = self._get_account()
 
-            # 2. Zone 权限
             zone_id, zone_status = self._get_zone()
 
-            # 3. Tunnel 权限 (尝试列出)
             self._cf_get(f"/accounts/{account_id}/cfd_tunnel",
                          params={"per_page": 1})
 
@@ -160,7 +143,6 @@ class TunnelManager:
         account_id, _ = self._get_account()
         zone_id, _ = self._get_zone()
 
-        # 1. 查找同名 tunnel
         tunnel = self._find_tunnel(account_id, self.tunnel_name)
 
         if tunnel:
@@ -168,15 +150,12 @@ class TunnelManager:
             tunnel_token = self._get_tunnel_token(account_id, tunnel_id)
             log.info(f"复用已有 Tunnel: {self.tunnel_name} ({tunnel_id})")
         else:
-            # 2. 创建新 tunnel
             tunnel_id, tunnel_token = self._create_tunnel(account_id)
             log.info(f"创建 Tunnel: {self.tunnel_name} ({tunnel_id})")
 
-        # 3. 配置 Ingress (总是覆盖, 确保最新)
         ingress = self._build_ingress(services)
         self._set_tunnel_config(account_id, tunnel_id, ingress)
 
-        # 4. 确保 DNS 记录
         urls = {}
         for svc in services:
             hostname = self._hostname_for(svc)
@@ -190,10 +169,6 @@ class TunnelManager:
         }
 
     def teardown(self, cf_name: str | None = None) -> bool:
-        """删除 Tunnel + 所有关联 DNS 记录 + 对应 cloudflared 进程。
-
-        cf_name: 要删除的 pm2 进程名; 默认当前活跃进程。
-        """
         try:
             from .cf_runtime import active_cf_name
             cf_name = cf_name or active_cf_name()
@@ -207,10 +182,8 @@ class TunnelManager:
 
             tunnel_id = tunnel["id"]
 
-            # 1. 停止 cloudflared
             subprocess.run(f"pm2 delete {shlex.quote(cf_name)} 2>/dev/null", shell=True)
 
-            # 2. 删除 DNS 记录 (查找所有指向该 tunnel 的 CNAME)
             tunnel_cname = f"{tunnel_id}.cfargotunnel.com"
             records = self._cf_get(
                 f"/zones/{zone_id}/dns_records",
@@ -220,12 +193,10 @@ class TunnelManager:
                 self._cf_delete(f"/zones/{zone_id}/dns_records/{rec['id']}")
                 log.info(f"删除 DNS: {rec['name']}")
 
-            # 3. 清除 Tunnel 连接
             self._cf_delete(
                 f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/connections"
             )
 
-            # 4. 删除 Tunnel
             self._cf_delete(
                 f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}"
             )
@@ -252,7 +223,6 @@ class TunnelManager:
 
             tunnel_id = tunnel["id"]
 
-            # 状态 (来自 _find_tunnel 响应)
             status = {
                 "exists": True,
                 "tunnel_id": tunnel_id,
@@ -260,7 +230,6 @@ class TunnelManager:
                 "connections": tunnel.get("connections", []) or [],
             }
 
-            # URL (来自 Ingress 配置)
             urls = {}
             try:
                 cfg = self._cf_get(
@@ -312,36 +281,25 @@ class TunnelManager:
         subprocess.run("pm2 save 2>/dev/null", shell=True, env=env)
         return r.returncode == 0
 
-    # ═══════════════════════════════════════════════════
-    # 内部方法
-    # ═══════════════════════════════════════════════════
-
     def _hostname_for(self, svc: dict) -> str:
-        """生成服务的完整域名: suffix-subdomain.domain"""
         suffix = svc.get("suffix", "")
         if suffix:
             return f"{suffix}-{self.subdomain}.{self.domain}"
         return f"{self.subdomain}.{self.domain}"
 
     def _port_to_service_name(self, port: int) -> str:
-        """端口 → 服务名映射"""
         for svc in get_default_services():
             if svc["port"] == port:
                 return svc["name"]
         return f"Service:{port}"
 
-    # ── CF API 操作 ──
-
     def _get_account(self) -> Tuple[str, str]:
-        """获取 account_id 和 account_name"""
         accounts = self._cf_get("/accounts", params={"per_page": 5})
         if not accounts:
             raise CFAPIError("无法获取 CF 账户信息", key="no_account")
-        # 返回第一个有 tunnel 权限的账户
         return accounts[0]["id"], accounts[0]["name"]
 
     def _get_zone(self) -> Tuple[str, str]:
-        """获取 zone_id 和 zone_status"""
         zones = self._cf_get("/zones", params={"name": self.domain, "per_page": 1})
         if not zones:
             raise CFAPIError(f"域名 {self.domain} 不在此账户中",
@@ -350,7 +308,6 @@ class TunnelManager:
         return zones[0]["id"], zones[0]["status"]
 
     def _find_tunnel(self, account_id: str, name: str) -> Optional[dict]:
-        """按名称查找 tunnel (返回 None 或 tunnel dict)"""
         tunnels = self._cf_get(
             f"/accounts/{account_id}/cfd_tunnel",
             params={"name": name, "is_deleted": "false", "per_page": 1}
@@ -358,7 +315,6 @@ class TunnelManager:
         return tunnels[0] if tunnels else None
 
     def _create_tunnel(self, account_id: str) -> Tuple[str, str]:
-        """创建 tunnel, 返回 (tunnel_id, tunnel_token)"""
         tunnel_secret = base64.b64encode(secrets.token_bytes(32)).decode()
         result = self._cf_post(
             f"/accounts/{account_id}/cfd_tunnel",
@@ -371,10 +327,6 @@ class TunnelManager:
         return result["id"], result["token"]
 
     def _get_tunnel_token(self, account_id: str, tunnel_id: str) -> str:
-        """
-        获取已有 tunnel 的 token。
-        CF API: GET /accounts/{id}/cfd_tunnel/{id}/token
-        """
         result = self._cf_get(
             f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/token"
         )
@@ -382,7 +334,6 @@ class TunnelManager:
 
     def _set_tunnel_config(self, account_id: str, tunnel_id: str,
                            ingress: List[dict]):
-        """设置 tunnel ingress 配置"""
         self._cf_put(
             f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations",
             json={"config": {"ingress": ingress}}
@@ -416,7 +367,6 @@ class TunnelManager:
         return ingress
 
     def _ensure_dns_cname(self, zone_id: str, hostname: str, tunnel_id: str):
-        """确保 DNS CNAME 记录存在且指向正确 (幂等)"""
         tunnel_cname = f"{tunnel_id}.cfargotunnel.com"
         name_part = hostname.replace(f".{self.domain}", "")
 
@@ -428,8 +378,7 @@ class TunnelManager:
         if existing:
             rec = existing[0]
             if rec["content"] == tunnel_cname:
-                return  # 已正确
-            # 更新
+                return
             self._cf_put(
                 f"/zones/{zone_id}/dns_records/{rec['id']}",
                 json={"type": "CNAME", "name": name_part,
@@ -443,8 +392,6 @@ class TunnelManager:
                       "content": tunnel_cname, "proxied": True}
             )
             log.info(f"创建 DNS: {hostname}")
-
-    # ── HTTP 封装 ──
 
     def _cf_headers(self) -> dict:
         return {

@@ -3,26 +3,15 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
-/**
- * ModelCard — shared visual shell for local & CivitAI model cards.
- *
- * Handles: image display (img/video/fallback), zoom icon, hover effects, title.
- * Consumers provide: #meta and #actions slot content.
- */
 defineOptions({ name: 'ModelCard' })
 
 const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
-  /** Primary image URL */
   imageSrc?: string
-  /** Fallback image URL (used if primary fails) */
   imageFallback?: string
-  /** Whether fallback is a video */
   isVideo?: boolean
-  /** Card title text */
   title: string
-  /** Full-size image URL for zoom preview */
   zoomUrl?: string
   /** NSFW 图片模糊遮罩 (Civitai blur 模式): true 时媒体加 blur + 点击揭开 */
   nsfwBlur?: boolean
@@ -33,7 +22,6 @@ const emit = defineEmits<{
   preview: [url: string]
 }>()
 
-// ── Image fallback state machine ──
 const primaryFailed = ref(false)
 const fallbackFailed = ref(false)
 
@@ -75,7 +63,6 @@ const showZoom = computed(() => {
   return true
 })
 
-// NSFW blur 遮罩揭开状态 (点击卡片媒体区切换; 切换媒体输入时复位)
 const nsfwRevealed = ref(false)
 
 watch(
@@ -115,7 +102,6 @@ watch(
 
 <template>
   <div class="mc" @click="emit('click')">
-    <!-- Image -->
     <div class="mc-img">
       <video
         v-if="showVideo"
@@ -155,7 +141,6 @@ watch(
       </span>
     </div>
 
-    <!-- Body -->
     <div class="mc-body">
       <div class="mc-title-row">
         <div class="mc-title text-truncate" :title="title">{{ title }}</div>
@@ -240,8 +225,6 @@ watch(
   opacity: 1;
 }
 
-/* ── NSFW blur 遮罩 (Civitai blur 模式) ──
-   媒体加模糊 + 中央眼睛图标; 点击揭开单张, 媒体切换时复位。 */
 .mc-nsfw-blurred {
   filter: blur(22px) saturate(.8);
   transform: scale(1.08);
@@ -266,7 +249,6 @@ watch(
   font-size: 26px;
 }
 
-/* ── Body ── */
 .mc-body {
   padding: 12px 14px;
 }

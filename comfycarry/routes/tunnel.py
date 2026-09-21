@@ -1,8 +1,3 @@
-"""ComfyCarry — Tunnel (v2)
-
-Cloudflare Tunnel 管理路由。通过 CF API 自动配置, 不再解析日志。
-"""
-
 import json
 import re
 import subprocess
@@ -17,7 +12,6 @@ from ..services.cf_runtime import active_cf_name, cf_metrics_url
 bp = Blueprint("tunnel", __name__)
 
 
-# ── 错误响应辅助 ──
 # /api/tunnel/* 的唯一消费方是面板前端, 回传中文成品文案的话英文 locale 下
 # toast 里会直接冒出中文。改为回传 error_key + error_params, 前端 apiErrorText()
 # 负责渲染。tunnel.py 的成功响应大多用 {"ok": True/False, ...} 自定义, 不走
@@ -37,33 +31,21 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 
 
 def _cf_err(e, status: int = 400):
-    """CFAPIError / PublicTunnelError → 响应。
-
-    异常自带 key 的用它, 否则回落 internal + 原文 detail —— 那种是 CF API 或
-    公共 Tunnel API 直接返回的报错, 透出原文比造键有用。
-    """
     if getattr(e, "key", ""):
         return _err(e.key, status, **(e.params or {}))
     return _err("internal", status, detail=str(e))
 
-# ── Tunnel 状态 TTL 缓存 ──
 # CF API 调用延迟高 (每次 2-4s, 共 3 次 ≈ 6-12s), 缓存 30 秒
 _tunnel_cache: dict = {"data": None, "ts": 0.0}
-_TUNNEL_CACHE_TTL = 30  # seconds
+_TUNNEL_CACHE_TTL = 30
 
 
 def _invalidate_tunnel_cache():
-    """清除 Tunnel 状态缓存 (在配置/DNS 变更后调用)"""
     _tunnel_cache["data"] = None
     _tunnel_cache["ts"] = 0.0
 
 
 def _check_cloudflared_ready(name: str | None = None) -> str:
-    """通过 cloudflared metrics /ready 端点检测实际连通性。
-
-    name: pm2 进程名; 默认当前活跃进程。
-    Returns: "connected" | "disconnected" | "unknown"
-    """
     try:
         r = http_requests.get(f"{cf_metrics_url(name)}/ready", timeout=2)
         return "connected" if r.status_code == 200 else "disconnected"
@@ -72,7 +54,6 @@ def _check_cloudflared_ready(name: str | None = None) -> str:
 
 
 def _get_manager():
-    """从 config 构造 TunnelManager (如果已配置)"""
     from ..services.tunnel_manager import TunnelManager
     token = get_config("cf_api_token", "")
     domain = get_config("cf_domain", "")
@@ -83,10 +64,6 @@ def _get_manager():
         return None
     return TunnelManager(token, domain, subdomain)
 
-
-# ═══════════════════════════════════════════════════════════════
-# 新 API 端点 (v2)
-# ═══════════════════════════════════════════════════════════════
 
 @bp.route("/api/tunnel/status")
 def api_tunnel_status_v2():
@@ -101,10 +78,6 @@ def api_tunnel_status_v2():
 
 
 def _build_tunnel_status(force: bool = False) -> dict:
-    """构建 Tunnel 综合状态 (带 TTL 缓存)。
-
-    CF API 调用延迟高, 缓存 30 秒减少 /api/overview 延迟。
-    """
     now = _time.time()
     if (not force
             and _tunnel_cache["data"]
@@ -123,7 +96,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
         "cf_protocol": get_config("cf_protocol", "auto"),
     }
 
-    # 构建服务列表 (默认 + 自定义)
     overrides = _get_suffix_overrides()
     all_services = []
     for svc in get_default_services():
@@ -142,7 +114,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
 
     result["services"] = all_services
 
-    # ── 公共 Tunnel 模式 ──
     tunnel_mode = get_config("tunnel_mode", "")
 
     if tunnel_mode == "public":
@@ -151,7 +122,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
         pub_status = client.get_status()
         result["tunnel_mode"] = "public"
 
-        # 为公共 Tunnel 的 Jupyter URL 拼接 token
         pub_urls = dict(pub_status.get("urls") or {})
         for name in list(pub_urls.keys()):
             if "jupyter" in name.lower():
@@ -168,7 +138,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
             "random_id": pub_status.get("random_id"),
             "urls": pub_urls,
         }
-        # 统一使用 cloudflared /ready 端点检测实际连通性
         ready = _check_cloudflared_ready()
         result["cloudflared_ready"] = ready
         if ready == "connected":
@@ -182,7 +151,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
         _tunnel_cache["ts"] = _time.time()
         return result
 
-    # ── 自定义 Tunnel 模式 ──
     mgr = _get_manager()
     if not mgr:
         result["tunnel_mode"] = None
@@ -199,7 +167,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
     result["tunnel"] = overview["status"]
     urls = overview["urls"]
 
-    # 为 JupyterLab URL 自动拼接 token
     for name in list(urls.keys()):
         if "jupyter" in name.lower():
             try:
@@ -213,7 +180,6 @@ def _build_tunnel_status(force: bool = False) -> dict:
 
     result["urls"] = urls
 
-    # ── 统一状态: 优先使用 cloudflared /ready 本地检测 ──
     ready = _check_cloudflared_ready()
     result["cloudflared_ready"] = ready
     pm2_on = result["cloudflared"] == "online"
@@ -324,7 +290,6 @@ def api_tunnel_provision():
 
 @bp.route("/api/tunnel/teardown", methods=["POST"])
 def api_tunnel_teardown():
-    """删除 Tunnel + DNS, 停止 cloudflared, 清除 config"""
     mgr = _get_manager()
     if not mgr:
         return _err("not_configured", 400)
@@ -344,7 +309,6 @@ def api_tunnel_teardown():
 
 @bp.route("/api/tunnel/restart", methods=["POST"])
 def api_tunnel_restart():
-    """重启 cloudflared (PM2)"""
     tunnel_mode = get_config("tunnel_mode", "")
 
     if tunnel_mode == "public":
@@ -384,15 +348,6 @@ def api_tunnel_restart():
 
 @bp.route("/api/tunnel/switch", methods=["POST"])
 def api_tunnel_switch():
-    """启动蓝绿隧道切换 (切换即刷新)。
-
-    Request:
-      {"mode": "custom", "api_token": "...", "domain": "...", "subdomain": "..."}
-      {"mode": "public", "subdomain": "..."}   // subdomain 可空 = 随机
-
-    Response 202: {ok, switch_id, old_url, new_url, same_host, services}
-    预留失败直接返回错误, 不启动切换。
-    """
     from ..services.tunnel_switch import SwitchError, start_switch
 
     data = request.get_json(force=True) or {}
@@ -406,7 +361,6 @@ def api_tunnel_switch():
 
 @bp.route("/api/tunnel/switch/status", methods=["GET"])
 def api_tunnel_switch_status():
-    """查询切换状态 phase ∈ idle|preparing|starting|ready|finalizing|done|failed"""
     from ..services.tunnel_switch import get_state
     state = get_state()
     # 后台线程写入的是裸 key (与 _err 的入参同源), 对外统一补 tunnel.err. 前缀,
@@ -418,7 +372,6 @@ def api_tunnel_switch_status():
 
 @bp.route("/api/tunnel/stop", methods=["POST"])
 def api_tunnel_stop():
-    """停止 cloudflared (PM2)"""
     r = subprocess.run(f"pm2 stop {active_cf_name()} 2>/dev/null", shell=True,
                        capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
@@ -429,7 +382,6 @@ def api_tunnel_stop():
 
 @bp.route("/api/tunnel/start", methods=["POST"])
 def api_tunnel_start():
-    """启动 cloudflared (PM2)"""
     r = subprocess.run(f"pm2 start {active_cf_name()} 2>/dev/null", shell=True,
                        capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
@@ -469,7 +421,6 @@ def api_tunnel_add_service():
 
 @bp.route("/api/tunnel/services/<suffix>", methods=["DELETE"])
 def api_tunnel_remove_service(suffix):
-    """移除自定义服务"""
     custom = _get_custom_services()
     custom = [s for s in custom if s["suffix"] != suffix]
     set_config("cf_custom_services", json.dumps(custom))
@@ -508,7 +459,6 @@ def api_tunnel_update_subdomain(suffix):
 
 @bp.route("/api/tunnel/config", methods=["GET"])
 def api_tunnel_get_config():
-    """获取当前 Tunnel 配置 (用于修改配置弹窗)"""
     return jsonify({
         "api_token": get_config("cf_api_token", ""),
         "domain": get_config("cf_domain", ""),
@@ -636,7 +586,6 @@ def api_tunnel_subdomain():
 
 
 def _get_custom_services():
-    """获取用户自定义服务列表"""
     raw = get_config("cf_custom_services", "")
     if not raw:
         return []
@@ -647,7 +596,6 @@ def _get_custom_services():
 
 
 def _get_suffix_overrides():
-    """获取默认服务的后缀覆盖"""
     raw = get_config("cf_suffix_overrides", "")
     if not raw:
         return {}
@@ -658,7 +606,6 @@ def _get_suffix_overrides():
 
 
 def _reprovision_services():
-    """重新 provision 所有服务 (默认 + 自定义)"""
     mgr = _get_manager()
     if not mgr:
         return _err("not_configured", 400)
@@ -704,7 +651,6 @@ _CF_NOISE_RE = re.compile(
 
 @bp.route("/api/tunnel/logs")
 def api_tunnel_logs():
-    """获取 cloudflared 历史日志 (行号游标分页, 读 /workspace/tunnel.log)"""
     from ..services.log_service import read_history
     try:
         lines = int(request.args.get("lines", "100"))
@@ -717,7 +663,6 @@ def api_tunnel_logs():
 
 @bp.route("/api/tunnel/logs/stream")
 def api_tunnel_logs_stream():
-    """SSE - cloudflared 实时日志流 (tail -f /workspace/tunnel.log)"""
     from ..services.log_service import stream_tail
     return Response(stream_tail("/workspace/tunnel.log", filter_re=_CF_NOISE_RE), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -728,7 +673,6 @@ def api_tunnel_logs_stream():
 # ═══════════════════════════════════════════════════════════════
 
 def _get_cloudflared_pm2_status() -> str:
-    """查询 cloudflared PM2 进程状态 (当前活跃进程名)"""
     name = active_cf_name()
     try:
         r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,

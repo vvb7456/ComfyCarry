@@ -36,13 +36,11 @@ export interface TourStep {
 const props = defineProps<{
   /** steps[0] 约定为欢迎卡（无 target，不显示步数点、不显示「上一步」） */
   steps: TourStep[]
-  /** v-model:active */
   modelValue: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 结束原因：skip = 跳过/Esc；finish = 走完最后一步 */
   close: [reason: 'skip' | 'finish']
 }>()
 
@@ -50,7 +48,6 @@ const { t } = useI18n({ useScope: 'global' })
 
 /** 当前步骤；watch(modelValue) 为 true 时归零起步 */
 const index = ref(0)
-/** props.steps 别名（模板 + 定位逻辑多处引用） */
 const steps = computed(() => props.steps)
 
 // ── 聚光洞 rect（虚拟 reference：气泡与洞共用一份数据）─────────────
@@ -199,7 +196,6 @@ watch(
   { immediate: true },
 )
 
-// ── 步骤驱动 ──────────────────────────────────────────────────
 const isWelcome = computed(() => index.value === 0)
 const isLast = computed(() => index.value === props.steps.length - 1)
 const currentStep = computed(() => props.steps[index.value])
@@ -231,7 +227,6 @@ function finish() {
   close('finish')
 }
 
-// ── 键盘（active 时挂全局 keydown）──────────────────────────────
 function onKeydown(e: KeyboardEvent) {
   if (!props.modelValue) return
   if (e.key === 'Escape') {
@@ -263,14 +258,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onReposition)
 })
 
-// 步骤徽章编号（正式步骤显示 index，欢迎卡无徽章）
 const badgeNumber = computed(() => index.value)
 </script>
 
 <template>
   <Teleport to="body">
     <template v-if="modelValue">
-      <!-- 聚光洞：本体透明, 四周压暗靠 box-shadow 200vmax spread（任意滚动位置全覆盖） -->
       <div
         class="tour-spot"
         :class="{ 'tour-spot--center': isCenterSpot }"
@@ -306,7 +299,6 @@ const badgeNumber = computed(() => index.value)
           <BaseButton variant="ghost" size="sm" @click="skip">
             {{ t('generate.tour.btn_skip') }}
           </BaseButton>
-          <!-- 步数点只对应正式步骤, 欢迎卡不显示（§4.5） -->
           <div v-if="!isWelcome" class="tour-bubble__dots" aria-hidden="true">
             <span
               v-for="n in formalSteps"
@@ -330,8 +322,7 @@ const badgeNumber = computed(() => index.value)
 </template>
 
 <style scoped>
-/* ── 全屏拦截层 ──
-   透明不参与视觉（暗色由聚光洞的投影负责）, 只负责拦截暗区点击 */
+/* 透明不参与视觉（暗色由聚光洞的投影负责）, 只负责拦截暗区点击 */
 .tour-mask {
   position: fixed;
   inset: 0;
@@ -339,7 +330,6 @@ const badgeNumber = computed(() => index.value)
   background: transparent;
 }
 
-/* ── 聚光洞 ── */
 .tour-spot {
   position: fixed;
   z-index: 10099;
@@ -353,7 +343,6 @@ const badgeNumber = computed(() => index.value)
 /* 欢迎卡 / 目标不可见: 洞退化为视口中心 0×0, 只留 200vmax 遮罩、无 ac 环 */
 .tour-spot--center { box-shadow: 0 0 0 200vmax var(--overlay-dark); }
 
-/* ── 气泡 ── */
 .tour-bubble {
   /* position: fixed 由 floatingStyles 覆写 */
   z-index: 10100; /* --z-float(10000) 之上, 先例 HelpTip 硬编码 10000 */

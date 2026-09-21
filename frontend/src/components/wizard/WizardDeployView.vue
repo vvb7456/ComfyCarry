@@ -60,24 +60,20 @@ async function onRetry() {
       />
     </div>
 
-    <!-- Error banner -->
     <AlertBanner v-if="status === 'error' && errorMsg" tone="danger">
       {{ errorMsg }}
     </AlertBanner>
 
-    <!-- Attention warnings -->
     <AlertBanner v-if="attnWarnings.length > 0" tone="warning">
       {{ t('wizard.deploy.attn_warn', { names: attnWarnings.join(' / ') }) }}
     </AlertBanner>
 
-    <!-- Success buttons -->
     <div v-if="status === 'success'" class="wizard-deploy__actions">
       <BaseButton variant="primary" size="lg" @click="enterDashboard">
         {{ t('wizard.deploy.enter') }}
       </BaseButton>
     </div>
 
-    <!-- Error buttons -->
     <div v-if="status === 'error'" class="wizard-deploy__actions">
       <BaseButton variant="default" @click="emit('backToWizard')">
         <MsIcon name="arrow_back" size="sm" />

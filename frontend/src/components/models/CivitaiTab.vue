@@ -34,7 +34,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-// ── CivitAI 设置 (key gate) ────────────────────────────────────────────────
 // 搜索/下载强制要求 API Key: 未配置时本 tab 呈引导空态, 不发起任何请求。
 const civitaiSettings = useCivitaiSettings()
 const settingsOpen = ref(false)
@@ -49,7 +48,6 @@ async function refreshSettings(): Promise<void> {
 /** key 未配置 → gate; 其余一切 (搜索/下载/收藏动作) 均以 key 已配置为前提 */
 const needsKey = computed(() => !civitaiSettings.keySet.value)
 
-// ── Downloads (singleton) ──
 const {
   favoritesItems: dlFavItems,
   addFavorite: dlAddFavorite,
@@ -63,7 +61,6 @@ const {
   activeTasks: dlActiveTasks,
 } = useDownloads()
 
-// ── CivitAI Search ──
 // Empty-query browsing is ranked by downloads; text searches switch to relevance.
 const civitaiSort = ref<SortKey>('Most Downloaded')
 const queryInput = ref('')
@@ -85,10 +82,8 @@ const {
   applyFilters,
 } = useCivitaiSearch(civitaiSort)
 
-// ── 筛选器选项 ────────────────────────────────────────────────────────────
 // selectedTypes / selectedBaseModels 本身就是 string[], ChipSelect 开 multiple
 // 后直接双向绑定, 不需要适配层。
-/** facet → ChipSelect 选项; count 作为 chip 右侧的小字。 */
 function facetOptions(facets: typeof typeFacets) {
   return computed(() => facets.value.map(f => ({
     value: f.value,
@@ -137,10 +132,8 @@ function handleFilterApply(types: string[], baseModels: string[], sort: string) 
   submitCurrentQuery()
 }
 
-// Auto-activate when tab becomes visible
 let initialTypeApplied = false
 
-/** key 已配置时执行浏览激活 (facets + 初始搜索 + 下载轮询) */
 function activateBrowsing() {
   // 外部跳转预选类型 (仅首次激活应用一次, 避免覆盖用户后续操作)
   if (props.initialType && !initialTypeApplied) {
@@ -155,7 +148,6 @@ function activateBrowsing() {
   })
 }
 
-/** 设置弹窗保存后: 刷新 key 状态, gate 解除 (或首次解除) 即激活浏览 */
 async function onSettingsSaved() {
   await refreshSettings()
   if (!needsKey.value && props.active) activateBrowsing()
@@ -168,13 +160,11 @@ watch(() => props.active, (val) => {
   })
 }, { immediate: true })
 
-// ── Version picker ──
 const vpOpen = ref(false)
 const vpHit = ref<CivitaiHit | null>(null)
 const favOpen = ref(false)
 const favHit = ref<CivitaiHit | null>(null)
 
-// ── Infinite scroll sentinel ──
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
@@ -189,7 +179,6 @@ watch(sentinelRef, (el) => {
   observer.observe(el)
 })
 
-// ── Favorite helpers ──
 function hitToFavoriteItem(hit: CivitaiHit) {
   const CDN = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
   const imgs = hit.images?.length ? hit.images : (hit.version?.images || [])
@@ -211,7 +200,6 @@ function hitToFavoriteItem(hit: CivitaiHit) {
 
 function toggleFavorite(hit: CivitaiHit) {
   if (dlIsInFavorites(hit.id)) {
-    // Remove all versions of this model from favorites
     for (const item of dlFavItems.value) {
       if (item.modelId === String(hit.id)) {
         const key = item.versionId ? `${item.modelId}:${item.versionId}` : item.modelId
@@ -221,11 +209,9 @@ function toggleFavorite(hit: CivitaiHit) {
   } else {
     const allVersions = hit.versions || (hit.version ? [hit.version] : [])
     if (allVersions.length > 1) {
-      // Multi-version: open picker modal
       favHit.value = hit
       favOpen.value = true
     } else {
-      // Single version: add directly
       dlAddFavorite(hitToFavoriteItem(hit))
     }
   }
@@ -269,7 +255,6 @@ function handleDownload(hit: CivitaiHit) {
     vpHit.value = hit
     vpOpen.value = true
   } else {
-    // Single version (idle/downloading/installed): download directly
     const versionId = hit.version?.id
     dlDownloadOne(String(hit.id), (hit.type || 'Checkpoint').toLowerCase(), versionId)
   }
@@ -303,7 +288,6 @@ function openCivitaiMeta(hit: CivitaiHit) {
   <LoadingCenter v-else-if="active && gateLoading && needsKey" />
 
   <template v-else>
-  <!-- 工具栏: key 已配置才挂载 (gate 态不占页头) -->
   <Teleport :to="toolbarTarget || 'body'" :disabled="!toolbarTarget || !active">
     <AppToolbar search-full>
       <template #search>
@@ -339,13 +323,10 @@ function openCivitaiMeta(hit: CivitaiHit) {
     </AppToolbar>
   </Teleport>
 
-  <!-- Error -->
   <EmptyState v-if="civitaiError" icon="error_outline" :message="civitaiError" />
 
-  <!-- Loading (initial) -->
   <LoadingCenter v-else-if="civitaiLoading && civitaiHits.length === 0" />
 
-  <!-- Card Grid -->
   <div v-else-if="civitaiHits.length > 0" class="model-grid">
     <CivitaiModelCard
       v-for="hit in civitaiHits"
@@ -360,14 +341,12 @@ function openCivitaiMeta(hit: CivitaiHit) {
     />
   </div>
 
-  <!-- Empty after search -->
   <EmptyState
     v-else-if="!civitaiLoading && civitaiTotalHits === 0 && facetsLoaded"
     icon="search_off"
     :message="t('models.civitai.no_results')"
   />
 
-  <!-- Infinite scroll sentinel -->
   <div
     v-if="civitaiHits.length > 0 && civitaiHasMore"
     ref="sentinelRef"
@@ -376,14 +355,12 @@ function openCivitaiMeta(hit: CivitaiHit) {
     <LoadingCenter v-if="civitaiLoading" />
   </div>
 
-  <!-- Version Picker Modal -->
   <VersionPickerModal
     v-model="vpOpen"
     :hit="vpHit"
     @download="handlePickerDownload"
   />
 
-  <!-- Favorite Version Modal -->
   <FavoriteVersionModal
     v-model="favOpen"
     :hit="favHit"

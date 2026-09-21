@@ -96,12 +96,9 @@ function onSpeedChange(v: string) {
   state.value.fast = (v === 'fast')
 }
 
-/* ── 分辨率 (单个 BaseSelect) ── */
-
 /** 起始画面是否就位 —— 决定「贴合起始画面」项是否出现 (t2v 永远不出现) */
 const hasRef = computed(() => props.refWidth > 0 && props.refHeight > 0)
 
-/** 贴合项的推导尺寸 (无起始画面时为 null) */
 const fitSize = computed(() => {
   if (!hasRef.value) return null
   return deriveFitSize(props.refWidth, props.refHeight, pixelBudget.value, vd.value.divisor)
@@ -109,7 +106,6 @@ const fitSize = computed(() => {
 
 type Orient = 'landscape' | 'portrait' | 'square'
 
-/** 全部档位预设摊平成下拉项 (来自 videoDefaults.presets, 不硬编码) */
 const presetEntries = computed(() => {
   const out: { value: string; label: string; width: number; height: number }[] = []
   const presets = vd.value.presets
@@ -128,7 +124,6 @@ const presetEntries = computed(() => {
   return out
 })
 
-/** 下拉选项: [贴合起始画面] → 6 个档位预设 → 自定义 */
 const resolutionOptions = computed(() => {
   const opts: { value: string; label: string }[] = []
   if (fitSize.value) {
@@ -209,7 +204,6 @@ watch(
   },
 )
 
-/* ── 自定义宽高: 实时整除吸附 + 像素预算约束 ── */
 function onCustomWidth(raw: number) {
   const d = vd.value.divisor
   let w = snap(raw, d)
@@ -225,7 +219,6 @@ function onCustomHeight(raw: number) {
   video.value.height = h
 }
 
-/* ── 时长 (步进 0.5s, 1 → maxDurationS, frames = fps×duration + 1) ── */
 const fps = computed(() => vd.value.fps)
 const maxDur = computed(() => vd.value.maxDurationS)
 /** 时长滑块下限 / 步进: 架构可覆盖 (H3 整数秒 4-15); 缺省 1 / 0.5 (Wan) */
@@ -252,7 +245,6 @@ const durationMarkFormat = (v: number) => `${v}s`
 
 <template>
   <div class="video-settings" :class="{ 'video-settings--disabled': disabled }">
-    <!-- 速度 (仅 speedToggle=true) -->
     <div v-if="hasSpeed" class="field-group">
       <div class="field-lbl">
         {{ t('generate.video.speed') }}
@@ -268,7 +260,6 @@ const durationMarkFormat = (v: number) => `${v}s`
       />
     </div>
 
-    <!-- 分辨率: 单下拉 (含贴合项 / 6 档预设 / 自定义); 与图像页 res-row 同构 -->
     <div class="field-group">
       <div class="field-lbl">
         {{ t('generate.basic.resolution') }}
@@ -307,7 +298,6 @@ const durationMarkFormat = (v: number) => `${v}s`
       </div>
     </div>
 
-    <!-- 时长 (步进 0.5s; 帧数走 label 徽章) -->
     <div class="field-group">
       <RangeField
         :model-value="video.durationS"
@@ -327,7 +317,6 @@ const durationMarkFormat = (v: number) => `${v}s`
       </RangeField>
     </div>
 
-    <!-- 步数 / CFG (仅标准档; 置于末尾 → 切档时上方控件不跳动) -->
     <div v-if="hasSpeed && !isFast" class="vs-slider-row">
       <RangeField
         :model-value="state.steps"
@@ -369,7 +358,6 @@ const durationMarkFormat = (v: number) => `${v}s`
   pointer-events: none;
 }
 
-/* 字段块 / 标签 — 与 BasicSettings、AdvancedSettings 同款 */
 .field-group {
   display: flex;
   flex-direction: column;
@@ -385,7 +373,6 @@ const durationMarkFormat = (v: number) => `${v}s`
   color: var(--t2);
 }
 
-/* 动态附属信息徽章 (帧数) — 与 AdvancedSettings 的 seed-mode-badge 同款 */
 .vs-badge {
   font-size: .65rem;
   font-weight: 500;
@@ -397,7 +384,6 @@ const durationMarkFormat = (v: number) => `${v}s`
   white-space: nowrap;
 }
 
-/* 分辨率行 — 与 BasicSettings res-row 同款: 左 select 右自定义宽高, 各占右列一半 */
 .res-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -405,7 +391,6 @@ const durationMarkFormat = (v: number) => `${v}s`
   align-items: start;
 }
 
-/* 自定义宽高 (与 BasicSettings custom-size 同款) */
 .vs-custom-size {
   display: flex;
   align-items: center;
@@ -423,7 +408,6 @@ const durationMarkFormat = (v: number) => `${v}s`
   flex-shrink: 0;
 }
 
-/* 步数/CFG 并排 */
 .vs-slider-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

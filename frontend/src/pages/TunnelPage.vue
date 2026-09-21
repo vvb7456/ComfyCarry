@@ -1,19 +1,4 @@
 <script setup lang="ts">
-/**
- * TunnelPage — 隧道单列页 (C04)。
- *
- * 结构: 页头 (停止/重启/启动 + 设置) → Hero → 运行事实 → 服务 → 日志。
- * 设置回迁页内 (TunnelSettingsModal): 未配置 Hero 的两个首次配置入口与页头设置
- * 打开同一弹窗, 前者预选对应模式。
- *
- * Hero 状态取后端 effective_status 与配置状态:
- *   unconfigured(off) / connecting(warn+busy) / online(ok) / stopped(off) / failed(bad)。
- * 运行事实 (模式 / 隧道标识 / 连接节点) 位于 Hero 卡片下方; 配置事实停机仍显示,
- * 连接节点等运行期字段随状态显示, 缺失不渲染。
- *
- * 服务行用 ListRow: HTTP 真实打开 (在线时), SSH 复制连接命令, TCP 复制地址;
- * 自定义模式保留添加服务与自定义服务删除 (内置不可删)。
- */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
@@ -47,10 +32,8 @@ const { toast } = useToast()
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
-// ── Tunnel data ──
 const data = ref<TunnelData | null>(null)
 
-// ── 页内设置弹窗 ──
 const settingsOpen = ref(false)
 const settingsPreset = ref<'off' | 'public' | 'custom' | null>(null)
 
@@ -59,7 +42,6 @@ function openSettings(mode: 'off' | 'public' | 'custom' | null = null) {
   settingsOpen.value = true
 }
 
-// ── 添加服务弹窗 ──
 const addSvcModal = ref(false)
 const addSvcName = ref('')
 const addSvcPort = ref('')
@@ -70,7 +52,6 @@ const addSvcPreview = computed(() => {
   return t('tunnel.config.enter_suffix')
 })
 
-// ── 日志流 ──
 const logOpen = ref(true)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/tunnel/logs',
@@ -102,11 +83,9 @@ async function loadTunnelStatus() {
   const requestedAt = Date.now()
   const d = await get<TunnelData>('/api/tunnel/status?refresh=1', { silent: true })
   if (!d) return
-  // 乱序响应保护: 迟到的旧快照不能覆盖新快照
   if (requestedAt < statusAppliedAt) return
   statusAppliedAt = requestedAt
   data.value = d
-  // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
   if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
 }
 
@@ -122,7 +101,6 @@ function markPendingStart() {
   pendingStartTimer = setTimeout(() => { pendingStartAt.value = 0 }, 120_000)
 }
 
-// ── 状态判定 ──
 type HeroState = 'unconfigured' | 'connecting' | 'online' | 'stopped' | 'failed'
 
 const isPublicMode = computed(() => data.value?.tunnel_mode === 'public')
@@ -160,7 +138,6 @@ const heroSubtitle = computed(() => heroState.value === 'online'
 
 const heroHasActions = computed(() => ['unconfigured', 'stopped', 'failed'].includes(heroState.value))
 
-// ── 服务列表 ──
 interface ServiceRow {
   key: string
   title: string
@@ -235,7 +212,6 @@ function rowFacts(row: ServiceRow): string[] {
   return facts
 }
 
-// ── 运行事实 ──
 const connInfo = computed(() => {
   const conns = data.value?.tunnel?.connections
   if (!conns?.length) return ''
@@ -258,7 +234,6 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   return out
 })
 
-// ── 服务操作 (cloudflared 启停) ──
 const pendingAction = ref<'start' | 'stop' | 'restart' | null>(null)
 const acting = computed(() => pendingAction.value !== null)
 
@@ -313,7 +288,6 @@ function onSettingsSaved() {
   loadTunnelStatus()
 }
 
-// ── 服务行操作 ──
 function buildSshCmd(url: string) {
   const hostname = url.replace(/^https?:\/\//, '')
   return `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" root@${hostname}`
@@ -377,7 +351,6 @@ function openAddSvc() {
       <LoadingCenter v-if="!data" style="padding:60px 0" />
 
       <template v-else>
-        <!-- Hero + 运行事实 -->
         <ServiceHero
           icon="vpn_lock"
           :title="heroTitle"
@@ -398,7 +371,6 @@ function openAddSvc() {
           </template>
         </ServiceHero>
 
-        <!-- 服务 -->
         <section v-if="configured" class="tunnel-block">
           <SectionHeader icon="link">
             {{ t('tunnel.services.title') }}
@@ -443,7 +415,6 @@ function openAddSvc() {
           <EmptyState v-else icon="link" :message="t('tunnel.services.empty')" density="compact" />
         </section>
 
-        <!-- 日志 (默认展开, 折叠标题与分区标题同构) -->
         <section v-if="configured" class="tunnel-block">
           <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
             {{ t('tunnel.log.title') }}
@@ -461,10 +432,8 @@ function openAddSvc() {
       </template>
     </div>
 
-    <!-- 页内设置 -->
     <TunnelSettingsModal v-model="settingsOpen" :preset-mode="settingsPreset" @saved="onSettingsSaved" />
 
-    <!-- 添加服务弹窗 -->
     <BaseModal v-model="addSvcModal" :title="t('tunnel.add_service.title')" size="md">
       <FormField :label="t('tunnel.add_service.name')" density="compact">
         <template #default="{ id }">
@@ -505,7 +474,6 @@ function openAddSvc() {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 服务 → 日志 (--section-gap, 与总览一致) */
 .tunnel-block {
   margin-top: var(--section-gap);
 }

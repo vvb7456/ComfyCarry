@@ -1,12 +1,4 @@
 <script setup lang="ts">
-/**
- * I2IPanel — Image-to-Image / Inpainting unified module panel.
- *
- * Layout: horizontal split — left: ref image area (280px), right: params (flex:1).
- * Mode switch (SegmentedControl): i2i / inpaint — both share the same FileUploadZone.
- * In inpaint mode, extra controls: growMaskBy slider + "Edit Mask" button.
- * In i2i mode, inpaint-specific controls are disabled (greyed out).
- */
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
@@ -36,7 +28,6 @@ const isInpaint = computed(() => state.value.i2i.mode === 'inpaint')
 const hasImage = computed(() => !!state.value.i2i.image)
 const hasMask = computed(() => !!state.value.i2i.mask)
 
-/** 模式分段单选: 图生图 / 局部重绘 */
 const modeOptions = computed(() => [
   { value: 'i2i', label: t('generate.i2i.mode_i2i') },
   { value: 'inpaint', label: t('generate.i2i.mode_inpaint') },
@@ -45,41 +36,35 @@ const modeOptions = computed(() => [
 /** Denoise range: slider always 0.10-1.00, but i2i mode soft-caps at 0.90 */
 const denoiseSoftMax = computed(() => isInpaint.value ? undefined : 0.90)
 
-// Clamp denoise when switching from inpaint to i2i
 watch(() => state.value.i2i.mode, (mode) => {
   if (mode === 'i2i' && state.value.i2i.denoise > 0.90) {
     state.value.i2i.denoise = 0.90
   }
 })
 
-/** Build preview URL for the selected image */
 const previewUrl = computed(() => {
   const img = state.value.i2i.image
   if (!img) return undefined
   return `/api/generate/input_image_preview?name=${encodeURIComponent(img)}`
 })
 
-/** Build preview URL for the mask overlay */
 const maskPreviewUrl = computed(() => {
   const mask = state.value.i2i.mask
   if (!mask) return undefined
   return `/api/generate/input_image_preview?name=${encodeURIComponent(mask)}`
 })
 
-/** Extract just the filename for display */
 const displayName = computed(() => {
   const img = state.value.i2i.image
   if (!img) return undefined
   return img.includes('/') ? img.slice(img.lastIndexOf('/') + 1) : img
 })
 
-/** Resolution display */
 const resDisplay = computed(() => {
   if (!hasImage.value) return ''
   return `${state.value.width} × ${state.value.height}`
 })
 
-/** Handle "Edit Mask" button click */
 function onEditMask() {
   if (!hasImage.value) {
     toast(t('generate.i2i.no_image_for_mask'), 'warning')
@@ -88,7 +73,6 @@ function onEditMask() {
   emit('mask-edit')
 }
 
-/** Handle denoise update with correct clamping */
 function onDenoiseUpdate(v: number) {
   const ceiling = denoiseSoftMax.value ?? 1.0
   state.value.i2i.denoise = Math.max(0.10, Math.min(ceiling, v))
@@ -98,7 +82,6 @@ function onDenoiseUpdate(v: number) {
 <template>
   <div class="i2i-split-container">
     <div class="i2i-split">
-      <!-- Left: reference image (FileUploadZone pick mode) -->
       <div class="i2i-split__media">
         <label class="field-lbl">{{ t('generate.i2i.ref_image') }}</label>
         <div class="i2i-ref-wrap">
@@ -115,7 +98,6 @@ function onDenoiseUpdate(v: number) {
             @clear="emit('clear')"
             @error="toast($event, 'warning')"
           />
-          <!-- Mask overlay (shown when inpaint mode + has mask) -->
           <img
             v-if="isInpaint && hasMask && hasImage && maskPreviewUrl"
             :src="maskPreviewUrl"
@@ -126,9 +108,7 @@ function onDenoiseUpdate(v: number) {
         <div v-if="resDisplay" class="i2i-ref-res">{{ resDisplay }}</div>
       </div>
 
-      <!-- Right: parameters -->
       <div class="i2i-split__params">
-        <!-- Mode switch -->
         <SegmentedControl
           :options="modeOptions"
           :model-value="state.i2i.mode"
@@ -136,7 +116,6 @@ function onDenoiseUpdate(v: number) {
           @update:model-value="state.i2i.mode = $event as 'i2i' | 'inpaint'"
         />
 
-        <!-- Denoise -->
         <RangeField
           :model-value="state.i2i.denoise"
           :min="0.10"
@@ -154,7 +133,6 @@ function onDenoiseUpdate(v: number) {
           </template>
         </RangeField>
 
-        <!-- Grow Mask By (disabled in i2i mode, always visible) -->
         <RangeField
           :model-value="state.i2i.growMaskBy"
           :min="0"
@@ -171,7 +149,6 @@ function onDenoiseUpdate(v: number) {
           </template>
         </RangeField>
 
-        <!-- Edit Mask button -->
         <BaseButton
           variant="default"
           :disabled="!isInpaint"
@@ -223,7 +200,6 @@ function onDenoiseUpdate(v: number) {
   color: var(--t2);
 }
 
-/* Wrapper for image + mask overlay */
 .i2i-ref-wrap {
   position: relative;
 }
@@ -232,7 +208,6 @@ function onDenoiseUpdate(v: number) {
   height: 280px;
 }
 
-/* Mask overlay: semi-transparent red on top of reference image */
 .i2i-mask-overlay {
   position: absolute;
   top: 0;

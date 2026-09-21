@@ -1,10 +1,3 @@
-"""
-ComfyCarry — 翻译服务
-
-本地 DB 优先 + 多 provider fallback。
-provider 列表: local_db, mymemory, bing, youdao, alibaba
-"""
-
 import logging
 import re
 import threading
@@ -17,14 +10,7 @@ from ..db import db
 
 log = logging.getLogger(__name__)
 
-# ── 语言代码映射 ────────────────────────────────────────
-
-
-# ── 翻译 Provider 基类 ─────────────────────────────────
-
 class TranslateProvider(ABC):
-    """翻译 provider 基类"""
-
     name: str = ""
 
     @abstractmethod
@@ -32,24 +18,14 @@ class TranslateProvider(ABC):
         """翻译文本，返回翻译结果字符串。失败抛异常。"""
 
 
-# ── 本地 DB 查词 ────────────────────────────────────────
-
 class LocalDBProvider(TranslateProvider):
-    """从 prompt_tags.translate + danbooru_tags.translate 查词"""
-
     name = "local_db"
 
     def translate(self, text: str, from_lang: str = "en", to_lang: str = "zh") -> str:
-        """
-        本地 DB 精确匹配翻译。
-        按逗号分割多 tag → 每个 tag 整体精确查 DB → 全部未匹配返回空串触发 fallback。
-        英→中: _lookup_en (含 underscore/space 互换)。中→英: _lookup_zh。
-        """
         text = text.strip()
         if not text:
             return ""
 
-        # 判断方向
         if to_lang.startswith("zh"):
             return self._en_to_zh(text)
         elif to_lang.startswith("en"):
@@ -57,7 +33,6 @@ class LocalDBProvider(TranslateProvider):
         return ""
 
     def _en_to_zh(self, text: str) -> str:
-        """英→中翻译: 整体精确匹配。完全未匹配时返回空串以触发 fallback。"""
         parts = [p.strip() for p in text.split(",") if p.strip()]
         translated = []
         any_found = False
@@ -71,7 +46,6 @@ class LocalDBProvider(TranslateProvider):
         return ", ".join(translated) if any_found else ""
 
     def _zh_to_en(self, text: str) -> str:
-        """中→英翻译: 查 DB 反向映射。全部未匹配时返回空串以触发 fallback。"""
         parts = [p.strip() for p in text.split(",") if p.strip()]
         translated = []
         any_found = False
@@ -82,20 +56,16 @@ class LocalDBProvider(TranslateProvider):
                 any_found = True
             else:
                 translated.append(part)
-        # 如果没有任何一个词被翻译，返回空串让 fallback 链继续
         return ", ".join(translated) if any_found else ""
 
     @staticmethod
     def _lookup_en(word: str) -> str | None:
-        """查询英文 tag 的中文翻译"""
-        # prompt_tags 优先
         row = db.fetch_one(
             "SELECT translate FROM prompt_tags WHERE text=? AND translate!='' LIMIT 1",
             (word,),
         )
         if row:
             return row[0]
-        # danbooru_tags fallback (下划线形式)
         underscore = word.replace(" ", "_")
         row = db.fetch_one(
             "SELECT translate FROM danbooru_tags WHERE tag=? AND translate!='' LIMIT 1",
@@ -103,7 +73,6 @@ class LocalDBProvider(TranslateProvider):
         )
         if row:
             return row[0]
-        # 也查空格形式
         if "_" in word:
             space_form = word.replace("_", " ")
             row = db.fetch_one(
@@ -116,7 +85,6 @@ class LocalDBProvider(TranslateProvider):
 
     @staticmethod
     def _lookup_zh(word: str) -> str | None:
-        """查询中文描述的英文 tag"""
         row = db.fetch_one(
             "SELECT text FROM prompt_tags WHERE translate=? LIMIT 1",
             (word,),
@@ -132,15 +100,12 @@ class LocalDBProvider(TranslateProvider):
         return None
 
 
-# ── MyMemory (免费默认) ─────────────────────────────────
-
 class MyMemoryProvider(TranslateProvider):
     """MyMemory 免费翻译 API (匿名 1000 字/天, 注册 10K)"""
 
     name = "mymemory"
     _url = "https://api.mymemory.translated.net/get"
 
-    # 语言代码映射
     _lang_map = {
         "zh": "zh-CN", "zh-CN": "zh-CN", "zh-Hans": "zh-CN",
         "en": "en-GB", "ja": "ja-JP", "ko": "ko-KR",
@@ -162,8 +127,6 @@ class MyMemoryProvider(TranslateProvider):
         return translated
 
 
-# ── Bing 翻译逆向 (Edge Token) ─────────────────────────
-
 class BingProvider(TranslateProvider):
     """Bing/Edge 翻译 (参考 WeiLin bing.py)"""
 
@@ -177,7 +140,6 @@ class BingProvider(TranslateProvider):
     _token_ttl = 3 * 3600
     _lock = threading.Lock()
 
-    # 语言代码映射
     _lang_map = {
         "zh": "zh-Hans", "zh-CN": "zh-Hans", "zh-Hans": "zh-Hans",
         "zh-TW": "zh-Hant", "zh-Hant": "zh-Hant",
@@ -239,8 +201,6 @@ class BingProvider(TranslateProvider):
             return cls._token
 
 
-# ── 有道翻译 Demo API ─────────────────────────────────
-
 class YoudaoProvider(TranslateProvider):
     """有道翻译 Demo API (参考 WeiLin wangyi.py)"""
 
@@ -274,8 +234,6 @@ class YoudaoProvider(TranslateProvider):
         return translations[0]
 
 
-# ── 阿里翻译 v2 逆向 ──────────────────────────────────
-
 class AlibabaProvider(TranslateProvider):
     """阿里翻译 v2 逆向 (参考 WeiLin alibabav2.py)"""
 
@@ -287,7 +245,6 @@ class AlibabaProvider(TranslateProvider):
         r"//lang\.alicdn\.com/mcms/translation-open-portal/(.*?)/translation-open-portal_interface\.json"
     )
 
-    # Session 缓存
     _session: requests.Session | None = None
     _csrf_token: dict | None = None
     _query_count = 0
@@ -339,7 +296,6 @@ class AlibabaProvider(TranslateProvider):
 
     @classmethod
     def _ensure_session(cls):
-        """初始化或刷新 Session + CSRF Token"""
         now = time.time()
         need_refresh = (
             cls._session is None
@@ -359,16 +315,12 @@ class AlibabaProvider(TranslateProvider):
             ),
         })
 
-        # 1. GET 主页 (建立 cookie)
         cls._session.get(cls._host_url, timeout=10)
 
-        # 2. GET CSRF Token
         csrf_resp = cls._session.get(cls._csrf_url, timeout=10)
         csrf_resp.raise_for_status()
         cls._csrf_token = csrf_resp.json()
-        # csrf_token 格式: {"headerName": "x-csrf-token", "token": "..."}
 
-        # 3. 更新 session headers
         cls._session.headers.update({
             cls._csrf_token["headerName"]: cls._csrf_token["token"],
         })
@@ -377,9 +329,6 @@ class AlibabaProvider(TranslateProvider):
         cls._query_count = 0
 
 
-# ── 翻译服务 (统一入口) ────────────────────────────────
-
-# Provider 注册表
 PROVIDERS: dict[str, TranslateProvider] = {
     "local_db": LocalDBProvider(),
     "mymemory": MyMemoryProvider(),
@@ -388,7 +337,6 @@ PROVIDERS: dict[str, TranslateProvider] = {
     "alibaba": AlibabaProvider(),
 }
 
-# 默认 fallback 链
 DEFAULT_CHAIN = ["local_db", "bing", "mymemory"]
 
 
@@ -398,23 +346,10 @@ def translate(
     to_lang: str = "zh",
     provider: str | None = None,
 ) -> dict:
-    """
-    翻译文本。
-
-    Args:
-        text: 待翻译文本
-        from_lang: 源语言 (en/zh/auto)
-        to_lang: 目标语言 (zh/en)
-        provider: 指定 provider 名称。None 则按 DEFAULT_CHAIN fallback。
-
-    Returns:
-        {"translate": str, "provider": str, "from_db": bool}
-    """
     text = text.strip()
     if not text:
         return {"translate": "", "provider": "", "from_db": False}
 
-    # 指定 provider
     if provider and provider in PROVIDERS:
         try:
             result = PROVIDERS[provider].translate(text, from_lang, to_lang)
@@ -427,7 +362,6 @@ def translate(
             log.warning("[translate] %s failed: %s", provider, e)
             return {"translate": "", "provider": provider, "error": str(e)}
 
-    # Fallback 链
     for name in DEFAULT_CHAIN:
         p = PROVIDERS.get(name)
         if not p:
@@ -449,9 +383,7 @@ def translate(
 
 
 def translate_word(word: str) -> dict:
-    """
-    单词快速翻译 (仅本地 DB)。用于 tag chip 的 tooltip。
-    """
+    """单词快速翻译 (仅本地 DB)。用于 tag chip 的 tooltip。"""
     text = word.strip()
     if not text:
         return {"translate": "", "from_db": False}

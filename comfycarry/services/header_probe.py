@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # 探针读取的字节数。safetensors header 实测 max=358KB, 1MB 覆盖全部样本。
 # GGUF metadata 段也在此范围内 (8 个样本均在 512KB 内)。
-_PROBE_BYTES = 1_048_576  # 1 MiB
+_PROBE_BYTES = 1_048_576
 _PROBE_TIMEOUT = 8  # 秒
 
 
@@ -51,8 +51,6 @@ class ProbeError(Exception):
     调用方应原样落回现有 409 + DownloadDirModal 流程 (等于改造前, 零回归)。
     """
 
-
-# ── HTTP 探针 ─────────────────────────────────────────────────────────────────
 
 def probe_download_url(url: str, timeout: int = _PROBE_TIMEOUT) -> bytes:
     """对下载 URL 发一次 Range 请求, 流式读满约 1MB 头部后断开。
@@ -107,7 +105,6 @@ def probe_download_url(url: str, timeout: int = _PROBE_TIMEOUT) -> bytes:
         resp.close()
 
 
-# ── GGUF 字节流解析 ───────────────────────────────────────────────────────────
 # 复用 arch_detect._detect_arch_gguf 的解析逻辑思路, 但改为接受字节流而非文件路径,
 # 并提取 general.architecture + tensor 名集合供探针判定。
 
@@ -164,7 +161,6 @@ def _gguf_read_string(buf: io.BytesIO) -> str:
 
 
 def _gguf_skip_value(buf: io.BytesIO, vtype: int) -> None:
-    """跳过一个 GGUF metadata value (不解析内容)。"""
     _FIXED_SIZES = {
         0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1,
         10: 8, 11: 8, 12: 8,
@@ -241,8 +237,6 @@ def parse_gguf_header(data: bytes) -> GGUFHeaderInfo | None:
         return None
 
 
-# ── 综合判定 ─────────────────────────────────────────────────────────────────
-
 def classify_from_probe(
     data: bytes,
     ext: str,
@@ -273,7 +267,6 @@ def classify_from_probe(
     mt = (model_type or "").strip().lower()
 
     if ext in (".safetensors", ".sft"):
-        # 触发条件: 仅 model_type == "Checkpoint" 时探测
         if mt != "checkpoint":
             return None
         header = parse_safetensors_header(data)
@@ -291,16 +284,13 @@ def classify_from_probe(
         return "checkpoints" if packaging == "checkpoint" else "diffusion_models"
 
     if ext == ".gguf":
-        # 触发条件: 任意 model_type
         info = parse_gguf_header(data)
         if info is None:
             return None
-        # 正向测扩散主干
         if info.arch and info.arch in _GGUF_IMG_ARCH_LIST:
             return "unet_gguf"
         if any(m in t for m in _DIFFUSION_TENSOR_MARKERS for t in info.tensor_names):
             return "unet_gguf"
-        # 其余归 TE (GGUF 是干净的二元判定)
         return "clip_gguf"
 
     return None

@@ -1,18 +1,10 @@
 <script setup lang="ts">
 /**
- * Step 3 连接云存储 —— wizard step 语义的原生化版本。
- *
- * 两区域: 上方 provider 六卡选择区, 下方单卡承载当前 provider 的连接过程。
- * 全部类型统一走 CloudAuthHero (identity):
- * - OAuth: 登录 → 粘贴回调+确认 → done
- * - 非 OAuth: 凭据表单 + 「连接」→ done
- * done 屏统一设置 存储名称 + 挂载根 (驱动器/存储桶) + 同步文件夹 ——
- * 名称等不再出现在凭据屏; 同步文件夹是预设规则路径的锚点。
+ * Step 3 连接云存储。
  *
  * 单存储语义: 向导只配置一个存储, 剩余的在 dashboard 处理; 重复创建会
  * 替换旧条目 (见 useWizardRclone.ensureCreated)。
- * 推进/跳过统一由 WizardStepLayout 底部导航承担; 未选 provider 且无已有
- * remote (导入 conf) → 「跳过」(nextStep 内部跳过 step 4)。
+ * 未选 provider 且无已有 remote (导入 conf) → 「跳过」(nextStep 内部跳过 step 4)。
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -232,7 +224,6 @@ watch(storageType, (next, previous) => {
       <HelpTip :text="t('wizard.step3.rclone_help')" />
     </template>
 
-    <!-- 区域 1: provider 选择六卡 -->
     <div class="step-rclone__choices">
       <OptionCard
         v-for="p in cloudProviders"
@@ -252,10 +243,6 @@ watch(storageType, (next, previous) => {
       </OptionCard>
     </div>
 
-    <!-- 区域 2: 下方单卡 (选中 provider 后) -->
-    <!-- 全类型统一 CloudAuthHero: OAuth 登录 / 非 OAuth 凭据 → done 屏
-         (名称 + 驱动器/存储桶 + 同步文件夹); 恢复态直接落 done, 凭据在服务端草稿,
-         目录浏览走 {wizard:true} staged -->
     <CloudAuthHero
       v-if="storageType"
       :key="storageType"
@@ -274,7 +261,6 @@ watch(storageType, (next, previous) => {
       @reset="onOAuthReset"
     />
 
-    <!-- 错误就地提示 -->
     <AlertBanner v-if="storageError" tone="danger" dense>{{ storageError }}</AlertBanner>
   </WizardStepLayout>
 </template>

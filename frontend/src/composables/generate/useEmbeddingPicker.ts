@@ -1,11 +1,3 @@
-/**
- * useEmbeddingPicker — Embedding browsing and insertion composable.
- *
- * Lazy-loads embedding list from /api/generate/embeddings (cached).
- * Provides search filtering and insertion with auto-separator.
- *
- * Legacy: _embeddingsCache / _openEmbeddingModal / _insertEmbedding in page-generate.js
- */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 

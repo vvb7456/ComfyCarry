@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * RefImageModal — Shared modal for picking reference images from ComfyUI input/.
- *
- * Used by I2I panel and ControlNet panels.
- * Legacy behavior: simple grid of image cards + upload card at the end.
- * No search/filter (matches old frontend gen-ref-modal).
- */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IMAGE_ACCEPT, type InputImage } from '@/composables/generate/useRefImagePicker'
@@ -72,12 +65,10 @@ function formatSize(bytes: number): string {
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <div class="ref-modal">
-      <!-- Loading -->
       <div v-if="loading" class="ref-state">
         <Spinner size="md" />
       </div>
 
-      <!-- Image grid (legacy gen-ref-grid) + upload card always present -->
       <div v-else class="ref-grid">
         <div
           v-for="img in images"
@@ -95,7 +86,6 @@ function formatSize(bytes: number): string {
           </div>
         </div>
 
-        <!-- Upload card (legacy .upload-card) -->
         <div class="ref-card ref-card--upload" @click="onUploadClick">
           <MsIcon name="upload_file" color="none" class="ref-card__upload-icon" />
           <span>{{ t('generate.i2i.upload_local') }}</span>
@@ -118,7 +108,6 @@ function formatSize(bytes: number): string {
   min-height: 200px;
 }
 
-/* ── States ── */
 .ref-state {
   display: flex;
   flex-direction: column;
@@ -133,7 +122,6 @@ function formatSize(bytes: number): string {
   opacity: .3;
 }
 
-/* ── Grid (legacy .gen-ref-grid) ── */
 .ref-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -172,7 +160,7 @@ function formatSize(bytes: number): string {
 
 .ref-card__body {
   padding: 6px 8px;
-  min-width: 0; /* allow children to shrink below content size */
+  min-width: 0;
 }
 .ref-card__name {
   display: block;
@@ -185,7 +173,6 @@ function formatSize(bytes: number): string {
   color: var(--t3);
 }
 
-/* ── Upload card (legacy .upload-card) ── */
 .ref-card--upload {
   display: flex;
   flex-direction: column;

@@ -16,7 +16,6 @@ export const CIVITAI_API_BASE = 'https://civitai.com/api/v1'
  * 永远 miss, HF 卡片 DiffusionModel 无映射, 全灰。
  */
 
-/** Model category → badge color mapping (used by Badge component across pages) */
 export const MODEL_CATEGORY_COLORS: Record<string, string> = {
   checkpoints: '#f472b6',
   // Diffusion model directories are checkpoint-family weights shown in a

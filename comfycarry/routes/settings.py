@@ -1,16 +1,3 @@
-"""
-ComfyCarry — 设置路由
-
-- /api/settings           — 设置概览
-- /api/settings/password  — 修改密码
-- /api/settings/restart   — 重启 Dashboard
-- /api/settings/debug     — Debug 模式 (POST 切换, GET 已合入 /api/settings)
-- /api/settings/api-key   — 重新生成 API Key
-- /api/settings/export-config  — 配置导出
-- /api/settings/import-config  — 配置导入
-- /api/settings/reinitialize   — 重新初始化
-"""
-
 import json
 import logging
 import shutil
@@ -123,7 +110,6 @@ def api_settings_restart():
 
 @bp.route("/api/settings/api-key", methods=["POST"])
 def api_settings_api_key():
-    """重新生成 API Key"""
     import secrets as _sec
     new_key = f"cc-{_sec.token_hex(24)}"
     cfg._save_api_key(new_key)
@@ -133,7 +119,6 @@ def api_settings_api_key():
 
 @bp.route("/api/settings/civitai-key", methods=["POST"])
 def api_settings_civitai_key():
-    """保存或清除 CivitAI API Key"""
     data = request.get_json(force=True) or {}
     key = data.get("api_key", "").strip()
     CONFIG_FILE.write_text(json.dumps({"api_key": key}))
@@ -224,7 +209,6 @@ def api_settings_export_config():
     except Exception:
         pass
 
-    # Tunnel v2 配置
     config["cf_api_token"] = _get_config("cf_api_token", "")
     config["cf_domain"] = _get_config("cf_domain", "")
     config["cf_subdomain"] = _get_config("cf_subdomain", "")
@@ -241,7 +225,6 @@ def api_settings_export_config():
         except Exception:
             pass
 
-    # API Key
     config["api_key"] = cfg.API_KEY
 
     # Tunnel 模式 (公共 Tunnel 由环境变量控制, 不导出)
@@ -256,7 +239,6 @@ def api_settings_export_config():
     if _get_config("ssh_pw_follow", False):
         config["ssh_pw_follow"] = True
 
-    # Tunnel 协议
     cf_protocol = _get_config("cf_protocol", "")
     if cf_protocol:
         config["cf_protocol"] = cf_protocol
@@ -272,12 +254,10 @@ def api_settings_export_config():
     if llm_provider_keys:
         config["llm_provider_keys"] = llm_provider_keys
 
-    # 提示词编辑器设置
     prompt_settings = _get_config("prompt_settings", {})
     if prompt_settings:
         config["prompt_settings"] = prompt_settings
 
-    # CivitAI NSFW 浏览设置
     civitai_nsfw_level = _get_config("civitai_nsfw_level", "")
     if civitai_nsfw_level != "":
         config["civitai_nsfw_level"] = civitai_nsfw_level
@@ -348,7 +328,6 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"同步设置: {e}")
 
-    # Tunnel v2 配置
     if data.get("cf_api_token"):
         _set_config("cf_api_token", data["cf_api_token"])
         _set_config("cf_domain", data.get("cf_domain", ""))
@@ -362,7 +341,6 @@ def api_settings_import_config():
     if data.get("cf_protocol"):
         _set_config("cf_protocol", data["cf_protocol"])
 
-    # API Key
     if data.get("api_key"):
         cfg._save_api_key(data["api_key"])
         cfg.API_KEY = data["api_key"]
@@ -397,7 +375,6 @@ def api_settings_import_config():
         else:
             errors.append(f"SSH 密码跟随: {err['error_key']}")
 
-    # LLM 配置
     if data.get("llm_provider"):
         try:
             provider = data["llm_provider"]
@@ -450,7 +427,6 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"ComfyUI 参数: {e}")
 
-    # 提示词编辑器设置
     if data.get("prompt_settings") and isinstance(data["prompt_settings"], dict):
         try:
             _set_config("prompt_settings", data["prompt_settings"])
@@ -458,7 +434,6 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"提示词编辑器设置: {e}")
 
-    # CivitAI NSFW 浏览设置
     if data.get("civitai_nsfw_level") or data.get("civitai_nsfw_blur") is not None:
         try:
             if data.get("civitai_nsfw_level"):

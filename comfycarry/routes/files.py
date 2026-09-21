@@ -1,13 +1,3 @@
-"""
-ComfyCarry — 通用文件管理路由
-
-包含:
-- GET  /api/files/stat   — 文件 / 目录信息 (存在性、大小、类型、修改时间)
-- GET  /api/files/read   — 读取文件内容 (文本 或 Base64)
-- POST /api/files/write  — 写入文件内容 (自动创建父目录、可选备份、可选权限)
-- POST /api/files/delete — 删除文件或目录 (支持批量 / 递归 / 关联文件清理)
-"""
-
 import base64
 import os
 import shutil
@@ -35,7 +25,6 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
     return jsonify(body), status
 
 
-# 模型关联文件后缀列表 (用于 companions 模式)
 _COMPANION_SUFFIXES = [
     ".jpg",               # 预览图 (替换扩展名)
     ".jpeg",
@@ -47,19 +36,6 @@ _COMPANION_SUFFIXES = [
 def _validate_path(
     raw: str, *, allow_root: bool = False
 ) -> tuple[Path | None, tuple[str, dict] | None]:
-    """验证并解析路径, 确保在 /workspace 内。
-
-    支持:
-    - 绝对路径: <workspace>/ComfyUI/models/foo.safetensors
-    - 相对路径: ComfyUI/models/foo.safetensors (相对于 workspace 根)
-
-    Args:
-        allow_root: 是否允许 /workspace 本身 (stat/read 允许, delete 不允许)
-
-    Returns:
-        (resolved_path, None) on success
-        (None, (i18n_key, params)) on failure
-    """
     if not raw or not raw.strip():
         return None, ("path_required", {})
 
@@ -77,7 +53,6 @@ def _validate_path(
 
 
 def _delete_companions(file_path: Path) -> list[str]:
-    """Delete companion files associated with a model file."""
     deleted = []
     base_no_ext = file_path.with_suffix("")
 
@@ -93,22 +68,8 @@ def _delete_companions(file_path: Path) -> list[str]:
 
 @bp.route("/api/files/delete", methods=["POST"])
 def api_delete_files():
-    """通用文件 / 目录删除端点。
-
-    Request JSON:
-        path      (str)           — 单个路径 (绝对 或 相对于 /workspace)
-        paths     (list[str])     — 批量路径 (与 path 互斥, 二选一)
-        recursive (bool, false)   — 删除目录时是否递归
-        companions (bool, false)  — 同时删除关联文件 (模型元数据 + 预览图)
-
-    Response JSON:
-        ok        (bool)          — 全部成功为 true
-        deleted   (list[str])     — 实际删除的路径列表
-        errors    (list[object])  — 失败项 [{path, error}], 空数组表示无错误
-    """
     data = request.get_json(force=True) or {}
 
-    # ── 解析目标路径列表 ──
     raw_paths: list[str] = []
     if "paths" in data and isinstance(data["paths"], list):
         raw_paths = [str(p) for p in data["paths"] if p]
@@ -127,7 +88,6 @@ def api_delete_files():
     for raw in raw_paths:
         target, err = _validate_path(raw)
         if err:
-            # err = (key, params); per-item 错误内嵌在 200 响应里, 前端按需渲染
             errors.append({"path": raw,
                            "error_key": f"files.err.{err[0]}",
                            "error_params": err[1]})
@@ -140,7 +100,6 @@ def api_delete_files():
 
         try:
             if target.is_file():
-                # 删除关联文件 (可选)
                 if companions:
                     deleted.extend(_delete_companions(target))
                 target.unlink()
@@ -171,25 +130,8 @@ def api_delete_files():
     })
 
 
-# ─────────────────────────────────────────────────────────
-# GET /api/files/stat — 文件 / 目录信息
-# ─────────────────────────────────────────────────────────
-
 @bp.route("/api/files/stat", methods=["GET"])
 def api_files_stat():
-    """查询文件或目录的基本信息。
-
-    Query params:
-        path  (str) — 绝对 或 相对于 /workspace
-
-    Response JSON:
-        exists   (bool)
-        is_file  (bool)
-        is_dir   (bool)
-        size     (int, bytes) — 仅文件
-        mtime    (float, unix timestamp)
-        path     (str) — 解析后的绝对路径
-    """
     raw = request.args.get("path", "")
     target, err = _validate_path(raw, allow_root=True)
     if err:
@@ -209,25 +151,8 @@ def api_files_stat():
     })
 
 
-# ─────────────────────────────────────────────────────────
-# GET /api/files/read — 读取文件内容
-# ─────────────────────────────────────────────────────────
-
 @bp.route("/api/files/read", methods=["GET"])
 def api_files_read():
-    """读取文件内容 (文本 或 Base64 编码的二进制)。
-
-    Query params:
-        path     (str)          — 绝对 或 相对于 /workspace
-        encoding (str, utf-8)   — 文本编码
-        binary   (bool, false)  — 以 Base64 返回二进制内容
-
-    Response JSON:
-        content        (str) — 文本内容 (binary=false)
-        content_base64 (str) — Base64 编码内容 (binary=true)
-        size           (int) — 文件大小 (bytes)
-        path           (str) — 解析后的绝对路径
-    """
     raw = request.args.get("path", "")
     target, err = _validate_path(raw)
     if err:
@@ -236,7 +161,6 @@ def api_files_read():
     if not target.is_file():
         return _err("not_a_file", 404)
 
-    # 限制读取大小 (10 MB)
     size = target.stat().st_size
     if size > 10 * 1024 * 1024:
         return _err("file_too_large", 413, size=size, max=10 * 1024 * 1024)
@@ -265,28 +189,8 @@ def api_files_read():
         return _err("internal", 500, detail=str(e))
 
 
-# ─────────────────────────────────────────────────────────
-# POST /api/files/write — 写入文件内容
-# ─────────────────────────────────────────────────────────
-
 @bp.route("/api/files/write", methods=["POST"])
 def api_files_write():
-    """写入文件内容。
-
-    Request JSON:
-        path           (str)          — 绝对 或 相对于 /workspace
-        content        (str)          — 文本内容 (与 content_base64 二选一)
-        content_base64 (str)          — Base64 编码的二进制内容
-        encoding       (str, utf-8)   — 文本写入编码
-        mkdir          (bool, true)   — 自动创建父目录
-        backup         (bool, false)  — 覆盖前创建 .bak 备份
-        mode           (str)          — 文件权限 (如 "0600"), 可选
-
-    Response JSON:
-        ok    (bool)
-        path  (str) — 写入的绝对路径
-        size  (int) — 写入的字节数
-    """
     data = request.get_json(force=True) or {}
 
     raw = data.get("path", "")
@@ -294,22 +198,18 @@ def api_files_write():
     if err:
         return _err(err[0], 400, **err[1])
 
-    # 不允许写入目录路径
     if target.exists() and target.is_dir():
         return _err("is_directory")
 
-    # 解析内容
     content_text = data.get("content")
     content_b64 = data.get("content_base64")
 
     if content_text is None and content_b64 is None:
         return _err("content_required")
 
-    # 自动创建父目录
     if data.get("mkdir", True):
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    # 备份现有文件
     if data.get("backup") and target.exists():
         bak = target.with_suffix(target.suffix + ".bak")
         shutil.copy2(target, bak)
@@ -328,7 +228,6 @@ def api_files_write():
     except OSError as e:
         return _err("internal", 500, detail=str(e))
 
-    # 设置文件权限
     mode = data.get("mode")
     if mode:
         try:

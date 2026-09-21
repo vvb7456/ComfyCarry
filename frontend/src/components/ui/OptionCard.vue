@@ -54,7 +54,6 @@ function onClick() {
     :aria-pressed="selected || locked"
     @click="onClick"
   >
-    <!-- checkmark indicator -->
     <span
       v-if="(selected || locked) && !hideCheck"
       class="option-card__check"

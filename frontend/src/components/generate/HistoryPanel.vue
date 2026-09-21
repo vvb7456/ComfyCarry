@@ -31,8 +31,6 @@ const historySortAsc = computed({
 
 const cardSize = ref<'sm' | 'md' | 'lg'>('md')
 
-// 行头切换按钮: 排序方向循环 (desc → asc), 尺寸循环 (sm → md → lg)。
-// 按钮文案即当前生效值, 与 QueuePanel 行头「中断/清空」同位同级 (xs, title-right 槽)。
 function toggleSort() {
   historySortAsc.value = !historySortAsc.value
   onSortChange()
@@ -42,8 +40,6 @@ function toggleCardSize() {
   cardSize.value = cardSize.value === 'sm' ? 'md' : cardSize.value === 'md' ? 'lg' : 'sm'
 }
 
-// emit('makeVideo', item) — 带上产物定位信息, 由 GeneratePage 接线跳转
-//  payload 结构见文件末尾注释
 const emit = defineEmits<{
   makeVideo: [payload: {
     filename: string
@@ -54,14 +50,12 @@ const emit = defineEmits<{
   }]
 }>()
 
-// Image preview
 const previewOpen = ref(false)
 const previewImages = ref<string[]>([])
 const previewIndex = ref(0)
 
 const sortedHistory = computed(() => historyItems.value)
 
-// ── 媒体判定 ──
 // 视频扩展名兜底 (animated 字段缺失时的老节点覆盖)
 // 与 useGeneratePreview / GeneratePage / 后端兜底集保持一致 —— 不一致会导致
 // 同一个产物在预览区判为视频、在历史里判为图像 (走错缩略图端点且显示「生成视频」按钮)。
@@ -71,13 +65,11 @@ function hasVideoExt(filename: string): boolean {
   if (i < 0) return false
   return VIDEO_EXTS.includes(filename.slice(i))
 }
-/** 媒体判定: 优先读条目上的 animated 标量布尔, 扩展名兜底 (.mp4/.webm/.mov) */
 function isVideo(img: HistoryImage): boolean {
   if (typeof img.animated === 'boolean') return img.animated
   return hasVideoExt(img.filename)
 }
 
-// ── 视频时长角标 (右下胶囊, play_arrow 图标 + 时长) ──
 // 时长由隐藏 <video preload="metadata"> 的 loadedmetadata 事件按需获取, 拿不到就只显图标
 const durationMap = ref<Record<string, number>>({})
 function durKey(img: HistoryImage): string {
@@ -97,7 +89,6 @@ function fmtDuration(d: number): string {
   return `${d.toFixed(d < 10 ? 1 : 0)}s`
 }
 
-// ── 渲染分页: 首屏 30 条, 哨兵 IntersectionObserver 触发追加 30 ──
 const PAGE_SIZE = 30
 const visibleCount = ref(PAGE_SIZE)
 const visibleHistory = computed(() => sortedHistory.value.slice(0, visibleCount.value))
@@ -114,7 +105,6 @@ function loadMore() {
     visibleCount.value + PAGE_SIZE,
     sortedHistory.value.length,
   )
-  // 追加后若哨兵仍在视口内, 下一帧再次检查 (确保一次滚动填满视口)
   nextTick(() => reobserve())
 }
 
@@ -135,11 +125,9 @@ function setupObserver() {
 }
 
 onMounted(() => {
-  // 抽屉首开挂载 — 从 store 取数 (未加载或 dirty 则拉取)
   if (!queueStore.historyLoaded || queueStore.historyDirty) {
     queueStore.loadHistory()
   } else {
-    // 已加载但首次挂载: 仍需建立哨兵观察
     nextTick(() => setupObserver())
   }
 })
@@ -169,17 +157,14 @@ function videoThumbUrl(img: { filename: string; subfolder: string; type: string 
   return `/api/comfyui/video_thumb?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`
 }
 
-/** 大图 URL — 不带 preview */
 function fullUrl(img: { filename: string; subfolder: string; type: string }) {
   return `/api/comfyui/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`
 }
 
-/** 卡片缩略图 URL — 按媒体类型分流 (视频走首帧端点, 图像保持原 webp 预览) */
 function cardThumbUrl(img: HistoryImage): string {
   return isVideo(img) ? videoThumbUrl(img) : thumbUrl(img)
 }
 
-/** Collect all image URLs across all history items for navigation (full-res) */
 function allImageUrls(): string[] {
   const urls: string[] = []
   for (const item of sortedHistory.value) {
@@ -218,10 +203,6 @@ function downloadAll(images: ComfyHistoryItem['images']) {
   )
 }
 
-/**
- * 「生成视频」入口 — 仅 emit, 不实现跳转。
- * payload 携带该产物定位信息 (filename/subfolder/type) + 所属 prompt_id + 媒体标志。
- */
 function onMakeVideo(img: HistoryImage, item: ComfyHistoryItem) {
   emit('makeVideo', {
     filename: img.filename,
@@ -232,7 +213,6 @@ function onMakeVideo(img: HistoryImage, item: ComfyHistoryItem) {
   })
 }
 
-// 暴露给模板通过 ref 调用 setupObserver (哨兵 ref 挂载后)
 defineExpose({ setupObserver })
 </script>
 
@@ -242,8 +222,6 @@ defineExpose({ setupObserver })
     :title="t('comfyui.history.total')"
     :default-open="true"
   >
-    <!-- 排序/尺寸切换收进行头右侧 (同 QueuePanel 的「中断/清空」),
-         点击循环切换, 按钮文案即当前生效值 -->
     <template #title-right>
       <BaseButton
         size="xs"
@@ -269,7 +247,6 @@ defineExpose({ setupObserver })
 
     <div v-else :class="['history-grid', 'size-' + cardSize]">
       <div v-for="item in visibleHistory" :key="item.prompt_id" class="history-card">
-        <!-- Images -->
         <div v-if="item.images?.length" class="history-card-images">
           <div
             v-for="(img, imgIdx) in (item.images as HistoryImage[])"
@@ -282,7 +259,7 @@ defineExpose({ setupObserver })
               loading="lazy"
               alt=""
             >
-            <!-- 视频角标: play_arrow + 时长; 时长由隐藏 <video> 抽取, 拿不到只显图标 -->
+            <!-- 视频角标: play_arrow + 时长 -->
             <span
               v-if="isVideo(img)"
               class="history-thumb-dur"
@@ -290,7 +267,6 @@ defineExpose({ setupObserver })
               <MsIcon name="play_arrow" size="xxs" color="none" />
               <template v-if="durationMap[durKey(img)!] != null">{{ fmtDuration(durationMap[durKey(img)!]!) }}</template>
             </span>
-            <!-- 视频时长抽取: preload="metadata" 只取头部, @loadedmetadata 写入时长 Map -->
             <video
               v-if="isVideo(img)"
               class="history-thumb-probe"
@@ -314,7 +290,6 @@ defineExpose({ setupObserver })
           {{ t('comfyui.history.no_preview') }}
         </div>
 
-        <!-- Info -->
         <div class="history-card-info">
           <span class="history-card-filename text-truncate" :title="item.images?.[0]?.filename">
             {{ item.images?.[0]?.filename || item.prompt_id.substring(0, 8) + '…' }}
@@ -331,12 +306,10 @@ defineExpose({ setupObserver })
           </BaseButton>
         </div>
       </div>
-      <!-- 渲染分页哨兵: 进入视口 → 追加 30 条 -->
       <div ref="sentinelRef" class="history-sentinel" aria-hidden="true"></div>
     </div>
   </CollapsibleGroup>
 
-  <!-- Image Preview Overlay -->
   <ImagePreview
     v-model="previewOpen"
     :images="previewImages"
@@ -345,7 +318,6 @@ defineExpose({ setupObserver })
 </template>
 
 <style scoped>
-/* ── Grid ── */
 .history-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -362,8 +334,7 @@ defineExpose({ setupObserver })
 }
 .history-grid.size-lg .history-card-info { padding: 6px 10px; }
 
-/* ── Card ──
-   图区显式 3:4 (与 DashboardGallery / PreviewArea 网格同口径);
+/* 图区显式 3:4 (与 DashboardGallery / PreviewArea 网格同口径);
    不再给整卡设 aspect-ratio —— 卡高 = 图区 3:4 + info 行自然高度 */
 .history-card {
   background: var(--bg3);
@@ -375,7 +346,6 @@ defineExpose({ setupObserver })
   flex-direction: column;
 }
 
-/* ── Image gallery ── */
 .history-card-images {
   display: flex;
   gap: 2px;
@@ -384,7 +354,6 @@ defineExpose({ setupObserver })
   aspect-ratio: 3 / 4;
   overflow: hidden;
 }
-/* 每个产物单元格: 相对定位承载角标与 hover 按钮 */
 .history-thumb {
   position: relative;
   flex: 1;
@@ -406,7 +375,7 @@ defineExpose({ setupObserver })
   font-size: var(--text-sm);
 }
 
-/* ── 视频角标 (play_arrow + 时长): 右下角半透明黑底胶囊 ── */
+/* 视频角标 (play_arrow + 时长): 右下角半透明黑底胶囊 */
 .history-thumb-dur {
   position: absolute;
   right: 6px;
@@ -436,7 +405,7 @@ defineExpose({ setupObserver })
   pointer-events: none;
 }
 
-/* ── 生成视频入口: 图像卡 hover 时显示的胶囊按钮 ── */
+/* 生成视频入口: 图像卡 hover 时显示的胶囊按钮 */
 .history-thumb-make {
   position: absolute;
   left: 50%;
@@ -481,7 +450,6 @@ defineExpose({ setupObserver })
   border-color: var(--ac2);
 }
 
-/* ── Info row ── */
 .history-card-info {
   padding: 4px 8px;
   display: flex;

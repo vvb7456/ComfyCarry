@@ -55,7 +55,6 @@ export function provideToastScope(name: string): void {
   if (inst) _instanceScopes.set(inst, name)
 }
 
-/** 静音 / 解除静音某个作用域 (页面失活 / 重新激活时调用)。 */
 export function muteToastScope(name: string): void { _mutedScopes.add(name) }
 export function unmuteToastScope(name: string): void { _mutedScopes.delete(name) }
 
@@ -91,9 +90,6 @@ function createToastApi(): ToastAPI {
 
 const _sharedApi: ToastAPI = createToastApi()
 
-/**
- * Provide toast API from App.vue root.
- */
 export function provideToast(): ToastAPI {
   provide(TOAST_KEY, _sharedApi)
   return _sharedApi
@@ -112,7 +108,6 @@ export function useToast(): ToastAPI {
   // 解构 toast 即抛 TypeError。必须先用 hasInjectionContext() 显式判上下文。
   if (!hasInjectionContext()) return _sharedApi
   const api = inject<ToastAPI>(TOAST_KEY, _sharedApi)
-  // 先走注入链 (子组件命中祖先 provide), 再兜底查本实例自身 provide 的作用域
   const inst = getCurrentInstance()
   const scope = inject<string | null>(TOAST_SCOPE_KEY, null)
     ?? (inst ? _instanceScopes.get(inst) ?? null : null)
@@ -122,7 +117,6 @@ export function useToast(): ToastAPI {
     remove: api.remove,
     toast(message, type, duration) {
       const kind = type ?? 'info'
-      // error 放行: 页面虽然不可见, 但失败必须让用户知道
       if (kind !== 'error' && _mutedScopes.has(scope)) return
       api.toast(message, kind, duration)
     },

@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// HelpTip — small "?" trigger that shows a tooltip on hover/click/focus.
-//
-// Tooltip is rendered via Teleport to <body> with position:fixed so it
-// is never clipped by ancestor overflow (e.g. modal-body's overflow-y:auto)
-// and never causes layout shift on hover.
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -35,7 +30,6 @@ function recalcPosition() {
   if (!trigger.value) return
   const rect = trigger.value.getBoundingClientRect()
   const vw = window.innerWidth
-  // Prefer above; flip below if no room
   const placement = rect.top > 80 ? 'top' : 'bottom'
   const left = Math.min(
     Math.max(8, rect.left),
@@ -57,7 +51,6 @@ function hide() {
   hovering.value = false
 }
 
-/** 键盘离开触发器时同时收起固定打开的弹层, 避免遗留无法关闭的气泡 */
 function onBlur() {
   open.value = false
   hide()

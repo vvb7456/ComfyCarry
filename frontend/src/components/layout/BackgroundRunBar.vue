@@ -27,7 +27,6 @@ const visible = computed(
   () => !(store.state === 'idle' && !store.stopReason),
 )
 
-// 正常结束: stopReason.code === 'max_reached'
 const isFinished = computed(
   () => store.stopReason?.code === 'max_reached',
 )

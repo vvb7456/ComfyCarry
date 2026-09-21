@@ -1,5 +1,3 @@
-// ── SSH Data Types ────────────────────────────────────────────
-
 export interface SSHStatus {
   running: boolean
   pid: number | null

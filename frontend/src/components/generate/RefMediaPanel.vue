@@ -43,7 +43,7 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 
-// ── 配额常量 (与后端校验一致) ──
+// 与后端校验一致
 const LIMIT_IMAGE = 9
 const LIMIT_VIDEO = 3
 const LIMIT_AUDIO = 3
@@ -52,17 +52,14 @@ const LIMIT_TOTAL = 12
 /** 引用标签名 — 提示词语法 (<Picture 1>) 是固定英文, 不走 i18n */
 const TAG_NAME: Record<RefItem['type'], string> = { image: 'Picture', video: 'Video', audio: 'Audio' }
 
-// ── 帮助模态 (用法说明, 内容依据 MiniMax 官方文档) ──
+// 内容依据 MiniMax 官方文档
 const helpOpen = ref(false)
 
-// ── 图片 picker (从输入目录选择) ──
 const imagePicker = useRefImagePicker('h3_ref')
 
-// ── 上传: 单个隐藏 file input, 用 pendingType 记录当前目标组 ──
 const pendingType = ref<RefItem['type'] | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
-/** 各组的 file input accept 白名单 */
 const ACCEPT_MAP: Record<RefItem['type'], string> = {
   image: IMAGE_ACCEPT,
   video: 'video/mp4,video/webm,video/quicktime',
@@ -73,7 +70,6 @@ function countOf(type: RefItem['type']): number {
   return props.refs.filter(r => r.type === type).length
 }
 
-/** 当前组是否已满 (组满或总数满) — 驱动添加按钮禁用 */
 const totalDisabled = computed(() => props.refs.length >= LIMIT_TOTAL)
 const imgAddDisabled = computed(() => totalDisabled.value || countOf('image') >= LIMIT_IMAGE)
 const vidAddDisabled = computed(() => totalDisabled.value || countOf('video') >= LIMIT_VIDEO)
@@ -109,7 +105,6 @@ function removeRef(index: number) {
   emit('update:refs', refs)
 }
 
-// ── 上传实现: POST /api/generate/upload_image (file + type='h3_ref') ──
 async function uploadRef(type: RefItem['type'], file: File) {
   const form = new FormData()
   form.append('file', file)
@@ -152,7 +147,6 @@ function triggerUpload(type: RefItem['type']) {
   }
 }
 
-// ── 图片 picker 接线 (复用 useRefImagePicker + RefImageModal, 与 ModelTab 同款) ──
 function onPickImage(name: string) {
   addRef('image', name)
   imagePicker.close()
@@ -163,7 +157,6 @@ async function onImageUpload(file: File) {
   addRef('image', result.filename)
 }
 
-// ── 展示辅助 ──
 function basename(n: string): string {
   return n.includes('/') ? n.slice(n.lastIndexOf('/') + 1) : n
 }
@@ -172,7 +165,6 @@ function imagePreviewUrl(name: string): string {
   return `/api/generate/input_image_preview?name=${encodeURIComponent(name)}`
 }
 
-/** 按组索引编号 (1-based) — 与后端引用编号同口径 */
 function refIndex(type: RefItem['type'], i: number): number {
   return props.refs.slice(0, i).filter(r => r.type === type).length + 1
 }
@@ -180,7 +172,6 @@ function refIndex(type: RefItem['type'], i: number): number {
 
 <template>
   <div class="ref-media-panel">
-    <!-- 标签行: 与 .model-tab__frame-lbl 同款小标题; 右端帮助按钮 → 用法说明 -->
     <p class="ref-media-panel__lbl">
       <span class="ref-media-panel__title">
         {{ t('generate.video.refs_title') }}
@@ -197,7 +188,6 @@ function refIndex(type: RefItem['type'], i: number): number {
       </button>
     </p>
 
-    <!-- 素材块网格: 内部滚动, 不撑高容器 (核心约束) -->
     <div class="ref-media-panel__grid">
       <span v-if="!refs.length" class="ref-media-panel__empty">{{ t('generate.video.refs_empty') }}</span>
       <div
@@ -234,7 +224,6 @@ function refIndex(type: RefItem['type'], i: number): number {
       </div>
     </div>
 
-    <!-- 添加行: 三个图标钮等分 (图=从输入目录选 / 视频·音频=上传), title 即文案 -->
     <div class="ref-media-panel__adds">
       <button
         type="button"
@@ -268,7 +257,6 @@ function refIndex(type: RefItem['type'], i: number): number {
       </button>
     </div>
 
-    <!-- 隐藏 file input (视频/音频共用, accept 在 triggerUpload 里命令式写入) -->
     <input
       ref="fileInputRef"
       type="file"
@@ -276,7 +264,6 @@ function refIndex(type: RefItem['type'], i: number): number {
       @change="onFileChange"
     >
 
-    <!-- 图片「从输入目录选择」模态 (与 ModelTab videoPicker 同款接线) -->
     <RefImageModal
       v-model="imagePicker.visible.value"
       :title="t('generate.video.refs_title')"
@@ -331,7 +318,6 @@ function refIndex(type: RefItem['type'], i: number): number {
   gap: var(--sp-2);
 }
 
-/* 标签行: 与 .model-tab__frame-lbl 同款; 右端帮助按钮 */
 .ref-media-panel__lbl {
   flex-shrink: 0;
   margin: 0;
@@ -356,7 +342,6 @@ function refIndex(type: RefItem['type'], i: number): number {
   color: var(--t3);
 }
 
-/* 帮助按钮: 与 prompt-help-btn 同款 (18px 圆钮, hover 高亮) */
 .ref-help-btn {
   display: inline-flex;
   align-items: center;
@@ -377,7 +362,6 @@ function refIndex(type: RefItem['type'], i: number): number {
   background: var(--bg3);
 }
 
-/* ── 使用说明模态 (与 prompt help 内容同款排版) ── */
 .ref-help {
   font-size: .88rem;
   line-height: 1.7;
@@ -403,7 +387,6 @@ function refIndex(type: RefItem['type'], i: number): number {
   color: var(--t2);
 }
 
-/* ── 素材块网格: 3 列 40px tile, 溢出纵向滚动 (滚动条隐藏, 与 prompt-toolbar 同款) ── */
 .ref-media-panel__grid {
   flex: 1;
   min-height: 0;
@@ -426,7 +409,6 @@ function refIndex(type: RefItem['type'], i: number): number {
   color: var(--t3);
 }
 
-/* ── 素材块: 40px 方形 tile ── */
 .ref-tile {
   position: relative;
   flex-shrink: 0;
@@ -448,7 +430,6 @@ function refIndex(type: RefItem['type'], i: number): number {
 }
 .ref-tile__icon { color: var(--t3); }
 
-/* 引用编号角标 (右下) */
 .ref-tile__num {
   position: absolute;
   right: 1px;
@@ -463,7 +444,6 @@ function refIndex(type: RefItem['type'], i: number): number {
   border-radius: 2px;
 }
 
-/* 删除 × (右上, 悬浮显现; 触屏常显) */
 .ref-tile__del {
   position: absolute;
   top: 1px;
@@ -488,7 +468,6 @@ function refIndex(type: RefItem['type'], i: number): number {
 }
 .ref-tile__del:disabled { cursor: not-allowed; }
 
-/* ── 添加行: 三钮等分, 纯图标 (title 悬浮给文案), 与 prompt-tool-btn 同款质感 ── */
 .ref-media-panel__adds {
   flex-shrink: 0;
   display: flex;

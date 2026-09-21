@@ -1,15 +1,6 @@
 <script setup lang="ts">
 /**
- * LoraPanel — Displays selected LoRAs with strength sliders + Add button.
- *
- * Legacy behavior (图像架构, mediaType==='image', 一字不变):
- * - Horizontal card grid with preview + strength slider + delete
- * - "Add LoRA" card at the end
- * - Click card image → (future) open model details
- * - Click delete → remove LoRA (auto-disables if last one removed)
- *
- * Video behavior (mediaType==='video'):
- * 卡片与图像架构**完全同构**, 只多一个「段徽章」—— 决定这个 LoRA 挂到哪一段采样器
+ * 视频架构卡片与图像架构**完全同构**, 只多一个「段徽章」—— 决定这个 LoRA 挂到哪一段采样器
  * (双段 / 仅高噪 / 仅低噪, 写入 loras[].apply), 点击循环切换, 默认双段。
  *
  * high/low 两段权重在文件层面完全无法区分 (字节数/头部长度/张量 key 全同且无元数据),
@@ -42,7 +33,6 @@ const store = useGenerateStore()
 const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
 
-// ── 架构判定 ──
 // store.activeModelType 是当前 tab 的架构 (LoraPanel 在 ModelTab 内, 一 tab 一实例)。
 // isVideo 决定是否启用视频配对折叠; 图像架构恒走原逻辑 (回归保护)。
 const isVideo = computed(
@@ -71,7 +61,6 @@ function getPreviewUrl(name: string): string | null {
   const info = getLoraInfo(name)
   if (!info) return null
   if (info.preview) return localModelPreviewUrl(info.preview)
-  // CivitAI fallback
   const civitImg = (info.info as Record<string, unknown>)?.images as Array<Record<string, unknown>> | undefined
   const first = civitImg?.[0]
   if (first?.url && typeof first.url === 'string' && first.url.startsWith('http')) return first.url
@@ -99,7 +88,6 @@ function updateStrength(index: number, value: number) {
   if (lora) lora.strength = value
 }
 
-// ── Inline strength editing ──
 const editingIndex = ref<number | null>(null)
 const editRef = ref<HTMLInputElement | null>(null)
 
@@ -127,10 +115,6 @@ function commitStrengthEdit(index: number, e: Event) {
 function cancelStrengthEdit() {
   editingIndex.value = null
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// 视频架构: LoRA 段徽章 (无配对、无推断)
-// ════════════════════════════════════════════════════════════════════════════
 
 function basename(name: string): string {
   return name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
@@ -167,7 +151,6 @@ function initApply(lora: LoraEntry): 'high' | 'low' | 'both' {
   return 'both'
 }
 
-/** apply 字段 → 段徽章 i18n key。 */
 function applyBadgeKey(apply: 'high' | 'low' | 'both'): string {
   return apply === 'both'
     ? 'generate.video.seg_both'
@@ -176,7 +159,6 @@ function applyBadgeKey(apply: 'high' | 'low' | 'both'): string {
       : 'generate.video.seg_low'
 }
 
-/** 点击段徽章循环切换: 双段 → 仅高噪 → 仅低噪 → 双段。 */
 function cycleApply(lora: LoraEntry) {
   const cur = initApply(lora)
   lora.apply = cur === 'both' ? 'high' : cur === 'high' ? 'low' : 'both'
@@ -185,7 +167,6 @@ function cycleApply(lora: LoraEntry) {
 
 <template>
   <div class="lora-panel">
-    <!-- 图像与视频**同一套卡片**: 唯一差异是视频双权重架构多一个段徽章。 -->
     <div class="lora-grid">
       <div
         v-for="{ lora, index } in visibleLoras"
@@ -217,8 +198,7 @@ function cycleApply(lora: LoraEntry) {
 
         <!-- 开关 / 删除: 挂在卡片根下 (相对卡片定位)。宽屏时缩略图占满卡片顶部,
              位置与旧版一致; 窄屏横向卡片下改贴卡片右缘, 不压住小缩略图。 -->
-        <button
-          type="button"
+        <button          type="button"
           class="lora-card__toggle"
           :title="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
           :aria-label="lora.enabled ? t('generate.lora.disable') : t('generate.lora.enable')"
@@ -281,7 +261,6 @@ function cycleApply(lora: LoraEntry) {
         </div>
       </div>
 
-      <!-- Add LoRA card -->
       <AddCard
         :label="t('generate.lora.add')"
         class="lora-add-card"
@@ -316,7 +295,6 @@ function cycleApply(lora: LoraEntry) {
   border-color: color-mix(in srgb, var(--ac) 50%, var(--bd));
 }
 
-/* Disabled state */
 .lora-card--disabled {
   opacity: .45;
 }
@@ -485,7 +463,6 @@ function cycleApply(lora: LoraEntry) {
   margin: 0;
 }
 
-/* ═══ 视频段徽章 ═══ */
 /* 徽章区: 左上角, toggle (top:4px left:4px, 22px) 下方, 不重叠 */
 .lora-card__seg-badges {
   position: absolute;
@@ -498,7 +475,6 @@ function cycleApply(lora: LoraEntry) {
   max-width: calc(100% - 8px);
 }
 
-/* 通用徽章风格: 紧凑字号 + 圆角胶囊 */
 .lora-card__badge {
   font-size: var(--text-xxs);
   font-weight: 600;
@@ -512,7 +488,6 @@ function cycleApply(lora: LoraEntry) {
 }
 
 
-/* 段标记: accent 系, 可点击 */
 .lora-card__badge--seg {
   background: var(--ac);
   color: #fff;
@@ -530,7 +505,6 @@ function cycleApply(lora: LoraEntry) {
 }
 
 
-/* Add card matching grid item height */
 .lora-add-card {
   height: 100%;
   /* 3:4 图区 + name + strength ≈ 300px 高, 与 LoRA 卡等高 */

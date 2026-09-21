@@ -3,15 +3,6 @@ ComfyCarry — Resource Registry
 
 资源级状态管理层, 位于 download_engine (任务级) 和前端之间.
 
-职责:
-  - 为每个下载资源维护 ResourceState (用户视角状态)
-  - 接收任务状态变化并推进资源状态
-  - 下载完成后执行文件验证 (verifying → installed)
-  - 向全局 SSE 流推送资源/任务事件
-  - 提供 snapshot API 供前端初始化
-  - 每次状态变更同步写入 SQLite (通过 download_store)
-  - 启动时从 DB 恢复状态
-
 ResourceKey 格式:
   source:model_id:version_id
   例: civitai:12345:67890
@@ -35,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceState(str, Enum):
-    """资源级状态 (用户视角)"""
     ABSENT = "absent"
     SUBMIT_PENDING = "submit_pending"
     DOWNLOADING = "downloading"
@@ -48,7 +38,6 @@ class ResourceState(str, Enum):
 
 @dataclass
 class ResourceView:
-    """资源快照视图"""
     resource_key: str
     source: str
     model_id: str
@@ -74,8 +63,6 @@ class ResourceView:
 
 
 class ResourceRegistry:
-    """资源级状态注册表 — 在 download_engine 之上管理用户视角状态"""
-
     def __init__(self):
         self._resources: dict[str, ResourceView] = {}
         self._lock = threading.Lock()
@@ -84,10 +71,7 @@ class ResourceRegistry:
         self._event_lock = threading.Lock()
         self._snapshot_version = 0
 
-    # ── DB 持久化 ────────────────────────────────────────────────────────
-
     def _persist(self, resource: ResourceView) -> None:
-        """将资源状态写入 DB (异步安全、不抛异常)。"""
         try:
             from . import download_store as store
             store.upsert_resource(
@@ -239,29 +223,19 @@ class ResourceRegistry:
             logger.info(f"[resource_registry] 从 DB 恢复 {restored} 个 task 记录")
         return restored
 
-    # ── Key 构造 ─────────────────────────────────────────────────────────
-
     @staticmethod
     def make_key(source: str, model_id: str, version_id: str) -> str:
-        """构造 ResourceKey"""
         return f"{source}:{model_id}:{version_id}"
 
     @staticmethod
     def parse_key(key: str) -> tuple[str, str, str]:
-        """解析 ResourceKey → (source, model_id, version_id)"""
         parts = key.split(":", 2)
         if len(parts) != 3:
             raise ValueError(f"Invalid resource key: {key}")
         return parts[0], parts[1], parts[2]
 
-    # ── 资源生命周期 ─────────────────────────────────────────────────────
-
     def submit_pending(self, source: str, model_id: str, version_id: str,
                        meta: dict | None = None) -> ResourceView:
-        """
-        标记资源为 submit_pending (用户刚点击下载, 等待后端确认).
-        幂等: 如果资源已在活跃状态, 返回现有资源.
-        """
         key = self.make_key(source, model_id, version_id)
         with self._lock:
             existing = self._resources.get(key)
@@ -293,9 +267,6 @@ class ResourceRegistry:
 
     def task_submitted(self, source: str, model_id: str, version_id: str,
                        task_id: str) -> ResourceView | None:
-        """
-        后端已成功提交 task → 资源从 submit_pending 转为 downloading.
-        """
         key = self.make_key(source, model_id, version_id)
         with self._lock:
             resource = self._resources.get(key)
@@ -321,19 +292,13 @@ class ResourceRegistry:
         return resource
 
     def task_paused(self, source: str, model_id: str, version_id: str) -> None:
-        """任务暂停 → 资源转为 paused"""
         self._transition(source, model_id, version_id, ResourceState.PAUSED)
 
     def task_resumed(self, source: str, model_id: str, version_id: str) -> None:
-        """任务恢复 → 资源转为 downloading"""
         self._transition(source, model_id, version_id, ResourceState.DOWNLOADING)
 
     def task_complete(self, source: str, model_id: str, version_id: str,
                       save_dir: str, filename: str) -> None:
-        """
-        任务传输完成 → 资源转为 verifying.
-        后台验证文件, 成功则转为 installed.
-        """
         key = self.make_key(source, model_id, version_id)
         with self._lock:
             resource = self._resources.get(key)
@@ -346,7 +311,6 @@ class ResourceRegistry:
         self._persist(resource)
         self._emit("resource.updated", resource.to_dict())
 
-        # 异步验证文件
         def _verify():
             dest = os.path.join(save_dir, filename)
             verified = (
@@ -364,11 +328,9 @@ class ResourceRegistry:
 
     def task_failed(self, source: str, model_id: str, version_id: str,
                     error: str = "") -> None:
-        """任务失败 → 资源转为 failed"""
         self._transition(source, model_id, version_id, ResourceState.FAILED, error=error)
 
     def task_cancelled(self, source: str, model_id: str, version_id: str) -> None:
-        """任务取消 → 资源转为 absent (取消后回归初始态)"""
         key = self.make_key(source, model_id, version_id)
         with self._lock:
             resource = self._resources.get(key)
@@ -383,10 +345,6 @@ class ResourceRegistry:
     def mark_installed(self, source: str, model_id: str, version_id: str,
                        meta: dict | None = None,
                        emit: bool = False) -> None:
-        """
-        外部标记资源为 installed (如本地扫描发现的已有文件).
-        默认不触发 SSE 事件 (批量操作), 设置 emit=True 可触发.
-        """
         key = self.make_key(source, model_id, version_id)
         with self._lock:
             resource = self._resources.get(key)
@@ -410,8 +368,6 @@ class ResourceRegistry:
             if emit:
                 self._emit("resource.updated", resource.to_dict())
 
-    # ── 查询 ─────────────────────────────────────────────────────────────
-
     def get_resource(self, source: str, model_id: str,
                      version_id: str) -> ResourceView | None:
         key = self.make_key(source, model_id, version_id)
@@ -420,22 +376,18 @@ class ResourceRegistry:
 
     def get_state(self, source: str, model_id: str,
                   version_id: str) -> str:
-        """获取资源状态字符串, 不存在则返回 'absent'"""
         key = self.make_key(source, model_id, version_id)
         with self._lock:
             r = self._resources.get(key)
             return r.state.value if r else ResourceState.ABSENT.value
 
     def get_snapshot(self) -> dict:
-        """返回完整快照 (内存活跃任务 + DB 历史任务合并)"""
         from .download_engine import get_engine
         engine = get_engine()
 
-        # 1. 内存中的活跃任务 (实时数据)
         live_tasks = engine.list_tasks()
         live_ids = {t["download_id"] for t in live_tasks}
 
-        # 2. DB 中的近期任务 (历史终态)
         try:
             from . import download_store as store
             db_tasks = store.get_recent_tasks(limit=200)
@@ -474,15 +426,11 @@ class ResourceRegistry:
             "server_time": time.time(),
         }
 
-    # ── 全局 SSE 事件系统 ────────────────────────────────────────────────
-
     def add_listener(self, listener) -> None:
-        """注册 SSE 事件监听器 (callable accepting event dict)"""
         with self._event_lock:
             self._event_listeners.append(listener)
 
     def remove_listener(self, listener) -> None:
-        """移除 SSE 事件监听器"""
         with self._event_lock:
             try:
                 self._event_listeners.remove(listener)
@@ -490,7 +438,6 @@ class ResourceRegistry:
                 pass
 
     def _emit(self, event_type: str, data: dict) -> None:
-        """向所有已注册的 SSE 监听器推送事件"""
         event = {"type": event_type, "data": data, "time": time.time()}
         with self._event_lock:
             listeners = list(self._event_listeners)
@@ -501,10 +448,7 @@ class ResourceRegistry:
                 logger.debug(f"[resource_registry] 事件推送失败: {e}")
 
     def emit_task_event(self, event_type: str, task_data: dict) -> None:
-        """推送任务级事件到全局流"""
         self._emit(event_type, task_data)
-
-    # ── 内部辅助 ─────────────────────────────────────────────────────────
 
     def _transition(self, source: str, model_id: str, version_id: str,
                     new_state: ResourceState, error: str = "") -> None:
@@ -521,16 +465,13 @@ class ResourceRegistry:
         self._emit("resource.updated", resource.to_dict())
 
     def _bump_version(self) -> None:
-        """递增快照版本号 (在 lock 内调用)"""
         self._snapshot_version += 1
 
 
-# ── 全局单例 ─────────────────────────────────────────────────────────────────
 _registry: ResourceRegistry | None = None
 
 
 def get_registry() -> ResourceRegistry:
-    """获取全局 ResourceRegistry 实例"""
     global _registry
     if _registry is None:
         _registry = ResourceRegistry()

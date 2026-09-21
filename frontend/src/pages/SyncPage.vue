@@ -70,7 +70,6 @@ const { toast } = useToast()
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
-// ── 页签 ──
 const activeTab = ref('sync')
 const tabs = computed<TabItem[]>(() => [
   { key: 'sync', label: t('sync.tabs.sync'), icon: 'cloud_sync' },
@@ -81,25 +80,21 @@ const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
 const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
 const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
 
-// ── Worker / 设置 ──
 const workerRunning = ref(false)
 const actionLoading = ref<'start' | 'stop' | 'restart' | null>(null)
 const acting = computed(() => actionLoading.value !== null)
 const settings = ref<SyncSettings | null>(null)
 
-// ── 存储 ──
 const remotes = ref<Remote[]>([])
 const storageData = ref<Record<string, StorageInfo>>({})
 const storageLoading = ref<Record<string, boolean>>({})
 const noCapacityTypes = new Set(['s3', 'webdav', 'ftp', 'swift', 'http', 'azureblob'])
 const remoteTypes = ref<Record<string, RemoteTypeDef>>({})
 
-// ── 规则 ──
 const rules = ref<SyncRule[]>([])
 const templates = ref<SyncTemplate[]>([])
 const ruleIsRunning = ref(false)
 
-// ── 弹窗 ──
 const addStorageModalOpen = ref(false)
 const reconnectPreset = ref<{ type?: string; name?: string; root_dir?: string; bucket?: string } | undefined>()
 const addRuleModal = ref(false)
@@ -116,7 +111,6 @@ function openDetail(jobId: string) {
   detailOpen.value = true
 }
 
-// ── 分页记录 ──
 const {
   jobs: syncJobs,
   currentJobId,
@@ -133,11 +127,9 @@ const {
   stopPolling: stopJobsPolling,
 } = useSyncJobs({ pageSize: 5 })
 
-// ── Hero 任务 ──
 const currentJob = ref<SyncJob | null>(null)
 const latestJob = ref<SyncJob | null>(null)
 
-// ── Companion 客户端 ──
 const {
   clients: companionClients,
   serve: companionServe,
@@ -149,7 +141,6 @@ const {
   stopPolling: stopCompanionPolling,
 } = useCompanionClients({ pollInterval: 20_000 })
 
-// ── 日志流 ──
 function translateSyncJsonl(text: string): { text: string; level?: string } {
   try {
     const e = JSON.parse(text)
@@ -159,7 +150,7 @@ function translateSyncJsonl(text: string): { text: string; level?: string } {
         level: (e.level || 'info') as string,
       }
     }
-  } catch { /* 非 JSON, 原样返回 */ }
+  } catch {}
   return { text }
 }
 
@@ -171,7 +162,6 @@ const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: lo
   transformText: translateSyncJsonl,
 })
 
-// ── 生命周期 ──
 const refreshStatus = useAutoRefresh(loadSyncStatus, 10_000)
 const refreshHero = useAutoRefresh(loadHeroJob, 5_000)
 
@@ -230,7 +220,6 @@ async function loadStorageAll() {
   if (d?.storage) storageData.value = d.storage
 }
 
-/** Hero 任务: 运行中读当前任务, 否则读最新一条完成记录 */
 async function loadHeroJob() {
   if (currentJobId.value) {
     const d = await fetchCurrentJobDetail()
@@ -242,7 +231,6 @@ async function loadHeroJob() {
   }
 }
 
-// ── Worker ──
 async function workerAction(action: 'start' | 'stop' | 'restart') {
   actionLoading.value = action
   try {
@@ -297,7 +285,6 @@ async function onHeroStart() {
   await workerAction('start')
 }
 
-// ── Hero 状态机 ──
 type HeroState = 'unconfigured' | 'running' | 'auth_expired' | 'idle' | 'stopped'
 
 const configured = computed(() => remotes.value.length > 0 || rules.value.length > 0)
@@ -359,7 +346,6 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   return out
 })
 
-// ── 存储行 ──
 function brandOf(remote: Remote) {
   return remoteBrand(remote.type, remote.params?.provider)
 }
@@ -373,7 +359,6 @@ function storagePct(info: StorageInfo | undefined) {
   return Math.round((info.used / info.total) * 100)
 }
 
-// ── Remote 创建 / 删除 ──
 async function openAddRemote() {
   const d = await get<RemoteTypesResponse>('/api/sync/remote/types')
   if (d?.types) remoteTypes.value = d.types
@@ -426,7 +411,6 @@ async function deleteRemote(name: string) {
   }
 }
 
-// ── 规则 ──
 /** Remote 下拉选项 (Remote 带 params 嵌套对象, 不能直接喂 BaseSelect) */
 const remoteOptions = computed(() =>
   remotes.value.map(r => {
@@ -543,7 +527,6 @@ async function interruptJob(jobId: string) {
   }
 }
 
-// ── 路径浏览 ──
 const browseMode = ref<'local' | 'remote'>('remote')
 const browseTargetField = ref<'remote_path' | 'local_path'>('remote_path')
 
@@ -557,13 +540,11 @@ function onBrowseSelect(path: string) {
   ruleForm.value[browseTargetField.value] = path
 }
 
-// ── 规则展示 ──
 const triggerLabels: Record<string, string> = { deploy: 'sync.rules.deploy', watch: 'sync.rules.watch', manual: 'sync.rules.manual' }
 const methodLabels: Record<string, string> = { copy: 'sync.rules.method_short.copy', sync: 'sync.rules.method_short.sync', move: 'sync.rules.method_short.move' }
 function triggerLabel(trigger: string) { return t(triggerLabels[trigger] || 'sync.rules.manual') }
 function methodLabel(method: string) { return t(methodLabels[method] || method) }
 
-// ── 记录展示 ──
 function statusTone(status: string): 'running' | 'stopped' | 'loading' | 'error' {
   if (status === 'running' || status === 'queued') return 'loading'
   if (status === 'success') return 'running'
@@ -576,8 +557,6 @@ function statusText(status: string): string {
   return t(key)
 }
 
-/** 方向图标: 与添加规则卡片一致 (上行 cloud_upload 绿, 下行 cloud_download 蓝,
- *  多规则/未知用双向 sync 图标着中性色) */
 function jobDirIcon(job: SyncJob): IconName {
   const rules = job.rules ?? []
   if (rules.length === 1) return rules[0]?.direction === 'push' ? 'cloud_upload' : 'cloud_download'
@@ -599,7 +578,6 @@ function jobTitle(job: SyncJob): string {
   return t('sync.records.files_synced', { count: job.files_synced })
 }
 
-/** 规则信息: 单规则显示名称, 多规则显示条数 (快照缺失时回退 rule_count) */
 function jobRulesFact(job: SyncJob): string {
   const rules = job.rules ?? []
   if (rules.length === 1) return rules[0]?.name || rules[0]?.id || ''
@@ -633,7 +611,6 @@ function jobFacts(job: SyncJob): string[] {
   return [jobRulesFact(job), fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
 }
 
-// ── 客户端展示 ──
 function fmtRelative(epoch: number) {
   if (!epoch) return t('sync.companion.never_seen')
   const sec = Math.max(0, Math.floor(Date.now() / 1000 - epoch))
@@ -695,7 +672,6 @@ async function copyHostUrl() {
   if (companionHostUrl.value) await copy(companionHostUrl.value)
 }
 
-// ── 页签切换 ──
 function switchTab(tab: string) {
   activeTab.value = tab
   if (tab === 'clients') {
@@ -738,9 +714,7 @@ function switchTab(tab: string) {
     </PageHeaderRow>
 
     <div class="page-col">
-      <!-- ═══════════ 同步 Tab ═══════════ -->
       <div v-if="activeTab === 'sync'" :id="panelId('sync')" role="tabpanel" :aria-labelledby="tabId('sync')" class="tab-panel">
-        <!-- Hero -->
         <ServiceHero
           icon="cloud_sync"
           :title="heroTitle"
@@ -766,7 +740,6 @@ function switchTab(tab: string) {
           </template>
         </ServiceHero>
 
-        <!-- 存储 -->
         <section class="sync-block">
           <SectionHeader icon="storage">
             {{ t('sync.storage.title') }}
@@ -797,7 +770,6 @@ function switchTab(tab: string) {
                 </span>
               </div>
 
-              <!-- 容量: 不支持查询 / 错误 / 正常 (文案 + 用量条) / 未加载 (点击刷新) -->
               <div class="sync-remote-card__cap">
                 <span v-if="noCapacityTypes.has(remote.type)" class="sync-remote-card__cap-note">
                   {{ t('sync.remote.no_capacity_info') }}
@@ -853,7 +825,6 @@ function switchTab(tab: string) {
           <EmptyState v-else icon="cloud" :message="t('sync.empty.desc')" density="compact" />
         </section>
 
-        <!-- 同步规则 -->
         <section class="sync-block">
           <SectionHeader icon="sync">
             {{ t('sync.rules_section.title') }}
@@ -873,7 +844,6 @@ function switchTab(tab: string) {
               :badges="[triggerLabel(rule.trigger), methodLabel(rule.method)]"
               :disabled="!rule.enabled"
             >
-              <!-- 行首方向图标: 与添加规则卡片一致 (cloud_upload/cloud_download, 下行蓝上行绿) -->
               <template #icon>
                 <MsIcon
                   :name="rule.direction === 'push' ? 'cloud_upload' : 'cloud_download'"
@@ -882,7 +852,6 @@ function switchTab(tab: string) {
                   :class="rule.direction === 'push' ? 'is-push' : 'is-pull'"
                 />
               </template>
-              <!-- 副行: 本地/远程路径 + 流动箭头 (方向决定两端次序; 停用规则箭头静止) -->
               <template #facts>
                 <span class="rule-flow">
                   <template v-if="rule.direction === 'push'">
@@ -925,7 +894,6 @@ function switchTab(tab: string) {
           <EmptyState v-else icon="sync" :message="t('sync.rules_section.empty')" density="compact" />
         </section>
 
-        <!-- 最近同步 -->
         <section class="sync-block">
           <SectionHeader icon="history">
             {{ t('sync.records.title') }}
@@ -940,7 +908,6 @@ function switchTab(tab: string) {
               :status="{ tone: statusTone(job.status), text: statusText(job.status) }"
               :facts="jobFacts(job)"
             >
-              <!-- 行首方向图标: 与添加规则卡片一致 (多规则双向, 下行蓝上行绿) -->
               <template #icon>
                 <MsIcon
                   :name="jobDirIcon(job)"
@@ -966,7 +933,6 @@ function switchTab(tab: string) {
                 >
                   <MsIcon name="stop" />
                 </BaseButton>
-                <!-- 详情入口对排队/运行中的任务同样可用 (弹窗已适配这两种状态) -->
                 <BaseButton
                   variant="ghost" size="sm" icon-only
                   :aria-label="t('sync.records.detail')"
@@ -988,7 +954,6 @@ function switchTab(tab: string) {
           />
         </section>
 
-        <!-- 同步日志 (默认收起, 折叠标题与分区标题同构) -->
         <section class="sync-block">
           <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
             {{ t('sync.log.title') }}
@@ -1005,7 +970,6 @@ function switchTab(tab: string) {
         </section>
       </div>
 
-      <!-- ═══════════ 客户端 Tab ═══════════ -->
       <div v-else :id="panelId('clients')" role="tabpanel" :aria-labelledby="tabId('clients')" class="tab-panel">
         <ServiceHero
           icon="devices"
@@ -1065,7 +1029,6 @@ function switchTab(tab: string) {
       </div>
     </div>
 
-    <!-- ═══════════ 弹窗 ═══════════ -->
     <AddStorageModal
       v-model="addStorageModalOpen"
       :existing-remotes="remotes"
@@ -1084,7 +1047,6 @@ function switchTab(tab: string) {
       @saved="onRulesSaved"
     />
 
-    <!-- 编辑规则 (表单主体复用 RuleFields) -->
     <BaseModal v-model="editRuleModal" :title="t('sync.rule.edit_modal')" size="md">
       <RuleFields
         :rule="ruleForm"
@@ -1113,7 +1075,6 @@ function switchTab(tab: string) {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 存储 → 规则 → 最近同步 → 日志 (--section-gap, 与总览一致) */
 .sync-block {
   margin-top: var(--section-gap);
 }
@@ -1269,7 +1230,6 @@ function switchTab(tab: string) {
   gap: 6px;
 }
 
-/* 方向图标配色: 与添加规则卡片一致 (下行蓝 / 上行绿) */
 .sync-dir-icon.is-pull { color: var(--blue); }
 .sync-dir-icon.is-push { color: var(--green); }
 

@@ -1,15 +1,6 @@
 <script setup lang="ts">
 /**
- * Badge — 全站唯一的标签实现。
- *
- * 两种用法, 不要混:
- *   - `tone`  语义状态 (正常/注意/异常/中性), 走语义色变量, 可带状态圆点
- *   - `color` 分类标签 (模型类型/底模等), 传显式色值, 背景自动 15%
- *
- * Usage:
- *   <Badge tone="positive" dot>运行中</Badge>
- *   <Badge color="#f472b6">CHECKPOINTS</Badge>
- *   <Badge>Illustrious</Badge>
+ * 两种用法, 不要混: `tone` 语义状态, `color` 分类标签。
  */
 import { computed } from 'vue'
 
@@ -68,7 +59,6 @@ const inlineStyle = computed(() =>
   color: var(--t2);
 }
 
-/* ── 语义状态 ── */
 .badge--positive {
   color: var(--green);
   background: color-mix(in srgb, var(--green) 14%, transparent);

@@ -1,14 +1,5 @@
-"""
-ComfyCarry — 热更新路由
-
-更新源为 GitHub 正式 Release (release.yml 发布的 latest), main 分支 push
-不再触发更新 —— commit 与 release 解耦。
-
-端点:
-  GET  /api/update/check    检查是否有新版本
-  POST /api/update/apply    执行更新 (SSE 进度流)
-"""
-
+# 更新源为 GitHub 正式 Release (release.yml 发布的 latest), main 分支 push
+# 不再触发更新 —— commit 与 release 解耦。
 import json
 import logging
 import os
@@ -31,8 +22,6 @@ bp = Blueprint("update", __name__)
 
 
 def _err(key: str, status: int = 400, /, **params):
-    """错误响应。前端按 `settings.err.update.<key>` 翻译 —— 面板更新 UI 在
-    设置页, 所以复用 settings 命名空间, 单开一层 update 分组。"""
     return jsonify({"error_key": f"settings.err.update.{key}",
                     "error_params": params}), status
 
@@ -49,7 +38,6 @@ _ASSET_NAME = "comfycarry-dist.tar.gz"
 # tarball 内顶层目录名 (打包时 -C 父目录 comfycarry/)
 _TARBALL_ROOT = "comfycarry"
 
-# 语义化版本比较: v1.2.3 → (1, 2, 3); 解析失败返回 None
 _SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)")
 
 
@@ -61,7 +49,6 @@ def _parse_semver(ver: str):
 
 
 def _is_newer(latest: str, current: str) -> bool:
-    """latest 是否比 current 新 (语义化版本比较, 无法解析时退化为字符串不等)"""
     l, c = _parse_semver(latest), _parse_semver(current)
     if l is None or c is None:
         return bool(latest) and latest != current
@@ -69,7 +56,6 @@ def _is_newer(latest: str, current: str) -> bool:
 
 
 def _read_version_file() -> dict:
-    """读取 .version 文件 {version, branch, commit}"""
     info = {}
     try:
         path = os.path.join(SCRIPT_DIR, ".version")
@@ -86,16 +72,13 @@ def _read_version_file() -> dict:
 
 
 def _current_version() -> str:
-    """当前部署版本: .version 的 version= 行, fallback APP_VERSION"""
     return _read_version_file().get("version") or APP_VERSION
 
 
 def _current_commit() -> str:
-    """读取当前部署的 commit hash (仅展示用)"""
     commit = _read_version_file().get("commit", "")
     if commit:
         return commit
-    # fallback: git
     try:
         r = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -109,7 +92,6 @@ def _current_commit() -> str:
 
 
 def _fetch_latest_release() -> dict | None:
-    """获取 latest Release 元数据 (tag_name / name / body / published_at / assets)"""
     resp = req_lib.get(
         _LATEST_RELEASE_API,
         headers={"Accept": "application/vnd.github.v3+json"},
@@ -119,13 +101,8 @@ def _fetch_latest_release() -> dict | None:
     return resp.json()
 
 
-# ====================================================================
-# 检查更新
-# ====================================================================
-
 @bp.route("/api/update/check", methods=["GET"])
 def api_update_check():
-    """检查是否有新版本可用 (与 latest Release 的 tag 比对)"""
     try:
         current = _current_version()
 
@@ -136,10 +113,8 @@ def api_update_check():
         latest_tag = data.get("tag_name", "")
         latest_name = data.get("name", "")
         latest_date = data.get("published_at", "")
-        # Release body 首行作为更新说明
         latest_msg = (data.get("body") or "").strip().split("\n")[0]
 
-        # asset 必须存在, 否则 Release 不可作为更新源
         asset_url = ""
         for asset in data.get("assets", []):
             if asset.get("name") == _ASSET_NAME:
@@ -162,10 +137,6 @@ def api_update_check():
         logger.error("update check failed: %s", e)
         return _err("check_failed", 500, detail=str(e))
 
-
-# ====================================================================
-# 执行更新
-# ====================================================================
 
 _update_lock = threading.Lock()
 _update_running = False
@@ -199,7 +170,6 @@ def _swap_dir(src: str, dst: str) -> None:
 
 
 def _swap_file(src: str, dst: str) -> None:
-    """单文件原子替换 (copy 到同分区再 rename, rename 本身原子)"""
     os.replace(src, dst)
 
 
@@ -240,7 +210,6 @@ def _apply_update(extracted: str, dashboard_dir: str) -> None:
 
 @bp.route("/api/update/apply", methods=["POST"])
 def api_update_apply():
-    """执行热更新，返回 SSE 事件流"""
     global _update_running
 
     if _update_running:
@@ -258,7 +227,6 @@ def api_update_apply():
         try:
             dashboard_dir = SCRIPT_DIR
 
-            # Step 1: 获取 latest Release 的部署包下载地址
             yield _sse("downloading", "Fetching latest release...")
             try:
                 release = _fetch_latest_release()
@@ -275,7 +243,6 @@ def api_update_apply():
                 yield _sse("error", f"Fetch release failed: {e}")
                 return
 
-            # Step 2: 下载部署包
             yield _sse("downloading", f"Downloading {latest_tag}...")
             tmp_tar = tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False)
             tmp_tar_path = tmp_tar.name
@@ -291,7 +258,6 @@ def api_update_apply():
                 yield _sse("error", f"Download failed: {e}")
                 return
 
-            # Step 3: 解压
             yield _sse("extracting", "Extracting files...")
             tmp_extract = tempfile.mkdtemp()
             try:
@@ -312,7 +278,6 @@ def api_update_apply():
             yield _sse("updating", "Updating files...")
             _apply_update(extracted, dashboard_dir)
 
-            # Step 6: 更新版本文件
             yield _sse("updating", "Updating version info...")
             new_version = latest_tag
             new_commit = ""
@@ -333,11 +298,9 @@ def api_update_apply():
                 f.write(f"branch=\n")
                 f.write(f"commit={new_commit}\n")
 
-            # Cleanup
             shutil.rmtree(tmp_extract, ignore_errors=True)
             tmp_extract = None
 
-            # Step 7: 重启
             yield _sse("restarting", "Restarting dashboard...")
             yield _sse("done", f"Updated to {new_version}")
 

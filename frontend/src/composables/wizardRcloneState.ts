@@ -14,7 +14,6 @@
  */
 import { ref } from 'vue'
 
-// ── Step 3 连接云存储 (provider 卡片选中后展开的表单) ────────
 /** 选中的 provider id (''=未选, 可整步跳过) */
 export const storageTypeRef = ref('')
 /** 存储名称 (rclone remote name; OAuth 时在 CloudAuthHero done 态填) */

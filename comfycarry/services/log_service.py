@@ -22,7 +22,6 @@ _PM2_ENV_KEYS = ("pm_log_path", "pm_out_log_path", "pm_err_log_path", "pm_pid_pa
 
 
 def clean_pm2_env(env: dict | None = None) -> dict:
-    """返回去掉了 pm2 注入日志路径的环境变量副本。"""
     src = env if env is not None else os.environ
     out = {k: v for k, v in src.items() if not k.startswith(_PM2_ENV_KEYS)}
     out.pop("merge_logs", None)
@@ -60,7 +59,6 @@ def _count_lines(path: str) -> int:
         return 0
     cached = _line_count_cache.get(path)
     if cached and cached[0] <= size:
-        # 增量: 从上次读到的位置继续数新增行
         prev_size, prev_total = cached
         if prev_size == size:
             return prev_total
@@ -72,7 +70,6 @@ def _count_lines(path: str) -> int:
         except OSError:
             total = 0
     else:
-        # 全量或轮转后重数
         try:
             with open(path, 'rb') as f:
                 total = sum(1 for _ in f)
@@ -109,7 +106,6 @@ def read_history(path: str, before: int | None = None, lines: int = 100, filter_
         if end < start:
             return {"entries": [], "total": total}
 
-    # sed -n 'start,end p'  (1-based, 含两端)
     try:
         proc = subprocess.run(
             ["sed", "-n", f"{start},{end}p", path],

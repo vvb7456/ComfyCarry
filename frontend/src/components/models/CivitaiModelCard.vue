@@ -31,10 +31,8 @@ const emit = defineEmits<{
   preview: [url: string]
 }>()
 
-// ── Image ──
 const CDN_PREFIX = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
 
-// ── NSFW 浏览级别 ──
 // 级别未开放的图不作为封面 (优先挑允许的图); 开放但需模糊的传遮罩给 ModelCard。
 const { levelAllows, shouldBlur } = useCivitaiSettings()
 
@@ -65,11 +63,9 @@ const zoomUrl = computed(() => {
   return `${CDN_PREFIX}${url}/default.jpg`
 })
 
-// ── Type badge (文案/颜色走统一归一, civitai 单数 type → 目录 key) ──
 const badgeColor = computed(() => modelCategoryColor(props.hit.type))
 const badgeLabel = computed(() => modelCategoryLabel(props.hit.type))
 
-// ── Meta ──
 const baseModel = computed(() => props.hit.version?.baseModel || '')
 
 const allVersions = computed(() =>
@@ -78,28 +74,20 @@ const allVersions = computed(() =>
 
 const versionCount = computed(() => allVersions.value.length)
 
-// 紧凑格式 (56.8k / 1.2M) — 卡片 meta 行空间敏感, 完整千分位留给详情弹窗
 const downloadCount = computed(() => fmtCompact(props.hit.metrics?.downloadCount || 0))
-
-// ── Download button state ──
 const dlState = computed<ModelAggregateState>(() => (props.downloadState as ModelAggregateState) || 'idle')
-
-// ── Version-level download info ──
 const { getVersionDownloadInfo, cancelDownload, retryVersion } = useDownloads()
 const { confirm } = useConfirm()
 
-/** Current version info for the card's primary version (single-version models). */
 const dlInfo = computed<VersionDownloadInfo>(() => {
   const v = props.hit.version
   if (!v?.id) return { state: 'idle', progress: 0, speed: 0, downloadId: null }
   return getVersionDownloadInfo(props.hit.id, v.id)
 })
 
-/** Map card-level state to the DownloadButton state: installed/idle pass through; downloading→version info state. */
 const dlBtnState = computed(() => {
   if (dlState.value === 'installed') return 'installed' as const
   if (dlState.value === 'partial') return 'idle' as const
-  // For a single-version model, surface the granular version state (queued/downloading/verifying/...)
   return dlInfo.value.state
 })
 
@@ -116,14 +104,11 @@ async function handleCancelDownload() {
   }
 }
 
-/** Failed/retry click from card button → retryVersion */
 function handleCardRetry() {
   const v = props.hit.version
   retryVersion(String(props.hit.id), (props.hit.type || 'Checkpoint').toLowerCase(), v?.id)
 }
 
-/** Download button click handler: idle → forward to parent (opens picker or downloads);
- *  failed → retryVersion. */
 function handleCardDownload() {
   if (dlBtnState.value === 'failed') {
     handleCardRetry()

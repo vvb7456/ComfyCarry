@@ -1,8 +1,3 @@
-/* ══════════════════════════════════════════════════════════════
-   forms.css — Unified form control visual baseline
-   Imported globally in main.ts
-   ══════════════════════════════════════════════════════════════ */
-
 /* ── 控件宽度基线 ──────────────────────────────────────────────
    forms.css 原先只统一了高度/内距/圆角, 没有宽度维度, 于是每个调用点
    自己拍一个 max-width (实测: 本地模型 280px / 插件 400px / 搜索页无),
@@ -18,7 +13,6 @@
     --ctl-w-lg: 420px;
 }
 
-/* ── Base input ── */
 .form-input,
 .form-textarea,
 .form-number {
@@ -55,14 +49,12 @@
     color: var(--t3);
 }
 
-/* ── Textarea ── */
 .form-textarea {
     resize: vertical;
     min-height: 60px;
     line-height: 1.5;
 }
 
-/* ── Number ── */
 .form-number {
     -moz-appearance: textfield;
 }
@@ -72,7 +64,6 @@
     margin: 0;
 }
 
-/* ── Monospace variant ── */
 .form-input--mono,
 .form-textarea--mono {
     font-family: var(--font-mono);

@@ -1,13 +1,4 @@
 <script setup lang="ts">
-/**
- * GpuMetricsCard — 单块 GPU 的四张指标卡 (C08, 需求 8.2)。
- *
- * 一块 GPU 一组四张卡: 利用率 / 显存 / 温度 / 功耗。
- * 每张卡固定「标签 → 主数值 → 细条 → 次级事实」四行, 次级事实只用后端原生读数。
- * 条统一主题色, 温度在 temp_limit 有效时按阈值归一化, 缺失时保留中性轨道。
- * null 读数保留结构, 值显示 ——; 0 是有效值照常显示。
- * 窄正文 (≤560px) 一块 GPU 收为一张卡, 四组指标顺序不变。
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UsageBar from '@/components/ui/UsageBar.vue'
@@ -23,12 +14,10 @@ function has(v: number | null | undefined): v is number {
   return v !== null && v !== undefined && !Number.isNaN(v)
 }
 
-/** 主数值格式化: 0 有效, null/缺失显示 — */
 function num(v: number | null | undefined, unit = ''): string {
   return has(v) ? `${Math.round(v)}${unit}` : '—'
 }
 
-/** 显存读数 (MB) 换算成可读容量 */
 function mb(v: number | null | undefined): string {
   // 与总览 Hero 一致: MiB → GB 四舍五入一位小数
   return has(v) ? `${(v / 1024).toFixed(1)} GB` : '—'

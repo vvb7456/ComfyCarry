@@ -32,7 +32,6 @@ export function componentDepRows(
   }))
 }
 
-/** 该文件在架构里承担的角色文案 (文本编码器 1/2、VAE、音频 VAE、加速件) */
 function roleText(arch: string, f: ComponentFile, t: (key: string) => string): string {
   const inSlot = (slot: 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning') =>
     componentsForSlot(arch, slot).some(x => x.id === f.id)

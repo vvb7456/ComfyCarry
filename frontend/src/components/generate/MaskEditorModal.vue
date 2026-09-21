@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * MaskEditorModal — Full-screen mask drawing editor.
- *
- * Opens as a large modal with the reference image as background.
- * User draws with brush (white = repaint area) / eraser (black = preserve).
- * On apply, exports mask as PNG and uploads via parent callback.
- */
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -34,14 +27,12 @@ const applying = ref(false)
 
 const editor = useMaskEditor()
 
-// Initialize canvas when modal opens
 watch(() => props.modelValue, async (visible) => {
   if (visible) {
     await nextTick()
     await nextTick() // wait for DOM to render
     if (canvasContainer.value && props.imageUrl) {
       await editor.init(props.imageUrl, canvasContainer.value)
-      // Load existing mask if any
       if (props.maskUrl) {
         await editor.loadMask(props.maskUrl)
       }
@@ -64,7 +55,6 @@ async function onApply() {
         await props.onApplyMask(blob)
       }
     } else {
-      // Mask is empty (all cleared) — remove the mask
       props.onClearMask?.()
     }
     emit('update:modelValue', false)
@@ -90,7 +80,6 @@ function onCancel() {
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="mask-editor">
-      <!-- Toolbar -->
       <div class="mask-editor__toolbar">
         <div class="mask-editor__tools">
           <BaseButton
@@ -138,7 +127,6 @@ function onCancel() {
         </div>
       </div>
 
-      <!-- Help text -->
       <div class="mask-editor__help">
         {{ t('generate.mask_editor.help') }}
         <span class="mask-editor__shortcuts">
@@ -146,7 +134,6 @@ function onCancel() {
         </span>
       </div>
 
-      <!-- Canvas area -->
       <div ref="canvasContainer" class="mask-editor__canvas" />
     </div>
 

@@ -25,13 +25,11 @@ const emit = defineEmits<{
   'update:modelValue': [value: number]
 }>()
 
-/* ── auto min-width: ensures the input is always wide enough for max value ── */
 const rootStyle = computed(() => {
   const maxLen = Math.max(
     String(props.min ?? 0).length,
     String(props.max ?? props.modelValue).length,
   )
-  // ch-based char width + padding-left(12) + padding-right(28 with spinners, 12 without) + border(2)
   const padRight = props.spinners ? 28 : 12
   return { minWidth: `calc(${maxLen}ch + ${12 + padRight + 2}px)` }
 })
@@ -43,7 +41,6 @@ function countDecimals(n: number): number {
 }
 
 function validate(v: number): number {
-  // snap to step grid anchored at min (consistent with RangeField)
   const base = props.min ?? 0
   v = Math.round((v - base) / props.step) * props.step + base
   v = +v.toFixed(countDecimals(props.step))
@@ -61,7 +58,6 @@ function onChange(e: Event) {
   }
   const val = validate(raw)
   emit('update:modelValue', val)
-  // force DOM sync in case validated value differs from typed value
   input.value = String(val)
 }
 
@@ -118,8 +114,6 @@ function decrement() {
   display: flex;
 }
 
-/* ── .form-number (forms.css) provides the base control look & focus ring ── */
-
 .number-input--has-spinners .number-input__field {
   padding-right: 28px;
 }
@@ -128,7 +122,6 @@ function decrement() {
   text-align: center;
 }
 
-/* ── custom spinner buttons ── */
 .number-input__spinners {
   position: absolute;
   right: 1px;

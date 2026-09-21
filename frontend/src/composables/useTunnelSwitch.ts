@@ -59,7 +59,6 @@ const POLL_INTERVAL = 2000
 const PROBE_TIMEOUT = 5000
 /** 新地址健康等待上限: 超时且旧地址可用 → 回退留在旧地址 */
 const NEW_TIMEOUT = 120_000
-/** 新旧地址都不可达的失败判定阈值 */
 const BOTH_FAIL_TIMEOUT = 60_000
 
 // ── 全局请求冻结 (useAutoRefresh 读 isTunnelSwitchFrozen) ──
@@ -89,7 +88,6 @@ function unfreezeFetch(): void {
   frozen = false
 }
 
-// ── 单例状态 ──
 const active = ref(false)
 const phase = ref<TunnelSwitchPhase>('idle')
 const oldUrl = ref('')
@@ -204,7 +202,6 @@ function fail(errorKey: string, bothDown: boolean, params?: Record<string, unkno
   unfreezeFetch()
 }
 
-/** 进入终态: 刷新当前页 (仍在当前地址, 新地址由后续导航保证)。 */
 function reload(): void {
   stopPolling()
   window.location.reload()
@@ -240,7 +237,6 @@ async function probeOnce(): Promise<void> {
   }
   const [newOk, oldOk] = await Promise.all([pollVersion(newUrl.value), pollVersion(oldUrl.value)])
   if (newOk) {
-    // 新地址可用: 跳转 (页面加载即拿到正确地址)
     stopPolling()
     const target = newUrl.value
     if (target) window.location.replace(target)
@@ -249,7 +245,6 @@ async function probeOnce(): Promise<void> {
   }
   const elapsed = Date.now() - startedAt
   if (oldOk && elapsed >= NEW_TIMEOUT) {
-    // 新地址迟迟不健康而旧地址仍在: 回退留在旧地址
     reload()
     return
   }

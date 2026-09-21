@@ -1,15 +1,3 @@
-/**
- * usePromptTranslate — Translation composable for prompt tokens.
- *
- * Two-tier strategy:
- *   1. Local DB lookup (fast, free, via /api/prompt-library/translate/word)
- *   2. Remote API fallback (via /api/prompt-library/translate)
- *
- * Provides:
- *   - Single word translation (local DB only)
- *   - Full text translation (local DB → remote API fallback)
- *   - Batch translate for all untranslated tokens
- */
 import { ref, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import type {
@@ -35,14 +23,8 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
   const { get, post } = useApiFetch()
   const translating = ref(false)
 
-  /**
-   * Fast local DB lookup for a single tag.
-   * Returns the translated string or empty string if not found.
-   * Results are cached at module level.
-   */
   async function translateWord(word: string): Promise<string> {
     if (!word.trim()) return ''
-    // Check cache first
     const cached = _translateCache.get(word)
     if (cached) return cached
     const resp = await get<TranslateWordResult>(
@@ -56,9 +38,6 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
     return result
   }
 
-  /**
-   * Full translation: local DB first, then remote API fallback.
-   */
   async function translateText(
     text: string,
     from = 'en',
@@ -98,7 +77,6 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
 
     translating.value = true
     try {
-      // Phase 1: Try local DB for each token
       const needRemote: PromptToken[] = []
 
       for (const token of untranslated) {
@@ -113,7 +91,6 @@ export function usePromptTranslate(): UsePromptTranslateReturn {
         }
       }
 
-      // Phase 2: Remote API for remaining tokens
       for (const token of needRemote) {
         const tagBefore = token.tag
         const result = await translateText(token.tag, 'en', 'zh', provider)

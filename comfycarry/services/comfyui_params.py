@@ -1,9 +1,3 @@
-"""
-ComfyCarry — ComfyUI 启动参数定义与解析
-"""
-
-
-# ── 启动参数定义 ──────────────────────────────────────────────
 COMFYUI_PARAM_GROUPS = {
     "vram": {
         "label": "VRAM 管理",
@@ -291,7 +285,6 @@ COMFYUI_PARAM_GROUPS = {
 }
 
 
-# ── 反向查找表: flag -> (group_key, value) ───────────────────
 _FLAG_TO_PARAM = {}
 for _gk, _gv in COMFYUI_PARAM_GROUPS.items():
     if "flag_map" in _gv:
@@ -300,7 +293,6 @@ for _gk, _gv in COMFYUI_PARAM_GROUPS.items():
 
 
 def parse_comfyui_args(args):
-    """从命令行参数列表解析为结构化参数字典"""
     params = {k: (0 if v["type"] == "number" else ("default" if v["type"] == "select" else ""))
               for k, v in COMFYUI_PARAM_GROUPS.items()}
     params["listen"] = "0.0.0.0"
@@ -353,7 +345,6 @@ def _depends_satisfied(params, gv):
 
 
 def build_comfyui_args(params):
-    """从结构化参数字典构建命令行参数字符串"""
     args = ["--listen", params.get("listen", "0.0.0.0"),
             "--port", str(params.get("port", 8188))]
 
@@ -379,7 +370,6 @@ def build_comfyui_args(params):
     return " ".join(args)
 
 
-# ── 首次启动的默认命令行 ─────────────────────────────────────
 # 部署引擎 / 容器重启自动恢复都必须走这里, 不要再手写字符串:
 # 漏掉 --preview-method 就等于 ComfyUI 默认的 NoPreviews, 生成过程没有任何实时预览。
 DEFAULT_COMFYUI_ARGS = "--listen 0.0.0.0 --port 8188 --preview-method auto"

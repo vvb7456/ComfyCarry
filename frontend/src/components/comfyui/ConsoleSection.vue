@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * ConsoleSection — ComfyUI 日志分区 (C08)。
- *
- * 运行页最后一块: 日志 (SectionHeader 折叠标题, 默认展开),
- * 数据源沿用现有 useLogStream 的 comfy 历史 + SSE 流。
- */
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLogStream } from '@/composables/useLogStream'

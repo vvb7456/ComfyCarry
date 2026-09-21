@@ -1,5 +1,3 @@
-// ── Tunnel Data Types ─────────────────────────────────────────
-
 export interface TunnelService {
   name: string
   port: number
@@ -36,8 +34,6 @@ export interface TunnelData {
   cf_domain?: string
   cf_protocol?: string
 }
-
-// ── API Responses ─────────────────────────────────────────────
 
 export interface TunnelConfigResponse {
   api_token?: string

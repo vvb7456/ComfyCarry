@@ -1,12 +1,3 @@
-/**
- * usePromptLibrary — Tag library API & state composable.
- *
- * Provides:
- * - Library status check
- * - Group / subgroup / tag queries (lazy-loaded, cached)
- * - Autocomplete search (debounced via backend API)
- * - History / favorites CRUD
- */
 import { ref, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import type {
@@ -46,19 +37,16 @@ export function usePromptLibrary(): UsePromptLibraryReturn {
   const groups = ref<PromptGroup[]>([])
   const loading = ref(false)
 
-  // ── Cache ────────────────────────────────────────────────────
   const _subgroupsCache = new Map<number, PromptSubgroup[]>()
   const _tagsCache = new Map<number, PromptTag[]>()
   let _groupsLoaded = false
 
-  // ── Status ───────────────────────────────────────────────────
   async function fetchStatus(): Promise<PromptLibraryStatus | null> {
     const resp = await get<PromptLibraryStatus>('/api/prompt-library/status')
     if (resp) status.value = resp
     return resp
   }
 
-  // ── Tag Library Queries ──────────────────────────────────────
   async function fetchGroups(): Promise<PromptGroup[]> {
     if (_groupsLoaded) return groups.value
     loading.value = true
@@ -97,7 +85,6 @@ export function usePromptLibrary(): UsePromptLibraryReturn {
     return data
   }
 
-  // ── Autocomplete ─────────────────────────────────────────────
   async function autocomplete(query: string, limit = 20): Promise<AutocompleteItem[]> {
     if (!query.trim()) return []
     const resp = await get<PromptLibraryDataResponse<AutocompleteItem[]>>(
@@ -106,7 +93,6 @@ export function usePromptLibrary(): UsePromptLibraryReturn {
     return resp?.data ?? []
   }
 
-  // ── History / Favorites ──────────────────────────────────────
   async function fetchHistory(
     type = 'all',
     page = 1,
@@ -139,7 +125,6 @@ export function usePromptLibrary(): UsePromptLibraryReturn {
     return updateHistory(item.id, { is_favorite: item.is_favorite ? 0 : 1 })
   }
 
-  // ── Resolve Tags (batch color/translate lookup) ──────────────
   async function resolveTags(
     texts: string[],
   ): Promise<Record<string, { color: string; translate: string }>> {

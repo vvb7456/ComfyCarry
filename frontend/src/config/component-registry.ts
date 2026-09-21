@@ -15,11 +15,8 @@
 
 import { HF_VERSION_INDEX, MODEL_TYPE_DIRS } from './huggingface-models'
 
-// ── 类型定义 ──────────────────────────────────────────────────────────────────
-
 export type ComponentTier = 'standard' | 'lite' | 'full'
 
-/** slot 类型: clip/clip2/vae/audio_vae (图像架构 + 视频) + lightning (视频加速件) */
 export type ComponentSlot = 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning'
 
 /**
@@ -31,31 +28,20 @@ export type ComponentSlot = 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning'
  */
 export type RequiredWhen = 'fast'
 
-/** 组件就绪判定上下文 (调用 requiredComponents 时传入)。 */
 export interface ComponentContext {
-  /** 速度档: true=快速 (加速件必需), false/缺省=标准 (加速件不计入必需集) */
   fast?: boolean
 }
 
 export interface ComponentFile {
-  /** 稳定唯一 id */
   readonly id: string
-  /** 展示名, 如 'CLIP-L' / 'T5-XXL FP8' */
   readonly label: string
   readonly tier: ComponentTier
-  /** 条件必需谓词: 'fast' = 仅快速模式必需; 缺省 = 无条件必需 */
   readonly requiredWhen?: RequiredWhen
-  /** HF 白名单版本锚点 — 文件事实唯一来源 */
   readonly hfVersionId: number
 
-  // ── 以下字段由 hf() 工厂从白名单派生填充, 禁止手写 ──
-  /** 文件名 (存在性判定与去重的唯一键) */
   readonly filename: string
-  /** HuggingFace 直链 */
   readonly url: string
-  /** 精确字节数 (十进制) */
   readonly bytes: number
-  /** 相对 ComfyUI 根的目录 */
   readonly subdir: string
   readonly sha256: string
 }
@@ -64,8 +50,6 @@ export interface ArchComponents {
   arch: string
   slots: Partial<Record<ComponentSlot, ComponentFile[]>>
 }
-
-// ── 工厂: 从白名单派生组件文件 ────────────────────────────────────────────────
 
 function hf(
   id: string,
@@ -96,7 +80,6 @@ const QWEN_IMAGE_VAE = hf('qwen_image_vae', 'Qwen Image VAE', -10000301, 'standa
 const AE_VAE = hf('flux_ae', 'Flux AE', -10000113, 'standard')
 const FLUX2_VAE = hf('flux2_vae', 'Flux2 VAE', -10000296, 'standard')
 
-// T5-XXL: flux1.clip2 与 chroma.clip 共用
 const T5XXL_FP8 = hf('t5xxl_fp8', 'T5-XXL FP8', -10000116, 'standard')
 const T5XXL_FP16 = hf('t5xxl_fp16', 'T5-XXL FP16', -10000342, 'full')
 
@@ -124,7 +107,6 @@ const H3_QWEN3VL_32B_NVFP4 = hf('minimax_h3_te', 'Qwen3-VL 32B NVFP4', -10000358
 const H3_VIDEO_VAE = hf('minimax_h3_video_vae', 'H3 Video VAE', -10000349, 'standard')
 const H3_AUDIO_VAE = hf('minimax_h3_audio_vae', 'H3 Audio VAE', -10000359, 'standard')
 
-// ── COMPONENT_REGISTRY ─────────────────────────────────────────────────────────
 // 约定: 每个 slot 的数组按 tier 排序, standard 档必须排第一 (派生函数默认取它)。
 
 const COMPONENT_REGISTRY: ArchComponents[] = [
@@ -243,8 +225,6 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
   },
 ]
 
-// ── 派生函数 ──────────────────────────────────────────────────────────────────
-
 const _ARCH_INDEX: Map<string, ArchComponents> = (() => {
   const m = new Map<string, ArchComponents>()
   for (const entry of COMPONENT_REGISTRY) m.set(entry.arch, entry)
@@ -253,27 +233,14 @@ const _ARCH_INDEX: Map<string, ArchComponents> = (() => {
 
 const TIER_ORDER: Record<ComponentTier, number> = { standard: 0, lite: 1, full: 2 }
 
-/** 所有 slot 的遍历顺序 (含 lightning) */
 const ALL_SLOTS: ComponentSlot[] = ['clip', 'clip2', 'vae', 'audio_vae', 'lightning']
 
-/** 文件的条件谓词在给定上下文下是否满足 */
 function isRequired(file: ComponentFile, ctx?: ComponentContext): boolean {
   if (!file.requiredWhen) return true
   if (file.requiredWhen === 'fast') return ctx?.fast === true
   return true
 }
 
-/**
- * 该架构在给定档位/上下文下的必需文件。arch 不在表中返回 []。
- *
- * 分两类:
- * - 无条件文件 (requiredWhen 缺省): 每 slot 取 1 个 (按 tier 优先级), 图像架构的 TE/VAE。
- * - 条件文件 (requiredWhen:'fast'): 满足 ctx 时该 slot 下全部计入 (high/low 两件都要),
- *   不满足时整 slot 跳过。用于视频加速件。
- *
- * 第二参数 tier 仅影响无条件文件的档位选择; ctx 控制条件 slot 是否计入。
- * 两者独立, 可组合 (目前视频架构无条件多档位, 图像架构无条件 slot)。
- */
 export function requiredComponents(
   arch: string,
   tier?: ComponentTier,
@@ -286,7 +253,6 @@ export function requiredComponents(
     const files = entry.slots[slot]
     if (!files || files.length === 0) continue
 
-    // 条件文件 (带 requiredWhen): 满足 ctx 时全部计入, 否则整 slot 跳过
     const conditional = files.filter(f => f.requiredWhen)
     if (conditional.length > 0) {
       for (const f of conditional) {
@@ -295,7 +261,6 @@ export function requiredComponents(
       continue
     }
 
-    // 无条件文件: 每 slot 取 1 个 (按 tier 优先级)
     let chosen: ComponentFile | undefined
     if (tier) chosen = files.find(f => f.tier === tier)
     if (!chosen) chosen = files.find(f => f.tier === 'standard')
@@ -305,10 +270,6 @@ export function requiredComponents(
   return result
 }
 
-/**
- * 该架构某个 slot 的全部档位; 无则返回 []。
- * 返回的是按 tier 排序的副本 (standard 优先)。
- */
 export function componentsForSlot(arch: string, slot: ComponentSlot): ComponentFile[] {
   const entry = _ARCH_INDEX.get(arch)
   if (!entry) return []
@@ -317,9 +278,6 @@ export function componentsForSlot(arch: string, slot: ComponentSlot): ComponentF
   return [...files].sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier])
 }
 
-/**
- * 反向索引: 哪些架构用到该文件名 (返回 arch key 数组, 已去重, 按 registry 声明顺序)。
- */
 export function archsUsingFile(filename: string): string[] {
   const result: string[] = []
   for (const entry of COMPONENT_REGISTRY) {
@@ -338,7 +296,6 @@ export function archsUsingFile(filename: string): string[] {
 }
 
 /**
- * registry 中所有组件文件名的聚合集合 (含加速件, 不含档位去重)。
  * 用途: 模型页隐藏 / LoRA 选择器同源过滤。
  * 加速件文件名必须在此集合内, 否则会泄漏进 LoRA 选择器。
  */
@@ -356,8 +313,6 @@ export const COMPONENT_FILENAMES: ReadonlySet<string> = (() => {
 
 /**
  * 剥掉量化/精度后缀得到家族词干, 用于"兼容版本"匹配。
- * 实现: 取 basename → 去扩展名 → 小写 → 反复剥除结尾的
- * (fp32|fp16|bf16|fp8|fp4|e4m3fn|e5m2|scaled|mixed|base|q\d+|int8|gguf) 片段及其前面的分隔符 [_-]
  */
 export function stemOf(filename: string): string {
   let s = filename.includes('/') ? filename.slice(filename.lastIndexOf('/') + 1) : filename

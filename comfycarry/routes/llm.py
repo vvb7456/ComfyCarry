@@ -1,15 +1,3 @@
-"""
-ComfyCarry — LLM 路由
-
-POST /api/llm/prompt      — 提示词生成 (SSE 流式 / JSON)
-POST /api/llm/chat         — 通用 LLM 对话 (SSE 流式)
-GET  /api/llm/providers    — 可用 Provider 列表
-POST /api/llm/models       — 动态获取 Provider 可用模型列表
-GET  /api/llm/config       — 当前 LLM 配置 (API Key 遮蔽)
-PUT  /api/llm/config       — 更新 LLM 配置
-POST /api/llm/test         — 连接测试
-"""
-
 import logging
 
 from flask import Blueprint, Response, jsonify, request
@@ -58,8 +46,6 @@ def _exc_err(e: Exception, status: int = 500):
     return _err("internal", status, detail=str(e))
 
 
-# ── POST /api/llm/prompt — 提示词生成 ────────────────────────────────────────
-
 @bp.route("/api/llm/prompt", methods=["POST"])
 def api_llm_prompt():
     data = request.get_json(silent=True) or {}
@@ -94,8 +80,6 @@ def api_llm_prompt():
             return _exc_err(e)
 
 
-# ── POST /api/llm/chat — 通用对话 ────────────────────────────────────────────
-
 @bp.route("/api/llm/chat", methods=["POST"])
 def api_llm_chat():
     data = request.get_json(silent=True) or {}
@@ -106,7 +90,6 @@ def api_llm_chat():
     if not messages:
         return _err("messages_required")
 
-    # 验证 messages 格式
     for msg in messages:
         if not isinstance(msg, dict) or "role" not in msg or "content" not in msg:
             return _err("messages_invalid")
@@ -125,8 +108,6 @@ def api_llm_chat():
             logger.exception("LLM chat failed")
             return _exc_err(e)
 
-
-# ── GET /api/llm/providers — Provider 列表 ───────────────────────────────────
 
 @bp.route("/api/llm/providers")
 def api_llm_providers():
@@ -158,8 +139,6 @@ def api_llm_providers():
     return jsonify(providers=providers, targets=targets)
 
 
-# ── GET /api/llm/config — 当前配置 ───────────────────────────────────────────
-
 @bp.route("/api/llm/config")
 def api_llm_config_get():
     cfg = get_llm_config()
@@ -167,18 +146,14 @@ def api_llm_config_get():
     return jsonify(ok=True, data=cfg)
 
 
-# ── PUT /api/llm/config — 更新配置 ───────────────────────────────────────────
-
 @bp.route("/api/llm/config", methods=["PUT"])
 def api_llm_config_put():
     data = request.get_json(silent=True) or {}
 
-    # 验证 provider
     provider = data.get("provider", "")
     if provider and provider not in PROVIDER_REGISTRY:
         return _err("unsupported_provider", provider=provider)
 
-    # 验证 temperature
     temp = data.get("temperature")
     if temp is not None:
         try:
@@ -189,7 +164,6 @@ def api_llm_config_put():
         except (ValueError, TypeError):
             return _err("temperature_range")
 
-    # 验证 max_tokens
     mt = data.get("max_tokens")
     if mt is not None:
         try:
@@ -200,7 +174,6 @@ def api_llm_config_put():
         except (ValueError, TypeError):
             return _err("max_tokens_range")
 
-    # 验证 stream
     stream = data.get("stream")
     if stream is not None:
         data["stream"] = bool(stream)
@@ -208,8 +181,6 @@ def api_llm_config_put():
     save_llm_config(data)
     return jsonify(ok=True)
 
-
-# ── POST /api/llm/test — 连接测试 ────────────────────────────────────────────
 
 @bp.route("/api/llm/test", methods=["POST"])
 def api_llm_test():
@@ -226,7 +197,6 @@ def api_llm_test():
     result = test_connection(provider, api_key, model, base_url)
     return jsonify(**result)
 
-# ── POST /api/llm/models — 动态获取可用模型列表 ───────────────────────────
 
 @bp.route("/api/llm/models", methods=["POST"])
 def api_llm_models():

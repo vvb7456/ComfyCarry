@@ -24,13 +24,10 @@ const errorText = computed(() => {
 })
 
 const props = defineProps<{
-  /** Favorite item mode */
   favoriteItem?: FavoriteItem
-  /** Download task mode */
   task?: DownloadTask
   /** Favorite mode: 该版本的下载状态 (驱动按钮 spinner/进度环), 缺省时退回 installed/idle */
   state?: VersionState
-  /** Favorite mode: 进度 % / 速度 B/s (state 为 queued/downloading 时显示) */
   progress?: number
   speed?: number
   /** Favorite mode: 有 downloadId 才允许 hover 取消 */
@@ -45,8 +42,6 @@ const emit = defineEmits<{
   cancel: [id: string]
   retry: [id: string]
 }>()
-
-// ── Shared display ──
 
 const name = computed(() =>
   props.favoriteItem?.name || props.task?.meta?.model_name || props.task?.filename || 'Unknown',
@@ -75,16 +70,12 @@ const civitaiUrl = computed(() => {
   return `https://civitai.com/models/${id}`
 })
 
-// ── Favorite-specific ──
-
 const favoriteKey = computed(() => {
   if (!props.favoriteItem) return ''
   return props.favoriteItem.versionId
     ? `${props.favoriteItem.modelId}:${props.favoriteItem.versionId}`
     : props.favoriteItem.modelId
 })
-
-// ── Task-specific ──
 
 const speedText = computed(() => fmtSpeed(props.task?.speed || 0))
 
@@ -98,7 +89,6 @@ const sizeText = computed(() => {
 
 const isFavorite = computed(() => !!props.favoriteItem)
 
-/** Favorite 按钮状态: 显式 state 优先, 缺省 idle */
 const favoriteState = computed<VersionState>(() => props.state ?? 'idle')
 const isActive = computed(() => props.task?.status === 'active')
 const isPaused = computed(() => props.task?.status === 'paused')
@@ -106,12 +96,10 @@ const isQueued = computed(() => props.task?.status === 'queued')
 const isComplete = computed(() => props.task?.status === 'complete')
 const isFailed = computed(() => props.task?.status === 'failed')
 
-/** Whether the progress row should render (active group, even at 0%). */
 const showProgressRow = computed(() =>
   !isFavorite.value && !!props.task && (isActive.value || isPaused.value || isQueued.value),
 )
 
-// ── 状态表达: 圆点 + 状态词 (ListRow 同口径) ──
 type DlState = 'active' | 'paused' | 'queued' | 'failed' | 'completed'
 
 const stateKey = computed<DlState | ''>(() => {
@@ -147,13 +135,11 @@ const stateText = computed(() => {
   return t(`models.downloads.${k}`)
 })
 
-/** 版本名 (纯文字, 优先弹性截断) */
 const versionName = computed(() => {
   if (isFavorite.value) return props.favoriteItem?.versionName || ''
   return props.task?.meta?.version_name || ''
 })
 
-/** 事实指标流 (纯文字, 速度 / 大小 / 进度 或 总大小, 保持不换行) */
 const metricFacts = computed(() => {
   if (isFavorite.value) return []
   const out: string[] = []
@@ -170,7 +156,6 @@ const metricFacts = computed(() => {
 
 <template>
   <div class="dli">
-    <!-- Thumbnail: 48px 严格垂直居中 -->
     <div class="dli-thumb">
       <img v-if="imageUrl" :src="imageUrl" alt="" loading="lazy" @error="($event.target as HTMLImageElement).style.display='none'">
       <MsIcon v-else name="image_not_supported" />
@@ -195,7 +180,6 @@ const metricFacts = computed(() => {
         <Badge v-if="baseModelText" class="dli-badge">{{ baseModelText }}</Badge>
       </div>
 
-      <!-- Row 3 (任务进行中): 细进度条 -->
       <div v-if="showProgressRow" class="dli-progress">
         <UsageBar :percent="progressPct" :height="5" />
       </div>
@@ -209,9 +193,7 @@ const metricFacts = computed(() => {
       <div v-if="isFailed && task?.error" class="dli-error" :title="errorText">{{ errorText }}</div>
     </div>
 
-    <!-- Actions -->
     <div class="dli-actions">
-      <!-- Favorite actions -->
       <template v-if="isFavorite">
         <DownloadButton
           :state="favoriteState"
@@ -233,7 +215,6 @@ const metricFacts = computed(() => {
         </BaseButton>
       </template>
 
-      <!-- Active download actions -->
       <template v-else-if="isActive">
         <BaseButton
           size="sm"
@@ -256,7 +237,6 @@ const metricFacts = computed(() => {
         </BaseButton>
       </template>
 
-      <!-- Paused actions -->
       <template v-else-if="isPaused">
         <BaseButton
           size="sm"
@@ -279,7 +259,6 @@ const metricFacts = computed(() => {
         </BaseButton>
       </template>
 
-      <!-- Queued actions -->
       <template v-else-if="isQueued">
         <BaseButton
           variant="danger"
@@ -293,7 +272,6 @@ const metricFacts = computed(() => {
         </BaseButton>
       </template>
 
-      <!-- Failed actions -->
       <template v-else-if="isFailed">
         <BaseButton size="sm" @click="emit('retry', task!.download_id)">
           <MsIcon name="replay" size="xs" /> {{ t('common.btn.retry') }}
@@ -304,7 +282,6 @@ const metricFacts = computed(() => {
 </template>
 
 <style scoped>
-/* 下载任务行: 严格三行/四行栅格, 缩略图、主内容、动作按钮在整行严格居中 */
 .dli {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
@@ -313,7 +290,6 @@ const metricFacts = computed(() => {
   padding: 12px 0;
 }
 
-/* ── Thumbnail ── */
 .dli-thumb {
   width: 48px;
   height: 48px;
@@ -332,7 +308,6 @@ const metricFacts = computed(() => {
   object-fit: cover;
 }
 
-/* ── Main ── */
 .dli-main {
   min-width: 0;
   display: flex;
@@ -341,7 +316,6 @@ const metricFacts = computed(() => {
   justify-content: center;
 }
 
-/* Row 1: 名称 + 状态点 (严格单行截断) */
 .dli-head {
   display: flex;
   align-items: center;
@@ -376,7 +350,6 @@ const metricFacts = computed(() => {
   flex-shrink: 0;
 }
 
-/* Row 2: 纯 Badge 行 (严格单行, 允许内部收缩打点) */
 .dli-badges {
   display: flex;
   align-items: center;
@@ -392,7 +365,6 @@ const metricFacts = computed(() => {
   flex-shrink: 1;
 }
 
-/* Row 3/4: 事实文本行 (版本名等事实, 纯文字) */
 .dli-facts {
   display: flex;
   align-items: center;
@@ -432,7 +404,6 @@ const metricFacts = computed(() => {
   word-break: break-word;
 }
 
-/* ── Actions: 常驻行尾 ── */
 .dli-actions {
   display: flex;
   align-items: center;

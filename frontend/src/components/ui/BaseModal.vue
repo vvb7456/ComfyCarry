@@ -35,20 +35,16 @@ const props = withDefaults(defineProps<{
   icon?: IconName
   iconColor?: string
   ariaLabel?: string
-  // Size
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl' | 'full'
   width?: string
   maxHeight?: string
-  // Layout
   density?: 'compact' | 'default' | 'roomy'
   align?: 'center' | 'top'
   scroll?: 'content' | 'body' | 'none'
-  // Close behavior
   closeOnOverlay?: boolean
   closeOnEsc?: boolean
   showClose?: boolean
   persistent?: boolean
-  // Visual
   tone?: 'default' | 'info' | 'danger'
   footerAlign?: 'start' | 'end' | 'between'
   /** Override z-index of the modal overlay (default: 1000) */
@@ -83,7 +79,6 @@ const hasBodyLock = ref(false)
 const titleId = `base-modal-title-${++modalIdCounter}`
 const { captureTrigger, restoreTrigger, trapTab } = useModalFocus()
 
-// Size presets
 const sizeWidths: Record<string, string> = { sm: '360px', md: '520px', lg: '720px', xl: '900px', xxl: '1400px', full: '95vw' }
 
 const resolvedMaxWidth = computed(() => {
@@ -100,7 +95,6 @@ const canClose = computed(() => !props.persistent)
 const canCloseOverlay = computed(() => canClose.value && props.closeOnOverlay)
 const canCloseEsc = computed(() => canClose.value && props.closeOnEsc)
 
-// Lock body scroll when modal is open
 watch(() => props.modelValue, (open) => {
   if (open) {
     if (!hasBodyLock.value) {
@@ -121,7 +115,6 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
-// Ensure scroll lock is released on unmount
 onUnmounted(() => {
   if (!hasBodyLock.value) return
   unlockBodyScroll()
@@ -141,7 +134,6 @@ function onOverlayMousedown(e: MouseEvent) {
 }
 
 function onOverlayClick(e: MouseEvent) {
-  // Only close if BOTH mousedown and mouseup (click) happened on overlay
   if (e.target === e.currentTarget && mouseDownOnOverlay.value && canCloseOverlay.value) close()
   mouseDownOnOverlay.value = false
 }
@@ -161,7 +153,6 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-// Footer alignment class
 const footerClass = computed(() => {
   if (props.footerAlign === 'start') return 'modal-footer--start'
   if (props.footerAlign === 'between') return 'modal-footer--between'
@@ -284,22 +275,18 @@ const footerClass = computed(() => {
   color: var(--red);
 }
 
-/* Scroll strategies */
 .modal-box--scroll-body { overflow-y: auto; }
 .modal-box--scroll-body > .modal-body { overflow: visible; }
 .modal-box--scroll-none > .modal-body { overflow: hidden; }
 
-/* Density: default */
 .modal-box--default > .modal-header { padding: 20px 24px 0; }
 .modal-box--default > .modal-body { padding: 16px 24px; }
 .modal-box--default > .modal-footer { padding: 0 24px 20px; }
 
-/* Density: compact */
 .modal-box--compact > .modal-header { padding: 12px 16px 0; }
 .modal-box--compact > .modal-body { padding: 12px 16px; }
 .modal-box--compact > .modal-footer { padding: 0 16px 12px; }
 
-/* Density: roomy */
 .modal-box--roomy > .modal-header { padding: clamp(20px, 2vw, 28px) clamp(24px, 2.2vw, 32px) 0; }
 .modal-box--roomy > .modal-body { padding: clamp(16px, 1.5vw, 24px) clamp(24px, 2.2vw, 32px); }
 .modal-box--roomy > .modal-footer { padding: 0 clamp(24px, 2.2vw, 32px) clamp(16px, 1.5vw, 24px); }
@@ -366,7 +353,6 @@ const footerClass = computed(() => {
 .modal-footer--start { justify-content: flex-start; }
 .modal-footer--between { justify-content: space-between; }
 
-/* Transitions */
 .modal-enter-active, .modal-leave-active { transition: opacity .2s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-active .modal-box, .modal-leave-active .modal-box { transition: transform .2s ease; }

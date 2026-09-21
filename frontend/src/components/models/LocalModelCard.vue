@@ -25,7 +25,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-// ── Image props for ModelCard ──
 const previewUrl = computed(() => {
   return props.model.has_preview && props.model.preview_url
     ? props.model.preview_url
@@ -43,7 +42,6 @@ const zoomUrl = computed(() => {
   return ''
 })
 
-// ── Badge ──
 // 文案/颜色走统一函数 (category 是 MODEL_DIRS key, 直通归一)
 const badgeColor = computed(() => modelCategoryColor(props.model.category))
 const badgeLabel = computed(() => modelCategoryLabel(props.model.category))
@@ -52,7 +50,6 @@ const badgeLabel = computed(() => modelCategoryLabel(props.model.category))
 const canFetchInfo = computed(() => props.model.can_fetch_info)
 const canDelete = computed(() => props.model.can_delete)
 
-// ── Fetch button label ──
 const fetchLabel = computed(() => {
   if (props.fetching) return t('models.local.fetching')
   return props.model.has_info ? t('models.local.fetched') : t('models.local.fetch_info')

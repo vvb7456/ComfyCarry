@@ -1,14 +1,4 @@
 <script setup lang="ts">
-/**
- * FusionTabs — Tab-panel fusion container.
- *
- * Two modes:
- *   1. `bare` (default) — just the tab bar, no wrapping container
- *   2. `wrapped` — tabs sit in a bg3 header, panel slot below,
- *      all wrapped in a bordered + rounded container
- *
- * Active tab's bottom border merges with the panel below.
- */
 import { computed } from 'vue'
 
 defineOptions({ name: 'FusionTabs' })
@@ -24,13 +14,9 @@ const props = withDefaults(defineProps<{
   modelValue: string | number | null
   /** Background of the panel below — used for border-bottom merge. */
   panelBg?: string
-  /** Size variant */
   size?: 'sm' | 'md'
-  /** Wrapping mode: false = tab bar only, true = bordered container with panel slot */
   wrapped?: boolean
-  /** Min height for the panel area (only in wrapped mode) */
   minHeight?: string
-  /** Allow deselecting the active tab by clicking it again (default: true) */
   collapsible?: boolean
 }>(), {
   panelBg: 'var(--bg)',
@@ -58,7 +44,6 @@ function onClick(tab: FusionTab) {
 </script>
 
 <template>
-  <!-- Wrapped mode: bordered container -->
   <div v-if="wrapped" class="ft-wrap">
     <div class="ft-header">
       <div class="ft-tabs" role="tablist">
@@ -91,7 +76,6 @@ function onClick(tab: FusionTab) {
     </div>
   </div>
 
-  <!-- Bare mode: just the tab bar -->
   <div v-else class="ft-tabs" role="tablist">
     <button
       type="button"
@@ -118,7 +102,6 @@ function onClick(tab: FusionTab) {
 </template>
 
 <style scoped>
-/* ═══ Wrapped mode ═══ */
 .ft-wrap {
   display: flex;
   flex-direction: column;
@@ -138,7 +121,6 @@ function onClick(tab: FusionTab) {
   flex: 1;
 }
 
-/* ═══ Tab bar ═══ */
 .ft-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -147,7 +129,6 @@ function onClick(tab: FusionTab) {
   border-bottom: 1px solid var(--bd);
 }
 
-/* ═══ Tab button ═══ */
 .ft-tab {
   --ft-panel-bg: var(--bg);
   position: relative;
@@ -183,7 +164,6 @@ function onClick(tab: FusionTab) {
   z-index: 1;
 }
 
-/* ── Size: sm ── */
 .ft-tab--sm {
   padding: 5px 12px;
   font-size: var(--text-sm);

@@ -1,10 +1,3 @@
-/**
- * useSystemStats — Shared singleton composable for real-time system metrics.
- *
- * Polls GET /api/system/stats every 3s.
- * Multiple consumers (DashboardPage, ConsoleSection) share one polling loop.
- * Auto-start on first mount, auto-stop when all consumers unmount.
- */
 import { ref, onMounted, onUnmounted, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import type { GpuInfo, SystemStats } from '@/types/system'
@@ -13,7 +6,6 @@ export type { GpuInfo, SystemStats }
 
 const POLL_INTERVAL = 3000
 
-// ── Singleton state ──
 const stats = ref<SystemStats | null>(null)
 let refCount = 0
 let timer: ReturnType<typeof setInterval> | null = null

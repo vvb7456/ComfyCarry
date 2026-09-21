@@ -85,7 +85,6 @@ function onPrev() { prevStep() }
       {{ t('wizard.env_hint.cf_detected') }}
     </AlertBanner>
 
-    <!-- Tunnel mode cards -->
     <div class="step-tunnel__cards">
       <ModeCard
         icon="public"
@@ -114,7 +113,6 @@ function onPrev() { prevStep() }
       </ModeCard>
     </div>
 
-    <!-- Public tunnel config (hidden when locked) -->
     <div v-if="config.tunnel_mode === 'public' && !tunnelLocked" class="step-tunnel__fields">
       <FormField>
         <template #label>{{ t('wizard.step2.subdomain') }} <span class="step-tunnel__optional">{{ t('wizard.common.optional') }}</span></template>
@@ -134,7 +132,6 @@ function onPrev() { prevStep() }
       </FormField>
     </div>
 
-    <!-- Custom tunnel config (hidden when locked) -->
     <div v-if="config.tunnel_mode === 'custom' && !tunnelLocked" class="step-tunnel__fields">
       <FormField>
         <template #label>

@@ -1,15 +1,4 @@
 <script setup lang="ts">
-/**
- * PresetRuleCard — 同步规则预设卡 (wizard step4 / dashboard 添加规则共用)。
- *
- * 视觉对齐「添加存储」的 OptionCard: 两行 (标题 + 描述), 执行时机/方式以
- * badge 放在标题旁; 不再罗列本地路径 —— 对「选不选」没有帮助, 细节留在
- * 确认弹窗里按需查看。
- *
- * - wizard: selected + toggle (整卡勾选, 右上角圆形角标)
- * - dashboard: 点击进入确认态 (无勾选态); deployAsManual 把「部署时执行」
- *   按「手动」呈现 —— dashboard 新建规则时也会落成 manual, 两处一致
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OptionCard from '@/components/ui/OptionCard.vue'
@@ -52,14 +41,12 @@ const dirIcon = computed<IconName>(() =>
 )
 const dirColor = computed(() => props.preset.direction === 'push' ? 'var(--green)' : 'var(--blue)')
 
-/** badge: 执行时机 (dashboard 把 deploy 显示为 manual) */
 const triggerLabel = computed(() => {
   let trig = props.preset.entries[0]?.trigger || ''
   if (props.deployAsManual && trig === 'deploy') trig = 'manual'
   return trig && te(`sync.rules.${trig}`) ? t(`sync.rules.${trig}`) : trig
 })
 
-/** badge: 执行方式 */
 const methodLabel = computed(() => {
   const m = props.preset.entries[0]?.method
   return m && te(`sync.rules.method_short.${m}`) ? t(`sync.rules.method_short.${m}`) : (m || '')

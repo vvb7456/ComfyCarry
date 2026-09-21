@@ -66,7 +66,6 @@ export function useModelModalManager({
       { key: 'interrogate', icon: 'image_search', label: t('generate.prompt.tools.interrogate'), title: t('generate.prompt.tools.interrogate_title') },
       { key: 'llm-assist', icon: 'auto_awesome', label: t('generate.prompt.tools.llm_assist'), title: t('generate.prompt.tools.llm_assist_title') },
     ]
-    // natural 模式过滤掉 tag 类工具 (prompt-editor / interrogate), 仅保留 llm-assist
     return isNaturalPrompt.value
       ? tools.filter(tool => tool.key === 'llm-assist')
       : tools
@@ -123,8 +122,6 @@ export function useModelModalManager({
     }
   }
 
-  // ── Model Picker (checkpoint / unet by modelField) ────────────────────────
-
   const showModelPicker = ref(false)
   const modelSelected = computed(() => {
     const name = modelField === 'unet' ? state.value.unet : state.value.checkpoint
@@ -145,8 +142,6 @@ export function useModelModalManager({
     showModelPicker.value = false
     toast(t('generate.msg.selected', { name: basename(name).replace(/\.[^.]+$/, '') }), 'success')
   }
-
-  // ── LoRA Picker ────────────────────────────────────────────────────────────
 
   const showLoraPicker = ref(false)
   const loraModalPending = ref(new Set<string>())

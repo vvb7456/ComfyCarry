@@ -4,8 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { apiErrorText } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export interface TagParamDef {
   key: string
   type: 'select' | 'slider' | 'toggle' | 'text'
@@ -18,8 +16,6 @@ export interface TagParamDef {
   placeholder?: string
   options?: { value: string; label: string }[]
 }
-
-// ── Param definitions ────────────────────────────────────────────────────────
 
 export const TAG_PARAMS_DEF: TagParamDef[] = [
   {
@@ -65,8 +61,6 @@ export const TAG_PARAMS_DEF: TagParamDef[] = [
     default: '',
   },
 ]
-
-// ── 内置模型 (依赖状态条用) ─────────────────────────────────────────────────
 
 import type { DepGroup } from './modelDepConfigs'
 
@@ -115,53 +109,41 @@ export const TAGGER_DEP_GROUP: DepGroup = {
   minOptional: 1,
 }
 
-// ── Composable ───────────────────────────────────────────────────────────────
-
 export function useTagInterrogation() {
   const { toast } = useToast()
   const { t } = useI18n({ useScope: 'global' })
 
-  // Modal visibility
   const visible = ref(false)
 
-  // Status: idle → running → done/error
   const status = ref<'idle' | 'running' | 'done'>('idle')
   const running = computed(() => status.value === 'running')
 
-  // Image source
   const sourceFile = ref<File | null>(null)
   const sourceInputName = ref('')
   const hasSource = computed(() => !!sourceFile.value || !!sourceInputName.value)
 
-  // Dynamic model list (fetched from backend)
   const models = ref<string[]>([])
 
-  // Parameter values (reset each open)
   const paramValues = ref<Record<string, unknown>>({})
 
-  // Result
   const resultText = ref('')
   const promptId = ref('')
 
-  // Timer for elapsed display
   const startTime = ref(0)
 
-  /** Fetch installed tagger model list from backend */
   async function loadModels() {
     try {
       const res = await fetch('/api/generate/tagger_models')
       if (res.ok) {
         const data = await res.json()
         models.value = data.models || []
-        // Auto-select first model if current selection is not in the list
         if (models.value.length > 0 && !models.value.includes(paramValues.value.model as string)) {
           paramValues.value = { ...paramValues.value, model: models.value[0] }
         }
       }
-    } catch { /* ignore */ }
+    } catch { }
   }
 
-  /** Open modal — resets state and loads models */
   function open() {
     sourceFile.value = null
     sourceInputName.value = ''
@@ -170,7 +152,6 @@ export function useTagInterrogation() {
     status.value = 'idle'
     startTime.value = 0
 
-    // Reset params to defaults
     const defaults: Record<string, unknown> = {}
     for (const p of TAG_PARAMS_DEF) defaults[p.key] = p.default
     paramValues.value = defaults
@@ -179,30 +160,25 @@ export function useTagInterrogation() {
     loadModels()
   }
 
-  /** Close modal (result preserved for auto-reopen) */
   function close() {
     visible.value = false
   }
 
-  /** Set image from local file upload / drag */
   function setLocalFile(file: File) {
     sourceFile.value = file
     sourceInputName.value = ''
   }
 
-  /** Set image from ComfyUI input/ picker */
   function setInputImage(name: string) {
     sourceFile.value = null
     sourceInputName.value = name
   }
 
-  /** Clear image source */
   function clearSource() {
     sourceFile.value = null
     sourceInputName.value = ''
   }
 
-  /** Submit interrogation request to backend */
   async function interrogate() {
     if (!hasSource.value || running.value) return
 
@@ -234,7 +210,6 @@ export function useTagInterrogation() {
     }
   }
 
-  /** Called by SSE router when interrogation task completes */
   async function onDone(success: boolean) {
     status.value = 'idle'
     startTime.value = 0
@@ -260,13 +235,11 @@ export function useTagInterrogation() {
 
     promptId.value = ''
 
-    // Auto-reopen modal if user closed it during interrogation and result arrived
     if (!visible.value && resultText.value) {
       visible.value = true
     }
   }
 
-  /** Apply result to positive prompt (overwrite) */
   function applyToPrompt(): string {
     const text = resultText.value
     if (text) {

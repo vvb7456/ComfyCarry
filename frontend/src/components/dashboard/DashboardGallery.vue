@@ -12,7 +12,6 @@ defineOptions({ name: 'DashboardGallery' })
 const { t } = useI18n({ useScope: 'global' })
 const queueStore = useGenerateQueueStore()
 
-// ── Image Preview ─────────────────────────────────────────────────────
 const previewOpen = ref(false)
 const previewImages = ref<string[]>([])
 const previewIndex = ref(0)
@@ -49,7 +48,6 @@ interface RecentOutput {
 }
 
 const recentOutputs = computed<RecentOutput[]>(() => {
-  // Always sort descending by timestamp regardless of HistoryPanel sort preference
   const sorted = [...queueStore.historyItems].sort((a, b) => {
     const ta = Number(a.timestamp) || 0
     const tb = Number(b.timestamp) || 0
@@ -122,12 +120,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Skeleton Loading -->
     <div v-if="!queueStore.historyLoaded && !queueStore.historyFailed && recentOutputs.length === 0" class="dash-output-grid">
       <div v-for="i in 4" :key="i" class="dash-output-skeleton"></div>
     </div>
 
-    <!-- Unavailable / Failed State -->
     <EmptyState
       v-else-if="queueStore.historyFailed && recentOutputs.length === 0"
       :message="t('dashboard.recent.unavailable')"
@@ -138,10 +134,8 @@ onMounted(() => {
       </BaseButton>
     </EmptyState>
 
-    <!-- Empty -->
     <EmptyState v-else-if="recentOutputs.length === 0" :message="t('dashboard.recent.empty')" />
 
-    <!-- Output Cards (Single Row, Never Wrap) -->
     <div v-else class="dash-output-grid">
       <div
         v-for="(item, idx) in recentOutputs"
@@ -175,7 +169,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Image Preview Modal -->
     <ImagePreview
       v-model="previewOpen"
       :images="previewImages"
@@ -215,7 +208,6 @@ onMounted(() => {
   transform: translateX(2px);
 }
 
-/* ── Section 3: Gallery (Single Row, Never Wrap) ── */
 .dash-output-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

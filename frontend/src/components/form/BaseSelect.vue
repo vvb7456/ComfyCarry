@@ -1,18 +1,13 @@
 <script lang="ts">
-/** 单个选项的取值类型。BaseSelect 是泛型组件, 调用点各自推断 T。 */
 export type SelectValue = string | number | boolean
 
 export interface SelectOption {
   value: SelectValue
   label: string
   disabled?: boolean
-  /** 分组标题。相邻的同 group 选项归为一组，在组首渲染一个不可点击的分组头 */
   group?: string
-  /** 右侧次要小字，如 "已装" / "5.16 GB" */
   hint?: string
-  /** 选项前缀图片 URL (品牌 logo 等); 与 icon 二选一, logo 优先 */
   logo?: string
-  /** 选项前缀 MsIcon 图标名 (无 logo 素材时的后备) */
   icon?: IconName
 }
 </script>
@@ -28,49 +23,25 @@ import { isIconName } from '@/config/icons'
 defineOptions({ name: 'BaseSelect', inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
-  /** Current value (v-model). Array when `multiple` is on. */
   modelValue: T
-  /**
-   * Options — accepts multiple shapes:
-   * - SelectOption[]: canonical {value, label}
-   * - string[]: auto-converts to {value: s, label: s}
-   * - Record<string, string | number | boolean>[]: uses valueKey/labelKey to map
-   */
   options: SelectOption[] | string[] | Record<string, string | number | boolean>[]
-  /** Key to extract value from object options */
   valueKey?: string
-  /** Key to extract label from object options */
   labelKey?: string
-  /** Text shown when no value is selected */
   placeholder?: string
-  /** Override display text (ignores current selection) */
   displayText?: string
-  /** Enable search input in the dropdown panel */
   searchable?: boolean
   /** Allow a searched string to be committed as the value (single-select only). */
   allowCustom?: boolean
-  /** Placeholder text for the search input */
   searchPlaceholder?: string
-  /** Text shown when search yields no results */
   emptyText?: string
-  /** Whether the select is disabled */
   disabled?: boolean
-  /** Visual size: 'default' matches form-input, 'sm' for toolbars */
   size?: 'default' | 'sm'
-  /** When true, width shrinks to fit content instead of 100% */
   fit?: boolean
   /** When true, dropdown panel is teleported to body (for use inside overflow containers) */
   teleport?: boolean
-  /** Optional upper bound for the dropdown option list (in px). */
   maxListHeight?: number
-  /**
-   * Multi-select. modelValue becomes an array; the panel stays open on pick and
-   * each row gets a checkbox. Trigger shows "A, B" or "N selected" past `maxTagText`.
-   */
   multiple?: boolean
-  /** Trigger text when nothing is selected in multiple mode (falls back to placeholder) */
   allText?: string
-  /** Show "N selected" instead of a label list once this many are picked (default 2) */
   maxTagText?: number
 }>(), {
   valueKey: 'value',
@@ -95,11 +66,9 @@ const { t } = useI18n({ useScope: 'global' })
 const emit = defineEmits<{
   'update:modelValue': [value: T]
   'change': [value: T]
-  /** 下拉面板展开 (首次打开时触发一次, 面板保持打开不重复触发) */
   'open': []
 }>()
 
-/** Current selection as an array, regardless of mode — the one shape all logic uses. */
 const selectedValues = computed<SelectValue[]>(() => {
   if (props.multiple) {
     return Array.isArray(props.modelValue) ? props.modelValue : []
@@ -143,7 +112,6 @@ const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
     floatingSize({
       padding: 8,
       apply({ availableHeight, elements }) {
-        // Clamp the list max-height to the available viewport space
         const searchH = props.searchable ? 36 : 0
         const availableMax = Math.max(80, availableHeight - searchH)
         const max = props.maxListHeight == null
@@ -171,7 +139,6 @@ const panelStyle = computed(() => {
   }
 })
 
-/** Normalize any option shape to SelectOption[] */
 const normalizedOptions = computed<SelectOption[]>(() => {
   return (props.options as unknown[]).map((o) => {
     if (typeof o === 'string') return { value: o, label: o }
@@ -193,7 +160,6 @@ const normalizedOptions = computed<SelectOption[]>(() => {
   })
 })
 
-/** Options after search filter (when searchable) */
 const filteredOptions = computed(() => {
   if (!props.searchable || !search.value) return normalizedOptions.value
   const q = search.value.toLowerCase()
@@ -232,7 +198,6 @@ const renderRows = computed<RenderRow[]>(() => {
   return rows
 })
 
-/** 当前选中项 (单选) —— trigger 上的 logo / icon 取自它 */
 const selectedOption = computed(() => {
   if (props.multiple || props.displayText) return undefined
   return normalizedOptions.value.find(o => o.value === props.modelValue)
@@ -269,7 +234,6 @@ const isSelectedDisabled = computed(() => {
   return !!opt?.disabled
 })
 
-// Reset highlight when filtered list changes
 watch(filteredOptions, () => { highlightIdx.value = -1 })
 
 function openPanel() {
@@ -279,7 +243,6 @@ function openPanel() {
     // 搜索框恒空: 预填当前值会把列表过滤到只剩选中项, 首次下拉应展示完整列表
     search.value = ''
   }
-  // Pre-highlight selected item
   const idx = filteredOptions.value.findIndex(o => isSelected(o.value))
   highlightIdx.value = idx >= 0 ? idx : 0
   if (props.searchable) {
@@ -294,7 +257,6 @@ function toggle() {
   if (open.value) { open.value = false } else { openPanel() }
 }
 
-/** 内部一律按数组算, 对外 emit 时断言回调用点的泛型 T。 */
 function emitValue(v: SelectValue | SelectValue[]) {
   emit('update:modelValue', v as T)
   emit('change', v as T)
@@ -314,7 +276,6 @@ function select(opt: SelectOption) {
 
   emitValue(opt.value)
   open.value = false
-  // Return focus to trigger
   nextTick(() => triggerRef.value?.focus())
 }
 
@@ -329,7 +290,6 @@ function commitCustomValue() {
   nextTick(() => triggerRef.value?.focus())
 }
 
-/** 清空多选 (触发器上的 × )。 */
 function clearAll(e: Event) {
   e.stopPropagation()
   if (props.disabled) return
@@ -384,7 +344,6 @@ function scrollToHighlighted() {
 
 function onClickOutside(e: MouseEvent) {
   if (triggerRef.value && !triggerRef.value.contains(e.target as Node)) {
-    // For teleported panels, also check if click is inside the panel
     if (panelRef.value?.contains(e.target as Node)) return
     open.value = false
   }
@@ -471,7 +430,6 @@ onBeforeUnmount(() => {
           :style="panelStyle"
           :data-placement="placement"
         >
-          <!-- Search input (when searchable) -->
           <input
             v-if="searchable"
             ref="searchRef"
@@ -576,7 +534,6 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* ── Trigger ── */
 .base-select__trigger {
   display: flex;
   align-items: center;
@@ -612,7 +569,6 @@ onBeforeUnmount(() => {
 .base-select__text--ph { color: var(--t3); }
 .base-select__text--muted { color: var(--t3); opacity: .7; }
 
-/* ── Panel ── */
 /* Position is handled by floatingStyles (inline). Only visual properties here.
    teleport 模式下本规则与全局块的 .base-select__panel--teleported 同时命中
    (scoped 属性选择器优先级更高), 层级值必须保持一致 —— 见全局块注释。 */
@@ -627,7 +583,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* ── Search input ── */
 .base-select__search {
   width: 100%;
   padding: 8px 10px;
@@ -640,7 +595,6 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-/* ── List ── */
 .base-select__list {
   max-height: 240px;
   overflow-y: auto;
@@ -648,7 +602,6 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
-/* ── Item ── */
 .base-select__item {
   display: flex;
   align-items: center;
@@ -686,7 +639,6 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* ── Group header ── */
 .base-select__group {
   padding: 6px 10px 3px;
   font-size: .68rem;
@@ -706,7 +658,6 @@ onBeforeUnmount(() => {
   color: var(--t3);
 }
 
-/* ── Empty state ── */
 .base-select__empty {
   padding: 12px 10px;
   text-align: center;

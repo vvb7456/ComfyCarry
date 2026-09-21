@@ -1,11 +1,5 @@
 <script setup lang="ts">
 /**
- * DrawerTrigger — 顶栏上打开侧滑抽屉的按钮。
- *
- * 规格与 GeneratePage 的架构选择器触发器同底: --bg3 底、1px --bd 边框、
- * var(--rs) 圆角、6px/12px padding, hover 边框变亮。文字取次级色 (--t2),
- * hover 才升主色 —— 它在任何页面上都是辅助操作, 不与主操作抢视觉权重。
- *
  * badge 只表达"正在发生的事"的条数, 不表达静态存量: 常年非零的数字会让 badge
  * 永远亮着, 彻底失去提示价值 (所以生成页放队列数而非历史数, 模型页放进行中
  * 任务数而非收藏数)。
@@ -21,13 +15,9 @@ defineOptions({ name: 'DrawerTrigger' })
 withDefaults(defineProps<{
   icon: IconName
   label: string
-  /** 正在进行的条数; 0 或不传则不显示计数 */
   badge?: number
-  /** 图标 pulse —— 有任务正在跑 */
   pulse?: boolean
-  /** 有失败待处理 */
   alert?: boolean
-  /** alert 的无障碍说明 (计数/红点的 title 与 aria-label) */
   alertText?: string
 }>(), {
   badge: 0,
@@ -70,7 +60,7 @@ defineEmits<{ click: [] }>()
   background: var(--bg3);
   border: 1px solid var(--bd);
   border-radius: var(--rs);
-  color: var(--t2);  /* 次级文字色 —— 辅助操作 */
+  color: var(--t2);
   font-size: var(--text-base);
   font-weight: 500;
   font-family: inherit;
@@ -89,7 +79,6 @@ defineEmits<{ click: [] }>()
   white-space: nowrap;
 }
 
-/* badge: 进行中条数 (>0 显示, accent 底) */
 .drawer-trigger__badge {
   background: var(--ac);
   color: #fff;
@@ -105,7 +94,6 @@ defineEmits<{ click: [] }>()
   background: var(--red);
 }
 
-/* 无计数时的失败红点 */
 .drawer-trigger__dot {
   width: 7px;
   height: 7px;
@@ -114,7 +102,6 @@ defineEmits<{ click: [] }>()
   flex-shrink: 0;
 }
 
-/* 执行中图标轻微 pulse (CSS, prefers-reduced-motion 降级静态) */
 .drawer-trigger__icon--pulse {
   animation: drawer-trigger-pulse 1.6s ease-in-out infinite;
 }

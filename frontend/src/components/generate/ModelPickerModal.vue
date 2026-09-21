@@ -1,14 +1,4 @@
 <script setup lang="ts">
-/**
- * ModelPickerModal — Shared modal for Checkpoint (single-select) and LoRA (multi-select).
- *
- * Features:
- * - Search: filename, displayName, trigger_words (LoRA only)
- * - Folder chips: auto-extracted from model paths
- * - Preview images: local → CivitAI fallback → placeholder
- * - Architecture tag: baseModel from CivitAI info, or detected arch
- * - Selection: single-click (checkpoint) or toggle + confirm (LoRA)
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -38,19 +28,13 @@ const props = withDefaults(defineProps<{
   title: string
   icon?: IconName
   items: PickerModelItem[]
-  /** Multi-select mode (LoRA). Single-select (Checkpoint) by default. */
   multi?: boolean
-  /** Currently selected names (for highlighting in grid) */
   selected?: Set<string>
-  /** Placeholder for search input */
   searchPlaceholder?: string
-  /** Count label for multi-select footer */
   countLabel?: string
   /** Current tab's arch (archFilter[0]); when set, arch chips default + mismatch confirm */
   currentArch?: string
-  /** 当前架构的运行组件是否缺失 (拆分形态卡片显示提示角标) */
   componentsMissing?: boolean
-  /** 两形态并存时显示形态过滤 chip + 卡片徽章 */
   showPackagingFilter?: boolean
 }>(), {
   icon: 'view_in_ar',
@@ -64,33 +48,25 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** Single-select: user clicked a model. */
   select: [name: string]
-  /** Multi-select: user toggled a model */
   toggle: [name: string]
-  /** Multi-select: user confirmed selection */
   confirm: []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
 const { confirm } = useConfirm()
 
-// ── Search ──
 const search = ref('')
 
-// ── Arch filter ──
 const activeArch = ref('')
-// Packaging filter (仅两形态并存时启用)
 const activePackaging = ref<'checkpoint' | 'split' | ''>('')
 
-// ── Arch chips (dynamic from items' effectiveArch field) ──
 const archOptions = computed<ChipOption[]>(() => {
   const set = new Set<string>()
   for (const m of props.items) {
     const ea = effectiveArch(m)
     if (ea) set.add(ea)
   }
-  // sort by ARCH_LABELS key order, unknown last
   const known = [...set].filter(a => a !== 'unknown')
     .sort((a, b) => {
       const ia = Object.keys(ARCH_LABELS).indexOf(a)
@@ -110,21 +86,17 @@ const packagingOptions = computed<ChipOption[]>(() => [
   { value: 'split', label: t('generate.picker.packaging_split') },
 ])
 
-// ── Filtered items ──
 const filtered = computed(() => {
   let list = props.items
 
-  // Arch filter (against effectiveArch)
   if (activeArch.value) {
     list = list.filter(m => effectiveArch(m) === activeArch.value)
   }
 
-  // Packaging filter (仅 showPackagingFilter 时生效)
   if (props.showPackagingFilter && activePackaging.value) {
     list = list.filter(m => (m.packaging ?? 'split') === activePackaging.value)
   }
 
-  // Search
   const q = search.value.toLowerCase().trim()
   if (q) {
     list = list.filter(m => {
@@ -138,19 +110,16 @@ const filtered = computed(() => {
   return list
 })
 
-// ── Reset state on open ──
 watch(() => props.modelValue, (open) => {
   if (open) {
     search.value = ''
     activePackaging.value = ''
-    // default to currentArch if present in items' effectiveArchs, else '全部'
     const archs = new Set(props.items.map(m => effectiveArch(m)))
     activeArch.value = (props.currentArch && archs.has(props.currentArch))
       ? props.currentArch : ''
   }
 })
 
-// ── Helpers ──
 function getDisplayName(item: PickerModelItem): string {
   const infoName = item.info?.name
   if (infoName && typeof infoName === 'string') return infoName
@@ -160,7 +129,6 @@ function getDisplayName(item: PickerModelItem): string {
 
 function getPreviewUrl(item: PickerModelItem): string | null {
   if (item.preview) return localModelPreviewUrl(item.preview)
-  // CivitAI fallback
   const civitImg = (item.info as Record<string, unknown>)?.images as Array<Record<string, unknown>> | undefined
   const first = civitImg?.[0]
   if (first?.url && typeof first.url === 'string' && first.url.startsWith('http')) return first.url
@@ -203,7 +171,6 @@ async function onCardClick(item: PickerModelItem) {
       const currentRoot = familyRoot(props.currentArch)
 
       if (itemEffArch === 'unknown') {
-        // (4) unknown confirm 不变
         const ok = await confirm({
           title: t('generate.confirm.arch_unknown.title'),
           message: t('generate.confirm.arch_unknown.message', {
@@ -214,7 +181,6 @@ async function onCardClick(item: PickerModelItem) {
         })
         if (!ok) return
       } else if (itemRoot !== currentRoot) {
-        // (1) 跨硬架构: 强警告文案不变
         const ok = await confirm({
           title: t('generate.confirm.arch_mismatch.title'),
           message: t('generate.confirm.arch_mismatch.message', {
@@ -226,7 +192,6 @@ async function onCardClick(item: PickerModelItem) {
         })
         if (!ok) return
       } else if (itemEffArch !== 'sdxl' && props.currentArch !== 'sdxl') {
-        // (2) 同家族软架构错配: 双方都明确 (非通用 sdxl) → 软提醒
         const ok = await confirm({
           title: t('generate.confirm.arch_subarch_mismatch.title'),
           message: t('generate.confirm.arch_subarch_mismatch.message', {
@@ -252,7 +217,6 @@ function close() {
   emit('update:modelValue', false)
 }
 
-// ── Modal mode (list / empty only; component-state removed) ─────────────────
 const router = useRouter()
 
 const currentArchLabel = computed(() => {
@@ -264,7 +228,6 @@ const isItemsEmpty = computed(() => props.items.length === 0)
 
 function goToDownloadPage() {
   close()
-  // 空态按钮 → 项目内模型页的 CivitAI 搜索 tab (LoRA 模式自动过滤 LORA 类型)
   router.push({
     name: 'models',
     query: { tab: 'civitai', ...(props.multi ? { type: 'LORA' } : {}) },
@@ -282,7 +245,6 @@ function goToDownloadPage() {
     density="default"
     scroll="none"
   >
-    <!-- ── ① 空态: 该 arch 两目录皆空 ── -->
     <div v-if="isItemsEmpty" class="picker-empty-state">
       <MsIcon name="cloud_download" color="none" class="picker-empty-icon" />
       <div class="picker-empty-title">{{
@@ -300,9 +262,7 @@ function goToDownloadPage() {
       </BaseButton>
     </div>
 
-    <!-- ── ③ 列表态 ── -->
     <template v-else>
-      <!-- Search + Chips -->
       <div class="picker-toolbar">
         <FilterInput
           v-model="search"
@@ -318,7 +278,6 @@ function goToDownloadPage() {
           class="picker-chips"
           @update:model-value="activeArch = $event as string"
         />
-        <!-- 形态过滤 chip (仅两形态并存时显示) -->
         <ChipSelect
           v-if="showPackagingFilter"
           :options="packagingOptions"
@@ -330,13 +289,11 @@ function goToDownloadPage() {
         />
       </div>
 
-      <!-- Grid -->
       <div class="picker-grid-wrap">
         <div v-if="filtered.length === 0" class="picker-empty">
           <MsIcon name="search_off" color="none" />
           <span>{{ t('common.no_results') }}</span>
         </div>
-        <!-- 单文件卡片网格 -->
         <div v-else class="picker-grid">
           <div
             v-for="item in filtered"
@@ -369,7 +326,6 @@ function goToDownloadPage() {
               <span v-if="getModelTag(item)" class="model-card__tag" :class="{ dim: isArchTag(item) }">
                 {{ getModelTag(item) }}
               </span>
-              <!-- 形态徽章 (整合包=clay / 拆分=teal, 仅两形态并存时显示) -->
               <span
                 v-if="showPackagingFilter && item.packaging"
                 class="model-card__pkg-badge"
@@ -382,7 +338,6 @@ function goToDownloadPage() {
               <div v-if="multi" class="model-card__check">
                 <MsIcon name="check" color="none" />
               </div>
-              <!-- 组件缺失提示角标 (拆分形态, 左下角, 不阻断) -->
               <span
                 v-if="componentsMissing && (item.packaging ?? 'split') === 'split'"
                 class="model-card__dep-hint"
@@ -399,7 +354,6 @@ function goToDownloadPage() {
       </div>
     </template>
 
-    <!-- Footer (multi-select only) -->
     <template v-if="multi" #footer>
       <span class="picker-count">{{ countLabel }}</span>
       <BaseButton @click="close">{{ t('common.btn.cancel') }}</BaseButton>
@@ -420,7 +374,6 @@ function goToDownloadPage() {
   margin: 0;
 }
 
-/* Grid wrapper with scroll */
 .picker-grid-wrap {
   overflow-y: auto;
   max-height: min(55vh, 520px);
@@ -443,7 +396,6 @@ function goToDownloadPage() {
   font-size: .85rem;
 }
 
-/* ── Model Card ── */
 .model-card {
   background: var(--bg3);
   border: 2px solid var(--bd);
@@ -497,7 +449,6 @@ function goToDownloadPage() {
   font-size: 1.8rem;
 }
 
-/* Architecture tag */
 .model-card__tag {
   position: absolute;
   top: 4px;
@@ -522,7 +473,6 @@ function goToDownloadPage() {
   color: var(--t-inv-2);
 }
 
-/* 形态徽章 (右上角, 整合包=clay 棕 / 拆分=teal 青) */
 .model-card__pkg-badge {
   position: absolute;
   top: 4px;
@@ -548,7 +498,6 @@ function goToDownloadPage() {
   color: #fff;
 }
 
-/* Check mark (multi-select) */
 .model-card__check {
   position: absolute;
   top: 4px;
@@ -578,14 +527,12 @@ function goToDownloadPage() {
   color: var(--t1);
 }
 
-/* Footer count */
 .picker-count {
   margin-right: auto;
   font-size: .8rem;
   color: var(--t3);
 }
 
-/* ── 空态 (该 arch 两目录皆空) ── */
 .picker-empty-state {
   display: flex;
   flex-direction: column;
@@ -613,7 +560,6 @@ function goToDownloadPage() {
   color: var(--t3);
 }
 
-/* 组件缺失提示角标 (拆分形态, 左下角, 不阻断选择) */
 .model-card__dep-hint {
   position: absolute;
   bottom: 4px;

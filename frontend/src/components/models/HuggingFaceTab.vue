@@ -29,7 +29,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-// ── Downloads (singleton) ──
 const {
   favoritesItems: dlFavItems,
   addFavorite: dlAddFavorite,
@@ -43,28 +42,23 @@ const {
   activeTasks: dlActiveTasks,
 } = useDownloads()
 
-// ── 激活时同步本地索引与下载状态 ──
 // 卡片要展示已安装与下载进度, 需要本地模型索引和任务快照。与 CivitaiTab 的做法一致。
 watch(() => props.active, (val) => {
   if (val) {
     dlFetchLocalIndex()
-    // 连接到进行中的下载, 保证卡片状态准确
     dlRefreshStatus().then(() => {
       if (dlActiveTasks.value.length) dlStartPolling()
     })
   }
 }, { immediate: true })
 
-// ── 搜索 / 筛选 ──────────────────────────────────────────────────────────────
 // 白名单是本地静态数据, 无需请求远端; 搜索/筛选全部本地完成。
 const searchQuery = ref('')
 const selectedTypes = ref<string[]>([])
 const selectedBaseModels = ref<string[]>([])
 
-/** facet 元素: 值 → 计数 */
 interface Facet { value: string; count: number }
 
-/** facet → BaseSelect 选项; count 走 hint 显示在右侧小字。label 直接用原值。 */
 function facetOptions(facets: ComputedRef<Facet[]>) {
   return computed(() => facets.value.map(f => ({
     value: f.value,
@@ -73,7 +67,6 @@ function facetOptions(facets: ComputedRef<Facet[]>) {
   })))
 }
 
-/** 一个模型可能有多版本不同 baseModel, 取并集 */
 function modelBaseModels(model: (typeof HUGGINGFACE_MODELS)[number]): string[] {
   const set = new Set<string>()
   if (model.version?.baseModel) set.add(model.version.baseModel)
@@ -83,7 +76,6 @@ function modelBaseModels(model: (typeof HUGGINGFACE_MODELS)[number]): string[] {
   return [...set]
 }
 
-// 类型 / baseModel 分布 (值 → 计数)
 const typeFacets = computed<Facet[]>(() => {
   const map = new Map<string, number>()
   for (const m of HUGGINGFACE_MODELS) {
@@ -105,10 +97,6 @@ const baseModelFacets = computed<Facet[]>(() => {
 const typeOptions = facetOptions(typeFacets)
 const baseModelOptions = facetOptions(baseModelFacets)
 
-/**
- * 本地过滤: 名称子串 (不区分大小写) + 类型/baseModel 多选。
- * 任一多选为空表示不过滤该维度。
- */
 const filteredModels = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   const hasType = selectedTypes.value.length > 0
@@ -124,7 +112,6 @@ const filteredModels = computed(() => {
   })
 })
 
-// ── 增量渲染 (IntersectionObserver sentinel) ──────────────────────────────
 const visibleCount = ref(60)
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -144,19 +131,16 @@ watch(sentinelRef, (el) => {
 
 onBeforeUnmount(() => observer?.disconnect())
 
-// 筛选条件变化时重置增量渲染起点
 watch([searchQuery, selectedTypes, selectedBaseModels], () => {
   visibleCount.value = 60
 })
 
-// ── Version picker ──
 // 与 CivitaiTab 一致用 CivitaiHit 承载弹窗数据;白名单条目在结构上兼容 CivitaiHit。
 const vpOpen = ref(false)
 const vpHit = ref<CivitaiHit | null>(null)
 const favOpen = ref(false)
 const favHit = ref<CivitaiHit | null>(null)
 
-// ── Favorite helpers ──
 function hitToFavoriteItem(hit: CivitaiHit) {
   const imgs = hit.images?.length ? hit.images : (hit.version?.images || [])
   // HF 图片 URL 已是绝对地址, 直接使用不拼 CivitAI CDN 前缀
@@ -178,7 +162,6 @@ function hitToFavoriteItem(hit: CivitaiHit) {
 
 function toggleFavorite(hit: CivitaiHit) {
   if (dlIsInFavorites(hit.id)) {
-    // 移除该模型全部版本的收藏
     for (const item of dlFavItems.value) {
       if (item.modelId === String(hit.id)) {
         const key = item.versionId ? `${item.modelId}:${item.versionId}` : item.modelId
@@ -188,11 +171,9 @@ function toggleFavorite(hit: CivitaiHit) {
   } else {
     const allVersions = hit.versions || (hit.version ? [hit.version] : [])
     if (allVersions.length > 1) {
-      // 多版本: 打开版本选择弹窗
       favHit.value = hit
       favOpen.value = true
     } else {
-      // 单版本: 直接收藏
       dlAddFavorite(hitToFavoriteItem(hit))
     }
   }
@@ -219,7 +200,6 @@ function handleUnfavoriteVersion(modelId: string, versionId: number) {
   dlRemoveFavorite(`${modelId}:${versionId}`)
 }
 
-// ── Download state & actions ──
 function getDownloadState(hit: CivitaiHit): string {
   const allVersions = hit.versions || (hit.version ? [hit.version] : [])
   const versionIds = allVersions.map(v => v.id)
@@ -240,12 +220,10 @@ function handleDownload(hit: CivitaiHit) {
   }
 }
 
-/** 版本选择弹窗里的下载 */
 function handlePickerDownload(modelId: string, modelType: string, versionId: number) {
   dlDownloadOne(modelId, modelType, versionId)
 }
 
-// ── HuggingFace → MetaModal ──
 function openModelMeta(hit: CivitaiHit) {
   emit('openMeta', remoteHitToMeta(hit, { channel: 'huggingface' }))
 }
@@ -292,7 +270,6 @@ function openModelMeta(hit: CivitaiHit) {
     </AppToolbar>
   </Teleport>
 
-  <!-- 卡片网格 (增量渲染前 visibleCount 张) -->
   <div v-if="filteredModels.length > 0" class="model-grid">
     <CivitaiModelCard
       v-for="model in filteredModels.slice(0, visibleCount)"
@@ -307,24 +284,20 @@ function openModelMeta(hit: CivitaiHit) {
     />
   </div>
 
-  <!-- 空结果 -->
   <EmptyState v-else icon="search_off" :message="t('models.huggingface.empty')" />
 
-  <!-- 无限滚动 sentinel -->
   <div
     v-if="filteredModels.length > 0 && hasMore"
     ref="sentinelRef"
     class="hf-sentinel"
   />
 
-  <!-- Version Picker Modal -->
   <VersionPickerModal
     v-model="vpOpen"
     :hit="vpHit"
     @download="handlePickerDownload"
   />
 
-  <!-- Favorite Version Modal -->
   <FavoriteVersionModal
     v-model="favOpen"
     :hit="favHit"

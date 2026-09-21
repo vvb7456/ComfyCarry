@@ -78,10 +78,8 @@ function onNext() {
       <span v-else>{{ t('wizard.step0.detecting') }}</span>
     </template>
 
-    <!-- GPU / Image info -->
     <EnvInfoCard :gpu-info="gpuInfo ?? undefined" :prebuilt-info="prebuiltInfo ?? undefined" />
 
-    <!-- Deploy mode cards -->
     <div v-if="!isUnsupported" class="step-deploy__cards">
       <ModeCard
         icon="rocket_launch"
@@ -100,7 +98,6 @@ function onNext() {
       />
     </div>
 
-    <!-- Import file upload -->
     <div v-if="selectedMode === 'import'" class="step-deploy__import">
       <p class="step-deploy__import-hint" v-html="t('wizard.step0.import_upload.hint')" />
       <FileUploadZone

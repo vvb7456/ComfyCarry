@@ -26,7 +26,6 @@ const sshPwFollow = computed({
   set: (v: boolean) => { config.ssh_pw_follow = v },
 })
 
-// Sync SSH keys from textarea
 watch(sshKeysText, (text) => {
   config.ssh_keys = text.split('\n').map(l => l.trim()).filter(Boolean)
 })
@@ -90,7 +89,6 @@ function onPrev() {
       </template>
     </FormField>
 
-    <!-- SSH section -->
     <div class="step-password__ssh-section">
       <ToggleSwitch v-model="sshPwFollow">
         <span class="step-password__ssh-label">

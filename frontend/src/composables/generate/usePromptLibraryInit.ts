@@ -1,18 +1,8 @@
-/**
- * usePromptLibraryInit — Tag library initialization composable.
- *
- * Follows the dependency-status pattern:
- *   - Check → show gate or not
- *   - SSE-based download + import with real-time progress
- *   - Error detail with recovery hints
- */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { apiErrorText } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
 import type { InitSourceStatus, ImportResult } from '@/types/prompt-library'
-
-// ── Types ──────────────────────────────────────────────────────────────────
 
 export interface InitProgress {
   phase: 'downloading' | 'importing' | 'done' | 'error'
@@ -23,31 +13,19 @@ export interface InitProgress {
 }
 
 export interface UsePromptLibraryInitReturn {
-  /** Raw status from backend */
   status: Ref<InitSourceStatus | null>
-  /** Whether the init gate should be shown */
   show: Ref<boolean>
-  /** Whether currently checking status */
   loading: Ref<boolean>
-  /** Whether import/download is in progress */
   importing: Ref<boolean>
-  /** Real-time progress info */
   progress: Ref<InitProgress | null>
-  /** Error message */
   error: Ref<string>
 
-  /** Library has data (groups + tags > 0) */
   initialized: ComputedRef<boolean>
 
-  /** Check status and decide whether to show gate */
   checkStatus(): Promise<void>
-  /** Start SSE-based import (download if needed) */
   startImport(): Promise<ImportResult | null>
-  /** Cleanup active fetch */
   destroy(): void
 }
-
-// ── Composable ─────────────────────────────────────────────────────────────
 
 export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
   const { get } = useApiFetch()
@@ -61,8 +39,6 @@ export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
 
   const initialized = computed(() => status.value?.initialized ?? false)
 
-  // ── Check ──────────────────────────────────────────────────────────────
-
   async function checkStatus(): Promise<void> {
     loading.value = true
     error.value = ''
@@ -70,14 +46,11 @@ export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
       const resp = await get<InitSourceStatus>('/api/prompt-library/init/status')
       if (resp) status.value = resp
 
-      // Show gate if library not yet initialized
       show.value = !initialized.value
     } finally {
       loading.value = false
     }
   }
-
-  // ── Import (SSE via fetch POST) ──────────────────────────────────────
 
   function startImport(): Promise<ImportResult | null> {
     if (importing.value) return Promise.resolve(null)
@@ -143,7 +116,6 @@ export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
       importing.value = false
       abortCtrl = null
 
-      // Refresh status after completion
       await checkStatus()
       return result
 
@@ -155,8 +127,6 @@ export function usePromptLibraryInit(): UsePromptLibraryInitReturn {
       return null
     }
   }
-
-  // ── Cleanup ──────────────────────────────────────────────────────────────
 
   function destroy() {
     importing.value = false

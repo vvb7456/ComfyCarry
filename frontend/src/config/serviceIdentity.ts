@@ -1,13 +1,4 @@
-/**
- * 服务身份图标单一来源 —— 侧栏、Dashboard 服务卡/诊断、Tunnel 服务行共用。
- *
- * 返回品牌 mark (BrandName) 或 MsIcon 名 (IconName) 二选一:
- *   - 有官方 mark 的服务 (ComfyUI / Jupyter) 用品牌单色图标;
- *   - 其余服务继续用 Material Symbols 语义图标。
- * 页面通过 components/ui/ServiceIdentityIcon.vue 渲染, 不在各页各写一份 iconMap。
- *
- * MsIcon 名必须同时出现在 frontend/icons.txt (字体子集清单), 否则 IconName 类型会报错。
- */
+// MsIcon 名必须同时出现在 frontend/icons.txt (字体子集清单), 否则 IconName 类型会报错。
 import type { BrandName } from '@/config/brand-icons'
 import type { IconName } from '@/config/icon-codepoints'
 

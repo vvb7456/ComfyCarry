@@ -29,7 +29,6 @@ const queue: QueueItem[] = []
 let resolveFn: ((value: ConfirmResult) => void) | null = null
 
 function confirm(options: ConfirmOptions): Promise<ConfirmResult> {
-  // Auto-confirm if user previously checked "don't ask again"
   if (options.dontAskKey && localStorage.getItem(options.dontAskKey) === 'true') {
     return Promise.resolve(true)
   }

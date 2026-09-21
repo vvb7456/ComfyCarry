@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * PromptHistoryModal — Browse and apply prompt history / favorites.
- *
- * Two tabs: History and Favorites.
- * Each item row shows positive/negative prompt preview, relative time,
- * favorite toggle, delete, and click-to-apply.
- */
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usePromptLibrary } from '@/composables/generate/usePromptLibrary'

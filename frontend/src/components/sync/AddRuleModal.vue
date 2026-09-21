@@ -1,20 +1,4 @@
 <script setup lang="ts">
-/**
- * AddRuleModal — dashboard「添加规则」弹窗 (三步式引导)。
- *
- * 流程 (参考「添加存储」的首屏交互):
- * - step=1 选择存储: 首屏居中 BaseSelect (非全宽), 选定后点「下一步」
- * - step=2 选择规则: 6 个预设卡 + 1 个「自定义规则」卡 (点击单选, 右上角
- *   角标指示; 不再点击卡片直接跳转), 底部 上一步/下一步
- * - step=3 分两态:
- *   - 预设: 该规则详情只读清单 (名称/方向/方式/触发 + 每条子规则的实际
- *     remote/路径, 占位符按所选存储展开), 上一步/保存
- *   - 自定义: RuleFields 完整表单 (remote 锁定为所选存储), 上一步/保存
- *
- * 保存即追加 (POST rules/save, 现有规则 + 新规则)。预设远程路径 = 存储同步
- * 文件夹 (root_dir) + 相对路径, s3 再前置 bucket 首段; 自定义规则按用户填写。
- * wizard 不复用本组件 (其 step4 是勾选式预设网格, 样式独立)。
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
@@ -37,7 +21,6 @@ const props = withDefaults(defineProps<{
   modelValue?: boolean
   presets: SyncTemplate[]
   remotes: Remote[]
-  /** 追加保存的现有规则 */
   existingRules: SyncRule[]
   /** 打开时预选的存储名 (存储卡「创建同步规则」入口, 直接跳过存储选择) */
   presetRemote?: string
@@ -59,18 +42,15 @@ function tr(key: string | undefined, fallback: string): string {
   return key && te(key) ? t(key) : fallback
 }
 
-// ── 流程状态 (step: 1=选存储 → 2=选规则 → 3=详情/表单) ──
 type Choice = { kind: 'preset'; tpl: SyncTemplate } | { kind: 'custom' }
 type Step = 1 | 2 | 3
 const step = ref<Step>(1)
-/** 二屏单选: null=未选 */
 const choice = ref<Choice | null>(null)
 const saving = ref(false)
 
 /** 当前选定的存储 (第一步确定, 全程不变) */
 const selectedRemote = ref('')
 
-// 自定义态表单
 const customForm = ref<Partial<SyncRule>>({})
 
 function brandOf(r: Remote) {
@@ -85,7 +65,6 @@ watch(() => props.modelValue, (open) => {
   if (!open) return
   choice.value = null
   customForm.value = { direction: 'pull', method: 'copy', trigger: 'manual', enabled: true, remote: defaultRemote() }
-  // 存储卡「创建同步规则」入口: 预选存储并直接进入规则选择
   if (props.presetRemote) {
     selectedRemote.value = props.presetRemote
     step.value = 2
@@ -95,7 +74,6 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
-// ── 第一步: 存储下拉 ──
 const remoteOptions = computed(() =>
   props.remotes.map(r => {
     const brand = brandOf(r)
@@ -113,7 +91,6 @@ function goNext() {
   if (step.value === 2 && choice.value) step.value = 3
 }
 
-// ── 第二步: 规则单选卡 ──
 const isChoiceSelected = (c: Choice): boolean => {
   if (!choice.value || choice.value.kind !== c.kind) return false
   return c.kind !== 'preset' || (choice.value as { kind: 'preset'; tpl: SyncTemplate }).tpl.id === c.tpl.id
@@ -122,19 +99,16 @@ const isChoiceSelected = (c: Choice): boolean => {
 function selectChoice(c: Choice) {
   choice.value = c
   if (c.kind === 'custom') {
-    // 换存储后回到自定义表单时重置 remote
     customForm.value = { ...customForm.value, remote: selectedRemote.value }
   }
 }
 
 const canGoDetail = computed(() => !!choice.value)
 
-// ── 第三步: 预设详情 (只读) / 自定义表单 ──
 const currentPreset = computed(() =>
   choice.value?.kind === 'preset' ? choice.value.tpl : null,
 )
 
-// 弹窗标题即步骤名称 (选择存储 → 选择规则 → 确认规则/自定义规则)
 const modalTitle = computed(() => {
   if (step.value === 1) return t('sync.rule.remote_select_title')
   if (step.value === 2) return t('sync.rule.choose_rule')
@@ -152,7 +126,6 @@ function entryRemotePath(remoteName: string, remotePath: string): string {
   return joinRemotePath(bucket, rootDir, remotePath)
 }
 
-/** 预设 → 待创建规则 (规则名以当前语言固化; deploy 在 dashboard 落成 manual) */
 function buildPresetRules(): SyncRule[] {
   const tpl = currentPreset.value
   if (!tpl) return []
@@ -172,7 +145,6 @@ function buildPresetRules(): SyncRule[] {
   }))
 }
 
-// ── 预设详情行 (只读信息列表, 占位符已按所选存储展开) ──
 const presetName = computed(() => {
   const tpl = currentPreset.value
   return tpl ? tr(tpl.name_key, tpl.name) : ''
@@ -182,7 +154,6 @@ const triggerLabels: Record<string, string> = { deploy: 'sync.rules.deploy', wat
 const methodLabels: Record<string, string> = { copy: 'sync.rules.method_short.copy', sync: 'sync.rules.method_short.sync', move: 'sync.rules.method_short.move' }
 
 interface PresetEntryRow {
-  /** 条目名 (e.g. 模型 / 工作流) */
   name: string
   direction: string
   remote: string
@@ -193,7 +164,6 @@ interface PresetEntryRow {
   filters: string[]
 }
 
-/** 三屏详情: 概要字段 + 每条子规则的实际路径 (remote 前缀替换占位) */
 const presetInfoRows = computed(() => {
   const tpl = currentPreset.value
   if (!tpl) return []
@@ -276,7 +246,6 @@ const isManualPreset = computed(() =>
 
 const isManualCustom = computed(() => customForm.value.trigger === 'manual')
 
-// ── 步进 ──
 function back() {
   if (step.value === 3) {
     step.value = 2
@@ -286,7 +255,6 @@ function back() {
   step.value = 1
 }
 
-// ── 路径浏览 (自定义表单) ──
 const browseModal = ref(false)
 const browseMode = ref<'local' | 'remote'>('remote')
 const browseTargetField = ref<'remote_path' | 'local_path'>('remote_path')
@@ -309,7 +277,6 @@ function onBrowseSelect(path: string) {
     size="lg"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <!-- 第一步: 选择存储 (首屏居中 select, 非全宽) -->
     <div v-if="step === 1" class="add-rule-step">
       <div class="add-rule-step__center">
         <div class="add-rule-step__select">
@@ -330,7 +297,6 @@ function onBrowseSelect(path: string) {
       </div>
     </div>
 
-    <!-- 第二步: 选择规则 (预设 + 自定义, 点击单选; 按钮右对齐) -->
     <div v-else-if="step === 2" class="add-rule-step">
       <div class="add-rule-grid">
         <PresetRuleCard
@@ -362,9 +328,7 @@ function onBrowseSelect(path: string) {
       </div>
     </div>
 
-    <!-- 第三步 a: 预设详情 (只读信息列表, 路径已按所选存储展开) -->
     <div v-else-if="currentPreset" class="add-rule-step">
-      <!-- 概要 -->
       <dl class="add-rule-info">
         <dt class="add-rule-info__label">{{ t('sync.rule.name') }}</dt>
         <dd class="add-rule-info__value">{{ presetName }}</dd>
@@ -374,7 +338,6 @@ function onBrowseSelect(path: string) {
         <dd class="add-rule-info__value">{{ presetInfoRows[0]?.remote }}</dd>
       </dl>
 
-      <!-- 子规则明细: 每条一张只读块, 路径分两行 -->
       <div v-for="(row, i) in presetInfoRows" :key="i" class="add-rule-entry">
         <div class="add-rule-entry__name">{{ row.name }}</div>
         <dl class="add-rule-info add-rule-info--entry">
@@ -406,7 +369,6 @@ function onBrowseSelect(path: string) {
       </div>
     </div>
 
-    <!-- 第三步 b: 自定义规则表单 (remote 锁定为选定的存储) -->
     <div v-else class="add-rule-step">
       <RuleFields
         :rule="customForm"
@@ -441,7 +403,6 @@ function onBrowseSelect(path: string) {
 
 /* 步骤名称改由 modal 标题承担, 不再内置 */
 
-/* 首屏: select 居中 (非全宽) */
 .add-rule-step__center {
   display: flex;
   justify-content: center;
@@ -530,7 +491,6 @@ function onBrowseSelect(path: string) {
   font-size: var(--text-xs, .78rem);
 }
 
-/* 子规则明细块: 只读边框卡, 分隔各条目 */
 .add-rule-entry {
   border: 1px solid var(--bd);
   border-radius: var(--rs, 6px);

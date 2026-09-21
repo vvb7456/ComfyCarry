@@ -21,7 +21,7 @@ const props = withDefaults(defineProps<{
   icon?: IconName
   variant?: 'primary' | 'danger' | 'success'
   disabled?: boolean
-  /** 软禁用: 主按钮视觉置灰但仍可点击 (供父组件 toast 说明原因), 右侧下拉真禁用 */
+  /** 软禁用: 主按钮视觉置灰但仍可点击 (供父组件 toast 说明原因) */
   softDisabled?: boolean
   loading?: boolean
   options: SplitButtonOption[]
@@ -103,7 +103,6 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   position: relative;
 }
 
-/* ── shared base ── */
 .split-button__main,
 .split-button__arrow {
   border: none;
@@ -148,7 +147,6 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   vertical-align: 0;
 }
 
-/* ── primary ── */
 .split-button--primary .split-button__main,
 .split-button--primary .split-button__arrow {
   background: var(--ac);
@@ -159,7 +157,6 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   background: var(--ac2);
 }
 
-/* ── danger ── */
 .split-button--danger .split-button__main,
 .split-button--danger .split-button__arrow {
   background: var(--red);
@@ -181,7 +178,6 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   background: color-mix(in srgb, var(--green) 50%, #000);
 }
 
-/* ── dropdown ── */
 .split-button__dropdown {
   position: absolute;
   right: 0;
@@ -231,7 +227,6 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   margin-left: auto;
 }
 
-/* ── loading spin ── */
 @keyframes split-button-spin {
   to { transform: rotate(360deg) }
 }

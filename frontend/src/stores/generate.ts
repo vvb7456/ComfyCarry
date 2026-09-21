@@ -3,8 +3,6 @@ import { ref, reactive, computed, watch } from 'vue'
 import type { ModelTypeConfig } from '@/config/model-types'
 import { MODEL_TYPES } from '@/config/model-types'
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export interface LoraEntry {
   name: string
   strength: number
@@ -110,7 +108,7 @@ export interface DisabledToken {
   bracketDepth: number
   explicitWeight: boolean
   index: number       // position in token list when disabled
-  translate?: string  // cached translation
+  translate?: string
 }
 
 export interface ModelState {
@@ -163,8 +161,6 @@ export interface ModelState {
   fast: boolean
 }
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 const STORAGE_KEY = 'comfycarry_generate_params'
 const SCHEMA_VERSION = 5
 const SAVE_DEBOUNCE_MS = 300
@@ -199,8 +195,6 @@ export function createDefaultVideoState(config: ModelTypeConfig): VideoState {
 function randomSeed(): number {
   return Math.floor(Math.random() * 4294967295)
 }
-
-// ── Factory ──────────────────────────────────────────────────────────────────
 
 export function createDefaultState(config: ModelTypeConfig): ModelState {
   const cnTypes = ['pose', 'canny', 'depth']
@@ -246,10 +240,8 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
     prefix: '[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]',
     format: 'png',
     runMode: 'normal',
-    // Clip Skip / VAE 覆盖 (checkpoint 系专属); 默认取 config.defaults.clip_skip ?? 1
     clipSkip: config.defaults.clip_skip ?? 1,
     vaeOverride: '',
-    // 后台运行模式: 轮次上限, 0 = 无限
     maxIterations: 0,
     controlNets,
     upscale: {
@@ -269,9 +261,7 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
       feather: 5, useSam: false,
     },
     activeModule: config.modules[0] || 'lora',
-    // 视频: 仅 mediaType:'video' 架构设 video 态; 图像架构恒 undefined
     video: config.mediaType === 'video' ? createDefaultVideoState(config) : undefined,
-    // 速度开关默认快速; 5B 无 speedToggle 但保留 true 不影响
     fast: true,
   }
 }
@@ -283,7 +273,6 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
 export function migrateV1(state: Record<string, unknown>): ModelState | null {
   try {
     const s = state as Record<string, unknown>
-    // Convert loras from Record<string, number> to LoraEntry[]
     const oldLoras = s.loras as Record<string, number> | LoraEntry[] | undefined
     let loras: LoraEntry[] = []
     if (oldLoras && !Array.isArray(oldLoras)) {
@@ -297,17 +286,14 @@ export function migrateV1(state: Record<string, unknown>): ModelState | null {
     }
     s.loras = loras
 
-    // Add runMode if missing
     if (!s.runMode || s.runMode === 'onChange') {
       s.runMode = 'normal'
     }
 
-    // Fix prefix if empty
     if (!s.prefix) {
       s.prefix = '[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]'
     }
 
-    // Clamp i2i denoise
     const i2i = s.i2i as I2IState | undefined
     if (i2i) {
       i2i.denoise = Math.max(0.10, Math.min(0.90, i2i.denoise))
@@ -319,12 +305,6 @@ export function migrateV1(state: Record<string, unknown>): ModelState | null {
   }
 }
 
-/**
- * Migrate v2 → v3: 为视频架构补全新字段 (不丢弃既有数据)。
- * v2 ModelState 缺: unetHigh/unetLow/video{}/fast; loras[] 元素缺 apply。
- * 容错策略 (同 migrateV1 风格): 缺则补默认, 非法则兜底; video 子对象整体兜底。
- * 架构判别由调用方 (restore) 按 key 取 config, 此处只管字段补全与类型校正。
- */
 /**
  * 把任意来源 (v2 缺字段 / v3 带 followRef / v4 已就位) 的 video 子对象归一到当前 VideoState。
  * 被 migrateV2 与 migrateV3 共用 —— 两处曾各写一份, 字段一变就会分叉。
@@ -458,16 +438,13 @@ export function migrateV2(state: Record<string, unknown>, key: string): ModelSta
 // ── Store ────────────────────────────────────────────────────────────────────
 
 export const useGenerateStore = defineStore('generate', () => {
-  // ── 任务级架构记忆 (两个任务各自记忆选中架构) ──
   // activeModelTypeByTask 是真实存储; activeModelType 是当前任务的派生值
   // (现有读取方 store.activeModelType 语义不变, 见 GeneratePage.vue:99-100)。
   const activeModelTypeByTask = reactive<{ image: string; video: string }>({
     image: 'sd15',
     video: 'wan22_i2v',
   })
-  // 当前任务 (image/video); restore 时由迁移逻辑设定, 默认 'image'
   const activeTask = ref<'image' | 'video'>('image')
-  // 当前任务选中架构的派生 getter/setter (保留旧 API, 不破坏现有读取方)
   const activeModelType = computed<string>({
     get: () => activeModelTypeByTask[activeTask.value],
     set: (v) => {
@@ -477,9 +454,6 @@ export const useGenerateStore = defineStore('generate', () => {
 
   const modelStates = reactive<Record<string, ModelState>>({})
 
-  // ── 各架构运行组件就绪状态 (不持久化, 不进 restore/persist 白名单) ──
-  // ModelTab 在 dep check 完成处调用 setComponentsReady(type, ready)。
-  // 菜单项 hint: componentsReady[key]===false → '未就绪'; true / undefined 不显示。
   /** 各架构的运行组件是否就绪; undefined = 尚未检查 */
   const componentsReady = reactive<Record<string, boolean | undefined>>({})
   function setComponentsReady(type: string, ready: boolean) {
@@ -512,7 +486,6 @@ export const useGenerateStore = defineStore('generate', () => {
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let autoSaveEnabled = false
-
   function scheduleSave() {
     if (!autoSaveEnabled) return
     if (saveTimer) clearTimeout(saveTimer)
@@ -521,7 +494,6 @@ export const useGenerateStore = defineStore('generate', () => {
 
   function enableAutoSave() {
     autoSaveEnabled = true
-    // Watch modelStates deeply for any change
     watch(
       () => JSON.stringify(modelStates),
       () => scheduleSave(),
@@ -585,10 +557,8 @@ export const useGenerateStore = defineStore('generate', () => {
 
       const data = JSON.parse(raw)
 
-      // Schema version check — migrate or discard
       const version = data._version || 1
       if (version > SCHEMA_VERSION) {
-        // Future version, discard
         localStorage.removeItem(STORAGE_KEY)
         return
       }
@@ -605,7 +575,6 @@ export const useGenerateStore = defineStore('generate', () => {
         activeModelTypeByTask.video = 'wan22_i2v'
         activeTask.value = 'image'
       } else {
-        // v3 数据: 优先读 activeModelTypeByTask; 兜底读旧 activeModelType
         const saved = data.activeModelTypeByTask
         if (saved && typeof saved === 'object') {
           const img = typeof saved.image === 'string' && MODEL_TYPES[saved.image] ? saved.image : 'sdxl'
@@ -613,7 +582,6 @@ export const useGenerateStore = defineStore('generate', () => {
           activeModelTypeByTask.image = img
           activeModelTypeByTask.video = vid
         } else if (typeof data.activeModelType === 'string' && MODEL_TYPES[data.activeModelType]) {
-          // 兜底: v3 但只存了旧字段 (不应发生, 防御)
           const cfg = MODEL_TYPES[data.activeModelType]!
           if (cfg.mediaType === 'video') {
             activeModelTypeByTask.video = data.activeModelType
@@ -621,7 +589,6 @@ export const useGenerateStore = defineStore('generate', () => {
             activeModelTypeByTask.image = data.activeModelType
           }
         }
-        // activeTask
         const t = data.activeTask
         activeTask.value = (t === 'video') ? 'video' : 'image'
       }
@@ -630,7 +597,6 @@ export const useGenerateStore = defineStore('generate', () => {
         for (const [key, rawState] of Object.entries(data.modelStates)) {
           let state = rawState as ModelState
 
-          // Migrate from v1 → v2
           if (version < 2) {
             const migrated = migrateV1(rawState as Record<string, unknown>)
             if (!migrated) continue
@@ -660,7 +626,6 @@ export const useGenerateStore = defineStore('generate', () => {
             state = migrated
           }
 
-          // Validate against current options
           if (validators) {
             if (state.checkpoint && validators.checkpointExists && !validators.checkpointExists(state.checkpoint)) {
               state.checkpoint = ''
@@ -683,7 +648,6 @@ export const useGenerateStore = defineStore('generate', () => {
             if (state.vae && validators.vaeExists && !validators.vaeExists(state.vae)) {
               state.vae = ''
             }
-            // clipSkip 校验 (1..4) + vaeOverride 校验 (校验通过 vaeExists)
             if (typeof state.clipSkip !== 'number' || state.clipSkip < 1 || state.clipSkip > 4) {
               const config = MODEL_TYPES[key] ?? MODEL_TYPES.sdxl!
               state.clipSkip = config.defaults.clip_skip ?? 1
@@ -727,18 +691,15 @@ export const useGenerateStore = defineStore('generate', () => {
           if (config) {
             const defaults = createDefaultState(config)
             const merged: ModelState = { ...defaults, ...state }
-            // Deep-merge nested objects so new fields are not lost
             for (const k of Object.keys(defaults) as (keyof ModelState)[]) {
               const dv = defaults[k]
               if (dv && typeof dv === 'object' && !Array.isArray(dv) && state[k] && typeof state[k] === 'object' && !Array.isArray(state[k])) {
                 ;(merged[k] as object) = { ...dv, ...(state[k] as object) }
               }
             }
-            // video 子对象对图像架构应为 undefined; 迁移/合并后强制对齐 config
             if (config.mediaType !== 'video') {
               merged.video = undefined
             } else {
-              // 视频架构: 若仍缺 video 态 (极端脏数据), 用默认补
               if (!merged.video) {
                 merged.video = createDefaultVideoState(config)
               }

@@ -6,13 +6,6 @@ import BrandIcon from './BrandIcon.vue'
 import type { BrandName } from '@/config/brand-icons'
 import type { IconName } from '@/config/icon-codepoints'
 
-/**
- * TabSwitcher — 纯 tab 条 (无页头/无标题/无吸顶)。
- *
- * 页面级用法放进 PageHeaderRow 默认插槽 (页头由 PageHeaderRow 统一承担
- * 汉堡/标题/吸顶); modal 内直接平铺使用 (sticky 相关样式已移入页头层)。
- * 需要贴行尾时由调用方加 margin-left:auto (如 ModelsPage 触发器)。
- */
 defineOptions({ name: 'TabSwitcher' })
 
 const { t } = useI18n({ useScope: 'global' })
@@ -21,14 +14,11 @@ export interface TabItem {
   key: string
   label: string
   icon?: IconName
-  /** 品牌身份图标 (单色); 与 icon 二选一, brand 优先 */
   brand?: BrandName
   iconColor?: string
   badge?: string | number
   disabled?: boolean
-  /** 未保存状态小圆点 (设置页分区导航用), 纯展示 */
   dot?: boolean
-  /** Push this tab to the right side (adds auto margin spacer before the first right-aligned tab) */
   align?: 'right'
 }
 
@@ -46,7 +36,6 @@ const emit = defineEmits<{
   'update:modelValue': [key: string]
 }>()
 
-/* tab/panel id 配对: 调用方用 tabIdFor(key)/panelIdFor(key) 建立 tab ↔ panel 关联 */
 const uid = useId()
 function tabIdFor(key: string) {
   return `tab-${uid}-${key}`
@@ -225,7 +214,6 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
   margin-left: 2px;
 }
 
-/* 未保存状态小圆点 (设置页分区导航): 与 label 同行的纯 CSS 圆点 */
 .tab-switcher__dot {
   width: 6px;
   height: 6px;
@@ -245,7 +233,6 @@ function onTabKeydown(e: KeyboardEvent, idx: number) {
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 18;
 }
 
-/* 品牌单色 mark 跟随选中态: 与上面 MsIcon 同色 */
 .tab-switcher__tab--active :deep(.brand-icon) {
   color: var(--ac);
 }

@@ -1,15 +1,7 @@
 <script setup lang="ts">
-/**
- * SSHSettingsModal — SSH 页内设置弹窗 (C05)。
- *
- * 由设置页「登录与认证」面板迁入这里的唯一一项: SSH 密码跟随面板密码。
- * 草稿模式: 打开时拉 /api/ssh/status 读 pw_follow 初始态, 切换只改本地
- * 草稿, 保存时提交; 关闭统一经未保存检查 (useModalCloseGuard)。
- *
- * 关键保留点: 「无公钥时关闭密码登录」由后端 409 + error_key=ssh.err.lockout_risk
- * 触发 danger 确认, 确认后带 force 重发。该请求不走 useApiFetch, 因为要读取 409
- * 状态码做分支, 同时避免 useApiFetch 的自动 toast 在确认流程里双重弹出。
- */
+// 关键保留点: 「无公钥时关闭密码登录」由后端 409 + error_key=ssh.err.lockout_risk
+// 触发 danger 确认, 确认后带 force 重发。该请求不走 useApiFetch, 因为要读取 409
+// 状态码做分支, 同时避免 useApiFetch 的自动 toast 在确认流程里双重弹出。
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -29,7 +21,6 @@ const props = defineProps<{ modelValue: boolean }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 开关实际变更成功: 页面刷新认证事实 */
   changed: []
 }>()
 
@@ -46,7 +37,6 @@ const saving = ref(false)
 
 const dirty = computed(() => follow.value !== baseline.value)
 
-/** 打开弹窗时读取开关初始态 */
 async function loadState(): Promise<void> {
   loading.value = true
   loadError.value = false
@@ -115,7 +105,6 @@ async function applyPwFollow(enabled: boolean, force = false): Promise<boolean> 
   return true
 }
 
-// ── 保存并关闭 ──
 async function onSave(): Promise<void> {
   if (!dirty.value) {
     emit('update:modelValue', false)
@@ -125,7 +114,6 @@ async function onSave(): Promise<void> {
   emit('update:modelValue', false)
 }
 
-// ── 关闭守卫: 取消 / Esc / 遮罩 / 关闭按钮统一经过未保存检查 ──
 const requestClose = useModalCloseGuard({
   dirty: () => dirty.value,
   saving: () => saving.value,

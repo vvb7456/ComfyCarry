@@ -14,11 +14,6 @@ export interface ComfySSEOptions {
   reconnectDelay?: number
 }
 
-/**
- * ComfyUI SSE event stream composable.
- * Connects to /api/comfyui/events and delegates to an ExecTracker.
- * Auto-reconnects on error. Auto-closes on component unmount.
- */
 export function useComfySSE(
   tracker: ReturnType<typeof useExecTracker>,
   opts: ComfySSEOptions = {},
@@ -53,7 +48,6 @@ export function useComfySSE(
           return
         }
 
-        // Let caller intercept auxiliary events before tracker
         const suppressed = opts.onBeforeTracker?.(event)
         let result: EventResult | undefined
         if (!suppressed) {
@@ -68,7 +62,6 @@ export function useComfySSE(
       active.value = false
       source?.close()
       source = null
-      // Auto-reconnect
       reconnectTimer = setTimeout(start, delay)
     }
   }

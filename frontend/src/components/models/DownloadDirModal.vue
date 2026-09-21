@@ -1,20 +1,15 @@
 <script setup lang="ts">
-/**
- * DownloadDirModal — 下载目录裁决。
- *
- * 后端在无法从 Civitai 元数据判定文件用途时返回 409 + needs_classification,
- * 由本 modal 让用户逐文件指定目标目录, 选完后带 dir_keys 重新提交下载。
- *
- * 判定契约见 docs/DOWNLOAD_CLASSIFICATION_SPEC.md。
- *
- * 设计要点:
- *  - 候选目录**只排序不预选**。这一层存在的前提就是「机器没有把握」,
- *    预选等于换个方式替用户做决定。
- *  - 文件名即 Civitai 详情页链接 —— 判断用途要看的就是那一页。
- *  - 说明只进标题旁的 HelpTip, 不占正文行;
- *    且讲的是**怎么选** (哪种权重放哪个目录), 不是「为什么要问你」——
- *    后者对用户没有可操作性。
- */
+// 后端在无法从 Civitai 元数据判定文件用途时返回 409 + needs_classification,
+// 由本 modal 让用户逐文件指定目标目录, 选完后带 dir_keys 重新提交下载。
+// 判定契约见 docs/DOWNLOAD_CLASSIFICATION_SPEC.md。
+//
+// 设计要点:
+//  - 候选目录**只排序不预选**。这一层存在的前提就是「机器没有把握」,
+//    预选等于换个方式替用户做决定。
+//  - 文件名即 Civitai 详情页链接 —— 判断用途要看的就是那一页。
+//  - 说明只进标题旁的 HelpTip, 不占正文行;
+//    且讲的是**怎么选** (哪种权重放哪个目录), 不是「为什么要问你」——
+//    后者对用户没有可操作性。
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -66,7 +61,6 @@ watch(
   { immediate: true, deep: false },
 )
 
-/** 候选排在前、其余按字母序；两段之间插一个分组头。 */
 function optionsFor(file: PendingFile) {
   const suggested = file.suggested_dir_keys || []
   const byKey = new Map(props.dirOptions.map(o => [o.key, o]))
@@ -135,7 +129,6 @@ function onConfirm() {
     <div class="dl-dir">
       <div v-for="f in pendingFiles" :key="f.filename" class="dl-dir__row">
         <div class="dl-dir__file">
-          <!-- 文件名即详情页入口 —— 用户判断用途要看的就是那一页 -->
           <a
             v-if="civitaiUrl"
             class="dl-dir__name dl-dir__name--link"

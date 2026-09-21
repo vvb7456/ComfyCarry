@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * PluginCard — 插件对象行 (C08, 需求 8.3)。
- *
- * 复用统一 ListRow: 语义徽章 + 描述 + 事实行 (仓库名带外链) + 行尾纯图标操作。
- * 危险操作 (删除) 置于末位; 操作过程由 PluginOpModal 阻塞弹窗承载。
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -17,7 +11,6 @@ defineOptions({ name: 'PluginCard' })
 
 const props = defineProps<{
   plugin: PluginData
-  /** 有变更待重启生效 */
   pending?: boolean
 }>()
 

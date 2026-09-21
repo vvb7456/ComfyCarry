@@ -23,8 +23,6 @@ const { confirm } = useConfirm()
 const { post } = useApiFetch()
 const { toast } = useToast()
 
-// ─── 页头右上: 重启服务 (与其他服务页统一) ────────────────────────────────────
-
 async function restartDashboard() {
   if (!await confirm({
     title: t('settings.confirm.restart.title'),
@@ -48,30 +46,25 @@ async function restartDashboard() {
       </template>
     </PageHeaderRow>
 
-    <!-- 正文: 760px 限宽列 (与原设置分区一致), 关于并入正文顺排 -->
     <div class="settings-page-col page-col">
-      <!-- 面板: 登录与认证 / 配置管理 (即时动作, 无草稿态) -->
       <SettingsSectionPanel />
 
-      <!-- 关于与更新 (原独立尾分区) -->
       <SettingsAboutFooter />
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 原设置分区正文限宽; page-col (1080) 兜底, 这里收紧到原值 */
+/* page-col (1080) 兜底, 这里收紧到原值 */
 .settings-page-col {
   max-width: 760px;
 }
 
-/* 模块间距 (原分区体系 .settings-module 间距规则的延续);
-   SettingsSectionPanel 为 fragment, 模块平铺为本容器直接子元素 */
+/* SettingsSectionPanel 为 fragment, 模块平铺为本容器直接子元素 */
 .settings-page-col :deep(.settings-module + .settings-module) {
   margin-top: 32px;
 }
 
-/* 关于并入正文: 与上方模块拉开分组间距 (原尾分区 72px 间距的延续) */
 .settings-page-col > :deep(.about-content) {
   margin-top: 72px;
 }

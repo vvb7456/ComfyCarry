@@ -23,7 +23,6 @@ from ..config import COMFYUI_DIR, COMFYUI_URL
 
 logger = logging.getLogger(__name__)
 
-# ── 模块级单例状态 ──────────────────────────────────────────────────────────
 _lock = threading.Lock()
 
 _state: str = "idle"                       # 'idle' | 'running'
@@ -127,7 +126,6 @@ def _check_prompt(prompt_id: str) -> tuple[str, str]:
 
 
 def _queue_busy() -> bool:
-    """ComfyUI /queue 是否有运行中或排队中任务"""
     try:
         r = requests.get(f"{COMFYUI_URL}/queue", timeout=5)
         r.raise_for_status()
@@ -138,7 +136,6 @@ def _queue_busy() -> bool:
 
 
 def _disk_low() -> bool:
-    """输出盘剩余 < min_free_disk_gb (psutil.disk_usage)"""
     output_dir = COMFYUI_DIR + "/output"
     try:
         usage = psutil.disk_usage(output_dir)
@@ -149,7 +146,6 @@ def _disk_low() -> bool:
 
 
 def _comfy_online() -> bool:
-    """ComfyUI 是否可达"""
     try:
         r = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
         return r.status_code == 200
@@ -158,7 +154,6 @@ def _comfy_online() -> bool:
 
 
 def _interrupt_comfyui() -> None:
-    """POST /interrupt (尽力而为)"""
     try:
         requests.post(f"{COMFYUI_URL}/interrupt", timeout=5)
     except Exception:
@@ -166,7 +161,6 @@ def _interrupt_comfyui() -> None:
 
 
 def _clear_queue() -> None:
-    """清残留队列 (POST /queue clear)"""
     try:
         requests.post(f"{COMFYUI_URL}/queue", json={"clear": True}, timeout=5)
     except Exception:
@@ -174,7 +168,6 @@ def _clear_queue() -> None:
 
 
 def _delete_prompt(prompt_id: str) -> None:
-    """从队列删除指定 prompt_id (epoch 切换后补刀)"""
     if not prompt_id:
         return
     try:
@@ -192,12 +185,10 @@ def _worker_loop(my_epoch: int) -> None:
     # 仅 worker 线程读写, 无需加锁: 上一轮 prompt 从 /history 消失的起始时刻
     missing_since: float | None = None
     while True:
-        # epoch 变了 → 退出
         with _lock:
             if _epoch != my_epoch:
                 return
 
-        # q = GET /queue (1s 一次)
         try:
             online = _comfy_online()
         except Exception:
@@ -250,7 +241,6 @@ def _worker_loop(my_epoch: int) -> None:
                 _set_stop("disk_low", "输出盘剩余空间不足")
             return
 
-        # 轮次检查 → 达上限则停机 (max_reached)
         with _lock:
             max_iter = _policy.get("max_iterations", 0)
             cur_iter = _stats.get("iteration", 0)
@@ -261,7 +251,6 @@ def _worker_loop(my_epoch: int) -> None:
                 _set_stop("max_reached", f"已达轮次上限 {max_iter}")
             return
 
-        # data = deepcopy(snapshot)
         with _lock:
             if _epoch != my_epoch:
                 return
@@ -277,7 +266,6 @@ def _worker_loop(my_epoch: int) -> None:
         data["seed"] = -1
         data["hires_seed"] = -1
 
-        # ok, resp = submit_generation(data) — 直接调 service
         try:
             from ..services.generate_service import submit_generation
             body, status = submit_generation(data)
@@ -289,7 +277,6 @@ def _worker_loop(my_epoch: int) -> None:
                 _set_stop("exec_error", f"submit_generation: {e}")
             return
 
-        # not ok → 停机 (file_missing / exec_error)
         ok = (status == 200)
         if not ok:
             err_text = ""
@@ -326,7 +313,6 @@ def _worker_loop(my_epoch: int) -> None:
         if isinstance(body, dict):
             prompt_id = body.get("prompt_id", "")
 
-        # if epoch 已变 → 对刚拿到的 prompt_id 补 interrupt + queue/delete
         with _lock:
             epoch_changed = (_epoch != my_epoch)
 
@@ -335,7 +321,6 @@ def _worker_loop(my_epoch: int) -> None:
             _delete_prompt(prompt_id)
             return
 
-        # stats.iteration += 1
         with _lock:
             _stats["iteration"] = _stats.get("iteration", 0) + 1
             _stats["last_prompt_id"] = prompt_id
@@ -414,7 +399,6 @@ def stop_session() -> None:
 
 
 def dismiss_stop_reason() -> None:
-    """清除 stop_reason。幂等 (已为 None 时无操作)。"""
     global _stop_reason
     with _lock:
         _stop_reason = None
@@ -436,24 +420,20 @@ def snapshot_status() -> dict:
 
 
 def is_running() -> bool:
-    """供 /api/generate/submit 硬闸与 interrupt 联动查询"""
     with _lock:
         return _state == "running"
 
 
 def is_queue_busy() -> bool:
-    """供 start 路由查队列是否非空 (队列非空 → 409)"""
     return _queue_busy()
 
 
 def get_last_prompt_id() -> str:
-    """测试钩子"""
     with _lock:
         return _stats.get("last_prompt_id", "")
 
 
 def _reset_for_test() -> None:
-    """测试专用: 清空全部单例状态 (不触碰 ComfyUI)"""
     global _state, _snapshot, _policy, _stats, _stop_reason, _epoch, _worker_thread
     with _lock:
         _state = "idle"

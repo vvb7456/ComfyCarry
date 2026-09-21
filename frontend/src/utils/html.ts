@@ -1,5 +1,3 @@
-/** HTML/string safety utilities */
-
 const _escMap: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }

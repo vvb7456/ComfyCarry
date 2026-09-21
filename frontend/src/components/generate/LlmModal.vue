@@ -1,13 +1,4 @@
 <script setup lang="ts">
-/**
- * LlmModal — AI Prompt Generation modal.
- *
- * Layout: 900px BaseModal (configured) / 520px (not configured), left-right split.
- *   Left: mode tabs (text/image) + textarea or FileUploadZone + model label + submit button
- *   Right: result area (empty / running stream or spinner / result with positive+negative + action buttons)
- *
- * Legacy: gen-llm-modal in generate-llm.js
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UseLlmAssistReturn } from '@/composables/generate/useLlmAssist'
@@ -38,21 +29,14 @@ const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 const store = useGenerateStore()
 
-// ── LLM 服务配置弹窗 (页内设置: 未配置空态与已配置态共用) ──
-
 const settingsOpen = ref(false)
 
-/** 设置保存成功后刷新 llm 配置状态 (configured / modelName / vision) */
 async function onSettingsSaved() {
   await props.llm.open()
   toast(t('generate.llm_modal.config_refreshed'), 'success')
 }
 
-// ── Text input ────────────────────────────────────────────────────────
-
 const textInput = ref('')
-
-// ── Image preview URL ─────────────────────────────────────────────────
 
 const previewUrl = ref('')
 
@@ -78,8 +62,6 @@ const imageName = computed(() => {
   }
   return ''
 })
-
-// ── Image picker from input ───────────────────────────────────────────
 
 const imgPicker = useRefImagePicker('__llm__', '')
 
@@ -107,8 +89,6 @@ function onClearImage() {
   props.llm.clearImage()
 }
 
-// ── Submit ────────────────────────────────────────────────────────────
-
 /** 静态模型与 LLM prompt 预设一一对应；视频双模式条目在下方动态分流。 */
 const STATIC_LLM_TARGETS: Record<string, string> = {
   sdxl: 'sdxl',
@@ -129,7 +109,6 @@ const STATIC_LLM_TARGETS: Record<string, string> = {
   minimax_h3_ref: 'minimax_h3_ref',
 }
 
-/** 根据模型和视频模式选择 LLM prompt。 */
 const llmTarget = computed(() => {
   const modelType = store.activeModelType
   const video = store.currentState.video
@@ -167,8 +146,6 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-// ── Result actions ────────────────────────────────────────────────────
-
 function onUsePrompt() {
   const r = props.llm.applyResult('positive')
   if (r) emit('apply', r)
@@ -183,15 +160,11 @@ function onCopy() {
   props.llm.applyResult('copy')
 }
 
-// ── Submit button label ───────────────────────────────────────────────
-
 const submitLabel = computed(() =>
   props.llm.mode.value === 'text'
     ? t('generate.llm_modal.generate')
     : t('generate.llm_modal.reverse'),
 )
-
-// ── Show negative block (hidden for flux targets) ─────────────────────
 
 const showNegative = computed(() =>
   !!props.llm.result.value?.negative,
@@ -209,7 +182,6 @@ const showNegative = computed(() =>
     density="default"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <!-- Not configured state -->
     <div v-if="!llm.configured.value" class="llm-not-configured">
       <MsIcon name="settings" size="xl" color="var(--t3)" />
       <p class="llm-not-configured__text">{{ t('generate.llm_modal.not_configured') }}</p>
@@ -219,11 +191,8 @@ const showNegative = computed(() =>
       </BaseButton>
     </div>
 
-    <!-- Main content: configured -->
     <div v-else class="llm-split">
-      <!-- ── Left: mode tabs + input + submit ── -->
       <div class="llm-left">
-        <!-- Mode tabs -->
         <div class="llm-mode-tabs">
           <button
             type="button"
@@ -248,7 +217,6 @@ const showNegative = computed(() =>
           </button>
         </div>
 
-        <!-- Text mode: textarea -->
         <div v-if="llm.mode.value === 'text'" class="llm-text-area">
           <textarea
             v-model="textInput"
@@ -259,7 +227,6 @@ const showNegative = computed(() =>
           />
         </div>
 
-        <!-- Image mode: file upload zone -->
         <div v-else class="llm-image-area">
           <FileUploadZone
             mode="pick"
@@ -276,7 +243,6 @@ const showNegative = computed(() =>
           />
         </div>
 
-        <!-- Model label + 设置入口 (换模型/调参数无需离开弹窗) -->
         <div v-if="llm.modelName.value" class="llm-model-label">
           <span class="llm-model-label__text">{{ t('generate.llm_modal.model_label', { model: llm.modelName.value }) }}</span>
           <button
@@ -290,7 +256,6 @@ const showNegative = computed(() =>
           </button>
         </div>
 
-        <!-- Submit button -->
         <BaseButton
           size="sm"
           variant="primary"
@@ -303,23 +268,18 @@ const showNegative = computed(() =>
         </BaseButton>
       </div>
 
-      <!-- ── Right: result area ── -->
       <div class="llm-result-area">
-        <!-- Running: streaming -->
         <div v-if="llm.running.value && llm.streaming.value" class="llm-result-content">
           <div class="llm-stream-text">{{ llm.streamText.value }}</div>
         </div>
 
-        <!-- Running: non-streaming spinner -->
         <div v-else-if="llm.running.value" class="llm-result-empty">
           <Spinner size="lg" />
           <p class="llm-result-hint">{{ t('generate.llm_modal.generating') }}</p>
         </div>
 
-        <!-- Has result -->
         <div v-else-if="llm.result.value" class="llm-result-content">
           <div class="llm-result-blocks">
-            <!-- Positive -->
             <div class="llm-result-block">
               <div class="llm-result-block__label">
                 <MsIcon name="add_circle" size="xs" color="none" />
@@ -327,7 +287,6 @@ const showNegative = computed(() =>
               </div>
               <div class="llm-result-block__text llm-result-block__text--pos">{{ llm.result.value.positive }}</div>
             </div>
-            <!-- Negative (hidden for flux or when empty) -->
             <div v-if="showNegative" class="llm-result-block">
               <div class="llm-result-block__label">
                 <MsIcon name="remove_circle" size="xs" color="none" />
@@ -352,7 +311,6 @@ const showNegative = computed(() =>
           </div>
         </div>
 
-        <!-- Empty / idle -->
         <div v-else class="llm-result-empty">
           <MsIcon name="auto_awesome" size="xl" color="var(--t3)" />
           <p class="llm-result-hint">{{ t('generate.llm_modal.result_hint') }}</p>
@@ -361,7 +319,6 @@ const showNegative = computed(() =>
     </div>
   </BaseModal>
 
-  <!-- Nested RefImageModal for "from input" picker (image mode) -->
   <RefImageModal
     v-model="imgPicker.visible.value"
     :title="t('generate.image_source.select_image')"
@@ -373,12 +330,11 @@ const showNegative = computed(() =>
     @upload="onPickUpload"
   />
 
-  <!-- LLM 服务配置 (未配置空态与已配置态共用入口) -->
+  <!-- LLM 服务配置 -->
   <LlmSettingsModal v-model="settingsOpen" @saved="onSettingsSaved" />
 </template>
 
 <style scoped>
-/* ── Not configured state ── */
 .llm-not-configured {
   display: flex;
   flex-direction: column;
@@ -394,7 +350,6 @@ const showNegative = computed(() =>
   font-size: 0.85rem;
 }
 
-/* ── Left-right split ── */
 .llm-split {
   display: flex;
   gap: var(--sp-4);
@@ -407,7 +362,6 @@ const showNegative = computed(() =>
   gap: var(--sp-3);
 }
 
-/* ── Mode tabs ── */
 .llm-mode-tabs {
   display: flex;
   gap: var(--sp-1);
@@ -444,7 +398,6 @@ const showNegative = computed(() =>
   cursor: not-allowed;
 }
 
-/* ── Text area ── */
 .llm-text-area {
   flex: 1;
   display: flex;
@@ -476,7 +429,6 @@ const showNegative = computed(() =>
   font-size: var(--text-xs);
 }
 
-/* ── Image area ── */
 .llm-image-area {
   flex: 1;
   min-height: 0;
@@ -486,7 +438,6 @@ const showNegative = computed(() =>
   height: 260px;
 }
 
-/* ── Model label ── */
 .llm-model-label {
   display: flex;
   align-items: center;
@@ -496,7 +447,7 @@ const showNegative = computed(() =>
   padding: 0 2px;
 }
 
-/* 设置入口: 裸 icon 小按钮 (先例 PromptEditor .prompt-help-btn) */
+/* 设置入口: 裸 icon 小按钮 */
 .llm-model-label__settings {
   display: inline-flex;
   align-items: center;
@@ -515,13 +466,11 @@ const showNegative = computed(() =>
   background: var(--bg3);
 }
 
-/* ── Submit button ── */
 .llm-submit-btn {
   width: 100%;
   margin-top: auto;
 }
 
-/* ── Result area ── */
 .llm-result-area {
   flex: 1 1 0;
   min-width: 200px;
@@ -555,7 +504,6 @@ const showNegative = computed(() =>
   flex: 1;
 }
 
-/* ── Stream text ── */
 .llm-stream-text {
   flex: 1;
   overflow-y: auto;
@@ -565,7 +513,6 @@ const showNegative = computed(() =>
   white-space: pre-wrap;
 }
 
-/* ── Result blocks ── */
 .llm-result-blocks {
   flex: 1;
   overflow-y: auto;
@@ -607,7 +554,6 @@ const showNegative = computed(() =>
   max-height: 120px;
 }
 
-/* ── Result actions ── */
 .llm-result-actions {
   display: flex;
   gap: var(--sp-2);

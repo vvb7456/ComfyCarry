@@ -8,7 +8,6 @@ withDefaults(defineProps<{
    * - 'embedded': 内嵌面板 (较小留白, 用于折叠卡 / 抽屉内的局部工具条)
    */
   variant?: 'page' | 'embedded'
-  /** search 段占满整行剩余空间 (Civitai 远程检索形态, 配合 SearchInput / FilterInput 的 full) */
   searchFull?: boolean
 }>(), {
   variant: 'page',

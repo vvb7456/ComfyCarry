@@ -14,7 +14,6 @@ export function useProductTour(storageKey: string) {
   const isDone: Ref<boolean> = ref(localStorage.getItem(storageKey) === '1')
   const active: Ref<boolean> = ref(false)
 
-  /** 手动/自动入口：进入导览并写入"已看过"标记 */
   function start() {
     localStorage.setItem(storageKey, '1')
     isDone.value = true

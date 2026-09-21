@@ -1,7 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { useApiFetch } from './useApiFetch'
 
-/** Lightweight row returned by GET /api/local_models. */
 export interface LocalModel {
   id: number
   filename: string

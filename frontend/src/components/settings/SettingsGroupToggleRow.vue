@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * SettingsGroupToggleRow — 设置组内的开关行 (label(+help)+desc 左 + ToggleSwitch 右)。
- * 纯展示包装, 统一行内边距与分隔线语义 (由 SettingsGroup 的行分隔样式承担)。
- */
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
@@ -11,7 +7,6 @@ defineOptions({ name: 'SettingsGroupToggleRow' })
 defineProps<{
   label: string
   desc?: string
-  /** 行级操作建议/注意事项 (HelpTip) */
   help?: string
   modelValue: boolean
   disabled?: boolean

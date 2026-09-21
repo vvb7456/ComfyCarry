@@ -65,7 +65,6 @@ const open = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-// ── Active tab: positive or negative ───────────────────────────
 const activeTab = ref<'positive' | 'negative'>('positive')
 // Session counter: increments each time the modal opens.
 // Used to discard stale async results from a previous editing session.
@@ -81,7 +80,6 @@ const promptTabs = computed(() => {
   return tabs
 })
 
-// ── Prompt editors (one per tab) ───────────────────────────────
 const posEditor = usePromptEditor()
 const negEditor = usePromptEditor()
 const translate = usePromptTranslate()
@@ -103,30 +101,25 @@ const activeEditor = computed(() =>
   activeTab.value === 'negative' ? negEditor : posEditor,
 )
 
-// Cleanup SSE on unmount
 onUnmounted(() => plInit.destroy())
 
-// Parse tokens when modal opens + resolve colors from library
 watch(open, async (isOpen) => {
   // Increment session counter on every open/close transition so
   // in-flight async results from the previous state are discarded.
   sessionId.value++
   if (!isOpen) return
   try {
-    // Load editor settings + check init status
     await Promise.all([loadPromptSettings(), plInit.checkStatus()])
 
     posEditor.parse(normalizePrompt(props.positive, normalizeOpts.value))
     negEditor.parse(normalizePrompt(props.negative, normalizeOpts.value))
 
-    // Restore disabled tokens from store
     const state = genStore.currentState
     posEditor.injectDisabled(state.positiveDisabled)
     negEditor.injectDisabled(state.negativeDisabled)
 
     activeTab.value = 'positive'
 
-    // Only resolve colors if library is initialized
     if (!plInit.initialized.value) return
 
     await _resolveTokenColors()
@@ -135,18 +128,13 @@ watch(open, async (isOpen) => {
   }
 })
 
-// ── Sync tokens → string → emit (real-time) ───────────────────
 function syncToParent() {
-  // Emit only enabled tokens as the prompt string
   emit('update:positive', posEditor.serializeEnabled())
   emit('update:negative', negEditor.serializeEnabled())
-  // Persist disabled tokens to store
   const state = genStore.currentState
   state.positiveDisabled = posEditor.extractDisabled()
   state.negativeDisabled = negEditor.extractDisabled()
 }
-
-// ── Token event handlers ───────────────────────────────────────
 
 function escapeBrackets(text: string): string {
   if (!promptSettings.escape_bracket) return text
@@ -248,7 +236,6 @@ async function onUpdateTag(id: string, newTag: string) {
   editor.updateTokenTag(id, newTag)
   syncToParent()
 
-  // Re-resolve library color + translate asynchronously
   const token = editor.tokens.value.find(t => t.id === id)
   if (token && (token.type === 'raw' || token.type === 'tag')) {
     const tagAtResolve = token.tag
@@ -272,7 +259,6 @@ function onMove(fromIndex: number, toIndex: number) {
   syncToParent()
 }
 
-// ── Chip translation (per-token) ───────────────────────────────
 const translatingIds = ref(new Set<string>())
 
 async function onTranslate(id: string) {
@@ -327,7 +313,6 @@ async function onTranslateAll() {
   )
 }
 
-// ── Non-ASCII detection ───────────────────────────────────────
 function hasNonAscii(text: string): boolean {
   return /[^\x00-\x7F]/.test(text)
 }
@@ -370,7 +355,6 @@ function onTagSelect(tag: PromptTag) {
   syncToParent()
 }
 
-// ── Library initialization gate ────────────────────────────────
 async function onInitImport() {
   const result = await plInit.startImport()
   if (result) {
@@ -390,7 +374,6 @@ async function _resolveTokenColors() {
   }
 }
 
-// ── Embedding & Wildcard insertion ─────────────────────────────
 async function openEmbedding() {
   await props.embPicker.open()
 }
@@ -418,23 +401,19 @@ function onWcInsert(token: string) {
     icon="edit_note"
     size="xxl"
   >
-    <!-- Init gate: show when library not initialized -->
     <PromptLibraryGate
       v-if="plInit.show.value"
       :init="plInit"
       @import="onInitImport"
     />
 
-    <!-- Normal editor content -->
     <div v-else class="pe-modal-body">
-      <!-- Prompt editor container (tabs + token input) -->
       <FusionTabs
         v-model="activeTab"
         :tabs="promptTabs"
         :wrapped="true"
         :collapsible="false"
       >
-        <!-- Token Input (shared area — switches via v-show) -->
         <div v-for="tab in promptTabs" :key="tab.key" v-show="activeTab === tab.key" class="pe-token-area">
           <TokenInput
             :tokens="tab.key === 'positive' ? posEditor.tokens.value : negEditor.tokens.value"
@@ -461,13 +440,11 @@ function onWcInsert(token: string) {
         </div>
       </FusionTabs>
 
-      <!-- Tag Browser -->
       <div class="pe-tag-area">
         <TagBrowser :show-translation="promptSettings.show_translation" @select="onTagSelect" />
       </div>
     </div>
 
-    <!-- Embedding & Wildcard modals (nested inside PromptEditorModal) -->
     <EmbeddingModal
       v-model="embPicker.visible.value"
       :picker="embPicker"
@@ -493,7 +470,6 @@ function onWcInsert(token: string) {
   min-height: 500px;
 }
 
-/* ── Token area ── */
 .pe-token-area {
   flex-shrink: 0;
 }
@@ -503,7 +479,6 @@ function onWcInsert(token: string) {
   border-radius: 0;
 }
 
-/* ── Tag browser area ── */
 .pe-tag-area {
   flex: 1;
   min-height: 200px;

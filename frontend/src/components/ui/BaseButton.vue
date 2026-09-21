@@ -24,7 +24,6 @@ const props = withDefaults(defineProps<{
   size?: ButtonSize
   disabled?: boolean
   loading?: boolean
-  /** 纯图标按钮形态（与同级文本按钮等高正方形），标准用法见组件头注释 */
   iconOnly?: boolean
   href?: string
   target?: string
@@ -108,7 +107,6 @@ function onClick(e: MouseEvent) {
   appearance: none;
 }
 
-/* ── Sizes (高度基准与常规内边距) ── */
 .base-btn--xs  {
   --btn-h: 22px;
   min-height: var(--btn-h);
@@ -135,9 +133,6 @@ function onClick(e: MouseEvent) {
   font-size: var(--btn-font-lg, var(--text-md));
 }
 
-/* ── Icon only（纯图标按钮：与同级文本按钮严格等高，呈紧凑正方形）──
-   高度与最小宽度继承 --btn-h，与文本按钮像素级对齐，避免混排撑高或高矮不齐。
-   触屏通过扩展可点击区域（::after）满足大点击域，绝不放大视觉盒模型破坏布局。 */
 .base-btn--icon-only {
   gap: 0;
   padding: 0;
@@ -177,13 +172,11 @@ function onClick(e: MouseEvent) {
   }
 }
 
-/* ── Variant: default ── */
 .base-btn--default:hover:not(.base-btn--disabled) {
   border-color: var(--bd-f);
   background: var(--bg4);
 }
 
-/* ── Variant: primary ── */
 .base-btn--primary {
   background: color-mix(in srgb, var(--ac) 65%, var(--bg3));
   border-color: color-mix(in srgb, var(--ac) 65%, var(--bg3));
@@ -193,7 +186,6 @@ function onClick(e: MouseEvent) {
   background: color-mix(in srgb, var(--ac) 80%, var(--bg3));
 }
 
-/* ── Variant: danger ── */
 .base-btn--danger {
   background: transparent;
   border-color: color-mix(in srgb, var(--red) 30%, transparent);
@@ -203,7 +195,6 @@ function onClick(e: MouseEvent) {
   background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 
-/* ── Variant: success ── */
 .base-btn--success {
   background: transparent;
   border-color: color-mix(in srgb, var(--green) 30%, transparent);
@@ -213,7 +204,6 @@ function onClick(e: MouseEvent) {
   background: color-mix(in srgb, var(--green) 10%, transparent);
 }
 
-/* ── Variant: warning ── */
 .base-btn--warning {
   background: transparent;
   border-color: color-mix(in srgb, var(--amber) 30%, transparent);
@@ -223,7 +213,6 @@ function onClick(e: MouseEvent) {
   background: color-mix(in srgb, var(--amber) 10%, transparent);
 }
 
-/* ── Variant: ghost ── */
 .base-btn--ghost {
   background: transparent;
   border-color: transparent;
@@ -234,19 +223,16 @@ function onClick(e: MouseEvent) {
   color: var(--t1);
 }
 
-/* ── Disabled ── */
 .base-btn--disabled {
   opacity: .4;
   cursor: not-allowed;
 }
 
-/* ── Focus ── */
 .base-btn:focus-visible {
   outline: 2px solid var(--ac);
   outline-offset: 2px;
 }
 
-/* ── Loading ── */
 .base-btn__spinner-wrap {
   position: absolute;
   inset: 0;

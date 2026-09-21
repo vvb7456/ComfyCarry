@@ -22,7 +22,6 @@ const schedulerOptions = computed(() => options.schedulers.value)
 
 <template>
   <div class="hires-grid">
-    <!-- Row 1: Denoise + Steps -->
     <div class="hires-grid__row">
       <div class="hr-cell">
         <RangeField
@@ -59,7 +58,6 @@ const schedulerOptions = computed(() => options.schedulers.value)
       </div>
     </div>
 
-    <!-- Row 2: CFG + Sampler -->
     <div class="hires-grid__row">
       <div class="hr-cell">
         <RangeField
@@ -90,7 +88,6 @@ const schedulerOptions = computed(() => options.schedulers.value)
       </div>
     </div>
 
-    <!-- Row 3: Scheduler + Seed -->
     <div class="hires-grid__row">
       <div class="hr-cell">
         <div class="hr-field">

@@ -1,12 +1,4 @@
 <script setup lang="ts">
-/**
- * AutoCompleteList — Floating dropdown list for tag autocomplete.
- *
- * Teleported to body and positioned via fixed coordinates passed from parent.
- * Shows: English tag (bold match) | Chinese translation | Danbooru popularity
- * Already-added tags are shown at the bottom with grey "已添加" mark.
- * Active item highlighted via activeIndex.
- */
 import { computed, watch, ref, nextTick, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -31,7 +23,6 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const listRef = ref<HTMLElement | null>(null)
 
-// Auto-scroll active item into view
 watch(() => props.activeIndex, async (idx) => {
   if (idx < 0 || !listRef.value) return
   await nextTick()
@@ -39,7 +30,6 @@ watch(() => props.activeIndex, async (idx) => {
   el?.scrollIntoView({ block: 'nearest' })
 })
 
-// ── Highlight matching portion ─────────────────────────────────
 function highlightMatch(text: string, query: string): string {
   if (!query) return escapeHtml(text)
   const idx = text.toLowerCase().indexOf(query.toLowerCase())
@@ -54,7 +44,6 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// ── Format popularity number ───────────────────────────────────
 function fmtHot(score: number): string {
   if (score >= 1_000_000) return `${(score / 1_000_000).toFixed(1)}M`
   if (score >= 1_000) return `${(score / 1_000).toFixed(0)}K`
@@ -62,7 +51,6 @@ function fmtHot(score: number): string {
 }
 
 const hasDivider = computed(() => {
-  // Check if there's a boundary between non-added and added
   const idx = props.items.findIndex(i => i.added)
   return idx > 0
 })
@@ -78,13 +66,11 @@ const dividerIndex = computed(() => props.items.findIndex(i => i.added))
       :style="positionStyle"
       @mousedown.prevent
     >
-      <!-- Empty state -->
       <div v-if="items.length === 0" class="ac-empty">
         {{ t('prompt-library.autocomplete.no_results') }}
       </div>
 
       <template v-for="(item, idx) in items" :key="item.text + idx">
-        <!-- Divider before first added item -->
         <div v-if="idx === dividerIndex && hasDivider" class="ac-divider" />
 
         <div

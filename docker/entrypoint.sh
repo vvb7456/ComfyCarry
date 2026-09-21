@@ -6,7 +6,6 @@
 # 所有应用逻辑由 bootstrap.sh (从 GitHub 获取) 接管
 # ==============================================================================
 
-# ── SSH Key 导入 ──
 # Vast.ai: SSH_PUBLIC_KEY / RunPod: PUBLIC_KEY
 SSH_KEY="${SSH_PUBLIC_KEY:-${PUBLIC_KEY:-}}"
 if [ -n "$SSH_KEY" ]; then
@@ -17,7 +16,6 @@ if [ -n "$SSH_KEY" ]; then
     chown root:root /root/.ssh/authorized_keys
 fi
 
-# ── SSH 启动 ──
 mkdir -p /run/sshd
 [ ! -f /etc/ssh/ssh_host_rsa_key ] && ssh-keygen -A 2>/dev/null || true
 # 清除云平台注入的 SSH Banner (vast.ai / RunPod)
@@ -41,5 +39,4 @@ else
     echo "  wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash"
 fi
 
-# ── 保持容器运行 ──
 exec sleep infinity

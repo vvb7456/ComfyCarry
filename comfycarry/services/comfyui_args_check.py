@@ -35,7 +35,7 @@ print(json.dumps(sorted(flags)))
 
 
 def dump_cli_flags(python: str) -> set[str]:
-    """从已安装的 ComfyUI 提取全部 CLI flag。任何失败都抛 RuntimeError。
+    """任何失败都抛 RuntimeError。
 
     dump 失败只有一种解释: 磁盘上的 ComfyUI 安装损坏/缺失 —— 这种环境里
     ComfyUI 本身也起不来, 由调用方按校验不通过拒绝操作。

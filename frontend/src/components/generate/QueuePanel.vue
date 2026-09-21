@@ -31,8 +31,6 @@ const { confirm } = useConfirm()
 const queueStore = useGenerateQueueStore()
 const { queueRunning, queuePending } = storeToRefs(queueStore)
 
-// 提交中的单动作标记: 对应按钮转 loading, 面板内其余动作互斥禁用。
-// 标记为 prompt id 或动作名, 不引入额外状态机。
 const acting = ref<string | null>(null)
 
 // 挂载时自行从 store 取数 (抽屉首开才挂载内容, 此处仅首次挂载时拉一次)
@@ -92,7 +90,6 @@ function nodeCount(item: QueueItem) {
 
 <template>
   <div class="queue-panel">
-    <!-- Running -->
     <CollapsibleGroup
       icon="play_arrow"
       :title="t('comfyui.queue.running')"
@@ -126,7 +123,6 @@ function nodeCount(item: QueueItem) {
       </ul>
     </CollapsibleGroup>
 
-    <!-- Pending -->
     <CollapsibleGroup
       icon="hourglass_top"
       :title="t('comfyui.queue.pending')"

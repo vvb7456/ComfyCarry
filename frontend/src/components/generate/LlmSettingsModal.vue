@@ -1,12 +1,4 @@
 <script setup lang="ts">
-/**
- * LlmSettingsModal — LLM 服务配置弹窗 (页内就近迁移自设置页)。
- *
- * 由 LlmModal 承载: 未配置空态的「配置」入口与已配置态模型行旁的设置按钮。
- * 表单为本地 ref + 快照基线 (非共享状态), 关闭 (取消 / Esc / 遮罩 / 关闭按钮)
- * 统一经过未保存检查, 放弃即丢弃本地草稿。
- * 保存成功后 emit('saved') — 由 LlmModal 调 llm.open() 刷新 configured/modelName。
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -30,15 +22,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 保存成功: 由宿主刷新 llm 配置状态 */
   saved: []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
 const { get, put, post } = useApiFetch()
 const { toast } = useToast()
-
-// ─── 表单状态 ────────────────────────────────────────────────────────────────
 
 const llmProvider = ref('')
 const llmApiKey = ref('')
@@ -114,8 +103,6 @@ const llmBaseUrlPlaceholder = computed(() =>
     : t('llm.settings.provider.base_url_placeholder_openai'),
 )
 
-// ─── 守卫状态: dirty = 表单值 ≠ 基线 (最近一次服务端确认值) ─────────────────
-
 function snapshotLlm(): string {
   return JSON.stringify({
     provider: llmProvider.value,
@@ -130,8 +117,6 @@ function snapshotLlm(): string {
 
 const llmSnapshot = ref('')
 const llmFormDirty = computed(() => llmProvidersLoaded.value && snapshotLlm() !== llmSnapshot.value)
-
-// ─── 加载: 打开弹窗时拉取服务端配置 ─────────────────────────────────────────
 
 const loading = ref(true)
 const loadError = ref(false)
@@ -167,8 +152,6 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
-// ─── 表单动作 ────────────────────────────────────────────────────────────────
-
 function onLlmProviderChange() {
   const saved = llmProviderKeys.value[llmProvider.value]
   llmApiKey.value = saved?.api_key || ''
@@ -183,7 +166,6 @@ function selectLlmModel(value: string | number | boolean) {
   selectedLlmModel.value = model || null
 }
 
-/** 模型已按当前 provider+key 拉取过 (供「展开自动刷新一次」判断) */
 const modelsFetchedFor = ref('')
 
 async function fetchLlmModels(): Promise<boolean> {
@@ -221,7 +203,6 @@ async function fetchLlmModels(): Promise<boolean> {
   return true
 }
 
-/** select 展开时自动刷新一次 (provider/key/endpoint 变化后首次展开触发) */
 function onModelSelectOpen() {
   const key = `${llmProvider.value}|${llmApiKey.value}|${llmBaseUrl.value}`
   if (!llmProvider.value || !llmApiKey.value) return
@@ -281,16 +262,12 @@ async function testLlmConnection() {
   }
 }
 
-// ─── 保存并关闭 / 关闭守卫 ────────────────────────────────────────────────────
-
 async function onSave(): Promise<void> {
   if (!await saveLlmConfig()) return
   toast(t('llm.settings.config_saved'), 'success')
   emit('saved')
   emit('update:modelValue', false)
 }
-
-// ─── 关闭守卫: 取消 / Esc / 遮罩 / 关闭按钮统一经过未保存检查 ────────────────
 
 const requestClose = useModalCloseGuard({
   dirty: () => llmFormDirty.value,

@@ -72,7 +72,6 @@ const config = computed(() => MODEL_TYPES[props.modelType]!)
 const isSplit = computed(() => config.value.loader === 'split')
 const modelField = computed<'checkpoint' | 'unet'>(() => isSplit.value ? 'unet' : 'checkpoint')
 
-// ── 视频架构派生 ────────────────────────────────────────────────────
 // mediaType==='video' 为视频架构 (Wan 2.2 三条目); 图像架构 (媒体=image) 一字不变。
 const isVideo = computed(() => config.value.mediaType === 'video')
 
@@ -136,7 +135,6 @@ const videoRefs = computed<RefItem[]>({
   },
 })
 
-// ── 起始画面上传/选择 (复用 FileUploadZone + useRefImagePicker, 与图生图同一套) ──
 const videoPicker = useRefImagePicker('video_ref')
 
 const startFrameName = computed(() => {
@@ -183,7 +181,6 @@ function onStartFrameClear() {
   if (state.value.video) state.value.video.refImage = ''
 }
 
-// ── 末画面上传/选择 (MiniMax H3 首尾帧; 复用同一套 FileUploadZone + picker) ──
 const lastFramePicker = useRefImagePicker('video_last_frame')
 
 const lastFrameName = computed(() => {
@@ -211,7 +208,6 @@ function onLastFrameClear() {
   if (state.value.video) state.value.video.lastImage = ''
 }
 
-// 包装形态: 该 tab 支持的形态列表 (supportedPackaging) + 当前选中项的实际形态
 const supportedPackaging = computed(() => config.value.supportedPackaging)
 const hasDualPackaging = computed(() => supportedPackaging.value.length > 1)
 
@@ -305,7 +301,6 @@ const localEnabledModules = computed(() => {
 })
 
 function onLocalModuleToggle(key: string, enabled: boolean) {
-  // 阻止 controlnet 三项 toggle，其余转发给 CN orchestration
   if (key === 'pose' || key === 'canny' || key === 'depth') {
     toast(t('generate.error.cn_disabled'), 'warning')
     return
@@ -314,14 +309,12 @@ function onLocalModuleToggle(key: string, enabled: boolean) {
 }
 
 const effectiveModuleTabs = computed<SwitchTabItem[]>(() => {
-  // 视频条目 config.modules === ['lora']: 模块区仅 LoRA, i2i/CN/upscale/hires/face 不出现。
   if (isVideo.value) {
     return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'layers' }]
   }
   return config.value.controlNetEnabled ? moduleTabs.value : localModuleTabs.value
 })
 const effectiveEnabledModules = computed(() => {
-  // 视频架构: 仅 lora 可启用 (其余模块不渲染也不计启用)
   if (isVideo.value) {
     const enabled = new Set<string>()
     if (state.value.loras.some((lora) => lora.enabled)) enabled.add('lora')
@@ -393,7 +386,6 @@ function onModelSelect(name: string) {
     const slot = pickerSlot.value
     if (slot === 'high') state.value.unetHigh = name
     else state.value.unetLow = name
-    // 主字段同步为高噪件: runBlockedReason / selectedPackaging / 提交链都读 state.unet
     state.value.unet = state.value.unetHigh || name
     showModelPicker.value = false
     pickerSlot.value = null
@@ -520,22 +512,18 @@ function autofillDefaultModels() {
   if (selectedPackaging.value !== 'split' || !config.value.defaultModels) return
 
   const defs = config.value.defaultModels
-  // CLIP
   if (!state.value.clip && defs.clip) {
     const found = options.clips.value.find(c => c.name === defs.clip || c.name.endsWith('/' + defs.clip))
     if (found) state.value.clip = found.name
   }
-  // CLIP2 (DualCLIPLoader, flux1)
   if (!state.value.clip2 && defs.clip2) {
     const found = options.clips.value.find(c => c.name === defs.clip2 || c.name.endsWith('/' + defs.clip2))
     if (found) state.value.clip2 = found.name
   }
-  // VAE
   if (!state.value.vae && defs.vae) {
     const found = options.vaes.value.find(v => v.name === defs.vae || v.name.endsWith('/' + defs.vae))
     if (found) state.value.vae = found.name
   }
-  // 音频 VAE (MiniMax H3; 与 vae 同池匹配)
   if (!state.value.audioVae && defs.audioVae) {
     const found = options.vaes.value.find(v => v.name === defs.audioVae || v.name.endsWith('/' + defs.audioVae))
     if (found) state.value.audioVae = found.name
@@ -550,7 +538,6 @@ const runBlockedReason = computed<string>(() => {
   const st = state.value
   const pkg = selectedPackaging.value
 
-  // 1. 主模型未选择 (整合包看 checkpoint, 拆分看 unet)
   // 双 UNet: 两个槽独立选择, 必须都填且互异 —— 只填一个是常见中间态, 要能说清缺什么
   if (config.value.dualUnet) {
     if (!st.unetHigh || !st.unetLow) return t('generate.error.no_unet_pair')
@@ -560,7 +547,6 @@ const runBlockedReason = computed<string>(() => {
     if (!modelPicked) return t('generate.error.no_checkpoint')
   }
 
-  // 1b. 视频 i2v 未选起始画面 → 软禁用 + 点击 toast。
   if (showStartFrame.value && !st.video?.refImage) return t('generate.error.no_start_frame')
 
   // 1b'. Ref2VA 参考生成: 至少一个参考素材 (图/视频/音频均可) → 软禁用 + 点击 toast。
@@ -584,12 +570,10 @@ const runBlockedReason = computed<string>(() => {
   // 整合包自带全部组件, 到此即可
   if (pkg !== 'split') return ''
 
-  // 2. 运行组件未下载 / 下载中 (ready 为假即涵盖两种)
   if (compStatus.has.value && !compStatus.ready.value) {
     return t('generate.error.components_not_ready')
   }
 
-  // 3. CLIP / CLIP2 / VAE 未在高级设置中选定
   if (!st.clip || !st.vae || (config.value.dualClip && !st.clip2)) {
     return t('generate.error.no_split_models')
   }
@@ -597,12 +581,10 @@ const runBlockedReason = computed<string>(() => {
   return ''
 })
 
-/** 用户点了软禁用的生成按钮 → toast 说明原因 */
 function onRunBlocked(reason: string) {
   toast(reason, 'warning')
 }
 
-/** Mask editor: image/mask preview URLs */
 const maskEditorImageUrl = computed(() => {
   const img = state.value.i2i.image
   if (!img) return ''
@@ -622,11 +604,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
 <template>
   <div class="model-tab">
-    <!-- ═══ 上部: 双列布局 ═══ -->
     <div class="gen-top-row">
-      <!-- 左列: 控制区 (冻结时 inert) -->
       <div class="gen-ctrl-col" :inert="frozen" :class="{ 'gen-frozen': frozen }">
-        <!-- 提示词 (视频的起始画面并入本区块左栏, 5B 模式开关并入标题行右端) -->
         <PromptEditor
           :ref="(el) => { promptEditorRef = (el as { insertAtCursor: (t: 'positive' | 'negative', text: string) => void } | null) }"
           data-tour="gen-prompt"
@@ -640,7 +619,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @update:negative="state.negative = $event"
           @tool="onPromptTool"
         >
-          <!-- 5B 条目内的文生/图生开关 -->
           <template v-if="showModeSwitch" #header-actions>
             <SegmentedControl
               :options="videoModeOptions"
@@ -676,7 +654,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
             <RefMediaPanel v-model:refs="videoRefs" :disabled="frozen" />
           </template>
 
-          <!-- 结束画面 (MiniMax H3 i2v 首尾帧; 可选) — 右媒体栏 -->
           <template v-if="showLastFrame" #media-right>
             <p class="model-tab__frame-lbl">{{ t('generate.video.last_frame') }}</p>
             <FileUploadZone
@@ -695,7 +672,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           </template>
         </PromptEditor>
 
-        <!-- 操作栏 -->
         <ActionBar
           data-tour="gen-run"
           :exec-state="execState"
@@ -710,7 +686,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
         <hr class="gen-sep">
 
-        <!-- 基础设置 -->
         <BasicSettings
           data-tour="gen-basic"
           :model-field="modelField"
@@ -719,7 +694,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @open-model="openModelPickerFor"
         />
 
-        <!-- 运行组件状态条 (三态: 就绪/缺失/下载中)。整合包或无组件需求时不渲染 -->
         <DependencyBar
           v-if="selectedPackaging === 'split' && compStatus.has.value"
           :status="compStatus"
@@ -727,7 +701,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           v-model:expanded="componentPanelExpanded"
         />
 
-        <!-- 高级设置 -->
         <AdvancedSettings
           data-tour="gen-advanced"
           :show-split-models="selectedPackaging === 'split'"
@@ -738,7 +711,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         />
       </div>
 
-      <!-- 右列: 预览区 -->
       <div class="gen-preview-col">
         <PreviewArea
           :images="previewImages"
@@ -751,7 +723,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       </div>
     </div>
 
-    <!-- ═══ 下部: 功能模块 (Tab + Panel 融合卡片) ═══ -->
     <div class="gen-module-wrap" data-tour="gen-modules" :inert="frozen" :class="{ 'gen-frozen': frozen }">
       <ModuleTabs
         :tabs="effectiveModuleTabs"
@@ -761,7 +732,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         @toggle="onEffectiveModuleToggle"
       />
 
-      <!-- 模块面板 -->
       <div v-show="state.activeModule === 'lora'" class="gen-module-panel">
         <LoraPanel @open-picker="openLoraPicker" @detail="openLoraDetail" />
       </div>
@@ -846,7 +816,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       </div>
     </div>
 
-    <!-- ═══ Picker Modals (Teleport to body) ═══ -->
     <ModelPickerModal
       v-model="showModelPicker"
       :title="hasDualPackaging
@@ -878,13 +847,11 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @confirm="onLoraConfirm"
     />
 
-    <!-- LoRA Detail Modal (local model, details loaded by numeric ID) -->
     <LocalModelModal
       v-model="showLoraDetail"
       :model-id="loraDetailModelId"
     />
 
-    <!-- 起始画面 Picker Modal (视频, usage='video_ref') -->
     <RefImageModal
       v-if="isVideo"
       v-model="videoPicker.visible.value"
@@ -898,7 +865,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="onStartFrameUpload"
     />
 
-    <!-- 结束画面 Picker Modal (MiniMax H3, usage='video_last_frame') -->
     <RefImageModal
       v-if="showLastFrame"
       v-model="lastFramePicker.visible.value"
@@ -912,7 +878,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="onLastFrameUpload"
     />
 
-    <!-- I2I Ref Image Picker Modal -->
     <RefImageModal
       v-model="i2i.picker.visible.value"
       :title="t('generate.i2i.ref_image')"
@@ -925,7 +890,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="i2i.handleUpload"
     />
 
-    <!-- Mask Editor Modal -->
     <MaskEditorModal
       v-model="i2i.maskEditorVisible.value"
       :image-url="maskEditorImageUrl"
@@ -934,7 +898,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :on-clear-mask="() => i2i.clearMask()"
     />
 
-    <!-- ControlNet Ref Image Picker Modals (only when CN enabled) -->
     <RefImageModal
       v-if="config.controlNetEnabled"
       v-model="cnPose.picker.visible.value"
@@ -972,7 +935,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @upload="cnDepth.handleUpload"
     />
 
-    <!-- ControlNet Preprocess Modals (only when CN enabled) -->
     <PreprocessModal
       v-if="config.controlNetEnabled"
       v-model="showPPModal.pose"
@@ -992,14 +954,12 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @submit="onPPSubmit('depth', $event)"
     />
 
-    <!-- LLM Assist Modal -->
     <LlmModal
       v-model="showLlmModal"
       :llm="llm"
       @apply="onLlmApply"
     />
 
-    <!-- Prompt Editor Modal -->
     <PromptEditorModal
       v-model="showPromptEditorModal"
       :positive="state.positive"
@@ -1011,7 +971,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @update:negative="state.negative = $event"
     />
 
-    <!-- Tagger Modal (handles gate internally when not ready) -->
     <TaggerModal
       v-model="showTaggerModal"
       :tagger="tagger"
@@ -1019,7 +978,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       @apply="onTaggerApply"
     />
 
-    <!-- Preview lightbox -->
     <ImagePreview v-model="previewOpen" :images="previewUrls" :initial-index="previewIndex" />
   </div>
 </template>
@@ -1032,7 +990,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   container: gen-model / inline-size;
 }
 
-/* ═══ 上部: 双列网格 ═══ */
 .gen-top-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1040,7 +997,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   align-items: stretch;
 }
 
-/* ── 左列 ── */
 .gen-ctrl-col {
   background: var(--bg2);
   border: 1px solid var(--bd);
@@ -1064,7 +1020,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   margin: 0;
 }
 
-/* ── 右列: 预览 ── */
 .gen-preview-col {
   position: relative;
   /* 宽度跟随网格列，避免单栏时由最小高度和宽高比反推宽度。 */
@@ -1090,7 +1045,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   }
 }
 
-/* ═══ 下部: 模块容器 (Tab + Panel 融合) ═══ */
 .gen-module-wrap {
   background: var(--bg2);
   border: 1px solid var(--bd);
@@ -1107,7 +1061,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   position: relative;
 }
 
-/* 所有 Tab 按钮与分割线重叠 (-1px) */
 .gen-module-wrap :deep(.switch-tab) {
   position: relative;
   margin-bottom: -1px;
@@ -1115,7 +1068,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   border-bottom-right-radius: 0;
 }
 
-/* 非激活 Tab: 退后层, 半透明 + 无底部 border */
 .gen-module-wrap :deep(.switch-tab:not(.active)) {
   background: transparent;
   border-color: transparent;
@@ -1126,7 +1078,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   color: var(--t2);
 }
 
-/* 激活 Tab: 弹出, 与内容区背景一致, 底部 border 断开 */
 .gen-module-wrap :deep(.switch-tab.active) {
   background: var(--bg2);
   border-color: var(--bd);
@@ -1135,7 +1086,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   z-index: 1;
 }
 
-/* 启用但非激活 Tab: 微弱高亮 */
 .gen-module-wrap :deep(.switch-tab.enabled) {
   background: color-mix(in srgb, var(--ac) 6%, transparent);
   border-color: transparent;
@@ -1154,7 +1104,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
   margin: 0 auto var(--sp-3);
 }
 
-/* ── 通用占位 ── */
 .gen-placeholder {
   background: var(--bg3);
   border: 1px dashed var(--bd);

@@ -22,7 +22,6 @@
 
 import os
 
-# ── 判定结果的哨兵值 ────────────────────────────────────────────────────────
 # 返回此值表示「机器判不出, 必须由用户选目录」。
 MANUAL = "__manual__"
 # 返回此值表示「非模型资产, 不下载」(训练数据 / 附件压缩包)。
@@ -31,7 +30,6 @@ SKIP = "__skip__"
 FOLLOW_PRIMARY = "__follow__"
 
 
-# ── 第 2.5 层: 老架构白名单 ──────────────────────────────────────────────
 # 这些 baseModel 不存在「拆分形态」—— UNet / TE / VAE 恒烘焙在同一个 ckpt 里,
 # 所以裸 file.type=Model 必然是整合包。
 #
@@ -50,7 +48,7 @@ LEGACY_INTEGRATED_BASE_MODELS = frozenset({
     "Pony", "Illustrious", "NoobAI",
 })
 
-# ── 第 1 层: file.type 细分档 → 目录 ─────────────────────────────────────
+# 第 1 层: file.type 细分档 → 目录
 # Civitai 的**文件级** type。填了就信 —— 它比条目级 model.type 精确。
 # 反向不成立: 没填不能推断「不是」(实测 Flux.1 D 有 395 条裸 Model,
 # 其中既有整合包也有 UNet-only)。
@@ -61,7 +59,6 @@ _FILE_TYPE_TO_DIR_KEY = {
     "negative": "embeddings",          # 负面 embedding, 只出现在 TextualInversion 下
 }
 
-# file.type ∈ 此集合 → 扩散主干, 按扩展名分 gguf / safetensors
 _FILE_TYPE_DIFFUSION = frozenset({"diffusion model", "unet"})
 
 # file.type == "Training Data" → 训练集, 不是资产, 不下载。
@@ -77,7 +74,7 @@ _FILE_TYPE_NON_ASSET = frozenset({"training data"})
 # (老架构不存在拆分形态, 裸文件必然是整合包), 故纳入 "other" 的失效模式仍是安全的。
 _FILE_TYPE_GENERIC = frozenset({"model", "pruned model", "other", ""})
 
-# ── 第 2 层: model.type 明确档 → 目录 ────────────────────────────────────
+# 第 2 层: model.type 明确档 → 目录
 # 条目级 type。这些类型用途单一, 且上传者有强动机选对
 # (选错自己的模型就从筛选里消失)。
 _MODEL_TYPE_TO_DIR_KEY = {
@@ -107,7 +104,6 @@ _SIDECAR_EXTS = frozenset({".json", ".yaml", ".yml", ".txt"})
 
 
 def _ext_of(filename: str) -> str:
-    """小写扩展名, 含点。无扩展名返回空串。"""
     return os.path.splitext(filename or "")[1].lower()
 
 
@@ -133,7 +129,7 @@ def classify_file(
     bm = (base_model or "").strip()
     ext = _ext_of(filename)
 
-    # ── 第 0 层: 非权重文件 ────────────────────────────────────────────────
+    # 第 0 层: 非权重文件
     # file.type 的非权重档优先于扩展名 —— 实测 file.type=Workflow 既有 .json
     # 也有 .zip, 反过来 .zip 也可能是 Archive。先看 file.type 才不会错位。
     if ft == "workflow":
@@ -151,7 +147,7 @@ def classify_file(
     if ext in _SIDECAR_EXTS:
         return FOLLOW_PRIMARY
 
-    # ── 第 1 层: file.type 细分档 (填了就信) ───────────────────────────────
+    # 第 1 层: file.type 细分档 (填了就信)
     if ft in _FILE_TYPE_TO_DIR_KEY:
         return _FILE_TYPE_TO_DIR_KEY[ft]
     if ft in _FILE_TYPE_DIFFUSION:
@@ -164,23 +160,23 @@ def classify_file(
     if ext == ".gguf":
         return MANUAL
 
-    # ── 第 2 层: model.type 明确档 ─────────────────────────────────────────
+    # 第 2 层: model.type 明确档
     if mt in _MODEL_TYPE_MANUAL:
         return MANUAL
     if mt in _MODEL_TYPE_TO_DIR_KEY:
         return _MODEL_TYPE_TO_DIR_KEY[mt]
 
-    # ── 第 2.5 层: 老架构白名单 ────────────────────────────────────────────
+    # 第 2.5 层: 老架构白名单
     if mt == "checkpoint" and ft in _FILE_TYPE_GENERIC and bm in LEGACY_INTEGRATED_BASE_MODELS:
         return "checkpoints"
 
-    # ── 第 3 层: 其余全部交给用户 ──────────────────────────────────────────
+    # 第 3 层: 其余全部交给用户
     # 涵盖: 新架构 Checkpoint 的裸 Model (整合包与 UNet-only 元数据同形),
     #       type=Other, .gguf (file.type 三种取值都出现过), 未知 model.type。
     return MANUAL
 
 
-# ── 手动裁决时给前端的候选排序 ──────────────────────────────────────────────
+# 手动裁决时给前端的候选排序
 # 这是**排序**, 不是预选。前端不得默认选中任何一项 —— 预选等于换个方式替用户
 # 做决定, 而这一层的存在前提正是「机器没有把握」。
 _SUGGEST_NEW_ARCH_CKPT = ("diffusion_models", "checkpoints", "vae", "text_encoders", "clip_vision")
@@ -195,7 +191,6 @@ def suggest_dir_keys(
     filename: str = "",
     base_model: str = "",
 ) -> list[str]:
-    """手动裁决时, 目录候选的展示顺序 (最可能的在前)。"""
     mt = (model_type or "").strip().lower()
     ext = _ext_of(filename)
 

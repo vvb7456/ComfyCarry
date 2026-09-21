@@ -28,8 +28,6 @@ export function useWizardDeploy() {
   const { t } = useI18n({ useScope: 'global' })
   const { config, deployState, importedConfig } = useWizardState()
 
-  // ── Elapsed timer ───────────────────────────────────────────
-
   function startElapsedTimer() {
     stopElapsedTimer()
     _deployStartTime = Date.now()
@@ -51,8 +49,6 @@ export function useWizardDeploy() {
     }
   }
 
-  // ── SSE connection ──────────────────────────────────────────
-
   function connectSSE() {
     _sseCompleted = false
     closeSSE()
@@ -73,7 +69,6 @@ export function useWizardDeploy() {
       }
 
       if (data.type === 'step') {
-        // Mark previous active step as done
         const prev = steps.value.find(s => s.status === 'active')
         if (prev) prev.status = 'done'
 
@@ -86,7 +81,6 @@ export function useWizardDeploy() {
         closeSSE()
         stopElapsedTimer()
 
-        // Finalize last active step
         const lastActive = steps.value.find(s => s.status === 'active')
         if (lastActive) {
           lastActive.status = data.success ? 'done' : 'error'
@@ -101,7 +95,6 @@ export function useWizardDeploy() {
             className: 'log-info',
           })
 
-          // Attention install warnings
           if (data.attn_warnings?.length) {
             attnWarnings.value = data.attn_warnings
             const names = data.attn_warnings.join(' / ')
@@ -140,7 +133,6 @@ export function useWizardDeploy() {
     evtSource.onerror = () => {
       evtSource.close()
       if (!_sseCompleted) {
-        // Auto-reconnect after delay
         _reconnectTimer = setTimeout(() => connectSSE(), SSE_RECONNECT_DELAY)
       }
     }
@@ -156,8 +148,6 @@ export function useWizardDeploy() {
       _evtSource = null
     }
   }
-
-  // ── Start deploy ────────────────────────────────────────────
 
   async function startDeploy(retryOnly = false): Promise<{ ok: boolean; error?: string }> {
     // Apply imported config to backend at deploy time (deferred from file upload)
@@ -191,7 +181,6 @@ export function useWizardDeploy() {
         return { ok: false, error: `${t('wizard.deploy.request_fail')} ${errorMessage(e)}` }
     }
 
-    // Switch to deploying state
     status.value = 'deploying'
     deployState.value = 'deploying'
     errorMsg.value = ''
@@ -201,14 +190,10 @@ export function useWizardDeploy() {
     return { ok: true }
   }
 
-  // ── Retry deploy ────────────────────────────────────────────
-
   async function retry(): Promise<{ ok: boolean; error?: string }> {
     // 原计划和凭据留在服务端，刷新后的本地镜像不参与重试。
     return startDeploy(true)
   }
-
-  // ── Resume (reconnect to ongoing deploy) ────────────────────
 
   function resume() {
     status.value = 'deploying'
@@ -216,15 +201,12 @@ export function useWizardDeploy() {
     connectSSE()
   }
 
-  // ── Cleanup ─────────────────────────────────────────────────
-
   onUnmounted(() => {
     closeSSE()
     stopElapsedTimer()
   })
 
   return {
-    // State
     steps,
     logLines,
     status,
@@ -232,7 +214,6 @@ export function useWizardDeploy() {
     errorMsg,
     attnWarnings,
 
-    // Actions
     startDeploy,
     retry,
     resume,

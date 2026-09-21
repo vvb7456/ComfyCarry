@@ -16,10 +16,6 @@ alias for the Wan 2.2 text-to-video prompt used by older clients.
 from __future__ import annotations
 
 
-# ---------------------------------------------------------------------------
-# Shared instructions
-# ---------------------------------------------------------------------------
-
 _OUTPUT_RULES = r"""
 ### 输出契约（必须遵守）
 只输出一个有效的 JSON 对象，不要 Markdown、代码围栏、解释文字或额外字段：
@@ -56,7 +52,6 @@ def _prompt_header(model: str, task: str) -> str:
 
 
 def _with_vision(system: str, model: str) -> str:
-    """Add the image-interrogation instructions without duplicating model rules."""
     return (
         system
         + "\n\n"
@@ -77,10 +72,6 @@ def _entry(system: str, label: str, *, negative: bool, vision_model: str | None 
         result["vision_system"] = _with_vision(system, vision_model)
     return result
 
-
-# ---------------------------------------------------------------------------
-# Image models
-# ---------------------------------------------------------------------------
 
 _TAG_RULES = r"""
 ### 提示词格式
@@ -338,10 +329,6 @@ semi-anthro`。若这些项与用户明确内容冲突，删除冲突项；再�
 )
 
 
-# ---------------------------------------------------------------------------
-# Video models
-# ---------------------------------------------------------------------------
-
 _WAN_MOTION_RULES = r"""
 ### Wan 2.2 格式
 - 使用英文自然语言，不使用 Danbooru tags、括号权重或静态质量词。重点是“怎么动”：
@@ -550,10 +537,6 @@ non_diegetic_music: ...
 SDXL_VISION_SYSTEM_PROMPT = _with_vision(SDXL_SYSTEM_PROMPT, "Stable Diffusion XL")
 FLUX_VISION_SYSTEM_PROMPT = _with_vision(FLUX_SYSTEM_PROMPT, "FLUX")
 
-
-# ---------------------------------------------------------------------------
-# Prompt registry
-# ---------------------------------------------------------------------------
 
 _BASE_ENTRIES = {
     "sdxl": _entry(SDXL_SYSTEM_PROMPT, "SDXL — Danbooru/A1111 标签格式", negative=True, vision_model="SDXL"),

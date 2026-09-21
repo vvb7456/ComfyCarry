@@ -5,11 +5,6 @@ import { useConfirm } from './useConfirm'
 import { useToast } from './useToast'
 import type { LocalModel } from './useLocalModels'
 
-/**
- * Model action handlers — fetchInfo, deleteModel.
- *
- * Depends on the models list and a reload callback from useLocalModels().
- */
 export function useModelActions(
   loadModels: () => Promise<void>,
 ) {
@@ -18,7 +13,6 @@ export function useModelActions(
   const { toast } = useToast()
   const { t } = useI18n({ useScope: 'global' })
 
-  /** Tracks model IDs currently being enriched. */
   const fetchingSet = reactive(new Set<string>())
 
   function isFetching(modelId: number): boolean {

@@ -1,12 +1,3 @@
-/**
- * useLlmAssist — AI prompt generation composable (LLM Assist).
- *
- * Two modes:
- *   - text: user describes a scene → LLM generates positive/negative prompts
- *   - image: user provides an image → LLM vision interrogation
- *
- * Supports SSE streaming and JSON fallback.
- */
 import { ref, type Ref } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
@@ -66,8 +57,6 @@ export function useLlmAssist(): UseLlmAssistReturn {
 
   let abortController: AbortController | null = null
 
-  // ── Open: check config + vision capability ────────────────────────────
-
   async function open() {
     // Keep previous result across open/close cycles
     running.value = false
@@ -91,7 +80,6 @@ export function useLlmAssist(): UseLlmAssistReturn {
         configured.value = false
       }
 
-      // Check vision support
       visionSupported.value = false
       if (configured.value && cfg?.provider) {
         try {
@@ -108,15 +96,12 @@ export function useLlmAssist(): UseLlmAssistReturn {
       configured.value = false
     }
 
-    // If current mode is image but vision not supported, switch back
     if (mode.value === 'image' && !visionSupported.value) {
       mode.value = 'text'
     }
 
     visible.value = true
   }
-
-  // ── Submit: text or image mode ────────────────────────────────────────
 
   /**
    * @param promptTarget 后端 `PROMPT_REGISTRY` 的模型专属预设 key。调用方按当前
@@ -136,7 +121,6 @@ export function useLlmAssist(): UseLlmAssistReturn {
       }
       body = { input: textInput, target: promptTarget, stream: streaming.value }
     } else {
-      // Image mode
       const file = imageFile.value
       const name = inputImageName.value
       if (!file && !name) {
@@ -147,7 +131,6 @@ export function useLlmAssist(): UseLlmAssistReturn {
       if (file) {
         base64 = await fileToBase64(file)
       } else if (name) {
-        // Fetch the image from server and convert
         try {
           const resp = await fetch(`/api/generate/input_image_preview?name=${encodeURIComponent(name)}`)
           const blob = await resp.blob()
@@ -239,14 +222,12 @@ export function useLlmAssist(): UseLlmAssistReturn {
             // 上游 Provider 的原始报错则只有 message
             toast(apiMessageText(evt, t('generate.llm_modal.failed')), 'error')
           }
-        } catch { /* ignore parse error */ }
+        } catch { }
       }
     }
 
     abortController = null
   }
-
-  // ── Abort ─────────────────────────────────────────────────────────────
 
   function abort() {
     if (abortController) {
@@ -255,8 +236,6 @@ export function useLlmAssist(): UseLlmAssistReturn {
     }
     running.value = false
   }
-
-  // ── Apply result ──────────────────────────────────────────────────────
 
   function applyResult(target: 'positive' | 'all' | 'copy'): { positive: string; negative?: string } | null {
     if (!result.value) return null
@@ -274,14 +253,10 @@ export function useLlmAssist(): UseLlmAssistReturn {
     }
   }
 
-  // ── Close ─────────────────────────────────────────────────────────────
-
   function close() {
     abort()
     visible.value = false
   }
-
-  // ── Mode / Image helpers ──────────────────────────────────────────────
 
   function setMode(m: 'text' | 'image') {
     if (m === 'image' && !visionSupported.value) return
@@ -305,8 +280,6 @@ export function useLlmAssist(): UseLlmAssistReturn {
     imageFileName.value = ''
     inputImageName.value = ''
   }
-
-  // ── Utilities ─────────────────────────────────────────────────────────
 
   function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {

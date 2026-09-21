@@ -106,7 +106,6 @@ function close() {
   opacity: 1;
 }
 
-/* ── Tone variants ── */
 .alert-banner--success {
   background: color-mix(in srgb, var(--c-positive) 8%, var(--bg3));
   border: 1px solid color-mix(in srgb, var(--c-positive) 25%, var(--bd));

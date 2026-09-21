@@ -25,9 +25,7 @@ export interface DropdownMenuItem {
   logoInvertDark?: boolean
   /** logo 缺省时字母徽章字符 (1-2 字符) */
   letter?: string
-  /** 说明性小字 (可选, 单行, 次要色) */
   hint?: string
-  /** 二级子项 */
   children?: DropdownMenuItem[]
 }
 
@@ -52,24 +50,20 @@ const triggerRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 
-// ── 响应式检测 (桌面端 vs 移动端) ──
 const isMobile = ref(false)
 function updateDevice() {
   if (typeof window === 'undefined') return
   isMobile.value = window.innerWidth <= 768
 }
 
-// ── 桌面端: 二级悬浮级联状态 ──
 const activeSubmenuParent = ref<DropdownMenuItem | null>(null)
 const subTriggerEl = ref<HTMLElement | null>(null)
 const subPanelRef = ref<HTMLElement | null>(null)
 let subOpenTimer: number | null = null
 let subCloseTimer: number | null = null
 
-// ── 移动端: 当前视图 ('root' | 父组 key) ──
 const currentView = ref<string>('root')
 
-/** 移动端当前视图行 */
 const mobileViewRows = computed<DropdownMenuItem[]>(() => {
   if (currentView.value === 'root') return props.items
   const parent = props.items.find(it => it.key === currentView.value)
@@ -82,7 +76,6 @@ const currentParent = computed<DropdownMenuItem | null>(() => {
   return props.items.find(it => it.key === currentView.value) || null
 })
 
-// ── 选中 key 所属的父组 key ──
 const selectedParentKey = computed<string | null>(() => {
   for (const it of props.items) {
     if (it.children && it.children.some(c => c.key === props.modelValue)) {
@@ -92,7 +85,6 @@ const selectedParentKey = computed<string | null>(() => {
   return null
 })
 
-// ── 叶子扁平序列 (触发器闭合态 ↑/↓ 切换) ──
 const flatLeaves = computed<DropdownMenuItem[]>(() => {
   const out: DropdownMenuItem[] = []
   for (const it of props.items) {
@@ -105,7 +97,6 @@ const flatLeaves = computed<DropdownMenuItem[]>(() => {
   return out
 })
 
-// ── 主面板定位 (floating-ui) ──
 const { floatingStyles: mainFloatingStyles, placement: mainPlacement } = useFloating(triggerRef, panelRef, {
   open,
   placement: 'bottom-start',
@@ -131,7 +122,6 @@ const { floatingStyles: mainFloatingStyles, placement: mainPlacement } = useFloa
   whileElementsMounted: autoUpdate,
 })
 
-// ── 桌面端二级面板定位 (floating-ui) ──
 const isSubmenuOpen = computed(() => !isMobile.value && open.value && !!activeSubmenuParent.value)
 const { floatingStyles: subFloatingStyles } = useFloating(subTriggerEl, subPanelRef, {
   open: isSubmenuOpen,
@@ -160,19 +150,15 @@ const originClass = computed(() => {
   return 'dd-origin-bottom-start'
 })
 
-// ── 键盘导航高亮 ──
 const highlightIdx = ref(-1)
 const subHighlightIdx = ref(-1)
 
-// ── 打开/关闭 ──
 function openMenu() {
   updateDevice()
   open.value = true
-  // 移动端和桌面端初次展开均始终展示一级 root 架构列表，保持全局视野
   currentView.value = 'root'
 
   if (!isMobile.value) {
-    // 桌面端: 若选中项在子集内, 默认展开该子集的二级菜单，并初始化子项的高亮与聚焦
     if (selectedParentKey.value) {
       const parent = props.items.find(it => it.key === selectedParentKey.value)
       if (parent) {
@@ -218,29 +204,24 @@ function clearTimers() {
   if (subCloseTimer) { clearTimeout(subCloseTimer); subCloseTimer = null }
 }
 
-// ── 选择叶子 ──
 function selectLeaf(item: DropdownMenuItem) {
   emit('update:modelValue', item.key)
   closeMenu()
 }
 
-// ── 桌面端悬浮级联处理 (位置与数据原子化同步更新，彻底根治残影闪烁) ──
 function onDesktopParentHover(item: DropdownMenuItem, e: MouseEvent) {
   if (isMobile.value) return
-  // 清除已有的关闭倒计时
   if (subCloseTimer) {
     clearTimeout(subCloseTimer)
     subCloseTimer = null
   }
 
-  // 若已经在当前父项上展开，无需任何操作
   if (activeSubmenuParent.value?.key === item.key) return
-
+  // 1. 若当前尚未展开任何子菜单: 延迟 80ms 展开 (防快速扫过误触)
+  // 2. 若当前已展开子菜单: 40ms 极短延迟原子切换 (位置与内容同步替换，绝不产生旧内容位置跳变)
   const targetEl = e.currentTarget as HTMLElement
   clearTimers()
 
-  // 1. 若当前尚未展开任何子菜单: 延迟 80ms 展开 (防快速扫过误触)
-  // 2. 若当前已展开子菜单: 40ms 极短延迟原子切换 (位置与内容同步替换，绝不产生旧内容位置跳变)
   const delay = activeSubmenuParent.value ? 40 : 80
   subOpenTimer = window.setTimeout(() => {
     subTriggerEl.value = targetEl
@@ -287,7 +268,6 @@ function onSubPanelMouseLeave() {
   }
 }
 
-// ── 移动端下钻处理 ──
 function onMobileParentClick(parent: DropdownMenuItem) {
   currentView.value = parent.key
   highlightIdx.value = 0
@@ -301,7 +281,6 @@ function drillBack() {
   nextTick(() => scrollToHighlighted())
 }
 
-// ── 键盘导航 ──
 function onTriggerKeydown(e: KeyboardEvent) {
   if (!open.value) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -328,7 +307,6 @@ function onTriggerKeydown(e: KeyboardEvent) {
 function handleKeydown(e: KeyboardEvent) {
   if (!open.value) return
 
-  // 移动端键盘逻辑
   if (isMobile.value) {
     const rows = mobileViewRows.value
     if (e.key === 'ArrowDown') {
@@ -358,9 +336,7 @@ function handleKeydown(e: KeyboardEvent) {
     return
   }
 
-  // 桌面端键盘逻辑
   if (activeSubmenuParent.value && activeSubmenuParent.value.children?.length) {
-    // 处于子菜单中
     const subRows = activeSubmenuParent.value.children
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -388,7 +364,6 @@ function handleKeydown(e: KeyboardEvent) {
     return
   }
 
-  // 处于一级菜单中
   const rows = props.items
   if (e.key === 'ArrowDown') {
     e.preventDefault()
@@ -439,7 +414,6 @@ function scrollToHighlighted() {
   })
 }
 
-// ── 点击外部关闭 ──
 function onClickOutside(e: MouseEvent) {
   if (!open.value) return
   const t = e.target as Node
@@ -465,13 +439,10 @@ defineExpose({ openMenu, closeMenu })
 
 <template>
   <div class="dd-menu" @keydown="onTriggerKeydown">
-    <!-- 触发器插槽。包裹 div 跟随 dd-menu 宽度: dd-menu 被
-         外部拉宽时 (如移动端通栏), slot 触发器才能随之全宽。 -->
     <div ref="triggerRef" class="dd-menu__trigger" @click="toggle">
       <slot :open="open" :toggle="toggle" />
     </div>
 
-    <!-- 弹层部分 -->
     <Teleport to="body">
       <Transition name="dd-pop">
         <div
@@ -484,7 +455,6 @@ defineExpose({ openMenu, closeMenu })
           tabindex="-1"
           @keydown="handleKeydown"
         >
-          <!-- ── 移动端专属吸顶强化返回条 ── -->
           <div
             v-if="isMobile && currentView !== 'root' && currentParent"
             class="dd-mobile-back-bar"
@@ -498,12 +468,9 @@ defineExpose({ openMenu, closeMenu })
             <span class="dd-mobile-back-hint">{{ backLabel || t('common.btn.all') }}</span>
           </div>
 
-          <!-- ── 列表内容 ── -->
           <div class="dd-list">
-            <!-- 移动端视图 (下钻) -->
             <template v-if="isMobile">
               <template v-for="(row, idx) in mobileViewRows" :key="row.key">
-                <!-- 移动端父行: 点击下钻 -->
                 <div
                   v-if="row.children && row.children.length"
                   class="dd-row dd-row--parent"
@@ -525,7 +492,6 @@ defineExpose({ openMenu, closeMenu })
                   </span>
                 </div>
 
-                <!-- 移动端叶子行 -->
                 <div
                   v-else
                   class="dd-row dd-row--leaf"
@@ -552,10 +518,8 @@ defineExpose({ openMenu, closeMenu })
               </template>
             </template>
 
-            <!-- 桌面端视图 (常驻一级 + 悬浮展开二级) -->
             <template v-else>
               <template v-for="(row, idx) in items" :key="row.key">
-                <!-- 桌面端父行 (有 children): 鼠标悬停向右展开子面板 -->
                 <div
                   v-if="row.children && row.children.length"
                   :data-key="row.key"
@@ -585,7 +549,6 @@ defineExpose({ openMenu, closeMenu })
                   </span>
                 </div>
 
-                <!-- 桌面端常规叶子行 -->
                 <div
                   v-else
                   class="dd-row dd-row--leaf"
@@ -616,7 +579,6 @@ defineExpose({ openMenu, closeMenu })
         </div>
       </Transition>
 
-      <!-- ── 桌面端二级悬浮子菜单面板 ── -->
       <Transition name="dd-pop">
         <div
           v-if="isSubmenuOpen && activeSubmenuParent?.children?.length"
@@ -723,7 +685,6 @@ defineExpose({ openMenu, closeMenu })
   max-height: var(--dd-sub-max, 360px);
 }
 
-/* ── 移动端专属吸顶强化返回条 ── */
 .dd-mobile-back-bar {
   display: flex;
   align-items: center;
@@ -747,7 +708,6 @@ defineExpose({ openMenu, closeMenu })
   color: var(--t3);
 }
 
-/* ── 行 (通用) ── */
 .dd-row {
   display: flex;
   align-items: center;
@@ -767,13 +727,11 @@ defineExpose({ openMenu, closeMenu })
   color: var(--t2);
 }
 
-/* hover 高亮 */
 .dd-row:hover {
   background: color-mix(in srgb, var(--ac) 6%, transparent);
   color: var(--t1);
 }
 
-/* 键盘高亮 */
 .dd-row--kb {
   background: color-mix(in srgb, var(--ac) 10%, transparent);
   color: var(--t1);
@@ -789,7 +747,6 @@ defineExpose({ openMenu, closeMenu })
   background: var(--ac);
 }
 
-/* 父行: 悬浮/激活态 */
 .dd-row--parent {
   font-size: var(--text-base);
   font-weight: 400;
@@ -801,7 +758,6 @@ defineExpose({ openMenu, closeMenu })
   color: var(--ac);
 }
 
-/* 家族内包含选中项的小圆点 */
 .dd-row__family-dot {
   width: 6px;
   height: 6px;
@@ -810,7 +766,6 @@ defineExpose({ openMenu, closeMenu })
   flex-shrink: 0;
 }
 
-/* 选中态高亮 */
 .dd-row--sel {
   color: var(--ac);
   font-weight: 500;
@@ -826,7 +781,6 @@ defineExpose({ openMenu, closeMenu })
   background: color-mix(in srgb, var(--ac) 40%, transparent);
 }
 
-/* ── logo / 字母徽章 (28px 圆角方块) ── */
 .dd-logo {
   width: 28px;
   height: 28px;
@@ -867,7 +821,6 @@ defineExpose({ openMenu, closeMenu })
   object-fit: contain;
 }
 
-/* 字母徽章: accent 渐变底 + 白字 */
 .dd-logo__letter {
   font-size: .82rem;
   font-weight: 700;
@@ -881,7 +834,6 @@ defineExpose({ openMenu, closeMenu })
   border-radius: 6px;
 }
 
-/* ── 文本 ── */
 .dd-row__label {
   flex: 1;
   min-width: 0;
@@ -926,7 +878,6 @@ defineExpose({ openMenu, closeMenu })
   justify-content: center;
 }
 
-/* ── 动画 ── */
 .dd-panel.dd-origin-bottom-start { transform-origin: top left; }
 .dd-panel.dd-origin-bottom-end { transform-origin: top right; }
 .dd-panel.dd-origin-top-start { transform-origin: bottom left; }

@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-/**
- * Global application state — theme, sidebar, version.
- */
 export const useAppStore = defineStore('app', () => {
   const sidebarCollapsed = ref(localStorage.getItem('sidebar_collapsed') === '1')
   const mobileSidebarOpen = ref(false)

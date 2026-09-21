@@ -1,18 +1,4 @@
 <script setup lang="ts">
-/**
- * BrandIcon — 第三方品牌图标, API 与 MsIcon 对齐。
- *
- * 两种用法:
- *   - mono (默认): 根节点 span 用 CSS mask 指向单色 SVG, background: currentColor,
- *     颜色完全由外部 color 决定, 可像 MsIcon 一样跟随选中态/状态色;
- *   - color: span 内 <img>, 官方彩色原样展示, 用于“选择位”。
- *
- * 尺寸映射与 MsIcon 一致: xxs(12) | xs(16) | sm(18, default) | md(20) | lg(32) | xl(48),
- * 另接受 number 按 px 处理 (如 Hero 的 42)。
- *
- * 名称由 config/brand-icons.ts 的 BrandName 联合类型约束, 写错在 vue-tsc 即报错。
- * 素材来源与授权见 assets/brand/SOURCES.md。
- */
 import { computed } from 'vue'
 import { BRAND_ASSETS, type BrandAsset, type BrandName } from '@/config/brand-icons'
 
@@ -29,7 +15,6 @@ const props = withDefaults(defineProps<{
 
 const asset = computed<BrandAsset>(() => BRAND_ASSETS[props.name])
 
-// 请求的 variant 没有素材时回退到存在的那个, 开发环境提示, 不抛错
 const resolvedVariant = computed<'mono' | 'color'>(() => {
   const a = asset.value
   if (props.variant === 'mono' ? a.mono : a.color) return props.variant
@@ -90,7 +75,6 @@ const monoStyle = computed(() => {
   mask-size: contain;
 }
 
-/* 彩色变体不参与遮罩, 只在 span 里放官方原图 */
 .brand-icon--img {
   background-color: transparent;
   -webkit-mask-image: none;

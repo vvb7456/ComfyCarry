@@ -1,8 +1,5 @@
 """
 ComfyCarry — Sync 持久化层
-
-负责 sync_jobs 和 sync_job_events 两张表的读写。
-被 sync_engine 调用，route 通过 store 查询历史。
 """
 
 import json
@@ -15,18 +12,12 @@ from ..db import db
 log = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Job CRUD
-# ═══════════════════════════════════════════════════════════════
-
 def create_job(job_id: str, *, trigger_type: str = "manual",
                trigger_ref: str = "", rule_count: int = 0,
                rules: list[dict] | None = None,
                status: str = "running",
                queued_at: float | None = None) -> None:
-    """创建新的 sync job 记录。
-
-    rules 是本次执行规则的展示快照 (SyncJobRuleSnapshot 列表)。落库为
+    """rules 是本次执行规则的展示快照 (SyncJobRuleSnapshot 列表)。落库为
     rules_json, 规则后续被编辑/删除也不影响历史回看。
 
     status 默认保持 'running' (不经队列的直接执行); 'queued' 时才写
@@ -48,9 +39,7 @@ def create_job(job_id: str, *, trigger_type: str = "manual",
 
 
 def mark_job_running(job_id: str) -> bool:
-    """把排队中的 job 置为 running 并覆盖 started_at 为真实开始时刻。
-
-    条件 UPDATE (WHERE status='queued') 是取消竞态安全的关键: 执行员
+    """条件 UPDATE (WHERE status='queued') 是取消竞态安全的关键: 执行员
     「读 DB 判状态」与「真正开跑」之间存在窗口, cancel 接口可能已把行
     改成 cancelled; 无条件 UPDATE 会把行改回 running 继续执行。未命中
     (已被取消/停止清队) 时返回 False, 执行员据此跳过该任务且不改库。
@@ -64,9 +53,7 @@ def mark_job_running(job_id: str) -> bool:
 
 
 def cancel_queued_job(job_id: str) -> bool:
-    """取消排队中的 job (queued_at 保留)。返回是否命中。
-
-    条件 UPDATE 保证只取消尚未开始执行的行; 执行中/已结束的行不命中。
+    """条件 UPDATE 保证只取消尚未开始执行的行; 执行中/已结束的行不命中。
     """
     cursor = db.execute(
         "UPDATE sync_jobs SET status = 'cancelled', finished_at = ? "
@@ -77,7 +64,6 @@ def cancel_queued_job(job_id: str) -> bool:
 
 
 def cancel_all_queued_jobs() -> int:
-    """把所有排队中的 job 置为 cancelled (用户「停止」清队)。返回行数。"""
     cursor = db.execute(
         "UPDATE sync_jobs SET status = 'cancelled', finished_at = ? "
         "WHERE status = 'queued'",
@@ -87,7 +73,6 @@ def cancel_all_queued_jobs() -> int:
 
 
 def has_active_watch_job() -> bool:
-    """是否存在排队中或执行中的 watch 任务 (供 watch 调度去重)。"""
     row = db.fetch_one(
         "SELECT 1 FROM sync_jobs WHERE trigger_type = 'watch' "
         "AND status IN ('queued', 'running') LIMIT 1",
@@ -96,7 +81,6 @@ def has_active_watch_job() -> bool:
 
 
 def count_queued_jobs() -> int:
-    """排队中的 job 数。"""
     row = db.fetch_one(
         "SELECT COUNT(*) FROM sync_jobs WHERE status = 'queued'",
     )
@@ -104,10 +88,6 @@ def count_queued_jobs() -> int:
 
 
 def reconcile_orphan_jobs() -> int:
-    """启动对账: 把进程重启前残留的 queued/running 任务置为 interrupted。
-
-    finished_at 原本为空时补 now。返回处理的行数 (便于日志)。
-    """
     now = time.time()
     cursor = db.execute(
         "UPDATE sync_jobs SET status = 'interrupted', "
@@ -122,7 +102,6 @@ def finish_job(job_id: str, *, status: str = "success",
                success_count: int = 0, failure_count: int = 0,
                files_synced: int = 0,
                summary: dict | None = None) -> None:
-    """标记 job 完成 (success/failed/partial/cancelled)。"""
     now = time.time()
     summary_json = json.dumps(summary or {}, ensure_ascii=False)
     db.execute(
@@ -137,7 +116,6 @@ def finish_job(job_id: str, *, status: str = "success",
 
 def update_job_progress(job_id: str, *,
                         success_count: int, failure_count: int) -> None:
-    """增量更新运行中 job 的进度计数 (每条规则执行完后调用)。"""
     db.execute(
         """UPDATE sync_jobs SET success_count = ?, failure_count = ?
            WHERE job_id = ? AND status = 'running'""",
@@ -146,7 +124,6 @@ def update_job_progress(job_id: str, *,
 
 
 def get_job(job_id: str) -> dict | None:
-    """读取单个 job。"""
     row = db.fetch_one(
         "SELECT * FROM sync_jobs WHERE job_id = ?", (job_id,),
     )
@@ -155,14 +132,8 @@ def get_job(job_id: str) -> dict | None:
 
 def get_jobs_page(*, page: int = 1, limit: int = 5,
                   finished: bool = False) -> tuple[list[dict], int, int]:
-    """分页读取 job。返回 (jobs, total, 归一化后的 page)。
-
-    - finished=True 只返回已结束 (finished_at IS NOT NULL) 的行, 供 Hero
-      取「上一条已完成任务」, 避免新排序把排队任务顶到第一条。
-    - 排序三层: running 最前; 其次 queued (按 queued_at ASC, 先入队在上);
-      其余按 started_at DESC (新在上); job_id DESC 兜底。
-    - page / limit 小于 1 时兜底为 1; 超出末页归一化到最后一页。
-    - 空集合 page 固定为 1。
+    """finished=True 时只返回已结束的行, 供 Hero 取「上一条已完成任务」,
+    避免新排序把排队任务顶到第一条。
     """
     where = "WHERE finished_at IS NOT NULL" if finished else ""
     row = db.fetch_one(f"SELECT COUNT(*) FROM sync_jobs {where}")
@@ -191,7 +162,6 @@ def get_jobs_page(*, page: int = 1, limit: int = 5,
 
 
 def delete_old_jobs(max_age_seconds: int = 7 * 86400) -> int:
-    """清理超龄 job 及其关联 events。返回删除的 job 数。"""
     cutoff = time.time() - max_age_seconds
     # 先删 events
     db.execute(
@@ -208,13 +178,8 @@ def delete_old_jobs(max_age_seconds: int = 7 * 86400) -> int:
     return cursor.rowcount
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Event CRUD
-# ═══════════════════════════════════════════════════════════════
-
 def add_event(job_id: str, key: str, *, rule_id: str = "",
               level: str = "info", params: dict | None = None) -> None:
-    """写入一条结构化事件。"""
     now = time.time()
     params_json = json.dumps(params or {}, ensure_ascii=False)
     db.execute(
@@ -227,7 +192,6 @@ def add_event(job_id: str, key: str, *, rule_id: str = "",
 
 def get_events(job_id: str, *, limit: int = 500,
                after_id: int = 0) -> list[dict]:
-    """读取某个 job 的事件 (支持游标分页)。"""
     rows = db.fetch_all(
         "SELECT * FROM sync_job_events "
         "WHERE job_id = ? AND id > ? "
@@ -237,12 +201,7 @@ def get_events(job_id: str, *, limit: int = 500,
     return [_row_to_dict(r) for r in rows]
 
 
-# ═══════════════════════════════════════════════════════════════
-#  Helpers
-# ═══════════════════════════════════════════════════════════════
-
 def _row_to_dict(row) -> dict:
-    """sqlite3.Row → dict, 自动解析 *_json 字段。"""
     d = dict(row)
     for key in list(d.keys()):
         if key.endswith("_json"):

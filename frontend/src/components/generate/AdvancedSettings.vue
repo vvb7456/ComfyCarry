@@ -42,9 +42,7 @@ const options = inject(GenerateOptionsKey)!
 
 const arch = computed(() => props.modelType || store.activeModelType)
 
-/** 视频收敛开关 (见 mediaType prop 注释) */
 const isVideo = computed(() => props.mediaType === 'video')
-/** 文本编码器槽的标签/占位: 视频用中性词, 图像保持既有 "CLIP 文本编码器" */
 const clipLabel = computed(() =>
   isVideo.value ? t('generate.basic.text_encoder') : t('generate.basic.clip'),
 )
@@ -52,7 +50,6 @@ const clipPlaceholder = computed(() =>
   isVideo.value ? t('generate.basic.select_text_encoder') : t('generate.basic.select_clip'),
 )
 
-/* ── Format ── */
 const formatOptions = [
   { value: 'png', label: '' },
   { value: 'jpeg', label: '' },
@@ -65,7 +62,6 @@ function formatLabel(key: string): string {
   return t(`generate.advanced.format_${key}`)
 }
 
-/* ── CLIP / VAE (split-file architectures) — 三分组 (本架构组件/兼容版本/其他文件) ── */
 function basenameNoExt(name: string): string {
   const base = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name
   return base.replace(/\.[^.]+$/, '')
@@ -162,7 +158,6 @@ const clipOptions = computed(() => buildSlotOptions('clip', options.clips.value)
 const clip2Options = computed(() => buildSlotOptions('clip2', options.clips.value))
 const vaeOptions = computed(() => buildSlotOptions('vae', options.vaes.value))
 
-/* ── 音频 VAE (MiniMax H3 音视频一体; 与 vae 同池三分组) ── */
 const hasAudioVae = computed(() => componentsForSlot(arch.value, 'audio_vae').length > 0)
 const audioVaeOptions = computed(() => buildSlotOptions('audio_vae', options.vaes.value))
 
@@ -177,7 +172,6 @@ const hasRegistry = computed(() =>
   componentsForSlot(arch.value, 'vae').length > 0 ||
   componentsForSlot(arch.value, 'audio_vae').length > 0)
 
-/* ── Clip Skip + VAE 覆盖 (checkpoint 系专属) ── */
 // Clip Skip: NumberInput 1~4; VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
 const vaeOverrideOptions = computed(() => [
   { value: '', label: t('generate.advanced.vae_override_follow') },
@@ -192,7 +186,6 @@ const vaeOverrideOptions = computed(() => [
     </summary>
 
     <div class="adv-body">
-      <!-- Row 0 (Anima only): CLIP + VAE split-file selectors -->
       <div v-if="showSplitModels" class="adv-split-grid" :class="{ 'adv-split-grid--3': dualClip || hasAudioVae }">
         <div class="field-group">
           <div class="field-lbl">
@@ -248,7 +241,6 @@ const vaeOverrideOptions = computed(() => [
             @update:model-value="state.vae = String($event)"
           />
         </div>
-        <!-- 音频 VAE (MiniMax H3 音视频一体必需件; 复用 VAE 同款三分组与不兼容提示) -->
         <div v-if="hasAudioVae" class="field-group">
           <div class="field-lbl">
             {{ t('generate.basic.audio_vae') }}
@@ -269,7 +261,6 @@ const vaeOverrideOptions = computed(() => [
         </div>
       </div>
 
-      <!-- Row 0b (checkpoint 系专属): Clip Skip + VAE 覆盖 (主 2×3 网格上方, 1fr 1fr 对称) -->
       <div v-if="showClipSkipVae" class="adv-2col">
         <div class="field-group">
           <div class="field-lbl">
@@ -336,12 +327,8 @@ const vaeOverrideOptions = computed(() => [
         </div>
       </div>
 
-      <!-- Row 2+3 合并为一个 2 列网格, 由 grid 自动流式排布 (行间距 = 原 .adv-body gap, 同值)。
-           图像: 种子|生成数量 / 文件格式|文件名前缀 —— 与合并前逐像素一致。
-           视频: 种子|文件名前缀 —— 隐藏的两项不留空位, 不会出现半空行。 -->
       <div class="adv-2col">
         <div class="field-group">
-          <!-- 后台模式: 种子强制随机 (runMode === 'background', 非冻结状态判定) → SeedInput 替换为禁用观感提示 -->
           <template v-if="state.runMode === 'background'">
             <div class="field-lbl">
               {{ t('generate.advanced.seed') }}
@@ -366,7 +353,6 @@ const vaeOverrideOptions = computed(() => [
             />
           </template>
         </div>
-        <!-- 生成数量: 视频不出现 (后端 _VIDEO_ARCHS 恒纠正 batch_size=1) -->
         <div v-if="!isVideo" class="field-group">
           <div class="field-lbl">
             {{ t('generate.advanced.batch') }}
@@ -382,7 +368,6 @@ const vaeOverrideOptions = computed(() => [
           />
         </div>
 
-        <!-- 文件格式: 视频不出现 (产物恒 mp4/h264, 无可选项) -->
         <div v-if="!isVideo" class="field-group">
           <div class="field-lbl">{{ t('generate.advanced.format') }}</div>
           <BaseSelect
@@ -421,7 +406,6 @@ const vaeOverrideOptions = computed(() => [
   pointer-events: none;
 }
 
-/* ── Summary ── */
 .adv-summary {
   display: flex;
   align-items: center;
@@ -454,7 +438,6 @@ const vaeOverrideOptions = computed(() => [
   transform: rotate(-90deg);
 }
 
-/* ── Body ── */
 .adv-body {
   display: flex;
   flex-direction: column;
@@ -462,14 +445,13 @@ const vaeOverrideOptions = computed(() => [
   margin-top: var(--sp-3);
 }
 
-/* ── 2-col grid ── */
 .adv-2col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-3);
 }
 
-/* ── split-file grid: 2 项 (CLIP/VAE) 或 3 项 (CLIP/CLIP2/VAE) 自适应 ── */
+/* split-file grid: 2 项 (CLIP/VAE) 或 3 项 (CLIP/CLIP2/VAE) 自适应 */
 .adv-split-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -487,7 +469,6 @@ const vaeOverrideOptions = computed(() => [
   }
 }
 
-/* ── Field ── */
 .field-group {
   display: flex;
   flex-direction: column;
@@ -505,7 +486,6 @@ const vaeOverrideOptions = computed(() => [
 }
 
 
-/* ── Incompatible warning ── */
 /* 不兼容提示: 跟在 label 的 HelpTip 右侧, 留间距; 过长时省略 (完整文案见 title) */
 .adv-warn {
   margin-left: 6px;
@@ -519,7 +499,6 @@ const vaeOverrideOptions = computed(() => [
   text-overflow: ellipsis;
 }
 
-/* ── Seed mode badge ── */
 .seed-mode-badge {
   font-size: .65rem;
   font-weight: 500;
@@ -530,7 +509,7 @@ const vaeOverrideOptions = computed(() => [
   margin-left: 2px;
 }
 
-/* ── 后台模式种子禁用提示: 虚线边框 + --t3 文字色 ── */
+/* 后台模式种子禁用提示: 虚线边框 + --t3 文字色 */
 .adv-seed-notice {
   padding: 8px 12px;
   border: 1px dashed var(--bd);

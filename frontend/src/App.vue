@@ -15,7 +15,7 @@ import { useBackgroundRunStore } from '@/stores/backgroundRun'
 defineOptions({ name: 'App' })
 
 provideToast()
-useTheme() // initialize theme on app level
+useTheme()
 // 执行终态通知器: App 级常驻, 全站唯一的完成/中断/出错提示出口 (与页面无关)
 useExecNotifications()
 

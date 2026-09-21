@@ -1,14 +1,8 @@
-        /* ══════════════════════════════════════════════════════════════
-           base.css — Reset · CSS Variables · Typography · Utilities
-           ══════════════════════════════════════════════════════════════ */
-
-        /* ── Local Fonts: IBM Plex Sans (Latin) ── */
         @font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-400-normal.woff2') format('woff2'); }
         @font-face { font-family: 'IBM Plex Sans'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-500-normal.woff2') format('woff2'); }
         @font-face { font-family: 'IBM Plex Sans'; font-weight: 600; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-600-normal.woff2') format('woff2'); }
         @font-face { font-family: 'IBM Plex Sans'; font-weight: 700; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-sans/latin-700-normal.woff2') format('woff2'); }
 
-        /* ── Local Fonts: IBM Plex Mono (Latin) ── */
         @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-mono/latin-400-normal.woff2') format('woff2'); }
         @font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/ibm-plex-mono/latin-500-normal.woff2') format('woff2'); }
 
@@ -44,7 +38,6 @@
             --pink: #f472b6;
             --purple: #a78bfa;
             --cyan: #22d3ee;
-            /* ── Semantic Colors ── */
             --c-positive: var(--green);
             --c-info: var(--blue);
             --c-caution: var(--amber);
@@ -57,7 +50,6 @@
             --r: 12px;
             --rs: 8px;
             --sh: 0 4px 24px rgba(0, 0, 0, 0.5);
-            /* ── Design Tokens ── */
             --sp-1: 4px;
             --sp-2: 8px;
             --sp-3: 12px;
@@ -87,18 +79,15 @@
             --text-md: .92rem;
             --text-lg: 1.05rem;
             --text-xl: 1.15rem;
-            /* ── Typography Tokens ── */
             --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Menlo, Consolas, monospace;
             --font-tabular: 'IBM Plex Mono', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            /* ── Overlay & Inverse & Logo Pad ── */
             --overlay: rgba(0, 0, 0, .5);
             --overlay-light: rgba(0, 0, 0, .35);
             --overlay-dark: rgba(0, 0, 0, .7);
             --t-inv: #fff;
             --t-inv-2: rgba(255, 255, 255, .8);
             --bg-logo-pad: #f1f3f5;
-            /* ── Ambient Background Token (Dark) ── */
             --bg-ambient:
                 radial-gradient(ellipse 80% 50% at 50% -10%, rgba(84, 112, 234, 0.12), transparent 70%),
                 radial-gradient(ellipse 55% 35% at 95% 15%, rgba(56, 189, 248, 0.04), transparent 60%),
@@ -111,7 +100,6 @@
             }
         }
 
-        /* ── Light Theme (Cool Slate / 冰霜冷钛灰) ── */
         [data-theme="light"] {
             --bg: #ebf0f5;
             --bg2: #e1e7ef;
@@ -140,7 +128,6 @@
             --t-inv: #fff;
             --t-inv-2: rgba(255, 255, 255, .8);
             --bg-logo-pad: #ffffff;
-            /* ── Ambient Background Token (Light: 冰蓝通透天幕) ── */
             --bg-ambient:
                 radial-gradient(ellipse 80% 50% at 50% -10%, rgba(79, 70, 229, 0.12), transparent 70%),
                 radial-gradient(ellipse 55% 35% at 95% 15%, rgba(14, 165, 233, 0.07), transparent 60%),
@@ -181,7 +168,6 @@
             min-height: 100dvh
         }
 
-        /* ── Material Symbols ── */
         @font-face {
             font-family: 'Material Symbols Outlined';
             font-style: normal;
@@ -266,7 +252,6 @@
             font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
         }
 
-        /* ── Global: Modern Auto-hiding Scrollbar ── */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -299,14 +284,12 @@
             scrollbar-color: color-mix(in srgb, var(--bd) 85%, transparent) transparent;
         }
 
-        /* Hide native browser password reveal button */
         input::-ms-reveal,
         input::-ms-clear,
         input::-webkit-credentials-auto-fill-button {
             display: none
         }
 
-        /* ── Global: Focus Visible ── */
         .tab:focus-visible,
         .nav-item:focus-visible,
         button:focus-visible {
@@ -314,7 +297,6 @@
             outline-offset: 2px
         }
 
-        /* ── Global: Utility Classes ── */
         .hidden {
             display: none !important
         }
@@ -333,7 +315,6 @@
             padding: 0
         }
 
-        /* ── Animations ── */
         @keyframes spin {
             to {
                 transform: rotate(360deg)

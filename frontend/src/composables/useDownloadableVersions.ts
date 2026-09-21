@@ -47,7 +47,6 @@ export function useDownloadableVersions<T extends { id: number }>(
     { immediate: true },
   )
 
-  /** 可下载的 version。判据缺失时原样返回。 */
   const downloadable = ref<T[]>([]) as Ref<T[]>
   watch(
     [versions, flags],

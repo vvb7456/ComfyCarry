@@ -48,22 +48,15 @@ class PublicTunnelClient:
             return
         self._initialized = True
 
-        # 运行时状态
         self.random_id: Optional[str] = None
         self.tunnel_token: Optional[str] = None
         self.urls: Optional[dict] = None
         self.subdomain: Optional[str] = None
         self.instance_id: str = self._detect_instance_id()
 
-        # 从持久化配置恢复运行时状态
         self._load_persisted_state()
 
-    # ═══════════════════════════════════════════════════
-    # 持久化
-    # ═══════════════════════════════════════════════════
-
     def _save_persisted_state(self):
-        """将运行时状态保存到 .dashboard_env"""
         state = {}
         if self.random_id:
             state["random_id"] = self.random_id
@@ -76,7 +69,6 @@ class PublicTunnelClient:
         set_config("public_tunnel_state", state if state else "")
 
     def _load_persisted_state(self):
-        """从 .dashboard_env 恢复运行时状态"""
         state = get_config("public_tunnel_state", "")
         if isinstance(state, dict):
             self.random_id = state.get("random_id")
@@ -87,12 +79,7 @@ class PublicTunnelClient:
                 log.info(f"从配置恢复公共 Tunnel 状态: {self.random_id}")
 
     def _clear_persisted_state(self):
-        """清除持久化状态"""
         set_config("public_tunnel_state", "")
-
-    # ═══════════════════════════════════════════════════
-    # 公共接口
-    # ═══════════════════════════════════════════════════
 
     def register(self, subdomain_override: str = "") -> dict:
         """
@@ -106,7 +93,6 @@ class PublicTunnelClient:
         Returns: { "ok": True, "urls": {...}, "random_id": "..." }
         Raises: PublicTunnelError
         """
-        # 如果已经注册，先释放
         if self.random_id:
             try:
                 self.release()
@@ -117,7 +103,6 @@ class PublicTunnelClient:
 
         services = self._get_services()
 
-        # 读取自定义子域名配置 (重注册场景由 override 优先, 保持地址不变)
         subdomain = (subdomain_override or "").strip() \
             or get_config("public_tunnel_subdomain", "")
 
@@ -193,10 +178,8 @@ class PublicTunnelClient:
 
         Returns: { "ok": True }
         """
-        # 停止 cloudflared
         self._stop_cloudflared()
 
-        # 调用 API 释放
         if self.random_id:
             try:
                 sig, ts = self._compute_hmac(self.instance_id)
@@ -220,13 +203,11 @@ class PublicTunnelClient:
             except Exception as e:
                 log.warning(f"API release 请求失败: {e}")
 
-        # 清除运行时状态
         self.random_id = None
         self.tunnel_token = None
         self.urls = None
         self.subdomain = None
 
-        # 清除持久化
         set_config("tunnel_mode", "")
         self._clear_persisted_state()
 
@@ -411,7 +392,6 @@ class PublicTunnelClient:
         if not self.verify():
             return self._reregister()
 
-        # 存活: 沿用旧 token
         # 确保 cloudflared 在运行; 起不来同样不能回 ok:true
         if not self._is_cloudflared_running():
             if not self._start_cloudflared(self.tunnel_token):
@@ -466,10 +446,6 @@ class PublicTunnelClient:
         except Exception as e:
             log.warning(f"获取 API 容量失败: {e}")
             return {"active_tunnels": -1, "max_tunnels": 200, "available": False}
-
-    # ═══════════════════════════════════════════════════
-    # 内部方法
-    # ═══════════════════════════════════════════════════
 
     @staticmethod
     def _parse_json_response(resp: requests.Response) -> dict:
@@ -553,7 +529,6 @@ class PublicTunnelClient:
         return f"local-{socket.gethostname()}"
 
     def _get_services(self) -> list:
-        """构建服务定义列表"""
         comfyui_port = 8188
         try:
             from ..config import COMFYUI_URL
@@ -609,7 +584,6 @@ class PublicTunnelClient:
             return False
 
     def _stop_cloudflared(self, name: str | None = None):
-        """通过 PM2 停止 cloudflared (默认当前活跃进程)"""
         name = name or active_cf_name()
         try:
             subprocess.run(
@@ -621,7 +595,6 @@ class PublicTunnelClient:
             pass
 
     def _is_cloudflared_running(self, name: str | None = None) -> bool:
-        """检查指定 (默认活跃) cloudflared PM2 进程是否在运行"""
         name = name or active_cf_name()
         try:
             r = subprocess.run(

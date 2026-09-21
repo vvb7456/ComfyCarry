@@ -74,7 +74,6 @@ export function useLogStream(opts: LogStreamOptions) {
   }
 
   function makeLine(text: string, level?: string, line?: number): LogLine {
-    // transformText: sync JSONL 等需要把行文本翻译成可读文本的场景
     if (opts.transformText) {
       const r = opts.transformText(text)
       if (typeof r === 'string') {

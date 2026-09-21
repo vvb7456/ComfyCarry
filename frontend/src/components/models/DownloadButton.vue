@@ -30,12 +30,10 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-// hover detection for the cancel affordance
 const hovering = ref(false)
 function onEnter() { hovering.value = true }
 function onLeave() { hovering.value = false }
 
-/** When hovered + cancellable + in an interruptible state, show cancel UI */
 const showCancel = computed(() =>
   hovering.value && props.cancellable && (props.state === 'downloading' || props.state === 'queued'),
 )
@@ -109,7 +107,6 @@ const speedTitle = computed(() => {
     {{ t('models.downloads.verifying') }}
   </BaseButton>
 
-  <!-- Paused -->
   <BaseButton
     v-else-if="state === 'paused'"
     :size="size"
@@ -130,7 +127,6 @@ const speedTitle = computed(() => {
     {{ t('models.downloads.download') }}
   </BaseButton>
 
-  <!-- Idle -->
   <BaseButton
     v-else
     :size="size"
@@ -166,7 +162,6 @@ const speedTitle = computed(() => {
 .dl-done--sm { min-height: 28px; padding: 4px 10px; font-size: var(--text-sm); }
 .dl-done--md { min-height: 34px; padding: 6px 12px; font-size: var(--text-base); }
 .dl-done--lg { min-height: 40px; padding: 8px 16px; font-size: var(--text-md); }
-/* hover 取消态: 恢复完全不透明与手型光标, 与可点击语义一致 */
 .dl-btn--busy.dl-btn--cancellable:hover {
   opacity: 1;
   cursor: pointer;

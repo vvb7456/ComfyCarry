@@ -40,7 +40,6 @@ function routeEvent(event: ComfyEvent): { target: TaskEntry } | null {
   const task = tasks.value.get(promptId)
   if (!task) return null
 
-  // Update task status based on event type.
   // 非终态事件一律把 pending 提升为 running: 注册可能晚于 execution_start
   // (提交响应回到 JS 的时刻与 SSE 事件到达的时刻是竞态), 只认 execution_start
   // 会让任务永久卡在 pending。

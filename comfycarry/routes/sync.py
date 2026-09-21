@@ -1,17 +1,3 @@
-"""
-ComfyCarry — Cloud Sync v2 路由
-
-- /api/sync/status           — Worker 状态 & 规则 & 模板 & 日志
-- /api/sync/remotes          — rclone remote 列表
-- /api/sync/remote/create|delete|browse — Remote 管理
-- /api/sync/remote/oauth/*   — OAuth authorize 中继 (start/status/paste/cancel)
-- /api/sync/remote/types     — Remote 类型定义
-- /api/sync/storage          — 容量查询
-- /api/sync/rules/save|run   — 规则保存/执行
-- /api/sync/worker/start|stop|restart — Worker 控制
-- /api/sync/settings         — 全局设置
-"""
-
 import json
 import os
 import re
@@ -176,16 +162,12 @@ def _resolve_staged_creds(remote, data):
 
 
 def _run_staged_rclone(args, remote, rtype, params, timeout):
-    """以 staged 凭据跑 rclone 子进程 (env 注入, 主 conf 不动)。"""
     env = os.environ.copy()
     env.update(_staged_env(remote, rtype, params))
     return subprocess.run(["rclone", *args], capture_output=True,
                           text=True, timeout=timeout, env=env)
 
 
-# ====================================================================
-# Worker 状态 & 日志
-# ====================================================================
 @bp.route("/api/sync/status")
 def api_sync_status():
     worker_running = is_worker_running()
@@ -218,12 +200,8 @@ def api_sync_status():
     })
 
 
-# ====================================================================
-# Sync 日志 (读 /workspace/sync.log JSONL, 复用 log_service)
-# ====================================================================
 @bp.route("/api/sync/logs")
 def api_sync_logs():
-    """获取 sync 日志 history (行号游标分页, 读 /workspace/sync.log JSONL)"""
     from ..services.log_service import read_history
     try:
         lines = int(request.args.get("lines", "200"))
@@ -236,7 +214,6 @@ def api_sync_logs():
 
 @bp.route("/api/sync/logs/stream")
 def api_sync_logs_stream():
-    """SSE: sync 日志实时流 (tail -f /workspace/sync.log JSONL)"""
     from ..services.log_service import stream_tail
     return Response(stream_tail("/workspace/sync.log"), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -279,7 +256,6 @@ _oauth_session: dict = {"phase": "idle"}
 
 
 def clear_oauth_session():
-    """清空已完成的 OAuth 会话。"""
     global _oauth_session
     with _oauth_lock:
         if _oauth_session.get("phase") == "done":
@@ -413,7 +389,6 @@ def _oauth_spawn(remote_type: str, client_id: str, client_secret: str) -> dict:
 
 @bp.route("/api/sync/remote/oauth/start", methods=["POST"])
 def api_sync_oauth_start():
-    """开始 OAuth 授权: 拉起 rclone authorize, 之后轮询 status 拿授权页 URL。"""
     data = request.get_json(force=True)
     rtype = (data.get("type") or "").strip()
     tdef = REMOTE_TYPE_DEFS.get(rtype)
@@ -494,7 +469,6 @@ def api_sync_oauth_paste():
 
 @bp.route("/api/sync/remote/oauth/cancel", methods=["POST"])
 def api_sync_oauth_cancel():
-    """放弃当前授权会话, 杀进程回 idle。"""
     global _oauth_session
     with _oauth_lock:
         proc = _oauth_session.get("proc")
@@ -640,9 +614,6 @@ def api_sync_oauth_drives():
     return _err("oauth_not_ready", 409)
 
 
-# ====================================================================
-# Remote 管理
-# ====================================================================
 # rclone.conf 里可以下发给前端的配置项白名单。其余一律不出后端 ——
 # pass / password / key_file / user 这些在 params 里对 UI 毫无用处,
 # 只会让密码 (rclone obscure 可逆) 和密钥路径随 API 响应外流。
@@ -745,14 +716,12 @@ def api_sync_remote_create():
     except Exception as e:
         return _err("create_failed", 500, detail=str(e))
 
-    # Step 2: Test connectivity — list root to verify credentials/endpoint
     try:
         test = subprocess.run(
             ["rclone", "lsf", f"{name}:", "--max-depth", "1", "--dirs-only"],
             capture_output=True, text=True, timeout=20
         )
         if test.returncode != 0:
-            # Rollback: delete the broken remote
             _rollback_new()
             err_msg = test.stderr.strip() or test.stdout.strip()
             if err_msg:
@@ -963,7 +932,6 @@ def api_sync_storage():
                 else:
                     results[name] = _storage_err("storage_unsupported")
             else:
-                # 解析 rclone 的真实错误信息
                 stderr = (proc.stderr or "").strip()
                 if "token" in stderr.lower() or "oauth" in stderr.lower() or "expired" in stderr.lower() or "invalid_grant" in stderr.lower():
                     results[name] = _storage_err("storage_auth_expired")
@@ -984,9 +952,6 @@ def api_sync_storage():
     return jsonify({"storage": results})
 
 
-# ====================================================================
-# 同步规则
-# ====================================================================
 def _normalize_rule(r: dict) -> tuple[dict | None, tuple[str, dict] | None]:
     """校验并规范化一条规则。返回 (规则, None) 或 (None, (i18n key, params))。
 
@@ -1099,9 +1064,6 @@ def api_sync_rules_run():
                job_id=job_ids[0], queued_count=store.count_queued_jobs())
 
 
-# ====================================================================
-# Worker 控制
-# ====================================================================
 @bp.route("/api/sync/worker/start", methods=["POST"])
 def api_sync_worker_start():
     start_sync_worker()
@@ -1121,9 +1083,6 @@ def api_sync_worker_restart_route():
     return _ok("worker_restart")
 
 
-# ====================================================================
-# 全局设置
-# ====================================================================
 @bp.route("/api/sync/settings", methods=["GET"])
 def api_sync_settings_get():
     return jsonify(_load_sync_settings())
@@ -1142,11 +1101,6 @@ def api_sync_settings_save():
         return _err("settings_numbers")
     _save_sync_settings(settings)
     return jsonify({"ok": True, "settings": settings})
-
-
-# ====================================================================
-# Sync Job 查询
-# ====================================================================
 
 
 @bp.route("/api/sync/jobs", methods=["GET"])
@@ -1179,7 +1133,6 @@ def api_sync_jobs():
 
 @bp.route("/api/sync/jobs/<job_id>/cancel", methods=["POST"])
 def api_sync_job_cancel(job_id: str):
-    """取消排队中的任务 (已在执行或已结束返回 409)。"""
     from ..services import sync_store as store
 
     job = store.get_job(job_id)

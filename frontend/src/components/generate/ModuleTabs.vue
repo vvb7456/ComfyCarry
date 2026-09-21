@@ -1,16 +1,4 @@
 <script setup lang="ts">
-/**
- * ModuleTabs — 功能模块 Tab 栏 + 独立开关
- *
- * 三态:
- *  1. 基础态 (inactive + disabled)
- *  2. 激活态 (active = 正在查看面板)
- *  3. 启用态 (enabled = 开关打开, 不一定正在查看)
- *
- * 行为:
- *  - 点击 tab → 切换 active (互斥, 再次点击同一 tab 可收起)
- *  - 点击 switch → 切换 enabled (独立于 active, 不冒泡)
- */
 import { computed, nextTick } from 'vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { IconName } from '@/config/icon-codepoints'
@@ -41,7 +29,6 @@ const activeKey = computed(() => props.activeTab)
 
 function onTabClick(tab: SwitchTabItem) {
   if (tab.disabled) return
-  // Toggle: 再次点击同一 tab → 收起 (null)
   emit('update:activeTab', activeKey.value === tab.key ? null : tab.key)
 }
 
@@ -120,7 +107,6 @@ function tabClass(tab: SwitchTabItem) {
   .switch-tab { flex-shrink: 0; }
 }
 
-/* ── Base state ── */
 .switch-tab {
   display: flex;
   align-items: center;
@@ -138,14 +124,12 @@ function tabClass(tab: SwitchTabItem) {
 }
 .switch-tab:hover:not(.disabled) { background: var(--bg3); }
 
-/* ── Active state: viewing panel ── */
 .switch-tab.active {
   background: color-mix(in srgb, var(--ac) 15%, transparent);
   border-color: var(--ac);
   color: var(--ac);
 }
 
-/* ── Enabled state: switch on, not viewing ── */
 .switch-tab.enabled {
   background: color-mix(in srgb, var(--ac) 8%, var(--bg2));
   border-color: color-mix(in srgb, var(--ac) 40%, var(--bd));
@@ -153,13 +137,10 @@ function tabClass(tab: SwitchTabItem) {
 }
 .switch-tab.enabled .tab-icon { color: var(--ac); }
 
-/* ── Disabled ── */
 .switch-tab.disabled { opacity: .4; cursor: not-allowed; }
 
-/* ── Icon ── */
 .tab-icon { font-size: .95rem; }
 
-/* ── Toggle switch ── */
 .tab-switch {
   appearance: none;
   -webkit-appearance: none;

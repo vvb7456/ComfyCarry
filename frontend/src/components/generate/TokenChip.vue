@@ -1,21 +1,4 @@
 <script setup lang="ts">
-/**
- * TokenChip — Single token chip for TokenInput.
- *
- * 5 type styles:
- *   tag       — group color background (double-line with translation)
- *   raw       — grey background
- *   embedding — purple background
- *   wildcard  — blue background
- *   template  — cyan background
- *
- * Features:
- *   - Close button (remove)
- *   - Single click to edit tag text; double-click to toggle disabled
- *   - Hover mini toolbar: bracket controls + weight NumberInput
- *   - Translation line (when showTranslation is on)
- *   - Draggable (HTML5 drag)
- */
 import { computed, ref, nextTick, onUnmounted, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PromptToken, BracketType } from '@/types/prompt-library'
@@ -32,7 +15,6 @@ const props = withDefaults(defineProps<{
   showTranslation?: boolean
   draggable?: boolean
   translating?: boolean
-  /** Any chip is currently being dragged — hides all mini toolbars */
   dragging?: boolean
 }>(), {
   selected: false,
@@ -76,7 +58,6 @@ onUnmounted(() => {
   if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
 })
 
-// ── Toolbar position (fixed, above chip) ───────────────────────
 // Imperatively updated (not computed) because getBoundingClientRect() is
 // not reactive — chip DOM position changes after drag-move don't invalidate a computed.
 const toolbarStyle = ref<CSSProperties>({ display: 'none' })
@@ -93,7 +74,6 @@ function updateToolbarPos() {
   }
 }
 
-// ── Computed styles ────────────────────────────────────────────
 const chipColor = computed(() => {
   const { type, groupColor } = props.token
   if (type === 'tag' && groupColor) return groupColor
@@ -121,7 +101,6 @@ const hasTranslation = computed(() =>
   props.showTranslation && props.token.translate,
 )
 
-// ── Bracket helpers ────────────────────────────────────────────
 function adjustBracket(type: BracketType, delta: number) {
   const { token } = props
   if (token.bracketType === type) {
@@ -132,7 +111,6 @@ function adjustBracket(type: BracketType, delta: number) {
       emit('update:bracket', token.id, type, newDepth)
     }
   } else {
-    // Switch type
     emit('update:bracket', token.id, delta > 0 ? type : 'none', delta > 0 ? 1 : 0)
   }
 }
@@ -141,7 +119,6 @@ function onWeightChange(val: number) {
   emit('update:weight', props.token.id, val)
 }
 
-// ── Drag ───────────────────────────────────────────────────────
 function onDragStart(e: DragEvent) {
   if (!props.draggable || editing.value) { e.preventDefault(); return }
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null }
@@ -155,7 +132,6 @@ function onDragEnd(e: DragEvent) {
   emit('drag-end', e)
 }
 
-// ── Inline editing ─────────────────────────────────────────────
 const editing = ref(false)
 const editValue = ref('')
 // 编辑期间的最小宽度: 取原文字宽度, 避免删空后 chip 塌缩 (参考 field-sizing 的 min-size 边界实践)
@@ -166,7 +142,6 @@ let clickTimer: ReturnType<typeof setTimeout> | null = null
 let pendingClickX: number | null = null
 
 function onTextClick(e: MouseEvent) {
-  // Single click → start editing (with delay to allow dblclick to cancel)
   if (clickTimer) return
   pendingClickX = e.clientX
   clickTimer = setTimeout(() => {
@@ -176,14 +151,12 @@ function onTextClick(e: MouseEvent) {
 }
 
 function onTextDblClick(e: Event) {
-  // Prevent chip-level dblclick from also firing
   e.stopPropagation()
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null }
   emit('toggle', props.token.id)
 }
 
 function onChipDblClick() {
-  // Double click on chip background (non-text area)
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null }
   emit('toggle', props.token.id)
 }
@@ -260,7 +233,6 @@ function cancelEdit() {
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
-    <!-- Close button — absolute top-right -->
     <button
       type="button"
       class="chip-close"
@@ -271,7 +243,6 @@ function cancelEdit() {
       <MsIcon name="remove_circle" size="xxs" color="none" />
     </button>
 
-    <!-- Top row: colored bg + tag text -->
     <div class="chip-top">
       <input
         v-if="editing"
@@ -285,7 +256,6 @@ function cancelEdit() {
         @mousedown.stop
       />
       <Spinner v-if="isPending && !editing" size="xs" />
-      <!-- 编辑态: 用输入内容撑住 chip 宽高, 并以原文字宽度为下限防止删空后塌缩 -->
       <span
         ref="chipTextRef"
         class="chip-text"
@@ -296,7 +266,6 @@ function cancelEdit() {
       >{{ editing ? editValue : displayText }}</span>
     </div>
 
-    <!-- Bottom row: translate text or clickable translate action -->
     <div v-if="showTranslation && isWeightType" class="chip-bot">
       <Spinner v-if="translating" size="xs" />
       <span v-else-if="hasTranslation" class="chip-translate-text">{{ token.translate }}</span>
@@ -307,7 +276,6 @@ function cancelEdit() {
       >{{ t('prompt-library.chip.translate_action') }}</span>
     </div>
 
-    <!-- Hover mini toolbar (teleported to body) -->
     <Teleport to="body">
       <div
         v-if="hovered && !props.dragging && isWeightType && token.enabled"
@@ -340,7 +308,6 @@ function cancelEdit() {
 </template>
 
 <style scoped>
-/* ── Chip container (TagBrowser dual-row style) ── */
 .token-chip {
   --chip-color: var(--t3);
   position: relative;
@@ -359,7 +326,6 @@ function cancelEdit() {
   border-color: color-mix(in srgb, var(--chip-color) 50%, var(--bd));
 }
 
-/* ── Break chip ── */
 .token-chip--break {
   border-color: color-mix(in srgb, var(--amber) 30%, var(--bd));
 }
@@ -383,7 +349,6 @@ function cancelEdit() {
   opacity: .6;
 }
 
-/* ── Top row: colored bg + tag text ── */
 .chip-top {
   position: relative;
   display: flex;
@@ -437,7 +402,6 @@ function cancelEdit() {
   text-align: center;
 }
 
-/* ── Bottom row: translate text or translate button ── */
 .chip-bot {
   display: flex;
   align-items: center;
@@ -465,7 +429,6 @@ function cancelEdit() {
   text-decoration: underline;
 }
 
-/* ── Close button ── */
 .chip-close {
   position: absolute;
   top: 0;
@@ -482,7 +445,6 @@ function cancelEdit() {
   color: var(--t3);
   cursor: pointer;
   flex-shrink: 0;
-  /* 默认隐藏, 悬停/聚焦时才出现 */
   opacity: 0;
   pointer-events: none;
   transition: color .15s, background .15s, opacity .12s;
@@ -504,7 +466,6 @@ function cancelEdit() {
   background: color-mix(in srgb, var(--t1) 12%, transparent);
 }
 
-/* ── Hover mini toolbar (teleported to body, position: fixed) ── */
 .chip-toolbar {
   display: flex;
   align-items: center;

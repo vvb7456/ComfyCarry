@@ -1,15 +1,4 @@
 <script setup lang="ts">
-/**
- * ComfyParamsModal — ComfyUI 启动参数弹窗 (C08, 需求 8.3 / 实施计划 2.5)。
- *
- * 原 ParamsCard 的表单迁入 600px BaseModal, 字段按「显存与内存 / 精度 / 速度与缓存 /
- * 其他」四组组织。字段控件、默认值与 depends_on 联动仍取后端 schema。
- * 修改过的分组在分组标签上显示圆点; 底部显示已修改项数 + 取消 + 保存并重启。
- * 保存需重启 ComfyUI 是按钮明示的常识, 取消 / Esc / 遮罩 / 关闭按钮一律丢弃改动直接关闭。
- *
- * 表单状态保留在本组件内: 组件常驻挂载, BaseModal 关闭只销毁插槽, 不销毁这里的 ref。
- * 保存成功通过 saved 事件把新的启动命令回传主页。
- */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -43,7 +32,6 @@ const props = defineProps<{ modelValue: boolean }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 保存成功: 新的启动命令行 */
   saved: [command: string]
 }>()
 
@@ -145,7 +133,6 @@ function paramEnabled(paramKey: string): boolean {
   return isParamEnabled(schema, paramsCurrent.value)
 }
 
-// ── 修改跟踪 ─────────────────────────────────────────────────
 function isDirtyKey(paramKey: string): boolean {
   const schema = paramsSchema.value[paramKey]
   if (!schema) return false
@@ -185,14 +172,12 @@ watch(() => paramsCurrent.value.cache, (cache) => {
   else normalizeCacheLruSize()
 })
 
-// ── 操作 ─────────────────────────────────────────────────────
 function discardChanges() {
   paramsCurrent.value = cloneParams(savedCurrent.value)
   extraArgs.value = savedExtraArgs.value
   normalizeCacheLruSize()
 }
 
-/** 取消: 丢弃全部改动并直接关闭 (footer 取消按钮) */
 function cancelAndClose() {
   if (saving.value) return
   discardChanges()
@@ -350,7 +335,6 @@ function requestClose() {
   font-size: var(--text-sm);
 }
 
-/* 分组切换全宽, 与下方参数列表拉开间距 */
 .param-group-switch {
   margin-bottom: var(--sp-3);
 }

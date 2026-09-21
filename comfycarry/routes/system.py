@@ -1,14 +1,3 @@
-"""
-ComfyCarry — 系统监控 & 服务管理路由
-
-包含:
-- /api/version         — 版本信息
-- /api/system/stats    — 实时系统指标 (读缓存, <1ms)
-- (internal)           — api_system() → 由 /api/overview 聚合
-- /api/services/<name>/<action> — 服务控制 (start/stop/restart)
-- /api/logs/<name>     — PM2 日志查看
-"""
-
 import json
 import os
 import re
@@ -33,20 +22,14 @@ bp = Blueprint("system", __name__)
 # 原文不翻译, 作为 detail 参数透传。
 # ====================================================================
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `system.err.<key>` 翻译; _extra 是响应体附加顶层字段。"""
     body = {"error_key": f"system.err.{key}", "error_params": params}
     if _extra:
         body.update(_extra)
     return jsonify(body), status
 
 
-# ====================================================================
-# 版本信息 API
-# ====================================================================
 @bp.route("/api/version")
 def api_version():
-    """返回当前部署版本信息"""
-    # branch/commit 无稳定值 (Release 分发后 branch 为空), 由 .version 或 git 兜底填充
     version_info = {"version": APP_VERSION, "branch": "", "commit": ""}
     version_file = os.path.join(SCRIPT_DIR, ".version")
     try:
@@ -59,7 +42,6 @@ def api_version():
                         version_info[k.strip().lower()] = v.strip()
     except Exception:
         pass
-    # Also try git if available (dev environment)
     if not version_info.get("commit"):
         try:
             result = subprocess.run(
@@ -79,28 +61,16 @@ def api_version():
     return jsonify(version_info)
 
 
-# ====================================================================
-# 实时系统指标 (读 system_monitor 缓存, <1ms)
-# ====================================================================
 @bp.route("/api/system/stats")
 def api_system_stats():
-    """实时系统指标 — GPU / CPU / 内存 / 磁盘 / 网络"""
     return jsonify(system_monitor.get_stats())
 
 
-# ====================================================================
-# 系统监控 (内部函数, 由 api_overview 聚合调用)
-# ====================================================================
 def api_system():
-    """获取系统信息 (仅供 api_overview 内部调用) — 读 monitor 缓存"""
     return jsonify(system_monitor.get_stats())
 
 
-# ====================================================================
-# 服务管理 (内部函数, 由 api_overview 聚合调用)
-# ====================================================================
 def api_services():
-    """获取 PM2 服务列表 (仅供 api_overview 内部调用)"""
     try:
         out = _run_cmd("pm2 jlist", timeout=5)
         if out and not out.startswith("Error"):
@@ -125,7 +95,6 @@ def api_services():
 
 @bp.route("/api/services/<name>/<action>", methods=["POST"])
 def api_service_action(name, action):
-    """控制服务: restart, stop, start"""
     if action not in ("restart", "stop", "start"):
         return _err("invalid_action")
     if not re.match(r'^[\w\-]+$', name):
@@ -134,9 +103,6 @@ def api_service_action(name, action):
     return jsonify({"ok": True, "output": out})
 
 
-# ====================================================================
-# 日志 API
-# ====================================================================
 _pm2_names_cache: tuple[float, set[str]] | None = None
 _PM2_CACHE_TTL = 3.0  # 秒, 避免每个日志请求都跑 pm2 jlist
 
@@ -221,24 +187,17 @@ def api_logs_stream(name):
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-# ====================================================================
-# 总览聚合 API
-# ====================================================================
 @bp.route("/api/overview")
 def api_overview():
-    """聚合总览页所需全部数据，避免前端发 5+ 个并发请求"""
     from . import tunnel as tunnel_mod, jupyter as jupyter_mod, comfyui as comfyui_mod
     from ..services import sync_engine, comfyui_bridge
 
     result = {}
 
-    # ── 系统硬件 ──
     result["system"] = json.loads(api_system().get_data())
 
-    # ── PM2 服务 ──
     result["services"] = json.loads(api_services().get_data())
 
-    # ── ComfyUI 状态 ──
     comfyui = {"online": False, "version": "", "pytorch_version": "",
                "python_version": "", "queue_pending": 0, "queue_running": 0,
                "current_prompt_id": None, "progress": None,
@@ -287,7 +246,6 @@ def api_overview():
 
     result["comfyui"] = comfyui
 
-    # ── Sync 状态 ──
     sync_status = {
         "worker_running": sync_engine.is_worker_running(),
         "rules_count": 0,
@@ -306,7 +264,6 @@ def api_overview():
         sync_status["last_log_lines"] = list(log_buf)[-5:]
     result["sync"] = sync_status
 
-    # ── Tunnel (使用缓存, 避免每次调用 CF API) ──
     tunnel_info = {"running": False, "urls": {}}
     try:
         tunnel_data = tunnel_mod._build_tunnel_status()
@@ -324,7 +281,6 @@ def api_overview():
         tunnel_info["running"] = tunnel_info["effective_status"] == "online"
     except Exception:
         pass
-    # PM2 status for cloudflared (当前活跃进程名)
     cf_name = active_cf_name()
     for svc in result.get("services", {}).get("services", []):
         if svc.get("name") == cf_name:
@@ -332,7 +288,6 @@ def api_overview():
             break
     result["tunnel"] = tunnel_info
 
-    # ── Jupyter ──
     try:
         jup_resp = jupyter_mod.jupyter_status()
         jup_data = jup_resp.get_json() if hasattr(jup_resp, 'get_json') else json.loads(jup_resp.get_data())
@@ -340,7 +295,6 @@ def api_overview():
     except Exception:
         result["jupyter"] = {"online": False}
 
-    # ── Downloads ──
     downloads = {"active": [], "active_count": 0, "queue_count": 0}
     try:
         from ..services.download_engine import get_engine as _get_dl_engine
@@ -354,24 +308,18 @@ def api_overview():
         pass
     result["downloads"] = downloads
 
-    # ── Dashboard 版本 ──
     ver_resp = api_version()
     result["version"] = ver_resp.get_json() if hasattr(ver_resp, 'get_json') else json.loads(ver_resp.get_data())
 
     return jsonify(result)
 
 
-# ====================================================================
-# 活动状态 API (快变化数据, 5s 轮询)
-# ====================================================================
 @bp.route("/api/activity")
 def api_activity():
-    """快变化数据聚合 — ComfyUI 队列/在线状态 + 下载进度 + Sync 日志"""
     from ..services import sync_engine, comfyui_bridge
 
     result = {}
 
-    # ── ComfyUI queue & online ──
     comfyui = {"online": False, "queue_running": 0, "queue_pending": 0}
     try:
         r = req_lib.get(f"{COMFYUI_URL}/queue", timeout=2)
@@ -394,7 +342,6 @@ def api_activity():
         comfyui["executing"] = False
     result["comfyui"] = comfyui
 
-    # ── Downloads ──
     downloads = {"active": [], "active_count": 0, "queue_count": 0}
     try:
         from ..services.download_engine import get_engine as _get_dl_engine
@@ -408,7 +355,6 @@ def api_activity():
         pass
     result["downloads"] = downloads
 
-    # ── Sync last log lines ──
     sync_status = {"worker_running": sync_engine.is_worker_running()}
     log_buf = sync_engine.get_sync_log_buffer()
     if log_buf:

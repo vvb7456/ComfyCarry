@@ -46,8 +46,6 @@ const { get, post, del } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
 const status = ref<JupyterStatus | null>(null)
 const statusLoading = ref(true)
 const jupyterUrl = ref('')
@@ -80,9 +78,6 @@ const anyRowPending = computed(() =>
 
 type RowStatus = { tone: 'running' | 'stopped' | 'loading' | 'error'; text: string }
 
-// ─── 日志流 ───────────────────────────────────────────────────────────────────
-
-// ── 日志流 ──
 const logOpen = ref(true)
 const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: logLoadingMore, prepending: logPrepending, onScroll: logOnScroll, start: logStart, stop: logStop } = useLogStream({
   historyUrl: '/api/jupyter/logs',
@@ -95,13 +90,9 @@ const { lines: logLines, status: logStatus, hasMore: logHasMore, loadingMore: lo
   },
 })
 
-// ─── 状态判定 ─────────────────────────────────────────────────────────────────
-
 const pm2Status = computed(() => status.value?.pm2_status || 'unknown')
 /** 可信的运行态: 快照在线且没有待确认的新进程 */
 const isRunning = computed(() => !pendingStartAt.value && !!status.value && (status.value.online || pm2Status.value === 'online'))
-
-// ─── API ──────────────────────────────────────────────────────────────────────
 
 let statusAppliedAt = 0
 async function loadStatus() {
@@ -183,8 +174,6 @@ const addressHost = computed(() => {
   }
 })
 
-// ─── Hero 状态机 ──────────────────────────────────────────────────────────────
-
 type HeroState = 'running' | 'starting' | 'stopped' | 'not_created' | 'failed'
 
 const heroState = computed<HeroState>(() => {
@@ -218,8 +207,6 @@ const heroAction = computed<'open' | 'start' | 'retry' | null>(() => {
   return 'start'
 })
 
-// ─── 运行事实 ─────────────────────────────────────────────────────────────────
-
 const factsList = computed<{ label: string; value: string }[]>(() => {
   const s = status.value
   if (!s) return []
@@ -237,8 +224,6 @@ const factsList = computed<{ label: string; value: string }[]>(() => {
   if (s.memory) out.push({ label: t('jupyter.facts.memory'), value: fmtBytes(s.memory) })
   return out
 })
-
-// ─── 运行对象字段 ─────────────────────────────────────────────────────────────
 
 const defaultKernel = computed(() => status.value?.default_kernel || '')
 const kernelSpecs = computed(() => status.value?.kernelspecs || [])
@@ -298,8 +283,6 @@ function terminalUrl(name: string): string | null {
   const qs = query ? `?${query}` : ''
   return `${root}/terminals/${encodeURIComponent(name)}${qs}`
 }
-
-// ─── 服务操作 ─────────────────────────────────────────────────────────────────
 
 async function jupyterAction(action: 'start' | 'stop' | 'restart') {
   if (action === 'stop' || action === 'restart') {
@@ -390,8 +373,6 @@ async function deleteTerminal(name: string) {
   loadStatus()
 }
 
-// ─── 自动刷新 ─────────────────────────────────────────────────────────────────
-
 async function refreshStatus() {
   const wasRunning = isRunning.value
   await loadStatus()
@@ -436,7 +417,6 @@ onUnmounted(() => {
       <LoadingCenter v-if="statusLoading && !status" style="padding:60px 0" />
 
       <template v-else-if="status">
-        <!-- Hero + 运行事实 -->
         <ServiceHero
           brand="jupyter"
           :title="heroTitle"
@@ -478,20 +458,17 @@ onUnmounted(() => {
           </template>
         </ServiceHero>
 
-        <!-- 访问令牌 (仅运行时存在) -->
         <section v-if="isRunning" class="jupyter-block">
           <SectionHeader icon="key">{{ t('jupyter.token.title') }}</SectionHeader>
           <SecretInput v-model="token" readonly copyable input-class="jupyter-token-input" />
         </section>
 
-        <!-- 活跃内核 (运行时显示, 空则紧凑空行) -->
         <section v-if="isRunning" class="jupyter-block">
           <SectionHeader icon="developer_board">
             {{ t('jupyter.kernels.title') }}
             <span class="jupyter-count">{{ status.kernels?.length ?? 0 }}</span>
           </SectionHeader>
 
-          <!-- 可用内核与默认内核: 紧凑副行 -->
           <div v-if="kernelSpecs.length" class="jupyter-ks">
             <span class="jupyter-ks__label">{{ t('jupyter.kernels.available') }}</span>
             <span
@@ -541,7 +518,6 @@ onUnmounted(() => {
           <EmptyState v-else icon="developer_board" :message="t('jupyter.kernels.empty')" density="compact" />
         </section>
 
-        <!-- 活跃会话 (运行时显示, 空则紧凑空行) -->
         <section v-if="isRunning" class="jupyter-block">
           <SectionHeader icon="web_asset">
             {{ t('jupyter.sessions.title') }}
@@ -573,7 +549,6 @@ onUnmounted(() => {
           <EmptyState v-else icon="web_asset" :message="t('jupyter.sessions.empty')" density="compact" />
         </section>
 
-        <!-- 终端 (运行时显示; 有独立新增入口, 保留紧凑空行) -->
         <section v-if="isRunning" class="jupyter-block">
           <SectionHeader icon="terminal">
             {{ t('jupyter.terminals.title') }}
@@ -623,7 +598,6 @@ onUnmounted(() => {
           <EmptyState v-else icon="terminal" :message="t('jupyter.terminals.empty')" density="compact" />
         </section>
 
-        <!-- 日志 (默认展开, 停机仍可读; 折叠标题与分区标题同构) -->
         <section class="jupyter-block">
           <SectionHeader icon="terminal" collapsible v-model:expanded="logOpen">
             {{ t('jupyter.log.title') }}
@@ -644,7 +618,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 分区节奏: Hero → 令牌 → 内核 → 会话 → 终端 → 日志 (--section-gap, 与总览一致) */
 .jupyter-block {
   margin-top: var(--section-gap);
 }
@@ -656,14 +629,12 @@ onUnmounted(() => {
   color: var(--t3);
 }
 
-/* 令牌输入用等宽字体, 与连接命令/密钥同一口径 */
 .jupyter-token-input {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: .02em;
 }
 
-/* 可用内核与默认内核: 内核区标题下的紧凑副行 */
 .jupyter-ks {
   display: flex;
   flex-wrap: wrap;

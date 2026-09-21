@@ -1,5 +1,3 @@
-// ── System Metrics Types (from /api/system/stats) ─────────────
-
 export interface GpuInfo {
   index: number
   name: string

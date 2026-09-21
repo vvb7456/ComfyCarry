@@ -48,7 +48,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-/* ── Selection ── */
 const selectedSet = computed(() => {
   const v = props.modelValue
   return new Set(Array.isArray(v) ? v : v ? [v] : [])
@@ -76,7 +75,6 @@ function toggleChip(value: string) {
   }
 }
 
-/* ── Collapse ── */
 const expanded = ref(false)
 const collapsible = computed(() => props.collapsedRows > 0)
 const rootRef = ref<HTMLElement>()
@@ -104,12 +102,10 @@ function measure() {
   const kids = el.children as HTMLCollectionOf<HTMLElement>
   if (kids.length === 0) { visibleCount.value = Infinity; return }
 
-  // Layout: [allChip?] [chip0 .. chipN-1] [togglePlaceholder]
   const offset = props.allOption ? 1 : 0
   const toggleEl = kids[kids.length - 1]!
   const toggleW = toggleEl.offsetWidth
 
-  // Detect row number (1-based) for each option chip
   let row = 0, prevTop = -1
   const rows: number[] = []
   for (let i = offset; i < kids.length - 1; i++) {
@@ -120,19 +116,16 @@ function measure() {
 
   const maxRow = props.collapsedRows
 
-  // All fit?
   if (!rows.length || (rows[rows.length - 1] ?? 0) <= maxRow) {
     visibleCount.value = Infinity
     return
   }
 
-  // Find first chip on row > maxRow
   let firstOver = rows.length
   for (let i = 0; i < rows.length; i++) {
     if ((rows[i] ?? 0) > maxRow) { firstOver = i; break }
   }
 
-  // Walk back from firstOver to find where toggle fits on the same row
   const cw = el.clientWidth
   const gap = 5
   let cut = firstOver
@@ -167,7 +160,6 @@ const displayOptions = computed(() => {
   return props.options.slice(0, visibleCount.value)
 })
 
-/* ── Formatting ── */
 function fmt(c: number | string) {
   return typeof c === 'string' ? c : c > 1000 ? (c / 1000).toFixed(1) + 'k' : String(c)
 }
@@ -175,7 +167,6 @@ function fmt(c: number | string) {
 
 <template>
   <div ref="rootRef" class="chip-select-root">
-    <!-- Hidden measurer -->
     <div
       v-if="collapsible && !expanded"
       ref="measurerRef"
@@ -189,12 +180,10 @@ function fmt(c: number | string) {
       <span class="chip-select__chip chip-select__chip--toggle">{{ t('common.chip_more', { n: options.length }) }}</span>
     </div>
 
-    <!-- Visible container -->
     <div
       class="chip-select"
       :style="expanded && maxHeight ? { maxHeight, overflowY: 'auto' } : undefined"
     >
-      <!-- Loading spinner when no options yet -->
       <template v-if="loading && !options.length">
         <span class="chip-select__loading"><Spinner size="sm" /></span>
       </template>
@@ -222,7 +211,6 @@ function fmt(c: number | string) {
         {{ o.label }}<span v-if="o.count != null" class="chip-select__count">{{ fmt(o.count) }}</span>
       </button>
 
-      <!-- "+N 更多" — same style as chips, replaces last overflowing chip -->
       <button
         v-if="hasOverflow && !expanded"
         ref="moreBtnRef"
@@ -232,7 +220,6 @@ function fmt(c: number | string) {
         @click="expand"
       >{{ t('common.chip_more', { n: overflowN }) }}</button>
 
-      <!-- "收起" — same style as chips, appended after all chips -->
       <button
         v-if="hasOverflow && expanded"
         ref="collapseBtnRef"

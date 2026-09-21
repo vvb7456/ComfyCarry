@@ -1,5 +1,3 @@
-// ── Sync Data Types ───────────────────────────────────────────
-
 export interface StorageInfo {
   used?: number
   total?: number
@@ -53,9 +51,6 @@ export interface SyncRule {
   filters?: string[] | string
 }
 
-// ── Companion (桌面客户端) ──────────────────────────────────
-
-/** rclone serve webdav 进程状态 */
 export interface CompanionServeStatus {
   running: boolean
   pid?: number
@@ -111,8 +106,6 @@ export interface SyncSettings {
   min_age: number
   watch_interval: number
 }
-
-// ── API Responses ─────────────────────────────────────────────
 
 export interface SyncStatusResponse {
   worker_running: boolean
@@ -235,7 +228,6 @@ export interface OAuthDriveItem {
   type?: string
 }
 
-/** GET /api/sync/remote/oauth/drives 响应 */
 export interface DrivesResponse extends ApiOkResponse {
   drives?: OAuthDriveItem[]
 }

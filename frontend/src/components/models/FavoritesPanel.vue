@@ -11,12 +11,6 @@ import BatchAddModal from '@/components/models/BatchAddModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { FavoriteItem } from '@/composables/useDownloads'
 
-/**
- * FavoritesPanel — 收藏列表, 挂在模型页的「收藏&下载」抽屉里。
- *
- * 不感知自己是否可见: 取数 (loadFavorites) 与连接 (startPolling/refreshStatus)
- * 由抽屉打开时统一触发, 见 ModelsPage.openDrawer()。
- */
 defineOptions({ name: 'FavoritesPanel' })
 
 const { t } = useI18n({ useScope: 'global' })
@@ -39,12 +33,10 @@ const { confirm } = useConfirm()
 const batchAddOpen = ref(false)
 const downloadingAll = ref(false)
 
-/** 版本级下载信息 (state + progress/speed/downloadId) — 驱动每行按钮的 spinner */
 function itemInfo(item: FavoriteItem) {
   return dlGetVersionInfo(item.modelId, item.versionId || item.modelId)
 }
 
-/** hover 取消 — 与 CivitaiModelCard 一致, 先确认再撤 */
 async function handleCancel(item: FavoriteItem) {
   const id = itemInfo(item).downloadId
   if (!id) return
@@ -67,14 +59,12 @@ async function handleDownloadAll() {
   }
 }
 
-// Count of favorite items that are NOT yet installed locally
 const downloadableCount = computed(() =>
   favItems.value.filter(it =>
     !(it.versionId && dlGetVersionState(it.modelId, it.versionId) === 'installed'),
   ).length,
 )
 
-// For each favorite item, surface the error text if the matching task is failed.
 // Resolves "toast 一闪即逝" by showing a persistent red error badge + tooltip.
 function failedError(item: FavoriteItem): string {
   const mid = String(item.modelId)

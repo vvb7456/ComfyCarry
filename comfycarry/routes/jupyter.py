@@ -1,18 +1,3 @@
-"""
-ComfyCarry — Jupyter 管理路由
-
-通过 PM2 管理 JupyterLab 进程 (进程名: jupyter)
-
-- /api/jupyter/status   — 状态概览 (进程、版本、kernels、sessions)
-- /api/jupyter/start    — 启动 JupyterLab
-- /api/jupyter/stop     — 停止 JupyterLab
-- /api/jupyter/restart  — 重启 JupyterLab
-- /api/jupyter/kernelspecs — 可用内核规格 (kernels/sessions/terminals 已合入 status)
-- /api/jupyter/logs     — Jupyter 日志
-- /api/jupyter/logs/stream — SSE 实时日志流
-- /api/jupyter/token    — 访问令牌
-"""
-
 import json
 import os
 import re
@@ -27,19 +12,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 bp = Blueprint("jupyter", __name__)
 
-# PM2 进程名
 PM2_NAME = "jupyter"
 
 
-# ── 错误响应辅助 ──
 # /api/jupyter/* 的唯一消费方是面板前端, 回传中文成品文案的话英文 locale 下
 # toast 里会直接冒出中文。改为回传 error_key + error_params, 前端 apiErrorText()
 # 负责渲染。需要保留 ok:false 语义的 (如 action 端点) 传 _extra={"ok": False}。
 # 异常原文 (str(e) / stderr) 作为 detail 参数透传, 前端在 detail 插值位呈现。
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `jupyter.err.<key>` 翻译; _extra 为响应体附加顶层字段。
-
-    形参位置化 (`/`): 插值参数里有 key / status / action 这种名字, 不然会撞车。
+    """形参位置化 (`/`): 插值参数里有 key / status / action 这种名字, 不然会撞车。
     `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
     `**params` 静默吞掉, 顶层字段丢失。
     """
@@ -50,7 +31,6 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 
 
 def _ok(key: str, /, **extra):
-    """成功响应。前端按 `jupyter.msg.<key>` 翻译 message_key。"""
     body = {"ok": True, "message_key": f"jupyter.msg.{key}"}
     params = extra.pop("params", None)
     if params:
@@ -62,7 +42,6 @@ def _ok(key: str, /, **extra):
 # ── 动态检测 ─────────────────────────────────────────────────
 
 def _detect_port() -> int | None:
-    """从运行中的 Jupyter 进程命令行检测端口"""
     try:
         out = subprocess.run(
             "ps aux | grep '[j]upyter-lab\\|[j]upyter-notebook'",
@@ -80,7 +59,6 @@ _cached_token = None
 
 
 def _detect_token() -> str:
-    """从 jupyter server list 获取 token"""
     global _cached_token
     if _cached_token:
         return _cached_token
@@ -100,7 +78,6 @@ def _detect_token() -> str:
                 continue
     except Exception:
         pass
-    # 回退: 从进程命令行检测
     try:
         out = subprocess.run(
             "ps aux | grep jupyter",
@@ -119,7 +96,6 @@ def _detect_token() -> str:
 
 
 def _jupyter_url() -> str | None:
-    """构建 Jupyter 内部访问 URL (动态检测端口)"""
     port = _detect_port()
     if not port:
         return None
@@ -127,13 +103,11 @@ def _jupyter_url() -> str | None:
 
 
 def _jupyter_headers() -> dict:
-    """构建 Jupyter API 请求头"""
     token = _detect_token()
     return {"Authorization": f"token {token}"} if token else {}
 
 
 def _jupyter_get(path, timeout=5):
-    """发送 GET 请求到 Jupyter REST API"""
     url = _jupyter_url()
     if not url:
         return None
@@ -142,7 +116,6 @@ def _jupyter_get(path, timeout=5):
 
 
 def _get_jupyter_pid():
-    """获取 Jupyter 主进程 PID 和资源占用"""
     try:
         out = subprocess.run(
             "ps aux | grep '[j]upyter-lab\\|[j]upyter-notebook' | head -1",
@@ -168,7 +141,7 @@ def _get_jupyter_pid():
 
 
 def _pm2_status() -> str:
-    """获取 jupyter PM2 进程状态: online / stopped / errored / not_found"""
+    """online / stopped / errored / not_found"""
     try:
         r = subprocess.run(
             "pm2 jlist 2>/dev/null", shell=True,
@@ -182,11 +155,8 @@ def _pm2_status() -> str:
         pass
     return "not_found"
 
-# ── API 端点 ──────────────────────────────────────────────────
-
 @bp.route("/api/jupyter/status")
 def jupyter_status():
-    """Jupyter 状态概览"""
     port = _detect_port()
     pm2 = _pm2_status()
 
@@ -210,7 +180,6 @@ def jupyter_status():
         result["cpu"] = proc["cpu"]
         result["memory"] = proc["memory"]
 
-    # API 健康检查 + 版本
     try:
         r = _jupyter_get("/api")
         if r and r.ok:
@@ -223,7 +192,6 @@ def jupyter_status():
     if not result["online"]:
         return jsonify(result)
 
-    # Kernels
     try:
         r = _jupyter_get("/api/kernels")
         if r and r.ok:
@@ -239,7 +207,6 @@ def jupyter_status():
     except Exception:
         pass
 
-    # Sessions
     try:
         r = _jupyter_get("/api/sessions")
         if r and r.ok:
@@ -257,7 +224,6 @@ def jupyter_status():
     except Exception:
         pass
 
-    # Terminals
     try:
         r = _jupyter_get("/api/terminals")
         if r and r.ok:
@@ -270,7 +236,6 @@ def jupyter_status():
     except Exception:
         pass
 
-    # Kernel specs
     try:
         r = _jupyter_get("/api/kernelspecs")
         if r and r.ok:
@@ -288,7 +253,6 @@ def jupyter_status():
 
 @bp.route("/api/jupyter/terminals/new", methods=["POST"])
 def jupyter_new_terminal():
-    """创建新终端"""
     try:
         base = _jupyter_url()
         if not base:
@@ -304,7 +268,6 @@ def jupyter_new_terminal():
 
 @bp.route("/api/jupyter/terminals/<name>", methods=["DELETE"])
 def jupyter_delete_terminal(name):
-    """销毁终端"""
     try:
         base = _jupyter_url()
         if not base:
@@ -320,7 +283,6 @@ def jupyter_delete_terminal(name):
 
 @bp.route("/api/jupyter/kernels/<kernel_id>/<action>", methods=["POST"])
 def jupyter_kernel_action(kernel_id, action):
-    """内核操作: restart, interrupt"""
     if action not in ("restart", "interrupt"):
         return _err("invalid_action", 400, action=action)
     try:
@@ -338,7 +300,6 @@ def jupyter_kernel_action(kernel_id, action):
 
 @bp.route("/api/jupyter/sessions/<session_id>", methods=["DELETE"])
 def jupyter_delete_session(session_id):
-    """关闭会话 (同时关闭内核)"""
     try:
         base = _jupyter_url()
         if not base:
@@ -354,7 +315,7 @@ def jupyter_delete_session(session_id):
 
 @bp.route("/api/jupyter/logs")
 def jupyter_logs():
-    """获取 Jupyter 日志 history (行号游标分页, 读 /workspace/jupyter.log)"""
+    """行号游标分页, 读 /workspace/jupyter.log"""
     from ..services.log_service import read_history
     try:
         lines = int(request.args.get("lines", "200"))
@@ -367,7 +328,6 @@ def jupyter_logs():
 
 @bp.route("/api/jupyter/logs/stream")
 def jupyter_logs_stream():
-    """SSE - Jupyter 日志实时流 (tail -f /workspace/jupyter.log)"""
     from ..services.log_service import stream_tail
     return Response(stream_tail("/workspace/jupyter.log"), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -375,17 +335,15 @@ def jupyter_logs_stream():
 
 @bp.route("/api/jupyter/start", methods=["POST"])
 def jupyter_start():
-    """启动 JupyterLab (PM2)"""
     pm2 = _pm2_status()
     if pm2 == "online":
         return _ok("already_running")
 
-    # 清除 token 缓存 (Jupyter 自动生成新 token)
+    # Jupyter 自动生成新 token
     global _cached_token
     _cached_token = None
 
     if pm2 == "not_found":
-        # 首次启动 - 创建 PM2 进程
         from ..services.log_service import clean_pm2_env
         env = clean_pm2_env()
         cmd = (
@@ -397,7 +355,6 @@ def jupyter_start():
             f'--ServerApp.language=zh_CN'
         )
     else:
-        # 已存在但 stopped/errored - 重启
         env = None
         cmd = f'pm2 restart {PM2_NAME}'
 
@@ -413,7 +370,6 @@ def jupyter_start():
 
 @bp.route("/api/jupyter/stop", methods=["POST"])
 def jupyter_stop():
-    """停止 JupyterLab (PM2)"""
     try:
         subprocess.run(f"pm2 stop {PM2_NAME} 2>/dev/null",
                        shell=True, timeout=10)
@@ -426,7 +382,6 @@ def jupyter_stop():
 
 @bp.route("/api/jupyter/restart", methods=["POST"])
 def jupyter_restart():
-    """重启 JupyterLab (PM2)"""
     try:
         r = subprocess.run(f"pm2 restart {PM2_NAME} 2>/dev/null",
                            shell=True, capture_output=True, text=True, timeout=10)
@@ -441,7 +396,7 @@ def jupyter_restart():
 
 @bp.route("/api/jupyter/token")
 def jupyter_token_endpoint():
-    """获取 Jupyter 访问令牌; ?refresh=1 跳过缓存重新检测 (进程重启后令牌会变)"""
+    """?refresh=1 跳过缓存重新检测 (进程重启后令牌会变)"""
     global _cached_token
     if request.args.get("refresh") == "1":
         _cached_token = None

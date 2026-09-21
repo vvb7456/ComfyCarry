@@ -1,12 +1,4 @@
 <script setup lang="ts">
-/**
- * CivitaiSettingsModal — CivitAI 设置弹窗 (页内就近迁移自设置页)。
- *
- * 内容: API Key + NSFW 两级 (浏览级别三档 / 模糊开关)。
- * 由 CivitaiTab 工具栏的设置按钮承载; 保存成功后 emit('saved'),
- * 由宿主刷新共享状态 (keySet) 并在 gate 解除时激活搜索。
- * 关闭 (取消 / Esc / 遮罩 / 关闭按钮) 统一经过未保存检查。
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -30,7 +22,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  /** 保存成功: 由宿主刷新 keySet 并解除 gate */
   saved: []
 }>()
 
@@ -38,14 +29,12 @@ const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
 const { toast } = useToast()
 
-// ── API Key 表单 ──
 const civitaiKey = ref('')
 const civitaiBaseline = ref('')
 const civitaiLoaded = ref(false)
 const civitaiSaving = ref(false)
 const keyDirty = computed(() => civitaiLoaded.value && civitaiKey.value.trim() !== civitaiBaseline.value)
 
-// ── NSFW 两级 (草稿 + 基线) ──
 // 底层仍是 browsingLevel bitmask, UI 仅暴露三档预设
 const NSFW_LEVEL_PRESETS = [1, 7, 31] as const
 const NSFW_LEVEL_DEFAULT = 31
@@ -64,7 +53,6 @@ const nsfwLevelOptions = computed(() => [
   { value: '31', label: t('models.civitai.settings.nsfw.level.all') },
 ])
 
-// ── 加载 ──
 const loading = ref(true)
 const loadError = ref(false)
 
@@ -96,7 +84,6 @@ watch(() => props.modelValue, (open) => {
   if (open) void loadAll()
 })
 
-// ── 保存并关闭 ──
 const { save: saveNsfwShared } = useCivitaiSettings()
 
 async function onSave(): Promise<void> {
@@ -133,7 +120,6 @@ async function onSave(): Promise<void> {
   }
 }
 
-// ── 关闭守卫: 取消 / Esc / 遮罩 / 关闭按钮统一经过未保存检查 ──
 const requestClose = useModalCloseGuard({
   dirty: () => keyDirty.value || nsfwDirty.value,
   saving: () => civitaiSaving.value,

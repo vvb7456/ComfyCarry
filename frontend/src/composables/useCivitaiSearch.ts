@@ -2,8 +2,6 @@ import { ref, computed, type Ref } from 'vue'
 import { useApiFetch } from './useApiFetch'
 import { errorMessage } from '@/utils/errorMessage'
 
-// ── Types ──────────────────────────────────────────────
-
 export interface CivitaiImage {
   url: string
   type?: string
@@ -54,8 +52,6 @@ export interface FacetOption {
 
 export type SortKey = 'Relevancy' | 'Most Downloaded' | 'Highest Rated' | 'Newest'
 
-// ── Constants ──────────────────────────────────────────
-
 const PAGE_SIZE = 20
 
 const SORT_MAP: Record<SortKey, string[]> = {
@@ -80,9 +76,6 @@ const ATTRIBUTES_TO_RETRIEVE = [
   'lastVersionAtUnix', 'user', 'nsfwLevel', 'availability',
 ]
 
-// ── Helpers ────────────────────────────────────────────
-
-/** Check if every part of the query is a numeric ID or CivitAI URL */
 function isIdQuery(text: string): boolean {
   const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
   if (parts.length === 0) return false
@@ -91,7 +84,6 @@ function isIdQuery(text: string): boolean {
   )
 }
 
-/** Parse model IDs & version IDs from text (IDs + URLs) */
 function parseIds(text: string): Array<{ id: number; versionId?: number }> {
   const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
   const seen = new Set<string>()
@@ -122,19 +114,16 @@ function parseIds(text: string): Array<{ id: number; versionId?: number }> {
   return result
 }
 
-// ── CivitAI v1 API raw response types ──────────────────
 // 字段类型经 2026-09 实测 (代理 /api/civitai/model/{id} 直连 civitai.com v1)
 // 与官方 OpenAPI (developer.civitai.com) 双重核对: nsfwLevel 为整数位掩码,
 // creator 可为 null, trainedWords 实测可为 null (官方文档标 string[])。
 
-/** CivitAI v1 /models/{id} 返回的原始图片结构 */
 export interface CivitaiApiImage {
   url: string
   type?: string
   nsfwLevel?: number
 }
 
-/** CivitAI v1 API 的原始 modelVersion 结构 (仅含前端用到的字段) */
 export interface CivitaiApiVersion {
   id: number
   name?: string
@@ -143,7 +132,6 @@ export interface CivitaiApiVersion {
   trainedWords?: string[] | null
 }
 
-/** CivitAI v1 API 的原始 model 结构 (仅含前端用到的字段) */
 export interface CivitaiApiModel {
   id: number
   name?: string
@@ -157,7 +145,6 @@ export interface CivitaiApiModel {
   modelVersions?: CivitaiApiVersion[]
 }
 
-/** Meilisearch multi-search 请求体中的一个 query */
 interface MeiliSearchQuery {
   indexUid: string
   q: string
@@ -199,21 +186,16 @@ export interface MeiliCivitaiHit {
   availability?: string
 }
 
-/** Meilisearch multi-search 响应中的一个 result */
 interface MeiliSearchResult {
   hits?: MeiliCivitaiHit[]
   estimatedTotalHits?: number
   facetDistribution?: Record<string, Record<string, number>>
 }
 
-/** /api/search 代理的 Meilisearch multi-search 响应体 */
 interface MeiliMultiSearchResponse {
   results?: MeiliSearchResult[]
 }
 
-/** Meilisearch hit → CivitaiHit。
- *  索引里的字段与 v1 API 形态不同: nsfwLevel 是位掩码数组 (取首个作图级判定),
- *  hashes 是纯字符串数组 (Map 成 {SHA256}), name/type 缺失时兜底。 */
 function normalizeMeiliHit(h: MeiliCivitaiHit): CivitaiHit {
   const verImages = h.version?.images
   const hitImages = h.images?.length ? h.images : verImages
@@ -255,7 +237,6 @@ function toHashRecord(hashes?: string[]): Record<string, string> | undefined {
   return { SHA256: sha256 }
 }
 
-/** Normalize a CivitAI v1 API model response to match CivitaiHit shape */
 function normalizeApiModel(m: CivitaiApiModel): CivitaiHit {
   const latestVersion = m.modelVersions?.[0]
   const toImages = (imgs?: CivitaiApiImage[]): CivitaiImage[] | undefined =>
@@ -289,12 +270,9 @@ function normalizeApiModel(m: CivitaiApiModel): CivitaiHit {
   }
 }
 
-// ── Composable ─────────────────────────────────────────
-
 export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   const { post } = useApiFetch()
 
-  // ── Reactive State ──
   const hits = ref<CivitaiHit[]>([])
   const loading = ref(false)
   const totalHits = ref(0)
@@ -302,22 +280,18 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   const lastQuery = ref('')
   const errorMsg = ref('')
 
-  // Facets
   const typeFacets = ref<FacetOption[]>([])
   const baseModelFacets = ref<FacetOption[]>([])
   const selectedTypes = ref<string[]>([])
   const selectedBaseModels = ref<string[]>([])
   const facetsLoaded = ref(false)
 
-  // Internal guards
   let _facetsPromise: Promise<void> | null = null
   let _searchId = 0
   const initialSearchDone = ref(false)
 
-  // Derived
   const hasMore = computed(() => (page.value + 1) * PAGE_SIZE < totalHits.value)
 
-  // ── Build Meilisearch filter array ──
   function buildFilter(): string[] {
     const filters: string[] = []
     if (selectedTypes.value.length > 0) {
@@ -329,7 +303,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     return filters
   }
 
-  // ── Meilisearch text search ──
   async function searchMeili(query: string, pageNum: number, append: boolean) {
     const mySearchId = _searchId
     const sort = SORT_MAP[sortKey.value] ?? []
@@ -369,7 +342,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     return true
   }
 
-  // ── CivitAI ID lookup via backend proxy ──
   async function lookupByIds(text: string) {
     const mySearchId = _searchId
     const parsed = parseIds(text)
@@ -382,7 +354,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
         if (res.ok) {
           const data = await res.json() as CivitaiApiModel
           const hit = normalizeApiModel(data)
-          // If URL specified a versionId, select that version
           if (versionId && data.modelVersions) {
             const match = data.modelVersions.find(v => v.id === versionId)
             if (match) {
@@ -407,7 +378,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     totalHits.value = results.length
   }
 
-  // ── Smart search dispatcher ──
   async function search(query: string) {
     const q = query.trim()
     const mySearchId = ++_searchId
@@ -430,10 +400,8 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     }
   }
 
-  // ── Load next page (infinite scroll) ──
   async function loadMore() {
     if (loading.value || !hasMore.value) return
-    // ID lookup has no pagination
     if (lastQuery.value && isIdQuery(lastQuery.value)) return
 
     loading.value = true
@@ -450,7 +418,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     }
   }
 
-  // ── Facets ──
   function updateFacets(dist: Record<string, Record<string, number>>) {
     if (dist.type) {
       typeFacets.value = Object.entries(dist.type)
@@ -473,8 +440,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     facetsLoaded.value = true
   }
 
-  /** Load facets via an empty search (no query, no filters).
-   *  Deduplicates concurrent calls (same promise reuse pattern). */
   async function loadFacets() {
     if (facetsLoaded.value) return
     if (_facetsPromise) return _facetsPromise
@@ -501,7 +466,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     return _facetsPromise
   }
 
-  /** Load facets then run initial empty search (first tab activation). */
   async function activate() {
     await loadFacets()
     if (!initialSearchDone.value) {
@@ -518,7 +482,6 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   }
 
   return {
-    // State
     hits,
     loading,
     totalHits,
@@ -526,14 +489,12 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     errorMsg,
     lastQuery,
 
-    // Facets
     typeFacets,
     baseModelFacets,
     selectedTypes,
     selectedBaseModels,
     facetsLoaded,
 
-    // Methods
     search,
     applyFilters,
     loadMore,

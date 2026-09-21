@@ -20,8 +20,6 @@ export interface PendingClassification {
   dirOptions: DirOption[]
 }
 
-// ── Types ──────────────────────────────────────────────
-
 export interface FavoriteItem {
   modelId: string
   name: string
@@ -58,10 +56,8 @@ export interface DownloadTask {
   }
 }
 
-/** Unified version-level state for UI consumption */
 export type VersionState = 'idle' | 'submitting' | 'queued' | 'downloading' | 'verifying' | 'paused' | 'installed' | 'failed'
 
-/** Version-level download info bundle: state + progress/speed/downloadId for active tasks */
 export interface VersionDownloadInfo {
   state: VersionState
   progress: number
@@ -69,17 +65,12 @@ export interface VersionDownloadInfo {
   downloadId: string | null
 }
 
-/** Aggregated model-level state for card display */
 export type ModelAggregateState = 'idle' | 'downloading' | 'partial' | 'installed'
-
-// ── Constants ──────────────────────────────────────────
 
 const POLL_INTERVAL = 3000
 const IDLE_DISCONNECT_MS = 60_000
 const ACTIVE_STATES = new Set<string>(['active', 'queued', 'paused'])
 const TERMINAL_STATES = new Set<string>(['complete', 'failed', 'cancelled'])
-
-// ── Favorites (FavoriteItem) ↔ API snake_case mapping ──────
 
 interface FavoriteApi {
   model_id: string
@@ -126,7 +117,6 @@ function favoriteKey(modelId: string, versionId?: number): string {
   return versionId ? `${modelId}:${versionId}` : modelId
 }
 
-/** Map backend ResourceState string to frontend VersionState */
 function mapResourceState(state: string): VersionState {
   switch (state) {
     case 'submit_pending': return 'submitting'
@@ -140,8 +130,6 @@ function mapResourceState(state: string): VersionState {
     default: return 'idle'
   }
 }
-
-// ── Hugging Face 白名单分派 (SPEC §5-C / §6-D) ──────────────
 
 /** 负整数模型 ID 即 HF 白名单条目 (SPEC §5-C: 模型 ID 为人工分配稳定负整数) */
 function isHuggingFaceId(modelId: number | string): boolean {
@@ -166,52 +154,36 @@ function sourcePrefixFor(modelId: number | string): 'huggingface' | 'civitai' {
   return isHuggingFaceId(modelId) ? 'huggingface' : 'civitai'
 }
 
-/** 拼接后端资源 key: "source:modelId:versionId" */
 function resourceKeyFor(modelId: number | string, versionId: number | string): string {
   return `${sourcePrefixFor(modelId)}:${String(modelId)}:${String(versionId)}`
 }
-
-// ── Store ──────────────────────────────────────────────
 
 export const useDownloadsStore = defineStore('downloads', () => {
   const { toast } = useToast()
   const { t } = useI18n({ useScope: 'global' })
 
-  // ── State ──
-
-  /** favorites: Map<favoriteKey, FavoriteItem> — backed by /api/favorites */
   const favorites = ref<Map<string, FavoriteItem>>(new Map())
 
   const tasks = ref<DownloadTask[]>([])
   const polling = ref(false)
 
-  /** civitai_model_id → Set<civitai_version_id> — built from local models API + completed tasks */
   const localCivitaiIds = ref<Map<string, Set<string>>>(new Map())
 
-  /** Backend ResourceState map: "source:modelId:versionId" → state string */
   const resourceStates = ref<Map<string, string>>(new Map())
 
-  /** Version IDs with pending POST requests (submitting state, before backend confirms) */
   const submittingVersionIds = ref<Set<string>>(new Set())
 
-  // 待用户裁决目录的下载 (后端 409)。非 null 时 UI 弹 DownloadDirModal。
   const pendingClassification = ref<PendingClassification | null>(null)
-
-  // ── Connection management ──
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let idleTimer: ReturnType<typeof setTimeout> | null = null
   let globalSSE: EventSource | null = null
-  /** Promise for the current in-flight refreshStatus, so callers can await the same request */
   let refreshPromise: Promise<void> | null = null
   /** Counter: >0 means a batch operation is in progress, suppress auto-stop */
   let _batchInFlight = 0
 
   let favoritesLoaded = false
 
-  // ── Favorites API ──
-
-  /** Load favorites from /api/favorites */
   async function loadFavorites(): Promise<void> {
     if (favoritesLoaded) return
     favoritesLoaded = true
@@ -235,7 +207,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function addFavorite(item: FavoriteItem): Promise<boolean> {
     const key = favoriteKey(item.modelId, item.versionId)
     if (favorites.value.has(key)) return false
-    // optimistic insert
     const prev = new Map(favorites.value)
     const optimistic = new Map(prev)
     optimistic.set(key, item)
@@ -336,7 +307,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     m.delete(key)
     m.set(newKey, updated)
     favorites.value = m
-    // optimistic remove old + add new via API
     try { await fetch(`/api/favorites/${encodeURIComponent(key)}`, { method: 'DELETE' }) } catch { /* ignore */ }
     try {
       const res = await fetch('/api/favorites', {
@@ -355,9 +325,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  // ── SSE & Task Update ──
-
-  /** Update a single task in-place from event data */
   function applyTaskUpdate(taskData: DownloadTask) {
     const idx = tasks.value.findIndex(t => t.download_id === taskData.download_id)
     if (idx >= 0) {
@@ -366,7 +333,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  /** Merge a single completed task into localCivitaiIds in the same tick */
   function mergeOneTaskIntoLocal(task: DownloadTask) {
     const mid = String(task.meta.model_id)
     const vid = task.meta.version_id ? String(task.meta.version_id) : null
@@ -386,7 +352,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  /** Apply a resource update from global SSE */
   function applyResourceUpdate(data: { resource_key: string; state: string; model_id: string; version_id: string }) {
     const newMap = new Map(resourceStates.value)
     if (data.state === 'absent') {
@@ -416,14 +381,11 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  // ── Global SSE Stream (SSE primary, polling fallback) ──
-
   function connectGlobalSSE() {
     if (globalSSE) return
     globalSSE = new EventSource('/api/downloads/stream')
 
     globalSSE.onopen = () => {
-      // SSE connected → stop polling fallback
       stopPollTimer()
     }
 
@@ -445,9 +407,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     globalSSE.onerror = () => {
       disconnectGlobalSSE()
-      // SSE failed → start polling fallback
       startPollTimer()
-      // Auto-reconnect after 3s
       setTimeout(() => {
         if (polling.value) connectGlobalSSE()
       }, 3000)
@@ -478,11 +438,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  /** Schedule auto-disconnect after IDLE_DISCONNECT_MS of no activity */
   function scheduleIdleDisconnect() {
     if (idleTimer) clearTimeout(idleTimer)
     idleTimer = setTimeout(() => {
-      // Only disconnect when no active tasks remain
       if (!tasks.value.some(t => ACTIVE_STATES.has(t.status))) {
         stopPolling()
       } else {
@@ -490,8 +448,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
       }
     }, IDLE_DISCONNECT_MS)
   }
-
-  // ── Local Model Index ──
 
   /** Full rebuild from /api/local_models (called once on init) */
   async function fetchLocalIndex() {
@@ -517,7 +473,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     } catch { /* ignore */ }
   }
 
-  /** Incrementally merge completed tasks' meta into localCivitaiIds */
   function mergeCompletedIntoLocal(taskList: DownloadTask[]) {
     let changed = false
     for (const task of taskList) {
@@ -539,8 +494,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
       localCivitaiIds.value = new Map(localCivitaiIds.value)
     }
   }
-
-  // ── Snapshot refresh ──
 
   /** Refresh task list + resource states from backend snapshot */
   async function _refreshStatus(): Promise<void> {
@@ -580,7 +533,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     } catch { /* ignore network errors */ }
   }
 
-  /** Coalescing refreshStatus: multiple callers await the same in-flight request */
   function refreshStatus(): Promise<void> {
     if (refreshPromise) return refreshPromise
     refreshPromise = _refreshStatus().finally(() => { refreshPromise = null })
@@ -589,7 +541,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   function startPolling() {
     if (polling.value) {
-      // Already polling — just trigger one refresh for the new caller
       refreshStatus()
       return
     }
@@ -608,8 +559,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
   }
 
-  // ── Submitting state helpers ──
-
   function setSubmitting(vid: string) {
     submittingVersionIds.value.add(vid)
     submittingVersionIds.value = new Set(submittingVersionIds.value)
@@ -620,15 +569,12 @@ export const useDownloadsStore = defineStore('downloads', () => {
     submittingVersionIds.value = new Set(submittingVersionIds.value)
   }
 
-  // ── Download Actions ──
-
   async function downloadOne(
     modelId: string,
     modelType: string,
     versionId?: number,
     dirKeys?: Record<string, string>,
   ) {
-    // 负整数 ID 命中 HF 白名单 → 走白名单通用提交 (SPEC §6-D)
     if (isHuggingFaceId(modelId)) return downloadHuggingFaceVersion(modelId, versionId)
 
     const vid = versionId ? String(versionId) : modelId
@@ -806,7 +752,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return true
   }
 
-  /** 用户在目录选择 modal 里选定后, 带 dir_keys 重新提交同一次下载。 */
   async function resolveClassification(dirKeys: Record<string, string>) {
     const p = pendingClassification.value
     if (!p) return
@@ -814,7 +759,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     await downloadOne(p.modelId, p.modelType, p.versionId, dirKeys)
   }
 
-  /** 用户放弃裁决 —— 该次下载未提交, 直接丢弃。 */
   function cancelClassification() {
     pendingClassification.value = null
   }
@@ -837,7 +781,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     let ok = 0, fail = 0
     for (const item of items) {
       const vid = item.versionId ? String(item.versionId) : item.modelId
-      // HF 白名单收藏 (source 字段优先, 重载后靠负 ID 兜底) → 走白名单通用提交
       if (item.source === 'huggingface' || isHuggingFaceId(item.modelId)) {
         const submitted = await downloadHuggingFaceVersion(item.modelId, item.versionId)
         if (submitted) ok++
@@ -857,7 +800,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
         })
         const data = await res.json()
         clearSubmitting(vid)
-        // 提交失败也会回 200 (响应体带 task 快照), 所以要看 error_key
         if (res.ok && !data.error_key && !data.error) ok++
         else fail++
       } catch {
@@ -873,8 +815,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     toast(msg, fail ? 'warning' : 'success')
     await refreshStatus()
   }
-
-  // ── Download Control ──
 
   /** 裸 POST, 不刷新 —— 批量操作用它, 刷新留到最后统一做一次 */
   async function _post(url: string) {
@@ -973,15 +913,13 @@ export const useDownloadsStore = defineStore('downloads', () => {
       tasks.value.filter(t => t.status === 'paused').map(t => t.download_id),
       'resume',
     )
-    startPolling()  // 同 resumeDownload: 恢复后要重新建连接才有进度
+    startPolling()
   }
 
   async function clearHistory() {
     await _postControl('/api/downloads/clear')
     toast(t('models.downloads.history_cleared') || 'History cleared', 'success')
   }
-
-  // ── Selectors (pure functions reading state) ──
 
   /**
    * Get the unified state for a specific version.
@@ -993,7 +931,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     if (submittingVersionIds.value.has(vid)) return 'submitting'
 
-    // 资源 key: "source:modelId:versionId", 前缀按 ID 正负号动态选择 (SPEC §7-D)
     const resourceKey = resourceKeyFor(mid, vid)
     const rState = resourceStates.value.get(resourceKey)
     if (rState) {
@@ -1018,9 +955,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return 'idle'
   }
 
-  /**
-   * Get aggregated state for a model across its versions.
-   */
   function getModelAggregateState(modelId: string | number, versionIds: (string | number)[]): ModelAggregateState {
     const mid = String(modelId)
     let anyDownloading = false
@@ -1040,9 +974,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return 'idle'
   }
 
-  /**
-   * Get version-level download info bundle (state + progress/speed/downloadId).
-   */
   function getVersionDownloadInfo(modelId: string | number, versionId: string | number): VersionDownloadInfo {
     const mid = String(modelId)
     const vid = String(versionId)
@@ -1066,13 +997,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return { state, progress: 0, speed: 0, downloadId: null }
   }
 
-  /** Watch a download task until it reaches a terminal state.
-   *  Resolves immediately if task already terminal or not found.
-   *
-   *  `onProgress` 在订阅期间随 SSE/轮询实时回调 (百分比已 clamp 到 0–100),
+  /** `onProgress` 在订阅期间随 SSE/轮询实时回调 (百分比已 clamp 到 0–100),
    *  订阅前的当前值也会立即回调一次 —— 等待链上的进度条由此与下载管理页
-   *  同源, 调用方不必自己 watch tasks。
-   *  Used by useDependencyStatus (wait-chain). */
+   *  同源, 调用方不必自己 watch tasks。Used by useDependencyStatus (wait-chain). */
   function watchTaskTerminal(
     downloadId: string,
     onProgress?: (percent: number, speed: number) => void,
@@ -1085,7 +1012,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return new Promise((resolve) => {
       const existing = tasks.value.find(t => t.download_id === downloadId)
       if (!existing) {
-        // Maybe already cleared; check snapshot once
         refreshStatus().then(() => {
           const t = tasks.value.find(x => x.download_id === downloadId)
           if (!t) { resolve('absent'); return }
@@ -1118,8 +1044,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     })
   }
 
-  // ── Computed ──
-
   const favoritesItems = computed(() => [...favorites.value.values()])
   const favoritesCount = computed(() => favorites.value.size)
 
@@ -1137,7 +1061,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
   )
 
   return {
-    // State
     favorites,
     tasks,
     polling,
@@ -1148,7 +1071,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     resolveClassification,
     cancelClassification,
 
-    // Favorites — API-backed
     favoritesItems,
     favoritesCount,
     loadFavorites,
@@ -1159,18 +1081,15 @@ export const useDownloadsStore = defineStore('downloads', () => {
     isInFavorites,
     updateFavoriteVersion,
 
-    // Tasks
     activeTasks,
     pausedTasks,
     completedTasks,
     failedTasks,
 
-    // Selectors
     getVersionState,
     getVersionDownloadInfo,
     getModelAggregateState,
 
-    // Actions
     downloadOne,
     downloadAll: downloadAllFromFavorites,
     pauseDownload,
@@ -1182,15 +1101,12 @@ export const useDownloadsStore = defineStore('downloads', () => {
     resumeAll,
     clearHistory,
 
-    // Connection
     refreshStatus,
     startPolling,
     stopPolling,
 
-    // Local model index
     fetchLocalIndex,
 
-    // Wait-chain helper for useDependencyStatus
     watchTaskTerminal,
   }
 })

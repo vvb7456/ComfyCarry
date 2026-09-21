@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * SyncJobDetailModal — 单条同步任务详情 (C07)。
- *
- * 数据来自 /api/sync/jobs/<id>?after_id=0&limit=500: 任务本体 + 事件流。
- * 规则列表使用执行时快照 (job.rules), 规则被编辑/删除后历史仍可回看。
- * 事件超过一批时按最后一条 id 通过 after_id 增量加载。
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -36,7 +29,6 @@ const job = ref<SyncJob | null>(null)
 const events = ref<SyncJobEvent[]>([])
 const loading = ref(false)
 const loadingMore = ref(false)
-/** 事件流已读完 (某批不足 EVENT_BATCH 即到头) */
 const eventsExhausted = ref(false)
 
 interface JobDetailResponse {
@@ -83,8 +75,6 @@ async function loadMoreEvents(): Promise<void> {
   }
 }
 
-// ── 展示格式化 ──
-
 function statusTone(status: string): 'positive' | 'caution' | 'negative' | 'neutral' {
   if (status === 'success') return 'positive'
   if (status === 'failed') return 'negative'
@@ -125,7 +115,6 @@ function fmtSpeed(bytesPerSec?: number): string {
 
 const files = computed(() => job.value?.summary?.files ?? [])
 
-/** 事件行: 复用 sync.log.* 的 key + params 文案 (缺条目时原样显示 key) */
 const eventRows = computed(() => events.value.map(e => ({
   id: e.id,
   time: new Date(e.created_at * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -149,7 +138,6 @@ const eventRows = computed(() => events.value.map(e => ({
     </div>
 
     <div v-else-if="job" class="detail">
-      <!-- 状态 + 触发 -->
       <div class="detail-status">
         <Badge :tone="statusTone(job.status)">{{ statusText(job.status) }}</Badge>
         <span class="detail-trigger">
@@ -158,7 +146,6 @@ const eventRows = computed(() => events.value.map(e => ({
         </span>
       </div>
 
-      <!-- 汇总 -->
       <dl class="detail-dl">
         <template v-if="job.queued_at">
           <dt>{{ t('sync.detail.queued_at') }}</dt>
@@ -178,7 +165,6 @@ const eventRows = computed(() => events.value.map(e => ({
         <dd>{{ fmtSpeed(job.summary?.speed) }}</dd>
       </dl>
 
-      <!-- 规则快照 -->
       <section class="detail-section">
         <h4 class="detail-section__title">{{ t('sync.detail.rules') }}</h4>
         <ul v-if="(job.rules ?? []).length" class="detail-rules">
@@ -195,7 +181,6 @@ const eventRows = computed(() => events.value.map(e => ({
         <p v-else class="detail-muted">{{ job.rule_count }}</p>
       </section>
 
-      <!-- 文件清单 -->
       <section v-if="files.length" class="detail-section">
         <h4 class="detail-section__title">{{ t('sync.detail.file_list') }}</h4>
         <div class="detail-files">
@@ -203,7 +188,6 @@ const eventRows = computed(() => events.value.map(e => ({
         </div>
       </section>
 
-      <!-- 事件 -->
       <section class="detail-section">
         <h4 class="detail-section__title">{{ t('sync.detail.events') }}</h4>
         <ul v-if="eventRows.length" class="detail-events">
@@ -255,7 +239,6 @@ const eventRows = computed(() => events.value.map(e => ({
   color: var(--t2);
 }
 
-/* 键值网格: 与设计稿 .cc-dl 同构 */
 .detail-dl {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);

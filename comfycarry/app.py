@@ -1,6 +1,4 @@
 """
-ComfyCarry — Flask Application Factory
-
 创建并配置 Flask app, 注册所有 Blueprint。
 """
 
@@ -51,7 +49,6 @@ def create_app():
     app.config["SESSION_COOKIE_NAME"] = f"cc_{secret[:8]}"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
-    # ── 注册 Blueprints ──────────────────────────────────
     app.register_blueprint(auth_bp)
     app.register_blueprint(system.bp)
     app.register_blueprint(tunnel.bp)
@@ -73,13 +70,10 @@ def create_app():
     app.register_blueprint(update.bp)
     app.register_blueprint(frontend.bp)
 
-    # ── 全局认证中间件 ───────────────────────────────────
     register_auth_middleware(app)
 
-    # ── 绑定 logger 到 sync engine ──────────────────────
     set_app_logger(app.logger)
 
-    # ── Companion WebDAV 反代中间件 (最外层) ────────────
     # 在 Flask 路由/鉴权之前拦截 /api/companion/dav/*, 流式转发到本机
     # rclone serve webdav (127.0.0.1:8688, --baseurl /dav)。
     from .services.dav_proxy import DavProxyMiddleware
@@ -94,7 +88,6 @@ def _restore_comfyui(log):
 
     条件: setup 已完成 + ComfyUI 目录存在 + comfy 进程未运行
     """
-    # 检查 setup 是否已完成
     setup_state_file = cfg.SETUP_STATE_FILE
     try:
         with open(setup_state_file) as f:
@@ -104,12 +97,10 @@ def _restore_comfyui(log):
     except (FileNotFoundError, json.JSONDecodeError):
         return
 
-    # 检查 ComfyUI 目录是否存在
     comfy_dir = cfg.COMFYUI_DIR
     if not os.path.isdir(comfy_dir):
         return
 
-    # 检查 comfy 进程是否已在运行
     try:
         r = subprocess.run(
             "pm2 jlist",
@@ -119,7 +110,7 @@ def _restore_comfyui(log):
             procs = json.loads(r.stdout)
             for p in procs:
                 if p.get("name") == "comfy":
-                    return  # 已存在 (running 或 stopped 都不干预)
+                    return
     except Exception:
         pass
 
@@ -198,7 +189,6 @@ def main():
 
     port = int(sys.argv[1]) if len(sys.argv) > 1 else MANAGER_PORT
 
-    # 从环境变量导入 API Key
     civitai_token = os.environ.get("CIVITAI_TOKEN", "")
     if civitai_token and not _get_api_key():
         CONFIG_FILE.write_text(json.dumps({"api_key": civitai_token}))
@@ -207,16 +197,12 @@ def main():
     # 启动系统指标采集守护线程 (pynvml + psutil, 2s 间隔)
     system_monitor.start()
 
-    # 启动 ComfyUI WS Bridge
     get_bridge()
 
-    # 恢复 SSH 配置
     restore_ssh_config()
 
-    # 恢复 ComfyUI (如果 setup 已完成、ComfyUI 已安装、但进程未运行)
     _restore_comfyui(app.logger)
 
-    # 确保 ControlNet 预处理输出子目录存在
     for sub in ("openpose", "canny", "depth"):
         os.makedirs(os.path.join(cfg.COMFYUI_DIR, "input", sub), exist_ok=True)
 

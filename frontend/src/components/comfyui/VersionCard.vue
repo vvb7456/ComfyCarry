@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * VersionCard — 「版本与启动」分区的只读展示 (C08, 需求 8.1)。
- *
- * 两行: 当前版本 (release / nightly 分类 + 切换入口) 与一行启动命令 (复制)。
- * 版本切换进入 VersionSwitchModal; 启动命令由主页按已保存配置生成后传入。
- */
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MsIcon from '@/components/ui/MsIcon.vue'

@@ -37,7 +37,6 @@ _lock = threading.Lock()
 
 
 def _build_cmd():
-    """构建 rclone serve webdav 命令列表 (避免 shell 注入)。"""
     return [
         "rclone", "serve", "webdav",
         str(COMPANION_SERVE_ROOT),
@@ -53,14 +52,9 @@ def _build_cmd():
 
 
 def start():
-    """启动 rclone serve webdav (幂等: 已在跑则不重启)。
-
-    返回 True 表示已启动/已在运行, False 表示失败。
-    """
     global _proc
     with _lock:
         if _proc and _proc.poll() is None:
-            # 已在运行
             return True
         if not os.path.isdir(COMPANION_SERVE_ROOT):
             try:
@@ -90,7 +84,6 @@ def start():
 
 
 def stop():
-    """停止 rclone serve webdav 进程 (幂等)。"""
     global _proc
     with _lock:
         if not _proc:
@@ -112,7 +105,6 @@ def stop():
 
 
 def status():
-    """返回 serve 进程状态 dict。"""
     with _lock:
         if _proc and _proc.poll() is None:
             return {

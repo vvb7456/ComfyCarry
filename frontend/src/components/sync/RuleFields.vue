@@ -1,10 +1,6 @@
 <script setup lang="ts">
 /**
- * RuleFields — 同步规则表单字段集 (自定义规则 / 编辑规则共用)。
- *
- * 直接原地修改 props.rule (对象引用传递, 父组件持有同一 reactive 对象);
- * 路径浏览按钮只 emit, PathBrowserModal 由父组件持有 (browse 目标字段
- * 经事件回传)。
+ * 直接原地修改 props.rule (对象引用传递, 父组件持有同一 reactive 对象)。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -22,7 +18,6 @@ defineOptions({ name: 'RuleFields' })
 const props = withDefaults(defineProps<{
   rule: Partial<SyncRule>
   remoteOptions: SelectOption[]
-  /** 锁定 remote 选择 (wizard 单存储) */
   fixedRemote?: string
 }>(), {
   fixedRemote: '',
@@ -45,7 +40,6 @@ const methodOptions = computed<SelectOption[]>(() => [
   { value: 'move', label: t('sync.rules.method_short.move') },
 ])
 
-// 含 deploy: 编辑部署触发的规则时不再悄悄降级为手动
 const triggerOptions = computed<SelectOption[]>(() => [
   { value: 'manual', label: t('sync.rule.trigger_manual') },
   { value: 'watch', label: t('sync.rule.trigger_watch') },

@@ -28,13 +28,10 @@ defineOptions({ name: 'ModelsPage' })
 const { t } = useI18n()
 const route = useRoute()
 
-// ── NSFW 浏览级别 (hide/blur/show, 模型卡片/详情/收藏共用) ──
 const { load: loadCivitaiSettings } = useCivitaiSettings()
 loadCivitaiSettings()
 
-// ── Tabs ──
-// 按「看哪个来源的模型」区分。收藏与下载任务是流水线状态不是浏览目的地,
-// 已收进右侧抽屉 (见下)。支持 query (?tab=civitai) 用于外部跳转直接定位 tab。
+// 支持 query (?tab=civitai) 用于外部跳转直接定位 tab。
 const validTabs = new Set(['local', 'huggingface', 'civitai'])
 const initialTab = validTabs.has(route.query.tab as string) ? (route.query.tab as string) : 'local'
 const activeTab = ref(initialTab)
@@ -49,13 +46,11 @@ const tabs = computed<TabItem[]>(() => [
   { key: 'civitai', label: t('models.tabs.civitai'), brand: 'civitai' },
 ])
 
-// CivitaiTab 预选类型 (来自 picker 空态跳转 ?type=LORA); 仅首次挂载时生效
 const civitaiInitialType = computed(() => {
   const v = route.query.type
   return typeof v === 'string' && v ? v : ''
 })
 
-// ── 收藏&下载抽屉 ──────────────────────────────────────────────────────────
 const {
   tasks: dlTasks,
   activeTasks: dlActiveTasks,
@@ -110,7 +105,6 @@ onMounted(() => {
   })
 })
 
-// ── 下载目录裁决 ──
 // 后端判不出文件用途时返回 409, store 把载荷放进 pendingClassification。
 // 挂在页面层而非抽屉内 —— 搜索页、收藏面板的下载都走同一条 store 动作。
 const downloads = useDownloadsStore()
@@ -119,7 +113,6 @@ const dirModalOpen = computed({
   set: (v: boolean) => { if (!v) downloads.cancelClassification() },
 })
 
-// ── Shared Modals ──
 const civitaiOpen = ref(false)
 const civitaiMeta = ref<ModelMeta | null>(null)
 const localOpen = ref(false)
@@ -181,8 +174,6 @@ function openPreviewSingle(url: string) {
       <CivitaiTab :active="activeTab === 'civitai'" :initial-type="civitaiInitialType" :toolbar-target="topStack?.toolbarTarget" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
 
-    <!-- ═══ 收藏&下载抽屉 (常驻挂载 Drawer, slot 内容首开才挂载) ═══
-         收藏 → 进行中 → 历史 三块竖排, 正好是一条流水线的时间顺序。 -->
     <Drawer
       v-model="drawerOpen"
       :title="t('models.drawer.title')"

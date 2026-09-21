@@ -21,11 +21,9 @@ echo "  ComfyCarry Bootstrap v1.0"
 echo "  $(date)"
 echo "================================================="
 
-# 路径准备
 ln -snf /workspace /root/workspace 2>/dev/null || true
 touch ~/.no_auto_tmux 2>/dev/null || true
 
-# ── 预构建镜像校验 ──
 if [ ! -f /opt/.comfycarry-prebuilt ]; then
     echo "  未检测到 ComfyCarry 预构建镜像"
     echo "  请使用官方预构建镜像: erocraft/comfycarry"
@@ -34,20 +32,14 @@ PYTHON_BIN=python3
 
 # SSH 已由 entrypoint.sh 处理 (SSH Key + sshd)
 
-# ── Python ──
-# 预构建镜像已含 Python 3.12
 echo "  -> Python: $PYTHON_BIN"
 
-# ── Node.js + PM2 ──
 echo "  -> Node.js/PM2 已预装"
 
-# ── ComfyCarry 依赖 ──
 echo "  -> ComfyCarry 依赖已预装"
 
-# ── Cloudflared (Tunnel) ──
 echo "  -> Cloudflared 已预装"
 
-# ── 下载 ComfyCarry 文件 ──
 # 更新源为 GitHub latest Release (完整部署包, 由 release.yml 发布),
 # main 分支 push 不影响已部署实例 —— commit 与 release 解耦
 DASHBOARD_DIR="/workspace/ComfyCarry"
@@ -122,7 +114,7 @@ branch=
 commit=${COMMIT_HASH}
 EOF
 
-# ── CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册) ──
+# CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册)
 _TUNNEL_DASHBOARD_URL=""
 if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     if [ -z "${CF_SUBDOMAIN:-}" ]; then
@@ -168,7 +160,6 @@ try:
     result = client.register()
     if result.get('ok'):
         urls = result.get('urls', {})
-        # 输出 dashboard URL
         print(urls.get('dashboard', ''))
     else:
         print(f'{result.get(\"error\", \"未知\")}', file=sys.stderr)
@@ -182,7 +173,6 @@ except Exception as e:
     fi
 fi
 
-# ── 启动 ComfyCarry ──
 pm2 delete dashboard 2>/dev/null || true
 
 if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
@@ -198,7 +188,6 @@ else
     exit 1
 fi
 
-# ── JupyterLab (基础镜像已预装, 通过 PM2 管理) ──
 pm2 delete jupyter 2>/dev/null || true
 pm2 start jupyter-lab --name jupyter \
     --interpreter none \

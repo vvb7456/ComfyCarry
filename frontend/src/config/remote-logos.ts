@@ -19,7 +19,6 @@ import type { IconName } from '@/config/icon-codepoints'
 export interface RemoteBrand {
   /** 品牌 logo 资产 URL; 缺省时用 icon */
   logo?: string
-  /** MsIcon 后备图标名 */
   icon: IconName
 }
 

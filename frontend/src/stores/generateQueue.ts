@@ -19,7 +19,6 @@ type QueueItem = [number, string, Record<string, unknown>, ...unknown[]]
 export const useGenerateQueueStore = defineStore('generateQueue', () => {
   const { get } = useApiFetch()
 
-  // ── Queue ──
   const queueRunning = ref<QueueItem[]>([])
   const queuePending = ref<QueueItem[]>([])
   const queueCount = computed(() => queueRunning.value.length + queuePending.value.length)
@@ -31,12 +30,11 @@ export const useGenerateQueueStore = defineStore('generateQueue', () => {
     queuePending.value = (d.queue_pending || []) as QueueItem[]
   }
 
-  // ── History ──
   const historyItems = ref<ComfyHistoryItem[]>([])
   const historyLoaded = ref(false)
   const historyFailed = ref(false)
   const historyDirty = ref(false)
-  // 排序方向 (与 HistoryPanel 双向绑定; API 响应默认 desc, sortAsc=true → 反转)
+  // API 响应默认 desc, sortAsc=true → 反转
   const historySortAsc = ref(false)
 
   let loadHistoryPromise: Promise<void> | null = null

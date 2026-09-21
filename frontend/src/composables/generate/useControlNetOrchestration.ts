@@ -19,7 +19,6 @@ interface UseControlNetOrchestrationOptions {
   options: GenerateOptionsReturn
   execState: Ref<ExecState | null>
   onRegisterTask: RegisterTask
-  /** 本 ModelTab 实例对应的模型 type key (静态, 用于推导 cnBranch) */
   modelType: string
 }
 
@@ -32,12 +31,10 @@ export function useControlNetOrchestration({
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
   const store = useGenerateStore()
-  // 本实例所属架构的 state (ModelTab 全量挂载, 不能用 currentState)
   const state = computed(() => store.stateFor(modelType))
 
   const i2i = useImageToImage()
 
-  // 本 tab 的 CN branch: 由 modelType → MODEL_TYPES[key].cnBranch 推导 (静态)。
   // pony/sdxl → 'sdxl'; illustrious/noobai → 'ilnoob'; 其余 (无 cnBranch) → undefined (不过滤)。
   const cnBranch = computed<CnBranch | undefined>(
     () => (MODEL_TYPES[modelType]?.cnBranch as CnBranch | undefined),
@@ -48,12 +45,10 @@ export function useControlNetOrchestration({
   const cnDepth = useControlNet('depth', options.controlnetModels, cnBranch, modelType)
   const cnMap = { pose: cnPose, canny: cnCanny, depth: cnDepth } as const
 
-  // ── 依赖状态机 (与运行组件同一套) ──────────────────────────────────────────
   // 依赖清单按 branch 取 (sdxl → union; ilnoob → 专用), 与面板下拉过滤同源。
   // 状态只来自磁盘, 没有 dismiss 记忆位: 换架构/删模型/别处下完都会自然收敛。
 
   const comfyuiDir = () => options.comfyuiDir.value
-  // 模块依赖只在本 tab 激活时体检 (全量挂载下否则是 17×6 次 check)
   const tabActive = () => store.activeModelType === modelType
 
   function cnDep(type: ControlNetType): UseDependencyStatusReturn {
@@ -129,7 +124,6 @@ export function useControlNetOrchestration({
   }
 
   function prepareTagger() {
-    // 缺件也照开: 弹窗顶部的状态条会说清缺什么并就地下载
     tagger.open()
   }
 
@@ -178,11 +172,6 @@ export function useControlNetOrchestration({
     return enabled
   })
 
-  /**
-   * 依赖未就绪时拒绝开启: 提示 + 跳到该模块。
-   * 模块面板顶部常驻状态条, 用户落地即能看到缺什么、就地下载 —— 不再有"提示了
-   * 却无处可去"的死路 (旧 welcome gate dismiss 后就是这个状态)。
-   */
   function blockOnMissingDep(key: string, dep: UseDependencyStatusReturn, msgKey: string): boolean {
     if (dep.ready.value) return false
     toast(t(msgKey), 'warning')

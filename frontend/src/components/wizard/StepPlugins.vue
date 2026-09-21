@@ -37,7 +37,6 @@ function togglePlugin(url: string) {
 }
 
 function onNext() {
-  // Append extra plugin URLs
   const extra = extraPluginsText.value.trim()
   if (extra) {
     extra.split('\n').forEach(u => {

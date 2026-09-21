@@ -34,7 +34,6 @@ export interface LocalizedText {
   en: string
 }
 
-/** 按界面语言取白名单文案; 目标语言为空时回退另一语言。 */
 export function localizedText(text: LocalizedText, locale: string): string {
   return locale.startsWith('zh') ? (text.zh || text.en) : (text.en || text.zh)
 }
@@ -59,7 +58,6 @@ export interface HuggingFaceFile {
   sha256: string
 }
 
-/** 手动补充条目的 mk() 工厂返回类型 (HuggingFaceModel 完整形态) */
 type ManualHfModel = HuggingFaceModel & { versions: HuggingFaceVersion[] }
 
 export interface HuggingFaceVersion {
@@ -83,15 +81,12 @@ export interface HuggingFaceModel extends Omit<CivitaiHit, 'version' | 'versions
   images: CivitaiImage[]
   user: { username: string }
   sourceUrl: string
-  /** 双语描述: 白名单独立维护, 不走 i18n locale */
   description: LocalizedText
   version: HuggingFaceVersion
   versions: HuggingFaceVersion[]
 }
 
-// ── checkpoints ──────────────────────────────────────────────────────────────
 
-// SDXL 1.0 官方 base, 通用高质量文生图
 const sdXlBaseVersion: HuggingFaceVersion = {
   id: -10000101,
   name: '1.0',
@@ -126,7 +121,6 @@ const sdXlBaseModel: HuggingFaceModel = {
   versions: [sdXlBaseVersion],
 }
 
-// SD1.5 官方归档 fp16 剪枝整合包, 基础文生图
 const sd15PrunedVersion: HuggingFaceVersion = {
   id: -10000102,
   name: '1.5',
@@ -161,7 +155,6 @@ const sd15PrunedModel: HuggingFaceModel = {
   versions: [sd15PrunedVersion],
 }
 
-// Flux.1 dev FP8 量化整合包, 通用文生图
 const flux1DevFp8Version: HuggingFaceVersion = {
   id: -10000103,
   name: 'dev-fp8',
@@ -196,9 +189,7 @@ const flux1DevFp8Model: HuggingFaceModel = {
   versions: [flux1DevFp8Version],
 }
 
-// ── diffusion_models ─────────────────────────────────────────────────────────
 
-// Flux.2 Dev fp8 拆分形态 UNet, 文生图/编辑
 const flux2DevFp8Version: HuggingFaceVersion = {
   id: -10000104,
   name: 'dev-fp8mixed',
@@ -233,7 +224,6 @@ const flux2DevFp8Model: HuggingFaceModel = {
   versions: [flux2DevFp8Version],
 }
 
-// Z-Image 官方拆分形态 UNet (bf16), 文生图
 const zImageVersion: HuggingFaceVersion = {
   id: -10000105,
   name: 'bf16',
@@ -268,7 +258,6 @@ const zImageModel: HuggingFaceModel = {
   versions: [zImageVersion],
 }
 
-// Wan 2.2 5B 单权重 (t2v/i2v 双模式), 图/文生视频
 const wan22_5bVersion: HuggingFaceVersion = {
   id: -10000106,
   name: 'fp16',
@@ -303,9 +292,7 @@ const wan22_5bModel: HuggingFaceModel = {
   versions: [wan22_5bVersion],
 }
 
-// ── loras ────────────────────────────────────────────────────────────────────
 
-// Flux.2 dev Turbo 加速 LoRA (ByteZSzn v2, ComfyUI 官方 repackaged)
 const flux2TurboLoraVersion: HuggingFaceVersion = {
   id: -10000107,
   name: 'v2',
@@ -340,7 +327,6 @@ const flux2TurboLoraModel: HuggingFaceModel = {
   versions: [flux2TurboLoraVersion],
 }
 
-// LTX-2 19B 蒸馏加速 LoRA (8 步, CFG=1), 用于完整版 19B
 const ltx2DistillLoraVersion: HuggingFaceVersion = {
   id: -10000108,
   name: 'distilled-lora-384',
@@ -375,7 +361,6 @@ const ltx2DistillLoraModel: HuggingFaceModel = {
   versions: [ltx2DistillLoraVersion],
 }
 
-// Wan 2.2 i2v 14B 4 步 Lightning 加速 LoRA (high noise)
 const wan22I2vLightningLoraVersion: HuggingFaceVersion = {
   id: -10000109,
   name: 'v1-high-noise',
@@ -410,9 +395,7 @@ const wan22I2vLightningLoraModel: HuggingFaceModel = {
   versions: [wan22I2vLightningLoraVersion],
 }
 
-// ── controlnet ───────────────────────────────────────────────────────────────
 
-// SD 3.5 Large Canny 边缘 ControlNet
 const sd35CannyCnVersion: HuggingFaceVersion = {
   id: -10000110,
   name: 'canny',
@@ -447,7 +430,6 @@ const sd35CannyCnModel: HuggingFaceModel = {
   versions: [sd35CannyCnVersion],
 }
 
-// SD 3.5 Large 深度图 ControlNet
 const sd35DepthCnVersion: HuggingFaceVersion = {
   id: -10000111,
   name: 'depth',
@@ -482,7 +464,6 @@ const sd35DepthCnModel: HuggingFaceModel = {
   versions: [sd35DepthCnVersion],
 }
 
-// SD1.5 ControlNet v1.1 深度图 (ComfyUI 可直接加载的 safetensors/FP16 转换版)
 const sd15DepthCnVersion: HuggingFaceVersion = {
   id: -10000381,
   name: 'depth-fp16',
@@ -517,7 +498,6 @@ const sd15DepthCnModel: HuggingFaceModel = {
   versions: [sd15DepthCnVersion],
 }
 
-// SD1.5 ControlNet v1.1 Canny 边缘 (ComfyUI 可直接加载的 safetensors/FP16 转换版)
 const sd15CannyCnVersion: HuggingFaceVersion = {
   id: -10000382,
   name: 'canny-fp16',
@@ -552,7 +532,6 @@ const sd15CannyCnModel: HuggingFaceModel = {
   versions: [sd15CannyCnVersion],
 }
 
-// SD1.5 ControlNet v1.1 OpenPose (ComfyUI 可直接加载的 safetensors/FP16 转换版)
 const sd15PoseCnVersion: HuggingFaceVersion = {
   id: -10000383,
   name: 'openpose-fp16',
@@ -587,9 +566,7 @@ const sd15PoseCnModel: HuggingFaceModel = {
   versions: [sd15PoseCnVersion],
 }
 
-// ── vae ──────────────────────────────────────────────────────────────────────
 
-// Wan 2.1 官方 VAE (bf16), Wan 2.1/2.2 14B 视频生成通用
 const wan21VaeVersion: HuggingFaceVersion = {
   id: -10000112,
   name: 'bf16',
@@ -624,7 +601,6 @@ const wan21VaeModel: HuggingFaceModel = {
   versions: [wan21VaeVersion],
 }
 
-// Flux/Z-Image 共用 VAE (ae), ComfyUI 官方 repackage
 const fluxAeVaeVersion: HuggingFaceVersion = {
   id: -10000113,
   name: 'ae',
@@ -659,7 +635,6 @@ const fluxAeVaeModel: HuggingFaceModel = {
   versions: [fluxAeVaeVersion],
 }
 
-// SD 1.5/SDXL 通用微调 VAE (ft-MSE, 人物/细节重建更佳)
 const sdVaeFtMseVersion: HuggingFaceVersion = {
   id: -10000114,
   name: '840000',
@@ -694,9 +669,7 @@ const sdVaeFtMseModel: HuggingFaceModel = {
   versions: [sdVaeFtMseVersion],
 }
 
-// ── text_encoders ────────────────────────────────────────────────────────────
 
-// Flux.1 CLIP-L 文本编码器 (双 CLIP 之一)
 const fluxClipLVersion: HuggingFaceVersion = {
   id: -10000115,
   name: 'clip_l',
@@ -731,7 +704,6 @@ const fluxClipLModel: HuggingFaceModel = {
   versions: [fluxClipLVersion],
 }
 
-// Flux.1 T5-XXL FP8 文本编码器 (双 CLIP 之一, Chroma/HiDream 共用)
 const fluxT5xxlFp8Version: HuggingFaceVersion = {
   id: -10000116,
   name: 'fp8_scaled',
@@ -766,7 +738,6 @@ const fluxT5xxlFp8Model: HuggingFaceModel = {
   versions: [fluxT5xxlFp8Version],
 }
 
-// Wan 2.1/2.2 全系 UM-T5-XXL FP8 文本编码器
 const wanUmt5Version: HuggingFaceVersion = {
   id: -10000117,
   name: 'fp8_scaled',
@@ -801,9 +772,7 @@ const wanUmt5Model: HuggingFaceModel = {
   versions: [wanUmt5Version],
 }
 
-// ── upscale_models ───────────────────────────────────────────────────────────
 
-// Real-ESRGAN 4x 通用放大模型 (arch 'realesrgan' 尚未注册进 ARCH_LABELS, 建议补充)
 const realEsrganVersion: HuggingFaceVersion = {
   id: -10000118,
   name: 'x4plus',
@@ -838,7 +807,6 @@ const realEsrganModel: HuggingFaceModel = {
   versions: [realEsrganVersion],
 }
 
-// 4x 通用放大模型 (ESRGAN, 擅长 JPEG 压缩图; arch 'esrgan' 尚未注册进 ARCH_LABELS)
 const ultraSharpVersion: HuggingFaceVersion = {
   id: -10000119,
   name: '4x',
@@ -873,9 +841,7 @@ const ultraSharpModel: HuggingFaceModel = {
   versions: [ultraSharpVersion],
 }
 
-// ── checkpoints ──────────────────────────────────────────────────────────────
 
-// DreamShaper 8, 经典 SD1.5 通用文生图整合包 (剪枝版)
 const dreamShaper8PrunedVersion: HuggingFaceVersion = {
   id: -10000120,
   name: 'v1.0',
@@ -911,7 +877,6 @@ const dreamShaper8PrunedModel: HuggingFaceModel = {
   versions: [dreamShaper8PrunedVersion],
 }
 
-// Juggernaut XL V9, SDXL 写实人像/摄影风格整合包
 const juggernautXLV9RunDiffusionPhotoV2Version: HuggingFaceVersion = {
   id: -10000121,
   name: 'v1.0',
@@ -947,7 +912,6 @@ const juggernautXLV9RunDiffusionPhotoV2Model: HuggingFaceModel = {
   versions: [juggernautXLV9RunDiffusionPhotoV2Version],
 }
 
-// NetaYume, 基于 Lumina Image 2.0 的动漫风格文生图整合包 (内置 Gemma2 TE + Flux VAE)
 const netaYumev35PretrainedAllInOneVersion: HuggingFaceVersion = {
   id: -10000122,
   name: 'v1.0',
@@ -983,7 +947,6 @@ const netaYumev35PretrainedAllInOneModel: HuggingFaceModel = {
   versions: [netaYumev35PretrainedAllInOneVersion],
 }
 
-// Flux.1 schnell FP8 量化整合包, 少步数快速文生图
 const flux1SchnellFp8Version: HuggingFaceVersion = {
   id: -10000123,
   name: 'v1.0',
@@ -1019,7 +982,6 @@ const flux1SchnellFp8Model: HuggingFaceModel = {
   versions: [flux1SchnellFp8Version],
 }
 
-// HiDream-O1 Image bf16, 通用文生图/图生图
 const hidreamO1ImageBf16Version: HuggingFaceVersion = {
   id: -10000124,
   name: 'v1.0',
@@ -1055,7 +1017,6 @@ const hidreamO1ImageBf16Model: HuggingFaceModel = {
   versions: [hidreamO1ImageBf16Version],
 }
 
-// HiDream-O1 Image Dev FP8 缩放版, 低显存文生图
 const hidreamO1ImageDevFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000125,
   name: 'v1.0',
@@ -1091,7 +1052,6 @@ const hidreamO1ImageDevFp8ScaledModel: HuggingFaceModel = {
   versions: [hidreamO1ImageDevFp8ScaledVersion],
 }
 
-// Juggernaut XL V9 RDPhoto2 Lightning, SDXL 4步超快写实生图
 const juggernautXLV9Rdphoto2LightningVersion: HuggingFaceVersion = {
   id: -10000126,
   name: 'v1.0',
@@ -1127,7 +1087,6 @@ const juggernautXLV9Rdphoto2LightningModel: HuggingFaceModel = {
   versions: [juggernautXLV9Rdphoto2LightningVersion],
 }
 
-// LTX-2 19B dev FP8, 音视频联合生成 (图/文生视频+音频)
 const ltx219bDevFp8Version: HuggingFaceVersion = {
   id: -10000127,
   name: 'v1.0',
@@ -1163,7 +1122,6 @@ const ltx219bDevFp8Model: HuggingFaceModel = {
   versions: [ltx219bDevFp8Version],
 }
 
-// LTX-2 19B dev bf16 完整版, 音视频联合生成
 const ltx219bDevVersion: HuggingFaceVersion = {
   id: -10000128,
   name: 'v1.0',
@@ -1199,7 +1157,6 @@ const ltx219bDevModel: HuggingFaceModel = {
   versions: [ltx219bDevVersion],
 }
 
-// LTX-2 19B distilled, 8步蒸馏版音视频生成
 const ltx219bDistilledVersion: HuggingFaceVersion = {
   id: -10000129,
   name: 'v1.0',
@@ -1235,7 +1192,6 @@ const ltx219bDistilledModel: HuggingFaceModel = {
   versions: [ltx219bDistilledVersion],
 }
 
-// LTX-2.3 22B dev FP8, 高质量音视频联合生成
 const ltx2322bDevFp8Version: HuggingFaceVersion = {
   id: -10000130,
   name: 'v1.0',
@@ -1271,7 +1227,6 @@ const ltx2322bDevFp8Model: HuggingFaceModel = {
   versions: [ltx2322bDevFp8Version],
 }
 
-// LTX-2.3 22B dev bf16 完整版, 高质量音视频联合生成
 const ltx2322bDevVersion: HuggingFaceVersion = {
   id: -10000131,
   name: 'v1.0',
@@ -1307,7 +1262,6 @@ const ltx2322bDevModel: HuggingFaceModel = {
   versions: [ltx2322bDevVersion],
 }
 
-// LTX-2.3 22B distilled FP8, 8步蒸馏版音视频生成
 const ltx2322bDistilledFp8Version: HuggingFaceVersion = {
   id: -10000132,
   name: 'v1.0',
@@ -1343,7 +1297,6 @@ const ltx2322bDistilledFp8Model: HuggingFaceModel = {
   versions: [ltx2322bDistilledFp8Version],
 }
 
-// LTX-Video 2B v0.9.5, 实时图生视频
 const ltxVideo2bV095Version: HuggingFaceVersion = {
   id: -10000133,
   name: 'v1.0',
@@ -1379,7 +1332,6 @@ const ltxVideo2bV095Model: HuggingFaceModel = {
   versions: [ltxVideo2bV095Version],
 }
 
-// LTX-Video 2B v0.9, 实时文生视频
 const ltxVideo2bV09Version: HuggingFaceVersion = {
   id: -10000134,
   name: 'v1.0',
@@ -1415,7 +1367,6 @@ const ltxVideo2bV09Model: HuggingFaceModel = {
   versions: [ltxVideo2bV09Version],
 }
 
-// SD3.5 Large FP8 整合包 (内置文本编码器), 高质量文生图
 const sd35LargeFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000135,
   name: 'v1.0',
@@ -1451,7 +1402,6 @@ const sd35LargeFp8ScaledModel: HuggingFaceModel = {
   versions: [sd35LargeFp8ScaledVersion],
 }
 
-// SDXL 1.0 refiner, 配合 base 精修图像细节
 const sdXlRefiner10Version: HuggingFaceVersion = {
   id: -10000136,
   name: 'v1.0',
@@ -1487,7 +1437,6 @@ const sdXlRefiner10Model: HuggingFaceModel = {
   versions: [sdXlRefiner10Version],
 }
 
-// SDXL Turbo, 1-4步极速文生图
 const sdXlTurbo10Fp16Version: HuggingFaceVersion = {
   id: -10000137,
   name: 'v1.0',
@@ -1523,7 +1472,6 @@ const sdXlTurbo10Fp16Model: HuggingFaceModel = {
   versions: [sdXlTurbo10Fp16Version],
 }
 
-// Stable Video Diffusion XT, 图生视频 (25帧)
 const svdXtVersion: HuggingFaceVersion = {
   id: -10000138,
   name: 'v1.0',
@@ -1558,9 +1506,7 @@ const svdXtModel: HuggingFaceModel = {
   version: svdXtVersion,
   versions: [svdXtVersion],
 }
-// ── diffusion_models ─────────────────────────────────────────────────────────
 
-// Chroma1 HD 文生图 fp8 混合精度
 const chroma1HDFp8mixedVersion: HuggingFaceVersion = {
   id: -10000139,
   name: 'v1.0',
@@ -1596,7 +1542,6 @@ const chroma1HDFp8mixedModel: HuggingFaceModel = {
   versions: [chroma1HDFp8mixedVersion],
 }
 
-// FireRed Image Edit 1.1 通用图像编辑 transformer
 const fireRedImageEdit11TransformerVersion: HuggingFaceVersion = {
   id: -10000140,
   name: 'v1.0',
@@ -1632,7 +1577,6 @@ const fireRedImageEdit11TransformerModel: HuggingFaceModel = {
   versions: [fireRedImageEdit11TransformerVersion],
 }
 
-// NewBie Image Exp0.1 文生图
 const newBieImageExp01Bf16Version: HuggingFaceVersion = {
   id: -10000141,
   name: 'v1.0',
@@ -1668,7 +1612,6 @@ const newBieImageExp01Bf16Model: HuggingFaceModel = {
   versions: [newBieImageExp01Bf16Version],
 }
 
-// Wan 2.1 WanMove 运动控制模型 (i2v 架构)
 const wan21WanMoveFp8ScaledE4m3fnKJVersion: HuggingFaceVersion = {
   id: -10000142,
   name: 'v1.0',
@@ -1704,7 +1647,6 @@ const wan21WanMoveFp8ScaledE4m3fnKJModel: HuggingFaceModel = {
   versions: [wan21WanMoveFp8ScaledE4m3fnKJVersion],
 }
 
-// Wan 2.1 i2v 480p 14B 图生视频
 const wan21I2V14B480pFp8E4m3fnScaledKJVersion: HuggingFaceVersion = {
   id: -10000143,
   name: 'v1.0',
@@ -1740,7 +1682,6 @@ const wan21I2V14B480pFp8E4m3fnScaledKJModel: HuggingFaceModel = {
   versions: [wan21I2V14B480pFp8E4m3fnScaledKJVersion],
 }
 
-// Wan 2.1 i2v ATI 动画轨迹控制 14B
 const wan21I2VATI14BFp8E4m3fnVersion: HuggingFaceVersion = {
   id: -10000144,
   name: 'v1.0',
@@ -1776,7 +1717,6 @@ const wan21I2VATI14BFp8E4m3fnModel: HuggingFaceModel = {
   versions: [wan21I2VATI14BFp8E4m3fnVersion],
 }
 
-// Wan 2.1 VACE 视频编辑模块 14B
 const wan21VACEModule14BBf16Version: HuggingFaceVersion = {
   id: -10000145,
   name: 'v1.0',
@@ -1812,7 +1752,6 @@ const wan21VACEModule14BBf16Model: HuggingFaceModel = {
   versions: [wan21VACEModule14BBf16Version],
 }
 
-// Wan 2.2 Animate 14B 动画/换装人物驱动 (i2v 架构)
 const wan22Animate14BFp8E4m3fnScaledKJVersion: HuggingFaceVersion = {
   id: -10000146,
   name: 'v1.0',
@@ -1848,7 +1787,6 @@ const wan22Animate14BFp8E4m3fnScaledKJModel: HuggingFaceModel = {
   versions: [wan22Animate14BFp8E4m3fnScaledKJVersion],
 }
 
-// ACE-Step 1.5 Turbo 文生音频
 const acestepV15TurboVersion: HuggingFaceVersion = {
   id: -10000147,
   name: 'v1.0',
@@ -1884,7 +1822,6 @@ const acestepV15TurboModel: HuggingFaceModel = {
   versions: [acestepV15TurboVersion],
 }
 
-// ACE-Step 1.5 XL Base 文生音频
 const acestepV15XlBaseBf16Version: HuggingFaceVersion = {
   id: -10000148,
   name: 'v1.0',
@@ -1920,7 +1857,6 @@ const acestepV15XlBaseBf16Model: HuggingFaceModel = {
   versions: [acestepV15XlBaseBf16Version],
 }
 
-// ACE-Step 1.5 XL SFT 文生音频
 const acestepV15XlSftBf16Version: HuggingFaceVersion = {
   id: -10000149,
   name: 'v1.0',
@@ -1956,7 +1892,6 @@ const acestepV15XlSftBf16Model: HuggingFaceModel = {
   versions: [acestepV15XlSftBf16Version],
 }
 
-// ACE-Step 1.5 XL Turbo 文生音频
 const acestepV15XlTurboBf16Version: HuggingFaceVersion = {
   id: -10000150,
   name: 'v1.0',
@@ -1992,7 +1927,6 @@ const acestepV15XlTurboBf16Model: HuggingFaceModel = {
   versions: [acestepV15XlTurboBf16Version],
 }
 
-// Anima 基础版文生图
 const animaBaseV10Version: HuggingFaceVersion = {
   id: -10000151,
   name: 'v1.0',
@@ -2028,7 +1962,6 @@ const animaBaseV10Model: HuggingFaceModel = {
   versions: [animaBaseV10Version],
 }
 
-// Anima Preview3 预览版文生图
 const animaPreview3BaseVersion: HuggingFaceVersion = {
   id: -10000152,
   name: 'v1.0',
@@ -2064,7 +1997,6 @@ const animaPreview3BaseModel: HuggingFaceModel = {
   versions: [animaPreview3BaseVersion],
 }
 
-// Capybara v0.1 图像编辑 (基于 HunyuanVideo 1.5 架构)
 const capybaraV01Version: HuggingFaceVersion = {
   id: -10000153,
   name: 'v1.0',
@@ -2100,7 +2032,6 @@ const capybaraV01Model: HuggingFaceModel = {
   versions: [capybaraV01Version],
 }
 
-// Causal Forcing 帧级自回归视频生成 (基于 Wan 2.1, 支持 t2v/i2v)
 const causalForcingFramewiseVersion: HuggingFaceVersion = {
   id: -10000154,
   name: 'v1.0',
@@ -2136,7 +2067,6 @@ const causalForcingFramewiseModel: HuggingFaceModel = {
   versions: [causalForcingFramewiseVersion],
 }
 
-// Chroma1 Radiance 文生图 x0
 const chromaRadianceX0Version: HuggingFaceVersion = {
   id: -10000155,
   name: 'v1.0',
@@ -2172,7 +2102,6 @@ const chromaRadianceX0Model: HuggingFaceModel = {
   versions: [chromaRadianceX0Version],
 }
 
-// ChronoEdit 14B 时间控制图像编辑 (基于 Wan 2.2 i2v 架构)
 const chronoEdit14BFp16Version: HuggingFaceVersion = {
   id: -10000156,
   name: 'v1.0',
@@ -2208,7 +2137,6 @@ const chronoEdit14BFp16Model: HuggingFaceModel = {
   versions: [chronoEdit14BFp16Version],
 }
 
-// ERNIE Image Turbo 文生图
 const ernieImageTurboVersion: HuggingFaceVersion = {
   id: -10000157,
   name: 'v1.0',
@@ -2244,7 +2172,6 @@ const ernieImageTurboModel: HuggingFaceModel = {
   versions: [ernieImageTurboVersion],
 }
 
-// ERNIE Image 文生图
 const ernieImageVersion: HuggingFaceVersion = {
   id: -10000158,
   name: 'v1.0',
@@ -2280,7 +2207,6 @@ const ernieImageModel: HuggingFaceModel = {
   versions: [ernieImageVersion],
 }
 
-// Flux.2 Klein 4B fp8 文生图/编辑
 const flux2Klein4bFp8Version: HuggingFaceVersion = {
   id: -10000159,
   name: 'v1.0',
@@ -2316,7 +2242,6 @@ const flux2Klein4bFp8Model: HuggingFaceModel = {
   versions: [flux2Klein4bFp8Version],
 }
 
-// Flux.2 Klein 4B 文生图/编辑
 const flux2Klein4bVersion: HuggingFaceVersion = {
   id: -10000160,
   name: 'v1.0',
@@ -2352,7 +2277,6 @@ const flux2Klein4bModel: HuggingFaceModel = {
   versions: [flux2Klein4bVersion],
 }
 
-// Flux.2 Klein 9B KV 缓存版 fp8 图像编辑
 const flux2Klein9bKvFp8Version: HuggingFaceVersion = {
   id: -10000161,
   name: 'v1.0',
@@ -2388,7 +2312,6 @@ const flux2Klein9bKvFp8Model: HuggingFaceModel = {
   versions: [flux2Klein9bKvFp8Version],
 }
 
-// Flux.2 Klein Base 4B fp8 文生图
 const flux2KleinBase4bFp8Version: HuggingFaceVersion = {
   id: -10000162,
   name: 'v1.0',
@@ -2424,7 +2347,6 @@ const flux2KleinBase4bFp8Model: HuggingFaceModel = {
   versions: [flux2KleinBase4bFp8Version],
 }
 
-// Flux.2 Klein Base 4B 文生图
 const flux2KleinBase4bVersion: HuggingFaceVersion = {
   id: -10000163,
   name: 'v1.0',
@@ -2460,7 +2382,6 @@ const flux2KleinBase4bModel: HuggingFaceModel = {
   versions: [flux2KleinBase4bVersion],
 }
 
-// Flux.1 Fill Dev OneReward 图像修复/编辑 fp8
 const flux1FillDevOneRewardTransformerFp8Version: HuggingFaceVersion = {
   id: -10000164,
   name: 'v1.0',
@@ -2496,7 +2417,6 @@ const flux1FillDevOneRewardTransformerFp8Model: HuggingFaceModel = {
   versions: [flux1FillDevOneRewardTransformerFp8Version],
 }
 
-// Flux.1 Canny Dev 边缘控制文生图
 const flux1CannyDevVersion: HuggingFaceVersion = {
   id: -10000165,
   name: 'v1.0',
@@ -2532,7 +2452,6 @@ const flux1CannyDevModel: HuggingFaceModel = {
   versions: [flux1CannyDevVersion],
 }
 
-// Flux.1 Dev Kontext 多图上下文图像编辑 fp8
 const flux1DevKontextFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000166,
   name: 'v1.0',
@@ -2568,7 +2487,6 @@ const flux1DevKontextFp8ScaledModel: HuggingFaceModel = {
   versions: [flux1DevKontextFp8ScaledVersion],
 }
 
-// Flux.1 Dev 文生图
 const flux1DevVersion: HuggingFaceVersion = {
   id: -10000167,
   name: 'v1.0',
@@ -2604,7 +2522,6 @@ const flux1DevModel: HuggingFaceModel = {
   versions: [flux1DevVersion],
 }
 
-// Flux.1 Fill Dev 图像修复/编辑
 const flux1FillDevVersion: HuggingFaceVersion = {
   id: -10000168,
   name: 'v1.0',
@@ -2640,7 +2557,6 @@ const flux1FillDevModel: HuggingFaceModel = {
   versions: [flux1FillDevVersion],
 }
 
-// Flux.1 Krea Dev 实时风格控制文生图 fp8
 const flux1KreaDevFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000169,
   name: 'v1.0',
@@ -2676,7 +2592,6 @@ const flux1KreaDevFp8ScaledModel: HuggingFaceModel = {
   versions: [flux1KreaDevFp8ScaledVersion],
 }
 
-// Flux.1 Schnell 快速文生图
 const flux1SchnellVersion: HuggingFaceVersion = {
   id: -10000170,
   name: 'v1.0',
@@ -2712,7 +2627,6 @@ const flux1SchnellModel: HuggingFaceModel = {
   versions: [flux1SchnellVersion],
 }
 
-// HiDream E1.1 文生图/图像编辑
 const hidreamE11Bf16Version: HuggingFaceVersion = {
   id: -10000171,
   name: 'v1.0',
@@ -2748,7 +2662,6 @@ const hidreamE11Bf16Model: HuggingFaceModel = {
   versions: [hidreamE11Bf16Version],
 }
 
-// HiDream E1 Full 文生图/图像编辑
 const hidreamE1FullBf16Version: HuggingFaceVersion = {
   id: -10000172,
   name: 'v1.0',
@@ -2784,7 +2697,6 @@ const hidreamE1FullBf16Model: HuggingFaceModel = {
   versions: [hidreamE1FullBf16Version],
 }
 
-// HiDream I1 Dev fp8 文生图/编辑
 const hidreamI1DevFp8Version: HuggingFaceVersion = {
   id: -10000173,
   name: 'v1.0',
@@ -2820,7 +2732,6 @@ const hidreamI1DevFp8Model: HuggingFaceModel = {
   versions: [hidreamI1DevFp8Version],
 }
 
-// HiDream I1 Fast fp8 快速文生图
 const hidreamI1FastFp8Version: HuggingFaceVersion = {
   id: -10000174,
   name: 'v1.0',
@@ -2856,7 +2767,6 @@ const hidreamI1FastFp8Model: HuggingFaceModel = {
   versions: [hidreamI1FastFp8Version],
 }
 
-// HiDream I1 Full fp8 文生图/编辑
 const hidreamI1FullFp8Version: HuggingFaceVersion = {
   id: -10000175,
   name: 'v1.0',
@@ -2892,7 +2802,6 @@ const hidreamI1FullFp8Model: HuggingFaceModel = {
   versions: [hidreamI1FullFp8Version],
 }
 
-// HuMo 17B 音频驱动人物视频生成 (基于 Wan 架构)
 const humo17BFp8E4m3fnVersion: HuggingFaceVersion = {
   id: -10000176,
   name: 'v1.0',
@@ -2928,7 +2837,6 @@ const humo17BFp8E4m3fnModel: HuggingFaceModel = {
   versions: [humo17BFp8E4m3fnVersion],
 }
 
-// Hunyuan Video t2v 720p 文生视频
 const hunyuanVideoT2v720pBf16Version: HuggingFaceVersion = {
   id: -10000177,
   name: 'v1.0',
@@ -2964,7 +2872,6 @@ const hunyuanVideoT2v720pBf16Model: HuggingFaceModel = {
   versions: [hunyuanVideoT2v720pBf16Version],
 }
 
-// Hunyuan Video 1.5 1080p 超分蒸馏
 const hunyuanvideo151080pSrDistilledFp16Version: HuggingFaceVersion = {
   id: -10000178,
   name: 'v1.0',
@@ -3000,7 +2907,6 @@ const hunyuanvideo151080pSrDistilledFp16Model: HuggingFaceModel = {
   versions: [hunyuanvideo151080pSrDistilledFp16Version],
 }
 
-// Hunyuan Video 1.5 720p 图生视频
 const hunyuanvideo15720pI2vFp16Version: HuggingFaceVersion = {
   id: -10000179,
   name: 'v1.0',
@@ -3036,7 +2942,6 @@ const hunyuanvideo15720pI2vFp16Model: HuggingFaceModel = {
   versions: [hunyuanvideo15720pI2vFp16Version],
 }
 
-// Hunyuan Video 1.5 720p 文生视频
 const hunyuanvideo15720pT2vFp16Version: HuggingFaceVersion = {
   id: -10000180,
   name: 'v1.0',
@@ -3072,7 +2977,6 @@ const hunyuanvideo15720pT2vFp16Model: HuggingFaceModel = {
   versions: [hunyuanvideo15720pT2vFp16Version],
 }
 
-// Kandinsky 5.0 Lite i2v 5 秒图生视频
 const kandinsky5liteI2v5sVersion: HuggingFaceVersion = {
   id: -10000181,
   name: 'v1.0',
@@ -3108,7 +3012,6 @@ const kandinsky5liteI2v5sModel: HuggingFaceModel = {
   versions: [kandinsky5liteI2v5sVersion],
 }
 
-// Kandinsky 5.0 Lite 文生图
 const kandinsky5liteT2iVersion: HuggingFaceVersion = {
   id: -10000182,
   name: 'v1.0',
@@ -3144,7 +3047,6 @@ const kandinsky5liteT2iModel: HuggingFaceModel = {
   versions: [kandinsky5liteT2iVersion],
 }
 
-// Kandinsky 5.0 Lite t2v SFT 5 秒文生视频
 const kandinsky5liteT2vSft5sVersion: HuggingFaceVersion = {
   id: -10000183,
   name: 'v1.0',
@@ -3180,7 +3082,6 @@ const kandinsky5liteT2vSft5sModel: HuggingFaceModel = {
   versions: [kandinsky5liteT2vSft5sVersion],
 }
 
-// Lens 文生图 (GPT-OSS 文本编码 + Flux.2 架构)
 const lensBf16Version: HuggingFaceVersion = {
   id: -10000184,
   name: 'v1.0',
@@ -3216,7 +3117,6 @@ const lensBf16Model: HuggingFaceModel = {
   versions: [lensBf16Version],
 }
 
-// Lens Turbo 快速文生图
 const lensTurboBf16Version: HuggingFaceVersion = {
   id: -10000185,
   name: 'v1.0',
@@ -3252,7 +3152,6 @@ const lensTurboBf16Model: HuggingFaceModel = {
   versions: [lensTurboBf16Version],
 }
 
-// LongCat-Image 文生图
 const longcatImageBf16Version: HuggingFaceVersion = {
   id: -10000186,
   name: 'v1.0',
@@ -3288,7 +3187,6 @@ const longcatImageBf16Model: HuggingFaceModel = {
   versions: [longcatImageBf16Version],
 }
 
-// LongCat-Image Edit 图像编辑
 const longcatImageEditBf16Version: HuggingFaceVersion = {
   id: -10000187,
   name: 'v1.0',
@@ -3324,7 +3222,6 @@ const longcatImageEditBf16Model: HuggingFaceModel = {
   versions: [longcatImageEditBf16Version],
 }
 
-// Lotus 单目深度估计模型
 const lotusDepthDV11Version: HuggingFaceVersion = {
   id: -10000188,
   name: 'v1.0',
@@ -3360,7 +3257,6 @@ const lotusDepthDV11Model: HuggingFaceModel = {
   versions: [lotusDepthDV11Version],
 }
 
-// LTX-2 19B Distilled 蒸馏视频生成 transformer
 const ltx219bDistilledTransformerOnlyBf16Version: HuggingFaceVersion = {
   id: -10000189,
   name: 'v1.0',
@@ -3396,7 +3292,6 @@ const ltx219bDistilledTransformerOnlyBf16Model: HuggingFaceModel = {
   versions: [ltx219bDistilledTransformerOnlyBf16Version],
 }
 
-// LTX-2.3 22B Dev 视频生成 transformer
 const ltx2322bDevTransformerOnlyBf16Version: HuggingFaceVersion = {
   id: -10000190,
   name: 'v1.0',
@@ -3432,7 +3327,6 @@ const ltx2322bDevTransformerOnlyBf16Model: HuggingFaceModel = {
   versions: [ltx2322bDevTransformerOnlyBf16Version],
 }
 
-// OmniGen2 通用文生图/图像编辑
 const omnigen2Fp16Version: HuggingFaceVersion = {
   id: -10000191,
   name: 'v1.0',
@@ -3468,7 +3362,6 @@ const omnigen2Fp16Model: HuggingFaceModel = {
   versions: [omnigen2Fp16Version],
 }
 
-// Ovis-Image 文生图
 const ovisImageBf16Version: HuggingFaceVersion = {
   id: -10000192,
   name: 'v1.0',
@@ -3504,7 +3397,6 @@ const ovisImageBf16Model: HuggingFaceModel = {
   versions: [ovisImageBf16Version],
 }
 
-// PiD Flux.1 1024→4096 像素级 4 步超分
 const pidFlux11024To40964stepBf16Version: HuggingFaceVersion = {
   id: -10000193,
   name: 'v1.0',
@@ -3540,7 +3432,6 @@ const pidFlux11024To40964stepBf16Model: HuggingFaceModel = {
   versions: [pidFlux11024To40964stepBf16Version],
 }
 
-// PixelDiT 1.3B 1024px 像素空间文生图
 const pixeldit1300m1024pxBf16Version: HuggingFaceVersion = {
   id: -10000194,
   name: 'v1.0',
@@ -3576,7 +3467,6 @@ const pixeldit1300m1024pxBf16Model: HuggingFaceModel = {
   versions: [pixeldit1300m1024pxBf16Version],
 }
 
-// Qwen-Image 2512 文生图/编辑
 const qwenImage2512Bf16Version: HuggingFaceVersion = {
   id: -10000195,
   name: 'v1.0',
@@ -3612,7 +3502,6 @@ const qwenImage2512Bf16Model: HuggingFaceModel = {
   versions: [qwenImage2512Bf16Version],
 }
 
-// Qwen-Image 2512 fp8 文生图/编辑
 const qwenImage2512Fp8E4m3fnVersion: HuggingFaceVersion = {
   id: -10000196,
   name: 'v1.0',
@@ -3648,7 +3537,6 @@ const qwenImage2512Fp8E4m3fnModel: HuggingFaceModel = {
   versions: [qwenImage2512Fp8E4m3fnVersion],
 }
 
-// Qwen-Image Edit 2509 fp8 图像编辑
 const qwenImageEdit2509Fp8E4m3fnVersion: HuggingFaceVersion = {
   id: -10000197,
   name: 'v1.0',
@@ -3684,7 +3572,6 @@ const qwenImageEdit2509Fp8E4m3fnModel: HuggingFaceModel = {
   versions: [qwenImageEdit2509Fp8E4m3fnVersion],
 }
 
-// Qwen-Image Edit 2511 图像编辑
 const qwenImageEdit2511Bf16Version: HuggingFaceVersion = {
   id: -10000198,
   name: 'v1.0',
@@ -3720,7 +3607,6 @@ const qwenImageEdit2511Bf16Model: HuggingFaceModel = {
   versions: [qwenImageEdit2511Bf16Version],
 }
 
-// Qwen-Image Edit fp8 图像编辑
 const qwenImageEditFp8E4m3fnVersion: HuggingFaceVersion = {
   id: -10000199,
   name: 'v1.0',
@@ -3756,7 +3642,6 @@ const qwenImageEditFp8E4m3fnModel: HuggingFaceModel = {
   versions: [qwenImageEditFp8E4m3fnVersion],
 }
 
-// Qwen-Image fp8 文生图
 const qwenImageFp8E4m3fnVersion: HuggingFaceVersion = {
   id: -10000200,
   name: 'v1.0',
@@ -3792,7 +3677,6 @@ const qwenImageFp8E4m3fnModel: HuggingFaceModel = {
   versions: [qwenImageFp8E4m3fnVersion],
 }
 
-// Qwen-Image Layered 分层图像生成
 const qwenImageLayeredBf16Version: HuggingFaceVersion = {
   id: -10000201,
   name: 'v1.0',
@@ -3828,7 +3712,6 @@ const qwenImageLayeredBf16Model: HuggingFaceModel = {
   versions: [qwenImageLayeredBf16Version],
 }
 
-// Qwen-Image Layered Control 分层控制图像生成
 const qwenImageLayeredControlBf16Version: HuggingFaceVersion = {
   id: -10000202,
   name: 'v1.0',
@@ -3864,7 +3747,6 @@ const qwenImageLayeredControlBf16Model: HuggingFaceModel = {
   versions: [qwenImageLayeredControlBf16Version],
 }
 
-// RT-DETR v4-X-HGNet 目标检测模型 (SDPose 用)
 const rtDetrV4XHgnetFp16Version: HuggingFaceVersion = {
   id: -10000203,
   name: 'v1.0',
@@ -3900,7 +3782,6 @@ const rtDetrV4XHgnetFp16Model: HuggingFaceModel = {
   versions: [rtDetrV4XHgnetFp16Version],
 }
 
-// TripoSplat 单图生成 3D 高斯泼溅
 const triposplatFp16Version: HuggingFaceVersion = {
   id: -10000204,
   name: 'v1.0',
@@ -3936,7 +3817,6 @@ const triposplatFp16Model: HuggingFaceModel = {
   versions: [triposplatFp16Version],
 }
 
-// VOID 视频物体删除 inpainting pass1
 const voidPass1Version: HuggingFaceVersion = {
   id: -10000205,
   name: 'v1.0',
@@ -3972,7 +3852,6 @@ const voidPass1Model: HuggingFaceModel = {
   versions: [voidPass1Version],
 }
 
-// VOID 视频物体删除 inpainting pass2
 const voidPass2Version: HuggingFaceVersion = {
   id: -10000206,
   name: 'v1.0',
@@ -4008,7 +3887,6 @@ const voidPass2Model: HuggingFaceModel = {
   versions: [voidPass2Version],
 }
 
-// Wan 2.1 FLF2V 首尾帧到视频 14B 720p
 const wan21Flf2v720p14BFp16Version: HuggingFaceVersion = {
   id: -10000207,
   name: 'v1.0',
@@ -4044,7 +3922,6 @@ const wan21Flf2v720p14BFp16Model: HuggingFaceModel = {
   versions: [wan21Flf2v720p14BFp16Version],
 }
 
-// Wan 2.1 Fun-Camera 相机控制 1.3B
 const wan21FunCameraV1113BBf16Version: HuggingFaceVersion = {
   id: -10000208,
   name: 'v1.0',
@@ -4080,7 +3957,6 @@ const wan21FunCameraV1113BBf16Model: HuggingFaceModel = {
   versions: [wan21FunCameraV1113BBf16Version],
 }
 
-// Wan 2.1 Fun-Camera 相机控制 14B
 const wan21FunCameraV1114BBf16Version: HuggingFaceVersion = {
   id: -10000209,
   name: 'v1.0',
@@ -4116,7 +3992,6 @@ const wan21FunCameraV1114BBf16Model: HuggingFaceModel = {
   versions: [wan21FunCameraV1114BBf16Version],
 }
 
-// Wan 2.1 Fun-Control 视频控制 1.3B
 const wan21FunControl13BBf16Version: HuggingFaceVersion = {
   id: -10000210,
   name: 'v1.0',
@@ -4152,7 +4027,6 @@ const wan21FunControl13BBf16Model: HuggingFaceModel = {
   versions: [wan21FunControl13BBf16Version],
 }
 
-// Wan 2.1 Fun-Inpaint 视频修复 1.3B
 const wan21FunInp13BBf16Version: HuggingFaceVersion = {
   id: -10000211,
   name: 'v1.0',
@@ -4188,7 +4062,6 @@ const wan21FunInp13BBf16Model: HuggingFaceModel = {
   versions: [wan21FunInp13BBf16Version],
 }
 
-// Wan 2.1 i2v 480p 14B 图生视频
 const wan21I2v480p14BFp16Version: HuggingFaceVersion = {
   id: -10000212,
   name: 'v1.0',
@@ -4224,7 +4097,6 @@ const wan21I2v480p14BFp16Model: HuggingFaceModel = {
   versions: [wan21I2v480p14BFp16Version],
 }
 
-// Wan 2.1 t2v 1.3B 文生视频
 const wan21T2v13BFp16Version: HuggingFaceVersion = {
   id: -10000213,
   name: 'v1.0',
@@ -4260,7 +4132,6 @@ const wan21T2v13BFp16Model: HuggingFaceModel = {
   versions: [wan21T2v13BFp16Version],
 }
 
-// Wan 2.1 t2v 14B fp8 文生视频
 const wan21T2v14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000214,
   name: 'v1.0',
@@ -4296,7 +4167,6 @@ const wan21T2v14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan21T2v14BFp8ScaledVersion],
 }
 
-// Wan 2.1 VACE 视频编辑 1.3B
 const wan21Vace13BFp16Version: HuggingFaceVersion = {
   id: -10000215,
   name: 'v1.0',
@@ -4332,7 +4202,6 @@ const wan21Vace13BFp16Model: HuggingFaceModel = {
   versions: [wan21Vace13BFp16Version],
 }
 
-// Wan 2.1 VACE 视频编辑 14B
 const wan21Vace14BFp16Version: HuggingFaceVersion = {
   id: -10000216,
   name: 'v1.0',
@@ -4368,7 +4237,6 @@ const wan21Vace14BFp16Model: HuggingFaceModel = {
   versions: [wan21Vace14BFp16Version],
 }
 
-// Wan 2.2 Fun-Camera 相机控制 high_noise 14B (i2v)
 const wan22FunCameraHighNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000217,
   name: 'v1.0',
@@ -4404,7 +4272,6 @@ const wan22FunCameraHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22FunCameraHighNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 Fun-Camera 相机控制 low_noise 14B (i2v)
 const wan22FunCameraLowNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000218,
   name: 'v1.0',
@@ -4440,7 +4307,6 @@ const wan22FunCameraLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22FunCameraLowNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 Fun-Control 视频控制 5B
 const wan22FunControl5BBf16Version: HuggingFaceVersion = {
   id: -10000219,
   name: 'v1.0',
@@ -4476,7 +4342,6 @@ const wan22FunControl5BBf16Model: HuggingFaceModel = {
   versions: [wan22FunControl5BBf16Version],
 }
 
-// Wan 2.2 Fun-Control 视频控制 high_noise 14B (i2v)
 const wan22FunControlHighNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000220,
   name: 'v1.0',
@@ -4512,7 +4377,6 @@ const wan22FunControlHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22FunControlHighNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 Fun-Control 视频控制 low_noise 14B (i2v)
 const wan22FunControlLowNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000221,
   name: 'v1.0',
@@ -4548,7 +4412,6 @@ const wan22FunControlLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22FunControlLowNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 Fun-Inpaint 视频修复 5B
 const wan22FunInpaint5BBf16Version: HuggingFaceVersion = {
   id: -10000222,
   name: 'v1.0',
@@ -4584,7 +4447,6 @@ const wan22FunInpaint5BBf16Model: HuggingFaceModel = {
   versions: [wan22FunInpaint5BBf16Version],
 }
 
-// Wan 2.2 Fun-Inpaint 视频修复 high_noise 14B (i2v)
 const wan22FunInpaintHighNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000223,
   name: 'v1.0',
@@ -4620,7 +4482,6 @@ const wan22FunInpaintHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22FunInpaintHighNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 Fun-Inpaint 视频修复 low_noise 14B (i2v)
 const wan22FunInpaintLowNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000224,
   name: 'v1.0',
@@ -4656,7 +4517,6 @@ const wan22FunInpaintLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22FunInpaintLowNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 i2v high_noise 14B 图生视频
 const wan22I2vHighNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000225,
   name: 'v1.0',
@@ -4692,7 +4552,6 @@ const wan22I2vHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22I2vHighNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 i2v low_noise 14B 图生视频
 const wan22I2vLowNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000226,
   name: 'v1.0',
@@ -4728,7 +4587,6 @@ const wan22I2vLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22I2vLowNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 S2V 音频驱动视频 14B (基于 t2v)
 const wan22S2v14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000227,
   name: 'v1.0',
@@ -4764,7 +4622,6 @@ const wan22S2v14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22S2v14BFp8ScaledVersion],
 }
 
-// Wan 2.2 t2v high_noise 14B 文生视频
 const wan22T2vHighNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000228,
   name: 'v1.0',
@@ -4800,7 +4657,6 @@ const wan22T2vHighNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22T2vHighNoise14BFp8ScaledVersion],
 }
 
-// Wan 2.2 t2v low_noise 14B 文生视频
 const wan22T2vLowNoise14BFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000229,
   name: 'v1.0',
@@ -4836,7 +4692,6 @@ const wan22T2vLowNoise14BFp8ScaledModel: HuggingFaceModel = {
   versions: [wan22T2vLowNoise14BFp8ScaledVersion],
 }
 
-// Z-Image Turbo 快速文生图
 const zImageTurboBf16Version: HuggingFaceVersion = {
   id: -10000230,
   name: 'v1.0',
@@ -4871,9 +4726,7 @@ const zImageTurboBf16Model: HuggingFaceModel = {
   version: zImageTurboBf16Version,
   versions: [zImageTurboBf16Version],
 }
-// ── loras ────────────────────────────────────────────────────────────────────
 
-// FireRed-Image-Edit 图像编辑模型 8 步 Lightning 加速 LoRA
 const fireRedImageEdit10Lightning8stepsV10Version: HuggingFaceVersion = {
   id: -10000231,
   name: 'v1.0',
@@ -4909,7 +4762,6 @@ const fireRedImageEdit10Lightning8stepsV10Model: HuggingFaceModel = {
   versions: [fireRedImageEdit10Lightning8stepsV10Version],
 }
 
-// Flux.2 dev Turbo 加速 LoRA (ByteZSzn, LoraLoaderModelOnly)
 const flux2TurboLoRAComfyuiVersion: HuggingFaceVersion = {
   id: -10000232,
   name: 'v1.0',
@@ -4945,7 +4797,6 @@ const flux2TurboLoRAComfyuiModel: HuggingFaceModel = {
   versions: [flux2TurboLoRAComfyuiVersion],
 }
 
-// 风格 LoRA, 将任意物体变成玩具/可动人偶 (触发词 "action the ...")
 const qWENEDITACTIONV1Version: HuggingFaceVersion = {
   id: -10000233,
   name: 'v1.0',
@@ -4981,7 +4832,6 @@ const qWENEDITACTIONV1Model: HuggingFaceModel = {
   versions: [qWENEDITACTIONV1Version],
 }
 
-// 多角度/镜头移动控制 LoRA (dx8152, 无触发词)
 const qwenEdit2509MultipleAnglesVersion: HuggingFaceVersion = {
   id: -10000234,
   name: 'v1.0',
@@ -5017,7 +4867,6 @@ const qwenEdit2509MultipleAnglesModel: HuggingFaceModel = {
   versions: [qwenEdit2509MultipleAnglesVersion],
 }
 
-// Qwen Image 2512 4 步蒸馏加速 LoRA (Lightning)
 const qwenImage2512Lightning4stepsV10Fp32Version: HuggingFaceVersion = {
   id: -10000235,
   name: 'v1.0',
@@ -5053,7 +4902,6 @@ const qwenImage2512Lightning4stepsV10Fp32Model: HuggingFaceModel = {
   versions: [qwenImage2512Lightning4stepsV10Fp32Version],
 }
 
-// 风格转写实 LoRA (Anything2Real, 任意画风转照片, 强度 0.75-0.9)
 const qwenImageEdit2509Anything2RealAlphaVersion: HuggingFaceVersion = {
   id: -10000236,
   name: 'v1.0',
@@ -5089,7 +4937,6 @@ const qwenImageEdit2509Anything2RealAlphaModel: HuggingFaceModel = {
   versions: [qwenImageEdit2509Anything2RealAlphaVersion],
 }
 
-// 图像融合/产品溶图 LoRA (dx8152, 触发词 "溶图")
 const qwenImageEdit2509FusionVersion: HuggingFaceVersion = {
   id: -10000237,
   name: 'v1.0',
@@ -5125,7 +4972,6 @@ const qwenImageEdit2509FusionModel: HuggingFaceModel = {
   versions: [qwenImageEdit2509FusionVersion],
 }
 
-// 光照迁移/二次打光 LoRA (dx8152)
 const qwenImageEdit2509LightMigrationVersion: HuggingFaceVersion = {
   id: -10000238,
   name: 'v1.0',
@@ -5161,7 +5007,6 @@ const qwenImageEdit2509LightMigrationModel: HuggingFaceModel = {
   versions: [qwenImageEdit2509LightMigrationVersion],
 }
 
-// Qwen Image Edit 2509 4 步蒸馏加速 LoRA (Lightning)
 const qwenImageEdit2509Lightning4stepsV10Bf16Version: HuggingFaceVersion = {
   id: -10000239,
   name: 'v1.0',
@@ -5197,7 +5042,6 @@ const qwenImageEdit2509Lightning4stepsV10Bf16Model: HuggingFaceModel = {
   versions: [qwenImageEdit2509Lightning4stepsV10Bf16Version],
 }
 
-// Qwen Image Edit 2509 8 步蒸馏加速 LoRA (Lightning)
 const qwenImageEdit2509Lightning8stepsV10Bf16Version: HuggingFaceVersion = {
   id: -10000240,
   name: 'v1.0',
@@ -5233,7 +5077,6 @@ const qwenImageEdit2509Lightning8stepsV10Bf16Model: HuggingFaceModel = {
   versions: [qwenImageEdit2509Lightning8stepsV10Bf16Version],
 }
 
-// 重打光 LoRA (dx8152, 触发词 "重新照明")
 const qwenImageEdit2509RelightVersion: HuggingFaceVersion = {
   id: -10000241,
   name: 'v1.0',
@@ -5269,7 +5112,6 @@ const qwenImageEdit2509RelightModel: HuggingFaceModel = {
   versions: [qwenImageEdit2509RelightVersion],
 }
 
-// Qwen Image Edit 2511 4 步蒸馏加速 LoRA (Lightning)
 const qwenImageEdit2511Lightning4stepsV10Bf16Version: HuggingFaceVersion = {
   id: -10000242,
   name: 'v1.0',
@@ -5305,7 +5147,6 @@ const qwenImageEdit2511Lightning4stepsV10Bf16Model: HuggingFaceModel = {
   versions: [qwenImageEdit2511Lightning4stepsV10Bf16Version],
 }
 
-// Qwen Image Edit 4 步蒸馏加速 LoRA (Lightning 早期版)
 const qwenImageEditLightning4stepsV10Bf16Version: HuggingFaceVersion = {
   id: -10000243,
   name: 'v1.0',
@@ -5341,7 +5182,6 @@ const qwenImageEditLightning4stepsV10Bf16Model: HuggingFaceModel = {
   versions: [qwenImageEditLightning4stepsV10Bf16Version],
 }
 
-// Qwen Image 4 步蒸馏加速 LoRA (Lightning)
 const qwenImageLightning4stepsV10Version: HuggingFaceVersion = {
   id: -10000244,
   name: 'v1.0',
@@ -5377,7 +5217,6 @@ const qwenImageLightning4stepsV10Model: HuggingFaceModel = {
   versions: [qwenImageLightning4stepsV10Version],
 }
 
-// Qwen Image 8 步蒸馏加速 LoRA (Lightning)
 const qwenImageLightning8stepsV10Version: HuggingFaceVersion = {
   id: -10000245,
   name: 'v1.0',
@@ -5413,7 +5252,6 @@ const qwenImageLightning8stepsV10Model: HuggingFaceModel = {
   versions: [qwenImageLightning8stepsV10Version],
 }
 
-// 风格 LoRA, 让物体膨胀 (触发词 "inflate the ...")
 const sYSTMSINFL8LoRAQwenImageEdit2511Version: HuggingFaceVersion = {
   id: -10000246,
   name: 'v1.0',
@@ -5449,7 +5287,6 @@ const sYSTMSINFL8LoRAQwenImageEdit2511Model: HuggingFaceModel = {
   versions: [sYSTMSINFL8LoRAQwenImageEdit2511Version],
 }
 
-// Wan 2.2 i2v 4 步加速 LoRA (high noise, Kijai 旧版)
 const wan22LightningI2VA14B4stepsLoraHIGHFp16Version: HuggingFaceVersion = {
   id: -10000247,
   name: 'v1.0',
@@ -5485,7 +5322,6 @@ const wan22LightningI2VA14B4stepsLoraHIGHFp16Model: HuggingFaceModel = {
   versions: [wan22LightningI2VA14B4stepsLoraHIGHFp16Version],
 }
 
-// Wan 2.2 i2v 4 步加速 LoRA (low noise, Kijai 旧版)
 const wan22LightningI2VA14B4stepsLoraLOWFp16Version: HuggingFaceVersion = {
   id: -10000248,
   name: 'v1.0',
@@ -5521,7 +5357,6 @@ const wan22LightningI2VA14B4stepsLoraLOWFp16Model: HuggingFaceModel = {
   versions: [wan22LightningI2VA14B4stepsLoraLOWFp16Version],
 }
 
-// Wan 2.1 T2V 14B CausVid 蒸馏 LoRA (实验性, v1)
 const wan21CausVid14BT2VLoraRank32Version: HuggingFaceVersion = {
   id: -10000249,
   name: 'v1.0',
@@ -5557,7 +5392,6 @@ const wan21CausVid14BT2VLoraRank32Model: HuggingFaceModel = {
   versions: [wan21CausVid14BT2VLoraRank32Version],
 }
 
-// Wan 2.1 T2V 14B CausVid 蒸馏 LoRA v2 (剪枝版, 仅 attention 层)
 const wan21CausVid14BT2VLoraRank32V2Version: HuggingFaceVersion = {
   id: -10000250,
   name: 'v1.0',
@@ -5593,7 +5427,6 @@ const wan21CausVid14BT2VLoraRank32V2Model: HuggingFaceModel = {
   versions: [wan21CausVid14BT2VLoraRank32V2Version],
 }
 
-// Wan 2.1 T2V 1.3B CausVid 蒸馏 LoRA (实验性)
 const wan21CausVidBidirect2T2V13BLoraRank32Version: HuggingFaceVersion = {
   id: -10000251,
   name: 'v1.0',
@@ -5629,7 +5462,6 @@ const wan21CausVidBidirect2T2V13BLoraRank32Model: HuggingFaceModel = {
   versions: [wan21CausVidBidirect2T2V13BLoraRank32Version],
 }
 
-// Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏加速 LoRA (rank32)
 const wan21T2V14BLightx2vCfgStepDistillLoraRank32Version: HuggingFaceVersion = {
   id: -10000252,
   name: 'v1.0',
@@ -5665,7 +5497,6 @@ const wan21T2V14BLightx2vCfgStepDistillLoraRank32Model: HuggingFaceModel = {
   versions: [wan21T2V14BLightx2vCfgStepDistillLoraRank32Version],
 }
 
-// Wan 2.2 Animate 角色替换重打光 LoRA (relighting)
 const wanAnimateRelightLoraFp16Version: HuggingFaceVersion = {
   id: -10000253,
   name: 'v1.0',
@@ -5701,7 +5532,6 @@ const wanAnimateRelightLoraFp16Model: HuggingFaceModel = {
   versions: [wanAnimateRelightLoraFp16Version],
 }
 
-// Qwen Image 2512 2 步 Turbo 加速 LoRA (Wuli 团队)
 const wuliQwenImage2512TurboLoRA2stepsV10Bf16Version: HuggingFaceVersion = {
   id: -10000254,
   name: 'v1.0',
@@ -5737,7 +5567,6 @@ const wuliQwenImage2512TurboLoRA2stepsV10Bf16Model: HuggingFaceModel = {
   versions: [wuliQwenImage2512TurboLoRA2stepsV10Bf16Version],
 }
 
-// NVIDIA ChronoEdit 图像编辑模型 8 步蒸馏加速 LoRA (基于 Wan 2.1 I2V 14B)
 const chronoeditDistillLoraVersion: HuggingFaceVersion = {
   id: -10000255,
   name: 'v1.0',
@@ -5773,7 +5602,6 @@ const chronoeditDistillLoraModel: HuggingFaceModel = {
   versions: [chronoeditDistillLoraVersion],
 }
 
-// FLUX.1 depth 深度条件控制 LoRA
 const flux1DepthDevLoraVersion: HuggingFaceVersion = {
   id: -10000256,
   name: 'v1.0',
@@ -5809,7 +5637,6 @@ const flux1DepthDevLoraModel: HuggingFaceModel = {
   versions: [flux1DepthDevLoraVersion],
 }
 
-// LTX-2 文本编码器 LoRA (Gemma 3 12B abliterated, rank 64)
 const gemma312bItAbliteratedLoraRank64Bf16Version: HuggingFaceVersion = {
   id: -10000257,
   name: 'v1.0',
@@ -5845,7 +5672,6 @@ const gemma312bItAbliteratedLoraRank64Bf16Model: HuggingFaceModel = {
   versions: [gemma312bItAbliteratedLoraRank64Bf16Version],
 }
 
-// LTX-2.3 搞笑风 LoRA, 给主体贴巨大"金鱼眼"贴纸 (触发词 googlyeyes)
 const googlyeyesLtx23Rank32Step03000Version: HuggingFaceVersion = {
   id: -10000258,
   name: 'v1.0',
@@ -5881,7 +5707,6 @@ const googlyeyesLtx23Rank32Step03000Model: HuggingFaceModel = {
   versions: [googlyeyesLtx23Rank32Step03000Version],
 }
 
-// 软糖(gummy)风格 LoRA, 把物体/动物变成半透明糖霜软糖
 const gummycandyQwenVersion: HuggingFaceVersion = {
   id: -10000259,
   name: 'v1.0',
@@ -5917,7 +5742,6 @@ const gummycandyQwenModel: HuggingFaceModel = {
   versions: [gummycandyQwenVersion],
 }
 
-// 插画/漫画/动漫综合风格 LoRA (无需触发词)
 const illustration10QwenImageVersion: HuggingFaceVersion = {
   id: -10000260,
   name: 'v1.0',
@@ -5953,7 +5777,6 @@ const illustration10QwenImageModel: HuggingFaceModel = {
   versions: [illustration10QwenImageVersion],
 }
 
-// Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏 LoRA (自适应 rank)
 const lightx2v14BT2VCfgStepDistillLoraAdaptiveRankQuantile015Bf16Version: HuggingFaceVersion = {
   id: -10000261,
   name: 'v1.0',
@@ -5989,7 +5812,6 @@ const lightx2v14BT2VCfgStepDistillLoraAdaptiveRankQuantile015Bf16Model: HuggingF
   versions: [lightx2v14BT2VCfgStepDistillLoraAdaptiveRankQuantile015Bf16Version],
 }
 
-// Wan 2.1 I2V 14B 480p lightx2v CFG+步数蒸馏加速 LoRA (rank128)
 const lightx2vI2V14B480pCfgStepDistillRank128Bf16Version: HuggingFaceVersion = {
   id: -10000262,
   name: 'v1.0',
@@ -6025,7 +5847,6 @@ const lightx2vI2V14B480pCfgStepDistillRank128Bf16Model: HuggingFaceModel = {
   versions: [lightx2vI2V14B480pCfgStepDistillRank128Bf16Version],
 }
 
-// Wan 2.1 I2V 14B 480p lightx2v CFG+步数蒸馏加速 LoRA (rank64)
 const lightx2vI2V14B480pCfgStepDistillRank64Bf16Version: HuggingFaceVersion = {
   id: -10000263,
   name: 'v1.0',
@@ -6061,7 +5882,6 @@ const lightx2vI2V14B480pCfgStepDistillRank64Bf16Model: HuggingFaceModel = {
   versions: [lightx2vI2V14B480pCfgStepDistillRank64Bf16Version],
 }
 
-// Wan 2.1 T2V 14B lightx2v CFG+步数蒸馏 LoRA v2 (rank64)
 const lightx2vT2V14BCfgStepDistillV2LoraRank64Bf16Version: HuggingFaceVersion = {
   id: -10000264,
   name: 'v1.0',
@@ -6097,7 +5917,6 @@ const lightx2vT2V14BCfgStepDistillV2LoraRank64Bf16Model: HuggingFaceModel = {
   versions: [lightx2vT2V14BCfgStepDistillV2LoraRank64Bf16Version],
 }
 
-// LTX-2 IC-LoRA Canny 边缘结构控制
 const ltx219bIcLoraCannyControlVersion: HuggingFaceVersion = {
   id: -10000265,
   name: 'v1.0',
@@ -6133,7 +5952,6 @@ const ltx219bIcLoraCannyControlModel: HuggingFaceModel = {
   versions: [ltx219bIcLoraCannyControlVersion],
 }
 
-// LTX-2 IC-LoRA 深度结构控制
 const ltx219bIcLoraDepthControlVersion: HuggingFaceVersion = {
   id: -10000266,
   name: 'v1.0',
@@ -6169,7 +5987,6 @@ const ltx219bIcLoraDepthControlModel: HuggingFaceModel = {
   versions: [ltx219bIcLoraDepthControlVersion],
 }
 
-// LTX-2 IC-LoRA 姿态结构控制
 const ltx219bIcLoraPoseControlVersion: HuggingFaceVersion = {
   id: -10000267,
   name: 'v1.0',
@@ -6205,7 +6022,6 @@ const ltx219bIcLoraPoseControlModel: HuggingFaceModel = {
   versions: [ltx219bIcLoraPoseControlVersion],
 }
 
-// LTX-2 镜头运动控制 LoRA (Dolly Left 左移)
 const ltx219bLoraCameraControlDollyLeftVersion: HuggingFaceVersion = {
   id: -10000268,
   name: 'v1.0',
@@ -6241,7 +6057,6 @@ const ltx219bLoraCameraControlDollyLeftModel: HuggingFaceModel = {
   versions: [ltx219bLoraCameraControlDollyLeftVersion],
 }
 
-// LTX-2.3 蒸馏 LoRA v1.1 (8 步, CFG=1)
 const ltx2322bDistilledLora38411Version: HuggingFaceVersion = {
   id: -10000269,
   name: 'v1.0',
@@ -6277,7 +6092,6 @@ const ltx2322bDistilledLora38411Model: HuggingFaceModel = {
   versions: [ltx2322bDistilledLora38411Version],
 }
 
-// LTX-2.3 蒸馏 LoRA (8 步, CFG=1)
 const ltx2322bDistilledLora384Version: HuggingFaceVersion = {
   id: -10000270,
   name: 'v1.0',
@@ -6313,7 +6127,6 @@ const ltx2322bDistilledLora384Model: HuggingFaceModel = {
   versions: [ltx2322bDistilledLora384Version],
 }
 
-// LTX-2.3 IC-LoRA 视频画布外扩 (outpaint, 黑色区域填充)
 const ltx2322bIcLoraOutpaintVersion: HuggingFaceVersion = {
   id: -10000271,
   name: 'v1.0',
@@ -6349,7 +6162,6 @@ const ltx2322bIcLoraOutpaintModel: HuggingFaceModel = {
   versions: [ltx2322bIcLoraOutpaintVersion],
 }
 
-// LTX-2.3 IC-LoRA 统一结构控制 (canny+depth+pose, 参考降采样 0.5)
 const ltx2322bIcLoraUnionControlRef05Version: HuggingFaceVersion = {
   id: -10000272,
   name: 'v1.0',
@@ -6385,7 +6197,6 @@ const ltx2322bIcLoraUnionControlRef05Model: HuggingFaceModel = {
   versions: [ltx2322bIcLoraUnionControlRef05Version],
 }
 
-// LTX-2.3 人物身份保持 LoRA (TalkVid-3K, 说话/口播场景)
 const ltx23IdLoraTalkvid3kVersion: HuggingFaceVersion = {
   id: -10000273,
   name: 'v1.0',
@@ -6421,7 +6232,6 @@ const ltx23IdLoraTalkvid3kModel: HuggingFaceModel = {
   versions: [ltx23IdLoraTalkvid3kVersion],
 }
 
-// LTX-2 挤压变形风格 LoRA (触发词 "squish it")
 const ltx2SquishVersion: HuggingFaceVersion = {
   id: -10000274,
   name: 'v1.0',
@@ -6457,7 +6267,6 @@ const ltx2SquishModel: HuggingFaceModel = {
   versions: [ltx2SquishVersion],
 }
 
-// LTX-2.3 场景/角色转场变形 LoRA (触发词 zhuanchang)
 const ltx23TransitionVersion: HuggingFaceVersion = {
   id: -10000275,
   name: 'v1.0',
@@ -6493,7 +6302,6 @@ const ltx23TransitionModel: HuggingFaceModel = {
   versions: [ltx23TransitionVersion],
 }
 
-// LTX-2.3 蒸馏 LoRA v1.1 (动态 rank, 平均 111, bf16)
 const ltx2322bDistilled11LoraDynamicFro09AvgRank111Bf16Version: HuggingFaceVersion = {
   id: -10000276,
   name: 'v1.0',
@@ -6529,7 +6337,6 @@ const ltx2322bDistilled11LoraDynamicFro09AvgRank111Bf16Model: HuggingFaceModel =
   versions: [ltx2322bDistilled11LoraDynamicFro09AvgRank111Bf16Version],
 }
 
-// Z-Image Turbo 像素画风格 LoRA (触发词 "Pixel art style.")
 const pixelArtStyleZImageTurboVersion: HuggingFaceVersion = {
   id: -10000277,
   name: 'v1.0',
@@ -6565,7 +6372,6 @@ const pixelArtStyleZImageTurboModel: HuggingFaceModel = {
   versions: [pixelArtStyleZImageTurboVersion],
 }
 
-// 360° 全景 equirectangular 生成 LoRA (基于 Qwen Image 2512, rank128)
 const qwen360Diffusion2512Int8Bf16V2Version: HuggingFaceVersion = {
   id: -10000278,
   name: 'v1.0',
@@ -6601,7 +6407,6 @@ const qwen360Diffusion2512Int8Bf16V2Model: HuggingFaceModel = {
   versions: [qwen360Diffusion2512Int8Bf16V2Version],
 }
 
-// 多角度相机控制 LoRA (fal, 96 机位, 触发词 <sks> 方位词)
 const qwenImageEdit2511MultipleAnglesLoraVersion: HuggingFaceVersion = {
   id: -10000279,
   name: 'v1.0',
@@ -6637,7 +6442,6 @@ const qwenImageEdit2511MultipleAnglesLoraModel: HuggingFaceModel = {
   versions: [qwenImageEdit2511MultipleAnglesLoraVersion],
 }
 
-// Qwen Image 统一结构控制 LoRA (canny/depth/pose/lineart/softedge/normal/openpose)
 const qwenImageUnionDiffsynthLoraVersion: HuggingFaceVersion = {
   id: -10000280,
   name: 'v1.0',
@@ -6673,7 +6477,6 @@ const qwenImageUnionDiffsynthLoraModel: HuggingFaceModel = {
   versions: [qwenImageUnionDiffsynthLoraVersion],
 }
 
-// Flux Fill 物体移除 LoRA (Object Removal v2.0, 需遮罩, 非商用)
 const removalTimestepAlpha21740Version: HuggingFaceVersion = {
   id: -10000281,
   name: 'v1.0',
@@ -6709,7 +6512,6 @@ const removalTimestepAlpha21740Model: HuggingFaceModel = {
   versions: [removalTimestepAlpha21740Version],
 }
 
-// 字节跳动 USO 统一风格/主体定制 LoRA (需配合 projector model patch)
 const usoFlux1DitLoraV1Version: HuggingFaceVersion = {
   id: -10000282,
   name: 'v1.0',
@@ -6745,7 +6547,6 @@ const usoFlux1DitLoraV1Model: HuggingFaceModel = {
   versions: [usoFlux1DitLoraV1Version],
 }
 
-// Wan 2.2 i2v 4 步蒸馏 LoRA (high noise, rank64, lightx2v)
 const wan22I2vA14bHighNoiseLoraRank64Lightx2v4step1022Version: HuggingFaceVersion = {
   id: -10000283,
   name: 'v1.0',
@@ -6781,7 +6582,6 @@ const wan22I2vA14bHighNoiseLoraRank64Lightx2v4step1022Model: HuggingFaceModel = 
   versions: [wan22I2vA14bHighNoiseLoraRank64Lightx2v4step1022Version],
 }
 
-// Wan 2.2 i2v 4 步蒸馏 LoRA (low noise, rank64, lightx2v)
 const wan22I2vA14bLowNoiseLoraRank64Lightx2v4step1022Version: HuggingFaceVersion = {
   id: -10000284,
   name: 'v1.0',
@@ -6817,7 +6617,6 @@ const wan22I2vA14bLowNoiseLoraRank64Lightx2v4step1022Model: HuggingFaceModel = {
   versions: [wan22I2vA14bLowNoiseLoraRank64Lightx2v4step1022Version],
 }
 
-// Wan 2.2 i2v 4 步加速 LoRA (low noise, ComfyUI 官方 repackaged)
 const wan22I2vLightx2v4stepsLoraV1LowNoiseVersion: HuggingFaceVersion = {
   id: -10000285,
   name: 'v1.0',
@@ -6853,7 +6652,6 @@ const wan22I2vLightx2v4stepsLoraV1LowNoiseModel: HuggingFaceModel = {
   versions: [wan22I2vLightx2v4stepsLoraV1LowNoiseVersion],
 }
 
-// Wan 2.2 t2v 4 步加速 LoRA v1.1 (high noise)
 const wan22T2vLightx2v4stepsLoraV11HighNoiseVersion: HuggingFaceVersion = {
   id: -10000286,
   name: 'v1.0',
@@ -6889,7 +6687,6 @@ const wan22T2vLightx2v4stepsLoraV11HighNoiseModel: HuggingFaceModel = {
   versions: [wan22T2vLightx2v4stepsLoraV11HighNoiseVersion],
 }
 
-// Wan 2.2 t2v 4 步加速 LoRA v1.1 (low noise)
 const wan22T2vLightx2v4stepsLoraV11LowNoiseVersion: HuggingFaceVersion = {
   id: -10000287,
   name: 'v1.0',
@@ -6925,7 +6722,6 @@ const wan22T2vLightx2v4stepsLoraV11LowNoiseModel: HuggingFaceModel = {
   versions: [wan22T2vLightx2v4stepsLoraV11LowNoiseVersion],
 }
 
-// Wan 2.1 A14B RGBA 透明通道(alpha)生成 LoRA
 const wanAlpha21RgbaLoraVersion: HuggingFaceVersion = {
   id: -10000288,
   name: 'v1.0',
@@ -6960,9 +6756,7 @@ const wanAlpha21RgbaLoraModel: HuggingFaceModel = {
   version: wanAlpha21RgbaLoraVersion,
   versions: [wanAlpha21RgbaLoraVersion],
 }
-// ── controlnet ───────────────────────────────────────────────────────────────
 
-// Qwen-Image-2512 的 Fun Union ControlNet (Canny/HED/Depth/Pose/MLSD/Scribble/Gray)
 const qwenImage2512FunControlnetUnion2602Version: HuggingFaceVersion = {
   id: -10000289,
   name: 'v1.0',
@@ -6998,7 +6792,6 @@ const qwenImage2512FunControlnetUnion2602Model: HuggingFaceModel = {
   versions: [qwenImage2512FunControlnetUnion2602Version],
 }
 
-// Qwen-Image 的 InstantX ControlNet (Inpainting 重绘)
 const qwenImageInstantXControlNetInpaintingVersion: HuggingFaceVersion = {
   id: -10000290,
   name: 'v1.0',
@@ -7034,7 +6827,6 @@ const qwenImageInstantXControlNetInpaintingModel: HuggingFaceModel = {
   versions: [qwenImageInstantXControlNetInpaintingVersion],
 }
 
-// Qwen-Image 的 InstantX Union ControlNet (多条件统一)
 const qwenImageInstantXControlNetUnionVersion: HuggingFaceVersion = {
   id: -10000291,
   name: 'v1.0',
@@ -7070,7 +6862,6 @@ const qwenImageInstantXControlNetUnionModel: HuggingFaceModel = {
   versions: [qwenImageInstantXControlNetUnionVersion],
 }
 
-// SD 3.5 Large 的模糊 ControlNet
 const sd35LargeControlnetBlurVersion: HuggingFaceVersion = {
   id: -10000292,
   name: 'v1.0',
@@ -7105,9 +6896,7 @@ const sd35LargeControlnetBlurModel: HuggingFaceModel = {
   version: sd35LargeControlnetBlurVersion,
   versions: [sd35LargeControlnetBlurVersion],
 }
-// ── vae ──────────────────────────────────────────────────────────────────────
 
-// Wan 2.1 官方 VAE (fp32 版), 精度更高但体积更大
 const wan21VAEFp32Version: HuggingFaceVersion = {
   id: -10000293,
   name: 'v1.0',
@@ -7143,7 +6932,6 @@ const wan21VAEFp32Model: HuggingFaceModel = {
   versions: [wan21VAEFp32Version],
 }
 
-// Ace-Step 1.5 音乐生成模型的音频 VAE
 const ace15VaeVersion: HuggingFaceVersion = {
   id: -10000294,
   name: 'v1.0',
@@ -7179,7 +6967,6 @@ const ace15VaeModel: HuggingFaceModel = {
   versions: [ace15VaeVersion],
 }
 
-// VOID 视频抠除模型 (基于 CogVideoX-2b) 的 VAE
 const cogvideoxVaeVersion: HuggingFaceVersion = {
   id: -10000295,
   name: 'v1.0',
@@ -7215,7 +7002,6 @@ const cogvideoxVaeModel: HuggingFaceModel = {
   versions: [cogvideoxVaeVersion],
 }
 
-// FLUX.2 系列专用的 Tripo VAE (也用于 TripoSplat 3D 管线)
 const flux2VaeVersion: HuggingFaceVersion = {
   id: -10000296,
   name: 'v1.0',
@@ -7251,7 +7037,6 @@ const flux2VaeModel: HuggingFaceModel = {
   versions: [flux2VaeVersion],
 }
 
-// FLUX.2 Small Decoder — 蒸馏版小解码器 VAE (解码更快、省显存)
 const fullEncoderSmallDecoderVersion: HuggingFaceVersion = {
   id: -10000297,
   name: 'v1.0',
@@ -7287,7 +7072,6 @@ const fullEncoderSmallDecoderModel: HuggingFaceModel = {
   versions: [fullEncoderSmallDecoderVersion],
 }
 
-// 混元视频 HunyuanVideo 的 VAE (bf16)
 const hunyuanVideoVaeBf16Version: HuggingFaceVersion = {
   id: -10000298,
   name: 'v1.0',
@@ -7323,7 +7107,6 @@ const hunyuanVideoVaeBf16Model: HuggingFaceModel = {
   versions: [hunyuanVideoVaeBf16Version],
 }
 
-// 混元视频 1.5 (HunyuanVideo 1.5 / Capybara) 的 VAE
 const hunyuanvideo15VaeFp16Version: HuggingFaceVersion = {
   id: -10000299,
   name: 'v1.0',
@@ -7359,7 +7142,6 @@ const hunyuanvideo15VaeFp16Model: HuggingFaceModel = {
   versions: [hunyuanvideo15VaeFp16Version],
 }
 
-// Qwen-Image-Layered 分层 RGBA 分解模型的专属 VAE
 const qwenImageLayeredVaeVersion: HuggingFaceVersion = {
   id: -10000300,
   name: 'v1.0',
@@ -7395,7 +7177,6 @@ const qwenImageLayeredVaeModel: HuggingFaceModel = {
   versions: [qwenImageLayeredVaeVersion],
 }
 
-// Qwen-Image 系列 VAE (Qwen-Image 2.0/Edit/2512 共用)
 const qwenImageVaeVersion: HuggingFaceVersion = {
   id: -10000301,
   name: 'v1.0',
@@ -7431,7 +7212,6 @@ const qwenImageVaeModel: HuggingFaceModel = {
   versions: [qwenImageVaeVersion],
 }
 
-// TripoSplat 3D 高斯泼溅生成的 VAE 解码器
 const triposplatVaeDecoderFp16Version: HuggingFaceVersion = {
   id: -10000302,
   name: 'v1.0',
@@ -7467,7 +7247,6 @@ const triposplatVaeDecoderFp16Model: HuggingFaceModel = {
   versions: [triposplatVaeDecoderFp16Version],
 }
 
-// Wan 2.2 5B 专属 VAE (16×16×4 压缩)
 const wan22VaeVersion: HuggingFaceVersion = {
   id: -10000303,
   name: 'v1.0',
@@ -7503,7 +7282,6 @@ const wan22VaeModel: HuggingFaceModel = {
   versions: [wan22VaeVersion],
 }
 
-// Wan 2.1 VAE (Wan 2.2 14B 复用同款)
 const wan21Vae2Version: HuggingFaceVersion = {
   id: -10000304,
   name: 'v1.0',
@@ -7539,7 +7317,6 @@ const wan21Vae2Model: HuggingFaceModel = {
   versions: [wan21Vae2Version],
 }
 
-// Wan 2.1 Alpha 的 Alpha 通道 VAE (透明通道)
 const wanAlpha21VaeAlphaChannelVersion: HuggingFaceVersion = {
   id: -10000305,
   name: 'v1.0',
@@ -7575,7 +7352,6 @@ const wanAlpha21VaeAlphaChannelModel: HuggingFaceModel = {
   versions: [wanAlpha21VaeAlphaChannelVersion],
 }
 
-// Wan 2.1 Alpha 的 RGB 通道 VAE
 const wanAlpha21VaeRgbChannelVersion: HuggingFaceVersion = {
   id: -10000306,
   name: 'v1.0',
@@ -7610,9 +7386,7 @@ const wanAlpha21VaeRgbChannelModel: HuggingFaceModel = {
   version: wanAlpha21VaeRgbChannelVersion,
   versions: [wanAlpha21VaeRgbChannelVersion],
 }
-// ── text_encoders ────────────────────────────────────────────────────────────
 
-// ByT5-small 字形/文本渲染编码器, HunyuanVideo 1.5 双 CLIP 之一 (HunyuanImage 2.1 同样使用)
 const byt5SmallGlyphxlFp16Version: HuggingFaceVersion = {
   id: -10000307,
   name: 'v1.0',
@@ -7648,7 +7422,6 @@ const byt5SmallGlyphxlFp16Model: HuggingFaceModel = {
   versions: [byt5SmallGlyphxlFp16Version],
 }
 
-// CLIP-G 文本编码器, HiDream I1 四编码器之一
 const clipGHidreamVersion: HuggingFaceVersion = {
   id: -10000308,
   name: 'v1.0',
@@ -7684,7 +7457,6 @@ const clipGHidreamModel: HuggingFaceModel = {
   versions: [clipGHidreamVersion],
 }
 
-// CLIP-L 文本编码器, HiDream I1 四编码器之一
 const clipLHidreamVersion: HuggingFaceVersion = {
   id: -10000309,
   name: 'v1.0',
@@ -7720,7 +7492,6 @@ const clipLHidreamModel: HuggingFaceModel = {
   versions: [clipLHidreamVersion],
 }
 
-// ERNIE-Image 提示词增强文本编码器
 const ernieImagePromptEnhancerVersion: HuggingFaceVersion = {
   id: -10000310,
   name: 'v1.0',
@@ -7756,7 +7527,6 @@ const ernieImagePromptEnhancerModel: HuggingFaceModel = {
   versions: [ernieImagePromptEnhancerVersion],
 }
 
-// Gemma-4 E4B 指令文本编码器, HiDream O1 使用
 const gemma4E4bItFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000311,
   name: 'v1.0',
@@ -7792,7 +7562,6 @@ const gemma4E4bItFp8ScaledModel: HuggingFaceModel = {
   versions: [gemma4E4bItFp8ScaledVersion],
 }
 
-// Gemma-2-2B + ELM 文本编码器, NVIDIA PixelDiT 使用
 const gemma22bItElmBf16Version: HuggingFaceVersion = {
   id: -10000312,
   name: 'v1.0',
@@ -7828,7 +7597,6 @@ const gemma22bItElmBf16Model: HuggingFaceModel = {
   versions: [gemma22bItElmBf16Version],
 }
 
-// Gemma-2-2B + ELM FP8 文本编码器, NVIDIA PixelDiT 使用
 const gemma22bItElmFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000313,
   name: 'v1.0',
@@ -7864,7 +7632,6 @@ const gemma22bItElmFp8ScaledModel: HuggingFaceModel = {
   versions: [gemma22bItElmFp8ScaledVersion],
 }
 
-// Gemma-3-12B 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)
 const gemma312BItVersion: HuggingFaceVersion = {
   id: -10000314,
   name: 'v1.0',
@@ -7900,7 +7667,6 @@ const gemma312BItModel: HuggingFaceModel = {
   versions: [gemma312BItVersion],
 }
 
-// Gemma-3-12B FP4 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)
 const gemma312BItFp4MixedVersion: HuggingFaceVersion = {
   id: -10000315,
   name: 'v1.0',
@@ -7936,7 +7702,6 @@ const gemma312BItFp4MixedModel: HuggingFaceModel = {
   versions: [gemma312BItFp4MixedVersion],
 }
 
-// Gemma-3-12B FP8 指令文本编码器, LTX-2 19B 使用 (LTX-2.3 共用)
 const gemma312BItFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000316,
   name: 'v1.0',
@@ -7972,7 +7737,6 @@ const gemma312BItFp8ScaledModel: HuggingFaceModel = {
   versions: [gemma312BItFp8ScaledVersion],
 }
 
-// Gemma-3-4B 文本编码器, NewBie-Image Exp0.1 (Lumina-Image 2.0 系) 使用
 const gemma34bItBf16Version: HuggingFaceVersion = {
   id: -10000317,
   name: 'v1.0',
@@ -8008,7 +7772,6 @@ const gemma34bItBf16Model: HuggingFaceModel = {
   versions: [gemma34bItBf16Version],
 }
 
-// GPT-OSS-20B NVFP4 文本编码器, Microsoft Lens 使用
 const gptOss20bNvfp4Version: HuggingFaceVersion = {
   id: -10000318,
   name: 'v1.0',
@@ -8044,7 +7807,6 @@ const gptOss20bNvfp4Model: HuggingFaceModel = {
   versions: [gptOss20bNvfp4Version],
 }
 
-// Jina-CLIP-v2 编码器, NewBie-Image Exp0.1 双编码器之一
 const jinaClipV2Bf16Version: HuggingFaceVersion = {
   id: -10000319,
   name: 'v1.0',
@@ -8080,7 +7842,6 @@ const jinaClipV2Bf16Model: HuggingFaceModel = {
   versions: [jinaClipV2Bf16Version],
 }
 
-// Llama-3.1-8B 指令文本编码器, HiDream I1 四编码器之一
 const llama318bInstructFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000320,
   name: 'v1.0',
@@ -8116,7 +7877,6 @@ const llama318bInstructFp8ScaledModel: HuggingFaceModel = {
   versions: [llama318bInstructFp8ScaledVersion],
 }
 
-// LLaVA-Llama3 多模态文本编码器, HunyuanVideo 2.0 双 CLIP 之一
 const llavaLlama3Fp8ScaledVersion: HuggingFaceVersion = {
   id: -10000321,
   name: 'v1.0',
@@ -8152,7 +7912,6 @@ const llavaLlama3Fp8ScaledModel: HuggingFaceModel = {
   versions: [llavaLlama3Fp8ScaledVersion],
 }
 
-// LTX-2 19B 蒸馏版 embeddings 连接器 (Gemma-3 嵌入转 LTX 格式)
 const ltx219bEmbeddingsConnectorDistillBf16Version: HuggingFaceVersion = {
   id: -10000322,
   name: 'v1.0',
@@ -8188,7 +7947,6 @@ const ltx219bEmbeddingsConnectorDistillBf16Model: HuggingFaceModel = {
   versions: [ltx219bEmbeddingsConnectorDistillBf16Version],
 }
 
-// LTX-2.3 文本投影模块 (Gemma-3 嵌入转 LTX 2.3 格式)
 const ltx23TextProjectionBf16Version: HuggingFaceVersion = {
   id: -10000323,
   name: 'v1.0',
@@ -8224,7 +7982,6 @@ const ltx23TextProjectionBf16Model: HuggingFaceModel = {
   versions: [ltx23TextProjectionBf16Version],
 }
 
-// Ministral-3-3B 文本编码器, ERNIE-Image 提示理解使用
 const ministral33bVersion: HuggingFaceVersion = {
   id: -10000324,
   name: 'v1.0',
@@ -8260,7 +8017,6 @@ const ministral33bModel: HuggingFaceModel = {
   versions: [ministral33bVersion],
 }
 
-// Mistral-3-Small 文本编码器, Flux.2 Dev 使用
 const mistral3SmallFlux2Bf16Version: HuggingFaceVersion = {
   id: -10000325,
   name: 'v1.0',
@@ -8296,7 +8052,6 @@ const mistral3SmallFlux2Bf16Model: HuggingFaceModel = {
   versions: [mistral3SmallFlux2Bf16Version],
 }
 
-// Mistral-3-Small FP8 文本编码器, Flux.2 Dev 使用
 const mistral3SmallFlux2Fp8Version: HuggingFaceVersion = {
   id: -10000326,
   name: 'v1.0',
@@ -8332,7 +8087,6 @@ const mistral3SmallFlux2Fp8Model: HuggingFaceModel = {
   versions: [mistral3SmallFlux2Fp8Version],
 }
 
-// Ovis 2.5 多模态文本编码器, Ovis-Image 使用
 const ovis25Version: HuggingFaceVersion = {
   id: -10000327,
   name: 'v1.0',
@@ -8368,7 +8122,6 @@ const ovis25Model: HuggingFaceModel = {
   versions: [ovis25Version],
 }
 
-// Qwen3.5-2B LLM 文本模型 (图像描述/提示词反推等 LLM 用途)
 const qwen352bBf16Version: HuggingFaceVersion = {
   id: -10000328,
   name: 'v1.0',
@@ -8404,7 +8157,6 @@ const qwen352bBf16Model: HuggingFaceModel = {
   versions: [qwen352bBf16Version],
 }
 
-// Qwen3.5-4B LLM 文本模型 (图像描述/提示词反推等 LLM 用途)
 const qwen354bBf16Version: HuggingFaceVersion = {
   id: -10000329,
   name: 'v1.0',
@@ -8440,7 +8192,6 @@ const qwen354bBf16Model: HuggingFaceModel = {
   versions: [qwen354bBf16Version],
 }
 
-// Qwen-0.6B 文本编码器, AceStep 1.5 音频模型使用
 const qwen06bAce15Version: HuggingFaceVersion = {
   id: -10000330,
   name: 'v1.0',
@@ -8476,7 +8227,6 @@ const qwen06bAce15Model: HuggingFaceModel = {
   versions: [qwen06bAce15Version],
 }
 
-// Qwen-1.7B 文本编码器, AceStep 1.5 音频模型使用
 const qwen17bAce15Version: HuggingFaceVersion = {
   id: -10000331,
   name: 'v1.0',
@@ -8512,7 +8262,6 @@ const qwen17bAce15Model: HuggingFaceModel = {
   versions: [qwen17bAce15Version],
 }
 
-// Qwen2.5-VL-7B 多模态文本编码器, HunyuanImage 2.1 使用 (Qwen-Image / HunyuanVideo 1.5 共用)
 const qwen25Vl7bVersion: HuggingFaceVersion = {
   id: -10000332,
   name: 'v1.0',
@@ -8548,7 +8297,6 @@ const qwen25Vl7bModel: HuggingFaceModel = {
   versions: [qwen25Vl7bVersion],
 }
 
-// Qwen2.5-VL-7B FP8 多模态文本编码器, Qwen-Image 使用 (HunyuanVideo 1.5 / HunyuanImage 2.1 共用)
 const qwen25Vl7bFp8ScaledVersion: HuggingFaceVersion = {
   id: -10000333,
   name: 'v1.0',
@@ -8584,7 +8332,6 @@ const qwen25Vl7bFp8ScaledModel: HuggingFaceModel = {
   versions: [qwen25Vl7bFp8ScaledVersion],
 }
 
-// Qwen2.5-VL 文本编码器, OmniGen2 使用
 const qwen25VlFp16Version: HuggingFaceVersion = {
   id: -10000334,
   name: 'v1.0',
@@ -8620,7 +8367,6 @@ const qwen25VlFp16Model: HuggingFaceModel = {
   versions: [qwen25VlFp16Version],
 }
 
-// Qwen3-0.6B 文本编码器, Anima 使用
 const qwen306bBaseVersion: HuggingFaceVersion = {
   id: -10000335,
   name: 'v1.0',
@@ -8656,7 +8402,6 @@ const qwen306bBaseModel: HuggingFaceModel = {
   versions: [qwen306bBaseVersion],
 }
 
-// Qwen3-4B 文本编码器, Z-Image Turbo 使用 (Flux.2 Klein 4B 共用同一 Qwen3-4B)
 const qwen34bVersion: HuggingFaceVersion = {
   id: -10000336,
   name: 'v1.0',
@@ -8692,7 +8437,6 @@ const qwen34bModel: HuggingFaceModel = {
   versions: [qwen34bVersion],
 }
 
-// Qwen3-8B 文本编码器, Flux.2 Klein 9B 使用
 const qwen38bVersion: HuggingFaceVersion = {
   id: -10000337,
   name: 'v1.0',
@@ -8728,7 +8472,6 @@ const qwen38bModel: HuggingFaceModel = {
   versions: [qwen38bVersion],
 }
 
-// Qwen3-8B FP8 文本编码器, Flux.2 Klein 9B 使用
 const qwen38bFp8mixedVersion: HuggingFaceVersion = {
   id: -10000338,
   name: 'v1.0',
@@ -8764,7 +8507,6 @@ const qwen38bFp8mixedModel: HuggingFaceModel = {
   versions: [qwen38bFp8mixedVersion],
 }
 
-// Qwen-4B 文本编码器, AceStep 1.5 音频模型使用
 const qwen4bAce15Version: HuggingFaceVersion = {
   id: -10000339,
   name: 'v1.0',
@@ -8800,7 +8542,6 @@ const qwen4bAce15Model: HuggingFaceModel = {
   versions: [qwen4bAce15Version],
 }
 
-// T5-Base 通用文本编码器, Stable Audio Open 1.0 等音频工作流使用
 const t5BaseVersion: HuggingFaceVersion = {
   id: -10000340,
   name: 'v1.0',
@@ -8836,7 +8577,6 @@ const t5BaseModel: HuggingFaceModel = {
   versions: [t5BaseVersion],
 }
 
-// T5+Gemma UL2 文本编码器, Stable Audio 3.0 使用
 const t5gemmaBBUl2Version: HuggingFaceVersion = {
   id: -10000341,
   name: 'v1.0',
@@ -8872,7 +8612,6 @@ const t5gemmaBBUl2Model: HuggingFaceModel = {
   versions: [t5gemmaBBUl2Version],
 }
 
-// T5-XXL 文本编码器, Flux 1 双 CLIP 之一 (Chroma / HiDream 共用)
 const t5xxlFp16Version: HuggingFaceVersion = {
   id: -10000342,
   name: 'v1.0',
@@ -8908,7 +8647,6 @@ const t5xxlFp16Model: HuggingFaceModel = {
   versions: [t5xxlFp16Version],
 }
 
-// UM-T5-XXL 文本编码器, Wan 2.1/2.2 全系使用
 const umt5XxlEncBf16Version: HuggingFaceVersion = {
   id: -10000343,
   name: 'v1.0',
@@ -8944,7 +8682,6 @@ const umt5XxlEncBf16Model: HuggingFaceModel = {
   versions: [umt5XxlEncBf16Version],
 }
 
-// UM-T5-XXL FP16 文本编码器, Wan 2.1/2.2 全系使用
 const umt5XxlFp16Version: HuggingFaceVersion = {
   id: -10000344,
   name: 'v1.0',
@@ -9375,8 +9112,6 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
     ]
   })(),
 
-
-
   // ── 未收录补充: A类(Krea-2/Mage-Flow/Qwen3-VL/MelBandRoFormer) + B类图像(CLIP-Vision/Redux/SigCLIP/USO) ──
   ...(() => {
     const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
@@ -9456,7 +9191,6 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
   })(),
 ]
 
-// ── 派生索引 ──────────────────────────────────────────────────────────────────
 
 /** version id → { model, version } 反查索引。运行组件按 version id 锚定白名单。 */
 export const HF_VERSION_INDEX: ReadonlyMap<number, { model: HuggingFaceModel; version: HuggingFaceVersion }> = (() => {

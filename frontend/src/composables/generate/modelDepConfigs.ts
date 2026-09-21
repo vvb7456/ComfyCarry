@@ -19,8 +19,6 @@ export interface DepGroup {
   minOptional?: number
 }
 
-// ── 白名单锚点工具 ────────────────────────────────────────────────────────────
-
 function hfFile(versionId: number): DepFileSpec {
   const hit = HF_VERSION_INDEX.get(versionId)
   if (!hit) throw new Error(`modelDepConfigs: 白名单版本 ${versionId} 不存在`)
@@ -37,8 +35,6 @@ function hfBytes(...versionIds: number[]): number {
     return sum + hit.version.file.sizeBytes
   }, 0)
 }
-
-// ── ControlNet ───────────────────────────────────────────────────────────────
 
 const CN_MODELS = {
   union: {
@@ -140,8 +136,6 @@ const CN_MODELS = {
   },
 }
 
-// ── 放大 ─────────────────────────────────────────────────────────────────────
-
 const UPSCALE_MODELS = {
   aurasr_v2: {
     id: 'aurasr-v2',
@@ -182,7 +176,6 @@ export const UPSCALE_DEP_GROUP: DepGroup = {
   minOptional: 1,
 }
 
-// ── 面部重绘 (FaceDetailer) ──────────────────────────────────────────────────
 // 检测器必需 (~52MB); SAM 可选增强 (vit_b, 修脸场景足够, vit_h 属过剩)
 
 const FACE_MODELS = {
@@ -214,7 +207,6 @@ export const FACE_DEP_GROUP: DepGroup = {
   rows: [FACE_MODELS.face_yolov8m, FACE_MODELS.sam_vit_b],
 }
 
-// ── CN 分家: 按 branch 取依赖清单 ──────────────────────────────────────────────
 // pony/sdxl 走 union (sdxl 通用), illustrious/noobai 走专用模型。
 // 分家后每 branch 只剩一个 CN 主模型 → 它和检测器一样是必需的 (不再是"多选一",
 // 故无 minOptional)。这是"原本可选的模型因架构拆分变成必需"的那一类。
@@ -302,17 +294,13 @@ export function getCnDepGroup(cnType: string, branch: CnBranch | undefined): Dep
  */
 export const CN_FILE_BRANCH: Record<string, CnBranch> = (() => {
   const map: Record<string, CnBranch> = {}
-  // sdxl branch: union (一个文件)
   for (const f of CN_MODELS.union.files) map[f.filename] = 'sdxl'
-  // ilnoob branch: 三个专用模型
   for (const f of CN_MODELS.pose_dedicated.files) map[f.filename] = 'ilnoob'
   for (const f of CN_MODELS.canny_dedicated.files) map[f.filename] = 'ilnoob'
   for (const f of CN_MODELS.depth_dedicated.files) map[f.filename] = 'ilnoob'
-  // sd15 branch: ControlNet v1.1 专用模型
   for (const f of CN_MODELS.sd15_pose_dedicated.files) map[f.filename] = 'sd15'
   for (const f of CN_MODELS.sd15_canny_dedicated.files) map[f.filename] = 'sd15'
   for (const f of CN_MODELS.sd15_depth_dedicated.files) map[f.filename] = 'sd15'
-  // flux branch: flux_union (Union Pro 2.0 FP8)
   for (const f of CN_MODELS.flux_union.files) map[f.filename] = 'flux'
   return map
 })()
@@ -323,10 +311,8 @@ export const CN_FILE_BRANCH: Record<string, CnBranch> = (() => {
  * 未命中返回 null (= 未知文件, 面板走"列出排后"分支)。
  */
 export function cnBranchForFile(filename: string): CnBranch | null {
-  // 精确 basename
   const base = filename.includes('/') ? filename.slice(filename.lastIndexOf('/') + 1) : filename
   if (CN_FILE_BRANCH[base]) return CN_FILE_BRANCH[base]
-  // endsWith 兼容子目录前缀
   for (const [fn, br] of Object.entries(CN_FILE_BRANCH)) {
     if (filename === fn || filename.endsWith('/' + fn)) return br
   }

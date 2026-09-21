@@ -48,7 +48,6 @@ const queueStore = useGenerateQueueStore()
 const bg = useBackgroundRunStore()
 const frozen = computed(() => bg.state === 'running')
 
-// ── Gate: check ComfyUI online ─────────────────────────────────────────────
 const gate = useComfyGate()
 gate.checkNow()
 
@@ -72,7 +71,6 @@ const gateMessage = computed(() => {
   return undefined
 })
 
-// ── Options: load once, provide to all children ────────────────────────────
 const options = useGenerateOptions()
 provide(GenerateOptionsKey, options)
 
@@ -84,8 +82,8 @@ async function initOptions(forceRefresh = false) {
   } else {
     await options.load()
   }
-  if (!options.loaded.value) return // ComfyUI may be offline, options failed
-  if (optionsReady.value) return // Already restored — skip duplicate restore
+  if (!options.loaded.value) return
+  if (optionsReady.value) return
   store.restore({
     checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
     loraExists: (name) => options.loras.value.some(l => l.name === name),
@@ -99,7 +97,6 @@ async function initOptions(forceRefresh = false) {
   optionsReady.value = true
 }
 
-// Only load options when gate is ready (not eagerly on mount)
 watch(() => gate.state.value, (newState) => {
   if (newState === 'ready') {
     // Force refresh if we previously loaded stale data while offline
@@ -108,20 +105,13 @@ watch(() => gate.state.value, (newState) => {
 }, { immediate: true })
 
 onActivated(() => {
-  // 回到本页: 解除 toast 静音
   unmuteToastScope('generate')
   if (optionsReady.value) options.refresh()
-  // Re-check gate on page re-activation
   gate.checkNow()
   // KeepAlive 切回来重拉后台运行状态 (服务端为准, 避免刷新瞬间闪可编辑)
   bg.refresh()
 })
 
-// ── 架构选择器 (顶栏左侧 DropdownMenu) ─────────────────────────────────────
-// 选中 → store.activeModelType 切换 (语义不变, ModelTab 全量 v-show 挂载,
-// 回调按 store.activeModelType 路由的机制严禁改动)。
-// F2 菜单结构: 有 familyOf 的 entry 归入对应父组 children; 无 familyOf 的平铺。
-// ── 任务切换 ────────────────────────────────────────────────────────────
 // 两个任务各自记忆选中架构。store.activeModelType 已是 computed 派生
 // (读写当前任务 activeModelTypeByTask[activeTask] 的槽), 切任务用 store.switchTask()
 // — 它会把 activeTask 切到该任务并保证对应架构的 modelStates 已初始化。
@@ -130,7 +120,6 @@ const activeTask = computed<'image' | 'video' | 'edit'>({
   get: () => store.activeTask,
   set: (v) => {
     if (v === 'image' || v === 'video') store.switchTask(v)
-    // 'edit' 仍为占位 (disabled), 不会触发
   },
 })
 const taskOptions = computed<SegmentOption[]>(() => [
@@ -148,9 +137,6 @@ const selectedModelKey = computed<string>({
   },
 })
 
-// ── 架构行 hint (b) ──────────────────────────────────────────────────────
-// 未就绪: 低对比度 hint '未就绪'; 就绪 / 未检查: 无 hint。
-// 状态点已移除 (DropdownMenuItem.status 字段已废弃), 不再传 status。
 function leafHint(cfg: { key: string }): { hint?: string } {
   if (store.componentsReady[cfg.key] === false) {
     return { hint: t('generate.header.not_ready') }
@@ -160,16 +146,13 @@ function leafHint(cfg: { key: string }): { hint?: string } {
 
 const menuItems = computed<DropdownMenuItem[]>(() => {
   const items: DropdownMenuItem[] = []
-  // 按 familyOf 分桶: 家族 key → 子叶子数组
   const families: Record<string, DropdownMenuItem[]> = {}
 
   // 菜单按当前任务的 mediaType 过滤 (image 任务只显图像架构, video 任务只显视频架构)。
   // activeTask 的 mediaType 由 store.activeModelType 派生 (image/video); 'edit' 占位时按 image。
   const taskMediaType = currentConfig.value.mediaType
 
-  // 构建叶子 (带 hint), 并按 familyOf 分桶
   for (const cfg of Object.values(MODEL_TYPES)) {
-    // 按任务媒体类型过滤: 不匹配的架构不进菜单
     if (cfg.mediaType !== taskMediaType) continue
     const { hint } = leafHint(cfg)
     const leaf: DropdownMenuItem = {
@@ -187,15 +170,9 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
     }
   }
 
-  // 把每个家族挂到对应父组:
-  //  - MODEL_TYPES[fam] 存在 (sdxl): 该顶级条目升级为父组, children = [自身叶子, ...家族子项]
-  //  - MODEL_TYPES[fam] 不存在 (flux2): 纯分组节点, children = [...家族子项], 无自身叶子
-  //    logo 取第一个子项的 logo, letter 取 'F2' 兜底徽章
-  //  顺序天然跟随 MODEL_TYPES 声明顺序 (子项在遍历时已按声明顺序入桶)。
   for (const [famKey, children] of Object.entries(families)) {
     const parentCfg = MODEL_TYPES[famKey]
     if (parentCfg) {
-      // 父组行本身不可选中; 在 items 中找到该顶级叶子并升级为父组
       const idx = items.findIndex(it => it.key === famKey)
       const selfLeaf = idx >= 0 ? items[idx] : undefined
       const parent: DropdownMenuItem = {
@@ -208,7 +185,6 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
       if (idx >= 0) items[idx] = parent
       else items.push(parent)
     } else {
-      // 纯分组节点: 就地插入到最后一个非家族顶级条目之后
       const firstChild = children[0]
       const parent: DropdownMenuItem = {
         key: `family_${famKey}`,
@@ -223,7 +199,6 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
   }
 
 
-  // ── 排序 (用户指定规则): 分组与叶子混排, 按发布时间升序 ──
   // 分组的排序键 = 组内最早的发布时间, 因此跨分组/叶子比较时使用同一时间轴。
   const relOf = (key: string) => MODEL_TYPES[key]?.releasedAt ?? '9999-99'
   const keyOf = (it: DropdownMenuItem) =>
@@ -231,7 +206,6 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
       ? (it.children.map(c => relOf(c.key)).sort()[0] ?? '9999-99')
       : relOf(it.key)
 
-  // 组内子项按发布时间
   for (const it of items) {
     if (it.children?.length) it.children.sort((a, b) => relOf(a.key).localeCompare(relOf(b.key)))
   }
@@ -240,17 +214,14 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
   return items
 })
 
-// 当前选中模型 (用于触发器显示)
 const currentConfig = computed(() => MODEL_TYPES[store.activeModelType] ?? MODEL_TYPES.sd15!)
 
-// ── 队列/历史抽屉 (顶栏右侧按钮 + Drawer) ──────────────────────────────────
 const drawerOpen = ref(false)
 const drawerEverOpened = ref(false)
 
 function openDrawer() {
   drawerOpen.value = true
   if (!drawerEverOpened.value) drawerEverOpened.value = true
-  // 队列实时刷新; 历史按 dirty / 未加载决定是否拉取
   queueStore.loadQueue()
   if (queueStore.historyDirty || !queueStore.historyLoaded) {
     queueStore.loadHistory()
@@ -286,8 +257,7 @@ watch(drawerOpen, (open) => {
 // deactivation 时触发), 避免遮罩与滚动锁泄漏到目标页。
 // 同时静音本页 toast 作用域 —— SSE 与 live 续跑照常, 只是不再从看不见的页面弹
 // 过程性提示 (error 仍放行, 见 useToast)。
-// ── 产品导览 (ProductTour) ───────────────────────────────────────────────
-// 语义: 只要 start 过（走完/跳过/中途切页）就不再自动触发, 手动入口随时可用。
+// 只要 start 过（走完/跳过/中途切页）就不再自动触发, 手动入口随时可用。
 const tour = useProductTour('generate_tour_done')
 
 onDeactivated(() => {
@@ -317,7 +287,6 @@ const tourSteps = computed<TourStep[]>(() => [
     title: t('generate.tour.steps.queue.title'), body: t('generate.tour.steps.queue.body') },
 ])
 
-// 状态由 v-model 收口, close 仅留日志级钩子（后续可接埋点）
 function onTourClose(_reason: 'skip' | 'finish') {}
 
 // 手动入口: 抽屉开着先关（规范 §8, 避免遮罩与抽屉叠层; 自动触发路径已在
@@ -327,7 +296,6 @@ function openTour() {
   tour.start()
 }
 
-// ── 首次自动触发（规范 §7.4）────────────────────────────────────────────
 // 四条件同时满足才触发: gate ready && 非 frozen && 未看过 && 本会话未触发过。
 // 延迟约 600ms 等页面渲染稳定; 会话内一次性标志防 gate 反复 ready 重触发。
 let tourAutoFired = false
@@ -370,19 +338,15 @@ onActivated(() => {
 
 onBeforeUnmount(clearTourAutoTimer)
 
-// badge: 队列任务数 (>0 显示, accent 底) — 读 store
 const queueCount = computed(() => queueStore.queueCount)
 const isExecuting = computed(() => !!execState.value)
 
-// ── Exec tracker + SSE ─────────────────────────────────────────────────────
 const tracker = useExecTracker()
 const execState = computed(() => tracker.state.value)
 
-// ── Task registry + Preview ────────────────────────────────────────────────
 const taskRegistry = useTaskRegistry()
 const preview = useGeneratePreview()
 
-// ── Submit ─────────────────────────────────────────────────────────────────
 const { submitting, submit, validate, buildPayload } = useGenerateSubmit(execState, options)
 
 async function handleRun(mode: string) {
@@ -403,7 +367,6 @@ async function handleRun(mode: string) {
   }
 }
 
-// ── Live mode auto-rerun: rerun 500ms after done ─────────
 let liveRerunTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleLiveRerun() {
@@ -432,8 +395,6 @@ async function handleStop() {
   toast(t('generate.msg.interrupt_sent'), 'info')
 }
 
-// ── 「生成视频」动线 ──────────────────────────────
-// payload = { filename, subfolder, type, prompt_id, animated }。
 // 接线步骤 (前端取回再上传, 零新端点):
 //   1. 切任务 → video; 切条目 → wan22_i2v
 //   2. 用 /api/comfyui/view 取回该产物为 Blob → 转 File
@@ -456,7 +417,6 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     toast(t('generate.video.start_frame_not_image'), 'warning')
     return
   }
-  // 1. 切任务 → video + 切条目 → wan22_i2v (默认 i2v 条目)
   const TARGET = 'wan22_i2v'
   store.switchTask('video')
   store.switchModelType(TARGET)
@@ -468,7 +428,6 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
   })
   const viewUrl = `/api/comfyui/view?${viewParams}`
 
-  // 2. 取回产物为 Blob → 转 File
   let blob: Blob
   try {
     const res = await fetch(viewUrl)
@@ -482,7 +441,6 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
   const ext = (payload.filename.toLowerCase().match(/(\.[^.]+)$/)?.[1]) || '.png'
   const file = new File([blob], `ref_${Date.now()}${ext}`, { type: blob.type || 'image/png' })
 
-  // 3. 上传到 input/ (走既有 upload_image, 表单字段 type='video_ref')
   const form = new FormData()
   form.append('file', file)
   form.append('type', 'video_ref')
@@ -503,7 +461,6 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     return
   }
 
-  // 4. 写入 refImage + 开启 followRef。
   // 取回与上传是异步的 (数百毫秒~数秒), 期间用户可能切走条目或切回图像任务 ——
   // 此时 store.currentState 已不是目标条目, 直接写会把参考图写到别处 (或静默丢弃却提示成功)。
   // 故按 key 定位目标 state, 而非依赖"当前"状态。
@@ -525,7 +482,6 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
   toast(t('generate.history.make_video'), 'success')
 }
 
-// ── Auxiliary task registration (from ModelTab) ─────────────────────────────
 const modelTabRefs: Record<string, InstanceType<typeof ModelTab> | null> = {}
 
 function activeTabRef() {
@@ -542,7 +498,6 @@ function onPreprocessComplete(cnType: string, success: boolean) {
   activeTabRef()?.handlePreprocessDone(cnType, success)
 }
 
-// ── SSE event routing ──────────────────────────────────────────────────────
 // All events flow through to the tracker so the button always reflects ComfyUI
 // real state. Auxiliary task completion (preprocess, tag) is handled via routing
 // but NOT suppressed — only the "aftermath" (toast, fetch) is selective.
@@ -556,7 +511,6 @@ const sse = useComfySSE(tracker, {
     const routed = taskRegistry.routeEvent(evt)
     lastRoutedType = routed?.target.type ?? null
 
-    // Handle auxiliary task completion callbacks (preprocess → set image, tag → set tags)
     if (routed && routed.target.type !== 'main') {
       if (evt.type === 'execution_done' || evt.type === 'execution_error' || evt.type === 'execution_interrupted') {
         const success = evt.type === 'execution_done'
@@ -573,11 +527,9 @@ const sse = useComfySSE(tracker, {
 
   onEvent(evt, result) {
     if (evt.type === 'status') {
-      // 队列变化事件 → store 刷新 (badge 常显, 保持实时)
       queueStore.loadQueue()
     }
 
-    // 新一轮开始 → 清掉上一轮产物与残留实时帧。
     // 由事件驱动而非提交响应驱动: 后台模式的 prompt 由服务端 worker 提交, 前端根本不走
     // handleRun; live 模式下提交响应与 execution_start 的先后是竞态 (实测差 2~50ms)。
     if (evt.type === 'execution_start') {
@@ -597,7 +549,6 @@ const sse = useComfySSE(tracker, {
       // 终态提示 (完成 / 中断 / 出错) 由 App 级 useExecNotifications 统一发出。
       // 这里只保留善后: 产物拉取、队列/历史刷新、live 续跑 —— 页面失活期间照常执行,
       // live 模式切走后继续自动续跑正是靠它 (设计意图, 不要在这里加可见性判断)。
-      // Only show fetch outputs for main tasks (or unknown = assumed main)
       const isMain = !lastRoutedType || lastRoutedType === 'main'
 
       if (isMain) {
@@ -605,10 +556,8 @@ const sse = useComfySSE(tracker, {
           const promptId = (evt.data?.prompt_id as string) || ''
           if (promptId) preview.fetchOutputImages(promptId)
           queueStore.loadQueue()
-          // 任务完成事件 → 抽屉开着: loadHistory; 关着: markHistoryDirty
           if (drawerOpen.value) queueStore.loadHistory()
           else queueStore.markHistoryDirty()
-          // Live mode: auto-rerun after successful execution
           if (store.currentState.runMode === 'live') scheduleLiveRerun()
         } else if (result.type === 'execution_interrupted') {
           preview.clearPreview()
@@ -632,7 +581,6 @@ sse.start()
 
 <template>
   <div class="page-body">
-    <!-- Gate overlay when ComfyUI is not ready -->
     <div v-if="gate.state.value !== 'ready'" class="gen-gate-overlay">
       <EmptyState
         :icon="gateIcon"
@@ -666,7 +614,6 @@ sse.start()
           </button>
         </template>
 
-        <!-- 任务切换 (占位: 视频/编辑未上线为禁用项; 上线时接子路由) -->
         <div
           class="gen-header-controls"
           data-tour="gen-header"
@@ -681,7 +628,6 @@ sse.start()
           />
         </div>
 
-        <!-- 架构选择器: 前置静音小标签提示控件语义 -->
         <template #sub>
           <div class="gen-header-controls" :inert="frozen" :class="{ 'gen-header-controls--frozen': frozen }">
             <span class="gen-arch-label">{{ t('generate.header.model_label') }}</span>
@@ -699,7 +645,6 @@ sse.start()
                   :aria-label="t('generate.header.model_selector_aria')"
                   :title="t('generate.header.model_selector_aria')"
                 >
-                  <!-- 当前模型 logo(20px 底板) / 字母徽章 -->
                   <span
                     class="gen-arch-logo"
                     :class="{ 'gen-arch-logo--pad': currentConfig.logo }"
@@ -715,7 +660,6 @@ sse.start()
           </div>
         </template>
 
-        <!-- 右: 队列/历史按钮 -->
         <template #actions>
           <DrawerTrigger
             data-tour="gen-queue"
@@ -728,7 +672,6 @@ sse.start()
         </template>
       </PageHeaderRow>
 
-      <!-- Model Tabs (config-driven, 全量 v-show 挂载) -->
       <div
         v-for="mt in Object.keys(MODEL_TYPES)"
         :key="mt"
@@ -799,8 +742,6 @@ sse.start()
 }
 @keyframes gate-spin { to { transform: rotate(360deg); } }
 
-/* ═══ 顶栏控件段 (任务切换 / 架构选择器): 段内水平排布,
-   吸顶/单行/窄屏下放由 PageHeaderRow 承担 ═══ */
 .gen-header-controls {
   display: flex;
   align-items: center;
@@ -874,7 +815,6 @@ sse.start()
   border-color: var(--ac);
 }
 
-/* 当前模型 logo (20px 底板) / 字母徽章 */
 .gen-arch-logo {
   width: 20px;
   height: 20px;
@@ -917,8 +857,6 @@ sse.start()
   transform: rotate(180deg);
 }
 
-/* ═══ 窄屏 (<600px): 页头已由 PageHeaderRow 下放为三行
-   (Row1 标题+队列 / Row2 任务切换 / Row3 模型选择), 此处只管控件段通栏 ═══ */
 @container page (max-width: 600px) {
   .gen-arch-label {
     display: none;

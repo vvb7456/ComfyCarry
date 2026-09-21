@@ -53,12 +53,10 @@ onMounted(() => {
       <ThemeToggle />
     </div>
 
-    <!-- Loading -->
     <div v-if="initLoading" class="wizard-app__loading">
       <Spinner size="lg" />
     </div>
 
-    <!-- Main Wizard -->
     <div v-else class="wizard-container">
       <div class="wizard-header">
         <img src="/logo-mark.svg" alt="" class="wizard-header__logo" width="48" height="48" />
@@ -66,7 +64,6 @@ onMounted(() => {
         <p class="wizard-header__subtitle">{{ t('wizard.subtitle') }}</p>
       </div>
 
-      <!-- Progress bar (hidden during deploy) -->
       <WizardStepper
         v-if="deployState !== 'deploying' && deployState !== 'done'"
         :total="totalSteps"
@@ -75,7 +72,6 @@ onMounted(() => {
         class="wizard-app__stepper"
       />
 
-      <!-- Step views -->
       <StepDeploy v-if="currentStep === 0 && deployState === 'idle'" />
       <StepPassword v-else-if="currentStep === 1 && deployState === 'idle'" />
       <StepTunnel v-else-if="currentStep === 2 && deployState === 'idle'" />

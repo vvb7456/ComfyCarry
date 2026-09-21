@@ -53,26 +53,18 @@ export function useWizardLlm() {
       : t('wizard.step6.base_url_help_openai'),
   )
 
-  /** Show model group when a provider is selected */
   const showModelGroup = computed(() => !!config.llm_provider)
-
-  // ── Get provider display name ───────────────────────────────
 
   function getProviderName(id: string): string {
     const p = providerOption(id)
     return p ? t(p.labelKey) : id
   }
 
-  // ── Provider change ─────────────────────────────────────────
-
   function onProviderChange() {
-    // Clear model state on provider change
     config.llm_model = ''
     models.value = []
     modelsError.value = ''
   }
-
-  // ── Fetch models from backend ───────────────────────────────
 
   async function fetchModels(preselect?: string) {
     if (!config.llm_provider || !config.llm_api_key) return
@@ -111,40 +103,31 @@ export function useWizardLlm() {
     }
   }
 
-  // ── Select model ────────────────────────────────────────────
-
   function selectModel(modelId: string) {
     config.llm_model = modelId
   }
-
-  // ── Init step (called when entering step 6) ────────────────
 
   function initStep() {
     if (inited.value) return
     inited.value = true
 
-    // Auto-fetch models if provider + key already restored from state/import
     if (config.llm_provider && config.llm_api_key) {
       fetchModels(config.llm_model || undefined)
     }
   }
 
   return {
-    // Constants
     providers,
 
-    // State
     models,
     modelsLoading,
     modelsError,
 
-    // Computed
     showBaseUrl,
     baseUrlPlaceholder,
     baseUrlHelp,
     showModelGroup,
 
-    // Actions
     getProviderName,
     onProviderChange,
     fetchModels,

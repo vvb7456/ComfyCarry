@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * 设置页关于模块 — 与更新 / 重新初始化 / 项目链接 / 署名。
- * 结构 = about-identity / desc / about-update-block (检查更新 + 重新初始化) /
- * about-project (链接 / 署名)。更新与重新初始化逻辑自原组件原样迁移。
- * 原独立尾分区已并入设置页正文顺排 (间距由 SettingsPage 承担)。
- */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -28,8 +22,6 @@ const repoUrl = 'https://github.com/vvb7456/ComfyCarry'
 const dockerHubUrl = 'https://hub.docker.com/r/erocraft/comfycarry'
 const erocraftUrl = 'https://www.erocraft.com/'
 const copyrightRange = `2015–${new Date().getFullYear()}`
-
-// ─── 更新 (自原 SettingsTabComfyCarry 迁移) ──────────────────────────────────
 
 const updateChecking = ref(false)
 const updateApplying = ref(false)
@@ -147,8 +139,6 @@ async function applyUpdate() {
   }
 }
 
-// ─── 重新初始化 (自原 SettingsTabComfyCarry 迁移) ────────────────────────────
-
 const reinitKeepModels = ref(true)
 const reinitLoading = ref(false)
 
@@ -179,7 +169,6 @@ async function reinitialize() {
 </script>
 
 <template>
-  <!-- 视觉/结构与原版 About 区完全一致 (class 名自原组件迁移) -->
   <div class="about-content" aria-labelledby="about-product-name">
     <header class="about-identity">
       <img class="about-logo" src="/logo-mark.svg" alt="" aria-hidden="true" />
@@ -252,7 +241,6 @@ async function reinitialize() {
 </template>
 
 <style scoped>
-/* Vue-unique: centered About identity block (样式自原 SettingsTabComfyCarry 原样迁移) */
 .about-content {
   text-align: center;
 }

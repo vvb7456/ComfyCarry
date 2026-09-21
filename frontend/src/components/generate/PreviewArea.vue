@@ -34,7 +34,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 
-// ── 五态状态机 ──────────────────────────────────────────────────────
 // phase 仅描述「执行中」的子态; 完成态 = 有产物且不在执行中。
 // hasOutput 必须带 !execState: 否则上一轮产物还挂着时 (后台模式逐轮不清),
 // phase 恒为 'empty', 采样/合成子态全部失效。
@@ -67,7 +66,6 @@ const isComposing = computed(() =>
   props.mediaType === 'video' && phase.value === 'composing',
 )
 
-// ── 视频元信息 (完成态元信息行, "能拿到多少显示多少") ──────────────────────────
 // url → VideoMeta; 由 <video> loadedmetadata 事件填充。fps 浏览器拿不到, 留 undefined。
 const videoMetaMap = ref<Record<string, VideoMeta>>({})
 
@@ -82,24 +80,20 @@ function onVideoLoadedMetadata(e: Event, url: string, filename: string) {
   videoMetaMap.value = { ...videoMetaMap.value, [url]: meta }
 }
 
-/** 从文件名提取视频格式标签 (扩展名大写)。 */
 function videoFormat(filename: string): string | undefined {
   const m = filename.match(/\.(mp4|webm|mov|avi|mkv)(\?|$)/i)
   return m?.[1]?.toUpperCase()
 }
 
-/** 判定产物条目是否为视频 (优先读 animated 标量布尔, 缺失则扩展名兜底)。 */
 function isVideo(img: PreviewImage): boolean {
   if (typeof img.animated === 'boolean') return img.animated
   return isVideoFile(img.filename)
 }
 
-/** 构建视频首帧缩略图 URL (GET /api/comfyui/video_thumb)。 */
 function thumbUrl(img: PreviewImage): string {
   return buildVideoThumbUrl(img)
 }
 
-/** 构建视频下载文件名 (从 URL 参数取 filename)。 */
 function downloadName(url: string): string {
   try {
     const u = new URL(url, window.location.origin)
@@ -109,22 +103,18 @@ function downloadName(url: string): string {
   }
 }
 
-/** 单产物分支内取首元素 (调用方已保证 length >= 1)。 */
 function firstImage(): PreviewImage {
   return props.images[0] as PreviewImage
 }
 
-/** 完成态: 是否有视频产物 (用于决定单图/单视频渲染分支)。 */
 const singleVideo = computed(() =>
   props.images.length === 1 && isVideo(firstImage()),
 )
 
-/** 完成态: 多产物网格里的视频项。 */
 function isGridVideo(img: PreviewImage): boolean {
   return isVideo(img)
 }
 
-// ── 完成态元信息行文案 ({dur}s · {w}×{h} · {fps}fps · {fmt}, 能拿到多少显示多少) ──
 function metaText(img: PreviewImage): string {
   const meta = videoMetaMap.value[img.url]
   if (!meta) return ''
@@ -139,11 +129,10 @@ function metaText(img: PreviewImage): string {
 
 <template>
   <div class="gen-preview-card">
-    <!-- ═══ 执行中态 — 最高优先级 ═══
-         执行中永远显示「当前这一轮」: 合成中 → 实时帧。
+    <!-- 执行中永远显示「当前这一轮」: 合成中 → 实时帧。
          上一轮产物排在其后, 否则后台/live 连跑时旧图会盖死本轮实时预览。 -->
 
-    <!-- 合成中 (视频架构): spinner + 文案 -->
+    <!-- 合成中 (视频架构) -->
     <div v-if="isComposing" class="gen-preview-loading">
       <div class="preview-spinner" />
       <span class="preview-status-text">{{ t('generate.video.composing') }}</span>
@@ -158,11 +147,8 @@ function metaText(img: PreviewImage): string {
       </span>
     </div>
 
-    <!-- ═══ 完成态: 有产物 (images.length>0) ═══ -->
     <template v-else-if="images.length > 0">
-      <!-- 单产物 -->
       <template v-if="images.length === 1">
-        <!-- 单视频: 内联 <video controls loop muted playsinline> -->
         <div v-if="singleVideo" class="gen-preview-single gen-preview-video-wrap">
           <video
             :src="firstImage().url"
@@ -174,7 +160,6 @@ function metaText(img: PreviewImage): string {
             @click="emit('clickImage', firstImage().url)"
             @loadedmetadata="onVideoLoadedMetadata($event, firstImage().url, firstImage().filename)"
           />
-          <!-- 元信息行 + 下载 -->
           <div class="preview-video-meta">
             <span v-if="metaText(firstImage())" class="preview-meta-text">{{ metaText(firstImage()) }}</span>
             <a
@@ -187,23 +172,19 @@ function metaText(img: PreviewImage): string {
             </a>
           </div>
         </div>
-        <!-- 单图像: 原样保留 (回归保护, 一字不变) -->
         <div v-else class="gen-preview-single">
           <img :src="firstImage().url" alt="Generated" @click="emit('clickImage', firstImage().url)" />
         </div>
       </template>
 
-      <!-- 多产物网格 -->
       <div v-else class="gen-preview-grid">
         <template v-for="(img, i) in images" :key="i">
-          <!-- 视频项: 首帧缩略图 + 播放角标 -->
           <div v-if="isGridVideo(img)" class="grid-video-item" @click="emit('clickImage', img.url)">
             <img :src="thumbUrl(img)" :alt="'Video ' + (i + 1)" class="grid-video-thumb" />
             <div class="grid-video-badge">
               <MsIcon name="play_arrow" size="sm" color="none" />
             </div>
           </div>
-          <!-- 图像项: 原样保留 (回归保护) -->
           <img
             v-else
             :src="img.url"
@@ -214,12 +195,10 @@ function metaText(img: PreviewImage): string {
       </div>
     </template>
 
-    <!-- 排队中 / 取产物中 (无实时帧): spinner -->
     <div v-else-if="loading || execState" class="gen-preview-loading">
       <div class="preview-spinner" />
     </div>
 
-    <!-- ═══ 空态: 视频架构换文案+图标, 图像架构维持原样 ═══ -->
     <div v-else class="gen-preview-empty">
       <MsIcon :name="mediaType === 'video' ? 'movie' : 'image'" color="none" class="preview-icon" />
       <span class="preview-hint">{{
@@ -243,7 +222,6 @@ function metaText(img: PreviewImage): string {
   padding: 0;
 }
 
-/* Loading / composing / sampling */
 .gen-preview-loading {
   position: absolute;
   inset: 0;
@@ -267,7 +245,6 @@ function metaText(img: PreviewImage): string {
   color: var(--t3);
 }
 
-/* Single image / video */
 .gen-preview-single {
   position: relative;
   height: 100%;
@@ -286,7 +263,6 @@ function metaText(img: PreviewImage): string {
 }
 .gen-preview-single img:hover { opacity: .9; }
 
-/* Single video player (object-fit:contain, 圆角 var(--r-md)) */
 .gen-preview-video-wrap {
   flex-direction: column;
 }
@@ -300,7 +276,6 @@ function metaText(img: PreviewImage): string {
   background: #000;
 }
 
-/* Video meta row (元信息 + 下载) */
 .preview-video-meta {
   display: flex;
   align-items: center;
@@ -326,7 +301,6 @@ function metaText(img: PreviewImage): string {
 }
 .preview-video-download:hover { opacity: .8; }
 
-/* Grid for batch */
 .gen-preview-grid {
   display: grid;
   /* 允许最后一个窄列收缩到容器宽度，避免小预览区被 180px 最小列宽撑出横向溢出。 */
@@ -347,7 +321,6 @@ function metaText(img: PreviewImage): string {
 }
 .gen-preview-grid img:hover { opacity: .9; }
 
-/* Grid video item: 首帧缩略图 + 播放角标 (3:4, 与图像项同比例) */
 .grid-video-item {
   position: relative;
   width: 100%;
@@ -383,7 +356,6 @@ function metaText(img: PreviewImage): string {
 .preview-live { opacity: 0.85; cursor: default; }
 .preview-live:hover { opacity: 0.85; }
 
-/* Sampling stage badge (「第 n/2 段」) */
 .preview-stage-badge {
   position: absolute;
   bottom: var(--sp-2);
@@ -399,7 +371,6 @@ function metaText(img: PreviewImage): string {
   white-space: nowrap;
 }
 
-/* Empty state */
 .gen-preview-empty {
   position: absolute;
   inset: 0;

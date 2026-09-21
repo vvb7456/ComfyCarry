@@ -21,7 +21,6 @@ const props = defineProps<{
   disabled?: boolean
   /** Override default 'select checkpoint' empty label (i18n string already resolved by caller) */
   emptyLabel?: string
-  /** Override default 'click to change' hint */
   changeLabel?: string
 }>()
 
@@ -33,7 +32,6 @@ const { t } = useI18n({ useScope: 'global' })
 
 function onImgError(e: Event) {
   const img = e.target as HTMLImageElement
-  // Try CivitAI fallback if available
   if (!img.dataset.fb && props.selected?.fallbackUrl && img.src !== props.selected.fallbackUrl) {
     img.dataset.fb = '1'
     img.src = props.selected.fallbackUrl
@@ -49,7 +47,6 @@ function onImgError(e: Event) {
     :class="{ 'ckpt-selector--disabled': disabled }"
     @click="emit('open')"
   >
-    <!-- Empty state -->
     <!-- 空态与其他架构一字不差 — 视频不再换专用长文案 (已移到 picker 空结果态),
          「+」统一用 MsIcon add (AddCard 同款), 不用字面 '+' -->
     <div v-if="!selected" class="ckpt-empty">
@@ -57,10 +54,8 @@ function onImgError(e: Event) {
       <span class="ckpt-empty__text">{{ emptyLabel || t('generate.basic.select_checkpoint') }}</span>
     </div>
 
-    <!-- Selected state — horizontal: left 30% image | right info -->
     <div v-else class="ckpt-card">
       <div class="ckpt-card__img">
-        <!-- Video preview -->
         <video
           v-if="selected.previewIsVideo && selected.previewUrl"
           :src="selected.previewUrl"
@@ -71,7 +66,6 @@ function onImgError(e: Event) {
           disablepictureinpicture
           preload="metadata"
         />
-        <!-- Image preview with fallback -->
         <img
           v-else-if="selected.previewUrl"
           :src="selected.previewUrl"
@@ -82,10 +76,8 @@ function onImgError(e: Event) {
         <div v-if="!selected.previewUrl" class="ckpt-card__no-img">
           <MsIcon name="image_not_supported" size="lg" color="none" />
         </div>
-        <!-- Model tag badge -->
         <span v-if="selected.baseModel" class="ckpt-card__tag">{{ selected.baseModel }}</span>
         <span v-else-if="selected.arch && selected.arch !== 'unknown'" class="ckpt-card__tag ckpt-card__tag--dim">{{ selected.arch }}</span>
-        <!-- 形态徽章 (右上角, 整合包=clay / 拆分=teal) -->
         <span
           v-if="selected.packaging"
           class="ckpt-card__pkg-badge"
@@ -117,7 +109,6 @@ function onImgError(e: Event) {
   pointer-events: none;
 }
 
-/* ── Empty state ── */
 .ckpt-empty {
   display: flex;
   align-items: center;
@@ -145,7 +136,6 @@ function onImgError(e: Event) {
   color: var(--ac);
 }
 
-/* ── Selected card — horizontal layout ── */
 .ckpt-card {
   display: flex;
   align-items: stretch;
@@ -192,7 +182,6 @@ function onImgError(e: Event) {
   opacity: .3;
 }
 
-/* ── Model tag badge (top-left of image area) ── */
 .ckpt-card__tag {
   position: absolute;
   top: 4px;
@@ -217,7 +206,6 @@ function onImgError(e: Event) {
   color: var(--t-inv-2);
 }
 
-/* 形态徽章 (右上角) */
 .ckpt-card__pkg-badge {
   position: absolute;
   top: 4px;

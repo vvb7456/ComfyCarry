@@ -17,8 +17,6 @@ const options = inject(GenerateOptionsKey)!
 
 const config = computed<UpscaleState>(() => store.currentState.upscale)
 
-// ── Engine select (chip 单选) ────────────────────────────────────────────
-
 const isSeedVR2 = computed(() => config.value.engine === 'seedvr2')
 
 /** 两个引擎各自的权重是否在磁盘 —— 未装的那一侧禁止切过去 (照面部面板 SAM 成例) */
@@ -37,8 +35,6 @@ watch([aurasrInstalled, seedvr2Installed], ([aura, svr]) => {
   else if (config.value.engine === 'seedvr2' && !svr && aura) config.value.engine = 'aurasr'
 }, { immediate: true })
 
-// ── AuraSR options ──────────────────────────────────────────────────────
-
 const modeOptions = computed(() => [
   { value: '4x_overlapped_checkboard', label: t('generate.upscale.mode_checkboard') },
   { value: '4x_overlapped_constant', label: t('generate.upscale.mode_constant') },
@@ -52,8 +48,6 @@ const downscaleOptions = computed(() => [
   { value: 'area', label: 'Area' },
   { value: 'nearest-exact', label: 'Nearest' },
 ])
-
-// ── SeedVR2 options ──────────────────────────────────────────────────────
 
 const SEEDVR2_MODEL_LABELS: Record<string, string> = {
   'seedvr2_ema_3b_fp8_e4m3fn.safetensors': 'SeedVR2 3B FP8 · 3.4GB',
@@ -78,8 +72,6 @@ const svrColorOptions = computed(() => [
   { value: 'none', label: t('generate.upscale.svr_color_none') },
 ])
 
-// ── Shared ──────────────────────────────────────────────────────────────
-
 const is4x = computed(() => config.value.factor >= 4)
 
 const sizeHint = computed(() => {
@@ -92,7 +84,6 @@ const sizeHint = computed(() => {
 
 <template>
   <div class="upscale-grid">
-    <!-- Engine select: 分段单选, 点选即切换 -->
     <div class="up-field">
       <div class="field-lbl">
         {{ t('generate.upscale.engine') }}
@@ -106,10 +97,8 @@ const sizeHint = computed(() => {
       />
     </div>
 
-    <!-- ── AuraSR: 上排两个滑条 / 下排两个下拉 ── -->
     <template v-if="!isSeedVR2">
       <div class="upscale-grid__row">
-        <!-- Factor slider -->
         <div class="up-cell">
           <RangeField
             :model-value="config.factor"
@@ -127,7 +116,6 @@ const sizeHint = computed(() => {
           </RangeField>
         </div>
 
-        <!-- Tile size slider -->
         <div class="up-cell">
           <RangeField
             :model-value="config.tile"
@@ -146,7 +134,6 @@ const sizeHint = computed(() => {
       </div>
 
       <div class="upscale-grid__row">
-        <!-- Mode select -->
         <div class="up-cell">
           <div class="up-field">
             <div class="field-lbl">
@@ -162,7 +149,6 @@ const sizeHint = computed(() => {
           </div>
         </div>
 
-        <!-- Downscale method (disabled at 4x) -->
         <div class="up-cell" :class="{ 'up-cell--disabled': is4x }">
           <div class="up-field">
             <div class="field-lbl">
@@ -181,10 +167,8 @@ const sizeHint = computed(() => {
       </div>
     </template>
 
-    <!-- ── SeedVR2: 倍率+VAE开关 / 两个下拉 / 两个噪声滑条 ── -->
     <template v-else>
       <div class="upscale-grid__row">
-        <!-- Factor slider -->
         <div class="up-cell">
           <RangeField
             :model-value="config.factor"
@@ -202,7 +186,6 @@ const sizeHint = computed(() => {
           </RangeField>
         </div>
 
-        <!-- VAE tiled toggle -->
         <div class="up-cell">
           <div class="up-field up-field--switch">
             <div class="field-lbl">
@@ -219,7 +202,6 @@ const sizeHint = computed(() => {
       </div>
 
       <div class="upscale-grid__row">
-        <!-- Model select -->
         <div class="up-cell">
           <div class="up-field">
             <div class="field-lbl">{{ t('generate.upscale.svr_model') }}</div>
@@ -232,7 +214,6 @@ const sizeHint = computed(() => {
           </div>
         </div>
 
-        <!-- Color correction -->
         <div class="up-cell">
           <div class="up-field">
             <div class="field-lbl">
@@ -250,7 +231,6 @@ const sizeHint = computed(() => {
       </div>
 
       <div class="upscale-grid__row">
-        <!-- Input noise -->
         <div class="up-cell">
           <RangeField
             :model-value="config.svrInputNoise"
@@ -268,7 +248,6 @@ const sizeHint = computed(() => {
           </RangeField>
         </div>
 
-        <!-- Latent noise -->
         <div class="up-cell">
           <RangeField
             :model-value="config.svrLatentNoise"
@@ -318,7 +297,6 @@ const sizeHint = computed(() => {
   gap: 4px;
 }
 
-/* VAE 分块开关: 与同排滑条等高, 水平排布垂直居中 */
 .up-field--switch {
   flex-direction: row;
   align-items: center;

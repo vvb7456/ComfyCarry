@@ -29,23 +29,17 @@ const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 
-// ─── Password state (modal) ──────────────────────────────────────────────────
-
 const pwModalOpen = ref(false)
 const pwCurrent = ref('')
 const pwNew = ref('')
 const pwConfirm = ref('')
 const pwSubmitting = ref(false)
 
-// ─── API Key state ───────────────────────────────────────────────────────────
-
 const apiKey = ref('')
 const apiKeyRevealed = ref(false)
 const regenLoading = ref(false)
 const apiKeyLoading = ref(true)
 const apiKeyError = ref(false)
-
-// ─── Load / actions ──────────────────────────────────────────────────────────
 
 async function loadSettings() {
   const data = await get<{ api_key?: string }>('/api/settings')
@@ -144,7 +138,6 @@ onMounted(() => {
 </script>
 
 <template>
-    <!-- 模块 1: 登录与认证 (即时动作) -->
     <SettingsModule :title="t('settings.domains.auth')">
       <div v-if="apiKeyError" class="settings-lines">
         <EmptyState icon="error_outline" :message="t('common.load_failed')">
@@ -153,7 +146,6 @@ onMounted(() => {
       </div>
 
       <div v-else class="settings-lines">
-        <!-- 修改登录密码 (modal 即时动作) -->
         <div class="settings-row">
           <div class="settings-row__text">
             <div class="settings-row__label">{{ t('settings.password.row_label') }}</div>
@@ -166,7 +158,6 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- API Key (只读 + 重新生成) -->
         <div class="settings-row">
           <div class="settings-row__text">
             <div class="settings-row__label">
@@ -200,7 +191,6 @@ onMounted(() => {
       </div>
     </SettingsModule>
 
-    <!-- 模块 2: 配置管理 (即时动作) -->
     <SettingsModule :title="t('settings.domains.configmgmt')">
       <div class="settings-lines">
         <div class="settings-row">
@@ -229,7 +219,6 @@ onMounted(() => {
       </div>
   </SettingsModule>
 
-  <!-- 改密 modal -->
   <BaseModal v-model="pwModalOpen" :title="t('settings.password.title')" icon="lock">
     <form @submit.prevent="changePassword" autocomplete="off">
       <input
@@ -292,7 +281,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Vue-unique: mono variant for API key display */
 .mono-input {
   font-family: var(--font-mono);
   font-size: .82rem;

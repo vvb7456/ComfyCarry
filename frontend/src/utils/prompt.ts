@@ -1,11 +1,3 @@
-/**
- * Prompt normalization utility.
- *
- * 可配置的规格化：根据编辑器设置决定启用哪些转换。
- * 始终执行：comma formatting (含连续逗号折叠) / space collapse / 首尾逗号清理。
- * 注意: 不做同名 tag 去重 — 重复 tag 在权重叠加上是有意义的写法。
- */
-
 export interface NormalizeOptions {
   /** 全角逗号 → 半角逗号 (，→ ,) */
   comma?: boolean
@@ -39,7 +31,6 @@ const PLACEHOLDER = '\u0000'
 export function normalizePrompt(text: string, opts: NormalizeOptions = DEFAULT_OPTIONS): string {
   let s = text
 
-  // 全角 → 半角 (按设置启用)
   if (opts.comma !== false) {
     s = s.replace(/，/g, ',')
   }
@@ -52,7 +43,6 @@ export function normalizePrompt(text: string, opts: NormalizeOptions = DEFAULT_O
     s = s.replace(/；/g, ';').replace(/：/g, ':')
   }
   if (opts.underscore) {
-    // 先把受保护段落挖出来占位，替换完下划线再原样填回
     const kept: string[] = []
     s = s.replace(RE_PROTECTED, (m) => {
       kept.push(m)
@@ -62,13 +52,12 @@ export function normalizePrompt(text: string, opts: NormalizeOptions = DEFAULT_O
     s = s.replace(new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, 'g'), (_m, i) => kept[Number(i)] ?? '')
   }
 
-  // 始终执行的格式化
   s = s
-    .replace(/\s*(?:,\s*)+/g, ', ')  // 折叠连续逗号 + 统一逗号间距
-    .replace(/^\s*,\s*|\s*,\s*$/g, '') // remove leading/trailing commas
-    .replace(/\(\s+/g, '(')          // bracket whitespace
+    .replace(/\s*(?:,\s*)+/g, ', ')
+    .replace(/^\s*,\s*|\s*,\s*$/g, '')
+    .replace(/\(\s+/g, '(')
     .replace(/\s+\)/g, ')')
-    .replace(/ {2,}/g, ' ')          // collapse multiple spaces
+    .replace(/ {2,}/g, ' ')
     .trim()
 
   return s

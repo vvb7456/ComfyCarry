@@ -1,11 +1,9 @@
 # syntax=docker/dockerfile:1.7
-# ==============================================================================
 # ComfyCarry Docker 镜像 (CUDA 13.0 / PyTorch 2.9.1)
 #
 # 正式生产基线：NVIDIA cudnn-runtime + 最小 CUDA 编译链。
 # CI 发布 latest、cu130-torch291 与 cu130-torch291-runtime-minimal。
 # 支持: Ampere (A100/30xx) | Ada (40xx) | Hopper (H100) | Blackwell (50xx/B200)
-# ==============================================================================
 
 FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04@sha256:6477166585af57524a052c59c611d23007a40fed605f8034684af2596e2a9ffb
 
@@ -33,9 +31,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-# =============================================================================
-# 1. 系统依赖 + 最小 CUDA 编译链
-# =============================================================================
 # cuda-minimal-build 保留 nvcc、CUDA runtime headers、CCCL/NVVM/PTX 组件，
 # 支持 SAM2 以及常见 torch.utils.cpp_extension；不安装 Nsight、完整数学库
 # development/static packages 等约 2 GiB 的 devel 增量。
@@ -58,9 +53,6 @@ RUN apt-get update -qq && \
 # Rclone 使用官方稳定版，避免 Ubuntu 仓库旧版本的 OneDrive multipart 问题。
 RUN curl -fsSL https://rclone.org/install.sh | bash
 
-# =============================================================================
-# 2. Node.js 20.x + PM2
-# =============================================================================
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g pm2 && \

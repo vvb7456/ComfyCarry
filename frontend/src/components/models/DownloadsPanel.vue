@@ -9,8 +9,6 @@ import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import DownloadItem from '@/components/models/DownloadItem.vue'
 
 /**
- * DownloadsPanel — 下载任务 (进行中 / 历史), 挂在模型页的「收藏&下载」抽屉里。
- *
  * 不感知自己是否可见: 连接由抽屉打开时统一触发, 见 ModelsPage.openDrawer()。
  */
 defineOptions({ name: 'DownloadsPanel' })
@@ -32,14 +30,12 @@ const {
   tasks: dlTasks,
 } = useDownloads()
 
-// In-progress group: active + queued + paused
 const inProgressTasks = computed(() =>
   dlTasks.value.filter(t =>
     t.status === 'active' || t.status === 'queued' || t.status === 'paused',
   ),
 )
 
-// History group: complete + failed merged, sorted by completed_at DESC
 const historyTasks = computed(() => {
   const merged = [...dlCompletedTasks.value, ...dlFailedTasks.value]
   return merged.sort((a, b) => (b.completed_at || 0) - (a.completed_at || 0))
@@ -51,7 +47,6 @@ const failedInHistory = computed(() =>
 </script>
 
 <template>
-  <!-- In-progress: active + queued + paused (always open) -->
   <CollapsibleGroup
     icon="download"
     :title="t('models.downloads.active')"
@@ -78,7 +73,6 @@ const failedInHistory = computed(() =>
     <EmptyState v-else icon="download" :message="t('models.downloads.no_active')" density="compact" />
   </CollapsibleGroup>
 
-  <!-- History: complete + failed merged -->
   <CollapsibleGroup
     icon="history"
     :title="t('models.downloads.history')"
@@ -104,7 +98,6 @@ const failedInHistory = computed(() =>
 </template>
 
 <style scoped>
-/* 下载任务列表: 行组件负责骨架, 容器只发丝线分隔 */
 .dl-list > li + li {
   border-top: 1px solid color-mix(in srgb, var(--bd) 65%, transparent);
 }

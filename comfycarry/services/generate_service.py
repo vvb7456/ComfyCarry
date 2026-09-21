@@ -45,7 +45,6 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
 
     返回: (错误响应 dict | None, HTTP 状态码); None 表示校验通过。
     """
-    # ── 主权重: 单 unet 必填 ──
     unet = str(data.get("unet", "")).strip()
     if not unet:
         return {"error_key": "generate.err.minimax_h3_unet_required"}, 400
@@ -57,7 +56,6 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
         }, 400
     data["unet"] = unet
 
-    # ── TE / 视频 VAE / 音频 VAE 必填 ──
     clip = str(data.get("clip", "")).strip()
     vae = str(data.get("vae", "")).strip()
     audio_vae = str(data.get("audio_vae", "")).strip()
@@ -100,7 +98,6 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
     data["width"] = width
     data["height"] = height
 
-    # ── 时长: 整数秒钳制 [min, max]; length = h3_align_length(duration×24) ──
     h3_min, h3_max = H3_DURATION_RANGE
     try:
         duration = int(float(data.get("duration_s", 5)))
@@ -114,7 +111,6 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
     data["duration_s"] = duration
     data["length"] = h3_align_length(duration * H3_FPS)
 
-    # ── batch 恒 1; steps 钳 [1,100]; pop 无用字段 (H3 无 CFG/负面/速度档) ──
     data["batch_size"] = 1
     try:
         steps = int(data.get("steps", 20))
@@ -138,7 +134,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
       成功: ({"prompt_id": "...", "status": "queued"}, 200)
       失败: ({"error_key": "generate.err.<key>", "error_params": {...}}, 400/500/502/503)
     """
-    # ── 每轮 deepcopy — 入口即深拷贝, 防止 wildcard 烤死 ──
     data = copy.deepcopy(data)
 
     # _BUILDERS / _SPLIT_ARCHS / _DUAL_CLIP_ARCHS / _fetch_generate_options
@@ -159,9 +154,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     if not positive_prompt:
         return {"error_key": "generate.err.empty_prompt"}, 400
 
-    # ── 参数范围校验 ────────────────────────────────────────────────────────
     batch_size = max(1, min(int(data.get("batch_size", 1) or 1), 16))
-    data["batch_size"] = batch_size  # 归一化后写回
+    data["batch_size"] = batch_size
 
     # ── 模型文件存在性校验 ──────────────────────────────────────────────────
     try:
@@ -172,7 +166,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         logger.warning(f"[generate] 获取 options 失败 (非致命，跳过校验): {e}")
         opts = {}
 
-    # 不同模型类型校验不同字段
     if model_type in ("sdxl", "sd15"):
         checkpoint = data.get("checkpoint", "").strip()
         if not checkpoint:
@@ -189,7 +182,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         except (TypeError, ValueError):
             clip_skip = 1
         data["clip_skip"] = max(1, min(clip_skip, 4))
-        # vae 覆盖 (可选 str, 非空时校验存在于 VAE 列表)
         vae_override = str(data.get("vae", "") or "").strip()
         if vae_override:
             vae_list = opts.get("vaes", [])
@@ -202,7 +194,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         else:
             data["vae"] = ""
     elif model_type in _SPLIT_ARCHS:
-        # packaging 校验分流: checkpoint → 校验 checkpoint 字段; split → 校验 unet/clip[/clip2]/vae
         packaging = str(data.get("packaging", "split"))
         if packaging not in ("checkpoint", "split"):
             packaging = "split"
@@ -249,7 +240,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                         "error_params": {"label": label, "name": fname},
                     }, 400
                 data[key] = fname
-            # flux1 等双 CLIP 架构: 额外校验 clip2 (第二 Text Encoder, 如 T5)
             if model_type in _DUAL_CLIP_ARCHS:
                 clip2 = data.get("clip2", "").strip()
                 if not clip2:
@@ -264,7 +254,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     }, 400
                 data["clip2"] = clip2
 
-    # ── Flux2 guider_mode 归一化 ──────────────────────────────────────────
     # basic (dev, 无负面) / cfg (klein, 有负面); 缺省 cfg
     if model_type == "flux2":
         guider_mode = str(data.get("guider_mode", "cfg"))
@@ -272,13 +261,11 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             guider_mode = "cfg"
         data["guider_mode"] = guider_mode
 
-    # ── Wan 2.2 视频校验分支 ─────────────────────────────────────────
-    # 独立于 _SPLIT_ARCHS (后者写死单 unet 必填)。variant 由 model_type 推导:
+    # variant 由 model_type 推导:
     #   wan22_i2v → "i2v" (14B 双权重), wan22_t2v → "t2v" (14B 双权重),
     #   wan22_5b → "5b" (单权重, 条目内 t2v/i2v 模式开关)。
     if model_type in _VIDEO_ARCHS:
         if model_type == "minimax_h3":
-            # ── MiniMax H3 (FL2VA) 独立校验子分支 ──
             # CFG-distilled: 无 negative / cfg; 单 UNETLoader + 单 CLIPLoader + 双 VAELoader
             # (视频 VAE + 音频 VAE)。length 满足 17k+5, 由 duration_s×24 对齐。
             mode = str(data.get("mode", "i2v")).strip().lower()
@@ -286,13 +273,10 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 mode = "i2v"
             data["mode"] = mode
 
-            # ── 通用校验 (unet/clip/vae/audio_vae/分辨率/时长/batch/steps/pop) ──
             err, status = _validate_h3_common(data, opts)
             if err is not None:
                 return err, status
 
-            # ── 起始画面: i2v 必填; t2v 清空 ──
-            # (路径三段校验与 wan22 完全一致: input_dir / realpath 越界 / 存在性)
             input_dir = os.path.join(COMFYUI_DIR, "input")
             real_input = os.path.realpath(input_dir)
             start_image = str(data.get("start_image", "")).strip()
@@ -336,16 +320,13 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             if mode == "t2v":
                 data["last_image"] = ""
 
-            # 校验完成, 落入下方通用提交链路 (LoRA / controlnet / save_prefix / 构建 / POST)
         elif model_type == "minimax_h3_ref":
-            # ── MiniMax H3 Ref2VA 参考生成 校验子分支 ──
             # 通用校验 (与 FL2VA 同) + refs 结构/计数/路径三段校验, 归一化后
             # 落入下方通用提交链路。起始画面不适用 (参考条目标识由 refs 承载)。
             err, status = _validate_h3_common(data, opts)
             if err is not None:
                 return err, status
 
-            # ── refs 结构校验: 必须是非空 list, 每项 dict + type∈{image,video,audio} + name 非空 ──
             refs_raw = data.get("refs")
             if not isinstance(refs_raw, list) or not refs_raw:
                 return {"error_key": "generate.err.minimax_h3_refs_required"}, 400
@@ -368,7 +349,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     n_aud += 1
                 refs.append({"type": rtype, "name": name})
 
-            # ── 计数上限: 图 ≤9 / 视频 ≤3 / 音频 ≤3 / 混合总数 ≤12 ──
             if n_img > 9:
                 return {
                     "error_key": "generate.err.minimax_h3_refs_images_too_many",
@@ -413,7 +393,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                         "error_params": {"name": ref["name"]},
                     }, 400
 
-            # ── 归一化写回: 精简 refs; 清空起始画面相关字段 (ref 条目不需要) ──
             data["refs"] = refs
             data["start_image"] = ""
             data["last_image"] = ""
@@ -422,9 +401,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
 
             variant = {"wan22_i2v": "i2v", "wan22_t2v": "t2v", "wan22_5b": "5b"}[model_type]
             is_14b = variant in ("t2v", "i2v")
-            fps = 16 if is_14b else 24  # 帧率随条目锁定
+            fps = 16 if is_14b else 24
 
-            # ── 主权重: 14B 双权重必填且互异; 5B 单权重必填 ──
             if is_14b:
                 unet_high = str(data.get("unet_high", "")).strip()
                 unet_low = str(data.get("unet_low", "")).strip()
@@ -455,7 +433,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     }, 400
                 data["unet"] = unet
 
-            # ── TE / VAE 必填 ──
             clip = str(data.get("clip", "")).strip()
             vae = str(data.get("vae", "")).strip()
             if not clip or not vae:
@@ -472,7 +449,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     }, 400
                 data[key] = fname
 
-            # ── 起始画面: i2v 必填; 5b 仅 mode=='i2v' 时必填 ──
             # (input_dir 与 i2i 校验块共用, 此处就地定义 — ControlNet 块在更后面)
             input_dir = os.path.join(COMFYUI_DIR, "input")
             start_image = str(data.get("start_image", "")).strip()
@@ -498,10 +474,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     }, 400
                 data["start_image"] = start_image
             else:
-                # t2v 模式清空, 防止脏值
                 data["start_image"] = ""
 
-            # ── 分辨率: 14B %16, 5B %32; W×H ≤ 921600 (720p 预算) ──
             try:
                 width = int(data.get("width", 640 if is_14b else 1280))
             except (TypeError, ValueError):
@@ -526,7 +500,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             data["width"] = width
             data["height"] = height
 
-            # ── 时长 / 帧数: frames = fps×duration+1, 上限 14B=7s / 5B=5s, 0.5s 步进 ──
             max_duration = 7 if is_14b else 5
             try:
                 duration = float(data.get("duration_s", 5))
@@ -545,11 +518,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             length = max(1, int(fps * duration) + 1)
             data["length"] = length
 
-            # ── batch 恒 1 (视频不支持批量) ──
-            # 传入 >1 时纠正为 1 (静默纠正, 不报错 — 避免前端 batch 状态残留阻塞提交)
             data["batch_size"] = 1
 
-            # ── 速度档 (仅 14B): fast / standard ──
             if is_14b:
                 speed = str(data.get("speed", "fast")).strip().lower()
                 if speed not in ("fast", "standard"):
@@ -575,7 +545,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     cfg = max(1.0, min(cfg, 20.0))
                     data["cfg"] = cfg
             else:
-                # 5B 无速度档: 忽略 fast 字段, 清理脏值
                 data.pop("speed", None)
                 data.pop("fast", None)
 
@@ -596,7 +565,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 "error_params": {"name": lora_name},
             }, 400
 
-    # 确保归一化后的 loras 写回 data（兼容 workflow_builder 读取）
     data["loras"] = loras
 
     # ── ControlNet 参数校验 ─────────────────────────────────────────────────
@@ -608,7 +576,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         cn_image = str(cn.get("image", "")).strip()
         if not cn_model or not cn_image:
             continue
-        # 校验图片文件存在
         img_path = os.path.join(input_dir, cn_image)
         real_img = os.path.realpath(img_path)
         real_input = os.path.realpath(input_dir)
@@ -676,29 +643,23 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         data["face_detailer_bbox_threshold"] = max(0.1, min(float(data.get("face_detailer_bbox_threshold", 0.5)), 0.9))
         data["face_detailer_feather"] = max(0, min(int(data.get("face_detailer_feather", 5)), 100))
 
-    # ── 保存路径模板解析 ─────────────────────────────────────────────────────
     # 支持 WAS Image Save 标准格式: [time(%Y-%m-%d)], [time(%H%M%S)] 等
     # 兼容旧格式: [date] → YYYY-MM-DD, [time] → HHMMSS
     now = datetime.now()
     save_prefix = str(data.get("save_prefix", "[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]") or "[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]")
 
-    # 安全检查: 禁止路径遍历和绝对路径
     if '..' in save_prefix or save_prefix.startswith('/'):
         save_prefix = "[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]"
 
-    # WAS 标准: [time(%Y-%m-%d)] → strftime
     save_prefix = re.sub(
         r'\[time\(([^)]+)\)\]',
         lambda m: now.strftime(m.group(1)),
         save_prefix
     )
-    # 兼容旧格式
     save_prefix = save_prefix.replace("[date]", now.strftime("%Y-%m-%d"))
     save_prefix = save_prefix.replace("[time]", now.strftime("%H%M%S"))
     data["save_prefix"] = save_prefix
 
-    # ── 输出格式 ─────────────────────────────────────────────────────────────
-    # WAS Image Save 支持: png, jpg, jpeg, webp, tiff, bmp, gif
     output_format = str(data.get("output_format", "png")).lower()
     if output_format not in ("png", "jpg", "jpeg", "webp", "tiff", "bmp", "gif"):
         output_format = "png"
@@ -707,7 +668,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     original_positive = positive_prompt
     original_negative = data.get("negative_prompt", "")
 
-    # ── 提示词模板展开 (dynamicprompts) ─────────────────────────────────────
     try:
         expander = get_expander()
         seed_val = int(data.get("seed", -1))

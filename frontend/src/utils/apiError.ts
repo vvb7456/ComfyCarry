@@ -38,7 +38,6 @@ export function apiErrorText(body: ApiErrorBody | null | undefined, fallback = '
   return body.error || body.message || fallback
 }
 
-/** 成功消息文本。没有 message_key / message 时返回 fallback。 */
 export function apiMessageText(body: ApiErrorBody | null | undefined, fallback = ''): string {
   if (!body) return fallback
   if (body.message_key) return translate(body.message_key, body.message_params)

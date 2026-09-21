@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * ActionBar — Progress status + Run/Stop split button
- *
- * Run mode stored in generate store (persisted).
- * 'normal' / 'live' / 'background' 三态; onChange 已作为 dead code 移除。
- */
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
@@ -35,7 +29,6 @@ const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
 const state = computed(() => store.currentState)
 
-/* ── Run mode ── */
 interface RunModeConfig {
   key: string
   icon: IconName

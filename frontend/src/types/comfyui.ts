@@ -1,5 +1,3 @@
-// ── ComfyUI Data Types ────────────────────────────────────────
-
 export interface ComfyStatus {
   online: boolean
   pm2_status: string
@@ -30,8 +28,6 @@ export interface ParamSchema {
   flag_map?: Record<string, string>
   flag_prefix?: string
 }
-
-// ── API Responses ─────────────────────────────────────────────
 
 export interface ComfyParamsResponse {
   schema?: Record<string, ParamSchema>
@@ -68,8 +64,6 @@ export interface ComfyHistoryResponse {
   error_key?: string
   error_params?: Record<string, unknown>
 }
-
-// ── Version Management ────────────────────────────────────────
 
 export interface ComfyVersionsResponse {
   versions: string[]

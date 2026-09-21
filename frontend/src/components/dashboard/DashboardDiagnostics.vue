@@ -157,7 +157,6 @@ const envFacts = computed(() => {
       </div>
     </div>
 
-    <!-- Initial loading -->
     <div v-if="initialLoading && !data" class="dash-diagnostics__loading">
       <div class="dash-spinner"></div>
       <span>{{ t('common.status.loading') }}</span>
@@ -248,8 +247,6 @@ const envFacts = computed(() => {
   font-size: var(--text-sm);
 }
 
-/* 服务行本身用 ListRow（图标 + 主副文案 + 行尾动作 + 命中区都在组件里）；
-   这里只剩“环境事实行”，与设计稿的 facts 行同构（标签 + 值，小字，无 chip） */
 .dash-facts {
   display: flex;
   flex-wrap: wrap;

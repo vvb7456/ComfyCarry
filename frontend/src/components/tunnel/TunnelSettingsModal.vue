@@ -37,12 +37,10 @@ defineOptions({ name: 'TunnelSettingsModal' })
 
 type TunnelMode = 'off' | 'public' | 'custom'
 
-/** 公共模式固定内置域名 (产品配置) */
 const PUBLIC_DOMAIN = 'erocraft.org'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
-  /** 打开时预选模式: Hero「连接公共节点 / 使用自定义隧道」入口传入 */
   presetMode?: TunnelMode | null
 }>(), {
   presetMode: null,

@@ -1,5 +1,3 @@
-// ── Jupyter Data Types ────────────────────────────────────────
-
 export interface KernelSpecInfo {
   name: string
   display_name: string

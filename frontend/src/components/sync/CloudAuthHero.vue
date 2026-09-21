@@ -65,7 +65,6 @@ const POLL_MS = 2000
 const MAX_POLL_FAILURES = 3
 
 const props = withDefaults(defineProps<{
-  /** 选中的 remote 类型 key (drive, onedrive, dropbox, s3, sftp, webdav) */
   type: string
   /** 是否以弹窗内紧凑模式渲染 (modal 42px 图标, 默认 false 为 48px) */
   modal?: boolean
@@ -98,37 +97,26 @@ const props = withDefaults(defineProps<{
   embedded: false,
 })
 
-/** 存储名称 (done 屏由卡片内输入框管理) */
 const name = defineModel<string>('name', { default: '' })
-/** 非 OAuth 凭据字段值 (REMOTE_TYPE_DEFS.fields), 由父组件持有时便于统计指纹 */
 const fields = defineModel<Record<string, string>>('fields', { default: () => ({}) })
-/** 与这份存储绑定的同步文件夹 (预设规则路径锚点) */
 const rootDir = defineModel<string>('rootDir', { default: '' })
-/** S3 存储桶 (rclone s3 路径首段; 非 S3 不用) */
 const bucket = defineModel<string>('bucket', { default: '' })
 
 const emit = defineEmits<{
-  /** 授权完成 (phase === 'done'), 附带可选的自建凭据参数 */
   authorized: [params: Record<string, string>]
-  /** 状态机流转通知 */
   'update:phase': [phase: OAuthPhase]
-  /** 用户点击「更换账号」重置 */
   reset: []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 
-// ── 类型判定 ──
 /** OAuth 类型走授权会话; 其余走凭据表单 (同一 done 屏收尾) */
 const isOAuth = computed(() =>
   !!(props.types[props.type]?.oauth ?? OAUTH_TYPES.includes(props.type)),
 )
-/** 非 OAuth 的凭据字段定义 (按后端 REMOTE_TYPE_DEFS) */
 const credFields = computed(() => props.types[props.type]?.fields || [])
 const isS3 = computed(() => props.type === 's3')
-
-// ── 会话状态 ──
 
 const phase = ref<OAuthPhase>(props.restored ? 'done' : 'idle')
 const providerUrl = ref('')
@@ -142,10 +130,7 @@ const pasting = ref(false)
 const redirecting = ref(false)
 const hasOpenedWindow = ref(false)
 
-/** 动态字段参数 (drive 的 client_id/client_secret) */
 const params = ref<Record<string, string>>({})
-
-// ── 驱动器 (identity 模式, done 态选择) ──
 
 const drives = ref<OAuthDriveItem[]>([])
 const selectedDrive = ref(
@@ -159,7 +144,6 @@ const drivesFetched = ref(false)
 let drivesPromise: Promise<void> | null = null
 let drivesGeneration = 0
 
-/** 支持驱动器选择的类型 (done 态 select 恒占位, 选项延迟加载, 避免布局跳动) */
 const hasDrives = computed(() => props.type === 'onedrive' || props.type === 'drive')
 
 /** 恢复态不再持有 OAuth session, 只能使用父组件传入的非敏感参数。 */
@@ -238,15 +222,12 @@ function resetDrives() {
   drivesError.value = ''
 }
 
-/** 驱动器加载失败时由 done 屏上的重试按钮调用。 */
 async function retryDrives() {
   drivesGeneration += 1
   drivesPromise = null
   drivesFetched.value = false
   await ensureSelectLoaded()
 }
-
-// ── S3 存储桶 (done 屏选择, bucket 是这份存储的根) ──
 
 const buckets = ref<string[]>([])
 const bucketsLoading = ref(false)
@@ -326,13 +307,9 @@ function ensureSelectLoaded(): Promise<void> {
   return Promise.resolve()
 }
 
-// ── 非 OAuth: 凭据屏 → done ──
-
 const credError = ref('')
-/** 用户是否点过「修改连接信息」: 之后 staged 浏览改用表单里的新凭据 */
 const credsEdited = ref(false)
 
-/** 非 OAuth 凭据必填校验 (错误就地展示, 不前进) */
 function connect() {
   credError.value = ''
   const missing = credFields.value
@@ -351,7 +328,6 @@ function connect() {
   void ensureSelectLoaded()
 }
 
-/** 非 OAuth done 屏「修改连接信息」: 回到凭据屏 (字段值保留) */
 function editCreds() {
   credError.value = ''
   credsEdited.value = true
@@ -359,7 +335,6 @@ function editCreds() {
   emit('update:phase', 'idle')
 }
 
-// ── 同步文件夹 (done 屏输入 + 远程目录浏览器) ──
 // 非空校验不就地报错 —— 未填时父流程的下一步/完成按钮保持置灰, 已是明确提示
 
 const browseOpen = ref(false)
@@ -437,7 +412,6 @@ const readyForCreate = computed(() => {
   return true
 })
 
-/** 登录按钮文案: 按 provider 用「xx 账号登录」措辞 (标题仍用品牌名) */
 const startLabel = computed(() => {
   const keys: Record<string, string> = {
     drive: 'sync.oauth.start_drive',
@@ -448,12 +422,9 @@ const startLabel = computed(() => {
   return key ? t(key) : t('sync.oauth.start_with_provider', { provider: providerName.value })
 })
 
-/** 是否在初始态显示 drive 的自建 client_id 折叠 */
 const showDriveAdvanced = computed(() =>
   props.type === 'drive' && phase.value !== 'starting' && phase.value !== 'url_ready' && phase.value !== 'exchanging' && phase.value !== 'done'
 )
-
-// ── 请求封装 ──
 
 interface OAuthFetchResult<T> { status: number; data: T | null }
 
@@ -484,8 +455,6 @@ function oauthErrText(data: ApiOkResponse | null, fallback: string): string {
   const d = typeof detail === 'string' && detail && !/^[a-z0-9_]+$/.test(detail) ? detail : ''
   return d ? `${text}：${d}` : text
 }
-
-// ── 授权页跳转 (延迟自动打开, 弹窗拦截由「立即打开」兜底) ──
 
 const REDIRECT_DELAY_MS = 4000
 let redirectTimer: ReturnType<typeof setTimeout> | null = null
@@ -518,8 +487,6 @@ function cancelRedirect() {
     redirectTimer = null
   }
 }
-
-// ── 状态机流转 ──
 
 function applyPhase(d: Partial<OAuthStatusResponse>) {
   switch (d.phase) {
@@ -566,8 +533,6 @@ function applyPhase(d: Partial<OAuthStatusResponse>) {
   }
 }
 
-// ── 轮询 (setTimeout 链式调度 + 代数计数) ──
-
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 let pollGen = 0
 let pollFailures = 0
@@ -608,8 +573,6 @@ async function pollTick(gen: number) {
     pollTimer = setTimeout(() => void pollTick(gen), POLL_MS)
   }
 }
-
-// ── 会话清理 ──
 
 function cancelSession() {
   void oauthFetch('/api/sync/remote/oauth/cancel', {})
@@ -657,8 +620,6 @@ watch(() => props.type, () => {
   resetBuckets()
 })
 
-// ── 启动授权 ──
-
 async function startAuth() {
   starting.value = true
   statusError.value = ''
@@ -702,7 +663,6 @@ async function startAuth() {
   startPolling()
 }
 
-/** 重新打开授权页面 (若尚未获取到 url 则重新 startAuth) */
 function reopenAuth() {
   if (providerUrl.value) {
     openProviderPage()
@@ -711,7 +671,6 @@ function reopenAuth() {
   }
 }
 
-/** 更换账号: 重置会话回到初始卡片 */
 function reconnect() {
   cancelSession()
   emit('reset')
@@ -751,10 +710,6 @@ function getParams(): Record<string, string> {
   }
   return res
 }
-
-// ── 校验 / 换取令牌 (主路径: 卡片内「确认」按钮; 父组件在「下一步」时调用是保底。
-//    idle/error 相位已被父组件的下一步按钮 disable 挡住, 输入框仅在等待态渲染,
-//    故此处只会遇到等待/完成态) ──
 
 async function validatePaste(): Promise<boolean> {
   if (phase.value === 'done') return true
@@ -861,8 +816,6 @@ defineExpose({
 
 <template>
   <div class="cloud-auth-hero" :class="{ 'is-modal': modal, 'is-embedded': embedded }">
-    <!-- 状态 3: 完成 (identity: hero 居中语言, 与登录/等待页一致)
-         非 OAuth 也落这一屏: 名称 + 挂载根 (驱动器/存储桶) + 同步文件夹 -->
     <div v-if="isDone" class="v-panel v-hero">
       <span class="v-hero-logo v-hero-logo--done">
         <img v-if="brand.logo" :src="brand.logo" alt="" class="v-hero-logo-img">
@@ -887,7 +840,6 @@ defineExpose({
           </template>
         </FormField>
 
-        <!-- 挂载根 select 恒占位 (驱动器/存储桶), 选项延迟加载, 避免布局跳动 -->
         <FormField v-if="hasDrives || isS3" :label="selectLabel" density="compact">
           <template #default="{ id }">
             <BaseSelect
@@ -924,8 +876,6 @@ defineExpose({
           {{ t('common.btn.retry') }}
         </BaseButton>
 
-        <!-- 同步文件夹 (与这份存储绑定): 预设规则路径的锚点, 不能是存储根。
-             只读 —— 仅经目录浏览器选择, 预防手输奇怪路径 -->
         <FormField :label="t('sync.dir.root_label')" density="compact">
           <template #default="{ id }">
             <div class="v-root-row">
@@ -956,7 +906,6 @@ defineExpose({
       </div>
     </div>
 
-    <!-- 非 OAuth: 凭据屏 (名称/同步文件夹在完成屏设置) -->
     <div v-else-if="!isOAuth" class="v-panel v-cred">
       <div class="v-cred-head">
         <span class="v-cred-logo">
@@ -993,16 +942,12 @@ defineExpose({
       </BaseButton>
     </div>
 
-    <!-- 状态 1 / 2 / 4: 初始 Hero / 等待+粘贴 / 失败 -->
     <div v-else class="v-panel v-hero">
-      <!-- 品牌 Logo 底座 (48px / modal 42px) -->
       <span class="v-hero-logo">
         <img v-if="brand.logo" :src="brand.logo" alt="" class="v-hero-logo-img">
         <MsIcon v-else :name="brand.icon" />
       </span>
 
-      <!-- 标题: 等待态按子相位切换 —— 延迟跳转期「spinner 正在跳转到 xx…」,
-           页面已打开后「在浏览器中登录 xx」; 初始/失败态保持「连接 xx」 -->
       <h3 v-if="isWaiting && redirecting" class="v-hero-title">
         <span class="v-redirecting">
           <Spinner size="sm" />
@@ -1012,8 +957,6 @@ defineExpose({
       <h3 v-else-if="isWaiting" class="v-hero-title">{{ t('sync.oauth.sign_in_at', { provider: providerName }) }}</h3>
       <h3 v-else>{{ t('sync.oauth.connect_provider', { provider: providerName }) }}</h3>
 
-      <!-- 说明行: 等待态只留一个超链接 (立即打开 / 重新打开), 初始态无副标题;
-           第三行 localhost 粘贴提示不受影响 -->
       <p>
         <template v-if="isWaiting && redirecting">
           <button type="button" class="v-link" @click="openProviderPage">
@@ -1027,8 +970,6 @@ defineExpose({
         </template>
       </p>
 
-      <!-- 等待态: 粘贴说明 + 无标题粘贴输入框 (粘贴回调为主路径;
-           embedded 模式无内嵌确认键, 由父流程「下一步」调 validatePaste) -->
       <template v-if="isWaiting">
         <p class="v-paste-hint">
           {{ t('sync.oauth.localhost_hint') }}
@@ -1059,9 +1000,6 @@ defineExpose({
         </AlertBanner>
       </template>
 
-      <!-- 初始态 / 失败态: 主按钮「使用 {provider} 登录」/「重新登录」
-           (embedded 模式保留: modal 下一步在初始/失败态 disable,
-           登录只能从这里发起; 登录后自动进入等待态) -->
       <template v-else>
         <BaseButton
           class="v-auth-btn"
@@ -1078,7 +1016,6 @@ defineExpose({
         </AlertBanner>
       </template>
 
-      <!-- Drive 高级自建 Client ID 折叠 (仅在初始态显示) -->
       <CollapsibleGroup
         v-if="showDriveAdvanced"
         class="v-advanced"
@@ -1115,7 +1052,6 @@ defineExpose({
       </CollapsibleGroup>
     </div>
 
-    <!-- 同步文件夹的远程目录浏览器 (S3 以已选存储桶为根, 锁定桶内; 不能选根) -->
     <PathBrowserModal
       v-model="browseOpen"
       mode="remote"
@@ -1133,7 +1069,6 @@ defineExpose({
   width: 100%;
 }
 
-/* ── v3 Hero 视觉外壳 ── */
 .v-panel {
   background: var(--bg3);
   border: 1px solid var(--bd);
@@ -1141,7 +1076,6 @@ defineExpose({
   padding: var(--sp-4);
 }
 
-/* dashboard 嵌入模式: 外壳由弹窗承担, 卡片去边框去内边距 */
 .is-embedded .v-panel {
   border: none;
   background: transparent;
@@ -1182,7 +1116,6 @@ defineExpose({
   object-fit: contain;
 }
 
-/* done 态: 品牌 logo + 右下角对勾角标 */
 .v-hero-logo--done {
   position: relative;
 }
@@ -1199,7 +1132,6 @@ defineExpose({
   line-height: 1;
 }
 
-/* identity 表单区: hero 内居中容器 (与登录/等待页的居中语言一致) */
 .v-identity {
   width: 100%;
   max-width: 340px;
@@ -1221,7 +1153,6 @@ defineExpose({
   color: var(--t1);
 }
 
-/* 等待态标题内联 spinner (正在跳转到 xx…) */
 .v-hero-title {
   display: inline-flex;
   align-items: center;
@@ -1234,7 +1165,6 @@ defineExpose({
   margin: var(--sp-2) 0 0;
 }
 
-/* 副标题为空时不再占位 */
 .v-hero p:empty {
   display: none;
 }
@@ -1253,7 +1183,6 @@ defineExpose({
   color: var(--ac);
 }
 
-/* ── 主按钮 ── */
 .v-auth-btn {
   margin-top: var(--sp-4);
   min-height: 40px;
@@ -1263,15 +1192,12 @@ defineExpose({
   margin-top: var(--sp-3);
 }
 
-/* ── 等待态胶囊 ── */
-/* 用双类选择器压过 .v-hero p 的级联, 避免 !important */
 .v-hero p.v-paste-hint {
   margin-top: var(--sp-3);
   line-height: 1.5;
   max-width: 480px;
 }
 
-/* 延迟跳转提示: 标题内联 spinner + 「正在跳转到 xx…」 */
 .v-redirecting {
   display: inline-flex;
   align-items: center;
@@ -1280,7 +1206,6 @@ defineExpose({
   font-weight: 600;
 }
 
-/* ── 粘贴输入框 / 确认按钮 / 错误提示 ── */
 .v-paste-input {
   margin-top: var(--sp-2);
 }
@@ -1296,7 +1221,6 @@ defineExpose({
   text-align: left;
 }
 
-/* ── Drive 高级折叠 ── */
 .v-advanced {
   width: 100%;
   margin-top: var(--sp-3);
@@ -1314,7 +1238,6 @@ defineExpose({
   margin: 0;
 }
 
-/* ── 非 OAuth 凭据屏 ── */
 .v-cred {
   display: grid;
   gap: var(--sp-3);
@@ -1356,7 +1279,6 @@ defineExpose({
   overflow-wrap: anywhere;
 }
 
-/* ── done 屏: 同步文件夹 (输入 + 浏览按钮) ── */
 .v-root-row {
   display: flex;
   align-items: center;

@@ -75,12 +75,10 @@ onUnmounted(() => {
   <Teleport to="body">
     <Transition name="ip-fade">
       <div v-if="modelValue" class="ip-overlay" @mousedown="onOverlayMousedown" @click="onOverlayClick">
-        <!-- Close button -->
         <button type="button" class="ip-close" :aria-label="t('common.btn.close')" :title="t('common.btn.close')" @click="close">
           <MsIcon name="close" />
         </button>
 
-        <!-- Left arrow -->
         <button
           type="button"
           v-if="hasNav"
@@ -93,7 +91,6 @@ onUnmounted(() => {
           <MsIcon name="chevron_left" />
         </button>
 
-        <!-- Media wrapper -->
         <div class="ip-frame">
           <video
             v-if="isVideo"
@@ -119,7 +116,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Right arrow -->
         <button
           type="button"
           v-if="hasNav"
@@ -132,7 +128,6 @@ onUnmounted(() => {
           <MsIcon name="chevron_right" />
         </button>
 
-        <!-- Counter -->
         <div v-if="hasNav" class="ip-counter">{{ idx + 1 }} / {{ total }}</div>
       </div>
     </Transition>
@@ -140,7 +135,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Overlay */
 .ip-overlay {
   position: fixed;
   inset: 0;
@@ -153,13 +147,11 @@ onUnmounted(() => {
   backdrop-filter: blur(4px);
 }
 
-/* Fade transition */
 .ip-fade-enter-active,
 .ip-fade-leave-active { transition: opacity .2s ease; }
 .ip-fade-enter-from,
 .ip-fade-leave-to { opacity: 0; }
 
-/* Close button */
 .ip-close {
   position: absolute;
   top: 16px;
@@ -179,7 +171,6 @@ onUnmounted(() => {
 }
 .ip-close:hover { background: rgba(255, 255, 255, .25); }
 
-/* Image frame — adapts to image natural size */
 .ip-frame {
   position: relative;
   max-width: 90vw;
@@ -217,7 +208,6 @@ onUnmounted(() => {
   min-height: 200px;
 }
 
-/* Navigation arrows */
 .ip-arrow {
   position: absolute;
   top: 50%;
@@ -241,7 +231,6 @@ onUnmounted(() => {
 .ip-arrow--left { left: 20px; }
 .ip-arrow--right { right: 20px; }
 
-/* Counter */
 .ip-counter {
   position: absolute;
   bottom: 20px;

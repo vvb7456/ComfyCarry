@@ -125,7 +125,6 @@ defineExpose({ clearFile })
       @change="onInputChange"
     >
 
-    <!-- Drop mode: file loaded -->
     <div v-if="mode === 'drop' && isLoaded" class="upload-zone__loaded">
       <MsIcon name="check_circle" color="none" class="upload-zone__loaded-icon" />
       <span class="upload-zone__loaded-name text-truncate">{{ loadedName }}</span>
@@ -140,7 +139,6 @@ defineExpose({ clearFile })
       </button>
     </div>
 
-    <!-- Drop mode: empty -->
     <button
       v-else-if="mode === 'drop'"
       type="button"
@@ -155,7 +153,6 @@ defineExpose({ clearFile })
       </slot>
     </button>
 
-    <!-- Pick mode: with preview -->
     <template v-else-if="isPreview">
       <img :src="preview" class="upload-zone__img" alt="">
       <button
@@ -170,7 +167,6 @@ defineExpose({ clearFile })
       <span v-if="fileName" class="upload-zone__fname">{{ fileName }}</span>
     </template>
 
-    <!-- Pick mode: no preview -->
     <template v-else>
       <button
         type="button"
@@ -182,7 +178,6 @@ defineExpose({ clearFile })
         <span>{{ pickLabel || t('common.upload.pick_label') }}</span>
       </button>
       <div class="upload-zone__divider">{{ t('common.upload.or_divider') }}</div>
-      <!-- Action variant: custom bottom action (e.g. open preprocess modal) -->
       <button
         v-if="actionLabel"
         type="button"
@@ -193,7 +188,6 @@ defineExpose({ clearFile })
         <MsIcon :name="actionIcon" color="none" />
         <span>{{ actionLabel }}</span>
       </button>
-      <!-- Default: upload local file -->
       <button
         v-else
         type="button"

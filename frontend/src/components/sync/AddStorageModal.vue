@@ -1,7 +1,5 @@
 <script setup lang="ts">
 /**
- * AddStorageModal — dashboard「添加存储」弹窗薄壳。
- *
  * 流程主体在 AddStorageFlow (两态: 类型 → 连接), 本组件只负责 BaseModal 包装。
  * 凭据全程零落盘, 关闭即丢弃 —— 无关闭守卫; 仅在关闭路径上清理未完成的
  * OAuth 授权会话 (经 flow.cleanupSession, done 会话留给 create 消费)。
@@ -17,11 +15,9 @@ import type { RemoteTypeDef } from '@/types/sync'
 defineOptions({ name: 'AddStorageModal' })
 
 const props = withDefaults(defineProps<{
-  /** 弹窗开关 */
   modelValue?: boolean
   /** 现有存储列表 (查重 / 覆盖确认) */
   existingRemotes?: Array<{ name: string; type: string }>
-  /** 远端类型定义表 */
   remoteTypes?: Record<string, RemoteTypeDef>
   /** 重连预填: 打开时自动选中对应 provider 并恢复名称/同步文件夹/存储桶 */
   preset?: { type?: string; name?: string; root_dir?: string; bucket?: string }
@@ -54,7 +50,6 @@ function onFlowCreated(remote: { name: string; type: string; openRuleModal: bool
   emit('close')
 }
 
-// 弹窗关闭时清理未完成的 OAuth 授权会话 (凭据零落盘, 关闭即丢弃)
 watch(() => props.modelValue, (open, wasOpen) => {
   if (!open && wasOpen) flowRef.value?.cleanupSession()
 })

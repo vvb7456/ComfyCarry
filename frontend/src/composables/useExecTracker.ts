@@ -29,9 +29,6 @@ export interface ExecState {
 }
 
 /**
- * ComfyUI execution state machine composable.
- * Tracks execution_start → progress → executing → done events.
- *
  * Bridge event data formats:
  *   execution_start:  { prompt_id, start_time (unix s), node_names: {nodeId: classType} }
  *   execution_snapshot: { ..., executed_nodes: [], cached_nodes: [], current_node }
@@ -59,9 +56,6 @@ export function useExecTracker() {
     elapsed.value = 0
   }
 
-  /**
-   * Fetch node_names from queue API when bridge didn't provide them.
-   */
   function fetchNodeNames(promptId: string) {
     fetch('/api/comfyui/queue').then(r => r.json()).then((qData: { queue_running?: unknown[][] }) => {
       if (!state.value || state.value.promptId !== promptId) return
@@ -85,14 +79,13 @@ export function useExecTracker() {
     switch (type) {
       case 'execution_start':
       case 'execution_snapshot': {
-        // Bridge sends node_names as { nodeId: classType } map
         const nodeNames = (data.node_names || {}) as Record<string, string>
         const totalNodes = Object.keys(nodeNames).length
         const promptId = data.prompt_id as string || ''
 
         state.value = {
           promptId,
-          // Use bridge's start_time (unix seconds) with ms conversion; fallback to now
+          // start_time 为 unix 秒
           startTime: typeof data.start_time === 'number' ? data.start_time * 1000 : Date.now(),
           currentNode: type === 'execution_snapshot' ? (data.current_node as string || '') : '',
           nodeNames,
@@ -102,7 +95,6 @@ export function useExecTracker() {
           progress: null,
         }
 
-        // When no node names provided, fetch from queue API
         if (totalNodes === 0 && promptId) {
           fetchNodeNames(promptId)
         }
@@ -130,7 +122,6 @@ export function useExecTracker() {
           state.value.currentNode = node
           state.value.executedNodes.add(node)
           if (data.class_type) state.value.nodeNames[node] = data.class_type as string
-          // Clear step progress when switching nodes
           state.value.progress = null
         }
         break

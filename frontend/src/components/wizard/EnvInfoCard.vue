@@ -32,7 +32,6 @@ const tags = computed(() => {
 
 <template>
   <BaseCard variant="bg3" density="roomy">
-    <!-- GPU row -->
     <div class="env-row">
       <span class="env-label">{{ t('wizard.env.gpu_label') }}</span>
       <template v-if="gpuInfo">
@@ -44,7 +43,6 @@ const tags = computed(() => {
       <span v-else class="env-value env-value--error">{{ t('wizard.env.no_gpu') }}</span>
     </div>
 
-    <!-- Divider + Image row -->
     <template v-if="prebuiltInfo">
       <hr class="env-divider">
       <div class="env-row">

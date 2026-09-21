@@ -26,7 +26,6 @@ function translateStep(name: string): string {
   }
   const key = `wizard.steps.${name}`
   const translated = t(key)
-  // If translation key not found, t() returns the key itself — fall back to raw name
   return translated === key ? name : translated
 }
 </script>

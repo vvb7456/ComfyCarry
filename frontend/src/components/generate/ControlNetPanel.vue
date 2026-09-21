@@ -1,12 +1,4 @@
 <script setup lang="ts">
-/**
- * ControlNetPanel — Single ControlNet module panel (pose / canny / depth).
- *
- * Legacy layout (gen-mod-split): left=media area (280px) | right=params area (flex:1)
- *
- * Media area uses FileUploadZone with actionLabel to replace the bottom upload
- * with "从新图片生成" (opens PreprocessModal). Processing state is overlaid.
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UseControlNetReturn } from '@/composables/generate/useControlNet'
@@ -27,7 +19,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   pick: []
-  /** 拖入本地图片: 底部按钮虽被 actionLabel 换成"从新图片生成", 拖拽通道仍在 */
   file: [file: File]
   clear: []
   'open-preprocess': []
@@ -38,49 +29,41 @@ const { toast } = useToast()
 
 const config = computed(() => props.cn.config.value)
 
-/** Preview URL for the currently selected reference image */
 const previewUrl = computed(() => {
   const img = config.value.image
   if (!img) return undefined
   return `/api/generate/input_image_preview?name=${encodeURIComponent(img)}`
 })
 
-/** Display name for the selected image */
 const displayName = computed(() => {
   const img = config.value.image
   if (!img) return undefined
   return img.includes('/') ? img.slice(img.lastIndexOf('/') + 1) : img
 })
 
-/** Model select options — string array from options */
 const modelOptions = computed(() => props.cn.models.value)
 
-/** Pick label text: "点击选择骨骼图" etc. */
 const pickLabel = computed(() => {
   const labelKey = CN_LABEL_KEYS[props.cn.type] || 'generate.controlnet.ref_image'
   return t('generate.controlnet.pick_ref', { label: t(labelKey) })
 })
 
-/** Media zone is in the processing state */
 const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running')
 </script>
 
 <template>
   <div class="cn-split-container">
     <div class="cn-split">
-      <!-- Left: media area (reference image) -->
       <div class="cn-split__media">
         <label class="field-lbl">{{ t(cn.refLabelKey) }}</label>
 
         <div class="cn-media-wrap">
-          <!-- Processing overlay -->
           <div v-if="isProcessing" class="cn-ref-processing">
             <Spinner size="sm" />
             <span>{{ t('generate.controlnet.preprocessing') }}</span>
             <span v-if="cn.preprocessElapsed.value > 0" class="cn-pp-timer">{{ cn.preprocessElapsed.value }}s</span>
           </div>
 
-          <!-- FileUploadZone: pick (top) + action "从新图片生成" (bottom) -->
           <FileUploadZone
             v-else
             mode="pick"
@@ -100,9 +83,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
         </div>
       </div>
 
-      <!-- Right: parameters area -->
       <div class="cn-split__params">
-        <!-- Model selector -->
         <div class="cn-field">
           <label class="field-lbl">{{ t('generate.controlnet.model') }}</label>
           <BaseSelect
@@ -115,7 +96,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           />
         </div>
 
-        <!-- Strength slider -->
         <RangeField
           :model-value="config.strength"
           :min="0.1"
@@ -132,7 +112,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           </template>
         </RangeField>
 
-        <!-- Start step slider -->
         <RangeField
           :model-value="config.start"
           :min="0"
@@ -149,7 +128,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           </template>
         </RangeField>
 
-        <!-- End step slider -->
         <RangeField
           :model-value="config.end"
           :min="0"
@@ -223,7 +201,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
   gap: var(--sp-1);
 }
 
-/* ── Processing overlay ── */
 .cn-ref-processing {
   height: 280px;
   display: flex;

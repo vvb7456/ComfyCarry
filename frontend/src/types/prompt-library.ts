@@ -1,5 +1,3 @@
-// ── Token System ──────────────────────────────────────────────
-
 export type TokenType = 'tag' | 'raw' | 'embedding' | 'wildcard' | 'template' | 'break'
 export type BracketType = 'round' | 'none'
 
@@ -17,8 +15,6 @@ export interface PromptToken {
   groupColor?: string
   pending?: boolean
 }
-
-// ── Tag Library ───────────────────────────────────────────────
 
 export interface PromptGroup {
   id: number
@@ -52,8 +48,6 @@ export interface PromptGroupTree extends PromptGroup {
   subgroups: PromptSubgroupTree[]
 }
 
-// ── Autocomplete ──────────────────────────────────────────────
-
 export interface AutocompleteItem {
   text: string
   desc: string
@@ -62,8 +56,6 @@ export interface AutocompleteItem {
   score: number
   hot?: number
 }
-
-// ── History / Favorites ───────────────────────────────────────
 
 export type HistoryType = 'all' | 'history' | 'favorite'
 
@@ -83,8 +75,6 @@ export interface PromptHistoryPage {
   size: number
 }
 
-// ── Translation ───────────────────────────────────────────────
-
 export interface TranslateResult {
   translate: string
   provider: string
@@ -102,8 +92,6 @@ export interface TranslateProvidersResult {
   default_chain: string[]
 }
 
-// ── Library Status ────────────────────────────────────────────
-
 export interface PromptLibraryStatus {
   initialized: boolean
   groups: number
@@ -111,8 +99,6 @@ export interface PromptLibraryStatus {
   danbooru: number
   history: number
 }
-
-// ── Init / Import ─────────────────────────────────────────────
 
 export interface InitSourceStatus {
   available: boolean
@@ -132,8 +118,6 @@ export interface ImportResult {
   danbooru_tags: number
 }
 
-// ── Editor Settings ───────────────────────────────────────────
-
 export interface PromptEditorSettings {
   show_translation: boolean
   show_nsfw: boolean
@@ -149,8 +133,6 @@ export interface PromptEditorSettings {
   translate_providers?: string[]
   translate_default_chain?: string[]
 }
-
-// ── API Response Wrappers ─────────────────────────────────────
 
 export interface PromptLibraryDataResponse<T> {
   data: T

@@ -34,7 +34,6 @@ const { getVersionDownloadInfo, downloadOne, cancelDownload, retryVersion } = us
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
-// ── NSFW 浏览级别 (级别未开放的图不进 gallery; 开放且需模糊的加遮罩) ──
 const { levelAllows, shouldBlur } = useCivitaiSettings()
 const nsfwRevealed = ref<Set<number>>(new Set())
 
@@ -47,7 +46,6 @@ function revealNsfw(i: number) {
   nsfwRevealed.value = new Set(nsfwRevealed.value)
 }
 
-// ── Version switching ──
 const selectedVersionId = ref<string | number | undefined>()
 
 const hasMultipleVersions = computed(() => (props.meta?.versions?.length || 0) > 1)
@@ -69,21 +67,17 @@ const activeVersion = computed<ModelMetaVersion | undefined>(() => {
     const found = versions.find(v => String(v.id) === String(sel))
     if (found) return found
   }
-  // Fallback: match meta.versionId
   if (props.meta?.versionId) {
     return versions.find(v => String(v.id) === String(props.meta!.versionId))
   }
   return versions[0]
 })
 
-// Use version-specific data when available, fallback to top-level meta
 const displayImages = computed<ModelMetaImage[]>(() => {
   const versions = activeVersion.value?.images?.length ? activeVersion.value.images : (props.meta?.images || [])
-  // 级别未开放的示例图直接不进 gallery (与卡片封面选取同口径); 全不允许则区块隐藏
   return versions.filter(img => levelAllows(img.nsfwLevel))
 })
 
-// Full-size URLs for gallery preview navigation (images + videos)
 const galleryImageUrls = computed(() =>
   displayImages.value.map(img => fullImageUrl(img.url)),
 )
@@ -104,11 +98,9 @@ const displaySha256 = computed(() =>
   activeVersion.value?.hashes?.SHA256 || props.meta?.sha256 || '',
 )
 
-// ── Source link (CivitAI / Hugging Face 共用) ──
 const sourceUrl = computed(() => props.meta?.sourceUrl || props.meta?.civitaiUrl)
 const sourceLabel = computed(() => props.meta?.sourceLabel || t('models.meta.view_on_civitai'))
 
-// ── Download button state for current version ──
 const dlInfo = computed<VersionDownloadInfo>(() => {
   const vid = activeVersion.value?.id ?? props.meta?.versionId
   const mid = props.meta?.id
@@ -145,7 +137,6 @@ async function handleCancelDownload() {
   }
 }
 
-// ── Trigger word selection ──
 const selectedWords = ref(new Set<string>())
 const twListRef = ref<HTMLElement>()
 const twCollapsed = ref(true)
@@ -164,7 +155,6 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
-// Reset trigger words state when version changes
 watch(activeVersion, () => {
   selectedWords.value = new Set()
   twCollapsed.value = true
@@ -197,7 +187,6 @@ function copyAllWords() {
   copyText(displayTrainedWords.value.join(', '))
 }
 
-// ── Image URL helpers ──
 // 缩略走 550 (3:4 竖版 gallery 单元高度 ~240px, DPR2 下需要更大)
 function resolveImageUrl(url: string, full = false): string {
   if (!url) return ''
@@ -218,7 +207,6 @@ function hasCaption(img: ModelMetaImage): boolean {
   return !!(img.seed || img.steps || img.cfg || img.sampler || img.model || img.positive || img.negative)
 }
 
-// ── 文件大小格式化 ──
 function fmtSize(bytes?: number): string {
   if (!bytes) return ''
   if (bytes < 1024) return bytes + ' B'
@@ -239,20 +227,17 @@ function fmtSize(bytes?: number): string {
     scroll="content"
   >
     <template v-if="meta">
-      <!-- Tags -->
       <div class="mm-tags">
         <Badge v-if="meta.type" :color="modelCategoryColor(meta.type)">{{ modelCategoryLabel(meta.type) }}</Badge>
         <Badge v-if="displayBaseModel">{{ displayBaseModel }}</Badge>
       </div>
 
-      <!-- Info Table -->
       <table class="mm-table">
         <tbody>
           <tr v-if="meta.id">
             <td>ID</td>
             <td>{{ meta.id }}</td>
           </tr>
-          <!-- Version row: selector + download button when CivitAI, plain text otherwise -->
           <tr v-if="hasMultipleVersions || displayVersionName">
             <td>{{ t('models.meta.version') }}</td>
             <td>
@@ -266,7 +251,6 @@ function fmtSize(bytes?: number): string {
                   class="mm-version-select"
                 />
                 <span v-else>{{ displayVersionName }}</span>
-                <!-- Download button (only when opened from CivitAI context) -->
                 <DownloadButton
                   v-if="showDownload && sourceUrl"
                   :state="dlBtnState"
@@ -314,7 +298,6 @@ function fmtSize(bytes?: number): string {
         </tbody>
       </table>
 
-      <!-- Trigger Words -->
       <div v-if="displayTrainedWords.length" class="mm-section">
         <div class="mm-section-header">
           <div class="mm-section-title">
@@ -351,7 +334,6 @@ function fmtSize(bytes?: number): string {
         </button>
       </div>
 
-      <!-- Image Gallery -->
       <div v-if="displayImages.length" class="mm-section">
         <div class="mm-section-title">
           <MsIcon name="image" />
@@ -414,10 +396,8 @@ function fmtSize(bytes?: number): string {
 </template>
 
 <style scoped>
-/* Tags */
 .mm-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
 
-/* Version row */
 .mm-version-row {
   display: flex;
   align-items: center;
@@ -428,14 +408,12 @@ function fmtSize(bytes?: number): string {
   min-width: 0;
 }
 
-/* Info table */
 .mm-table { width: 100%; font-size: var(--text-base); border-collapse: collapse; margin-bottom: var(--sp-4); }
 .mm-table td { padding: 7px 10px; border-bottom: 1px solid var(--bd); vertical-align: top; }
 .mm-table td:first-child { color: var(--t3); white-space: nowrap; width: 100px; font-weight: 500; }
 .mm-hash { word-break: break-all; font-family: var(--font-mono); font-size: .75rem; }
 .mm-desc { line-height: 1.5; color: var(--t2); }
 
-/* Sections */
 .mm-section { margin-top: var(--sp-4); }
 .mm-section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -446,7 +424,6 @@ function fmtSize(bytes?: number): string {
   display: flex; align-items: center; gap: var(--sp-1);
 }
 
-/* Trigger words */
 .mm-tw-actions { display: flex; align-items: center; gap: 6px; }
 .mm-tw-count { font-size: var(--text-sm); color: var(--t3); }
 .mm-tw-list {
@@ -468,7 +445,6 @@ function fmtSize(bytes?: number): string {
 }
 .mm-tw-toggle:hover { text-decoration: underline; }
 
-/* Gallery */
 .mm-gallery {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px; margin-top: 10px;
@@ -483,7 +459,6 @@ function fmtSize(bytes?: number): string {
 }
 .mm-figure { cursor: zoom-in; }
 .mm-figure video { cursor: pointer; }
-/* NSFW blur 遮罩 (Civitai blur 模式): 点击眼睛揭开单张 */
 .mm-nsfw-blurred {
   filter: blur(22px) saturate(.8);
 }

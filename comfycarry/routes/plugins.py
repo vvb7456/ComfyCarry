@@ -1,16 +1,3 @@
-"""
-ComfyCarry — 插件管理路由 (代理 ComfyUI-Manager)
-
-- /api/plugins/installed      — 已安装插件列表
-- /api/plugins/available      — 可用插件列表
-- /api/plugins/versions/<name> — 插件版本
-- /api/plugins/fetch_updates  — 拉取更新
-- /api/plugins/install|uninstall|update|disable — 操作队列
-- /api/plugins/install_git    — Git URL 安装
-- /api/plugins/queue_status   — 队列状态
-- /api/plugins/manager_version — Manager 版本
-"""
-
 import time
 
 import requests
@@ -21,8 +8,6 @@ from ..config import COMFYUI_URL
 bp = Blueprint("plugins", __name__)
 
 
-# ── ComfyUI-Manager 请求辅助 ────────────────────────────────
-
 def _safe_upstream_code(code: int) -> int:
     """上游 status code → 安全的 Dashboard 响应码 (避免 401/403 被前端误判为 session 过期)"""
     if 200 <= code < 300:
@@ -31,7 +16,6 @@ def _safe_upstream_code(code: int) -> int:
 
 
 def _cm_get(path, params=None, timeout=30):
-    """向 ComfyUI-Manager 发送 GET 请求"""
     try:
         r = requests.get(f"{COMFYUI_URL}{path}", params=params, timeout=timeout)
         return r
@@ -42,7 +26,6 @@ def _cm_get(path, params=None, timeout=30):
 
 
 def _cm_post(path, json_data=None, text_data=None, timeout=30):
-    """向 ComfyUI-Manager 发送 POST 请求"""
     try:
         if text_data is not None:
             r = requests.post(f"{COMFYUI_URL}{path}", data=text_data,
@@ -56,13 +39,11 @@ def _cm_post(path, json_data=None, text_data=None, timeout=30):
         return None
 
 
-# ====================================================================
 # 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/plugins.json)
 #
 # /api/plugins/* 的唯一消费方是面板前端, 错误回传 error_key + error_params,
 # 前端按 plugins.err.<key> 翻译; 未接 i18n 的端点继续回传 error 原文,
 # apiErrorText() 对两种后端都安全。成功响应只回传 ok, 前端不消费成功文案。
-# ====================================================================
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
     """错误响应。前端按 `plugins.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
 
@@ -77,15 +58,10 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 
 
 def _ok(**extra):
-    """成功响应。"""
     body = {"ok": True}
     body.update(extra)
     return jsonify(body)
 
-
-# ====================================================================
-# 路由
-# ====================================================================
 
 @bp.route("/api/plugins/installed")
 def api_plugins_installed():

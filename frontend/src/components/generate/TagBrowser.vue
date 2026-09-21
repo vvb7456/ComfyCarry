@@ -1,16 +1,4 @@
 <script setup lang="ts">
-/**
- * TagBrowser — 3-layer cascade tag browser (Group → Subgroup → Tag).
- *
- * Visual pattern: Each level uses the tab-panel fusion trick from ModuleTabs/SdxlTab:
- *   - Tab chips sit on top, active chip's bottom border merges with the panel below
- *   - Creates a visual "selected tab = connected to content" effect
- *
- * Data flow:
- *   - Groups are fetched once on mount via usePromptLibrary
- *   - Subgroups/tags are lazy-loaded on selection, cached in composable
- *   - Tag click emits `select` event to parent for insertion
- */
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usePromptLibrary } from '@/composables/generate/usePromptLibrary'
@@ -37,7 +25,6 @@ const { t, locale } = useI18n({ useScope: 'global' })
 const lib = usePromptLibrary()
 const { settings: promptSettings } = usePromptSettings()
 
-// ── State ──────────────────────────────────────────────────────
 const selectedGroup = ref<number | null>(null)
 const selectedSubgroup = ref<number | null>(null)
 const subgroups = ref<PromptSubgroup[]>([])
@@ -45,12 +32,10 @@ const tags = ref<PromptTag[]>([])
 const loadingSub = ref(false)
 const loadingTags = ref(false)
 
-// ── Fetch groups on mount ──────────────────────────────────────
 onMounted(() => {
   lib.fetchGroups()
 })
 
-// ── When group changes → load subgroups ────────────────────────
 watch(selectedGroup, async (id) => {
   selectedSubgroup.value = null
   subgroups.value = []
@@ -64,7 +49,6 @@ watch(selectedGroup, async (id) => {
   }
 })
 
-// ── When subgroup changes → load tags ──────────────────────────
 watch(selectedSubgroup, async (id) => {
   tags.value = []
   if (!id) return
@@ -76,12 +60,10 @@ watch(selectedSubgroup, async (id) => {
   }
 })
 
-// ── Actions ────────────────────────────────────────────────────
 function onTagClick(tag: PromptTag) {
   emit('select', tag)
 }
 
-// ── FusionTab data ─────────────────────────────────────────────
 const isZh = computed(() => locale.value.startsWith('zh'))
 
 const groupTabs = computed<FusionTab[]>(() =>
@@ -105,7 +87,6 @@ const subgroupTabs = computed<FusionTab[]>(() =>
 
 <template>
   <div class="tb">
-    <!-- Level 1: Groups (wrapped FusionTabs) -->
     <FusionTabs
       v-model="selectedGroup"
       :tabs="groupTabs"
@@ -117,13 +98,11 @@ const subgroupTabs = computed<FusionTab[]>(() =>
         <Spinner v-if="lib.loading.value" size="sm" />
       </template>
 
-      <!-- L1 panel content -->
       <template v-if="selectedGroup">
         <div v-if="loadingSub" class="tb-loading">
           <Spinner size="sm" />
         </div>
         <template v-else-if="subgroups.length">
-          <!-- Level 2: Subgroup tabs (bare FusionTabs) -->
           <FusionTabs
             v-model="selectedSubgroup"
             :tabs="subgroupTabs"
@@ -132,7 +111,6 @@ const subgroupTabs = computed<FusionTab[]>(() =>
             class="tb-l2-tabs"
           />
 
-          <!-- Level 2 panel (tag content) -->
           <div v-if="selectedSubgroup" class="tb-panel--l2">
             <div v-if="loadingTags" class="tb-loading">
               <Spinner size="sm" />
@@ -161,7 +139,6 @@ const subgroupTabs = computed<FusionTab[]>(() =>
         <div v-else class="tb-empty">{{ t('prompt-library.tag_browser.no_subgroups') }}</div>
       </template>
 
-      <!-- Empty state: no group selected -->
       <EmptyState
         v-else
         icon="category"
@@ -181,23 +158,19 @@ const subgroupTabs = computed<FusionTab[]>(() =>
   overflow-y: auto;
 }
 
-/* ── L2 tabs (inside L1 panel, inherits bg2) ── */
 .tb-l2-tabs {
   padding: var(--sp-2) var(--sp-3) 0;
 }
 
-/* ═══ Level 2 panel (tag content area) ═══ */
 .tb-panel--l2 {
   flex: 1;
   background: var(--bg);
 }
 
-/* EmptyState fills panel for vertical centering */
 .tb-empty-state {
   flex: 1;
 }
 
-/* ── Tag grid ── */
 .tb-tag-grid {
   display: flex;
   flex-wrap: wrap;
@@ -205,7 +178,6 @@ const subgroupTabs = computed<FusionTab[]>(() =>
   padding: var(--sp-3);
 }
 
-/* ── Tag chip (level 3, vertical two-row) ── */
 .tb-tag {
   --chip-color: var(--t3);
   display: inline-flex;
@@ -227,7 +199,6 @@ const subgroupTabs = computed<FusionTab[]>(() =>
   transform: scale(.97);
 }
 
-/* Top row: theme color bg + tag text */
 .tb-tag-top {
   display: block;
   padding: 3px 10px;
@@ -238,7 +209,6 @@ const subgroupTabs = computed<FusionTab[]>(() =>
   line-height: 1.4;
 }
 
-/* Bottom row: standard bg + translation */
 .tb-tag-bot {
   display: block;
   padding: 2px 10px 3px;
@@ -249,12 +219,10 @@ const subgroupTabs = computed<FusionTab[]>(() =>
   line-height: 1.4;
 }
 
-/* When no translation, single row looks cleaner */
 .tb-tag:not(.tb-tag--has-desc) .tb-tag-top {
   padding: 4px 10px;
 }
 
-/* ── States ── */
 .tb-loading {
   display: flex;
   align-items: center;

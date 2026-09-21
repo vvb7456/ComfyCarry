@@ -1,6 +1,4 @@
 """
-ComfyCarry — 模型管理路由
-
 包含:
 - CivitAI 搜索代理 (Meilisearch CORS bypass)
 - 本地模型管理 (索引/预览/删除/获取信息)
@@ -41,9 +39,6 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
     return jsonify(body), status
 
 
-# ====================================================================
-# CivitAI 搜索代理 (Meilisearch CORS bypass)
-# ====================================================================
 # CivitAI 功能 (搜索/下载) 强制要求 API Key — 前端 gate 之外的后端兜底,
 # 与前端引导空态同一语义: 无 key 一律拒绝, 不做匿名降级。
 @bp.route("/api/search", methods=["POST"])
@@ -74,9 +69,7 @@ def proxy_search():
         return _err("internal", 500, detail=str(e))
 
 
-# ====================================================================
 # CivitAI Model API Proxy (统一前端对 civitai.com 的请求)
-# ====================================================================
 @bp.route("/api/civitai/model/<int:model_id>", methods=["GET"])
 def proxy_civitai_model(model_id: int):
     """代理 CivitAI v1 models/{id} API, 避免前端直接跨域请求."""
@@ -102,9 +95,6 @@ def proxy_civitai_model(model_id: int):
         return _err("civitai_api_failed", 502, detail=str(e))
 
 
-# ====================================================================
-# CivitAI 可下载性 (Generation-Only 过滤)
-# ====================================================================
 # 背景: 作者可以把模型设为 "Generation-Only" —— 只能在 Civitai 站内出图,
 #       不提供权重下载。这类 version 不该出现在下载列表里。
 #
@@ -183,10 +173,6 @@ def civitai_download_flags(model_id: int):
     return jsonify(payload)
 
 
-# --------------------------------------------------------------------
-# Indexed local-model API
-# --------------------------------------------------------------------
-#
 # The metadata store is the source of truth for this API.  Production callers
 # use the ID-based endpoints below and never submit a filesystem path.
 
@@ -195,7 +181,6 @@ model_meta_store = None
 
 
 def _get_model_meta_store():
-    """Import the metadata store lazily to avoid an app-startup cycle."""
     global model_meta_store
     if model_meta_store is None:
         from ..services import model_meta_store as store
@@ -209,7 +194,6 @@ def _model_not_found(local_model_id: int):
 
 
 def _as_dict(value):
-    """Convert a store row (dict/sqlite Row) to a plain dictionary."""
     if value is None:
         return None
     if isinstance(value, dict):
@@ -221,7 +205,6 @@ def _as_dict(value):
 
 
 def _json_value(value, default):
-    """Decode a JSON column while accepting already-decoded values."""
     if value is None:
         return default
     if isinstance(value, (dict, list)):
@@ -235,7 +218,6 @@ def _json_value(value, default):
 
 
 def _path_in(root: Path, candidate) -> bool:
-    """Resolve a path and check that it is below ``root``."""
     if not candidate:
         return False
     try:
@@ -245,7 +227,6 @@ def _path_in(root: Path, candidate) -> bool:
 
 
 def _managed_model_roots() -> list[Path]:
-    """Return every configured model root after resolving directory symlinks."""
     roots: list[Path] = []
     seen: set[str] = set()
     comfy_root = Path(COMFYUI_DIR)
@@ -268,7 +249,6 @@ def _path_in_managed_models(candidate) -> bool:
 
 
 def _invalidate_generate_options() -> None:
-    """Refresh generation metadata after an indexed model changes."""
     try:
         from .generate import invalidate_options_cache
 
@@ -278,7 +258,6 @@ def _invalidate_generate_options() -> None:
 
 
 def _capabilities(model: dict) -> tuple[bool, bool]:
-    """Return safe enrich/delete capabilities for an internal model row."""
     real_path = model.get("real_path")
     enrich_default = _path_in(Path(COMFYUI_DIR), real_path)
     delete_default = _path_in(Path(WORKSPACE_ROOT), real_path)
@@ -291,7 +270,6 @@ def _capabilities(model: dict) -> tuple[bool, bool]:
 
 
 def _public_model(model: dict, *, detail: bool = False) -> dict:
-    """Map a store row to the API contract and hide internal paths."""
     value = _as_dict(model) or {}
     # Normalize defaults for an index row that has not been enriched yet.
     value.setdefault("relative_path", "")
@@ -393,7 +371,6 @@ def _get_internal_model(local_model_id: int) -> dict | None:
 
 @bp.route("/api/local_models")
 def api_local_models():
-    """Return small list fields from the SQLite model index."""
     category = request.args.get("category", "all").strip()
     category_arg = None if not category or category == "all" else category
     try:
@@ -408,7 +385,6 @@ def api_local_models():
 
 @bp.route("/api/local_models/<int:local_model_id>", methods=["GET"])
 def api_local_model_detail(local_model_id: int):
-    """Return complete metadata for one indexed local model."""
     try:
         model = _get_internal_model(local_model_id)
     except Exception as exc:
@@ -421,7 +397,6 @@ def api_local_model_detail(local_model_id: int):
 
 @bp.route("/api/local_models/<int:local_model_id>/preview", methods=["GET"])
 def api_local_model_preview(local_model_id: int):
-    """Serve the preview image associated with a model ID."""
     try:
         model = _get_internal_model(local_model_id)
     except Exception as exc:
@@ -455,7 +430,6 @@ def api_local_model_preview(local_model_id: int):
 
 @bp.route("/api/local_models/<int:local_model_id>/enrich", methods=["POST"])
 def api_local_model_enrich(local_model_id: int):
-    """Fetch CivitAI metadata by hash and update one indexed model row."""
     try:
         model = _get_internal_model(local_model_id)
     except Exception as exc:
@@ -500,7 +474,6 @@ def api_local_model_enrich(local_model_id: int):
 
 @bp.route("/api/local_models/<int:local_model_id>", methods=["DELETE"])
 def api_local_model_delete(local_model_id: int):
-    """Delete one model file, preview and metadata row by ID."""
     try:
         model = _get_internal_model(local_model_id)
     except Exception as exc:

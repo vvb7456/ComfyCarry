@@ -14,12 +14,9 @@ _cache: dict[str, Any] = {}
 _cache_lock = threading.Lock()
 _started = False
 
-POLL_INTERVAL = 2  # 秒
+POLL_INTERVAL = 2
 
 
-# ====================================================================
-# GPU 采集 — pynvml (NVML C library binding, ~0.9ms/call)
-# ====================================================================
 def _collect_gpu() -> list[dict]:
     gpus: list[dict] = []
     try:
@@ -62,7 +59,7 @@ def _collect_gpu() -> list[dict]:
             gpus.append({
                 "index": i,
                 "name": name,
-                "mem_total": mem.total // 1048576,   # MB
+                "mem_total": mem.total // 1048576,
                 "mem_used": mem.used // 1048576,
                 "mem_free": mem.free // 1048576,
                 "util": util.gpu,
@@ -87,7 +84,6 @@ def _collect_system() -> dict:
     try:
         import psutil
 
-        # CPU
         data["cpu"] = {
             "percent": psutil.cpu_percent(interval=None),
             "cores": psutil.cpu_count(),
@@ -97,7 +93,6 @@ def _collect_system() -> dict:
         load = os.getloadavg()
         data["cpu"]["load"] = {"1m": load[0], "5m": load[1], "15m": load[2]}
 
-        # Memory
         mem = psutil.virtual_memory()
         data["memory"] = {
             "total": mem.total,
@@ -106,7 +101,6 @@ def _collect_system() -> dict:
             "percent": mem.percent,
         }
 
-        # Disk
         path = "/workspace" if os.path.exists("/workspace") else "/"
         disk = psutil.disk_usage(path)
         data["disk"] = {
@@ -117,7 +111,6 @@ def _collect_system() -> dict:
             "path": path,
         }
 
-        # Network
         net = psutil.net_io_counters()
         data["network"] = {
             "bytes_sent": net.bytes_sent,
@@ -128,7 +121,6 @@ def _collect_system() -> dict:
     except Exception:
         pass
 
-    # Uptime
     try:
         import subprocess
         data["uptime"] = subprocess.check_output(
@@ -140,9 +132,6 @@ def _collect_system() -> dict:
     return data
 
 
-# ====================================================================
-# 主循环
-# ====================================================================
 def _collect_all() -> dict:
     snapshot: dict[str, Any] = {"ts": time.time()}
     snapshot["gpu"] = _collect_gpu()
@@ -162,7 +151,6 @@ def _worker():
 
 
 def start():
-    """启动后台采集线程 (daemon)，幂等"""
     global _started
     if _started:
         return
@@ -185,6 +173,5 @@ def start():
 
 
 def get_stats() -> dict:
-    """读取最新缓存快照 (线程安全，<0.01ms)"""
     with _cache_lock:
         return dict(_cache)

@@ -1,5 +1,3 @@
-// ── Settings Data Types ───────────────────────────────────────
-
 export interface SettingsResponse {
   civitai_key_set?: boolean
   civitai_key?: string
@@ -26,8 +24,6 @@ export interface ReinitializeResponse {
   ok?: boolean
   errors?: string[]
 }
-
-// ── LLM Types ─────────────────────────────────────────────────
 
 export interface LlmProvider {
   id: string

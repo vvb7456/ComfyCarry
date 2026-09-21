@@ -63,7 +63,6 @@ const iconMap: Record<string, IconName> = {
 .cc-toast__icon { flex-shrink: 0; }
 .cc-toast__msg  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* TransitionGroup animation */
 .cc-toast-enter-active,
 .cc-toast-leave-active { transition: all .25s ease; }
 .cc-toast-enter-from   { opacity: 0; transform: translateY(10px); }

@@ -45,7 +45,6 @@ function versionInfo(versionId: number): VersionDownloadInfo {
 function handleDownload(versionId: number) {
   if (!props.hit) return
   const info = versionInfo(versionId)
-  // failed → retryVersion; otherwise forward to parent
   if (info.state === 'failed') {
     retryVersion(String(props.hit.id), (props.hit.type || 'Checkpoint').toLowerCase(), versionId)
     return

@@ -55,18 +55,15 @@ function formatDlSize(completed?: number, total?: number): string {
       </div>
     </div>
 
-    <!-- Initial loading -->
     <div v-if="initialLoading && !activity" class="dash-tasks-loading">
       <div class="dash-spinner"></div>
       <span>{{ t('common.status.loading') }}</span>
     </div>
 
-    <!-- Executing generation progress bar (Reused ComfyProgressBar) -->
     <div v-else-if="execState" class="dash-tasks-exec">
       <ComfyProgressBar :state="execState" :elapsed="elapsed" />
     </div>
 
-    <!-- Active downloads -->
     <div v-else-if="activeDownloads.length > 0" class="dash-tasks-card">
       <div
         v-for="dl in activeDownloads"
@@ -132,8 +129,6 @@ function formatDlSize(completed?: number, total?: number): string {
 .dash-section-action:hover .ms {
   transform: translateX(2px);
 }
-
-/* ── Section 1: Real-time Tasks ── */
 
 .dash-tasks-loading {
   min-height: 80px;

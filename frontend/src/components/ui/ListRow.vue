@@ -49,13 +49,10 @@ defineOptions({ name: 'ListRow' })
 withDefaults(defineProps<{
   /** Material Symbols 图标名（对象身份图标） */
   icon?: IconName
-  /** 主行文字（对象名） */
   title: string
   /** 主行悬停说明：pm2 内部名、完整路径这类排障信息 */
   titleTooltip?: string
-  /** 主行状态：圆点 + 词 */
   status?: { tone: 'running' | 'stopped' | 'loading' | 'error'; text: string }
-  /** 主行徽章（分类/状态标签）；对象形式可带语义色 */
   badges?: Array<string | ListRowBadge>
   /** 描述行（head 与 facts 之间的普通文本，最多两行截断） */
   description?: string

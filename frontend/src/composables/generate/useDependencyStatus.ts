@@ -15,12 +15,9 @@ import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-
  * 就绪判定: 所有 required 行已装 且 已装的可选行数 >= minOptional。
  */
 
-// ── 类型 ─────────────────────────────────────────────────────────────────────
-
 export interface DepFileSpec {
   filename: string
   url: string
-  /** 相对 ComfyUI 根的目录 */
   subdir: string
   /**
    * HF 白名单锚点 (可选)。存在时下载改走 huggingface 统一通道
@@ -31,20 +28,13 @@ export interface DepFileSpec {
 }
 
 export interface DepRow {
-  /** 稳定唯一 id */
   id: string
   label: string
-  /** 一行说明, 展开态显示在标签右侧 */
   hint?: string
-  /** 展示用体积文本 (如 '~2.5 GB'); bytes 存在时优先按 bytes 格式化 */
   sizeText?: string
-  /** 精确字节数, 用于"待下载合计" */
   bytes?: number
-  /** 必需行: 不可取消勾选, 缺失即未就绪 */
   required?: boolean
-  /** 本行的文件, 需全部存在才算已装 */
   files: DepFileSpec[]
-  /** 调用方私有数据 (如 registry 里的原始 ComponentFile), 引擎不解释 */
   meta?: unknown
 }
 
@@ -52,35 +42,23 @@ export interface DepRowStatus {
   row: DepRow
   installed: boolean
   downloading: boolean
-  /** 本行进行中的任务 id (多文件行有多个) */
   downloadIds: string[]
-  /** 0-100, 多文件行为各文件均值 */
   percent: number
-  /** bytes/s, 多文件行为当前活跃文件的速度 */
   speed: number
   failed: boolean
 }
 
-/** 折叠态摘要 —— 各行独立下载, 这里汇总当前活跃的那些 */
 export interface DepCurrent {
-  /** 正在下载的行数 */
   active: number
-  /** 其中第一行的名称 (折叠态只报一个, 数量另给) */
   name: string
-  /** 活跃行的平均进度 */
   percent: number
-  /** 活跃行的速度合计 (bytes/s) */
   speed: number
 }
 
 export interface UseDependencyStatusOptions {
-  /** 至少需要装几个可选行 (默认 0 = 可选行装不装都算就绪) */
   minOptional?: MaybeRefOrGetter<number>
-  /** ComfyUI 根目录; 空则无法提交下载 */
   comfyuiDir?: MaybeRefOrGetter<string>
-  /** 下载任务的 meta.source, 便于在下载管理页区分来源 */
   source?: string
-  /** 附加到下载任务 meta 的字段 */
   metaOf?: (row: DepRow) => Record<string, unknown>
   /**
    * 是否体检 (默认 true)。ModelTab 是全量 v-show 挂载的, 17 个架构 × 6 组依赖
@@ -92,30 +70,20 @@ export interface UseDependencyStatusOptions {
 
 export interface UseDependencyStatusReturn {
   loading: Ref<boolean>
-  /** 首次体检是否已完成 (未完成时 installed 全为 false, 属"未知"而非"缺失") */
   checked: Ref<boolean>
   rows: Ref<DepRowStatus[]>
-  /** 该上下文是否存在依赖需求 (空清单 → false) */
   has: ComputedRef<boolean>
-  /** 必需项齐全 且 可选项满足 minOptional */
   ready: ComputedRef<boolean>
-  /** 未安装的行 */
   missing: ComputedRef<DepRowStatus[]>
-  /** 未安装的必需行 —— "获取缺失"批量按钮的目标 */
   missingRequired: ComputedRef<DepRowStatus[]>
-  /** 任一行在下载 (派生自行状态 —— 各行互不阻塞) */
   downloading: ComputedRef<boolean>
   current: ComputedRef<DepCurrent | null>
   error: Ref<string>
   refresh(): Promise<void>
-  /** 下载单行 —— 下载入口一律逐行, 没有批量按钮 */
   downloadRow(rowId: string): Promise<void>
-  /** 取消单行的下载 */
   cancelRow(rowId: string): Promise<void>
   destroy(): void
 }
-
-// ── Composable ───────────────────────────────────────────────────────────────
 
 export function useDependencyStatus(
   rowsSource: MaybeRefOrGetter<DepRow[]>,
@@ -126,12 +94,10 @@ export function useDependencyStatus(
   const rows = ref<DepRowStatus[]>([])
   const error = ref('')
 
-  /** 正在被等待链盯着的行 id —— 防重复接管 */
   const watching = new Set<string>()
   /** 已点下、正在提交给引擎的行 id —— 提交有若干个来回, 这期间也算忙 */
   const submitting = new Set<string>()
 
-  /** 该行是否忙 (提交中或等待中); 忙的只是行, 状态条整体不上锁 */
   function isBusy(rowId: string): boolean {
     return submitting.has(rowId) || watching.has(rowId)
   }
@@ -142,8 +108,6 @@ export function useDependencyStatus(
   const stopHandles: Array<() => void> = []
 
   const minOptional = computed(() => toValue(opts.minOptional) ?? 0)
-
-  // ── 派生状态 ──────────────────────────────────────────────────────────────
 
   const has = computed(() => rows.value.length > 0)
 
@@ -161,7 +125,6 @@ export function useDependencyStatus(
     return installedOptional.value >= minOptional.value
   })
 
-  /** 未装的必需行 —— 批量"获取缺失"只碰这些 */
   const missingRequired = computed(() => rows.value.filter(r => !r.installed && r.row.required))
 
   // 下载态一律派生自行: 行与行之间没有互斥, 点第二行不该被第一行的下载挡掉
@@ -179,8 +142,6 @@ export function useDependencyStatus(
       speed: active.reduce((a, r) => a + r.speed, 0),
     }
   })
-
-  // ── refresh() ─────────────────────────────────────────────────────────────
 
   /**
    * 按新清单落地行状态。
@@ -210,7 +171,6 @@ export function useDependencyStatus(
   async function refresh(): Promise<void> {
     const list = toValue(rowsSource)
 
-    // 无依赖需求 → 清空, 不发任何请求
     if (!list.length) {
       rows.value = []
       checked.value = true
@@ -226,7 +186,6 @@ export function useDependencyStatus(
     // 骨架态, 不会等一个来回之后才"蹦"出来 (has 从此由配置决定, 不由请求结果决定)。
     const statuses = buildStatuses(list)
     rows.value = statuses
-    // 扁平文件清单 + 每个文件属于第几行
     const flat: Array<{ rowIdx: number; file: DepFileSpec }> = []
     list.forEach((row, rowIdx) => {
       for (const file of row.files) flat.push({ rowIdx, file })
@@ -246,7 +205,6 @@ export function useDependencyStatus(
         const results: Array<{ installed: boolean; downloading: boolean; download_id: string | null }> =
           data?.results || []
 
-        // 行内全装才算已装; 任一文件在下载则该行标下载中
         for (const s of statuses) s.installed = true
         for (let i = 0; i < flat.length; i++) {
           const r = results[i]
@@ -284,9 +242,6 @@ export function useDependencyStatus(
     }
   }
 
-  // ── 下载 ──────────────────────────────────────────────────────────────────
-
-  /** 下载单行 */
   async function downloadRow(rowId: string): Promise<void> {
     const r = rows.value.find(x => x.row.id === rowId)
     if (!r || r.installed) return
@@ -329,7 +284,6 @@ export function useDependencyStatus(
         for (const f of s.row.files) {
           const saveDir = dir + '/' + f.subdir
 
-          // 先 check: 已装跳过, 已在下载则复用其 id
           try {
             const chkRes = await fetch('/api/downloads/check', {
               method: 'POST',
@@ -394,7 +348,6 @@ export function useDependencyStatus(
         }
 
         if (!ids.length) {
-          // 全部文件都已存在 → 直接算装好
           s.installed = true
           s.downloading = false
           rows.value = [...rows.value]
@@ -435,7 +388,6 @@ export function useDependencyStatus(
     const ids = [...s.downloadIds]
     s.failed = false
 
-    // 行进度 = 各文件均值, 速度 = 各文件之和 (行内文件也是并行下的)
     const pcts = new Array(ids.length).fill(0)
     const speeds = new Array(ids.length).fill(0)
 
@@ -468,9 +420,6 @@ export function useDependencyStatus(
     }
   }
 
-  // ── 逐行取消 ──────────────────────────────────────────────────────────────
-
-  /** 组合式已销毁 (卸载); 等待循环据此收手 */
   let disposed = false
 
   async function cancelRow(rowId: string): Promise<void> {
@@ -487,8 +436,6 @@ export function useDependencyStatus(
     r.percent = 0
     rows.value = [...rows.value]
   }
-
-  // ── 响应式 & 生命周期 ─────────────────────────────────────────────────────
 
   // 依赖清单变化 (架构切换 / branch 切换 / 条件组件增删) 或从未启用变启用 → 重新判定。
   // 下载进行中不打断, 结束后的 refresh 自会带上新清单。

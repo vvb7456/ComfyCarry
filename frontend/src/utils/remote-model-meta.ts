@@ -3,15 +3,8 @@ import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
 import { localizedText, type LocalizedText } from '@/config/huggingface-models'
 import i18n from '@/i18n/vue-i18n'
 
-// ── 远程模型 → ModelMeta 转换 ─────────────────────────────────────────────
-// CivitAI 标签页与 Hugging Face 标签页共用的展示模型转换逻辑。两个标签页都把
-// 远程条目适配到同一 ModelMeta 结构后交给卡片、详情弹窗和下载流程复用。
-// channel='civitai' 时输出字段与旧 CivitaiTab 内实现完全一致;channel='huggingface'
-// 时不再设置 civitaiUrl,改用 sourceUrl/sourceLabel 描述模型来源页面。
-
 const CIVITAI_CDN = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
 
-/** 图片转换:绝对 http(s) URL 原样透传(兼容 HF 绝对地址),相对路径拼 CivitAI CDN 前缀。 */
 export function convertImages(imgs: CivitaiImage[]): ModelMetaImage[] {
   const out: ModelMetaImage[] = []
   for (const img of imgs) {
@@ -37,23 +30,16 @@ export function convertImages(imgs: CivitaiImage[]): ModelMetaImage[] {
   return out
 }
 
-/** 触发词归一化:兼容字符串数组与 { word } 对象数组。 */
 export function normalizeWords(words?: (string | { word: string })[]): string[] {
   if (!words?.length) return []
   return words.map(w => typeof w === 'string' ? w : w.word).filter(Boolean)
 }
 
 export interface RemoteMetaOptions {
-  /** 来源渠道,默认 'civitai'。 */
   channel?: 'civitai' | 'huggingface'
-  /** Hugging Face 模型页面 URL;缺省时回退读取 hit 上的 sourceUrl 字段。 */
   sourceUrl?: string
 }
 
-/**
- * 远程条目 → ModelMeta。CivitAI 标签页传默认 channel('civitai'),
- * Hugging Face 标签页传 channel('huggingface') 并携带模型页面 URL。
- */
 export function remoteHitToMeta(h: CivitaiHit, opts?: RemoteMetaOptions): ModelMeta {
   const channel = opts?.channel ?? 'civitai'
   const allImgs = h.images?.length ? h.images : (h.version?.images || [])

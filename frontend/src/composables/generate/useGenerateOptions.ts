@@ -2,8 +2,6 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import type { ModelTypeConfig } from '@/config/model-types'
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export interface CheckpointItem {
   name: string
   preview: string | null
@@ -50,8 +48,6 @@ export interface GenerateOptionsReturn {
   refresh: () => Promise<void>
 }
 
-// ── Raw API response shape ───────────────────────────────────────────────────
-
 interface OptionsResponse {
   samplers: string[]
   schedulers: string[]
@@ -80,8 +76,6 @@ interface OptionsResponse {
   comfyui_dir: string
 }
 
-// ── Composable ───────────────────────────────────────────────────────────────
-
 export function useGenerateOptions(): GenerateOptionsReturn {
   const { get } = useApiFetch()
 
@@ -96,7 +90,6 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const ultralyticsBboxModels = ref<string[]>([])
   const samModels = ref<string[]>([])
 
-  // Raw data from API
   const rawCheckpoints = ref<string[]>([])
   const rawLoras = ref<string[]>([])
   const rawUnets = ref<string[]>([])
@@ -115,7 +108,6 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   const loraInfo = ref<Record<string, Record<string, unknown>>>({})
   const unetInfo = ref<Record<string, Record<string, unknown>>>({})
 
-  // Structured computed
   // packaging 由列表归属推导 — checkpoints 列表项 = 整合包, unets 列表项 = 拆分件。
   // 字段本身保留 (picker 徽章 / 形态过滤 chip / BasicSettings 仍读 item.packaging)。
   const checkpoints = computed<CheckpointItem[]>(() =>
@@ -238,7 +230,6 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   }
 }
 
-// ── 打包形态判定 helper ────────────────────────────────────────────
 // 收敛 ModelTab.selectedPackaging (原 unet 优先) 与 useGenerateSubmit.resolvePackaging
 // (原 checkpoint 优先) 两处互为镜像、优先级相反的实现。正常情况下 (state.checkpoint 与
 // state.unet 互斥) 二者结论本就一致; 脏数据 (两字段同时非空) 下旧实现会分叉, 此 helper

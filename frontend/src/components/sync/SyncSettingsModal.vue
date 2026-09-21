@@ -1,14 +1,4 @@
 <script setup lang="ts">
-/**
- * SyncSettingsModal — 云同步页内设置弹窗 (C07)。
- *
- * 由原「设置页 → 连接与同步 → 云同步」域迁入: 同步延迟 (min_age) 与
- * 检查间隔 (watch_interval), 沿用 GET/POST /api/sync/settings。
- *
- * 与设置页域的差异:
- *   - 外层改为 BaseModal (宽 600px), 底部「取消 / 保存」取代模块头保存按钮;
- *   - 关闭 (取消 / Esc / 遮罩 / 关闭按钮) 统一经过未保存检查。
- */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'

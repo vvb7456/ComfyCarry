@@ -73,7 +73,6 @@ function sectionSummary(rows: SummaryRow[]): string {
 const sections = computed<SummarySection[]>(() => {
   const c = props.config
 
-  /* ── tunnel value ── */
   let tunnelValue = t('wizard.summary.skipped')
   let tunnelIcon: IconName = 'skip_next'
   if (c.tunnel_mode === 'public') {
@@ -85,7 +84,6 @@ const sections = computed<SummarySection[]>(() => {
     tunnelIcon = 'build'
   }
 
-  /* ── rclone method ('base64' 仅来自导入链路, wizard 自身只产生 skip/manual) ── */
   const rcloneLabels: Record<string, string> = {
     skip: t('wizard.summary.skipped'),
     manual: t('wizard.summary.manual_create'),
@@ -96,7 +94,6 @@ const sections = computed<SummarySection[]>(() => {
   }
   const dm = c.rclone_config_method
 
-  /* ── imported config section (prepended if present) ── */
   const importSection: SummarySection[] = props.importedConfig ? [{
     title: t('wizard.summary.imported'),
     rows: [

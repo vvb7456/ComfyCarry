@@ -36,8 +36,6 @@ class WorkflowBuilder:
     @staticmethod
     def _ref(ref, default_idx: int = 0) -> list:
         """
-        归一化节点引用 (str | tuple | list) → [node_id, output_index]。
-
         - str:        旧 SDXL 调用风格，按 default_idx 解释。例如:
                         CLIP 默认 1 (CheckpointLoaderSimple),
                         VAE 默认 2 (CheckpointLoaderSimple),
@@ -48,7 +46,6 @@ class WorkflowBuilder:
             return [ref[0], int(ref[1])]
         return [ref, default_idx]
 
-    # ── 基础节点方法 ──────────────────────────────────────────────────────────
 
     def add_checkpoint_loader(self, ckpt_name: str) -> str:
         """
@@ -62,7 +59,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── 分离式加载器 (Anima / Flux / SD3 / HiDream / WAN 等) ─────────────────
 
     def add_unet_loader(self, unet_name: str, weight_dtype: str = "default") -> str:
         """
@@ -151,7 +147,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── 文本/Latent 通用节点 ────────────────────────────────────────────────
 
     def add_clip_text_encode(self, text: str, clip_ref) -> str:
         """
@@ -245,7 +240,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── Flux2 采样链节点 (SamplerCustomAdvanced 体系) ───────────────────────
 
     def add_random_noise(self, seed: int) -> str:
         """
@@ -461,7 +455,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── 扩展模块 ─────────────────────────────────────────────────────────────
 
     def add_lora_loader(
         self,
@@ -492,7 +485,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── 视频节点 (Wan 2.2) ───────────────────────────────────────────────────
 
     def add_model_sampling_sd3(self, model_ref, shift: float = 5.0) -> str:
         """
@@ -689,7 +681,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── MiniMax H3 Ref2VA 参考节点 ─────────────────────────────────────────
 
     def add_load_video(self, file_name: str) -> str:
         """
@@ -849,7 +840,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── ControlNet 模块 ─────────────────────────────────────────────────────
 
     def add_load_image(self, image_name: str) -> str:
         """
@@ -918,7 +908,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── Inpaint ──────────────────────────────────────────────────────────────
 
     def add_load_image_mask(self, filename: str, channel: str = "red") -> str:
         """
@@ -980,7 +969,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── 面部重绘 (Impact Pack FaceDetailer) ─────────────────────────────────
 
     def add_ultralytics_detector(self, model_name: str) -> str:
         """
@@ -1079,7 +1067,6 @@ class WorkflowBuilder:
         self._nodes[nid] = {"class_type": "FaceDetailer", "inputs": inputs}
         return nid
 
-    # ── ControlNet 预处理器节点 ──────────────────────────────────────────────
 
     def add_dw_preprocessor(self, image_node_id: str, resolution: int = 1024,
                            detect_body: bool = True, detect_hand: bool = True,
@@ -1128,7 +1115,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── AI 放大模块 ──────────────────────────────────────────────────────────
 
     def add_aurasr_upscale(
         self,
@@ -1185,7 +1171,6 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── SeedVR2 放大引擎 (numz/ComfyUI-SeedVR2_VideoUpscaler) ────────────────
 
     def add_seedvr2_dit_loader(self, model: str) -> str:
         """
@@ -1260,14 +1245,11 @@ class WorkflowBuilder:
         }
         return nid
 
-    # ── 构建 ─────────────────────────────────────────────────────────────────
 
     def build(self) -> dict:
         """返回最终的 ComfyUI /prompt API 格式 prompt dict。"""
         return dict(self._nodes)
 
-
-# ── 顶层工作流函数 ────────────────────────────────────────────────────────────
 
 # SeedVR2 DiT 权重白名单 (models/SEEDVR2/, GGUF 变体首版不暴露)
 SEEDVR2_DIT_MODELS = (
@@ -1464,10 +1446,8 @@ def build_sdxl_workflow(params: dict) -> dict:
     """
     b = WorkflowBuilder()
 
-    # 1. 加载 Checkpoint
     ckpt = b.add_checkpoint_loader(params["checkpoint"])
 
-    # 当前 model/clip 引用点 (LoRA 会链式改变这些引用)
     model_ref = ckpt
     clip_ref = ckpt
 
@@ -1490,7 +1470,6 @@ def build_sdxl_workflow(params: dict) -> dict:
     else:
         vae_ref = ckpt
 
-    # 2. 链式插入多个 LoRA
     loras = params.get("loras") or []
 
     for lora_entry in loras:
@@ -1502,11 +1481,9 @@ def build_sdxl_workflow(params: dict) -> dict:
         model_ref = lora_node
         clip_ref = lora_node
 
-    # 3. 编码提示词
     positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
     negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
 
-    # 3.5 ControlNet 链式应用 (在 pos/neg 与 KSampler 之间)
     pos_ref = (positive, 0)
     neg_ref = (negative, 0)
     controlnets = params.get("controlnets") or []
@@ -1526,7 +1503,6 @@ def build_sdxl_workflow(params: dict) -> dict:
         pos_ref = (cn_apply, 0)
         neg_ref = (cn_apply, 1)
 
-    # 4. Latent 来源 (Inpaint: VAEEncodeForInpaint / I2I: VAEEncode / T2I: EmptyLatentImage)
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
     inpaint_image = str(params.get("inpaint_image", "")).strip()
     inpaint_mask = str(params.get("inpaint_mask", "")).strip()
@@ -1534,14 +1510,12 @@ def build_sdxl_workflow(params: dict) -> dict:
     i2i_denoise = 1.0  # T2I 默认全去噪
 
     if inpaint_image and inpaint_mask:
-        # 局部重绘: 加载参考图 + mask → VAEEncodeForInpaint (VAE 引用 vae_ref)
         inp_load = b.add_load_image(inpaint_image)
         mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
         grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
         latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
         i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
     elif i2i_image:
-        # 图生图: 加载参考图 → VAE 编码为 latent (VAE 引用 vae_ref)
         i2i_load = b.add_load_image(i2i_image)
         latent = b.add_vae_encode(i2i_load, vae_ref)
         i2i_denoise = max(0.10, min(float(params.get("i2i_denoise", 0.7)), 0.90))
@@ -1552,7 +1526,6 @@ def build_sdxl_workflow(params: dict) -> dict:
             batch_size=batch_size,
         )
 
-    # 5. 采样
     sampled = b.add_ksampler(
         model_ref,
         pos_ref,
@@ -1566,11 +1539,9 @@ def build_sdxl_workflow(params: dict) -> dict:
         denoise=i2i_denoise,
     )
 
-    # 6. VAE 解码 (VAE 引用 vae_ref: 覆盖时 = VAELoader, 否则 = Checkpoint index=2)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # ── 面部重绘 (双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
-    # 无 HiRes → 此处 (放大之前, 避免 max_size 压缩致修后脸偏软); 有 HiRes → HiRes 之后
+    # 修脸跟随最后一个带提示词的全图扩散阶段: 无 HiRes → 放大之前 (避免 max_size 压缩致修后脸偏软)
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
     _face_defaults = {
@@ -1583,13 +1554,10 @@ def build_sdxl_workflow(params: dict) -> dict:
             params, _face_defaults,
         )
 
-    # ── 放大链路 (Phase 2, 引擎分流见 _add_upscale_chain) ────────────────
     final_image = decoded
     if bool(params.get("upscale_enabled", False)):
         final_image = _add_upscale_chain(b, decoded, params)
 
-    # ── 二次采样 (HiRes Refine) ─────────────────────────────────────
-    # 将图像 VAE 编码回 latent → 独立参数二次采样 → VAE 解码 (VAE 引用 vae_ref)
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
         hires_steps = max(1, min(int(params.get("hires_steps", 20)), 100))
@@ -1597,9 +1565,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         hires_sampler = str(params.get("hires_sampler", "euler"))
         hires_scheduler = str(params.get("hires_scheduler", "normal"))
         hires_seed = int(params.get("hires_seed", -1))
-        # VAE 编码: IMAGE → LATENT
         hires_latent = b.add_vae_encode(final_image, vae_ref)
-        # 第二次 KSampler (使用基础正/负提示词，不带 ControlNet)
         hires_sampled = b.add_ksampler(
             model_ref,
             positive,  # 基础正向提示词 (非 ControlNet 修改后的)
@@ -1612,16 +1578,15 @@ def build_sdxl_workflow(params: dict) -> dict:
             scheduler=hires_scheduler,
             denoise=hires_denoise,
         )
-        final_image = b.add_vae_decode(hires_sampled, vae_ref)
+        final_image = b.add_vae_decode(hires_sampled, vae_ref        )
 
-        # ── 面部重绘 (双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
+        # HiRes 之后修脸, 否则修脸结果被全图重绘覆盖
         if face_enabled:
             final_image = _add_face_detailer_chain(
                 b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
                 params, _face_defaults,
             )
 
-    # 7. 保存图片 (WAS Image Save)
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()
     if output_format not in ("png", "jpg", "jpeg", "webp", "tiff", "bmp", "gif"):
@@ -1636,8 +1601,6 @@ def build_sdxl_workflow(params: dict) -> dict:
     b.add_save_image(final_image, prefix=save_filename, output_path=save_output_path,
                      extension=output_format, batch_size=batch_size)
 
-    # 8. PreviewImage — 加入工作流以触发 ComfyUI WS 预览帧广播
-    #    (每执行步通过 WS 二进制帧推送 JPEG 预览给所有连接的客户端)
     b.add_preview_image(final_image)
 
     return b.build()
@@ -1761,7 +1724,6 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         clip_ref = (clip_node, 0)
         vae_ref = (vae_node, 0)
 
-    # 2. 链式插入多个 LoRA (节点输出形状与 SDXL 一致: [0]=MODEL, [1]=CLIP)
     loras = params.get("loras") or []
     for lora_entry in loras:
         lora_name = str(lora_entry.get("name", "")).strip()
@@ -1779,16 +1741,12 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         ms_node = b.add_model_sampling_auraflow(model_ref, shift=shift)
         model_ref = (ms_node, 0)
 
-    # 3. 编码提示词
     positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
     negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
     pos_ref = (positive, 0)
     neg_ref = (negative, 0)
 
-    # 3.5 ControlNet 链式应用 (在 pos/neg 与 KSampler 之间)
-    #   按 profile 开关: 仅 profile["controlnet"]==True 时处理 (flux1 已启用, 其余跳过)。
-    #   仿 build_sdxl_workflow 3.5 段: 每个 apply 接 pos/neg 输出, 链式更新引用。
-    #   差异: flux 系 CN 是 latent 空间条件, ControlNetApplyAdvanced 必须接 optional vae
+    # 仅 profile["controlnet"]==True 时处理 (flux1 已启用, 其余跳过); flux 系 CN 是 latent
     #   (传 vae_ref; sdxl 走 build_sdxl_workflow 不经此函数, 既有行为不变)。
     if profile.get("controlnet"):
         controlnets = params.get("controlnets") or []
@@ -1809,7 +1767,6 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             pos_ref = (cn_apply, 0)
             neg_ref = (cn_apply, 1)
 
-    # 4. Latent 来源 (Inpaint / I2I / T2I)
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
     inpaint_image = str(params.get("inpaint_image", "")).strip()
     inpaint_mask = str(params.get("inpaint_mask", "")).strip()
@@ -1834,7 +1791,6 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             class_type=str(profile.get("latent_class", "EmptyLatentImage")),
         )
 
-    # 5. 采样 (默认值取自 profile)
     sampled = b.add_ksampler(
         model_ref,
         pos_ref,
@@ -1848,11 +1804,9 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         denoise=i2i_denoise,
     )
 
-    # 6. VAE 解码 (独立 VAELoader, index=0)
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # ── 面部重绘 (双分支): 修脸跟随最后一个带提示词的全图扩散阶段 ──
-    # 无 HiRes → 此处 (放大之前); 有 HiRes → HiRes 之后。缺省采样器/调度器随 profile
+    # 修脸跟随最后一个带提示词的全图扩散阶段: 无 HiRes → 放大之前; 有 HiRes → HiRes 之后
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
     _face_defaults = {
@@ -1865,12 +1819,10 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             params, _face_defaults,
         )
 
-    # ── 放大链路 (与架构无关, 引擎分流见 _add_upscale_chain) ──────────
     final_image = decoded
     if bool(params.get("upscale_enabled", False)):
         final_image = _add_upscale_chain(b, decoded, params)
 
-    # ── 二次采样 (HiRes Refine) ────────────────────────────────────────
     # 缺省值同步取 profile (hires_cfg 下限 clamp 保持 1.0)
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
@@ -1892,16 +1844,15 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             scheduler=hires_scheduler,
             denoise=hires_denoise,
         )
-        final_image = b.add_vae_decode(hires_sampled, vae_ref)
+        final_image = b.add_vae_decode(hires_sampled, vae_ref        )
 
-        # ── 面部重绘 (双分支之二): HiRes 之后, 否则修脸结果被全图重绘覆盖 ──
+        # HiRes 之后修脸, 否则修脸结果被全图重绘覆盖
         if face_enabled:
             final_image = _add_face_detailer_chain(
                 b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
                 params, _face_defaults,
             )
 
-    # 7. 保存图片
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()
     if output_format not in ("png", "jpg", "jpeg", "webp", "tiff", "bmp", "gif"):
@@ -1915,7 +1866,6 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     b.add_save_image(final_image, prefix=save_filename, output_path=save_output_path,
                      extension=output_format, batch_size=batch_size)
 
-    # 8. PreviewImage
     b.add_preview_image(final_image)
 
     return b.build()
@@ -2031,9 +1981,7 @@ def build_flux2_workflow(params: dict) -> dict:
         guider = b.add_cfg_guider(model_ref, pos_ref, neg_ref, cfg)
 
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
-    # flux2 仅 t2i: SamplerCustomAdvanced 用 Flux2Scheduler 全量 sigma (denoise=1)。
-    # i2i/inpaint 需 SplitSigmas 分段去噪 (未实装) — 直接喂编码 latent 会被全量重噪 = 忽略参考图,
-    # 故不接 i2i/inpaint 分支 (前端 flux2 modules 亦已去 i2i/hires)。
+    # flux2 仅 t2i: 直接喂编码 latent 会被全量重噪 = 忽略参考图, 故不接 i2i/inpaint 分支
     latent = b.add_empty_latent(
         int(params.get("width", 1024)),
         int(params.get("height", 1024)),
@@ -2056,8 +2004,7 @@ def build_flux2_workflow(params: dict) -> dict:
     if bool(params.get("upscale_enabled", False)):
         final_image = _add_upscale_chain(b, decoded, params)
 
-    # HiRes 二次采样对 flux2 需另一次 SamplerCustomAdvanced + SplitSigmas 分段去噪 (未实装);
-    # 不能退回普通 KSampler (缺 Flux2Scheduler 的分辨率相关 sigma, 且 dev 无 CFG) → 略过。
+    # HiRes 二次采样对 flux2 需另一次 SamplerCustomAdvanced + SplitSigmas 分段去噪 (未实装) → 略过。
 
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()
@@ -2073,8 +2020,6 @@ def build_flux2_workflow(params: dict) -> dict:
 
     return b.build()
 
-
-# ── Wan 2.2 视频工作流 ───────────────────────────────────────────────────────
 
 # 内置中文负面模板 — 标准档 negative 为空时注入。
 WAN22_DEFAULT_NEGATIVE = (
@@ -2166,9 +2111,7 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
 
     b = WorkflowBuilder()
 
-    # ── 1. 加载层 ──────────────────────────────────────────────────────────
-    # TE/VAE 全 variant 共用: 单 CLIPLoader(type=wan) + VAELoader。
-    # 14B: 两个 UNETLoader (high/low); 5B: 单 UNETLoader。
+    # TE/VAE 全 variant 共用; 14B: 两个 UNETLoader (high/low), 5B: 单 UNETLoader。
     clip_node = b.add_clip_loader_single(
         params["clip"], type="wan",
         device=str(params.get("clip_device", "default")),
@@ -2179,8 +2122,7 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
 
     is_14b = variant in ("t2v", "i2v")
 
-    # ── 2. 提示词编码 (全 variant 共用) ─────────────────────────────────────
-    # 速度档决定 negative 可见性: fast 忽略 negative (cfg=1 无效); standard 使用之。
+    # 速度档决定 negative 可见性: fast 忽略 negative (cfg=1 无效)
     if is_14b:
         speed = str(params.get("speed", "fast")).lower()
         if speed not in ("fast", "standard"):
@@ -2207,11 +2149,9 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         negative = b.add_clip_text_encode("", clip_ref)
         neg_ref = (negative, 0)
 
-    # ── 3. MODEL 链 + latent + 采样 (按 variant 分流) ───────────────────────
     fps = WAN22_FPS[variant]
     shift = float(params.get("shift", WAN22_SHIFT[variant]))
 
-    # 帧数: 显式 length 优先, 否则 fps × duration_s + 1。
     length = int(params.get("length", 0))
     if length <= 0:
         duration = float(params.get("duration_s", 5))
@@ -2223,7 +2163,6 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
     seed = int(params.get("seed", -1))
 
     if is_14b:
-        # 14B 双链
         unet_high_node = b.add_unet_loader(
             params["unet_high"],
             weight_dtype=str(params.get("unet_weight_dtype", "default")),
@@ -2247,7 +2186,6 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
             )
             low_model = (low_light, 0)
 
-        # 用户 LoRA 分链挂载 (apply ∈ high/low/both, 默认 both)。
         for lora_entry in (params.get("loras") or []):
             lora_name = str(lora_entry.get("name", "")).strip()
             if not lora_name:
@@ -2261,13 +2199,11 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
                 node = b.add_lora_loader_model_only(low_model, lora_name, strength)
                 low_model = (node, 0)
 
-        # ModelSamplingSD3(shift) — 两段各接一件。
         high_ms = b.add_model_sampling_sd3(high_model, shift=shift)
         low_ms = b.add_model_sampling_sd3(low_model, shift=shift)
         high_model = (high_ms, 0)
         low_model = (low_ms, 0)
 
-        # latent 来源: t2v = EmptyHunyuanLatentVideo; i2v = WanImageToVideo。
         if variant == "i2v":
             start_image_name = str(params.get("start_image", "")).strip()
             start_image_node = b.add_load_image(start_image_name)
@@ -2295,7 +2231,6 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         sampler = str(params.get("sampler", "euler"))
         scheduler = str(params.get("scheduler", "simple"))
 
-        # 高噪段: 用 high_model + (i2v 改写后的或原始) pos/neg + latent。
         ks_pos = i2v_pos if i2v_pos is not None else pos_ref
         ks_neg = i2v_neg if i2v_neg is not None else neg_ref
         ks1 = b.add_ksampler_advanced(
@@ -2305,7 +2240,6 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
             start_at_step=0, end_at_step=split,
             return_with_leftover_noise=True, seed=seed,
         )
-        # 低噪段: 用 low_model + 同 conditioning + 段1 输出的 latent。
         ks2 = b.add_ksampler_advanced(
             low_model, ks_pos, ks_neg, (ks1, 0),
             add_noise=False, steps=steps, cfg=cfg,
@@ -2315,14 +2249,12 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         )
         sampled = (ks2, 0)
     else:
-        # 5B 单链: 单 UNETLoader → ModelSamplingSD3(shift=8.0) → 单 KSampler。
         unet_node = b.add_unet_loader(
             params["unet"],
             weight_dtype=str(params.get("unet_weight_dtype", "default")),
         )
         model_ref = (unet_node, 0)
 
-        # 5B 不挂加速件 (无对应 LoRA), 用户 LoRA 仍可挂 (apply 字段忽略, 单链)。
         for lora_entry in (params.get("loras") or []):
             lora_name = str(lora_entry.get("name", "")).strip()
             if not lora_name:
@@ -2355,7 +2287,6 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         )
         sampled = (ks, 0)
 
-    # ── 4. 尾链: VAEDecode → CreateVideo(fps) → SaveVideo ──────────────────
     decoded = b.add_vae_decode(sampled, vae_ref)
     video = b.add_create_video(decoded, fps=fps)
     save_prefix = str(params.get("save_prefix", "video/ComfyCarry")).strip() or "video/ComfyCarry"
@@ -2363,8 +2294,6 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
 
     return b.build()
 
-
-# ── MiniMax H3 视频工作流 ──────────────────────────────────────────────────
 
 # MiniMax H3 (FL2VA, t2v/i2v) — CFG-distilled, 无 negative / cfg。
 H3_FPS = 24
@@ -2390,7 +2319,6 @@ def _h3_shared_setup(params: dict):
     """
     b = WorkflowBuilder()
 
-    # ── 加载层: CLIP / 视频 VAE / 音频 VAE / UNet ────────────────────────────
     clip_node = b.add_clip_loader_single(
         params["clip"], type="minimax",
         device=str(params.get("clip_device", "default")),
@@ -2421,7 +2349,6 @@ def _h3_sampling_and_tail(b: WorkflowBuilder, unet_node, cond_latent, seed: int,
     BasicScheduler → SamplerCustomAdvanced) + 尾链 (VAEDecode + VAEDecodeAudio →
     CreateVideo(fps=24, audio) → SaveVideo)。节点就地写入 builder。
     """
-    # ── 采样链: RandomNoise + BasicGuider + KSamplerSelect + BasicScheduler ──
     noise = b.add_random_noise(seed)
     guider = b.add_basic_guider((unet_node, 0), (cond_latent, 0))
     sampler = b.add_ksampler_select(str(params.get("sampler", H3_DEFAULT_SAMPLER)))
@@ -2434,7 +2361,6 @@ def _h3_sampling_and_tail(b: WorkflowBuilder, unet_node, cond_latent, seed: int,
         noise, guider, sampler, sigmas, (cond_latent, 1),
     )
 
-    # ── 尾链: 视频解码 + 音频解码 → CreateVideo(fps=24, audio) → SaveVideo ──
     video_img = b.add_vae_decode(sampled, (vae_node, 0))
     audio = b.add_vae_decode_audio(sampled, (audio_vae_node, 0))
     video = b.add_create_video(video_img, fps=H3_FPS, audio_ref=audio)
@@ -2486,7 +2412,6 @@ def build_minimax_h3_workflow(params: dict, variant: str = "i2v") -> dict:
     b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps = \
         _h3_shared_setup(params)
 
-    # ── 2. (仅 i2v) 首/尾帧加载 ─────────────────────────────────────────────
     load_start = load_last = None
     if variant == "i2v":
         start_image = str(params.get("start_image", "")).strip()
@@ -2496,7 +2421,6 @@ def build_minimax_h3_workflow(params: dict, variant: str = "i2v") -> dict:
         if last_image:
             load_last = b.add_load_image(last_image)
 
-    # ── 3. 条件节点: MiniMaxH3ImageToVideo → [0]=positive, [1]=LATENT ───────
     cond_latent = b.add_minimax_h3_image_to_video(
         (clip_node, 0), (vae_node, 0),
         str(params.get("positive_prompt", "")),
@@ -2504,7 +2428,6 @@ def build_minimax_h3_workflow(params: dict, variant: str = "i2v") -> dict:
         first_frame_ref=load_start, last_frame_ref=load_last,
     )
 
-    # ── 4 + 5. 采样链 + 尾链 ────────────────────────────────────────────────
     _h3_sampling_and_tail(b, unet_node, cond_latent, seed, steps, vae_node, audio_vae_node, params)
 
     return b.build()
@@ -2553,7 +2476,6 @@ def build_minimax_h3_ref_workflow(params: dict) -> dict:
     b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps = \
         _h3_shared_setup(params)
 
-    # ── 2. 参考分组: image / video / audio 各归其列, 保持原顺序 ──────────────
     image_refs: list = []
     video_refs: list = []
     audio_refs: list = []
@@ -2571,7 +2493,6 @@ def build_minimax_h3_ref_workflow(params: dict) -> dict:
         else:
             raise ValueError(f"不支持的 ref type: {rtype!r}")
 
-    # ── 3. 条件节点: MiniMaxH3ReferenceToVideo → [0]=positive, [1]=LATENT ───
     cond_latent = b.add_minimax_h3_reference_to_video(
         (clip_node, 0), (vae_node, 0), (audio_vae_node, 0),
         str(params.get("positive_prompt", "")),
@@ -2579,7 +2500,6 @@ def build_minimax_h3_ref_workflow(params: dict) -> dict:
         image_refs=image_refs, video_refs=video_refs, audio_refs=audio_refs,
     )
 
-    # ── 4 + 5. 采样链 + 尾链 ────────────────────────────────────────────────
     _h3_sampling_and_tail(b, unet_node, cond_latent, seed, steps, vae_node, audio_vae_node, params)
 
     return b.build()
@@ -2612,10 +2532,8 @@ def build_preprocess_workflow(params: dict) -> dict:
 
     b = WorkflowBuilder()
 
-    # 1. 加载源图片
     load_img = b.add_load_image(image)
 
-    # 2. 预处理器 (按类型分配)
     if pp_type == "pose":
         detect_body = params.get("detect_body", True)
         detect_hand = params.get("detect_hand", True)
@@ -2635,11 +2553,9 @@ def build_preprocess_workflow(params: dict) -> dict:
     else:
         raise ValueError(f"不支持的预处理类型: {pp_type}")
 
-    # 3. 保存到 input/ 目录 (使用绝对路径)
     b.add_save_image(processed, prefix=save_prefix,
                      output_path=input_dir, extension='png')
 
-    # 4. PreviewImage — 广播预览帧
     b.add_preview_image(processed)
 
     return b.build()
@@ -2682,7 +2598,3 @@ def build_tag_workflow(params: dict) -> dict:
             },
         },
     }
-
-
-# 扩展占位符:
-# def build_flux2_workflow(params): ...  # 已实装于上方 (SamplerCustomAdvanced + Flux2Scheduler)

@@ -1,22 +1,3 @@
-"""
-ComfyCarry — Downloads 路由
-
-通用下载管理 API, 基于 download_engine.py (aria2c JSON-RPC).
-
-端点:
-  POST /api/downloads/check    — 检查文件是否已安装 (单个或批量)
-  POST /api/downloads           — 提交下载任务
-  GET  /api/downloads           — 获取所有下载任务列表
-  GET  /api/downloads/<id>      — 获取单个任务状态
-  POST /api/downloads/<id>/cancel — 取消下载
-  POST /api/downloads/<id>/pause  — 暂停下载 (断点续传)
-  POST /api/downloads/<id>/resume — 恢复暂停的下载
-  GET  /api/downloads/<id>/events — SSE 实时进度流 (per-task)
-  POST /api/downloads/clear     — 清除已完成的历史
-  GET  /api/downloads/snapshot  — 资源+任务快照
-  GET  /api/downloads/stream    — 全局 SSE 事件流
-"""
-
 import json
 import logging
 import os
@@ -34,16 +15,10 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("downloads", __name__)
 
-# ComfyUI 根的 realpath (用于 subdir 防路径遍历校验)
 _REAL_COMFYUI_DIR = os.path.realpath(COMFYUI_DIR)
 
 
-# ====================================================================
-# 响应文案 —— key + params, 前端按 `models.err.<key>` 翻译
-# (downloads 路由复用 models 命名空间, 与 favorites.py 同策略)
-# ====================================================================
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `models.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
     body = {"error_key": f"models.err.{key}", "error_params": params}
     if _extra:
         body.update(_extra)
@@ -51,13 +26,6 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 
 
 def _resolve_check_save_dir(spec: dict) -> str | None:
-    """解析文件检查的目标目录 (save_dir)。
-
-    - 提供 subdir (相对 ComfyUI 根, 如 "models/text_encoders"): 用
-      os.path.join(COMFYUI_DIR, subdir) 解析, 忽略 save_dir; realpath 结果
-      必须位于 COMFYUI_DIR 之下, 否则返回 None (按未安装处理)。
-    - 未提供 subdir: 维持现有 save_dir (绝对路径) 行为, 不做遍历校验。
-    """
     subdir = (spec.get("subdir") or "").strip()
     if subdir:
         save_dir = os.path.join(COMFYUI_DIR, subdir)
@@ -68,10 +36,6 @@ def _resolve_check_save_dir(spec: dict) -> str | None:
 
 
 def _check_file_spec(engine, spec: dict) -> dict:
-    """单条文件检查, 返回 {installed, downloading, download_id}。
-
-    目录解析失败 (subdir 越界 / 缺失) 或 filename 缺失时按未安装处理。
-    """
     filename = (spec.get("filename") or "").strip()
     if not filename:
         return {"installed": False, "downloading": False, "download_id": None}
@@ -81,13 +45,10 @@ def _check_file_spec(engine, spec: dict) -> dict:
     return engine.check_file(save_dir, filename)
 
 
-# ── Registry ↔ Engine 集成 ───────────────────────────────────────────────────
-
 _registry_wired = False
 
 
 def _persist_task(task) -> None:
-    """将 engine task 快照写入 download_tasks 表 (fire-and-forget)。"""
     try:
         from ..services import download_store as store
         meta = task.meta or {}
@@ -115,7 +76,6 @@ def _persist_task(task) -> None:
 
 
 def _wire_registry():
-    """将 download_engine 的状态变化事件桥接到 resource_registry"""
     global _registry_wired
     if _registry_wired:
         return
@@ -124,17 +84,14 @@ def _wire_registry():
     registry = get_registry()
     engine = get_engine()
 
-    # 节流: 进度更新只在跨越 10% 门槛时写入 DB
-    _progress_thresholds: dict[str, int] = {}  # download_id → last written 10% bucket
+    _progress_thresholds: dict[str, int] = {}
 
     def _on_status_change(task, old_status, new_status):
-        """Engine 状态变化 → Registry 推进 ResourceState + DB 持久化"""
         meta = task.meta or {}
         source = meta.get("source", "")
         model_id = meta.get("model_id", "")
         version_id = meta.get("version_id", "")
 
-        # Registry (仅 civitai 来源)
         if source and model_id:
             if new_status == DownloadStatus.COMPLETE:
                 registry.task_complete(source, model_id, version_id,
@@ -160,17 +117,13 @@ def _wire_registry():
             except Exception as e:
                 logger.debug(f"[downloads] 失效 options 缓存失败 (非致命): {e}")
 
-        # Emit task event to global stream
         registry.emit_task_event("task.updated", task.to_dict())
 
-        # DB: 状态变化时一律持久化
         _persist_task(task)
 
     def _on_progress(task):
-        """Engine 进度变化 → 全局 SSE 流 + 节流 DB 持久化"""
         registry.emit_task_event("task.progress", task.to_dict())
 
-        # 节流: 仅在进度跨越 10% 门槛时写 DB
         bucket = int(task.progress // 10)
         last = _progress_thresholds.get(task.download_id, -1)
         if bucket != last:
@@ -203,12 +156,10 @@ def api_downloads_check():
     data = request.get_json(force=True) or {}
     engine = get_engine()
 
-    # 批量模式
     if "files" in data:
         results = [_check_file_spec(engine, spec) for spec in data["files"]]
         return jsonify({"results": results})
 
-    # 单文件模式
     result = _check_file_spec(engine, data)
     if not (data.get("subdir", "").strip() or data.get("save_dir", "").strip()
             or data.get("filename", "").strip()):
@@ -237,7 +188,6 @@ def api_downloads_submit():
       {"download_id": "dl-abc123", "status": "active", ...}
     """
     data = request.get_json(force=True) or {}
-    # CivitAI 来源 → 走原 /api/downloads/civitai 全套逻辑 (source 为顶层字段)
     if data.get("source") == "civitai":
         return _handle_civitai_source(data)
     # Hugging Face 来源 → 通用 URL 下载 + 白名单元数据完成登记 (SPEC §7-A)
@@ -254,7 +204,6 @@ def api_downloads_submit():
     if not filename:
         return _err("dl_filename_required")
 
-    # 如果没有 save_dir 但有 model_type, 从 MODEL_DIRS 解析
     if not save_dir and model_type:
         rel_dir = MODEL_DIRS.get(model_type)
         if not rel_dir:
@@ -277,7 +226,6 @@ def api_downloads_submit():
         headers=headers,
     )
 
-    # 立即持久化新任务 (消除首次提交→首个 poll tick 之间的空窗)
     _persist_task(task)
 
     resp = task.to_dict()
@@ -291,7 +239,6 @@ def api_downloads_submit():
 
 @bp.route("/api/downloads", methods=["GET"])
 def api_downloads_list():
-    """获取所有下载任务列表"""
     _wire_registry()
     engine = get_engine()
     tasks = engine.list_tasks()
@@ -300,7 +247,6 @@ def api_downloads_list():
 
 @bp.route("/api/downloads/<download_id>", methods=["GET"])
 def api_downloads_get(download_id: str):
-    """获取单个任务状态"""
     engine = get_engine()
     task = engine.get_task(download_id)
     if not task:
@@ -310,7 +256,6 @@ def api_downloads_get(download_id: str):
 
 @bp.route("/api/downloads/<download_id>/cancel", methods=["POST"])
 def api_downloads_cancel(download_id: str):
-    """取消下载任务"""
     engine = get_engine()
     ok = engine.cancel(download_id)
     if not ok:
@@ -323,7 +268,6 @@ def api_downloads_cancel(download_id: str):
 
 @bp.route("/api/downloads/<download_id>/pause", methods=["POST"])
 def api_downloads_pause(download_id: str):
-    """暂停下载任务 (支持断点续传)"""
     engine = get_engine()
     ok = engine.pause(download_id)
     if not ok:
@@ -336,7 +280,6 @@ def api_downloads_pause(download_id: str):
 
 @bp.route("/api/downloads/<download_id>/resume", methods=["POST"])
 def api_downloads_resume(download_id: str):
-    """恢复已暂停的下载任务"""
     engine = get_engine()
     ok = engine.resume(download_id)
     if not ok:
@@ -378,7 +321,6 @@ def api_downloads_events(download_id: str):
                     {"error_key": "models.err.dl_task_deleted"}) + "\n\n")
                 break
 
-            # 进度变化或终态 → 推送数据
             if t.progress != last_progress or t.status in terminal_states:
                 event = {
                     "status": t.status.value,
@@ -418,7 +360,6 @@ def api_downloads_events(download_id: str):
 
 @bp.route("/api/downloads/<download_id>/retry", methods=["POST"])
 def api_downloads_retry(download_id: str):
-    """重试失败的下载 — 重新提交相同任务"""
     engine = get_engine()
     old_task = engine.get_task(download_id)
     if not old_task:
@@ -433,18 +374,15 @@ def api_downloads_retry(download_id: str):
         from ..utils import _get_api_key
         from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
         api_key = _get_api_key()
-        # 先移除旧的 token 参数
         parsed = urlparse(url)
         params = parse_qs(parsed.query, keep_blank_values=True)
         params.pop("token", None)
         new_query = urlencode(params, doseq=True)
         url = urlunparse(parsed._replace(query=new_query))
-        # 注入新的 token
         if api_key and api_key.strip():
             sep = "&" if "?" in url and url.split("?")[1] else "?"
             url += f"{sep}token={api_key}"
 
-    # 移除旧的失败记录
     engine.clear_task(download_id)
     try:
         from ..services import download_store as store
@@ -452,7 +390,6 @@ def api_downloads_retry(download_id: str):
     except Exception:
         pass
 
-    # Registry: 标记资源为 submit_pending (重试 = 重新走完整生命周期)
     _wire_registry()
     registry = get_registry()
     source = old_task.meta.get("source", "")
@@ -469,10 +406,8 @@ def api_downloads_retry(download_id: str):
         on_complete=old_task.on_complete,
     )
 
-    # 立即持久化新任务
     _persist_task(new_task)
 
-    # Registry: 更新提交结果
     if source and res_model_id:
         if new_task.status == DownloadStatus.FAILED:
             registry.task_failed(source, res_model_id, res_version_id,
@@ -503,10 +438,8 @@ def api_downloads_retry(download_id: str):
 
 @bp.route("/api/downloads/clear", methods=["POST"])
 def api_downloads_clear():
-    """清除已完成的历史任务"""
     engine = get_engine()
     count = engine.clear_completed()
-    # 同步清理 DB 中的终态 task (保留 24 小时内的)
     try:
         from ..services import download_store as store
         store.clear_terminal_tasks(max_age_seconds=0)
@@ -610,15 +543,12 @@ def _handle_civitai_source(data: dict):
             ],
         }), 409
 
-    # Early Access 付费模型检测
     info = resolved["info"]
     if info.get("availability") == "EarlyAccess":
         ea = info.get("early_access_config") or {}
         if ea.get("chargeForDownload"):
             price = ea.get("downloadPrice", "?")
             return _err("dl_early_access", 403, price=price, _extra={"early_access": True})
-        # EarlyAccess 但不收费: 可能仅需登录, 继续尝试下载
-
     def _on_civitai_complete(task):
         # 目录已在下载前逐文件定好；完成钩子在终态广播前登记模型元数据。
         model_path = os.path.join(task.save_dir, task.filename)
@@ -639,7 +569,6 @@ def _handle_civitai_source(data: dict):
     _wire_registry()
     registry = get_registry()
 
-    # Registry: 标记资源为 submit_pending
     res_model_id = str(info.get("model_id", ""))
     res_version_id = str(info.get("version_id", ""))
     registry.submit_pending("civitai", res_model_id, res_version_id, meta={
@@ -665,12 +594,10 @@ def _handle_civitai_source(data: dict):
         },
     )
 
-    # 立即持久化新任务 (消除首次提交→首个 poll tick 之间的空窗)
     _persist_task(task)
 
     existed = task.meta.get("existed", False)
 
-    # Registry: 更新资源状态
     if task.status == DownloadStatus.FAILED:
         registry.task_failed("civitai", res_model_id, res_version_id, task.error)
     elif existed:
@@ -743,7 +670,6 @@ def _handle_huggingface_source(data: dict):
     if not filename:
         return _err("dl_filename_required")
 
-    # 与通用路径相同的 model_type → MODEL_DIRS 目录解析 (不新造)
     rel_dir = MODEL_DIRS.get(model_type)
     if not rel_dir:
         rel_dir = f"models/{model_type}" if model_type else "models/other"
@@ -771,7 +697,6 @@ def _handle_huggingface_source(data: dict):
     engine = get_engine()
     registry = get_registry()
 
-    # Registry: 标记资源为 submit_pending (资源 key: huggingface:<model_id>:<version_id>)
     res_model_id = str(meta.get("model_id", ""))
     res_version_id = str(meta.get("version_id", ""))
     registry.submit_pending("huggingface", res_model_id, res_version_id, meta={
@@ -788,12 +713,10 @@ def _handle_huggingface_source(data: dict):
         on_complete=_on_huggingface_complete,
     )
 
-    # 立即持久化新任务 (消除首次提交→首个 poll tick 之间的空窗)
     _persist_task(task)
 
     existed = task.meta.get("existed", False)
 
-    # Registry: 更新资源状态 (已存在文件时 engine 已触发完成回调登记, 走 mark_installed)
     if task.status == DownloadStatus.FAILED:
         registry.task_failed("huggingface", res_model_id, res_version_id, task.error)
     elif existed:
@@ -811,11 +734,8 @@ def _handle_huggingface_source(data: dict):
     return jsonify(resp), 201 if task.status == DownloadStatus.ACTIVE else 200
 
 
-# SSE 轮询间隔 (秒)
 _SSE_POLL_INTERVAL = 0.8
 
-
-# ── Snapshot + Global SSE ────────────────────────────────────────────────────
 
 @bp.route("/api/downloads/snapshot", methods=["GET"])
 def api_downloads_snapshot():

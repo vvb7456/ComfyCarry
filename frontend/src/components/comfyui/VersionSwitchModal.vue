@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * VersionSwitchModal — ComfyUI 版本切换弹窗 (C08, 需求 8.1)。
- *
- * 由原 VersionCard 的选择 + 切换逻辑迁入: 版本用可搜索的 BaseSelect 呈现
- * (稳定版 / nightly / 历史版本分组), 切换沿用「仅切换 / 切换并安装依赖」
- * 两种操作与各自的确认流程。
- */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -146,7 +139,6 @@ async function switchSelectedVersion() {
       version: tag,
       install_deps: result === 'alt',
     })
-    // 非 2xx 已由 useApiFetch 统一提示; 这里只判业务层 ok (finally 会回弹选择)
     if (!d) return
     if (d.ok) {
       applied = true

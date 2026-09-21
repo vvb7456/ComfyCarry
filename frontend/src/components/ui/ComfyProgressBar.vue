@@ -49,8 +49,6 @@ const fillPct = computed(() => {
   return 0
 })
 
-// ── Display Text ─────────────────────────────────────────────────────────
-
 const nodeName = computed(() => {
   if (!props.state) return ''
   const cn = props.state.currentNode
@@ -83,7 +81,6 @@ const timeText = computed(() => {
 </script>
 
 <template>
-  <!-- Active: executing -->
   <div v-if="isActive" class="comfy-progress-bar active" :class="{ 'comfy-progress-bar--compact': compact }">
     <div class="comfy-progress-bar-fill" :style="{ width: fillPct + '%' }" />
     <span class="comfy-progress-pulse" />
@@ -214,7 +211,6 @@ const timeText = computed(() => {
   margin-left: auto;
 }
 
-/* ── Compact mode (Dashboard activity feed) ── */
 .comfy-progress-bar--compact {
   margin-top: 6px;
   font-size: .72rem;

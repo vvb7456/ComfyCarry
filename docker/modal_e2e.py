@@ -62,7 +62,6 @@ VOLUMES = {
 
 
 def _link_to_vol(local_path: str, vol_dir: str):
-    """把镜像内目录替换为指向卷内目录的软链, 首次把镜像自带内容并入卷 (不覆盖)。"""
     if os.path.islink(local_path):
         return
     os.makedirs(vol_dir, exist_ok=True)
@@ -72,15 +71,8 @@ def _link_to_vol(local_path: str, vol_dir: str):
 
 
 def _prepare_workspace():
-    """混合布局: 代码留容器本地盘 (贴近生产的无状态架构), 仅重资产落卷。
-
-    /workspace 保持为容器本地目录 (与生产一致), ComfyUI 代码从本地盘
-    import (FUSE 卷上启动要 ~4 分钟); 模型/出图/工作流/面板状态软链到卷。
-    """
     vol = "/vol/workspace"
 
-    # ── 旧布局迁移: 曾把整个 /workspace 落卷 (含 20GB ComfyUI 代码副本),
-    #    抢救模型/出图/工作流后清理代码副本, 释放卷空间 ──
     old_comfy = f"{vol}/ComfyUI"
     if os.path.isdir(old_comfy) and not os.path.islink(old_comfy):
         for src, dst in ((f"{old_comfy}/models", f"{vol}/models"),
@@ -96,7 +88,6 @@ def _prepare_workspace():
         if os.path.isfile(old) and not os.path.islink(old):
             os.rename(old, f"{vol}/panel_state/{fname}")
 
-    # ── 模型 / 出图 / 工作流 → 卷 ──
     _link_to_vol("/opt/ComfyUI/models", f"{vol}/models")
     _link_to_vol("/opt/ComfyUI/output", f"{vol}/comfy_output")
     _link_to_vol("/opt/ComfyUI/user", f"{vol}/comfy_user")
@@ -104,11 +95,9 @@ def _prepare_workspace():
     for sub in ("diffusion_models", "text_encoders", "unet", "clip", "embeddings"):
         os.makedirs(f"{vol}/models/{sub}", exist_ok=True)
 
-    # ── ComfyUI 本体: 软链让部署引擎跳过 cp -a /opt→/workspace 的 20GB 复制 ──
     if not os.path.exists("/workspace/ComfyUI"):
         os.symlink("/opt/ComfyUI", "/workspace/ComfyUI")
 
-    # ── 面板状态 (向导配置/部署进度/同步规则) → 卷, 免每会话重跑向导 ──
     for fname in (".setup_state.json", ".dashboard_env",
                   ".sync_rules.json", ".sync_settings.json"):
         link = f"/workspace/{fname}"
@@ -122,15 +111,10 @@ def _prepare_workspace():
     if not os.path.islink(civ):
         os.symlink(f"{vol}/panel_state/.civitai_config.json", civ)
 
-    # ── rclone 配置 → 卷, 同步模块 e2e 免重配 ──
     _link_to_vol("/root/.config/rclone", f"{vol}/rclone")
 
 
 def _session(hours: float, label: str):
-    """公共会话逻辑: 开双隧道 → 走生产启动链路 → 挂住直到超时/Ctrl+C
-
-    hours <= 0 表示不限时: 一直运行到手动结束 (或 Modal 24h 硬上限强杀)。
-    """
     if hours > 0:
         deadline = time.time() + min(hours, HARD_TIMEOUT_H - 0.1) * 3600
         duration_desc = f"{min(hours, HARD_TIMEOUT_H - 0.1):.1f}h (Ctrl+C 提前结束)"
@@ -148,8 +132,6 @@ def _session(hours: float, label: str):
         print(f"  时长    : {duration_desc}")
         print("=" * 60)
 
-        # 真实生产启动链路: sshd → bootstrap.sh (GitHub main) → pm2 dashboard:5000
-        # 面板代码在容器本地盘, 每个会话都是全新下载的最新 main
         boot = subprocess.Popen(["bash", "/opt/entrypoint.sh"])
 
         try:
@@ -172,8 +154,6 @@ def _session(hours: float, label: str):
     volumes=VOLUMES,
 )
 def e2e(hours: float = 0):
-    """GPU 会话 (L4, ≈$1.12/h) — 真实出图的端到端验证。
-    hours=0 (默认) 不限时, 手动结束; 传 --hours N 到点自动收尾。"""
     _session(hours, f"GPU {GPU}")
 
 
@@ -185,7 +165,4 @@ def e2e(hours: float = 0):
     volumes=VOLUMES,
 )
 def e2e_cpu(hours: float = 0):
-    """纯 CPU 会话 (≈$0.11/h) — 仅验证面板 UI/交互。
-    无 GPU 环境不做降级, ComfyUI 会拒绝启动 (崩溃退出), 属预期行为。
-    hours=0 (默认) 不限时, 手动结束; 传 --hours N 到点自动收尾。"""
     _session(hours, "CPU only")

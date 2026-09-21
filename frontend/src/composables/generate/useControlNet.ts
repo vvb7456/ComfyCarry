@@ -7,37 +7,29 @@ import { cnBranchForFile, type CnBranch } from '@/composables/generate/modelDepC
 import { apiErrorText } from '@/utils/apiError'
 import type { IconName } from '@/config/icon-codepoints'
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-/** Default input/ subfolder for each CN type */
 const CN_SUBFOLDERS: Record<string, string> = {
   pose: 'openpose',
   canny: 'canny',
   depth: 'depth',
 }
 
-/** Map CN type → i18n ref label key */
 const CN_REF_KEYS: Record<string, string> = {
   pose: 'generate.controlnet.ref_pose',
   canny: 'generate.controlnet.ref_canny',
   depth: 'generate.controlnet.ref_depth',
 }
 
-/** Map CN type → i18n strength help key */
 const CN_STRENGTH_HELP_KEYS: Record<string, string> = {
   pose: 'generate.controlnet.strength_help_pose',
   canny: 'generate.controlnet.strength_help_canny',
   depth: 'generate.controlnet.strength_help_depth',
 }
 
-/** i18n key for the CN type display name (骨骼图 / 边缘图 / 深度图) */
 export const CN_LABEL_KEYS: Record<string, string> = {
   pose: 'generate.controlnet.bone_map',
   canny: 'generate.controlnet.edge_map',
   depth: 'generate.controlnet.depth_map',
 }
-
-// ── Preprocess param definitions ───────────────────
 
 export interface PPParamDef {
   key: string
@@ -95,54 +87,32 @@ export const PP_PARAMS_DEF: Record<CnType, PPTypeDef> = {
   },
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export type CnType = 'pose' | 'canny' | 'depth'
 
 export interface UseControlNetReturn {
-  /** CN type identifier */
   type: CnType
-  /** Default subfolder in input/ for this CN type */
   subfolder: string
-  /** Reactive CN config from store */
   config: ComputedRef<ControlNetState>
-  /** i18n key for the reference image label */
   refLabelKey: string
-  /** i18n key for the strength help tooltip */
   strengthHelpKey: string
 
-  /** Available CN models for this type (from options) */
   models: ComputedRef<string[]>
-  /** Whether any models are available */
   hasModels: ComputedRef<boolean>
 
-  /** Ref image picker (shared composable) */
   picker: ReturnType<typeof useRefImagePicker>
 
-  /** Preprocess status */
   preprocessStatus: Ref<'idle' | 'running' | 'done' | 'error'>
-  /** Preprocess prompt ID (for task registry matching) */
   preprocessPromptId: Ref<string>
-  /** Preprocess timer elapsed (seconds) */
   preprocessElapsed: Ref<number>
 
-  /** Set the CN reference image */
   setImage: (filename: string) => void
-  /** Clear the CN reference image */
   clearImage: () => void
-  /** Handle file upload for reference image */
   handleUpload: (file: File) => Promise<void>
-  /** Handle select from ref image picker */
   handleSelect: (name: string) => void
-  /** Submit preprocessing workflow */
   submitPreprocess: (file: File | string, params?: Record<string, unknown>) => Promise<string | null>
-  /** Handle preprocess completion (called from SSE event routing) */
   onPreprocessDone: (success: boolean, outputFile?: string) => void
-  /** Validate enable toggle — returns true if allowed, false if blocked (with toast) */
   validateEnable: (modelList: string[]) => boolean
 }
-
-// ── Composable ───────────────────────────────────────────────────────────────
 
 /**
  * ControlNet composable — encapsulates all logic for a single CN type.
@@ -170,34 +140,28 @@ export function useControlNet(
   const refLabelKey = CN_REF_KEYS[type] || 'generate.controlnet.ref_image'
   const strengthHelpKey = CN_STRENGTH_HELP_KEYS[type] || ''
 
-  // ── Store config ─────────────────────────────────────────────────────────
-
   const config = computed<ControlNetState>(() => state.value.controlNets[type] as ControlNetState)
 
-  // ── Models ───────────────────────────────────────────────────────────────
   // 三规则过滤 (branch = 当前 tab 的 cnBranch):
   //   1. 已知且属于当前 branch → 列出且排前, 无选中时自动默认第一个;
   //   2. 已知但属于另一 branch → 隐藏;
   //   3. 未知文件 (用户手动安装, 不在 CN_FILE_BRANCH) → 列出, 排在已知兼容项之后。
   // 无 cnBranch (split 系未启用 CN, 或 config.cnBranch 缺省) → 不过滤, 原样返回 (兼容旧行为)。
 
-  /** 原始 (未过滤) 模型列表, 来自后端 options */
   const rawModels = computed<string[]>(() => controlnetModels.value[type] || [])
 
-  /** 按三规则过滤 + 排序后的模型列表 */
   const models = computed<string[]>(() => {
     const branch = branchRef?.value
     if (!branch) return rawModels.value
-    const compat: string[] = []      // 规则 1: 已知 + 兼容 → 排前
-    const unknown: string[] = []     // 规则 3: 未知 → 排后
+    const compat: string[] = []
+    const unknown: string[] = []
     for (const name of rawModels.value) {
       const fileBranch = cnBranchForFile(name)
       if (fileBranch === null) {
-        unknown.push(name)            // 规则 3
+        unknown.push(name)
       } else if (fileBranch === branch) {
-        compat.push(name)             // 规则 1
+        compat.push(name)
       }
-      // 规则 2: fileBranch !== branch → 隐藏 (跳过)
     }
     return [...compat, ...unknown]
   })
@@ -215,8 +179,6 @@ export function useControlNet(
       config.value.model = list[0]!
     }
   }, { immediate: true })
-
-  // ── Ref image picker ─────────────────────────────────────────────────────
 
   const picker = useRefImagePicker(type, subfolder)
 
@@ -241,8 +203,6 @@ export function useControlNet(
     setImage(name)
     picker.close()
   }
-
-  // ── Preprocessing ────────────────────────────────────────────────────────
 
   const preprocessStatus = ref<'idle' | 'running' | 'done' | 'error'>('idle')
   const preprocessPromptId = ref('')
@@ -337,8 +297,6 @@ export function useControlNet(
     preprocessPromptId.value = ''
     preprocessOutputFile.value = ''
   }
-
-  // ── Validation for enable toggle ─────────────────────────────────────────
 
   function validateEnable(modelList: string[]): boolean {
     if (modelList.length === 0) {

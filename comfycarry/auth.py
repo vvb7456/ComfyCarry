@@ -1,7 +1,3 @@
-"""
-ComfyCarry — 认证模块 (Login/Logout + check_auth 中间件)
-"""
-
 import logging
 
 from flask import Blueprint, request, jsonify, redirect, session
@@ -70,8 +66,6 @@ def logout():
 
 
 def register_auth_middleware(app):
-    """注册全局认证中间件到 Flask app"""
-
     # Setup 阶段额外放行的精确路由 (集中维护)
     _SETUP_OPEN_ROUTES = {
         "/api/settings/import-config",    # 配置导入
@@ -107,7 +101,6 @@ def register_auth_middleware(app):
 
     @app.before_request
     def check_auth():
-        """全局鉴权与 Setup Wizard 路由"""
         # Setup 相关路由: 部署未完成时全部放行 (此时还没有密码);
         # 已完成则把写/触发类路由交回正常鉴权, 只读的继续放行。
         if request.path.startswith("/api/setup/") or request.path == "/setup":

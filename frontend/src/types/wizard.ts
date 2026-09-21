@@ -1,7 +1,5 @@
 import type { SyncTemplate as SyncTemplateBase, ApiOkResponse } from './sync'
 
-// ── GPU & Image ──────────────────────────────────────────────
-
 export interface GpuInfo {
   name: string
   cuda_cap: string
@@ -15,8 +13,6 @@ export interface PrebuiltInfo {
   fa2: boolean
   build_date: string
 }
-
-// ── Wizard Config (submitted to POST /api/setup/deploy) ─────
 
 /**
  * 向导同步规则项 (wizard_sync_rules) —— 仅预设形态:
@@ -87,23 +83,18 @@ export interface WizardConfig {
   ssh_pw_follow?: boolean
 }
 
-// ── Plugins ──────────────────────────────────────────────────
-
 export interface PluginInfo {
   url: string
   name: string
   required?: boolean
 }
 
-// ── Sync Templates (from backend SYNC_RULE_TEMPLATES) ───────
 // 与 sync 页共用同一份定义 (types/sync.ts)。预设 = 一组子规则,
 // 向导侧的模板来自后端常量, entries 必有值, 在此收窄为必填。
 
 export type SyncTemplate = Required<
   Pick<SyncTemplateBase, 'id' | 'name' | 'direction' | 'entries'>
 > & Pick<SyncTemplateBase, 'name_key' | 'desc_key'>
-
-// ── Remote Type Definitions (from backend REMOTE_TYPE_DEFS) ─
 
 export interface RemoteFieldDef {
   key: string
@@ -122,8 +113,6 @@ export interface RemoteTypeDef {
   fields: RemoteFieldDef[]
 }
 
-// ── LLM ──────────────────────────────────────────────────────
-
 export interface LlmProvider {
   id: string
   name: string
@@ -133,8 +122,6 @@ export interface LlmModel {
   id: string
   name?: string
 }
-
-// ── Deploy SSE Events ────────────────────────────────────────
 
 export interface DeployStep {
   name: string
@@ -164,8 +151,6 @@ export interface DeployStepEvent {
 }
 
 export type DeploySSEEvent = DeployDoneEvent | DeployLogEvent | DeployStepEvent
-
-// ── Setup State (GET /api/setup/state response) ─────────────
 
 export type DetectedImageType = 'prebuilt' | 'unsupported' | 'unsupported-gpu' | 'no-gpu'
 

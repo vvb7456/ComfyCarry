@@ -35,7 +35,6 @@ function createDefaultConfig(): WizardConfig {
   }
 }
 
-// ── Singleton state (shared across all wizard components) ────
 let _initialized = false
 const config = reactive<WizardConfig>(createDefaultConfig())
 const currentStep = ref(0)
@@ -55,8 +54,6 @@ const initLoading = ref(true)
 export function useWizardState() {
   const { t } = useI18n({ useScope: 'global' })
 
-  // ── Computed ────────────────────────────────────────────────
-
   const isUnsupported = computed(() =>
     detectedImageType.value === 'unsupported' ||
     detectedImageType.value === 'unsupported-gpu' ||
@@ -75,10 +72,8 @@ export function useWizardState() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const state: SetupState = await res.json()
 
-      // Env vars
       envVars.value = state.env_vars || {}
 
-      // GPU detection
       const gpu = state.gpu_info
       gpuInfo.value = gpu || null
       prebuiltInfo.value = state.prebuilt_info || null
@@ -113,21 +108,17 @@ export function useWizardState() {
         detectedImageType.value = 'no-gpu'
       }
 
-      // Template data
       pluginData.value = state.plugins_available || []
       syncTemplates.value = state.sync_templates || []
       remoteTypeDefs.value = state.remote_type_defs || {}
 
-      // Active tunnel
       activeTunnelMode.value = state.active_tunnel_mode || ''
       activeTunnelUrls.value = state.active_tunnel_urls || {}
 
-      // Default plugins
       // 注意: state 里的 wizard_remotes / wizard_sync_rules 等部署快照字段
       // 不回填 —— 会话外无草稿, 仅在部署中/失败恢复快照时灌入 (_applyDeployPlan)
       config.plugins = state.plugins || pluginData.value.map(p => p.url)
 
-      // ── Env var pre-fill ────────────────────────────────
       const ev = envVars.value
       if (ev.password) config.password = ev.password
       if (ev.cf_api_token) config.cf_api_token = ev.cf_api_token
@@ -186,15 +177,11 @@ export function useWizardState() {
     }
   }
 
-  // ── Step Navigation ────────────────────────────────────────
-
   function nextStep() {
-    // Step 1: password validation
     if (currentStep.value === 1) {
       if (!config.password) return false
     }
 
-    // Import mode: step 0 → last step
     if (currentStep.value === 0 && importedConfig.value) {
       currentStep.value = TOTAL_STEPS - 1
       return true
@@ -219,7 +206,6 @@ export function useWizardState() {
   }
 
   function prevStep() {
-    // Import mode: from last step back to step 0
     if (currentStep.value === TOTAL_STEPS - 1 && importedConfig.value) {
       currentStep.value = 0
       return true
@@ -247,8 +233,6 @@ export function useWizardState() {
     }
   }
 
-  // ── Import config from file ────────────────────────────────
-
   async function handleImportFile(file: File): Promise<{ ok: boolean; message: string }> {
     try {
       const text = await file.text()
@@ -261,7 +245,6 @@ export function useWizardState() {
       // Store raw import data — will be applied to backend at deploy time
       importedConfig.value = parsed
 
-      // Apply parsed values to local wizard config
       let appliedCount = 0
       if (parsed.password) { config.password = parsed.password; appliedCount++ }
       if (parsed.cf_api_token) { config.cf_api_token = parsed.cf_api_token; appliedCount++ }
@@ -309,8 +292,6 @@ export function useWizardState() {
     }
   }
 
-  // ── Mode selection (step 0) ────────────────────────────────
-
   function selectMode(mode: 'fresh' | 'import') {
     if (mode === 'fresh') {
       importedConfig.value = null
@@ -319,7 +300,6 @@ export function useWizardState() {
       // 跨步骤状态 —— 不显式清掉的话, 上一轮的表单残留会漏进 Step 3/4
       resetRcloneState()
 
-      // Reset config to defaults, then re-apply env var pre-fills
       const defaults = createDefaultConfig()
       Object.assign(config, defaults)
 
