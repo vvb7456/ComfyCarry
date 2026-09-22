@@ -292,7 +292,8 @@ def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
     # CivitAI links are deterministic and therefore available even when the
     # resolver did not include a pre-built links list.
     if source_type == "civitai" and model_id not in (None, ""):
-        model_url = f"https://civitai.com/models/{model_id}"
+        # 回链统一走 .red (全模型库, .com 是 NSFW 过滤视图)
+        model_url = f"https://civitai.red/models/{model_id}"
         if version_id not in (None, ""):
             model_url += f"?modelVersionId={version_id}"
         existing_urls = {link["url"] for link in links}

@@ -1,6 +1,7 @@
 import type { ModelMeta, ModelMetaImage } from '@/types/models'
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
 import { localizedText, type LocalizedText } from '@/config/huggingface-models'
+import { civitaiModelUrl } from '@/utils/constants'
 import i18n from '@/i18n/vue-i18n'
 
 const CIVITAI_CDN = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/'
@@ -79,7 +80,7 @@ export function remoteHitToMeta(h: CivitaiHit, opts?: RemoteMetaOptions): ModelM
     meta.sizeBytes = hfVersion?.file?.sizeBytes
     meta.filename = hfVersion?.file?.filename
   } else {
-    meta.civitaiUrl = `https://civitai.com/models/${h.id}`
+    meta.civitaiUrl = civitaiModelUrl(h.id)
   }
   return meta
 }

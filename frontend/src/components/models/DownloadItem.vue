@@ -8,7 +8,7 @@ import StatusDot from '@/components/ui/StatusDot.vue'
 import DownloadButton from '@/components/models/DownloadButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
-import { modelCategoryColor, modelCategoryLabel } from '@/utils/constants'
+import { modelCategoryColor, modelCategoryLabel, civitaiModelUrl } from '@/utils/constants'
 import { fmtBytes, fmtSpeed } from '@/utils/format'
 
 defineOptions({ name: 'DownloadItem' })
@@ -67,7 +67,7 @@ const civitaiUrl = computed(() => {
   const id = props.favoriteItem?.modelId || props.task?.meta?.model_id
   // 负整数 ID 为 HF 白名单模型, 无 CivitAI 页面, 隐藏链接 (SPEC §4-E)
   if (!id || Number(id) < 0) return ''
-  return `https://civitai.com/models/${id}`
+  return civitaiModelUrl(id)
 })
 
 const favoriteKey = computed(() => {

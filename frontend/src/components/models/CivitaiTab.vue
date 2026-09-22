@@ -18,6 +18,7 @@ import FavoriteVersionModal from '@/components/models/FavoriteVersionModal.vue'
 import type { ModelMeta } from '@/types/models'
 import type { CivitaiHit } from '@/composables/useCivitaiSearch'
 import { remoteHitToMeta } from '@/utils/remote-model-meta'
+import { isCivitaiIdQuery } from '@/utils/constants'
 
 defineOptions({ name: 'CivitaiTab' })
 
@@ -102,14 +103,7 @@ const sortOptions = computed(() => [
   { value: 'Newest', label: t('models.civitai.sort.newest') },
 ])
 
-function isExactQuery(text: string): boolean {
-  const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
-  return parts.length > 0 && parts.every(p =>
-    /^\d+$/.test(p.trim()) || /civitai\.com\/models\/\d+/.test(p.trim()),
-  )
-}
-
-const exactQuery = computed(() => isExactQuery(queryInput.value.trim()))
+const exactQuery = computed(() => isCivitaiIdQuery(queryInput.value.trim()))
 
 function handleSearch(query: string) {
   queryInput.value = query

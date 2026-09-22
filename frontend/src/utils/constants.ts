@@ -1,5 +1,23 @@
 export const CIVITAI_API_BASE = 'https://civitai.com/api/v1'
 
+/** CivitAI 模型页链接 (2026-04 域名拆分后 .red 是完整库, .com 仅 SFW)。
+ *  组1=模型 ID, 组2=可选 modelVersionId。 */
+export const CIVITAI_URL_RE = /civitai\.(?:com|red)\/models\/(\d+)(?:.*[?&]modelVersionId=(\d+))?/
+
+/** 是否纯 ID/URL 查询: 每段都是纯数字或模型页链接 */
+export function isCivitaiIdQuery(text: string): boolean {
+  const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
+  return parts.length > 0 && parts.every(p =>
+    /^\d+$/.test(p.trim()) || CIVITAI_URL_RE.test(p.trim()),
+  )
+}
+
+/** 模型页回链统一走 .red (全模型库, .com 是 NSFW 过滤视图) */
+export function civitaiModelUrl(modelId: number | string, versionId?: number | string): string {
+  const base = `https://civitai.red/models/${modelId}`
+  return versionId ? `${base}?modelVersionId=${versionId}` : base
+}
+
 /**
  * 模型类别 badge 的单一事实源。
  *

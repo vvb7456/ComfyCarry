@@ -7,6 +7,7 @@ import { useToast } from '@/composables/useToast'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useDownloads, type FavoriteItem } from '@/composables/useDownloads'
 import type { CivitaiApiModel } from '@/composables/useCivitaiSearch'
+import { CIVITAI_URL_RE } from '@/utils/constants'
 
 defineOptions({ name: 'BatchAddModal' })
 
@@ -27,7 +28,6 @@ const { addFavorite } = useDownloads()
 const inputText = ref('')
 const loading = ref(false)
 
-const CIVITAI_URL_RE = /civitai\.com\/models\/(\d+)(?:.*[?&]modelVersionId=(\d+))?/
 const ID_RE = /^\d+$/
 
 interface ParsedId {
@@ -115,7 +115,7 @@ async function submit() {
     <ul class="bam-examples">
       <li><code>12345</code></li>
       <li><code>https://civitai.com/models/12345</code></li>
-      <li><code>https://civitai.com/models/12345?modelVersionId=67890</code></li>
+      <li><code>https://civitai.red/models/12345?modelVersionId=67890</code></li>
     </ul>
     <textarea
       v-model="inputText"

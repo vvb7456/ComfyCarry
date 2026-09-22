@@ -110,7 +110,8 @@ def parse_civitai_input(input_str: str) -> dict:
     except Exception:
         raise ValueError(f"无法解析输入: {text}")
 
-    if parsed.hostname and "civitai.com" not in parsed.hostname:
+    # 2026-04 拆分双域名: .com 仅 SFW, .red 是完整库 (含 NSFW)
+    if parsed.hostname and not re.search(r"civitai\.(com|red)$", parsed.hostname):
         raise ValueError(f"不是 CivitAI 链接: {parsed.hostname}")
 
     path = parsed.path.rstrip("/")
@@ -757,7 +758,7 @@ def resolve_civitai_download(
     if pending:
         mid = info.get("model_id")
         vid_ = info.get("version_id")
-        civitai_url = f"https://civitai.com/models/{mid}" if mid else ""
+        civitai_url = f"https://civitai.red/models/{mid}" if mid else ""
         if civitai_url and vid_:
             civitai_url += f"?modelVersionId={vid_}"
         return {

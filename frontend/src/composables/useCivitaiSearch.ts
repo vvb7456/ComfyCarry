@@ -1,6 +1,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { useApiFetch } from './useApiFetch'
 import { errorMessage } from '@/utils/errorMessage'
+import { CIVITAI_URL_RE, isCivitaiIdQuery } from '@/utils/constants'
 
 export interface CivitaiImage {
   url: string
@@ -76,14 +77,6 @@ const ATTRIBUTES_TO_RETRIEVE = [
   'lastVersionAtUnix', 'user', 'nsfwLevel', 'availability',
 ]
 
-function isIdQuery(text: string): boolean {
-  const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
-  if (parts.length === 0) return false
-  return parts.every(p =>
-    /^\d+$/.test(p.trim()) || /civitai\.com\/models\/\d+/.test(p.trim()),
-  )
-}
-
 function parseIds(text: string): Array<{ id: number; versionId?: number }> {
   const parts = text.split(/[,\s\n]+/).filter(p => p.trim())
   const seen = new Set<string>()
@@ -94,7 +87,7 @@ function parseIds(text: string): Array<{ id: number; versionId?: number }> {
     let id: number | undefined
     let versionId: number | undefined
 
-    const urlMatch = p.match(/civitai\.com\/models\/(\d+)/)
+    const urlMatch = p.match(CIVITAI_URL_RE)
     if (urlMatch) {
       id = Number(urlMatch[1])
       const vMatch = p.match(/[?&]modelVersionId=(\d+)/)
@@ -387,7 +380,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     lastQuery.value = q
 
     try {
-      if (q && isIdQuery(q)) {
+      if (q && isCivitaiIdQuery(q)) {
         await lookupByIds(q)
       } else {
         await searchMeili(q, 0, false)
@@ -402,7 +395,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
 
   async function loadMore() {
     if (loading.value || !hasMore.value) return
-    if (lastQuery.value && isIdQuery(lastQuery.value)) return
+    if (lastQuery.value && isCivitaiIdQuery(lastQuery.value)) return
 
     loading.value = true
     const mySearchId = _searchId
