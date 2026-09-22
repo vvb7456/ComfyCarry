@@ -48,6 +48,7 @@
     "progress": "{done}/{total} done",
     "detail": "View details",
     "files_synced": "Synced {count} files",
+    "files_deleted": "Deleted {count} files",
     "waiting": "Waiting",
     "cancel": "Cancel task",
     "interrupt": "Interrupt task",

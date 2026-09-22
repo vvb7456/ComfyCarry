@@ -161,6 +161,12 @@ def get_jobs_page(*, page: int = 1, limit: int = 5,
     return [_row_to_dict(r) for r in rows], total, page
 
 
+def delete_job(job_id: str) -> None:
+    """删除 job 及其事件。watch 空跑 (零传输) 的任务不留档用。"""
+    db.execute("DELETE FROM sync_job_events WHERE job_id = ?", (job_id,))
+    db.execute("DELETE FROM sync_jobs WHERE job_id = ?", (job_id,))
+
+
 def delete_old_jobs(max_age_seconds: int = 7 * 86400) -> int:
     cutoff = time.time() - max_age_seconds
     # 先删 events

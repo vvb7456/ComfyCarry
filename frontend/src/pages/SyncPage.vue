@@ -43,6 +43,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import UsageBar from '@/components/ui/UsageBar.vue'
 import AddStorageModal from '@/components/sync/AddStorageModal.vue'
 import AddRuleModal from '@/components/sync/AddRuleModal.vue'
@@ -94,6 +95,8 @@ const remoteTypes = ref<Record<string, RemoteTypeDef>>({})
 const rules = ref<SyncRule[]>([])
 const templates = ref<SyncTemplate[]>([])
 const ruleIsRunning = ref(false)
+/** 首载门: 页面数据未就绪前只显示 spinner; 失败靠轮询自愈, 不做失败终态 */
+const pageDataReady = ref(false)
 
 const addStorageModalOpen = ref(false)
 const reconnectPreset = ref<{ type?: string; name?: string; root_dir?: string; bucket?: string } | undefined>()
@@ -184,6 +187,7 @@ onUnmounted(() => {
 async function loadSyncPage() {
   await Promise.all([loadRemotes(), loadSyncStatus()])
   await loadHeroJob()
+  pageDataReady.value = true
 }
 
 async function loadRemotes() {
@@ -572,12 +576,6 @@ function jobDirClass(job: SyncJob): string {
   return ''
 }
 
-function jobTitle(job: SyncJob): string {
-  // 排队中/执行中文件数还是 0, 显示规则摘要更有意义
-  if (job.status === 'queued' || job.status === 'running') return jobRulesFact(job)
-  return t('sync.records.files_synced', { count: job.files_synced })
-}
-
 function jobRulesFact(job: SyncJob): string {
   const rules = job.rules ?? []
   if (rules.length === 1) return rules[0]?.name || rules[0]?.id || ''
@@ -590,6 +588,17 @@ function jobTransfers(job: SyncJob): string {
   }
   if (job.summary?.bytes) return fmtBytes(job.summary.bytes)
   return ''
+}
+
+/** 完成记录的传输事实: 文件数 + 体积 (无体积时仅文件数); 删除场景单独表述 */
+function jobFileSynced(job: SyncJob): string {
+  const deletes = job.summary?.deletes ?? 0
+  if (deletes > 0 && !job.summary?.transfers) {
+    return t('sync.records.files_deleted', { count: deletes })
+  }
+  const bytes = job.summary?.bytes ? fmtBytes(job.summary.bytes) : ''
+  const files = t('sync.records.files_synced', { count: job.files_synced })
+  return [files, bytes].filter(Boolean).join(' · ')
 }
 
 function fmtJobTime(epoch: number): string {
@@ -608,7 +617,7 @@ function jobFacts(job: SyncJob): string[] {
   if (job.status === 'running') {
     return [fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
   }
-  return [jobRulesFact(job), fmtJobTime(job.started_at), jobTransfers(job)].filter(Boolean)
+  return [fmtJobTime(job.started_at), jobFileSynced(job)].filter(Boolean)
 }
 
 function fmtRelative(epoch: number) {
@@ -714,7 +723,9 @@ function switchTab(tab: string) {
     </PageHeaderRow>
 
     <div class="page-col">
-      <div v-if="activeTab === 'sync'" :id="panelId('sync')" role="tabpanel" :aria-labelledby="tabId('sync')" class="tab-panel">
+      <LoadingCenter v-if="!pageDataReady" style="padding:60px 0" />
+
+      <div v-else-if="activeTab === 'sync'" :id="panelId('sync')" role="tabpanel" :aria-labelledby="tabId('sync')" class="tab-panel">
         <ServiceHero
           icon="cloud_sync"
           :title="heroTitle"
@@ -904,7 +915,7 @@ function switchTab(tab: string) {
             <ListRow
               v-for="job in syncJobs"
               :key="job.job_id"
-              :title="jobTitle(job)"
+              :title="jobRulesFact(job)"
               :status="{ tone: statusTone(job.status), text: statusText(job.status) }"
               :facts="jobFacts(job)"
             >

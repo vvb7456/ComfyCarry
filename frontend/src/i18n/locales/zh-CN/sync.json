@@ -48,6 +48,7 @@
     "progress": "已完成 {done}/{total}",
     "detail": "查看详情",
     "files_synced": "已同步 {count} 个文件",
+    "files_deleted": "已删除 {count} 个文件",
     "waiting": "等待执行",
     "cancel": "取消任务",
     "interrupt": "中断任务",

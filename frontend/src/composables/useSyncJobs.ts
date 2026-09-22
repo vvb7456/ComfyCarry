@@ -17,6 +17,7 @@ export interface SyncJobSummary {
   bytes?: number          // total bytes transferred
   speed?: number          // average speed (bytes/s)
   transfers?: number      // total file transfers
+  deletes?: number        // deleted file count (rclone sync mirror)
   files?: string[]        // transferred file names (max 50)
   errors?: number
 }

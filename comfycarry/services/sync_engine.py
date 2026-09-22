@@ -213,6 +213,7 @@ def _parse_rclone_json_logs(stderr_output: str) -> dict:
                 'speed': s.get('speed', 0),           # bytes/s
                 'transfers': s.get('transfers', 0),
                 'total_transfers': s.get('totalTransfers', 0),
+                'deletes': s.get('deletes', 0),
                 'checks': s.get('checks', 0),
                 'errors': s.get('errors', 0),
                 'elapsed': s.get('elapsedTime', 0),
@@ -406,6 +407,7 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
 
         total_bytes = sum(s.get('bytes', 0) for s in all_stats)
         total_transfers = sum(s.get('transfers', 0) for s in all_stats)
+        total_deletes = sum(s.get('deletes', 0) for s in all_stats)
         total_elapsed = sum(s.get('elapsed', 0) for s in all_stats)
         all_files: list[str] = []
         for s in all_stats:
@@ -416,6 +418,7 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
             'bytes': total_bytes,
             'speed': avg_speed,
             'transfers': total_transfers,
+            'deletes': total_deletes,
             'files': all_files[:50],     # 最多保存 50 个文件名
             'errors': sum(s.get('errors', 0) for s in all_stats),
         }
@@ -434,13 +437,22 @@ def run_rules_as_job(rules: list[dict], trigger_type: str = "manual",
 
         try:
             from . import sync_store as store
-            store.finish_job(
-                job_id, status=status,
-                success_count=success_count,
-                failure_count=failure_count,
-                files_synced=total_transfers,
-                summary=summary,
-            )
+            # watch 空跑 (零传输、零删除且无错误) 的任务没有回看价值, 完成即
+            # 删除, 否则监控规则每轮 tick 都会留一条「0 文件已完成」的噪音记录。
+            # 删除不算空跑: 镜像 sync 清掉远端文件时传输数为 0, 但必须留痕。
+            # 手动/部署触发与失败/中断/部分成功的任务不受影响, 全部留档。
+            if (trigger_type == "watch" and status == "success"
+                    and total_transfers == 0 and total_deletes == 0
+                    and not summary['errors']):
+                store.delete_job(job_id)
+            else:
+                store.finish_job(
+                    job_id, status=status,
+                    success_count=success_count,
+                    failure_count=failure_count,
+                    files_synced=total_transfers,
+                    summary=summary,
+                )
         except Exception as e:
             if _app_logger:
                 _app_logger.warning(f"[sync] finish_job failed: {e}")
@@ -585,7 +597,11 @@ def _sync_worker_tick():
         from . import sync_store as store
         # 已有 watch 任务在排队或执行时本轮不入队, 防止队列无界堆积
         if not store.has_active_watch_job():
-            enqueue_job(runnable, trigger_type="watch")
+            # 一条规则 = 一个任务, 与手动/部署触发一致; 拆开后中断/取消的
+            # 粒度就是单条规则。tick 已按 copy → sync → move 排序, 逐条
+            # 入队经 FIFO 队列后仍保持该顺序。
+            for rule in runnable:
+                enqueue_job([rule], trigger_type="watch")
 
     settings = _load_sync_settings()
     wait = max(settings.get("watch_interval", 60), 5)

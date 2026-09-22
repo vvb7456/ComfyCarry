@@ -43,13 +43,16 @@ async function loadDetail(): Promise<void> {
   events.value = []
   eventsExhausted.value = false
   try {
-    const d = await get<JobDetailResponse>(`/api/sync/jobs/${props.jobId}?after_id=0&limit=${EVENT_BATCH}`)
+    const d = await get<JobDetailResponse>(`/api/sync/jobs/${props.jobId}?after_id=0&limit=${EVENT_BATCH}`, { silent: true })
     if (!d) return
     job.value = d.job
     events.value = d.events || []
     eventsExhausted.value = events.value.length < EVENT_BATCH
   } finally {
     loading.value = false
+    // watch 空跑的任务完成即被后端删除, 详情请求会 404 (d 为 null):
+    // 静默关弹窗, 不停在无内容的加载态上
+    if (!job.value && props.modelValue) emit('update:modelValue', false)
   }
 }
 
