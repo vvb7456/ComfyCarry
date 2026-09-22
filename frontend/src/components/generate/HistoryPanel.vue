@@ -6,6 +6,7 @@ import type { ComfyHistoryItem } from '@/types/comfyui'
 import CollapsibleGroup from '@/components/ui/CollapsibleGroup.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import ImagePreview from '@/components/ui/ImagePreview.vue'
 
@@ -239,8 +240,18 @@ defineExpose({ setupObserver })
       </BaseButton>
     </template>
 
+    <LoadingCenter v-if="!queueStore.historyLoaded && !queueStore.historyFailed && historyItems.length === 0" style="padding:24px 0" />
+
     <EmptyState
-      v-if="historyItems.length === 0"
+      v-else-if="queueStore.historyFailed && historyItems.length === 0"
+      icon="error_outline"
+      :message="t('common.load_failed')"
+    >
+      <BaseButton size="sm" @click="queueStore.loadHistory()">{{ t('common.btn.retry') }}</BaseButton>
+    </EmptyState>
+
+    <EmptyState
+      v-else-if="historyItems.length === 0"
       icon="history"
       :message="t('comfyui.history.no_records')"
     />

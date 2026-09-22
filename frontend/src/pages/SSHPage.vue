@@ -30,7 +30,6 @@ const { confirm } = useConfirm()
 const { copy } = useClipboard()
 
 const status = ref<SSHStatus | null>(null)
-const statusLoading = ref(true)
 const connectCmd = ref<string | null>(null)
 const connectCmdLoading = ref(true)
 const connectCmdState = ref<'loading' | 'tunnel' | 'local' | 'not_running'>('loading')
@@ -68,7 +67,6 @@ async function loadStatus() {
   if (requestedAt < statusAppliedAt) return
   statusAppliedAt = requestedAt
   status.value = data
-  statusLoading.value = false
 }
 
 /** 本机直连命令: 无隧道时按本地容器场景生成, 端口回落 ssh 默认 22。 */
@@ -290,7 +288,7 @@ onUnmounted(() => {
     </PageHeaderRow>
 
     <div class="page-col">
-      <LoadingCenter v-if="statusLoading && !status" style="padding:60px 0" />
+      <LoadingCenter v-if="!status" style="padding:60px 0" />
 
       <template v-else-if="status">
         <ServiceHero

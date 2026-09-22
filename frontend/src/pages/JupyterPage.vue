@@ -47,7 +47,6 @@ const { toast } = useToast()
 const { confirm } = useConfirm()
 
 const status = ref<JupyterStatus | null>(null)
-const statusLoading = ref(true)
 const jupyterUrl = ref('')
 const token = ref('')
 // 进程重启后 Jupyter 会生成新 token; 置脏后持续重取, 直到拿到非空令牌
@@ -103,7 +102,6 @@ async function loadStatus() {
   if (requestedAt < statusAppliedAt) return
   statusAppliedAt = requestedAt
   status.value = data
-  statusLoading.value = false
   // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
   if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
 }
@@ -414,7 +412,7 @@ onUnmounted(() => {
     </PageHeaderRow>
 
     <div class="page-col">
-      <LoadingCenter v-if="statusLoading && !status" style="padding:60px 0" />
+      <LoadingCenter v-if="!status" style="padding:60px 0" />
 
       <template v-else-if="status">
         <ServiceHero
