@@ -97,14 +97,14 @@ RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED && \
 # =============================================================================
 # 5. FlashAttention-2 (预编译 wheel — 全架构: sm80/86/89/90/100/120)
 # =============================================================================
-RUN --mount=type=bind,source=wheels,target=/tmp/wheels,ro \
+RUN --mount=type=bind,source=docker/wheels,target=/tmp/wheels,ro \
     python3.12 -m pip install \
         /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
 
 # =============================================================================
 # 6. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
 # =============================================================================
-COPY wheels/sageattention-2.2.0-cp312-cp312-linux_x86_64_sm*.whl /opt/wheels/sa2/
+COPY docker/wheels/sageattention-2.2.0-cp312-cp312-linux_x86_64_sm*.whl /opt/wheels/sa2/
 
 # =============================================================================
 # 7. 生成 torch 约束文件，防止插件依赖覆盖已验证版本
@@ -217,10 +217,14 @@ open('/opt/.comfycarry-prebuilt','w').write(json.dumps(info, indent=2))"
 # =============================================================================
 # 12. 入口脚本与交互式 Shell 品牌信息
 # =============================================================================
-COPY entrypoint.sh /opt/entrypoint.sh
+COPY comfycarry/services/management_agent.py /opt/comfycarry-management-agent.py
+COPY comfycarry/services/management_agent.py /opt/management_agent.py
+COPY comfycarry/services/usage_collector.py /opt/comfycarry-usage-collector.py
+COPY comfycarry/services/system_monitor.py /opt/system_monitor.py
+COPY docker/entrypoint.sh /opt/entrypoint.sh
 RUN chmod +x /opt/entrypoint.sh
 
-COPY comfycarry-banner.txt /etc/runpod.txt
+COPY docker/comfycarry-banner.txt /etc/runpod.txt
 RUN touch /root/.bashrc && \
     sed -i '/docs\.runpod\.io/d' /root/.bashrc && \
     echo '[ -f /etc/runpod.txt ] && cat /etc/runpod.txt' >> /root/.bashrc

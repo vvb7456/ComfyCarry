@@ -9,17 +9,10 @@
 name: Build & Push Docker Image
 
 on:
-  workflow_dispatch:  # 手动触发
-  push:
-    paths:
-      - "docker/Dockerfile"
-      - "docker/entrypoint.sh"
-      - "docker/comfycarry-banner.txt"
-      - ".github/workflows/docker-build.yml"
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
-  group: docker-production-${{ github.ref }}
+  group: docker-validation-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -88,16 +81,12 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: docker
+          context: .
           file: docker/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-managed-${{ github.sha }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:test-managed-${{ github.sha }}
           # 不生成 attestation/provenance (避免 manifest list 问题)
           provenance: false
           sbom: false
@@ -107,7 +96,5 @@ jobs:
       # ── 验证 ──
       - name: Verify pushed image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal
-          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
-          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-managed-${{ github.sha }}
+          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:test-managed-${{ github.sha }}

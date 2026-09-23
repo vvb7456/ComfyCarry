@@ -25,16 +25,37 @@ mkdir -p /run/sshd
 # ── 环境变量持久化 (SSH session 可见) ──
 env >> /etc/environment 2>/dev/null || true
 
-# ── Bootstrap (可通过 docker run -v bootstrap.sh:/tmp/bootstrap.sh 挂载覆盖) ──
-if [ ! -f /tmp/bootstrap.sh ]; then
-    echo "==> 下载 bootstrap.sh..."
-    wget -qO /tmp/bootstrap.sh \
-        https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh 2>/dev/null || true
+AGENT=/opt/comfycarry-management-agent.py
+report_failure() {
+    echo "启动失败: $1" >> /workspace/setup.log
+    python3 "$AGENT" event --stage FAILED --error-code "$1" --log-file /workspace/setup.log || true
+}
+if python3 "$AGENT" enabled; then
+    python3 "$AGENT" event --stage ENV_INITIALIZING || true
+    pm2 start "$AGENT" --name management-agent --interpreter python3 \
+        --log /workspace/management-agent.log --merge-logs --restart-delay 5000 -- run
+    pm2 start /opt/comfycarry-usage-collector.py --name usage-collector --interpreter python3 \
+        --log /workspace/usage-collector.log --merge-logs --restart-delay 5000
 fi
 
-if [ -f /tmp/bootstrap.sh ]; then
+# ── Bootstrap (可通过 docker run -v bootstrap.sh:/tmp/bootstrap.sh 挂载覆盖) ──
+BOOTSTRAP_ERROR=BOOTSTRAP_UNAVAILABLE
+if [ ! -f /tmp/bootstrap.sh ]; then
+    echo "==> 下载 bootstrap.sh..."
+    if ! wget -q --timeout=30 --tries=2 -O /tmp/bootstrap.sh \
+        https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh 2>> /workspace/setup.log; then
+        rm -f /tmp/bootstrap.sh
+        BOOTSTRAP_ERROR=BOOTSTRAP_DOWNLOAD_FAILED
+    fi
+fi
+
+if [ -s /tmp/bootstrap.sh ]; then
     bash /tmp/bootstrap.sh
+    if [ "$?" -ne 0 ]; then
+        report_failure BOOTSTRAP_FAILED
+    fi
 else
+    report_failure "$BOOTSTRAP_ERROR"
     echo "bootstrap.sh 不可用, 请手动运行:"
     echo "  wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh | bash"
 fi
