@@ -12,7 +12,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-APP_VERSION = "v0.8.3"
+APP_VERSION = "v0.8.4"
 
 # 面板的路径约定: 对外 (UI / 规则数据 / 文件 API) 一律用 "workspace 根相对路径",
 # 即前导 "/" 代表 WORKSPACE_DIR 而非文件系统根。真实绝对路径只在后端内部出现,
