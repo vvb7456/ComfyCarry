@@ -259,7 +259,13 @@
     "not_configured": "未配置",
     "items_set": "已设置 {count} 项",
     "attn": "Attention 加速",
-    "install": "安装"
+    "install": "安装",
+    "favorites": "收藏模型",
+    "prompt_history": "提示词历史",
+    "prompt_settings": "提示词编辑器设置",
+    "civitai_nsfw": "CivitAI 浏览设置",
+    "comfyui_args": "ComfyUI 启动参数",
+    "count_items": "{count} 项"
   },
   "setup": {
     "err": {

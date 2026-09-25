@@ -79,6 +79,48 @@ def clear_favorites() -> int:
     return cursor.rowcount
 
 
+def replace_favorites(favs: list[dict]) -> int:
+    """整体覆盖收藏 (导入语义即覆盖), 保留 created_at, 返回写入条数。"""
+    db.execute("DELETE FROM civitai_favorites")
+    count = 0
+    for fav in favs:
+        if not isinstance(fav, dict):
+            continue
+        try:
+            fav_key = _compute_fav_key(fav)
+            if not str(fav.get("model_id", "")):
+                continue
+            av = fav.get("all_versions")
+            if not isinstance(av, list):
+                av = []
+            created_at = fav.get("created_at")
+            try:
+                created_at = float(created_at)
+            except (TypeError, ValueError):
+                created_at = time.time()
+            db.execute(
+                """INSERT INTO civitai_favorites
+                       (fav_key, model_id, version_id, name, model_type,
+                        image_url, version_name, base_model, all_versions_json,
+                        created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (fav_key,
+                 str(fav.get("model_id", "")),
+                 str(fav.get("version_id", "") or ""),
+                 str(fav.get("name", "") or ""),
+                 str(fav.get("model_type", "") or ""),
+                 str(fav.get("image_url", "") or ""),
+                 str(fav.get("version_name", "") or ""),
+                 str(fav.get("base_model", "") or ""),
+                 json.dumps(av, ensure_ascii=False),
+                 created_at),
+            )
+            count += 1
+        except Exception as e:
+            log.warning("[favorites] replace_favorites 跳过条目: %s", e)
+    return count
+
+
 def bulk_upsert(favs: list[dict]) -> int:
     """批量 upsert, 供前端 localStorage 迁移一次性导入, 返回处理条数。"""
     count = 0

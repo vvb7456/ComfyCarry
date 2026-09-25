@@ -94,13 +94,30 @@ const sections = computed<SummarySection[]>(() => {
   }
   const dm = c.rclone_config_method
 
+  const importRows: SummaryRow[] = props.importedConfig ? [
+    { label: t('wizard.summary.export_time'), value: props.importedConfig._exported_at || t('wizard.summary.unknown'), icon: 'inventory_2', active: true },
+  ] : []
+  if (c._imported_favorites) {
+    importRows.push({ label: t('wizard.summary.favorites'), value: t('wizard.summary.count_items', { count: c._imported_favorites }), active: true })
+  }
+  if (c._imported_history) {
+    importRows.push({ label: t('wizard.summary.prompt_history'), value: t('wizard.summary.count_items', { count: c._imported_history }), active: true })
+  }
+  if (c._imported_prompt_settings) {
+    importRows.push({ label: t('wizard.summary.prompt_settings'), value: t('wizard.summary.configured'), active: true })
+  }
+  if (c._imported_nsfw) {
+    importRows.push({ label: t('wizard.summary.civitai_nsfw'), value: t('wizard.summary.configured'), active: true })
+  }
+  if (c._imported_comfyui_args) {
+    importRows.push({ label: t('wizard.summary.comfyui_args'), value: t('wizard.summary.configured'), active: true })
+  }
+
   const importSection: SummarySection[] = props.importedConfig ? [{
     title: t('wizard.summary.imported'),
-    rows: [
-      { label: t('wizard.summary.export_time'), value: props.importedConfig._exported_at || t('wizard.summary.unknown'), icon: 'inventory_2', active: true },
-    ],
+    rows: importRows,
     accent: true,
-    summaryText: t('wizard.summary.items_set', { count: 1 }),
+    summaryText: t('wizard.summary.items_set', { count: importRows.length }),
   }] : []
 
   const summarySections: SummarySection[] = [

@@ -17,10 +17,12 @@ from ..config import (
     COMFYUI_DIR, WORKSPACE_ROOT,
 )
 from ..utils import _get_api_key
-from ..services.comfyui_params import parse_comfyui_args
+from ..db import db
 from ..services.sync_engine import (
     stop_sync_worker, _save_sync_settings,
 )
+from ..services import favorites_store
+from ..services import prompt_library
 
 log = logging.getLogger(__name__)
 
@@ -196,18 +198,7 @@ def api_settings_export_config():
         except Exception:
             pass
 
-    try:
-        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
-                           capture_output=True, text=True, timeout=5)
-        procs = json.loads(r.stdout or "[]")
-        comfy = next((p for p in procs if p.get("name") == "comfy"), None)
-        if comfy:
-            raw_args = comfy.get("pm2_env", {}).get("args", [])
-            if isinstance(raw_args, str):
-                raw_args = raw_args.split()
-            config["comfyui_params"] = parse_comfyui_args(raw_args)
-    except Exception:
-        pass
+    config["comfyui_args"] = _get_config("comfyui_args", "")
 
     config["cf_api_token"] = _get_config("cf_api_token", "")
     config["cf_domain"] = _get_config("cf_domain", "")
@@ -264,6 +255,11 @@ def api_settings_export_config():
     civitai_nsfw_blur = _get_config("civitai_nsfw_blur", "")
     if civitai_nsfw_blur != "":
         config["civitai_nsfw_blur"] = civitai_nsfw_blur
+
+    if db.table_exists("civitai_favorites"):
+        config["favorites"] = favorites_store.list_favorites()
+    if db.table_exists("prompt_history"):
+        config["prompt_history"] = prompt_library.dump_history()
 
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
@@ -420,9 +416,9 @@ def api_settings_import_config():
     except Exception as e:
         errors.append(f"向导状态: {e}")
 
-    if data.get("comfyui_params"):
+    if data.get("comfyui_args"):
         try:
-            _set_config("comfyui_params", data["comfyui_params"])
+            _set_config("comfyui_args", str(data["comfyui_args"]))
             applied.append("ComfyUI 启动参数 (需重启 ComfyUI 生效)")
         except Exception as e:
             errors.append(f"ComfyUI 参数: {e}")
@@ -433,6 +429,28 @@ def api_settings_import_config():
             applied.append("提示词编辑器设置")
         except Exception as e:
             errors.append(f"提示词编辑器设置: {e}")
+
+    if isinstance(data.get("favorites"), list):
+        try:
+            from .favorites import _normalize_fav
+            items = []
+            for fav in data["favorites"]:
+                if not isinstance(fav, dict):
+                    continue
+                item = _normalize_fav(fav)
+                item["created_at"] = fav.get("created_at")
+                items.append(item)
+            favorites_store.replace_favorites(items)
+            applied.append("收藏模型")
+        except Exception as e:
+            errors.append(f"收藏模型: {e}")
+
+    if isinstance(data.get("prompt_history"), list):
+        try:
+            prompt_library.replace_history(data["prompt_history"])
+            applied.append("提示词历史")
+        except Exception as e:
+            errors.append(f"提示词历史: {e}")
 
     if data.get("civitai_nsfw_level") or data.get("civitai_nsfw_blur") is not None:
         try:

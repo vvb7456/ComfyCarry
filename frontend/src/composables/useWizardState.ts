@@ -285,6 +285,28 @@ export function useWizardState() {
           config.llm_model = provKeys.model || ''
         }
       }
+      // 与设置页导入对齐: 运行时配置与数据类字段不在向导表单中编辑,
+      // 由部署时整份转发给 /api/settings/import-config 落库, 这里只统计与展示。
+      if (parsed.prompt_settings !== undefined) {
+        config._imported_prompt_settings = true
+        appliedCount++
+      }
+      if (parsed.civitai_nsfw_level !== undefined || parsed.civitai_nsfw_blur !== undefined) {
+        config._imported_nsfw = true
+        appliedCount++
+      }
+      if (parsed.comfyui_args) {
+        config._imported_comfyui_args = true
+        appliedCount++
+      }
+      if (Array.isArray(parsed.favorites)) {
+        config._imported_favorites = parsed.favorites.length
+        appliedCount++
+      }
+      if (Array.isArray(parsed.prompt_history)) {
+        config._imported_history = parsed.prompt_history.length
+        appliedCount++
+      }
 
       return { ok: true, message: t('wizard.import.success', { count: appliedCount }) }
     } catch (e: unknown) {

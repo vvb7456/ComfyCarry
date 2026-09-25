@@ -81,6 +81,16 @@ export interface WizardConfig {
   _imported_sync_rules_count?: number
   /** Runtime-only: allow SSH login with the dashboard password (default on) */
   ssh_pw_follow?: boolean
+  /** Runtime-only: 导入文件带提示词编辑器设置 (部署时随整份导入落库) */
+  _imported_prompt_settings?: boolean
+  /** Runtime-only: 导入文件带 CivitAI NSFW 浏览设置 */
+  _imported_nsfw?: boolean
+  /** Runtime-only: 导入文件带 ComfyUI 启动参数 */
+  _imported_comfyui_args?: boolean
+  /** Runtime-only: 导入文件带收藏数 (0 表示不带) */
+  _imported_favorites?: number
+  /** Runtime-only: 导入文件带提示词历史条数 */
+  _imported_history?: number
 }
 
 export interface PluginInfo {

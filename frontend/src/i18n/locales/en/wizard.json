@@ -259,7 +259,13 @@
     "not_configured": "Not Configured",
     "items_set": "Configured {count}",
     "attn": "Attention Acceleration",
-    "install": "Install"
+    "install": "Install",
+    "favorites": "Favorite Models",
+    "prompt_history": "Prompt History",
+    "prompt_settings": "Prompt Editor Settings",
+    "civitai_nsfw": "CivitAI Browsing",
+    "comfyui_args": "ComfyUI Launch Args",
+    "count_items": "{count}"
   },
   "setup": {
     "err": {

@@ -10,8 +10,34 @@ export interface LlmProviderKeys {
   model?: string
 }
 
+/** 收藏模型条目 (civitai_favorites 行, all_versions_json 已反序列化) */
+export interface FavoriteExportItem {
+  fav_key: string
+  model_id: string
+  version_id?: string
+  name?: string
+  model_type?: string
+  image_url?: string
+  version_name?: string
+  base_model?: string
+  all_versions?: Array<{ id: number | string; name?: string; baseModel?: string }>
+  created_at?: number
+}
+
+/** 提示词历史条目 (prompt_history 行, 含软删除标记) */
+export interface PromptHistoryExportItem {
+  id: number
+  positive: string
+  negative: string
+  name: string
+  is_favorite: number
+  created_at: number
+  is_deleted: number
+}
+
 /** 导出的配置文件结构 (_version 缺失即视为非法格式) */
 export interface ExportedConfig {
+  public_tunnel_subdomain?: string
   _version: number
   /** ISO 导出时间 */
   _exported_at?: string
@@ -24,7 +50,8 @@ export interface ExportedConfig {
   disabled_default_plugins?: string[]
   sync_rules?: SyncRule[]
   sync_settings?: Record<string, unknown>
-  comfyui_params?: Record<string, unknown>
+  /** 真正生效的 ComfyUI 启动参数 (--flag value 串) */
+  comfyui_args?: string
   cf_api_token?: string
   cf_domain?: string
   cf_subdomain?: string
@@ -41,6 +68,8 @@ export interface ExportedConfig {
   llm_stream?: boolean
   llm_provider_keys?: Record<string, LlmProviderKeys>
   prompt_settings?: Record<string, unknown>
-  browsing_level?: number
-  blur?: boolean
+  civitai_nsfw_level?: number
+  civitai_nsfw_blur?: boolean
+  favorites?: FavoriteExportItem[]
+  prompt_history?: PromptHistoryExportItem[]
 }

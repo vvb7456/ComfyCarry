@@ -313,3 +313,41 @@ def delete_history_batch(ids: list[int]) -> int:
         tuple(ids),
     )
     return cursor.rowcount
+
+
+def dump_history() -> list[dict]:
+    """导出全部历史记录 (含已删除标记与 id), 供配置导出整体备份。"""
+    rows = db.fetch_all(
+        f"SELECT id, positive, negative, name, is_favorite, created_at, is_deleted "
+        f"FROM {T_HISTORY} ORDER BY id"
+    )
+    return [dict(r) for r in rows]
+
+
+def replace_history(rows: list[dict]) -> int:
+    """整体覆盖历史记录 (导入语义即覆盖), 返回写入条数。"""
+    db.execute(f"DELETE FROM {T_HISTORY}")
+    count = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            raw_id = row.get("id")
+            db.execute(
+                f"INSERT INTO {T_HISTORY} "
+                f"(id, positive, negative, name, is_favorite, created_at, is_deleted) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    int(raw_id) if raw_id else None,
+                    str(row.get("positive", "") or ""),
+                    str(row.get("negative", "") or ""),
+                    str(row.get("name", "") or ""),
+                    1 if row.get("is_favorite") else 0,
+                    int(row.get("created_at") or 0),
+                    1 if row.get("is_deleted") else 0,
+                ),
+            )
+            count += 1
+        except Exception as e:
+            log.warning("[prompt_library] replace_history 跳过条目: %s", e)
+    return count
