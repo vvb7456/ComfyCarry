@@ -187,7 +187,6 @@ async function switchSelectedVersion() {
       :max-list-height="260"
       :disabled="switching"
       searchable
-      teleport
     />
 
     <template #footer>

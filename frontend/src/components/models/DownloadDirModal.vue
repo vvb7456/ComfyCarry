@@ -150,7 +150,6 @@ function onConfirm() {
           :placeholder="t('models.dl_dir.placeholder')"
           :search-placeholder="t('models.dl_dir.search')"
           searchable
-          teleport
           @update:model-value="setChoice(f.filename, $event as string)"
         />
       </div>

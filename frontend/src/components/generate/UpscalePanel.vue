@@ -143,7 +143,6 @@ const sizeHint = computed(() => {
             <BaseSelect
               :model-value="config.mode"
               :options="modeOptions"
-              teleport
               @update:model-value="config.mode = String($event)"
             />
           </div>
@@ -159,7 +158,6 @@ const sizeHint = computed(() => {
               :model-value="config.downscale"
               :options="downscaleOptions"
               :disabled="is4x"
-              teleport
               @update:model-value="config.downscale = String($event)"
             />
           </div>
@@ -208,7 +206,6 @@ const sizeHint = computed(() => {
             <BaseSelect
               :model-value="config.svrModel"
               :options="svrModelOptions"
-              teleport
               @update:model-value="config.svrModel = String($event)"
             />
           </div>
@@ -223,7 +220,6 @@ const sizeHint = computed(() => {
             <BaseSelect
               :model-value="config.svrColorCorrection"
               :options="svrColorOptions"
-              teleport
               @update:model-value="config.svrColorCorrection = String($event)"
             />
           </div>

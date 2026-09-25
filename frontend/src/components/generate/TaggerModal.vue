@@ -163,7 +163,6 @@ function onCopy() {
                   :options="p.key === 'model' ? modelOptions : (p.options || [])"
                   :disabled="p.key === 'model' && modelOptions.length === 0"
                   size="sm"
-                  teleport
                   class="tag-param-row__select"
                   @update:model-value="tagger.paramValues.value[p.key] = String($event)"
                 />

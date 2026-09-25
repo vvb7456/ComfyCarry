@@ -57,7 +57,7 @@ const triggerOptions = computed<SelectOption[]>(() => [
     <div class="rule-fields__row">
       <FormField :label="t('sync.rule.direction')" density="compact">
         <template #default="{ id }">
-          <BaseSelect :id="id" v-model="rule.direction!" :options="directionOptions" teleport />
+          <BaseSelect :id="id" v-model="rule.direction!" :options="directionOptions" />
         </template>
       </FormField>
       <FormField density="compact">
@@ -66,20 +66,20 @@ const triggerOptions = computed<SelectOption[]>(() => [
           <HelpTip :text="t('sync.rule.method_help')" />
         </template>
         <template #default="{ id }">
-          <BaseSelect :id="id" v-model="rule.method!" :options="methodOptions" teleport />
+          <BaseSelect :id="id" v-model="rule.method!" :options="methodOptions" />
         </template>
       </FormField>
     </div>
     <div class="rule-fields__row">
       <FormField :label="t('sync.rule.remote')" density="compact">
         <template #default="{ id }">
-          <BaseSelect v-if="!fixedRemote" :id="id" v-model="rule.remote!" :options="remoteOptions" teleport />
+          <BaseSelect v-if="!fixedRemote" :id="id" v-model="rule.remote!" :options="remoteOptions" />
           <input v-else :id="id" type="text" class="form-input" :value="fixedRemote" disabled>
         </template>
       </FormField>
       <FormField :label="t('sync.rule.trigger')" density="compact">
         <template #default="{ id }">
-          <BaseSelect :id="id" v-model="rule.trigger!" :options="triggerOptions" teleport />
+          <BaseSelect :id="id" v-model="rule.trigger!" :options="triggerOptions" />
         </template>
       </FormField>
     </div>

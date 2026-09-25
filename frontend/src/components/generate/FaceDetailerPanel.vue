@@ -80,7 +80,6 @@ watch(samInstalled, (ok) => {
             :model-value="config.detectionModel"
             :options="detectionOptions"
             :disabled="detectionOptions.length === 0"
-            teleport
             @update:model-value="config.detectionModel = String($event)"
           />
         </div>

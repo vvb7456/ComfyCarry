@@ -849,7 +849,6 @@ defineExpose({
               :options="driveOptions"
               :disabled="drivesLoading || !!drivesError"
               :placeholder="drivesLoading ? t('common.loading') : ''"
-              teleport
             />
             <BaseSelect
               v-else
@@ -858,7 +857,6 @@ defineExpose({
               :options="bucketOptions"
               :disabled="bucketsLoading || !!bucketsError"
               :placeholder="bucketsLoading ? t('common.loading') : t('sync.dir.bucket_placeholder')"
-              teleport
             />
           </template>
         </FormField>
@@ -922,7 +920,6 @@ defineExpose({
             :id="id"
             :model-value="fields[field.key] || ''"
             :options="(field.options || []).map(o => ({ value: o, label: o }))"
-            teleport
             @update:model-value="(v: string | number | boolean) => fields[field.key] = String(v)"
           />
           <SecretInput v-else-if="field.type === 'password'" :id="id" v-model="fields[field.key]" :is-password="true" :placeholder="field.placeholder" />

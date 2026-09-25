@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFloating, autoUpdate, offset, flip, shift } from '@floating-ui/vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import type { IconName } from '@/config/icon-codepoints'
 
@@ -36,6 +37,20 @@ const emit = defineEmits<{
 
 const open = ref(false)
 
+// 菜单 Teleport 到 body + fixed 定位: 内联 absolute 会在滚动容器里撑大
+// 可滚动溢出 (ActionBar 贴近视口底部, 展开即顶出滚动条), 且会被
+// overflow 祖先裁剪; flip 让底部空间不足时自动向上翻。
+const anchorRef = ref<HTMLElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
+
+const { floatingStyles } = useFloating(anchorRef, menuRef, {
+  open,
+  placement: 'bottom-end',
+  strategy: 'fixed',
+  middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+  whileElementsMounted: autoUpdate,
+})
+
 function toggle(e: MouseEvent) {
   e.stopPropagation()
   if (props.disabled || props.loading) return
@@ -56,7 +71,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div class="split-button" :class="[`split-button--${variant}`, { 'split-button--soft': softDisabled }]">
+  <div ref="anchorRef" class="split-button" :class="[`split-button--${variant}`, { 'split-button--soft': softDisabled }]">
     <button
       type="button"
       class="split-button__main"
@@ -81,19 +96,21 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       <MsIcon name="expand_more" size="xs" color="none" />
     </button>
 
-    <div v-if="open" class="split-button__dropdown">
-      <div
-        v-for="opt in options"
-        :key="opt.key"
-        class="split-button__option"
-        :class="{ 'split-button__option--active': opt.active, 'split-button__option--disabled': opt.disabled }"
-        @click="!opt.disabled && select(opt.key)"
-      >
-        <MsIcon v-if="opt.icon" :name="opt.icon" size="sm" color="none" />
-        <span class="split-button__option-label">{{ opt.label }}</span>
-        <MsIcon v-if="opt.active" name="check" color="none" class="split-button__check" />
+    <Teleport to="body">
+      <div v-if="open" ref="menuRef" class="split-button__dropdown" :style="floatingStyles">
+        <div
+          v-for="opt in options"
+          :key="opt.key"
+          class="split-button__option"
+          :class="{ 'split-button__option--active': opt.active, 'split-button__option--disabled': opt.disabled }"
+          @click="!opt.disabled && select(opt.key)"
+        >
+          <MsIcon v-if="opt.icon" :name="opt.icon" size="sm" color="none" />
+          <span class="split-button__option-label">{{ opt.label }}</span>
+          <MsIcon v-if="opt.active" name="check" color="none" class="split-button__check" />
+        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -179,15 +196,13 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 }
 
 .split-button__dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
+  /* 定位由 floatingStyles 内联接管, 这里只保留视觉 */
   background: var(--bg3);
   border: 1px solid var(--bd);
   border-radius: var(--r);
   box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
   min-width: 170px;
-  z-index: 210;
+  z-index: calc(var(--z-float) + 1);
   padding: 4px 0;
 }
 

@@ -118,7 +118,7 @@ function onDocumentPointerDown(event: PointerEvent) {
   if (root.value?.contains(target) || panel.value?.contains(target)) return
   // 豁免: 排序 BaseSelect teleport 到 <body> 的下拉面板,
   // 点击其选项不应触发外层 popover 的 outside-close
-  if (target instanceof Element && target.closest('.base-select__panel--teleported')) return
+  if (target instanceof Element && target.closest('.base-select__panel')) return
   close()
 }
 
@@ -188,7 +188,6 @@ onBeforeUnmount(removeDocumentListeners)
               v-model="draftSort"
               :options="sortOptions"
               size="sm"
-              teleport
             />
           </div>
           <div class="civitai-filter__section">

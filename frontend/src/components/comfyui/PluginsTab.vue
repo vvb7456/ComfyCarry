@@ -275,7 +275,6 @@ function submitGitInstall() {
       :empty-text="t('plugins.version_picker.empty')"
       :max-list-height="260"
       searchable
-      teleport
     />
     <template #footer>
       <BaseButton @click="versionModalOpen = false">{{ t('common.btn.cancel') }}</BaseButton>

@@ -171,7 +171,6 @@ function onSubmit() {
                   :model-value="paramValues[p.key] as number"
                   :options="p.options!.map(o => ({ value: o.value, label: o.label }))"
                   size="sm"
-                  teleport
                   class="pp-param-row__select"
                   @update:model-value="paramValues[p.key] = Number($event)"
                 />

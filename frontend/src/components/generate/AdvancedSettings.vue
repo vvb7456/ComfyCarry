@@ -287,7 +287,6 @@ const vaeOverrideOptions = computed(() => [
             :disabled="disabled"
             searchable
             :search-placeholder="t('generate.basic.search_vae')"
-            teleport
             @update:model-value="state.vaeOverride = String($event)"
           />
         </div>
@@ -306,7 +305,6 @@ const vaeOverrideOptions = computed(() => [
             :disabled="disabled"
             searchable
             :search-placeholder="t('generate.advanced.sampler_search')"
-            teleport
             @update:model-value="state.sampler = String($event)"
           />
         </div>
@@ -321,7 +319,6 @@ const vaeOverrideOptions = computed(() => [
             :disabled="disabled"
             searchable
             :search-placeholder="t('generate.advanced.scheduler_search')"
-            teleport
             @update:model-value="state.scheduler = String($event)"
           />
         </div>

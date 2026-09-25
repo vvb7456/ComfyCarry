@@ -252,7 +252,6 @@ function openModelMeta(hit: CivitaiHit) {
           size="sm"
           fit
           searchable
-          teleport
           :search-placeholder="t('models.huggingface.filter_type')"
         />
         <BaseSelect
@@ -263,7 +262,6 @@ function openModelMeta(hit: CivitaiHit) {
           size="sm"
           fit
           searchable
-          teleport
           :search-placeholder="t('models.huggingface.filter_base_model')"
         />
       </template>

@@ -37,8 +37,6 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   size?: 'default' | 'sm'
   fit?: boolean
-  /** When true, dropdown panel is teleported to body (for use inside overflow containers) */
-  teleport?: boolean
   maxListHeight?: number
   multiple?: boolean
   allText?: string
@@ -55,7 +53,6 @@ const props = withDefaults(defineProps<{
   disabled: false,
   size: 'default',
   fit: false,
-  teleport: false,
   multiple: false,
   allText: '',
   maxTagText: 2,
@@ -98,13 +95,12 @@ function optionDomId(value: SelectValue) {
 }
 
 // ── Floating UI positioning ──────────────────────────────────
-// When teleport is on, use fixed strategy so the panel escapes any
-// overflow:hidden / clipping ancestor. When off, absolute is fine
-// because the panel is a direct child of .base-select (position: relative).
+// 面板恒 Teleport 到 body + fixed 定位: absolute 面板会扩大滚动祖先的
+// 可滚动溢出 (modal body 打开下拉即撑高内容), fixed 从根上消除这一类问题。
 const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
   open,
   placement: 'bottom-start',
-  strategy: props.teleport ? 'fixed' : 'absolute',
+  strategy: 'fixed',
   middleware: [
     offset(4),
     flip({ padding: 8 }),
@@ -114,9 +110,7 @@ const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
       apply({ availableHeight, elements }) {
         const searchH = props.searchable ? 36 : 0
         const availableMax = Math.max(80, availableHeight - searchH)
-        const max = props.maxListHeight == null
-          ? availableMax
-          : Math.min(Math.max(80, props.maxListHeight), availableMax)
+        const max = Math.min(props.maxListHeight ?? 240, availableMax)
         elements.floating.style.setProperty('--bs-list-max', `${max}px`)
       },
     }),
@@ -125,13 +119,10 @@ const { floatingStyles, placement } = useFloating(triggerRef, panelRef, {
 })
 
 /**
- * When teleported to <body>, CSS `min-width: 100%` would resolve against the
- * body (full viewport) instead of the trigger. We must set it inline to match
- * the trigger's actual width. Non-teleported panels use CSS `min-width: 100%`
- * which correctly resolves to the .base-select parent width.
+ * 面板挂在 <body>, CSS `min-width: 100%` 会解析到视口宽 —— 必须内联
+ * 显式设为触发器的实际宽度。
  */
 const panelStyle = computed(() => {
-  if (!props.teleport) return floatingStyles.value
   const tw = triggerRef.value?.offsetWidth
   return {
     ...floatingStyles.value,
@@ -353,12 +344,12 @@ function onClickOutside(e: MouseEvent) {
  * 面板打开期间在 document 上接管键盘。
  *
  * 不能只依赖模板上 `.base-select` 的 @keydown: openPanel() 会把焦点移进面板
- * (searchable → search input, 否则 → list), 而 teleport 模式下面板挂在 <body>,
+ * (searchable → search input, 否则 → list), 而面板挂在 <body>,
  * keydown 的冒泡路径不经过 .base-select —— 方向键/Enter/Esc 会全部失效。
  */
 function onTriggerKeydown(e: KeyboardEvent) {
-  // 打开期间一律走 document 监听 —— 非 teleport 时事件同样会冒泡到
-  // .base-select, 两边都处理会让方向键一次跳两格
+  // 打开期间一律走 document 监听 —— 触发器上的事件同样会冒泡到这里,
+  // 两边都处理会让方向键一次跳两格
   if (open.value) return
   onKeydown(e)
 }
@@ -420,13 +411,12 @@ onBeforeUnmount(() => {
       </button>
       <MsIcon name="expand_more" size="sm" color="var(--t3)" />
     </div>
-    <Teleport to="body" :disabled="!teleport">
+    <Teleport to="body">
       <Transition name="bs-fade">
         <div
           v-if="open"
           ref="panelRef"
           class="base-select__panel"
-          :class="{ 'base-select__panel--teleported': teleport }"
           :style="panelStyle"
           :data-placement="placement"
         >
@@ -570,10 +560,10 @@ onBeforeUnmount(() => {
 .base-select__text--muted { color: var(--t3); opacity: .7; }
 
 /* Position is handled by floatingStyles (inline). Only visual properties here.
-   teleport 模式下本规则与全局块的 .base-select__panel--teleported 同时命中
-   (scoped 属性选择器优先级更高), 层级值必须保持一致 —— 见全局块注释。 */
+   面板 Teleport 到 body 后 data-v 属性仍在, scoped 规则照常命中;
+   z-index 必须压过 BaseModal 遮罩 (1000) 与其他浮层 (--z-float) ——
+   下拉可能嵌在同为 --z-float 的浮层内展开 (如 CivitaiFilterPopover 里的下拉)。 */
 .base-select__panel {
-  min-width: 100%;
   width: max-content;
   background: var(--bg2);
   border: 1px solid var(--bd);
@@ -596,7 +586,7 @@ onBeforeUnmount(() => {
 }
 
 .base-select__list {
-  max-height: 240px;
+  max-height: var(--bs-list-max, 240px);
   overflow-y: auto;
   padding: 4px;
   outline: none;
@@ -668,48 +658,4 @@ onBeforeUnmount(() => {
 /* ── Transition ── */
 .bs-fade-enter-active, .bs-fade-leave-active { transition: opacity .12s; }
 .bs-fade-enter-from, .bs-fade-leave-to { opacity: 0; }
-</style>
-
-<!-- Global styles for teleported panel (escapes scoped context) -->
-<style>
-.base-select__panel--teleported {
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.25);
-  overflow: hidden;
-  /* 面板 teleport 到 body 后与 BaseModal 的遮罩 (z-index 1000) 同层,
-     必须显式抬高 —— scoped 的 .base-select__panel z-index 管不到这里。
-     取 --z-float + 1 (先例 AutoCompleteList): 下拉可能嵌在同为 --z-float 的
-     浮层内展开 (如 CivitaiFilterPopover 面板里的排序下拉), 必须压过宿主浮层。 */
-  z-index: calc(var(--z-float) + 1);
-}
-.base-select__panel--teleported .base-select__list {
-  max-height: var(--bs-list-max, 200px);
-  overflow-y: auto;
-  padding: 4px;
-  outline: none;
-}
-.base-select__panel--teleported .base-select__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: .82rem;
-  color: var(--t1);
-}
-.base-select__panel--teleported .base-select__logo {
-  width: 16px; height: 16px; object-fit: contain; flex-shrink: 0;
-}
-.base-select__panel--teleported .base-select__item:hover,
-.base-select__panel--teleported .base-select__item--hl { background: var(--bg3); }
-.base-select__panel--teleported .base-select__item--sel { color: var(--ac); font-weight: 500; }
-.base-select__panel--teleported .base-select__empty {
-  padding: 12px 10px;
-  text-align: center;
-  color: var(--t3);
-  font-size: .82rem;
-}
 </style>

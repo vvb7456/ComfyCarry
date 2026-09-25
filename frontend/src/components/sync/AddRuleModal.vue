@@ -284,7 +284,6 @@ function onBrowseSelect(path: string) {
             v-model="selectedRemote"
             :options="remoteOptions"
             :placeholder="t('sync.rule.select_storage_ph')"
-            teleport
           />
         </div>
       </div>

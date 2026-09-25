@@ -91,7 +91,6 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
             :options="modelOptions"
             :placeholder="cn.hasModels.value ? t('generate.controlnet.model') : t('generate.controlnet.need_model')"
             :disabled="!cn.hasModels.value"
-            teleport
             @update:model-value="config.model = String($event)"
           />
         </div>

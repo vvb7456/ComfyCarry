@@ -81,7 +81,6 @@ const schedulerOptions = computed(() => options.schedulers.value)
             :disabled="samplerOptions.length === 0"
             searchable
             :search-placeholder="t('generate.advanced.sampler_search')"
-            teleport
             @update:model-value="config.sampler = String($event)"
           />
         </div>
@@ -98,7 +97,6 @@ const schedulerOptions = computed(() => options.schedulers.value)
             :disabled="schedulerOptions.length === 0"
             searchable
             :search-placeholder="t('generate.advanced.scheduler_search')"
-            teleport
             @update:model-value="config.scheduler = String($event)"
           />
         </div>

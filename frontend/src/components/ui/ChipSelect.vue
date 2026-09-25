@@ -253,6 +253,10 @@ function fmt(c: number | string) {
   top: 0;
   left: 0;
   right: 0;
+  /* visibility:hidden 的盒子仍计入祖先滚动溢出 —— 高度归零裁掉,
+     wrap 换行只取决于宽度, offsetTop/offsetWidth 测量不受影响 */
+  height: 0;
+  overflow: hidden;
   visibility: hidden;
   pointer-events: none;
   z-index: -1;
