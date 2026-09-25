@@ -273,7 +273,7 @@ onDeactivated(() => {
 
 const tourSteps = computed<TourStep[]>(() => [
   { title: t('generate.tour.steps.welcome.title'), body: t('generate.tour.steps.welcome.body') },
-  { target: '[data-tour="gen-header"]', placement: 'bottom',
+  { target: '[data-tour="gen-header"], [data-tour="gen-arch"]', placement: 'bottom',
     title: t('generate.tour.steps.task.title'), body: t('generate.tour.steps.task.body') },
   { target: '[data-tour="gen-prompt"]', placement: 'bottom',
     title: t('generate.tour.steps.prompt.title'), body: t('generate.tour.steps.prompt.body') },
@@ -629,7 +629,12 @@ sse.start()
         </div>
 
         <template #sub>
-          <div class="gen-header-controls" :inert="frozen" :class="{ 'gen-header-controls--frozen': frozen }">
+          <div
+            class="gen-header-controls"
+            data-tour="gen-arch"
+            :inert="frozen"
+            :class="{ 'gen-header-controls--frozen': frozen }"
+          >
             <span class="gen-arch-label">{{ t('generate.header.model_label') }}</span>
             <DropdownMenu
               v-model="selectedModelKey"
