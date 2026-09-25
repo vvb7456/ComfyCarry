@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onDeactivated } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloads } from '@/composables/useDownloads'
 import { useConfirm } from '@/composables/useConfirm'
@@ -85,6 +85,12 @@ async function handleClearFavorites() {
     confirmText: t('common.btn.clear'),
   })) clearFav()
 }
+
+// KeepAlive 下离开模型页走 onDeactivated: 抽屉被关闭后, 其内的批量添加弹窗也须
+// 一并关闭, 否则其 body 滚动锁与遮罩会残留在目标页上。
+onDeactivated(() => {
+  batchAddOpen.value = false
+})
 </script>
 
 <template>

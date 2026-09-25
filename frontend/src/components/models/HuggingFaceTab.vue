@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloads } from '@/composables/useDownloads'
@@ -227,6 +227,13 @@ function handlePickerDownload(modelId: string, modelType: string, versionId: num
 function openModelMeta(hit: CivitaiHit) {
   emit('openMeta', remoteHitToMeta(hit, { channel: 'huggingface' }))
 }
+
+// KeepAlive 下离开模型页走 onDeactivated: 关闭本 tab 自己的浮层, 避免其 body
+// 滚动锁在失活时残留、状态被缓存后切回又自动弹出。
+onDeactivated(() => {
+  vpOpen.value = false
+  favOpen.value = false
+})
 </script>
 
 <template>

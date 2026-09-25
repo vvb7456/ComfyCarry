@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onActivated, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLocalModels } from '@/composables/useLocalModels'
 import { useModelActions } from '@/composables/useModelActions'
@@ -60,8 +60,11 @@ const folderOptions = computed(() => [
   ...availableFolders.value.map(f => ({ value: f, label: f })),
 ])
 
-onMounted(() => {
-  loadModels()
+// onActivated: 首次挂载与 KeepAlive 切回本页都会触发。缓存后本组件不再重挂,
+// 只靠 onMounted 会漏; 且本 tab 若在离开时就是激活态, watch(active) 不会变化,
+// 也补不上别处 (生成页依赖条 / 其他 tab 下载) 完成的模型 —— 故此处按 active 重拉。
+onActivated(() => {
+  if (props.active) loadModels()
 })
 
 // 切回本 tab 时重新加载本地模型 —— 其他 tab (HF/Civitai) 下载完成后,

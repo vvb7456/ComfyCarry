@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onDeactivated } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCivitaiSearch, type SortKey } from '@/composables/useCivitaiSearch'
 import { useDownloads } from '@/composables/useDownloads'
@@ -77,6 +77,7 @@ const {
   selectedTypes,
   selectedBaseModels,
   facetsLoaded,
+  blocking,
   search: civitaiSearch,
   loadMore: civitaiLoadMore,
   activate: civitaiActivate,
@@ -111,6 +112,7 @@ function handleSearch(query: string) {
 }
 
 function submitCurrentQuery() {
+  if (blocking.value) return
   const query = queryInput.value.trim()
   if (!sortTouched.value) {
     if (!query) civitaiSort.value = 'Most Downloaded'
@@ -263,6 +265,15 @@ function handlePickerDownload(modelId: string, modelType: string, versionId: num
 function openCivitaiMeta(hit: CivitaiHit) {
   emit('openMeta', remoteHitToMeta(hit))
 }
+
+// KeepAlive 下离开模型页走 onDeactivated 而非 onUnmounted: 关闭本 tab 自己的浮层
+// (设置 / 版本选择 / 收藏版本), 其 body 滚动锁不会在失活时释放, 且状态被缓存后
+// 切回还会重新出现。筛选弹层自身已 watch exactMode/blocked 关闭, 这里不重复。
+onDeactivated(() => {
+  settingsOpen.value = false
+  vpOpen.value = false
+  favOpen.value = false
+})
 </script>
 
 <template>
@@ -289,6 +300,7 @@ function openCivitaiMeta(hit: CivitaiHit) {
           v-model="queryInput"
           :placeholder="t('models.civitai.search_placeholder')"
           :loading="civitaiLoading"
+          :disabled="blocking"
           full
           @search="handleSearch"
         />
@@ -302,6 +314,7 @@ function openCivitaiMeta(hit: CivitaiHit) {
           :sort="civitaiSort"
           :sort-options="sortOptions"
           :disabled="!facetsLoaded"
+          :blocked="blocking"
           :exact-mode="exactQuery"
           @apply="handleFilterApply"
         />

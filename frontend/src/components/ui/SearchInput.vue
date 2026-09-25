@@ -13,10 +13,13 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   loading?: boolean
   full?: boolean
+  /** 锁定搜索入口 (输入框、清空、回车、提交按钮一并禁用) */
+  disabled?: boolean
 }>(), {
   placeholder: '',
   loading: false,
   full: false,
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -26,14 +29,22 @@ const emit = defineEmits<{
 const inputRef = ref<HTMLInputElement>()
 
 function submit() {
+  if (props.disabled) return
   emit('search', model.value.trim())
 }
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') {
     e.preventDefault()
-    submit()
+    if (!props.disabled) submit()
   }
+}
+
+function onClear() {
+  if (props.disabled) return
+  model.value = ''
+  emit('search', '')
+  focus()
 }
 
 function focus() {
@@ -44,13 +55,14 @@ defineExpose({ focus })
 </script>
 
 <template>
-  <div class="search-input" :class="{ 'search-input--full': full }">
+  <div class="search-input" :class="{ 'search-input--full': full, 'search-input--disabled': disabled }">
     <input
       ref="inputRef"
       v-model="model"
       type="text"
       class="search-input__field"
       :placeholder="placeholder || t('common.search_hint')"
+      :disabled="disabled"
       @keydown="onKeydown"
     >
     <button
@@ -58,9 +70,10 @@ defineExpose({ focus })
       v-if="model"
       class="search-input__clear"
       tabindex="-1"
+      :disabled="disabled"
       :aria-label="t('common.btn.clear')"
       :title="t('common.btn.clear')"
-      @click="model = ''; emit('search', ''); focus()"
+      @click="onClear"
     >
       <MsIcon name="close" size="xs" />
     </button>
@@ -73,7 +86,7 @@ defineExpose({ focus })
       class="search-input__submit"
       :aria-label="t('common.btn.search')"
       :title="t('common.btn.search')"
-      :disabled="loading"
+      :disabled="loading || disabled"
       @click="submit"
     >
       <MsIcon v-if="!loading" name="search" />
@@ -121,6 +134,15 @@ defineExpose({ focus })
 
 .search-input__field::placeholder {
   color: var(--t3);
+}
+
+.search-input--disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.search-input--disabled .search-input__field {
+  cursor: not-allowed;
 }
 
 .search-input__clear {

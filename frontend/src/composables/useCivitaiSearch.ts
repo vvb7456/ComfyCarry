@@ -55,6 +55,9 @@ export type SortKey = 'Relevancy' | 'Most Downloaded' | 'Highest Rated' | 'Newes
 
 const PAGE_SIZE = 20
 
+/** 首次空搜索的最长等待; 超时按「已返回」处理并解锁搜索入口, 避免后端卡住时入口被永久封锁 */
+const INITIAL_SEARCH_TIMEOUT_MS = 15000
+
 const SORT_MAP: Record<SortKey, string[]> = {
   'Relevancy': [],
   'Most Downloaded': ['metrics.downloadCount:desc'],
@@ -189,6 +192,17 @@ interface MeiliMultiSearchResponse {
   results?: MeiliSearchResult[]
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number | undefined): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) return promise
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Search timed out')), timeoutMs)
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) },
+    )
+  })
+}
+
 function normalizeMeiliHit(h: MeiliCivitaiHit): CivitaiHit {
   const verImages = h.version?.images
   const hitImages = h.images?.length ? h.images : verImages
@@ -283,6 +297,11 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   let _searchId = 0
   const initialSearchDone = ref(false)
 
+  /** 首次空搜索尚未返回 (成功/失败/超时) 期间为 true, 用于禁用一切搜索入口。
+   *  必须在发起空搜索之前就置位 —— 空搜索要等 facets 加载完, 若等到真正发请求
+   *  才置位, 这段间隔用户发起的搜索会被随后的空搜索覆盖。 */
+  const blocking = ref(false)
+
   const hasMore = computed(() => (page.value + 1) * PAGE_SIZE < totalHits.value)
 
   function buildFilter(): string[] {
@@ -371,7 +390,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     totalHits.value = results.length
   }
 
-  async function search(query: string) {
+  async function search(query: string, opts?: { timeoutMs?: number }) {
     const q = query.trim()
     const mySearchId = ++_searchId
     loading.value = true
@@ -383,7 +402,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
       if (q && isCivitaiIdQuery(q)) {
         await lookupByIds(q)
       } else {
-        await searchMeili(q, 0, false)
+        await withTimeout(searchMeili(q, 0, false), opts?.timeoutMs)
       }
     } catch (e: unknown) {
       errorMsg.value = errorMessage(e) || 'Search failed'
@@ -460,10 +479,20 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
   }
 
   async function activate() {
-    await loadFacets()
-    if (!initialSearchDone.value) {
-      initialSearchDone.value = true
-      await search('')
+    if (initialSearchDone.value) {
+      await loadFacets()
+      return
+    }
+    // 首次进入: 立刻锁住搜索入口 (blocking=true), 直到空搜索返回 (成功/失败/超时)。
+    // 空搜索请求要等 facets 加载完才发出, 必须在此刻置位, 否则这段间隔里用户发起的
+    // 搜索会被随后发出的空搜索覆盖掉。
+    initialSearchDone.value = true
+    blocking.value = true
+    try {
+      await loadFacets()
+      await search('', { timeoutMs: INITIAL_SEARCH_TIMEOUT_MS })
+    } finally {
+      blocking.value = false
     }
   }
 
@@ -481,6 +510,7 @@ export function useCivitaiSearch(sortKey: Ref<SortKey>) {
     hasMore,
     errorMsg,
     lastQuery,
+    blocking,
 
     typeFacets,
     baseModelFacets,

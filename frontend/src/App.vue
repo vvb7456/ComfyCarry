@@ -49,7 +49,7 @@ function onOverlayClick() {
   <main class="content" :class="{ 'sidebar-collapsed': app.sidebarCollapsed }">
     <RouterView v-slot="{ Component, route }">
       <Transition name="page-fade" mode="out-in">
-        <KeepAlive include="GeneratePage">
+        <KeepAlive include="GeneratePage,ModelsPage">
           <component :is="Component" :key="route.name || route.path" />
         </KeepAlive>
       </Transition>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onActivated, onDeactivated, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import TabSwitcher from '@/components/ui/TabSwitcher.vue'
@@ -35,6 +35,9 @@ loadCivitaiSettings()
 const validTabs = new Set(['local', 'huggingface', 'civitai'])
 const initialTab = validTabs.has(route.query.tab as string) ? (route.query.tab as string) : 'local'
 const activeTab = ref(initialTab)
+// 外部跳转 (?tab=&type=) 强制重挂 CivitaiTab 的 key —— 缓存后仅靠 props 变化
+// 不会重跑「首次激活应用预选类型」的那次逻辑 (见 CivitaiTab.initialTypeApplied)。
+const civitaiKey = ref(0)
 const topStack = ref<InstanceType<typeof PageTopStack> | null>(null)
 /* tab/panel id 配对 (TabSwitcher tabIdFor/panelIdFor), 建立 tab ↔ tabpanel 关联 */
 const tabSwitcher = ref<InstanceType<typeof TabSwitcher> | null>(null)
@@ -51,6 +54,18 @@ const civitaiInitialType = computed(() => {
   return typeof v === 'string' && v ? v : ''
 })
 
+// 本页被 KeepAlive 常驻后, 从生成页模型选择器再次跳转 (?tab=civitai&type=) 时
+// 组件不会重新挂载, 必须在 query 变化时手动同步 tab 与预选类型。仅在本页为当前
+// 路由时响应 —— 缓存后本 watch 在离开本页后仍然存活, 否则会误吃别的页面的 query。
+watch(
+  [() => route.query.tab, () => route.query.type],
+  ([tab, type]) => {
+    if (route.name !== 'models') return
+    if (typeof tab === 'string' && validTabs.has(tab)) activeTab.value = tab
+    if (type) civitaiKey.value++
+  },
+)
+
 const {
   tasks: dlTasks,
   activeTasks: dlActiveTasks,
@@ -61,6 +76,8 @@ const {
 } = useDownloads()
 
 const drawerOpen = ref(false)
+// 本页是否处于激活态 (KeepAlive 失活时为 false), 用于门控由 store 驱动的弹窗显隐
+const pageActive = ref(true)
 // 抽屉内容首开才挂载: Drawer 本身常驻 (Teleport), slot 内容首次打开后保留
 const drawerEverOpened = ref(false)
 
@@ -97,9 +114,12 @@ function openDrawer() {
 // 冷启动: 直接刷新落在模型页、而后台已有任务在跑时 store 是空的, badge 会假报 0。
 // 拿一次快照补上 —— /api/downloads/snapshot 很小; 只有快照里确实有活跃任务才
 // 建连接 (startPolling 会拉全量本地模型索引, 空闲时不值得)。同 CivitaiTab 的做法。
+// onActivated (非 onMounted): 本页被 KeepAlive 常驻, 重新进入时也要刷新 badge/状态;
+// 首次挂载 onActivated 同样触发, 初始加载语义不变。
 // 离开本页不 stopPolling: 生成页的依赖状态条共用同一个 store 单例, 断连会让那边
 // 一起瞎; 收尾交给 store 自己的空闲断开。
-onMounted(() => {
+onActivated(() => {
+  pageActive.value = true
   dlRefreshStatus().then(() => {
     if (dlActiveTasks.value.length) dlStartPolling()
   })
@@ -107,9 +127,11 @@ onMounted(() => {
 
 // 后端判不出文件用途时返回 409, store 把载荷放进 pendingClassification。
 // 挂在页面层而非抽屉内 —— 搜索页、收藏面板的下载都走同一条 store 动作。
+// 该弹窗由 store 状态驱动而非本页 ref: 本页不在激活态时即使 store 仍有待裁决载荷,
+// 也不能把弹窗盖在别的页面上 —— 用 pageActive 门控显隐, 切回时原状态继续, 不丢弃。
 const downloads = useDownloadsStore()
 const dirModalOpen = computed({
-  get: () => downloads.pendingClassification !== null,
+  get: () => pageActive.value && downloads.pendingClassification !== null,
   set: (v: boolean) => { if (!v) downloads.cancelClassification() },
 })
 
@@ -140,6 +162,19 @@ function openPreview(images: string[], index = 0) {
 function openPreviewSingle(url: string) {
   openPreview([url], 0)
 }
+
+// KeepAlive 下切走是 onDeactivated 而非 onUnmounted: 关闭本页自己的瞬态浮层
+// (抽屉 / 详情 / 预览弹窗)。BaseModal/Drawer 的 body 滚动锁挂在 deactivate 时不
+// 会释放, 且弹窗状态被缓存后切回还会重新出现 —— 在失活时关掉, 与生成页一致。
+// DownloadDirModal 不在此列: 它由 store.pendingClassification 驱动, 关掉等于丢弃
+// 用户待裁决的下载提交, 切回时仍应从原状态继续。
+onDeactivated(() => {
+  pageActive.value = false
+  drawerOpen.value = false
+  civitaiOpen.value = false
+  localOpen.value = false
+  previewOpen.value = false
+})
 </script>
 
 <template>
@@ -171,7 +206,7 @@ function openPreviewSingle(url: string) {
     </div>
 
     <div v-show="activeTab === 'civitai'" :id="panelId('civitai')" role="tabpanel" :aria-labelledby="tabId('civitai')" class="tab-panel">
-      <CivitaiTab :active="activeTab === 'civitai'" :initial-type="civitaiInitialType" :toolbar-target="topStack?.toolbarTarget" @open-meta="openMeta" @open-preview="openPreviewSingle" />
+      <CivitaiTab :key="civitaiKey" :active="activeTab === 'civitai'" :initial-type="civitaiInitialType" :toolbar-target="topStack?.toolbarTarget" @open-meta="openMeta" @open-preview="openPreviewSingle" />
     </div>
 
     <Drawer

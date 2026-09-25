@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue'
 import ChipSelect, { type ChipOption } from '@/components/ui/ChipSelect.vue'
@@ -17,9 +17,12 @@ const props = withDefaults(defineProps<{
   sort: string
   sortOptions: SelectOption[]
   disabled?: boolean
+  /** 首次空搜索未返回期间锁定: 筛选入口整体禁用, 已打开的弹层关闭, 阻止经「应用」发起搜索 */
+  blocked?: boolean
   exactMode?: boolean
 }>(), {
   disabled: false,
+  blocked: false,
   exactMode: false,
 })
 
@@ -75,7 +78,7 @@ function syncDraft() {
 }
 
 function toggle() {
-  if (props.disabled || props.exactMode) return
+  if (props.disabled || props.blocked || props.exactMode) return
   open.value = !open.value
   if (open.value) {
     syncDraft()
@@ -100,11 +103,13 @@ function close() {
 }
 
 function apply() {
+  if (props.blocked) return
   emit('apply', [...draftTypes.value], [...draftBaseModels.value], draftSort.value)
   close()
 }
 
 function clearFilters() {
+  if (props.blocked) return
   draftTypes.value = []
   draftBaseModels.value = []
   // Clear is an immediate action, but intentionally leaves the popover open
@@ -129,6 +134,10 @@ function onDocumentKeydown(event: KeyboardEvent) {
 
 watch(() => [props.types, props.baseModels, props.sort], syncDraft, { deep: true })
 watch(() => props.exactMode, (exact) => { if (exact) close() })
+watch(() => props.blocked, (blocked) => { if (blocked) close() })
+// KeepAlive 下离开模型页走 onDeactivated: 弹层 teleport 到 body 且挂了全局
+// pointerdown/keydown 监听, 失活时必须关闭并摘掉监听, 否则会残留在目标页上。
+onDeactivated(close)
 onBeforeUnmount(removeDocumentListeners)
 </script>
 
@@ -139,7 +148,7 @@ onBeforeUnmount(removeDocumentListeners)
       type="button"
       class="civitai-filter__trigger"
       :class="{ 'is-active': selectedCount > 0 }"
-      :disabled="disabled || exactMode"
+      :disabled="disabled || blocked || exactMode"
       :title="exactMode ? t('models.civitai.filter_exact_disabled') : triggerLabel"
       :aria-label="exactMode ? t('models.civitai.filter_exact_disabled') : triggerLabel"
       aria-haspopup="dialog"
