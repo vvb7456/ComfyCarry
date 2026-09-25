@@ -814,6 +814,17 @@ def _run_auto_enrich(model_id: int, model_path: str) -> None:
             _auto_enrich_queued.discard(model_id)
 
 
+def _forget_auto_enrich_attempt(model_id: int) -> None:
+    """Allow a changed file to be picked up by the automatic enrich pass again.
+
+    The attempted set is per-process dedup for a stable file.  Once the file
+    bytes change, the previous attempt no longer applies and the model must be
+    eligible for one new automatic lookup.
+    """
+    with _auto_enrich_lock:
+        _auto_enrich_attempted.discard(model_id)
+
+
 def _queue_auto_enrich(model_id: int, model_path: str) -> None:
     with _auto_enrich_lock:
         if model_id in _auto_enrich_attempted or model_id in _auto_enrich_queued:
@@ -882,6 +893,7 @@ def reconcile_model_index() -> dict:
     updated = 0
     removed = 0
     enrich_ids: list[tuple[int, str]] = []
+    rehashed_ids: list[int] = []
     now = time.time()
     with _transaction() as conn:
         if conn is not None:
@@ -907,7 +919,11 @@ def reconcile_model_index() -> dict:
                 architecture = old_arch or "unknown"
             values = {
                 **candidate,
-                "sha256": _text(old_dict.get("sha256")).upper(),
+                # A changed file invalidates the indexed hash: it no longer
+                # describes the bytes on disk.  Clearing it forces the next
+                # enrich to recompute instead of trusting a stale hash that
+                # may have been computed while the file was still being written.
+                "sha256": "" if file_changed else _text(old_dict.get("sha256")).upper(),
                 "display_name": _text(old_dict.get("display_name")) or candidate["filename"],
                 "model_type": _text(old_dict.get("model_type")) or candidate["category"],
                 "architecture": architecture,
@@ -934,6 +950,8 @@ def reconcile_model_index() -> dict:
                 if not changed:
                     continue
                 values["updated_at"] = now
+                if file_changed:
+                    rehashed_ids.append(int(old["id"]))
             columns = tuple(values)
             params = tuple(values[column] for column in columns)
             update = ", ".join(f"{column}=excluded.{column}" for column in columns if column not in {"real_path", "created_at"})
@@ -967,6 +985,9 @@ def reconcile_model_index() -> dict:
                 else:
                     db.execute("DELETE FROM models WHERE id = ?", (model_id,))
             removed = len(stale)
+
+    for model_id in rehashed_ids:
+        _forget_auto_enrich_attempt(model_id)
 
     # One query is enough to find locally indexed models that have never had
     # the automatic metadata attempt. Restrict it to this successful disk scan
