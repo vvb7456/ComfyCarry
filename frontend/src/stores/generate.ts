@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
 import type { ModelTypeConfig } from '@/config/model-types'
 import { MODEL_TYPES } from '@/config/model-types'
+import { redirectToLogin } from '@/composables/useApiFetch'
 
 export interface LoraEntry {
   name: string
@@ -161,9 +162,16 @@ export interface ModelState {
   fast: boolean
 }
 
-const STORAGE_KEY = 'comfycarry_generate_params'
 const SCHEMA_VERSION = 5
 const SAVE_DEBOUNCE_MS = 300
+const SAVE_RETRY_MAX = 5
+
+/** 状态装载结果。failed 时**不得**开启自动保存, 否则会用默认值覆盖服务端。 */
+export type RestoreOutcome = 'applied' | 'empty' | 'failed' | 'incompatible'
+
+export interface RestoreResult {
+  outcome: RestoreOutcome
+}
 
 /** 视频架构的默认视频态: 从 config.videoDefaults 推导。
  *  durationS 默认 5; width/height 取默认档 landscape (优先 720p, 缺失时回退到第一个档位, 如 H3 的 768p);
@@ -454,6 +462,95 @@ export const useGenerateStore = defineStore('generate', () => {
 
   const modelStates = reactive<Record<string, ModelState>>({})
 
+  /**
+   * 各架构下「引用了但本机不存在」的模型名 (架构 → 名字集合)。装载时由 restore
+   * 的校验链记录 —— 引用**保留**, 只在此标记, 由 UI 标明缺失。
+   * 刻意不删除引用: 文件临时不在时用户的配置不该被销毁 (见 restore 内注释)。
+   * 删除是用户的显式选择 (见 pruneMissing)。
+   */
+  const missingModels = reactive<Record<string, Set<string>>>({})
+
+  /** 缺失引用的完整清单 (供缺失 modal 展示): 架构 + 字段 + 名字 */
+  const missingRefs = ref<{ arch: string; field: string; name: string }[]>([])
+
+  function markMissing(arch: string, field: string, name: string) {
+    if (!name) return
+    ;(missingModels[arch] ??= new Set()).add(name)
+    missingRefs.value.push({ arch, field, name })
+  }
+
+  /** 该项目是否缺失 (供面板标警示) */
+  function isMissing(arch: string, name: string): boolean {
+    return missingModels[arch]?.has(name) ?? false
+  }
+
+  /** 用户已换选/删除该项目 → 移除标记 */
+  function clearMissing(arch: string, name: string) {
+    missingModels[arch]?.delete(name)
+    missingRefs.value = missingRefs.value.filter(r => !(r.arch === arch && r.name === name))
+  }
+
+  function resetMissing() {
+    for (const key of Object.keys(missingModels)) delete missingModels[key]
+    missingRefs.value = []
+  }
+
+  /**
+   * 下载完成后按**本机最新清单**复核缺失标记, 清掉已补齐的项。
+   *
+   * missingRefs 是 restore 时的快照; 文件由下载补回后它不会自愈 —— 卡片/
+   * 弹窗会永远停在缺失态。validators 与 restore 装载同一套判据 (磁盘真相)。
+   */
+  function reconcileMissing(validators: {
+    loraExists?: (name: string) => boolean
+    checkpointExists?: (name: string) => boolean
+    unetExists?: (name: string) => boolean
+    controlNetExists?: (type: string, name: string) => boolean
+    seedvr2Exists?: (name: string) => boolean
+    faceDetectionExists?: (name: string) => boolean
+  }) {
+    for (const { arch, field, name } of [...missingRefs.value]) {
+      const exists = field === 'loras' ? validators.loraExists?.(name)
+        : field === 'checkpoint' ? validators.checkpointExists?.(name)
+        : field === 'unet' || field === 'unetHigh' || field === 'unetLow' ? validators.unetExists?.(name)
+        : field.startsWith('controlNets.') ? validators.controlNetExists?.(field.slice('controlNets.'.length, -'.model'.length), name)
+        : field === 'upscale.svrModel' ? validators.seedvr2Exists?.(name)
+        : field === 'faceDetailer.detectionModel' ? validators.faceDetectionExists?.(name)
+        : undefined
+      if (exists) clearMissing(arch, name)
+    }
+  }
+
+  /**
+   * 把缺失引用从状态里剔除, 回到「未选择」语义 (缺失 modal 的「忽略并回退」动作)。
+   *
+   * 这是**用户显式发起**的清理 —— 与 restore 装载时静默删除的区别就在于此:
+   * 系统不替用户销毁配置, 但用户可以选择清理掉跑不了的项。
+   * 只处理被标记为缺失的字段; clip/vae 等的置空逻辑不受影响 (它们不在此清单里)。
+   */
+  function pruneMissing() {
+    for (const { arch, field, name } of missingRefs.value) {
+      const state = modelStates[arch]
+      if (!state) continue
+      if (field === 'loras') {
+        state.loras = state.loras.filter(l => l.name !== name)
+      } else if (field.startsWith('controlNets.') && field.endsWith('.model')) {
+        // 回退 = 清引用: 模块 enabled 状态不动 (与 LoRA 保留条目只标缺失不同,
+        // CN 的模型是必填, 清掉后用户重新选择即可)。
+        const cnType = field.slice('controlNets.'.length, -'.model'.length)
+        const cn = state.controlNets?.[cnType]
+        if (cn && cn.model === name) cn.model = ''
+      } else if (field === 'upscale.svrModel') {
+        if (state.upscale?.svrModel === name) state.upscale.svrModel = ''
+      } else if (field === 'faceDetailer.detectionModel') {
+        if (state.faceDetailer?.detectionModel === name) state.faceDetailer.detectionModel = ''
+      } else if ((state as unknown as Record<string, unknown>)[field] === name) {
+        ;(state as unknown as Record<string, unknown>)[field] = ''
+      }
+    }
+    resetMissing()
+  }
+
   /** 各架构的运行组件是否就绪; undefined = 尚未检查 */
   const componentsReady = reactive<Record<string, boolean | undefined>>({})
   function setComponentsReady(type: string, ready: boolean) {
@@ -482,14 +579,68 @@ export const useGenerateStore = defineStore('generate', () => {
     return modelStates[type] as ModelState
   }
 
-  // ── Auto-save with debounce ──────────────────────────────────────────────
+  // ── 状态持久化 (服务端唯一真相源) ────────────────────────────────────────
+  //
+  // 本地不再保留副本: 页面有 gate 门禁, 后端不可达时本就无法编辑, 因此
+  // 「离线编辑丢失」这一 localStorage 唯一的价值场景不存在。
+
+  const STATE_ENDPOINT = '/api/generate/state'
+  /** 最近一次保存失败原因; null = 无未保存错误 */
+  const saveError = ref<string | null>(null)
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let saveFailures = 0
   let autoSaveEnabled = false
+  // 串行化写入: 并发 PUT 可能乱序到达, 后者覆盖前者就与「后写入覆盖」语义相悖
+  let saving = false
+  let pending = false
+  // 各架构上次成功落盘的快照 (JSON 字符串) —— 用于增量提交, 只发变更的架构。
+  // 服务端按架构合并, 因此「只发改动的架构」才能让多设备分别编辑不同架构时不互相覆盖。
+  let savedStatesJson: Record<string, string> = {}
+
+  function clearTimers() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+  }
+
+  function currentStatesJson(): Record<string, string> {
+    const out: Record<string, string> = {}
+    for (const [key, value] of Object.entries(modelStates)) {
+      out[key] = JSON.stringify(value)
+    }
+    return out
+  }
+
+  /**
+   * 构造增量 envelope: 顶层字段照常带 (指针类字段后写入覆盖即可),
+   * modelStates 只含相对上次落盘有变化的架构。同时返回本次基线快照,
+   * 供成功后更新 savedStatesJson (必须在**请求前**取, 否则请求期间的新改动
+   * 会被误标为已保存)。
+   */
+  function buildEnvelope() {
+    const baseline = currentStatesJson()
+    const changedStates: Record<string, unknown> = {}
+    for (const [key, json] of Object.entries(baseline)) {
+      if (savedStatesJson[key] !== json) changedStates[key] = JSON.parse(json)
+    }
+    return {
+      baseline,
+      top: {
+        _version: SCHEMA_VERSION,
+        activeTask: activeTask.value,
+        activeModelTypeByTask: { ...activeModelTypeByTask },
+        // [向后兼容] 旧读取方读 activeModelType (现在已不存在为字段, 这里写当前任务派生值)
+        activeModelType: activeModelTypeByTask[activeTask.value],
+      },
+      changedStates,
+    }
+  }
+
   function scheduleSave() {
     if (!autoSaveEnabled) return
     if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(save, SAVE_DEBOUNCE_MS)
+    saveTimer = setTimeout(() => { void save() }, SAVE_DEBOUNCE_MS)
   }
 
   function enableAutoSave() {
@@ -522,27 +673,80 @@ export const useGenerateStore = defineStore('generate', () => {
     }
   }
 
-  function save() {
+  /**
+   * 落盘 (PUT 整份覆盖)。失败不静默: 保留失败标记并退避重试,
+   * 期间新变更会重置防抖计时器, 最终仍以最新状态重发。
+   */
+  async function save(): Promise<void> {
+    if (!autoSaveEnabled) return
+    if (saving) { pending = true; return }
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+    const { baseline, top, changedStates } = buildEnvelope()
+    saving = true
     try {
-      const data = {
-        _version: SCHEMA_VERSION,
-        activeTask: activeTask.value,
-        activeModelTypeByTask: { ...activeModelTypeByTask },
-        // [向后兼容] 旧读取方读 activeModelType (现在已不存在为字段, 这里写当前任务派生值)
-        activeModelType: activeModelTypeByTask[activeTask.value],
-        modelStates: JSON.parse(JSON.stringify(modelStates)),
+      const res = await fetch(STATE_ENDPOINT, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...top, modelStates: changedStates }),
+      })
+      if (res.status === 401) { redirectToLogin(); return }
+      // 409 = 服务端已置「需重新装载」守卫 (配置在别处被导入/修改)。停止重试:
+      // 重试只会一直失败, 且此刻内存里的状态已过时, 必须重新装载。
+      if (res.status === 409) {
+        saveError.value = 'reload_required'
+        clearTimers()
+        return
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    } catch { /* ignore quota errors */ }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      saveFailures = 0
+      saveError.value = null
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+      // 只把**本次提交基线**标记为已落盘: 请求期间发生的新改动不在 baseline 里,
+      // 会被下一次 scheduleSave/save 正常再提交。
+      savedStatesJson = baseline
+    } catch (e) {
+      saveFailures++
+      saveError.value = e instanceof Error ? e.message : String(e)
+      if (saveFailures <= SAVE_RETRY_MAX) {
+        const delay = Math.min(1000 * 2 ** (saveFailures - 1), 10000)
+        if (retryTimer) clearTimeout(retryTimer)
+        retryTimer = setTimeout(() => { void save() }, delay)
+      }
+    } finally {
+      saving = false
+      // 保存期间又有变更 → 立即补一次, 保证最终落盘的是最新状态
+      if (pending) { pending = false; void save() }
+    }
   }
 
   /**
-   * Restore from localStorage. Must be called AFTER options are loaded
+   * 离页/隐藏时立即刷一次, 覆盖防抖窗口内的改动。
+   * keepalive 上限约 64KB, 超限时退化为普通请求 (可能被卸载取消, 但不致报错)。
+   */
+  function flushSave() {
+    if (!autoSaveEnabled) return
+    clearTimers()
+    const { top, changedStates } = buildEnvelope()
+    const body = JSON.stringify({ ...top, modelStates: changedStates })
+    const init: RequestInit = {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }
+    if (body.length < 60 * 1024) init.keepalive = true
+    try { void fetch(STATE_ENDPOINT, init).catch(() => {}) } catch { /* ignore */ }
+  }
+
+  /**
+   * 从服务端装载工作区状态。Must be called AFTER options are loaded
    * so that checkpoint/lora/sampler/scheduler can be validated.
+   *
+   * 返回装载结果 —— 失败/版本过新时调用方**不得**开启自动保存, 否则会用
+   * 默认值覆盖服务端既有配置。
    *
    * @param validators Optional validation callbacks to check if a value still exists
    */
-  function restore(validators?: {
+  async function restore(validators?: {
     checkpointExists?: (name: string) => boolean
     loraExists?: (name: string) => boolean
     samplerExists?: (name: string) => boolean
@@ -550,18 +754,43 @@ export const useGenerateStore = defineStore('generate', () => {
     unetExists?: (name: string) => boolean
     clipExists?: (name: string) => boolean
     vaeExists?: (name: string) => boolean
-  }) {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return
-
-      const data = JSON.parse(raw)
-
-      const version = data._version || 1
-      if (version > SCHEMA_VERSION) {
-        localStorage.removeItem(STORAGE_KEY)
-        return
+    controlNetExists?: (type: string, name: string) => boolean
+    seedvr2Exists?: (name: string) => boolean
+    faceDetectionExists?: (name: string) => boolean
+  }): Promise<RestoreResult> {
+    // 每次装载重新计算缺失清单 (旧标记已随上次选择失效)
+    resetMissing()
+    const GET_RETRIES = 3
+    let data: Record<string, unknown> | null = null
+    let ok = false
+    for (let attempt = 0; attempt <= GET_RETRIES; attempt++) {
+      try {
+        const res = await fetch(STATE_ENDPOINT, {
+          headers: { Accept: 'application/json' },
+        })
+        if (res.status === 401) { redirectToLogin(); return { outcome: 'failed' } }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const body = await res.json() as { state?: Record<string, unknown> | null }
+        data = body?.state ?? null
+        ok = true
+        break
+      } catch {
+        // 网络抖动/后端瞬时不可用: 指数退避重试 (对齐 ComfyUI settingStore 的做法),
+        // 用尽后返回 failed, 由调用方提示并保留手动重试入口。
+        if (attempt < GET_RETRIES) {
+          await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** attempt, 8000)))
+        }
       }
+    }
+    if (!ok) return { outcome: 'failed' }
+
+    // 无数据: 首次使用, 保留默认值; 允许后续变更落盘。
+    if (!data) return { outcome: 'empty' }
+
+    try {
+      const version = (data._version as number) || 1
+      // 服务端配置由更新版本保存 → 不套用、不覆盖, 交由调用方提示更新面板。
+      if (version > SCHEMA_VERSION) return { outcome: 'incompatible' }
 
       // ── 任务级架构记忆迁移 ──
       // v2 只有单一 activeModelType; v3 拆 activeModelTypeByTask {image, video}。
@@ -575,7 +804,7 @@ export const useGenerateStore = defineStore('generate', () => {
         activeModelTypeByTask.video = 'wan22_i2v'
         activeTask.value = 'image'
       } else {
-        const saved = data.activeModelTypeByTask
+        const saved = data.activeModelTypeByTask as Record<string, unknown> | undefined
         if (saved && typeof saved === 'object') {
           const img = typeof saved.image === 'string' && MODEL_TYPES[saved.image] ? saved.image : 'sdxl'
           const vid = typeof saved.video === 'string' && MODEL_TYPES[saved.video] ? saved.video : 'wan22_i2v'
@@ -627,17 +856,28 @@ export const useGenerateStore = defineStore('generate', () => {
           }
 
           if (validators) {
+            // ── 缺失引用: 「记录」而非「删除」 ──
+            // 模型文件只是临时不在 (同步未完成 / 用户移走) 时, 用户的配置**不该
+            // 被自动销毁** —— 那会让导入的配置当场失效, 且清了就写回服务端,
+            // 不可恢复。故保留引用并记入 missing, 由 UI 标明缺失、提交时由
+            // validate() 拦住。
+            //
+            // 例外 (刻意保留旧行为):
+            //   · clip/clip2/vae/vaeOverride — 单值主键, 拆分形态另有依赖检查
+            //     (组件状态条) 告知缺件; fallback 到别的模型更糟, 置空是合理提示。
+            //   · sampler/scheduler — 枚举值, ComfyUI 升级后可能消失, 保留会让
+            //     提交必然失败, 回落默认值。
             if (state.checkpoint && validators.checkpointExists && !validators.checkpointExists(state.checkpoint)) {
-              state.checkpoint = ''
+              markMissing(key, 'checkpoint', state.checkpoint)
             }
             if (state.unet && validators.unetExists && !validators.unetExists(state.unet)) {
-              state.unet = ''
+              markMissing(key, 'unet', state.unet)
             }
             if (state.unetHigh && validators.unetExists && !validators.unetExists(state.unetHigh)) {
-              state.unetHigh = ''
+              markMissing(key, 'unetHigh', state.unetHigh)
             }
             if (state.unetLow && validators.unetExists && !validators.unetExists(state.unetLow)) {
-              state.unetLow = ''
+              markMissing(key, 'unetLow', state.unetLow)
             }
             if (state.clip && validators.clipExists && !validators.clipExists(state.clip)) {
               state.clip = ''
@@ -655,8 +895,32 @@ export const useGenerateStore = defineStore('generate', () => {
             if (state.vaeOverride && validators.vaeExists && !validators.vaeExists(state.vaeOverride)) {
               state.vaeOverride = ''
             }
+            // 仅 enabled 的 LoRA 计入缺失: buildPayload 只发 enabled 项, 关闭的
+            // 不阻塞运行, 标出来只会让用户以为配置坏了。
             if (validators.loraExists) {
-              state.loras = state.loras.filter(l => validators.loraExists!(l.name))
+              for (const l of state.loras) {
+                if (l.enabled && !validators.loraExists(l.name)) markMissing(key, 'loras', l.name)
+              }
+            }
+            // ControlNet / SeedVR2 / 面部检测: 只在对应模块 enabled 时校验 ——
+            // 关闭态引用的模型不影响运行, 与 LoRA 同口径。
+            if (state.controlNets && validators.controlNetExists) {
+              for (const cnType of ['pose', 'canny', 'depth']) {
+                const cn = state.controlNets[cnType]
+                if (cn?.enabled && cn.model && !validators.controlNetExists(cnType, cn.model)) {
+                  markMissing(key, `controlNets.${cnType}.model`, cn.model)
+                }
+              }
+            }
+            if (state.upscale?.enabled && state.upscale.engine === 'seedvr2'
+              && state.upscale.svrModel && validators.seedvr2Exists
+              && !validators.seedvr2Exists(state.upscale.svrModel)) {
+              markMissing(key, 'upscale.svrModel', state.upscale.svrModel)
+            }
+            if (state.faceDetailer?.enabled && state.faceDetailer.detectionModel
+              && validators.faceDetectionExists
+              && !validators.faceDetectionExists(state.faceDetailer.detectionModel)) {
+              markMissing(key, 'faceDetailer.detectionModel', state.faceDetailer.detectionModel)
             }
             if (state.sampler && validators.samplerExists && !validators.samplerExists(state.sampler)) {
               const config = MODEL_TYPES[key] ?? MODEL_TYPES.sdxl!
@@ -710,14 +974,23 @@ export const useGenerateStore = defineStore('generate', () => {
           }
         }
       }
-    } catch { /* ignore corrupt data */ }
+      // 以「装载并校验后的实际内存态」为已落盘基线: 校验会清掉不存在的模型/
+      // LoRA, 基线必须反映清理后的结果 —— 否则首次变更会把全部架构当成已变更重发。
+      savedStatesJson = currentStatesJson()
+      return { outcome: 'applied' }
+    } catch {
+      // 服务端已守结构不变量, 走到这里基本不可达; 按「空」处理以免页面卡死在装载失败态。
+      return { outcome: 'empty' }
+    }
   }
 
   return {
     activeModelType, activeModelTypeByTask, activeTask,
     modelStates,
+    missingModels, missingRefs, isMissing, clearMissing, pruneMissing, reconcileMissing,
     componentsReady, setComponentsReady,
     currentConfig, currentState, stateFor,
-    switchModelType, switchTask, save, restore, enableAutoSave,
+    switchModelType, switchTask, save, restore, enableAutoSave, flushSave,
+    saveError,
   }
 })

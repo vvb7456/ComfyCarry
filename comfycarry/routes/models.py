@@ -95,6 +95,58 @@ def proxy_civitai_model(model_id: int):
         return _err("civitai_api_failed", 502, detail=str(e))
 
 
+@bp.route("/api/civitai/by-hash/<sha256>", methods=["GET"])
+def proxy_civitai_by_hash(sha256: str):
+    """代理 CivitAI v1 model-versions/by-hash API, 纯查询 (不要求本地文件存在)。
+
+    与 enrich_model_by_hash 用同一条 by-hash 调用链与版本归一化; 返回结构因此与
+    前端已消费的 civitai version 详情同构。sha256 大小写不敏感 (调 civitai 前统一
+    小写)。
+    """
+    from ..services.civitai_resolver import (
+        _CIVITAI_API_BASE,
+        normalize_version_data,
+    )
+
+    digest = (sha256 or "").strip().lower()
+    if not digest:
+        return _err("invalid_hash")
+
+    headers = {}
+    api_key = _get_api_key()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        resp = requests.get(
+            f"{_CIVITAI_API_BASE}/model-versions/by-hash/{digest}",
+            headers=headers,
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            return _err("civitai_not_found", 404)
+        resp.raise_for_status()
+        version_data = resp.json()
+    except requests.Timeout:
+        return _err("civitai_api_timeout", 504)
+    except requests.RequestException as e:
+        return _err("civitai_api_failed", 502, detail=str(e))
+    except Exception as e:
+        return _err("civitai_api_failed", 502, detail=str(e))
+
+    if not isinstance(version_data, dict):
+        return _err("civitai_not_found", 404)
+
+    body = normalize_version_data(version_data)
+    # raw 是 civitai 的完整原始 JSON, 已含 files/images —— 对纯查询路由纯属载荷
+    # 重复, 删掉; files/availability 系显式补齐 (归一化函数不含这三个字段)
+    body.pop("raw", None)
+    body["files"] = version_data.get("files", [])
+    body["availability"] = version_data.get("availability", "Public")
+    body["early_access_config"] = version_data.get("earlyAccessConfig") or {}
+    return jsonify(body)
+
+
 # 背景: 作者可以把模型设为 "Generation-Only" —— 只能在 Civitai 站内出图,
 #       不提供权重下载。这类 version 不该出现在下载列表里。
 #

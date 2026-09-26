@@ -36,7 +36,6 @@ const {
   isInFavorites: dlIsInFavorites,
   getModelAggregateState: dlGetModelState,
   downloadOne: dlDownloadOne,
-  fetchLocalIndex: dlFetchLocalIndex,
   refreshStatus: dlRefreshStatus,
   startPolling: dlStartPolling,
   activeTasks: dlActiveTasks,
@@ -45,8 +44,7 @@ const {
 // 卡片要展示已安装与下载进度, 需要本地模型索引和任务快照。与 CivitaiTab 的做法一致。
 watch(() => props.active, (val) => {
   if (val) {
-    dlFetchLocalIndex()
-    dlRefreshStatus().then(() => {
+      dlRefreshStatus().then(() => {
       if (dlActiveTasks.value.length) dlStartPolling()
     })
   }

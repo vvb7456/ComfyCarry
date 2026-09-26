@@ -20,10 +20,16 @@ export function useProductTour(storageKey: string) {
     active.value = true
   }
 
+  /** 直接标记为已完成, 不激活导览。用于「导入配置」等用户已熟悉的场景。 */
+  function markDone() {
+    localStorage.setItem(storageKey, '1')
+    isDone.value = true
+  }
+
   /** 中断（切页 KeepAlive deactivate 等）：标记已由 start 写入, 这里只关开关 */
   function stop() {
     active.value = false
   }
 
-  return { active, isDone, start, stop }
+  return { active, isDone, start, stop, markDone }
 }

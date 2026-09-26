@@ -45,6 +45,18 @@ const isPaired = computed(
   () => isVideo.value && MODEL_TYPES[store.activeModelType]?.dualUnet === true,
 )
 
+/** 该 LoRA 引用了但本机不存在 (文件被删/未同步): 保留条目但标警示 */
+function isMissing(name: string): boolean {
+  return store.isMissing(store.activeModelType, name)
+}
+
+/** 用户换选 (从选择器挑新的) 或删除条目后, 旧的缺失标记应清除 */
+function removeLora(index: number) {
+  const entry = state.value.loras[index]
+  if (entry) store.clearMissing(store.activeModelType, entry.name)
+  state.value.loras.splice(index, 1)
+}
+
 function getLoraInfo(name: string): LoraItem | undefined {
   return options.loras.value.find(l => l.name === name)
 }
@@ -72,10 +84,6 @@ function isPreviewVideo(name: string): boolean {
   if (!info || info.preview) return false
   const civitImg = (info.info as Record<string, unknown>)?.images as Array<Record<string, unknown>> | undefined
   return civitImg?.[0]?.type === 'video'
-}
-
-function removeLora(index: number) {
-  state.value.loras.splice(index, 1)
 }
 
 function toggleEnabled(index: number) {
@@ -175,25 +183,33 @@ function cycleApply(lora: LoraEntry) {
         :class="{ 'lora-card--disabled': !lora.enabled }"
       >
         <div class="lora-card__img" @click="emit('detail', lora.name)">
-          <template v-if="getPreviewUrl(lora.name)">
-            <video
-              v-if="isPreviewVideo(lora.name)"
-              :src="getPreviewUrl(lora.name)!"
-              muted autoplay loop playsinline disablepictureinpicture preload="metadata"
-              class="lora-card__media"
-            />
-            <img
-              v-else
-              :src="getPreviewUrl(lora.name)!"
-              alt=""
-              loading="lazy"
-              class="lora-card__media"
-              @error="($event.target as HTMLImageElement).style.display = 'none'"
-            />
-          </template>
-          <div v-if="!getPreviewUrl(lora.name)" class="lora-card__no-img">
-            <MsIcon name="layers" color="none" />
+          <!-- 缺失态替换整个图片栏: 引用保留、文件暂不在 (被删/未同步), 补齐后恢复。
+               角标方案已弃 —— 小角标与预览图叠在一起, 不如直接把预览位让给提示 -->
+          <div v-if="isMissing(lora.name)" class="lora-card__missing" :title="t('generate.missing.tag_hint')">
+            <MsIcon name="error_outline" color="none" />
+            <span>{{ t('generate.missing.tag') }}</span>
           </div>
+          <template v-else>
+            <template v-if="getPreviewUrl(lora.name)">
+              <video
+                v-if="isPreviewVideo(lora.name)"
+                :src="getPreviewUrl(lora.name)!"
+                muted autoplay loop playsinline disablepictureinpicture preload="metadata"
+                class="lora-card__media"
+              />
+              <img
+                v-else
+                :src="getPreviewUrl(lora.name)!"
+                alt=""
+                loading="lazy"
+                class="lora-card__media"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
+              />
+            </template>
+            <div v-if="!getPreviewUrl(lora.name)" class="lora-card__no-img">
+              <MsIcon name="layers" color="none" />
+            </div>
+          </template>
         </div>
 
         <!-- 开关 / 删除: 挂在卡片根下 (相对卡片定位)。宽屏时缩略图占满卡片顶部,
@@ -595,5 +611,29 @@ function cycleApply(lora: LoraEntry) {
     top: auto;
     bottom: 5px;
   }
+}
+
+/* 缺失态: 替换整个预览图栏 (EmptyState 紧凑形态的落位)。警告要克制 ——
+   不整面铺警示底色, 只用低对比度: 图标 + 短文案用 t3 静音色, 底色比无图占位
+   略沉一点即可; 卡片名保持原色 (缺失信息由预览位本身表达) */
+.lora-card__missing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--bg-in);
+  color: var(--t3);
+}
+
+.lora-card__missing .ms {
+  font-size: 1.5rem;
+}
+
+.lora-card__missing span {
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 </style>

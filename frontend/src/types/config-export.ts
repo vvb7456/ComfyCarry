@@ -72,4 +72,8 @@ export interface ExportedConfig {
   civitai_nsfw_blur?: boolean
   favorites?: FavoriteExportItem[]
   prompt_history?: PromptHistoryExportItem[]
+  /** 生成页工作区状态 (服务端持久化的完整 envelope) */
+  generate_state?: Record<string, unknown>
+  /** 引用模型文件的 SHA256 指纹表: "<category>/<relative_path>" → 大写 hex */
+  generate_model_hashes?: Record<string, string>
 }

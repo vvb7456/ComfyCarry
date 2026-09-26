@@ -4,7 +4,13 @@
     "checking": "Checking ComfyUI status…",
     "starting": "ComfyUI is starting, please wait…",
     "go_comfyui": "Go to ComfyUI page to start",
-    "backend_error": "Cannot connect to Dashboard service"
+    "backend_error": "Cannot connect to Dashboard service",
+    "loading_state": "Loading workspace configuration…",
+    "state_failed_title": "Failed to load workspace configuration",
+    "state_failed_desc": "Your configuration is still stored on the server and was not changed. You can retry.",
+    "state_incompatible_title": "Workspace configuration is from a newer version",
+    "state_incompatible_desc": "This configuration was saved by a newer panel version. Update the panel first to avoid overwriting it.",
+    "save_state_failed": "Workspace configuration could not be saved to the server; retrying"
   },
   "header": {
     "queue_history": "Queue & History",
@@ -620,7 +626,8 @@
     "minimax_h3_refs_images_too_many": "At most {limit} images (currently {current})",
     "minimax_h3_refs_videos_too_many": "At most {limit} videos (currently {current})",
     "minimax_h3_refs_audios_too_many": "At most {limit} audio files (currently {current})",
-    "minimax_h3_refs_total_too_many": "At most {limit} references in total (currently {current})"
+    "minimax_h3_refs_total_too_many": "At most {limit} references in total (currently {current})",
+    "models_missing": "The configuration references models not present on this instance: {names}. Provide the files or choose \"reset to defaults\" in the import prompt."
   },
   "components": {
     "title": "Runtime components",
@@ -801,7 +808,11 @@
     "face_model_not_found": "Face detection model not found: {name}, please download it in the face module first",
     "comfyui_error": "ComfyUI error: {detail}",
     "minimax_h3_refs_invalid": "Invalid reference media",
-    "minimax_h3_refs_audio_requires_visual": "Audio cannot be the only reference; add an image or video"
+    "minimax_h3_refs_audio_requires_visual": "Audio cannot be the only reference; add an image or video",
+    "state_invalid_payload": "Invalid workspace state payload",
+    "state_invalid_version": "Invalid workspace state version",
+    "state_invalid_model_states": "Workspace state is missing model configs",
+    "state_too_large": "Workspace state is too large to save"
   },
   "tour": {
     "open_aria": "Feature tour",
@@ -849,5 +860,34 @@
     "wait_workflow": "Please wait for current workflow to finish or cancel",
     "interrogate_submit_failed": "Interrogate submit failed",
     "interrogate_result_failed": "Failed to get interrogate results"
+  },
+  "missing": {
+    "title": "Imported configuration is missing dependencies",
+    "section_downloadable": "Available for download ({count})",
+    "section_unavailable": "Cannot be fetched automatically ({count})",
+    "download_all": "Download all",
+    "download_submitted": "{count} download task(s) submitted",
+    "role_checkpoint": "Checkpoint",
+    "role_unet": "UNet",
+    "role_unet_high": "UNet (high noise)",
+    "role_unet_low": "UNet (low noise)",
+    "role_clip": "Text encoder",
+    "role_clip2": "Text encoder 2",
+    "role_vae": "VAE",
+    "role_audio_vae": "Audio VAE",
+    "role_lora": "LoRA",
+    "role_controlnet": "ControlNet",
+    "role_upscale_model": "Upscale model",
+    "role_face_model": "Face detection model",
+    "tag": "Missing",
+    "tag_hint": "This model is not present on this instance; it will work once the file is available",
+    "keep": "Keep as is",
+    "ignore_fallback": "Ignore and reset to defaults",
+    "confirm_fallback": {
+      "title": "Ignore invalid settings",
+      "message": "This will remove {count} model reference(s) not present on this instance from the workspace configuration, reverting them to unselected.\n\nThey will not be restored automatically once the files are available; you will need to select them again. Continue?",
+      "button": "Remove and reset"
+    },
+    "querying": "Looking up model information…"
   }
 }

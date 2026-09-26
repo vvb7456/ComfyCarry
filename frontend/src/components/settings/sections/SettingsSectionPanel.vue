@@ -117,16 +117,46 @@ async function importConfig(event: Event) {
     const text = await file.text()
     const config = JSON.parse(text)
     if (!config._version) { toast(t('settings.config.invalid_format'), 'error'); return }
-    if (!await confirm({
-      title: t('settings.confirm.import_config.title'),
-      message: t('settings.confirm.import_config.message', { date: config._exported_at || t('settings.config.unknown_date') }),
-      confirmText: t('settings.confirm.import_config.button'),
-      variant: 'danger',
-    })) return
+
+    // 含工作区状态的导入会替换生成页配置, 而当前可能正有任务在跑 (其工作流图
+    // 由旧配置编译)。故确认文案必须说清后果, 确认后先停止再导入。
+    const hasState = !!config.generate_state
+    const confirmed = hasState
+      ? await confirm({
+          // title 与普通导入共用一份 (同一个动作, 不该有两套说法)
+          title: t('settings.confirm.import_config.title'),
+          message: t('settings.confirm.import_state.message'),
+          confirmText: t('settings.confirm.import_state.button'),
+          variant: 'danger',
+        })
+      : await confirm({
+          title: t('settings.confirm.import_config.title'),
+          message: t('settings.confirm.import_config.message', { date: config._exported_at || t('settings.config.unknown_date') }),
+          confirmText: t('settings.confirm.import_config.button'),
+          variant: 'danger',
+        })
+    if (!confirmed) return
+
+    if (hasState) {
+      // 停止当前任务并清空队列: 队列里的 pending 由旧配置编译, 不应继续跑。
+      // interrupt 端点内部对后台会话会走完整的 stop_session (置 idle +
+      // interrupt + 清队列); 非后台模式下原生 interrupt 不清队列, 故显式补一次。
+      await post('/api/comfyui/interrupt', {}, { silent: true })
+      await post('/api/comfyui/queue/clear', {}, { silent: true })
+    }
+
     const data = await post<{ message?: string }>('/api/settings/import-config', JSON.parse(text))
     if (!data) return
     toast(apiMessageText(data), 'success')
-    await loadSettings()
+
+    // 导入后无条件重载并回到总览。不就地复用当前页面:
+    // 导入替换了大量设置 (密码/密钥/同步/Tunnel/工作区状态), 各页面持有的都是
+    // 旧值, 逐个通知既易漏又会残留; 整页重载最干净, 也顺带清掉生成页的执行态
+    // 与预览态。工作区状态那条路径另有服务端「需重新装载」守卫兜底, 防止旧
+    // 标签页的自动保存把导入结果覆盖回去。
+    // 用 '/' 而非 '/#/dashboard': 根路径对路由模式不敏感 (hash 与 history 都落到
+    // 首页路由, 且 '/' 本就重定向到 /dashboard), 不会因将来改模式而失效。
+    window.location.href = '/'
   } catch (e: unknown) {
     toast(`${t('settings.config.import_failed')}: ${errorMessage(e)}`, 'error')
   }

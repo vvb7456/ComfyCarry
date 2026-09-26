@@ -15,28 +15,26 @@ def upsert_resource(resource_key: str, source: str, model_id: str,
                     version_id: str, state: str, *,
                     active_task_id: str = "",
                     last_error: str = "",
-                    meta: dict | None = None,
-                    installed_at: float | None = None) -> None:
+                    meta: dict | None = None) -> None:
     now = time.time()
     meta_json = json.dumps(meta or {}, ensure_ascii=False)
     db.execute(
         """INSERT INTO download_resources
                (resource_key, source, model_id, version_id, state,
                 active_task_id, last_error, meta_json,
-                created_at, updated_at, installed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(resource_key) DO UPDATE SET
                state = excluded.state,
                active_task_id = excluded.active_task_id,
                last_error = excluded.last_error,
                meta_json = CASE WHEN excluded.meta_json != '{}' THEN excluded.meta_json
                                 ELSE download_resources.meta_json END,
-               updated_at = excluded.updated_at,
-               installed_at = COALESCE(excluded.installed_at, download_resources.installed_at)
+               updated_at = excluded.updated_at
         """,
         (resource_key, source, model_id, version_id, state,
          active_task_id, last_error, meta_json,
-         now, now, installed_at),
+         now, now),
     )
 
 
@@ -49,9 +47,13 @@ def get_resource(resource_key: str) -> dict | None:
 
 
 def get_all_resources() -> list[dict]:
+    """所有资源记录, 含 state='absent' (流程结束的痕迹)。
+
+    absent 不代表"曾经下过", 只代表"没有进行中的流程"; 可用性一律由调用方
+    按磁盘现状判断 (见 resource_registry.resolve_state)。
+    """
     rows = db.fetch_all(
-        "SELECT * FROM download_resources WHERE state != 'absent' "
-        "ORDER BY updated_at DESC",
+        "SELECT * FROM download_resources ORDER BY updated_at DESC",
     )
     return [_row_to_dict(r) for r in rows]
 

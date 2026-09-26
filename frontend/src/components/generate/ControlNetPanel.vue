@@ -8,6 +8,7 @@ import { useToast } from '@/composables/useToast'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 
@@ -42,6 +43,19 @@ const displayName = computed(() => {
 })
 
 const modelOptions = computed(() => props.cn.models.value)
+
+/**
+ * 缺失的选中项要保留在下拉里 (带提示), 否则 BaseSelect 找不到值会显示空占位 ——
+ * 看上去像"没选", 而实际选的是一个本机不存在的模型。
+ */
+const modelSelectOptions = computed(() => {
+  const list = modelOptions.value.map(value => ({ value, label: value }))
+  const cur = config.value.model
+  if (cur && !modelOptions.value.includes(cur)) {
+    return [{ value: cur, label: cur, hint: t('generate.missing.tag') }, ...list]
+  }
+  return list
+})
 
 const pickLabel = computed(() => {
   const labelKey = CN_LABEL_KEYS[props.cn.type] || 'generate.controlnet.ref_image'
@@ -88,11 +102,15 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           <label class="field-lbl">{{ t('generate.controlnet.model') }}</label>
           <BaseSelect
             :model-value="config.model"
-            :options="modelOptions"
+            :options="modelSelectOptions"
             :placeholder="cn.hasModels.value ? t('generate.controlnet.model') : t('generate.controlnet.need_model')"
             :disabled="!cn.hasModels.value"
             @update:model-value="config.model = String($event)"
           />
+          <div v-if="cn.modelMissing.value" class="cn-missing">
+            <MsIcon name="error_outline" size="xs" />
+            {{ t('generate.missing.tag_hint') }}
+          </div>
         </div>
 
         <RangeField
@@ -221,5 +239,14 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
 @container gen-controlnet (max-width: 520px) {
   .cn-split { flex-direction: column; }
   .cn-split__media { max-width: 420px; width: 100%; }
+}
+
+.cn-missing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--sp-1);
+  font-size: var(--text-xs);
+  color: var(--c-caution);
 }
 </style>

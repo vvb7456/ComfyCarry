@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, watch } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore, type UpscaleState } from '@/stores/generate'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
@@ -8,6 +8,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
+import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'UpscalePanel' })
 
@@ -28,12 +29,16 @@ const engineOptions = computed(() => [
   { value: 'seedvr2', label: t('generate.upscale.engine_seedvr2'), disabled: !seedvr2Installed.value },
 ])
 
-// 选中的引擎权重被删 / 持久化状态指向未装的引擎时归位到装了的那个,
-// 避免置灰段呈选中态 (两个都没装时模块开关本身就打不开, 不必处理)
-watch([aurasrInstalled, seedvr2Installed], ([aura, svr]) => {
-  if (config.value.engine === 'aurasr' && !aura && svr) config.value.engine = 'seedvr2'
-  else if (config.value.engine === 'seedvr2' && !svr && aura) config.value.engine = 'aurasr'
-}, { immediate: true })
+// 刻意不做引擎自动切换: 原来"权重被删 → 切到装了的那个"会静默改变放大结果,
+// 用户无从察觉。现在保留用户选择, 由 engineMissing 标警示、提交时拦下。
+// 两个都没装时模块开关本身就打不开, 不必处理。
+
+/** 当前选中的引擎在本机缺权重 (供面板标警示 + 提交拦截) */
+const engineMissing = computed(() => {
+  if (config.value.engine === 'aurasr') return !aurasrInstalled.value
+  if (config.value.engine === 'seedvr2') return !seedvr2Installed.value
+  return false
+})
 
 const modeOptions = computed(() => [
   { value: '4x_overlapped_checkboard', label: t('generate.upscale.mode_checkboard') },
@@ -88,6 +93,10 @@ const sizeHint = computed(() => {
       <div class="field-lbl">
         {{ t('generate.upscale.engine') }}
         <HelpTip :text="t('generate.upscale.engine_help')" />
+        <span v-if="engineMissing" class="up-missing" :title="t('generate.missing.tag_hint')">
+          <MsIcon name="error_outline" size="xs" />
+          {{ t('generate.missing.tag') }}
+        </span>
       </div>
       <SegmentedControl
         :options="engineOptions"
@@ -96,7 +105,6 @@ const sizeHint = computed(() => {
         @update:model-value="config.engine = $event as 'aurasr' | 'seedvr2'"
       />
     </div>
-
     <template v-if="!isSeedVR2">
       <div class="upscale-grid__row">
         <div class="up-cell">
@@ -317,5 +325,15 @@ const sizeHint = computed(() => {
   .upscale-grid__row {
     grid-template-columns: 1fr;
   }
+}
+
+.up-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--c-caution);
+  font-weight: 500;
 }
 </style>

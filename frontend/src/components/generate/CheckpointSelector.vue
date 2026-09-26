@@ -22,6 +22,8 @@ const props = defineProps<{
   /** Override default 'select checkpoint' empty label (i18n string already resolved by caller) */
   emptyLabel?: string
   changeLabel?: string
+  /** 该模型本机缺失 (引用保留但标警示, 与 LoRA 卡片同语义) */
+  missing?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -44,7 +46,7 @@ function onImgError(e: Event) {
 <template>
   <div
     class="ckpt-selector"
-    :class="{ 'ckpt-selector--disabled': disabled }"
+    :class="{ 'ckpt-selector--disabled': disabled, 'ckpt-selector--missing': missing }"
     @click="emit('open')"
   >
     <!-- 空态与其他架构一字不差 — 视频不再换专用长文案 (已移到 picker 空结果态),
@@ -75,6 +77,10 @@ function onImgError(e: Event) {
         />
         <div v-if="!selected.previewUrl" class="ckpt-card__no-img">
           <MsIcon name="image_not_supported" size="lg" color="none" />
+        </div>
+        <!-- 缺失标记: 引用了但本机没有。条目保留, 补齐文件后即恢复 -->
+        <div v-if="missing" class="ckpt-card__missing" :title="t('generate.missing.tag_hint')">
+          <MsIcon name="error_outline" size="sm" color="none" />
         </div>
         <span v-if="selected.baseModel" class="ckpt-card__tag">{{ selected.baseModel }}</span>
         <span v-else-if="selected.arch && selected.arch !== 'unknown'" class="ckpt-card__tag ckpt-card__tag--dim">{{ selected.arch }}</span>
@@ -253,5 +259,23 @@ function onImgError(e: Event) {
 .ckpt-card__hint {
   font-size: .7rem;
   color: var(--t3);
+}
+
+/* 缺失标记: 卡片右上角, 与左下角的打包徽章错开 */
+.ckpt-card__missing {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c-caution);
+  color: var(--t-inv);
+}
+.ckpt-selector--missing .ckpt-card {
+  border-color: var(--c-caution);
 }
 </style>

@@ -31,6 +31,7 @@ export function useDownloads() {
     getModelAggregateState: store.getModelAggregateState,
 
     downloadOne: store.downloadOne,
+    downloadHuggingFaceVersion: store.downloadHuggingFaceVersion,
     downloadAll: store.downloadAll,
     pauseDownload: store.pauseDownload,
     resumeDownload: store.resumeDownload,
@@ -44,9 +45,6 @@ export function useDownloads() {
     refreshStatus: store.refreshStatus,
     startPolling: store.startPolling,
     stopPolling: store.stopPolling,
-
-    localCivitaiIds: computed(() => store.localCivitaiIds),
-    fetchLocalIndex: store.fetchLocalIndex,
 
     favorites: computed(() => store.favorites),
     favoritesItems: computed(() => store.favoritesItems),

@@ -18,6 +18,8 @@ export interface PendingClassification {
   civitaiUrl: string
   files: PendingFile[]
   dirOptions: DirOption[]
+  /** 二次提交时带回的落盘文件名 (生成页缺失弹窗按配置引用覆写时需要; 模型页缺省不设) */
+  customFilename?: string
 }
 
 export interface FavoriteItem {
@@ -167,8 +169,13 @@ export const useDownloadsStore = defineStore('downloads', () => {
   const tasks = ref<DownloadTask[]>([])
   const polling = ref(false)
 
-  const localCivitaiIds = ref<Map<string, Set<string>>>(new Map())
-
+  /**
+   * 资源状态 (服务端下发, 已按磁盘现状派生): resource_key → state。
+   *
+   * 这是「已下载/已删除」的唯一判据 —— 服务端从 models 表 (扫盘对账维护)
+   * 派生, 而不是从前端的本地索引缓存推断。"在不在磁盘上"没有本地缓存,
+   * 因此不存在缓存过期导致的误报 (曾经因此把已删文件显示为已下载)。
+   */
   const resourceStates = ref<Map<string, string>>(new Map())
 
   const submittingVersionIds = ref<Set<string>>(new Set())
@@ -333,25 +340,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  function mergeOneTaskIntoLocal(task: DownloadTask) {
-    const mid = String(task.meta.model_id)
-    const vid = task.meta.version_id ? String(task.meta.version_id) : null
-    let versions = localCivitaiIds.value.get(mid)
-    let changed = false
-    if (!versions) {
-      versions = new Set()
-      localCivitaiIds.value.set(mid, versions)
-      changed = true
-    }
-    if (vid && !versions.has(vid)) {
-      versions.add(vid)
-      changed = true
-    }
-    if (changed) {
-      localCivitaiIds.value = new Map(localCivitaiIds.value)
-    }
-  }
-
   function applyResourceUpdate(data: { resource_key: string; state: string; model_id: string; version_id: string }) {
     const newMap = new Map(resourceStates.value)
     if (data.state === 'absent') {
@@ -360,25 +348,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
       newMap.set(data.resource_key, data.state)
     }
     resourceStates.value = newMap
-
-    if (data.state === 'installed' && data.model_id) {
-      const mid = String(data.model_id)
-      const vid = data.version_id ? String(data.version_id) : null
-      let versions = localCivitaiIds.value.get(mid)
-      let changed = false
-      if (!versions) {
-        versions = new Set()
-        localCivitaiIds.value.set(mid, versions)
-        changed = true
-      }
-      if (vid && !versions.has(vid)) {
-        versions.add(vid)
-        changed = true
-      }
-      if (changed) {
-        localCivitaiIds.value = new Map(localCivitaiIds.value)
-      }
-    }
   }
 
   function connectGlobalSSE() {
@@ -395,9 +364,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
         const { type, data } = event
         if (type === 'task.updated' || type === 'task.progress') {
           applyTaskUpdate(data as DownloadTask)
-          if (data.status === 'complete' && data.meta?.model_id) {
-            mergeOneTaskIntoLocal(data as DownloadTask)
-          }
         } else if (type === 'resource.updated') {
           applyResourceUpdate(data)
         }
@@ -449,52 +415,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }, IDLE_DISCONNECT_MS)
   }
 
-  /** Full rebuild from /api/local_models (called once on init) */
-  async function fetchLocalIndex() {
-    try {
-      const res = await fetch('/api/local_models?category=all')
-      if (!res.ok) return
-      const data = await res.json()
-      const models: Array<{
-        source_model_id?: number | string
-        source_version_id?: number | string
-        source?: { model_id?: number | string; version_id?: number | string }
-      }> = data.models || []
-      const newMap = new Map<string, Set<string>>()
-      for (const m of models) {
-        const midValue = m.source_model_id ?? m.source?.model_id
-        if (!midValue) continue
-        const mid = String(midValue)
-        if (!newMap.has(mid)) newMap.set(mid, new Set())
-        const versionId = m.source_version_id ?? m.source?.version_id
-        if (versionId) newMap.get(mid)!.add(String(versionId))
-      }
-      localCivitaiIds.value = newMap
-    } catch { /* ignore */ }
-  }
-
-  function mergeCompletedIntoLocal(taskList: DownloadTask[]) {
-    let changed = false
-    for (const task of taskList) {
-      if (task.status !== 'complete' || !task.meta?.model_id) continue
-      const mid = String(task.meta.model_id)
-      const vid = task.meta.version_id ? String(task.meta.version_id) : null
-      let versions = localCivitaiIds.value.get(mid)
-      if (!versions) {
-        versions = new Set()
-        localCivitaiIds.value.set(mid, versions)
-        changed = true
-      }
-      if (vid && !versions.has(vid)) {
-        versions.add(vid)
-        changed = true
-      }
-    }
-    if (changed) {
-      localCivitaiIds.value = new Map(localCivitaiIds.value)
-    }
-  }
-
   /** Refresh task list + resource states from backend snapshot */
   async function _refreshStatus(): Promise<void> {
     try {
@@ -504,27 +424,15 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
       if (r?.tasks) {
         tasks.value = r.tasks
-        mergeCompletedIntoLocal(r.tasks)
       }
 
       if (r?.resources) {
         const newMap = new Map<string, string>()
         for (const [key, view] of Object.entries(r.resources)) {
-          const v = view as { state: string; model_id?: string; version_id?: string }
+          const v = view as { state: string }
           newMap.set(key, v.state)
-          if (v.state === 'installed' && v.model_id) {
-            const mid = String(v.model_id)
-            const vid = v.version_id ? String(v.version_id) : null
-            let versions = localCivitaiIds.value.get(mid)
-            if (!versions) {
-              versions = new Set()
-              localCivitaiIds.value.set(mid, versions)
-            }
-            if (vid) versions.add(vid)
-          }
         }
         resourceStates.value = newMap
-        localCivitaiIds.value = new Map(localCivitaiIds.value)
       }
 
       if (polling.value && _batchInFlight === 0 && r?.tasks && !r.tasks.some((t: DownloadTask) => ACTIVE_STATES.has(t.status))) {
@@ -545,7 +453,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
       return
     }
     polling.value = true
-    fetchLocalIndex()
     refreshStatus()
     connectGlobalSSE()
     startPollTimer()
@@ -574,6 +481,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     modelType: string,
     versionId?: number,
     dirKeys?: Record<string, string>,
+    opts?: { customFilename?: string },
   ) {
     if (isHuggingFaceId(modelId)) return downloadHuggingFaceVersion(modelId, versionId)
 
@@ -602,6 +510,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
           model_type: modelType.toLowerCase(),
           ...(versionId && { version_id: versionId }),
           ...(dirKeys && Object.keys(dirKeys).length ? { dir_keys: dirKeys } : {}),
+          // 生成页缺失弹窗按配置槽位取货时改用配置引用的文件名; 模型页缺省不带。
+          ...(opts?.customFilename ? { custom_filename: opts.customFilename } : {}),
         }),
       })
       if (res.status === 401) {
@@ -629,6 +539,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
           civitaiUrl: result.civitai_url || '',
           files: result.pending_files || [],
           dirOptions: result.dir_options || [],
+          ...(opts?.customFilename && { customFilename: opts.customFilename }),
         }
         return
       }
@@ -672,6 +583,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function downloadHuggingFaceVersion(
     modelId: number | string,
     versionId?: number | string,
+    opts?: { customFilename?: string; modelType?: HuggingFaceVersion['file']['modelType'] },
   ): Promise<boolean> {
     const found = findHuggingFaceVersion(modelId, versionId)
     if (!found) {
@@ -683,8 +595,12 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     setSubmitting(vid)
 
-    // 请求体契约唯一实现在 utils/hfDownload.ts (运行组件依赖条共用)
-    const body = buildHuggingFaceDownloadBody(model, version)
+    // 请求体契约唯一实现在 utils/hfDownload.ts (运行组件依赖条共用);
+    // 生成页缺失弹窗按配置槽位覆写落盘文件名与登记类别。
+    const body = buildHuggingFaceDownloadBody(model, version, {
+      filename: opts?.customFilename,
+      modelType: opts?.modelType,
+    })
 
     let result: {
       download_id?: string; message?: string; error?: string; existed?: boolean
@@ -756,7 +672,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
     const p = pendingClassification.value
     if (!p) return
     pendingClassification.value = null
-    await downloadOne(p.modelId, p.modelType, p.versionId, dirKeys)
+    await downloadOne(p.modelId, p.modelType, p.versionId, dirKeys,
+      p.customFilename ? { customFilename: p.customFilename } : undefined)
   }
 
   function cancelClassification() {
@@ -931,6 +848,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     if (submittingVersionIds.value.has(vid)) return 'submitting'
 
+    // 服务端下发的资源状态已按「磁盘现状 ⊕ 进行中流程态」派生 ——
+    // installed 表示磁盘上确有该文件 (可用性问磁盘, 不问历史)。
+    // 这是唯一判据, 前端不再维护自己的索引 (那会过期且无法自愈)。
     const resourceKey = resourceKeyFor(mid, vid)
     const rState = resourceStates.value.get(resourceKey)
     if (rState) {
@@ -938,6 +858,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       if (mapped !== 'idle') return mapped
     }
 
+    // 快照未覆盖时的补充: 正在进行的任务 (服务端可能还没来得及写状态)
     for (const task of tasks.value) {
       const taskVid = task.meta?.version_id ? String(task.meta.version_id) : null
       const taskMid = task.meta?.model_id ? String(task.meta.model_id) : null
@@ -945,12 +866,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
         if (task.status === 'active' || task.status === 'queued') return 'downloading'
         if (task.status === 'paused') return 'paused'
         if (task.status === 'failed') return 'failed'
-        if (task.status === 'complete') return 'installed'
       }
     }
-
-    const localVersions = localCivitaiIds.value.get(mid)
-    if (localVersions?.has(vid)) return 'installed'
 
     return 'idle'
   }
@@ -1064,7 +981,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     favorites,
     tasks,
     polling,
-    localCivitaiIds,
     resourceStates,
     submittingVersionIds,
     pendingClassification,
@@ -1091,6 +1007,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     getModelAggregateState,
 
     downloadOne,
+    downloadHuggingFaceVersion,
     downloadAll: downloadAllFromFavorites,
     pauseDownload,
     resumeDownload,
@@ -1105,7 +1022,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     startPolling,
     stopPolling,
 
-    fetchLocalIndex,
 
     watchTaskTerminal,
   }

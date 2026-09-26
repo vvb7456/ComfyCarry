@@ -25,6 +25,7 @@ from ..config import COMFYUI_DIR, COMFYUI_URL
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
 from ..services.generate_service import submit_generation
+from ..services import generate_state_store
 from ..services.workflow_builder import (
     build_sdxl_workflow,
     build_anima_workflow,
@@ -351,6 +352,46 @@ def api_generate_options():
         _options_cache_time = 0.0
         _combo_cache.clear()
     return jsonify(_fetch_generate_options())
+
+
+@bp.route("/api/generate/state")
+def api_generate_state_get():
+    """工作区状态 (唯一真相源)。
+
+    首次使用返回 state=null 而非 404 —— 前端据此区分「空」与「请求失败」,
+    失败时不得开启自动保存 (否则会用默认值覆盖服务端)。
+    """
+    state = generate_state_store.load_state()
+    # 成功装载即解除写入守卫 (见 store 的 mark_reload_required 说明)
+    generate_state_store.clear_reload_required()
+    return jsonify({"state": state})
+
+
+@bp.route("/api/generate/model-hashes")
+def api_generate_model_hashes():
+    """配置引用模型文件的 SHA256 指纹表 (只读)。
+
+    键 "<category>/<relative_path>", 值为大写十六进制。空表返回 {}。
+    """
+    from ..services import model_hash_store
+    return jsonify({"hashes": model_hash_store.load_hashes()})
+
+
+@bp.route("/api/generate/state", methods=["PUT"])
+def api_generate_state_put():
+    """整份覆盖写。后写入覆盖 (单实例单用户, 不做乐观锁)。
+
+    结构校验在 store 层 (见 services/generate_state_store.validate)。
+    """
+    # 导入后守卫期内拒绝写入: 否则其它标签页的旧状态会覆盖刚导入的配置
+    if generate_state_store.is_reload_required():
+        return _err("state_reload_required", 409)
+    payload = request.get_json(silent=True)
+    stored, err = generate_state_store.save_state(payload)
+    if err:
+        key, params = err
+        return _err(key, _extra={"state": None}, **params)
+    return jsonify({"ok": True, "updated_at": stored["updated_at"]})
 
 
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/bmp"}

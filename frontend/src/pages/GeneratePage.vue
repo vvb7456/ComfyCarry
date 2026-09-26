@@ -9,6 +9,7 @@ import { apiErrorText } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
+import { useDownloadsStore } from '@/stores/downloads'
 import { useGenerateQueueStore } from '@/stores/generateQueue'
 import { useBackgroundRunStore } from '@/stores/backgroundRun'
 import { useProductTour } from '@/composables/useProductTour'
@@ -17,6 +18,7 @@ import { useComfyGate } from '@/composables/generate/useComfyGate'
 import { useTaskRegistry } from '@/composables/generate/useTaskRegistry'
 import { useGenerateSubmit } from '@/composables/generate/useGenerateSubmit'
 import { useGeneratePreview } from '@/composables/generate/useGeneratePreview'
+import { useMissingModels } from '@/composables/generate/useMissingModels'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
 import { MODEL_TYPES } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -29,7 +31,10 @@ import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
 import ModelTab from '@/components/generate/ModelTab.vue'
 import QueuePanel from '@/components/generate/QueuePanel.vue'
 import HistoryPanel from '@/components/generate/HistoryPanel.vue'
+import MissingModelsModal from '@/components/generate/MissingModelsModal.vue'
+import DownloadDirModal from '@/components/models/DownloadDirModal.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 
 defineOptions({ name: 'GeneratePage' })
 
@@ -52,29 +57,85 @@ const gate = useComfyGate()
 gate.checkNow()
 
 const gateIcon = computed(() => {
+  if (stateIncompatible.value) return 'warning'
+  if (stateFailed.value) return 'error_outline'
   if (gate.state.value === 'error') return 'error_outline'
   if (gate.state.value === 'offline') return 'cloud_off'
   return 'cloud_sync'
 })
 
 const gateTitle = computed(() => {
+  if (stateIncompatible.value) return t('generate.gate.state_incompatible_title')
+  if (stateFailed.value) return t('generate.gate.state_failed_title')
   const s = gate.state.value
-  if (s === 'checking') return t('generate.gate.checking')
+  if (s === 'checking' || (s === 'ready' && !optionsReady.value)) return t('generate.gate.loading_state')
   if (s === 'starting') return t('generate.gate.starting')
   if (s === 'error') return t('generate.gate.backend_error')
   return t('generate.preview.offline_title')
 })
 
 const gateMessage = computed(() => {
+  if (stateIncompatible.value) return t('generate.gate.state_incompatible_desc')
+  if (stateFailed.value) return t('generate.gate.state_failed_desc')
   const s = gate.state.value
   if (s === 'starting' || s === 'offline') return t('generate.preview.offline_desc')
   return undefined
+})
+
+/** 遮罩是否可见: gate 未就绪、状态装载未完成、或装载失败/版本过新 */
+const overlayVisible = computed(() =>
+  gate.state.value !== 'ready' || !optionsReady.value || stateFailed.value || stateIncompatible.value,
+)
+
+/**
+ * 遮罩内是否显示转圈。涵盖 gate 的 checking/starting 与「gate 已就绪但工作区
+ * 配置尚未装载完」三种等待态; 可操作/错误态 (offline 的去向链接、装载失败的重试
+ * 按钮、版本过新) 不显示, 避免与操作入口并列出现。
+ */
+const loadingVisible = computed(() => {
+  if (stateFailed.value || stateIncompatible.value) return false
+  const s = gate.state.value
+  if (s === 'checking' || s === 'starting') return true
+  return s === 'ready' && !optionsReady.value
 })
 
 const options = useGenerateOptions()
 provide(GenerateOptionsKey, options)
 
 const optionsReady = ref(false)
+// 状态装载失败/版本过新: 保持遮罩可见并阻止自动保存 (见 initOptions)
+const stateFailed = ref(false)
+const stateIncompatible = ref(false)
+
+const missingModels = useMissingModels()
+
+// 后端判不出下载文件用途时返回 409 + needs_classification。模型页由页面层的
+// DownloadDirModal 承接; 生成页也会提交下载 (缺失弹窗), 同样需要接住 ——
+// 否则裁决载荷进 store 后无人展示, 下载静默丢失 (且被 gate 遮罩挡住)。
+const downloads = useDownloadsStore()
+const dirModalOpen = computed({
+  get: () => downloads.pendingClassification !== null,
+  set: (v: boolean) => { if (!v) downloads.cancelClassification() },
+})
+
+// 产品导览状态。在此处声明而非文件后部: initOptions 在装载完成时要按导入情况
+// 标记「已看过」(见下), 若声明在后, 首次装载 (gate 立即可用的场景) 会撞上 TDZ。
+const tour = useProductTour('generate_tour_done')
+
+// 缺失 modal 展示: 由缺失清单驱动, 用户关闭后本会话不再自动弹
+// (missingModels.visible 是「有缺失且未关闭」; modal 自身用 v-model 控制
+// 打开, 关闭时同步 dismiss 以免切页回来又弹)。
+const missingModalOpen = ref(false)
+watch(
+  () => missingModels.visible.value,
+  (show) => {
+    if (show) missingModalOpen.value = true
+  },
+  { immediate: true },
+)
+watch(missingModalOpen, (open) => {
+  if (!open) missingModels.dismiss()
+})
 
 async function initOptions(forceRefresh = false) {
   if (forceRefresh) {
@@ -84,7 +145,8 @@ async function initOptions(forceRefresh = false) {
   }
   if (!options.loaded.value) return
   if (optionsReady.value) return
-  store.restore({
+  // 装载结果决定是否开启自动保存: 失败/版本过新时不得开启, 否则默认值会覆盖服务端。
+  const { outcome } = await store.restore({
     checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
     loraExists: (name) => options.loras.value.some(l => l.name === name),
     unetExists: (name) => options.unets.value.some(u => u.name === name),
@@ -92,9 +154,38 @@ async function initOptions(forceRefresh = false) {
     vaeExists: (name) => options.vaes.value.some(v => v.name === name),
     samplerExists: (name) => options.samplers.value.includes(name),
     schedulerExists: (name) => options.schedulers.value.includes(name),
+    controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
+    seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
+    faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),
   })
+  if (outcome === 'failed' || outcome === 'incompatible') {
+    stateFailed.value = outcome === 'failed'
+    stateIncompatible.value = outcome === 'incompatible'
+    return
+  }
+  stateFailed.value = false
+  stateIncompatible.value = false
+  // 取回指纹表 (表2): 缺失弹窗据此检索取货来源; 表非空即视为「本实例导入过配置」。
+  await missingModels.loadHashes()
+  // 带工作区状态的导入视为「这个实例是从别处搬过来的」—— 用户已经会用本页,
+  // 不再自动弹导览, 直接永久标记为已完成 (手动入口仍随时可用)。
+  // 判据用指纹表而非 modelStates: 它只在导入路径上写入 (随配置包附带),
+  // 本地长期使用不会产生, 因此不会误伤正常用户。
+  if (missingModels.imported.value) {
+    tour.markDone()
+    clearTourAutoTimer()
+  }
   store.enableAutoSave()
   optionsReady.value = true
+  // 装载完成后才排定导览: 「是否导入过」此刻才确定, 早于此的定时器会先弹
+  // 再标记, 导入过的用户仍会看到引导 (见 scheduleTourAuto 的说明)。
+  scheduleTourAuto()
+}
+
+/** 重试装载 (失败遮罩上的按钮) */
+function retryLoadState() {
+  stateFailed.value = false
+  void initOptions(false)
 }
 
 watch(() => gate.state.value, (newState) => {
@@ -110,6 +201,22 @@ onActivated(() => {
   gate.checkNow()
   // KeepAlive 切回来重拉后台运行状态 (服务端为准, 避免刷新瞬间闪可编辑)
   bg.refresh()
+})
+
+// 关标签页/切后台时立即落盘, 覆盖 300ms 防抖窗口内的改动 (keepalive 请求)。
+function onPageHide() {
+  if (optionsReady.value) store.flushSave()
+}
+function onVisibility() {
+  if (document.visibilityState === 'hidden' && optionsReady.value) store.flushSave()
+}
+if (typeof document !== 'undefined') {
+  window.addEventListener('pagehide', onPageHide)
+  document.addEventListener('visibilitychange', onVisibility)
+}
+onBeforeUnmount(() => {
+  window.removeEventListener('pagehide', onPageHide)
+  document.removeEventListener('visibilitychange', onVisibility)
 })
 
 // 两个任务各自记忆选中架构。store.activeModelType 已是 computed 派生
@@ -258,8 +365,6 @@ watch(drawerOpen, (open) => {
 // 同时静音本页 toast 作用域 —— SSE 与 live 续跑照常, 只是不再从看不见的页面弹
 // 过程性提示 (error 仍放行, 见 useToast)。
 // 只要 start 过（走完/跳过/中途切页）就不再自动触发, 手动入口随时可用。
-const tour = useProductTour('generate_tour_done')
-
 onDeactivated(() => {
   muteToastScope('generate')
   drawerOpen.value = false
@@ -309,6 +414,10 @@ function clearTourAutoTimer() {
 }
 
 function scheduleTourAuto() {
+  // 装载结果未出时不排定: 「是否曾导入过配置」要等装载完才知道, 早于它的
+  // 定时器会先弹出导览、之后才写入已完成标记 —— 导入过的用户仍会看到引导。
+  // 装载完成后由 initOptions 调用本函数重新排定。
+  if (!optionsReady.value) return
   if (gate.state.value !== 'ready') return
   clearTourAutoTimer()
   tourAutoTimer = setTimeout(() => {
@@ -337,6 +446,39 @@ onActivated(() => {
 })
 
 onBeforeUnmount(clearTourAutoTimer)
+
+// 下载补齐文件后自愈缺失标记: 某资源「刚变为 installed」(磁盘上有了) → 拉最新
+// 清单 → 按 restore 同款判据清掉已存在的引用。
+// missingRefs 是 restore 快照, 不复核 LoRA 卡片/缺失弹窗会永远停在缺失态。
+let reconciling = false
+let prevStates = new Map<string, string>()
+let statesInit = false
+watch(
+  () => new Map(downloads.resourceStates),
+  async (states) => {
+    // 首次收到快照时只记基线: 里面已有的 installed 是历史, 不是"刚下载完"
+    const becameInstalled = statesInit && [...states].some(
+      ([key, state]) => state === 'installed' && prevStates.get(key) !== 'installed',
+    )
+    prevStates = states
+    statesInit = true
+    if (!becameInstalled || !optionsReady.value || reconciling) return
+    reconciling = true
+    try {
+      await options.refresh()
+      store.reconcileMissing({
+        loraExists: (name) => options.loras.value.some(l => l.name === name),
+        checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
+        unetExists: (name) => options.unets.value.some(u => u.name === name),
+        controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
+        seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
+        faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),
+      })
+    } finally {
+      reconciling = false
+    }
+  },
+)
 
 const queueCount = computed(() => queueStore.queueCount)
 const isExecuting = computed(() => !!execState.value)
@@ -581,17 +723,20 @@ sse.start()
 
 <template>
   <div class="page-body">
-    <div v-if="gate.state.value !== 'ready'" class="gen-gate-overlay">
+    <div v-if="overlayVisible" class="gen-gate-overlay">
       <EmptyState
         :icon="gateIcon"
         :title="gateTitle"
         :message="gateMessage"
       >
-        <router-link v-if="gate.state.value === 'offline'" to="/comfyui" class="gen-gate-link">
+        <BaseButton v-if="stateFailed" size="sm" @click="retryLoadState">
+          {{ t('common.btn.retry') }}
+        </BaseButton>
+        <router-link v-else-if="gate.state.value === 'offline'" to="/comfyui" class="gen-gate-link">
           {{ t('generate.gate.go_comfyui') }}
           <MsIcon name="open_in_new" color="none" />
         </router-link>
-        <div v-if="gate.state.value === 'starting' || gate.state.value === 'checking'" class="gen-gate-spinner">
+        <div v-if="loadingVisible" class="gen-gate-spinner">
           <div class="gate-spinner" />
         </div>
       </EmptyState>
@@ -666,6 +811,13 @@ sse.start()
         </template>
 
         <template #actions>
+          <span
+            v-if="store.saveError"
+            class="gen-save-warn"
+            :title="t('generate.gate.save_state_failed')"
+          >
+            <MsIcon name="cloud_off" size="xs" />
+          </span>
           <DrawerTrigger
             data-tour="gen-queue"
             icon="history"
@@ -714,6 +866,23 @@ sse.start()
       <!-- 产品导览: gate 空态不出现（挂在 v-else 分支内） -->
       <ProductTour v-model="tour.active.value" :steps="tourSteps" @close="onTourClose" />
     </template>
+
+    <!-- 导入配置后的缺失依赖提示（有缺失才弹; 独立于 gate 分支,
+         因为导入后用户可能已经关闭过它而页面仍在用） -->
+    <MissingModelsModal
+      v-model="missingModalOpen"
+      :downloadable="missingModels.downloadable.value"
+      :unavailable="missingModels.unavailable.value"
+      @fallback="missingModels.ignoreAndFallback()"
+    />
+
+    <DownloadDirModal
+      v-model="dirModalOpen"
+      :civitai-url="downloads.pendingClassification?.civitaiUrl || ''"
+      :pending-files="downloads.pendingClassification?.files || []"
+      :dir-options="downloads.pendingClassification?.dirOptions || []"
+      @confirm="downloads.resolveClassification"
+    />
   </div>
 </template>
 
@@ -752,6 +921,13 @@ sse.start()
   align-items: center;
   gap: var(--sp-3);
   min-width: 0;
+}
+
+/* 未保存提示: 保存失败且仍在重试时点亮, 不弹 toast (后台行为, 避免刷屏) */
+.gen-save-warn {
+  display: inline-flex;
+  align-items: center;
+  color: var(--c-caution);
 }
 
 /* 导览入口: 裸 icon 小按钮（先例 PromptEditor .prompt-help-btn）, 紧贴标题右侧 */

@@ -261,6 +261,23 @@ def api_settings_export_config():
     if db.table_exists("prompt_history"):
         config["prompt_history"] = prompt_library.dump_history()
 
+    # 工作区状态 (内容生成页配置): 随配置导入导出, 供换实例后恢复。
+    # 注意其中的参考图引用只是 input/ 下的文件名, 导入到别的实例后由前端
+    # restore 的校验链按模型/文件存在性清理。
+    from ..services import generate_state_store, model_hash_store
+    generate_state = generate_state_store.load_state()
+    if generate_state:
+        config["generate_state"] = generate_state
+        # 引用的模型文件 SHA256 指纹作为**独立字段**导出, 不混进状态本体。
+        # 与存量表取并集: 本实例从未下载过的引用, 其哈希来自当初的导入包,
+        # 现扫覆盖不到, 必须保留, 否则迁移链在第二跳就丢信息。
+        try:
+            hashes = model_hash_store.export_hashes(generate_state)
+        except Exception as e:
+            log.warning(f"[settings] 导出模型哈希失败: {e}")
+            hashes = {}
+        config["generate_model_hashes"] = hashes
+
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -451,6 +468,31 @@ def api_settings_import_config():
             applied.append("提示词历史")
         except Exception as e:
             errors.append(f"提示词历史: {e}")
+
+    if data.get("generate_state"):
+        try:
+            from ..services import generate_state_store
+            # 导入是「完整替换」而非增量合并: 配置包没覆盖到的架构应被清除,
+            # 否则目标实例会把自家配置和配置包混在一起。
+            _stored, err = generate_state_store.replace_state(data["generate_state"])
+            if err:
+                errors.append(f"工作区状态: {err[0]}")
+            else:
+                applied.append("工作区状态")
+                # 置位写入守卫: 其它标签页的自动保存可能仍持有旧状态, 必须
+                # 阻止它们在刷新前把旧状态 PUT 回来覆盖导入结果。
+                generate_state_store.mark_reload_required()
+        except Exception as e:
+            errors.append(f"工作区状态: {e}")
+
+    # 模型哈希表: 不透明 JSON, 整体替换 (导入 = 完整替换, 无兼容负担)。
+    # 请求里没有该字段 → 存空表, 免残留旧指纹指向已不存在的引用。
+    # generate_model_meta 是旧方案的字段, 已退役 —— 直接忽略, 不做兼容处理。
+    try:
+        from ..services import model_hash_store
+        model_hash_store.replace_hashes(data.get("generate_model_hashes"))
+    except Exception as e:
+        errors.append(f"模型哈希表: {e}")
 
     if data.get("civitai_nsfw_level") or data.get("civitai_nsfw_blur") is not None:
         try:

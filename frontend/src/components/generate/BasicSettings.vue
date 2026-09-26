@@ -65,6 +65,10 @@ function describe(name: string): CheckpointInfo | null {
 const selectedHigh = computed(() => describe(state.value.unetHigh))
 const selectedLow = computed(() => describe(state.value.unetLow))
 
+/** 缺失标记 (与 LoRA 卡片同语义: 引用保留, 只是标出本机没有) */
+const archKey = computed(() => store.activeModelType)
+const missingOf = (name: string) => !!name && store.isMissing(archKey.value, name)
+
 const selected = computed<CheckpointInfo | null>(() => {
   const name = props.modelField === 'unet' ? state.value.unet : state.value.checkpoint
   // 合并 picker 模式 fallback: 若主字段空但另一字段有值 (两形态并存 tab), 用另一字段
@@ -144,6 +148,7 @@ watch(() => state.value.resolution, (v) => {
             </div>
             <CheckpointSelector
               :selected="selectedHigh"
+              :missing="missingOf(state.unetHigh)"
               :empty-label="t('generate.basic.select_unet_high')"
               :change-label="t('generate.basic.click_change')"
               :disabled="disabled"
@@ -154,6 +159,7 @@ watch(() => state.value.resolution, (v) => {
             <div class="field-lbl">{{ t('generate.basic.unet_low') }}</div>
             <CheckpointSelector
               :selected="selectedLow"
+              :missing="missingOf(state.unetLow)"
               :empty-label="t('generate.basic.select_unet_low')"
               :change-label="t('generate.basic.click_change')"
               :disabled="disabled"
@@ -164,6 +170,7 @@ watch(() => state.value.resolution, (v) => {
         <CheckpointSelector
           v-else
           :selected="selected"
+          :missing="missingOf(modelField === 'unet' ? state.unet : state.checkpoint)"
           :empty-label="modelField === 'unet' ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint')"
           :change-label="t('generate.basic.click_change')"
           :disabled="disabled"

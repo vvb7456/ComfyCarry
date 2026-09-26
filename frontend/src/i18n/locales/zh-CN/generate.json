@@ -4,7 +4,13 @@
     "checking": "正在检查 ComfyUI 状态…",
     "starting": "ComfyUI 正在启动，请稍候…",
     "go_comfyui": "前往 ComfyUI 页启动",
-    "backend_error": "无法连接 Dashboard 服务"
+    "backend_error": "无法连接 Dashboard 服务",
+    "loading_state": "正在载入工作区配置…",
+    "state_failed_title": "工作区配置载入失败",
+    "state_failed_desc": "配置仍保存在服务端，未做任何改动。可重试载入。",
+    "state_incompatible_title": "工作区配置版本过新",
+    "state_incompatible_desc": "该配置由更新版本的面板保存。请先更新面板，避免覆盖。",
+    "save_state_failed": "工作区配置未能保存到服务端，正在重试"
   },
   "header": {
     "queue_history": "队列&历史",
@@ -620,7 +626,8 @@
     "minimax_h3_refs_images_too_many": "图片最多 {limit} 个（当前 {current}）",
     "minimax_h3_refs_videos_too_many": "视频最多 {limit} 个（当前 {current}）",
     "minimax_h3_refs_audios_too_many": "音频最多 {limit} 个（当前 {current}）",
-    "minimax_h3_refs_total_too_many": "参考素材总数最多 {limit} 个（当前 {current}）"
+    "minimax_h3_refs_total_too_many": "参考素材总数最多 {limit} 个（当前 {current}）",
+    "models_missing": "配置引用的模型在本机不存在：{names}。请补齐文件或在导入提示中选择回退默认。"
   },
   "components": {
     "title": "运行组件",
@@ -801,7 +808,11 @@
     "face_model_not_found": "面部检测模型不存在：{name}，请先在面部模块下载",
     "comfyui_error": "ComfyUI 错误：{detail}",
     "minimax_h3_refs_invalid": "参考素材格式无效",
-    "minimax_h3_refs_audio_requires_visual": "音频不能作为唯一参考，请同时添加图片或视频"
+    "minimax_h3_refs_audio_requires_visual": "音频不能作为唯一参考，请同时添加图片或视频",
+    "state_invalid_payload": "工作区状态格式无效",
+    "state_invalid_version": "工作区状态版本无效",
+    "state_invalid_model_states": "工作区状态缺少模型配置",
+    "state_too_large": "工作区状态过大，无法保存"
   },
   "tour": {
     "open_aria": "功能导览",
@@ -849,5 +860,34 @@
     "wait_workflow": "请等待当前工作流完成或取消",
     "interrogate_submit_failed": "反推提交失败",
     "interrogate_result_failed": "获取反推结果失败"
+  },
+  "missing": {
+    "title": "导入的配置缺少依赖",
+    "section_downloadable": "可下载（{count}）",
+    "section_unavailable": "无法自动获取（{count}）",
+    "download_all": "全部下载",
+    "download_submitted": "已提交 {count} 个下载任务",
+    "role_checkpoint": "主模型",
+    "role_unet": "UNet",
+    "role_unet_high": "UNet（高噪）",
+    "role_unet_low": "UNet（低噪）",
+    "role_clip": "文本编码器",
+    "role_clip2": "文本编码器 2",
+    "role_vae": "VAE",
+    "role_audio_vae": "音频 VAE",
+    "role_lora": "LoRA",
+    "role_controlnet": "ControlNet",
+    "role_upscale_model": "放大模型",
+    "role_face_model": "面部检测模型",
+    "tag": "缺失",
+    "tag_hint": "该模型在本机不存在，补齐文件后即可正常使用",
+    "keep": "保留缺失项",
+    "ignore_fallback": "忽略并回退默认",
+    "confirm_fallback": {
+      "title": "忽略无效设置",
+      "message": "将从工作区配置中移除 {count} 个本机不存在的模型引用，回退为未选择。\n\n补齐文件后不会自动恢复，需重新选择。确定继续吗？",
+      "button": "移除并回退"
+    },
+    "querying": "正在查询模型信息…"
   }
 }

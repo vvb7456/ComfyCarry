@@ -82,8 +82,7 @@ def _migration_v1(conn):
             last_error      TEXT NOT NULL DEFAULT '',
             meta_json       TEXT NOT NULL DEFAULT '{}',
             created_at      REAL NOT NULL,
-            updated_at      REAL NOT NULL,
-            installed_at    REAL
+            updated_at      REAL NOT NULL
         )""",
 
         """CREATE TABLE IF NOT EXISTS models (
@@ -217,3 +216,33 @@ def _migration_v4(conn):
 
 
 db.register_migration(4, _migration_v4, "sync job queue")
+
+
+def _migration_v5(conn):
+    """download_resources 结构收敛: 去掉 installed_at。
+
+    该字段从未在任何界面显示, 也没有读取方。同时「已下载」不再由本表回答
+    (改由磁盘现状派生, 见 services/resource_registry.resolve_state), 故一并去掉。
+
+    用重建而非 ALTER 删列: v1 里的建表是 CREATE TABLE IF NOT EXISTS, 对已建过
+    表的库不会生效 —— 结构变更必须落在新 migration 里, 否则旧库永远停在旧结构
+    (曾因手工删表导致该表缺失、下载功能整体报错)。
+    """
+    conn.execute("DROP TABLE IF EXISTS download_resources")
+    conn.execute("""
+        CREATE TABLE download_resources (
+            resource_key    TEXT PRIMARY KEY,
+            source          TEXT NOT NULL,
+            model_id        TEXT NOT NULL,
+            version_id      TEXT NOT NULL,
+            state           TEXT NOT NULL DEFAULT 'absent',
+            active_task_id  TEXT NOT NULL DEFAULT '',
+            last_error      TEXT NOT NULL DEFAULT '',
+            meta_json       TEXT NOT NULL DEFAULT '{}',
+            created_at      REAL NOT NULL,
+            updated_at      REAL NOT NULL
+        )
+    """)
+
+
+db.register_migration(5, _migration_v5, "download resource state (drop installed_at)")

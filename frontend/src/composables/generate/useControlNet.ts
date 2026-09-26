@@ -98,6 +98,8 @@ export interface UseControlNetReturn {
 
   models: ComputedRef<string[]>
   hasModels: ComputedRef<boolean>
+  /** 选中模型在本机缺失 (保留选择但标记, 提交时拦下) */
+  modelMissing: ComputedRef<boolean>
 
   picker: ReturnType<typeof useRefImagePicker>
 
@@ -168,17 +170,22 @@ export function useControlNet(
   const hasModels = computed(() => models.value.length > 0)
 
   // 选中项收敛 (规则 1 的"自动默认第一个"):
-  //   列表非空 且 (未选 或 选中项已不在列表里) → 取首项。
-  // "已不在列表里" 覆盖两种情况: 被规则 2 按 branch 隐藏, 或模型已被删除 —— 二者
-  // 都会让 BaseSelect 找不到值而显示空占位。
-  // 列表为空时不清值: options 尚未加载完时列表也是空的, 清了会误伤持久化的选择。
+  //   列表非空 且 未选 → 取首项 (首次进入的合理默认)。
+  // 刻意不再对"选中项不在列表里"做替换: 那会静默改变下次生成的结果, 用户无从
+  // 察觉 (原实现的注释里"模型已被删除 → 取首项"正是这个问题)。现在保留选择,
+  // 由 modelMissing 标警示、提交时拦下。
+  // 列表为空时不动: options 尚未加载完时列表也是空的, 清了会误伤持久化的选择。
   watch(models, (list) => {
     if (!list.length) return
-    const cur = config.value.model
-    if (!cur || !list.includes(cur)) {
+    if (!config.value.model) {
       config.value.model = list[0]!
     }
   }, { immediate: true })
+
+  /** 当前选中的 CN 模型在本机缺失 (供面板标警示 + 提交拦截) */
+  const modelMissing = computed(() =>
+    !!config.value.model && !models.value.includes(config.value.model!),
+  )
 
   const picker = useRefImagePicker(type, subfolder)
 
@@ -318,6 +325,7 @@ export function useControlNet(
     strengthHelpKey,
     models,
     hasModels,
+    modelMissing,
     picker,
     preprocessStatus,
     preprocessPromptId,

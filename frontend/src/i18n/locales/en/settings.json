@@ -120,6 +120,10 @@
       "message": "All configuration and services will be reset. This cannot be undone.",
       "button": "Reinitialize",
       "checkbox": "Keep model files & outputs"
+    },
+    "import_state": {
+      "message": "The current task will be stopped, the queue cleared, and this instance's workspace configuration overwritten.",
+      "button": "Stop and import"
     }
   },
   "restarting": "ComfyCarry is restarting, auto-refresh in 3 seconds..."

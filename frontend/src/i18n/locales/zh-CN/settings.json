@@ -120,6 +120,10 @@
       "message": "所有配置与服务将被重置，此操作无法撤销。",
       "button": "重新初始化",
       "checkbox": "保留模型文件与产物"
+    },
+    "import_state": {
+      "message": "当前任务将停止、队列将清空，本机工作区配置将被覆盖。",
+      "button": "停止并导入"
     }
   },
   "restarting": "ComfyCarry 正在重启，3 秒后自动刷新..."

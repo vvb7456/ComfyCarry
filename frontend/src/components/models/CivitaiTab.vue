@@ -56,7 +56,6 @@ const {
   isInFavorites: dlIsInFavorites,
   getModelAggregateState: dlGetModelState,
   downloadOne: dlDownloadOne,
-  fetchLocalIndex: dlFetchLocalIndex,
   refreshStatus: dlRefreshStatus,
   startPolling: dlStartPolling,
   activeTasks: dlActiveTasks,
@@ -137,7 +136,6 @@ function activateBrowsing() {
     applyFilters([props.initialType], [])
   }
   civitaiActivate()
-  dlFetchLocalIndex()
   // Connect to any in-flight downloads so card states are accurate
   dlRefreshStatus().then(() => {
     if (dlActiveTasks.value.length) dlStartPolling()
