@@ -45,7 +45,7 @@ const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
 const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
 const tabs = computed<TabItem[]>(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
-  { key: 'huggingface', label: t('models.tabs.huggingface'), brand: 'hf' },
+  { key: 'huggingface', label: t('models.tabs.huggingface') },
   { key: 'civitai', label: t('models.tabs.civitai'), brand: 'civitai' },
 ])
 
@@ -68,11 +68,9 @@ watch(
 
 const {
   tasks: dlTasks,
-  activeTasks: dlActiveTasks,
   failedTasks: dlFailedTasks,
   loadFavorites: dlLoadFavorites,
   refreshStatus: dlRefreshStatus,
-  startPolling: dlStartPolling,
 } = useDownloads()
 
 const drawerOpen = ref(false)
@@ -104,25 +102,15 @@ const hasUnseenFailure = computed(() =>
 function openDrawer() {
   drawerOpen.value = true
   if (!drawerEverOpened.value) drawerEverOpened.value = true
-  // 打开时拿一次即时数据。startPolling 不在这里调 —— store 的下载动作自己会调,
-  // 且 refreshStatus 在没有活跃任务时会自行 stopPolling。
   dlLoadFavorites()
   dlRefreshStatus()
   seenFailedIds.value = new Set(dlFailedTasks.value.map(x => x.download_id))
 }
 
-// 冷启动: 直接刷新落在模型页、而后台已有任务在跑时 store 是空的, badge 会假报 0。
-// 拿一次快照补上 —— /api/downloads/snapshot 很小; 只有快照里确实有活跃任务才
-// 建连接 (startPolling 会拉全量本地模型索引, 空闲时不值得)。同 CivitaiTab 的做法。
-// onActivated (非 onMounted): 本页被 KeepAlive 常驻, 重新进入时也要刷新 badge/状态;
-// 首次挂载 onActivated 同样触发, 初始加载语义不变。
-// 离开本页不 stopPolling: 生成页的依赖状态条共用同一个 store 单例, 断连会让那边
-// 一起瞎; 收尾交给 store 自己的空闲断开。
+// KeepAlive 页面重新激活时复核磁盘；实时订阅的生命周期由 useDownloads 管理。
 onActivated(() => {
   pageActive.value = true
-  dlRefreshStatus().then(() => {
-    if (dlActiveTasks.value.length) dlStartPolling()
-  })
+  void dlRefreshStatus()
 })
 
 // 后端判不出文件用途时返回 409, store 把载荷放进 pendingClassification。

@@ -3,8 +3,7 @@
  * PathBrowserModal — 目录选择器 (本地 workspace / rclone remote 两种模式)。
  *
  * 路径约定:
- *  - 本地: 一律 workspace 根相对, 前导 "/" 代表 WORKSPACE_DIR (后端
- *    resolve_workspace_path 换算真实路径, 越界拒绝)。所以本地模式恒 rooted。
+ *  - 本地: 显式标记 {workspace} / {ComfyUI}，也可输入绝对路径。
  *  - 远程: **原样保留用户写法的前导 "/"**。s3 / webdav / drive / dropbox /
  *    onedrive 都会把前导 "/" Trim 掉, 但 sftp 上 "remote:path" 是登录用户
  *    home 相对、"remote:/path" 是服务器文件系统根 —— 语义不同, 面板不能
@@ -36,12 +35,13 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import type { BrowseResponse, StagedCreds } from '@/types/sync'
+import { FilePathError, normalizeFilePath } from '@/utils/filePath'
 
 defineOptions({ name: 'PathBrowserModal' })
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
-  /** local = workspace 根相对; remote = rclone remote */
+  /** local = 本地显式文件地址; remote = rclone remote */
   mode: 'local' | 'remote'
   remote?: string
   /** staged 凭据 (wizard 计划 / oauth 会话 / 表单直传); 缺省走已落盘 remote */
@@ -65,8 +65,9 @@ const { post } = useApiFetch()
 const rootSegments = ref<string[]>([])
 /** 当前位置相对锁定根的段 (根上为空; S3 即桶内相对路径) */
 const segments = ref<string[]>([])
-/** 路径是否带前导 "/" —— 本地恒 true, 远程沿用根路径原本写法 (见文件头注释) */
+/** 远程路径沿用原本的前导斜杠，区分 SFTP 的 home 与系统根。 */
 const rooted = ref(true)
+const localRoot = ref('{workspace}')
 const dirs = ref<string[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -90,11 +91,12 @@ const show = computed({
 /** API 请求用完整路径 = 锁定根 + 当前相对段 (S3 浏览必须带桶名) */
 const currentPath = computed(() => {
   const all = [...rootSegments.value, ...segments.value]
+  if (props.mode === 'local') return normalizeFilePath(localRoot.value + '/' + segments.value.join('/'))
   return (rooted.value ? '/' : '') + all.join('/')
 })
 
 const rootLabel = computed(() => {
-  if (props.mode === 'local') return t('sync.browse.root_local')
+  if (props.mode === 'local') return localRoot.value
   if (rootSegments.value.length) {
     // 锁定根: 面包屑根就是桶本身 (remote:my-bucket), 不再暴露端点根
     return `${props.remote}:${(rooted.value ? '/' : '') + rootSegments.value.join('/')}`
@@ -115,8 +117,9 @@ watch(() => props.modelValue, (open) => {
   }
   // 打开即位于锁定根上, 不预填表单当前值 (与常规文件选择器一致)
   const rp = (props.rootPath || '').trim()
+  localRoot.value = '{workspace}'
   rooted.value = props.mode === 'local' ? true : rp.startsWith('/')
-  rootSegments.value = rp.split('/').filter(Boolean)
+  rootSegments.value = props.mode === 'local' ? [] : rp.split('/').filter(Boolean)
   segments.value = []
   dirs.value = []
   error.value = ''
@@ -156,6 +159,13 @@ function enterDir(dir: string) {
   load()
 }
 
+function chooseLocalRoot(root: string) {
+  localRoot.value = root
+  segments.value = []
+  editing.value = false
+  load()
+}
+
 /** 跳到面包屑第 i 段 (含); 点击当前段 = 展开路径输入框 (预填当前路径) */
 function goToSegment(i: number) {
   if (i === segments.value.length - 1) {
@@ -192,6 +202,17 @@ function applyDraft() {
     return
   }
   editing.value = false
+  if (props.mode === 'local') {
+    try {
+      const path = normalizeFilePath(raw)
+      localRoot.value = path.startsWith('{') ? path.split('/')[0]! : '/'
+      segments.value = path.slice(localRoot.value.length).split('/').filter(Boolean)
+      load()
+    } catch (e) {
+      error.value = e instanceof FilePathError ? t(`sync.err.${e.key}`, e.params ?? {}) : String(e)
+    }
+    return
+  }
   const full = raw.split('/').filter(Boolean)
   if (rootSegments.value.length) {
     // 锁定根: 草稿按"根内路径"解释; 带根前缀 (my-bucket/sub) 先剥前缀,
@@ -201,7 +222,7 @@ function applyDraft() {
       && rootSegments.value.every((seg, i) => full[i] === seg)
     segments.value = isRooted ? full.slice(rootSegments.value.length) : full
   } else {
-    rooted.value = props.mode === 'local' ? true : raw.startsWith('/')
+    rooted.value = raw.startsWith('/')
     segments.value = full
   }
   load()
@@ -267,6 +288,9 @@ function confirmSelect() {
     :title="mode === 'local' ? t('sync.browse.local_title') : t('sync.browse.remote_title')"
     width="480px"
   >
+    <div v-if="mode === 'local'" class="pb-top">
+      <BaseButton v-for="root in ['{workspace}', '{ComfyUI}']" :key="root" size="xs" @click="chooseLocalRoot(root)">{{ root }}</BaseButton>
+    </div>
     <div class="pb-top">
       <template v-if="editing">
         <input
@@ -316,7 +340,7 @@ function confirmSelect() {
       </BaseButton>
       <BaseButton
         variant="primary"
-        :disabled="!!error || (forbidRoot && atRoot)"
+        :disabled="loading || !!error || (forbidRoot && atRoot)"
         @click="confirmSelect"
       >
         {{ t('sync.browse.select') }}

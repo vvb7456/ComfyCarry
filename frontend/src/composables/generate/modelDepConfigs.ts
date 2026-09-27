@@ -1,5 +1,5 @@
 import type { DepRow, DepFileSpec } from './useDependencyStatus'
-import { HF_VERSION_INDEX, MODEL_TYPE_DIRS } from '@/config/huggingface-models'
+import { HF_VERSION_INDEX, fileDirectory } from '@/config/huggingface-models'
 
 /**
  * 各功能模块的依赖清单。
@@ -7,9 +7,7 @@ import { HF_VERSION_INDEX, MODEL_TYPE_DIRS } from '@/config/huggingface-models'
  * 全部是 useDependencyStatus 认得的 DepRow —— 运行组件、ControlNet、放大、
  * 面部修复、反推共用同一个状态机与同一个展示组件, 这里只描述"要哪些文件"。
  *
- * 模型文件优先锚定 HF 白名单 (hfFile): 文件事实 (url/size/sha256/目录) 单一来源,
- * 下载走 huggingface 统一通道 (完成即登记 SQLite + 状态与 HF 标签页同步)。
- * 仅 custom_nodes 辅助件与非 HF 源文件保留手写 url。
+ * 文件事实 (url/size/sha256/目录) 统一来自白名单，模型与辅助文件共用下载通道。
  */
 export interface DepGroup {
   /** 展开态标题的 i18n key */
@@ -19,13 +17,13 @@ export interface DepGroup {
   minOptional?: number
 }
 
-function hfFile(versionId: number): DepFileSpec {
+export function hfFile(versionId: number): DepFileSpec {
   const hit = HF_VERSION_INDEX.get(versionId)
   if (!hit) throw new Error(`modelDepConfigs: 白名单版本 ${versionId} 不存在`)
   const file = hit.version.file
-  const subdir = MODEL_TYPE_DIRS[file.modelType]
-  if (!subdir) throw new Error(`modelDepConfigs: modelType ${file.modelType} 无目录映射`)
-  return { filename: file.filename, url: file.url, subdir, hf: hit }
+  const directory = fileDirectory(file)
+  if (!directory) throw new Error(`modelDepConfigs: modelType ${file.modelType} 无目录映射`)
+  return { filename: file.filename, url: file.url, directory, hf: hit }
 }
 
 function hfBytes(...versionIds: number[]): number {
@@ -99,19 +97,7 @@ const CN_MODELS = {
     hint: '姿态检测',
     sizeText: '~352 MB',
     required: true,
-    // custom_nodes 检测器 ckpt, 不属模型索引范畴 → 通用通道
-    files: [
-      {
-        filename: 'yolox_l.onnx',
-        url: 'https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx?download=true',
-        subdir: 'custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose',
-      },
-      {
-        filename: 'dw-ll_ucoco_384_bs5.torchscript.pt',
-        url: 'https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt?download=true',
-        subdir: 'custom_nodes/comfyui_controlnet_aux/ckpts/hr16/DWPose-TorchScript-BatchSize5',
-      },
-    ],
+    files: [hfFile(-10000386), hfFile(-10000387)],
   },
   depth_anything_v2: {
     id: 'depth-anything-v2',
@@ -119,12 +105,7 @@ const CN_MODELS = {
     hint: '深度估计',
     sizeText: '~1.34 GB',
     required: true,
-    // custom_nodes 检测器 ckpt, 不属模型索引范畴 → 通用通道
-    files: [{
-      filename: 'depth_anything_v2_vitl.pth',
-      url: 'https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true',
-      subdir: 'custom_nodes/comfyui_controlnet_aux/ckpts/depth-anything/Depth-Anything-V2-Large',
-    }],
+    files: [hfFile(-10000388)],
   },
   flux_union: {
     id: 'flux-union-pro2-fp8',
@@ -141,17 +122,8 @@ const UPSCALE_MODELS = {
     id: 'aurasr-v2',
     label: 'AuraSR v2',
     hint: '4× 超分辨率放大',
-    // bytes 仅含白名单锚定的权重件; 伴生 config.json 非模型文件未计入 (数百字节, 忽略)
-    bytes: hfBytes(-10000371),
-    files: [
-      hfFile(-10000371),
-      {
-        // 配套配置文件, 非模型文件不入白名单 → 通用通道
-        filename: 'config.json',
-        url: 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json?download=true',
-        subdir: 'models/Aura-SR',
-      },
-    ],
+    bytes: hfBytes(-10000371, -10000384),
+    files: [hfFile(-10000371), hfFile(-10000384)],
   },
   seedvr2_3b_fp8: {
     id: 'seedvr2-3b-fp8',
@@ -192,13 +164,7 @@ const FACE_MODELS = {
     label: 'SAM 精细掩码',
     hint: '五官级分割掩码，边界更精确',
     sizeText: '~375 MB',
-    // Meta 官方源 (dl.fbaipublicfiles.com/segment_anything, facebookresearch/segment-anything);
-    // HF 无官方仓库 (facebook/sam-vit-base 是 transformers 格式转换, 非 Impact Pack 用的原始 .pth) → 通用通道
-    files: [{
-      filename: 'sam_vit_b_01ec64.pth',
-      url: 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth',
-      subdir: 'models/sams',
-    }],
+    files: [hfFile(-10000385)],
   },
 }
 

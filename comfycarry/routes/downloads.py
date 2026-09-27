@@ -6,7 +6,7 @@ import time
 
 from flask import Blueprint, Response, jsonify, request
 
-from ..config import COMFYUI_DIR, MODEL_DIRS
+from ..config import COMFYUI_DIR, MODEL_DIRS, resolve_file_path, FilePathError
 from ..services.download_engine import get_engine, DownloadStatus
 from ..services.resource_registry import get_registry
 from ..utils import _sha256_file
@@ -14,8 +14,6 @@ from ..utils import _sha256_file
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("downloads", __name__)
-
-_REAL_COMFYUI_DIR = os.path.realpath(COMFYUI_DIR)
 
 
 def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
@@ -26,23 +24,26 @@ def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params
 
 
 def _resolve_check_save_dir(spec: dict) -> str | None:
-    subdir = (spec.get("subdir") or "").strip()
-    if subdir:
-        save_dir = os.path.join(COMFYUI_DIR, subdir)
-        if not os.path.realpath(save_dir).startswith(_REAL_COMFYUI_DIR + os.sep):
-            return None
-        return save_dir
-    return (spec.get("save_dir") or "").strip()
+    try:
+        if spec.get("path"):
+            return str(resolve_file_path(spec["path"]).parent)
+        return str(resolve_file_path(spec.get("save_dir")))
+    except FilePathError:
+        return None
 
 
 def _check_file_spec(engine, spec: dict) -> dict:
-    filename = (spec.get("filename") or "").strip()
-    if not filename:
+    try:
+        filename = resolve_file_path(spec["path"]).name if spec.get("path") else (spec.get("filename") or "").strip()
+    except FilePathError:
+        filename = ""
+    if not filename or filename in (".", "..") or "/" in filename:
         return {"installed": False, "downloading": False, "download_id": None}
     save_dir = _resolve_check_save_dir(spec)
     if not save_dir:
         return {"installed": False, "downloading": False, "download_id": None}
-    return engine.check_file(save_dir, filename)
+    return {**engine.check_file(save_dir, filename),
+            "path": os.path.realpath(os.path.join(save_dir, filename))}
 
 
 _registry_wired = False
@@ -73,6 +74,11 @@ def _persist_task(task) -> None:
         )
     except Exception as e:
         logger.debug(f"[downloads] task persist failed: {e}")
+
+
+def _publish_task(task) -> None:
+    _persist_task(task)
+    get_registry().emit_task_event("task.updated", task.to_dict())
 
 
 def _wire_registry():
@@ -141,13 +147,9 @@ def api_downloads_check():
     检查文件是否已安装 + 是否有活跃下载.
 
     请求体:
-      单文件: {"save_dir": "/path", "filename": "model.safetensors"}
-              或 {"subdir": "models/text_encoders", "filename": "model.safetensors"}
-      批量:   {"files": [{"save_dir"|"subdir": "...", "filename": "..."}, ...]}
-
-    subdir 为相对 ComfyUI 根的目录 (如 "models/text_encoders"), 提供时后端
-    用 os.path.join(COMFYUI_DIR, subdir) 解析并忽略 save_dir; 防路径遍历:
-    realpath 结果必须位于 COMFYUI_DIR 之下, 否则该项按未安装处理.
+      单文件: {"path": "{ComfyUI}/models/text_encoders/model.safetensors"}
+              或 {"save_dir": "{ComfyUI}/models/text_encoders", "filename": "model.safetensors"}
+      批量:   {"files": [{"path": "..."}, ...]}
 
     响应:
       单文件: {"installed": bool, "downloading": bool, "download_id": str|null}
@@ -161,11 +163,9 @@ def api_downloads_check():
         return jsonify({"results": results})
 
     result = _check_file_spec(engine, data)
-    if not (data.get("subdir", "").strip() or data.get("save_dir", "").strip()
+    if not (data.get("path", "").strip() or data.get("save_dir", "").strip()
             or data.get("filename", "").strip()):
         return _err("dl_missing_dir_or_filename")
-    # subdir 路径越界或 filename 缺失时 _check_file_spec 已返回未安装,
-    # 此处统一走正常响应, 避免把非法路径暴露为 4xx
     return jsonify(result)
 
 
@@ -190,9 +190,9 @@ def api_downloads_submit():
     data = request.get_json(force=True) or {}
     if data.get("source") == "civitai":
         return _handle_civitai_source(data)
-    # Hugging Face 来源 → 通用 URL 下载 + 白名单元数据完成登记 (SPEC §7-A)
-    if data.get("source") == "huggingface":
-        return _handle_huggingface_source(data)
+    # 白名单不按发布平台分流，直接使用登记的 URL 和目标路径。
+    if data.get("source") == "whitelist":
+        return _handle_whitelist_source(data)
 
     url = data.get("url", "").strip()
     save_dir = data.get("save_dir", "").strip()
@@ -213,6 +213,13 @@ def api_downloads_submit():
     if not save_dir:
         return _err("dl_save_dir_or_model_type_required")
 
+    try:
+        save_dir = str(resolve_file_path(save_dir))
+    except FilePathError:
+        return _err("path_invalid")
+    if filename in (".", "..") or "/" in filename:
+        return _err("dl_filename_required")
+
     _wire_registry()
     engine = get_engine()
     headers = data.get("headers")
@@ -226,7 +233,7 @@ def api_downloads_submit():
         headers=headers,
     )
 
-    _persist_task(task)
+    _publish_task(task)
 
     resp = task.to_dict()
     if task.meta.get("existed"):
@@ -406,7 +413,7 @@ def api_downloads_retry(download_id: str):
         on_complete=old_task.on_complete,
     )
 
-    _persist_task(new_task)
+    _publish_task(new_task)
 
     if source and res_model_id:
         if new_task.status == DownloadStatus.FAILED:
@@ -513,6 +520,7 @@ def _handle_civitai_source(data: dict):
             api_key=api_key,
             custom_filename=custom_filename,
             dir_keys=dir_keys or None,
+            target_path=data.get("target_path", ""),
         )
     except ValueError as e:
         return _err("dl_civitai_invalid", 400, detail=str(e))
@@ -594,7 +602,7 @@ def _handle_civitai_source(data: dict):
         },
     )
 
-    _persist_task(task)
+    _publish_task(task)
 
     existed = task.meta.get("existed", False)
 
@@ -632,30 +640,8 @@ def _handle_civitai_source(data: dict):
     }), 201 if task.status == DownloadStatus.ACTIVE else 200
 
 
-def _handle_huggingface_source(data: dict):
-    """
-    处理 Hugging Face 来源 (source == 'huggingface') 的下载。
-
-    请求体 (白名单契约, SPEC §2-C / §6-E):
-      {
-        "source": "huggingface",
-        "url": "https://huggingface.co/.../resolve/main/model.safetensors",
-        "model_type": "checkpoints",
-        "filename": "model.safetensors",
-        "meta": {
-          "model_id": "-100001", "version_id": "-10000101",
-          "model_name": "...", "version_name": "...", "category": "checkpoints",
-          "model_type": "Checkpoint", "base_model": "SDXL 1.0",
-          "architecture": "sdxl", "sha256": "...", "size_bytes": 0,
-          "trained_words": [...], "images": [...], "author": "...", "source_url": "..."
-        }
-      }
-
-    目录按 model_type → MODEL_DIRS 解析 (与通用路径一致), 不做目录裁决。
-    文件下载完成后由 _on_huggingface_complete 把任务携带的白名单元数据直接登记到
-    模型索引 (SPEC §7-B)。响应结构与通用下载一致 (download_id / status /
-    existed / message_key 等)。
-    """
+def _handle_whitelist_source(data: dict):
+    """下载白名单中的任意文件，只有 is_model=true 才登记模型元数据。"""
     from ..services.model_meta_store import register_downloaded_model
 
     url = data.get("url", "").strip()
@@ -670,12 +656,23 @@ def _handle_huggingface_source(data: dict):
     if not filename:
         return _err("dl_filename_required")
 
-    rel_dir = MODEL_DIRS.get(model_type)
-    if not rel_dir:
-        rel_dir = f"models/{model_type}" if model_type else "models/other"
-    save_dir = os.path.join(COMFYUI_DIR, rel_dir)
+    target_path = data.get("target_path", "")
+    if target_path:
+        try:
+            target = str(resolve_file_path(target_path))
+        except FilePathError:
+            return _err("path_invalid")
+        save_dir, filename = os.path.split(target)
+    else:
+        rel_dir = MODEL_DIRS.get(model_type) or f"models/{model_type or 'other'}"
+        save_dir = os.path.join(COMFYUI_DIR, rel_dir)
 
-    def _on_huggingface_complete(task):
+    if not filename or filename in (".", "..") or "/" in filename:
+        return _err("dl_filename_required")
+
+    def _on_whitelist_complete(task):
+        if task.meta.get("is_model") is False:
+            return
         # 白名单元数据直接登记; 回调期间不读取模型文件内容 (SPEC §7-B / §11-B-4)。
         model_path = os.path.join(task.save_dir, task.filename)
         detail = register_downloaded_model(
@@ -689,7 +686,7 @@ def _handle_huggingface_source(data: dict):
 
     # 任务 meta: 白名单字段 + 强制完成登记回调 (前端已传则尊重, 缺省补 true)
     task_meta = dict(meta)
-    task_meta.setdefault("source", "huggingface")
+    task_meta["source"] = "whitelist"
     task_meta.setdefault("category", model_type)
     task_meta.setdefault("completion_requires_callback", True)
 
@@ -699,9 +696,11 @@ def _handle_huggingface_source(data: dict):
 
     res_model_id = str(meta.get("model_id", ""))
     res_version_id = str(meta.get("version_id", ""))
-    registry.submit_pending("huggingface", res_model_id, res_version_id, meta={
+    registry.submit_pending("whitelist", res_model_id, res_version_id, meta={
         "model_name": meta.get("model_name", ""),
         "model_type": meta.get("model_type", ""),
+        "is_model": meta.get("is_model", True),
+        "path": os.path.join(save_dir, filename),
     })
 
     task = engine.submit(
@@ -710,19 +709,19 @@ def _handle_huggingface_source(data: dict):
         filename=filename,
         meta=task_meta,
         headers=data.get("headers"),
-        on_complete=_on_huggingface_complete,
+        on_complete=_on_whitelist_complete,
     )
 
-    _persist_task(task)
+    _publish_task(task)
 
     existed = task.meta.get("existed", False)
 
     if task.status == DownloadStatus.FAILED:
-        registry.task_failed("huggingface", res_model_id, res_version_id, task.error)
+        registry.task_failed("whitelist", res_model_id, res_version_id, task.error)
     elif existed:
-        registry.mark_installed("huggingface", res_model_id, res_version_id, emit=True)
+        registry.mark_installed("whitelist", res_model_id, res_version_id, emit=True)
     else:
-        registry.task_submitted("huggingface", res_model_id, res_version_id,
+        registry.task_submitted("whitelist", res_model_id, res_version_id,
                                 task.download_id)
 
     resp = task.to_dict()
@@ -780,6 +779,7 @@ def api_downloads_stream():
     def _sse_generator():
         heartbeat_counter = 0
         try:
+            yield ": connected\n\n"
             while True:
                 try:
                     event = event_queue.get(timeout=1.0)

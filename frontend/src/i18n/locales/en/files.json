@@ -1,6 +1,7 @@
 {
   "err": {
     "path_required": "Path is required",
+    "path_invalid": "Use a root-marked path or an absolute path",
     "path_outside": "Path out of bounds: must be inside {root}",
     "path_is_root": "Cannot operate on the {root} root itself",
     "not_a_file": "Not a file or does not exist",

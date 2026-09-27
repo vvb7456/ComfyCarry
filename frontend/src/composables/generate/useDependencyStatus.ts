@@ -1,29 +1,13 @@
 import { ref, computed, watch, onScopeDispose, toValue, type Ref, type ComputedRef, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDownloadsStore } from '@/stores/downloads'
-import { apiErrorText } from '@/utils/apiError'
-import { buildHuggingFaceDownloadBody } from '@/utils/hfDownload'
+import { useDownloadsStore, type VersionState } from '@/stores/downloads'
+import { joinFilePath } from '@/utils/filePath'
 import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
-
-/**
- * useDependencyStatus — 依赖状态机 (运行组件那套的通用化)。
- *
- * 唯一真相是磁盘: 状态只来自 /api/downloads/check, 没有"看过没有"的记忆位,
- * 因此换架构/删模型/别处下完都会自然收敛。调用方按行 (DepRow) 描述依赖,
- * 一行 = 一个可展示的条目, 底下挂 1..N 个必须齐全的文件。
- *
- * 就绪判定: 所有 required 行已装 且 已装的可选行数 >= minOptional。
- */
 
 export interface DepFileSpec {
   filename: string
   url: string
-  subdir: string
-  /**
-   * HF 白名单锚点 (可选)。存在时下载改走 huggingface 统一通道
-   * (完成即登记 SQLite + resource_registry 状态与 HF 标签页同步);
-   * 缺省走通用 URL 通道 (custom_nodes 辅助件 / 非 HF 源)。
-   */
+  directory: string
   hf?: { model: HuggingFaceModel; version: HuggingFaceVersion }
 }
 
@@ -40,6 +24,7 @@ export interface DepRow {
 
 export interface DepRowStatus {
   row: DepRow
+  state: VersionState
   installed: boolean
   downloading: boolean
   downloadIds: string[]
@@ -57,21 +42,16 @@ export interface DepCurrent {
 
 export interface UseDependencyStatusOptions {
   minOptional?: MaybeRefOrGetter<number>
-  comfyuiDir?: MaybeRefOrGetter<string>
   source?: string
   metaOf?: (row: DepRow) => Record<string, unknown>
-  /**
-   * 是否体检 (默认 true)。ModelTab 是全量 v-show 挂载的, 17 个架构 × 6 组依赖
-   * 一起体检 = 页面加载 100+ 次 /api/downloads/check; 模块级依赖用它推迟到
-   * 该 tab 真正被激活时再查, 切回来会自动复查 (别处下完的也就跟着收敛)。
-   */
+  /** 架构面板常驻；只对启用面板首次检查文件。 */
   enabled?: MaybeRefOrGetter<boolean>
 }
 
 export interface UseDependencyStatusReturn {
   loading: Ref<boolean>
-  checked: Ref<boolean>
-  rows: Ref<DepRowStatus[]>
+  checked: ComputedRef<boolean>
+  rows: ComputedRef<DepRowStatus[]>
   has: ComputedRef<boolean>
   ready: ComputedRef<boolean>
   missing: ComputedRef<DepRowStatus[]>
@@ -85,411 +65,83 @@ export interface UseDependencyStatusReturn {
   destroy(): void
 }
 
+const BUSY: VersionState[] = ['submitting', 'downloading', 'queued', 'verifying', 'paused']
+
+/** 依赖条只聚合共享下载状态，不维护任务副本或自己的进度等待链。 */
 export function useDependencyStatus(
   rowsSource: MaybeRefOrGetter<DepRow[]>,
   opts: UseDependencyStatusOptions = {},
 ): UseDependencyStatusReturn {
-  const loading = ref(false)
-  const checked = ref(false)
-  const rows = ref<DepRowStatus[]>([])
-  const error = ref('')
-
-  const watching = new Set<string>()
-  /** 已点下、正在提交给引擎的行 id —— 提交有若干个来回, 这期间也算忙 */
-  const submitting = new Set<string>()
-
-  function isBusy(rowId: string): boolean {
-    return submitting.has(rowId) || watching.has(rowId)
-  }
-
-  const dlStore = useDownloadsStore()
+  const downloads = useDownloadsStore()
+  const release = downloads.subscribe()
   const { t } = useI18n({ useScope: 'global' })
-
-  const stopHandles: Array<() => void> = []
-
-  const minOptional = computed(() => toValue(opts.minOptional) ?? 0)
-
-  const has = computed(() => rows.value.length > 0)
-
-  const missing = computed(() => rows.value.filter(r => !r.installed))
-
-  const installedOptional = computed(
-    () => rows.value.filter(r => !r.row.required && r.installed).length,
-  )
-
-  const ready = computed(() => {
-    // 体检完成前一律算就绪: "还不知道" 不等于 "缺件", 否则 UI 会闪一下未就绪
-    if (!checked.value) return true
-    if (!has.value) return true
-    if (rows.value.some(r => r.row.required && !r.installed)) return false
-    return installedOptional.value >= minOptional.value
-  })
-
-  const missingRequired = computed(() => rows.value.filter(r => !r.installed && r.row.required))
-
-  // 下载态一律派生自行: 行与行之间没有互斥, 点第二行不该被第一行的下载挡掉
-  const activeRows = computed(() => rows.value.filter(r => r.downloading))
-  const downloading = computed(() => activeRows.value.length > 0)
-
-  const current = computed<DepCurrent | null>(() => {
-    const active = activeRows.value
-    if (!active.length) return null
-    const head = active[0] as (typeof active)[number]
+  const loading = ref(false)
+  const error = ref('')
+  const paths = computed(() => toValue(rowsSource).flatMap(row => row.files.map(file => joinFilePath(file.directory, file.filename))))
+  const checked = computed(() => !!error.value || paths.value.every(path => downloads.fileChecks.has(path)))
+  const rows = computed<DepRowStatus[]>(() => toValue(rowsSource).map(row => {
+    const infos = row.files.map(file => downloads.getFileDownloadInfo(joinFilePath(file.directory, file.filename),
+      file.hf ? { modelId: String(file.hf.model.id), versionId: String(file.hf.version.id) } : undefined))
+    const installed = infos.every(info => info.state === 'installed')
+    const state = installed ? 'installed' : [...BUSY, 'failed' as const].find(state => infos.some(info => info.state === state)) ?? 'idle'
     return {
-      active: active.length,
-      name: head.row.label,
-      percent: Math.round(active.reduce((a, r) => a + r.percent, 0) / active.length),
-      speed: active.reduce((a, r) => a + r.speed, 0),
+      row, state, installed,
+      downloading: BUSY.includes(state),
+      failed: infos.some(info => info.state === 'failed'),
+      downloadIds: [...new Set(infos.filter(info => BUSY.includes(info.state) && info.downloadId).map(info => info.downloadId!))],
+      percent: infos.length ? Math.round(infos.reduce((sum, info) => sum + info.progress, 0) / infos.length) : 0,
+      speed: infos.reduce((sum, info) => sum + info.speed, 0),
     }
-  })
-
-  /**
-   * 按新清单落地行状态。
-   * 正在下载的行沿用原来的状态对象 —— 等待链持有的是对象引用, 换新对象会让
-   * 进行中的进度更新写进一个已经脱离 rows 的孤儿上, 界面看着就"卡住不动"了。
-   */
-  function buildStatuses(list: DepRow[]): DepRowStatus[] {
-    const prev = new Map(rows.value.map(r => [r.row.id, r]))
-    return list.map(row => {
-      const p = prev.get(row.id)
-      if (p && isBusy(row.id)) {
-        p.row = row
-        return p
-      }
-      return {
-        row,
-        installed: false,
-        downloading: false,
-        downloadIds: [],
-        percent: 0,
-        speed: 0,
-        failed: false,
-      }
-    })
-  }
+  }))
+  const has = computed(() => rows.value.length > 0)
+  const missing = computed(() => rows.value.filter(row => !row.installed))
+  const missingRequired = computed(() => missing.value.filter(row => row.row.required))
+  const ready = computed(() => !checked.value || !has.value || (!missingRequired.value.length
+    && rows.value.filter(row => !row.row.required && row.installed).length >= (toValue(opts.minOptional) ?? 0)))
+  const active = computed(() => rows.value.filter(row => row.downloading))
+  const downloading = computed(() => active.value.length > 0)
+  const current = computed<DepCurrent | null>(() => active.value.length ? {
+    active: active.value.length,
+    name: active.value[0]!.row.label,
+    percent: Math.round(active.value.reduce((sum, row) => sum + row.percent, 0) / active.value.length),
+    speed: active.value.reduce((sum, row) => sum + row.speed, 0),
+  } : null)
 
   async function refresh(): Promise<void> {
-    const list = toValue(rowsSource)
-
-    if (!list.length) {
-      rows.value = []
-      checked.value = true
-      loading.value = false
-      error.value = ''
-      return
-    }
-
     loading.value = true
     error.value = ''
-
-    // 先按清单落地占位行, 请求回来再覆盖 —— 状态条据此与其它 UI 同帧出现并显示
-    // 骨架态, 不会等一个来回之后才"蹦"出来 (has 从此由配置决定, 不由请求结果决定)。
-    const statuses = buildStatuses(list)
-    rows.value = statuses
-    const flat: Array<{ rowIdx: number; file: DepFileSpec }> = []
-    list.forEach((row, rowIdx) => {
-      for (const file of row.files) flat.push({ rowIdx, file })
-    })
-
     try {
-      const res = await fetch('/api/downloads/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          files: flat.map(f => ({ subdir: f.file.subdir, filename: f.file.filename })),
-        }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        const results: Array<{ installed: boolean; downloading: boolean; download_id: string | null }> =
-          data?.results || []
-
-        for (const s of statuses) s.installed = true
-        for (let i = 0; i < flat.length; i++) {
-          const r = results[i]
-          const s = statuses[flat[i]!.rowIdx] as (typeof statuses)[number]
-          if (!r) { s.installed = false; continue }
-          if (!r.installed) s.installed = false
-          // 已被等待链接管的行不动它的下载态: 那边才是权威, 这里再 push 只会攒重复 id
-          if (r.downloading && !isBusy(s.row.id)) {
-            s.downloading = true
-            if (r.download_id && !s.downloadIds.includes(r.download_id)) {
-              s.downloadIds.push(r.download_id)
-            }
-          }
-        }
-      } else {
-        console.warn('[dep] check failed:', res.status)
-        error.value = t('generate.dep.error_check')
-      }
-    } catch (e) {
-      console.warn('[dep] check error:', e)
+      await downloads.checkFiles(paths.value)
+    } catch {
       error.value = t('generate.dep.error_check')
-    }
-
-    rows.value = [...statuses]
-    checked.value = true
-    loading.value = false
-
-    // 自动接管进行中的下载 (刷新/切页回来接上); 已在盯的行跳过, 免得等两遍
-    const inProgress = statuses.filter(
-      s => s.downloading && s.downloadIds.length && !isBusy(s.row.id),
-    )
-    if (inProgress.length > 0) {
-      await Promise.all(inProgress.map(s => watchRow(s)))
-      await refresh()
+    } finally {
+      loading.value = false
     }
   }
 
   async function downloadRow(rowId: string): Promise<void> {
-    const r = rows.value.find(x => x.row.id === rowId)
-    if (!r || r.installed) return
-    await _download([r])
-  }
-
-  async function _download(targets: DepRowStatus[]): Promise<void> {
-    const dir = toValue(opts.comfyuiDir) ?? ''
-    if (dir === '') {
-      error.value = t('generate.dep.error_no_dir')
-      return
-    }
-
-    // 忙的只是行, 不是整条状态条: 已装或已在下载的行跳过, 其余照常提交
-    const pending = targets.filter(s => !s.installed && !isBusy(s.row.id))
-    if (!pending.length) return
-
-    // 先占位再发请求: 提交要走 check + POST 若干个来回, 不占位的话连点两下会提交两遍。
-    // 同时把行置为下载中 —— 点了按钮就该有反应, 不等提交往返回来才变样。
-    for (const s of pending) {
-      submitting.add(s.row.id)
-      s.downloading = true
-      s.failed = false
-      s.percent = 0
-      s.speed = 0
-    }
-    rows.value = [...rows.value]
-
+    const row = toValue(rowsSource).find(row => row.id === rowId)
+    if (!row) return
     error.value = ''
-
-    const waiting: DepRowStatus[] = []
-
-    try {
-      // ── 阶段 1: 把所有缺失文件一次性提交给引擎 ──
-      // 不逐个等待; 中途切页/关面板不中断下载 (下载由后端引擎跑)。
-      for (const s of pending) {
-        const ids: string[] = []
-        let rowFailed = false
-
-        for (const f of s.row.files) {
-          const saveDir = dir + '/' + f.subdir
-
-          try {
-            const chkRes = await fetch('/api/downloads/check', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ save_dir: saveDir, filename: f.filename }),
-            })
-            if (chkRes.ok) {
-              const chk = await chkRes.json()
-              if (chk?.installed) continue
-              if (chk?.downloading && chk.download_id) { ids.push(chk.download_id); continue }
-            }
-          } catch { /* check 失败则继续尝试提交 */ }
-
-          try {
-            // 有白名单锚点 → huggingface 统一通道 (目录按 model_type 由后端解析,
-            // 完成自动登记 SQLite + resource_registry); 否则通用 URL 通道
-            // (custom_nodes 辅助件 / 非 HF 源)。
-            const payload = f.hf
-              ? buildHuggingFaceDownloadBody(f.hf.model, f.hf.version)
-              : {
-                  url: f.url,
-                  save_dir: saveDir,
-                  filename: f.filename,
-                  meta: {
-                    source: opts.source || 'model-dependency',
-                    model: s.row.label,
-                    ...(opts.metaOf ? opts.metaOf(s.row) : {}),
-                  },
-                }
-            const dlRes = await fetch('/api/downloads', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            })
-            if (!dlRes.ok) {
-              console.warn('[dep] submit failed:', f.filename, dlRes.status)
-              rowFailed = true
-              break
-            }
-            const dlData = await dlRes.json()
-            if (dlData?.error || dlData?.error_key) {
-              console.warn('[dep] submit rejected:', f.filename, apiErrorText(dlData))
-              rowFailed = true
-              break
-            }
-            if (dlData?.status === 'complete') continue  // 文件已存在
-            if (!dlData?.download_id) { rowFailed = true; break }
-            ids.push(dlData.download_id)
-          } catch (e) {
-            console.warn('[dep] submit error:', f.filename, e)
-            rowFailed = true
-            break
-          }
-        }
-
-        if (rowFailed) {
-          s.failed = true
-          s.downloading = false
-          error.value = t('generate.dep.error_submit', { name: s.row.label })
-          rows.value = [...rows.value]
-          continue
-        }
-
-        if (!ids.length) {
-          s.installed = true
-          s.downloading = false
-          rows.value = [...rows.value]
-          continue
-        }
-
-        s.downloadIds = ids
-        rows.value = [...rows.value]
-        waiting.push(s)
-      }
-
-      // ── 阶段 2: 各行并行等待完成 (仅进度展示; 任务已全在引擎队列里) ──
-      if (waiting.length > 0) await Promise.all(waiting.map(s => watchRow(s)))
-    } catch (e) {
-      console.error('[dep] download error:', e)
-      error.value = t('generate.dep.failed')
-    } finally {
-      for (const s of pending) submitting.delete(s.row.id)
-    }
-
-    // 复核真实文件状态 (别的行可能还在下, refresh 会保住它们的进度)
-    await refresh()
-  }
-
-  /**
-   * 盯一行下载到终态, 期间把进度同步到行上。
-   * 进度来自 downloads store 的等待链 (SSE 主 + 轮询兜底), 与下载管理页同源。
-   * 一行一个等待链, 彼此不排队 —— 行 A 在下的时候行 B 照样能点。
-   */
-  async function watchRow(s: DepRowStatus): Promise<void> {
-    const rowId = s.row.id
-    if (watching.has(rowId)) return
-    watching.add(rowId)
-
-    // store 需在流式推送状态 (SSE 优先, 轮询兜底)
-    dlStore.startPolling()
-
-    const ids = [...s.downloadIds]
-    s.failed = false
-
-    const pcts = new Array(ids.length).fill(0)
-    const speeds = new Array(ids.length).fill(0)
-
-    try {
-      const results = await Promise.all(ids.map((id, k) =>
-        dlStore.watchTaskTerminal(id, (percent, speed) => {
-          if (disposed) return
-          pcts[k] = percent
-          speeds[k] = speed
-          s.percent = Math.round(pcts.reduce((a: number, b: number) => a + b, 0) / ids.length)
-          s.speed = speeds.reduce((a: number, b: number) => a + b, 0)
-          rows.value = [...rows.value]
-        }),
-      ))
-
-      const rowOk = results.every(r => r === 'complete' || r === 'absent')
-      s.downloading = false
-      s.downloadIds = []
-      s.speed = 0
-      if (rowOk && !disposed) {
-        s.installed = true
-        s.percent = 100
-      } else if (results.some(r => r === 'failed')) {
-        s.failed = true
-        error.value = t('generate.dep.error_download', { name: s.row.label })
-      }
-      rows.value = [...rows.value]
-    } finally {
-      watching.delete(rowId)
+    for (const file of row.files) {
+      const submitted = await downloads.downloadFile({
+        path: joinFilePath(file.directory, file.filename), url: file.url,
+        ...(file.hf ? { modelId: String(file.hf.model.id), versionId: String(file.hf.version.id) } : {}),
+        meta: { source: opts.source || 'model-dependency', model: row.label, ...opts.metaOf?.(row) },
+      })
+      if (!submitted) error.value = t('generate.dep.error_submit', { name: row.label })
     }
   }
-
-  let disposed = false
 
   async function cancelRow(rowId: string): Promise<void> {
-    const r = rows.value.find(x => x.row.id === rowId)
-    if (!r) return
-    for (const id of r.downloadIds) {
-      try {
-        await fetch(`/api/downloads/${id}/cancel`, { method: 'POST' })
-      } catch { /* 忽略 */ }
-    }
-    // 任务转终态后等待链自行收尾, 这里只把行状态即时回落
-    r.downloading = false
-    r.downloadIds = []
-    r.percent = 0
-    rows.value = [...rows.value]
+    const row = rows.value.find(row => row.row.id === rowId)
+    if (row) await Promise.all(row.downloadIds.map(id => downloads.cancelDownload(id)))
   }
 
-  // 依赖清单变化 (架构切换 / branch 切换 / 条件组件增删) 或从未启用变启用 → 重新判定。
-  // 下载进行中不打断, 结束后的 refresh 自会带上新清单。
-  stopHandles.push(
-    watch(
-      () => [toValue(opts.enabled ?? true), toValue(rowsSource).map(r => r.id).join('|')] as const,
-      ([on]) => {
-        if (!on || downloading.value) return
-        void refresh()
-      },
-      { immediate: true },
-    ),
-  )
-
-  // comfyuiDir 从空变非空: 若有进行中的下载则重新接管一次
-  let prevDir = toValue(opts.comfyuiDir) ?? ''
-  stopHandles.push(
-    watch(
-      () => toValue(opts.comfyuiDir) ?? '',
-      (newDir) => {
-        const wasEmpty = prevDir === ''
-        prevDir = newDir
-        if (wasEmpty && newDir !== '') {
-          for (const r of rows.value) {
-            if (r.downloading && r.downloadIds.length) void watchRow(r)
-          }
-        }
-      },
-    ),
-  )
-
-  function destroy(): void {
-    for (const stop of stopHandles) stop()
-    stopHandles.length = 0
-    disposed = true
-  }
-
-  // 兜底: 调用方忘记 destroy 也不泄漏
+  const stop = watch(() => [toValue(opts.enabled ?? true), paths.value] as const, ([enabled]) => {
+    if (enabled) void refresh()
+  }, { immediate: true })
+  function destroy() { stop(); release() }
   onScopeDispose(destroy)
-
-  return {
-    loading,
-    checked,
-    rows,
-    has,
-    ready,
-    missing,
-    missingRequired,
-    downloading,
-    current,
-    error,
-    refresh,
-    downloadRow,
-    cancelRow,
-    destroy,
-  }
+  return { loading, checked, rows, has, ready, missing, missingRequired, downloading, current, error, refresh, downloadRow, cancelRow, destroy }
 }

@@ -12,8 +12,10 @@
 set -e
 set -o pipefail
 
-LOG_FILE="/workspace/setup.log"
-mkdir -p /workspace
+export WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
+export COMFYUI_DIR="${COMFYUI_DIR:-$WORKSPACE_DIR/ComfyUI}"
+LOG_FILE="$WORKSPACE_DIR/setup.log"
+mkdir -p "$WORKSPACE_DIR"
 exec &> >(tee -a "$LOG_FILE")
 
 echo "================================================="
@@ -21,7 +23,7 @@ echo "  ComfyCarry Bootstrap v1.0"
 echo "  $(date)"
 echo "================================================="
 
-ln -snf /workspace /root/workspace 2>/dev/null || true
+ln -snf "$WORKSPACE_DIR" /root/workspace 2>/dev/null || true
 touch ~/.no_auto_tmux 2>/dev/null || true
 
 if [ ! -f /opt/.comfycarry-prebuilt ]; then
@@ -42,7 +44,7 @@ echo "  -> Cloudflared 已预装"
 
 # 更新源为 GitHub latest Release (完整部署包, 由 release.yml 发布),
 # main 分支 push 不影响已部署实例 —— commit 与 release 解耦
-DASHBOARD_DIR="/workspace/ComfyCarry"
+DASHBOARD_DIR="$WORKSPACE_DIR/ComfyCarry"
 REPO_OWNER="vvb7456"
 REPO_NAME="ComfyCarry"
 RELEASE_ASSET="comfycarry-dist.tar.gz"
@@ -178,7 +180,7 @@ pm2 delete dashboard 2>/dev/null || true
 if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
     pm2 start "$PYTHON_BIN" --name dashboard \
         --interpreter none \
-        --log /workspace/dashboard.log \
+        --log "$WORKSPACE_DIR/dashboard.log" \
         --merge-logs \
         --time \
         -- "$DASHBOARD_DIR/workspace_manager.py" 5000
@@ -191,9 +193,9 @@ fi
 pm2 delete jupyter 2>/dev/null || true
 pm2 start jupyter-lab --name jupyter \
     --interpreter none \
-    --log /workspace/jupyter.log --merge-logs --time \
+    --log "$WORKSPACE_DIR/jupyter.log" --merge-logs --time \
     -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
-    --ServerApp.root_dir=/workspace \
+    --ServerApp.root_dir="$WORKSPACE_DIR" \
     --ServerApp.language=zh_CN
 pm2 save 2>/dev/null || true
 echo "  JupyterLab 已启动 (port 8888)"

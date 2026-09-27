@@ -14,15 +14,13 @@ log = logging.getLogger(__name__)
 
 APP_VERSION = "v0.8.4"
 
-# 面板的路径约定: 对外 (UI / 规则数据 / 文件 API) 一律用 "workspace 根相对路径",
-# 即前导 "/" 代表 WORKSPACE_DIR 而非文件系统根。真实绝对路径只在后端内部出现,
-# 由 resolve_workspace_path() 统一换算。
+# 本地文件地址显式使用 {workspace}、{ComfyUI} 或系统绝对路径。
 # 用 `or` 而非 get 的默认值: 环境变量传空串时 Path("").resolve() 会解析成
 # 当前工作目录, 所有状态文件 (.dashboard_env / .sync_rules.json / DB) 都会
 # 落错地方
-WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR") or "/workspace"
+WORKSPACE_DIR = os.path.abspath(os.environ.get("WORKSPACE_DIR") or "/workspace")
 WORKSPACE_ROOT = Path(WORKSPACE_DIR).resolve()
-COMFYUI_DIR = os.environ.get("COMFYUI_DIR") or os.path.join(WORKSPACE_DIR, "ComfyUI")
+COMFYUI_DIR = os.path.abspath(os.environ.get("COMFYUI_DIR") or os.path.join(WORKSPACE_DIR, "ComfyUI"))
 COMFYUI_URL = os.environ.get("COMFYUI_URL") or "http://localhost:8188"
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根目录
 CONFIG_FILE = Path(SCRIPT_DIR) / ".civitai_config.json"
@@ -34,61 +32,64 @@ except (ValueError, TypeError):
 MEILI_URL = "https://search.civitai.com/multi-search"
 MEILI_BEARER = "8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61"
 
-def workspace_relative(real) -> str:
-    """真实绝对路径 → workspace 根相对路径 ("/ComfyUI/output")。
+class FilePathError(ValueError):
+    def __init__(self, key: str, **params):
+        self.key = key
+        self.params = params
+        super().__init__(key)
 
-    不在 workspace 内的路径原样返回 (调用方自行决定是否展示)。
-    """
-    norm = os.path.normpath(str(real))
-    base = str(WORKSPACE_ROOT)
-    if norm == base:
-        return "/"
-    if norm.startswith(base + os.sep):
-        return "/" + norm[len(base) + 1:]
-    return norm
+
+def normalize_file_path(raw) -> str:
+    """规范化地址但保留根标记；禁止隐含根目录及越过标记根的 ..。"""
+    if not isinstance(raw, str) or not raw.strip():
+        raise FilePathError("path_required")
+    value = raw.strip()
+    if "\x00" in value:
+        raise FilePathError("path_invalid")
+    for marker in ("{workspace}", "{ComfyUI}"):
+        if value == marker or value.startswith(marker + "/"):
+            parts = []
+            for part in value[len(marker):].split("/"):
+                if not part or part == ".":
+                    continue
+                if part == "..":
+                    if not parts:
+                        raise FilePathError("path_outside", root=marker)
+                    parts.pop()
+                else:
+                    parts.append(part)
+            return marker + ("/" + "/".join(parts) if parts else "")
+    if not os.path.isabs(value):
+        raise FilePathError("path_invalid")
+    return os.path.normpath("/" + value.lstrip("/"))
+
+
+def resolve_file_path(raw) -> Path:
+    """统一解析本地文件地址。保留软链接位置，访问范围由调用模块校验。"""
+    value = normalize_file_path(raw)
+    for marker, root in (("{workspace}", WORKSPACE_ROOT), ("{ComfyUI}", Path(COMFYUI_DIR))):
+        if value == marker or value.startswith(marker + "/"):
+            return root / value[len(marker):].lstrip("/")
+    return Path(value)
 
 
 def resolve_workspace_path(
     raw, *, allow_root: bool = True
 ) -> tuple[Path | None, tuple[str, dict] | None]:
-    """workspace 根相对路径 → 真实绝对路径, 并校验未越界。
-
-    接受三种写法, 结果一致:
-    - "/ComfyUI/models"           — 面板约定 (前导 / 即 workspace 根)
-    - "ComfyUI/models"            — 不带前导 /
-    - "/workspace/ComfyUI/models" — 真实绝对路径 (兼容既有调用方)
-
-    仅做字符串规范化, 不解析符号链接 —— models/ 之类目录常被部署脚本
-    symlink 到外部卷, resolve() 会把这类合法目标误判为越界。".." 逃逸
-    仍会被 normpath 折叠后拦下。
-
-    Returns:
-        (Path, None) 成功 / (None, (i18n key, params)) 失败。
-
-        错误不返回文案而是 key + 插值参数 —— 这些错误会经 API 原样送到面板,
-        由前端按 `sync.err.<key>` 翻译 (与 _sync_log 的 key+params 同一套路)。
-    """
-    s = str(raw or "").strip()
-    if not s:
-        return None, ("path_required", {})
-
-    base = str(WORKSPACE_ROOT)
-    norm = os.path.normpath(s)
-    if os.path.isabs(norm) and (norm == base or norm.startswith(base + os.sep)):
-        target = norm
-    else:
-        target = os.path.normpath(os.path.join(base, norm.lstrip(os.sep)))
-
-    if target != base and not target.startswith(base + os.sep):
-        return None, ("path_outside", {"root": WORKSPACE_DIR})
-    if not allow_root and target == base:
-        return None, ("path_is_root", {"root": WORKSPACE_DIR})
-    return Path(target), None
+    """同步范围为工作目录及 ComfyUI 目录；保留挂载到外部卷的软链接。"""
+    try:
+        target = resolve_file_path(raw)
+    except FilePathError as exc:
+        return None, (exc.key, exc.params)
+    roots = (WORKSPACE_ROOT, Path(COMFYUI_DIR))
+    if not any(target.is_relative_to(root) for root in roots):
+        return None, ("path_outside", {"root": "{workspace}, {ComfyUI}"})
+    if not allow_root and target == WORKSPACE_ROOT:
+        return None, ("path_is_root", {"root": normalize_file_path(raw)})
+    return target, None
 
 
-# ComfyUI 目录的 workspace 根相对形式 ("/ComfyUI") — 同步模板等对外文案用
-# rstrip: COMFYUI_DIR 恰为 workspace 根时避免拼出 "//models"
-COMFYUI_REL = workspace_relative(COMFYUI_DIR).rstrip("/")
+COMFYUI_PATH = "{ComfyUI}"
 
 DASHBOARD_ENV_FILE = WORKSPACE_ROOT / ".dashboard_env"
 
@@ -442,7 +443,7 @@ SYNC_RULE_TEMPLATES = [
         "direction": "pull",
         "entries": [
             {"name": "模型", "name_key": "sync.preset.entry.models",
-             "local_path": f"{COMFYUI_REL}/models", "remote_path": "models",
+             "local_path": f"{COMFYUI_PATH}/models", "remote_path": "models",
              "method": "copy", "trigger": "deploy"},
         ],
     },
@@ -453,13 +454,13 @@ SYNC_RULE_TEMPLATES = [
         "direction": "pull",
         "entries": [
             {"name": "工作流", "name_key": "sync.preset.entry.workflows",
-             "local_path": f"{COMFYUI_REL}/user/default/workflows", "remote_path": "workflows",
+             "local_path": f"{COMFYUI_PATH}/user/default/workflows", "remote_path": "workflows",
              "method": "copy", "trigger": "deploy"},
             {"name": "Wildcards", "name_key": "sync.preset.entry.wildcards",
-             "local_path": f"{COMFYUI_REL}/wildcards", "remote_path": "wildcards",
+             "local_path": f"{COMFYUI_PATH}/wildcards", "remote_path": "wildcards",
              "method": "copy", "trigger": "deploy"},
             {"name": "Input 素材", "name_key": "sync.preset.entry.input",
-             "local_path": f"{COMFYUI_REL}/input", "remote_path": "input",
+             "local_path": f"{COMFYUI_PATH}/input", "remote_path": "input",
              "method": "copy", "trigger": "deploy"},
         ],
     },
@@ -470,7 +471,7 @@ SYNC_RULE_TEMPLATES = [
         "direction": "push",
         "entries": [
             {"name": "模型", "name_key": "sync.preset.entry.push_models",
-             "local_path": f"{COMFYUI_REL}/models", "remote_path": "models",
+             "local_path": f"{COMFYUI_PATH}/models", "remote_path": "models",
              "method": "copy", "trigger": "manual"},
         ],
     },
@@ -481,13 +482,13 @@ SYNC_RULE_TEMPLATES = [
         "direction": "push",
         "entries": [
             {"name": "工作流", "name_key": "sync.preset.entry.push_workflows",
-             "local_path": f"{COMFYUI_REL}/user/default/workflows", "remote_path": "workflows",
+             "local_path": f"{COMFYUI_PATH}/user/default/workflows", "remote_path": "workflows",
              "method": "copy", "trigger": "manual"},
             {"name": "Wildcards", "name_key": "sync.preset.entry.push_wildcards",
-             "local_path": f"{COMFYUI_REL}/wildcards", "remote_path": "wildcards",
+             "local_path": f"{COMFYUI_PATH}/wildcards", "remote_path": "wildcards",
              "method": "copy", "trigger": "manual"},
             {"name": "Input 素材", "name_key": "sync.preset.entry.push_input",
-             "local_path": f"{COMFYUI_REL}/input", "remote_path": "input",
+             "local_path": f"{COMFYUI_PATH}/input", "remote_path": "input",
              "method": "copy", "trigger": "manual"},
         ],
     },
@@ -498,7 +499,7 @@ SYNC_RULE_TEMPLATES = [
         "direction": "push",
         "entries": [
             {"name": "输出", "name_key": "sync.preset.entry.push_output",
-             "local_path": f"{COMFYUI_REL}/output", "remote_path": "output",
+             "local_path": f"{COMFYUI_PATH}/output", "remote_path": "output",
              "method": "move", "trigger": "watch",
              "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
         ],
@@ -510,7 +511,7 @@ SYNC_RULE_TEMPLATES = [
         "direction": "push",
         "entries": [
             {"name": "输出", "name_key": "sync.preset.entry.push_output",
-             "local_path": f"{COMFYUI_REL}/output", "remote_path": "output",
+             "local_path": f"{COMFYUI_PATH}/output", "remote_path": "output",
              "method": "copy", "trigger": "watch",
              "filters": ["+ *.{png,jpg,jpeg,webp,gif,bmp,tiff,tif,mp4,mov,webm,mkv,avi}", "- .*/**", "- *"]},
         ],

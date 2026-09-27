@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, getCurrentScope, onScopeDispose } from 'vue'
 import { useDownloadsStore } from '@/stores/downloads'
 import type {
   FavoriteItem,
@@ -18,6 +18,7 @@ export type {
 
 export function useDownloads() {
   const store = useDownloadsStore()
+  if (getCurrentScope()) onScopeDispose(store.subscribe())
 
   return {
     tasks: computed(() => store.tasks),
@@ -29,6 +30,7 @@ export function useDownloads() {
     getVersionState: store.getVersionState,
     getVersionDownloadInfo: store.getVersionDownloadInfo,
     getModelAggregateState: store.getModelAggregateState,
+    getFileDownloadInfo: store.getFileDownloadInfo,
 
     downloadOne: store.downloadOne,
     downloadHuggingFaceVersion: store.downloadHuggingFaceVersion,
@@ -57,6 +59,5 @@ export function useDownloads() {
     updateFavoriteVersion: store.updateFavoriteVersion,
     loadFavorites: store.loadFavorites,
 
-    watchTaskTerminal: store.watchTaskTerminal,
   }
 }

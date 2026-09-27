@@ -12,7 +12,7 @@ import BaseSelect from '@/components/form/BaseSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { ModelMeta } from '@/types/models'
 import type { CivitaiHit } from '@/composables/useCivitaiSearch'
-import { HUGGINGFACE_MODELS } from '@/config/huggingface-models'
+import { MODEL_WHITELIST as HUGGINGFACE_MODELS } from '@/config/huggingface-models'
 import { remoteHitToMeta } from '@/utils/remote-model-meta'
 
 defineOptions({ name: 'HuggingFaceTab' })
@@ -37,16 +37,12 @@ const {
   getModelAggregateState: dlGetModelState,
   downloadOne: dlDownloadOne,
   refreshStatus: dlRefreshStatus,
-  startPolling: dlStartPolling,
-  activeTasks: dlActiveTasks,
 } = useDownloads()
 
 // 卡片要展示已安装与下载进度, 需要本地模型索引和任务快照。与 CivitaiTab 的做法一致。
 watch(() => props.active, (val) => {
   if (val) {
-      dlRefreshStatus().then(() => {
-      if (dlActiveTasks.value.length) dlStartPolling()
-    })
+    void dlRefreshStatus()
   }
 }, { immediate: true })
 
@@ -154,7 +150,7 @@ function hitToFavoriteItem(hit: CivitaiHit) {
     versionName: v?.name,
     baseModel: v?.baseModel,
     allVersions,
-    source: 'huggingface',
+    source: 'whitelist',
   }
 }
 
@@ -190,7 +186,7 @@ function handleFavoriteVersion(modelId: string, versionId: number, versionName: 
     versionId,
     versionName,
     baseModel,
-    source: 'huggingface',
+    source: 'whitelist',
   })
 }
 
@@ -223,7 +219,7 @@ function handlePickerDownload(modelId: string, modelType: string, versionId: num
 }
 
 function openModelMeta(hit: CivitaiHit) {
-  emit('openMeta', remoteHitToMeta(hit, { channel: 'huggingface' }))
+  emit('openMeta', remoteHitToMeta(hit, { channel: 'whitelist' }))
 }
 
 // KeepAlive 下离开模型页走 onDeactivated: 关闭本 tab 自己的浮层, 避免其 body

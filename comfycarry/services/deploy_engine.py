@@ -9,17 +9,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-DEPLOY_LOG_FILE = "/workspace/deploy.log"
-
 from ..config import (
-    COMFYUI_DIR, CONFIG_FILE, DEFAULT_PLUGINS,
+    COMFYUI_DIR, WORKSPACE_ROOT, CONFIG_FILE, DEFAULT_PLUGINS,
     SYNC_RULE_TEMPLATES,
     SYNC_RULE_DIRECTIONS, SYNC_RULE_METHODS, SYNC_RULE_TRIGGERS,
     REMOTE_ROOT_DIR_KEY, join_remote_path,
     _load_setup_state, _save_setup_state,
     _save_dashboard_password,
     _RCLONE_TOKEN_RE,
-    resolve_workspace_path, workspace_relative,
+    resolve_workspace_path, normalize_file_path,
 )
 from .comfyui_params import DEFAULT_COMFYUI_ARGS
 from .sync_engine import (
@@ -27,6 +25,7 @@ from .sync_engine import (
     start_sync_worker,
 )
 
+DEPLOY_LOG_FILE = str(WORKSPACE_ROOT / "deploy.log")
 
 _deploy_thread = None
 _deploy_log_lines = []
@@ -511,10 +510,11 @@ def _step_install_comfyui(PY):
         return
 
     _deploy_step("install_comfyui")
-    if not Path("/workspace/ComfyUI/main.py").exists():
+    comfy_dir = shlex.quote(COMFYUI_DIR)
+    if not (Path(COMFYUI_DIR) / "main.py").exists():
         _deploy_log("从镜像复制 ComfyUI...")
-        _deploy_exec("mkdir -p /workspace/ComfyUI && "
-                     "cp -a /opt/ComfyUI/. /workspace/ComfyUI/")
+        _deploy_exec(f"mkdir -p {comfy_dir} && "
+                     f"cp -a /opt/ComfyUI/. {comfy_dir}/")
     else:
         _deploy_log("ComfyUI 已存在, 跳过复制")
 
@@ -530,7 +530,7 @@ def _step_install_comfyui(PY):
 
     _deploy_log("启动健康检查...")
     _deploy_exec(
-        f'cd /workspace/ComfyUI && {PY} main.py --listen 127.0.0.1 '
+        f'cd {comfy_dir} && {PY} main.py --listen 127.0.0.1 '
         f'--port 8188 --disable-all-custom-nodes > /tmp/comfy_boot.log 2>&1 &'
     )
     boot_ok = False
@@ -601,6 +601,8 @@ def _step_accelerators(config, PY):
 
 def _step_plugins(config, PY):
     PIP = f"{PY} -m pip"
+    nodes_dir = Path(COMFYUI_DIR) / "custom_nodes"
+    quoted_nodes = shlex.quote(str(nodes_dir))
     _deploy_step("install_plugins")
     plugins = [p for p in config.get("plugins", []) if p]
     _deploy_log("检查额外插件...")
@@ -608,23 +610,23 @@ def _step_plugins(config, PY):
         if url == "comfycarry_ws_broadcast":
             continue
         name = url.rstrip("/").split("/")[-1].replace(".git", "")
-        if not Path(f"/workspace/ComfyUI/custom_nodes/{name}").exists():
+        if not (nodes_dir / name).exists():
             _deploy_log(f"安装新插件: {name}")
             _deploy_exec(
-                f'cd /workspace/ComfyUI/custom_nodes && '
+                f'cd {quoted_nodes} && '
                 f'git clone {shlex.quote(url)} || true', timeout=60
             )
 
     _deploy_log("安装插件依赖...")
     _deploy_exec(
-        f'find /workspace/ComfyUI/custom_nodes -name "requirements.txt" -type f '
+        f'find {quoted_nodes} -name "requirements.txt" -type f '
         f'-exec {PIP} install --no-cache-dir -r {{}} \\; 2>&1 || true',
         timeout=600, label="pip install plugin deps"
     )
 
     _deploy_log("安装 ComfyCarry WS 广播插件...")
     broadcast_src = Path(__file__).resolve().parent.parent.parent / "comfycarry_ws_broadcast"
-    broadcast_dst = Path("/workspace/ComfyUI/custom_nodes/comfycarry_ws_broadcast")
+    broadcast_dst = nodes_dir / "comfycarry_ws_broadcast"
     if broadcast_src.exists():
         if broadcast_dst.exists():
             shutil.rmtree(broadcast_dst)
@@ -736,7 +738,7 @@ def _custom_rule_from_wizard(wr: dict, remote: str, idx: int, ts: int) -> dict |
         "name": name or f"rule-{idx}",
         "remote": remote,
         "remote_path": remote_path,
-        "local_path": workspace_relative(target),
+        "local_path": normalize_file_path(local_path),
         "direction": direction,
         "method": method,
         "trigger": trigger,
@@ -863,14 +865,16 @@ def _step_start_services(config, cfg, PY):
     comfy_args = (f"{DEFAULT_COMFYUI_ARGS} {attn_flag} "
                   f"--fast --disable-xformers")
 
-    _deploy_exec("mkdir -p /workspace/ComfyUI/input/openpose /workspace/ComfyUI/input/canny /workspace/ComfyUI/input/depth")
+    input_dirs = " ".join(shlex.quote(str(Path(COMFYUI_DIR) / "input" / name))
+                          for name in ("openpose", "canny", "depth"))
+    _deploy_exec(f"mkdir -p {input_dirs}")
 
     _deploy_exec("pm2 delete comfy 2>/dev/null || true")
     # 清掉 pm2 注入的日志路径环境变量 (见 log_service.clean_pm2_env)
     from .log_service import clean_pm2_env
     _deploy_exec(
-        f'cd /workspace/ComfyUI && pm2 start {PY} --name comfy '
-        f'--interpreter none --log /workspace/comfy.log --merge-logs --time '
+        f'cd {shlex.quote(COMFYUI_DIR)} && pm2 start {PY} --name comfy '
+        f'--interpreter none --log {shlex.quote(str(WORKSPACE_ROOT / "comfy.log"))} --merge-logs --time '
         f'--restart-delay 3000 --max-restarts 10 '
         f'-- main.py {comfy_args}',
         env=clean_pm2_env(),

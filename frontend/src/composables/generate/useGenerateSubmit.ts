@@ -68,15 +68,6 @@ export function useGenerateSubmit(
       return false
     }
 
-    // 缺失引用先行拦截: 装载时保留了本机不存在的模型引用 (不销毁用户配置),
-    // 这里在提交前拦下并说明是哪些, 而不是让后端返回一个"找不到模型"的报错。
-    const missingHere = store.missingRefs.filter(r => r.arch === store.activeModelType)
-    if (missingHere.length) {
-      const names = missingHere.map(r => r.name).join(', ')
-      toast(t('generate.error.models_missing', { names }), 'error')
-      return false
-    }
-
     const { modelType, activeConfig, selectedPackaging } = resolvePackaging()
 
     if (activeConfig?.mediaType === 'video') {

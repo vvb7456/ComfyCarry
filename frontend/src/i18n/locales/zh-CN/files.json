@@ -1,6 +1,7 @@
 {
   "err": {
     "path_required": "请填写路径",
+    "path_invalid": "请使用带根目录标记的路径或绝对路径",
     "path_outside": "路径越界：必须位于 {root} 内",
     "path_is_root": "不能直接操作 {root} 根目录",
     "not_a_file": "不是文件或不存在",

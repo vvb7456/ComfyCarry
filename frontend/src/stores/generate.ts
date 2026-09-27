@@ -3,6 +3,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import type { ModelTypeConfig } from '@/config/model-types'
 import { MODEL_TYPES } from '@/config/model-types'
 import { redirectToLogin } from '@/composables/useApiFetch'
+import { workspaceFiles, type WorkspaceFile } from '@/composables/generate/workspaceFiles'
 
 export interface LoraEntry {
   name: string
@@ -113,6 +114,7 @@ export interface DisabledToken {
 }
 
 export interface ModelState {
+  files?: WorkspaceFile[]
   positive: string
   negative: string
   positiveDisabled: DisabledToken[]
@@ -472,6 +474,7 @@ export const useGenerateStore = defineStore('generate', () => {
 
   /** 缺失引用的完整清单 (供缺失 modal 展示): 架构 + 字段 + 名字 */
   const missingRefs = ref<{ arch: string; field: string; name: string }[]>([])
+  const restoredFiles = ref<Array<WorkspaceFile & { arch: string }>>([])
 
   function markMissing(arch: string, field: string, name: string) {
     if (!name) return
@@ -528,8 +531,10 @@ export const useGenerateStore = defineStore('generate', () => {
    * 系统不替用户销毁配置, 但用户可以选择清理掉跑不了的项。
    * 只处理被标记为缺失的字段; clip/vae 等的置空逻辑不受影响 (它们不在此清单里)。
    */
-  function pruneMissing() {
+  function pruneMissing(paths?: Set<string>) {
     for (const { arch, field, name } of missingRefs.value) {
+      if (paths && !restoredFiles.value.some(file => file.arch === arch && file.field === field
+        && file.path.endsWith('/' + name) && paths.has(file.path))) continue
       const state = modelStates[arch]
       if (!state) continue
       if (field === 'loras') {
@@ -548,7 +553,20 @@ export const useGenerateStore = defineStore('generate', () => {
         ;(state as unknown as Record<string, unknown>)[field] = ''
       }
     }
+    for (const file of restoredFiles.value) {
+      if (!paths?.has(file.path)) continue
+      const state = modelStates[file.arch]
+      if (!state) continue
+      if (file.field.startsWith('fast.')) state.fast = false
+      else if (file.field === 'faceDetailer.sam') state.faceDetailer.useSam = false
+      else if (file.field.startsWith('upscale.') && file.field !== 'upscale.svrModel') state.upscale.enabled = false
+      else if (file.field.includes('.dependency.')) {
+        const type = file.field.split('.')[1]!
+        if (state.controlNets[type]) state.controlNets[type].enabled = false
+      }
+    }
     resetMissing()
+    restoredFiles.value = []
   }
 
   /** 各架构的运行组件是否就绪; undefined = 尚未检查 */
@@ -607,7 +625,7 @@ export const useGenerateStore = defineStore('generate', () => {
   function currentStatesJson(): Record<string, string> {
     const out: Record<string, string> = {}
     for (const [key, value] of Object.entries(modelStates)) {
-      out[key] = JSON.stringify(value)
+      out[key] = JSON.stringify({ ...value, files: workspaceFiles(key, value) })
     }
     return out
   }
@@ -760,6 +778,7 @@ export const useGenerateStore = defineStore('generate', () => {
   }): Promise<RestoreResult> {
     // 每次装载重新计算缺失清单 (旧标记已随上次选择失效)
     resetMissing()
+    restoredFiles.value = []
     const GET_RETRIES = 3
     let data: Record<string, unknown> | null = null
     let ok = false
@@ -855,12 +874,13 @@ export const useGenerateStore = defineStore('generate', () => {
             state = migrated
           }
 
+          restoredFiles.value.push(...(state.files ?? []).map(file => ({ ...file, arch: key })))
+
           if (validators) {
             // ── 缺失引用: 「记录」而非「删除」 ──
             // 模型文件只是临时不在 (同步未完成 / 用户移走) 时, 用户的配置**不该
             // 被自动销毁** —— 那会让导入的配置当场失效, 且清了就写回服务端,
-            // 不可恢复。故保留引用并记入 missing, 由 UI 标明缺失、提交时由
-            // validate() 拦住。
+            // 不可恢复。故保留引用并记入 missing，仅供展示和补齐文件。
             //
             // 例外 (刻意保留旧行为):
             //   · clip/clip2/vae/vaeOverride — 单值主键, 拆分形态另有依赖检查
@@ -974,9 +994,11 @@ export const useGenerateStore = defineStore('generate', () => {
           }
         }
       }
-      // 以「装载并校验后的实际内存态」为已落盘基线: 校验会清掉不存在的模型/
-      // LoRA, 基线必须反映清理后的结果 —— 否则首次变更会把全部架构当成已变更重发。
-      savedStatesJson = currentStatesJson()
+      // 新增的文件引用清单也需要随首次保存落库。
+      savedStatesJson = Object.fromEntries(
+        Object.entries((data.modelStates as Record<string, unknown>) ?? {})
+          .map(([key, state]) => [key, JSON.stringify(state)]),
+      )
       return { outcome: 'applied' }
     } catch {
       // 服务端已守结构不变量, 走到这里基本不可达; 按「空」处理以免页面卡死在装载失败态。
@@ -988,6 +1010,7 @@ export const useGenerateStore = defineStore('generate', () => {
     activeModelType, activeModelTypeByTask, activeTask,
     modelStates,
     missingModels, missingRefs, isMissing, clearMissing, pruneMissing, reconcileMissing,
+    restoredFiles,
     componentsReady, setComponentsReady,
     currentConfig, currentState, stateFor,
     switchModelType, switchTask, save, restore, enableAutoSave, flushSave,

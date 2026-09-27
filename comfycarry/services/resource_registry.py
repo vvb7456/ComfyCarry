@@ -485,6 +485,8 @@ class ResourceRegistry:
             for key, r in self._resources.items():
                 if r.state.value in PROCESS_STATES:
                     resources[key] = r.to_dict()
+                elif r.meta.get("path") and file_on_disk(r.meta["path"]):
+                    resources[key] = {**r.to_dict(), "state": DERIVED_INSTALLED}
                 elif key in resources:
                     continue
             version = self._snapshot_version
@@ -534,7 +536,7 @@ class ResourceRegistry:
                 payload["state"] = self.resolve_state(
                     resource.source, resource.model_id, resource.version_id,
                     source_file_exists(resource.source, resource.model_id,
-                                       resource.version_id),
+                                       resource.version_id, resource.meta.get("path", "")),
                 )
             except Exception as e:
                 logger.debug(f"[resource_registry] 派生事件状态失败: {e}")
@@ -561,7 +563,16 @@ class ResourceRegistry:
 _registry: ResourceRegistry | None = None
 
 
-def source_file_exists(source: str, model_id: str, version_id: str) -> Callable[[], bool]:
+def file_on_disk(path: str) -> bool:
+    try:
+        from ..config import resolve_file_path
+        path = str(resolve_file_path(path))
+        return os.path.isfile(path) and os.path.getsize(path) > 0 and not os.path.isfile(path + ".aria2")
+    except (OSError, ValueError):
+        return False
+
+
+def source_file_exists(source: str, model_id: str, version_id: str, path: str = "") -> Callable[[], bool]:
     """「这个来源版本的文件现在在磁盘上吗」的判据 —— 查 models 表。
 
     models 表由扫盘对账维护 (reconcile_model_index), 是磁盘现状的唯一真相;
@@ -569,6 +580,8 @@ def source_file_exists(source: str, model_id: str, version_id: str) -> Callable[
     返回闭包而非布尔: 调用方 (resolve_state) 只在需要时才查, 避免无谓查询。
     """
     def _check() -> bool:
+        if path:
+            return file_on_disk(path)
         if not model_id and not version_id:
             return False
         try:

@@ -48,7 +48,6 @@ export function useControlNetOrchestration({
   // 依赖清单按 branch 取 (sdxl → union; ilnoob → 专用), 与面板下拉过滤同源。
   // 状态只来自磁盘, 没有 dismiss 记忆位: 换架构/删模型/别处下完都会自然收敛。
 
-  const comfyuiDir = () => options.comfyuiDir.value
   const tabActive = () => store.activeModelType === modelType
 
   function cnDep(type: ControlNetType): UseDependencyStatusReturn {
@@ -56,7 +55,6 @@ export function useControlNetOrchestration({
       () => getCnDepGroup(type, cnBranch.value).rows,
       {
         minOptional: () => getCnDepGroup(type, cnBranch.value).minOptional ?? 0,
-        comfyuiDir,
         enabled: tabActive,
         source: 'controlnet-dep',
       },
@@ -70,19 +68,16 @@ export function useControlNetOrchestration({
 
   const depUpscale = useDependencyStatus(() => UPSCALE_DEP_GROUP.rows, {
     minOptional: UPSCALE_DEP_GROUP.minOptional ?? 0,
-    comfyuiDir,
     enabled: tabActive,
     source: 'upscale-dep',
   })
   const depTagger = useDependencyStatus(() => TAGGER_DEP_GROUP.rows, {
     minOptional: TAGGER_DEP_GROUP.minOptional ?? 0,
-    comfyuiDir,
     enabled: tabActive,
     source: 'tagger-dep',
   })
   const depFace = useDependencyStatus(() => FACE_DEP_GROUP.rows, {
     minOptional: FACE_DEP_GROUP.minOptional ?? 0,
-    comfyuiDir,
     enabled: tabActive,
     source: 'face-dep',
   })

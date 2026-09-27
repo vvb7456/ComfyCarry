@@ -20,7 +20,7 @@ bp = Blueprint("ssh", __name__)
 
 AUTHORIZED_KEYS_FILE = os.path.expanduser("~/.ssh/authorized_keys")
 SSHD_CONFIG_FILE = "/etc/ssh/sshd_config"
-SSHD_LOG_FILE = "/workspace/sshd.log"
+SSHD_LOG_FILE = str(cfg.WORKSPACE_ROOT / "sshd.log")
 
 
 # 响应文案 —— 一律 key + params, 由前端翻译 (i18n/locales/*/ssh.json)

@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request, Response
 
 import requests as req_lib
 
-from ..config import SCRIPT_DIR, COMFYUI_URL, APP_VERSION
+from ..config import SCRIPT_DIR, COMFYUI_URL, APP_VERSION, WORKSPACE_ROOT
 from ..utils import _run_cmd
 from ..services import system_monitor
 from ..services.cf_runtime import active_cf_name
@@ -132,7 +132,7 @@ def _pm2_log_path(name: str) -> str | None:
             _pm2_names_cache = (now, names)
         except Exception:
             return None
-    return f"/workspace/{name}.log" if name in names else None
+    return str(WORKSPACE_ROOT / f"{name}.log") if name in names else None
 
 
 @bp.route("/api/logs/<name>")

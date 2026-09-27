@@ -9,6 +9,7 @@ import os
 import threading
 import time
 from typing import Any
+from ..config import WORKSPACE_DIR
 
 _cache: dict[str, Any] = {}
 _cache_lock = threading.Lock()
@@ -101,7 +102,7 @@ def _collect_system() -> dict:
             "percent": mem.percent,
         }
 
-        path = "/workspace" if os.path.exists("/workspace") else "/"
+        path = WORKSPACE_DIR if os.path.exists(WORKSPACE_DIR) else "/"
         disk = psutil.disk_usage(path)
         data["disk"] = {
             "total": disk.total,

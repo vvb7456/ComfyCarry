@@ -6,6 +6,10 @@
 # 所有应用逻辑由 bootstrap.sh (从 GitHub 获取) 接管
 # ==============================================================================
 
+export WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
+export COMFYUI_DIR="${COMFYUI_DIR:-$WORKSPACE_DIR/ComfyUI}"
+mkdir -p "$WORKSPACE_DIR"
+
 # Vast.ai: SSH_PUBLIC_KEY / RunPod: PUBLIC_KEY
 SSH_KEY="${SSH_PUBLIC_KEY:-${PUBLIC_KEY:-}}"
 if [ -n "$SSH_KEY" ]; then
@@ -20,7 +24,7 @@ mkdir -p /run/sshd
 [ ! -f /etc/ssh/ssh_host_rsa_key ] && ssh-keygen -A 2>/dev/null || true
 # 清除云平台注入的 SSH Banner (vast.ai / RunPod)
 : > /etc/banner 2>/dev/null || true
-/usr/sbin/sshd -E /workspace/sshd.log 2>/dev/null || true
+/usr/sbin/sshd -E "$WORKSPACE_DIR/sshd.log" 2>/dev/null || true
 
 # ── 环境变量持久化 (SSH session 可见) ──
 env >> /etc/environment 2>/dev/null || true

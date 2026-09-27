@@ -94,7 +94,7 @@ const triggerOptions = computed<SelectOption[]>(() => [
     <FormField :label="t('sync.rule.local_path')" density="compact">
       <template #default="{ id }">
         <FieldControlRow>
-          <input :id="id" v-model="rule.local_path" type="text" class="form-input" placeholder="/ComfyUI/models/loras">
+          <input :id="id" v-model="rule.local_path" type="text" class="form-input" placeholder="{ComfyUI}/models/loras">
           <BaseButton size="sm" icon-only :aria-label="t('sync.browse.local_title')" :title="t('sync.browse.local_title')" @click="emit('browse', 'local', 'local_path')"><MsIcon name="folder_open" /></BaseButton>
         </FieldControlRow>
       </template>

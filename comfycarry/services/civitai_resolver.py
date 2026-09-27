@@ -609,6 +609,7 @@ def resolve_civitai_download(
     api_key: str = "",
     custom_filename: str = "",
     dir_keys: dict[str, str] | None = None,
+    target_path: str = "",
 ) -> dict:
     """
     Returns:
@@ -654,6 +655,20 @@ def resolve_civitai_download(
         version_id=vid,
         api_key=api_key,
     )
+
+    if target_path:
+        # 恢复已指定目的文件，不再按模型类型分类或附加架构子目录。
+        from ..config import resolve_file_path
+        target = str(resolve_file_path(target_path))
+        return {
+            "url": build_download_url(info["selected_file"], info.get("version_id"), api_key),
+            "filename": os.path.basename(target),
+            "save_dir": os.path.dirname(target),
+            "model_type": model_type,
+            "display_name": info["model_name"],
+            "info": info,
+            "is_video": info.get("is_video", False),
+        }
 
     base_model = info.get("base_model", "")
     entry_type = info.get("model_type", "")

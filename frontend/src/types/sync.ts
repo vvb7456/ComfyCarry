@@ -133,7 +133,7 @@ export interface RemoteTypesResponse {
 }
 
 export interface RulesSaveResponse extends ApiOkResponse {
-  /** 后端规范化 (local_path 转 workspace 根相对、字段校验) 后的规则, 以此为准 */
+  /** 后端规范化（保留 local_path 根标记、字段校验）后的规则，以此为准。 */
   rules?: SyncRule[]
 }
 

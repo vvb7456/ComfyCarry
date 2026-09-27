@@ -1,29 +1,16 @@
-/**
- * 同步规则 local_path 的前端预检。
- *
- * 与后端 `resolve_workspace_path(allow_root=False)` 保持同一套 workspace
- * 根相对语义: 前导 "/" 即 workspace 根, "." 忽略, ".." 向上折叠; 折叠到根
- * 之上即越界, 折到根本身则拒绝。两边必须一致, 否则会出现「前端放行、后端
- * 拒绝」——向导里这类规则会在部署时被静默跳过。
- *
- * 返回短 key (调用方用 `sync.err.<key>` 翻译) 与可选插值, 合法返回 null。
- */
-export function localPathError(path: string): { key: string; params?: Record<string, unknown> } | null {
-  const raw = (path || '').trim()
-  if (!raw) return { key: 'path_required' }
+import { FilePathError, normalizeFilePath } from './filePath'
 
-  const segments: string[] = []
-  for (const part of raw.replace(/\\/g, '/').split('/')) {
-    if (!part || part === '.') continue
-    if (part === '..') {
-      // 越过 workspace 根 —— 后端会 normpath 到工作区之外并拒绝
-      if (!segments.length) return { key: 'path_outside', params: { root: '/' } }
-      segments.pop()
-      continue
+/** 前端检查地址格式；实际访问范围由后端按当前实例的两个根目录判定。 */
+export function localPathError(path: string): { key: string; params?: Record<string, unknown> } | null {
+  try {
+    const normalized = normalizeFilePath(path || '')
+    if (normalized === '{workspace}' || normalized === '/') {
+      return { key: 'path_is_root', params: { root: normalized } }
     }
-    segments.push(part)
+  } catch (error) {
+    if (error instanceof FilePathError) return { key: error.key, params: error.params }
+    throw error
   }
-  if (!segments.length) return { key: 'path_is_root', params: { root: '/' } }
   return null
 }
 

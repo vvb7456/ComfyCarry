@@ -34,7 +34,7 @@ export interface ModelMeta {
   civitaiUrl?: string
   sourceUrl?: string
   sourceLabel?: string
-  channel?: 'civitai' | 'huggingface'
+  channel?: 'civitai' | 'whitelist'
   sizeBytes?: number
   description?: string
   stats?: { downloads?: number; likes?: number }

@@ -74,12 +74,12 @@ const TAGGER_MODELS = {
       {
         filename: 'wd-eva02-large-tagger-v3.onnx',
         url: 'https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/model.onnx',
-        subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        directory: '{ComfyUI}/custom_nodes/ComfyUI-WD14-Tagger/models',
       },
       {
         filename: 'wd-eva02-large-tagger-v3.csv',
         url: 'https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3/resolve/main/selected_tags.csv',
-        subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        directory: '{ComfyUI}/custom_nodes/ComfyUI-WD14-Tagger/models',
       },
     ],
   },
@@ -92,12 +92,12 @@ const TAGGER_MODELS = {
       {
         filename: 'wd-vit-tagger-v3.onnx',
         url: 'https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/model.onnx',
-        subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        directory: '{ComfyUI}/custom_nodes/ComfyUI-WD14-Tagger/models',
       },
       {
         filename: 'wd-vit-tagger-v3.csv',
         url: 'https://huggingface.co/SmilingWolf/wd-vit-tagger-v3/resolve/main/selected_tags.csv',
-        subdir: 'custom_nodes/ComfyUI-WD14-Tagger/models',
+        directory: '{ComfyUI}/custom_nodes/ComfyUI-WD14-Tagger/models',
       },
     ],
   },

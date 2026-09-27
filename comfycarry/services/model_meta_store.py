@@ -278,7 +278,7 @@ def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
 
     # HF 白名单平铺字段 → details_json 扩展 (仅新增键兼容, 不影响 civitai 读取)
     details_extra: dict[str, Any] = {}
-    for key in ("author", "image_url", "source_url"):
+    for key in ("author", "image_url", "source_url", "provider"):
         value = data.get(key)
         if value not in (None, ""):
             details_extra[key] = _text(value)

@@ -1,24 +1,16 @@
-"""配置引用模型文件的 SHA256 指纹表 (表2) 及其扫描器。
+"""工作区文件指纹表：键为表一 files 中的原路径，值为实际文件的 SHA256。
 
-导出/导入配置时携带 (key=generate_model_hashes), 键为
-``"<category>/<relative_path>"``, 值为大写十六进制 SHA256。表内**不记来源**:
-"从哪取字节" 是导入端的检索策略 (本机白名单哈希索引 → civitai by-hash → unknown),
-与后端无关, 后端只负责把这张不透明 JSON 整体存取。
-
-两种来源分开:
-  - 存量表: 上次导入留下的指纹。记录的是**源实例**引用的文件, 本实例可能从未
-    下载过; 导出时须原样带走, 否则迁移链在第二跳就丢失信息。
-  - 现扫: 本实例当前工作区状态引用到、且 models 表里已有的文件指纹。
-
-扫描刻意不判断插槽、不过滤 enabled: 深度遍历 modelStates 子树里的全部字符串,
-按 relative_path 命中即收 —— 多收无害, 漏收才致命。
+辅助文件不一定进入模型索引；有索引的复用哈希缓存，其余直接读取文件。
+导入后尚未补齐的文件保留原指纹，便于再次导出。
 """
 
 import json
+import os
 import logging
-from typing import Any, Iterator
+from typing import Any
 
 from ..db import db
+from ..config import resolve_file_path
 
 log = logging.getLogger(__name__)
 
@@ -27,59 +19,34 @@ TABLE = "app_meta"
 MODELS_TABLE = "models"
 
 
-def _iter_strings(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _iter_strings(item)
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            yield from _iter_strings(item)
+def referenced_paths(state: Any) -> set[str]:
+    if not isinstance(state, dict):
+        return set()
+    model_states = state.get("modelStates")
+    if not isinstance(model_states, dict):
+        return set()
+    return {
+        file["path"] for model_state in model_states.values()
+        if isinstance(model_state, dict)
+        for file in model_state.get("files", [])
+        if isinstance(file, dict) and isinstance(file.get("path"), str) and file["path"]
+    }
 
 
 def scan_model_hashes(state: Any) -> dict[str, str]:
-    """扫描工作区状态引用的模型文件, 返回 {"<category>/<relative_path>": sha}。
-
-    每个去重后的字符串按 relative_path 等值匹配 models 表; 命中行的每一条各
-    产出一个键 (同名文件落在不同 category 时各自成键)。文件不在磁盘或哈希算
-    不出 → 省略该键。
-    """
-    if not isinstance(state, dict):
-        return {}
-    model_states = state.get("modelStates")
-    if not isinstance(model_states, dict):
-        return {}
-    if not db.table_exists(TABLE) or not db.table_exists(MODELS_TABLE):
-        return {}
-
-    names = {name for name in _iter_strings(model_states) if name and name.strip()}
-    if not names:
-        return {}
-
+    """表二直接以表一的原路径为键，不使用模型索引的分类路径。"""
     from ..utils import _sha256_file
     from .model_meta_store import get_or_compute_model_sha256
 
     result: dict[str, str] = {}
-    for name in names:
-        rows = db.fetch_all(
-            # 兜底 filename: 配置引用可能是裸文件名 (如 face_yolov8m.pt), 而登记行
-            # 的 relative_path 是相对其扫描根的路径 (如 bbox/face_yolov8m.pt ——
-            # 父根 ultralytics 先于子根 bbox 被扫, 归属 category=ultralytics)。
-            # 等值匹配会漏行 → 键被省略 → 导入端永远查不到指纹。
-            "SELECT id, real_path, category, relative_path FROM models "
-            "WHERE relative_path = ? OR filename = ?",
-            (name, name),
-        )
-        for row in rows:
-            # get_or_compute 同时承担「缓存是否仍匹配磁盘」与「现算」:
-            # 缓存有效即直接用, 文件缺失/算不出返回 None → 该键省略。
-            sha = get_or_compute_model_sha256(
-                int(row["id"]), row["real_path"], _sha256_file
-            )
-            if not sha:
-                continue
-            result[f"{row['category']}/{row['relative_path']}"] = sha.upper()
+    indexed = db.table_exists(MODELS_TABLE)
+    for path in referenced_paths(state):
+        real_path = os.path.realpath(resolve_file_path(path))
+        row = db.fetch_one("SELECT id FROM models WHERE real_path = ?", (real_path,)) if indexed else None
+        sha = (get_or_compute_model_sha256(int(row["id"]), real_path, _sha256_file)
+               if row else _sha256_file(real_path))
+        if sha:
+            result[path] = sha.upper()
     return result
 
 
@@ -113,8 +80,9 @@ def replace_hashes(payload: object) -> dict[str, str]:
 
 
 def export_hashes(state: Any) -> dict[str, str]:
-    """导出用并集: 现扫结果 ∪ 存量表中现扫未产出的键 (现扫优先)。"""
-    merged = dict(load_hashes())
+    """只导出表一引用的原路径，缺失文件沿用相同路径下保存的指纹。"""
+    paths = referenced_paths(state)
+    merged = {path: sha for path, sha in load_hashes().items() if path in paths}
     for key, sha in scan_model_hashes(state).items():
         merged[key] = sha
     return merged

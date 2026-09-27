@@ -10,12 +10,12 @@ from dataclasses import dataclass
 
 from ..config import (
     RCLONE_CONF, SYNC_RULES_FILE, SYNC_SETTINGS_FILE,
-    REMOTE_ROOT_DIR_KEY, resolve_workspace_path,
+    REMOTE_ROOT_DIR_KEY, resolve_workspace_path, WORKSPACE_ROOT,
 )
 
 
 def _local_abs(rule_path: str) -> str | None:
-    """规则里的 local_path (workspace 根相对) → 真实绝对路径。越界返回 None。"""
+    """规则地址统一解析为 rclone 使用的绝对路径。越界返回 None。"""
     target, err = resolve_workspace_path(rule_path, allow_root=False)
     return None if err else str(target)
 
@@ -155,7 +155,7 @@ def _sync_log(key, params=None, level="info"):
     if _app_logger:
         _app_logger.debug(f"[sync] {key} {params or {}}")
     try:
-        with open("/workspace/sync.log", "a") as f:
+        with open(WORKSPACE_ROOT / "sync.log", "a") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         pass

@@ -327,8 +327,15 @@ def api_settings_import_config():
 
     if data.get("sync_rules"):
         try:
+            from .sync import _normalize_rule
+            rules = []
+            for rule in data["sync_rules"]:
+                normalized, err = _normalize_rule(dict(rule))
+                if err:
+                    raise ValueError(f"{err[0]}: {err[1]}")
+                rules.append(normalized)
             SYNC_RULES_FILE.write_text(
-                json.dumps(data["sync_rules"], indent=2, ensure_ascii=False),
+                json.dumps(rules, indent=2, ensure_ascii=False),
                 encoding="utf-8"
             )
             applied.append("同步规则")

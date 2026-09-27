@@ -19,7 +19,6 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import DownloadButton from '@/components/models/DownloadButton.vue'
 import { modelCategoryColor } from '@/utils/constants'
-import { MODEL_TYPE_DIRS } from '@/config/huggingface-models'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
 import { useDownloads } from '@/composables/useDownloads'
@@ -42,17 +41,16 @@ const emit = defineEmits<{
 const { t, te } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 const { confirm } = useConfirm()
-const { getVersionDownloadInfo, downloadOne, downloadHuggingFaceVersion, cancelDownload, startPolling } = useDownloads()
+const { getFileDownloadInfo, downloadOne, downloadHuggingFaceVersion, cancelDownload } = useDownloads()
 const missingModels = useMissingModels()
 
 const submitting = ref(false)
 
-const totalCount = computed(() => props.downloadable.length + props.unavailable.length)
+const totalCount = computed(() => [...props.downloadable, ...props.unavailable].filter(m => missingModels.isMissing(m.path)).length)
 
 /** 该行的下载状态 (与模型页同源的状态机) */
 function infoOf(m: MissingModel) {
-  if (!m.modelId) return { state: 'idle' as const, progress: 0, speed: 0, downloadId: null }
-  return getVersionDownloadInfo(m.modelId, m.versionId || m.modelId)
+  return getFileDownloadInfo(m.path, { modelId: m.modelId, versionId: m.versionId || m.modelId })
 }
 
 /**
@@ -62,21 +60,19 @@ function infoOf(m: MissingModel) {
  */
 function handleDownload(m: MissingModel) {
   if (!m.modelId) return
-  // 接上进度流 (SSE 优先, 轮询兜底) —— 与模型页下载入口同一动作。
-  // 不接的话 tasks 列表是空的, getVersionDownloadInfo 匹配不到任务,
-  // 按钮拿到的 progress/speed 恒为 0, 看起来就是"没有进度提示"。
-  startPolling()
   if (m.source === 'whitelist') {
     // 白名单命中: 依赖条同款的 HuggingFace 请求体, 覆写落盘文件名与登记类别
     downloadHuggingFaceVersion(m.modelId, m.versionId, {
       customFilename: basenameOf(m.path),
       modelType: m.category,
+      targetPath: m.path,
     })
     return
   }
   // civitai 命中: 模型页同款请求体 (custom_filename = 配置引用的文件名)
   downloadOne(m.modelId, m.category, Number(m.versionId) || undefined, undefined, {
     customFilename: basenameOf(m.path),
+    targetPath: m.path,
   })
 }
 
@@ -93,7 +89,7 @@ function roleLabel(m: MissingModel): string {
 
 /** 事实行第一格: 类别对应的完整落盘目录 (models/checkpoints 等) */
 function fullDir(m: MissingModel): string {
-  return MODEL_TYPE_DIRS[m.category] ?? `models/${m.category}`
+  return m.path.slice(0, m.path.lastIndexOf('/'))
 }
 
 async function handleCancel(m: MissingModel) {
@@ -226,7 +222,7 @@ watch(() => props.modelValue, (open) => {
       <BaseButton :disabled="submitting" @click="emit('update:modelValue', false)">
         {{ t('generate.missing.keep') }}
       </BaseButton>
-      <BaseButton :disabled="submitting" @click="ignoreAndFallback">
+      <BaseButton :disabled="submitting || totalCount === 0" @click="ignoreAndFallback">
         {{ t('generate.missing.ignore_fallback') }}
       </BaseButton>
       <BaseButton

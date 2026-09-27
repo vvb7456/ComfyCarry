@@ -812,6 +812,7 @@
     "state_invalid_payload": "Invalid workspace state payload",
     "state_invalid_version": "Invalid workspace state version",
     "state_invalid_model_states": "Workspace state is missing model configs",
+    "state_invalid_file_path": "Workspace files require root-marked or absolute paths",
     "state_too_large": "Workspace state is too large to save"
   },
   "tour": {

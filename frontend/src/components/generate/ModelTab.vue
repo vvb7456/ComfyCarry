@@ -419,7 +419,6 @@ function onModelSelect(name: string) {
 const compStatus = useDependencyStatus(
   () => componentDepRows(props.modelType, { fast: state.value.fast }, t),
   {
-    comfyuiDir: () => options.comfyuiDir.value,
     source: 'runtime-component',
     metaOf: () => ({ arch: props.modelType }),
   },

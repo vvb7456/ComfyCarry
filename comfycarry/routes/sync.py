@@ -15,7 +15,7 @@ from ..config import (
     SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
     SYNC_RULE_DIRECTIONS, SYNC_RULE_METHODS, SYNC_RULE_TRIGGERS,
     REMOTE_ROOT_DIR_KEY, normalize_remote_root_dir,
-    resolve_workspace_path, workspace_relative,
+    resolve_workspace_path, normalize_file_path, WORKSPACE_ROOT,
     _RCLONE_TOKEN_RE,
 )
 from ..services.sync_engine import (
@@ -209,13 +209,13 @@ def api_sync_logs():
         lines = 200
     before = request.args.get("before")
     before = int(before) if before and before.isdigit() else None
-    return jsonify(read_history("/workspace/sync.log", before=before, lines=lines))
+    return jsonify(read_history(str(WORKSPACE_ROOT / "sync.log"), before=before, lines=lines))
 
 
 @bp.route("/api/sync/logs/stream")
 def api_sync_logs_stream():
     from ..services.log_service import stream_tail
-    return Response(stream_tail("/workspace/sync.log"), mimetype="text/event-stream",
+    return Response(stream_tail(str(WORKSPACE_ROOT / "sync.log")), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
@@ -875,17 +875,17 @@ def api_sync_remote_mkdir():
 
 @bp.route("/api/sync/local/browse", methods=["POST"])
 def api_sync_local_browse():
-    """列出本地目录。path 为 workspace 根相对路径 ("/" 即 WORKSPACE_DIR)。
+    """列出本地目录。path 使用显式根目录标记或绝对路径。
 
     失败一律 HTTP 200 + {ok: false, error}, 理由同 remote/browse。
     """
     data = request.get_json(force=True)
-    path = data.get("path") or "/"
+    path = data.get("path") or "{workspace}"
     target, err = resolve_workspace_path(path)
     if err:
         return _soft_err(err[0], **err[1])
     if not target.is_dir():
-        return _soft_err("dir_missing", path=workspace_relative(target))
+        return _soft_err("dir_missing", path=normalize_file_path(path))
     try:
         dirs = sorted(
             d.name for d in target.iterdir()
@@ -970,13 +970,12 @@ def _normalize_rule(r: dict) -> tuple[dict | None, tuple[str, dict] | None]:
     if not str(r.get("remote_path") or "").strip():
         return None, ("rule_remote_path_required", {"label": label})
 
-    # local_path 必须是 workspace 根相对路径, 且不得越界 ——
-    # sync / move 会删目标端多余文件, 指到 workspace 外风险过大
+    # sync / move 会删目标端文件，范围校验与地址解析分开。
     target, err = resolve_workspace_path(r["local_path"], allow_root=False)
     if err:
         # 路径类错误带上规则名: 一次保存可能有多条规则, 用户要知道是哪条
         return None, (f"rule_{err[0]}", {"label": label, **err[1]})
-    r["local_path"] = workspace_relative(target)
+    r["local_path"] = normalize_file_path(r["local_path"])
 
     if not _RCLONE_TOKEN_RE.match(str(r["remote"])):
         return None, ("rule_remote_invalid", {"label": label})

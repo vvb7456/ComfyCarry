@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import requests
 from flask import Blueprint, Response, jsonify, request
 
-from ..config import COMFYUI_URL, COMFYUI_DIR, _set_config
+from ..config import COMFYUI_URL, COMFYUI_DIR, WORKSPACE_ROOT, _set_config
 
 
 def comfyui_port() -> int:
@@ -160,8 +160,8 @@ def restart_comfyui(args_str: str = "") -> tuple[bool, dict | None]:
         import time as _time
         _time.sleep(1)
         cmd = (
-            f'cd {COMFYUI_DIR} && pm2 start {py} --name comfy '
-            f'--interpreter none --log /workspace/comfy.log --merge-logs --time '
+            f'cd {shlex.quote(COMFYUI_DIR)} && pm2 start {py} --name comfy '
+            f'--interpreter none --log {shlex.quote(str(WORKSPACE_ROOT / "comfy.log"))} --merge-logs --time '
             f'--restart-delay 3000 --max-restarts 10 '
             f'-- main.py {args_str}'
         )

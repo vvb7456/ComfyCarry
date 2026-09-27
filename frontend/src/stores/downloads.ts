@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
 import { apiErrorText, apiMessageText } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
 import { buildHuggingFaceDownloadBody } from '@/utils/hfDownload'
+import { joinFilePath, normalizeFilePath } from '@/utils/filePath'
 import type { PendingFile, DirOption } from '@/components/models/DownloadDirModal.vue'
 import { HUGGINGFACE_MODELS } from '@/config/huggingface-models'
 import type { HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
@@ -37,6 +38,7 @@ export interface FavoriteItem {
 
 export interface DownloadTask {
   download_id: string
+  save_dir: string
   filename: string
   status: 'queued' | 'active' | 'paused' | 'complete' | 'failed' | 'cancelled'
   total_bytes: number
@@ -72,7 +74,33 @@ export type ModelAggregateState = 'idle' | 'downloading' | 'partial' | 'installe
 const POLL_INTERVAL = 3000
 const IDLE_DISCONNECT_MS = 60_000
 const ACTIVE_STATES = new Set<string>(['active', 'queued', 'paused'])
-const TERMINAL_STATES = new Set<string>(['complete', 'failed', 'cancelled'])
+
+interface FileCheck {
+  path?: string
+  installed: boolean
+  downloading?: boolean
+  download_id?: string | null
+}
+
+interface ResourceUpdate {
+  resource_key: string
+  state: string
+  active_task_id?: string | null
+}
+
+function taskPath(task: DownloadTask): string {
+  return task.save_dir ? joinFilePath(task.save_dir, task.filename) : ''
+}
+
+function taskInfo(task: DownloadTask): VersionDownloadInfo {
+  const states: Record<DownloadTask['status'], VersionState> = {
+    active: 'downloading', queued: 'queued', paused: 'paused', complete: 'installed', failed: 'failed', cancelled: 'idle',
+  }
+  return { state: states[task.status], progress: Math.min(100, Math.max(0, task.progress || 0)), speed: task.speed || 0,
+    downloadId: task.download_id }
+}
+
+const idleInfo = (): VersionDownloadInfo => ({ state: 'idle', progress: 0, speed: 0, downloadId: null })
 
 interface FavoriteApi {
   model_id: string
@@ -133,7 +161,7 @@ function mapResourceState(state: string): VersionState {
   }
 }
 
-/** 负整数模型 ID 即 HF 白名单条目 (SPEC §5-C: 模型 ID 为人工分配稳定负整数) */
+/** 白名单采用内部稳定负整数 ID，与文件发布平台无关。 */
 function isHuggingFaceId(modelId: number | string): boolean {
   return Number(modelId) < 0
 }
@@ -151,9 +179,9 @@ function findHuggingFaceVersion(
   return { model, version }
 }
 
-/** 后端资源 key 前缀: 负 ID → huggingface, 正 ID → civitai (SPEC §7-D) */
-function sourcePrefixFor(modelId: number | string): 'huggingface' | 'civitai' {
-  return isHuggingFaceId(modelId) ? 'huggingface' : 'civitai'
+/** 后端资源 key 前缀：白名单内部 ID 与 CivitAI 平台 ID 分开。 */
+function sourcePrefixFor(modelId: number | string): 'whitelist' | 'civitai' {
+  return isHuggingFaceId(modelId) ? 'whitelist' : 'civitai'
 }
 
 function resourceKeyFor(modelId: number | string, versionId: number | string): string {
@@ -177,6 +205,17 @@ export const useDownloadsStore = defineStore('downloads', () => {
    * 因此不存在缓存过期导致的误报 (曾经因此把已删文件显示为已下载)。
    */
   const resourceStates = ref<Map<string, string>>(new Map())
+  const resourceTaskIds = ref(new Map<string, string>())
+  const fileChecks = ref(new Map<string, FileCheck>())
+  const submittingPaths = ref(new Set<string>())
+  const knownFiles = new Set<string>()
+  const queuedChecks = new Set<string>()
+  let fileCheckPromise: Promise<void> | null = null
+  let revision = 0
+  const taskRevisions = new Map<string, number>()
+  const resourceRevisions = new Map<string, number>()
+  let subscribers = 0
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   const submittingVersionIds = ref<Set<string>>(new Set())
 
@@ -333,14 +372,33 @@ export const useDownloadsStore = defineStore('downloads', () => {
   }
 
   function applyTaskUpdate(taskData: DownloadTask) {
+    taskRevisions.set(taskData.download_id, ++revision)
     const idx = tasks.value.findIndex(t => t.download_id === taskData.download_id)
     if (idx >= 0) {
       tasks.value[idx] = taskData
       tasks.value = [...tasks.value]
+    } else {
+      tasks.value = [...tasks.value, taskData]
+    }
+    const path = taskPath(taskData)
+    if (path) {
+      const next = new Map(fileChecks.value)
+      for (const [key, value] of next) {
+        if (value.path !== path) continue
+        if (taskData.status === 'complete') next.set(key, { ...value, installed: true, downloading: false, download_id: null })
+        else if (ACTIVE_STATES.has(taskData.status)) next.set(key, { ...value, installed: false, downloading: true, download_id: taskData.download_id })
+        else next.set(key, { ...value, downloading: false, download_id: null })
+      }
+      fileChecks.value = next
     }
   }
 
-  function applyResourceUpdate(data: { resource_key: string; state: string; model_id: string; version_id: string }) {
+  function applyResourceUpdate(data: ResourceUpdate) {
+    resourceRevisions.set(data.resource_key, ++revision)
+    const ids = new Map(resourceTaskIds.value)
+    if (data.active_task_id) ids.set(data.resource_key, data.active_task_id)
+    else ids.delete(data.resource_key)
+    resourceTaskIds.value = ids
     const newMap = new Map(resourceStates.value)
     if (data.state === 'absent') {
       newMap.delete(data.resource_key)
@@ -352,10 +410,14 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   function connectGlobalSSE() {
     if (globalSSE) return
-    globalSSE = new EventSource('/api/downloads/stream')
+    const source = new EventSource('/api/downloads/stream')
+    globalSSE = source
 
-    globalSSE.onopen = () => {
+    globalSSE.onopen = async () => {
       stopPollTimer()
+      // 连接建立后重新取快照，补上断线期间及首次订阅前发生的变化。
+      if (refreshPromise) await refreshPromise
+      if (globalSSE === source) await refreshStatus()
     }
 
     globalSSE.onmessage = (e) => {
@@ -374,7 +436,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
     globalSSE.onerror = () => {
       disconnectGlobalSSE()
       startPollTimer()
-      setTimeout(() => {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
         if (polling.value) connectGlobalSSE()
       }, 3000)
     }
@@ -407,7 +470,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
   function scheduleIdleDisconnect() {
     if (idleTimer) clearTimeout(idleTimer)
     idleTimer = setTimeout(() => {
-      if (!tasks.value.some(t => ACTIVE_STATES.has(t.status))) {
+      if (!subscribers && !submittingVersionIds.value.size && !submittingPaths.value.size && _batchInFlight === 0
+          && !tasks.value.some(t => ACTIVE_STATES.has(t.status))) {
         stopPolling()
       } else {
         scheduleIdleDisconnect()
@@ -417,27 +481,39 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   /** Refresh task list + resource states from backend snapshot */
   async function _refreshStatus(): Promise<void> {
+    const started = revision
     try {
       const res = await fetch('/api/downloads/snapshot')
       if (!res.ok) return
       const r = await res.json()
 
       if (r?.tasks) {
-        tasks.value = r.tasks
+        const fresh = new Map<string, DownloadTask>((r.tasks as DownloadTask[]).map(task => [task.download_id, task]))
+        for (const task of tasks.value) {
+          if ((taskRevisions.get(task.download_id) ?? 0) > started) fresh.set(task.download_id, task)
+        }
+        tasks.value = [...fresh.values()]
       }
 
       if (r?.resources) {
         const newMap = new Map<string, string>()
+        const ids = new Map<string, string>()
         for (const [key, view] of Object.entries(r.resources)) {
-          const v = view as { state: string }
+          const v = view as ResourceUpdate
           newMap.set(key, v.state)
+          if (v.active_task_id) ids.set(key, v.active_task_id)
+        }
+        for (const [key, changed] of resourceRevisions) {
+          if (changed <= started) continue
+          if (resourceStates.value.has(key)) newMap.set(key, resourceStates.value.get(key)!)
+          else newMap.delete(key)
+          if (resourceTaskIds.value.has(key)) ids.set(key, resourceTaskIds.value.get(key)!)
+          else ids.delete(key)
         }
         resourceStates.value = newMap
+        resourceTaskIds.value = ids
       }
-
-      if (polling.value && _batchInFlight === 0 && r?.tasks && !r.tasks.some((t: DownloadTask) => ACTIVE_STATES.has(t.status))) {
-        stopPolling()
-      }
+      await checkFiles()
     } catch { /* ignore network errors */ }
   }
 
@@ -464,6 +540,107 @@ export const useDownloadsStore = defineStore('downloads', () => {
     polling.value = false
     disconnectGlobalSSE()
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  }
+
+  function subscribe() {
+    subscribers++
+    if (!polling.value) startPolling()
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      subscribers--
+      scheduleIdleDisconnect()
+    }
+  }
+
+  function checkFiles(paths: string[] = [...knownFiles]): Promise<void> {
+    for (const raw of paths) {
+      const path = normalizeFilePath(raw)
+      knownFiles.add(path)
+      queuedChecks.add(path)
+    }
+    if (fileCheckPromise) return fileCheckPromise
+    if (!queuedChecks.size) return Promise.resolve()
+    fileCheckPromise = Promise.resolve().then(async () => {
+      while (queuedChecks.size) {
+        const batch = [...queuedChecks]
+        queuedChecks.clear()
+        const started = revision
+        const res = await fetch('/api/downloads/check', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: batch.map(path => ({ path })) }) })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json() as { results: FileCheck[] }
+        const next = new Map(fileChecks.value)
+        batch.forEach((path, index) => {
+          const checked = data.results[index]
+          if (!checked) return
+          const recent = newestTask(task => taskPath(task) === checked.path && (taskRevisions.get(task.download_id) ?? 0) > started)
+          if (recent) {
+            checked.downloading = ACTIVE_STATES.has(recent.status)
+            checked.download_id = checked.downloading ? recent.download_id : null
+            if (recent.status === 'complete') checked.installed = true
+            else if (checked.downloading) checked.installed = false
+          }
+          next.set(path, checked)
+        })
+        fileChecks.value = next
+      }
+    }).finally(() => { fileCheckPromise = null })
+    return fileCheckPromise
+  }
+
+  function newestTask(matches: (task: DownloadTask) => boolean): DownloadTask | undefined {
+    return tasks.value.filter(matches).sort((a, b) =>
+      Number(ACTIVE_STATES.has(b.status)) - Number(ACTIVE_STATES.has(a.status)) || b.created_at - a.created_at)[0]
+  }
+
+  function getFileDownloadInfo(path: string, resource?: { modelId: string; versionId: string }): VersionDownloadInfo {
+    const key = normalizeFilePath(path)
+    const checked = fileChecks.value.get(key)
+    if (submittingPaths.value.has(key)) return { ...idleInfo(), state: 'submitting' }
+    const task = newestTask(task => !!checked?.path && taskPath(task) === checked.path)
+    const resourceInfo = resource?.modelId ? getVersionDownloadInfo(resource.modelId, resource.versionId) : undefined
+    if (task && ACTIVE_STATES.has(task.status)) {
+      return resourceInfo?.downloadId === task.download_id ? resourceInfo : taskInfo(task)
+    }
+    if (checked?.installed) return { ...idleInfo(), state: 'installed', progress: 100 }
+    if (resourceInfo && ['submitting', 'queued', 'downloading', 'verifying', 'paused'].includes(resourceInfo.state)) return resourceInfo
+    if (checked?.downloading && checked.download_id) {
+      return { ...idleInfo(), state: 'downloading', downloadId: checked.download_id }
+    }
+    if (task?.status === 'failed') return taskInfo(task)
+    return idleInfo()
+  }
+
+  async function downloadFile(file: { path: string; url: string; modelId?: string; versionId?: string; meta?: Record<string, unknown> }): Promise<boolean> {
+    const path = normalizeFilePath(file.path)
+    const state = getFileDownloadInfo(path, file.modelId ? { modelId: file.modelId, versionId: file.versionId || file.modelId } : undefined).state
+    if (['installed', 'submitting', 'queued', 'downloading', 'verifying', 'paused'].includes(state)) return true
+    submittingPaths.value = new Set([...submittingPaths.value, path])
+    startPolling()
+    try {
+      if (file.modelId) {
+        const submitted = await downloadHuggingFaceVersion(file.modelId, file.versionId, { targetPath: path })
+        await checkFiles([path])
+        return submitted
+      }
+      const res = await fetch('/api/downloads', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: file.url, save_dir: path.slice(0, path.lastIndexOf('/')), filename: path.split('/').pop(), meta: file.meta }) })
+      const result = await res.json()
+      acceptSubmission(result)
+      if (!res.ok || result.error || result.error_key) throw new Error(apiErrorText(result, `HTTP ${res.status}`))
+      await checkFiles([path])
+      return true
+    } catch (error) {
+      toast(errorMessage(error), 'error')
+      return false
+    } finally {
+      const next = new Set(submittingPaths.value)
+      next.delete(path)
+      submittingPaths.value = next
+    }
   }
 
   function setSubmitting(vid: string) {
@@ -476,14 +653,20 @@ export const useDownloadsStore = defineStore('downloads', () => {
     submittingVersionIds.value = new Set(submittingVersionIds.value)
   }
 
+  function acceptSubmission(result: unknown) {
+    const task = result as DownloadTask | null
+    // 推送可能先于 POST 响应到达；较早的提交响应不能把进度覆盖回 0。
+    if (task?.download_id && task.status && !tasks.value.some(existing => existing.download_id === task.download_id)) applyTaskUpdate(task)
+  }
+
   async function downloadOne(
     modelId: string,
     modelType: string,
     versionId?: number,
     dirKeys?: Record<string, string>,
-    opts?: { customFilename?: string },
+    opts?: { customFilename?: string; targetPath?: string },
   ) {
-    if (isHuggingFaceId(modelId)) return downloadHuggingFaceVersion(modelId, versionId)
+    if (isHuggingFaceId(modelId)) return downloadHuggingFaceVersion(modelId, versionId, opts)
 
     const vid = versionId ? String(versionId) : modelId
 
@@ -512,6 +695,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
           ...(dirKeys && Object.keys(dirKeys).length ? { dir_keys: dirKeys } : {}),
           // 生成页缺失弹窗按配置槽位取货时改用配置引用的文件名; 模型页缺省不带。
           ...(opts?.customFilename ? { custom_filename: opts.customFilename } : {}),
+          ...(opts?.targetPath ? { target_path: opts.targetPath } : {}),
         }),
       })
       if (res.status === 401) {
@@ -520,6 +704,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         return
       }
       result = await res.json()
+      acceptSubmission(result)
       // 403 + probe_auth: 探针收到 401 —— 文件需付费或无权限下载。
       // 不创建下载任务, 不弹目录选择 modal, 仅 toast 错误。
       if (res.status === 403 && result?.probe_auth) {
@@ -583,7 +768,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function downloadHuggingFaceVersion(
     modelId: number | string,
     versionId?: number | string,
-    opts?: { customFilename?: string; modelType?: HuggingFaceVersion['file']['modelType'] },
+    opts?: { customFilename?: string; modelType?: HuggingFaceVersion['file']['modelType']; targetPath?: string },
   ): Promise<boolean> {
     const found = findHuggingFaceVersion(modelId, versionId)
     if (!found) {
@@ -600,6 +785,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     const body = buildHuggingFaceDownloadBody(model, version, {
       filename: opts?.customFilename,
       modelType: opts?.modelType,
+      targetPath: opts?.targetPath,
     })
 
     let result: {
@@ -621,6 +807,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         return false
       }
       result = await res.json()
+      acceptSubmission(result)
       // 403 + probe_auth: 与 civitai 路径一致 —— 文件需付费或无权限下载
       if (res.status === 403 && result?.probe_auth) {
         clearSubmitting(vid)
@@ -698,7 +885,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     let ok = 0, fail = 0
     for (const item of items) {
       const vid = item.versionId ? String(item.versionId) : item.modelId
-      if (item.source === 'huggingface' || isHuggingFaceId(item.modelId)) {
+      if (item.source === 'whitelist' || isHuggingFaceId(item.modelId)) {
         const submitted = await downloadHuggingFaceVersion(item.modelId, item.versionId)
         if (submitted) ok++
         else fail++
@@ -748,13 +935,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function pauseDownload(id: string) { await _postControl(`/api/downloads/${id}/pause`) }
   async function cancelDownload(id: string) { await _postControl(`/api/downloads/${id}/cancel`) }
 
-  /**
-   * 恢复后必须重新建连接: 全部任务都暂停时没有活跃任务, 连接早已被空闲断开
-   * 或 _refreshStatus 的自动停止收掉了, 不重连的话进度条会停在恢复的那一刻。
-   * 顺序不能反 —— startPolling 内部的 refreshStatus 若在 resume 生效前跑,
-   * 看到的仍是 paused, 会立刻把自己停掉。downloadOne / retryDownload 早就这么做,
-   * resume 是漏网的一条。
-   */
   async function resumeDownload(id: string) {
     await _postControl(`/api/downloads/${id}/resume`)
     startPolling()
@@ -767,6 +947,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         headers: { 'Content-Type': 'application/json' },
       })
       const data = await res.json()
+      acceptSubmission(data)
       if (data?.error_key || data?.error) {
         toast(apiErrorText(data), 'error')
       } else {
@@ -779,14 +960,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     await refreshStatus()
   }
 
-  /**
-   * 批量启停: N 个请求并发, 快照只在最后取一次。
-   *
-   * 原实现是 `for … await _postControl(…)`, 每轮串行等一个 POST + 一个全量快照 ——
-   * 10 个任务就是 20 次往返, 而中间 9 次快照的结果全被下一次覆盖。
-   * _batchInFlight 压住 _refreshStatus 的自动停止: pauseAll 途中一旦某次快照
-   * 撞上"已经没有活跃任务"的瞬间, 连接会被掐掉, 剩下的请求就没人接了。
-   */
+  /** 批量请求共用一次快照刷新；操作期间保持事件订阅。 */
   async function _bulkControl(ids: string[], action: 'pause' | 'resume') {
     if (!ids.length) return
     _batchInFlight++
@@ -813,12 +987,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function retryVersion(modelId: string, modelType: string, versionId?: number) {
     const mid = String(modelId)
     const vid = versionId ? String(versionId) : mid
-    const existing = tasks.value.find(t => {
-      const tvid = t.meta?.version_id ? String(t.meta.version_id) : null
-      const tmid = t.meta?.model_id ? String(t.meta.model_id) : null
-      return (tvid === vid || (!tvid && tmid === mid)) && t.status === 'failed'
-    })
-    if (existing) {
+    const existing = versionTask(mid, vid)
+    if (existing?.status === 'failed') {
       await retryDownload(existing.download_id)
     } else {
       await downloadOne(modelId, modelType, versionId)
@@ -853,21 +1023,12 @@ export const useDownloadsStore = defineStore('downloads', () => {
     // 这是唯一判据, 前端不再维护自己的索引 (那会过期且无法自愈)。
     const resourceKey = resourceKeyFor(mid, vid)
     const rState = resourceStates.value.get(resourceKey)
-    if (rState) {
-      const mapped = mapResourceState(rState)
-      if (mapped !== 'idle') return mapped
-    }
-
-    // 快照未覆盖时的补充: 正在进行的任务 (服务端可能还没来得及写状态)
-    for (const task of tasks.value) {
-      const taskVid = task.meta?.version_id ? String(task.meta.version_id) : null
-      const taskMid = task.meta?.model_id ? String(task.meta.model_id) : null
-      if (taskVid === vid || (!taskVid && taskMid === mid)) {
-        if (task.status === 'active' || task.status === 'queued') return 'downloading'
-        if (task.status === 'paused') return 'paused'
-        if (task.status === 'failed') return 'failed'
-      }
-    }
+    const task = versionTask(mid, vid)
+    const mapped = mapResourceState(rState || '')
+    if (['submitting', 'downloading', 'paused', 'verifying'].includes(mapped)) return mapped
+    if (task && ACTIVE_STATES.has(task.status)) return taskInfo(task).state
+    if (mapped !== 'idle') return mapped
+    if (task && task.status !== 'complete') return taskInfo(task).state
 
     return 'idle'
   }
@@ -896,11 +1057,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     const vid = String(versionId)
     const state = getVersionState(mid, vid)
 
-    const task = tasks.value.find(t => {
-      const taskVid = t.meta?.version_id ? String(t.meta.version_id) : null
-      const taskMid = t.meta?.model_id ? String(t.meta.model_id) : null
-      return taskVid === vid || (!taskVid && taskMid === mid)
-    })
+    const task = versionTask(mid, vid)
 
     if (task && (task.status === 'active' || task.status === 'queued' || task.status === 'paused')) {
       return {
@@ -911,54 +1068,15 @@ export const useDownloadsStore = defineStore('downloads', () => {
       }
     }
 
-    return { state, progress: 0, speed: 0, downloadId: null }
+    return { state, progress: state === 'installed' ? 100 : 0, speed: 0, downloadId: null }
   }
 
-  /** `onProgress` 在订阅期间随 SSE/轮询实时回调 (百分比已 clamp 到 0–100),
-   *  订阅前的当前值也会立即回调一次 —— 等待链上的进度条由此与下载管理页
-   *  同源, 调用方不必自己 watch tasks。Used by useDependencyStatus (wait-chain). */
-  function watchTaskTerminal(
-    downloadId: string,
-    onProgress?: (percent: number, speed: number) => void,
-  ): Promise<'complete' | 'failed' | 'cancelled' | 'absent'> {
-    const emitProgress = (t: DownloadTask | undefined) => {
-      if (!t || !onProgress) return
-      onProgress(Math.min(Math.max(t.progress || 0, 0), 100), t.speed || 0)
-    }
-
-    return new Promise((resolve) => {
-      const existing = tasks.value.find(t => t.download_id === downloadId)
-      if (!existing) {
-        refreshStatus().then(() => {
-          const t = tasks.value.find(x => x.download_id === downloadId)
-          if (!t) { resolve('absent'); return }
-          if (TERMINAL_STATES.has(t.status)) { resolve(t.status as 'complete' | 'failed' | 'cancelled'); return }
-          subscribe()
-        })
-        return
-      }
-      if (TERMINAL_STATES.has(existing.status)) {
-        resolve(existing.status as 'complete' | 'failed' | 'cancelled')
-        return
-      }
-      subscribe()
-
-      function subscribe() {
-        emitProgress(tasks.value.find(t => t.download_id === downloadId))
-        const stop = watch(
-          () => tasks.value.find(t => t.download_id === downloadId),
-          (task) => {
-            emitProgress(task)
-            const st = task?.status
-            if (st && TERMINAL_STATES.has(st)) {
-              stop()
-              resolve(st as 'complete' | 'failed' | 'cancelled')
-            }
-          },
-          { immediate: false, deep: true },
-        )
-      }
-    })
+  function versionTask(modelId: string, versionId: string): DownloadTask | undefined {
+    const id = resourceTaskIds.value.get(resourceKeyFor(modelId, versionId))
+    const linked = id ? tasks.value.find(task => task.download_id === id && ACTIVE_STATES.has(task.status)) : undefined
+    return linked ?? newestTask(task => task.meta?.source === sourcePrefixFor(modelId)
+      && String(task.meta?.model_id) === modelId
+      && (String(task.meta?.version_id) === versionId || (!task.meta?.version_id && versionId === modelId)))
   }
 
   const favoritesItems = computed(() => [...favorites.value.values()])
@@ -982,6 +1100,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     tasks,
     polling,
     resourceStates,
+    fileChecks,
     submittingVersionIds,
     pendingClassification,
     resolveClassification,
@@ -1005,6 +1124,10 @@ export const useDownloadsStore = defineStore('downloads', () => {
     getVersionState,
     getVersionDownloadInfo,
     getModelAggregateState,
+    getFileDownloadInfo,
+    checkFiles,
+    downloadFile,
+    subscribe,
 
     downloadOne,
     downloadHuggingFaceVersion,
@@ -1021,8 +1144,5 @@ export const useDownloadsStore = defineStore('downloads', () => {
     refreshStatus,
     startPolling,
     stopPolling,
-
-
-    watchTaskTerminal,
   }
 })

@@ -5,7 +5,7 @@
   },
   "tabs": {
     "local": "本地模型",
-    "huggingface": "官方模型",
+    "huggingface": "模型白名单",
     "civitai": "CivitAI"
   },
   "source_types": {
@@ -225,6 +225,7 @@
     "no_json_body": "请求体不能为空",
     "not_in_comfy_dir": "路径不在 ComfyUI 目录内",
     "path_outside": "路径越界",
+    "path_invalid": "请使用带根目录标记的路径或绝对路径",
     "preview_not_found": "模型预览图不存在",
     "search_timeout": "CivitAI 搜索服务响应超时，请稍后重试",
     "search_unavailable": "CivitAI 搜索服务不可用：{detail}",

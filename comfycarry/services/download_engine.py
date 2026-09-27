@@ -279,6 +279,10 @@ class DownloadEngine:
         Returns:
             DownloadTask 对象
         """
+        from ..config import resolve_file_path
+        save_dir = os.path.realpath(resolve_file_path(save_dir))
+        if not filename or filename in (".", "..") or "/" in filename:
+            raise ValueError("Invalid download filename")
         download_id = f"dl-{uuid.uuid4().hex[:12]}"
 
         os.makedirs(save_dir, exist_ok=True)
@@ -498,6 +502,8 @@ class DownloadEngine:
         检查文件是否存在 + 是否有活跃下载.
         Returns: {installed: bool, downloading: bool, download_id: str|None}
         """
+        from ..config import resolve_file_path
+        save_dir = os.path.realpath(resolve_file_path(save_dir))
         dest = os.path.join(save_dir, filename)
         file_exists = os.path.isfile(dest) and os.path.getsize(dest) > 0
         aria2_partial = os.path.isfile(dest + ".aria2")

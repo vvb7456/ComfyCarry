@@ -5,8 +5,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-# ── 安全边界: 所有操作限制在 workspace 内 (常量唯一源在 config) ──
-from ..config import WORKSPACE_ROOT
+# 文件 API 保留物理路径范围检查；根标记本身不扩大软链接的访问范围。
+from ..config import WORKSPACE_ROOT, COMFYUI_DIR, resolve_file_path, FilePathError
 
 bp = Blueprint("files", __name__)
 
@@ -36,16 +36,14 @@ _COMPANION_SUFFIXES = [
 def _validate_path(
     raw: str, *, allow_root: bool = False
 ) -> tuple[Path | None, tuple[str, dict] | None]:
-    if not raw or not raw.strip():
-        return None, ("path_required", {})
-
-    p = Path(raw.strip())
-    if not p.is_absolute():
-        p = WORKSPACE_ROOT / p
+    try:
+        p = resolve_file_path(raw)
+    except FilePathError as exc:
+        return None, (exc.key, exc.params)
     resolved = p.resolve()
 
-    if not resolved.is_relative_to(WORKSPACE_ROOT):
-        return None, ("path_outside", {"root": str(WORKSPACE_ROOT)})
+    if not any(resolved.is_relative_to(root.resolve()) for root in (WORKSPACE_ROOT, Path(COMFYUI_DIR))):
+        return None, ("path_outside", {"root": "{workspace}, {ComfyUI}"})
     if not allow_root and resolved == WORKSPACE_ROOT:
         return None, ("path_is_root", {"root": str(WORKSPACE_ROOT)})
 

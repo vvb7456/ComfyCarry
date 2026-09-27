@@ -428,6 +428,13 @@ def api_local_models():
     try:
         _get_model_meta_store().reconcile_model_index()
         models = _get_model_meta_store().list_models(category_arg) or []
+        from ..services import download_store
+        auxiliary_paths = {
+            os.path.realpath(r["meta"]["path"])
+            for r in download_store.get_all_resources()
+            if r.get("meta", {}).get("is_model") is False and r["meta"].get("path")
+        }
+        models = [m for m in models if os.path.realpath(_as_dict(m).get("real_path", "")) not in auxiliary_paths]
         public = [_public_model(m) for m in models]
         return jsonify({"models": public, "total": len(public)})
     except Exception as exc:
@@ -551,4 +558,3 @@ def api_local_model_delete(local_model_id: int):
     deleted_paths = deleted or []
     _invalidate_generate_options()
     return jsonify({"ok": True, "deleted": list(deleted_paths)})
-

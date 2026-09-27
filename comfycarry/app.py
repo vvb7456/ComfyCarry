@@ -4,6 +4,7 @@
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 
@@ -125,8 +126,8 @@ def _restore_comfyui(log):
         from .services.log_service import clean_pm2_env
         env = clean_pm2_env()
         cmd = (
-            f'cd {comfy_dir} && pm2 start {py} --name comfy '
-            f'--interpreter none --log /workspace/comfy.log --merge-logs --time '
+            f'cd {shlex.quote(comfy_dir)} && pm2 start {py} --name comfy '
+            f'--interpreter none --log {shlex.quote(str(cfg.WORKSPACE_ROOT / "comfy.log"))} --merge-logs --time '
             f'--restart-delay 3000 --max-restarts 10 '
             f'-- main.py {saved_args}'
         )

@@ -57,8 +57,6 @@ const {
   getModelAggregateState: dlGetModelState,
   downloadOne: dlDownloadOne,
   refreshStatus: dlRefreshStatus,
-  startPolling: dlStartPolling,
-  activeTasks: dlActiveTasks,
 } = useDownloads()
 
 // Empty-query browsing is ranked by downloads; text searches switch to relevance.
@@ -137,9 +135,7 @@ function activateBrowsing() {
   }
   civitaiActivate()
   // Connect to any in-flight downloads so card states are accurate
-  dlRefreshStatus().then(() => {
-    if (dlActiveTasks.value.length) dlStartPolling()
-  })
+  void dlRefreshStatus()
 }
 
 async function onSettingsSaved() {

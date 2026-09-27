@@ -1,14 +1,15 @@
-import { computed, ref } from 'vue'
+import { computed, ref, getCurrentScope, onScopeDispose } from 'vue'
+import { useDownloadsStore } from '@/stores/downloads'
 import { useGenerateStore } from '@/stores/generate'
 import { MODEL_TYPES } from '@/config/model-types'
 import { HUGGINGFACE_MODELS } from '@/config/huggingface-models'
 import type { HuggingFaceFile, HuggingFaceModel, HuggingFaceVersion } from '@/config/huggingface-models'
+import type { WorkspaceFile } from './workspaceFiles'
 
 /**
  * 导入后「这份配置还差什么」的清单。
  *
- * 范围 = 配置里引用的、本机不存在的模型。判定来自 store: restore 的校验链按
- * 本机文件逐个核对引用, 缺的记入 missingRefs (引用保留, 只是标记)。
+ * 范围 = 工作区 files 引用的全部文件；通过下载服务按原路径检查磁盘。
  *
  * 取货来源按固定顺序检索 (指纹表里只有哈希, 没有来源):
  *   1. 本机已有 (restore 校验通过) —— 不进清单
@@ -17,16 +18,15 @@ import type { HuggingFaceFile, HuggingFaceModel, HuggingFaceVersion } from '@/co
  *   4. civitai by-hash 命中且 files 里哈希精确一致 → 可下载, 名称取响应
  *   5. 双命中 → 白名单优先
  *
- * 下载一律沿用既有端点与请求体 (白名单走 huggingface 通道, civitai 走模型页
- * 同款请求体); 本模块不拼下载 URL、不造端点。
+ * 下载沿用下载服务，指定原路径以跳过目录推断。
  */
 
 export interface MissingModel {
-  /** 去重键: `<category>/<配置里的文件名字符串>` */
+  /** 去重键为原路径。 */
   key: string
   /** 展示标题 (白名单/civitai 命中取元数据名; unknown 取文件名) */
   name: string
-  /** 配置引用的原值 (完整相对路径), 兼作副行事实 */
+  /** 带根标记的文件地址或实例内绝对路径。 */
   path: string
   /** 展示角色 (i18n key 后缀 `generate.missing.role_<role>`) */
   role: string
@@ -57,32 +57,6 @@ const ROLE_OF_FIELD: Record<string, string> = {
   'controlNets.depth.model': 'controlnet',
   'upscale.svrModel': 'upscale_model',
   'faceDetailer.detectionModel': 'face_model',
-}
-
-/**
- * 字段 → 落盘/登记类别 (取值 = MODEL_DIRS 的 key, 见 comfycarry/config.py)。
- * clip/vae 系列当前由 restore 直接置空 (单值主键, 缺件另有依赖条提示), 不会被
- * 标记缺失; 保留映射以便将来校验口径变化时不必再补一份。
- */
-const FIELD_CATEGORY: Record<string, HuggingFaceFile['modelType']> = {
-  checkpoint: 'checkpoints',
-  unet: 'diffusion_models',
-  unetHigh: 'diffusion_models',
-  unetLow: 'diffusion_models',
-  clip: 'text_encoders',
-  clip2: 'text_encoders',
-  vae: 'vae',
-  vaeOverride: 'vae',
-  audioVae: 'vae',
-  loras: 'loras',
-  'controlNets.pose.model': 'controlnet',
-  'controlNets.canny.model': 'controlnet',
-  'controlNets.depth.model': 'controlnet',
-  // SeedVR2 DiT 权重落在 models/SEEDVR2/ (MODEL_DIRS 键 'seedvr2'); 若按
-  // 'upscale_models' 取货会下到 models/upscale_models/, SeedVR2LoadDiTModel
-  // 读不到 → 配置仍跑不起来。
-  'upscale.svrModel': 'seedvr2',
-  'faceDetailer.detectionModel': 'ultralytics_bbox',
 }
 
 /** 白名单哈希索引: sha256(小写) → 条目。构建一次, 比较时两侧统一小写。 */
@@ -133,6 +107,11 @@ const byHashCache = new Map<string, CivitaiByHash | null>()
 
 export function useMissingModels() {
   const store = useGenerateStore()
+  const downloads = useDownloadsStore()
+  if (getCurrentScope()) onScopeDispose(downloads.subscribe())
+  const missingPaths = computed(() => new Set(store.restoredFiles
+    .filter(file => downloads.fileChecks.has(file.path) && downloads.getFileDownloadInfo(file.path).state !== 'installed')
+    .map(file => file.path)))
 
   /** 带超时的 fetch: 到点抛错, 由调用方按「查不到」处理 */
   async function fetchWithTimeout(url: string): Promise<Response> {
@@ -156,21 +135,12 @@ export function useMissingModels() {
     } catch {
       // 拉不到按空表: 缺失项全部落入手动列表, 不阻塞弹窗
     }
+    await checkFiles().catch(() => {})
   }
 
-  /** 表2里取指纹。精确键查不到时按 basename 后缀兜底:
-   *  配置引用可能是裸文件名 (face_yolov8m.pt), 而登记行的键带子目录前缀
-   *  (ultralytics/bbox/face_yolov8m.pt —— 父根先扫, 键的 category 随登记行),
-   *  两边 category 口径对不上。指纹表是"按字节取货"的索引, 键只是它的住址,
-   *  落盘路径以配置槽为准 —— 故后缀命中即可认定同一文件。
-   *  多行同 basename 时无法区分 → 只认唯一命中。 */
-  function hashOfKey(key: string, refValue: string): string | undefined {
-    const exact = hashes.value[key]
-    if (exact) return exact
-    const name = basename(refValue)
-    const hits = Object.entries(hashes.value)
-      .filter(([k]) => k.endsWith(`/${name}`) || k === name)
-    return hits.length === 1 ? hits[0]![1] : undefined
+  async function checkFiles(): Promise<void> {
+    const paths = [...new Set(store.restoredFiles.map(file => file.path))]
+    await downloads.checkFiles(paths)
   }
 
   /** 查一个哈希的 civitai 版本详情 (按哈希缓存); 未命中/超时 → null */
@@ -214,17 +184,21 @@ export function useMissingModels() {
   }
 
   /** 解析一条缺失引用 → 最终展示行 (来源已定, 下载能力已复核) */
-  async function resolveItem(field: string, refValue: string): Promise<MissingModel> {
-    const category = FIELD_CATEGORY[field] ?? ('' as HuggingFaceFile['modelType'])
-    const key = `${category}/${refValue}`
+  async function resolveItem(file: WorkspaceFile): Promise<MissingModel> {
+    const { field, path: refValue } = file
+    const category = file.category as HuggingFaceFile['modelType']
+    const key = refValue
     const base: MissingModel = {
       key, name: basename(refValue), path: refValue,
-      role: ROLE_OF_FIELD[field] ?? '', baseModel: '',
+      role: ROLE_OF_FIELD[field] ?? (field.startsWith('upscale.') ? 'upscale_model'
+        : field.startsWith('controlNets.') ? 'controlnet'
+        : field.startsWith('faceDetailer.') ? 'face_model'
+        : field.startsWith('fast.') ? 'lora' : ''), baseModel: '',
       imageUrl: '',
       category, source: 'unknown', modelId: '', versionId: '',
     }
 
-    const sha = hashOfKey(key, refValue)
+    const sha = hashes.value[file.path]
     if (!sha) return base
 
     // 白名单哈希索引命中 (双命中时优先)
@@ -267,16 +241,16 @@ export function useMissingModels() {
   }
 
   /** 去重后的缺失条目 (同步可得, 供 visible 判定; 不含检索结果) */
-  const refEntries = computed<Array<{ field: string; name: string; key: string }>>(() => {
+  const refEntries = computed<WorkspaceFile[]>(() => {
     const seen = new Set<string>()
-    const out: Array<{ field: string; name: string; key: string }> = []
-    for (const r of store.missingRefs) {
+    const out: WorkspaceFile[] = []
+    for (const r of store.restoredFiles) {
       if (r.arch && !MODEL_TYPES[r.arch]) continue
-      const category = FIELD_CATEGORY[r.field] ?? ''
-      const key = `${category}/${r.name}`
+      const key = r.path
+      if (!missingPaths.value.has(key)) continue
       if (seen.has(key)) continue
       seen.add(key)
-      out.push({ field: r.field, name: r.name, key })
+      out.push(r)
     }
     return out
   })
@@ -295,7 +269,7 @@ export function useMissingModels() {
       await loadHashes()
       // 并发解析: 串行会让最坏情况叠加成 N×8s 的转圈
       resolved.value = await Promise.all(
-        refEntries.value.map(entry => resolveItem(entry.field, entry.name)),
+        refEntries.value.map(resolveItem),
       )
     } finally {
       loading.value = false
@@ -307,7 +281,7 @@ export function useMissingModels() {
    * 删除是**用户显式选择** —— 系统装载时不替用户销毁配置, 但用户可以清理。
    */
   function ignoreAndFallback() {
-    store.pruneMissing()
+    store.pruneMissing(missingPaths.value)
     resolved.value = []
     dismiss()
   }
@@ -329,6 +303,8 @@ export function useMissingModels() {
     loading,
     prepare,
     loadHashes,
+    checkFiles,
+    isMissing: (path: string) => missingPaths.value.has(path),
     imported,
     ignoreAndFallback,
     dismiss,

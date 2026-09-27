@@ -6,14 +6,14 @@
  * 主权重 (UNet) 不在此表: 按项目惯例由用户在 unet 选择器中自选, 不做推荐/预下载。
  *
  * 文件事实单一来源: 每个组件通过 hfVersionId 锚定 HF 白名单
- * (huggingface-models.ts) 条目, filename/url/bytes/subdir/sha256 全部派生,
+ * (huggingface-models.ts) 条目, filename/url/bytes/directory/sha256 全部派生,
  * 本文件不再手抄。白名单缺锚点会在模块加载时抛错 (fail-fast)。
  *
  * 视频架构 (Wan 2.2) 额外引入 "lightning" 加速件 slot (LoRA, 落 loras/ 目录),
  * 以及条件 slot 机制: 带 `requiredWhen: 'fast'` 的文件仅在"速度=快速"时计入必需集。
  */
 
-import { HF_VERSION_INDEX, MODEL_TYPE_DIRS } from './huggingface-models'
+import { HF_VERSION_INDEX, fileDirectory } from './huggingface-models'
 
 export type ComponentTier = 'standard' | 'lite' | 'full'
 
@@ -42,7 +42,7 @@ export interface ComponentFile {
   readonly filename: string
   readonly url: string
   readonly bytes: number
-  readonly subdir: string
+  readonly directory: string
   readonly sha256: string
 }
 
@@ -61,15 +61,15 @@ function hf(
   const hit = HF_VERSION_INDEX.get(hfVersionId)
   if (!hit) throw new Error(`component-registry: 白名单版本 ${hfVersionId} 不存在 (组件 ${id})`)
   const file = hit.version.file
-  const subdir = MODEL_TYPE_DIRS[file.modelType]
-  if (!subdir) throw new Error(`component-registry: modelType ${file.modelType} 无目录映射 (组件 ${id})`)
+  const directory = fileDirectory(file)
+  if (!directory) throw new Error(`component-registry: modelType ${file.modelType} 无目录映射 (组件 ${id})`)
   return {
     id, label, tier, hfVersionId,
     ...(requiredWhen ? { requiredWhen } : {}),
     filename: file.filename,
     url: file.url,
     bytes: file.sizeBytes,
-    subdir,
+    directory,
     sha256: file.sha256,
   }
 }

@@ -176,6 +176,7 @@ async function initOptions(forceRefresh = false) {
     clearTourAutoTimer()
   }
   store.enableAutoSave()
+  void store.save()
   optionsReady.value = true
   // 装载完成后才排定导览: 「是否导入过」此刻才确定, 早于此的定时器会先弹
   // 再标记, 导入过的用户仍会看到引导 (见 scheduleTourAuto 的说明)。
@@ -451,6 +452,29 @@ onBeforeUnmount(clearTourAutoTimer)
 // 清单 → 按 restore 同款判据清掉已存在的引用。
 // missingRefs 是 restore 快照, 不复核 LoRA 卡片/缺失弹窗会永远停在缺失态。
 let reconciling = false
+let reconcilePending = false
+async function reconcileDownloads() {
+  if (!optionsReady.value) return
+  if (reconciling) { reconcilePending = true; return }
+  reconciling = true
+  try {
+    do {
+      reconcilePending = false
+      await options.refresh()
+      await missingModels.checkFiles()
+      store.reconcileMissing({
+        loraExists: (name) => options.loras.value.some(l => l.name === name),
+        checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
+        unetExists: (name) => options.unets.value.some(u => u.name === name),
+        controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
+        seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
+        faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),
+      })
+    } while (reconcilePending)
+  } finally {
+    reconciling = false
+  }
+}
 let prevStates = new Map<string, string>()
 let statesInit = false
 watch(
@@ -462,22 +486,13 @@ watch(
     )
     prevStates = states
     statesInit = true
-    if (!becameInstalled || !optionsReady.value || reconciling) return
-    reconciling = true
-    try {
-      await options.refresh()
-      store.reconcileMissing({
-        loraExists: (name) => options.loras.value.some(l => l.name === name),
-        checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
-        unetExists: (name) => options.unets.value.some(u => u.name === name),
-        controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
-        seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
-        faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),
-      })
-    } finally {
-      reconciling = false
-    }
+    if (becameInstalled) await reconcileDownloads().catch(() => {})
   },
+)
+
+watch(
+  () => downloads.tasks.filter(task => task.status === 'complete').map(task => task.download_id).join(','),
+  () => { void reconcileDownloads().catch(() => {}) },
 )
 
 const queueCount = computed(() => queueStore.queueCount)

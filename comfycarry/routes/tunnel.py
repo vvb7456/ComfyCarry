@@ -6,7 +6,7 @@ import time as _time
 import requests as http_requests
 from flask import Blueprint, Response, jsonify, request
 
-from ..config import get_config, set_config
+from ..config import get_config, set_config, WORKSPACE_ROOT
 from ..services.cf_runtime import active_cf_name, cf_metrics_url
 
 bp = Blueprint("tunnel", __name__)
@@ -658,13 +658,13 @@ def api_tunnel_logs():
         lines = 100
     before = request.args.get("before")
     before = int(before) if before and before.isdigit() else None
-    return jsonify(read_history("/workspace/tunnel.log", before=before, lines=lines, filter_re=_CF_NOISE_RE))
+    return jsonify(read_history(str(WORKSPACE_ROOT / "tunnel.log"), before=before, lines=lines, filter_re=_CF_NOISE_RE))
 
 
 @bp.route("/api/tunnel/logs/stream")
 def api_tunnel_logs_stream():
     from ..services.log_service import stream_tail
-    return Response(stream_tail("/workspace/tunnel.log", filter_re=_CF_NOISE_RE), mimetype="text/event-stream",
+    return Response(stream_tail(str(WORKSPACE_ROOT / "tunnel.log"), filter_re=_CF_NOISE_RE), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 

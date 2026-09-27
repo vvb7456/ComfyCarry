@@ -1,13 +1,14 @@
 """内容生成工作区状态的持久层。
 
 单一真相源: 服务端 app_meta 里的一个 JSON 值 (key=generate_state)。
-前端 ModelState envelope 原样存取, 服务端**不解释** modelStates 内部结构 ——
-迁移与字段校验留在前端 (frontend/src/stores/generate.ts 的 restore 链)。
+前端 ModelState envelope 原样存取；服务端校验文件地址格式，
+生成参数的校验留在前端 (frontend/src/stores/generate.ts 的 restore 链)。
 
 只守结构不变量 (契约见 tests/test_generate_state.py):
   - body 为 object
   - _version 为非 bool 的 int 且 >= 1
   - modelStates 为 object
+  - files 中的地址显式声明根目录或使用绝对路径
   - 序列化后体积 <= MAX_BYTES
 
 刻意不校验 activeTask / activeModelTypeByTask: 它们属前端内部状态, 任务类型
@@ -26,6 +27,7 @@ import time
 from typing import Any
 
 from ..db import db
+from ..config import normalize_file_path, FilePathError
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +63,17 @@ def validate(payload: Any) -> tuple[dict | None, tuple[str, dict] | None]:
 
     if not isinstance(payload.get("modelStates"), dict):
         return None, ("state_invalid_model_states", {})
+
+    for state in payload["modelStates"].values():
+        if not isinstance(state, dict) or "files" not in state:
+            continue
+        if not isinstance(state["files"], list):
+            return None, ("state_invalid_file_path", {})
+        for file in state["files"]:
+            try:
+                normalize_file_path(file.get("path") if isinstance(file, dict) else None)
+            except FilePathError:
+                return None, ("state_invalid_file_path", {})
 
     if _serialized_size(payload) > MAX_BYTES:
         return None, ("state_too_large", {"limit_bytes": MAX_BYTES})

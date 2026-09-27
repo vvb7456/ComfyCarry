@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from ..config import get_config, set_config
+from ..config import get_config, set_config, WORKSPACE_ROOT
 from .cf_runtime import active_cf_name, cf_metrics_port
 
 log = logging.getLogger(__name__)
@@ -567,7 +567,7 @@ class PublicTunnelClient:
         try:
             r = subprocess.run(
                 f'pm2 start cloudflared --name {shlex.quote(name)} '
-                f'--interpreter none --log /workspace/tunnel.log --merge-logs --time '
+                f'--interpreter none --log {shlex.quote(str(WORKSPACE_ROOT / "tunnel.log"))} --merge-logs --time '
                 f'-- tunnel --protocol {shlex.quote(protocol)} '
                 f'--metrics localhost:{port} run --token {shlex.quote(token)}',
                 shell=True, capture_output=True, text=True, timeout=15, env=env,

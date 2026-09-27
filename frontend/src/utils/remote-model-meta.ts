@@ -37,7 +37,7 @@ export function normalizeWords(words?: (string | { word: string })[]): string[] 
 }
 
 export interface RemoteMetaOptions {
-  channel?: 'civitai' | 'huggingface'
+  channel?: 'civitai' | 'whitelist'
   sourceUrl?: string
 }
 
@@ -68,11 +68,11 @@ export function remoteHitToMeta(h: CivitaiHit, opts?: RemoteMetaOptions): ModelM
     })),
     channel,
   }
-  if (channel === 'huggingface') {
+  if (channel === 'whitelist') {
     const hfHit = h as CivitaiHit & { sourceUrl?: string; description?: LocalizedText }
-    const hfVersion = h.version as { file?: { sizeBytes?: number; filename?: string } } | undefined
+    const hfVersion = h.version as { file?: { sizeBytes?: number; filename?: string; source?: string } } | undefined
     meta.sourceUrl = opts?.sourceUrl ?? hfHit.sourceUrl
-    meta.sourceLabel = 'Hugging Face'
+    meta.sourceLabel = hfVersion?.file?.source || 'Whitelist'
     // 白名单描述是双语字段, 按当前界面语言取值 (不接入 i18n locale)
     meta.description = hfHit.description
       ? localizedText(hfHit.description, String(i18n.global.locale.value))

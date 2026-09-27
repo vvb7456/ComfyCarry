@@ -1,5 +1,5 @@
 /**
- * huggingface-models.ts — Hugging Face 模型白名单 (人工维护)
+ * 通用文件白名单。文件可来自任意平台；模型管理只展示 isModel=true 的条目。
  *
  * 对应 SPEC: docs/HF_OFFICIAL_MODEL_CATALOG_SPEC.md §5 (数据契约)
  * 白名单条目从 docs/hf-catalog-research.json 生成, 全部经 Hugging Face API 逐项核实
@@ -16,8 +16,8 @@
  * FLUX.2 klein 门控仓库, 共 225 条。
  *
  * 可用 ID (下一个):
- *   模型 ID: -100284
- *   版本 ID: -10000384
+ *   模型 ID: -100289
+ *   版本 ID: -10000389
  */
 
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
@@ -39,8 +39,15 @@ export function localizedText(text: LocalizedText, locale: string): string {
 }
 
 export interface HuggingFaceFile {
+  /** 文件发布平台的标识，例如 huggingface、civitai、meta、modelscope；不决定下载通道。 */
+  source?: string
+  headers?: Record<string, string>
   url: string
   filename: string
+  /** 带根标记的目录或实例内绝对目录；省略时采用模型分类的默认目录。 */
+  directory?: string
+  /** 非扩散模型及其衍生模型不进入模型管理页，但仍参与依赖下载与恢复。 */
+  isModel?: boolean
   modelType:
     | 'checkpoints'
     | 'loras'
@@ -53,6 +60,7 @@ export interface HuggingFaceFile {
     | 'ultralytics_bbox'
     | 'seedvr2'
     | 'aura-sr'
+    | 'auxiliary'
   architecture: string
   sizeBytes: number
   sha256: string
@@ -8718,6 +8726,22 @@ const umt5XxlFp16Model: HuggingFaceModel = {
 }
 
 export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
+  ...([
+    [-100284, -10000384, 'AuraSR 配套配置', 'huggingface', 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json', '{ComfyUI}/models/Aura-SR', 'config.json', 222, '5009aca786759dc78369abc666878ec7dd99167beaada28bf473fbaf1a68ac9a'],
+    [-100285, -10000385, 'SAM 精细掩码', 'meta', 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth', '{ComfyUI}/models/sams', 'sam_vit_b_01ec64.pth', 375042383, 'ec2df62732614e57411cdcf32a23ffdf28910380d03139ee0f4fcbe91eb8c912'],
+    [-100286, -10000386, 'DWPose 人体检测', 'huggingface', 'https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx', '{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose', 'yolox_l.onnx', 216746733, '7860ae79de6c89a3c1eb72ae9a2756c0ccfbe04b7791bb5880afabd97855a411'],
+    [-100287, -10000387, 'DWPose 姿态检测', 'huggingface', 'https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt', '{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/hr16/DWPose-TorchScript-BatchSize5', 'dw-ll_ucoco_384_bs5.torchscript.pt', 135059124, 'd86a0b2b59fddc0901a7076e9f59c9f8602602133ed72511c693fd11eea23d91'],
+    [-100288, -10000388, 'Depth Anything V2 深度检测', 'huggingface', 'https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth', '{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/depth-anything/Depth-Anything-V2-Large', 'depth_anything_v2_vitl.pth', 1341395338, 'a7ea19fa0ed99244e67b624c72b8580b7e9553043245905be58796a608eb9345'],
+  ] as const).map(([id, versionId, name, source, url, directory, filename, sizeBytes, sha256]): HuggingFaceModel => {
+    const version: HuggingFaceVersion = {
+      id: versionId, name: 'v1', baseModel: '', images: [], trainedWords: [], hashes: { SHA256: sha256 },
+      file: { source, url, directory, filename, sizeBytes, sha256, isModel: false, modelType: 'auxiliary', architecture: '' },
+    }
+    return {
+      id, name, type: 'Auxiliary', metrics: { downloadCount: 0, thumbsUpCount: 0 }, images: [],
+      user: { username: source }, sourceUrl: url, description: { zh: name, en: name }, version, versions: [version],
+    }
+  }),
   sdXlBaseModel,
   sd15PrunedModel,
   flux1DevFp8Model,
@@ -9117,11 +9141,11 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
     const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
                 arch: string, modelType: HuggingFaceFile['modelType'], fn: string, repo: string, path: string,
                 size: number, sha: string, verName: string, desc: string, thumb: string,
-                dl: number, likes: number, author: string): ManualHfModel => {
+                dl: number, likes: number, author: string, isModel = true): ManualHfModel => {
       const img: CivitaiImage[] = thumb ? [{ url: thumb, type: 'image' }] : []
       const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: img,
                   trainedWords: [], hashes: { SHA256: sha },
-                  file: { url: 'https://huggingface.co/' + repo + '/resolve/main/' + path, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
+                  file: { url: 'https://huggingface.co/' + repo + '/resolve/main/' + path, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha, isModel } }
       return { id, name, type, metrics: { downloadCount: dl, thumbsUpCount: likes },
                images: img, user: { username: author },
                sourceUrl: 'https://huggingface.co/' + repo, description: { zh: desc, en: desc }, version: v, versions: [v] }
@@ -9166,7 +9190,7 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
     mk(-100259, -10000375, 'MelBandRoFormer FP16', 'DiffusionModel', 'MelBandRoFormer', 'unknown',
          'diffusion_models', 'MelBandRoformer_fp16.safetensors', 'Kijai/MelBandRoFormer_comfy', 'MelBandRoformer_fp16.safetensors',
          456479072, '6119aef379a6c7264e0b37db65ae1e6488b8ca4a00baf56d6d244737b8488226', 'fp16',
-         'MelBandRoFormer 音乐人声/伴奏分离模型, 需 ComfyUI-MelBandRoFormer 自定义节点', '', 89830, 43, 'Kijai'),
+          'MelBandRoFormer 音乐人声/伴奏分离模型, 需 ComfyUI-MelBandRoFormer 自定义节点', '', 89830, 43, 'Kijai', false),
     mk(-100260, -10000376, 'CLIP-Vision H', 'TextEncoder', 'Wan 2.1', 'wan21',
          'text_encoders', 'clip_vision_h.safetensors', 'Comfy-Org/Wan_2.1_ComfyUI_repackaged', 'split_files/clip_vision/clip_vision_h.safetensors',
          1264219396, '64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161', 'v1.0',
@@ -9191,6 +9215,23 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
   })(),
 ]
 
+for (const model of HUGGINGFACE_MODELS) {
+  for (const version of model.versions) {
+    version.file.isModel ??= model.type !== 'Detector'
+    version.file.source ??= 'huggingface'
+  }
+}
+
+export function fileDirectory(file: HuggingFaceFile): string {
+  return file.directory ?? MODEL_TYPE_DIRS[file.modelType]
+}
+
+export const MODEL_WHITELIST: HuggingFaceModel[] = HUGGINGFACE_MODELS.flatMap(model => {
+  const versions = model.versions.filter(version => version.file.isModel)
+  if (!versions.length) return []
+  return [{ ...model, versions, version: versions.find(version => version.id === model.version.id) ?? versions[0]! }]
+})
+
 
 /** version id → { model, version } 反查索引。运行组件按 version id 锚定白名单。 */
 export const HF_VERSION_INDEX: ReadonlyMap<number, { model: HuggingFaceModel; version: HuggingFaceVersion }> = (() => {
@@ -9202,20 +9243,20 @@ export const HF_VERSION_INDEX: ReadonlyMap<number, { model: HuggingFaceModel; ve
 })()
 
 /**
- * modelType → 相对 ComfyUI 根的落盘目录。与后端 config.py MODEL_DIRS 逐键一致
- * (白名单下载通道按 model_type 解析目录; 前端依赖条体检按此拼 subdir)。
- * 新增 modelType 必须同步后端 MODEL_DIRS, 否则下载目录解析回落 models/{modelType}。
+ * modelType → 显式落盘地址。目录布局与后端 config.py MODEL_DIRS 一致。
+ * 文件未明确指定 directory 时使用；辅助文件和非标准位置直接填写 directory。
  */
 export const MODEL_TYPE_DIRS: Record<HuggingFaceFile['modelType'], string> = {
-  checkpoints: 'models/checkpoints',
-  loras: 'models/loras',
-  controlnet: 'models/controlnet',
-  vae: 'models/vae',
-  embeddings: 'models/embeddings',
-  upscale_models: 'models/upscale_models',
-  diffusion_models: 'models/diffusion_models',
-  text_encoders: 'models/text_encoders',
-  ultralytics_bbox: 'models/ultralytics/bbox',
-  seedvr2: 'models/SEEDVR2',
-  'aura-sr': 'models/Aura-SR',
+  checkpoints: '{ComfyUI}/models/checkpoints',
+  loras: '{ComfyUI}/models/loras',
+  controlnet: '{ComfyUI}/models/controlnet',
+  vae: '{ComfyUI}/models/vae',
+  embeddings: '{ComfyUI}/models/embeddings',
+  upscale_models: '{ComfyUI}/models/upscale_models',
+  diffusion_models: '{ComfyUI}/models/diffusion_models',
+  text_encoders: '{ComfyUI}/models/text_encoders',
+  ultralytics_bbox: '{ComfyUI}/models/ultralytics/bbox',
+  seedvr2: '{ComfyUI}/models/SEEDVR2',
+  'aura-sr': '{ComfyUI}/models/Aura-SR',
+  auxiliary: '',
 }

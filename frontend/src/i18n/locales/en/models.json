@@ -5,7 +5,7 @@
   },
   "tabs": {
     "local": "Local Models",
-    "huggingface": "Official Models",
+    "huggingface": "Model Whitelist",
     "civitai": "CivitAI"
   },
   "source_types": {
@@ -225,6 +225,7 @@
     "no_json_body": "Request body cannot be empty",
     "not_in_comfy_dir": "Path is not inside the ComfyUI directory",
     "path_outside": "Path out of bounds",
+    "path_invalid": "Use a root-marked path or an absolute path",
     "preview_not_found": "Model preview not found",
     "search_timeout": "CivitAI search timed out, please try again later",
     "search_unavailable": "CivitAI search service unavailable: {detail}",

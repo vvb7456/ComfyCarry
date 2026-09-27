@@ -812,6 +812,7 @@
     "state_invalid_payload": "工作区状态格式无效",
     "state_invalid_version": "工作区状态版本无效",
     "state_invalid_model_states": "工作区状态缺少模型配置",
+    "state_invalid_file_path": "工作区文件地址必须使用根目录标记或绝对路径",
     "state_too_large": "工作区状态过大，无法保存"
   },
   "tour": {

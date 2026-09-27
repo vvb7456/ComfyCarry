@@ -27,7 +27,7 @@ export function componentDepRows(
     hint: roleText(arch, f, t),
     bytes: f.bytes,
     required: true,
-    files: [{ filename: f.filename, url: f.url, subdir: f.subdir, hf: HF_VERSION_INDEX.get(f.hfVersionId) }],
+    files: [{ filename: f.filename, url: f.url, directory: f.directory, hf: HF_VERSION_INDEX.get(f.hfVersionId) }],
     meta: f,
   }))
 }

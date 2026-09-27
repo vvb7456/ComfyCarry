@@ -263,7 +263,7 @@ class TunnelManager:
         name / metrics_port: 蓝绿切换时用于启动新进程 (如 cf-tunnel-next / 20242);
         默认使用当前活跃进程名及其对应 metrics 端口。
         """
-        from ..config import get_config
+        from ..config import get_config, WORKSPACE_ROOT
         from .cf_runtime import active_cf_name, cf_metrics_port
         name = name or active_cf_name()
         port = metrics_port or cf_metrics_port(name)
@@ -273,7 +273,7 @@ class TunnelManager:
         subprocess.run(f"pm2 delete {shlex.quote(name)} 2>/dev/null", shell=True, env=env)
         r = subprocess.run(
             f'pm2 start cloudflared --name {shlex.quote(name)} '
-            f'--interpreter none --log /workspace/tunnel.log --merge-logs --time '
+            f'--interpreter none --log {shlex.quote(str(WORKSPACE_ROOT / "tunnel.log"))} --merge-logs --time '
             f'-- tunnel --protocol {shlex.quote(protocol)} '
             f'--metrics localhost:{port} run --token {shlex.quote(tunnel_token)}',
             shell=True, capture_output=True, text=True, env=env

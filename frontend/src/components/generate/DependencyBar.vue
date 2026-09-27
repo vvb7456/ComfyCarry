@@ -6,7 +6,6 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import DownloadButton from '@/components/models/DownloadButton.vue'
-import type { VersionState } from '@/composables/useDownloads'
 
 defineOptions({ name: 'DependencyBar' })
 
@@ -59,13 +58,6 @@ function toggleExpand() {
   emit('update:expanded', !props.expanded)
 }
 
-/** 行状态 → 模型页下载按钮的状态机 (进度/spinner/hover 取消都由它管) */
-function rowState(r: DepRowStatus): VersionState {
-  if (r.installed) return 'installed'
-  if (r.downloading) return 'downloading'
-  if (r.failed) return 'failed'
-  return 'idle'
-}
 </script>
 
 <template>
@@ -107,10 +99,10 @@ function rowState(r: DepRowStatus): VersionState {
 
             <span class="dep-file__status">
               <DownloadButton
-                :state="rowState(r)"
+                :state="r.state"
                 :progress="r.percent"
                 :speed="r.speed"
-                cancellable
+                :cancellable="r.downloadIds.length > 0"
                 size="xs"
                 @download="s.downloadRow(r.row.id)"
                 @cancel="s.cancelRow(r.row.id)"

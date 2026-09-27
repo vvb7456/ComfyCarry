@@ -65,7 +65,7 @@ function sourceLabel() {
 function sourceUrl() {
   const source = detail.value?.source
   if (!source?.type) return ''
-  if (source.type === 'huggingface') return detail.value?.source_url || ''
+  if (source.type === 'whitelist') return detail.value?.source_url || ''
   return detail.value?.links?.find(link => link.url)?.url || ''
 }
 

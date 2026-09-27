@@ -1,12 +1,14 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 
 import requests
 import urllib3
 
 from flask import Blueprint, Response, jsonify, request
+from ..config import WORKSPACE_ROOT
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -323,13 +325,13 @@ def jupyter_logs():
         lines = 200
     before = request.args.get("before")
     before = int(before) if before and before.isdigit() else None
-    return jsonify(read_history("/workspace/jupyter.log", before=before, lines=lines))
+    return jsonify(read_history(str(WORKSPACE_ROOT / "jupyter.log"), before=before, lines=lines))
 
 
 @bp.route("/api/jupyter/logs/stream")
 def jupyter_logs_stream():
     from ..services.log_service import stream_tail
-    return Response(stream_tail("/workspace/jupyter.log"), mimetype="text/event-stream",
+    return Response(stream_tail(str(WORKSPACE_ROOT / "jupyter.log")), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
@@ -349,9 +351,9 @@ def jupyter_start():
         cmd = (
             f'pm2 start jupyter-lab --name {PM2_NAME} '
             f'--interpreter none '
-            f'--log /workspace/jupyter.log --merge-logs --time '
+            f'--log {shlex.quote(str(WORKSPACE_ROOT / "jupyter.log"))} --merge-logs --time '
             f'-- --ip=0.0.0.0 --port=8888 --no-browser --allow-root '
-            f'--ServerApp.root_dir=/workspace '
+            f'--ServerApp.root_dir={shlex.quote(str(WORKSPACE_ROOT))} '
             f'--ServerApp.language=zh_CN'
         )
     else:
