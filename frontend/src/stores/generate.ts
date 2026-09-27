@@ -508,6 +508,8 @@ export const useGenerateStore = defineStore('generate', () => {
     loraExists?: (name: string) => boolean
     checkpointExists?: (name: string) => boolean
     unetExists?: (name: string) => boolean
+    clipExists?: (name: string) => boolean
+    vaeExists?: (name: string) => boolean
     controlNetExists?: (type: string, name: string) => boolean
     seedvr2Exists?: (name: string) => boolean
     faceDetectionExists?: (name: string) => boolean
@@ -516,6 +518,8 @@ export const useGenerateStore = defineStore('generate', () => {
       const exists = field === 'loras' ? validators.loraExists?.(name)
         : field === 'checkpoint' ? validators.checkpointExists?.(name)
         : field === 'unet' || field === 'unetHigh' || field === 'unetLow' ? validators.unetExists?.(name)
+        : field === 'clip' || field === 'clip2' ? validators.clipExists?.(name)
+        : field === 'vae' || field === 'vaeOverride' || field === 'audioVae' ? validators.vaeExists?.(name)
         : field.startsWith('controlNets.') ? validators.controlNetExists?.(field.slice('controlNets.'.length, -'.model'.length), name)
         : field === 'upscale.svrModel' ? validators.seedvr2Exists?.(name)
         : field === 'faceDetailer.detectionModel' ? validators.faceDetectionExists?.(name)
@@ -529,7 +533,6 @@ export const useGenerateStore = defineStore('generate', () => {
    *
    * 这是**用户显式发起**的清理 —— 与 restore 装载时静默删除的区别就在于此:
    * 系统不替用户销毁配置, 但用户可以选择清理掉跑不了的项。
-   * 只处理被标记为缺失的字段; clip/vae 等的置空逻辑不受影响 (它们不在此清单里)。
    */
   function pruneMissing(paths?: Set<string>) {
     for (const { arch, field, name } of missingRefs.value) {
@@ -625,7 +628,8 @@ export const useGenerateStore = defineStore('generate', () => {
   function currentStatesJson(): Record<string, string> {
     const out: Record<string, string> = {}
     for (const [key, value] of Object.entries(modelStates)) {
-      out[key] = JSON.stringify({ ...value, files: workspaceFiles(key, value) })
+      const previous = savedStatesJson[key] ? JSON.parse(savedStatesJson[key]) as ModelState : undefined
+      out[key] = JSON.stringify({ ...value, files: workspaceFiles(key, value, previous) })
     }
     return out
   }
@@ -882,11 +886,7 @@ export const useGenerateStore = defineStore('generate', () => {
             // 被自动销毁** —— 那会让导入的配置当场失效, 且清了就写回服务端,
             // 不可恢复。故保留引用并记入 missing，仅供展示和补齐文件。
             //
-            // 例外 (刻意保留旧行为):
-            //   · clip/clip2/vae/vaeOverride — 单值主键, 拆分形态另有依赖检查
-            //     (组件状态条) 告知缺件; fallback 到别的模型更糟, 置空是合理提示。
-            //   · sampler/scheduler — 枚举值, ComfyUI 升级后可能消失, 保留会让
-            //     提交必然失败, 回落默认值。
+            // sampler/scheduler 是枚举值，ComfyUI 升级后可能消失，仍回落默认值。
             if (state.checkpoint && validators.checkpointExists && !validators.checkpointExists(state.checkpoint)) {
               markMissing(key, 'checkpoint', state.checkpoint)
             }
@@ -900,20 +900,23 @@ export const useGenerateStore = defineStore('generate', () => {
               markMissing(key, 'unetLow', state.unetLow)
             }
             if (state.clip && validators.clipExists && !validators.clipExists(state.clip)) {
-              state.clip = ''
+              markMissing(key, 'clip', state.clip)
             }
             if (state.clip2 && validators.clipExists && !validators.clipExists(state.clip2)) {
-              state.clip2 = ''
+              markMissing(key, 'clip2', state.clip2)
             }
             if (state.vae && validators.vaeExists && !validators.vaeExists(state.vae)) {
-              state.vae = ''
+              markMissing(key, 'vae', state.vae)
+            }
+            if (state.audioVae && validators.vaeExists && !validators.vaeExists(state.audioVae)) {
+              markMissing(key, 'audioVae', state.audioVae)
             }
             if (typeof state.clipSkip !== 'number' || state.clipSkip < 1 || state.clipSkip > 4) {
               const config = MODEL_TYPES[key] ?? MODEL_TYPES.sdxl!
               state.clipSkip = config.defaults.clip_skip ?? 1
             }
             if (state.vaeOverride && validators.vaeExists && !validators.vaeExists(state.vaeOverride)) {
-              state.vaeOverride = ''
+              markMissing(key, 'vaeOverride', state.vaeOverride)
             }
             // 仅 enabled 的 LoRA 计入缺失: buildPayload 只发 enabled 项, 关闭的
             // 不阻塞运行, 标出来只会让用户以为配置坏了。

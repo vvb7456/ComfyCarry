@@ -466,6 +466,8 @@ async function reconcileDownloads() {
         loraExists: (name) => options.loras.value.some(l => l.name === name),
         checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
         unetExists: (name) => options.unets.value.some(u => u.name === name),
+        clipExists: (name) => options.clips.value.some(c => c.name === name),
+        vaeExists: (name) => options.vaes.value.some(v => v.name === name),
         controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
         seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
         faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),

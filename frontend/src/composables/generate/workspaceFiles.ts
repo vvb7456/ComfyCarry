@@ -11,18 +11,25 @@ export interface WorkspaceFile {
   category: string
 }
 
-export function workspaceFiles(arch: string, state: ModelState): WorkspaceFile[] {
+export function workspaceFiles(arch: string, state: ModelState, previous?: ModelState): WorkspaceFile[] {
   const files: WorkspaceFile[] = []
   function selected(field: string, name: string, category: keyof typeof MODEL_TYPE_DIRS) {
     if (!name) return
-    const original = state.files?.find(file => file.field === field && file.path.endsWith('/' + name))
+    const previousValue = field.split('.').reduce<unknown>((value, key) =>
+      value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, previous)
+    const previousNames = field === 'loras'
+      ? (previous?.loras ?? []).map(lora => lora.name).sort((a, b) => b.length - a.length)
+      : [previousValue]
+    // 原地址只属于原选择；同名文件在子目录与根目录之间切换时不能靠后缀继承。
+    const original = previous?.files?.find(file => file.field === field
+      && previousNames.find(oldName => typeof oldName === 'string' && file.path.endsWith('/' + oldName)) === name)
     files.push({ field, path: original?.path ?? joinFilePath(MODEL_TYPE_DIRS[category], name), category })
   }
   function dependency(field: string, versionId: number) {
     const entry = HF_VERSION_INDEX.get(versionId)
     if (!entry) throw new Error(`Missing whitelist file: ${versionId}`)
     const file = entry.version.file
-    const original = state.files?.find(f => f.field === field)
+    const original = previous?.files?.find(f => f.field === field)
     files.push({ field, path: original?.path ?? joinFilePath(fileDirectory(file), file.filename), category: file.modelType })
   }
 

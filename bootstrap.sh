@@ -109,7 +109,7 @@ except Exception:
     pass
 " 2>/dev/null || true)
 fi
-APP_VERSION=$(python3 -c "import re; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open('$DASHBOARD_DIR/comfycarry/config.py').read()); print(m.group(1) if m else 'unknown')" 2>/dev/null || echo "unknown")
+APP_VERSION=$(python3 -c "import re, sys; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open(sys.argv[1]).read()); print(m.group(1) if m else 'unknown')" "$DASHBOARD_DIR/comfycarry/config.py" 2>/dev/null || echo "unknown")
 cat > "$DASHBOARD_DIR/.version" <<EOF
 version=${RELEASE_TAG:-$APP_VERSION}
 branch=
@@ -124,9 +124,9 @@ if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
         echo "  Tunnel 启动失败"
     else
         echo "  -> 检测到 CF 配置, 启动 Tunnel..."
-        _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "
+        _TUNNEL_DASHBOARD_URL=$("$PYTHON_BIN" -c "
 import sys, os
-sys.path.insert(0, '$DASHBOARD_DIR')
+sys.path.insert(0, sys.argv[1])
 from comfycarry.services.tunnel_manager import TunnelManager
 
 mgr = TunnelManager(
@@ -143,7 +143,7 @@ try:
 except Exception as e:
     print('', file=sys.stderr)
     print(f'Tunnel 启动失败: {e}', file=sys.stderr)
-" 2>/dev/null) || true
+" "$DASHBOARD_DIR" 2>/dev/null) || true
             if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
                 echo "  Tunnel 已启动"
             else
@@ -152,9 +152,9 @@ except Exception as e:
         fi
 elif [ "${PUBLIC_TUNNEL:-}" = "1" ] || [ "${PUBLIC_TUNNEL:-}" = "true" ]; then
     echo "  -> 检测到 PUBLIC_TUNNEL, 正在注册公共 Tunnel..."
-    _TUNNEL_DASHBOARD_URL=$($PYTHON_BIN -c "
+    _TUNNEL_DASHBOARD_URL=$("$PYTHON_BIN" -c "
 import sys, os
-sys.path.insert(0, '$DASHBOARD_DIR')
+sys.path.insert(0, sys.argv[1])
 from comfycarry.services.public_tunnel import PublicTunnelClient
 
 client = PublicTunnelClient()
@@ -167,7 +167,7 @@ try:
         print(f'{result.get(\"error\", \"未知\")}', file=sys.stderr)
 except Exception as e:
     print(f'{e}', file=sys.stderr)
-" 2>/dev/null) || true
+" "$DASHBOARD_DIR" 2>/dev/null) || true
     if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
         echo "  公共 Tunnel 已启用"
     else
