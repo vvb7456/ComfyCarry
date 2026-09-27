@@ -242,6 +242,7 @@ const {
   depUpscale,
   depTagger,
   depFace,
+  upscaleVaeReady,
   showPPModal,
   moduleTabs,
   enabledModules,
@@ -798,7 +799,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :noun="depNouns.upscale"
           v-model:expanded="depExpanded.upscale"
         />
-        <UpscalePanel />
+        <UpscalePanel :seedvr2-vae-ready="upscaleVaeReady" />
       </div>
       <div v-show="state.activeModule === 'hires'" class="gen-module-panel">
         <HiResPanel />

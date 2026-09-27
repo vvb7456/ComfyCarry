@@ -16,13 +16,21 @@ const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
 const options = inject(GenerateOptionsKey)!
 
+const props = withDefaults(defineProps<{
+  /** SeedVR2 共用 VAE 是否在位 (来自依赖条, 与磁盘一致) */
+  seedvr2VaeReady?: boolean
+}>(), {
+  seedvr2VaeReady: false,
+})
+
 const config = computed<UpscaleState>(() => store.currentState.upscale)
 
 const isSeedVR2 = computed(() => config.value.engine === 'seedvr2')
 
 /** 两个引擎各自的权重是否在磁盘 —— 未装的那一侧禁止切过去 (照面部面板 SAM 成例) */
 const aurasrInstalled = computed(() => options.aurasrInstalled.value)
-const seedvr2Installed = computed(() => options.seedvr2Models.value.length > 0)
+// SeedVR2 需要主权重与共用 VAE 都在位 (后端 seedvr2_models 已排除 VAE)
+const seedvr2Installed = computed(() => options.seedvr2Models.value.length > 0 && props.seedvr2VaeReady)
 
 const engineOptions = computed(() => [
   { value: 'aurasr', label: t('generate.upscale.engine_aurasr'), disabled: !aurasrInstalled.value },

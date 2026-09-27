@@ -15,6 +15,12 @@ export interface DepGroup {
   rows: DepRow[]
   /** 至少需要装几个可选行 (可选行 = 未标 required 的行) */
   minOptional?: number
+  /**
+   * 自定义就绪判定, 给出已安装的行 id, 返回整套是否可用 (覆盖 minOptional)。
+   * 用于计数表达不了的"多套餐任一成套"规则: 如放大要么 AuraSR 权重齐,
+   * 要么 SeedVR2 权重 + 共用 VAE 齐。
+   */
+  readyWhen?: (installedIds: Set<string>) => boolean
 }
 
 export function hfFile(versionId: number): DepFileSpec {
@@ -129,23 +135,37 @@ const UPSCALE_MODELS = {
     id: 'seedvr2-3b-fp8',
     label: 'SeedVR2 3B FP8',
     hint: '视频放大，显存约 10GB',
-    bytes: hfBytes(-10000368, -10000369),
-    files: [hfFile(-10000368), hfFile(-10000369)],
+    bytes: hfBytes(-10000368),
+    files: [hfFile(-10000368)],
   },
   seedvr2_7b_sharp_fp8: {
     id: 'seedvr2-7b-sharp-fp8',
     label: 'SeedVR2 7B-sharp FP8',
     hint: '锐化版，显存约 17GB',
-    bytes: hfBytes(-10000370, -10000369),
-    files: [hfFile(-10000370), hfFile(-10000369)],
+    bytes: hfBytes(-10000370),
+    files: [hfFile(-10000370)],
+  },
+  // 3B/7B 共用的配套 VAE 单列一行: 两行各自引用同一文件会让下载进度互相串台
+  // (点一行的下载, 另一行也显示在下载), 拆开后每行的进度只属于自己。
+  seedvr2_vae: {
+    id: 'seedvr2-vae',
+    label: 'SeedVR2 VAE FP16',
+    hint: '3B/7B 共用配套 VAE',
+    bytes: hfBytes(-10000369),
+    files: [hfFile(-10000369)],
   },
 }
 
+/** SeedVR2 共用 VAE 的依赖行 id (放大面板据此判断 VAE 是否在位) */
+export const SEEDVR2_VAE_ROW_ID = UPSCALE_MODELS.seedvr2_vae.id
+
 export const UPSCALE_DEP_GROUP: DepGroup = {
   title: 'generate.upscale.need_download',
-  rows: [UPSCALE_MODELS.aurasr_v2, UPSCALE_MODELS.seedvr2_3b_fp8, UPSCALE_MODELS.seedvr2_7b_sharp_fp8],
-  // 三个引擎互为替代: 装任意一个即可用, 一个都没有则模块开关打不开
-  minOptional: 1,
+  rows: [UPSCALE_MODELS.aurasr_v2, UPSCALE_MODELS.seedvr2_3b_fp8, UPSCALE_MODELS.seedvr2_7b_sharp_fp8, UPSCALE_MODELS.seedvr2_vae],
+  // 两套引擎互为替代, 但各自必须成套: AuraSR 权重齐, 或 SeedVR2 权重 + 共用 VAE 齐。
+  readyWhen: (ids) => ids.has(UPSCALE_MODELS.aurasr_v2.id)
+    || (ids.has(UPSCALE_MODELS.seedvr2_vae.id)
+      && (ids.has(UPSCALE_MODELS.seedvr2_3b_fp8.id) || ids.has(UPSCALE_MODELS.seedvr2_7b_sharp_fp8.id))),
 }
 
 // 检测器必需 (~52MB); SAM 可选增强 (vit_b, 修脸场景足够, vit_h 属过剩)

@@ -5,7 +5,7 @@ import { useImageToImage } from '@/composables/generate/useImageToImage'
 import { useControlNet } from '@/composables/generate/useControlNet'
 import { useDependencyStatus, type UseDependencyStatusReturn } from '@/composables/generate/useDependencyStatus'
 import { useTagInterrogation, TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
-import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, SEEDVR2_VAE_ROW_ID, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
@@ -68,9 +68,14 @@ export function useControlNetOrchestration({
 
   const depUpscale = useDependencyStatus(() => UPSCALE_DEP_GROUP.rows, {
     minOptional: UPSCALE_DEP_GROUP.minOptional ?? 0,
+    readyWhen: UPSCALE_DEP_GROUP.readyWhen,
     enabled: tabActive,
     source: 'upscale-dep',
   })
+  /** SeedVR2 共用 VAE 是否在位 (与依赖条同一磁盘真相), 放大面板据此启停 SeedVR2 引擎 */
+  const upscaleVaeReady = computed(
+    () => depUpscale.rows.value.some(row => row.row.id === SEEDVR2_VAE_ROW_ID && row.installed),
+  )
   const depTagger = useDependencyStatus(() => TAGGER_DEP_GROUP.rows, {
     minOptional: TAGGER_DEP_GROUP.minOptional ?? 0,
     enabled: tabActive,
@@ -235,6 +240,7 @@ export function useControlNetOrchestration({
     depUpscale,
     depTagger,
     depFace,
+    upscaleVaeReady,
     showPPModal,
     moduleTabs,
     enabledModules,

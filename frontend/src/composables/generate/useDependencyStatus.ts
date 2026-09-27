@@ -42,6 +42,8 @@ export interface DepCurrent {
 
 export interface UseDependencyStatusOptions {
   minOptional?: MaybeRefOrGetter<number>
+  /** 自定义就绪判定 (覆盖 minOptional), 入参为本条已安装的行 id */
+  readyWhen?: (installedIds: Set<string>) => boolean
   source?: string
   metaOf?: (row: DepRow) => Record<string, unknown>
   /** 架构面板常驻；只对启用面板首次检查文件。 */
@@ -96,8 +98,14 @@ export function useDependencyStatus(
   const has = computed(() => rows.value.length > 0)
   const missing = computed(() => rows.value.filter(row => !row.installed))
   const missingRequired = computed(() => missing.value.filter(row => row.row.required))
-  const ready = computed(() => !checked.value || !has.value || (!missingRequired.value.length
-    && rows.value.filter(row => !row.row.required && row.installed).length >= (toValue(opts.minOptional) ?? 0)))
+  const ready = computed(() => {
+    if (!checked.value || !has.value) return true
+    if (missingRequired.value.length) return false
+    if (opts.readyWhen) {
+      return opts.readyWhen(new Set(rows.value.filter(row => row.installed).map(row => row.row.id)))
+    }
+    return rows.value.filter(row => !row.row.required && row.installed).length >= (toValue(opts.minOptional) ?? 0)
+  })
   const active = computed(() => rows.value.filter(row => row.downloading))
   const downloading = computed(() => active.value.length > 0)
   const current = computed<DepCurrent | null>(() => active.value.length ? {
