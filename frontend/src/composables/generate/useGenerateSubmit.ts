@@ -438,6 +438,8 @@ export function useGenerateSubmit(
 
     if (state.hires.enabled) {
       payload.hires_enabled = true
+      payload.hires_scale = state.hires.scale
+      payload.hires_upscale_method = state.hires.upscaleMethod
       payload.hires_denoise = state.hires.denoise
       payload.hires_steps = state.hires.steps
       payload.hires_cfg = state.hires.cfg

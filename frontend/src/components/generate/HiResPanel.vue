@@ -18,10 +18,52 @@ const config = computed<HiResState>(() => store.currentState.hires)
 
 const samplerOptions = computed(() => options.samplers.value)
 const schedulerOptions = computed(() => options.schedulers.value)
+
+const upscaleMethodOptions = computed(() => [
+  { value: 'bislerp', label: t('generate.hires.method_bislerp') },
+  { value: 'bicubic', label: t('generate.hires.method_bicubic') },
+  { value: 'bilinear', label: t('generate.hires.method_bilinear') },
+  { value: 'area', label: t('generate.hires.method_area') },
+  { value: 'nearest-exact', label: t('generate.hires.method_nearest') },
+])
 </script>
 
 <template>
   <div class="hires-grid">
+    <div class="hires-grid__row">
+      <div class="hr-cell">
+        <RangeField
+          :model-value="config.scale"
+          :min="1"
+          :max="2"
+          :step="0.05"
+          :label="t('generate.hires.scale')"
+          :marks="2"
+          :value-format="(v: number) => v.toFixed(2)"
+          editable
+          @update:model-value="config.scale = $event"
+        >
+          <template #label-append>
+            <HelpTip :text="t('generate.hires.scale_help')" />
+          </template>
+        </RangeField>
+      </div>
+      <div class="hr-cell">
+        <div class="hr-field">
+          <label class="field-lbl">
+            {{ t('generate.hires.upscale_method') }}
+            <HelpTip :text="t('generate.hires.upscale_method_help')" />
+          </label>
+          <BaseSelect
+            :model-value="config.upscaleMethod"
+            :options="upscaleMethodOptions"
+            :disabled="config.scale <= 1"
+            @update:model-value="config.upscaleMethod = String($event)"
+          />
+        </div>
+      </div>
+    </div>
+
     <div class="hires-grid__row">
       <div class="hr-cell">
         <RangeField

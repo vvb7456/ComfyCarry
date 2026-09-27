@@ -67,6 +67,10 @@ export interface UpscaleState {
 
 export interface HiResState {
   enabled: boolean
+  /** 潜空间放大倍率 (1.0 = 不放大, 仅原生分辨率精修); 最终尺寸 = 底图 × 本倍率 × 放大模块倍率 */
+  scale: number
+  /** LatentUpscaleBy 插值方式 */
+  upscaleMethod: string
   denoise: number
   steps: number
   cfg: number
@@ -263,7 +267,7 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
       svrLatentNoise: 0,
       svrTiledVae: false,
     },
-    hires: { enabled: false, denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: randomSeed() },
+    hires: { enabled: false, scale: 1.5, upscaleMethod: 'bislerp', denoise: 0.4, steps: 20, cfg: 7, sampler: 'euler', scheduler: 'normal', seedMode: 'random', seedValue: randomSeed() },
     i2i: { enabled: false, image: null, denoise: 0.7, mode: 'i2i', mask: null, growMaskBy: 6 },
     faceDetailer: {
       enabled: false, detectionModel: 'face_yolov8m.pt', denoise: 0.35, steps: 20,

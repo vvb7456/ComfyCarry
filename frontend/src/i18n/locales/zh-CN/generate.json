@@ -484,6 +484,15 @@
     "downscale_method_help": "2x/3x 倍率时，先 4x 超采再缩放到目标尺寸所用的插值算法。4x 时不生效。"
   },
   "hires": {
+    "scale": "放大倍率",
+    "scale_help": "二次采样在潜空间放大的倍率。1.00 = 不放大，只在原分辨率精修；大于 1 时为真正的 Hires Fix。最终尺寸 = 底图 × 本倍率 × 高清放大倍率（开启高清放大时为两次叠加）。",
+    "upscale_method": "插值方式",
+    "upscale_method_help": "潜空间放大的插值算法。平滑 (bislerp) 适合大多数场景；邻近 (nearest-exact) 保留原始像素、速度快但可能有锯齿。",
+    "method_bislerp": "平滑 (bislerp)",
+    "method_bicubic": "双三次 (bicubic)",
+    "method_bilinear": "双线性 (bilinear)",
+    "method_area": "区域 (area)",
+    "method_nearest": "邻近 (nearest-exact)",
     "denoise": "重绘强度",
     "denoise_help": "控制二次采样对画面的修改程度。值越低越接近原图，值越高细节越丰富但可能偏离原始构图。建议 0.3-0.5。",
     "steps": "采样步数",

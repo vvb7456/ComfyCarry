@@ -484,6 +484,15 @@
     "downscale_method_help": "Interpolation algorithm used when scaling from 4x to target size at 2x/3x. Not used at 4x."
   },
   "hires": {
+    "scale": "Upscale Factor",
+    "scale_help": "Latent-space upscale factor for the second pass. 1.00 = no upscale, refine at native resolution only; above 1 makes it a true Hires Fix. Final size = base × this factor × upscale factor (two stages when the upscale module is on).",
+    "upscale_method": "Interpolation",
+    "upscale_method_help": "Interpolation used for the latent upscale. Smooth (bislerp) suits most cases; nearest-exact keeps original pixels and is fast but may alias.",
+    "method_bislerp": "Smooth (bislerp)",
+    "method_bicubic": "Bicubic",
+    "method_bilinear": "Bilinear",
+    "method_area": "Area",
+    "method_nearest": "Nearest-exact",
     "denoise": "Denoise Strength",
     "denoise_help": "Controls how much the second pass modifies the image. Lower values stay closer to original, higher values add more detail but may deviate from composition. Recommended 0.3-0.5.",
     "steps": "Steps",

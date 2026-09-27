@@ -142,12 +142,12 @@ export function useControlNetOrchestration({
       { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new' },
       { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve' },
       { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain' },
-      { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
       { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
     ]
     if (faceModuleAvailable) {
       tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' })
     }
+    tabs.push({ key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' })
     return tabs
   })
 

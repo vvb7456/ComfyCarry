@@ -970,6 +970,28 @@ class WorkflowBuilder:
         return nid
 
 
+    def add_latent_upscale_by(
+        self, samples_ref, scale_by: float = 1.5, method: str = "bislerp",
+    ) -> str:
+        """
+        LatentUpscaleBy — 潜空间按倍率放大 (二次采样 Hires Fix 的放大步骤)。
+        method: nearest-exact / bilinear / area / bicubic / bislerp
+        输出: [node_id, 0]=LATENT
+        """
+        if method not in ("nearest-exact", "bilinear", "area", "bicubic", "bislerp"):
+            method = "bislerp"
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "LatentUpscaleBy",
+            "inputs": {
+                "samples": self._ref(samples_ref, default_idx=0),
+                "upscale_method": method,
+                "scale_by": float(scale_by),
+            },
+        }
+        return nid
+
+
     def add_ultralytics_detector(self, model_name: str) -> str:
         """
         UltralyticsDetectorProvider (ComfyUI-Impact-Subpack) — YOLO 检测器加载。
@@ -1323,15 +1345,22 @@ def _add_face_detailer_chain(
     )
 
 
-def _add_upscale_chain(b: WorkflowBuilder, decoded: str, params: dict) -> str:
+def _add_upscale_chain(
+    b: WorkflowBuilder, decoded: str, params: dict,
+    source_w: int | None = None, source_h: int | None = None,
+) -> str:
     """
     放大链路 (SDXL / Anima 共用)，按 upscale_engine 分流:
       aurasr (默认) — AuraSR 固定 4x → [ImageScale 缩到目标倍率]
       seedvr2       — DiT + VAE 加载器 + 一步扩散放大，倍率换算为短边目标像素
+    source_w/source_h: 传入图像的当前尺寸 (二次采样若放大过会大于 params.width/height);
+                       缺省回落到 params.width/height。目标尺寸据此按倍率推导。
     返回最终 IMAGE 节点 id。
     """
     upscale_factor = max(1.0, min(float(params.get("upscale_factor", 2)), 4.0))
     engine = str(params.get("upscale_engine", "aurasr"))
+    base_w = int(source_w if source_w is not None else params.get("width", 1024))
+    base_h = int(source_h if source_h is not None else params.get("height", 1024))
 
     if engine == "seedvr2":
         svr_model = str(params.get("upscale_svr_model", SEEDVR2_DIT_MODELS[0]))
@@ -1343,8 +1372,6 @@ def _add_upscale_chain(b: WorkflowBuilder, decoded: str, params: dict) -> str:
         input_noise = max(0.0, min(float(params.get("upscale_svr_input_noise", 0.0)), 1.0))
         latent_noise = max(0.0, min(float(params.get("upscale_svr_latent_noise", 0.0)), 1.0))
         tiled_vae = bool(params.get("upscale_svr_tiled_vae", False))
-        base_w = int(params.get("width", 1024))
-        base_h = int(params.get("height", 1024))
         # 共用倍率滑条 → 短边目标像素 (取偶数)
         resolution = round(min(base_w, base_h) * upscale_factor / 2) * 2
         dit = b.add_seedvr2_dit_loader(svr_model)
@@ -1378,8 +1405,6 @@ def _add_upscale_chain(b: WorkflowBuilder, decoded: str, params: dict) -> str:
     )
     if upscale_factor < 4.0:
         # 非 4x: 先 4x 超采再缩回目标尺寸
-        base_w = int(params.get("width", 1024))
-        base_h = int(params.get("height", 1024))
         target_w = round(base_w * upscale_factor)
         target_h = round(base_h * upscale_factor)
         return b.add_image_scale(aurasr, target_w, target_h, method=downscale_method)
@@ -1426,6 +1451,8 @@ def build_sdxl_workflow(params: dict) -> dict:
                                       model: ControlNet 模型文件名
                                       image: 已上传到 ComfyUI input/ 的图片文件名
         hires_enabled   (bool)      — 是否启用二次采样
+        hires_scale     (float)     — 二次采样潜空间放大倍率 (1.0-2.0)，默认 1.5；1.0 = 不放大只精修
+        hires_upscale_method (str)  — 潜空间插值: bislerp(默认)/bicubic/bilinear/area/nearest-exact
         hires_denoise   (float)     — 二次采样去噪强度 (0.1-1.0)，默认 0.4
         hires_steps     (int)       — 二次采样步数 (1-100)，默认 20
         hires_cfg       (float)     — 二次采样 CFG scale，默认 7.0
@@ -1541,23 +1568,17 @@ def build_sdxl_workflow(params: dict) -> dict:
 
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # 修脸跟随最后一个带提示词的全图扩散阶段: 无 HiRes → 放大之前 (避免 max_size 压缩致修后脸偏软)
+    # 模块顺序与功能模块栏一致: 二次采样 → 面部修复 → 高清放大。
+    # 二次采样先在原生分辨率上编码 (可选 latent 放大), 面部修复跟随其后,
+    # 最后由不吃提示词的放大模型 (AuraSR/SeedVR2) 收尾 —— 避免其成品被 VAE
+    # 往返与重绘破坏, 也避免修脸在放大后被 max_size 压软。
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
-    _face_defaults = {
-        "sampler": str(params.get("sampler", "euler")),
-        "scheduler": str(params.get("scheduler", "normal")),
-    }
-    if face_enabled and not hires_enabled:
-        decoded = _add_face_detailer_chain(
-            b, decoded, model_ref, clip_ref, vae_ref, positive, negative,
-            params, _face_defaults,
-        )
+    upscale_enabled = bool(params.get("upscale_enabled", False))
+    hires_scale = max(1.0, min(float(params.get("hires_scale", 1.5)), 2.0))
+    hires_method = str(params.get("hires_upscale_method", "bislerp"))
 
     final_image = decoded
-    if bool(params.get("upscale_enabled", False)):
-        final_image = _add_upscale_chain(b, decoded, params)
-
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
         hires_steps = max(1, min(int(params.get("hires_steps", 20)), 100))
@@ -1566,10 +1587,12 @@ def build_sdxl_workflow(params: dict) -> dict:
         hires_scheduler = str(params.get("hires_scheduler", "normal"))
         hires_seed = int(params.get("hires_seed", -1))
         hires_latent = b.add_vae_encode(final_image, vae_ref)
+        if hires_scale > 1.0:
+            hires_latent = b.add_latent_upscale_by(hires_latent, hires_scale, method=hires_method)
         hires_sampled = b.add_ksampler(
             model_ref,
-            positive,  # 基础正向提示词 (非 ControlNet 修改后的)
-            negative,  # 基础负向提示词
+            pos_ref,  # 与主采样同源, 含 ControlNet 条件
+            neg_ref,
             hires_latent,
             seed=hires_seed,
             steps=hires_steps,
@@ -1578,14 +1601,32 @@ def build_sdxl_workflow(params: dict) -> dict:
             scheduler=hires_scheduler,
             denoise=hires_denoise,
         )
-        final_image = b.add_vae_decode(hires_sampled, vae_ref        )
+        final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
-        # HiRes 之后修脸, 否则修脸结果被全图重绘覆盖
-        if face_enabled:
-            final_image = _add_face_detailer_chain(
-                b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
-                params, _face_defaults,
-            )
+    if face_enabled:
+        _face_defaults = {
+            "sampler": str(params.get("sampler", "euler")),
+            "scheduler": str(params.get("scheduler", "normal")),
+        }
+        # 修脸是局部裁切重绘, 而 ControlNet 控制图是整图 (不随裁切同步) ->
+        # 不接 CN 条件, 恒用原始正/负提示词, 避免控制图被压进脸部裁切。
+        final_image = _add_face_detailer_chain(
+            b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
+            params, _face_defaults,
+        )
+
+    if upscale_enabled:
+        base_w = int(params.get("width", 1024))
+        base_h = int(params.get("height", 1024))
+        if hires_enabled and hires_scale > 1.0:
+            # LatentUpscaleBy 在 /8 网格取整, 目标尺寸按同一网格推导
+            source_w = round(base_w * hires_scale / 8) * 8
+            source_h = round(base_h * hires_scale / 8) * 8
+        else:
+            source_w, source_h = base_w, base_h
+        final_image = _add_upscale_chain(
+            b, final_image, params, source_w=source_w, source_h=source_h,
+        )
 
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()
@@ -1670,8 +1711,9 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         或 VAEEncodeForInpaint / VAEEncode 用于 I2I/Inpaint
       KSampler (默认值取自 profile)
       VAEDecode
-      [可选放大链路]
-      [可选二次采样 HiRes]
+      [可选二次采样 HiRes (含潜空间放大)]
+      [可选面部修复]
+      [可选放大链路 (AuraSR/SeedVR2 收尾)]
       Image Save + PreviewImage
 
     支持模块: LoRA / I2I / Inpaint / HiRes / Upscale (与 SDXL 相同)
@@ -1806,23 +1848,14 @@ def build_split_workflow(params: dict, arch: str) -> dict:
 
     decoded = b.add_vae_decode(sampled, vae_ref)
 
-    # 修脸跟随最后一个带提示词的全图扩散阶段: 无 HiRes → 放大之前; 有 HiRes → HiRes 之后
+    # 模块顺序与功能模块栏一致: 二次采样 → 面部修复 → 高清放大 (同 SDXL, 见 build_sdxl_workflow)
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
-    _face_defaults = {
-        "sampler": str(params.get("sampler", profile["sampler"])),
-        "scheduler": str(params.get("scheduler", profile["scheduler"])),
-    }
-    if face_enabled and not hires_enabled:
-        decoded = _add_face_detailer_chain(
-            b, decoded, model_ref, clip_ref, vae_ref, positive, negative,
-            params, _face_defaults,
-        )
+    upscale_enabled = bool(params.get("upscale_enabled", False))
+    hires_scale = max(1.0, min(float(params.get("hires_scale", 1.5)), 2.0))
+    hires_method = str(params.get("hires_upscale_method", "bislerp"))
 
     final_image = decoded
-    if bool(params.get("upscale_enabled", False)):
-        final_image = _add_upscale_chain(b, decoded, params)
-
     # 缺省值同步取 profile (hires_cfg 下限 clamp 保持 1.0)
     if hires_enabled:
         hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
@@ -1832,10 +1865,12 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         hires_scheduler = str(params.get("hires_scheduler", profile["scheduler"]))
         hires_seed = int(params.get("hires_seed", -1))
         hires_latent = b.add_vae_encode(final_image, vae_ref)
+        if hires_scale > 1.0:
+            hires_latent = b.add_latent_upscale_by(hires_latent, hires_scale, method=hires_method)
         hires_sampled = b.add_ksampler(
             model_ref,
-            positive,  # 复用基础正/负提示词
-            negative,
+            pos_ref,  # 与主采样同源, 含 ControlNet 条件
+            neg_ref,
             hires_latent,
             seed=hires_seed,
             steps=hires_steps,
@@ -1844,14 +1879,31 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             scheduler=hires_scheduler,
             denoise=hires_denoise,
         )
-        final_image = b.add_vae_decode(hires_sampled, vae_ref        )
+        final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
-        # HiRes 之后修脸, 否则修脸结果被全图重绘覆盖
-        if face_enabled:
-            final_image = _add_face_detailer_chain(
-                b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
-                params, _face_defaults,
-            )
+    if face_enabled:
+        _face_defaults = {
+            "sampler": str(params.get("sampler", profile["sampler"])),
+            "scheduler": str(params.get("scheduler", profile["scheduler"])),
+        }
+        # 修脸是局部裁切重绘, 而 ControlNet 控制图是整图 (不随裁切同步) ->
+        # 不接 CN 条件, 恒用原始正/负提示词, 避免控制图被压进脸部裁切。
+        final_image = _add_face_detailer_chain(
+            b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
+            params, _face_defaults,
+        )
+
+    if upscale_enabled:
+        base_w = int(params.get("width", 1024))
+        base_h = int(params.get("height", 1024))
+        if hires_enabled and hires_scale > 1.0:
+            source_w = round(base_w * hires_scale / 8) * 8
+            source_h = round(base_h * hires_scale / 8) * 8
+        else:
+            source_w, source_h = base_w, base_h
+        final_image = _add_upscale_chain(
+            b, final_image, params, source_w=source_w, source_h=source_h,
+        )
 
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()

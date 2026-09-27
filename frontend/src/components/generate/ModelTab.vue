@@ -280,12 +280,12 @@ const localModuleTabs = computed<SwitchTabItem[]>(() => {
       icon: 'terrain',
       disabled: true,
     },
-    { key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' },
     { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
   ]
   if (config.value.modules.includes('face')) {
     tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' })
   }
+  tabs.push({ key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' })
   return tabs
 })
 

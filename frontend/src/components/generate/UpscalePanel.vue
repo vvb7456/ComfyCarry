@@ -81,8 +81,10 @@ const is4x = computed(() => config.value.factor >= 4)
 
 const sizeHint = computed(() => {
   const s = store.currentState
-  const w = Math.round(s.width * config.value.factor)
-  const h = Math.round(s.height * config.value.factor)
+  // 二次采样开启且带倍率时, 放大模块的输入已放大过 -> 目标尺寸按叠乘
+  const hiresMul = s.hires.enabled ? s.hires.scale : 1
+  const w = Math.round(s.width * hiresMul * config.value.factor)
+  const h = Math.round(s.height * hiresMul * config.value.factor)
   return `${w} × ${h}`
 })
 </script>
