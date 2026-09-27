@@ -173,6 +173,7 @@
   },
   "env_hint": {
     "cf_detected": "CF configuration detected from environment variables",
+    "tunnel_managed": "Managed mode is active. Tunnel settings are unavailable.",
     "tunnel_active_public": "Tunnel is active (Public Node: {url}). To modify, use the Dashboard Tunnel page",
     "tunnel_active_custom": "Tunnel is active (Custom mode). To modify, use the Dashboard Tunnel page"
   },

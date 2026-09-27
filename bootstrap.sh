@@ -42,8 +42,9 @@ echo "  -> ComfyCarry 依赖已预装"
 
 echo "  -> Cloudflared 已预装"
 
-# 更新源为 GitHub latest Release (完整部署包, 由 release.yml 发布),
-# main 分支 push 不影响已部署实例 —— commit 与 release 解耦
+# 更新源: 托管开通使用主控下发并已校验的固定部署包 (COMFYCARRY_BUNDLE_DIR),
+# 自托管仍从 GitHub latest Release (完整部署包, 由 release.yml 发布) 更新 ——
+# main 分支 push 不影响已部署实例, commit 与 release 解耦。
 DASHBOARD_DIR="$WORKSPACE_DIR/ComfyCarry"
 REPO_OWNER="vvb7456"
 REPO_NAME="ComfyCarry"
@@ -52,6 +53,57 @@ LATEST_RELEASE_API="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/rele
 
 mkdir -p "$DASHBOARD_DIR"
 
+BUNDLE_DIR="${COMFYCARRY_BUNDLE_DIR:-}"
+BUNDLE_ID=""
+if [ -n "$BUNDLE_DIR" ]; then
+    BUNDLE_ID=$(python3 - "$BUNDLE_DIR" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+value = json.loads((root / "manifest.json").read_text(encoding="utf-8"))["content_sha256"]
+if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+    sys.exit("托管部署包缺少有效版本摘要")
+print(value)
+PY
+)
+fi
+
+if [ -n "$BUNDLE_DIR" ]; then
+    DEPLOYED_ID=""
+    [ -f "$DASHBOARD_DIR/.bundle-id" ] && DEPLOYED_ID=$(cat "$DASHBOARD_DIR/.bundle-id" 2>/dev/null || true)
+
+    # 同一定位包重复启动不覆盖工作区: 仅首次或包身份变化时复制, 保留用户
+    # 向导/配置等本地文件 (cp 合并, 不删除包外文件)。
+    if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "$DEPLOYED_ID" != "$BUNDLE_ID" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
+        echo "  -> 复制托管部署包 (bundle=${BUNDLE_ID:0:12})..."
+        for _item in comfycarry comfycarry_ws_broadcast data; do
+            if [ -e "$BUNDLE_DIR/$_item" ]; then
+                cp -r "$BUNDLE_DIR/$_item" "$DASHBOARD_DIR/"
+            fi
+        done
+        for _item in workspace_manager.py favicon.ico; do
+            if [ -f "$BUNDLE_DIR/$_item" ]; then
+                cp -f "$BUNDLE_DIR/$_item" "$DASHBOARD_DIR/$_item"
+            fi
+        done
+        if [ -d "$BUNDLE_DIR/static/dist" ]; then
+            mkdir -p "$DASHBOARD_DIR/static/dist"
+            cp -r "$BUNDLE_DIR/static/dist/." "$DASHBOARD_DIR/static/dist/"
+        fi
+        if [ -f "$BUNDLE_DIR/.version" ]; then
+            cp -f "$BUNDLE_DIR/.version" "$DASHBOARD_DIR/.version"
+        elif [ ! -f "$DASHBOARD_DIR/.version" ]; then
+            printf 'version=unknown\nbranch=\ncommit=\nmanaged=true\ndirty=true\nbundle_sha256=%s\n' "$BUNDLE_ID" > "$DASHBOARD_DIR/.version"
+        fi
+        printf '%s\n' "$BUNDLE_ID" > "$DASHBOARD_DIR/.bundle-id"
+        echo "  ComfyCarry 文件已更新"
+    else
+        echo "  -> 托管部署包未变化, 保留现有文件 (设置 FORCE_UPDATE=true 强制覆盖)"
+    fi
+else
 # 拉取一次 latest Release 元数据, 下载地址与 .version 共用 (限流 60 req/h, 不要重复请求)
 RELEASE_JSON=$(wget -qO- "$LATEST_RELEASE_API" 2>/dev/null || true)
 
@@ -115,10 +167,16 @@ version=${RELEASE_TAG:-$APP_VERSION}
 branch=
 commit=${COMMIT_HASH}
 EOF
+fi
 
 # CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册)
+if [ -f /opt/comfycarry-management-agent.py ]; then
+    python3 /opt/comfycarry-management-agent.py event --stage SERVICE_STARTING || true
+fi
 _TUNNEL_DASHBOARD_URL=""
-if [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
+if "$PYTHON_BIN" -c "import sys; sys.path.insert(0, sys.argv[1]); from comfycarry.services.managed_tunnel import is_managed; sys.exit(0 if is_managed() else 1)" "$DASHBOARD_DIR"; then
+    _TUNNEL_DASHBOARD_URL=$("$PYTHON_BIN" -c "import sys; sys.path.insert(0, sys.argv[1]); from comfycarry.services.managed_tunnel import ensure_connected; print(ensure_connected()['urls']['dashboard'])" "$DASHBOARD_DIR")
+elif [ -n "${CF_API_TOKEN:-}" ] && [ -n "${CF_DOMAIN:-}" ]; then
     if [ -z "${CF_SUBDOMAIN:-}" ]; then
         echo "  -> 错误: 自定义 Tunnel 需要 CF_SUBDOMAIN, 按启动失败处理" >&2
         echo "  Tunnel 启动失败"

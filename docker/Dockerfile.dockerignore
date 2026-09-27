@@ -1,0 +1,12 @@
+**
+!docker/
+!docker/Dockerfile
+!docker/entrypoint.sh
+!docker/comfycarry-banner.txt
+!docker/wheels/
+!docker/wheels/**
+!comfycarry/
+!comfycarry/services/
+!comfycarry/services/management_agent.py
+!comfycarry/services/usage_collector.py
+!comfycarry/services/system_monitor.py

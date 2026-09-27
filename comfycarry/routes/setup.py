@@ -74,6 +74,12 @@ def api_setup_state():
             except Exception:
                 safe["active_tunnel_urls"] = {}
 
+    from ..services.managed_tunnel import public_view
+    managed = public_view()
+    safe["managed"] = managed["managed"]
+    if managed["managed"]:
+        safe["active_tunnel_mode"] = "public"
+        safe["active_tunnel_urls"] = managed["urls"]
     safe["sync_templates"] = SYNC_RULE_TEMPLATES
     safe["remote_type_defs"] = REMOTE_TYPE_DEFS
     return jsonify(safe)

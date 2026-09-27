@@ -93,6 +93,9 @@ class PublicTunnelClient:
         Returns: { "ok": True, "urls": {...}, "random_id": "..." }
         Raises: PublicTunnelError
         """
+        from .managed_tunnel import is_managed, ensure_connected
+        if is_managed():
+            return ensure_connected()
         if self.random_id:
             try:
                 self.release()
@@ -386,6 +389,9 @@ class PublicTunnelClient:
         Returns: {"ok": True, "random_id": "...", "recovered": bool}
                  或 {"ok": False, "error_key": "..."}
         """
+        from .managed_tunnel import is_managed, ensure_connected
+        if is_managed():
+            return ensure_connected()
         if not self.random_id or not self.tunnel_token:
             return {"ok": False, "error_key": "tunnel.err.public_no_state"}
 
@@ -411,6 +417,11 @@ class PublicTunnelClient:
             "cloudflared_running": bool
         }
         """
+        from .managed_tunnel import public_view
+        managed = public_view()
+        if managed["managed"]:
+            return {**managed, "mode": "public", "random_id": None,
+                    "cloudflared_running": self._is_cloudflared_running()}
         mode = get_config("tunnel_mode", "")
         cf_token = get_config("cf_api_token", "")
 

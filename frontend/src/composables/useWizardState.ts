@@ -47,6 +47,7 @@ const syncTemplates = ref<SyncTemplate[]>([])
 const remoteTypeDefs = ref<Record<string, RemoteTypeDef>>({})
 const importedConfig = ref<ExportedConfig | null>(null)
 const activeTunnelMode = ref('')
+const managedTunnel = ref(false)
 const activeTunnelUrls = ref<Record<string, string>>({})
 const deployState = ref<'idle' | 'deploying' | 'done' | 'error'>('idle')
 const initLoading = ref(true)
@@ -113,6 +114,7 @@ export function useWizardState() {
       remoteTypeDefs.value = state.remote_type_defs || {}
 
       activeTunnelMode.value = state.active_tunnel_mode || ''
+      managedTunnel.value = state.managed === true
       activeTunnelUrls.value = state.active_tunnel_urls || {}
 
       // 注意: state 里的 wizard_remotes / wizard_sync_rules 等部署快照字段
@@ -242,6 +244,13 @@ export function useWizardState() {
         return { ok: false, message: t('wizard.import.invalid_format') }
       }
 
+      if (managedTunnel.value) {
+        for (const key of [
+          'tunnel_mode', 'public_tunnel_subdomain', 'cf_api_token', 'cf_domain', 'cf_subdomain',
+          'cf_custom_services', 'cf_suffix_overrides', 'cf_protocol',
+        ] as const) delete parsed[key]
+      }
+
       // Store raw import data — will be applied to backend at deploy time
       importedConfig.value = parsed
 
@@ -349,6 +358,7 @@ export function useWizardState() {
     remoteTypeDefs,
     importedConfig,
     activeTunnelMode,
+    managedTunnel,
     activeTunnelUrls,
     deployState,
     initLoading,

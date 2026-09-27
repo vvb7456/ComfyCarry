@@ -172,6 +172,7 @@
     "prebuilt_image": "ComfyCarry"
   },
   "env_hint": {
+    "tunnel_managed": "当前处于托管模式，无法设置隧道。",
     "tunnel_active_public": "Tunnel 已启用（公共节点：{url}），如需修改请在 Dashboard Tunnel 页操作",
     "tunnel_active_custom": "Tunnel 已启用（自定义模式），如需修改请在 Dashboard Tunnel 页操作",
     "cf_detected": "已从环境变量检测到 CF 配置"

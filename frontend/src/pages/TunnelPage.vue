@@ -334,14 +334,14 @@ function openAddSvc() {
   <div class="page-body">
     <PageHeaderRow :title="t('tunnel.title')">
       <template #actions>
-        <template v-if="configured">
+        <template v-if="configured && !data?.managed">
           <template v-if="heroState === 'online' || heroState === 'connecting'">
             <BaseButton size="sm" :loading="pendingAction === 'stop'" :disabled="acting" @click="tunnelStop"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>
             <BaseButton size="sm" :loading="pendingAction === 'restart'" :disabled="acting" @click="tunnelRestart()"><MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}</BaseButton>
           </template>
           <BaseButton v-else size="sm" :loading="pendingAction === 'start'" :disabled="acting" @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
         </template>
-        <BaseButton variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
+        <BaseButton v-if="data && !data.managed" variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
           <MsIcon name="settings" /> {{ t('common.btn.settings') }}
         </BaseButton>
       </template>
@@ -358,7 +358,7 @@ function openAddSvc() {
           :tone="heroTone"
           :busy="heroBusy"
         >
-          <template v-if="heroHasActions" #actions>
+          <template v-if="heroHasActions && !data?.managed" #actions>
             <template v-if="heroState === 'unconfigured'">
               <BaseButton variant="primary" @click="openSettings('public')">{{ t('tunnel.hero.action.connect_public') }}</BaseButton>
               <BaseButton @click="openSettings('custom')">{{ t('tunnel.hero.action.connect_custom') }}</BaseButton>

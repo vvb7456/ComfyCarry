@@ -1,4 +1,6 @@
 import logging
+import os
+import secrets
 
 from flask import Blueprint, request, jsonify, redirect, session
 from flask.sessions import SecureCookieSessionInterface, SecureCookieSession
@@ -101,6 +103,11 @@ def register_auth_middleware(app):
 
     @app.before_request
     def check_auth():
+        # 托管开通交付验收探针: 无面板会话凭据的外网 GET, 与 /api/version
+        # 同级豁免; 仅精确路径 + GET, POST/子路径/其他方法一律走正常鉴权。
+        # 放在 setup 判断之前, 部署前后均可达 (不受 setup 503/重定向影响)。
+        if request.method == "GET" and request.path == "/api/provisioning/readiness":
+            return
         # Setup 相关路由: 部署未完成时全部放行 (此时还没有密码);
         # 已完成则把写/触发类路由交回正常鉴权, 只读的继续放行。
         if request.path.startswith("/api/setup/") or request.path == "/setup":
@@ -144,7 +151,8 @@ def register_auth_middleware(app):
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 api_key = auth_header[7:]
-        if api_key and api_key == config.API_KEY:
+        if api_key and any(key and secrets.compare_digest(api_key.encode(), key.encode())
+                           for key in (config.API_KEY, os.environ.get("MANAGEMENT_API_KEY", ""))):
             return
         if request.path.startswith("/api/"):
             cookie_name = app.config.get("SESSION_COOKIE_NAME", "")

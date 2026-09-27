@@ -14,7 +14,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 defineOptions({ name: 'StepTunnel' })
 
 const { t } = useI18n({ useScope: 'global' })
-const { config, envVars, activeTunnelMode, activeTunnelUrls, nextStep, prevStep } = useWizardState()
+const { config, envVars, activeTunnelMode, activeTunnelUrls, managedTunnel, nextStep, prevStep } = useWizardState()
 const {
   capacity, capacityLoading, capacityError,
   validating, validateResult, tunnelLocked,
@@ -24,6 +24,7 @@ const {
 const hasEnvCfToken = computed(() => !!envVars.value.cf_api_token)
 
 const tunnelActiveHint = computed(() => {
+  if (managedTunnel.value) return t('wizard.env_hint.tunnel_managed')
   if (!activeTunnelMode.value) return ''
   if (activeTunnelMode.value === 'public') {
     const url = activeTunnelUrls.value.dashboard || ''

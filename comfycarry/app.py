@@ -23,7 +23,7 @@ from .auth import auth_bp, register_auth_middleware, DebugSessionInterface
 
 # Route Blueprints
 from .routes import system, tunnel, models, comfyui, plugins, settings, sync, setup, frontend, jupyter, ssh
-from .routes import generate, downloads, llm, files, prompt_library, update, favorites
+from .routes import generate, downloads, llm, files, prompt_library, update, favorites, provisioning
 from .routes.ssh import restore_ssh_config
 from .routes import companion
 
@@ -69,6 +69,7 @@ def create_app():
     app.register_blueprint(files.bp)
     app.register_blueprint(prompt_library.bp)
     app.register_blueprint(update.bp)
+    app.register_blueprint(provisioning.bp)
     app.register_blueprint(frontend.bp)
 
     register_auth_middleware(app)
@@ -211,7 +212,13 @@ def main():
     # 注意: 首次注册由 bootstrap.sh 完成, Dashboard 只负责 restore
     # 长时间停机后隧道可能已被后端清理回收, restore 内部会自动重新注册
     tunnel_mode = cfg.get_config("tunnel_mode")
-    if tunnel_mode == "public":
+    from .services.managed_tunnel import is_managed, ensure_connected
+    if is_managed():
+        try:
+            ensure_connected()
+        except Exception as exc:
+            app.logger.warning("托管入口连接恢复失败: %s", type(exc).__name__)
+    elif tunnel_mode == "public":
         try:
             from .services.public_tunnel import PublicTunnelClient
             client = PublicTunnelClient()

@@ -202,6 +202,7 @@ export interface SetupState {
   plugins_available: PluginInfo[]
   env_vars: SetupStateEnvVars
   active_tunnel_mode?: string
+  managed?: boolean
   active_tunnel_urls?: Record<string, string>
   sync_templates: SyncTemplate[]
   remote_type_defs: Record<string, RemoteTypeDef>

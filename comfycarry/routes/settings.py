@@ -291,10 +291,17 @@ def api_settings_export_config():
 @bp.route("/api/settings/import-config", methods=["POST"])
 def api_settings_import_config():
     import base64 as _b64
+    from ..services.managed_tunnel import is_managed
 
     data = request.get_json(force=True) or {}
     if not data:
         return _err("invalid_config")
+
+    if is_managed():
+        data = {key: value for key, value in data.items() if key not in {
+            "tunnel_mode", "public_tunnel_subdomain", "cf_api_token", "cf_domain",
+            "cf_subdomain", "cf_custom_services", "cf_suffix_overrides", "cf_protocol",
+        }}
 
     applied = []
     errors = []

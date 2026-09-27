@@ -78,6 +78,16 @@ def api_tunnel_status_v2():
 
 
 def _build_tunnel_status(force: bool = False) -> dict:
+    from ..services.managed_tunnel import public_view
+    managed = public_view()
+    if managed["managed"]:
+        ready = _check_cloudflared_ready()
+        return {**managed, "configured": True, "tunnel_mode": "public",
+                "tunnel": {"exists": True, "status": "active"}, "services": [],
+                "cloudflared": _get_cloudflared_pm2_status(), "cloudflared_ready": ready,
+                "effective_status": "online" if ready == "connected" else "offline",
+                "cf_protocol": get_config("cf_protocol", "auto"),
+                "public": {"random_id": None, "urls": managed["urls"]}}
     now = _time.time()
     if (not force
             and _tunnel_cache["data"]
@@ -684,6 +694,3 @@ def _get_cloudflared_pm2_status() -> str:
     except Exception:
         pass
     return "unknown"
-
-
-

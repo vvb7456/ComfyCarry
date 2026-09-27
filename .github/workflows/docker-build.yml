@@ -14,6 +14,10 @@ on:
     paths:
       - "docker/Dockerfile"
       - "docker/entrypoint.sh"
+      - "docker/Dockerfile.dockerignore"
+      - "comfycarry/services/management_agent.py"
+      - "comfycarry/services/usage_collector.py"
+      - "comfycarry/services/system_monitor.py"
       - "docker/comfycarry-banner.txt"
       - ".github/workflows/docker-build.yml"
     branches: [main]
@@ -88,7 +92,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: docker
+          context: .
           file: docker/Dockerfile
           push: true
           tags: |

@@ -53,7 +53,7 @@ DOCKER_BUILDKIT=1 docker build \
     --build-arg NO_PROXY="${NO_PROXY}" \
     -f "${DOCKERFILE}" \
     -t "${FULL_IMAGE_NAME}" \
-    .
+    ..
 
 echo ""
 echo "================================================="

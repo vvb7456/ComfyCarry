@@ -21,6 +21,7 @@ export interface PublicTunnelInfo {
 }
 
 export interface TunnelData {
+  managed?: boolean
   tunnel_mode: string | null
   configured: boolean
   effective_status: string
