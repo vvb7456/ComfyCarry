@@ -204,22 +204,6 @@ onActivated(() => {
   bg.refresh()
 })
 
-// 关标签页/切后台时立即落盘, 覆盖 300ms 防抖窗口内的改动 (keepalive 请求)。
-function onPageHide() {
-  if (optionsReady.value) store.flushSave()
-}
-function onVisibility() {
-  if (document.visibilityState === 'hidden' && optionsReady.value) store.flushSave()
-}
-if (typeof document !== 'undefined') {
-  window.addEventListener('pagehide', onPageHide)
-  document.addEventListener('visibilitychange', onVisibility)
-}
-onBeforeUnmount(() => {
-  window.removeEventListener('pagehide', onPageHide)
-  document.removeEventListener('visibilitychange', onVisibility)
-})
-
 // 两个任务各自记忆选中架构。store.activeModelType 已是 computed 派生
 // (读写当前任务 activeModelTypeByTask[activeTask] 的槽), 切任务用 store.switchTask()
 // — 它会把 activeTask 切到该任务并保证对应架构的 modelStates 已初始化。

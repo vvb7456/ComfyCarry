@@ -5,11 +5,14 @@ SystemMonitor — 后台 daemon 线程采集系统指标，写入模块级缓存
 采集项: GPU (pynvml) + CPU / Memory / Disk / Network (psutil)。
 """
 
+import logging
 import os
 import threading
 import time
 from typing import Any
-from ..config import WORKSPACE_DIR
+
+log = logging.getLogger(__name__)
+WORKSPACE_DIR = os.path.abspath(os.environ.get("WORKSPACE_DIR") or "/workspace")
 
 _cache: dict[str, Any] = {}
 _cache_lock = threading.Lock()
@@ -73,7 +76,7 @@ def _collect_gpu() -> list[dict]:
             })
         pynvml.nvmlShutdown()
     except Exception:
-        pass
+        log.exception("GPU 指标采集失败")
     return gpus
 
 
@@ -120,7 +123,7 @@ def _collect_system() -> dict:
             "packets_recv": net.packets_recv,
         }
     except Exception:
-        pass
+        log.exception("系统指标采集失败")
 
     try:
         import subprocess

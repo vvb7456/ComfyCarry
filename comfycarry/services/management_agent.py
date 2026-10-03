@@ -212,6 +212,7 @@ class AgentClient:
                 from system_monitor import _collect_all
             stats = _collect_all()
         except Exception:
+            log.exception("系统指标采集失败，本次心跳保留未知指标")
             stats = {}
         health = {"dashboard": self.local_ready(), "jupyter": None, "tunnel": None,
                   "disk_used_pct": stats.get("disk", {}).get("percent"),

@@ -746,24 +746,6 @@ export const useGenerateStore = defineStore('generate', () => {
   }
 
   /**
-   * 离页/隐藏时立即刷一次, 覆盖防抖窗口内的改动。
-   * keepalive 上限约 64KB, 超限时退化为普通请求 (可能被卸载取消, 但不致报错)。
-   */
-  function flushSave() {
-    if (!autoSaveEnabled) return
-    clearTimers()
-    const { top, changedStates } = buildEnvelope()
-    const body = JSON.stringify({ ...top, modelStates: changedStates })
-    const init: RequestInit = {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    }
-    if (body.length < 60 * 1024) init.keepalive = true
-    try { void fetch(STATE_ENDPOINT, init).catch(() => {}) } catch { /* ignore */ }
-  }
-
-  /**
    * 从服务端装载工作区状态。Must be called AFTER options are loaded
    * so that checkpoint/lora/sampler/scheduler can be validated.
    *
@@ -1020,7 +1002,7 @@ export const useGenerateStore = defineStore('generate', () => {
     restoredFiles,
     componentsReady, setComponentsReady,
     currentConfig, currentState, stateFor,
-    switchModelType, switchTask, save, restore, enableAutoSave, flushSave,
+    switchModelType, switchTask, save, restore, enableAutoSave,
     saveError,
   }
 })
