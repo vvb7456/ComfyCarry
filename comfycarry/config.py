@@ -12,7 +12,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-APP_VERSION = "v0.8.4"
+APP_VERSION = "v0.8.5"
 
 # 本地文件地址显式使用 {workspace}、{ComfyUI} 或系统绝对路径。
 # 用 `or` 而非 get 的默认值: 环境变量传空串时 Path("").resolve() 会解析成
