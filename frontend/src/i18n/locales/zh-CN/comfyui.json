@@ -96,7 +96,7 @@
       },
       "attention": {
         "label": "Attention 方案",
-        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。FlashAttention 和 SageAttention 可在部署向导中安装。",
+        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。也可选择 FlashAttention 或 SageAttention。",
         "options": {
           "default": "默认",
           "pytorch-cross": "PyTorch SDPA",

@@ -96,7 +96,7 @@
       },
       "attention": {
         "label": "Attention Mode",
-        "help": "PyTorch SDPA is the recommended default and automatically picks an efficient kernel. FlashAttention and SageAttention can be installed in Setup Wizard.",
+        "help": "PyTorch SDPA is the recommended default and automatically picks an efficient kernel. FlashAttention and SageAttention are also available options.",
         "options": {
           "default": "Default",
           "pytorch-cross": "PyTorch SDPA",

@@ -23,8 +23,8 @@ function createDefaultConfig(): WizardConfig {
     rclone_config_value: '',
     civitai_token: '',
     plugins: [],
-    install_fa2: false,
-    install_sa2: false,
+    attention: 'default',
+    comfyui_args: '',
     ssh_keys: [],
     wizard_sync_rules: [],
     wizard_remotes: [],
@@ -39,6 +39,9 @@ let _initialized = false
 const config = reactive<WizardConfig>(createDefaultConfig())
 const currentStep = ref(0)
 const gpuInfo = ref<GpuInfo | null>(null)
+const supportsAcceleratedAttention = computed(() =>
+  Number.parseFloat(gpuInfo.value?.cuda_cap ?? '') >= 8.0,
+)
 const prebuiltInfo = ref<PrebuiltInfo | null>(null)
 const detectedImageType = ref<DetectedImageType>('prebuilt')
 const pluginData = ref<PluginInfo[]>([])
@@ -100,12 +103,12 @@ export function useWizardState() {
       }
 
       // GPU capability check → override detectedImageType
-      if (gpu?.cuda_cap) {
-        const capMajor = parseInt(gpu.cuda_cap.split('.')[0] ?? '0', 10)
-        if (capMajor > 0 && capMajor < 8) {
+      if (gpuInfo.value?.cuda_cap) {
+        const capability = Number.parseFloat(gpuInfo.value.cuda_cap)
+        if (capability > 0 && capability < 7.5) {
           detectedImageType.value = 'unsupported-gpu'
         }
-      } else if (!gpu && !mockParam) {
+      } else if (!gpuInfo.value && !mockParam) {
         detectedImageType.value = 'no-gpu'
       }
 
@@ -165,8 +168,10 @@ export function useWizardState() {
     if (state.plugins) config.plugins = state.plugins
     if (state.wizard_remotes) config.wizard_remotes = state.wizard_remotes
     if (state.wizard_sync_rules) config.wizard_sync_rules = state.wizard_sync_rules
-    if (state.install_fa2 !== undefined) config.install_fa2 = state.install_fa2
-    if (state.install_sa2 !== undefined) config.install_sa2 = state.install_sa2
+    if (state.attention !== undefined) {
+      config.attention = supportsAcceleratedAttention.value ? state.attention : 'default'
+    }
+    config.comfyui_args = state.comfyui_args || ''
     if (state.ssh_pw_follow !== undefined) config.ssh_pw_follow = state.ssh_pw_follow
     if (state.ssh_keys) config.ssh_keys = state.ssh_keys
     if (state.llm_provider) config.llm_provider = state.llm_provider
@@ -280,8 +285,6 @@ export function useWizardState() {
         config._imported_sync_rules_count = syncRules.length
         appliedCount++
       }
-      if (parsed.install_fa2 !== undefined) config.install_fa2 = parsed.install_fa2
-      if (parsed.install_sa2 !== undefined) config.install_sa2 = parsed.install_sa2
       if (parsed.tunnel_mode === 'custom') { config.tunnel_mode = 'custom'; appliedCount++ }
       if (parsed.ssh_pw_follow !== undefined) config.ssh_pw_follow = parsed.ssh_pw_follow
       if (parsed.ssh_keys) config.ssh_keys = parsed.ssh_keys
@@ -304,8 +307,8 @@ export function useWizardState() {
         config._imported_nsfw = true
         appliedCount++
       }
-      if (parsed.comfyui_args) {
-        config._imported_comfyui_args = true
+      config.comfyui_args = parsed.comfyui_args || ''
+      if (config.comfyui_args) {
         appliedCount++
       }
       if (Array.isArray(parsed.favorites)) {
@@ -365,6 +368,7 @@ export function useWizardState() {
 
     // Computed
     isUnsupported,
+    supportsAcceleratedAttention,
     totalSteps,
 
     // Actions

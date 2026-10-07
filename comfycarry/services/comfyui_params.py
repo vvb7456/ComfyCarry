@@ -19,7 +19,7 @@ COMFYUI_PARAM_GROUPS = {
     "attention": {
         "label": "Attention 方案",
         "type": "select",
-        "help": "PyTorch SDPA 推荐，自动调用最优内核。FlashAttention/SageAttention 可通过 Setup Wizard 安装",
+        "help": "PyTorch SDPA 推荐，自动调用最优内核。也可选择 FlashAttention 或 SageAttention",
         "options": [
             ("default", "默认"),
             ("pytorch-cross", "PyTorch SDPA"),

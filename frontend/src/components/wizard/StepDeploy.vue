@@ -13,8 +13,8 @@ defineOptions({ name: 'StepDeploy' })
 
 const { t } = useI18n({ useScope: 'global' })
 const {
-  gpuInfo, prebuiltInfo, detectedImageType, isUnsupported,
-  importedConfig, nextStep, handleImportFile,
+  config, gpuInfo, prebuiltInfo, detectedImageType, isUnsupported,
+  importedConfig, nextStep, handleImportFile, selectMode: selectWizardMode,
 } = useWizardState()
 
 // Explicit mode selection — NOT derived from importedConfig
@@ -35,8 +35,8 @@ const nextDisabled = computed(() => {
 
 function selectMode(m: 'fresh' | 'import') {
   selectedMode.value = m
+  selectWizardMode(m)
   if (m === 'fresh') {
-    importedConfig.value = null
     importError.value = ''
     uploadRef.value?.clearFile()
   }
@@ -52,11 +52,12 @@ async function onImportFile(file: File) {
 }
 
 function clearImport() {
-  importedConfig.value = null
+  selectWizardMode('fresh')
   importError.value = ''
 }
 
 function onNext() {
+  if (selectedMode.value === 'fresh') config.comfyui_args = ''
   nextStep()
 }
 </script>

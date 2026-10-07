@@ -109,7 +109,7 @@ const sections = computed<SummarySection[]>(() => {
   if (c._imported_nsfw) {
     importRows.push({ label: t('wizard.summary.civitai_nsfw'), value: t('wizard.summary.configured'), active: true })
   }
-  if (c._imported_comfyui_args) {
+  if (c.comfyui_args) {
     importRows.push({ label: t('wizard.summary.comfyui_args'), value: t('wizard.summary.configured'), active: true })
   }
 
@@ -165,8 +165,13 @@ const sections = computed<SummarySection[]>(() => {
     {
       title: t('wizard.summary.attn'),
       rows: [
-        { label: 'FlashAttention-2', value: c.install_fa2 ? t('wizard.summary.install') : t('wizard.summary.skipped'), icon: configured(c.install_fa2), active: !!c.install_fa2 },
-        { label: 'SageAttention-2', value: c.install_sa2 ? t('wizard.summary.install') : t('wizard.summary.skipped'), icon: configured(c.install_sa2), active: !!c.install_sa2 },
+        {
+          label: t('wizard.summary.attn'),
+          value: c.comfyui_args ? t('wizard.summary.attn_imported')
+            : c.attention === 'flash' ? 'FlashAttention-2'
+            : c.attention === 'sage' ? 'SageAttention-2' : t('wizard.step8.default_title'),
+          active: true,
+        },
       ],
     },
   ]

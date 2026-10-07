@@ -99,7 +99,7 @@ def _apply_deploy_plan(state, data):
         "cf_api_token", "cf_domain", "cf_subdomain",
         "rclone_config_method", "rclone_config_value",
         "civitai_token", "plugins",
-        "install_fa2", "install_sa2",
+        "attention", "comfyui_args",
         "wizard_sync_rules",
         "_imported_sync_rules", "_imported_sync_rules_count",
         "ssh_keys", "ssh_pw_follow",
@@ -291,9 +291,6 @@ def api_setup_log_stream():
                 for line in remaining:
                     yield f"data: {json.dumps(line, ensure_ascii=False)}\n\n"
                 done_evt = {'type': 'done', 'success': True}
-                attn_warnings = state.get("attn_install_warnings", [])
-                if attn_warnings:
-                    done_evt["attn_warnings"] = attn_warnings
                 yield f"data: {json.dumps(done_evt, ensure_ascii=False)}\n\n"
                 break
             deploy_thread = get_deploy_thread()

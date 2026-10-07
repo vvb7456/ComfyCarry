@@ -14,7 +14,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 
 const {
-  steps, logLines, status, elapsed, errorMsg, attnWarnings,
+  steps, logLines, status, elapsed, errorMsg,
   retry,
 } = useWizardDeploy()
 
@@ -62,10 +62,6 @@ async function onRetry() {
 
     <AlertBanner v-if="status === 'error' && errorMsg" tone="danger">
       {{ errorMsg }}
-    </AlertBanner>
-
-    <AlertBanner v-if="attnWarnings.length > 0" tone="warning">
-      {{ t('wizard.deploy.attn_warn', { names: attnWarnings.join(' / ') }) }}
     </AlertBanner>
 
     <div v-if="status === 'success'" class="wizard-deploy__actions">

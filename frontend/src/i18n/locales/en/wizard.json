@@ -148,18 +148,14 @@
     "preinstalled": "Pre-installed"
   },
   "step8": {
-    "title": "Attention Acceleration",
-    "desc": "Choose Attention acceleration components to install",
+    "title": "Attention Backend",
+    "desc": "Choose the Attention backend used when launching ComfyUI",
+    "default_title": "Default",
+    "default_desc": "PyTorch SDPA",
     "fa2_desc": "High-performance Attention implementation, widely supported",
     "fa2_param": "Launch param: --use-flash-attention",
     "sa2_desc": "Next-gen Attention solution, faster in some scenarios",
-    "sa2_param": "Launch param: --use-sage-attention",
-    "fa2_preinstalled": "Pre-installed in image",
-    "hint_both": "When both installed, ComfyUI will prioritize FlashAttention-2",
-    "hint_fa2": "ComfyUI will launch with --use-flash-attention",
-    "hint_sa2": "ComfyUI will launch with --use-sage-attention",
-    "hint_none": "Skip to use default PyTorch SDPA",
-    "attn_help": "FlashAttention-2 and SageAttention-2 accelerate Transformer computation. FA2 has better compatibility and is recommended. SA2 is a newer approach that can be reused for some models. When both are installed, FA2 is prioritized."
+    "sa2_param": "Launch param: --use-sage-attention"
   },
   "step9": {
     "title": "Confirm Deployment",
@@ -191,8 +187,7 @@
     "retry": "Retry Deploy",
     "back_to_config": "Back to Configuration",
     "start_fail": "Deploy start failed:",
-    "request_fail": "Request failed:",
-    "attn_warn": "{names} installation failed, fell back to PyTorch SDPA. You can click \"Retry Deploy\" or reconfigure in ComfyUI page launch parameters later."
+    "request_fail": "Request failed:"
   },
   "import": {
     "invalid_format": "Invalid configuration file format",
@@ -212,7 +207,6 @@
     "install_comfyui_skip": "Install ComfyUI",
     "health_check": "ComfyUI Health Check",
     "health_check_skip": "ComfyUI Health Check",
-    "install_attn_user_skip": "Install Accelerators",
     "install_attn_skip": "Install Accelerators",
     "install_attn": "Install Accelerators ({parts})",
     "install_plugins": "Install Plugins",
@@ -259,8 +253,8 @@
     "llm_model": "Model",
     "not_configured": "Not Configured",
     "items_set": "Configured {count}",
-    "attn": "Attention Acceleration",
-    "install": "Install",
+    "attn": "Attention Backend",
+    "attn_imported": "Use imported launch arguments",
     "favorites": "Favorite Models",
     "prompt_history": "Prompt History",
     "prompt_settings": "Prompt Editor Settings",

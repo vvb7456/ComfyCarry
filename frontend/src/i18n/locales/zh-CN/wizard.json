@@ -148,18 +148,14 @@
     "preinstalled": "预装"
   },
   "step8": {
-    "title": "Attention 加速",
-    "desc": "选择要安装的 Attention 加速组件",
+    "title": "Attention 方案",
+    "desc": "选择 ComfyUI 启动时使用的 Attention 方案",
+    "default_title": "默认",
+    "default_desc": "PyTorch SDPA",
     "fa2_desc": "高性能 Attention 实现，广泛支持",
     "fa2_param": "启动参数：--use-flash-attention",
     "sa2_desc": "新一代 Attention 方案，部分场景更快",
-    "sa2_param": "启动参数：--use-sage-attention",
-    "fa2_preinstalled": "已预装在镜像中",
-    "hint_both": "两者同时安装时，ComfyUI 将优先使用 FlashAttention-2",
-    "hint_fa2": "ComfyUI 将使用 --use-flash-attention 启动",
-    "hint_sa2": "ComfyUI 将使用 --use-sage-attention 启动",
-    "hint_none": "跳过后 ComfyUI 将使用默认 PyTorch SDPA",
-    "attn_help": "FlashAttention-2 和 SageAttention-2 可加速 Transformer 计算。FA2 兼容性更好，推荐安装。SA2 是新较方案，部分模型可复用。两者同时安装时优先使用 FA2。"
+    "sa2_param": "启动参数：--use-sage-attention"
   },
   "step9": {
     "title": "确认部署配置",
@@ -191,8 +187,7 @@
     "retry": "重试部署",
     "back_to_config": "返回修改配置",
     "start_fail": "部署启动失败：",
-    "request_fail": "请求失败：",
-    "attn_warn": "{names} 安装失败，已回退到 PyTorch SDPA。可点击「重试部署」或稍后在 ComfyUI 页面的启动参数中重新选择。"
+    "request_fail": "请求失败："
   },
   "import": {
     "invalid_format": "无效的配置文件格式",
@@ -212,7 +207,6 @@
     "install_comfyui_skip": "安装 ComfyUI",
     "health_check": "ComfyUI 健康检查",
     "health_check_skip": "ComfyUI 健康检查",
-    "install_attn_user_skip": "安装加速组件",
     "install_attn_skip": "安装加速组件",
     "install_attn": "安装加速组件 ({parts})",
     "install_plugins": "安装插件",
@@ -259,8 +253,8 @@
     "llm_model": "模型",
     "not_configured": "未配置",
     "items_set": "已设置 {count} 项",
-    "attn": "Attention 加速",
-    "install": "安装",
+    "attn": "Attention 方案",
+    "attn_imported": "使用导入的启动参数",
     "favorites": "收藏模型",
     "prompt_history": "提示词历史",
     "prompt_settings": "提示词编辑器设置",

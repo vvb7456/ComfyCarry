@@ -25,7 +25,9 @@ from ..services.comfyui_params import (
 )
 from ..services.comfyui_bridge import get_bridge
 from ..services.comfyui_version import get_versions, switch_version
-from ..services.deploy_engine import _detect_python
+from ..services.deploy_engine import (
+    _detect_python, _detect_gpu_info, supports_attention_accelerators,
+)
 from ..services.video_thumb import get_video_thumbnail, is_video_filename
 
 bp = Blueprint("comfyui", __name__)
@@ -92,6 +94,7 @@ def api_comfyui_params_get():
             if isinstance(raw_args, str):
                 raw_args = raw_args.split()
         current = parse_comfyui_args(raw_args)
+        attn_supported = supports_attention_accelerators(_detect_gpu_info().get("cuda_cap", ""))
         schema = {}
         for gk, gv in COMFYUI_PARAM_GROUPS.items():
             schema[gk] = {
@@ -100,14 +103,8 @@ def api_comfyui_params_get():
             }
             if "options" in gv:
                 opts = list(gv["options"])
-                if gk == "attention":
-                    from ..config import _get_config
-                    has_fa2 = _get_config("installed_fa2", False)
-                    has_sa2 = _get_config("installed_sa2", False)
-                    if not has_fa2:
-                        opts = [o for o in opts if o[0] != "flash"]
-                    if not has_sa2:
-                        opts = [o for o in opts if o[0] != "sage"]
+                if gk == "attention" and not attn_supported:
+                    opts = [o for o in opts if o[0] not in ("flash", "sage")]
                 schema[gk]["options"] = opts
             if "depends_on" in gv:
                 schema[gk]["depends_on"] = gv["depends_on"]

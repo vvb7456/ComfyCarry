@@ -43,8 +43,6 @@ export interface ExportedConfig {
   _exported_at?: string
   password?: string
   civitai_token?: string
-  install_fa2?: boolean
-  install_sa2?: boolean
   rclone_config_base64?: string
   extra_plugins?: string[]
   disabled_default_plugins?: string[]

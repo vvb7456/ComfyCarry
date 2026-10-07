@@ -16,7 +16,6 @@ const logLines = ref<LogLine[]>([])
 const status = ref<DeployStatus>('idle')
 const elapsed = ref('')
 const errorMsg = ref('')
-const attnWarnings = ref<string[]>([])
 
 let _evtSource: EventSource | null = null
 let _elapsedTimer: ReturnType<typeof setInterval> | null = null
@@ -95,14 +94,6 @@ export function useWizardDeploy() {
             className: 'log-info',
           })
 
-          if (data.attn_warnings?.length) {
-            attnWarnings.value = data.attn_warnings
-            const names = data.attn_warnings.join(' / ')
-            logLines.value.push({
-              text: t('wizard.deploy.attn_warn', { names }),
-              className: 'log-warn',
-            })
-          }
         } else {
           status.value = 'error'
           deployState.value = 'error'
@@ -184,7 +175,6 @@ export function useWizardDeploy() {
     status.value = 'deploying'
     deployState.value = 'deploying'
     errorMsg.value = ''
-    attnWarnings.value = []
     startElapsedTimer()
     connectSSE()
     return { ok: true }
@@ -212,7 +202,6 @@ export function useWizardDeploy() {
     status,
     elapsed,
     errorMsg,
-    attnWarnings,
 
     startDeploy,
     retry,

@@ -106,6 +106,13 @@ def _detect_gpu_info():
     return info
 
 
+def supports_attention_accelerators(cuda_cap):
+    try:
+        return float(cuda_cap) >= 8.0
+    except (TypeError, ValueError):
+        return False
+
+
 def _deploy_log(msg, level="info"):
     now_str = datetime.now().strftime("%H:%M:%S")
     entry = {"type": "log", "level": level, "msg": msg,
@@ -280,7 +287,7 @@ def _run_deploy(config):
         _step_ssh(config)
         _step_check_pytorch(PY)
         _step_install_comfyui(PY)
-        _step_accelerators(config, PY)
+        _step_accelerators(PY)
         _step_plugins(config, PY)
         _step_sync_assets(config)
         _step_start_services(config, cfg, PY)
@@ -563,40 +570,25 @@ def _step_install_comfyui(PY):
     _mark_step_done("comfyui_install")
 
 
-def _step_accelerators(config, PY):
-    want_fa2 = config.get("install_fa2", False)
-    want_sa2 = config.get("install_sa2", False)
-    if not want_fa2 and not want_sa2:
-        _deploy_step("install_attn_user_skip")
-        return
-    if _step_done("accelerators"):
+def _step_accelerators(PY):
+    gpu_info = _detect_gpu_info()
+    cuda_cap = gpu_info.get("cuda_cap", "")
+    if not supports_attention_accelerators(cuda_cap):
         _deploy_step("install_attn_skip")
         return
 
-    parts = []
-    if want_fa2: parts.append("FA2")
-    if want_sa2: parts.append("SA2")
-    _deploy_step(f"install_attn:{'/'.join(parts)}")
-    _deploy_log("检测 GPU 架构...")
-    gpu_info = _detect_gpu_info()
-    cuda_cap = gpu_info.get("cuda_cap", "")
+    _deploy_step("install_attn:FA2/SA2")
     _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
 
-    if want_fa2:
-        _deploy_log("验证 FlashAttention-2...")
-        _deploy_exec(
-            f'{PY} -c "import flash_attn; '
-            f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
-            label="检查 FA2"
-        )
-    if want_sa2:
-        if cuda_cap:
-            _install_sa2(PY, cuda_cap)
-        else:
-            _deploy_log("未检测到 GPU, 跳过 SA2", "warn")
+    _deploy_log("验证预装 FlashAttention-2...")
+    _deploy_exec(
+        f'{PY} -c "import flash_attn; '
+        f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
+        label="检查 FA2"
+    )
+    _install_sa2(PY, cuda_cap)
 
     _deploy_log("加速组件安装完成", "success")
-    _mark_step_done("accelerators")
 
 
 def _step_plugins(config, PY):
@@ -814,8 +806,40 @@ def _step_sync_assets(config):
         _deploy_log("没有 deploy 同步规则, 跳过")
 
 
+def _build_launch_args(config, cuda_cap):
+    imported_args = config.get("comfyui_args", "")
+    supported = supports_attention_accelerators(cuda_cap)
+    if imported_args:
+        if supported:
+            return imported_args
+        # 换到 Turing 实例时只移除不支持的加速方案，其余导入参数保留。
+        return shlex.join([
+            arg for arg in shlex.split(imported_args)
+            if arg not in ("--use-flash-attention", "--use-sage-attention")
+        ])
+
+    args = DEFAULT_COMFYUI_ARGS
+    if supported:
+        attn_flag = {
+            "flash": "--use-flash-attention",
+            "sage": "--use-sage-attention",
+        }.get(config.get("attention", "default"), "")
+        if attn_flag:
+            args += f" {attn_flag}"
+    return args + " --fast --disable-xformers"
+
+
 def _step_start_services(config, cfg, PY):
     _deploy_step("start_services")
+    gpu_info = _detect_gpu_info()
+    comfy_args = _build_launch_args(config, gpu_info.get("cuda_cap", ""))
+    if config.get("comfyui_args"):
+        from .comfyui_args_check import check_comfyui_args
+        check_ok, unsupported = check_comfyui_args(comfy_args, python=PY)
+        if not check_ok:
+            raise RuntimeError("无法读取 ComfyUI 启动参数定义")
+        if unsupported:
+            raise RuntimeError(f"当前 ComfyUI 版本不支持启动参数: {', '.join(unsupported)}")
 
     # watch worker 的启动只看规则本身: conf 可能来自 base64 导入, remote
     # 也可能来自 wizard_remotes (OAuth 链路), 不能用 conf 有无做代理判断
@@ -833,37 +857,6 @@ def _step_start_services(config, cfg, PY):
 
     _deploy_log("启动 ComfyUI 主服务...")
     from comfycarry.config import set_config
-    want_fa2 = config.get("install_fa2", False)
-    want_sa2 = config.get("install_sa2", False)
-    fa2_ok = False
-    sa2_ok = False
-    if want_fa2:
-        r = subprocess.run(
-            f'{PY} -c "import flash_attn"',
-            shell=True, capture_output=True, text=True, timeout=10
-        )
-        fa2_ok = r.returncode == 0
-        if not fa2_ok:
-            _deploy_log("FlashAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
-    if want_sa2:
-        r = subprocess.run(
-            f'{PY} -c "import sageattention"',
-            shell=True, capture_output=True, text=True, timeout=10
-        )
-        sa2_ok = r.returncode == 0
-        if not sa2_ok:
-            _deploy_log("SageAttention-2 导入验证失败，回退到 PyTorch SDPA", "warn")
-    set_config("installed_fa2", fa2_ok)
-    set_config("installed_sa2", sa2_ok)
-
-    attn_flag = "--use-pytorch-cross-attention"
-    if fa2_ok:
-        attn_flag = "--use-flash-attention"
-    elif sa2_ok:
-        attn_flag = "--use-sage-attention"
-    # --preview-method 必须显式给出: ComfyUI 默认 NoPreviews, 漏掉就没有实时预览
-    comfy_args = (f"{DEFAULT_COMFYUI_ARGS} {attn_flag} "
-                  f"--fast --disable-xformers")
 
     input_dirs = " ".join(shlex.quote(str(Path(COMFYUI_DIR) / "input" / name))
                           for name in ("openpose", "canny", "depth"))
@@ -876,7 +869,7 @@ def _step_start_services(config, cfg, PY):
         f'cd {shlex.quote(COMFYUI_DIR)} && pm2 start {PY} --name comfy '
         f'--interpreter none --log {shlex.quote(str(WORKSPACE_ROOT / "comfy.log"))} --merge-logs --time '
         f'--restart-delay 3000 --max-restarts 10 '
-        f'-- main.py {comfy_args}',
+        f'-- main.py {shlex.join(shlex.split(comfy_args))}',
         env=clean_pm2_env(),
     )
 
@@ -895,14 +888,6 @@ def _step_start_services(config, cfg, PY):
     state = _load_setup_state()
     state["deploy_completed"] = True
     state["deploy_error"] = ""
-    # 仅当最终回退到 SDPA 时才记录警告 (FA2 可用时 SA2 失败不算回退)
-    attn_warnings = []
-    if (want_fa2 or want_sa2) and not fa2_ok and not sa2_ok:
-        if want_fa2:
-            attn_warnings.append("FlashAttention-2")
-        if want_sa2:
-            attn_warnings.append("SageAttention-2")
-    state["attn_install_warnings"] = attn_warnings
     # 部署成功后不再保留向导 remote 凭据快照；失败/重试期间才需要它。
     state["wizard_remotes"] = []
     # 保留 deploy_steps_completed — reinitialize 需要据此跳过已完成的耗时步骤
@@ -910,7 +895,6 @@ def _step_start_services(config, cfg, PY):
     from . import wizard_draft
     wizard_draft.reset()
 
-    gpu_info = _detect_gpu_info()
     _deploy_log(
         f"部署完成! GPU: {gpu_info.get('name', '?')} | "
         f"CUDA: {gpu_info.get('cuda_cap', '?')}",
