@@ -165,6 +165,7 @@
     "gpu_label": "GPU",
     "no_gpu": "No CUDA GPU detected",
     "image_label": "Image",
+    "runtime_label": "Environment",
     "prebuilt_image": "ComfyCarry"
   },
   "env_hint": {

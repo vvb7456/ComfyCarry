@@ -310,8 +310,8 @@ DEFAULT_PLUGINS = [
     {"url": "https://github.com/crystian/ComfyUI-Crystools", "name": "Crystools"},
     {"url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "name": "Ultimate SD Upscale"},
     {"url": "https://github.com/adieyal/comfyui-dynamicprompts", "name": "Dynamic Prompts"},
-    {"url": "https://github.com/GreenLandisaLie/AuraSR-ComfyUI", "name": "AuraSR"},
-    {"url": "https://github.com/ltdrdata/was-node-suite-comfyui", "name": "WAS Node Suite"},
+    {"url": "https://github.com/vvb7456/AuraSR-ComfyUI", "name": "AuraSR"},
+    {"url": "https://github.com/ltdrdata/was-node-suite-comfyui", "name": "WAS Node Suite", "required": True},
     {"url": "https://github.com/kijai/ComfyUI-KJNodes", "name": "KJNodes"},
     {"url": "https://github.com/BenjaMITM/Enhanced-Civicomfy", "name": "Enhanced Civicomfy", "required": True},
     {"url": "https://github.com/pythongosssss/ComfyUI-WD14-Tagger", "name": "WD14 Tagger"},
@@ -323,6 +323,7 @@ DEFAULT_PLUGINS = [
     {"url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite", "name": "Video Helper Suite"},
     {"url": "https://github.com/cubiq/ComfyUI_essentials", "name": "Essentials"},
     {"url": "https://github.com/1038lab/ComfyUI-RMBG", "name": "RMBG"},
+    {"url": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler", "name": "SeedVR2 Video Upscaler"},
 ]
 
 _setup_state_lock = threading.Lock()

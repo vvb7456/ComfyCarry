@@ -22,10 +22,10 @@ import threading
 
 from flask import Blueprint, jsonify, request
 
+from .. import config as cfg
 from ..config import (
     API_KEY,
     COMFYUI_DIR,
-    DASHBOARD_PASSWORD,
     INSTANCE_LABEL,
 )
 from ..services import companion_serve
@@ -73,10 +73,10 @@ def api_companion_connect():
     data = request.get_json(silent=True) or {}
     password = data.get("password", "")
 
-    if not DASHBOARD_PASSWORD:
+    if not cfg.DASHBOARD_PASSWORD:
         return jsonify({"error": "面板未设置密码, 无法连接"}), 503
 
-    if password != DASHBOARD_PASSWORD:
+    if password != cfg.DASHBOARD_PASSWORD:
         log.warning("companion connect 密码不符")
         return jsonify({"error": "密码错误"}), 401
 
@@ -146,4 +146,3 @@ def api_companion_clients():
         "serve": companion_serve.status(),
         "dav_url": _infer_dav_url(),
     })
-

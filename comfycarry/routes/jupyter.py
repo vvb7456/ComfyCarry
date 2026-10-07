@@ -348,11 +348,13 @@ def jupyter_start():
     if pm2 == "not_found":
         from ..services.log_service import clean_pm2_env
         env = clean_pm2_env()
+        config_path = os.environ.get("COMFYCARRY_JUPYTER_CONFIG", "")
+        config_arg = f"--config={shlex.quote(config_path)} " if config_path else ""
         cmd = (
             f'pm2 start jupyter-lab --name {PM2_NAME} '
             f'--interpreter none '
             f'--log {shlex.quote(str(WORKSPACE_ROOT / "jupyter.log"))} --merge-logs --time '
-            f'-- --ip=0.0.0.0 --port=8888 --no-browser --allow-root '
+            f'-- {config_arg}--ip=0.0.0.0 --port=8888 --no-browser --allow-root '
             f'--ServerApp.root_dir={shlex.quote(str(WORKSPACE_ROOT))} '
             f'--ServerApp.language=zh_CN'
         )

@@ -15,7 +15,7 @@ const { config, pluginData, prebuiltInfo, nextStep, prevStep } = useWizardState(
 
 const extraPluginsText = ref('')
 
-const isPrebuilt = computed(() => !!prebuiltInfo.value)
+const isPrebuilt = computed(() => !!prebuiltInfo.value && prebuiltInfo.value.plugins_preinstalled !== false)
 
 const sortedPlugins = computed(() =>
   [...pluginData.value].sort((a, b) =>

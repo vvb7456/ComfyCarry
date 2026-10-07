@@ -187,6 +187,8 @@ class ResourceRegistry:
             logger.warning(f"[resource_registry] task hydrate failed: {e}")
             return 0
 
+        if not rows:
+            return 0
         engine = get_engine()
         restored = 0
         now = time.time()
@@ -393,9 +395,9 @@ class ResourceRegistry:
                 )
                 self._resources[key] = resource
             self._bump_version()
-            self._persist(resource)
-            if emit:
-                self._emit_resource(resource)
+        self._persist(resource)
+        if emit:
+            self._emit_resource(resource)
 
     def resolve_state(self, source: str, model_id: str, version_id: str,
                       file_exists: Callable[[], bool]) -> str:

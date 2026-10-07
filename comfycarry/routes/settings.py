@@ -86,6 +86,9 @@ def api_settings_password():
 
     cfg.DASHBOARD_PASSWORD = new_pw
     cfg._save_dashboard_password(new_pw)
+    from ..services import companion_serve
+    companion_serve.stop()
+    companion_serve.start()
 
     # SSH 密码跟随钩子 (v2, spec §5.1): 跟随开启时 root 密码即时同步新面板
     # 密码。chpasswd 即时生效, 无需重启 sshd。
@@ -307,6 +310,9 @@ def api_settings_import_config():
         try:
             cfg.DASHBOARD_PASSWORD = data["password"]
             cfg._save_dashboard_password(data["password"])
+            from ..services import companion_serve
+            companion_serve.stop()
+            companion_serve.start()
             applied.append("ComfyCarry 密码")
         except Exception as e:
             errors.append(f"密码: {e}")

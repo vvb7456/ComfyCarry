@@ -46,10 +46,11 @@ const tags = computed(() => {
     <template v-if="prebuiltInfo">
       <hr class="env-divider">
       <div class="env-row">
-        <span class="env-label">{{ t('wizard.env.image_label') }}</span>
+        <span class="env-label">{{ t(prebuiltInfo.runtime === 'colab' ? 'wizard.env.runtime_label' : 'wizard.env.image_label') }}</span>
         <span class="env-value env-value--green">
           <MsIcon name="bolt" size="xs" color="none" />
-          {{ t('wizard.env.prebuilt_image') }}{{ prebuiltInfo.version !== 'unknown' ? ` v${prebuiltInfo.version}` : '' }}
+          <template v-if="prebuiltInfo.runtime === 'colab'">Colab</template>
+          <template v-else>{{ t('wizard.env.prebuilt_image') }}{{ prebuiltInfo.version !== 'unknown' ? ` v${prebuiltInfo.version}` : '' }}</template>
         </span>
       </div>
 

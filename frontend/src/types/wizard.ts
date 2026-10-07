@@ -7,6 +7,8 @@ export interface GpuInfo {
 }
 
 export interface PrebuiltInfo {
+  runtime?: 'colab'
+  plugins_preinstalled?: boolean
   version: string
   torch: string
   cuda_toolkit: string

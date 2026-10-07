@@ -30,7 +30,7 @@ if [ ! -f /opt/.comfycarry-prebuilt ]; then
     echo "  未检测到 ComfyCarry 预构建镜像"
     echo "  请使用官方预构建镜像: erocraft/comfycarry"
 fi
-PYTHON_BIN=python3
+PYTHON_BIN="${COMFYCARRY_PYTHON:-python3}"
 
 # SSH 已由 entrypoint.sh 处理 (SSH Key + sshd)
 
@@ -103,6 +103,18 @@ if [ -n "$BUNDLE_DIR" ]; then
     else
         echo "  -> 托管部署包未变化, 保留现有文件 (设置 FORCE_UPDATE=true 强制覆盖)"
     fi
+elif [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
+    SOURCE_DIR="${COMFYCARRY_SOURCE_DIR:-$DASHBOARD_DIR}"
+    if [ "$(readlink -f "$SOURCE_DIR")" != "$(readlink -f "$DASHBOARD_DIR")" ]; then
+        for _item in comfycarry comfycarry_ws_broadcast data workspace_manager.py favicon.ico; do
+            cp -r "$SOURCE_DIR/$_item" "$DASHBOARD_DIR/"
+        done
+        mkdir -p "$DASHBOARD_DIR/static/dist"
+        cp -r "$SOURCE_DIR/static/dist/." "$DASHBOARD_DIR/static/dist/"
+    fi
+    APP_VERSION=$("$PYTHON_BIN" -c "import re,sys; print(re.search(r'APP_VERSION\\s*=\\s*\"([^\"]+)\"', open(sys.argv[1]).read()).group(1))" "$DASHBOARD_DIR/comfycarry/config.py")
+    COMMIT_HASH=$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)
+    printf 'version=%s\nbranch=%s\ncommit=%s\n' "$APP_VERSION" "${COMFYCARRY_REF:-main}" "$COMMIT_HASH" > "$DASHBOARD_DIR/.version"
 else
 # 拉取一次 latest Release 元数据, 下载地址与 .version 共用 (限流 60 req/h, 不要重复请求)
 RELEASE_JSON=$(wget -qO- "$LATEST_RELEASE_API" 2>/dev/null || true)
@@ -217,9 +229,12 @@ from comfycarry.services.public_tunnel import PublicTunnelClient
 
 client = PublicTunnelClient()
 try:
-    result = client.register()
+    if os.environ.get('COMFYCARRY_RUNTIME') == 'colab' and client.random_id:
+        result = client.restore()
+    else:
+        result = client.register()
     if result.get('ok'):
-        urls = result.get('urls', {})
+        urls = result.get('urls') or client.urls or {}
         print(urls.get('dashboard', ''))
     else:
         print(f'{result.get(\"error\", \"未知\")}', file=sys.stderr)
@@ -241,7 +256,7 @@ if [ -f "$DASHBOARD_DIR/workspace_manager.py" ]; then
         --log "$WORKSPACE_DIR/dashboard.log" \
         --merge-logs \
         --time \
-        -- "$DASHBOARD_DIR/workspace_manager.py" 5000
+        -- "$DASHBOARD_DIR/workspace_manager.py" "${MANAGER_PORT:-5000}"
     pm2 save 2>/dev/null || true
 else
     echo "ComfyCarry 文件下载失败，请检查网络连接"
@@ -249,10 +264,14 @@ else
 fi
 
 pm2 delete jupyter 2>/dev/null || true
+JUPYTER_ARGS=()
+if [ -n "${COMFYCARRY_JUPYTER_CONFIG:-}" ]; then
+    JUPYTER_ARGS+=("--config=$COMFYCARRY_JUPYTER_CONFIG")
+fi
 pm2 start jupyter-lab --name jupyter \
     --interpreter none \
     --log "$WORKSPACE_DIR/jupyter.log" --merge-logs --time \
-    -- --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
+    -- "${JUPYTER_ARGS[@]}" --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
     --ServerApp.root_dir="$WORKSPACE_DIR" \
     --ServerApp.language=zh_CN
 pm2 save 2>/dev/null || true

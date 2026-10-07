@@ -79,6 +79,9 @@ def _read_prebuilt_info():
 
 def _detect_python():
     """动态检测可用的 Python (优先 3.12, wheel 在 3.12 上编译验证)"""
+    configured = os.environ.get("COMFYCARRY_PYTHON")
+    if configured:
+        return configured
     for cmd in ["python3.12", "python3", "python"]:
         if shutil.which(cmd):
             return cmd
@@ -322,7 +325,7 @@ def _step_system_deps(config, PY):
             timeout=300, label="apt-get install"
         )
         py_bin = shutil.which(PY) or ""
-        if py_bin:
+        if py_bin and not os.environ.get("VIRTUAL_ENV"):
             _deploy_exec(f'ln -sf "{py_bin}" /usr/local/bin/python && '
                          f'ln -sf "{py_bin}" /usr/bin/python || true')
         _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q',
@@ -606,7 +609,12 @@ def _step_plugins(config, PY):
             _deploy_log(f"安装新插件: {name}")
             _deploy_exec(
                 f'cd {quoted_nodes} && '
-                f'git clone {shlex.quote(url)} || true', timeout=60
+                f'git clone --recursive {shlex.quote(url)} || true', timeout=120
+            )
+        elif (nodes_dir / name / ".gitmodules").exists():
+            _deploy_exec(
+                ["git", "-C", str(nodes_dir / name), "submodule", "update", "--init", "--recursive"],
+                timeout=120, label=f"更新 {name} 子模块",
             )
 
     _deploy_log("安装插件依赖...")
@@ -883,6 +891,9 @@ def _step_start_services(config, cfg, PY):
     if new_pw:
         cfg.DASHBOARD_PASSWORD = new_pw
         _save_dashboard_password(new_pw)
+        from . import companion_serve
+        companion_serve.stop()
+        companion_serve.start()
         _deploy_log("ComfyCarry 密码已更新并保存")
 
     state = _load_setup_state()

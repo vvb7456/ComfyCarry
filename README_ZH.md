@@ -72,6 +72,20 @@ wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh
 
 部署完成自动跳转主界面。
 
+### Google Colab
+
+在 Colab 选择 GPU 运行时，在代码单元格运行：
+
+```bash
+!curl -fsSL https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/colab.sh | bash
+```
+
+安装器复用 Colab 已有组件，补齐 Wizard 不负责的运行依赖，并启动面板和 JupyterLab。打开输出中的项目 Tunnel 地址，照常用 Wizard 配置密码、存储和插件；插件及其依赖仍由 Wizard 安装。默认工作区为 `/content`，T4 使用默认 Attention。
+
+重复执行可重新启动。需要拉取最新源码时，在命令中的 `bash` 前加上 `FORCE_UPDATE=true`。安装日志位于 `/content/colab-install.log`。
+
+在 SSH 中手动管理应用时，先运行 `source /content/.comfycarry-colab-env`，即可使用相同的 Python 和工具环境。
+
 ---
 
 ## 预装插件

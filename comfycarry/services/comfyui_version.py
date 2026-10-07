@@ -201,6 +201,9 @@ def _install_requirements():
 
 
 def _detect_python_bin() -> str:
+    configured = os.environ.get("COMFYCARRY_PYTHON")
+    if configured:
+        return configured
     for candidate in ("python3.12", "python3.11", "python3", "python"):
         try:
             subprocess.run([candidate, "--version"], capture_output=True, timeout=5)

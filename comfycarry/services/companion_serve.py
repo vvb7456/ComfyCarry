@@ -24,10 +24,10 @@ import os
 import subprocess
 import threading
 
+from .. import config as cfg
 from ..config import (
     COMPANION_DAV_PORT,
     COMPANION_SERVE_ROOT,
-    DASHBOARD_PASSWORD,
 )
 
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def _build_cmd():
         "--addr", f"127.0.0.1:{COMPANION_DAV_PORT}",
         "--baseurl", "/api/companion/dav",
         "--user", "comfy",
-        "--pass", str(DASHBOARD_PASSWORD),
+        "--pass", str(cfg.DASHBOARD_PASSWORD),
         # ComfyUI 持续产出新文件; 默认 dir-cache-time 5m 会让新产物长时间
         # 不出现在 WebDAV 列目录里 (直连路径的 GET/DELETE 不受影响, 但 watch
         # 自动拉取靠列目录发现新文件)。缩短到 5s 让新产物快速可见。
@@ -61,7 +61,7 @@ def start():
                 os.makedirs(COMPANION_SERVE_ROOT, exist_ok=True)
             except Exception as e:
                 log.warning("[companion_serve] 创建 serve root 失败: %s", e)
-        if not str(DASHBOARD_PASSWORD):
+        if not str(cfg.DASHBOARD_PASSWORD):
             log.warning("[companion_serve] DASHBOARD_PASSWORD 为空, 不启动 serve")
             return False
         cmd = _build_cmd()
