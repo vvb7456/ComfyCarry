@@ -103,18 +103,6 @@ if [ -n "$BUNDLE_DIR" ]; then
     else
         echo "  -> 托管部署包未变化, 保留现有文件 (设置 FORCE_UPDATE=true 强制覆盖)"
     fi
-elif [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
-    SOURCE_DIR="${COMFYCARRY_SOURCE_DIR:-$DASHBOARD_DIR}"
-    if [ "$(readlink -f "$SOURCE_DIR")" != "$(readlink -f "$DASHBOARD_DIR")" ]; then
-        for _item in comfycarry comfycarry_ws_broadcast data workspace_manager.py favicon.ico; do
-            cp -r "$SOURCE_DIR/$_item" "$DASHBOARD_DIR/"
-        done
-        mkdir -p "$DASHBOARD_DIR/static/dist"
-        cp -r "$SOURCE_DIR/static/dist/." "$DASHBOARD_DIR/static/dist/"
-    fi
-    APP_VERSION=$("$PYTHON_BIN" -c "import re,sys; print(re.search(r'APP_VERSION\\s*=\\s*\"([^\"]+)\"', open(sys.argv[1]).read()).group(1))" "$DASHBOARD_DIR/comfycarry/config.py")
-    COMMIT_HASH=$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)
-    printf 'version=%s\nbranch=%s\ncommit=%s\n' "$APP_VERSION" "${COMFYCARRY_REF:-main}" "$COMMIT_HASH" > "$DASHBOARD_DIR/.version"
 else
 # 拉取一次 latest Release 元数据, 下载地址与 .version 共用 (限流 60 req/h, 不要重复请求)
 RELEASE_JSON=$(wget -qO- "$LATEST_RELEASE_API" 2>/dev/null || true)
@@ -179,6 +167,23 @@ version=${RELEASE_TAG:-$APP_VERSION}
 branch=
 commit=${COMMIT_HASH}
 EOF
+fi
+
+# Colab 没有镜像内的独立服务脚本，使用本次部署包里的版本。
+if [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
+    for _file in static/dist/index.html static/dist/wizard.html \
+        comfycarry/services/management_agent.py comfycarry/services/usage_collector.py \
+        comfycarry/services/system_monitor.py; do
+        if [ ! -s "$DASHBOARD_DIR/$_file" ]; then
+            echo "部署包缺少 $_file" >&2
+            exit 1
+        fi
+    done
+    for _pair in management_agent.py:comfycarry-management-agent.py \
+        management_agent.py:management_agent.py usage_collector.py:comfycarry-usage-collector.py \
+        system_monitor.py:system_monitor.py; do
+        install -m 644 "$DASHBOARD_DIR/comfycarry/services/${_pair%%:*}" "/opt/${_pair##*:}"
+    done
 fi
 
 # CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册)

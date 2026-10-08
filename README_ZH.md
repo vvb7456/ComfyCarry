@@ -80,9 +80,9 @@ wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh
 !curl -fsSL https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/colab.sh | bash
 ```
 
-安装器复用 Colab 已有组件，补齐 Wizard 不负责的运行依赖，并启动面板和 JupyterLab。打开输出中的项目 Tunnel 地址，照常用 Wizard 配置密码、存储和插件；插件及其依赖仍由 Wizard 安装。默认工作区为 `/content`，T4 使用默认 Attention。
+安装器先复用 Colab 已有组件、补齐 Wizard 不负责的运行依赖，再交给 `bootstrap.sh`，按正常 Docker 路径下载现有 Release 部署包并启动面板和 JupyterLab。Colab 不克隆 ComfyCarry 源码或构建前端。打开输出中的地址，使用部署向导配置密码、存储和插件；插件及其依赖仍由 Wizard 安装。默认工作区为 `/content`，T4 使用默认 Attention。
 
-重复执行可重新启动。需要拉取最新源码时，在命令中的 `bash` 前加上 `FORCE_UPDATE=true`。安装日志位于 `/content/colab-install.log`。
+重复执行可重新启动并复用现有安装。需要重新下载最新正式 Release 时，在命令中的 `bash` 前加上 `FORCE_UPDATE=true`。安装日志位于 `/content/colab-install.log`。
 
 在 SSH 中手动管理应用时，先运行 `source /content/.comfycarry-colab-env`，即可使用相同的 Python 和工具环境。
 
@@ -92,7 +92,7 @@ wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh
 
 镜像内置 21 个插件：
 
-ComfyUI-Manager, comfyui_controlnet_aux, ComfyUI-Impact-Pack, ComfyUI-Easy-Use, ComfyUI-Crystools, ComfyUI_UltimateSDUpscale, comfyui-dynamicprompts, AuraSR-ComfyUI, was-node-suite-comfyui, ComfyUI-KJNodes, Enhanced-Civicomfy, ComfyUI-WD14-Tagger, rgthree-comfy, ComfyUI-Inspire-Pack, ComfyUI-Custom-Scripts, ComfyUI-GGUF, ComfyUI_IPAdapter_plus, ComfyUI-VideoHelperSuite, ComfyUI_essentials, ComfyUI-RMBG
+ComfyUI-Manager, comfyui_controlnet_aux, ComfyUI-Impact-Pack, ComfyUI-Impact-Subpack, ComfyUI-Easy-Use, ComfyUI-Crystools, ComfyUI_UltimateSDUpscale, comfyui-dynamicprompts, AuraSR-ComfyUI, was-node-suite-comfyui, ComfyUI-KJNodes, ComfyUI-WD14-Tagger, rgthree-comfy, ComfyUI-Inspire-Pack, ComfyUI-Custom-Scripts, ComfyUI-GGUF, ComfyUI_IPAdapter_plus, ComfyUI-VideoHelperSuite, ComfyUI_essentials, ComfyUI-RMBG, ComfyUI-SeedVR2_VideoUpscaler
 
 ---
 

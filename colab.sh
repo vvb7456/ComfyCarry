@@ -3,8 +3,6 @@ set -Eeuo pipefail
 
 export WORKSPACE_DIR="${WORKSPACE_DIR:-/content}"
 export COMFYUI_DIR="${COMFYUI_DIR:-$WORKSPACE_DIR/ComfyUI}"
-export COMFYCARRY_REF="${COMFYCARRY_REF:-main}"
-export COMFYCARRY_REPO="${COMFYCARRY_REPO:-https://github.com/vvb7456/ComfyCarry.git}"
 
 if [[ $(id -u) != 0 || $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
     echo "Colab 安装器需要 Linux x86_64 的 root 环境。" >&2
@@ -16,20 +14,14 @@ if ! command -v nvidia-smi >/dev/null || ! nvidia-smi -L >/dev/null; then
 fi
 
 mkdir -p "$WORKSPACE_DIR"
-export COMFYCARRY_SOURCE_DIR="${COMFYCARRY_SOURCE_DIR:-$WORKSPACE_DIR/ComfyCarry}"
+INSTALLER_DIR="$WORKSPACE_DIR/.comfycarry-installer"
+mkdir -p "$INSTALLER_DIR/scripts"
 
-if [[ ! -f "$COMFYCARRY_SOURCE_DIR/scripts/install-colab.sh" ]]; then
-    if [[ -e "$COMFYCARRY_SOURCE_DIR" ]] && [[ -n $(ls -A "$COMFYCARRY_SOURCE_DIR") ]]; then
-        echo "目录已存在但缺少 Colab 安装器：$COMFYCARRY_SOURCE_DIR。请指定新的 COMFYCARRY_SOURCE_DIR。" >&2
-        exit 1
-    fi
-    if ! command -v git >/dev/null; then
-        apt-get update -qq
-        apt-get install -y --no-install-recommends git ca-certificates
-    fi
-    git clone --depth 1 --branch "$COMFYCARRY_REF" "$COMFYCARRY_REPO" "$COMFYCARRY_SOURCE_DIR"
-elif [[ ${FORCE_UPDATE:-false} == true ]] && [[ -d "$COMFYCARRY_SOURCE_DIR/.git" ]]; then
-    git -C "$COMFYCARRY_SOURCE_DIR" pull --ff-only
-fi
+echo "==> 下载安装脚本"
+for file in bootstrap.sh scripts/install-colab.sh scripts/colab-requirements.txt scripts/colab-constraints.txt; do
+    curl --fail --silent --show-error --location --retry 3 --connect-timeout 30 \
+        "https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/$file" \
+        -o "$INSTALLER_DIR/$file"
+done
 
-exec bash "$COMFYCARRY_SOURCE_DIR/scripts/install-colab.sh"
+exec bash "$INSTALLER_DIR/scripts/install-colab.sh"

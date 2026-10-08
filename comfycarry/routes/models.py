@@ -2,7 +2,6 @@
 包含:
 - CivitAI 搜索代理 (Meilisearch CORS bypass)
 - 本地模型管理 (索引/预览/删除/获取信息)
-- Enhanced-Civicomfy 下载代理
 """
 
 import json

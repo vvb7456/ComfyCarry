@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SOURCE_DIR="${COMFYCARRY_SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+for file in bootstrap.sh scripts/colab-requirements.txt scripts/colab-constraints.txt; do
+    if [[ ! -s "$INSTALLER_DIR/$file" ]]; then
+        echo "安装文件缺少 $file。" >&2
+        exit 1
+    fi
+done
 export WORKSPACE_DIR="${WORKSPACE_DIR:-/content}"
 export COMFYUI_DIR="${COMFYUI_DIR:-$WORKSPACE_DIR/ComfyUI}"
 export COMFYCARRY_RUNTIME=colab
@@ -48,7 +54,7 @@ say() { echo "==> $*"; }
 download() { curl --fail --location --retry 3 --connect-timeout 30 "$1" -o "$2"; }
 package_installed() { [[ $(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null) == installed ]]; }
 
-say "检查 Colab 现有基础环境"
+say "检查 Colab 环境"
 command -v nvidia-smi >/dev/null
 nvidia-smi --query-gpu=name,driver_version,compute_cap --format=csv,noheader
 for tool in git curl wget jq ffmpeg cmake make g++ sshd nvcc node npm; do
@@ -59,7 +65,7 @@ done
 
 # 这些包不在 Wizard 的 apt 清单里；编译 Python 扩展与 MediaPipe 需要它们。
 packages=()
-for package in ca-certificates wget gnupg gawk tar gzip \
+for package in ca-certificates git curl wget gnupg gawk tar gzip \
     python3.12 python3.12-dev python3.12-venv cmake pkg-config \
     libjpeg-dev libpng-dev libtiff-dev libffi-dev libssl-dev libnuma-dev \
     libxrender1 libportaudio2 openssh-server passwd procps iproute2 unzip rsync; do
@@ -67,7 +73,7 @@ for package in ca-certificates wget gnupg gawk tar gzip \
     if ! package_installed "$package"; then packages+=("$package"); fi
 done
 if (( ${#packages[@]} )); then
-    say "补齐基础环境缺失包：${packages[*]}"
+    say "安装系统依赖"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y --no-install-recommends "${packages[@]}"
@@ -95,7 +101,7 @@ fi
 
 # Wizard 的存储配置页面在部署开始前就调用 rclone；私有路径避免后续 apt 安装旧版覆盖它。
 if ! command -v rclone >/dev/null; then
-    say "安装 Wizard 配置页面需要的 Rclone"
+    say "安装 Rclone"
     rclone_tmp=$(mktemp -d)
     download https://downloads.rclone.org/rclone-current-linux-amd64.zip "$rclone_tmp/rclone.zip"
     unzip -q "$rclone_tmp/rclone.zip" -d "$rclone_tmp"
@@ -105,17 +111,17 @@ if ! command -v rclone >/dev/null; then
 fi
 
 if [[ ! -x "$COMFYCARRY_PYTHON" ]]; then
-    say "创建 Python 3.12 应用环境，不改动 Colab 的内核 Python"
+    say "创建 Python 3.12 环境"
     /usr/bin/python3.12 -m venv --system-site-packages "$VIRTUAL_ENV"
 fi
 "$COMFYCARRY_PYTHON" -m pip install --upgrade pip 'setuptools<81' wheel Cython
-export PIP_CONSTRAINT="$SOURCE_DIR/scripts/colab-constraints.txt"
+export PIP_CONSTRAINT="$INSTALLER_DIR/scripts/colab-constraints.txt"
 export UV_CONSTRAINT="$PIP_CONSTRAINT"
 export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu130
 # SAM2 等节点的构建脚本会导入已安装的 torch，不能另建未配置 CUDA 的构建环境。
 export PIP_NO_BUILD_ISOLATION=0
 
-say "准备 Wizard 不负责安装的 PyTorch"
+say "安装 PyTorch 2.9.1"
 "$COMFYCARRY_PYTHON" -m pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 \
     --index-url https://download.pytorch.org/whl/cu130
 "$COMFYCARRY_PYTHON" - <<'PY'
@@ -135,7 +141,7 @@ PY
 export TORCH_CUDA_ARCH_LIST=$("$COMFYCARRY_PYTHON" -c 'import torch; print("%d.%d" % torch.cuda.get_device_capability())')
 
 if ! "$CUDA_HOME/bin/nvcc" --version | grep -q 'release 13\.0'; then
-    say "补齐与项目 cu130 软件栈匹配的 CUDA 编译链"
+    say "安装 CUDA 13.0 编译工具"
     if ! apt-cache show cuda-minimal-build-13-0 >/dev/null 2>&1; then
         cuda_keyring=$(mktemp --suffix=.deb)
         download https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb "$cuda_keyring"
@@ -150,19 +156,20 @@ if ! "$CUDA_HOME/bin/nvcc" --version | grep -q 'release 13\.0'; then
     "$CUDA_HOME/bin/nvcc" --version
 fi
 
-say "准备 /opt/ComfyUI 主体，工作区复制和插件安装仍由 Wizard 完成"
 if [[ ! -f /opt/ComfyUI/main.py ]]; then
+    say "克隆 ComfyUI"
     COMFYUI_REF="${COMFYUI_REF:-$(git ls-remote --refs --tags https://github.com/Comfy-Org/ComfyUI.git 'v*' | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)}"
     git clone --depth 1 --branch "$COMFYUI_REF" https://github.com/Comfy-Org/ComfyUI.git /opt/ComfyUI
 fi
+say "安装 ComfyUI 依赖"
 "$COMFYCARRY_PYTHON" -m pip install -r /opt/ComfyUI/requirements.txt
 
-say "补齐 Dashboard、Jupyter 和未被节点 requirements 声明的镜像依赖"
-"$COMFYCARRY_PYTHON" -m pip install --no-build-isolation -r "$SOURCE_DIR/scripts/colab-requirements.txt"
+say "安装运行依赖"
+"$COMFYCARRY_PYTHON" -m pip install --no-build-isolation -r "$INSTALLER_DIR/scripts/colab-requirements.txt"
 
 gpu_cap=$("$COMFYCARRY_PYTHON" -c 'import torch; a,b=torch.cuda.get_device_capability(); print(a*10+b)')
 if (( gpu_cap >= 80 )); then
-    say "安装 Wizard 只负责验证的 FlashAttention-2"
+    say "安装 FlashAttention-2"
     fa_wheel="$WORKSPACE_DIR/.cache/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl"
     mkdir -p "$(dirname "$fa_wheel")"
     if [[ ! -f "$fa_wheel" ]]; then
@@ -172,10 +179,10 @@ if (( gpu_cap >= 80 )); then
     "$COMFYCARRY_PYTHON" -m pip install --no-deps "$fa_wheel"
     "$COMFYCARRY_PYTHON" -c 'import flash_attn; print(f"FlashAttention-2 {flash_attn.__version__}")'
 else
-    say "计算能力 7.5：沿用项目默认 Attention，不安装不适用的 FA2"
+    say "使用默认 Attention"
 fi
 
-say "准备 SA2 wheel，安装及架构选择留给 Wizard"
+say "准备 SageAttention-2 安装包"
 mkdir -p /opt/wheels/sa2
 while read -r arch digest; do
     wheel="sageattention-2.2.0-cp312-cp312-linux_x86_64_${arch}.whl"
@@ -191,18 +198,6 @@ sm90 cb12ae89a247c5d7bea3799ce63a2bad07b2633d4436ba4f5d32b7cd361c0276
 sm100 26e6105944ff68476801375e85b2f204943eddfc1b4c7b48cea998f4f78d9a88
 sm120 62d8dfbfba684152208960456adae3a980e35657b5ced9922bd7bbf36153a433
 WHEELS
-
-say "构建与当前后端一致的前端"
-if [[ -f "$SOURCE_DIR/frontend/package.json" ]]; then
-    (
-        cd "$SOURCE_DIR/frontend"
-        npm ci
-        bash build-fonts.sh
-        npm run build
-    )
-fi
-test -s "$SOURCE_DIR/static/dist/index.html"
-test -s "$SOURCE_DIR/static/dist/wizard.html"
 
 "$COMFYCARRY_PYTHON" - <<'PY'
 import json
@@ -239,7 +234,7 @@ ipython_config.write_text(
     "c.InteractiveShellApp.exec_lines = []\n"
     "c.InteractiveShellApp.matplotlib = None\n"
 )
-print("基础运行环境检查通过；插件和实际部署留给 Wizard。")
+print("运行环境检查通过。")
 PY
 
 # bootstrap/PM2 的后续进程需要同一套 PATH、Python、编译和依赖约束。
@@ -264,13 +259,8 @@ fi
 if ! "$COMFYCARRY_PYTHON" -c 'import socket; socket.create_connection(("127.0.0.1", 22), timeout=2).close()' 2>/dev/null; then
     /usr/sbin/sshd -E "$WORKSPACE_DIR/sshd.log" 9>&-
 fi
-for pair in management_agent.py:comfycarry-management-agent.py usage_collector.py:comfycarry-usage-collector.py system_monitor.py:system_monitor.py; do
-    install -m 644 "$SOURCE_DIR/comfycarry/services/${pair%%:*}" "/opt/${pair##*:}"
-done
-install -m 644 "$SOURCE_DIR/comfycarry/services/management_agent.py" /opt/management_agent.py
-
-say "启动 ComfyCarry，继续使用原有 Wizard 完成配置和部署"
-bash "$SOURCE_DIR/bootstrap.sh" 9>&-
+say "启动 ComfyCarry"
+bash "$INSTALLER_DIR/bootstrap.sh" 9>&-
 "$COMFYCARRY_PYTHON" - <<'PY'
 import os
 import time
@@ -281,7 +271,7 @@ for _ in range(60):
     try:
         response = requests.get(url, timeout=3)
         response.raise_for_status()
-        print("ComfyCarry 已就绪，请打开上方项目 Tunnel 地址完成 Wizard。")
+        print("ComfyCarry 已就绪，请打开上方地址完成配置。")
         break
     except requests.RequestException:
         time.sleep(1)

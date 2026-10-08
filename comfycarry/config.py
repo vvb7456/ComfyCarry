@@ -303,18 +303,17 @@ SETUP_STATE_FILE = WORKSPACE_ROOT / ".setup_state.json"
 DEFAULT_PLUGINS = [
     {"url": "https://github.com/ltdrdata/ComfyUI-Manager", "name": "ComfyUI-Manager", "required": True},
     {"url": "comfycarry_ws_broadcast", "name": "ComfyCarry WS Broadcast", "required": True},
-    {"url": "https://github.com/Fannovel16/comfyui_controlnet_aux", "name": "ControlNet Aux"},
-    {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack", "name": "Impact Pack"},
-    {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack", "name": "Impact Subpack"},
+    {"url": "https://github.com/Fannovel16/comfyui_controlnet_aux", "name": "ControlNet Aux", "required": True},
+    {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack", "name": "Impact Pack", "required": True},
+    {"url": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack", "name": "Impact Subpack", "required": True},
     {"url": "https://github.com/yolain/ComfyUI-Easy-Use", "name": "Easy Use"},
     {"url": "https://github.com/crystian/ComfyUI-Crystools", "name": "Crystools"},
     {"url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale", "name": "Ultimate SD Upscale"},
     {"url": "https://github.com/adieyal/comfyui-dynamicprompts", "name": "Dynamic Prompts"},
-    {"url": "https://github.com/vvb7456/AuraSR-ComfyUI", "name": "AuraSR"},
+    {"url": "https://github.com/vvb7456/AuraSR-ComfyUI", "name": "AuraSR", "required": True},
     {"url": "https://github.com/ltdrdata/was-node-suite-comfyui", "name": "WAS Node Suite", "required": True},
     {"url": "https://github.com/kijai/ComfyUI-KJNodes", "name": "KJNodes"},
-    {"url": "https://github.com/BenjaMITM/Enhanced-Civicomfy", "name": "Enhanced Civicomfy", "required": True},
-    {"url": "https://github.com/pythongosssss/ComfyUI-WD14-Tagger", "name": "WD14 Tagger"},
+    {"url": "https://github.com/pythongosssss/ComfyUI-WD14-Tagger", "name": "WD14 Tagger", "required": True},
     {"url": "https://github.com/rgthree/rgthree-comfy", "name": "rgthree"},
     {"url": "https://github.com/ltdrdata/ComfyUI-Inspire-Pack", "name": "Inspire Pack"},
     {"url": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts", "name": "Custom Scripts"},
@@ -323,7 +322,7 @@ DEFAULT_PLUGINS = [
     {"url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite", "name": "Video Helper Suite"},
     {"url": "https://github.com/cubiq/ComfyUI_essentials", "name": "Essentials"},
     {"url": "https://github.com/1038lab/ComfyUI-RMBG", "name": "RMBG"},
-    {"url": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler", "name": "SeedVR2 Video Upscaler"},
+    {"url": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler", "name": "SeedVR2 Video Upscaler", "required": True},
 ]
 
 _setup_state_lock = threading.Lock()

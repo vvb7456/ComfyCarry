@@ -20,5 +20,3 @@ hf_transfer
 dynamicprompts==0.30.2
 uuid7
 insightface
-fonttools
-brotli
