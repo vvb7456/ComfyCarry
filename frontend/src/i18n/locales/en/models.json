@@ -5,12 +5,14 @@
   },
   "tabs": {
     "local": "Local Models",
-    "huggingface": "Model Whitelist",
+    "huggingface": "Official Models",
     "civitai": "CivitAI"
   },
   "source_types": {
     "civitai": "CivitAI",
     "huggingface": "Hugging Face",
+    "meta": "Meta",
+    "modelscope": "ModelScope",
     "unknown": "Unknown"
   },
   "drawer": {

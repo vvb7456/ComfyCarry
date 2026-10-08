@@ -492,6 +492,7 @@ def _row_base(row: Any) -> dict[str, Any]:
     d["links"] = _normalize_links(details.get("links", []))
     d["images"] = _normalize_images(details.get("images", []))
     d["source_url"] = _text(details.get("source_url"))
+    d["provider"] = _text(details.get("provider"))
     first_image = d["images"][0] if d["images"] else {}
     d["remote_preview_url"] = first_image.get("url") or None
     d["remote_preview_type"] = first_image.get("type") or None

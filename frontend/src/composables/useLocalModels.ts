@@ -54,6 +54,7 @@ export interface LocalModelDetail extends LocalModel {
   links: Array<{ type: string; url: string }>
   images: LocalModelImage[]
   source_url?: string
+  provider?: string
 }
 
 /**

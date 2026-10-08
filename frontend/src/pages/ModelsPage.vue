@@ -45,7 +45,7 @@ const panelId = (key: string) => tabSwitcher.value?.panelIdFor(key)
 const tabId = (key: string) => tabSwitcher.value?.tabIdFor(key)
 const tabs = computed<TabItem[]>(() => [
   { key: 'local', label: t('models.tabs.local'), icon: 'inventory_2' },
-  { key: 'huggingface', label: t('models.tabs.huggingface') },
+  { key: 'huggingface', label: t('models.tabs.huggingface'), brand: 'hf' },
   { key: 'civitai', label: t('models.tabs.civitai'), brand: 'civitai' },
 ])
 

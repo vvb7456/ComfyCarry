@@ -18,6 +18,15 @@ export function civitaiModelUrl(modelId: number | string, versionId?: number | s
   return versionId ? `${base}?modelVersionId=${versionId}` : base
 }
 
+export function modelSourceLabel(
+  source: string | undefined,
+  t: (key: string) => string,
+  te: (key: string) => boolean,
+): string {
+  const key = `models.source_types.${source || 'unknown'}`
+  return te(key) ? t(key) : source || t('models.source_types.unknown')
+}
+
 /**
  * 模型类别 badge 的单一事实源。
  *

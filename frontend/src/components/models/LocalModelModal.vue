@@ -7,7 +7,7 @@ import Badge from '@/components/ui/Badge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import { fmtBytes } from '@/utils/format'
-import { modelCategoryColor, modelCategoryLabel } from '@/utils/constants'
+import { modelCategoryColor, modelCategoryLabel, modelSourceLabel } from '@/utils/constants'
 import { useClipboard } from '@/composables/useClipboard'
 import { useToast } from '@/composables/useToast'
 import { useI18n } from 'vue-i18n'
@@ -28,7 +28,7 @@ const emit = defineEmits<{
 const { get, post } = useApiFetch()
 const { copy } = useClipboard()
 const { toast } = useToast()
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const detail = ref<LocalModelDetail | null>(null)
 const loading = ref(false)
 const enriching = ref(false)
@@ -59,7 +59,7 @@ const displayName = computed(() => detail.value?.display_name || props.model?.di
 
 function sourceLabel() {
   const type = detail.value?.source?.type
-  return t(`models.source_types.${type || 'unknown'}`)
+  return modelSourceLabel(type === 'whitelist' ? detail.value?.provider : type, t, te)
 }
 
 function sourceUrl() {

@@ -5,12 +5,14 @@
   },
   "tabs": {
     "local": "本地模型",
-    "huggingface": "模型白名单",
+    "huggingface": "官方模型",
     "civitai": "CivitAI"
   },
   "source_types": {
     "civitai": "CivitAI",
     "huggingface": "Hugging Face",
+    "meta": "Meta",
+    "modelscope": "ModelScope",
     "unknown": "未知"
   },
   "drawer": {
