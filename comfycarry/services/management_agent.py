@@ -192,16 +192,24 @@ class AgentClient:
                     return status
         return status
 
-    def local_ready(self):
+    def local_readiness(self):
         if not self.identity:
-            return False
+            return {}
         try:
             port = int(self.environ.get("MANAGER_PORT", "5000"))
             response = self.http.get(f"http://127.0.0.1:{port}/api/provisioning/readiness", timeout=2, allow_redirects=False)
             body = response.json()
-            return response.status_code == 200 and isinstance(body, dict) and body.get("ready") is True and body.get("wizard_available") is True and body.get("instance_id") == self.identity
+            if response.status_code not in {200, 503} or not isinstance(body, dict) or body.get("instance_id") != self.identity:
+                return {}
+            return {
+                "ready": response.status_code == 200 and body.get("ready") is True and body.get("wizard_available") is True,
+                "setup_complete": body.get("setup_complete") if isinstance(body.get("setup_complete"), bool) else None,
+            }
         except (requests.RequestException, ValueError):
-            return False
+            return {}
+
+    def local_ready(self):
+        return self.local_readiness().get("ready") is True
 
     def collect_health(self):
         # The image carries the same collector as the dashboard, before the Release exists.
@@ -214,7 +222,9 @@ class AgentClient:
         except Exception:
             log.exception("系统指标采集失败，本次心跳保留未知指标")
             stats = {}
-        health = {"dashboard": self.local_ready(), "jupyter": None, "tunnel": None,
+        readiness = self.local_readiness()
+        health = {"dashboard": readiness.get("ready") is True, "setup_complete": readiness.get("setup_complete"),
+                  "jupyter": None, "tunnel": None,
                   "disk_used_pct": stats.get("disk", {}).get("percent"),
                   "gpu_visible": True if stats.get("gpu") else None}
         try:

@@ -1,11 +1,4 @@
-"""最小就绪接口 (托管开通交付验收用)。
-
-GET /api/provisioning/readiness — 200/503 + 三字段 (ready/wizard_available/
-instance_id), 供管理端经 tunnel_urls.dashboard 探活。契约样本
-(protocol-v1.json readiness 节) 定义字段与状态码, 上报依赖
-PROVISIONING_TOKEN + MANAGEMENT_API_URL + PROVISIONING_INSTANCE_ID 由
-services/management_agent (主控后续模块) 统一接线; 本模块只读环境变量判定。
-"""
+"""托管实例的启动入口就绪检查与 Wizard 完成状态。"""
 
 import os
 import re
@@ -120,6 +113,7 @@ def readiness():
     body = {
         "ready": ready,
         "wizard_available": wizard_available,
+        "setup_complete": bool(config._is_setup_complete()),
         "instance_id": _instance_id(),
     }
     return jsonify(body), (200 if ready else 503)
