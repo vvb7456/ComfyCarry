@@ -171,7 +171,7 @@ async function reinitialize() {
 <template>
   <div class="about-content" aria-labelledby="about-product-name">
     <header class="about-identity">
-      <img class="about-logo" src="/logo-mark.svg" alt="" aria-hidden="true" />
+      <img class="about-logo" src="/logo-mark.svg?v=2" alt="" aria-hidden="true" />
       <h3 id="about-product-name" class="about-product-name">Comfy<span class="about-product-name__b">Carry</span></h3>
       <div class="about-build">
         <span>{{ t('settings.about.version') }} {{ app.version || '—' }}</span>

@@ -125,9 +125,12 @@ function toggleLang() {
       <MsIcon name="chevron_left" size="xs" />
     </button>
 
-    <div class="sidebar-logo">
-      <img src="/logo-mark.svg" alt="ComfyCarry" class="logo-icon" width="28" height="28" />
-      <span class="logo-text" aria-hidden="true">Comfy<span class="logo-text__b">Carry</span></span>
+    <div class="sidebar-logo" role="img" aria-label="ComfyCarry Dashboard">
+      <img src="/logo-mark.svg?v=2" alt="" class="logo-icon" width="28" height="28" />
+      <div class="logo-text" aria-hidden="true">
+        <strong>Comfy<span class="logo-text__b">Carry</span></strong>
+        <span>DASHBOARD</span>
+      </div>
     </div>
 
     <div class="sidebar-nav">

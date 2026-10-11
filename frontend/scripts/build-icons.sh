@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 重新生成栅格图标:
-#   favicon.ico        <- logo-mark.svg (透明背景, 浏览器标签页用)
+#   favicon.ico        <- logo-mark.svg (浏览器标签页与发布包回退图标)
 #   apple-touch-icon   <- logo-tile.svg (iOS 主屏图标不支持透明, 规范即带底板)
 # 改了标识就跑一次: bash frontend/scripts/build-icons.sh
 set -euo pipefail
@@ -49,5 +49,7 @@ imgs = [Image.open(f"{tmp}/ico-{n}.png").convert("RGBA") for n in (48, 32, 16)]
 imgs[0].save(out, format="ICO", sizes=[(48, 48), (32, 32), (16, 16)])
 print(f"  favicon.ico <- 48/32/16")
 PY
+
+cp "$PUB/favicon.ico" "$HERE/../../favicon.ico"
 
 echo "完成。"

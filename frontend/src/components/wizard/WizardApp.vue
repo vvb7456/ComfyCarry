@@ -59,7 +59,7 @@ onMounted(() => {
 
     <div v-else class="wizard-container">
       <div class="wizard-header">
-        <img src="/logo-mark.svg" alt="" class="wizard-header__logo" width="48" height="48" />
+        <img src="/logo-mark.svg?v=2" alt="" class="wizard-header__logo" width="48" height="48" />
         <h1>Comfy<span class="wizard-header__brand-b">Carry</span></h1>
         <p class="wizard-header__subtitle">{{ t('wizard.subtitle') }}</p>
       </div>

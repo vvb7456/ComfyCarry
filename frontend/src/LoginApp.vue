@@ -113,8 +113,9 @@ async function submit() {
 
     <div class="card">
       <div class="logo">
-        <img src="/logo-mark.svg" alt="" width="48" height="48">
+        <img src="/logo-mark.svg?v=2" alt="" width="48" height="48">
         <h1>Comfy<b>Carry</b></h1>
+        <span class="logo-caption">DASHBOARD</span>
       </div>
 
       <form @submit.prevent="submit">
@@ -397,7 +398,6 @@ html[data-theme="light"] .lang-toggle:hover {
   margin-bottom: clamp(28px, 2.5vw, 40px);
 }
 
-/* 与字标保持 1.5:1 — 品牌块统一比例 (3vw = 字标 2vw 的 1.5 倍) */
 .logo img {
   width: clamp(38px, 3vw, 50px);
   height: auto;
@@ -408,7 +408,8 @@ html[data-theme="light"] .lang-toggle:hover {
 .logo h1 {
   font-size: clamp(1.6rem, 2vw, 2.1rem);
   font-weight: 700;
-  letter-spacing: -.02em;
+  letter-spacing: -.035em;
+  line-height: 1.25;
   color: var(--l-t1);
 }
 
@@ -419,6 +420,16 @@ html[data-theme="light"] .lang-toggle:hover {
 
 html[data-theme="light"] .logo h1 b {
   color: #4f46e5;
+}
+
+.logo-caption {
+  display: block;
+  margin-top: 8px;
+  color: var(--l-t3);
+  font-size: .62rem;
+  font-weight: 500;
+  letter-spacing: .2em;
+  line-height: 1.35;
 }
 
 .input-wrap {
