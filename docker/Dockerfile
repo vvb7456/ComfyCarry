@@ -207,7 +207,7 @@ RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_model
     python3.12 -c "\
 import json, datetime, platform, torch; \
 info = { \
-    'version': '3.1-runtime-minimal', \
+    'version': '3.2 (arm)' if platform.machine() == 'aarch64' else '3.2 (x86)', \
     'build_date': datetime.datetime.now().strftime('%Y-%m-%d'), \
     'python': '3.12', \
     'torch': torch.__version__, \
