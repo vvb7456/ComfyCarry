@@ -14,6 +14,7 @@
  */
 
 import { HF_VERSION_INDEX, fileDirectory } from './huggingface-models'
+import { MODEL_VARIANTS } from './model-types'
 
 export type ComponentTier = 'standard' | 'lite' | 'full'
 
@@ -77,6 +78,14 @@ function hf(
 // ── 共享常量 (多架构复用同一文件, 必须用同一个常量对象) ────────────────────────
 
 const QWEN_IMAGE_VAE = hf('qwen_image_vae', 'Qwen Image VAE', -10000301, 'standard')
+const QWEN_IMAGE21_COMPONENTS: ArchComponents['slots'] = {
+  clip: [
+    hf('qwen_image21_te', 'Qwen3-VL 8B INT8', -10000401, 'standard'),
+    hf('qwen_image21_te_lite', 'Qwen3-VL 8B W4A8', -10000402, 'lite'),
+    hf('qwen_image21_te_full', 'Qwen3-VL 8B BF16', -10000400, 'full'),
+  ],
+  vae: [hf('qwen_image21_vae', 'Qwen Image 2.1 VAE', -10000403, 'standard')],
+}
 const AE_VAE = hf('flux_ae', 'Flux AE', -10000113, 'standard')
 const FLUX2_VAE = hf('flux2_vae', 'Flux2 VAE', -10000296, 'standard')
 
@@ -110,6 +119,8 @@ const H3_AUDIO_VAE = hf('minimax_h3_audio_vae', 'H3 Audio VAE', -10000359, 'stan
 // 约定: 每个 slot 的数组按 tier 排序, standard 档必须排第一 (派生函数默认取它)。
 
 const COMPONENT_REGISTRY: ArchComponents[] = [
+  { arch: 'qwen_image21', slots: QWEN_IMAGE21_COMPONENTS },
+  { arch: 'qwen_image21_turbo', slots: QWEN_IMAGE21_COMPONENTS },
   {
     arch: 'anima',
     slots: {
@@ -228,6 +239,10 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
 const _ARCH_INDEX: Map<string, ArchComponents> = (() => {
   const m = new Map<string, ArchComponents>()
   for (const entry of COMPONENT_REGISTRY) m.set(entry.arch, entry)
+  for (const [arch, { base }] of Object.entries(MODEL_VARIANTS)) {
+    const entry = m.get(base)
+    if (entry) m.set(arch, { ...entry, arch })
+  }
   return m
 })()
 
@@ -318,7 +333,7 @@ export function stemOf(filename: string): string {
   let s = filename.includes('/') ? filename.slice(filename.lastIndexOf('/') + 1) : filename
   s = s.includes('.') ? s.slice(0, s.lastIndexOf('.')) : s
   s = s.toLowerCase()
-  const suffixRe = /(?:fp32|fp16|bf16|fp8|fp4|e4m3fn|e5m2|scaled|mixed|base|q\d+|int8|gguf)$/
+  const suffixRe = /(?:fp32|fp16|bf16|fp8|fp4|e4m3fn|e5m2|scaled|mixed|base|q\d+|int8|convrot|w4a8|gguf)$/
   const sepRe = /[_-]$/
   // 循环剥除: 'fp8mixed' 需要两轮 (先剥 'mixed', 再剥 'fp8' + 分隔符)
   let prev = ''

@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import queue
 import shlex
@@ -8,6 +9,7 @@ import requests
 from flask import Blueprint, Response, jsonify, request
 
 from ..config import COMFYUI_URL, COMFYUI_DIR, WORKSPACE_ROOT, _set_config
+from ..utils import api_err
 
 
 def comfyui_port() -> int:
@@ -33,12 +35,7 @@ from ..services.video_thumb import get_video_thumbnail, is_video_filename
 bp = Blueprint("comfyui", __name__)
 
 
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `comfyui.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
-    body = {"error_key": f"comfyui.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "comfyui")
 
 
 @bp.route("/api/comfyui/status")
@@ -62,9 +59,8 @@ def api_comfyui_status():
         except Exception:
             pass
     try:
-        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
-                           capture_output=True, text=True, timeout=5)
-        procs = json.loads(r.stdout or "[]")
+        from ..utils import get_pm2_procs
+        procs = get_pm2_procs()
         comfy = next((p for p in procs if p.get("name") == "comfy"), None)
         if comfy:
             pm2_env = comfy.get("pm2_env", {})
@@ -84,9 +80,8 @@ def api_comfyui_status():
 @bp.route("/api/comfyui/params", methods=["GET"])
 def api_comfyui_params_get():
     try:
-        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
-                           capture_output=True, text=True, timeout=5)
-        procs = json.loads(r.stdout or "[]")
+        from ..utils import get_pm2_procs
+        procs = get_pm2_procs()
         comfy = next((p for p in procs if p.get("name") == "comfy"), None)
         raw_args = []
         if comfy:

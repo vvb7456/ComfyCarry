@@ -218,6 +218,21 @@ _FLUX_SYSTEM_PROMPT = (
 FLUX_SYSTEM_PROMPT = _FLUX_SYSTEM_PROMPT
 
 
+_QWEN_IMAGE21_SYSTEM_PROMPT = (
+    _prompt_header("Qwen Image 2.1", "将用户描述改写为自然语言图像生成提示词")
+    + _FIDELITY_RULES
+    + r"""
+### Qwen Image 2.1 格式
+- 使用连贯的中文或英文句子，先写主体、外观和动作，再写场景、构图、光线和材质。
+- 画面文字用双引号原样保留，不翻译文字本身；不要堆叠 Danbooru 标签或括号权重。
+- 用户要求透明背景时，使用官方格式：This is an RGBA image with transparency.
+  <画面描述>. The image has alpha channel and the background is transparent.
+- 默认 CFG 为 1（包括 Turbo），`negative` 留空，将排除要求写为正向约束。
+"""
+    + _OUTPUT_RULES
+)
+
+
 _CHROMA_SYSTEM_PROMPT = (
     _prompt_header(
         "Chroma",
@@ -543,6 +558,7 @@ _BASE_ENTRIES = {
     "sd15": _entry(SD15_SYSTEM_PROMPT, "SD 1.5 — A1111/ComfyUI 标签格式", negative=True, vision_model="Stable Diffusion 1.5"),
     "anima": _entry(_ANIMA_SYSTEM_PROMPT, "Anima — tags/短语格式", negative=True, vision_model="Anima"),
     "krea2": _entry(_KREA2_SYSTEM_PROMPT, "Krea 2 — 自然语言格式", negative=False, vision_model="Krea 2"),
+    "qwen_image21": _entry(_QWEN_IMAGE21_SYSTEM_PROMPT, "Qwen Image 2.1 — 自然语言格式", negative=False, vision_model="Qwen Image 2.1"),
     "zimage": _entry(_ZIMAGE_SYSTEM_PROMPT, "Z-Image — 中英自然语言格式", negative=False, vision_model="Z-Image"),
     "flux": _entry(FLUX_SYSTEM_PROMPT, "Flux 1 — FLUX 自然语言格式", negative=False, vision_model="FLUX"),
     "chroma": _entry(_CHROMA_SYSTEM_PROMPT, "Chroma — 自然语言 + 负面提示词", negative=True, vision_model="Chroma"),

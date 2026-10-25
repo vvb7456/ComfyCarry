@@ -17,7 +17,7 @@ import requests
 from ..config import get_config, set_config
 from .cf_runtime import active_cf_name, cf_metrics_port, next_cf_name
 from .public_tunnel import PublicTunnelClient, PublicTunnelError
-from .tunnel_manager import CFAPIError, TunnelManager, get_default_services
+from .tunnel_manager import CFAPIError, TunnelManager, get_effective_services
 
 log = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ def _begin_custom(payload: dict) -> dict:
     if not subdomain:
         raise SwitchError("subdomain_required", 400)
 
-    services = _effective_services()
+    services = get_effective_services()
     # 构造管理器兼做子域名必填校验 (不做网络调用)
     mgr = TunnelManager(api_token, domain, subdomain)
     svc_urls = {svc["name"]: f"https://{mgr._hostname_for(svc)}" for svc in services}
@@ -459,30 +459,3 @@ def _current_info() -> dict:
         return {"mode": "custom", "url": f"https://{subdomain}.{domain}",
                 "token": token, "domain": domain, "subdomain": subdomain}
     return {"mode": None, "url": ""}
-
-
-def _effective_services() -> list:
-    overrides = {}
-    custom = []
-    try:
-        raw = get_config("cf_suffix_overrides", "")
-        if raw:
-            overrides = json.loads(raw)
-    except Exception:
-        overrides = {}
-    try:
-        raw = get_config("cf_custom_services", "")
-        if raw:
-            custom = json.loads(raw)
-    except Exception:
-        custom = []
-
-    services = []
-    for svc in get_default_services():
-        s = dict(svc)
-        orig = s.get("suffix", "")
-        if orig in overrides:
-            s["suffix"] = overrides[orig]
-        services.append(s)
-    services.extend(custom)
-    return services

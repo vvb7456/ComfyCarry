@@ -2,14 +2,14 @@
 ComfyCarry — 统一 SQLite 数据库层
 
 单一 .comfycarry.db 文件，WAL 模式，线程安全。
-各模块通过 register_migration() 注册自己的表结构，
-应用启动时 migrate() 按版本号顺序执行。
+应用启动时 initialize() 创建当前完整表结构。
 """
 
 import atexit
 import logging
 import sqlite3
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 from .config import WORKSPACE_ROOT
@@ -21,11 +21,10 @@ DB_PATH = WORKSPACE_ROOT / ".comfycarry.db"
 
 class Database:
 
-    def __init__(self, db_path: Path = DB_PATH):
+    def __init__(self, db_path: str | Path = DB_PATH):
         self._db_path = db_path
         self._conn: sqlite3.Connection | None = None
         self._lock = threading.Lock()
-        self._migrations: dict[int, tuple[str, callable]] = {}
         atexit.register(self.close)
 
     def _ensure_conn(self) -> sqlite3.Connection:
@@ -43,10 +42,6 @@ class Database:
             self._conn.execute("PRAGMA cache_size=-2000")   # 2 MB
             self._conn.execute("PRAGMA busy_timeout=5000")   # 5s 重试
             self._conn.execute("PRAGMA foreign_keys=ON")
-            self._conn.execute(
-                "CREATE TABLE IF NOT EXISTS schema_version "
-                "(version INTEGER PRIMARY KEY)"
-            )
             log.info("[db] SQLite 连接已建立: %s (WAL)", self._db_path)
         return self._conn
 
@@ -60,40 +55,23 @@ class Database:
                 self._conn = None
                 log.info("[db] SQLite 连接已关闭")
 
-    def register_migration(self, version: int, up_fn: callable, name: str = ""):
-        if version in self._migrations:
-            raise ValueError(f"Migration v{version} 已注册: {self._migrations[version][0]}")
-        self._migrations[version] = (name or f"migration_{version}", up_fn)
+    def initialize(self):
+        from .schema import create_schema
 
-    def migrate(self):
-        """按版本号顺序执行未应用的 migration。应在 app 启动时调用一次。"""
-        if not self._migrations:
-            return
+        with self.transaction() as conn:
+            create_schema(conn)
+
+    @contextmanager
+    def transaction(self):
         with self._lock:
             conn = self._ensure_conn()
-            row = conn.execute(
-                "SELECT COALESCE(MAX(version), 0) FROM schema_version"
-            ).fetchone()
-            current = row[0]
-            pending = sorted(v for v in self._migrations if v > current)
-            if not pending:
-                log.debug("[db] 数据库 schema 已是最新 (v%d)", current)
-                return
-            for v in pending:
-                name, up_fn = self._migrations[v]
-                log.info("[db] 执行 migration v%d: %s", v, name)
-                try:
-                    conn.execute("BEGIN")
-                    up_fn(conn)
-                    conn.execute(
-                        "INSERT INTO schema_version (version) VALUES (?)", (v,)
-                    )
-                    conn.execute("COMMIT")
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    log.exception("[db] Migration v%d 失败, 已回滚", v)
-                    raise
-            log.info("[db] 数据库已迁移到 v%d", pending[-1])
+            conn.execute("BEGIN")
+            try:
+                yield conn
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
 
     def execute(self, sql: str, params=()) -> sqlite3.Cursor:
         with self._lock:
@@ -151,19 +129,6 @@ class Database:
                 except Exception:
                     pass
                 raise
-
-    def get_schema_version(self) -> int:
-        row = self.fetch_one(
-            "SELECT COALESCE(MAX(version), 0) FROM schema_version"
-        )
-        return row[0] if row else 0
-
-    def table_exists(self, table_name: str) -> bool:
-        row = self.fetch_one(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-            (table_name,),
-        )
-        return row is not None
 
     def row_count(self, table_name: str) -> int:
         """获取表行数。表名由内部控制，不接受外部输入。"""

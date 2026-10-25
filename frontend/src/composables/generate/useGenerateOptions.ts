@@ -162,6 +162,7 @@ export function useGenerateOptions(): GenerateOptionsReturn {
   // 表现为"组件下完了但 CLIP/VAE 下拉没更新"。改为: 非强制刷新复用在飞的请求,
   // 强制刷新排队到其后重跑, 绝不丢弃。
   let inflight: Promise<void> | null = null
+  let queuedRefresh: Promise<void> | null = null
 
   async function _doFetch(forceRefresh: boolean): Promise<void> {
     loading.value = true
@@ -204,7 +205,9 @@ export function useGenerateOptions(): GenerateOptionsReturn {
 
   function fetchOptions(forceRefresh = false): Promise<void> {
     if (inflight) {
-      return forceRefresh ? inflight.then(() => fetchOptions(true)) : inflight
+      if (!forceRefresh) return inflight
+      queuedRefresh ??= inflight.then(() => fetchOptions(true)).finally(() => { queuedRefresh = null })
+      return queuedRefresh
     }
     const p = _doFetch(forceRefresh).finally(() => { if (inflight === p) inflight = null })
     inflight = p

@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import secrets
+import shlex
 import threading
 from pathlib import Path
 
@@ -131,6 +132,18 @@ set_config = _set_config
 get_config = _get_config
 
 
+def get_comfyui_output_dir() -> Path:
+    args = iter(shlex.split(get_config("comfyui_args", "")))
+    directory = "output"
+    for arg in args:
+        if arg == "--output-directory":
+            directory = next(args)
+        elif arg.startswith("--output-directory="):
+            directory = arg.split("=", 1)[1]
+    # ComfyUI 从自身目录启动，相对输出路径也以该目录为基准。
+    return (Path(COMFYUI_DIR) / directory).resolve()
+
+
 def _load_dashboard_password():
     """优先 .dashboard_env > 环境变量 > 默认值"""
     pw = _get_config("password")
@@ -180,6 +193,7 @@ MODEL_DIRS = {
     "checkpoints": "models/checkpoints",
     "loras": "models/loras",
     "controlnet": "models/controlnet",
+    "model_patches": "models/model_patches",
     "vae": "models/vae",
     "upscale_models": "models/upscale_models",
     "embeddings": "models/embeddings",
@@ -351,14 +365,10 @@ def _load_setup_state():
         "deploy_error": "",
         "deploy_steps_completed": [],
     }
-    # 幽灵 key 兼容清除: 旧版本写过的字段不再有任何读取, 加载时直接丢弃
-    _ghost_keys = {"completed", "cloudflared_token", "image_type", "deploy_log"}
     with _setup_state_lock:
         if SETUP_STATE_FILE.exists():
             try:
                 state = json.loads(SETUP_STATE_FILE.read_text(encoding="utf-8"))
-                for k in _ghost_keys:
-                    state.pop(k, None)
                 for k, v in defaults.items():
                     if k not in state:
                         state[k] = v

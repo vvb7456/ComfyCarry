@@ -8,9 +8,9 @@
     "loading_state": "正在载入工作区配置…",
     "state_failed_title": "工作区配置载入失败",
     "state_failed_desc": "配置仍保存在服务端，未做任何改动。可重试载入。",
-    "state_incompatible_title": "工作区配置版本过新",
-    "state_incompatible_desc": "该配置由更新版本的面板保存。请先更新面板，避免覆盖。",
-    "save_state_failed": "工作区配置未能保存到服务端，正在重试"
+    "state_reload_title": "工作区配置已重新导入",
+    "state_reload_desc": "请重新载入配置后继续编辑，以免覆盖刚导入的设置。",
+    "save_state_failed": "工作区配置尚未保存，请检查服务连接"
   },
   "header": {
     "queue_history": "队列&历史",
@@ -24,6 +24,9 @@
     "family_flux2": "Flux 2 系列",
     "family_wan22": "Wan 2.2 系列",
     "family_minimax_h3": "MiniMax H3 系列",
+    "family_qwen_image21": "Qwen Image 2.1 系列",
+    "family_anima": "Anima 系列",
+    "family_zimage": "Z-Image 系列",
     "not_ready": "未就绪",
     "back_to_all_models": "返回所有架构"
   },
@@ -31,17 +34,25 @@
     "sdxl": "SDXL",
     "sd15": "SD 1.5",
     "anima": "Anima",
+    "anima_turbo": "Anima Turbo",
     "flux": "Flux",
-    "krea2": "Krea 2",
+    "krea2": "Krea 2 Turbo",
+    "qwen_image21": "Qwen Image 2.1",
+    "qwen_image21_turbo": "Qwen Image 2.1 Turbo",
     "zimage": "Z-Image",
+    "zimage_turbo": "Z-Image Turbo",
     "flux1": "Flux 1.D",
+    "flux1_schnell": "Flux 1 Schnell",
     "chroma": "Chroma",
-    "flux2klein4b": "Flux 2 Klein 4B",
-    "flux2klein9b": "Flux 2 Klein 9B",
+    "flux2klein4b": "Flux 2 Klein 4B 蒸馏版",
+    "flux2klein9b": "Flux 2 Klein 9B 蒸馏版",
+    "flux2klein4b_base": "Flux 2 Klein 4B",
+    "flux2klein9b_base": "Flux 2 Klein 9B",
     "flux2dev": "Flux 2 Dev",
     "pony": "Pony",
     "illustrious": "Illustrious",
     "noobai": "NoobAI",
+    "noobai_vpred": "NoobAI V-Pred",
     "wan22_i2v": "Wan 2.2 图生视频",
     "wan22_t2v": "Wan 2.2 文生视频",
     "wan22_5b": "Wan 2.2 5B 轻量",
@@ -65,7 +76,7 @@
       "prompt_editor_title": "可视化提示词编辑器，支持自动补全和标签库"
     },
     "video_ph": "描述画面如何运动：主体 → 动作 → 镜头 → 场景。例如：女孩转身回眸，长发飘动，镜头缓慢拉近…",
-    "negative_video_ph": "已内置推荐负面提示词，留空即用默认",
+    "negative_video_ph": "输入不希望出现的内容，例如：模糊、闪烁、变形、字幕",
     "syntax_help_title": "模型提示词与随机语法帮助",
     "help_modal_title": "提示词帮助",
     "help": {
@@ -95,6 +106,19 @@
           "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, {'@'}artist, red dress, outdoors",
           "negative": "建议以 worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, chromatic aberration 为基础，再按场景增删。"
         },
+        "qwen_image21": {
+          "title": "Qwen Image 2.1（自然语言）",
+          "format": "用中英文完整句子描述画面，画面文字用引号原样保留。",
+          "order": "主体 → 外观与动作 → 场景与构图 → 光线、材质和风格。",
+          "special": "一位穿蓝色衬衫的女子站在窗边，自然光照亮面部，半身人像，背景柔和虚化。",
+          "negative": "CFG 为 1 时不使用负面提示词；提高 CFG 后可填写排除项。"
+        },
+        "qwen_image21_turbo": {
+          "title": "Qwen Image 2.1 Turbo（自然语言）",
+          "format": "用中英文完整句子描述画面，画面文字用引号原样保留。",
+          "order": "主体 → 外观与动作 → 场景与构图 → 光线、材质和风格。",
+          "special": "This is an RGBA image with transparency. A cute cartoon dragon sticker. The image has alpha channel and the background is transparent."
+        },
         "krea2": {
           "title": "Krea 2（自然语言）",
           "format": "自然语言短段落（中英文均可），写可观察的主体、材质和场景；不要堆 Danbooru 标签。",
@@ -107,7 +131,7 @@
           "format": "用中文或英文完整句子描述画面；明确主体、动作、空间关系和可见文字。",
           "order": "主体/人数 → 外观与动作 → 场景 → 构图/文字内容 → 光线和风格。",
           "special": "雨夜的便利店门口，红色灯牌清晰写着“营业中”，广角街拍，湿漉地面反光。",
-          "negative": "留空。将排除要求改写为想要的正向效果。"
+          "negative": "可填写不希望出现的元素或画面缺陷；Turbo 在 CFG 1 时不使用负面提示词。"
         },
         "flux1": {
           "title": "Flux 1（自然语言）",
@@ -128,14 +152,14 @@
           "format": "自然语言段落，先说明主体与关系，再补材质、空间、光线和构图；不要堆标签。",
           "order": "主体/关系 → 动作 → 环境与材质 → 光线色彩 → 镜头与风格。",
           "special": "A compact silver robot repairs a bicycle in a bright workshop, precise hand placement, clean overhead light, wide shot.",
-          "negative": "留空。用正向句子写出期望的画面状态。"
+          "negative": "可填写排除项；蒸馏版在 CFG 1 时不使用负面提示词。"
         },
         "flux2klein9b": {
           "title": "Flux 2 Klein 9B（自然语言）",
           "format": "自然语言段落，先说明主体与关系，再补材质、空间、光线和构图；不要堆标签。",
           "order": "主体/关系 → 动作 → 环境与材质 → 光线色彩 → 镜头与风格。",
           "special": "A compact silver robot repairs a bicycle in a bright workshop, precise hand placement, clean overhead light, wide shot.",
-          "negative": "留空。用正向句子写出期望的画面状态。"
+          "negative": "可填写排除项；蒸馏版在 CFG 1 时不使用负面提示词。"
         },
         "flux2dev": {
           "title": "Flux 2 Dev（自然语言）",
@@ -346,7 +370,7 @@
     "composing": "正在合成视频…",
     "stage": "采样中 · 第 {i} / {n} 段",
     "download": "下载视频",
-    "speed_help": "快速：4 步出片，负面提示词不生效。标准：20 步，细节更好，耗时约为快速的 5 倍。",
+    "speed_help": "快速：加载加速 LoRA，初始为 4 步、CFG 1。标准：初始为 20 步、CFG 3.5。采样参数可独立调整。",
     "res_fit_option": "跟随起始画面（{w}×{h}）",
     "res_preset": "{w}×{h}",
     "res_help": "选中尺寸的比例与起始画面不一致时，起始画面会被居中裁切以适配。",
@@ -514,7 +538,7 @@
     "mask_sam": "SAM 轮廓",
     "mask_mode_help": "修复区域贴回原图的掩码形状。矩形框：按检测框羽化贴回；SAM 轮廓：五官级分割掩码，贴回边界更精确。SAM 未安装时不可选，下载入口在本模块首次进入的引导页。",
     "advanced": "高级参数",
-    "cfg_help": "默认 7。Krea2 / Z-Image / Flux 等蒸馏架构请设为 1。",
+    "cfg_help": "初始值与主模型的推荐 CFG 一致，可独立调整。",
     "guide_size": "参考尺寸",
     "guide_size_help": "脸部裁切区放大后的短边目标像素，越大细节越多、耗时越长。",
     "crop_factor": "裁切余量",

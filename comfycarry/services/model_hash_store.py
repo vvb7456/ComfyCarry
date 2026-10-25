@@ -16,7 +16,6 @@ log = logging.getLogger(__name__)
 
 KEY = "generate_model_hashes"
 TABLE = "app_meta"
-MODELS_TABLE = "models"
 
 
 def referenced_paths(state: Any) -> set[str]:
@@ -39,10 +38,9 @@ def scan_model_hashes(state: Any) -> dict[str, str]:
     from .model_meta_store import get_or_compute_model_sha256
 
     result: dict[str, str] = {}
-    indexed = db.table_exists(MODELS_TABLE)
     for path in referenced_paths(state):
         real_path = os.path.realpath(resolve_file_path(path))
-        row = db.fetch_one("SELECT id FROM models WHERE real_path = ?", (real_path,)) if indexed else None
+        row = db.fetch_one("SELECT id FROM models WHERE real_path = ?", (real_path,))
         sha = (get_or_compute_model_sha256(int(row["id"]), real_path, _sha256_file)
                if row else _sha256_file(real_path))
         if sha:
@@ -52,8 +50,6 @@ def scan_model_hashes(state: Any) -> dict[str, str]:
 
 def load_hashes() -> dict[str, str]:
     """读取指纹表; 无数据 / 损坏 / 非 object → {}。"""
-    if not db.table_exists(TABLE):
-        return {}
     row = db.fetch_one(f"SELECT value FROM {TABLE} WHERE key = ?", (KEY,))
     if row is None:
         return {}
@@ -70,8 +66,6 @@ def load_hashes() -> dict[str, str]:
 def replace_hashes(payload: object) -> dict[str, str]:
     """整体替换 (不合并)。非 object 按空表落库。"""
     value = payload if isinstance(payload, dict) else {}
-    if not db.table_exists(TABLE):
-        return {}
     db.execute(
         f"INSERT OR REPLACE INTO {TABLE} (key, value) VALUES (?, ?)",
         (KEY, json.dumps(value, ensure_ascii=False)),

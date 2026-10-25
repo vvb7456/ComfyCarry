@@ -52,8 +52,6 @@ function isMissing(name: string): boolean {
 
 /** 用户换选 (从选择器挑新的) 或删除条目后, 旧的缺失标记应清除 */
 function removeLora(index: number) {
-  const entry = state.value.loras[index]
-  if (entry) store.clearMissing(store.activeModelType, entry.name)
   state.value.loras.splice(index, 1)
 }
 

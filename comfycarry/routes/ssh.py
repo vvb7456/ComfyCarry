@@ -2,6 +2,7 @@
 管理容器 sshd 服务、公钥、Root 密码
 """
 
+from functools import partial
 import logging
 import os
 import re
@@ -12,6 +13,7 @@ import time
 from flask import Blueprint, Response, jsonify, request
 
 from .. import config as cfg
+from ..utils import api_err
 from ..config import _get_config, _set_config
 
 log = logging.getLogger("ssh")
@@ -29,18 +31,7 @@ SSHD_LOG_FILE = str(cfg.WORKSPACE_ROOT / "sshd.log")
 # 回传中文的话英文 locale 下 toast 里会直接冒出中文。契约与 sync 路由的
 # _err 完全一致, 前端 apiErrorText() / t() 负责渲染。前端缺条目时会原样
 # 显示 key, 开发期一眼可见。
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `ssh.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
-
-    形参位置化 (`/`): 插值参数里有 key / status 这种名字, 不然会和
-    函数自己的形参撞车。
-    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
-    `**params` 静默吞掉, 顶层字段丢失。
-    """
-    body = {"error_key": f"ssh.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "ssh")
 
 
 def _ok(key: str, /, **extra):

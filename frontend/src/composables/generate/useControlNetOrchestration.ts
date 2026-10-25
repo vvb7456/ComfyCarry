@@ -87,13 +87,6 @@ export function useControlNetOrchestration({
     source: 'face-dep',
   })
 
-  // 依赖由缺失变就绪 = 刚下完 → 刷新 options, 让新模型立刻出现在下拉里
-  for (const dep of [depPose, depCanny, depDepth, depUpscale, depFace]) {
-    watch(() => dep.ready.value, (ready, prev) => {
-      if (ready && prev === false) void options.refresh()
-    })
-  }
-
   const tagger = useTagInterrogation()
   const showPPModal = ref({ pose: false, canny: false, depth: false })
 
@@ -141,12 +134,17 @@ export function useControlNetOrchestration({
   const faceModuleAvailable = (MODEL_TYPES[modelType]?.modules ?? []).includes('face')
 
   const moduleTabs = computed<SwitchTabItem[]>(() => {
+    const config = MODEL_TYPES[modelType]!
+    const disabled = !config.controlNetEnabled
+    if (config.mediaType === 'video') {
+      return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'layers' }]
+    }
     const tabs: SwitchTabItem[] = [
       { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
       { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
-      { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new' },
-      { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve' },
-      { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain' },
+      { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new', disabled },
+      { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve', disabled },
+      { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain', disabled },
       { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
     ]
     if (faceModuleAvailable) {
@@ -204,6 +202,10 @@ export function useControlNetOrchestration({
       case 'pose':
       case 'canny':
       case 'depth': {
+        if (!MODEL_TYPES[modelType]!.controlNetEnabled) {
+          toast(t('generate.error.cn_disabled'), 'warning')
+          return
+        }
         const cnKey = key as ControlNetType
         const cn = cnMap[cnKey]
         if (enabled && blockOnMissingDep(cnKey, depMap[cnKey], `generate.controlnet.need_download_${cnKey}`)) return

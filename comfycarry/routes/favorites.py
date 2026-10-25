@@ -2,11 +2,13 @@
 全局 check_auth 已覆盖 /api/*, 此 blueprint 无独立鉴权逻辑。
 """
 
+from functools import partial
 import logging
 
 from flask import Blueprint, jsonify, request
 
 from ..services import favorites_store as store
+from ..utils import api_err
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +18,7 @@ bp = Blueprint("favorites", __name__)
 # 响应文案 —— key + params, 由前端翻译。
 # 收藏是模型管理子页, 复用 models 命名空间: error_key=models.err.<key>
 # (i18n/locales/*/models.json 的 err 对象)。
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    body = {"error_key": f"models.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "models")
 
 
 # 长度上限 (防超长字段入库)

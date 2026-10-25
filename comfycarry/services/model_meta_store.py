@@ -14,9 +14,8 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import time
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from ..config import (
     COMFYUI_DIR,
@@ -35,25 +34,13 @@ _auto_enrich_lock = threading.Lock()
 _auto_enrich_queued: set[int] = set()
 _auto_enrich_attempted: set[int] = set()
 _auto_enrich_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="model-enrich")
+_scan_lock = threading.Lock()
+_last_scan_time = 0.0
+_last_scan_result: dict | None = None
 
 
-def _json_load(value: Any, default: Any) -> Any:
-    if isinstance(value, (dict, list)):
-        return value
-    try:
-        parsed = json.loads(value)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return default
-    return parsed
-
-
-def _json_dump(value: Any, default: Any) -> str:
-    if value is None:
-        value = default
-    try:
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    except (TypeError, ValueError):
-        return json.dumps(default, ensure_ascii=False, separators=(",", ":"))
+def _json_dump(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 def _text(value: Any) -> str:
@@ -62,44 +49,12 @@ def _text(value: Any) -> str:
     return str(value).strip()
 
 
-def _source_model(source_data: dict[str, Any]) -> dict[str, Any]:
-    model = source_data.get("model")
-    return model if isinstance(model, dict) else {}
-
-
-def _source_value(source_data: dict[str, Any], model: dict[str, Any], *keys: str) -> Any:
-    for key in keys:
-        value = source_data.get(key)
-        if value not in (None, ""):
-            return value
-    for key in keys:
-        value = model.get(key)
-        if value not in (None, ""):
-            return value
-    return ""
-
-
-def _normalize_words(value: Any) -> list[str]:
+def _normalize_words(value: list[str]) -> list[str]:
     """Split comma-delimited trigger values, preserving first-seen spelling."""
-    if value is None:
-        return []
-    if isinstance(value, dict):
-        value = value.get("word", value.get("text", ""))
-    if isinstance(value, str):
-        values = [value]
-    elif isinstance(value, (list, tuple, set)):
-        values = list(value)
-    else:
-        values = [value]
-
     result: list[str] = []
     seen: set[str] = set()
-    for item in values:
-        if isinstance(item, dict):
-            item = item.get("word", item.get("text", ""))
-        if item is None:
-            continue
-        for part in str(item).split(","):
+    for item in value or []:
+        for part in item.split(","):
             word = part.strip()
             if word and word not in seen:
                 seen.add(word)
@@ -176,9 +131,7 @@ def _normalize_links(value: Any) -> list[dict[str, str]]:
             kind = _text(item.get("type")) or "source"
         else:
             continue
-        # The API endpoint is an implementation detail and is not useful in
-        # the local model detail view.  Filter it at normalization time so
-        # old rows and newly fetched metadata have one public shape.
+        # 模型详情只展示可访问的网页链接，不展示 API 地址。
         if kind.lower() == "civitai_api":
             continue
         if not url or (kind, url) in seen:
@@ -189,94 +142,23 @@ def _normalize_links(value: Any) -> list[dict[str, str]]:
 
 
 def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
-    """Convert resolver output or a raw CivitAI version response to one shape."""
-    data = source_data if isinstance(source_data, dict) else {}
-    model = _source_model(data)
+    """只接受 resolver / 下载入口提供的 snake_case 元数据。"""
+    data = source_data or {}
+    model_id = _text(data.get("model_id"))
+    version_id = _text(data.get("version_id"))
+    model_name = _text(data.get("model_name"))
+    version_name = _text(data.get("version_name"))
+    model_type = _text(data.get("model_type"))
+    base_model = _text(data.get("base_model"))
+    explicit_arch = _text(data.get("architecture"))
+    source_type = _text(data.get("source"))
+    display_name = model_name
+    trained_words = data.get("trained_words", [])
+    file_words = data.get("file_trigger_words", [])
+    links = _normalize_links(data.get("links", []))
+    images = _normalize_images(data.get("images", []))
 
-    model_id = _source_value(data, model, "model_id", "modelId")
-    nested_source = data.get("source") if isinstance(data.get("source"), dict) else {}
-    if model_id in (None, ""):
-        model_id = nested_source.get("model_id", nested_source.get("modelId", ""))
-    if model_id in (None, ""):
-        model_id = model.get("id", "")
-    if model_id in (None, "") and not model and data.get("version_id") not in (None, ""):
-        # Some adapters expose a model ID as ``id`` alongside an explicit
-        # version_id rather than nesting a model object.
-        model_id = data.get("id", "")
-    if model_id in (None, "") and isinstance(data.get("raw"), dict):
-        raw = data["raw"]
-        raw_model = raw.get("model") if isinstance(raw.get("model"), dict) else {}
-        model_id = raw.get("modelId") or raw_model.get("id") or ""
-    version_id = _source_value(data, model, "version_id", "versionId")
-    if version_id in (None, ""):
-        version_id = nested_source.get("version_id", nested_source.get("versionId", ""))
-    # In a raw version response, ``id`` is the version ID; normalized resolver
-    # output already supplies version_id and should not be overwritten.
-    if version_id in (None, ""):
-        version_id = data.get("id", "")
-    # Raw CivitAI version responses use ``name`` for the version and nest the
-    # model's display name under ``model.name``.  Prefer the nested value when
-    # the resolver has not already supplied model_name explicitly.
-    model_name = (
-        data.get("model_name")
-        or model.get("name")
-        or (
-            data.get("name")
-            if not model and data.get("name") != data.get("version_name")
-            else ""
-        )
-        or ""
-    )
-    version_name = (
-        data.get("version_name")
-        or data.get("versionName")
-        or nested_source.get("version_name")
-        or nested_source.get("versionName")
-        or (data.get("name") if data.get("name") and data.get("name") != model_name else "")
-        or ""
-    )
-    model_type = _source_value(data, model, "model_type", "type")
-    base_model = _source_value(data, model, "base_model", "baseModel")
-    # 白名单等显式声明的架构优先, 缺失时回退到 base_model 推断
-    explicit_arch = _text(data.get("architecture")) or _text(model.get("architecture"))
-
-    source_type = _text(data.get("source_type"))
-    source = data.get("source")
-    if not source_type and isinstance(source, dict):
-        source_type = _text(source.get("type"))
-    elif not source_type and isinstance(source, str):
-        source_type = source.strip()
-    if not source_type and (model_id not in (None, "") or version_id not in (None, "")):
-        source_type = "civitai"
-
-    # Keep the card title stable at the model level.  Version identity is
-    # stored independently in ``source_version_name`` and shown where a
-    # version-specific label is appropriate.
-    display_name = _text(model_name)
-
-    trained_words = data.get("trained_words")
-    if trained_words is None:
-        trained_words = data.get("trainedWords")
-    if trained_words is None:
-        trained_words = data.get("trigger_words", [])
-    if not trained_words and isinstance(data.get("trigger_sources"), dict):
-        trained_words = data["trigger_sources"].get("civitai", [])
-    file_words = data.get("file_trigger_words", data.get("file_header_words", []))
-    if not file_words and isinstance(data.get("trigger_sources"), dict):
-        file_words = data["trigger_sources"].get("file_header", [])
-
-    details = data.get("details_json", data.get("details"))
-    if isinstance(details, str):
-        details = _json_load(details, {})
-    if not isinstance(details, dict):
-        details = {}
-    links = _normalize_links(data.get("links", details.get("links", [])))
-    images_value = data.get("images")
-    if images_value is None:
-        images_value = details.get("images", [])
-    images = _normalize_images(images_value)
-
-    # HF 白名单平铺字段 → details_json 扩展 (仅新增键兼容, 不影响 civitai 读取)
+    # 白名单专属展示字段保存在 details_json。
     details_extra: dict[str, Any] = {}
     for key in ("author", "image_url", "source_url", "provider"):
         value = data.get(key)
@@ -314,16 +196,16 @@ def _normalize_source(source_data: dict[str, Any] | None) -> dict[str, Any]:
         "model_type": _text(model_type),
         "base_model": _text(base_model),
         "architecture": explicit_arch or arch_from_base_model(_text(base_model)),
-        "civitai_words": _normalize_words(trained_words),
-        "file_words": _normalize_words(file_words),
+        "civitai_words": trained_words,
+        "file_words": file_words,
         "links": links,
         "images": images,
         "details_extra": details_extra,
         "has_source": has_source,
-        "has_images": "images" in data or "images" in details,
+        "has_images": "images" in data,
         # Generated CivitAI links count as source detail even when the resolver
         # supplied only IDs and names.
-        "has_links": bool(links) or "links" in data or "links" in details,
+        "has_links": bool(links) or "links" in data,
     }
 
 
@@ -471,33 +353,19 @@ def get_or_compute_model_sha256(
     return normalized
 
 
-def _json_sources(value: Any) -> dict[str, list[str]]:
-    parsed = _json_load(value, {})
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _json_words(value: Any) -> list[str]:
-    return _normalize_words(_json_load(value, []))
-
-
-def _row_base(row: Any) -> dict[str, Any]:
+def _row_base(row: Any, *, include_path: bool = False) -> dict[str, Any]:
     d = dict(row)
-    details = _json_load(d.pop("details_json", "{}"), {})
-    if not isinstance(details, dict):
-        details = {}
-    trigger_sources = _json_sources(d.pop("trigger_sources_json", "{}"))
-    trigger_words = _json_words(d.pop("trigger_words_json", "[]"))
-    d["trigger_words"] = trigger_words
-    d["trigger_sources"] = trigger_sources
-    d["links"] = _normalize_links(details.get("links", []))
-    d["images"] = _normalize_images(details.get("images", []))
+    details = json.loads(d.pop("details_json", "{}"))
+    d["trigger_words"] = json.loads(d.pop("trigger_words_json", "[]"))
+    d["trigger_sources"] = json.loads(d.pop("trigger_sources_json", "{}"))
+    d["links"] = details.get("links", [])
+    d["images"] = details.get("images", [])
     d["source_url"] = _text(details.get("source_url"))
     d["provider"] = _text(details.get("provider"))
     first_image = d["images"][0] if d["images"] else {}
     d["remote_preview_url"] = first_image.get("url") or None
     d["remote_preview_type"] = first_image.get("type") or None
     d["has_info"] = bool(d.get("has_info"))
-    d.pop("details_json", None)
     try:
         path = _resolve(d.get("real_path", "")) if d.get("real_path") else Path()
     except (OSError, RuntimeError, TypeError, ValueError):
@@ -527,6 +395,9 @@ def _row_base(row: Any) -> dict[str, Any]:
     d["source_model_id"] = source_model_id
     d["source_version_id"] = source_version_id
     d["source_version_name"] = source_version_name
+    if not include_path:
+        d.pop("real_path", None)
+        d.pop("storage_type", None)
     return d
 
 
@@ -540,26 +411,6 @@ def _list_select_sql() -> str:
     )
 
 
-@contextmanager
-def _transaction() -> Iterator[Any]:
-    """Use Database's lock/connection for multi-statement atomic operations."""
-    lock = getattr(db, "_lock", None)
-    ensure = getattr(db, "_ensure_conn", None)
-    if lock is None or ensure is None:
-        # This fallback keeps the service easy to exercise with a tiny fake DB.
-        yield None
-        return
-    with lock:
-        conn = ensure()
-        conn.execute("BEGIN")
-        try:
-            yield conn
-            conn.execute("COMMIT")
-        except Exception:
-            conn.execute("ROLLBACK")
-            raise
-
-
 def register_downloaded_model(
     model_path: str,
     category: str,
@@ -571,16 +422,11 @@ def register_downloaded_model(
     source = _normalize_source(source_data)
     relative_path, storage_type = _path_fields(path, _text(category))
     size_bytes, file_mtime = _file_stat(path)
-    detected_arch = detect_arch(str(path), relative_path) or "unknown"
+    detected_arch = (detect_arch(str(path), relative_path) or "unknown") if category != "auxiliary" else "unknown"
     architecture = source["architecture"] if source["architecture"] != "unknown" else detected_arch
-    if architecture == "unknown":
-        architecture = "unknown"
     now = time.time()
-    with _transaction() as conn:
-        if conn is not None:
-            existing = conn.execute("SELECT * FROM models WHERE real_path = ?", (str(path),)).fetchone()
-        else:
-            existing = db.fetch_one("SELECT * FROM models WHERE real_path = ?", (str(path),))
+    with db.transaction() as conn:
+        existing = conn.execute("SELECT * FROM models WHERE real_path = ?", (str(path),)).fetchone()
         old = dict(existing) if existing else {}
         words, sources = _merge_words(
             source["civitai_words"],
@@ -589,13 +435,11 @@ def register_downloaded_model(
         details = _details_from_values(source["links"], source["images"])
         details.update(source.get("details_extra") or {})
         if existing:
-            old_details = _json_load(old.get("details_json", "{}"), {})
-            if not isinstance(old_details, dict):
-                old_details = {}
+            old_details = json.loads(old["details_json"])
             if not source["has_links"]:
-                details["links"] = _normalize_links(old_details.get("links", []))
+                details["links"] = old_details.get("links", [])
             if not source["has_images"]:
-                details["images"] = _normalize_images(old_details.get("images", []))
+                details["images"] = old_details.get("images", [])
         values = {
             "real_path": str(path),
             "filename": path.name,
@@ -609,13 +453,13 @@ def register_downloaded_model(
             "model_type": source["model_type"] or _text(old.get("model_type")) or _text(category),
             "architecture": architecture if architecture != "unknown" else _text(old.get("architecture")) or "unknown",
             "base_model": source["base_model"] or _text(old.get("base_model")),
-            "trigger_words_json": _json_dump(words, []),
-            "trigger_sources_json": _json_dump(sources, {}),
+            "trigger_words_json": _json_dump(words),
+            "trigger_sources_json": _json_dump(sources),
             "source_type": source["source_type"] or _text(old.get("source_type")),
             "source_model_id": source["source_model_id"] or _text(old.get("source_model_id")),
             "source_version_id": source["source_version_id"] or _text(old.get("source_version_id")),
             "source_version_name": source["source_version_name"] or _text(old.get("source_version_name")),
-            "details_json": _json_dump(details, {"links": [], "images": []}),
+            "details_json": _json_dump(details),
             "has_info": int(source["has_source"] or bool(old.get("has_info"))),
             "created_at": float(old.get("created_at") or now),
             "updated_at": now,
@@ -627,12 +471,8 @@ def register_downloaded_model(
             f"INSERT INTO models ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)}) "
             f"ON CONFLICT(real_path) DO UPDATE SET {update}"
         )
-        if conn is not None:
-            conn.execute(sql, params)
-            row = conn.execute("SELECT * FROM models WHERE real_path = ?", (str(path),)).fetchone()
-        else:
-            db.execute(sql, params)
-            row = db.fetch_one("SELECT * FROM models WHERE real_path = ?", (str(path),))
+        conn.execute(sql, params)
+        row = conn.execute("SELECT * FROM models WHERE real_path = ?", (str(path),)).fetchone()
     return _row_base(row) if row else {}
 
 
@@ -644,9 +484,8 @@ def enrich_model(
 ) -> dict:
     source = _normalize_source(source_data)
     now = time.time()
-    with _transaction() as conn:
-        fetch = (lambda sql, params=(): conn.execute(sql, params).fetchone()) if conn is not None else db.fetch_one
-        existing = fetch("SELECT * FROM models WHERE id = ?", (int(model_id),))
+    with db.transaction() as conn:
+        existing = conn.execute("SELECT * FROM models WHERE id = ?", (int(model_id),)).fetchone()
         if not existing:
             return {}
         old = dict(existing)
@@ -658,9 +497,7 @@ def enrich_model(
             source["civitai_words"],
             file_trigger_words or source["file_words"],
         )
-        details = _json_load(old.get("details_json", "{}"), {})
-        if not isinstance(details, dict):
-            details = {"links": [], "images": []}
+        details = json.loads(old["details_json"])
         if source["has_links"]:
             details["links"] = source["links"]
         if source["has_images"]:
@@ -674,43 +511,43 @@ def enrich_model(
             "model_type": source["model_type"] or _text(old.get("model_type")),
             "architecture": architecture or "unknown",
             "base_model": source["base_model"] or _text(old.get("base_model")),
-            "trigger_words_json": _json_dump(words, []),
-            "trigger_sources_json": _json_dump(sources, {}),
+            "trigger_words_json": _json_dump(words),
+            "trigger_sources_json": _json_dump(sources),
             "source_type": source["source_type"] or _text(old.get("source_type")),
             "source_model_id": source["source_model_id"] or _text(old.get("source_model_id")),
             "source_version_id": source["source_version_id"] or _text(old.get("source_version_id")),
             "source_version_name": source["source_version_name"] or _text(old.get("source_version_name")),
-            "details_json": _json_dump(details, {"links": [], "images": []}),
+            "details_json": _json_dump(details),
             "has_info": int(bool(source["has_source"]) or bool(old.get("has_info"))),
             "updated_at": now,
         }
         assignments = ", ".join(f"{key} = ?" for key in values)
         params = tuple(values.values()) + (int(model_id),)
-        if conn is not None:
-            conn.execute(f"UPDATE models SET {assignments} WHERE id = ?", params)
-            row = conn.execute("SELECT * FROM models WHERE id = ?", (int(model_id),)).fetchone()
-        else:
-            db.execute(f"UPDATE models SET {assignments} WHERE id = ?", params)
-            row = db.fetch_one("SELECT * FROM models WHERE id = ?", (int(model_id),))
+        conn.execute(f"UPDATE models SET {assignments} WHERE id = ?", params)
+        row = conn.execute("SELECT * FROM models WHERE id = ?", (int(model_id),)).fetchone()
     return _row_base(row) if row else {}
 
 
 def list_models(category: str | None = None) -> list[dict]:
-    sql = _list_select_sql()
+    sql = _list_select_sql() + " WHERE category != 'auxiliary'"
     params: tuple[Any, ...] = ()
     if category and category != "all":
-        sql += " WHERE category = ?"
+        sql += " AND category = ?"
         params = (_text(category),)
     sql += " ORDER BY updated_at DESC, id DESC"
     rows = db.fetch_all(sql, params)
-    return [_row_base(row) for row in rows]
+    models = [_row_base(row) for row in rows]
+    for model in models:
+        for field in ("trigger_words", "trigger_sources", "links", "images"):
+            model.pop(field, None)
+    return models
 
 
-def get_model_detail(model_id: int) -> dict | None:
+def get_model_detail(model_id: int, *, include_path: bool = False) -> dict | None:
     row = db.fetch_one("SELECT * FROM models WHERE id = ?", (int(model_id),))
     if not row:
         return None
-    return _row_base(row)
+    return _row_base(row, include_path=include_path)
 
 
 def get_generation_metadata(categories: list[str]) -> dict[tuple[str, str], dict]:
@@ -749,10 +586,8 @@ def get_generation_metadata(categories: list[str]) -> dict[tuple[str, str], dict
         # record when roots overlap and expose one generation option.
         if key in result:
             continue
-        details = _json_load(row["details_json"], {})
-        if not isinstance(details, dict):
-            details = {}
-        images = _normalize_images(details.get("images", []))[:6]
+        details = json.loads(row["details_json"])
+        images = details.get("images", [])[:6]
         preview = local_preview_path(row["real_path"])
         has_preview = bool(preview)
         result[key] = {
@@ -763,7 +598,7 @@ def get_generation_metadata(categories: list[str]) -> dict[tuple[str, str], dict
             "architecture": row["architecture"] or "unknown",
             "base_model": row["base_model"] or "",
             "sha256": row["sha256"] or "",
-            "trigger_words": _json_words(row["trigger_words_json"]),
+            "trigger_words": json.loads(row["trigger_words_json"]),
             "source_type": row["source_type"] or "",
             "source_model_id": row["source_model_id"] or "",
             "source_version_id": row["source_version_id"] or "",
@@ -878,7 +713,17 @@ def _scan_root(root: Path, category: str, storage_type: str) -> tuple[list[dict[
     return candidates, scan_ok
 
 
-def reconcile_model_index() -> dict:
+def reconcile_model_index(*, min_interval: float = 0) -> dict:
+    global _last_scan_time, _last_scan_result
+    with _scan_lock:
+        if _last_scan_result is not None and time.monotonic() - _last_scan_time < min_interval:
+            return _last_scan_result
+        _last_scan_result = _reconcile_model_index()
+        _last_scan_time = time.monotonic()
+        return _last_scan_result
+
+
+def _reconcile_model_index() -> dict:
     """Scan configured model roots and reconcile the SQLite model index."""
     candidates: dict[str, dict[str, Any]] = {}
     successful_roots: list[Path] = []
@@ -896,15 +741,14 @@ def reconcile_model_index() -> dict:
     enrich_ids: list[tuple[int, str]] = []
     rehashed_ids: list[int] = []
     now = time.time()
-    with _transaction() as conn:
-        if conn is not None:
-            existing_rows = conn.execute("SELECT * FROM models").fetchall()
-        else:
-            existing_rows = db.fetch_all("SELECT * FROM models")
+    with db.transaction() as conn:
+        existing_rows = conn.execute("SELECT * FROM models").fetchall()
         existing_by_path = {str(row["real_path"]): row for row in existing_rows}
 
         for real_path, candidate in candidates.items():
             old = existing_by_path.get(real_path)
+            if old and old["category"] == "auxiliary":
+                continue
             old_dict = dict(old) if old else {}
             # Architecture detection is relatively expensive. Existing
             # unchanged rows retain their value, including ``unknown``.
@@ -960,10 +804,7 @@ def reconcile_model_index() -> dict:
                 f"INSERT INTO models ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)}) "
                 f"ON CONFLICT(real_path) DO UPDATE SET {update}"
             )
-            if conn is not None:
-                conn.execute(sql, params)
-            else:
-                db.execute(sql, params)
+            conn.execute(sql, params)
             if old:
                 updated += 1
             else:
@@ -978,13 +819,12 @@ def reconcile_model_index() -> dict:
                 real_path = _resolve(row["real_path"])
                 if str(real_path) in candidate_paths:
                     continue
-                if any(_is_under(real_path, root) for root in successful_roots):
+                if row["category"] == "auxiliary" and real_path.is_file():
+                    continue
+                if row["category"] == "auxiliary" or any(_is_under(real_path, root) for root in successful_roots):
                     stale.append(int(row["id"]))
             for model_id in stale:
-                if conn is not None:
-                    conn.execute("DELETE FROM models WHERE id = ?", (model_id,))
-                else:
-                    db.execute("DELETE FROM models WHERE id = ?", (model_id,))
+                conn.execute("DELETE FROM models WHERE id = ?", (model_id,))
             removed = len(stale)
 
     for model_id in rehashed_ids:
@@ -995,7 +835,7 @@ def reconcile_model_index() -> dict:
     # so an unavailable mounted root is not queued accidentally.
     candidate_paths = set(candidates)
     for row in db.fetch_all(
-        "SELECT id, real_path FROM models WHERE has_info = 0 AND sha256 = ''"
+        "SELECT id, real_path FROM models WHERE has_info = 0 AND sha256 = '' AND category != 'auxiliary'"
     ):
         real_path = str(row["real_path"])
         if real_path in candidate_paths:

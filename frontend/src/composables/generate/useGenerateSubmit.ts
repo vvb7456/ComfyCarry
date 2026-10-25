@@ -291,7 +291,9 @@ export function useGenerateSubmit(
           duration_s: Math.round(v?.durationS ?? 5),  // 整数秒 4-15
           batch_size: 1,  // 视频不支持批量 (后端恒纠正为 1)
           seed,
-          steps: state.steps,  // CFG-distilled 无 cfg/speed; 默认 20
+          steps: state.steps,
+          sampler: state.sampler,
+          scheduler: state.scheduler,
           save_prefix: state.prefix,
           output_format: 'png',  // 通过后端 output_format 枚举校验; 视频走 SaveVideo, 该字段被忽略
           loras,
@@ -314,7 +316,9 @@ export function useGenerateSubmit(
           duration_s: Math.round(v?.durationS ?? 5),  // 整数秒 4-15
           batch_size: 1,  // 视频不支持批量
           seed,
-          steps: state.steps,  // CFG-distilled 无 cfg/speed; 默认 20
+          steps: state.steps,
+          sampler: state.sampler,
+          scheduler: state.scheduler,
           save_prefix: state.prefix,
           output_format: 'png',
           loras: [],  // Ref2VA 无 LoRA 支持 (契约固定空数组)
@@ -335,6 +339,10 @@ export function useGenerateSubmit(
         height: v?.height ?? state.height,
         batch_size: 1, // 视频不支持批量 (后端恒纠正为 1)
         seed,
+        steps: state.steps,
+        cfg: state.cfg,
+        sampler: state.sampler,
+        scheduler: state.scheduler,
         save_prefix: state.prefix,
         // output_format 仅对图像 WASImageSave 有效; 视频走 SaveVideo(mp4/h264), 该字段被忽略。
         // 传 'png' (图像默认) 以通过后端 output_format 枚举校验; mp4 锁定在 builder 端实现。
@@ -358,11 +366,6 @@ export function useGenerateSubmit(
       vpayload.duration_s = v?.durationS ?? 5
       if (is14b) {
         vpayload.speed = state.fast ? 'fast' : 'standard'
-        // 标准档才传 steps/cfg; 快速档后端丢弃 (builder 常量决定)
-        if (!state.fast) {
-          vpayload.steps = state.steps
-          vpayload.cfg = state.cfg
-        }
       }
       return vpayload
     }
@@ -463,6 +466,8 @@ export function useGenerateSubmit(
       payload.face_detailer_denoise = state.faceDetailer.denoise
       payload.face_detailer_steps = state.faceDetailer.steps
       payload.face_detailer_cfg = state.faceDetailer.cfg
+      payload.face_detailer_sampler = state.faceDetailer.sampler
+      payload.face_detailer_scheduler = state.faceDetailer.scheduler
       payload.face_detailer_guide_size = state.faceDetailer.guideSize
       payload.face_detailer_crop_factor = state.faceDetailer.cropFactor
       payload.face_detailer_bbox_threshold = state.faceDetailer.bboxThreshold

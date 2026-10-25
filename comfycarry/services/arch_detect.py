@@ -95,6 +95,7 @@ _BASE_MODEL_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("lens", ("lens",)),
     # Qwen 3.5 必须在通用 qwen 之前 ("Qwen 3.5" 含 "qwen")
     ("qwen35", ("qwen 3.5", "qwen3.5")),
+    ("qwen_image21", ("qwen image 2.1", "qwen-image-2.1", "qwen_image_2.1", "qwen_image21")),
     ("qwen", ("qwen",)),
     ("acestep", ("ace audio", "ace-step", "ace step")),
     ("svd", ("svd", "stable video")),
@@ -559,6 +560,18 @@ _ARCH_KEY_RULES: list[tuple[str, "Callable[[set[str], dict | None], bool]"]] = [
         and _shape_of(sh, "txt_norm.weight")[0] == 2560
         and _shape_of(sh, "proj_out.weight") is not None
         and _shape_of(sh, "proj_out.weight")[0] == 128),
+
+    # 2.1 单流 DiT 与旧 Qwen Image 的双流结构不兼容。
+    ("qwen_image21", lambda ks, sh: _has_sub(ks, "txt_in.text_norm.weight")
+        and _has_sub(ks, "modulation.1.weight")
+        and _has_sub(ks, "transformer_blocks.0.attn.norm_q.weight")
+        and (_has_sub(ks, "transformer_blocks.0.img_mlp.gate_up.weight")
+             or _has_sub(ks, "transformer_blocks.0.img_mlp.proj.weight"))),
+    ("qwen_image21", lambda ks, sh: _is_lora(ks)
+        and (_has_sub(ks, "transformer_blocks.0.img_mlp.gate_up.")
+             or _has_sub(ks, "transformer_blocks.0.img_mlp.proj.")
+             or _has_sub(ks, "transformer_blocks_0_img_mlp_gate_up")
+             or _has_sub(ks, "transformer_blocks_0_img_mlp_proj"))),
 
     # ── Qwen Image (ComfyUI L923: txt_norm.weight) ──
     #    必须在 Mage-Flow 之后 (Mage-Flow 也有 txt_norm 但靠 shape 区分)

@@ -61,8 +61,23 @@ def get_default_services() -> List[dict]:
     return services
 
 
-# 向后兼容: 其他模块 import DEFAULT_SERVICES 时获取检测结果
-DEFAULT_SERVICES = get_default_services()
+def get_custom_services() -> list[dict]:
+    from ..config import get_config
+    return json.loads(get_config("cf_custom_services", "") or "[]")
+
+
+def get_suffix_overrides() -> dict:
+    from ..config import get_config
+    return json.loads(get_config("cf_suffix_overrides", "") or "{}")
+
+
+def get_effective_services() -> list[dict]:
+    overrides = get_suffix_overrides()
+    defaults = [
+        {**service, "suffix": overrides.get(service["suffix"], service["suffix"]), "custom": False}
+        for service in get_default_services()
+    ]
+    return defaults + [{**service, "custom": True} for service in get_custom_services()]
 
 
 class CFAPIError(Exception):

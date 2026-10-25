@@ -5,8 +5,6 @@ import { useI18n } from 'vue-i18n'
 import { useExecTracker } from '@/composables/useExecTracker'
 import { useComfySSE } from '@/composables/useComfySSE'
 import { useToast, provideToastScope, muteToastScope, unmuteToastScope } from '@/composables/useToast'
-import { apiErrorText } from '@/utils/apiError'
-import { errorMessage } from '@/utils/errorMessage'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useGenerateStore } from '@/stores/generate'
 import { useDownloadsStore } from '@/stores/downloads'
@@ -57,7 +55,7 @@ const gate = useComfyGate()
 gate.checkNow()
 
 const gateIcon = computed(() => {
-  if (stateIncompatible.value) return 'warning'
+  if (store.saveError === 'reload_required') return 'warning'
   if (stateFailed.value) return 'error_outline'
   if (gate.state.value === 'error') return 'error_outline'
   if (gate.state.value === 'offline') return 'cloud_off'
@@ -65,7 +63,7 @@ const gateIcon = computed(() => {
 })
 
 const gateTitle = computed(() => {
-  if (stateIncompatible.value) return t('generate.gate.state_incompatible_title')
+  if (store.saveError === 'reload_required') return t('generate.gate.state_reload_title')
   if (stateFailed.value) return t('generate.gate.state_failed_title')
   const s = gate.state.value
   if (s === 'checking' || (s === 'ready' && !optionsReady.value)) return t('generate.gate.loading_state')
@@ -75,25 +73,25 @@ const gateTitle = computed(() => {
 })
 
 const gateMessage = computed(() => {
-  if (stateIncompatible.value) return t('generate.gate.state_incompatible_desc')
+  if (store.saveError === 'reload_required') return t('generate.gate.state_reload_desc')
   if (stateFailed.value) return t('generate.gate.state_failed_desc')
   const s = gate.state.value
   if (s === 'starting' || s === 'offline') return t('generate.preview.offline_desc')
   return undefined
 })
 
-/** 遮罩是否可见: gate 未就绪、状态装载未完成、或装载失败/版本过新 */
+/** 配置尚未就绪或需要重新装载时阻止编辑。 */
 const overlayVisible = computed(() =>
-  gate.state.value !== 'ready' || !optionsReady.value || stateFailed.value || stateIncompatible.value,
+  gate.state.value !== 'ready' || !optionsReady.value || stateFailed.value || store.saveError === 'reload_required',
 )
 
 /**
  * 遮罩内是否显示转圈。涵盖 gate 的 checking/starting 与「gate 已就绪但工作区
  * 配置尚未装载完」三种等待态; 可操作/错误态 (offline 的去向链接、装载失败的重试
- * 按钮、版本过新) 不显示, 避免与操作入口并列出现。
+ * 按钮、配置需重新装载) 不显示, 避免与操作入口并列出现。
  */
 const loadingVisible = computed(() => {
-  if (stateFailed.value || stateIncompatible.value) return false
+  if (stateFailed.value || store.saveError === 'reload_required') return false
   const s = gate.state.value
   if (s === 'checking' || s === 'starting') return true
   return s === 'ready' && !optionsReady.value
@@ -103,9 +101,8 @@ const options = useGenerateOptions()
 provide(GenerateOptionsKey, options)
 
 const optionsReady = ref(false)
-// 状态装载失败/版本过新: 保持遮罩可见并阻止自动保存 (见 initOptions)
+// 装载失败时阻止默认值自动回写。
 const stateFailed = ref(false)
-const stateIncompatible = ref(false)
 
 const missingModels = useMissingModels()
 
@@ -145,28 +142,19 @@ async function initOptions(forceRefresh = false) {
   }
   if (!options.loaded.value) return
   if (optionsReady.value) return
-  // 装载结果决定是否开启自动保存: 失败/版本过新时不得开启, 否则默认值会覆盖服务端。
+  // 装载失败时不得开启自动保存，否则默认值会覆盖服务端。
   const { outcome } = await store.restore({
-    checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
-    loraExists: (name) => options.loras.value.some(l => l.name === name),
-    unetExists: (name) => options.unets.value.some(u => u.name === name),
-    clipExists: (name) => options.clips.value.some(c => c.name === name),
-    vaeExists: (name) => options.vaes.value.some(v => v.name === name),
     samplerExists: (name) => options.samplers.value.includes(name),
     schedulerExists: (name) => options.schedulers.value.includes(name),
-    controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
-    seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
-    faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),
   })
-  if (outcome === 'failed' || outcome === 'incompatible') {
-    stateFailed.value = outcome === 'failed'
-    stateIncompatible.value = outcome === 'incompatible'
+  if (outcome === 'failed') {
+    stateFailed.value = true
     return
   }
   stateFailed.value = false
-  stateIncompatible.value = false
   // 取回指纹表 (表2): 缺失弹窗据此检索取货来源; 表非空即视为「本实例导入过配置」。
   await missingModels.loadHashes()
+  await store.checkMissingFiles()
   // 带工作区状态的导入视为「这个实例是从别处搬过来的」—— 用户已经会用本页,
   // 不再自动弹导览, 直接永久标记为已完成 (手动入口仍随时可用)。
   // 判据用指纹表而非 modelStates: 它只在导入路径上写入 (随配置包附带),
@@ -176,7 +164,6 @@ async function initOptions(forceRefresh = false) {
     clearTourAutoTimer()
   }
   store.enableAutoSave()
-  void store.save()
   optionsReady.value = true
   // 装载完成后才排定导览: 「是否导入过」此刻才确定, 早于此的定时器会先弹
   // 再标记, 导入过的用户仍会看到引导 (见 scheduleTourAuto 的说明)。
@@ -186,6 +173,7 @@ async function initOptions(forceRefresh = false) {
 /** 重试装载 (失败遮罩上的按钮) */
 function retryLoadState() {
   stateFailed.value = false
+  optionsReady.value = false
   void initOptions(false)
 }
 
@@ -445,40 +433,17 @@ async function reconcileDownloads() {
     do {
       reconcilePending = false
       await options.refresh()
-      await missingModels.checkFiles()
-      store.reconcileMissing({
-        loraExists: (name) => options.loras.value.some(l => l.name === name),
-        checkpointExists: (name) => options.checkpoints.value.some(c => c.name === name),
-        unetExists: (name) => options.unets.value.some(u => u.name === name),
-        clipExists: (name) => options.clips.value.some(c => c.name === name),
-        vaeExists: (name) => options.vaes.value.some(v => v.name === name),
-        controlNetExists: (type, name) => (options.controlnetModels.value[type] || []).includes(name),
-        seedvr2Exists: (name) => options.seedvr2Models.value.includes(name),
-        faceDetectionExists: (name) => options.ultralyticsBboxModels.value.includes(name),
-      })
+      await store.checkMissingFiles()
     } while (reconcilePending)
   } finally {
     reconciling = false
   }
 }
-let prevStates = new Map<string, string>()
-let statesInit = false
 watch(
-  () => new Map(downloads.resourceStates),
-  async (states) => {
-    // 首次收到快照时只记基线: 里面已有的 installed 是历史, 不是"刚下载完"
-    const becameInstalled = statesInit && [...states].some(
-      ([key, state]) => state === 'installed' && prevStates.get(key) !== 'installed',
-    )
-    prevStates = states
-    statesInit = true
-    if (becameInstalled) await reconcileDownloads().catch(() => {})
+  () => new Set(downloads.tasks.filter(task => task.status === 'complete').map(task => task.download_id)),
+  (ids, previous) => {
+    if ([...ids].some(id => !previous.has(id))) void reconcileDownloads().catch(() => {})
   },
-)
-
-watch(
-  () => downloads.tasks.filter(task => task.status === 'complete').map(task => task.download_id).join(','),
-  () => { void reconcileDownloads().catch(() => {}) },
 )
 
 const queueCount = computed(() => queueStore.queueCount)
@@ -538,12 +503,6 @@ async function handleStop() {
   toast(t('generate.msg.interrupt_sent'), 'info')
 }
 
-// 接线步骤 (前端取回再上传, 零新端点):
-//   1. 切任务 → video; 切条目 → wan22_i2v
-//   2. 用 /api/comfyui/view 取回该产物为 Blob → 转 File
-//   3. 走 /api/generate/upload_image (表单字段 type='video_ref') → 拿 input/ 下文件名
-//   4. 写入 store.currentState.video.refImage, 开启 followRef
-//   失败: 明确 toast, 不静默 (fetch 失败 / 上传失败 / 视频产物不可走 i2v)
 const VIDEO_RE = /\.(mp4|webm|mov|mkv|avi)$/i
 
 interface MakeVideoPayload {
@@ -564,45 +523,12 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
   store.switchTask('video')
   store.switchModelType(TARGET)
 
-  const viewParams = new URLSearchParams({
+  const copied = await post<{ filename: string }>('/api/generate/copy_output_image', {
     filename: payload.filename,
     subfolder: payload.subfolder || '',
     type: payload.type || 'output',
   })
-  const viewUrl = `/api/comfyui/view?${viewParams}`
-
-  let blob: Blob
-  try {
-    const res = await fetch(viewUrl)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    blob = await res.blob()
-  } catch (e: unknown) {
-    toast(`${t('generate.history.make_video')}: ${errorMessage(e) || 'fetch failed'}`, 'error')
-    return
-  }
-  // 从原文件名推导扩展名 (上传端点按 content_type 映射扩展名, 这里给 Blob 一个带扩展名的文件名)
-  const ext = (payload.filename.toLowerCase().match(/(\.[^.]+)$/)?.[1]) || '.png'
-  const file = new File([blob], `ref_${Date.now()}${ext}`, { type: blob.type || 'image/png' })
-
-  const form = new FormData()
-  form.append('file', file)
-  form.append('type', 'video_ref')
-  let uploadedName: string
-  try {
-    const upRes = await fetch('/api/generate/upload_image', { method: 'POST', body: form })
-    if (!upRes.ok) {
-      const body = await upRes.json().catch(() => ({}))
-      throw new Error(apiErrorText(body, `Upload failed (${upRes.status})`))
-    }
-    const upData = await upRes.json() as { filename?: string }
-    // 后端返回 200 但 body 缺 filename 时视为失败 —— 否则会写入 undefined 并误报成功,
-    // 用户随后在提交时才撞上「请先上传起始画面」, 与刚才的成功提示自相矛盾。
-    if (!upData.filename) throw new Error('upload response missing filename')
-    uploadedName = upData.filename
-  } catch (e: unknown) {
-    toast(`${t('generate.history.make_video')}: ${errorMessage(e) || 'upload failed'}`, 'error')
-    return
-  }
+  if (!copied) return
 
   // 取回与上传是异步的 (数百毫秒~数秒), 期间用户可能切走条目或切回图像任务 ——
   // 此时 store.currentState 已不是目标条目, 直接写会把参考图写到别处 (或静默丢弃却提示成功)。
@@ -612,7 +538,7 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     toast(`${t('generate.history.make_video')}: ${t('generate.errors.state_lost')}`, 'error')
     return
   }
-  target.video.refImage = uploadedName
+  target.video.refImage = copied.filename
   // 分辨率切到「贴合起始画面」哨兵。VideoSettings 挂载/收到尺寸后会重算实际宽高;
   // 这里先写哨兵, 保证即使用户此刻不在该 tab, 状态也已表达「按这张图的比例出片」。
   target.video.resolution = 'ref'
@@ -730,7 +656,7 @@ sse.start()
         :title="gateTitle"
         :message="gateMessage"
       >
-        <BaseButton v-if="stateFailed" size="sm" @click="retryLoadState">
+        <BaseButton v-if="stateFailed || store.saveError === 'reload_required'" size="sm" @click="retryLoadState">
           {{ t('common.btn.retry') }}
         </BaseButton>
         <router-link v-else-if="gate.state.value === 'offline'" to="/comfyui" class="gen-gate-link">
@@ -815,7 +741,7 @@ sse.start()
           <span
             v-if="store.saveError"
             class="gen-save-warn"
-            :title="t('generate.gate.save_state_failed')"
+            :title="t(store.saveError === 'reload_required' ? 'generate.gate.state_reload_desc' : 'generate.gate.save_state_failed')"
           >
             <MsIcon name="cloud_off" size="xs" />
           </span>

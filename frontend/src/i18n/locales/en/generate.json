@@ -8,9 +8,9 @@
     "loading_state": "Loading workspace configuration…",
     "state_failed_title": "Failed to load workspace configuration",
     "state_failed_desc": "Your configuration is still stored on the server and was not changed. You can retry.",
-    "state_incompatible_title": "Workspace configuration is from a newer version",
-    "state_incompatible_desc": "This configuration was saved by a newer panel version. Update the panel first to avoid overwriting it.",
-    "save_state_failed": "Workspace configuration could not be saved to the server; retrying"
+    "state_reload_title": "Workspace configuration was imported",
+    "state_reload_desc": "Reload the configuration before editing to avoid overwriting the imported settings.",
+    "save_state_failed": "Workspace configuration has not been saved. Check the server connection."
   },
   "header": {
     "queue_history": "Queue & History",
@@ -24,24 +24,35 @@
     "family_flux2": "Flux 2 series",
     "family_wan22": "Wan 2.2 series",
     "family_minimax_h3": "MiniMax H3 series",
+    "family_qwen_image21": "Qwen Image 2.1 series",
+    "family_anima": "Anima series",
+    "family_zimage": "Z-Image series",
     "not_ready": "Not ready",
     "back_to_all_models": "Back to all models"
   },
   "tabs": {
     "sdxl": "SDXL",
     "sd15": "SD 1.5",
-    "anima": "Anima",
+    "anima": "Anima Base",
+    "anima_turbo": "Anima Turbo",
     "flux": "Flux",
-    "krea2": "Krea 2",
-    "zimage": "Z-Image",
+    "krea2": "Krea 2 Turbo",
+    "qwen_image21": "Qwen Image 2.1",
+    "qwen_image21_turbo": "Qwen Image 2.1 Turbo",
+    "zimage": "Z-Image Base",
+    "zimage_turbo": "Z-Image Turbo",
     "flux1": "Flux 1.D",
+    "flux1_schnell": "Flux 1 Schnell",
     "chroma": "Chroma",
-    "flux2klein4b": "Flux 2 Klein 4B",
-    "flux2klein9b": "Flux 2 Klein 9B",
+    "flux2klein4b": "Flux 2 Klein 4B Distilled",
+    "flux2klein9b": "Flux 2 Klein 9B Distilled",
+    "flux2klein4b_base": "Flux 2 Klein 4B Base",
+    "flux2klein9b_base": "Flux 2 Klein 9B Base",
     "flux2dev": "Flux 2 Dev",
     "pony": "Pony",
     "illustrious": "Illustrious",
-    "noobai": "NoobAI",
+    "noobai": "NoobAI EPS",
+    "noobai_vpred": "NoobAI V-Pred",
     "wan22_i2v": "Wan 2.2 Image to Video",
     "wan22_t2v": "Wan 2.2 Text to Video",
     "wan22_5b": "Wan 2.2 5B Lite",
@@ -65,7 +76,7 @@
       "prompt_editor_title": "Visual tag editor with autocomplete and tag library"
     },
     "video_ph": "Describe how the scene moves: subject → action → camera → setting. e.g.: A girl turns and glances back, long hair flowing, camera slowly pushing in…",
-    "negative_video_ph": "A recommended negative prompt is built in — leave empty to use the default",
+    "negative_video_ph": "Describe unwanted content, such as blur, flickering, deformation or subtitles",
     "syntax_help_title": "Model prompt and random syntax help",
     "help_modal_title": "Prompt Help",
     "help": {
@@ -95,6 +106,19 @@
           "special": "masterpiece, best quality, score_7, safe, 1girl, character, series, {'@'}artist, red dress, outdoors",
           "negative": "Start from worst quality, low quality, score_1, score_2, score_3, artist name, blurry, jpeg artifacts, chromatic aberration, then tailor it to the scene."
         },
+        "qwen_image21": {
+          "title": "Qwen Image 2.1 (natural language)",
+          "format": "Describe the image in complete Chinese or English sentences. Preserve visible text verbatim in quotes.",
+          "order": "Subject → appearance and action → scene and composition → lighting, materials and style.",
+          "special": "A woman in a blue shirt standing by a window, natural light on her face, a half-body portrait with a softly blurred background.",
+          "negative": "Negative prompts are inactive at CFG 1; increase CFG to use exclusions."
+        },
+        "qwen_image21_turbo": {
+          "title": "Qwen Image 2.1 Turbo (natural language)",
+          "format": "Describe the image in complete Chinese or English sentences. Preserve visible text verbatim in quotes.",
+          "order": "Subject → appearance and action → scene and composition → lighting, materials and style.",
+          "special": "This is an RGBA image with transparency. A cute cartoon dragon sticker. The image has alpha channel and the background is transparent."
+        },
         "krea2": {
           "title": "Krea 2 (natural language)",
           "format": "Write a short natural-language paragraph (Chinese or English) with observable subjects, materials and setting; avoid Danbooru tag piles.",
@@ -107,7 +131,7 @@
           "format": "Use complete Chinese or English sentences describing the subject, action, spatial relationships and visible text.",
           "order": "Subject/count → appearance and action → scene → composition/text content → lighting and style.",
           "special": "The convenience store entrance on a rainy night, a red sign clearly reading \"Open\", wide street shot, wet ground reflecting the light.",
-          "negative": "Leave empty. Rewrite exclusions as the desired positive result."
+          "negative": "Base supports exclusions and unwanted visual artifacts. Turbo ignores negative prompts at CFG 1."
         },
         "flux1": {
           "title": "Flux 1 (natural language)",
@@ -128,14 +152,14 @@
           "format": "Use a natural-language paragraph: state the subject and relationships first, then materials, space, light and composition; avoid tag piles.",
           "order": "Subject/relationship → action → environment/material → lighting/color → camera and style.",
           "special": "A compact silver robot repairs a bicycle in a bright workshop, precise hand placement, clean overhead light, wide shot.",
-          "negative": "Leave empty. Describe the desired state with positive sentences."
+          "negative": "Base supports exclusions. Distilled models ignore negative prompts at CFG 1."
         },
         "flux2klein9b": {
           "title": "Flux 2 Klein 9B (natural language)",
           "format": "Use a natural-language paragraph: state the subject and relationships first, then materials, space, light and composition; avoid tag piles.",
           "order": "Subject/relationship → action → environment/material → lighting/color → camera and style.",
           "special": "A compact silver robot repairs a bicycle in a bright workshop, precise hand placement, clean overhead light, wide shot.",
-          "negative": "Leave empty. Describe the desired state with positive sentences."
+          "negative": "Base supports exclusions. Distilled models ignore negative prompts at CFG 1."
         },
         "flux2dev": {
           "title": "Flux 2 Dev (natural language)",
@@ -346,7 +370,7 @@
     "composing": "Composing video…",
     "stage": "Sampling · stage {i} / {n}",
     "download": "Download Video",
-    "speed_help": "Fast: 4 steps, negative prompt has no effect. Standard: 20 steps, finer detail, about 5x the time of Fast.",
+    "speed_help": "Fast loads the acceleration LoRA and starts at 4 steps, CFG 1. Standard starts at 20 steps, CFG 3.5. Sampling parameters remain independently adjustable.",
     "res_fit_option": "Fit start frame ({w}×{h})",
     "res_preset": "{w}×{h}",
     "res_help": "When the selected size has a different aspect ratio from the start frame, the start frame is center-cropped to fit.",
@@ -514,7 +538,7 @@
     "mask_sam": "SAM contour",
     "mask_mode_help": "Shape of the paste-back mask. Box: feathered rectangle from the detection box; SAM contour: facial-feature segmentation for a cleaner blend. Unavailable until the SAM weight is downloaded from this module’s setup page.",
     "advanced": "Advanced",
-    "cfg_help": "Default 7. Set to 1 for distilled models such as Krea2 / Z-Image / Flux.",
+    "cfg_help": "Starts with the main model's recommended CFG and can be adjusted independently.",
     "guide_size": "Guide size",
     "guide_size_help": "Target short-edge resolution of the upscaled face crop. Larger = more detail, slower.",
     "crop_factor": "Crop factor",

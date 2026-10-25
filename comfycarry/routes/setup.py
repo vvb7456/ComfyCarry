@@ -8,7 +8,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from ..config import (
     DEFAULT_PLUGINS, SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
-    SETUP_STATE_FILE, _RCLONE_TOKEN_RE,
+    _RCLONE_TOKEN_RE,
     normalize_remote_root_dir,
     _load_setup_state, _save_setup_state,
     get_config,
@@ -18,6 +18,7 @@ from ..services.deploy_engine import (
     _detect_gpu_info, _read_prebuilt_info,
 )
 from ..services import wizard_draft
+from ..services.llm_engine import get_llm_config, save_llm_config
 
 bp = Blueprint("setup", __name__)
 _deploy_submit_lock = threading.Lock()
@@ -26,10 +27,8 @@ _deploy_submit_lock = threading.Lock()
 # 响应文案 —— key + params, 前端按 `<prefix>.<key>` 翻译
 # 默认 prefix 为 `setup.err`，deploy 端点保留 `wizard.err`
 def _err(key: str, status: int = 400, /, *, prefix: str = "setup.err", _extra: dict | None = None, **params):
-    body = {"error_key": f"{prefix}.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+    from ..utils import api_err
+    return api_err(prefix.removesuffix(".err"), key, status, _extra=_extra, **params)
 
 
 @bp.route("/api/setup/state")
@@ -42,6 +41,8 @@ def api_setup_state():
     safe = {k: v for k, v in state.items()}
     safe["rclone_config_value"] = ""
     safe["wizard_remotes"] = _draft_safe()
+    llm_config = get_llm_config()
+    safe.update({f"llm_{key}": llm_config[key] for key in ("provider", "api_key", "base_url", "model")})
     safe["plugins_available"] = DEFAULT_PLUGINS
     safe["gpu_info"] = _detect_gpu_info()
     safe["detected_image_type"] = "prebuilt" if _read_prebuilt_info() else "unsupported"
@@ -103,7 +104,6 @@ def _apply_deploy_plan(state, data):
         "wizard_sync_rules",
         "_imported_sync_rules", "_imported_sync_rules_count",
         "ssh_keys", "ssh_pw_follow",
-        "llm_provider", "llm_api_key", "llm_base_url", "llm_model",
     ]
     for k in plan_keys:
         if k in data:
@@ -119,26 +119,11 @@ def _apply_deploy_plan(state, data):
 
 
 def _persist_llm_config(data):
-    if data.get("llm_provider") or data.get("llm_api_key"):
-        from ..config import get_config, set_config
-        if data.get("llm_provider"):
-            set_config("llm_provider", data["llm_provider"])
-        if data.get("llm_api_key"):
-            set_config("llm_api_key", data["llm_api_key"])
-        if "llm_base_url" in data:
-            set_config("llm_base_url", data["llm_base_url"])
-        if data.get("llm_model"):
-            set_config("llm_model", data["llm_model"])
-        provider = data.get("llm_provider", "")
-        api_key = data.get("llm_api_key", "")
-        if provider and api_key:
-            keys = get_config("llm_provider_keys", {})
-            keys[provider] = {
-                "api_key": api_key,
-                "model": data.get("llm_model", ""),
-                "base_url": data.get("llm_base_url", ""),
-            }
-            set_config("llm_provider_keys", keys)
+    save_llm_config({
+        key: data[f"llm_{key}"]
+        for key in ("provider", "api_key", "base_url", "model")
+        if f"llm_{key}" in data
+    })
 
 
 def _draft_safe() -> list[dict]:

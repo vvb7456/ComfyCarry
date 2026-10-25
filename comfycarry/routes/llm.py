@@ -1,7 +1,9 @@
+from functools import partial
 import logging
 
 from flask import Blueprint, Response, jsonify, request
 
+from ..utils import api_err
 from ..services.llm_engine import (
     PROVIDER_CAPABILITIES,
     PROVIDER_REGISTRY,
@@ -31,11 +33,7 @@ _MAX_INPUT_LEN = 2000
 # 回中文成品文案的话英文 locale 下会直接冒中文。ok:false 保留 —— 这几个
 # 消费方都按 ok 分支, 不看状态码。
 # ====================================================================
-def _err(key: str, status: int = 400, /, **params):
-    """错误响应。形参位置化 (`/`): 插值参数里有 provider / target 之外还可能
-    有 key / status 这种名字, 不然会和函数自己的形参撞车。"""
-    return jsonify({"ok": False, "error_key": f"llm.err.{key}",
-                    "error_params": params}), status
+_err = partial(api_err, "llm", _extra={"ok": False})
 
 
 def _exc_err(e: Exception, status: int = 500):

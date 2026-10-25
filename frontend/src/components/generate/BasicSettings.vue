@@ -202,7 +202,7 @@ watch(() => state.value.resolution, (v) => {
                   :model-value="state.width"
                   :min="64"
                   :max="4096"
-                  :step="8"
+                  :step="config.resolutionStep ?? 8"
                   :disabled="disabled"
                   :placeholder="t('generate.basic.width')"
                   center
@@ -213,7 +213,7 @@ watch(() => state.value.resolution, (v) => {
                   :model-value="state.height"
                   :min="64"
                   :max="4096"
-                  :step="8"
+                  :step="config.resolutionStep ?? 8"
                   :disabled="disabled"
                   :placeholder="t('generate.basic.height')"
                   center

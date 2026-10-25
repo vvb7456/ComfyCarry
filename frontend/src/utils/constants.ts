@@ -54,6 +54,7 @@ export const MODEL_CATEGORY_COLORS: Record<string, string> = {
   loras: '#60a5fa',
   embeddings: '#22d3ee',
   controlnet: '#fb923c',
+  model_patches: '#fb923c',
   vae: '#22c55e',
   upscale_models: '#a855f7',
   // ── 本地索引实际出现的功能件目录 (此前无色 → 灰 badge 误读为"状态未知") ──
@@ -121,6 +122,7 @@ export const MODEL_CATEGORY_LABELS: Record<string, string> = {
   embeddings: 'Embedding',
   hypernetworks: 'Hypernetwork',
   controlnet: 'ControlNet',
+  model_patches: 'Model Patch',
   vae: 'VAE',
   upscale_models: 'Upscaler',
   text_encoders: 'Text Encoder',

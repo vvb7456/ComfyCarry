@@ -35,13 +35,7 @@ class WorkflowBuilder:
 
     @staticmethod
     def _ref(ref, default_idx: int = 0) -> list:
-        """
-        - str:        旧 SDXL 调用风格，按 default_idx 解释。例如:
-                        CLIP 默认 1 (CheckpointLoaderSimple),
-                        VAE 默认 2 (CheckpointLoaderSimple),
-                        MODEL 默认 0.
-        - tuple/list: 显式 (node_id, output_index)，用于独立 loader (UNETLoader, CLIPLoader, VAELoader)。
-        """
+        """节点 ID 使用该输入的默认端口；多输出节点可显式指定 (ID, 端口)。"""
         if isinstance(ref, (tuple, list)):
             return [ref[0], int(ref[1])]
         return [ref, default_idx]
@@ -167,6 +161,62 @@ class WorkflowBuilder:
         }
         return nid
 
+    def add_qwen_image21_conditioning(self, clip_ref, prompt: str,
+                                      negative_prompt: str) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "TextEncodeQwenImage21",
+            "inputs": {
+                "clip": self._ref(clip_ref, default_idx=1), "prompt": prompt,
+                "negative_prompt": negative_prompt, "resolution": 1024,
+            },
+        }
+        return nid
+
+    def add_qwen_image21_cache(self, model_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "QwenImage21Cache",
+            "inputs": {"model": self._ref(model_ref), "device": "auto", "dtype": "default"},
+        }
+        return nid
+
+    def add_manual_sigmas(self, sigmas: str) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "ManualSigmas", "inputs": {"sigmas": sigmas}}
+        return nid
+
+    def add_split_sigmas_denoise(self, sigmas_ref, denoise: float) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SplitSigmasDenoise",
+            "inputs": {"sigmas": self._ref(sigmas_ref), "denoise": denoise},
+        }
+        return nid
+
+    def add_sigma_scheduler(self, sigmas_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "ComfyCarrySigmaScheduler",
+            "inputs": {"sigmas": self._ref(sigmas_ref)},
+        }
+        return nid
+
+    def add_join_image_alpha(self, image_ref, alpha_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "JoinImageWithAlpha",
+            "inputs": {"image": self._ref(image_ref), "alpha": self._ref(alpha_ref)},
+        }
+        return nid
+
+    def add_split_image_alpha(self, image_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SplitImageWithAlpha", "inputs": {"image": self._ref(image_ref)},
+        }
+        return nid
+
     def add_empty_latent(
         self, width: int, height: int, batch_size: int = 1,
         class_type: str = "EmptyLatentImage",
@@ -208,11 +258,11 @@ class WorkflowBuilder:
         positive_ref,
         negative_ref,
         latent_node_id: str,
-        seed: int = -1,
-        steps: int = 20,
-        cfg: float = 7.0,
-        sampler: str = "euler",
-        scheduler: str = "normal",
+        seed: int,
+        steps: int,
+        cfg: float,
+        sampler: str,
+        scheduler: str,
         denoise: float = 1.0,
     ) -> str:
         """
@@ -255,7 +305,7 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_ksampler_select(self, sampler_name: str = "euler") -> str:
+    def add_ksampler_select(self, sampler_name: str) -> str:
         """
         KSamplerSelect — 选择采样器 (Flux2 采样链, 与 KSampler 分离)。
         输出: [node_id, 0]=SAMPLER
@@ -303,7 +353,7 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_flux_guidance(self, conditioning_ref, guidance: float = 4.0) -> str:
+    def add_flux_guidance(self, conditioning_ref, guidance: float) -> str:
         """
         FluxGuidance — Flux2 dev 模式 guidance 调整 (插入到正向 conditioning 链)。
         输出: [node_id, 0]=CONDITIONING
@@ -509,15 +559,15 @@ class WorkflowBuilder:
         positive_ref,
         negative_ref,
         latent_ref,
-        add_noise: bool = True,
-        steps: int = 20,
-        cfg: float = 7.0,
-        sampler: str = "euler",
-        scheduler: str = "normal",
-        start_at_step: int = 0,
-        end_at_step: int = 20,
-        return_with_leftover_noise: bool = False,
-        seed: int = -1,
+        add_noise: bool,
+        steps: int,
+        cfg: float,
+        sampler: str,
+        scheduler: str,
+        start_at_step: int,
+        end_at_step: int,
+        return_with_leftover_noise: bool,
+        seed: int,
     ) -> str:
         """
         KSamplerAdvanced — 双段采样核心 (Wan 14B 高噪/低噪分链)。
@@ -925,6 +975,22 @@ class WorkflowBuilder:
         }
         return nid
 
+    def add_grow_mask(self, mask_ref, expand: int) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "GrowMask",
+            "inputs": {"mask": self._ref(mask_ref), "expand": expand, "tapered_corners": True},
+        }
+        return nid
+
+    def add_set_latent_noise_mask(self, samples_ref, mask_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {
+            "class_type": "SetLatentNoiseMask",
+            "inputs": {"samples": self._ref(samples_ref), "mask": self._ref(mask_ref)},
+        }
+        return nid
+
     def add_vae_encode_for_inpaint(
         self,
         image_node_id: str,
@@ -1027,17 +1093,19 @@ class WorkflowBuilder:
         positive_ref,
         negative_ref,
         bbox_detector_ref,
+        *,
         sam_model_ref=None,
-        seed: int = -1,
-        steps: int = 20,
-        cfg: float = 7.0,
-        sampler: str = "euler",
-        scheduler: str = "normal",
-        denoise: float = 0.35,
+        seed: int,
+        steps: int,
+        cfg: float,
+        sampler: str,
+        scheduler: str,
+        denoise: float,
         guide_size: int = 768,
         crop_factor: float = 1.8,
         bbox_threshold: float = 0.5,
         feather: int = 5,
+        scheduler_func_ref=None,
     ) -> str:
         """
         FaceDetailer (Impact Pack) — 检测人脸 → 裁切放大 → 局部低 denoise 重绘 → 贴回。
@@ -1086,6 +1154,8 @@ class WorkflowBuilder:
         }
         if sam_model_ref is not None:
             inputs["sam_model_opt"] = self._ref(sam_model_ref, default_idx=0)
+        if scheduler_func_ref is not None:
+            inputs["scheduler_func_opt"] = self._ref(scheduler_func_ref)
         self._nodes[nid] = {"class_type": "FaceDetailer", "inputs": inputs}
         return nid
 
@@ -1292,22 +1362,20 @@ def _add_face_detailer_chain(
     positive,
     negative,
     params: dict,
-    defaults: dict,
 ) -> str:
     """
     面部重绘链路 (SDXL / split 共用):
       UltralyticsDetectorProvider → [SAMLoader] → FaceDetailer
     face_detailer_prompt 非空 → 用主链末端 clip_ref 独立编码; 空 → 复用主 positive 引用。
-    sampler/scheduler 跟随主采样 (defaults 由调用方按架构注入); cfg 独立参数, 缺省 7.0。
     返回修脸后的 IMAGE 节点 id。
     """
-    detection_model = str(params.get("face_detailer_model", "face_yolov8m.pt")).strip()
+    detection_model = str(params["face_detailer_model"]).strip()
     # 只留文件名, 防路径注入; builder 统一拼 ComfyUI 枚举所需的 bbox/ 前缀
     detection_model = detection_model.replace("\\", "/").split("/")[-1] or "face_yolov8m.pt"
     bbox = b.add_ultralytics_detector(f"bbox/{detection_model}")
 
     sam = None
-    if bool(params.get("face_detailer_use_sam", False)):
+    if bool(params["face_detailer_use_sam"]):
         sam = b.add_sam_loader("sam_vit_b_01ec64.pth", device_mode="AUTO")
 
     face_prompt = str(params.get("face_detailer_prompt", "")).strip()
@@ -1315,13 +1383,23 @@ def _add_face_detailer_chain(
         b.add_clip_text_encode(face_prompt, clip_ref) if face_prompt else positive
     )
 
-    denoise = max(0.1, min(float(params.get("face_detailer_denoise", 0.35)), 1.0))
-    steps = max(1, min(int(params.get("face_detailer_steps", 20)), 100))
-    cfg = max(1.0, min(float(params.get("face_detailer_cfg", 7.0)), 20.0))
-    guide_size = max(256, min(int(params.get("face_detailer_guide_size", 768)), 2048))
-    crop_factor = max(1.0, min(float(params.get("face_detailer_crop_factor", 1.8)), 4.0))
-    bbox_threshold = max(0.1, min(float(params.get("face_detailer_bbox_threshold", 0.5)), 0.9))
-    feather = max(0, min(int(params.get("face_detailer_feather", 5)), 100))
+    denoise = float(params["face_detailer_denoise"])
+    steps = int(params["face_detailer_steps"])
+    cfg = float(params["face_detailer_cfg"])
+    guide_size = int(params["face_detailer_guide_size"])
+    crop_factor = float(params["face_detailer_crop_factor"])
+    bbox_threshold = float(params["face_detailer_bbox_threshold"])
+    feather = int(params["face_detailer_feather"])
+    sampler = str(params["face_detailer_sampler"])
+    scheduler = str(params["face_detailer_scheduler"])
+    scheduler_func = None
+    if scheduler == "qwen_image21_turbo":
+        sigmas = b.add_manual_sigmas(QWEN_IMAGE21_TURBO_SIGMAS)
+        if denoise < 1.0:
+            sigmas = (b.add_split_sigmas_denoise(sigmas, denoise), 1)
+        scheduler_func = b.add_sigma_scheduler(sigmas)
+        # Impact 内部还会截取序列；这里已按去噪强度截好，传完整区间避免重复截取。
+        steps, denoise, scheduler = 8, 1.0, "simple"
 
     return b.add_face_detailer(
         image,
@@ -1332,16 +1410,17 @@ def _add_face_detailer_chain(
         negative,
         bbox,
         sam_model_ref=sam,
-        seed=int(params.get("seed", -1)),
+        seed=int(params["seed"]),
         steps=steps,
         cfg=cfg,
-        sampler=str(defaults.get("sampler", "euler")),
-        scheduler=str(defaults.get("scheduler", "normal")),
+        sampler=sampler,
+        scheduler=scheduler,
         denoise=denoise,
         guide_size=guide_size,
         crop_factor=crop_factor,
         bbox_threshold=bbox_threshold,
         feather=feather,
+        scheduler_func_ref=scheduler_func,
     )
 
 
@@ -1380,7 +1459,7 @@ def _add_upscale_chain(
             decoded,
             dit,
             vae,
-            seed=int(params.get("seed", -1)),
+            seed=int(params["seed"]),
             resolution=resolution,
             color_correction=color_correction,
             input_noise_scale=input_noise,
@@ -1390,11 +1469,8 @@ def _add_upscale_chain(
     upscale_mode = str(params.get("upscale_mode", "4x_overlapped_checkboard"))
     if upscale_mode not in ("4x", "4x_overlapped_checkboard", "4x_overlapped_constant"):
         upscale_mode = "4x_overlapped_checkboard"
-    # 兼容两组 key: 前端历史上发 upscale_tile / upscale_downscale
-    upscale_tile = int(params.get("upscale_tile_batch_size", params.get("upscale_tile", 8)))
-    downscale_method = str(
-        params.get("upscale_downscale_method", params.get("upscale_downscale", "lanczos"))
-    )
+    upscale_tile = int(params.get("upscale_tile_batch_size", 8))
+    downscale_method = str(params.get("upscale_downscale_method", "lanczos"))
     if downscale_method not in ("lanczos", "bicubic", "bilinear", "area", "nearest-exact"):
         downscale_method = "lanczos"
     aurasr = b.add_aurasr_upscale(
@@ -1427,20 +1503,15 @@ def build_sdxl_workflow(params: dict) -> dict:
         height          (int)       — 高度，默认 1024
         batch_size      (int)       — 批量生成数量，默认 1（最多 16）
         seed            (int)       — 种子，-1 = 随机，默认 -1
-        steps           (int)       — 采样步数，默认 20
-        cfg             (float)     — CFG scale，默认 7.0
-        sampler         (str)       — 采样器，默认 "euler"
-        scheduler       (str)       — 调度器，默认 "normal"
+        steps / cfg / sampler / scheduler — 前端必传的采样参数
         save_prefix     (str)       — 文件名前缀，默认 "ComfyCarry"
         loras           (list)      — LoRA 列表: [{name, strength}, ...]
-                                      （也兼容旧格式: lora_name + lora_strength）
         upscale_enabled (bool)      — 是否启用 AI 放大 (Phase 2)
         upscale_engine  (str)       — 放大引擎: aurasr (默认) / seedvr2
         upscale_factor  (float)     — 放大倍率 1.5-4，默认 2 (两引擎共用)
         upscale_mode    (str)       — [aurasr] 放大模式: 4x / 4x_overlapped_checkboard / 4x_overlapped_constant
-        upscale_tile_batch_size (int) — [aurasr] 分块大小 1-32，默认 8 (兼容旧 key upscale_tile)
+        upscale_tile_batch_size (int) — [aurasr] 分块大小 1-32，默认 8
         upscale_downscale_method (str) — [aurasr] 缩放算法: lanczos / bicubic / bilinear / area / nearest-exact
-                                      (兼容旧 key upscale_downscale)
         upscale_svr_model (str)     — [seedvr2] DiT 权重文件名，白名单见 SEEDVR2_DIT_MODELS
         upscale_svr_color_correction (str) — [seedvr2] 色彩校正: lab(默认)/wavelet/wavelet_adaptive/hsv/adain/none
         upscale_svr_input_noise (float)  — [seedvr2] 输入噪声 0-1，默认 0
@@ -1453,11 +1524,8 @@ def build_sdxl_workflow(params: dict) -> dict:
         hires_enabled   (bool)      — 是否启用二次采样
         hires_scale     (float)     — 二次采样潜空间放大倍率 (1.0-2.0)，默认 1.5；1.0 = 不放大只精修
         hires_upscale_method (str)  — 潜空间插值: bislerp(默认)/bicubic/bilinear/area/nearest-exact
-        hires_denoise   (float)     — 二次采样去噪强度 (0.1-1.0)，默认 0.4
-        hires_steps     (int)       — 二次采样步数 (1-100)，默认 20
-        hires_cfg       (float)     — 二次采样 CFG scale，默认 7.0
-        hires_sampler   (str)       — 二次采样采样器，默认 "euler"
-        hires_scheduler (str)       — 二次采样调度器，默认 "normal"
+        hires_denoise / hires_steps / hires_cfg / hires_sampler / hires_scheduler
+                                    — 启用二次采样时由前端完整传入
         hires_seed      (int)       — 二次采样种子，-1 = 随机
         i2i_image       (str)       — 图生图: 已上传到 ComfyUI input/ 的图片文件名 (启用时替换 EmptyLatentImage)
         i2i_denoise     (float)     — 图生图去噪强度 (0.10-0.90)，默认 0.7，值越低越贴近原图
@@ -1541,11 +1609,11 @@ def build_sdxl_workflow(params: dict) -> dict:
         mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
         grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
         latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
-        i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
+        i2i_denoise = float(params["inpaint_denoise"])
     elif i2i_image:
         i2i_load = b.add_load_image(i2i_image)
         latent = b.add_vae_encode(i2i_load, vae_ref)
-        i2i_denoise = max(0.10, min(float(params.get("i2i_denoise", 0.7)), 0.90))
+        i2i_denoise = float(params["i2i_denoise"])
     else:
         latent = b.add_empty_latent(
             int(params.get("width", 1024)),
@@ -1558,11 +1626,11 @@ def build_sdxl_workflow(params: dict) -> dict:
         pos_ref,
         neg_ref,
         latent,
-        seed=int(params.get("seed", -1)),
-        steps=int(params.get("steps", 20)),
-        cfg=float(params.get("cfg", 7.0)),
-        sampler=str(params.get("sampler", "euler")),
-        scheduler=str(params.get("scheduler", "normal")),
+        seed=int(params["seed"]),
+        steps=int(params["steps"]),
+        cfg=float(params["cfg"]),
+        sampler=str(params["sampler"]),
+        scheduler=str(params["scheduler"]),
         denoise=i2i_denoise,
     )
 
@@ -1575,17 +1643,17 @@ def build_sdxl_workflow(params: dict) -> dict:
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
     upscale_enabled = bool(params.get("upscale_enabled", False))
-    hires_scale = max(1.0, min(float(params.get("hires_scale", 1.5)), 2.0))
-    hires_method = str(params.get("hires_upscale_method", "bislerp"))
 
     final_image = decoded
     if hires_enabled:
-        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
-        hires_steps = max(1, min(int(params.get("hires_steps", 20)), 100))
-        hires_cfg = max(1.0, min(float(params.get("hires_cfg", 7.0)), 20.0))
-        hires_sampler = str(params.get("hires_sampler", "euler"))
-        hires_scheduler = str(params.get("hires_scheduler", "normal"))
-        hires_seed = int(params.get("hires_seed", -1))
+        hires_scale = float(params["hires_scale"])
+        hires_method = str(params["hires_upscale_method"])
+        hires_denoise = float(params["hires_denoise"])
+        hires_steps = int(params["hires_steps"])
+        hires_cfg = float(params["hires_cfg"])
+        hires_sampler = str(params["hires_sampler"])
+        hires_scheduler = str(params["hires_scheduler"])
+        hires_seed = int(params["hires_seed"])
         hires_latent = b.add_vae_encode(final_image, vae_ref)
         if hires_scale > 1.0:
             hires_latent = b.add_latent_upscale_by(hires_latent, hires_scale, method=hires_method)
@@ -1604,15 +1672,11 @@ def build_sdxl_workflow(params: dict) -> dict:
         final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
     if face_enabled:
-        _face_defaults = {
-            "sampler": str(params.get("sampler", "euler")),
-            "scheduler": str(params.get("scheduler", "normal")),
-        }
         # 修脸是局部裁切重绘, 而 ControlNet 控制图是整图 (不随裁切同步) ->
         # 不接 CN 条件, 恒用原始正/负提示词, 避免控制图被压进脸部裁切。
         final_image = _add_face_detailer_chain(
             b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
-            params, _face_defaults,
+            params,
         )
 
     if upscale_enabled:
@@ -1647,57 +1711,62 @@ def build_sdxl_workflow(params: dict) -> dict:
     return b.build()
 
 
+QWEN_IMAGE21_TURBO_SIGMAS = "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0"
+
 # 分离式三件套 (UNet + 单 CLIP + VAE) 架构的差异化参数。
 # 新增同构架构 (未来 flux 单 TE 变体等) 在此加 profile + _BUILDERS 注册即可。
 _SPLIT_ARCH_PROFILES = {
-    # Anima (CircleStone Labs, 2B): 实测 er_sde/simple/30步/cfg4
-    "anima": {"clip_type": "stable_diffusion", "steps": 30, "cfg": 4.0,
-              "sampler": "er_sde", "scheduler": "simple"},
-    # Krea 2 (12B SingleStreamDiT): 官方 Turbo 模板 image_krea2_turbo_t2i.json
-    # 实测值 euler/simple/8步/cfg1.0 (cfg=1 等效禁用 CFG; Raw 用户自行调参)
-    "krea2": {"clip_type": "krea2", "steps": 8, "cfg": 1.0,
-              "sampler": "euler", "scheduler": "simple"},
-    # Z-Image Turbo 官方模板 image_z_image_turbo.json 实测值
-    # (Base 用户手动调 25/4.0; ModelSamplingAuraFlow 接在 MODEL 链路 shift=3.0;
-    #  Lumina2 族 CLIPLoader type=lumina2; latent 用 EmptySD3LatentImage 16ch)
-    "zimage": {"clip_type": "lumina2", "steps": 8, "cfg": 1.0,
-               "sampler": "res_multistep", "scheduler": "simple",
+    "anima": {"clip_type": "stable_diffusion"},
+    "krea2": {"clip_type": "krea2"},
+    "qwen_image21": {"clip_type": "qwen_image", "latent_stride": 16},
+    "qwen_image21_turbo": {"clip_type": "qwen_image", "latent_stride": 16},
+    "zimage": {"clip_type": "lumina2",
                "latent_class": "EmptySD3LatentImage",
                "model_sampling": {"class": "auraflow", "shift": 3.0}},
-    # Flux1 dev 官方模板 flux_dev_full_text_to_image.json 实测值
-    # (双 CLIP: clip_l + t5xxl, DualCLIPLoader type=flux;
-    #  EmptySD3LatentImage 16ch; 无 ModelSamplingAuraFlow)
-    "flux1": {"dual_clip_type": "flux", "steps": 20, "cfg": 1.0,
-              "sampler": "euler", "scheduler": "simple",
+    "flux1": {"dual_clip_type": "flux",
               "latent_class": "EmptySD3LatentImage",
               "controlnet": True},
-    # Chroma (flux schnell 衍生, 单 T5 + 真 CFG + 负面)
-    # CLIPLoader type=chroma; 不设 dual_clip_type → 单 CLIP 路径
-    # 默认 26 步 / cfg 4.0 / euler / simple; EmptySD3LatentImage 16ch
-    "chroma": {"clip_type": "chroma", "steps": 26, "cfg": 4.0,
-               "sampler": "euler", "scheduler": "simple",
-               "latent_class": "EmptySD3LatentImage"},
+    "chroma": {"clip_type": "chroma", "latent_class": "EmptySD3LatentImage",
+               "model_sampling": {"class": "auraflow", "shift": 1.0}},
     # Flux2 (dev/klein) — 独立 builder (SamplerCustomAdvanced + Flux2Scheduler), 此 profile
     # 仅用于 _SPLIT_ARCH_PROFILES 注册 (arch 检测 + 加载层标识)。采样不经过 build_split_workflow。
     # latent=EmptyFlux2LatentImage (128ch, /16, step16); 单 CLIP (type=flux2)。
-    "flux2": {"clip_type": "flux2", "steps": 20, "cfg": 4.0,
-              "sampler": "euler", "scheduler": "simple",
+    "flux2": {"clip_type": "flux2",
               "latent_class": "EmptyFlux2LatentImage"},
 }
 
 
+def _add_split_sampler(
+    b: WorkflowBuilder, model_ref, positive_ref, negative_ref, latent_ref,
+    *, seed: int, steps: int, cfg: float, sampler: str, scheduler: str, denoise: float,
+) -> str:
+    if scheduler != "qwen_image21_turbo":
+        return b.add_ksampler(
+            model_ref, positive_ref, negative_ref, latent_ref,
+            seed=seed, steps=steps, cfg=cfg, sampler=sampler, scheduler=scheduler, denoise=denoise,
+        )
+
+    sigmas = b.add_manual_sigmas(QWEN_IMAGE21_TURBO_SIGMAS)
+    if denoise < 1.0:
+        sigmas = (b.add_split_sigmas_denoise(sigmas, denoise), 1)
+    noise = b.add_random_noise(seed)
+    guider = b.add_cfg_guider(model_ref, positive_ref, negative_ref, cfg)
+    selected_sampler = b.add_ksampler_select(sampler)
+    return b.add_sampler_custom_advanced(noise, guider, selected_sampler, sigmas, latent_ref)
+
+
 def build_split_workflow(params: dict, arch: str) -> dict:
     """
-    构建分离式架构 (UNet + CLIP + VAE) 工作流 — 参数按架构 profile 驱动。
+    构建分离式架构 (UNet + CLIP + VAE) 工作流，profile 描述加载方式与潜空间。
 
     支持架构 (见 _SPLIT_ARCH_PROFILES):
-      - anima:  CircleStone Labs 2B, CLIPLoader type=stable_diffusion, er_sde/simple/30步/cfg4
-      - krea2:  Krea 2 12B SingleStreamDiT, CLIPLoader type=krea2, euler/simple/8步/cfg1.0
+      - anima:  CircleStone Labs 2B, CLIPLoader type=stable_diffusion
+      - krea2:  Krea 2 12B SingleStreamDiT, CLIPLoader type=krea2
       - zimage: Z-Image (Tongyi/阿里, 6B 单流 DiT), CLIPLoader type=lumina2,
-                res_multistep/simple/8步/cfg1.0, ModelSamplingAuraFlow(shift=3) 接 MODEL 链,
+                ModelSamplingAuraFlow(shift=3) 接 MODEL 链,
                 latent=EmptySD3LatentImage
       - flux1:  Flux 1 dev, DualCLIPLoader type=flux (clip_l + t5xxl 双 TE),
-                euler/simple/20步/cfg1.0, latent=EmptySD3LatentImage
+                latent=EmptySD3LatentImage
 
     节点拓扑 (各架构同构, 按 profile 差异化加载):
       UNETLoader(unet_name, weight_dtype="default")
@@ -1709,7 +1778,7 @@ def build_split_workflow(params: dict, arch: str) -> dict:
       CLIPTextEncode ×2 (正/负)
       EmptyLatentImage / EmptySD3LatentImage (按 profile.latent_class)
         或 VAEEncodeForInpaint / VAEEncode 用于 I2I/Inpaint
-      KSampler (默认值取自 profile)
+      KSampler / SamplerCustomAdvanced (按前端所选调度器)
       VAEDecode
       [可选二次采样 HiRes (含潜空间放大)]
       [可选面部修复]
@@ -1730,7 +1799,8 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         shift             (float)      — ModelSamplingAuraFlow shift, 默认取 profile.model_sampling.shift
         其余字段同 build_sdxl_workflow (positive_prompt / loras / hires / i2i / upscale / inpaint 等)
     """
-    profile = _SPLIT_ARCH_PROFILES.get(arch, _SPLIT_ARCH_PROFILES["anima"])
+    profile = _SPLIT_ARCH_PROFILES[arch]
+    is_qwen_image21 = arch in ("qwen_image21", "qwen_image21_turbo")
     b = WorkflowBuilder()
 
     # 加载分支: packaging='checkpoint' → CheckpointLoaderSimple (整合包, model/clip/vae 同节点);
@@ -1783,10 +1853,17 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         ms_node = b.add_model_sampling_auraflow(model_ref, shift=shift)
         model_ref = (ms_node, 0)
 
-    positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
-    negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
-    pos_ref = (positive, 0)
-    neg_ref = (negative, 0)
+    if is_qwen_image21:
+        model_ref = (b.add_qwen_image21_cache(model_ref), 0)
+        conditioning = b.add_qwen_image21_conditioning(
+            clip_ref, params.get("positive_prompt", ""), params.get("negative_prompt", ""),
+        )
+        positive, negative = (conditioning, 0), (conditioning, 1)
+    else:
+        positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
+        negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
+    pos_ref = b._ref(positive)
+    neg_ref = b._ref(negative)
 
     # 仅 profile["controlnet"]==True 时处理 (flux1 已启用, 其余跳过); flux 系 CN 是 latent
     #   (传 vae_ref; sdxl 走 build_sdxl_workflow 不经此函数, 既有行为不变)。
@@ -1817,14 +1894,24 @@ def build_split_workflow(params: dict, arch: str) -> dict:
 
     if inpaint_image and inpaint_mask:
         inp_load = b.add_load_image(inpaint_image)
+        if is_qwen_image21:
+            inp_load = b.add_join_image_alpha(inp_load, (inp_load, 1))
         mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
         grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
-        latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
-        i2i_denoise = max(0.10, min(float(params.get("inpaint_denoise", 0.75)), 1.0))
+        if is_qwen_image21:
+            # Qwen 低去噪会保留 VAEEncodeForInpaint 的灰色填充，改用原图加噪声遮罩。
+            latent = b.add_vae_encode(inp_load, vae_ref)
+            mask = b.add_grow_mask(mask_load, grow)
+            latent = b.add_set_latent_noise_mask(latent, mask)
+        else:
+            latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
+        i2i_denoise = float(params["inpaint_denoise"])
     elif i2i_image:
         i2i_load = b.add_load_image(i2i_image)
+        if is_qwen_image21:
+            i2i_load = b.add_join_image_alpha(i2i_load, (i2i_load, 1))
         latent = b.add_vae_encode(i2i_load, vae_ref)
-        i2i_denoise = max(0.10, min(float(params.get("i2i_denoise", 0.7)), 0.90))
+        i2i_denoise = float(params["i2i_denoise"])
     else:
         latent = b.add_empty_latent(
             int(params.get("width", 1024)),
@@ -1833,16 +1920,13 @@ def build_split_workflow(params: dict, arch: str) -> dict:
             class_type=str(profile.get("latent_class", "EmptyLatentImage")),
         )
 
-    sampled = b.add_ksampler(
-        model_ref,
-        pos_ref,
-        neg_ref,
-        latent,
-        seed=int(params.get("seed", -1)),
-        steps=int(params.get("steps", profile["steps"])),
-        cfg=float(params.get("cfg", profile["cfg"])),
-        sampler=str(params.get("sampler", profile["sampler"])),
-        scheduler=str(params.get("scheduler", profile["scheduler"])),
+    sampled = _add_split_sampler(
+        b, model_ref, pos_ref, neg_ref, latent,
+        seed=int(params["seed"]),
+        steps=int(params["steps"]),
+        cfg=float(params["cfg"]),
+        sampler=str(params["sampler"]),
+        scheduler=str(params["scheduler"]),
         denoise=i2i_denoise,
     )
 
@@ -1852,23 +1936,22 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     face_enabled = bool(params.get("face_detailer_enabled", False))
     hires_enabled = bool(params.get("hires_enabled", False))
     upscale_enabled = bool(params.get("upscale_enabled", False))
-    hires_scale = max(1.0, min(float(params.get("hires_scale", 1.5)), 2.0))
-    hires_method = str(params.get("hires_upscale_method", "bislerp"))
 
     final_image = decoded
-    # 缺省值同步取 profile (hires_cfg 下限 clamp 保持 1.0)
     if hires_enabled:
-        hires_denoise = max(0.1, min(float(params.get("hires_denoise", 0.4)), 1.0))
-        hires_steps = max(1, min(int(params.get("hires_steps", profile["steps"])), 100))
-        hires_cfg = max(1.0, min(float(params.get("hires_cfg", profile["cfg"])), 20.0))
-        hires_sampler = str(params.get("hires_sampler", profile["sampler"]))
-        hires_scheduler = str(params.get("hires_scheduler", profile["scheduler"]))
-        hires_seed = int(params.get("hires_seed", -1))
+        hires_scale = float(params["hires_scale"])
+        hires_method = str(params["hires_upscale_method"])
+        hires_denoise = float(params["hires_denoise"])
+        hires_steps = int(params["hires_steps"])
+        hires_cfg = float(params["hires_cfg"])
+        hires_sampler = str(params["hires_sampler"])
+        hires_scheduler = str(params["hires_scheduler"])
+        hires_seed = int(params["hires_seed"])
         hires_latent = b.add_vae_encode(final_image, vae_ref)
         if hires_scale > 1.0:
             hires_latent = b.add_latent_upscale_by(hires_latent, hires_scale, method=hires_method)
-        hires_sampled = b.add_ksampler(
-            model_ref,
+        hires_sampled = _add_split_sampler(
+            b, model_ref,
             pos_ref,  # 与主采样同源, 含 ControlNet 条件
             neg_ref,
             hires_latent,
@@ -1882,28 +1965,37 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         final_image = b.add_vae_decode(hires_sampled, vae_ref)
 
     if face_enabled:
-        _face_defaults = {
-            "sampler": str(params.get("sampler", profile["sampler"])),
-            "scheduler": str(params.get("scheduler", profile["scheduler"])),
-        }
         # 修脸是局部裁切重绘, 而 ControlNet 控制图是整图 (不随裁切同步) ->
         # 不接 CN 条件, 恒用原始正/负提示词, 避免控制图被压进脸部裁切。
+        if is_qwen_image21:
+            face_rgba = b.add_split_image_alpha(final_image)
+            final_image = face_rgba
         final_image = _add_face_detailer_chain(
             b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
-            params, _face_defaults,
+            params,
         )
+        if is_qwen_image21:
+            final_image = b.add_join_image_alpha(final_image, (face_rgba, 1))
 
     if upscale_enabled:
         base_w = int(params.get("width", 1024))
         base_h = int(params.get("height", 1024))
+        stride = profile.get("latent_stride", 8)
+        if is_qwen_image21:
+            base_w, base_h = base_w // stride * stride, base_h // stride * stride
         if hires_enabled and hires_scale > 1.0:
-            source_w = round(base_w * hires_scale / 8) * 8
-            source_h = round(base_h * hires_scale / 8) * 8
+            source_w = round(base_w * hires_scale / stride) * stride
+            source_h = round(base_h * hires_scale / stride) * stride
         else:
             source_w, source_h = base_w, base_h
+        if is_qwen_image21:
+            upscale_rgba = b.add_split_image_alpha(final_image)
+            final_image = upscale_rgba
         final_image = _add_upscale_chain(
             b, final_image, params, source_w=source_w, source_h=source_h,
         )
+        if is_qwen_image21:
+            final_image = b.add_join_image_alpha(final_image, (upscale_rgba, 1))
 
     save_prefix_raw = str(params.get("save_prefix", "ComfyCarry")).strip() or "ComfyCarry"
     output_format = str(params.get("output_format", "png")).lower()
@@ -1915,7 +2007,10 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     else:
         save_output_path, save_filename = '', save_prefix_raw
 
-    b.add_save_image(final_image, prefix=save_filename, output_path=save_output_path,
+    saved_image = final_image
+    if is_qwen_image21 and output_format in ("jpg", "jpeg", "bmp", "gif"):
+        saved_image = b.add_split_image_alpha(final_image)
+    b.add_save_image(saved_image, prefix=save_filename, output_path=save_output_path,
                      extension=output_format, batch_size=batch_size)
 
     b.add_preview_image(final_image)
@@ -1946,13 +2041,17 @@ def build_chroma_workflow(params: dict) -> dict:
     return build_split_workflow(params, "chroma")
 
 
+def build_qwen_image21_workflow(params: dict, turbo: bool = False) -> dict:
+    return build_split_workflow(params, "qwen_image21_turbo" if turbo else "qwen_image21")
+
+
 def build_flux2_workflow(params: dict) -> dict:
     """
     Flux2 (dev/klein) — 独立采样 builder (SamplerCustomAdvanced + Flux2Scheduler)。
 
     guider_mode 分支:
       - 'basic' (dev):  FluxGuidance(positive, guidance) → BasicGuider(model, positive)
-                        (无负面, guidance 默认 4.0, 20 步)
+                        (无负面, cfg 字段作为 guidance)
       - 'cfg'   (klein): CFGGuider(model, positive, negative, cfg)
                         (有负面, cfg 5.0 base / 1.0 distilled)
 
@@ -1981,10 +2080,8 @@ def build_flux2_workflow(params: dict) -> dict:
         clip             (str)   — [packaging=split] Text Encoder 文件名 (Qwen3/Mistral)
         vae              (str)   — [packaging=split] VAE 文件名
         guider_mode      (str)   — 'basic' (dev) | 'cfg' (klein), 默认 'cfg'
-        guidance         (float) — [basic] FluxGuidance 值, 默认 4.0 (兼容 cfg 字段)
-        cfg              (float) — [cfg] CFGGuider 值, 默认 5.0 (base) / 1.0 (distilled)
-        steps            (int)   — 采样步数 (默认 20; distilled klein 4)
-        sampler          (str)   — 采样器 (默认 euler)
+        cfg              (float) — [basic] Guidance / [cfg] CFGGuider 值
+        steps / sampler / scheduler — 前端必传; scheduler='flux2' 选择专用调度器
         width/height     (int)   — 须 /16 (现有分辨率预设已满足)
         其余字段: positive_prompt / negative_prompt / loras / upscale / save_prefix / output_format
     """
@@ -2020,16 +2117,16 @@ def build_flux2_workflow(params: dict) -> dict:
     positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
     pos_ref = (positive, 0)
 
-    guider_mode = str(params.get("guider_mode", "cfg"))
+    guider_mode = str(params["guider_mode"])
 
     if guider_mode == "basic":
-        guidance = float(params.get("guidance", params.get("cfg", 4.0)))
+        guidance = float(params["cfg"])
         guided_pos = b.add_flux_guidance(pos_ref, guidance=guidance)
         guider = b.add_basic_guider(model_ref, (guided_pos, 0))
     else:
         negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
         neg_ref = (negative, 0)
-        cfg = float(params.get("cfg", 5.0))
+        cfg = float(params["cfg"])
         guider = b.add_cfg_guider(model_ref, pos_ref, neg_ref, cfg)
 
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
@@ -2041,13 +2138,15 @@ def build_flux2_workflow(params: dict) -> dict:
         class_type="EmptyFlux2LatentImage",
     )
 
-    seed = int(params.get("seed", -1))
+    seed = int(params["seed"])
     noise = b.add_random_noise(seed)
-    sampler = b.add_ksampler_select(str(params.get("sampler", "euler")))
-    steps = int(params.get("steps", 20))
-    sigmas = b.add_flux2_scheduler(
-        steps, int(params.get("width", 1024)), int(params.get("height", 1024)),
-    )
+    sampler = b.add_ksampler_select(str(params["sampler"]))
+    steps = int(params["steps"])
+    scheduler = str(params["scheduler"])
+    if scheduler == "flux2":
+        sigmas = b.add_flux2_scheduler(steps, int(params["width"]), int(params["height"]))
+    else:
+        sigmas = b.add_basic_scheduler(model_ref, scheduler, steps)
     sampled = b.add_sampler_custom_advanced(noise, guider, sampler, sigmas, latent)
 
     decoded = b.add_vae_decode(sampled, vae_ref)
@@ -2073,15 +2172,6 @@ def build_flux2_workflow(params: dict) -> dict:
     return b.build()
 
 
-# 内置中文负面模板 — 标准档 negative 为空时注入。
-WAN22_DEFAULT_NEGATIVE = (
-    "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，"
-    "静止，整体发灰，最差质量，劣质画面，坏手，变形手，多余手指，"
-    "缺少手指，畸形，丑陋脸，模糊脸，不自然的面部，错误的人体，"
-    "多肢体，畸形肢体，多余肢体，残缺肢体，不自然的姿势，扭曲身体，"
-    "变形身体，不自然的动作，错误动作，不连贯运动，画面闪烁，画面抖动"
-)
-
 # Wan 2.2 Lightning 加速件文件名 — t2v 与 i2v 不通用, high/low 成对。
 WAN22_LIGHTNING_LORAS = {
     "t2v": {
@@ -2100,13 +2190,6 @@ WAN22_FPS = {"t2v": 16, "i2v": 16, "5b": 24}
 # shift: 14B=5.0, 5B=8.0。
 WAN22_SHIFT = {"t2v": 5.0, "i2v": 5.0, "5b": 8.0}
 
-# 速度档参数 (仅 14B)。快速档自动注入 high+low 加速件对 (按 variant)。
-WAN22_SPEED_PROFILES = {
-    "fast": {"steps": 4, "split": 2, "cfg": 1.0, "use_negative": False, "inject_lightning": True},
-    "standard": {"steps": 20, "split": None, "cfg": 3.5, "use_negative": True, "inject_lightning": False},
-}
-
-
 def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
     """
     Wan 2.2 视频工作流 — 三 variant (t2v/i2v/5b) 平级于 build_flux2_workflow。
@@ -2121,11 +2204,8 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         (uni_pc/simple/steps=20/cfg=5.0/denoise=1.0)。latent = Wan22ImageToVideoLatent
         (接 start_image=i2v, 不接=t2v)。fps=24。无速度档。
 
-    速度档 (仅 14B t2v/i2v):
-      - fast:   steps=4, split=2, cfg=1.0, 自动注入对应 variant 的 high+low 加速件对,
-                忽略 negative (cfg=1 无效)。
-      - standard: steps=20 (可调, 默认 20), split=steps//2, cfg=3.5, 不挂加速件,
-                使用 negative, 空则注入内置中文负面模板 WAN22_DEFAULT_NEGATIVE。
+    速度档仅决定是否注入对应 variant 的 high+low 加速件对。
+    步数、CFG、采样器、调度器均使用前端传值，两段在 steps//2 处交接。
 
     LoRA apply 分链 (仅 14B): loras[].apply ∈ {'high','low','both'}:
       - 'high' → 挂到高噪段 MODEL 链 (KSamplerAdvanced #1)
@@ -2142,16 +2222,15 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         clip             (str, 必填)      — Text Encoder (umt5_xxl)
         vae              (str, 必填)      — VAE (14B=wan_2.1_vae, 5B=wan2.2_vae)
         positive_prompt (str, 必填)       — 正向提示词
-        negative_prompt (str)             — 负向提示词 (标准档空则注入内置模板)
+        negative_prompt (str)             — 负向提示词
         width            (int)            — 宽度 (14B %16, 5B %32)
         height           (int)            — 高度
         duration_s       (float)          — 时长秒 (帧数 = fps×duration+1)
         length           (int)            — 帧数 (显式覆盖 duration_s 计算)
         batch_size       (int)            — 批量, 默认 1 (视频恒 1)
         seed             (int)            — 种子, -1 = 随机
-        steps            (int)            — 标准档步数 (默认 20; 快速档忽略)
-        cfg              (float)          — 标准档 CFG (默认 3.5; 快速档忽略)
-        speed            (str, 14B)       — 'fast' | 'standard' (默认 'fast')
+        steps / cfg / sampler / scheduler — 前端必传的采样参数
+        speed            (str, 14B)       — 'fast' | 'standard'
         start_image      (str, i2v/5b)    — 起始画面文件名 (ComfyUI input/)
         loras            (list)           — LoRA: [{name, strength, apply}]
         save_prefix      (str)            — 保存前缀 (默认 "video/ComfyCarry")
@@ -2174,32 +2253,12 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
 
     is_14b = variant in ("t2v", "i2v")
 
-    # 速度档决定 negative 可见性: fast 忽略 negative (cfg=1 无效)
-    if is_14b:
-        speed = str(params.get("speed", "fast")).lower()
-        if speed not in ("fast", "standard"):
-            speed = "fast"
-        profile = WAN22_SPEED_PROFILES[speed]
-    else:
-        # 5B 无速度档: 恒 standard 风格 (有负面, 不挂加速件)。
-        speed, profile = "standard", WAN22_SPEED_PROFILES["standard"]
-
     positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
     pos_ref = (positive, 0)
 
-    if profile["use_negative"]:
-        neg_text = str(params.get("negative_prompt", "")).strip()
-        if not neg_text:
-            neg_text = WAN22_DEFAULT_NEGATIVE
-        negative = b.add_clip_text_encode(neg_text, clip_ref)
-        neg_ref = (negative, 0)
-    else:
-        # fast 档 (cfg=1.0): negative 在采样中不生效, 但**必须是独立节点**, 不能复用 positive。
-        # 原因: i2v 的 WanImageToVideo 会改写正负 conditioning (对 negative 做 mask/concat 处理),
-        # 若正负指向同一节点则其行为未定义; 且官方模板的 negative 始终是独立 CLIPTextEncode。
-        # 用空串编码, 语义上等价于"无负面"且开销极小。
-        negative = b.add_clip_text_encode("", clip_ref)
-        neg_ref = (negative, 0)
+    # WanImageToVideo 会分别改写正负条件，两者必须是独立引用。
+    negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
+    neg_ref = (negative, 0)
 
     fps = WAN22_FPS[variant]
     shift = float(params.get("shift", WAN22_SHIFT[variant]))
@@ -2212,7 +2271,7 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
     width = int(params.get("width", 640 if is_14b else 1280))
     height = int(params.get("height", 640 if is_14b else 704))
     batch_size = max(1, min(int(params.get("batch_size", 1)), 1))  # 视频恒 1
-    seed = int(params.get("seed", -1))
+    seed = int(params["seed"])
 
     if is_14b:
         unet_high_node = b.add_unet_loader(
@@ -2227,7 +2286,7 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         low_model = (unet_low_node, 0)
 
         # 加速件 (快速档): high/low 各挂一件到对应段, 在用户 LoRA 之前。
-        if profile["inject_lightning"]:
+        if params["speed"] == "fast":
             lora_pair = WAN22_LIGHTNING_LORAS[variant]
             high_light = b.add_lora_loader_model_only(
                 high_model, lora_pair["high"], strength_model=1.0,
@@ -2275,13 +2334,11 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
 
         # 两段 KSamplerAdvanced: #1 add_noise=enable 0→split leftover=enable;
         #                              #2 add_noise=disable split→steps leftover=disable。
-        steps = int(params.get("steps", profile["steps"]))
-        split = profile["split"]
-        if split is None:
-            split = steps // 2
-        cfg = float(params.get("cfg", profile["cfg"]))
-        sampler = str(params.get("sampler", "euler"))
-        scheduler = str(params.get("scheduler", "simple"))
+        steps = int(params["steps"])
+        split = steps // 2
+        cfg = float(params["cfg"])
+        sampler = str(params["sampler"])
+        scheduler = str(params["scheduler"])
 
         ks_pos = i2v_pos if i2v_pos is not None else pos_ref
         ks_neg = i2v_neg if i2v_neg is not None else neg_ref
@@ -2327,10 +2384,10 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
         )
         latent_ref = (latent_node, 0)
 
-        steps = int(params.get("steps", 20))
-        cfg = float(params.get("cfg", 5.0))
-        sampler = str(params.get("sampler", "uni_pc"))
-        scheduler = str(params.get("scheduler", "simple"))
+        steps = int(params["steps"])
+        cfg = float(params["cfg"])
+        sampler = str(params["sampler"])
+        scheduler = str(params["scheduler"])
 
         ks = b.add_ksampler(
             model_ref, pos_ref, neg_ref, latent_ref,
@@ -2353,8 +2410,6 @@ H3_DURATION_RANGE = (4, 15)      # 整数秒
 H3_FRAME_GRID = 17               # length = 17k+5
 H3_FRAME_GRID_OFFSET = 5
 H3_MAX_PIXELS = 768 * 1344
-H3_DEFAULT_SAMPLER = "res_multistep"
-H3_DEFAULT_SCHEDULER = "simple"
 
 
 def h3_align_length(frames: int) -> int:
@@ -2389,8 +2444,8 @@ def _h3_shared_setup(params: dict):
         length = h3_align_length(int(round(H3_FPS * duration)))
     width = int(params.get("width", 1344))
     height = int(params.get("height", 768))
-    seed = int(params.get("seed", -1))
-    steps = int(params.get("steps", 20))
+    seed = int(params["seed"])
+    steps = int(params["steps"])
     return b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps
 
 
@@ -2403,10 +2458,10 @@ def _h3_sampling_and_tail(b: WorkflowBuilder, unet_node, cond_latent, seed: int,
     """
     noise = b.add_random_noise(seed)
     guider = b.add_basic_guider((unet_node, 0), (cond_latent, 0))
-    sampler = b.add_ksampler_select(str(params.get("sampler", H3_DEFAULT_SAMPLER)))
+    sampler = b.add_ksampler_select(str(params["sampler"]))
     sigmas = b.add_basic_scheduler(
         (unet_node, 0),
-        str(params.get("scheduler", H3_DEFAULT_SCHEDULER)),
+        str(params["scheduler"]),
         steps, denoise=1.0,
     )
     sampled = b.add_sampler_custom_advanced(
@@ -2449,9 +2504,7 @@ def build_minimax_h3_workflow(params: dict, variant: str = "i2v") -> dict:
         length           (int)           — 帧数 (须 17k+5; 无则由 duration_s×24 对齐兜底)
         duration_s       (float)         — 时长秒 (length 缺失时兜底计算)
         seed             (int)           — 种子, -1 = 随机
-        steps            (int)           — 采样步数 (默认 20)
-        sampler          (str)           — 采样器 (默认 "res_multistep")
-        scheduler        (str)           — 调度器 (默认 "simple")
+        steps / sampler / scheduler     — 前端必传的采样参数
         start_image      (str, i2v)      — 首帧文件名 (ComfyUI input/)
         last_image       (str, i2v 可选) — 尾帧文件名
         save_prefix      (str)           — 保存前缀 (默认 "video/MiniMax_H3")
@@ -2515,8 +2568,7 @@ def build_minimax_h3_ref_workflow(params: dict) -> dict:
         length           (int)     — 帧数 (须 17k+5; 无则由 duration_s×24 对齐兜底)
         duration_s       (float)   — 时长秒 (length 缺失时兜底计算)
         seed             (int)     — 种子, -1 = 随机
-        steps            (int)     — 采样步数 (默认 20)
-        sampler / scheduler (str)  — 采样器/调度器 (默认 res_multistep / simple)
+        steps / sampler / scheduler — 前端必传的采样参数
         save_prefix      (str)     — 保存前缀 (默认 "video/MiniMax_H3")
 
     返回值: ComfyUI /prompt API 所需的 prompt dict

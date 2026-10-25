@@ -60,7 +60,7 @@ export interface DownloadTask {
   }
 }
 
-export type VersionState = 'idle' | 'submitting' | 'queued' | 'downloading' | 'verifying' | 'paused' | 'installed' | 'failed'
+export type VersionState = 'idle' | 'submitting' | 'queued' | 'downloading' | 'paused' | 'installed' | 'failed'
 
 export interface VersionDownloadInfo {
   state: VersionState
@@ -152,7 +152,6 @@ function mapResourceState(state: string): VersionState {
     case 'submit_pending': return 'submitting'
     case 'downloading': return 'downloading'
     case 'paused': return 'paused'
-    case 'verifying': return 'verifying'
     case 'installed': return 'installed'
     case 'failed': return 'failed'
     case 'cancelled': return 'idle'
@@ -606,7 +605,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       return resourceInfo?.downloadId === task.download_id ? resourceInfo : taskInfo(task)
     }
     if (checked?.installed) return { ...idleInfo(), state: 'installed', progress: 100 }
-    if (resourceInfo && ['submitting', 'queued', 'downloading', 'verifying', 'paused'].includes(resourceInfo.state)) return resourceInfo
+    if (resourceInfo && ['submitting', 'queued', 'downloading', 'paused'].includes(resourceInfo.state)) return resourceInfo
     if (checked?.downloading && checked.download_id) {
       return { ...idleInfo(), state: 'downloading', downloadId: checked.download_id }
     }
@@ -617,7 +616,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
   async function downloadFile(file: { path: string; url: string; modelId?: string; versionId?: string; meta?: Record<string, unknown> }): Promise<boolean> {
     const path = normalizeFilePath(file.path)
     const state = getFileDownloadInfo(path, file.modelId ? { modelId: file.modelId, versionId: file.versionId || file.modelId } : undefined).state
-    if (['installed', 'submitting', 'queued', 'downloading', 'verifying', 'paused'].includes(state)) return true
+    if (['installed', 'submitting', 'queued', 'downloading', 'paused'].includes(state)) return true
     submittingPaths.value = new Set([...submittingPaths.value, path])
     startPolling()
     try {
@@ -1025,7 +1024,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     const rState = resourceStates.value.get(resourceKey)
     const task = versionTask(mid, vid)
     const mapped = mapResourceState(rState || '')
-    if (['submitting', 'downloading', 'paused', 'verifying'].includes(mapped)) return mapped
+    if (['submitting', 'downloading', 'paused'].includes(mapped)) return mapped
     if (task && ACTIVE_STATES.has(task.status)) return taskInfo(task).state
     if (mapped !== 'idle') return mapped
     if (task && task.status !== 'complete') return taskInfo(task).state
@@ -1041,7 +1040,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
     for (const vid of versionIds) {
       const state = getVersionState(mid, vid)
-      if (state === 'submitting' || state === 'queued' || state === 'downloading' || state === 'verifying' || state === 'paused') anyDownloading = true
+      if (state === 'submitting' || state === 'queued' || state === 'downloading' || state === 'paused') anyDownloading = true
       if (state === 'installed') anyInstalled = true
       else allInstalled = false
     }

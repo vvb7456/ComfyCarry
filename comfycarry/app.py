@@ -104,15 +104,9 @@ def _restore_comfyui(log):
         return
 
     try:
-        r = subprocess.run(
-            "pm2 jlist",
-            shell=True, capture_output=True, text=True, timeout=10,
-        )
-        if r.returncode == 0:
-            procs = json.loads(r.stdout)
-            for p in procs:
-                if p.get("name") == "comfy":
-                    return
+        from .utils import get_pm2_procs
+        if any(p.get("name") == "comfy" for p in get_pm2_procs(refresh=True)):
+            return
     except Exception:
         pass
 
@@ -151,10 +145,9 @@ def main():
     except Exception as e:
         app.logger.warning(f"[tunnel] 清理切换状态失败: {e}")
 
-    # 执行数据库迁移
-    from . import migrations as _migrations  # noqa: F811,F401 — 注册所有表
+    # 初始化当前数据库结构
     from .db import db
-    db.migrate()
+    db.initialize()
 
     # 当前实例的模型文件与 SQLite 索引在启动时完成一次校对；运行期由下载、
     # enrich 和删除事件直接维护。
@@ -162,9 +155,8 @@ def main():
     model_sync = reconcile_model_index()
     app.logger.info("[models] 启动校对完成: %s", model_sync)
 
-    # 从 DB 恢复下载资源状态
-    from .services.resource_registry import get_registry
-    get_registry().hydrate_from_db()
+    from .services.download_engine import get_engine
+    get_engine().hydrate_from_db()
 
     # 启动对账: 进程重启后把上次残留的 queued/running 本地任务置为 interrupted,
     # 否则会留下永远排队中的脏记录 (且 finished_at 为 NULL, 清理也删不掉)

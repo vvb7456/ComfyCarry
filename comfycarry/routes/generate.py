@@ -11,6 +11,7 @@ ComfyCarry — Generate 路由
   (flux, zimage, ... — Phase 2+)
 """
 
+from functools import partial
 import json
 import logging
 import os
@@ -21,7 +22,8 @@ from datetime import datetime
 import requests
 from flask import Blueprint, jsonify, request
 
-from ..config import COMFYUI_DIR, COMFYUI_URL
+from ..config import COMFYUI_DIR, COMFYUI_URL, get_comfyui_output_dir
+from ..utils import api_err
 from ..services.comfyui_bridge import get_bridge
 from ..services.prompt_expander import get_expander
 from ..services.generate_service import submit_generation
@@ -30,6 +32,7 @@ from ..services.workflow_builder import (
     build_sdxl_workflow,
     build_anima_workflow,
     build_krea2_workflow,
+    build_qwen_image21_workflow,
     build_zimage_workflow,
     build_flux1_workflow,
     build_chroma_workflow,
@@ -48,18 +51,7 @@ bp = Blueprint("generate", __name__)
 
 # 与 sync 路由同契约: 回传 error_key + error_params, 前端按 `generate.err.<key>`
 # 翻译; str(e) 异常透传放进 params.detail, 不翻译。
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `generate.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
-
-    形参位置化 (`/`): 插值参数里有 key / status / detail 这种名字, 不然会和
-    函数自己的形参撞车。
-    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
-    `**params` 静默吞掉, 顶层字段丢失。
-    """
-    body = {"error_key": f"generate.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "generate")
 
 _options_cache: dict | None = None
 _options_cache_time: float = 0.0
@@ -143,19 +135,20 @@ def invalidate_options_cache() -> None:
     _combo_cache.clear()
 
 
-def _fetch_generate_options() -> dict:
+def _fetch_generate_options(*, force_refresh: bool = False) -> dict:
     global _options_cache, _options_cache_time
+    if force_refresh:
+        invalidate_options_cache()
+    if _options_cache is not None and (time.monotonic() - _options_cache_time) < 10:
+        return _options_cache
+
     # Disk is authoritative: models can arrive through Sync, Wizard, Jupyter,
     # or a mounted volume without an in-process download callback.
     try:
         from ..services.model_meta_store import reconcile_model_index
-        sync_summary = reconcile_model_index()
-        if any(sync_summary.get(key) for key in ("inserted", "updated", "removed")):
-            invalidate_options_cache()
+        reconcile_model_index(min_interval=0 if force_refresh else 10)
     except Exception:
         logger.exception("[generate] model index reconcile failed")
-    if _options_cache is not None and (time.time() - _options_cache_time) < 300:
-        return _options_cache
 
     # 走到这里 = 缓存已过期(或从未建立), 本次要真正重算。
     # _combo_cache 保存的是 ComfyUI /object_info 快照(含 checkpoints/unets/clips/vaes 文件列表),
@@ -340,18 +333,13 @@ def _fetch_generate_options() -> dict:
     result["sam_models"] = sam_models
 
     _options_cache = result
-    _options_cache_time = time.time()
+    _options_cache_time = time.monotonic()
     return result
 
 
 @bp.route("/api/generate/options")
 def api_generate_options():
-    global _options_cache, _options_cache_time, _combo_cache
-    if request.args.get("refresh") == "1":
-        _options_cache = None
-        _options_cache_time = 0.0
-        _combo_cache.clear()
-    return jsonify(_fetch_generate_options())
+    return jsonify(_fetch_generate_options(force_refresh=request.args.get("refresh") == "1"))
 
 
 @bp.route("/api/generate/state")
@@ -361,10 +349,7 @@ def api_generate_state_get():
     首次使用返回 state=null 而非 404 —— 前端据此区分「空」与「请求失败」,
     失败时不得开启自动保存 (否则会用默认值覆盖服务端)。
     """
-    state = generate_state_store.load_state()
-    # 成功装载即解除写入守卫 (见 store 的 mark_reload_required 说明)
-    generate_state_store.clear_reload_required()
-    return jsonify({"state": state})
+    return jsonify(generate_state_store.load_snapshot())
 
 
 @bp.route("/api/generate/model-hashes")
@@ -379,18 +364,13 @@ def api_generate_model_hashes():
 
 @bp.route("/api/generate/state", methods=["PUT"])
 def api_generate_state_put():
-    """整份覆盖写。后写入覆盖 (单实例单用户, 不做乐观锁)。
-
-    结构校验在 store 层 (见 services/generate_state_store.validate)。
-    """
-    # 导入后守卫期内拒绝写入: 否则其它标签页的旧状态会覆盖刚导入的配置
-    if generate_state_store.is_reload_required():
-        return _err("state_reload_required", 409)
+    """按架构合并；导入前打开的页面须先重新读取配置。"""
     payload = request.get_json(silent=True)
-    stored, err = generate_state_store.save_state(payload)
+    stored, err = generate_state_store.save_state(payload, request.headers.get("X-Generate-Epoch", ""))
     if err:
         key, params = err
-        return _err(key, _extra={"state": None}, **params)
+        return _err(key, 409 if key == "state_reload_required" else 400,
+                    _extra={"state": None}, **params)
     return jsonify({"ok": True, "updated_at": stored["updated_at"]})
 
 
@@ -495,6 +475,41 @@ def api_generate_upload_image():
             pass
 
     return jsonify(result)
+
+
+@bp.route("/api/generate/copy_output_image", methods=["POST"])
+def api_generate_copy_output_image():
+    import shutil
+    import uuid
+    from pathlib import Path
+    from PIL import Image, UnidentifiedImageError
+
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return _err("invalid_file")
+    filename = data.get("filename", "")
+    subfolder = data.get("subfolder", "")
+    img_type = data.get("type", "output")
+    if not isinstance(filename, str) or not isinstance(subfolder, str) or img_type not in ("output", "temp"):
+        return _err("invalid_file")
+    root = get_comfyui_output_dir() if img_type == "output" else (Path(COMFYUI_DIR) / img_type).resolve()
+    source = (root / subfolder / filename).resolve()
+    if not source.is_relative_to(root):
+        return _err("invalid_file")
+    if not source.is_file():
+        return _err("file_not_found", 404, name=filename)
+    try:
+        with Image.open(source) as image:
+            if image.format not in ("PNG", "JPEG", "WEBP", "BMP") or getattr(image, "is_animated", False):
+                return _err("invalid_file")
+            width, height = image.size
+            extension = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp", "BMP": ".bmp"}[image.format]
+    except (UnidentifiedImageError, OSError):
+        return _err("invalid_file")
+    target = Path(COMFYUI_DIR) / "input" / f"comfycarry_video_ref_{uuid.uuid4().hex}{extension}"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    return jsonify({"filename": target.name, "width": width, "height": height})
 
 
 @bp.route("/api/generate/preprocess", methods=["POST"])
@@ -654,6 +669,8 @@ _BUILDERS = {
     "sd15": build_sdxl_workflow,
     "anima": build_anima_workflow,    # 分离式架构: UNet + 单 CLIP + VAE
     "krea2": build_krea2_workflow,    # 分离式架构: UNet + 单 CLIP + VAE
+    "qwen_image21": build_qwen_image21_workflow,
+    "qwen_image21_turbo": lambda params: build_qwen_image21_workflow(params, turbo=True),
     "zimage": build_zimage_workflow,  # 分离式架构: UNet + 单 CLIP (lumina2) + VAE + ModelSamplingAuraFlow
     "flux1": build_flux1_workflow,    # 分离式架构: UNet + 双 CLIP (flux) + VAE
     "chroma": build_chroma_workflow,  # 分离式架构: UNet + 单 CLIP (chroma) + VAE
@@ -670,7 +687,7 @@ _BUILDERS = {
 
 # 分离式三件套架构集合 (UNet + Text Encoder + VAE), 校验逻辑共用
 # flux2 走独立 builder 但校验规则与 split 架构同 (unet/clip/vae 三字段)
-_SPLIT_ARCHS = ("anima", "krea2", "zimage", "flux1", "chroma", "flux2")
+_SPLIT_ARCHS = ("anima", "krea2", "zimage", "flux1", "chroma", "flux2", "qwen_image21", "qwen_image21_turbo")
 
 # 需要 dual CLIP (clip + clip2) 的架构集合 — 在 _SPLIT_ARCHS 分支内额外校验 clip2
 _DUAL_CLIP_ARCHS = ("flux1",)

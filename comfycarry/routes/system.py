@@ -1,4 +1,4 @@
-import json
+from functools import partial
 import os
 import re
 import subprocess
@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request, Response
 import requests as req_lib
 
 from ..config import SCRIPT_DIR, COMFYUI_URL, APP_VERSION, WORKSPACE_ROOT
-from ..utils import _run_cmd
+from ..utils import _run_cmd, get_pm2_procs, api_err
 from ..services import system_monitor
 from ..services.cf_runtime import active_cf_name
 
@@ -21,15 +21,15 @@ bp = Blueprint("system", __name__)
 # 契约同 sync.py: error_key=system.err.<key> + error_params; str(e)
 # 原文不翻译, 作为 detail 参数透传。
 # ====================================================================
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    body = {"error_key": f"system.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "system")
 
 
 @bp.route("/api/version")
 def api_version():
+    return jsonify(get_version())
+
+
+def get_version():
     version_info = {"version": APP_VERSION, "branch": "", "commit": ""}
     version_file = os.path.join(SCRIPT_DIR, ".version")
     try:
@@ -58,7 +58,7 @@ def api_version():
                 version_info["branch"] = result2.stdout.strip()
         except Exception:
             pass
-    return jsonify(version_info)
+    return version_info
 
 
 @bp.route("/api/system/stats")
@@ -66,31 +66,19 @@ def api_system_stats():
     return jsonify(system_monitor.get_stats())
 
 
-def api_system():
-    return jsonify(system_monitor.get_stats())
-
-
-def api_services():
+def get_services():
     try:
-        out = _run_cmd("pm2 jlist", timeout=5)
-        if out and not out.startswith("Error"):
-            services = json.loads(out)
-            result = []
-            for s in services:
-                result.append({
-                    "name": s.get("name"),
-                    "pm_id": s.get("pm_id"),
-                    "status": s.get("pm2_env", {}).get("status"),
-                    "cpu": s.get("monit", {}).get("cpu", 0),
-                    "memory": s.get("monit", {}).get("memory", 0),
-                    "restarts": s.get("pm2_env", {}).get("restart_time", 0),
-                    "uptime": s.get("pm2_env", {}).get("pm_uptime", 0),
-                    "pid": s.get("pid"),
-                })
-            return jsonify({"services": result})
-        return jsonify({"services": [], "error": out})
+        return {"services": [{
+            "name": s.get("name"), "pm_id": s.get("pm_id"),
+            "status": s.get("pm2_env", {}).get("status"),
+            "cpu": s.get("monit", {}).get("cpu", 0),
+            "memory": s.get("monit", {}).get("memory", 0),
+            "restarts": s.get("pm2_env", {}).get("restart_time", 0),
+            "uptime": s.get("pm2_env", {}).get("pm_uptime", 0),
+            "pid": s.get("pid"),
+        } for s in get_pm2_procs()]}
     except Exception as e:
-        return jsonify({"services": [], "error": str(e)})
+        return {"services": [], "error": str(e)}
 
 
 @bp.route("/api/services/<name>/<action>", methods=["POST"])
@@ -103,9 +91,6 @@ def api_service_action(name, action):
     return jsonify({"ok": True, "output": out})
 
 
-_pm2_names_cache: tuple[float, set[str]] | None = None
-_PM2_CACHE_TTL = 3.0  # 秒, 避免每个日志请求都跑 pm2 jlist
-
 def _pm2_log_path(name: str) -> str | None:
     """返回进程的合并日志文件路径 /workspace/<name>.log。
 
@@ -117,21 +102,10 @@ def _pm2_log_path(name: str) -> str | None:
     注: cf-tunnel 的日志文件是 /workspace/tunnel.log (非 cf-tunnel.log),
     但 tunnel 页走自己的 /api/tunnel/logs 端点, 不经过这里。
     """
-    global _pm2_names_cache
-    import time as _time
-    now = _time.time()
-    if _pm2_names_cache and (now - _pm2_names_cache[0]) < _PM2_CACHE_TTL:
-        names = _pm2_names_cache[1]
-    else:
-        try:
-            proc = subprocess.run(["pm2", "jlist"], capture_output=True, text=True, timeout=5)
-            if proc.returncode != 0:
-                return None
-            apps = json.loads(proc.stdout or "[]")
-            names = {a.get("name", "") for a in apps}
-            _pm2_names_cache = (now, names)
-        except Exception:
-            return None
+    try:
+        names = {p.get("name") for p in get_pm2_procs()}
+    except Exception:
+        return None
     return str(WORKSPACE_ROOT / f"{name}.log") if name in names else None
 
 
@@ -194,9 +168,9 @@ def api_overview():
 
     result = {}
 
-    result["system"] = json.loads(api_system().get_data())
+    result["system"] = system_monitor.get_stats()
 
-    result["services"] = json.loads(api_services().get_data())
+    result["services"] = get_services()
 
     comfyui = {"online": False, "version": "", "pytorch_version": "",
                "python_version": "", "queue_pending": 0, "queue_running": 0,
@@ -289,9 +263,7 @@ def api_overview():
     result["tunnel"] = tunnel_info
 
     try:
-        jup_resp = jupyter_mod.jupyter_status()
-        jup_data = jup_resp.get_json() if hasattr(jup_resp, 'get_json') else json.loads(jup_resp.get_data())
-        result["jupyter"] = jup_data
+        result["jupyter"] = jupyter_mod.get_jupyter_status()
     except Exception:
         result["jupyter"] = {"online": False}
 
@@ -308,8 +280,7 @@ def api_overview():
         pass
     result["downloads"] = downloads
 
-    ver_resp = api_version()
-    result["version"] = ver_resp.get_json() if hasattr(ver_resp, 'get_json') else json.loads(ver_resp.get_data())
+    result["version"] = get_version()
 
     return jsonify(result)
 

@@ -16,8 +16,8 @@
  * FLUX.2 klein 门控仓库, 共 225 条。
  *
  * 可用 ID (下一个):
- *   模型 ID: -100289
- *   版本 ID: -10000389
+ *   模型 ID: -100304
+ *   版本 ID: -10000404
  */
 
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
@@ -52,6 +52,7 @@ export interface HuggingFaceFile {
     | 'checkpoints'
     | 'loras'
     | 'controlnet'
+    | 'model_patches'
     | 'vae'
     | 'embeddings'
     | 'upscale_models'
@@ -1965,7 +1966,7 @@ const animaBaseV10Model: HuggingFaceModel = {
   images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_base_v1-1.webp', type: 'image' }],
   user: { username: 'circlestone-labs' },
   sourceUrl: 'https://huggingface.co/circlestone-labs/Anima',
-  description: { zh: 'Anima 基础版文生图', en: 'Anima base text-to-image' },
+  description: { zh: 'Anima 文生图', en: 'Anima base text-to-image' },
   version: animaBaseV10Version,
   versions: [animaBaseV10Version],
 }
@@ -8726,6 +8727,78 @@ const umt5XxlFp16Model: HuggingFaceModel = {
 }
 
 export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
+  // Comfy-Org/Qwen-Image-2.1，文件大小与 SHA256 经 HF tree API 核实 (2026-10-19)。
+  ...(() => {
+    const repo = 'https://huggingface.co/Comfy-Org/Qwen-Image-2.1'
+    const thumb = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp'
+    const images: CivitaiImage[] = [{ url: thumb, type: 'image' }]
+    type QwenFolder = 'diffusion_models' | 'loras' | 'model_patches' | 'text_encoders' | 'vae'
+    const mk = (id: number, vid: number, name: string, folder: QwenFolder, filename: string,
+                sizeBytes: number, sha256: string, zh: string, en: string): HuggingFaceModel => {
+      const modelType = folder
+      const type = { diffusion_models: 'DiffusionModel', loras: 'LORA', model_patches: 'ControlNet', text_encoders: 'TextEncoder', vae: 'VAE' }[modelType]
+      const isPromptEnhancer = filename.includes('_pe_')
+      const version: HuggingFaceVersion = {
+        id: vid, name: name.replace(/^Qwen Image 2\.1 /, ''), baseModel: isPromptEnhancer ? 'Qwen 3.5' : 'Qwen Image 2.1',
+        images, trainedWords: [], hashes: { SHA256: sha256 },
+        file: {
+          url: `${repo}/resolve/main/${folder}/${filename}`, filename, modelType,
+          directory: `{ComfyUI}/models/${folder}`, architecture: isPromptEnhancer ? 'qwen35' : 'qwen_image21', sizeBytes, sha256,
+        },
+      }
+      return {
+        id, name, type, metrics: { downloadCount: 11386917, thumbsUpCount: 1156 }, images,
+        user: { username: 'Comfy-Org' }, sourceUrl: repo, description: { zh, en }, version, versions: [version],
+      }
+    }
+    return [
+      mk(-100289, -10000389, 'Qwen Image 2.1 BF16', 'diffusion_models', 'qwen_image_2.1_bf16.safetensors',
+        14230280616, '89f4158d066cc33906a199fca85634f766892dd78f49b6698dabf187ac86c4bc',
+        'Qwen Image 2.1 文生图与图像编辑，原生透明图像，BF16 权重', 'Qwen Image 2.1 generation and editing with native transparency, BF16 weights'),
+      mk(-100290, -10000390, 'Qwen Image 2.1 INT8', 'diffusion_models', 'qwen_image_2.1_int8_convrot.safetensors',
+        7256783064, 'cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d',
+        'Qwen Image 2.1 文生图与图像编辑，INT8 ConvRot 量化', 'Qwen Image 2.1 generation and editing, INT8 ConvRot quantization'),
+      mk(-100291, -10000391, 'Qwen Image 2.1 Turbo BF16', 'diffusion_models', 'qwen_image_2.1_turbo_bf16.safetensors',
+        14230280616, '8b74237a7f505773e2c66726fa696444b4c704585c93a347cff9044937f7914a',
+        'Qwen Image 2.1 Turbo 8 步蒸馏模型，BF16 权重', 'Qwen Image 2.1 Turbo 8-step distilled model, BF16 weights'),
+      mk(-100292, -10000392, 'Qwen Image 2.1 Turbo INT8', 'diffusion_models', 'qwen_image_2.1_turbo_int8_convrot.safetensors',
+        7256787829, '8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c',
+        'Qwen Image 2.1 Turbo 8 步蒸馏模型，INT8 ConvRot 量化', 'Qwen Image 2.1 Turbo 8-step distilled model, INT8 ConvRot quantization'),
+      mk(-100293, -10000393, 'Qwen Image 2.1 Turbo LoRA', 'loras', 'qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors',
+        913314512, '208dd43250e1e01467ba190572ae2e7107a7870ec1ff026bc65f791fa1e80e95',
+        '基础模型使用的 Turbo 加速 LoRA，搭配 Turbo 8 步采样序列', 'Turbo acceleration LoRA for the base model, used with the Turbo 8-step sampling schedule'),
+      mk(-100294, -10000394, 'Qwen Image 2.1 Fun ControlNet Union BF16', 'model_patches', 'qwen_image_2.1_fun_controlnet_union_bf16.safetensors',
+        7550977992, '1f9dea8384ba167084f39f624908f1dbf2ea8a223bb4a8108a77dafa9b55bfe1',
+        'Qwen Image 2.1 Fun 联合控制补丁，BF16，存放于 model_patches', 'Qwen Image 2.1 Fun union control patch, BF16, stored in model_patches'),
+      mk(-100295, -10000395, 'Qwen Image 2.1 Fun ControlNet Union INT8', 'model_patches', 'qwen_image_2.1_fun_controlnet_union_int8_convrot.safetensors',
+        3779298944, '07aa961570ac0e03d4ca936aecd76854d077a33cde69b5092399afba01b3715d',
+        'Qwen Image 2.1 Fun 联合控制补丁，INT8，存放于 model_patches', 'Qwen Image 2.1 Fun union control patch, INT8, stored in model_patches'),
+      mk(-100296, -10000396, 'Qwen Image 2.1 PE I2I INT8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors',
+        9471072252, '32707d01b427e488af252b95c551989aad59f9fec611a694f5db6bde7f0f1f6c',
+        '图像编辑提示词扩写模型，供 ComfyUI Generate Text 节点使用', 'Image-editing prompt enhancer for the ComfyUI Generate Text node'),
+      mk(-100297, -10000397, 'Qwen Image 2.1 PE I2I W4A8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_i2i_w4a8.safetensors',
+        6724090764, '3c7c88f786f1bac5baf2c4b314fe28172cc03d93b29dfc8b445e85a655cbabb1',
+        '图像编辑提示词扩写模型，W4A8 轻量版', 'Image-editing prompt enhancer, lightweight W4A8 version'),
+      mk(-100298, -10000398, 'Qwen Image 2.1 PE T2I INT8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors',
+        9471072252, '9182abae56fe05459840a86d22abd21f972061c92fce032630af680c8c5178d3',
+        '文生图提示词扩写模型，供 ComfyUI Generate Text 节点使用', 'Text-to-image prompt enhancer for the ComfyUI Generate Text node'),
+      mk(-100299, -10000399, 'Qwen Image 2.1 PE T2I W4A8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_t2i_w4a8.safetensors',
+        6724090764, 'bdc244869e71e91f9e66638dd85872d8906ac26ce24ef9f32fecbc488e6bc708',
+        '文生图提示词扩写模型，W4A8 轻量版', 'Text-to-image prompt enhancer, lightweight W4A8 version'),
+      mk(-100300, -10000400, 'Qwen3-VL 8B BF16', 'text_encoders', 'qwen3vl_8b_bf16.safetensors',
+        17534334616, '68bdc82bc1b66851162ae656225e7e2068166b603db19bd5d5a3b90eb12669a9',
+        'Qwen Image 2.1 配套视觉语言编码器，BF16 完整档', 'Qwen Image 2.1 vision-language encoder, full BF16 tier'),
+      mk(-100301, -10000401, 'Qwen3-VL 8B INT8', 'text_encoders', 'qwen3vl_8b_int8_convrot.safetensors',
+        9350798360, '8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f',
+        'Qwen Image 2.1 配套视觉语言编码器，INT8 标准档', 'Qwen Image 2.1 vision-language encoder, standard INT8 tier'),
+      mk(-100302, -10000402, 'Qwen3-VL 8B W4A8', 'text_encoders', 'qwen3vl_8b_w4a8.safetensors',
+        6312105364, '7754425e55e7bea2bfde4dde59a4cc236cb44e5ee9c215ea66ef8d47012824eb',
+        'Qwen Image 2.1 配套视觉语言编码器，W4A8 轻量档', 'Qwen Image 2.1 vision-language encoder, lightweight W4A8 tier'),
+      mk(-100303, -10000403, 'Qwen Image 2.1 VAE BF16', 'vae', 'qwen_image_2.1_vae_bf16.safetensors',
+        675509688, 'bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9',
+        'Qwen Image 2.1 专用 64 通道 RGBA VAE', 'Qwen Image 2.1 dedicated 64-channel RGBA VAE'),
+    ]
+  })(),
   ...([
     [-100284, -10000384, 'AuraSR 配套配置', 'huggingface', 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json', '{ComfyUI}/models/Aura-SR', 'config.json', 222, '5009aca786759dc78369abc666878ec7dd99167beaada28bf473fbaf1a68ac9a'],
     [-100285, -10000385, 'SAM 精细掩码', 'meta', 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth', '{ComfyUI}/models/sams', 'sam_vit_b_01ec64.pth', 375042383, 'ec2df62732614e57411cdcf32a23ffdf28910380d03139ee0f4fcbe91eb8c912'],
@@ -9047,7 +9120,7 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
   // ── 运行组件联动补充 (2026-08-07, 全部经 HF API 核实 size/lfs.oid) ──
   // 生成页「运行组件」依赖条引用的模型文件: 文本编码器/ControlNet/检测器/放大权重。
   // 与 component-registry.ts / modelDepConfigs.ts 通过 version id 锚定, 下载走
-  // huggingface 统一通道 (完成即登记 SQLite + resource_registry 状态同步)。
+  // huggingface 统一通道，登记文件后广播完成事件。
   // 不含 custom_nodes 辅助件 (DWPose/DepthAnything/WD tagger) 与非 HF 源 SAM。
   ...(() => {
     const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
@@ -9250,6 +9323,7 @@ export const MODEL_TYPE_DIRS: Record<HuggingFaceFile['modelType'], string> = {
   checkpoints: '{ComfyUI}/models/checkpoints',
   loras: '{ComfyUI}/models/loras',
   controlnet: '{ComfyUI}/models/controlnet',
+  model_patches: '{ComfyUI}/models/model_patches',
   vae: '{ComfyUI}/models/vae',
   embeddings: '{ComfyUI}/models/embeddings',
   upscale_models: '{ComfyUI}/models/upscale_models',

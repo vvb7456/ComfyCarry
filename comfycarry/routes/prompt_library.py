@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import logging
 import threading
@@ -6,6 +7,7 @@ import time
 from flask import Blueprint, Response, jsonify, request
 
 from ..config import get_config, set_config
+from ..utils import api_err
 from ..services import prompt_library as pl
 from ..services import prompt_library_init as pl_init
 from ..services import translate_service as ts
@@ -15,12 +17,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("prompt_library", __name__)
 
 
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `prompt-library.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
-    body = {"error_key": f"prompt-library.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "prompt-library")
 
 
 @bp.route("/api/prompt-library/status", methods=["GET"])

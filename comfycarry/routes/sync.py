@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import os
 import re
@@ -11,6 +12,7 @@ import urllib.request
 import requests
 from flask import Blueprint, jsonify, request, Response
 
+from ..utils import api_err
 from ..config import (
     SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
     SYNC_RULE_DIRECTIONS, SYNC_RULE_METHODS, SYNC_RULE_TRIGGERS,
@@ -41,18 +43,7 @@ bp = Blueprint("sync", __name__)
 # 的 key+params 完全一致, 前端 apiErrorText() / t() 负责渲染。
 # 前端缺条目时会原样显示 key, 开发期一眼可见。
 # ====================================================================
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `sync.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
-
-    形参位置化 (`/`): 插值参数里有 key / name / status 这种名字, 不然会和
-    函数自己的形参撞车。
-    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
-    `**params` 静默吞掉, 顶层字段丢失。
-    """
-    body = {"error_key": f"sync.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "sync")
 
 
 def _soft_err(key: str, /, **params):
@@ -173,13 +164,11 @@ def api_sync_status():
     worker_running = is_worker_running()
     pm2_status = "stopped"
     try:
-        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
-                           capture_output=True, text=True, timeout=5)
-        if r.returncode == 0:
-            for p in json.loads(r.stdout or "[]"):
-                if p.get("name") == "sync":
-                    pm2_status = p.get("pm2_env", {}).get("status", "unknown")
-                    break
+        from ..utils import get_pm2_procs
+        for p in get_pm2_procs():
+            if p.get("name") == "sync":
+                pm2_status = p.get("pm2_env", {}).get("status", "unknown")
+                break
     except Exception:
         pass
 

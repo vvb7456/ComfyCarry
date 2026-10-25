@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { MODEL_TYPES } from '@/config/model-types'
+import { MODEL_TYPES, MODEL_VARIANTS } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import type { IconName } from '@/config/icon-codepoints'
@@ -41,15 +41,16 @@ const emit = defineEmits<{
 const { t, te } = useI18n({ useScope: 'global' })
 
 const modelGuidePath = computed(() => {
-  const path = `generate.prompt.help.models.${props.modelType}`
+  const path = `generate.prompt.help.models.${MODEL_VARIANTS[props.modelType]?.base ?? props.modelType}`
   // vue-i18n 的 te() 只可靠检查叶子 key；对 models.<id> 对象本身检查会返回 false。
   return props.modelType && te(`${path}.title`) ? path : 'generate.prompt.help.models.sdxl'
 })
 
 const NO_NEGATIVE_GUIDE_MODELS = new Set([
   'krea2',
-  'zimage',
+  'zimage_turbo',
   'flux1',
+  'flux1_schnell',
   'flux2klein4b',
   'flux2klein9b',
   'flux2dev',

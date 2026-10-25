@@ -4,6 +4,7 @@
 - 本地模型管理 (索引/预览/删除/获取信息)
 """
 
+from functools import partial
 import json
 import logging
 import os
@@ -23,19 +24,14 @@ from ..config import (
     WORKSPACE_ROOT,
     get_extra_model_paths,
 )
-from ..utils import _get_api_key
+from ..utils import _get_api_key, api_err
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("models", __name__)
 
 
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `models.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
-    body = {"error_key": f"models.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "models")
 
 
 # CivitAI 功能 (搜索/下载) 强制要求 API Key — 前端 gate 之外的后端兜底,
@@ -244,30 +240,6 @@ def _model_not_found(local_model_id: int):
     return _err("model_not_found", 404, local_model_id=local_model_id)
 
 
-def _as_dict(value):
-    if value is None:
-        return None
-    if isinstance(value, dict):
-        return dict(value)
-    try:
-        return dict(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _json_value(value, default):
-    if value is None:
-        return default
-    if isinstance(value, (dict, list)):
-        return value
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except (TypeError, ValueError):
-            return default
-    return default
-
-
 def _path_in(root: Path, candidate) -> bool:
     if not candidate:
         return False
@@ -308,117 +280,8 @@ def _invalidate_generate_options() -> None:
         logger.debug("[models] invalidate generate options failed: %s", exc)
 
 
-def _capabilities(model: dict) -> tuple[bool, bool]:
-    real_path = model.get("real_path")
-    enrich_default = _path_in(Path(COMFYUI_DIR), real_path)
-    delete_default = _path_in(Path(WORKSPACE_ROOT), real_path)
-    can_fetch = model.get("can_fetch_info")
-    can_delete = model.get("can_delete")
-    return (
-        bool(enrich_default if can_fetch is None else can_fetch),
-        bool(delete_default if can_delete is None else can_delete),
-    )
-
-
-def _public_model(model: dict, *, detail: bool = False) -> dict:
-    value = _as_dict(model) or {}
-    # Normalize defaults for an index row that has not been enriched yet.
-    value.setdefault("relative_path", "")
-    value.setdefault("display_name", value.get("filename", ""))
-    value.setdefault("model_type", value.get("category", ""))
-    value.setdefault("file_mtime", 0)
-    value.setdefault("size_bytes", 0)
-    value.setdefault("architecture", value.get("architecture", "unknown") or "unknown")
-    value.setdefault("base_model", value.get("base_model", ""))
-    value["has_info"] = bool(value.get("has_info", False))
-    value["has_preview"] = bool(value.get("has_preview", False))
-
-    if "trigger_words" not in value:
-        value["trigger_words"] = _json_value(value.get("trigger_words_json"), [])
-    if "trigger_sources" not in value:
-        value["trigger_sources"] = _json_value(value.get("trigger_sources_json"), {})
-
-    source = value.get("source")
-    if isinstance(source, dict):
-        value.setdefault("source_type", source.get("type", ""))
-        value.setdefault("source_model_id", source.get("model_id", ""))
-        value.setdefault("source_version_id", source.get("version_id", ""))
-        value.setdefault("source_version_name", source.get("version_name", ""))
-    elif detail:
-        value["source"] = {
-            "type": value.get("source_type", ""),
-            "model_id": value.get("source_model_id", ""),
-            "version_id": value.get("source_version_id", ""),
-            "version_name": value.get("source_version_name", ""),
-        }
-
-    if value.get("id") is not None:
-        try:
-            value["preview_url"] = (
-                f"/api/local_models/{int(value['id'])}/preview"
-                if value["has_preview"]
-                else None
-            )
-        except (TypeError, ValueError):
-            value["preview_url"] = None
-
-    can_fetch, can_delete = _capabilities(value)
-    value["can_fetch_info"] = can_fetch
-    value["can_delete"] = can_delete
-
-    details = _json_value(value.get("details_json"), {})
-    if isinstance(details, dict):
-        images = details.get("images", [])
-        if isinstance(images, list) and images:
-            first = images[0] if isinstance(images[0], dict) else {}
-            value.setdefault("remote_preview_url", first.get("url"))
-            value.setdefault("remote_preview_type", first.get("type") or "image")
-        else:
-            value.setdefault("remote_preview_url", None)
-            value.setdefault("remote_preview_type", None)
-        if detail:
-            value.setdefault("links", details.get("links", []))
-            value.setdefault("images", images)
-
-    fields = (
-        "id",
-        "filename",
-        "category",
-        "relative_path",
-        "display_name",
-        "model_type",
-        "architecture",
-        "base_model",
-        "size_bytes",
-        "file_mtime",
-        "has_info",
-        "has_preview",
-        "preview_url",
-        "remote_preview_url",
-        "remote_preview_type",
-        "source_type",
-        "source_model_id",
-        "source_version_id",
-        "source_version_name",
-        "can_fetch_info",
-        "can_delete",
-    )
-    if detail:
-        fields += (
-            "sha256",
-            "trigger_words",
-            "trigger_sources",
-            "source",
-            "links",
-            "images",
-            "source_url",
-            "provider",
-        )
-    return {key: value[key] for key in fields if key in value}
-
-
 def _get_internal_model(local_model_id: int) -> dict | None:
-    return _as_dict(_get_model_meta_store().get_model_detail(local_model_id))
+    return _get_model_meta_store().get_model_detail(local_model_id, include_path=True)
 
 
 @bp.route("/api/local_models")
@@ -426,17 +289,9 @@ def api_local_models():
     category = request.args.get("category", "all").strip()
     category_arg = None if not category or category == "all" else category
     try:
-        _get_model_meta_store().reconcile_model_index()
+        _get_model_meta_store().reconcile_model_index(min_interval=10)
         models = _get_model_meta_store().list_models(category_arg) or []
-        from ..services import download_store
-        auxiliary_paths = {
-            os.path.realpath(r["meta"]["path"])
-            for r in download_store.get_all_resources()
-            if r.get("meta", {}).get("is_model") is False and r["meta"].get("path")
-        }
-        models = [m for m in models if os.path.realpath(_as_dict(m).get("real_path", "")) not in auxiliary_paths]
-        public = [_public_model(m) for m in models]
-        return jsonify({"models": public, "total": len(public)})
+        return jsonify({"models": models, "total": len(models)})
     except Exception as exc:
         logger.exception("[models] list local models failed")
         return _err("internal", 500, detail=str(exc))
@@ -445,13 +300,13 @@ def api_local_models():
 @bp.route("/api/local_models/<int:local_model_id>", methods=["GET"])
 def api_local_model_detail(local_model_id: int):
     try:
-        model = _get_internal_model(local_model_id)
+        model = _get_model_meta_store().get_model_detail(local_model_id)
     except Exception as exc:
         logger.exception("[models] get local model %s failed", local_model_id)
         return _err("internal", 500, detail=str(exc))
     if model is None:
         return _model_not_found(local_model_id)
-    return jsonify(_public_model(model, detail=True))
+    return jsonify(model)
 
 
 @bp.route("/api/local_models/<int:local_model_id>/preview", methods=["GET"])
@@ -497,8 +352,7 @@ def api_local_model_enrich(local_model_id: int):
     if model is None:
         return _model_not_found(local_model_id)
 
-    can_fetch, _ = _capabilities(model)
-    if not can_fetch:
+    if not model["can_fetch_info"]:
         return _err("not_in_comfy_dir", 403)
 
     real_path = model.get("real_path")
@@ -520,15 +374,7 @@ def api_local_model_enrich(local_model_id: int):
 
     _invalidate_generate_options()
 
-    try:
-        updated = _get_internal_model(local_model_id) or _as_dict(result)
-    except Exception:
-        updated = _as_dict(result)
-    if not updated:
-        return _err("internal", 500, detail="enrich did not return model metadata")
-    response = _public_model(updated, detail=True)
-    response["ok"] = True
-    return jsonify(response)
+    return jsonify({**result, "ok": True})
 
 
 @bp.route("/api/local_models/<int:local_model_id>", methods=["DELETE"])
@@ -541,8 +387,7 @@ def api_local_model_delete(local_model_id: int):
     if model is None:
         return _model_not_found(local_model_id)
 
-    _, can_delete = _capabilities(model)
-    if not can_delete:
+    if not model["can_delete"]:
         return _err("not_in_comfy_dir", 403)
 
     try:

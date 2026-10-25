@@ -113,8 +113,8 @@ comfycarry/
 ├── app.py                        # App factory + startup
 ├── config.py                     # Global config
 ├── auth.py                       # Auth middleware
-├── db.py                         # SQLite WAL + auto migrations
-├── migrations.py                 # Schema (sync_jobs, download_resources, models)
+├── db.py                         # SQLite WAL + transactions
+├── schema.py                     # Current complete database schema
 ├── routes/                       # 15 route blueprints
 │   ├── system / comfyui / models / plugins / tunnel
 │   ├── sync / jupyter / settings / setup / ssh
@@ -126,7 +126,8 @@ comfycarry/
     ├── sync_store.py             # Sync persistence layer
     ├── download_engine.py        # Download queue
     ├── download_store.py         # Download persistence layer
-    ├── resource_registry.py      # Model resource registry
+    ├── download_events.py        # Download events + derived resource status
+    ├── download_completion.py    # Downloaded file registration
     ├── tunnel_manager.py         # CF Tunnel management
     ├── workflow_builder.py       # Workflow builder
     ├── civitai_resolver.py       # CivitAI model resolver

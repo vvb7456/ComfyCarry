@@ -127,8 +127,8 @@ comfycarry/
 ├── app.py                        # App 工厂 + 启动逻辑
 ├── config.py                     # 全局配置
 ├── auth.py                       # 认证中间件
-├── db.py                         # SQLite WAL + 自动 migration
-├── migrations.py                 # Schema 定义 (sync_jobs, download_resources, models)
+├── db.py                         # SQLite WAL + 事务
+├── schema.py                     # 当前完整数据库结构
 ├── routes/                       # 15 个路由蓝图
 │   ├── system / comfyui / models / plugins / tunnel
 │   ├── sync / jupyter / settings / setup / ssh
@@ -140,7 +140,8 @@ comfycarry/
     ├── sync_store.py             # Sync 持久化层
     ├── download_engine.py        # 下载队列
     ├── download_store.py         # 下载持久化层
-    ├── resource_registry.py      # 模型资源注册表
+    ├── download_events.py        # 下载事件与文件状态查询
+    ├── download_completion.py    # 下载文件登记
     ├── tunnel_manager.py         # CF Tunnel 管理
     ├── workflow_builder.py       # 工作流构建器
     ├── civitai_resolver.py       # CivitAI 模型解析

@@ -96,17 +96,6 @@ const speedTitle = computed(() => {
     </template>
   </BaseButton>
 
-  <!-- Verifying: full ring + pulse, not cancellable -->
-  <BaseButton
-    v-else-if="state === 'verifying'"
-    :size="size"
-    class="dl-btn dl-btn--busy"
-    :title="t('models.downloads.verifying')"
-  >
-    <ProgressRing :progress="100" :size="16" :stroke-width="2" />
-    {{ t('models.downloads.verifying') }}
-  </BaseButton>
-
   <BaseButton
     v-else-if="state === 'paused'"
     :size="size"

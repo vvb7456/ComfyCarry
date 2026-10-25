@@ -2,11 +2,35 @@ import hashlib
 import json
 import struct
 import subprocess
+import threading
+import time
 
-from .config import CONFIG_FILE
+def api_err(domain: str, key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
+    from flask import jsonify
+
+    return jsonify({"error_key": f"{domain}.err.{key}", "error_params": params,
+                    **(_extra or {})}), status
+
+
+_pm2_lock = threading.Lock()
+_pm2_cache: list[dict] = []
+_pm2_cache_time = 0.0
+
+
+def get_pm2_procs(*, refresh: bool = False) -> list[dict]:
+    global _pm2_cache, _pm2_cache_time
+    with _pm2_lock:
+        if not refresh and time.monotonic() - _pm2_cache_time < 2:
+            return _pm2_cache
+        result = subprocess.run(["pm2", "jlist"], capture_output=True, text=True, timeout=5, check=True)
+        _pm2_cache = json.loads(result.stdout)
+        _pm2_cache_time = time.monotonic()
+        return _pm2_cache
 
 
 def _get_api_key():
+    from .config import CONFIG_FILE
+
     if CONFIG_FILE.exists():
         try:
             return json.loads(CONFIG_FILE.read_text()).get("api_key", "")

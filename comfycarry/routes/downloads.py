@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import logging
 import os
@@ -7,20 +8,17 @@ import time
 from flask import Blueprint, Response, jsonify, request
 
 from ..config import COMFYUI_DIR, MODEL_DIRS, resolve_file_path, FilePathError
+from ..utils import api_err
 from ..services.download_engine import get_engine, DownloadStatus
-from ..services.resource_registry import get_registry
-from ..utils import _sha256_file
+from ..services import download_events
+from ..services.download_completion import register_task_file
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("downloads", __name__)
 
 
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    body = {"error_key": f"models.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "models")
 
 
 def _resolve_check_save_dir(spec: dict) -> str | None:
@@ -46,7 +44,7 @@ def _check_file_spec(engine, spec: dict) -> dict:
             "path": os.path.realpath(os.path.join(save_dir, filename))}
 
 
-_registry_wired = False
+_events_wired = False
 
 
 def _persist_task(task) -> None:
@@ -77,58 +75,28 @@ def _persist_task(task) -> None:
 
 
 def _publish_task(task) -> None:
+    if task.status == DownloadStatus.COMPLETE:
+        from .generate import invalidate_options_cache
+        invalidate_options_cache()
     _persist_task(task)
-    get_registry().emit_task_event("task.updated", task.to_dict())
+    download_events.emit_task_event("task.updated", task.to_dict())
 
 
-def _wire_registry():
-    global _registry_wired
-    if _registry_wired:
+def _wire_events():
+    global _events_wired
+    if _events_wired:
         return
-    _registry_wired = True
+    _events_wired = True
 
-    registry = get_registry()
     engine = get_engine()
 
     _progress_thresholds: dict[str, int] = {}
 
     def _on_status_change(task, old_status, new_status):
-        meta = task.meta or {}
-        source = meta.get("source", "")
-        model_id = meta.get("model_id", "")
-        version_id = meta.get("version_id", "")
-
-        if source and model_id:
-            if new_status == DownloadStatus.COMPLETE:
-                registry.task_complete(source, model_id, version_id,
-                                       task.save_dir, task.filename)
-            elif new_status == DownloadStatus.FAILED:
-                registry.task_failed(source, model_id, version_id, task.error)
-            elif new_status == DownloadStatus.CANCELLED:
-                registry.task_cancelled(source, model_id, version_id)
-            elif new_status == DownloadStatus.PAUSED:
-                registry.task_paused(source, model_id, version_id)
-            elif new_status in (DownloadStatus.ACTIVE, DownloadStatus.QUEUED):
-                if old_status == DownloadStatus.PAUSED:
-                    registry.task_resumed(source, model_id, version_id)
-
-        # 下载完成 → 立即失效 Generate 下拉选项缓存。
-        # 新落盘的 checkpoint / UNet / 文本编码器 / VAE 必须马上能出现在选择器与
-        # 高级设置的下拉里 (用户预期: 组件下完 select 自动出现并选中), 不能等
-        # options 的 300s TTL。放在 emit 之前, 保证前端收到 SSE 完成事件时后端已是新数据。
-        if new_status == DownloadStatus.COMPLETE:
-            try:
-                from .generate import invalidate_options_cache
-                invalidate_options_cache()
-            except Exception as e:
-                logger.debug(f"[downloads] 失效 options 缓存失败 (非致命): {e}")
-
-        registry.emit_task_event("task.updated", task.to_dict())
-
-        _persist_task(task)
+        _publish_task(task)
 
     def _on_progress(task):
-        registry.emit_task_event("task.progress", task.to_dict())
+        download_events.emit_task_event("task.progress", task.to_dict())
 
         bucket = int(task.progress // 10)
         last = _progress_thresholds.get(task.download_id, -1)
@@ -138,7 +106,7 @@ def _wire_registry():
 
     engine._on_status_change.append(_on_status_change)
     engine._on_progress.append(_on_progress)
-    logger.info("[downloads] Registry ↔ Engine 已连接")
+    logger.info("[downloads] 下载事件广播已连接")
 
 
 @bp.route("/api/downloads/check", methods=["POST"])
@@ -220,7 +188,7 @@ def api_downloads_submit():
     if filename in (".", "..") or "/" in filename:
         return _err("dl_filename_required")
 
-    _wire_registry()
+    _wire_events()
     engine = get_engine()
     headers = data.get("headers")
     meta = data.get("meta")
@@ -246,7 +214,7 @@ def api_downloads_submit():
 
 @bp.route("/api/downloads", methods=["GET"])
 def api_downloads_list():
-    _wire_registry()
+    _wire_events()
     engine = get_engine()
     tasks = engine.list_tasks()
     return jsonify({"tasks": tasks})
@@ -297,74 +265,6 @@ def api_downloads_resume(download_id: str):
     return jsonify({"ok": True, "download_id": download_id})
 
 
-@bp.route("/api/downloads/<download_id>/events", methods=["GET"])
-def api_downloads_events(download_id: str):
-    """
-    SSE 实时进度流.
-
-    事件格式:
-      data: {"status": "active", "progress": 45.2, "speed": 52428800, ...}
-
-    当下载完成/失败/取消时发送最终事件并关闭连接.
-    """
-    engine = get_engine()
-    task = engine.get_task(download_id)
-    if not task:
-        return _err("dl_task_not_found", 404)
-
-    def _sse_generator():
-        last_progress = -1
-        heartbeat_counter = 0
-        terminal_states = (
-            DownloadStatus.COMPLETE,
-            DownloadStatus.FAILED,
-            DownloadStatus.CANCELLED,
-        )
-
-        while True:
-            t = engine.get_task(download_id)
-            if not t:
-                yield ("data: " + json.dumps(
-                    {"error_key": "models.err.dl_task_deleted"}) + "\n\n")
-                break
-
-            if t.progress != last_progress or t.status in terminal_states:
-                event = {
-                    "status": t.status.value,
-                    "progress": t.progress,
-                    "completed_bytes": t.completed_bytes,
-                    "total_bytes": t.total_bytes,
-                    "speed": t.speed,
-                    "filename": t.filename,
-                }
-                if t.error:
-                    event["error"] = t.error
-                yield f"data: {json.dumps(event)}\n\n"
-                last_progress = t.progress
-                heartbeat_counter = 0
-            else:
-                # 进度无变化时定期发心跳, 防止连接被中间件/浏览器超时断开
-                heartbeat_counter += 1
-                if heartbeat_counter >= 15:  # 约每 12 秒
-                    yield ": heartbeat\n\n"
-                    heartbeat_counter = 0
-
-            if t.status in terminal_states:
-                break
-
-            time.sleep(_SSE_POLL_INTERVAL)
-
-    return Response(
-        _sse_generator(),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
-
-
 @bp.route("/api/downloads/<download_id>/retry", methods=["POST"])
 def api_downloads_retry(download_id: str):
     engine = get_engine()
@@ -397,14 +297,7 @@ def api_downloads_retry(download_id: str):
     except Exception:
         pass
 
-    _wire_registry()
-    registry = get_registry()
-    source = old_task.meta.get("source", "")
-    res_model_id = old_task.meta.get("model_id", "")
-    res_version_id = old_task.meta.get("version_id", "")
-    if source and res_model_id:
-        registry.submit_pending(source, res_model_id, res_version_id)
-
+    _wire_events()
     new_task = engine.submit(
         url=url,
         save_dir=old_task.save_dir,
@@ -414,22 +307,6 @@ def api_downloads_retry(download_id: str):
     )
 
     _publish_task(new_task)
-
-    if source and res_model_id:
-        if new_task.status == DownloadStatus.FAILED:
-            registry.task_failed(source, res_model_id, res_version_id,
-                                 new_task.error)
-        elif new_task.status == DownloadStatus.COMPLETE:
-            registry.task_complete(
-                source,
-                res_model_id,
-                res_version_id,
-                new_task.save_dir,
-                new_task.filename,
-            )
-        else:
-            registry.task_submitted(source, res_model_id, res_version_id,
-                                    new_task.download_id)
 
     if new_task.status == DownloadStatus.FAILED:
         return jsonify({
@@ -478,10 +355,8 @@ def _handle_civitai_source(data: dict):
       docs/DOWNLOAD_CLASSIFICATION_SPEC.md §5-B。
     """
     from ..services.civitai_resolver import (
-        resolve_civitai_download, download_preview_image,
-        extract_file_trigger_words, NoDownloadableFiles,
+        resolve_civitai_download, NoDownloadableFiles,
     )
-    from ..services.model_meta_store import register_downloaded_model
     from ..services.header_probe import ProbeAuthError
     from ..utils import _get_api_key
 
@@ -557,40 +432,24 @@ def _handle_civitai_source(data: dict):
         if ea.get("chargeForDownload"):
             price = ea.get("downloadPrice", "?")
             return _err("dl_early_access", 403, price=price, _extra={"early_access": True})
-    def _on_civitai_complete(task):
-        # 目录已在下载前逐文件定好；完成钩子在终态广播前登记模型元数据。
-        model_path = os.path.join(task.save_dir, task.filename)
-        sha256 = _sha256_file(model_path)
-        if not sha256:
-            raise RuntimeError("SHA256 计算失败")
-        download_preview_image(model_path, info.get("images", []))
-        detail = register_downloaded_model(
-            model_path=model_path,
-            category=resolved.get("model_type", "") or info.get("save_dir_key", ""),
-            source_data=info,
-            sha256=sha256,
-            file_trigger_words=extract_file_trigger_words(model_path),
-        )
-        task.meta["local_model_id"] = detail["id"]
-
     engine = get_engine()
-    _wire_registry()
-    registry = get_registry()
+    _wire_events()
 
     res_model_id = str(info.get("model_id", ""))
     res_version_id = str(info.get("version_id", ""))
-    registry.submit_pending("civitai", res_model_id, res_version_id, meta={
-        "model_name": info.get("model_name", ""),
-        "model_type": info.get("model_type", ""),
-    })
 
     task = engine.submit(
         url=resolved["url"],
         save_dir=resolved["save_dir"],
         filename=resolved["filename"],
-        on_complete=_on_civitai_complete,
+        on_complete=register_task_file,
         meta={
             "source": "civitai",
+            "category": resolved["model_type"],
+            "source_data": {key: info[key] for key in (
+                "source", "model_id", "version_id", "model_name", "version_name",
+                "model_type", "base_model", "images", "trained_words",
+            ) if key in info},
             "model_id": res_model_id,
             "version_id": res_version_id,
             "model_name": info.get("model_name", ""),
@@ -606,14 +465,6 @@ def _handle_civitai_source(data: dict):
 
     existed = task.meta.get("existed", False)
 
-    if task.status == DownloadStatus.FAILED:
-        registry.task_failed("civitai", res_model_id, res_version_id, task.error)
-    elif existed:
-        registry.mark_installed("civitai", res_model_id, res_version_id, emit=True)
-    else:
-        registry.task_submitted("civitai", res_model_id, res_version_id,
-                                task.download_id)
-
     # 提交失败 (aria2 RPC error) — 返回 200 + error 字段 (兼容 useApiFetch)
     if task.status == DownloadStatus.FAILED:
         return jsonify({
@@ -621,7 +472,6 @@ def _handle_civitai_source(data: dict):
             "error_key": "models.err.dl_submit_failed",
             "error_params": {"name": resolved['display_name'],
                              "detail": task.error or ""},
-            "resource_state": registry.get_state("civitai", res_model_id, res_version_id),
         }), 200
 
     if existed:
@@ -636,13 +486,11 @@ def _handle_civitai_source(data: dict):
         "message_key": msg_key,
         "message_params": msg_params,
         "existed": existed,
-        "resource_state": registry.get_state("civitai", res_model_id, res_version_id),
     }), 201 if task.status == DownloadStatus.ACTIVE else 200
 
 
 def _handle_whitelist_source(data: dict):
-    """下载白名单中的任意文件，只有 is_model=true 才登记模型元数据。"""
-    from ..services.model_meta_store import register_downloaded_model
+    """下载并登记白名单文件，辅助文件不进入模型列表。"""
 
     url = data.get("url", "").strip()
     filename = data.get("filename", "").strip()
@@ -670,38 +518,14 @@ def _handle_whitelist_source(data: dict):
     if not filename or filename in (".", "..") or "/" in filename:
         return _err("dl_filename_required")
 
-    def _on_whitelist_complete(task):
-        if task.meta.get("is_model") is False:
-            return
-        # 白名单元数据直接登记; 回调期间不读取模型文件内容 (SPEC §7-B / §11-B-4)。
-        model_path = os.path.join(task.save_dir, task.filename)
-        detail = register_downloaded_model(
-            model_path=model_path,
-            category=task.meta["category"],
-            source_data=task.meta,
-            sha256=task.meta["sha256"],
-            file_trigger_words=[],
-        )
-        task.meta["local_model_id"] = detail["id"]
-
     # 任务 meta: 白名单字段 + 强制完成登记回调 (前端已传则尊重, 缺省补 true)
     task_meta = dict(meta)
     task_meta["source"] = "whitelist"
     task_meta.setdefault("category", model_type)
     task_meta.setdefault("completion_requires_callback", True)
 
-    _wire_registry()
+    _wire_events()
     engine = get_engine()
-    registry = get_registry()
-
-    res_model_id = str(meta.get("model_id", ""))
-    res_version_id = str(meta.get("version_id", ""))
-    registry.submit_pending("whitelist", res_model_id, res_version_id, meta={
-        "model_name": meta.get("model_name", ""),
-        "model_type": meta.get("model_type", ""),
-        "is_model": meta.get("is_model", True),
-        "path": os.path.join(save_dir, filename),
-    })
 
     task = engine.submit(
         url=url,
@@ -709,20 +533,12 @@ def _handle_whitelist_source(data: dict):
         filename=filename,
         meta=task_meta,
         headers=data.get("headers"),
-        on_complete=_on_whitelist_complete,
+        on_complete=register_task_file,
     )
 
     _publish_task(task)
 
     existed = task.meta.get("existed", False)
-
-    if task.status == DownloadStatus.FAILED:
-        registry.task_failed("whitelist", res_model_id, res_version_id, task.error)
-    elif existed:
-        registry.mark_installed("whitelist", res_model_id, res_version_id, emit=True)
-    else:
-        registry.task_submitted("whitelist", res_model_id, res_version_id,
-                                task.download_id)
 
     resp = task.to_dict()
     if existed:
@@ -731,9 +547,6 @@ def _handle_whitelist_source(data: dict):
         resp["message_params"] = {"filename": filename}
 
     return jsonify(resp), 201 if task.status == DownloadStatus.ACTIVE else 200
-
-
-_SSE_POLL_INTERVAL = 0.8
 
 
 @bp.route("/api/downloads/snapshot", methods=["GET"])
@@ -749,9 +562,8 @@ def api_downloads_snapshot():
         "server_time": 1710000000.0
       }
     """
-    _wire_registry()
-    registry = get_registry()
-    return jsonify(registry.get_snapshot())
+    _wire_events()
+    return jsonify(download_events.get_snapshot())
 
 
 @bp.route("/api/downloads/stream", methods=["GET"])
@@ -764,8 +576,7 @@ def api_downloads_stream():
       data: {"type": "task.updated", "data": {...}, "time": 1710000000.0}
       data: {"type": "task.progress", "data": {...}, "time": 1710000000.0}
     """
-    _wire_registry()
-    registry = get_registry()
+    _wire_events()
     event_queue: queue.Queue = queue.Queue(maxsize=100)
 
     def _listener(event):
@@ -774,7 +585,7 @@ def api_downloads_stream():
         except queue.Full:
             pass  # 丢弃旧事件, 防止阻塞
 
-    registry.add_listener(_listener)
+    download_events.add_listener(_listener)
 
     def _sse_generator():
         heartbeat_counter = 0
@@ -791,7 +602,7 @@ def api_downloads_stream():
                         yield ": heartbeat\n\n"
                         heartbeat_counter = 0
         finally:
-            registry.remove_listener(_listener)
+            download_events.remove_listener(_listener)
 
     return Response(
         _sse_generator(),

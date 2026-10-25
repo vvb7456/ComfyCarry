@@ -17,6 +17,10 @@ const store = useGenerateStore()
 const options = inject(GenerateOptionsKey)!
 
 const config = computed<FaceDetailerState>(() => store.currentState.faceDetailer)
+const schedulerOptions = computed(() => [
+  ...(store.currentConfig.extraSchedulers ?? []),
+  ...options.schedulers.value,
+])
 
 const detectionOptions = computed(() =>
   options.ultralyticsBboxModels.value.map(f => ({ value: f, label: f })),
@@ -114,6 +118,32 @@ watch(samInstalled, (ok) => {
     </div>
 
     <CollapsibleGroup :title="t('generate.face.advanced')" :default-open="false">
+      <div class="face-grid__row">
+        <div class="fd-cell">
+          <div class="fd-field">
+            <label class="field-lbl">{{ t('generate.advanced.sampler') }}</label>
+            <BaseSelect
+              :model-value="config.sampler"
+              :options="options.samplers.value"
+              searchable
+              :search-placeholder="t('generate.advanced.sampler_search')"
+              @update:model-value="config.sampler = String($event)"
+            />
+          </div>
+        </div>
+        <div class="fd-cell">
+          <div class="fd-field">
+            <label class="field-lbl">{{ t('generate.advanced.scheduler') }}</label>
+            <BaseSelect
+              :model-value="config.scheduler"
+              :options="schedulerOptions"
+              searchable
+              :search-placeholder="t('generate.advanced.scheduler_search')"
+              @update:model-value="config.scheduler = String($event)"
+            />
+          </div>
+        </div>
+      </div>
       <div class="face-grid__row">
         <div class="fd-cell">
           <RangeField

@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import logging
 import shutil
@@ -9,6 +10,7 @@ from flask import Blueprint, Response, jsonify, request
 from pathlib import Path
 
 from .. import config as cfg
+from ..utils import api_err
 from ..config import (
     CONFIG_FILE, DEFAULT_PLUGINS,
     SYNC_RULES_FILE, SYNC_SETTINGS_FILE, RCLONE_CONF,
@@ -29,12 +31,7 @@ log = logging.getLogger(__name__)
 bp = Blueprint("settings", __name__)
 
 
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `settings.err.<key>` 翻译 error_key。"""
-    body = {"error_key": f"settings.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "settings")
 
 
 def _err_item(key: str, /, **params) -> dict:
@@ -256,10 +253,8 @@ def api_settings_export_config():
     if civitai_nsfw_blur != "":
         config["civitai_nsfw_blur"] = civitai_nsfw_blur
 
-    if db.table_exists("civitai_favorites"):
-        config["favorites"] = favorites_store.list_favorites()
-    if db.table_exists("prompt_history"):
-        config["prompt_history"] = prompt_library.dump_history()
+    config["favorites"] = favorites_store.list_favorites()
+    config["prompt_history"] = prompt_library.dump_history()
 
     # 工作区状态 (内容生成页配置): 随配置导入导出, 供换实例后恢复。
     # 注意其中的参考图引用只是 input/ 下的文件名, 导入到别的实例后由前端
@@ -409,10 +404,6 @@ def api_settings_import_config():
         try:
             provider = data["llm_provider"]
             _set_config("llm_provider", provider)
-            prov_keys = data.get("llm_provider_keys", {}).get(provider, {})
-            _set_config("llm_model", prov_keys.get("model", ""))
-            _set_config("llm_api_key", prov_keys.get("api_key", ""))
-            _set_config("llm_base_url", prov_keys.get("base_url", ""))
             _set_config("llm_temperature", data.get("llm_temperature", 0.7))
             _set_config("llm_max_tokens", data.get("llm_max_tokens", 2000))
             _set_config("llm_stream", data.get("llm_stream", False))
@@ -496,15 +487,11 @@ def api_settings_import_config():
                 errors.append(f"工作区状态: {err[0]}")
             else:
                 applied.append("工作区状态")
-                # 置位写入守卫: 其它标签页的自动保存可能仍持有旧状态, 必须
-                # 阻止它们在刷新前把旧状态 PUT 回来覆盖导入结果。
-                generate_state_store.mark_reload_required()
         except Exception as e:
             errors.append(f"工作区状态: {e}")
 
     # 模型哈希表: 不透明 JSON, 整体替换 (导入 = 完整替换, 无兼容负担)。
     # 请求里没有该字段 → 存空表, 免残留旧指纹指向已不存在的引用。
-    # generate_model_meta 是旧方案的字段, 已退役 —— 直接忽略, 不做兼容处理。
     try:
         from ..services import model_hash_store
         model_hash_store.replace_hashes(data.get("generate_model_hashes"))

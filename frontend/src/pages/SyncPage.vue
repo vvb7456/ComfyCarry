@@ -213,7 +213,7 @@ async function loadStorage(name: string) {
   storageLoading.value[name] = true
   try {
     const d = await get<StorageResponse>('/api/sync/storage')
-    if (d?.storage && d.storage[name]) storageData.value[name] = d.storage[name]
+    if (d?.storage) storageData.value = { ...storageData.value, ...d.storage }
   } finally {
     storageLoading.value[name] = false
   }

@@ -162,7 +162,6 @@
     "download": "下载",
     "installed": "已下载",
     "resolving": "解析中…",
-    "verifying": "校验中",
     "batch_modal_title": "批量添加模型",
     "batch_modal_hint": "每行输入一个 CivitAI 模型链接或 ID，支持多种格式：",
     "batch_modal_placeholder": "粘贴链接或 ID...",

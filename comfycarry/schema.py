@@ -1,11 +1,7 @@
-"""
-注意: migration 函数内 **禁止** 使用 executescript()，必须逐条 execute()。
-"""
-
-from .db import db
+"""当前实例的完整表结构；容器升级时重建，不维护历史迁移。"""
 
 
-def _migration_v1(conn):
+def create_schema(conn):
     stmts = [
         """CREATE TABLE IF NOT EXISTS app_meta (
             key   TEXT PRIMARY KEY,
@@ -72,19 +68,6 @@ def _migration_v1(conn):
             completed_at    REAL
         )""",
 
-        """CREATE TABLE IF NOT EXISTS download_resources (
-            resource_key    TEXT PRIMARY KEY,
-            source          TEXT NOT NULL,
-            model_id        TEXT NOT NULL,
-            version_id      TEXT NOT NULL,
-            state           TEXT NOT NULL DEFAULT 'absent',
-            active_task_id  TEXT NOT NULL DEFAULT '',
-            last_error      TEXT NOT NULL DEFAULT '',
-            meta_json       TEXT NOT NULL DEFAULT '{}',
-            created_at      REAL NOT NULL,
-            updated_at      REAL NOT NULL
-        )""",
-
         """CREATE TABLE IF NOT EXISTS models (
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
             real_path             TEXT NOT NULL,
@@ -126,24 +109,12 @@ def _migration_v1(conn):
 
         "CREATE INDEX IF NOT EXISTS idx_dl_tasks_resource   ON download_tasks(resource_key)",
         "CREATE INDEX IF NOT EXISTS idx_dl_tasks_status     ON download_tasks(status, updated_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_dl_res_source       ON download_resources(source, model_id, version_id)",
-        "CREATE INDEX IF NOT EXISTS idx_dl_res_state        ON download_resources(state, updated_at DESC)",
 
         "CREATE INDEX IF NOT EXISTS idx_models_category     ON models(category)",
         "CREATE INDEX IF NOT EXISTS idx_models_source       ON models(source_type, source_model_id, source_version_id)",
         "CREATE INDEX IF NOT EXISTS idx_models_hash         ON models(sha256)",
 
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_models_real_path ON models(real_path)",
-    ]
-    for sql in stmts:
-        conn.execute(sql)
-
-
-db.register_migration(1, _migration_v1, "core tables — prompt, download, model")
-
-
-def _migration_v2(conn):
-    stmts = [
         """CREATE TABLE IF NOT EXISTS sync_jobs (
             job_id          TEXT PRIMARY KEY,
             trigger_type    TEXT NOT NULL DEFAULT 'manual',
@@ -156,7 +127,8 @@ def _migration_v2(conn):
             summary_json    TEXT NOT NULL DEFAULT '{}',
             rules_json      TEXT NOT NULL DEFAULT '[]',
             started_at      REAL NOT NULL,
-            finished_at     REAL
+            finished_at     REAL,
+            queued_at       REAL
         )""",
 
         """CREATE TABLE IF NOT EXISTS sync_job_events (
@@ -173,16 +145,7 @@ def _migration_v2(conn):
         "CREATE INDEX IF NOT EXISTS idx_sync_jobs_started ON sync_jobs(started_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_sync_events_job ON sync_job_events(job_id, id)",
         "CREATE INDEX IF NOT EXISTS idx_sync_events_created ON sync_job_events(created_at DESC)",
-    ]
-    for sql in stmts:
-        conn.execute(sql)
-
-
-db.register_migration(2, _migration_v2, "sync job/event model")
-
-
-def _migration_v3(conn):
-    stmts = [
+        "CREATE INDEX IF NOT EXISTS idx_sync_jobs_queued ON sync_jobs(status, queued_at)",
         """CREATE TABLE IF NOT EXISTS civitai_favorites (
             fav_key           TEXT PRIMARY KEY,
             model_id          TEXT NOT NULL,
@@ -199,50 +162,3 @@ def _migration_v3(conn):
     ]
     for sql in stmts:
         conn.execute(sql)
-
-
-db.register_migration(3, _migration_v3, "civitai favorites")
-
-
-def _migration_v4(conn):
-    stmts = [
-        # 入队时刻; 仅 queued/cancelled 行有意义 (取消的行保留以便排查)
-        "ALTER TABLE sync_jobs ADD COLUMN queued_at REAL",
-        "CREATE INDEX IF NOT EXISTS idx_sync_jobs_queued "
-        "ON sync_jobs(status, queued_at)",
-    ]
-    for sql in stmts:
-        conn.execute(sql)
-
-
-db.register_migration(4, _migration_v4, "sync job queue")
-
-
-def _migration_v5(conn):
-    """download_resources 结构收敛: 去掉 installed_at。
-
-    该字段从未在任何界面显示, 也没有读取方。同时「已下载」不再由本表回答
-    (改由磁盘现状派生, 见 services/resource_registry.resolve_state), 故一并去掉。
-
-    用重建而非 ALTER 删列: v1 里的建表是 CREATE TABLE IF NOT EXISTS, 对已建过
-    表的库不会生效 —— 结构变更必须落在新 migration 里, 否则旧库永远停在旧结构
-    (曾因手工删表导致该表缺失、下载功能整体报错)。
-    """
-    conn.execute("DROP TABLE IF EXISTS download_resources")
-    conn.execute("""
-        CREATE TABLE download_resources (
-            resource_key    TEXT PRIMARY KEY,
-            source          TEXT NOT NULL,
-            model_id        TEXT NOT NULL,
-            version_id      TEXT NOT NULL,
-            state           TEXT NOT NULL DEFAULT 'absent',
-            active_task_id  TEXT NOT NULL DEFAULT '',
-            last_error      TEXT NOT NULL DEFAULT '',
-            meta_json       TEXT NOT NULL DEFAULT '{}',
-            created_at      REAL NOT NULL,
-            updated_at      REAL NOT NULL
-        )
-    """)
-
-
-db.register_migration(5, _migration_v5, "download resource state (drop installed_at)")

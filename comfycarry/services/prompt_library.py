@@ -13,22 +13,12 @@ T_HISTORY = "prompt_history"
 
 
 def get_status() -> dict:
-    groups = db.row_count(T_GROUPS) if db.table_exists(T_GROUPS) else 0
-    tags = db.row_count(T_TAGS) if db.table_exists(T_TAGS) else 0
-    danbooru = db.row_count(T_DANBOORU) if db.table_exists(T_DANBOORU) else 0
-    history = 0
-    if db.table_exists(T_HISTORY):
-        row = db.fetch_one(
-            f"SELECT COUNT(*) FROM {T_HISTORY} WHERE is_deleted=0"
-        )
-        history = row[0] if row else 0
-
-    initialized = False
-    if db.table_exists("app_meta"):
-        row = db.fetch_one(
-            "SELECT value FROM app_meta WHERE key = 'prompt_library_imported'"
-        )
-        initialized = row is not None and row[0] == "true"
+    groups = db.row_count(T_GROUPS)
+    tags = db.row_count(T_TAGS)
+    danbooru = db.row_count(T_DANBOORU)
+    history = db.fetch_one(f"SELECT COUNT(*) FROM {T_HISTORY} WHERE is_deleted=0")[0]
+    row = db.fetch_one("SELECT value FROM app_meta WHERE key = 'prompt_library_imported'")
+    initialized = row is not None and row[0] == "true"
 
     return {
         "initialized": initialized,

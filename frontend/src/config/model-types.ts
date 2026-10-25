@@ -33,6 +33,8 @@ export interface ModelTypeConfig {
   /** 按模式的 ControlNet 默认参数 (start 恒 0 不需字段); 有该 key 的 mode 新建态取此值 */
   cnDefaults?: Record<string, { strength: number; end: number }>
   resolutions: { label: string; value: string }[]
+  resolutionStep?: number
+  extraSchedulers?: string[]
   defaults: {
     steps: number
     cfg: number
@@ -135,7 +137,7 @@ export const ARCH_LABELS: Record<string, string> = {
   'ace1.5': 'ACE 1.5',
   // 补全 arch_detect 全架构 (审计 Q6)
   hidream: 'HiDream', cogvideox: 'CogVideoX', ernie: 'Ernie Image',
-  lens: 'Lens', qwen: 'Qwen Image', acestep: 'ACE-Step',
+  lens: 'Lens', qwen: 'Qwen Image', qwen_image21: 'Qwen Image 2.1', acestep: 'ACE-Step',
   svd: 'SVD', kandinsky5: 'Kandinsky 5', pixeldit: 'PixelDiT',
   newbie: 'NewBie', omnigen2: 'OmniGen2', triposplat: 'TripoSplat',
   lotus: 'Lotus', rtdetr: 'RT-DETR', t5: 'T5', qwen35: 'Qwen 3.5',
@@ -203,7 +205,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   },
   anima: {
     key: 'anima',
-    label: 'Anima',
+    label: 'Anima Base',
     archFilter: ['anima'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -229,9 +231,66 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     // ControlNet 模块开关 disabled (Anima 暂无 ControlNet 生态)
     modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
   },
+  qwen_image21: {
+    key: 'qwen_image21',
+    label: 'Qwen Image 2.1',
+    archFilter: ['qwen_image21'],
+    supportedPackaging: ['split'],
+    controlNetEnabled: false,
+    logo: tongyiLogo,
+    pickerArch: 'qwen_image21',
+    releasedAt: '2026-09',
+    mediaType: 'image',
+    resolutionStep: 16,
+    extraSchedulers: ['qwen_image21_turbo'],
+    resolutions: [
+      { label: '1024×1024', value: '1024x1024' },
+      { label: '2048×2048', value: '2048x2048' },
+      { label: '2400×1792', value: '2400x1792' },
+      { label: '1792×2400', value: '1792x2400' },
+      { label: '2528×1696', value: '2528x1696' },
+      { label: '1696×2528', value: '1696x2528' },
+      { label: '2752×1536', value: '2752x1536' },
+      { label: '1536×2752', value: '1536x2752' },
+    ],
+    defaults: { steps: 25, cfg: 1.0, sampler: 'euler', scheduler: 'simple' },
+    hasNegativePrompt: true,
+    promptStyle: 'natural',
+    defaultModels: { clip: 'qwen3vl_8b_int8_convrot.safetensors', vae: 'qwen_image_2.1_vae_bf16.safetensors' },
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
+  },
+  qwen_image21_turbo: {
+    key: 'qwen_image21_turbo',
+    label: 'Qwen Image 2.1 Turbo',
+    archFilter: ['qwen_image21'],
+    supportedPackaging: ['split'],
+    controlNetEnabled: false,
+    familyOf: 'qwen_image21',
+    logo: tongyiLogo,
+    pickerArch: 'qwen_image21',
+    releasedAt: '2026-10',
+    mediaType: 'image',
+    resolutionStep: 16,
+    extraSchedulers: ['qwen_image21_turbo'],
+    resolutions: [
+      { label: '1024×1024', value: '1024x1024' },
+      { label: '2048×2048', value: '2048x2048' },
+      { label: '2400×1792', value: '2400x1792' },
+      { label: '1792×2400', value: '1792x2400' },
+      { label: '2528×1696', value: '2528x1696' },
+      { label: '1696×2528', value: '1696x2528' },
+      { label: '2752×1536', value: '2752x1536' },
+      { label: '1536×2752', value: '1536x2752' },
+    ],
+    defaults: { steps: 8, cfg: 1.0, sampler: 'euler', scheduler: 'qwen_image21_turbo' },
+    hasNegativePrompt: true,
+    promptStyle: 'natural',
+    defaultModels: { clip: 'qwen3vl_8b_int8_convrot.safetensors', vae: 'qwen_image_2.1_vae_bf16.safetensors' },
+    modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
+  },
   krea2: {
     key: 'krea2',
-    label: 'Krea 2',
+    label: 'Krea 2 Turbo',
     archFilter: ['krea2'],
     supportedPackaging: ['checkpoint', 'split'],
     controlNetEnabled: false,
@@ -260,7 +319,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
   },
   zimage: {
     key: 'zimage',
-    label: 'Z-Image',
+    label: 'Z-Image Base',
     archFilter: ['zimage'],
     supportedPackaging: ['split'],
     controlNetEnabled: false,  // 官方 CN 模板已出现, 二期评估
@@ -279,9 +338,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    // 官方 Turbo 模板 image_z_image_turbo.json 实测值; Base 用户手动调 25/4.0
-    defaults: { steps: 8, cfg: 1.0, sampler: 'res_multistep', scheduler: 'simple' },
-    hasNegativePrompt: false,
+    defaults: { steps: 25, cfg: 4.0, sampler: 'res_multistep', scheduler: 'simple' },
+    hasNegativePrompt: true,
     promptStyle: 'natural',  // 中英双语原生
     defaultModels: { clip: 'qwen_3_4b.safetensors', vae: 'ae.safetensors' },
     modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
@@ -344,7 +402,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    defaults: { steps: 26, cfg: 4, sampler: 'euler', scheduler: 'simple' },
+    defaults: { steps: 26, cfg: 3.5, sampler: 'euler', scheduler: 'beta' },
     hasNegativePrompt: true,
     promptStyle: 'natural',
     defaultModels: { clip: 't5xxl_fp8_e4m3fn_scaled.safetensors', vae: 'ae.safetensors' },
@@ -381,8 +439,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    // distilled 默认 (4 步 / cfg 1.0, CFGGuider); base 模型用户手动调 20 步 / cfg 5.0
-    defaults: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'simple' },
+    extraSchedulers: ['flux2'],
+    defaults: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'flux2' },
     hasNegativePrompt: true,
     promptStyle: 'natural',
     defaultModels: { clip: 'qwen_3_4b.safetensors', vae: 'flux2-vae.safetensors' },
@@ -415,8 +473,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    // distilled 默认 (4 步 / cfg 1.0, CFGGuider); base 模型用户手动调 20 步 / cfg 5.0
-    defaults: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'simple' },
+    extraSchedulers: ['flux2'],
+    defaults: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'flux2' },
     hasNegativePrompt: true,
     promptStyle: 'natural',
     defaultModels: { clip: 'qwen_3_8b_fp8mixed.safetensors', vae: 'flux2-vae.safetensors' },
@@ -448,7 +506,8 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    defaults: { steps: 20, cfg: 4.0, sampler: 'euler', scheduler: 'simple' },
+    extraSchedulers: ['flux2'],
+    defaults: { steps: 20, cfg: 4.0, sampler: 'euler', scheduler: 'flux2' },
     hasNegativePrompt: false,
     promptStyle: 'natural',
     defaultModels: { clip: 'mistral_3_small_flux2_fp8.safetensors', vae: 'flux2-vae.safetensors' },
@@ -543,8 +602,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       { label: '1536×640', value: '1536x640' },
       { label: '640×1536', value: '640x1536' },
     ],
-    // NoobAI (同 IL): 28 步 / cfg 4.5 / euler_ancestral / clip_skip 2
-    defaults: { steps: 28, cfg: 4.5, sampler: 'euler_ancestral', scheduler: 'normal', clip_skip: 2 },
+    defaults: { steps: 28, cfg: 5, sampler: 'euler_ancestral', scheduler: 'normal', clip_skip: 2 },
     hasNegativePrompt: true,
     promptStyle: 'tags',
     modules: ['lora', 'i2i', 'controlnet', 'upscale', 'hires', 'face'],
@@ -567,7 +625,7 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     workflowType: 'wan22',
     modules: ['lora'],
     promptStyle: 'natural',  // 视频提示词: 主体→动作→镜头→场景
-    hasNegativePrompt: true,  // 标准档显负面框; 快速档 cfg=1.0 时组件层隐藏
+    hasNegativePrompt: true,
     pickerArch: 'wan22_i2v',
     releasedAt: '2025-07',
     // 视频不沿用图像 resolutions; 档位走 videoDefaults.presets
@@ -673,7 +731,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
       maxDurationS: 5,  // frames = 24×5+1 = 121; 模板默认 length=121
       divisor: 32,  // W/H 整除约束 (5B)
       shift: 8.0,  // ModelSamplingSD3
-      // 5B 无速度开关: 固定 20 步 / cfg 5.0 / uni_pc, 负面恒显示
       presets: {
         '480p': {
           landscape: { width: 832, height: 448 },
@@ -704,7 +761,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     pickerArch: 'minimax_h3',
     releasedAt: '2026-08',
     resolutions: [],
-    // CFG-distilled 默认: 20 步 / cfg 1.0 / res_multistep / simple; 后端默认 sampler/scheduler 无需前端传
     defaults: { steps: 20, cfg: 1.0, sampler: 'res_multistep', scheduler: 'simple' },
     defaultModels: {
       clip: 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
@@ -754,7 +810,6 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     pickerArch: 'minimax_h3',
     releasedAt: '2026-08',
     resolutions: [],
-    // CFG-distilled 默认: 20 步 / cfg 1.0 / res_multistep / simple; 后端默认 sampler/scheduler 无需前端传
     defaults: { steps: 20, cfg: 1.0, sampler: 'res_multistep', scheduler: 'simple' },
     defaultModels: {
       clip: 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
@@ -782,6 +837,40 @@ export const MODEL_TYPES: Record<string, ModelTypeConfig> = {
     },
   },
 }
+
+export const MODEL_VARIANTS: Record<string, { base: string } & Partial<ModelTypeConfig>> = {
+  anima_turbo: {
+    base: 'anima', label: 'Anima Turbo', familyOf: 'anima', workflowType: 'anima',
+    defaults: { steps: 8, cfg: 1, sampler: 'euler', scheduler: 'simple' },
+  },
+  zimage_turbo: {
+    base: 'zimage', label: 'Z-Image Turbo', familyOf: 'zimage', workflowType: 'zimage',
+    defaults: { steps: 8, cfg: 1, sampler: 'res_multistep', scheduler: 'simple' },
+    hasNegativePrompt: false,
+  },
+  flux1_schnell: {
+    base: 'flux1', label: 'Flux 1 Schnell', familyOf: 'flux1', workflowType: 'flux1',
+    defaults: { steps: 4, cfg: 1, sampler: 'euler', scheduler: 'simple' },
+  },
+  flux2klein4b_base: {
+    base: 'flux2klein4b', label: 'Flux 2 Klein 4B Base',
+    defaults: { steps: 20, cfg: 5, sampler: 'euler', scheduler: 'flux2' },
+  },
+  flux2klein9b_base: {
+    base: 'flux2klein9b', label: 'Flux 2 Klein 9B Base',
+    defaults: { steps: 20, cfg: 5, sampler: 'euler', scheduler: 'flux2' },
+  },
+  noobai_vpred: {
+    base: 'noobai', label: 'NoobAI V-Pred',
+    defaults: { steps: 28, cfg: 4.5, sampler: 'euler', scheduler: 'normal', clip_skip: 2 },
+  },
+}
+
+for (const [key, { base, ...variant }] of Object.entries(MODEL_VARIANTS)) {
+  MODEL_TYPES[key] = { ...MODEL_TYPES[base]!, ...variant, key }
+}
+
+export const WAN22_FAST_SAMPLING = { steps: 4, cfg: 1, sampler: 'euler', scheduler: 'simple' }
 
 // [向后兼容] 给每个条目加 .loader 派生属性 (supportedPackaging 含 'checkpoint' → 'checkpoint' 否则 'split')
 // 旧代码读 config.loader 仍可工作; 新代码应直接用 supportedPackaging。

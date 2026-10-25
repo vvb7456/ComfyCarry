@@ -608,14 +608,10 @@ class PublicTunnelClient:
     def _is_cloudflared_running(self, name: str | None = None) -> bool:
         name = name or active_cf_name()
         try:
-            r = subprocess.run(
-                "pm2 jlist 2>/dev/null",
-                shell=True, capture_output=True, text=True, timeout=5,
-            )
-            if r.returncode == 0:
-                for p in json.loads(r.stdout):
-                    if p.get("name") == name:
-                        return p.get("pm2_env", {}).get("status") == "online"
+            from ..utils import get_pm2_procs
+            for p in get_pm2_procs(refresh=True):
+                if p.get("name") == name:
+                    return p.get("pm2_env", {}).get("status") == "online"
         except Exception:
             pass
         return False

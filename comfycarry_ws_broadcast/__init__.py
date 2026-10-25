@@ -9,16 +9,17 @@ ComfyUI 默认只将执行事件 (progress, executing, executed 等) 发送给
 也能收到完整的执行进度信息。
 
 安装: 放入 ComfyUI/custom_nodes/comfycarry_ws_broadcast/ 即可
-无需在工作流中添加任何节点。
+广播功能无需在工作流中添加节点。
 """
 
 import logging
 import server
+from .sampling import SigmaScheduler
 
 log = logging.getLogger("comfycarry.ws_broadcast")
 
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+NODE_CLASS_MAPPINGS = {"ComfyCarrySigmaScheduler": SigmaScheduler}
+NODE_DISPLAY_NAME_MAPPINGS = {"ComfyCarrySigmaScheduler": "ComfyCarry Sigma Scheduler"}
 
 _patched = False
 

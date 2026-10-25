@@ -237,6 +237,7 @@ def _parse_version_response(version_data: dict, api_key: str = "") -> dict:
     ea_config = version_data.get("earlyAccessConfig") or {}
 
     result = {
+        "source": "civitai",
         "model_id": model_info.get("id") or version_data.get("modelId"),
         "model_name": model_info.get("name", "Unknown"),
         "version_id": version_data.get("id"),
@@ -476,6 +477,7 @@ def normalize_version_data(version_data: dict) -> dict:
     """仅提取元数据字段, 不做文件选择或下载 URL 构建。"""
     model_info = version_data.get("model", {})
     return {
+        "source": "civitai",
         "model_id": model_info.get("id") or version_data.get("modelId"),
         "model_name": model_info.get("name", "Unknown"),
         "version_id": version_data.get("id"),

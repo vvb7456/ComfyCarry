@@ -12,7 +12,6 @@ import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
-import type { SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
 import PromptEditor from '@/components/generate/PromptEditor.vue'
 import ActionBar from '@/components/generate/ActionBar.vue'
 import BasicSettings from '@/components/generate/BasicSettings.vue'
@@ -79,10 +78,8 @@ const isVideo = computed(() => config.value.mediaType === 'video')
 // 转手喂给 BasicSettings.refWidth/refHeight → VideoSettings「贴合起始画面」推导用。
 const refSize = ref<{ width: number; height: number }>({ width: 0, height: 0 })
 
-// 负面提示词框可见性: 视频快速档 cfg=1.0 时负面无效, 隐藏输入框 (沿用 Krea2 Turbo 先例)。
-// 图像架构恒走 config.hasNegativePrompt (回归保护)。
 const showNegative = computed(() =>
-  config.value.hasNegativePrompt && !(isVideo.value && state.value.fast),
+  config.value.hasNegativePrompt,
 )
 
 // 当前视频模式 (仅 5B 有意义; 14B 恒 i2v)。
@@ -246,7 +243,7 @@ const {
   showPPModal,
   moduleTabs,
   enabledModules,
-  onModuleToggle: cnModuleToggle,
+  onModuleToggle,
   onPPSubmit,
   handlePreprocessDone,
   prepareTagger,
@@ -257,79 +254,6 @@ const {
   onRegisterTask: (promptId, type, subtype) => emit('register-task', promptId, type, subtype),
   modelType: props.modelType,
 })
-
-/** controlNetEnabled=false 时本地覆盖 moduleTabs (CN 三项 disabled + toast) */
-const localModuleTabs = computed<SwitchTabItem[]>(() => {
-  const tabs: SwitchTabItem[] = [
-    { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
-    { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
-    {
-      key: 'pose',
-      label: t('generate.modules.pose'),
-      icon: 'accessibility_new',
-      disabled: true,
-    },
-    {
-      key: 'canny',
-      label: t('generate.modules.canny'),
-      icon: 'line_curve',
-      disabled: true,
-    },
-    {
-      key: 'depth',
-      label: t('generate.modules.depth'),
-      icon: 'terrain',
-      disabled: true,
-    },
-    { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
-  ]
-  if (config.value.modules.includes('face')) {
-    tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' })
-  }
-  tabs.push({ key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' })
-  return tabs
-})
-
-const localEnabledModules = computed(() => {
-  const currentState = state.value
-  const enabled = new Set<string>()
-  if (currentState.loras.some((lora) => lora.enabled)) enabled.add('lora')
-  if (currentState.i2i.enabled) enabled.add('i2i')
-  if (currentState.upscale.enabled) enabled.add('upscale')
-  if (currentState.hires.enabled) enabled.add('hires')
-  if (currentState.faceDetailer.enabled) enabled.add('face')
-  return enabled
-})
-
-function onLocalModuleToggle(key: string, enabled: boolean) {
-  if (key === 'pose' || key === 'canny' || key === 'depth') {
-    toast(t('generate.error.cn_disabled'), 'warning')
-    return
-  }
-  cnModuleToggle(key, enabled)
-}
-
-const effectiveModuleTabs = computed<SwitchTabItem[]>(() => {
-  if (isVideo.value) {
-    return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'layers' }]
-  }
-  return config.value.controlNetEnabled ? moduleTabs.value : localModuleTabs.value
-})
-const effectiveEnabledModules = computed(() => {
-  if (isVideo.value) {
-    const enabled = new Set<string>()
-    if (state.value.loras.some((lora) => lora.enabled)) enabled.add('lora')
-    return enabled
-  }
-  return config.value.controlNetEnabled ? enabledModules.value : localEnabledModules.value
-})
-function onEffectiveModuleToggle(key: string, enabled: boolean) {
-  if (config.value.controlNetEnabled) {
-    cnModuleToggle(key, enabled)
-  } else {
-    onLocalModuleToggle(key, enabled)
-  }
-}
 
 const {
   llm,
@@ -439,13 +363,8 @@ const loraPickerItems = computed(() => {
 })
 
 // 就绪状态回流 store (单一真值): 页面级重复预检已删, 菜单状态完全靠各 tab 写入, 故 immediate
-watch(() => compStatus.ready.value, (ready, prev) => {
-  store.setComponentsReady(props.modelType, ready)
-  // 由"未就绪"翻转为"就绪" = 组件刚下载完 → 强制刷新 ComfyUI 选项列表。
-  // 不刷新的话新下载的文本编码器/VAE 不会出现在高级设置的下拉里 (后端 options 带缓存),
-  // 刷新后由 autofillDefaultModels 的 watch 自动填上官方组件。
-  // prev === undefined 表示 immediate 首次执行 (挂载即就绪), 无需刷新。
-  if (ready && prev === false) void options.refresh()
+watch(() => compStatus.ready.value, (ready) => {
+    store.setComponentsReady(props.modelType, ready)
 }, { immediate: true })
 
 // 切到本 tab 时复检组件状态: 组件跨架构共享 (如 ae.safetensors 同时服务 Z-Image/Flux1/Chroma),
@@ -725,11 +644,11 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
     <div class="gen-module-wrap" data-tour="gen-modules" :inert="frozen" :class="{ 'gen-frozen': frozen }">
       <ModuleTabs
-        :tabs="effectiveModuleTabs"
+        :tabs="moduleTabs"
         :active-tab="state.activeModule"
-        :enabled-tabs="effectiveEnabledModules"
+        :enabled-tabs="enabledModules"
         @update:active-tab="state.activeModule = $event ?? 'lora'"
-        @toggle="onEffectiveModuleToggle"
+        @toggle="onModuleToggle"
       />
 
       <div v-show="state.activeModule === 'lora'" class="gen-module-panel">

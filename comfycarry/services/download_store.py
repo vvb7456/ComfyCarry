@@ -1,6 +1,4 @@
-"""
-被 resource_registry 和 download_engine 调用，route 不直接访问。
-"""
+"""下载任务持久化。"""
 
 import json
 import logging
@@ -9,58 +7,6 @@ import time
 from ..db import db
 
 log = logging.getLogger(__name__)
-
-
-def upsert_resource(resource_key: str, source: str, model_id: str,
-                    version_id: str, state: str, *,
-                    active_task_id: str = "",
-                    last_error: str = "",
-                    meta: dict | None = None) -> None:
-    now = time.time()
-    meta_json = json.dumps(meta or {}, ensure_ascii=False)
-    db.execute(
-        """INSERT INTO download_resources
-               (resource_key, source, model_id, version_id, state,
-                active_task_id, last_error, meta_json,
-                created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(resource_key) DO UPDATE SET
-               state = excluded.state,
-               active_task_id = excluded.active_task_id,
-               last_error = excluded.last_error,
-               meta_json = CASE WHEN excluded.meta_json != '{}' THEN excluded.meta_json
-                                ELSE download_resources.meta_json END,
-               updated_at = excluded.updated_at
-        """,
-        (resource_key, source, model_id, version_id, state,
-         active_task_id, last_error, meta_json,
-         now, now),
-    )
-
-
-def get_resource(resource_key: str) -> dict | None:
-    row = db.fetch_one(
-        "SELECT * FROM download_resources WHERE resource_key = ?",
-        (resource_key,),
-    )
-    return _row_to_dict(row) if row else None
-
-
-def get_all_resources() -> list[dict]:
-    """所有资源记录, 含 state='absent' (流程结束的痕迹)。
-
-    absent 不代表"曾经下过", 只代表"没有进行中的流程"; 可用性一律由调用方
-    按磁盘现状判断 (见 resource_registry.resolve_state)。
-    """
-    rows = db.fetch_all(
-        "SELECT * FROM download_resources ORDER BY updated_at DESC",
-    )
-    return [_row_to_dict(r) for r in rows]
-
-
-def delete_resource(resource_key: str) -> None:
-    db.execute("DELETE FROM download_resources WHERE resource_key = ?",
-               (resource_key,))
 
 
 def upsert_task(task_id: str, *, resource_key: str = "",
@@ -85,6 +31,7 @@ def upsert_task(task_id: str, *, resource_key: str = "",
                speed = excluded.speed,
                progress = excluded.progress,
                error = excluded.error,
+               meta_json = excluded.meta_json,
                updated_at = excluded.updated_at,
                completed_at = COALESCE(excluded.completed_at, download_tasks.completed_at)
         """,
@@ -108,6 +55,14 @@ def get_recent_tasks(limit: int = 100) -> list[dict]:
         (limit,),
     )
     return [_row_to_dict(r) for r in rows]
+
+
+def restore_tasks() -> list[dict]:
+    now = time.time()
+    db.execute("UPDATE download_tasks SET status = 'failed', error = ?, speed = 0, "
+               "completed_at = ?, updated_at = ? WHERE status IN ('queued', 'active', 'paused')",
+               ("models.err.dl_interrupted", now, now))
+    return [_row_to_dict(row) for row in db.fetch_all("SELECT * FROM download_tasks ORDER BY created_at")]
 
 
 def get_tasks_by_resource(resource_key: str) -> list[dict]:

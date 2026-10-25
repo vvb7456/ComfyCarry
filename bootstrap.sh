@@ -184,6 +184,7 @@ if [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
         system_monitor.py:system_monitor.py; do
         install -m 644 "$DASHBOARD_DIR/comfycarry/services/${_pair%%:*}" "/opt/${_pair##*:}"
     done
+    "$PYTHON_BIN" -c "import sys; sys.path.insert(0, sys.argv[1]); from comfycarry.config import set_config; set_config('cf_protocol', 'http2')" "$DASHBOARD_DIR"
 fi
 
 # CF Tunnel (可选 — 必须在 Dashboard 启动前完成, 避免双重注册)

@@ -17,7 +17,10 @@ const options = inject(GenerateOptionsKey)!
 const config = computed<HiResState>(() => store.currentState.hires)
 
 const samplerOptions = computed(() => options.samplers.value)
-const schedulerOptions = computed(() => options.schedulers.value)
+const schedulerOptions = computed(() => [
+  ...(store.currentConfig.extraSchedulers ?? []),
+  ...options.schedulers.value,
+])
 
 const upscaleMethodOptions = computed(() => [
   { value: 'bislerp', label: t('generate.hires.method_bislerp') },

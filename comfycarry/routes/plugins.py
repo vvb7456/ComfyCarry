@@ -1,9 +1,11 @@
+from functools import partial
 import time
 
 import requests
 from flask import Blueprint, jsonify, request
 
 from ..config import COMFYUI_URL
+from ..utils import api_err
 
 bp = Blueprint("plugins", __name__)
 
@@ -44,17 +46,7 @@ def _cm_post(path, json_data=None, text_data=None, timeout=30):
 # /api/plugins/* 的唯一消费方是面板前端, 错误回传 error_key + error_params,
 # 前端按 plugins.err.<key> 翻译; 未接 i18n 的端点继续回传 error 原文,
 # apiErrorText() 对两种后端都安全。成功响应只回传 ok, 前端不消费成功文案。
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `plugins.err.<key>` 翻译; _extra 是响应体的附加顶层字段。
-
-    形参位置化 (`/`): 插值参数里有 code 这种名字, 不然会和函数自己的形参撞车。
-    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
-    `**params` 静默吞掉, 顶层字段丢失。
-    """
-    body = {"error_key": f"plugins.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "plugins")
 
 
 def _ok(**extra):

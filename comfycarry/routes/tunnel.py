@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import re
 import subprocess
@@ -7,6 +8,7 @@ import requests as http_requests
 from flask import Blueprint, Response, jsonify, request
 
 from ..config import get_config, set_config, WORKSPACE_ROOT
+from ..utils import api_err
 from ..services.cf_runtime import active_cf_name, cf_metrics_url
 
 bp = Blueprint("tunnel", __name__)
@@ -17,17 +19,7 @@ bp = Blueprint("tunnel", __name__)
 # 负责渲染。tunnel.py 的成功响应大多用 {"ok": True/False, ...} 自定义, 不走
 # _ok; 错误统一走 _err, 需要保留 ok:false 语义的 (如 200 状态码软错误) 传
 # _extra={"ok": False}。
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `tunnel.err.<key>` 翻译; _extra 为响应体附加顶层字段。
-
-    形参位置化 (`/`): 插值参数里有 key / status 这种名字, 不然会撞车。
-    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
-    `**params` 静默吞掉, 顶层字段丢失。
-    """
-    body = {"error_key": f"tunnel.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "tunnel")
 
 
 def _cf_err(e, status: int = 400):
@@ -94,7 +86,7 @@ def _build_tunnel_status(force: bool = False) -> dict:
             and (now - _tunnel_cache["ts"]) < _TUNNEL_CACHE_TTL):
         return _tunnel_cache["data"]
 
-    from ..services.tunnel_manager import get_default_services
+    from ..services.tunnel_manager import get_effective_services
     result = {
         "configured": False,
         "domain": get_config("cf_domain", ""),
@@ -106,23 +98,7 @@ def _build_tunnel_status(force: bool = False) -> dict:
         "cf_protocol": get_config("cf_protocol", "auto"),
     }
 
-    overrides = _get_suffix_overrides()
-    all_services = []
-    for svc in get_default_services():
-        s = dict(svc)
-        s["custom"] = False
-        orig_suffix = s.get("suffix", "")
-        if orig_suffix in overrides:
-            s["suffix"] = overrides[orig_suffix]
-        all_services.append(s)
-
-    custom = _get_custom_services()
-    for svc in custom:
-        s = dict(svc)
-        s["custom"] = True
-        all_services.append(s)
-
-    result["services"] = all_services
+    result["services"] = get_effective_services()
 
     tunnel_mode = get_config("tunnel_mode", "")
 
@@ -260,21 +236,11 @@ def api_tunnel_provision():
         except Exception:
             pass
 
-    from ..services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
+    from ..services.tunnel_manager import TunnelManager, CFAPIError, get_effective_services
 
     mgr = TunnelManager(api_token, domain, subdomain)
 
-    # 包含自定义服务
-    overrides = _get_suffix_overrides()
-    services = []
-    for svc in get_default_services():
-        s = dict(svc)
-        orig_suffix = s.get("suffix", "")
-        if orig_suffix in overrides:
-            s["suffix"] = overrides[orig_suffix]
-        services.append(s)
-    custom = _get_custom_services()
-    services.extend(custom)
+    services = get_effective_services()
 
     try:
         result = mgr.ensure(services)
@@ -596,23 +562,13 @@ def api_tunnel_subdomain():
 
 
 def _get_custom_services():
-    raw = get_config("cf_custom_services", "")
-    if not raw:
-        return []
-    try:
-        return json.loads(raw)
-    except Exception:
-        return []
+    from ..services.tunnel_manager import get_custom_services
+    return get_custom_services()
 
 
 def _get_suffix_overrides():
-    raw = get_config("cf_suffix_overrides", "")
-    if not raw:
-        return {}
-    try:
-        return json.loads(raw)
-    except Exception:
-        return {}
+    from ..services.tunnel_manager import get_suffix_overrides
+    return get_suffix_overrides()
 
 
 def _reprovision_services():
@@ -620,21 +576,8 @@ def _reprovision_services():
     if not mgr:
         return _err("not_configured", 400)
 
-    from ..services.tunnel_manager import get_default_services, CFAPIError
-
-    # 应用后缀覆盖到默认服务
-    overrides = _get_suffix_overrides()
-    services = []
-    for svc in get_default_services():
-        s = dict(svc)
-        orig_suffix = s.get("suffix", "")
-        if orig_suffix in overrides:
-            s["suffix"] = overrides[orig_suffix]
-        services.append(s)
-
-    # 添加自定义服务
-    custom = _get_custom_services()
-    services.extend(custom)
+    from ..services.tunnel_manager import get_effective_services, CFAPIError
+    services = get_effective_services()
 
     try:
         result = mgr.ensure(services)
@@ -685,12 +628,10 @@ def api_tunnel_logs_stream():
 def _get_cloudflared_pm2_status() -> str:
     name = active_cf_name()
     try:
-        r = subprocess.run("pm2 jlist 2>/dev/null", shell=True,
-                           capture_output=True, text=True, timeout=5)
-        if r.returncode == 0:
-            for p in json.loads(r.stdout):
-                if p.get("name") == name:
-                    return p.get("pm2_env", {}).get("status", "unknown")
+        from ..utils import get_pm2_procs
+        for p in get_pm2_procs():
+            if p.get("name") == name:
+                return p.get("pm2_env", {}).get("status", "unknown")
     except Exception:
         pass
     return "unknown"

@@ -46,15 +46,10 @@ def _is_cf_tunnel_online() -> bool:
     from .cf_runtime import active_cf_name
     name = active_cf_name()
     try:
-        r = subprocess.run(
-            "pm2 jlist 2>/dev/null", shell=True,
-            capture_output=True, text=True, timeout=5
-        )
-        if r.returncode == 0:
-            import json as _json
-            for p in _json.loads(r.stdout):
-                if p.get("name") == name:
-                    return p.get("pm2_env", {}).get("status") == "online"
+        from ..utils import get_pm2_procs
+        for p in get_pm2_procs(refresh=True):
+            if p.get("name") == name:
+                return p.get("pm2_env", {}).get("status") == "online"
     except Exception:
         pass
     return False
@@ -365,7 +360,7 @@ def _step_tunnel(config):
             _deploy_log(f"公共 Tunnel 异常: {e}", "warn")
     elif cf_api_token and cf_domain:
         _deploy_step("setup_cf_tunnel")
-        from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_default_services
+        from comfycarry.services.tunnel_manager import TunnelManager, CFAPIError, get_effective_services
         from comfycarry.config import set_config as _sc, get_config as _gc
 
         cf_subdomain = config.get("cf_subdomain", "") or _gc("cf_subdomain", "")
@@ -381,25 +376,7 @@ def _step_tunnel(config):
             else:
                 _deploy_log(f"CF 账户: {info.get('account_name', '?')}")
 
-                raw_overrides = _gc("cf_suffix_overrides", "")
-                raw_custom = _gc("cf_custom_services", "")
-                suffix_overrides = {}
-                custom_services = []
-                try:
-                    if raw_overrides:
-                        suffix_overrides = json.loads(raw_overrides)
-                    if raw_custom:
-                        custom_services = json.loads(raw_custom)
-                except Exception:
-                    pass
-                services = []
-                for svc in get_default_services():
-                    s = dict(svc)
-                    orig = s.get("suffix", "")
-                    if orig in suffix_overrides:
-                        s["suffix"] = suffix_overrides[orig]
-                    services.append(s)
-                services.extend(custom_services)
+                services = get_effective_services()
 
                 result = mgr.ensure(services)
                 _deploy_log(f"Tunnel 已就绪: {mgr.subdomain}.{cf_domain}", "success")

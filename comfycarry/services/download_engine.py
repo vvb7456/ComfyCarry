@@ -377,6 +377,8 @@ class DownloadEngine:
         # 回调在 lock 外触发
         if fire_existed:
             self._fire_on_complete(return_task)
+            with self._lock:
+                self._tasks[download_id] = return_task
 
         if not fire_existed:
             logger.info(
@@ -496,6 +498,25 @@ class DownloadEngine:
     def list_tasks(self) -> list[dict]:
         with self._lock:
             return [t.to_dict() for t in self._tasks.values()]
+
+    def hydrate_from_db(self) -> int:
+        from . import download_store
+        from .download_completion import register_task_file
+
+        rows = download_store.restore_tasks()
+        with self._lock:
+            for row in rows:
+                meta = row["meta"]
+                task = DownloadTask(
+                    download_id=row["task_id"], url=row["url"], save_dir=row["save_dir"],
+                    filename=row["filename"], status=DownloadStatus(row["status"]),
+                    total_bytes=row["total_bytes"], completed_bytes=row["completed_bytes"],
+                    progress=row["progress"], error=row["error"], created_at=row["created_at"],
+                    completed_at=row["completed_at"] or 0, meta=meta,
+                    on_complete=register_task_file if meta.get("source") in ("civitai", "whitelist") else None,
+                )
+                self._tasks[task.download_id] = task
+        return len(rows)
 
     def check_file(self, save_dir: str, filename: str) -> dict:
         """

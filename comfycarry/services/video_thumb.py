@@ -5,13 +5,11 @@ ComfyCarry — 视频首帧缩略图服务
 
 设计要点:
 - 部署镜像预装 ffmpeg 二进制, 本模块用 subprocess 调用, 不依赖 python av/moviepy。
-- 缓存目录: <COMFYUI_DIR>/output/.video_thumbs (与产物同分区, 容器重启不丢; ComfyUI
+- 缓存目录: 当前输出目录下的 .video_thumbs (与产物同分区, 容器重启不丢; ComfyUI
   本身不会扫 output 下的隐藏目录当产物)。陈旧判定: 缓存键含源文件 size+mtime, 源文件
   被覆盖重写后缓存自动失效 (用新的缓存文件名)。
-- 源文件定位: 参数与 ComfyUI /view 对齐 (filename/subfolder/type), 解析为
-  {COMFYUI_DIR}/{type}/{subfolder}/{filename}; 路径穿越防护用 realpath 必须位于
-  {COMFYUI_DIR}/{type} 之下。本地读不到时, 回退到经 ComfyUI /view 拉取到临时文件再抽帧
-  (兼容 ComfyUI 在远端部署)。
+- 源文件定位: 参数与 ComfyUI /view 对齐 (filename/subfolder/type)，output 跟随
+  启动参数，input/temp 位于 ComfyUI 目录下；realpath 必须位于对应目录之下。
 - 并发: 同一缓存键的抽帧用进程内锁去重; 多 worker 进程下用 os.O_EXCL 原子创建
   占位文件兜底 (此处实现进程内 + 原子写, 跨进程留 .lock 文件名约定)。
 - 失败: ffmpeg 非视频/抽帧失败/超时 → 返回明确错误 (HTTP 400/415/502), 不抛 500 堆栈。
@@ -20,18 +18,13 @@ ComfyCarry — 视频首帧缩略图服务
 import hashlib
 import logging
 import os
-import shutil
 import subprocess
-import tempfile
 import threading
 from pathlib import Path
 
-from ..config import COMFYUI_DIR, COMFYUI_URL
+from ..config import COMFYUI_DIR, get_comfyui_output_dir
 
 logger = logging.getLogger(__name__)
-
-# 缓存根: 与 ComfyUI output 同分区, 重启不丢; 隐藏目录不进 ComfyUI 产物扫描
-THUMB_CACHE_DIR = Path(COMFYUI_DIR) / "output" / ".video_thumbs"
 
 # ffmpeg 抽帧超时 (秒): 5s 720p mp4 抽首帧实测 <2s, 留余量
 FFMPEG_TIMEOUT = 30
@@ -74,7 +67,7 @@ def _resolve_local_path(filename: str, subfolder: str, img_type: str) -> Path | 
     if subfolder.startswith("/") or subfolder.startswith("\\"):
         return None
 
-    base_dir = Path(COMFYUI_DIR) / img_type
+    base_dir = get_comfyui_output_dir() if img_type == "output" else Path(COMFYUI_DIR) / img_type
     candidate = base_dir / subfolder / filename
     try:
         real = candidate.resolve()
@@ -86,36 +79,9 @@ def _resolve_local_path(filename: str, subfolder: str, img_type: str) -> Path | 
         real.relative_to(base_real)
     except ValueError:
         return None
-    # 去掉 symlink 段后再次确认 (resolve 已含 symlink 展开, 二次保险)
-    if not str(real).startswith(str(base_real)):
-        return None
     if not real.is_file():
         return None
     return real
-
-
-def _fetch_via_comfyui_view(filename: str, subfolder: str, img_type: str,
-                           dest: Path) -> bool:
-    try:
-        import requests
-        params = {"filename": filename, "type": img_type}
-        if subfolder:
-            params["subfolder"] = subfolder
-        resp = requests.get(f"{COMFYUI_URL}/view", params=params,
-                            timeout=60, stream=True)
-        if resp.status_code != 200:
-            logger.warning("video_thumb: ComfyUI /view 返回 %s for %s/%s",
-                           resp.status_code, subfolder, filename)
-            return False
-        with open(dest, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=1 << 20):
-                if chunk:
-                    f.write(chunk)
-        return True
-    except Exception as e:
-        logger.warning("video_thumb: 经 ComfyUI /view 拉取失败 %s/%s: %s",
-                       subfolder, filename, e)
-        return False
 
 
 def _video_exts() -> set[str]:
@@ -216,42 +182,26 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
 
     local_path = _resolve_local_path(filename, subfolder, img_type)
 
-    remote_temp: Path | None = None
     if local_path is None:
-        tmpdir = Path(tempfile.gettempdir())
-        remote_temp = tmpdir / f"_vthumb_dl_{os.getpid()}_{filename}"
-        if not _fetch_via_comfyui_view(filename, subfolder, img_type, remote_temp):
-            _safe_remove(remote_temp)
-            # 无法区分"文件不存在"与"ComfyUI 不可达", 统一报 404 语义
-            return None, "无法定位视频文件 (本地不存在或 ComfyUI 不可达)", 404
-        local_path = remote_temp
-
-    assert local_path is not None
+        return None, "视频文件不存在", 404
 
     # 扩展名兜底: 非视频扩展名直接拒绝 (ffmpeg 也会失败, 但提前给出明确错误)
     if not is_video_filename(filename):
-        _safe_remove(remote_temp) if remote_temp else None
         return None, f"文件不是视频 ({filename})", 415
 
-    if remote_temp is not None:
-        sig = f"remote|{filename}|{subfolder}|{img_type}"
-        h = hashlib.sha1(sig.encode("utf-8")).hexdigest()[:24]
-        cache_name = f"{Path(filename).stem}_{h}.webp"
-    else:
-        cache_name = _cache_key(local_path)
+    cache_name = _cache_key(local_path)
+    cache_dir = get_comfyui_output_dir() / ".video_thumbs"
 
     try:
-        THUMB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        _safe_remove(remote_temp) if remote_temp else None
         return None, f"无法创建缓存目录: {e}", 500
 
-    cache_path = THUMB_CACHE_DIR / cache_name
+    cache_path = cache_dir / cache_name
 
     if cache_path.is_file():
         try:
             data = cache_path.read_bytes()
-            _safe_remove(remote_temp) if remote_temp else None
             return data, None, 200
         except OSError:
             pass  # 缓存读取失败, 降级重抽
@@ -262,13 +212,11 @@ def get_video_thumbnail(filename: str, subfolder: str = "",
         if cache_path.is_file():
             try:
                 data = cache_path.read_bytes()
-                _safe_remove(remote_temp) if remote_temp else None
                 return data, None, 200
             except OSError:
                 pass
 
         ok, msg = _run_ffmpeg_extract(local_path, cache_path)
-        _safe_remove(remote_temp) if remote_temp else None
         if not ok:
             _safe_remove(cache_path)
             status = 415 if "不是" in msg or "损坏" in msg else 502

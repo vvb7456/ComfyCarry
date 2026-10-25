@@ -1,3 +1,4 @@
+from functools import partial
 import logging
 import os
 import secrets
@@ -7,17 +8,13 @@ from flask.sessions import SecureCookieSessionInterface, SecureCookieSession
 from itsdangerous import BadSignature
 
 from . import config
+from .utils import api_err
 
 auth_bp = Blueprint("auth", __name__)
 _auth_log = logging.getLogger("comfycarry.auth")
 
 
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `auth.err.<key>` 翻译; _extra 是响应体的附加顶层字段。"""
-    body = {"error_key": f"auth.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "auth")
 
 
 # ── 自定义 Session Interface ─────────────────────────────────

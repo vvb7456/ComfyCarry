@@ -22,8 +22,8 @@ bp = Blueprint("update", __name__)
 
 
 def _err(key: str, status: int = 400, /, **params):
-    return jsonify({"error_key": f"settings.err.update.{key}",
-                    "error_params": params}), status
+    from ..utils import api_err
+    return api_err("settings", f"update.{key}", status, **params)
 
 
 _REPO_OWNER = "vvb7456"

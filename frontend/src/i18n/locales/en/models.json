@@ -162,7 +162,6 @@
     "download": "Download",
     "installed": "Installed",
     "resolving": "Resolving…",
-    "verifying": "Verifying",
     "batch_modal_title": "Batch Add Models",
     "batch_modal_hint": "Enter one CivitAI model link or ID per line. Supports multiple formats:",
     "batch_modal_placeholder": "Paste links or IDs...",

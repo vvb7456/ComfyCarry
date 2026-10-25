@@ -32,6 +32,18 @@ from ..services.workflow_builder import (
 logger = logging.getLogger(__name__)
 
 
+def _validate_input_file(name: str, label: str) -> dict | None:
+    root = os.path.realpath(os.path.join(COMFYUI_DIR, "input"))
+    path = os.path.realpath(os.path.join(root, name))
+    if os.path.isabs(name) or not path.startswith(root + os.sep):
+        key = f"invalid_{label}_path"
+    elif not os.path.isfile(path):
+        key = f"{label}_not_found"
+    else:
+        return None
+    return {"error_key": f"generate.err.{key}", "error_params": {"name": name}}
+
+
 def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
     """
     MiniMax H3 家族 (FL2VA) 通用校验 — minimax_h3 / minimax_h3_ref 共用。
@@ -40,7 +52,7 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
       - unet / clip / vae / audio_vae 必填 + 文件列表校验
       - 分辨率: %32 整除, W×H ≤ H3_MAX_PIXELS
       - 时长: 整数秒钳 [4,15], length = h3_align_length(duration×24) 写回
-      - batch_size=1; steps 钳 [1,100]; pop cfg/negative_prompt/speed/fast
+      - batch_size=1; pop cfg/negative_prompt/speed/fast
     起始画面 / refs 校验不在本函数 (由各分支单独处理)。
 
     返回: (错误响应 dict | None, HTTP 状态码); None 表示校验通过。
@@ -112,11 +124,6 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
     data["length"] = h3_align_length(duration * H3_FPS)
 
     data["batch_size"] = 1
-    try:
-        steps = int(data.get("steps", 20))
-    except (TypeError, ValueError):
-        steps = 20
-    data["steps"] = max(1, min(steps, 100))
     for k in ("cfg", "negative_prompt", "speed", "fast"):
         data.pop(k, None)
     return None, 200
@@ -254,13 +261,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     }, 400
                 data["clip2"] = clip2
 
-    # basic (dev, 无负面) / cfg (klein, 有负面); 缺省 cfg
-    if model_type == "flux2":
-        guider_mode = str(data.get("guider_mode", "cfg"))
-        if guider_mode not in ("basic", "cfg"):
-            guider_mode = "cfg"
-        data["guider_mode"] = guider_mode
-
     # variant 由 model_type 推导:
     #   wan22_i2v → "i2v" (14B 双权重), wan22_t2v → "t2v" (14B 双权重),
     #   wan22_5b → "5b" (单权重, 条目内 t2v/i2v 模式开关)。
@@ -277,24 +277,12 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             if err is not None:
                 return err, status
 
-            input_dir = os.path.join(COMFYUI_DIR, "input")
-            real_input = os.path.realpath(input_dir)
             start_image = str(data.get("start_image", "")).strip()
             if mode == "i2v":
                 if not start_image:
                     return {"error_key": "generate.err.no_start_frame"}, 400
-                img_path = os.path.join(input_dir, start_image)
-                real_img = os.path.realpath(img_path)
-                if not real_img.startswith(real_input + os.sep):
-                    return {
-                        "error_key": "generate.err.invalid_start_frame_path",
-                        "error_params": {"name": start_image},
-                    }, 400
-                if not os.path.isfile(img_path):
-                    return {
-                        "error_key": "generate.err.start_frame_not_found",
-                        "error_params": {"name": start_image},
-                    }, 400
+                if err := _validate_input_file(start_image, "start_frame"):
+                    return err, 400
                 data["start_image"] = start_image
             else:
                 data["start_image"] = ""
@@ -302,18 +290,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             # ── 尾帧 (可选): 提供则走同样路径三段校验, 缺省清空 ──
             last_image = str(data.get("last_image", "")).strip()
             if last_image:
-                last_path = os.path.join(input_dir, last_image)
-                real_last = os.path.realpath(last_path)
-                if not real_last.startswith(real_input + os.sep):
-                    return {
-                        "error_key": "generate.err.invalid_last_frame_path",
-                        "error_params": {"name": last_image},
-                    }, 400
-                if not os.path.isfile(last_path):
-                    return {
-                        "error_key": "generate.err.last_frame_not_found",
-                        "error_params": {"name": last_image},
-                    }, 400
+                if err := _validate_input_file(last_image, "last_frame"):
+                    return err, 400
                 data["last_image"] = last_image
             else:
                 data["last_image"] = ""
@@ -376,22 +354,9 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     "error_key": "generate.err.minimax_h3_refs_audio_requires_visual",
                 }, 400
 
-            # ── 路径三段校验 (与起始画面同款: input_dir / realpath 越界 / 存在性) ──
-            input_dir = os.path.join(COMFYUI_DIR, "input")
-            real_input = os.path.realpath(input_dir)
             for ref in refs:
-                ref_path = os.path.join(input_dir, ref["name"])
-                real_ref = os.path.realpath(ref_path)
-                if not real_ref.startswith(real_input + os.sep):
-                    return {
-                        "error_key": "generate.err.invalid_ref_path",
-                        "error_params": {"name": ref["name"]},
-                    }, 400
-                if not os.path.isfile(ref_path):
-                    return {
-                        "error_key": "generate.err.ref_not_found",
-                        "error_params": {"name": ref["name"]},
-                    }, 400
+                if err := _validate_input_file(ref["name"], "ref"):
+                    return err, 400
 
             data["refs"] = refs
             data["start_image"] = ""
@@ -449,8 +414,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                     }, 400
                 data[key] = fname
 
-            # (input_dir 与 i2i 校验块共用, 此处就地定义 — ControlNet 块在更后面)
-            input_dir = os.path.join(COMFYUI_DIR, "input")
             start_image = str(data.get("start_image", "")).strip()
             need_start = variant == "i2v"
             if variant == "5b":
@@ -459,19 +422,8 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             if need_start:
                 if not start_image:
                     return {"error_key": "generate.err.no_start_frame"}, 400
-                img_path = os.path.join(input_dir, start_image)
-                real_img = os.path.realpath(img_path)
-                real_input = os.path.realpath(input_dir)
-                if not real_img.startswith(real_input + os.sep):
-                    return {
-                        "error_key": "generate.err.invalid_start_frame_path",
-                        "error_params": {"name": start_image},
-                    }, 400
-                if not os.path.isfile(img_path):
-                    return {
-                        "error_key": "generate.err.start_frame_not_found",
-                        "error_params": {"name": start_image},
-                    }, 400
+                if err := _validate_input_file(start_image, "start_frame"):
+                    return err, 400
                 data["start_image"] = start_image
             else:
                 data["start_image"] = ""
@@ -520,41 +472,12 @@ def submit_generation(data: dict) -> tuple[dict, int]:
 
             data["batch_size"] = 1
 
-            if is_14b:
-                speed = str(data.get("speed", "fast")).strip().lower()
-                if speed not in ("fast", "standard"):
-                    speed = "fast"
-                data["speed"] = speed
-                if speed == "fast":
-                    # 快速档: steps/split/cfg 由 builder 常量决定, 丢弃 negative (cfg=1 无效)
-                    data.pop("steps", None)
-                    data.pop("cfg", None)
-                    data["negative_prompt"] = ""
-                else:
-                    # 标准档: steps ∈ [1,100], cfg ∈ [1,20]; negative 为空则由 builder 注入内置模板
-                    try:
-                        steps = int(data.get("steps", 20))
-                    except (TypeError, ValueError):
-                        steps = 20
-                    steps = max(1, min(steps, 100))
-                    data["steps"] = steps
-                    try:
-                        cfg = float(data.get("cfg", 3.5))
-                    except (TypeError, ValueError):
-                        cfg = 3.5
-                    cfg = max(1.0, min(cfg, 20.0))
-                    data["cfg"] = cfg
-            else:
+            if not is_14b:
                 data.pop("speed", None)
                 data.pop("fast", None)
 
     # ── LoRA 文件存在性校验 (支持数组格式) ─────────────────────────────────
     loras = data.get("loras") or []
-    # 兼容旧格式
-    if not loras:
-        legacy_name = data.get("lora_name", "").strip()
-        if legacy_name:
-            loras = [{"name": legacy_name, "strength": float(data.get("lora_strength", 1.0))}]
 
     lora_list = opts.get("loras", [])
     for lora_entry in loras:
@@ -570,25 +493,13 @@ def submit_generation(data: dict) -> tuple[dict, int]:
     # ── ControlNet 参数校验 ─────────────────────────────────────────────────
     controlnets = data.get("controlnets") or []
     validated_cns = []
-    input_dir = os.path.join(COMFYUI_DIR, "input")
     for cn in controlnets:
         cn_model = str(cn.get("model", "")).strip()
         cn_image = str(cn.get("image", "")).strip()
         if not cn_model or not cn_image:
             continue
-        img_path = os.path.join(input_dir, cn_image)
-        real_img = os.path.realpath(img_path)
-        real_input = os.path.realpath(input_dir)
-        if not real_img.startswith(real_input + os.sep):
-            return {
-                "error_key": "generate.err.invalid_cn_image_path",
-                "error_params": {"name": cn_image},
-            }, 400
-        if not os.path.isfile(img_path):
-            return {
-                "error_key": "generate.err.cn_image_not_found",
-                "error_params": {"name": cn_image},
-            }, 400
+        if err := _validate_input_file(cn_image, "cn_image"):
+            return err, 400
         validated_cns.append({
             "type": str(cn.get("type", "")),
             "model": cn_model,
@@ -599,27 +510,15 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         })
     data["controlnets"] = validated_cns
 
-    # ── Img2Img 参数校验 ────────────────────────────────────────────────────
-    i2i_image = str(data.get("i2i_image", "")).strip()
-    if i2i_image:
-        img_path = os.path.join(input_dir, i2i_image)
-        real_img = os.path.realpath(img_path)
-        real_input = os.path.realpath(input_dir)
-        if not real_img.startswith(real_input + os.sep):
-            return {
-                "error_key": "generate.err.invalid_i2i_image_path",
-                "error_params": {"name": i2i_image},
-            }, 400
-        if not os.path.isfile(img_path):
-            return {
-                "error_key": "generate.err.i2i_image_not_found",
-                "error_params": {"name": i2i_image},
-            }, 400
-        data["i2i_image"] = i2i_image
+    for field in ("i2i_image", "inpaint_image", "inpaint_mask"):
+        name = str(data.get(field, "")).strip()
+        if name and (err := _validate_input_file(name, "i2i_image")):
+            return err, 400
+        data[field] = name
 
     # ── 面部重绘参数校验 ────────────────────────────────────────────────────
     if bool(data.get("face_detailer_enabled", False)):
-        fd_model = str(data.get("face_detailer_model", "face_yolov8m.pt")).strip()
+        fd_model = str(data["face_detailer_model"]).strip()
         fd_model = fd_model.replace("\\", "/").split("/")[-1] or "face_yolov8m.pt"
         fd_path = os.path.join(COMFYUI_DIR, "models", "ultralytics", "bbox", fd_model)
         if not os.path.isfile(fd_path):
@@ -628,23 +527,14 @@ def submit_generation(data: dict) -> tuple[dict, int]:
                 "error_params": {"name": fd_model},
             }, 400
         data["face_detailer_model"] = fd_model
-        if bool(data.get("face_detailer_use_sam", False)):
+        if bool(data["face_detailer_use_sam"]):
             sam_path = os.path.join(COMFYUI_DIR, "models", "sams", "sam_vit_b_01ec64.pth")
             if not os.path.isfile(sam_path):
                 # SAM 缺失不阻塞生成: 降级为 bbox 矩形掩码
                 logger.warning("[generate] SAM 权重缺失, 面部重绘降级为 bbox 掩码")
                 data["face_detailer_use_sam"] = False
-        # 数值钳制 (builder 端还有一层, 此处保证入库参数干净)
-        data["face_detailer_denoise"] = max(0.1, min(float(data.get("face_detailer_denoise", 0.35)), 1.0))
-        data["face_detailer_steps"] = max(1, min(int(data.get("face_detailer_steps", 20)), 100))
-        data["face_detailer_cfg"] = max(1.0, min(float(data.get("face_detailer_cfg", 7.0)), 20.0))
-        data["face_detailer_guide_size"] = max(256, min(int(data.get("face_detailer_guide_size", 768)), 2048))
-        data["face_detailer_crop_factor"] = max(1.0, min(float(data.get("face_detailer_crop_factor", 1.8)), 4.0))
-        data["face_detailer_bbox_threshold"] = max(0.1, min(float(data.get("face_detailer_bbox_threshold", 0.5)), 0.9))
-        data["face_detailer_feather"] = max(0, min(int(data.get("face_detailer_feather", 5)), 100))
 
     # 支持 WAS Image Save 标准格式: [time(%Y-%m-%d)], [time(%H%M%S)] 等
-    # 兼容旧格式: [date] → YYYY-MM-DD, [time] → HHMMSS
     now = datetime.now()
     save_prefix = str(data.get("save_prefix", "[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]") or "[time(%Y-%m-%d)]/ComfyCarry_[time(%H%M%S)]")
 
@@ -656,8 +546,6 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         lambda m: now.strftime(m.group(1)),
         save_prefix
     )
-    save_prefix = save_prefix.replace("[date]", now.strftime("%Y-%m-%d"))
-    save_prefix = save_prefix.replace("[time]", now.strftime("%H%M%S"))
     data["save_prefix"] = save_prefix
 
     output_format = str(data.get("output_format", "png")).lower()

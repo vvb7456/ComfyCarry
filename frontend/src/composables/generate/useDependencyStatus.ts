@@ -67,7 +67,7 @@ export interface UseDependencyStatusReturn {
   destroy(): void
 }
 
-const BUSY: VersionState[] = ['submitting', 'downloading', 'queued', 'verifying', 'paused']
+const BUSY: VersionState[] = ['submitting', 'downloading', 'queued', 'paused']
 
 /** 依赖条只聚合共享下载状态，不维护任务副本或自己的进度等待链。 */
 export function useDependencyStatus(

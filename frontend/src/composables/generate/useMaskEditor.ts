@@ -39,7 +39,6 @@ export function useMaskEditor() {
   let imgCanvas: HTMLCanvasElement | null = null
   let maskCanvas: HTMLCanvasElement | null = null
   let displayCanvas: HTMLCanvasElement | null = null
-  let tintCanvas: HTMLCanvasElement | null = null
   let containerEl: HTMLElement | null = null
 
   let imgCtx: CanvasRenderingContext2D | null = null
@@ -57,8 +56,8 @@ export function useMaskEditor() {
   let spaceHeld = false
 
   async function init(imageUrl: string, container: HTMLElement): Promise<void> {
-    containerEl = container
     destroy()
+    containerEl = container
 
     const img = await loadImage(imageUrl)
     imgWidth = img.naturalWidth
@@ -74,8 +73,6 @@ export function useMaskEditor() {
     maskCanvas.width = imgWidth
     maskCanvas.height = imgHeight
     maskCtx = maskCanvas.getContext('2d')!
-    maskCtx.fillStyle = '#000000'
-    maskCtx.fillRect(0, 0, imgWidth, imgHeight)
     hasMaskContent.value = false
 
     displayCanvas = document.createElement('canvas')
@@ -97,7 +94,6 @@ export function useMaskEditor() {
     imgCanvas = null
     maskCanvas = null
     displayCanvas = null
-    tintCanvas = null
     imgCtx = null
     maskCtx = null
     displayCtx = null
@@ -146,30 +142,8 @@ export function useMaskEditor() {
 
     displayCtx.drawImage(imgCanvas, 0, 0)
 
-    if (!tintCanvas || tintCanvas.width !== imgWidth || tintCanvas.height !== imgHeight) {
-      tintCanvas = document.createElement('canvas')
-      tintCanvas.width = imgWidth
-      tintCanvas.height = imgHeight
-    }
-    const tintCtx = tintCanvas.getContext('2d')!
-    tintCtx.clearRect(0, 0, imgWidth, imgHeight)
-    const maskData = maskCtx!.getImageData(0, 0, imgWidth, imgHeight)
-    const tintImageData = tintCtx.createImageData(imgWidth, imgHeight)
-    const src = maskData.data
-    const dst = tintImageData.data
-    for (let i = 0; i < src.length; i += 4) {
-      const brightness = src[i]!
-      if (brightness > 128) {
-        dst[i] = 255
-        dst[i + 1] = 51
-        dst[i + 2] = 51
-        dst[i + 3] = 255
-      }
-    }
-    tintCtx.putImageData(tintImageData, 0, 0)
-
     displayCtx.globalAlpha = 0.45
-    displayCtx.drawImage(tintCanvas, 0, 0)
+    displayCtx.drawImage(maskCanvas, 0, 0)
     displayCtx.globalAlpha = 1
 
     displayCtx.restore()
@@ -188,8 +162,8 @@ export function useMaskEditor() {
   function drawStroke(x0: number, y0: number, x1: number, y1: number) {
     if (!maskCtx) return
     const radius = brushSize.value / 2
-    const color = tool.value === 'brush' ? '#ffffff' : '#000000'
-    maskCtx.fillStyle = color
+    maskCtx.globalCompositeOperation = tool.value === 'brush' ? 'source-over' : 'destination-out'
+    maskCtx.fillStyle = '#ff3333'
 
     const dx = x1 - x0
     const dy = y1 - y0
@@ -207,29 +181,16 @@ export function useMaskEditor() {
 
     if (tool.value === 'brush') {
       hasMaskContent.value = true
-    } else {
-      hasMaskContent.value = checkMaskContent()
     }
   }
 
   function drawDot(x: number, y: number) {
-    if (!maskCtx) return
-    const radius = brushSize.value / 2
-    maskCtx.fillStyle = tool.value === 'brush' ? '#ffffff' : '#000000'
-    maskCtx.beginPath()
-    maskCtx.arc(x, y, radius, 0, Math.PI * 2)
-    maskCtx.fill()
-    if (tool.value === 'brush') {
-      hasMaskContent.value = true
-    } else {
-      hasMaskContent.value = checkMaskContent()
-    }
+    drawStroke(x, y, x, y)
   }
 
   function clearMask() {
     if (!maskCtx) return
-    maskCtx.fillStyle = '#000000'
-    maskCtx.fillRect(0, 0, imgWidth, imgHeight)
+    maskCtx.clearRect(0, 0, imgWidth, imgHeight)
     hasMaskContent.value = false
     render()
   }
@@ -239,9 +200,10 @@ export function useMaskEditor() {
     const imageData = maskCtx.getImageData(0, 0, imgWidth, imgHeight)
     const data = imageData.data
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = 255 - data[i]!
-      data[i + 1] = 255 - data[i + 1]!
-      data[i + 2] = 255 - data[i + 2]!
+      data[i] = 255
+      data[i + 1] = 51
+      data[i + 2] = 51
+      data[i + 3] = 255 - data[i + 3]!
     }
     maskCtx.putImageData(imageData, 0, 0)
     hasMaskContent.value = checkMaskContent()
@@ -251,23 +213,46 @@ export function useMaskEditor() {
   function checkMaskContent(): boolean {
     if (!maskCtx) return false
     const data = maskCtx.getImageData(0, 0, imgWidth, imgHeight).data
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i]! > 128) return true
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i]! > 0) return true
     }
     return false
   }
 
   async function exportMask(): Promise<Blob | null> {
-    if (!maskCanvas) return null
+    if (!maskCtx) return null
+    const canvas = document.createElement('canvas')
+    canvas.width = imgWidth
+    canvas.height = imgHeight
+    const ctx = canvas.getContext('2d')!
+    const imageData = maskCtx.getImageData(0, 0, imgWidth, imgHeight)
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      const value = data[i + 3]!
+      data[i] = data[i + 1] = data[i + 2] = value
+      data[i + 3] = 255
+    }
+    ctx.putImageData(imageData, 0, 0)
     return new Promise((resolve) => {
-      maskCanvas!.toBlob((blob) => resolve(blob), 'image/png')
+      canvas.toBlob(resolve, 'image/png')
     })
   }
 
   async function loadMask(maskUrl: string): Promise<void> {
     if (!maskCtx) return
     const img = await loadImage(maskUrl)
+    if (!maskCtx) return
+    maskCtx.globalCompositeOperation = 'source-over'
+    maskCtx.clearRect(0, 0, imgWidth, imgHeight)
     maskCtx.drawImage(img, 0, 0, imgWidth, imgHeight)
+    const imageData = maskCtx.getImageData(0, 0, imgWidth, imgHeight)
+    const data = imageData.data
+    for (let i = 0; i < data.length; i += 4) {
+      data[i + 3] = data[i]!
+      data[i] = 255
+      data[i + 1] = data[i + 2] = 51
+    }
+    maskCtx.putImageData(imageData, 0, 0)
     hasMaskContent.value = checkMaskContent()
     render()
   }
@@ -308,7 +293,6 @@ export function useMaskEditor() {
     drawStroke(lastX, lastY, ix, iy)
     lastX = ix
     lastY = iy
-    render()
     renderCursor(e)
   }
 
@@ -318,6 +302,7 @@ export function useMaskEditor() {
       if (displayCanvas) displayCanvas.style.cursor = 'crosshair'
       return
     }
+    if (drawing) hasMaskContent.value = checkMaskContent()
     drawing = false
     lastX = -1
     lastY = -1
@@ -386,6 +371,7 @@ export function useMaskEditor() {
     displayCanvas.addEventListener('pointerdown', onPointerDown)
     displayCanvas.addEventListener('pointermove', onPointerMove)
     displayCanvas.addEventListener('pointerup', onPointerUp)
+    displayCanvas.addEventListener('pointercancel', onPointerUp)
     displayCanvas.addEventListener('pointerleave', onPointerUp)
     displayCanvas.addEventListener('wheel', onWheel, { passive: false })
     document.addEventListener('keydown', onKeyDown)
@@ -397,6 +383,7 @@ export function useMaskEditor() {
       displayCanvas.removeEventListener('pointerdown', onPointerDown)
       displayCanvas.removeEventListener('pointermove', onPointerMove)
       displayCanvas.removeEventListener('pointerup', onPointerUp)
+      displayCanvas.removeEventListener('pointercancel', onPointerUp)
       displayCanvas.removeEventListener('pointerleave', onPointerUp)
       displayCanvas.removeEventListener('wheel', onWheel)
     }

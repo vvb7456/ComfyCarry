@@ -1,3 +1,4 @@
+from functools import partial
 import base64
 import os
 import shutil
@@ -7,6 +8,7 @@ from flask import Blueprint, jsonify, request
 
 # 文件 API 保留物理路径范围检查；根标记本身不扩大软链接的访问范围。
 from ..config import WORKSPACE_ROOT, COMFYUI_DIR, resolve_file_path, FilePathError
+from ..utils import api_err
 
 bp = Blueprint("files", __name__)
 
@@ -17,12 +19,7 @@ bp = Blueprint("files", __name__)
 # apiErrorText() 查 key, 缺条目原样显示 key。str(e) 原文不翻译, 作为
 # detail 参数透传。
 # ====================================================================
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """错误响应。前端按 `files.err.<key>` 翻译; _extra 是响应体附加顶层字段。"""
-    body = {"error_key": f"files.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "files")
 
 
 _COMPANION_SUFFIXES = [

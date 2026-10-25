@@ -9,7 +9,6 @@
  *
  * 字段顺序 (分辨率在上、步数/CFG 在下):
  *   速度 → 分辨率 → 时长 → 步数/CFG
- * 步数/CFG 置末尾另有收益: 切速度档时增删发生在末尾, 上方控件不跳动。
  *
  * 样式: label 一律 .field-lbl 同款 (.78rem/500/--t2);
  *       说明文字一律进 HelpTip 不占行;
@@ -21,7 +20,7 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
-import type { ModelTypeConfig } from '@/config/model-types'
+import { WAN22_FAST_SAMPLING, type ModelTypeConfig } from '@/config/model-types'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
 import RangeField from '@/components/form/RangeField.vue'
@@ -84,7 +83,6 @@ function deriveFitSize(refW: number, refH: number, budget: number, d: number): {
 
 /* ── 速度档 (仅 speedToggle=true 的 14B 条目) ── */
 const hasSpeed = computed(() => !!vd.value.speedToggle)
-/** 快速档: 步数/CFG 被锁定 (4 步 / cfg 1.0), 故仅标准档渲染两个滑块 */
 const isFast = computed(() => state.value.fast)
 
 const speedOptions = computed(() => [
@@ -94,6 +92,7 @@ const speedOptions = computed(() => [
 const speedValue = computed<string>(() => (isFast.value ? 'fast' : 'std'))
 function onSpeedChange(v: string) {
   state.value.fast = (v === 'fast')
+  Object.assign(state.value, state.value.fast ? WAN22_FAST_SAMPLING : config.value.defaults)
 }
 
 /** 起始画面是否就位 —— 决定「贴合起始画面」项是否出现 (t2v 永远不出现) */
@@ -317,7 +316,7 @@ const durationMarkFormat = (v: number) => `${v}s`
       </RangeField>
     </div>
 
-    <div v-if="hasSpeed && !isFast" class="vs-slider-row">
+    <div class="vs-slider-row">
       <RangeField
         :model-value="state.steps"
         :min="1"
@@ -330,6 +329,7 @@ const durationMarkFormat = (v: number) => `${v}s`
         @update:model-value="state.steps = $event"
       />
       <RangeField
+        v-if="config.hasNegativePrompt"
         :model-value="state.cfg"
         :min="1"
         :max="20"

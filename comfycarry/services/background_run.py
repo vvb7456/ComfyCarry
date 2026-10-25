@@ -19,7 +19,7 @@ import time
 import psutil
 import requests
 
-from ..config import COMFYUI_DIR, COMFYUI_URL
+from ..config import COMFYUI_URL, get_comfyui_output_dir
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +136,8 @@ def _queue_busy() -> bool:
 
 
 def _disk_low() -> bool:
-    output_dir = COMFYUI_DIR + "/output"
     try:
-        usage = psutil.disk_usage(output_dir)
+        usage = psutil.disk_usage(get_comfyui_output_dir())
     except Exception:
         return False
     free_gb = usage.free / (1024 ** 3)

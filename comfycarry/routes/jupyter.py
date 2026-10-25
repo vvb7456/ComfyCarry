@@ -1,3 +1,4 @@
+from functools import partial
 import json
 import os
 import re
@@ -9,6 +10,7 @@ import urllib3
 
 from flask import Blueprint, Response, jsonify, request
 from ..config import WORKSPACE_ROOT
+from ..utils import api_err
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -21,15 +23,7 @@ PM2_NAME = "jupyter"
 # toast 里会直接冒出中文。改为回传 error_key + error_params, 前端 apiErrorText()
 # 负责渲染。需要保留 ok:false 语义的 (如 action 端点) 传 _extra={"ok": False}。
 # 异常原文 (str(e) / stderr) 作为 detail 参数透传, 前端在 detail 插值位呈现。
-def _err(key: str, status: int = 400, /, *, _extra: dict | None = None, **params):
-    """形参位置化 (`/`): 插值参数里有 key / status / action 这种名字, 不然会撞车。
-    `_extra` 反过来只能用关键字传 (`*` 右边): 它要是位置化, 关键字写法会被
-    `**params` 静默吞掉, 顶层字段丢失。
-    """
-    body = {"error_key": f"jupyter.err.{key}", "error_params": params}
-    if _extra:
-        body.update(_extra)
-    return jsonify(body), status
+_err = partial(api_err, "jupyter")
 
 
 def _ok(key: str, /, **extra):
@@ -145,20 +139,20 @@ def _get_jupyter_pid():
 def _pm2_status() -> str:
     """online / stopped / errored / not_found"""
     try:
-        r = subprocess.run(
-            "pm2 jlist 2>/dev/null", shell=True,
-            capture_output=True, text=True, timeout=5
-        )
-        if r.returncode == 0:
-            for p in json.loads(r.stdout):
-                if p.get("name") == PM2_NAME:
-                    return p.get("pm2_env", {}).get("status", "unknown")
+        from ..utils import get_pm2_procs
+        for p in get_pm2_procs():
+            if p.get("name") == PM2_NAME:
+                return p.get("pm2_env", {}).get("status", "unknown")
     except Exception:
         pass
     return "not_found"
 
 @bp.route("/api/jupyter/status")
 def jupyter_status():
+    return jsonify(get_jupyter_status())
+
+
+def get_jupyter_status():
     port = _detect_port()
     pm2 = _pm2_status()
 
@@ -192,7 +186,7 @@ def jupyter_status():
         pass
 
     if not result["online"]:
-        return jsonify(result)
+        return result
 
     try:
         r = _jupyter_get("/api/kernels")
@@ -250,7 +244,7 @@ def jupyter_status():
     except Exception:
         pass
 
-    return jsonify(result)
+    return result
 
 
 @bp.route("/api/jupyter/terminals/new", methods=["POST"])

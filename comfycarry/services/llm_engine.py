@@ -585,32 +585,32 @@ def create_provider(provider_id: str, api_key: str, model: str,
 
 def get_llm_config() -> dict:
     provider = get_config("llm_provider", "")
+    keys = get_config("llm_provider_keys", {})
+    current = keys.get(provider, {})
     return {
         "provider": provider,
-        "model": get_config("llm_model", ""),
-        "api_key": get_config("llm_api_key", ""),
-        "base_url": get_config("llm_base_url", ""),
+        "model": current.get("model", ""),
+        "api_key": current.get("api_key", ""),
+        "base_url": current.get("base_url", ""),
         "temperature": get_config("llm_temperature", 0.7),
         "max_tokens": get_config("llm_max_tokens", 2000),
         "stream": get_config("llm_stream", False),
-        "provider_keys": get_config("llm_provider_keys", {}),
+        "provider_keys": keys,
     }
 
 
 def save_llm_config(data: dict):
-    for key in ("provider", "model", "api_key", "base_url",
-                "temperature", "max_tokens", "stream"):
+    for key in ("provider", "temperature", "max_tokens", "stream"):
         if key in data:
             set_config(f"llm_{key}", data[key])
 
     # Per-provider key/model/base_url persistence
     provider = data.get("provider") or get_config("llm_provider", "")
-    if provider and "api_key" in data:
+    if provider and any(key in data for key in ("api_key", "model", "base_url")):
         keys = get_config("llm_provider_keys", {})
         keys[provider] = {
-            "api_key": data.get("api_key", ""),
-            "model": data.get("model", ""),
-            "base_url": data.get("base_url", ""),
+            **keys.get(provider, {}),
+            **{key: data[key] for key in ("api_key", "model", "base_url") if key in data},
         }
         set_config("llm_provider_keys", keys)
 

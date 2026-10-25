@@ -109,9 +109,7 @@ export function useMissingModels() {
   const store = useGenerateStore()
   const downloads = useDownloadsStore()
   if (getCurrentScope()) onScopeDispose(downloads.subscribe())
-  const missingPaths = computed(() => new Set(store.restoredFiles
-    .filter(file => downloads.fileChecks.has(file.path) && downloads.getFileDownloadInfo(file.path).state !== 'installed')
-    .map(file => file.path)))
+  const missingPaths = computed(() => store.missingPaths)
 
   /** 带超时的 fetch: 到点抛错, 由调用方按「查不到」处理 */
   async function fetchWithTimeout(url: string): Promise<Response> {
@@ -135,12 +133,6 @@ export function useMissingModels() {
     } catch {
       // 拉不到按空表: 缺失项全部落入手动列表, 不阻塞弹窗
     }
-    await checkFiles().catch(() => {})
-  }
-
-  async function checkFiles(): Promise<void> {
-    const paths = [...new Set(store.restoredFiles.map(file => file.path))]
-    await downloads.checkFiles(paths)
   }
 
   /** 查一个哈希的 civitai 版本详情 (按哈希缓存); 未命中/超时 → null */
@@ -303,7 +295,6 @@ export function useMissingModels() {
     loading,
     prepare,
     loadHashes,
-    checkFiles,
     isMissing: (path: string) => missingPaths.value.has(path),
     imported,
     ignoreAndFallback,

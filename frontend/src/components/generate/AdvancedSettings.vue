@@ -41,6 +41,10 @@ const state = computed(() => store.currentState)
 const options = inject(GenerateOptionsKey)!
 
 const arch = computed(() => props.modelType || store.activeModelType)
+const schedulerOptions = computed(() => [
+  ...(MODEL_TYPES[arch.value]?.extraSchedulers ?? []),
+  ...options.schedulers.value,
+])
 
 const isVideo = computed(() => props.mediaType === 'video')
 const clipLabel = computed(() =>
@@ -315,7 +319,7 @@ const vaeOverrideOptions = computed(() => [
           </div>
           <BaseSelect
             :model-value="state.scheduler"
-            :options="options.schedulers.value"
+            :options="schedulerOptions"
             :disabled="disabled"
             searchable
             :search-placeholder="t('generate.advanced.scheduler_search')"
