@@ -3,7 +3,7 @@
 #
 # 基线: NVIDIA cudnn-runtime + 最小 CUDA 编译链
 # 触发: 手动 / push 生产 Dockerfile、入口脚本或本工作流
-# 产物: x86 latest / ARM arm，分别保留版本标签
+# 产物: latest / x86 / arm，以及 v<版本>-x86 / v<版本>-arm
 # ==============================================================================
 
 name: Build & Push Docker Image
@@ -13,6 +13,7 @@ on:
   push:
     paths:
       - "docker/Dockerfile"
+      - "docker/VERSION"
       - "docker/entrypoint.sh"
       - "docker/Dockerfile.dockerignore"
       - "comfycarry/services/management_agent.py"
@@ -38,15 +39,15 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-latest
-            tag: latest
-            suffix: ""
+            name: x86
+            tags: latest x86
             wheel_arch: x86_64
             sa_archs: sm80 sm86 sm89 sm90 sm100 sm120
             cuda_archs: "8.0;8.6;8.9;9.0;10.0;12.0"
           - arch: arm64
             runner: ubuntu-24.04-arm
-            tag: arm
-            suffix: -arm
+            name: arm
+            tags: arm
             wheel_arch: aarch64
             sa_archs: sm120
             cuda_archs: "12.1"
@@ -59,6 +60,21 @@ jobs:
       # ── 检出代码 ──
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: 生成镜像版本和标签
+        id: metadata
+        run: |
+          VERSION=$(cat docker/VERSION)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          {
+            echo 'tags<<EOF'
+            for image in "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry"; do
+              for tag in ${{ matrix.tags }} "v${VERSION}-${{ matrix.name }}"; do
+                echo "${image}:${tag}"
+              done
+            done
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       # ── 下载预编译 wheels (从 GitHub Release) ──
       - name: Download wheels from Release
@@ -105,14 +121,9 @@ jobs:
           file: docker/Dockerfile
           push: true
           build-args: |
+            IMAGE_VERSION=${{ steps.metadata.outputs.version }}
             TORCH_CUDA_ARCH_LIST=${{ matrix.cuda_archs }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291${{ matrix.suffix }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal${{ matrix.suffix }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:${{ matrix.tag }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291${{ matrix.suffix }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal${{ matrix.suffix }}
+          tags: ${{ steps.metadata.outputs.tags }}
           provenance: false
           sbom: false
           platforms: linux/${{ matrix.arch }}
@@ -120,7 +131,8 @@ jobs:
       # ── 验证 ──
       - name: Verify pushed image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal${{ matrix.suffix }}
-          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:${{ matrix.tag }}
-          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal${{ matrix.suffix }}
+          while IFS= read -r image; do
+            docker buildx imagetools inspect "$image"
+          done <<'TAGS'
+          ${{ steps.metadata.outputs.tags }}
+          TAGS

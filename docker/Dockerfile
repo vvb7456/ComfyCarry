@@ -2,14 +2,12 @@
 # ComfyCarry Docker 镜像 (CUDA 13.0 / PyTorch 2.9.1)
 #
 # 正式生产基线：NVIDIA cudnn-runtime + 最小 CUDA 编译链。
-# CI 发布 latest、cu130-torch291 与 cu130-torch291-runtime-minimal。
+# CI 发布 latest / x86 / arm 和 v<版本>-<架构> 标签。
 # 支持: amd64 Ampere/Ada/Hopper/Blackwell | arm64 GB10
 
 FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04@sha256:f2c12914cf4751e61073843724275aa35d4817e01dbdc87eac03905971628c6e
 
 LABEL maintainer="ComfyCarry"
-LABEL description="ComfyCarry runtime-minimal — CUDA 13.0 / PyTorch 2.9.1"
-LABEL version="cu130-torch291-runtime-minimal"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -196,6 +194,12 @@ RUN python3.12 -m pip install \
 # =============================================================================
 # 11. 目录结构 & 预构建标记
 # =============================================================================
+ARG IMAGE_VERSION
+LABEL description="ComfyCarry v${IMAGE_VERSION} — CUDA 13.0 / PyTorch 2.9.1"
+LABEL version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.title="ComfyCarry"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+
 WORKDIR /workspace
 RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_models,Aura-SR,sams} \
              /opt/ComfyUI/{output,input} \
@@ -207,7 +211,7 @@ RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_model
     python3.12 -c "\
 import json, datetime, platform, torch; \
 info = { \
-    'version': '3.2 (arm)' if platform.machine() == 'aarch64' else '3.2 (x86)', \
+    'version': '${IMAGE_VERSION} (arm)' if platform.machine() == 'aarch64' else '${IMAGE_VERSION} (x86)', \
     'build_date': datetime.datetime.now().strftime('%Y-%m-%d'), \
     'python': '3.12', \
     'torch': torch.__version__, \

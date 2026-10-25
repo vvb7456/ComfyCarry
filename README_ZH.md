@@ -47,6 +47,20 @@ erocraft/comfycarry:latest
 
 基于 Python 3.12 + PyTorch 2.9.1 + CUDA 13.0，内含 FlashAttention-2、SageAttention-2、ComfyUI 及 21 个常用插件。启动耗时 2-5 分钟。
 
+#### 镜像命名与版本
+
+Docker Hub 的 `erocraft/comfycarry` 和 GHCR 的 `ghcr.io/vvb7456/comfycarry` 使用相同标签：
+
+| 标签 | 用途 | 镜像内名称示例 |
+|------|------|----------------|
+| `latest`、`x86` | 最新 x86 镜像，两者指向同一镜像 | `ComfyCarry v3.2.0 (x86)` |
+| `arm` | 最新 ARM64 / GB10 镜像 | `ComfyCarry v3.2.0 (arm)` |
+| `v3.2.0-x86`、`v3.2.0-arm` | 按版本和架构选择镜像 | 与对应版本一致 |
+
+镜像版本统一维护在 `docker/VERSION`，采用 `主版本.次版本.修订版本` 格式，与客户端 Release 版本独立。发布新镜像时先更新此文件：小修复递增修订版本，新增功能递增次版本，重大变更递增主版本。CUDA、PyTorch 版本保留在镜像信息中。
+
+修改镜像构建文件或 `docker/VERSION` 并推送到 `main`，CI 会同时构建两种架构，生成标签和镜像内名称。也可以运行 `bash docker/build.sh` 手动触发 `main` 分支的 CI 构建。
+
 ### 2. 设置启动命令
 
 在 **On-start Script** 中填写：
