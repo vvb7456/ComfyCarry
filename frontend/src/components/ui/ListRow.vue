@@ -42,6 +42,7 @@ export interface ListRowFact {
 import MsIcon from './MsIcon.vue'
 import StatusDot from './StatusDot.vue'
 import Badge from './Badge.vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import type { IconName } from '@/config/icon-codepoints'
 
 defineOptions({ name: 'ListRow' })
@@ -50,6 +51,7 @@ withDefaults(defineProps<{
   /** Material Symbols 图标名（对象身份图标） */
   icon?: IconName
   title: string
+  titleTo?: RouteLocationRaw
   /** 主行悬停说明：pm2 内部名、完整路径这类排障信息 */
   titleTooltip?: string
   status?: { tone: 'running' | 'stopped' | 'loading' | 'error'; text: string }
@@ -81,7 +83,13 @@ withDefaults(defineProps<{
     </span>
     <div class="list-row__main">
       <div class="list-row__head">
-        <span class="list-row__title" :title="titleTooltip">{{ title }}</span>
+        <RouterLink
+          v-if="titleTo"
+          :to="titleTo"
+          class="list-row__title list-row__title--link"
+          :title="titleTooltip"
+        >{{ title }}</RouterLink>
+        <span v-else class="list-row__title" :title="titleTooltip">{{ title }}</span>
         <span v-if="status" class="list-row__status">
           <StatusDot :status="status.tone" size="sm" />
           {{ status.text }}
@@ -174,6 +182,17 @@ withDefaults(defineProps<{
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--t1);
+}
+
+.list-row__title--link {
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.list-row__title--link:hover,
+.list-row__title--link:focus-visible {
+  color: var(--ac);
+  text-decoration: underline;
 }
 
 /* 描述行: 普通字色, 最多两行 */

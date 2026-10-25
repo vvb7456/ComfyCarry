@@ -66,10 +66,17 @@
     "meta_restarts": "Restarts {value}"
   },
   "gpu": {
-    "title": "GPU VRAM",
-    "used_pct": "{pct}% used",
-    "available": "{vram} free",
+    "title": "Available VRAM",
     "not_detected": "No GPU detected"
+  },
+  "disk": {
+    "title": "Available Disk",
+    "unavailable": "Unavailable"
+  },
+  "resources": {
+    "total": "{size} total",
+    "used_pct": "{pct}% used",
+    "usage_detail": "{used} / {total} used ({pct}%)"
   },
   "recent": {
     "title": "Recent Generations",

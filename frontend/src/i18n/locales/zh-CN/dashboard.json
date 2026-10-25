@@ -66,10 +66,17 @@
     "meta_restarts": "重启 {value} 次"
   },
   "gpu": {
-    "title": "GPU 显存",
-    "used_pct": "{pct}% 已用",
-    "available": "{vram} 可用",
+    "title": "可用显存",
     "not_detected": "未检测到 GPU"
+  },
+  "disk": {
+    "title": "可用磁盘",
+    "unavailable": "暂不可用"
+  },
+  "resources": {
+    "total": "共 {size}",
+    "used_pct": "已用 {pct}%",
+    "usage_detail": "已用 {used} / {total}（{pct}%）"
   },
   "recent": {
     "title": "最近生成",

@@ -38,12 +38,12 @@ const diagSummary = computed(() => {
 // ── 服务行的身份 ──────────────────────────────────────────────────────
 // 列表按“用户在面板上认识的名字”渲染（ComfyUI / Jupyter / 云同步 / 隧道），
 // pm2 内部名只用于取数据，并留在名称的 title 里供排障时悬停查看。
-const SVC_IDENTITY: Record<string, { nameKey: string }> = {
-  comfy: { nameKey: 'comfyui' },
-  'cf-tunnel': { nameKey: 'tunnel' },
-  'cf-tunnel-next': { nameKey: 'tunnel' },
-  jupyter: { nameKey: 'jupyter' },
-  'sync-worker': { nameKey: 'sync' },
+const SVC_IDENTITY: Record<string, { nameKey: string; to?: string }> = {
+  comfy: { nameKey: 'comfyui', to: '/comfyui' },
+  'cf-tunnel': { nameKey: 'tunnel', to: '/tunnel' },
+  'cf-tunnel-next': { nameKey: 'tunnel', to: '/tunnel' },
+  jupyter: { nameKey: 'jupyter', to: '/jupyter' },
+  'sync-worker': { nameKey: 'sync', to: '/sync' },
   dashboard: { nameKey: 'dashboard' },
 }
 
@@ -169,6 +169,7 @@ const envFacts = computed(() => {
           v-for="svc in orderedServices"
           :key="svc.name"
           :title="svcName(svc.name)"
+          :title-to="SVC_IDENTITY[svc.name]?.to"
           :title-tooltip="svc.name"
           :status="{ tone: svcStatusTone(svc.status), text: svcStatusText(svc.status) }"
           :facts="svcFacts(svc)"
