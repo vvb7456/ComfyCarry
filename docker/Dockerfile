@@ -3,9 +3,9 @@
 #
 # 正式生产基线：NVIDIA cudnn-runtime + 最小 CUDA 编译链。
 # CI 发布 latest、cu130-torch291 与 cu130-torch291-runtime-minimal。
-# 支持: Ampere (A100/30xx) | Ada (40xx) | Hopper (H100) | Blackwell (50xx/B200)
+# 支持: amd64 Ampere/Ada/Hopper/Blackwell | arm64 GB10
 
-FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04@sha256:6477166585af57524a052c59c611d23007a40fed605f8034684af2596e2a9ffb
+FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04@sha256:f2c12914cf4751e61073843724275aa35d4817e01dbdc87eac03905971628c6e
 
 LABEL maintainer="ComfyCarry"
 LABEL description="ComfyCarry runtime-minimal — CUDA 13.0 / PyTorch 2.9.1"
@@ -95,16 +95,16 @@ RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED && \
         jupyterlab-language-pack-zh-CN
 
 # =============================================================================
-# 5. FlashAttention-2 (预编译 wheel — 全架构: sm80/86/89/90/100/120)
+# 5. FlashAttention-2 (按 CPU 架构选取预编译 wheel)
 # =============================================================================
 RUN --mount=type=bind,source=docker/wheels,target=/tmp/wheels,ro \
     python3.12 -m pip install \
-        /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
+        /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_$(uname -m).whl
 
 # =============================================================================
 # 6. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
 # =============================================================================
-COPY docker/wheels/sageattention-2.2.0-cp312-cp312-linux_x86_64_sm*.whl /opt/wheels/sa2/
+COPY docker/wheels/sageattention-2.2.0-cp312-cp312-linux_*_sm*.whl /opt/wheels/sa2/
 
 # =============================================================================
 # 7. 生成 torch 约束文件，防止插件依赖覆盖已验证版本
@@ -154,6 +154,11 @@ RUN git clone --depth 1 https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone --depth 1 https://github.com/1038lab/ComfyUI-RMBG && \
     git clone --depth 1 https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler
 
+# decord 没有 Linux ARM wheel，decord2 保留相同的 decord 导入接口。
+RUN if [ "$(uname -m)" = aarch64 ]; then \
+        sed -i 's/^decord[[:space:]]*$/decord2==3.4.0/' /opt/ComfyUI/custom_nodes/ComfyUI-RMBG/requirements.txt; \
+    fi
+
 RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f); do \
         echo "========================================" && \
         echo ">>> Installing: $req" && \
@@ -169,11 +174,12 @@ RUN python3.12 -m pip install \
     diffusers clip_interrogator peft open-clip-torch timm ftfy \
     color-matcher mss dill
 
-# SAM2 默认编译 connected-components CUDA 扩展。显式指定全架构并禁止静默
-# 降级，确保 minimal-build 工具链在 CI 中真实可用。
-RUN TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0" \
+# SAM2 使用镜像内的 PyTorch 编译，避免隔离环境引入其他版本导致 ABI 不匹配。
+# 显式指定目标架构并禁止静默降级，确保 minimal-build 工具链在 CI 中真实可用。
+ARG TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
+RUN TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
     SAM2_BUILD_ALLOW_ERRORS=0 \
-    python3.12 -m pip install \
+    python3.12 -m pip install --no-build-isolation \
         "git+https://github.com/facebookresearch/sam2.git"
 
 RUN python3.12 -m pip install \
@@ -199,7 +205,7 @@ RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_model
     ln -snf /workspace /root/workspace && \
     touch /root/.no_auto_tmux && \
     python3.12 -c "\
-import json, datetime, torch; \
+import json, datetime, platform, torch; \
 info = { \
     'version': '3.1-runtime-minimal', \
     'build_date': datetime.datetime.now().strftime('%Y-%m-%d'), \
@@ -207,7 +213,7 @@ info = { \
     'torch': torch.__version__, \
     'cuda_toolkit': torch.version.cuda or '', \
     'fa2': True, \
-    'sa2_archs': ['sm80','sm86','sm89','sm90','sm100','sm120'], \
+    'sa2_archs': ['sm120'] if platform.machine() == 'aarch64' else ['sm80','sm86','sm89','sm90','sm100','sm120'], \
     'base_image': 'nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04', \
     'cuda_build_toolchain': 'cuda-minimal-build-13-0', \
 }; \

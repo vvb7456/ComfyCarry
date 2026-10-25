@@ -29,7 +29,15 @@ def _collect_gpu() -> list[dict]:
         count = pynvml.nvmlDeviceGetCount()
         for i in range(count):
             h = pynvml.nvmlDeviceGetHandleByIndex(i)
-            mem = pynvml.nvmlDeviceGetMemoryInfo(h)
+            try:
+                mem = pynvml.nvmlDeviceGetMemoryInfo(h)
+                mem_total, mem_used, mem_free = mem.total, mem.used, mem.free
+            except pynvml.NVMLError_NotSupported:
+                # GB10 共享系统内存，NVML 不提供独立显存读数。
+                import psutil
+                mem = psutil.virtual_memory()
+                mem_total, mem_free = mem.total, mem.available
+                mem_used = mem_total - mem_free
             util = pynvml.nvmlDeviceGetUtilizationRates(h)
             temp = pynvml.nvmlDeviceGetTemperature(h, 0)
             try:
@@ -63,9 +71,9 @@ def _collect_gpu() -> list[dict]:
             gpus.append({
                 "index": i,
                 "name": name,
-                "mem_total": mem.total // 1048576,
-                "mem_used": mem.used // 1048576,
-                "mem_free": mem.free // 1048576,
+                "mem_total": mem_total // 1048576,
+                "mem_used": mem_used // 1048576,
+                "mem_free": mem_free // 1048576,
                 "util": util.gpu,
                 "temp": temp,
                 "power": round(power, 1),

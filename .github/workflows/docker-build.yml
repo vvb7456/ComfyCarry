@@ -3,7 +3,7 @@
 #
 # 基线: NVIDIA cudnn-runtime + 最小 CUDA 编译链
 # 触发: 手动 / push 生产 Dockerfile、入口脚本或本工作流
-# 产物: latest + cu130-torch291 + cu130-torch291-runtime-minimal
+# 产物: x86 latest / ARM arm，分别保留版本标签
 # ==============================================================================
 
 name: Build & Push Docker Image
@@ -29,20 +29,28 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: vvb7456/comfycarry
-  # wheels 版本 — 修改时同步更新 Release tag
-  FA2_WHEEL: flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
-  SA2_WHEELS: >-
-    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm80.whl
-    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm86.whl
-    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm89.whl
-    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm90.whl
-    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm100.whl
-    sageattention-2.2.0-cp312-cp312-linux_x86_64_sm120.whl
   RELEASE_TAG: wheels-v1  # GitHub Release tag (存放预编译 wheels)
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            tag: latest
+            suffix: ""
+            wheel_arch: x86_64
+            sa_archs: sm80 sm86 sm89 sm90 sm100 sm120
+            cuda_archs: "8.0;8.6;8.9;9.0;10.0;12.0"
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            tag: arm
+            suffix: -arm
+            wheel_arch: aarch64
+            sa_archs: sm120
+            cuda_archs: "12.1"
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -59,10 +67,11 @@ jobs:
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
 
           echo ">>> Downloading FA2 wheel..."
-          wget -q -P docker/wheels "${RELEASE_URL}/${{ env.FA2_WHEEL }}"
+          wget -q -P docker/wheels "${RELEASE_URL}/flash_attn-2.8.3-cp312-cp312-linux_${{ matrix.wheel_arch }}.whl"
 
           echo ">>> Downloading SA2 wheels..."
-          for whl in ${{ env.SA2_WHEELS }}; do
+          for arch in ${{ matrix.sa_archs }}; do
+            whl="sageattention-2.2.0-cp312-cp312-linux_${{ matrix.wheel_arch }}_${arch}.whl"
             wget -q -P docker/wheels "${RELEASE_URL}/${whl}"
           done
 
@@ -95,23 +104,23 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          build-args: |
+            TORCH_CUDA_ARCH_LIST=${{ matrix.cuda_archs }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal
-          # 不生成 attestation/provenance (避免 manifest list 问题)
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291${{ matrix.suffix }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal${{ matrix.suffix }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:${{ matrix.tag }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291${{ matrix.suffix }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal${{ matrix.suffix }}
           provenance: false
           sbom: false
-          # 单平台 amd64
-          platforms: linux/amd64
+          platforms: linux/${{ matrix.arch }}
 
       # ── 验证 ──
       - name: Verify pushed image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal
-          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:latest
-          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cu130-torch291-runtime-minimal${{ matrix.suffix }}
+          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:${{ matrix.tag }}
+          docker buildx imagetools inspect docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry:cu130-torch291-runtime-minimal${{ matrix.suffix }}

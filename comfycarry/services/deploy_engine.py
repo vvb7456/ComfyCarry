@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 import selectors
 import shlex
 import shutil
@@ -153,13 +154,14 @@ def _install_sa2(py, cuda_cap):
         _deploy_log(f"未知 GPU 架构 {cuda_cap}, 跳过 SA2", "warn")
         return
 
-    whl_src = Path(f"/opt/wheels/sa2/sageattention-2.2.0-cp312-cp312-linux_x86_64_{wheel_suffix}.whl")
+    cpu_arch = platform.machine()
+    whl_src = Path(f"/opt/wheels/sa2/sageattention-2.2.0-cp312-cp312-linux_{cpu_arch}_{wheel_suffix}.whl")
     if not whl_src.exists():
         _deploy_log(f"SA2 wheel 不存在: {whl_src}", "warn")
         return
 
     # wheel 文件名必须符合 PEP 427, 复制后改名为标准格式
-    tmp_whl = "/tmp/sageattention-2.2.0-cp312-cp312-linux_x86_64.whl"
+    tmp_whl = f"/tmp/sageattention-2.2.0-cp312-cp312-linux_{cpu_arch}.whl"
     shutil.copy2(str(whl_src), tmp_whl)
 
     _deploy_log(f"安装 SA2 ({wheel_suffix})...")
