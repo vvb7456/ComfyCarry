@@ -61,6 +61,13 @@ Docker Hub 的 `erocraft/comfycarry` 和 GHCR 的 `ghcr.io/vvb7456/comfycarry` �
 
 修改镜像构建文件或 `docker/VERSION` 并推送到 `main`，CI 会同时构建两种架构，生成标签和镜像内名称。也可以运行 `bash docker/build.sh` 手动触发 `main` 分支的 CI 构建。
 
+预编译加速包按运行环境分别保存：
+
+- [Python 3.12 / PyTorch 2.9.1 / CUDA 13.0](https://github.com/vvb7456/ComfyCarry/releases/tag/wheels-v1)
+- [Python 3.13 / PyTorch 2.11.0 / CUDA 13.0](https://github.com/vvb7456/ComfyCarry/releases/tag/wheels-py313-torch2.11.0-cu130)
+
+Python 3.13 的全量编译入口为 `bash docker/build-attention-wheels.sh`，自动按本机 CPU 架构生成对应 wheel。编译环境需要 Python 3.13、PyTorch 2.11.0 + CUDA 13.0，以及 CUDA 编译工具和 cuBLAS/cuSPARSE/cuSOLVER 开发头文件。新包文件名记录 Python、PyTorch、CUDA 和目标架构。
+
 ### 2. 设置启动命令
 
 在 **On-start Script** 中填写：
