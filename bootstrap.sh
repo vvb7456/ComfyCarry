@@ -169,21 +169,7 @@ commit=${COMMIT_HASH}
 EOF
 fi
 
-# Colab 没有镜像内的独立服务脚本，使用本次部署包里的版本。
 if [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
-    for _file in static/dist/index.html static/dist/wizard.html \
-        comfycarry/services/management_agent.py comfycarry/services/usage_collector.py \
-        comfycarry/services/system_monitor.py; do
-        if [ ! -s "$DASHBOARD_DIR/$_file" ]; then
-            echo "部署包缺少 $_file" >&2
-            exit 1
-        fi
-    done
-    for _pair in management_agent.py:comfycarry-management-agent.py \
-        management_agent.py:management_agent.py usage_collector.py:comfycarry-usage-collector.py \
-        system_monitor.py:system_monitor.py; do
-        install -m 644 "$DASHBOARD_DIR/comfycarry/services/${_pair%%:*}" "/opt/${_pair##*:}"
-    done
     "$PYTHON_BIN" -c "import sys; sys.path.insert(0, sys.argv[1]); from comfycarry.config import set_config; set_config('cf_protocol', 'http2')" "$DASHBOARD_DIR"
 fi
 

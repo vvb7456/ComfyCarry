@@ -95,17 +95,15 @@ wget -qO- https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/bootstrap.sh
 
 ### Google Colab
 
-在 Colab 选择 GPU 运行时，在代码单元格运行：
+在 Colab 选择最新的 GPU 运行时（Python 3.13 / PyTorch 2.11.0 / CUDA 13.0），在代码单元格运行：
 
 ```bash
 !curl -fsSL https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/colab.sh | bash
 ```
 
-安装器先复用 Colab 已有组件、补齐 Wizard 不负责的运行依赖，再交给 `bootstrap.sh`，按正常 Docker 路径下载现有 Release 部署包并启动面板和 JupyterLab。Colab 不克隆 ComfyCarry 源码或构建前端。打开输出中的地址，使用部署向导配置密码、存储和插件；插件及其依赖仍由 Wizard 安装。默认工作区为 `/content`，T4 使用默认 Attention。
+安装器直接使用 Colab 自带的 Python、PyTorch 和 CUDA，将 ComfyUI 安装到工作区，补齐应用依赖，并安装当前 GPU 对应的加速包。随后通过 `bootstrap.sh` 下载正式 Release 部署包，启动面板和 JupyterLab。打开输出中的地址，使用部署向导配置密码、存储和插件。默认工作区为 `/content`，T4 使用默认 Attention。
 
 重复执行可重新启动并复用现有安装。需要重新下载最新正式 Release 时，在命令中的 `bash` 前加上 `FORCE_UPDATE=true`。安装日志位于 `/content/colab-install.log`。
-
-在 SSH 中手动管理应用时，先运行 `source /content/.comfycarry-colab-env`，即可使用相同的 Python 和工具环境。
 
 ---
 

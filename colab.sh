@@ -18,7 +18,7 @@ INSTALLER_DIR="$WORKSPACE_DIR/.comfycarry-installer"
 mkdir -p "$INSTALLER_DIR/scripts"
 
 echo "==> 下载安装脚本"
-for file in bootstrap.sh scripts/install-colab.sh scripts/colab-requirements.txt scripts/colab-constraints.txt; do
+for file in bootstrap.sh scripts/install-colab.sh scripts/colab-requirements.txt; do
     curl --fail --silent --show-error --location --retry 3 --connect-timeout 30 \
         "https://raw.githubusercontent.com/vvb7456/ComfyCarry/main/$file" \
         -o "$INSTALLER_DIR/$file"

@@ -127,29 +127,15 @@ def _deploy_log(msg, level="info"):
 
 
 def _install_sa2(py, cuda_cap):
+    if subprocess.run([py, "-c", "import sageattention"], capture_output=True).returncode == 0:
+        _deploy_log("SageAttention-2 已安装，跳过安装", "success")
+        return
+
     wheel_map = {
         "8.0": "sm80", "8.6": "sm86", "8.9": "sm89",
-        "9.0": "sm90", "10.0": "sm100", "12.0": "sm120"
+        "9.0": "sm90", "10.0": "sm100", "12.0": "sm120", "12.1": "sm120",
     }
     wheel_suffix = wheel_map.get(cuda_cap)
-
-    # 向下兼容: 同代未知小版本
-    if not wheel_suffix and cuda_cap:
-        try:
-            major = int(cuda_cap.split(".")[0])
-            minor = int(cuda_cap.split(".")[1]) if "." in cuda_cap else 0
-        except (ValueError, IndexError):
-            _deploy_log(f"无法解析 CUDA Cap: {cuda_cap}", "warn")
-            return
-        if major == 8:
-            wheel_suffix = "sm80" if minor <= 0 else "sm86" if minor <= 6 else "sm89"
-        elif major == 9:
-            wheel_suffix = "sm90"
-        elif major == 10:
-            wheel_suffix = "sm100"
-        elif major == 12:
-            wheel_suffix = "sm120"
-
     if not wheel_suffix:
         _deploy_log(f"未知 GPU 架构 {cuda_cap}, 跳过 SA2", "warn")
         return
@@ -160,14 +146,14 @@ def _install_sa2(py, cuda_cap):
         _deploy_log(f"SA2 wheel 不存在: {whl_src}", "warn")
         return
 
-    # wheel 文件名必须符合 PEP 427, 复制后改名为标准格式
-    tmp_whl = f"/tmp/sageattention-2.2.0-cp312-cp312-linux_{cpu_arch}.whl"
-    shutil.copy2(str(whl_src), tmp_whl)
+    # Docker wheel 的 GPU 标记位于平台名后，安装前需恢复标准平台名。
+    install_whl = Path(f"/tmp/sageattention-2.2.0-cp312-cp312-linux_{cpu_arch}.whl")
+    shutil.copy2(str(whl_src), str(install_whl))
 
     _deploy_log(f"安装 SA2 ({wheel_suffix})...")
-    _deploy_exec(f'{py} -m pip install "{tmp_whl}" --no-deps --no-cache-dir',
+    _deploy_exec(f'{py} -m pip install "{install_whl}" --no-deps --no-cache-dir',
                  label=f"pip install SA2-{wheel_suffix}")
-    _deploy_exec(f'rm -f "{tmp_whl}"')
+    _deploy_exec(f'rm -f "{install_whl}"')
     _deploy_log(f"SageAttention-2 ({wheel_suffix}) 安装完成", "success")
 
 
@@ -321,12 +307,13 @@ def _step_system_deps(config, PY):
             "libglib2.0-0 libsm6 libxext6 build-essential",
             timeout=300, label="apt-get install"
         )
-        py_bin = shutil.which(PY) or ""
-        if py_bin and not os.environ.get("VIRTUAL_ENV"):
-            _deploy_exec(f'ln -sf "{py_bin}" /usr/local/bin/python && '
-                         f'ln -sf "{py_bin}" /usr/bin/python || true')
-        _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q',
-                     label="pip upgrade")
+        if os.environ.get("COMFYCARRY_RUNTIME") != "colab":
+            py_bin = shutil.which(PY) or ""
+            if py_bin and not os.environ.get("VIRTUAL_ENV"):
+                _deploy_exec(f'ln -sf "{py_bin}" /usr/local/bin/python && '
+                             f'ln -sf "{py_bin}" /usr/bin/python || true')
+            _deploy_exec(f'{PIP} install --upgrade pip setuptools packaging ninja -q',
+                         label="pip upgrade")
         _mark_step_done("system_deps")
 
 

@@ -386,12 +386,7 @@ def _save_setup_state(state):
 
 
 def _is_setup_complete():
-    if not SETUP_STATE_FILE.exists():
-        if (Path(COMFYUI_DIR) / "main.py").exists():
-            return True
-        return False
-    state = _load_setup_state()
-    return state.get("deploy_completed", False)
+    return _load_setup_state().get("deploy_completed", False)
 
 
 RCLONE_CONF = Path(os.path.expanduser("~/.config/rclone/rclone.conf"))
