@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UseLlmAssistReturn } from '@/composables/generate/useLlmAssist'
 import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
 import { useToast } from '@/composables/useToast'
-import { useGenerateStore } from '@/stores/generate'
+import { GenerateModelKey } from '@/composables/generate/keys'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
@@ -27,7 +27,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
-const store = useGenerateStore()
+const { state, config } = inject(GenerateModelKey)!
 
 const settingsOpen = ref(false)
 
@@ -118,8 +118,8 @@ const STATIC_LLM_TARGETS: Record<string, string> = {
 }
 
 const llmTarget = computed(() => {
-  const modelType = store.activeModelType
-  const video = store.currentState.video
+  const modelType = config.value.runtimeKey ?? config.value.key
+  const video = state.value.video
 
   if (modelType === 'wan22_5b') {
     return video?.mode === 't2v' ? 'wan22_5b_t2v' : 'wan22_5b_i2v'
@@ -139,7 +139,7 @@ function onSubmit() {
   // 图片反推不携带用户之前在文字 tab 的草稿；视频的时长是系统上下文，两种模式都要发送。
   let input = props.llm.mode.value === 'image' ? '' : textInput.value
   if (llmTarget.value.startsWith('wan22_') || llmTarget.value.startsWith('minimax_h3_')) {
-    const duration = store.currentState.video?.durationS
+    const duration = state.value.video?.durationS
     if (duration) {
       input += `\n\n系统补充的生成参数（不是画面内容）：目标视频时长为 ${duration.toFixed(2)} 秒。`
     }

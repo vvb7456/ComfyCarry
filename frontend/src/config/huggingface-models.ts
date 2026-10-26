@@ -16,8 +16,8 @@
  * FLUX.2 klein 门控仓库, 共 225 条。
  *
  * 可用 ID (下一个):
- *   模型 ID: -100304
- *   版本 ID: -10000404
+ *   模型 ID: -100330
+ *   版本 ID: -10000446
  */
 
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
@@ -53,6 +53,8 @@ export interface HuggingFaceFile {
     | 'loras'
     | 'controlnet'
     | 'model_patches'
+    | 'clip_vision'
+    | 'style_models'
     | 'vae'
     | 'embeddings'
     | 'upscale_models'
@@ -66,8 +68,6 @@ export interface HuggingFaceFile {
   sizeBytes: number
   sha256: string
 }
-
-type ManualHfModel = HuggingFaceModel & { versions: HuggingFaceVersion[] }
 
 export interface HuggingFaceVersion {
   id: number
@@ -94,6 +94,7 @@ export interface HuggingFaceModel extends Omit<CivitaiHit, 'version' | 'versions
   version: HuggingFaceVersion
   versions: HuggingFaceVersion[]
 }
+
 
 
 const sdXlBaseVersion: HuggingFaceVersion = {
@@ -8726,95 +8727,1967 @@ const umt5XxlFp16Model: HuggingFaceModel = {
   versions: [umt5XxlFp16Version],
 }
 
+const whitelist100304Version: HuggingFaceVersion = {
+  id: -10000420, name: "2.1 Lite", baseModel: "Z-Image",
+  images: [{"url": "https://huggingface.co/alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1/resolve/main/results/canny.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "3c3e2265d1c301b444e83d668a2d12416b0b6d91cd2d18bc11eec12a7fc335cb"},
+  file: {
+    url: "https://huggingface.co/alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Fun-Controlnet-Union-2.1-lite.safetensors",
+    filename: "Z-Image-Fun-Controlnet-Union-2.1-lite.safetensors",
+    modelType: "model_patches",
+    architecture: "zimage",
+    sizeBytes: 2016627488,
+    sha256: "3c3e2265d1c301b444e83d668a2d12416b0b6d91cd2d18bc11eec12a7fc335cb",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100304Model: HuggingFaceModel = {
+  id: -100304, name: "Z-Image Union 2.1 Lite", type: "ControlNet",
+  metrics: {"downloadCount": 8673, "thumbsUpCount": 64}, images: whitelist100304Version.images,
+  user: {"username": "alibaba-pai"}, sourceUrl: "https://huggingface.co/alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+  description: {"zh": "Z-Image Base 多类型结构控制，Lite 版；使用 ModelPatchLoader 加载。", "en": "Multi-condition control patch for Z-Image Base, Lite edition; loaded with ModelPatchLoader."},
+  version: whitelist100304Version, versions: [whitelist100304Version],
+}
+
+const whitelist100305Version: HuggingFaceVersion = {
+  id: -10000421, name: "2.1 Lite", baseModel: "Z-Image",
+  images: [{"url": "https://huggingface.co/alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1/resolve/main/results/canny.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "b02f4b93f87096d67e8a2ca648b23908bbcdc4b0261b2c511b75bf20903f7100"},
+  file: {
+    url: "https://huggingface.co/alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Fun-Controlnet-Tile-2.1-lite.safetensors",
+    filename: "Z-Image-Fun-Controlnet-Tile-2.1-lite.safetensors",
+    modelType: "model_patches",
+    architecture: "zimage",
+    sizeBytes: 2016627488,
+    sha256: "b02f4b93f87096d67e8a2ca648b23908bbcdc4b0261b2c511b75bf20903f7100",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100305Model: HuggingFaceModel = {
+  id: -100305, name: "Z-Image Tile 2.1 Lite", type: "ControlNet",
+  metrics: {"downloadCount": 8673, "thumbsUpCount": 64}, images: whitelist100305Version.images,
+  user: {"username": "alibaba-pai"}, sourceUrl: "https://huggingface.co/alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+  description: {"zh": "Z-Image Base 的 Tile 细节控制补丁，适合保留原图构图并细化。", "en": "Tile detail-control patch for Z-Image Base, preserving composition while refining an image."},
+  version: whitelist100305Version, versions: [whitelist100305Version],
+}
+
+const whitelist100306Version: HuggingFaceVersion = {
+  id: -10000422, name: "2.1 Lite 2602 8steps", baseModel: "ZImageTurbo",
+  images: [{"url": "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/results/8steps.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "3ea098db9bd145be525c7e2366920b6d76c5ffd46b3d7aa8169bbc943fdaee35"},
+  file: {
+    url: "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors",
+    filename: "Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors",
+    modelType: "model_patches",
+    architecture: "zimage",
+    sizeBytes: 2016627488,
+    sha256: "3ea098db9bd145be525c7e2366920b6d76c5ffd46b3d7aa8169bbc943fdaee35",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100306Model: HuggingFaceModel = {
+  id: -100306, name: "Z-Image Turbo Union 2602 Lite", type: "ControlNet",
+  metrics: {"downloadCount": 93795, "thumbsUpCount": 465}, images: whitelist100306Version.images,
+  user: {"username": "alibaba-pai"}, sourceUrl: "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1",
+  description: {"zh": "Z-Image Turbo 八步联合控制补丁，2602 Lite 版。", "en": "Eight-step Union control patch for Z-Image Turbo, 2602 Lite edition."},
+  version: whitelist100306Version, versions: [whitelist100306Version],
+}
+
+const whitelist100307Version: HuggingFaceVersion = {
+  id: -10000423, name: "2.1 Lite 2601 8steps", baseModel: "ZImageTurbo",
+  images: [{"url": "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/results/8steps.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "880bf452b060abfcbccedee56f8d3dbf8aed2cb0311b599210361b414fc8f2fd"},
+  file: {
+    url: "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Tile-2.1-lite-2601-8steps.safetensors",
+    filename: "Z-Image-Turbo-Fun-Controlnet-Tile-2.1-lite-2601-8steps.safetensors",
+    modelType: "model_patches",
+    architecture: "zimage",
+    sizeBytes: 2016627488,
+    sha256: "880bf452b060abfcbccedee56f8d3dbf8aed2cb0311b599210361b414fc8f2fd",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100307Model: HuggingFaceModel = {
+  id: -100307, name: "Z-Image Turbo Tile 2601 Lite", type: "ControlNet",
+  metrics: {"downloadCount": 93795, "thumbsUpCount": 465}, images: whitelist100307Version.images,
+  user: {"username": "alibaba-pai"}, sourceUrl: "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1",
+  description: {"zh": "Z-Image Turbo 八步 Tile 细节控制补丁，2601 Lite 版。", "en": "Eight-step Tile detail-control patch for Z-Image Turbo, 2601 Lite edition."},
+  version: whitelist100307Version, versions: [whitelist100307Version],
+}
+
+const whitelist100308Version: HuggingFaceVersion = {
+  id: -10000424, name: "v2", baseModel: "Anima",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_lllite_any_control_to_image-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8863424f04a2445815a827b22cbda557a085d2752e05fab54a2b303821a9e3b2"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Anima-LLLite/resolve/main/model_patches/anima-lllite-any-test-like-v2.safetensors",
+    filename: "anima-lllite-any-test-like-v2.safetensors",
+    modelType: "model_patches",
+    architecture: "anima",
+    sizeBytes: 16403008,
+    sha256: "8863424f04a2445815a827b22cbda557a085d2752e05fab54a2b303821a9e3b2",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100308Model: HuggingFaceModel = {
+  id: -100308, name: "Anima LLLite Any v2", type: "ControlNet",
+  metrics: {"downloadCount": 49276, "thumbsUpCount": 25}, images: whitelist100308Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Anima-LLLite",
+  description: {"zh": "Anima Base v1.0 的轻量轮廓、线稿、草图和灰度控制补丁；ComfyUI 官方通用控制模板默认使用 Canny，配合原生 AnimaLLLiteApply。", "en": "Lightweight Canny, line-art, sketch and grayscale control for Anima Base v1.0; the official ComfyUI Any Control workflow uses Canny with native AnimaLLLiteApply."},
+  version: whitelist100308Version, versions: [whitelist100308Version],
+}
+
+const whitelist100309Version: HuggingFaceVersion = {
+  id: -10000425, name: "v1", baseModel: "Anima",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_lllite_depth_control_to_image-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "81357e51cd59874b4fbdda1eb3117aa73eafe36cc7efb9cf80a152d6bc8d0602"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Anima-LLLite/resolve/main/model_patches/anima-lllite-depth-1.safetensors",
+    filename: "anima-lllite-depth-1.safetensors",
+    modelType: "model_patches",
+    architecture: "anima",
+    sizeBytes: 7864128,
+    sha256: "81357e51cd59874b4fbdda1eb3117aa73eafe36cc7efb9cf80a152d6bc8d0602",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100309Model: HuggingFaceModel = {
+  id: -100309, name: "Anima LLLite 深度", type: "ControlNet",
+  metrics: {"downloadCount": 49276, "thumbsUpCount": 25}, images: whitelist100309Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Anima-LLLite",
+  description: {"zh": "Anima 深度控制补丁，基于 Preview3 训练；ComfyUI 官方深度模板采用此文件。", "en": "Anima depth-control patch trained on Preview3 and used by the official ComfyUI depth workflow."},
+  version: whitelist100309Version, versions: [whitelist100309Version],
+}
+
+const whitelist100310Version: HuggingFaceVersion = {
+  id: -10000426, name: "v2", baseModel: "Anima",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_lllite_image_inpainting-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "5242e677d2be34ee70ca7c97c3b14ff5ee49838c03fc1e60ac4852a180db6ef5"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Anima-LLLite/resolve/main/model_patches/anima-lllite-inpainting-v2.safetensors",
+    filename: "anima-lllite-inpainting-v2.safetensors",
+    modelType: "model_patches",
+    architecture: "anima",
+    sizeBytes: 65772872,
+    sha256: "5242e677d2be34ee70ca7c97c3b14ff5ee49838c03fc1e60ac4852a180db6ef5",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100310Model: HuggingFaceModel = {
+  id: -100310, name: "Anima LLLite 重绘 v2", type: "ControlNet",
+  metrics: {"downloadCount": 49276, "thumbsUpCount": 25}, images: whitelist100310Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Anima-LLLite",
+  description: {"zh": "Anima Base v1.0 遮罩重绘补丁，白色遮罩区域重新生成。", "en": "Masked inpainting patch for Anima Base v1.0; white mask regions are regenerated."},
+  version: whitelist100310Version, versions: [whitelist100310Version],
+}
+
+const whitelist100311Version: HuggingFaceVersion = {
+  id: -10000427, name: "v0.2", baseModel: "Anima",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_anima_base_v1-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "1b55e40bdb1d0e5a78cb498f245fccfdaae97823265db957d2aabdcf4cd3caf1"},
+  file: {
+    url: "https://huggingface.co/circlestone-labs/Anima-Official-LoRAs/resolve/main/anima-turbo-lora-v0.2.safetensors",
+    filename: "anima-turbo-lora-v0.2.safetensors",
+    modelType: "loras",
+    architecture: "anima",
+    sizeBytes: 148902616,
+    sha256: "1b55e40bdb1d0e5a78cb498f245fccfdaae97823265db957d2aabdcf4cd3caf1",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100311Model: HuggingFaceModel = {
+  id: -100311, name: "Anima Turbo LoRA v0.2", type: "LORA",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 28}, images: whitelist100311Version.images,
+  user: {"username": "circlestone-labs"}, sourceUrl: "https://huggingface.co/circlestone-labs/Anima-Official-LoRAs",
+  description: {"zh": "Anima 官方少步数加速 LoRA，推荐 8–12 步、CFG 1；与基础主模型配合使用。", "en": "Official Anima acceleration LoRA; use with the base model at 8–12 steps and CFG 1."},
+  version: whitelist100311Version, versions: [whitelist100311Version],
+}
+
+const whitelist100312Version: HuggingFaceVersion = {
+  id: -10000428, name: "v1.0 8step", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "2339acdf19bfe123f46b971ea35d367a84adb85de43627e1eceafa5a5b2b111e"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+    filename: "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+    modelType: "loras",
+    architecture: "minimax_h3",
+    sizeBytes: 1956193000,
+    sha256: "2339acdf19bfe123f46b971ea35d367a84adb85de43627e1eceafa5a5b2b111e",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100312Model: HuggingFaceModel = {
+  id: -100312, name: "H3 首尾帧 Turbo 8步", type: "LORA",
+  metrics: {"downloadCount": 26539748, "thumbsUpCount": 2409}, images: whitelist100312Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "LightX2V H3 FL2VA 加速 LoRA 的 ComfyUI 版本，文生及首尾帧生成使用；8 步，视频/音频 shift 为 12/3。", "en": "ComfyUI repack of LightX2V H3 FL2VA Turbo for text and first/last-frame generation; 8 steps, video/audio shifts 12/3."},
+  version: whitelist100312Version, versions: [whitelist100312Version],
+}
+
+const whitelist100313Version: HuggingFaceVersion = {
+  id: -10000429, name: "v0.1 4step", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_r2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "5b9ab5ade15d0775676d01a907268a69a1468dc6033b3b0d3ded5502f3ebb84c"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+    filename: "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+    modelType: "loras",
+    architecture: "minimax_h3",
+    sizeBytes: 1956193000,
+    sha256: "5b9ab5ade15d0775676d01a907268a69a1468dc6033b3b0d3ded5502f3ebb84c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100313Model: HuggingFaceModel = {
+  id: -100313, name: "H3 参考生成 Turbo 4步", type: "LORA",
+  metrics: {"downloadCount": 26539748, "thumbsUpCount": 2409}, images: whitelist100313Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "LightX2V H3 Ref2VA 加速 LoRA 的 ComfyUI 版本，参考生成使用；4 步，视频/音频 shift 为 12/3。", "en": "ComfyUI repack of LightX2V H3 Ref2VA Turbo for reference generation; 4 steps, video/audio shifts 12/3."},
+  version: whitelist100313Version, versions: [whitelist100313Version],
+}
+
+const whitelist100314Version: HuggingFaceVersion = {
+  id: -10000430, name: "2.0 INT8 ConvRot", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_fun_controlnet_union-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "890af58bb350f0c2f6c409b1c67ea8f4196654297d037769b72de1e6f504c612"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/model_patches/minimax_h3_fun_controlnet_union_2.0_pruned_int8_convrot.safetensors",
+    filename: "minimax_h3_fun_controlnet_union_2.0_pruned_int8_convrot.safetensors",
+    modelType: "model_patches",
+    architecture: "minimax_h3",
+    sizeBytes: 4531220608,
+    sha256: "890af58bb350f0c2f6c409b1c67ea8f4196654297d037769b72de1e6f504c612",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100314Model: HuggingFaceModel = {
+  id: -100314, name: "H3 Fun Union 2.0 INT8", type: "ControlNet",
+  metrics: {"downloadCount": 26539748, "thumbsUpCount": 2409}, images: whitelist100314Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 Fun Union 2.0 控制补丁，支持姿态、边缘、深度等八类控制与视频重绘；剪枝 INT8 版。", "en": "Pruned INT8 MiniMax H3 Fun Union 2.0 patch supporting eight controls, including pose, edges and depth, plus video inpainting."},
+  version: whitelist100314Version, versions: [whitelist100314Version],
+}
+
+const whitelist100315Version: HuggingFaceVersion = {
+  id: -10000431, name: "v1.1 FP16", baseModel: "SD 1.5",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/comfyanonymous/ControlNet-v1-1_fp16_safetensors.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "10559106d1bb8196298b7a81565ede9279295d2b2df15165b9dbe189994def56"},
+  file: {
+    url: "https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors/resolve/main/control_v11p_sd15_lineart_fp16.safetensors",
+    filename: "control_v11p_sd15_lineart_fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "sd15",
+    sizeBytes: 722601100,
+    sha256: "10559106d1bb8196298b7a81565ede9279295d2b2df15165b9dbe189994def56",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100315Model: HuggingFaceModel = {
+  id: -100315, name: "SD1.5 线稿 FP16", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 533}, images: whitelist100315Version.images,
+  user: {"username": "comfyanonymous"}, sourceUrl: "https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors",
+  description: {"zh": "SD 1.5 ControlNet v1.1 线稿控制，FP16 转换版。", "en": "FP16 conversion of SD 1.5 ControlNet v1.1 line-art control."},
+  version: whitelist100315Version, versions: [whitelist100315Version],
+}
+
+const whitelist100316Version: HuggingFaceVersion = {
+  id: -10000432, name: "v1.1 FP16", baseModel: "SD 1.5",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/comfyanonymous/ControlNet-v1-1_fp16_safetensors.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "2f31868eedb243a77932e3c63907a6ba0a2058b6d65b5c27b89ee1b7f618ea33"},
+  file: {
+    url: "https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors/resolve/main/control_v11f1e_sd15_tile_fp16.safetensors",
+    filename: "control_v11f1e_sd15_tile_fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "sd15",
+    sizeBytes: 722601104,
+    sha256: "2f31868eedb243a77932e3c63907a6ba0a2058b6d65b5c27b89ee1b7f618ea33",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100316Model: HuggingFaceModel = {
+  id: -100316, name: "SD1.5 Tile FP16", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 533}, images: whitelist100316Version.images,
+  user: {"username": "comfyanonymous"}, sourceUrl: "https://huggingface.co/comfyanonymous/ControlNet-v1-1_fp16_safetensors",
+  description: {"zh": "SD 1.5 ControlNet Tile，FP16 转换版；用于细节恢复和分块重绘。", "en": "FP16 SD 1.5 ControlNet Tile for detail restoration and tiled refinement."},
+  version: whitelist100316Version, versions: [whitelist100316Version],
+}
+
+const whitelist100317Version: HuggingFaceVersion = {
+  id: -10000433, name: "FP16", baseModel: "NoobAI",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Eugeoter/noob-sdxl-controlnet-lineart_anime.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "44eae6a514a60ae426ff966ecdbb9e170ad63d8889456982bb29037df42b86a8"},
+  file: {
+    url: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-lineart_anime/resolve/main/diffusion_pytorch_model.fp16.safetensors",
+    filename: "noob-sdxl-controlnet-lineart_anime-fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "noobai",
+    sizeBytes: 2502139136,
+    sha256: "44eae6a514a60ae426ff966ecdbb9e170ad63d8889456982bb29037df42b86a8",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100317Model: HuggingFaceModel = {
+  id: -100317, name: "NoobAI 动漫线稿 FP16", type: "ControlNet",
+  metrics: {"downloadCount": 10379, "thumbsUpCount": 7}, images: whitelist100317Version.images,
+  user: {"username": "Eugeoter"}, sourceUrl: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-lineart_anime",
+  description: {"zh": "NoobAI 动漫线稿 ControlNet；下载后使用明确的线稿文件名。", "en": "NoobAI anime line-art ControlNet, saved under a descriptive line-art filename."},
+  version: whitelist100317Version, versions: [whitelist100317Version],
+}
+
+const whitelist100318Version: HuggingFaceVersion = {
+  id: -10000434, name: "FP16", baseModel: "NoobAI",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Eugeoter/noob-sdxl-controlnet-tile.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "d6d676f29153357ac8d57727e35b8edc090aa4de57e861b878872ff45c432615"},
+  file: {
+    url: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-tile/resolve/main/diffusion_pytorch_model.fp16.safetensors",
+    filename: "noob-sdxl-controlnet-tile-fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "noobai",
+    sizeBytes: 2502139136,
+    sha256: "d6d676f29153357ac8d57727e35b8edc090aa4de57e861b878872ff45c432615",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100318Model: HuggingFaceModel = {
+  id: -100318, name: "NoobAI Tile FP16", type: "ControlNet",
+  metrics: {"downloadCount": 4420, "thumbsUpCount": 9}, images: whitelist100318Version.images,
+  user: {"username": "Eugeoter"}, sourceUrl: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-tile",
+  description: {"zh": "NoobAI Tile ControlNet，保留原图构图并恢复细节。", "en": "NoobAI Tile ControlNet for composition-preserving detail restoration."},
+  version: whitelist100318Version, versions: [whitelist100318Version],
+}
+
+const whitelist100319Version: HuggingFaceVersion = {
+  id: -10000435, name: "sk_model", baseModel: "Other",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/lllyasviel/Annotators.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "c686ced2a666b4850b4bb6ccf0748031c3eda9f822de73a34b8979970d90f0c6"},
+  file: {
+    url: "https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model.pth",
+    filename: "sk_model.pth",
+    modelType: "controlnet",
+    architecture: "unknown",
+    sizeBytes: 17173511,
+    sha256: "c686ced2a666b4850b4bb6ccf0748031c3eda9f822de73a34b8979970d90f0c6",
+    directory: "{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100319Model: HuggingFaceModel = {
+  id: -100319, name: "线稿检测器", type: "Detector",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 403}, images: whitelist100319Version.images,
+  user: {"username": "lllyasviel"}, sourceUrl: "https://huggingface.co/lllyasviel/Annotators",
+  description: {"zh": "ControlNet Aux 写实线稿检测器，提取输入图像的线条。", "en": "ControlNet Aux realistic line-art detector for extracting image outlines."},
+  version: whitelist100319Version, versions: [whitelist100319Version],
+}
+
+const whitelist100320Version: HuggingFaceVersion = {
+  id: -10000436, name: "sk_model2", baseModel: "Other",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/lllyasviel/Annotators.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "30a534781061f34e83bb9406b4335da4ff2616c95d22a585c1245aa8363e74e0"},
+  file: {
+    url: "https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model2.pth",
+    filename: "sk_model2.pth",
+    modelType: "controlnet",
+    architecture: "unknown",
+    sizeBytes: 17173511,
+    sha256: "30a534781061f34e83bb9406b4335da4ff2616c95d22a585c1245aa8363e74e0",
+    directory: "{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100320Model: HuggingFaceModel = {
+  id: -100320, name: "粗线稿检测器", type: "Detector",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 403}, images: whitelist100320Version.images,
+  user: {"username": "lllyasviel"}, sourceUrl: "https://huggingface.co/lllyasviel/Annotators",
+  description: {"zh": "ControlNet Aux 粗线稿检测器，与写实线稿检测器配套。", "en": "ControlNet Aux coarse line-art detector, paired with the realistic detector."},
+  version: whitelist100320Version, versions: [whitelist100320Version],
+}
+
+const whitelist100321Version: HuggingFaceVersion = {
+  id: -10000437, name: "netG", baseModel: "Other",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/lllyasviel/Annotators.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "ccabdcc3f5cf3c07cf65d58776acb21df7dfda825cdc70c9766a93fd62bfc488"},
+  file: {
+    url: "https://huggingface.co/lllyasviel/Annotators/resolve/main/netG.pth",
+    filename: "netG.pth",
+    modelType: "controlnet",
+    architecture: "unknown",
+    sizeBytes: 217631959,
+    sha256: "ccabdcc3f5cf3c07cf65d58776acb21df7dfda825cdc70c9766a93fd62bfc488",
+    directory: "{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100321Model: HuggingFaceModel = {
+  id: -100321, name: "动漫线稿检测器", type: "Detector",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 403}, images: whitelist100321Version.images,
+  user: {"username": "lllyasviel"}, sourceUrl: "https://huggingface.co/lllyasviel/Annotators",
+  description: {"zh": "ControlNet Aux 动漫线稿检测器，供动漫线稿控制预处理使用。", "en": "ControlNet Aux anime line-art detector for anime control preprocessing."},
+  version: whitelist100321Version, versions: [whitelist100321Version],
+}
+
+const whitelist100322Version: HuggingFaceVersion = {
+  id: -10000438, name: "FP16", baseModel: "NoobAI",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Laxhar/noob_openpose.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "918cfc4d7def165ea7a06bee10841fe525332515f8a0486c5cb2a171ec40b873"},
+  file: {
+    url: "https://huggingface.co/Laxhar/noob_openpose/resolve/main/openpose_pre.safetensors",
+    filename: "noob-openpose.safetensors",
+    modelType: "controlnet",
+    architecture: "noobai",
+    sizeBytes: 2502140008,
+    sha256: "918cfc4d7def165ea7a06bee10841fe525332515f8a0486c5cb2a171ec40b873",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100322Model: HuggingFaceModel = {
+  id: -100322, name: "Laxhar NoobAI OpenPose", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 23}, images: whitelist100322Version.images,
+  user: {"username": "Laxhar"}, sourceUrl: "https://huggingface.co/Laxhar/noob_openpose",
+  description: {"zh": "Laxhar NoobAI 姿势控制；Krita 用于 Illustrious 与 NoobAI，配合 DWPose。", "en": "Laxhar NoobAI pose control, used by Krita for Illustrious and NoobAI with DWPose."},
+  version: whitelist100322Version, versions: [whitelist100322Version],
+}
+
+const whitelist100323Version: HuggingFaceVersion = {
+  id: -10000439, name: "FP16", baseModel: "NoobAI",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Eugeoter/noob-sdxl-controlnet-canny.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "68d4115d0f97ff59f3444aa06bd81a6c1e96c8a3750d8f6b442aa0495cc89508"},
+  file: {
+    url: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-canny/resolve/main/diffusion_pytorch_model.fp16.safetensors",
+    filename: "noob-sdxl-controlnet-canny-fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "noobai",
+    sizeBytes: 2502139136,
+    sha256: "68d4115d0f97ff59f3444aa06bd81a6c1e96c8a3750d8f6b442aa0495cc89508",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100323Model: HuggingFaceModel = {
+  id: -100323, name: "NoobAI Canny FP16", type: "ControlNet",
+  metrics: {"downloadCount": 5853, "thumbsUpCount": 6}, images: whitelist100323Version.images,
+  user: {"username": "Eugeoter"}, sourceUrl: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-canny",
+  description: {"zh": "NoobAI Canny 轮廓控制；Krita 的 Illustrious 系列推荐权重。", "en": "NoobAI Canny control, recommended by Krita for the Illustrious family."},
+  version: whitelist100323Version, versions: [whitelist100323Version],
+}
+
+const whitelist100324Version: HuggingFaceVersion = {
+  id: -10000440, name: "v1.1 FP16", baseModel: "NoobAI",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Eugeoter/noob-sdxl-controlnet-depth_midas-v1-1.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "678b94ef3260744a1e9e50932ef8895e7f7fabf25eec7fd5cc96298f7220fe50"},
+  file: {
+    url: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-depth_midas-v1-1/resolve/main/diffusion_pytorch_model.fp16.safetensors",
+    filename: "noob-sdxl-controlnet-depth_midas-fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "noobai",
+    sizeBytes: 2502139136,
+    sha256: "678b94ef3260744a1e9e50932ef8895e7f7fabf25eec7fd5cc96298f7220fe50",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100324Model: HuggingFaceModel = {
+  id: -100324, name: "NoobAI Depth MiDaS FP16", type: "ControlNet",
+  metrics: {"downloadCount": 5687, "thumbsUpCount": 4}, images: whitelist100324Version.images,
+  user: {"username": "Eugeoter"}, sourceUrl: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-depth_midas-v1-1",
+  description: {"zh": "NoobAI 深度控制，配合 MiDaS 深度图；Krita 用于 Illustrious 系列。", "en": "NoobAI depth control trained for MiDaS maps, used by Krita for the Illustrious family."},
+  version: whitelist100324Version, versions: [whitelist100324Version],
+}
+
+const whitelist100325Version: HuggingFaceVersion = {
+  id: -10000441, name: "DPT Hybrid", baseModel: "Other",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Intel/dpt-hybrid-midas.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "b6c4d44f9d96ca3fa76dd3bbb153989a60b4ad5526559f3c598562a368d687ec"},
+  file: {
+    url: "https://huggingface.co/Intel/dpt-hybrid-midas/resolve/main/pytorch_model.bin",
+    filename: "pytorch_model.bin",
+    modelType: "controlnet",
+    architecture: "unknown",
+    sizeBytes: 489648389,
+    sha256: "b6c4d44f9d96ca3fa76dd3bbb153989a60b4ad5526559f3c598562a368d687ec",
+    directory: "{workspace}/.cache/huggingface/hub/models--Intel--dpt-hybrid-midas/snapshots/11eaf7a1cf4bd70740697dbc216f98980c0aeb03",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100325Model: HuggingFaceModel = {
+  id: -100325, name: "MiDaS DPT Hybrid", type: "Detector",
+  metrics: {"downloadCount": 621202, "thumbsUpCount": 110}, images: whitelist100325Version.images,
+  user: {"username": "Intel"}, sourceUrl: "https://huggingface.co/Intel/dpt-hybrid-midas",
+  description: {"zh": "ControlNet Aux 当前使用的 Transformers 版 MiDaS 深度检测器。", "en": "Transformers MiDaS depth estimator used by current ControlNet Aux."},
+  version: whitelist100325Version, versions: [whitelist100325Version],
+}
+
+const whitelist100326Version: HuggingFaceVersion = {
+  id: -10000442, name: "v1", baseModel: "Flux.1 D",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/TheMistoAI/MistoLine_Flux.dev.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "400928554fa14dba41ac3cbd906ba2858ac24928f1546082ced1e0c4d0d82046"},
+  file: {
+    url: "https://huggingface.co/TheMistoAI/MistoLine_Flux.dev/resolve/main/mistoline_flux.dev_v1.safetensors",
+    filename: "mistoline_flux.dev_v1.safetensors",
+    modelType: "controlnet",
+    architecture: "flux",
+    sizeBytes: 2790301664,
+    sha256: "400928554fa14dba41ac3cbd906ba2858ac24928f1546082ced1e0c4d0d82046",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100326Model: HuggingFaceModel = {
+  id: -100326, name: "MistoLine Flux Dev", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 127}, images: whitelist100326Version.images,
+  user: {"username": "TheMistoAI"}, sourceUrl: "https://huggingface.co/TheMistoAI/MistoLine_Flux.dev",
+  description: {"zh": "Flux 1 Dev 线稿控制，ComfyUI 原生加载，建议强度 0.65。", "en": "Flux 1 Dev line-art control with native ComfyUI loading; suggested strength 0.65."},
+  version: whitelist100326Version, versions: [whitelist100326Version],
+}
+
+const whitelist100327Version: HuggingFaceVersion = {
+  id: -10000443, name: "v1", baseModel: "Flux.1 D",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/jasperai/Flux.1-dev-Controlnet-Upscaler.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "2a7ea24d2037ff2aa4d25f8b4ce9fe7e739a2cfe6b9d05106788005d5058c8ca"},
+  file: {
+    url: "https://huggingface.co/jasperai/Flux.1-dev-Controlnet-Upscaler/resolve/main/diffusion_pytorch_model.safetensors",
+    filename: "jasper-flux-dev-upscaler.safetensors",
+    modelType: "controlnet",
+    architecture: "flux",
+    sizeBytes: 3583232168,
+    sha256: "2a7ea24d2037ff2aa4d25f8b4ce9fe7e739a2cfe6b9d05106788005d5058c8ca",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100327Model: HuggingFaceModel = {
+  id: -100327, name: "Jasper Flux Dev Upscaler", type: "ControlNet",
+  metrics: {"downloadCount": 2314, "thumbsUpCount": 888}, images: whitelist100327Version.images,
+  user: {"username": "jasperai"}, sourceUrl: "https://huggingface.co/jasperai/Flux.1-dev-Controlnet-Upscaler",
+  description: {"zh": "Flux 1 Dev 低清图修复与细节控制，建议强度 0.6。", "en": "Flux 1 Dev low-resolution restoration and detail control; suggested strength 0.6."},
+  version: whitelist100327Version, versions: [whitelist100327Version],
+}
+
+const whitelist100328Version: HuggingFaceVersion = {
+  id: -10000444, name: "config", baseModel: "Other",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Intel/dpt-hybrid-midas.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "d469783f4a0bbfdbdafb9af7b193480ce9d87c5687984056ccc3738e5367ca66"},
+  file: {
+    url: "https://huggingface.co/Intel/dpt-hybrid-midas/resolve/main/config.json",
+    filename: "config.json",
+    modelType: "controlnet",
+    architecture: "unknown",
+    sizeBytes: 9876,
+    sha256: "d469783f4a0bbfdbdafb9af7b193480ce9d87c5687984056ccc3738e5367ca66",
+    directory: "{workspace}/.cache/huggingface/hub/models--Intel--dpt-hybrid-midas/snapshots/11eaf7a1cf4bd70740697dbc216f98980c0aeb03",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100328Model: HuggingFaceModel = {
+  id: -100328, name: "MiDaS 模型配置", type: "Detector",
+  metrics: {"downloadCount": 621202, "thumbsUpCount": 110}, images: whitelist100328Version.images,
+  user: {"username": "Intel"}, sourceUrl: "https://huggingface.co/Intel/dpt-hybrid-midas",
+  description: {"zh": "MiDaS DPT Hybrid 模型配置，与检测权重配套。", "en": "MiDaS DPT Hybrid model configuration, paired with the estimator weights."},
+  version: whitelist100328Version, versions: [whitelist100328Version],
+}
+
+const whitelist100329Version: HuggingFaceVersion = {
+  id: -10000445, name: "preprocessor", baseModel: "Other",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Intel/dpt-hybrid-midas.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "4da22e615634b6316e2564136943b8550ebaa77d4e300004e8a7e99c92b68c6a"},
+  file: {
+    url: "https://huggingface.co/Intel/dpt-hybrid-midas/resolve/main/preprocessor_config.json",
+    filename: "preprocessor_config.json",
+    modelType: "controlnet",
+    architecture: "unknown",
+    sizeBytes: 382,
+    sha256: "4da22e615634b6316e2564136943b8550ebaa77d4e300004e8a7e99c92b68c6a",
+    directory: "{workspace}/.cache/huggingface/hub/models--Intel--dpt-hybrid-midas/snapshots/11eaf7a1cf4bd70740697dbc216f98980c0aeb03",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100329Model: HuggingFaceModel = {
+  id: -100329, name: "MiDaS 预处理配置", type: "Detector",
+  metrics: {"downloadCount": 621202, "thumbsUpCount": 110}, images: whitelist100329Version.images,
+  user: {"username": "Intel"}, sourceUrl: "https://huggingface.co/Intel/dpt-hybrid-midas",
+  description: {"zh": "MiDaS DPT Hybrid 图像预处理配置，与检测权重配套。", "en": "MiDaS DPT Hybrid image processor configuration, paired with the estimator weights."},
+  version: whitelist100329Version, versions: [whitelist100329Version],
+}
+
+const whitelist100289Version: HuggingFaceVersion = {
+  id: -10000389, name: "BF16", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "89f4158d066cc33906a199fca85634f766892dd78f49b6698dabf187ac86c4bc"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_bf16.safetensors",
+    filename: "qwen_image_2.1_bf16.safetensors",
+    modelType: "diffusion_models",
+    directory: "{ComfyUI}/models/diffusion_models",
+    architecture: "qwen_image21",
+    sizeBytes: 14230280616,
+    sha256: "89f4158d066cc33906a199fca85634f766892dd78f49b6698dabf187ac86c4bc",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100289Model: HuggingFaceModel = {
+  id: -100289, name: "Qwen Image 2.1 BF16", type: "DiffusionModel",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100289Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 文生图与图像编辑，原生透明图像，BF16 权重", "en": "Qwen Image 2.1 generation and editing with native transparency, BF16 weights"},
+  version: whitelist100289Version, versions: [whitelist100289Version],
+}
+
+const whitelist100290Version: HuggingFaceVersion = {
+  id: -10000390, name: "INT8", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
+    filename: "qwen_image_2.1_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    directory: "{ComfyUI}/models/diffusion_models",
+    architecture: "qwen_image21",
+    sizeBytes: 7256783064,
+    sha256: "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100290Model: HuggingFaceModel = {
+  id: -100290, name: "Qwen Image 2.1 INT8", type: "DiffusionModel",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100290Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 文生图与图像编辑，INT8 ConvRot 量化", "en": "Qwen Image 2.1 generation and editing, INT8 ConvRot quantization"},
+  version: whitelist100290Version, versions: [whitelist100290Version],
+}
+
+const whitelist100291Version: HuggingFaceVersion = {
+  id: -10000391, name: "Turbo BF16", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8b74237a7f505773e2c66726fa696444b4c704585c93a347cff9044937f7914a"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_turbo_bf16.safetensors",
+    filename: "qwen_image_2.1_turbo_bf16.safetensors",
+    modelType: "diffusion_models",
+    directory: "{ComfyUI}/models/diffusion_models",
+    architecture: "qwen_image21",
+    sizeBytes: 14230280616,
+    sha256: "8b74237a7f505773e2c66726fa696444b4c704585c93a347cff9044937f7914a",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100291Model: HuggingFaceModel = {
+  id: -100291, name: "Qwen Image 2.1 Turbo BF16", type: "DiffusionModel",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100291Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 Turbo 8 步蒸馏模型，BF16 权重", "en": "Qwen Image 2.1 Turbo 8-step distilled model, BF16 weights"},
+  version: whitelist100291Version, versions: [whitelist100291Version],
+}
+
+const whitelist100292Version: HuggingFaceVersion = {
+  id: -10000392, name: "Turbo INT8", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",
+    filename: "qwen_image_2.1_turbo_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    directory: "{ComfyUI}/models/diffusion_models",
+    architecture: "qwen_image21",
+    sizeBytes: 7256787829,
+    sha256: "8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100292Model: HuggingFaceModel = {
+  id: -100292, name: "Qwen Image 2.1 Turbo INT8", type: "DiffusionModel",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100292Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 Turbo 8 步蒸馏模型，INT8 ConvRot 量化", "en": "Qwen Image 2.1 Turbo 8-step distilled model, INT8 ConvRot quantization"},
+  version: whitelist100292Version, versions: [whitelist100292Version],
+}
+
+const whitelist100293Version: HuggingFaceVersion = {
+  id: -10000393, name: "Turbo LoRA", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "208dd43250e1e01467ba190572ae2e7107a7870ec1ff026bc65f791fa1e80e95"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors",
+    filename: "qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors",
+    modelType: "loras",
+    directory: "{ComfyUI}/models/loras",
+    architecture: "qwen_image21",
+    sizeBytes: 913314512,
+    sha256: "208dd43250e1e01467ba190572ae2e7107a7870ec1ff026bc65f791fa1e80e95",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100293Model: HuggingFaceModel = {
+  id: -100293, name: "Qwen Image 2.1 Turbo LoRA", type: "LORA",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100293Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "基础模型使用的 Turbo 加速 LoRA，搭配 Turbo 8 步采样序列", "en": "Turbo acceleration LoRA for the base model, used with the Turbo 8-step sampling schedule"},
+  version: whitelist100293Version, versions: [whitelist100293Version],
+}
+
+const whitelist100294Version: HuggingFaceVersion = {
+  id: -10000394, name: "Fun ControlNet Union BF16", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "1f9dea8384ba167084f39f624908f1dbf2ea8a223bb4a8108a77dafa9b55bfe1"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/model_patches/qwen_image_2.1_fun_controlnet_union_bf16.safetensors",
+    filename: "qwen_image_2.1_fun_controlnet_union_bf16.safetensors",
+    modelType: "model_patches",
+    directory: "{ComfyUI}/models/model_patches",
+    architecture: "qwen_image21",
+    sizeBytes: 7550977992,
+    sha256: "1f9dea8384ba167084f39f624908f1dbf2ea8a223bb4a8108a77dafa9b55bfe1",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100294Model: HuggingFaceModel = {
+  id: -100294, name: "Qwen Image 2.1 Fun ControlNet Union BF16", type: "ControlNet",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100294Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 Fun 联合控制补丁，BF16，存放于 model_patches", "en": "Qwen Image 2.1 Fun union control patch, BF16, stored in model_patches"},
+  version: whitelist100294Version, versions: [whitelist100294Version],
+}
+
+const whitelist100295Version: HuggingFaceVersion = {
+  id: -10000395, name: "Fun ControlNet Union INT8", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "07aa961570ac0e03d4ca936aecd76854d077a33cde69b5092399afba01b3715d"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/model_patches/qwen_image_2.1_fun_controlnet_union_int8_convrot.safetensors",
+    filename: "qwen_image_2.1_fun_controlnet_union_int8_convrot.safetensors",
+    modelType: "model_patches",
+    directory: "{ComfyUI}/models/model_patches",
+    architecture: "qwen_image21",
+    sizeBytes: 3779298944,
+    sha256: "07aa961570ac0e03d4ca936aecd76854d077a33cde69b5092399afba01b3715d",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100295Model: HuggingFaceModel = {
+  id: -100295, name: "Qwen Image 2.1 Fun ControlNet Union INT8", type: "ControlNet",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100295Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 Fun 联合控制补丁，INT8，存放于 model_patches", "en": "Qwen Image 2.1 Fun union control patch, INT8, stored in model_patches"},
+  version: whitelist100295Version, versions: [whitelist100295Version],
+}
+
+const whitelist100296Version: HuggingFaceVersion = {
+  id: -10000396, name: "PE I2I INT8", baseModel: "Qwen 3.5",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "32707d01b427e488af252b95c551989aad59f9fec611a694f5db6bde7f0f1f6c"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors",
+    filename: "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen35",
+    sizeBytes: 9471072252,
+    sha256: "32707d01b427e488af252b95c551989aad59f9fec611a694f5db6bde7f0f1f6c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100296Model: HuggingFaceModel = {
+  id: -100296, name: "Qwen Image 2.1 PE I2I INT8", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100296Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "图像编辑提示词扩写模型，供 ComfyUI Generate Text 节点使用", "en": "Image-editing prompt enhancer for the ComfyUI Generate Text node"},
+  version: whitelist100296Version, versions: [whitelist100296Version],
+}
+
+const whitelist100297Version: HuggingFaceVersion = {
+  id: -10000397, name: "PE I2I W4A8", baseModel: "Qwen 3.5",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "3c7c88f786f1bac5baf2c4b314fe28172cc03d93b29dfc8b445e85a655cbabb1"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3.5_9b_qwen_image_2.1_pe_i2i_w4a8.safetensors",
+    filename: "qwen3.5_9b_qwen_image_2.1_pe_i2i_w4a8.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen35",
+    sizeBytes: 6724090764,
+    sha256: "3c7c88f786f1bac5baf2c4b314fe28172cc03d93b29dfc8b445e85a655cbabb1",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100297Model: HuggingFaceModel = {
+  id: -100297, name: "Qwen Image 2.1 PE I2I W4A8", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100297Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "图像编辑提示词扩写模型，W4A8 轻量版", "en": "Image-editing prompt enhancer, lightweight W4A8 version"},
+  version: whitelist100297Version, versions: [whitelist100297Version],
+}
+
+const whitelist100298Version: HuggingFaceVersion = {
+  id: -10000398, name: "PE T2I INT8", baseModel: "Qwen 3.5",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "9182abae56fe05459840a86d22abd21f972061c92fce032630af680c8c5178d3"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors",
+    filename: "qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen35",
+    sizeBytes: 9471072252,
+    sha256: "9182abae56fe05459840a86d22abd21f972061c92fce032630af680c8c5178d3",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100298Model: HuggingFaceModel = {
+  id: -100298, name: "Qwen Image 2.1 PE T2I INT8", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100298Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "文生图提示词扩写模型，供 ComfyUI Generate Text 节点使用", "en": "Text-to-image prompt enhancer for the ComfyUI Generate Text node"},
+  version: whitelist100298Version, versions: [whitelist100298Version],
+}
+
+const whitelist100299Version: HuggingFaceVersion = {
+  id: -10000399, name: "PE T2I W4A8", baseModel: "Qwen 3.5",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "bdc244869e71e91f9e66638dd85872d8906ac26ce24ef9f32fecbc488e6bc708"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3.5_9b_qwen_image_2.1_pe_t2i_w4a8.safetensors",
+    filename: "qwen3.5_9b_qwen_image_2.1_pe_t2i_w4a8.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen35",
+    sizeBytes: 6724090764,
+    sha256: "bdc244869e71e91f9e66638dd85872d8906ac26ce24ef9f32fecbc488e6bc708",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100299Model: HuggingFaceModel = {
+  id: -100299, name: "Qwen Image 2.1 PE T2I W4A8", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100299Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "文生图提示词扩写模型，W4A8 轻量版", "en": "Text-to-image prompt enhancer, lightweight W4A8 version"},
+  version: whitelist100299Version, versions: [whitelist100299Version],
+}
+
+const whitelist100300Version: HuggingFaceVersion = {
+  id: -10000400, name: "Qwen3-VL 8B BF16", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "68bdc82bc1b66851162ae656225e7e2068166b603db19bd5d5a3b90eb12669a9"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_bf16.safetensors",
+    filename: "qwen3vl_8b_bf16.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen_image21",
+    sizeBytes: 17534334616,
+    sha256: "68bdc82bc1b66851162ae656225e7e2068166b603db19bd5d5a3b90eb12669a9",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100300Model: HuggingFaceModel = {
+  id: -100300, name: "Qwen3-VL 8B BF16", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100300Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 配套视觉语言编码器，BF16 完整档", "en": "Qwen Image 2.1 vision-language encoder, full BF16 tier"},
+  version: whitelist100300Version, versions: [whitelist100300Version],
+}
+
+const whitelist100301Version: HuggingFaceVersion = {
+  id: -10000401, name: "Qwen3-VL 8B INT8", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors",
+    filename: "qwen3vl_8b_int8_convrot.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen_image21",
+    sizeBytes: 9350798360,
+    sha256: "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100301Model: HuggingFaceModel = {
+  id: -100301, name: "Qwen3-VL 8B INT8", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100301Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 配套视觉语言编码器，INT8 标准档", "en": "Qwen Image 2.1 vision-language encoder, standard INT8 tier"},
+  version: whitelist100301Version, versions: [whitelist100301Version],
+}
+
+const whitelist100302Version: HuggingFaceVersion = {
+  id: -10000402, name: "Qwen3-VL 8B W4A8", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "7754425e55e7bea2bfde4dde59a4cc236cb44e5ee9c215ea66ef8d47012824eb"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_w4a8.safetensors",
+    filename: "qwen3vl_8b_w4a8.safetensors",
+    modelType: "text_encoders",
+    directory: "{ComfyUI}/models/text_encoders",
+    architecture: "qwen_image21",
+    sizeBytes: 6312105364,
+    sha256: "7754425e55e7bea2bfde4dde59a4cc236cb44e5ee9c215ea66ef8d47012824eb",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100302Model: HuggingFaceModel = {
+  id: -100302, name: "Qwen3-VL 8B W4A8", type: "TextEncoder",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100302Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 配套视觉语言编码器，W4A8 轻量档", "en": "Qwen Image 2.1 vision-language encoder, lightweight W4A8 tier"},
+  version: whitelist100302Version, versions: [whitelist100302Version],
+}
+
+const whitelist100303Version: HuggingFaceVersion = {
+  id: -10000403, name: "VAE BF16", baseModel: "Qwen Image 2.1",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors",
+    filename: "qwen_image_2.1_vae_bf16.safetensors",
+    modelType: "vae",
+    directory: "{ComfyUI}/models/vae",
+    architecture: "qwen_image21",
+    sizeBytes: 675509688,
+    sha256: "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100303Model: HuggingFaceModel = {
+  id: -100303, name: "Qwen Image 2.1 VAE BF16", type: "VAE",
+  metrics: {"downloadCount": 11386917, "thumbsUpCount": 1156}, images: whitelist100303Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+  description: {"zh": "Qwen Image 2.1 专用 64 通道 RGBA VAE", "en": "Qwen Image 2.1 dedicated 64-channel RGBA VAE"},
+  version: whitelist100303Version, versions: [whitelist100303Version],
+}
+
+const whitelist100284Version: HuggingFaceVersion = {
+  id: -10000384, name: "v1", baseModel: "",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "5009aca786759dc78369abc666878ec7dd99167beaada28bf473fbaf1a68ac9a"},
+  file: {
+    source: "huggingface",
+    url: "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json",
+    directory: "{ComfyUI}/models/Aura-SR",
+    filename: "config.json",
+    sizeBytes: 222,
+    sha256: "5009aca786759dc78369abc666878ec7dd99167beaada28bf473fbaf1a68ac9a",
+    isModel: false,
+    modelType: "auxiliary",
+    architecture: "",
+  },
+}
+const whitelist100284Model: HuggingFaceModel = {
+  id: -100284, name: "AuraSR 配套配置", type: "Auxiliary",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 0}, images: whitelist100284Version.images,
+  user: {"username": "huggingface"}, sourceUrl: "https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json",
+  description: {"zh": "AuraSR 配套配置", "en": "AuraSR 配套配置"},
+  version: whitelist100284Version, versions: [whitelist100284Version],
+}
+
+const whitelist100285Version: HuggingFaceVersion = {
+  id: -10000385, name: "v1", baseModel: "",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "ec2df62732614e57411cdcf32a23ffdf28910380d03139ee0f4fcbe91eb8c912"},
+  file: {
+    source: "meta",
+    url: "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+    directory: "{ComfyUI}/models/sams",
+    filename: "sam_vit_b_01ec64.pth",
+    sizeBytes: 375042383,
+    sha256: "ec2df62732614e57411cdcf32a23ffdf28910380d03139ee0f4fcbe91eb8c912",
+    isModel: false,
+    modelType: "auxiliary",
+    architecture: "",
+  },
+}
+const whitelist100285Model: HuggingFaceModel = {
+  id: -100285, name: "SAM 精细掩码", type: "Auxiliary",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 0}, images: whitelist100285Version.images,
+  user: {"username": "meta"}, sourceUrl: "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+  description: {"zh": "SAM 精细掩码", "en": "SAM 精细掩码"},
+  version: whitelist100285Version, versions: [whitelist100285Version],
+}
+
+const whitelist100286Version: HuggingFaceVersion = {
+  id: -10000386, name: "v1", baseModel: "",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "7860ae79de6c89a3c1eb72ae9a2756c0ccfbe04b7791bb5880afabd97855a411"},
+  file: {
+    source: "huggingface",
+    url: "https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx",
+    directory: "{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose",
+    filename: "yolox_l.onnx",
+    sizeBytes: 216746733,
+    sha256: "7860ae79de6c89a3c1eb72ae9a2756c0ccfbe04b7791bb5880afabd97855a411",
+    isModel: false,
+    modelType: "auxiliary",
+    architecture: "",
+  },
+}
+const whitelist100286Model: HuggingFaceModel = {
+  id: -100286, name: "DWPose 人体检测", type: "Auxiliary",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 0}, images: whitelist100286Version.images,
+  user: {"username": "huggingface"}, sourceUrl: "https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx",
+  description: {"zh": "DWPose 人体检测", "en": "DWPose 人体检测"},
+  version: whitelist100286Version, versions: [whitelist100286Version],
+}
+
+const whitelist100287Version: HuggingFaceVersion = {
+  id: -10000387, name: "v1", baseModel: "",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "d86a0b2b59fddc0901a7076e9f59c9f8602602133ed72511c693fd11eea23d91"},
+  file: {
+    source: "huggingface",
+    url: "https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt",
+    directory: "{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/hr16/DWPose-TorchScript-BatchSize5",
+    filename: "dw-ll_ucoco_384_bs5.torchscript.pt",
+    sizeBytes: 135059124,
+    sha256: "d86a0b2b59fddc0901a7076e9f59c9f8602602133ed72511c693fd11eea23d91",
+    isModel: false,
+    modelType: "auxiliary",
+    architecture: "",
+  },
+}
+const whitelist100287Model: HuggingFaceModel = {
+  id: -100287, name: "DWPose 姿态检测", type: "Auxiliary",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 0}, images: whitelist100287Version.images,
+  user: {"username": "huggingface"}, sourceUrl: "https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt",
+  description: {"zh": "DWPose 姿态检测", "en": "DWPose 姿态检测"},
+  version: whitelist100287Version, versions: [whitelist100287Version],
+}
+
+const whitelist100288Version: HuggingFaceVersion = {
+  id: -10000388, name: "v1", baseModel: "",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "a7ea19fa0ed99244e67b624c72b8580b7e9553043245905be58796a608eb9345"},
+  file: {
+    source: "huggingface",
+    url: "https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth",
+    directory: "{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/depth-anything/Depth-Anything-V2-Large",
+    filename: "depth_anything_v2_vitl.pth",
+    sizeBytes: 1341395338,
+    sha256: "a7ea19fa0ed99244e67b624c72b8580b7e9553043245905be58796a608eb9345",
+    isModel: false,
+    modelType: "auxiliary",
+    architecture: "",
+  },
+}
+const whitelist100288Model: HuggingFaceModel = {
+  id: -100288, name: "Depth Anything V2 深度检测", type: "Auxiliary",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 0}, images: whitelist100288Version.images,
+  user: {"username": "huggingface"}, sourceUrl: "https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth",
+  description: {"zh": "Depth Anything V2 深度检测", "en": "Depth Anything V2 深度检测"},
+  version: whitelist100288Version, versions: [whitelist100288Version],
+}
+
+const whitelist100245Version: HuggingFaceVersion = {
+  id: -10000345, name: "fp8", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "12944c1f7791637e7de12208aef04da82bd26b95271b1b47d817364315ade993"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+    filename: "minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+    modelType: "diffusion_models",
+    architecture: "minimax_h3",
+    sizeBytes: 20958205608,
+    sha256: "12944c1f7791637e7de12208aef04da82bd26b95271b1b47d817364315ade993",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100245Model: HuggingFaceModel = {
+  id: -100245, name: "MiniMax H3 FL2V FP8", type: "DiffusionModel",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100245Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 图生视频 (FL2V), pruned FP8 量化版, 音视频一体生成", "en": "MiniMax H3 图生视频 (FL2V), pruned FP8 量化版, 音视频一体生成"},
+  version: whitelist100245Version, versions: [whitelist100245Version],
+}
+
+const whitelist100246Version: HuggingFaceVersion = {
+  id: -10000346, name: "fp8", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_r2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "f86f2f79ebd2d76eb8eeb46091e83982e6ff51d255747e7b16e92834b392b8e9"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+    filename: "minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+    modelType: "diffusion_models",
+    architecture: "minimax_h3",
+    sizeBytes: 20958205608,
+    sha256: "f86f2f79ebd2d76eb8eeb46091e83982e6ff51d255747e7b16e92834b392b8e9",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100246Model: HuggingFaceModel = {
+  id: -100246, name: "MiniMax H3 REF2V FP8", type: "DiffusionModel",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100246Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 参考视频生成 (REF2V), pruned FP8 量化版, 参考图/视频驱动生成", "en": "MiniMax H3 参考视频生成 (REF2V), pruned FP8 量化版, 参考图/视频驱动生成"},
+  version: whitelist100246Version, versions: [whitelist100246Version],
+}
+
+const whitelist100247Version: HuggingFaceVersion = {
+  id: -10000347, name: "bf16", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "a32572fb90b5508b201ec7c2eddcc184b13ddfd3c6f6d2cf06a0b46535d541b4"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_fl2va_pruned_bf16.safetensors",
+    filename: "minimax_h3_fl2va_pruned_bf16.safetensors",
+    modelType: "diffusion_models",
+    architecture: "minimax_h3",
+    sizeBytes: 40225724176,
+    sha256: "a32572fb90b5508b201ec7c2eddcc184b13ddfd3c6f6d2cf06a0b46535d541b4",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100247Model: HuggingFaceModel = {
+  id: -100247, name: "MiniMax H3 FL2V BF16", type: "DiffusionModel",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100247Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 图生视频 (FL2V), pruned BF16 完整版, 高精度", "en": "MiniMax H3 图生视频 (FL2V), pruned BF16 完整版, 高精度"},
+  version: whitelist100247Version, versions: [whitelist100247Version],
+}
+
+const whitelist100248Version: HuggingFaceVersion = {
+  id: -10000348, name: "bf16", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_t2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "600d567f6a9629c8574e8e7041b199bdd9c59a986afa7906910a81919610607d"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/text_encoders/qwen3vl_32b_minimax_h3_bf16.safetensors",
+    filename: "qwen3vl_32b_minimax_h3_bf16.safetensors",
+    modelType: "text_encoders",
+    architecture: "minimax_h3",
+    sizeBytes: 51506295256,
+    sha256: "600d567f6a9629c8574e8e7041b199bdd9c59a986afa7906910a81919610607d",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100248Model: HuggingFaceModel = {
+  id: -100248, name: "MiniMax H3 Qwen3-VL 32B TE", type: "TextEncoder",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100248Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 文本编码器 (Qwen3-VL 32B), BF16", "en": "MiniMax H3 文本编码器 (Qwen3-VL 32B), BF16"},
+  version: whitelist100248Version, versions: [whitelist100248Version],
+}
+
+const whitelist100249Version: HuggingFaceVersion = {
+  id: -10000349, name: "fp16", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_video_vae_fp16.safetensors",
+    filename: "minimax_h3_video_vae_fp16.safetensors",
+    modelType: "vae",
+    architecture: "minimax_h3",
+    sizeBytes: 5207808496,
+    sha256: "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100249Model: HuggingFaceModel = {
+  id: -100249, name: "MiniMax H3 Video VAE", type: "VAE",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100249Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 视频编解码器 VAE, FP16", "en": "MiniMax H3 视频编解码器 VAE, FP16"},
+  version: whitelist100249Version, versions: [whitelist100249Version],
+}
+
+const whitelist100265Version: HuggingFaceVersion = {
+  id: -10000356, name: "int8_convrot", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    filename: "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    architecture: "minimax_h3",
+    sizeBytes: 20970379616,
+    sha256: "e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100265Model: HuggingFaceModel = {
+  id: -100265, name: "MiniMax H3 FL2V INT8 ConvRot", type: "DiffusionModel",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100265Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 图生视频 (FL2V), pruned INT8 ConvRot 量化版, 官方推荐档, 音视频一体生成", "en": "MiniMax H3 图生视频 (FL2V), pruned INT8 ConvRot 量化版, 官方推荐档, 音视频一体生成"},
+  version: whitelist100265Version, versions: [whitelist100265Version],
+}
+
+const whitelist100266Version: HuggingFaceVersion = {
+  id: -10000357, name: "int8_convrot", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_r2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+    filename: "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    architecture: "minimax_h3",
+    sizeBytes: 20970379616,
+    sha256: "9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100266Model: HuggingFaceModel = {
+  id: -100266, name: "MiniMax H3 REF2V INT8 ConvRot", type: "DiffusionModel",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100266Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 参考视频生成 (REF2V), pruned INT8 ConvRot 量化版, 官方推荐档, 参考图/视频驱动生成", "en": "MiniMax H3 参考视频生成 (REF2V), pruned INT8 ConvRot 量化版, 官方推荐档, 参考图/视频驱动生成"},
+  version: whitelist100266Version, versions: [whitelist100266Version],
+}
+
+const whitelist100267Version: HuggingFaceVersion = {
+  id: -10000358, name: "nvfp4_awq", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_t2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    filename: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    modelType: "text_encoders",
+    architecture: "minimax_h3",
+    sizeBytes: 15687142551,
+    sha256: "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100267Model: HuggingFaceModel = {
+  id: -100267, name: "MiniMax H3 Qwen3-VL 32B TE NVFP4", type: "TextEncoder",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100267Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 文本编码器 (Qwen3-VL 32B), NVFP4 AWQ 量化版, 官方推荐档, 16-24GB 显存友好", "en": "MiniMax H3 文本编码器 (Qwen3-VL 32B), NVFP4 AWQ 量化版, 官方推荐档, 16-24GB 显存友好"},
+  version: whitelist100267Version, versions: [whitelist100267Version],
+}
+
+const whitelist100268Version: HuggingFaceVersion = {
+  id: -10000359, name: "fp32", baseModel: "MiniMax H3",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_audio_vae_fp32.safetensors",
+    filename: "minimax_h3_audio_vae_fp32.safetensors",
+    modelType: "vae",
+    architecture: "minimax_h3",
+    sizeBytes: 605254808,
+    sha256: "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100268Model: HuggingFaceModel = {
+  id: -100268, name: "MiniMax H3 Audio VAE", type: "VAE",
+  metrics: {"downloadCount": 3139920, "thumbsUpCount": 886}, images: whitelist100268Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/MiniMax-H3",
+  description: {"zh": "MiniMax H3 音频编解码器 VAE, FP32, 音视频同出必需件", "en": "MiniMax H3 音频编解码器 VAE, FP32, 音视频同出必需件"},
+  version: whitelist100268Version, versions: [whitelist100268Version],
+}
+
+const whitelist100269Version: HuggingFaceVersion = {
+  id: -10000360, name: "fp4_mixed", baseModel: "Flux.2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_flux2_fp8.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "1ee1ff334d78228d73049ef0ee4fcd21c1700536b5a45c06547af057f92463a7"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
+    filename: "mistral_3_small_flux2_fp4_mixed.safetensors",
+    modelType: "text_encoders",
+    architecture: "flux2",
+    sizeBytes: 12275678071,
+    sha256: "1ee1ff334d78228d73049ef0ee4fcd21c1700536b5a45c06547af057f92463a7",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100269Model: HuggingFaceModel = {
+  id: -100269, name: "Mistral 3 Small Flux.2 FP4", type: "TextEncoder",
+  metrics: {"downloadCount": 1505066, "thumbsUpCount": 285}, images: whitelist100269Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/flux2-dev",
+  description: {"zh": "Flux.2 Dev 文本编码器 (Mistral-3-Small), FP4 混合量化轻量档, 运行组件引用", "en": "Flux.2 Dev 文本编码器 (Mistral-3-Small), FP4 混合量化轻量档, 运行组件引用"},
+  version: whitelist100269Version, versions: [whitelist100269Version],
+}
+
+const whitelist100270Version: HuggingFaceVersion = {
+  id: -10000361, name: "fp8_mixed", baseModel: "Z-Image",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "72450b19758172c5a7273cf7de729d1c17e7f434a104a00167624cba94f68f15"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors",
+    filename: "qwen_3_4b_fp8_mixed.safetensors",
+    modelType: "text_encoders",
+    architecture: "zimage",
+    sizeBytes: 5631994051,
+    sha256: "72450b19758172c5a7273cf7de729d1c17e7f434a104a00167624cba94f68f15",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100270Model: HuggingFaceModel = {
+  id: -100270, name: "Qwen 3 4B FP8 Mixed", type: "TextEncoder",
+  metrics: {"downloadCount": 5204347, "thumbsUpCount": 801}, images: whitelist100270Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/z_image_turbo",
+  description: {"zh": "Z-Image 文本编码器 (Qwen3-4B), FP8 混合量化轻量档, 运行组件引用", "en": "Z-Image 文本编码器 (Qwen3-4B), FP8 混合量化轻量档, 运行组件引用"},
+  version: whitelist100270Version, versions: [whitelist100270Version],
+}
+
+const whitelist100271Version: HuggingFaceVersion = {
+  id: -10000362, name: "promax", baseModel: "SDXL 1.0",
+  images: [{"url": "https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/images/ControlNet++.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "9fae2e50cb431bfcbe05822b59ec2228df545ef27f711dea8949e9f4ed9f7cdc"},
+  file: {
+    url: "https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/diffusion_pytorch_model_promax.safetensors",
+    filename: "diffusion_pytorch_model_promax.safetensors",
+    modelType: "controlnet",
+    architecture: "sdxl",
+    sizeBytes: 2513342408,
+    sha256: "9fae2e50cb431bfcbe05822b59ec2228df545ef27f711dea8949e9f4ed9f7cdc",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100271Model: HuggingFaceModel = {
+  id: -100271, name: "ControlNet Union SDXL ProMax", type: "ControlNet",
+  metrics: {"downloadCount": 96846, "thumbsUpCount": 1803}, images: whitelist100271Version.images,
+  user: {"username": "xinsir"}, sourceUrl: "https://huggingface.co/xinsir/controlnet-union-sdxl-1.0",
+  description: {"zh": "SDXL/Pony 通用 ControlNet Union ProMax (xinsir), 运行组件引用", "en": "SDXL/Pony 通用 ControlNet Union ProMax (xinsir), 运行组件引用"},
+  version: whitelist100271Version, versions: [whitelist100271Version],
+}
+
+const whitelist100272Version: HuggingFaceVersion = {
+  id: -10000363, name: "s6000", baseModel: "Illustrious",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/windsingai/openpose.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "0d8bacf24534dc6f2716f5d0ffa6085571928776f8687565ef290a17d9f3615c"},
+  file: {
+    url: "https://huggingface.co/windsingai/openpose/resolve/main/openpose_s6000.safetensors",
+    filename: "openpose_s6000.safetensors",
+    modelType: "controlnet",
+    architecture: "illustrious",
+    sizeBytes: 2502140008,
+    sha256: "0d8bacf24534dc6f2716f5d0ffa6085571928776f8687565ef290a17d9f3615c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100272Model: HuggingFaceModel = {
+  id: -100272, name: "OpenPose Illustrious S6000", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 1}, images: whitelist100272Version.images,
+  user: {"username": "windsingai"}, sourceUrl: "https://huggingface.co/windsingai/openpose",
+  description: {"zh": "windsingai 的 Illustrious OpenPose 控制权重", "en": "windsingai 的 Illustrious OpenPose 控制权重"},
+  version: whitelist100272Version, versions: [whitelist100272Version],
+}
+
+const whitelist100273Version: HuggingFaceVersion = {
+  id: -10000364, name: "fp16", baseModel: "Illustrious",
+  images: [{"url": "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/example/example_illustriousXLv1.1_canny/88004.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "3255c963a219a20040d2bef913216dd03d6da958068f5e69548dfe6e66528bcd"},
+  file: {
+    url: "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/illustriousXLv1.1_canny_fp16.safetensors",
+    filename: "illustriousXLv1.1_canny_fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "illustrious",
+    sizeBytes: 2502139104,
+    sha256: "3255c963a219a20040d2bef913216dd03d6da958068f5e69548dfe6e66528bcd",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100273Model: HuggingFaceModel = {
+  id: -100273, name: "Illustrious XL Canny FP16", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 12}, images: whitelist100273Version.images,
+  user: {"username": "MIC-Lab"}, sourceUrl: "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet",
+  description: {"zh": "MIC-Lab 的 Illustrious XL v1.1 轮廓控制权重", "en": "MIC-Lab 的 Illustrious XL v1.1 轮廓控制权重"},
+  version: whitelist100273Version, versions: [whitelist100273Version],
+}
+
+const whitelist100274Version: HuggingFaceVersion = {
+  id: -10000365, name: "fp16", baseModel: "Illustrious",
+  images: [{"url": "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/example/example_illustriousXLv1.1_depth/6uof8bk5.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "14d168497226d3563b5a30bd7a72f73f98c263bf03780a5d473fb3b0afc44e17"},
+  file: {
+    url: "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/illustriousXLv1.1_depth_midas_fp16.safetensors",
+    filename: "illustriousXLv1.1_depth_midas_fp16.safetensors",
+    modelType: "controlnet",
+    architecture: "illustrious",
+    sizeBytes: 2502139104,
+    sha256: "14d168497226d3563b5a30bd7a72f73f98c263bf03780a5d473fb3b0afc44e17",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100274Model: HuggingFaceModel = {
+  id: -100274, name: "Illustrious XL Depth Midas FP16", type: "ControlNet",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 12}, images: whitelist100274Version.images,
+  user: {"username": "MIC-Lab"}, sourceUrl: "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet",
+  description: {"zh": "MIC-Lab 的 Illustrious XL v1.1 深度控制权重，配合 MiDaS 深度图", "en": "MIC-Lab 的 Illustrious XL v1.1 深度控制权重，配合 MiDaS 深度图"},
+  version: whitelist100274Version, versions: [whitelist100274Version],
+}
+
+const whitelist100275Version: HuggingFaceVersion = {
+  id: -10000366, name: "fp8", baseModel: "Flux.1",
+  images: [{"url": "https://huggingface.co/ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8/resolve/main/images/canny.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "393fc2a298b93ffe39f2db3f0d2ce11dfba62d44b7aa3c1dd3380d4a1be04deb"},
+  file: {
+    url: "https://huggingface.co/ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8/resolve/main/diffusion_pytorch_model.safetensors",
+    filename: "FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8.safetensors",
+    modelType: "controlnet",
+    architecture: "flux",
+    sizeBytes: 2140902936,
+    sha256: "393fc2a298b93ffe39f2db3f0d2ce11dfba62d44b7aa3c1dd3380d4a1be04deb",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100275Model: HuggingFaceModel = {
+  id: -100275, name: "FLUX.1 Dev CN Union Pro 2.0 FP8", type: "ControlNet",
+  metrics: {"downloadCount": 2709, "thumbsUpCount": 58}, images: whitelist100275Version.images,
+  user: {"username": "ABDALLALSWAITI"}, sourceUrl: "https://huggingface.co/ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8",
+  description: {"zh": "Flux.1 专用 ControlNet Union Pro 2.0 FP8, 落盘名重命名以区分, 运行组件引用", "en": "Flux.1 专用 ControlNet Union Pro 2.0 FP8, 落盘名重命名以区分, 运行组件引用"},
+  version: whitelist100275Version, versions: [whitelist100275Version],
+}
+
+const whitelist100276Version: HuggingFaceVersion = {
+  id: -10000367, name: "yolov8m", baseModel: "Ultralytics",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Bingsu/adetailer.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "717923c19b3f4bbf5250b728f1fa6b2cb72a33aed1d236ea9caf0e21ad943e5f"},
+  file: {
+    url: "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt",
+    filename: "face_yolov8m.pt",
+    modelType: "ultralytics_bbox",
+    architecture: "ultralytics",
+    sizeBytes: 52026019,
+    sha256: "717923c19b3f4bbf5250b728f1fa6b2cb72a33aed1d236ea9caf0e21ad943e5f",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100276Model: HuggingFaceModel = {
+  id: -100276, name: "YOLOv8 Face Detector", type: "Detector",
+  metrics: {"downloadCount": 10086784, "thumbsUpCount": 757}, images: whitelist100276Version.images,
+  user: {"username": "Bingsu"}, sourceUrl: "https://huggingface.co/Bingsu/adetailer",
+  description: {"zh": "YOLOv8 面部检测器 (FaceDetailer 必需), 运行组件引用", "en": "YOLOv8 面部检测器 (FaceDetailer 必需), 运行组件引用"},
+  version: whitelist100276Version, versions: [whitelist100276Version],
+}
+
+const whitelist100277Version: HuggingFaceVersion = {
+  id: -10000368, name: "3b_fp8", baseModel: "SeedVR2",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/numz/SeedVR2_comfyUI.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff"},
+  file: {
+    url: "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+    filename: "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+    modelType: "seedvr2",
+    architecture: "seedvr2",
+    sizeBytes: 3391544696,
+    sha256: "3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100277Model: HuggingFaceModel = {
+  id: -100277, name: "SeedVR2 3B FP8", type: "Upscaler",
+  metrics: {"downloadCount": 207242, "thumbsUpCount": 298}, images: whitelist100277Version.images,
+  user: {"username": "numz"}, sourceUrl: "https://huggingface.co/numz/SeedVR2_comfyUI",
+  description: {"zh": "SeedVR2 视频放大 3B FP8, 显存约 10GB, 运行组件引用", "en": "SeedVR2 视频放大 3B FP8, 显存约 10GB, 运行组件引用"},
+  version: whitelist100277Version, versions: [whitelist100277Version],
+}
+
+const whitelist100278Version: HuggingFaceVersion = {
+  id: -10000369, name: "fp16", baseModel: "SeedVR2",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/numz/SeedVR2_comfyUI.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1"},
+  file: {
+    url: "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors",
+    filename: "ema_vae_fp16.safetensors",
+    modelType: "seedvr2",
+    architecture: "seedvr2",
+    sizeBytes: 501324814,
+    sha256: "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100278Model: HuggingFaceModel = {
+  id: -100278, name: "SeedVR2 EMA VAE FP16", type: "VAE",
+  metrics: {"downloadCount": 207242, "thumbsUpCount": 298}, images: whitelist100278Version.images,
+  user: {"username": "numz"}, sourceUrl: "https://huggingface.co/numz/SeedVR2_comfyUI",
+  description: {"zh": "SeedVR2 视频放大配套 VAE (3B/7B 共用), 运行组件引用", "en": "SeedVR2 视频放大配套 VAE (3B/7B 共用), 运行组件引用"},
+  version: whitelist100278Version, versions: [whitelist100278Version],
+}
+
+const whitelist100279Version: HuggingFaceVersion = {
+  id: -10000370, name: "7b_sharp_fp8", baseModel: "SeedVR2",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/AInVFX/SeedVR2_comfyUI.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "0d2c5b8be0fda94351149c5115da26aef4f4932a7a2a928c6f184dda9186e0be"},
+  file: {
+    url: "https://huggingface.co/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+    filename: "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+    modelType: "seedvr2",
+    architecture: "seedvr2",
+    sizeBytes: 8466296338,
+    sha256: "0d2c5b8be0fda94351149c5115da26aef4f4932a7a2a928c6f184dda9186e0be",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100279Model: HuggingFaceModel = {
+  id: -100279, name: "SeedVR2 7B Sharp FP8", type: "Upscaler",
+  metrics: {"downloadCount": 55788, "thumbsUpCount": 72}, images: whitelist100279Version.images,
+  user: {"username": "AInVFX"}, sourceUrl: "https://huggingface.co/AInVFX/SeedVR2_comfyUI",
+  description: {"zh": "SeedVR2 视频放大 7B 锐化版 FP8, 显存约 17GB, 运行组件引用", "en": "SeedVR2 视频放大 7B 锐化版 FP8, 显存约 17GB, 运行组件引用"},
+  version: whitelist100279Version, versions: [whitelist100279Version],
+}
+
+const whitelist100280Version: HuggingFaceVersion = {
+  id: -10000371, name: "v2", baseModel: "AuraSR",
+  images: [{"url": "https://cdn-thumbnails.huggingface.co/social-thumbnails/models/fal/AuraSR-v2.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8a80b4546f3f49b9095733cb9699030409339e2f4eb0ae9c1ada14c7d21d4dde"},
+  file: {
+    url: "https://huggingface.co/fal/AuraSR-v2/resolve/main/model.safetensors",
+    filename: "model.safetensors",
+    modelType: "aura-sr",
+    architecture: "aurasr",
+    sizeBytes: 2470247916,
+    sha256: "8a80b4546f3f49b9095733cb9699030409339e2f4eb0ae9c1ada14c7d21d4dde",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100280Model: HuggingFaceModel = {
+  id: -100280, name: "AuraSR v2", type: "Upscaler",
+  metrics: {"downloadCount": 749, "thumbsUpCount": 340}, images: whitelist100280Version.images,
+  user: {"username": "fal"}, sourceUrl: "https://huggingface.co/fal/AuraSR-v2",
+  description: {"zh": "AuraSR v2 4× 超分辨率放大权重 (需与同目录 config.json 配套), 运行组件引用", "en": "AuraSR v2 4× 超分辨率放大权重 (需与同目录 config.json 配套), 运行组件引用"},
+  version: whitelist100280Version, versions: [whitelist100280Version],
+}
+
+const whitelist100250Version: HuggingFaceVersion = {
+  id: -10000350, name: "fp8", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen3-VL/resolve/main/text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
+    filename: "qwen3vl_4b_fp8_scaled.safetensors",
+    modelType: "text_encoders",
+    architecture: "krea2",
+    sizeBytes: 5242467968,
+    sha256: "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100250Model: HuggingFaceModel = {
+  id: -100250, name: "Qwen3-VL 4B FP8", type: "TextEncoder",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 49}, images: whitelist100250Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen3-VL",
+  description: {"zh": "Qwen3-VL 4B 视觉语言模型 FP8 量化, Krea-2/Mage-Flow 共用文本编码器", "en": "Qwen3-VL 4B 视觉语言模型 FP8 量化, Krea-2/Mage-Flow 共用文本编码器"},
+  version: whitelist100250Version, versions: [whitelist100250Version],
+}
+
+const whitelist100251Version: HuggingFaceVersion = {
+  id: -10000351, name: "bf16", baseModel: "Mage-Flow",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "36f3ff447ef59201722e8f9ce6020c9819fdcfba6aa2608c4e09b1c0ce114e34"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Qwen3-VL/resolve/main/text_encoders/qwen3vl_4b_bf16.safetensors",
+    filename: "qwen3vl_4b_bf16.safetensors",
+    modelType: "text_encoders",
+    architecture: "mage_flow",
+    sizeBytes: 8875719384,
+    sha256: "36f3ff447ef59201722e8f9ce6020c9819fdcfba6aa2608c4e09b1c0ce114e34",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100251Model: HuggingFaceModel = {
+  id: -100251, name: "Qwen3-VL 4B BF16", type: "TextEncoder",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 49}, images: whitelist100251Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Qwen3-VL",
+  description: {"zh": "Qwen3-VL 4B 视觉语言模型 BF16, Krea-2/Mage-Flow 共用文本编码器", "en": "Qwen3-VL 4B 视觉语言模型 BF16, Krea-2/Mage-Flow 共用文本编码器"},
+  version: whitelist100251Version, versions: [whitelist100251Version],
+}
+
+const whitelist100252Version: HuggingFaceVersion = {
+  id: -10000352, name: "fp8", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "eb4dd8c612cfd10f64f25b057e6e6bbcb5737c94a7372177e456dbf7579502f1"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_fp8_scaled.safetensors",
+    filename: "krea2_turbo_fp8_scaled.safetensors",
+    modelType: "diffusion_models",
+    architecture: "krea2",
+    sizeBytes: 13141730784,
+    sha256: "eb4dd8c612cfd10f64f25b057e6e6bbcb5737c94a7372177e456dbf7579502f1",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100252Model: HuggingFaceModel = {
+  id: -100252, name: "Krea 2 Turbo FP8", type: "DiffusionModel",
+  metrics: {"downloadCount": 10, "thumbsUpCount": 417}, images: whitelist100252Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 Turbo 文生图主模型 FP8 量化版, Krea 官方 2026-06 发布", "en": "Krea 2 Turbo 文生图主模型 FP8 量化版, Krea 官方 2026-06 发布"},
+  version: whitelist100252Version, versions: [whitelist100252Version],
+}
+
+const whitelist100253Version: HuggingFaceVersion = {
+  id: -10000353, name: "int8", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i_int8.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "8e4eeda70dd5037ab1ba2bef6b417f9f901e26093117cf397f741fc1fdaaf3f1"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_int8_convrot.safetensors",
+    filename: "krea2_turbo_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    architecture: "krea2",
+    sizeBytes: 13492686496,
+    sha256: "8e4eeda70dd5037ab1ba2bef6b417f9f901e26093117cf397f741fc1fdaaf3f1",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100253Model: HuggingFaceModel = {
+  id: -100253, name: "Krea 2 Turbo INT8", type: "DiffusionModel",
+  metrics: {"downloadCount": 10, "thumbsUpCount": 417}, images: whitelist100253Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 Turbo 文生图主模型 INT8 量化版, 更快更省显存", "en": "Krea 2 Turbo 文生图主模型 INT8 量化版, 更快更省显存"},
+  version: whitelist100253Version, versions: [whitelist100253Version],
+}
+
+const whitelist100254Version: HuggingFaceVersion = {
+  id: -10000354, name: "v1.0", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "f47c4316dd93af66e0518c93b582f459571d4925b519133770c73a52cd5db7c6"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_darkbrush.safetensors",
+    filename: "krea2_darkbrush.safetensors",
+    modelType: "loras",
+    architecture: "krea2",
+    sizeBytes: 469291992,
+    sha256: "f47c4316dd93af66e0518c93b582f459571d4925b519133770c73a52cd5db7c6",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100254Model: HuggingFaceModel = {
+  id: -100254, name: "Krea 2 Darkbrush LoRA", type: "LORA",
+  metrics: {"downloadCount": 10, "thumbsUpCount": 417}, images: whitelist100254Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 水墨风格 LoRA", "en": "Krea 2 水墨风格 LoRA"},
+  version: whitelist100254Version, versions: [whitelist100254Version],
+}
+
+const whitelist100255Version: HuggingFaceVersion = {
+  id: -10000355, name: "v1.0", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/thumbnail/image_krea2_turbo_int8_image_style_reference.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "f50df5a9e62e4be8aa926a63dd5bb1a64770c4004f763c1208007ae13daa82b8"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_style_reference.safetensors",
+    filename: "krea2_style_reference.safetensors",
+    modelType: "loras",
+    architecture: "krea2",
+    sizeBytes: 457111760,
+    sha256: "f50df5a9e62e4be8aa926a63dd5bb1a64770c4004f763c1208007ae13daa82b8",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100255Model: HuggingFaceModel = {
+  id: -100255, name: "Krea 2 Style Reference LoRA", type: "LORA",
+  metrics: {"downloadCount": 10, "thumbsUpCount": 417}, images: whitelist100255Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 风格参考 LoRA", "en": "Krea 2 风格参考 LoRA"},
+  version: whitelist100255Version, versions: [whitelist100255Version],
+}
+
+const whitelist100256Version: HuggingFaceVersion = {
+  id: -10000372, name: "int8", baseModel: "Mage-Flow",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "e081068163d7793b7e0d54ae2a773d3ac1c0d5b099c09b69dcbff36448485ae8"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Mage-Flow/resolve/main/diffusion_models/mage_flow_int8_convrot.safetensors",
+    filename: "mage_flow_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    architecture: "mage_flow",
+    sizeBytes: 4159146848,
+    sha256: "e081068163d7793b7e0d54ae2a773d3ac1c0d5b099c09b69dcbff36448485ae8",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100256Model: HuggingFaceModel = {
+  id: -100256, name: "Mage-Flow INT8", type: "DiffusionModel",
+  metrics: {"downloadCount": 103268, "thumbsUpCount": 120}, images: whitelist100256Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Mage-Flow",
+  description: {"zh": "Mage-Flow 4B 文生图主模型 INT8, 微软开源, 原生 512-2048 分辨率", "en": "Mage-Flow 4B 文生图主模型 INT8, 微软开源, 原生 512-2048 分辨率"},
+  version: whitelist100256Version, versions: [whitelist100256Version],
+}
+
+const whitelist100257Version: HuggingFaceVersion = {
+  id: -10000373, name: "int8", baseModel: "Mage-Flow",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow_turbo.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "327c3967a5190ea52e453ec3dd81ba168e37a2a0ff2c763aa3e9260bbbe1913c"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Mage-Flow/resolve/main/diffusion_models/mage_flow_turbo_int8_convrot.safetensors",
+    filename: "mage_flow_turbo_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    architecture: "mage_flow",
+    sizeBytes: 4159146840,
+    sha256: "327c3967a5190ea52e453ec3dd81ba168e37a2a0ff2c763aa3e9260bbbe1913c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100257Model: HuggingFaceModel = {
+  id: -100257, name: "Mage-Flow Turbo INT8", type: "DiffusionModel",
+  metrics: {"downloadCount": 103268, "thumbsUpCount": 120}, images: whitelist100257Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Mage-Flow",
+  description: {"zh": "Mage-Flow Turbo 4 步蒸馏 INT8, 约 0.6s/图 (A100)", "en": "Mage-Flow Turbo 4 步蒸馏 INT8, 约 0.6s/图 (A100)"},
+  version: whitelist100257Version, versions: [whitelist100257Version],
+}
+
+const whitelist100258Version: HuggingFaceVersion = {
+  id: -10000374, name: "bf16", baseModel: "Mage-Flow",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "34e076dc1e8a15321e1e07be5111d59cf16dd10b804b7c7e20b4de29013427e0"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Mage-Flow/resolve/main/vae/mage_flow_vae_bf16.safetensors",
+    filename: "mage_flow_vae_bf16.safetensors",
+    modelType: "vae",
+    architecture: "mage_flow",
+    sizeBytes: 345053056,
+    sha256: "34e076dc1e8a15321e1e07be5111d59cf16dd10b804b7c7e20b4de29013427e0",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100258Model: HuggingFaceModel = {
+  id: -100258, name: "Mage-Flow VAE BF16", type: "VAE",
+  metrics: {"downloadCount": 103268, "thumbsUpCount": 120}, images: whitelist100258Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Mage-Flow",
+  description: {"zh": "Mage-Flow 专属 VAE, BF16", "en": "Mage-Flow 专属 VAE, BF16"},
+  version: whitelist100258Version, versions: [whitelist100258Version],
+}
+
+const whitelist100259Version: HuggingFaceVersion = {
+  id: -10000375, name: "fp16", baseModel: "MelBandRoFormer",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "6119aef379a6c7264e0b37db65ae1e6488b8ca4a00baf56d6d244737b8488226"},
+  file: {
+    url: "https://huggingface.co/Kijai/MelBandRoFormer_comfy/resolve/main/MelBandRoformer_fp16.safetensors",
+    filename: "MelBandRoformer_fp16.safetensors",
+    modelType: "diffusion_models",
+    architecture: "unknown",
+    sizeBytes: 456479072,
+    sha256: "6119aef379a6c7264e0b37db65ae1e6488b8ca4a00baf56d6d244737b8488226",
+    isModel: false,
+    source: "huggingface",
+  },
+}
+const whitelist100259Model: HuggingFaceModel = {
+  id: -100259, name: "MelBandRoFormer FP16", type: "DiffusionModel",
+  metrics: {"downloadCount": 89830, "thumbsUpCount": 43}, images: whitelist100259Version.images,
+  user: {"username": "Kijai"}, sourceUrl: "https://huggingface.co/Kijai/MelBandRoFormer_comfy",
+  description: {"zh": "MelBandRoFormer 音乐人声/伴奏分离模型, 需 ComfyUI-MelBandRoFormer 自定义节点", "en": "MelBandRoFormer 音乐人声/伴奏分离模型, 需 ComfyUI-MelBandRoFormer 自定义节点"},
+  version: whitelist100259Version, versions: [whitelist100259Version],
+}
+
+const whitelist100260Version: HuggingFaceVersion = {
+  id: -10000376, name: "v1.0", baseModel: "Wan 2.1",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors",
+    filename: "clip_vision_h.safetensors",
+    modelType: "clip_vision",
+    architecture: "wan21",
+    sizeBytes: 1264219396,
+    sha256: "64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100260Model: HuggingFaceModel = {
+  id: -100260, name: "CLIP-Vision H", type: "TextEncoder",
+  metrics: {"downloadCount": 2236045, "thumbsUpCount": 948}, images: whitelist100260Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+  description: {"zh": "CLIP-ViT-H 视觉编码器, Wan 2.1 图生视频使用", "en": "CLIP-ViT-H 视觉编码器, Wan 2.1 图生视频使用"},
+  version: whitelist100260Version, versions: [whitelist100260Version],
+}
+
+const whitelist100261Version: HuggingFaceVersion = {
+  id: -10000377, name: "dev", baseModel: "Flux.1 D",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "a1b3bdcb4bdc58ce04874b9ca776d61fc3e914bb6beab41efb63e4e2694dca45"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/flux1-redux-dev/resolve/main/flux1-redux-dev.safetensors",
+    filename: "flux1-redux-dev.safetensors",
+    modelType: "style_models",
+    architecture: "flux",
+    sizeBytes: 129063232,
+    sha256: "a1b3bdcb4bdc58ce04874b9ca776d61fc3e914bb6beab41efb63e4e2694dca45",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100261Model: HuggingFaceModel = {
+  id: -100261, name: "Flux.1 Redux Dev", type: "DiffusionModel",
+  metrics: {"downloadCount": 5351, "thumbsUpCount": 6}, images: whitelist100261Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/flux1-redux-dev",
+  description: {"zh": "Flux.1 Redux Dev 风格迁移模型", "en": "Flux.1 Redux Dev 风格迁移模型"},
+  version: whitelist100261Version, versions: [whitelist100261Version],
+}
+
+const whitelist100262Version: HuggingFaceVersion = {
+  id: -10000378, name: "v1.0", baseModel: "SDXL",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "9908329b3ead722a693ea400fab1d7c9ec91d6736fd194a94d20d793457f9c2e"},
+  file: {
+    url: "https://huggingface.co/comfyanonymous/clip_vision_g/resolve/main/clip_vision_g.safetensors",
+    filename: "clip_vision_g.safetensors",
+    modelType: "clip_vision",
+    architecture: "sdxl",
+    sizeBytes: 3689911098,
+    sha256: "9908329b3ead722a693ea400fab1d7c9ec91d6736fd194a94d20d793457f9c2e",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100262Model: HuggingFaceModel = {
+  id: -100262, name: "CLIP-Vision G", type: "TextEncoder",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 76}, images: whitelist100262Version.images,
+  user: {"username": "comfyanonymous"}, sourceUrl: "https://huggingface.co/comfyanonymous/clip_vision_g",
+  description: {"zh": "CLIP-ViT-G 视觉编码器, SDXL Revision 使用", "en": "CLIP-ViT-G 视觉编码器, SDXL Revision 使用"},
+  version: whitelist100262Version, versions: [whitelist100262Version],
+}
+
+const whitelist100263Version: HuggingFaceVersion = {
+  id: -10000379, name: "v1.0", baseModel: "Flux.1 D",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "1fee501deabac72f0ed17610307d7131e3e9d1e838d0363aa3c2b97a6e03fb33"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged/resolve/main/split_files/clip_vision/sigclip_vision_patch14_384.safetensors",
+    filename: "sigclip_vision_patch14_384.safetensors",
+    modelType: "clip_vision",
+    architecture: "flux",
+    sizeBytes: 856505640,
+    sha256: "1fee501deabac72f0ed17610307d7131e3e9d1e838d0363aa3c2b97a6e03fb33",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100263Model: HuggingFaceModel = {
+  id: -100263, name: "SigCLIP Vision Patch14 384", type: "TextEncoder",
+  metrics: {"downloadCount": 447893, "thumbsUpCount": 94}, images: whitelist100263Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged",
+  description: {"zh": "SigCLIP 视觉编码器, Flux.1 USO/Redux 使用", "en": "SigCLIP 视觉编码器, Flux.1 USO/Redux 使用"},
+  version: whitelist100263Version, versions: [whitelist100263Version],
+}
+
+const whitelist100264Version: HuggingFaceVersion = {
+  id: -10000380, name: "v1.0", baseModel: "Flux.1 D",
+  images: [],
+  trainedWords: [], hashes: {"SHA256": "9a0dfcd6644e3acaf6995625562ab0af1f9cf048bf739c7e5822ee106fb44311"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/USO_1.0_Repackaged/resolve/main/split_files/model_patches/uso-flux1-projector-v1.safetensors",
+    filename: "uso-flux1-projector-v1.safetensors",
+    modelType: "model_patches",
+    architecture: "flux",
+    sizeBytes: 21548200,
+    sha256: "9a0dfcd6644e3acaf6995625562ab0af1f9cf048bf739c7e5822ee106fb44311",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100264Model: HuggingFaceModel = {
+  id: -100264, name: "USO Flux.1 Projector V1", type: "DiffusionModel",
+  metrics: {"downloadCount": 28770, "thumbsUpCount": 18}, images: whitelist100264Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/USO_1.0_Repackaged",
+  description: {"zh": "USO 1.0 projector, Flux.1 Dev 参考图生成", "en": "USO 1.0 projector, Flux.1 Dev 参考图生成"},
+  version: whitelist100264Version, versions: [whitelist100264Version],
+}
+
 export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
+  // 2026-10-26：HF 文件元数据与 resolve HEAD 的 SHA256、大小一致，封面地址已核实。
+  whitelist100304Model,
+  whitelist100305Model,
+  whitelist100306Model,
+  whitelist100307Model,
+  whitelist100308Model,
+  whitelist100309Model,
+  whitelist100310Model,
+  whitelist100311Model,
+  whitelist100312Model,
+  whitelist100313Model,
+  whitelist100314Model,
+  whitelist100315Model,
+  whitelist100316Model,
+  whitelist100317Model,
+  whitelist100318Model,
+  whitelist100319Model,
+  whitelist100320Model,
+  whitelist100321Model,
+  whitelist100322Model,
+  whitelist100323Model,
+  whitelist100324Model,
+  whitelist100325Model,
+  whitelist100326Model,
+  whitelist100327Model,
+  whitelist100328Model,
+  whitelist100329Model,
   // Comfy-Org/Qwen-Image-2.1，文件大小与 SHA256 经 HF tree API 核实 (2026-10-19)。
-  ...(() => {
-    const repo = 'https://huggingface.co/Comfy-Org/Qwen-Image-2.1'
-    const thumb = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i-1.webp'
-    const images: CivitaiImage[] = [{ url: thumb, type: 'image' }]
-    type QwenFolder = 'diffusion_models' | 'loras' | 'model_patches' | 'text_encoders' | 'vae'
-    const mk = (id: number, vid: number, name: string, folder: QwenFolder, filename: string,
-                sizeBytes: number, sha256: string, zh: string, en: string): HuggingFaceModel => {
-      const modelType = folder
-      const type = { diffusion_models: 'DiffusionModel', loras: 'LORA', model_patches: 'ControlNet', text_encoders: 'TextEncoder', vae: 'VAE' }[modelType]
-      const isPromptEnhancer = filename.includes('_pe_')
-      const version: HuggingFaceVersion = {
-        id: vid, name: name.replace(/^Qwen Image 2\.1 /, ''), baseModel: isPromptEnhancer ? 'Qwen 3.5' : 'Qwen Image 2.1',
-        images, trainedWords: [], hashes: { SHA256: sha256 },
-        file: {
-          url: `${repo}/resolve/main/${folder}/${filename}`, filename, modelType,
-          directory: `{ComfyUI}/models/${folder}`, architecture: isPromptEnhancer ? 'qwen35' : 'qwen_image21', sizeBytes, sha256,
-        },
-      }
-      return {
-        id, name, type, metrics: { downloadCount: 11386917, thumbsUpCount: 1156 }, images,
-        user: { username: 'Comfy-Org' }, sourceUrl: repo, description: { zh, en }, version, versions: [version],
-      }
-    }
-    return [
-      mk(-100289, -10000389, 'Qwen Image 2.1 BF16', 'diffusion_models', 'qwen_image_2.1_bf16.safetensors',
-        14230280616, '89f4158d066cc33906a199fca85634f766892dd78f49b6698dabf187ac86c4bc',
-        'Qwen Image 2.1 文生图与图像编辑，原生透明图像，BF16 权重', 'Qwen Image 2.1 generation and editing with native transparency, BF16 weights'),
-      mk(-100290, -10000390, 'Qwen Image 2.1 INT8', 'diffusion_models', 'qwen_image_2.1_int8_convrot.safetensors',
-        7256783064, 'cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d',
-        'Qwen Image 2.1 文生图与图像编辑，INT8 ConvRot 量化', 'Qwen Image 2.1 generation and editing, INT8 ConvRot quantization'),
-      mk(-100291, -10000391, 'Qwen Image 2.1 Turbo BF16', 'diffusion_models', 'qwen_image_2.1_turbo_bf16.safetensors',
-        14230280616, '8b74237a7f505773e2c66726fa696444b4c704585c93a347cff9044937f7914a',
-        'Qwen Image 2.1 Turbo 8 步蒸馏模型，BF16 权重', 'Qwen Image 2.1 Turbo 8-step distilled model, BF16 weights'),
-      mk(-100292, -10000392, 'Qwen Image 2.1 Turbo INT8', 'diffusion_models', 'qwen_image_2.1_turbo_int8_convrot.safetensors',
-        7256787829, '8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c',
-        'Qwen Image 2.1 Turbo 8 步蒸馏模型，INT8 ConvRot 量化', 'Qwen Image 2.1 Turbo 8-step distilled model, INT8 ConvRot quantization'),
-      mk(-100293, -10000393, 'Qwen Image 2.1 Turbo LoRA', 'loras', 'qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors',
-        913314512, '208dd43250e1e01467ba190572ae2e7107a7870ec1ff026bc65f791fa1e80e95',
-        '基础模型使用的 Turbo 加速 LoRA，搭配 Turbo 8 步采样序列', 'Turbo acceleration LoRA for the base model, used with the Turbo 8-step sampling schedule'),
-      mk(-100294, -10000394, 'Qwen Image 2.1 Fun ControlNet Union BF16', 'model_patches', 'qwen_image_2.1_fun_controlnet_union_bf16.safetensors',
-        7550977992, '1f9dea8384ba167084f39f624908f1dbf2ea8a223bb4a8108a77dafa9b55bfe1',
-        'Qwen Image 2.1 Fun 联合控制补丁，BF16，存放于 model_patches', 'Qwen Image 2.1 Fun union control patch, BF16, stored in model_patches'),
-      mk(-100295, -10000395, 'Qwen Image 2.1 Fun ControlNet Union INT8', 'model_patches', 'qwen_image_2.1_fun_controlnet_union_int8_convrot.safetensors',
-        3779298944, '07aa961570ac0e03d4ca936aecd76854d077a33cde69b5092399afba01b3715d',
-        'Qwen Image 2.1 Fun 联合控制补丁，INT8，存放于 model_patches', 'Qwen Image 2.1 Fun union control patch, INT8, stored in model_patches'),
-      mk(-100296, -10000396, 'Qwen Image 2.1 PE I2I INT8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors',
-        9471072252, '32707d01b427e488af252b95c551989aad59f9fec611a694f5db6bde7f0f1f6c',
-        '图像编辑提示词扩写模型，供 ComfyUI Generate Text 节点使用', 'Image-editing prompt enhancer for the ComfyUI Generate Text node'),
-      mk(-100297, -10000397, 'Qwen Image 2.1 PE I2I W4A8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_i2i_w4a8.safetensors',
-        6724090764, '3c7c88f786f1bac5baf2c4b314fe28172cc03d93b29dfc8b445e85a655cbabb1',
-        '图像编辑提示词扩写模型，W4A8 轻量版', 'Image-editing prompt enhancer, lightweight W4A8 version'),
-      mk(-100298, -10000398, 'Qwen Image 2.1 PE T2I INT8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors',
-        9471072252, '9182abae56fe05459840a86d22abd21f972061c92fce032630af680c8c5178d3',
-        '文生图提示词扩写模型，供 ComfyUI Generate Text 节点使用', 'Text-to-image prompt enhancer for the ComfyUI Generate Text node'),
-      mk(-100299, -10000399, 'Qwen Image 2.1 PE T2I W4A8', 'text_encoders', 'qwen3.5_9b_qwen_image_2.1_pe_t2i_w4a8.safetensors',
-        6724090764, 'bdc244869e71e91f9e66638dd85872d8906ac26ce24ef9f32fecbc488e6bc708',
-        '文生图提示词扩写模型，W4A8 轻量版', 'Text-to-image prompt enhancer, lightweight W4A8 version'),
-      mk(-100300, -10000400, 'Qwen3-VL 8B BF16', 'text_encoders', 'qwen3vl_8b_bf16.safetensors',
-        17534334616, '68bdc82bc1b66851162ae656225e7e2068166b603db19bd5d5a3b90eb12669a9',
-        'Qwen Image 2.1 配套视觉语言编码器，BF16 完整档', 'Qwen Image 2.1 vision-language encoder, full BF16 tier'),
-      mk(-100301, -10000401, 'Qwen3-VL 8B INT8', 'text_encoders', 'qwen3vl_8b_int8_convrot.safetensors',
-        9350798360, '8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f',
-        'Qwen Image 2.1 配套视觉语言编码器，INT8 标准档', 'Qwen Image 2.1 vision-language encoder, standard INT8 tier'),
-      mk(-100302, -10000402, 'Qwen3-VL 8B W4A8', 'text_encoders', 'qwen3vl_8b_w4a8.safetensors',
-        6312105364, '7754425e55e7bea2bfde4dde59a4cc236cb44e5ee9c215ea66ef8d47012824eb',
-        'Qwen Image 2.1 配套视觉语言编码器，W4A8 轻量档', 'Qwen Image 2.1 vision-language encoder, lightweight W4A8 tier'),
-      mk(-100303, -10000403, 'Qwen Image 2.1 VAE BF16', 'vae', 'qwen_image_2.1_vae_bf16.safetensors',
-        675509688, 'bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9',
-        'Qwen Image 2.1 专用 64 通道 RGBA VAE', 'Qwen Image 2.1 dedicated 64-channel RGBA VAE'),
-    ]
-  })(),
-  ...([
-    [-100284, -10000384, 'AuraSR 配套配置', 'huggingface', 'https://huggingface.co/fal/AuraSR-v2/resolve/main/config.json', '{ComfyUI}/models/Aura-SR', 'config.json', 222, '5009aca786759dc78369abc666878ec7dd99167beaada28bf473fbaf1a68ac9a'],
-    [-100285, -10000385, 'SAM 精细掩码', 'meta', 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth', '{ComfyUI}/models/sams', 'sam_vit_b_01ec64.pth', 375042383, 'ec2df62732614e57411cdcf32a23ffdf28910380d03139ee0f4fcbe91eb8c912'],
-    [-100286, -10000386, 'DWPose 人体检测', 'huggingface', 'https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx', '{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/yzd-v/DWPose', 'yolox_l.onnx', 216746733, '7860ae79de6c89a3c1eb72ae9a2756c0ccfbe04b7791bb5880afabd97855a411'],
-    [-100287, -10000387, 'DWPose 姿态检测', 'huggingface', 'https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt', '{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/hr16/DWPose-TorchScript-BatchSize5', 'dw-ll_ucoco_384_bs5.torchscript.pt', 135059124, 'd86a0b2b59fddc0901a7076e9f59c9f8602602133ed72511c693fd11eea23d91'],
-    [-100288, -10000388, 'Depth Anything V2 深度检测', 'huggingface', 'https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth', '{ComfyUI}/custom_nodes/comfyui_controlnet_aux/ckpts/depth-anything/Depth-Anything-V2-Large', 'depth_anything_v2_vitl.pth', 1341395338, 'a7ea19fa0ed99244e67b624c72b8580b7e9553043245905be58796a608eb9345'],
-  ] as const).map(([id, versionId, name, source, url, directory, filename, sizeBytes, sha256]): HuggingFaceModel => {
-    const version: HuggingFaceVersion = {
-      id: versionId, name: 'v1', baseModel: '', images: [], trainedWords: [], hashes: { SHA256: sha256 },
-      file: { source, url, directory, filename, sizeBytes, sha256, isModel: false, modelType: 'auxiliary', architecture: '' },
-    }
-    return {
-      id, name, type: 'Auxiliary', metrics: { downloadCount: 0, thumbsUpCount: 0 }, images: [],
-      user: { username: source }, sourceUrl: url, description: { zh: name, en: name }, version, versions: [version],
-    }
-  }),
+  whitelist100289Model,
+  whitelist100290Model,
+  whitelist100291Model,
+  whitelist100292Model,
+  whitelist100293Model,
+  whitelist100294Model,
+  whitelist100295Model,
+  whitelist100296Model,
+  whitelist100297Model,
+  whitelist100298Model,
+  whitelist100299Model,
+  whitelist100300Model,
+  whitelist100301Model,
+  whitelist100302Model,
+  whitelist100303Model,
+  whitelist100284Model,
+  whitelist100285Model,
+  whitelist100286Model,
+  whitelist100287Model,
+  whitelist100288Model,
   sdXlBaseModel,
   sd15PrunedModel,
   flux1DevFp8Model,
@@ -9064,228 +10937,50 @@ export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
   umt5XxlFp16Model,
 
   // ── MiniMax H3 (2026-08 新发布, generated-models 快照未收录, 手动补) ──
-  ...(() => {
-    const t = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/'
-    const repo = 'https://huggingface.co/Comfy-Org/MiniMax-H3'
-    const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
-                arch: string, modelType: HuggingFaceFile['modelType'], fn: string, path: string, size: number,
-                sha: string, verName: string, desc: string, thumb: string): ManualHfModel => {
-      const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: [{ url: thumb, type: 'image' }],
-                  trainedWords: [], hashes: { SHA256: sha },
-                  file: { url: `${repo}/resolve/main/${path}`, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
-      return { id, name, type, metrics: { downloadCount: 3139920, thumbsUpCount: 886 },
-               images: [{ url: thumb, type: 'image' }], user: { username: 'Comfy-Org' },
-               sourceUrl: repo, description: { zh: desc, en: desc }, version: v, versions: [v] }
-    }
-    return [
-      mk(-100245, -10000345, 'MiniMax H3 FL2V FP8', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
-         'diffusion_models', 'minimax_h3_fl2va_pruned_fp8_scaled.safetensors', 'diffusion_models/minimax_h3_fl2va_pruned_fp8_scaled.safetensors',
-         20958205608, '12944c1f7791637e7de12208aef04da82bd26b95271b1b47d817364315ade993', 'fp8',
-         'MiniMax H3 图生视频 (FL2V), pruned FP8 量化版, 音视频一体生成', t + 'video_minimax_h3_i2v-1.webp'),
-      mk(-100246, -10000346, 'MiniMax H3 REF2V FP8', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
-         'diffusion_models', 'minimax_h3_ref2va_pruned_fp8_scaled.safetensors', 'diffusion_models/minimax_h3_ref2va_pruned_fp8_scaled.safetensors',
-         20958205608, 'f86f2f79ebd2d76eb8eeb46091e83982e6ff51d255747e7b16e92834b392b8e9', 'fp8',
-         'MiniMax H3 参考视频生成 (REF2V), pruned FP8 量化版, 参考图/视频驱动生成', t + 'video_minimax_h3_r2v-1.webp'),
-      mk(-100247, -10000347, 'MiniMax H3 FL2V BF16', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
-         'diffusion_models', 'minimax_h3_fl2va_pruned_bf16.safetensors', 'diffusion_models/minimax_h3_fl2va_pruned_bf16.safetensors',
-         40225724176, 'a32572fb90b5508b201ec7c2eddcc184b13ddfd3c6f6d2cf06a0b46535d541b4', 'bf16',
-         'MiniMax H3 图生视频 (FL2V), pruned BF16 完整版, 高精度', t + 'video_minimax_h3_i2v-1.webp'),
-      mk(-100248, -10000348, 'MiniMax H3 Qwen3-VL 32B TE', 'TextEncoder', 'MiniMax H3', 'minimax_h3',
-         'text_encoders', 'qwen3vl_32b_minimax_h3_bf16.safetensors', 'text_encoders/qwen3vl_32b_minimax_h3_bf16.safetensors',
-         51506295256, '600d567f6a9629c8574e8e7041b199bdd9c59a986afa7906910a81919610607d', 'bf16',
-         'MiniMax H3 文本编码器 (Qwen3-VL 32B), BF16', t + 'video_minimax_h3_t2v-1.webp'),
-      mk(-100249, -10000349, 'MiniMax H3 Video VAE', 'VAE', 'MiniMax H3', 'minimax_h3',
-         'vae', 'minimax_h3_video_vae_fp16.safetensors', 'vae/minimax_h3_video_vae_fp16.safetensors',
-         5207808496, '7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522', 'fp16',
-         'MiniMax H3 视频编解码器 VAE, FP16', t + 'video_minimax_h3_i2v-1.webp'),
-      mk(-100265, -10000356, 'MiniMax H3 FL2V INT8 ConvRot', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
-         'diffusion_models', 'minimax_h3_fl2va_pruned_int8_convrot.safetensors', 'diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors',
-         20970379616, 'e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a', 'int8_convrot',
-         'MiniMax H3 图生视频 (FL2V), pruned INT8 ConvRot 量化版, 官方推荐档, 音视频一体生成', t + 'video_minimax_h3_i2v-1.webp'),
-      mk(-100266, -10000357, 'MiniMax H3 REF2V INT8 ConvRot', 'DiffusionModel', 'MiniMax H3', 'minimax_h3',
-         'diffusion_models', 'minimax_h3_ref2va_pruned_int8_convrot.safetensors', 'diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors',
-         20970379616, '9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779', 'int8_convrot',
-         'MiniMax H3 参考视频生成 (REF2V), pruned INT8 ConvRot 量化版, 官方推荐档, 参考图/视频驱动生成', t + 'video_minimax_h3_r2v-1.webp'),
-      mk(-100267, -10000358, 'MiniMax H3 Qwen3-VL 32B TE NVFP4', 'TextEncoder', 'MiniMax H3', 'minimax_h3',
-         'text_encoders', 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors', 'text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
-         15687142551, '35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6', 'nvfp4_awq',
-         'MiniMax H3 文本编码器 (Qwen3-VL 32B), NVFP4 AWQ 量化版, 官方推荐档, 16-24GB 显存友好', t + 'video_minimax_h3_t2v-1.webp'),
-       mk(-100268, -10000359, 'MiniMax H3 Audio VAE', 'VAE', 'MiniMax H3', 'minimax_h3',
-          'vae', 'minimax_h3_audio_vae_fp32.safetensors', 'vae/minimax_h3_audio_vae_fp32.safetensors',
-          605254808, '8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48', 'fp32',
-          'MiniMax H3 音频编解码器 VAE, FP32, 音视频同出必需件', t + 'video_minimax_h3_i2v-1.webp'),
-    ]
-  })(),
+  whitelist100245Model,
+  whitelist100246Model,
+  whitelist100247Model,
+  whitelist100248Model,
+  whitelist100249Model,
+  whitelist100265Model,
+  whitelist100266Model,
+  whitelist100267Model,
+  whitelist100268Model,
 
   // ── 运行组件联动补充 (2026-08-07, 全部经 HF API 核实 size/lfs.oid) ──
   // 生成页「运行组件」依赖条引用的模型文件: 文本编码器/ControlNet/检测器/放大权重。
   // 与 component-registry.ts / modelDepConfigs.ts 通过 version id 锚定, 下载走
   // huggingface 统一通道，登记文件后广播完成事件。
   // 不含 custom_nodes 辅助件 (DWPose/DepthAnything/WD tagger) 与非 HF 源 SAM。
-  ...(() => {
-    const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
-                arch: string, modelType: HuggingFaceFile['modelType'], fn: string, repo: string, path: string,
-                size: number, sha: string, verName: string, desc: string,
-                thumb: string, dl: number, likes: number, author: string): ManualHfModel => {
-      const img: CivitaiImage[] = thumb ? [{ url: thumb, type: 'image' }] : []
-      const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: img,
-                  trainedWords: [], hashes: { SHA256: sha },
-                  file: { url: `https://huggingface.co/${repo}/resolve/main/${path}`, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha } }
-      return { id, name, type, metrics: { downloadCount: dl, thumbsUpCount: likes },
-               images: img, user: { username: author },
-               sourceUrl: `https://huggingface.co/${repo}`, description: { zh: desc, en: desc }, version: v, versions: [v] }
-    }
-    const wt = 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/'
-    return [
-      mk(-100269, -10000360, 'Mistral 3 Small Flux.2 FP4', 'TextEncoder', 'Flux.2', 'flux2',
-         'text_encoders', 'mistral_3_small_flux2_fp4_mixed.safetensors', 'Comfy-Org/flux2-dev',
-         'split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors',
-         12275678071, '1ee1ff334d78228d73049ef0ee4fcd21c1700536b5a45c06547af057f92463a7', 'fp4_mixed',
-         'Flux.2 Dev 文本编码器 (Mistral-3-Small), FP4 混合量化轻量档, 运行组件引用',
-         wt + 'output/image_flux2_fp8.png', 1505066, 285, 'Comfy-Org'),
-      mk(-100270, -10000361, 'Qwen 3 4B FP8 Mixed', 'TextEncoder', 'Z-Image', 'zimage',
-         'text_encoders', 'qwen_3_4b_fp8_mixed.safetensors', 'Comfy-Org/z_image_turbo',
-         'split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors',
-         5631994051, '72450b19758172c5a7273cf7de729d1c17e7f434a104a00167624cba94f68f15', 'fp8_mixed',
-         'Z-Image 文本编码器 (Qwen3-4B), FP8 混合量化轻量档, 运行组件引用',
-         wt + 'templates/image_z_image_turbo-1.webp', 5204347, 801, 'Comfy-Org'),
-      mk(-100271, -10000362, 'ControlNet Union SDXL ProMax', 'ControlNet', 'SDXL 1.0', 'sdxl',
-         'controlnet', 'diffusion_pytorch_model_promax.safetensors', 'xinsir/controlnet-union-sdxl-1.0',
-         'diffusion_pytorch_model_promax.safetensors',
-         2513342408, '9fae2e50cb431bfcbe05822b59ec2228df545ef27f711dea8949e9f4ed9f7cdc', 'promax',
-         'SDXL/Pony 通用 ControlNet Union ProMax (xinsir), 运行组件引用',
-         'https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/images/ControlNet++.png', 96846, 1803, 'xinsir'),
-      mk(-100272, -10000363, 'OpenPose Illustrious S6000', 'ControlNet', 'Illustrious', 'illustrious',
-         'controlnet', 'openpose_s6000.safetensors', 'windsingai/openpose',
-         'openpose_s6000.safetensors',
-         2502140008, '0d8bacf24534dc6f2716f5d0ffa6085571928776f8687565ef290a17d9f3615c', 's6000',
-         'Illustrious/NoobAI 专用 OpenPose ControlNet, 运行组件引用',
-         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/windsingai/openpose.png', 0, 1, 'windsingai'),
-      mk(-100273, -10000364, 'Illustrious XL Canny FP16', 'ControlNet', 'Illustrious', 'illustrious',
-         'controlnet', 'illustriousXLv1.1_canny_fp16.safetensors', 'MIC-Lab/illustriousXLv1.1_controlnet',
-         'illustriousXLv1.1_canny_fp16.safetensors',
-         2502139104, '3255c963a219a20040d2bef913216dd03d6da958068f5e69548dfe6e66528bcd', 'fp16',
-         'Illustrious/NoobAI 专用 Canny ControlNet (MIC-Lab), 运行组件引用',
-         'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/example/example_illustriousXLv1.1_canny/88004.png', 0, 12, 'MIC-Lab'),
-      mk(-100274, -10000365, 'Illustrious XL Depth Midas FP16', 'ControlNet', 'Illustrious', 'illustrious',
-         'controlnet', 'illustriousXLv1.1_depth_midas_fp16.safetensors', 'MIC-Lab/illustriousXLv1.1_controlnet',
-         'illustriousXLv1.1_depth_midas_fp16.safetensors',
-         2502139104, '14d168497226d3563b5a30bd7a72f73f98c263bf03780a5d473fb3b0afc44e17', 'fp16',
-         'Illustrious/NoobAI 专用 Depth (MiDaS) ControlNet (MIC-Lab), 运行组件引用',
-         'https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet/resolve/main/example/example_illustriousXLv1.1_depth/6uof8bk5.png', 0, 12, 'MIC-Lab'),
-      mk(-100275, -10000366, 'FLUX.1 Dev CN Union Pro 2.0 FP8', 'ControlNet', 'Flux.1', 'flux',
-         'controlnet', 'FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8.safetensors',
-         'ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8', 'diffusion_pytorch_model.safetensors',
-         2140902936, '393fc2a298b93ffe39f2db3f0d2ce11dfba62d44b7aa3c1dd3380d4a1be04deb', 'fp8',
-         'Flux.1 专用 ControlNet Union Pro 2.0 FP8, 落盘名重命名以区分, 运行组件引用',
-         'https://huggingface.co/ABDALLALSWAITI/FLUX.1-dev-ControlNet-Union-Pro-2.0-fp8/resolve/main/images/canny.png', 2709, 58, 'ABDALLALSWAITI'),
-      mk(-100276, -10000367, 'YOLOv8 Face Detector', 'Detector', 'Ultralytics', 'ultralytics',
-         'ultralytics_bbox', 'face_yolov8m.pt', 'Bingsu/adetailer', 'face_yolov8m.pt',
-         52026019, '717923c19b3f4bbf5250b728f1fa6b2cb72a33aed1d236ea9caf0e21ad943e5f', 'yolov8m',
-         'YOLOv8 面部检测器 (FaceDetailer 必需), 运行组件引用',
-         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/Bingsu/adetailer.png', 10086784, 757, 'Bingsu'),
-      mk(-100277, -10000368, 'SeedVR2 3B FP8', 'Upscaler', 'SeedVR2', 'seedvr2',
-         'seedvr2', 'seedvr2_ema_3b_fp8_e4m3fn.safetensors', 'numz/SeedVR2_comfyUI',
-         'seedvr2_ema_3b_fp8_e4m3fn.safetensors',
-         3391544696, '3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff', '3b_fp8',
-         'SeedVR2 视频放大 3B FP8, 显存约 10GB, 运行组件引用',
-         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/numz/SeedVR2_comfyUI.png', 207242, 298, 'numz'),
-      mk(-100278, -10000369, 'SeedVR2 EMA VAE FP16', 'VAE', 'SeedVR2', 'seedvr2',
-         'seedvr2', 'ema_vae_fp16.safetensors', 'numz/SeedVR2_comfyUI', 'ema_vae_fp16.safetensors',
-         501324814, '20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1', 'fp16',
-         'SeedVR2 视频放大配套 VAE (3B/7B 共用), 运行组件引用',
-         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/numz/SeedVR2_comfyUI.png', 207242, 298, 'numz'),
-      mk(-100279, -10000370, 'SeedVR2 7B Sharp FP8', 'Upscaler', 'SeedVR2', 'seedvr2',
-         'seedvr2', 'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors', 'AInVFX/SeedVR2_comfyUI',
-         'seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors',
-         8466296338, '0d2c5b8be0fda94351149c5115da26aef4f4932a7a2a928c6f184dda9186e0be', '7b_sharp_fp8',
-         'SeedVR2 视频放大 7B 锐化版 FP8, 显存约 17GB, 运行组件引用',
-         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/AInVFX/SeedVR2_comfyUI.png', 55788, 72, 'AInVFX'),
-      mk(-100280, -10000371, 'AuraSR v2', 'Upscaler', 'AuraSR', 'aurasr',
-         'aura-sr', 'model.safetensors', 'fal/AuraSR-v2', 'model.safetensors',
-         2470247916, '8a80b4546f3f49b9095733cb9699030409339e2f4eb0ae9c1ada14c7d21d4dde', 'v2',
-         'AuraSR v2 4× 超分辨率放大权重 (需与同目录 config.json 配套), 运行组件引用',
-         'https://cdn-thumbnails.huggingface.co/social-thumbnails/models/fal/AuraSR-v2.png', 749, 340, 'fal'),
-    ]
-  })(),
+  whitelist100269Model,
+  whitelist100270Model,
+  whitelist100271Model,
+  whitelist100272Model,
+  whitelist100273Model,
+  whitelist100274Model,
+  whitelist100275Model,
+  whitelist100276Model,
+  whitelist100277Model,
+  whitelist100278Model,
+  whitelist100279Model,
+  whitelist100280Model,
 
   // ── 未收录补充: A类(Krea-2/Mage-Flow/Qwen3-VL/MelBandRoFormer) + B类图像(CLIP-Vision/Redux/SigCLIP/USO) ──
-  ...(() => {
-    const mk = (id: number, vid: number, name: string, type: string, baseModel: string,
-                arch: string, modelType: HuggingFaceFile['modelType'], fn: string, repo: string, path: string,
-                size: number, sha: string, verName: string, desc: string, thumb: string,
-                dl: number, likes: number, author: string, isModel = true): ManualHfModel => {
-      const img: CivitaiImage[] = thumb ? [{ url: thumb, type: 'image' }] : []
-      const v: HuggingFaceVersion = { id: vid, name: verName, baseModel, images: img,
-                  trainedWords: [], hashes: { SHA256: sha },
-                  file: { url: 'https://huggingface.co/' + repo + '/resolve/main/' + path, filename: fn, modelType, architecture: arch, sizeBytes: size, sha256: sha, isModel } }
-      return { id, name, type, metrics: { downloadCount: dl, thumbsUpCount: likes },
-               images: img, user: { username: author },
-               sourceUrl: 'https://huggingface.co/' + repo, description: { zh: desc, en: desc }, version: v, versions: [v] }
-    }
-    return [
-    mk(-100250, -10000350, 'Qwen3-VL 4B FP8', 'TextEncoder', 'Krea 2', 'krea2',
-         'text_encoders', 'qwen3vl_4b_fp8_scaled.safetensors', 'Comfy-Org/Qwen3-VL', 'text_encoders/qwen3vl_4b_fp8_scaled.safetensors',
-         5242467968, '54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094', 'fp8',
-         'Qwen3-VL 4B 视觉语言模型 FP8 量化, Krea-2/Mage-Flow 共用文本编码器', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png', 0, 49, 'Comfy-Org'),
-    mk(-100251, -10000351, 'Qwen3-VL 4B BF16', 'TextEncoder', 'Mage-Flow', 'mage_flow',
-         'text_encoders', 'qwen3vl_4b_bf16.safetensors', 'Comfy-Org/Qwen3-VL', 'text_encoders/qwen3vl_4b_bf16.safetensors',
-         8875719384, '36f3ff447ef59201722e8f9ce6020c9819fdcfba6aa2608c4e09b1c0ce114e34', 'bf16',
-         'Qwen3-VL 4B 视觉语言模型 BF16, Krea-2/Mage-Flow 共用文本编码器', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png', 0, 49, 'Comfy-Org'),
-    mk(-100252, -10000352, 'Krea 2 Turbo FP8', 'DiffusionModel', 'Krea 2', 'krea2',
-         'diffusion_models', 'krea2_turbo_fp8_scaled.safetensors', 'Comfy-Org/Krea-2', 'diffusion_models/krea2_turbo_fp8_scaled.safetensors',
-         13141730784, 'eb4dd8c612cfd10f64f25b057e6e6bbcb5737c94a7372177e456dbf7579502f1', 'fp8',
-         'Krea 2 Turbo 文生图主模型 FP8 量化版, Krea 官方 2026-06 发布', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png', 10, 417, 'Comfy-Org'),
-    mk(-100253, -10000353, 'Krea 2 Turbo INT8', 'DiffusionModel', 'Krea 2', 'krea2',
-         'diffusion_models', 'krea2_turbo_int8_convrot.safetensors', 'Comfy-Org/Krea-2', 'diffusion_models/krea2_turbo_int8_convrot.safetensors',
-         13492686496, '8e4eeda70dd5037ab1ba2bef6b417f9f901e26093117cf397f741fc1fdaaf3f1', 'int8',
-         'Krea 2 Turbo 文生图主模型 INT8 量化版, 更快更省显存', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i_int8.png', 10, 417, 'Comfy-Org'),
-    mk(-100254, -10000354, 'Krea 2 Darkbrush LoRA', 'LORA', 'Krea 2', 'krea2',
-         'loras', 'krea2_darkbrush.safetensors', 'Comfy-Org/Krea-2', 'loras/krea2_darkbrush.safetensors',
-         469291992, 'f47c4316dd93af66e0518c93b582f459571d4925b519133770c73a52cd5db7c6', 'v1.0',
-         'Krea 2 水墨风格 LoRA', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png', 10, 417, 'Comfy-Org'),
-    mk(-100255, -10000355, 'Krea 2 Style Reference LoRA', 'LORA', 'Krea 2', 'krea2',
-         'loras', 'krea2_style_reference.safetensors', 'Comfy-Org/Krea-2', 'loras/krea2_style_reference.safetensors',
-         457111760, 'f50df5a9e62e4be8aa926a63dd5bb1a64770c4004f763c1208007ae13daa82b8', 'v1.0',
-         'Krea 2 风格参考 LoRA', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/thumbnail/image_krea2_turbo_int8_image_style_reference.png', 10, 417, 'Comfy-Org'),
-    mk(-100256, -10000372, 'Mage-Flow INT8', 'DiffusionModel', 'Mage-Flow', 'mage_flow',
-         'diffusion_models', 'mage_flow_int8_convrot.safetensors', 'Comfy-Org/Mage-Flow', 'diffusion_models/mage_flow_int8_convrot.safetensors',
-         4159146848, 'e081068163d7793b7e0d54ae2a773d3ac1c0d5b099c09b69dcbff36448485ae8', 'int8',
-         'Mage-Flow 4B 文生图主模型 INT8, 微软开源, 原生 512-2048 分辨率', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png', 103268, 120, 'Comfy-Org'),
-    mk(-100257, -10000373, 'Mage-Flow Turbo INT8', 'DiffusionModel', 'Mage-Flow', 'mage_flow',
-         'diffusion_models', 'mage_flow_turbo_int8_convrot.safetensors', 'Comfy-Org/Mage-Flow', 'diffusion_models/mage_flow_turbo_int8_convrot.safetensors',
-         4159146840, '327c3967a5190ea52e453ec3dd81ba168e37a2a0ff2c763aa3e9260bbbe1913c', 'int8',
-         'Mage-Flow Turbo 4 步蒸馏 INT8, 约 0.6s/图 (A100)', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow_turbo.png', 103268, 120, 'Comfy-Org'),
-    mk(-100258, -10000374, 'Mage-Flow VAE BF16', 'VAE', 'Mage-Flow', 'mage_flow',
-         'vae', 'mage_flow_vae_bf16.safetensors', 'Comfy-Org/Mage-Flow', 'vae/mage_flow_vae_bf16.safetensors',
-         345053056, '34e076dc1e8a15321e1e07be5111d59cf16dd10b804b7c7e20b4de29013427e0', 'bf16',
-         'Mage-Flow 专属 VAE, BF16', 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/Mage_flow.png', 103268, 120, 'Comfy-Org'),
-    mk(-100259, -10000375, 'MelBandRoFormer FP16', 'DiffusionModel', 'MelBandRoFormer', 'unknown',
-         'diffusion_models', 'MelBandRoformer_fp16.safetensors', 'Kijai/MelBandRoFormer_comfy', 'MelBandRoformer_fp16.safetensors',
-         456479072, '6119aef379a6c7264e0b37db65ae1e6488b8ca4a00baf56d6d244737b8488226', 'fp16',
-          'MelBandRoFormer 音乐人声/伴奏分离模型, 需 ComfyUI-MelBandRoFormer 自定义节点', '', 89830, 43, 'Kijai', false),
-    mk(-100260, -10000376, 'CLIP-Vision H', 'TextEncoder', 'Wan 2.1', 'wan21',
-         'text_encoders', 'clip_vision_h.safetensors', 'Comfy-Org/Wan_2.1_ComfyUI_repackaged', 'split_files/clip_vision/clip_vision_h.safetensors',
-         1264219396, '64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161', 'v1.0',
-         'CLIP-ViT-H 视觉编码器, Wan 2.1 图生视频使用', '', 2236045, 948, 'Comfy-Org'),
-    mk(-100261, -10000377, 'Flux.1 Redux Dev', 'DiffusionModel', 'Flux.1 D', 'flux',
-         'diffusion_models', 'flux1-redux-dev.safetensors', 'Comfy-Org/flux1-redux-dev', 'flux1-redux-dev.safetensors',
-         129063232, 'a1b3bdcb4bdc58ce04874b9ca776d61fc3e914bb6beab41efb63e4e2694dca45', 'dev',
-         'Flux.1 Redux Dev 风格迁移模型', '', 5351, 6, 'Comfy-Org'),
-    mk(-100262, -10000378, 'CLIP-Vision G', 'TextEncoder', 'SDXL', 'sdxl',
-         'text_encoders', 'clip_vision_g.safetensors', 'comfyanonymous/clip_vision_g', 'clip_vision_g.safetensors',
-         3689911098, '9908329b3ead722a693ea400fab1d7c9ec91d6736fd194a94d20d793457f9c2e', 'v1.0',
-         'CLIP-ViT-G 视觉编码器, SDXL Revision 使用', '', 0, 76, 'comfyanonymous'),
-    mk(-100263, -10000379, 'SigCLIP Vision Patch14 384', 'TextEncoder', 'Flux.1 D', 'flux',
-         'text_encoders', 'sigclip_vision_patch14_384.safetensors', 'Comfy-Org/HunyuanVideo_1.5_repackaged', 'split_files/clip_vision/sigclip_vision_patch14_384.safetensors',
-         856505640, '1fee501deabac72f0ed17610307d7131e3e9d1e838d0363aa3c2b97a6e03fb33', 'v1.0',
-         'SigCLIP 视觉编码器, Flux.1 USO/Redux 使用', '', 447893, 94, 'Comfy-Org'),
-    mk(-100264, -10000380, 'USO Flux.1 Projector V1', 'DiffusionModel', 'Flux.1 D', 'flux',
-         'diffusion_models', 'uso-flux1-projector-v1.safetensors', 'Comfy-Org/USO_1.0_Repackaged', 'split_files/model_patches/uso-flux1-projector-v1.safetensors',
-         21548200, '9a0dfcd6644e3acaf6995625562ab0af1f9cf048bf739c7e5822ee106fb44311', 'v1.0',
-         'USO 1.0 projector, Flux.1 Dev 参考图生成', '', 28770, 18, 'Comfy-Org')
-    ]
-  })(),
+  whitelist100250Model,
+  whitelist100251Model,
+  whitelist100252Model,
+  whitelist100253Model,
+  whitelist100254Model,
+  whitelist100255Model,
+  whitelist100256Model,
+  whitelist100257Model,
+  whitelist100258Model,
+  whitelist100259Model,
+  whitelist100260Model,
+  whitelist100261Model,
+  whitelist100262Model,
+  whitelist100263Model,
+  whitelist100264Model,
 ]
 
 for (const model of HUGGINGFACE_MODELS) {
@@ -9324,6 +11019,8 @@ export const MODEL_TYPE_DIRS: Record<HuggingFaceFile['modelType'], string> = {
   loras: '{ComfyUI}/models/loras',
   controlnet: '{ComfyUI}/models/controlnet',
   model_patches: '{ComfyUI}/models/model_patches',
+  clip_vision: '{ComfyUI}/models/clip_vision',
+  style_models: '{ComfyUI}/models/style_models',
   vae: '{ComfyUI}/models/vae',
   embeddings: '{ComfyUI}/models/embeddings',
   upscale_models: '{ComfyUI}/models/upscale_models',

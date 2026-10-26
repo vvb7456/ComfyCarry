@@ -41,25 +41,15 @@ const emit = defineEmits<{
 const { t, te } = useI18n({ useScope: 'global' })
 
 const modelGuidePath = computed(() => {
+  const ownPath = `generate.prompt.help.models.${props.modelType}`
+  if (props.modelType && te(`${ownPath}.title`)) return ownPath
   const path = `generate.prompt.help.models.${MODEL_VARIANTS[props.modelType]?.base ?? props.modelType}`
   // vue-i18n 的 te() 只可靠检查叶子 key；对 models.<id> 对象本身检查会返回 false。
   return props.modelType && te(`${path}.title`) ? path : 'generate.prompt.help.models.sdxl'
 })
 
-const NO_NEGATIVE_GUIDE_MODELS = new Set([
-  'krea2',
-  'zimage_turbo',
-  'flux1',
-  'flux1_schnell',
-  'flux2klein4b',
-  'flux2klein9b',
-  'flux2dev',
-  'minimax_h3',
-  'minimax_h3_ref',
-])
-
 const showNegativeGuide = computed(() =>
-  props.showNegative && !NO_NEGATIVE_GUIDE_MODELS.has(props.modelType),
+  props.showNegative,
 )
 
 const modelGuideRows = computed(() => [
@@ -265,6 +255,7 @@ defineExpose({ insertAtCursor })
   color: var(--t2);
   min-height: 28px;
   box-sizing: border-box;
+  flex-wrap: wrap;
 }
 .hdr-icon { font-size: .9rem; color: var(--t3); }
 
@@ -338,21 +329,26 @@ defineExpose({ insertAtCursor })
 }
 
 @container gen-prompt (max-width: 600px) {
-  .prompt-body { flex-direction: column; }
-  /* 三栏退回纵向堆叠; 媒体列高度自适应 (下限 180px): 单上传区 (wan22) 内容
-     不足 180px 时仍撑满 180px 与旧版一致; H3 两栏各自独立渲染, 不裁切。 */
+  .prompt-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prompt-body--3col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prompt-fields { grid-column: 1 / -1; }
   .prompt-media,
   .prompt-body--3col .prompt-media {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: 180px;
+    height: 180px;
     min-width: 0;
     max-width: none;
     border-right: none;
     border-left: none;
     border-bottom: 1px solid var(--bd);
   }
-  .prompt-media--right { border-bottom: none; border-top: 1px solid var(--bd); }
+  .prompt-body--3col .prompt-media { grid-row: 1; }
+  .prompt-body--3col .prompt-media--right {
+    grid-column: 2;
+    border-left: 1px solid var(--bd);
+  }
 }
 
 .prompt-textarea {

@@ -2,8 +2,7 @@
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
-import { GenerateOptionsKey } from '@/composables/generate/keys'
-import { MODEL_TYPES } from '@/config/model-types'
+import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import { componentsForSlot, stemOf, type ComponentSlot, type ComponentFile } from '@/config/component-registry'
 import type { SelectOption } from '@/components/form/BaseSelect.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
@@ -23,8 +22,6 @@ const props = defineProps<{
   dualClip?: boolean
   /** Checkpoint 系专属: 在主 2×3 网格上方新增 [Clip Skip | VAE] 对称条件行 */
   showClipSkipVae?: boolean
-  /** 本 tab 的架构 key; 缺省时回退 store.activeModelType (过渡期兼容) */
-  modelType?: string
   /**
    * 媒体类型。'video' 时按惯例 (能力无效则控件整个不出现) 收敛:
    *  - 隐藏「文件格式」— 视频产物恒 mp4/h264, 无可选项;
@@ -37,12 +34,11 @@ const props = defineProps<{
 
 const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
-const state = computed(() => store.currentState)
+const { modelType, state, config } = inject(GenerateModelKey)!
 const options = inject(GenerateOptionsKey)!
 
-const arch = computed(() => props.modelType || store.activeModelType)
 const schedulerOptions = computed(() => [
-  ...(MODEL_TYPES[arch.value]?.extraSchedulers ?? []),
+  ...(config.value.extraSchedulers ?? []),
   ...options.schedulers.value,
 ])
 
@@ -94,7 +90,7 @@ interface SlotConfig {
  * 整合包架构 (registry 无条目) → 不分组，平铺全量。
  */
 function buildSlotOptions(slot: ComponentSlot, candidates: { name: string }[]): SelectOption[] {
-  const files = componentsForSlot(arch.value, slot)
+  const files = componentsForSlot(modelType, slot)
   if (files.length === 0) {
     return candidates.map(c => ({ value: c.name, label: basenameNoExt(c.name) }))
   }
@@ -145,7 +141,7 @@ function isOtherGroup(slot: ComponentSlot, candidates: { name: string }[], value
   void candidates
   // 未选择任何文件时不算"不兼容" (空值不该触发警告)
   if (!value) return false
-  const files = componentsForSlot(arch.value, slot)
+  const files = componentsForSlot(modelType, slot)
   if (files.length === 0) return false
   const base = fileBaseName(value)
   if (files.some(f => f.filename === base)) return false
@@ -162,25 +158,26 @@ const clipOptions = computed(() => buildSlotOptions('clip', options.clips.value)
 const clip2Options = computed(() => buildSlotOptions('clip2', options.clips.value))
 const vaeOptions = computed(() => buildSlotOptions('vae', options.vaes.value))
 
-const hasAudioVae = computed(() => componentsForSlot(arch.value, 'audio_vae').length > 0)
+const hasAudioVae = computed(() => componentsForSlot(modelType, 'audio_vae').length > 0)
 const audioVaeOptions = computed(() => buildSlotOptions('audio_vae', options.vaes.value))
 
-const archLabel = computed(() => MODEL_TYPES[arch.value]?.label ?? arch.value)
+const archLabel = computed(() => config.value.label)
 const clipIncompatible = computed(() => isOtherGroup('clip', options.clips.value, state.value.clip))
 const clip2Incompatible = computed(() => isOtherGroup('clip2', options.clips.value, state.value.clip2))
 const vaeIncompatible = computed(() => isOtherGroup('vae', options.vaes.value, state.value.vae))
 const audioVaeIncompatible = computed(() => isOtherGroup('audio_vae', options.vaes.value, state.value.audioVae))
 const hasRegistry = computed(() =>
-  componentsForSlot(arch.value, 'clip').length > 0 ||
-  componentsForSlot(arch.value, 'clip2').length > 0 ||
-  componentsForSlot(arch.value, 'vae').length > 0 ||
-  componentsForSlot(arch.value, 'audio_vae').length > 0)
+  componentsForSlot(modelType, 'clip').length > 0 ||
+  componentsForSlot(modelType, 'clip2').length > 0 ||
+  componentsForSlot(modelType, 'vae').length > 0 ||
+  componentsForSlot(modelType, 'audio_vae').length > 0)
 
 // Clip Skip: NumberInput 1~4; VAE 首项 "跟随 Checkpoint" (值空) + 全量 VAE 列表 (仅排序不裁剪)
 const vaeOverrideOptions = computed(() => [
   { value: '', label: t('generate.advanced.vae_override_follow') },
   ...vaeOptions.value,
-])</script>
+])
+</script>
 
 <template>
   <details class="adv-settings" :class="{ 'adv-settings--disabled': disabled }">
@@ -323,7 +320,7 @@ const vaeOverrideOptions = computed(() => [
             :disabled="disabled"
             searchable
             :search-placeholder="t('generate.advanced.scheduler_search')"
-            @update:model-value="state.scheduler = String($event)"
+            @update:model-value="store.setScheduler(String($event), modelType)"
           />
         </div>
       </div>
@@ -448,21 +445,26 @@ const vaeOverrideOptions = computed(() => [
 
 .adv-2col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
 }
 
 /* split-file grid: 2 项 (CLIP/VAE) 或 3 项 (CLIP/CLIP2/VAE) 自适应 */
 .adv-split-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
 }
 .adv-split-grid--3 {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-@container gen-advanced (max-width: 600px) {
+@container gen-advanced (max-width: 560px) {
+  .adv-split-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adv-split-grid--3 > :last-child { grid-column: 1 / -1; }
+}
+
+@container gen-advanced (max-width: 360px) {
   .adv-2col,
   .adv-split-grid,
   .adv-split-grid--3 {
@@ -474,6 +476,7 @@ const vaeOverrideOptions = computed(() => [
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .field-lbl {

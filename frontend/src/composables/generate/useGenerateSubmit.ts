@@ -6,7 +6,7 @@ import { useToast } from '@/composables/useToast'
 import { useGenerateStore } from '@/stores/generate'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { normalizePrompt } from '@/utils/prompt'
-import { MODEL_TYPES } from '@/config/model-types'
+import { requiredLoras } from '@/config/component-registry'
 import { packagingOf } from '@/composables/generate/useGenerateOptions'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
 import type { ExecState } from '@/composables/useExecTracker'
@@ -51,7 +51,7 @@ export function useGenerateSubmit(
   function resolvePackaging() {
     const state = store.currentState
     const modelType = store.activeModelType
-    const activeConfig = MODEL_TYPES[modelType]
+    const activeConfig = store.currentConfig
     const selectedPackaging = packagingOf(
       state.checkpoint || state.unet,
       activeConfig,
@@ -68,10 +68,10 @@ export function useGenerateSubmit(
       return false
     }
 
-    const { modelType, activeConfig, selectedPackaging } = resolvePackaging()
+    const { activeConfig, selectedPackaging } = resolvePackaging()
 
     if (activeConfig?.mediaType === 'video') {
-      const variant = videoVariant(modelType)
+      const variant = videoVariant(activeConfig.runtimeKey!)
       const isH3 = variant === 'h3' || variant === 'h3ref'
       if (variant && variant !== '5b' && !isH3) {
         if (!state.unetHigh || !state.unetLow) {
@@ -110,7 +110,8 @@ export function useGenerateSubmit(
       if ((variant === '5b' || isH3) && v?.mode) {
         needStart = v.mode === 'i2v'
       }
-      if (needStart && !v?.refImage) {
+      if (needStart && !v?.refImage
+        && !(activeConfig.controlNetEnabled && Object.values(state.controlNets).some(cn => cn.enabled))) {
         // 与 ModelTab.runBlockedReason 用同一条文案 (阻断只有一种表达)
         toast(t('generate.error.no_start_frame'), 'error')
         return false
@@ -251,7 +252,9 @@ export function useGenerateSubmit(
       })
 
     const controlnets = Object.entries(state.controlNets)
-      .filter(([, cn]) => cn.enabled && cn.model && cn.image)
+      .filter(([type, cn]) => activeConfig.controlNetEnabled
+        && (!activeConfig.controlTypes || activeConfig.controlTypes.includes(type))
+        && cn.enabled && cn.model && cn.image)
       .map(([type, cn]) => ({
         type,
         model: cn.model,
@@ -260,6 +263,16 @@ export function useGenerateSubmit(
         start_percent: cn.start,
         end_percent: cn.end,
       }))
+
+    if (!activeConfig.dualUnet) {
+      for (const file of requiredLoras(activeConfig.runtimeKey!, {
+        fast: state.fast, mode: state.video?.mode ?? state.mode,
+      })) {
+        if (!loras.some(lora => lora.name === file.filename || lora.name.endsWith('/' + file.filename))) {
+          loras.unshift({ name: file.filename, strength: 1 })
+        }
+      }
+    }
 
     const { settings: ps } = usePromptSettings()
     const nOpts = {
@@ -271,13 +284,13 @@ export function useGenerateSubmit(
 
     // 视频架构: 独立 payload 组装, 字段名与后端 generate_service.py 逐字对齐
     if (activeConfig?.mediaType === 'video') {
-      const variant = videoVariant(modelType)
+      const variant = videoVariant(activeConfig.runtimeKey!)
       const v = state.video
 
       if (variant === 'h3') {
         const isI2v = v?.mode === 'i2v'
         const h3payload: Record<string, unknown> = {
-          model_type: modelType,
+          model_type: activeConfig.runtimeKey,
           mode: isI2v ? 'i2v' : 't2v',
           positive_prompt: normalizePrompt(state.positive, nOpts),
           unet: state.unet,
@@ -298,13 +311,13 @@ export function useGenerateSubmit(
           output_format: 'png',  // 通过后端 output_format 枚举校验; 视频走 SaveVideo, 该字段被忽略
           loras,
         }
-        return h3payload
+        return { ...h3payload, controlnets, fast: state.fast }
       }
 
       // Ref2VA: refs = {type, name}[], 同 type 内顺序 = 引用编号
       if (variant === 'h3ref') {
         const h3refPayload: Record<string, unknown> = {
-          model_type: modelType,
+          model_type: activeConfig.runtimeKey,
           positive_prompt: normalizePrompt(state.positive, nOpts),
           unet: state.unet,
           clip: state.clip,
@@ -321,18 +334,19 @@ export function useGenerateSubmit(
           scheduler: state.scheduler,
           save_prefix: state.prefix,
           output_format: 'png',
-          loras: [],  // Ref2VA 无 LoRA 支持 (契约固定空数组)
+          loras,
+          controlnets,
+          fast: state.fast,
         }
         return h3refPayload
       }
 
       const is14b = variant === 'i2v' || variant === 't2v'
-      let needStart = variant === 'i2v'
-      if (variant === '5b' && v?.mode) needStart = v.mode === 'i2v'
+      const needStart = v?.mode === 'i2v'
       const startImage = needStart ? (v?.refImage ?? '') : ''
 
       const vpayload: Record<string, unknown> = {
-        model_type: modelType, // 细粒度 key, 后端 _VIDEO_ARCHS 与 _BUILDERS 均以该 key 路由
+        model_type: activeConfig.runtimeKey,
         positive_prompt: normalizePrompt(state.positive, nOpts),
         negative_prompt: normalizePrompt(state.negative, nOpts),
         width: v?.width ?? state.width,
@@ -359,6 +373,7 @@ export function useGenerateSubmit(
       vpayload.clip = state.clip
       vpayload.vae = state.vae
       vpayload.start_image = startImage
+      vpayload.last_image = needStart ? v?.lastImage ?? '' : ''
       if (variant === '5b' && v?.mode) {
         vpayload.mode = v.mode
       }
@@ -390,6 +405,8 @@ export function useGenerateSubmit(
       output_format: state.format,
       loras,
       controlnets,
+      refs: state.mode === 'ref' ? state.refs : [],
+      fast: state.fast,
     }
 
     // 架构专属参数: flux2klein/flux2dev 的 guider_mode 在此注入, 后端按字段分支
@@ -428,8 +445,8 @@ export function useGenerateSubmit(
       payload.upscale_factor = state.upscale.factor
       payload.upscale_engine = state.upscale.engine
       payload.upscale_mode = state.upscale.mode
-      payload.upscale_tile = state.upscale.tile
-      payload.upscale_downscale = state.upscale.downscale
+      payload.upscale_tile_batch_size = state.upscale.tile
+      payload.upscale_downscale_method = state.upscale.downscale
       if (state.upscale.engine === 'seedvr2') {
         payload.upscale_svr_model = state.upscale.svrModel
         payload.upscale_svr_color_correction = state.upscale.svrColorCorrection

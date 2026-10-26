@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useGenerateStore, type HiResState } from '@/stores/generate'
-import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
@@ -11,14 +10,14 @@ import SeedInput from '@/components/generate/SeedInput.vue'
 defineOptions({ name: 'HiResPanel' })
 
 const { t } = useI18n({ useScope: 'global' })
-const store = useGenerateStore()
+const { state, config: modelConfig } = inject(GenerateModelKey)!
 const options = inject(GenerateOptionsKey)!
 
-const config = computed<HiResState>(() => store.currentState.hires)
+const config = computed(() => state.value.hires)
 
 const samplerOptions = computed(() => options.samplers.value)
 const schedulerOptions = computed(() => [
-  ...(store.currentConfig.extraSchedulers ?? []),
+  ...(modelConfig.value.extraSchedulers ?? []),
   ...options.schedulers.value,
 ])
 

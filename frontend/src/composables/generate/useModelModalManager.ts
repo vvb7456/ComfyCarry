@@ -14,6 +14,7 @@ interface PromptEditorHandle {
 }
 
 interface UseModelModalManagerOptions {
+  modelType: string
   options: GenerateOptionsReturn
   previewImages: Ref<PreviewImage[]>
   prepareTagger: () => void
@@ -25,6 +26,7 @@ function basename(name: string) {
 }
 
 export function useModelModalManager({
+  modelType,
   options,
   previewImages,
   prepareTagger,
@@ -33,7 +35,7 @@ export function useModelModalManager({
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
   const store = useGenerateStore()
-  const state = computed(() => store.currentState)
+  const state = computed(() => store.stateFor(modelType))
 
   const llm = useLlmAssist()
   const embPicker = useEmbeddingPicker()
@@ -58,7 +60,7 @@ export function useModelModalManager({
   //   WD14 反推 — 两者均面向 A1111 tag 体系, 对自然语言架构无意义); AI 助手保留
   //   (视频提示词更需要它, 且图像 natural 架构如 krea2/zimage 同样受益)。
   // 判据基于 promptStyle (非 mediaType): krea2/zimage 等「图像+natural」架构也收敛。
-  const isNaturalPrompt = computed(() => store.currentConfig.promptStyle === 'natural')
+  const isNaturalPrompt = computed(() => store.configFor(modelType).promptStyle === 'natural')
 
   const promptTools = computed(() => {
     const tools: ToolButton[] = [

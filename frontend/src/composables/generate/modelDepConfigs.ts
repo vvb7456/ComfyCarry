@@ -1,5 +1,6 @@
 import type { DepRow, DepFileSpec } from './useDependencyStatus'
 import { HF_VERSION_INDEX, fileDirectory } from '@/config/huggingface-models'
+import type { ModelTypeConfig } from '@/config/model-types'
 
 /**
  * 各功能模块的依赖清单。
@@ -50,28 +51,28 @@ const CN_MODELS = {
     files: [hfFile(-10000362)],
   },
   pose_dedicated: {
-    id: 'windsingai-openpose',
-    label: 'windsingai OpenPose',
-    hint: 'Illustrious/NoobAI 专用',
-    bytes: hfBytes(-10000363),
+    id: 'noob-openpose',
+    label: 'Laxhar NoobAI OpenPose',
+    hint: 'Illustrious/NoobAI 姿势控制',
+    bytes: hfBytes(-10000438),
     required: true,
-    files: [hfFile(-10000363)],
+    files: [hfFile(-10000438)],
   },
   canny_dedicated: {
-    id: 'illustrious-canny',
-    label: 'Illustrious XL Canny',
-    hint: 'Illustrious/NoobAI 专用',
-    bytes: hfBytes(-10000364),
+    id: 'noob-canny',
+    label: 'NoobAI Canny FP16',
+    hint: 'Illustrious/NoobAI 轮廓控制',
+    bytes: hfBytes(-10000439),
     required: true,
-    files: [hfFile(-10000364)],
+    files: [hfFile(-10000439)],
   },
   depth_dedicated: {
-    id: 'illustrious-depth',
-    label: 'Illustrious XL Depth',
-    hint: 'Illustrious/NoobAI 专用',
-    bytes: hfBytes(-10000365),
+    id: 'noob-depth-midas',
+    label: 'NoobAI Depth MiDaS FP16',
+    hint: 'Illustrious/NoobAI 深度控制',
+    bytes: hfBytes(-10000440),
     required: true,
-    files: [hfFile(-10000365)],
+    files: [hfFile(-10000440)],
   },
   sd15_pose_dedicated: {
     id: 'sd15-controlnet-openpose',
@@ -193,82 +194,69 @@ export const FACE_DEP_GROUP: DepGroup = {
   rows: [FACE_MODELS.face_yolov8m, FACE_MODELS.sam_vit_b],
 }
 
-// pony/sdxl 走 union (sdxl 通用), illustrious/noobai 走专用模型。
-// 分家后每 branch 只剩一个 CN 主模型 → 它和检测器一样是必需的 (不再是"多选一",
-// 故无 minOptional)。这是"原本可选的模型因架构拆分变成必需"的那一类。
-//
-// pose:   sdxl → [union, dwpose];            ilnoob → [pose_dedicated, dwpose]
-// canny:  sdxl → [union];                    ilnoob → [canny_dedicated]
-// depth:  sdxl → [union, depth_anything_v2];  ilnoob → [depth_dedicated, depth_anything_v2]
-//         sd15 → [sd15 专用模型 (+ 对应检测器)]
+export type CnBranch = NonNullable<ModelTypeConfig['cnBranch']>
 
-export type CnBranch = 'sdxl' | 'ilnoob' | 'flux' | 'sd15'
-
-const _CN_BRANCH_GROUPS: Record<string, Record<CnBranch, DepGroup>> = {
-  pose: {
-    sdxl: {
-      title: 'generate.controlnet.need_download_pose',
-      rows: [CN_MODELS.union, CN_MODELS.dwpose],
-    },
-    ilnoob: {
-      title: 'generate.controlnet.need_download_pose',
-      rows: [CN_MODELS.pose_dedicated, CN_MODELS.dwpose],
-    },
-    flux: {
-      title: 'generate.controlnet.need_download_pose',
-      rows: [CN_MODELS.flux_union, CN_MODELS.dwpose],
-    },
-    sd15: {
-      title: 'generate.controlnet.need_download_pose',
-      rows: [CN_MODELS.sd15_pose_dedicated, CN_MODELS.dwpose],
-    },
-  },
-  canny: {
-    sdxl: {
-      title: 'generate.controlnet.need_download_canny',
-      rows: [CN_MODELS.union],
-    },
-    ilnoob: {
-      title: 'generate.controlnet.need_download_canny',
-      rows: [CN_MODELS.canny_dedicated],
-    },
-    flux: {
-      title: 'generate.controlnet.need_download_canny',
-      rows: [CN_MODELS.flux_union],
-    },
-    sd15: {
-      title: 'generate.controlnet.need_download_canny',
-      rows: [CN_MODELS.sd15_canny_dedicated],
-    },
-  },
-  depth: {
-    sdxl: {
-      title: 'generate.controlnet.need_download_depth',
-      rows: [CN_MODELS.union, CN_MODELS.depth_anything_v2],
-    },
-    ilnoob: {
-      title: 'generate.controlnet.need_download_depth',
-      rows: [CN_MODELS.depth_dedicated, CN_MODELS.depth_anything_v2],
-    },
-    flux: {
-      title: 'generate.controlnet.need_download_depth',
-      rows: [CN_MODELS.flux_union, CN_MODELS.depth_anything_v2],
-    },
-    sd15: {
-      title: 'generate.controlnet.need_download_depth',
-      rows: [CN_MODELS.sd15_depth_dedicated, CN_MODELS.depth_anything_v2],
-    },
-  },
+function modelRow(id: string, label: string, hint: string, ...versions: number[]): DepRow {
+  return { id, label, hint, required: true, bytes: hfBytes(...versions), files: versions.map(hfFile) }
 }
 
-/**
- * getCnDepGroup — 按 CN 类型 + branch 返回该 branch 的依赖清单。
- * branch 缺省时回退 'sdxl' (仅 sdxl/pony 等已显式声明 cnBranch)。
- */
-export function getCnDepGroup(cnType: string, branch: CnBranch | undefined): DepGroup {
-  const table = _CN_BRANCH_GROUPS[cnType]
-  if (!table) return { title: '', rows: [] }
-  return table[branch ?? 'sdxl']
+const CONTROL_MODELS = {
+  qwen: modelRow('qwen-union', 'Qwen Image 2.1 Fun Union INT8', 'Qwen Image 2.1 专用', -10000395),
+  zimage: modelRow('zimage-union', 'Z-Image Fun Union 2.1 Lite', 'Z-Image Base 专用', -10000420),
+  zimageTile: modelRow('zimage-tile', 'Z-Image Fun Tile 2.1 Lite', 'Z-Image Base 专用', -10000421),
+  zimageTurbo: modelRow('zimage-turbo-union', 'Z-Image Turbo Fun Union 2602 Lite', 'Z-Image Turbo 专用', -10000422),
+  zimageTurboTile: modelRow('zimage-turbo-tile', 'Z-Image Turbo Fun Tile 2601 Lite', 'Z-Image Turbo 专用', -10000423),
+  anima: modelRow('anima-any', 'Anima LLLite Any v2', 'Anima 专用', -10000424),
+  animaDepth: modelRow('anima-depth', 'Anima LLLite Depth', 'Anima 专用', -10000425),
+  h3: modelRow('h3-union', 'MiniMax H3 Fun Union 2.0 INT8', 'MiniMax H3 视频控制附件', -10000430),
+  sd15Lineart: modelRow('sd15-lineart', 'SD1.5 Lineart ControlNet', 'SD1.5 专用', -10000431),
+  sd15Tile: modelRow('sd15-tile', 'SD1.5 Tile ControlNet', 'SD1.5 专用', -10000432),
+  noobLineart: modelRow('noob-lineart', 'Noob SDXL Lineart Anime', 'Illustrious/NoobAI 线稿控制', -10000433),
+  noobTile: modelRow('noob-tile', 'Noob SDXL Tile', 'Illustrious/NoobAI 细节恢复', -10000434),
+  fluxLineart: modelRow('flux-lineart', 'MistoLine Flux Dev', 'Flux 1 线稿控制', -10000442),
+  fluxTile: modelRow('flux-tile', 'Jasper Flux Dev Upscaler', 'Flux 1 细节恢复', -10000443),
+}
+
+const PREPROCESSORS = {
+  midas: modelRow('midas-depth', 'MiDaS DPT Hybrid', '深度检测', -10000441, -10000444, -10000445),
+  lineart: modelRow('lineart', 'Lineart', '线稿检测', -10000435),
+  lineartCoarse: modelRow('lineart-coarse', 'Lineart Coarse', '粗线稿检测', -10000436),
+  lineartAnime: modelRow('lineart-anime', 'Lineart Anime', '动漫线稿检测', -10000437),
+}
+
+const CN_BRANCH_MODELS: Record<CnBranch, Record<string, DepRow>> = {
+  sdxl: { pose: CN_MODELS.union, canny: CN_MODELS.union, depth: CN_MODELS.union, lineart: CN_MODELS.union, tile: CN_MODELS.union },
+  ilnoob: { pose: CN_MODELS.pose_dedicated, canny: CN_MODELS.canny_dedicated, depth: CN_MODELS.depth_dedicated, lineart: CONTROL_MODELS.noobLineart, tile: CONTROL_MODELS.noobTile },
+  sd15: { pose: CN_MODELS.sd15_pose_dedicated, canny: CN_MODELS.sd15_canny_dedicated, depth: CN_MODELS.sd15_depth_dedicated, lineart: CONTROL_MODELS.sd15Lineart, tile: CONTROL_MODELS.sd15Tile },
+  flux: { pose: CN_MODELS.flux_union, canny: CN_MODELS.flux_union, depth: CN_MODELS.flux_union, lineart: CONTROL_MODELS.fluxLineart, tile: CONTROL_MODELS.fluxTile },
+  zimage: { pose: CONTROL_MODELS.zimage, canny: CONTROL_MODELS.zimage, depth: CONTROL_MODELS.zimage, tile: CONTROL_MODELS.zimageTile },
+  zimage_turbo: { pose: CONTROL_MODELS.zimageTurbo, canny: CONTROL_MODELS.zimageTurbo, depth: CONTROL_MODELS.zimageTurbo, tile: CONTROL_MODELS.zimageTurboTile },
+  qwen_image21: { pose: CONTROL_MODELS.qwen, canny: CONTROL_MODELS.qwen, depth: CONTROL_MODELS.qwen, lineart: CONTROL_MODELS.qwen },
+  anima: { canny: CONTROL_MODELS.anima, depth: CONTROL_MODELS.animaDepth, lineart: CONTROL_MODELS.anima },
+  minimax_h3: { pose: CONTROL_MODELS.h3, canny: CONTROL_MODELS.h3, depth: CONTROL_MODELS.h3, lineart: CONTROL_MODELS.h3 },
+}
+
+export function cnPreprocessor(type: string, branch: CnBranch | undefined, model = ''): { rows: DepRow[]; params: Record<string, boolean> } {
+  if (type === 'pose') return { rows: [CN_MODELS.dwpose], params: {} }
+  if (type === 'depth') {
+    const midas = model ? model.toLowerCase().includes('midas') : branch === 'ilnoob'
+    return { rows: [midas ? PREPROCESSORS.midas : CN_MODELS.depth_anything_v2], params: { depth_midas: midas } }
+  }
+  if (type === 'lineart') {
+    const anime = branch === 'ilnoob'
+    return { rows: anime ? [PREPROCESSORS.lineartAnime] : [PREPROCESSORS.lineart, PREPROCESSORS.lineartCoarse], params: { lineart_anime: anime } }
+  }
+  return { rows: [], params: {} }
+}
+
+export function getCnDepGroup(type: string, branch: CnBranch | undefined, model = ''): DepGroup {
+  const control = CN_BRANCH_MODELS[branch ?? 'sdxl'][type]
+  return { title: `generate.controlnet.need_download_${type}`,
+    rows: control ? [control, ...cnPreprocessor(type, branch, model).rows] : [] }
+}
+
+export function isPreprocessorRow(row: DepRow): boolean {
+  return row.files.every(file => file.hf?.version.file.isModel === false)
 }
 
 /**
@@ -280,14 +268,13 @@ export function getCnDepGroup(cnType: string, branch: CnBranch | undefined): Dep
  */
 export const CN_FILE_BRANCH: Record<string, CnBranch> = (() => {
   const map: Record<string, CnBranch> = {}
-  for (const f of CN_MODELS.union.files) map[f.filename] = 'sdxl'
-  for (const f of CN_MODELS.pose_dedicated.files) map[f.filename] = 'ilnoob'
-  for (const f of CN_MODELS.canny_dedicated.files) map[f.filename] = 'ilnoob'
-  for (const f of CN_MODELS.depth_dedicated.files) map[f.filename] = 'ilnoob'
-  for (const f of CN_MODELS.sd15_pose_dedicated.files) map[f.filename] = 'sd15'
-  for (const f of CN_MODELS.sd15_canny_dedicated.files) map[f.filename] = 'sd15'
-  for (const f of CN_MODELS.sd15_depth_dedicated.files) map[f.filename] = 'sd15'
-  for (const f of CN_MODELS.flux_union.files) map[f.filename] = 'flux'
+  for (const [branch, modes] of Object.entries(CN_BRANCH_MODELS)) {
+    for (const row of Object.values(modes)) {
+      for (const file of row.files) map[file.filename] = branch as CnBranch
+    }
+  }
+  map[hfFile(-10000394).filename] = 'qwen_image21'
+  for (const id of [-10000363, -10000364, -10000365]) map[hfFile(id).filename] = 'ilnoob'
   return map
 })()
 

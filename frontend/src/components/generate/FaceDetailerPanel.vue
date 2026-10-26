@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useGenerateStore, type FaceDetailerState } from '@/stores/generate'
-import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import BaseTextarea from '@/components/form/BaseTextarea.vue'
@@ -13,12 +12,12 @@ import HelpTip from '@/components/ui/HelpTip.vue'
 defineOptions({ name: 'FaceDetailerPanel' })
 
 const { t } = useI18n({ useScope: 'global' })
-const store = useGenerateStore()
+const { state, config: modelConfig } = inject(GenerateModelKey)!
 const options = inject(GenerateOptionsKey)!
 
-const config = computed<FaceDetailerState>(() => store.currentState.faceDetailer)
+const config = computed(() => state.value.faceDetailer)
 const schedulerOptions = computed(() => [
-  ...(store.currentConfig.extraSchedulers ?? []),
+  ...(modelConfig.value.extraSchedulers ?? []),
   ...options.schedulers.value,
 ])
 

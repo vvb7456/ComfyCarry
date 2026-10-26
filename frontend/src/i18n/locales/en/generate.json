@@ -1,5 +1,9 @@
 {
   "title": "Generate",
+  "mode": {
+    "t2i": "Text to Image",
+    "ref": "Reference"
+  },
   "gate": {
     "checking": "Checking ComfyUI status…",
     "starting": "ComfyUI is starting, please wait…",
@@ -8,8 +12,6 @@
     "loading_state": "Loading workspace configuration…",
     "state_failed_title": "Failed to load workspace configuration",
     "state_failed_desc": "Your configuration is still stored on the server and was not changed. You can retry.",
-    "state_reload_title": "Workspace configuration was imported",
-    "state_reload_desc": "Reload the configuration before editing to avoid overwriting the imported settings.",
     "save_state_failed": "Workspace configuration has not been saved. Check the server connection."
   },
   "header": {
@@ -33,19 +35,19 @@
   "tabs": {
     "sdxl": "SDXL",
     "sd15": "SD 1.5",
-    "anima": "Anima Base",
+    "anima": "Anima",
     "anima_turbo": "Anima Turbo",
     "flux": "Flux",
-    "krea2": "Krea 2 Turbo",
+    "krea2": "Krea 2",
     "qwen_image21": "Qwen Image 2.1",
     "qwen_image21_turbo": "Qwen Image 2.1 Turbo",
-    "zimage": "Z-Image Base",
+    "zimage": "Z-Image",
     "zimage_turbo": "Z-Image Turbo",
-    "flux1": "Flux 1.D",
+    "flux1": "Flux 1",
     "flux1_schnell": "Flux 1 Schnell",
     "chroma": "Chroma",
-    "flux2klein4b": "Flux 2 Klein 4B Distilled",
-    "flux2klein9b": "Flux 2 Klein 9B Distilled",
+    "flux2klein4b": "Flux 2 Klein 4B",
+    "flux2klein9b": "Flux 2 Klein 9B",
     "flux2klein4b_base": "Flux 2 Klein 4B Base",
     "flux2klein9b_base": "Flux 2 Klein 9B Base",
     "flux2dev": "Flux 2 Dev",
@@ -53,7 +55,7 @@
     "illustrious": "Illustrious",
     "noobai": "NoobAI EPS",
     "noobai_vpred": "NoobAI V-Pred",
-    "wan22_i2v": "Wan 2.2 Image to Video",
+    "wan22_i2v": "Wan 2.2 14B",
     "wan22_t2v": "Wan 2.2 Text to Video",
     "wan22_5b": "Wan 2.2 5B Lite",
     "minimax_h3": "MiniMax H3 AV",
@@ -394,6 +396,8 @@
     "refs_help_formats_b": "Audio: WAV / MP3, ≤ 15 MB per file; Images: JPG / PNG / WEBP…, ≤ 20 MB per file"
   },
   "modules": {
+    "lineart": "Line Art Control",
+    "tile": "Tile Control",
     "lora": "LoRA",
     "i2i": "Img2Img",
     "pose": "Pose Control",
@@ -441,6 +445,26 @@
     "scroll_zoom": "Scroll=Zoom"
   },
   "controlnet": {
+    "ref_lineart": "Reference (Line Art)",
+    "ref_tile": "Reference (Original Image)",
+    "ref_video": "Reference Video",
+    "lineart_map": "Line Art Map",
+    "tile_map": "Reference Image",
+    "strength_help_lineart": "Controls how strictly the line art constraint is applied. Higher values follow the line art map more strictly",
+    "strength_help_tile": "Controls how strongly the detail constraint is applied. Higher values preserve more of the reference composition and detail",
+    "need_download_lineart": "Line art control models required",
+    "need_download_tile": "Tile control models required",
+    "video_pose": "Skeleton Video",
+    "video_canny": "Edge Video",
+    "video_depth": "Depth Video",
+    "video_lineart": "Line Art Video",
+    "generate_video": "Generate Reference Video",
+    "upload_video": "Upload Local Video",
+    "select_video": "Select Video",
+    "video_uploaded": "Reference video uploaded",
+    "need_video": "Please select a reference video first",
+    "preprocess_models": "Preprocessing Models",
+    "need_preprocess_models": "Please download the preprocessing models first",
     "model": "Model",
     "strength": "Strength",
     "strength_help_pose": "Controls how strictly the pose constraint is applied. Higher values follow the skeleton map more strictly",
@@ -669,7 +693,8 @@
     "role_text_encoder_2": "Text encoder 2",
     "role_vae": "VAE",
     "role_audio_vae": "Audio VAE",
-    "fast_files_hint": "Only needed in Fast mode"
+    "fast_files_hint": "Only needed in Fast mode",
+    "ref_files_hint": "Only needed in Reference mode"
   },
   "confirm": {
     "modules_not_enabled": {
@@ -756,6 +781,8 @@
     "state_lost": "Target model state unavailable, please retry"
   },
   "dep": {
+    "noun_lineart": "line art control models",
+    "noun_tile": "tile control models",
     "ready": "{noun} ready · {n} item(s)",
     "missing": "{n} {noun} missing",
     "downloading_one": "Fetching · {name}",

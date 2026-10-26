@@ -11,24 +11,32 @@ const CN_SUBFOLDERS: Record<string, string> = {
   pose: 'openpose',
   canny: 'canny',
   depth: 'depth',
+  lineart: 'lineart',
+  tile: 'tile',
 }
 
 const CN_REF_KEYS: Record<string, string> = {
   pose: 'generate.controlnet.ref_pose',
   canny: 'generate.controlnet.ref_canny',
   depth: 'generate.controlnet.ref_depth',
+  lineart: 'generate.controlnet.ref_lineart',
+  tile: 'generate.controlnet.ref_tile',
 }
 
 const CN_STRENGTH_HELP_KEYS: Record<string, string> = {
   pose: 'generate.controlnet.strength_help_pose',
   canny: 'generate.controlnet.strength_help_canny',
   depth: 'generate.controlnet.strength_help_depth',
+  lineart: 'generate.controlnet.strength_help_lineart',
+  tile: 'generate.controlnet.strength_help_tile',
 }
 
 export const CN_LABEL_KEYS: Record<string, string> = {
   pose: 'generate.controlnet.bone_map',
   canny: 'generate.controlnet.edge_map',
   depth: 'generate.controlnet.depth_map',
+  lineart: 'generate.controlnet.lineart_map',
+  tile: 'generate.controlnet.tile_map',
 }
 
 export interface PPParamDef {
@@ -50,6 +58,12 @@ export interface PPTypeDef {
 }
 
 export const PP_PARAMS_DEF: Record<CnType, PPTypeDef> = {
+  lineart: {
+    titleKey: 'generate.controlnet.lineart_map', icon: 'line_curve',
+    params: [{ key: 'resolution', labelKey: 'generate.controlnet.detect_resolution', type: 'select', default: 1024,
+      options: [{ value: 512, label: '512' }, { value: 768, label: '768' }, { value: 1024, label: '1024' }, { value: 1536, label: '1536' }] }],
+  },
+  tile: { titleKey: 'generate.controlnet.tile_map', icon: 'image', params: [] },
   pose: {
     titleKey: 'generate.controlnet.bone_map',
     icon: 'accessibility_new',
@@ -87,9 +101,11 @@ export const PP_PARAMS_DEF: Record<CnType, PPTypeDef> = {
   },
 }
 
-export type CnType = 'pose' | 'canny' | 'depth'
+export const CN_TYPES = ['pose', 'canny', 'depth', 'lineart', 'tile'] as const
+export type CnType = typeof CN_TYPES[number]
 
 export interface UseControlNetReturn {
+  video: boolean
   type: CnType
   subfolder: string
   config: ComputedRef<ControlNetState>
@@ -135,6 +151,7 @@ export function useControlNet(
 ): UseControlNetReturn {
   const store = useGenerateStore()
   const state = computed(() => store.stateFor(modelType))
+  const video = store.configFor(modelType).mediaType === 'video'
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
 
@@ -153,6 +170,9 @@ export function useControlNet(
   const rawModels = computed<string[]>(() => controlnetModels.value[type] || [])
 
   const models = computed<string[]>(() => {
+    const modelConfig = store.configFor(modelType)
+    if (!modelConfig.controlNetEnabled || !modelConfig.modules.includes('controlnet')
+      || !(modelConfig.controlTypes ?? CN_TYPES).includes(type)) return []
     const branch = branchRef?.value
     if (!branch) return rawModels.value
     const compat: string[] = []
@@ -187,7 +207,7 @@ export function useControlNet(
     !!config.value.model && !models.value.includes(config.value.model!),
   )
 
-  const picker = useRefImagePicker(type, subfolder)
+  const picker = useRefImagePicker(type, subfolder, video ? 'video' : 'image')
 
   function setImage(filename: string) {
     config.value.image = filename
@@ -202,7 +222,7 @@ export function useControlNet(
     const result = await picker.uploadFile(file)
     if (result) {
       setImage(result.filename)
-      toast(t('generate.i2i.uploaded'), 'success')
+      toast(t(video ? 'generate.controlnet.video_uploaded' : 'generate.i2i.uploaded'), 'success')
     }
   }
 
@@ -240,12 +260,6 @@ export function useControlNet(
     preprocessStatus.value = 'running'
     startPPTimer()
 
-    const labelMap: Record<string, string> = {
-      pose: t('generate.controlnet.bone_map'),
-      canny: t('generate.controlnet.edge_map'),
-      depth: t('generate.controlnet.depth_map'),
-    }
-
     try {
       const form = new FormData()
       if (file instanceof File) {
@@ -274,7 +288,7 @@ export function useControlNet(
       const data = await res.json()
       preprocessPromptId.value = data.prompt_id || ''
       preprocessOutputFile.value = data.output_filename || ''
-      toast(t('generate.controlnet.generating', { label: labelMap[type] || type }), 'info')
+      toast(t('generate.controlnet.generating', { label: t(video ? `generate.controlnet.video_${type}` : CN_LABEL_KEYS[type]!) }), 'info')
       return data.prompt_id || null
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Preprocess failed'
@@ -292,12 +306,7 @@ export function useControlNet(
       preprocessStatus.value = 'done'
       // Auto-fill the reference image from preprocess output
       setImage(output)
-      const labelMap: Record<string, string> = {
-        pose: t('generate.controlnet.bone_map'),
-        canny: t('generate.controlnet.edge_map'),
-        depth: t('generate.controlnet.depth_map'),
-      }
-      toast(t('generate.controlnet.generating', { label: labelMap[type] || type }), 'success')
+      toast(t('generate.controlnet.generating', { label: t(video ? `generate.controlnet.video_${type}` : CN_LABEL_KEYS[type]!) }), 'success')
     } else {
       preprocessStatus.value = success ? 'done' : 'error'
     }
@@ -311,13 +320,14 @@ export function useControlNet(
       return false
     }
     if (!config.value.image) {
-      toast(t('generate.controlnet.need_ref'), 'warning')
+      toast(t(video ? 'generate.controlnet.need_video' : 'generate.controlnet.need_ref'), 'warning')
       return false
     }
     return true
   }
 
   return {
+    video,
     type,
     subfolder,
     config,

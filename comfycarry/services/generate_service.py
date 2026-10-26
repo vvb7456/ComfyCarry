@@ -52,7 +52,7 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
       - unet / clip / vae / audio_vae 必填 + 文件列表校验
       - 分辨率: %32 整除, W×H ≤ H3_MAX_PIXELS
       - 时长: 整数秒钳 [4,15], length = h3_align_length(duration×24) 写回
-      - batch_size=1; pop cfg/negative_prompt/speed/fast
+      - batch_size=1; pop cfg/negative_prompt/speed
     起始画面 / refs 校验不在本函数 (由各分支单独处理)。
 
     返回: (错误响应 dict | None, HTTP 状态码); None 表示校验通过。
@@ -124,7 +124,7 @@ def _validate_h3_common(data: dict, opts: dict) -> tuple[dict | None, int]:
     data["length"] = h3_align_length(duration * H3_FPS)
 
     data["batch_size"] = 1
-    for k in ("cfg", "negative_prompt", "speed", "fast"):
+    for k in ("cfg", "negative_prompt", "speed"):
         data.pop(k, None)
     return None, 200
 
@@ -279,9 +279,9 @@ def submit_generation(data: dict) -> tuple[dict, int]:
 
             start_image = str(data.get("start_image", "")).strip()
             if mode == "i2v":
-                if not start_image:
+                if not start_image and not data.get("controlnets"):
                     return {"error_key": "generate.err.no_start_frame"}, 400
-                if err := _validate_input_file(start_image, "start_frame"):
+                if start_image and (err := _validate_input_file(start_image, "start_frame")):
                     return err, 400
                 data["start_image"] = start_image
             else:
@@ -418,7 +418,7 @@ def submit_generation(data: dict) -> tuple[dict, int]:
             need_start = variant == "i2v"
             if variant == "5b":
                 mode = str(data.get("mode", "")).strip().lower()
-                need_start = (mode == "i2v")
+                need_start = mode == "i2v"
             if need_start:
                 if not start_image:
                     return {"error_key": "generate.err.no_start_frame"}, 400
@@ -498,10 +498,13 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         cn_image = str(cn.get("image", "")).strip()
         if not cn_model or not cn_image:
             continue
+        cn_type = str(cn.get("type", ""))
+        if cn_type not in ("pose", "canny", "depth", "lineart", "tile"):
+            return {"error_key": "generate.err.unsupported_preprocess_type", "error_params": {"pp_type": cn_type}}, 400
         if err := _validate_input_file(cn_image, "cn_image"):
             return err, 400
         validated_cns.append({
-            "type": str(cn.get("type", "")),
+            "type": cn_type,
             "model": cn_model,
             "image": cn_image,
             "strength": float(cn.get("strength", 1.0)),
@@ -510,7 +513,12 @@ def submit_generation(data: dict) -> tuple[dict, int]:
         })
     data["controlnets"] = validated_cns
 
-    for field in ("i2i_image", "inpaint_image", "inpaint_mask"):
+    if model_type not in _VIDEO_ARCHS:
+        for ref in data.get("refs") or []:
+            if err := _validate_input_file(ref["name"], "ref"):
+                return err, 400
+
+    for field in ("i2i_image", "inpaint_image", "inpaint_mask", "last_image"):
         name = str(data.get(field, "")).strip()
         if name and (err := _validate_input_file(name, "i2i_image")):
             return err, 400

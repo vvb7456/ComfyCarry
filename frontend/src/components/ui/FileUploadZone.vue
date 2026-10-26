@@ -10,6 +10,7 @@ const props = withDefaults(defineProps<{
   mode?: 'drop' | 'pick'
   accept?: string
   preview?: string
+  mediaType?: 'image' | 'video'
   fileName?: string
   pickLabel?: string
   uploadLabel?: string
@@ -154,7 +155,8 @@ defineExpose({ clearFile })
     </button>
 
     <template v-else-if="isPreview">
-      <img :src="preview" class="upload-zone__img" alt="">
+      <video v-if="mediaType === 'video'" :src="preview" class="upload-zone__img" controls muted playsinline preload="metadata" />
+      <img v-else :src="preview" class="upload-zone__img" alt="">
       <button
         type="button"
         class="upload-zone__clear"
@@ -164,7 +166,7 @@ defineExpose({ clearFile })
       >
         <MsIcon name="close" color="none" />
       </button>
-      <span v-if="fileName" class="upload-zone__fname">{{ fileName }}</span>
+      <span v-if="fileName" class="upload-zone__fname" :class="{ 'upload-zone__fname--video': mediaType === 'video' }">{{ fileName }}</span>
     </template>
 
     <template v-else>
@@ -281,6 +283,7 @@ defineExpose({ clearFile })
   padding: 2px 8px; border-radius: 4px;
   max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.upload-zone__fname--video { top: 6px; bottom: auto; pointer-events: none; }
 
 .upload-zone__loaded {
   display: flex; align-items: center; gap: 8px;

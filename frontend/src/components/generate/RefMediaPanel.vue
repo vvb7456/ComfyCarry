@@ -31,10 +31,13 @@ import RefImageModal from '@/components/generate/RefImageModal.vue'
 
 defineOptions({ name: 'RefMediaPanel' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   refs: RefItem[]
   disabled?: boolean
-}>()
+  types?: RefItem['type'][]
+  limit?: number
+  h3Help?: boolean
+}>(), { types: () => ['image', 'video', 'audio'], limit: 12, h3Help: true })
 
 const emit = defineEmits<{
   'update:refs': [value: RefItem[]]
@@ -44,10 +47,10 @@ const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 
 // 与后端校验一致
-const LIMIT_IMAGE = 9
+const LIMIT_IMAGE = computed(() => props.types.length === 1 ? props.limit : 9)
 const LIMIT_VIDEO = 3
 const LIMIT_AUDIO = 3
-const LIMIT_TOTAL = 12
+const LIMIT_TOTAL = computed(() => props.limit)
 
 /** 引用标签名 — 提示词语法 (<Picture 1>) 是固定英文, 不走 i18n */
 const TAG_NAME: Record<RefItem['type'], string> = { image: 'Picture', video: 'Video', audio: 'Audio' }
@@ -70,8 +73,8 @@ function countOf(type: RefItem['type']): number {
   return props.refs.filter(r => r.type === type).length
 }
 
-const totalDisabled = computed(() => props.refs.length >= LIMIT_TOTAL)
-const imgAddDisabled = computed(() => totalDisabled.value || countOf('image') >= LIMIT_IMAGE)
+const totalDisabled = computed(() => props.refs.length >= LIMIT_TOTAL.value)
+const imgAddDisabled = computed(() => totalDisabled.value || countOf('image') >= LIMIT_IMAGE.value)
 const vidAddDisabled = computed(() => totalDisabled.value || countOf('video') >= LIMIT_VIDEO)
 const audAddDisabled = computed(() => totalDisabled.value || countOf('audio') >= LIMIT_AUDIO)
 
@@ -79,8 +82,8 @@ function addRef(type: RefItem['type'], name: string) {
   const refs = [...props.refs]
   const cur = countOf(type)
   // 组内超限 → toast (按钮已禁用时理论走不到, 防御提交链外的越界调用)
-  if (type === 'image' && cur >= LIMIT_IMAGE) {
-    toast(t('generate.error.minimax_h3_refs_images_too_many', { limit: LIMIT_IMAGE, current: cur }), 'warning')
+  if (type === 'image' && cur >= LIMIT_IMAGE.value) {
+    toast(t('generate.error.minimax_h3_refs_images_too_many', { limit: LIMIT_IMAGE.value, current: cur }), 'warning')
     return
   }
   if (type === 'video' && cur >= LIMIT_VIDEO) {
@@ -91,8 +94,8 @@ function addRef(type: RefItem['type'], name: string) {
     toast(t('generate.error.minimax_h3_refs_audios_too_many', { limit: LIMIT_AUDIO, current: cur }), 'warning')
     return
   }
-  if (refs.length >= LIMIT_TOTAL) {
-    toast(t('generate.error.minimax_h3_refs_total_too_many', { limit: LIMIT_TOTAL, current: refs.length }), 'warning')
+  if (refs.length >= LIMIT_TOTAL.value) {
+    toast(t('generate.error.minimax_h3_refs_total_too_many', { limit: LIMIT_TOTAL.value, current: refs.length }), 'warning')
     return
   }
   refs.push({ type, name })
@@ -178,6 +181,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         <em class="ref-media-panel__count">{{ refs.length }}/{{ LIMIT_TOTAL }}</em>
       </span>
       <button
+        v-if="h3Help"
         type="button"
         class="ref-help-btn"
         :title="t('generate.video.refs_help')"
@@ -194,7 +198,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         v-for="(r, i) in refs"
         :key="'ref-' + i"
         class="ref-tile"
-        :title="`${basename(r.name)} · <${TAG_NAME[r.type]} ${refIndex(r.type, i)}>`"
+        :title="h3Help ? `${basename(r.name)} · <${TAG_NAME[r.type]} ${refIndex(r.type, i)}>` : basename(r.name)"
       >
         <img
           v-if="r.type === 'image'"
@@ -226,6 +230,7 @@ function refIndex(type: RefItem['type'], i: number): number {
 
     <div class="ref-media-panel__adds">
       <button
+        v-if="types.includes('image')"
         type="button"
         class="ref-add-btn"
         :title="t('generate.video.refs_add_image')"
@@ -239,6 +244,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         type="button"
         class="ref-add-btn"
         :title="t('generate.video.refs_add_video')"
+        v-if="types.includes('video')"
         :aria-label="t('generate.video.refs_add_video')"
         :disabled="disabled || vidAddDisabled"
         @click="triggerUpload('video')"
@@ -249,6 +255,7 @@ function refIndex(type: RefItem['type'], i: number): number {
         type="button"
         class="ref-add-btn"
         :title="t('generate.video.refs_add_audio')"
+        v-if="types.includes('audio')"
         :aria-label="t('generate.video.refs_add_audio')"
         :disabled="disabled || audAddDisabled"
         @click="triggerUpload('audio')"

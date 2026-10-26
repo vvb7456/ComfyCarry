@@ -97,7 +97,7 @@ def _generate_info(row: dict | None) -> dict:
 
 def _classify_controlnet_models(names: list[str]) -> dict:
     import re
-    result = {"pose": [], "canny": [], "depth": [], "other": []}
+    result = {"pose": [], "canny": [], "depth": [], "lineart": [], "tile": [], "other": []}
     for name in names:
         lower = name.lower()
         # Union / ProMax 出现在所有类型
@@ -105,16 +105,25 @@ def _classify_controlnet_models(names: list[str]) -> dict:
             result["pose"].append(name)
             result["canny"].append(name)
             result["depth"].append(name)
+            result["lineart"].append(name)
+            if "sdxl" in lower or "promax" in lower:
+                result["tile"].append(name)
             continue
         matched = False
         if re.search(r"pose|openpose|dwpose", lower):
             result["pose"].append(name)
             matched = True
-        if re.search(r"canny|edge|lineart|line.?art", lower):
+        if re.search(r"canny|edge|any-test-like", lower):
             result["canny"].append(name)
             matched = True
         if re.search(r"depth", lower):
             result["depth"].append(name)
+            matched = True
+        if re.search(r"line.?art|mistoline|any-test-like", lower):
+            result["lineart"].append(name)
+            matched = True
+        if "tile" in lower or "jasper-flux-dev-upscaler" in lower:
+            result["tile"].append(name)
             matched = True
         if not matched:
             result["other"].append(name)
@@ -296,6 +305,8 @@ def _fetch_generate_options(*, force_refresh: bool = False) -> dict:
     }
 
     cn_list = _get_combo_list("ControlNetLoader", "control_net_name")
+    cn_list = cn_list + [name for name in _get_combo_list("ModelPatchLoader", "name")
+                         if "controlnet" in name.lower() or "lllite" in name.lower()]
     result["controlnet_models"] = _classify_controlnet_models(cn_list)
 
     # ComfyUI 的 combo 列表返回节点已知的全部变体（含未下载的 GGUF 等），
@@ -349,7 +360,7 @@ def api_generate_state_get():
     首次使用返回 state=null 而非 404 —— 前端据此区分「空」与「请求失败」,
     失败时不得开启自动保存 (否则会用默认值覆盖服务端)。
     """
-    return jsonify(generate_state_store.load_snapshot())
+    return jsonify({"state": generate_state_store.load_state()})
 
 
 @bp.route("/api/generate/model-hashes")
@@ -364,13 +375,12 @@ def api_generate_model_hashes():
 
 @bp.route("/api/generate/state", methods=["PUT"])
 def api_generate_state_put():
-    """按架构合并；导入前打开的页面须先重新读取配置。"""
+    """按架构合并保存生成设置。"""
     payload = request.get_json(silent=True)
-    stored, err = generate_state_store.save_state(payload, request.headers.get("X-Generate-Epoch", ""))
+    stored, err = generate_state_store.save_state(payload)
     if err:
         key, params = err
-        return _err(key, 409 if key == "state_reload_required" else 400,
-                    _extra={"state": None}, **params)
+        return _err(key, 400, _extra={"state": None}, **params)
     return jsonify({"ok": True, "updated_at": stored["updated_at"]})
 
 
@@ -515,7 +525,7 @@ def api_generate_copy_output_image():
 @bp.route("/api/generate/preprocess", methods=["POST"])
 def api_generate_preprocess():
     """
-    上传源图片（或指定 input/ 已有文件）并提交 ControlNet 预处理工作流。
+    上传源图片/视频（或指定 input/ 已有文件）并提交 ControlNet 预处理工作流。
 
     Form data:
         file       — 源图片文件 (png/jpeg/webp/bmp, 最大 20MB)。与 input_name 二选一
@@ -529,7 +539,7 @@ def api_generate_preprocess():
     import json as _json
 
     pp_type = request.form.get("type", "").strip()
-    if pp_type not in ("pose", "canny", "depth"):
+    if pp_type not in ("pose", "canny", "depth", "lineart"):
         return _err("unsupported_preprocess_type", pp_type=pp_type)
 
     input_dir = os.path.join(COMFYUI_DIR, "input")
@@ -538,28 +548,30 @@ def api_generate_preprocess():
 
     input_name = request.form.get("input_name", "").strip()
     if input_name:
-        safe_name = os.path.basename(input_name)
-        src_path = os.path.join(input_dir, safe_name)
+        src_path = os.path.realpath(os.path.join(input_dir, input_name))
+        if not src_path.startswith(os.path.realpath(input_dir) + os.sep):
+            return _err("invalid_file")
         if not os.path.isfile(src_path):
-            return _err("file_not_found", 404, name=safe_name)
-        src_name = safe_name
+            return _err("file_not_found", 404, name=input_name)
+        src_name = input_name
     elif "file" in request.files:
         file = request.files["file"]
         if not file or not file.filename:
             return _err("invalid_file")
 
         content_type = file.content_type or ""
-        if content_type not in ALLOWED_IMAGE_TYPES:
+        media = next((spec for kind, spec in _UPLOAD_MEDIA_TYPES.items()
+                      if kind in ("image", "video") and content_type in spec[0]), None)
+        if media is None:
             return _err("unsupported_image_format", content_type=content_type)
 
         file.seek(0, 2)
         size = file.tell()
         file.seek(0)
-        if size > MAX_IMAGE_SIZE:
-            return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=20)
+        if size > media[2]:
+            return _err("file_too_large", size_mb=size // 1024 // 1024, limit_mb=media[2] // 1024 // 1024)
 
-        ext_map = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/bmp": ".bmp"}
-        ext = ext_map.get(content_type, ".png")
+        ext = media[1][content_type]
         src_name = f"comfycarry_src_{pp_type}_{uid}{ext}"
         dest = os.path.join(input_dir, src_name)
         file.save(dest)
@@ -579,14 +591,16 @@ def api_generate_preprocess():
     output_dir = os.path.join(input_dir, subfolder)
     os.makedirs(output_dir, exist_ok=True)
     output_name = f"preprocess_{pp_type}_{uid}"
+    video = os.path.splitext(src_name)[1].lower() in VIDEO_EXTENSIONS
 
     try:
         prompt = build_preprocess_workflow({
+            **extra_params,
             "image": src_name,
             "type": pp_type,
+            "video": video,
             "save_prefix": output_name,
             "input_dir": output_dir,
-            **extra_params,
         })
     except Exception as e:
         logger.exception("[generate] 构建预处理工作流失败")
@@ -605,8 +619,10 @@ def api_generate_preprocess():
         return _err("submit_failed", 500, detail=str(e))
 
     prompt_id = result.get("prompt_id", "")
-    output_filename = f"{output_name}.png"
+    output_filename = f"{output_name}.mp4" if video else f"{output_name}.png"
     output_relpath = f"{subfolder}/{output_filename}"
+    if video:
+        bridge.register_preprocess_output(prompt_id, output_relpath)
     logger.info(f"[generate] 预处理提交 prompt_id={prompt_id} type={pp_type} output={output_relpath}")
 
     return jsonify({
@@ -616,6 +632,7 @@ def api_generate_preprocess():
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov"}
 
 @bp.route("/api/generate/input_images")
 def api_generate_input_images():
@@ -630,9 +647,10 @@ def api_generate_input_images():
     if not os.path.isdir(scan_dir):
         return jsonify({"images": []})
     images = []
+    extensions = VIDEO_EXTENSIONS if request.args.get("media_type") == "video" else IMAGE_EXTENSIONS
     for f in sorted(os.listdir(scan_dir)):
         ext = os.path.splitext(f)[1].lower()
-        if ext not in IMAGE_EXTENSIONS:
+        if ext not in extensions:
             continue
         fpath = os.path.join(scan_dir, f)
         if not os.path.isfile(fpath):

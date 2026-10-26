@@ -24,7 +24,6 @@
 import json
 import logging
 import time
-import uuid
 from typing import Any
 
 from ..db import db
@@ -34,9 +33,6 @@ log = logging.getLogger(__name__)
 
 KEY = "generate_state"
 TABLE = "app_meta"
-
-# 导入时更换批次；每个页面必须先读到当前批次才能保存，GET 不替其他页面解锁。
-EPOCH_KEY = "generate_state_epoch"
 
 # 工作区状态体积上限 (序列化后字节数)。参考图只存文件名, 提示词是主要变量;
 # 1 MiB 远高于真实用量, 同时挡住异常 payload 把 DB 写爆。
@@ -108,15 +104,7 @@ def _decode_state(raw: str) -> dict | None:
     return value if isinstance(value, dict) else None
 
 
-def load_snapshot() -> dict:
-    with db.transaction() as conn:
-        values = dict(conn.execute("SELECT key, value FROM app_meta WHERE key IN (?, ?)",
-                                   (KEY, EPOCH_KEY)))
-        return {"state": _decode_state(values[KEY]) if KEY in values else None,
-                "epoch": values.get(EPOCH_KEY, "")}
-
-
-def save_state(payload: Any, epoch: str = "") -> tuple[dict | None, tuple[str, dict] | None]:
+def save_state(payload: Any) -> tuple[dict | None, tuple[str, dict] | None]:
     """校验、合并、落库。updated_at 由服务端盖章。
 
     日常自动保存走这条路径 (按架构合并, 多设备分别编辑不同架构不互相覆盖)。
@@ -129,9 +117,6 @@ def save_state(payload: Any, epoch: str = "") -> tuple[dict | None, tuple[str, d
         return None, err
 
     with db.transaction() as conn:
-        row = conn.execute("SELECT value FROM app_meta WHERE key = ?", (EPOCH_KEY,)).fetchone()
-        if epoch != (row[0] if row else ""):
-            return None, ("state_reload_required", {})
         row = conn.execute("SELECT value FROM app_meta WHERE key = ?", (KEY,)).fetchone()
         stored = merge_state(_decode_state(row[0]) if row else None, valid)
         return _write(conn, stored)
@@ -148,11 +133,7 @@ def replace_state(payload: Any) -> tuple[dict | None, tuple[str, dict] | None]:
         return None, err
 
     with db.transaction() as conn:
-        stored, err = _write(conn, dict(valid))
-        if not err:
-            conn.execute("INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)",
-                         (EPOCH_KEY, uuid.uuid4().hex))
-        return stored, err
+        return _write(conn, dict(valid))
 
 
 def _write(conn, stored: dict) -> tuple[dict | None, tuple[str, dict] | None]:

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, inject, ref, toRef, watch } from 'vue'
+import { computed, inject, provide, ref, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
-import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import { packagingOf } from '@/composables/generate/useGenerateOptions'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
+import { CN_TYPES, PP_PARAMS_DEF } from '@/composables/generate/useControlNet'
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
 import { useDependencyStatus } from '@/composables/generate/useDependencyStatus'
 import { componentDepRows } from '@/composables/generate/depRows'
-import { MODEL_TYPES } from '@/config/model-types'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { PreviewImage } from '@/composables/generate/useGeneratePreview'
 import ModuleTabs from '@/components/generate/ModuleTabs.vue'
@@ -64,10 +64,11 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
 const store = useGenerateStore()
-const state = computed(() => store.currentState)
+const state = computed(() => store.stateFor(props.modelType))
 const options = inject(GenerateOptionsKey)!
 
-const config = computed(() => MODEL_TYPES[props.modelType]!)
+const config = computed(() => store.configFor(props.modelType))
+provide(GenerateModelKey, { modelType: props.modelType, state, config })
 const isSplit = computed(() => config.value.loader === 'split')
 const modelField = computed<'checkpoint' | 'unet'>(() => isSplit.value ? 'unet' : 'checkpoint')
 
@@ -82,25 +83,18 @@ const showNegative = computed(() =>
   config.value.hasNegativePrompt,
 )
 
-// 当前视频模式 (仅 5B 有意义; 14B 恒 i2v)。
-const videoMode = computed<'t2v' | 'i2v'>(() => {
-  if (config.value.videoModes?.length) {
-    return state.value.video?.mode ?? config.value.videoModes[0] ?? 'i2v'
-  }
-  return 'i2v'
-})
+const videoMode = computed(() => state.value.video?.mode ?? state.value.mode)
 
-// 5B 的文生/图生开关 — 挂在提示词区块标题行右端 (PromptEditor 的 #header-actions 槽)。
-// 选那个位置是因为切到文生时左侧媒体栏整块消失, 开关必须待在不随之移动的地方。
-const showModeSwitch = computed(() => isVideo.value && (config.value.videoModes?.length ?? 0) > 0)
+// 媒体栏随模式显示，开关放在不会随之消失的提示词标题行。
+const showModeSwitch = computed(() => (config.value.videoModes ?? config.value.modes ?? []).length > 0)
 const videoModeOptions = computed(() =>
-  (config.value.videoModes ?? []).map(m => ({
+  (config.value.videoModes ?? config.value.modes ?? []).map(m => ({
     value: m,
-    label: m === 't2v' ? t('generate.video.mode_t2v') : t('generate.video.mode_i2v'),
+    label: t(m === 'i2v' || m === 't2v' ? `generate.video.mode_${m}` : `generate.mode.${m}`),
   })),
 )
 function onVideoModeChange(v: string) {
-  if (state.value.video) state.value.video.mode = v as 't2v' | 'i2v'
+  store.setMode(v)
 }
 
 // 起始画面挂载判定 — 挂在提示词容器左栏 (PromptEditor 的 #media 槽):
@@ -110,25 +104,26 @@ function onVideoModeChange(v: string) {
 const showStartFrame = computed(() => {
   if (!isVideo.value) return false
   // Ref2VA 参考生成条目无起始画面 (左媒体栏让位给 RefMediaPanel)
-  if (props.modelType === 'minimax_h3_ref') return false
+  if (videoMode.value === 'ref') return false
   if (config.value.videoModes?.length) return videoMode.value === 'i2v'
   return !props.modelType.includes('t2v')
 })
 
 // 末帧挂载判定 (MiniMax H3 首尾帧): 仅 minimax_h3 且 i2v 模式时渲染。
 // 其余架构恒 false (不渲染), 末帧是可选项, 不阻断生成。
-const showLastFrame = computed(() => props.modelType === 'minimax_h3' && videoMode.value === 'i2v')
+const showLastFrame = computed(() => ['minimax_h3', 'wan22_i2v'].includes(props.modelType) && videoMode.value === 'i2v')
 
 // 参考素材面板挂载判定 (MiniMax H3 Ref2VA): 左媒体栏渲染 RefMediaPanel,
 // 与 showStartFrame 分支互斥 (两者不会同时渲染)。
-const showRefPanel = computed(() => props.modelType === 'minimax_h3_ref')
+const showRefPanel = computed(() => videoMode.value === 'ref')
 
 // state.video 可能为 undefined (图像架构); 参考素材面板仅视频架构渲染,
 // 这里用 computed getter/setter 包裹 v-model, 避免模板里直接解包 undefined。
 const videoRefs = computed<RefItem[]>({
-  get: () => state.value.video?.refs ?? [],
+  get: () => state.value.video?.refs ?? state.value.refs,
   set: (v) => {
     if (state.value.video) state.value.video.refs = v
+    else state.value.refs = v
   },
 })
 
@@ -153,29 +148,41 @@ function loadRefSize(name: string) {
     return
   }
   const img = new Image()
-  img.onload = () => { refSize.value = { width: img.naturalWidth || 0, height: img.naturalHeight || 0 } }
+  img.onload = () => {
+    refSize.value = { width: img.naturalWidth || 0, height: img.naturalHeight || 0 }
+  }
   img.onerror = () => { refSize.value = { width: 0, height: 0 } }
   img.src = `/api/generate/input_image_preview?name=${encodeURIComponent(name)}`
 }
 
 // refImage 任何来源的变化 (手动上传 / picker 选择 / 「生成视频」带入 / t2v 切回) 都要刷新尺寸
-watch(() => state.value.video?.refImage ?? '', (name) => loadRefSize(name), { immediate: true })
+watch(() => isVideo.value ? state.value.video?.refImage ?? '' : state.value.refs[0]?.name ?? '',
+  name => loadRefSize(name), { immediate: true })
 
 function onStartFramePick(name: string) {
-  if (state.value.video) state.value.video.refImage = name
+  if (state.value.video) {
+    state.value.video.refImage = name
+    state.value.video.resolution = 'ref'
+  }
   videoPicker.close()
 }
 async function onStartFrameUpload(file: File) {
   const result = await videoPicker.uploadFile(file)
   if (!result) return
-  if (state.value.video) state.value.video.refImage = result.filename
+  if (state.value.video) {
+    state.value.video.refImage = result.filename
+    state.value.video.resolution = 'ref'
+  }
   if (result.width && result.height) {
     refSize.value = { width: result.width, height: result.height }
   }
   toast(t('generate.i2i.uploaded'), 'success')
 }
 function onStartFrameClear() {
-  if (state.value.video) state.value.video.refImage = ''
+  if (state.value.video) {
+    state.value.video.refImage = ''
+    if (state.value.video.resolution === 'ref') state.value.video.resolution = 'custom'
+  }
 }
 
 const lastFramePicker = useRefImagePicker('video_last_frame')
@@ -230,12 +237,10 @@ const selectedPackaging = computed<'checkpoint' | 'split'>(() =>
 const {
   i2i,
   tagger,
-  cnPose,
-  cnCanny,
-  cnDepth,
-  depPose,
-  depCanny,
-  depDepth,
+  cnMap,
+  depMap,
+  preprocessDepMap,
+  cnModelsReady,
   depUpscale,
   depTagger,
   depFace,
@@ -289,6 +294,7 @@ const {
   previewImages: toRef(props, 'previewImages'),
   prepareTagger,
   modelField: modelField.value,
+  modelType: props.modelType,
 })
 
 // 双 UNet 架构的槽位路由。picker 是同一个 (普通单选), 由这个 ref 记住当前是给哪个槽选。
@@ -342,7 +348,7 @@ function onModelSelect(name: string) {
 // 清单随 fast 档位变化 (视频快速档要把 lightning 加速件计入必需集, 否则缺件会
 // 误判为就绪), 引擎 watch 清单变化自动重判, 无需手动调首次 refresh。
 const compStatus = useDependencyStatus(
-  () => componentDepRows(props.modelType, { fast: state.value.fast }, t),
+  () => componentDepRows(config.value.runtimeKey!, { fast: state.value.fast, mode: videoMode.value }, t, selectedPackaging.value),
   {
     source: 'runtime-component',
     metaOf: () => ({ arch: props.modelType }),
@@ -355,7 +361,6 @@ const componentPanelExpanded = ref(false)
 // 图像架构不过滤 (行为一字不变, 回归保护)。LoraPanel 内部卡片渲染已用同一集合过滤,
 // 这里只管 picker 的 items 绑定。
 const loraPickerItems = computed(() => {
-  if (!isVideo.value) return options.loras.value
   return options.loras.value.filter(l => {
     const bname = l.name.includes('/') ? l.name.slice(l.name.lastIndexOf('/') + 1) : l.name
     return !COMPONENT_FILENAMES.has(bname)
@@ -392,29 +397,20 @@ watch(() => [store.activeModelType, state.value.video] as const, () => {
   const modes = config.value.videoModes
   if (!modes?.length) return
   const v = state.value.video
-  if (v && v.mode !== 't2v' && v.mode !== 'i2v') {
+    if (v && !modes.includes(v.mode!)) {
     v.mode = modes[0]
   }
 }, { immediate: true })
 
-// 视频架构模块区仅 LoRA: 若 activeModule 残留图像架构旧值 (如 'i2i'/'upscale'),
-// 强制校正回 'lora', 保证视频任务模块区只渲染 LoRA 面板。仅当前激活 tab + 视频架构生效。
-watch(() => [store.activeModelType, isVideo.value] as const, () => {
+watch([() => store.activeModelType, moduleTabs], () => {
   if (store.activeModelType !== props.modelType) return
-  if (!isVideo.value) return
-  if (state.value.activeModule !== 'lora') {
+  if (!moduleTabs.value.some(tab => tab.key === state.value.activeModule && !tab.disabled)) {
     state.value.activeModule = 'lora'
   }
 }, { immediate: true })
 
-/** CN 三个模块的依赖句柄, 供生成前置校验按 key 取 */
-const cnDepMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
-
 /** 各依赖状态条的称呼 (进"XX 已就绪 / 缺少 N 项 XX"文案) */
 const depNouns = computed(() => ({
-  pose: t('generate.dep.noun_pose'),
-  canny: t('generate.dep.noun_canny'),
-  depth: t('generate.dep.noun_depth'),
   upscale: t('generate.dep.noun_upscale'),
   face: t('generate.dep.noun_face'),
   components: t('generate.components.title'),
@@ -422,7 +418,7 @@ const depNouns = computed(() => ({
 
 /** 模块面板顶部状态条的展开态 (每模块各自记) */
 const depExpanded = ref<Record<string, boolean>>({
-  pose: false, canny: false, depth: false, upscale: false, face: false,
+  ...Object.fromEntries(CN_TYPES.map(type => [type, false])), upscale: false, face: false,
 })
 
 /** 高级设置 CLIP / VAE 自动填充: 仅当前激活 tab + split 形态 (selectedPackaging) + 字段为空时填充 */
@@ -466,32 +462,32 @@ const runBlockedReason = computed<string>(() => {
     if (!modelPicked) return t('generate.error.no_checkpoint')
   }
 
-  if (showStartFrame.value && !st.video?.refImage) return t('generate.error.no_start_frame')
+  if (showStartFrame.value && !st.video?.refImage
+    && !(config.value.controlNetEnabled && Object.values(st.controlNets).some(cn => cn.enabled))) return t('generate.error.no_start_frame')
 
   // 1b'. Ref2VA 参考生成: 至少一个参考素材 (图/视频/音频均可) → 软禁用 + 点击 toast。
   //      音频不能作为唯一参考 (官方约束) → 同样软禁用。
   if (showRefPanel.value) {
-    const refs = st.video?.refs ?? []
+    const refs = videoRefs.value
     if (!refs.length) return t('generate.error.minimax_h3_refs_required')
-    if (refs.every(r => r.type === 'audio')) return t('generate.error.minimax_h3_refs_audio_requires_visual')
+    if (isVideo.value && refs.every(r => r.type === 'audio')) return t('generate.error.minimax_h3_refs_audio_requires_visual')
   }
 
   // 1c. 模块已启用但依赖缺件。开关本身会拦, 但 enabled 是持久化的 —— 上次开着、
   // 这次模型被删/换了架构 (专用 CN 模型按 branch 分家) 都会留下开着却跑不了的状态。
-  for (const cnKey of ['pose', 'canny', 'depth'] as const) {
-    if (st.controlNets[cnKey]?.enabled && !cnDepMap[cnKey].ready.value) {
+  for (const cnKey of CN_TYPES) {
+    if (config.value.controlNetEnabled && st.controlNets[cnKey]?.enabled && !cnModelsReady(cnKey)) {
       return t(`generate.controlnet.need_download_${cnKey}`)
     }
   }
   if (st.upscale.enabled && !depUpscale.ready.value) return t('generate.upscale.need_model')
   if (st.faceDetailer.enabled && !depFace.ready.value) return t('generate.face.need_model')
 
-  // 整合包自带全部组件, 到此即可
-  if (pkg !== 'split') return ''
-
   if (compStatus.has.value && !compStatus.ready.value) {
     return t('generate.error.components_not_ready')
   }
+
+  if (pkg !== 'split') return ''
 
   if (!st.clip || !st.vae || (config.value.dualClip && !st.clip2)) {
     return t('generate.error.no_split_models')
@@ -532,7 +528,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :negative="state.negative"
           :show-negative="showNegative"
           :prompt-style="config.promptStyle"
-          :model-type="modelType"
+          :model-type="config.runtimeKey ?? modelType"
           :tools="promptTools"
           @update:positive="state.positive = $event"
           @update:negative="state.negative = $event"
@@ -570,7 +566,13 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           <!-- 参考素材 (MiniMax H3 Ref2VA) — 左媒体栏 (既有「左侧媒体」形态;
                面板内部滚动, 不撑高容器), 与起始画面互斥 -->
           <template v-if="showRefPanel" #media>
-            <RefMediaPanel v-model:refs="videoRefs" :disabled="frozen" />
+            <RefMediaPanel
+              v-model:refs="videoRefs"
+              :types="isVideo ? ['image', 'video', 'audio'] : ['image']"
+              :limit="config.referenceLimit ?? 12"
+              :h3-help="isVideo"
+              :disabled="frozen"
+            />
           </template>
 
           <template v-if="showLastFrame" #media-right>
@@ -614,7 +616,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         />
 
         <DependencyBar
-          v-if="selectedPackaging === 'split' && compStatus.has.value"
+          v-if="compStatus.has.value"
           :status="compStatus"
           :noun="depNouns.components"
           v-model:expanded="componentPanelExpanded"
@@ -625,7 +627,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           :show-split-models="selectedPackaging === 'split'"
           :dual-clip="config.dualClip"
           :show-clip-skip-vae="!!config.clipSkipSupport"
-          :model-type="modelType"
           :media-type="config.mediaType"
         />
       </div>
@@ -647,7 +648,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         :tabs="moduleTabs"
         :active-tab="state.activeModule"
         :enabled-tabs="enabledModules"
-        @update:active-tab="state.activeModule = $event ?? 'lora'"
+        @update:active-tab="state.activeModule = $event"
         @toggle="onModuleToggle"
       />
 
@@ -662,52 +663,20 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @mask-edit="i2i.openMaskEditor"
         />
       </div>
-      <div v-show="state.activeModule === 'pose'" class="gen-module-panel">
+      <div v-for="type in config.controlNetEnabled ? CN_TYPES : []" :key="type" v-show="state.activeModule === type" class="gen-module-panel">
         <DependencyBar
-          v-if="depPose.has.value"
+          v-if="depMap[type].has.value"
           class="gen-module-dep"
-          :status="depPose"
-          :noun="depNouns.pose"
-          v-model:expanded="depExpanded.pose"
+          :status="depMap[type]"
+          :noun="t(`generate.dep.noun_${type}`)"
+          v-model:expanded="depExpanded[type]"
         />
         <ControlNetPanel
-          :cn="cnPose"
-          @pick="cnPose.picker.open()"
-          @file="cnPose.handleUpload"
-          @clear="cnPose.clearImage"
-          @open-preprocess="showPPModal.pose = true"
-        />
-      </div>
-      <div v-show="state.activeModule === 'canny'" class="gen-module-panel">
-        <DependencyBar
-          v-if="depCanny.has.value"
-          class="gen-module-dep"
-          :status="depCanny"
-          :noun="depNouns.canny"
-          v-model:expanded="depExpanded.canny"
-        />
-        <ControlNetPanel
-          :cn="cnCanny"
-          @pick="cnCanny.picker.open()"
-          @file="cnCanny.handleUpload"
-          @clear="cnCanny.clearImage"
-          @open-preprocess="showPPModal.canny = true"
-        />
-      </div>
-      <div v-show="state.activeModule === 'depth'" class="gen-module-panel">
-        <DependencyBar
-          v-if="depDepth.has.value"
-          class="gen-module-dep"
-          :status="depDepth"
-          :noun="depNouns.depth"
-          v-model:expanded="depExpanded.depth"
-        />
-        <ControlNetPanel
-          :cn="cnDepth"
-          @pick="cnDepth.picker.open()"
-          @file="cnDepth.handleUpload"
-          @clear="cnDepth.clearImage"
-          @open-preprocess="showPPModal.depth = true"
+          :cn="cnMap[type]"
+          @pick="cnMap[type].picker.open()"
+          @file="cnMap[type].handleUpload"
+          @clear="cnMap[type].clearImage"
+          @open-preprocess="showPPModal[type] = true"
         />
       </div>
       <div v-show="state.activeModule === 'upscale'" class="gen-module-panel">
@@ -817,61 +786,31 @@ defineExpose({ handlePreprocessDone, handleTagDone })
       :on-clear-mask="() => i2i.clearMask()"
     />
 
-    <RefImageModal
-      v-if="config.controlNetEnabled"
-      v-model="cnPose.picker.visible.value"
-      :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.bone_map') })"
-      icon="accessibility_new"
-      :images="cnPose.picker.images.value"
-      :loading="cnPose.picker.loading.value"
-      :uploading="cnPose.picker.uploading.value"
-      :preview-url-fn="cnPose.picker.previewUrl"
-      @select="cnPose.handleSelect"
-      @upload="cnPose.handleUpload"
-    />
-    <RefImageModal
-      v-if="config.controlNetEnabled"
-      v-model="cnCanny.picker.visible.value"
-      :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.edge_map') })"
-      icon="line_curve"
-      :images="cnCanny.picker.images.value"
-      :loading="cnCanny.picker.loading.value"
-      :uploading="cnCanny.picker.uploading.value"
-      :preview-url-fn="cnCanny.picker.previewUrl"
-      @select="cnCanny.handleSelect"
-      @upload="cnCanny.handleUpload"
-    />
-    <RefImageModal
-      v-if="config.controlNetEnabled"
-      v-model="cnDepth.picker.visible.value"
-      :title="t('generate.controlnet.select_title', { label: t('generate.controlnet.depth_map') })"
-      icon="terrain"
-      :images="cnDepth.picker.images.value"
-      :loading="cnDepth.picker.loading.value"
-      :uploading="cnDepth.picker.uploading.value"
-      :preview-url-fn="cnDepth.picker.previewUrl"
-      @select="cnDepth.handleSelect"
-      @upload="cnDepth.handleUpload"
-    />
-
-    <PreprocessModal
-      v-if="config.controlNetEnabled"
-      v-model="showPPModal.pose"
-      type="pose"
-      @submit="onPPSubmit('pose', $event)"
-    />
-    <PreprocessModal
-      v-if="config.controlNetEnabled"
-      v-model="showPPModal.canny"
-      type="canny"
-      @submit="onPPSubmit('canny', $event)"
-    />
-    <PreprocessModal
-      v-if="config.controlNetEnabled"
-      v-model="showPPModal.depth"
-      type="depth"
-      @submit="onPPSubmit('depth', $event)"
-    />
+    <template v-if="config.controlNetEnabled">
+      <template v-for="type in CN_TYPES" :key="type">
+        <RefImageModal
+          v-model="cnMap[type].picker.visible.value"
+          :title="t('generate.controlnet.select_title', { label: t(isVideo ? `generate.controlnet.video_${type}` : PP_PARAMS_DEF[type].titleKey) })"
+          :media-type="isVideo ? 'video' : 'image'"
+          :icon="PP_PARAMS_DEF[type].icon"
+          :images="cnMap[type].picker.images.value"
+          :loading="cnMap[type].picker.loading.value"
+          :uploading="cnMap[type].picker.uploading.value"
+          :preview-url-fn="cnMap[type].picker.previewUrl"
+          @select="cnMap[type].handleSelect"
+          @upload="cnMap[type].handleUpload"
+        />
+        <PreprocessModal
+          v-if="type !== 'tile'"
+          :model-value="!!showPPModal[type]"
+          @update:model-value="showPPModal[type] = $event"
+          :type="type"
+          :video="isVideo"
+          :dep="preprocessDepMap[type]"
+          @submit="onPPSubmit(type, $event)"
+        />
+      </template>
+    </template>
 
     <LlmModal
       v-model="showLlmModal"

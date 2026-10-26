@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, inject, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useGenerateStore } from '@/stores/generate'
+import { GenerateModelKey } from '@/composables/generate/keys'
 import type { ExecState } from '@/composables/useExecTracker'
 import SplitButton, { type SplitButtonOption } from '@/components/ui/SplitButton.vue'
 import ComfyProgressBar from '@/components/ui/ComfyProgressBar.vue'
@@ -26,8 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const store = useGenerateStore()
-const state = computed(() => store.currentState)
+const { state, config } = inject(GenerateModelKey)!
 
 interface RunModeConfig {
   key: string
@@ -40,7 +39,7 @@ const isRunning = computed(() => props.execState != null)
 
 // 视频架构隐藏「运行（实时）」— 仅保留「运行 / 运行（后台）」。
 // 后台运行照常可用 (worker 对时长无假设)。
-const isVideo = computed(() => store.currentConfig.mediaType === 'video')
+const isVideo = computed(() => config.value.mediaType === 'video')
 
 const runModes = computed<RunModeConfig[]>(() => {
   const modes: RunModeConfig[] = [

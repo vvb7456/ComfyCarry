@@ -18,7 +18,7 @@ import { MODEL_VARIANTS } from './model-types'
 
 export type ComponentTier = 'standard' | 'lite' | 'full'
 
-export type ComponentSlot = 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning'
+export type ComponentSlot = 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning' | 'reference'
 
 /**
  * 条件必需谓词。
@@ -27,10 +27,11 @@ export type ComponentSlot = 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning'
  *
  * 声明式而非函数式: 视频只有"快速/标准"两档, 枚举足够; 且可被序列化/快照。
  */
-export type RequiredWhen = 'fast'
+export type RequiredWhen = 'fast' | 'ref'
 
 export interface ComponentContext {
   fast?: boolean
+  mode?: string
 }
 
 export interface ComponentFile {
@@ -79,6 +80,7 @@ function hf(
 
 const QWEN_IMAGE_VAE = hf('qwen_image_vae', 'Qwen Image VAE', -10000301, 'standard')
 const QWEN_IMAGE21_COMPONENTS: ArchComponents['slots'] = {
+  lightning: [hf('qwen_image21_turbo', 'Qwen Image 2.1 Turbo', -10000393, 'standard', 'fast')],
   clip: [
     hf('qwen_image21_te', 'Qwen3-VL 8B INT8', -10000401, 'standard'),
     hf('qwen_image21_te_lite', 'Qwen3-VL 8B W4A8', -10000402, 'lite'),
@@ -120,10 +122,10 @@ const H3_AUDIO_VAE = hf('minimax_h3_audio_vae', 'H3 Audio VAE', -10000359, 'stan
 
 const COMPONENT_REGISTRY: ArchComponents[] = [
   { arch: 'qwen_image21', slots: QWEN_IMAGE21_COMPONENTS },
-  { arch: 'qwen_image21_turbo', slots: QWEN_IMAGE21_COMPONENTS },
   {
     arch: 'anima',
     slots: {
+      lightning: [hf('anima_turbo', 'Anima Turbo v0.2', -10000427, 'standard', 'fast')],
       clip: [hf('anima_te', 'Qwen3 0.6B', -10000335, 'standard')],
       vae: [QWEN_IMAGE_VAE],
     },
@@ -131,6 +133,7 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
   {
     arch: 'krea2',
     slots: {
+      reference: [hf('krea2_style_ref', 'Krea 2 Style Reference LoRA', -10000355, 'standard', 'ref')],
       clip: [
         hf('krea2_te', 'Qwen3-VL-4B FP8', -10000350, 'standard'),
         hf('krea2_te_full', 'Qwen3-VL-4B BF16', -10000351, 'full'),
@@ -183,6 +186,7 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
   {
     arch: 'flux2dev',
     slots: {
+      lightning: [hf('flux2dev_turbo', 'Flux 2 Dev Turbo v2', -10000107, 'standard', 'fast')],
       clip: [
         hf('flux2dev_te', 'Mistral-3-Small FP8', -10000326, 'standard'),
         hf('flux2dev_te_lite', 'Mistral-3-Small FP4', -10000360, 'lite'),
@@ -219,6 +223,7 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
   {
     arch: 'minimax_h3',
     slots: {
+      lightning: [hf('h3_fl2va_turbo', 'H3 FL2VA Turbo 8-step', -10000428, 'standard', 'fast')],
       clip: [H3_QWEN3VL_32B_NVFP4],
       vae: [H3_VIDEO_VAE],
       audio_vae: [H3_AUDIO_VAE],
@@ -229,6 +234,7 @@ const COMPONENT_REGISTRY: ArchComponents[] = [
   {
     arch: 'minimax_h3_ref',
     slots: {
+      lightning: [hf('h3_ref2va_turbo', 'H3 Ref2VA Turbo 4-step', -10000429, 'standard', 'fast')],
       clip: [H3_QWEN3VL_32B_NVFP4],
       vae: [H3_VIDEO_VAE],
       audio_vae: [H3_AUDIO_VAE],
@@ -241,18 +247,19 @@ const _ARCH_INDEX: Map<string, ArchComponents> = (() => {
   for (const entry of COMPONENT_REGISTRY) m.set(entry.arch, entry)
   for (const [arch, { base }] of Object.entries(MODEL_VARIANTS)) {
     const entry = m.get(base)
-    if (entry) m.set(arch, { ...entry, arch })
+    if (entry && !m.has(arch)) m.set(arch, { ...entry, arch })
   }
   return m
 })()
 
 const TIER_ORDER: Record<ComponentTier, number> = { standard: 0, lite: 1, full: 2 }
 
-const ALL_SLOTS: ComponentSlot[] = ['clip', 'clip2', 'vae', 'audio_vae', 'lightning']
+const ALL_SLOTS: ComponentSlot[] = ['clip', 'clip2', 'vae', 'audio_vae', 'lightning', 'reference']
 
 function isRequired(file: ComponentFile, ctx?: ComponentContext): boolean {
   if (!file.requiredWhen) return true
   if (file.requiredWhen === 'fast') return ctx?.fast === true
+  if (file.requiredWhen === 'ref') return ctx?.mode === 'ref'
   return true
 }
 
@@ -291,6 +298,11 @@ export function componentsForSlot(arch: string, slot: ComponentSlot): ComponentF
   const files = entry.slots[slot]
   if (!files || files.length === 0) return []
   return [...files].sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier])
+}
+
+export function requiredLoras(arch: string, ctx?: ComponentContext): ComponentFile[] {
+  return [...componentsForSlot(arch, 'lightning'), ...componentsForSlot(arch, 'reference')]
+    .filter(file => isRequired(file, ctx))
 }
 
 export function archsUsingFile(filename: string): string[] {

@@ -18,7 +18,7 @@ import { useGenerateSubmit } from '@/composables/generate/useGenerateSubmit'
 import { useGeneratePreview } from '@/composables/generate/useGeneratePreview'
 import { useMissingModels } from '@/composables/generate/useMissingModels'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
-import { MODEL_TYPES } from '@/config/model-types'
+import { MODEL_TYPES, MODEL_MENU } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import ProductTour, { type TourStep } from '@/components/ui/ProductTour.vue'
 import DropdownMenu, { type DropdownMenuItem } from '@/components/ui/DropdownMenu.vue'
@@ -55,7 +55,6 @@ const gate = useComfyGate()
 gate.checkNow()
 
 const gateIcon = computed(() => {
-  if (store.saveError === 'reload_required') return 'warning'
   if (stateFailed.value) return 'error_outline'
   if (gate.state.value === 'error') return 'error_outline'
   if (gate.state.value === 'offline') return 'cloud_off'
@@ -63,7 +62,6 @@ const gateIcon = computed(() => {
 })
 
 const gateTitle = computed(() => {
-  if (store.saveError === 'reload_required') return t('generate.gate.state_reload_title')
   if (stateFailed.value) return t('generate.gate.state_failed_title')
   const s = gate.state.value
   if (s === 'checking' || (s === 'ready' && !optionsReady.value)) return t('generate.gate.loading_state')
@@ -73,7 +71,6 @@ const gateTitle = computed(() => {
 })
 
 const gateMessage = computed(() => {
-  if (store.saveError === 'reload_required') return t('generate.gate.state_reload_desc')
   if (stateFailed.value) return t('generate.gate.state_failed_desc')
   const s = gate.state.value
   if (s === 'starting' || s === 'offline') return t('generate.preview.offline_desc')
@@ -82,7 +79,7 @@ const gateMessage = computed(() => {
 
 /** 配置尚未就绪或需要重新装载时阻止编辑。 */
 const overlayVisible = computed(() =>
-  gate.state.value !== 'ready' || !optionsReady.value || stateFailed.value || store.saveError === 'reload_required',
+  gate.state.value !== 'ready' || !optionsReady.value || stateFailed.value,
 )
 
 /**
@@ -91,7 +88,7 @@ const overlayVisible = computed(() =>
  * 按钮、配置需重新装载) 不显示, 避免与操作入口并列出现。
  */
 const loadingVisible = computed(() => {
-  if (stateFailed.value || store.saveError === 'reload_required') return false
+  if (stateFailed.value) return false
   const s = gate.state.value
   if (s === 'checking' || s === 'starting') return true
   return s === 'ready' && !optionsReady.value
@@ -209,16 +206,16 @@ const taskOptions = computed<SegmentOption[]>(() => [
 ])
 
 const selectedModelKey = computed<string>({
-  get: () => store.activeModelType,
+  get: () => store.currentConfig.menuKey ?? store.activeModelType,
   set: (v) => {
-    if (MODEL_TYPES[v] && store.activeModelType !== v) {
-      store.switchModelType(v)
+    if (MODEL_TYPES[v] && selectedModelKey.value !== v) {
+      store.selectModelGroup(v)
     }
   },
 })
 
 function leafHint(cfg: { key: string }): { hint?: string } {
-  if (store.componentsReady[cfg.key] === false) {
+  if (store.componentsReady[store.modelSelections[cfg.key] ?? cfg.key] === false) {
     return { hint: t('generate.header.not_ready') }
   }
   return {}
@@ -232,7 +229,7 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
   // activeTask 的 mediaType 由 store.activeModelType 派生 (image/video); 'edit' 占位时按 image。
   const taskMediaType = currentConfig.value.mediaType
 
-  for (const cfg of Object.values(MODEL_TYPES)) {
+  for (const cfg of MODEL_MENU) {
     if (cfg.mediaType !== taskMediaType) continue
     const { hint } = leafHint(cfg)
     const leaf: DropdownMenuItem = {
@@ -294,7 +291,7 @@ const menuItems = computed<DropdownMenuItem[]>(() => {
   return items
 })
 
-const currentConfig = computed(() => MODEL_TYPES[store.activeModelType] ?? MODEL_TYPES.sd15!)
+const currentConfig = computed(() => store.currentConfig)
 
 const drawerOpen = ref(false)
 const drawerEverOpened = ref(false)
@@ -656,7 +653,7 @@ sse.start()
         :title="gateTitle"
         :message="gateMessage"
       >
-        <BaseButton v-if="stateFailed || store.saveError === 'reload_required'" size="sm" @click="retryLoadState">
+        <BaseButton v-if="stateFailed" size="sm" @click="retryLoadState">
           {{ t('common.btn.retry') }}
         </BaseButton>
         <router-link v-else-if="gate.state.value === 'offline'" to="/comfyui" class="gen-gate-link">
@@ -729,7 +726,7 @@ sse.start()
                     <img v-if="currentConfig.logo" :src="currentConfig.logo" :alt="currentConfig.label" />
                     <span v-else class="gen-arch-logo__letter">{{ currentConfig.label.slice(0, 2) }}</span>
                   </span>
-                  <span class="gen-arch-trigger__label">{{ t(`generate.tabs.${currentConfig.key}`) }}</span>
+                  <span class="gen-arch-trigger__label">{{ t(`generate.tabs.${currentConfig.menuKey ?? currentConfig.key}`) }}</span>
                   <MsIcon name="expand_more" size="sm" color="var(--t3)" :class="{ 'gen-arch-trigger__icon--open': open }" />
                 </button>
               </template>
@@ -741,7 +738,7 @@ sse.start()
           <span
             v-if="store.saveError"
             class="gen-save-warn"
-            :title="t(store.saveError === 'reload_required' ? 'generate.gate.state_reload_desc' : 'generate.gate.save_state_failed')"
+            :title="t('generate.gate.save_state_failed')"
           >
             <MsIcon name="cloud_off" size="xs" />
           </span>

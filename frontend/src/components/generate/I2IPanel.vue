@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, inject, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useGenerateStore } from '@/stores/generate'
+import { GenerateModelKey } from '@/composables/generate/keys'
 import RangeField from '@/components/form/RangeField.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
@@ -21,8 +21,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const { toast } = useToast()
-const store = useGenerateStore()
-const state = computed(() => store.currentState)
+const { state } = inject(GenerateModelKey)!
 
 const isInpaint = computed(() => state.value.i2i.mode === 'inpaint')
 const hasImage = computed(() => !!state.value.i2i.image)

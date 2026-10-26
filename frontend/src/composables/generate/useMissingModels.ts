@@ -185,7 +185,7 @@ export function useMissingModels() {
       role: ROLE_OF_FIELD[field] ?? (field.startsWith('upscale.') ? 'upscale_model'
         : field.startsWith('controlNets.') ? 'controlnet'
         : field.startsWith('faceDetailer.') ? 'face_model'
-        : field.startsWith('fast.') ? 'lora' : ''), baseModel: '',
+        : (field.startsWith('fast.') || field.startsWith('reference.')) ? 'lora' : ''), baseModel: '',
       imageUrl: '',
       category, source: 'unknown', modelId: '', versionId: '',
     }

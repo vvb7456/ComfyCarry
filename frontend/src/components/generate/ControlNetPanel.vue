@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UseControlNetReturn } from '@/composables/generate/useControlNet'
 import { CN_LABEL_KEYS } from '@/composables/generate/useControlNet'
-import { IMAGE_ACCEPT } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, VIDEO_ACCEPT } from '@/composables/generate/useRefImagePicker'
 import { useToast } from '@/composables/useToast'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
@@ -58,6 +58,7 @@ const modelSelectOptions = computed(() => {
 })
 
 const pickLabel = computed(() => {
+  if (props.cn.video) return t('generate.controlnet.pick_ref', { label: t(`generate.controlnet.video_${props.cn.type}`) })
   const labelKey = CN_LABEL_KEYS[props.cn.type] || 'generate.controlnet.ref_image'
   return t('generate.controlnet.pick_ref', { label: t(labelKey) })
 })
@@ -69,7 +70,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
   <div class="cn-split-container">
     <div class="cn-split">
       <div class="cn-split__media">
-        <label class="field-lbl">{{ t(cn.refLabelKey) }}</label>
+        <label class="field-lbl">{{ t(cn.video ? `generate.controlnet.video_${cn.type}` : cn.refLabelKey) }}</label>
 
         <div class="cn-media-wrap">
           <div v-if="isProcessing" class="cn-ref-processing">
@@ -81,11 +82,12 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
           <FileUploadZone
             v-else
             mode="pick"
-            :accept="IMAGE_ACCEPT"
+            :accept="cn.video ? VIDEO_ACCEPT : IMAGE_ACCEPT"
+            :media-type="cn.video ? 'video' : 'image'"
             :preview="previewUrl"
             :file-name="displayName"
             :pick-label="pickLabel"
-            :action-label="t('generate.image_source.generate_new')"
+            :action-label="cn.type === 'tile' ? undefined : t(cn.video ? 'generate.controlnet.generate_video' : 'generate.image_source.generate_new')"
             action-icon="auto_fix_high"
             class="cn-ref-zone"
             @pick="emit('pick')"

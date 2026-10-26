@@ -1,5 +1,9 @@
 {
   "title": "内容生成",
+  "mode": {
+    "t2i": "文生图",
+    "ref": "参考生成"
+  },
   "gate": {
     "checking": "正在检查 ComfyUI 状态…",
     "starting": "ComfyUI 正在启动，请稍候…",
@@ -8,8 +12,6 @@
     "loading_state": "正在载入工作区配置…",
     "state_failed_title": "工作区配置载入失败",
     "state_failed_desc": "配置仍保存在服务端，未做任何改动。可重试载入。",
-    "state_reload_title": "工作区配置已重新导入",
-    "state_reload_desc": "请重新载入配置后继续编辑，以免覆盖刚导入的设置。",
     "save_state_failed": "工作区配置尚未保存，请检查服务连接"
   },
   "header": {
@@ -36,16 +38,16 @@
     "anima": "Anima",
     "anima_turbo": "Anima Turbo",
     "flux": "Flux",
-    "krea2": "Krea 2 Turbo",
+    "krea2": "Krea 2",
     "qwen_image21": "Qwen Image 2.1",
     "qwen_image21_turbo": "Qwen Image 2.1 Turbo",
     "zimage": "Z-Image",
     "zimage_turbo": "Z-Image Turbo",
-    "flux1": "Flux 1.D",
+    "flux1": "Flux 1",
     "flux1_schnell": "Flux 1 Schnell",
     "chroma": "Chroma",
-    "flux2klein4b": "Flux 2 Klein 4B 蒸馏版",
-    "flux2klein9b": "Flux 2 Klein 9B 蒸馏版",
+    "flux2klein4b": "Flux 2 Klein 4B",
+    "flux2klein9b": "Flux 2 Klein 9B",
     "flux2klein4b_base": "Flux 2 Klein 4B",
     "flux2klein9b_base": "Flux 2 Klein 9B",
     "flux2dev": "Flux 2 Dev",
@@ -53,7 +55,7 @@
     "illustrious": "Illustrious",
     "noobai": "NoobAI",
     "noobai_vpred": "NoobAI V-Pred",
-    "wan22_i2v": "Wan 2.2 图生视频",
+    "wan22_i2v": "Wan 2.2 14B",
     "wan22_t2v": "Wan 2.2 文生视频",
     "wan22_5b": "Wan 2.2 5B 轻量",
     "minimax_h3": "MiniMax H3 音视频",
@@ -394,6 +396,8 @@
     "refs_help_formats_b": "音频：WAV / MP3，单文件 ≤ 15 MB；图片：JPG / PNG / WEBP 等，单文件 ≤ 20 MB"
   },
   "modules": {
+    "lineart": "线稿控制",
+    "tile": "细节控制",
     "lora": "LoRA",
     "i2i": "图生图",
     "pose": "姿势控制",
@@ -441,6 +445,26 @@
     "scroll_zoom": "滚轮=缩放"
   },
   "controlnet": {
+    "ref_lineart": "参考图（线稿图）",
+    "ref_tile": "参考图（原图）",
+    "ref_video": "参考视频",
+    "lineart_map": "线稿图",
+    "tile_map": "参考图",
+    "strength_help_lineart": "控制线稿约束的影响程度。值越高越严格遵循线稿图",
+    "strength_help_tile": "控制细节约束的影响程度。值越高越保留参考图的构图和细节",
+    "need_download_lineart": "该功能需下载线稿控制模型",
+    "need_download_tile": "该功能需下载细节控制模型",
+    "video_pose": "骨骼视频",
+    "video_canny": "边缘视频",
+    "video_depth": "深度视频",
+    "video_lineart": "线稿视频",
+    "generate_video": "生成参考视频",
+    "upload_video": "上传本地视频",
+    "select_video": "选择视频",
+    "video_uploaded": "参考视频已上传",
+    "need_video": "请先选择参考视频",
+    "preprocess_models": "预处理模型",
+    "need_preprocess_models": "请先下载预处理模型",
     "model": "模型",
     "strength": "强度",
     "strength_help_pose": "控制姿势约束的影响程度。值越高越严格遵循骨骼图",
@@ -669,7 +693,8 @@
     "role_text_encoder_2": "文本编码器 2",
     "role_vae": "VAE",
     "role_audio_vae": "音频 VAE",
-    "fast_files_hint": "仅快速模式需要"
+    "fast_files_hint": "仅快速模式需要",
+    "ref_files_hint": "仅参考生成需要"
   },
   "confirm": {
     "modules_not_enabled": {
@@ -756,6 +781,8 @@
     "state_lost": "目标条目状态不可用，请重试"
   },
   "dep": {
+    "noun_lineart": "线稿控制模型",
+    "noun_tile": "细节控制模型",
     "ready": "{noun}已就绪 · {n} 项",
     "missing": "缺少 {n} 项{noun}",
     "downloading_one": "正在获取 · {name}",

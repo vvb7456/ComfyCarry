@@ -21,15 +21,15 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:activeTab': [key: string | null]
+  'update:activeTab': [key: string]
   'toggle': [key: string, enabled: boolean]
 }>()
 
 const activeKey = computed(() => props.activeTab)
 
 function onTabClick(tab: SwitchTabItem) {
-  if (tab.disabled) return
-  emit('update:activeTab', activeKey.value === tab.key ? null : tab.key)
+  if (tab.disabled || activeKey.value === tab.key) return
+  emit('update:activeTab', tab.key)
 }
 
 function onSwitchClick(e: Event, tab: SwitchTabItem) {

@@ -1,6 +1,6 @@
-import { ref, unref, watch, type Ref, type ComputedRef } from 'vue'
+import { inject, ref, unref, watch, type Ref, type ComputedRef } from 'vue'
 import { useApiFetch } from '@/composables/useApiFetch'
-import { useGenerateStore } from '@/stores/generate'
+import { GenerateModelKey } from './keys'
 import type { AutocompleteItem, PromptLibraryDataResponse } from '@/types/prompt-library'
 
 export interface AutocompleteDisplayItem extends AutocompleteItem {
@@ -53,7 +53,7 @@ export function useAutoComplete(
   limitRef: Ref<number> | ComputedRef<number> | number = 20,
 ): UseAutoCompleteReturn {
   const { get } = useApiFetch()
-  const store = useGenerateStore()
+  const { modelType, config } = inject(GenerateModelKey)!
 
   const query = ref('')
   const results = ref<AutocompleteDisplayItem[]>([])
@@ -77,7 +77,7 @@ export function useAutoComplete(
     // 提示词收敛: natural 模式 (视频 / krea2 / zimage 等) 不触发 tag 补全弹层。
     // 判据基于 promptStyle (非 mediaType): 任何 natural 架构都不需要 Danbooru tag 补全。
     // 早早返回, 不发后端请求, 不弹层 (回归保护: tags 模式行为一字不变)。
-    if (store.currentConfig.promptStyle === 'natural') {
+    if (config.value.promptStyle === 'natural') {
       _fetchGen++
       results.value = []
       visible.value = false
@@ -97,7 +97,7 @@ export function useAutoComplete(
       if (gen !== _fetchGen) return
       let items = resp?.data ?? []
 
-      if (store.activeModelType === 'pony') {
+      if (modelType === 'pony') {
         const qLower = q.toLowerCase()
         const ponyMatches = PONY_SPECIAL_TAGS
           .filter(tag => tag.toLowerCase().includes(qLower))

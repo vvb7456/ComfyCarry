@@ -333,7 +333,7 @@ DEFAULT_PLUGINS = [
     {"url": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts", "name": "Custom Scripts"},
     {"url": "https://github.com/city96/ComfyUI-GGUF", "name": "GGUF"},
     {"url": "https://github.com/cubiq/ComfyUI_IPAdapter_plus", "name": "IPAdapter Plus"},
-    {"url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite", "name": "Video Helper Suite"},
+    {"url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite", "name": "Video Helper Suite", "required": True},
     {"url": "https://github.com/cubiq/ComfyUI_essentials", "name": "Essentials"},
     {"url": "https://github.com/1038lab/ComfyUI-RMBG", "name": "RMBG"},
     {"url": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler", "name": "SeedVR2 Video Upscaler", "required": True},

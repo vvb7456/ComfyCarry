@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useGenerateStore, type UpscaleState } from '@/stores/generate'
-import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import RangeField from '@/components/form/RangeField.vue'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -13,7 +12,7 @@ import MsIcon from '@/components/ui/MsIcon.vue'
 defineOptions({ name: 'UpscalePanel' })
 
 const { t } = useI18n({ useScope: 'global' })
-const store = useGenerateStore()
+const { state } = inject(GenerateModelKey)!
 const options = inject(GenerateOptionsKey)!
 
 const props = withDefaults(defineProps<{
@@ -23,7 +22,7 @@ const props = withDefaults(defineProps<{
   seedvr2VaeReady: false,
 })
 
-const config = computed<UpscaleState>(() => store.currentState.upscale)
+const config = computed(() => state.value.upscale)
 
 const isSeedVR2 = computed(() => config.value.engine === 'seedvr2')
 
@@ -88,7 +87,7 @@ const svrColorOptions = computed(() => [
 const is4x = computed(() => config.value.factor >= 4)
 
 const sizeHint = computed(() => {
-  const s = store.currentState
+  const s = state.value
   // 二次采样开启且带倍率时, 放大模块的输入已放大过 -> 目标尺寸按叠乘
   const hiresMul = s.hires.enabled ? s.hires.scale : 1
   const w = Math.round(s.width * hiresMul * config.value.factor)

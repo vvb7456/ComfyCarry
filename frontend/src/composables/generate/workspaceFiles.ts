@@ -1,7 +1,7 @@
 import { MODEL_TYPE_DIRS, HF_VERSION_INDEX, fileDirectory } from '@/config/huggingface-models'
-import { componentsForSlot } from '@/config/component-registry'
+import { requiredLoras } from '@/config/component-registry'
 import { getCnDepGroup, type CnBranch } from './modelDepConfigs'
-import { MODEL_TYPES } from '@/config/model-types'
+import { modelConfig } from '@/config/model-types'
 import type { ModelState } from '@/stores/generate'
 import { joinFilePath } from '@/utils/filePath'
 
@@ -12,6 +12,7 @@ export interface WorkspaceFile {
 }
 
 export function workspaceFiles(arch: string, state: ModelState, previous?: ModelState): WorkspaceFile[] {
+  const config = modelConfig(arch, state.fast, state.video?.mode ?? state.mode)
   const files: WorkspaceFile[] = []
   function selected(field: string, name: string, category: keyof typeof MODEL_TYPE_DIRS) {
     if (!name) return
@@ -40,9 +41,10 @@ export function workspaceFiles(arch: string, state: ModelState, previous?: Model
   for (const lora of state.loras) if (lora.enabled) selected('loras', lora.name, 'loras')
 
   for (const [type, cn] of Object.entries(state.controlNets)) {
-    if (!cn.enabled) continue
-    selected(`controlNets.${type}.model`, cn.model, 'controlnet')
-    const group = getCnDepGroup(type, MODEL_TYPES[arch]?.cnBranch as CnBranch | undefined)
+    if (!config.controlNetEnabled || !cn.enabled) continue
+    const patch = ['zimage', 'zimage_turbo', 'qwen_image21', 'anima', 'minimax_h3'].includes(config.cnBranch ?? '')
+    selected(`controlNets.${type}.model`, cn.model, patch ? 'model_patches' : 'controlnet')
+    const group = getCnDepGroup(type, config.cnBranch as CnBranch | undefined, cn.model)
     for (const row of group.rows) {
       for (const file of row.files) {
         if (file.hf?.version.file.isModel === false) {
@@ -64,9 +66,9 @@ export function workspaceFiles(arch: string, state: ModelState, previous?: Model
     selected('faceDetailer.detectionModel', state.faceDetailer.detectionModel, 'ultralytics_bbox')
     if (state.faceDetailer.useSam) dependency('faceDetailer.sam', -10000385)
   }
-  if (state.fast && (state.unetHigh || state.unetLow)) {
-    for (const file of componentsForSlot(arch, 'lightning')) {
-      dependency(`fast.${file.id}`, file.hfVersionId)
+  if (state.checkpoint || state.unet || state.unetHigh || state.unetLow) {
+    for (const file of requiredLoras(config.runtimeKey!, { fast: state.fast, mode: state.video?.mode ?? state.mode })) {
+      dependency(`${file.requiredWhen === 'ref' ? 'reference' : 'fast'}.${file.id}`, file.hfVersionId)
     }
   }
   return files

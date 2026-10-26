@@ -19,11 +19,13 @@ import base64
 import threading
 import time
 import uuid
+import shutil
+from pathlib import Path
 
 import requests
 import websocket  # websocket-client
 
-from ..config import COMFYUI_URL
+from ..config import COMFYUI_URL, COMFYUI_DIR, get_comfyui_output_dir
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class ComfyWSBridge:
         self._last_status = None
         self._last_progress = None
         self._exec_info = None
+        self._preprocess_outputs = {}
 
     @property
     def client_id(self):
@@ -56,6 +59,29 @@ class ComfyWSBridge:
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
+
+    def register_preprocess_output(self, prompt_id, filename):
+        self._preprocess_outputs[prompt_id] = Path(COMFYUI_DIR) / "input" / filename
+
+    def _archive_preprocess_output(self, data):
+        prompt_id = data.get("prompt_id")
+        target = self._preprocess_outputs.get(prompt_id)
+        images = data.get("output", {}).get("images", [])
+        if target is None or not images:
+            return
+        output = images[0]
+        source = get_comfyui_output_dir() / output.get("subfolder", "") / output["filename"]
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(target))
+        except OSError as exc:
+            logger.exception("[bridge] 预处理视频归档失败")
+            self._broadcast({"type": "execution_error", "data": {
+                "prompt_id": prompt_id, "exception_message": str(exc),
+            }})
+            self._exec_info = None
+        finally:
+            self._preprocess_outputs.pop(prompt_id, None)
 
     def _run_loop(self):
         while self._running:
@@ -230,6 +256,7 @@ class ComfyWSBridge:
                     self._broadcast({"type": "executing", "data": enriched})
 
             elif msg_type == "executed":
+                self._archive_preprocess_output(msg_data)
                 node_id = msg_data.get("node")
                 if self._exec_info and node_id:
                     self._exec_info["nodes"][node_id] = "done"
@@ -277,6 +304,7 @@ class ComfyWSBridge:
                     self._last_progress = None
 
             elif msg_type == "execution_error":
+                self._preprocess_outputs.pop(msg_data.get("prompt_id"), None)
                 self._broadcast({"type": "execution_error", "data": {
                     "prompt_id": msg_data.get("prompt_id"),
                     "node_id": msg_data.get("node_id"),
@@ -287,6 +315,7 @@ class ComfyWSBridge:
                 self._last_progress = None
 
             elif msg_type == "execution_interrupted":
+                self._preprocess_outputs.pop(msg_data.get("prompt_id"), None)
                 self._broadcast({"type": "execution_interrupted", "data": msg_data})
                 self._exec_info = None
                 self._last_progress = None

@@ -162,16 +162,125 @@ class WorkflowBuilder:
         return nid
 
     def add_qwen_image21_conditioning(self, clip_ref, prompt: str,
-                                      negative_prompt: str) -> str:
+                                      negative_prompt: str, vae_ref=None, images=(), resolution=1024) -> str:
         nid = self._next_id()
         self._nodes[nid] = {
             "class_type": "TextEncodeQwenImage21",
             "inputs": {
                 "clip": self._ref(clip_ref, default_idx=1), "prompt": prompt,
-                "negative_prompt": negative_prompt, "resolution": 1024,
+                "negative_prompt": negative_prompt, "resolution": resolution,
             },
         }
+        if images:
+            self._nodes[nid]["inputs"]["vae"] = self._ref(vae_ref, 2)
+            for index, image in enumerate(images, 1):
+                self._nodes[nid]["inputs"][f"images.image_{index}"] = self._ref(image)
         return nid
+
+    def add_reference_latent(self, conditioning_ref, latent_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "ReferenceLatent", "inputs": {
+            "conditioning": self._ref(conditioning_ref), "latent": self._ref(latent_ref),
+        }}
+        return nid
+
+    def add_reference_image_scale(self, image_ref, resolution_steps=16) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "ImageScaleToTotalPixels", "inputs": {
+            "image": self._ref(image_ref), "upscale_method": "lanczos", "megapixels": 1.0, "resolution_steps": resolution_steps,
+        }}
+        return nid
+
+    def add_kontext_image_scale(self, image_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "FluxKontextImageScale", "inputs": {"image": self._ref(image_ref)}}
+        return nid
+
+    def add_image_invert(self, image_ref) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "ImageInvert", "inputs": {"image": self._ref(image_ref)}}
+        return nid
+
+    def add_repeat_latent(self, latent_ref, amount) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "RepeatLatentBatch", "inputs": {
+            "samples": self._ref(latent_ref), "amount": amount,
+        }}
+        return nid
+
+    def add_latent_resize(self, latent_ref, width, height, method, stride=8) -> str:
+        nid = self._next_id()
+        # LatentUpscale 的宽高固定按 /8 换算，Qwen 2.1 的潜空间步幅为 16。
+        self._nodes[nid] = {"class_type": "LatentUpscale", "inputs": {
+            "samples": self._ref(latent_ref), "upscale_method": method,
+            "width": width * 8 // stride, "height": height * 8 // stride, "crop": "disabled",
+        }}
+        return nid
+
+    def add_model_sampling_flux(self, model_ref, width, height) -> str:
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "ModelSamplingFlux", "inputs": {
+            "model": self._ref(model_ref), "max_shift": 1.15, "base_shift": 0.5,
+            "width": width, "height": height,
+        }}
+        return nid
+
+    def add_krea_reference_conditioning(self, clip_ref, vae_ref, prompt, images) -> str:
+        encode = self._next_id()
+        self._nodes[encode] = {"class_type": "TextEncodeQwenImageEditPlus", "inputs": {
+            "clip": self._ref(clip_ref, 1), "vae": self._ref(vae_ref, 2), "prompt": prompt,
+            **{f"image{i}": self._ref(image) for i, image in enumerate(images, 1)},
+        }}
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "FluxKontextMultiReferenceLatentMethod", "inputs": {
+            "conditioning": [encode, 0], "reference_latents_method": "index_timestep_zero",
+        }}
+        return nid
+
+    def add_model_patch(self, model_ref, vae_ref, image_ref, cn, arch) -> str:
+        loader = self._next_id()
+        self._nodes[loader] = {"class_type": "ModelPatchLoader", "inputs": {"name": cn["model"]}}
+        nid = self._next_id()
+        inputs = {
+            "model": self._ref(model_ref), "model_patch": [loader, 0],
+            "strength": float(cn.get("strength", 1)),
+            "start_percent": float(cn.get("start_percent", 0)),
+            "end_percent": float(cn.get("end_percent", 1)),
+        }
+        if arch == "anima":
+            class_type = "AnimaLLLiteApply"
+            inputs["image"] = self._ref(image_ref)
+        else:
+            class_type = "MiniMaxH3FunControlNetApply" if arch == "minimax_h3" else "ZImageFunControlnet"
+            inputs["vae"] = self._ref(vae_ref, 2)
+            inputs["control_video" if arch == "minimax_h3" else "image"] = self._ref(image_ref)
+        self._nodes[nid] = {"class_type": class_type, "inputs": inputs}
+        return nid
+
+    def add_union_control_type(self, control_ref, control_type) -> str:
+        types = {"pose": "openpose", "canny": "canny/lineart/anime_lineart/mlsd",
+                 "lineart": "canny/lineart/anime_lineart/mlsd", "depth": "depth", "tile": "tile"}
+        nid = self._next_id()
+        self._nodes[nid] = {"class_type": "SetUnionControlNetType", "inputs": {
+            "control_net": self._ref(control_ref), "type": types[control_type],
+        }}
+        return nid
+
+    def add_lineart_preprocessor(self, image_ref, resolution=1024, anime=False) -> str:
+        nid = self._next_id()
+        inputs = {"image": self._ref(image_ref), "resolution": resolution}
+        if not anime:
+            inputs["coarse"] = "disable"
+        self._nodes[nid] = {"class_type": "AnimeLineArtPreprocessor" if anime else "LineArtPreprocessor", "inputs": inputs}
+        return nid
+
+    def add_control_video(self, cn, length, fps) -> str:
+        frames = self._next_id()
+        self._nodes[frames] = {"class_type": "VHS_LoadVideo", "inputs": {
+            "video": cn["image"], "force_rate": fps, "custom_width": 0, "custom_height": 0,
+            "frame_load_cap": length, "skip_first_frames": 0, "select_every_nth": 1, "format": "None",
+        }}
+        return frames
 
     def add_qwen_image21_cache(self, model_ref) -> str:
         nid = self._next_id()
@@ -633,6 +742,7 @@ class WorkflowBuilder:
         length: int,
         batch_size: int = 1,
         clip_vision_ref=None,
+        end_image_ref=None,
     ) -> str:
         """
         WanImageToVideo — Wan 2.2 14B i2v 起始节点。
@@ -656,8 +766,10 @@ class WorkflowBuilder:
         }
         if clip_vision_ref is not None:
             inputs["clip_vision_output"] = self._ref(clip_vision_ref, default_idx=0)
+        if end_image_ref is not None:
+            inputs["end_image"] = self._ref(end_image_ref)
         self._nodes[nid] = {
-            "class_type": "WanImageToVideo",
+            "class_type": "WanFirstLastFrameToVideo" if end_image_ref is not None else "WanImageToVideo",
             "inputs": inputs,
         }
         return nid
@@ -828,7 +940,7 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_create_video(self, images_ref, fps: int = 16, audio_ref=None) -> str:
+    def add_create_video(self, images_ref, fps: int | float | tuple | list = 16, audio_ref=None) -> str:
         """
         CreateVideo — 将 IMAGE 序列封装为 VIDEO (帧率绑定), 可附音轨。
         Wan 14B fps=16, 5B fps=24; MiniMax H3 fps=24 (帧率随条目锁定, 不进 UI)。
@@ -837,7 +949,7 @@ class WorkflowBuilder:
         """
         nid = self._next_id()
         inputs = {
-            "fps": float(fps),
+            "fps": self._ref(fps) if isinstance(fps, (tuple, list)) else float(fps),
             "images": self._ref(images_ref, default_idx=0),
         }
         if audio_ref is not None:
@@ -1194,14 +1306,13 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_depth_preprocessor(self, image_node_id: str, resolution: int = 1024) -> str:
-        """DepthAnythingV2Preprocessor — 深度图估计。输出: IMAGE"""
+    def add_depth_preprocessor(self, image_node_id: str, resolution: int = 1024, midas=False) -> str:
         nid = self._next_id()
         self._nodes[nid] = {
-            "class_type": "DepthAnythingV2Preprocessor",
+            "class_type": "MiDaS-DepthMapPreprocessor" if midas else "DepthAnythingV2Preprocessor",
             "inputs": {
                 "image": [image_node_id, 0],
-                "ckpt_name": "depth_anything_v2_vitl.pth",
+                **({"a": 6.283185307179586, "bg_threshold": 0.1} if midas else {"ckpt_name": "depth_anything_v2_vitl.pth"}),
                 "resolution": resolution,
             },
         }
@@ -1362,6 +1473,7 @@ def _add_face_detailer_chain(
     positive,
     negative,
     params: dict,
+    face_positive=None,
 ) -> str:
     """
     面部重绘链路 (SDXL / split 共用):
@@ -1379,9 +1491,8 @@ def _add_face_detailer_chain(
         sam = b.add_sam_loader("sam_vit_b_01ec64.pth", device_mode="AUTO")
 
     face_prompt = str(params.get("face_detailer_prompt", "")).strip()
-    face_positive = (
-        b.add_clip_text_encode(face_prompt, clip_ref) if face_prompt else positive
-    )
+    if face_positive is None:
+        face_positive = b.add_clip_text_encode(face_prompt, clip_ref) if face_prompt else positive
 
     denoise = float(params["face_detailer_denoise"])
     steps = int(params["face_detailer_steps"])
@@ -1487,6 +1598,64 @@ def _add_upscale_chain(
     return aurasr
 
 
+def _add_controlnet_chain(b, model_ref, pos_ref, neg_ref, vae_ref, params, arch):
+    for cn in params.get("controlnets") or []:
+        if not cn.get("model") or not cn.get("image"):
+            continue
+        image = b.add_load_image(cn["image"])
+        if arch == "anima" and cn["type"] == "canny":
+            image = b.add_image_invert(image)
+        if arch in ("anima", "zimage", "qwen_image21", "qwen_image21_turbo"):
+            model_ref = (b.add_model_patch(model_ref, vae_ref, image, cn, arch), 0)
+        else:
+            control = b.add_controlnet_loader(cn["model"])
+            if arch == "sdxl" and any(word in cn["model"].lower() for word in ("union", "promax")):
+                control = b.add_union_control_type(control, cn["type"])
+            applied = b.add_controlnet_apply_advanced(
+                pos_ref, neg_ref, control, image,
+                strength=float(cn.get("strength", 1)),
+                start_percent=float(cn.get("start_percent", 0)),
+                end_percent=float(cn.get("end_percent", 1)),
+                vae_ref=vae_ref if arch != "sdxl" else None,
+            )
+            pos_ref, neg_ref = (applied, 0), (applied, 1)
+    return model_ref, pos_ref, neg_ref
+
+
+def _add_image_input_latent(b, vae_ref, params, width, height, batch_size, rgba=False):
+    inpaint = bool(params.get("inpaint_image") and params.get("inpaint_mask"))
+    filename = params["inpaint_image"] if inpaint else params.get("i2i_image")
+    if not filename:
+        return None, 1.0
+    image = b.add_load_image(filename)
+    if rgba:
+        image = b.add_join_image_alpha(image, (image, 1))
+    image = b.add_image_scale(image, width, height)
+    if inpaint:
+        mask = b.add_load_image_mask(params["inpaint_mask"], channel="red")
+        grow = int(params.get("inpaint_grow_mask_by", 6))
+        if rgba:
+            # Qwen 低去噪重绘保留原图，再对缩放后的遮罩扩边并加噪。
+            mask_image = b._next_id()
+            b._nodes[mask_image] = {"class_type": "MaskToImage", "inputs": {"mask": b._ref(mask)}}
+            mask_image = b.add_image_scale(mask_image, width, height, method="nearest-exact")
+            resized_mask = b._next_id()
+            b._nodes[resized_mask] = {"class_type": "ImageToMask", "inputs": {
+                "image": b._ref(mask_image), "channel": "red",
+            }}
+            mask = b.add_grow_mask(resized_mask, grow)
+            latent = b.add_set_latent_noise_mask(b.add_vae_encode(image, vae_ref), mask)
+        else:
+            latent = b.add_vae_encode_for_inpaint(image, vae_ref, mask, grow)
+        denoise = float(params["inpaint_denoise"])
+    else:
+        latent = b.add_vae_encode(image, vae_ref)
+        denoise = float(params["i2i_denoise"])
+    if batch_size > 1:
+        latent = b.add_repeat_latent(latent, batch_size)
+    return latent, denoise
+
+
 def build_sdxl_workflow(params: dict) -> dict:
     """
     构建 SDXL 基础工作流 (T2I + 可选多 LoRA 堆叠)。
@@ -1581,43 +1750,17 @@ def build_sdxl_workflow(params: dict) -> dict:
 
     pos_ref = (positive, 0)
     neg_ref = (negative, 0)
-    controlnets = params.get("controlnets") or []
-    for cn in controlnets:
-        cn_model = str(cn.get("model", "")).strip()
-        cn_image = str(cn.get("image", "")).strip()
-        if not cn_model or not cn_image:
-            continue
-        cn_loader = b.add_controlnet_loader(cn_model)
-        cn_img = b.add_load_image(cn_image)
-        cn_apply = b.add_controlnet_apply_advanced(
-            pos_ref, neg_ref, cn_loader, cn_img,
-            strength=float(cn.get("strength", 1.0)),
-            start_percent=float(cn.get("start_percent", 0.0)),
-            end_percent=float(cn.get("end_percent", 1.0)),
-        )
-        pos_ref = (cn_apply, 0)
-        neg_ref = (cn_apply, 1)
+    model_ref, pos_ref, neg_ref = _add_controlnet_chain(
+        b, model_ref, pos_ref, neg_ref, vae_ref, params, "sdxl",
+    )
 
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
-    inpaint_image = str(params.get("inpaint_image", "")).strip()
-    inpaint_mask = str(params.get("inpaint_mask", "")).strip()
-    i2i_image = str(params.get("i2i_image", "")).strip()
-    i2i_denoise = 1.0  # T2I 默认全去噪
-
-    if inpaint_image and inpaint_mask:
-        inp_load = b.add_load_image(inpaint_image)
-        mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
-        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
-        latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
-        i2i_denoise = float(params["inpaint_denoise"])
-    elif i2i_image:
-        i2i_load = b.add_load_image(i2i_image)
-        latent = b.add_vae_encode(i2i_load, vae_ref)
-        i2i_denoise = float(params["i2i_denoise"])
-    else:
+    width = int(params.get("width", 1024)) // 8 * 8
+    height = int(params.get("height", 1024)) // 8 * 8
+    latent, i2i_denoise = _add_image_input_latent(b, vae_ref, params, width, height, batch_size)
+    if latent is None:
         latent = b.add_empty_latent(
-            int(params.get("width", 1024)),
-            int(params.get("height", 1024)),
+            width, height,
             batch_size=batch_size,
         )
 
@@ -1680,8 +1823,7 @@ def build_sdxl_workflow(params: dict) -> dict:
         )
 
     if upscale_enabled:
-        base_w = int(params.get("width", 1024))
-        base_h = int(params.get("height", 1024))
+        base_w, base_h = width, height
         if hires_enabled and hires_scale > 1.0:
             # LatentUpscaleBy 在 /8 网格取整, 目标尺寸按同一网格推导
             source_w = round(base_w * hires_scale / 8) * 8
@@ -1712,15 +1854,17 @@ def build_sdxl_workflow(params: dict) -> dict:
 
 
 QWEN_IMAGE21_TURBO_SIGMAS = "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0"
+FLUX2_TURBO_SIGMAS = "1.0, 0.6509, 0.4374, 0.2932, 0.1893, 0.1108, 0.0495, 0.00031, 0"
 
 # 分离式三件套 (UNet + 单 CLIP + VAE) 架构的差异化参数。
 # 新增同构架构 (未来 flux 单 TE 变体等) 在此加 profile + _BUILDERS 注册即可。
 _SPLIT_ARCH_PROFILES = {
-    "anima": {"clip_type": "stable_diffusion"},
+    "anima": {"clip_type": "stable_diffusion", "controlnet": True},
     "krea2": {"clip_type": "krea2"},
-    "qwen_image21": {"clip_type": "qwen_image", "latent_stride": 16},
-    "qwen_image21_turbo": {"clip_type": "qwen_image", "latent_stride": 16},
+    "qwen_image21": {"clip_type": "qwen_image", "latent_stride": 16, "controlnet": True},
+    "qwen_image21_turbo": {"clip_type": "qwen_image", "latent_stride": 16, "controlnet": True},
     "zimage": {"clip_type": "lumina2",
+               "controlnet": True,
                "latent_class": "EmptySD3LatentImage",
                "model_sampling": {"class": "auraflow", "shift": 3.0}},
     "flux1": {"dual_clip_type": "flux",
@@ -1786,8 +1930,7 @@ def build_split_workflow(params: dict, arch: str) -> dict:
       Image Save + PreviewImage
 
     支持模块: LoRA / I2I / Inpaint / HiRes / Upscale (与 SDXL 相同)
-    ControlNet: 按 profile["controlnet"] 开关 — flux1 已启用 (Union Pro 2.0, latent 空间 CN
-                 需 vae_ref); 其余架构 (anima/krea2/zimage) profile 无开关, 传入 controlnets 被忽略。
+    ControlNet 按 profile 启用；模型补丁与标准 ControlNet 分别应用到模型或条件链。
 
     params 关键字段:
         unet              (str, 必填) — UNet 文件名 (models/diffusion_models/)
@@ -1853,72 +1996,66 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         ms_node = b.add_model_sampling_auraflow(model_ref, shift=shift)
         model_ref = (ms_node, 0)
 
+    reference_images = [b.add_load_image(ref["name"]) for ref in params.get("refs") or []]
+    stride = profile.get("latent_stride", 8)
+    canvas_step = 32 if is_qwen_image21 and reference_images else stride
+    width = int(params.get("width", 1024)) // canvas_step * canvas_step
+    height = int(params.get("height", 1024)) // canvas_step * canvas_step
     if is_qwen_image21:
+        reference_images = [b.add_join_image_alpha(image, (image, 1)) for image in reference_images]
         model_ref = (b.add_qwen_image21_cache(model_ref), 0)
-        conditioning = b.add_qwen_image21_conditioning(
-            clip_ref, params.get("positive_prompt", ""), params.get("negative_prompt", ""),
-        )
-        positive, negative = (conditioning, 0), (conditioning, 1)
-    else:
-        positive = b.add_clip_text_encode(params.get("positive_prompt", ""), clip_ref)
+    if arch == "krea2" and reference_images:
+        model_ref = (b.add_model_sampling_flux(model_ref, width, height), 0)
+    flux_reference = None
+    if arch == "flux1" and reference_images:
+        image = b.add_kontext_image_scale(reference_images[0])
+        flux_reference = b.add_vae_encode(image, vae_ref)
+
+    def encode_prompt(prompt, target_width=width, target_height=height):
+        if is_qwen_image21:
+            images = []
+            if reference_images:
+                images = [b.add_image_scale(reference_images[0], target_width, target_height, crop="center")]
+                images.extend(b.add_reference_image_scale(image, resolution_steps=32) for image in reference_images[1:])
+            encoded = b.add_qwen_image21_conditioning(
+                clip_ref, prompt, params.get("negative_prompt", ""), vae_ref, images,
+                resolution=0 if images else 1024,
+            )
+            return (encoded, 0), (encoded, 1)
         negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
+        if arch == "krea2" and reference_images:
+            positive = b.add_krea_reference_conditioning(clip_ref, vae_ref, prompt, reference_images)
+        else:
+            positive = b.add_clip_text_encode(prompt, clip_ref)
+        if flux_reference is not None:
+            positive = b.add_reference_latent(positive, flux_reference)
+            positive = b.add_flux_guidance(positive, guidance=2.5)
+        return positive, negative
+
+    positive, negative = encode_prompt(params.get("positive_prompt", ""))
     pos_ref = b._ref(positive)
     neg_ref = b._ref(negative)
 
-    # 仅 profile["controlnet"]==True 时处理 (flux1 已启用, 其余跳过); flux 系 CN 是 latent
-    #   (传 vae_ref; sdxl 走 build_sdxl_workflow 不经此函数, 既有行为不变)。
+    unpatched_model_ref = model_ref
     if profile.get("controlnet"):
-        controlnets = params.get("controlnets") or []
-        for cn in controlnets:
-            cn_model = str(cn.get("model", "")).strip()
-            cn_image = str(cn.get("image", "")).strip()
-            if not cn_model or not cn_image:
-                continue
-            cn_loader = b.add_controlnet_loader(cn_model)
-            cn_img = b.add_load_image(cn_image)
-            cn_apply = b.add_controlnet_apply_advanced(
-                pos_ref, neg_ref, cn_loader, cn_img,
-                strength=float(cn.get("strength", 1.0)),
-                start_percent=float(cn.get("start_percent", 0.0)),
-                end_percent=float(cn.get("end_percent", 1.0)),
-                vae_ref=vae_ref,
-            )
-            pos_ref = (cn_apply, 0)
-            neg_ref = (cn_apply, 1)
+        model_ref, pos_ref, neg_ref = _add_controlnet_chain(
+            b, model_ref, pos_ref, neg_ref, vae_ref, params, arch,
+        )
 
     batch_size = max(1, min(int(params.get("batch_size", 1)), 16))
-    inpaint_image = str(params.get("inpaint_image", "")).strip()
-    inpaint_mask = str(params.get("inpaint_mask", "")).strip()
-    i2i_image = str(params.get("i2i_image", "")).strip()
-    i2i_denoise = 1.0
-
-    if inpaint_image and inpaint_mask:
-        inp_load = b.add_load_image(inpaint_image)
-        if is_qwen_image21:
-            inp_load = b.add_join_image_alpha(inp_load, (inp_load, 1))
-        mask_load = b.add_load_image_mask(inpaint_mask, channel="red")
-        grow = max(0, min(int(params.get("inpaint_grow_mask_by", 6)), 128))
-        if is_qwen_image21:
-            # Qwen 低去噪会保留 VAEEncodeForInpaint 的灰色填充，改用原图加噪声遮罩。
-            latent = b.add_vae_encode(inp_load, vae_ref)
-            mask = b.add_grow_mask(mask_load, grow)
-            latent = b.add_set_latent_noise_mask(latent, mask)
+    latent, i2i_denoise = _add_image_input_latent(
+        b, vae_ref, params, width, height, batch_size, rgba=is_qwen_image21,
+    )
+    if latent is None:
+        if is_qwen_image21 and reference_images:
+            latent = (positive[0], 2)
+            if batch_size > 1:
+                latent = b.add_repeat_latent(latent, batch_size)
         else:
-            latent = b.add_vae_encode_for_inpaint(inp_load, vae_ref, mask_load, grow)
-        i2i_denoise = float(params["inpaint_denoise"])
-    elif i2i_image:
-        i2i_load = b.add_load_image(i2i_image)
-        if is_qwen_image21:
-            i2i_load = b.add_join_image_alpha(i2i_load, (i2i_load, 1))
-        latent = b.add_vae_encode(i2i_load, vae_ref)
-        i2i_denoise = float(params["i2i_denoise"])
-    else:
-        latent = b.add_empty_latent(
-            int(params.get("width", 1024)),
-            int(params.get("height", 1024)),
-            batch_size=batch_size,
-            class_type=str(profile.get("latent_class", "EmptyLatentImage")),
-        )
+            latent = b.add_empty_latent(
+                width, height, batch_size=batch_size,
+                class_type=str(profile.get("latent_class", "EmptyLatentImage")),
+            )
 
     sampled = _add_split_sampler(
         b, model_ref, pos_ref, neg_ref, latent,
@@ -1938,6 +2075,7 @@ def build_split_workflow(params: dict, arch: str) -> dict:
     upscale_enabled = bool(params.get("upscale_enabled", False))
 
     final_image = decoded
+    source_w, source_h = width, height
     if hires_enabled:
         hires_scale = float(params["hires_scale"])
         hires_method = str(params["hires_upscale_method"])
@@ -1947,13 +2085,19 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         hires_sampler = str(params["hires_sampler"])
         hires_scheduler = str(params["hires_scheduler"])
         hires_seed = int(params["hires_seed"])
+        source_w = round(width * hires_scale / canvas_step) * canvas_step
+        source_h = round(height * hires_scale / canvas_step) * canvas_step
         hires_latent = b.add_vae_encode(final_image, vae_ref)
         if hires_scale > 1.0:
-            hires_latent = b.add_latent_upscale_by(hires_latent, hires_scale, method=hires_method)
+            hires_latent = b.add_latent_resize(hires_latent, source_w, source_h, hires_method, stride)
+        hires_pos, hires_neg = pos_ref, neg_ref
+        if is_qwen_image21 and reference_images:
+            hires_pos, hires_neg = encode_prompt(params.get("positive_prompt", ""), source_w, source_h)
+        hires_model = model_ref
+        if arch == "krea2" and reference_images:
+            hires_model = b.add_model_sampling_flux(model_ref, source_w, source_h)
         hires_sampled = _add_split_sampler(
-            b, model_ref,
-            pos_ref,  # 与主采样同源, 含 ControlNet 条件
-            neg_ref,
+            b, hires_model, hires_pos, hires_neg,
             hires_latent,
             seed=hires_seed,
             steps=hires_steps,
@@ -1970,24 +2114,16 @@ def build_split_workflow(params: dict, arch: str) -> dict:
         if is_qwen_image21:
             face_rgba = b.add_split_image_alpha(final_image)
             final_image = face_rgba
+        face_prompt = str(params.get("face_detailer_prompt", "")).strip()
+        face_positive = encode_prompt(face_prompt)[0] if face_prompt else positive
         final_image = _add_face_detailer_chain(
-            b, final_image, model_ref, clip_ref, vae_ref, positive, negative,
-            params,
+            b, final_image, unpatched_model_ref, clip_ref, vae_ref, positive, negative,
+            params, face_positive=face_positive,
         )
         if is_qwen_image21:
             final_image = b.add_join_image_alpha(final_image, (face_rgba, 1))
 
     if upscale_enabled:
-        base_w = int(params.get("width", 1024))
-        base_h = int(params.get("height", 1024))
-        stride = profile.get("latent_stride", 8)
-        if is_qwen_image21:
-            base_w, base_h = base_w // stride * stride, base_h // stride * stride
-        if hires_enabled and hires_scale > 1.0:
-            source_w = round(base_w * hires_scale / stride) * stride
-            source_h = round(base_h * hires_scale / stride) * stride
-        else:
-            source_w, source_h = base_w, base_h
         if is_qwen_image21:
             upscale_rgba = b.add_split_image_alpha(final_image)
             final_image = upscale_rgba
@@ -2119,6 +2255,13 @@ def build_flux2_workflow(params: dict) -> dict:
 
     guider_mode = str(params["guider_mode"])
 
+    reference_latents = []
+    for ref in params.get("refs") or []:
+        image = b.add_reference_image_scale(b.add_load_image(ref["name"]))
+        latent = b.add_vae_encode(image, vae_ref)
+        reference_latents.append(latent)
+        pos_ref = (b.add_reference_latent(pos_ref, latent), 0)
+
     if guider_mode == "basic":
         guidance = float(params["cfg"])
         guided_pos = b.add_flux_guidance(pos_ref, guidance=guidance)
@@ -2126,6 +2269,8 @@ def build_flux2_workflow(params: dict) -> dict:
     else:
         negative = b.add_clip_text_encode(params.get("negative_prompt", ""), clip_ref)
         neg_ref = (negative, 0)
+        for latent in reference_latents:
+            neg_ref = (b.add_reference_latent(neg_ref, latent), 0)
         cfg = float(params["cfg"])
         guider = b.add_cfg_guider(model_ref, pos_ref, neg_ref, cfg)
 
@@ -2143,7 +2288,9 @@ def build_flux2_workflow(params: dict) -> dict:
     sampler = b.add_ksampler_select(str(params["sampler"]))
     steps = int(params["steps"])
     scheduler = str(params["scheduler"])
-    if scheduler == "flux2":
+    if scheduler == "flux2_turbo":
+        sigmas = b.add_manual_sigmas(FLUX2_TURBO_SIGMAS)
+    elif scheduler == "flux2":
         sigmas = b.add_flux2_scheduler(steps, int(params["width"]), int(params["height"]))
     else:
         sigmas = b.add_basic_scheduler(model_ref, scheduler, steps)
@@ -2321,6 +2468,7 @@ def build_wan22_workflow(params: dict, variant: str = "t2v") -> dict:
             i2v_node = b.add_wan_image_to_video(
                 pos_ref, neg_ref, vae_ref, start_image_node,
                 width=width, height=height, length=length, batch_size=batch_size,
+                end_image_ref=b.add_load_image(params["last_image"]) if params.get("last_image") else None,
             )
             # WanImageToVideo 输出: 0=改写 pos, 1=改写 neg, 2=latent。
             i2v_pos = (i2v_node, 0)
@@ -2437,6 +2585,15 @@ def _h3_shared_setup(params: dict):
         weight_dtype=str(params.get("unet_weight_dtype", "default")),
     )
 
+    for lora in params.get("loras") or []:
+        unet_node = b.add_lora_loader_model_only(unet_node, lora["name"], float(lora.get("strength", 1)))
+    if params.get("fast"):
+        shifted = b._next_id()
+        b._nodes[shifted] = {"class_type": "MiniMaxH3SigmaShift", "inputs": {
+            "model": [unet_node, 0], "shift_video": 12.0, "shift_audio": 3.0,
+        }}
+        unet_node = shifted
+
     # 帧数: 显式 length 优先, 否则按 duration_s×24 对齐 17k+5 兜底。
     length = int(params.get("length", 0))
     if length <= 0:
@@ -2446,6 +2603,11 @@ def _h3_shared_setup(params: dict):
     height = int(params.get("height", 768))
     seed = int(params["seed"])
     steps = int(params["steps"])
+    for cn in params.get("controlnets") or []:
+        if not cn.get("model") or not cn.get("image"):
+            continue
+        frames = b.add_control_video(cn, length, H3_FPS)
+        unet_node = b.add_model_patch(unet_node, (vae_node, 0), frames, cn, "minimax_h3")
     return b, clip_node, vae_node, audio_vae_node, unet_node, length, width, height, seed, steps
 
 
@@ -2636,7 +2798,11 @@ def build_preprocess_workflow(params: dict) -> dict:
 
     b = WorkflowBuilder()
 
-    load_img = b.add_load_image(image)
+    if params.get("video"):
+        video = b.add_load_video(image)
+        load_img = b.add_get_video_components(video)
+    else:
+        load_img = b.add_load_image(image)
 
     if pp_type == "pose":
         detect_body = params.get("detect_body", True)
@@ -2653,14 +2819,19 @@ def build_preprocess_workflow(params: dict) -> dict:
             load_img, resolution=resolution, low_threshold=low, high_threshold=high,
         )
     elif pp_type == "depth":
-        processed = b.add_depth_preprocessor(load_img, resolution=resolution)
+        processed = b.add_depth_preprocessor(load_img, resolution=resolution, midas=bool(params.get("depth_midas")))
+    elif pp_type == "lineart":
+        processed = b.add_lineart_preprocessor(load_img, resolution=resolution, anime=bool(params.get("lineart_anime")))
     else:
         raise ValueError(f"不支持的预处理类型: {pp_type}")
 
-    b.add_save_image(processed, prefix=save_prefix,
-                     output_path=input_dir, extension='png')
-
-    b.add_preview_image(processed)
+    if params.get("video"):
+        # 沿用源帧率保存，控制视频的动作时间与原片一致。
+        result = b.add_create_video(processed, fps=(load_img, 2))
+        b.add_save_video(result, prefix=save_prefix)
+    else:
+        b.add_save_image(processed, prefix=save_prefix, output_path=input_dir, extension='png')
+        b.add_preview_image(processed)
 
     return b.build()
 

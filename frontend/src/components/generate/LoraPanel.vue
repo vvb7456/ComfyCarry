@@ -12,10 +12,9 @@
 import { computed, inject, ref, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
-import { GenerateOptionsKey } from '@/composables/generate/keys'
+import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import type { LoraItem } from '@/composables/generate/useGenerateOptions'
 import type { LoraEntry } from '@/stores/generate'
-import { MODEL_TYPES } from '@/config/model-types'
 import { COMPONENT_FILENAMES } from '@/config/component-registry'
 import AddCard from '@/components/ui/AddCard.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
@@ -30,24 +29,22 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const store = useGenerateStore()
-const state = computed(() => store.currentState)
+const { modelType, state, config } = inject(GenerateModelKey)!
 const options = inject(GenerateOptionsKey)!
 
-// store.activeModelType 是当前 tab 的架构 (LoraPanel 在 ModelTab 内, 一 tab 一实例)。
-// isVideo 决定是否启用视频配对折叠; 图像架构恒走原逻辑 (回归保护)。
 const isVideo = computed(
-  () => MODEL_TYPES[store.activeModelType]?.mediaType === 'video',
+  () => config.value.mediaType === 'video',
 )
 
 // 只有双权重条目 (14B) 才存在 high/low 噪声段概念。5B 是单权重架构, 其 LoRA
 // 不分段 —— 若对它做段推导, 文件名含 "high_" 的普通 LoRA 会被误标「仅高噪」。
 const isPaired = computed(
-  () => isVideo.value && MODEL_TYPES[store.activeModelType]?.dualUnet === true,
+  () => isVideo.value && config.value.dualUnet === true,
 )
 
 /** 该 LoRA 引用了但本机不存在 (文件被删/未同步): 保留条目但标警示 */
 function isMissing(name: string): boolean {
-  return store.isMissing(store.activeModelType, name)
+  return store.isMissing(modelType, name)
 }
 
 /** 用户换选 (从选择器挑新的) 或删除条目后, 旧的缺失标记应清除 */

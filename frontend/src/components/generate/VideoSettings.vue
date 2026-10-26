@@ -1,30 +1,10 @@
 <script setup lang="ts">
-/**
- * VideoSettings — 视频专属基础设置。
- *
- * 分辨率收敛为一个 BaseSelect, 与图像页同构。
- * 「清晰度档下拉 + 方向分段 + 跟随胶囊」三个控件本质上只是在决定 latent 尺寸,
- * 那是分辨率字段的职责, 不该另立概念。「贴合起始画面」只是下拉里的一个动态选项,
- * 与 `自定义...` 同性质。
- *
- * 字段顺序 (分辨率在上、步数/CFG 在下):
- *   速度 → 分辨率 → 时长 → 步数/CFG
- *
- * 样式: label 一律 .field-lbl 同款 (.78rem/500/--t2);
- *       说明文字一律进 HelpTip 不占行;
- *       动态附属信息 (帧数) 做 label 徽章, 不塞进滑块 marks。
- *
- * 数据走 store (与 BasicSettings 同模式); 起始画面原尺寸由父组件经 refWidth/refHeight 传入。
- * 档位值全部来自 config.videoDefaults.presets, 不硬编码。
- */
-import { computed, watch } from 'vue'
+import { computed, inject, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useGenerateStore } from '@/stores/generate'
-import { WAN22_FAST_SAMPLING, type ModelTypeConfig } from '@/config/model-types'
+import { GenerateModelKey } from '@/composables/generate/keys'
 import BaseSelect from '@/components/form/BaseSelect.vue'
 import NumberInput from '@/components/form/NumberInput.vue'
 import RangeField from '@/components/form/RangeField.vue'
-import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 
 defineOptions({ name: 'VideoSettings' })
@@ -32,7 +12,7 @@ defineOptions({ name: 'VideoSettings' })
 const props = withDefaults(defineProps<{
   /** 禁用全部控件 (与 BasicSettings.disabled 语义一致) */
   disabled?: boolean
-  /** 起始画面原始宽高 (0 = 无起始画面 → 分辨率下拉不出现「贴合起始画面」项) */
+  /** 起始画面原始宽高；异步加载完成前为 0。 */
   refWidth?: number
   refHeight?: number
 }>(), {
@@ -42,9 +22,7 @@ const props = withDefaults(defineProps<{
 })
 
 const { t } = useI18n({ useScope: 'global' })
-const store = useGenerateStore()
-const config = computed<ModelTypeConfig>(() => store.currentConfig)
-const state = computed(() => store.currentState)
+const { state, config } = inject(GenerateModelKey)!
 const video = computed(() => state.value.video!)
 const vd = computed(() => config.value.videoDefaults!)
 
@@ -81,21 +59,6 @@ function deriveFitSize(refW: number, refH: number, budget: number, d: number): {
   return { w, h }
 }
 
-/* ── 速度档 (仅 speedToggle=true 的 14B 条目) ── */
-const hasSpeed = computed(() => !!vd.value.speedToggle)
-const isFast = computed(() => state.value.fast)
-
-const speedOptions = computed(() => [
-  { value: 'fast', label: t('generate.video.speed_fast') },
-  { value: 'std', label: t('generate.video.speed_std') },
-])
-const speedValue = computed<string>(() => (isFast.value ? 'fast' : 'std'))
-function onSpeedChange(v: string) {
-  state.value.fast = (v === 'fast')
-  Object.assign(state.value, state.value.fast ? WAN22_FAST_SAMPLING : config.value.defaults)
-}
-
-/** 起始画面是否就位 —— 决定「贴合起始画面」项是否出现 (t2v 永远不出现) */
 const hasRef = computed(() => props.refWidth > 0 && props.refHeight > 0)
 
 const fitSize = computed(() => {
@@ -125,10 +88,10 @@ const presetEntries = computed(() => {
 
 const resolutionOptions = computed(() => {
   const opts: { value: string; label: string }[] = []
-  if (fitSize.value) {
+  if (video.value.refImage) {
     opts.push({
       value: RES_FIT,
-      label: t('generate.video.res_fit_option', { w: fitSize.value.w, h: fitSize.value.h }),
+      label: t('generate.video.res_fit_option', { w: fitSize.value?.w ?? video.value.width, h: fitSize.value?.h ?? video.value.height }),
     })
   }
   for (const e of presetEntries.value) opts.push({ value: e.value, label: e.label })
@@ -163,44 +126,13 @@ function onResolutionChange(v: string) {
   applyResolution(v)
 }
 
-/**
- * 尺寸同步 (immediate): 选中贴合项时, 起始画面尺寸一变就重算宽高;
- * 图被移除 (5B 切文生 / 用户清除) 时贴合项从下拉消失, 选中值会悬空 → 回落到第一个档位。
- * 这个 watch 只做"让状态自洽", 不改变用户的选择。
- */
+// 图片尺寸异步到达；只有用户选了「贴合」才同步，不把加载中的零尺寸当作清除图片。
 watch(
-  () => [props.refWidth, props.refHeight] as const,
+  [resolution, fitSize],
   () => {
-    if (resolution.value !== RES_FIT) return
-    if (hasRef.value) {
-      applyResolution(RES_FIT)
-    } else {
-      const fallback = presetEntries.value[0]?.value
-      if (fallback) {
-        resolution.value = fallback
-        applyResolution(fallback)
-      }
-    }
+    if (resolution.value === RES_FIT && hasRef.value) applyResolution(RES_FIT)
   },
   { immediate: true },
-)
-
-/**
- * 换图 → 自动选中「贴合起始画面」。
- *
- * 判据刻意是 refImage 文件名而非尺寸, 且**不加 immediate**:
- * 尺寸是异步探测出来的, 0→N 这个跃迁在"首次上传"和"切回本 tab 重新挂载"时都会发生,
- * 用尺寸做判据会在每次切 tab 时把用户手选的 720p 档冲回贴合项。
- * 用文件名 + 无 immediate: 组件挂载时以当前值为基线不触发, 只有真正换了图才切。
- */
-watch(
-  () => video.value.refImage,
-  (name) => {
-    if (!name) return
-    resolution.value = RES_FIT
-    // 尺寸此刻可能还没探测回来; 上面的 immediate watch 会在尺寸到位时补算宽高。
-    applyResolution(RES_FIT)
-  },
 )
 
 function onCustomWidth(raw: number) {
@@ -243,35 +175,20 @@ const durationMarkFormat = (v: number) => `${v}s`
 </script>
 
 <template>
-  <div class="video-settings" :class="{ 'video-settings--disabled': disabled }">
-    <div v-if="hasSpeed" class="field-group">
-      <div class="field-lbl">
-        {{ t('generate.video.speed') }}
-        <HelpTip :text="t('generate.video.speed_help')" />
-      </div>
-      <SegmentedControl
-        :options="speedOptions"
-        :model-value="speedValue"
-        size="sm"
-        block
-        :disabled="disabled"
-        @update:model-value="onSpeedChange(String($event))"
-      />
-    </div>
-
-    <div class="field-group">
+  <div class="video-settings">
+    <div class="field-group resolution-field">
       <div class="field-lbl">
         {{ t('generate.basic.resolution') }}
         <HelpTip :text="t('generate.video.res_help')" />
       </div>
-      <div class="res-row">
+      <div class="res-row" :class="{ 'res-row--custom': isCustom }">
         <BaseSelect
           :model-value="resolution"
           :options="resolutionOptions"
           :disabled="disabled"
           @update:model-value="onResolutionChange(String($event))"
         />
-        <div v-if="isCustom" class="vs-custom-size">
+        <div v-if="isCustom" class="custom-size">
           <NumberInput
             :model-value="video.width"
             :min="vd.divisor"
@@ -282,7 +199,7 @@ const durationMarkFormat = (v: number) => `${v}s`
             center
             @update:model-value="onCustomWidth($event)"
           />
-          <span class="vs-custom-size__x">×</span>
+          <span class="custom-size__x">×</span>
           <NumberInput
             :model-value="video.height"
             :min="vd.divisor"
@@ -297,7 +214,7 @@ const durationMarkFormat = (v: number) => `${v}s`
       </div>
     </div>
 
-    <div class="field-group">
+    <div class="slider-row" :class="{ 'slider-row--3': config.guidance !== 'none' }">
       <RangeField
         :model-value="video.durationS"
         :min="durationMin"
@@ -311,12 +228,9 @@ const durationMarkFormat = (v: number) => `${v}s`
         @update:model-value="video.durationS = $event"
       >
         <template #label-append>
-          <span class="vs-badge">{{ t('generate.video.frames_hint', { frames: frameCount, fps }) }}</span>
+          <span class="vs-badge" :title="t('generate.video.frames_hint', { frames: frameCount, fps })">{{ t('generate.video.frames_hint', { frames: frameCount, fps }) }}</span>
         </template>
       </RangeField>
-    </div>
-
-    <div class="vs-slider-row">
       <RangeField
         :model-value="state.steps"
         :min="1"
@@ -329,7 +243,7 @@ const durationMarkFormat = (v: number) => `${v}s`
         @update:model-value="state.steps = $event"
       />
       <RangeField
-        v-if="config.hasNegativePrompt"
+        v-if="config.guidance !== 'none'"
         :model-value="state.cfg"
         :min="1"
         :max="20"
@@ -347,30 +261,7 @@ const durationMarkFormat = (v: number) => `${v}s`
 
 <style scoped>
 .video-settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  container: gen-video / inline-size;
-}
-
-.video-settings--disabled {
-  opacity: .55;
-  pointer-events: none;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.field-lbl {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: .78rem;
-  font-weight: 500;
-  color: var(--t2);
+  display: contents;
 }
 
 .vs-badge {
@@ -382,44 +273,8 @@ const durationMarkFormat = (v: number) => `${v}s`
   color: var(--t3);
   margin-left: 2px;
   white-space: nowrap;
-}
-
-.res-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-2);
-  align-items: start;
-}
-
-.vs-custom-size {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 两个 input 等宽, 与 ×(固定字符宽) 一起自然填满容器剩余宽度 */
-.vs-custom-size :deep(.number-input) {
-  flex: 1;
-}
-
-.vs-custom-size__x {
-  font-size: .78rem;
-  color: var(--t3);
-  flex-shrink: 0;
-}
-
-.vs-slider-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
-}
-
-@container gen-video (max-width: 480px) {
-  .res-row {
-    grid-template-columns: 1fr;
-  }
-  .vs-slider-row {
-    grid-template-columns: 1fr;
-  }
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

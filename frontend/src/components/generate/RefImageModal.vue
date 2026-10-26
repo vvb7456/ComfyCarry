@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IMAGE_ACCEPT, type InputImage } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, VIDEO_ACCEPT, type InputImage } from '@/composables/generate/useRefImagePicker'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -16,6 +16,7 @@ const props = defineProps<{
   images: InputImage[]
   loading: boolean
   uploading: boolean
+  mediaType?: 'image' | 'video'
   previewUrlFn: (name: string) => string
 }>()
 
@@ -78,7 +79,8 @@ function formatSize(bytes: number): string {
           @click="onSelect(img.name)"
         >
           <div class="ref-card__img-wrap">
-            <img :src="previewUrlFn(img.name)" :alt="img.name" class="ref-card__img" loading="lazy">
+            <video v-if="mediaType === 'video'" :src="previewUrlFn(img.name)" class="ref-card__img" muted playsinline preload="metadata" />
+            <img v-else :src="previewUrlFn(img.name)" :alt="img.name" class="ref-card__img" loading="lazy">
           </div>
           <div class="ref-card__body">
             <span class="ref-card__name text-truncate">{{ img.name.split('/').pop() }}</span>
@@ -88,14 +90,14 @@ function formatSize(bytes: number): string {
 
         <div class="ref-card ref-card--upload" @click="onUploadClick">
           <MsIcon name="upload_file" color="none" class="ref-card__upload-icon" />
-          <span>{{ t('generate.i2i.upload_local') }}</span>
+          <span>{{ t(mediaType === 'video' ? 'generate.controlnet.upload_video' : 'generate.i2i.upload_local') }}</span>
         </div>
       </div>
 
       <input
         ref="fileInputRef"
         type="file"
-        :accept="IMAGE_ACCEPT"
+        :accept="mediaType === 'video' ? VIDEO_ACCEPT : IMAGE_ACCEPT"
         style="display: none"
         @change="onFileChange"
       >

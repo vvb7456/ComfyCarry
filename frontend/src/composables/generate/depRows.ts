@@ -1,6 +1,7 @@
 import type { DepRow } from './useDependencyStatus'
 import {
   requiredComponents,
+  requiredLoras,
   componentsForSlot,
   type ComponentFile,
   type ComponentContext,
@@ -19,8 +20,9 @@ export function componentDepRows(
   arch: string,
   ctx: ComponentContext | undefined,
   t: (key: string) => string,
+  packaging: 'checkpoint' | 'split' = 'split',
 ): DepRow[] {
-  const files = requiredComponents(arch, undefined, ctx)
+  const files = packaging === 'split' ? requiredComponents(arch, undefined, ctx) : requiredLoras(arch, ctx)
   return files.map<DepRow>(f => ({
     id: f.id,
     label: f.label,
@@ -33,7 +35,7 @@ export function componentDepRows(
 }
 
 function roleText(arch: string, f: ComponentFile, t: (key: string) => string): string {
-  const inSlot = (slot: 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning') =>
+  const inSlot = (slot: 'clip' | 'clip2' | 'vae' | 'audio_vae' | 'lightning' | 'reference') =>
     componentsForSlot(arch, slot).some(x => x.id === f.id)
 
   if (inSlot('clip')) {
@@ -46,5 +48,6 @@ function roleText(arch: string, f: ComponentFile, t: (key: string) => string): s
   if (inSlot('vae')) return t('generate.components.role_vae')
   if (inSlot('audio_vae')) return t('generate.components.role_audio_vae')
   if (inSlot('lightning')) return t('generate.components.fast_files_hint')
+  if (inSlot('reference')) return t('generate.components.ref_files_hint')
   return ''
 }

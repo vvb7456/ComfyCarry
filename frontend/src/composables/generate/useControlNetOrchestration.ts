@@ -2,17 +2,16 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { useImageToImage } from '@/composables/generate/useImageToImage'
-import { useControlNet } from '@/composables/generate/useControlNet'
+import { useControlNet, CN_TYPES, PP_PARAMS_DEF, type CnType } from '@/composables/generate/useControlNet'
 import { useDependencyStatus, type UseDependencyStatusReturn } from '@/composables/generate/useDependencyStatus'
 import { useTagInterrogation, TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
-import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, SEEDVR2_VAE_ROW_ID, getCnDepGroup, type CnBranch } from '@/composables/generate/modelDepConfigs'
-import { MODEL_TYPES } from '@/config/model-types'
+import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, SEEDVR2_VAE_ROW_ID, getCnDepGroup, cnPreprocessor, isPreprocessorRow, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
 import { useToast } from '@/composables/useToast'
 
-type ControlNetType = 'pose' | 'canny' | 'depth'
+type ControlNetType = CnType
 type RegisterTask = (promptId: string, type: 'preprocess' | 'tag', subtype: string) => void
 
 interface UseControlNetOrchestrationOptions {
@@ -33,17 +32,16 @@ export function useControlNetOrchestration({
   const store = useGenerateStore()
   const state = computed(() => store.stateFor(modelType))
 
-  const i2i = useImageToImage()
+  const i2i = useImageToImage(modelType)
 
   // pony/sdxl → 'sdxl'; illustrious/noobai → 'ilnoob'; 其余 (无 cnBranch) → undefined (不过滤)。
   const cnBranch = computed<CnBranch | undefined>(
-    () => (MODEL_TYPES[modelType]?.cnBranch as CnBranch | undefined),
+    () => store.configFor(modelType).cnBranch,
   )
 
-  const cnPose = useControlNet('pose', options.controlnetModels, cnBranch, modelType)
-  const cnCanny = useControlNet('canny', options.controlnetModels, cnBranch, modelType)
-  const cnDepth = useControlNet('depth', options.controlnetModels, cnBranch, modelType)
-  const cnMap = { pose: cnPose, canny: cnCanny, depth: cnDepth } as const
+  const cnMap = Object.fromEntries(CN_TYPES.map(type => [
+    type, useControlNet(type, options.controlnetModels, cnBranch, modelType),
+  ])) as Record<CnType, ReturnType<typeof useControlNet>>
 
   // 依赖清单按 branch 取 (sdxl → union; ilnoob → 专用), 与面板下拉过滤同源。
   // 状态只来自磁盘, 没有 dismiss 记忆位: 换架构/删模型/别处下完都会自然收敛。
@@ -52,7 +50,7 @@ export function useControlNetOrchestration({
 
   function cnDep(type: ControlNetType): UseDependencyStatusReturn {
     return useDependencyStatus(
-      () => getCnDepGroup(type, cnBranch.value).rows,
+      () => store.configFor(modelType).controlNetEnabled ? getCnDepGroup(type, cnBranch.value, cnMap[type].config.value.model).rows : [],
       {
         minOptional: () => getCnDepGroup(type, cnBranch.value).minOptional ?? 0,
         enabled: tabActive,
@@ -61,10 +59,17 @@ export function useControlNetOrchestration({
     )
   }
 
-  const depPose = cnDep('pose')
-  const depCanny = cnDep('canny')
-  const depDepth = cnDep('depth')
-  const depMap = { pose: depPose, canny: depCanny, depth: depDepth } as const
+  const depMap = Object.fromEntries(CN_TYPES.map(type => [type, cnDep(type)])) as Record<CnType, UseDependencyStatusReturn>
+  const preprocessDepMap = Object.fromEntries(CN_TYPES.map(type => [type,
+    useDependencyStatus(() => store.configFor(modelType).controlNetEnabled
+      ? cnPreprocessor(type, cnBranch.value, cnMap[type].config.value.model).rows : [], {
+      enabled: tabActive, source: 'controlnet-preprocess',
+    }),
+  ])) as Record<CnType, UseDependencyStatusReturn>
+
+  function cnModelsReady(type: CnType): boolean {
+    return depMap[type].missingRequired.value.every(row => isPreprocessorRow(row.row))
+  }
 
   const depUpscale = useDependencyStatus(() => UPSCALE_DEP_GROUP.rows, {
     minOptional: UPSCALE_DEP_GROUP.minOptional ?? 0,
@@ -88,7 +93,7 @@ export function useControlNetOrchestration({
   })
 
   const tagger = useTagInterrogation()
-  const showPPModal = ref({ pose: false, canny: false, depth: false })
+  const showPPModal = ref<Record<string, boolean>>({})
 
   async function onPPSubmit(
     cnType: ControlNetType,
@@ -103,8 +108,14 @@ export function useControlNetOrchestration({
       toast(t('generate.controlnet.preprocess_blocked'), 'warning')
       return
     }
+    if (!preprocessDepMap[cnType].ready.value) {
+      toast(t('generate.controlnet.need_preprocess_models'), 'warning')
+      return
+    }
 
-    const promptId = await cnMap[cnType].submitPreprocess(payload.file, payload.params)
+    const promptId = await cnMap[cnType].submitPreprocess(payload.file, {
+      ...payload.params, ...cnPreprocessor(cnType, cnBranch.value, cnMap[cnType].config.value.model).params,
+    })
     if (promptId) {
       onRegisterTask(promptId, 'preprocess', cnType)
     }
@@ -130,27 +141,34 @@ export function useControlNetOrchestration({
     tagger.onDone(success)
   }
 
-  // face 模块按架构可用 (FR-1): MODEL_TYPES[type].modules 声明 — flux2 系不含
-  const faceModuleAvailable = (MODEL_TYPES[modelType]?.modules ?? []).includes('face')
-
   const moduleTabs = computed<SwitchTabItem[]>(() => {
-    const config = MODEL_TYPES[modelType]!
-    const disabled = !config.controlNetEnabled
-    if (config.mediaType === 'video') {
-      return [{ key: 'lora', label: t('generate.modules.lora'), icon: 'layers' }]
-    }
+    const config = store.configFor(modelType)
+    const isImage = config.mediaType === 'image'
+    const controlTypes: readonly string[] = config.controlTypes ?? CN_TYPES
     const tabs: SwitchTabItem[] = [
-      { key: 'lora', label: t('generate.modules.lora'), icon: 'layers' },
-      { key: 'i2i', label: t('generate.modules.i2i'), icon: 'image' },
-      { key: 'pose', label: t('generate.modules.pose'), icon: 'accessibility_new', disabled },
-      { key: 'canny', label: t('generate.modules.canny'), icon: 'line_curve', disabled },
-      { key: 'depth', label: t('generate.modules.depth'), icon: 'terrain', disabled },
-      { key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high' },
+      { key: 'lora', label: t('generate.modules.lora'), icon: 'layers', disabled: !config.modules.includes('lora') },
     ]
-    if (faceModuleAvailable) {
-      tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural' })
+    if (isImage || config.modules.includes('i2i')) {
+      tabs.push({ key: 'i2i', label: t('generate.modules.i2i'), icon: 'image', disabled: !config.modules.includes('i2i') })
     }
-    tabs.push({ key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd' })
+    if (isImage || config.modules.includes('controlnet')) {
+      for (const key of isImage ? CN_TYPES : controlTypes) {
+        tabs.push({
+          key, label: t(`generate.modules.${key}`), icon: PP_PARAMS_DEF[key as CnType].icon,
+          disabled: !config.modules.includes('controlnet') || !config.controlNetEnabled
+            || !controlTypes.includes(key),
+        })
+      }
+    }
+    if (isImage || config.modules.includes('hires')) {
+      tabs.push({ key: 'hires', label: t('generate.modules.hires'), icon: 'auto_fix_high', disabled: !config.modules.includes('hires') })
+    }
+    if (isImage || config.modules.includes('face')) {
+      tabs.push({ key: 'face', label: t('generate.modules.face'), icon: 'face_retouching_natural', disabled: !config.modules.includes('face') })
+    }
+    if (isImage || config.modules.includes('upscale')) {
+      tabs.push({ key: 'upscale', label: t('generate.modules.upscale'), icon: 'hd', disabled: !config.modules.includes('upscale') })
+    }
     return tabs
   })
 
@@ -160,9 +178,7 @@ export function useControlNetOrchestration({
 
     if (currentState.loras.some((lora) => lora.enabled)) enabled.add('lora')
     if (currentState.i2i.enabled) enabled.add('i2i')
-    if (currentState.controlNets.pose?.enabled) enabled.add('pose')
-    if (currentState.controlNets.canny?.enabled) enabled.add('canny')
-    if (currentState.controlNets.depth?.enabled) enabled.add('depth')
+    for (const key of CN_TYPES) if (currentState.controlNets[key]?.enabled) enabled.add(key)
     if (currentState.upscale.enabled) enabled.add('upscale')
     if (currentState.hires.enabled) enabled.add('hires')
     if (currentState.faceDetailer.enabled) enabled.add('face')
@@ -201,14 +217,20 @@ export function useControlNetOrchestration({
 
       case 'pose':
       case 'canny':
+      case 'lineart':
+      case 'tile':
       case 'depth': {
-        if (!MODEL_TYPES[modelType]!.controlNetEnabled) {
+        if (moduleTabs.value.find(tab => tab.key === key)?.disabled) {
           toast(t('generate.error.cn_disabled'), 'warning')
           return
         }
         const cnKey = key as ControlNetType
         const cn = cnMap[cnKey]
-        if (enabled && blockOnMissingDep(cnKey, depMap[cnKey], `generate.controlnet.need_download_${cnKey}`)) return
+        if (enabled && !cnModelsReady(cnKey)) {
+          toast(t(`generate.controlnet.need_download_${cnKey}`), 'warning')
+          currentState.activeModule = cnKey
+          return
+        }
         if (enabled && !cn.validateEnable(cn.models.value)) return
         if (currentState.controlNets[key]) currentState.controlNets[key].enabled = enabled
         break
@@ -233,12 +255,10 @@ export function useControlNetOrchestration({
   return {
     i2i,
     tagger,
-    cnPose,
-    cnCanny,
-    cnDepth,
-    depPose,
-    depCanny,
-    depDepth,
+    cnMap,
+    depMap,
+    preprocessDepMap,
+    cnModelsReady,
     depUpscale,
     depTagger,
     depFace,

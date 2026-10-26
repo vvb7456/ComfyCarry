@@ -9,6 +9,7 @@ import { errorMessage } from '@/utils/errorMessage'
  * 以免加格式时漏改其中某一处。
  */
 export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/bmp'
+export const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime'
 
 export interface InputImage {
   name: string
@@ -21,7 +22,7 @@ export interface UploadResult {
   height?: number
 }
 
-export function useRefImagePicker(usageType: string, subfolder = '') {
+export function useRefImagePicker(usageType: string, subfolder = '', mediaType: 'image' | 'video' = 'image') {
   const { toast } = useToast()
 
   const visible = ref(false)
@@ -41,8 +42,8 @@ export function useRefImagePicker(usageType: string, subfolder = '') {
   async function loadImages() {
     loading.value = true
     try {
-      const qs = subfolder ? `?subfolder=${encodeURIComponent(subfolder)}` : ''
-      const res = await fetch(`/api/generate/input_images${qs}`)
+      const qs = new URLSearchParams({ subfolder, media_type: mediaType })
+      const res = await fetch(`/api/generate/input_images?${qs}`)
       if (res.ok) {
         const data = await res.json()
         images.value = data.images || []

@@ -149,13 +149,7 @@ async function importConfig(event: Event) {
     if (!data) return
     toast(apiMessageText(data), 'success')
 
-    // 导入后无条件重载并回到总览。不就地复用当前页面:
-    // 导入替换了大量设置 (密码/密钥/同步/Tunnel/工作区状态), 各页面持有的都是
-    // 旧值, 逐个通知既易漏又会残留; 整页重载最干净, 也顺带清掉生成页的执行态
-    // 与预览态。工作区状态那条路径另有服务端「需重新装载」守卫兜底, 防止旧
-    // 标签页的自动保存把导入结果覆盖回去。
-    // 用 '/' 而非 '/#/dashboard': 根路径对路由模式不敏感 (hash 与 history 都落到
-    // 首页路由, 且 '/' 本就重定向到 /dashboard), 不会因将来改模式而失效。
+    // 密码、密钥等全局设置也随导入变化，重新加载应用。
     window.location.href = '/'
   } catch (e: unknown) {
     toast(`${t('settings.config.import_failed')}: ${errorMessage(e)}`, 'error')

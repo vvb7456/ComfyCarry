@@ -2,7 +2,9 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PP_PARAMS_DEF, type CnType } from '@/composables/generate/useControlNet'
-import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import { IMAGE_ACCEPT, VIDEO_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
+import type { UseDependencyStatusReturn } from '@/composables/generate/useDependencyStatus'
+import DependencyBar from './DependencyBar.vue'
 import { useToast } from '@/composables/useToast'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -19,6 +21,8 @@ defineOptions({ name: 'PreprocessModal' })
 const props = defineProps<{
   modelValue: boolean
   type: CnType
+  video?: boolean
+  dep: UseDependencyStatusReturn
 }>()
 
 const emit = defineEmits<{
@@ -31,8 +35,9 @@ const { toast } = useToast()
 
 const def = computed(() => PP_PARAMS_DEF[props.type])
 const title = computed(() =>
-  t('generate.controlnet.generate_title', { title: t(def.value.titleKey) }),
+  t('generate.controlnet.generate_title', { title: t(props.video ? `generate.controlnet.video_${props.type}` : def.value.titleKey) }),
 )
+const depExpanded = ref(false)
 
 const sourceFile = ref<File | null>(null)
 const sourceInputName = ref('')
@@ -47,7 +52,7 @@ const sourceName = computed(() => {
 })
 const hasSource = computed(() => !!sourceFile.value || !!sourceInputName.value)
 
-const ppPicker = useRefImagePicker('__pp__', '')
+const ppPicker = useRefImagePicker('__pp__', '', props.video ? 'video' : 'image')
 
 function onPickInput() {
   ppPicker.open()
@@ -114,15 +119,17 @@ function onSubmit() {
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <div class="pp-wrap">
+      <DependencyBar v-if="dep.has.value" :status="dep" :noun="t('generate.controlnet.preprocess_models')" v-model:expanded="depExpanded" class="pp-dep" />
       <div class="pp-split">
         <div class="pp-split__media">
           <FileUploadZone
             mode="pick"
-            :accept="IMAGE_ACCEPT"
+            :accept="video ? VIDEO_ACCEPT : IMAGE_ACCEPT"
+            :media-type="video ? 'video' : 'image'"
             :preview="sourcePreviewUrl"
             :file-name="sourceName"
             :pick-label="t('generate.image_source.from_input')"
-            :upload-label="t('generate.image_source.upload_local')"
+            :upload-label="t(video ? 'generate.controlnet.upload_video' : 'generate.image_source.upload_local')"
             class="pp-source-zone"
             @pick="onPickInput"
             @file="onFileFromZone"
@@ -181,7 +188,7 @@ function onSubmit() {
           <BaseButton
             size="sm"
             variant="primary"
-            :disabled="!hasSource"
+            :disabled="!hasSource || !dep.ready.value"
             class="pp-submit-btn"
             @click="onSubmit"
           >
@@ -195,7 +202,8 @@ function onSubmit() {
 
   <RefImageModal
     v-model="ppPicker.visible.value"
-    :title="t('generate.image_source.select_image')"
+    :title="t(video ? 'generate.controlnet.select_video' : 'generate.image_source.select_image')"
+    :media-type="video ? 'video' : 'image'"
     :images="ppPicker.images.value"
     :loading="ppPicker.loading.value"
     :uploading="ppPicker.uploading.value"
@@ -211,6 +219,7 @@ function onSubmit() {
 .pp-wrap {
   container: pp-wrap / inline-size;
 }
+.pp-dep { margin-bottom: var(--sp-3); }
 
 .pp-split {
   display: flex;

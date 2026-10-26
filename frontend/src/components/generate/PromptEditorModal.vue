@@ -11,7 +11,7 @@
  *   - Embedding and Wildcard insertion as token chips
  *   - Real-time sync to parent (no confirm button)
  */
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, inject, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usePromptEditor, buildRaw } from '@/composables/generate/usePromptEditor'
 import { usePromptTranslate } from '@/composables/generate/usePromptTranslate'
@@ -19,7 +19,7 @@ import { usePromptLibrary } from '@/composables/generate/usePromptLibrary'
 import { usePromptLibraryInit } from '@/composables/generate/usePromptLibraryInit'
 import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { useConfirm } from '@/composables/useConfirm'
-import { useGenerateStore } from '@/stores/generate'
+import { GenerateModelKey } from '@/composables/generate/keys'
 import { normalizePrompt } from '@/utils/prompt'
 import type { BracketType, PromptTag, PromptToken } from '@/types/prompt-library'
 import type { AutocompleteDisplayItem } from '@/composables/generate/useAutoComplete'
@@ -86,7 +86,7 @@ const translate = usePromptTranslate()
 const lib = usePromptLibrary()
 const plInit = usePromptLibraryInit()
 const { settings: promptSettings, load: loadPromptSettings } = usePromptSettings()
-const genStore = useGenerateStore()
+const { state: modelState } = inject(GenerateModelKey)!
 
 /** Normalize options derived from settings
  *  (escape_bracket 不在此列 — 它只作用于插入 tag 时, 见 escapeBrackets()) */
@@ -114,7 +114,7 @@ watch(open, async (isOpen) => {
     posEditor.parse(normalizePrompt(props.positive, normalizeOpts.value))
     negEditor.parse(normalizePrompt(props.negative, normalizeOpts.value))
 
-    const state = genStore.currentState
+    const state = modelState.value
     posEditor.injectDisabled(state.positiveDisabled)
     negEditor.injectDisabled(state.negativeDisabled)
 
@@ -131,7 +131,7 @@ watch(open, async (isOpen) => {
 function syncToParent() {
   emit('update:positive', posEditor.serializeEnabled())
   emit('update:negative', negEditor.serializeEnabled())
-  const state = genStore.currentState
+  const state = modelState.value
   state.positiveDisabled = posEditor.extractDisabled()
   state.negativeDisabled = negEditor.extractDisabled()
 }
@@ -341,8 +341,8 @@ async function onHistoryApply(item: { positive: string; negative: string }) {
   }
   posEditor.parse(normalizePrompt(item.positive, normalizeOpts.value))
   negEditor.parse(normalizePrompt(item.negative, normalizeOpts.value))
-  genStore.currentState.positiveDisabled = []
-  genStore.currentState.negativeDisabled = []
+  modelState.value.positiveDisabled = []
+  modelState.value.negativeDisabled = []
   syncToParent()
   historyModalVisible.value = false
   if (plInit.initialized.value) {

@@ -4,9 +4,9 @@ import { useGenerateStore } from '@/stores/generate'
 import { useRefImagePicker } from './useRefImagePicker'
 import { useToast } from '@/composables/useToast'
 
-export function useImageToImage() {
+export function useImageToImage(modelType: string) {
   const store = useGenerateStore()
-  const state = computed(() => store.currentState)
+  const state = computed(() => store.stateFor(modelType))
   const { t } = useI18n({ useScope: 'global' })
   const { toast } = useToast()
 

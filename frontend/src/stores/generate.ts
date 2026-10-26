@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
 import type { ModelTypeConfig } from '@/config/model-types'
-import { MODEL_TYPES, WAN22_FAST_SAMPLING } from '@/config/model-types'
+import { MODEL_TYPES, modelConfig, modelsForMode } from '@/config/model-types'
 import { redirectToLogin } from '@/composables/useApiFetch'
 import { workspaceFiles, type WorkspaceFile } from '@/composables/generate/workspaceFiles'
 import { useDownloadsStore } from '@/stores/downloads'
@@ -32,7 +32,7 @@ export interface RefItem {
  *  `'custom'` = 用户自定义。刻意**不复用** state.resolution: BasicSettings 对它有一个
  *  「拆 WxH 写回 state.width/height」的图像侧 watch, 视频写进去会产生无用的交叉写入。 */
 export interface VideoState {
-  mode?: 't2v' | 'i2v'
+  mode?: 't2v' | 'i2v' | 'ref'
   refImage: string
   lastImage: string
   resolution: string
@@ -121,6 +121,8 @@ export interface DisabledToken {
 }
 
 export interface ModelState {
+  mode: string
+  refs: RefItem[]
   files?: WorkspaceFile[]
   positive: string
   negative: string
@@ -171,9 +173,12 @@ export interface ModelState {
   fast: boolean
 }
 
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 const SAVE_DEBOUNCE_MS = 300
 const SAVE_RETRY_MAX = 5
+const DEFAULT_MODEL_SELECTIONS = {
+  krea2: 'krea2_turbo', flux2klein4b: 'flux2klein4b_distilled', flux2klein9b: 'flux2klein9b_distilled',
+}
 
 /** 状态装载结果。failed 时**不得**开启自动保存, 否则会用默认值覆盖服务端。 */
 export type RestoreOutcome = 'applied' | 'empty' | 'failed'
@@ -185,7 +190,7 @@ export interface RestoreResult {
 /** 视频架构的默认视频态: 从 config.videoDefaults 推导。
  *  durationS 默认 5; width/height 取默认档 landscape (优先 720p, 缺失时回退到第一个档位, 如 H3 的 768p);
  *  refImage 空。resolution 默认指向那一档预设本身 (自洽: 下拉选中项与 width/height 一致);
- *  用户上传起始画面后由 VideoSettings 自动切到 'ref' (贴合项)。 */
+ *  用户选择起始画面后切到 'ref' (贴合项)。 */
 export function createDefaultVideoState(config: ModelTypeConfig): VideoState {
   const vd = config.videoDefaults
   const presets = vd?.presets
@@ -204,7 +209,7 @@ export function createDefaultVideoState(config: ModelTypeConfig): VideoState {
     // 默认取 i2v (产品重心是「把自己的图动起来」); videoModes 的数组顺序只决定
     // SegmentedControl 的显示顺序, 不代表默认值。单模式条目 (14B) 不设此字段。
     ...(config.videoModes?.length
-      ? { mode: config.videoModes.includes('i2v') ? 'i2v' as const : config.videoModes[0] }
+      ? { mode: (config.defaultMode ?? (config.videoModes.includes('i2v') ? 'i2v' : config.videoModes[0])) as VideoState['mode'] }
       : {}),
   }
 }
@@ -214,8 +219,8 @@ function randomSeed(): number {
 }
 
 export function createDefaultState(config: ModelTypeConfig): ModelState {
-  const sampling = config.videoDefaults?.speedToggle ? WAN22_FAST_SAMPLING : config.defaults
-  const cnTypes = ['pose', 'canny', 'depth']
+  const sampling = modelConfig(config.key, config.fastDefault ?? false).defaults
+  const cnTypes = ['pose', 'canny', 'depth', 'lineart', 'tile']
   const controlNets: Record<string, ControlNetState> = {}
   cnTypes.forEach(t => {
     const d = config.cnDefaults?.[t]
@@ -232,6 +237,8 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
   const [width, height] = resolution.split('x').map(Number)
 
   return {
+    mode: config.defaultMode ?? config.modes?.[0] ?? 't2i',
+    refs: [],
     positive: '',
     negative: '',
     positiveDisabled: [],
@@ -273,21 +280,21 @@ export function createDefaultState(config: ModelTypeConfig): ModelState {
     },
     hires: {
       enabled: false, scale: 1.5, upscaleMethod: 'bislerp', denoise: 0.4,
-      steps: sampling.steps, cfg: sampling.cfg,
-      sampler: sampling.sampler, scheduler: sampling.scheduler,
+      steps: config.defaults.steps, cfg: config.defaults.cfg,
+      sampler: config.defaults.sampler, scheduler: config.defaults.scheduler,
       seedMode: 'random', seedValue: randomSeed(),
     },
     i2i: { enabled: false, image: null, denoise: 0.7, mode: 'i2i', mask: null, growMaskBy: 6 },
     faceDetailer: {
       enabled: false, detectionModel: 'face_yolov8m.pt', denoise: 0.35,
-      steps: sampling.steps, prompt: '', cfg: sampling.cfg,
-      sampler: sampling.sampler, scheduler: sampling.scheduler,
+      steps: config.defaults.steps, prompt: '', cfg: config.defaults.cfg,
+      sampler: config.defaults.sampler, scheduler: config.defaults.scheduler,
       guideSize: 768, cropFactor: 1.8, bboxThreshold: 0.5,
       feather: 5, useSam: false,
     },
     activeModule: config.modules[0] || 'lora',
     video: config.mediaType === 'video' ? createDefaultVideoState(config) : undefined,
-    fast: true,
+    fast: config.fastDefault ?? false,
   }
 }
 
@@ -309,6 +316,7 @@ export const useGenerateStore = defineStore('generate', () => {
   })
 
   const modelStates = reactive<Record<string, ModelState>>({})
+  const modelSelections = reactive<Record<string, string>>({ ...DEFAULT_MODEL_SELECTIONS })
 
   const downloads = useDownloadsStore()
   const restoredFiles = computed<Array<WorkspaceFile & { arch: string }>>(() =>
@@ -370,6 +378,7 @@ export const useGenerateStore = defineStore('generate', () => {
       const state = modelStates[file.arch]
       if (!state) continue
       if (file.field.startsWith('fast.')) state.fast = false
+      else if (file.field.startsWith('reference.')) state.mode = 't2i'
       else if (file.field === 'faceDetailer.sam') state.faceDetailer.useSam = false
       else if (file.field.startsWith('upscale.') && file.field !== 'upscale.svrModel') state.upscale.enabled = false
       else if (file.field.includes('.dependency.')) {
@@ -385,11 +394,11 @@ export const useGenerateStore = defineStore('generate', () => {
     componentsReady[type] = ready
   }
 
-  const currentConfig = computed<ModelTypeConfig>(() => MODEL_TYPES[activeModelType.value] ?? MODEL_TYPES.sd15!)
+  const currentConfig = computed<ModelTypeConfig>(() => configFor(activeModelType.value))
   const currentState = computed<ModelState>(() => {
     const key = activeModelType.value
     if (!modelStates[key]) {
-      modelStates[key] = createDefaultState(currentConfig.value)
+      modelStates[key] = createDefaultState(MODEL_TYPES[key]!)
     }
     return modelStates[key] as ModelState
   })
@@ -405,6 +414,42 @@ export const useGenerateStore = defineStore('generate', () => {
       modelStates[type] = createDefaultState(cfg)
     }
     return modelStates[type] as ModelState
+  }
+
+  function configFor(type: string): ModelTypeConfig {
+    const state = stateFor(type)
+    return modelConfig(type, state.fast, state.video?.mode ?? state.mode)
+  }
+
+  function setFast(fast: boolean) {
+    if (currentState.value.fast === fast || currentConfig.value.fastLocked) return
+    const config = currentConfig.value
+    if (config.fastModel) {
+      const mode = currentState.value.video?.mode ?? currentState.value.mode
+      const target = modelsForMode(config.key, mode).find(key => !!MODEL_TYPES[key]!.fastDefault === fast)!
+      switchModelType(target, mode)
+    } else {
+      currentState.value.fast = fast
+      Object.assign(currentState.value, currentConfig.value.defaults)
+    }
+  }
+
+  function setMode(mode: string) {
+    const previousMode = currentState.value.video?.mode ?? currentState.value.mode
+    if (previousMode === mode) return
+    const config = currentConfig.value
+    const group = config.menuKey ?? config.key
+    modelSelections[`${group}.${previousMode}`] = config.key
+    const choices = modelsForMode(config.key, mode)
+    const target = modelSelections[`${group}.${mode}`]
+      ?? (choices.includes(config.key) ? config.key : choices[0]!)
+    switchModelType(target, mode)
+  }
+
+  function setScheduler(scheduler: string, type = activeModelType.value) {
+    const state = stateFor(type)
+    state.scheduler = scheduler
+    if (['qwen_image21_turbo', 'flux2_turbo'].includes(scheduler)) state.steps = 8
   }
 
   // ── 状态持久化 (服务端唯一真相源) ────────────────────────────────────────
@@ -423,7 +468,6 @@ export const useGenerateStore = defineStore('generate', () => {
   // 串行化写入: 并发 PUT 可能乱序到达, 后者覆盖前者就与「后写入覆盖」语义相悖
   let saving = false
   let pending = false
-  let epoch = ''
   const savedStates = ref<Record<string, ModelState>>({})
   const dirty = new Set<string>()
 
@@ -442,6 +486,7 @@ export const useGenerateStore = defineStore('generate', () => {
       _version: SCHEMA_VERSION,
       activeTask: activeTask.value,
       activeModelTypeByTask,
+      modelSelections,
       modelStates: changedStates,
     })
   }
@@ -471,18 +516,28 @@ export const useGenerateStore = defineStore('generate', () => {
   }, { flush: 'sync' })
   watch(activeModelTypeByTask, scheduleSave, { deep: true, flush: 'sync' })
   watch(activeTask, scheduleSave, { flush: 'sync' })
+  watch(modelSelections, scheduleSave, { deep: true, flush: 'sync' })
   watch(() => restoredFiles.value.map(file => file.path).join('\n'), () => {
     if (autoSaveEnabled) void checkMissingFiles().catch(() => {})
   })
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
-  function switchModelType(type: string) {
+  function switchModelType(type: string, mode?: string) {
     if (!MODEL_TYPES[type]) return
-    activeModelTypeByTask[activeTask.value] = type
-    if (!modelStates[type]) {
-      modelStates[type] = createDefaultState(MODEL_TYPES[type])
+    const state = stateFor(type)
+    if (mode !== undefined) {
+      if (state.video) state.video.mode = mode as VideoState['mode']
+      else state.mode = mode
     }
+    activeModelTypeByTask[activeTask.value] = type
+    const group = MODEL_TYPES[type].menuKey ?? type
+    modelSelections[group] = type
+    modelSelections[`${group}.${state.video?.mode ?? state.mode}`] = type
+  }
+
+  function selectModelGroup(key: string) {
+    switchModelType(modelSelections[key] ?? key)
   }
 
   /** 切换任务 (image/video); 同时把当前架构指针切到该任务的记忆值 */
@@ -509,19 +564,10 @@ export const useGenerateStore = defineStore('generate', () => {
     try {
       const res = await fetch(STATE_ENDPOINT, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-Generate-Epoch': epoch },
+        headers: { 'Content-Type': 'application/json' },
         body,
       })
       if (res.status === 401) { redirectToLogin(); return }
-      // 409 = 服务端配置批次已改变。停止重试:
-      // 重试只会一直失败, 且此刻内存里的状态已过时, 必须重新装载。
-      if (res.status === 409) {
-        saveError.value = 'reload_required'
-        autoSaveEnabled = false
-        pending = false
-        clearTimers()
-        return
-      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       saveFailures = 0
       saveError.value = null
@@ -569,9 +615,8 @@ export const useGenerateStore = defineStore('generate', () => {
         })
         if (res.status === 401) { redirectToLogin(); return { outcome: 'failed' } }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const body = await res.json() as { state: Record<string, unknown> | null; epoch: string }
+        const body = await res.json() as { state: Record<string, unknown> | null }
         data = body?.state ?? null
-        epoch = body.epoch
         ok = true
         break
       } catch {
@@ -585,6 +630,8 @@ export const useGenerateStore = defineStore('generate', () => {
     if (!ok) return { outcome: 'failed' }
 
     for (const key of Object.keys(modelStates)) delete modelStates[key]
+    for (const key of Object.keys(modelSelections)) delete modelSelections[key]
+    Object.assign(modelSelections, DEFAULT_MODEL_SELECTIONS)
     savedStates.value = {}
     saveError.value = null
 
@@ -598,6 +645,7 @@ export const useGenerateStore = defineStore('generate', () => {
         if (type && MODEL_TYPES[type]?.mediaType === task) activeModelTypeByTask[task] = type
       }
       activeTask.value = data.activeTask === 'video' ? 'video' : 'image'
+      Object.assign(modelSelections, data.modelSelections)
 
       if (data.modelStates) {
         for (const [key, rawState] of Object.entries(data.modelStates)) {
@@ -643,12 +691,12 @@ export const useGenerateStore = defineStore('generate', () => {
 
   return {
     activeModelType, activeModelTypeByTask, activeTask,
-    modelStates,
+    modelStates, modelSelections,
     missingPaths, missingRefs, isMissing, pruneMissing, checkMissingFiles,
     restoredFiles,
     componentsReady, setComponentsReady,
-    currentConfig, currentState, stateFor,
-    switchModelType, switchTask, save, restore, enableAutoSave,
+    currentConfig, currentState, stateFor, configFor, setFast, setMode, setScheduler,
+    switchModelType, selectModelGroup, switchTask, save, restore, enableAutoSave,
     saveError,
   }
 })
