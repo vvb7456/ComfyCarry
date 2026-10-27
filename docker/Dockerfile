@@ -183,8 +183,10 @@ RUN python3.13 -m pip install \
 # SAM2 使用镜像内的 PyTorch 编译，避免隔离环境引入其他版本导致 ABI 不匹配。
 # 显式指定目标架构并禁止静默降级，确保 minimal-build 工具链在 CI 中真实可用。
 # 插件可能已安装同版本的无 CUDA 扩展包，需强制重装 SAM2，保留现有依赖。
+# CUDA 数学库头文件由 PyTorch 的 NVIDIA wheel 提供。
 ARG TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
 RUN TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
+    CUDA_INC_PATH=/usr/local/lib/python3.13/dist-packages/nvidia/cu13/include \
     SAM2_BUILD_ALLOW_ERRORS=0 \
     python3.13 -m pip install --no-build-isolation --force-reinstall --no-deps \
         "git+https://github.com/facebookresearch/sam2.git"
