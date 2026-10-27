@@ -102,7 +102,7 @@ RUN --mount=type=bind,source=docker/wheels,target=/tmp/wheels,ro \
 # =============================================================================
 # 6. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
 # =============================================================================
-COPY docker/wheels/sageattention-2.2.0-cp312-cp312-linux_*_sm*.whl /opt/wheels/sa2/
+COPY docker/wheels/sageattention-2.2.0-0.cu130torch2.9.1.sm*-cp312-cp312-linux_*.whl /opt/wheels/sa2/
 
 # =============================================================================
 # 7. 生成 torch 约束文件，防止插件依赖覆盖已验证版本

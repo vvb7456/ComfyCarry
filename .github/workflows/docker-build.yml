@@ -3,7 +3,7 @@
 #
 # 基线: NVIDIA cudnn-runtime + 最小 CUDA 编译链
 # 触发: 手动 / push 生产 Dockerfile、入口脚本或本工作流
-# 产物: latest / x86 / arm，以及 v<版本>-x86 / v<版本>-arm
+# 产物: Python 3.12 的 v<版本>-x86 / v<版本>-arm
 # ==============================================================================
 
 name: Build & Push Docker Image
@@ -21,7 +21,7 @@ on:
       - "comfycarry/services/system_monitor.py"
       - "docker/comfycarry-banner.txt"
       - ".github/workflows/docker-build.yml"
-    branches: [main]
+    branches: [image/py312]
 
 concurrency:
   group: docker-production-${{ github.ref }}
@@ -40,14 +40,12 @@ jobs:
           - arch: amd64
             runner: ubuntu-latest
             name: x86
-            tags: latest x86
             wheel_arch: x86_64
             sa_archs: sm80 sm86 sm89 sm90 sm100 sm120
             cuda_archs: "8.0;8.6;8.9;9.0;10.0;12.0"
           - arch: arm64
             runner: ubuntu-24.04-arm
             name: arm
-            tags: arm
             wheel_arch: aarch64
             sa_archs: sm120
             cuda_archs: "12.1"
@@ -69,9 +67,7 @@ jobs:
           {
             echo 'tags<<EOF'
             for image in "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry"; do
-              for tag in ${{ matrix.tags }} "v${VERSION}-${{ matrix.name }}"; do
-                echo "${image}:${tag}"
-              done
+              echo "${image}:v${VERSION}-${{ matrix.name }}"
             done
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
@@ -87,7 +83,7 @@ jobs:
 
           echo ">>> Downloading SA2 wheels..."
           for arch in ${{ matrix.sa_archs }}; do
-            whl="sageattention-2.2.0-cp312-cp312-linux_${{ matrix.wheel_arch }}_${arch}.whl"
+            whl="sageattention-2.2.0-0.cu130torch2.9.1.${arch}-cp312-cp312-linux_${{ matrix.wheel_arch }}.whl"
             wget -q -P docker/wheels "${RELEASE_URL}/${whl}"
           done
 
