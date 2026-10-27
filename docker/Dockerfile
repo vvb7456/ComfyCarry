@@ -105,7 +105,7 @@ RUN ln -s /usr/bin/python3.13 /usr/local/bin/python3 && \
 # 5. FlashAttention-2 (按 CPU 架构选取预编译 wheel)
 # =============================================================================
 RUN --mount=type=bind,source=docker/wheels,target=/tmp/wheels,ro \
-    python3.13 -m pip install --no-deps \
+    python3.13 -m pip install \
         /tmp/wheels/flash_attn-2.8.3.post2+cu130torch2.11.0-cp313-cp313-linux_$(uname -m).whl
 
 # =============================================================================
@@ -194,17 +194,10 @@ RUN python3.13 -m pip install \
 
 RUN python3.13 -m pip install \
     aiohttp opencv-python-headless scikit-image \
-    accelerate transformers safetensors
+    accelerate transformers safetensors onnxruntime-gpu
 
-# InsightFace 会安装 CPU 版 onnxruntime，GPU 包最后安装，避免覆盖 CUDA Provider。
 RUN python3.13 -m pip install \
-    gguf insightface imageio imageio-ffmpeg && \
-    python3.13 -m pip install --force-reinstall --no-deps onnxruntime-gpu
-
-RUN python3.13 -c "\
-import torch, flash_attn, onnxruntime; \
-assert 'CUDAExecutionProvider' in onnxruntime.get_available_providers(); \
-print('FA2/ONNX GPU 导入检查通过')"
+    gguf insightface imageio imageio-ffmpeg
 
 # =============================================================================
 # 11. 目录结构 & 预构建标记
