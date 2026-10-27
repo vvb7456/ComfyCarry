@@ -140,21 +140,35 @@ def _install_sa2(py, cuda_cap):
         _deploy_log(f"未知 GPU 架构 {cuda_cap}, 跳过 SA2", "warn")
         return
 
-    cpu_arch = platform.machine()
-    whl_src = Path(f"/opt/wheels/sa2/sageattention-2.2.0-cp312-cp312-linux_{cpu_arch}_{wheel_suffix}.whl")
-    if not whl_src.exists():
-        _deploy_log(f"SA2 wheel 不存在: {whl_src}", "warn")
+    python_tag = subprocess.check_output(
+        [py, "-c", "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')"],
+        text=True,
+    ).strip()
+    wheel_tag = f"{python_tag}-{python_tag}-linux_{platform.machine()}"
+    for whl_src in Path("/opt/wheels/sa2").glob("sageattention-*.whl"):
+        if whl_src.name.endswith(f".{wheel_suffix}-{wheel_tag}.whl"):
+            install_whl = whl_src
+            break
+        if whl_src.name.endswith(f"-{wheel_tag}_{wheel_suffix}.whl"):
+            # 旧镜像把 GPU 标记放在平台名后，安装前需恢复标准 wheel 文件名。
+            install_whl = Path("/tmp") / whl_src.name.replace(f"_{wheel_suffix}.whl", ".whl")
+            shutil.copy2(whl_src, install_whl)
+            break
+    else:
+        _deploy_log(f"未找到匹配的 SA2 wheel: {wheel_tag}, {wheel_suffix}", "warn")
         return
 
-    # Docker wheel 的 GPU 标记位于平台名后，安装前需恢复标准平台名。
-    install_whl = Path(f"/tmp/sageattention-2.2.0-cp312-cp312-linux_{cpu_arch}.whl")
-    shutil.copy2(str(whl_src), str(install_whl))
-
     _deploy_log(f"安装 SA2 ({wheel_suffix})...")
-    _deploy_exec(f'{py} -m pip install "{install_whl}" --no-deps --no-cache-dir',
-                 label=f"pip install SA2-{wheel_suffix}")
-    _deploy_exec(f'rm -f "{install_whl}"')
-    _deploy_log(f"SageAttention-2 ({wheel_suffix}) 安装完成", "success")
+    installed = _deploy_exec(
+        [py, "-m", "pip", "install", str(install_whl), "--no-deps", "--no-cache-dir"],
+        label=f"pip install SA2-{wheel_suffix}",
+    )
+    if install_whl != whl_src:
+        install_whl.unlink()
+    if installed:
+        _deploy_log(f"SageAttention-2 ({wheel_suffix}) 安装完成", "success")
+    else:
+        _deploy_log(f"SageAttention-2 ({wheel_suffix}) 安装失败", "error")
 
 
 def _deploy_step(name):
@@ -557,7 +571,7 @@ def _step_accelerators(PY):
     )
     _install_sa2(PY, cuda_cap)
 
-    _deploy_log("加速组件安装完成", "success")
+    _deploy_log("加速组件安装流程结束")
 
 
 def _step_plugins(config, PY):
