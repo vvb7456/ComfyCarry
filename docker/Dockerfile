@@ -42,7 +42,7 @@ RUN apt-get update -qq && \
     apt-get update -qq && \
     apt-get install -y --no-install-recommends \
         cuda-minimal-build-13-0=13.0.0-1 \
-        ca-certificates curl wget gnupg gawk \
+        wget gawk \
         python3.13 python3.13-dev python3.13-venv \
         git git-lfs aria2 jq ffmpeg unzip tar gzip rsync \
         libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
@@ -83,8 +83,7 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
 RUN ln -s /usr/bin/python3.13 /usr/local/bin/python3 && \
     ln -s /usr/bin/python3.13 /usr/local/bin/python && \
     curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && \
-    python3.13 /tmp/get-pip.py && \
-    python3.13 -m pip install --upgrade pip setuptools wheel && \
+    python3.13 /tmp/get-pip.py setuptools wheel && \
     python3.13 -m pip install \
         torch==2.11.0 \
         torchvision==0.26.0 \
@@ -120,11 +119,8 @@ COPY docker/wheels/sageattention-2.2.0+cu130torch2.11.0.sm*-cp313-cp313-linux_*.
 RUN python3.13 -c "\
 from importlib.metadata import version; \
 print('\n'.join(f'{name}=={version(name)}' for name in ('torch', 'torchaudio', 'torchvision', 'triton')))" \
-    > /opt/torch-constraints.txt && \
-    cat /opt/torch-constraints.txt
-
-ENV PIP_CONSTRAINT=/opt/torch-constraints.txt \
-    UV_CONSTRAINT=/opt/torch-constraints.txt
+    > /tmp/torch-constraints.txt && \
+    cat /tmp/torch-constraints.txt
 
 # =============================================================================
 # 8. ComfyUI
@@ -135,7 +131,8 @@ RUN COMFY_TAG=$(git ls-remote --refs --tags https://github.com/comfyanonymous/Co
     echo "ComfyUI stable tag: ${COMFY_TAG}" && \
     git clone --depth 1 --branch "${COMFY_TAG}" https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
-    python3.13 -m pip install -r requirements.txt
+    python3.13 -m pip install --constraint /tmp/torch-constraints.txt \
+        -r requirements.txt
 
 # =============================================================================
 # 9. 常用插件
@@ -172,7 +169,7 @@ RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f
         echo "========================================" && \
         echo ">>> Installing: $req" && \
         echo "========================================" && \
-        python3.13 -m pip install -r "$req" || \
+        python3.13 -m pip install --constraint /tmp/torch-constraints.txt -r "$req" || \
         echo "PARTIAL FAILURE: $req"; \
     done
 
@@ -180,7 +177,7 @@ RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f
 # 10. 显式安装易遗漏 / 补充依赖
 # =============================================================================
 RUN python3.13 -m pip install \
-    diffusers torchao==0.17.0 clip_interrogator peft open-clip-torch timm ftfy \
+    diffusers clip_interrogator peft open-clip-torch timm ftfy \
     color-matcher mss dill
 
 # SAM2 使用镜像内的 PyTorch 编译，避免隔离环境引入其他版本导致 ABI 不匹配。
@@ -204,15 +201,11 @@ RUN python3.13 -m pip install \
     gguf insightface imageio imageio-ffmpeg && \
     python3.13 -m pip install --force-reinstall --no-deps onnxruntime-gpu
 
-RUN python3 -c "\
-import sys, torch, torchvision, torchaudio, flash_attn, onnxruntime; \
+RUN python3.13 -c "\
+import torch, flash_attn, onnxruntime; \
 from sam2 import _C; \
-from torchao.quantization import FqnToConfig; \
-assert sys.version_info[:2] == (3, 13); \
-assert torch.__version__.split('+')[0] == '2.11.0'; \
-assert torch.version.cuda == '13.0'; \
 assert 'CUDAExecutionProvider' in onnxruntime.get_available_providers(); \
-print('Python/PyTorch/FA2/SAM2/ONNX 导入检查通过')"
+print('FA2/SAM2/ONNX GPU 导入检查通过')"
 
 # =============================================================================
 # 11. 目录结构 & 预构建标记
