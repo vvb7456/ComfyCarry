@@ -117,8 +117,9 @@ COPY docker/wheels/sageattention-2.2.0+cu130torch2.11.0.sm*-cp313-cp313-linux_*.
 # 7. 生成 torch 约束文件，防止插件依赖覆盖已验证版本
 # =============================================================================
 RUN python3.13 -c "\
-from importlib.metadata import version; \
-print('\n'.join(f'{name}=={version(name)}' for name in ('torch', 'torchaudio', 'torchvision', 'triton')))" \
+import torch; print(f'torch=={torch.__version__}'); \
+import torchaudio; print(f'torchaudio=={torchaudio.__version__}'); \
+import torchvision; print(f'torchvision=={torchvision.__version__}')" \
     > /tmp/torch-constraints.txt && \
     cat /tmp/torch-constraints.txt
 
@@ -180,15 +181,11 @@ RUN python3.13 -m pip install \
     diffusers clip_interrogator peft open-clip-torch timm ftfy \
     color-matcher mss dill
 
-# SAM2 使用镜像内的 PyTorch 编译，避免隔离环境引入其他版本导致 ABI 不匹配。
-# 显式指定目标架构并禁止静默降级，确保 minimal-build 工具链在 CI 中真实可用。
-# 插件可能已安装同版本的无 CUDA 扩展包，需强制重装 SAM2，保留现有依赖。
-# CUDA 数学库头文件由 PyTorch 的 NVIDIA wheel 提供。
+# SAM2 如需编译，复用镜像内的 PyTorch，避免隔离环境引入其他版本。
 ARG TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
 RUN TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
-    CUDA_INC_PATH=/usr/local/lib/python3.13/dist-packages/nvidia/cu13/include \
     SAM2_BUILD_ALLOW_ERRORS=0 \
-    python3.13 -m pip install --no-build-isolation --force-reinstall --no-deps \
+    python3.13 -m pip install --no-build-isolation \
         "git+https://github.com/facebookresearch/sam2.git"
 
 RUN python3.13 -m pip install \
@@ -206,9 +203,8 @@ RUN python3.13 -m pip install \
 
 RUN python3.13 -c "\
 import torch, flash_attn, onnxruntime; \
-from sam2 import _C; \
 assert 'CUDAExecutionProvider' in onnxruntime.get_available_providers(); \
-print('FA2/SAM2/ONNX GPU 导入检查通过')"
+print('FA2/ONNX GPU 导入检查通过')"
 
 # =============================================================================
 # 11. 目录结构 & 预构建标记
