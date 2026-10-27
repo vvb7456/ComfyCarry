@@ -145,26 +145,17 @@ def _install_sa2(py, cuda_cap):
         text=True,
     ).strip()
     wheel_tag = f"{python_tag}-{python_tag}-linux_{platform.machine()}"
-    for whl_src in Path("/opt/wheels/sa2").glob("sageattention-*.whl"):
-        if whl_src.name.endswith(f".{wheel_suffix}-{wheel_tag}.whl"):
-            install_whl = whl_src
-            break
-        if whl_src.name.endswith(f"-{wheel_tag}_{wheel_suffix}.whl"):
-            # 旧镜像把 GPU 标记放在平台名后，安装前需恢复标准 wheel 文件名。
-            install_whl = Path("/tmp") / whl_src.name.replace(f"_{wheel_suffix}.whl", ".whl")
-            shutil.copy2(whl_src, install_whl)
-            break
-    else:
+    wheel_pattern = f"sageattention-*.{wheel_suffix}-{wheel_tag}.whl"
+    whl_src = next(Path("/opt/wheels/sa2").glob(wheel_pattern), None)
+    if whl_src is None:
         _deploy_log(f"未找到匹配的 SA2 wheel: {wheel_tag}, {wheel_suffix}", "warn")
         return
 
     _deploy_log(f"安装 SA2 ({wheel_suffix})...")
     installed = _deploy_exec(
-        [py, "-m", "pip", "install", str(install_whl), "--no-deps", "--no-cache-dir"],
+        [py, "-m", "pip", "install", str(whl_src), "--no-deps", "--no-cache-dir"],
         label=f"pip install SA2-{wheel_suffix}",
     )
-    if install_whl != whl_src:
-        install_whl.unlink()
     if installed:
         _deploy_log(f"SageAttention-2 ({wheel_suffix}) 安装完成", "success")
     else:
