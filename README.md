@@ -45,7 +45,9 @@ Create a GPU instance on Vast.ai / RunPod with the pre-built image:
 erocraft/comfycarry:latest
 ```
 
-Built on Python 3.12 + PyTorch 2.9.1 + CUDA 13.0, includes FlashAttention-2, SageAttention-2, ComfyUI & 21 popular plugins. Boot time: 2-5 minutes.
+Built on Python 3.13 + PyTorch 2.11.0 + CUDA 13.0, includes FlashAttention-2, SageAttention-2, ComfyUI & 21 popular plugins. Boot time: 2-5 minutes.
+
+Use `v3.3.0-x86` / `v3.3.0-arm` for Python 3.13, or `v3.2.0-x86` / `v3.2.0-arm` for Python 3.12. The `latest` and `x86` tags select the newest x86 image; `arm` selects the newest ARM64 image.
 
 ### 2. Set the On-Start Script
 

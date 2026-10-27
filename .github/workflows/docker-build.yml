@@ -30,7 +30,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: vvb7456/comfycarry
-  RELEASE_TAG: wheels-v1  # GitHub Release tag (存放预编译 wheels)
+  RELEASE_TAG: wheels-py313-torch2.11.0-cu130  # GitHub Release tag (存放预编译 wheels)
 
 jobs:
   build-push:
@@ -83,11 +83,11 @@ jobs:
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
 
           echo ">>> Downloading FA2 wheel..."
-          wget -q -P docker/wheels "${RELEASE_URL}/flash_attn-2.8.3-cp312-cp312-linux_${{ matrix.wheel_arch }}.whl"
+          wget -q -P docker/wheels "${RELEASE_URL}/flash_attn-2.8.3.post2+cu130torch2.11.0-cp313-cp313-linux_${{ matrix.wheel_arch }}.whl"
 
           echo ">>> Downloading SA2 wheels..."
           for arch in ${{ matrix.sa_archs }}; do
-            whl="sageattention-2.2.0-cp312-cp312-linux_${{ matrix.wheel_arch }}_${arch}.whl"
+            whl="sageattention-2.2.0+cu130torch2.11.0.${arch}-cp313-cp313-linux_${{ matrix.wheel_arch }}.whl"
             wget -q -P docker/wheels "${RELEASE_URL}/${whl}"
           done
 

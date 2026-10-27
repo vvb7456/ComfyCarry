@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# ComfyCarry Docker 镜像 (CUDA 13.0 / PyTorch 2.9.1)
+# ComfyCarry Docker 镜像 (Python 3.13 / CUDA 13.0 / PyTorch 2.11.0)
 #
 # 正式生产基线：NVIDIA cudnn-runtime + 最小 CUDA 编译链。
 # CI 发布 latest / x86 / arm 和 v<版本>-<架构> 标签。
@@ -17,6 +17,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_BREAK_SYSTEM_PACKAGES=1 \
     PIP_ROOT_USER_ACTION=ignore \
+    COMFYCARRY_PYTHON=/usr/bin/python3.13 \
     HOME=/root \
     RP_WORKSPACE=/workspace \
     HF_HOME=/workspace/.cache/huggingface \
@@ -33,11 +34,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # 支持 SAM2 以及常见 torch.utils.cpp_extension；不安装 Nsight、完整数学库
 # development/static packages 等约 2 GiB 的 devel 增量。
 RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
+    curl -fsSL 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776' \
+        | gpg --dearmor -o /usr/share/keyrings/deadsnakes.gpg && \
+    echo 'deb [signed-by=/usr/share/keyrings/deadsnakes.gpg] https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu noble main' \
+        > /etc/apt/sources.list.d/deadsnakes.list && \
+    apt-get update -qq && \
     apt-get install -y --no-install-recommends \
         cuda-minimal-build-13-0=13.0.0-1 \
         ca-certificates curl wget gnupg gawk \
-        python3.12 python3.12-dev python3.12-venv python3-pip \
-        python-is-python3 \
+        python3.13 python3.13-dev python3.13-venv \
         git git-lfs aria2 jq ffmpeg unzip tar gzip rsync \
         libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
         build-essential cmake pkg-config \
@@ -73,22 +79,26 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings && \
 # =============================================================================
 # 4. Python、PyTorch、Jupyter 与 Dashboard 依赖
 # =============================================================================
-RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED && \
-    python3.12 -m pip install --upgrade --ignore-installed pip setuptools wheel && \
-    python3.12 -m pip install \
-        torch==2.9.1 \
-        torchvision==0.24.1 \
-        torchaudio==2.9.1 \
+# /usr/bin/python3 留给 Ubuntu 的系统工具，应用使用 /usr/local/bin 中的默认命令。
+RUN ln -s /usr/bin/python3.13 /usr/local/bin/python3 && \
+    ln -s /usr/bin/python3.13 /usr/local/bin/python && \
+    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && \
+    python3.13 /tmp/get-pip.py && \
+    python3.13 -m pip install --upgrade pip setuptools wheel && \
+    python3.13 -m pip install \
+        torch==2.11.0 \
+        torchvision==0.26.0 \
+        torchaudio==2.11.0 \
         --index-url https://download.pytorch.org/whl/cu130 && \
-    python3.12 -m pip install \
+    python3.13 -m pip install \
         packaging ninja einops numpy psutil virtualenv uv nvidia-ml-py \
         hf_transfer && \
-    python3.12 -m pip install --ignore-installed \
+    python3.13 -m pip install --ignore-installed \
         flask flask-cors requests websocket-client && \
-    python3.12 -m pip install \
+    python3.13 -m pip install \
         'openai==1.109.1' 'anthropic==0.46.0' 'google-genai==1.75.0' \
         'pydantic>=2.0,<3' 'httpx>=0.27,<1' && \
-    python3.12 -m pip install \
+    python3.13 -m pip install \
         jupyterlab notebook==7.4.2 ipywidgets jupyter-archive \
         jupyterlab-language-pack-zh-CN
 
@@ -96,23 +106,25 @@ RUN rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED && \
 # 5. FlashAttention-2 (按 CPU 架构选取预编译 wheel)
 # =============================================================================
 RUN --mount=type=bind,source=docker/wheels,target=/tmp/wheels,ro \
-    python3.12 -m pip install \
-        /tmp/wheels/flash_attn-2.8.3-cp312-cp312-linux_$(uname -m).whl
+    python3.13 -m pip install --no-deps \
+        /tmp/wheels/flash_attn-2.8.3.post2+cu130torch2.11.0-cp313-cp313-linux_$(uname -m).whl
 
 # =============================================================================
 # 6. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
 # =============================================================================
-COPY docker/wheels/sageattention-2.2.0-cp312-cp312-linux_*_sm*.whl /opt/wheels/sa2/
+COPY docker/wheels/sageattention-2.2.0+cu130torch2.11.0.sm*-cp313-cp313-linux_*.whl /opt/wheels/sa2/
 
 # =============================================================================
 # 7. 生成 torch 约束文件，防止插件依赖覆盖已验证版本
 # =============================================================================
-RUN python3.12 -c "\
-import torch; print(f'torch=={torch.__version__}'); \
-import torchaudio; print(f'torchaudio=={torchaudio.__version__}'); \
-import torchvision; print(f'torchvision=={torchvision.__version__}')" \
-    > /tmp/torch-constraints.txt && \
-    cat /tmp/torch-constraints.txt
+RUN python3.13 -c "\
+from importlib.metadata import version; \
+print('\n'.join(f'{name}=={version(name)}' for name in ('torch', 'torchaudio', 'torchvision', 'triton')))" \
+    > /opt/torch-constraints.txt && \
+    cat /opt/torch-constraints.txt
+
+ENV PIP_CONSTRAINT=/opt/torch-constraints.txt \
+    UV_CONSTRAINT=/opt/torch-constraints.txt
 
 # =============================================================================
 # 8. ComfyUI
@@ -123,8 +135,7 @@ RUN COMFY_TAG=$(git ls-remote --refs --tags https://github.com/comfyanonymous/Co
     echo "ComfyUI stable tag: ${COMFY_TAG}" && \
     git clone --depth 1 --branch "${COMFY_TAG}" https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
-    python3.12 -m pip install --constraint /tmp/torch-constraints.txt \
-        -r requirements.txt
+    python3.13 -m pip install -r requirements.txt
 
 # =============================================================================
 # 9. 常用插件
@@ -161,15 +172,15 @@ RUN for req in $(find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f
         echo "========================================" && \
         echo ">>> Installing: $req" && \
         echo "========================================" && \
-        python3.12 -m pip install --constraint /tmp/torch-constraints.txt -r "$req" || \
+        python3.13 -m pip install -r "$req" || \
         echo "PARTIAL FAILURE: $req"; \
     done
 
 # =============================================================================
 # 10. 显式安装易遗漏 / 补充依赖
 # =============================================================================
-RUN python3.12 -m pip install \
-    diffusers clip_interrogator peft open-clip-torch timm ftfy \
+RUN python3.13 -m pip install \
+    diffusers torchao==0.17.0 clip_interrogator peft open-clip-torch timm ftfy \
     color-matcher mss dill
 
 # SAM2 使用镜像内的 PyTorch 编译，避免隔离环境引入其他版本导致 ABI 不匹配。
@@ -177,25 +188,37 @@ RUN python3.12 -m pip install \
 ARG TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
 RUN TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
     SAM2_BUILD_ALLOW_ERRORS=0 \
-    python3.12 -m pip install --no-build-isolation \
+    python3.13 -m pip install --no-build-isolation \
         "git+https://github.com/facebookresearch/sam2.git"
 
-RUN python3.12 -m pip install \
+RUN python3.13 -m pip install \
     numba matplotlib dynamicprompts==0.30.2 \
     aiosqlite uuid7 deepdiff piexif segment-anything py-cpuinfo
 
-RUN python3.12 -m pip install \
+RUN python3.13 -m pip install \
     aiohttp opencv-python-headless scikit-image \
-    accelerate transformers safetensors onnxruntime-gpu
+    accelerate transformers safetensors
 
-RUN python3.12 -m pip install \
-    gguf insightface imageio imageio-ffmpeg
+# InsightFace 会安装 CPU 版 onnxruntime，GPU 包最后安装，避免覆盖 CUDA Provider。
+RUN python3.13 -m pip install \
+    gguf insightface imageio imageio-ffmpeg && \
+    python3.13 -m pip install --force-reinstall --no-deps onnxruntime-gpu
+
+RUN python3 -c "\
+import sys, torch, torchvision, torchaudio, flash_attn, onnxruntime; \
+from sam2 import _C; \
+from torchao.quantization import FqnToConfig; \
+assert sys.version_info[:2] == (3, 13); \
+assert torch.__version__.split('+')[0] == '2.11.0'; \
+assert torch.version.cuda == '13.0'; \
+assert 'CUDAExecutionProvider' in onnxruntime.get_available_providers(); \
+print('Python/PyTorch/FA2/SAM2/ONNX 导入检查通过')"
 
 # =============================================================================
 # 11. 目录结构 & 预构建标记
 # =============================================================================
 ARG IMAGE_VERSION
-LABEL description="ComfyCarry v${IMAGE_VERSION} — CUDA 13.0 / PyTorch 2.9.1"
+LABEL description="ComfyCarry v${IMAGE_VERSION} — Python 3.13 / CUDA 13.0 / PyTorch 2.11.0"
 LABEL version="${IMAGE_VERSION}"
 LABEL org.opencontainers.image.title="ComfyCarry"
 LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
@@ -208,12 +231,12 @@ RUN mkdir -p /opt/ComfyUI/models/{checkpoints,loras,controlnet,vae,upscale_model
              /workspace/.cache/{huggingface,uv,virtualenv} && \
     ln -snf /workspace /root/workspace && \
     touch /root/.no_auto_tmux && \
-    python3.12 -c "\
+    python3.13 -c "\
 import json, datetime, platform, torch; \
 info = { \
     'version': '${IMAGE_VERSION} (arm)' if platform.machine() == 'aarch64' else '${IMAGE_VERSION} (x86)', \
     'build_date': datetime.datetime.now().strftime('%Y-%m-%d'), \
-    'python': '3.12', \
+    'python': '3.13', \
     'torch': torch.__version__, \
     'cuda_toolkit': torch.version.cuda or '', \
     'fa2': True, \
@@ -245,7 +268,7 @@ RUN find /opt/ComfyUI/custom_nodes -name "requirements.txt" -type f \
         -exec sed -i '/^git+/d' {} \;
 
 RUN rm -rf /tmp/* /var/tmp/* && \
-    python3.12 -m pip cache purge 2>/dev/null || true
+    python3.13 -m pip cache purge 2>/dev/null || true
 
 EXPOSE 5000 8188 8888 22
 CMD ["/opt/entrypoint.sh"]
