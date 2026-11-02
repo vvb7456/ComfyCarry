@@ -277,7 +277,12 @@ const footerClass = computed(() => {
 
 .modal-box--scroll-body { overflow-y: auto; }
 .modal-box--scroll-body > .modal-body { overflow: visible; }
-.modal-box--scroll-none > .modal-body { overflow: hidden; }
+.modal-box--scroll-none > .modal-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 
 .modal-box--default > .modal-header { padding: 20px 24px 0; }
 .modal-box--default > .modal-body { padding: 16px 24px; }
@@ -385,6 +390,12 @@ const footerClass = computed(() => {
   .modal-footer {
     row-gap: 8px;
   }
+}
+
+@media (max-width: 600px) {
+  .modal-box--default > .modal-header { padding: 14px 16px 0; }
+  .modal-box--default > .modal-body { padding: 12px 16px; }
+  .modal-box--default > .modal-footer { padding: 0 16px 14px; }
 }
 
 @supports (height: 100dvh) {

@@ -71,6 +71,7 @@ const hasMain = computed(() => !!slots.default)
   margin-top: calc(-1 * var(--page-body-pt));
   padding-top: var(--page-body-pt);
   padding-bottom: 8px;
+  margin-bottom: calc(var(--sp-4) - 8px);
   min-height: calc(var(--page-body-pt) + 38px + 8px);
   mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 10px), transparent 100%);
@@ -184,6 +185,7 @@ const hasMain = computed(() => !!slots.default)
 
   .page-header-row:not(.page-header-row--static) {
     padding-bottom: 6px;
+    margin-bottom: calc(var(--sp-4) - 6px);
   }
 }
 </style>

@@ -116,10 +116,9 @@ interface ArchCardItem {
 
 /**
  * 统一架构标签规范 (全部由 ModelTypeConfig 决定性派生，零手写硬编码):
+ * 每张卡片固定输出 3 个高信息量标签，保证单行整齐排列:
  * 1. 提示词语法: Tag 提示词 | 自然语言
- * 2. 生成模式: 文生图 / 图生图 / 参考生成 / 文生视频 / 图生视频
- * 3. 加速能力: 快速模式 (支持 fastModel 或 FAST_PRESETS)
- * 4. 控制能力: ControlNet (controlNetEnabled = true)
+ * 2. 核心工作流 / 加速 / 控制能力 (参考生成、快速模式、ControlNet、文/图生图等)
  */
 function buildArchTags(cfg: ModelTypeConfig): ArchTag[] {
   const tags: ArchTag[] = []
@@ -130,44 +129,33 @@ function buildArchTags(cfg: ModelTypeConfig): ArchTag[] {
     kind: 'prompt',
   })
 
-  // 2. 生成模式
-  if (cfg.mediaType === 'video') {
-    if (cfg.videoModes?.length) {
-      for (const m of cfg.videoModes) {
-        tags.push({
-          label: t(m === 'i2v' || m === 't2v' ? `generate.video.mode_${m}` : `generate.mode.${m}`),
-          kind: 'mode',
-        })
-      }
-    } else if (cfg.key.includes('t2v')) {
-      tags.push({ label: t('generate.video.mode_t2v'), kind: 'mode' })
-    } else {
-      tags.push({ label: t('generate.video.mode_i2v'), kind: 'mode' })
-    }
-  } else {
-    if (cfg.modes?.length) {
-      for (const m of cfg.modes) {
-        tags.push({ label: t(`generate.mode.${m}`), kind: 'mode' })
-      }
-    } else {
-      tags.push({ label: t('generate.mode.t2i'), kind: 'mode' })
-      if (cfg.modules.includes('i2i')) {
-        tags.push({ label: t('generate.modules.i2i'), kind: 'mode' })
-      }
-    }
+  // 2. 差异化模式与核心特性
+  if (cfg.modes?.includes('ref') || cfg.videoModes?.includes('ref')) {
+    tags.push({ label: t('generate.mode.ref'), kind: 'mode' })
   }
-
-  // 3. 快速模式
   if (cfg.fastModel || FAST_PRESETS[cfg.key]) {
     tags.push({ label: t('generate.arch.tag_fast'), kind: 'feature' })
   }
-
-  // 4. ControlNet
-  if (cfg.controlNetEnabled) {
+  if (cfg.controlNetEnabled && tags.length < 3) {
     tags.push({ label: t('generate.arch.tag_controlnet'), kind: 'feature' })
   }
 
-  return tags
+  // 3. 补足基础生成模式至 3 个标签，保证所有卡片底部标签行高度与密度完全一致
+  const fallbackModes: string[] = cfg.mediaType === 'video'
+    ? [t('generate.video.mode_t2v'), t('generate.video.mode_i2v')]
+    : [
+        ...(cfg.modules.includes('i2i') ? [t('generate.modules.i2i')] : []),
+        t('generate.mode.t2i'),
+      ]
+
+  for (const label of fallbackModes) {
+    if (tags.length >= 3) break
+    if (!tags.some(item => item.label === label)) {
+      tags.push({ label, kind: 'mode' })
+    }
+  }
+
+  return tags.slice(0, 3)
 }
 
 const FAMILY_LABEL_KEYS = new Set([
@@ -257,19 +245,17 @@ function selectArch(key: string) {
           <span v-else class="arch-logo__letter">{{ config.label.slice(0, 2) }}</span>
         </span>
 
-        <span class="arch-trigger__name">{{ t(`generate.tabs.${selectedGroupKey}`) }}</span>
-
-        <span class="arch-trigger__badge">
-          {{ config.mediaType === 'video' ? t('generate.header.task_video') : t('generate.header.task_image') }}
-        </span>
-
-        <span v-if="notReady" class="arch-trigger__warn">
-          {{ t('generate.header.not_ready') }}
-        </span>
-
-        <span class="arch-trigger__action">
-          <MsIcon name="swap_horiz" size="xs" color="none" />
-          <span>{{ t('generate.arch.switch_btn') }}</span>
+        <span class="arch-trigger__info">
+          <span class="arch-trigger__top">
+            <span class="arch-trigger__name">{{ t(`generate.tabs.${selectedGroupKey}`) }}</span>
+            <span class="arch-trigger__badge">
+              {{ config.mediaType === 'video' ? t('generate.header.task_video') : t('generate.header.task_image') }}
+            </span>
+            <span v-if="notReady" class="arch-trigger__warn">
+              {{ t('generate.header.not_ready') }}
+            </span>
+          </span>
+          <span class="arch-trigger__fact">{{ t('generate.arch.click_change') }}</span>
         </span>
       </button>
     </div>
@@ -304,60 +290,56 @@ function selectArch(key: string) {
       density="default"
       scroll="none"
     >
-      <!-- 任务大类导航卡片 (取代原先简易分段开关) -->
-      <div class="arch-cat-nav" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="modalTask === 'image'"
-          class="arch-cat-card"
-          :class="{ 'arch-cat-card--active': modalTask === 'image' }"
-          @click="onModalTaskChange('image')"
-        >
-          <span class="arch-cat-card__icon">
-            <MsIcon name="image" size="md" color="none" />
-          </span>
-          <span class="arch-cat-card__body">
-            <span class="arch-cat-card__title">{{ t('generate.arch.cat_image_title') }}</span>
-            <span class="arch-cat-card__sub">{{ t('generate.arch.cat_count', { count: imageArchCount }) }}</span>
-          </span>
-        </button>
+      <!-- 顶部任务大类导航栏 (底线式 Tab 导航条 + 通栏分割线, 与下方画廊卡片明确区分层级) -->
+      <div class="arch-modal__nav" role="tablist">
+        <div class="arch-modal__tabs">
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="modalTask === 'image'"
+            class="arch-nav-tab"
+            :class="{ 'arch-nav-tab--active': modalTask === 'image' }"
+            @click="onModalTaskChange('image')"
+          >
+            <MsIcon name="image" size="sm" color="none" />
+            <span class="arch-nav-tab__label">{{ t('generate.arch.cat_image_title') }}</span>
+            <span class="arch-nav-tab__badge">{{ imageArchCount }}</span>
+          </button>
 
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="modalTask === 'video'"
-          class="arch-cat-card"
-          :class="{ 'arch-cat-card--active': modalTask === 'video' }"
-          @click="onModalTaskChange('video')"
-        >
-          <span class="arch-cat-card__icon">
-            <MsIcon name="videocam" size="md" color="none" />
-          </span>
-          <span class="arch-cat-card__body">
-            <span class="arch-cat-card__title">{{ t('generate.arch.cat_video_title') }}</span>
-            <span class="arch-cat-card__sub">{{ t('generate.arch.cat_count', { count: videoArchCount }) }}</span>
-          </span>
-        </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="modalTask === 'video'"
+            class="arch-nav-tab"
+            :class="{ 'arch-nav-tab--active': modalTask === 'video' }"
+            @click="onModalTaskChange('video')"
+          >
+            <MsIcon name="videocam" size="sm" color="none" />
+            <span class="arch-nav-tab__label">{{ t('generate.arch.cat_video_title') }}</span>
+            <span class="arch-nav-tab__badge">{{ videoArchCount }}</span>
+          </button>
 
-        <button
-          type="button"
-          role="tab"
-          aria-selected="false"
-          disabled
-          class="arch-cat-card arch-cat-card--disabled"
-        >
-          <span class="arch-cat-card__icon">
-            <MsIcon name="edit" size="md" color="none" />
-          </span>
-          <span class="arch-cat-card__body">
-            <span class="arch-cat-card__title">{{ t('generate.arch.cat_edit_title') }}</span>
-            <span class="arch-cat-card__sub">{{ t('generate.arch.cat_edit_sub') }}</span>
-          </span>
-        </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected="false"
+            disabled
+            class="arch-nav-tab arch-nav-tab--disabled"
+          >
+            <MsIcon name="edit" size="sm" color="none" />
+            <span class="arch-nav-tab__label">{{ t('generate.arch.cat_edit_title') }}</span>
+            <span class="arch-nav-tab__badge arch-nav-tab__badge--muted">{{ t('generate.arch.cat_edit_sub') }}</span>
+          </button>
+        </div>
+
+        <span class="arch-modal__nav-hint">
+          {{ modalTask === 'video'
+            ? t('generate.arch.cat_video_sub', { count: videoArchCount })
+            : t('generate.arch.cat_image_sub', { count: imageArchCount }) }}
+        </span>
       </div>
 
-      <!-- 架构画廊网格 (带真实预览图/预览动图、架构简介与能力标签) -->
+      <!-- 架构画廊网格 (3:4 竖版比例 + 统一基线底部 Overlay) -->
       <div class="arch-modal__grid-wrap">
         <div class="arch-modal__grid">
           <button
@@ -368,65 +350,64 @@ function selectArch(key: string) {
             :class="{ 'arch-gallery-card--selected': item.key === selectedGroupKey }"
             @click="selectArch(item.key)"
           >
-            <!-- 16:10 视觉封面区 -->
-            <div class="arch-gallery-card__cover">
-              <video
-                v-if="item.media && item.media.isVideo"
-                :key="item.media.url"
-                :src="item.media.url"
-                class="arch-gallery-card__media"
-                autoplay
-                loop
-                muted
-                playsinline
-                @error="onMediaError(item.key)"
-              />
-              <img
-                v-else-if="item.media"
-                :key="item.media.url"
-                :src="item.media.url"
-                :alt="item.label"
-                loading="lazy"
-                class="arch-gallery-card__media"
-                @error="onMediaError(item.key)"
-              />
-              <div v-else class="arch-gallery-card__fallback">
-                <div
-                  class="arch-logo arch-logo--lg"
-                  :class="{ 'arch-logo--pad': item.logo }"
-                >
-                  <img v-if="item.logo" :src="item.logo" :alt="item.label" class="arch-logo__img" />
-                  <span v-else class="arch-logo__letter">{{ item.letter }}</span>
-                </div>
+            <video
+              v-if="item.media && item.media.isVideo"
+              :key="item.media.url"
+              :src="item.media.url"
+              class="arch-gallery-card__media"
+              autoplay
+              loop
+              muted
+              playsinline
+              @error="onMediaError(item.key)"
+            />
+            <img
+              v-else-if="item.media"
+              :key="item.media.url"
+              :src="item.media.url"
+              :alt="item.label"
+              loading="lazy"
+              class="arch-gallery-card__media"
+              @error="onMediaError(item.key)"
+            />
+            <div v-else class="arch-gallery-card__fallback">
+              <div
+                class="arch-logo arch-logo--lg"
+                :class="{ 'arch-logo--pad': item.logo }"
+              >
+                <img v-if="item.logo" :src="item.logo" :alt="item.label" class="arch-logo__img" />
+                <span v-else class="arch-logo__letter">{{ item.letter }}</span>
               </div>
+            </div>
 
-              <div class="arch-gallery-card__scrim" />
+            <div class="arch-gallery-card__scrim" />
 
-              <!-- 顶部悬浮角标行: 左侧系列归属 / 视频动图标识, 右侧当前使用或就绪状态 -->
-              <div class="arch-gallery-card__top-badges">
-                <div class="arch-gallery-card__top-left">
-                  <span v-if="item.familyLabel" class="arch-pill arch-pill--family">
-                    {{ item.familyLabel }}
-                  </span>
-                  <span v-if="item.isVideoArch" class="arch-pill arch-pill--video">
-                    <MsIcon name="videocam" size="xs" color="none" />
-                  </span>
-                </div>
-
-                <span v-if="item.key === selectedGroupKey" class="arch-pill arch-pill--active">
-                  <MsIcon name="check" size="xs" color="none" />
-                  <span>{{ t('generate.arch.current_used') }}</span>
+            <!-- 顶部悬浮角标行: 左侧系列归属 / 视频动图标识, 右侧当前使用或就绪状态 -->
+            <div class="arch-gallery-card__top-badges">
+              <div class="arch-gallery-card__top-left">
+                <span v-if="item.familyLabel" class="arch-pill arch-pill--family">
+                  {{ item.familyLabel }}
                 </span>
-                <span
-                  v-else
-                  class="arch-pill"
-                  :class="item.ready ? 'arch-pill--ready' : 'arch-pill--warn'"
-                >
-                  {{ item.ready ? t('generate.arch.ready') : t('generate.header.not_ready') }}
+                <span v-if="item.isVideoArch" class="arch-pill arch-pill--video">
+                  <MsIcon name="videocam" size="xs" color="none" />
                 </span>
               </div>
 
-              <!-- 封面底部品牌标识与架构标题 -->
+              <span v-if="item.key === selectedGroupKey" class="arch-pill arch-pill--active">
+                <MsIcon name="check" size="xs" color="none" />
+                <span>{{ t('generate.arch.current_used') }}</span>
+              </span>
+              <span
+                v-else
+                class="arch-pill"
+                :class="item.ready ? 'arch-pill--ready' : 'arch-pill--warn'"
+              >
+                {{ item.ready ? t('generate.arch.ready') : t('generate.header.not_ready') }}
+              </span>
+            </div>
+
+            <!-- 底部定高渐暗 Overlay: 顶部锁定品牌+标题, 中段两行简介, 底部单行3标签 -->
+            <div class="arch-gallery-card__overlay">
               <div class="arch-gallery-card__hero">
                 <div
                   class="arch-logo arch-logo--md"
@@ -437,11 +418,9 @@ function selectArch(key: string) {
                 </div>
                 <span class="arch-gallery-card__title" :title="item.label">{{ item.label }}</span>
               </div>
-            </div>
 
-            <!-- 底部信息区: 两行自然语言简介 + 统一规范能力标签 -->
-            <div class="arch-gallery-card__body">
-              <p class="arch-gallery-card__desc" :title="item.desc">{{ item.desc }}</p>
+              <p class="arch-gallery-card__desc">{{ item.desc }}</p>
+
               <div class="arch-gallery-card__tags">
                 <span
                   v-for="tag in item.tags"
@@ -489,20 +468,20 @@ function selectArch(key: string) {
   white-space: nowrap;
 }
 
-/* 与 DrawerTrigger / SegmentedControl(md) 同高 (34px) 同底色 */
+/* 双行架构触发器: 恒高 38px, 贴合 PageHeaderRow 内容行基准高度, 不撑高页头 */
 .arch-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 6px 0 10px;
+  height: 38px;
+  padding: 2px 12px 2px 6px;
   box-sizing: border-box;
   background: var(--bg3);
   border: 1px solid var(--bd);
   border-radius: var(--rs);
   color: var(--t1);
   font-family: inherit;
-  font-size: var(--text-base);
+  text-align: left;
   cursor: pointer;
   transition: border-color .15s, background .15s, box-shadow .15s;
   min-width: 0;
@@ -530,16 +509,16 @@ function selectArch(key: string) {
 }
 
 .arch-logo--sm {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
 }
 
 .arch-logo--md {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
 }
 
 .arch-logo--lg {
@@ -578,8 +557,25 @@ function selectArch(key: string) {
   font-size: 1.05rem;
 }
 
+.arch-trigger__info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.arch-trigger__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.15;
+}
+
 .arch-trigger__name {
-  font-weight: 600;
+  font-size: .82rem;
+  font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
   overflow: hidden;
@@ -587,50 +583,39 @@ function selectArch(key: string) {
 }
 
 .arch-trigger__badge {
-  font-size: .66rem;
+  font-size: .62rem;
   font-weight: 600;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--ac) 14%, transparent);
   color: var(--ac);
   white-space: nowrap;
   flex-shrink: 0;
-  line-height: 1.4;
+  line-height: 1.25;
 }
 
 .arch-trigger__warn {
-  font-size: .66rem;
+  font-size: .62rem;
   font-weight: 500;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--c-caution) 15%, transparent);
   color: var(--c-caution);
   white-space: nowrap;
   flex-shrink: 0;
-  line-height: 1.4;
+  line-height: 1.25;
 }
 
-.arch-trigger__action {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin-left: 2px;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  color: var(--t2);
-  font-size: .72rem;
-  font-weight: 500;
+.arch-trigger__fact {
+  font-size: .66rem;
+  color: var(--t3);
+  line-height: 1.15;
   white-space: nowrap;
-  flex-shrink: 0;
-  transition: color .15s, border-color .15s, background .15s;
+  transition: color .15s;
 }
 
-.arch-trigger:hover:not(:disabled) .arch-trigger__action {
+.arch-trigger:hover:not(:disabled) .arch-trigger__fact {
   color: var(--ac);
-  border-color: color-mix(in srgb, var(--ac) 35%, var(--bd));
-  background: color-mix(in srgb, var(--ac) 10%, var(--bg2));
 }
 
 .arch-bar__controls {
@@ -662,10 +647,6 @@ function selectArch(key: string) {
     width: 100%;
   }
 
-  .arch-trigger__action {
-    margin-left: auto;
-  }
-
   .arch-bar__controls {
     width: 100%;
     display: flex;
@@ -683,122 +664,150 @@ function selectArch(key: string) {
   }
 }
 
-/* ═══ Modal 顶部任务大类切换卡片 ═══ */
-.arch-cat-nav {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: var(--sp-3);
-}
-
-.arch-cat-card {
+/* ═══ Modal 顶部底线式导航栏 (与下方画廊卡片清晰区分视觉层级) ═══ */
+.arch-modal__nav {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
-  background: var(--bg3);
-  border: 1.5px solid var(--bd);
-  border-radius: var(--r);
+  margin: -4px -24px 0;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--bd);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.arch-modal__tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.arch-modal__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.arch-nav-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px 11px;
+  border: none;
+  background: none;
   color: var(--t2);
   font: inherit;
-  text-align: left;
+  font-size: .88rem;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
-  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, color .16s ease;
-  min-width: 0;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  transition: color .15s ease, background .15s ease;
 }
 
-.arch-cat-card:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--ac) 50%, var(--bd));
-  background: color-mix(in srgb, var(--ac) 5%, var(--bg3));
+.arch-nav-tab::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2.5px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  transition: background .16s ease, box-shadow .16s ease;
+}
+
+.arch-nav-tab:hover:not(:disabled) {
   color: var(--t1);
+  background: color-mix(in srgb, var(--t1) 4%, transparent);
 }
 
-.arch-cat-card--active {
-  border-color: var(--ac);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ac) 15%, var(--bg3)),
-    color-mix(in srgb, var(--ac2) 6%, var(--bg3))
-  );
+.arch-nav-tab--active {
   color: var(--t1);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
+  font-weight: 700;
 }
 
-.arch-cat-card--disabled {
-  opacity: .45;
+.arch-nav-tab--active :deep(.ms) {
+  color: var(--ac);
+}
+
+.arch-nav-tab--active::after {
+  background: var(--ac);
+  box-shadow: 0 -1px 8px color-mix(in srgb, var(--ac) 45%, transparent);
+}
+
+.arch-nav-tab--disabled {
+  opacity: .42;
   cursor: not-allowed;
 }
 
-.arch-cat-card__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
+.arch-nav-tab__badge {
+  font-size: .68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 1px 7px;
+  border-radius: 999px;
   background: var(--bg2);
   border: 1px solid var(--bd);
   color: var(--t2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
 
-.arch-cat-card--active .arch-cat-card__icon {
-  background: var(--ac);
-  border-color: var(--ac);
-  color: #fff;
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--ac) 40%, transparent);
+.arch-nav-tab--active .arch-nav-tab__badge {
+  background: color-mix(in srgb, var(--ac) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ac) 38%, transparent);
+  color: var(--ac);
 }
 
-.arch-cat-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+.arch-nav-tab__badge--muted {
+  font-weight: 500;
+  color: var(--t3);
 }
 
-.arch-cat-card__title {
-  font-size: .88rem;
-  font-weight: 700;
-  color: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.arch-cat-card__sub {
-  font-size: .7rem;
+.arch-modal__nav-hint {
+  font-size: .75rem;
   color: var(--t3);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
-.arch-cat-card--active .arch-cat-card__sub {
-  color: var(--t2);
-}
-
-/* ═══ Modal 架构画廊网格与卡片 ═══ */
+/* ═══ Modal 架构画廊网格与 3:4 竖版卡片 ═══
+   桌面端使用 flex: none + 固定 height (恰好容纳两行完整卡片 + 第三行露头约 40px 提示可滚动),
+   避免 flex-basis:0% 覆盖 height 导致切换至视频页(仅单行)时外层弹窗收缩跳动;
+   内边距留足 16px 顶部缓冲与 6px 左右缓冲，保证首行卡片 hover 上浮 (-2px) 与
+   2px 选中外发光环完全在滚动盒与渐隐遮罩的不透明区内，绝不被上方分割线裁切 */
 .arch-modal__grid-wrap {
+  flex: none;
+  height: min(650px, calc(88vh - 106px));
   overflow-y: auto;
-  max-height: min(64vh, 580px);
-  padding-right: 4px;
+  margin: 0 -6px -16px;
+  padding: 16px 6px 20px;
+  mask-image: linear-gradient(to bottom, transparent 0, black 8px, black calc(100% - 8px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 8px, black calc(100% - 8px), transparent 100%);
 }
 
 .arch-modal__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
   gap: 12px;
 }
 
 .arch-gallery-card {
+  position: relative;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  /* 与 ModelCard / ModelPickerModal 同口径 3:4 竖版比例 */
+  aspect-ratio: 3 / 4;
   padding: 0;
-  background: var(--bg3);
+  background: var(--bg2);
   border: 2px solid var(--bd);
   border-radius: var(--r-lg, 12px);
-  color: inherit;
+  color: #fff;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -814,21 +823,12 @@ function selectArch(key: string) {
 
 .arch-gallery-card--selected {
   border-color: var(--ac);
-  background: color-mix(in srgb, var(--ac) 5%, var(--bg3));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ac) 30%, transparent), var(--sh);
-}
-
-/* 16:10 封面区 */
-.arch-gallery-card__cover {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  background: var(--bg2);
-  overflow: hidden;
-  flex-shrink: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 32%, transparent), var(--sh);
 }
 
 .arch-gallery-card__media {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -841,40 +841,42 @@ function selectArch(key: string) {
 }
 
 .arch-gallery-card__fallback {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-bottom: 24%;
   background:
-    radial-gradient(circle at 25% 25%, color-mix(in srgb, var(--ac) 22%, transparent), transparent 60%),
+    radial-gradient(circle at 25% 25%, color-mix(in srgb, var(--ac) 24%, transparent), transparent 60%),
     radial-gradient(circle at 80% 75%, color-mix(in srgb, var(--ac2) 18%, transparent), transparent 60%),
     var(--bg2);
 }
 
-/* 底部暗角渐变遮罩，保证封面上的品牌图标与白色标题在任何亮色预览图上清晰可读 */
+/* 渐暗遮罩: 上沿轻压保证角标清晰, 下半段提前加深压住高饱和度预览图, 保证白色文字清晰易读 */
 .arch-gallery-card__scrim {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(10, 12, 18, .38) 0%,
-    rgba(10, 12, 18, .05) 42%,
-    rgba(10, 12, 18, .84) 100%
+    rgba(6, 8, 14, .44) 0%,
+    rgba(6, 8, 14, .05) 24%,
+    rgba(6, 8, 14, .30) 44%,
+    rgba(6, 8, 14, .88) 62%,
+    rgba(6, 8, 14, .96) 78%,
+    rgba(6, 8, 14, .99) 100%
   );
   pointer-events: none;
 }
 
 .arch-gallery-card__top-badges {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  z-index: 1;
+  padding: 10px 10px 0;
 }
 
 .arch-gallery-card__top-left {
@@ -929,110 +931,165 @@ function selectArch(key: string) {
   color: var(--c-caution);
 }
 
+/* 底部定高信息层 (Overlay):
+   固定 120px 基准高度 —— 顶部锁定品牌图标+标题, 中间自然展示两行简介, 底部单行 3 标签并留出 16px 底边距,
+   保证同行任意卡片的主标题、简介起点与标签行在水平方向上严格对齐 */
+.arch-gallery-card__overlay {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  height: 120px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 14px 16px;
+}
+
 .arch-gallery-card__hero {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 9px;
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 26px;
+  flex-shrink: 0;
   min-width: 0;
-  z-index: 1;
 }
 
 .arch-gallery-card__title {
   font-size: .92rem;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, .65);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .8);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 卡片下半部: 简介 + 标签 */
-.arch-gallery-card__body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px 12px;
-}
-
 .arch-gallery-card__desc {
+  flex: 1;
   margin: 0;
-  font-size: .75rem;
-  line-height: 1.48;
-  color: var(--t2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: calc(1.48em * 2);
+  font-size: .74rem;
+  line-height: 1.44;
+  color: rgba(255, 255, 255, .94);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .85);
+  white-space: normal;
+  word-break: break-word;
 }
 
 .arch-gallery-card__tags {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 5px;
+  margin-top: auto;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .arch-tag {
-  font-size: .67rem;
+  font-size: .64rem;
   font-weight: 500;
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  color: var(--t2);
+  background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(255, 255, 255, .24);
+  color: rgba(255, 255, 255, .96);
   white-space: nowrap;
   line-height: 1.35;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .arch-tag--feature {
-  background: color-mix(in srgb, var(--ac) 10%, var(--bg2));
-  border-color: color-mix(in srgb, var(--ac) 28%, var(--bd));
-  color: var(--ac);
+  background: color-mix(in srgb, var(--ac) 42%, rgba(10, 12, 20, .82));
+  border-color: color-mix(in srgb, var(--ac) 68%, rgba(255, 255, 255, .28));
+  color: #fff;
 }
 
-/* ═══ Modal 移动端适配 ═══ */
+/* ═══ Modal 移动端与平板响应式适配 ═══ */
+@media (max-width: 768px) {
+  /* 移动端全屏弹窗 (100dvh): 切换为 flex: 1 自动填满全屏剩余高度 */
+  .arch-modal__grid-wrap {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  .arch-modal__nav-hint {
+    display: none;
+  }
+}
+
 @media (max-width: 600px) {
-  .arch-cat-nav {
+  .arch-modal__nav {
+    margin: -4px -16px 0;
+    padding: 0 12px;
+  }
+
+  .arch-nav-tab {
+    padding: 8px 8px 10px;
+    font-size: .8rem;
+    gap: 5px;
+  }
+
+  .arch-nav-tab__badge {
+    font-size: .62rem;
+    padding: 1px 5px;
+  }
+
+  .arch-modal__grid-wrap {
+    padding: 12px 4px 16px;
+    margin: 0 -4px -12px;
+  }
+
+  /* 移动端采用紧凑双列 3:4 网格, 单屏可同时浏览 4~6 款架构 */
+  .arch-modal__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .arch-gallery-card__top-badges {
+    padding: 7px 7px 0;
+  }
+
+  .arch-pill {
+    font-size: .58rem;
+    padding: 1px 5px;
+  }
+
+  .arch-gallery-card__overlay {
+    height: 106px;
+    padding: 0 10px 12px;
+    gap: 4px;
+  }
+
+  .arch-gallery-card__hero {
+    height: 22px;
     gap: 6px;
   }
 
-  .arch-cat-card {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 5px;
-    padding: 8px 6px;
+  .arch-logo--md {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
   }
 
-  .arch-cat-card__icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
+  .arch-gallery-card__title {
+    font-size: .8rem;
   }
 
-  .arch-cat-card__body {
-    align-items: center;
+  .arch-gallery-card__desc {
+    font-size: .66rem;
+    line-height: 1.38;
   }
 
-  .arch-cat-card__title {
-    font-size: .78rem;
+  .arch-gallery-card__tags {
+    gap: 3px;
   }
 
-  .arch-cat-card__sub {
-    font-size: .64rem;
-  }
-
-  .arch-modal__grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+  .arch-tag {
+    font-size: .56rem;
+    padding: 1px 4px;
   }
 }
 </style>

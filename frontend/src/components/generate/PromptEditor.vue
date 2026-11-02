@@ -135,11 +135,6 @@ defineExpose({ insertAtCursor })
       <button type="button" class="prompt-help-btn" :title="t('generate.prompt.syntax_help_title')" :aria-label="t('generate.prompt.syntax_help_title')" @click="helpOpen = true">
         <MsIcon name="help_outline" size="sm" color="none" />
       </button>
-      <!-- 标题行右端槽 — 视频 5B 的文生/图生开关挂这里。
-           选它是因为切到文生时左侧媒体栏整块消失, 开关必须待在不随之移动的位置。 -->
-      <div v-if="$slots['header-actions']" class="prompt-hdr-actions">
-        <slot name="header-actions" />
-      </div>
     </div>
 
     <div class="prompt-container">
@@ -253,17 +248,8 @@ defineExpose({ insertAtCursor })
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--t2);
-  min-height: 28px;
-  box-sizing: border-box;
-  flex-wrap: wrap;
 }
 .hdr-icon { font-size: .9rem; color: var(--t3); }
-
-.prompt-hdr-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-}
 
 .prompt-container {
   display: flex;
