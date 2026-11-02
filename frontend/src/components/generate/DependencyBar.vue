@@ -95,7 +95,7 @@ function toggleExpand() {
             </Badge>
             <span class="dep-file__label">{{ r.row.label }}</span>
             <span v-if="rowSize(r)" class="dep-file__size">{{ rowSize(r) }}</span>
-            <span v-if="r.row.hint" class="dep-file__hint">{{ r.row.hint }}</span>
+            <span v-if="r.row.hintKey || r.row.hint" class="dep-file__hint">{{ r.row.hintKey ? t(r.row.hintKey) : r.row.hint }}</span>
 
             <span class="dep-file__status">
               <DownloadButton

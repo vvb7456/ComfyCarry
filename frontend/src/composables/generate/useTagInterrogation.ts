@@ -68,7 +68,7 @@ const TAGGER_MODELS = {
   'wd-eva02-large-tagger-v3': {
     id: 'wd-eva02-large-tagger-v3',
     label: 'WD EVA02 Large v3',
-    hint: '最高精度',
+    hintKey: 'generate.dep.hints.tagger_large',
     sizeText: '~1.2 GB',
     files: [
       {
@@ -86,7 +86,7 @@ const TAGGER_MODELS = {
   'wd-vit-tagger-v3': {
     id: 'wd-vit-tagger-v3',
     label: 'WD ViT v3',
-    hint: '轻量快速',
+    hintKey: 'generate.dep.hints.tagger_light',
     sizeText: '~361 MB',
     files: [
       {

@@ -1306,13 +1306,13 @@ class WorkflowBuilder:
         }
         return nid
 
-    def add_depth_preprocessor(self, image_node_id: str, resolution: int = 1024, midas=False) -> str:
+    def add_depth_preprocessor(self, image_node_id: str, resolution: int = 1024) -> str:
         nid = self._next_id()
         self._nodes[nid] = {
-            "class_type": "MiDaS-DepthMapPreprocessor" if midas else "DepthAnythingV2Preprocessor",
+            "class_type": "DepthAnythingV2Preprocessor",
             "inputs": {
                 "image": [image_node_id, 0],
-                **({"a": 6.283185307179586, "bg_threshold": 0.1} if midas else {"ckpt_name": "depth_anything_v2_vitl.pth"}),
+                "ckpt_name": "depth_anything_v2_vitl.pth",
                 "resolution": resolution,
             },
         }
@@ -2819,7 +2819,7 @@ def build_preprocess_workflow(params: dict) -> dict:
             load_img, resolution=resolution, low_threshold=low, high_threshold=high,
         )
     elif pp_type == "depth":
-        processed = b.add_depth_preprocessor(load_img, resolution=resolution, midas=bool(params.get("depth_midas")))
+        processed = b.add_depth_preprocessor(load_img, resolution=resolution)
     elif pp_type == "lineart":
         processed = b.add_lineart_preprocessor(load_img, resolution=resolution, anime=bool(params.get("lineart_anime")))
     else:

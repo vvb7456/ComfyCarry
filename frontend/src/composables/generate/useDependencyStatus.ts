@@ -15,6 +15,7 @@ export interface DepRow {
   id: string
   label: string
   hint?: string
+  hintKey?: string
   sizeText?: string
   bytes?: number
   required?: boolean

@@ -10,8 +10,6 @@ import NumberInput from '@/components/form/NumberInput.vue'
 import RangeField from '@/components/form/RangeField.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import SegmentedControl from '@/components/ui/SegmentedControl.vue'
-import { FAST_PRESETS } from '@/config/model-types'
 import { localModelPreviewUrl } from '@/utils/modelPreview'
 
 defineOptions({ name: 'BasicSettings' })
@@ -40,7 +38,6 @@ const options = inject(GenerateOptionsKey)!
 const fixedSteps = computed(() => ['qwen_image21_turbo', 'flux2_turbo'].includes(state.value.scheduler) ? 8 : undefined)
 
 const isVideo = computed(() => config.value.mediaType === 'video')
-const hasSpeed = computed(() => !!config.value.fastModel || !!FAST_PRESETS[config.value.key])
 
 /**
  * 双 UNet 架构 (Wan 2.2 14B) 渲染**两个独立选择槽**, 不再配对折叠。
@@ -183,21 +180,7 @@ function onResolutionChange(v: string) {
 
       <!-- Right: 视频 → VideoSettings / 图像 → Resolution + Steps/CFG -->
       <div class="basic-grid__params">
-        <div class="basic-fields" :class="{ 'basic-fields--speed': hasSpeed }">
-          <div v-if="hasSpeed" class="field-group basic-speed">
-            <div class="field-lbl">{{ t('generate.video.speed') }}</div>
-            <SegmentedControl
-              :options="[
-                { value: 'standard', label: t('generate.video.speed_std'), disabled: config.fastLocked && state.fast },
-                { value: 'fast', label: t('generate.video.speed_fast'), disabled: config.fastLocked && !state.fast },
-              ]"
-              :model-value="state.fast ? 'fast' : 'standard'"
-              :disabled="disabled"
-              size="sm"
-              block
-              @update:model-value="store.setFast($event === 'fast')"
-            />
-          </div>
+        <div class="basic-fields">
           <VideoSettings
             v-if="isVideo"
             :disabled="disabled"
@@ -367,24 +350,9 @@ function onResolutionChange(v: string) {
   align-items: start;
 }
 
-.basic-fields--speed {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.basic-speed {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.basic-speed :deep(.seg-control) { height: 36px; }
-
 .basic-grid__params :deep(.resolution-field) {
   grid-column: 1 / -1;
   grid-row: 1;
-}
-
-.basic-fields--speed :deep(.resolution-field) {
-  grid-column: 2 / span 2;
 }
 
 /* ── Field label ── */
@@ -411,10 +379,6 @@ function onResolutionChange(v: string) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
   align-items: start;
-}
-
-.basic-fields--speed :deep(.res-row:not(.res-row--custom)) {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .basic-grid__params :deep(.res-row > .base-select) {
@@ -459,20 +423,12 @@ function onResolutionChange(v: string) {
 .basic-grid__params :deep(.range-field__value) { flex-shrink: 0; }
 
 @container gen-params (max-width: 560px) {
-  .basic-fields--speed :deep(.res-row--custom) {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .basic-grid__params :deep(.slider-row--3) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .basic-grid__params :deep(.slider-row--3 > :first-child) {
     grid-column: 1 / -1;
   }
-}
-
-@container gen-params (max-width: 400px) {
-  .basic-fields--speed { grid-template-columns: minmax(0, 1fr); }
-  .basic-fields--speed :deep(.resolution-field) { grid-column: 1; grid-row: 2; }
 }
 
 @container gen-params (max-width: 360px) {

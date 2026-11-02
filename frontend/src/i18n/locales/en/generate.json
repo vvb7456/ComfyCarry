@@ -4,6 +4,44 @@
     "t2i": "Text to Image",
     "ref": "Reference"
   },
+  "arch": {
+    "click_change": "Click to change architecture",
+    "switch_btn": "Change",
+    "modal_title": "Select Architecture & Workflow",
+    "cat_image_title": "Image Generation",
+    "cat_image_sub": "{count} architectures",
+    "cat_video_title": "Video Generation",
+    "cat_video_sub": "{count} architectures",
+    "cat_edit_title": "Image Editing",
+    "cat_edit_sub": "Coming soon",
+    "current_used": "Active",
+    "tag_tags": "Tag prompt",
+    "tag_natural": "Natural language",
+    "tag_fast": "Fast mode",
+    "tag_controlnet": "ControlNet",
+    "ready": "Ready",
+    "desc": {
+      "sd15": "Classic lightweight diffusion architecture with low VRAM usage, fast generation, and a vast community ecosystem.",
+      "sdxl": "Native 1024px high-resolution general-purpose architecture balancing photorealism, illustration, and rich ControlNet support.",
+      "pony": "SDXL derivative fine-tuned for anime and character art using quality score tags and Danbooru tag syntax.",
+      "illustrious": "Modern anime illustration powerhouse with deep Danbooru tag knowledge, vibrant colors, and strong anatomy.",
+      "noobai": "Community anime architecture evolved from Illustrious (EPS prediction) with enhanced character and artist tag fidelity.",
+      "noobai_vpred": "V-Prediction branch of NoobAI offering wider dynamic range, rich contrast, and dramatic dark/backlit scenes.",
+      "anima": "Modern anime diffusion architecture powered by Qwen3 text encoding, supporting Danbooru tags and Turbo fast mode.",
+      "flux1": "Black Forest Labs' 12B DiT flagship with strong natural language understanding, photorealism, and text rendering.",
+      "krea2": "Krea's open-weights aesthetic architecture paired with Qwen3-VL text encoding for cinematic, art-directed imagery.",
+      "chroma": "De-distilled open DiT architecture built on Flux with full CFG guidance control and vibrant color rendition.",
+      "flux2dev": "Next-gen multimodal image architecture with Mistral VLM encoding, native multi-reference generation, and 8-step Turbo.",
+      "flux2klein4b": "Lightweight 4B member of the Flux 2 family with low VRAM footprint, fast inference, and reference generation.",
+      "flux2klein9b": "Balanced 9B member of the Flux 2 family delivering strong composition accuracy and multi-reference consistency.",
+      "qwen_image21": "Alibaba Qwen multimodal image architecture featuring strong bilingual prompt adherence and 8-step Turbo distillation.",
+      "zimage": "Alibaba Tongyi's efficient DiT image architecture supporting natural language prompts, Union ControlNet, and fast mode.",
+      "wan22_i2v": "Wan 2.2 flagship 14B image-to-video architecture with dual high/low-noise UNets, start/end frames, and 4-step fast mode.",
+      "wan22_t2v": "Wan 2.2 flagship 14B text-to-video architecture with dual-stage denoising for cinematic camera motion and physics.",
+      "wan22_5b": "Lightweight 5B Wan 2.2 video architecture supporting both text-to-video and image-to-video on modest VRAM.",
+      "minimax_h3": "Joint audio-video generation architecture supporting text-to-video, first/last frame I2V, and multi-modal reference."
+    }
+  },
   "gate": {
     "checking": "Checking ComfyUI status…",
     "starting": "ComfyUI is starting, please wait…",
@@ -16,10 +54,10 @@
   },
   "header": {
     "queue_history": "Queue & History",
-    "model_selector_aria": "Select model",
+    "model_selector_aria": "Select architecture",
     "family_sdxl": "SDXL series",
     "family_flux1": "Flux 1 series",
-    "model_label": "Model",
+    "model_label": "Architecture",
     "task_image": "Image",
     "task_video": "Video",
     "task_edit": "Edit",
@@ -30,7 +68,7 @@
     "family_anima": "Anima series",
     "family_zimage": "Z-Image series",
     "not_ready": "Not ready",
-    "back_to_all_models": "Back to all models"
+    "back_to_all_models": "Back to all architectures"
   },
   "tabs": {
     "sdxl": "SDXL",
@@ -781,6 +819,30 @@
     "state_lost": "Target model state unavailable, please retry"
   },
   "dep": {
+    "hints": {
+      "sdxl": "For SDXL/Pony",
+      "ilnoob": "For Illustrious/NoobAI",
+      "sd15": "For SD1.5",
+      "flux1": "For Flux 1",
+      "qwen_image21": "For Qwen Image 2.1",
+      "zimage": "For Z-Image Base",
+      "zimage_turbo": "For Z-Image Turbo",
+      "anima": "For Anima",
+      "minimax_h3": "For MiniMax H3",
+      "pose": "Pose detection",
+      "depth": "Depth estimation",
+      "lineart": "Line art detection",
+      "lineart_coarse": "Coarse line art detection",
+      "lineart_anime": "Anime line art detection",
+      "aurasr": "4× super-resolution upscaling",
+      "seedvr2_3b": "Video upscaling · ~10 GB VRAM",
+      "seedvr2_7b": "Sharpened variant · ~17 GB VRAM",
+      "seedvr2_vae": "Shared VAE for 3B/7B",
+      "face_detector": "Face detection",
+      "face_mask": "Facial segmentation with finer boundaries",
+      "tagger_large": "High accuracy",
+      "tagger_light": "Lightweight and fast"
+    },
     "noun_lineart": "line art control models",
     "noun_tile": "tile control models",
     "ready": "{noun} ready · {n} item(s)",
@@ -924,6 +986,7 @@
   },
   "missing": {
     "title": "Imported configuration is missing dependencies",
+    "complete": "All models are ready",
     "section_downloadable": "Available for download ({count})",
     "section_unavailable": "Cannot be fetched automatically ({count})",
     "download_all": "Download all",
@@ -942,12 +1005,11 @@
     "role_face_model": "Face detection model",
     "tag": "Missing",
     "tag_hint": "This model is not present on this instance; it will work once the file is available",
-    "keep": "Keep as is",
-    "ignore_fallback": "Ignore and reset to defaults",
+    "ignore_fallback": "Clear missing items",
     "confirm_fallback": {
-      "title": "Ignore invalid settings",
-      "message": "This will remove {count} model reference(s) not present on this instance from the workspace configuration, reverting them to unselected.\n\nThey will not be restored automatically once the files are available; you will need to select them again. Continue?",
-      "button": "Remove and reset"
+      "title": "Clear missing items",
+      "message": "Clear {count} missing item(s)? You will need to select them again later.",
+      "button": "Clear"
     },
     "querying": "Looking up model information…"
   }

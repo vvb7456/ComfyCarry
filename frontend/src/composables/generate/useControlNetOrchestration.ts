@@ -5,7 +5,7 @@ import { useImageToImage } from '@/composables/generate/useImageToImage'
 import { useControlNet, CN_TYPES, PP_PARAMS_DEF, type CnType } from '@/composables/generate/useControlNet'
 import { useDependencyStatus, type UseDependencyStatusReturn } from '@/composables/generate/useDependencyStatus'
 import { useTagInterrogation, TAGGER_DEP_GROUP } from '@/composables/generate/useTagInterrogation'
-import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, SEEDVR2_VAE_ROW_ID, getCnDepGroup, cnPreprocessor, isPreprocessorRow, type CnBranch } from '@/composables/generate/modelDepConfigs'
+import { UPSCALE_DEP_GROUP, FACE_DEP_GROUP, SEEDVR2_VAE_ROW_ID, getCnDepGroup, cnPreprocessor, type CnBranch } from '@/composables/generate/modelDepConfigs'
 import type { ExecState } from '@/composables/useExecTracker'
 import type { SwitchTabItem } from '@/components/generate/ModuleTabs.vue'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
@@ -62,13 +62,14 @@ export function useControlNetOrchestration({
   const depMap = Object.fromEntries(CN_TYPES.map(type => [type, cnDep(type)])) as Record<CnType, UseDependencyStatusReturn>
   const preprocessDepMap = Object.fromEntries(CN_TYPES.map(type => [type,
     useDependencyStatus(() => store.configFor(modelType).controlNetEnabled
-      ? cnPreprocessor(type, cnBranch.value, cnMap[type].config.value.model).rows : [], {
+      ? cnPreprocessor(type, cnBranch.value).rows : [], {
       enabled: tabActive, source: 'controlnet-preprocess',
     }),
   ])) as Record<CnType, UseDependencyStatusReturn>
 
   function cnModelsReady(type: CnType): boolean {
-    return depMap[type].missingRequired.value.every(row => isPreprocessorRow(row.row))
+    const cn = cnMap[type]
+    return !!cn.config.value.model && !cn.modelMissing.value
   }
 
   const depUpscale = useDependencyStatus(() => UPSCALE_DEP_GROUP.rows, {
@@ -114,7 +115,7 @@ export function useControlNetOrchestration({
     }
 
     const promptId = await cnMap[cnType].submitPreprocess(payload.file, {
-      ...payload.params, ...cnPreprocessor(cnType, cnBranch.value, cnMap[cnType].config.value.model).params,
+      ...payload.params, ...cnPreprocessor(cnType, cnBranch.value).params,
     })
     if (promptId) {
       onRegisterTask(promptId, 'preprocess', cnType)

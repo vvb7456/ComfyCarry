@@ -9,11 +9,11 @@ import type { WorkspaceFile } from './workspaceFiles'
 /**
  * 导入后「这份配置还差什么」的清单。
  *
- * 范围 = 工作区 files 引用的全部文件；通过下载服务按原路径检查磁盘。
+ * 范围 = 导入指纹表记录、且当前工作区仍在引用的文件。
  *
  * 取货来源按固定顺序检索 (指纹表里只有哈希, 没有来源):
  *   1. 本机已有 (restore 校验通过) —— 不进清单
- *   2. 指纹表无此键 → unknown → 只能手动准备
+ *   2. 指纹为空 → unknown → 只能手动准备
  *   3. 白名单哈希索引命中 → 可下载, 名称取白名单元数据
  *   4. civitai by-hash 命中且 files 里哈希精确一致 → 可下载, 名称取响应
  *   5. 双命中 → 白名单优先
@@ -92,8 +92,8 @@ function basename(name: string): string {
 // 模块级共享状态: GeneratePage 与 MissingModelsModal 各调一次本组合式, 二者
 // 必须看到同一份清单 (页面持 visible/分区列表, modal 触发 prepare) —— 各自持
 // 一份副本会让 modal 解析出的结果传不回页面的展示列表。
-const dismissed = ref(false)
-/** 指纹表 (表2); 非空即视为「本实例曾导入配置」 */
+const visible = ref(false)
+/** 指纹只用于查找下载来源；弹窗由本次导入的待检查标记触发。 */
 const hashes = ref<Record<string, string>>({})
 const imported = ref(false)
 /** 解析完成后的缺失清单 (prepare 前为空) */
@@ -119,19 +119,6 @@ export function useMissingModels() {
       return await fetch(url, { signal: ctl.signal })
     } finally {
       clearTimeout(timer)
-    }
-  }
-
-  /** 拉取表2 (只读)。非空即视为导入过 —— 与旧 modelMeta 的「是否导入」判据同义。 */
-  async function loadHashes(): Promise<void> {
-    try {
-      const res = await fetch('/api/generate/model-hashes')
-      if (!res.ok) return
-      const data = await res.json() as { hashes?: Record<string, string> }
-      hashes.value = data?.hashes ?? {}
-      imported.value = Object.keys(hashes.value).length > 0
-    } catch {
-      // 拉不到按空表: 缺失项全部落入手动列表, 不阻塞弹窗
     }
   }
 
@@ -239,6 +226,7 @@ export function useMissingModels() {
     for (const r of store.restoredFiles) {
       if (r.arch && !MODEL_TYPES[r.arch]) continue
       const key = r.path
+      if (!Object.prototype.hasOwnProperty.call(hashes.value, key)) continue
       if (!missingPaths.value.has(key)) continue
       if (seen.has(key)) continue
       seen.add(key)
@@ -251,6 +239,16 @@ export function useMissingModels() {
   const downloadable = computed<MissingModel[]>(() => resolved.value.filter(m => m.source !== 'unknown'))
   const unavailable = computed<MissingModel[]>(() => resolved.value.filter(m => m.source === 'unknown'))
 
+  async function checkImported() {
+    await store.checkMissingFiles()
+    const res = await fetch('/api/generate/import-check', { method: 'POST' })
+    if (!res.ok) return
+    const data = await res.json() as { pending: boolean; hashes: Record<string, string> }
+    hashes.value = data.hashes
+    imported.value = data.pending || Object.keys(data.hashes).length > 0
+    visible.value = data.pending && refEntries.value.length > 0
+  }
+
   /**
    * 展示前把全部缺失项解析完 (表2 + 白名单索引 + civitai by-hash + 判据),
    * 列表一次成型, 不跳变。
@@ -258,7 +256,6 @@ export function useMissingModels() {
   async function prepare() {
     loading.value = true
     try {
-      await loadHashes()
       // 并发解析: 串行会让最坏情况叠加成 N×8s 的转圈
       resolved.value = await Promise.all(
         refEntries.value.map(resolveItem),
@@ -273,19 +270,14 @@ export function useMissingModels() {
    * 删除是**用户显式选择** —— 系统装载时不替用户销毁配置, 但用户可以清理。
    */
   function ignoreAndFallback() {
-    store.pruneMissing(missingPaths.value)
+    store.pruneMissing(new Set(resolved.value.filter(file => missingPaths.value.has(file.path)).map(file => file.path)))
     resolved.value = []
     dismiss()
   }
 
   function dismiss() {
-    dismissed.value = true
+    visible.value = false
   }
-
-  /** 有缺失、来自导入、且用户未关闭过 → 自动展示 modal */
-  const visible = computed(() =>
-    !dismissed.value && imported.value && refEntries.value.length > 0,
-  )
 
   return {
     resolved,
@@ -294,7 +286,7 @@ export function useMissingModels() {
     visible,
     loading,
     prepare,
-    loadHashes,
+    checkImported,
     isMissing: (path: string) => missingPaths.value.has(path),
     imported,
     ignoreAndFallback,

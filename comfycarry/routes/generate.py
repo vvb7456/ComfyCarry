@@ -373,6 +373,15 @@ def api_generate_model_hashes():
     return jsonify({"hashes": model_hash_store.load_hashes()})
 
 
+@bp.route("/api/generate/import-check", methods=["POST"])
+def api_generate_import_check():
+    from ..services import model_hash_store
+    return jsonify({
+        "hashes": model_hash_store.load_hashes(),
+        "pending": generate_state_store.consume_import_check(),
+    })
+
+
 @bp.route("/api/generate/state", methods=["PUT"])
 def api_generate_state_put():
     """按架构合并保存生成设置。"""

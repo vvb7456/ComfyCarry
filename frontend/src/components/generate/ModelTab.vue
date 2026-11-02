@@ -21,7 +21,6 @@ import ModelPickerModal from '@/components/generate/ModelPickerModal.vue'
 import DependencyBar from '@/components/generate/DependencyBar.vue'
 import LoraPanel from '@/components/generate/LoraPanel.vue'
 import FileUploadZone from '@/components/ui/FileUploadZone.vue'
-import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import { IMAGE_ACCEPT, useRefImagePicker } from '@/composables/generate/useRefImagePicker'
 import { COMPONENT_FILENAMES } from '@/config/component-registry'
 import I2IPanel from '@/components/generate/I2IPanel.vue'
@@ -84,18 +83,6 @@ const showNegative = computed(() =>
 )
 
 const videoMode = computed(() => state.value.video?.mode ?? state.value.mode)
-
-// 媒体栏随模式显示，开关放在不会随之消失的提示词标题行。
-const showModeSwitch = computed(() => (config.value.videoModes ?? config.value.modes ?? []).length > 0)
-const videoModeOptions = computed(() =>
-  (config.value.videoModes ?? config.value.modes ?? []).map(m => ({
-    value: m,
-    label: t(m === 'i2v' || m === 't2v' ? `generate.video.mode_${m}` : `generate.mode.${m}`),
-  })),
-)
-function onVideoModeChange(v: string) {
-  store.setMode(v)
-}
 
 // 起始画面挂载判定 — 挂在提示词容器左栏 (PromptEditor 的 #media 槽):
 //  - 条目内双模式 (wan22_5b/minimax_h3): 仅 i2v 模式渲染 (文生模式下左栏整块消失)
@@ -534,16 +521,6 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @update:negative="state.negative = $event"
           @tool="onPromptTool"
         >
-          <template v-if="showModeSwitch" #header-actions>
-            <SegmentedControl
-              :options="videoModeOptions"
-              :model-value="videoMode"
-              size="sm"
-              :disabled="frozen"
-              @update:model-value="onVideoModeChange(String($event))"
-            />
-          </template>
-
           <!-- 起始画面 — 与图生图参考图同一组件。
                H3 首尾帧: 首帧 | 提示词 | 尾帧 三栏 (尾帧走 media-right 槽) -->
           <template v-if="showStartFrame" #media>

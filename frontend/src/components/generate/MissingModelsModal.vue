@@ -47,6 +47,8 @@ const missingModels = useMissingModels()
 const submitting = ref(false)
 
 const totalCount = computed(() => [...props.downloadable, ...props.unavailable].filter(m => missingModels.isMissing(m.path)).length)
+const completed = computed(() => !missingModels.loading.value && totalCount.value === 0)
+const canDownload = computed(() => props.downloadable.some(m => ['idle', 'failed'].includes(infoOf(m).state)))
 
 /** 该行的下载状态 (与模型页同源的状态机) */
 function infoOf(m: MissingModel) {
@@ -144,7 +146,7 @@ watch(() => props.modelValue, (open) => {
   <BaseModal
     :model-value="modelValue"
     size="md"
-    :title="t('generate.missing.title')"
+    :title="t(completed ? 'generate.missing.complete' : 'generate.missing.title')"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <LoadingCenter v-if="missingModels.loading.value">
@@ -219,14 +221,14 @@ watch(() => props.modelValue, (open) => {
     </div>
 
     <template #footer>
-      <BaseButton :disabled="submitting" @click="emit('update:modelValue', false)">
-        {{ t('generate.missing.keep') }}
+      <BaseButton :variant="completed ? 'primary' : 'default'" @click="emit('update:modelValue', false)">
+        {{ t(completed ? 'common.btn.done' : 'common.btn.close') }}
       </BaseButton>
-      <BaseButton :disabled="submitting || totalCount === 0" @click="ignoreAndFallback">
+      <BaseButton v-if="!missingModels.loading.value && !completed" :disabled="submitting" @click="ignoreAndFallback">
         {{ t('generate.missing.ignore_fallback') }}
       </BaseButton>
       <BaseButton
-        v-if="downloadable.length"
+        v-if="!missingModels.loading.value && canDownload"
         variant="primary"
         :loading="submitting"
         @click="downloadAll"

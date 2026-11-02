@@ -4,6 +4,44 @@
     "t2i": "文生图",
     "ref": "参考生成"
   },
+  "arch": {
+    "click_change": "点击更换架构",
+    "switch_btn": "更换",
+    "modal_title": "选择架构与工作流",
+    "cat_image_title": "图像生成",
+    "cat_image_sub": "{count} 款可用架构",
+    "cat_video_title": "视频生成",
+    "cat_video_sub": "{count} 款可用架构",
+    "cat_edit_title": "图像编辑",
+    "cat_edit_sub": "即将支持",
+    "current_used": "当前使用",
+    "tag_tags": "Tag 提示词",
+    "tag_natural": "自然语言",
+    "tag_fast": "快速模式",
+    "tag_controlnet": "ControlNet",
+    "ready": "已就绪",
+    "desc": {
+      "sd15": "经典轻量化扩散架构，显存占用低、出图极快，拥有庞大成熟的社区模型与 ControlNet 生态。",
+      "sdxl": "1024px 原生高分辨率通用架构，兼顾写实摄影、商业插画与多风格创作，控制插件生态完善。",
+      "pony": "基于 SDXL 深度微调的角色与二次元架构，采用质量评分与 Danbooru 标签体系，擅长丰富动态与角色表现。",
+      "illustrious": "新一代二次元插画主力架构，全面兼容 Danbooru 角色与画风标签，色彩通透、构图与人体表现优异。",
+      "noobai": "基于 Illustrious 演进的社区动漫架构（EPS 预测），强化海量角色识别、画师风格还原与光影细节。",
+      "noobai_vpred": "采用 V-Prediction 预测模式的 NoobAI 分支，大幅拓宽明暗动态范围，擅长高对比度光影与深色夜景。",
+      "anima": "搭载 Qwen3 文本编码器的现代动漫扩散架构，支持 Danbooru 标签与 Turbo 快速模式，兼顾细节与速度。",
+      "flux1": "Black Forest Labs 旗舰级 12B DiT 架构，自然语言理解极强，擅长真实光影质感、复杂构图与文字渲染。",
+      "krea2": "Krea 官方开源的高美学文生图架构，结合 Qwen3-VL 视觉语言编码器，直出极具胶片感与艺术张力的画面。",
+      "chroma": "基于 Flux 去蒸馏重构的开源全精度 DiT 架构，色彩表现鲜明，恢复完整 CFG 引导与高自由度微调。",
+      "flux2dev": "新一代多模态图像架构，搭载 Mistral 视觉语言编码器，原生支持文生图、多图参考生成与 8 步加速。",
+      "flux2klein4b": "Flux 2 家族 4B 轻量化版本，显存占用友好、推理迅捷，完整保留文生图与多图参考生成能力。",
+      "flux2klein9b": "Flux 2 家族 9B 均衡版本，在构图准确度、材质细节与多参考图一致性之间取得理想平衡。",
+      "qwen_image21": "通义千问多模态图像生成架构，具备出色的中英自然语言理解、复杂排版渲染与 8 步快速蒸馏模式。",
+      "zimage": "通义实验室开源的高效 DiT 图像架构，支持自然语言长提示词、ControlNet 联合控制与少步数快速出图。",
+      "wan22_i2v": "通义万相 2.2 旗舰 14B 图生视频架构，采用高低噪双 UNet 协同采样，支持首尾帧过渡、4 步加速与视频控制。",
+      "wan22_t2v": "通义万相 2.2 旗舰 14B 纯文生视频架构，双 UNet 分段去噪，大幅提升大幅度运镜与复杂动态的物理合理性。",
+      "wan22_5b": "通义万相 2.2 轻量化 5B 视频架构，单模型同时支持文生视频与图生视频，中等显存设备也能流畅生成。",
+      "minimax_h3": "音视频一体化旗舰视频架构，支持文生视频、首尾帧图生视频与多素材参考生成（图/视频/音频驱动）及快速模式。"
+    }
+  },
   "gate": {
     "checking": "正在检查 ComfyUI 状态…",
     "starting": "ComfyUI 正在启动，请稍候…",
@@ -16,10 +54,10 @@
   },
   "header": {
     "queue_history": "队列&历史",
-    "model_selector_aria": "选择模型",
+    "model_selector_aria": "选择架构",
     "family_sdxl": "SDXL 系列",
     "family_flux1": "Flux 1 系列",
-    "model_label": "模型",
+    "model_label": "架构",
     "task_image": "图像",
     "task_video": "视频",
     "task_edit": "编辑",
@@ -781,6 +819,30 @@
     "state_lost": "目标条目状态不可用，请重试"
   },
   "dep": {
+    "hints": {
+      "sdxl": "SDXL/Pony 通用",
+      "ilnoob": "Illustrious/NoobAI 专用",
+      "sd15": "SD1.5 专用",
+      "flux1": "Flux 1 专用",
+      "qwen_image21": "Qwen Image 2.1 专用",
+      "zimage": "Z-Image Base 专用",
+      "zimage_turbo": "Z-Image Turbo 专用",
+      "anima": "Anima 专用",
+      "minimax_h3": "MiniMax H3 专用",
+      "pose": "姿态检测",
+      "depth": "深度估计",
+      "lineart": "线稿检测",
+      "lineart_coarse": "粗线稿检测",
+      "lineart_anime": "动漫线稿检测",
+      "aurasr": "4× 超分辨率放大",
+      "seedvr2_3b": "视频放大，显存约 10 GB",
+      "seedvr2_7b": "锐化版，显存约 17 GB",
+      "seedvr2_vae": "3B/7B 共用配套 VAE",
+      "face_detector": "检测人脸位置",
+      "face_mask": "五官级分割掩码，边界更精确",
+      "tagger_large": "高精度",
+      "tagger_light": "轻量快速"
+    },
     "noun_lineart": "线稿控制模型",
     "noun_tile": "细节控制模型",
     "ready": "{noun}已就绪 · {n} 项",
@@ -924,6 +986,7 @@
   },
   "missing": {
     "title": "导入的配置缺少依赖",
+    "complete": "模型已补齐",
     "section_downloadable": "可下载（{count}）",
     "section_unavailable": "无法自动获取（{count}）",
     "download_all": "全部下载",
@@ -942,12 +1005,11 @@
     "role_face_model": "面部检测模型",
     "tag": "缺失",
     "tag_hint": "该模型在本机不存在，补齐文件后即可正常使用",
-    "keep": "保留缺失项",
-    "ignore_fallback": "忽略并回退默认",
+    "ignore_fallback": "清除缺失项",
     "confirm_fallback": {
-      "title": "忽略无效设置",
-      "message": "将从工作区配置中移除 {count} 个本机不存在的模型引用，回退为未选择。\n\n补齐文件后不会自动恢复，需重新选择。确定继续吗？",
-      "button": "移除并回退"
+      "title": "清除缺失项",
+      "message": "将清除 {count} 个缺失项，之后需要重新选择。",
+      "button": "清除"
     },
     "querying": "正在查询模型信息…"
   }

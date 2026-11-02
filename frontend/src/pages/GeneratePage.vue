@@ -18,14 +18,13 @@ import { useGenerateSubmit } from '@/composables/generate/useGenerateSubmit'
 import { useGeneratePreview } from '@/composables/generate/useGeneratePreview'
 import { useMissingModels } from '@/composables/generate/useMissingModels'
 import { GenerateOptionsKey } from '@/composables/generate/keys'
-import { MODEL_TYPES, MODEL_MENU } from '@/config/model-types'
+import { MODEL_TYPES } from '@/config/model-types'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import ProductTour, { type TourStep } from '@/components/ui/ProductTour.vue'
-import DropdownMenu, { type DropdownMenuItem } from '@/components/ui/DropdownMenu.vue'
-import SegmentedControl, { type SegmentOption } from '@/components/ui/SegmentedControl.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import PageHeaderRow from '@/components/ui/PageHeaderRow.vue'
 import DrawerTrigger from '@/components/ui/DrawerTrigger.vue'
+import ArchSelector from '@/components/generate/ArchSelector.vue'
 import ModelTab from '@/components/generate/ModelTab.vue'
 import QueuePanel from '@/components/generate/QueuePanel.vue'
 import HistoryPanel from '@/components/generate/HistoryPanel.vue'
@@ -116,20 +115,7 @@ const dirModalOpen = computed({
 // 标记「已看过」(见下), 若声明在后, 首次装载 (gate 立即可用的场景) 会撞上 TDZ。
 const tour = useProductTour('generate_tour_done')
 
-// 缺失 modal 展示: 由缺失清单驱动, 用户关闭后本会话不再自动弹
-// (missingModels.visible 是「有缺失且未关闭」; modal 自身用 v-model 控制
-// 打开, 关闭时同步 dismiss 以免切页回来又弹)。
-const missingModalOpen = ref(false)
-watch(
-  () => missingModels.visible.value,
-  (show) => {
-    if (show) missingModalOpen.value = true
-  },
-  { immediate: true },
-)
-watch(missingModalOpen, (open) => {
-  if (!open) missingModels.dismiss()
-})
+const missingModalOpen = missingModels.visible
 
 async function initOptions(forceRefresh = false) {
   if (forceRefresh) {
@@ -149,9 +135,8 @@ async function initOptions(forceRefresh = false) {
     return
   }
   stateFailed.value = false
-  // 取回指纹表 (表2): 缺失弹窗据此检索取货来源; 表非空即视为「本实例导入过配置」。
-  await missingModels.loadHashes()
-  await store.checkMissingFiles()
+  // 导入缺失提示只在恢复配置后检查，日常切换功能使用各模块的依赖栏。
+  await missingModels.checkImported()
   // 带工作区状态的导入视为「这个实例是从别处搬过来的」—— 用户已经会用本页,
   // 不再自动弹导览, 直接永久标记为已完成 (手动入口仍随时可用)。
   // 判据用指纹表而非 modelStates: 它只在导入路径上写入 (随配置包附带),
@@ -188,110 +173,6 @@ onActivated(() => {
   // KeepAlive 切回来重拉后台运行状态 (服务端为准, 避免刷新瞬间闪可编辑)
   bg.refresh()
 })
-
-// 两个任务各自记忆选中架构。store.activeModelType 已是 computed 派生
-// (读写当前任务 activeModelTypeByTask[activeTask] 的槽), 切任务用 store.switchTask()
-// — 它会把 activeTask 切到该任务并保证对应架构的 modelStates 已初始化。
-// 切回图像任务时回到上次的图像架构 (activeModelTypeByTask.image 槽保留记忆)。
-const activeTask = computed<'image' | 'video' | 'edit'>({
-  get: () => store.activeTask,
-  set: (v) => {
-    if (v === 'image' || v === 'video') store.switchTask(v)
-  },
-})
-const taskOptions = computed<SegmentOption[]>(() => [
-  { value: 'image', label: t('generate.header.task_image'), icon: 'image' },
-  { value: 'video', label: t('generate.header.task_video'), icon: 'videocam' },
-  { value: 'edit', label: t('generate.header.task_edit'), icon: 'edit', disabled: true },
-])
-
-const selectedModelKey = computed<string>({
-  get: () => store.currentConfig.menuKey ?? store.activeModelType,
-  set: (v) => {
-    if (MODEL_TYPES[v] && selectedModelKey.value !== v) {
-      store.selectModelGroup(v)
-    }
-  },
-})
-
-function leafHint(cfg: { key: string }): { hint?: string } {
-  if (store.componentsReady[store.modelSelections[cfg.key] ?? cfg.key] === false) {
-    return { hint: t('generate.header.not_ready') }
-  }
-  return {}
-}
-
-const menuItems = computed<DropdownMenuItem[]>(() => {
-  const items: DropdownMenuItem[] = []
-  const families: Record<string, DropdownMenuItem[]> = {}
-
-  // 菜单按当前任务的 mediaType 过滤 (image 任务只显图像架构, video 任务只显视频架构)。
-  // activeTask 的 mediaType 由 store.activeModelType 派生 (image/video); 'edit' 占位时按 image。
-  const taskMediaType = currentConfig.value.mediaType
-
-  for (const cfg of MODEL_MENU) {
-    if (cfg.mediaType !== taskMediaType) continue
-    const { hint } = leafHint(cfg)
-    const leaf: DropdownMenuItem = {
-      key: cfg.key,
-      label: t(`generate.tabs.${cfg.key}`),
-      logo: cfg.logo,
-      logoInvertDark: cfg.logoInvertDark,
-      letter: cfg.logo ? undefined : (cfg.label.slice(0, 2) || cfg.key.slice(0, 2)),
-      hint,
-    }
-    if (cfg.familyOf) {
-      ;(families[cfg.familyOf] ||= []).push(leaf)
-    } else {
-      items.push(leaf)
-    }
-  }
-
-  for (const [famKey, children] of Object.entries(families)) {
-    const parentCfg = MODEL_TYPES[famKey]
-    if (parentCfg) {
-      const idx = items.findIndex(it => it.key === famKey)
-      const selfLeaf = idx >= 0 ? items[idx] : undefined
-      const parent: DropdownMenuItem = {
-        key: `family_${famKey}`,
-        label: t(`generate.header.family_${famKey}`),
-        logo: parentCfg.logo,
-        logoInvertDark: parentCfg.logoInvertDark,
-        children: selfLeaf ? [selfLeaf, ...children] : children,
-      }
-      if (idx >= 0) items[idx] = parent
-      else items.push(parent)
-    } else {
-      const firstChild = children[0]
-      const parent: DropdownMenuItem = {
-        key: `family_${famKey}`,
-        label: t(`generate.header.family_${famKey}`),
-        logo: firstChild?.logo,
-        logoInvertDark: firstChild?.logoInvertDark,
-        letter: firstChild?.logo ? undefined : 'F2',
-        children,
-      }
-      items.push(parent)
-    }
-  }
-
-
-  // 分组的排序键 = 组内最早的发布时间, 因此跨分组/叶子比较时使用同一时间轴。
-  const relOf = (key: string) => MODEL_TYPES[key]?.releasedAt ?? '9999-99'
-  const keyOf = (it: DropdownMenuItem) =>
-    it.children?.length
-      ? (it.children.map(c => relOf(c.key)).sort()[0] ?? '9999-99')
-      : relOf(it.key)
-
-  for (const it of items) {
-    if (it.children?.length) it.children.sort((a, b) => relOf(a.key).localeCompare(relOf(b.key)))
-  }
-  items.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))
-
-  return items
-})
-
-const currentConfig = computed(() => store.currentConfig)
 
 const drawerOpen = ref(false)
 const drawerEverOpened = ref(false)
@@ -348,7 +229,7 @@ onDeactivated(() => {
 
 const tourSteps = computed<TourStep[]>(() => [
   { title: t('generate.tour.steps.welcome.title'), body: t('generate.tour.steps.welcome.body') },
-  { target: '[data-tour="gen-header"], [data-tour="gen-arch"]', placement: 'bottom',
+  { target: '[data-tour="gen-arch"]', placement: 'bottom',
     title: t('generate.tour.steps.task.title'), body: t('generate.tour.steps.task.body') },
   { target: '[data-tour="gen-prompt"]', placement: 'bottom',
     title: t('generate.tour.steps.prompt.title'), body: t('generate.tour.steps.prompt.body') },
@@ -667,8 +548,7 @@ sse.start()
     </div>
 
     <template v-else>
-      <!-- ═══ 顶栏: 内容生成 ① │ [任务切换] [模型 ▾] ··· [队列/历史 ②]
-          窄屏 (<600px) 由 PageHeaderRow 自动下放: Row1 标题+队列, Row2 任务切换, Row3 模型选择 ═══ -->
+      <!-- ═══ 顶栏: 内容生成 ① │ 架构与工作流选择器 ··· [队列/历史 ②] ═══ -->
       <PageHeaderRow :title="t('generate.title')">
         <!-- 产品导览手动入口: 裸 icon (省宽度), 纯前端覆盖层不因 frozen 禁用 -->
         <template #title-extra>
@@ -683,56 +563,10 @@ sse.start()
           </button>
         </template>
 
-        <div
-          class="gen-header-controls"
-          data-tour="gen-header"
-          :inert="frozen"
-          :class="{ 'gen-header-controls--frozen': frozen }"
-        >
-          <SegmentedControl
-            v-model="activeTask"
-            :options="taskOptions"
-            size="md"
-            class="gen-task-switch"
-          />
-        </div>
-
-        <template #sub>
-          <div
-            class="gen-header-controls"
-            data-tour="gen-arch"
-            :inert="frozen"
-            :class="{ 'gen-header-controls--frozen': frozen }"
-          >
-            <span class="gen-arch-label">{{ t('generate.header.model_label') }}</span>
-            <DropdownMenu
-              v-model="selectedModelKey"
-              :items="menuItems"
-              :back-label="t('generate.header.back_to_all_models')"
-              class="gen-arch-selector"
-            >
-              <template #default="{ open }">
-                <button
-                  type="button"
-                  class="gen-arch-trigger"
-                  :class="{ 'gen-arch-trigger--open': open }"
-                  :aria-label="t('generate.header.model_selector_aria')"
-                  :title="t('generate.header.model_selector_aria')"
-                >
-                  <span
-                    class="gen-arch-logo"
-                    :class="{ 'gen-arch-logo--pad': currentConfig.logo }"
-                  >
-                    <img v-if="currentConfig.logo" :src="currentConfig.logo" :alt="currentConfig.label" />
-                    <span v-else class="gen-arch-logo__letter">{{ currentConfig.label.slice(0, 2) }}</span>
-                  </span>
-                  <span class="gen-arch-trigger__label">{{ t(`generate.tabs.${currentConfig.menuKey ?? currentConfig.key}`) }}</span>
-                  <MsIcon name="expand_more" size="sm" color="var(--t3)" :class="{ 'gen-arch-trigger__icon--open': open }" />
-                </button>
-              </template>
-            </DropdownMenu>
-          </div>
-        </template>
+        <ArchSelector
+          data-tour="gen-arch"
+          :disabled="frozen"
+        />
 
         <template #actions>
           <span
@@ -840,13 +674,6 @@ sse.start()
 }
 @keyframes gate-spin { to { transform: rotate(360deg); } }
 
-.gen-header-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-}
-
 /* 未保存提示: 保存失败且仍在重试时点亮, 不弹 toast (后台行为, 避免刷屏) */
 .gen-save-warn {
   display: inline-flex;
@@ -871,128 +698,5 @@ sse.start()
 .gen-tour-btn:hover {
   color: var(--ac);
   background: var(--bg3);
-}
-
-/* inert 本身无视觉表现, 冻结区半透明 + 禁止光标 */
-.gen-header-controls--frozen {
-  opacity: .45;
-  cursor: not-allowed;
-}
-
-/* 架构选择器前置静音标签: 提示控件语义, 窄屏隐藏 */
-.gen-arch-label {
-  font-size: var(--text-xs);
-  color: var(--t3);
-  user-select: none;
-  margin-right: calc(var(--sp-2) * -0.5);
-}
-
-.gen-arch-selector {
-  flex-shrink: 0;
-}
-
-/* 架构触发器的按钮规格 —— 与 ui/DrawerTrigger.vue 同底 (--bg3 底、1px --bd 边框、
-   var(--rs) 圆角、同高度同 padding、hover 边框变亮)。 */
-.gen-arch-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 0 12px;
-  height: 34px;
-  box-sizing: border-box;
-  background: var(--bg3);
-  border: 1px solid var(--bd);
-  border-radius: var(--rs);
-  color: var(--t1);
-  font-size: var(--text-base);
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
-  flex-shrink: 0;
-  position: relative;
-}
-.gen-arch-trigger:hover {
-  border-color: var(--bd-f);
-}
-
-.gen-arch-trigger--open {
-  border-color: var(--ac);
-}
-
-.gen-arch-logo {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.gen-arch-logo--pad {
-  background: var(--bg-logo-pad, #f1f3f5);
-  border: 1px solid var(--bd);
-  padding: 1px;
-}
-.gen-arch-logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.gen-arch-logo__letter {
-  font-size: .7rem;
-  font-weight: 700;
-  color: var(--t-inv);
-  background: linear-gradient(135deg, var(--ac), var(--ac2));
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.gen-arch-trigger__label {
-  white-space: nowrap;
-}
-
-/* chevron 旋转 (复用 MsIcon class) */
-.gen-arch-trigger :deep(.ms.gen-arch-trigger__icon--open) {
-  transform: rotate(180deg);
-}
-
-@container page (max-width: 600px) {
-  .gen-arch-label {
-    display: none;
-  }
-
-  /* 任务切换: 通栏 3 等分 */
-  .gen-task-switch {
-    display: flex;
-    width: 100%;
-  }
-  .gen-task-switch :deep(.seg-control__item) {
-    flex: 1;
-    justify-content: center;
-    text-align: center;
-  }
-
-  /* 架构选择器: 通栏全宽 */
-  .gen-arch-selector {
-    display: flex;
-    width: 100%;
-  }
-  .gen-arch-trigger {
-    width: 100%;
-    justify-content: space-between;
-  }
-  .gen-arch-trigger__label {
-    flex: 1;
-    min-width: 0;
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 </style>

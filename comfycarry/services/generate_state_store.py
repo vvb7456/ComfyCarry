@@ -32,6 +32,7 @@ from ..config import normalize_file_path, FilePathError
 log = logging.getLogger(__name__)
 
 KEY = "generate_state"
+IMPORT_PENDING_KEY = "generate_import_pending"
 TABLE = "app_meta"
 
 # 工作区状态体积上限 (序列化后字节数)。参考图只存文件名, 提示词是主要变量;
@@ -133,7 +134,21 @@ def replace_state(payload: Any) -> tuple[dict | None, tuple[str, dict] | None]:
         return None, err
 
     with db.transaction() as conn:
-        return _write(conn, dict(valid))
+        stored, err = _write(conn, dict(valid))
+        if not err:
+            conn.execute(
+                f"INSERT OR REPLACE INTO {TABLE} (key, value) VALUES (?, ?)",
+                (IMPORT_PENDING_KEY, "1"),
+            )
+        return stored, err
+
+
+def consume_import_check() -> bool:
+    """首次进入生成页时消费导入提醒；持久化以跨越向导部署和服务重启。"""
+    with db.transaction() as conn:
+        return conn.execute(
+            f"DELETE FROM {TABLE} WHERE key = ?", (IMPORT_PENDING_KEY,),
+        ).rowcount > 0
 
 
 def _write(conn, stored: dict) -> tuple[dict | None, tuple[str, dict] | None]:

@@ -45,39 +45,39 @@ const CN_MODELS = {
   union: {
     id: 'xinsir-union-promax',
     label: 'Xinsir Union ProMax',
-    hint: 'SDXL/Pony 通用',
+    hintKey: 'generate.dep.hints.sdxl',
     bytes: hfBytes(-10000362),
     required: true,
     files: [hfFile(-10000362)],
   },
   pose_dedicated: {
-    id: 'noob-openpose',
-    label: 'Laxhar NoobAI OpenPose',
-    hint: 'Illustrious/NoobAI 姿势控制',
-    bytes: hfBytes(-10000438),
+    id: 'windsingai-openpose',
+    label: 'windsingai OpenPose',
+    hintKey: 'generate.dep.hints.ilnoob',
+    bytes: hfBytes(-10000363),
     required: true,
-    files: [hfFile(-10000438)],
+    files: [hfFile(-10000363)],
   },
   canny_dedicated: {
-    id: 'noob-canny',
-    label: 'NoobAI Canny FP16',
-    hint: 'Illustrious/NoobAI 轮廓控制',
-    bytes: hfBytes(-10000439),
+    id: 'illustrious-canny',
+    label: 'Illustrious XL Canny',
+    hintKey: 'generate.dep.hints.ilnoob',
+    bytes: hfBytes(-10000364),
     required: true,
-    files: [hfFile(-10000439)],
+    files: [hfFile(-10000364)],
   },
   depth_dedicated: {
-    id: 'noob-depth-midas',
-    label: 'NoobAI Depth MiDaS FP16',
-    hint: 'Illustrious/NoobAI 深度控制',
-    bytes: hfBytes(-10000440),
+    id: 'illustrious-depth',
+    label: 'Illustrious XL Depth',
+    hintKey: 'generate.dep.hints.ilnoob',
+    bytes: hfBytes(-10000365),
     required: true,
-    files: [hfFile(-10000440)],
+    files: [hfFile(-10000365)],
   },
   sd15_pose_dedicated: {
     id: 'sd15-controlnet-openpose',
     label: 'SD1.5 OpenPose ControlNet',
-    hint: 'SD1.5 专用',
+    hintKey: 'generate.dep.hints.sd15',
     bytes: hfBytes(-10000383),
     required: true,
     files: [hfFile(-10000383)],
@@ -85,7 +85,7 @@ const CN_MODELS = {
   sd15_canny_dedicated: {
     id: 'sd15-controlnet-canny',
     label: 'SD1.5 Canny ControlNet',
-    hint: 'SD1.5 专用',
+    hintKey: 'generate.dep.hints.sd15',
     bytes: hfBytes(-10000382),
     required: true,
     files: [hfFile(-10000382)],
@@ -93,7 +93,7 @@ const CN_MODELS = {
   sd15_depth_dedicated: {
     id: 'sd15-controlnet-depth',
     label: 'SD1.5 Depth ControlNet',
-    hint: 'SD1.5 专用',
+    hintKey: 'generate.dep.hints.sd15',
     bytes: hfBytes(-10000381),
     required: true,
     files: [hfFile(-10000381)],
@@ -101,7 +101,7 @@ const CN_MODELS = {
   dwpose: {
     id: 'dwpose',
     label: 'DWPose',
-    hint: '姿态检测',
+    hintKey: 'generate.dep.hints.pose',
     sizeText: '~352 MB',
     required: true,
     files: [hfFile(-10000386), hfFile(-10000387)],
@@ -109,7 +109,7 @@ const CN_MODELS = {
   depth_anything_v2: {
     id: 'depth-anything-v2',
     label: 'Depth Anything V2',
-    hint: '深度估计',
+    hintKey: 'generate.dep.hints.depth',
     sizeText: '~1.34 GB',
     required: true,
     files: [hfFile(-10000388)],
@@ -117,7 +117,7 @@ const CN_MODELS = {
   flux_union: {
     id: 'flux-union-pro2-fp8',
     label: 'Union Pro 2.0 FP8',
-    hint: 'Flux 1 专用',
+    hintKey: 'generate.dep.hints.flux1',
     bytes: hfBytes(-10000366),
     required: true,
     files: [hfFile(-10000366)],
@@ -128,21 +128,21 @@ const UPSCALE_MODELS = {
   aurasr_v2: {
     id: 'aurasr-v2',
     label: 'AuraSR v2',
-    hint: '4× 超分辨率放大',
+    hintKey: 'generate.dep.hints.aurasr',
     bytes: hfBytes(-10000371, -10000384),
     files: [hfFile(-10000371), hfFile(-10000384)],
   },
   seedvr2_3b_fp8: {
     id: 'seedvr2-3b-fp8',
     label: 'SeedVR2 3B FP8',
-    hint: '视频放大，显存约 10GB',
+    hintKey: 'generate.dep.hints.seedvr2_3b',
     bytes: hfBytes(-10000368),
     files: [hfFile(-10000368)],
   },
   seedvr2_7b_sharp_fp8: {
     id: 'seedvr2-7b-sharp-fp8',
     label: 'SeedVR2 7B-sharp FP8',
-    hint: '锐化版，显存约 17GB',
+    hintKey: 'generate.dep.hints.seedvr2_7b',
     bytes: hfBytes(-10000370),
     files: [hfFile(-10000370)],
   },
@@ -151,7 +151,7 @@ const UPSCALE_MODELS = {
   seedvr2_vae: {
     id: 'seedvr2-vae',
     label: 'SeedVR2 VAE FP16',
-    hint: '3B/7B 共用配套 VAE',
+    hintKey: 'generate.dep.hints.seedvr2_vae',
     bytes: hfBytes(-10000369),
     files: [hfFile(-10000369)],
   },
@@ -175,7 +175,7 @@ const FACE_MODELS = {
   face_yolov8m: {
     id: 'face-yolov8m',
     label: 'YOLOv8 面部检测器',
-    hint: '检测人脸位置',
+    hintKey: 'generate.dep.hints.face_detector',
     bytes: hfBytes(-10000367),
     required: true,
     files: [hfFile(-10000367)],
@@ -183,7 +183,7 @@ const FACE_MODELS = {
   sam_vit_b: {
     id: 'sam-vit-b',
     label: 'SAM 精细掩码',
-    hint: '五官级分割掩码，边界更精确',
+    hintKey: 'generate.dep.hints.face_mask',
     sizeText: '~375 MB',
     files: [hfFile(-10000385)],
   },
@@ -197,31 +197,30 @@ export const FACE_DEP_GROUP: DepGroup = {
 export type CnBranch = NonNullable<ModelTypeConfig['cnBranch']>
 
 function modelRow(id: string, label: string, hint: string, ...versions: number[]): DepRow {
-  return { id, label, hint, required: true, bytes: hfBytes(...versions), files: versions.map(hfFile) }
+  return { id, label, hintKey: `generate.dep.hints.${hint}`, required: true, bytes: hfBytes(...versions), files: versions.map(hfFile) }
 }
 
 const CONTROL_MODELS = {
-  qwen: modelRow('qwen-union', 'Qwen Image 2.1 Fun Union INT8', 'Qwen Image 2.1 专用', -10000395),
-  zimage: modelRow('zimage-union', 'Z-Image Fun Union 2.1 Lite', 'Z-Image Base 专用', -10000420),
-  zimageTile: modelRow('zimage-tile', 'Z-Image Fun Tile 2.1 Lite', 'Z-Image Base 专用', -10000421),
-  zimageTurbo: modelRow('zimage-turbo-union', 'Z-Image Turbo Fun Union 2602 Lite', 'Z-Image Turbo 专用', -10000422),
-  zimageTurboTile: modelRow('zimage-turbo-tile', 'Z-Image Turbo Fun Tile 2601 Lite', 'Z-Image Turbo 专用', -10000423),
-  anima: modelRow('anima-any', 'Anima LLLite Any v2', 'Anima 专用', -10000424),
-  animaDepth: modelRow('anima-depth', 'Anima LLLite Depth', 'Anima 专用', -10000425),
-  h3: modelRow('h3-union', 'MiniMax H3 Fun Union 2.0 INT8', 'MiniMax H3 视频控制附件', -10000430),
-  sd15Lineart: modelRow('sd15-lineart', 'SD1.5 Lineart ControlNet', 'SD1.5 专用', -10000431),
-  sd15Tile: modelRow('sd15-tile', 'SD1.5 Tile ControlNet', 'SD1.5 专用', -10000432),
-  noobLineart: modelRow('noob-lineart', 'Noob SDXL Lineart Anime', 'Illustrious/NoobAI 线稿控制', -10000433),
-  noobTile: modelRow('noob-tile', 'Noob SDXL Tile', 'Illustrious/NoobAI 细节恢复', -10000434),
-  fluxLineart: modelRow('flux-lineart', 'MistoLine Flux Dev', 'Flux 1 线稿控制', -10000442),
-  fluxTile: modelRow('flux-tile', 'Jasper Flux Dev Upscaler', 'Flux 1 细节恢复', -10000443),
+  qwen: modelRow('qwen-union', 'Qwen Image 2.1 Fun Union INT8', 'qwen_image21', -10000395),
+  zimage: modelRow('zimage-union', 'Z-Image Fun Union 2.1 Lite', 'zimage', -10000420),
+  zimageTile: modelRow('zimage-tile', 'Z-Image Fun Tile 2.1 Lite', 'zimage', -10000421),
+  zimageTurbo: modelRow('zimage-turbo-union', 'Z-Image Turbo Fun Union 2602 Lite', 'zimage_turbo', -10000422),
+  zimageTurboTile: modelRow('zimage-turbo-tile', 'Z-Image Turbo Fun Tile 2601 Lite', 'zimage_turbo', -10000423),
+  anima: modelRow('anima-any', 'Anima LLLite Any v2', 'anima', -10000424),
+  animaDepth: modelRow('anima-depth', 'Anima LLLite Depth', 'anima', -10000425),
+  h3: modelRow('h3-union', 'MiniMax H3 Fun Union 2.0 INT8', 'minimax_h3', -10000430),
+  sd15Lineart: modelRow('sd15-lineart', 'SD1.5 Lineart ControlNet', 'sd15', -10000431),
+  sd15Tile: modelRow('sd15-tile', 'SD1.5 Tile ControlNet', 'sd15', -10000432),
+  noobLineart: modelRow('noob-lineart', 'Noob SDXL Lineart Anime', 'ilnoob', -10000433),
+  noobTile: modelRow('noob-tile', 'Noob SDXL Tile', 'ilnoob', -10000434),
+  fluxLineart: modelRow('flux-lineart', 'MistoLine Flux Dev', 'flux1', -10000442),
+  fluxTile: modelRow('flux-tile', 'Jasper Flux Dev Upscaler', 'flux1', -10000443),
 }
 
 const PREPROCESSORS = {
-  midas: modelRow('midas-depth', 'MiDaS DPT Hybrid', '深度检测', -10000441, -10000444, -10000445),
-  lineart: modelRow('lineart', 'Lineart', '线稿检测', -10000435),
-  lineartCoarse: modelRow('lineart-coarse', 'Lineart Coarse', '粗线稿检测', -10000436),
-  lineartAnime: modelRow('lineart-anime', 'Lineart Anime', '动漫线稿检测', -10000437),
+  lineart: modelRow('lineart', 'Lineart', 'lineart', -10000435),
+  lineartCoarse: modelRow('lineart-coarse', 'Lineart Coarse', 'lineart_coarse', -10000436),
+  lineartAnime: modelRow('lineart-anime', 'Lineart Anime', 'lineart_anime', -10000437),
 }
 
 const CN_BRANCH_MODELS: Record<CnBranch, Record<string, DepRow>> = {
@@ -236,12 +235,9 @@ const CN_BRANCH_MODELS: Record<CnBranch, Record<string, DepRow>> = {
   minimax_h3: { pose: CONTROL_MODELS.h3, canny: CONTROL_MODELS.h3, depth: CONTROL_MODELS.h3, lineart: CONTROL_MODELS.h3 },
 }
 
-export function cnPreprocessor(type: string, branch: CnBranch | undefined, model = ''): { rows: DepRow[]; params: Record<string, boolean> } {
+export function cnPreprocessor(type: string, branch: CnBranch | undefined): { rows: DepRow[]; params: Record<string, boolean> } {
   if (type === 'pose') return { rows: [CN_MODELS.dwpose], params: {} }
-  if (type === 'depth') {
-    const midas = model ? model.toLowerCase().includes('midas') : branch === 'ilnoob'
-    return { rows: [midas ? PREPROCESSORS.midas : CN_MODELS.depth_anything_v2], params: { depth_midas: midas } }
-  }
+  if (type === 'depth') return { rows: [CN_MODELS.depth_anything_v2], params: {} }
   if (type === 'lineart') {
     const anime = branch === 'ilnoob'
     return { rows: anime ? [PREPROCESSORS.lineartAnime] : [PREPROCESSORS.lineart, PREPROCESSORS.lineartCoarse], params: { lineart_anime: anime } }
@@ -250,13 +246,23 @@ export function cnPreprocessor(type: string, branch: CnBranch | undefined, model
 }
 
 export function getCnDepGroup(type: string, branch: CnBranch | undefined, model = ''): DepGroup {
-  const control = CN_BRANCH_MODELS[branch ?? 'sdxl'][type]
+  const recommended = CN_BRANCH_MODELS[branch ?? 'sdxl'][type]
+  if (!recommended) return { title: `generate.controlnet.need_download_${type}`, rows: [] }
+  let control: DepRow | undefined = recommended
+  if (model) {
+    const filename = model.split('/').pop()
+    const hit = [...HF_VERSION_INDEX.values()].find(entry => entry.version.file.filename === filename)
+    control = hit ? {
+      ...recommended,
+      id: `controlnet-${hit.version.id}`,
+      label: recommended.files.some(file => file.filename === filename) ? recommended.label : hit.model.name,
+      required: true,
+      bytes: hit.version.file.sizeBytes,
+      files: [{ ...hfFile(hit.version.id), filename: model }],
+    } : undefined
+  }
   return { title: `generate.controlnet.need_download_${type}`,
-    rows: control ? [control, ...cnPreprocessor(type, branch, model).rows] : [] }
-}
-
-export function isPreprocessorRow(row: DepRow): boolean {
-  return row.files.every(file => file.hf?.version.file.isModel === false)
+    rows: [...(control ? [control] : []), ...cnPreprocessor(type, branch).rows] }
 }
 
 /**
@@ -274,7 +280,7 @@ export const CN_FILE_BRANCH: Record<string, CnBranch> = (() => {
     }
   }
   map[hfFile(-10000394).filename] = 'qwen_image21'
-  for (const id of [-10000363, -10000364, -10000365]) map[hfFile(id).filename] = 'ilnoob'
+  for (const id of [-10000438, -10000439, -10000440]) map[hfFile(id).filename] = 'ilnoob'
   return map
 })()
 

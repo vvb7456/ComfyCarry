@@ -524,14 +524,16 @@ export const useGenerateStore = defineStore('generate', () => {
   // ── Actions ──────────────────────────────────────────────────────────────
 
   function switchModelType(type: string, mode?: string) {
-    if (!MODEL_TYPES[type]) return
+    const cfg = MODEL_TYPES[type]
+    if (!cfg) return
     const state = stateFor(type)
     if (mode !== undefined) {
       if (state.video) state.video.mode = mode as VideoState['mode']
       else state.mode = mode
     }
-    activeModelTypeByTask[activeTask.value] = type
-    const group = MODEL_TYPES[type].menuKey ?? type
+    activeTask.value = cfg.mediaType
+    activeModelTypeByTask[cfg.mediaType] = type
+    const group = cfg.menuKey ?? type
     modelSelections[group] = type
     modelSelections[`${group}.${state.video?.mode ?? state.mode}`] = type
   }

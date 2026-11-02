@@ -16,8 +16,8 @@
  * FLUX.2 klein 门控仓库, 共 225 条。
  *
  * 可用 ID (下一个):
- *   模型 ID: -100330
- *   版本 ID: -10000446
+ *   模型 ID: -100342
+ *   版本 ID: -10000458
  */
 
 import type { CivitaiHit, CivitaiImage } from '@/composables/useCivitaiSearch'
@@ -4706,7 +4706,7 @@ const zImageTurboBf16Version: HuggingFaceVersion = {
   id: -10000230,
   name: 'v1.0',
   baseModel: 'ZImageTurbo',
-  images: [],
+  images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo-1.webp', type: 'image' }],
   trainedWords: [],
   hashes: {
     SHA256: '2407613050b809ffdff18a4ac99af83ea6b95443ecebdf80e064a79c825574a6',
@@ -4729,7 +4729,7 @@ const zImageTurboBf16Model: HuggingFaceModel = {
     downloadCount: 5204347,
     thumbsUpCount: 801,
   },
-  images: [],
+  images: [{ url: 'https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo-1.webp', type: 'image' }],
   user: { username: 'Comfy-Org' },
   sourceUrl: 'https://huggingface.co/Comfy-Org/z_image_turbo',
   description: { zh: 'Z-Image Turbo 快速文生图', en: 'Z-Image Turbo fast text-to-image' },
@@ -9209,7 +9209,7 @@ const whitelist100324Model: HuggingFaceModel = {
   id: -100324, name: "NoobAI Depth MiDaS FP16", type: "ControlNet",
   metrics: {"downloadCount": 5687, "thumbsUpCount": 4}, images: whitelist100324Version.images,
   user: {"username": "Eugeoter"}, sourceUrl: "https://huggingface.co/Eugeoter/noob-sdxl-controlnet-depth_midas-v1-1",
-  description: {"zh": "NoobAI 深度控制，配合 MiDaS 深度图；Krita 用于 Illustrious 系列。", "en": "NoobAI depth control trained for MiDaS maps, used by Krita for the Illustrious family."},
+  description: {"zh": "NoobAI 深度控制；Krita 用于 Illustrious 系列，搭配 Depth Anything V2。", "en": "NoobAI depth control used by Krita for the Illustrious family with Depth Anything V2."},
   version: whitelist100324Version, versions: [whitelist100324Version],
 }
 
@@ -9329,6 +9329,282 @@ const whitelist100329Model: HuggingFaceModel = {
   user: {"username": "Intel"}, sourceUrl: "https://huggingface.co/Intel/dpt-hybrid-midas",
   description: {"zh": "MiDaS DPT Hybrid 图像预处理配置，与检测权重配套。", "en": "MiDaS DPT Hybrid image processor configuration, paired with the estimator weights."},
   version: whitelist100329Version, versions: [whitelist100329Version],
+}
+
+const whitelist100330Version: HuggingFaceVersion = {
+  id: -10000446, name: "V6 XL", baseModel: "Pony",
+  images: [{"url": "https://cdn-uploads.huggingface.co/production/uploads/663e3e78c719b0b8a386f24e/svjfriQM5OzWep-os7u1W.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "67ab2fd8ec439a89b3fedb15cc65f54336af163c7eb5e4f2acc98f090a29b0b3"},
+  file: {
+    url: "https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL/resolve/main/ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+    filename: "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+    modelType: "checkpoints",
+    architecture: "pony",
+    sizeBytes: 6938041050,
+    sha256: "67ab2fd8ec439a89b3fedb15cc65f54336af163c7eb5e4f2acc98f090a29b0b3",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100330Model: HuggingFaceModel = {
+  id: -100330, name: "Pony Diffusion V6 XL", type: "Checkpoint",
+  metrics: {"downloadCount": 310069, "thumbsUpCount": 222}, images: whitelist100330Version.images,
+  user: {"username": "LyliaEngine"}, sourceUrl: "https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL",
+  description: {"zh": "Pony Diffusion V6 XL 官方基础模型，基于 SDXL 微调的二次元与多角色生成底模，原生支持 score 质量标签与 Danbooru 标签。", "en": "Pony Diffusion V6 XL official base checkpoint fine-tuned from SDXL with native score quality tags and Danbooru tag support."},
+  version: whitelist100330Version, versions: [whitelist100330Version],
+}
+
+const whitelist100331Version: HuggingFaceVersion = {
+  id: -10000447, name: "v0.1", baseModel: "Illustrious",
+  images: [{"url": "https://cdn-uploads.huggingface.co/production/uploads/65eea2d62cc24ebc6dbe16c0/dXvGxUKjcsqzt_gDWc9FU.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "3e15ba00387db678ab4a099f75771c4f5ac67fda9e7100a01d263eaf30145aa9"},
+  file: {
+    url: "https://huggingface.co/OnomaAIResearch/Illustrious-xl-early-release-v0/resolve/main/Illustrious-XL-v0.1.safetensors",
+    filename: "Illustrious-XL-v0.1.safetensors",
+    modelType: "checkpoints",
+    architecture: "illustrious",
+    sizeBytes: 6938040760,
+    sha256: "3e15ba00387db678ab4a099f75771c4f5ac67fda9e7100a01d263eaf30145aa9",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100331Model: HuggingFaceModel = {
+  id: -100331, name: "Illustrious XL v0.1", type: "Checkpoint",
+  metrics: {"downloadCount": 169960, "thumbsUpCount": 437}, images: whitelist100331Version.images,
+  user: {"username": "OnomaAIResearch"}, sourceUrl: "https://huggingface.co/OnomaAIResearch/Illustrious-xl-early-release-v0",
+  description: {"zh": "OnomaAI 官方 Illustrious XL v0.1 基础模型，针对动漫插画与 Danbooru 标签体系深度训练。", "en": "Official OnomaAI Illustrious XL v0.1 base checkpoint trained for anime illustration and Danbooru tag prompting."},
+  version: whitelist100331Version, versions: [whitelist100331Version],
+}
+
+const whitelist100332Version: HuggingFaceVersion = {
+  id: -10000448, name: "v1.0", baseModel: "Illustrious",
+  images: [{"url": "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/2f1abb9d-f8cd-4b0c-9304-461c3ee301e8/width=550/57120893.jpeg", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "735cf3fefcbdc4f7817f53247e38b836ffd27c7641af6d8daa21d245242cb4bd"},
+  file: {
+    url: "https://huggingface.co/OnomaAIResearch/Illustrious-XL-v1.0/resolve/main/Illustrious-XL-v1.0.safetensors",
+    filename: "Illustrious-XL-v1.0.safetensors",
+    modelType: "checkpoints",
+    architecture: "illustrious",
+    sizeBytes: 6938040736,
+    sha256: "735cf3fefcbdc4f7817f53247e38b836ffd27c7641af6d8daa21d245242cb4bd",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100332Model: HuggingFaceModel = {
+  id: -100332, name: "Illustrious XL v1.0", type: "Checkpoint",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 47}, images: whitelist100332Version.images,
+  user: {"username": "OnomaAIResearch"}, sourceUrl: "https://huggingface.co/OnomaAIResearch/Illustrious-XL-v1.0",
+  description: {"zh": "OnomaAI 官方 Illustrious XL v1.0 正式版主权重，增强多分辨率与自然语言混合提示能力。", "en": "Official OnomaAI Illustrious XL v1.0 checkpoint with improved multi-resolution and hybrid natural-language prompting."},
+  version: whitelist100332Version, versions: [whitelist100332Version],
+}
+
+const whitelist100333Version: HuggingFaceVersion = {
+  id: -10000449, name: "v1.1", baseModel: "Illustrious",
+  images: [{"url": "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/6e6a04eb-d884-4759-97a8-1fc0a5278fb6/width=550/58405067.jpeg", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "536863e9f0c13b0ce834e2f8a19ada425ee4f722c0ad3d0051ec7e6adaa8156c"},
+  file: {
+    url: "https://huggingface.co/OnomaAIResearch/Illustrious-XL-v1.1/resolve/main/Illustrious-XL-v1.1.safetensors",
+    filename: "Illustrious-XL-v1.1.safetensors",
+    modelType: "checkpoints",
+    architecture: "illustrious",
+    sizeBytes: 6938040728,
+    sha256: "536863e9f0c13b0ce834e2f8a19ada425ee4f722c0ad3d0051ec7e6adaa8156c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100333Model: HuggingFaceModel = {
+  id: -100333, name: "Illustrious XL v1.1", type: "Checkpoint",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 91}, images: whitelist100333Version.images,
+  user: {"username": "OnomaAIResearch"}, sourceUrl: "https://huggingface.co/OnomaAIResearch/Illustrious-XL-v1.1",
+  description: {"zh": "OnomaAI 官方 Illustrious XL v1.1 主权重，优化线条质感与色彩对比度。", "en": "Official OnomaAI Illustrious XL v1.1 checkpoint with refined linework and color contrast."},
+  version: whitelist100333Version, versions: [whitelist100333Version],
+}
+
+const whitelist100334Version: HuggingFaceVersion = {
+  id: -10000450, name: "v2.0", baseModel: "Illustrious",
+  images: [{"url": "https://cdn-uploads.huggingface.co/production/uploads/63398de08f27255b6b50081a/knyLuPlgUHm1ylRQaxrnx.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "c2a1a3eaa13d4c107dc7e00c3fe830cab427aa026362740ea094745b3422a331"},
+  file: {
+    url: "https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0/resolve/main/Illustrious-XL-v2.0.safetensors",
+    filename: "Illustrious-XL-v2.0.safetensors",
+    modelType: "checkpoints",
+    architecture: "illustrious",
+    sizeBytes: 6938040674,
+    sha256: "c2a1a3eaa13d4c107dc7e00c3fe830cab427aa026362740ea094745b3422a331",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100334Model: HuggingFaceModel = {
+  id: -100334, name: "Illustrious XL v2.0", type: "Checkpoint",
+  metrics: {"downloadCount": 0, "thumbsUpCount": 240}, images: whitelist100334Version.images,
+  user: {"username": "OnomaAIResearch"}, sourceUrl: "https://huggingface.co/OnomaAIResearch/Illustrious-XL-v2.0",
+  description: {"zh": "OnomaAI 官方 Illustrious XL v2.0 主权重，扩展至更高分辨率与最新角色画风知识。", "en": "Official OnomaAI Illustrious XL v2.0 checkpoint with expanded resolution and updated character/style knowledge."},
+  version: whitelist100334Version, versions: [whitelist100334Version],
+}
+
+const whitelist100335Version: HuggingFaceVersion = {
+  id: -10000451, name: "Epsilon 1.1", baseModel: "NoobAI",
+  images: [{"url": "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/b63678b1-200c-4216-9b66-49a7fb4d20bf/width=550/42997451.jpeg", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "6681e8e4b134c81f16533acedb0d406d7e5e366e1624b4105178c64d00b05d51"},
+  file: {
+    url: "https://huggingface.co/Laxhar/noobai-XL-1.1/resolve/main/NoobAI-XL-v1.1.safetensors",
+    filename: "NoobAI-XL-v1.1.safetensors",
+    modelType: "checkpoints",
+    architecture: "noobai",
+    sizeBytes: 7105349958,
+    sha256: "6681e8e4b134c81f16533acedb0d406d7e5e366e1624b4105178c64d00b05d51",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100335Model: HuggingFaceModel = {
+  id: -100335, name: "NoobAI XL Epsilon 1.1", type: "Checkpoint",
+  metrics: {"downloadCount": 522772, "thumbsUpCount": 198}, images: whitelist100335Version.images,
+  user: {"username": "Laxhar"}, sourceUrl: "https://huggingface.co/Laxhar/noobai-XL-1.1",
+  description: {"zh": "Laxhar Lab 官方 NoobAI-XL Epsilon-pred 1.1 主权重，基于完整 Danbooru 与 e621 数据集训练。", "en": "Official Laxhar Lab NoobAI-XL Epsilon-pred 1.1 checkpoint trained on full Danbooru and e621 datasets."},
+  version: whitelist100335Version, versions: [whitelist100335Version],
+}
+
+const whitelist100336Version: HuggingFaceVersion = {
+  id: -10000452, name: "V-Pred 1.0", baseModel: "NoobAI",
+  images: [{"url": "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/1d2e5702-a618-40e2-b83e-26569a753b0d/width=550/46921472.jpeg", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "ea349eeae87ca8d25ba902c93810f7ca83e5c82f920edf12f273af004ae02819"},
+  file: {
+    url: "https://huggingface.co/Laxhar/noobai-XL-Vpred-1.0/resolve/main/NoobAI-XL-Vpred-v1.0.safetensors",
+    filename: "NoobAI-XL-Vpred-v1.0.safetensors",
+    modelType: "checkpoints",
+    architecture: "noobai",
+    sizeBytes: 7105350110,
+    sha256: "ea349eeae87ca8d25ba902c93810f7ca83e5c82f920edf12f273af004ae02819",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100336Model: HuggingFaceModel = {
+  id: -100336, name: "NoobAI XL V-Pred 1.0", type: "Checkpoint",
+  metrics: {"downloadCount": 74024, "thumbsUpCount": 76}, images: whitelist100336Version.images,
+  user: {"username": "Laxhar"}, sourceUrl: "https://huggingface.co/Laxhar/noobai-XL-Vpred-1.0",
+  description: {"zh": "Laxhar Lab 官方 NoobAI-XL V-Pred 1.0 主权重，采用 v-prediction 参数化与零终端信噪比训练，色彩动态范围更广。", "en": "Official Laxhar Lab NoobAI-XL V-Pred 1.0 checkpoint using v-prediction parameterization for wider dynamic range and color depth."},
+  version: whitelist100336Version, versions: [whitelist100336Version],
+}
+
+const whitelist100337Version: HuggingFaceVersion = {
+  id: -10000453, name: "Raw FP8", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "48cd5d6c100297968349b41a8e77c6591d1dac18a215807f5f25f59e5c54cd61"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_raw_fp8_scaled.safetensors",
+    filename: "krea2_raw_fp8_scaled.safetensors",
+    modelType: "diffusion_models",
+    architecture: "krea2",
+    sizeBytes: 13141730784,
+    sha256: "48cd5d6c100297968349b41a8e77c6591d1dac18a215807f5f25f59e5c54cd61",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100337Model: HuggingFaceModel = {
+  id: -100337, name: "Krea 2 Raw FP8", type: "DiffusionModel",
+  metrics: {"downloadCount": 4068766, "thumbsUpCount": 776}, images: whitelist100337Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 Raw 标准非蒸馏文生图主模型 FP8 量化版，适合高细节多步采样。", "en": "Krea 2 Raw non-distilled base text-to-image model in FP8 quantization for high-detail multi-step sampling."},
+  version: whitelist100337Version, versions: [whitelist100337Version],
+}
+
+const whitelist100338Version: HuggingFaceVersion = {
+  id: -10000454, name: "Raw INT8", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i_int8.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "5585a4a38c4bcfb6fde2d480a4aa6edf7f665721ebde56d30662c35a45f5fa5c"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_raw_int8_convrot.safetensors",
+    filename: "krea2_raw_int8_convrot.safetensors",
+    modelType: "diffusion_models",
+    architecture: "krea2",
+    sizeBytes: 13492686496,
+    sha256: "5585a4a38c4bcfb6fde2d480a4aa6edf7f665721ebde56d30662c35a45f5fa5c",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100338Model: HuggingFaceModel = {
+  id: -100338, name: "Krea 2 Raw INT8", type: "DiffusionModel",
+  metrics: {"downloadCount": 4068766, "thumbsUpCount": 776}, images: whitelist100338Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 Raw 标准非蒸馏文生图主模型 INT8 ConvRot 量化版。", "en": "Krea 2 Raw non-distilled base text-to-image model in INT8 ConvRot quantization."},
+  version: whitelist100338Version, versions: [whitelist100338Version],
+}
+
+const whitelist100339Version: HuggingFaceVersion = {
+  id: -10000455, name: "Raw BF16", baseModel: "Krea 2",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/output/image_krea2_turbo_t2i.png", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "f99bb0ff8e362b77342bc4994e0c50906fe7ef7074864b181b7d48d2fa6d03d7"},
+  file: {
+    url: "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_raw_bf16.safetensors",
+    filename: "krea2_raw_bf16.safetensors",
+    modelType: "diffusion_models",
+    architecture: "krea2",
+    sizeBytes: 26283332608,
+    sha256: "f99bb0ff8e362b77342bc4994e0c50906fe7ef7074864b181b7d48d2fa6d03d7",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100339Model: HuggingFaceModel = {
+  id: -100339, name: "Krea 2 Raw BF16", type: "DiffusionModel",
+  metrics: {"downloadCount": 4068766, "thumbsUpCount": 776}, images: whitelist100339Version.images,
+  user: {"username": "Comfy-Org"}, sourceUrl: "https://huggingface.co/Comfy-Org/Krea-2",
+  description: {"zh": "Krea 2 Raw 标准非蒸馏文生图主模型 BF16 全精度版。", "en": "Krea 2 Raw non-distilled base text-to-image model in full BF16 precision."},
+  version: whitelist100339Version, versions: [whitelist100339Version],
+}
+
+const whitelist100340Version: HuggingFaceVersion = {
+  id: -10000456, name: "BF16", baseModel: "Flux.2 Klein 9B",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "0975d6b77b5f510b99547d6724a208e36527df654e8f6134f59ece3f9f30da58"},
+  file: {
+    url: "https://huggingface.co/unsloth/FLUX.2-klein-9B/resolve/main/flux-2-klein-9b.safetensors",
+    filename: "flux-2-klein-9b.safetensors",
+    modelType: "diffusion_models",
+    architecture: "flux2",
+    sizeBytes: 18157185168,
+    sha256: "0975d6b77b5f510b99547d6724a208e36527df654e8f6134f59ece3f9f30da58",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100340Model: HuggingFaceModel = {
+  id: -100340, name: "Flux 2 Klein 9B", type: "DiffusionModel",
+  metrics: {"downloadCount": 23672, "thumbsUpCount": 6}, images: whitelist100340Version.images,
+  user: {"username": "unsloth"}, sourceUrl: "https://huggingface.co/unsloth/FLUX.2-klein-9B",
+  description: {"zh": "Flux.2 Klein 9B 蒸馏版文生图与参考编辑主权重（免门控同源镜像）。", "en": "Flux.2 Klein 9B distilled text-to-image and reference editing weights (ungated mirror)."},
+  version: whitelist100340Version, versions: [whitelist100340Version],
+}
+
+const whitelist100341Version: HuggingFaceVersion = {
+  id: -10000457, name: "Base BF16", baseModel: "Flux.2 Klein 9B",
+  images: [{"url": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image-1.webp", "type": "image"}],
+  trainedWords: [], hashes: {"SHA256": "4a54fad7f5f741b99eee217198daac20b8d8e515e2a1f5b064fd51cf074f95bd"},
+  file: {
+    url: "https://huggingface.co/unsloth/FLUX.2-klein-base-9B/resolve/main/flux-2-klein-base-9b.safetensors",
+    filename: "flux-2-klein-base-9b.safetensors",
+    modelType: "diffusion_models",
+    architecture: "flux2",
+    sizeBytes: 18157185168,
+    sha256: "4a54fad7f5f741b99eee217198daac20b8d8e515e2a1f5b064fd51cf074f95bd",
+    isModel: true,
+    source: "huggingface",
+  },
+}
+const whitelist100341Model: HuggingFaceModel = {
+  id: -100341, name: "Flux 2 Klein Base 9B", type: "DiffusionModel",
+  metrics: {"downloadCount": 11646, "thumbsUpCount": 4}, images: whitelist100341Version.images,
+  user: {"username": "unsloth"}, sourceUrl: "https://huggingface.co/unsloth/FLUX.2-klein-base-9B",
+  description: {"zh": "Flux.2 Klein Base 9B 标准非蒸馏文生图主权重（免门控同源镜像）。", "en": "Flux.2 Klein Base 9B non-distilled base text-to-image weights (ungated mirror)."},
+  version: whitelist100341Version, versions: [whitelist100341Version],
 }
 
 const whitelist100289Version: HuggingFaceVersion = {
@@ -10152,7 +10428,7 @@ const whitelist100274Model: HuggingFaceModel = {
   id: -100274, name: "Illustrious XL Depth Midas FP16", type: "ControlNet",
   metrics: {"downloadCount": 0, "thumbsUpCount": 12}, images: whitelist100274Version.images,
   user: {"username": "MIC-Lab"}, sourceUrl: "https://huggingface.co/MIC-Lab/illustriousXLv1.1_controlnet",
-  description: {"zh": "MIC-Lab 的 Illustrious XL v1.1 深度控制权重，配合 MiDaS 深度图", "en": "MIC-Lab 的 Illustrious XL v1.1 深度控制权重，配合 MiDaS 深度图"},
+  description: {"zh": "MIC-Lab 的 Illustrious XL v1.1 深度控制权重，作者示例搭配 Depth Anything V2 Large。", "en": "MIC-Lab Illustrious XL v1.1 depth ControlNet, paired with Depth Anything V2 Large in the author's examples."},
   version: whitelist100274Version, versions: [whitelist100274Version],
 }
 
@@ -10640,6 +10916,18 @@ const whitelist100264Model: HuggingFaceModel = {
 }
 
 export const HUGGINGFACE_MODELS: HuggingFaceModel[] = [
+  whitelist100330Model,
+  whitelist100331Model,
+  whitelist100332Model,
+  whitelist100333Model,
+  whitelist100334Model,
+  whitelist100335Model,
+  whitelist100336Model,
+  whitelist100337Model,
+  whitelist100338Model,
+  whitelist100339Model,
+  whitelist100340Model,
+  whitelist100341Model,
   // 2026-10-26：HF 文件元数据与 resolve HEAD 的 SHA256、大小一致，封面地址已核实。
   whitelist100304Model,
   whitelist100305Model,
