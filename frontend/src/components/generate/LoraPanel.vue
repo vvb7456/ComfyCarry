@@ -176,6 +176,7 @@ function cycleApply(lora: LoraEntry) {
         :key="lora.name"
         class="lora-card"
         :class="{ 'lora-card--disabled': !lora.enabled }"
+        :data-guide="isMissing(lora.name) ? 'lora-missing' : undefined"
       >
         <div class="lora-card__img" @click="emit('detail', lora.name)">
           <!-- 缺失态替换整个图片栏: 引用保留、文件暂不在 (被删/未同步), 补齐后恢复。

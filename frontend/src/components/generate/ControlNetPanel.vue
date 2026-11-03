@@ -81,6 +81,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
 
           <FileUploadZone
             v-else
+            data-guide="cn-image"
             mode="pick"
             :accept="cn.video ? VIDEO_ACCEPT : IMAGE_ACCEPT"
             :media-type="cn.video ? 'video' : 'image'"
@@ -103,6 +104,7 @@ const isProcessing = computed(() => props.cn.preprocessStatus.value === 'running
         <div class="cn-field">
           <label class="field-lbl">{{ t('generate.controlnet.model') }}</label>
           <BaseSelect
+            data-guide="cn-model"
             :model-value="config.model"
             :options="modelSelectOptions"
             :placeholder="cn.hasModels.value ? t('generate.controlnet.model') : t('generate.controlnet.need_model')"

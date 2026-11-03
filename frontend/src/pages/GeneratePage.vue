@@ -231,14 +231,20 @@ const tourSteps = computed<TourStep[]>(() => [
   { title: t('generate.tour.steps.welcome.title'), body: t('generate.tour.steps.welcome.body') },
   { target: '[data-tour="gen-arch"]', placement: 'bottom',
     title: t('generate.tour.steps.task.title'), body: t('generate.tour.steps.task.body') },
-  { target: '[data-tour="gen-prompt"]', placement: 'bottom',
+  { target: '[data-tour="gen-prompt-body"]', placement: 'bottom',
     title: t('generate.tour.steps.prompt.title'), body: t('generate.tour.steps.prompt.body') },
-  { target: '[data-tour="gen-basic"], [data-tour="gen-advanced"]', placement: 'bottom',
+  { target: '[data-tour="gen-prompt-tools"]', placement: 'bottom',
+    title: t('generate.tour.steps.prompt_tools.title'), body: t('generate.tour.steps.prompt_tools.body') },
+  { target: '[data-tour="gen-basic"], [data-tour="gen-dep"]', placement: 'bottom',
     title: t('generate.tour.steps.basic.title'), body: t('generate.tour.steps.basic.body') },
-  { target: '[data-tour="gen-run"]', placement: 'bottom',
-    title: t('generate.tour.steps.run.title'), body: t('generate.tour.steps.run.body') },
+  { target: '[data-tour="gen-advanced"]', placement: 'top',
+    title: t('generate.tour.steps.advanced.title'), body: t('generate.tour.steps.advanced.body') },
   { target: '[data-tour="gen-modules"]', placement: 'top',
     title: t('generate.tour.steps.modules.title'), body: t('generate.tour.steps.modules.body') },
+  { target: '[data-tour="gen-run"]', placement: 'bottom',
+    title: t('generate.tour.steps.run.title'), body: t('generate.tour.steps.run.body') },
+  { target: '[data-tour="gen-preview"]', placement: 'left',
+    title: t('generate.tour.steps.preview.title'), body: t('generate.tour.steps.preview.body') },
   { target: '[data-tour="gen-queue"]', placement: 'bottom',
     title: t('generate.tour.steps.queue.title'), body: t('generate.tour.steps.queue.body') },
 ])
@@ -338,7 +344,10 @@ const { submitting, submit, validate, buildPayload } = useGenerateSubmit(execSta
 async function handleRun(mode: string) {
   // 分流: background 模式走后台 start; 其余走现有 submit() 路径 (live 的 scheduleLiveRerun 不动)
   if (mode === 'background') {
-    if (!(await validate())) return
+    if (!(await validate())) {
+      void activeTabRef()?.guideToProblem()
+      return
+    }
     const payload = buildPayload({ randomSeedWriteback: false })
     await bg.start(payload, { max_iterations: store.currentState.maxIterations })
     // start 失败 (409 队列非空 / 已在运行) 时 useApiFetch 已 toast 过错误且 state 仍为 idle,
@@ -350,6 +359,8 @@ async function handleRun(mode: string) {
   if (promptId) {
     taskRegistry.registerTask(promptId, 'main')
     preview.clearPreview()
+  } else {
+    void activeTabRef()?.guideToProblem()
   }
 }
 

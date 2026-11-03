@@ -952,27 +952,39 @@
       },
       "task": {
         "title": "Task & Architecture",
-        "body": "Choose to generate images, videos or other outputs, then pick the diffusion model architecture that matches the generation type."
+        "body": "Switch between image and video generation tasks, and pick the corresponding diffusion model architecture."
       },
       "prompt": {
         "title": "Prompt",
-        "body": "Describe the image you want in words. Open the Tag Editor to compose prompts visually, or use image interrogation / AI to generate them."
+        "body": "Enter positive and negative prompts to describe the scene. Click '?' beside the title for prompt syntax and random wildcard help."
+      },
+      "prompt_tools": {
+        "title": "Prompt Tools",
+        "body": "Compose prompts visually with the Tag Editor, or generate prompts via image interrogation and AI assistance."
       },
       "basic": {
         "title": "Basic Settings",
-        "body": "Pick the diffusion model for the workflow here, and adjust resolution and sampling steps as needed. Open Advanced Settings for other sampling parameters."
+        "body": "Select the main model for the workflow, and adjust resolution, steps, and CFG. Encoders and VAEs required by some architectures can be downloaded in one click under Runtime Components."
       },
-      "run": {
-        "title": "Run",
-        "body": "Click the button to run the workflow once. You can also pick Live or Background mode from the dropdown menu to keep the workflow running in a loop."
+      "advanced": {
+        "title": "Advanced Settings",
+        "body": "Expand to adjust sampler, scheduler, seed, batch size, and output format, or manually select encoders and VAEs."
       },
       "modules": {
         "title": "Feature Modules",
-        "body": "Add LoRAs as needed here, and toggle the other advanced features available in the workflow."
+        "body": "Add LoRAs as needed, or enable Img2Img, ControlNet, Upscale, HiRes Fix, and Face Fix."
+      },
+      "run": {
+        "title": "Run",
+        "body": "Click the button to run the workflow once, or switch to Live or Background continuous mode from the dropdown menu."
+      },
+      "preview": {
+        "title": "Preview",
+        "body": "View live generation progress, intermediate preview frames, and final outputs here."
       },
       "queue": {
         "title": "Queue & History",
-        "body": "View the current ComfyUI task queue and generation history here."
+        "body": "View queued tasks and generation history, download outputs, or send still images to video generation."
       }
     }
   },

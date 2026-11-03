@@ -339,3 +339,27 @@
                 background-position: -200% 0
             }
         }
+
+        /* 生成页运行阻断视觉引导: 品牌色慢速呼吸脉冲 (无位移震动) */
+        @keyframes guide-pulse-ac {
+            0%, 100% {
+                box-shadow: 0 0 0 0 transparent, 0 0 0 transparent;
+            }
+            45%, 55% {
+                border-color: var(--ac2);
+                box-shadow:
+                    0 0 0 2px color-mix(in srgb, var(--ac2) 85%, transparent),
+                    0 0 22px color-mix(in srgb, var(--ac) 42%, transparent);
+            }
+        }
+
+        .gen-guide-flash {
+            position: relative;
+            z-index: 20;
+            animation: guide-pulse-ac 1.35s ease-in-out 2 !important;
+        }
+
+        .gen-guide-flash > .ckpt-empty,
+        .gen-guide-flash > .ckpt-card {
+            animation: guide-pulse-ac 1.35s ease-in-out 2 !important;
+        }

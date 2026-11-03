@@ -147,6 +147,7 @@ function onResolutionChange(v: string) {
               <HelpTip :text="t('generate.basic.unet_seg_help')" />
             </div>
             <CheckpointSelector
+              data-guide="unet-high"
               :selected="selectedHigh"
               :missing="missingOf(state.unetHigh)"
               :empty-label="t('generate.basic.select_unet_high')"
@@ -158,6 +159,7 @@ function onResolutionChange(v: string) {
           <div class="dual-slot">
             <div class="field-lbl">{{ t('generate.basic.unet_low') }}</div>
             <CheckpointSelector
+              data-guide="unet-low"
               :selected="selectedLow"
               :missing="missingOf(state.unetLow)"
               :empty-label="t('generate.basic.select_unet_low')"
@@ -169,6 +171,7 @@ function onResolutionChange(v: string) {
         </template>
         <CheckpointSelector
           v-else
+          data-guide="main-model"
           :selected="selected"
           :missing="missingOf(modelField === 'unet' ? state.unet : state.checkpoint)"
           :empty-label="modelField === 'unet' ? t('generate.basic.select_unet') : t('generate.basic.select_checkpoint')"

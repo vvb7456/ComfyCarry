@@ -305,6 +305,7 @@ const badgeNumber = computed(() => index.value)
               :key="n"
               class="tour-dot"
               :class="{ active: n - 1 === index - 1 }"
+              @click="goTo(n)"
             />
           </div>
           <div class="tour-bubble__nav">
@@ -346,7 +347,7 @@ const badgeNumber = computed(() => index.value)
 .tour-bubble {
   /* position: fixed 由 floatingStyles 覆写 */
   z-index: 10100; /* --z-float(10000) 之上, 先例 HelpTip 硬编码 10000 */
-  width: min(92vw, 340px);
+  width: min(92vw, 356px);
   background: var(--bg2);
   border: 1px solid var(--bd);
   border-radius: var(--r-lg);
@@ -402,11 +403,19 @@ const badgeNumber = computed(() => index.value)
 .tour-bubble__dots {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: 1;
   justify-content: center;
 }
-.tour-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--bd); }
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bd);
+  cursor: pointer;
+  transition: background .15s;
+}
+.tour-dot:hover { background: var(--t3); }
 .tour-dot.active { background: var(--ac); }
 
 .tour-bubble__nav {

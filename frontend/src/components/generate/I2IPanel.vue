@@ -85,6 +85,7 @@ function onDenoiseUpdate(v: number) {
         <label class="field-lbl">{{ t('generate.i2i.ref_image') }}</label>
         <div class="i2i-ref-wrap">
           <FileUploadZone
+            data-guide="i2i-image"
             mode="pick"
             :accept="IMAGE_ACCEPT"
             :preview="previewUrl"

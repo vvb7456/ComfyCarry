@@ -137,13 +137,14 @@ defineExpose({ insertAtCursor })
       </button>
     </div>
 
-    <div class="prompt-container">
+    <div class="prompt-container" data-guide="positive-prompt">
       <div v-if="tools.length" class="prompt-toolbar">
         <button
           type="button"
           v-for="tool in tools"
           :key="tool.key"
           class="prompt-tool-btn"
+          data-tour="gen-prompt-tools"
           :title="tool.title"
           :aria-label="tool.title"
           :disabled="tool.disabled"
@@ -158,7 +159,7 @@ defineExpose({ insertAtCursor })
            (H3 尾帧; 首帧 | 提示词 | 尾帧 三栏)。
            未传 media 槽时 .prompt-media 不渲染, .prompt-fields 独占整宽,
            渲染结果与分栏改造前逐像素一致 (图像架构回归保护)。 -->
-      <div class="prompt-body" :class="{ 'prompt-body--3col': $slots['media-right'] }">
+      <div class="prompt-body" data-tour="gen-prompt-body" :class="{ 'prompt-body--3col': $slots['media-right'] }">
         <div v-if="$slots.media" class="prompt-media">
           <slot name="media" />
         </div>
@@ -171,6 +172,7 @@ defineExpose({ insertAtCursor })
           <textarea
             ref="posRef"
             class="prompt-textarea"
+            data-guide="positive-textarea"
             :rows="showNegative ? 4 : 9"
             :value="positive"
             :placeholder="positivePlaceholder"

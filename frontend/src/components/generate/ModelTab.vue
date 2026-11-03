@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, provide, ref, toRef, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, provide, ref, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
@@ -483,8 +483,187 @@ const runBlockedReason = computed<string>(() => {
   return ''
 })
 
+const rootRef = ref<HTMLElement | null>(null)
+let guideClearTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearGuideFlash() {
+  if (guideClearTimer) {
+    clearTimeout(guideClearTimer)
+    guideClearTimer = null
+  }
+  rootRef.value?.querySelectorAll('.gen-guide-flash').forEach((el) => {
+    el.classList.remove('gen-guide-flash')
+  })
+}
+
+onBeforeUnmount(clearGuideFlash)
+
+async function flashTargets(
+  selectors: string[],
+  opts?: { openAdv?: boolean; focusSelector?: string },
+) {
+  const root = rootRef.value
+  if (!root || !selectors.length) return
+  clearGuideFlash()
+
+  if (opts?.openAdv) {
+    const details = root.querySelector('details.adv-settings') as HTMLDetailsElement | null
+    if (details && !details.open) details.open = true
+  }
+
+  await nextTick()
+
+  const els: HTMLElement[] = []
+  for (const sel of selectors) {
+    root.querySelectorAll<HTMLElement>(sel).forEach((el) => {
+      if (!els.includes(el)) els.push(el)
+    })
+  }
+  if (!els.length) return
+
+  const first = els[0]!
+  first.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+
+  for (const el of els) {
+    void el.offsetWidth
+    el.classList.add('gen-guide-flash')
+  }
+
+  if (opts?.focusSelector) {
+    const focusEl = root.querySelector<HTMLElement>(opts.focusSelector)
+    focusEl?.focus({ preventScroll: true })
+  }
+
+  guideClearTimer = setTimeout(() => {
+    guideClearTimer = null
+    els.forEach(el => el.classList.remove('gen-guide-flash'))
+  }, 2800)
+}
+
+async function guideToProblem() {
+  const st = state.value
+  const pkg = selectedPackaging.value
+  const isH3 = props.modelType === 'minimax_h3' || props.modelType === 'minimax_h3_ref'
+
+  if (config.value.dualUnet) {
+    if (!st.unetHigh || !st.unetLow) {
+      const targets: string[] = []
+      if (!st.unetHigh) targets.push('[data-guide="unet-high"]')
+      if (!st.unetLow) targets.push('[data-guide="unet-low"]')
+      await flashTargets(targets)
+      return
+    }
+    if (st.unetHigh === st.unetLow) {
+      await flashTargets(['[data-guide="unet-high"]', '[data-guide="unet-low"]'])
+      return
+    }
+  } else {
+    const modelPicked = pkg === 'split' ? !!st.unet : !!st.checkpoint
+    if (!modelPicked) {
+      await flashTargets(['[data-guide="main-model"]'])
+      return
+    }
+  }
+
+  if (showStartFrame.value && !st.video?.refImage
+    && !(config.value.controlNetEnabled && Object.values(st.controlNets).some(cn => cn.enabled))) {
+    await flashTargets(['[data-guide="start-frame"]'])
+    return
+  }
+
+  if (showRefPanel.value) {
+    const refs = videoRefs.value
+    const img = refs.filter(r => r.type === 'image').length
+    const vid = refs.filter(r => r.type === 'video').length
+    const aud = refs.filter(r => r.type === 'audio').length
+    if (
+      !refs.length
+      || (isVideo.value && refs.every(r => r.type === 'audio'))
+      || img > 9 || vid > 3 || aud > 3 || refs.length > 12
+    ) {
+      await flashTargets(['[data-guide="ref-media"]'])
+      return
+    }
+  }
+
+  for (const cnKey of CN_TYPES) {
+    if (config.value.controlNetEnabled && st.controlNets[cnKey]?.enabled && !cnModelsReady(cnKey)) {
+      st.activeModule = cnKey
+      depExpanded.value[cnKey] = true
+      await flashTargets([`[data-guide="cn-dep-${cnKey}"]`, `[data-guide="cn-panel-${cnKey}"]`])
+      return
+    }
+  }
+
+  if (st.upscale.enabled && !depUpscale.ready.value) {
+    st.activeModule = 'upscale'
+    depExpanded.value.upscale = true
+    await flashTargets(['[data-guide="upscale-dep"]'])
+    return
+  }
+
+  if (st.faceDetailer.enabled && !depFace.ready.value) {
+    st.activeModule = 'face'
+    depExpanded.value.face = true
+    await flashTargets(['[data-guide="face-dep"]'])
+    return
+  }
+
+  if (compStatus.has.value && !compStatus.ready.value) {
+    componentPanelExpanded.value = true
+    await flashTargets(['[data-guide="comp-dep"]'])
+    return
+  }
+
+  if (pkg === 'split') {
+    const splitTargets: string[] = []
+    if (!st.clip) splitTargets.push('[data-guide="split-clip"]')
+    if (config.value.dualClip && !st.clip2) splitTargets.push('[data-guide="split-clip2"]')
+    if (!st.vae) splitTargets.push('[data-guide="split-vae"]')
+    if (isH3 && !st.audioVae) splitTargets.push('[data-guide="split-audio-vae"]')
+    if (splitTargets.length > 0) {
+      await flashTargets(splitTargets, { openAdv: true })
+      return
+    }
+  }
+
+  if (!st.positive.trim()) {
+    await flashTargets(['[data-guide="positive-prompt"]'], {
+      focusSelector: '[data-guide="positive-textarea"]',
+    })
+    return
+  }
+
+  for (const [type, cn] of Object.entries(st.controlNets)) {
+    if (cn.enabled) {
+      if (!cn.model) {
+        st.activeModule = type
+        await flashTargets([`[data-guide="cn-panel-${type}"] [data-guide="cn-model"]`])
+        return
+      }
+      if (!cn.image) {
+        st.activeModule = type
+        await flashTargets([`[data-guide="cn-panel-${type}"] [data-guide="cn-image"]`])
+        return
+      }
+    }
+  }
+
+  if (st.i2i.enabled && !st.i2i.image) {
+    st.activeModule = 'i2i'
+    await flashTargets(['[data-guide="i2i-image"]'])
+    return
+  }
+
+  if (st.loras.some(l => l.enabled && store.isMissing('lora', l.name))) {
+    st.activeModule = 'lora'
+    await flashTargets(['[data-guide="lora-missing"]'])
+  }
+}
+
 function onRunBlocked(reason: string) {
   toast(reason, 'warning')
+  void guideToProblem()
 }
 
 const maskEditorImageUrl = computed(() => {
@@ -501,11 +680,11 @@ async function onMaskApply(blob: Blob) {
   await i2i.uploadMask(blob)
 }
 
-defineExpose({ handlePreprocessDone, handleTagDone })
+defineExpose({ handlePreprocessDone, handleTagDone, guideToProblem })
 </script>
 
 <template>
-  <div class="model-tab">
+  <div ref="rootRef" class="model-tab">
     <div class="gen-top-row">
       <div class="gen-ctrl-col" :inert="frozen" :class="{ 'gen-frozen': frozen }">
         <PromptEditor
@@ -526,6 +705,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           <template v-if="showStartFrame" #media>
             <p v-if="showLastFrame" class="model-tab__frame-lbl">{{ t('generate.video.start_frame') }}</p>
             <FileUploadZone
+              data-guide="start-frame"
               mode="pick"
               :accept="IMAGE_ACCEPT"
               :preview="startFramePreview"
@@ -544,6 +724,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
                面板内部滚动, 不撑高容器), 与起始画面互斥 -->
           <template v-if="showRefPanel" #media>
             <RefMediaPanel
+              data-guide="ref-media"
               v-model:refs="videoRefs"
               :types="isVideo ? ['image', 'video', 'audio'] : ['image']"
               :limit="config.referenceLimit ?? 12"
@@ -594,6 +775,8 @@ defineExpose({ handlePreprocessDone, handleTagDone })
 
         <DependencyBar
           v-if="compStatus.has.value"
+          data-tour="gen-dep"
+          data-guide="comp-dep"
           :status="compStatus"
           :noun="depNouns.components"
           v-model:expanded="componentPanelExpanded"
@@ -608,7 +791,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         />
       </div>
 
-      <div class="gen-preview-col">
+      <div class="gen-preview-col" data-tour="gen-preview">
         <PreviewArea
           :images="previewImages"
           :loading="previewLoading"
@@ -640,10 +823,11 @@ defineExpose({ handlePreprocessDone, handleTagDone })
           @mask-edit="i2i.openMaskEditor"
         />
       </div>
-      <div v-for="type in config.controlNetEnabled ? CN_TYPES : []" :key="type" v-show="state.activeModule === type" class="gen-module-panel">
+      <div v-for="type in config.controlNetEnabled ? CN_TYPES : []" :key="type" v-show="state.activeModule === type" class="gen-module-panel" :data-guide="`cn-panel-${type}`">
         <DependencyBar
           v-if="depMap[type].has.value"
           class="gen-module-dep"
+          :data-guide="`cn-dep-${type}`"
           :status="depMap[type]"
           :noun="t(`generate.dep.noun_${type}`)"
           v-model:expanded="depExpanded[type]"
@@ -660,6 +844,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <DependencyBar
           v-if="depUpscale.has.value"
           class="gen-module-dep"
+          data-guide="upscale-dep"
           :status="depUpscale"
           :noun="depNouns.upscale"
           v-model:expanded="depExpanded.upscale"
@@ -673,6 +858,7 @@ defineExpose({ handlePreprocessDone, handleTagDone })
         <DependencyBar
           v-if="depFace.has.value"
           class="gen-module-dep"
+          data-guide="face-dep"
           :status="depFace"
           :noun="depNouns.face"
           v-model:expanded="depExpanded.face"

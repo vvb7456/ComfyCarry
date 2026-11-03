@@ -199,6 +199,7 @@ const vaeOverrideOptions = computed(() => [
             >{{ t('generate.advanced.clip_incompatible', { arch: archLabel }) }}</span>
           </div>
           <BaseSelect
+            data-guide="split-clip"
             :model-value="state.clip"
             :options="clipOptions"
             :disabled="disabled"
@@ -217,6 +218,7 @@ const vaeOverrideOptions = computed(() => [
             >{{ t('generate.advanced.clip_incompatible', { arch: archLabel }) }}</span>
           </div>
           <BaseSelect
+            data-guide="split-clip2"
             :model-value="state.clip2"
             :options="clip2Options"
             :disabled="disabled"
@@ -235,6 +237,7 @@ const vaeOverrideOptions = computed(() => [
             >{{ t('generate.advanced.vae_incompatible', { arch: archLabel }) }}</span>
           </div>
           <BaseSelect
+            data-guide="split-vae"
             :model-value="state.vae"
             :options="vaeOptions"
             :disabled="disabled"
@@ -253,6 +256,7 @@ const vaeOverrideOptions = computed(() => [
             >{{ t('generate.advanced.vae_incompatible', { arch: archLabel }) }}</span>
           </div>
           <BaseSelect
+            data-guide="split-audio-vae"
             :model-value="state.audioVae"
             :options="audioVaeOptions"
             :disabled="disabled"
