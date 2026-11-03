@@ -23,11 +23,6 @@ const config = computed(() => store.currentConfig)
 
 const selectedGroupKey = computed(() => config.value.menuKey ?? modelType.value)
 
-const notReady = computed(() => {
-  const targetKey = store.modelSelections[selectedGroupKey.value] ?? modelType.value
-  return store.componentsReady[targetKey] === false
-})
-
 const modeOptions = computed<SegmentOption[]>(() =>
   (config.value.videoModes ?? config.value.modes ?? []).map(m => ({
     value: m,
@@ -108,7 +103,6 @@ interface ArchCardItem {
   logoInvertDark?: boolean
   letter: string
   familyLabel?: string
-  ready: boolean
   isVideoArch: boolean
   media: MediaSource | null
   tags: ArchTag[]
@@ -197,8 +191,6 @@ const modalItems = computed<ArchCardItem[]>(() => {
   return sorted.map(cfg => {
     const fk = famKeyOf(cfg)
     const familyLabel = FAMILY_LABEL_KEYS.has(fk) ? t(`generate.header.family_${fk}`) : undefined
-    const resolvedKey = store.modelSelections[cfg.key] ?? cfg.key
-    const ready = store.componentsReady[resolvedKey] !== false
     const media = mediaFailed.value[cfg.key] ? null : resolveArchMedia(cfg)
 
     return {
@@ -209,7 +201,6 @@ const modalItems = computed<ArchCardItem[]>(() => {
       logoInvertDark: cfg.logoInvertDark,
       letter: cfg.label.slice(0, 2) || cfg.key.slice(0, 2).toUpperCase(),
       familyLabel,
-      ready,
       isVideoArch: cfg.mediaType === 'video',
       media,
       tags: buildArchTags(cfg),
@@ -250,9 +241,6 @@ function selectArch(key: string) {
             <span class="arch-trigger__name">{{ t(`generate.tabs.${selectedGroupKey}`) }}</span>
             <span class="arch-trigger__badge">
               {{ config.mediaType === 'video' ? t('generate.header.task_video') : t('generate.header.task_image') }}
-            </span>
-            <span v-if="notReady" class="arch-trigger__warn">
-              {{ t('generate.header.not_ready') }}
             </span>
           </span>
           <span class="arch-trigger__fact">{{ t('generate.arch.click_change') }}</span>
@@ -382,7 +370,7 @@ function selectArch(key: string) {
 
             <div class="arch-gallery-card__scrim" />
 
-            <!-- 顶部悬浮角标行: 左侧系列归属 / 视频动图标识, 右侧当前使用或就绪状态 -->
+            <!-- 顶部悬浮角标行: 左侧系列归属 / 视频动图标识, 右侧当前选中勾选标记 -->
             <div class="arch-gallery-card__top-badges">
               <div class="arch-gallery-card__top-left">
                 <span v-if="item.familyLabel" class="arch-pill arch-pill--family">
@@ -393,16 +381,13 @@ function selectArch(key: string) {
                 </span>
               </div>
 
-              <span v-if="item.key === selectedGroupKey" class="arch-pill arch-pill--active">
-                <MsIcon name="check" size="xs" color="none" />
-                <span>{{ t('generate.arch.current_used') }}</span>
-              </span>
               <span
-                v-else
-                class="arch-pill"
-                :class="item.ready ? 'arch-pill--ready' : 'arch-pill--warn'"
+                v-if="item.key === selectedGroupKey"
+                class="arch-gallery-card__check"
+                :title="t('generate.arch.current_used')"
+                :aria-label="t('generate.arch.current_used')"
               >
-                {{ item.ready ? t('generate.arch.ready') : t('generate.header.not_ready') }}
+                <MsIcon name="check" size="xs" color="none" />
               </span>
             </div>
 
@@ -589,18 +574,6 @@ function selectArch(key: string) {
   border-radius: 4px;
   background: color-mix(in srgb, var(--ac) 14%, transparent);
   color: var(--ac);
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1.25;
-}
-
-.arch-trigger__warn {
-  font-size: .62rem;
-  font-weight: 500;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--c-caution) 15%, transparent);
-  color: var(--c-caution);
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1.25;
@@ -913,22 +886,17 @@ function selectArch(key: string) {
   color: #fff;
 }
 
-.arch-pill--active {
+.arch-gallery-card__check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   background: var(--ac);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
-}
-
-.arch-pill--ready {
-  background: rgba(15, 18, 26, .65);
-  border: 1px solid rgba(255, 255, 255, .14);
-  color: rgba(255, 255, 255, .85);
-}
-
-.arch-pill--warn {
-  background: rgba(24, 18, 10, .78);
-  border: 1px solid color-mix(in srgb, var(--c-caution) 55%, transparent);
-  color: var(--c-caution);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
 }
 
 /* 底部定高信息层 (Overlay):
@@ -1055,6 +1023,11 @@ function selectArch(key: string) {
   .arch-pill {
     font-size: .58rem;
     padding: 1px 5px;
+  }
+
+  .arch-gallery-card__check {
+    width: 18px;
+    height: 18px;
   }
 
   .arch-gallery-card__overlay {
