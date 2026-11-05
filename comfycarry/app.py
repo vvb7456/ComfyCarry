@@ -191,6 +191,9 @@ def main():
     # 启动系统指标采集守护线程 (pynvml + psutil, 2s 间隔)
     system_monitor.start()
 
+    from .services.cloud_backup import start_auto_sync_worker
+    start_auto_sync_worker()
+
     get_bridge()
 
     restore_ssh_config()

@@ -255,6 +255,16 @@ def api_setup_deploy():
         ok, msg = start_deploy(state)
         if not ok:
             return _err("deploy_already_running", 409, prefix="wizard.err")
+        try:
+            from ..services.managed_tunnel import is_managed
+            if is_managed():
+                from ..services.cloud_backup import platform_request
+                threading.Thread(
+                    target=lambda: platform_request("POST", "/backups/recovery/dismiss"),
+                    daemon=True,
+                ).start()
+        except Exception:
+            pass
         # 草稿保留至部署成功，失败后可直接返回修改；retry 只使用上面的快照。
         return jsonify({"ok": True, "message": msg})
 

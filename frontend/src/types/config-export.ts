@@ -70,8 +70,44 @@ export interface ExportedConfig {
   civitai_nsfw_blur?: boolean
   favorites?: FavoriteExportItem[]
   prompt_history?: PromptHistoryExportItem[]
+  /** 自动同步配置开关状态 */
+  auto_sync_config?: boolean
   /** 生成页工作区状态 (服务端持久化的完整 envelope) */
   generate_state?: Record<string, unknown>
   /** 引用模型文件的 SHA256 指纹表: "<category>/<relative_path>" → 大写 hex */
   generate_model_hashes?: Record<string, string>
+}
+
+export interface CloudBackupSummary {
+  has_rclone: boolean
+  sync_rules_count: number
+  extra_plugins_count: number
+  favorites_count: number
+  prompt_history_count: number
+  has_generate_state: boolean
+}
+
+export interface CloudBackupSlot {
+  id: string
+  name: string
+  is_auto: boolean
+  slot_type?: 'manual' | 'auto' | 'recovery'
+  instance_id?: string
+  gpu_name: string
+  summary: CloudBackupSummary
+  created_at?: string
+  updated_at: string
+  config_json?: ExportedConfig
+  payload?: ExportedConfig
+}
+
+export interface CloudBackupsListResponse {
+  items: CloudBackupSlot[]
+  pending_recovery?: CloudBackupSlot | null
+  max_manual_slots: number
+  instance_gpu_name?: string
+}
+
+export interface CloudBackupDetailResponse extends CloudBackupSlot {
+  config_json: ExportedConfig
 }

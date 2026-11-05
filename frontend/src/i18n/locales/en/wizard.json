@@ -41,6 +41,20 @@
       "title": "Restore Settings",
       "desc": "Restore all settings from a previously exported config file to quickly rebuild your workspace"
     },
+    "import_managed": {
+      "title": "Restore from Backup",
+      "desc": "Restore all settings from a cloud backup slot or local backup file to quickly rebuild your workspace",
+      "selected_slot": "Selected backup: {name}",
+      "none_selected": "Select a cloud backup slot or upload a local backup file",
+      "choose_btn": "Select Backup",
+      "reselect": "Change",
+      "local_file": "Local file: {name}"
+    },
+    "recovery": {
+      "title": "Your previous instance ({gpu}) ended unexpectedly. We saved a configuration snapshot before interruption.",
+      "restore_btn": "Restore Now",
+      "dismiss_btn": "Dismiss"
+    },
     "import_upload": {
       "hint": "Upload a previously exported <code>comfycarry-config.json</code> configuration file"
     }

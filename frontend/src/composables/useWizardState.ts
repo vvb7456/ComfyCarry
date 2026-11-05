@@ -35,6 +35,18 @@ function createDefaultConfig(): WizardConfig {
   }
 }
 
+function resetWizardConfig(target: WizardConfig) {
+  delete target._imported_sync_rules
+  delete target._imported_sync_rules_count
+  delete target._imported_prompt_settings
+  delete target._imported_nsfw
+  delete target._imported_favorites
+  delete target._imported_history
+  delete target._rclone_display_method
+  delete target.ssh_pw_follow
+  Object.assign(target, createDefaultConfig())
+}
+
 let _initialized = false
 const config = reactive<WizardConfig>(createDefaultConfig())
 const currentStep = ref(0)
@@ -49,6 +61,7 @@ const envVars = ref<SetupStateEnvVars>({})
 const syncTemplates = ref<SyncTemplate[]>([])
 const remoteTypeDefs = ref<Record<string, RemoteTypeDef>>({})
 const importedConfig = ref<ExportedConfig | null>(null)
+const selectedBackupName = ref('')
 const activeTunnelMode = ref('')
 const managedTunnel = ref(false)
 const activeTunnelUrls = ref<Record<string, string>>({})
@@ -240,87 +253,103 @@ export function useWizardState() {
     }
   }
 
+  function applyImportedConfig(parsed: ExportedConfig, label = ''): { ok: boolean; message: string } {
+    if (!parsed || !parsed._version) {
+      return { ok: false, message: t('wizard.import.invalid_format') }
+    }
+
+    // Reset config before applying new backup so switching slots leaves no stale fields
+    resetRcloneState()
+    resetWizardConfig(config)
+    config.plugins = pluginData.value.map(p => p.url)
+    const ev = envVars.value
+    if (ev.password) config.password = ev.password
+    if (ev.cf_api_token) config.cf_api_token = ev.cf_api_token
+    if (ev.cf_domain) config.cf_domain = ev.cf_domain
+    if (ev.cf_subdomain) config.cf_subdomain = ev.cf_subdomain
+    if (ev.civitai_token) config.civitai_token = ev.civitai_token
+
+    const copy = JSON.parse(JSON.stringify(parsed)) as ExportedConfig
+    if (managedTunnel.value) {
+      for (const key of [
+        'tunnel_mode', 'public_tunnel_subdomain', 'cf_api_token', 'cf_domain', 'cf_subdomain',
+        'cf_custom_services', 'cf_suffix_overrides', 'cf_protocol',
+      ] as const) delete copy[key]
+    }
+
+    // Store raw import data — will be applied to backend at deploy time
+    importedConfig.value = copy
+    selectedBackupName.value = label
+
+    let appliedCount = 0
+    if (copy.password) { config.password = copy.password; appliedCount++ }
+    if (copy.cf_api_token) { config.cf_api_token = copy.cf_api_token; appliedCount++ }
+    if (copy.cf_domain) config.cf_domain = copy.cf_domain
+    if (copy.cf_subdomain) config.cf_subdomain = copy.cf_subdomain
+    if (copy.civitai_token) { config.civitai_token = copy.civitai_token; appliedCount++ }
+    if (copy.rclone_config_base64) {
+      config.rclone_config_method = 'base64'
+      config._rclone_display_method = 'base64'
+      config.rclone_config_value = copy.rclone_config_base64
+      appliedCount++
+    }
+    if (copy.extra_plugins !== undefined || copy.disabled_default_plugins !== undefined) {
+      const defaultUrls = pluginData.value.map(p => p.url)
+      const disabled = new Set<string>(copy.disabled_default_plugins || [])
+      const plugins = defaultUrls.filter(u => !disabled.has(u))
+      plugins.push(...(copy.extra_plugins || []))
+      config.plugins = plugins
+      appliedCount++
+    }
+    const syncRules = copy.sync_rules
+    if (syncRules && syncRules.length > 0) {
+      config._imported_sync_rules = true
+      config._imported_sync_rules_count = syncRules.length
+      appliedCount++
+    }
+    if (copy.tunnel_mode === 'custom') { config.tunnel_mode = 'custom'; appliedCount++ }
+    if (copy.ssh_pw_follow !== undefined) config.ssh_pw_follow = copy.ssh_pw_follow
+    if (copy.ssh_keys) config.ssh_keys = copy.ssh_keys
+    if (copy.llm_provider) {
+      config.llm_provider = copy.llm_provider; appliedCount++
+      const provKeys = copy.llm_provider_keys?.[copy.llm_provider]
+      if (provKeys) {
+        config.llm_api_key = provKeys.api_key || ''
+        config.llm_base_url = provKeys.base_url || ''
+        config.llm_model = provKeys.model || ''
+      }
+    }
+    // 与设置页导入对齐: 运行时配置与数据类字段不在向导表单中编辑,
+    // 由部署时整份转发给 /api/settings/import-config 落库, 这里只统计与展示。
+    if (copy.prompt_settings !== undefined) {
+      config._imported_prompt_settings = true
+      appliedCount++
+    }
+    if (copy.civitai_nsfw_level !== undefined || copy.civitai_nsfw_blur !== undefined) {
+      config._imported_nsfw = true
+      appliedCount++
+    }
+    config.comfyui_args = copy.comfyui_args || ''
+    if (config.comfyui_args) {
+      appliedCount++
+    }
+    if (Array.isArray(copy.favorites)) {
+      config._imported_favorites = copy.favorites.length
+      appliedCount++
+    }
+    if (Array.isArray(copy.prompt_history)) {
+      config._imported_history = copy.prompt_history.length
+      appliedCount++
+    }
+
+    return { ok: true, message: t('wizard.import.success', { count: appliedCount }) }
+  }
+
   async function handleImportFile(file: File): Promise<{ ok: boolean; message: string }> {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text) as ExportedConfig
-
-      if (!parsed._version) {
-        return { ok: false, message: t('wizard.import.invalid_format') }
-      }
-
-      if (managedTunnel.value) {
-        for (const key of [
-          'tunnel_mode', 'public_tunnel_subdomain', 'cf_api_token', 'cf_domain', 'cf_subdomain',
-          'cf_custom_services', 'cf_suffix_overrides', 'cf_protocol',
-        ] as const) delete parsed[key]
-      }
-
-      // Store raw import data — will be applied to backend at deploy time
-      importedConfig.value = parsed
-
-      let appliedCount = 0
-      if (parsed.password) { config.password = parsed.password; appliedCount++ }
-      if (parsed.cf_api_token) { config.cf_api_token = parsed.cf_api_token; appliedCount++ }
-      if (parsed.cf_domain) config.cf_domain = parsed.cf_domain
-      if (parsed.cf_subdomain) config.cf_subdomain = parsed.cf_subdomain
-      if (parsed.civitai_token) { config.civitai_token = parsed.civitai_token; appliedCount++ }
-      if (parsed.rclone_config_base64) {
-        config.rclone_config_method = 'base64'
-        config._rclone_display_method = 'base64'
-        config.rclone_config_value = parsed.rclone_config_base64
-        appliedCount++
-      }
-      if (parsed.extra_plugins !== undefined || parsed.disabled_default_plugins !== undefined) {
-        const defaultUrls = pluginData.value.map(p => p.url)
-        const disabled = new Set<string>(parsed.disabled_default_plugins || [])
-        const plugins = defaultUrls.filter(u => !disabled.has(u))
-        plugins.push(...(parsed.extra_plugins || []))
-        config.plugins = plugins
-        appliedCount++
-      }
-      const syncRules = parsed.sync_rules
-      if (syncRules && syncRules.length > 0) {
-        config._imported_sync_rules = true
-        config._imported_sync_rules_count = syncRules.length
-        appliedCount++
-      }
-      if (parsed.tunnel_mode === 'custom') { config.tunnel_mode = 'custom'; appliedCount++ }
-      if (parsed.ssh_pw_follow !== undefined) config.ssh_pw_follow = parsed.ssh_pw_follow
-      if (parsed.ssh_keys) config.ssh_keys = parsed.ssh_keys
-      if (parsed.llm_provider) {
-        config.llm_provider = parsed.llm_provider; appliedCount++
-        const provKeys = parsed.llm_provider_keys?.[parsed.llm_provider]
-        if (provKeys) {
-          config.llm_api_key = provKeys.api_key || ''
-          config.llm_base_url = provKeys.base_url || ''
-          config.llm_model = provKeys.model || ''
-        }
-      }
-      // 与设置页导入对齐: 运行时配置与数据类字段不在向导表单中编辑,
-      // 由部署时整份转发给 /api/settings/import-config 落库, 这里只统计与展示。
-      if (parsed.prompt_settings !== undefined) {
-        config._imported_prompt_settings = true
-        appliedCount++
-      }
-      if (parsed.civitai_nsfw_level !== undefined || parsed.civitai_nsfw_blur !== undefined) {
-        config._imported_nsfw = true
-        appliedCount++
-      }
-      config.comfyui_args = parsed.comfyui_args || ''
-      if (config.comfyui_args) {
-        appliedCount++
-      }
-      if (Array.isArray(parsed.favorites)) {
-        config._imported_favorites = parsed.favorites.length
-        appliedCount++
-      }
-      if (Array.isArray(parsed.prompt_history)) {
-        config._imported_history = parsed.prompt_history.length
-        appliedCount++
-      }
-
-      return { ok: true, message: t('wizard.import.success', { count: appliedCount }) }
+      return applyImportedConfig(parsed, file.name)
     } catch (e: unknown) {
       return { ok: false, message: `${t('wizard.import.parse_fail')} ${errorMessage(e)}` }
     }
@@ -329,13 +358,13 @@ export function useWizardState() {
   function selectMode(mode: 'fresh' | 'import') {
     if (mode === 'fresh') {
       importedConfig.value = null
+      selectedBackupName.value = ''
 
       // 服务端草稿在页面加载 (/api/setup/state) 时已重置, 这里只清前端
       // 跨步骤状态 —— 不显式清掉的话, 上一轮的表单残留会漏进 Step 3/4
       resetRcloneState()
 
-      const defaults = createDefaultConfig()
-      Object.assign(config, defaults)
+      resetWizardConfig(config)
 
       config.plugins = pluginData.value.map(p => p.url)
 
@@ -360,6 +389,7 @@ export function useWizardState() {
     syncTemplates,
     remoteTypeDefs,
     importedConfig,
+    selectedBackupName,
     activeTunnelMode,
     managedTunnel,
     activeTunnelUrls,
@@ -376,6 +406,7 @@ export function useWizardState() {
     nextStep,
     prevStep,
     goToStep,
+    applyImportedConfig,
     handleImportFile,
     selectMode,
   }

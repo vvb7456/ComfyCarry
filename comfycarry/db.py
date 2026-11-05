@@ -30,6 +30,8 @@ class Database:
     def _ensure_conn(self) -> sqlite3.Connection:
         """获取连接 (lazy init + WAL + PRAGMA)。调用者必须已持有 _lock。"""
         if self._conn is None:
+            if str(self._db_path) != ":memory:":
+                Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
             self._conn = sqlite3.connect(
                 str(self._db_path),
                 timeout=10,
@@ -42,6 +44,8 @@ class Database:
             self._conn.execute("PRAGMA cache_size=-2000")   # 2 MB
             self._conn.execute("PRAGMA busy_timeout=5000")   # 5s 重试
             self._conn.execute("PRAGMA foreign_keys=ON")
+            from .schema import create_schema
+            create_schema(self._conn)
             log.info("[db] SQLite 连接已建立: %s (WAL)", self._db_path)
         return self._conn
 

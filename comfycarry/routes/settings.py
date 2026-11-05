@@ -52,6 +52,8 @@ def _ok(key: str, /, **extra):
 
 @bp.route("/api/settings", methods=["GET"])
 def api_settings_get():
+    from ..services.managed_tunnel import is_managed
+    from ..services.cloud_backup import short_gpu_name
     civitai_key = _get_api_key()
     return jsonify({
         "password_set": bool(cfg.DASHBOARD_PASSWORD),
@@ -65,7 +67,18 @@ def api_settings_get():
         "api_key": cfg.API_KEY,
         "comfyui_dir": cfg.COMFYUI_DIR,
         "comfyui_url": cfg.COMFYUI_URL,
+        "managed": is_managed(),
+        "auto_sync_config": bool(_get_config("auto_sync_config", True)),
+        "gpu_name": short_gpu_name(),
     })
+
+
+@bp.route("/api/settings/auto-sync", methods=["POST"])
+def api_settings_auto_sync():
+    data = request.get_json(force=True) or {}
+    enabled = bool(data.get("enabled", True))
+    _set_config("auto_sync_config", enabled)
+    return jsonify({"ok": True, "auto_sync_config": enabled})
 
 
 @bp.route("/api/settings/password", methods=["POST"])
@@ -154,10 +167,13 @@ def api_settings_civitai_nsfw():
     })
 
 
-@bp.route("/api/settings/export-config")
-def api_settings_export_config():
+def build_export_config_dict(*, include_timestamp: bool = True) -> dict:
     import base64 as _b64
-    config = {"_version": 1, "_exported_at": __import__("datetime").datetime.now().isoformat()}
+    from ..services.cloud_backup import scan_installed_plugins
+
+    config = {"_version": 1}
+    if include_timestamp:
+        config["_exported_at"] = __import__("datetime").datetime.now().isoformat()
 
     config["password"] = cfg.DASHBOARD_PASSWORD
 
@@ -166,8 +182,6 @@ def api_settings_export_config():
             config["civitai_token"] = json.loads(CONFIG_FILE.read_text()).get("api_key", "")
     except Exception:
         pass
-
-    state = _load_setup_state()
 
     rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
     if rclone_conf.exists():
@@ -178,10 +192,9 @@ def api_settings_export_config():
         except Exception:
             pass
 
-    default_urls = {p["url"] for p in DEFAULT_PLUGINS}
-    all_plugins = state.get("plugins", [])
-    config["extra_plugins"] = [u for u in all_plugins if u not in default_urls]
-    config["disabled_default_plugins"] = [u for u in default_urls if u not in all_plugins]
+    extra_plugins, disabled_default_plugins = scan_installed_plugins()
+    config["extra_plugins"] = extra_plugins
+    config["disabled_default_plugins"] = disabled_default_plugins
 
     if SYNC_RULES_FILE.exists():
         try:
@@ -253,6 +266,8 @@ def api_settings_export_config():
     if civitai_nsfw_blur != "":
         config["civitai_nsfw_blur"] = civitai_nsfw_blur
 
+    config["auto_sync_config"] = bool(_get_config("auto_sync_config", True))
+
     config["favorites"] = favorites_store.list_favorites()
     config["prompt_history"] = prompt_library.dump_history()
 
@@ -273,6 +288,12 @@ def api_settings_export_config():
             hashes = {}
         config["generate_model_hashes"] = hashes
 
+    return config
+
+
+@bp.route("/api/settings/export-config")
+def api_settings_export_config():
+    config = build_export_config_dict(include_timestamp=True)
     return Response(
         json.dumps(config, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -291,6 +312,8 @@ def api_settings_import_config():
     data = request.get_json(force=True) or {}
     if not data:
         return _err("invalid_config")
+
+    from_recovery = bool(data.pop("_from_recovery", False))
 
     if is_managed():
         data = {key: value for key, value in data.items() if key not in {
@@ -431,6 +454,12 @@ def api_settings_import_config():
             plugins = [u for u in default_urls if u not in disabled]
             plugins.extend(data.get("extra_plugins", []))
             state["plugins"] = plugins
+            if cfg._is_setup_complete():
+                from ..services.cloud_backup import apply_imported_plugins_on_disk
+                apply_imported_plugins_on_disk(
+                    data.get("extra_plugins", []),
+                    data.get("disabled_default_plugins", []),
+                )
             applied.append("插件列表")
         if data.get("rclone_config_base64"):
             state["rclone_config_method"] = "base64"
@@ -511,10 +540,135 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"CivitAI NSFW: {e}")
 
+    if "auto_sync_config" in data and data["auto_sync_config"] is not None:
+        try:
+            _set_config("auto_sync_config", bool(data["auto_sync_config"]))
+            applied.append("自动同步设置")
+        except Exception as e:
+            errors.append(f"自动同步设置: {e}")
+
+    if from_recovery and is_managed():
+        import threading
+        from ..services.cloud_backup import platform_request
+
+        def _dismiss_recovery():
+            try:
+                platform_request("POST", "/backups/recovery/dismiss", timeout=8.0)
+            except Exception:
+                pass
+
+        threading.Thread(target=_dismiss_recovery, daemon=True, name="import-dismiss-recovery").start()
+
     msg_key = "config_imported_with_errors" if errors else "config_imported"
     return _ok(msg_key,
                params={"applied": len(applied), "failed": len(errors)},
                applied=applied, errors=errors)
+
+
+def _upstream_backup_err(status: int, body: dict):
+    detail = body.get("detail") if isinstance(body.get("detail"), dict) else {}
+    code = detail.get("code") or ""
+    if code == "BACKUP_SLOTS_FULL":
+        return _err("backup_slots_full", 409)
+    if code == "BACKUP_TOO_LARGE":
+        return _err("backup_too_large", 413)
+    if code == "BACKUP_NOT_FOUND":
+        return _err("backup_not_found", 404)
+    if code == "AUTO_SLOT_IMMUTABLE":
+        return _err("auto_slot_immutable", 400)
+    if body.get("error_key"):
+        return jsonify(body), status
+    return _err("cloud_backup_failed", 502 if status >= 500 or status in {401, 403} else status)
+
+
+@bp.route("/api/settings/cloud-backups", methods=["GET"])
+def api_settings_cloud_backups_list():
+    from ..services.cloud_backup import platform_request, short_gpu_name
+    status, body = platform_request("GET", "/backups")
+    if status != 200:
+        return _upstream_backup_err(status, body)
+    return jsonify({
+        "ok": True,
+        "items": body.get("items") or [],
+        "pending_recovery": body.get("pending_recovery"),
+        "max_manual_slots": body.get("max_manual_slots", 10),
+        "instance_gpu_name": body.get("instance_gpu_name") or short_gpu_name(),
+    })
+
+
+@bp.route("/api/settings/cloud-backups/recovery/dismiss", methods=["POST"])
+def api_settings_cloud_backups_dismiss_recovery():
+    from ..services.cloud_backup import platform_request
+    status, body = platform_request("POST", "/backups/recovery/dismiss")
+    if status != 200:
+        return _upstream_backup_err(status, body)
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/settings/cloud-backups/<slot_id>", methods=["GET"])
+def api_settings_cloud_backups_get(slot_id: str):
+    from ..services.cloud_backup import platform_request
+    status, body = platform_request("GET", f"/backups/{slot_id}")
+    if status != 200:
+        return _upstream_backup_err(status, body)
+    payload_obj = body.get("payload") or body.get("config_json") or {}
+    return jsonify({
+        "ok": True,
+        **body,
+        "config_json": payload_obj,
+        "backup": body,
+    })
+
+
+@bp.route("/api/settings/cloud-backups", methods=["POST"])
+def api_settings_cloud_backups_save():
+    from ..services.cloud_backup import compute_config_hash, platform_request, set_last_synced_hash, short_gpu_name
+    data = request.get_json(force=True) or {}
+    mode = data.get("mode")
+    slot_id = data.get("slot_id")
+    if mode == "auto":
+        slot_id = "auto"
+    elif mode == "new":
+        slot_id = None
+    name = data.get("name")
+    payload = build_export_config_dict(include_timestamp=True)
+    status, body = platform_request(
+        "POST",
+        "/backups",
+        json_body={
+            "slot_id": slot_id,
+            "name": name,
+            "gpu_name": short_gpu_name(),
+            "payload": payload,
+        },
+    )
+    if status != 200:
+        return _upstream_backup_err(status, body)
+    if slot_id == "auto" or body.get("is_auto"):
+        set_last_synced_hash(compute_config_hash(payload))
+    return _ok("cloud_backup_saved", slot=body)
+
+
+@bp.route("/api/settings/cloud-backups/<slot_id>", methods=["PATCH"])
+def api_settings_cloud_backups_rename(slot_id: str):
+    from ..services.cloud_backup import platform_request
+    data = request.get_json(force=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return _err("invalid_config", 400)
+    status, body = platform_request("PATCH", f"/backups/{slot_id}", json_body={"name": name})
+    if status != 200:
+        return _upstream_backup_err(status, body)
+    return _ok("cloud_backup_renamed", slot=body)
+
+
+@bp.route("/api/settings/cloud-backups/<slot_id>", methods=["DELETE"])
+def api_settings_cloud_backups_delete(slot_id: str):
+    from ..services.cloud_backup import platform_request
+    status, body = platform_request("DELETE", f"/backups/{slot_id}")
+    if status != 200:
+        return _upstream_backup_err(status, body)
+    return _ok("cloud_backup_deleted")
 
 
 @bp.route("/api/settings/reinitialize", methods=["POST"])

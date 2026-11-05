@@ -190,6 +190,8 @@ def api_plugins_install():
     if r.status_code not in (200, 201):
         return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
+    from ..services.cloud_backup import record_plugin_repo
+    record_plugin_repo(plugin_id=plugin_id, repo_url=data.get("repository", ""), files=data.get("files"))
     return _ok()
 
 
@@ -212,6 +214,8 @@ def api_plugins_uninstall():
     if r.status_code not in (200, 201):
         return _err("uninstall_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
+    from ..services.cloud_backup import remove_plugin_record
+    remove_plugin_record(plugin_id=plugin_id, files=data.get("files"))
     return _ok()
 
 
@@ -324,6 +328,8 @@ def api_plugins_install_git():
     if r.status_code not in (200, 201):
         return _err("install_failed", _safe_upstream_code(r.status_code), code=r.status_code)
     _cm_post("/manager/queue/start")
+    from ..services.cloud_backup import record_plugin_repo
+    record_plugin_repo(repo_url=url, files=[url])
     return _ok()
 
 

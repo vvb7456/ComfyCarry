@@ -16,11 +16,15 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import FormField from '@/components/form/FormField.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import HelpTip from '@/components/ui/HelpTip.vue'
+import CloudSaveConfigModal from '@/components/settings/CloudSaveConfigModal.vue'
+import CloudReadConfigModal from '@/components/settings/CloudReadConfigModal.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
+import type { ExportedConfig } from '@/types/config-export'
+import type { SettingsResponse } from '@/types/settings'
 
 defineOptions({ name: 'SettingsSectionPanel' })
 
@@ -41,14 +45,23 @@ const regenLoading = ref(false)
 const apiKeyLoading = ref(true)
 const apiKeyError = ref(false)
 
+const isManaged = ref(false)
+const gpuName = ref('')
+const saveModalOpen = ref(false)
+const readModalOpen = ref(false)
+
 async function loadSettings() {
-  const data = await get<{ api_key?: string }>('/api/settings')
+  const data = await get<SettingsResponse>('/api/settings')
   if (!data) {
     apiKeyError.value = true
     return
   }
   apiKeyError.value = false
   if (data.api_key) apiKey.value = data.api_key
+  isManaged.value = data.managed === true
+  if (data.gpu_name) {
+    gpuName.value = data.gpu_name
+  }
 }
 
 async function changePassword() {
@@ -109,48 +122,70 @@ async function exportConfig() {
   }
 }
 
+async function applyConfigImport(config: ExportedConfig, isRecovery = false) {
+  if (!config || !config._version) {
+    toast(t('settings.config.invalid_format'), 'error')
+    return
+  }
+
+  // 含工作区状态的导入会替换生成页配置, 而当前可能正有任务在跑 (其工作流图
+  // 由旧配置编译)。故确认文案必须说清后果, 确认后先停止再导入。
+  const hasState = !!config.generate_state
+  const confirmed = hasState
+    ? await confirm({
+        // title 与普通导入共用一份 (同一个动作, 不该有两套说法)
+        title: t('settings.confirm.import_config.title'),
+        message: t('settings.confirm.import_state.message'),
+        confirmText: t('settings.confirm.import_state.button'),
+        variant: 'danger',
+      })
+    : await confirm({
+        title: t('settings.confirm.import_config.title'),
+        message: t('settings.confirm.import_config.message', { date: config._exported_at || t('settings.config.unknown_date') }),
+        confirmText: t('settings.confirm.import_config.button'),
+        variant: 'danger',
+      })
+  if (!confirmed) return
+
+  if (hasState) {
+    // 停止当前任务并清空队列: 队列里的 pending 由旧配置编译, 不应继续跑。
+    // interrupt 端点内部对后台会话会走完整的 stop_session (置 idle +
+    // interrupt + 清队列); 非后台模式下原生 interrupt 不清队列, 故显式补一次。
+    await post('/api/comfyui/interrupt', {}, { silent: true })
+    await post('/api/comfyui/queue/clear', {}, { silent: true })
+  }
+
+  const body: Record<string, unknown> = {
+    ...(config as unknown as Record<string, unknown>),
+    ...(isRecovery ? { _from_recovery: true } : {}),
+  }
+  const data = await post<{ message?: string }>('/api/settings/import-config', body)
+  if (!data) return
+  if (isRecovery) {
+    await post('/api/settings/cloud-backups/recovery/dismiss', {}, { silent: true })
+  }
+  toast(apiMessageText(data), 'success')
+
+  // 密码、密钥等全局设置也随导入变化，重新加载应用。
+  window.location.href = '/'
+}
+
 async function importConfig(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   ;(event.target as HTMLInputElement).value = ''
   try {
     const text = await file.text()
-    const config = JSON.parse(text)
-    if (!config._version) { toast(t('settings.config.invalid_format'), 'error'); return }
+    const config = JSON.parse(text) as ExportedConfig
+    await applyConfigImport(config)
+  } catch (e: unknown) {
+    toast(`${t('settings.config.import_failed')}: ${errorMessage(e)}`, 'error')
+  }
+}
 
-    // 含工作区状态的导入会替换生成页配置, 而当前可能正有任务在跑 (其工作流图
-    // 由旧配置编译)。故确认文案必须说清后果, 确认后先停止再导入。
-    const hasState = !!config.generate_state
-    const confirmed = hasState
-      ? await confirm({
-          // title 与普通导入共用一份 (同一个动作, 不该有两套说法)
-          title: t('settings.confirm.import_config.title'),
-          message: t('settings.confirm.import_state.message'),
-          confirmText: t('settings.confirm.import_state.button'),
-          variant: 'danger',
-        })
-      : await confirm({
-          title: t('settings.confirm.import_config.title'),
-          message: t('settings.confirm.import_config.message', { date: config._exported_at || t('settings.config.unknown_date') }),
-          confirmText: t('settings.confirm.import_config.button'),
-          variant: 'danger',
-        })
-    if (!confirmed) return
-
-    if (hasState) {
-      // 停止当前任务并清空队列: 队列里的 pending 由旧配置编译, 不应继续跑。
-      // interrupt 端点内部对后台会话会走完整的 stop_session (置 idle +
-      // interrupt + 清队列); 非后台模式下原生 interrupt 不清队列, 故显式补一次。
-      await post('/api/comfyui/interrupt', {}, { silent: true })
-      await post('/api/comfyui/queue/clear', {}, { silent: true })
-    }
-
-    const data = await post<{ message?: string }>('/api/settings/import-config', JSON.parse(text))
-    if (!data) return
-    toast(apiMessageText(data), 'success')
-
-    // 密码、密钥等全局设置也随导入变化，重新加载应用。
-    window.location.href = '/'
+async function onSelectRestoreConfig(payload: { config: ExportedConfig; isRecovery?: boolean }) {
+  try {
+    await applyConfigImport(payload.config, Boolean(payload.isRecovery))
   } catch (e: unknown) {
     toast(`${t('settings.config.import_failed')}: ${errorMessage(e)}`, 'error')
   }
@@ -216,7 +251,32 @@ onMounted(() => {
     </SettingsModule>
 
     <SettingsModule :title="t('settings.domains.configmgmt')">
-      <div class="settings-lines">
+      <div v-if="isManaged" class="settings-lines">
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.config.save_title') }}</div>
+            <div class="settings-row__desc">{{ t('settings.config.save_desc') }}</div>
+          </div>
+          <div class="settings-row__control settings-row__control--auto">
+            <BaseButton size="sm" @click="saveModalOpen = true">
+              <MsIcon name="cloud_upload" /> {{ t('settings.config.save_btn') }}
+            </BaseButton>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-row__label">{{ t('settings.config.restore_title') }}</div>
+            <div class="settings-row__desc">{{ t('settings.config.restore_desc') }}</div>
+          </div>
+          <div class="settings-row__control settings-row__control--auto">
+            <BaseButton size="sm" @click="readModalOpen = true">
+              <MsIcon name="cloud_download" /> {{ t('settings.config.restore_btn') }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="settings-lines">
         <div class="settings-row">
           <div class="settings-row__text">
             <div class="settings-row__label">{{ t('settings.config.export_title') }}</div>
@@ -242,6 +302,18 @@ onMounted(() => {
         </div>
       </div>
   </SettingsModule>
+
+  <CloudSaveConfigModal
+    v-if="isManaged"
+    v-model="saveModalOpen"
+    :gpu-name="gpuName"
+    @download-local="exportConfig"
+  />
+  <CloudReadConfigModal
+    v-if="isManaged"
+    v-model="readModalOpen"
+    @select-config="onSelectRestoreConfig"
+  />
 
   <BaseModal v-model="pwModalOpen" :title="t('settings.password.title')" icon="lock">
     <form @submit.prevent="changePassword" autocomplete="off">

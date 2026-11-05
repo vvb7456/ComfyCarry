@@ -112,7 +112,11 @@ def register_auth_middleware(app):
                     and request.path in _SETUP_PRIVILEGED_ROUTES):
                 return
         # Setup 阶段额外放行的路由
-        if not config._is_setup_complete() and request.path in _SETUP_OPEN_ROUTES:
+        if not config._is_setup_complete() and (
+            request.path in _SETUP_OPEN_ROUTES
+            or request.path == "/api/settings/cloud-backups"
+            or request.path.startswith("/api/settings/cloud-backups/")
+        ):
             return
         if request.path in ("/login", "/favicon.ico", "/api/version"):
             return

@@ -571,6 +571,21 @@ def _step_plugins(config, PY):
     quoted_nodes = shlex.quote(str(nodes_dir))
     _deploy_step("install_plugins")
     plugins = [p for p in config.get("plugins", []) if p]
+    if "plugins" in config and nodes_dir.is_dir():
+        enabled_set = set(plugins)
+        for dp in DEFAULT_PLUGINS:
+            d_url = dp["url"]
+            if d_url == "comfycarry_ws_broadcast" or dp.get("required"):
+                continue
+            d_name = d_url.rstrip("/").split("/")[-1].replace(".git", "")
+            active_dir = nodes_dir / d_name
+            disabled_dir = nodes_dir / f"{d_name}.disabled"
+            if d_url not in enabled_set:
+                if active_dir.is_dir() and not disabled_dir.exists():
+                    active_dir.rename(disabled_dir)
+            else:
+                if disabled_dir.is_dir() and not active_dir.exists():
+                    disabled_dir.rename(active_dir)
     _deploy_log("检查额外插件...")
     for url in plugins:
         if url == "comfycarry_ws_broadcast":
