@@ -203,6 +203,8 @@ RUN python3.13 -m pip install \
 # 11. 目录结构 & 预构建标记
 # =============================================================================
 ARG IMAGE_VERSION
+ARG DEFAULT_RELEASE_TAG=""
+ENV COMFYCARRY_RELEASE_TAG="${DEFAULT_RELEASE_TAG}"
 LABEL description="ComfyCarry v${IMAGE_VERSION} — Python 3.13 / CUDA 13.0 / PyTorch 2.11.0"
 LABEL version="${IMAGE_VERSION}"
 LABEL org.opencontainers.image.title="ComfyCarry"

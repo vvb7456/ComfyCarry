@@ -1,31 +1,35 @@
 # ==============================================================================
-# ComfyCarry 生产镜像构建 & 推送 (GitHub Actions)
+# ComfyCarry 镜像构建 & 推送 (GitHub Actions)
 #
 # 基线: NVIDIA cudnn-runtime + 最小 CUDA 编译链
-# 触发: 手动 / push 生产 Dockerfile、入口脚本或本工作流
-# 产物: latest / x86 / arm，以及 v<版本>-x86 / v<版本>-arm
+# 触发与通道:
+#   1. push main 分支: 若镜像相关文件有修改, 自动构建并推送测试镜像
+#      (dev / dev-x86 / dev-arm, 内置 COMFYCARRY_RELEASE_TAG=dev-latest)
+#   2. push tag v*: 若相比上一个正式 v* 标签镜像相关文件有修改, 自动构建并推送正式镜像
+#      (latest / x86 / arm / v<版本>-x86 / v<版本>-arm)
+#   3. workflow_dispatch: 手动选择 dev 或 release 通道强制构建
 # ==============================================================================
 
 name: Build & Push Docker Image
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "镜像通道 (dev: 推送 dev/dev-x86/dev-arm 测试镜像; release: 推送正式镜像)"
+        required: true
+        type: choice
+        options:
+          - dev
+          - release
+        default: dev
   push:
-    paths:
-      - "docker/Dockerfile"
-      - "docker/VERSION"
-      - "docker/entrypoint.sh"
-      - "docker/Dockerfile.dockerignore"
-      - "comfycarry/services/management_agent.py"
-      - "comfycarry/services/usage_collector.py"
-      - "comfycarry/services/system_monitor.py"
-      - "docker/comfycarry-banner.txt"
-      - ".github/workflows/docker-build.yml"
     branches: [main]
+    tags: ["v*"]
 
 concurrency:
-  group: docker-production-${{ github.ref }}
-  cancel-in-progress: true
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 env:
   REGISTRY: ghcr.io
@@ -33,21 +37,88 @@ env:
   RELEASE_TAG: wheels-py313-torch2.11.0-cu130  # GitHub Release tag (存放预编译 wheels)
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      channel: ${{ steps.check.outputs.channel }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve channel and check Docker changes
+        id: check
+        run: |
+          DOCKER_PATHS=(
+            docker/Dockerfile
+            docker/VERSION
+            docker/entrypoint.sh
+            docker/Dockerfile.dockerignore
+            comfycarry/services/management_agent.py
+            comfycarry/services/usage_collector.py
+            comfycarry/services/system_monitor.py
+            docker/comfycarry-banner.txt
+            .github/workflows/docker-build.yml
+          )
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CHANNEL="${{ inputs.channel }}"
+            SHOULD_BUILD="true"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            CHANNEL="release"
+            CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+            PREV_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Fxv "$CURRENT_TAG" | head -n1 || true)
+            if [ -z "$PREV_TAG" ]; then
+              SHOULD_BUILD="true"
+              echo ">>> 未找到上一个正式版本标签, 执行正式镜像构建"
+            elif ! git diff --quiet "$PREV_TAG" "$CURRENT_TAG" -- "${DOCKER_PATHS[@]}"; then
+              SHOULD_BUILD="true"
+              echo ">>> 检测到 ${PREV_TAG}..${CURRENT_TAG} 之间镜像相关文件有变更, 执行正式镜像构建"
+            else
+              SHOULD_BUILD="false"
+              echo ">>> ${PREV_TAG}..${CURRENT_TAG} 之间镜像相关文件无变更, 跳过正式镜像构建"
+            fi
+          else
+            CHANNEL="dev"
+            BEFORE="${{ github.event.before }}"
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              SHOULD_BUILD="true"
+            elif ! git diff --quiet "$BEFORE" "$GITHUB_SHA" -- "${DOCKER_PATHS[@]}"; then
+              SHOULD_BUILD="true"
+              echo ">>> 检测到本次提交修改了镜像相关文件, 执行 dev 测试镜像构建"
+            else
+              SHOULD_BUILD="false"
+              echo ">>> 本次提交未涉及镜像相关文件, 跳过 dev 测试镜像构建"
+            fi
+          fi
+
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "should_build=${SHOULD_BUILD}" >> "$GITHUB_OUTPUT"
+          echo ">>> Channel: ${CHANNEL} | Should build: ${SHOULD_BUILD}"
+
   build-push:
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
     strategy:
       matrix:
         include:
           - arch: amd64
             runner: ubuntu-latest
             name: x86
-            tags: latest x86
+            release_tags: latest x86
+            dev_tags: dev dev-x86
             wheel_arch: x86_64
             sa_archs: sm80 sm86 sm89 sm90 sm100 sm120
             cuda_archs: "8.0;8.6;8.9;9.0;10.0;12.0"
           - arch: arm64
             runner: ubuntu-24.04-arm
             name: arm
-            tags: arm
+            release_tags: arm
+            dev_tags: dev-arm
             wheel_arch: aarch64
             sa_archs: sm120
             cuda_archs: "12.1"
@@ -64,12 +135,24 @@ jobs:
       - name: 生成镜像版本和标签
         id: metadata
         run: |
-          VERSION=$(cat docker/VERSION)
+          BASE_VERSION=$(cat docker/VERSION)
+          CHANNEL="${{ needs.prepare.outputs.channel }}"
+          if [ "$CHANNEL" = "dev" ]; then
+            VERSION="${BASE_VERSION}-dev"
+            DEFAULT_RELEASE_TAG="dev-latest"
+            TAG_LIST="${{ matrix.dev_tags }}"
+          else
+            VERSION="${BASE_VERSION}"
+            DEFAULT_RELEASE_TAG=""
+            TAG_LIST="${{ matrix.release_tags }} v${BASE_VERSION}-${{ matrix.name }}"
+          fi
+
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "default_release_tag=${DEFAULT_RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<EOF'
             for image in "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comfycarry"; do
-              for tag in ${{ matrix.tags }} "v${VERSION}-${{ matrix.name }}"; do
+              for tag in $TAG_LIST; do
                 echo "${image}:${tag}"
               done
             done
@@ -122,6 +205,7 @@ jobs:
           push: true
           build-args: |
             IMAGE_VERSION=${{ steps.metadata.outputs.version }}
+            DEFAULT_RELEASE_TAG=${{ steps.metadata.outputs.default_release_tag }}
             TORCH_CUDA_ARCH_LIST=${{ matrix.cuda_archs }}
           tags: ${{ steps.metadata.outputs.tags }}
           provenance: false

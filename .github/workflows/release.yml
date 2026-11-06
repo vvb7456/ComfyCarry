@@ -1,12 +1,11 @@
 # ==============================================================================
-# ComfyCarry Release 发布 (GitHub Actions)
+# ComfyCarry Release & Pre-release 发布 (GitHub Actions)
 #
-# 触发: 手动 dispatch 或 push tag v*
-# 流程: 从 tag 处 checkout → 构建前端 → 打包完整部署 tarball
-#       → 发布正式 latest Release
+# 触发与通道:
+#   1. push main 分支: 若部署包相关文件有修改, 自动构建并滚动覆盖 dev-latest Pre-release
+#   2. push tag v*: 构建并发布正式 latest Release
+#   3. workflow_dispatch: 手动选择 dev 或 release 通道构建
 # 产物: comfycarry-dist.tar.gz (后端 + 前端 dist + data)
-# 说明: 面板更新检查 (update.py) 与 bootstrap.sh 均以本 Release 为更新源,
-#       main 分支的 push 不再触发任何发布 —— commit 与 release 完全解耦。
 # ==============================================================================
 
 name: Release
@@ -14,57 +13,127 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Release tag (如 v0.6.5, 需与 config.py 的 APP_VERSION 一致)"
+      channel:
+        description: "发布通道 (dev: 滚动覆盖 dev-latest 预发布包; release: 发布正式版本)"
         required: true
+        type: choice
+        options:
+          - dev
+          - release
+        default: dev
+      tag:
+        description: "正式 Release tag (仅 release 通道必填, 如 v0.8.8, 需与 config.py 的 APP_VERSION 一致)"
+        required: false
         type: string
   push:
+    branches: [main]
     tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 permissions:
   contents: write
 
 env:
   ASSET_NAME: comfycarry-dist.tar.gz
+  DEV_TAG: dev-latest
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 确定 tag ──
-      - name: Resolve tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo ">>> Releasing ${TAG}"
-
-      # ── 检出 tag 对应代码 ──
+      # ── 检出代码 (完整历史用于对比变更与更新 dev-latest 标签) ──
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'release' && inputs.tag || github.ref }}
+          fetch-depth: 0
 
-      # ── 校验 tag 与 APP_VERSION 一致 ──
-      - name: Verify APP_VERSION matches tag
+      # ── 确定通道、tag 与是否需要构建 ──
+      - name: Resolve channel and check changes
+        id: meta
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
+          APP_PATHS=(
+            comfycarry
+            comfycarry_ws_broadcast
+            frontend
+            data
+            workspace_manager.py
+            favicon.ico
+            bootstrap.sh
+            .github/workflows/release.yml
+          )
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CHANNEL="${{ inputs.channel }}"
+            if [ "$CHANNEL" = "release" ]; then
+              TAG="${{ inputs.tag }}"
+              if [ -z "$TAG" ]; then
+                echo "::error::release 通道必须填写正式 tag (如 v0.8.8)"
+                exit 1
+              fi
+            else
+              TAG="${DEV_TAG}"
+            fi
+            SHOULD_BUILD="true"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            CHANNEL="release"
+            TAG="${GITHUB_REF#refs/tags/}"
+            SHOULD_BUILD="true"
+          else
+            CHANNEL="dev"
+            TAG="${DEV_TAG}"
+            BEFORE="${{ github.event.before }}"
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              SHOULD_BUILD="true"
+            elif ! git diff --quiet "$BEFORE" "$GITHUB_SHA" -- "${APP_PATHS[@]}"; then
+              SHOULD_BUILD="true"
+            else
+              SHOULD_BUILD="false"
+              echo ">>> 本次提交未涉及应用部署包相关文件, 跳过 dev-latest 构建"
+            fi
+          fi
+
+          COMMIT_SHA=$(git rev-parse HEAD)
+          SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          COMMIT_SUBJECT=$(git log -1 --format='%s' HEAD)
+
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "should_build=${SHOULD_BUILD}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          {
+            echo "dev_notes<<DEV_EOF"
+            echo "开发测试预发布包（滚动更新）"
+            echo ""
+            echo "- Commit: \`${COMMIT_SHA}\`"
+            echo "- 摘要: ${COMMIT_SUBJECT}"
+            echo "DEV_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo ">>> Channel: ${CHANNEL} | Tag: ${TAG} | Should build: ${SHOULD_BUILD}"
+
+      # ── 校验 tag 与 APP_VERSION 一致 (仅正式 release) ──
+      - name: Verify APP_VERSION matches tag
+        if: steps.meta.outputs.should_build == 'true' && steps.meta.outputs.channel == 'release'
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
           APP_VERSION=$(python3 -c "import re; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open('comfycarry/config.py').read()); print(m.group(1) if m else '')")
           if [ "$TAG" != "$APP_VERSION" ]; then
             echo "::error::tag (${TAG}) 与 comfycarry/config.py APP_VERSION (${APP_VERSION}) 不一致"
             exit 1
           fi
 
-      # ── 提取 CHANGELOG.md 中对应 tag 的变更日志 ──
+      # ── 提取 CHANGELOG.md 中对应 tag 的变更日志 (仅正式 release) ──
       - name: Extract changelog
         id: changelog
+        if: steps.meta.outputs.should_build == 'true' && steps.meta.outputs.channel == 'release'
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
           NOTES=$(python3 -c "
           import re, sys
           tag = sys.argv[1]
@@ -82,6 +151,7 @@ jobs:
 
       # ── 前端构建 ──
       - name: Setup Node.js
+        if: steps.meta.outputs.should_build == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -89,16 +159,19 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        if: steps.meta.outputs.should_build == 'true'
         working-directory: frontend
         run: npm ci
 
       - name: Build icon font subset
+        if: steps.meta.outputs.should_build == 'true'
         working-directory: frontend
         run: |
           pip install fonttools brotli
           bash build-fonts.sh
 
       - name: Build
+        if: steps.meta.outputs.should_build == 'true'
         working-directory: frontend
         run: npm run build
 
@@ -107,6 +180,7 @@ jobs:
       #   comfycarry/  workspace_manager.py  comfycarry_ws_broadcast/
       #   data/  static/dist/...
       - name: Package dist
+        if: steps.meta.outputs.should_build == 'true'
         run: |
           STAGE="$(mktemp -d)/comfycarry"
           mkdir -p "$STAGE/static"
@@ -125,12 +199,34 @@ jobs:
           echo ">>> Packaged $(du -h "$ASSET_NAME" | cut -f1)"
           tar -tzf "$ASSET_NAME" | head -20
 
-      # ── 发布 Release ──
-      - name: Create Release
+      # ── 更新 dev-latest 标签指向当前 commit (仅 dev 通道) ──
+      - name: Update dev-latest tag
+        if: steps.meta.outputs.should_build == 'true' && steps.meta.outputs.channel == 'dev'
+        run: |
+          git tag -f "${DEV_TAG}" "${{ steps.meta.outputs.commit_sha }}"
+          git push -f origin "refs/tags/${DEV_TAG}"
+
+      # ── 发布 Pre-release (dev 通道) ──
+      - name: Publish dev Pre-release
+        if: steps.meta.outputs.should_build == 'true' && steps.meta.outputs.channel == 'dev'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ComfyCarry ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ env.DEV_TAG }}
+          target_commitish: ${{ steps.meta.outputs.commit_sha }}
+          name: ComfyCarry ${{ env.DEV_TAG }} (${{ steps.meta.outputs.short_sha }})
+          body: ${{ steps.meta.outputs.dev_notes }}
+          files: ${{ env.ASSET_NAME }}
+          prerelease: true
+          make_latest: false
+
+      # ── 发布正式 Release (release 通道) ──
+      - name: Publish Release
+        if: steps.meta.outputs.should_build == 'true' && steps.meta.outputs.channel == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ComfyCarry ${{ steps.meta.outputs.tag }}
           body: ${{ steps.changelog.outputs.notes }}
           files: ${{ env.ASSET_NAME }}
+          prerelease: false
           make_latest: true

@@ -43,13 +43,21 @@ echo "  -> ComfyCarry 依赖已预装"
 echo "  -> Cloudflared 已预装"
 
 # 更新源: 托管开通使用主控下发并已校验的固定部署包 (COMFYCARRY_BUNDLE_DIR),
-# 自托管仍从 GitHub latest Release (完整部署包, 由 release.yml 发布) 更新 ——
-# main 分支 push 不影响已部署实例, commit 与 release 解耦。
+# 自托管及常规镜像从 GitHub Release (完整部署包, 由 release.yml 发布) 更新:
+# 默认拉取正式 latest Release; 若指定 COMFYCARRY_RELEASE_TAG (如测试镜像内置的
+# dev-latest), 则拉取对应标签的 Release/Pre-release。
 DASHBOARD_DIR="$WORKSPACE_DIR/ComfyCarry"
 REPO_OWNER="vvb7456"
 REPO_NAME="ComfyCarry"
 RELEASE_ASSET="comfycarry-dist.tar.gz"
-LATEST_RELEASE_API="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
+TARGET_RELEASE_TAG="${COMFYCARRY_RELEASE_TAG:-}"
+if [ -n "$TARGET_RELEASE_TAG" ]; then
+    RELEASE_API="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/${TARGET_RELEASE_TAG}"
+    RELEASE_DESC="Release (${TARGET_RELEASE_TAG})"
+else
+    RELEASE_API="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
+    RELEASE_DESC="latest Release"
+fi
 
 mkdir -p "$DASHBOARD_DIR"
 
@@ -104,11 +112,11 @@ if [ -n "$BUNDLE_DIR" ]; then
         echo "  -> 托管部署包未变化, 保留现有文件 (设置 FORCE_UPDATE=true 强制覆盖)"
     fi
 else
-# 拉取一次 latest Release 元数据, 下载地址与 .version 共用 (限流 60 req/h, 不要重复请求)
-RELEASE_JSON=$(wget -qO- "$LATEST_RELEASE_API" 2>/dev/null || true)
+# 拉取一次目标 Release 元数据, 下载地址与 .version 共用 (限流 60 req/h, 不要重复请求)
+RELEASE_JSON=$(wget -qO- "$RELEASE_API" 2>/dev/null || true)
 
 if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
-    echo "  -> 下载 ComfyCarry (latest Release)..."
+    echo "  -> 下载 ComfyCarry (${RELEASE_DESC})..."
     DIST_URL=$(echo "$RELEASE_JSON" | python3 -c "
 import sys, json
 try:
@@ -141,7 +149,7 @@ except Exception:
 
         rm -rf "$TMP_TAR" "$TMP_EXTRACT"
     else
-        echo "  未找到 latest Release (${RELEASE_ASSET}), 请检查是否已发布 Release"
+        echo "  未找到 ${RELEASE_DESC} (${RELEASE_ASSET}), 请检查是否已发布 Release"
     fi
 else
     echo "  -> ComfyCarry 文件已存在，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"

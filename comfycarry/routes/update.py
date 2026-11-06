@@ -91,9 +91,35 @@ def _current_commit() -> str:
     return ""
 
 
+def _target_release_tag() -> str:
+    return os.environ.get("COMFYCARRY_RELEASE_TAG", "").strip()
+
+
+def _release_api_url() -> str:
+    tag = _target_release_tag()
+    if tag:
+        return f"{_GITHUB_API}/releases/tags/{tag}"
+    return _LATEST_RELEASE_API
+
+
+def _fetch_tag_commit(tag: str) -> str:
+    if not tag:
+        return ""
+    try:
+        resp = req_lib.get(
+            f"{_GITHUB_API}/commits/{tag}",
+            headers={"Accept": "application/vnd.github.v3+json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json().get("sha", "")
+    except Exception:
+        return ""
+
+
 def _fetch_latest_release() -> dict | None:
     resp = req_lib.get(
-        _LATEST_RELEASE_API,
+        _release_api_url(),
         headers={"Accept": "application/vnd.github.v3+json"},
         timeout=15,
     )
@@ -105,6 +131,7 @@ def _fetch_latest_release() -> dict | None:
 def api_update_check():
     try:
         current = _current_version()
+        current_commit = _current_commit()
 
         data = _fetch_latest_release()
         if not data:
@@ -121,11 +148,15 @@ def api_update_check():
                 asset_url = asset.get("browser_download_url", "")
                 break
 
-        has_update = bool(latest_tag and asset_url and _is_newer(latest_tag, current))
+        if _target_release_tag() and latest_tag == current:
+            remote_commit = _fetch_tag_commit(latest_tag)
+            has_update = bool(asset_url and remote_commit and remote_commit != current_commit)
+        else:
+            has_update = bool(latest_tag and asset_url and _is_newer(latest_tag, current))
 
         return jsonify({
             "current_version": current,
-            "current_commit": _current_commit()[:8],
+            "current_commit": current_commit[:8],
             "latest_version": latest_tag,
             "latest_name": latest_name,
             "latest_message": latest_msg,
@@ -280,17 +311,7 @@ def api_update_apply():
 
             yield _sse("updating", "Updating version info...")
             new_version = latest_tag
-            new_commit = ""
-            try:
-                resp = req_lib.get(
-                    f"{_GITHUB_API}/commits/{latest_tag}",
-                    headers={"Accept": "application/vnd.github.v3+json"},
-                    timeout=10,
-                )
-                resp.raise_for_status()
-                new_commit = resp.json().get("sha", "")
-            except Exception:
-                pass
+            new_commit = _fetch_tag_commit(latest_tag)
 
             version_file = os.path.join(dashboard_dir, ".version")
             with open(version_file, "w") as f:
