@@ -7,6 +7,7 @@ import { useLogStream } from '@/composables/useLogStream'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useClipboard } from '@/composables/useClipboard'
+import { useAppStore } from '@/stores/app'
 import { apiErrorText } from '@/utils/apiError'
 import ServiceHero from '@/components/ui/ServiceHero.vue'
 import ListRow from '@/components/ui/ListRow.vue'
@@ -31,8 +32,10 @@ const { get, post, del } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
+const app = useAppStore()
 
 const data = ref<TunnelData | null>(null)
+const isManaged = computed(() => data.value?.managed ?? app.managed === true)
 
 const settingsOpen = ref(false)
 const settingsPreset = ref<'off' | 'public' | 'custom' | null>(null)
@@ -86,6 +89,9 @@ async function loadTunnelStatus() {
   if (requestedAt < statusAppliedAt) return
   statusAppliedAt = requestedAt
   data.value = d
+  if (typeof d.managed === 'boolean') {
+    app.setRuntimeEnv({ managed: d.managed })
+  }
   if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
 }
 
@@ -334,14 +340,14 @@ function openAddSvc() {
   <div class="page-body">
     <PageHeaderRow :title="t('tunnel.title')">
       <template #actions>
-        <template v-if="configured && !data?.managed">
+        <template v-if="configured && !isManaged">
           <template v-if="heroState === 'online' || heroState === 'connecting'">
             <BaseButton size="sm" :loading="pendingAction === 'stop'" :disabled="acting" @click="tunnelStop"><MsIcon name="stop" /> {{ t('common.btn.stop') }}</BaseButton>
             <BaseButton size="sm" :loading="pendingAction === 'restart'" :disabled="acting" @click="tunnelRestart()"><MsIcon name="restart_alt" /> {{ t('common.btn.restart') }}</BaseButton>
           </template>
           <BaseButton v-else size="sm" :loading="pendingAction === 'start'" :disabled="acting" @click="tunnelStartByMode"><MsIcon name="play_arrow" /> {{ t('common.btn.start') }}</BaseButton>
         </template>
-        <BaseButton v-if="data && !data.managed" variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
+        <BaseButton v-if="app.managed === false || (data && !data.managed)" variant="ghost" size="sm" :aria-label="t('tunnel.settings.title')" @click="openSettings()">
           <MsIcon name="settings" /> {{ t('common.btn.settings') }}
         </BaseButton>
       </template>
@@ -358,7 +364,7 @@ function openAddSvc() {
           :tone="heroTone"
           :busy="heroBusy"
         >
-          <template v-if="heroHasActions && !data?.managed" #actions>
+          <template v-if="heroHasActions && !isManaged" #actions>
             <template v-if="heroState === 'unconfigured'">
               <BaseButton variant="primary" @click="openSettings('public')">{{ t('tunnel.hero.action.connect_public') }}</BaseButton>
               <BaseButton @click="openSettings('custom')">{{ t('tunnel.hero.action.connect_custom') }}</BaseButton>

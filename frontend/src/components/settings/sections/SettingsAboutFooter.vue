@@ -118,6 +118,7 @@ async function applyUpdate() {
             toast(t('settings.update.done'), 'success')
             setTimeout(() => {
               updateApplying.value = false
+              void app.loadVersion()
               location.reload()
             }, 4000)
           } else if (ev.phase === 'error') {

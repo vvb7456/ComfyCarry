@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import OptionCard from '@/components/ui/OptionCard.vue'
+import Badge from '@/components/ui/Badge.vue'
+import LoadingCenter from '@/components/ui/LoadingCenter.vue'
+import BaseInput from '@/components/form/BaseInput.vue'
+import FormField from '@/components/form/FormField.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import AlertBanner from '@/components/ui/AlertBanner.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
-import { useConfirm } from '@/composables/useConfirm'
 import type { CloudBackupSlot, CloudBackupsListResponse, CloudBackupSummary } from '@/types/config-export'
 
 defineOptions({ name: 'CloudSaveConfigModal' })
@@ -25,9 +29,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
-const { get, post, del } = useApiFetch()
+const { get, post } = useApiFetch()
 const { toast } = useToast()
-const { confirm } = useConfirm()
 
 const show = computed({
   get: () => props.modelValue,
@@ -37,15 +40,11 @@ const show = computed({
 const loadingList = ref(false)
 const loadError = ref(false)
 const saving = ref(false)
-const deletingId = ref('')
 const items = ref<CloudBackupSlot[]>([])
-const maxManualSlots = ref(10)
+const maxManualSlots = ref(5)
 const instanceGpuName = ref('')
-
-// 'new' | slot.id
 const selectedTarget = ref<string>('new')
 const newSlotName = ref('')
-const newNameInputRef = ref<HTMLInputElement | null>(null)
 
 const manualSlots = computed(() => items.value.filter(item => !item.is_auto))
 const canCreateNew = computed(() => manualSlots.value.length < maxManualSlots.value)
@@ -72,16 +71,20 @@ function formatDate(iso: string): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`
 }
 
-function summaryTags(s?: CloudBackupSummary): string[] {
-  if (!s) return []
-  const tags: string[] = []
-  if (s.has_rclone) tags.push(t('settings.config.summary_rclone'))
-  if (s.sync_rules_count > 0) tags.push(t('settings.config.summary_rules', { count: s.sync_rules_count }))
-  if (s.extra_plugins_count > 0) tags.push(t('settings.config.summary_plugins', { count: s.extra_plugins_count }))
-  if (s.favorites_count > 0) tags.push(t('settings.config.summary_favorites', { count: s.favorites_count }))
-  if (s.prompt_history_count > 0) tags.push(t('settings.config.summary_history', { count: s.prompt_history_count }))
-  if (s.has_generate_state) tags.push(t('settings.config.summary_workspace'))
-  return tags
+function slotDescription(slot: CloudBackupSlot): string {
+  const s: CloudBackupSummary | undefined = slot.summary
+  const parts: string[] = []
+  const formatted = formatDate(slot.updated_at)
+  if (formatted) parts.push(formatted)
+  if (s) {
+    if (s.has_rclone) parts.push(t('settings.config.summary_rclone'))
+    if (s.sync_rules_count > 0) parts.push(t('settings.config.summary_rules', { count: s.sync_rules_count }))
+    if (s.extra_plugins_count > 0) parts.push(t('settings.config.summary_plugins', { count: s.extra_plugins_count }))
+    if (s.favorites_count > 0) parts.push(t('settings.config.summary_favorites', { count: s.favorites_count }))
+    if (s.prompt_history_count > 0) parts.push(t('settings.config.summary_history', { count: s.prompt_history_count }))
+    if (s.has_generate_state) parts.push(t('settings.config.summary_workspace'))
+  }
+  return parts.join(' · ')
 }
 
 async function fetchSlots() {
@@ -94,7 +97,7 @@ async function fetchSlots() {
     return
   }
   items.value = data.items || []
-  maxManualSlots.value = data.max_manual_slots ?? 10
+  maxManualSlots.value = data.max_manual_slots ?? 5
   if (data.instance_gpu_name) {
     instanceGpuName.value = data.instance_gpu_name
   }
@@ -113,36 +116,6 @@ function selectNewSlot() {
   selectedTarget.value = 'new'
   if (!newSlotName.value) {
     newSlotName.value = formatDefaultName()
-  }
-  nextTick(() => {
-    newNameInputRef.value?.focus()
-    newNameInputRef.value?.select()
-  })
-}
-
-async function deleteSlot(slot: CloudBackupSlot, ev: Event) {
-  ev.stopPropagation()
-  if (slot.is_auto) return
-  const ok = await confirm({
-    title: t('settings.config.delete_slot_confirm_title'),
-    message: t('settings.config.delete_slot_confirm_msg', { name: slot.name }),
-    variant: 'danger',
-    confirmText: t('common.btn.delete'),
-  })
-  if (!ok) return
-  deletingId.value = slot.id
-  const res = await del<{ ok?: boolean }>(`/api/settings/cloud-backups/${encodeURIComponent(slot.id)}`)
-  deletingId.value = ''
-  if (res) {
-    toast(t('settings.config.slot_deleted'), 'success')
-    items.value = items.value.filter(i => i.id !== slot.id)
-    if (selectedTarget.value === slot.id) {
-      if (canCreateNew.value) {
-        selectNewSlot()
-      } else if (manualSlots.value[0]) {
-        selectedTarget.value = manualSlots.value[0].id
-      }
-    }
   }
 }
 
@@ -180,88 +153,47 @@ watch(() => props.modelValue, (open) => {
     size="md"
     footer-align="between"
   >
-    <div v-if="loadingList" class="slot-modal__loading">
-      <Spinner size="md" />
-    </div>
+    <LoadingCenter v-if="loadingList" />
 
-    <div v-else-if="loadError" class="slot-modal__error">
-      <EmptyState icon="error_outline" :message="t('settings.config.cloud_load_failed')">
-        <BaseButton size="sm" @click="fetchSlots">{{ t('common.btn.retry') }}</BaseButton>
-      </EmptyState>
-    </div>
+    <EmptyState v-else-if="loadError" icon="error_outline" :message="t('settings.config.cloud_load_failed')">
+      <BaseButton size="sm" @click="fetchSlots">{{ t('common.btn.retry') }}</BaseButton>
+    </EmptyState>
 
-    <div v-else class="slot-list">
-      <!-- 已有手动存档槽 -->
-      <div
+    <div v-else class="slot-stack">
+      <OptionCard
         v-for="slot in manualSlots"
         :key="slot.id"
-        class="slot-item"
-        :class="{ 'slot-item--selected': selectedTarget === slot.id }"
-        role="radio"
-        :aria-checked="selectedTarget === slot.id"
-        tabindex="0"
-        @click="selectedTarget = slot.id"
-        @keydown.enter.prevent="selectedTarget = slot.id"
-        @keydown.space.prevent="selectedTarget = slot.id"
+        variant="bg2"
+        :selected="selectedTarget === slot.id"
+        :title="slot.name"
+        :description="slotDescription(slot)"
+        @toggle="selectedTarget = slot.id"
       >
-        <div class="slot-item__main">
-          <div class="slot-item__title-row">
-            <span class="slot-item__radio" :class="{ 'slot-item__radio--checked': selectedTarget === slot.id }" />
-            <span class="slot-item__name">{{ slot.name }}</span>
-            <span v-if="slot.gpu_name" class="slot-item__gpu">{{ slot.gpu_name }}</span>
-          </div>
-          <div class="slot-item__meta">
-            <span>{{ formatDate(slot.updated_at) }}</span>
-            <span v-for="tag in summaryTags(slot.summary)" :key="tag" class="slot-item__tag">{{ tag }}</span>
-          </div>
-        </div>
-        <div class="slot-item__actions">
-          <button
-            type="button"
-            class="slot-item__del-btn"
-            :disabled="deletingId === slot.id"
-            :title="t('common.btn.delete')"
-            @click="deleteSlot(slot, $event)"
-          >
-            <MsIcon name="delete" size="xs" />
-          </button>
-        </div>
-      </div>
+        <template v-if="slot.gpu_name" #badge>
+          <Badge tone="neutral">{{ slot.gpu_name }}</Badge>
+        </template>
+      </OptionCard>
 
-      <!-- 新建存档槽 -->
-      <div
+      <OptionCard
         v-if="canCreateNew"
-        class="slot-item slot-item--new"
-        :class="{ 'slot-item--selected': selectedTarget === 'new' }"
-        role="radio"
-        :aria-checked="selectedTarget === 'new'"
-        tabindex="0"
-        @click="selectNewSlot"
-        @keydown.enter.prevent="selectNewSlot"
-        @keydown.space.prevent="selectNewSlot"
-      >
-        <div class="slot-item__main">
-          <div class="slot-item__title-row">
-            <span class="slot-item__radio" :class="{ 'slot-item__radio--checked': selectedTarget === 'new' }" />
-            <span class="slot-item__name slot-item__name--new">{{ t('settings.config.new_slot_btn') }}</span>
-          </div>
-          <div v-if="selectedTarget === 'new'" class="slot-item__new-input-wrap" @click.stop>
-            <input
-              ref="newNameInputRef"
-              v-model="newSlotName"
-              type="text"
-              class="form-input slot-item__new-input"
-              maxlength="100"
-              :placeholder="t('settings.config.new_slot_placeholder')"
-              @keydown.enter.prevent="confirmSave"
-            />
-          </div>
-        </div>
-      </div>
+        variant="bg2"
+        icon="add"
+        :selected="selectedTarget === 'new'"
+        :title="t('settings.config.new_slot_btn')"
+        @toggle="selectNewSlot"
+      />
 
-      <div v-else class="slot-list__limit-hint">
+      <FormField v-if="canCreateNew && selectedTarget === 'new'" :label="t('settings.config.new_slot_placeholder')">
+        <BaseInput
+          v-model="newSlotName"
+          :placeholder="t('settings.config.new_slot_placeholder')"
+          @keydown.enter.prevent="confirmSave"
+        />
+      </FormField>
+
+      <AlertBanner v-if="!canCreateNew" tone="info" dense>
         {{ t('settings.config.slot_limit_reached', { max: maxManualSlots }) }}
-      </div>
+      </AlertBanner>
     </div>
 
     <template #footer>
@@ -282,169 +214,9 @@ watch(() => props.modelValue, (open) => {
 </template>
 
 <style scoped>
-.slot-modal__loading {
-  display: flex;
-  justify-content: center;
-  padding: 32px 0;
-}
-
-.slot-list {
+.slot-stack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.slot-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--rs);
-  border: 1px solid var(--bd);
-  background: var(--bg2);
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
-}
-
-.slot-item:hover {
-  border-color: var(--bd-f);
-  background: var(--bg4);
-}
-
-.slot-item--selected {
-  border-color: var(--ac);
-  background: color-mix(in srgb, var(--ac) 8%, var(--bg2));
-}
-
-.slot-item__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.slot-item__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.slot-item__radio {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--t3);
-  flex-shrink: 0;
-  position: relative;
-}
-
-.slot-item__radio--checked {
-  border-color: var(--ac);
-}
-
-.slot-item__radio--checked::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-radius: 50%;
-  background: var(--ac);
-}
-
-.slot-item__name {
-  font-weight: 600;
-  font-size: .88rem;
-  color: var(--t1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.slot-item__name--new {
-  color: var(--ac);
-}
-
-.slot-item__badge--auto {
-  font-size: .68rem;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--ac) 18%, transparent);
-  color: var(--ac);
-  border: 1px solid color-mix(in srgb, var(--ac) 38%, transparent);
-}
-
-.slot-item__gpu {
-  font-size: .72rem;
-  color: var(--t3);
-  background: var(--bg3);
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.slot-item__meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: .75rem;
-  color: var(--t3);
-  padding-left: 22px;
-}
-
-.slot-item__meta--muted {
-  font-style: italic;
-}
-
-.slot-item__tag {
-  background: var(--bg3);
-  border: 1px solid var(--bd);
-  padding: 0 5px;
-  border-radius: 4px;
-  font-size: .7rem;
-  color: var(--t2);
-}
-
-.slot-item__actions {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.slot-item__del-btn {
-  background: none;
-  border: none;
-  color: var(--t3);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: var(--rs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.slot-item__del-btn:hover {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-.slot-item__new-input-wrap {
-  padding-left: 22px;
-  margin-top: 4px;
-}
-
-.slot-item__new-input {
-  width: 100%;
-  font-size: .84rem;
-  padding: 6px 10px;
-}
-
-.slot-list__limit-hint {
-  font-size: .76rem;
-  color: var(--t3);
-  text-align: center;
-  padding: 6px 4px;
+  gap: var(--sp-2);
 }
 </style>

@@ -24,13 +24,20 @@ bp = Blueprint("system", __name__)
 _err = partial(api_err, "system")
 
 
+# 托管模式下由 entrypoint 拉起的平台侧后台守护进程, 不属于用户可管理服务
+_INTERNAL_DAEMON_PROCS = frozenset({"management-agent", "usage-collector"})
+
+
 @bp.route("/api/version")
 def api_version():
     return jsonify(get_version())
 
 
 def get_version():
-    version_info = {"version": APP_VERSION, "branch": "", "commit": ""}
+    from ..services.managed_tunnel import is_managed
+    from ..services.cloud_backup import short_gpu_name
+
+    version_info: dict = {"version": APP_VERSION, "branch": "", "commit": ""}
     version_file = os.path.join(SCRIPT_DIR, ".version")
     try:
         if os.path.exists(version_file):
@@ -58,6 +65,8 @@ def get_version():
                 version_info["branch"] = result2.stdout.strip()
         except Exception:
             pass
+    version_info["managed"] = is_managed()
+    version_info["gpu_name"] = short_gpu_name()
     return version_info
 
 
@@ -76,7 +85,7 @@ def get_services():
             "restarts": s.get("pm2_env", {}).get("restart_time", 0),
             "uptime": s.get("pm2_env", {}).get("pm_uptime", 0),
             "pid": s.get("pid"),
-        } for s in get_pm2_procs()]}
+        } for s in get_pm2_procs() if s.get("name") not in _INTERNAL_DAEMON_PROCS]}
     except Exception as e:
         return {"services": [], "error": str(e)}
 
@@ -85,7 +94,7 @@ def get_services():
 def api_service_action(name, action):
     if action not in ("restart", "stop", "start"):
         return _err("invalid_action")
-    if not re.match(r'^[\w\-]+$', name):
+    if not re.match(r'^[\w\-]+$', name) or name in _INTERNAL_DAEMON_PROCS:
         return _err("invalid_service")
     out = _run_cmd(f"pm2 {action} {name}", timeout=10)
     return jsonify({"ok": True, "output": out})

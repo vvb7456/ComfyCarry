@@ -366,9 +366,6 @@ const orderedServices = computed(() => {
     if (!map.has(slot)) map.set(slot, s)
   }
   const result = svcOrder.map((n) => map.get(n)).filter((s): s is ServiceEntry => !!s)
-  svcs.forEach((s) => {
-    if (!svcOrder.includes(orderSlot(s.name))) result.push(s)
-  })
   if (!map.has('cf-tunnel') && data.value?.tunnel) {
     const tStatus = data.value.tunnel.effective_status
     result.splice(1, 0, {

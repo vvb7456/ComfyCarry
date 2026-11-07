@@ -87,7 +87,7 @@
     "recovery_slot_name": "Crash Recovery Snapshot",
     "recovery_slot_badge": "Auto Recovery",
     "auto_slot_empty": "No auto save yet; confirming will save immediately",
-    "new_slot_btn": "+ New Slot",
+    "new_slot_btn": "New Slot",
     "new_slot_placeholder": "Enter slot name",
     "slot_limit_reached": "Manual slot limit reached ({max}). Overwrite an existing slot or delete one first.",
     "download_local_btn": "Download Local File (.json)",

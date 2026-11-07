@@ -21,6 +21,7 @@ import CloudReadConfigModal from '@/components/settings/CloudReadConfigModal.vue
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAppStore } from '@/stores/app'
 import { apiErrorText, apiMessageText, type ApiErrorBody } from '@/utils/apiError'
 import { errorMessage } from '@/utils/errorMessage'
 import type { ExportedConfig } from '@/types/config-export'
@@ -32,6 +33,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { get, post } = useApiFetch()
 const { toast } = useToast()
 const { confirm } = useConfirm()
+const app = useAppStore()
 
 const pwModalOpen = ref(false)
 const pwCurrent = ref('')
@@ -45,8 +47,6 @@ const regenLoading = ref(false)
 const apiKeyLoading = ref(true)
 const apiKeyError = ref(false)
 
-const isManaged = ref(false)
-const gpuName = ref('')
 const saveModalOpen = ref(false)
 const readModalOpen = ref(false)
 
@@ -58,10 +58,10 @@ async function loadSettings() {
   }
   apiKeyError.value = false
   if (data.api_key) apiKey.value = data.api_key
-  isManaged.value = data.managed === true
-  if (data.gpu_name) {
-    gpuName.value = data.gpu_name
-  }
+  app.setRuntimeEnv({
+    managed: data.managed === true,
+    gpu_name: data.gpu_name,
+  })
 }
 
 async function changePassword() {
@@ -251,7 +251,26 @@ onMounted(() => {
     </SettingsModule>
 
     <SettingsModule :title="t('settings.domains.configmgmt')">
-      <div v-if="isManaged" class="settings-lines">
+      <div v-if="app.managed === null" class="settings-lines">
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-skeleton__line" style="width: 120px" />
+          </div>
+          <div class="settings-row__control settings-row__control--auto">
+            <div class="settings-skeleton__line" style="width: 96px" />
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row__text">
+            <div class="settings-skeleton__line" style="width: 120px" />
+          </div>
+          <div class="settings-row__control settings-row__control--auto">
+            <div class="settings-skeleton__line" style="width: 96px" />
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="app.managed" class="settings-lines">
         <div class="settings-row">
           <div class="settings-row__text">
             <div class="settings-row__label">{{ t('settings.config.save_title') }}</div>
@@ -304,13 +323,13 @@ onMounted(() => {
   </SettingsModule>
 
   <CloudSaveConfigModal
-    v-if="isManaged"
+    v-if="app.managed"
     v-model="saveModalOpen"
-    :gpu-name="gpuName"
+    :gpu-name="app.gpuName"
     @download-local="exportConfig"
   />
   <CloudReadConfigModal
-    v-if="isManaged"
+    v-if="app.managed"
     v-model="readModalOpen"
     @select-config="onSelectRestoreConfig"
   />

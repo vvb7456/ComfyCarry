@@ -347,24 +347,33 @@ def apply_imported_plugins_on_disk(
         threading.Thread(target=_bg_clone, daemon=True, name="import-plugin-clone").start()
 
 
+_cached_gpu_name: str | None = None
+
+
 def short_gpu_name() -> str:
+    global _cached_gpu_name
+    if _cached_gpu_name is not None:
+        return _cached_gpu_name
     try:
         from . import system_monitor
         snap = system_monitor.get_snapshot()
         gpus = (snap or {}).get("gpu") or []
         if gpus and gpus[0].get("name"):
             raw = str(gpus[0]["name"]).strip()
-            return re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
+            _cached_gpu_name = re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
+            return _cached_gpu_name
     except Exception:
         pass
     try:
         from .deploy_engine import _detect_gpu_info
         raw = str(_detect_gpu_info().get("name") or "").strip()
         if raw:
-            return re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
+            _cached_gpu_name = re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
+            return _cached_gpu_name
     except Exception:
         pass
-    return ""
+    _cached_gpu_name = ""
+    return _cached_gpu_name
 
 
 def compute_config_hash(config_data: dict) -> str:

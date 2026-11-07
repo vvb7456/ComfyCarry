@@ -63,7 +63,11 @@ const remoteTypeDefs = ref<Record<string, RemoteTypeDef>>({})
 const importedConfig = ref<ExportedConfig | null>(null)
 const selectedBackupName = ref('')
 const activeTunnelMode = ref('')
-const managedTunnel = ref(false)
+const initialManaged = typeof window !== 'undefined'
+  && typeof (window as Window & { __CC_ENV__?: { managed?: boolean } }).__CC_ENV__?.managed === 'boolean'
+  ? Boolean((window as Window & { __CC_ENV__?: { managed?: boolean } }).__CC_ENV__?.managed)
+  : false
+const managedTunnel = ref(initialManaged)
 const activeTunnelUrls = ref<Record<string, string>>({})
 const deployState = ref<'idle' | 'deploying' | 'done' | 'error'>('idle')
 const initLoading = ref(true)

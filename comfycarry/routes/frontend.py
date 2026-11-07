@@ -1,3 +1,4 @@
+import json
 import os
 
 from flask import Blueprint, Response, send_file
@@ -8,6 +9,19 @@ from ..config import SCRIPT_DIR, _is_setup_complete
 bp = Blueprint("frontend", __name__)
 
 DIST_DIR = Path(SCRIPT_DIR) / "static" / "dist"
+
+
+def _inject_bootstrap_env(html: str) -> str:
+    """将实例级只读环境元数据同步注入 HTML <head>, 消除首屏异步闪烁。"""
+    try:
+        from .system import get_version
+        payload = json.dumps(get_version(), ensure_ascii=False, separators=(",", ":"))
+        script_tag = f"<script>window.__CC_ENV__={payload};</script>"
+        if "</head>" in html:
+            return html.replace("</head>", f"{script_tag}</head>", 1)
+    except Exception:
+        pass
+    return html
 
 
 def _serve_public_file(filename: str, mimetype: str | None = None):
@@ -26,8 +40,8 @@ def index():
     if not _is_setup_complete():
         wizard_dist = DIST_DIR / "wizard.html"
         if wizard_dist.exists():
-            resp = Response(wizard_dist.read_text(encoding="utf-8"),
-                            mimetype="text/html")
+            html = _inject_bootstrap_env(wizard_dist.read_text(encoding="utf-8"))
+            resp = Response(html, mimetype="text/html")
             resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
             return resp
         return Response("<h1>dist/wizard.html not found</h1>",
@@ -35,8 +49,8 @@ def index():
 
     dist_index = DIST_DIR / "index.html"
     if dist_index.exists():
-        resp = Response(dist_index.read_text(encoding="utf-8"),
-                        mimetype="text/html")
+        html = _inject_bootstrap_env(dist_index.read_text(encoding="utf-8"))
+        resp = Response(html, mimetype="text/html")
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return resp
     return Response("<h1>dist/index.html not found</h1>",

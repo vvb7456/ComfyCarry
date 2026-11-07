@@ -87,7 +87,7 @@
     "recovery_slot_name": "异常中断自动恢复快照",
     "recovery_slot_badge": "异常恢复",
     "auto_slot_empty": "尚未生成自动存档，确认后将立即保存",
-    "new_slot_btn": "+ 新建存档",
+    "new_slot_btn": "新建存档",
     "new_slot_placeholder": "输入存档名称",
     "slot_limit_reached": "手动存档已达上限（{max} 个），请选择已有存档覆盖或先删除旧存档",
     "download_local_btn": "下载为本地文件 (.json)",
