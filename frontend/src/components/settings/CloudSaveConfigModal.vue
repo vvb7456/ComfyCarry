@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import AddCard from '@/components/ui/AddCard.vue'
 import OptionCard from '@/components/ui/OptionCard.vue'
 import Badge from '@/components/ui/Badge.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
@@ -43,7 +44,8 @@ const saving = ref(false)
 const items = ref<CloudBackupSlot[]>([])
 const maxManualSlots = ref(5)
 const instanceGpuName = ref('')
-const selectedTarget = ref<string>('new')
+const selectedTarget = ref<string>('')
+const nameModalOpen = ref(false)
 const newSlotName = ref('')
 
 const manualSlots = computed(() => items.value.filter(item => !item.is_auto))
@@ -101,34 +103,37 @@ async function fetchSlots() {
   if (data.instance_gpu_name) {
     instanceGpuName.value = data.instance_gpu_name
   }
-  if (canCreateNew.value) {
-    selectedTarget.value = 'new'
-    if (!newSlotName.value) {
-      newSlotName.value = formatDefaultName()
-    }
-  } else if (manualSlots.value[0]) {
-    selectedTarget.value = manualSlots.value[0].id
-  }
 }
 
-function selectNewSlot() {
+function openNameModal() {
   if (!canCreateNew.value) return
-  selectedTarget.value = 'new'
-  if (!newSlotName.value) {
-    newSlotName.value = formatDefaultName()
-  }
+  newSlotName.value = formatDefaultName()
+  nameModalOpen.value = true
 }
 
-async function confirmSave() {
+async function confirmCreateNew() {
+  if (saving.value) return
   saving.value = true
-  let body: Record<string, unknown>
-  if (selectedTarget.value === 'new') {
-    const trimmed = newSlotName.value.trim() || formatDefaultName()
-    body = { mode: 'new', name: trimmed }
-  } else {
-    body = { mode: 'overwrite', slot_id: selectedTarget.value }
-  }
-  const saved = await post<CloudBackupSlot>('/api/settings/cloud-backups', body)
+  const trimmed = newSlotName.value.trim() || formatDefaultName()
+  const saved = await post<CloudBackupSlot>('/api/settings/cloud-backups', {
+    mode: 'new',
+    name: trimmed,
+  })
+  saving.value = false
+  if (!saved) return
+  toast(t('settings.config.cloud_saved'), 'success')
+  nameModalOpen.value = false
+  emit('saved', saved)
+  show.value = false
+}
+
+async function confirmOverwrite() {
+  if (!selectedTarget.value || saving.value) return
+  saving.value = true
+  const saved = await post<CloudBackupSlot>('/api/settings/cloud-backups', {
+    mode: 'overwrite',
+    slot_id: selectedTarget.value,
+  })
   saving.value = false
   if (!saved) return
   toast(t('settings.config.cloud_saved'), 'success')
@@ -138,9 +143,12 @@ async function confirmSave() {
 
 watch(() => props.modelValue, (open) => {
   if (open) {
-    selectedTarget.value = 'new'
+    selectedTarget.value = ''
+    nameModalOpen.value = false
     newSlotName.value = ''
     void fetchSlots()
+  } else {
+    nameModalOpen.value = false
   }
 })
 </script>
@@ -160,6 +168,19 @@ watch(() => props.modelValue, (open) => {
     </EmptyState>
 
     <div v-else class="slot-stack">
+      <AddCard
+        v-if="canCreateNew"
+        inline
+        size="compact"
+        :stretch="false"
+        :label="t('settings.config.new_slot_btn')"
+        @click="openNameModal"
+      />
+
+      <AlertBanner v-else tone="info" dense>
+        {{ t('settings.config.slot_limit_reached', { max: maxManualSlots }) }}
+      </AlertBanner>
+
       <OptionCard
         v-for="slot in manualSlots"
         :key="slot.id"
@@ -173,27 +194,6 @@ watch(() => props.modelValue, (open) => {
           <Badge tone="neutral">{{ slot.gpu_name }}</Badge>
         </template>
       </OptionCard>
-
-      <OptionCard
-        v-if="canCreateNew"
-        variant="bg2"
-        icon="add"
-        :selected="selectedTarget === 'new'"
-        :title="t('settings.config.new_slot_btn')"
-        @toggle="selectNewSlot"
-      />
-
-      <FormField v-if="canCreateNew && selectedTarget === 'new'" :label="t('settings.config.new_slot_placeholder')">
-        <BaseInput
-          v-model="newSlotName"
-          :placeholder="t('settings.config.new_slot_placeholder')"
-          @keydown.enter.prevent="confirmSave"
-        />
-      </FormField>
-
-      <AlertBanner v-if="!canCreateNew" tone="info" dense>
-        {{ t('settings.config.slot_limit_reached', { max: maxManualSlots }) }}
-      </AlertBanner>
     </div>
 
     <template #footer>
@@ -203,9 +203,39 @@ watch(() => props.modelValue, (open) => {
       <BaseButton
         variant="primary"
         size="sm"
+        :loading="saving && !nameModalOpen"
+        :disabled="loadingList || loadError || !selectedTarget"
+        @click="confirmOverwrite"
+      >
+        <MsIcon name="save" /> {{ t('settings.config.confirm_save_btn') }}
+      </BaseButton>
+    </template>
+  </BaseModal>
+
+  <BaseModal
+    v-model="nameModalOpen"
+    :title="t('settings.config.new_slot_btn')"
+    icon="add"
+    size="sm"
+    :z-index="1010"
+  >
+    <FormField :label="t('settings.config.new_slot_placeholder')">
+      <BaseInput
+        v-model="newSlotName"
+        :placeholder="formatDefaultName()"
+        @keydown.enter.prevent="confirmCreateNew"
+      />
+    </FormField>
+
+    <template #footer>
+      <BaseButton variant="ghost" size="sm" @click="nameModalOpen = false">
+        {{ t('common.btn.cancel') }}
+      </BaseButton>
+      <BaseButton
+        variant="primary"
+        size="sm"
         :loading="saving"
-        :disabled="loadingList || loadError"
-        @click="confirmSave"
+        @click="confirmCreateNew"
       >
         <MsIcon name="save" /> {{ t('settings.config.confirm_save_btn') }}
       </BaseButton>

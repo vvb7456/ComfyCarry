@@ -3,10 +3,8 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import FileUploadZone from '@/components/ui/FileUploadZone.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import ListRow, { type ListRowBadge } from '@/components/ui/ListRow.vue'
-import SectionHeader from '@/components/ui/SectionHeader.vue'
 import LoadingCenter from '@/components/ui/LoadingCenter.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -50,7 +48,7 @@ const deletingId = ref('')
 const items = ref<CloudBackupSlot[]>([])
 const pendingRecovery = ref<CloudBackupSlot | null>(null)
 const fileError = ref('')
-const uploadRef = ref<InstanceType<typeof FileUploadZone>>()
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const allSlots = computed<CloudBackupSlot[]>(() => {
   const list: CloudBackupSlot[] = []
@@ -172,14 +170,17 @@ async function deleteSlot(slot: CloudBackupSlot) {
   }
 }
 
-async function onLocalFile(file: File) {
+async function onLocalFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
   fileError.value = ''
   try {
     const text = await file.text()
     const parsed = JSON.parse(text) as ExportedConfig
     if (!parsed || typeof parsed !== 'object' || !parsed._version) {
       fileError.value = t('settings.config.invalid_format')
-      uploadRef.value?.clearFile()
       return
     }
     emit('selectConfig', {
@@ -190,14 +191,12 @@ async function onLocalFile(file: File) {
     show.value = false
   } catch (e: unknown) {
     fileError.value = `${t('settings.config.invalid_format')}: ${errorMessage(e)}`
-    uploadRef.value?.clearFile()
   }
 }
 
 watch(() => props.modelValue, (open) => {
   if (open) {
     fileError.value = ''
-    uploadRef.value?.clearFile()
     void fetchSlots()
   }
 })
@@ -209,9 +208,8 @@ watch(() => props.modelValue, (open) => {
     :title="t('settings.config.cloud_read_modal_title')"
     icon="cloud_download"
     size="lg"
+    footer-align="start"
   >
-    <SectionHeader icon="cloud" flush>{{ t('settings.config.cloud_section_title') }}</SectionHeader>
-
     <LoadingCenter v-if="loadingList" />
 
     <EmptyState v-else-if="loadError" icon="error_outline" :message="t('settings.config.cloud_load_failed')">
@@ -254,17 +252,21 @@ watch(() => props.modelValue, (open) => {
       </ListRow>
     </ul>
 
-    <SectionHeader icon="upload_file">{{ t('settings.config.local_section_title') }}</SectionHeader>
-    <FileUploadZone
-      ref="uploadRef"
-      accept=".json"
-      mode="drop"
-      @file="onLocalFile"
-      @clear="fileError = ''"
-      @error="fileError = $event"
-    />
     <AlertBanner v-if="fileError" tone="danger" dense>
       {{ fileError }}
     </AlertBanner>
+
+    <template #footer>
+      <BaseButton size="sm" @click="fileInputRef?.click()">
+        <MsIcon name="upload" /> {{ t('settings.config.local_section_title') }}
+      </BaseButton>
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept=".json"
+        style="display: none"
+        @change="onLocalFileChange"
+      />
+    </template>
   </BaseModal>
 </template>

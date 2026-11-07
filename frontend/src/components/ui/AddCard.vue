@@ -6,11 +6,13 @@ defineOptions({ name: 'AddCard' })
 const props = withDefaults(defineProps<{
   label?: string
   size?: 'compact' | 'default'
+  inline?: boolean
   disabled?: boolean
   stretch?: boolean
   fill?: boolean
 }>(), {
   size: 'default',
+  inline: false,
   disabled: false,
   stretch: true,
   fill: true,
@@ -33,6 +35,7 @@ function onClick(event: MouseEvent) {
     :class="[
       `add-card--${props.size}`,
       {
+        'add-card--inline': props.inline,
         'add-card--fill': props.fill,
         'add-card--stretch': props.stretch,
         'add-card--disabled': props.disabled,
@@ -81,8 +84,14 @@ function onClick(event: MouseEvent) {
 }
 
 .add-card--compact {
-  padding: 10px 14px;
-  min-height: 56px;
+  padding: 12px 16px;
+  min-height: 52px;
+}
+
+.add-card--inline {
+  flex-direction: row;
+  border-width: 1.5px;
+  font-weight: 500;
 }
 
 .add-card--stretch {
