@@ -4,6 +4,13 @@ set -Eeuo pipefail
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export WORKSPACE_DIR="${WORKSPACE_DIR:-/content}"
 export COMFYUI_DIR="${COMFYUI_DIR:-$WORKSPACE_DIR/ComfyUI}"
+export DRIVE_MOUNT="${DRIVE_MOUNT:-true}"
+export DRIVE_DIR="${DRIVE_DIR:-ComfyCarry}"
+export DRIVE_ROOT="${DRIVE_ROOT:-$WORKSPACE_DIR/drive/MyDrive}"
+export DEV_RELEASE="${DEV_RELEASE:-false}"
+if [[ "${DEV_RELEASE,,}" =~ ^(1|true|yes|on)$ ]] || [[ "${RELEASE_CHANNEL:-}" == "dev" ]]; then
+    export COMFYCARRY_RELEASE_TAG="${COMFYCARRY_RELEASE_TAG:-dev-latest}"
+fi
 export COMFYCARRY_RUNTIME=colab
 export COMFYCARRY_PYTHON="$(command -v python3)"
 export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
@@ -141,6 +148,36 @@ if [[ ! -f "$COMFYUI_DIR/main.py" ]]; then
     say "克隆 ComfyUI"
     COMFYUI_REF="${COMFYUI_REF:-$(git ls-remote --refs --tags https://github.com/Comfy-Org/ComfyUI.git 'v*' | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)}"
     git clone --depth 1 --branch "$COMFYUI_REF" https://github.com/Comfy-Org/ComfyUI.git "$COMFYUI_DIR"
+fi
+
+drive_pairs=(
+    "models:$COMFYUI_DIR/models"
+    "output:$COMFYUI_DIR/output"
+    "input:$COMFYUI_DIR/input"
+    "workflows:$COMFYUI_DIR/user/default/workflows"
+)
+if [[ ! "${DRIVE_MOUNT,,}" =~ ^(0|false|no|off)$ ]] && [[ -d "$DRIVE_ROOT" ]]; then
+    drive_base="$DRIVE_ROOT/${DRIVE_DIR#/}"
+    say "关联 Google Drive 持久化目录 ($drive_base)"
+    for pair in "${drive_pairs[@]}"; do
+        drive_sub="${pair%%:*}"
+        local_dir="${pair#*:}"
+        target_dir="$drive_base/$drive_sub"
+        mkdir -p "$target_dir" "$(dirname "$local_dir")"
+        if [[ -d "$local_dir" && ! -L "$local_dir" ]]; then
+            cp -rn "$local_dir/." "$target_dir/" 2>/dev/null || true
+            rm -rf "$local_dir"
+        fi
+        ln -sfn "$target_dir" "$local_dir"
+    done
+else
+    for pair in "${drive_pairs[@]}"; do
+        local_dir="${pair#*:}"
+        if [[ -L "$local_dir" ]]; then
+            rm -f "$local_dir"
+            mkdir -p "$local_dir"
+        fi
+    done
 fi
 say "安装 ComfyUI 和运行依赖"
 "$COMFYCARRY_PYTHON" -m pip install \

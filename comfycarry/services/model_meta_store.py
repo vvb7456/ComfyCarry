@@ -276,7 +276,22 @@ def _path_fields(model_path: Path, category: str) -> tuple[str, str]:
             continue
         if _is_under(path, root):
             return str(path.relative_to(root)), storage_type
-    return path.name, "primary" if _is_under(path, _resolve(COMFYUI_DIR)) else "extra"
+    return path.name, "primary" if _is_in_primary_model_dir(path) else "extra"
+
+
+def _is_in_primary_model_dir(path: Path) -> bool:
+    comfy = Path(COMFYUI_DIR)
+    if _is_under(path, _resolve(comfy)) or _is_under(path, _resolve(comfy / "models")):
+        return True
+    return any(
+        _is_under(path, root)
+        for _category, root, storage_type in _configured_roots()
+        if storage_type == "primary"
+    )
+
+
+def _can_delete_model(path: Path) -> bool:
+    return _is_under(path, _resolve(WORKSPACE_ROOT)) or _is_in_primary_model_dir(path)
 
 
 def local_preview_path(model_path: str | os.PathLike[str] | Path) -> Path | None:
@@ -374,8 +389,8 @@ def _row_base(row: Any, *, include_path: bool = False) -> dict[str, Any]:
     has_preview = bool(preview)
     d["has_preview"] = has_preview
     d["preview_url"] = f"/api/local_models/{d['id']}/preview" if d["has_preview"] else None
-    d["can_fetch_info"] = _is_under(path, _resolve(COMFYUI_DIR))
-    d["can_delete"] = _is_under(path, _resolve(WORKSPACE_ROOT))
+    d["can_fetch_info"] = _is_in_primary_model_dir(path)
+    d["can_delete"] = _can_delete_model(path)
     d["capabilities"] = {
         "can_fetch_info": d["can_fetch_info"],
         "can_delete": d["can_delete"],
@@ -615,7 +630,7 @@ def delete_model(model_id: int) -> list[str]:
     if not row:
         return []
     model_path = _resolve(row["real_path"])
-    if not _is_under(model_path, _resolve(WORKSPACE_ROOT)):
+    if not _can_delete_model(model_path):
         raise PermissionError("model path is outside the current workspace")
     deleted: list[str] = []
     # The database remains until all file operations have succeeded, so a

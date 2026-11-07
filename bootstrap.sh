@@ -114,8 +114,28 @@ if [ -n "$BUNDLE_DIR" ]; then
 else
 # 拉取一次目标 Release 元数据, 下载地址与 .version 共用 (限流 60 req/h, 不要重复请求)
 RELEASE_JSON=$(wget -qO- "$RELEASE_API" 2>/dev/null || true)
+RELEASE_TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null || true)
+COMMIT_HASH=""
+if [ -n "$RELEASE_TAG" ]; then
+    COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${RELEASE_TAG}" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    print(json.load(sys.stdin).get('sha', ''))
+except Exception:
+    pass
+" 2>/dev/null || true)
+fi
 
-if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
+INSTALLED_VERSION=$(grep '^version=' "$DASHBOARD_DIR/.version" 2>/dev/null | cut -d= -f2- || true)
+INSTALLED_COMMIT=$(grep '^commit=' "$DASHBOARD_DIR/.version" 2>/dev/null | cut -d= -f2- || true)
+VERSION_CHANGED="false"
+if [ -n "$RELEASE_TAG" ] && [ "$INSTALLED_VERSION" != "$RELEASE_TAG" ]; then
+    VERSION_CHANGED="true"
+elif [ -n "$COMMIT_HASH" ] && [ "$INSTALLED_COMMIT" != "$COMMIT_HASH" ]; then
+    VERSION_CHANGED="true"
+fi
+
+if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "$VERSION_CHANGED" = "true" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
     echo "  -> 下载 ComfyCarry (${RELEASE_DESC})..."
     DIST_URL=$(echo "$RELEASE_JSON" | python3 -c "
 import sys, json
@@ -155,20 +175,6 @@ else
     echo "  -> ComfyCarry 文件已存在，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"
 fi
 
-# Write version info (从 latest Release 元数据读取)
-# 注意: target_commitish 是分支名而非 SHA; 真实 commit 用 /commits/<tag>
-# (对 lightweight/annotated tag 均解析到其指向的 commit, 同 update.py Step 6)
-RELEASE_TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null || true)
-COMMIT_HASH=""
-if [ -n "$RELEASE_TAG" ]; then
-    COMMIT_HASH=$(wget -qO- "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${RELEASE_TAG}" 2>/dev/null | python3 -c "
-import sys, json
-try:
-    print(json.load(sys.stdin).get('sha', ''))
-except Exception:
-    pass
-" 2>/dev/null || true)
-fi
 APP_VERSION=$(python3 -c "import re, sys; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open(sys.argv[1]).read()); print(m.group(1) if m else 'unknown')" "$DASHBOARD_DIR/comfycarry/config.py" 2>/dev/null || echo "unknown")
 cat > "$DASHBOARD_DIR/.version" <<EOF
 version=${RELEASE_TAG:-$APP_VERSION}
