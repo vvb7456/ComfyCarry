@@ -5,7 +5,6 @@ set -euo pipefail
 PYTHON_VERSION=3.13
 TORCH_VERSION=2.11.0
 CUDA_VERSION=13.0
-FLASH_VERSION=2.8.3.post2
 SAGE_VERSION=2.2.0
 BUILD_DIR="${BUILD_DIR:-/workspace/attention-wheels}"
 PYTHON="${PYTHON:-python$PYTHON_VERSION}"
@@ -33,11 +32,9 @@ PY
 
 case "$(uname -m)" in
     x86_64)
-        FLASH_ARCHS="80;90;100;120"
         SAGE_ARCHS=(8.0 8.6 8.9 9.0 10.0 12.0)
         ;;
     aarch64)
-        FLASH_ARCHS=120
         SAGE_ARCHS=(12.0)
         ;;
     *)
@@ -45,19 +42,6 @@ case "$(uname -m)" in
         exit 1
         ;;
 esac
-
-build_flash() {
-    local source="$BUILD_DIR/src/flash_attn-$FLASH_VERSION"
-    if [[ ! -d "$source" ]]; then
-        "$PYTHON" -m pip download "flash-attn==$FLASH_VERSION" \
-            --no-deps --no-binary flash-attn --no-build-isolation -d "$BUILD_DIR/src"
-        tar -xzf "$BUILD_DIR/src/flash_attn-$FLASH_VERSION.tar.gz" -C "$BUILD_DIR/src"
-    fi
-    # sm80 cubin 可用于同代 sm86/sm89；GB10 使用同代 sm120 内核。
-    FLASH_ATTENTION_FORCE_BUILD=TRUE FLASH_ATTN_CUDA_ARCHS="$FLASH_ARCHS" \
-        FLASH_ATTN_LOCAL_VERSION="$LOCAL_VERSION" \
-        "$PYTHON" -m pip wheel "$source" --no-deps --no-build-isolation -v -w "$BUILD_DIR/dist"
-}
 
 build_sage() {
     local arch="$1"
@@ -100,17 +84,13 @@ PY
 
 case "$COMPONENT" in
     all)
-        build_flash
         for arch in "${SAGE_ARCHS[@]}"; do build_sage "$arch"; done
-        ;;
-    flash)
-        build_flash
         ;;
     sage)
         build_sage "${2:?需要指定目标架构，例如 8.9 或 12.0}"
         ;;
     *)
-        echo "用法：$0 [all|flash|sage <目标架构>]" >&2
+        echo "用法：$0 [all|sage <目标架构>]" >&2
         exit 1
         ;;
 esac

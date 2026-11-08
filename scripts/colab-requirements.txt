@@ -13,8 +13,8 @@ jupyter-archive
 jupyterlab-language-pack-zh-CN
 packaging
 ninja
-# Colab 自带的 torchao 0.10 缺少新版 diffusers 所需接口；0.17 对应 PyTorch 2.11。
-torchao==0.17.0
+# Colab 旧版自带的 torchao 0.10 缺少新版 diffusers 所需接口。
+torchao>=0.17.0
 nvidia-ml-py
 dynamicprompts==0.30.2
 uuid7

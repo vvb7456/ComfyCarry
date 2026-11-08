@@ -102,14 +102,7 @@ RUN ln -s /usr/bin/python3.13 /usr/local/bin/python3 && \
         jupyterlab-language-pack-zh-CN
 
 # =============================================================================
-# 5. FlashAttention-2 (按 CPU 架构选取预编译 wheel)
-# =============================================================================
-RUN --mount=type=bind,source=docker/wheels,target=/tmp/wheels,ro \
-    python3.13 -m pip install \
-        /tmp/wheels/flash_attn-2.8.3.post2+cu130torch2.11.0-cp313-cp313-linux_$(uname -m).whl
-
-# =============================================================================
-# 6. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
+# 5. SageAttention-2 (预编译 wheel — 按架构分包, 运行时选装)
 # =============================================================================
 COPY docker/wheels/sageattention-2.2.0+cu130torch2.11.0.sm*-cp313-cp313-linux_*.whl /opt/wheels/sa2/
 
@@ -226,7 +219,6 @@ info = { \
     'python': '3.13', \
     'torch': torch.__version__, \
     'cuda_toolkit': torch.version.cuda or '', \
-    'fa2': True, \
     'sa2_archs': ['sm120'] if platform.machine() == 'aarch64' else ['sm80','sm86','sm89','sm90','sm100','sm120'], \
     'base_image': 'nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04', \
     'cuda_build_toolchain': 'cuda-minimal-build-13-0', \

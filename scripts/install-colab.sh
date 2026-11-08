@@ -56,27 +56,37 @@ say() { echo "==> $*"; }
 download() { curl --fail --location --retry 3 --connect-timeout 30 "$1" -o "$2"; }
 
 say "复用 Colab 运行时"
-TORCH_CUDA_ARCH_LIST=$("$COMFYCARRY_PYTHON" - <<'PY'
+read -r TORCH_CUDA_ARCH_LIST RUNTIME_WHEEL_TAG < <("$COMFYCARRY_PYTHON" - <<'PY'
 import json
 import os
 import sys
 from datetime import datetime, timezone
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import torch
 
-if (sys.version_info[:2], torch.__version__.split('+')[0], torch.version.cuda) != ((3, 13), '2.11.0', '13.0'):
-    raise SystemExit("请使用 Python 3.13 / PyTorch 2.11.0 / CUDA 13.0 的 Colab 最新运行时。")
+if not torch.cuda.is_available():
+    raise SystemExit("未检测到可用的 CUDA GPU，请先在 Colab 中选择 GPU 运行时。")
 major, minor = torch.cuda.get_device_capability()
+if (major, minor) < (7, 5):
+    raise SystemExit(f"当前 GPU ({torch.cuda.get_device_name(0)}, sm_{major}{minor}) 算力低于 7.5，不支持运行。")
+torch_ver = torch.__version__.split('+')[0]
+cuda_ver = (torch.version.cuda or '').replace('.', '')
+py_tag = f"py{sys.version_info.major}{sys.version_info.minor}"
+wheel_tag = f"{py_tag}-torch{torch_ver}-cu{cuda_ver}"
 print(f"Python {sys.version.split()[0]} / PyTorch {torch.__version__} / GPU {torch.cuda.get_device_name(0)}", file=sys.stderr)
 # 后续安装 ComfyUI 和插件时保留原生计算环境。
-Path(os.environ['PIP_CONSTRAINT']).write_text(''.join(
-    f'{name}=={version(name)}\n' for name in ('torch', 'torchvision', 'torchaudio', 'triton')
-))
+constraints = []
+for name in ('torch', 'torchvision', 'torchaudio', 'triton'):
+    try:
+        constraints.append(f'{name}=={version(name)}\n')
+    except PackageNotFoundError:
+        pass
+Path(os.environ['PIP_CONSTRAINT']).write_text(''.join(constraints))
 info = {
     "version": "colab", "runtime": "colab", "plugins_preinstalled": False,
-    "torch": torch.__version__, "cuda_toolkit": torch.version.cuda,
-    "fa2": major >= 8,
+    "torch": torch.__version__, "cuda_toolkit": torch.version.cuda or "",
+    "sa2": False,
     "build_date": datetime.now(timezone.utc).isoformat(),
 }
 Path("/opt/.comfycarry-prebuilt").write_text(json.dumps(info, indent=2))
@@ -95,7 +105,7 @@ ipython_config.write_text(
     "c.InteractiveShellApp.exec_lines = []\n"
     "c.InteractiveShellApp.matplotlib = None\n"
 )
-print(f"{major}.{minor}")
+print(f"{major}.{minor} {wheel_tag}")
 PY
 )
 export TORCH_CUDA_ARCH_LIST
@@ -184,30 +194,18 @@ say "安装 ComfyUI 和运行依赖"
     -r "$COMFYUI_DIR/requirements.txt" -r "$INSTALLER_DIR/scripts/colab-requirements.txt"
 
 WHEEL_URL=https://github.com/vvb7456/ComfyCarry/releases/download/wheels-py313-torch2.11.0-cu130
-if (( gpu_cap >= 80 )); then
-    say "安装 FlashAttention-2"
-    fa_wheel="$WORKSPACE_DIR/.cache/flash_attn-2.8.3.post2+cu130torch2.11.0-cp313-cp313-linux_x86_64.whl"
-    mkdir -p "$(dirname "$fa_wheel")"
-    if [[ ! -f "$fa_wheel" ]]; then
-        download "$WHEEL_URL/$(basename "$fa_wheel")" "$fa_wheel"
-    fi
-    printf '%s  %s\n' 3836b5ea48723fb64a8df461e7d7e1054d122651e73e1e0a08adf7edc165ce1b "$fa_wheel" | sha256sum -c -
-    "$COMFYCARRY_PYTHON" -m pip install --no-deps "$fa_wheel"
-    "$COMFYCARRY_PYTHON" -c 'import flash_attn; print(f"FlashAttention-2 {flash_attn.__version__}")'
-else
-    say "使用默认 Attention"
-fi
-
-while read -r arch digest; do
-    [[ "$arch" == "sm$gpu_cap" ]] || continue
-    say "安装 SageAttention-2 ($arch)"
-    sa_wheel="$WORKSPACE_DIR/.cache/sageattention-2.2.0+cu130torch2.11.0.${arch}-cp313-cp313-linux_x86_64.whl"
-    if [[ ! -f "$sa_wheel" ]]; then
-        download "$WHEEL_URL/$(basename "$sa_wheel")" "$sa_wheel"
-    fi
-    printf '%s  %s\n' "$digest" "$sa_wheel" | sha256sum -c -
-    "$COMFYCARRY_PYTHON" -m pip install --no-deps "$sa_wheel"
-done <<'WHEELS'
+if [[ "$RUNTIME_WHEEL_TAG" == "py313-torch2.11.0-cu130" ]]; then
+    while read -r arch digest; do
+        [[ "$arch" == "sm$gpu_cap" ]] || continue
+        say "安装 SageAttention-2 ($arch)"
+        sa_wheel="$WORKSPACE_DIR/.cache/sageattention-2.2.0+cu130torch2.11.0.${arch}-cp313-cp313-linux_x86_64.whl"
+        mkdir -p "$(dirname "$sa_wheel")"
+        if [[ ! -f "$sa_wheel" ]]; then
+            download "$WHEEL_URL/$(basename "$sa_wheel")" "$sa_wheel"
+        fi
+        printf '%s  %s\n' "$digest" "$sa_wheel" | sha256sum -c -
+        "$COMFYCARRY_PYTHON" -m pip install --no-deps "$sa_wheel"
+    done <<'WHEELS'
 sm80 eae6018ba9cb3e2db6a909b6317c45c8edad36b56114e2b0492ffb264e05395d
 sm86 88952d2bf104d447dca86204b9fa1f1f49332f177b95202044eff0e8ea117a91
 sm89 0ea5c67e5d39d3921f981736db1ede13355a24e4550b7d3e5f209d32c0063138
@@ -215,6 +213,19 @@ sm90 17c528976e236b17814e219db60025ba55f7b13d3b7d9186549dc33c0a21cff7
 sm100 ad93884995a1661e9641cc47c1abb977cf54b9a1b74418cec8b589941f5d8b1a
 sm120 89e726e0ec7d1cd2094d1513daa7877351123956f6e7d2eb48f52d06fc585547
 WHEELS
+elif (( gpu_cap >= 80 )); then
+    say "当前运行时 ($RUNTIME_WHEEL_TAG) 无预编译 SageAttention-2 wheel，跳过预装"
+fi
+"$COMFYCARRY_PYTHON" - <<'PY'
+import importlib.util
+import json
+from pathlib import Path
+
+prebuilt_path = Path("/opt/.comfycarry-prebuilt")
+info = json.loads(prebuilt_path.read_text())
+info["sa2"] = importlib.util.find_spec("sageattention") is not None
+prebuilt_path.write_text(json.dumps(info, indent=2))
+PY
 
 mkdir -p /run/sshd
 ssh-keygen -A

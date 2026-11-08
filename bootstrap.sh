@@ -30,7 +30,8 @@ if [ ! -f /opt/.comfycarry-prebuilt ]; then
     echo "  未检测到 ComfyCarry 预构建镜像"
     echo "  请使用官方预构建镜像: erocraft/comfycarry"
 fi
-PYTHON_BIN="${COMFYCARRY_PYTHON:-python3}"
+export COMFYCARRY_PYTHON="${COMFYCARRY_PYTHON:-$(command -v python3)}"
+PYTHON_BIN="$COMFYCARRY_PYTHON"
 
 # SSH 已由 entrypoint.sh 处理 (SSH Key + sshd)
 

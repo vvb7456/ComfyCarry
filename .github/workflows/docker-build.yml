@@ -165,9 +165,6 @@ jobs:
           mkdir -p docker/wheels
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
 
-          echo ">>> Downloading FA2 wheel..."
-          wget -q -P docker/wheels "${RELEASE_URL}/flash_attn-2.8.3.post2+cu130torch2.11.0-cp313-cp313-linux_${{ matrix.wheel_arch }}.whl"
-
           echo ">>> Downloading SA2 wheels..."
           for arch in ${{ matrix.sa_archs }}; do
             whl="sageattention-2.2.0+cu130torch2.11.0.${arch}-cp313-cp313-linux_${{ matrix.wheel_arch }}.whl"

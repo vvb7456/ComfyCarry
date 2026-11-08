@@ -33,18 +33,6 @@ function onPrev() { prevStep() }
 
       <OptionCard
         class="step-attn__card"
-        icon="local_fire_department"
-        title="FlashAttention-2"
-        :description="t('wizard.step8.fa2_desc')"
-        :selected="config.attention === 'flash'"
-        :disabled="!supportsAcceleratedAttention"
-        @toggle="config.attention = 'flash'"
-      >
-        <div class="step-attn__param">{{ t('wizard.step8.fa2_param') }}</div>
-      </OptionCard>
-
-      <OptionCard
-        class="step-attn__card"
         icon="eco"
         title="SageAttention-2"
         :description="t('wizard.step8.sa2_desc')"
@@ -61,7 +49,7 @@ function onPrev() { prevStep() }
 <style scoped>
 .step-attn__cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 

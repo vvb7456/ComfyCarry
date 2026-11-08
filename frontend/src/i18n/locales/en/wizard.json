@@ -166,8 +166,6 @@
     "desc": "Choose the Attention backend used when launching ComfyUI",
     "default_title": "Default",
     "default_desc": "PyTorch SDPA",
-    "fa2_desc": "High-performance Attention implementation, widely supported",
-    "fa2_param": "Launch param: --use-flash-attention",
     "sa2_desc": "Next-gen Attention solution, faster in some scenarios",
     "sa2_param": "Launch param: --use-sage-attention"
   },

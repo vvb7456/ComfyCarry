@@ -50,13 +50,17 @@ const pendingRecovery = ref<CloudBackupSlot | null>(null)
 const fileError = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+function isRecoverySlot(slot: CloudBackupSlot): boolean {
+  return Boolean(slot.is_auto || slot.slot_type === 'recovery' || slot.id?.startsWith('recovery-'))
+}
+
 const allSlots = computed<CloudBackupSlot[]>(() => {
   const list: CloudBackupSlot[] = []
   if (pendingRecovery.value) {
     list.push(pendingRecovery.value)
   }
   for (const item of items.value) {
-    if (!item.is_auto) {
+    if (!isRecoverySlot(item)) {
       list.push(item)
     }
   }
@@ -64,7 +68,7 @@ const allSlots = computed<CloudBackupSlot[]>(() => {
 })
 
 function slotDisplayName(slot: CloudBackupSlot): string {
-  if (slot.is_auto || slot.slot_type === 'recovery') {
+  if (isRecoverySlot(slot)) {
     return t('settings.config.recovery_slot_name')
   }
   return slot.name
@@ -72,7 +76,7 @@ function slotDisplayName(slot: CloudBackupSlot): string {
 
 function slotBadges(slot: CloudBackupSlot): ListRowBadge[] {
   const badges: ListRowBadge[] = []
-  if (slot.is_auto) {
+  if (isRecoverySlot(slot)) {
     badges.push({ text: t('settings.config.recovery_slot_badge'), tone: 'caution' })
   }
   if (slot.gpu_name) {
@@ -125,7 +129,7 @@ async function fetchSlots() {
 async function chooseSlot(slot: CloudBackupSlot) {
   if (loadingSlotId.value) return
   const label = slotDisplayName(slot)
-  const isRecovery = Boolean(slot.is_auto || slot.slot_type === 'recovery' || slot.id.startsWith('recovery-'))
+  const isRecovery = isRecoverySlot(slot)
   const embedded = slot.config_json || slot.payload
   if (embedded && embedded._version) {
     emit('selectConfig', {
@@ -153,7 +157,7 @@ async function chooseSlot(slot: CloudBackupSlot) {
 }
 
 async function deleteSlot(slot: CloudBackupSlot) {
-  if (slot.is_auto) return
+  if (isRecoverySlot(slot)) return
   const ok = await confirm({
     title: t('settings.config.delete_slot_confirm_title'),
     message: t('settings.config.delete_slot_confirm_msg', { name: slot.name }),
@@ -222,7 +226,7 @@ watch(() => props.modelValue, (open) => {
       <ListRow
         v-for="slot in allSlots"
         :key="slot.id"
-        :icon="slot.is_auto ? 'cloud_sync' : 'inventory_2'"
+        :icon="isRecoverySlot(slot) ? 'cloud_sync' : 'inventory_2'"
         :title="slotDisplayName(slot)"
         :badges="slotBadges(slot)"
         :facts="slotFacts(slot)"
@@ -237,7 +241,7 @@ watch(() => props.modelValue, (open) => {
             {{ t('settings.config.restore_slot_btn') }}
           </BaseButton>
           <BaseButton
-            v-if="!slot.is_auto"
+            v-if="!isRecoverySlot(slot)"
             variant="ghost"
             size="sm"
             icon-only

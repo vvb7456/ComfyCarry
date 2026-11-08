@@ -19,7 +19,7 @@ const icons: Record<DeployStep['status'], IconName> = {
 }
 
 function translateStep(name: string): string {
-  // Handle "install_attn:FA2/SA2" format
+  // Handle "install_attn:SA2" format
   if (name.startsWith('install_attn:')) {
     const parts = name.slice('install_attn:'.length)
     return t('wizard.steps.install_attn', { parts })

@@ -96,13 +96,12 @@
       },
       "attention": {
         "label": "Attention 方案",
-        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。也可选择 FlashAttention 或 SageAttention。",
+        "help": "PyTorch SDPA 为推荐方案，会自动调用更优内核。也可选择 SageAttention。",
         "options": {
           "default": "默认",
           "pytorch-cross": "PyTorch SDPA",
           "split-cross": "Split Cross Attention",
           "quad-cross": "Sub-Quadratic",
-          "flash": "FlashAttention",
           "sage": "SageAttention"
         }
       },

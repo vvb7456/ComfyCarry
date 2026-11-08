@@ -212,13 +212,16 @@ def scan_installed_plugins() -> tuple[list[str], list[str]]:
         if u != "comfycarry_ws_broadcast"
     }
 
+    with _cloning_lock:
+        cloning_urls = set(_cloning_plugin_urls)
+
     for p in DEFAULT_PLUGINS:
         url = p["url"]
         if url == "comfycarry_ws_broadcast":
             continue
         dir_name = url.rstrip("/").split("/")[-1].removesuffix(".git")
         default_dir_names_folded.add(dir_name.casefold())
-        if not (nodes_dir / dir_name).is_dir() or (nodes_dir / f"{dir_name}.disabled").exists():
+        if (not (nodes_dir / dir_name).is_dir() and url not in cloning_urls) or (nodes_dir / f"{dir_name}.disabled").exists():
             disabled_default_plugins.append(url)
 
     repo_map = _get_config("plugin_repo_map", {})
@@ -285,6 +288,7 @@ def apply_imported_plugins_on_disk(
     if not nodes_dir.is_dir():
         return
     disabled_set = set(disabled_default_plugins or [])
+    missing_urls: list[tuple[str, Path]] = []
     for dp in DEFAULT_PLUGINS:
         d_url = dp["url"]
         if d_url == "comfycarry_ws_broadcast" or dp.get("required"):
@@ -298,8 +302,9 @@ def apply_imported_plugins_on_disk(
         else:
             if disabled_dir.is_dir() and not active_dir.exists():
                 disabled_dir.rename(active_dir)
+            elif not active_dir.exists():
+                missing_urls.append((d_url, active_dir))
 
-    missing_urls: list[tuple[str, Path]] = []
     for raw_url in extra_plugins or []:
         norm = normalize_git_url(str(raw_url or ""))
         if not norm or norm == "comfycarry_ws_broadcast":

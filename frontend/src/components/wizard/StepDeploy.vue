@@ -13,7 +13,13 @@ import AlertBanner from '@/components/ui/AlertBanner.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import CloudReadConfigModal from '@/components/settings/CloudReadConfigModal.vue'
-import type { CloudBackupSlot, CloudBackupsListResponse, CloudBackupSummary, ExportedConfig } from '@/types/config-export'
+import type {
+  CloudBackupDetailResponse,
+  CloudBackupSlot,
+  CloudBackupsListResponse,
+  CloudBackupSummary,
+  ExportedConfig,
+} from '@/types/config-export'
 
 defineOptions({ name: 'StepDeploy' })
 
@@ -32,6 +38,7 @@ const readModalOpen = ref(false)
 const uploadRef = ref<InstanceType<typeof FileUploadZone>>()
 const pendingRecovery = ref<CloudBackupSlot | null>(null)
 const dismissingRecovery = ref(false)
+const applyingRecovery = ref(false)
 
 function formatDate(iso: string): string {
   if (!iso) return ''
@@ -71,19 +78,31 @@ watch(managedTunnel, (isManaged) => {
   }
 }, { immediate: true })
 
-function applyPendingRecovery() {
+async function applyPendingRecovery() {
   const snap = pendingRecovery.value
-  if (!snap) return
-  const payload = snap.config_json || snap.payload
-  if (!payload) return
+  if (!snap || applyingRecovery.value) return
   importError.value = ''
+  let payload = snap.config_json || snap.payload
+  if (!payload || !payload._version) {
+    applyingRecovery.value = true
+    const detail = await get<CloudBackupDetailResponse>(
+      `/api/settings/cloud-backups/${encodeURIComponent(snap.id)}`,
+    )
+    applyingRecovery.value = false
+    payload = detail?.config_json
+  }
+  if (!payload) {
+    selectedMode.value = 'import'
+    importError.value = t('wizard.import.invalid_format')
+    return
+  }
   const label = t('settings.config.recovery_slot_name')
   const result = applyImportedConfig(payload, label)
+  selectedMode.value = 'import'
   if (!result.ok) {
     importError.value = result.message
     return
   }
-  selectedMode.value = 'import'
   nextStep()
 }
 
@@ -167,7 +186,7 @@ function onNext() {
     <EnvInfoCard :gpu-info="gpuInfo ?? undefined" :prebuilt-info="prebuiltInfo ?? undefined" />
 
     <BaseCard
-      v-if="!isUnsupported && managedTunnel && pendingRecovery"
+      v-if="!isUnsupported && managedTunnel && pendingRecovery && !importedConfig"
       variant="bg2"
       density="compact"
       class="step-deploy__recovery"
@@ -183,6 +202,7 @@ function onNext() {
             <BaseButton
               size="sm"
               :loading="dismissingRecovery"
+              :disabled="applyingRecovery"
               @click="dismissPendingRecovery"
             >
               {{ t('wizard.step0.recovery.dismiss_btn') }}
@@ -190,6 +210,8 @@ function onNext() {
             <BaseButton
               variant="primary"
               size="sm"
+              :loading="applyingRecovery"
+              :disabled="dismissingRecovery"
               @click="applyPendingRecovery"
             >
               <MsIcon name="bolt" size="xs" /> {{ t('wizard.step0.recovery.restore_btn') }}

@@ -107,9 +107,14 @@ def _detect_gpu_info():
 
 def supports_attention_accelerators(cuda_cap):
     try:
-        return float(cuda_cap) >= 8.0
+        if float(cuda_cap) < 8.0:
+            return False
     except (TypeError, ValueError):
         return False
+    prebuilt = _read_prebuilt_info()
+    if isinstance(prebuilt, dict) and prebuilt.get("sa2") is False:
+        return False
+    return True
 
 
 def _deploy_log(msg, level="info"):
@@ -551,15 +556,9 @@ def _step_accelerators(PY):
         _deploy_step("install_attn_skip")
         return
 
-    _deploy_step("install_attn:FA2/SA2")
+    _deploy_step("install_attn:SA2")
     _deploy_log(f"GPU: {gpu_info.get('name', '?')} | CUDA Cap: {cuda_cap}")
 
-    _deploy_log("验证预装 FlashAttention-2...")
-    _deploy_exec(
-        f'{PY} -c "import flash_attn; '
-        f'print(f\\"FA2 v{{flash_attn.__version__}}\\")"',
-        label="检查 FA2"
-    )
     _install_sa2(PY, cuda_cap)
 
     _deploy_log("加速组件安装流程结束")
@@ -809,13 +808,12 @@ def _build_launch_args(config, cuda_cap):
         # 换到 Turing 实例时只移除不支持的加速方案，其余导入参数保留。
         return shlex.join([
             arg for arg in shlex.split(imported_args)
-            if arg not in ("--use-flash-attention", "--use-sage-attention")
+            if arg != "--use-sage-attention"
         ])
 
     args = DEFAULT_COMFYUI_ARGS
     if supported:
         attn_flag = {
-            "flash": "--use-flash-attention",
             "sage": "--use-sage-attention",
         }.get(config.get("attention", "default"), "")
         if attn_flag:

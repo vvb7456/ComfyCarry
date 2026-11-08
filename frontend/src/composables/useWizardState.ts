@@ -52,7 +52,8 @@ const config = reactive<WizardConfig>(createDefaultConfig())
 const currentStep = ref(0)
 const gpuInfo = ref<GpuInfo | null>(null)
 const supportsAcceleratedAttention = computed(() =>
-  Number.parseFloat(gpuInfo.value?.cuda_cap ?? '') >= 8.0,
+  Number.parseFloat(gpuInfo.value?.cuda_cap ?? '') >= 8.0
+  && prebuiltInfo.value?.sa2 !== false,
 )
 const prebuiltInfo = ref<PrebuiltInfo | null>(null)
 const detectedImageType = ref<DetectedImageType>('prebuilt')
@@ -105,7 +106,7 @@ export function useWizardState() {
       if (mockParam) {
         if (mockParam === 'prebuilt') {
           detectedImageType.value = 'prebuilt'
-          prebuiltInfo.value = { version: '3.0', torch: '2.9.1+cu130', cuda_toolkit: '13.0', fa2: true, build_date: '2026-02-20T00:00:00Z' }
+          prebuiltInfo.value = { version: '3.0', torch: '2.9.1+cu130', cuda_toolkit: '13.0', build_date: '2026-02-20T00:00:00Z' }
         } else if (mockParam === 'unsupported') {
           detectedImageType.value = 'unsupported'
           prebuiltInfo.value = null

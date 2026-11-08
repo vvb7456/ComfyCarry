@@ -168,7 +168,6 @@ const sections = computed<SummarySection[]>(() => {
         {
           label: t('wizard.summary.attn'),
           value: c.comfyui_args ? t('wizard.summary.attn_imported')
-            : c.attention === 'flash' ? 'FlashAttention-2'
             : c.attention === 'sage' ? 'SageAttention-2' : t('wizard.step8.default_title'),
           active: true,
         },

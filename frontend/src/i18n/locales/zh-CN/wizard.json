@@ -166,8 +166,6 @@
     "desc": "选择 ComfyUI 启动时使用的 Attention 方案",
     "default_title": "默认",
     "default_desc": "PyTorch SDPA",
-    "fa2_desc": "高性能 Attention 实现，广泛支持",
-    "fa2_param": "启动参数：--use-flash-attention",
     "sa2_desc": "新一代 Attention 方案，部分场景更快",
     "sa2_param": "启动参数：--use-sage-attention"
   },

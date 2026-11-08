@@ -12,7 +12,7 @@ export interface PrebuiltInfo {
   version: string
   torch: string
   cuda_toolkit: string
-  fa2: boolean
+  sa2?: boolean
   build_date: string
 }
 
@@ -66,7 +66,7 @@ export interface WizardConfig {
   rclone_config_value: string
   civitai_token: string
   plugins: string[]
-  attention: 'default' | 'flash' | 'sage'
+  attention: 'default' | 'sage'
   comfyui_args: string
   ssh_keys: string[]
   wizard_sync_rules: WizardSyncRule[]

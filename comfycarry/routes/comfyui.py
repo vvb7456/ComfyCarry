@@ -99,7 +99,7 @@ def api_comfyui_params_get():
             if "options" in gv:
                 opts = list(gv["options"])
                 if gk == "attention" and not attn_supported:
-                    opts = [o for o in opts if o[0] not in ("flash", "sage")]
+                    opts = [o for o in opts if o[0] != "sage"]
                 schema[gk]["options"] = opts
             if "depends_on" in gv:
                 schema[gk]["depends_on"] = gv["depends_on"]
