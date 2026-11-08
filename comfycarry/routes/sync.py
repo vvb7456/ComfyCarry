@@ -15,6 +15,7 @@ from flask import Blueprint, jsonify, request, Response
 from ..utils import api_err
 from ..config import (
     SYNC_RULE_TEMPLATES, REMOTE_TYPE_DEFS,
+    DEFAULT_GDRIVE_CLIENT_ID, DEFAULT_GDRIVE_CLIENT_SECRET,
     SYNC_RULE_DIRECTIONS, SYNC_RULE_METHODS, SYNC_RULE_TRIGGERS,
     REMOTE_ROOT_DIR_KEY, normalize_remote_root_dir,
     resolve_workspace_path, normalize_file_path, WORKSPACE_ROOT,
@@ -348,6 +349,9 @@ def _oauth_check_timeout():
 def _oauth_spawn(remote_type: str, client_id: str, client_secret: str) -> dict:
     """拉起 rclone authorize + 两个读线程。调用方需持有 _oauth_lock。"""
     global _oauth_session
+    if remote_type == "drive" and not (client_id and client_secret):
+        client_id = DEFAULT_GDRIVE_CLIENT_ID
+        client_secret = DEFAULT_GDRIVE_CLIENT_SECRET
     cmd = ["rclone", "authorize", remote_type]
     if remote_type == "drive" and client_id and client_secret:
         cmd += [client_id, client_secret]

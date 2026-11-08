@@ -526,6 +526,16 @@ SYNC_RULE_TEMPLATES = [
 # rclone remote 名 / 类型 / 配置键的合法字符集
 _RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
+# Google Drive 官方内置 OAuth 凭据 (未填写高级自定义 Client ID 时自动使用)
+DEFAULT_GDRIVE_CLIENT_ID = os.environ.get(
+    "COMFYCARRY_GDRIVE_CLIENT_ID",
+    "138048408901-cidep01hacrqvuoik806bkqq3ngdmp60.apps.googleusercontent.com",
+)
+DEFAULT_GDRIVE_CLIENT_SECRET = os.environ.get(
+    "COMFYCARRY_GDRIVE_CLIENT_SECRET",
+    "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",
+)
+
 REMOTE_TYPE_DEFS = {
     "s3": {
         "label": "S3 / Cloudflare R2",
