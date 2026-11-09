@@ -138,33 +138,38 @@ export function useGenerateSubmit(
           return fail(t('generate.error.minimax_h3_refs_total_too_many', { limit: 12, current: refs.length }))
         }
       }
-      return true
+    } else {
+      if (selectedPackaging === 'split') {
+        if (!state.unet || !state.clip || !state.vae) {
+          return fail(t('generate.error.no_split_models'))
+        }
+        // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
+        if (activeConfig?.dualClip && !state.clip2) {
+          return fail(t('generate.error.no_split_models'))
+        }
+      } else {
+        if (!state.checkpoint) {
+          return fail(t('generate.error.no_checkpoint'))
+        }
+      }
+      if (!state.positive.trim()) {
+        return fail(t('generate.error.no_prompt'))
+      }
     }
 
-    if (selectedPackaging === 'split') {
-      if (!state.unet || !state.clip || !state.vae) {
-        return fail(t('generate.error.no_split_models'))
-      }
-      // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
-      if (activeConfig?.dualClip && !state.clip2) {
-        return fail(t('generate.error.no_split_models'))
-      }
-    } else {
-      if (!state.checkpoint) {
-        return fail(t('generate.error.no_checkpoint'))
-      }
-    }
-    if (!state.positive.trim()) {
-      return fail(t('generate.error.no_prompt'))
-    }
+    const isCnSupported = (type: string) => Boolean(
+      activeConfig?.controlNetEnabled
+      && (!activeConfig.controlTypes || activeConfig.controlTypes.includes(type)),
+    )
+    const isI2iSupported = Boolean(activeConfig?.modules.includes('i2i'))
 
     const inactiveModules: string[] = []
     for (const [type, cn] of Object.entries(state.controlNets)) {
-      if (!cn.enabled && cn.image) {
+      if (isCnSupported(type) && !cn.enabled && cn.image) {
         inactiveModules.push(t(`generate.modules.${type}`))
       }
     }
-    if (!state.i2i.enabled && state.i2i.image) {
+    if (isI2iSupported && !state.i2i.enabled && state.i2i.image) {
       inactiveModules.push(t('generate.modules.i2i'))
     }
 
@@ -179,7 +184,7 @@ export function useGenerateSubmit(
     }
 
     for (const [type, cn] of Object.entries(state.controlNets)) {
-      if (cn.enabled) {
+      if (isCnSupported(type) && cn.enabled) {
         if (!cn.model) {
           return fail(t('generate.error.cn_no_model', { type }))
         }
@@ -189,11 +194,11 @@ export function useGenerateSubmit(
       }
     }
 
-    if (state.i2i.enabled && !state.i2i.image) {
+    if (isI2iSupported && state.i2i.enabled && !state.i2i.image) {
       return fail(t('generate.error.i2i_no_ref'))
     }
 
-    if (state.i2i.enabled && state.i2i.image && state.i2i.mode === 'inpaint' && !state.i2i.mask) {
+    if (isI2iSupported && state.i2i.enabled && state.i2i.image && state.i2i.mode === 'inpaint' && !state.i2i.mask) {
       const proceed = await confirm({
         title: t('generate.confirm.inpaint_no_mask.title'),
         message: t('generate.confirm.inpaint_no_mask.message'),

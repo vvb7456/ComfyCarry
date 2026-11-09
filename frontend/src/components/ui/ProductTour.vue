@@ -23,7 +23,6 @@ import BaseButton from './BaseButton.vue'
 
 defineOptions({ name: 'ProductTour' })
 
-// 类型从组件文件导出（先例：DropdownMenu.vue 导出 DropdownMenuItem）
 export interface TourStep {
   /** 聚光目标的 CSS 选择器；缺省 = 欢迎卡（屏幕居中，无聚光洞） */
   target?: string

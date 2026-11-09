@@ -639,30 +639,27 @@ async function guideToProblem() {
     }
   }
 
-  for (const [type, cn] of Object.entries(st.controlNets)) {
-    if (cn.enabled) {
-      if (!cn.model) {
-        st.activeModule = type
-        await flashTargets([`[data-guide="cn-panel-${type}"] [data-guide="cn-model"]`])
-        return
-      }
-      if (!cn.image) {
-        st.activeModule = type
-        await flashTargets([`[data-guide="cn-panel-${type}"] [data-guide="cn-image"]`])
-        return
+  if (config.value.controlNetEnabled) {
+    for (const [type, cn] of Object.entries(st.controlNets)) {
+      if (config.value.controlTypes && !config.value.controlTypes.includes(type)) continue
+      if (cn.enabled) {
+        if (!cn.model) {
+          st.activeModule = type
+          await flashTargets([`[data-guide="cn-panel-${type}"] [data-guide="cn-model"]`])
+          return
+        }
+        if (!cn.image) {
+          st.activeModule = type
+          await flashTargets([`[data-guide="cn-panel-${type}"] [data-guide="cn-image"]`])
+          return
+        }
       }
     }
   }
 
-  if (st.i2i.enabled && !st.i2i.image) {
+  if (config.value.modules.includes('i2i') && st.i2i.enabled && !st.i2i.image) {
     st.activeModule = 'i2i'
     await flashTargets(['[data-guide="i2i-image"]'])
-    return
-  }
-
-  if (st.loras.some(l => l.enabled && store.isMissing('lora', l.name))) {
-    st.activeModule = 'lora'
-    await flashTargets(['[data-guide="lora-missing"]'])
   }
 }
 

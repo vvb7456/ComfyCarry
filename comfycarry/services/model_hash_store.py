@@ -1,6 +1,6 @@
 """工作区文件指纹表：键为表一 files 中的原路径，值为实际文件的 SHA256。
 
-辅助文件不一定进入模型索引；有索引的复用哈希缓存，其余直接读取文件。
+所有本地文件均通过 models 表统一维护与缓存 SHA256。
 导入后尚未补齐的文件保留原指纹，便于再次导出。
 """
 
@@ -33,16 +33,33 @@ def referenced_paths(state: Any) -> set[str]:
 
 
 def scan_model_hashes(state: Any) -> dict[str, str]:
-    """表二直接以表一的原路径为键，不使用模型索引的分类路径。"""
+    """表二直接以表一的原路径为键，统一通过模型索引表读取或计算并缓存哈希。"""
     from ..utils import _sha256_file
-    from .model_meta_store import get_or_compute_model_sha256
+    from .model_meta_store import (
+        get_or_compute_model_sha256,
+        reconcile_model_index,
+        register_downloaded_model,
+    )
 
+    paths = referenced_paths(state)
+    if not paths:
+        return {}
+
+    reconcile_model_index(min_interval=10)
     result: dict[str, str] = {}
-    for path in referenced_paths(state):
+    for path in paths:
         real_path = os.path.realpath(resolve_file_path(path))
         row = db.fetch_one("SELECT id FROM models WHERE real_path = ?", (real_path,))
-        sha = (get_or_compute_model_sha256(int(row["id"]), real_path, _sha256_file)
-               if row else _sha256_file(real_path))
+        if row:
+            model_id = int(row["id"])
+        elif os.path.isfile(real_path):
+            detail = register_downloaded_model(real_path, "auxiliary", {}, "", [])
+            model_id = int(detail["id"]) if detail.get("id") is not None else None
+        else:
+            model_id = None
+        if model_id is None:
+            continue
+        sha = get_or_compute_model_sha256(model_id, real_path, _sha256_file)
         if sha:
             result[path] = sha.upper()
     return result

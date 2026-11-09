@@ -100,7 +100,6 @@ interface ArchCardItem {
   label: string
   desc: string
   logo?: string
-  logoInvertDark?: boolean
   letter: string
   familyLabel?: string
   isVideoArch: boolean
@@ -198,7 +197,6 @@ const modalItems = computed<ArchCardItem[]>(() => {
       label: t(`generate.tabs.${cfg.key}`),
       desc: t(`generate.arch.desc.${cfg.key}`),
       logo: cfg.logo,
-      logoInvertDark: cfg.logoInvertDark,
       letter: cfg.label.slice(0, 2) || cfg.key.slice(0, 2).toUpperCase(),
       familyLabel,
       isVideoArch: cfg.mediaType === 'video',

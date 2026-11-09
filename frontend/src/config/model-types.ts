@@ -64,9 +64,6 @@ export interface ModelTypeConfig {
   extraParams?: Record<string, string | number | boolean>
   /** Logo 资产 URL (静态 import); 缺省走字母徽章 */
   logo?: string
-  /** 暗色主题下 logo 反色 (仅纯黑/单色 logo): true → filter: invert(1)
-   *  且底板改用透明/深色; 彩色 logo 不应启用 */
-  logoInvertDark?: boolean
   /** 软架构: 所属家族 key (如 'sdxl'); 有此字段 = 二级条目 (衍生)。
    *  家族 key 可以不对应 MODEL_TYPES 中的条目 (如 'flux2' 是纯分组, 无同名可选架构)。 */
   familyOf?: string
