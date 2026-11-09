@@ -339,13 +339,16 @@ const execState = computed(() => tracker.state.value)
 const taskRegistry = useTaskRegistry()
 const preview = useGeneratePreview()
 
-const { submitting, submit, validate, buildPayload } = useGenerateSubmit(execState, options)
+const { submitting, submit, validate, buildPayload } = useGenerateSubmit(
+  execState,
+  options,
+  () => void activeTabRef()?.guideToProblem(),
+)
 
 async function handleRun(mode: string) {
   // 分流: background 模式走后台 start; 其余走现有 submit() 路径 (live 的 scheduleLiveRerun 不动)
   if (mode === 'background') {
     if (!(await validate())) {
-      void activeTabRef()?.guideToProblem()
       return
     }
     const payload = buildPayload({ randomSeedWriteback: false })
@@ -359,8 +362,6 @@ async function handleRun(mode: string) {
   if (promptId) {
     taskRegistry.registerTask(promptId, 'main')
     preview.clearPreview()
-  } else {
-    void activeTabRef()?.guideToProblem()
   }
 }
 

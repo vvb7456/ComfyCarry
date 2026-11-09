@@ -97,7 +97,7 @@ async function applyPendingRecovery() {
     return
   }
   const label = t('settings.config.recovery_slot_name')
-  const result = applyImportedConfig(payload, label)
+  const result = applyImportedConfig({ ...payload, _from_recovery: true } as ExportedConfig, label)
   selectedMode.value = 'import'
   if (!result.ok) {
     importError.value = result.message
@@ -136,9 +136,12 @@ function selectMode(m: 'fresh' | 'import') {
   }
 }
 
-function onSelectCloudOrFileConfig(payload: { config: ExportedConfig; label: string; source: 'cloud' | 'file' }) {
+function onSelectCloudOrFileConfig(payload: { config: ExportedConfig; label: string; source: 'cloud' | 'file'; isRecovery?: boolean }) {
   importError.value = ''
-  const result = applyImportedConfig(payload.config, payload.label)
+  const cfg = payload.isRecovery
+    ? ({ ...payload.config, _from_recovery: true } as ExportedConfig)
+    : payload.config
+  const result = applyImportedConfig(cfg, payload.label)
   if (!result.ok) {
     importError.value = result.message
   } else {

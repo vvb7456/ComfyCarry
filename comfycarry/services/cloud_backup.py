@@ -321,28 +321,51 @@ def apply_imported_plugins_on_disk(
             missing_urls.append((norm, target_dir))
 
     if missing_urls:
+        pending_urls: list[tuple[str, Path]] = []
         with _cloning_lock:
-            for url, _ in missing_urls:
-                _cloning_plugin_urls.add(url)
+            for url, target_dir in missing_urls:
+                if url not in _cloning_plugin_urls:
+                    _cloning_plugin_urls.add(url)
+                    pending_urls.append((url, target_dir))
+
+        if not pending_urls:
+            return
 
         def _bg_clone():
-            for url, target_dir in missing_urls:
+            for url, target_dir in pending_urls:
                 try:
-                    subprocess.run(
+                    clone_res = subprocess.run(
                         ["git", "clone", "--recursive", url, str(target_dir)],
                         cwd=str(nodes_dir),
                         capture_output=True,
+                        text=True,
                         timeout=180,
                     )
+                    if clone_res.returncode != 0:
+                        log.warning(
+                            "[cloud_backup] 导入后后台克隆插件 %s 失败 (code=%s): %s",
+                            url,
+                            clone_res.returncode,
+                            (clone_res.stderr or clone_res.stdout or "").strip(),
+                        )
+                        continue
                     req_file = target_dir / "requirements.txt"
                     if req_file.is_file():
                         from .deploy_engine import _detect_python
                         py = _detect_python()
-                        subprocess.run(
+                        pip_res = subprocess.run(
                             [py, "-m", "pip", "install", "--no-cache-dir", "-r", str(req_file)],
                             capture_output=True,
+                            text=True,
                             timeout=300,
                         )
+                        if pip_res.returncode != 0:
+                            log.warning(
+                                "[cloud_backup] 导入后安装插件依赖 %s 失败 (code=%s): %s",
+                                url,
+                                pip_res.returncode,
+                                (pip_res.stderr or pip_res.stdout or "").strip(),
+                            )
                 except Exception as exc:
                     log.warning("[cloud_backup] 导入后后台安装插件 %s 失败: %s", url, exc)
                 finally:
@@ -357,7 +380,7 @@ _cached_gpu_name: str | None = None
 
 def short_gpu_name() -> str:
     global _cached_gpu_name
-    if _cached_gpu_name is not None:
+    if _cached_gpu_name:
         return _cached_gpu_name
     try:
         from . import system_monitor
@@ -365,20 +388,23 @@ def short_gpu_name() -> str:
         gpus = (snap or {}).get("gpu") or []
         if gpus and gpus[0].get("name"):
             raw = str(gpus[0]["name"]).strip()
-            _cached_gpu_name = re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
-            return _cached_gpu_name
+            name = re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
+            if name:
+                _cached_gpu_name = name
+                return name
     except Exception:
         pass
     try:
         from .deploy_engine import _detect_gpu_info
         raw = str(_detect_gpu_info().get("name") or "").strip()
         if raw:
-            _cached_gpu_name = re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
-            return _cached_gpu_name
+            name = re.sub(r"^(?:NVIDIA\s+)?(?:GeForce\s+|Tesla\s+|Quadro\s+)?", "", raw, flags=re.I).strip()
+            if name:
+                _cached_gpu_name = name
+                return name
     except Exception:
         pass
-    _cached_gpu_name = ""
-    return _cached_gpu_name
+    return ""
 
 
 def compute_config_hash(config_data: dict) -> str:

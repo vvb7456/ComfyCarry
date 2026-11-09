@@ -161,9 +161,6 @@ async function applyConfigImport(config: ExportedConfig, isRecovery = false) {
   }
   const data = await post<{ message?: string }>('/api/settings/import-config', body)
   if (!data) return
-  if (isRecovery) {
-    await post('/api/settings/cloud-backups/recovery/dismiss', {}, { silent: true })
-  }
   toast(apiMessageText(data), 'success')
 
   // 密码、密钥等全局设置也随导入变化，重新加载应用。

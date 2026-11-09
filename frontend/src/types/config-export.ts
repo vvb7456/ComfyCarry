@@ -70,8 +70,6 @@ export interface ExportedConfig {
   civitai_nsfw_blur?: boolean
   favorites?: FavoriteExportItem[]
   prompt_history?: PromptHistoryExportItem[]
-  /** 自动同步配置开关状态 */
-  auto_sync_config?: boolean
   /** 生成页工作区状态 (服务端持久化的完整 envelope) */
   generate_state?: Record<string, unknown>
   /** 引用模型文件的 SHA256 指纹表: "<category>/<relative_path>" → 大写 hex */

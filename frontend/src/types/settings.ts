@@ -3,7 +3,6 @@ export interface SettingsResponse {
   civitai_key?: string
   api_key?: string
   managed?: boolean
-  auto_sync_config?: boolean
   gpu_name?: string
 }
 

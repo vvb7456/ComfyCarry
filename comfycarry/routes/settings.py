@@ -68,17 +68,8 @@ def api_settings_get():
         "comfyui_dir": cfg.COMFYUI_DIR,
         "comfyui_url": cfg.COMFYUI_URL,
         "managed": is_managed(),
-        "auto_sync_config": bool(_get_config("auto_sync_config", True)),
         "gpu_name": short_gpu_name(),
     })
-
-
-@bp.route("/api/settings/auto-sync", methods=["POST"])
-def api_settings_auto_sync():
-    data = request.get_json(force=True) or {}
-    enabled = bool(data.get("enabled", True))
-    _set_config("auto_sync_config", enabled)
-    return jsonify({"ok": True, "auto_sync_config": enabled})
 
 
 @bp.route("/api/settings/password", methods=["POST"])
@@ -265,8 +256,6 @@ def build_export_config_dict(*, include_timestamp: bool = True) -> dict:
     civitai_nsfw_blur = _get_config("civitai_nsfw_blur", "")
     if civitai_nsfw_blur != "":
         config["civitai_nsfw_blur"] = civitai_nsfw_blur
-
-    config["auto_sync_config"] = bool(_get_config("auto_sync_config", True))
 
     config["favorites"] = favorites_store.list_favorites()
     config["prompt_history"] = prompt_library.dump_history()
@@ -539,13 +528,6 @@ def api_settings_import_config():
             applied.append("CivitAI NSFW 浏览设置")
         except Exception as e:
             errors.append(f"CivitAI NSFW: {e}")
-
-    if "auto_sync_config" in data and data["auto_sync_config"] is not None:
-        try:
-            _set_config("auto_sync_config", bool(data["auto_sync_config"]))
-            applied.append("自动同步设置")
-        except Exception as e:
-            errors.append(f"自动同步设置: {e}")
 
     if from_recovery and is_managed():
         import threading

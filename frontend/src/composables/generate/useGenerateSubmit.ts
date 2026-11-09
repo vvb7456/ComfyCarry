@@ -19,6 +19,7 @@ interface SubmitResponse {
 export function useGenerateSubmit(
   execState: Ref<ExecState | null>,
   options: GenerateOptionsReturn,
+  onInvalid?: () => void,
 ) {
   const { post: apiPost } = useApiFetch()
   const { t } = useI18n({ useScope: 'global' })
@@ -60,6 +61,12 @@ export function useGenerateSubmit(
     return { modelType, activeConfig, selectedPackaging }
   }
 
+  function fail(message: string): false {
+    toast(message, 'error')
+    onInvalid?.()
+    return false
+  }
+
   async function validate(): Promise<boolean> {
     const state = store.currentState
 
@@ -75,34 +82,28 @@ export function useGenerateSubmit(
       const isH3 = variant === 'h3' || variant === 'h3ref'
       if (variant && variant !== '5b' && !isH3) {
         if (!state.unetHigh || !state.unetLow) {
-          toast(t('generate.error.no_unet_pair'), 'error')
-          return false
+          return fail(t('generate.error.no_unet_pair'))
         }
         // 互异: v6 起两个槽由用户各自独立选择, 完全可能选中同一个文件 (这条校验因此是
         // 载荷性的, 不再只是防脏数据)。后端也会拦 (400), 这里前置以少一次往返。
         if (state.unetHigh === state.unetLow) {
-          toast(t('generate.error.video_same_unet'), 'error')
-          return false
+          return fail(t('generate.error.video_same_unet'))
         }
       } else {
         if (!state.unet) {
-          toast(t(isH3 ? 'generate.error.minimax_h3_unet_required' : 'generate.error.no_split_models'), 'error')
-          return false
+          return fail(t(isH3 ? 'generate.error.minimax_h3_unet_required' : 'generate.error.no_split_models'))
         }
       }
       // TE / VAE 必填; H3 另需音频 VAE (音视频一体必需件)
       if (isH3) {
         if (!state.clip || !state.vae || !state.audioVae) {
-          toast(t('generate.error.minimax_h3_te_vae_required'), 'error')
-          return false
+          return fail(t('generate.error.minimax_h3_te_vae_required'))
         }
       } else if (!state.clip || !state.vae) {
-        toast(t('generate.error.no_split_models'), 'error')
-        return false
+        return fail(t('generate.error.no_split_models'))
       }
       if (!state.positive.trim()) {
-        toast(t('generate.error.no_prompt'), 'error')
-        return false
+        return fail(t('generate.error.no_prompt'))
       }
       // 起始画面: i2v 必填; 5b/h3 仅 mode=='i2v' 时必填 (h3 末帧可选, 不阻断)
       const v = state.video
@@ -113,34 +114,28 @@ export function useGenerateSubmit(
       if (needStart && !v?.refImage
         && !(activeConfig.controlNetEnabled && Object.values(state.controlNets).some(cn => cn.enabled))) {
         // 与 ModelTab.runBlockedReason 用同一条文案 (阻断只有一种表达)
-        toast(t('generate.error.no_start_frame'), 'error')
-        return false
+        return fail(t('generate.error.no_start_frame'))
       }
       // Ref2VA 参考生成: 参考素材非空 + 组内/总数配额前端预检 (后端同样拦截, 这里少一次往返)
       if (variant === 'h3ref') {
         const refs = v?.refs ?? []
         if (refs.length === 0) {
-          toast(t('generate.error.minimax_h3_refs_required'), 'error')
-          return false
+          return fail(t('generate.error.minimax_h3_refs_required'))
         }
         const img = refs.filter(r => r.type === 'image').length
         const vid = refs.filter(r => r.type === 'video').length
         const aud = refs.filter(r => r.type === 'audio').length
         if (img > 9) {
-          toast(t('generate.error.minimax_h3_refs_images_too_many', { limit: 9, current: img }), 'error')
-          return false
+          return fail(t('generate.error.minimax_h3_refs_images_too_many', { limit: 9, current: img }))
         }
         if (vid > 3) {
-          toast(t('generate.error.minimax_h3_refs_videos_too_many', { limit: 3, current: vid }), 'error')
-          return false
+          return fail(t('generate.error.minimax_h3_refs_videos_too_many', { limit: 3, current: vid }))
         }
         if (aud > 3) {
-          toast(t('generate.error.minimax_h3_refs_audios_too_many', { limit: 3, current: aud }), 'error')
-          return false
+          return fail(t('generate.error.minimax_h3_refs_audios_too_many', { limit: 3, current: aud }))
         }
         if (refs.length > 12) {
-          toast(t('generate.error.minimax_h3_refs_total_too_many', { limit: 12, current: refs.length }), 'error')
-          return false
+          return fail(t('generate.error.minimax_h3_refs_total_too_many', { limit: 12, current: refs.length }))
         }
       }
       return true
@@ -148,23 +143,19 @@ export function useGenerateSubmit(
 
     if (selectedPackaging === 'split') {
       if (!state.unet || !state.clip || !state.vae) {
-        toast(t('generate.error.no_split_models'), 'error')
-        return false
+        return fail(t('generate.error.no_split_models'))
       }
       // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
       if (activeConfig?.dualClip && !state.clip2) {
-        toast(t('generate.error.no_split_models'), 'error')
-        return false
+        return fail(t('generate.error.no_split_models'))
       }
     } else {
       if (!state.checkpoint) {
-        toast(t('generate.error.no_checkpoint'), 'error')
-        return false
+        return fail(t('generate.error.no_checkpoint'))
       }
     }
     if (!state.positive.trim()) {
-      toast(t('generate.error.no_prompt'), 'error')
-      return false
+      return fail(t('generate.error.no_prompt'))
     }
 
     const inactiveModules: string[] = []
@@ -190,19 +181,16 @@ export function useGenerateSubmit(
     for (const [type, cn] of Object.entries(state.controlNets)) {
       if (cn.enabled) {
         if (!cn.model) {
-          toast(t('generate.error.cn_no_model', { type }), 'error')
-          return false
+          return fail(t('generate.error.cn_no_model', { type }))
         }
         if (!cn.image) {
-          toast(t('generate.error.cn_no_ref', { type }), 'error')
-          return false
+          return fail(t('generate.error.cn_no_ref', { type }))
         }
       }
     }
 
     if (state.i2i.enabled && !state.i2i.image) {
-      toast(t('generate.error.i2i_no_ref'), 'error')
-      return false
+      return fail(t('generate.error.i2i_no_ref'))
     }
 
     if (state.i2i.enabled && state.i2i.image && state.i2i.mode === 'inpaint' && !state.i2i.mask) {

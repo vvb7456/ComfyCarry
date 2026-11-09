@@ -42,13 +42,17 @@ const loadingList = ref(false)
 const loadError = ref(false)
 const saving = ref(false)
 const items = ref<CloudBackupSlot[]>([])
-const maxManualSlots = ref(5)
+const maxManualSlots = ref(10)
 const instanceGpuName = ref('')
 const selectedTarget = ref<string>('')
 const nameModalOpen = ref(false)
 const newSlotName = ref('')
 
-const manualSlots = computed(() => items.value.filter(item => !item.is_auto))
+function isRecoverySlot(slot: CloudBackupSlot): boolean {
+  return Boolean(slot.is_auto || slot.slot_type === 'recovery' || slot.id?.startsWith('recovery-'))
+}
+
+const manualSlots = computed(() => items.value.filter(item => !isRecoverySlot(item)))
 const canCreateNew = computed(() => manualSlots.value.length < maxManualSlots.value)
 
 function formatDefaultName(): string {
@@ -99,7 +103,7 @@ async function fetchSlots() {
     return
   }
   items.value = data.items || []
-  maxManualSlots.value = data.max_manual_slots ?? 5
+  maxManualSlots.value = data.max_manual_slots ?? 10
   if (data.instance_gpu_name) {
     instanceGpuName.value = data.instance_gpu_name
   }
@@ -115,7 +119,7 @@ async function confirmCreateNew() {
   if (saving.value) return
   saving.value = true
   const trimmed = newSlotName.value.trim() || formatDefaultName()
-  const saved = await post<CloudBackupSlot>('/api/settings/cloud-backups', {
+  const saved = await post<{ slot?: CloudBackupSlot } & CloudBackupSlot>('/api/settings/cloud-backups', {
     mode: 'new',
     name: trimmed,
   })
@@ -123,21 +127,21 @@ async function confirmCreateNew() {
   if (!saved) return
   toast(t('settings.config.cloud_saved'), 'success')
   nameModalOpen.value = false
-  emit('saved', saved)
+  emit('saved', saved.slot ?? saved)
   show.value = false
 }
 
 async function confirmOverwrite() {
   if (!selectedTarget.value || saving.value) return
   saving.value = true
-  const saved = await post<CloudBackupSlot>('/api/settings/cloud-backups', {
+  const saved = await post<{ slot?: CloudBackupSlot } & CloudBackupSlot>('/api/settings/cloud-backups', {
     mode: 'overwrite',
     slot_id: selectedTarget.value,
   })
   saving.value = false
   if (!saved) return
   toast(t('settings.config.cloud_saved'), 'success')
-  emit('saved', saved)
+  emit('saved', saved.slot ?? saved)
   show.value = false
 }
 

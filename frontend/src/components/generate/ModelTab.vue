@@ -476,8 +476,9 @@ const runBlockedReason = computed<string>(() => {
 
   if (pkg !== 'split') return ''
 
-  if (!st.clip || !st.vae || (config.value.dualClip && !st.clip2)) {
-    return t('generate.error.no_split_models')
+  const isH3 = props.modelType === 'minimax_h3' || props.modelType === 'minimax_h3_ref'
+  if (!st.clip || !st.vae || (config.value.dualClip && !st.clip2) || (isH3 && !st.audioVae)) {
+    return t(isH3 ? 'generate.error.minimax_h3_te_vae_required' : 'generate.error.no_split_models')
   }
 
   return ''
@@ -573,14 +574,7 @@ async function guideToProblem() {
 
   if (showRefPanel.value) {
     const refs = videoRefs.value
-    const img = refs.filter(r => r.type === 'image').length
-    const vid = refs.filter(r => r.type === 'video').length
-    const aud = refs.filter(r => r.type === 'audio').length
-    if (
-      !refs.length
-      || (isVideo.value && refs.every(r => r.type === 'audio'))
-      || img > 9 || vid > 3 || aud > 3 || refs.length > 12
-    ) {
+    if (!refs.length || (isVideo.value && refs.every(r => r.type === 'audio'))) {
       await flashTargets(['[data-guide="ref-media"]'])
       return
     }
@@ -632,6 +626,17 @@ async function guideToProblem() {
       focusSelector: '[data-guide="positive-textarea"]',
     })
     return
+  }
+
+  if (showRefPanel.value) {
+    const refs = videoRefs.value
+    const img = refs.filter(r => r.type === 'image').length
+    const vid = refs.filter(r => r.type === 'video').length
+    const aud = refs.filter(r => r.type === 'audio').length
+    if (img > 9 || vid > 3 || aud > 3 || refs.length > 12) {
+      await flashTargets(['[data-guide="ref-media"]'])
+      return
+    }
   }
 
   for (const [type, cn] of Object.entries(st.controlNets)) {

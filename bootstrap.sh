@@ -136,6 +136,7 @@ elif [ -n "$COMMIT_HASH" ] && [ "$INSTALLED_COMMIT" != "$COMMIT_HASH" ]; then
     VERSION_CHANGED="true"
 fi
 
+UPDATED="false"
 if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "$VERSION_CHANGED" = "true" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
     echo "  -> 下载 ComfyCarry (${RELEASE_DESC})..."
     DIST_URL=$(echo "$RELEASE_JSON" | python3 -c "
@@ -163,6 +164,7 @@ except Exception:
         EXTRACTED="${TMP_EXTRACT}/comfycarry"
         if [ -d "$EXTRACTED" ]; then
             cp -r "$EXTRACTED/." "$DASHBOARD_DIR/"
+            UPDATED="true"
             echo "  ComfyCarry 文件已更新"
         else
             echo "  部署包结构异常, 请检查 Release asset"
@@ -176,12 +178,14 @@ else
     echo "  -> ComfyCarry 文件已存在，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"
 fi
 
-APP_VERSION=$(python3 -c "import re, sys; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open(sys.argv[1]).read()); print(m.group(1) if m else 'unknown')" "$DASHBOARD_DIR/comfycarry/config.py" 2>/dev/null || echo "unknown")
-cat > "$DASHBOARD_DIR/.version" <<EOF
+if [ "$UPDATED" = "true" ] || [ ! -f "$DASHBOARD_DIR/.version" ]; then
+    APP_VERSION=$(python3 -c "import re, sys; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open(sys.argv[1]).read()); print(m.group(1) if m else 'unknown')" "$DASHBOARD_DIR/comfycarry/config.py" 2>/dev/null || echo "unknown")
+    cat > "$DASHBOARD_DIR/.version" <<EOF
 version=${RELEASE_TAG:-$APP_VERSION}
 branch=
 commit=${COMMIT_HASH}
 EOF
+fi
 fi
 
 if [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
