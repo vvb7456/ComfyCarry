@@ -410,7 +410,6 @@ async function handleMakeVideo(payload: MakeVideoPayload) {
     return
   }
   const TARGET = 'wan22_i2v'
-  store.switchTask('video')
   store.switchModelType(TARGET)
 
   const copied = await post<{ filename: string }>('/api/generate/copy_output_image', {

@@ -529,7 +529,7 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"CivitAI NSFW: {e}")
 
-    if from_recovery and is_managed():
+    if from_recovery and is_managed() and cfg._is_setup_complete():
         import threading
         from ..services.cloud_backup import platform_request
 

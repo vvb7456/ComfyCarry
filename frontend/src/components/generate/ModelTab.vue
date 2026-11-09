@@ -339,6 +339,7 @@ const compStatus = useDependencyStatus(
   {
     source: 'runtime-component',
     metaOf: () => ({ arch: props.modelType }),
+    enabled: () => store.activeModelType === props.modelType,
   },
 )
 const componentPanelExpanded = ref(false)
@@ -352,17 +353,6 @@ const loraPickerItems = computed(() => {
     const bname = l.name.includes('/') ? l.name.slice(l.name.lastIndexOf('/') + 1) : l.name
     return !COMPONENT_FILENAMES.has(bname)
   })
-})
-
-// 就绪状态回流 store (单一真值): 页面级重复预检已删, 菜单状态完全靠各 tab 写入, 故 immediate
-watch(() => compStatus.ready.value, (ready) => {
-    store.setComponentsReady(props.modelType, ready)
-}, { immediate: true })
-
-// 切到本 tab 时复检组件状态: 组件跨架构共享 (如 ae.safetensors 同时服务 Z-Image/Flux1/Chroma),
-// 在别的 tab 下载完后, 本 tab 的状态与菜单标记会滞留为"未就绪", 切回来时需要复检。
-watch(() => store.activeModelType, (active) => {
-  if (active === props.modelType) void compStatus.refresh()
 })
 
 // 视频架构「隐藏实时模式」: 视频任务无实时预览语义 (分钟级任务), live 模式无意义。

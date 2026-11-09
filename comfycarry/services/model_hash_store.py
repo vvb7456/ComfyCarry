@@ -45,18 +45,23 @@ def scan_model_hashes(state: Any) -> dict[str, str]:
     if not paths:
         return {}
 
-    reconcile_model_index(min_interval=10)
+    reconciled = False
     result: dict[str, str] = {}
     for path in paths:
         real_path = os.path.realpath(resolve_file_path(path))
         row = db.fetch_one("SELECT id FROM models WHERE real_path = ?", (real_path,))
-        if row:
-            model_id = int(row["id"])
-        elif os.path.isfile(real_path):
-            detail = register_downloaded_model(real_path, "auxiliary", {}, "", [])
-            model_id = int(detail["id"]) if detail.get("id") is not None else None
+        if not row and os.path.isfile(real_path):
+            if not reconciled:
+                reconcile_model_index(min_interval=0)
+                reconciled = True
+                row = db.fetch_one("SELECT id FROM models WHERE real_path = ?", (real_path,))
+            if row:
+                model_id = int(row["id"])
+            else:
+                detail = register_downloaded_model(real_path, "auxiliary", {}, "", [])
+                model_id = int(detail["id"]) if detail.get("id") is not None else None
         else:
-            model_id = None
+            model_id = int(row["id"]) if row else None
         if model_id is None:
             continue
         sha = get_or_compute_model_sha256(model_id, real_path, _sha256_file)

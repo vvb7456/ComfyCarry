@@ -388,12 +388,6 @@ export const useGenerateStore = defineStore('generate', () => {
     }
   }
 
-  /** 各架构的运行组件是否就绪; undefined = 尚未检查 */
-  const componentsReady = reactive<Record<string, boolean | undefined>>({})
-  function setComponentsReady(type: string, ready: boolean) {
-    componentsReady[type] = ready
-  }
-
   const currentConfig = computed<ModelTypeConfig>(() => configFor(activeModelType.value))
   const currentState = computed<ModelState>(() => {
     const key = activeModelType.value
@@ -542,15 +536,6 @@ export const useGenerateStore = defineStore('generate', () => {
     switchModelType(modelSelections[key] ?? key)
   }
 
-  /** 切换任务 (image/video); 同时把当前架构指针切到该任务的记忆值 */
-  function switchTask(task: 'image' | 'video') {
-    activeTask.value = task
-    const type = activeModelTypeByTask[task]
-    if (MODEL_TYPES[type] && !modelStates[type]) {
-      modelStates[type] = createDefaultState(MODEL_TYPES[type])
-    }
-  }
-
   /**
    * 按架构增量保存。失败不静默: 保留失败标记并退避重试,
    * 期间新变更会重置防抖计时器, 最终仍以最新状态重发。
@@ -696,9 +681,8 @@ export const useGenerateStore = defineStore('generate', () => {
     modelStates, modelSelections,
     missingPaths, missingRefs, isMissing, pruneMissing, checkMissingFiles,
     restoredFiles,
-    componentsReady, setComponentsReady,
     currentConfig, currentState, stateFor, configFor, setFast, setMode, setScheduler,
-    switchModelType, selectModelGroup, switchTask, save, restore, enableAutoSave,
+    switchModelType, selectModelGroup, save, restore, enableAutoSave,
     saveError,
   }
 })
