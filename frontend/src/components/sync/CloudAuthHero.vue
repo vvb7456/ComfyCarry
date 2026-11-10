@@ -922,7 +922,7 @@ defineExpose({
             :options="(field.options || []).map(o => ({ value: o, label: o }))"
             @update:model-value="(v: string | number | boolean) => fields[field.key] = String(v)"
           />
-          <SecretInput v-else-if="field.type === 'password'" :id="id" v-model="fields[field.key]" :is-password="true" :placeholder="field.placeholder" />
+          <SecretInput v-else-if="field.type === 'password'" :id="id" v-model="fields[field.key]" :placeholder="field.placeholder" />
           <textarea v-else-if="field.type === 'textarea'" :id="id" v-model="fields[field.key]" rows="3" class="form-textarea form-textarea--mono" :placeholder="field.placeholder" />
           <input v-else :id="id" v-model="fields[field.key]" type="text" class="form-input" :placeholder="field.placeholder" autocomplete="off">
         </template>
@@ -1040,7 +1040,6 @@ defineExpose({
               <SecretInput
                 :id="id"
                 v-model="params.client_secret"
-                :is-password="true"
                 placeholder="Google Cloud Client Secret"
               />
             </template>

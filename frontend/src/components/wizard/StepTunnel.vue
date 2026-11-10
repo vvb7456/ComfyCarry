@@ -145,7 +145,6 @@ function onPrev() { prevStep() }
           <SecretInput
             :id="id"
             v-model="config.cf_api_token"
-            is-password
             :placeholder="t('wizard.step2.cf_token_placeholder')"
           />
         </template>
