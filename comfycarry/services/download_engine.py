@@ -287,6 +287,11 @@ class DownloadEngine:
 
         os.makedirs(save_dir, exist_ok=True)
 
+        if self._aria2_proc is None or self._aria2_proc.poll() is not None:
+            with self._lifecycle_lock:
+                if self._aria2_proc is None or self._aria2_proc.poll() is not None:
+                    self._start_aria2_daemon()
+
         with self._lock:
             # 去重：同 filename+save_dir 的活跃/排队/暂停任务
             for existing in self._tasks.values():

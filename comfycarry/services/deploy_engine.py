@@ -313,7 +313,7 @@ def _step_system_deps(config, PY):
         _deploy_exec(
             "apt-get update -qq && "
             "apt-get install -y --no-install-recommends "
-            "git git-lfs aria2 rclone jq curl ffmpeg libgl1 "
+            "git git-lfs aria2 jq curl ffmpeg libgl1 "
             "libglib2.0-0 libsm6 libxext6 build-essential",
             timeout=300, label="apt-get install"
         )

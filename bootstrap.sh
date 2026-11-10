@@ -35,12 +35,11 @@ PYTHON_BIN="$COMFYCARRY_PYTHON"
 
 # SSH 已由 entrypoint.sh 处理 (SSH Key + sshd)
 
+echo "  -> Runtime: ${COMFYCARRY_RUNTIME:-docker}"
+echo "  -> Workspace: $WORKSPACE_DIR (ComfyUI: $COMFYUI_DIR)"
 echo "  -> Python: $PYTHON_BIN"
-
 echo "  -> Node.js/PM2 已预装"
-
 echo "  -> ComfyCarry 依赖已预装"
-
 echo "  -> Cloudflared 已预装"
 
 # 更新源: 托管开通使用主控下发并已校验的固定部署包 (COMFYCARRY_BUNDLE_DIR),
@@ -59,6 +58,7 @@ else
     RELEASE_API="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
     RELEASE_DESC="latest Release"
 fi
+echo "  -> 更新配置: RELEASE_TAG=${TARGET_RELEASE_TAG:-<latest>} | FORCE_UPDATE=${FORCE_UPDATE:-false} | BUNDLE_DIR=${COMFYCARRY_BUNDLE_DIR:-<none>}"
 
 mkdir -p "$DASHBOARD_DIR"
 
@@ -135,10 +135,11 @@ if [ -n "$RELEASE_TAG" ] && [ "$INSTALLED_VERSION" != "$RELEASE_TAG" ]; then
 elif [ -n "$COMMIT_HASH" ] && [ "$INSTALLED_COMMIT" != "$COMMIT_HASH" ]; then
     VERSION_CHANGED="true"
 fi
+echo "  -> 版本检查: 目标=${RELEASE_TAG:-未知} (${COMMIT_HASH:0:8}) | 本地=${INSTALLED_VERSION:-未安装} (${INSTALLED_COMMIT:0:8}) | 变更=$VERSION_CHANGED"
 
 UPDATED="false"
 if [ ! -f "$DASHBOARD_DIR/workspace_manager.py" ] || [ "$VERSION_CHANGED" = "true" ] || [ "${FORCE_UPDATE:-false}" = "true" ]; then
-    echo "  -> 下载 ComfyCarry (${RELEASE_DESC})..."
+    echo "  -> 下载 ComfyCarry (${RELEASE_DESC}, tag=${RELEASE_TAG:-未知}, commit=${COMMIT_HASH:0:8})..."
     DIST_URL=$(echo "$RELEASE_JSON" | python3 -c "
 import sys, json
 try:
@@ -152,6 +153,7 @@ except Exception:
 " 2>/dev/null || true)
 
     if [ -n "$DIST_URL" ]; then
+        echo "  -> 下载地址: $DIST_URL"
         TMP_TAR="/tmp/comfycarry_dist.tar.gz"
         TMP_EXTRACT="/tmp/comfycarry_extract"
 
@@ -175,7 +177,7 @@ except Exception:
         echo "  未找到 ${RELEASE_DESC} (${RELEASE_ASSET}), 请检查是否已发布 Release"
     fi
 else
-    echo "  -> ComfyCarry 文件已存在，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"
+    echo "  -> ComfyCarry 文件已存在且版本一致 (${INSTALLED_VERSION:-未知} ${INSTALLED_COMMIT:0:8})，跳过下载 (设置 FORCE_UPDATE=true 强制更新)"
 fi
 
 if [ "$UPDATED" = "true" ] || [ ! -f "$DASHBOARD_DIR/.version" ]; then
@@ -187,6 +189,7 @@ commit=${COMMIT_HASH}
 EOF
 fi
 fi
+echo "  -> 当前生效版本: $(tr '\n' ' ' < "$DASHBOARD_DIR/.version" 2>/dev/null || echo '未知')"
 
 if [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
     "$PYTHON_BIN" -c "import sys; sys.path.insert(0, sys.argv[1]); from comfycarry.config import set_config; set_config('cf_protocol', 'http2')" "$DASHBOARD_DIR"
@@ -224,7 +227,7 @@ try:
 except Exception as e:
     print('', file=sys.stderr)
     print(f'Tunnel 启动失败: {e}', file=sys.stderr)
-" "$DASHBOARD_DIR" 2>/dev/null) || true
+" "$DASHBOARD_DIR") || true
             if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
                 echo "  Tunnel 已启动"
             else
@@ -251,7 +254,7 @@ try:
         print(f'{result.get(\"error\", \"未知\")}', file=sys.stderr)
 except Exception as e:
     print(f'{e}', file=sys.stderr)
-" "$DASHBOARD_DIR" 2>/dev/null) || true
+" "$DASHBOARD_DIR") || true
     if [ -n "$_TUNNEL_DASHBOARD_URL" ]; then
         echo "  公共 Tunnel 已启用"
     else

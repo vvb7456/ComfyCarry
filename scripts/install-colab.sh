@@ -56,6 +56,9 @@ say() { echo "==> $*"; }
 download() { curl --fail --location --retry 3 --connect-timeout 30 "$1" -o "$2"; }
 
 say "复用 Colab 运行时"
+say "环境参数: WORKSPACE_DIR=$WORKSPACE_DIR | COMFYUI_DIR=$COMFYUI_DIR"
+say "发布通道: DEV_RELEASE=$DEV_RELEASE | RELEASE_CHANNEL=${RELEASE_CHANNEL:-<unset>} | COMFYCARRY_RELEASE_TAG=${COMFYCARRY_RELEASE_TAG:-latest} | FORCE_UPDATE=${FORCE_UPDATE:-false}"
+say "存储与隧道: DRIVE_MOUNT=$DRIVE_MOUNT | DRIVE_ROOT=$DRIVE_ROOT (存在=$([[ -d "$DRIVE_ROOT" ]] && echo yes || echo no)) | DRIVE_DIR=$DRIVE_DIR | PUBLIC_TUNNEL=$PUBLIC_TUNNEL"
 read -r TORCH_CUDA_ARCH_LIST RUNTIME_WHEEL_TAG < <("$COMFYCARRY_PYTHON" - <<'PY'
 import json
 import os
@@ -74,7 +77,12 @@ torch_ver = torch.__version__.split('+')[0]
 cuda_ver = (torch.version.cuda or '').replace('.', '')
 py_tag = f"py{sys.version_info.major}{sys.version_info.minor}"
 wheel_tag = f"{py_tag}-torch{torch_ver}-cu{cuda_ver}"
-print(f"Python {sys.version.split()[0]} / PyTorch {torch.__version__} / GPU {torch.cuda.get_device_name(0)}", file=sys.stderr)
+print(
+    f"Python {sys.version.split()[0]} ({sys.executable}) / "
+    f"PyTorch {torch.__version__} (CUDA {torch.version.cuda or 'unknown'}) / "
+    f"GPU {torch.cuda.get_device_name(0)} (sm_{major}{minor}, wheel_tag={wheel_tag})",
+    file=sys.stderr,
+)
 # 后续安装 ComfyUI 和插件时保留原生计算环境。
 constraints = []
 for name in ('torch', 'torchvision', 'torchaudio', 'triton'):
@@ -111,14 +119,17 @@ PY
 export TORCH_CUDA_ARCH_LIST
 gpu_cap="${TORCH_CUDA_ARCH_LIST/./}"
 
+sed -i '/r2u\.stat\.illinois\.edu/d' /etc/apt/sources.list 2>/dev/null || true
+grep -rl 'r2u\.stat\.illinois\.edu' /etc/apt/sources.list.d/ 2>/dev/null | xargs -r rm -f
+
 packages=()
-for package in openssh-server rsync libportaudio2; do
+for package in openssh-server rsync libportaudio2 aria2; do
     if [[ $(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null) != installed ]]; then
         packages+=("$package")
     fi
 done
 if (( ${#packages[@]} )); then
-    say "安装系统依赖"
+    say "安装系统依赖 (${packages[*]})"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y --no-install-recommends "${packages[@]}"
@@ -155,9 +166,11 @@ if ! command -v rclone >/dev/null; then
 fi
 
 if [[ ! -f "$COMFYUI_DIR/main.py" ]]; then
-    say "克隆 ComfyUI"
     COMFYUI_REF="${COMFYUI_REF:-$(git ls-remote --refs --tags https://github.com/Comfy-Org/ComfyUI.git 'v*' | awk -F/ '{print $NF}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)}"
+    say "克隆 ComfyUI (ref=$COMFYUI_REF -> $COMFYUI_DIR)"
     git clone --depth 1 --branch "$COMFYUI_REF" https://github.com/Comfy-Org/ComfyUI.git "$COMFYUI_DIR"
+else
+    say "检测到已有 ComfyUI ($COMFYUI_DIR)，跳过克隆"
 fi
 
 drive_pairs=(
@@ -179,8 +192,14 @@ if [[ ! "${DRIVE_MOUNT,,}" =~ ^(0|false|no|off)$ ]] && [[ -d "$DRIVE_ROOT" ]]; t
             rm -rf "$local_dir"
         fi
         ln -sfn "$target_dir" "$local_dir"
+        echo "  -> $local_dir -> $target_dir"
     done
 else
+    if [[ "${DRIVE_MOUNT,,}" =~ ^(0|false|no|off)$ ]]; then
+        say "已禁用 Google Drive 挂载 (DRIVE_MOUNT=$DRIVE_MOUNT)，使用本地目录"
+    else
+        say "未检测到 Google Drive 挂载目录 ($DRIVE_ROOT)，使用本地目录"
+    fi
     for pair in "${drive_pairs[@]}"; do
         local_dir="${pair#*:}"
         if [[ -L "$local_dir" ]]; then
@@ -215,6 +234,8 @@ sm120 89e726e0ec7d1cd2094d1513daa7877351123956f6e7d2eb48f52d06fc585547
 WHEELS
 elif (( gpu_cap >= 80 )); then
     say "当前运行时 ($RUNTIME_WHEEL_TAG) 无预编译 SageAttention-2 wheel，跳过预装"
+else
+    say "当前 GPU (sm$gpu_cap) 算力低于 8.0，跳过 SageAttention-2 预装"
 fi
 "$COMFYCARRY_PYTHON" - <<'PY'
 import importlib.util
