@@ -178,6 +178,7 @@ drive_pairs=(
     "output:$COMFYUI_DIR/output"
     "input:$COMFYUI_DIR/input"
     "workflows:$COMFYUI_DIR/user/default/workflows"
+    "wildcards:$COMFYUI_DIR/wildcards"
 )
 if [[ ! "${DRIVE_MOUNT,,}" =~ ^(0|false|no|off)$ ]] && [[ -d "$DRIVE_ROOT" ]]; then
     drive_base="$DRIVE_ROOT/${DRIVE_DIR#/}"
