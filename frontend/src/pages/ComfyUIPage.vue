@@ -74,9 +74,11 @@ const queuePending = computed(() => status.value?.queue_pending || 0)
 const queueTotal = computed(() => (status.value?.queue_running || 0) + (status.value?.queue_pending || 0))
 
 const comfyUrl = ref('')
+const tunnelLoaded = ref(false)
 const effectiveComfyUrl = computed(() => {
   if (!isOnline.value) return ''
   if (comfyUrl.value) return comfyUrl.value
+  if (!tunnelLoaded.value) return ''
   const port = status.value?.port || 8188
   const host = window.location.hostname || 'localhost'
   return `http://${host}:${port}`
@@ -93,13 +95,25 @@ const addressHost = computed(() => {
 })
 
 async function loadComfyUrl() {
-  const d = await get<{ urls?: Record<string, string>; public?: { urls?: Record<string, string> } }>(
-    '/api/tunnel/status',
-    { silent: true },
-  )
-  const urls: Record<string, string> = { ...(d?.urls || {}), ...(d?.public?.urls || {}) }
-  const hit = Object.entries(urls).find(([name]) => name.toLowerCase().includes('comfyui'))
-  comfyUrl.value = hit ? hit[1] : ''
+  try {
+    const d = await get<{
+      effective_status?: string
+      urls?: Record<string, string>
+      public?: { urls?: Record<string, string> }
+    }>(
+      '/api/tunnel/status',
+      { silent: true },
+    )
+    if (d?.effective_status !== 'online') {
+      comfyUrl.value = ''
+      return
+    }
+    const urls: Record<string, string> = { ...(d?.urls || {}), ...(d?.public?.urls || {}) }
+    const hit = Object.entries(urls).find(([name]) => name.toLowerCase().includes('comfyui'))
+    comfyUrl.value = hit ? hit[1] : ''
+  } finally {
+    tunnelLoaded.value = true
+  }
 }
 
 let statusAppliedAt = 0
@@ -137,7 +151,9 @@ const sse = useComfySSE(tracker, {
   },
 })
 
-const refresh = useAutoRefresh(loadStatus, 10000)
+const refresh = useAutoRefresh(async () => {
+  await Promise.all([loadStatus(), loadComfyUrl()])
+}, 10000)
 
 onMounted(() => {
   loadStatus()

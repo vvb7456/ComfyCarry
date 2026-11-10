@@ -172,7 +172,7 @@ onUnmounted(() => {
 
 const tunnelUrls = computed(() => {
   const tObj = data.value?.tunnel
-  if (!tObj) return {} as Record<string, string>
+  if (!tObj || tObj.effective_status !== 'online') return {} as Record<string, string>
   const all = { ...(tObj.urls || {}) }
   if (tObj.public?.urls) Object.assign(all, tObj.public.urls)
   return Object.fromEntries(

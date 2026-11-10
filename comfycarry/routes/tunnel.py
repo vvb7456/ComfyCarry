@@ -133,16 +133,18 @@ def _build_tunnel_status(force: bool = False) -> dict:
         else:
             result["effective_status"] = "offline"
 
-        _tunnel_cache["data"] = result
-        _tunnel_cache["ts"] = _time.time()
+        if result["effective_status"] != "connecting":
+            _tunnel_cache["data"] = result
+            _tunnel_cache["ts"] = _time.time()
         return result
 
     mgr = _get_manager()
     if not mgr:
         result["tunnel_mode"] = None
         result["effective_status"] = "unconfigured"
-        _tunnel_cache["data"] = result
-        _tunnel_cache["ts"] = _time.time()
+        if result["effective_status"] != "connecting":
+            _tunnel_cache["data"] = result
+            _tunnel_cache["ts"] = _time.time()
         return result
 
     result["configured"] = True
@@ -182,8 +184,9 @@ def _build_tunnel_status(force: bool = False) -> dict:
     else:
         result["effective_status"] = "unconfigured"
 
-    _tunnel_cache["data"] = result
-    _tunnel_cache["ts"] = _time.time()
+    if result["effective_status"] != "connecting":
+        _tunnel_cache["data"] = result
+        _tunnel_cache["ts"] = _time.time()
     return result
 
 

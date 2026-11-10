@@ -97,6 +97,11 @@ def _finish(phase: str, error_key: str = "", error_params: dict | None = None):
         _state["error_key"] = error_key
         _state["error_params"] = error_params or {}
         _persist_locked()
+    try:
+        from ..routes.tunnel import _invalidate_tunnel_cache
+        _invalidate_tunnel_cache()
+    except Exception:
+        pass
 
 
 def _snapshot() -> dict:

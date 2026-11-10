@@ -227,6 +227,10 @@ class TunnelManager:
 
         Returns: {"status": {...}, "urls": {...}}
         """
+        default_urls = {
+            svc["name"]: f"https://{self._hostname_for(svc)}"
+            for svc in get_effective_services()
+        }
         try:
             account_id, _ = self._get_account()
             tunnel = self._find_tunnel(account_id, self.tunnel_name)
@@ -245,7 +249,7 @@ class TunnelManager:
                 "connections": tunnel.get("connections", []) or [],
             }
 
-            urls = {}
+            urls = dict(default_urls)
             try:
                 cfg = self._cf_get(
                     f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations"
@@ -268,7 +272,7 @@ class TunnelManager:
         except Exception:
             return {
                 "status": {"exists": False, "status": "unknown"},
-                "urls": {},
+                "urls": default_urls,
             }
 
     def start_cloudflared(self, tunnel_token: str, name: str | None = None,

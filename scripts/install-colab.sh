@@ -29,7 +29,10 @@ if [[ -z ${PUBLIC_TUNNEL+x} ]] && [[ -f "$WORKSPACE_DIR/.dashboard_env" ]]; then
 import json
 import sys
 from pathlib import Path
-state = json.loads(Path(sys.argv[1]).read_text())
+try:
+    state = json.loads(Path(sys.argv[1]).read_text())
+except Exception:
+    state = {}
 print("0" if state.get("tunnel_mode") == "custom" else "1")
 PY
 )
@@ -118,6 +121,24 @@ PY
 )
 export TORCH_CUDA_ARCH_LIST
 gpu_cap="${TORCH_CUDA_ARCH_LIST/./}"
+if [[ -d /etc/profile.d ]]; then
+    cat > /etc/profile.d/comfycarry-colab.sh <<EOF
+export WORKSPACE_DIR=${WORKSPACE_DIR@Q}
+export COMFYUI_DIR=${COMFYUI_DIR@Q}
+export COMFYCARRY_RUNTIME=colab
+export COMFYCARRY_PYTHON=${COMFYCARRY_PYTHON@Q}
+export CUDA_HOME=${CUDA_HOME@Q}
+export HF_HOME=${HF_HOME@Q}
+export UV_CACHE_DIR=${UV_CACHE_DIR@Q}
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+export PIP_ROOT_USER_ACTION=ignore
+export PIP_CONSTRAINT=${PIP_CONSTRAINT@Q}
+export UV_CONSTRAINT=${UV_CONSTRAINT@Q}
+export PIP_NO_BUILD_ISOLATION=0
+export TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST@Q}
+export PATH="\$CUDA_HOME/bin:/usr/local/bin:\$PATH"
+EOF
+fi
 
 sed -i '/r2u\.stat\.illinois\.edu/d' /etc/apt/sources.list 2>/dev/null || true
 grep -rl 'r2u\.stat\.illinois\.edu' /etc/apt/sources.list.d/ 2>/dev/null | xargs -r rm -f
@@ -147,6 +168,12 @@ if ! command -v pm2 >/dev/null; then
     say "安装 PM2"
     npm install -g pm2
 fi
+for bin in node npm pm2; do
+    bin_path="$(command -v "$bin" || true)"
+    if [[ -n "$bin_path" && "$bin_path" != "/usr/local/bin/$bin" && "$bin_path" != "/usr/bin/$bin" ]]; then
+        ln -sfn "$bin_path" "/usr/local/bin/$bin"
+    fi
+done
 
 if ! command -v cloudflared >/dev/null; then
     say "安装 Cloudflared"

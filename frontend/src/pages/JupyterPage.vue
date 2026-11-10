@@ -48,6 +48,7 @@ const { confirm } = useConfirm()
 
 const status = ref<JupyterStatus | null>(null)
 const jupyterUrl = ref('')
+const tunnelLoaded = ref(false)
 const token = ref('')
 // 进程重启后 Jupyter 会生成新 token; 置脏后持续重取, 直到拿到非空令牌
 const tokenDirty = ref(false)
@@ -108,19 +109,27 @@ async function loadStatus() {
 
 /** 有隧道用隧道入口 (自定义 + 公共), 无隧道在 effectiveJupyterUrl 里回落本机直连。 */
 async function loadJupyterUrl() {
-  const data = await get<{ urls?: Record<string, string>; public?: { urls?: Record<string, string> } }>('/api/tunnel/status', { silent: true })
-  if (!data) {
-    jupyterUrl.value = ''
-    return
-  }
-  const urls: Record<string, string> = { ...(data.urls || {}), ...(data.public?.urls || {}) }
-  for (const [name, url] of Object.entries(urls)) {
-    if (name.toLowerCase().includes('jupyter')) {
-      jupyterUrl.value = url as string
+  try {
+    const data = await get<{
+      effective_status?: string
+      urls?: Record<string, string>
+      public?: { urls?: Record<string, string> }
+    }>('/api/tunnel/status', { silent: true })
+    if (!data || data.effective_status !== 'online') {
+      jupyterUrl.value = ''
       return
     }
+    const urls: Record<string, string> = { ...(data.urls || {}), ...(data.public?.urls || {}) }
+    for (const [name, url] of Object.entries(urls)) {
+      if (name.toLowerCase().includes('jupyter')) {
+        jupyterUrl.value = url as string
+        return
+      }
+    }
+    jupyterUrl.value = ''
+  } finally {
+    tunnelLoaded.value = true
   }
-  jupyterUrl.value = ''
 }
 
 /** force=true 时跳过后端缓存重新检测 (重启后必须, 进程可能晚于轮询就绪) */
@@ -135,6 +144,7 @@ async function loadToken(force = false) {
 
 const effectiveJupyterUrl = computed(() => {
   if (jupyterUrl.value) return jupyterUrl.value
+  if (!tunnelLoaded.value) return ''
   // 无隧道时兜底本地直连; 端口取自运行中进程检测 (status.port),
   // 离线时地址不可达, 不显示。
   if (!isRunning.value || !status.value?.port) return ''
@@ -372,12 +382,12 @@ async function deleteTerminal(name: string) {
 }
 
 async function refreshStatus() {
-  const wasRunning = isRunning.value
   await loadStatus()
-  // 服务刚起来, 或重启后令牌尚未取到 (进程可能晚于轮询就绪): 刷新地址与令牌
-  if (isRunning.value && (!wasRunning || tokenDirty.value || !token.value)) {
+  if (isRunning.value) {
     void loadJupyterUrl()
-    void loadToken(tokenDirty.value)
+    if (tokenDirty.value || !token.value) {
+      void loadToken(tokenDirty.value)
+    }
   }
 }
 

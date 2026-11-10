@@ -12,7 +12,14 @@
 set -e
 set -o pipefail
 
-export WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
+if [ -z "${COMFYCARRY_RUNTIME:-}" ] && [ -f /opt/.comfycarry-prebuilt ] && grep -q '"runtime"[[:space:]]*:[[:space:]]*"colab"' /opt/.comfycarry-prebuilt 2>/dev/null; then
+    export COMFYCARRY_RUNTIME="colab"
+fi
+if [ "${COMFYCARRY_RUNTIME:-}" = "colab" ]; then
+    export WORKSPACE_DIR="${WORKSPACE_DIR:-/content}"
+else
+    export WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
+fi
 export COMFYUI_DIR="${COMFYUI_DIR:-$WORKSPACE_DIR/ComfyUI}"
 LOG_FILE="$WORKSPACE_DIR/setup.log"
 mkdir -p "$WORKSPACE_DIR"
@@ -151,25 +158,36 @@ try:
 except Exception:
     pass
 " 2>/dev/null || true)
+    if [ -z "$DIST_URL" ]; then
+        if [ -n "$TARGET_RELEASE_TAG" ]; then
+            DIST_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TARGET_RELEASE_TAG}/${RELEASE_ASSET}"
+        else
+            DIST_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${RELEASE_ASSET}"
+        fi
+        echo "  -> GitHub API 未返回资产链接 (可能触发匿名限流)，回退直链: $DIST_URL"
+    fi
 
     if [ -n "$DIST_URL" ]; then
         echo "  -> 下载地址: $DIST_URL"
         TMP_TAR="/tmp/comfycarry_dist.tar.gz"
         TMP_EXTRACT="/tmp/comfycarry_extract"
 
-        wget -q -O "$TMP_TAR" "$DIST_URL"
-        rm -rf "$TMP_EXTRACT"
-        mkdir -p "$TMP_EXTRACT"
-        tar xzf "$TMP_TAR" -C "$TMP_EXTRACT"
+        if wget -q -O "$TMP_TAR" "$DIST_URL"; then
+            rm -rf "$TMP_EXTRACT"
+            mkdir -p "$TMP_EXTRACT"
+            tar xzf "$TMP_TAR" -C "$TMP_EXTRACT"
 
-        # 部署包顶层目录为 comfycarry/, 内容直接覆盖到面板根
-        EXTRACTED="${TMP_EXTRACT}/comfycarry"
-        if [ -d "$EXTRACTED" ]; then
-            cp -r "$EXTRACTED/." "$DASHBOARD_DIR/"
-            UPDATED="true"
-            echo "  ComfyCarry 文件已更新"
+            # 部署包顶层目录为 comfycarry/, 内容直接覆盖到面板根
+            EXTRACTED="${TMP_EXTRACT}/comfycarry"
+            if [ -d "$EXTRACTED" ]; then
+                cp -r "$EXTRACTED/." "$DASHBOARD_DIR/"
+                UPDATED="true"
+                echo "  ComfyCarry 文件已更新"
+            else
+                echo "  部署包结构异常, 请检查 Release asset"
+            fi
         else
-            echo "  部署包结构异常, 请检查 Release asset"
+            echo "  下载失败 (${RELEASE_DESC}: $DIST_URL), 请检查是否已发布 Release 或网络连接"
         fi
 
         rm -rf "$TMP_TAR" "$TMP_EXTRACT"
@@ -183,7 +201,7 @@ fi
 if [ "$UPDATED" = "true" ] || [ ! -f "$DASHBOARD_DIR/.version" ]; then
     APP_VERSION=$(python3 -c "import re, sys; m=re.search(r'APP_VERSION\s*=\s*\"([^\"]+)\"', open(sys.argv[1]).read()); print(m.group(1) if m else 'unknown')" "$DASHBOARD_DIR/comfycarry/config.py" 2>/dev/null || echo "unknown")
     cat > "$DASHBOARD_DIR/.version" <<EOF
-version=${RELEASE_TAG:-$APP_VERSION}
+version=${RELEASE_TAG:-${TARGET_RELEASE_TAG:-$APP_VERSION}}
 branch=
 commit=${COMMIT_HASH}
 EOF

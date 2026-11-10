@@ -287,6 +287,19 @@ def _run_deploy(config):
         _step_plugins(config, PY)
         _step_sync_assets(config)
         _step_start_services(config, cfg, PY)
+        from .model_meta_store import reconcile_model_index
+
+        def _post_deploy_reconcile_models():
+            try:
+                reconcile_model_index()
+            except Exception:
+                pass
+
+        threading.Thread(
+            target=_post_deploy_reconcile_models,
+            name="post-deploy-model-reconcile",
+            daemon=True,
+        ).start()
 
     except Exception as e:
         _deploy_log(f"部署失败: {e}", "error")
@@ -349,6 +362,8 @@ def _step_tunnel(config):
                 _sc("public_tunnel_subdomain", pub_subdomain)
             client = PublicTunnelClient()
             result = client.register()
+            from comfycarry.routes.tunnel import _invalidate_tunnel_cache
+            _invalidate_tunnel_cache()
             _deploy_log(f"公共 Tunnel 已启用: {result.get('random_id', '?')}", "success")
             urls = result.get("urls", {})
             for name, url in urls.items():
@@ -385,6 +400,8 @@ def _step_tunnel(config):
                 _sc("cf_api_token", cf_api_token)
                 _sc("cf_domain", cf_domain)
                 _sc("cf_subdomain", mgr.subdomain)
+                from comfycarry.routes.tunnel import _invalidate_tunnel_cache
+                _invalidate_tunnel_cache()
 
                 # 启动 cloudflared (如已在运行则跳过, 避免断开 SSE)
                 if _is_cf_tunnel_online():
@@ -604,7 +621,7 @@ def _step_plugins(config, PY):
 
     _deploy_log("安装插件依赖...")
     _deploy_exec(
-        f'find {quoted_nodes} -name "requirements.txt" -type f '
+        f'find {quoted_nodes} -mindepth 2 -maxdepth 2 -not -path "*.disabled/*" -name "requirements.txt" -type f '
         f'-exec {PIP} install --no-cache-dir -r {{}} \\; 2>&1 || true',
         timeout=600, label="pip install plugin deps"
     )

@@ -16,6 +16,6 @@ ninja
 # Colab 旧版自带的 torchao 0.10 缺少新版 diffusers 所需接口。
 torchao>=0.17.0
 nvidia-ml-py
-dynamicprompts==0.30.2
+dynamicprompts>=0.34.0
 uuid7
 insightface

@@ -149,11 +149,26 @@ def main():
     from .db import db
     db.initialize()
 
-    # 当前实例的模型文件与 SQLite 索引在启动时完成一次校对；运行期由下载、
+    # 当前实例的模型文件与 SQLite 索引在已完成初始化向导的启动阶段异步完成校对
+    # (避免 Google Drive FUSE 等慢速挂载在启动时阻塞端口监听, 且避免向导未完成时
+    # 在尚未配置 CivitAI Token 的情况下提前扫描/触发自动补全); 运行期由下载、
     # enrich 和删除事件直接维护。
-    from .services.model_meta_store import reconcile_model_index
-    model_sync = reconcile_model_index()
-    app.logger.info("[models] 启动校对完成: %s", model_sync)
+    if cfg._is_setup_complete():
+        import threading
+        from .services.model_meta_store import reconcile_model_index
+
+        def _startup_reconcile_models():
+            try:
+                model_sync = reconcile_model_index()
+                app.logger.info("[models] 启动校对完成: %s", model_sync)
+            except Exception as e:
+                app.logger.warning("[models] 启动校对失败: %s", e)
+
+        threading.Thread(
+            target=_startup_reconcile_models,
+            name="startup-model-reconcile",
+            daemon=True,
+        ).start()
 
     from .services.download_engine import get_engine
     get_engine().hydrate_from_db()
