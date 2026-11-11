@@ -71,6 +71,8 @@ export interface ModelTypeConfig {
   workflowType?: string
   /** Picker 传给 ModelPickerModal 的 current-arch (显式声明) */
   pickerArch: string
+  /** 架构画廊卡片封面绑定的白名单模型 ID（存在同 pickerArch 多条目且需指定官方主模型时声明） */
+  coverModelId?: number
   /** 发布时间 YYYY-MM (取 HuggingFace 官方仓库创建时间); 架构菜单按此排序 */
   releasedAt: string
   /** 媒体类型: 'image' = 图像 (存量 12 条目); 'video' = 视频 (Wan 2.2 等)。
@@ -637,6 +639,7 @@ const MODEL_CONFIGS: Record<string, ModelTypeConfig> = {
     promptStyle: 'natural',  // 视频提示词: 主体→动作→镜头→场景
     hasNegativePrompt: true,
     pickerArch: 'wan22_i2v',
+    coverModelId: -100128,
     releasedAt: '2025-07',
     // 视频不沿用图像 resolutions; 档位走 videoDefaults.presets
     resolutions: [],
@@ -796,7 +799,7 @@ export const MODEL_VARIANTS: Record<string, { base: string } & Partial<ModelType
     base: 'minimax_h3', menuKey: 'minimax_h3', defaultMode: 'ref',
   },
   noobai_vpred: {
-    base: 'noobai', label: 'NoobAI V-Pred',
+    base: 'noobai', label: 'NoobAI V-Pred', coverModelId: -100336,
     defaults: { steps: 28, cfg: 4.5, sampler: 'euler', scheduler: 'normal', clip_skip: 2 },
   },
 }

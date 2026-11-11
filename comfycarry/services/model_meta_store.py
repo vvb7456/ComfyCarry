@@ -37,6 +37,8 @@ _auto_enrich_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mo
 _scan_lock = threading.Lock()
 _last_scan_time = 0.0
 _last_scan_result: dict | None = None
+_hash_locks_guard = threading.Lock()
+_hash_locks: dict[str, threading.Lock] = {}
 
 
 def _json_dump(value: Any) -> str:
@@ -279,7 +281,19 @@ def _path_fields(model_path: Path, category: str) -> tuple[str, str]:
     return path.name, "primary" if _is_in_primary_model_dir(path) else "extra"
 
 
-def _is_in_primary_model_dir(path: Path) -> bool:
+def _primary_roots(roots: list[tuple[str, Path, str]] | None = None) -> list[Path]:
+    comfy = Path(COMFYUI_DIR)
+    active_roots = _configured_roots() if roots is None else roots
+    return [
+        _resolve(comfy),
+        _resolve(comfy / "models"),
+        *(root for _category, root, storage_type in active_roots if storage_type == "primary"),
+    ]
+
+
+def _is_in_primary_model_dir(path: Path, primary_roots: list[Path] | None = None) -> bool:
+    if primary_roots is not None:
+        return any(_is_under(path, root) for root in primary_roots)
     comfy = Path(COMFYUI_DIR)
     if _is_under(path, _resolve(comfy)) or _is_under(path, _resolve(comfy / "models")):
         return True
@@ -290,8 +304,14 @@ def _is_in_primary_model_dir(path: Path) -> bool:
     )
 
 
-def _can_delete_model(path: Path) -> bool:
-    return _is_under(path, _resolve(WORKSPACE_ROOT)) or _is_in_primary_model_dir(path)
+def _can_delete_model(
+    path: Path,
+    *,
+    primary_roots: list[Path] | None = None,
+    workspace_root: Path | None = None,
+) -> bool:
+    ws = _resolve(WORKSPACE_ROOT) if workspace_root is None else workspace_root
+    return _is_under(path, ws) or _is_in_primary_model_dir(path, primary_roots)
 
 
 def local_preview_path(model_path: str | os.PathLike[str] | Path) -> Path | None:
@@ -343,32 +363,42 @@ def get_or_compute_model_sha256(
     metadata-store persistence details.
     """
     path = _resolve(model_path)
-    size_bytes, file_mtime = _file_stat(path)
-    if not size_bytes and not file_mtime:
-        return None
-    row = _model_row(model_id)
-    if row:
-        cached = _text(row["sha256"]).upper()
-        try:
-            same_size = int(row["size_bytes"] or 0) == size_bytes
-            same_mtime = abs(float(row["file_mtime"] or 0.0) - file_mtime) < 1e-6
-        except (TypeError, ValueError):
-            same_size = same_mtime = False
-        if cached and same_size and same_mtime:
-            return cached
+    path_key = str(path)
+    with _hash_locks_guard:
+        file_lock = _hash_locks.setdefault(path_key, threading.Lock())
+    with file_lock:
+        size_bytes, file_mtime = _file_stat(path)
+        if not size_bytes and not file_mtime:
+            return None
+        row = _model_row(model_id)
+        if row:
+            cached = _text(row["sha256"]).upper()
+            try:
+                same_size = int(row["size_bytes"] or 0) == size_bytes
+                same_mtime = abs(float(row["file_mtime"] or 0.0) - file_mtime) < 1e-6
+            except (TypeError, ValueError):
+                same_size = same_mtime = False
+            if cached and same_size and same_mtime:
+                return cached
 
-    computed = compute_sha256(str(path))
-    if not computed:
-        return None
-    normalized = _text(computed).upper()
-    db.execute(
-        "UPDATE models SET sha256 = ?, size_bytes = ?, file_mtime = ? WHERE id = ?",
-        (normalized, size_bytes, file_mtime, int(model_id)),
-    )
-    return normalized
+        computed = compute_sha256(path_key)
+        if not computed:
+            return None
+        normalized = _text(computed).upper()
+        db.execute(
+            "UPDATE models SET sha256 = ?, size_bytes = ?, file_mtime = ? WHERE id = ?",
+            (normalized, size_bytes, file_mtime, int(model_id)),
+        )
+        return normalized
 
 
-def _row_base(row: Any, *, include_path: bool = False) -> dict[str, Any]:
+def _row_base(
+    row: Any,
+    *,
+    include_path: bool = False,
+    primary_roots: list[Path] | None = None,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
     d = dict(row)
     details = json.loads(d.pop("details_json", "{}"))
     d["trigger_words"] = json.loads(d.pop("trigger_words_json", "[]"))
@@ -389,8 +419,8 @@ def _row_base(row: Any, *, include_path: bool = False) -> dict[str, Any]:
     has_preview = bool(preview)
     d["has_preview"] = has_preview
     d["preview_url"] = f"/api/local_models/{d['id']}/preview" if d["has_preview"] else None
-    d["can_fetch_info"] = _is_in_primary_model_dir(path)
-    d["can_delete"] = _can_delete_model(path)
+    d["can_fetch_info"] = _is_in_primary_model_dir(path, primary_roots)
+    d["can_delete"] = _can_delete_model(path, primary_roots=primary_roots, workspace_root=workspace_root)
     d["capabilities"] = {
         "can_fetch_info": d["can_fetch_info"],
         "can_delete": d["can_delete"],
@@ -518,6 +548,7 @@ def enrich_model(
         if source["has_images"]:
             details["images"] = source["images"]
         details.update(source.get("details_extra") or {})
+        details["civitai_checked"] = True
         values = {
             "size_bytes": size_bytes,
             "file_mtime": file_mtime,
@@ -551,7 +582,12 @@ def list_models(category: str | None = None) -> list[dict]:
         params = (_text(category),)
     sql += " ORDER BY updated_at DESC, id DESC"
     rows = db.fetch_all(sql, params)
-    models = [_row_base(row) for row in rows]
+    primary_roots = _primary_roots()
+    workspace_root = _resolve(WORKSPACE_ROOT)
+    models = [
+        _row_base(row, primary_roots=primary_roots, workspace_root=workspace_root)
+        for row in rows
+    ]
     for model in models:
         for field in ("trigger_words", "trigger_sources", "links", "images"):
             model.pop(field, None)
@@ -794,7 +830,11 @@ def _reconcile_model_index() -> dict:
                 "source_model_id": _text(old_dict.get("source_model_id")),
                 "source_version_id": _text(old_dict.get("source_version_id")),
                 "source_version_name": _text(old_dict.get("source_version_name")),
-                "details_json": _text(old_dict.get("details_json")) or "{}",
+                "details_json": (
+                    _json_dump({k: v for k, v in json.loads(old_dict.get("details_json") or "{}").items() if k != "civitai_checked"})
+                    if file_changed
+                    else (_text(old_dict.get("details_json")) or "{}")
+                ),
                 "has_info": int(old_dict.get("has_info") or 0),
                 "created_at": float(old_dict.get("created_at") or now),
                 "updated_at": now,
@@ -850,11 +890,14 @@ def _reconcile_model_index() -> dict:
     # so an unavailable mounted root is not queued accidentally.
     candidate_paths = set(candidates)
     for row in db.fetch_all(
-        "SELECT id, real_path FROM models WHERE has_info = 0 AND sha256 = '' AND category != 'auxiliary'"
+        "SELECT id, real_path, sha256, details_json FROM models WHERE has_info = 0 AND category != 'auxiliary'"
     ):
         real_path = str(row["real_path"])
-        if real_path in candidate_paths:
-            enrich_ids.append((int(row["id"]), real_path))
+        if real_path not in candidate_paths:
+            continue
+        if _text(row["sha256"]) and json.loads(row["details_json"] or "{}").get("civitai_checked"):
+            continue
+        enrich_ids.append((int(row["id"]), real_path))
 
     for model_id, real_path in enrich_ids:
         _queue_auto_enrich(model_id, real_path)
@@ -866,3 +909,23 @@ def _reconcile_model_index() -> dict:
         "removed": removed,
         "roots": len(successful_roots),
     }
+
+
+def reconcile_model_index_async(
+    *,
+    name: str = "model-index-reconcile",
+    on_done=None,
+    on_error=None,
+) -> threading.Thread:
+    def _runner():
+        try:
+            res = reconcile_model_index()
+            if on_done:
+                on_done(res)
+        except Exception as exc:
+            if on_error:
+                on_error(exc)
+
+    thread = threading.Thread(target=_runner, name=name, daemon=True)
+    thread.start()
+    return thread

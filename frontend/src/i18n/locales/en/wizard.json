@@ -47,8 +47,7 @@
       "selected_slot": "Selected backup: {name}",
       "none_selected": "Select a cloud backup slot or upload a local backup file",
       "choose_btn": "Select Backup",
-      "reselect": "Change",
-      "local_file": "Local file: {name}"
+      "reselect": "Change"
     },
     "recovery": {
       "title": "Your previous instance ({gpu}) ended unexpectedly. We saved a configuration snapshot before interruption.",

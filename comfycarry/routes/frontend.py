@@ -15,7 +15,8 @@ def _inject_bootstrap_env(html: str) -> str:
     """将实例级只读环境元数据同步注入 HTML <head>, 消除首屏异步闪烁。"""
     try:
         from .system import get_version
-        payload = json.dumps(get_version(), ensure_ascii=False, separators=(",", ":"))
+        # 转义 </ 防止任意字符串字段包含 </script> 时提前闭合脚本标签
+        payload = json.dumps(get_version(), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
         script_tag = f"<script>window.__CC_ENV__={payload};</script>"
         if "</head>" in html:
             return html.replace("</head>", f"{script_tag}</head>", 1)

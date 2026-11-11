@@ -52,9 +52,6 @@ const ROLE_OF_FIELD: Record<string, string> = {
   vaeOverride: 'vae',
   audioVae: 'audio_vae',
   loras: 'lora',
-  'controlNets.pose.model': 'controlnet',
-  'controlNets.canny.model': 'controlnet',
-  'controlNets.depth.model': 'controlnet',
   'upscale.svrModel': 'upscale_model',
   'faceDetailer.detectionModel': 'face_model',
 }

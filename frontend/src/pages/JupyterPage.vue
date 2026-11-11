@@ -33,6 +33,7 @@ import SecretInput from '@/components/ui/SecretInput.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useLogStream } from '@/composables/useLogStream'
+import { useTunnelServiceUrl } from '@/composables/useTunnelServiceUrl'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { fmtBytes } from '@/utils/format'
@@ -47,8 +48,7 @@ const { toast } = useToast()
 const { confirm } = useConfirm()
 
 const status = ref<JupyterStatus | null>(null)
-const jupyterUrl = ref('')
-const tunnelLoaded = ref(false)
+const { tunnelUrl: jupyterUrl, tunnelLoaded, loadTunnelUrl: loadJupyterUrl } = useTunnelServiceUrl('jupyter')
 const token = ref('')
 // 进程重启后 Jupyter 会生成新 token; 置脏后持续重取, 直到拿到非空令牌
 const tokenDirty = ref(false)
@@ -105,31 +105,6 @@ async function loadStatus() {
   status.value = data
   // 只有在新进程下发之后发起的请求才可信; 在途的旧快照不能解除 pending
   if (pendingStartAt.value && requestedAt >= pendingStartAt.value) pendingStartAt.value = 0
-}
-
-/** 有隧道用隧道入口 (自定义 + 公共), 无隧道在 effectiveJupyterUrl 里回落本机直连。 */
-async function loadJupyterUrl() {
-  try {
-    const data = await get<{
-      effective_status?: string
-      urls?: Record<string, string>
-      public?: { urls?: Record<string, string> }
-    }>('/api/tunnel/status', { silent: true })
-    if (!data || data.effective_status !== 'online') {
-      jupyterUrl.value = ''
-      return
-    }
-    const urls: Record<string, string> = { ...(data.urls || {}), ...(data.public?.urls || {}) }
-    for (const [name, url] of Object.entries(urls)) {
-      if (name.toLowerCase().includes('jupyter')) {
-        jupyterUrl.value = url as string
-        return
-      }
-    }
-    jupyterUrl.value = ''
-  } finally {
-    tunnelLoaded.value = true
-  }
 }
 
 /** force=true 时跳过后端缓存重新检测 (重启后必须, 进程可能晚于轮询就绪) */

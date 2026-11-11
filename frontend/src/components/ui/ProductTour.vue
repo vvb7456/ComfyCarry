@@ -298,12 +298,15 @@ const badgeNumber = computed(() => index.value)
           <BaseButton variant="ghost" size="sm" @click="skip">
             {{ t('generate.tour.btn_skip') }}
           </BaseButton>
-          <div v-if="!isWelcome" class="tour-bubble__dots" aria-hidden="true">
-            <span
+          <div v-if="!isWelcome" class="tour-bubble__dots">
+            <button
               v-for="n in formalSteps"
               :key="n"
+              type="button"
               class="tour-dot"
-              :class="{ active: n - 1 === index - 1 }"
+              :class="{ active: n === index }"
+              :aria-label="`${n} / ${formalSteps}`"
+              :aria-current="n === index ? 'step' : undefined"
               @click="goTo(n)"
             />
           </div>
@@ -407,15 +410,32 @@ const badgeNumber = computed(() => index.value)
   justify-content: center;
 }
 .tour-dot {
+  position: relative;
   width: 6px;
   height: 6px;
+  padding: 0;
+  border: none;
   border-radius: 50%;
   background: var(--bd);
   cursor: pointer;
   transition: background .15s;
 }
+.tour-dot::after {
+  content: '';
+  position: absolute;
+  inset: -5px -2px;
+}
 .tour-dot:hover { background: var(--t3); }
 .tour-dot.active { background: var(--ac); }
+.tour-dot:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot { transition: none; }
+  .tour-bubble { animation: none; }
+}
 
 .tour-bubble__nav {
   display: flex;

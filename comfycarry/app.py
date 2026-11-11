@@ -154,21 +154,12 @@ def main():
     # 在尚未配置 CivitAI Token 的情况下提前扫描/触发自动补全); 运行期由下载、
     # enrich 和删除事件直接维护。
     if cfg._is_setup_complete():
-        import threading
-        from .services.model_meta_store import reconcile_model_index
-
-        def _startup_reconcile_models():
-            try:
-                model_sync = reconcile_model_index()
-                app.logger.info("[models] 启动校对完成: %s", model_sync)
-            except Exception as e:
-                app.logger.warning("[models] 启动校对失败: %s", e)
-
-        threading.Thread(
-            target=_startup_reconcile_models,
+        from .services.model_meta_store import reconcile_model_index_async
+        reconcile_model_index_async(
             name="startup-model-reconcile",
-            daemon=True,
-        ).start()
+            on_done=lambda res: app.logger.info("[models] 启动校对完成: %s", res),
+            on_error=lambda err: app.logger.warning("[models] 启动校对失败: %s", err),
+        )
 
     from .services.download_engine import get_engine
     get_engine().hydrate_from_db()

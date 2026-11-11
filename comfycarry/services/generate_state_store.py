@@ -143,6 +143,15 @@ def replace_state(payload: Any) -> tuple[dict | None, tuple[str, dict] | None]:
         return stored, err
 
 
+def clear_state() -> None:
+    """清空工作区状态与导入待检标记（用于导入不含 generate_state 的整份配置包）。"""
+    with db.transaction() as conn:
+        conn.execute(
+            f"DELETE FROM {TABLE} WHERE key IN (?, ?)",
+            (KEY, IMPORT_PENDING_KEY),
+        )
+
+
 def consume_import_check() -> bool:
     """首次进入生成页时消费导入提醒；持久化以跨越向导部署和服务重启。"""
     with db.transaction() as conn:

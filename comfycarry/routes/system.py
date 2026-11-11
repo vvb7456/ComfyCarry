@@ -33,38 +33,58 @@ def api_version():
     return jsonify(get_version())
 
 
-def get_version():
-    from ..services.managed_tunnel import is_managed
-    from ..services.cloud_backup import short_gpu_name
+_build_version_cache: tuple[tuple[str, float | None], dict[str, str]] | None = None
 
-    version_info: dict = {"version": APP_VERSION, "branch": "", "commit": ""}
+
+def _get_build_version() -> dict[str, str]:
+    global _build_version_cache
     version_file = os.path.join(SCRIPT_DIR, ".version")
     try:
-        if os.path.exists(version_file):
-            with open(version_file, "r") as f:
+        mtime: float | None = os.path.getmtime(version_file)
+    except OSError:
+        mtime = None
+
+    cache_key = (SCRIPT_DIR, mtime)
+    if _build_version_cache and _build_version_cache[0] == cache_key:
+        return dict(_build_version_cache[1])
+
+    info: dict[str, str] = {"version": APP_VERSION, "branch": "", "commit": ""}
+    if mtime is not None:
+        try:
+            with open(version_file, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if "=" in line:
                         k, v = line.split("=", 1)
-                        version_info[k.strip().lower()] = v.strip()
-    except Exception:
-        pass
-    if not version_info.get("commit"):
+                        info[k.strip().lower()] = v.strip()
+        except Exception:
+            pass
+    if not info.get("commit"):
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
                 cwd=SCRIPT_DIR, timeout=3
             )
             if result.returncode == 0:
-                version_info["commit"] = result.stdout.strip()
+                info["commit"] = result.stdout.strip()
             result2 = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True,
                 cwd=SCRIPT_DIR, timeout=3
             )
             if result2.returncode == 0:
-                version_info["branch"] = result2.stdout.strip()
+                info["branch"] = result2.stdout.strip()
         except Exception:
             pass
+
+    _build_version_cache = (cache_key, dict(info))
+    return info
+
+
+def get_version():
+    from ..services.managed_tunnel import is_managed
+    from ..services.cloud_backup import short_gpu_name
+
+    version_info: dict = _get_build_version()
     version_info["managed"] = is_managed()
     version_info["gpu_name"] = short_gpu_name()
     return version_info

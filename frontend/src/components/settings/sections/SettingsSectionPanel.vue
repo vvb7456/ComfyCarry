@@ -159,12 +159,33 @@ async function applyConfigImport(config: ExportedConfig, isRecovery = false) {
     ...(config as unknown as Record<string, unknown>),
     ...(isRecovery ? { _from_recovery: true } : {}),
   }
-  const data = await post<{ message?: string }>('/api/settings/import-config', body)
+  const data = await post<{
+    message?: string
+    message_key?: string
+    params?: Record<string, unknown>
+    errors?: string[]
+    plugins_installing?: number
+    comfyui_restart_needed?: boolean
+  }>('/api/settings/import-config', body)
   if (!data) return
-  toast(apiMessageText(data), 'success')
 
-  // 密码、密钥等全局设置也随导入变化，重新加载应用。
-  window.location.href = '/'
+  if (data.errors?.length) {
+    toast(`${apiMessageText(data)}：${data.errors.join('；')}`, 'warning')
+    setTimeout(() => { window.location.href = '/' }, 3500)
+    return
+  }
+
+  let msg = apiMessageText(data)
+  if (data.plugins_installing && data.plugins_installing > 0) {
+    msg += ` · ${t('settings.config.import_plugins_bg', { count: data.plugins_installing })}`
+  } else if (data.comfyui_restart_needed) {
+    msg += ` · ${t('settings.config.import_restart_comfyui')}`
+  }
+  toast(msg, 'success')
+
+  // 密码、密钥等全局设置也随导入变化，留出提示展示时间后重新加载应用。
+  const delay = (data.plugins_installing && data.plugins_installing > 0) || data.comfyui_restart_needed ? 2200 : 1500
+  setTimeout(() => { window.location.href = '/' }, delay)
 }
 
 async function importConfig(event: Event) {

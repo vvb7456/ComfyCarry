@@ -13,11 +13,11 @@ import AlertBanner from '@/components/ui/AlertBanner.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 import CloudReadConfigModal from '@/components/settings/CloudReadConfigModal.vue'
+import { buildSlotFacts } from '@/utils/cloudBackup'
 import type {
   CloudBackupDetailResponse,
   CloudBackupSlot,
   CloudBackupsListResponse,
-  CloudBackupSummary,
   ExportedConfig,
 } from '@/types/config-export'
 
@@ -39,30 +39,6 @@ const uploadRef = ref<InstanceType<typeof FileUploadZone>>()
 const pendingRecovery = ref<CloudBackupSlot | null>(null)
 const dismissingRecovery = ref(false)
 const applyingRecovery = ref(false)
-
-function formatDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
-}
-
-function summaryTags(s?: CloudBackupSummary): string[] {
-  if (!s) return []
-  const tags: string[] = []
-  if (s.has_rclone) tags.push(t('settings.config.summary_rclone'))
-  if (s.sync_rules_count > 0) tags.push(t('settings.config.summary_rules', { count: s.sync_rules_count }))
-  if (s.extra_plugins_count > 0) tags.push(t('settings.config.summary_plugins', { count: s.extra_plugins_count }))
-  if (s.favorites_count > 0) tags.push(t('settings.config.summary_favorites', { count: s.favorites_count }))
-  if (s.prompt_history_count > 0) tags.push(t('settings.config.summary_history', { count: s.prompt_history_count }))
-  if (s.has_generate_state) tags.push(t('settings.config.summary_workspace'))
-  return tags
-}
 
 async function checkPendingRecovery() {
   if (!managedTunnel.value) return
@@ -196,7 +172,7 @@ function onNext() {
           icon="history"
           :title="t('wizard.step0.recovery.title', { gpu: pendingRecovery.gpu_name || 'GPU' })"
           :badges="[{ text: t('settings.config.recovery_slot_badge'), tone: 'caution' }]"
-          :facts="[formatDate(pendingRecovery.updated_at), ...summaryTags(pendingRecovery.summary)]"
+          :facts="buildSlotFacts(pendingRecovery, t)"
         >
           <template #actions>
             <BaseButton

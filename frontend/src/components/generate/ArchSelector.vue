@@ -6,6 +6,7 @@ import { FAST_PRESETS, MODEL_MENU, MODEL_TYPES, type ModelTypeConfig } from '@/c
 import { MODEL_WHITELIST } from '@/config/huggingface-models'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import SegmentedControl, { type SegmentOption } from '@/components/ui/SegmentedControl.vue'
+import TabSwitcher, { type TabItem } from '@/components/ui/TabSwitcher.vue'
 import MsIcon from '@/components/ui/MsIcon.vue'
 
 defineOptions({ name: 'ArchSelector' })
@@ -56,9 +57,16 @@ watch(() => store.activeModelType, () => {
 
 const imageArchCount = computed(() => MODEL_MENU.filter(c => c.mediaType === 'image').length)
 const videoArchCount = computed(() => MODEL_MENU.filter(c => c.mediaType === 'video').length)
+const tabSwitcherRef = ref<InstanceType<typeof TabSwitcher> | null>(null)
 
-function onModalTaskChange(v: 'image' | 'video') {
-  modalTask.value = v
+const modalTabs = computed<TabItem[]>(() => [
+  { key: 'image', label: t('generate.arch.cat_image_title'), icon: 'image', badge: imageArchCount.value },
+  { key: 'video', label: t('generate.arch.cat_video_title'), icon: 'videocam', badge: videoArchCount.value },
+  { key: 'edit', label: t('generate.arch.cat_edit_title'), icon: 'edit', badge: t('generate.arch.cat_edit_sub'), disabled: true },
+])
+
+function onModalTaskChange(v: string) {
+  if (v === 'image' || v === 'video') modalTask.value = v
 }
 
 interface MediaSource {
@@ -75,6 +83,11 @@ const MAIN_WEIGHT_ENTRIES = MODEL_WHITELIST.filter(m => {
 })
 
 function resolveArchMedia(cfg: ModelTypeConfig): MediaSource | null {
+  if (cfg.coverModelId != null) {
+    const pinned = MAIN_WEIGHT_ENTRIES.find(m => m.id === cfg.coverModelId)
+    const pinnedImg = pinned?.images?.[0] ?? pinned?.version.images?.[0]
+    if (pinnedImg?.url) return { url: pinnedImg.url, isVideo: pinnedImg.type === 'video' }
+  }
   const candidates = MAIN_WEIGHT_ENTRIES.filter(m => m.version.file.architecture === cfg.pickerArch)
   if (!candidates.length) return null
 
@@ -276,57 +289,32 @@ function selectArch(key: string) {
       density="default"
       scroll="none"
     >
-      <!-- 顶部任务大类导航栏 (底线式 Tab 导航条 + 通栏分割线, 与下方画廊卡片明确区分层级) -->
-      <div class="arch-modal__nav" role="tablist">
-        <div class="arch-modal__tabs">
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="modalTask === 'image'"
-            class="arch-nav-tab"
-            :class="{ 'arch-nav-tab--active': modalTask === 'image' }"
-            @click="onModalTaskChange('image')"
-          >
-            <MsIcon name="image" size="sm" color="none" />
-            <span class="arch-nav-tab__label">{{ t('generate.arch.cat_image_title') }}</span>
-            <span class="arch-nav-tab__badge">{{ imageArchCount }}</span>
-          </button>
-
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="modalTask === 'video'"
-            class="arch-nav-tab"
-            :class="{ 'arch-nav-tab--active': modalTask === 'video' }"
-            @click="onModalTaskChange('video')"
-          >
-            <MsIcon name="videocam" size="sm" color="none" />
-            <span class="arch-nav-tab__label">{{ t('generate.arch.cat_video_title') }}</span>
-            <span class="arch-nav-tab__badge">{{ videoArchCount }}</span>
-          </button>
-
-          <button
-            type="button"
-            role="tab"
-            aria-selected="false"
-            disabled
-            class="arch-nav-tab arch-nav-tab--disabled"
-          >
-            <MsIcon name="edit" size="sm" color="none" />
-            <span class="arch-nav-tab__label">{{ t('generate.arch.cat_edit_title') }}</span>
-            <span class="arch-nav-tab__badge arch-nav-tab__badge--muted">{{ t('generate.arch.cat_edit_sub') }}</span>
-          </button>
-        </div>
-
-        <span class="arch-modal__nav-hint">
-          {{ modalTask === 'video'
-            ? t('generate.arch.cat_video_sub', { count: videoArchCount })
-            : t('generate.arch.cat_image_sub', { count: imageArchCount }) }}
-        </span>
+      <!-- 顶部任务大类导航栏 -->
+      <div class="arch-modal__nav">
+        <TabSwitcher
+          ref="tabSwitcherRef"
+          :model-value="modalTask"
+          :tabs="modalTabs"
+          panel-ids="arch-modal-panel"
+          @update:model-value="onModalTaskChange"
+        >
+          <template #extra>
+            <span class="arch-modal__nav-hint">
+              {{ modalTask === 'video'
+                ? t('generate.arch.cat_video_sub', { count: videoArchCount })
+                : t('generate.arch.cat_image_sub', { count: imageArchCount }) }}
+            </span>
+          </template>
+        </TabSwitcher>
       </div>
 
       <!-- 架构画廊网格 (3:4 竖版比例 + 统一基线底部 Overlay) -->
-      <div class="arch-modal__grid-wrap">
+      <div
+        id="arch-modal-panel"
+        role="tabpanel"
+        :aria-labelledby="tabSwitcherRef?.tabIdFor(modalTask)"
+        class="arch-modal__grid-wrap"
+      >
         <div class="arch-modal__grid">
           <button
             v-for="item in modalItems"
@@ -494,20 +482,20 @@ function selectArch(key: string) {
 .arch-logo--sm {
   width: 26px;
   height: 26px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 .arch-logo--md {
   width: 26px;
   height: 26px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
 }
 
 .arch-logo--lg {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
 }
 
 .arch-logo--pad {
@@ -524,7 +512,7 @@ function selectArch(key: string) {
 }
 
 .arch-logo__letter {
-  font-size: .7rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, var(--ac), var(--ac2));
@@ -537,7 +525,7 @@ function selectArch(key: string) {
 }
 
 .arch-logo--lg .arch-logo__letter {
-  font-size: 1.05rem;
+  font-size: var(--text-lg);
 }
 
 .arch-trigger__info {
@@ -557,7 +545,7 @@ function selectArch(key: string) {
 }
 
 .arch-trigger__name {
-  font-size: .82rem;
+  font-size: var(--text-base);
   font-weight: 700;
   color: var(--t1);
   white-space: nowrap;
@@ -566,10 +554,10 @@ function selectArch(key: string) {
 }
 
 .arch-trigger__badge {
-  font-size: .62rem;
+  font-size: var(--text-xxs);
   font-weight: 600;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: color-mix(in srgb, var(--ac) 14%, transparent);
   color: var(--ac);
   white-space: nowrap;
@@ -578,7 +566,7 @@ function selectArch(key: string) {
 }
 
 .arch-trigger__fact {
-  font-size: .66rem;
+  font-size: var(--text-xxs);
   color: var(--t3);
   line-height: 1.15;
   white-space: nowrap;
@@ -635,112 +623,27 @@ function selectArch(key: string) {
   }
 }
 
-/* ═══ Modal 顶部底线式导航栏 (与下方画廊卡片清晰区分视觉层级) ═══ */
+/* ═══ Modal 顶部导航栏 ═══ */
 .arch-modal__nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin: -4px -24px 0;
-  padding: 0 24px;
+  padding: 0 24px 10px;
   border-bottom: 1px solid var(--bd);
   flex-shrink: 0;
   position: relative;
   z-index: 2;
 }
 
-.arch-modal__tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+.arch-modal__nav :deep(.tab-switcher) {
+  width: 100%;
 }
 
-.arch-modal__tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.arch-nav-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 12px 11px;
-  border: none;
-  background: none;
+.arch-modal__nav :deep(.tab-switcher__tab:not(.tab-switcher__tab--active) .tab-switcher__badge) {
+  background: var(--bg3);
   color: var(--t2);
-  font: inherit;
-  font-size: .88rem;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  border-radius: var(--r-sm) var(--r-sm) 0 0;
-  transition: color .15s ease, background .15s ease;
-}
-
-.arch-nav-tab::after {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: -1px;
-  height: 2.5px;
-  border-radius: 2px 2px 0 0;
-  background: transparent;
-  transition: background .16s ease, box-shadow .16s ease;
-}
-
-.arch-nav-tab:hover:not(:disabled) {
-  color: var(--t1);
-  background: color-mix(in srgb, var(--t1) 4%, transparent);
-}
-
-.arch-nav-tab--active {
-  color: var(--t1);
-  font-weight: 700;
-}
-
-.arch-nav-tab--active :deep(.ms) {
-  color: var(--ac);
-}
-
-.arch-nav-tab--active::after {
-  background: var(--ac);
-  box-shadow: 0 -1px 8px color-mix(in srgb, var(--ac) 45%, transparent);
-}
-
-.arch-nav-tab--disabled {
-  opacity: .42;
-  cursor: not-allowed;
-}
-
-.arch-nav-tab__badge {
-  font-size: .68rem;
-  font-weight: 600;
-  line-height: 1.3;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  color: var(--t2);
-  transition: background .15s ease, color .15s ease, border-color .15s ease;
-}
-
-.arch-nav-tab--active .arch-nav-tab__badge {
-  background: color-mix(in srgb, var(--ac) 16%, transparent);
-  border-color: color-mix(in srgb, var(--ac) 38%, transparent);
-  color: var(--ac);
-}
-
-.arch-nav-tab__badge--muted {
-  font-weight: 500;
-  color: var(--t3);
 }
 
 .arch-modal__nav-hint {
-  font-size: .75rem;
+  font-size: var(--text-xs);
   color: var(--t3);
   white-space: nowrap;
   flex-shrink: 0;
@@ -862,8 +765,8 @@ function selectArch(key: string) {
   align-items: center;
   gap: 3px;
   padding: 2px 7px;
-  border-radius: 999px;
-  font-size: .66rem;
+  border-radius: var(--r-pill);
+  font-size: var(--text-xxs);
   font-weight: 600;
   line-height: 1.35;
   white-space: nowrap;
@@ -910,7 +813,7 @@ function selectArch(key: string) {
   flex-direction: column;
   justify-content: flex-start;
   gap: 6px;
-  padding: 0 14px 16px;
+  padding: 0 12px 14px;
 }
 
 .arch-gallery-card__hero {
@@ -923,7 +826,7 @@ function selectArch(key: string) {
 }
 
 .arch-gallery-card__title {
-  font-size: .92rem;
+  font-size: var(--text-md);
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, .8);
@@ -935,7 +838,7 @@ function selectArch(key: string) {
 .arch-gallery-card__desc {
   flex: 1;
   margin: 0;
-  font-size: .74rem;
+  font-size: var(--text-xs);
   line-height: 1.44;
   color: rgba(255, 255, 255, .94);
   text-shadow: 0 1px 3px rgba(0, 0, 0, .85);
@@ -946,21 +849,24 @@ function selectArch(key: string) {
 .arch-gallery-card__tags {
   display: flex;
   flex-wrap: nowrap;
-  gap: 5px;
+  gap: 4px;
   margin-top: auto;
   flex-shrink: 0;
   overflow: hidden;
 }
 
 .arch-tag {
-  font-size: .64rem;
+  font-size: var(--text-xxs);
   font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
   background: rgba(255, 255, 255, .16);
   border: 1px solid rgba(255, 255, 255, .24);
   color: rgba(255, 255, 255, .96);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.35;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -970,6 +876,18 @@ function selectArch(key: string) {
   background: color-mix(in srgb, var(--ac) 42%, rgba(10, 12, 20, .82));
   border-color: color-mix(in srgb, var(--ac) 68%, rgba(255, 255, 255, .28));
   color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arch-gallery-card,
+  .arch-gallery-card__media {
+    transition: none;
+  }
+
+  .arch-gallery-card:hover,
+  .arch-gallery-card:hover .arch-gallery-card__media {
+    transform: none;
+  }
 }
 
 /* ═══ Modal 移动端与平板响应式适配 ═══ */
@@ -989,18 +907,7 @@ function selectArch(key: string) {
 @media (max-width: 600px) {
   .arch-modal__nav {
     margin: -4px -16px 0;
-    padding: 0 12px;
-  }
-
-  .arch-nav-tab {
-    padding: 8px 8px 10px;
-    font-size: .8rem;
-    gap: 5px;
-  }
-
-  .arch-nav-tab__badge {
-    font-size: .62rem;
-    padding: 1px 5px;
+    padding: 0 12px 8px;
   }
 
   .arch-modal__grid-wrap {
@@ -1019,7 +926,6 @@ function selectArch(key: string) {
   }
 
   .arch-pill {
-    font-size: .58rem;
     padding: 1px 5px;
   }
 
@@ -1029,8 +935,8 @@ function selectArch(key: string) {
   }
 
   .arch-gallery-card__overlay {
-    height: 106px;
-    padding: 0 10px 12px;
+    height: 108px;
+    padding: 0 8px 10px;
     gap: 4px;
   }
 
@@ -1042,15 +948,15 @@ function selectArch(key: string) {
   .arch-logo--md {
     width: 22px;
     height: 22px;
-    border-radius: 5px;
+    border-radius: var(--r-xs);
   }
 
   .arch-gallery-card__title {
-    font-size: .8rem;
+    font-size: var(--text-sm);
   }
 
   .arch-gallery-card__desc {
-    font-size: .66rem;
+    font-size: var(--text-xxs);
     line-height: 1.38;
   }
 
@@ -1059,7 +965,6 @@ function selectArch(key: string) {
   }
 
   .arch-tag {
-    font-size: .56rem;
     padding: 1px 4px;
   }
 }

@@ -312,6 +312,8 @@ def api_settings_import_config():
 
     applied = []
     errors = []
+    plugins_disk_changed = False
+    plugins_installing = 0
 
     if data.get("password"):
         try:
@@ -445,7 +447,7 @@ def api_settings_import_config():
             state["plugins"] = plugins
             if cfg._is_setup_complete():
                 from ..services.cloud_backup import apply_imported_plugins_on_disk
-                apply_imported_plugins_on_disk(
+                plugins_disk_changed, plugins_installing = apply_imported_plugins_on_disk(
                     data.get("extra_plugins", []),
                     data.get("disabled_default_plugins", []),
                 )
@@ -495,9 +497,9 @@ def api_settings_import_config():
         except Exception as e:
             errors.append(f"提示词历史: {e}")
 
-    if data.get("generate_state"):
-        try:
-            from ..services import generate_state_store
+    try:
+        from ..services import generate_state_store
+        if data.get("generate_state"):
             # 导入是「完整替换」而非增量合并: 配置包没覆盖到的架构应被清除,
             # 否则目标实例会把自家配置和配置包混在一起。
             _stored, err = generate_state_store.replace_state(data["generate_state"])
@@ -505,8 +507,10 @@ def api_settings_import_config():
                 errors.append(f"工作区状态: {err[0]}")
             else:
                 applied.append("工作区状态")
-        except Exception as e:
-            errors.append(f"工作区状态: {e}")
+        else:
+            generate_state_store.clear_state()
+    except Exception as e:
+        errors.append(f"工作区状态: {e}")
 
     # 模型哈希表: 不透明 JSON, 整体替换 (导入 = 完整替换, 无兼容负担)。
     # 请求里没有该字段 → 存空表, 免残留旧指纹指向已不存在的引用。
@@ -542,9 +546,15 @@ def api_settings_import_config():
         threading.Thread(target=_dismiss_recovery, daemon=True, name="import-dismiss-recovery").start()
 
     msg_key = "config_imported_with_errors" if errors else "config_imported"
-    return _ok(msg_key,
-               params={"applied": len(applied), "failed": len(errors)},
-               applied=applied, errors=errors)
+    comfyui_restart_needed = bool(data.get("comfyui_args") or plugins_disk_changed or plugins_installing > 0)
+    return _ok(
+        msg_key,
+        params={"applied": len(applied), "failed": len(errors)},
+        applied=applied,
+        errors=errors,
+        plugins_installing=plugins_installing,
+        comfyui_restart_needed=comfyui_restart_needed,
+    )
 
 
 def _upstream_backup_err(status: int, body: dict):
@@ -604,14 +614,10 @@ def api_settings_cloud_backups_get(slot_id: str):
 
 @bp.route("/api/settings/cloud-backups", methods=["POST"])
 def api_settings_cloud_backups_save():
-    from ..services.cloud_backup import compute_config_hash, platform_request, set_last_synced_hash, short_gpu_name
+    from ..services.cloud_backup import platform_request, short_gpu_name
     data = request.get_json(force=True) or {}
     mode = data.get("mode")
-    slot_id = data.get("slot_id")
-    if mode == "auto":
-        slot_id = "auto"
-    elif mode == "new":
-        slot_id = None
+    slot_id = None if mode == "new" else data.get("slot_id")
     name = data.get("name")
     payload = build_export_config_dict(include_timestamp=True)
     status, body = platform_request(
@@ -626,8 +632,6 @@ def api_settings_cloud_backups_save():
     )
     if status != 200:
         return _upstream_backup_err(status, body)
-    if slot_id == "auto" or body.get("is_auto"):
-        set_last_synced_hash(compute_config_hash(payload))
     return _ok("cloud_backup_saved", slot=body)
 
 

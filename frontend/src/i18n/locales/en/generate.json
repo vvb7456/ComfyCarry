@@ -6,13 +6,11 @@
   },
   "arch": {
     "click_change": "Click to change architecture",
-    "switch_btn": "Change",
     "modal_title": "Select Architecture & Workflow",
     "cat_image_title": "Image Generation",
     "cat_image_sub": "{count} architectures",
     "cat_video_title": "Video Generation",
     "cat_video_sub": "{count} architectures",
-    "cat_count": "{count} architectures",
     "cat_edit_title": "Image Editing",
     "cat_edit_sub": "Coming soon",
     "current_used": "Active",
@@ -20,7 +18,6 @@
     "tag_natural": "Natural language",
     "tag_fast": "Fast mode",
     "tag_controlnet": "ControlNet",
-    "ready": "Ready",
     "desc": {
       "sd15": "Lightweight classic diffusion model with low VRAM usage, fast speed, and a vast plugin ecosystem.",
       "sdxl": "Native 1024px general-purpose model balancing photorealism, illustration, and rich ControlNet support.",
@@ -61,15 +58,12 @@
     "model_label": "Architecture",
     "task_image": "Image",
     "task_video": "Video",
-    "task_edit": "Edit",
     "family_flux2": "Flux 2 series",
     "family_wan22": "Wan 2.2 series",
     "family_minimax_h3": "MiniMax H3 series",
     "family_qwen_image21": "Qwen Image 2.1 series",
     "family_anima": "Anima series",
-    "family_zimage": "Z-Image series",
-    "not_ready": "Not ready",
-    "back_to_all_models": "Back to all architectures"
+    "family_zimage": "Z-Image series"
   },
   "tabs": {
     "sdxl": "SDXL",

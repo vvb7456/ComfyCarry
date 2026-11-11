@@ -14,7 +14,8 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useToast } from '@/composables/useToast'
-import type { CloudBackupSlot, CloudBackupsListResponse, CloudBackupSummary } from '@/types/config-export'
+import { buildSlotFacts, isRecoverySlot } from '@/utils/cloudBackup'
+import type { CloudBackupSlot, CloudBackupsListResponse } from '@/types/config-export'
 
 defineOptions({ name: 'CloudSaveConfigModal' })
 
@@ -48,10 +49,6 @@ const selectedTarget = ref<string>('')
 const nameModalOpen = ref(false)
 const newSlotName = ref('')
 
-function isRecoverySlot(slot: CloudBackupSlot): boolean {
-  return Boolean(slot.is_auto || slot.slot_type === 'recovery' || slot.id?.startsWith('recovery-'))
-}
-
 const manualSlots = computed(() => items.value.filter(item => !isRecoverySlot(item)))
 const canCreateNew = computed(() => manualSlots.value.length < maxManualSlots.value)
 
@@ -65,32 +62,8 @@ function formatDefaultName(): string {
   return `${gpu} · ${mm}-${dd} ${hh}:${min}`
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
-}
-
 function slotDescription(slot: CloudBackupSlot): string {
-  const s: CloudBackupSummary | undefined = slot.summary
-  const parts: string[] = []
-  const formatted = formatDate(slot.updated_at)
-  if (formatted) parts.push(formatted)
-  if (s) {
-    if (s.has_rclone) parts.push(t('settings.config.summary_rclone'))
-    if (s.sync_rules_count > 0) parts.push(t('settings.config.summary_rules', { count: s.sync_rules_count }))
-    if (s.extra_plugins_count > 0) parts.push(t('settings.config.summary_plugins', { count: s.extra_plugins_count }))
-    if (s.favorites_count > 0) parts.push(t('settings.config.summary_favorites', { count: s.favorites_count }))
-    if (s.prompt_history_count > 0) parts.push(t('settings.config.summary_history', { count: s.prompt_history_count }))
-    if (s.has_generate_state) parts.push(t('settings.config.summary_workspace'))
-  }
-  return parts.join(' · ')
+  return buildSlotFacts(slot, t).join(' · ')
 }
 
 async function fetchSlots() {

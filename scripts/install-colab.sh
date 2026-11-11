@@ -138,6 +138,9 @@ export PIP_NO_BUILD_ISOLATION=0
 export TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST@Q}
 export PATH="\$CUDA_HOME/bin:/usr/local/bin:\$PATH"
 EOF
+    if [[ -n "${COMFYCARRY_RELEASE_TAG:-}" ]]; then
+        printf 'export COMFYCARRY_RELEASE_TAG=%q\n' "$COMFYCARRY_RELEASE_TAG" >> /etc/profile.d/comfycarry-colab.sh
+    fi
 fi
 
 sed -i '/r2u\.stat\.illinois\.edu/d' /etc/apt/sources.list 2>/dev/null || true

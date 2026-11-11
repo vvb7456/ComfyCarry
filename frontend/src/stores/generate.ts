@@ -377,8 +377,12 @@ export const useGenerateStore = defineStore('generate', () => {
       if (!paths?.has(file.path)) continue
       const state = modelStates[file.arch]
       if (!state) continue
-      if (file.field.startsWith('fast.')) state.fast = false
-      else if (file.field.startsWith('reference.')) state.mode = 't2i'
+      if (file.field.startsWith('fast.')) {
+        if (state.fast) {
+          state.fast = false
+          Object.assign(state, configFor(file.arch).defaults)
+        }
+      } else if (file.field.startsWith('reference.')) state.mode = 't2i'
       else if (file.field === 'faceDetailer.sam') state.faceDetailer.useSam = false
       else if (file.field.startsWith('upscale.') && file.field !== 'upscale.svrModel') state.upscale.enabled = false
       else if (file.field.includes('.dependency.')) {

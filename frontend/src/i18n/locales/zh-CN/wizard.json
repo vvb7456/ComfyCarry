@@ -47,8 +47,7 @@
       "selected_slot": "已选存档：{name}",
       "none_selected": "请选择要恢复的云端存档或本地备份文件",
       "choose_btn": "选择配置存档",
-      "reselect": "重新选择",
-      "local_file": "本地文件：{name}"
+      "reselect": "重新选择"
     },
     "recovery": {
       "title": "检测到上次实例（{gpu}）异常中断，已为您保留中断前的配置快照",

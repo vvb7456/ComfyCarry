@@ -283,10 +283,12 @@ def scan_installed_plugins() -> tuple[list[str], list[str]]:
 def apply_imported_plugins_on_disk(
     extra_plugins: list[str] | None,
     disabled_default_plugins: list[str] | None,
-) -> None:
+) -> tuple[bool, int]:
+    """同步导入的插件启停与缺失克隆；返回 (是否原地变更了目录启停, 后台排队克隆数量)。"""
     nodes_dir = Path(cfg.COMFYUI_DIR) / "custom_nodes"
     if not nodes_dir.is_dir():
-        return
+        return False, 0
+    disk_changed = False
     disabled_set = set(disabled_default_plugins or [])
     missing_urls: list[tuple[str, Path]] = []
     for dp in DEFAULT_PLUGINS:
@@ -299,9 +301,11 @@ def apply_imported_plugins_on_disk(
         if d_url in disabled_set:
             if active_dir.is_dir() and not disabled_dir.exists():
                 active_dir.rename(disabled_dir)
+                disk_changed = True
         else:
             if disabled_dir.is_dir() and not active_dir.exists():
                 disabled_dir.rename(active_dir)
+                disk_changed = True
             elif not active_dir.exists():
                 missing_urls.append((d_url, active_dir))
 
@@ -316,63 +320,67 @@ def apply_imported_plugins_on_disk(
         disabled_dir = nodes_dir / f"{dir_name}.disabled"
         if disabled_dir.is_dir() and not target_dir.exists():
             disabled_dir.rename(target_dir)
+            disk_changed = True
         elif not target_dir.exists():
             record_plugin_repo(plugin_id=dir_name, repo_url=norm)
             missing_urls.append((norm, target_dir))
 
-    if missing_urls:
-        pending_urls: list[tuple[str, Path]] = []
-        with _cloning_lock:
-            for url, target_dir in missing_urls:
-                if url not in _cloning_plugin_urls:
-                    _cloning_plugin_urls.add(url)
-                    pending_urls.append((url, target_dir))
+    if not missing_urls:
+        return disk_changed, 0
 
-        if not pending_urls:
-            return
+    pending_urls: list[tuple[str, Path]] = []
+    with _cloning_lock:
+        for url, target_dir in missing_urls:
+            if url not in _cloning_plugin_urls:
+                _cloning_plugin_urls.add(url)
+                pending_urls.append((url, target_dir))
 
-        def _bg_clone():
-            for url, target_dir in pending_urls:
-                try:
-                    clone_res = subprocess.run(
-                        ["git", "clone", "--recursive", url, str(target_dir)],
-                        cwd=str(nodes_dir),
+    if not pending_urls:
+        return disk_changed, 0
+
+    def _bg_clone():
+        for url, target_dir in pending_urls:
+            try:
+                clone_res = subprocess.run(
+                    ["git", "clone", "--recursive", url, str(target_dir)],
+                    cwd=str(nodes_dir),
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                )
+                if clone_res.returncode != 0:
+                    log.warning(
+                        "[cloud_backup] 导入后后台克隆插件 %s 失败 (code=%s): %s",
+                        url,
+                        clone_res.returncode,
+                        (clone_res.stderr or clone_res.stdout or "").strip(),
+                    )
+                    continue
+                req_file = target_dir / "requirements.txt"
+                if req_file.is_file():
+                    from .deploy_engine import _detect_python
+                    py = _detect_python()
+                    pip_res = subprocess.run(
+                        [py, "-m", "pip", "install", "--no-cache-dir", "-r", str(req_file)],
                         capture_output=True,
                         text=True,
-                        timeout=180,
+                        timeout=300,
                     )
-                    if clone_res.returncode != 0:
+                    if pip_res.returncode != 0:
                         log.warning(
-                            "[cloud_backup] 导入后后台克隆插件 %s 失败 (code=%s): %s",
+                            "[cloud_backup] 导入后安装插件依赖 %s 失败 (code=%s): %s",
                             url,
-                            clone_res.returncode,
-                            (clone_res.stderr or clone_res.stdout or "").strip(),
+                            pip_res.returncode,
+                            (pip_res.stderr or pip_res.stdout or "").strip(),
                         )
-                        continue
-                    req_file = target_dir / "requirements.txt"
-                    if req_file.is_file():
-                        from .deploy_engine import _detect_python
-                        py = _detect_python()
-                        pip_res = subprocess.run(
-                            [py, "-m", "pip", "install", "--no-cache-dir", "-r", str(req_file)],
-                            capture_output=True,
-                            text=True,
-                            timeout=300,
-                        )
-                        if pip_res.returncode != 0:
-                            log.warning(
-                                "[cloud_backup] 导入后安装插件依赖 %s 失败 (code=%s): %s",
-                                url,
-                                pip_res.returncode,
-                                (pip_res.stderr or pip_res.stdout or "").strip(),
-                            )
-                except Exception as exc:
-                    log.warning("[cloud_backup] 导入后后台安装插件 %s 失败: %s", url, exc)
-                finally:
-                    with _cloning_lock:
-                        _cloning_plugin_urls.discard(url)
+            except Exception as exc:
+                log.warning("[cloud_backup] 导入后后台安装插件 %s 失败: %s", url, exc)
+            finally:
+                with _cloning_lock:
+                    _cloning_plugin_urls.discard(url)
 
-        threading.Thread(target=_bg_clone, daemon=True, name="import-plugin-clone").start()
+    threading.Thread(target=_bg_clone, daemon=True, name="import-plugin-clone").start()
+    return disk_changed, len(pending_urls)
 
 
 _cached_gpu_name: str | None = None

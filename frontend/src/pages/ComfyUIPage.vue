@@ -8,6 +8,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiFetch } from '@/composables/useApiFetch'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import { useTunnelServiceUrl } from '@/composables/useTunnelServiceUrl'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useExecTracker } from '@/composables/useExecTracker'
@@ -73,8 +74,7 @@ const isOnline = computed(() => !!status.value?.online && !pendingStartAt.value)
 const queuePending = computed(() => status.value?.queue_pending || 0)
 const queueTotal = computed(() => (status.value?.queue_running || 0) + (status.value?.queue_pending || 0))
 
-const comfyUrl = ref('')
-const tunnelLoaded = ref(false)
+const { tunnelUrl: comfyUrl, tunnelLoaded, loadTunnelUrl: loadComfyUrl } = useTunnelServiceUrl('comfyui')
 const effectiveComfyUrl = computed(() => {
   if (!isOnline.value) return ''
   if (comfyUrl.value) return comfyUrl.value
@@ -93,28 +93,6 @@ const addressHost = computed(() => {
     return url.replace(/^https?:\/\//, '').split('/')[0]
   }
 })
-
-async function loadComfyUrl() {
-  try {
-    const d = await get<{
-      effective_status?: string
-      urls?: Record<string, string>
-      public?: { urls?: Record<string, string> }
-    }>(
-      '/api/tunnel/status',
-      { silent: true },
-    )
-    if (d?.effective_status !== 'online') {
-      comfyUrl.value = ''
-      return
-    }
-    const urls: Record<string, string> = { ...(d?.urls || {}), ...(d?.public?.urls || {}) }
-    const hit = Object.entries(urls).find(([name]) => name.toLowerCase().includes('comfyui'))
-    comfyUrl.value = hit ? hit[1] : ''
-  } finally {
-    tunnelLoaded.value = true
-  }
-}
 
 let statusAppliedAt = 0
 async function loadStatus() {

@@ -287,19 +287,8 @@ def _run_deploy(config):
         _step_plugins(config, PY)
         _step_sync_assets(config)
         _step_start_services(config, cfg, PY)
-        from .model_meta_store import reconcile_model_index
-
-        def _post_deploy_reconcile_models():
-            try:
-                reconcile_model_index()
-            except Exception:
-                pass
-
-        threading.Thread(
-            target=_post_deploy_reconcile_models,
-            name="post-deploy-model-reconcile",
-            daemon=True,
-        ).start()
+        from .model_meta_store import reconcile_model_index_async
+        reconcile_model_index_async(name="post-deploy-model-reconcile")
 
     except Exception as e:
         _deploy_log(f"部署失败: {e}", "error")

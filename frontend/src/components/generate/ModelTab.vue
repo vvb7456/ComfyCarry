@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useGenerateStore } from '@/stores/generate'
 import { GenerateModelKey, GenerateOptionsKey } from '@/composables/generate/keys'
 import { packagingOf } from '@/composables/generate/useGenerateOptions'
+import { needsVideoStartFrame, validateBaseReadiness, validateRefMedia } from '@/composables/generate/validateRun'
 import { useControlNetOrchestration } from '@/composables/generate/useControlNetOrchestration'
 import { CN_TYPES, PP_PARAMS_DEF } from '@/composables/generate/useControlNet'
 import { useModelModalManager } from '@/composables/generate/useModelModalManager'
@@ -88,13 +89,7 @@ const videoMode = computed(() => state.value.video?.mode ?? state.value.mode)
 //  - 条目内双模式 (wan22_5b/minimax_h3): 仅 i2v 模式渲染 (文生模式下左栏整块消失)
 //  - 无 videoModes 的条目: 按 modelType 的 t2v 语义判断 (wan22_t2v = 纯文生不渲染,
 //    wan22_i2v 等其余视频条目恒渲染)。原硬编码 'wan22_t2v' 判据由该语义泛化覆盖。
-const showStartFrame = computed(() => {
-  if (!isVideo.value) return false
-  // Ref2VA 参考生成条目无起始画面 (左媒体栏让位给 RefMediaPanel)
-  if (videoMode.value === 'ref') return false
-  if (config.value.videoModes?.length) return videoMode.value === 'i2v'
-  return !props.modelType.includes('t2v')
-})
+const showStartFrame = computed(() => needsVideoStartFrame(config.value, state.value))
 
 // 末帧挂载判定 (MiniMax H3 首尾帧): 仅 minimax_h3 且 i2v 模式时渲染。
 // 其余架构恒 false (不渲染), 末帧是可选项, 不阻断生成。
@@ -428,50 +423,20 @@ watch([() => options.clips.value, () => options.vaes.value, () => store.activeMo
 // 返回空串 = 可以生成; 非空 = 禁用原因 (已翻译文案)。
 const runBlockedReason = computed<string>(() => {
   const st = state.value
-  const pkg = selectedPackaging.value
-
-  // 双 UNet: 两个槽独立选择, 必须都填且互异 —— 只填一个是常见中间态, 要能说清缺什么
-  if (config.value.dualUnet) {
-    if (!st.unetHigh || !st.unetLow) return t('generate.error.no_unet_pair')
-    if (st.unetHigh === st.unetLow) return t('generate.error.video_same_unet')
-  } else {
-    const modelPicked = pkg === 'split' ? !!st.unet : !!st.checkpoint
-    if (!modelPicked) return t('generate.error.no_checkpoint')
-  }
-
-  if (showStartFrame.value && !st.video?.refImage
-    && !(config.value.controlNetEnabled && Object.values(st.controlNets).some(cn => cn.enabled))) return t('generate.error.no_start_frame')
-
-  // 1b'. Ref2VA 参考生成: 至少一个参考素材 (图/视频/音频均可) → 软禁用 + 点击 toast。
-  //      音频不能作为唯一参考 (官方约束) → 同样软禁用。
-  if (showRefPanel.value) {
-    const refs = videoRefs.value
-    if (!refs.length) return t('generate.error.minimax_h3_refs_required')
-    if (isVideo.value && refs.every(r => r.type === 'audio')) return t('generate.error.minimax_h3_refs_audio_requires_visual')
-  }
-
-  // 1c. 模块已启用但依赖缺件。开关本身会拦, 但 enabled 是持久化的 —— 上次开着、
-  // 这次模型被删/换了架构 (专用 CN 模型按 branch 分家) 都会留下开着却跑不了的状态。
-  for (const cnKey of CN_TYPES) {
-    if (config.value.controlNetEnabled && st.controlNets[cnKey]?.enabled && !cnModelsReady(cnKey)) {
-      return t(`generate.controlnet.need_download_${cnKey}`)
+  return validateBaseReadiness(st, config.value, selectedPackaging.value, t, () => {
+    // 模块已启用但依赖缺件：enabled 是持久化的，模型删除或切换后可能残留已开启却缺件的状态
+    for (const cnKey of CN_TYPES) {
+      if (config.value.controlNetEnabled && st.controlNets[cnKey]?.enabled && !cnModelsReady(cnKey)) {
+        return t(`generate.controlnet.need_download_${cnKey}`)
+      }
     }
-  }
-  if (st.upscale.enabled && !depUpscale.ready.value) return t('generate.upscale.need_model')
-  if (st.faceDetailer.enabled && !depFace.ready.value) return t('generate.face.need_model')
-
-  if (compStatus.has.value && !compStatus.ready.value) {
-    return t('generate.error.components_not_ready')
-  }
-
-  if (pkg !== 'split') return ''
-
-  const isH3 = props.modelType === 'minimax_h3' || props.modelType === 'minimax_h3_ref'
-  if (!st.clip || !st.vae || (config.value.dualClip && !st.clip2) || (isH3 && !st.audioVae)) {
-    return t(isH3 ? 'generate.error.minimax_h3_te_vae_required' : 'generate.error.no_split_models')
-  }
-
-  return ''
+    if (st.upscale.enabled && !depUpscale.ready.value) return t('generate.upscale.need_model')
+    if (st.faceDetailer.enabled && !depFace.ready.value) return t('generate.face.need_model')
+    if (compStatus.has.value && !compStatus.ready.value) {
+      return t('generate.error.components_not_ready')
+    }
+    return ''
+  })
 })
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -563,8 +528,7 @@ async function guideToProblem() {
   }
 
   if (showRefPanel.value) {
-    const refs = videoRefs.value
-    if (!refs.length || (isVideo.value && refs.every(r => r.type === 'audio'))) {
+    if (validateRefMedia(videoRefs.value, { isVideo: isVideo.value, referenceLimit: config.value.referenceLimit }, t)) {
       await flashTargets(['[data-guide="ref-media"]'])
       return
     }
@@ -616,17 +580,6 @@ async function guideToProblem() {
       focusSelector: '[data-guide="positive-textarea"]',
     })
     return
-  }
-
-  if (showRefPanel.value) {
-    const refs = videoRefs.value
-    const img = refs.filter(r => r.type === 'image').length
-    const vid = refs.filter(r => r.type === 'video').length
-    const aud = refs.filter(r => r.type === 'audio').length
-    if (img > 9 || vid > 3 || aud > 3 || refs.length > 12) {
-      await flashTargets(['[data-guide="ref-media"]'])
-      return
-    }
   }
 
   if (config.value.controlNetEnabled) {

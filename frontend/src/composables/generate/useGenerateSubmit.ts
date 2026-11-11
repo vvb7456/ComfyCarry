@@ -8,6 +8,7 @@ import { usePromptSettings } from '@/composables/generate/usePromptSettings'
 import { normalizePrompt } from '@/utils/prompt'
 import { requiredLoras } from '@/config/component-registry'
 import { packagingOf } from '@/composables/generate/useGenerateOptions'
+import { validateBaseReadiness } from '@/composables/generate/validateRun'
 import type { GenerateOptionsReturn } from '@/composables/generate/useGenerateOptions'
 import type { ExecState } from '@/composables/useExecTracker'
 
@@ -77,84 +78,12 @@ export function useGenerateSubmit(
 
     const { activeConfig, selectedPackaging } = resolvePackaging()
 
-    if (activeConfig?.mediaType === 'video') {
-      const variant = videoVariant(activeConfig.runtimeKey!)
-      const isH3 = variant === 'h3' || variant === 'h3ref'
-      if (variant && variant !== '5b' && !isH3) {
-        if (!state.unetHigh || !state.unetLow) {
-          return fail(t('generate.error.no_unet_pair'))
-        }
-        // 互异: v6 起两个槽由用户各自独立选择, 完全可能选中同一个文件 (这条校验因此是
-        // 载荷性的, 不再只是防脏数据)。后端也会拦 (400), 这里前置以少一次往返。
-        if (state.unetHigh === state.unetLow) {
-          return fail(t('generate.error.video_same_unet'))
-        }
-      } else {
-        if (!state.unet) {
-          return fail(t(isH3 ? 'generate.error.minimax_h3_unet_required' : 'generate.error.no_split_models'))
-        }
-      }
-      // TE / VAE 必填; H3 另需音频 VAE (音视频一体必需件)
-      if (isH3) {
-        if (!state.clip || !state.vae || !state.audioVae) {
-          return fail(t('generate.error.minimax_h3_te_vae_required'))
-        }
-      } else if (!state.clip || !state.vae) {
-        return fail(t('generate.error.no_split_models'))
-      }
-      if (!state.positive.trim()) {
-        return fail(t('generate.error.no_prompt'))
-      }
-      // 起始画面: i2v 必填; 5b/h3 仅 mode=='i2v' 时必填 (h3 末帧可选, 不阻断)
-      const v = state.video
-      let needStart = variant === 'i2v'
-      if ((variant === '5b' || isH3) && v?.mode) {
-        needStart = v.mode === 'i2v'
-      }
-      if (needStart && !v?.refImage
-        && !(activeConfig.controlNetEnabled && Object.values(state.controlNets).some(cn => cn.enabled))) {
-        // 与 ModelTab.runBlockedReason 用同一条文案 (阻断只有一种表达)
-        return fail(t('generate.error.no_start_frame'))
-      }
-      // Ref2VA 参考生成: 参考素材非空 + 组内/总数配额前端预检 (后端同样拦截, 这里少一次往返)
-      if (variant === 'h3ref') {
-        const refs = v?.refs ?? []
-        if (refs.length === 0) {
-          return fail(t('generate.error.minimax_h3_refs_required'))
-        }
-        const img = refs.filter(r => r.type === 'image').length
-        const vid = refs.filter(r => r.type === 'video').length
-        const aud = refs.filter(r => r.type === 'audio').length
-        if (img > 9) {
-          return fail(t('generate.error.minimax_h3_refs_images_too_many', { limit: 9, current: img }))
-        }
-        if (vid > 3) {
-          return fail(t('generate.error.minimax_h3_refs_videos_too_many', { limit: 3, current: vid }))
-        }
-        if (aud > 3) {
-          return fail(t('generate.error.minimax_h3_refs_audios_too_many', { limit: 3, current: aud }))
-        }
-        if (refs.length > 12) {
-          return fail(t('generate.error.minimax_h3_refs_total_too_many', { limit: 12, current: refs.length }))
-        }
-      }
-    } else {
-      if (selectedPackaging === 'split') {
-        if (!state.unet || !state.clip || !state.vae) {
-          return fail(t('generate.error.no_split_models'))
-        }
-        // DualCLIPLoader 架构 (flux1): 第二个文本编码器必填
-        if (activeConfig?.dualClip && !state.clip2) {
-          return fail(t('generate.error.no_split_models'))
-        }
-      } else {
-        if (!state.checkpoint) {
-          return fail(t('generate.error.no_checkpoint'))
-        }
-      }
-      if (!state.positive.trim()) {
-        return fail(t('generate.error.no_prompt'))
-      }
+    if (activeConfig) {
+      const readinessErr = validateBaseReadiness(state, activeConfig, selectedPackaging, t)
+      if (readinessErr) return fail(readinessErr)
+    }
+    if (!state.positive.trim()) {
+      return fail(t('generate.error.no_prompt'))
     }
 
     const isCnSupported = (type: string) => Boolean(

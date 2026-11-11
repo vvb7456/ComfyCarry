@@ -563,15 +563,15 @@ sse.start()
       <PageHeaderRow :title="t('generate.title')">
         <!-- 产品导览手动入口: 裸 icon (省宽度), 纯前端覆盖层不因 frozen 禁用 -->
         <template #title-extra>
-          <button
-            type="button"
-            class="gen-tour-btn"
+          <BaseButton
+            variant="ghost"
+            size="xs"
+            icon-only
             :aria-label="t('generate.tour.open_aria')"
-            :title="t('generate.tour.open_aria')"
             @click="openTour"
           >
-            <MsIcon name="help_outline" size="xs" />
-          </button>
+            <MsIcon name="help_outline" />
+          </BaseButton>
         </template>
 
         <ArchSelector
@@ -690,24 +690,5 @@ sse.start()
   display: inline-flex;
   align-items: center;
   color: var(--c-caution);
-}
-
-/* 导览入口: 裸 icon 小按钮（先例 PromptEditor .prompt-help-btn）, 紧贴标题右侧 */
-.gen-tour-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--t3);
-  cursor: pointer;
-}
-.gen-tour-btn:hover {
-  color: var(--ac);
-  background: var(--bg3);
 }
 </style>
