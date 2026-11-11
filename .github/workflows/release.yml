@@ -181,7 +181,14 @@ jobs:
       #   data/  static/dist/...
       - name: Package dist
         if: steps.meta.outputs.should_build == 'true'
+        env:
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
         run: |
+          if [ -z "${GDRIVE_CLIENT_SECRET}" ]; then
+            echo "::error::未配置 GitHub Secret: GDRIVE_CLIENT_SECRET (请在仓库 Settings -> Secrets and variables -> Actions 中添加)"
+            exit 1
+          fi
+
           STAGE="$(mktemp -d)/comfycarry"
           mkdir -p "$STAGE/static"
 
@@ -191,6 +198,24 @@ jobs:
           cp workspace_manager.py "$STAGE/workspace_manager.py"
           cp -r static/dist "$STAGE/static/dist"
           cp favicon.ico "$STAGE/favicon.ico"
+
+          python3 - "$STAGE/comfycarry/config.py" <<'PY'
+          import base64, os, pathlib, re, sys
+
+          cfg_path = pathlib.Path(sys.argv[1])
+          b64 = base64.b64encode(os.environ["GDRIVE_CLIENT_SECRET"].strip().encode("utf-8")).decode("ascii")
+          text = cfg_path.read_text(encoding="utf-8")
+          new_text, count = re.subn(
+              r'^_BUILTIN_GDRIVE_SECRET_B64\s*=\s*""$',
+              f'_BUILTIN_GDRIVE_SECRET_B64 = "{b64}"',
+              text,
+              count=1,
+              flags=re.M,
+          )
+          if count != 1:
+              sys.exit("注入 _BUILTIN_GDRIVE_SECRET_B64 失败: 未找到占位符")
+          cfg_path.write_text(new_text, encoding="utf-8")
+          PY
 
           # 清理 pyc 缓存
           find "$STAGE" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
@@ -225,6 +250,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
+          target_commitish: ${{ steps.meta.outputs.commit_sha }}
           name: ComfyCarry ${{ steps.meta.outputs.tag }}
           body: ${{ steps.changelog.outputs.notes }}
           files: ${{ env.ASSET_NAME }}

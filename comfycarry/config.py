@@ -2,6 +2,7 @@
 所有模块共同依赖的基础层，不引入 Flask 依赖。
 """
 
+import base64
 import json
 import logging
 import os
@@ -527,13 +528,22 @@ SYNC_RULE_TEMPLATES = [
 _RCLONE_TOKEN_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 # Google Drive 官方内置 OAuth 凭据 (未填写高级自定义 Client ID 时自动使用)
-DEFAULT_GDRIVE_CLIENT_ID = os.environ.get(
-    "COMFYCARRY_GDRIVE_CLIENT_ID",
-    "138048408901-cidep01hacrqvuoik806bkqq3ngdmp60.apps.googleusercontent.com",
+# Secret 不存入仓库, 由 release.yml 打包时从 GitHub Secrets 注入 Base64 值
+_BUILTIN_GDRIVE_SECRET_B64 = ""
+
+DEFAULT_GDRIVE_CLIENT_ID = (
+    os.environ.get("COMFYCARRY_GDRIVE_CLIENT_ID")
+    or _get_config("gdrive_client_id")
+    or "138048408901-cidep01hacrqvuoik806bkqq3ngdmp60.apps.googleusercontent.com"
 )
-DEFAULT_GDRIVE_CLIENT_SECRET = os.environ.get(
-    "COMFYCARRY_GDRIVE_CLIENT_SECRET",
-    "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",
+DEFAULT_GDRIVE_CLIENT_SECRET = (
+    os.environ.get("COMFYCARRY_GDRIVE_CLIENT_SECRET")
+    or _get_config("gdrive_client_secret")
+    or (
+        base64.b64decode(_BUILTIN_GDRIVE_SECRET_B64).decode("utf-8")
+        if _BUILTIN_GDRIVE_SECRET_B64
+        else ""
+    )
 )
 
 REMOTE_TYPE_DEFS = {
