@@ -25,7 +25,7 @@ from .cf_runtime import active_cf_name, cf_metrics_port
 
 log = logging.getLogger(__name__)
 
-API_URL = "https://api.erocraft.org"
+API_URL = "https://comfycarry.erocraft.com"
 WORKER_AUTH_KEY = "ca8d5865f3ccfc1b305145fd4f4a3c17398e8f5dd7ac493428a3a8f44769ae5f"
 API_HEADERS_BASE = {"User-Agent": "ComfyCarry-Client/1.0"}
 

@@ -459,7 +459,10 @@ def platform_request(method: str, path: str, *, json_body: dict | None = None, t
         return 400, {"error_key": "settings.err.not_managed"}
     base_url, token = creds
     url = f"{base_url}/api/v1/agent{path}"
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "ComfyCarry-Client/1.0",
+    }
     try:
         resp = requests.request(
             method=method.upper(),

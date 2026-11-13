@@ -159,18 +159,27 @@ class AgentClient:
         rows = self.db.execute("SELECT seq,endpoint,payload FROM outbox WHERE endpoint=? ORDER BY seq", (endpoint,)).fetchall() if endpoint else self.db.execute("SELECT seq,endpoint,payload FROM outbox WHERE endpoint != 'usage' ORDER BY seq").fetchall()
         for seq, endpoint, payload in rows:
             try:
-                args = {"headers": {"Authorization": f"Bearer {self.token}"}, "json": json.loads(payload)}
+                args = {
+                    "headers": {
+                        "Authorization": f"Bearer {self.token}",
+                        "User-Agent": "ComfyCarry-Client/1.0",
+                    },
+                    "json": json.loads(payload),
+                }
                 url = f"{self.base_url}/api/v1/agent/{endpoint}"
                 response = (self.transport("POST", url, **args) if self.transport else
                             self.http.post(url, **args, timeout=(3, 7), allow_redirects=False))
                 status = response.status_code
-                data = response.json() if status == 200 else {}
-                if not isinstance(data, dict):
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = None
+                if status == 200 and not isinstance(data, dict):
                     raise ValueError("Invalid management acknowledgement")
             except (requests.RequestException, ValueError):
-                status, data = None, {}
+                status, data = None, None
             with self.db:
-                if status in {401, 403}:
+                if status == 401:
                     self._set("revoked", "1")
                     return status
                 if status == 200:
@@ -180,10 +189,11 @@ class AgentClient:
                         self._set("heartbeat_interval", interval)
                     self._set("retry_delay", 5)
                     self._set("retry_at", 0)
-                elif status in {400, 404, 409, 422}:
-                    # Invalid protocol must not silently discard a lifecycle transition.
+                elif status in {400, 403, 404, 409, 422} and isinstance(data, dict) and "detail" in data:
+                    # Backend JSON protocol/identity rejection stops reporting; non-JSON edge 403/404 retries.
                     self._set("revoked", "1")
-                    log.error("管理代理协议被拒绝，停止上报: HTTP %s", status)
+                    if status != 403:
+                        log.error("管理代理协议被拒绝，停止上报: HTTP %s", status)
                     return status
                 else:
                     delay = min(60, int(self._get("retry_delay", "5")))

@@ -32,7 +32,9 @@ __pycache__/
 .vscode/
 *.bak
 comfycarry-config-test.json
+scripts/comfycarry-windows.json
 .codex
+.wrangler/
 
 # Frontend 依赖 (CI/CD 构建)
 frontend/node_modules/
